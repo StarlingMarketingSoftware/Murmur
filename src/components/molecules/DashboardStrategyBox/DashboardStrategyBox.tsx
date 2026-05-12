@@ -508,7 +508,8 @@ const buildDraftSlots = (count: number): DraftSlot[] => {
 const DraftMessagesTopCard: FC<{
 	count: number;
 	campaignName?: string;
-}> = ({ count, campaignName }) => {
+	onClick?: () => void;
+}> = ({ count, campaignName, onClick }) => {
 	const slots = buildDraftSlots(count);
 	const [isHovered, setIsHovered] = useState(false);
 
@@ -519,26 +520,29 @@ const DraftMessagesTopCard: FC<{
 		<div
 			onMouseEnter={() => setIsHovered(true)}
 			onMouseLeave={() => setIsHovered(false)}
+			onClick={onClick}
+			onKeyDown={(e) => {
+				if (!onClick) return;
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					onClick();
+				}
+			}}
+			role={onClick ? 'button' : undefined}
+			tabIndex={onClick ? 0 : undefined}
 			style={{
 				position: 'relative',
 				width: '622px',
 				maxWidth: '100%',
 				height: '113px',
 				borderRadius: '6.389px',
-				opacity: isHovered ? 1 : 0.8,
 				background:
 					'linear-gradient(179deg, #BEA9ED 62.44%, rgba(169, 218, 237, 0.00) 120.01%)',
 				overflow: 'hidden',
 				flexShrink: 0,
-				transform: isHovered ? 'translateY(-1px)' : 'translateY(0)',
-				boxShadow: isHovered
-					? '0 14px 34px rgba(99, 74, 149, 0.22), inset 0 1px 0 rgba(255,255,255,0.42)'
-					: '0 0 0 rgba(99, 74, 149, 0)',
-				transition:
-					'opacity 240ms ease, transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 240ms ease',
-				willChange: 'opacity, transform',
 				WebkitMaskImage: containerMask,
 				maskImage: containerMask,
+				cursor: onClick ? 'pointer' : undefined,
 			}}
 		>
 			<div
@@ -546,23 +550,11 @@ const DraftMessagesTopCard: FC<{
 				style={{
 					position: 'absolute',
 					inset: 0,
-					background: '#BEA9ED',
-					opacity: isHovered ? 1 : 0,
+					background: '#000000',
+					opacity: isHovered ? 0.05 : 0,
 					transition: 'opacity 260ms ease',
 					pointerEvents: 'none',
-				}}
-			/>
-			<div
-				aria-hidden="true"
-				style={{
-					position: 'absolute',
-					inset: 0,
-					background:
-						'linear-gradient(90deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.08) 45%, rgba(255,255,255,0) 100%)',
-					opacity: isHovered ? 1 : 0,
-					transform: isHovered ? 'translateX(0)' : 'translateX(-18px)',
-					transition: 'opacity 260ms ease, transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1)',
-					pointerEvents: 'none',
+					zIndex: 1,
 				}}
 			/>
 			<div
@@ -611,12 +603,6 @@ const DraftMessagesTopCard: FC<{
 							fontFamily: 'Inter, sans-serif',
 							color: '#000',
 							zIndex: 1,
-							transform: isHovered ? 'translateY(-1px)' : 'translateY(0)',
-							boxShadow: isHovered
-								? '0 7px 18px rgba(81, 58, 132, 0.14)'
-								: '0 0 0 rgba(81, 58, 132, 0)',
-							transition:
-								'transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 240ms ease',
 						}}
 					>
 						<div
@@ -1297,7 +1283,9 @@ const ReviewDraftsTopCard: FC<{
 	count: number;
 	campaignId?: number;
 	campaignName?: string;
-}> = ({ count, campaignId, campaignName }) => {
+	onClick?: () => void;
+}> = ({ count, campaignId, campaignName, onClick }) => {
+	const [isHovered, setIsHovered] = useState(false);
 	const { data: drafts } = useGetEmails({
 		enabled: !!campaignId,
 		filters: campaignId
@@ -1334,6 +1322,18 @@ const ReviewDraftsTopCard: FC<{
 
 	return (
 		<div
+			onMouseEnter={() => setIsHovered(true)}
+			onMouseLeave={() => setIsHovered(false)}
+			onClick={onClick}
+			onKeyDown={(e) => {
+				if (!onClick) return;
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					onClick();
+				}
+			}}
+			role={onClick ? 'button' : undefined}
+			tabIndex={onClick ? 0 : undefined}
 			style={{
 				position: 'relative',
 				width: '622px',
@@ -1345,8 +1345,21 @@ const ReviewDraftsTopCard: FC<{
 				flexShrink: 0,
 				WebkitMaskImage: containerMask,
 				maskImage: containerMask,
+				cursor: onClick ? 'pointer' : undefined,
 			}}
 		>
+			<div
+				aria-hidden="true"
+				style={{
+					position: 'absolute',
+					inset: 0,
+					background: '#000000',
+					opacity: isHovered ? 0.05 : 0,
+					transition: 'opacity 260ms ease',
+					pointerEvents: 'none',
+					zIndex: 1,
+				}}
+			/>
 			<div
 				style={{
 					position: 'absolute',
@@ -1499,7 +1512,9 @@ const StackedReplyEmailCards: FC<{ emails: MockEmail[] }> = ({ emails }) => {
 const ReplyEmailsTopCard: FC<{
 	count: number;
 	realEmails?: InboundEmailWithRelations[];
-}> = ({ count, realEmails }) => {
+	onClick?: () => void;
+}> = ({ count, realEmails, onClick }) => {
+	const [isHovered, setIsHovered] = useState(false);
 	const emails: MockEmail[] = realEmails && realEmails.length > 0
 		? realEmails.slice(0, 4).map((e, i) => inboundToMockEmail(e, i + 1))
 		: getMockEmails(Math.min(count, MOCK_EMAILS.length));
@@ -1512,6 +1527,18 @@ const ReplyEmailsTopCard: FC<{
 
 	return (
 		<div
+			onMouseEnter={() => setIsHovered(true)}
+			onMouseLeave={() => setIsHovered(false)}
+			onClick={onClick}
+			onKeyDown={(e) => {
+				if (!onClick) return;
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					onClick();
+				}
+			}}
+			role={onClick ? 'button' : undefined}
+			tabIndex={onClick ? 0 : undefined}
 			style={{
 				position: 'relative',
 				width: '622px',
@@ -1524,8 +1551,21 @@ const ReplyEmailsTopCard: FC<{
 				flexShrink: 0,
 				WebkitMaskImage: containerMask,
 				maskImage: containerMask,
+				cursor: onClick ? 'pointer' : undefined,
 			}}
 		>
+			<div
+				aria-hidden="true"
+				style={{
+					position: 'absolute',
+					inset: 0,
+					background: '#000000',
+					opacity: isHovered ? 0.05 : 0,
+					transition: 'opacity 260ms ease',
+					pointerEvents: 'none',
+					zIndex: 1,
+				}}
+			/>
 			<div
 				style={{
 					position: 'absolute',
@@ -1781,20 +1821,37 @@ const DecorativeGlobeMap: FC = () => {
 // (i.e. no drafts to review and no inbound emails to reply to). 622×169 with
 // a darker green header bar over a lighter green body, hosting a 606×128
 // inset "window" that mirrors the dashboard's decorative spinning globe.
-const SearchContactsTopCard: FC = () => (
-	<div
-		style={{
-			position: 'relative',
-			width: '622px',
-			maxWidth: '100%',
-			height: '169px',
-			borderRadius: '6.39px',
-			background: '#C6EDA9',
-			overflow: 'hidden',
-			flexShrink: 0,
-		}}
-	>
+const SearchContactsTopCard: FC = () => {
+	const [isHovered, setIsHovered] = useState(false);
+
+	return (
 		<div
+			onMouseEnter={() => setIsHovered(true)}
+			onMouseLeave={() => setIsHovered(false)}
+			style={{
+				position: 'relative',
+				width: '622px',
+				maxWidth: '100%',
+				height: '169px',
+				borderRadius: '6.39px',
+				background: '#C6EDA9',
+				overflow: 'hidden',
+				flexShrink: 0,
+			}}
+		>
+			<div
+				aria-hidden="true"
+				style={{
+					position: 'absolute',
+					inset: 0,
+					background: '#000000',
+					opacity: isHovered ? 0.05 : 0,
+					transition: 'opacity 260ms ease',
+					pointerEvents: 'none',
+					zIndex: 1,
+				}}
+			/>
+			<div
 			style={{
 				position: 'absolute',
 				top: 0,
@@ -1834,7 +1891,8 @@ const SearchContactsTopCard: FC = () => (
 			<DecorativeGlobeMap />
 		</div>
 	</div>
-);
+	);
+};
 
 // Top-card element heights, kept in sync with the height: '…' values used
 // inside each *TopCard component above. Used to place subordinate pills below
@@ -1895,6 +1953,72 @@ type Props = {
 	mockState?: StrategyMockState;
 };
 
+const StrategyActionButton: FC<{
+	action: StrategyAction;
+	isTop: boolean;
+	onClick: () => void;
+}> = ({ action, isTop, onClick }) => {
+	const [isHovered, setIsHovered] = useState(false);
+
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			onMouseEnter={() => setIsHovered(true)}
+			onMouseLeave={() => setIsHovered(false)}
+			style={{
+				display: 'flex',
+				alignItems: 'center',
+				gap: '8px',
+				width: isTop ? '100%' : '620px',
+				maxWidth: '100%',
+				height: isTop ? undefined : '30px',
+				minHeight: isTop ? '52px' : undefined,
+				padding: isTop ? '12px 14px' : '0 14px',
+				borderRadius: '6px',
+				background: actionBackground(action, isTop),
+				border: 'none',
+				color: '#1A1A1A',
+				fontFamily: 'Inter, sans-serif',
+				fontSize: '14px',
+				fontWeight: isTop ? 600 : 500,
+				textAlign: 'left',
+				cursor: 'pointer',
+				position: 'relative',
+				overflow: 'hidden',
+			}}
+		>
+			<div
+				aria-hidden="true"
+				style={{
+					position: 'absolute',
+					inset: 0,
+					background: '#000000',
+					opacity: isHovered ? 0.05 : 0,
+					transition: 'opacity 260ms ease',
+					pointerEvents: 'none',
+				}}
+			/>
+			<span style={{ position: 'relative', zIndex: 1 }}>{actionLabel(action)}</span>
+			{action.campaign && (
+				<span
+					style={{
+						display: 'inline-flex',
+						alignItems: 'center',
+						background: '#FFFFFF',
+						borderRadius: '6px',
+						padding: '2px 6px',
+						position: 'relative',
+						zIndex: 1,
+					}}
+				>
+					<CampaignTitlePills title={action.campaign.name} size="table" />
+				</span>
+			)}
+		</button>
+	);
+};
+
 export const DashboardStrategyBox: FC<Props> = ({ className, mockState }) => {
 	const router = useRouter();
 	const { data: realCampaigns } = useGetCampaigns();
@@ -1922,12 +2046,32 @@ export const DashboardStrategyBox: FC<Props> = ({ className, mockState }) => {
 	const itemMarginTops = useMemo(() => computeItemMarginTops(actions), [actions]);
 
 	const handleActionClick = (action: StrategyAction) => {
-		if (action.kind === 'searchContacts' || action.kind === 'replyEmails') {
-			// search-focus + inbox navigation aren't wired up yet
+		if (action.kind === 'searchContacts') {
+			// search-focus isn't wired up yet
 			return;
 		}
+
+		if (action.kind === 'replyEmails') {
+			// Reply emails are aggregated across campaigns, so anchor the inbox
+			// navigation on the first inbound email's campaign (most recent).
+			// Fall back to the first known campaign so mock/empty-inbox states
+			// still navigate somewhere reasonable instead of silently no-op'ing.
+			const firstInboundCampaignId = inboundEmails?.find((e) => e.campaign?.id)?.campaign?.id;
+			const firstStrategyCampaignId = campaigns[0]?.id;
+			const targetCampaignId = firstInboundCampaignId ?? firstStrategyCampaignId;
+			if (targetCampaignId) {
+				router.push(
+					`${urls.murmur.campaign.detail(targetCampaignId)}?tab=inbox&silent=1`
+				);
+			}
+			return;
+		}
+
 		if (action.campaign) {
-			router.push(`${urls.murmur.campaign.detail(action.campaign.id)}?silent=1`);
+			const tab = action.kind === 'draftMessages' ? 'testing' : 'drafting';
+			router.push(
+				`${urls.murmur.campaign.detail(action.campaign.id)}?tab=${tab}&silent=1`
+			);
 		}
 	};
 
@@ -1984,6 +2128,7 @@ export const DashboardStrategyBox: FC<Props> = ({ className, mockState }) => {
 								<ReplyEmailsTopCard
 									count={action.count}
 									realEmails={useReal ? inboundEmails : undefined}
+									onClick={() => handleActionClick(action)}
 								/>
 							</div>
 						);
@@ -1995,6 +2140,7 @@ export const DashboardStrategyBox: FC<Props> = ({ className, mockState }) => {
 								<DraftMessagesTopCard
 									count={action.count}
 									campaignName={action.campaign?.name}
+									onClick={() => handleActionClick(action)}
 								/>
 							</div>
 						);
@@ -2007,6 +2153,7 @@ export const DashboardStrategyBox: FC<Props> = ({ className, mockState }) => {
 									count={action.count}
 									campaignId={action.campaign?.id}
 									campaignName={action.campaign?.name}
+									onClick={() => handleActionClick(action)}
 								/>
 							</div>
 						);
@@ -2025,44 +2172,11 @@ export const DashboardStrategyBox: FC<Props> = ({ className, mockState }) => {
 							key={`${action.kind}-${action.campaign?.id ?? 'none'}-${index}`}
 							style={wrapperStyle}
 						>
-							<button
-								type="button"
+							<StrategyActionButton
+								action={action}
+								isTop={isTop}
 								onClick={() => handleActionClick(action)}
-								style={{
-									display: 'flex',
-									alignItems: 'center',
-									gap: '8px',
-									width: isTop ? '100%' : '620px',
-									maxWidth: '100%',
-									height: isTop ? undefined : '30px',
-									minHeight: isTop ? '52px' : undefined,
-									padding: isTop ? '12px 14px' : '0 14px',
-									borderRadius: '6px',
-									background: actionBackground(action, isTop),
-									border: 'none',
-									color: '#1A1A1A',
-									fontFamily: 'Inter, sans-serif',
-									fontSize: '14px',
-									fontWeight: isTop ? 600 : 500,
-									textAlign: 'left',
-									cursor: 'pointer',
-								}}
-							>
-								<span>{actionLabel(action)}</span>
-								{action.campaign && (
-									<span
-										style={{
-											display: 'inline-flex',
-											alignItems: 'center',
-											background: '#FFFFFF',
-											borderRadius: '6px',
-											padding: '2px 6px',
-										}}
-									>
-										<CampaignTitlePills title={action.campaign.name} size="table" />
-									</span>
-								)}
-							</button>
+							/>
 						</div>
 					);
 				})}

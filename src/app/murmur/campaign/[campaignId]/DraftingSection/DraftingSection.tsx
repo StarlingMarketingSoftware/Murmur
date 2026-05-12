@@ -2264,19 +2264,35 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	useEffect(() => {
 		const wasLive = wasLivePreviewVisibleRef.current;
 
+		// `contactedContactIds` is a fresh Set on every render (its source arrays
+		// come from .filter() calls), so blindly assigning `new Set(...)` here
+		// would trigger an infinite render loop. Only update when the contents
+		// actually differ.
+		const syncBaselineToContacted = () => {
+			setVisualContactedBaselineIds((prev) => {
+				if (
+					prev.size === contactedContactIds.size &&
+					[...contactedContactIds].every((id) => prev.has(id))
+				) {
+					return prev;
+				}
+				return new Set(contactedContactIds);
+			});
+		};
+
 		if (isLivePreviewVisible && !wasLive) {
 			// Batch started: snapshot "already contacted" contacts so we only pace *new* drafts.
-			setVisualContactedBaselineIds(new Set(contactedContactIds));
-			setVisualContactedCompletedIds(new Set());
+			syncBaselineToContacted();
+			setVisualContactedCompletedIds((prev) => (prev.size === 0 ? prev : new Set()));
 			lastLivePreviewContactIdRef.current = null;
 		} else if (!isLivePreviewVisible && wasLive) {
 			// Batch ended/hidden: snap baseline to reality so the list reflects actual state.
-			setVisualContactedBaselineIds(new Set(contactedContactIds));
-			setVisualContactedCompletedIds(new Set());
+			syncBaselineToContacted();
+			setVisualContactedCompletedIds((prev) => (prev.size === 0 ? prev : new Set()));
 			lastLivePreviewContactIdRef.current = null;
 		} else if (!isLivePreviewVisible) {
 			// When no live preview playback is active, keep baseline synced with actual data.
-			setVisualContactedBaselineIds(new Set(contactedContactIds));
+			syncBaselineToContacted();
 		}
 
 		wasLivePreviewVisibleRef.current = isLivePreviewVisible;
