@@ -6,6 +6,30 @@ import { useCampaignsTable } from './useCampaignsTable';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { cn } from '@/utils';
 import type { CampaignDataTypeSummary } from '@/utils/campaignDataTypes';
+import { CampaignApiError, useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
+import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
+import { generateCampaignName } from '@/utils/campaignNames';
+import { toast } from 'sonner';
+
+const MAX_CAMPAIGNS = 5;
+
+const AddCampaignPlusIcon = () => (
+	<svg
+		width={7}
+		height={7}
+		viewBox="0 0 7 7"
+		fill="none"
+		xmlns="http://www.w3.org/2000/svg"
+		aria-hidden="true"
+	>
+		<path
+			d="M3.5 0.75V6.25M0.75 3.5H6.25"
+			stroke="currentColor"
+			strokeWidth={1.5}
+			strokeLinecap="round"
+		/>
+	</svg>
+);
 
 export type CampaignsMockFolder = {
 	name?: string;
@@ -22,9 +46,13 @@ export type CampaignsMockState = {
 
 type CampaignsTableProps = {
 	mockState?: CampaignsMockState;
+	onMockStateChange?: (next: CampaignsMockState | undefined) => void;
 };
 
-export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
+export const CampaignsTable: FC<CampaignsTableProps> = ({
+	mockState,
+	onMockStateChange,
+}) => {
 	// Treat all mobile orientations (portrait and landscape) as mobile for this table
 	const isMobile = useIsMobile();
 	const desktopMeasureRef = useRef<HTMLDivElement | null>(null);
@@ -78,6 +106,75 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
 		columns,
 		handleRowClick,
 	} = useCampaignsTable({ compactMetrics: shouldUseCompactMetrics, mockState });
+	const { mutateAsync: createContactList, isPending: isPendingCreateContactList } =
+		useCreateUserContactList({ suppressToasts: true });
+	const { mutateAsync: createCampaign, isPending: isPendingCreateCampaign } =
+		useCreateCampaign({ suppressToasts: true });
+	const isAddingCampaign = isPendingCreateContactList || isPendingCreateCampaign;
+	const campaignRows = Array.isArray(data) ? data : [];
+	const campaignCount = campaignRows.length;
+	const existingCampaignNames = campaignRows
+		.map((campaign) => {
+			const name = (campaign as { name?: unknown }).name;
+			return typeof name === 'string' ? name : null;
+		})
+		.filter((name): name is string => Boolean(name));
+	const shouldShowAddCampaignButton = !isPending && campaignCount < MAX_CAMPAIGNS;
+
+	const handleAddCampaign = async () => {
+		if (isAddingCampaign || !shouldShowAddCampaignButton) return;
+
+		const name = generateCampaignName(existingCampaignNames);
+
+		if (mockState && onMockStateChange) {
+			const folders = (mockState.folders ?? []).slice(0, MAX_CAMPAIGNS - 1);
+			onMockStateChange({
+				folders: [
+					...folders,
+					{
+						name,
+						draftCount: 0,
+						sentCount: 0,
+						updatedDaysAgo: 0,
+						newEmailCount: 0,
+					},
+				],
+			});
+			return;
+		}
+
+		try {
+			const contactList = await createContactList({ name, contactIds: [] });
+			await createCampaign({
+				name,
+				userContactLists: [contactList.id],
+			});
+		} catch (error) {
+			if (error instanceof CampaignApiError && error.code === 'CAMPAIGN_CAP_REACHED') {
+				toast.error(
+					error.message ||
+						`You have reached the maximum of ${MAX_CAMPAIGNS} active campaigns. Delete one to create a new one.`
+				);
+				return;
+			}
+
+			toast.error('Could not create campaign. Please try again.');
+		}
+	};
+
+	const addCampaignFooter = shouldShowAddCampaignButton ? (
+		<div className="mt-[20px] flex w-full justify-center">
+			<button
+				type="button"
+				onClick={handleAddCampaign}
+				disabled={isAddingCampaign}
+				aria-label="Add campaign"
+				className="flex h-[17px] w-[calc(100%-30px)] max-w-[624px] items-center justify-center rounded-[6px] bg-[#EDEDED] text-black transition-colors duration-150 hover:bg-[#E2E2E2] active:bg-[#DADADA] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-[#EDEDED] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+			>
+				<AddCampaignPlusIcon />
+			</button>
+		</div>
+	) : null;
 
 	const metricsSkeletonContainerClassName = cn(
 		'metrics-grid-container w-full items-center text-left',
@@ -174,7 +271,9 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
 
 	return (
 		<Card className="relative border-none bg-transparent w-full max-w-[1132px] mx-auto !p-0 !my-0">
-			{isPending && <Spinner size="medium" className="absolute top-2 right-2" />}
+			{(isPending || isAddingCampaign) && (
+				<Spinner size="medium" className="absolute top-2 right-2" />
+			)}
 			{shouldShowMobileFeatures && (
 				<CardHeader className="bg-transparent mobile-portrait-card-header">
 					<CardTitle
@@ -273,6 +372,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
 											scrollbarOffsetRight={0}
 											nativeScroll={false}
 											stickyHeader={false}
+											footerContent={addCampaignFooter}
 										/>
 									</div>
 								</div>
@@ -342,6 +442,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
 								scrollbarOffsetRight={-5}
 								nativeScroll={false}
 								stickyHeader={false}
+								footerContent={addCampaignFooter}
 							/>
 						)}
 					</div>

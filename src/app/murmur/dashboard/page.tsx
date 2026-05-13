@@ -9874,7 +9874,10 @@ const DashboardContent = () => {
 								/>
 							)}
 							{selectedActionBarIcon === 'folder' && (
-								<CampaignsTable mockState={campaignsMockState} />
+								<CampaignsTable
+									mockState={campaignsMockState}
+									onMockStateChange={setCampaignsMockState}
+								/>
 							)}
 							{selectedActionBarIcon === 'envelope' && (
 								<DashboardResponsesWidget enabled={isSignedIn === true} />

@@ -62,6 +62,7 @@ interface DataTableProps<TData, TValue> {
 	hidePagination?: boolean;
 	headerAction?: ReactNode;
 	headerInlineAction?: ReactNode;
+	footerContent?: ReactNode;
 }
 
 interface TableSortingButtonProps<TData> {
@@ -141,6 +142,7 @@ export function CustomTable<TData, TValue>({
 	hidePagination = false,
 	headerAction,
 	headerInlineAction,
+	footerContent,
 	useAutoLayout = false,
 	allowColumnOverflow = false,
 	containerClassName,
@@ -615,6 +617,7 @@ export function CustomTable<TData, TValue>({
 								)}
 							</TableBody>
 						</Table>
+						{footerContent}
 					</div>
 				</CustomScrollbar>
 			) : (
@@ -825,6 +828,7 @@ export function CustomTable<TData, TValue>({
 							)}
 						</TableBody>
 					</Table>
+					{footerContent}
 				</div>
 			)}
 			{!hidePagination && (
