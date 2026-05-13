@@ -1,4 +1,4 @@
-import { FC, type CSSProperties, useEffect, useRef, useState } from 'react';
+import { FC, type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import CustomTable from '../../../molecules/CustomTable/CustomTable';
@@ -9,9 +9,12 @@ import type { CampaignDataTypeSummary } from '@/utils/campaignDataTypes';
 import { CampaignApiError, useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { generateCampaignName } from '@/utils/campaignNames';
+import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import { toast } from 'sonner';
 
 const MAX_CAMPAIGNS = 5;
+const CAMPAIGN_FINDER_MIN_HEIGHT = 415;
+const CAMPAIGN_FINDER_VIEWPORT_BOTTOM_GAP = 0;
 
 const AddCampaignPlusIcon = () => (
 	<svg
@@ -31,12 +34,100 @@ const AddCampaignPlusIcon = () => (
 	</svg>
 );
 
+type CampaignFinderViewMode = 'single' | 'split';
+
+type CampaignFinderTopBarProps = {
+	searchValue: string;
+	onSearchChange: (value: string) => void;
+	viewMode: CampaignFinderViewMode;
+	onToggleViewMode: () => void;
+	splitPane?: 'left' | 'right';
+};
+
+const CampaignFinderTopBar = ({
+	searchValue,
+	onSearchChange,
+	viewMode,
+	onToggleViewMode,
+	splitPane,
+}: CampaignFinderTopBarProps) => {
+	const nextViewMode = viewMode === 'single' ? 'split' : 'single';
+	const showControls = splitPane !== 'left';
+
+	return (
+		<div
+			className="campaign-finder-topbar"
+			data-split-pane={splitPane}
+			data-custom-table-ignore-row-click="true"
+		>
+			<div className="campaign-finder-topbar-brand">MURMUR</div>
+			{showControls ? (
+				<>
+					<button
+						type="button"
+						className="campaign-finder-view-control"
+						data-custom-table-ignore-row-click="true"
+						data-view-mode={viewMode}
+						aria-pressed={viewMode === 'split'}
+						aria-label={`Switch campaign finder to ${nextViewMode} view`}
+						onClick={onToggleViewMode}
+					>
+						<div className="campaign-finder-view-icons">
+							<span
+								className={cn(
+									'campaign-finder-view-icon',
+									viewMode === 'single' && 'campaign-finder-view-icon-active'
+								)}
+							/>
+							<span
+								className={cn(
+									'campaign-finder-view-icon campaign-finder-view-icon-split',
+									viewMode === 'split' && 'campaign-finder-view-icon-active'
+								)}
+							/>
+						</div>
+						<span className="campaign-finder-view-label">View</span>
+					</button>
+					<div className="campaign-finder-topbar-search">
+						<SearchIconDesktop width={18} height={20} stroke="#717171" strokeWidth={1.8} />
+						<input
+							type="search"
+							className="campaign-finder-topbar-search-input"
+							aria-label="Search campaign contacts"
+							placeholder="Search"
+							value={searchValue}
+							autoComplete="off"
+							spellCheck={false}
+							onChange={(event) => onSearchChange(event.target.value)}
+							onKeyDown={(event) => {
+								if (event.key === 'Escape' && searchValue) {
+									event.preventDefault();
+									onSearchChange('');
+								}
+							}}
+						/>
+						{searchValue ? (
+							<button
+								type="button"
+								className="campaign-finder-topbar-search-clear"
+								aria-label="Clear campaign contact search"
+								onClick={() => onSearchChange('')}
+							/>
+						) : null}
+					</div>
+				</>
+			) : null}
+		</div>
+	);
+};
+
 export type CampaignsMockFolder = {
 	name?: string;
 	draftCount?: number;
 	sentCount?: number;
 	updatedDaysAgo?: number;
 	newEmailCount?: number;
+	contactCount?: number;
 	campaignDataTypes?: CampaignDataTypeSummary[];
 };
 
@@ -60,6 +151,12 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 	const [shouldScaleDesktopTable, setShouldScaleDesktopTable] = useState<boolean>(false);
 	const [mobileScale, setMobileScale] = useState<number>(1);
 	const [shouldScaleMobileTable, setShouldScaleMobileTable] = useState<boolean>(false);
+	const [leftFinderSearchQuery, setLeftFinderSearchQuery] = useState<string>('');
+	const [rightFinderSearchQuery, setRightFinderSearchQuery] = useState<string>('');
+	const [campaignFinderViewMode, setCampaignFinderViewMode] =
+		useState<CampaignFinderViewMode>('single');
+	const [campaignFinderHeight, setCampaignFinderHeight] =
+		useState<number>(CAMPAIGN_FINDER_MIN_HEIGHT);
 
 	const shouldShowMobileFeatures = isMobile === true;
 	const [isLandscape, setIsLandscape] = useState<boolean>(false);
@@ -100,26 +197,143 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 	// Use compact metrics on mobile OR on narrow desktop (<=960px)
 	const shouldUseCompactMetrics = shouldShowMobileFeatures || (!isMobile && isNarrowDesktop);
 
+	const leftCampaignsTable = useCampaignsTable({
+		compactMetrics: shouldUseCompactMetrics,
+		mockState,
+		enableFinder: !shouldShowMobileFeatures,
+		finderSearchQuery: leftFinderSearchQuery,
+	});
+	const rightCampaignsTable = useCampaignsTable({
+		compactMetrics: shouldUseCompactMetrics,
+		mockState,
+		enableFinder: !shouldShowMobileFeatures,
+		finderSearchQuery: rightFinderSearchQuery,
+	});
 	const {
 		data,
+		campaignRows: campaignDataRows,
 		isPending,
 		columns,
 		handleRowClick,
-	} = useCampaignsTable({ compactMetrics: shouldUseCompactMetrics, mockState });
+		isFinderOpen,
+	} = leftCampaignsTable;
+	const closeRightFinder = rightCampaignsTable.closeFinder;
 	const { mutateAsync: createContactList, isPending: isPendingCreateContactList } =
 		useCreateUserContactList({ suppressToasts: true });
 	const { mutateAsync: createCampaign, isPending: isPendingCreateCampaign } =
 		useCreateCampaign({ suppressToasts: true });
 	const isAddingCampaign = isPendingCreateContactList || isPendingCreateCampaign;
-	const campaignRows = Array.isArray(data) ? data : [];
+	const campaignRows = Array.isArray(campaignDataRows) ? campaignDataRows : [];
 	const campaignCount = campaignRows.length;
+	const isSplitFinderView = !shouldShowMobileFeatures && campaignFinderViewMode === 'split';
+	const isFinderLayoutOpen = isSplitFinderView
+		? leftCampaignsTable.isFinderOpen || rightCampaignsTable.isFinderOpen
+		: leftCampaignsTable.isFinderOpen;
 	const existingCampaignNames = campaignRows
 		.map((campaign) => {
 			const name = (campaign as { name?: unknown }).name;
 			return typeof name === 'string' ? name : null;
 		})
 		.filter((name): name is string => Boolean(name));
-	const shouldShowAddCampaignButton = !isPending && campaignCount < MAX_CAMPAIGNS;
+	const shouldShowAddCampaignButton =
+		!isPending && !isFinderLayoutOpen && !isSplitFinderView && campaignCount < MAX_CAMPAIGNS;
+	const campaignsTableScale = shouldScaleDesktopTable
+		? desktopScale
+		: shouldScaleMobileTable
+			? mobileScale
+			: 1;
+
+	useEffect(() => {
+		if (campaignFinderViewMode === 'split') {
+			if (!leftCampaignsTable.isFinderOpen && !rightCampaignsTable.isFinderOpen) {
+				setCampaignFinderViewMode('single');
+			}
+
+			if (!leftCampaignsTable.isFinderOpen && leftFinderSearchQuery) {
+				setLeftFinderSearchQuery('');
+			}
+
+			if (!rightCampaignsTable.isFinderOpen && rightFinderSearchQuery) {
+				setRightFinderSearchQuery('');
+			}
+
+			return;
+		}
+
+		if (!leftCampaignsTable.isFinderOpen && leftFinderSearchQuery) {
+			setLeftFinderSearchQuery('');
+		}
+
+		if (rightCampaignsTable.isFinderOpen) {
+			closeRightFinder();
+		}
+
+		if (rightFinderSearchQuery) {
+			setRightFinderSearchQuery('');
+		}
+	}, [
+		campaignFinderViewMode,
+		closeRightFinder,
+		leftCampaignsTable.isFinderOpen,
+		leftFinderSearchQuery,
+		rightCampaignsTable.isFinderOpen,
+		rightFinderSearchQuery,
+	]);
+
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+
+		if (!isFinderLayoutOpen || shouldShowMobileFeatures) {
+			setCampaignFinderHeight(CAMPAIGN_FINDER_MIN_HEIGHT);
+			return;
+		}
+
+		const el = desktopMeasureRef.current;
+		if (!el) return;
+
+		let raf: number | null = null;
+		const update = () => {
+			if (raf !== null) cancelAnimationFrame(raf);
+			raf = requestAnimationFrame(() => {
+				const rect = el.getBoundingClientRect();
+				const scaleFromLayout =
+					el.offsetWidth > 0 && rect.width > 0 ? rect.width / el.offsetWidth : 1;
+				const tableScale = shouldScaleDesktopTable ? campaignsTableScale : 1;
+				const scale = Math.max(0.1, scaleFromLayout * tableScale);
+				const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+				const availableHeight =
+					(viewportHeight - rect.top - CAMPAIGN_FINDER_VIEWPORT_BOTTOM_GAP) / scale;
+				const nextHeight = Math.max(
+					CAMPAIGN_FINDER_MIN_HEIGHT,
+					Math.floor(availableHeight)
+				);
+
+				setCampaignFinderHeight((current) =>
+					Math.abs(current - nextHeight) > 1 ? nextHeight : current
+				);
+			});
+		};
+
+		update();
+		window.addEventListener('resize', update);
+		window.addEventListener('scroll', update, true);
+		window.visualViewport?.addEventListener('resize', update);
+		const ro = 'ResizeObserver' in window ? new ResizeObserver(update) : null;
+		ro?.observe(el);
+
+		return () => {
+			if (raf !== null) cancelAnimationFrame(raf);
+			window.removeEventListener('resize', update);
+			window.removeEventListener('scroll', update, true);
+			window.visualViewport?.removeEventListener('resize', update);
+			ro?.disconnect();
+		};
+	}, [
+		campaignsTableScale,
+		isFinderLayoutOpen,
+		shouldScaleDesktopTable,
+		shouldShowMobileFeatures,
+	]);
 
 	const handleAddCampaign = async () => {
 		if (isAddingCampaign || !shouldShowAddCampaignButton) return;
@@ -137,6 +351,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 						sentCount: 0,
 						updatedDaysAgo: 0,
 						newEmailCount: 0,
+						contactCount: 0,
 					},
 				],
 			});
@@ -193,6 +408,35 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 	);
 	const metricBoxSkeletonClassName =
 		'metric-box inline-flex box-border items-center justify-center border-[0.799px] border-black truncate h-[20px] w-[80px] min-w-[80px] max-w-[80px] rounded-[6.389px] px-0 flex-none bg-black/10 animate-pulse font-inter font-medium text-[13.854px] leading-[17.186px]';
+	const renderCampaignLoadingCell = ({ column }: { column: { id: string } }) => {
+		if (column.id === 'metrics') {
+			return (
+				<div
+					className={metricsSkeletonContainerClassName}
+					style={metricsSkeletonContainerStyle}
+				>
+					<div className={metricSlotClassName}>
+						<div data-new-fill="skeleton" className={metricBoxSkeletonClassName} />
+					</div>
+					<div className={metricSlotClassName}>
+						<div data-draft-fill="skeleton" className={metricBoxSkeletonClassName} />
+					</div>
+					<div className={metricSlotClassName}>
+						<div data-sent-fill="skeleton" className={metricBoxSkeletonClassName} />
+					</div>
+					<div className={metricSlotClassName}>
+						<div data-updated-fill="skeleton" className={metricBoxSkeletonClassName} />
+					</div>
+				</div>
+			);
+		}
+
+		return (
+			<div className="flex items-center">
+				<div className="h-[16px] w-[70%] rounded bg-black/10 animate-pulse" />
+			</div>
+		);
+	};
 
 	// No orientation gating; we rely on device detection so landscape uses mobile layout too
 
@@ -263,11 +507,74 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 		return null;
 	}
 
-	const campaignsTableScale = shouldScaleDesktopTable
-		? desktopScale
-		: shouldScaleMobileTable
-			? mobileScale
-			: 1;
+	const handleToggleCampaignFinderViewMode = (sourcePane: 'left' | 'right' = 'left') => {
+		if (campaignFinderViewMode === 'single') {
+			if (leftCampaignsTable.openCampaignId !== null) {
+				rightCampaignsTable.openFinderForCampaign(leftCampaignsTable.openCampaignId);
+			}
+			setRightFinderSearchQuery(leftFinderSearchQuery);
+			setLeftFinderSearchQuery('');
+			setCampaignFinderViewMode('split');
+			return;
+		}
+
+		if (sourcePane === 'right' && rightCampaignsTable.openCampaignId !== null) {
+			leftCampaignsTable.openFinderForCampaign(rightCampaignsTable.openCampaignId);
+			setLeftFinderSearchQuery(rightFinderSearchQuery);
+		}
+
+		setCampaignFinderViewMode('single');
+	};
+
+	const campaignsTableStyle = {
+		['--campaigns-table-scale' as never]: campaignsTableScale,
+		['--campaigns-finder-height' as never]: `${campaignFinderHeight}px`,
+	} as CSSProperties;
+	const finderTopContent = isFinderOpen ? (
+		<CampaignFinderTopBar
+			searchValue={leftFinderSearchQuery}
+			onSearchChange={setLeftFinderSearchQuery}
+			viewMode={campaignFinderViewMode}
+			onToggleViewMode={() => handleToggleCampaignFinderViewMode('left')}
+		/>
+	) : undefined;
+	const renderDesktopCampaignsTable = (
+		tableState: ReturnType<typeof useCampaignsTable>,
+		topContent: ReactNode,
+		splitPane?: 'left' | 'right'
+	) => (
+		<CustomTable
+			variant="secondary"
+			containerClassName={cn(
+				'border-none rounded-[8px] my-campaigns-table desktop-campaigns-table !bg-[#F8F8F8] !mx-auto !py-[8px] !px-0 w-[654px] h-[253px]',
+				isNarrowDesktop && 'narrow-desktop-table',
+				(tableState.isFinderOpen || splitPane) && 'campaigns-finder-open',
+				splitPane && 'campaign-finder-split-table',
+				splitPane && `campaign-finder-split-table-${splitPane}`
+			)}
+			headerClassName="!bg-white [&_tr]:!bg-white [&_th]:!bg-white [&_th]:!border-0 [&_th]:!h-[28px] [&_tr]:!h-[28px] [&_th:first-child]:rounded-tl-[8px] [&_th:last-child]:rounded-tr-[8px] [&_th]:relative [&_th]:!overflow-visible"
+			rowClassName="!bg-transparent !border-0 hover:!bg-transparent group"
+			renderLoadingCell={renderCampaignLoadingCell}
+			handleRowClick={tableState.handleRowClick}
+			columns={tableState.columns}
+			data={tableState.data}
+			isLoading={tableState.isPending}
+			loadingRowCount={6}
+			noDataMessage="Start Your First Campaign"
+			topContent={topContent}
+			rowsPerPage={100}
+			displayRowsPerPage={false}
+			constrainHeight
+			hidePagination={true}
+			searchable={false}
+			useAutoLayout
+			useCustomScrollbar={true}
+			scrollbarOffsetRight={-5}
+			nativeScroll={false}
+			stickyHeader={false}
+			footerContent={splitPane ? null : addCampaignFooter}
+		/>
+	);
 
 	return (
 		<Card className="relative border-none bg-transparent w-full max-w-[1132px] mx-auto !p-0 !my-0">
@@ -301,9 +608,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 						data-ultra-narrow-scale={shouldScaleDesktopTable ? 'true' : undefined}
 						data-mobile-ultra-narrow-scale={shouldScaleMobileTable ? 'true' : undefined}
 						style={
-							{
-								['--campaigns-table-scale' as never]: campaignsTableScale,
-							} as React.CSSProperties
+							campaignsTableStyle
 						}
 					>
 						{shouldShowMobileFeatures ? (
@@ -377,73 +682,41 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 									</div>
 								</div>
 							</div>
+						) : isSplitFinderView ? (
+							<div
+								className="campaign-finder-split-shell"
+								data-custom-table-ignore-row-click="true"
+							>
+								<div className="campaign-finder-split-pane campaign-finder-split-pane-left">
+									{renderDesktopCampaignsTable(
+										leftCampaignsTable,
+										<CampaignFinderTopBar
+											searchValue={leftFinderSearchQuery}
+											onSearchChange={setLeftFinderSearchQuery}
+											viewMode={campaignFinderViewMode}
+											onToggleViewMode={() => handleToggleCampaignFinderViewMode('left')}
+											splitPane="left"
+										/>,
+										'left'
+									)}
+								</div>
+								<div className="campaign-finder-split-divider" aria-hidden="true" />
+								<div className="campaign-finder-split-pane campaign-finder-split-pane-right">
+									{renderDesktopCampaignsTable(
+										rightCampaignsTable,
+										<CampaignFinderTopBar
+											searchValue={rightFinderSearchQuery}
+											onSearchChange={setRightFinderSearchQuery}
+											viewMode={campaignFinderViewMode}
+											onToggleViewMode={() => handleToggleCampaignFinderViewMode('right')}
+											splitPane="right"
+										/>,
+										'right'
+									)}
+								</div>
+							</div>
 						) : (
-							<CustomTable
-								variant="secondary"
-								containerClassName={`border-none rounded-[8px] my-campaigns-table desktop-campaigns-table !bg-[#F8F8F8] !mx-auto !py-[8px] !px-0 w-[654px] h-[253px] ${
-									isNarrowDesktop ? 'narrow-desktop-table' : ''
-								}`}
-								headerClassName="!bg-white [&_tr]:!bg-white [&_th]:!bg-white [&_th]:!border-0 [&_th]:!h-[28px] [&_tr]:!h-[28px] [&_th:first-child]:rounded-tl-[8px] [&_th:last-child]:rounded-tr-[8px] [&_th]:relative [&_th]:!overflow-visible"
-								rowClassName="!bg-transparent !border-0 hover:!bg-transparent group"
-								renderLoadingCell={({ column }) => {
-									if (column.id === 'metrics') {
-										return (
-											<div
-												className={metricsSkeletonContainerClassName}
-												style={metricsSkeletonContainerStyle}
-											>
-												<div className={metricSlotClassName}>
-													<div
-														data-new-fill="skeleton"
-														className={metricBoxSkeletonClassName}
-													/>
-												</div>
-												<div className={metricSlotClassName}>
-													<div
-														data-draft-fill="skeleton"
-														className={metricBoxSkeletonClassName}
-													/>
-												</div>
-												<div className={metricSlotClassName}>
-													<div
-														data-sent-fill="skeleton"
-														className={metricBoxSkeletonClassName}
-													/>
-												</div>
-												<div className={metricSlotClassName}>
-													<div
-														data-updated-fill="skeleton"
-														className={metricBoxSkeletonClassName}
-													/>
-												</div>
-											</div>
-										);
-									}
-
-									return (
-										<div className="flex items-center">
-											<div className="h-[16px] w-[70%] rounded bg-black/10 animate-pulse" />
-										</div>
-									);
-								}}
-								handleRowClick={handleRowClick}
-								columns={columns}
-								data={data}
-								isLoading={isPending}
-								loadingRowCount={6}
-								noDataMessage="Start Your First Campaign"
-								rowsPerPage={100}
-								displayRowsPerPage={false}
-								constrainHeight
-								hidePagination={true}
-								searchable={false}
-								useAutoLayout
-								useCustomScrollbar={true}
-								scrollbarOffsetRight={-5}
-								nativeScroll={false}
-								stickyHeader={false}
-								footerContent={addCampaignFooter}
-							/>
+							renderDesktopCampaignsTable(leftCampaignsTable, finderTopContent)
 						)}
 					</div>
 				</div>

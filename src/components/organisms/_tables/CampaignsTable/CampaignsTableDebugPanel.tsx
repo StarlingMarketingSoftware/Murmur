@@ -16,6 +16,7 @@ const blankFolder = (index: number): CampaignsMockFolder => ({
 	sentCount: 0,
 	updatedDaysAgo: 0,
 	newEmailCount: 0,
+	contactCount: 0,
 });
 
 const buildState = (folders: CampaignsMockFolder[]): CampaignsMockState => ({
@@ -130,6 +131,11 @@ const FolderCard: FC<{
 					style={textInputStyle}
 				/>
 			</div>
+			<NumberField
+				label="Contacts"
+				value={folder.contactCount ?? 0}
+				onChange={(n) => patch({ contactCount: n })}
+			/>
 			<NumberField
 				label="Drafts"
 				value={folder.draftCount ?? 0}
@@ -290,9 +296,10 @@ export const CampaignsTableDebugPanel: FC<Props> = ({ value, onChange }) => {
 					</div>
 
 					<div style={{ color: '#888', marginTop: 8, lineHeight: 1.4 }}>
-						Drafts/Sent feed the metric pills. Updated controls the Updated
-						column color + label ("Today" at 0, then mm.dd). New Emails is
-						stored on the row for upcoming UI.
+						Contacts controls the count shown in the Finder's Contacts folder
+						when this campaign is expanded. Drafts/Sent feed the metric pills.
+						Updated controls the Updated column color + label ("Today" at 0,
+						then mm.dd). New Emails is stored on the row for upcoming UI.
 					</div>
 				</>
 			)}

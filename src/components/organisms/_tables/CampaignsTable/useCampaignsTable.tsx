@@ -1,7 +1,14 @@
-import { Campaign } from '@prisma/client';
+import type { Campaign, Contact } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
 import { Typography } from '@/components/ui/typography';
-import { useDeleteCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
+import {
+	useDeleteCampaign,
+	useGetCampaign,
+	useGetCampaigns,
+} from '@/hooks/queryHooks/useCampaigns';
+import { useGetContacts } from '@/hooks/queryHooks/useContacts';
+import { useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import {
@@ -21,6 +28,7 @@ import type { CampaignsMockState } from './CampaignsTable';
 import {
 	type CampaignDataTypeCategoryKey,
 	type CampaignDataTypeSummary,
+	getCampaignDataCategoryFromText,
 	getCampaignDataCategoryLabel,
 } from '@/utils/campaignDataTypes';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
@@ -31,13 +39,150 @@ import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { getCityIconProps } from '@/utils/cityIcons';
+import { EmailStatus } from '@/constants/prismaEnums';
+import { stateBadgeColorMap } from '@/constants/ui';
+import { getStateAbbreviation } from '@/utils/string';
+import type { ContactWithName } from '@/types/contact';
+import type { EmailWithRelations, InboundEmailWithRelations } from '@/types';
 
 type CampaignWithCounts = Campaign & {
 	draftCount?: number;
 	sentCount?: number;
 	newEmailCount?: number;
+	contactCount?: number;
 	campaignDataTypes?: CampaignDataTypeSummary[];
 };
+
+type FinderFolderKey = 'contacts' | 'drafts' | 'inbox' | 'sent' | 'archive';
+
+type FinderContactItem = {
+	id: string | number;
+	name: string;
+	personName?: string | null;
+	company?: string | null;
+	title?: string | null;
+	headline?: string | null;
+	category?: {
+		key: CampaignDataTypeCategoryKey;
+		label: string;
+	} | null;
+	city?: string | null;
+	state?: string | null;
+	email?: string | null;
+};
+
+type FinderFolder = {
+	key: FinderFolderKey;
+	label: string;
+	color: string;
+	items: FinderContactItem[];
+};
+
+type FinderTableRow = {
+	id: string;
+	__rowType: 'finder';
+	__customTableColSpanAll: true;
+	parentCampaignId: number;
+	name: string;
+	draftCount: number;
+	sentCount: number;
+	newEmailCount: number;
+	updatedAt: Date;
+};
+
+type CampaignTableRow = CampaignWithCounts | FinderTableRow;
+
+type FinderContactSource = Partial<Contact> & {
+	name?: string | null;
+	curatedCategory?: string | null;
+	curatedDisplayLabel?: string | null;
+};
+
+const isFinderTableRow = (row: CampaignTableRow): row is FinderTableRow =>
+	(row as FinderTableRow).__rowType === 'finder';
+
+const FINDER_FOLDER_CONFIG: Array<Pick<FinderFolder, 'key' | 'label' | 'color'>> = [
+	{ key: 'contacts', label: 'Contacts', color: '#CC5858' },
+	{ key: 'drafts', label: 'Drafts', color: '#FAC25F' },
+	{ key: 'inbox', label: 'Inbox', color: '#3DB3DE' },
+	{ key: 'sent', label: 'Sent', color: '#67CA51' },
+	{ key: 'archive', label: 'Archive', color: '#ACACAC' },
+];
+
+const MOCK_FINDER_CONTACTS: FinderContactItem[] = [
+	{
+		id: 'mock-contact-1',
+		name: 'Mina Park',
+		company: 'Juniper Room',
+		title: 'Beverage Director',
+		city: 'Brooklyn',
+		state: 'NY',
+		email: 'mina@juniper.example',
+	},
+	{
+		id: 'mock-contact-2',
+		name: 'Elias Stone',
+		company: 'North Fork Cellars',
+		title: 'Owner',
+		city: 'Southold',
+		state: 'NY',
+		email: 'elias@northfork.example',
+	},
+	{
+		id: 'mock-contact-3',
+		name: 'Priya Rao',
+		company: 'Table Twelve',
+		title: 'General Manager',
+		city: 'Philadelphia',
+		state: 'PA',
+		email: 'priya@tabletwelve.example',
+	},
+	{
+		id: 'mock-contact-4',
+		name: 'Caleb Brooks',
+		company: 'Harbor House',
+		title: 'Events Lead',
+		city: 'Chicago',
+		state: 'IL',
+		email: 'caleb@harborhouse.example',
+	},
+	{
+		id: 'mock-contact-5',
+		name: 'Ana Torres',
+		company: 'Mesa Verde',
+		title: 'Wine Buyer',
+		city: 'Austin',
+		state: 'TX',
+		email: 'ana@mesaverde.example',
+	},
+	{
+		id: 'mock-contact-6',
+		name: 'Nolan Reed',
+		company: 'Cedar & Rye',
+		title: 'Bar Manager',
+		city: 'Nashville',
+		state: 'TN',
+		email: 'nolan@cedarrye.example',
+	},
+	{
+		id: 'mock-contact-7',
+		name: 'Sofia Kim',
+		company: 'Golden Hour',
+		title: 'Hospitality Director',
+		city: 'Los Angeles',
+		state: 'CA',
+		email: 'sofia@goldenhour.example',
+	},
+	{
+		id: 'mock-contact-8',
+		name: 'Marcus Lee',
+		company: 'Blue Note Room',
+		title: 'Talent Buyer',
+		city: 'New Orleans',
+		state: 'LA',
+		email: 'marcus@bluenote.example',
+	},
+];
 
 const DEFAULT_MOCK_FOLDER_NAMES = ['Orion', 'Leo', 'Pieces', 'Capricorn', 'Sagittarius'];
 const CAMPAIGN_FOLDER_NAME_BOX_COLORS = [
@@ -69,6 +214,16 @@ const DEFAULT_MOCK_CAMPAIGN_DATA_TYPES: CampaignDataTypeSummary[] = [
 	{ kind: 'state', key: 'CA', label: 'CA', count: 1 },
 ];
 
+const FINDER_CONTACT_CATEGORY_LABELS: Record<CampaignDataTypeCategoryKey, string> = {
+	wine_beer_spirits: 'Wine, Beer, Spirits',
+	restaurants: 'Restaurant',
+	coffee_shops: 'Coffee Shop',
+	music_venues: 'Music Venue',
+	music_festivals: 'Music Festival',
+	wedding: 'Wedding',
+	radio: 'Radio',
+};
+
 const getCampaignFolderPaletteIndex = (rowIndex: number) => {
 	const paletteLength = CAMPAIGN_FOLDER_NAME_BOX_COLORS.length;
 	return ((rowIndex % paletteLength) + paletteLength) % paletteLength;
@@ -91,10 +246,324 @@ const buildMockCampaignRows = (mockState: CampaignsMockState): CampaignWithCount
 			draftCount: Math.max(0, folder.draftCount ?? 0),
 			sentCount: Math.max(0, folder.sentCount ?? 0),
 			newEmailCount: Math.max(0, folder.newEmailCount ?? 0),
+			contactCount: Math.max(0, folder.contactCount ?? 0),
 			campaignDataTypes: folder.campaignDataTypes ?? DEFAULT_MOCK_CAMPAIGN_DATA_TYPES,
 			updatedAt,
 		} as unknown as CampaignWithCounts;
 	});
+};
+
+const getFinderContactPersonName = (contact: FinderContactSource): string | null => {
+	const firstLast = [contact.firstName, contact.lastName]
+		.map((part) => (typeof part === 'string' ? part.trim() : ''))
+		.filter(Boolean)
+		.join(' ');
+
+	return contact.name?.trim() || firstLast || null;
+};
+
+const getFinderContactName = (contact: FinderContactSource): string => {
+	return (
+		getFinderContactPersonName(contact) ||
+		contact.company?.trim() ||
+		contact.email?.trim() ||
+		'Unknown Contact'
+	);
+};
+
+const getFinderContactCategory = (
+	contact: FinderContactSource
+): FinderContactItem['category'] => {
+	const displayLabel = contact.curatedDisplayLabel?.trim();
+	const categorySources = [
+		contact.curatedCategory,
+		contact.curatedDisplayLabel,
+		contact.title,
+		contact.headline,
+	];
+
+	for (const source of categorySources) {
+		const categoryKey = getCampaignDataCategoryFromText(source);
+		if (!categoryKey) continue;
+
+		return {
+			key: categoryKey,
+			label: displayLabel || FINDER_CONTACT_CATEGORY_LABELS[categoryKey],
+		};
+	}
+
+	return null;
+};
+
+const toFinderContactItem = (
+	contact: FinderContactSource,
+	fallbackId: string
+): FinderContactItem => ({
+	id: typeof contact.id === 'number' ? contact.id : fallbackId,
+	name: getFinderContactName(contact),
+	personName: getFinderContactPersonName(contact),
+	company: contact.company ?? null,
+	title: contact.title ?? null,
+	headline: contact.headline ?? null,
+	category: getFinderContactCategory(contact),
+	city: contact.city ?? null,
+	state: contact.state ?? null,
+	email: contact.email ?? null,
+});
+
+const buildMockFinderItems = (
+	count: number,
+	folderKey: FinderFolderKey
+): FinderContactItem[] => {
+	const safeCount = Math.max(0, count);
+	return Array.from({ length: safeCount }, (_, index) => {
+		const contact = MOCK_FINDER_CONTACTS[index % MOCK_FINDER_CONTACTS.length];
+		return {
+			...contact,
+			id: `mock-${folderKey}-${index + 1}`,
+		};
+	});
+};
+
+const getUniqueContactItemsFromEmails = (
+	emails: Array<Pick<EmailWithRelations, 'contact'> | Pick<InboundEmailWithRelations, 'contact'>> | undefined,
+	folderKey: FinderFolderKey
+): FinderContactItem[] => {
+	const seenContactIds = new Set<number>();
+	const items: FinderContactItem[] = [];
+
+	emails?.forEach((email, index) => {
+		const contact = email.contact as FinderContactSource | null | undefined;
+		if (!contact) return;
+
+		if (typeof contact.id === 'number') {
+			if (seenContactIds.has(contact.id)) return;
+			seenContactIds.add(contact.id);
+		}
+
+		items.push(toFinderContactItem(contact, `${folderKey}-${index + 1}`));
+	});
+
+	return items;
+};
+
+const normalizeFinderSearchText = (value: string | null | undefined): string =>
+	(value ?? '').trim().toLowerCase();
+
+const finderContactMatchesSearch = (item: FinderContactItem, normalizedQuery: string): boolean => {
+	if (!normalizedQuery) return true;
+
+	return [item.personName, item.name, item.company].some((value) =>
+		normalizeFinderSearchText(value).includes(normalizedQuery)
+	);
+};
+
+const getMetricSortValue = (campaign: CampaignWithCounts, sortKey: MetricSortKey) => {
+	if (sortKey === 'sent') return campaign.sentCount ?? 0;
+	if (sortKey === 'updated') {
+		const timestamp = new Date(campaign.updatedAt as string | number | Date).getTime();
+		return Number.isFinite(timestamp) ? timestamp : 0;
+	}
+	return campaign.draftCount ?? 0;
+};
+
+const sortCampaignsByMetric = (
+	campaigns: CampaignWithCounts[],
+	sortState: MetricSortState
+): CampaignWithCounts[] => {
+	if (!sortState) return campaigns;
+
+	return campaigns
+		.map((campaign, index) => ({ campaign, index }))
+		.sort((a, b) => {
+			const aValue = getMetricSortValue(a.campaign, sortState.key);
+			const bValue = getMetricSortValue(b.campaign, sortState.key);
+			if (aValue === bValue) return a.index - b.index;
+			return sortState.mode === 'desc' ? bValue - aValue : aValue - bValue;
+		})
+		.map(({ campaign }) => campaign);
+};
+
+const FinderStateBadge = ({ state }: { state?: string | null }) => {
+	const stateAbbr = getStateAbbreviation(state).trim().toUpperCase();
+
+	if (!stateAbbr) {
+		return <span className="campaign-finder-state-badge-empty" aria-hidden="true" />;
+	}
+
+	return (
+		<span
+			className="campaign-finder-state-badge"
+			style={{ backgroundColor: stateBadgeColorMap[stateAbbr] || 'transparent' }}
+		>
+			{stateAbbr}
+		</span>
+	);
+};
+
+const FinderContactRow = ({
+	item,
+	index,
+	dotColor,
+}: {
+	item: FinderContactItem;
+	index: number;
+	dotColor: string;
+}) => {
+	const hasLegacyPersonName = Boolean(
+		item.personName === undefined &&
+			item.company?.trim() &&
+			item.name.trim() !== item.company.trim()
+	);
+	const primaryText = item.personName || item.name;
+	const showCompany = Boolean((item.personName || hasLegacyPersonName) && item.company);
+	const descriptorText = item.category?.label || item.title?.trim() || item.headline?.trim() || '';
+
+	return (
+		<div
+			className="campaign-finder-contact-row"
+			data-custom-table-ignore-row-click="true"
+			style={{ backgroundColor: index % 2 === 0 ? '#FAF7F7' : '#FFFFFF' }}
+		>
+			<span
+				className="campaign-finder-contact-dot"
+				style={{ backgroundColor: dotColor }}
+				aria-hidden="true"
+			/>
+			<span className="campaign-finder-contact-name" title={primaryText}>
+				{primaryText}
+			</span>
+			{showCompany ? (
+				<span className="campaign-finder-contact-company" title={item.company ?? undefined}>
+					{item.company}
+				</span>
+			) : (
+				<span className="campaign-finder-contact-company-empty" aria-hidden="true" />
+			)}
+			<span
+				className="campaign-finder-contact-descriptor"
+				title={descriptorText || undefined}
+			>
+				{descriptorText}
+			</span>
+			<span className="campaign-finder-contact-category-icon" aria-hidden={!item.category}>
+				{item.category ? (
+					<CampaignDataTypeBadge
+						dataType={{
+							kind: 'category',
+							key: item.category.key,
+							label: item.category.label,
+							count: 1,
+						}}
+					/>
+				) : null}
+			</span>
+			<FinderStateBadge state={item.state} />
+			{item.city ? (
+				<span className="campaign-finder-contact-city" title={item.city}>
+					{item.city}
+				</span>
+			) : (
+				<span className="campaign-finder-contact-city-empty" aria-hidden="true" />
+			)}
+		</div>
+	);
+};
+
+const CampaignFinderPanel = ({
+	folders,
+	expandedFolderKeys,
+	onToggleFolder,
+	searchQuery,
+}: {
+	folders: FinderFolder[];
+	expandedFolderKeys: FinderFolderKey[];
+	onToggleFolder: (folderKey: FinderFolderKey) => void;
+	searchQuery: string;
+}) => {
+	const stopFinderEvent = (event: React.SyntheticEvent) => {
+		event.stopPropagation();
+		event.nativeEvent.stopImmediatePropagation();
+	};
+	const isSearching = normalizeFinderSearchText(searchQuery).length > 0;
+	const contactsFolder = folders.find((folder) => folder.key === 'contacts');
+	const searchItems = contactsFolder?.items ?? [];
+
+	return (
+		<div className="campaign-finder-cell" data-custom-table-ignore-row-click="true">
+			<div
+				className="campaign-finder-panel"
+				data-custom-table-ignore-row-click="true"
+				onPointerDown={stopFinderEvent}
+				onMouseDown={stopFinderEvent}
+				onClick={stopFinderEvent}
+			>
+				{isSearching ? (
+					<div className="campaign-finder-search-results">
+						{searchItems.length > 0 ? (
+							searchItems.map((item, itemIndex) => (
+								<FinderContactRow
+									key={`search-${item.id}`}
+									item={item}
+									index={itemIndex}
+									dotColor={contactsFolder?.color ?? '#CC5858'}
+								/>
+							))
+						) : (
+							<div className="campaign-finder-empty-row">
+								No matching contacts
+							</div>
+						)}
+					</div>
+				) : folders.map((folder, folderIndex) => {
+					const isExpanded = expandedFolderKeys.includes(folder.key);
+					const handleToggle = () => onToggleFolder(folder.key);
+
+					return (
+						<div key={folder.key} className="campaign-finder-folder-group">
+							<button
+								type="button"
+								className="campaign-finder-folder-row"
+								data-custom-table-ignore-row-click="true"
+								style={{
+									backgroundColor: folderIndex % 2 === 0 ? '#FAF7F7' : '#FFFFFF',
+								}}
+								onClick={(event) => {
+									stopFinderEvent(event);
+									handleToggle();
+								}}
+								aria-expanded={isExpanded}
+							>
+								<CampaignRowChevronIcon
+									className={cn(
+										'campaign-finder-folder-chevron',
+										isExpanded && 'campaign-finder-folder-chevron-open'
+									)}
+								/>
+								<span
+									className="campaign-finder-folder-icon"
+									style={{ color: folder.color }}
+								>
+									<DashboardActionBarFolderIcon width={16} height={10} />
+								</span>
+								<span className="campaign-finder-folder-label">{folder.label}</span>
+							</button>
+							{isExpanded
+								? folder.items.map((item, itemIndex) => (
+									<FinderContactRow
+										key={`${folder.key}-${item.id}`}
+										item={item}
+										index={itemIndex}
+										dotColor={folder.color}
+									/>
+								  ))
+								: null}
+						</div>
+					);
+				})}
+			</div>
+		</div>
+	);
 };
 
 const useIsomorphicLayoutEffect =
@@ -277,22 +746,27 @@ const CampaignDataTypeIconStrip = ({
 export const useCampaignsTable = (options?: {
 	compactMetrics?: boolean;
 	mockState?: CampaignsMockState;
+	enableFinder?: boolean;
+	finderSearchQuery?: string;
 }) => {
 	const compactMetrics = options?.compactMetrics ?? false;
 	const mockState = options?.mockState;
+	const enableFinder = options?.enableFinder ?? true;
+	const finderSearchQuery = options?.finderSearchQuery ?? '';
+	const normalizedFinderSearchQuery = normalizeFinderSearchText(finderSearchQuery);
 	const isMockActive = mockState != null;
 	const [confirmingCampaignId, setConfirmingCampaignId] = useState<number | null>(null);
 	const [countdown, setCountdown] = useState<number>(5);
 	const confirmationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const [openCampaignId, setOpenCampaignId] = useState<number | null>(null);
+	const [openFolderKeys, setOpenFolderKeys] = useState<FinderFolderKey[]>([]);
+	const frozenCampaignOrderRef = useRef<number[] | null>(null);
+	const isFinderOpen = enableFinder && openCampaignId !== null;
 
 	const [metricSort, setMetricSort] = useState<MetricSortState>(null);
 	const metricSortKey = metricSort?.key ?? null;
 	const metricSortMode = metricSort?.mode ?? null;
 	const isMetricSortActive = metricSort !== null;
-	const metricSortRef = useRef<MetricSortState>(null);
-	useEffect(() => {
-		metricSortRef.current = metricSort;
-	}, [metricSort]);
 
 	const draftsHeaderButtonRef = useRef<HTMLButtonElement | null>(null);
 	const setDraftsHeaderButtonRef = useCallback((el: HTMLButtonElement | null) => {
@@ -321,6 +795,53 @@ export const useCampaignsTable = (options?: {
 			}
 		};
 	}, []);
+
+	const closeFinder = useCallback(() => {
+		setOpenCampaignId(null);
+		setOpenFolderKeys([]);
+		frozenCampaignOrderRef.current = null;
+	}, []);
+
+	useEffect(() => {
+		if (!enableFinder && openCampaignId !== null) {
+			closeFinder();
+		}
+	}, [closeFinder, enableFinder, openCampaignId]);
+
+	useEffect(() => {
+		if (!isFinderOpen) return;
+
+		const handleDocumentPointerDown = (event: PointerEvent) => {
+			const target = event.target;
+			const targetElement =
+				target instanceof Element
+					? target
+					: target instanceof Node
+						? target.parentElement
+						: null;
+			const tableBox = document.querySelector(
+				'.my-campaigns-table.campaigns-finder-open'
+			);
+
+			if (targetElement?.closest('.my-campaigns-table, .campaign-finder-split-shell')) return;
+
+			if (tableBox instanceof HTMLElement) {
+				const rect = tableBox.getBoundingClientRect();
+				const isInsideTableBox =
+					event.clientX >= rect.left &&
+					event.clientX <= rect.right &&
+					event.clientY >= rect.top &&
+					event.clientY <= rect.bottom;
+
+				if (isInsideTableBox) return;
+			}
+
+			closeFinder();
+		};
+
+		document.addEventListener('pointerdown', handleDocumentPointerDown);
+		return () => document.removeEventListener('pointerdown', handleDocumentPointerDown);
+	}, [closeFinder, isFinderOpen]);
 
 	// Keep the Drafts sort underline anchored to the bottom of the table container,
 	// aligned with the Drafts header "pill" width.
@@ -496,14 +1017,104 @@ export const useCampaignsTable = (options?: {
 		() => (mockState ? buildMockCampaignRows(mockState) : null),
 		[mockState]
 	);
-	const data = mockData ?? realData;
+	const baseData = (mockData ?? realData) as CampaignWithCounts[] | undefined;
+	const selectedCampaignId = enableFinder && openCampaignId !== null ? openCampaignId : null;
+	const selectedCampaignIdForRealQuery =
+		!isMockActive && selectedCampaignId !== null ? String(selectedCampaignId) : '';
+	const { data: selectedCampaign } = useGetCampaign(selectedCampaignIdForRealQuery);
+	const selectedContactListIds = useMemo(
+		() =>
+			(selectedCampaign?.userContactLists ?? [])
+				.map((contactList) => contactList.id)
+				.filter((id): id is number => typeof id === 'number'),
+		[selectedCampaign?.userContactLists]
+	);
+	const shouldFetchFinderData =
+		enableFinder && !isMockActive && selectedCampaignId !== null;
+	const { data: finderContacts } = useGetContacts({
+		filters: { contactListIds: selectedContactListIds },
+		enabled: shouldFetchFinderData && selectedContactListIds.length > 0,
+	});
+	const { data: finderDraftEmails } = useGetEmails({
+		filters: {
+			campaignId: selectedCampaignId ?? undefined,
+			status: EmailStatus.draft,
+		},
+		enabled: shouldFetchFinderData,
+	});
+	const { data: finderSentEmails } = useGetEmails({
+		filters: {
+			campaignId: selectedCampaignId ?? undefined,
+			status: EmailStatus.sent,
+		},
+		enabled: shouldFetchFinderData,
+	});
+	const { data: finderInboundEmails } = useGetInboundEmails({
+		filters: { campaignId: selectedCampaignId ?? undefined },
+		enabled: shouldFetchFinderData,
+	});
+	const sortedCampaignData = useMemo(
+		() => (baseData ? sortCampaignsByMetric(baseData, metricSort) : baseData),
+		[baseData, metricSort]
+	);
+	const displayedCampaignData = useMemo(() => {
+		if (!sortedCampaignData || openCampaignId === null || !frozenCampaignOrderRef.current) {
+			return sortedCampaignData;
+		}
+
+		const byId = new Map(sortedCampaignData.map((campaign) => [campaign.id, campaign]));
+		const ordered = frozenCampaignOrderRef.current
+			.map((campaignId) => byId.get(campaignId))
+			.filter((campaign): campaign is CampaignWithCounts => Boolean(campaign));
+		const orderedIds = new Set(ordered.map((campaign) => campaign.id));
+		const added = sortedCampaignData.filter((campaign) => !orderedIds.has(campaign.id));
+
+		return [...ordered, ...added];
+	}, [openCampaignId, sortedCampaignData]);
+	const data = useMemo<CampaignTableRow[] | undefined>(() => {
+		if (!displayedCampaignData) return displayedCampaignData;
+		if (!isFinderOpen || openCampaignId === null) return displayedCampaignData;
+
+		return displayedCampaignData.flatMap((campaign) => {
+			if (campaign.id !== openCampaignId) return [campaign];
+
+			return [
+				campaign,
+				{
+					id: `finder-${campaign.id}`,
+					__rowType: 'finder',
+					__customTableColSpanAll: true,
+					parentCampaignId: campaign.id,
+					name: '',
+					draftCount: 0,
+					sentCount: 0,
+					newEmailCount: 0,
+					updatedAt: new Date(campaign.updatedAt),
+				} satisfies FinderTableRow,
+			];
+		});
+	}, [displayedCampaignData, isFinderOpen, openCampaignId]);
+	const openFinderForCampaign = useCallback(
+		(campaignId: number | null) => {
+			if (!enableFinder || campaignId === null) {
+				closeFinder();
+				return;
+			}
+
+			frozenCampaignOrderRef.current =
+				sortedCampaignData?.map((campaign) => campaign.id) ?? null;
+			setOpenCampaignId(campaignId);
+			setOpenFolderKeys([]);
+		},
+		[closeFinder, enableFinder, sortedCampaignData]
+	);
 	const isPending = isMockActive ? false : realIsPending;
 	const shouldShowNewMetricSlot = useMemo(() => {
-		if (data == null) return true;
-		return data.some(
+		if (displayedCampaignData == null) return true;
+		return displayedCampaignData.some(
 			(campaign: CampaignWithCounts) => (campaign.newEmailCount ?? 0) >= 1
 		);
-	}, [data]);
+	}, [displayedCampaignData]);
 	const desktopMetricsStyle = compactMetrics
 		? undefined
 		: ({
@@ -511,7 +1122,127 @@ export const useCampaignsTable = (options?: {
 				...(shouldShowNewMetricSlot ? {} : { '--campaign-metric-gap': '62px' }),
 		  } as CSSProperties);
 
-	const columns: ColumnDef<CampaignWithCounts>[] = [
+	useEffect(() => {
+		if (openCampaignId !== null && !baseData?.some((campaign) => campaign.id === openCampaignId)) {
+			closeFinder();
+		}
+	}, [baseData, closeFinder, openCampaignId]);
+
+	const handleFinderToggleClick = useCallback(
+		(event: React.MouseEvent, campaignId: number) => {
+			event.preventDefault();
+			event.stopPropagation();
+
+			if (!enableFinder) return;
+
+			if (openCampaignId === campaignId) {
+				closeFinder();
+				return;
+			}
+
+			openFinderForCampaign(campaignId);
+		},
+		[closeFinder, enableFinder, openCampaignId, openFinderForCampaign]
+	);
+
+	const toggleFinderFolder = useCallback((folderKey: FinderFolderKey) => {
+		setOpenFolderKeys((current) =>
+			current.includes(folderKey)
+				? current.filter((key) => key !== folderKey)
+				: [...current, folderKey]
+		);
+	}, []);
+
+	const openCampaign = useMemo(
+		() => displayedCampaignData?.find((campaign) => campaign.id === openCampaignId) ?? null,
+		[displayedCampaignData, openCampaignId]
+	);
+	const finderFolders = useMemo<FinderFolder[]>(() => {
+		const applySearchFilter = (folders: FinderFolder[]) => {
+			if (!normalizedFinderSearchQuery) return folders;
+
+			return folders.map((folder) =>
+				folder.key === 'contacts'
+					? {
+							...folder,
+							items: folder.items.filter((item) =>
+								finderContactMatchesSearch(item, normalizedFinderSearchQuery)
+							),
+					  }
+					: folder
+			);
+		};
+
+		if (!openCampaign) {
+			return applySearchFilter(FINDER_FOLDER_CONFIG.map((folder) => ({ ...folder, items: [] })));
+		}
+
+		if (isMockActive) {
+			const mockContactCount = openCampaign.contactCount;
+			const itemsByKey: Record<FinderFolderKey, FinderContactItem[]> = {
+				contacts:
+					typeof mockContactCount === 'number'
+						? buildMockFinderItems(mockContactCount, 'contacts')
+						: MOCK_FINDER_CONTACTS,
+				drafts: buildMockFinderItems(openCampaign.draftCount ?? 0, 'drafts'),
+				inbox: buildMockFinderItems(openCampaign.newEmailCount ?? 0, 'inbox'),
+				sent: buildMockFinderItems(openCampaign.sentCount ?? 0, 'sent'),
+				archive: [],
+			};
+
+			return applySearchFilter(FINDER_FOLDER_CONFIG.map((folder) => ({
+				...folder,
+				items: itemsByKey[folder.key],
+			})));
+		}
+
+		const contactItems = (finderContacts ?? []).map((contact: ContactWithName, index) =>
+			toFinderContactItem(contact, `contact-${index + 1}`)
+		);
+		const draftItems = getUniqueContactItemsFromEmails(finderDraftEmails, 'drafts');
+		const inboxItems = getUniqueContactItemsFromEmails(finderInboundEmails, 'inbox');
+		const sentItems = getUniqueContactItemsFromEmails(finderSentEmails, 'sent');
+		const itemsByKey: Record<FinderFolderKey, FinderContactItem[]> = {
+			contacts: contactItems,
+			drafts: draftItems,
+			inbox: inboxItems,
+			sent: sentItems,
+			archive: [],
+		};
+
+		return applySearchFilter(FINDER_FOLDER_CONFIG.map((folder) => ({
+			...folder,
+			items: itemsByKey[folder.key],
+		})));
+	}, [
+		finderContacts,
+		finderDraftEmails,
+		finderInboundEmails,
+		finderSentEmails,
+		isMockActive,
+		normalizedFinderSearchQuery,
+		openCampaign,
+	]);
+
+	const handleMetricSortClick = useCallback(
+		(sortKey: MetricSortKey) => {
+			if (isFinderOpen) return;
+
+			setMetricSort((current) => {
+				const next: MetricSortState =
+					current?.key !== sortKey
+						? { key: sortKey, mode: 'desc' }
+						: current.mode === 'desc'
+							? { key: sortKey, mode: 'asc' }
+							: null;
+
+				return next;
+			});
+		},
+		[isFinderOpen]
+	);
+
+	const columns: ColumnDef<CampaignTableRow>[] = [
 		{
 			accessorKey: 'name',
 			header: () => (
@@ -520,15 +1251,31 @@ export const useCampaignsTable = (options?: {
 				</div>
 			),
 			cell: ({ row, table }) => {
+				const original = row.original as CampaignTableRow;
+				if (isFinderTableRow(original)) {
+					return (
+						<CampaignFinderPanel
+							folders={finderFolders}
+							expandedFolderKeys={openFolderKeys}
+							onToggleFolder={toggleFinderFolder}
+							searchQuery={finderSearchQuery}
+						/>
+					);
+				}
+
 				const name: string = row.getValue('name');
-				const campaign = row.original as CampaignWithCounts;
+				const campaign = original as CampaignWithCounts;
 				const isConfirming = campaign.id === confirmingCampaignId;
+				const isCampaignFinderOpen = isFinderOpen && campaign.id === openCampaignId;
 				const newCount = campaign.newEmailCount ?? 0;
 				const campaignDataTypes = campaign.campaignDataTypes ?? [];
 				const hasNew = newCount >= 1;
 				const visibleRowIndex = table
 					.getRowModel()
-					.rows.findIndex((visibleRow) => visibleRow.id === row.id);
+					.rows.filter(
+						(visibleRow) => !isFinderTableRow(visibleRow.original as CampaignTableRow)
+					)
+					.findIndex((visibleRow) => visibleRow.id === row.id);
 				const paletteIndex = getCampaignFolderPaletteIndex(
 					visibleRowIndex >= 0 ? visibleRowIndex : row.index
 				);
@@ -542,14 +1289,24 @@ export const useCampaignsTable = (options?: {
 					);
 				}
 				return (
-					<div className="campaign-row-folder-cell relative text-left">
-						{!isConfirming && (
-							<span className="campaign-row-left-hover-surface" aria-hidden="true" />
+					<div
+						className="campaign-row-folder-cell relative text-left"
+						data-finder-open={isCampaignFinderOpen ? 'true' : undefined}
+					>
+						{!isConfirming && enableFinder && (
+							<button
+								type="button"
+								className="campaign-row-left-hover-surface"
+								data-custom-table-ignore-row-click="true"
+								aria-label={`${isCampaignFinderOpen ? 'Hide' : 'Show'} ${name}`}
+								onClick={(event) => handleFinderToggleClick(event, campaign.id)}
+							/>
 						)}
 						<CampaignRowChevronIcon
 							className={cn(
 								'campaign-row-chevron pointer-events-none absolute left-[-19px] top-1/2 h-[14px] w-[14px] -translate-y-1/2',
-								isConfirming ? 'text-white' : 'text-black'
+								isConfirming ? 'text-white' : 'text-black',
+								isCampaignFinderOpen && 'campaign-row-chevron-open'
 							)}
 						/>
 						<div
@@ -661,36 +1418,22 @@ export const useCampaignsTable = (options?: {
 		},
 		{
 			id: 'metrics',
-			// This is a "display" column visually, but we still provide an accessor so TanStack
-			// treats it as sortable (we sort by Drafts or Sent when their headers are clicked).
-			accessorFn: (row) =>
-				(metricSortKey === 'sent'
-					? (row as CampaignWithCounts)?.sentCount
-					: metricSortKey === 'updated'
-						? new Date((row as CampaignWithCounts)?.updatedAt as unknown as string | number | Date)
-								.getTime()
-					: (row as CampaignWithCounts)?.draftCount) ?? 0,
-			enableSorting: true,
-			// Sort campaigns by Drafts or Sent, depending on which header is active.
-			sortingFn: (rowA, rowB) => {
-				const aRow = rowA.original as CampaignWithCounts;
-				const bRow = rowB.original as CampaignWithCounts;
-				const sortKey = metricSortRef.current?.key ?? metricSortKey ?? 'drafts';
-				const a =
-					sortKey === 'sent'
-						? aRow?.sentCount ?? 0
-						: sortKey === 'updated'
-							? new Date(aRow?.updatedAt as unknown as string | number | Date).getTime() || 0
-							: aRow?.draftCount ?? 0;
-				const b =
-					sortKey === 'sent'
-						? bRow?.sentCount ?? 0
-						: sortKey === 'updated'
-							? new Date(bRow?.updatedAt as unknown as string | number | Date).getTime() || 0
-							: bRow?.draftCount ?? 0;
-				return a === b ? 0 : a > b ? 1 : -1;
+			// Finder freezes row order while open, so metric sorting is applied before
+			// rows reach CustomTable instead of using TanStack's internal sorting state.
+			accessorFn: (row) => {
+				if (isFinderTableRow(row as CampaignTableRow)) return 0;
+				return (
+					(metricSortKey === 'sent'
+						? (row as CampaignWithCounts)?.sentCount
+						: metricSortKey === 'updated'
+							? new Date(
+									(row as CampaignWithCounts)?.updatedAt as unknown as string | number | Date
+							  ).getTime()
+						: (row as CampaignWithCounts)?.draftCount) ?? 0
+				);
 			},
-			header: ({ column, table }) => {
+			enableSorting: false,
+			header: () => {
 				const highlightColor =
 					metricSortKey === 'updated'
 						? '#FFA3A3'
@@ -742,25 +1485,9 @@ export const useCampaignsTable = (options?: {
 						ref={setDraftsHeaderButtonRef}
 						onClick={(e) => {
 							e.stopPropagation();
-							// Toggle (Drafts):
-							// 1) desc (highest → lowest) with bottom indicator line
-							// 2) asc (lowest → highest) with top (36px) indicator line
-							// 3) default state (no sorting / no highlight)
-							const next: MetricSortState =
-								metricSortKey !== 'drafts'
-									? { key: 'drafts', mode: 'desc' }
-									: metricSortMode === 'desc'
-										? { key: 'drafts', mode: 'asc' }
-										: null;
-
-							metricSortRef.current = next;
-							setMetricSort(next);
-							if (next === null) {
-								table.setSorting([]);
-							} else {
-								table.setSorting([{ id: column.id, desc: next.mode === 'desc' }]);
-							}
+							handleMetricSortClick('drafts');
 						}}
+						disabled={isFinderOpen}
 						className={cn(
 							'metrics-header-label relative z-[1] cursor-pointer select-none border-0 bg-transparent p-0 m-0',
 							!compactMetrics &&
@@ -770,6 +1497,7 @@ export const useCampaignsTable = (options?: {
 						)}
 						data-label="drafts"
 						aria-pressed={metricSortKey === 'drafts'}
+						aria-disabled={isFinderOpen}
 					>
 						Drafts
 					</button>
@@ -778,25 +1506,9 @@ export const useCampaignsTable = (options?: {
 						ref={setSentHeaderButtonRef}
 						onClick={(e) => {
 							e.stopPropagation();
-							// Toggle (Sent):
-							// 1) desc (highest → lowest)
-							// 2) asc (lowest → highest)
-							// 3) default state (no sorting)
-							const next: MetricSortState =
-								metricSortKey !== 'sent'
-									? { key: 'sent', mode: 'desc' }
-									: metricSortMode === 'desc'
-										? { key: 'sent', mode: 'asc' }
-										: null;
-
-							metricSortRef.current = next;
-							setMetricSort(next);
-							if (next === null) {
-								table.setSorting([]);
-							} else {
-								table.setSorting([{ id: column.id, desc: next.mode === 'desc' }]);
-							}
+							handleMetricSortClick('sent');
 						}}
+						disabled={isFinderOpen}
 						className={cn(
 							'metrics-header-label relative z-[1] cursor-pointer select-none border-0 bg-transparent p-0 m-0',
 							!compactMetrics &&
@@ -806,6 +1518,7 @@ export const useCampaignsTable = (options?: {
 						)}
 						data-label="sent"
 						aria-pressed={metricSortKey === 'sent'}
+						aria-disabled={isFinderOpen}
 					>
 						Sent
 					</button>
@@ -814,25 +1527,9 @@ export const useCampaignsTable = (options?: {
 						ref={setUpdatedHeaderButtonRef}
 						onClick={(e) => {
 							e.stopPropagation();
-							// Toggle (Updated):
-							// 1) desc (most recent → oldest)
-							// 2) asc (oldest → most recent)
-							// 3) default state (no sorting)
-							const next: MetricSortState =
-								metricSortKey !== 'updated'
-									? { key: 'updated', mode: 'desc' }
-									: metricSortMode === 'desc'
-										? { key: 'updated', mode: 'asc' }
-										: null;
-
-							metricSortRef.current = next;
-							setMetricSort(next);
-							if (next === null) {
-								table.setSorting([]);
-							} else {
-								table.setSorting([{ id: column.id, desc: next.mode === 'desc' }]);
-							}
+							handleMetricSortClick('updated');
 						}}
+						disabled={isFinderOpen}
 						className={cn(
 							'metrics-header-label relative z-[1] cursor-pointer select-none border-0 bg-transparent p-0 m-0',
 							!compactMetrics &&
@@ -842,6 +1539,7 @@ export const useCampaignsTable = (options?: {
 						)}
 						data-label="updated"
 						aria-pressed={metricSortKey === 'updated'}
+						aria-disabled={isFinderOpen}
 					>
 						Updated
 					</button>
@@ -850,7 +1548,10 @@ export const useCampaignsTable = (options?: {
 				);
 			},
 			cell: ({ row }) => {
-				const campaign = row.original as CampaignWithCounts;
+				const original = row.original as CampaignTableRow;
+				if (isFinderTableRow(original)) return null;
+
+				const campaign = original as CampaignWithCounts;
 				const isConfirming = campaign.id === confirmingCampaignId;
 
 				if (isConfirming) {
@@ -1014,7 +1715,13 @@ export const useCampaignsTable = (options?: {
 
 	const { mutateAsync: deleteCampaign, isPending: isPendingDelete } = useDeleteCampaign();
 
-	const handleRowClick = (rowData: Campaign) => {
+	const handleRowClick = (rowData: CampaignTableRow) => {
+		if (isFinderTableRow(rowData)) return;
+
+		if (enableFinder && openCampaignId === rowData.id) {
+			return;
+		}
+
 		// While mock data is active, the row IDs are synthetic (negative) and
 		// would route to a nonexistent campaign detail page. Eat the click so the
 		// debug session stays on the dashboard.
@@ -1051,7 +1758,7 @@ export const useCampaignsTable = (options?: {
 				setCurrentRow(null);
 			} else {
 				setConfirmingCampaignId(campaignId);
-				const campaign = data?.find((c: Campaign) => c.id === campaignId);
+				const campaign = baseData?.find((c: Campaign) => c.id === campaignId);
 				if (campaign) setCurrentRow(campaign);
 				confirmationTimeoutRef.current = setTimeout(() => {
 					setConfirmingCampaignId(null);
@@ -1075,7 +1782,7 @@ export const useCampaignsTable = (options?: {
 		} else {
 			// Set confirming state for new campaign
 			setConfirmingCampaignId(campaignId);
-			const campaign = data?.find((c: Campaign) => c.id === campaignId);
+			const campaign = baseData?.find((c: Campaign) => c.id === campaignId);
 			if (campaign) {
 				setCurrentRow(campaign);
 			}
@@ -1091,8 +1798,13 @@ export const useCampaignsTable = (options?: {
 	return {
 		columns,
 		data,
+		campaignRows: displayedCampaignData,
 		isPending,
 		handleRowClick,
+		isFinderOpen,
+		openCampaignId,
+		openFinderForCampaign,
+		closeFinder,
 		handleDeleteClick,
 		isPendingDelete,
 		isConfirmDialogOpen,
