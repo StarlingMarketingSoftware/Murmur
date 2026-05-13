@@ -1696,13 +1696,25 @@ export const useCampaignsTable = (options?: {
 	const selectedCampaignIdForRealQuery =
 		!isMockActive && selectedCampaignId !== null ? String(selectedCampaignId) : '';
 	const { data: selectedCampaign } = useGetCampaign(selectedCampaignIdForRealQuery);
-	const selectedContactListIds = useMemo(
+	const selectedCampaignContactListIds = useMemo(
 		() =>
 			(selectedCampaign?.userContactLists ?? [])
 				.map((contactList) => contactList.id)
 				.filter((id): id is number => typeof id === 'number'),
 		[selectedCampaign?.userContactLists]
 	);
+	const selectedCampaignFallbackContactListIds = useMemo(() => {
+		if (selectedCampaignId === null) return [];
+		return (
+			baseData
+				?.find((campaign) => campaign.id === selectedCampaignId)
+				?.userContactListIds?.filter((id): id is number => typeof id === 'number') ?? []
+		);
+	}, [baseData, selectedCampaignId]);
+	const selectedContactListIds =
+		selectedCampaignContactListIds.length > 0
+			? selectedCampaignContactListIds
+			: selectedCampaignFallbackContactListIds;
 	const shouldFetchFinderData =
 		enableFinder && !isMockActive && selectedCampaignId !== null;
 	const { data: finderContacts } = useGetContacts({
@@ -2398,8 +2410,12 @@ export const useCampaignsTable = (options?: {
 
 	const handleFinderContextRemoveFromFolder = useCallback(
 		async (state: FinderContextMenuState) => {
-			const payload = getFinderContextMenuPayload(state);
-			if (!payload || payload.itemKind !== 'contact') return;
+			const rawPayload = getFinderContextMenuPayload(state);
+			if (!rawPayload || rawPayload.itemKind !== 'contact') return;
+			const payload =
+				rawPayload.sourceContactListIds.length > 0
+					? rawPayload
+					: { ...rawPayload, sourceContactListIds: selectedContactListIds };
 
 			setFinderContextMenu(null);
 
@@ -2408,6 +2424,11 @@ export const useCampaignsTable = (options?: {
 				if (removed) {
 					toast.success('Removed from folder');
 				}
+				return;
+			}
+
+			if (payload.sourceContactListIds.length === 0) {
+				toast.error('Could not remove contact. Please try again.');
 				return;
 			}
 
@@ -2427,6 +2448,7 @@ export const useCampaignsTable = (options?: {
 			isMockActive,
 			removeFinderContactFromFolder,
 			removeMockFinderContactFromFolder,
+			selectedContactListIds,
 		]
 	);
 
@@ -2453,7 +2475,6 @@ export const useCampaignsTable = (options?: {
 	);
 	const canRemoveFinderContextItem = Boolean(
 		finderContextMenuPayload?.itemKind === 'contact' &&
-			finderContextMenuPayload.sourceContactListIds.length > 0 &&
 			!isFinderDropPending &&
 			(!isMockActive || onMockStateChange)
 	);

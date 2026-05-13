@@ -1,4 +1,12 @@
-import { FC, type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
+import {
+	FC,
+	type CSSProperties,
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import CustomTable from '../../../molecules/CustomTable/CustomTable';
@@ -161,6 +169,10 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 		useState<CampaignFinderViewMode>('single');
 	const [campaignFinderHeight, setCampaignFinderHeight] =
 		useState<number>(CAMPAIGN_FINDER_MIN_HEIGHT);
+	const [pendingSplitFinderOpen, setPendingSplitFinderOpen] = useState<{
+		campaignId: number;
+		pane: 'left' | 'right';
+	} | null>(null);
 
 	const shouldShowMobileFeatures = isMobile === true;
 	const [isLandscape, setIsLandscape] = useState<boolean>(false);
@@ -200,18 +212,39 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 
 	// Use compact metrics on mobile OR on narrow desktop (<=960px)
 	const shouldUseCompactMetrics = shouldShowMobileFeatures || (!isMobile && isNarrowDesktop);
+	const handleFinderOpenInNewTab = useCallback(
+		(campaignId: number, sourcePane: 'left' | 'right') => {
+			const targetPane = sourcePane === 'left' ? 'right' : 'left';
+
+			setCampaignFinderViewMode('split');
+			setPendingSplitFinderOpen({ campaignId, pane: targetPane });
+
+			if (sourcePane === 'left') {
+				setRightFinderSearchQuery(leftFinderSearchQuery);
+				setLeftFinderSearchQuery('');
+			} else {
+				setLeftFinderSearchQuery(rightFinderSearchQuery);
+				setRightFinderSearchQuery('');
+			}
+		},
+		[leftFinderSearchQuery, rightFinderSearchQuery]
+	);
 
 	const leftCampaignsTable = useCampaignsTable({
 		compactMetrics: shouldUseCompactMetrics,
 		mockState,
+		onMockStateChange,
 		enableFinder: !shouldShowMobileFeatures,
 		finderSearchQuery: leftFinderSearchQuery,
+		onFinderOpenInNewTab: (campaignId) => handleFinderOpenInNewTab(campaignId, 'left'),
 	});
 	const rightCampaignsTable = useCampaignsTable({
 		compactMetrics: shouldUseCompactMetrics,
 		mockState,
+		onMockStateChange,
 		enableFinder: !shouldShowMobileFeatures,
 		finderSearchQuery: rightFinderSearchQuery,
+		onFinderOpenInNewTab: (campaignId) => handleFinderOpenInNewTab(campaignId, 'right'),
 	});
 	const {
 		data,
@@ -222,6 +255,8 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 		isFinderOpen,
 	} = leftCampaignsTable;
 	const closeRightFinder = rightCampaignsTable.closeFinder;
+	const openLeftFinderForCampaign = leftCampaignsTable.openFinderForCampaign;
+	const openRightFinderForCampaign = rightCampaignsTable.openFinderForCampaign;
 	const { mutateAsync: createContactList, isPending: isPendingCreateContactList } =
 		useCreateUserContactList({ suppressToasts: true });
 	const { mutateAsync: createCampaign, isPending: isPendingCreateCampaign } =
@@ -255,6 +290,18 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 		: shouldScaleMobileTable
 			? mobileScale
 			: 1;
+
+	useEffect(() => {
+		if (!pendingSplitFinderOpen) return;
+
+		if (pendingSplitFinderOpen.pane === 'left') {
+			openLeftFinderForCampaign(pendingSplitFinderOpen.campaignId);
+		} else {
+			openRightFinderForCampaign(pendingSplitFinderOpen.campaignId);
+		}
+
+		setPendingSplitFinderOpen(null);
+	}, [openLeftFinderForCampaign, openRightFinderForCampaign, pendingSplitFinderOpen]);
 
 	useEffect(() => {
 		if (campaignFinderViewMode === 'split') {
@@ -411,49 +458,21 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 		</div>
 	) : null;
 
-	const metricsSkeletonContainerClassName = cn(
-		'metrics-grid-container w-full items-center text-left',
-		shouldUseCompactMetrics
-			? 'flex flex-nowrap gap-[7px] justify-start'
-			: 'flex flex-nowrap justify-end'
-	);
-	const metricsSkeletonContainerStyle: CSSProperties | undefined = shouldUseCompactMetrics
-		? undefined
-		: { gap: 'var(--campaign-metric-gap, 32px)' };
-	const metricSlotClassName = cn(
-		'campaign-metric-slot relative flex items-center',
-		shouldUseCompactMetrics
-			? 'w-auto flex-shrink-0 justify-start'
-			: 'h-[20px] w-[80px] flex-none justify-center'
-	);
-	const metricBoxSkeletonClassName =
-		'metric-box inline-flex box-border items-center justify-center border-[0.799px] border-black truncate h-[20px] w-[80px] min-w-[80px] max-w-[80px] rounded-[6.389px] px-0 flex-none bg-black/10 animate-pulse font-inter font-medium text-[13.854px] leading-[17.186px]';
-	const renderCampaignLoadingCell = ({ column }: { column: { id: string } }) => {
+	const renderCampaignLoadingCell = ({
+		column,
+	}: {
+		column: { id: string };
+		columnIndex: number;
+	}) => {
+		// Keep the campaigns table loading state very quiet: mostly blank rows,
+		// with only a subtle name bar to suggest structure.
 		if (column.id === 'metrics') {
-			return (
-				<div
-					className={metricsSkeletonContainerClassName}
-					style={metricsSkeletonContainerStyle}
-				>
-					<div className={metricSlotClassName}>
-						<div data-new-fill="skeleton" className={metricBoxSkeletonClassName} />
-					</div>
-					<div className={metricSlotClassName}>
-						<div data-draft-fill="skeleton" className={metricBoxSkeletonClassName} />
-					</div>
-					<div className={metricSlotClassName}>
-						<div data-sent-fill="skeleton" className={metricBoxSkeletonClassName} />
-					</div>
-					<div className={metricSlotClassName}>
-						<div data-updated-fill="skeleton" className={metricBoxSkeletonClassName} />
-					</div>
-				</div>
-			);
+			return <div className="h-3" />;
 		}
 
 		return (
 			<div className="flex items-center">
-				<div className="h-[16px] w-[70%] rounded bg-black/10 animate-pulse" />
+				<div className="h-3 w-2/5 rounded bg-black/5" />
 			</div>
 		);
 	};
@@ -640,47 +659,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 											containerClassName="my-campaigns-table mobile-table-no-scroll !bg-[#F8F8F8]"
 											headerClassName="!bg-white [&_tr]:!bg-white [&_th]:!bg-white [&_th]:!border-b-[#F8F8F8] [&_th]:relative [&_th]:!overflow-visible"
 											rowClassName="!bg-transparent !border-b-[#F8F8F8] hover:!bg-[#F0F0F0] group"
-											renderLoadingCell={({ column }) => {
-												if (column.id === 'metrics') {
-													return (
-														<div
-															className={metricsSkeletonContainerClassName}
-															style={metricsSkeletonContainerStyle}
-														>
-															<div className={metricSlotClassName}>
-																<div
-																	data-new-fill="skeleton"
-																	className={metricBoxSkeletonClassName}
-																/>
-															</div>
-															<div className={metricSlotClassName}>
-																<div
-																	data-draft-fill="skeleton"
-																	className={metricBoxSkeletonClassName}
-																/>
-															</div>
-															<div className={metricSlotClassName}>
-																<div
-																	data-sent-fill="skeleton"
-																	className={metricBoxSkeletonClassName}
-																/>
-															</div>
-															<div className={metricSlotClassName}>
-																<div
-																	data-updated-fill="skeleton"
-																	className={metricBoxSkeletonClassName}
-																/>
-															</div>
-														</div>
-													);
-												}
-
-												return (
-													<div className="flex items-center">
-														<div className="h-[16px] w-[70%] rounded bg-black/10 animate-pulse" />
-													</div>
-												);
-											}}
+											renderLoadingCell={renderCampaignLoadingCell}
 											handleRowClick={handleRowClick}
 											columns={columns}
 											data={data}
