@@ -249,6 +249,7 @@ export async function GET() {
 				},
 				userContactLists: {
 					select: {
+						id: true,
 						name: true,
 						contacts: {
 							select: campaignDataTypeContactSelect,
@@ -303,6 +304,9 @@ export async function GET() {
 					...campaign.contactLists.flatMap((list) => [list.name, list.title]),
 				],
 			});
+			const userContactListIds = campaign.userContactLists
+				.map((list) => list.id)
+				.filter((id): id is number => typeof id === 'number');
 
 			// Remove the emails and userContactLists arrays from the response, keep only counts and contactEmails
 
@@ -316,6 +320,7 @@ export async function GET() {
 				sentCount,
 				contactEmails,
 				campaignDataTypes,
+				userContactListIds,
 			};
 		});
 

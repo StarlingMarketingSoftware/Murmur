@@ -416,35 +416,35 @@ body {
 @keyframes landing-search-waltz-pulse {
 	/* Beat 1 (small) */
 	0% {
-		background-color: rgba(93, 171, 104, 0.49);
+		background-color: #4DC864;
 	}
 	12% {
-		background-color: rgba(93, 171, 104, 0.58);
+		background-color: #4DC864;
 	}
 	24% {
-		background-color: rgba(93, 171, 104, 0.49);
+		background-color: #4DC864;
 	}
 
 	/* Beat 2 (small) */
 	33.333% {
-		background-color: rgba(93, 171, 104, 0.49);
+		background-color: #4DC864;
 	}
 	45% {
-		background-color: rgba(93, 171, 104, 0.6);
+		background-color: #4DC864;
 	}
 	57% {
-		background-color: rgba(93, 171, 104, 0.49);
+		background-color: #4DC864;
 	}
 
 	/* Beat 3 (big accent) */
 	66.666% {
-		background-color: rgba(120, 206, 140, 0.78);
+		background-color: #4DC864;
 	}
 	85% {
-		background-color: rgba(93, 171, 104, 0.58);
+		background-color: #4DC864;
 	}
 	100% {
-		background-color: rgba(93, 171, 104, 0.49);
+		background-color: #4DC864;
 	}
 }
 
@@ -981,4 +981,3 @@ body {
 		--drafting-feature-scale: calc((100vw - 32px) / 1354px);
 	}
 }
-

@@ -2200,6 +2200,7 @@ const DashboardContent = () => {
 	const [campaignsMockState, setCampaignsMockState] = useState<
 		CampaignsMockState | undefined
 	>(undefined);
+	const [isCampaignFinderOpen, setIsCampaignFinderOpen] = useState(false);
 	const isTabPreviewingOther = hoveredTab != null && hoveredTab !== activeTab;
 	// Dashboard inbox deep-link (`?tab=inbox`) should land on the Campaigns sub-tab.
 	const [inboxSubtab, setInboxSubtab] = useState<'messages' | 'campaigns'>('campaigns');
@@ -5442,10 +5443,12 @@ const DashboardContent = () => {
 				window.scrollTo({ top: 0, left: 0 });
 			}
 
-			root.style.overflow = 'hidden';
+			const overflowValue = isCampaignFinderOpen ? 'visible' : 'hidden';
+
+			root.style.overflow = overflowValue;
 			root.style.height = '100vh';
 			root.style.overscrollBehavior = 'none';
-			body.style.overflow = 'hidden';
+			body.style.overflow = overflowValue;
 			body.style.height = '100vh';
 			body.style.overscrollBehavior = 'none';
 
@@ -5460,7 +5463,45 @@ const DashboardContent = () => {
 		}
 
 		return undefined;
-	}, [shouldLockDashboardPageScroll, shouldLockLandingDashboardScroll]);
+	}, [shouldLockDashboardPageScroll, shouldLockLandingDashboardScroll, isCampaignFinderOpen]);
+
+	// When the campaign finder is open we allow the table to overflow the viewport
+	// (overflow: visible) so it can expand to its full height. We still want to prevent
+	// the *page* from scrolling, so we intercept wheel/touch/keyboard scroll events.
+	useEffect(() => {
+		if (!isCampaignFinderOpen || !shouldLockDashboardPageScroll) return;
+
+		const preventWheel = (e: WheelEvent) => {
+			e.preventDefault();
+		};
+
+		const preventTouch = (e: TouchEvent) => {
+			e.preventDefault();
+		};
+
+		const preventKeyScroll = (e: KeyboardEvent) => {
+			const scrollKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '];
+			if (!scrollKeys.includes(e.key)) return;
+
+			const target = e.target as HTMLElement;
+			const isEditable =
+				target.isContentEditable ||
+				['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
+			if (isEditable) return;
+
+			e.preventDefault();
+		};
+
+		window.addEventListener('wheel', preventWheel, { passive: false });
+		window.addEventListener('touchmove', preventTouch, { passive: false });
+		window.addEventListener('keydown', preventKeyScroll);
+
+		return () => {
+			window.removeEventListener('wheel', preventWheel);
+			window.removeEventListener('touchmove', preventTouch);
+			window.removeEventListener('keydown', preventKeyScroll);
+		};
+	}, [isCampaignFinderOpen, shouldLockDashboardPageScroll]);
 
 	// Combine section values into main search field
 	useEffect(() => {
@@ -6559,9 +6600,15 @@ const DashboardContent = () => {
 	return (
 		<>
 			<style jsx global>{`
-				html:has([data-dashboard-scroll-lock='true']),
-				body:has([data-dashboard-scroll-lock='true']) {
+				html:has([data-dashboard-scroll-lock='true']:not([data-campaign-finder-open='true'])),
+				body:has([data-dashboard-scroll-lock='true']:not([data-campaign-finder-open='true'])) {
 					overflow: hidden !important;
+					height: 100vh !important;
+					overscroll-behavior: none !important;
+				}
+				html:has([data-dashboard-scroll-lock='true'][data-campaign-finder-open='true']),
+				body:has([data-dashboard-scroll-lock='true'][data-campaign-finder-open='true']) {
+					overflow: visible !important;
 					height: 100vh !important;
 					overscroll-behavior: none !important;
 				}
@@ -6628,8 +6675,13 @@ const DashboardContent = () => {
 				data-dashboard-scroll-lock={
 					shouldLockDashboardPageScroll ? 'true' : undefined
 				}
+				data-campaign-finder-open={
+					isCampaignFinderOpen ? 'true' : undefined
+				}
 				className={
-					shouldLockDashboardPageScroll ? 'h-screen overflow-hidden' : undefined
+					shouldLockDashboardPageScroll && !isCampaignFinderOpen
+						? 'h-screen overflow-hidden'
+						: undefined
 				}
 			>
 				<AppLayout>
@@ -9877,6 +9929,7 @@ const DashboardContent = () => {
 								<CampaignsTable
 									mockState={campaignsMockState}
 									onMockStateChange={setCampaignsMockState}
+									onFinderOpenChange={setIsCampaignFinderOpen}
 								/>
 							)}
 							{selectedActionBarIcon === 'envelope' && (

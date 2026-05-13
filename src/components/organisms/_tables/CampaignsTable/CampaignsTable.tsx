@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 
 const MAX_CAMPAIGNS = 5;
 const CAMPAIGN_FINDER_MIN_HEIGHT = 415;
+const CAMPAIGN_FINDER_MAX_HEIGHT = 415;
 const CAMPAIGN_FINDER_VIEWPORT_BOTTOM_GAP = 0;
 
 const AddCampaignPlusIcon = () => (
@@ -138,11 +139,14 @@ export type CampaignsMockState = {
 type CampaignsTableProps = {
 	mockState?: CampaignsMockState;
 	onMockStateChange?: (next: CampaignsMockState | undefined) => void;
+	/** Called whenever the campaign finder (single or split) opens or closes. */
+	onFinderOpenChange?: (isOpen: boolean) => void;
 };
 
 export const CampaignsTable: FC<CampaignsTableProps> = ({
 	mockState,
 	onMockStateChange,
+	onFinderOpenChange,
 }) => {
 	// Treat all mobile orientations (portrait and landscape) as mobile for this table
 	const isMobile = useIsMobile();
@@ -229,6 +233,15 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 	const isFinderLayoutOpen = isSplitFinderView
 		? leftCampaignsTable.isFinderOpen || rightCampaignsTable.isFinderOpen
 		: leftCampaignsTable.isFinderOpen;
+
+	// Notify parent when the finder open state changes.
+	useEffect(() => {
+		onFinderOpenChange?.(isFinderLayoutOpen);
+		return () => {
+			onFinderOpenChange?.(false);
+		};
+	}, [isFinderLayoutOpen, onFinderOpenChange]);
+
 	const existingCampaignNames = campaignRows
 		.map((campaign) => {
 			const name = (campaign as { name?: unknown }).name;
@@ -303,10 +316,13 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 				const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
 				const availableHeight =
 					(viewportHeight - rect.top - CAMPAIGN_FINDER_VIEWPORT_BOTTOM_GAP) / scale;
-				const nextHeight = Math.max(
+			const nextHeight = Math.min(
+				CAMPAIGN_FINDER_MAX_HEIGHT,
+				Math.max(
 					CAMPAIGN_FINDER_MIN_HEIGHT,
 					Math.floor(availableHeight)
-				);
+				)
+			);
 
 				setCampaignFinderHeight((current) =>
 					Math.abs(current - nextHeight) > 1 ? nextHeight : current

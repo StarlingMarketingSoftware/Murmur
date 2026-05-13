@@ -3,12 +3,17 @@ import { ColumnDef } from '@tanstack/react-table';
 import { Typography } from '@/components/ui/typography';
 import {
 	useDeleteCampaign,
+	useEditCampaign,
 	useGetCampaign,
 	useGetCampaigns,
 } from '@/hooks/queryHooks/useCampaigns';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
-import { useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { useEditEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
+import {
+	useCreateUserContactList,
+	useEditUserContactList,
+} from '@/hooks/queryHooks/useUserContactLists';
 import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import {
@@ -20,11 +25,12 @@ import {
 	useCallback,
 	type CSSProperties,
 } from 'react';
-import { cn, mmdd } from '@/utils';
+import { createPortal } from 'react-dom';
+import { _fetch, cn, mmdd } from '@/utils';
 import { useRowConfirmationAnimation } from '@/hooks/useRowConfirmationAnimation';
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 import CampaignRowChevronIcon from '@/components/atoms/_svg/CampaignRowChevronIcon';
-import type { CampaignsMockState } from './CampaignsTable';
+import type { CampaignsMockFolder, CampaignsMockState } from './CampaignsTable';
 import {
 	type CampaignDataTypeCategoryKey,
 	type CampaignDataTypeSummary,
@@ -43,7 +49,10 @@ import { EmailStatus } from '@/constants/prismaEnums';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { getStateAbbreviation } from '@/utils/string';
 import type { ContactWithName } from '@/types/contact';
-import type { EmailWithRelations, InboundEmailWithRelations } from '@/types';
+import type { CampaignWithRelations, EmailWithRelations, InboundEmailWithRelations } from '@/types';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 
 type CampaignWithCounts = Campaign & {
 	draftCount?: number;
@@ -51,12 +60,105 @@ type CampaignWithCounts = Campaign & {
 	newEmailCount?: number;
 	contactCount?: number;
 	campaignDataTypes?: CampaignDataTypeSummary[];
+	userContactListIds?: number[];
 };
 
 type FinderFolderKey = 'contacts' | 'drafts' | 'inbox' | 'sent' | 'archive';
 
+const CAMPAIGN_FINDER_DRAG_MIME = 'application/x-murmur-campaign-finder-item';
+
+type FinderDragItemKind = 'contact' | 'draft';
+
+type CampaignFinderDragPayload = {
+	itemKind: FinderDragItemKind;
+	sourceFolderKey: FinderFolderKey;
+	sourceCampaignId: number;
+	sourceContactListIds: number[];
+	contactId: number;
+	emailId?: number;
+	itemLabel: string;
+};
+
+let activeCampaignFinderDragPayload: CampaignFinderDragPayload | null = null;
+
+const getFinderDragItemKind = (folderKey: FinderFolderKey): FinderDragItemKind | null => {
+	if (folderKey === 'contacts') return 'contact';
+	if (folderKey === 'drafts') return 'draft';
+	return null;
+};
+
+const isCampaignFinderDragTransfer = (dataTransfer: DataTransfer): boolean =>
+	Array.from(dataTransfer.types).includes(CAMPAIGN_FINDER_DRAG_MIME);
+
+const hasCampaignFinderDragContext = (dataTransfer: DataTransfer): boolean =>
+	activeCampaignFinderDragPayload !== null || isCampaignFinderDragTransfer(dataTransfer);
+
+const parseCampaignFinderDragPayload = (value: string): CampaignFinderDragPayload | null => {
+	try {
+		const parsed = JSON.parse(value) as Partial<CampaignFinderDragPayload>;
+		const itemKind = parsed.itemKind;
+		const sourceFolderKey = parsed.sourceFolderKey;
+		const sourceCampaignId = parsed.sourceCampaignId;
+		const sourceContactListIds = parsed.sourceContactListIds;
+		const contactId = parsed.contactId;
+		const emailId = parsed.emailId;
+		const itemLabel = parsed.itemLabel;
+
+		if (itemKind !== 'contact' && itemKind !== 'draft') return null;
+		if (sourceFolderKey !== 'contacts' && sourceFolderKey !== 'drafts') return null;
+		if (typeof sourceCampaignId !== 'number') return null;
+		if (!Array.isArray(sourceContactListIds)) return null;
+		if (typeof contactId !== 'number') return null;
+		if (itemKind === 'draft' && typeof emailId !== 'number') return null;
+		if (typeof itemLabel !== 'string') return null;
+
+		return {
+			itemKind,
+			sourceFolderKey,
+			sourceCampaignId,
+			sourceContactListIds: sourceContactListIds.filter(
+				(id): id is number => typeof id === 'number'
+			),
+			contactId,
+			...(typeof emailId === 'number' ? { emailId } : {}),
+			itemLabel,
+		};
+	} catch {
+		return null;
+	}
+};
+
+const getCampaignFinderDragPayload = (dataTransfer: DataTransfer): CampaignFinderDragPayload | null => {
+	const raw = dataTransfer.getData(CAMPAIGN_FINDER_DRAG_MIME);
+	return raw ? parseCampaignFinderDragPayload(raw) : null;
+};
+
+const canDropCampaignFinderPayload = (
+	payload: CampaignFinderDragPayload | null,
+	targetCampaignId: number | null
+): payload is CampaignFinderDragPayload => {
+	if (!payload || targetCampaignId === null) return false;
+	if (payload.sourceCampaignId === targetCampaignId) return false;
+	if (typeof payload.contactId !== 'number') return false;
+	if (payload.itemKind === 'draft' && typeof payload.emailId !== 'number') return false;
+	return payload.itemKind === 'contact' || payload.itemKind === 'draft';
+};
+
+const getFinderDropTargetFolderKey = (
+	payload: CampaignFinderDragPayload | null
+): FinderFolderKey | null => {
+	if (!payload) return null;
+	if (payload.itemKind === 'contact') return 'contacts';
+	if (payload.itemKind === 'draft') return 'drafts';
+	return null;
+};
+
 type FinderContactItem = {
 	id: string | number;
+	contactId?: number;
+	emailId?: number;
+	campaignId?: number | null;
+	researchContact?: ContactWithName | null;
 	name: string;
 	personName?: string | null;
 	company?: string | null;
@@ -71,11 +173,105 @@ type FinderContactItem = {
 	email?: string | null;
 };
 
+const FINDER_SELECTED_ROW_COLORS: Record<FinderFolderKey, string> = {
+	contacts: '#F5A3A3',
+	drafts: '#FDDFB1',
+	inbox: '#9FCAFF',
+	sent: '#97E89B',
+	archive: '#CCC9C9',
+};
+
+const FINDER_CONTEXT_MENU_WIDTH = 200;
+const FINDER_CONTEXT_MENU_VIEWPORT_PADDING = 8;
+const FINDER_CONTEXT_MENU_BASE_HEIGHT = 128;
+const FINDER_CONTEXT_MENU_MOVE_TARGET_HEIGHT = 31;
+
+const getClampedFinderPopupPosition = (x: number, y: number, width: number, height: number) => {
+	if (typeof window === 'undefined') return { left: x, top: y };
+
+	return {
+		left: Math.max(
+			FINDER_CONTEXT_MENU_VIEWPORT_PADDING,
+			Math.min(x, window.innerWidth - width - FINDER_CONTEXT_MENU_VIEWPORT_PADDING)
+		),
+		top: Math.max(
+			FINDER_CONTEXT_MENU_VIEWPORT_PADDING,
+			Math.min(y, window.innerHeight - height - FINDER_CONTEXT_MENU_VIEWPORT_PADDING)
+		),
+	};
+};
+
+const getFinderItemSelectionKey = (folderKey: FinderFolderKey, item: FinderContactItem) => {
+	if (typeof item.emailId === 'number') return `${folderKey}:email:${item.emailId}`;
+	if (typeof item.contactId === 'number') return `${folderKey}:contact:${item.contactId}`;
+	return `${folderKey}:item:${String(item.id)}`;
+};
+
+const getFinderContextMenuPayload = (
+	state: FinderContextMenuState | null
+): CampaignFinderDragPayload | null => {
+	if (!state || state.sourceCampaignId === null) return null;
+	const itemKind = getFinderDragItemKind(state.folderKey);
+	if (!itemKind || typeof state.item.contactId !== 'number') return null;
+	if (itemKind === 'draft' && typeof state.item.emailId !== 'number') return null;
+
+	return {
+		itemKind,
+		sourceFolderKey: state.folderKey,
+		sourceCampaignId: state.sourceCampaignId,
+		sourceContactListIds: state.sourceContactListIds,
+		contactId: state.item.contactId,
+		...(typeof state.item.emailId === 'number' ? { emailId: state.item.emailId } : {}),
+		itemLabel: state.item.name,
+	};
+};
+
+const getFinderItemResearchContact = (item: FinderContactItem): ContactWithName | null => {
+	if (item.researchContact) return item.researchContact;
+	if (typeof item.contactId !== 'number') return null;
+
+	return {
+		id: item.contactId,
+		name: item.personName || item.name,
+		firstName: null,
+		lastName: null,
+		company: item.company ?? null,
+		email: item.email ?? '',
+		title: item.title ?? null,
+		headline: item.headline ?? null,
+		city: item.city ?? null,
+		state: item.state ?? null,
+		metadata: null,
+	} as ContactWithName;
+};
+
 type FinderFolder = {
 	key: FinderFolderKey;
 	label: string;
 	color: string;
 	items: FinderContactItem[];
+};
+
+type FinderMoveTarget = {
+	campaignId: number;
+	name: string;
+	folderIconColor: string;
+	userContactListIds: number[];
+};
+
+type FinderContextMenuState = {
+	x: number;
+	y: number;
+	selectionKey: string;
+	folderKey: FinderFolderKey;
+	item: FinderContactItem;
+	sourceCampaignId: number | null;
+	sourceContactListIds: number[];
+};
+
+type FinderInfoPopupState = {
+	contact: ContactWithName | null;
+	title: string;
 };
 
 type FinderTableRow = {
@@ -185,6 +381,7 @@ const MOCK_FINDER_CONTACTS: FinderContactItem[] = [
 ];
 
 const DEFAULT_MOCK_FOLDER_NAMES = ['Orion', 'Leo', 'Pieces', 'Capricorn', 'Sagittarius'];
+const MOCK_CONTACT_ID_BASE = 100000;
 const CAMPAIGN_FOLDER_NAME_BOX_COLORS = [
 	'#B9EAF1',
 	'#CDCFF9',
@@ -246,11 +443,37 @@ const buildMockCampaignRows = (mockState: CampaignsMockState): CampaignWithCount
 			draftCount: Math.max(0, folder.draftCount ?? 0),
 			sentCount: Math.max(0, folder.sentCount ?? 0),
 			newEmailCount: Math.max(0, folder.newEmailCount ?? 0),
-			contactCount: Math.max(0, folder.contactCount ?? 0),
+			contactCount: Math.max(0, folder.contactCount ?? folder.contactIds?.length ?? 0),
 			campaignDataTypes: folder.campaignDataTypes ?? DEFAULT_MOCK_CAMPAIGN_DATA_TYPES,
 			updatedAt,
 		} as unknown as CampaignWithCounts;
 	});
+};
+
+const getMockContactId = (index: number) => MOCK_CONTACT_ID_BASE + index + 1;
+
+const getMockContactIndex = (contactId: number) => {
+	const index = contactId - MOCK_CONTACT_ID_BASE - 1;
+	return Number.isInteger(index) && index >= 0 ? index : 0;
+};
+
+const resolveMockContactIds = (folder?: CampaignsMockFolder): number[] => {
+	const count = Math.max(0, folder?.contactCount ?? folder?.contactIds?.length ?? 0);
+	const ids = (folder?.contactIds ?? [])
+		.filter((id): id is number => typeof id === 'number')
+		.slice(0, count);
+
+	for (let index = 0; ids.length < count; index++) {
+		const nextId = getMockContactId(index);
+		if (!ids.includes(nextId)) ids.push(nextId);
+	}
+
+	return ids;
+};
+
+const getMockCampaignFolderIndex = (campaignId: number) => {
+	const index = -1000 - campaignId;
+	return Number.isInteger(index) && index >= 0 ? index : -1;
 };
 
 const getFinderContactPersonName = (contact: FinderContactSource): string | null => {
@@ -298,35 +521,69 @@ const getFinderContactCategory = (
 const toFinderContactItem = (
 	contact: FinderContactSource,
 	fallbackId: string
-): FinderContactItem => ({
-	id: typeof contact.id === 'number' ? contact.id : fallbackId,
-	name: getFinderContactName(contact),
-	personName: getFinderContactPersonName(contact),
-	company: contact.company ?? null,
-	title: contact.title ?? null,
-	headline: contact.headline ?? null,
-	category: getFinderContactCategory(contact),
-	city: contact.city ?? null,
-	state: contact.state ?? null,
-	email: contact.email ?? null,
-});
+): FinderContactItem => {
+	const contactId = typeof contact.id === 'number' ? contact.id : undefined;
+
+	return {
+		id: contactId ?? fallbackId,
+		...(contactId !== undefined ? { contactId } : {}),
+		...(contactId !== undefined
+			? {
+					researchContact: {
+						...contact,
+						name: getFinderContactName(contact),
+					} as ContactWithName,
+			  }
+			: {}),
+		name: getFinderContactName(contact),
+		personName: getFinderContactPersonName(contact),
+		company: contact.company ?? null,
+		title: contact.title ?? null,
+		headline: contact.headline ?? null,
+		category: getFinderContactCategory(contact),
+		city: contact.city ?? null,
+		state: contact.state ?? null,
+		email: contact.email ?? null,
+	};
+};
 
 const buildMockFinderItems = (
 	count: number,
-	folderKey: FinderFolderKey
+	folderKey: FinderFolderKey,
+	contactIds?: number[]
 ): FinderContactItem[] => {
-	const safeCount = Math.max(0, count);
-	return Array.from({ length: safeCount }, (_, index) => {
-		const contact = MOCK_FINDER_CONTACTS[index % MOCK_FINDER_CONTACTS.length];
+	const ids = contactIds ?? resolveMockContactIds({ contactCount: count });
+	return ids.map((contactId) => {
+		const mockIndex = getMockContactIndex(contactId);
+		const contact = MOCK_FINDER_CONTACTS[mockIndex % MOCK_FINDER_CONTACTS.length];
 		return {
 			...contact,
-			id: `mock-${folderKey}-${index + 1}`,
+			id: `mock-${folderKey}-${contactId}`,
+			contactId,
+			researchContact: {
+				id: contactId,
+				name: contact.name,
+				firstName: null,
+				lastName: null,
+				company: contact.company ?? null,
+				email: contact.email ?? '',
+				title: contact.title ?? null,
+				headline: null,
+				city: contact.city ?? null,
+				state: contact.state ?? null,
+				metadata: null,
+			} as ContactWithName,
 		};
 	});
 };
 
 const getUniqueContactItemsFromEmails = (
-	emails: Array<Pick<EmailWithRelations, 'contact'> | Pick<InboundEmailWithRelations, 'contact'>> | undefined,
+	emails:
+		| Array<
+				| Pick<EmailWithRelations, 'id' | 'campaignId' | 'contact'>
+				| Pick<InboundEmailWithRelations, 'id' | 'campaignId' | 'contact'>
+		  >
+		| undefined,
 	folderKey: FinderFolderKey
 ): FinderContactItem[] => {
 	const seenContactIds = new Set<number>();
@@ -341,7 +598,12 @@ const getUniqueContactItemsFromEmails = (
 			seenContactIds.add(contact.id);
 		}
 
-		items.push(toFinderContactItem(contact, `${folderKey}-${index + 1}`));
+		const item = toFinderContactItem(contact, `${folderKey}-${index + 1}`);
+		items.push({
+			...item,
+			...(typeof email.id === 'number' ? { emailId: email.id } : {}),
+			campaignId: typeof email.campaignId === 'number' ? email.campaignId : null,
+		});
 	});
 
 	return items;
@@ -401,14 +663,186 @@ const FinderStateBadge = ({ state }: { state?: string | null }) => {
 	);
 };
 
+const CampaignFinderContextMenu = ({
+	state,
+	moveTargets,
+	canMove,
+	canRemove,
+	isPending,
+	onOpenInNewTab,
+	onMoveToCampaign,
+	onRemoveFromFolder,
+	onGetInfo,
+}: {
+	state: FinderContextMenuState | null;
+	moveTargets: FinderMoveTarget[];
+	canMove: boolean;
+	canRemove: boolean;
+	isPending: boolean;
+	onOpenInNewTab: (state: FinderContextMenuState) => void;
+	onMoveToCampaign: (state: FinderContextMenuState, target: FinderMoveTarget) => void;
+	onRemoveFromFolder: (state: FinderContextMenuState) => void;
+	onGetInfo: (state: FinderContextMenuState) => void;
+}) => {
+	if (!state) return null;
+	if (typeof document === 'undefined') return null;
+
+	const showMoveSection = canMove && moveTargets.length > 0;
+	const estimatedHeight =
+		FINDER_CONTEXT_MENU_BASE_HEIGHT +
+		(showMoveSection ? 35 + moveTargets.length * FINDER_CONTEXT_MENU_MOVE_TARGET_HEIGHT : 0) +
+		(canRemove ? 42 : 0);
+	const position = getClampedFinderPopupPosition(
+		state.x,
+		state.y,
+		FINDER_CONTEXT_MENU_WIDTH,
+		estimatedHeight
+	);
+
+	return createPortal(
+		<div
+			className="campaign-finder-context-menu"
+			data-custom-table-ignore-row-click="true"
+			role="menu"
+			style={{ left: position.left, top: position.top }}
+			onContextMenu={(event) => event.preventDefault()}
+			onPointerDown={(event) => event.stopPropagation()}
+		>
+			<button
+				type="button"
+				className="campaign-finder-context-menu-item"
+				role="menuitem"
+				onClick={() => onOpenInNewTab(state)}
+			>
+				Open in New Tab
+			</button>
+
+			{showMoveSection ? (
+				<>
+					<div className="campaign-finder-context-menu-separator" role="separator" />
+					<div className="campaign-finder-context-menu-label">Move to</div>
+					{moveTargets.map((target) => (
+						<button
+							type="button"
+							key={target.campaignId}
+							className="campaign-finder-context-menu-item campaign-finder-context-menu-move-item"
+							role="menuitem"
+							disabled={isPending}
+							onClick={() => onMoveToCampaign(state, target)}
+						>
+							<span
+								className="campaign-finder-context-menu-folder-icon"
+								style={{ color: target.folderIconColor }}
+								aria-hidden="true"
+							>
+								<DashboardActionBarFolderIcon width={21} height={13} />
+							</span>
+							<span className="campaign-finder-context-menu-target-name">
+								{target.name}
+							</span>
+						</button>
+					))}
+				</>
+			) : null}
+
+			{canRemove ? (
+				<>
+					<div className="campaign-finder-context-menu-separator" role="separator" />
+					<button
+						type="button"
+						className="campaign-finder-context-menu-item"
+						role="menuitem"
+						disabled={isPending}
+						onClick={() => onRemoveFromFolder(state)}
+					>
+						Remove from Folder
+					</button>
+				</>
+			) : null}
+
+			<div className="campaign-finder-context-menu-separator" role="separator" />
+			<button
+				type="button"
+				className="campaign-finder-context-menu-item"
+				role="menuitem"
+				onClick={() => onGetInfo(state)}
+			>
+				Get Info
+			</button>
+		</div>,
+		document.documentElement
+	);
+};
+
+const CampaignFinderInfoPopup = ({
+	state,
+	onClose,
+}: {
+	state: FinderInfoPopupState | null;
+	onClose: () => void;
+}) => {
+	if (!state) return null;
+	if (typeof document === 'undefined') return null;
+
+	return createPortal(
+		<div
+			className="campaign-finder-info-popup-layer"
+			data-custom-table-ignore-row-click="true"
+			onContextMenu={(event) => event.preventDefault()}
+		>
+			<div
+				className="campaign-finder-info-popup"
+				role="dialog"
+				aria-label={`Info for ${state.title}`}
+				onContextMenu={(event) => event.preventDefault()}
+				onPointerDown={(event) => event.stopPropagation()}
+			>
+				<button
+					type="button"
+					className="campaign-finder-info-popup-close"
+					aria-label="Close info"
+					onClick={onClose}
+				/>
+				<ContactResearchPanel contact={state.contact} disableExpansion />
+			</div>
+		</div>,
+		document.documentElement
+	);
+};
+
 const FinderContactRow = ({
 	item,
 	index,
 	dotColor,
+	folderKey,
+	sourceCampaignId,
+	sourceContactListIds,
+	selectedItemKey,
+	isDragEnabled,
+	onSelect,
+	onContextMenu,
+	onDragStart,
+	onDragEnd,
 }: {
 	item: FinderContactItem;
 	index: number;
 	dotColor: string;
+	folderKey: FinderFolderKey;
+	sourceCampaignId: number | null;
+	sourceContactListIds: number[];
+	selectedItemKey: string | null;
+	isDragEnabled: boolean;
+	onSelect: (selectionKey: string) => void;
+	onContextMenu: (
+		event: React.MouseEvent<HTMLDivElement>,
+		item: FinderContactItem,
+		folderKey: FinderFolderKey,
+		sourceCampaignId: number | null,
+		sourceContactListIds: number[],
+		selectionKey: string
+	) => void;
+	onDragStart: (event: React.DragEvent<HTMLDivElement>, payload: CampaignFinderDragPayload) => void;
+	onDragEnd: () => void;
 }) => {
 	const hasLegacyPersonName = Boolean(
 		item.personName === undefined &&
@@ -418,12 +852,75 @@ const FinderContactRow = ({
 	const primaryText = item.personName || item.name;
 	const showCompany = Boolean((item.personName || hasLegacyPersonName) && item.company);
 	const descriptorText = item.category?.label || item.title?.trim() || item.headline?.trim() || '';
+	const selectionKey = getFinderItemSelectionKey(folderKey, item);
+	const isSelected = selectedItemKey === selectionKey;
+	const dragItemKind = getFinderDragItemKind(folderKey);
+	const canDrag = Boolean(
+		isDragEnabled &&
+			dragItemKind &&
+			sourceCampaignId !== null &&
+			typeof item.contactId === 'number' &&
+			(dragItemKind !== 'draft' || typeof item.emailId === 'number')
+	);
+	const dragPayload: CampaignFinderDragPayload | null =
+		canDrag && dragItemKind && sourceCampaignId !== null && typeof item.contactId === 'number'
+			? {
+					itemKind: dragItemKind,
+					sourceFolderKey: folderKey,
+					sourceCampaignId,
+					sourceContactListIds,
+					contactId: item.contactId,
+					...(typeof item.emailId === 'number' ? { emailId: item.emailId } : {}),
+					itemLabel: primaryText,
+			  }
+			: null;
 
 	return (
 		<div
-			className="campaign-finder-contact-row"
+			className={cn(
+				'campaign-finder-contact-row',
+				'campaign-finder-contact-row-selectable',
+				isSelected && 'campaign-finder-contact-row-selected',
+				canDrag && 'campaign-finder-contact-row-draggable'
+			)}
 			data-custom-table-ignore-row-click="true"
-			style={{ backgroundColor: index % 2 === 0 ? '#FAF7F7' : '#FFFFFF' }}
+			data-finder-row-selected={isSelected ? 'true' : undefined}
+			aria-selected={isSelected}
+			draggable={canDrag}
+			style={{
+				backgroundColor: isSelected
+					? FINDER_SELECTED_ROW_COLORS[folderKey]
+					: index % 2 === 0
+						? '#FAF7F7'
+						: '#FFFFFF',
+			}}
+			onPointerDown={(event) => {
+				if (event.button !== 0) return;
+				onSelect(selectionKey);
+			}}
+			onClick={() => onSelect(selectionKey)}
+			onContextMenu={(event) => {
+				onSelect(selectionKey);
+				onContextMenu(
+					event,
+					item,
+					folderKey,
+					sourceCampaignId,
+					sourceContactListIds,
+					selectionKey
+				);
+			}}
+			onDragStart={(event) => {
+				onSelect(selectionKey);
+
+				if (!dragPayload) {
+					event.preventDefault();
+					return;
+				}
+
+				onDragStart(event, dragPayload);
+			}}
+			onDragEnd={onDragEnd}
 		>
 			<span
 				className="campaign-finder-contact-dot"
@@ -471,15 +968,50 @@ const FinderContactRow = ({
 };
 
 const CampaignFinderPanel = ({
+	campaignId,
+	contactListIds,
 	folders,
 	expandedFolderKeys,
 	onToggleFolder,
 	searchQuery,
+	selectedItemKey,
+	isDragEnabled,
+	isDropTargetActive,
+	dropTargetFolderKey,
+	isDropPending,
+	onSelectItem,
+	onItemContextMenu,
+	onItemDragStart,
+	onItemDragEnd,
+	onPanelDragOver,
+	onPanelDragLeave,
+	onPanelDrop,
 }: {
+	campaignId: number | null;
+	contactListIds: number[];
 	folders: FinderFolder[];
 	expandedFolderKeys: FinderFolderKey[];
 	onToggleFolder: (folderKey: FinderFolderKey) => void;
 	searchQuery: string;
+	selectedItemKey: string | null;
+	isDragEnabled: boolean;
+	isDropTargetActive: boolean;
+	dropTargetFolderKey: FinderFolderKey | null;
+	isDropPending: boolean;
+	onSelectItem: (selectionKey: string) => void;
+	onItemContextMenu: (
+		event: React.MouseEvent<HTMLDivElement>,
+		item: FinderContactItem,
+		folderKey: FinderFolderKey,
+		sourceCampaignId: number | null,
+		sourceContactListIds: number[],
+		selectionKey: string
+	) => void;
+	onItemDragStart: (event: React.DragEvent<HTMLDivElement>, payload: CampaignFinderDragPayload) => void;
+	onItemDragEnd: () => void;
+	onPanelDragOver: (event: React.DragEvent<HTMLDivElement>) => void;
+	onPanelDragLeave: (event: React.DragEvent<HTMLDivElement>) => void;
+	onPanelDrop: (event: React.DragEvent<HTMLDivElement>) => void;
 }) => {
 	const stopFinderEvent = (event: React.SyntheticEvent) => {
 		event.stopPropagation();
@@ -494,9 +1026,15 @@ const CampaignFinderPanel = ({
 			<div
 				className="campaign-finder-panel"
 				data-custom-table-ignore-row-click="true"
+				data-finder-drop-target={isDropTargetActive ? 'true' : undefined}
+				data-finder-drop-pending={isDropPending ? 'true' : undefined}
+				data-finder-drop-zone="true"
 				onPointerDown={stopFinderEvent}
 				onMouseDown={stopFinderEvent}
 				onClick={stopFinderEvent}
+				onDragOver={onPanelDragOver}
+				onDragLeave={onPanelDragLeave}
+				onDrop={onPanelDrop}
 			>
 				{isSearching ? (
 					<div className="campaign-finder-search-results">
@@ -507,6 +1045,15 @@ const CampaignFinderPanel = ({
 									item={item}
 									index={itemIndex}
 									dotColor={contactsFolder?.color ?? '#CC5858'}
+									folderKey="contacts"
+									sourceCampaignId={campaignId}
+									sourceContactListIds={contactListIds}
+									selectedItemKey={selectedItemKey}
+									isDragEnabled={isDragEnabled}
+									onSelect={onSelectItem}
+									onContextMenu={onItemContextMenu}
+									onDragStart={onItemDragStart}
+									onDragEnd={onItemDragEnd}
 								/>
 							))
 						) : (
@@ -517,6 +1064,7 @@ const CampaignFinderPanel = ({
 					</div>
 				) : folders.map((folder, folderIndex) => {
 					const isExpanded = expandedFolderKeys.includes(folder.key);
+					const isFolderDropTarget = isDropTargetActive && dropTargetFolderKey === folder.key;
 					const handleToggle = () => onToggleFolder(folder.key);
 
 					return (
@@ -525,6 +1073,7 @@ const CampaignFinderPanel = ({
 								type="button"
 								className="campaign-finder-folder-row"
 								data-custom-table-ignore-row-click="true"
+								data-finder-folder-drop-target={isFolderDropTarget ? 'true' : undefined}
 								style={{
 									backgroundColor: folderIndex % 2 === 0 ? '#FAF7F7' : '#FFFFFF',
 								}}
@@ -555,6 +1104,15 @@ const CampaignFinderPanel = ({
 										item={item}
 										index={itemIndex}
 										dotColor={folder.color}
+										folderKey={folder.key}
+										sourceCampaignId={campaignId}
+										sourceContactListIds={contactListIds}
+										selectedItemKey={selectedItemKey}
+										isDragEnabled={isDragEnabled}
+										onSelect={onSelectItem}
+										onContextMenu={onItemContextMenu}
+										onDragStart={onItemDragStart}
+										onDragEnd={onItemDragEnd}
 									/>
 								  ))
 								: null}
@@ -746,13 +1304,17 @@ const CampaignDataTypeIconStrip = ({
 export const useCampaignsTable = (options?: {
 	compactMetrics?: boolean;
 	mockState?: CampaignsMockState;
+	onMockStateChange?: (next: CampaignsMockState | undefined) => void;
 	enableFinder?: boolean;
 	finderSearchQuery?: string;
+	onFinderOpenInNewTab?: (campaignId: number) => void;
 }) => {
 	const compactMetrics = options?.compactMetrics ?? false;
 	const mockState = options?.mockState;
+	const onMockStateChange = options?.onMockStateChange;
 	const enableFinder = options?.enableFinder ?? true;
 	const finderSearchQuery = options?.finderSearchQuery ?? '';
+	const onFinderOpenInNewTab = options?.onFinderOpenInNewTab;
 	const normalizedFinderSearchQuery = normalizeFinderSearchText(finderSearchQuery);
 	const isMockActive = mockState != null;
 	const [confirmingCampaignId, setConfirmingCampaignId] = useState<number | null>(null);
@@ -760,8 +1322,25 @@ export const useCampaignsTable = (options?: {
 	const confirmationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const [openCampaignId, setOpenCampaignId] = useState<number | null>(null);
 	const [openFolderKeys, setOpenFolderKeys] = useState<FinderFolderKey[]>([]);
+	const [selectedFinderItemKey, setSelectedFinderItemKey] = useState<string | null>(null);
 	const frozenCampaignOrderRef = useRef<number[] | null>(null);
 	const isFinderOpen = enableFinder && openCampaignId !== null;
+	const queryClient = useQueryClient();
+	const [isFinderDropTargetActive, setIsFinderDropTargetActive] = useState(false);
+	const [finderDropTargetFolderKey, setFinderDropTargetFolderKey] =
+		useState<FinderFolderKey | null>(null);
+	const [isFinderDropPending, setIsFinderDropPending] = useState(false);
+	const [finderContextMenu, setFinderContextMenu] =
+		useState<FinderContextMenuState | null>(null);
+	const [finderInfoPopup, setFinderInfoPopup] = useState<FinderInfoPopupState | null>(null);
+	const { mutateAsync: createFinderUserContactList } = useCreateUserContactList({
+		suppressToasts: true,
+	});
+	const { mutateAsync: editFinderCampaign } = useEditCampaign({ suppressToasts: true });
+	const { mutateAsync: editFinderUserContactList } = useEditUserContactList({
+		suppressToasts: true,
+	});
+	const { mutateAsync: editFinderEmail } = useEditEmail({ suppressToasts: true });
 
 	const [metricSort, setMetricSort] = useState<MetricSortState>(null);
 	const metricSortKey = metricSort?.key ?? null;
@@ -799,6 +1378,11 @@ export const useCampaignsTable = (options?: {
 	const closeFinder = useCallback(() => {
 		setOpenCampaignId(null);
 		setOpenFolderKeys([]);
+		setSelectedFinderItemKey(null);
+		setIsFinderDropTargetActive(false);
+		setFinderDropTargetFolderKey(null);
+		setFinderContextMenu(null);
+		setFinderInfoPopup(null);
 		frozenCampaignOrderRef.current = null;
 	}, []);
 
@@ -842,6 +1426,40 @@ export const useCampaignsTable = (options?: {
 		document.addEventListener('pointerdown', handleDocumentPointerDown);
 		return () => document.removeEventListener('pointerdown', handleDocumentPointerDown);
 	}, [closeFinder, isFinderOpen]);
+
+	useEffect(() => {
+		if (!finderContextMenu && !finderInfoPopup) return;
+
+		const handleDocumentPointerDown = (event: PointerEvent) => {
+			const target = event.target;
+			const targetElement =
+				target instanceof Element
+					? target
+					: target instanceof Node
+						? target.parentElement
+						: null;
+
+			if (targetElement?.closest('.campaign-finder-context-menu, .campaign-finder-info-popup')) {
+				return;
+			}
+
+			setFinderContextMenu(null);
+			setFinderInfoPopup(null);
+		};
+
+		const handleDocumentKeyDown = (event: KeyboardEvent) => {
+			if (event.key !== 'Escape') return;
+			setFinderContextMenu(null);
+			setFinderInfoPopup(null);
+		};
+
+		document.addEventListener('pointerdown', handleDocumentPointerDown);
+		document.addEventListener('keydown', handleDocumentKeyDown);
+		return () => {
+			document.removeEventListener('pointerdown', handleDocumentPointerDown);
+			document.removeEventListener('keydown', handleDocumentKeyDown);
+		};
+	}, [finderContextMenu, finderInfoPopup]);
 
 	// Keep the Drafts sort underline anchored to the bottom of the table container,
 	// aligned with the Drafts header "pill" width.
@@ -1071,6 +1689,22 @@ export const useCampaignsTable = (options?: {
 
 		return [...ordered, ...added];
 	}, [openCampaignId, sortedCampaignData]);
+	const finderMoveTargets = useMemo<FinderMoveTarget[]>(() => {
+		if (!displayedCampaignData || openCampaignId === null) return [];
+
+		return displayedCampaignData
+			.map((campaign, index) => ({ campaign, index }))
+			.filter(({ campaign }) => campaign.id !== openCampaignId)
+			.map(({ campaign, index }) => ({
+				campaignId: campaign.id,
+				name: campaign.name || `Folder ${index + 1}`,
+				folderIconColor:
+					CAMPAIGN_FOLDER_ICON_COLORS[getCampaignFolderPaletteIndex(index)],
+				userContactListIds: (campaign.userContactListIds ?? []).filter(
+					(id): id is number => typeof id === 'number'
+				),
+			}));
+	}, [displayedCampaignData, openCampaignId]);
 	const data = useMemo<CampaignTableRow[] | undefined>(() => {
 		if (!displayedCampaignData) return displayedCampaignData;
 		if (!isFinderOpen || openCampaignId === null) return displayedCampaignData;
@@ -1105,6 +1739,7 @@ export const useCampaignsTable = (options?: {
 				sortedCampaignData?.map((campaign) => campaign.id) ?? null;
 			setOpenCampaignId(campaignId);
 			setOpenFolderKeys([]);
+			setSelectedFinderItemKey(null);
 		},
 		[closeFinder, enableFinder, sortedCampaignData]
 	);
@@ -1121,6 +1756,7 @@ export const useCampaignsTable = (options?: {
 				gap: 'var(--campaign-metric-gap, 32px)',
 				...(shouldShowNewMetricSlot ? {} : { '--campaign-metric-gap': '62px' }),
 		  } as CSSProperties);
+	const canDragFinderItems = !isFinderDropPending && (!isMockActive || Boolean(onMockStateChange));
 
 	useEffect(() => {
 		if (openCampaignId !== null && !baseData?.some((campaign) => campaign.id === openCampaignId)) {
@@ -1153,6 +1789,37 @@ export const useCampaignsTable = (options?: {
 		);
 	}, []);
 
+	const handleFinderItemSelect = useCallback((selectionKey: string) => {
+		setSelectedFinderItemKey(selectionKey);
+	}, []);
+
+	const handleFinderItemContextMenu = useCallback(
+		(
+			event: React.MouseEvent<HTMLDivElement>,
+			item: FinderContactItem,
+			folderKey: FinderFolderKey,
+			sourceCampaignId: number | null,
+			sourceContactListIds: number[],
+			selectionKey: string
+		) => {
+			event.preventDefault();
+			event.stopPropagation();
+			event.nativeEvent.stopImmediatePropagation();
+			setSelectedFinderItemKey(selectionKey);
+			setFinderInfoPopup(null);
+			setFinderContextMenu({
+				x: event.clientX,
+				y: event.clientY,
+				selectionKey,
+				folderKey,
+				item,
+				sourceCampaignId,
+				sourceContactListIds,
+			});
+		},
+		[]
+	);
+
 	const openCampaign = useMemo(
 		() => displayedCampaignData?.find((campaign) => campaign.id === openCampaignId) ?? null,
 		[displayedCampaignData, openCampaignId]
@@ -1178,11 +1845,13 @@ export const useCampaignsTable = (options?: {
 		}
 
 		if (isMockActive) {
-			const mockContactCount = openCampaign.contactCount;
+			const mockFolderIndex = openCampaignId === null ? -1 : getMockCampaignFolderIndex(openCampaignId);
+			const mockContactIds = resolveMockContactIds(mockState?.folders?.[mockFolderIndex]);
+			const mockContactCount = mockContactIds.length || openCampaign.contactCount;
 			const itemsByKey: Record<FinderFolderKey, FinderContactItem[]> = {
 				contacts:
 					typeof mockContactCount === 'number'
-						? buildMockFinderItems(mockContactCount, 'contacts')
+						? buildMockFinderItems(mockContactCount, 'contacts', mockContactIds)
 						: MOCK_FINDER_CONTACTS,
 				drafts: buildMockFinderItems(openCampaign.draftCount ?? 0, 'drafts'),
 				inbox: buildMockFinderItems(openCampaign.newEmailCount ?? 0, 'inbox'),
@@ -1220,9 +1889,516 @@ export const useCampaignsTable = (options?: {
 		finderInboundEmails,
 		finderSentEmails,
 		isMockActive,
+		mockState,
 		normalizedFinderSearchQuery,
 		openCampaign,
+		openCampaignId,
 	]);
+	const ensureFinderUserContactListIdForCampaign = useCallback(
+		async ({
+			campaignId,
+			campaignName,
+			knownContactListIds,
+		}: {
+			campaignId: number;
+			campaignName: string;
+			knownContactListIds: number[];
+		}): Promise<number> => {
+			const knownListId = knownContactListIds.find((id) => typeof id === 'number');
+			if (typeof knownListId === 'number') return knownListId;
+
+			const campaignDetail = await queryClient.fetchQuery<CampaignWithRelations>({
+				queryKey: ['campaigns', 'detail', campaignId.toString()],
+				queryFn: async () => {
+					const response = await _fetch(urls.api.campaigns.detail(campaignId));
+					if (!response.ok) {
+						throw new Error('Failed to fetch campaign');
+					}
+					return response.json() as Promise<CampaignWithRelations>;
+				},
+			});
+
+			const existingListId = campaignDetail.userContactLists?.find(
+				(list) => typeof list.id === 'number'
+			)?.id;
+			if (typeof existingListId === 'number') return existingListId;
+
+			const createdList = await createFinderUserContactList({
+				name: campaignName || 'Campaign Contacts',
+				contactIds: [],
+			});
+			const createdListId = (createdList as { id?: unknown }).id;
+			if (typeof createdListId !== 'number') {
+				throw new Error('Could not create a contact list for this campaign.');
+			}
+
+			await editFinderCampaign({
+				id: campaignId,
+				data: {
+					userContactListOperation: {
+						action: 'connect',
+						userContactListIds: [createdListId],
+					},
+				},
+			});
+
+			return createdListId;
+		},
+		[createFinderUserContactList, editFinderCampaign, queryClient]
+	);
+
+	const ensureFinderTargetUserContactListId = useCallback(async (): Promise<number> => {
+		if (!openCampaign || openCampaignId === null) {
+			throw new Error('Target campaign is not open.');
+		}
+
+		return ensureFinderUserContactListIdForCampaign({
+			campaignId: openCampaignId,
+			campaignName: openCampaign.name || 'Campaign Contacts',
+			knownContactListIds: selectedContactListIds,
+		});
+	}, [
+		ensureFinderUserContactListIdForCampaign,
+		openCampaign,
+		openCampaignId,
+		selectedContactListIds,
+	]);
+
+	const invalidateFinderDropQueries = useCallback(async () => {
+		await Promise.all([
+			queryClient.invalidateQueries({ queryKey: ['campaigns'] }),
+			queryClient.invalidateQueries({ queryKey: ['contacts'] }),
+			queryClient.invalidateQueries({ queryKey: ['emails'] }),
+			queryClient.invalidateQueries({ queryKey: ['userContactLists'] }),
+		]);
+	}, [queryClient]);
+
+	const moveFinderContact = useCallback(
+		async (payload: CampaignFinderDragPayload) => {
+			const targetListId = await ensureFinderTargetUserContactListId();
+			await editFinderUserContactList({
+				id: targetListId,
+				data: {
+					contactOperation: {
+						action: 'connect',
+						contactIds: [payload.contactId],
+					},
+				},
+			});
+
+			const sourceListIds = payload.sourceContactListIds.filter((id) => id !== targetListId);
+			if (sourceListIds.length === 0) return;
+
+			await Promise.all(
+				sourceListIds.map((id) =>
+					editFinderUserContactList({
+						id,
+						data: {
+							contactOperation: {
+								action: 'disconnect',
+								contactIds: [payload.contactId],
+							},
+						},
+					})
+				)
+			);
+		},
+		[editFinderUserContactList, ensureFinderTargetUserContactListId]
+	);
+
+	const moveFinderContactToCampaign = useCallback(
+		async (payload: CampaignFinderDragPayload, target: FinderMoveTarget) => {
+			const targetListId = await ensureFinderUserContactListIdForCampaign({
+				campaignId: target.campaignId,
+				campaignName: target.name,
+				knownContactListIds: target.userContactListIds,
+			});
+
+			await editFinderUserContactList({
+				id: targetListId,
+				data: {
+					contactOperation: {
+						action: 'connect',
+						contactIds: [payload.contactId],
+					},
+				},
+			});
+
+			const sourceListIds = payload.sourceContactListIds.filter((id) => id !== targetListId);
+			if (sourceListIds.length === 0) return;
+
+			await Promise.all(
+				sourceListIds.map((id) =>
+					editFinderUserContactList({
+						id,
+						data: {
+							contactOperation: {
+								action: 'disconnect',
+								contactIds: [payload.contactId],
+							},
+						},
+					})
+				)
+			);
+		},
+		[editFinderUserContactList, ensureFinderUserContactListIdForCampaign]
+	);
+
+	const removeFinderContactFromFolder = useCallback(
+		async (payload: CampaignFinderDragPayload) => {
+			if (payload.sourceContactListIds.length === 0) return;
+
+			await Promise.all(
+				payload.sourceContactListIds.map((id) =>
+					editFinderUserContactList({
+						id,
+						data: {
+							contactOperation: {
+								action: 'disconnect',
+								contactIds: [payload.contactId],
+							},
+						},
+					})
+				)
+			);
+		},
+		[editFinderUserContactList]
+	);
+
+	const moveFinderDraft = useCallback(
+		async (payload: CampaignFinderDragPayload) => {
+			if (openCampaignId === null || typeof payload.emailId !== 'number') return;
+
+			await editFinderEmail({
+				id: payload.emailId,
+				data: { campaignId: openCampaignId },
+			});
+		},
+		[editFinderEmail, openCampaignId]
+	);
+
+	const moveFinderDraftToCampaign = useCallback(
+		async (payload: CampaignFinderDragPayload, targetCampaignId: number) => {
+			if (typeof payload.emailId !== 'number') return;
+
+			await editFinderEmail({
+				id: payload.emailId,
+				data: { campaignId: targetCampaignId },
+			});
+		},
+		[editFinderEmail]
+	);
+
+	const moveMockFinderContactToCampaign = useCallback(
+		(payload: CampaignFinderDragPayload, targetCampaignId: number) => {
+			if (!mockState || !onMockStateChange) return false;
+			if (payload.itemKind !== 'contact') return false;
+
+			const sourceIndex = getMockCampaignFolderIndex(payload.sourceCampaignId);
+			const targetIndex = getMockCampaignFolderIndex(targetCampaignId);
+			if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return false;
+
+			const folders = mockState.folders?.slice() ?? [];
+			const sourceFolder = folders[sourceIndex];
+			const targetFolder = folders[targetIndex];
+			if (!sourceFolder || !targetFolder) return false;
+
+			const sourceContactIds = resolveMockContactIds(sourceFolder);
+			const targetContactIds = resolveMockContactIds(targetFolder);
+			if (!sourceContactIds.includes(payload.contactId)) return false;
+
+			const nextSourceContactIds = sourceContactIds.filter((id) => id !== payload.contactId);
+			const nextTargetContactIds = targetContactIds.includes(payload.contactId)
+				? targetContactIds
+				: [...targetContactIds, payload.contactId];
+
+			folders[sourceIndex] = {
+				...sourceFolder,
+				contactIds: nextSourceContactIds,
+				contactCount: nextSourceContactIds.length,
+			};
+			folders[targetIndex] = {
+				...targetFolder,
+				contactIds: nextTargetContactIds,
+				contactCount: nextTargetContactIds.length,
+			};
+
+			onMockStateChange({
+				...mockState,
+				folders,
+			});
+
+			return true;
+		},
+		[mockState, onMockStateChange]
+	);
+
+	const moveMockFinderContact = useCallback(
+		(payload: CampaignFinderDragPayload) => {
+			if (openCampaignId === null) return false;
+			return moveMockFinderContactToCampaign(payload, openCampaignId);
+		},
+		[moveMockFinderContactToCampaign, openCampaignId]
+	);
+
+	const removeMockFinderContactFromFolder = useCallback(
+		(payload: CampaignFinderDragPayload) => {
+			if (!mockState || !onMockStateChange) return false;
+			if (payload.itemKind !== 'contact') return false;
+
+			const sourceIndex = getMockCampaignFolderIndex(payload.sourceCampaignId);
+			if (sourceIndex < 0) return false;
+
+			const folders = mockState.folders?.slice() ?? [];
+			const sourceFolder = folders[sourceIndex];
+			if (!sourceFolder) return false;
+
+			const sourceContactIds = resolveMockContactIds(sourceFolder);
+			if (!sourceContactIds.includes(payload.contactId)) return false;
+
+			const nextSourceContactIds = sourceContactIds.filter((id) => id !== payload.contactId);
+			folders[sourceIndex] = {
+				...sourceFolder,
+				contactIds: nextSourceContactIds,
+				contactCount: nextSourceContactIds.length,
+			};
+
+			onMockStateChange({
+				...mockState,
+				folders,
+			});
+
+			return true;
+		},
+		[mockState, onMockStateChange]
+	);
+
+	const handleFinderItemDrop = useCallback(
+		async (payload: CampaignFinderDragPayload | null) => {
+			if (!canDropCampaignFinderPayload(payload, openCampaignId)) {
+				activeCampaignFinderDragPayload = null;
+				setIsFinderDropTargetActive(false);
+				setFinderDropTargetFolderKey(null);
+				return;
+			}
+
+			if (isMockActive) {
+				const moved = moveMockFinderContact(payload);
+				activeCampaignFinderDragPayload = null;
+				setIsFinderDropTargetActive(false);
+				setFinderDropTargetFolderKey(null);
+				if (moved) {
+					toast.success('Contact moved');
+				}
+				return;
+			}
+
+			setIsFinderDropPending(true);
+			try {
+				if (payload.itemKind === 'contact') {
+					await moveFinderContact(payload);
+				} else {
+					await moveFinderDraft(payload);
+				}
+
+				await invalidateFinderDropQueries();
+				toast.success(payload.itemKind === 'contact' ? 'Contact moved' : 'Draft moved');
+			} catch {
+				toast.error(
+					payload.itemKind === 'contact'
+						? 'Could not move contact. Please try again.'
+						: 'Could not move draft. Please try again.'
+				);
+			} finally {
+				activeCampaignFinderDragPayload = null;
+				setIsFinderDropPending(false);
+				setIsFinderDropTargetActive(false);
+				setFinderDropTargetFolderKey(null);
+			}
+		},
+		[
+			invalidateFinderDropQueries,
+			isMockActive,
+			moveFinderContact,
+			moveFinderDraft,
+			moveMockFinderContact,
+			openCampaignId,
+		]
+	);
+
+	const handleFinderItemDragStart = useCallback(
+		(event: React.DragEvent<HTMLDivElement>, payload: CampaignFinderDragPayload) => {
+			activeCampaignFinderDragPayload = payload;
+			setSelectedFinderItemKey(
+				`${payload.sourceFolderKey}:${typeof payload.emailId === 'number' ? 'email' : 'contact'}:${
+					payload.emailId ?? payload.contactId
+				}`
+			);
+			event.dataTransfer.effectAllowed = 'move';
+			event.dataTransfer.setData(CAMPAIGN_FINDER_DRAG_MIME, JSON.stringify(payload));
+			event.dataTransfer.setData('text/plain', payload.itemLabel);
+		},
+		[]
+	);
+
+	const handleFinderItemDragEnd = useCallback(() => {
+		activeCampaignFinderDragPayload = null;
+		setIsFinderDropTargetActive(false);
+		setFinderDropTargetFolderKey(null);
+	}, []);
+
+	const handleFinderPanelDragOver = useCallback(
+		(event: React.DragEvent<HTMLDivElement>) => {
+			if (isFinderDropPending || (isMockActive && !onMockStateChange)) return;
+			if (!hasCampaignFinderDragContext(event.dataTransfer)) return;
+			const payload = activeCampaignFinderDragPayload;
+			if (payload) {
+				if (!canDropCampaignFinderPayload(payload, openCampaignId)) return;
+			} else if (openCampaignId === null) {
+				return;
+			}
+
+			event.preventDefault();
+			event.stopPropagation();
+			event.dataTransfer.dropEffect = 'move';
+			setIsFinderDropTargetActive(true);
+			setFinderDropTargetFolderKey(getFinderDropTargetFolderKey(payload));
+		},
+		[isFinderDropPending, isMockActive, onMockStateChange, openCampaignId]
+	);
+
+	const handleFinderPanelDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+		const nextTarget = event.relatedTarget;
+		if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) return;
+		setIsFinderDropTargetActive(false);
+		setFinderDropTargetFolderKey(null);
+	}, []);
+
+	const handleFinderPanelDrop = useCallback(
+		(event: React.DragEvent<HTMLDivElement>) => {
+			if (!hasCampaignFinderDragContext(event.dataTransfer)) return;
+
+			event.preventDefault();
+			event.stopPropagation();
+			void handleFinderItemDrop(
+				getCampaignFinderDragPayload(event.dataTransfer) ?? activeCampaignFinderDragPayload
+			);
+		},
+		[handleFinderItemDrop]
+	);
+
+	const handleFinderContextOpenInNewTab = useCallback(
+		(state: FinderContextMenuState) => {
+			setFinderContextMenu(null);
+			if (state.sourceCampaignId === null) return;
+			onFinderOpenInNewTab?.(state.sourceCampaignId);
+		},
+		[onFinderOpenInNewTab]
+	);
+
+	const handleFinderContextMoveToCampaign = useCallback(
+		async (state: FinderContextMenuState, target: FinderMoveTarget) => {
+			const payload = getFinderContextMenuPayload(state);
+			if (!payload || target.campaignId === payload.sourceCampaignId) return;
+
+			setFinderContextMenu(null);
+
+			if (isMockActive) {
+				const moved = moveMockFinderContactToCampaign(payload, target.campaignId);
+				if (moved) {
+					toast.success('Contact moved');
+				}
+				return;
+			}
+
+			setIsFinderDropPending(true);
+			try {
+				if (payload.itemKind === 'contact') {
+					await moveFinderContactToCampaign(payload, target);
+				} else {
+					await moveFinderDraftToCampaign(payload, target.campaignId);
+				}
+
+				await invalidateFinderDropQueries();
+				toast.success(payload.itemKind === 'contact' ? 'Contact moved' : 'Draft moved');
+			} catch {
+				toast.error(
+					payload.itemKind === 'contact'
+						? 'Could not move contact. Please try again.'
+						: 'Could not move draft. Please try again.'
+				);
+			} finally {
+				setIsFinderDropPending(false);
+			}
+		},
+		[
+			invalidateFinderDropQueries,
+			isMockActive,
+			moveFinderContactToCampaign,
+			moveFinderDraftToCampaign,
+			moveMockFinderContactToCampaign,
+		]
+	);
+
+	const handleFinderContextRemoveFromFolder = useCallback(
+		async (state: FinderContextMenuState) => {
+			const payload = getFinderContextMenuPayload(state);
+			if (!payload || payload.itemKind !== 'contact') return;
+
+			setFinderContextMenu(null);
+
+			if (isMockActive) {
+				const removed = removeMockFinderContactFromFolder(payload);
+				if (removed) {
+					toast.success('Removed from folder');
+				}
+				return;
+			}
+
+			setIsFinderDropPending(true);
+			try {
+				await removeFinderContactFromFolder(payload);
+				await invalidateFinderDropQueries();
+				toast.success('Removed from folder');
+			} catch {
+				toast.error('Could not remove contact. Please try again.');
+			} finally {
+				setIsFinderDropPending(false);
+			}
+		},
+		[
+			invalidateFinderDropQueries,
+			isMockActive,
+			removeFinderContactFromFolder,
+			removeMockFinderContactFromFolder,
+		]
+	);
+
+	const handleFinderContextGetInfo = useCallback((state: FinderContextMenuState) => {
+		setFinderContextMenu(null);
+		setFinderInfoPopup({
+			contact: getFinderItemResearchContact(state.item),
+			title: state.item.name,
+		});
+	}, []);
+
+	const handleFinderInfoPopupClose = useCallback(() => {
+		setFinderInfoPopup(null);
+	}, []);
+
+	const finderContextMenuPayload = getFinderContextMenuPayload(finderContextMenu);
+	const canMoveFinderContextItem = Boolean(
+		finderContextMenuPayload &&
+			finderMoveTargets.length > 0 &&
+			!isFinderDropPending &&
+			(!isMockActive || onMockStateChange)
+	);
+	const canRemoveFinderContextItem = Boolean(
+		finderContextMenuPayload?.itemKind === 'contact' &&
+			finderContextMenuPayload.sourceContactListIds.length > 0 &&
+			!isFinderDropPending &&
+			(!isMockActive || onMockStateChange)
+	);
 
 	const handleMetricSortClick = useCallback(
 		(sortKey: MetricSortKey) => {
@@ -1254,12 +2430,43 @@ export const useCampaignsTable = (options?: {
 				const original = row.original as CampaignTableRow;
 				if (isFinderTableRow(original)) {
 					return (
-						<CampaignFinderPanel
-							folders={finderFolders}
-							expandedFolderKeys={openFolderKeys}
-							onToggleFolder={toggleFinderFolder}
-							searchQuery={finderSearchQuery}
-						/>
+						<>
+							<CampaignFinderPanel
+								campaignId={openCampaignId}
+								contactListIds={selectedContactListIds}
+								folders={finderFolders}
+								expandedFolderKeys={openFolderKeys}
+								onToggleFolder={toggleFinderFolder}
+								searchQuery={finderSearchQuery}
+								selectedItemKey={selectedFinderItemKey}
+								isDragEnabled={canDragFinderItems}
+								isDropTargetActive={isFinderDropTargetActive}
+								dropTargetFolderKey={finderDropTargetFolderKey}
+								isDropPending={isFinderDropPending}
+								onSelectItem={handleFinderItemSelect}
+								onItemContextMenu={handleFinderItemContextMenu}
+								onItemDragStart={handleFinderItemDragStart}
+								onItemDragEnd={handleFinderItemDragEnd}
+								onPanelDragOver={handleFinderPanelDragOver}
+								onPanelDragLeave={handleFinderPanelDragLeave}
+								onPanelDrop={handleFinderPanelDrop}
+							/>
+							<CampaignFinderContextMenu
+								state={finderContextMenu}
+								moveTargets={finderMoveTargets}
+								canMove={canMoveFinderContextItem}
+								canRemove={canRemoveFinderContextItem}
+								isPending={isFinderDropPending}
+								onOpenInNewTab={handleFinderContextOpenInNewTab}
+								onMoveToCampaign={handleFinderContextMoveToCampaign}
+								onRemoveFromFolder={handleFinderContextRemoveFromFolder}
+								onGetInfo={handleFinderContextGetInfo}
+							/>
+							<CampaignFinderInfoPopup
+								state={finderInfoPopup}
+								onClose={handleFinderInfoPopupClose}
+							/>
+						</>
 					);
 				}
 
@@ -1292,6 +2499,13 @@ export const useCampaignsTable = (options?: {
 					<div
 						className="campaign-row-folder-cell relative text-left"
 						data-finder-open={isCampaignFinderOpen ? 'true' : undefined}
+						data-finder-drop-zone={isCampaignFinderOpen ? 'true' : undefined}
+						data-finder-drop-target={
+							isCampaignFinderOpen && isFinderDropTargetActive ? 'true' : undefined
+						}
+						onDragOver={isCampaignFinderOpen ? handleFinderPanelDragOver : undefined}
+						onDragLeave={isCampaignFinderOpen ? handleFinderPanelDragLeave : undefined}
+						onDrop={isCampaignFinderOpen ? handleFinderPanelDrop : undefined}
 					>
 						{!isConfirming && enableFinder && (
 							<button
@@ -1802,9 +3016,14 @@ export const useCampaignsTable = (options?: {
 		isPending,
 		handleRowClick,
 		isFinderOpen,
+		isFinderDropTargetActive,
+		isFinderDropPending,
 		openCampaignId,
 		openFinderForCampaign,
 		closeFinder,
+		handleFinderPaneDragOver: handleFinderPanelDragOver,
+		handleFinderPaneDragLeave: handleFinderPanelDragLeave,
+		handleFinderPaneDrop: handleFinderPanelDrop,
 		handleDeleteClick,
 		isPendingDelete,
 		isConfirmDialogOpen,

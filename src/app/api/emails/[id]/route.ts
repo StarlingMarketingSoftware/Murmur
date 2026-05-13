@@ -17,11 +17,17 @@ import { EmailStatus } from '@prisma/client';
 const patchEmailSchema = z.object({
 	subject: z.string().min(1).optional(),
 	message: z.string().min(1).optional(),
+	campaignId: z.number().int().positive().optional(),
 	status: z.nativeEnum(EmailStatus).optional(),
 	reviewStatus: z.enum(['approved', 'rejected']).nullable().optional(),
 	sentAt: z.union([z.date(), z.string().datetime()]).optional(),
 });
 export type PatchEmailData = z.infer<typeof patchEmailSchema>;
+
+const normalizeSentAt = (sentAt: string | Date | undefined): Date | undefined => {
+	if (sentAt === undefined) return undefined;
+	return sentAt instanceof Date ? sentAt : new Date(sentAt);
+};
 
 export async function PATCH(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
@@ -47,12 +53,101 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 			return apiBadRequest(validatedData.error);
 		}
 
-		const updatedEmail = await prisma.email.update({
-			where: {
-				id: Number(id),
-				userId,
+		const emailId = Number(id);
+		const existingEmail = await prisma.email.findUnique({
+			where: { id: emailId },
+			select: {
+				id: true,
+				userId: true,
+				campaignId: true,
+				contactId: true,
+				subject: true,
+				message: true,
+				status: true,
+				reviewStatus: true,
+				sentAt: true,
 			},
-			data: validatedData.data,
+		});
+
+		if (!existingEmail) {
+			return apiNotFound();
+		}
+
+		if (existingEmail.userId !== userId) {
+			return apiUnauthorizedResource();
+		}
+
+		const { campaignId, sentAt, ...emailPatchData } = validatedData.data;
+		const normalizedSentAt = normalizeSentAt(sentAt);
+		const updateData = {
+			...emailPatchData,
+			...(sentAt !== undefined ? { sentAt: normalizedSentAt } : {}),
+			...(campaignId !== undefined ? { campaignId } : {}),
+		};
+
+		if (campaignId !== undefined) {
+			const targetCampaign = await prisma.campaign.findUnique({
+				where: { id: campaignId },
+				select: { userId: true },
+			});
+
+			if (!targetCampaign) {
+				return apiNotFound();
+			}
+
+			if (targetCampaign.userId !== userId) {
+				return apiUnauthorizedResource();
+			}
+		}
+
+		const nextStatus = emailPatchData.status ?? existingEmail.status;
+		if (
+			campaignId !== undefined &&
+			campaignId !== existingEmail.campaignId &&
+			nextStatus === EmailStatus.draft
+		) {
+			const targetDraft = await prisma.email.findFirst({
+				where: {
+					userId,
+					campaignId,
+					contactId: existingEmail.contactId,
+					status: EmailStatus.draft,
+					id: { not: existingEmail.id },
+				},
+				orderBy: { createdAt: 'desc' as const },
+				select: { id: true },
+			});
+
+			if (targetDraft) {
+				const updatedEmail = await prisma.$transaction(async (tx) => {
+					const updated = await tx.email.update({
+						where: { id: targetDraft.id },
+						data: {
+							subject: emailPatchData.subject ?? existingEmail.subject,
+							message: emailPatchData.message ?? existingEmail.message,
+							status: nextStatus,
+							reviewStatus:
+								'reviewStatus' in emailPatchData
+									? emailPatchData.reviewStatus
+									: existingEmail.reviewStatus,
+							sentAt: sentAt !== undefined ? normalizedSentAt : existingEmail.sentAt,
+						},
+					});
+
+					await tx.email.delete({
+						where: { id: existingEmail.id },
+					});
+
+					return updated;
+				});
+
+				return apiResponse(updatedEmail);
+			}
+		}
+
+		const updatedEmail = await prisma.email.update({
+			where: { id: emailId },
+			data: updateData,
 		});
 
 		return apiResponse(updatedEmail);
