@@ -4091,6 +4091,11 @@ body.murmur-mobile .results-align {
 	z-index: 90; /* Expanded finder should overlay the fixed Ask Anything bar. */
 }
 
+/* Dashboard Calendar panel can be taller than the locked landing viewport; keep it above the fixed Ask Anything bar. */
+.campaigns-table-wrapper:has([data-dashboard-calendar-panel='true']) {
+	z-index: 90;
+}
+
 /* Dashboard: show only 3 visible rows, but keep internal scroll + custom scrollbar. */
 .dashboard-recent-campaigns .campaigns-table-container .my-campaigns-table {
 	height: 184px !important;

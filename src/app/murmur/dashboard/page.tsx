@@ -24,6 +24,10 @@ import {
 } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { CampaignsTableDebugPanel } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTableDebugPanel';
 import { DashboardStrategyBox } from '@/components/molecules/DashboardStrategyBox/DashboardStrategyBox';
+import DashboardCalendarPanel, {
+	type DashboardCalendarMockState,
+} from '@/components/molecules/DashboardCalendarPanel/DashboardCalendarPanel';
+import { DashboardCalendarDebugPanel } from '@/components/molecules/DashboardCalendarPanel/DashboardCalendarDebugPanel';
 import { useDashboard } from './useDashboard';
 import { urls } from '@/constants/urls';
 import {
@@ -2199,6 +2203,10 @@ const DashboardContent = () => {
 	const campaignsDebugEnabled = searchParams.get('campaignsDebug') === '1';
 	const [campaignsMockState, setCampaignsMockState] = useState<
 		CampaignsMockState | undefined
+	>(undefined);
+	const calendarDebugEnabled = searchParams.get('calendarDebug') === '1';
+	const [calendarMockState, setCalendarMockState] = useState<
+		DashboardCalendarMockState | undefined
 	>(undefined);
 	const [isCampaignFinderOpen, setIsCampaignFinderOpen] = useState(false);
 	const isTabPreviewingOther = hoveredTab != null && hoveredTab !== activeTab;
@@ -5418,12 +5426,22 @@ const DashboardContent = () => {
 		}
 	}, [isMobile, setHoveredContact]);
 
+	// The initial desktop dashboard uses a scroll-locked, single-screen layout.
+	// If a panel needs more vertical room (ex: Calendar), unlock scroll so it isn't clipped.
+	const shouldUnlockLandingDashboardScroll =
+		isMobile === false &&
+		!hasSearched &&
+		activeTab === 'search' &&
+		!fromHomeParam &&
+		!isMapView &&
+		selectedActionBarIcon === 'calendar';
 	const shouldLockLandingDashboardScroll =
 		isMobile === false &&
 		!hasSearched &&
 		activeTab === 'search' &&
 		!fromHomeParam &&
-		!isMapView;
+		!isMapView &&
+		!shouldUnlockLandingDashboardScroll;
 	const shouldLockDashboardPageScroll =
 		isMapView || shouldLockLandingDashboardScroll;
 
@@ -5464,6 +5482,7 @@ const DashboardContent = () => {
 
 		return undefined;
 	}, [shouldLockDashboardPageScroll, shouldLockLandingDashboardScroll, isCampaignFinderOpen]);
+
 
 	// When the campaign finder is open we allow the table to overflow the viewport
 	// (overflow: visible) so it can expand to its full height. We still want to prevent
@@ -9925,6 +9944,9 @@ const DashboardContent = () => {
 									onSearchContacts={handleMapBottomForYouSubmit}
 								/>
 							)}
+							{selectedActionBarIcon === 'calendar' && (
+								<DashboardCalendarPanel mockState={calendarMockState} />
+							)}
 							{selectedActionBarIcon === 'folder' && (
 								<CampaignsTable
 									mockState={campaignsMockState}
@@ -9943,6 +9965,13 @@ const DashboardContent = () => {
 					<CampaignsTableDebugPanel
 						value={campaignsMockState}
 						onChange={setCampaignsMockState}
+					/>
+				)}
+
+				{calendarDebugEnabled && (
+					<DashboardCalendarDebugPanel
+						value={calendarMockState}
+						onChange={setCalendarMockState}
 					/>
 				)}
 
