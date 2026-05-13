@@ -181,22 +181,56 @@ const FINDER_SELECTED_ROW_COLORS: Record<FinderFolderKey, string> = {
 	archive: '#CCC9C9',
 };
 
-const FINDER_CONTEXT_MENU_WIDTH = 200;
+const FINDER_CONTEXT_MENU_WIDTH = 180;
 const FINDER_CONTEXT_MENU_VIEWPORT_PADDING = 8;
-const FINDER_CONTEXT_MENU_BASE_HEIGHT = 128;
-const FINDER_CONTEXT_MENU_MOVE_TARGET_HEIGHT = 31;
+const FINDER_CONTEXT_MENU_BASE_HEIGHT = 111;
+const FINDER_CONTEXT_MENU_MOVE_TARGET_HEIGHT = 27;
+const FINDER_INFO_POPUP_WIDTH = 318;
+const FINDER_INFO_POPUP_HEIGHT = 352;
+const FINDER_INFO_POPUP_GAP = 10;
+
+const getDocumentZoomFactor = () => {
+	if (typeof window === 'undefined') return 1;
+	const zoom = window.getComputedStyle(document.documentElement).zoom;
+	if (!zoom || zoom === 'normal') return 1;
+	const parsedZoom = parseFloat(zoom);
+	return Number.isFinite(parsedZoom) && parsedZoom > 0 ? parsedZoom : 1;
+};
 
 const getClampedFinderPopupPosition = (x: number, y: number, width: number, height: number) => {
 	if (typeof window === 'undefined') return { left: x, top: y };
+	const zoom = getDocumentZoomFactor();
+	const scaledX = x / zoom;
+	const scaledY = y / zoom;
+	const viewportWidth = window.innerWidth / zoom;
+	const viewportHeight = window.innerHeight / zoom;
 
 	return {
 		left: Math.max(
 			FINDER_CONTEXT_MENU_VIEWPORT_PADDING,
-			Math.min(x, window.innerWidth - width - FINDER_CONTEXT_MENU_VIEWPORT_PADDING)
+			Math.min(scaledX, viewportWidth - width - FINDER_CONTEXT_MENU_VIEWPORT_PADDING)
 		),
 		top: Math.max(
 			FINDER_CONTEXT_MENU_VIEWPORT_PADDING,
-			Math.min(y, window.innerHeight - height - FINDER_CONTEXT_MENU_VIEWPORT_PADDING)
+			Math.min(scaledY, viewportHeight - height - FINDER_CONTEXT_MENU_VIEWPORT_PADDING)
+		),
+	};
+};
+
+const getClampedFinderViewportPosition = (left: number, top: number, width: number, height: number) => {
+	if (typeof window === 'undefined') return { left, top };
+	const zoom = getDocumentZoomFactor();
+	const viewportWidth = window.innerWidth / zoom;
+	const viewportHeight = window.innerHeight / zoom;
+
+	return {
+		left: Math.max(
+			FINDER_CONTEXT_MENU_VIEWPORT_PADDING,
+			Math.min(left, viewportWidth - width - FINDER_CONTEXT_MENU_VIEWPORT_PADDING)
+		),
+		top: Math.max(
+			FINDER_CONTEXT_MENU_VIEWPORT_PADDING,
+			Math.min(top, viewportHeight - height - FINDER_CONTEXT_MENU_VIEWPORT_PADDING)
 		),
 	};
 };
@@ -270,6 +304,8 @@ type FinderContextMenuState = {
 };
 
 type FinderInfoPopupState = {
+	x: number;
+	y: number;
 	contact: ContactWithName | null;
 	title: string;
 };
@@ -690,8 +726,8 @@ const CampaignFinderContextMenu = ({
 	const showMoveSection = canMove && moveTargets.length > 0;
 	const estimatedHeight =
 		FINDER_CONTEXT_MENU_BASE_HEIGHT +
-		(showMoveSection ? 35 + moveTargets.length * FINDER_CONTEXT_MENU_MOVE_TARGET_HEIGHT : 0) +
-		(canRemove ? 42 : 0);
+		(showMoveSection ? 31 + moveTargets.length * FINDER_CONTEXT_MENU_MOVE_TARGET_HEIGHT : 0) +
+		(canRemove ? 36 : 0);
 	const position = getClampedFinderPopupPosition(
 		state.x,
 		state.y,
@@ -704,7 +740,7 @@ const CampaignFinderContextMenu = ({
 			className="campaign-finder-context-menu"
 			data-custom-table-ignore-row-click="true"
 			role="menu"
-			style={{ left: position.left, top: position.top }}
+			style={{ position: 'fixed', zIndex: 10000, left: position.left, top: position.top }}
 			onContextMenu={(event) => event.preventDefault()}
 			onPointerDown={(event) => event.stopPropagation()}
 		>
@@ -735,7 +771,7 @@ const CampaignFinderContextMenu = ({
 								style={{ color: target.folderIconColor }}
 								aria-hidden="true"
 							>
-								<DashboardActionBarFolderIcon width={21} height={13} />
+								<DashboardActionBarFolderIcon width={18} height={11} />
 							</span>
 							<span className="campaign-finder-context-menu-target-name">
 								{target.name}
@@ -783,28 +819,48 @@ const CampaignFinderInfoPopup = ({
 }) => {
 	if (!state) return null;
 	if (typeof document === 'undefined') return null;
+	const menuPosition = getClampedFinderPopupPosition(
+		state.x,
+		state.y,
+		FINDER_CONTEXT_MENU_WIDTH,
+		FINDER_CONTEXT_MENU_BASE_HEIGHT
+	);
+	const popupPosition = getClampedFinderViewportPosition(
+		menuPosition.left + FINDER_CONTEXT_MENU_WIDTH + FINDER_INFO_POPUP_GAP,
+		menuPosition.top,
+		FINDER_INFO_POPUP_WIDTH,
+		FINDER_INFO_POPUP_HEIGHT
+	);
 
 	return createPortal(
 		<div
-			className="campaign-finder-info-popup-layer"
+			className="campaign-finder-info-popup"
 			data-custom-table-ignore-row-click="true"
+			role="dialog"
+			aria-label={`Info for ${state.title}`}
+			style={{
+				position: 'fixed',
+				zIndex: 10001,
+				left: popupPosition.left,
+				top: popupPosition.top,
+			}}
 			onContextMenu={(event) => event.preventDefault()}
+			onPointerDown={(event) => event.stopPropagation()}
 		>
-			<div
-				className="campaign-finder-info-popup"
-				role="dialog"
-				aria-label={`Info for ${state.title}`}
-				onContextMenu={(event) => event.preventDefault()}
-				onPointerDown={(event) => event.stopPropagation()}
-			>
-				<button
-					type="button"
-					className="campaign-finder-info-popup-close"
-					aria-label="Close info"
-					onClick={onClose}
-				/>
-				<ContactResearchPanel contact={state.contact} disableExpansion />
-			</div>
+			<button
+				type="button"
+				className="campaign-finder-info-popup-close"
+				aria-label="Close info"
+				onClick={onClose}
+			/>
+			<ContactResearchPanel
+				contact={state.contact}
+				width={306}
+				boxWidth={292}
+				height={340}
+				compactHeader
+				disableExpansion
+			/>
 		</div>,
 		document.documentElement
 	);
@@ -2377,6 +2433,8 @@ export const useCampaignsTable = (options?: {
 	const handleFinderContextGetInfo = useCallback((state: FinderContextMenuState) => {
 		setFinderContextMenu(null);
 		setFinderInfoPopup({
+			x: state.x,
+			y: state.y,
 			contact: getFinderItemResearchContact(state.item),
 			title: state.item.name,
 		});

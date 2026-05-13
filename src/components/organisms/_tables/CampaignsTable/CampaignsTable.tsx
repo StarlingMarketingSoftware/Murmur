@@ -307,22 +307,26 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 		let raf: number | null = null;
 		const update = () => {
 			if (raf !== null) cancelAnimationFrame(raf);
-			raf = requestAnimationFrame(() => {
-				const rect = el.getBoundingClientRect();
-				const scaleFromLayout =
-					el.offsetWidth > 0 && rect.width > 0 ? rect.width / el.offsetWidth : 1;
-				const tableScale = shouldScaleDesktopTable ? campaignsTableScale : 1;
-				const scale = Math.max(0.1, scaleFromLayout * tableScale);
-				const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-				const availableHeight =
-					(viewportHeight - rect.top - CAMPAIGN_FINDER_VIEWPORT_BOTTOM_GAP) / scale;
-			const nextHeight = Math.min(
-				CAMPAIGN_FINDER_MAX_HEIGHT,
-				Math.max(
-					CAMPAIGN_FINDER_MIN_HEIGHT,
-					Math.floor(availableHeight)
-				)
-			);
+				raf = requestAnimationFrame(() => {
+					const rect = el.getBoundingClientRect();
+					const scaleFromLayout =
+						el.offsetWidth > 0 && rect.width > 0 ? rect.width / el.offsetWidth : 1;
+					const tableScale = shouldScaleDesktopTable ? campaignsTableScale : 1;
+					const scale = Math.max(0.1, scaleFromLayout * tableScale);
+					const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+					const availableHeight =
+						(viewportHeight - rect.top - CAMPAIGN_FINDER_VIEWPORT_BOTTOM_GAP) / scale;
+
+					// Guard against NaN/infinity (can happen during layout/scale transitions).
+					// If that occurs, fall back to the design height rather than letting NaN
+					// propagate and blow the layout up.
+					const boundedAvailableHeight = Number.isFinite(availableHeight)
+						? Math.floor(availableHeight)
+						: CAMPAIGN_FINDER_MAX_HEIGHT;
+					const nextHeight = Math.min(
+						CAMPAIGN_FINDER_MAX_HEIGHT,
+						Math.max(CAMPAIGN_FINDER_MIN_HEIGHT, boundedAvailableHeight)
+					);
 
 				setCampaignFinderHeight((current) =>
 					Math.abs(current - nextHeight) > 1 ? nextHeight : current
