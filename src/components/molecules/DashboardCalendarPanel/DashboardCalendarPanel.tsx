@@ -588,7 +588,8 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 			if (!popup) return;
 			const target = event.target as Node | null;
 			if (!target) return;
-			if (popup.contains(target)) return;
+			const eventPath = event.composedPath();
+			if (popup.contains(target) || eventPath.includes(popup)) return;
 			// Switching to a different cell? Let its click handler take over instead of
 			// closing first (avoids a single-frame flash between popups).
 			const panel = panelRef.current;

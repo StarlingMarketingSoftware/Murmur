@@ -8,6 +8,7 @@ import {
 	useRef,
 	useState,
 	type CSSProperties,
+	type MouseEvent as ReactMouseEvent,
 } from 'react';
 import mapboxgl from 'mapbox-gl';
 
@@ -323,6 +324,24 @@ export const DashboardCalendarPopupLocation: FC<Props> = ({
 	const hasSavedLocation = lat != null && lng != null;
 	const showDrivingPill = !isEditing && hasSavedLocation && Boolean(drivingDuration);
 
+	const startEditingLocation = () => {
+		focusInputOnNextRenderRef.current = true;
+		setIsPillHovered(false);
+		setIsEditing(true);
+	};
+
+	const handleEditLocationMouseDown = (event: ReactMouseEvent<HTMLElement>) => {
+		event.preventDefault();
+		event.stopPropagation();
+		event.nativeEvent.stopImmediatePropagation();
+		startEditingLocation();
+	};
+
+	const handleEditLocationClick = (event: ReactMouseEvent<HTMLElement>) => {
+		event.stopPropagation();
+		startEditingLocation();
+	};
+
 	// When the user activates the pill, isEditing flips to true and the input mounts.
 	// useLayoutEffect runs after the DOM update but before paint, so we can focus the
 	// input before the user ever sees it un-focused. The ref-driven trigger keeps this
@@ -380,26 +399,27 @@ export const DashboardCalendarPopupLocation: FC<Props> = ({
 				}}
 			>
 				{showDrivingPill ? (
-					<>
+					<div
+						onMouseEnter={() => setIsPillHovered(true)}
+						onMouseLeave={() => setIsPillHovered(false)}
+						style={{
+							position: 'relative',
+							width: '100%',
+							minWidth: 0,
+							height: '100%',
+							display: 'flex',
+							alignItems: 'center',
+						}}
+					>
 						<button
 							type="button"
 							aria-label={`Edit location — ${drivingDuration} drive from you`}
-							onMouseDown={(event) => {
-								// Handle on mousedown (not click) so the swap happens before any
-								// other handler in the gesture. preventDefault stops the button
-								// from grabbing focus during the brief moment before it unmounts.
-								event.preventDefault();
-								focusInputOnNextRenderRef.current = true;
-								setIsEditing(true);
-							}}
-							onClick={() => {
+							onMouseDown={handleEditLocationMouseDown}
+							onClick={(event) => {
 								// Fallback for keyboard activation (Enter/Space), which doesn't
 								// fire mousedown. Idempotent if mousedown already ran.
-								focusInputOnNextRenderRef.current = true;
-								setIsEditing(true);
+								handleEditLocationClick(event);
 							}}
-							onMouseEnter={() => setIsPillHovered(true)}
-							onMouseLeave={() => setIsPillHovered(false)}
 							onFocus={() => setIsPillHovered(true)}
 							onBlur={() => setIsPillHovered(false)}
 							style={{
@@ -424,14 +444,22 @@ export const DashboardCalendarPopupLocation: FC<Props> = ({
 							{drivingDuration} from you
 						</button>
 						{isPillHovered && address && (
-							<div
-								role="tooltip"
+							<button
+								type="button"
+								tabIndex={-1}
+								aria-label={`Edit location address, currently ${address}`}
+								onMouseDown={handleEditLocationMouseDown}
+								onClick={handleEditLocationClick}
 								style={{
 									position: 'absolute',
 									left: '8px',
 									right: '8px',
 									top: 'calc(100% + 6px)',
 									zIndex: 30,
+									border: 0,
+									margin: 0,
+									appearance: 'none',
+									WebkitAppearance: 'none',
 									background: 'rgba(0, 0, 0, 0.86)',
 									color: '#FFFFFF',
 									borderRadius: '6px',
@@ -440,16 +468,17 @@ export const DashboardCalendarPopupLocation: FC<Props> = ({
 									fontSize: '11.5px',
 									fontWeight: 500,
 									lineHeight: '14px',
+									textAlign: 'left',
 									boxShadow: '0 4px 14px rgba(0, 0, 0, 0.28)',
-									pointerEvents: 'none',
 									whiteSpace: 'normal',
 									overflowWrap: 'anywhere',
+									cursor: 'text',
 								}}
 							>
 								{address}
-							</div>
+							</button>
 						)}
-					</>
+					</div>
 				) : (
 					<input
 						ref={inputRef}
@@ -462,12 +491,6 @@ export const DashboardCalendarPopupLocation: FC<Props> = ({
 						}}
 						onFocus={() => {
 							if (hasSavedLocation) setIsEditing(true);
-						}}
-						onBlur={() => {
-							// If we have something to fall back to, hand the bar back to the pill
-							// so the user sees the persisted state. Otherwise stay in input mode
-							// so an in-progress query isn't visually lost.
-							if (hasSavedLocation && drivingDuration) setIsEditing(false);
 						}}
 						onKeyDown={(event) => {
 							if (event.key === 'Enter') {
@@ -517,13 +540,22 @@ export const DashboardCalendarPopupLocation: FC<Props> = ({
 
 				{/* Saved address caption along the bottom of the map. */}
 				{hasSavedLocation && address && (
-					<div
+					<button
+						type="button"
+						aria-label={`Edit location address, currently ${address}`}
+						onMouseDown={handleEditLocationMouseDown}
+						onClick={handleEditLocationClick}
 						style={{
 							position: 'absolute',
 							left: '8px',
 							right: '8px',
 							bottom: '8px',
+							boxSizing: 'border-box',
+							border: 0,
+							margin: 0,
 							textAlign: 'center',
+							appearance: 'none',
+							WebkitAppearance: 'none',
 							...popupTextStyle,
 							color: '#000000',
 							fontSize: '12px',
@@ -532,14 +564,14 @@ export const DashboardCalendarPopupLocation: FC<Props> = ({
 							overflow: 'hidden',
 							textOverflow: 'ellipsis',
 							whiteSpace: 'nowrap',
-							pointerEvents: 'none',
 							background: 'rgba(255, 255, 255, 0.9)',
 							borderRadius: '6px',
 							padding: '2px 6px',
+							cursor: 'text',
 						}}
 					>
 						{address}
-					</div>
+					</button>
 				)}
 
 				{/* Lightweight status badge while geocoding or after a miss. */}
