@@ -155,6 +155,7 @@ const createDefaultEventDraft = (date: Date): CalendarEventDraft => ({
 	placeId: null,
 	lat: null,
 	lng: null,
+	drivingDuration: null,
 });
 
 const parseClockMinutes = (value: string): number | null => {
@@ -286,6 +287,8 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	const [scrollTop, setScrollTop] = useState(INITIAL_SCROLL_TOP_PX);
 	const [isDraggingScrollbar, setIsDraggingScrollbar] = useState(false);
 	const [activePopup, setActivePopup] = useState<ActiveCalendarPopup | null>(null);
+	const [activeTimeDropdownField, setActiveTimeDropdownField] =
+		useState<TimeDropdownField | null>(null);
 	const [eventDrafts, setEventDrafts] = useState<Record<string, CalendarEventDraft>>({});
 
 	const monthLabelStyle = {
@@ -604,11 +607,18 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (event.key === 'Escape') {
 				event.stopPropagation();
+				if (activeTimeDropdownField) {
+					setActiveTimeDropdownField(null);
+					return;
+				}
 				setActivePopup(null);
 			}
 		};
 
-		const handleDismiss = () => setActivePopup(null);
+		const handleDismiss = () => {
+			setActiveTimeDropdownField(null);
+			setActivePopup(null);
+		};
 
 		const handleScrollDismiss = (event: Event) => {
 			const target = event.target as Node | null;
@@ -620,20 +630,27 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		document.addEventListener('keydown', handleKeyDown);
 		window.addEventListener('resize', handleDismiss);
 		// Capture-phase scroll listener catches scroll on any ancestor (including the
-		// calendar's internal scroll container during wheel-snap between months).
-		window.addEventListener('scroll', handleDismiss, true);
+		// calendar's internal scroll container during wheel-snap between months), while
+		// allowing internal popup controls like the time dropdown to scroll normally.
+		window.addEventListener('scroll', handleScrollDismiss, true);
 
 		return () => {
 			document.removeEventListener('mousedown', handleMouseDown);
 			document.removeEventListener('keydown', handleKeyDown);
 			window.removeEventListener('resize', handleDismiss);
-			window.removeEventListener('scroll', handleDismiss, true);
+			window.removeEventListener('scroll', handleScrollDismiss, true);
 		};
 	}, [activePopup, activeTimeDropdownField]);
 
 	useEffect(() => {
 		if (!activeTimeDropdownField) return;
 
+		const handleMouseDown = (event: MouseEvent) => {
+			const target = event.target as Node | null;
+			if (!target) return;
+			if (timePickerRef.current?.contains(target)) return;
+			setActiveTimeDropdownField(null);
+		};
 
 		document.addEventListener('mousedown', handleMouseDown);
 		return () => document.removeEventListener('mousedown', handleMouseDown);
