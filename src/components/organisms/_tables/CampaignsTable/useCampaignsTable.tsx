@@ -81,6 +81,56 @@ type CampaignFinderDragPayload = {
 
 let activeCampaignFinderDragPayload: CampaignFinderDragPayload | null = null;
 
+// Apple Finder-style drag preview: a small card that floats with the cursor and shows
+// the dragged contact identity (colored dot + name, plus optional company subtitle). We
+// render it off-screen so the browser can snapshot it for the native drag image, then
+// remove it on the next frame.
+const createCampaignFinderDragPreview = ({
+	label,
+	secondary,
+	dotColor,
+}: {
+	label: string;
+	secondary?: string | null;
+	dotColor?: string | null;
+}): HTMLDivElement => {
+	const node = document.createElement('div');
+	node.className = 'campaign-finder-drag-preview';
+	node.setAttribute('aria-hidden', 'true');
+
+	if (dotColor) {
+		const dot = document.createElement('span');
+		dot.className = 'campaign-finder-drag-preview-dot';
+		dot.style.backgroundColor = dotColor;
+		node.appendChild(dot);
+	}
+
+	const textWrap = document.createElement('span');
+	textWrap.className = 'campaign-finder-drag-preview-text';
+
+	const labelEl = document.createElement('span');
+	labelEl.className = 'campaign-finder-drag-preview-label';
+	labelEl.textContent = label;
+	textWrap.appendChild(labelEl);
+
+	if (secondary && secondary.trim()) {
+		const sub = document.createElement('span');
+		sub.className = 'campaign-finder-drag-preview-secondary';
+		sub.textContent = secondary;
+		textWrap.appendChild(sub);
+	}
+
+	node.appendChild(textWrap);
+
+	node.style.position = 'fixed';
+	node.style.top = '-1000px';
+	node.style.left = '-1000px';
+	node.style.pointerEvents = 'none';
+
+	document.body.appendChild(node);
+	return node;
+};
+
 const getFinderDragItemKind = (folderKey: FinderFolderKey): FinderDragItemKind | null => {
 	if (folderKey === 'contacts') return 'contact';
 	if (folderKey === 'drafts') return 'draft';
@@ -973,6 +1023,21 @@ const FinderContactRow = ({
 					event.preventDefault();
 					return;
 				}
+
+				const preview = createCampaignFinderDragPreview({
+					label: primaryText,
+					secondary: showCompany ? item.company : null,
+					dotColor,
+				});
+				const rect = preview.getBoundingClientRect();
+				event.dataTransfer.setDragImage(
+					preview,
+					Math.round(rect.width / 2),
+					Math.round(rect.height / 2)
+				);
+				window.setTimeout(() => {
+					preview.remove();
+				}, 0);
 
 				onDragStart(event, dragPayload);
 			}}

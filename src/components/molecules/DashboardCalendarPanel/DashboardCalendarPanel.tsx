@@ -183,13 +183,21 @@ const parseClockMinutes = (value: string): number | null => {
 	return hours * 60 + minutes;
 };
 
+const getSameDayTimeRangeError = (startTime: string, endTime: string): string | null => {
+	const startMinutes = parseClockMinutes(startTime);
+	const endMinutes = parseClockMinutes(endTime);
+	if (startMinutes == null || endMinutes == null) return null;
+
+	return endMinutes <= startMinutes ? 'Time range must stay within one day' : null;
+};
+
 const formatDurationLabel = (startTime: string, endTime: string): string => {
 	const startMinutes = parseClockMinutes(startTime);
 	const endMinutes = parseClockMinutes(endTime);
 	if (startMinutes == null || endMinutes == null) return 'Duration';
 
-	let durationMinutes = endMinutes - startMinutes;
-	if (durationMinutes < 0) durationMinutes += 24 * 60;
+	const durationMinutes = endMinutes - startMinutes;
+	if (durationMinutes <= 0) return 'Not doable';
 
 	const hours = Math.floor(durationMinutes / 60);
 	const minutes = durationMinutes % 60;
@@ -289,6 +297,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	const [activePopup, setActivePopup] = useState<ActiveCalendarPopup | null>(null);
 	const [activeTimeDropdownField, setActiveTimeDropdownField] =
 		useState<TimeDropdownField | null>(null);
+	const [timeRangeError, setTimeRangeError] = useState<string | null>(null);
 	const [eventDrafts, setEventDrafts] = useState<Record<string, CalendarEventDraft>>({});
 
 	const monthLabelStyle = {
@@ -715,8 +724,15 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	const activeDraft = activePopup
 		? eventDrafts[activePopup.key] ?? createDefaultEventDraft(activePopup.date)
 		: null;
+	const activeTimeRangeError = activeDraft
+		? getSameDayTimeRangeError(activeDraft.startTime, activeDraft.endTime)
+		: null;
+	const visibleTimeRangeError = activeTimeRangeError ?? timeRangeError;
+	const hasTimeRangeError = visibleTimeRangeError != null;
 	const activeDurationLabel = activeDraft
-		? formatDurationLabel(activeDraft.startTime, activeDraft.endTime)
+		? hasTimeRangeError
+			? 'Not doable'
+			: formatDurationLabel(activeDraft.startTime, activeDraft.endTime)
 		: 'Duration';
 
 	useLayoutEffect(() => {
@@ -758,6 +774,32 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 				...partial,
 			},
 		}));
+	};
+
+	const getTimeChoiceError = (
+		field: TimeDropdownField,
+		option: TimeOption,
+		draft: CalendarEventDraft
+	): string | null => {
+		const nextStartTime = field === 'startTime' ? option.label : draft.startTime;
+		const nextEndTime = field === 'endTime' ? option.label : draft.endTime;
+		if (!getSameDayTimeRangeError(nextStartTime, nextEndTime)) return null;
+
+		return field === 'startTime' ? 'Start must be before end' : 'End must be after start';
+	};
+
+	const selectTimeOption = (field: TimeDropdownField, option: TimeOption) => {
+		if (!activeDraft) return;
+
+		const nextError = getTimeChoiceError(field, option, activeDraft);
+		if (nextError) {
+			setTimeRangeError(nextError);
+			return;
+		}
+
+		setTimeRangeError(null);
+		updateActiveDraft(field, option.label);
+		setActiveTimeDropdownField(null);
 	};
 
 	const VIEWPORT_MARGIN_PX = 12;
@@ -809,6 +851,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		);
 
 		setActiveTimeDropdownField(null);
+		setTimeRangeError(null);
 		setActivePopup({ key, date, left, top, placement });
 	};
 
@@ -870,6 +913,9 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 					.dashboard-calendar-time-option:hover {
 						background: #D1D5DB !important;
 					}
+					.dashboard-calendar-time-option[data-invalid-time="true"]:hover {
+						background: #FECACA !important;
+					}
 					.dashboard-calendar-time-option:focus-visible {
 						outline: 1px solid #000000;
 						outline-offset: -2px;
@@ -884,30 +930,38 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 				>
 					{TIME_OPTIONS.map((option) => {
 						const isSelected = selectedMinutes === option.minutes;
+						const optionError = getTimeChoiceError(field, option, activeDraft);
+						const isInvalid = optionError != null;
 						return (
 							<button
 								key={option.label}
 								type="button"
 								role="option"
 								aria-selected={isSelected}
+								aria-disabled={isInvalid}
+								aria-label={optionError ? `${option.label}, ${optionError}` : option.label}
 								data-selected-time={isSelected ? 'true' : undefined}
+								data-invalid-time={isInvalid ? 'true' : undefined}
 								onMouseDown={(event) => event.preventDefault()}
 								onClick={(event) => {
 									event.stopPropagation();
-									updateActiveDraft(field, option.label);
-									setActiveTimeDropdownField(null);
+									selectTimeOption(field, option);
 								}}
 								className="dashboard-calendar-time-option"
 								style={{
 									width: '100%',
 									height: '24px',
 									border: 0,
-									background: isSelected ? '#D1D5DB99' : 'transparent',
-									color: '#000000',
-									cursor: 'pointer',
+									background: isInvalid
+										? '#FEE2E2'
+										: isSelected
+											? '#D1D5DB99'
+											: 'transparent',
+									color: isInvalid ? '#B00020' : '#000000',
+									cursor: isInvalid ? 'not-allowed' : 'pointer',
 									fontFamily: 'Inter, system-ui, sans-serif',
 									fontSize: '12px',
-									fontWeight: isSelected ? 600 : 400,
+									fontWeight: isSelected || isInvalid ? 600 : 400,
 									lineHeight: '12px',
 									padding: '0 8px',
 									textAlign: 'center',
@@ -953,7 +1007,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 						border: 0,
 						borderRadius: '5px',
 						background: isOpen ? 'rgba(255, 255, 255, 0.36)' : 'transparent',
-						color: '#000000',
+						color: hasTimeRangeError ? '#FFFFFF' : '#000000',
 						cursor: 'pointer',
 						display: 'flex',
 						alignItems: 'center',
@@ -1343,10 +1397,15 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 					>
 						<div
 							ref={timePickerRef}
+							aria-invalid={hasTimeRangeError}
+							title={visibleTimeRangeError ?? undefined}
 							style={{
 								height: '17px',
 								borderRadius: '7px',
-								background: '#8BF0F7',
+								background: hasTimeRangeError ? '#FF3B30' : '#8BF0F7',
+								boxShadow: hasTimeRangeError
+									? '0 0 0 1px rgba(176, 0, 32, 0.7)'
+									: undefined,
 								padding: '0 5px',
 								display: 'flex',
 								alignItems: 'center',
@@ -1358,7 +1417,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 							<span
 								style={{
 									...popupTextStyle,
-									color: '#000000',
+									color: hasTimeRangeError ? '#FFFFFF' : '#000000',
 									fontSize: '16px',
 									fontWeight: 500,
 									lineHeight: '16px',
@@ -1372,7 +1431,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 							aria-live="polite"
 							style={{
 								...popupTextStyle,
-								color: '#000000',
+								color: hasTimeRangeError ? '#B00020' : '#000000',
 								fontSize: '16px',
 								fontWeight: 700,
 								lineHeight: '20px',

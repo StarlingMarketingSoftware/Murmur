@@ -7029,6 +7029,19 @@ body.murmur-mobile .search-input-icon-btn {
 	max-width: 100% !important;
 }
 
+.campaign-finder-split-shell .campaign-finder-contact-row {
+	grid-template-columns: 8px minmax(90px, 128px) minmax(118px, 1fr);
+}
+
+.campaign-finder-split-shell .campaign-finder-contact-descriptor,
+.campaign-finder-split-shell .campaign-finder-contact-category-icon,
+.campaign-finder-split-shell .campaign-finder-state-badge,
+.campaign-finder-split-shell .campaign-finder-state-badge-empty,
+.campaign-finder-split-shell .campaign-finder-contact-city,
+.campaign-finder-split-shell .campaign-finder-contact-city-empty {
+	display: none;
+}
+
 .campaign-finder-split-pane-left .my-campaigns-table.desktop-campaigns-table.campaigns-finder-open {
 	border-radius: 8px 0 0 8px !important;
 }
@@ -7429,6 +7442,63 @@ body.murmur-mobile .search-input-icon-btn {
 	min-height: 27px;
 	border: 0;
 	transition: none !important;
+}
+
+.campaign-finder-drag-preview {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	width: 240px;
+	max-width: 240px;
+	min-height: 42px;
+	padding: 8px 14px 8px 12px;
+	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.96);
+	border: 1px solid rgba(0, 0, 0, 0.06);
+	box-shadow:
+		0 1px 2px rgba(0, 0, 0, 0.08),
+		0 10px 24px rgba(0, 0, 0, 0.18);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+	font-family: var(--font-inter), Inter, sans-serif;
+	color: #000000;
+}
+
+.campaign-finder-drag-preview-dot {
+	display: block;
+	width: 10px;
+	height: 10px;
+	border-radius: 9999px;
+	flex: none;
+	box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+
+.campaign-finder-drag-preview-text {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	gap: 2px;
+}
+
+.campaign-finder-drag-preview-label {
+	min-width: 0;
+	font-size: 13px;
+	font-weight: 600;
+	line-height: 16px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.campaign-finder-drag-preview-secondary {
+	min-width: 0;
+	font-size: 11px;
+	font-weight: 500;
+	line-height: 13px;
+	color: #545454;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .campaign-finder-folder-row {
