@@ -10,6 +10,7 @@ import {
 	type MouseEvent as ReactMouseEvent,
 	type UIEvent,
 } from 'react';
+import { createPortal } from 'react-dom';
 
 export type DashboardCalendarMockState = {
 	year?: number;
@@ -35,8 +36,10 @@ type CalendarEventDraft = {
 type ActiveCalendarPopup = {
 	key: string;
 	date: Date;
+	// Viewport-relative coordinates — popup renders via portal with position: fixed.
 	left: number;
 	top: number;
+	placement: 'right' | 'left';
 };
 
 type CalendarScrollbarState =
@@ -174,6 +177,8 @@ const hasDraftContent = (draft: CalendarEventDraft): boolean =>
 
 const SMOOTH_SCROLL_LERP = 0.14;
 const WHEEL_SCROLL_MULTIPLIER = 1.12;
+// Quiet period after the last wheel event before we ease to the nearest month boundary.
+const WHEEL_SNAP_DELAY_MS = 150;
 
 const clamp = (value: number, min: number, max: number): number =>
 	Math.min(Math.max(value, min), max);
@@ -185,20 +190,20 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	mockState,
 }) => {
 	// Layout constants (hard dashboard sizing)
-	const OUTER_WIDTH_PX = 662;
-	const INNER_WIDTH_PX = 654;
+	const COLS = 7;
+	const ROWS = 6;
+	const CELL_W_PX = 94.542;
+	const CELL_H_PX = 91.224;
+	const INNER_WIDTH_PX = COLS * CELL_W_PX;
+	// Viewport shows ~4 rows plus a sliver of row 5; remaining rows scroll into view.
 	const INNER_HEIGHT_PX = 373;
-	const OUTER_PADDING_PX = (OUTER_WIDTH_PX - INNER_WIDTH_PX) / 2;
+	const OUTER_PADDING_PX = 4;
+	const OUTER_WIDTH_PX = INNER_WIDTH_PX + OUTER_PADDING_PX * 2;
 	const OUTER_HEIGHT_PX = INNER_HEIGHT_PX + OUTER_PADDING_PX * 2;
 	const OUTER_RADIUS_PX = 22;
 	const OUTER_BG = 'rgba(164, 221, 239, 0.8)'; // #A4DDEF @ 0.8
 	const OUTER_STROKE_W_PX = 1.424;
 
-	const COLS = 7;
-	const ROWS = 6;
-	// Each month exactly fills the inner viewport; wheel scroll snaps between months
-	// rendered in the stack below.
-	const CELL_H_PX = INNER_HEIGHT_PX / ROWS;
 	const MONTH_GRID_HEIGHT_PX = ROWS * CELL_H_PX;
 	const CELL_RADIUS_PX = 10;
 	const CELL_BORDER = '1px solid #E0E0E0';
@@ -224,9 +229,20 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	const inMonthYear = mockState?.year ?? 2026;
 	const rawMonthIndex = mockState?.monthIndex ?? 0;
 	const inMonthIndex = ((rawMonthIndex % 12) + 12) % 12;
-	const highlightDay = mockState?.day;
+	// Highlight reflects today's date. In debug mode, mockState stands in for "today"
+	// so previews of arbitrary dates exercise the same highlight code path.
+	const effectiveToday =
+		mockState?.year != null && mockState?.monthIndex != null && mockState?.day != null
+			? new Date(
+					mockState.year,
+					((mockState.monthIndex % 12) + 12) % 12,
+					mockState.day
+				)
+			: new Date();
 	const panelRef = useRef<HTMLDivElement>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
+	const popupRef = useRef<HTMLDivElement>(null);
+	const popupPersonNameInputRef = useRef<HTMLInputElement>(null);
 	const smoothScrollTargetRef = useRef(INITIAL_SCROLL_TOP_PX);
 	const smoothScrollRafRef = useRef<number | null>(null);
 	const dragStateRef = useRef<{
@@ -234,6 +250,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		startClientY: number;
 		startScrollTop: number;
 	} | null>(null);
+	const wheelSnapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const [scrollTop, setScrollTop] = useState(INITIAL_SCROLL_TOP_PX);
 	const [isDraggingScrollbar, setIsDraggingScrollbar] = useState(false);
 	const [activePopup, setActivePopup] = useState<ActiveCalendarPopup | null>(null);
@@ -353,6 +370,48 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 
 	const scrollbarState = getScrollbarState(scrollTop);
 
+	const animateSmoothScroll = () => {
+		const activeContainer = scrollContainerRef.current;
+		if (!activeContainer) {
+			smoothScrollRafRef.current = null;
+			return;
+		}
+
+		const distance = smoothScrollTargetRef.current - activeContainer.scrollTop;
+		if (Math.abs(distance) < 0.5) {
+			activeContainer.scrollTop = smoothScrollTargetRef.current;
+			smoothScrollRafRef.current = null;
+			return;
+		}
+
+		activeContainer.scrollTop += distance * SMOOTH_SCROLL_LERP;
+		smoothScrollRafRef.current = requestAnimationFrame(animateSmoothScroll);
+	};
+
+	// Gently align the smooth-scroll target with the nearest row boundary, so the
+	// calendar settles on a clean week-row after wheel/drag input finishes.
+	const snapToNearestRow = () => {
+		if (MAX_SCROLL_TOP_PX <= 0 || CELL_H_PX <= 0) return;
+		const container = scrollContainerRef.current;
+		if (!container) return;
+
+		const reference =
+			smoothScrollRafRef.current != null
+				? smoothScrollTargetRef.current
+				: container.scrollTop;
+		const snapped = clamp(
+			Math.round(reference / CELL_H_PX) * CELL_H_PX,
+			0,
+			MAX_SCROLL_TOP_PX
+		);
+		if (Math.abs(snapped - reference) < 0.5) return;
+
+		smoothScrollTargetRef.current = snapped;
+		if (smoothScrollRafRef.current == null) {
+			smoothScrollRafRef.current = requestAnimationFrame(animateSmoothScroll);
+		}
+	};
+
 	useLayoutEffect(() => {
 		const container = scrollContainerRef.current;
 		if (!container) return;
@@ -360,6 +419,10 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		if (smoothScrollRafRef.current != null) {
 			cancelAnimationFrame(smoothScrollRafRef.current);
 			smoothScrollRafRef.current = null;
+		}
+		if (wheelSnapTimeoutRef.current != null) {
+			clearTimeout(wheelSnapTimeoutRef.current);
+			wheelSnapTimeoutRef.current = null;
 		}
 		smoothScrollTargetRef.current = INITIAL_SCROLL_TOP_PX;
 		container.scrollTop = INITIAL_SCROLL_TOP_PX;
@@ -369,26 +432,8 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	useEffect(() => {
 		const container = scrollContainerRef.current;
 		if (!container) return;
-		// Single-month mode (no internal scroll): don't intercept wheel events.
+		// If there is no internal scroll capacity, leave wheel events alone.
 		if (MAX_SCROLL_TOP_PX <= 0) return;
-
-		const animateSmoothScroll = () => {
-			const activeContainer = scrollContainerRef.current;
-			if (!activeContainer) {
-				smoothScrollRafRef.current = null;
-				return;
-			}
-
-			const distance = smoothScrollTargetRef.current - activeContainer.scrollTop;
-			if (Math.abs(distance) < 0.5) {
-				activeContainer.scrollTop = smoothScrollTargetRef.current;
-				smoothScrollRafRef.current = null;
-				return;
-			}
-
-			activeContainer.scrollTop += distance * SMOOTH_SCROLL_LERP;
-			smoothScrollRafRef.current = requestAnimationFrame(animateSmoothScroll);
-		};
 
 		const handleWheel = (event: WheelEvent) => {
 			if (event.ctrlKey) return;
@@ -409,6 +454,14 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 			if (smoothScrollRafRef.current == null) {
 				smoothScrollRafRef.current = requestAnimationFrame(animateSmoothScroll);
 			}
+
+			if (wheelSnapTimeoutRef.current != null) {
+				clearTimeout(wheelSnapTimeoutRef.current);
+			}
+			wheelSnapTimeoutRef.current = setTimeout(() => {
+				wheelSnapTimeoutRef.current = null;
+				snapToNearestRow();
+			}, WHEEL_SNAP_DELAY_MS);
 		};
 
 		container.addEventListener('wheel', handleWheel, { passive: false });
@@ -419,7 +472,12 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 				cancelAnimationFrame(smoothScrollRafRef.current);
 				smoothScrollRafRef.current = null;
 			}
+			if (wheelSnapTimeoutRef.current != null) {
+				clearTimeout(wheelSnapTimeoutRef.current);
+				wheelSnapTimeoutRef.current = null;
+			}
 		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [MAX_SCROLL_TOP_PX]);
 
 	useEffect(() => {
@@ -457,8 +515,13 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		};
 
 		const handleMouseUp = () => {
+			const container = scrollContainerRef.current;
+			if (container) {
+				smoothScrollTargetRef.current = container.scrollTop;
+			}
 			dragStateRef.current = null;
 			setIsDraggingScrollbar(false);
+			snapToNearestRow();
 		};
 
 		document.addEventListener('mousemove', handleMouseMove);
@@ -479,6 +542,64 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		SCROLLBAR_TRAVEL_PX,
 		isDraggingScrollbar,
 	]);
+
+	// While the popup is open: dismiss on outside mousedown, Escape, or any window-level
+	// scroll/resize (the popup anchors to a cell that may have moved).
+	useEffect(() => {
+		if (!activePopup) return;
+
+		const handleMouseDown = (event: MouseEvent) => {
+			const popup = popupRef.current;
+			if (!popup) return;
+			const target = event.target as Node | null;
+			if (!target) return;
+			if (popup.contains(target)) return;
+			// Switching to a different cell? Let its click handler take over instead of
+			// closing first (avoids a single-frame flash between popups).
+			const panel = panelRef.current;
+			if (panel && panel.contains(target)) {
+				const targetEl = target as HTMLElement;
+				if (
+					targetEl.closest('button[data-dashboard-calendar-cell="true"]')
+				) {
+					return;
+				}
+			}
+			setActivePopup(null);
+		};
+
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') {
+				event.stopPropagation();
+				setActivePopup(null);
+			}
+		};
+
+		const handleDismiss = () => setActivePopup(null);
+
+		document.addEventListener('mousedown', handleMouseDown);
+		document.addEventListener('keydown', handleKeyDown);
+		window.addEventListener('resize', handleDismiss);
+		// Capture-phase scroll listener catches scroll on any ancestor (including the
+		// calendar's internal scroll container during wheel-snap between months).
+		window.addEventListener('scroll', handleDismiss, true);
+
+		return () => {
+			document.removeEventListener('mousedown', handleMouseDown);
+			document.removeEventListener('keydown', handleKeyDown);
+			window.removeEventListener('resize', handleDismiss);
+			window.removeEventListener('scroll', handleDismiss, true);
+		};
+	}, [activePopup]);
+
+	// Focus the name input when a popup opens.
+	useEffect(() => {
+		if (!activePopup) return;
+		const id = requestAnimationFrame(() => {
+			popupPersonNameInputRef.current?.focus();
+		});
+		return () => cancelAnimationFrame(id);
+	}, [activePopup]);
 
 	const handleCalendarScroll = (event: UIEvent<HTMLDivElement>) => {
 		setScrollTop(event.currentTarget.scrollTop);
@@ -522,6 +643,8 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 				INITIAL_SCROLL_TOP_PX - (1 - clickProgress) * INITIAL_SCROLL_TOP_PX;
 			container.scrollTop = INITIAL_SCROLL_TOP_PX - (1 - clickProgress) * INITIAL_SCROLL_TOP_PX;
 		}
+
+		snapToNearestRow();
 	};
 
 	const activeDraft = activePopup
@@ -547,22 +670,55 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		}));
 	};
 
+	const VIEWPORT_MARGIN_PX = 12;
+	const POPUP_CELL_GAP_PX = 10;
+
 	const openEventPopup = (
 		event: ReactMouseEvent<HTMLButtonElement>,
 		key: string,
 		date: Date
 	) => {
-		const panelRect = panelRef.current?.getBoundingClientRect();
 		const cellRect = event.currentTarget.getBoundingClientRect();
-		const rawLeft = panelRect ? cellRect.left - panelRect.left : OUTER_PADDING_PX;
-		const rawTop = panelRect ? cellRect.top - panelRect.top : OUTER_PADDING_PX;
+		const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1440;
+		const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 900;
 
-		setActivePopup({
-			key,
-			date,
-			left: clamp(rawLeft, 4, OUTER_WIDTH_PX - POPUP_WIDTH_PX - 4),
-			top: clamp(rawTop, 4, OUTER_HEIGHT_PX - POPUP_HEIGHT_PX - 4),
-		});
+		// Apple-style placement: prefer right of the cell, flip to the left when there
+		// isn't room. The popup is allowed to overhang the panel edges; it's only
+		// clamped to the viewport so nothing gets cut off the screen.
+		const roomRight = viewportWidth - cellRect.right - POPUP_CELL_GAP_PX;
+		const roomLeft = cellRect.left - POPUP_CELL_GAP_PX;
+
+		let placement: 'right' | 'left';
+		let left: number;
+		if (roomRight >= POPUP_WIDTH_PX + VIEWPORT_MARGIN_PX) {
+			placement = 'right';
+			left = cellRect.right + POPUP_CELL_GAP_PX;
+		} else if (roomLeft >= POPUP_WIDTH_PX + VIEWPORT_MARGIN_PX) {
+			placement = 'left';
+			left = cellRect.left - POPUP_WIDTH_PX - POPUP_CELL_GAP_PX;
+		} else if (roomRight >= roomLeft) {
+			placement = 'right';
+			left = clamp(
+				cellRect.right + POPUP_CELL_GAP_PX,
+				VIEWPORT_MARGIN_PX,
+				viewportWidth - POPUP_WIDTH_PX - VIEWPORT_MARGIN_PX
+			);
+		} else {
+			placement = 'left';
+			left = clamp(
+				cellRect.left - POPUP_WIDTH_PX - POPUP_CELL_GAP_PX,
+				VIEWPORT_MARGIN_PX,
+				viewportWidth - POPUP_WIDTH_PX - VIEWPORT_MARGIN_PX
+			);
+		}
+
+		const top = clamp(
+			cellRect.top,
+			VIEWPORT_MARGIN_PX,
+			Math.max(viewportHeight - POPUP_HEIGHT_PX - VIEWPORT_MARGIN_PX, VIEWPORT_MARGIN_PX)
+		);
+
+		setActivePopup({ key, date, left, top, placement });
 	};
 
 	const popupInputBaseStyle: CSSProperties = {
@@ -640,11 +796,11 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 						date.getFullYear() === gridMonthYear &&
 						date.getMonth() === gridMonthIndex &&
 						date.getDate() === 1;
-					const isHighlighted =
-						monthOffset === 0 &&
+					const isToday =
 						inPrimary &&
-						highlightDay != null &&
-						date.getDate() === highlightDay;
+						date.getFullYear() === effectiveToday.getFullYear() &&
+						date.getMonth() === effectiveToday.getMonth() &&
+						date.getDate() === effectiveToday.getDate();
 
 					const isoKey = toIsoKey(date);
 					const draft = eventDrafts[isoKey];
@@ -655,14 +811,21 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 							draft.date !== defaultDraft.date ||
 							draft.startTime.trim() !== defaultDraft.startTime ||
 							draft.endTime.trim() !== defaultDraft.endTime);
+					// A draft on today's cell still shows the red event card; the green
+					// "today" pill only appears when the cell has no scheduled event.
+					const isHighlighted = isToday && !showDraftSummary;
 					const textColor = showDraftSummary
 						? '#FFFFFF'
-						: inPrimary
-							? IN_MONTH_TEXT.color
-							: OUTSIDE_MONTH_TEXT_COLOR;
+						: isHighlighted
+							? '#00AFE5'
+							: inPrimary
+								? IN_MONTH_TEXT.color
+								: OUTSIDE_MONTH_TEXT_COLOR;
 					const cellBackground = showDraftSummary
 						? '#F14048'
-						: getCellBackground(gridMonthIndex, row, col);
+						: isHighlighted
+							? '#38E497'
+							: getCellBackground(gridMonthIndex, row, col);
 
 					let label = String(date.getDate());
 					if (isTopRow) {
@@ -676,13 +839,19 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 						<button
 							key={`${row}-${col}-${isoKey}`}
 							type="button"
+							data-dashboard-calendar-cell="true"
 							aria-label={`Edit event for ${formatCalendarDate(date)}`}
 							onClick={(event) => openEventPopup(event, isoKey, date)}
 							style={{
 								width: '100%',
 								height: `${CELL_H_PX}px`,
-								borderRadius: `${CELL_RADIUS_PX}px`,
-								border: showDraftSummary ? '1.175px solid #FFFFFF' : CELL_BORDER,
+								borderRadius: isHighlighted
+									? '9.747px'
+									: `${CELL_RADIUS_PX}px`,
+								border:
+									isHighlighted || showDraftSummary
+										? '1.175px solid #FFFFFF'
+										: CELL_BORDER,
 								backgroundColor: cellBackground,
 								boxSizing: 'border-box',
 								position: 'relative',
@@ -691,8 +860,6 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 								font: 'inherit',
 								appearance: 'none',
 								WebkitAppearance: 'none',
-								outline: isHighlighted ? '2px solid #00AFE5' : 'none',
-								outlineOffset: isHighlighted ? '-2px' : undefined,
 							}}
 						>
 							<div
@@ -817,21 +984,34 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 				</div>
 			</div>
 
-			{activePopup && activeDraft && (
+			{activePopup &&
+				activeDraft &&
+				typeof window !== 'undefined' &&
+				createPortal(
 				<div
+					ref={popupRef}
+					role="dialog"
+					aria-modal="false"
 					aria-label="Calendar event editor"
 					style={{
-						position: 'absolute',
+						position: 'fixed',
 						left: `${activePopup.left}px`,
 						top: `${activePopup.top}px`,
 						width: `${POPUP_WIDTH_PX}px`,
 						height: `${POPUP_HEIGHT_PX}px`,
 						borderRadius: '9px',
-						border: '1.076px solid #FFFFFF',
-						background: 'rgba(229, 96, 98, 0.8)',
+						border: '1.076px solid rgba(255, 255, 255, 0.9)',
+						background: 'rgba(229, 96, 98, 0.82)',
+						backdropFilter: 'blur(22px) saturate(180%)',
+						WebkitBackdropFilter: 'blur(22px) saturate(180%)',
+						boxShadow:
+							'0 22px 52px rgba(0, 0, 0, 0.20), 0 6px 16px rgba(0, 0, 0, 0.10), 0 1px 0 rgba(255, 255, 255, 0.35) inset',
 						boxSizing: 'border-box',
 						overflow: 'hidden',
-						zIndex: 45,
+						zIndex: 2147483600,
+						transformOrigin:
+							activePopup.placement === 'right' ? 'left center' : 'right center',
+						animation: 'dashboardCalendarPopupEnter 160ms cubic-bezier(0.22, 1, 0.36, 1)',
 					}}
 				>
 					<div
@@ -847,8 +1027,9 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 						}}
 					>
 						<input
+							ref={popupPersonNameInputRef}
 							aria-label="Person or thing"
-							placeholder="Name"
+							placeholder="New Event"
 							value={activeDraft.personName}
 							onChange={(event) => updateActiveDraft('personName', event.target.value)}
 							style={{
@@ -863,7 +1044,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 						/>
 						<input
 							aria-label="Company"
-							placeholder="Company"
+							placeholder="Add Business"
 							value={activeDraft.company}
 							onChange={(event) => updateActiveDraft('company', event.target.value)}
 							style={{
@@ -1050,7 +1231,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 						>
 							<input
 								aria-label="Event address"
-								placeholder="Address"
+								placeholder="Add Location"
 								value={activeDraft.address}
 								onChange={(event) => updateActiveDraft('address', event.target.value)}
 								style={{
@@ -1114,11 +1295,12 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 									lineHeight: '14px',
 								}}
 							>
-								Map preview later
+								Add Address
 							</div>
 						</div>
 					</div>
-				</div>
+				</div>,
+				document.body
 			)}
 
 			{scrollbarState.visible && (

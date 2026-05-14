@@ -502,6 +502,19 @@ body {
 	}
 }
 
+/* Dashboard calendar popover: gentle Apple-style scale + fade from its anchor edge. */
+
+@keyframes dashboardCalendarPopupEnter {
+	0% {
+		opacity: 0;
+		transform: scale(0.94) translateY(-2px);
+	}
+	100% {
+		opacity: 1;
+		transform: scale(1) translateY(0);
+	}
+}
+
 /* TipTap Placeholder Styles */
 .is-editor-empty:first-child::before {
 	content: attr(data-placeholder);
