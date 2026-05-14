@@ -197,7 +197,7 @@ const formatDurationLabel = (startTime: string, endTime: string): string => {
 	if (startMinutes == null || endMinutes == null) return 'Duration';
 
 	const durationMinutes = endMinutes - startMinutes;
-	if (durationMinutes <= 0) return 'Not doable';
+	if (durationMinutes <= 0) return 'Pick Valid Time';
 
 	const hours = Math.floor(durationMinutes / 60);
 	const minutes = durationMinutes % 60;
@@ -731,7 +731,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	const hasTimeRangeError = visibleTimeRangeError != null;
 	const activeDurationLabel = activeDraft
 		? hasTimeRangeError
-			? 'Not doable'
+			? 'Pick Valid Time'
 			: formatDurationLabel(activeDraft.startTime, activeDraft.endTime)
 		: 'Duration';
 
@@ -776,16 +776,44 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		}));
 	};
 
+	const getAdjustedEndOption = (
+		startMinutes: number,
+		draft: CalendarEventDraft
+	): TimeOption | null => {
+		const laterOptions = TIME_OPTIONS.filter((option) => option.minutes > startMinutes);
+		if (laterOptions.length === 0) return null;
+
+		const currentStartMinutes = parseClockMinutes(draft.startTime);
+		const currentEndMinutes = parseClockMinutes(draft.endTime);
+		const currentDurationMinutes =
+			currentStartMinutes != null &&
+			currentEndMinutes != null &&
+			currentEndMinutes > currentStartMinutes
+				? currentEndMinutes - currentStartMinutes
+				: 60;
+
+		return (
+			laterOptions.find(
+				(option) => option.minutes >= startMinutes + currentDurationMinutes
+			) ?? laterOptions[laterOptions.length - 1]
+		);
+	};
+
 	const getTimeChoiceError = (
 		field: TimeDropdownField,
 		option: TimeOption,
 		draft: CalendarEventDraft
 	): string | null => {
-		const nextStartTime = field === 'startTime' ? option.label : draft.startTime;
-		const nextEndTime = field === 'endTime' ? option.label : draft.endTime;
-		if (!getSameDayTimeRangeError(nextStartTime, nextEndTime)) return null;
+		if (field === 'startTime') {
+			return getAdjustedEndOption(option.minutes, draft) == null
+				? 'Start must leave room for an end time'
+				: null;
+		}
 
-		return field === 'startTime' ? 'Start must be before end' : 'End must be after start';
+		const startMinutes = parseClockMinutes(draft.startTime);
+		return startMinutes != null && option.minutes <= startMinutes
+			? 'End must be after start'
+			: null;
 	};
 
 	const selectTimeOption = (field: TimeDropdownField, option: TimeOption) => {
@@ -798,7 +826,25 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		}
 
 		setTimeRangeError(null);
-		updateActiveDraft(field, option.label);
+		if (field === 'startTime') {
+			const currentEndMinutes = parseClockMinutes(activeDraft.endTime);
+			if (currentEndMinutes != null && currentEndMinutes > option.minutes) {
+				updateActiveDraft('startTime', option.label);
+			} else {
+				const adjustedEndOption = getAdjustedEndOption(option.minutes, activeDraft);
+				if (!adjustedEndOption) {
+					setTimeRangeError('Start must leave room for an end time');
+					return;
+				}
+
+				updateActiveDraftFields({
+					startTime: option.label,
+					endTime: adjustedEndOption.label,
+				});
+			}
+		} else {
+			updateActiveDraft('endTime', option.label);
+		}
 		setActiveTimeDropdownField(null);
 	};
 
@@ -1432,7 +1478,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 							style={{
 								...popupTextStyle,
 								color: hasTimeRangeError ? '#B00020' : '#000000',
-								fontSize: '16px',
+								fontSize: hasTimeRangeError ? '11px' : '16px',
 								fontWeight: 700,
 								lineHeight: '20px',
 								minWidth: '74px',
