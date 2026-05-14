@@ -4,6 +4,7 @@ import {
 	FC,
 	useCallback,
 	useEffect,
+	useLayoutEffect,
 	useRef,
 	useState,
 	type CSSProperties,
@@ -66,9 +67,15 @@ export const DashboardCalendarPopupLocation: FC<Props> = ({
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	// Monotonic counter so a slow geocode response doesn't overwrite a newer search.
 	const geocodeGenRef = useRef(0);
+	// Set true when the user activates the pill so the next paint focuses the input.
+	// A ref (not state) so toggling it doesn't itself cause a re-render.
+	const focusInputOnNextRenderRef = useRef(false);
 
 	const [query, setQuery] = useState(address);
-	const [isFocused, setIsFocused] = useState(false);
+	// True while the input is rendered (editing mode); false while the pill is rendered.
+	// We render one OR the other — never both stacked — so the click target is unambiguous
+	// and we don't depend on focus-event timing to swap which control receives input.
+	const [isEditing, setIsEditing] = useState(false);
 	const [isMapReady, setIsMapReady] = useState(false);
 	const [isGeocoding, setIsGeocoding] = useState(false);
 	const [geocodeError, setGeocodeError] = useState<string | null>(null);
@@ -303,7 +310,9 @@ export const DashboardCalendarPopupLocation: FC<Props> = ({
 				drivingDuration: null,
 			});
 			setQuery(formatted);
-			inputRef.current?.blur();
+			// Hand off to the pill view; computeDrivingTime will then fill in the duration.
+			// (Once we have a saved location, the input is unmounted in favor of the pill.)
+			setIsEditing(false);
 		} catch {
 			if (myGen === geocodeGenRef.current) setGeocodeError('Lookup failed');
 		} finally {
@@ -312,7 +321,21 @@ export const DashboardCalendarPopupLocation: FC<Props> = ({
 	}, [query, mapboxToken, userLocation, onUpdate]);
 
 	const hasSavedLocation = lat != null && lng != null;
-	const showDrivingPill = !isFocused && hasSavedLocation && Boolean(drivingDuration);
+	const showDrivingPill = !isEditing && hasSavedLocation && Boolean(drivingDuration);
+
+	// When the user activates the pill, isEditing flips to true and the input mounts.
+	// useLayoutEffect runs after the DOM update but before paint, so we can focus the
+	// input before the user ever sees it un-focused. The ref-driven trigger keeps this
+	// from firing on unrelated re-renders (e.g., when the parent re-renders the popup).
+	useLayoutEffect(() => {
+		if (!focusInputOnNextRenderRef.current) return;
+		if (!isEditing) return;
+		focusInputOnNextRenderRef.current = false;
+		const input = inputRef.current;
+		if (!input) return;
+		input.focus({ preventScroll: true });
+		input.select();
+	}, [isEditing]);
 
 	return (
 		<div
@@ -341,7 +364,9 @@ export const DashboardCalendarPopupLocation: FC<Props> = ({
 				}
 			`}</style>
 
-			{/* Top bar: either the driving-time pill (saved + idle) or the editable input. */}
+			{/* Top bar: either the driving-time pill (saved + idle) or the editable input.
+			    These render as siblings, not overlapping — clicking the pill is unambiguously
+			    a click on the pill, with no input behind it racing focus events. */}
 			<div
 				style={{
 					position: 'relative',
@@ -354,115 +379,117 @@ export const DashboardCalendarPopupLocation: FC<Props> = ({
 					alignItems: 'center',
 				}}
 			>
-				<input
-					ref={inputRef}
-					aria-label="Event location"
-					placeholder="Add Location"
-					value={query}
-					onChange={(event) => {
-						setQuery(event.target.value);
-						if (geocodeError) setGeocodeError(null);
-					}}
-					onFocus={() => setIsFocused(true)}
-					onBlur={() => setIsFocused(false)}
-					onKeyDown={(event) => {
-						if (event.key === 'Enter') {
-							event.preventDefault();
-							void runGeocode();
-						}
-					}}
-					style={{
-						width: '100%',
-						minWidth: 0,
-						border: 0,
-						outline: 'none',
-						background: 'transparent',
-						boxShadow: 'none',
-						fontFamily:
-							'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-						color: '#000000',
-						fontSize: '13px',
-						fontWeight: 700,
-						lineHeight: '16px',
-					}}
-				/>
-				{showDrivingPill && (
-					<button
-						type="button"
-						aria-label={`Edit location — ${drivingDuration} drive from you`}
-						onMouseDown={(event) => {
-							// Keep focus from landing on the button; route it to the input instead so
-							// the user can immediately edit. select() pre-highlights the existing
-							// address so a single keystroke replaces it.
-							// preventScroll: true is critical — the popup's parent registers a
-							// capture-phase scroll listener that dismisses on any ancestor scroll,
-							// and a naive focus() can auto-scroll the calendar's internal container
-							// to bring the input into view, closing the popup mid-click.
-							event.preventDefault();
-							const input = inputRef.current;
-							if (!input) return;
-							input.focus({ preventScroll: true });
-							input.select();
+				{showDrivingPill ? (
+					<>
+						<button
+							type="button"
+							aria-label={`Edit location — ${drivingDuration} drive from you`}
+							onMouseDown={(event) => {
+								// Handle on mousedown (not click) so the swap happens before any
+								// other handler in the gesture. preventDefault stops the button
+								// from grabbing focus during the brief moment before it unmounts.
+								event.preventDefault();
+								focusInputOnNextRenderRef.current = true;
+								setIsEditing(true);
+							}}
+							onClick={() => {
+								// Fallback for keyboard activation (Enter/Space), which doesn't
+								// fire mousedown. Idempotent if mousedown already ran.
+								focusInputOnNextRenderRef.current = true;
+								setIsEditing(true);
+							}}
+							onMouseEnter={() => setIsPillHovered(true)}
+							onMouseLeave={() => setIsPillHovered(false)}
+							onFocus={() => setIsPillHovered(true)}
+							onBlur={() => setIsPillHovered(false)}
+							style={{
+								width: '100%',
+								minWidth: 0,
+								padding: 0,
+								margin: 0,
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'flex-start',
+								background: 'transparent',
+								border: 0,
+								cursor: 'text',
+								...popupTextStyle,
+								color: '#000000',
+								fontSize: '14px',
+								fontWeight: 700,
+								lineHeight: '16px',
+								textAlign: 'left',
+							}}
+						>
+							{drivingDuration} from you
+						</button>
+						{isPillHovered && address && (
+							<div
+								role="tooltip"
+								style={{
+									position: 'absolute',
+									left: '8px',
+									right: '8px',
+									top: 'calc(100% + 6px)',
+									zIndex: 30,
+									background: 'rgba(0, 0, 0, 0.86)',
+									color: '#FFFFFF',
+									borderRadius: '6px',
+									padding: '6px 9px',
+									...popupTextStyle,
+									fontSize: '11.5px',
+									fontWeight: 500,
+									lineHeight: '14px',
+									boxShadow: '0 4px 14px rgba(0, 0, 0, 0.28)',
+									pointerEvents: 'none',
+									whiteSpace: 'normal',
+									overflowWrap: 'anywhere',
+								}}
+							>
+								{address}
+							</div>
+						)}
+					</>
+				) : (
+					<input
+						ref={inputRef}
+						aria-label="Event location"
+						placeholder="Add Location"
+						value={query}
+						onChange={(event) => {
+							setQuery(event.target.value);
+							if (geocodeError) setGeocodeError(null);
 						}}
-						onClick={() => {
-							// Safety net in case mousedown didn't run (e.g., keyboard activation).
-							const input = inputRef.current;
-							if (!input) return;
-							if (document.activeElement !== input) {
-								input.focus({ preventScroll: true });
-								input.select();
+						onFocus={() => {
+							if (hasSavedLocation) setIsEditing(true);
+						}}
+						onBlur={() => {
+							// If we have something to fall back to, hand the bar back to the pill
+							// so the user sees the persisted state. Otherwise stay in input mode
+							// so an in-progress query isn't visually lost.
+							if (hasSavedLocation && drivingDuration) setIsEditing(false);
+						}}
+						onKeyDown={(event) => {
+							if (event.key === 'Enter') {
+								event.preventDefault();
+								void runGeocode();
 							}
 						}}
-						onMouseEnter={() => setIsPillHovered(true)}
-						onMouseLeave={() => setIsPillHovered(false)}
-						onFocus={() => setIsPillHovered(true)}
-						onBlur={() => setIsPillHovered(false)}
 						style={{
-							position: 'absolute',
-							inset: 0,
-							padding: '0 10px',
-							display: 'flex',
-							alignItems: 'center',
-							justifyContent: 'flex-start',
-							background: '#FFFFFF',
+							width: '100%',
+							minWidth: 0,
 							border: 0,
-							cursor: 'text',
-							...popupTextStyle,
+							outline: 'none',
+							background: 'transparent',
+							boxShadow: 'none',
+							fontFamily:
+								'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
 							color: '#000000',
-							fontSize: '14px',
+							fontSize: '13px',
 							fontWeight: 700,
 							lineHeight: '16px',
-							textAlign: 'left',
 						}}
-					>
-						{drivingDuration} from you
-					</button>
-				)}
-				{showDrivingPill && isPillHovered && address && (
-					<div
-						role="tooltip"
-						style={{
-							position: 'absolute',
-							left: '8px',
-							right: '8px',
-							top: 'calc(100% + 6px)',
-							zIndex: 30,
-							background: 'rgba(0, 0, 0, 0.86)',
-							color: '#FFFFFF',
-							borderRadius: '6px',
-							padding: '6px 9px',
-							...popupTextStyle,
-							fontSize: '11.5px',
-							fontWeight: 500,
-							lineHeight: '14px',
-							boxShadow: '0 4px 14px rgba(0, 0, 0, 0.28)',
-							pointerEvents: 'none',
-							whiteSpace: 'normal',
-							overflowWrap: 'anywhere',
-						}}
-					>
-						{address}
-					</div>
+					/>
 				)}
 			</div>
 
