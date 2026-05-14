@@ -1,6 +1,10 @@
 'use client';
-import { GoogleMap, MarkerF, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, MarkerF, useJsApiLoader, type Libraries } from '@react-google-maps/api';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+// Shared with the dashboard calendar's location popup — both call useJsApiLoader with the
+// same id, so they MUST agree on libraries or the second consumer ends up without `places`.
+const SHARED_MAPS_LIBRARIES: Libraries = ['places'];
 import {
 	generateMapMarkerPinIconUrl,
 	MAP_MARKER_PIN_CIRCLE_CENTER_X,
@@ -688,6 +692,7 @@ export function LandingPageGoogleMapBackground({ className, onReady }: Props) {
 	const { isLoaded, loadError } = useJsApiLoader({
 		id: 'google-maps-loader',
 		googleMapsApiKey: apiKey,
+		libraries: SHARED_MAPS_LIBRARIES,
 	});
 
 	const [preparedCalifornia, setPreparedCalifornia] = useState<PreparedPolygon[] | null>(null);
