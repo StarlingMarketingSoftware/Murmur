@@ -4008,6 +4008,30 @@ body.murmur-mobile .results-align {
 	height: 540px !important; /* Balanced height to keep everything feeling centered */
 }
 
+/* Short landscape monitors: keep the initial dashboard landing view single-screen.
+   (Calendar panel is taller than the campaigns table, so we compact the hero block
+   rather than unlocking page scroll.) */
+@media (max-height: 820px) and (orientation: landscape) {
+	.hero-wrapper {
+		min-height: 520px !important;
+		height: 520px !important;
+	}
+}
+
+@media (max-height: 800px) and (orientation: landscape) {
+	.hero-wrapper {
+		min-height: 480px !important;
+		height: 480px !important;
+	}
+}
+
+@media (max-height: 720px) and (orientation: landscape) {
+	.hero-wrapper {
+		min-height: 430px !important;
+		height: 430px !important;
+	}
+}
+
 .search-bar-wrapper {
 	width: 100%;
 	max-width: 100%;

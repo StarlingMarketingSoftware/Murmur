@@ -5427,14 +5427,8 @@ const DashboardContent = () => {
 	}, [isMobile, setHoveredContact]);
 
 	// The initial desktop dashboard uses a scroll-locked, single-screen layout.
-	// If a panel needs more vertical room (ex: Calendar), unlock scroll so it isn't clipped.
-	const shouldUnlockLandingDashboardScroll =
-		isMobile === false &&
-		!hasSearched &&
-		activeTab === 'search' &&
-		!fromHomeParam &&
-		!isMapView &&
-		selectedActionBarIcon === 'calendar';
+	// Calendar now fits without page scrolling, so we never unlock.
+	const shouldUnlockLandingDashboardScroll = false;
 	const shouldLockLandingDashboardScroll =
 		isMobile === false &&
 		!hasSearched &&
@@ -5444,6 +5438,15 @@ const DashboardContent = () => {
 		!shouldUnlockLandingDashboardScroll;
 	const shouldLockDashboardPageScroll =
 		isMapView || shouldLockLandingDashboardScroll;
+
+	// The calendar panel's natural height can exceed the locked-100vh wrapper on shorter
+	// monitors, which clips its bottom row. Treat it the same way the open campaign finder
+	// is treated: let it paint past the wrapper (overflow: visible on html/body, drop the
+	// `h-screen overflow-hidden` clipper) while still preventing the page from scrolling.
+	const isCalendarPanelOpen =
+		!hasSearched && activeTab === 'search' && selectedActionBarIcon === 'calendar';
+	const isOverflowingDashboardPanelOpen =
+		isCampaignFinderOpen || isCalendarPanelOpen;
 
 	// Lock body scroll when in map view or on the initial desktop dashboard.
 	useLayoutEffect(() => {
@@ -5461,7 +5464,7 @@ const DashboardContent = () => {
 				window.scrollTo({ top: 0, left: 0 });
 			}
 
-			const overflowValue = isCampaignFinderOpen ? 'visible' : 'hidden';
+			const overflowValue = isOverflowingDashboardPanelOpen ? 'visible' : 'hidden';
 
 			root.style.overflow = overflowValue;
 			root.style.height = '100vh';
@@ -5481,14 +5484,19 @@ const DashboardContent = () => {
 		}
 
 		return undefined;
-	}, [shouldLockDashboardPageScroll, shouldLockLandingDashboardScroll, isCampaignFinderOpen]);
+	}, [
+		shouldLockDashboardPageScroll,
+		shouldLockLandingDashboardScroll,
+		isOverflowingDashboardPanelOpen,
+	]);
 
 
-	// When the campaign finder is open we allow the table to overflow the viewport
-	// (overflow: visible) so it can expand to its full height. We still want to prevent
-	// the *page* from scrolling, so we intercept wheel/touch/keyboard scroll events.
+	// When the campaign finder OR the calendar panel is open we allow the panel to overflow
+	// the viewport (overflow: visible) so it can paint past the locked-100vh wrapper at its
+	// full height. We still want to prevent the *page* from scrolling, so we intercept
+	// wheel/touch/keyboard scroll events.
 	useEffect(() => {
-		if (!isCampaignFinderOpen || !shouldLockDashboardPageScroll) return;
+		if (!isOverflowingDashboardPanelOpen || !shouldLockDashboardPageScroll) return;
 
 		const preventWheel = (e: WheelEvent) => {
 			e.preventDefault();
@@ -5520,7 +5528,7 @@ const DashboardContent = () => {
 			window.removeEventListener('touchmove', preventTouch);
 			window.removeEventListener('keydown', preventKeyScroll);
 		};
-	}, [isCampaignFinderOpen, shouldLockDashboardPageScroll]);
+	}, [isOverflowingDashboardPanelOpen, shouldLockDashboardPageScroll]);
 
 	// Combine section values into main search field
 	useEffect(() => {
@@ -6317,7 +6325,17 @@ const DashboardContent = () => {
 
 	// Reduce extra white space above the fixed mobile action button by
 	// only adding bottom padding when needed and using a smaller value on mobile
-	const bottomPadding = isMobile && hasSearched ? 'pb-[64px]' : 'pb-0 md:pb-[100px]';
+	const isInitialDashboardLanding =
+		isMobile === false &&
+		!hasSearched &&
+		activeTab === 'search' &&
+		!fromHomeParam &&
+		!isMapView;
+	const bottomPadding = isInitialDashboardLanding
+		? 'pb-0'
+		: isMobile && hasSearched
+			? 'pb-[64px]'
+			: 'pb-0 md:pb-[100px]';
 	const mapBottomSearchShellWidth = isMapBottomCategoryMode
 		? MAP_RESULTS_BOTTOM_CATEGORY_SEARCH_BOX.width
 		: isMapBottomForYouMode
@@ -6619,14 +6637,24 @@ const DashboardContent = () => {
 	return (
 		<>
 			<style jsx global>{`
-				html:has([data-dashboard-scroll-lock='true']:not([data-campaign-finder-open='true'])),
-				body:has([data-dashboard-scroll-lock='true']:not([data-campaign-finder-open='true'])) {
+				html:has(
+						[data-dashboard-scroll-lock='true']:not([data-campaign-finder-open='true']):not(
+								[data-calendar-panel-open='true']
+							)
+					),
+				body:has(
+						[data-dashboard-scroll-lock='true']:not([data-campaign-finder-open='true']):not(
+								[data-calendar-panel-open='true']
+							)
+					) {
 					overflow: hidden !important;
 					height: 100vh !important;
 					overscroll-behavior: none !important;
 				}
 				html:has([data-dashboard-scroll-lock='true'][data-campaign-finder-open='true']),
-				body:has([data-dashboard-scroll-lock='true'][data-campaign-finder-open='true']) {
+				html:has([data-dashboard-scroll-lock='true'][data-calendar-panel-open='true']),
+				body:has([data-dashboard-scroll-lock='true'][data-campaign-finder-open='true']),
+				body:has([data-dashboard-scroll-lock='true'][data-calendar-panel-open='true']) {
 					overflow: visible !important;
 					height: 100vh !important;
 					overscroll-behavior: none !important;
@@ -6697,8 +6725,11 @@ const DashboardContent = () => {
 				data-campaign-finder-open={
 					isCampaignFinderOpen ? 'true' : undefined
 				}
+				data-calendar-panel-open={
+					isCalendarPanelOpen ? 'true' : undefined
+				}
 				className={
-					shouldLockDashboardPageScroll && !isCampaignFinderOpen
+					shouldLockDashboardPageScroll && !isOverflowingDashboardPanelOpen
 						? 'h-screen overflow-hidden'
 						: undefined
 				}
