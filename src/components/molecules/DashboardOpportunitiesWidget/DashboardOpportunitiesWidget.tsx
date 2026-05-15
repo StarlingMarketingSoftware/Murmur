@@ -654,10 +654,10 @@ export const DashboardOpportunitiesWidget: FC<{
 			<CustomScrollbar
 				className="flex-1 min-h-0 self-center"
 				contentClassName="flex flex-col items-center"
-				thumbWidth={4}
-				thumbColor="#F0EEEE"
+				thumbWidth={2}
+				thumbColor="#000000"
 				trackColor="transparent"
-				offsetRight={-2}
+				offsetRight={-12}
 				lockHorizontalScroll
 				style={{
 					width: '639px',
