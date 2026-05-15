@@ -533,6 +533,7 @@ export const DashboardOpportunitiesWidget: FC<{
 				.includes(q);
 		});
 	}, [activeStatus, inboundEmails, mockOverrideActive, mockState?.rows, searchQuery, threadExchangeCounts]);
+	const isUnfilteredView = activeStatus === null && searchQuery.trim() === '';
 
 	if (!enabled) return null;
 
@@ -700,6 +701,7 @@ export const DashboardOpportunitiesWidget: FC<{
 						opportunities.map((opportunity) => {
 							const statusMeta = STATUS_META[opportunity.status];
 							const categoryMeta = getOpportunityCategoryMeta(opportunity.categoryTitle);
+							const isCompactClosedRow = isUnfilteredView && opportunity.status === 'closed';
 							return (
 								<button
 									key={opportunity.id}
@@ -707,10 +709,10 @@ export const DashboardOpportunitiesWidget: FC<{
 									className="text-left hover:brightness-[0.985] transition-[filter]"
 									style={{
 										width: '639px',
-										height: '48px',
+										height: isCompactClosedRow ? '25px' : '48px',
 										borderRadius: '6.389px',
 										border: 'none',
-										background: '#FEFEFE',
+										background: isCompactClosedRow ? '#E6E6E6' : '#FEFEFE',
 										boxShadow: '0px 1px 0px rgba(0, 0, 0, 0.05)',
 										overflow: 'hidden',
 										position: 'relative',
@@ -737,11 +739,11 @@ export const DashboardOpportunitiesWidget: FC<{
 										style={{
 											position: 'absolute',
 											left: '27px',
-											top: '7px',
+											top: isCompactClosedRow ? '4px' : '7px',
 											width: '190px',
 											height: '17.186px',
 											display: 'flex',
-											alignItems: 'baseline',
+											alignItems: isCompactClosedRow ? 'center' : 'baseline',
 											gap: '5px',
 											overflow: 'hidden',
 											color: '#000000',
@@ -756,132 +758,137 @@ export const DashboardOpportunitiesWidget: FC<{
 										<span
 											style={{
 												flex: '0 0 auto',
+												marginLeft: isCompactClosedRow ? '22px' : undefined,
 												fontSize: '10px',
 												fontWeight: 400,
 												lineHeight: 1,
-												transform: 'translateY(-4px)',
+												transform: isCompactClosedRow ? undefined : 'translateY(-4px)',
 											}}
 										>
 											{opportunity.exchangeCount}
 										</span>
 									</span>
 
-									<span
-										style={{
-											position: 'absolute',
-											left: '27px',
-											bottom: '9px',
-											width: '80px',
-											height: '15px',
-											borderRadius: '3px',
-											background: '#B9BBF1',
-											display: 'flex',
-											alignItems: 'center',
-											overflow: 'hidden',
-											boxSizing: 'border-box',
-											padding: '0 4px',
-										}}
-									>
-										<DashboardActionBarFolderIcon
-											width={20}
-											height={12}
-											style={{ color: '#C847CB', flex: '0 0 auto' }}
-										/>
-										<FadeOverflowText
-											text={opportunity.folder}
+									{!isCompactClosedRow && (
+										<span
 											style={{
-												minWidth: 0,
-												flex: 1,
-												marginLeft: '6px',
-												color: '#000000',
-												fontFamily: 'Inter, sans-serif',
-												fontSize: '13.854px',
-												fontStyle: 'normal',
-												fontWeight: 500,
-												lineHeight: '17.186px',
+												position: 'absolute',
+												left: '27px',
+												bottom: '9px',
+												width: '80px',
+												height: '15px',
+												borderRadius: '3px',
+												background: '#B9BBF1',
+												display: 'flex',
+												alignItems: 'center',
+												overflow: 'hidden',
+												boxSizing: 'border-box',
+												padding: '0 4px',
 											}}
-										/>
-									</span>
-
-									<div
-										style={{
-											position: 'absolute',
-											left: '115px',
-											bottom: '9px',
-											right: '409px',
-											height: '15px',
-											display: 'flex',
-											alignItems: 'center',
-											gap: '5px',
-											overflow: 'hidden',
-										}}
-									>
-										{categoryMeta && (
-											<span
-												aria-label={categoryMeta.label}
-												title={categoryMeta.label}
-												style={{
-													width: '24px',
-													height: '15px',
-													borderRadius: '5.6px',
-													border: '1px solid #000000',
-													background: categoryMeta.background,
-													display: 'inline-flex',
-													alignItems: 'center',
-													justifyContent: 'center',
-													boxSizing: 'border-box',
-													flex: '0 0 auto',
-													overflow: 'hidden',
-												}}
-											>
-												{categoryMeta.icon}
-											</span>
-										)}
-										{opportunity.stateAbbr && (
-											<span
-												style={{
-													minWidth: '27px',
-													height: '15px',
-													borderRadius: '5.6px',
-													border: '1px solid #000000',
-													backgroundColor:
-														stateBadgeColorMap[opportunity.stateAbbr] || '#F8F1C8',
-													display: 'inline-flex',
-													alignItems: 'center',
-													justifyContent: 'center',
-													boxSizing: 'border-box',
-													flex: '0 0 auto',
-													color: '#000000',
-													fontFamily: 'Inter, sans-serif',
-													fontSize: '12px',
-													fontWeight: 600,
-													lineHeight: 1,
-												}}
-											>
-												{opportunity.stateAbbr}
-											</span>
-										)}
-										{opportunity.city && (
+										>
+											<DashboardActionBarFolderIcon
+												width={20}
+												height={12}
+												style={{ color: '#C847CB', flex: '0 0 auto' }}
+											/>
 											<FadeOverflowText
-												text={opportunity.city}
+												text={opportunity.folder}
 												style={{
 													minWidth: 0,
-													height: '15px',
-													display: 'inline-flex',
-													alignItems: 'center',
-													justifyContent: 'center',
-													transform: 'translateY(1px)',
+													flex: 1,
+													marginLeft: '6px',
 													color: '#000000',
-													textAlign: 'center',
 													fontFamily: 'Inter, sans-serif',
-													fontSize: '9.454px',
+													fontSize: '13.854px',
 													fontStyle: 'normal',
 													fontWeight: 500,
-													lineHeight: '12.482px',
+													lineHeight: '17.186px',
 												}}
 											/>
-										)}
-									</div>
+										</span>
+									)}
+
+									{!isCompactClosedRow && (
+										<div
+											style={{
+												position: 'absolute',
+												left: '115px',
+												bottom: '9px',
+												right: '409px',
+												height: '15px',
+												display: 'flex',
+												alignItems: 'center',
+												gap: '5px',
+												overflow: 'hidden',
+											}}
+										>
+											{categoryMeta && (
+												<span
+													aria-label={categoryMeta.label}
+													title={categoryMeta.label}
+													style={{
+														width: '24px',
+														height: '15px',
+														borderRadius: '5.6px',
+														border: '1px solid #000000',
+														background: categoryMeta.background,
+														display: 'inline-flex',
+														alignItems: 'center',
+														justifyContent: 'center',
+														boxSizing: 'border-box',
+														flex: '0 0 auto',
+														overflow: 'hidden',
+													}}
+												>
+													{categoryMeta.icon}
+												</span>
+											)}
+											{opportunity.stateAbbr && (
+												<span
+													style={{
+														minWidth: '27px',
+														height: '15px',
+														borderRadius: '5.6px',
+														border: '1px solid #000000',
+														backgroundColor:
+															stateBadgeColorMap[opportunity.stateAbbr] || '#F8F1C8',
+														display: 'inline-flex',
+														alignItems: 'center',
+														justifyContent: 'center',
+														boxSizing: 'border-box',
+														flex: '0 0 auto',
+														color: '#000000',
+														fontFamily: 'Inter, sans-serif',
+														fontSize: '12px',
+														fontWeight: 600,
+														lineHeight: 1,
+													}}
+												>
+													{opportunity.stateAbbr}
+												</span>
+											)}
+											{opportunity.city && (
+												<FadeOverflowText
+													text={opportunity.city}
+													style={{
+														minWidth: 0,
+														height: '15px',
+														display: 'inline-flex',
+														alignItems: 'center',
+														justifyContent: 'center',
+														transform: 'translateY(1px)',
+														color: '#000000',
+														textAlign: 'center',
+														fontFamily: 'Inter, sans-serif',
+														fontSize: '9.454px',
+														fontStyle: 'normal',
+														fontWeight: 500,
+														lineHeight: '12.482px',
+													}}
+												/>
+											)}
+										</div>
+									)}
 
 									<div
 										style={{
@@ -931,46 +938,48 @@ export const DashboardOpportunitiesWidget: FC<{
 										<FadeOverflowText text={opportunity.opportunityDate} style={{ width: '100%' }} />
 									</div>
 
-									<div
-										style={{
-											position: 'absolute',
-											left: '232px',
-											top: '25px',
-											right: '100px',
-											height: '20px',
-											overflow: 'hidden',
-											color: '#000000',
-											whiteSpace: 'nowrap',
-											fontFamily: 'Inter, sans-serif',
-											fontSize: '14px',
-											fontStyle: 'normal',
-											fontWeight: 200,
-											lineHeight: '20px',
-										}}
-									>
-										<FadeOverflowText
-											text={
-												opportunity.lastMessage ||
-												'Reply received. Add details as this opportunity develops.'
-											}
-											style={{ display: 'block', width: '100%' }}
-										/>
-									</div>
+									{!isCompactClosedRow && (
+										<div
+											style={{
+												position: 'absolute',
+												left: '232px',
+												top: '25px',
+												right: '100px',
+												height: '20px',
+												overflow: 'hidden',
+												color: '#000000',
+												whiteSpace: 'nowrap',
+												fontFamily: 'Inter, sans-serif',
+												fontSize: '14px',
+												fontStyle: 'normal',
+												fontWeight: 200,
+												lineHeight: '20px',
+											}}
+										>
+											<FadeOverflowText
+												text={
+													opportunity.lastMessage ||
+													'Reply received. Add details as this opportunity develops.'
+												}
+												style={{ display: 'block', width: '100%' }}
+											/>
+										</div>
+									)}
 
 									<div
 										style={{
 											position: 'absolute',
 											right: '10px',
-											top: '25px',
+											top: isCompactClosedRow ? '4px' : '26px',
 											width: '82px',
-											height: '20px',
-											color: '#000000',
+											height: '17.186px',
+											color: '#000',
 											textAlign: 'right',
 											fontFamily: 'Inter, sans-serif',
-											fontSize: '14px',
+											fontSize: '13px',
 											fontStyle: 'normal',
-											fontWeight: 600,
-											lineHeight: '20px',
+											fontWeight: 500,
+											lineHeight: '17.186px',
 											whiteSpace: 'nowrap',
 										}}
 									>
