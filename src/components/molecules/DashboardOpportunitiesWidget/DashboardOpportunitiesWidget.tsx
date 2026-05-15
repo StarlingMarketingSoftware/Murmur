@@ -85,18 +85,19 @@ const MONTH_NAME_TO_INDEX: Record<string, number> = {
 	december: 11,
 };
 
-const OPPORTUNITY_TABS: Array<{ key: OpportunityStatus; label: string }> = [
-	{ key: 'booked', label: 'Booked' },
-	{ key: 'closed', label: 'Closed' },
-	{ key: 'in-progress', label: 'In Progress' },
+const OPPORTUNITY_TABS: Array<{ key: OpportunityStatus; label: string; offsetLeft: number }> = [
+	{ key: 'booked', label: 'Booked', offsetLeft: 14 },
+	{ key: 'closed', label: 'Closed', offsetLeft: 136 },
+	{ key: 'in-progress', label: 'In Progress', offsetLeft: 264 },
 ];
 
 const STATUS_META: Record<
 	OpportunityStatus,
-	{ label: string; chipFill: string; rowFill: string; accent: string; border: string }
+	{ label: string; tabFill: string; chipFill: string; rowFill: string; accent: string; border: string }
 > = {
 	booked: {
 		label: 'Booked',
+		tabFill: '#8AFF92',
 		chipFill: '#80F58A',
 		rowFill: '#FFFFFF',
 		accent: '#88F08A',
@@ -104,6 +105,7 @@ const STATUS_META: Record<
 	},
 	closed: {
 		label: 'Closed',
+		tabFill: '#FF8282',
 		chipFill: '#F0A1A6',
 		rowFill: '#E57C82',
 		accent: '#C95055',
@@ -111,6 +113,7 @@ const STATUS_META: Record<
 	},
 	'in-progress': {
 		label: 'In Progress',
+		tabFill: '#FFF18A',
 		chipFill: '#BDE7EE',
 		rowFill: '#FFFFFF',
 		accent: '#F2D782',
@@ -321,7 +324,7 @@ export const DashboardOpportunitiesWidget: FC<{
 		enabled: enabled && !mockOverrideActive,
 	});
 	const isLoading = mockOverrideActive ? false : isLoadingEmails;
-	const [activeStatus, setActiveStatus] = useState<OpportunityStatus>('booked');
+	const [activeStatus, setActiveStatus] = useState<OpportunityStatus | null>(null);
 	const [searchQuery, setSearchQuery] = useState('');
 
 	const threadExchangeCounts = useMemo(() => {
@@ -364,7 +367,7 @@ export const DashboardOpportunitiesWidget: FC<{
 
 		const q = searchQuery.trim().toLowerCase();
 		return rows.filter((row) => {
-			if (row.status !== activeStatus) return false;
+			if (activeStatus && row.status !== activeStatus) return false;
 			if (!q) return true;
 
 			return [
@@ -454,15 +457,15 @@ export const DashboardOpportunitiesWidget: FC<{
 			</div>
 
 			<div
-				className="grid items-center"
+				className="relative"
+				onClick={() => setActiveStatus(null)}
 				style={{
-					gridTemplateColumns: 'repeat(3, 1fr)',
-					columnGap: '28px',
-					padding: '8px 18px 7px',
+					height: '30px',
 					fontFamily: 'Inter, sans-serif',
-					fontSize: '16px',
-					fontWeight: 700,
-					lineHeight: 1,
+					fontSize: '12.809px',
+					fontStyle: 'normal',
+					fontWeight: 500,
+					lineHeight: '20.199px',
 				}}
 			>
 				{OPPORTUNITY_TABS.map((tab) => {
@@ -472,16 +475,26 @@ export const DashboardOpportunitiesWidget: FC<{
 							key={tab.key}
 							type="button"
 							aria-pressed={isActive}
-							onClick={() => setActiveStatus(tab.key)}
+							onClick={(event) => {
+								event.stopPropagation();
+								setActiveStatus((current) => (current === tab.key ? null : tab.key));
+							}}
 							style={{
-								height: '20px',
+								position: 'absolute',
+								left: `${tab.offsetLeft}px`,
+								top: '7px',
+								width: '80px',
+								height: '15px',
 								border: 'none',
-								borderRadius: '5px',
-								background: isActive ? STATUS_META[tab.key].chipFill : 'transparent',
+								borderRadius: '3px',
+								background: isActive ? STATUS_META[tab.key].tabFill : 'transparent',
 								color: '#000000',
 								font: 'inherit',
 								padding: 0,
 								cursor: 'pointer',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
 							}}
 						>
 							{tab.label}
@@ -491,24 +504,28 @@ export const DashboardOpportunitiesWidget: FC<{
 			</div>
 
 			<CustomScrollbar
-				className="flex-1 min-h-0"
-				contentClassName="flex flex-col gap-[8px] pr-[4px]"
+				className="flex-1 min-h-0 self-center"
+				contentClassName="flex flex-col items-center"
 				thumbWidth={4}
 				thumbColor="#F0EEEE"
 				trackColor="transparent"
 				offsetRight={-2}
 				lockHorizontalScroll
+				style={{
+					width: '639px',
+					marginTop: '8px',
+				}}
 			>
-				<div className="flex flex-col gap-[8px] pb-[1px]">
+				<div className="flex flex-col items-center gap-[5px] pb-[1px]">
 					{isLoading ? (
 						Array.from({ length: 3 }).map((_, index) => (
 							<div
 								key={`opportunity-loading-${index}`}
 								style={{
-									width: '100%',
-									height: '55px',
-									borderRadius: '7px',
-									background: '#FFFFFF',
+									width: '639px',
+									height: '48px',
+									borderRadius: '6.389px',
+									background: '#FEFEFE',
 									opacity: 0.65,
 								}}
 							/>
@@ -517,17 +534,19 @@ export const DashboardOpportunitiesWidget: FC<{
 						<div
 							className="flex items-center justify-center text-center"
 							style={{
-								width: '100%',
-								height: '55px',
-								borderRadius: '7px',
-								background: '#FFFFFF',
+								width: '639px',
+								height: '48px',
+								borderRadius: '6.389px',
+								background: '#FEFEFE',
 								fontFamily: 'Inter, sans-serif',
 								fontSize: '14px',
 								fontWeight: 600,
 								color: '#000000',
 							}}
 						>
-							No {STATUS_META[activeStatus].label.toLowerCase()} opportunities yet
+							{activeStatus
+								? `No ${STATUS_META[activeStatus].label.toLowerCase()} opportunities yet`
+								: 'No opportunities yet'}
 						</div>
 					) : (
 						opportunities.map((opportunity) => {
@@ -538,14 +557,11 @@ export const DashboardOpportunitiesWidget: FC<{
 									type="button"
 									className="text-left hover:brightness-[0.985] transition-[filter]"
 									style={{
-										width: '100%',
-										height: '55px',
-										borderRadius: '7px',
-										border:
-											statusMeta.border === 'transparent'
-												? 'none'
-												: `1px solid ${statusMeta.border}`,
-										background: statusMeta.rowFill,
+										width: '639px',
+										height: '48px',
+										borderRadius: '6.389px',
+										border: 'none',
+										background: '#FEFEFE',
 										boxShadow: '0px 1px 0px rgba(0, 0, 0, 0.05)',
 										overflow: 'hidden',
 										display: 'grid',
