@@ -3,12 +3,29 @@
 import { FC, useMemo, useState } from 'react';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import DashboardActionBarStarIcon from '@/components/atoms/_svg/DashboardActionBarStarIcon';
+import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
+import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
+import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
+import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import type { InboundEmailWithRelations } from '@/types';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { cn } from '@/utils/ui';
+import {
+	getWineBeerSpiritsLabel,
+	isCoffeeShopTitle,
+	isMusicFestivalTitle,
+	isMusicVenueTitle,
+	isRestaurantTitle,
+	isWeddingPlannerTitle,
+	isWeddingVenueTitle,
+	isWineBeerSpiritsTitle,
+} from '@/utils/restaurantTitle';
 
 export type OpportunityStatus = 'booked' | 'closed' | 'in-progress';
 
@@ -18,6 +35,8 @@ type OpportunityRow = {
 	contactLabel: string;
 	exchangeCount: number;
 	folder: string;
+	categoryTitle: string;
+	city: string;
 	location: string;
 	stateAbbr: string;
 	opportunityType: string;
@@ -31,6 +50,7 @@ export type OpportunitiesMockRow = {
 	contactLabel?: string;
 	exchangeCount?: number;
 	folder?: string;
+	category?: string;
 	location?: string;
 	stateAbbr?: string;
 	opportunityType?: string;
@@ -93,32 +113,36 @@ const OPPORTUNITY_TABS: Array<{ key: OpportunityStatus; label: string; offsetLef
 
 const STATUS_META: Record<
 	OpportunityStatus,
-	{ label: string; tabFill: string; chipFill: string; rowFill: string; accent: string; border: string }
+	{ label: string; tabFill: string; accent: string }
 > = {
 	booked: {
 		label: 'Booked',
 		tabFill: '#8AFF92',
-		chipFill: '#80F58A',
-		rowFill: '#FFFFFF',
-		accent: '#88F08A',
-		border: 'transparent',
+		accent: '#97EE8E',
 	},
 	closed: {
 		label: 'Closed',
 		tabFill: '#FF8282',
-		chipFill: '#F0A1A6',
-		rowFill: '#E57C82',
-		accent: '#C95055',
-		border: '#321111',
+		accent: '#CE3232',
 	},
 	'in-progress': {
 		label: 'In Progress',
 		tabFill: '#FFF18A',
-		chipFill: '#BDE7EE',
-		rowFill: '#FFFFFF',
-		accent: '#F2D782',
-		border: 'transparent',
+		accent: '#FFD08A',
 	},
+};
+
+const fadeTextStyle = {
+	overflow: 'hidden',
+	whiteSpace: 'nowrap',
+	WebkitMaskImage: 'linear-gradient(90deg, #000 calc(100% - 16px), transparent)',
+	maskImage: 'linear-gradient(90deg, #000 calc(100% - 16px), transparent)',
+} as const;
+
+const getCityFromLocation = (location: string, stateAbbr: string) => {
+	const city = location.split(',')[0]?.trim() || '';
+	if (!stateAbbr) return city;
+	return city.replace(new RegExp(`\\s+${stateAbbr}$`, 'i'), '').trim();
 };
 
 const getDayOrdinalSuffix = (day: number) => {
@@ -169,6 +193,61 @@ const getContactLabel = (email: InboundEmailWithRelations) => {
 	if (company && fullName) return `${company} / ${fullName}`;
 
 	return company || fullName || email.senderName?.trim() || email.sender?.trim() || 'Unknown venue';
+};
+
+const getContactCategoryTitle = (email: InboundEmailWithRelations) => {
+	const contact = email.contact;
+	return (contact?.headline || contact?.title || '').trim();
+};
+
+const getOpportunityCategoryMeta = (title: string) => {
+	const value = title.trim();
+	if (!value) return null;
+
+	if (isRestaurantTitle(value)) {
+		return {
+			label: 'Restaurant',
+			background: '#C3FBD1',
+			icon: <RestaurantsIcon size={12} className="flex-shrink-0" />,
+		};
+	}
+	if (isCoffeeShopTitle(value)) {
+		return {
+			label: 'Coffee Shop',
+			background: '#D6F1BD',
+			icon: <CoffeeShopsIcon size={7} className="flex-shrink-0" />,
+		};
+	}
+	if (isMusicVenueTitle(value)) {
+		return {
+			label: 'Music Venue',
+			background: '#B7E5FF',
+			icon: <MusicVenuesIcon size={14} className="flex-shrink-0" />,
+		};
+	}
+	if (isMusicFestivalTitle(value)) {
+		return {
+			label: 'Music Festival',
+			background: '#C1D6FF',
+			icon: <FestivalsIcon size={12} className="flex-shrink-0" />,
+		};
+	}
+	if (isWeddingPlannerTitle(value) || isWeddingVenueTitle(value)) {
+		return {
+			label: isWeddingVenueTitle(value) ? 'Wedding Venue' : 'Wedding Planner',
+			background: '#FFF2BC',
+			icon: <WeddingPlannersIcon size={12} className="flex-shrink-0" />,
+		};
+	}
+	if (isWineBeerSpiritsTitle(value)) {
+		return {
+			label: getWineBeerSpiritsLabel(value) || 'Wine/Beer/Spirits',
+			background: '#BFC4FF',
+			icon: <WineBeerSpiritsIcon size={12} className="flex-shrink-0" />,
+		};
+	}
+
+	return null;
 };
 
 const getOpportunityText = (email: InboundEmailWithRelations) =>
@@ -274,6 +353,7 @@ const buildOpportunityRow = (
 	exchangeCount: number
 ): OpportunityRow | null => {
 	const contact = email.contact;
+	const city = contact?.city?.trim() || '';
 	const stateAbbr = contact?.state
 		? getStateAbbreviation(contact.state)?.trim().toUpperCase() || ''
 		: '';
@@ -288,6 +368,8 @@ const buildOpportunityRow = (
 		contactLabel: getContactLabel(email),
 		exchangeCount,
 		folder: email.campaign?.name?.trim() || 'Campaign',
+		categoryTitle: getContactCategoryTitle(email),
+		city,
 		location: [contact?.city?.trim(), stateAbbr].filter(Boolean).join(', '),
 		stateAbbr,
 		opportunityType: getOpportunityType(email, opportunityDate),
@@ -299,13 +381,16 @@ const buildOpportunityRow = (
 
 const buildMockOpportunityRow = (row: OpportunitiesMockRow, index: number): OpportunityRow => {
 	const stateAbbr = (row.stateAbbr || '').trim().toUpperCase();
+	const location = row.location?.trim() || '';
 	return {
 		id: -(index + 1),
 		status: row.status ?? 'booked',
 		contactLabel: row.contactLabel?.trim() || 'Mock Venue',
 		exchangeCount: Math.max(0, row.exchangeCount ?? 1),
 		folder: row.folder?.trim() || 'Campaign',
-		location: row.location?.trim() || '',
+		categoryTitle: row.category?.trim() || '',
+		city: getCityFromLocation(location, stateAbbr),
+		location,
 		stateAbbr,
 		opportunityType: row.opportunityType?.trim() || 'Opportunity',
 		opportunityDate: row.opportunityDate?.trim() || 'Date TBD',
@@ -374,6 +459,8 @@ export const DashboardOpportunitiesWidget: FC<{
 				row.contactLabel,
 				row.exchangeCount,
 				row.folder,
+				row.categoryTitle,
+				row.city,
 				row.location,
 				row.opportunityType,
 				row.opportunityDate,
@@ -551,6 +638,7 @@ export const DashboardOpportunitiesWidget: FC<{
 					) : (
 						opportunities.map((opportunity) => {
 							const statusMeta = STATUS_META[opportunity.status];
+							const categoryMeta = getOpportunityCategoryMeta(opportunity.categoryTitle);
 							return (
 								<button
 									key={opportunity.id}
@@ -564,106 +652,253 @@ export const DashboardOpportunitiesWidget: FC<{
 										background: '#FEFEFE',
 										boxShadow: '0px 1px 0px rgba(0, 0, 0, 0.05)',
 										overflow: 'hidden',
-										display: 'grid',
-										gridTemplateColumns: '218px minmax(0, 1fr) 68px',
-										alignItems: 'center',
-										gap: '10px',
-										paddingRight: '10px',
+										position: 'relative',
+										display: 'block',
+										appearance: 'none',
+										padding: 0,
 										fontFamily: 'Inter, sans-serif',
+										color: '#000000',
 									}}
 								>
-									<div className="min-w-0 h-full flex">
-										<span
-											aria-hidden="true"
-											style={{
-												width: '8px',
-												height: '100%',
-												background: statusMeta.accent,
-												flexShrink: 0,
-											}}
+									<span
+										aria-hidden="true"
+										style={{
+											position: 'absolute',
+											left: 0,
+											top: 0,
+											width: '6px',
+											height: '100%',
+											background: statusMeta.accent,
+										}}
+									/>
+
+									<span
+										style={{
+											position: 'absolute',
+											left: '27px',
+											top: '7px',
+											width: '190px',
+											height: '17.186px',
+											display: 'flex',
+											alignItems: 'baseline',
+											gap: '5px',
+											overflow: 'hidden',
+											color: '#000000',
+											fontFamily: 'Inter, sans-serif',
+											fontSize: '14px',
+											fontStyle: 'normal',
+											fontWeight: 600,
+											lineHeight: '17.186px',
+										}}
+									>
+										<span style={{ ...fadeTextStyle, minWidth: 0 }}>
+											{opportunity.contactLabel}
+										</span>
+										<span style={{ flex: '0 0 auto', fontWeight: 400 }}>
+											{opportunity.exchangeCount}
+										</span>
+									</span>
+
+									<span
+										style={{
+											position: 'absolute',
+											left: '27px',
+											bottom: '9px',
+											width: '80px',
+											height: '15px',
+											borderRadius: '3px',
+											background: '#B9BBF1',
+											display: 'flex',
+											alignItems: 'center',
+											overflow: 'hidden',
+											boxSizing: 'border-box',
+											padding: '0 4px',
+										}}
+									>
+										<DashboardActionBarFolderIcon
+											width={20}
+											height={12}
+											style={{ color: '#C847CB', flex: '0 0 auto' }}
 										/>
-										<div className="min-w-0 flex flex-col justify-center pl-[11px]">
-											<div className="flex items-baseline gap-[6px] min-w-0">
-												<span className="text-[16px] leading-[18px] font-extrabold text-black truncate">
-													{opportunity.contactLabel}
-												</span>
-												<span className="text-[12px] leading-[18px] text-black flex-shrink-0">
-													{opportunity.exchangeCount}
-												</span>
-											</div>
+										<span
+											style={{
+												...fadeTextStyle,
+												minWidth: 0,
+												flex: 1,
+												marginLeft: '6px',
+												color: '#000000',
+												fontFamily: 'Inter, sans-serif',
+												fontSize: '13.854px',
+												fontStyle: 'normal',
+												fontWeight: 500,
+												lineHeight: '17.186px',
+											}}
+										>
+											{opportunity.folder}
+										</span>
+									</span>
 
-											<div className="mt-[4px] flex items-center gap-[6px] min-w-0">
-												<span
-													className="min-w-0 inline-flex items-center gap-[4px]"
-													style={{
-														maxWidth: '116px',
-														height: '18px',
-														borderRadius: '4px',
-														background: '#B8B5EC',
-														padding: '0 7px',
-														fontSize: '13px',
-														fontWeight: 700,
-														lineHeight: 1,
-														color: '#000000',
-													}}
-												>
-													<span
-														aria-hidden="true"
-														style={{
-															width: '20px',
-															height: '11px',
-															borderRadius: '2px',
-															background: '#C847CB',
-															boxShadow: 'inset 0 4px 0 rgba(255,255,255,0.16)',
-															flexShrink: 0,
-														}}
-													/>
-													<span className="truncate">{opportunity.folder}</span>
-												</span>
-												{opportunity.stateAbbr && (
-													<span
-														className="inline-flex items-center justify-center h-[18px] rounded-[5px] border border-black text-[12px] leading-none font-bold flex-shrink-0"
-														style={{
-															minWidth: '27px',
-															backgroundColor:
-																stateBadgeColorMap[opportunity.stateAbbr] || '#F8F1C8',
-														}}
-													>
-														{opportunity.stateAbbr}
-													</span>
-												)}
-												{opportunity.location && (
-													<span className="text-[11px] leading-[14px] font-bold text-black truncate">
-														{opportunity.location}
-													</span>
-												)}
-											</div>
-										</div>
-									</div>
-
-									<div className="min-w-0">
-										<div className="flex items-center gap-[6px] min-w-0 text-[16px] leading-[18px] text-black">
-											<span className="truncate">{opportunity.opportunityType}</span>
+									<div
+										style={{
+											position: 'absolute',
+											left: '115px',
+											bottom: '9px',
+											right: '409px',
+											height: '15px',
+											display: 'flex',
+											alignItems: 'center',
+											gap: '5px',
+											overflow: 'hidden',
+										}}
+									>
+										{categoryMeta && (
 											<span
-												className="inline-flex items-center h-[21px] rounded-[5px] min-w-0 flex-shrink-0"
+												aria-label={categoryMeta.label}
+												title={categoryMeta.label}
 												style={{
-													maxWidth: '122px',
-													background: statusMeta.chipFill,
-													padding: '0 8px',
-													fontSize: '15px',
-													lineHeight: 1,
-													color: '#000000',
+													width: '24px',
+													height: '15px',
+													borderRadius: '5.6px',
+													border: '1px solid #000000',
+													background: categoryMeta.background,
+													display: 'inline-flex',
+													alignItems: 'center',
+													justifyContent: 'center',
+													boxSizing: 'border-box',
+													flex: '0 0 auto',
+													overflow: 'hidden',
 												}}
 											>
-												<span className="truncate">{opportunity.opportunityDate}</span>
+												{categoryMeta.icon}
 											</span>
-										</div>
-										<div className="mt-[4px] text-[13px] leading-[15px] text-black/75 truncate">
-											{opportunity.lastMessage || 'Reply received. Add details as this opportunity develops.'}
-										</div>
+										)}
+										{opportunity.stateAbbr && (
+											<span
+												style={{
+													minWidth: '27px',
+													height: '15px',
+													borderRadius: '5.6px',
+													border: '1px solid #000000',
+													backgroundColor:
+														stateBadgeColorMap[opportunity.stateAbbr] || '#F8F1C8',
+													display: 'inline-flex',
+													alignItems: 'center',
+													justifyContent: 'center',
+													boxSizing: 'border-box',
+													flex: '0 0 auto',
+													color: '#000000',
+													fontFamily: 'Inter, sans-serif',
+													fontSize: '12px',
+													fontWeight: 600,
+													lineHeight: 1,
+												}}
+											>
+												{opportunity.stateAbbr}
+											</span>
+										)}
+										{opportunity.city && (
+											<span
+												style={{
+													...fadeTextStyle,
+													minWidth: 0,
+													color: '#000000',
+													fontFamily: 'Inter, sans-serif',
+													fontSize: '10px',
+													fontWeight: 600,
+													lineHeight: '14px',
+												}}
+											>
+												{opportunity.city}
+											</span>
+										)}
 									</div>
 
-									<div className="text-[14px] leading-[16px] font-extrabold text-black text-right whitespace-nowrap">
+									<div
+										style={{
+											position: 'absolute',
+											left: '232px',
+											top: '5px',
+											right: '269.118px',
+											height: '20px',
+											overflow: 'hidden',
+											whiteSpace: 'nowrap',
+											color: '#000000',
+											textAlign: 'center',
+											fontFamily: 'Inter, sans-serif',
+											fontSize: '14px',
+											fontStyle: 'normal',
+											fontWeight: 400,
+											lineHeight: '20px',
+										}}
+									>
+										{opportunity.opportunityType}
+									</div>
+
+									<div
+										style={{
+											position: 'absolute',
+											right: '137px',
+											top: '2px',
+											width: '124.118px',
+											height: '19.936px',
+											borderRadius: '4.502px',
+											background: '#B6E8F1',
+											overflow: 'hidden',
+											display: 'flex',
+											alignItems: 'center',
+											justifyContent: 'center',
+											color: '#000000',
+											textAlign: 'center',
+											fontFamily: 'Inter, sans-serif',
+											fontSize: '14px',
+											fontStyle: 'normal',
+											fontWeight: 400,
+											lineHeight: '20px',
+										}}
+									>
+										<span style={{ ...fadeTextStyle, width: '100%' }}>
+											{opportunity.opportunityDate}
+										</span>
+									</div>
+
+									<div
+										style={{
+											position: 'absolute',
+											left: '232px',
+											top: '25px',
+											right: '100px',
+											height: '20px',
+											overflow: 'hidden',
+											color: '#000000',
+											textOverflow: 'ellipsis',
+											whiteSpace: 'nowrap',
+											fontFamily: 'Inter, sans-serif',
+											fontSize: '14px',
+											fontStyle: 'normal',
+											fontWeight: 200,
+											lineHeight: '20px',
+										}}
+									>
+										{opportunity.lastMessage || 'Reply received. Add details as this opportunity develops.'}
+									</div>
+
+									<div
+										style={{
+											position: 'absolute',
+											right: '10px',
+											top: '25px',
+											width: '82px',
+											height: '20px',
+											color: '#000000',
+											textAlign: 'right',
+											fontFamily: 'Inter, sans-serif',
+											fontSize: '14px',
+											fontStyle: 'normal',
+											fontWeight: 600,
+											lineHeight: '20px',
+											whiteSpace: 'nowrap',
+										}}
+									>
 										{opportunity.lastReceivedLabel}
 									</div>
 								</button>

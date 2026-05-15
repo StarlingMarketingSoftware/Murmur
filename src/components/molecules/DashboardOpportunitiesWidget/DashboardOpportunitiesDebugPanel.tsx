@@ -24,6 +24,7 @@ const DEFAULT_ROWS: OpportunitiesMockRow[] = [
 		contactLabel: 'Stargazer Hall / Maria Lin',
 		exchangeCount: 4,
 		folder: 'Spring Tour',
+		category: 'Music Venues',
 		location: 'Brooklyn, NY',
 		stateAbbr: 'NY',
 		opportunityType: 'Acoustic set',
@@ -36,6 +37,7 @@ const DEFAULT_ROWS: OpportunitiesMockRow[] = [
 		contactLabel: 'Blue Note Cafe / Jordan Pierce',
 		exchangeCount: 2,
 		folder: 'Spring Tour',
+		category: 'Coffee Shops',
 		location: 'Portland, OR',
 		stateAbbr: 'OR',
 		opportunityType: 'Friday residency',
@@ -48,6 +50,7 @@ const DEFAULT_ROWS: OpportunitiesMockRow[] = [
 		contactLabel: 'The Iron Room / Casey Park',
 		exchangeCount: 3,
 		folder: 'Summer Outreach',
+		category: 'Restaurants',
 		location: 'Austin, TX',
 		stateAbbr: 'TX',
 		opportunityType: 'Headline slot',
@@ -62,6 +65,7 @@ const blankRow = (index: number): OpportunitiesMockRow => ({
 	contactLabel: `Mock Venue ${index + 1}`,
 	exchangeCount: 1,
 	folder: 'Campaign',
+	category: 'Music Venues',
 	location: '',
 	stateAbbr: '',
 	opportunityType: 'Opportunity',
@@ -283,6 +287,12 @@ const RowCard: FC<{
 						value={row.folder ?? ''}
 						placeholder="Campaign"
 						onChange={(next) => patch({ folder: next })}
+					/>
+					<TextField
+						label="Category"
+						value={row.category ?? ''}
+						placeholder="Music Venues"
+						onChange={(next) => patch({ category: next })}
 					/>
 					<TextField
 						label="Location"
