@@ -393,22 +393,25 @@ export const DashboardOpportunitiesWidget: FC<{
 				height: '266px',
 				borderRadius: '6px',
 				background: '#D97676',
-				padding: '8px',
+				padding: '9px 8px 8px',
 				boxSizing: 'border-box',
 			}}
 		>
-			<div className="flex items-center gap-[10px]">
+			<div className="flex items-center gap-[7px]">
 				<div
 					className="min-w-0 flex items-center gap-[8px]"
 					style={{
-						width: '357px',
-						height: '28px',
-						borderRadius: '8px',
-						background: '#F8D3D3',
+						width: '346px',
+						height: '22px',
+						borderRadius: '6px',
+						background: '#FFD5D5',
 						padding: '0 11px',
+						boxSizing: 'border-box',
 						fontFamily: 'Inter, sans-serif',
-						fontSize: '15px',
-						fontWeight: 700,
+						fontSize: '12.809px',
+						fontStyle: 'normal',
+						fontWeight: 500,
+						lineHeight: '20.199px',
 						color: '#000000',
 					}}
 				>
@@ -419,20 +422,20 @@ export const DashboardOpportunitiesWidget: FC<{
 				<div
 					className="flex items-center gap-[8px]"
 					style={{
-						width: '155px',
-						height: '28px',
-						borderRadius: '8px',
+						width: '136px',
+						height: '22px',
+						borderRadius: '6px',
 						background: '#FFFFFF',
 						padding: '0 11px',
 						boxSizing: 'border-box',
 					}}
 				>
-					<SearchIconDesktop width={16} height={17} stroke="black" strokeWidth={2} />
+					<SearchIconDesktop width={12} height={13} stroke="#000000" strokeWidth={2} />
 					<input
 						value={searchQuery}
 						onChange={(event) => setSearchQuery(event.target.value)}
 						placeholder="Search"
-						className="min-w-0"
+						className="min-w-0 placeholder:text-black placeholder:opacity-100"
 						style={{
 							flex: 1,
 							height: '100%',
@@ -440,8 +443,10 @@ export const DashboardOpportunitiesWidget: FC<{
 							outline: 'none',
 							background: 'transparent',
 							fontFamily: 'Inter, sans-serif',
-							fontSize: '15px',
-							fontWeight: 600,
+							fontSize: '12.809px',
+							fontStyle: 'normal',
+							fontWeight: 500,
+							lineHeight: '20.199px',
 							color: '#000000',
 						}}
 					/>
