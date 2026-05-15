@@ -1,6 +1,15 @@
 'use client';
 
-import { FC, useMemo, useState } from 'react';
+import {
+	FC,
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+	type CSSProperties,
+} from 'react';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import DashboardActionBarStarIcon from '@/components/atoms/_svg/DashboardActionBarStarIcon';
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
@@ -132,12 +141,64 @@ const STATUS_META: Record<
 	},
 };
 
-const fadeTextStyle = {
+const fadeTextStyle: CSSProperties = {
 	overflow: 'hidden',
 	whiteSpace: 'nowrap',
-	WebkitMaskImage: 'linear-gradient(90deg, #000 calc(100% - 16px), transparent)',
-	maskImage: 'linear-gradient(90deg, #000 calc(100% - 16px), transparent)',
-} as const;
+};
+
+const FadeOverflowText: FC<{
+	text: string;
+	style?: CSSProperties;
+	className?: string;
+	fadePx?: number;
+}> = ({ text, style, className, fadePx = 16 }) => {
+	const spanRef = useRef<HTMLSpanElement | null>(null);
+	const [isOverflowing, setIsOverflowing] = useState(false);
+
+	const measure = useCallback(() => {
+		const el = spanRef.current;
+		if (!el) return;
+		setIsOverflowing(el.scrollWidth > el.clientWidth + 1);
+	}, []);
+
+	useLayoutEffect(() => {
+		measure();
+	}, [measure, text]);
+
+	useEffect(() => {
+		const el = spanRef.current;
+		if (!el) return;
+
+		if (typeof ResizeObserver === 'undefined') {
+			window.addEventListener('resize', measure);
+			return () => window.removeEventListener('resize', measure);
+		}
+
+		const ro = new ResizeObserver(() => measure());
+		ro.observe(el);
+		if (el.parentElement) ro.observe(el.parentElement);
+
+		return () => ro.disconnect();
+	}, [measure]);
+
+	const safeFadePx = Math.max(0, fadePx);
+	const overflowFadeStyle: CSSProperties | undefined = isOverflowing
+		? {
+				WebkitMaskImage: `linear-gradient(90deg, #000 calc(100% - ${safeFadePx}px), transparent)`,
+				maskImage: `linear-gradient(90deg, #000 calc(100% - ${safeFadePx}px), transparent)`,
+			}
+		: undefined;
+
+	return (
+		<span
+			ref={spanRef}
+			className={className}
+			style={{ ...fadeTextStyle, ...style, ...overflowFadeStyle }}
+		>
+			{text}
+		</span>
+	);
+};
 
 const getCityFromLocation = (location: string, stateAbbr: string) => {
 	const city = location.split(',')[0]?.trim() || '';
@@ -691,9 +752,7 @@ export const DashboardOpportunitiesWidget: FC<{
 											lineHeight: '17.186px',
 										}}
 									>
-										<span style={{ ...fadeTextStyle, minWidth: 0 }}>
-											{opportunity.contactLabel}
-										</span>
+										<FadeOverflowText text={opportunity.contactLabel} style={{ minWidth: 0 }} />
 										<span style={{ flex: '0 0 auto', fontWeight: 400 }}>
 											{opportunity.exchangeCount}
 										</span>
@@ -720,9 +779,9 @@ export const DashboardOpportunitiesWidget: FC<{
 											height={12}
 											style={{ color: '#C847CB', flex: '0 0 auto' }}
 										/>
-										<span
+										<FadeOverflowText
+											text={opportunity.folder}
 											style={{
-												...fadeTextStyle,
 												minWidth: 0,
 												flex: 1,
 												marginLeft: '6px',
@@ -733,9 +792,7 @@ export const DashboardOpportunitiesWidget: FC<{
 												fontWeight: 500,
 												lineHeight: '17.186px',
 											}}
-										>
-											{opportunity.folder}
-										</span>
+										/>
 									</span>
 
 									<div
@@ -797,19 +854,24 @@ export const DashboardOpportunitiesWidget: FC<{
 											</span>
 										)}
 										{opportunity.city && (
-											<span
+											<FadeOverflowText
+												text={opportunity.city}
 												style={{
-													...fadeTextStyle,
 													minWidth: 0,
+													height: '15px',
+													display: 'inline-flex',
+													alignItems: 'center',
+													justifyContent: 'center',
+													transform: 'translateY(1px)',
 													color: '#000000',
+													textAlign: 'center',
 													fontFamily: 'Inter, sans-serif',
-													fontSize: '10px',
-													fontWeight: 600,
-													lineHeight: '14px',
+													fontSize: '9.454px',
+													fontStyle: 'normal',
+													fontWeight: 500,
+													lineHeight: '12.482px',
 												}}
-											>
-												{opportunity.city}
-											</span>
+											/>
 										)}
 									</div>
 
@@ -817,13 +879,13 @@ export const DashboardOpportunitiesWidget: FC<{
 										style={{
 											position: 'absolute',
 											left: '232px',
-											top: '5px',
+											top: '2px',
 											right: '269.118px',
-											height: '20px',
+											height: '19.936px',
 											overflow: 'hidden',
 											whiteSpace: 'nowrap',
 											color: '#000000',
-											textAlign: 'center',
+											textAlign: 'left',
 											fontFamily: 'Inter, sans-serif',
 											fontSize: '14px',
 											fontStyle: 'normal',
@@ -846,9 +908,11 @@ export const DashboardOpportunitiesWidget: FC<{
 											overflow: 'hidden',
 											display: 'flex',
 											alignItems: 'center',
-											justifyContent: 'center',
+											justifyContent: 'flex-start',
+											boxSizing: 'border-box',
+											padding: '0 14px',
 											color: '#000000',
-											textAlign: 'center',
+											textAlign: 'left',
 											fontFamily: 'Inter, sans-serif',
 											fontSize: '14px',
 											fontStyle: 'normal',
@@ -856,9 +920,7 @@ export const DashboardOpportunitiesWidget: FC<{
 											lineHeight: '20px',
 										}}
 									>
-										<span style={{ ...fadeTextStyle, width: '100%' }}>
-											{opportunity.opportunityDate}
-										</span>
+										<FadeOverflowText text={opportunity.opportunityDate} style={{ width: '100%' }} />
 									</div>
 
 									<div
@@ -870,7 +932,6 @@ export const DashboardOpportunitiesWidget: FC<{
 											height: '20px',
 											overflow: 'hidden',
 											color: '#000000',
-											textOverflow: 'ellipsis',
 											whiteSpace: 'nowrap',
 											fontFamily: 'Inter, sans-serif',
 											fontSize: '14px',
@@ -879,7 +940,13 @@ export const DashboardOpportunitiesWidget: FC<{
 											lineHeight: '20px',
 										}}
 									>
-										{opportunity.lastMessage || 'Reply received. Add details as this opportunity develops.'}
+										<FadeOverflowText
+											text={
+												opportunity.lastMessage ||
+												'Reply received. Add details as this opportunity develops.'
+											}
+											style={{ display: 'block', width: '100%' }}
+										/>
 									</div>
 
 									<div
