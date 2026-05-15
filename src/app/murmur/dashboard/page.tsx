@@ -123,6 +123,10 @@ import {
 import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import DashboardResponsesWidget from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesWidget';
+import DashboardOpportunitiesWidget, {
+	type OpportunitiesMockState,
+} from '@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesWidget';
+import { DashboardOpportunitiesDebugPanel } from '@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesDebugPanel';
 import { useGetCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
 import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { useQueryClient } from '@tanstack/react-query';
@@ -2207,6 +2211,10 @@ const DashboardContent = () => {
 	const calendarDebugEnabled = searchParams.get('calendarDebug') === '1';
 	const [calendarMockState, setCalendarMockState] = useState<
 		DashboardCalendarMockState | undefined
+	>(undefined);
+	const opportunitiesDebugEnabled = searchParams.get('opportunitiesDebug') === '1';
+	const [opportunitiesMockState, setOpportunitiesMockState] = useState<
+		OpportunitiesMockState | undefined
 	>(undefined);
 	const [isCampaignFinderOpen, setIsCampaignFinderOpen] = useState(false);
 	const isTabPreviewingOther = hoveredTab != null && hoveredTab !== activeTab;
@@ -7293,11 +7301,11 @@ const DashboardContent = () => {
 																>
 																	{(
 																		[
-																			{ key: 'playbook', Icon: DashboardActionBarPlaybookIcon, label: 'Playbook' },
-																			{ key: 'folder', Icon: DashboardActionBarFolderIcon, label: 'Folder' },
-																			{ key: 'calendar', Icon: DashboardActionBarCalendarIcon, label: 'Calendar' },
-																			{ key: 'star', Icon: DashboardActionBarStarIcon, label: 'Starred' },
-																			{ key: 'envelope', Icon: DashboardActionBarEnvelopeIcon, label: 'Messages' },
+															{ key: 'playbook', Icon: DashboardActionBarPlaybookIcon, label: 'Playbook' },
+															{ key: 'folder', Icon: DashboardActionBarFolderIcon, label: 'Folder' },
+															{ key: 'calendar', Icon: DashboardActionBarCalendarIcon, label: 'Calendar' },
+															{ key: 'star', Icon: DashboardActionBarStarIcon, label: 'Opportunities' },
+															{ key: 'envelope', Icon: DashboardActionBarEnvelopeIcon, label: 'Messages' },
 																		] as const
 																	).map(({ key, Icon, label }) => {
 																		const isSelected = selectedActionBarIcon === key;
@@ -8397,7 +8405,7 @@ const DashboardContent = () => {
 									>
 										{(
 											[
-												{ key: 'star', Icon: DashboardActionBarStarIcon, label: 'Starred', width: 21, height: 20 },
+												{ key: 'star', Icon: DashboardActionBarStarIcon, label: 'Opportunities', width: 21, height: 20 },
 												{ key: 'envelope', Icon: DashboardActionBarEnvelopeIcon, label: 'Messages', width: 22, height: 13 },
 											] as const
 										).map(({ key, Icon, label, width, height }) => {
@@ -9985,6 +9993,12 @@ const DashboardContent = () => {
 									onFinderOpenChange={setIsCampaignFinderOpen}
 								/>
 							)}
+							{selectedActionBarIcon === 'star' && (
+								<DashboardOpportunitiesWidget
+									enabled={isSignedIn === true}
+									mockState={opportunitiesMockState}
+								/>
+							)}
 							{selectedActionBarIcon === 'envelope' && (
 								<DashboardResponsesWidget enabled={isSignedIn === true} />
 							)}
@@ -10003,6 +10017,13 @@ const DashboardContent = () => {
 					<DashboardCalendarDebugPanel
 						value={calendarMockState}
 						onChange={setCalendarMockState}
+					/>
+				)}
+
+				{opportunitiesDebugEnabled && (
+					<DashboardOpportunitiesDebugPanel
+						value={opportunitiesMockState}
+						onChange={setOpportunitiesMockState}
 					/>
 				)}
 
