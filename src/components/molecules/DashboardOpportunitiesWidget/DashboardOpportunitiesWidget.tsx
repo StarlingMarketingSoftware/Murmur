@@ -753,7 +753,15 @@ export const DashboardOpportunitiesWidget: FC<{
 										}}
 									>
 										<FadeOverflowText text={opportunity.contactLabel} style={{ minWidth: 0 }} />
-										<span style={{ flex: '0 0 auto', fontWeight: 400 }}>
+										<span
+											style={{
+												flex: '0 0 auto',
+												fontSize: '10px',
+												fontWeight: 400,
+												lineHeight: 1,
+												transform: 'translateY(-4px)',
+											}}
+										>
 											{opportunity.exchangeCount}
 										</span>
 									</span>
