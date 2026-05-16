@@ -112,10 +112,22 @@ const RESPONSE_TOGGLE_TABS: Array<{
 	width: number;
 	activeFill: string;
 }> = [
-	{ key: 'responses', label: 'Responses', width: 104, activeFill: '#84C1E2' },
+	{ key: 'responses', label: 'Responses', width: 104, activeFill: '#98DAFC' },
 	{ key: 'sent', label: 'Sent', width: 97, activeFill: '#B0E0A6' },
 	{ key: 'opportunities', label: 'Opportunities', width: 145, activeFill: '#FFD5D5' },
 ];
+
+const RESPONSE_WIDGET_BACKGROUND_BY_TAB: Record<DashboardResponsesTab, string> = {
+	responses: '#84C1E2',
+	sent: '#6DB97B',
+	opportunities: '#D97676',
+};
+
+const getResponseToggleDividerColor = (
+	activeTab: DashboardResponsesTab,
+	leftTab: DashboardResponsesTab,
+	rightTab: DashboardResponsesTab
+) => (activeTab === leftTab || activeTab === rightTab ? '#000000' : 'rgba(0,0,0,0.18)');
 
 const getDayOrdinalSuffix = (day: number) => {
 	// 11, 12, 13 are special-cased
@@ -356,7 +368,7 @@ export const DashboardResponsesWidget: FC<{
 				width: '654px',
 				height: '206px',
 				borderRadius: '8px',
-				backgroundColor: '#84C1E2',
+				backgroundColor: RESPONSE_WIDGET_BACKGROUND_BY_TAB[activeTab],
 				paddingTop: '6px',
 				paddingBottom: '6px',
 			}}
@@ -388,8 +400,9 @@ export const DashboardResponsesWidget: FC<{
 						color: '#000000',
 					}}
 				>
-					{RESPONSE_TOGGLE_TABS.map((tab) => {
+					{RESPONSE_TOGGLE_TABS.map((tab, index) => {
 						const isActive = activeTab === tab.key;
+						const previousTab = RESPONSE_TOGGLE_TABS[index - 1]?.key;
 						return (
 							<button
 								key={tab.key}
@@ -397,9 +410,15 @@ export const DashboardResponsesWidget: FC<{
 								aria-pressed={isActive}
 								onClick={() => setActiveTab(tab.key)}
 								style={{
-									width: `${tab.width}px`,
-									height: '22px',
+									width: '100%',
+									height: '100%',
+									alignSelf: 'stretch',
+									justifySelf: 'stretch',
 									border: 'none',
+									borderLeft: previousTab
+										? `1px solid ${getResponseToggleDividerColor(activeTab, previousTab, tab.key)}`
+										: 'none',
+									boxSizing: 'border-box',
 									background: isActive ? tab.activeFill : '#FFFFFF',
 									font: 'inherit',
 									color: 'inherit',
@@ -423,30 +442,6 @@ export const DashboardResponsesWidget: FC<{
 							</button>
 						);
 					})}
-					<span
-						aria-hidden="true"
-						style={{
-							position: 'absolute',
-							left: '104px',
-							top: 0,
-							width: '1px',
-							height: '22px',
-							backgroundColor: 'rgba(0,0,0,0.3)',
-							pointerEvents: 'none',
-						}}
-					/>
-					<span
-						aria-hidden="true"
-						style={{
-							position: 'absolute',
-							left: '201px',
-							top: 0,
-							width: '1px',
-							height: '22px',
-							backgroundColor: 'rgba(0,0,0,0.18)',
-							pointerEvents: 'none',
-						}}
-					/>
 				</div>
 
 				<div
