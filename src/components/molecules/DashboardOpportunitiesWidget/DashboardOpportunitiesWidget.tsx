@@ -143,6 +143,7 @@ const STATUS_META: Record<
 
 const EXPIRED_OPPORTUNITY_FILL = '#DD7376';
 const EXPIRED_OPPORTUNITY_FOLDER_ICON = '#B84A4A';
+const EMPTY_OPPORTUNITY_OUTLINE_ROW_COUNT = 4;
 
 const fadeTextStyle: CSSProperties = {
 	overflow: 'hidden',
@@ -554,7 +555,7 @@ export const DashboardOpportunitiesWidget: FC<{
 		return counts;
 	}, [inboundEmails]);
 
-	const opportunities = useMemo(() => {
+	const allOpportunities = useMemo(() => {
 		let rows: OpportunityRow[];
 		if (mockOverrideActive) {
 			rows = (mockState?.rows ?? []).map((row, index) => buildMockOpportunityRow(row, index));
@@ -576,8 +577,12 @@ export const DashboardOpportunitiesWidget: FC<{
 			}
 		}
 
+		return rows;
+	}, [inboundEmails, mockOverrideActive, mockState?.rows, threadExchangeCounts]);
+
+	const opportunities = useMemo(() => {
 		const q = searchQuery.trim().toLowerCase();
-		return rows.filter((row) => {
+		return allOpportunities.filter((row) => {
 			if (activeStatus && row.status !== activeStatus) return false;
 			if (!q) return true;
 
@@ -597,8 +602,9 @@ export const DashboardOpportunitiesWidget: FC<{
 				.toLowerCase()
 				.includes(q);
 		});
-	}, [activeStatus, inboundEmails, mockOverrideActive, mockState?.rows, searchQuery, threadExchangeCounts]);
+	}, [activeStatus, allOpportunities, searchQuery]);
 	const isUnfilteredView = activeStatus === null && searchQuery.trim() === '';
+	const isFullyEmpty = !isLoading && allOpportunities.length === 0;
 
 	if (!enabled) return null;
 
@@ -744,6 +750,24 @@ export const DashboardOpportunitiesWidget: FC<{
 								}}
 							/>
 						))
+					) : isFullyEmpty ? (
+						<>
+							<span className="sr-only">No opportunities yet</span>
+							{Array.from({ length: EMPTY_OPPORTUNITY_OUTLINE_ROW_COUNT }).map((_, index) => (
+								<div
+									key={`opportunity-empty-outline-${index}`}
+									aria-hidden="true"
+									style={{
+										width: '639px',
+										height: '48px',
+										borderRadius: '6.389px',
+										border: '1px solid #000000',
+										background: 'transparent',
+										boxSizing: 'border-box',
+									}}
+								/>
+							))}
+						</>
 					) : opportunities.length === 0 ? (
 						<div
 							className="flex items-center justify-center text-center"
