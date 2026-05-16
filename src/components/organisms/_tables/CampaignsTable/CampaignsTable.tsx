@@ -252,7 +252,6 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 		isPending,
 		columns,
 		handleRowClick,
-		isFinderOpen,
 	} = leftCampaignsTable;
 	const closeRightFinder = rightCampaignsTable.closeFinder;
 	const openLeftFinderForCampaign = leftCampaignsTable.openFinderForCampaign;
@@ -265,6 +264,15 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 	const campaignRows = Array.isArray(campaignDataRows) ? campaignDataRows : [];
 	const campaignCount = campaignRows.length;
 	const isSplitFinderView = !shouldShowMobileFeatures && campaignFinderViewMode === 'split';
+	const leftFinderSearchActive = leftFinderSearchQuery.trim().length > 0;
+	const rightFinderSearchActive = rightFinderSearchQuery.trim().length > 0;
+	const activeFinderSearchPane: 'left' | 'right' | null = rightFinderSearchActive
+		? 'right'
+		: leftFinderSearchActive
+			? 'left'
+			: null;
+	const isSplitFinderSearchActive = isSplitFinderView && activeFinderSearchPane !== null;
+	const shouldRenderSplitFinderView = isSplitFinderView && !isSplitFinderSearchActive;
 	const isFinderLayoutOpen = isSplitFinderView
 		? leftCampaignsTable.isFinderOpen || rightCampaignsTable.isFinderOpen
 		: leftCampaignsTable.isFinderOpen;
@@ -564,17 +572,37 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 
 		setCampaignFinderViewMode('single');
 	};
+	const clearFinderSearches = () => {
+		setLeftFinderSearchQuery('');
+		setRightFinderSearchQuery('');
+	};
 
 	const campaignsTableStyle = {
 		['--campaigns-table-scale' as never]: campaignsTableScale,
 		['--campaigns-finder-height' as never]: `${campaignFinderHeight}px`,
 	} as CSSProperties;
-	const finderTopContent = isFinderOpen ? (
+	const singleFinderPane = isSplitFinderSearchActive && activeFinderSearchPane === 'right'
+		? 'right'
+		: 'left';
+	const singleCampaignsTable = singleFinderPane === 'right'
+		? rightCampaignsTable
+		: leftCampaignsTable;
+	const singleFinderSearchQuery = singleFinderPane === 'right'
+		? rightFinderSearchQuery
+		: leftFinderSearchQuery;
+	const setSingleFinderSearchQuery = singleFinderPane === 'right'
+		? setRightFinderSearchQuery
+		: setLeftFinderSearchQuery;
+	const finderTopContent = singleCampaignsTable.isFinderOpen ? (
 		<CampaignFinderTopBar
-			searchValue={leftFinderSearchQuery}
-			onSearchChange={setLeftFinderSearchQuery}
-			viewMode={campaignFinderViewMode}
-			onToggleViewMode={() => handleToggleCampaignFinderViewMode('left')}
+			searchValue={singleFinderSearchQuery}
+			onSearchChange={setSingleFinderSearchQuery}
+			viewMode={isSplitFinderSearchActive ? 'single' : campaignFinderViewMode}
+			onToggleViewMode={
+				isSplitFinderSearchActive
+					? clearFinderSearches
+					: () => handleToggleCampaignFinderViewMode(singleFinderPane)
+			}
 		/>
 	) : undefined;
 	const renderDesktopCampaignsTable = (
@@ -681,7 +709,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 									</div>
 								</div>
 							</div>
-						) : isSplitFinderView ? (
+						) : shouldRenderSplitFinderView ? (
 							<div
 								className="campaign-finder-split-shell"
 								data-custom-table-ignore-row-click="true"
@@ -715,7 +743,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 								</div>
 							</div>
 						) : (
-							renderDesktopCampaignsTable(leftCampaignsTable, finderTopContent)
+							renderDesktopCampaignsTable(singleCampaignsTable, finderTopContent)
 						)}
 					</div>
 				</div>
