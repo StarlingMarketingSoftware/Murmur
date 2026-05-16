@@ -141,6 +141,9 @@ const STATUS_META: Record<
 	},
 };
 
+const EXPIRED_OPPORTUNITY_FILL = '#DD7376';
+const EXPIRED_OPPORTUNITY_FOLDER_ICON = '#B84A4A';
+
 const fadeTextStyle: CSSProperties = {
 	overflow: 'hidden',
 	whiteSpace: 'nowrap',
@@ -348,6 +351,68 @@ const extractOpportunityDateLabel = (text: string): string => {
 	}
 
 	return 'Date TBD';
+};
+
+const getStartOfDay = (date: Date) =>
+	new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const parseOpportunityDateForComparison = (label: string, today: Date): Date | null => {
+	const normalized = label.trim().toLowerCase();
+	if (!normalized || normalized === 'date tbd') return null;
+
+	if (normalized === 'yesterday') {
+		return new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+	}
+	if (normalized === 'today') return today;
+	if (normalized === 'tomorrow') {
+		return new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+	}
+
+	const monthMatch = normalized.match(
+		/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,\s*(\d{4}))?\b/i
+	);
+	if (monthMatch) {
+		const monthIndex = MONTH_NAME_TO_INDEX[monthMatch[1].toLowerCase().replace('.', '')];
+		const day = Number(monthMatch[2]);
+		const year = monthMatch[3] ? Number(monthMatch[3]) : today.getFullYear();
+		const date = new Date(year, monthIndex, day);
+		if (
+			monthIndex != null &&
+			Number.isFinite(day) &&
+			date.getFullYear() === year &&
+			date.getMonth() === monthIndex &&
+			date.getDate() === day
+		) {
+			return date;
+		}
+	}
+
+	const slashMatch = normalized.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
+	if (slashMatch) {
+		const monthIndex = Number(slashMatch[1]) - 1;
+		const day = Number(slashMatch[2]);
+		const rawYear = slashMatch[3] ? Number(slashMatch[3]) : today.getFullYear();
+		const year = rawYear < 100 ? 2000 + rawYear : rawYear;
+		const date = new Date(year, monthIndex, day);
+		if (
+			monthIndex >= 0 &&
+			monthIndex <= 11 &&
+			Number.isFinite(day) &&
+			date.getFullYear() === year &&
+			date.getMonth() === monthIndex &&
+			date.getDate() === day
+		) {
+			return date;
+		}
+	}
+
+	return null;
+};
+
+const isOpportunityDatePassed = (label: string) => {
+	const today = getStartOfDay(new Date());
+	const date = parseOpportunityDateForComparison(label, today);
+	return date != null && date.getTime() < today.getTime();
 };
 
 const normalizeOpportunityType = (value: string | null | undefined, dateLabel: string) => {
@@ -702,6 +767,9 @@ export const DashboardOpportunitiesWidget: FC<{
 							const statusMeta = STATUS_META[opportunity.status];
 							const categoryMeta = getOpportunityCategoryMeta(opportunity.categoryTitle);
 							const isCompactClosedRow = isUnfilteredView && opportunity.status === 'closed';
+							const isExpiredOpportunity = isOpportunityDatePassed(
+								opportunity.opportunityDate
+							);
 							return (
 								<button
 									key={opportunity.id}
@@ -711,9 +779,16 @@ export const DashboardOpportunitiesWidget: FC<{
 										width: '639px',
 										height: isCompactClosedRow ? '25px' : '48px',
 										borderRadius: '6.389px',
-										border: 'none',
-										background: isCompactClosedRow ? '#E6E6E6' : '#FEFEFE',
-										boxShadow: '0px 1px 0px rgba(0, 0, 0, 0.05)',
+										border: isExpiredOpportunity ? '1px solid #000000' : 'none',
+										background: isExpiredOpportunity
+											? EXPIRED_OPPORTUNITY_FILL
+											: isCompactClosedRow
+												? '#E6E6E6'
+												: '#FEFEFE',
+										boxShadow: isExpiredOpportunity
+											? 'none'
+											: '0px 1px 0px rgba(0, 0, 0, 0.05)',
+										boxSizing: 'border-box',
 										overflow: 'hidden',
 										position: 'relative',
 										display: 'block',
@@ -731,7 +806,9 @@ export const DashboardOpportunitiesWidget: FC<{
 											top: 0,
 											width: '6px',
 											height: '100%',
-											background: statusMeta.accent,
+											background: isExpiredOpportunity
+												? EXPIRED_OPPORTUNITY_FILL
+												: statusMeta.accent,
 										}}
 									/>
 
@@ -778,7 +855,10 @@ export const DashboardOpportunitiesWidget: FC<{
 												width: '80px',
 												height: '15px',
 												borderRadius: '3px',
-												background: '#B9BBF1',
+												border: isExpiredOpportunity ? '1px solid #000000' : 'none',
+												background: isExpiredOpportunity
+													? EXPIRED_OPPORTUNITY_FILL
+													: '#B9BBF1',
 												display: 'flex',
 												alignItems: 'center',
 												overflow: 'hidden',
@@ -789,7 +869,12 @@ export const DashboardOpportunitiesWidget: FC<{
 											<DashboardActionBarFolderIcon
 												width={20}
 												height={12}
-												style={{ color: '#C847CB', flex: '0 0 auto' }}
+												style={{
+													color: isExpiredOpportunity
+														? EXPIRED_OPPORTUNITY_FOLDER_ICON
+														: '#C847CB',
+													flex: '0 0 auto',
+												}}
 											/>
 											<FadeOverflowText
 												text={opportunity.folder}
@@ -919,7 +1004,10 @@ export const DashboardOpportunitiesWidget: FC<{
 											width: '124.118px',
 											height: '19.936px',
 											borderRadius: '4.502px',
-											background: '#B6E8F1',
+											border: isExpiredOpportunity ? '1px solid #000000' : 'none',
+											background: isExpiredOpportunity
+												? EXPIRED_OPPORTUNITY_FILL
+												: '#B6E8F1',
 											overflow: 'hidden',
 											display: 'flex',
 											alignItems: 'center',
