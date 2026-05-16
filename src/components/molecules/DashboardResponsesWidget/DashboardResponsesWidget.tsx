@@ -28,6 +28,84 @@ import { CornerUpLeft } from 'lucide-react';
 
 type DashboardResponsesTab = 'responses' | 'sent' | 'opportunities';
 
+export type ResponsesMockTab = 'responses' | 'sent' | 'opportunities';
+
+export type ResponsesMockRow = {
+	tab?: ResponsesMockTab;
+	senderEmail?: string;
+	senderName?: string;
+	subject?: string;
+	body?: string;
+	receivedIso?: string;
+	withContact?: boolean;
+	contactFirstName?: string;
+	contactLastName?: string;
+	contactCompany?: string;
+	contactHeadline?: string;
+	contactState?: string;
+	contactCity?: string;
+	campaignName?: string;
+};
+
+export type ResponsesMockState = {
+	rows?: ResponsesMockRow[];
+};
+
+const buildMockInboundEmail = (
+	row: ResponsesMockRow,
+	index: number
+): InboundEmailWithRelations & { isSent?: boolean } => {
+	const fallbackTime = Date.now() - (index + 1) * 1000 * 60 * 47;
+	const receivedAt =
+		row.receivedIso && !Number.isNaN(new Date(row.receivedIso).getTime())
+			? new Date(row.receivedIso)
+			: new Date(fallbackTime);
+	const body = row.body?.trim() || '';
+	const wantsContact =
+		row.withContact ??
+		Boolean(
+			row.contactFirstName ||
+				row.contactLastName ||
+				row.contactCompany ||
+				row.contactHeadline ||
+				row.contactState ||
+				row.contactCity
+		);
+	const contact = wantsContact
+		? ({
+				id: -(index + 1),
+				email: row.senderEmail?.trim() || '',
+				firstName: row.contactFirstName?.trim() || '',
+				lastName: row.contactLastName?.trim() || '',
+				company: row.contactCompany?.trim() || '',
+				headline: row.contactHeadline?.trim() || '',
+				title: row.contactHeadline?.trim() || '',
+				state: row.contactState?.trim() || '',
+				city: row.contactCity?.trim() || '',
+			} as any)
+		: null;
+	const campaign = row.campaignName?.trim()
+		? ({ id: -(index + 1), name: row.campaignName.trim() } as any)
+		: null;
+	const isSent = row.tab === 'sent';
+
+	return {
+		id: -(index + 1),
+		sender: row.senderEmail?.trim() || '',
+		senderName: row.senderName?.trim() || '',
+		recipient: '',
+		subject: row.subject?.trim() || '',
+		bodyPlain: body,
+		bodyHtml: body,
+		strippedText: body,
+		receivedAt,
+		contact,
+		campaign,
+		originalEmail: null,
+		isSent,
+	} as unknown as InboundEmailWithRelations & { isSent?: boolean };
+};
+
 const RESPONSE_TOGGLE_TABS: Array<{
 	key: DashboardResponsesTab;
 	label: string;
@@ -147,13 +225,17 @@ const isOpportunityEmail = (email: InboundEmailWithRelations) => {
 export const DashboardResponsesWidget: FC<{
 	enabled?: boolean;
 	className?: string;
-}> = ({ enabled = true, className }) => {
-	const { data: inboundEmails, isLoading: isLoadingInboundEmails } = useGetInboundEmails({ enabled });
+	mockState?: ResponsesMockState;
+}> = ({ enabled = true, className, mockState }) => {
+	const mockOverrideActive = mockState != null;
+	const { data: inboundEmails, isLoading: isLoadingInboundEmails } = useGetInboundEmails({
+		enabled: enabled && !mockOverrideActive,
+	});
 	const [searchQuery, setSearchQuery] = useState('');
 	const [activeTab, setActiveTab] = useState<DashboardResponsesTab>('responses');
 	const [openedEmailIds, setOpenedEmailIds] = useState<Record<string, true>>({});
 	const { data: sentEmails, isLoading: isLoadingSentEmails } = useGetEmails({
-		enabled: enabled && activeTab === 'sent',
+		enabled: enabled && !mockOverrideActive && activeTab === 'sent',
 		filters: { status: EmailStatus.sent },
 	});
 
@@ -182,16 +264,40 @@ export const DashboardResponsesWidget: FC<{
 		[sentEmails]
 	);
 
+	const mockEmails = useMemo(() => {
+		if (!mockOverrideActive) return null;
+		const rows = mockState?.rows ?? [];
+		return rows.map((row, index) => ({
+			tab: (row.tab ?? 'responses') as ResponsesMockTab,
+			email: buildMockInboundEmail(row, index),
+		}));
+	}, [mockOverrideActive, mockState?.rows]);
+
 	const displayEmails = useMemo(() => {
+		if (mockOverrideActive) {
+			const all = mockEmails ?? [];
+			if (activeTab === 'sent') return all.filter((m) => m.tab === 'sent').map((m) => m.email);
+			if (activeTab === 'opportunities') {
+				return all.filter((m) => m.tab === 'opportunities').map((m) => m.email);
+			}
+			// Responses tab shows everything that is not "sent" — including opportunities,
+			// matching real-data behavior where any inbound reply also appears here.
+			return all.filter((m) => m.tab !== 'sent').map((m) => m.email);
+		}
+
 		if (activeTab === 'sent') return normalizedSentEmails;
 
 		const list = [...(inboundEmails ?? [])];
 		if (activeTab === 'opportunities') return list.filter(isOpportunityEmail);
 
 		return list;
-	}, [activeTab, inboundEmails, normalizedSentEmails]);
+	}, [activeTab, inboundEmails, mockEmails, mockOverrideActive, normalizedSentEmails]);
 
-	const isLoading = activeTab === 'sent' ? isLoadingSentEmails : isLoadingInboundEmails;
+	const isLoading = mockOverrideActive
+		? false
+		: activeTab === 'sent'
+		? isLoadingSentEmails
+		: isLoadingInboundEmails;
 	const emptyMessage =
 		activeTab === 'sent'
 			? 'No sent emails yet'

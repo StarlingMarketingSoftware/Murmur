@@ -122,7 +122,10 @@ import {
 } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
-import DashboardResponsesWidget from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesWidget';
+import DashboardResponsesWidget, {
+	type ResponsesMockState,
+} from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesWidget';
+import { DashboardResponsesDebugPanel } from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesDebugPanel';
 import DashboardOpportunitiesWidget, {
 	type OpportunitiesMockState,
 } from '@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesWidget';
@@ -2215,6 +2218,10 @@ const DashboardContent = () => {
 	const opportunitiesDebugEnabled = searchParams.get('opportunitiesDebug') === '1';
 	const [opportunitiesMockState, setOpportunitiesMockState] = useState<
 		OpportunitiesMockState | undefined
+	>(undefined);
+	const inboxDebugEnabled = searchParams.get('inboxDebug') === '1';
+	const [responsesMockState, setResponsesMockState] = useState<
+		ResponsesMockState | undefined
 	>(undefined);
 	const [isCampaignFinderOpen, setIsCampaignFinderOpen] = useState(false);
 	const isTabPreviewingOther = hoveredTab != null && hoveredTab !== activeTab;
@@ -10000,7 +10007,10 @@ const DashboardContent = () => {
 								/>
 							)}
 							{selectedActionBarIcon === 'envelope' && (
-								<DashboardResponsesWidget enabled={isSignedIn === true} />
+								<DashboardResponsesWidget
+									enabled={isSignedIn === true}
+									mockState={responsesMockState}
+								/>
 							)}
 						</div>
 					</div>
@@ -10024,6 +10034,13 @@ const DashboardContent = () => {
 					<DashboardOpportunitiesDebugPanel
 						value={opportunitiesMockState}
 						onChange={setOpportunitiesMockState}
+					/>
+				)}
+
+				{inboxDebugEnabled && (
+					<DashboardResponsesDebugPanel
+						value={responsesMockState}
+						onChange={setResponsesMockState}
 					/>
 				)}
 
