@@ -2,12 +2,15 @@
 
 import { FC, useMemo, useState } from 'react';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
+import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import type { InboundEmailWithRelations } from '@/types';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
+import DashboardActionBarStarIcon from '@/components/atoms/_svg/DashboardActionBarStarIcon';
 import { cn } from '@/utils/ui';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
+import { EmailStatus } from '@/constants/prismaEnums';
 import {
 	isCoffeeShopTitle,
 	isMusicVenueTitle,
@@ -22,6 +25,19 @@ import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { CornerUpLeft } from 'lucide-react';
+
+type DashboardResponsesTab = 'responses' | 'sent' | 'opportunities';
+
+const RESPONSE_TOGGLE_TABS: Array<{
+	key: DashboardResponsesTab;
+	label: string;
+	width: number;
+	activeFill: string;
+}> = [
+	{ key: 'responses', label: 'Responses', width: 104, activeFill: '#84C1E2' },
+	{ key: 'sent', label: 'Sent', width: 97, activeFill: '#B0E0A6' },
+	{ key: 'opportunities', label: 'Opportunities', width: 145, activeFill: '#FFD5D5' },
+];
 
 const getDayOrdinalSuffix = (day: number) => {
 	// 11, 12, 13 are special-cased
@@ -113,26 +129,88 @@ const getCategoryIcon = (email: InboundEmailWithRelations) => {
 	return null;
 };
 
+const isOpportunityEmail = (email: InboundEmailWithRelations) => {
+	const text = `${email.subject || ''} ${getEmailSnippet(email)}`.toLowerCase();
+	return (
+		/\b(pass|passed|declin(?:e|ed|ing)|not interested|not a fit|unavailable|can't|cannot|no longer)\b/.test(
+			text
+		) ||
+		/\b(?:already|fully) booked\b/.test(text) ||
+		/\b(booked|confirmed|confirming|reserved)\b/.test(text) ||
+		/\b(?:sounds good|let'?s do it|works for us|we'd love|we would love)\b/.test(text) ||
+		/\b(in progress|interested|available|tentative|pencil(?:ed)? in|hold(?:ing)? the date|checking|looking into|following up|follow up|send more|details|what dates|which date)\b/.test(
+			text
+		)
+	);
+};
+
 export const DashboardResponsesWidget: FC<{
 	enabled?: boolean;
 	className?: string;
 }> = ({ enabled = true, className }) => {
-	const { data: inboundEmails, isLoading } = useGetInboundEmails({ enabled });
+	const { data: inboundEmails, isLoading: isLoadingInboundEmails } = useGetInboundEmails({ enabled });
 	const [searchQuery, setSearchQuery] = useState('');
-	const [openedEmailIds, setOpenedEmailIds] = useState<Record<number, true>>({});
+	const [activeTab, setActiveTab] = useState<DashboardResponsesTab>('responses');
+	const [openedEmailIds, setOpenedEmailIds] = useState<Record<string, true>>({});
+	const { data: sentEmails, isLoading: isLoadingSentEmails } = useGetEmails({
+		enabled: enabled && activeTab === 'sent',
+		filters: { status: EmailStatus.sent },
+	});
+
+	const normalizedSentEmails = useMemo(
+		() =>
+			(sentEmails ?? []).map(
+				(email) =>
+					({
+						id: email.id,
+						sender: email.contact?.email || '',
+						senderName: email.contact
+							? `${email.contact.firstName || ''} ${email.contact.lastName || ''}`.trim()
+							: '',
+						recipient: '',
+						subject: email.subject || '',
+						bodyPlain: email.message || '',
+						bodyHtml: email.message || '',
+						strippedText: email.message?.replace(/<[^>]*>/g, '') || '',
+						receivedAt: email.sentAt || email.createdAt,
+						contact: email.contact,
+						campaign: null,
+						originalEmail: null,
+						isSent: true,
+					} as InboundEmailWithRelations & { isSent?: boolean })
+			),
+		[sentEmails]
+	);
+
+	const displayEmails = useMemo(() => {
+		if (activeTab === 'sent') return normalizedSentEmails;
+
+		const list = [...(inboundEmails ?? [])];
+		if (activeTab === 'opportunities') return list.filter(isOpportunityEmail);
+
+		return list;
+	}, [activeTab, inboundEmails, normalizedSentEmails]);
+
+	const isLoading = activeTab === 'sent' ? isLoadingSentEmails : isLoadingInboundEmails;
+	const emptyMessage =
+		activeTab === 'sent'
+			? 'No sent emails yet'
+			: activeTab === 'opportunities'
+			? 'No opportunities yet'
+			: 'No responses yet';
 
 	const senderCounts = useMemo(() => {
 		const counts: Record<string, number> = {};
-		for (const email of inboundEmails ?? []) {
+		for (const email of displayEmails) {
 			const key = (email.sender || '').toLowerCase().trim();
 			if (!key) continue;
 			counts[key] = (counts[key] || 0) + 1;
 		}
 		return counts;
-	}, [inboundEmails]);
+	}, [displayEmails]);
 
 	const visibleEmails = useMemo(() => {
-		const list = [...(inboundEmails ?? [])];
+		const list = [...displayEmails];
 
 		// Sort newest-first (defensive: hook ordering isn't guaranteed).
 		list.sort((a, b) => {
@@ -161,7 +239,7 @@ export const DashboardResponsesWidget: FC<{
 				snippet.includes(q)
 			);
 		});
-	}, [inboundEmails, searchQuery]);
+	}, [displayEmails, searchQuery]);
 
 	if (!enabled) return null;
 
@@ -177,57 +255,116 @@ export const DashboardResponsesWidget: FC<{
 				paddingBottom: '6px',
 			}}
 		>
-			{/* Top bar (639 x 28) */}
+			{/* Top controls */}
 			<div
 				style={{
 					width: '639px',
-					height: '28px',
-					borderTopLeftRadius: '8px',
-					borderTopRightRadius: '8px',
-					borderBottomLeftRadius: '0px',
-					borderBottomRightRadius: '0px',
-					backgroundColor: '#F4F4F4',
+					height: '22px',
 					display: 'flex',
 					alignItems: 'center',
-					overflow: 'hidden',
+					gap: '7px',
 				}}
 			>
 				<div
 					style={{
-						height: '100%',
-						display: 'flex',
-						alignItems: 'center',
-						paddingLeft: '12px',
-						paddingRight: '12px',
-						borderRight: '1px solid rgba(0,0,0,0.12)',
+						position: 'relative',
+						width: '346px',
+						height: '22px',
+						borderRadius: '6px',
+						backgroundColor: '#FFFFFF',
+						display: 'grid',
+						gridTemplateColumns: RESPONSE_TOGGLE_TABS.map((tab) => `${tab.width}px`).join(' '),
+						overflow: 'hidden',
 						fontFamily: 'Inter, sans-serif',
 						fontSize: '14px',
-						fontWeight: 600,
+						fontWeight: 500,
+						lineHeight: '20px',
 						color: '#000000',
-						whiteSpace: 'nowrap',
 					}}
 				>
-					Responses
+					{RESPONSE_TOGGLE_TABS.map((tab) => {
+						const isActive = activeTab === tab.key;
+						return (
+							<button
+								key={tab.key}
+								type="button"
+								aria-pressed={isActive}
+								onClick={() => setActiveTab(tab.key)}
+								style={{
+									width: `${tab.width}px`,
+									height: '22px',
+									border: 'none',
+									background: isActive ? tab.activeFill : '#FFFFFF',
+									font: 'inherit',
+									color: 'inherit',
+									padding: 0,
+									cursor: 'pointer',
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center',
+									gap: tab.key === 'opportunities' ? '7px' : '0px',
+									whiteSpace: 'nowrap',
+								}}
+							>
+								{tab.key === 'opportunities' && (
+									<DashboardActionBarStarIcon
+										width={15}
+										height={15}
+										style={{ color: '#E32222', flexShrink: 0 }}
+									/>
+								)}
+								<span>{tab.label}</span>
+							</button>
+						);
+					})}
+					<span
+						aria-hidden="true"
+						style={{
+							position: 'absolute',
+							left: '104px',
+							top: 0,
+							width: '1px',
+							height: '22px',
+							backgroundColor: 'rgba(0,0,0,0.3)',
+							pointerEvents: 'none',
+						}}
+					/>
+					<span
+						aria-hidden="true"
+						style={{
+							position: 'absolute',
+							left: '201px',
+							top: 0,
+							width: '1px',
+							height: '22px',
+							backgroundColor: 'rgba(0,0,0,0.18)',
+							pointerEvents: 'none',
+						}}
+					/>
 				</div>
 
 				<div
-					className="min-w-0"
 					style={{
-						flex: 1,
-						height: '100%',
+						width: '136px',
+						height: '22px',
+						borderRadius: '6px',
+						backgroundColor: '#FFFFFF',
 						display: 'flex',
 						alignItems: 'center',
-						gap: '10px',
-						paddingLeft: '14px',
-						paddingRight: '14px',
+						gap: '8px',
+						paddingLeft: '10px',
+						paddingRight: '10px',
+						boxSizing: 'border-box',
 					}}
 				>
-					<SearchIconDesktop width={16} height={16} stroke="black" strokeWidth={2} />
+					<span style={{ display: 'flex', flexShrink: 0 }}>
+						<SearchIconDesktop width={16} height={16} stroke="black" strokeWidth={2} />
+					</span>
 					<input
 						value={searchQuery}
 						onChange={(e) => setSearchQuery(e.target.value)}
 						placeholder="Search Mail"
-						className="min-w-0"
+						className="min-w-0 placeholder:text-black placeholder:opacity-100"
 						style={{
 							flex: 1,
 							height: '100%',
@@ -236,7 +373,10 @@ export const DashboardResponsesWidget: FC<{
 							background: 'transparent',
 							fontFamily: 'Inter, sans-serif',
 							fontSize: '14px',
+							fontWeight: 500,
+							lineHeight: '20px',
 							color: '#000000',
+							padding: 0,
 						}}
 					/>
 				</div>
@@ -284,10 +424,11 @@ export const DashboardResponsesWidget: FC<{
 								color: '#000000',
 							}}
 						>
-							No responses yet
+							{emptyMessage}
 						</div>
 					) : (
 						visibleEmails.map((email) => {
+							const rowKey = `${activeTab}:${email.id}`;
 							const senderLabel = getCanonicalSenderLabel(email);
 							const senderKey = (email.sender || '').toLowerCase().trim();
 							const senderCount = senderKey ? senderCounts[senderKey] || 0 : 0;
@@ -301,12 +442,12 @@ export const DashboardResponsesWidget: FC<{
 								: '';
 							const categoryIcon = getCategoryIcon(email);
 
-							const isOpened = openedEmailIds[email.id] === true;
+							const isOpened = openedEmailIds[rowKey] === true;
 							const rowFill = isOpened ? '#F4F4F4' : '#FFFFFF';
 
 							return (
 								<button
-									key={email.id}
+									key={rowKey}
 									type="button"
 									className="text-left hover:brightness-[0.985] transition-[filter]"
 									style={{
@@ -324,8 +465,8 @@ export const DashboardResponsesWidget: FC<{
 									}}
 									onClick={() => {
 										setOpenedEmailIds((prev) => {
-											if (prev[email.id]) return prev;
-											return { ...prev, [email.id]: true };
+											if (prev[rowKey]) return prev;
+											return { ...prev, [rowKey]: true };
 										});
 									}}
 								>
@@ -399,4 +540,3 @@ export const DashboardResponsesWidget: FC<{
 };
 
 export default DashboardResponsesWidget;
-
