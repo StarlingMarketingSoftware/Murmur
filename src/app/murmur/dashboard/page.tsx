@@ -536,9 +536,9 @@ const INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX = {
 } as const;
 
 const INITIAL_DASHBOARD_ACTIVE_SEARCH_SUGGESTIONS = [
-	{ label: 'Wineries with acoustic nights in New York', opacity: 0.3 },
-	{ label: 'Breweries with live music in New Jersey', opacity: 0.5 },
-	{ label: 'Music venues booking emerging acts in Pennsylvania', opacity: 0.7 },
+	{ label: 'Wineries', opacity: 0.3 },
+	{ label: 'Breweries', opacity: 0.5 },
+	{ label: 'Music venues', opacity: 0.7 },
 ] as const;
 
 type InitialDashboardSearchSuggestionState = {
@@ -558,6 +558,7 @@ type LiveMusicSearchSuggestionTemplate = {
 
 type LiveMusicSearchSuggestionCategory = {
 	key: string;
+	label: string;
 	baseScore: number;
 	keywords: readonly string[];
 	templates: readonly LiveMusicSearchSuggestionTemplate[];
@@ -608,6 +609,7 @@ const LIVE_MUSIC_GENERIC_SUGGESTION_KEYWORDS = [
 const LIVE_MUSIC_SEARCH_SUGGESTION_CATEGORIES = [
 	{
 		key: 'wineries',
+		label: 'Wineries',
 		baseScore: 7.6,
 		keywords: [
 			'wineries',
@@ -636,6 +638,7 @@ const LIVE_MUSIC_SEARCH_SUGGESTION_CATEGORIES = [
 	},
 	{
 		key: 'breweries',
+		label: 'Breweries',
 		baseScore: 7.3,
 		keywords: [
 			'breweries',
@@ -665,6 +668,7 @@ const LIVE_MUSIC_SEARCH_SUGGESTION_CATEGORIES = [
 	},
 	{
 		key: 'music-venues',
+		label: 'Music venues',
 		baseScore: 6.9,
 		keywords: [
 			'music venues',
@@ -697,6 +701,7 @@ const LIVE_MUSIC_SEARCH_SUGGESTION_CATEGORIES = [
 	},
 	{
 		key: 'coffee-shops',
+		label: 'Coffee shops',
 		baseScore: 6.7,
 		keywords: [
 			'coffee shops',
@@ -727,6 +732,7 @@ const LIVE_MUSIC_SEARCH_SUGGESTION_CATEGORIES = [
 	},
 	{
 		key: 'restaurants',
+		label: 'Restaurants',
 		baseScore: 6.6,
 		keywords: [
 			'restaurants',
@@ -756,6 +762,7 @@ const LIVE_MUSIC_SEARCH_SUGGESTION_CATEGORIES = [
 	},
 	{
 		key: 'music-festivals',
+		label: 'Music festivals',
 		baseScore: 6.5,
 		keywords: [
 			'music festivals',
@@ -784,6 +791,7 @@ const LIVE_MUSIC_SEARCH_SUGGESTION_CATEGORIES = [
 	},
 	{
 		key: 'distilleries',
+		label: 'Distilleries',
 		baseScore: 6.3,
 		keywords: [
 			'distilleries',
@@ -811,6 +819,7 @@ const LIVE_MUSIC_SEARCH_SUGGESTION_CATEGORIES = [
 	},
 	{
 		key: 'cideries',
+		label: 'Cideries',
 		baseScore: 6.1,
 		keywords: [
 			'cideries',
@@ -837,6 +846,7 @@ const LIVE_MUSIC_SEARCH_SUGGESTION_CATEGORIES = [
 	},
 	{
 		key: 'wedding-venues',
+		label: 'Wedding venues',
 		baseScore: 5.8,
 		keywords: [
 			'wedding venues',
@@ -1082,8 +1092,7 @@ const buildInitialDashboardSearchSuggestions = (
 ): string[] => {
 	const normalizedQuery = normalizeSearchSuggestionText(query);
 	if (!normalizedQuery) {
-		return seeds
-			.map((seed) => seed.label)
+		return INITIAL_DASHBOARD_ACTIVE_SEARCH_SUGGESTIONS.map((suggestion) => suggestion.label)
 			.slice(0, INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT);
 	}
 
@@ -1094,12 +1103,6 @@ const buildInitialDashboardSearchSuggestions = (
 		category,
 		score: scoreLiveMusicSearchSuggestionCategory(category, normalizedQuery, queryTokens),
 	})).sort((a, b) => b.score - a.score || b.category.baseScore - a.category.baseScore);
-	const focusedCategory =
-		rankedCategories[0] &&
-		rankedCategories[0].score >= rankedCategories[0].category.baseScore + 2 &&
-		rankedCategories[0].score - (rankedCategories[1]?.score ?? 0) >= 1.4
-			? rankedCategories[0].category
-			: null;
 	const states = focusedState
 		? [focusedState, ...rankedStates.map((entry) => entry.state)]
 		: rankedStates.map((entry) => entry.state);
@@ -1132,11 +1135,11 @@ const buildInitialDashboardSearchSuggestions = (
 			const stateScore =
 				rankedStates.find((entry) => entry.state.abbr === state.abbr)?.score ?? 0;
 
-			for (const { template, score: templateScore, index: templateIndex } of templateScores) {
-				if (focusedCategory && category.key !== focusedCategory.key) continue;
-
+			for (const { score: templateScore, index: templateIndex } of templateScores) {
 				candidates.push({
-					label: template.label.replace('{state}', state.name),
+					label: focusedState
+						? `${category.label} in ${state.name}`
+						: category.label,
 					categoryKey: category.key,
 					stateAbbr: state.abbr,
 					score:
@@ -1150,7 +1153,6 @@ const buildInitialDashboardSearchSuggestions = (
 		}
 	}
 
-	const allowRepeatedCategory = Boolean(focusedCategory);
 	const allowRepeatedState = Boolean(focusedState);
 	const selected: string[] = [];
 	const usedLabels = new Set<string>();
@@ -1161,7 +1163,7 @@ const buildInitialDashboardSearchSuggestions = (
 	for (const candidate of sortedCandidates) {
 		if (selected.length >= INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT) break;
 		if (usedLabels.has(candidate.label)) continue;
-		if (!allowRepeatedCategory && usedCategories.has(candidate.categoryKey)) continue;
+		if (usedCategories.has(candidate.categoryKey)) continue;
 		if (!allowRepeatedState && usedStates.has(candidate.stateAbbr)) continue;
 
 		selected.push(candidate.label);
