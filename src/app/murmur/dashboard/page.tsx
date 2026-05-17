@@ -535,6 +535,656 @@ const INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX = {
 	bottomOffset: 14,
 } as const;
 
+const INITIAL_DASHBOARD_ACTIVE_SEARCH_SUGGESTIONS = [
+	{ label: 'Wineries with acoustic nights in New York', opacity: 0.3 },
+	{ label: 'Breweries with live music in New Jersey', opacity: 0.5 },
+	{ label: 'Music venues booking emerging acts in Pennsylvania', opacity: 0.7 },
+] as const;
+
+type InitialDashboardSearchSuggestionState = {
+	name: string;
+	abbr: string;
+};
+
+type InitialDashboardSearchSuggestionSeed = {
+	label: string;
+	state: InitialDashboardSearchSuggestionState;
+};
+
+type LiveMusicSearchSuggestionTemplate = {
+	label: string;
+	keywords: readonly string[];
+};
+
+type LiveMusicSearchSuggestionCategory = {
+	key: string;
+	baseScore: number;
+	keywords: readonly string[];
+	templates: readonly LiveMusicSearchSuggestionTemplate[];
+};
+
+type SearchSuggestionsApiResponse = {
+	suggestions?: Array<{
+		label?: unknown;
+		state?: { name?: unknown; abbr?: unknown };
+	}>;
+	location?: {
+		nearbyStates?: Array<{ name?: unknown; abbr?: unknown }>;
+	};
+};
+
+const INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT =
+	INITIAL_DASHBOARD_ACTIVE_SEARCH_SUGGESTIONS.length;
+
+const DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES = [
+	{ name: 'New York', abbr: 'NY' },
+	{ name: 'New Jersey', abbr: 'NJ' },
+	{ name: 'Pennsylvania', abbr: 'PA' },
+] as const satisfies readonly InitialDashboardSearchSuggestionState[];
+
+const AMBIGUOUS_STATE_ABBR_TOKENS = new Set(['hi', 'in', 'me', 'or']);
+
+const LIVE_MUSIC_GENERIC_SUGGESTION_KEYWORDS = [
+	'live music',
+	'music',
+	'booking',
+	'book',
+	'bands',
+	'band',
+	'acts',
+	'act',
+	'shows',
+	'show',
+	'gigs',
+	'gig',
+	'concerts',
+	'concert',
+	'touring',
+	'open mic',
+	'acoustic',
+	'local music',
+] as const;
+
+const LIVE_MUSIC_SEARCH_SUGGESTION_CATEGORIES = [
+	{
+		key: 'wineries',
+		baseScore: 7.6,
+		keywords: [
+			'wineries',
+			'winery',
+			'vineyards',
+			'vineyard',
+			'wine',
+			'tasting room',
+			'acoustic',
+			'folk',
+		],
+		templates: [
+			{
+				label: 'Wineries with acoustic nights in {state}',
+				keywords: ['wineries', 'winery', 'wine', 'acoustic nights', 'acoustic'],
+			},
+			{
+				label: 'Vineyards booking live music in {state}',
+				keywords: ['vineyards', 'vineyard', 'booking', 'live music'],
+			},
+			{
+				label: 'Wine tasting rooms booking acoustic acts in {state}',
+				keywords: ['wine', 'tasting room', 'booking', 'acoustic acts'],
+			},
+		],
+	},
+	{
+		key: 'breweries',
+		baseScore: 7.3,
+		keywords: [
+			'breweries',
+			'brewery',
+			'brew',
+			'beer',
+			'taproom',
+			'taprooms',
+			'pub',
+			'craft beer',
+			'bands',
+		],
+		templates: [
+			{
+				label: 'Breweries with live music in {state}',
+				keywords: ['breweries', 'brewery', 'beer', 'live music'],
+			},
+			{
+				label: 'Brewery taprooms booking bands in {state}',
+				keywords: ['brewery', 'taprooms', 'booking', 'bands'],
+			},
+			{
+				label: 'Breweries with weekend shows in {state}',
+				keywords: ['breweries', 'weekend', 'shows'],
+			},
+		],
+	},
+	{
+		key: 'music-venues',
+		baseScore: 6.9,
+		keywords: [
+			'music venues',
+			'music venue',
+			'venues',
+			'venue',
+			'clubs',
+			'club',
+			'listening room',
+			'listening rooms',
+			'talent buyer',
+			'booker',
+			'booking',
+			'emerging acts',
+		],
+		templates: [
+			{
+				label: 'Music venues booking emerging acts in {state}',
+				keywords: ['music venues', 'booking', 'emerging acts'],
+			},
+			{
+				label: 'Small music venues booking bands in {state}',
+				keywords: ['small music venues', 'booking', 'bands'],
+			},
+			{
+				label: 'Listening-room music venues in {state}',
+				keywords: ['listening room', 'music venues'],
+			},
+		],
+	},
+	{
+		key: 'coffee-shops',
+		baseScore: 6.7,
+		keywords: [
+			'coffee shops',
+			'coffee shop',
+			'coffeehouses',
+			'coffeehouse',
+			'cafes',
+			'cafe',
+			'open mic',
+			'open mics',
+			'singer songwriter',
+			'acoustic',
+		],
+		templates: [
+			{
+				label: 'Coffee shops with open mic nights in {state}',
+				keywords: ['coffee shops', 'open mic nights', 'open mic'],
+			},
+			{
+				label: 'Coffeehouses booking acoustic sets in {state}',
+				keywords: ['coffeehouses', 'booking', 'acoustic sets'],
+			},
+			{
+				label: 'Coffee shops with singer-songwriter nights in {state}',
+				keywords: ['coffee shops', 'singer songwriter', 'nights'],
+			},
+		],
+	},
+	{
+		key: 'restaurants',
+		baseScore: 6.6,
+		keywords: [
+			'restaurants',
+			'restaurant',
+			'dinner',
+			'brunch',
+			'patio',
+			'bar',
+			'bars',
+			'local bands',
+			'cover band',
+		],
+		templates: [
+			{
+				label: 'Restaurants booking local bands in {state}',
+				keywords: ['restaurants', 'booking', 'local bands'],
+			},
+			{
+				label: 'Dinner spots with live music in {state}',
+				keywords: ['dinner', 'live music'],
+			},
+			{
+				label: 'Restaurants with live music patios in {state}',
+				keywords: ['restaurants', 'live music', 'patios'],
+			},
+		],
+	},
+	{
+		key: 'music-festivals',
+		baseScore: 6.5,
+		keywords: [
+			'music festivals',
+			'music festival',
+			'festivals',
+			'festival',
+			'outdoor',
+			'summer',
+			'community',
+			'local acts',
+		],
+		templates: [
+			{
+				label: 'Music festivals booking local acts in {state}',
+				keywords: ['music festivals', 'booking', 'local acts'],
+			},
+			{
+				label: 'Outdoor music festivals in {state}',
+				keywords: ['outdoor', 'music festivals'],
+			},
+			{
+				label: 'Community music festivals booking bands in {state}',
+				keywords: ['community', 'music festivals', 'booking', 'bands'],
+			},
+		],
+	},
+	{
+		key: 'distilleries',
+		baseScore: 6.3,
+		keywords: [
+			'distilleries',
+			'distillery',
+			'spirits',
+			'whiskey',
+			'cocktail',
+			'tasting room',
+			'weekend shows',
+		],
+		templates: [
+			{
+				label: 'Distilleries with weekend shows in {state}',
+				keywords: ['distilleries', 'weekend shows'],
+			},
+			{
+				label: 'Distillery tasting rooms booking bands in {state}',
+				keywords: ['distillery', 'tasting rooms', 'booking', 'bands'],
+			},
+			{
+				label: 'Distilleries with live music nights in {state}',
+				keywords: ['distilleries', 'live music nights'],
+			},
+		],
+	},
+	{
+		key: 'cideries',
+		baseScore: 6.1,
+		keywords: [
+			'cideries',
+			'cidery',
+			'cider',
+			'cider house',
+			'folk',
+			'acoustic',
+		],
+		templates: [
+			{
+				label: 'Cideries with folk nights in {state}',
+				keywords: ['cideries', 'folk nights'],
+			},
+			{
+				label: 'Cider houses booking acoustic acts in {state}',
+				keywords: ['cider houses', 'booking', 'acoustic acts'],
+			},
+			{
+				label: 'Cideries with live music in {state}',
+				keywords: ['cideries', 'live music'],
+			},
+		],
+	},
+	{
+		key: 'wedding-venues',
+		baseScore: 5.8,
+		keywords: [
+			'wedding venues',
+			'wedding venue',
+			'weddings',
+			'wedding',
+			'event barns',
+			'event barn',
+			'reception',
+			'private events',
+			'live bands',
+		],
+		templates: [
+			{
+				label: 'Wedding venues booking live bands in {state}',
+				keywords: ['wedding venues', 'booking', 'live bands'],
+			},
+			{
+				label: 'Event barns booking live music in {state}',
+				keywords: ['event barns', 'booking', 'live music'],
+			},
+			{
+				label: 'Wedding venues with preferred musicians in {state}',
+				keywords: ['wedding venues', 'preferred musicians'],
+			},
+		],
+	},
+] as const satisfies readonly LiveMusicSearchSuggestionCategory[];
+
+const getDefaultInitialDashboardSearchSuggestionSeeds =
+	(): InitialDashboardSearchSuggestionSeed[] =>
+	INITIAL_DASHBOARD_ACTIVE_SEARCH_SUGGESTIONS.map((suggestion, index) => ({
+		label: suggestion.label,
+		state:
+			DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[index] ??
+			DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[0],
+	}));
+
+const normalizeSearchSuggestionText = (value: string): string =>
+	value
+		.toLowerCase()
+		.replace(/&/g, ' and ')
+		.replace(/[^a-z0-9]+/g, ' ')
+		.replace(/\s+/g, ' ')
+		.trim();
+
+const tokenizeSearchSuggestionText = (value: string): string[] =>
+	normalizeSearchSuggestionText(value).split(' ').filter(Boolean);
+
+const scoreSearchSuggestionKeyword = (
+	normalizedQuery: string,
+	queryTokens: readonly string[],
+	keyword: string
+): number => {
+	const normalizedKeyword = normalizeSearchSuggestionText(keyword);
+	if (!normalizedKeyword) return 0;
+
+	const keywordTokens = normalizedKeyword.split(' ');
+	if (normalizedQuery.includes(normalizedKeyword)) {
+		return keywordTokens.length > 1 ? 6 + keywordTokens.length : 4;
+	}
+
+	if (keywordTokens.length > 1) {
+		for (let start = 0; start <= queryTokens.length - keywordTokens.length; start += 1) {
+			const isPhrasePrefix = keywordTokens.every((keywordToken, offset) => {
+				const queryToken = queryTokens[start + offset];
+				return Boolean(queryToken && keywordToken.startsWith(queryToken));
+			});
+			if (isPhrasePrefix) return 4 + keywordTokens.length;
+		}
+		return 0;
+	}
+
+	const keywordToken = keywordTokens[0];
+	const matchedToken = queryTokens.find(
+		(queryToken) =>
+			keywordToken.startsWith(queryToken) ||
+			(queryToken.length >= 3 && queryToken.startsWith(keywordToken))
+	);
+
+	if (!matchedToken) return 0;
+	return matchedToken === keywordToken ? 3 : Math.max(1.2, matchedToken.length / 2);
+};
+
+const scoreSearchSuggestionKeywords = (
+	normalizedQuery: string,
+	queryTokens: readonly string[],
+	keywords: readonly string[]
+): number =>
+	keywords.reduce(
+		(score, keyword) =>
+			score + scoreSearchSuggestionKeyword(normalizedQuery, queryTokens, keyword),
+		0
+	);
+
+const coerceInitialDashboardSuggestionState = (
+	value: { name?: unknown; abbr?: unknown } | null | undefined
+): InitialDashboardSearchSuggestionState | null => {
+	const stateName = typeof value?.name === 'string' ? value.name.trim() : '';
+	const stateAbbr = typeof value?.abbr === 'string' ? value.abbr.trim().toUpperCase() : '';
+	const canonicalName = normalizeUsStateName(stateName || stateAbbr);
+	if (!canonicalName) return null;
+
+	const canonicalAbbr = getStateAbbreviation(canonicalName).trim().toUpperCase();
+	if (!/^[A-Z]{2}$/.test(canonicalAbbr)) return null;
+
+	return {
+		name: canonicalName,
+		abbr: canonicalAbbr,
+	};
+};
+
+const getInitialDashboardSuggestionStateFromName = (
+	value: string | null | undefined
+): InitialDashboardSearchSuggestionState | null =>
+	coerceInitialDashboardSuggestionState({ name: value });
+
+const dedupeInitialDashboardSuggestionStates = (
+	states: readonly InitialDashboardSearchSuggestionState[]
+): InitialDashboardSearchSuggestionState[] => {
+	const seen = new Set<string>();
+	const deduped: InitialDashboardSearchSuggestionState[] = [];
+
+	for (const state of states) {
+		if (seen.has(state.abbr)) continue;
+		seen.add(state.abbr);
+		deduped.push(state);
+	}
+
+	return deduped;
+};
+
+const scoreInitialDashboardSuggestionState = (
+	state: InitialDashboardSearchSuggestionState,
+	normalizedQuery: string,
+	queryTokens: readonly string[]
+): number => {
+	if (!normalizedQuery) return 0;
+
+	const normalizedStateName = normalizeSearchSuggestionText(state.name);
+	const normalizedAbbr = state.abbr.toLowerCase();
+	const stateTokens = normalizedStateName.split(' ');
+	let score = 0;
+
+	if (normalizedQuery.length >= 3 && normalizedQuery.includes(normalizedStateName)) {
+		score += 10;
+	}
+	if (normalizedQuery.length >= 2 && normalizedStateName.includes(normalizedQuery)) {
+		score += 6;
+	}
+
+	for (let start = 0; start < queryTokens.length; start += 1) {
+		const token = queryTokens[start];
+		if (
+			token === normalizedAbbr &&
+			!AMBIGUOUS_STATE_ABBR_TOKENS.has(token)
+		) {
+			score += 8;
+		}
+
+		const isStatePrefix = stateTokens.every((stateToken, offset) => {
+			const queryToken = queryTokens[start + offset];
+			return Boolean(
+				queryToken && queryToken.length >= 2 && stateToken.startsWith(queryToken)
+			);
+		});
+		if (isStatePrefix) score += 5 + stateTokens.length;
+	}
+
+	return score;
+};
+
+const rankInitialDashboardSuggestionStates = (
+	query: string,
+	seeds: readonly InitialDashboardSearchSuggestionSeed[]
+): Array<{ state: InitialDashboardSearchSuggestionState; score: number }> => {
+	const normalizedQuery = normalizeSearchSuggestionText(query);
+	const queryTokens = tokenizeSearchSuggestionText(query);
+	const seedStates = dedupeInitialDashboardSuggestionStates(seeds.map((seed) => seed.state));
+	const allStates = dedupeInitialDashboardSuggestionStates([
+		...seedStates,
+		...buildAllUsStateNames()
+			.map(getInitialDashboardSuggestionStateFromName)
+			.filter((state): state is InitialDashboardSearchSuggestionState => Boolean(state)),
+	]);
+
+	const ranked = allStates
+		.map((state) => {
+			const seedIndex = seedStates.findIndex((seedState) => seedState.abbr === state.abbr);
+			const seedBoost = seedIndex >= 0 ? (seedStates.length - seedIndex) * 0.2 : 0;
+			return {
+				state,
+				score:
+					scoreInitialDashboardSuggestionState(state, normalizedQuery, queryTokens) +
+					seedBoost,
+			};
+		})
+		.sort((a, b) => b.score - a.score || a.state.name.localeCompare(b.state.name));
+
+	return ranked.slice(0, Math.max(6, INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT));
+};
+
+const scoreLiveMusicSearchSuggestionCategory = (
+	category: LiveMusicSearchSuggestionCategory,
+	normalizedQuery: string,
+	queryTokens: readonly string[]
+): number => {
+	const categoryScore = scoreSearchSuggestionKeywords(
+		normalizedQuery,
+		queryTokens,
+		category.keywords
+	);
+	const genericScore = scoreSearchSuggestionKeywords(
+		normalizedQuery,
+		queryTokens,
+		LIVE_MUSIC_GENERIC_SUGGESTION_KEYWORDS
+	);
+	const bestTemplateScore = Math.max(
+		...category.templates.map((template) =>
+			scoreSearchSuggestionKeywords(normalizedQuery, queryTokens, [
+				template.label.replace('{state}', ''),
+				...template.keywords,
+			])
+		)
+	);
+
+	return category.baseScore + categoryScore + genericScore * 0.35 + bestTemplateScore * 0.45;
+};
+
+const scoreLiveMusicSearchSuggestionTemplate = (
+	template: LiveMusicSearchSuggestionTemplate,
+	normalizedQuery: string,
+	queryTokens: readonly string[]
+): number =>
+	scoreSearchSuggestionKeywords(normalizedQuery, queryTokens, [
+		template.label.replace('{state}', ''),
+		...template.keywords,
+	]);
+
+const buildInitialDashboardSearchSuggestions = (
+	query: string,
+	seeds: readonly InitialDashboardSearchSuggestionSeed[]
+): string[] => {
+	const normalizedQuery = normalizeSearchSuggestionText(query);
+	if (!normalizedQuery) {
+		return seeds
+			.map((seed) => seed.label)
+			.slice(0, INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT);
+	}
+
+	const queryTokens = tokenizeSearchSuggestionText(query);
+	const rankedStates = rankInitialDashboardSuggestionStates(query, seeds);
+	const focusedState = rankedStates.find((entry) => entry.score >= 5)?.state ?? null;
+	const rankedCategories = LIVE_MUSIC_SEARCH_SUGGESTION_CATEGORIES.map((category) => ({
+		category,
+		score: scoreLiveMusicSearchSuggestionCategory(category, normalizedQuery, queryTokens),
+	})).sort((a, b) => b.score - a.score || b.category.baseScore - a.category.baseScore);
+	const focusedCategory =
+		rankedCategories[0] &&
+		rankedCategories[0].score >= rankedCategories[0].category.baseScore + 2 &&
+		rankedCategories[0].score - (rankedCategories[1]?.score ?? 0) >= 1.4
+			? rankedCategories[0].category
+			: null;
+	const states = focusedState
+		? [focusedState, ...rankedStates.map((entry) => entry.state)]
+		: rankedStates.map((entry) => entry.state);
+	const statePool = dedupeInitialDashboardSuggestionStates(states).slice(
+		0,
+		INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT
+	);
+	const fallbackStatePool = statePool.length > 0 ? statePool : seeds.map((seed) => seed.state);
+	const candidates: Array<{
+		label: string;
+		categoryKey: string;
+		stateAbbr: string;
+		score: number;
+	}> = [];
+
+	for (const { category, score: categoryScore } of rankedCategories) {
+		const templateScores = category.templates
+			.map((template, index) => ({
+				template,
+				index,
+				score: scoreLiveMusicSearchSuggestionTemplate(
+					template,
+					normalizedQuery,
+					queryTokens
+				),
+			}))
+			.sort((a, b) => b.score - a.score || a.index - b.index);
+
+		for (const [stateIndex, state] of fallbackStatePool.entries()) {
+			const stateScore =
+				rankedStates.find((entry) => entry.state.abbr === state.abbr)?.score ?? 0;
+
+			for (const { template, score: templateScore, index: templateIndex } of templateScores) {
+				if (focusedCategory && category.key !== focusedCategory.key) continue;
+
+				candidates.push({
+					label: template.label.replace('{state}', state.name),
+					categoryKey: category.key,
+					stateAbbr: state.abbr,
+					score:
+						categoryScore +
+						stateScore * 0.8 +
+						templateScore * 0.7 -
+						stateIndex * 0.2 -
+						templateIndex * 0.04,
+				});
+			}
+		}
+	}
+
+	const allowRepeatedCategory = Boolean(focusedCategory);
+	const allowRepeatedState = Boolean(focusedState);
+	const selected: string[] = [];
+	const usedLabels = new Set<string>();
+	const usedCategories = new Set<string>();
+	const usedStates = new Set<string>();
+	const sortedCandidates = candidates.sort((a, b) => b.score - a.score);
+
+	for (const candidate of sortedCandidates) {
+		if (selected.length >= INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT) break;
+		if (usedLabels.has(candidate.label)) continue;
+		if (!allowRepeatedCategory && usedCategories.has(candidate.categoryKey)) continue;
+		if (!allowRepeatedState && usedStates.has(candidate.stateAbbr)) continue;
+
+		selected.push(candidate.label);
+		usedLabels.add(candidate.label);
+		usedCategories.add(candidate.categoryKey);
+		usedStates.add(candidate.stateAbbr);
+	}
+
+	for (const candidate of sortedCandidates) {
+		if (selected.length >= INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT) break;
+		if (usedLabels.has(candidate.label)) continue;
+
+		selected.push(candidate.label);
+		usedLabels.add(candidate.label);
+	}
+
+	return selected.length === INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT
+		? selected
+		: seeds
+				.map((seed) => seed.label)
+				.slice(0, INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT);
+};
+
 // Resolution-aware zoom for the fullscreen map view. Mirrors the campaign page's tuned
 // `SIXTEEN_BY_TEN_ZOOM_MAP` / `SIXTEEN_BY_NINE_ZOOM_MAP` tables so the dashboard map-view
 // chrome lands at the same physical size as the campaign chrome on every monitor.
@@ -4448,11 +5098,123 @@ const DashboardContent = () => {
 
 	const [isMapBottomSearchActive, setIsMapBottomSearchActive] = useState(false);
 	const [mapBottomSearchValue, setMapBottomSearchValue] = useState('');
+	const [initialDashboardSearchSuggestionSeeds, setInitialDashboardSearchSuggestionSeeds] =
+		useState<InitialDashboardSearchSuggestionSeed[]>(
+			getDefaultInitialDashboardSearchSuggestionSeeds
+		);
 	const [mapBottomSearchActiveHeight, setMapBottomSearchActiveHeight] = useState<number>(
 		MAP_RESULTS_BOTTOM_SEARCH_BOX.activeHeight
 	);
 	const mapBottomSearchInputRef = useRef<HTMLTextAreaElement | null>(null);
+	const hasLoadedInitialDashboardSearchSuggestionsRef = useRef(false);
 	const isMapBottomSearchExpanded = isMapBottomSearchActive;
+	const initialDashboardSearchSuggestions = useMemo(
+		() =>
+			buildInitialDashboardSearchSuggestions(
+				mapBottomSearchValue,
+				initialDashboardSearchSuggestionSeeds
+			),
+		[initialDashboardSearchSuggestionSeeds, mapBottomSearchValue]
+	);
+
+	useEffect(() => {
+		if (
+			hasLoadedInitialDashboardSearchSuggestionsRef.current ||
+			!isMapBottomSearchExpanded ||
+			isMobile !== false ||
+			hasSearched ||
+			activeTab !== 'search' ||
+			fromHomeParam ||
+			isMapView
+		) {
+			return;
+		}
+
+		let cancelled = false;
+		hasLoadedInitialDashboardSearchSuggestionsRef.current = true;
+
+		const loadSuggestions = async () => {
+			const params = new URLSearchParams();
+
+			try {
+				const loc = await Promise.race([
+					getApproximateLocation(),
+					new Promise<null>((resolve) => setTimeout(() => resolve(null), 1600)),
+				]);
+				if (loc) {
+					if (loc.lat != null && loc.lon != null) {
+						params.set('lat', String(loc.lat));
+						params.set('lon', String(loc.lon));
+					}
+					if (loc.city) params.set('city', loc.city);
+					if (loc.region) params.set('region', loc.region);
+					if (loc.regionCode) params.set('regionCode', loc.regionCode);
+				}
+			} catch {
+				// Server-side geo headers or fallback states still give useful suggestions.
+			}
+
+			const query = params.toString();
+			try {
+				const response = await fetch(
+					`/api/search-suggestions${query ? `?${query}` : ''}`,
+					{ cache: 'no-store' }
+				);
+				if (!response.ok) throw new Error('Suggestion request failed');
+
+				const data = (await response.json()) as SearchSuggestionsApiResponse;
+				const nearbyStates = (data.location?.nearbyStates ?? [])
+					.map(coerceInitialDashboardSuggestionState)
+					.filter(
+						(state): state is InitialDashboardSearchSuggestionState => Boolean(state)
+					);
+				const suggestionSeeds = (data.suggestions ?? [])
+					.map((suggestion, index): InitialDashboardSearchSuggestionSeed | null => {
+						const label =
+							typeof suggestion.label === 'string' ? suggestion.label.trim() : '';
+						if (!label) return null;
+
+						const state =
+							coerceInitialDashboardSuggestionState(suggestion.state) ??
+							nearbyStates[index] ??
+							DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[index] ??
+							DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[0];
+
+						return { label, state };
+					})
+					.filter(
+						(
+							seed
+						): seed is InitialDashboardSearchSuggestionSeed => Boolean(seed)
+					)
+					.slice(0, INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT);
+
+				if (
+					!cancelled &&
+					suggestionSeeds.length === INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT
+				) {
+					setInitialDashboardSearchSuggestionSeeds(suggestionSeeds);
+				}
+			} catch {
+				if (!cancelled) {
+					hasLoadedInitialDashboardSearchSuggestionsRef.current = false;
+				}
+			}
+		};
+
+		void loadSuggestions();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		activeTab,
+		fromHomeParam,
+		hasSearched,
+		isMapBottomSearchExpanded,
+		isMapView,
+		isMobile,
+	]);
 
 	useLayoutEffect(() => {
 		if (!isMapBottomSearchExpanded) {
@@ -6686,6 +7448,30 @@ const DashboardContent = () => {
 					width: 0 !important;
 					height: 0 !important;
 				}
+				.initial-dashboard-search-suggestion {
+					opacity: var(--initial-dashboard-search-suggestion-opacity, 0.5);
+					transform: translateY(0) scale(1);
+					transform-origin: center bottom;
+					animation: initial-dashboard-search-suggestion-enter 320ms cubic-bezier(0, 0, 0.2, 1) both;
+					will-change: opacity, transform;
+				}
+				@keyframes initial-dashboard-search-suggestion-enter {
+					from {
+						opacity: 0;
+						transform: translateY(12px) scale(0.985);
+					}
+					to {
+						opacity: var(--initial-dashboard-search-suggestion-opacity, 0.5);
+						transform: translateY(0) scale(1);
+					}
+				}
+				@media (prefers-reduced-motion: reduce) {
+					.initial-dashboard-search-suggestion {
+						animation: none;
+						opacity: var(--initial-dashboard-search-suggestion-opacity, 0.5);
+						transform: none;
+					}
+				}
 			`}</style>
 			{/* Shared Mapbox globe background */}
 			{mapPortal}
@@ -6703,6 +7489,51 @@ const DashboardContent = () => {
 						zIndex: 70,
 					}}
 				>
+					{isMapBottomSearchExpanded && !isMapBottomCategoryMode && !isMapBottomForYouMode && (
+						<div
+							aria-hidden="true"
+							className="absolute left-1/2 flex flex-col gap-[5px] pointer-events-none"
+							style={{
+								bottom: 'calc(100% + 12px)',
+								width: '404px',
+								transform: 'translateX(-50%)',
+							}}
+						>
+							{initialDashboardSearchSuggestions.map((label, index) => (
+								<div
+									key={`initial-dashboard-search-suggestion-${index}`}
+									className="initial-dashboard-search-suggestion flex items-center overflow-hidden"
+									style={{
+										width: '404px',
+										height: '29px',
+										borderRadius: '10px',
+										backgroundColor: '#F8F8F8',
+										'--initial-dashboard-search-suggestion-opacity':
+											INITIAL_DASHBOARD_ACTIVE_SEARCH_SUGGESTIONS[index]?.opacity ?? 0.5,
+										animationDelay: `${
+											(initialDashboardSearchSuggestions.length - 1 - index) * 48
+										}ms`,
+										boxSizing: 'border-box',
+										padding: '0 16px',
+									} as React.CSSProperties}
+								>
+									<span
+										className="truncate"
+										style={{
+											color: '#000000',
+											fontFamily: 'Inter, sans-serif',
+											fontSize: '12.809px',
+											fontStyle: 'normal',
+											fontWeight: 400,
+											lineHeight: '20.199px',
+										}}
+									>
+										{label}
+									</span>
+								</div>
+							))}
+						</div>
+					)}
 					<MapBottomSearchBar
 						value={mapBottomSearchValue}
 						isExpanded={isMapBottomSearchExpanded}
