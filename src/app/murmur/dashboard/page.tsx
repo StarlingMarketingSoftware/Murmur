@@ -5250,8 +5250,8 @@ const DashboardContent = () => {
 	// list, and selection just update. Empty input → no-op (don't accidentally
 	// kick off a curated re-roll). Available on the free trial — no demo-mode
 	// gate here.
-	const handleMapBottomSearchSubmit = useCallback(async () => {
-		const q = mapBottomSearchValue.trim();
+	const submitMapBottomSearchQuery = useCallback(async (query: string) => {
+		const q = query.trim();
 		if (!q) return;
 		mapBottomSearchInputRef.current?.blur();
 		setIsMapBottomSearchActive(false);
@@ -5294,13 +5294,23 @@ const DashboardContent = () => {
 			radiusKm: lat != null && lon != null ? 250 : undefined,
 		}).catch(() => undefined);
 	}, [
-		mapBottomSearchValue,
 		primeFreeTextSearch,
 		triggerFreeTextSearch,
 		ensureActiveCampaign,
 		isAddToCampaignMode,
 		isFromHomeDemoMode,
 	]);
+
+	const handleMapBottomSearchSubmit = useCallback(async () => {
+		await submitMapBottomSearchQuery(mapBottomSearchValue);
+	}, [mapBottomSearchValue, submitMapBottomSearchQuery]);
+
+	const handleInitialDashboardSearchSuggestionClick = useCallback(
+		(suggestion: string) => {
+			void submitMapBottomSearchQuery(suggestion);
+		},
+		[submitMapBottomSearchQuery]
+	);
 
 	const cancelMapBottomSearchFollowupPreviewClear = useCallback(() => {
 		if (!mapBottomSearchFollowupPreviewClearTimeoutRef.current) return;
@@ -7449,11 +7459,28 @@ const DashboardContent = () => {
 					height: 0 !important;
 				}
 				.initial-dashboard-search-suggestion {
+					appearance: none;
+					background-color: var(--initial-dashboard-search-suggestion-background, #f8f8f8);
+					border: 0;
+					cursor: pointer;
 					opacity: var(--initial-dashboard-search-suggestion-opacity, 0.5);
+					text-align: left;
 					transform: translateY(0) scale(1);
 					transform-origin: center bottom;
-					animation: initial-dashboard-search-suggestion-enter 320ms cubic-bezier(0, 0, 0.2, 1) both;
+					transition: background-color 120ms ease, box-shadow 120ms ease, opacity 120ms ease, transform 120ms ease;
+					animation: initial-dashboard-search-suggestion-enter 320ms cubic-bezier(0, 0, 0.2, 1) backwards;
 					will-change: opacity, transform;
+				}
+				.initial-dashboard-search-suggestion:hover,
+				.initial-dashboard-search-suggestion:focus-visible {
+					background-color: #ffffff;
+					box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+					opacity: 1;
+					transform: translateY(-1px) scale(1.01);
+				}
+				.initial-dashboard-search-suggestion:focus-visible {
+					outline: 2px solid rgba(54, 143, 237, 0.9);
+					outline-offset: 2px;
 				}
 				@keyframes initial-dashboard-search-suggestion-enter {
 					from {
@@ -7491,7 +7518,7 @@ const DashboardContent = () => {
 				>
 					{isMapBottomSearchExpanded && !isMapBottomCategoryMode && !isMapBottomForYouMode && (
 						<div
-							aria-hidden="true"
+							aria-label="Search suggestions"
 							className="absolute left-1/2 flex flex-col gap-[5px] pointer-events-none"
 							style={{
 								bottom: 'calc(100% + 12px)',
@@ -7500,14 +7527,16 @@ const DashboardContent = () => {
 							}}
 						>
 							{initialDashboardSearchSuggestions.map((label, index) => (
-								<div
+								<button
+									type="button"
+									aria-label={`Search for ${label}`}
 									key={`initial-dashboard-search-suggestion-${index}`}
-									className="initial-dashboard-search-suggestion flex items-center overflow-hidden"
+									className="initial-dashboard-search-suggestion pointer-events-auto flex items-center overflow-hidden"
 									style={{
 										width: '404px',
 										height: '29px',
 										borderRadius: '10px',
-										backgroundColor: '#F8F8F8',
+										'--initial-dashboard-search-suggestion-background': '#F8F8F8',
 										'--initial-dashboard-search-suggestion-opacity':
 											INITIAL_DASHBOARD_ACTIVE_SEARCH_SUGGESTIONS[index]?.opacity ?? 0.5,
 										animationDelay: `${
@@ -7516,6 +7545,14 @@ const DashboardContent = () => {
 										boxSizing: 'border-box',
 										padding: '0 16px',
 									} as React.CSSProperties}
+									onMouseDown={(event) => {
+										event.preventDefault();
+										event.stopPropagation();
+									}}
+									onClick={(event) => {
+										event.stopPropagation();
+										handleInitialDashboardSearchSuggestionClick(label);
+									}}
 								>
 									<span
 										className="truncate"
@@ -7530,7 +7567,7 @@ const DashboardContent = () => {
 									>
 										{label}
 									</span>
-								</div>
+								</button>
 							))}
 						</div>
 					)}
