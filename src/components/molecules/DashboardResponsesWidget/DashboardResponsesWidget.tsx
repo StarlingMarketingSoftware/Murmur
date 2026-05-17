@@ -366,10 +366,11 @@ export const DashboardResponsesWidget: FC<{
 			className={cn('flex flex-col items-center', className)}
 			style={{
 				width: '654px',
-				height: '206px',
+				height: '266px',
+				boxSizing: 'border-box',
 				borderRadius: '8px',
 				backgroundColor: RESPONSE_WIDGET_BACKGROUND_BY_TAB[activeTab],
-				paddingTop: '6px',
+				paddingTop: '9px',
 				paddingBottom: '6px',
 			}}
 		>
@@ -493,11 +494,11 @@ export const DashboardResponsesWidget: FC<{
 				offsetRight={0}
 				lockHorizontalScroll
 				style={{
-					marginTop: '6px',
+					marginTop: '9px',
 				}}
 			>
 				{/* Blue gaps between rows */}
-				<div className="w-full flex flex-col items-center gap-[8px] pb-[6px]">
+				<div className="w-full flex flex-col items-center gap-[6px] pb-[6px]">
 					{isLoading ? (
 						Array.from({ length: 3 }).map((_, idx) => (
 							<div
@@ -505,8 +506,8 @@ export const DashboardResponsesWidget: FC<{
 								style={{
 									width: '639px',
 									height: '48px',
-									borderRadius: '8px',
-									backgroundColor: '#F4F4F4',
+									borderRadius: '6.389px',
+									backgroundColor: '#FEFEFE',
 									opacity: 0.6,
 								}}
 							/>
@@ -517,8 +518,8 @@ export const DashboardResponsesWidget: FC<{
 							style={{
 								width: '639px',
 								height: '48px',
-								borderRadius: '8px',
-								backgroundColor: '#F4F4F4',
+								borderRadius: '6.389px',
+								backgroundColor: '#FEFEFE',
 								fontFamily: 'Inter, sans-serif',
 								fontSize: '14px',
 								fontWeight: 500,
@@ -544,7 +545,7 @@ export const DashboardResponsesWidget: FC<{
 							const categoryIcon = getCategoryIcon(email);
 
 							const isOpened = openedEmailIds[rowKey] === true;
-							const rowFill = isOpened ? '#F4F4F4' : '#FFFFFF';
+							const rowFill = isOpened ? '#F4F4F4' : '#FEFEFE';
 
 							return (
 								<button
@@ -554,8 +555,9 @@ export const DashboardResponsesWidget: FC<{
 									style={{
 										width: '639px',
 										height: '48px',
-										borderRadius: '8px',
+										borderRadius: '6.389px',
 										backgroundColor: rowFill,
+										border: 'none',
 										boxShadow: '0px 1px 0px rgba(0,0,0,0.05)',
 										paddingLeft: '12px',
 										paddingRight: '12px',
