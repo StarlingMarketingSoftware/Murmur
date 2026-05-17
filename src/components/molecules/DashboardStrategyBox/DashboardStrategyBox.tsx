@@ -11,18 +11,9 @@ import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { US_STATES } from '@/constants/usStates';
 import {
-	isCoffeeShopTitle,
-	isMusicVenueTitle,
-	isRestaurantTitle,
-	isWeddingPlannerTitle,
-	isWeddingVenueTitle,
-	isWineBeerSpiritsTitle,
-} from '@/utils/restaurantTitle';
-import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
-import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
-import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
-import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
-import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
+	getContactCategoryPill,
+	type CategoryPillSpec,
+} from './contactCategoryPill';
 import { CampaignTitlePills } from '@/components/molecules/CampaignTitlePills/CampaignTitlePills';
 import {
 	DASHBOARD_DECORATIVE_CENTER,
@@ -44,6 +35,8 @@ import {
 import { computeMoodVisualNightT } from '@/components/molecules/SearchResultsMap/moodConfig';
 import { getMoodConfig } from '@/lib/weather/moodConfig';
 import { urls } from '@/constants/urls';
+
+export { getContactCategoryPill } from './contactCategoryPill';
 
 type CampaignWithCounts = {
 	id: number;
@@ -615,64 +608,6 @@ const DraftMessagesTopCard: FC<{
 			})}
 		</div>
 	);
-};
-
-type CategoryPillSpec = {
-	label: string;
-	background: string;
-	icon: React.ReactNode;
-};
-
-export const getContactCategoryPill = (
-	contact: EmailWithRelations['contact']
-): CategoryPillSpec | null => {
-	const c = contact as unknown as { headline?: string; title?: string } | null;
-	const headline = (c?.headline || c?.title || '').trim();
-	if (!headline) return null;
-
-	if (isMusicVenueTitle(headline)) {
-		return {
-			label: 'Music Venue',
-			background: '#B7E5FF',
-			icon: <MusicVenuesIcon size={14} className="flex-shrink-0" />,
-		};
-	}
-	if (isRestaurantTitle(headline)) {
-		return {
-			label: 'Restaurant',
-			background: '#C3FBD1',
-			icon: <RestaurantsIcon size={14} className="flex-shrink-0" />,
-		};
-	}
-	if (isCoffeeShopTitle(headline)) {
-		return {
-			label: 'Coffee',
-			background: '#D6F1BD',
-			icon: <CoffeeShopsIcon size={12} className="flex-shrink-0" />,
-		};
-	}
-	if (isWeddingPlannerTitle(headline)) {
-		return {
-			label: 'Wedding Planner',
-			background: '#FFF2BC',
-			icon: <WeddingPlannersIcon size={14} className="flex-shrink-0" />,
-		};
-	}
-	if (isWeddingVenueTitle(headline)) {
-		return {
-			label: 'Wedding Venue',
-			background: '#FFF2BC',
-			icon: <WeddingPlannersIcon size={14} className="flex-shrink-0" />,
-		};
-	}
-	if (isWineBeerSpiritsTitle(headline)) {
-		return {
-			label: 'W.B.S.',
-			background: '#BFC4FF',
-			icon: <WineBeerSpiritsIcon size={14} className="flex-shrink-0" />,
-		};
-	}
-	return null;
 };
 
 const CategoryPill: FC<{ spec: CategoryPillSpec }> = ({ spec }) => (

@@ -3,7 +3,7 @@ import type { InboundEmailWithRelations } from '@/types';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { US_STATES } from '@/constants/usStates';
-import { getContactCategoryPill } from './DashboardStrategyBox';
+import { getContactCategoryPill } from './contactCategoryPill';
 
 // Fallback used when no real inbound email is available (mock-state mode), so
 // designers can see the preview chrome with content in place during iteration.
@@ -81,9 +81,7 @@ export const NewEmailHoverPreview: FC<Props> = ({ email }) => {
 	const categoryContact = email
 		? contact
 		: ({ headline: PREVIEW_MOCK.headline } as { headline?: string });
-	const categoryPill = getContactCategoryPill(
-		categoryContact as Parameters<typeof getContactCategoryPill>[0]
-	);
+	const categoryPill = getContactCategoryPill(categoryContact);
 
 	const bodyText = email
 		? cleanBody(email.strippedText) ||

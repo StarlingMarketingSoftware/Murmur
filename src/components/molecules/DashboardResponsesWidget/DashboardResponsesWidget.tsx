@@ -10,6 +10,7 @@ import {
 	useState,
 	type CSSProperties,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import type { InboundEmailWithRelations } from '@/types';
@@ -20,6 +21,7 @@ import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActio
 import { cn } from '@/utils/ui';
 import { EmailStatus } from '@/constants/prismaEnums';
 import { DashboardOpportunitiesContent } from '@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesWidget';
+import { NewEmailHoverPreview } from '@/components/molecules/DashboardStrategyBox/NewEmailHoverPreview';
 
 type DashboardResponsesTab = 'responses' | 'sent' | 'opportunities';
 
@@ -122,6 +124,12 @@ const RESPONSE_WIDGET_BACKGROUND_BY_TAB: Record<DashboardResponsesTab, string> =
 	sent: '#6DB97B',
 	opportunities: '#D97676',
 };
+
+const EMPTY_RESPONSE_OUTLINE_ROW_COUNT = 4;
+const EMAIL_PREVIEW_HOVER_DELAY_MS = 1000;
+const EMAIL_PREVIEW_WIDTH_PX = 654;
+const EMAIL_PREVIEW_HEIGHT_PX = 374;
+const EMAIL_PREVIEW_GAP_PX = 13;
 
 const fadeTextStyle: CSSProperties = {
 	overflow: 'hidden',
@@ -273,15 +281,41 @@ const getResponseThreadKey = (email: InboundEmailWithRelations) => {
 	return `${email.campaignId ?? email.campaign?.id ?? 'none'}:${contactId ?? (participant || email.id)}`;
 };
 
+const getRootZoom = (): number => {
+	if (typeof window === 'undefined') return 1;
+	const zoomStr = window.getComputedStyle(document.documentElement).zoom;
+	const parsed = zoomStr ? parseFloat(zoomStr) : NaN;
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+};
+
+const computeEmailPreviewPosition = (rect: DOMRect): { top: number; left: number } => {
+	const z = getRootZoom();
+	const cssTop = rect.top / z;
+	const cssLeft = rect.left / z;
+	const cssWidth = rect.width / z;
+	return {
+		top: cssTop - EMAIL_PREVIEW_HEIGHT_PX - EMAIL_PREVIEW_GAP_PX,
+		left: cssLeft + (cssWidth - EMAIL_PREVIEW_WIDTH_PX) / 2,
+	};
+};
+
 export const DashboardResponsesWidget: FC<{
 	enabled?: boolean;
 	className?: string;
 	mockState?: ResponsesMockState;
 }> = ({ enabled = true, className, mockState }) => {
 	const mockOverrideActive = mockState != null;
+	const widgetRef = useRef<HTMLDivElement>(null);
+	const emailHoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const [searchQuery, setSearchQuery] = useState('');
 	const [activeTab, setActiveTab] = useState<DashboardResponsesTab>('responses');
 	const [openedEmailIds, setOpenedEmailIds] = useState<Record<string, true>>({});
+	const [showEmailPreview, setShowEmailPreview] = useState(false);
+	const [previewEmail, setPreviewEmail] = useState<InboundEmailWithRelations | null>(null);
+	const [previewPosition, setPreviewPosition] = useState<{
+		top: number;
+		left: number;
+	} | null>(null);
 	const { data: inboundEmails, isLoading: isLoadingInboundEmails } = useGetInboundEmails({
 		enabled: enabled && !mockOverrideActive && activeTab !== 'opportunities',
 	});
@@ -355,12 +389,56 @@ export const DashboardResponsesWidget: FC<{
 		: activeTab === 'sent'
 		? isLoadingSentEmails
 		: isLoadingInboundEmails;
-	const emptyMessage =
-		activeTab === 'sent'
-			? 'No sent emails yet'
-			: activeTab === 'opportunities'
-			? 'No opportunities yet'
-			: 'No responses yet';
+	const emptyMessage = activeTab === 'sent' ? 'No sent emails yet' : 'No responses yet';
+
+	const clearEmailPreviewTimer = useCallback(() => {
+		if (!emailHoverTimerRef.current) return;
+		clearTimeout(emailHoverTimerRef.current);
+		emailHoverTimerRef.current = null;
+	}, []);
+
+	const updateEmailPreviewPosition = useCallback(() => {
+		const rect = widgetRef.current?.getBoundingClientRect();
+		if (rect && rect.width > 0) {
+			setPreviewPosition(computeEmailPreviewPosition(rect));
+		}
+	}, []);
+
+	const hideEmailPreview = useCallback(() => {
+		clearEmailPreviewTimer();
+		setShowEmailPreview(false);
+		setPreviewEmail(null);
+	}, [clearEmailPreviewTimer]);
+
+	const handleEmailHoverStart = useCallback(
+		(email: InboundEmailWithRelations) => {
+			clearEmailPreviewTimer();
+			emailHoverTimerRef.current = setTimeout(() => {
+				updateEmailPreviewPosition();
+				setPreviewEmail(email);
+				setShowEmailPreview(true);
+			}, EMAIL_PREVIEW_HOVER_DELAY_MS);
+		},
+		[clearEmailPreviewTimer, updateEmailPreviewPosition]
+	);
+
+	useEffect(() => {
+		return () => clearEmailPreviewTimer();
+	}, [clearEmailPreviewTimer]);
+
+	useEffect(() => {
+		if (!showEmailPreview) return;
+		window.addEventListener('scroll', updateEmailPreviewPosition, true);
+		window.addEventListener('resize', updateEmailPreviewPosition);
+		return () => {
+			window.removeEventListener('scroll', updateEmailPreviewPosition, true);
+			window.removeEventListener('resize', updateEmailPreviewPosition);
+		};
+	}, [showEmailPreview, updateEmailPreviewPosition]);
+
+	useEffect(() => {
+		hideEmailPreview();
+	}, [activeTab, hideEmailPreview]);
 
 	const exchangeCounts = useMemo(() => {
 		const counts: Record<string, number> = {};
@@ -414,6 +492,7 @@ export const DashboardResponsesWidget: FC<{
 
 	return (
 		<div
+			ref={widgetRef}
 			className={cn('flex flex-col items-center', className)}
 			style={{
 				width: '654px',
@@ -425,6 +504,24 @@ export const DashboardResponsesWidget: FC<{
 				paddingBottom: '6px',
 			}}
 		>
+			{showEmailPreview &&
+				previewEmail &&
+				previewPosition &&
+				typeof document !== 'undefined' &&
+				createPortal(
+					<div
+						style={{
+							position: 'fixed',
+							top: `${previewPosition.top}px`,
+							left: `${previewPosition.left}px`,
+							zIndex: 10000,
+							pointerEvents: 'none',
+						}}
+					>
+						<NewEmailHoverPreview email={previewEmail} />
+					</div>,
+					document.documentElement
+				)}
 			{/* Top controls */}
 			<div
 				style={{
@@ -557,37 +654,39 @@ export const DashboardResponsesWidget: FC<{
 				>
 					{/* Blue gaps between rows */}
 					<div className="w-full flex flex-col items-center gap-[6px] pb-[6px]">
-					{isLoading ? (
-						Array.from({ length: 3 }).map((_, idx) => (
-							<div
-								key={`responses-loading-${idx}`}
-								style={{
-									width: '639px',
-									height: '48px',
-									borderRadius: '6.389px',
-									backgroundColor: '#FEFEFE',
-									opacity: 0.6,
-								}}
-							/>
-						))
-					) : visibleEmails.length === 0 ? (
-						<div
-							className="flex items-center justify-center"
-							style={{
-								width: '639px',
-								height: '48px',
-								borderRadius: '6.389px',
-								backgroundColor: '#FEFEFE',
-								fontFamily: 'Inter, sans-serif',
-								fontSize: '14px',
-								fontWeight: 500,
-								color: '#000000',
-							}}
-						>
-							{emptyMessage}
-						</div>
-					) : (
-						visibleEmails.map((email) => {
+						{isLoading ? (
+							Array.from({ length: 3 }).map((_, idx) => (
+								<div
+									key={`responses-loading-${idx}`}
+									style={{
+										width: '639px',
+										height: '48px',
+										borderRadius: '6.389px',
+										backgroundColor: '#FEFEFE',
+										opacity: 0.6,
+									}}
+								/>
+							))
+						) : visibleEmails.length === 0 ? (
+							<>
+								<span className="sr-only">{emptyMessage}</span>
+								{Array.from({ length: EMPTY_RESPONSE_OUTLINE_ROW_COUNT }).map((_, index) => (
+									<div
+										key={`responses-empty-outline-${index}`}
+										aria-hidden="true"
+										style={{
+											width: '639px',
+											height: '48px',
+											borderRadius: '6.389px',
+											border: '1px solid #000000',
+											background: 'transparent',
+											boxSizing: 'border-box',
+										}}
+									/>
+								))}
+							</>
+						) : (
+							visibleEmails.map((email) => {
 							const rowKey = `${activeTab}:${email.id}`;
 							const senderLabel = getCanonicalSenderLabel(email);
 							const exchangeKey = getResponseThreadKey(email);
@@ -628,6 +727,8 @@ export const DashboardResponsesWidget: FC<{
 											return { ...prev, [rowKey]: true };
 										});
 									}}
+									onMouseEnter={() => handleEmailHoverStart(email)}
+									onMouseLeave={hideEmailPreview}
 								>
 									{/* Sender + campaign */}
 									<div
@@ -774,8 +875,8 @@ export const DashboardResponsesWidget: FC<{
 									</div>
 								</button>
 							);
-						})
-					)}
+							})
+						)}
 					</div>
 				</CustomScrollbar>
 			)}
