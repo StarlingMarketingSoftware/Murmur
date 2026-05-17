@@ -2328,10 +2328,10 @@ const MapBottomSearchBar = memo(({
 					left: isInitialDashboardSearch ? '24px' : '14px',
 					width: `calc(100% - ${anythingRightReservedWidth + (isInitialDashboardSearch ? 24 : 0)}px)`,
 					height: `${
-						isExpanded
+						isInitialDashboardSearch
 							? activeHeight
-							: isInitialDashboardSearch
-								? INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.height - 4
+							: isExpanded
+								? activeHeight
 								: MAP_RESULTS_BOTTOM_SEARCH_BOX.textRowHeight
 					}px`,
 					padding: isInitialDashboardSearch ? '8px 0 7px' : '8px 0 6px',
@@ -5540,16 +5540,14 @@ const DashboardContent = () => {
 			? MAP_RESULTS_BOTTOM_SEARCH_BOX.activeMaxHeight
 			: INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.activeMaxHeight;
 
-		if (!isMapBottomSearchExpanded) {
+		const input = mapBottomSearchInputRef.current;
+		if (!input) {
 			setMapBottomSearchActiveHeight(baseHeight);
 			return;
 		}
 
-		const input = mapBottomSearchInputRef.current;
-		if (!input) return;
-
 		const previousHeight = input.style.height;
-		input.style.height = 'auto';
+		input.style.height = '0px';
 		const nextHeight = Math.min(
 			maxHeight,
 			Math.max(baseHeight, input.scrollHeight)
@@ -7833,11 +7831,7 @@ const DashboardContent = () => {
 					style={{
 						bottom: `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.bottomOffset}px`,
 						width: `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.width}px`,
-						height: `${
-							isMapBottomSearchExpanded
-								? mapBottomSearchActiveHeight
-								: INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.height
-						}px`,
+						height: `${mapBottomSearchActiveHeight}px`,
 						transform: 'translateX(-50%)',
 						transition: 'none',
 						zIndex: 70,
