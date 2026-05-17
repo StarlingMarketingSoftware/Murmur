@@ -14,6 +14,7 @@ export type CampaignWithRelations = Prisma.CampaignGetPayload<{
 export type EmailWithRelations = Prisma.EmailGetPayload<{
 	include: {
 		contact: true;
+		campaign: true;
 	};
 }>;
 

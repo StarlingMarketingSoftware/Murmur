@@ -526,23 +526,38 @@ const buildMockOpportunityRow = (row: OpportunitiesMockRow, index: number): Oppo
 	};
 };
 
-export const DashboardOpportunitiesWidget: FC<{
+export const DashboardOpportunitiesContent: FC<{
 	enabled?: boolean;
+	searchQuery: string;
 	className?: string;
 	mockState?: OpportunitiesMockState;
-}> = ({ enabled = true, className, mockState }) => {
+	inboundEmailsOverride?: InboundEmailWithRelations[];
+	isLoadingOverride?: boolean;
+}> = ({
+	enabled = true,
+	searchQuery,
+	className,
+	mockState,
+	inboundEmailsOverride,
+	isLoadingOverride,
+}) => {
 	const mockOverrideActive = mockState != null;
+	const hasInboundEmailsOverride = inboundEmailsOverride != null;
 	const { data: inboundEmails, isLoading: isLoadingEmails } = useGetInboundEmails({
-		enabled: enabled && !mockOverrideActive,
+		enabled: enabled && !mockOverrideActive && !hasInboundEmailsOverride,
 	});
-	const isLoading = mockOverrideActive ? false : isLoadingEmails;
+	const sourceInboundEmails = useMemo(
+		() => inboundEmailsOverride ?? inboundEmails ?? [],
+		[inboundEmails, inboundEmailsOverride]
+	);
+	const isLoading =
+		isLoadingOverride ?? (mockOverrideActive || hasInboundEmailsOverride ? false : isLoadingEmails);
 	const [activeStatus, setActiveStatus] = useState<OpportunityStatus | null>(null);
-	const [searchQuery, setSearchQuery] = useState('');
 
 	const threadExchangeCounts = useMemo(() => {
 		const counts: Record<string, number> = {};
 		const threadsWithOriginal = new Set<string>();
-		for (const email of inboundEmails ?? []) {
+		for (const email of sourceInboundEmails) {
 			const key = getOpportunityThreadKey(email);
 			counts[key] = (counts[key] || 0) + 1;
 			if (email.originalEmailId != null) threadsWithOriginal.add(key);
@@ -553,7 +568,7 @@ export const DashboardOpportunitiesWidget: FC<{
 		}
 
 		return counts;
-	}, [inboundEmails]);
+	}, [sourceInboundEmails]);
 
 	const allOpportunities = useMemo(() => {
 		let rows: OpportunityRow[];
@@ -562,7 +577,7 @@ export const DashboardOpportunitiesWidget: FC<{
 		} else {
 			const seenThreadKeys = new Set<string>();
 			rows = [];
-			const sortedEmails = [...(inboundEmails ?? [])].sort((a, b) => {
+			const sortedEmails = [...sourceInboundEmails].sort((a, b) => {
 				const aMs = a.receivedAt ? new Date(a.receivedAt).getTime() : 0;
 				const bMs = b.receivedAt ? new Date(b.receivedAt).getTime() : 0;
 				return bMs - aMs;
@@ -578,7 +593,7 @@ export const DashboardOpportunitiesWidget: FC<{
 		}
 
 		return rows;
-	}, [inboundEmails, mockOverrideActive, mockState?.rows, threadExchangeCounts]);
+	}, [mockOverrideActive, mockState?.rows, sourceInboundEmails, threadExchangeCounts]);
 
 	const opportunities = useMemo(() => {
 		const q = searchQuery.trim().toLowerCase();
@@ -609,73 +624,7 @@ export const DashboardOpportunitiesWidget: FC<{
 	if (!enabled) return null;
 
 	return (
-		<div
-			className={cn('flex flex-col', className)}
-			style={{
-				width: 'min(654px, calc(100vw - 32px))',
-				height: '266px',
-				borderRadius: '6px',
-				background: '#D97676',
-				padding: '9px 8px 8px',
-				boxSizing: 'border-box',
-			}}
-		>
-			<div className="flex items-center gap-[7px]">
-				<div
-					className="min-w-0 flex items-center gap-[8px]"
-					style={{
-						width: '346px',
-						height: '22px',
-						borderRadius: '6px',
-						background: '#FFD5D5',
-						padding: '0 11px',
-						boxSizing: 'border-box',
-						fontFamily: 'Inter, sans-serif',
-						fontSize: '12.809px',
-						fontStyle: 'normal',
-						fontWeight: 500,
-						lineHeight: '20.199px',
-						color: '#000000',
-					}}
-				>
-					<DashboardActionBarStarIcon width={16} height={16} style={{ color: '#E32222' }} />
-					<span className="truncate">Opportunities</span>
-				</div>
-
-				<div
-					className="flex items-center gap-[8px]"
-					style={{
-						width: '136px',
-						height: '22px',
-						borderRadius: '6px',
-						background: '#FFFFFF',
-						padding: '0 11px',
-						boxSizing: 'border-box',
-					}}
-				>
-					<SearchIconDesktop width={12} height={13} stroke="#000000" strokeWidth={2} />
-					<input
-						value={searchQuery}
-						onChange={(event) => setSearchQuery(event.target.value)}
-						placeholder="Search"
-						className="min-w-0 placeholder:text-black placeholder:opacity-100"
-						style={{
-							flex: 1,
-							height: '100%',
-							border: 'none',
-							outline: 'none',
-							background: 'transparent',
-							fontFamily: 'Inter, sans-serif',
-							fontSize: '12.809px',
-							fontStyle: 'normal',
-							fontWeight: 500,
-							lineHeight: '20.199px',
-							color: '#000000',
-						}}
-					/>
-				</div>
-			</div>
-
+		<div className={cn('flex w-[639px] flex-1 flex-col self-center min-h-0', className)}>
 			<div
 				className="relative"
 				onClick={() => setActiveStatus(null)}
@@ -1103,6 +1052,92 @@ export const DashboardOpportunitiesWidget: FC<{
 					)}
 				</div>
 			</CustomScrollbar>
+		</div>
+	);
+};
+
+export const DashboardOpportunitiesWidget: FC<{
+	enabled?: boolean;
+	className?: string;
+	mockState?: OpportunitiesMockState;
+}> = ({ enabled = true, className, mockState }) => {
+	const [searchQuery, setSearchQuery] = useState('');
+
+	if (!enabled) return null;
+
+	return (
+		<div
+			className={cn('flex flex-col', className)}
+			style={{
+				width: 'min(654px, calc(100vw - 32px))',
+				height: '266px',
+				borderRadius: '6px',
+				background: '#D97676',
+				padding: '9px 8px 8px',
+				boxSizing: 'border-box',
+			}}
+		>
+			<div className="flex items-center gap-[7px]">
+				<div
+					className="min-w-0 flex items-center gap-[8px]"
+					style={{
+						width: '346px',
+						height: '22px',
+						borderRadius: '6px',
+						background: '#FFD5D5',
+						padding: '0 11px',
+						boxSizing: 'border-box',
+						fontFamily: 'Inter, sans-serif',
+						fontSize: '12.809px',
+						fontStyle: 'normal',
+						fontWeight: 500,
+						lineHeight: '20.199px',
+						color: '#000000',
+					}}
+				>
+					<DashboardActionBarStarIcon width={16} height={16} style={{ color: '#E32222' }} />
+					<span className="truncate">Opportunities</span>
+				</div>
+
+				<div
+					className="flex items-center gap-[8px]"
+					style={{
+						width: '136px',
+						height: '22px',
+						borderRadius: '6px',
+						background: '#FFFFFF',
+						padding: '0 11px',
+						boxSizing: 'border-box',
+					}}
+				>
+					<SearchIconDesktop width={12} height={13} stroke="#000000" strokeWidth={2} />
+					<input
+						value={searchQuery}
+						onChange={(event) => setSearchQuery(event.target.value)}
+						placeholder="Search"
+						className="min-w-0 placeholder:text-black placeholder:opacity-100"
+						style={{
+							flex: 1,
+							height: '100%',
+							border: 'none',
+							outline: 'none',
+							background: 'transparent',
+							fontFamily: 'Inter, sans-serif',
+							fontSize: '12.809px',
+							fontStyle: 'normal',
+							fontWeight: 500,
+							lineHeight: '20.199px',
+							color: '#000000',
+						}}
+					/>
+				</div>
+			</div>
+
+			<DashboardOpportunitiesContent
+				enabled={enabled}
+				mockState={mockState}
+				searchQuery={searchQuery}
+			/>
 		</div>
 	);
 };

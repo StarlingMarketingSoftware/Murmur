@@ -54,6 +54,7 @@ export async function GET(req: NextRequest) {
 			},
 			include: {
 				contact: true,
+				campaign: true,
 			},
 			orderBy: {
 				createdAt: 'desc' as const,

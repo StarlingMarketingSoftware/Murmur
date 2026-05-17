@@ -1,29 +1,25 @@
 'use client';
 
-import { FC, useMemo, useState } from 'react';
+import {
+	FC,
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+	type CSSProperties,
+} from 'react';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import type { InboundEmailWithRelations } from '@/types';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import DashboardActionBarStarIcon from '@/components/atoms/_svg/DashboardActionBarStarIcon';
+import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 import { cn } from '@/utils/ui';
-import { getStateAbbreviation } from '@/utils/string';
-import { stateBadgeColorMap } from '@/constants/ui';
 import { EmailStatus } from '@/constants/prismaEnums';
-import {
-	isCoffeeShopTitle,
-	isMusicVenueTitle,
-	isRestaurantTitle,
-	isWeddingPlannerTitle,
-	isWeddingVenueTitle,
-	isWineBeerSpiritsTitle,
-} from '@/utils/restaurantTitle';
-import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
-import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
-import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
-import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
-import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
+import { DashboardOpportunitiesContent } from '@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesWidget';
 
 type DashboardResponsesTab = 'responses' | 'sent' | 'opportunities';
 
@@ -87,6 +83,8 @@ const buildMockInboundEmail = (
 		? ({ id: -(index + 1), name: row.campaignName.trim() } as any)
 		: null;
 	const isSent = row.tab === 'sent';
+	const contactId = contact?.id ?? null;
+	const campaignId = campaign?.id ?? null;
 
 	return {
 		id: -(index + 1),
@@ -98,9 +96,12 @@ const buildMockInboundEmail = (
 		bodyHtml: body,
 		strippedText: body,
 		receivedAt,
+		contactId,
 		contact,
+		campaignId,
 		campaign,
 		originalEmail: null,
+		originalEmailId: null,
 		isSent,
 	} as unknown as InboundEmailWithRelations & { isSent?: boolean };
 };
@@ -120,6 +121,67 @@ const RESPONSE_WIDGET_BACKGROUND_BY_TAB: Record<DashboardResponsesTab, string> =
 	responses: '#84C1E2',
 	sent: '#6DB97B',
 	opportunities: '#D97676',
+};
+
+const fadeTextStyle: CSSProperties = {
+	overflow: 'hidden',
+	whiteSpace: 'nowrap',
+};
+
+const FadeOverflowText: FC<{
+	text: string;
+	style?: CSSProperties;
+	className?: string;
+	fadePx?: number;
+	title?: string;
+}> = ({ text, style, className, fadePx = 16, title }) => {
+	const spanRef = useRef<HTMLSpanElement | null>(null);
+	const [isOverflowing, setIsOverflowing] = useState(false);
+
+	const measure = useCallback(() => {
+		const el = spanRef.current;
+		if (!el) return;
+		setIsOverflowing(el.scrollWidth > el.clientWidth + 1);
+	}, []);
+
+	useLayoutEffect(() => {
+		measure();
+	}, [measure, text]);
+
+	useEffect(() => {
+		const el = spanRef.current;
+		if (!el) return;
+
+		if (typeof ResizeObserver === 'undefined') {
+			window.addEventListener('resize', measure);
+			return () => window.removeEventListener('resize', measure);
+		}
+
+		const ro = new ResizeObserver(() => measure());
+		ro.observe(el);
+		if (el.parentElement) ro.observe(el.parentElement);
+
+		return () => ro.disconnect();
+	}, [measure]);
+
+	const safeFadePx = Math.max(0, fadePx);
+	const overflowFadeStyle: CSSProperties | undefined = isOverflowing
+		? {
+				WebkitMaskImage: `linear-gradient(90deg, #000 calc(100% - ${safeFadePx}px), transparent)`,
+				maskImage: `linear-gradient(90deg, #000 calc(100% - ${safeFadePx}px), transparent)`,
+			}
+		: undefined;
+
+	return (
+		<span
+			ref={spanRef}
+			className={className}
+			title={title}
+			style={{ ...fadeTextStyle, ...style, ...overflowFadeStyle }}
+		>
+			{text}
+		</span>
+	);
 };
 
 const getResponseToggleDividerColor = (
@@ -200,37 +262,15 @@ const getSecondaryCompanyLabel = (email: InboundEmailWithRelations) => {
 	return company.trim();
 };
 
-const getCategoryIcon = (email: InboundEmailWithRelations) => {
-	const contact: any = email.contact;
-	const headline: string = (contact?.headline || contact?.title || '').trim();
-	if (!headline) return null;
+const getCampaignLabel = (email: InboundEmailWithRelations) =>
+	email.campaign?.name?.trim() || 'Campaign';
 
-	if (isRestaurantTitle(headline)) return <RestaurantsIcon size={14} className="flex-shrink-0" />;
-	if (isCoffeeShopTitle(headline)) return <CoffeeShopsIcon size={8} className="flex-shrink-0" />;
-	if (isMusicVenueTitle(headline)) return <MusicVenuesIcon size={14} className="flex-shrink-0" />;
-	if (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) {
-		return <WeddingPlannersIcon size={14} className="flex-shrink-0" />;
-	}
-	if (isWineBeerSpiritsTitle(headline)) {
-		return <WineBeerSpiritsIcon size={14} className="flex-shrink-0" />;
-	}
-
-	return null;
-};
-
-const isOpportunityEmail = (email: InboundEmailWithRelations) => {
-	const text = `${email.subject || ''} ${getEmailSnippet(email)}`.toLowerCase();
-	return (
-		/\b(pass|passed|declin(?:e|ed|ing)|not interested|not a fit|unavailable|can't|cannot|no longer)\b/.test(
-			text
-		) ||
-		/\b(?:already|fully) booked\b/.test(text) ||
-		/\b(booked|confirmed|confirming|reserved)\b/.test(text) ||
-		/\b(?:sounds good|let'?s do it|works for us|we'd love|we would love)\b/.test(text) ||
-		/\b(in progress|interested|available|tentative|pencil(?:ed)? in|hold(?:ing)? the date|checking|looking into|following up|follow up|send more|details|what dates|which date)\b/.test(
-			text
-		)
-	);
+const getResponseThreadKey = (email: InboundEmailWithRelations) => {
+	const contactId = email.contactId ?? email.contact?.id;
+	const participant = (email.sender || email.contact?.email || getCanonicalSenderLabel(email))
+		.toLowerCase()
+		.trim();
+	return `${email.campaignId ?? email.campaign?.id ?? 'none'}:${contactId ?? (participant || email.id)}`;
 };
 
 export const DashboardResponsesWidget: FC<{
@@ -239,12 +279,12 @@ export const DashboardResponsesWidget: FC<{
 	mockState?: ResponsesMockState;
 }> = ({ enabled = true, className, mockState }) => {
 	const mockOverrideActive = mockState != null;
-	const { data: inboundEmails, isLoading: isLoadingInboundEmails } = useGetInboundEmails({
-		enabled: enabled && !mockOverrideActive,
-	});
 	const [searchQuery, setSearchQuery] = useState('');
 	const [activeTab, setActiveTab] = useState<DashboardResponsesTab>('responses');
 	const [openedEmailIds, setOpenedEmailIds] = useState<Record<string, true>>({});
+	const { data: inboundEmails, isLoading: isLoadingInboundEmails } = useGetInboundEmails({
+		enabled: enabled && !mockOverrideActive && activeTab !== 'opportunities',
+	});
 	const { data: sentEmails, isLoading: isLoadingSentEmails } = useGetEmails({
 		enabled: enabled && !mockOverrideActive && activeTab === 'sent',
 		filters: { status: EmailStatus.sent },
@@ -266,9 +306,12 @@ export const DashboardResponsesWidget: FC<{
 						bodyHtml: email.message || '',
 						strippedText: email.message?.replace(/<[^>]*>/g, '') || '',
 						receivedAt: email.sentAt || email.createdAt,
+						contactId: email.contactId,
 						contact: email.contact,
-						campaign: null,
+						campaignId: email.campaignId,
+						campaign: email.campaign,
 						originalEmail: null,
+						originalEmailId: null,
 						isSent: true,
 					} as InboundEmailWithRelations & { isSent?: boolean })
 			),
@@ -284,24 +327,27 @@ export const DashboardResponsesWidget: FC<{
 		}));
 	}, [mockOverrideActive, mockState?.rows]);
 
+	const opportunityMockEmails = useMemo(() => {
+		if (!mockOverrideActive) return undefined;
+		return (mockEmails ?? [])
+			.filter((m) => m.tab === 'opportunities')
+			.map((m) => m.email);
+	}, [mockEmails, mockOverrideActive]);
+
 	const displayEmails = useMemo(() => {
 		if (mockOverrideActive) {
 			const all = mockEmails ?? [];
 			if (activeTab === 'sent') return all.filter((m) => m.tab === 'sent').map((m) => m.email);
-			if (activeTab === 'opportunities') {
-				return all.filter((m) => m.tab === 'opportunities').map((m) => m.email);
-			}
+			if (activeTab === 'opportunities') return [];
 			// Responses tab shows everything that is not "sent" — including opportunities,
 			// matching real-data behavior where any inbound reply also appears here.
 			return all.filter((m) => m.tab !== 'sent').map((m) => m.email);
 		}
 
 		if (activeTab === 'sent') return normalizedSentEmails;
+		if (activeTab === 'opportunities') return [];
 
-		const list = [...(inboundEmails ?? [])];
-		if (activeTab === 'opportunities') return list.filter(isOpportunityEmail);
-
-		return list;
+		return [...(inboundEmails ?? [])];
 	}, [activeTab, inboundEmails, mockEmails, mockOverrideActive, normalizedSentEmails]);
 
 	const isLoading = mockOverrideActive
@@ -316,13 +362,19 @@ export const DashboardResponsesWidget: FC<{
 			? 'No opportunities yet'
 			: 'No responses yet';
 
-	const senderCounts = useMemo(() => {
+	const exchangeCounts = useMemo(() => {
 		const counts: Record<string, number> = {};
+		const threadsWithOriginal = new Set<string>();
 		for (const email of displayEmails) {
-			const key = (email.sender || '').toLowerCase().trim();
-			if (!key) continue;
+			const key = getResponseThreadKey(email);
+			counts[key] = (counts[key] || 0) + 1;
+			if (email.originalEmailId != null) threadsWithOriginal.add(key);
+		}
+
+		for (const key of threadsWithOriginal) {
 			counts[key] = (counts[key] || 0) + 1;
 		}
+
 		return counts;
 	}, [displayEmails]);
 
@@ -464,7 +516,7 @@ export const DashboardResponsesWidget: FC<{
 					<input
 						value={searchQuery}
 						onChange={(e) => setSearchQuery(e.target.value)}
-						placeholder="Search Mail"
+						placeholder={activeTab === 'opportunities' ? 'Search' : 'Search Mail'}
 						className="min-w-0 placeholder:text-black placeholder:opacity-100"
 						style={{
 							flex: 1,
@@ -484,20 +536,27 @@ export const DashboardResponsesWidget: FC<{
 			</div>
 
 			{/* Rows list */}
-			<CustomScrollbar
-				className="w-full flex-1 min-h-0"
-				contentClassName="flex flex-col items-center"
-				thumbWidth={2}
-				thumbColor="#000000"
-				trackColor="transparent"
-				offsetRight={0}
-				lockHorizontalScroll
-				style={{
-					marginTop: '9px',
-				}}
-			>
-				{/* Blue gaps between rows */}
-				<div className="w-full flex flex-col items-center gap-[6px] pb-[6px]">
+			{activeTab === 'opportunities' ? (
+				<DashboardOpportunitiesContent
+					enabled={enabled}
+					searchQuery={searchQuery}
+					inboundEmailsOverride={opportunityMockEmails}
+				/>
+			) : (
+				<CustomScrollbar
+					className="w-full flex-1 min-h-0"
+					contentClassName="flex flex-col items-center"
+					thumbWidth={2}
+					thumbColor="#000000"
+					trackColor="transparent"
+					offsetRight={0}
+					lockHorizontalScroll
+					style={{
+						marginTop: '9px',
+					}}
+				>
+					{/* Blue gaps between rows */}
+					<div className="w-full flex flex-col items-center gap-[6px] pb-[6px]">
 					{isLoading ? (
 						Array.from({ length: 3 }).map((_, idx) => (
 							<div
@@ -531,20 +590,15 @@ export const DashboardResponsesWidget: FC<{
 						visibleEmails.map((email) => {
 							const rowKey = `${activeTab}:${email.id}`;
 							const senderLabel = getCanonicalSenderLabel(email);
-							const senderKey = (email.sender || '').toLowerCase().trim();
-							const senderCount = senderKey ? senderCounts[senderKey] || 0 : 0;
+							const exchangeKey = getResponseThreadKey(email);
+							const exchangeCount = Math.max(1, exchangeCounts[exchangeKey] || 1);
+							const campaignLabel = getCampaignLabel(email);
 							const subject = email.subject?.trim() || '(No Subject)';
 							const snippet = getEmailSnippet(email);
 							const timeLabel = formatInboxTimestamp(email.receivedAt);
 
-							const companyLabel = getSecondaryCompanyLabel(email);
-							const stateAbbr = email.contact?.state
-								? getStateAbbreviation(email.contact.state)?.trim().toUpperCase() || ''
-								: '';
-							const categoryIcon = getCategoryIcon(email);
-
 							const isOpened = openedEmailIds[rowKey] === true;
-							const rowFill = isOpened ? '#F4F4F4' : '#FEFEFE';
+							const rowFill = isOpened ? '#E6E6E6' : '#FEFEFE';
 
 							return (
 								<button
@@ -558,12 +612,15 @@ export const DashboardResponsesWidget: FC<{
 										backgroundColor: rowFill,
 										border: 'none',
 										boxShadow: '0px 1px 0px rgba(0,0,0,0.05)',
-										paddingLeft: '12px',
-										paddingRight: '12px',
-										display: 'grid',
-										gridTemplateColumns: '176px 1fr auto',
-										gap: '12px',
-										alignItems: 'center',
+										boxSizing: 'border-box',
+										overflow: 'hidden',
+										padding: '7px 31px 9px 27px',
+										display: 'flex',
+										alignItems: 'flex-start',
+										gap: '18px',
+										fontFamily: 'Inter, sans-serif',
+										color: '#000000',
+										cursor: 'pointer',
 									}}
 									onClick={() => {
 										setOpenedEmailIds((prev) => {
@@ -572,70 +629,156 @@ export const DashboardResponsesWidget: FC<{
 										});
 									}}
 								>
-									{/* Sender + badges */}
-									<div className="min-w-0">
-										<div className="flex items-baseline gap-[8px] min-w-0">
-											<span className="font-semibold text-[14px] leading-[16px] text-black truncate">
-												{senderLabel}
+									{/* Sender + campaign */}
+									<div
+										style={{
+											flex: '0 1 auto',
+											minWidth: '80px',
+											maxWidth: '190px',
+											height: '32px',
+											display: 'flex',
+											flexDirection: 'column',
+											justifyContent: 'space-between',
+											overflow: 'hidden',
+										}}
+									>
+										<div
+											style={{
+												width: 'max-content',
+												maxWidth: '190px',
+												height: '17.186px',
+												display: 'flex',
+												alignItems: 'baseline',
+												gap: '7px',
+												overflow: 'hidden',
+												color: '#000000',
+												fontFamily: 'Inter, sans-serif',
+												fontSize: '14px',
+												fontStyle: 'normal',
+												lineHeight: '17.186px',
+											}}
+										>
+											<FadeOverflowText
+												text={senderLabel}
+												title={senderLabel}
+												style={{
+													minWidth: 0,
+													maxWidth: '164px',
+													fontWeight: 600,
+												}}
+											/>
+											<span
+												style={{
+													flex: '0 0 auto',
+													fontWeight: 400,
+												}}
+											>
+												{exchangeCount}
 											</span>
-											{senderCount > 1 && (
-												<span className="text-[13px] leading-[16px] text-[#6B6B6B] flex-shrink-0">
-													{senderCount}
-												</span>
-											)}
 										</div>
 
-										<div className="mt-[2px] flex items-center gap-[6px]">
-											{categoryIcon ? (
-												<span className="text-black flex items-center">{categoryIcon}</span>
-											) : (
-												<span className="inline-flex w-[14px]" aria-hidden="true" />
-											)}
-
-											{stateAbbr ? (
-												<span
-													className="inline-flex items-center justify-center w-[40px] h-[19px] rounded-[5.6px] border border-black text-[16px] leading-none font-bold flex-shrink-0"
-													style={{
-														backgroundColor:
-															stateBadgeColorMap[stateAbbr] || 'transparent',
-													}}
-												>
-													{stateAbbr}
-												</span>
-											) : (
-												<span className="inline-flex w-[40px]" aria-hidden="true" />
-											)}
-
-										</div>
+										<span
+											title={campaignLabel}
+											style={{
+												width: '80px',
+												height: '15px',
+												borderRadius: '3px',
+												background: '#B9BBF1',
+												display: 'flex',
+												alignItems: 'center',
+												overflow: 'hidden',
+												boxSizing: 'border-box',
+												padding: '0 4px',
+												flex: '0 0 auto',
+											}}
+										>
+											<DashboardActionBarFolderIcon
+												width={20}
+												height={12}
+												style={{ color: '#C847CB', flex: '0 0 auto' }}
+											/>
+											<FadeOverflowText
+												text={campaignLabel}
+												style={{
+													minWidth: 0,
+													flex: 1,
+													marginLeft: '6px',
+													color: '#000000',
+													fontFamily: 'Inter, sans-serif',
+													fontSize: '13.854px',
+													fontStyle: 'normal',
+													fontWeight: 500,
+													lineHeight: '17.186px',
+												}}
+											/>
+										</span>
 									</div>
 
 									{/* Subject + preview */}
-									<div className="min-w-0">
-										<div className="text-[14px] leading-[16px] text-black truncate">
-											{subject}
-										</div>
-										<div className="text-[12px] leading-[14px] truncate">
-											{companyLabel ? (
-												<>
-													<span className="text-black">{companyLabel}</span>
-													<span className="text-[#7A7A7A]">{snippet ? ` ${snippet}` : ''}</span>
-												</>
-											) : (
-												<span className="text-[#7A7A7A]">{snippet}</span>
-											)}
-										</div>
+									<div
+										style={{
+											flex: '1 1 auto',
+											minWidth: 0,
+											height: '40px',
+											overflow: 'hidden',
+										}}
+									>
+										<FadeOverflowText
+											text={subject}
+											style={{
+												display: 'block',
+												width: 'fit-content',
+												maxWidth: '100%',
+												height: '20px',
+												color: '#000000',
+												textAlign: 'center',
+												fontFamily: 'Inter, sans-serif',
+												fontSize: '14px',
+												fontStyle: 'normal',
+												fontWeight: 400,
+												lineHeight: '20px',
+											}}
+										/>
+										<FadeOverflowText
+											text={snippet}
+											style={{
+												display: 'block',
+												width: '100%',
+												height: '20px',
+												color: '#000000',
+												fontFamily: 'Inter, sans-serif',
+												fontSize: '14px',
+												fontStyle: 'normal',
+												fontWeight: 200,
+												lineHeight: '20px',
+											}}
+										/>
 									</div>
 
 									{/* Timestamp */}
-									<div className="text-[14px] leading-[16px] font-medium text-black whitespace-nowrap">
+									<div
+										style={{
+											flex: '0 0 82px',
+											height: '17.186px',
+											color: '#000000',
+											textAlign: 'right',
+											fontFamily: 'Inter, sans-serif',
+											fontSize: '14px',
+											fontStyle: 'normal',
+											fontWeight: 500,
+											lineHeight: '17.186px',
+											whiteSpace: 'nowrap',
+										}}
+									>
 										{timeLabel}
 									</div>
 								</button>
 							);
 						})
 					)}
-				</div>
-			</CustomScrollbar>
+					</div>
+				</CustomScrollbar>
+			)}
 		</div>
 	);
 };
