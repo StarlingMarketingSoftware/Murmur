@@ -101,6 +101,7 @@ import { useMe } from '@/hooks/useMe';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
+import { CITY_LOCATIONS_LIST } from '@/constants/cityLocations';
 import SearchResultsMap, {
 	DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING,
 	DASHBOARD_TO_INTERACTIVE_TRANSITION_MS,
@@ -536,9 +537,9 @@ const INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX = {
 } as const;
 
 const INITIAL_DASHBOARD_ACTIVE_SEARCH_SUGGESTIONS = [
-	{ label: 'Wineries', opacity: 0.3 },
-	{ label: 'Breweries', opacity: 0.5 },
-	{ label: 'Music venues', opacity: 0.7 },
+	{ label: 'Wineries in New York', opacity: 0.3 },
+	{ label: 'Breweries in New Jersey', opacity: 0.5 },
+	{ label: 'Music venues in Pennsylvania', opacity: 0.7 },
 ] as const;
 
 type InitialDashboardSearchSuggestionState = {
@@ -546,9 +547,16 @@ type InitialDashboardSearchSuggestionState = {
 	abbr: string;
 };
 
+type InitialDashboardSearchSuggestionLocation = {
+	city: string;
+	state: InitialDashboardSearchSuggestionState;
+	label: string;
+};
+
 type InitialDashboardSearchSuggestionSeed = {
 	label: string;
 	state: InitialDashboardSearchSuggestionState;
+	location?: InitialDashboardSearchSuggestionLocation;
 };
 
 type LiveMusicSearchSuggestionTemplate = {
@@ -570,6 +578,8 @@ type SearchSuggestionsApiResponse = {
 		state?: { name?: unknown; abbr?: unknown };
 	}>;
 	location?: {
+		city?: unknown;
+		region?: unknown;
 		nearbyStates?: Array<{ name?: unknown; abbr?: unknown }>;
 	};
 };
@@ -583,7 +593,33 @@ const DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES = [
 	{ name: 'Pennsylvania', abbr: 'PA' },
 ] as const satisfies readonly InitialDashboardSearchSuggestionState[];
 
+const DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_LOCATIONS = [
+	{
+		city: 'New York',
+		state: DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[0],
+		label: 'New York, NY',
+	},
+	{
+		city: 'Newark',
+		state: DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[1],
+		label: 'Newark, NJ',
+	},
+	{
+		city: 'Philadelphia',
+		state: DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[2],
+		label: 'Philadelphia, PA',
+	},
+] as const satisfies readonly InitialDashboardSearchSuggestionLocation[];
+
 const AMBIGUOUS_STATE_ABBR_TOKENS = new Set(['hi', 'in', 'me', 'or']);
+
+const INITIAL_DASHBOARD_SEARCH_LOCATION_ALIASES: Record<string, readonly string[]> = {
+	'New York, NY': ['nyc', 'new york city'],
+	'Los Angeles, CA': ['la'],
+	'Philadelphia, PA': ['philly'],
+	'San Francisco, CA': ['sf'],
+	'Portland, OR': ['pdx'],
+};
 
 const LIVE_MUSIC_GENERIC_SUGGESTION_KEYWORDS = [
 	'live music',
@@ -883,6 +919,7 @@ const getDefaultInitialDashboardSearchSuggestionSeeds =
 		state:
 			DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[index] ??
 			DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[0],
+		location: DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_LOCATIONS[index],
 	}));
 
 const normalizeSearchSuggestionText = (value: string): string =>
@@ -964,6 +1001,41 @@ const getInitialDashboardSuggestionStateFromName = (
 ): InitialDashboardSearchSuggestionState | null =>
 	coerceInitialDashboardSuggestionState({ name: value });
 
+const formatInitialDashboardSuggestionLocationLabel = (
+	city: string,
+	state: InitialDashboardSearchSuggestionState
+): string => `${city}, ${state.abbr}`;
+
+const coerceInitialDashboardSuggestionLocation = (
+	city: unknown,
+	stateValue: unknown
+): InitialDashboardSearchSuggestionLocation | null => {
+	const cityName = typeof city === 'string' ? city.trim() : '';
+	if (!cityName) return null;
+
+	const stateText = typeof stateValue === 'string' ? stateValue.trim() : '';
+	const state = coerceInitialDashboardSuggestionState({ name: stateText, abbr: stateText });
+	if (!state) return null;
+
+	return {
+		city: cityName,
+		state,
+		label: formatInitialDashboardSuggestionLocationLabel(cityName, state),
+	};
+};
+
+const parseInitialDashboardSuggestionCityLocation = (
+	value: string
+): InitialDashboardSearchSuggestionLocation | null => {
+	const commaIndex = value.lastIndexOf(',');
+	if (commaIndex <= 0) return null;
+
+	return coerceInitialDashboardSuggestionLocation(
+		value.slice(0, commaIndex),
+		value.slice(commaIndex + 1)
+	);
+};
+
 const dedupeInitialDashboardSuggestionStates = (
 	states: readonly InitialDashboardSearchSuggestionState[]
 ): InitialDashboardSearchSuggestionState[] => {
@@ -978,6 +1050,40 @@ const dedupeInitialDashboardSuggestionStates = (
 
 	return deduped;
 };
+
+const dedupeInitialDashboardSuggestionLocations = (
+	locations: readonly InitialDashboardSearchSuggestionLocation[]
+): InitialDashboardSearchSuggestionLocation[] => {
+	const seen = new Set<string>();
+	const deduped: InitialDashboardSearchSuggestionLocation[] = [];
+
+	for (const location of locations) {
+		const key = `${normalizeSearchSuggestionText(location.city)}:${location.state.abbr}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
+		deduped.push(location);
+	}
+
+	return deduped;
+};
+
+const getAllInitialDashboardSuggestionLocations = (
+	seeds: readonly InitialDashboardSearchSuggestionSeed[]
+): InitialDashboardSearchSuggestionLocation[] =>
+	dedupeInitialDashboardSuggestionLocations([
+		...seeds
+			.map((seed) => seed.location)
+			.filter(
+				(
+					location
+				): location is InitialDashboardSearchSuggestionLocation => Boolean(location)
+			),
+		...CITY_LOCATIONS_LIST.map(parseInitialDashboardSuggestionCityLocation).filter(
+			(
+				location
+			): location is InitialDashboardSearchSuggestionLocation => Boolean(location)
+		),
+	]);
 
 const scoreInitialDashboardSuggestionState = (
 	state: InitialDashboardSearchSuggestionState,
@@ -1019,6 +1125,86 @@ const scoreInitialDashboardSuggestionState = (
 	return score;
 };
 
+const scoreInitialDashboardSuggestionLocation = (
+	location: InitialDashboardSearchSuggestionLocation,
+	normalizedQuery: string,
+	queryTokens: readonly string[]
+): number => {
+	if (!normalizedQuery) return 0;
+
+	const normalizedCity = normalizeSearchSuggestionText(location.city);
+	const normalizedLocation = normalizeSearchSuggestionText(location.label);
+	const cityTokens = normalizedCity.split(' ');
+	const aliasScore = scoreSearchSuggestionKeywords(
+		normalizedQuery,
+		queryTokens,
+		INITIAL_DASHBOARD_SEARCH_LOCATION_ALIASES[location.label] ?? []
+	);
+	let score = scoreInitialDashboardSuggestionState(
+		location.state,
+		normalizedQuery,
+		queryTokens
+	) * 0.45 + aliasScore * 1.4;
+
+	if (normalizedQuery.length >= 3 && normalizedQuery.includes(normalizedCity)) {
+		score += 12;
+	}
+	if (normalizedQuery.length >= 2 && normalizedCity.includes(normalizedQuery)) {
+		score += 7;
+	}
+	if (normalizedQuery.length >= 3 && normalizedLocation.includes(normalizedQuery)) {
+		score += 4;
+	}
+
+	for (let start = 0; start < queryTokens.length; start += 1) {
+		const isCityPrefix = cityTokens.every((cityToken, offset) => {
+			const queryToken = queryTokens[start + offset];
+			return Boolean(
+				queryToken && queryToken.length >= 2 && cityToken.startsWith(queryToken)
+			);
+		});
+		if (isCityPrefix) score += 6 + cityTokens.length;
+	}
+
+	return score;
+};
+
+const scoreInitialDashboardSuggestionCityIntent = (
+	location: InitialDashboardSearchSuggestionLocation,
+	normalizedQuery: string,
+	queryTokens: readonly string[]
+): number => {
+	if (!normalizedQuery) return 0;
+
+	const normalizedCity = normalizeSearchSuggestionText(location.city);
+	const cityTokens = normalizedCity.split(' ');
+	const aliasScore = scoreSearchSuggestionKeywords(
+		normalizedQuery,
+		queryTokens,
+		INITIAL_DASHBOARD_SEARCH_LOCATION_ALIASES[location.label] ?? []
+	);
+	let score = aliasScore * 1.5;
+
+	if (normalizedQuery.length >= 3 && normalizedQuery.includes(normalizedCity)) {
+		score += 12;
+	}
+	if (normalizedQuery.length >= 2 && normalizedCity.includes(normalizedQuery)) {
+		score += 7;
+	}
+
+	for (let start = 0; start < queryTokens.length; start += 1) {
+		const isCityPrefix = cityTokens.every((cityToken, offset) => {
+			const queryToken = queryTokens[start + offset];
+			return Boolean(
+				queryToken && queryToken.length >= 2 && cityToken.startsWith(queryToken)
+			);
+		});
+		if (isCityPrefix) score += 6 + cityTokens.length;
+	}
+
+	return score;
+};
+
 const rankInitialDashboardSuggestionStates = (
 	query: string,
 	seeds: readonly InitialDashboardSearchSuggestionSeed[]
@@ -1047,6 +1233,46 @@ const rankInitialDashboardSuggestionStates = (
 		.sort((a, b) => b.score - a.score || a.state.name.localeCompare(b.state.name));
 
 	return ranked.slice(0, Math.max(6, INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT));
+};
+
+const rankInitialDashboardSuggestionLocations = (
+	query: string,
+	seeds: readonly InitialDashboardSearchSuggestionSeed[]
+): Array<{ location: InitialDashboardSearchSuggestionLocation; score: number }> => {
+	const normalizedQuery = normalizeSearchSuggestionText(query);
+	const queryTokens = tokenizeSearchSuggestionText(query);
+	const seedLocations = seeds
+		.map((seed) => seed.location)
+		.filter(
+			(
+				location
+			): location is InitialDashboardSearchSuggestionLocation => Boolean(location)
+		);
+	const allLocations = getAllInitialDashboardSuggestionLocations(seeds);
+
+	const ranked = allLocations
+		.map((location, order) => {
+			const seedIndex = seedLocations.findIndex(
+				(seedLocation) =>
+					seedLocation.state.abbr === location.state.abbr &&
+					normalizeSearchSuggestionText(seedLocation.city) ===
+						normalizeSearchSuggestionText(location.city)
+			);
+			const seedBoost = seedIndex >= 0 ? (seedLocations.length - seedIndex) * 0.35 : 0;
+			return {
+				location,
+				order,
+				score:
+					scoreInitialDashboardSuggestionLocation(
+						location,
+						normalizedQuery,
+						queryTokens
+					) + seedBoost,
+			};
+		})
+		.sort((a, b) => b.score - a.score || a.order - b.order);
+
+	return ranked.slice(0, Math.max(12, INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT));
 };
 
 const scoreLiveMusicSearchSuggestionCategory = (
@@ -1092,17 +1318,45 @@ const buildInitialDashboardSearchSuggestions = (
 ): string[] => {
 	const normalizedQuery = normalizeSearchSuggestionText(query);
 	if (!normalizedQuery) {
-		return INITIAL_DASHBOARD_ACTIVE_SEARCH_SUGGESTIONS.map((suggestion) => suggestion.label)
-			.slice(0, INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT);
+		return LIVE_MUSIC_SEARCH_SUGGESTION_CATEGORIES.slice(
+			0,
+			INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT
+		).map((category, index) => {
+			const state =
+				seeds[index]?.state ??
+				DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[index] ??
+				DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[0];
+			return `${category.label} in ${state.name}`;
+		});
 	}
 
 	const queryTokens = tokenizeSearchSuggestionText(query);
 	const rankedStates = rankInitialDashboardSuggestionStates(query, seeds);
-	const focusedState = rankedStates.find((entry) => entry.score >= 5)?.state ?? null;
+	const rankedLocations = rankInitialDashboardSuggestionLocations(query, seeds);
+	const rankedCityLocations = rankedLocations
+		.map((entry) => ({
+			...entry,
+			cityScore: scoreInitialDashboardSuggestionCityIntent(
+				entry.location,
+				normalizedQuery,
+				queryTokens
+			),
+		}))
+		.sort((a, b) => b.cityScore - a.cityScore || b.score - a.score);
+	const focusedLocation =
+		rankedCityLocations.find((entry) => entry.cityScore >= 7)?.location ?? null;
+	const focusedState =
+		focusedLocation?.state ?? rankedStates.find((entry) => entry.score >= 5)?.state ?? null;
 	const rankedCategories = LIVE_MUSIC_SEARCH_SUGGESTION_CATEGORIES.map((category) => ({
 		category,
 		score: scoreLiveMusicSearchSuggestionCategory(category, normalizedQuery, queryTokens),
 	})).sort((a, b) => b.score - a.score || b.category.baseScore - a.category.baseScore);
+	const focusedCategory =
+		rankedCategories[0] &&
+		rankedCategories[0].score >= rankedCategories[0].category.baseScore + 2 &&
+		rankedCategories[0].score - (rankedCategories[1]?.score ?? 0) >= 1.4
+			? rankedCategories[0].category
+			: null;
 	const states = focusedState
 		? [focusedState, ...rankedStates.map((entry) => entry.state)]
 		: rankedStates.map((entry) => entry.state);
@@ -1111,6 +1365,22 @@ const buildInitialDashboardSearchSuggestions = (
 		INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT
 	);
 	const fallbackStatePool = statePool.length > 0 ? statePool : seeds.map((seed) => seed.state);
+	const shouldUseSpecificLocations = Boolean(focusedLocation);
+	const specificLocationPool = shouldUseSpecificLocations
+		? dedupeInitialDashboardSuggestionLocations([
+				...(focusedLocation ? [focusedLocation] : []),
+				...rankedCityLocations
+					.filter((entry) => entry.location.state.abbr === focusedState?.abbr)
+					.map((entry) => entry.location),
+				...rankedCityLocations.map((entry) => entry.location),
+			]).slice(0, Math.max(6, INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT))
+		: [];
+	const fallbackSearchTargets: Array<{
+		state: InitialDashboardSearchSuggestionState;
+		location?: InitialDashboardSearchSuggestionLocation;
+	}> = shouldUseSpecificLocations
+		? specificLocationPool.map((location) => ({ location, state: location.state }))
+		: fallbackStatePool.map((state) => ({ state }));
 	const candidates: Array<{
 		label: string;
 		categoryKey: string;
@@ -1121,7 +1391,6 @@ const buildInitialDashboardSearchSuggestions = (
 	for (const { category, score: categoryScore } of rankedCategories) {
 		const templateScores = category.templates
 			.map((template, index) => ({
-				template,
 				index,
 				score: scoreLiveMusicSearchSuggestionTemplate(
 					template,
@@ -1131,28 +1400,47 @@ const buildInitialDashboardSearchSuggestions = (
 			}))
 			.sort((a, b) => b.score - a.score || a.index - b.index);
 
-		for (const [stateIndex, state] of fallbackStatePool.entries()) {
+		if (
+			shouldUseSpecificLocations &&
+			focusedCategory &&
+			category.key !== focusedCategory.key
+		) {
+			continue;
+		}
+
+		for (const [targetIndex, target] of fallbackSearchTargets.entries()) {
+			const state = target.state;
 			const stateScore =
 				rankedStates.find((entry) => entry.state.abbr === state.abbr)?.score ?? 0;
+			const locationScore = target.location
+				? (rankedLocations.find(
+						(entry) =>
+							entry.location.state.abbr === target.location?.state.abbr &&
+							normalizeSearchSuggestionText(entry.location.city) ===
+								normalizeSearchSuggestionText(target.location?.city ?? '')
+					)?.score ?? 0)
+				: 0;
 
 			for (const { score: templateScore, index: templateIndex } of templateScores) {
 				candidates.push({
-					label: focusedState
-						? `${category.label} in ${state.name}`
-						: category.label,
+					label: target.location
+						? `${category.label} in ${target.location.label}`
+						: `${category.label} in ${state.name}`,
 					categoryKey: category.key,
 					stateAbbr: state.abbr,
 					score:
 						categoryScore +
 						stateScore * 0.8 +
+						locationScore * 0.9 +
 						templateScore * 0.7 -
-						stateIndex * 0.2 -
+						targetIndex * 0.2 -
 						templateIndex * 0.04,
 				});
 			}
 		}
 	}
 
+	const allowRepeatedCategory = Boolean(focusedCategory);
 	const allowRepeatedState = Boolean(focusedState);
 	const selected: string[] = [];
 	const usedLabels = new Set<string>();
@@ -1163,7 +1451,7 @@ const buildInitialDashboardSearchSuggestions = (
 	for (const candidate of sortedCandidates) {
 		if (selected.length >= INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT) break;
 		if (usedLabels.has(candidate.label)) continue;
-		if (usedCategories.has(candidate.categoryKey)) continue;
+		if (!allowRepeatedCategory && usedCategories.has(candidate.categoryKey)) continue;
 		if (!allowRepeatedState && usedStates.has(candidate.stateAbbr)) continue;
 
 		selected.push(candidate.label);
@@ -1182,9 +1470,16 @@ const buildInitialDashboardSearchSuggestions = (
 
 	return selected.length === INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT
 		? selected
-		: seeds
-				.map((seed) => seed.label)
-				.slice(0, INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT);
+		: LIVE_MUSIC_SEARCH_SUGGESTION_CATEGORIES.slice(
+				0,
+				INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT
+			).map((category, index) => {
+				const state =
+					seeds[index]?.state ??
+					DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[index] ??
+					DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[0];
+				return `${category.label} in ${state.name}`;
+			});
 };
 
 // Resolution-aware zoom for the fullscreen map view. Mirrors the campaign page's tuned
@@ -5137,6 +5432,7 @@ const DashboardContent = () => {
 
 		const loadSuggestions = async () => {
 			const params = new URLSearchParams();
+			let approximateLocation: Awaited<ReturnType<typeof getApproximateLocation>> | null = null;
 
 			try {
 				const loc = await Promise.race([
@@ -5144,6 +5440,7 @@ const DashboardContent = () => {
 					new Promise<null>((resolve) => setTimeout(() => resolve(null), 1600)),
 				]);
 				if (loc) {
+					approximateLocation = loc;
 					if (loc.lat != null && loc.lon != null) {
 						params.set('lat', String(loc.lat));
 						params.set('lon', String(loc.lon));
@@ -5170,6 +5467,15 @@ const DashboardContent = () => {
 					.filter(
 						(state): state is InitialDashboardSearchSuggestionState => Boolean(state)
 					);
+				const responseLocation = coerceInitialDashboardSuggestionLocation(
+					data.location?.city,
+					data.location?.region
+				);
+				const approximateSuggestionLocation = coerceInitialDashboardSuggestionLocation(
+					approximateLocation?.city,
+					approximateLocation?.regionCode ?? approximateLocation?.region
+				);
+				const allSuggestionLocations = getAllInitialDashboardSuggestionLocations([]);
 				const suggestionSeeds = (data.suggestions ?? [])
 					.map((suggestion, index): InitialDashboardSearchSuggestionSeed | null => {
 						const label =
@@ -5181,8 +5487,14 @@ const DashboardContent = () => {
 							nearbyStates[index] ??
 							DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[index] ??
 							DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[0];
+						const location =
+							(index === 0 ? responseLocation ?? approximateSuggestionLocation : null) ??
+							allSuggestionLocations.find(
+								(candidate) => candidate.state.abbr === state.abbr
+							) ??
+							DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_LOCATIONS[index];
 
-						return { label, state };
+						return { label, state, location };
 					})
 					.filter(
 						(
