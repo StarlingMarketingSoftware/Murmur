@@ -11,7 +11,11 @@ import {
 	type CSSProperties,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
+import { useRouter } from 'next/navigation';
+import {
+	useAssignInboundEmailToCampaign,
+	useGetInboundEmails,
+} from '@/hooks/queryHooks/useInboundEmails';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import type { InboundEmailWithRelations } from '@/types';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
@@ -20,6 +24,7 @@ import DashboardActionBarStarIcon from '@/components/atoms/_svg/DashboardActionB
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 import { cn } from '@/utils/ui';
 import { EmailStatus } from '@/constants/prismaEnums';
+import { urls } from '@/constants/urls';
 import { DashboardOpportunitiesContent } from '@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesWidget';
 import { NewEmailHoverPreview } from '@/components/molecules/DashboardStrategyBox/NewEmailHoverPreview';
 
@@ -304,9 +309,11 @@ export const DashboardResponsesWidget: FC<{
 	className?: string;
 	mockState?: ResponsesMockState;
 }> = ({ enabled = true, className, mockState }) => {
+	const router = useRouter();
 	const mockOverrideActive = mockState != null;
 	const widgetRef = useRef<HTMLDivElement>(null);
 	const emailHoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const campaignAssignmentPromisesRef = useRef<Record<string, Promise<number | null>>>({});
 	const [searchQuery, setSearchQuery] = useState('');
 	const [activeTab, setActiveTab] = useState<DashboardResponsesTab>('responses');
 	const [openedEmailIds, setOpenedEmailIds] = useState<Record<string, true>>({});
@@ -322,6 +329,9 @@ export const DashboardResponsesWidget: FC<{
 	const { data: sentEmails, isLoading: isLoadingSentEmails } = useGetEmails({
 		enabled: enabled && !mockOverrideActive && activeTab === 'sent',
 		filters: { status: EmailStatus.sent },
+	});
+	const { mutateAsync: assignInboundEmailToCampaign } = useAssignInboundEmailToCampaign({
+		suppressToasts: true,
 	});
 
 	const normalizedSentEmails = useMemo(
@@ -410,16 +420,65 @@ export const DashboardResponsesWidget: FC<{
 		setPreviewEmail(null);
 	}, [clearEmailPreviewTimer]);
 
-	const handleEmailHoverStart = useCallback(
+	const markEmailOpened = useCallback((rowKey: string) => {
+		setOpenedEmailIds((prev) => (prev[rowKey] ? prev : { ...prev, [rowKey]: true }));
+	}, []);
+
+	const ensureEmailCampaign = useCallback(
 		(email: InboundEmailWithRelations) => {
+			const existingCampaignId = email.campaignId ?? email.campaign?.id;
+			if (existingCampaignId) return Promise.resolve(existingCampaignId);
+			if (mockOverrideActive || (email as { isSent?: boolean }).isSent) {
+				return Promise.resolve(null);
+			}
+
+			const key = String(email.id);
+			const existingPromise = campaignAssignmentPromisesRef.current[key];
+			if (existingPromise) return existingPromise;
+
+			const promise = assignInboundEmailToCampaign({ id: email.id })
+				.then((assignedEmail) => assignedEmail.campaignId ?? assignedEmail.campaign?.id ?? null)
+				.finally(() => {
+					delete campaignAssignmentPromisesRef.current[key];
+				});
+			campaignAssignmentPromisesRef.current[key] = promise;
+			return promise;
+		},
+		[assignInboundEmailToCampaign, mockOverrideActive]
+	);
+
+	const handleEmailClick = useCallback(
+		(email: InboundEmailWithRelations, rowKey: string) => {
+			markEmailOpened(rowKey);
+			void ensureEmailCampaign(email).catch(() => null);
+		},
+		[ensureEmailCampaign, markEmailOpened]
+	);
+
+	const handleEmailDoubleClick = useCallback(
+		async (email: InboundEmailWithRelations, rowKey: string) => {
+			markEmailOpened(rowKey);
+
+			const targetCampaignId = await ensureEmailCampaign(email).catch(() => null);
+			if (!targetCampaignId) return;
+
+			hideEmailPreview();
+			router.push(`${urls.murmur.campaign.detail(targetCampaignId)}?tab=inbox&silent=1`);
+		},
+		[ensureEmailCampaign, hideEmailPreview, markEmailOpened, router]
+	);
+
+	const handleEmailHoverStart = useCallback(
+		(email: InboundEmailWithRelations, rowKey: string) => {
 			clearEmailPreviewTimer();
 			emailHoverTimerRef.current = setTimeout(() => {
 				updateEmailPreviewPosition();
+				markEmailOpened(rowKey);
 				setPreviewEmail(email);
 				setShowEmailPreview(true);
 			}, EMAIL_PREVIEW_HOVER_DELAY_MS);
 		},
-		[clearEmailPreviewTimer, updateEmailPreviewPosition]
+		[clearEmailPreviewTimer, markEmailOpened, updateEmailPreviewPosition]
 	);
 
 	useEffect(() => {
@@ -641,14 +700,15 @@ export const DashboardResponsesWidget: FC<{
 				/>
 			) : (
 				<CustomScrollbar
-					className="w-full flex-1 min-h-0"
+					className="flex-1 min-h-0 self-center"
 					contentClassName="flex flex-col items-center"
 					thumbWidth={2}
 					thumbColor="#000000"
 					trackColor="transparent"
-					offsetRight={0}
+					offsetRight={-12}
 					lockHorizontalScroll
 					style={{
+						width: '639px',
 						marginTop: '9px',
 					}}
 				>
@@ -695,7 +755,6 @@ export const DashboardResponsesWidget: FC<{
 							const subject = email.subject?.trim() || '(No Subject)';
 							const snippet = getEmailSnippet(email);
 							const timeLabel = formatInboxTimestamp(email.receivedAt);
-
 							const isOpened = openedEmailIds[rowKey] === true;
 							const rowFill = isOpened ? '#E6E6E6' : '#FEFEFE';
 
@@ -721,13 +780,9 @@ export const DashboardResponsesWidget: FC<{
 										color: '#000000',
 										cursor: 'pointer',
 									}}
-									onClick={() => {
-										setOpenedEmailIds((prev) => {
-											if (prev[rowKey]) return prev;
-											return { ...prev, [rowKey]: true };
-										});
-									}}
-									onMouseEnter={() => handleEmailHoverStart(email)}
+									onClick={() => handleEmailClick(email, rowKey)}
+									onDoubleClick={() => handleEmailDoubleClick(email, rowKey)}
+									onMouseEnter={() => handleEmailHoverStart(email, rowKey)}
 									onMouseLeave={hideEmailPreview}
 								>
 									{/* Sender + campaign */}
