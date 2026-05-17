@@ -24,7 +24,6 @@ import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
-import { CornerUpLeft } from 'lucide-react';
 
 type DashboardResponsesTab = 'responses' | 'sent' | 'opportunities';
 
@@ -607,7 +606,6 @@ export const DashboardResponsesWidget: FC<{
 												<span className="inline-flex w-[40px]" aria-hidden="true" />
 											)}
 
-											<CornerUpLeft className="w-[14px] h-[14px] text-black opacity-80" />
 										</div>
 									</div>
 
