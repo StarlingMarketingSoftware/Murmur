@@ -258,6 +258,84 @@ const matchesAnyTitlePrefix = (
 	return prefixes.some((p) => lc.startsWith(p.toLowerCase()));
 };
 
+const EMERGING_ARTIST_SUPPORT_TERMS = [
+	'emerging artist',
+	'emerging artists',
+	'emerging act',
+	'emerging acts',
+	'local artist',
+	'local artists',
+	'local act',
+	'local acts',
+	'new artist',
+	'new artists',
+	'up-and-coming',
+	'up and coming',
+	'independent artist',
+	'independent artists',
+	'indie artist',
+	'indie artists',
+	'showcase',
+	'showcases',
+	'open mic',
+	'open-mic',
+	'singer-songwriter',
+	'songwriter night',
+	'booking bands',
+	'booking acts',
+] as const;
+
+const SOFT_DESCRIPTOR_GROUPS: readonly {
+	triggers: readonly RegExp[];
+	terms: readonly string[];
+}[] = [
+	{
+		triggers: [
+			/\bemerging\s+(artists?|acts?)\b/i,
+			/\bsupport(?:s|ing)?\s+emerging\b/i,
+			/\blocal\s+(artists?|acts?|bands?)\b/i,
+			/\bup[-\s]and[-\s]coming\b/i,
+			/\bopen\s?mic\b/i,
+			/\bshowcases?\b/i,
+		],
+		terms: EMERGING_ARTIST_SUPPORT_TERMS,
+	},
+];
+
+const getSoftDescriptorTerms = (restOfQuery: string): readonly string[] => {
+	const terms = new Set<string>();
+	for (const group of SOFT_DESCRIPTOR_GROUPS) {
+		if (!group.triggers.some((trigger) => trigger.test(restOfQuery))) continue;
+		for (const term of group.terms) terms.add(term);
+	}
+	return [...terms];
+};
+
+const fieldContainsAnyTerm = (
+	value: string | null | undefined,
+	terms: readonly string[]
+): boolean => {
+	if (!value) return false;
+	const lc = value.toLowerCase();
+	return terms.some((term) => lc.includes(term));
+};
+
+const softDescriptorSignalScore = (
+	contact: Contact,
+	terms: readonly string[]
+): number => {
+	if (terms.length === 0) return 0;
+	let score = 0;
+	if (fieldContainsAnyTerm(contact.title, terms)) score += 5;
+	if (fieldContainsAnyTerm(contact.company, terms)) score += 4;
+	if (fieldContainsAnyTerm(contact.headline, terms)) score += 3;
+	if (fieldContainsAnyTerm((contact.companyKeywords ?? []).join(' '), terms)) score += 3;
+	if (fieldContainsAnyTerm(contact.metadata, terms)) score += 2;
+	if (fieldContainsAnyTerm(contact.companyIndustry, terms)) score += 1;
+	if (fieldContainsAnyTerm(contact.companyType, terms)) score += 1;
+	return score;
+};
+
 const VAGUE_REST_TOKENS = new Set([
 	'best',
 	'cool',
@@ -1088,6 +1166,15 @@ const scoreAndInterleave = (
 	const explicitPlace = parsed.hadExplicitPlace;
 	const onlyOneCategory = parsed.categories.length === 1;
 	const liveMusicQuery = parsed.mentionsLiveMusic;
+	const exactCityCenter = parsed.city?.coordinatePrecision === 'city';
+	const cityState = parsed.city?.state
+		? US_STATES.find(
+				(s) => s.abbr.toLowerCase() === parsed.city!.state!.toLowerCase()
+			  )
+		: null;
+	const localityStateNameLc = (parsed.state?.name ?? cityState?.name ?? null)?.toLowerCase() ?? null;
+	const localityStateAbbrLc = (parsed.state?.abbr ?? parsed.city?.state ?? null)?.toLowerCase() ?? null;
+	const softDescriptorTerms = getSoftDescriptorTerms(parsed.restOfQuery);
 
 	const restOfQueryLc = parsed.restOfQuery.trim().toLowerCase();
 	const escapedQuery =
@@ -1132,9 +1219,9 @@ const scoreAndInterleave = (
 			);
 			if (matched) {
 				categoryMatch = matched;
-				multiplier *= 1.5;
+				multiplier *= parsed.hadExplicitCategory ? 2.1 : 1.5;
 			} else if (onlyOneCategory) {
-				multiplier *= 0.6;
+				multiplier *= parsed.hadExplicitCategory ? 0.25 : 0.6;
 			}
 		}
 
@@ -1144,22 +1231,35 @@ const scoreAndInterleave = (
 					parsed.city &&
 					contact.city &&
 					contact.city.toLowerCase() === parsed.city.name.toLowerCase();
+				const contactStateLc = (contact.state ?? '').trim().toLowerCase();
 				const stateMatch =
-					parsed.state &&
-					contact.state &&
-					(contact.state.toLowerCase() === parsed.state.name.toLowerCase() ||
-						contact.state.toLowerCase() === parsed.state.abbr.toLowerCase());
-				if (cityMatch) multiplier *= 1.6;
-				else if (stateMatch) multiplier *= 1.35;
-				else if (
-					hasCenter &&
-					contact.latitude != null &&
-					contact.longitude != null &&
-					distanceKm(centerPoint!, {
-						lat: contact.latitude,
-						lon: contact.longitude,
-					}) <= radiusKm
-				) {
+					contactStateLc.length > 0 &&
+					((localityStateNameLc != null &&
+						(contactStateLc === localityStateNameLc ||
+							contactStateLc.startsWith(localityStateNameLc + ',') ||
+							contactStateLc.startsWith(localityStateNameLc + ' '))) ||
+						(localityStateAbbrLc != null &&
+							(contactStateLc === localityStateAbbrLc ||
+								contactStateLc.startsWith(localityStateAbbrLc + ',') ||
+								contactStateLc.startsWith(localityStateAbbrLc + ' '))));
+				const d =
+					hasCenter && contact.latitude != null && contact.longitude != null
+						? distanceKm(centerPoint!, {
+								lat: contact.latitude,
+								lon: contact.longitude,
+						  })
+						: null;
+				if (cityMatch) multiplier *= 2.2;
+				else if (exactCityCenter && d != null) {
+					if (d <= 25) multiplier *= 1.85;
+					else if (d <= 50) multiplier *= 1.6;
+					else if (d <= 100) multiplier *= 1.35;
+					else if (d <= radiusKm) multiplier *= 1.18;
+					else if (stateMatch) multiplier *= 1.05;
+					else multiplier *= 0.85;
+				} else if (stateMatch) {
+					multiplier *= 1.35;
+				} else if (d != null && d <= radiusKm) {
 					multiplier *= 1.15;
 				}
 			} else if (
@@ -1182,6 +1282,11 @@ const scoreAndInterleave = (
 			if (lm >= 6) multiplier *= 1.35;
 			else if (lm >= 1) multiplier *= 1.1;
 		}
+
+		const softDescriptorScore = softDescriptorSignalScore(contact, softDescriptorTerms);
+		if (softDescriptorScore >= 6) multiplier *= 1.3;
+		else if (softDescriptorScore >= 3) multiplier *= 1.18;
+		else if (softDescriptorScore > 0) multiplier *= 1.08;
 
 		if (restOfQueryWordRe) {
 			const titleLc = (contact.title ?? '').toLowerCase();
@@ -1265,6 +1370,14 @@ const scoreAndInterleave = (
 		finalOrder = scored;
 	}
 
+	if (parsed.hadExplicitCategory && onlyOneCategory) {
+		const categoryRows = finalOrder.filter((s) => s.categoryMatch !== null);
+		if (categoryRows.length > 0) {
+			const nonCategoryRows = finalOrder.filter((s) => s.categoryMatch === null);
+			finalOrder = [...categoryRows, ...nonCategoryRows];
+		}
+	}
+
 	const finalContacts: FreeTextSearchContact[] = finalOrder
 		.slice(0, limit)
 		.map((s) => ({
@@ -1332,14 +1445,26 @@ export async function GET(req: NextRequest) {
 		}
 
 		const parsed = parseFreeTextSearchQuery(rawQuery);
+		const cityStateForCenter = parsed.city?.state
+			? US_STATES.find(
+					(s) => s.abbr.toLowerCase() === parsed.city!.state!.toLowerCase()
+			  )
+			: null;
+		const parsedCityHasExactCenter = parsed.city?.coordinatePrecision === 'city';
+		const parsedCenterLat = parsedCityHasExactCenter
+			? parsed.city!.lat
+			: parsed.state?.lat ?? cityStateForCenter?.centroid.lat ?? null;
+		const parsedCenterLon = parsedCityHasExactCenter
+			? parsed.city!.lon
+			: parsed.state?.lon ?? cityStateForCenter?.centroid.lng ?? null;
 		const center = inferCenter(
 			req,
 			{ lat: overrideLat, lon: overrideLon },
 			{
-				lat: parsed.city?.lat ?? parsed.state?.lat ?? null,
-				lon: parsed.city?.lon ?? parsed.state?.lon ?? null,
+				lat: parsedCenterLat,
+				lon: parsedCenterLon,
 				city: parsed.city?.name ?? null,
-				state: parsed.state?.name ?? null,
+				state: parsed.state?.name ?? cityStateForCenter?.name ?? null,
 			}
 		);
 		const hasCenter = center.lat != null && center.lon != null;
@@ -1401,16 +1526,21 @@ export async function GET(req: NextRequest) {
 				: FALLBACK_BBOX_RADIUS_KM
 			: null;
 		// Center+radius passed to the lexical and prefix retrievers as a hard
-		// geo_distance filter. With explicit state, no geo filter (state filter
-		// handles it). With explicit city/place, the parsed centroid + 250km.
-		// With nothing, the implicit locality above.
+		// geo_distance filter. Explicit state still enforces state; if the user also
+		// named a city with exact coordinates, geo narrows to that city's radius.
+		// With no explicit place, the implicit locality above is used.
+		const explicitCityCenter = parsedCityHasExactCenter && parsed.city
+			? { lat: parsed.city.lat, lon: parsed.city.lon }
+			: null;
 		const retrieverCenter = enforcedState
-			? null
+			? explicitCityCenter
 			: hasCenter
 			? centerPoint
 			: implicitLocalityCenter;
 		const retrieverRadiusKm = enforcedState
-			? null
+			? explicitCityCenter
+				? radiusKm
+				: null
 			: hasCenter
 			? radiusKm
 			: implicitLocalityRadiusKm;
@@ -1418,7 +1548,7 @@ export async function GET(req: NextRequest) {
 		const isNounLed = isNounLedQuery(parsed);
 
 		console.info(
-			`[contacts-search][${requestId}] start q="${rawQuery}" categories=${parsed.categories.join(',') || 'none'} city=${parsed.city?.name ?? 'none'} state=${parsed.state?.abbr ?? 'none'} enforcedState=${enforcedState?.abbr ?? 'none'} implicitLocality=${useImplicitLocality ? `center=${implicitLocalityCenter?.lat},${implicitLocalityCenter?.lon} r=${implicitLocalityRadiusKm}km` : 'no'} restOfQuery="${parsed.restOfQuery}" nounLed=${isNounLed} centerSource=${center.source} radiusKm=${radiusKm} limit=${requestedLimit}`
+			`[contacts-search][${requestId}] start q="${rawQuery}" categories=${parsed.categories.join(',') || 'none'} city=${parsed.city?.name ?? 'none'} cityPrecision=${parsed.city?.coordinatePrecision ?? 'none'} state=${parsed.state?.abbr ?? 'none'} enforcedState=${enforcedState?.abbr ?? 'none'} implicitLocality=${useImplicitLocality ? `center=${implicitLocalityCenter?.lat},${implicitLocalityCenter?.lon} r=${implicitLocalityRadiusKm}km` : 'no'} restOfQuery="${parsed.restOfQuery}" nounLed=${isNounLed} centerSource=${center.source} radiusKm=${radiusKm} limit=${requestedLimit}`
 		);
 
 		// Person-target probe runs only on noun-led queries. The other routing
@@ -1534,7 +1664,10 @@ export async function GET(req: NextRequest) {
 		// to embed; if the user typed only a category and a place, we let lexical
 		// + prefix carry the load (no point burning an embedding on an empty
 		// rest-of-query).
-		const knnText = parsed.restOfQuery.length > 2 ? parsed.restOfQuery : rawQuery;
+		const knnBaseText = parsed.restOfQuery.length > 2 ? parsed.restOfQuery : rawQuery;
+		const knnText = parsed.categories.length > 0
+			? `${parsed.categories.join(' ')} ${knnBaseText}`.trim()
+			: knnBaseText;
 		const shouldRunKnn = knnText.trim().length > 1;
 
 		type KnnResult = Awaited<ReturnType<typeof searchSimilarContacts>>;

@@ -522,6 +522,7 @@ const MAP_RESULTS_BOTTOM_SEARCH_BOX = {
 const INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX = {
 	width: 418,
 	height: 39,
+	activeMaxHeight: 140,
 	borderRadius: 26,
 	borderWidth: 2,
 	borderColor: '#000000',
@@ -2310,6 +2311,7 @@ const MapBottomSearchBar = memo(({
 			<textarea
 				ref={inputRef}
 				value={value}
+				rows={1}
 				onChange={(event) => onValueChange(event.target.value)}
 				onFocus={() => onActiveChange(true)}
 				onBlur={() => onActiveChange(false)}
@@ -5531,8 +5533,15 @@ const DashboardContent = () => {
 	]);
 
 	useLayoutEffect(() => {
+		const baseHeight = isMapView
+			? MAP_RESULTS_BOTTOM_SEARCH_BOX.activeHeight
+			: INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.height;
+		const maxHeight = isMapView
+			? MAP_RESULTS_BOTTOM_SEARCH_BOX.activeMaxHeight
+			: INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.activeMaxHeight;
+
 		if (!isMapBottomSearchExpanded) {
-			setMapBottomSearchActiveHeight(MAP_RESULTS_BOTTOM_SEARCH_BOX.activeHeight);
+			setMapBottomSearchActiveHeight(baseHeight);
 			return;
 		}
 
@@ -5542,15 +5551,15 @@ const DashboardContent = () => {
 		const previousHeight = input.style.height;
 		input.style.height = 'auto';
 		const nextHeight = Math.min(
-			MAP_RESULTS_BOTTOM_SEARCH_BOX.activeMaxHeight,
-			Math.max(MAP_RESULTS_BOTTOM_SEARCH_BOX.activeHeight, input.scrollHeight)
+			maxHeight,
+			Math.max(baseHeight, input.scrollHeight)
 		);
 		input.style.height = previousHeight;
 
 		setMapBottomSearchActiveHeight((current) =>
 			current === nextHeight ? current : nextHeight
 		);
-	}, [isMapBottomSearchExpanded, mapBottomSearchValue]);
+	}, [isMapBottomSearchExpanded, mapBottomSearchValue, isMapView]);
 
 	const handleMapBottomSearchActivate = useCallback(() => {
 		setIsMapBottomSearchActive(true);
@@ -7824,7 +7833,11 @@ const DashboardContent = () => {
 					style={{
 						bottom: `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.bottomOffset}px`,
 						width: `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.width}px`,
-						height: `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.height}px`,
+						height: `${
+							isMapBottomSearchExpanded
+								? mapBottomSearchActiveHeight
+								: INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.height
+						}px`,
 						transform: 'translateX(-50%)',
 						transition: 'none',
 						zIndex: 70,
@@ -7888,7 +7901,7 @@ const DashboardContent = () => {
 					<MapBottomSearchBar
 						value={mapBottomSearchValue}
 						isExpanded={isMapBottomSearchExpanded}
-						activeHeight={INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.height}
+						activeHeight={mapBottomSearchActiveHeight}
 						inputRef={mapBottomSearchInputRef}
 						appearance="initial-dashboard"
 						mode={

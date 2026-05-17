@@ -1,14 +1,46 @@
 import { type BookingContactTitlePrefix } from '@/constants/contactCategories';
+import { CITY_LOCATIONS_LIST } from '@/constants/cityLocations';
 import { US_STATES } from '@/constants/usStates';
 
-// Small known-city dictionary for the most common booking destinations. We
-// don't try to be comprehensive — anything we miss falls through to the
-// lexical retriever's `match` on the `city` field. The dictionary exists so
-// "music venues in nashville" can resolve a center point and apply a strong
-// locality multiplier.
-const KNOWN_CITIES: { name: string; state: string; lat: number; lon: number }[] = [
+type ParsedCityCoordinatePrecision = 'city' | 'state';
+
+type KnownCity = {
+	name: string;
+	state: string;
+	lat: number;
+	lon: number;
+	coordinatePrecision: ParsedCityCoordinatePrecision;
+	aliases?: readonly string[];
+};
+
+const EXTRA_REGION_CENTROIDS = [
+	{
+		name: 'District of Columbia',
+		abbr: 'DC',
+		centroid: { lat: 38.9072, lng: -77.0369 },
+	},
+] as const;
+
+const SEARCH_REGIONS = [...US_STATES, ...EXTRA_REGION_CENTROIDS] as const;
+
+// Ambiguous two-letter state abbreviations that are also common English words.
+// These must not be parsed from lowercase filler text: "in Newark" is not
+// Indiana, "or breweries" is not Oregon, and "near me" is not Maine.
+const AMBIGUOUS_STATE_ABBRS = new Set(['HI', 'IN', 'ME', 'OR']);
+
+const STATE_BY_NAME_OR_ABBR = new Map(
+	SEARCH_REGIONS.flatMap((state) => [
+		[state.name.toLowerCase(), state],
+		[state.abbr.toLowerCase(), state],
+	])
+);
+
+// City coordinates for the most common booking destinations. CITY_LOCATIONS_LIST
+// below gives us broader phrase coverage; these exact coordinates let explicit
+// city searches apply proximity instead of falling back to a state centroid.
+const SEEDED_CITY_COORDINATES: Omit<KnownCity, 'coordinatePrecision'>[] = [
 	{ name: 'New York', state: 'NY', lat: 40.7128, lon: -74.006 },
-	{ name: 'NYC', state: 'NY', lat: 40.7128, lon: -74.006 },
+	{ name: 'NYC', state: 'NY', lat: 40.7128, lon: -74.006, aliases: ['New York City'] },
 	{ name: 'Brooklyn', state: 'NY', lat: 40.6782, lon: -73.9442 },
 	{ name: 'Manhattan', state: 'NY', lat: 40.7831, lon: -73.9712 },
 	{ name: 'Queens', state: 'NY', lat: 40.7282, lon: -73.7949 },
@@ -32,6 +64,12 @@ const KNOWN_CITIES: { name: string; state: string; lat: number; lon: number }[] 
 	{ name: 'Savannah', state: 'GA', lat: 32.0809, lon: -81.0912 },
 	{ name: 'Boston', state: 'MA', lat: 42.3601, lon: -71.0589 },
 	{ name: 'Cambridge', state: 'MA', lat: 42.3736, lon: -71.1097 },
+	{ name: 'Newark', state: 'NJ', lat: 40.7357, lon: -74.1724 },
+	{ name: 'Jersey City', state: 'NJ', lat: 40.7178, lon: -74.0431 },
+	{ name: 'Hoboken', state: 'NJ', lat: 40.7439, lon: -74.0324 },
+	{ name: 'Paterson', state: 'NJ', lat: 40.9168, lon: -74.1718 },
+	{ name: 'Elizabeth', state: 'NJ', lat: 40.6639, lon: -74.2107 },
+	{ name: 'Edison', state: 'NJ', lat: 40.5187, lon: -74.4121 },
 	{ name: 'Seattle', state: 'WA', lat: 47.6062, lon: -122.3321 },
 	{ name: 'Portland', state: 'OR', lat: 45.5152, lon: -122.6784 },
 	{ name: 'Denver', state: 'CO', lat: 39.7392, lon: -104.9903 },
@@ -95,10 +133,61 @@ const KNOWN_CITIES: { name: string; state: string; lat: number; lon: number }[] 
 	{ name: 'New Haven', state: 'CT', lat: 41.3083, lon: -72.9279 },
 ];
 
+const cityKey = (name: string, state: string): string =>
+	`${name.toLowerCase().trim()}:${state.toLowerCase().trim()}`;
+
+const cleanCityLocationPart = (value: string): string =>
+	value.replace(/\s+/g, ' ').trim();
+
+const cityLocationFromListLabel = (label: string): KnownCity | null => {
+	const commaIndex = label.indexOf(',');
+	if (commaIndex === -1) return null;
+	const city = cleanCityLocationPart(label.slice(0, commaIndex));
+	const rawState = cleanCityLocationPart(label.slice(commaIndex + 1));
+	if (!city || !rawState) return null;
+	const state = STATE_BY_NAME_OR_ABBR.get(rawState.toLowerCase());
+	if (!state) return null;
+
+	return {
+		name: city,
+		state: state.abbr,
+		lat: state.centroid.lat,
+		lon: state.centroid.lng,
+		coordinatePrecision: 'state',
+	};
+};
+
+const buildKnownCities = (): KnownCity[] => {
+	const byKey = new Map<string, KnownCity>();
+
+	for (const label of CITY_LOCATIONS_LIST) {
+		const city = cityLocationFromListLabel(label);
+		if (!city) continue;
+		byKey.set(cityKey(city.name, city.state), city);
+	}
+
+	for (const city of SEEDED_CITY_COORDINATES) {
+		byKey.set(cityKey(city.name, city.state), {
+			...city,
+			coordinatePrecision: 'city',
+		});
+	}
+
+	return [...byKey.values()].sort((a, b) => b.name.length - a.name.length);
+};
+
+const KNOWN_CITIES_LONGEST_FIRST = buildKnownCities();
+
 export type ParsedSearchQuery = {
 	raw: string;
 	categories: BookingContactTitlePrefix[];
-	city: { name: string; state: string | null; lat: number; lon: number } | null;
+	city: {
+		name: string;
+		state: string | null;
+		lat: number;
+		lon: number;
+		coordinatePrecision: ParsedCityCoordinatePrecision;
+	} | null;
 	state: { name: string; abbr: string; lat: number; lon: number } | null;
 	country: string | null;
 	restOfQuery: string;
@@ -145,21 +234,129 @@ const FLAT_CATEGORY_PHRASES = (() => {
 	return flat;
 })();
 
-const STATES_LONGEST_FIRST = [...US_STATES].sort(
-	(a, b) => b.name.length - a.name.length
-);
-
-const KNOWN_CITIES_LONGEST_FIRST = [...KNOWN_CITIES].sort(
+const STATES_LONGEST_FIRST = [...SEARCH_REGIONS].sort(
 	(a, b) => b.name.length - a.name.length
 );
 
 const escapeForRegex = (value: string): string =>
 	value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const normalizeWorkingQuery = (value: string): string =>
+	` ${value.replace(/\s+/g, ' ').trim()} `;
+
+const normalizeAfterStrip = (value: string): string =>
+	` ${value.replace(/\s+/g, ' ').trim()} `;
+
 const stripPhraseFromQuery = (query: string, phrase: string): string => {
 	const re = new RegExp(`\\b${escapeForRegex(phrase)}\\b`, 'gi');
-	return query.replace(re, ' ').replace(/\s+/g, ' ').trim();
+	return normalizeAfterStrip(query.replace(re, ' '));
 };
+
+const stripRegexMatchFromQuery = (query: string, re: RegExp): string =>
+	normalizeAfterStrip(query.replace(re, ' '));
+
+const stateFromRegion = (
+	state: (typeof SEARCH_REGIONS)[number]
+): ParsedSearchQuery['state'] => ({
+	name: state.name,
+	abbr: state.abbr,
+	lat: state.centroid.lat,
+	lon: state.centroid.lng,
+});
+
+const boundaryWrappedPhrase = (phrase: string): string =>
+	`(?:^|[\\s(])${escapeForRegex(phrase)}(?=[\\s,.!?)]|$)`;
+
+const cityPhrases = (city: KnownCity): string[] => [
+	city.name,
+	...(city.aliases ?? []),
+];
+
+const findCityStateMatch = (
+	working: string
+): { city: ParsedSearchQuery['city']; state: ParsedSearchQuery['state']; re: RegExp } | null => {
+	for (const city of KNOWN_CITIES_LONGEST_FIRST) {
+		const state = STATE_BY_NAME_OR_ABBR.get(city.state.toLowerCase());
+		if (!state) continue;
+		const stateNames = [state.name, state.abbr];
+		for (const phrase of cityPhrases(city)) {
+			for (const stateName of stateNames) {
+				const commaRe = new RegExp(
+					`(?:^|[\\s(])${escapeForRegex(phrase)}\\s*,\\s*${escapeForRegex(stateName)}(?=[\\s,.!?)]|$)`,
+					'i'
+				);
+				if (commaRe.test(working)) {
+					return {
+						city,
+						state: stateFromRegion(state),
+						re: commaRe,
+					};
+				}
+
+				if (stateName.length === 2) {
+					const spacedRe = new RegExp(
+						`(?:^|[\\s(])${escapeForRegex(phrase)}\\s+${escapeForRegex(stateName)}(?=[\\s,.!?)]|$)`,
+						'i'
+					);
+					if (spacedRe.test(working)) {
+						return {
+							city,
+							state: stateFromRegion(state),
+							re: spacedRe,
+						};
+					}
+				}
+			}
+		}
+	}
+	return null;
+};
+
+const findKnownCityMatch = (
+	working: string
+): { city: ParsedSearchQuery['city']; re: RegExp } | null => {
+	for (const city of KNOWN_CITIES_LONGEST_FIRST) {
+		for (const phrase of cityPhrases(city)) {
+			const cityPattern = new RegExp(boundaryWrappedPhrase(phrase), 'i');
+			if (cityPattern.test(working)) {
+				return { city, re: cityPattern };
+			}
+		}
+	}
+	return null;
+};
+
+const findStateAbbreviationMatch = (
+	working: string
+): { state: ParsedSearchQuery['state']; start: number; end: number } | null => {
+	for (const state of US_STATES) {
+		const abbrPattern = new RegExp(
+			`(^|[\\s,])(${escapeForRegex(state.abbr)})(?=[\\s,.!?]|$)`,
+			'gi'
+		);
+		let match: RegExpExecArray | null;
+		while ((match = abbrPattern.exec(working)) !== null) {
+			const prefix = match[1] ?? '';
+			const token = match[2] ?? '';
+			const ambiguous = AMBIGUOUS_STATE_ABBRS.has(state.abbr);
+			const commaDelimited = prefix.includes(',');
+			const uppercaseToken = token === state.abbr;
+
+			if (ambiguous && !uppercaseToken && !commaDelimited) continue;
+
+			const tokenStart = match.index + prefix.length;
+			return {
+				state: stateFromRegion(state),
+				start: tokenStart,
+				end: tokenStart + token.length,
+			};
+		}
+	}
+	return null;
+};
+
+const stripRangeFromQuery = (query: string, start: number, end: number): string =>
+	normalizeAfterStrip(`${query.slice(0, start)} ${query.slice(end)}`);
 
 const COUNTRY_DETECTORS: { country: string; patterns: RegExp[] }[] = [
 	{ country: 'United States', patterns: [/\busa\b/i, /\bunited states\b/i, /\bu\.s\.?a?\b/i, /\bamerica\b/i] },
@@ -169,7 +366,7 @@ const COUNTRY_DETECTORS: { country: string; patterns: RegExp[] }[] = [
 
 export const parseFreeTextSearchQuery = (rawQuery: string): ParsedSearchQuery => {
 	const raw = (rawQuery ?? '').trim();
-	let working = ' ' + raw.toLowerCase().replace(/\s+/g, ' ') + ' ';
+	let working = normalizeWorkingQuery(raw);
 
 	const categoriesFound = new Set<BookingContactTitlePrefix>();
 	for (const { prefix, phrase } of FLAT_CATEGORY_PHRASES) {
@@ -183,49 +380,46 @@ export const parseFreeTextSearchQuery = (rawQuery: string): ParsedSearchQuery =>
 	}
 
 	let stateMatch: ParsedSearchQuery['state'] = null;
+	let cityMatch: ParsedSearchQuery['city'] = null;
+
+	const explicitCityState = findCityStateMatch(working);
+	if (explicitCityState) {
+		cityMatch = explicitCityState.city;
+		stateMatch = explicitCityState.state;
+		working = stripRegexMatchFromQuery(working, explicitCityState.re);
+	}
+
 	for (const state of STATES_LONGEST_FIRST) {
+		if (stateMatch) break;
 		const namePattern = new RegExp(`\\b${escapeForRegex(state.name)}\\b`, 'i');
 		if (namePattern.test(working)) {
-			stateMatch = {
-				name: state.name,
-				abbr: state.abbr,
-				lat: state.centroid.lat,
-				lon: state.centroid.lng,
-			};
+			stateMatch = stateFromRegion(state);
 			working = stripPhraseFromQuery(working, state.name);
 			break;
 		}
 	}
-	if (!stateMatch) {
-		// Two-letter state abbreviations: only accept when surrounded by spaces or
-		// punctuation — never embedded inside a word like "or" inside "Oregon".
-		// Walk the largest-first list to keep it deterministic.
-		for (const state of US_STATES) {
-			const abbrPattern = new RegExp(`(?:^|[\\s,])${state.abbr}(?:[\\s,.!?]|$)`, 'i');
-			if (abbrPattern.test(' ' + working + ' ')) {
-				stateMatch = {
-					name: state.name,
-					abbr: state.abbr,
-					lat: state.centroid.lat,
-					lon: state.centroid.lng,
-				};
-				working = working.replace(
-					new RegExp(`(^|[\\s,])${state.abbr}([\\s,.!?]|$)`, 'gi'),
-					'$1$2'
-				).replace(/\s+/g, ' ').trim();
-				working = ' ' + working + ' ';
-				break;
-			}
+
+	if (!cityMatch) {
+		const city = findKnownCityMatch(working);
+		if (city) {
+			cityMatch = city.city;
+			working = stripRegexMatchFromQuery(working, city.re);
 		}
 	}
 
-	let cityMatch: ParsedSearchQuery['city'] = null;
-	for (const city of KNOWN_CITIES_LONGEST_FIRST) {
-		const cityPattern = new RegExp(`\\b${escapeForRegex(city.name)}\\b`, 'i');
-		if (cityPattern.test(working)) {
-			cityMatch = { name: city.name, state: city.state, lat: city.lat, lon: city.lon };
-			working = stripPhraseFromQuery(working, city.name);
-			break;
+	if (!stateMatch) {
+		// Two-letter state abbreviations: only accept when surrounded by spaces or
+		// punctuation — never embedded inside a word. Ambiguous abbreviations that
+		// are also common words (IN/OR/ME/HI) additionally require uppercase or comma
+		// context unless they were already consumed as part of a known City, State.
+		const abbreviationMatch = findStateAbbreviationMatch(working);
+		if (abbreviationMatch) {
+			stateMatch = abbreviationMatch.state;
+			working = stripRangeFromQuery(
+				working,
+				abbreviationMatch.start,
+				abbreviationMatch.end
+			);
 		}
 	}
 
@@ -246,7 +440,7 @@ export const parseFreeTextSearchQuery = (rawQuery: string): ParsedSearchQuery =>
 	// kNN retriever — best when it's the substantive intent ("indie rock with
 	// craft beer" rather than "music venues in austin").
 	const restOfQuery = working
-		.replace(/\b(in|near|around|at|located|within)\b/gi, ' ')
+		.replace(/\b(in|near|around|at|located|within|that|which|who|and|or)\b/gi, ' ')
 		.replace(/\s+/g, ' ')
 		.trim();
 

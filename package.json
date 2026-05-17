@@ -18,6 +18,7 @@
 		"postinstall": "prisma generate",
 		"import-production-contacts": "tsx --tsconfig tsconfig.json scripts/import-production-contacts.ts",
 		"check-elasticsearch": "tsx --tsconfig tsconfig.json scripts/check-elasticsearch.tsx",
+		"check:free-text-parse": "tsx --tsconfig=tsconfig.json scripts/check-free-text-search-parse.ts",
 		"reindex-from-production": "tsx --tsconfig tsconfig.json scripts/reindex-from-production.ts"
 	},
 	"engines": {
