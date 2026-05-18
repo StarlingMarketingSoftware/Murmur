@@ -6,6 +6,7 @@ import { cn } from '@/utils';
 import {
 	isRestaurantTitle,
 	isCoffeeShopTitle,
+	isMusicFestivalTitle,
 	isMusicVenueTitle,
 	isWeddingPlannerTitle,
 	isWeddingVenueTitle,
@@ -16,7 +17,9 @@ import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
+import { WebsiteIcon } from '@/components/atoms/_svg/WebsiteIcon';
 
 const RESEARCH_PANEL_DEFAULT_WIDTH = 375;
 const RESEARCH_PANEL_DEFAULT_HEIGHT = 672;
@@ -30,13 +33,151 @@ const RESEARCH_PANEL_BANDS = [
 	{ top: 138, height: 24, color: '#D2EFFF' },
 	{ top: 162, height: 24, color: '#E8F7FF' },
 	{ top: 186, height: 24, color: '#EDF8FF' },
+	{ top: 210, height: 24, color: '#F4FBFF' },
+	{ top: 234, height: 24, color: '#F8FCFF' },
 ] as const;
 
-const RESEARCH_PANEL_METADATA_TOP = 210;
-const RESEARCH_PANEL_DIVIDER_TOPS = [52, 65, 90, 138, 162, 186, 210] as const;
+const RESEARCH_PANEL_METADATA_TOP = 258;
+const RESEARCH_PANEL_DIVIDER_TOPS = [52, 65, 90, 138, 162, 186, 210, 234, 258] as const;
 
 const toCssSize = (value: string | number) =>
 	typeof value === 'number' ? `${value}px` : value;
+
+type ContactTitleCategoryKind =
+	| 'restaurant'
+	| 'coffee-shop'
+	| 'music-venue'
+	| 'music-festival'
+	| 'wedding-planner'
+	| 'wedding-venue'
+	| 'wine-beer-spirits'
+	| 'custom';
+
+const getContactTitleCategory = (title: string | null | undefined) => {
+	const value = title?.trim();
+	if (!value) return null;
+
+	if (isRestaurantTitle(value)) {
+		return {
+			kind: 'restaurant' as const,
+			label: 'Restaurant',
+			backgroundColor: '#C3FBD1',
+		};
+	}
+	if (isCoffeeShopTitle(value)) {
+		return {
+			kind: 'coffee-shop' as const,
+			label: 'Coffee Shop',
+			backgroundColor: '#D6F1BD',
+		};
+	}
+	if (isMusicVenueTitle(value)) {
+		return {
+			kind: 'music-venue' as const,
+			label: 'Music Venue',
+			backgroundColor: '#B7E5FF',
+		};
+	}
+	if (isMusicFestivalTitle(value)) {
+		return {
+			kind: 'music-festival' as const,
+			label: 'Music Festival',
+			backgroundColor: '#C1D6FF',
+		};
+	}
+	if (isWeddingPlannerTitle(value)) {
+		return {
+			kind: 'wedding-planner' as const,
+			label: 'Wedding Planner',
+			backgroundColor: '#FFF2BC',
+		};
+	}
+	if (isWeddingVenueTitle(value)) {
+		return {
+			kind: 'wedding-venue' as const,
+			label: 'Wedding Venue',
+			backgroundColor: '#FFF2BC',
+		};
+	}
+	if (isWineBeerSpiritsTitle(value)) {
+		return {
+			kind: 'wine-beer-spirits' as const,
+			label: getWineBeerSpiritsLabel(value) || 'Wine/Beer/Spirits',
+			backgroundColor: '#BFC4FF',
+		};
+	}
+
+	return {
+		kind: 'custom' as const,
+		label: value,
+		backgroundColor: '#E8EFFF',
+	};
+};
+
+const renderContactTitleCategoryIcon = (
+	kind: ContactTitleCategoryKind,
+	size = 12
+) => {
+	switch (kind) {
+		case 'restaurant':
+			return (
+				<RestaurantsIcon
+					size={size}
+					className="flex-shrink-0"
+					innerFill="transparent"
+					outlineFill="black"
+				/>
+			);
+		case 'coffee-shop':
+			return (
+				<CoffeeShopsIcon
+					size={Math.round(size * (7 / 12))}
+					className="flex-shrink-0"
+					innerFill="transparent"
+					outlineFill="black"
+				/>
+			);
+		case 'music-venue':
+			return (
+				<MusicVenuesIcon
+					size={size}
+					className="flex-shrink-0"
+					innerFill="transparent"
+					outlineFill="black"
+				/>
+			);
+		case 'music-festival':
+			return (
+				<FestivalsIcon
+					size={size}
+					className="flex-shrink-0"
+					innerFill="transparent"
+					outlineFill="black"
+				/>
+			);
+		case 'wedding-planner':
+		case 'wedding-venue':
+			return (
+				<WeddingPlannersIcon
+					size={size}
+					className="flex-shrink-0"
+					innerFill="transparent"
+					outlineFill="black"
+				/>
+			);
+		case 'wine-beer-spirits':
+			return (
+				<WineBeerSpiritsIcon
+					size={size}
+					className="flex-shrink-0"
+					innerFill="transparent"
+					outlineFill="black"
+				/>
+			);
+		case 'custom':
+			return null;
+	}
+};
 
 export interface ContactResearchPanelProps {
 	contact: ContactWithName | null | undefined;
@@ -154,6 +295,14 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	const coordinateText = [latitude, longitude].filter(Boolean).join('   ');
 	const addressText = contact?.address?.trim() || '';
 	const headlineText = contact?.headline?.trim() || contact?.title?.trim() || '';
+	const titleCategory = getContactTitleCategory(contact?.title);
+	const titleCategoryIcon = titleCategory
+		? renderContactTitleCategoryIcon(titleCategory.kind, 16)
+		: null;
+	const companyTypeText = contact?.companyType?.trim() || '';
+	const stateAbbr = getStateAbbreviation(contact?.state || '').trim();
+	const cityText = contact?.city?.trim() || '';
+	const foundedYearText = contact?.companyFoundedYear?.trim() || '';
 	const metadataText = contact?.metadata || '';
 	const textStyle = hideAllText ? { color: 'transparent' } : undefined;
 
@@ -206,7 +355,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 			))}
 
 			<div
-				className="absolute left-[31px] right-[17px] top-[10px] z-10 font-inter text-black"
+				className="absolute left-[23px] right-[17px] top-[10px] z-10 font-inter text-left text-black"
 				style={textStyle}
 			>
 				<div className="min-w-0 pr-[130px]">
@@ -227,7 +376,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 			</div>
 
 			<div
-				className="absolute left-0 right-0 z-10 flex items-center justify-center px-[24px] font-inter text-black"
+				className="absolute left-[23px] right-[17px] z-10 flex items-center justify-start font-inter text-left text-black"
 				style={{
 					top: '65px',
 					height: '25px',
@@ -235,7 +384,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 					fontStyle: 'normal',
 					fontWeight: 500,
 					lineHeight: '16.419px',
-					textAlign: 'center',
+					textAlign: 'left',
 					...(textStyle || {}),
 				}}
 			>
@@ -243,7 +392,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 			</div>
 
 			<div
-				className="absolute left-0 right-0 z-10 flex items-center px-[36px] font-inter text-black"
+				className="absolute left-[23px] right-[17px] z-10 flex items-center font-inter text-left text-black"
 				style={{
 					top: '90px',
 					height: '48px',
@@ -266,6 +415,167 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				</span>
 			</div>
 
+			{titleCategory && !hideAllText && (
+				<div
+					className="absolute left-[23px] right-[17px] z-10 flex items-center overflow-hidden"
+					style={{
+						top: '138px',
+						height: '24px',
+					}}
+				>
+					<div
+						className={cn(
+							'w-full items-center overflow-hidden',
+							titleCategoryIcon
+								? 'grid grid-cols-[24px_minmax(0,1fr)] gap-x-[12px]'
+								: 'flex justify-start'
+						)}
+					>
+						{titleCategoryIcon && (
+							<div className="flex items-center justify-start">
+								{titleCategoryIcon}
+							</div>
+						)}
+						<span
+							className="truncate"
+							style={{
+								color: '#000',
+								textAlign: 'left',
+								fontFamily: 'Inter',
+								fontSize: '14.349px',
+								fontStyle: 'normal',
+								fontWeight: 500,
+								lineHeight: '16.419px',
+							}}
+						>
+							{titleCategory.label}
+						</span>
+					</div>
+				</div>
+			)}
+
+			{companyTypeText && !hideAllText && (
+				<div
+					className="absolute left-[23px] right-[17px] z-10 flex items-center justify-start"
+					style={{
+						top: '162px',
+						height: '24px',
+					}}
+				>
+					<span
+						className="block w-full truncate"
+						style={{
+							color: '#000',
+							textAlign: 'left',
+							fontFamily: 'Inter',
+							fontSize: '14.349px',
+							fontStyle: 'normal',
+							fontWeight: 500,
+							lineHeight: '16.419px',
+						}}
+					>
+						{companyTypeText}
+					</span>
+				</div>
+			)}
+
+			{(stateAbbr || cityText) && !hideAllText && (
+				<div
+					className="absolute left-[23px] right-[17px] z-10 grid grid-cols-[24px_minmax(0,1fr)] items-center gap-x-[12px] overflow-hidden"
+					style={{
+						top: '186px',
+						height: '24px',
+					}}
+				>
+					<div className="flex items-center justify-start">
+						{stateAbbr && (
+							<span
+								style={{
+									color: '#000',
+									fontFamily: 'Inter',
+									fontSize: '15.091px',
+									fontStyle: 'normal',
+									fontWeight: 400,
+									lineHeight: '14.408px',
+								}}
+							>
+								{stateAbbr}
+							</span>
+						)}
+					</div>
+					{cityText && (
+						<span
+							className="truncate"
+							style={{
+								color: '#202020',
+								fontFamily: 'Inter',
+								fontSize: '15.091px',
+								fontStyle: 'normal',
+								fontWeight: 600,
+								lineHeight: '14.408px',
+							}}
+						>
+							{cityText}
+						</span>
+					)}
+				</div>
+			)}
+
+			{foundedYearText && !hideAllText && (
+				<div
+					className="absolute left-[23px] right-[17px] z-10 flex items-center justify-start overflow-hidden"
+					style={{
+						top: '210px',
+						height: '24px',
+					}}
+				>
+					<span
+						className="block w-full truncate"
+						style={{
+							color: '#000',
+							textAlign: 'left',
+							fontFamily: 'Inter',
+							fontSize: '14.349px',
+							fontStyle: 'normal',
+							fontWeight: 500,
+							lineHeight: '16.419px',
+						}}
+					>
+						Founded {foundedYearText}
+					</span>
+				</div>
+			)}
+
+			{!hideAllText && (
+				<div
+					className="absolute left-[23px] right-[17px] z-10 flex items-center justify-start overflow-hidden"
+					style={{
+						top: '234px',
+						height: '24px',
+					}}
+				>
+					<div className="grid w-full grid-cols-[18px_minmax(0,1fr)] items-center gap-x-[9px] overflow-hidden">
+						<div className="flex items-center justify-start">
+							<WebsiteIcon className="flex-shrink-0" />
+						</div>
+						<span
+							className="truncate"
+							style={{
+								color: '#000',
+								textAlign: 'left',
+								fontFamily: 'Inter',
+								fontSize: '14.349px',
+								fontStyle: 'normal',
+								fontWeight: 500,
+								lineHeight: '16.419px',
+							}}
+						>
+							Website
+						</span>
+					</div>
+				</div>
+			)}
+
 			<div
 				className="research-panel-metadata-scroll absolute left-0 right-0 bottom-0 z-10"
 				style={{ top: `${RESEARCH_PANEL_METADATA_TOP}px` }}
@@ -282,7 +592,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						scrollbar-width: none !important;
 					}
 				`}</style>
-				<div className="h-full px-[40px] pt-[20px] pb-[22px] overflow-hidden">
+				<div className="h-full pl-[23px] pr-[17px] pt-[20px] pb-[22px] overflow-hidden">
 					<div
 						className="h-full overflow-y-auto whitespace-pre-wrap break-words font-inter text-[15px] leading-[1.33] font-normal text-black"
 						style={textStyle}
@@ -383,6 +693,7 @@ export const ContactResearchHorizontalStrip: FC<
 	const hasName = fullName.length > 0 || (contact.name && contact.name.length > 0);
 
 	const stateAbbr = getStateAbbreviation(contact.state || '') || '';
+	const titleCategory = getContactTitleCategory(contact.title);
 
 	// Contact info box component (reused in both layouts)
 	const contactInfoBox = (
@@ -418,50 +729,14 @@ export const ContactResearchHorizontalStrip: FC<
 						</span>
 					)}
 				</div>
-				{contact.title && (
+				{titleCategory && (
 					<div
 						className="max-w-[160px] px-2 py-[2px] rounded-[8px] border border-black flex items-center gap-1"
-						style={{
-							backgroundColor: isRestaurantTitle(contact.title)
-								? '#C3FBD1'
-								: isCoffeeShopTitle(contact.title)
-									? '#D6F1BD'
-									: isMusicVenueTitle(contact.title)
-										? '#B7E5FF'
-										: isWeddingPlannerTitle(contact.title) ||
-											  isWeddingVenueTitle(contact.title)
-											? '#FFF2BC'
-											: isWineBeerSpiritsTitle(contact.title)
-												? '#BFC4FF'
-												: '#E8EFFF',
-						}}
+						style={{ backgroundColor: titleCategory.backgroundColor }}
 					>
-						{isRestaurantTitle(contact.title) && (
-							<RestaurantsIcon size={12} className="flex-shrink-0" />
-						)}
-						{isCoffeeShopTitle(contact.title) && <CoffeeShopsIcon size={7} />}
-						{isMusicVenueTitle(contact.title) && (
-							<MusicVenuesIcon size={12} className="flex-shrink-0" />
-						)}
-						{(isWeddingPlannerTitle(contact.title) ||
-							isWeddingVenueTitle(contact.title)) && <WeddingPlannersIcon size={12} />}
-						{isWineBeerSpiritsTitle(contact.title) && (
-							<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
-						)}
+						{renderContactTitleCategoryIcon(titleCategory.kind)}
 						<span className="text-[10px] leading-none text-black block truncate">
-							{isRestaurantTitle(contact.title)
-								? 'Restaurant'
-								: isCoffeeShopTitle(contact.title)
-									? 'Coffee Shop'
-									: isMusicVenueTitle(contact.title)
-										? 'Music Venue'
-										: isWeddingPlannerTitle(contact.title)
-											? 'Wedding Planner'
-											: isWeddingVenueTitle(contact.title)
-												? 'Wedding Venue'
-												: isWineBeerSpiritsTitle(contact.title)
-													? getWineBeerSpiritsLabel(contact.title)
-													: contact.title}
+							{titleCategory.label}
 						</span>
 					</div>
 				)}
