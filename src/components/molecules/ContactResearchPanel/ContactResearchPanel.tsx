@@ -1,4 +1,4 @@
-import { FC, useMemo } from 'react';
+import { FC, Fragment, useMemo } from 'react';
 import { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
@@ -280,6 +280,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	hideAllText = false,
 	height,
 	width,
+	boxWidth,
 }) => {
 	const panelWidth = width ?? RESEARCH_PANEL_DEFAULT_WIDTH;
 	const panelHeight = height ?? RESEARCH_PANEL_DEFAULT_HEIGHT;
@@ -303,123 +304,90 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	const stateAbbr = getStateAbbreviation(contact?.state || '').trim();
 	const cityText = contact?.city?.trim() || '';
 	const foundedYearText = contact?.companyFoundedYear?.trim() || '';
+	const websiteText = contact?.website?.trim() || '';
 	const metadataText = contact?.metadata || '';
 	const textStyle = hideAllText ? { color: 'transparent' } : undefined;
+	const headlineWidth =
+		boxWidth ?? (typeof style?.width === 'number' ? style.width : panelWidth);
+	const headlineCharsPerLine = Math.max(1, Math.floor((headlineWidth - 40) / 7.5));
+	const isSingleLineHeadline =
+		!headlineText.includes('\n') && headlineText.length <= headlineCharsPerLine;
+	const headlineRowHeight = isSingleLineHeadline ? 24 : 48;
+	const topDetailRows: Array<{
+		key: string;
+		height: number;
+		color: string;
+		render: (top: number) => React.ReactNode;
+	}> = [];
 
-	return (
-		<div
-			data-contact-research-panel="true"
-			className={cn(
-				'relative block overflow-hidden rounded-[11.48px] border-[1.913px] border-black bg-[#F8FAFF] text-black',
-				className
-			)}
-			style={{
-				width: toCssSize(panelWidth),
-				height: toCssSize(panelHeight),
-				...style,
-			}}
-			data-hover-description="Research: Background info and notes for the selected contact."
-			role="region"
-			aria-label="Research panel"
-		>
-			<div className="absolute inset-0 rounded-[inherit] overflow-hidden">
-				{RESEARCH_PANEL_BANDS.map((band) => (
-					<div
-						key={`${band.top}-${band.color}`}
-						className="absolute left-0 right-0"
-						style={{
-							top: `${band.top}px`,
-							height: `${band.height}px`,
-							backgroundColor: band.color,
-						}}
-					/>
-				))}
+	if (addressText) {
+		topDetailRows.push({
+			key: 'address',
+			height: 25,
+			color: '#ABDCF9',
+			render: (top) => (
 				<div
-					className="absolute left-0 right-0 bottom-0"
-					style={{
-						top: `${RESEARCH_PANEL_METADATA_TOP}px`,
-						backgroundColor: '#FCFDFF',
-					}}
-				/>
-			</div>
-
-			{RESEARCH_PANEL_DIVIDER_TOPS.map((top) => (
-				<div
-					key={top}
-					className="absolute left-0 right-0 bg-black"
+					className="absolute left-[23px] right-[17px] z-10 flex items-center justify-start font-inter text-left text-black"
 					style={{
 						top: `${top}px`,
-						height: `${RESEARCH_PANEL_BORDER_WIDTH}px`,
-					}}
-				/>
-			))}
-
-			<div
-				className="absolute left-[23px] right-[17px] top-[10px] z-10 font-inter text-left text-black"
-				style={textStyle}
-			>
-				<div className="min-w-0 pr-[130px]">
-					<div className="truncate text-[18px] leading-[1.05] font-normal">
-						{displayName}
-					</div>
-					{companyName && (
-						<div className="truncate text-[17px] leading-[1.05] font-normal mt-[2px]">
-							{companyName}
-						</div>
-					)}
-				</div>
-				{coordinateText && (
-					<div className="absolute right-0 bottom-[1px] text-[13px] leading-none font-bold whitespace-nowrap">
-						{coordinateText}
-					</div>
-				)}
-			</div>
-
-			<div
-				className="absolute left-[23px] right-[17px] z-10 flex items-center justify-start font-inter text-left text-black"
-				style={{
-					top: '65px',
-					height: '25px',
-					fontSize: '14.349px',
-					fontStyle: 'normal',
-					fontWeight: 500,
-					lineHeight: '16.419px',
-					textAlign: 'left',
-					...(textStyle || {}),
-				}}
-			>
-				<span className="block w-full truncate">{addressText}</span>
-			</div>
-
-			<div
-				className="absolute left-[23px] right-[17px] z-10 flex items-center font-inter text-left text-black"
-				style={{
-					top: '90px',
-					height: '48px',
-					fontSize: '14.349px',
-					fontStyle: 'normal',
-					fontWeight: 600,
-					lineHeight: '24.392px',
-					...(textStyle || {}),
-				}}
-			>
-				<span
-					style={{
-						display: '-webkit-box',
-						WebkitBoxOrient: 'vertical',
-						WebkitLineClamp: 2,
-						overflow: 'hidden',
+						height: '25px',
+						fontSize: '14.349px',
+						fontStyle: 'normal',
+						fontWeight: 500,
+						lineHeight: '16.419px',
+						textAlign: 'left',
+						...(textStyle || {}),
 					}}
 				>
-					{headlineText}
-				</span>
-			</div>
+					<span className="block w-full truncate">{addressText}</span>
+				</div>
+			),
+		});
+	}
 
-			{titleCategory && !hideAllText && (
+	if (headlineText) {
+		topDetailRows.push({
+			key: 'headline',
+			height: headlineRowHeight,
+			color: '#BBE0F5',
+			render: (top) => (
+				<div
+					className="absolute left-[23px] right-[17px] z-10 flex items-center font-inter text-left text-black"
+					style={{
+						top: `${top}px`,
+						height: `${headlineRowHeight}px`,
+						fontSize: '14.349px',
+						fontStyle: 'normal',
+						fontWeight: 600,
+						lineHeight: isSingleLineHeadline ? '16.419px' : '24.392px',
+						...(textStyle || {}),
+					}}
+				>
+					<span
+						style={{
+							display: '-webkit-box',
+							WebkitBoxOrient: 'vertical',
+							WebkitLineClamp: isSingleLineHeadline ? 1 : 2,
+							overflow: 'hidden',
+						}}
+					>
+						{headlineText}
+					</span>
+				</div>
+			),
+		});
+	}
+
+	if (titleCategory && !hideAllText) {
+		topDetailRows.push({
+			key: 'title-category',
+			height: 24,
+			color: '#D2EFFF',
+			render: (top) => (
 				<div
 					className="absolute left-[23px] right-[17px] z-10 flex items-center overflow-hidden"
 					style={{
-						top: '138px',
+						top: `${top}px`,
 						height: '24px',
 					}}
 				>
@@ -452,13 +420,20 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						</span>
 					</div>
 				</div>
-			)}
+			),
+		});
+	}
 
-			{companyTypeText && !hideAllText && (
+	if (companyTypeText && !hideAllText) {
+		topDetailRows.push({
+			key: 'company-type',
+			height: 24,
+			color: '#E8F7FF',
+			render: (top) => (
 				<div
 					className="absolute left-[23px] right-[17px] z-10 flex items-center justify-start"
 					style={{
-						top: '162px',
+						top: `${top}px`,
 						height: '24px',
 					}}
 				>
@@ -477,13 +452,20 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						{companyTypeText}
 					</span>
 				</div>
-			)}
+			),
+		});
+	}
 
-			{(stateAbbr || cityText) && !hideAllText && (
+	if ((stateAbbr || cityText) && !hideAllText) {
+		topDetailRows.push({
+			key: 'location',
+			height: 24,
+			color: '#EDF8FF',
+			render: (top) => (
 				<div
 					className="absolute left-[23px] right-[17px] z-10 grid grid-cols-[24px_minmax(0,1fr)] items-center gap-x-[12px] overflow-hidden"
 					style={{
-						top: '186px',
+						top: `${top}px`,
 						height: '24px',
 					}}
 				>
@@ -519,13 +501,20 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						</span>
 					)}
 				</div>
-			)}
+			),
+		});
+	}
 
-			{foundedYearText && !hideAllText && (
+	if (foundedYearText && !hideAllText) {
+		topDetailRows.push({
+			key: 'founded-year',
+			height: 24,
+			color: '#F4FBFF',
+			render: (top) => (
 				<div
 					className="absolute left-[23px] right-[17px] z-10 flex items-center justify-start overflow-hidden"
 					style={{
-						top: '210px',
+						top: `${top}px`,
 						height: '24px',
 					}}
 				>
@@ -544,13 +533,20 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						Founded {foundedYearText}
 					</span>
 				</div>
-			)}
+			),
+		});
+	}
 
-			{!hideAllText && (
+	if (websiteText && !hideAllText) {
+		topDetailRows.push({
+			key: 'website',
+			height: 24,
+			color: '#F8FCFF',
+			render: (top) => (
 				<div
 					className="absolute left-[23px] right-[17px] z-10 flex items-center justify-start overflow-hidden"
 					style={{
-						top: '234px',
+						top: `${top}px`,
 						height: '24px',
 					}}
 				>
@@ -574,11 +570,113 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						</span>
 					</div>
 				</div>
+			),
+		});
+	}
+
+	let nextTopDetailRowTop = 65;
+	const positionedTopDetailRows = topDetailRows.map((row) => {
+		const top = nextTopDetailRowTop;
+		nextTopDetailRowTop += row.height;
+		return { ...row, top };
+	});
+	const lastTopDetailRow = positionedTopDetailRows[positionedTopDetailRows.length - 1];
+	const metadataTop = hideAllText
+		? RESEARCH_PANEL_METADATA_TOP
+		: lastTopDetailRow
+			? lastTopDetailRow.top + lastTopDetailRow.height
+			: 65;
+	const panelBands = hideAllText
+		? RESEARCH_PANEL_BANDS
+		: [
+				{ top: 0, height: 52, color: '#FFFFFF' },
+				{ top: 52, height: 13, color: '#F67C7E' },
+				...positionedTopDetailRows.map(({ top, height, color }) => ({
+					top,
+					height,
+					color,
+				})),
+			];
+	const dividerTops = hideAllText
+		? RESEARCH_PANEL_DIVIDER_TOPS
+		: [52, 65, ...positionedTopDetailRows.map((row) => row.top + row.height)];
+
+	return (
+		<div
+			data-contact-research-panel="true"
+			className={cn(
+				'relative block overflow-hidden rounded-[11.48px] border-[1.913px] border-black bg-[#F8FAFF] text-black',
+				className
 			)}
+			style={{
+				width: toCssSize(panelWidth),
+				height: toCssSize(panelHeight),
+				...style,
+			}}
+			data-hover-description="Research: Background info and notes for the selected contact."
+			role="region"
+			aria-label="Research panel"
+		>
+			<div className="absolute inset-0 rounded-[inherit] overflow-hidden">
+				{panelBands.map((band) => (
+					<div
+						key={`${band.top}-${band.color}`}
+						className="absolute left-0 right-0"
+						style={{
+							top: `${band.top}px`,
+							height: `${band.height}px`,
+							backgroundColor: band.color,
+						}}
+					/>
+				))}
+				<div
+					className="absolute left-0 right-0 bottom-0"
+					style={{
+						top: `${metadataTop}px`,
+						backgroundColor: '#FCFDFF',
+					}}
+				/>
+			</div>
+
+			{dividerTops.map((top) => (
+				<div
+					key={top}
+					className="absolute left-0 right-0 bg-black"
+					style={{
+						top: `${top}px`,
+						height: `${RESEARCH_PANEL_BORDER_WIDTH}px`,
+					}}
+				/>
+			))}
+
+			<div
+				className="absolute left-[23px] right-[17px] top-[10px] z-10 font-inter text-left text-black"
+				style={textStyle}
+			>
+				<div className="min-w-0 pr-[130px]">
+					<div className="truncate text-[18px] leading-[1.05] font-normal">
+						{displayName}
+					</div>
+					{companyName && (
+						<div className="truncate text-[17px] leading-[1.05] font-normal mt-[2px]">
+							{companyName}
+						</div>
+					)}
+				</div>
+				{coordinateText && (
+					<div className="absolute right-0 bottom-[1px] text-[13px] leading-none font-bold whitespace-nowrap">
+						{coordinateText}
+					</div>
+				)}
+			</div>
+
+			{positionedTopDetailRows.map((row) => (
+				<Fragment key={row.key}>{row.render(row.top)}</Fragment>
+			))}
 
 			<div
 				className="research-panel-metadata-scroll absolute left-0 right-0 bottom-0 z-10"
-				style={{ top: `${RESEARCH_PANEL_METADATA_TOP}px` }}
+				style={{ top: `${metadataTop}px` }}
 			>
 				<style>{`
 					.research-panel-metadata-scroll *::-webkit-scrollbar {
