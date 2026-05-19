@@ -403,7 +403,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						className={cn(
 							'w-full items-center overflow-hidden',
 							titleCategoryIcon
-								? 'grid grid-cols-[24px_minmax(0,1fr)] gap-x-[12px]'
+								? 'grid grid-cols-[18px_minmax(0,1fr)] gap-x-[8px]'
 								: 'flex justify-start'
 						)}
 					>
@@ -471,7 +471,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 			color: '#EDF8FF',
 			render: (top) => (
 				<div
-					className="absolute left-[23px] right-[17px] z-10 grid grid-cols-[24px_minmax(0,1fr)] items-center gap-x-[12px] overflow-hidden"
+					className="absolute left-[23px] right-[17px] z-10 grid grid-cols-[24px_minmax(0,1fr)] items-center gap-x-[6px] overflow-hidden"
 					style={{
 						top: `${top}px`,
 						height: '24px',
