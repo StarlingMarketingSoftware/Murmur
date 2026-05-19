@@ -3,6 +3,7 @@ import { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { cn } from '@/utils';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import {
 	isRestaurantTitle,
 	isCoffeeShopTitle,
@@ -285,10 +286,17 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	const panelWidth = width ?? RESEARCH_PANEL_DEFAULT_WIDTH;
 	const panelHeight = height ?? RESEARCH_PANEL_DEFAULT_HEIGHT;
 	const fullName = `${contact?.firstName || ''} ${contact?.lastName || ''}`.trim();
-	const displayName = contact
-		? fullName || contact.name || contact.company || 'Unknown'
-		: 'Loading...';
+	const personalName = fullName || contact?.name?.trim() || '';
 	const companyName = contact?.company?.trim() || '';
+	const isCompanyOnlyHeader = Boolean(
+		!hideAllText && contact && companyName && !personalName
+	);
+	const headerHeight = isCompanyOnlyHeader ? 45 : 52;
+	const topDetailStart = headerHeight + 13;
+	const displayName = contact
+		? personalName || companyName || 'Unknown'
+		: 'Loading...';
+	const showCompanyName = Boolean(personalName && companyName);
 	const latitude =
 		typeof contact?.latitude === 'number' ? contact.latitude.toFixed(4) : '';
 	const longitude =
@@ -574,7 +582,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 		});
 	}
 
-	let nextTopDetailRowTop = 65;
+	let nextTopDetailRowTop = topDetailStart;
 	const positionedTopDetailRows = topDetailRows.map((row) => {
 		const top = nextTopDetailRowTop;
 		nextTopDetailRowTop += row.height;
@@ -585,12 +593,12 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 		? RESEARCH_PANEL_METADATA_TOP
 		: lastTopDetailRow
 			? lastTopDetailRow.top + lastTopDetailRow.height
-			: 65;
+			: topDetailStart;
 	const panelBands = hideAllText
 		? RESEARCH_PANEL_BANDS
 		: [
-				{ top: 0, height: 52, color: '#FFFFFF' },
-				{ top: 52, height: 13, color: '#F67C7E' },
+				{ top: 0, height: headerHeight, color: '#FFFFFF' },
+				{ top: headerHeight, height: 13, color: '#F67C7E' },
 				...positionedTopDetailRows.map(({ top, height, color }) => ({
 					top,
 					height,
@@ -599,7 +607,11 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 			];
 	const dividerTops = hideAllText
 		? RESEARCH_PANEL_DIVIDER_TOPS
-		: [52, 65, ...positionedTopDetailRows.map((row) => row.top + row.height)];
+		: [
+				headerHeight,
+				topDetailStart,
+				...positionedTopDetailRows.map((row) => row.top + row.height),
+			];
 
 	return (
 		<div
@@ -650,21 +662,38 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 			))}
 
 			<div
-				className="absolute left-[23px] right-[17px] top-[10px] z-10 font-inter text-left text-black"
-				style={textStyle}
+				className={cn(
+					'absolute left-[23px] right-[17px] top-[10px] z-10 font-inter text-left text-black',
+					isCompanyOnlyHeader && 'flex items-center'
+				)}
+				style={{
+					...(textStyle || {}),
+					...(isCompanyOnlyHeader ? { top: 0 } : {}),
+					height: `${isCompanyOnlyHeader ? headerHeight : headerHeight - 10}px`,
+				}}
 			>
-				<div className="min-w-0 pr-[130px]">
+				<div className={cn('min-w-0 pr-[130px]', isCompanyOnlyHeader && 'w-full')}>
 					<div className="truncate text-[18px] leading-[1.05] font-normal">
 						{displayName}
 					</div>
-					{companyName && (
+					{showCompanyName && (
 						<div className="truncate text-[17px] leading-[1.05] font-normal mt-[2px]">
 							{companyName}
 						</div>
 					)}
 				</div>
 				{coordinateText && (
-					<div className="absolute right-0 bottom-[1px] text-[13px] leading-none font-bold whitespace-nowrap">
+					<div
+						className="absolute right-0 bottom-[-2px] whitespace-nowrap"
+						style={{
+							color: '#000',
+							fontFamily: 'Inter',
+							fontSize: '11.48px',
+							fontStyle: 'normal',
+							fontWeight: 600,
+							lineHeight: '24.392px',
+						}}
+					>
 						{coordinateText}
 					</div>
 				)}
@@ -678,25 +707,29 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				className="research-panel-metadata-scroll absolute left-0 right-0 bottom-0 z-10"
 				style={{ top: `${metadataTop}px` }}
 			>
-				<style>{`
-					.research-panel-metadata-scroll *::-webkit-scrollbar {
-						display: none !important;
-						width: 0 !important;
-						height: 0 !important;
-						background: transparent !important;
-					}
-					.research-panel-metadata-scroll * {
-						-ms-overflow-style: none !important;
-						scrollbar-width: none !important;
-					}
-				`}</style>
-				<div className="h-full pl-[23px] pr-[17px] pt-[20px] pb-[22px] overflow-hidden">
-					<div
-						className="h-full overflow-y-auto whitespace-pre-wrap break-words font-inter text-[15px] leading-[1.33] font-normal text-black"
-						style={textStyle}
+				<div className="h-full pl-[23px] pr-[17px] pt-[11px] pb-[22px] overflow-hidden">
+					<CustomScrollbar
+						className="h-full"
+						thumbWidth={0}
+						thumbColor="transparent"
+						trackColor="transparent"
+						lockHorizontalScroll
 					>
-						{metadataText}
-					</div>
+						<div
+							className="whitespace-pre-wrap break-words"
+							style={{
+								color: '#000',
+								fontFamily: 'Inter',
+								fontSize: '14.349px',
+								fontStyle: 'normal',
+								fontWeight: 400,
+								lineHeight: '121.531%',
+								...(textStyle || {}),
+							}}
+						>
+							{metadataText}
+						</div>
+					</CustomScrollbar>
 				</div>
 			</div>
 		</div>
