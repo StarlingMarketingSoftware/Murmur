@@ -92,10 +92,13 @@ const FadeOverflowText: FC<{
 	className?: string;
 	fadePx?: number;
 	measureKey?: unknown;
-}> = ({ text, className, fadePx = 16, measureKey }) => {
+	splitNumericSuffix?: boolean;
+}> = ({ text, className, fadePx = 16, measureKey, splitNumericSuffix = true }) => {
 	const spanRef = useRef<HTMLSpanElement | null>(null);
 	const [isOverflowing, setIsOverflowing] = useState(false);
-	const { base, suffixNumber } = splitTrailingNumericSuffix(text);
+	const { base, suffixNumber } = splitNumericSuffix
+		? splitTrailingNumericSuffix(text)
+		: { base: text, suffixNumber: null };
 
 	const measure = useCallback(() => {
 		const el = spanRef.current;
@@ -885,18 +888,16 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				</div>
 
 				<div className="absolute left-3 top-[17px] right-1/2 pr-1 pointer-events-none">
-					<div
-						className="font-inter text-[14.661px] font-medium leading-[19.547px] text-black whitespace-nowrap overflow-hidden text-ellipsis"
-						title={companyLabel}
-					>
-						{companyLabel}
-					</div>
-					<div
-						className="font-inter text-[14.661px] font-normal leading-[19.547px] text-black whitespace-nowrap overflow-hidden text-ellipsis"
-						title={contactName}
-					>
-						{contactName}
-					</div>
+					<FadeOverflowText
+						text={companyLabel}
+						className="font-inter text-[14.661px] font-medium leading-[19.547px] text-black"
+						splitNumericSuffix={false}
+					/>
+					<FadeOverflowText
+						text={contactName}
+						className="font-inter text-[14.661px] font-normal leading-[19.547px] text-black"
+						splitNumericSuffix={false}
+					/>
 				</div>
 
 				<div className="absolute top-[16px] left-1/2 right-2 pl-1 pointer-events-none">
@@ -923,18 +924,16 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				</div>
 
 				<div className="absolute left-3 right-[12px] top-[57px] pointer-events-none">
-					<div
-						className="font-inter text-[13.215px] text-black font-semibold leading-[21.144px] whitespace-nowrap overflow-hidden text-ellipsis"
-						title={draft.subject || 'No subject'}
-					>
-						{draft.subject || 'No subject'}
-					</div>
-					<div
-						className="font-inter text-[13.215px] text-black font-normal leading-[21.144px] whitespace-nowrap overflow-hidden text-ellipsis"
-						title={messagePreview}
-					>
-						{messagePreview}
-					</div>
+					<FadeOverflowText
+						text={draft.subject || 'No subject'}
+						className="font-inter text-[13.215px] text-black font-semibold leading-[21.144px]"
+						splitNumericSuffix={false}
+					/>
+					<FadeOverflowText
+						text={messagePreview}
+						className="font-inter text-[13.215px] text-black font-normal leading-[21.144px]"
+						splitNumericSuffix={false}
+					/>
 				</div>
 			</div>
 		);
@@ -952,9 +951,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		const companyLabel = getContactCompanyLabel(contact);
 		const contactTitle = getContactTitle(contact);
 		const bodyPreview = email.bodyPlain
-			? `${email.bodyPlain.substring(0, 60)}...`
+			? email.bodyPlain
 			: email.bodyHtml
-				? `${email.bodyHtml.replace(/<[^>]*>/g, '').substring(0, 60)}...`
+				? convertHtmlToPlainText(email.bodyHtml)
 				: 'No content';
 
 		return (
@@ -987,18 +986,16 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			>
 				{/* Layout mirrors supplemental draft rows, but without the top strip. */}
 				<div className="absolute left-3 top-[10px] right-1/2 pr-1 pointer-events-none">
-					<div
-						className="font-inter text-[14.661px] font-medium leading-[19.547px] text-black whitespace-nowrap overflow-hidden text-ellipsis"
-						title={companyLabel}
-					>
-						{companyLabel}
-					</div>
-					<div
-						className="font-inter text-[14.661px] font-normal leading-[19.547px] text-black whitespace-nowrap overflow-hidden text-ellipsis"
-						title={contactName}
-					>
-						{contactName}
-					</div>
+					<FadeOverflowText
+						text={companyLabel}
+						className="font-inter text-[14.661px] font-medium leading-[19.547px] text-black"
+						splitNumericSuffix={false}
+					/>
+					<FadeOverflowText
+						text={contactName}
+						className="font-inter text-[14.661px] font-normal leading-[19.547px] text-black"
+						splitNumericSuffix={false}
+					/>
 				</div>
 
 				<div className="absolute top-[9px] left-1/2 right-2 pl-1 pointer-events-none">
@@ -1025,18 +1022,16 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				</div>
 
 				<div className="absolute left-3 right-[12px] top-[42px] pointer-events-none">
-					<div
-						className="font-inter text-[13.215px] text-black font-semibold leading-[21.144px] whitespace-nowrap overflow-hidden text-ellipsis"
-						title={email.subject || 'No subject'}
-					>
-						{email.subject || 'No subject'}
-					</div>
-					<div
-						className="font-inter text-[13.215px] text-black font-normal leading-[21.144px] whitespace-nowrap overflow-hidden text-ellipsis"
-						title={bodyPreview}
-					>
-						{bodyPreview}
-					</div>
+					<FadeOverflowText
+						text={email.subject || 'No subject'}
+						className="font-inter text-[13.215px] text-black font-semibold leading-[21.144px]"
+						splitNumericSuffix={false}
+					/>
+					<FadeOverflowText
+						text={bodyPreview}
+						className="font-inter text-[13.215px] text-black font-normal leading-[21.144px]"
+						splitNumericSuffix={false}
+					/>
 				</div>
 			</div>
 		);
@@ -1442,20 +1437,24 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									const isSelected =
 										!isActivelyDrafting && currentSelectedIds.has(contact.id);
 									const contactTitle = contact.title || contact.headline || '';
-									// Standard left padding for contact text.
+									// Pull the contact identity block slightly toward the row center.
 									const leftPadding = 'pl-3';
 									// Keyboard focus shows hover UI independently of mouse hover
 									const isKeyboardFocused = hoveredContactIndex === contactIndex;
+									const shouldShowSelectedState = !isAllTabNavigation && isSelected;
 									// Final background: actively drafting > selected > keyboard focus > white (mouse hover handled by CSS)
 									const contactBgColor = isActivelyDrafting
 										? 'murmur-actively-drafting'
 										: isAllTabNavigation
 											? 'bg-[#FFF]'
-											: isSelected
-												? 'bg-[#F5DADA]'
+											: shouldShowSelectedState
+												? 'bg-[#FD8E89]'
 												: isKeyboardFocused
 													? 'bg-[#FAE6E6]'
 													: 'bg-[#FFF] hover:bg-[#FAE6E6]';
+									const contactBorderColor = shouldShowSelectedState
+										? 'border-white'
+										: 'border-[#000000]';
 									return (
 										<div
 											key={contact.id}
@@ -1467,11 +1466,12 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 												}
 											}}
 											className={cn(
-												'overflow-hidden border-2 border-[#000000] select-none relative grid grid-cols-2 grid-rows-2',
+												'overflow-hidden border-2 select-none relative grid grid-cols-2 grid-rows-2',
 												isAllTabNavigation ? 'cursor-default' : 'cursor-pointer',
 												isBottomView
 													? 'w-[224px] h-[30px] rounded-[4.7px]'
 													: 'max-[480px]:w-[96.27vw]',
+												contactBorderColor,
 												contactBgColor
 											)}
 											style={contactRowStyle}
@@ -1796,24 +1796,29 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 												</>
 											) : fullName ? (
 												<>
-													{/* Top Left - Company (fixed top slot) */}
+													{/* Left - Name and company centered as a tighter stack */}
 													<div
 														className={cn(
 															leftPadding,
-															'col-start-1 row-start-1 pr-1 flex items-end pb-[2px] overflow-hidden'
+															'col-start-1 row-start-1 row-span-2 pr-1 flex flex-col justify-center gap-[1px] overflow-hidden'
 														)}
 													>
-														<div
-													className="font-inter text-[14.661px] font-medium leading-[19.547px] text-black text-left w-full overflow-hidden whitespace-nowrap"
-															style={{
-																maskImage:
-																	'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
-																WebkitMaskImage:
-																	'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
-															}}
-														>
-															{contact.company || ''}
+														<div className="font-inter text-[14.661px] font-normal leading-[17px] text-black text-left w-full truncate">
+															{fullName}
 														</div>
+														{contact.company ? (
+															<div
+																className="font-inter text-[14.661px] font-medium leading-[17px] text-black text-left w-full overflow-hidden whitespace-nowrap"
+																style={{
+																	maskImage:
+																		'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+																	WebkitMaskImage:
+																		'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+																}}
+															>
+																{contact.company}
+															</div>
+														) : null}
 													</div>
 
 													{/* Top Right - Title (aligned to top slot) */}
@@ -1875,18 +1880,6 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 														) : (
 															<div className="w-full" />
 														)}
-													</div>
-
-													{/* Bottom Left - Name (fixed bottom slot) */}
-													<div
-														className={cn(
-															leftPadding,
-															'col-start-1 row-start-2 pr-1 flex items-start pt-[2px] overflow-hidden'
-														)}
-													>
-												<div className="font-inter text-[14.661px] font-normal leading-[19.547px] text-black text-left w-full truncate">
-															{fullName}
-														</div>
 													</div>
 
 													{/* Bottom Right - Location (aligned to bottom slot) */}
@@ -1960,7 +1953,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 												</>
 											) : (
 												<>
-													{/* Top Left - Company (fixed top slot) */}
+													{/* Top Left - Company only */}
 													<div
 														className={cn(
 															leftPadding,
@@ -1968,7 +1961,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 														)}
 													>
 														<div
-													className="font-inter text-[14.661px] font-medium leading-[19.547px] text-black text-left w-full overflow-hidden whitespace-nowrap"
+															className="font-inter text-[14.661px] font-medium leading-[17px] text-black text-left w-full overflow-hidden whitespace-nowrap"
 															style={{
 																maskImage:
 																	'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
@@ -1979,7 +1972,6 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 															{contact.company || 'Contact'}
 														</div>
 													</div>
-													{/* Bottom Left - (empty fixed bottom slot) */}
 													<div className="col-start-1 row-start-2" />
 
 													{contactTitle ? (
