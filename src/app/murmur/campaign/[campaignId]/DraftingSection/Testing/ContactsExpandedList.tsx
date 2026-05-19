@@ -61,12 +61,15 @@ const isSameLocalDay = (a: Date, b: Date) =>
 	a.getMonth() === b.getMonth() &&
 	a.getDate() === b.getDate();
 
-	const CONTACT_ROW_INSET_PX = 6.104;
-	const CONTACT_ROW_HEIGHT_PX = 49.657;
-	const CONTACT_ROW_RADIUS_PX = 8.269;
-	const SUPPLEMENTAL_DRAFT_ROW_HEIGHT_PX = 108;
-	const SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX = 7.798;
-	const SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX = 92;
+const CONTACT_ROW_INSET_PX = 6.104;
+const CONTACT_ROW_HEIGHT_PX = 49.657;
+const CONTACT_ROW_RADIUS_PX = 8.269;
+const SUPPLEMENTAL_DRAFT_ROW_HEIGHT_PX = 108;
+const SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX = 7.798;
+const SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX = 92;
+const WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR = '#F5C0BD';
+const WRITE_TAB_SUPPLEMENTAL_BADGE_FILL_COLOR = '#EE9798';
+const WRITE_TAB_SUPPLEMENTAL_ROW_FILL_COLOR = '#EB8586';
 
 const formatBatchCount = (count: number) => `+${count < 10 ? `0${count}` : count}`;
 
@@ -212,6 +215,10 @@ const TitleBadge: FC<{
 	title: string;
 	className?: string;
 	textClassName?: string;
+	fillColor?: string;
+	strokeColor?: string;
+	textColor?: string;
+	showStroke?: boolean;
 	restaurantIconSize?: number;
 	coffeeIconSize?: number;
 	defaultIconSize?: number;
@@ -219,31 +226,71 @@ const TitleBadge: FC<{
 	title,
 	className,
 	textClassName,
+	fillColor,
+	strokeColor,
+	textColor,
+	showStroke = true,
 	restaurantIconSize = 14,
 	coffeeIconSize = 6,
 	defaultIconSize = 14,
 }) => (
 	<div
-		className={cn('border border-black overflow-hidden flex items-center gap-0.5', className)}
-		style={{ backgroundColor: getTitleBadgeBgColor(title) }}
+		className={cn('border overflow-hidden flex items-center gap-0.5', className)}
+		style={{
+			backgroundColor: fillColor ?? getTitleBadgeBgColor(title),
+			borderColor: showStroke ? (strokeColor ?? '#000000') : 'transparent',
+			borderWidth: showStroke ? undefined : 0,
+			color: textColor ?? '#000000',
+		}}
 	>
-		{isRestaurantTitle(title) && <RestaurantsIcon size={restaurantIconSize} />}
-		{isCoffeeShopTitle(title) && <CoffeeShopsIcon size={coffeeIconSize} />}
+		{isRestaurantTitle(title) && (
+			<RestaurantsIcon
+				size={restaurantIconSize}
+				innerFill={fillColor}
+				outlineFill={strokeColor}
+			/>
+		)}
+		{isCoffeeShopTitle(title) && (
+			<CoffeeShopsIcon
+				size={coffeeIconSize}
+				innerFill={fillColor}
+				outlineFill={strokeColor}
+			/>
+		)}
 		{isMusicVenueTitle(title) && (
-			<MusicVenuesIcon size={defaultIconSize} className="flex-shrink-0" />
+			<MusicVenuesIcon
+				size={defaultIconSize}
+				className="flex-shrink-0"
+				innerFill={fillColor}
+				outlineFill={strokeColor}
+			/>
 		)}
 		{isMusicFestivalTitle(title) && (
-			<FestivalsIcon size={defaultIconSize} className="flex-shrink-0" />
+			<FestivalsIcon
+				size={defaultIconSize}
+				className="flex-shrink-0"
+				innerFill={fillColor}
+				outlineFill={strokeColor}
+			/>
 		)}
 		{(isWeddingPlannerTitle(title) || isWeddingVenueTitle(title)) && (
-			<WeddingPlannersIcon size={defaultIconSize} />
+			<WeddingPlannersIcon
+				size={defaultIconSize}
+				innerFill={fillColor}
+				outlineFill={strokeColor}
+			/>
 		)}
 		{isWineBeerSpiritsTitle(title) && (
-			<WineBeerSpiritsIcon size={defaultIconSize} className="flex-shrink-0" />
+			<WineBeerSpiritsIcon
+				size={defaultIconSize}
+				className="flex-shrink-0"
+				innerFill={fillColor}
+				outlineFill={strokeColor}
+			/>
 		)}
 		<ScrollableText
 			text={getTitleBadgeLabel(title)}
-			className={cn('text-black leading-none', textClassName)}
+			className={cn('leading-none', textClassName)}
 		/>
 	</div>
 );
@@ -254,7 +301,21 @@ const StateLocationRow: FC<{
 	badgeClassName?: string;
 	badgeTextClassName?: string;
 	cityClassName?: string;
-}> = ({ contact, className, badgeClassName, badgeTextClassName, cityClassName }) => {
+	badgeFillColor?: string;
+	strokeColor?: string;
+	textColor?: string;
+	showBadgeStroke?: boolean;
+}> = ({
+	contact,
+	className,
+	badgeClassName,
+	badgeTextClassName,
+	cityClassName,
+	badgeFillColor,
+	strokeColor,
+	textColor,
+	showBadgeStroke = true,
+}) => {
 	const fullStateName = (contact?.state as string) || '';
 	const stateAbbr = getStateAbbreviation(fullStateName) || '';
 	const normalizedState = fullStateName.trim();
@@ -264,9 +325,14 @@ const StateLocationRow: FC<{
 		canadianProvinceAbbreviations.includes(normalizedState.toUpperCase()) ||
 		canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
 	const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+	const badgeBorderColor = showBadgeStroke ? (strokeColor ?? '#000000') : 'transparent';
+	const badgeBorderWidth = showBadgeStroke ? undefined : 0;
 
 	return (
-		<div className={cn('flex items-center justify-start gap-1', className)}>
+		<div
+			className={cn('flex items-center justify-start gap-1', className)}
+			style={{ color: textColor ?? '#000000' }}
+		>
 			{stateAbbr ? (
 				isCanadianProvince ? (
 					<div
@@ -274,7 +340,7 @@ const StateLocationRow: FC<{
 							'inline-flex items-center justify-center border overflow-hidden',
 							badgeClassName
 						)}
-						style={{ borderColor: '#000000' }}
+						style={{ borderColor: badgeBorderColor, borderWidth: badgeBorderWidth }}
 						title="Canadian province"
 					>
 						<CanadianFlag width="100%" height="100%" className="w-full h-full" />
@@ -287,8 +353,10 @@ const StateLocationRow: FC<{
 							badgeTextClassName
 						)}
 						style={{
-							backgroundColor: stateBadgeColorMap[stateAbbr] || 'transparent',
-							borderColor: '#000000',
+							backgroundColor: badgeFillColor ?? stateBadgeColorMap[stateAbbr] ?? 'transparent',
+							borderColor: badgeBorderColor,
+							borderWidth: badgeBorderWidth,
+							color: textColor ?? '#000000',
 						}}
 					>
 						{stateAbbr}
@@ -299,12 +367,12 @@ const StateLocationRow: FC<{
 							'inline-flex items-center justify-center border',
 							badgeClassName
 						)}
-						style={{ borderColor: '#000000' }}
+						style={{ borderColor: badgeBorderColor, borderWidth: badgeBorderWidth }}
 					/>
 				)
 			) : null}
 			{contact?.city ? (
-				<ScrollableText text={contact.city} className={cn('text-black leading-none', cityClassName)} />
+				<ScrollableText text={contact.city} className={cn('leading-none', cityClassName)} />
 			) : null}
 		</div>
 	);
@@ -745,6 +813,23 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		`${effectiveWhiteSectionHeight}px, #EB8586 ${effectiveWhiteSectionHeight}px)`;
 	const resolvedActiveTopNavStop: ContactsExpandedTopNavStop =
 		activeTopNavStop ?? (enableUsedContactTooltip ? 'write' : 'all');
+	const shouldUseWriteSupplementalStyles =
+		!isBottomView && resolvedActiveTopNavStop === 'write';
+	const supplementalTextClassName = shouldUseWriteSupplementalStyles
+		? 'text-[#F5C0BD]'
+		: 'text-black';
+	const supplementalBorderColor = shouldUseWriteSupplementalStyles
+		? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
+		: '#000000';
+	const supplementalRowFillColor = shouldUseWriteSupplementalStyles
+		? WRITE_TAB_SUPPLEMENTAL_ROW_FILL_COLOR
+		: undefined;
+	const supplementalBadgeFillColor = shouldUseWriteSupplementalStyles
+		? WRITE_TAB_SUPPLEMENTAL_BADGE_FILL_COLOR
+		: undefined;
+	const supplementalTextColor = shouldUseWriteSupplementalStyles
+		? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
+		: undefined;
 	const collapsedTopBoxHeightPx = 22;
 	const collapsedTopBoxWidthPx = 224;
 	const collapsedTopBoxRadiusPx = 4.7;
@@ -859,17 +944,18 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			<div
 				key={`contacts-draft-${draft.id}-${draftIndex}`}
 				className={cn(
-					'relative select-none overflow-hidden bg-[#FFF]',
+					'relative select-none overflow-hidden',
 					isAllTabNavigation ? 'cursor-default' : 'cursor-pointer'
 				)}
 				style={{
 					width: contactRowWidth,
 					height: `${SUPPLEMENTAL_DRAFT_ROW_HEIGHT_PX}px`,
 					borderRadius: `${SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX}px`,
-					borderTop: '1.955px solid #000000',
-					borderRight: '1.949px solid #000000',
-					borderBottom: '1.949px solid #000000',
-					borderLeft: '1.949px solid #000000',
+					borderTop: `1.955px solid ${supplementalBorderColor}`,
+					borderRight: `1.949px solid ${supplementalBorderColor}`,
+					borderBottom: `1.949px solid ${supplementalBorderColor}`,
+					borderLeft: `1.949px solid ${supplementalBorderColor}`,
+					backgroundColor: supplementalRowFillColor ?? '#FFFFFF',
 					boxSizing: 'border-box',
 				}}
 				onMouseEnter={() => {
@@ -883,19 +969,35 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				}}
 			>
 				<div className="absolute left-0 top-0 h-[13px] w-full pointer-events-none flex">
-					<div className="h-full w-[115px] shrink-0 bg-[#FFE3AA]" />
-					<div className="h-full flex-1 bg-[#F9FAFB]" />
+					<div
+						className={cn(
+							'h-full w-[115px] shrink-0',
+							shouldUseWriteSupplementalStyles ? 'bg-[#F5C0BD]' : 'bg-[#FFE3AA]'
+						)}
+					/>
+					<div
+						className={cn(
+							'h-full flex-1',
+							shouldUseWriteSupplementalStyles ? 'bg-[#EB8586]' : 'bg-[#F9FAFB]'
+						)}
+					/>
 				</div>
 
 				<div className="absolute left-3 top-[17px] right-1/2 pr-1 pointer-events-none">
 					<FadeOverflowText
 						text={companyLabel}
-						className="font-inter text-[14.661px] font-medium leading-[19.547px] text-black"
+						className={cn(
+							'font-inter text-[14.661px] font-medium leading-[19.547px]',
+							supplementalTextClassName
+						)}
 						splitNumericSuffix={false}
 					/>
 					<FadeOverflowText
 						text={contactName}
-						className="font-inter text-[14.661px] font-normal leading-[19.547px] text-black"
+						className={cn(
+							'font-inter text-[14.661px] font-normal leading-[19.547px]',
+							supplementalTextClassName
+						)}
 						splitNumericSuffix={false}
 					/>
 				</div>
@@ -905,7 +1007,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						<TitleBadge
 							title={contactTitle}
 							className="w-full h-[17px] rounded-[6px] px-2 gap-1"
-							textClassName="text-[10px] text-black leading-none"
+							textClassName={cn('text-[10px] leading-none', supplementalTextClassName)}
+							fillColor={supplementalBadgeFillColor}
+							strokeColor={supplementalBorderColor}
+							textColor={supplementalTextColor}
+							showStroke={!shouldUseWriteSupplementalStyles}
 							restaurantIconSize={12}
 							coffeeIconSize={7}
 							defaultIconSize={12}
@@ -919,19 +1025,29 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						className="h-[16px] w-full gap-1"
 						badgeClassName="box-border w-[29px] h-[16px] rounded-[4px] shrink-0"
 						badgeTextClassName="font-inter text-[10px] leading-none font-bold"
-						cityClassName="text-[10px] text-black leading-none"
+						cityClassName={cn('text-[10px] leading-none', supplementalTextClassName)}
+						badgeFillColor={supplementalBadgeFillColor}
+						strokeColor={supplementalBorderColor}
+						textColor={supplementalTextColor}
+						showBadgeStroke={!shouldUseWriteSupplementalStyles}
 					/>
 				</div>
 
 				<div className="absolute left-3 right-[12px] top-[57px] pointer-events-none">
 					<FadeOverflowText
 						text={draft.subject || 'No subject'}
-						className="font-inter text-[13.215px] text-black font-semibold leading-[21.144px]"
+						className={cn(
+							'font-inter text-[13.215px] font-semibold leading-[21.144px]',
+							supplementalTextClassName
+						)}
 						splitNumericSuffix={false}
 					/>
 					<FadeOverflowText
 						text={messagePreview}
-						className="font-inter text-[13.215px] text-black font-normal leading-[21.144px]"
+						className={cn(
+							'font-inter text-[13.215px] font-normal leading-[21.144px]',
+							supplementalTextClassName
+						)}
 						splitNumericSuffix={false}
 					/>
 				</div>
@@ -967,11 +1083,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					width: contactRowWidth,
 					height: `${SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX}px`,
 					borderRadius: `${SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX}px`,
-					borderTop: '1.955px solid #000000',
-					borderRight: '1.949px solid #000000',
-					borderBottom: '1.949px solid #000000',
-					borderLeft: '1.949px solid #000000',
-					background: '#F9FAFB',
+					borderTop: `1.955px solid ${supplementalBorderColor}`,
+					borderRight: `1.949px solid ${supplementalBorderColor}`,
+					borderBottom: `1.949px solid ${supplementalBorderColor}`,
+					borderLeft: `1.949px solid ${supplementalBorderColor}`,
+					background: supplementalRowFillColor ?? '#F9FAFB',
 					boxSizing: 'border-box',
 				}}
 				onMouseEnter={() => {
@@ -988,12 +1104,18 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				<div className="absolute left-3 top-[10px] right-1/2 pr-1 pointer-events-none">
 					<FadeOverflowText
 						text={companyLabel}
-						className="font-inter text-[14.661px] font-medium leading-[19.547px] text-black"
+						className={cn(
+							'font-inter text-[14.661px] font-medium leading-[19.547px]',
+							supplementalTextClassName
+						)}
 						splitNumericSuffix={false}
 					/>
 					<FadeOverflowText
 						text={contactName}
-						className="font-inter text-[14.661px] font-normal leading-[19.547px] text-black"
+						className={cn(
+							'font-inter text-[14.661px] font-normal leading-[19.547px]',
+							supplementalTextClassName
+						)}
 						splitNumericSuffix={false}
 					/>
 				</div>
@@ -1003,7 +1125,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						<TitleBadge
 							title={contactTitle}
 							className="w-full h-[17px] rounded-[6px] px-2 gap-1"
-							textClassName="text-[10px] text-black leading-none"
+							textClassName={cn('text-[10px] leading-none', supplementalTextClassName)}
+							fillColor={supplementalBadgeFillColor}
+							strokeColor={supplementalBorderColor}
+							textColor={supplementalTextColor}
+							showStroke={!shouldUseWriteSupplementalStyles}
 							restaurantIconSize={12}
 							coffeeIconSize={7}
 							defaultIconSize={12}
@@ -1017,19 +1143,29 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						className="h-[16px] w-full gap-1"
 						badgeClassName="box-border w-[29px] h-[16px] rounded-[4px] shrink-0"
 						badgeTextClassName="font-inter text-[10px] leading-none font-bold"
-						cityClassName="text-[10px] text-black leading-none"
+						cityClassName={cn('text-[10px] leading-none', supplementalTextClassName)}
+						badgeFillColor={supplementalBadgeFillColor}
+						strokeColor={supplementalBorderColor}
+						textColor={supplementalTextColor}
+						showBadgeStroke={!shouldUseWriteSupplementalStyles}
 					/>
 				</div>
 
 				<div className="absolute left-3 right-[12px] top-[42px] pointer-events-none">
 					<FadeOverflowText
 						text={email.subject || 'No subject'}
-						className="font-inter text-[13.215px] text-black font-semibold leading-[21.144px]"
+						className={cn(
+							'font-inter text-[13.215px] font-semibold leading-[21.144px]',
+							supplementalTextClassName
+						)}
 						splitNumericSuffix={false}
 					/>
 					<FadeOverflowText
 						text={bodyPreview}
-						className="font-inter text-[13.215px] text-black font-normal leading-[21.144px]"
+						className={cn(
+							'font-inter text-[13.215px] font-normal leading-[21.144px]',
+							supplementalTextClassName
+						)}
 						splitNumericSuffix={false}
 					/>
 				</div>
