@@ -2373,8 +2373,8 @@ const Murmur = () => {
 
 	// Mobile-specific tab navigation (only the visible tabs on mobile)
 	const mobileTabOrder: Array<'drafting' | 'inbox'> = [
-		'drafting',
 		'inbox',
+		'drafting',
 	];
 
 	const goToPreviousMobileTab = () => {
@@ -2525,7 +2525,7 @@ const Murmur = () => {
 						<div className="campaign-map-split-overlay" aria-hidden="true" />
 					)}
 			{/* Top navigation box (ported from dashboard map view).
-			    Translucent backdrop + 5-tab row (Search / Write / [campaign chip] / Send / Inbox)
+			    Translucent backdrop + 5-tab row (Search / Write / [campaign chip] / Inbox / Drafts)
 			    + empty outline boxes flanking a center search pill. Desktop only. */}
 			{!isMobile && (() => {
 				// Constants mirror dashboard/page.tsx:3879-3924 so visual proportions match.
@@ -2605,7 +2605,7 @@ const Murmur = () => {
 							/>
 						</div>
 
-						{/* Tabs row: Search / Write / [campaign chip] / Send / Inbox */}
+						{/* Tabs row: Search / Write / [campaign chip] / Inbox / Drafts */}
 						<div
 							data-slot="campaign-top-tabs"
 							data-hover-description-suppress="true"
@@ -2681,18 +2681,18 @@ const Murmur = () => {
 									<button
 										type="button"
 										className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
-										style={inactiveTabStyle(activeView === 'drafting')}
-										onClick={() => setActiveView('drafting')}
-									>
-										Send
-									</button>
-									<button
-										type="button"
-										className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
 										style={inactiveTabStyle(activeView === 'inbox')}
 										onClick={() => setActiveView('inbox')}
 									>
 										Inbox
+									</button>
+									<button
+										type="button"
+										className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
+										style={inactiveTabStyle(activeView === 'drafting')}
+										onClick={() => setActiveView('drafting')}
+									>
+										Drafts
 									</button>
 								</div>
 							</div>
@@ -2926,18 +2926,6 @@ const Murmur = () => {
 							<button
 								type="button"
 								className={cn(
-									'font-inter text-[13px] font-medium leading-none bg-[#FFE3AA] border cursor-pointer rounded-full px-3 py-1',
-									activeView === 'drafting'
-										? 'text-black border-black'
-										: 'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
-								)}
-								onClick={() => setActiveView('drafting')}
-							>
-								{headerDraftCount.toString().padStart(2, '0')} Drafts
-							</button>
-							<button
-								type="button"
-								className={cn(
 									'font-inter text-[13px] font-medium leading-none bg-[#E8EFFF] border cursor-pointer rounded-full px-3 py-1',
 									activeView === 'inbox'
 										? 'text-black border-black'
@@ -2946,6 +2934,18 @@ const Murmur = () => {
 								onClick={() => setActiveView('inbox')}
 							>
 								Inbox
+							</button>
+							<button
+								type="button"
+								className={cn(
+									'font-inter text-[13px] font-medium leading-none bg-[#FFE3AA] border cursor-pointer rounded-full px-3 py-1',
+									activeView === 'drafting'
+										? 'text-black border-black'
+										: 'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
+								)}
+								onClick={() => setActiveView('drafting')}
+							>
+								{headerDraftCount.toString().padStart(2, '0')} Drafts
 							</button>
 						</div>
 					</div>

@@ -172,16 +172,16 @@ export const ContactsHeaderChrome: FC<{
 				onClick: onWriteClick,
 			},
 			{
-				id: 'send',
-				label: 'Send',
-				backgroundColor: '#EFDAAF',
-				onClick: onSendClick,
-			},
-			{
 				id: 'inbox',
 				label: 'Inbox',
 				backgroundColor: '#CCDFF4',
 				onClick: onInboxClick,
+			},
+			{
+				id: 'send',
+				label: 'Drafts',
+				backgroundColor: '#EFDAAF',
+				onClick: onSendClick,
 			},
 		];
 		const safeActiveStop = campaignStops.some((stop) => stop.id === activeCampaignStop)
