@@ -58,6 +58,7 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 		}
 
 		const result = await prisma.$transaction(async (tx) => {
+			const requestedCampaignId = validatedData.data.campaignId;
 			const inboundEmail = await tx.inboundEmail.findFirst({
 				where: { id: inboundEmailId, userId },
 				include: { contact: true },
@@ -67,7 +68,11 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 				return { status: 'email-not-found' as const };
 			}
 
-			if (inboundEmail.campaignId != null) {
+			if (
+				inboundEmail.campaignId != null &&
+				(requestedCampaignId === undefined ||
+					requestedCampaignId === inboundEmail.campaignId)
+			) {
 				const currentEmail = await tx.inboundEmail.findUnique({
 					where: { id: inboundEmail.id },
 					include: { contact: true, campaign: true, originalEmail: true },
@@ -83,7 +88,7 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 				where: {
 					userId,
 					status: Status.active,
-					...(validatedData.data.campaignId ? { id: validatedData.data.campaignId } : {}),
+					...(requestedCampaignId !== undefined ? { id: requestedCampaignId } : {}),
 				},
 				orderBy: { createdAt: 'desc' },
 				include: {

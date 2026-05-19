@@ -173,6 +173,7 @@ const CURATED_URL_PARAM_KEYS = ['pick', 'state', 'cat', 'lat', 'lon', 'r'] as co
 // for a curated rehydration (which would replay /api/contacts/curated-search instead of
 // restoring the cached free-text results from sessionStorage).
 const FREETEXT_URL_PARAM_KEYS = ['ft', 'ftLat', 'ftLon', 'ftR'] as const;
+const PENDING_SEARCH_STORAGE_KEY = 'murmur_pending_search';
 
 type CuratedUrlArgs = {
 	lat: number | null;
@@ -187,6 +188,33 @@ type FreeTextUrlArgs = {
 	lon: number | null;
 	radiusKm: number | null;
 } | null;
+
+type PendingDashboardSearch = {
+	query: string;
+	fromCampaignId: string | null;
+};
+
+const parsePendingDashboardSearch = (raw: string): PendingDashboardSearch => {
+	try {
+		const parsed = JSON.parse(raw) as {
+			query?: unknown;
+			fromCampaignId?: unknown;
+		};
+		if (parsed && typeof parsed === 'object' && typeof parsed.query === 'string') {
+			return {
+				query: parsed.query,
+				fromCampaignId:
+					typeof parsed.fromCampaignId === 'string'
+						? parsed.fromCampaignId
+						: null,
+			};
+		}
+	} catch {
+		// Legacy payloads were plain query strings.
+	}
+
+	return { query: raw, fromCampaignId: null };
+};
 
 // Serializes curated-mode args onto the given URLSearchParams under short, shared keys.
 // Pass `null` to strip them (e.g. when switching back to a regular text search).
@@ -4436,27 +4464,13 @@ const DashboardContent = () => {
 			}
 
 			hasHydratedFromCampaignUrlRef.current = true;
-			const hasCapturedCoords = curatedLatParam != null && curatedLonParam != null;
-			void (async () => {
-				let lat = curatedLatParam;
-				let lon = curatedLonParam;
-				if (!hasCapturedCoords) {
-					try {
-						const loc = await getApproximateLocation();
-						lat = loc.lat;
-						lon = loc.lon;
-					} catch {
-						// Non-fatal: backend can infer from request headers.
-					}
-				}
-				await rehydrateCuratedSession({
-					lat,
-					lon,
-					radiusKm: curatedRadiusKmParam,
-					category: curatedCategoryParam || null,
-					state: curatedStateParam || null,
-				}).catch(() => undefined);
-			})();
+			rehydrateCuratedSession({
+				lat: curatedLatParam,
+				lon: curatedLonParam,
+				radiusKm: curatedRadiusKmParam,
+				category: curatedCategoryParam || null,
+				state: curatedStateParam || null,
+			}).catch(() => undefined);
 			return;
 		}
 
@@ -6747,12 +6761,39 @@ const DashboardContent = () => {
 		whyValue,
 	]);
 
-	// Check for pending search from contacts page searchbar
+	// Check for pending search from campaign searchbars. Campaign-scoped payloads must
+	// match the current `fromCampaignId`; stale payloads should never override a curated
+	// campaign entry or bind a search to the wrong campaign.
 	useEffect(() => {
-		const pendingSearch = sessionStorage.getItem('murmur_pending_search');
-		if (pendingSearch) {
-			// Clear the pending search immediately to prevent re-triggering
-			sessionStorage.removeItem('murmur_pending_search');
+		if (typeof window === 'undefined') return;
+
+		let rawPendingSearch: string | null = null;
+		try {
+			rawPendingSearch = sessionStorage.getItem(PENDING_SEARCH_STORAGE_KEY);
+			if (rawPendingSearch) {
+				// Clear immediately so ignored stale payloads cannot replay later.
+				sessionStorage.removeItem(PENDING_SEARCH_STORAGE_KEY);
+			}
+		} catch {
+			return;
+		}
+
+		if (rawPendingSearch) {
+			const pending = parsePendingDashboardSearch(rawPendingSearch);
+			const pendingSearch = pending.query.trim();
+			if (!pendingSearch) return;
+
+			const hasExplicitSearchContext =
+				curatedModeParam ||
+				freeTextModeParam ||
+				Boolean(dashboardSearchParam || fromCampaignSearchParam);
+			if (hasExplicitSearchContext) return;
+
+			if (pending.fromCampaignId) {
+				if (pending.fromCampaignId !== fromCampaignIdParam) return;
+			} else if (isAddToCampaignMode) {
+				return;
+			}
 
 			// Parse the search query: "[Why] What in Where"
 			const whyMatch = pendingSearch.match(/^\[(Booking|Promotion)\]/i);
@@ -6804,7 +6845,16 @@ const DashboardContent = () => {
 				}
 			}, 100);
 		}
-	}, [form, onSubmit]);
+	}, [
+		curatedModeParam,
+		dashboardSearchParam,
+		form,
+		freeTextModeParam,
+		fromCampaignIdParam,
+		fromCampaignSearchParam,
+		isAddToCampaignMode,
+		onSubmit,
+	]);
 
 	// Handle clicks outside to deactivate sections
 	useEffect(() => {

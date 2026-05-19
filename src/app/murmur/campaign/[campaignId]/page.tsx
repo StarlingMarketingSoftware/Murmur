@@ -1191,36 +1191,19 @@ const Murmur = () => {
 		try {
 			sessionStorage.removeItem('murmur_pending_search');
 		} catch {
-			// sessionStorage may be unavailable — the URL flag below is enough.
+			// sessionStorage may be unavailable — navigation can still proceed.
 		}
-		const params = new URLSearchParams({
-			fromCampaignId: String(campaign.id),
-			pick: '1',
-		});
 
 		// Hard navigation: a soft router.push sometimes doesn't fully re-mount the
 		// dashboard's map-search mode (especially mid-transition or with cached state),
 		// so use window.location.assign for a reliable, fresh dashboard load.
-		window.location.assign(`${urls.murmur.dashboard.index}?${params.toString()}`);
+		window.location.assign(
+			`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}&pick=1`
+		);
 	}, [campaign]);
 
-	// Navigation back to the dashboard's map/search view. Restores the user's last search
-	// if we persisted one (see the URL-mirror effect in dashboard/page.tsx), otherwise drops
-	// them into a default curated map view via the `pick=1` flag. Does NOT enter
-	// "fromCampaign" / add-to-campaign mode and does NOT prefill any search query.
-	const handleGoToDashboardSearch = useCallback(() => {
-		if (typeof window === 'undefined') return;
-
-		let lastSearch = '';
-		try {
-			lastSearch = localStorage.getItem('murmur_dashboard_last_search') || '';
-		} catch {
-			// localStorage may be unavailable — fall through to the curated default.
-		}
-
-		const query = lastSearch || 'pick=1';
-		window.location.assign(`${urls.murmur.dashboard.index}?${query}`);
-	}, []);
+	// Campaign Search should always stay pinned to the campaign the user is viewing.
+	const handleGoToDashboardSearch = handleOpenDashboardSearchForCampaign;
 
 	// Track highlight state in a ref so the event listener has fresh access without re-binding constantly
 	const isTopSearchHighlightedRef = useRef(isTopSearchHighlighted);

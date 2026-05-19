@@ -148,6 +148,7 @@ const DEFAULT_STATE_SUGGESTIONS = [
 		generalDescription: 'contact venues, restaurants and more, to book shows',
 	},
 ];
+const PENDING_SEARCH_STORAGE_KEY = 'murmur_pending_search';
 
 const stripInjectedSubjectFromTestMessageHtml = (
 	rawHtml: string
@@ -2162,26 +2163,21 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		const trimmedWhat = (what ?? '').trim();
 		const trimmedWhere = (where ?? '').trim();
 
-		const dashboardParams = new URLSearchParams();
-		if (campaign?.id) {
-			dashboardParams.set('fromCampaignId', String(campaign.id));
-		}
+		const dashboardUrl = campaign?.id
+			? `${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`
+			: urls.murmur.dashboard.index;
 
-		// Blank mini-searches should open the curated campaign search flow instead of
-		// falling back to the campaign/list name as an exact query.
+		// Empty mini searches should behave like the campaign Search button: open the
+		// campaign-scoped curated view instead of searching the campaign name.
 		if (!trimmedWhat && !trimmedWhere) {
-			dashboardParams.set('pick', '1');
 			try {
 				if (typeof window !== 'undefined') {
-					sessionStorage.removeItem('murmur_pending_search');
+					sessionStorage.removeItem(PENDING_SEARCH_STORAGE_KEY);
 				}
 			} catch {
 				// Ignore sessionStorage errors (e.g., disabled storage)
 			}
-			const curatedDashboardUrl = dashboardParams.toString()
-				? `${urls.murmur.dashboard.index}?${dashboardParams.toString()}`
-				: urls.murmur.dashboard.index;
-			router.push(curatedDashboardUrl);
+			router.push(`${dashboardUrl}${dashboardUrl.includes('?') ? '&' : '?'}pick=1`);
 			return;
 		}
 
@@ -2200,16 +2196,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		if (searchQuery) {
 			try {
 				if (typeof window !== 'undefined') {
-					sessionStorage.setItem('murmur_pending_search', searchQuery);
+					sessionStorage.setItem(
+						PENDING_SEARCH_STORAGE_KEY,
+						JSON.stringify({
+							v: 1,
+							query: searchQuery,
+							fromCampaignId: campaign?.id != null ? String(campaign.id) : null,
+						})
+					);
 				}
 			} catch {
 				// Ignore sessionStorage errors (e.g., disabled storage)
 			}
 		}
 
-		const dashboardUrl = dashboardParams.toString()
-			? `${urls.murmur.dashboard.index}?${dashboardParams.toString()}`
-			: urls.murmur.dashboard.index;
 		router.push(dashboardUrl);
 	};
 

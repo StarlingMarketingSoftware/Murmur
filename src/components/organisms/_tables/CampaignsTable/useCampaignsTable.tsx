@@ -9,7 +9,10 @@ import {
 } from '@/hooks/queryHooks/useCampaigns';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
 import { useEditEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
-import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
+import {
+	useAssignInboundEmailToCampaign,
+	useGetInboundEmails,
+} from '@/hooks/queryHooks/useInboundEmails';
 import {
 	useCreateUserContactList,
 	useEditUserContactList,
@@ -67,7 +70,13 @@ type FinderFolderKey = 'contacts' | 'drafts' | 'inbox' | 'sent' | 'archive';
 
 const CAMPAIGN_FINDER_DRAG_MIME = 'application/x-murmur-campaign-finder-item';
 
-type FinderDragItemKind = 'contact' | 'draft';
+type FinderDragItemKind = 'contact' | 'draft' | 'inbox';
+
+const getFinderMovedItemLabel = (itemKind: FinderDragItemKind): string => {
+	if (itemKind === 'contact') return 'Contact';
+	if (itemKind === 'draft') return 'Draft';
+	return 'Inbox email';
+};
 
 type CampaignFinderDragPayload = {
 	itemKind: FinderDragItemKind;
@@ -134,6 +143,7 @@ const createCampaignFinderDragPreview = ({
 const getFinderDragItemKind = (folderKey: FinderFolderKey): FinderDragItemKind | null => {
 	if (folderKey === 'contacts') return 'contact';
 	if (folderKey === 'drafts') return 'draft';
+	if (folderKey === 'inbox') return 'inbox';
 	return null;
 };
 
@@ -154,12 +164,21 @@ const parseCampaignFinderDragPayload = (value: string): CampaignFinderDragPayloa
 		const emailId = parsed.emailId;
 		const itemLabel = parsed.itemLabel;
 
-		if (itemKind !== 'contact' && itemKind !== 'draft') return null;
-		if (sourceFolderKey !== 'contacts' && sourceFolderKey !== 'drafts') return null;
+		if (itemKind !== 'contact' && itemKind !== 'draft' && itemKind !== 'inbox')
+			return null;
+		if (
+			sourceFolderKey !== 'contacts' &&
+			sourceFolderKey !== 'drafts' &&
+			sourceFolderKey !== 'inbox'
+		) {
+			return null;
+		}
 		if (typeof sourceCampaignId !== 'number') return null;
 		if (!Array.isArray(sourceContactListIds)) return null;
 		if (typeof contactId !== 'number') return null;
-		if (itemKind === 'draft' && typeof emailId !== 'number') return null;
+		if ((itemKind === 'draft' || itemKind === 'inbox') && typeof emailId !== 'number') {
+			return null;
+		}
 		if (typeof itemLabel !== 'string') return null;
 
 		return {
@@ -190,8 +209,17 @@ const canDropCampaignFinderPayload = (
 	if (!payload || targetCampaignId === null) return false;
 	if (payload.sourceCampaignId === targetCampaignId) return false;
 	if (typeof payload.contactId !== 'number') return false;
-	if (payload.itemKind === 'draft' && typeof payload.emailId !== 'number') return false;
-	return payload.itemKind === 'contact' || payload.itemKind === 'draft';
+	if (
+		(payload.itemKind === 'draft' || payload.itemKind === 'inbox') &&
+		typeof payload.emailId !== 'number'
+	) {
+		return false;
+	}
+	return (
+		payload.itemKind === 'contact' ||
+		payload.itemKind === 'draft' ||
+		payload.itemKind === 'inbox'
+	);
 };
 
 const getFinderDropTargetFolderKey = (
@@ -200,6 +228,7 @@ const getFinderDropTargetFolderKey = (
 	if (!payload) return null;
 	if (payload.itemKind === 'contact') return 'contacts';
 	if (payload.itemKind === 'draft') return 'drafts';
+	if (payload.itemKind === 'inbox') return 'inbox';
 	return null;
 };
 
@@ -297,7 +326,12 @@ const getFinderContextMenuPayload = (
 	if (!state || state.sourceCampaignId === null) return null;
 	const itemKind = getFinderDragItemKind(state.folderKey);
 	if (!itemKind || typeof state.item.contactId !== 'number') return null;
-	if (itemKind === 'draft' && typeof state.item.emailId !== 'number') return null;
+	if (
+		(itemKind === 'draft' || itemKind === 'inbox') &&
+		typeof state.item.emailId !== 'number'
+	) {
+		return null;
+	}
 
 	return {
 		itemKind,
@@ -966,7 +1000,7 @@ const FinderContactRow = ({
 			dragItemKind &&
 			sourceCampaignId !== null &&
 			typeof item.contactId === 'number' &&
-			(dragItemKind !== 'draft' || typeof item.emailId === 'number')
+			(dragItemKind === 'contact' || typeof item.emailId === 'number')
 	);
 	const dragPayload: CampaignFinderDragPayload | null =
 		canDrag && dragItemKind && sourceCampaignId !== null && typeof item.contactId === 'number'
@@ -1462,6 +1496,9 @@ export const useCampaignsTable = (options?: {
 		suppressToasts: true,
 	});
 	const { mutateAsync: editFinderEmail } = useEditEmail({ suppressToasts: true });
+	const { mutateAsync: assignFinderInboundEmailToCampaign } = useAssignInboundEmailToCampaign({
+		suppressToasts: true,
+	});
 
 	const [metricSort, setMetricSort] = useState<MetricSortState>(null);
 	const metricSortKey = metricSort?.key ?? null;
@@ -2102,6 +2139,7 @@ export const useCampaignsTable = (options?: {
 			queryClient.invalidateQueries({ queryKey: ['campaigns'] }),
 			queryClient.invalidateQueries({ queryKey: ['contacts'] }),
 			queryClient.invalidateQueries({ queryKey: ['emails'] }),
+			queryClient.invalidateQueries({ queryKey: ['inboundEmails'] }),
 			queryClient.invalidateQueries({ queryKey: ['userContactLists'] }),
 		]);
 	}, [queryClient]);
@@ -2222,6 +2260,30 @@ export const useCampaignsTable = (options?: {
 		[editFinderEmail]
 	);
 
+	const moveFinderInboxEmail = useCallback(
+		async (payload: CampaignFinderDragPayload) => {
+			if (openCampaignId === null || typeof payload.emailId !== 'number') return;
+
+			await assignFinderInboundEmailToCampaign({
+				id: payload.emailId,
+				data: { campaignId: openCampaignId },
+			});
+		},
+		[assignFinderInboundEmailToCampaign, openCampaignId]
+	);
+
+	const moveFinderInboxEmailToCampaign = useCallback(
+		async (payload: CampaignFinderDragPayload, targetCampaignId: number) => {
+			if (typeof payload.emailId !== 'number') return;
+
+			await assignFinderInboundEmailToCampaign({
+				id: payload.emailId,
+				data: { campaignId: targetCampaignId },
+			});
+		},
+		[assignFinderInboundEmailToCampaign]
+	);
+
 	const moveMockFinderContactToCampaign = useCallback(
 		(payload: CampaignFinderDragPayload, targetCampaignId: number) => {
 			if (!mockState || !onMockStateChange) return false;
@@ -2330,17 +2392,17 @@ export const useCampaignsTable = (options?: {
 			try {
 				if (payload.itemKind === 'contact') {
 					await moveFinderContact(payload);
-				} else {
+				} else if (payload.itemKind === 'draft') {
 					await moveFinderDraft(payload);
+				} else {
+					await moveFinderInboxEmail(payload);
 				}
 
 				await invalidateFinderDropQueries();
-				toast.success(payload.itemKind === 'contact' ? 'Contact moved' : 'Draft moved');
+				toast.success(`${getFinderMovedItemLabel(payload.itemKind)} moved`);
 			} catch {
 				toast.error(
-					payload.itemKind === 'contact'
-						? 'Could not move contact. Please try again.'
-						: 'Could not move draft. Please try again.'
+					`Could not move ${getFinderMovedItemLabel(payload.itemKind).toLowerCase()}. Please try again.`
 				);
 			} finally {
 				activeCampaignFinderDragPayload = null;
@@ -2354,6 +2416,7 @@ export const useCampaignsTable = (options?: {
 			isMockActive,
 			moveFinderContact,
 			moveFinderDraft,
+			moveFinderInboxEmail,
 			moveMockFinderContact,
 			openCampaignId,
 		]
@@ -2448,17 +2511,17 @@ export const useCampaignsTable = (options?: {
 			try {
 				if (payload.itemKind === 'contact') {
 					await moveFinderContactToCampaign(payload, target);
-				} else {
+				} else if (payload.itemKind === 'draft') {
 					await moveFinderDraftToCampaign(payload, target.campaignId);
+				} else {
+					await moveFinderInboxEmailToCampaign(payload, target.campaignId);
 				}
 
 				await invalidateFinderDropQueries();
-				toast.success(payload.itemKind === 'contact' ? 'Contact moved' : 'Draft moved');
+				toast.success(`${getFinderMovedItemLabel(payload.itemKind)} moved`);
 			} catch {
 				toast.error(
-					payload.itemKind === 'contact'
-						? 'Could not move contact. Please try again.'
-						: 'Could not move draft. Please try again.'
+					`Could not move ${getFinderMovedItemLabel(payload.itemKind).toLowerCase()}. Please try again.`
 				);
 			} finally {
 				setIsFinderDropPending(false);
@@ -2469,6 +2532,7 @@ export const useCampaignsTable = (options?: {
 			isMockActive,
 			moveFinderContactToCampaign,
 			moveFinderDraftToCampaign,
+			moveFinderInboxEmailToCampaign,
 			moveMockFinderContactToCampaign,
 		]
 	);

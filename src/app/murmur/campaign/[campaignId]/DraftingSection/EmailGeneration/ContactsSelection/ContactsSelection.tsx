@@ -26,7 +26,6 @@ import {
 	useGetUsedContactIds,
 	useGetLocations,
 } from '@/hooks/queryHooks/useContacts';
-import { CampaignWithRelations } from '@/types';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
@@ -48,11 +47,10 @@ const DEFAULT_STATE_SUGGESTIONS = [
 	{ label: 'Pennsylvania', description: 'contact venues, restaurants and more' },
 	{ label: 'California', description: 'contact venues, restaurants and more' },
 ];
+const PENDING_SEARCH_STORAGE_KEY = 'murmur_pending_search';
 
-// Keep campaign mini-search empty by default. The dashboard redirect handles blank
-// submissions as curated picks, which avoids exact-searching the campaign/list name.
-export const parseSearchFromCampaign = (campaign?: CampaignWithRelations) => {
-	void campaign;
+// Campaign mini search starts blank so the campaign name is never used as a query.
+export const parseSearchFromCampaign = () => {
 	return { why: 'Booking', what: '', where: '' };
 };
 
@@ -952,7 +950,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 	const [isDrafting, setIsDrafting] = useState(false);
 	const router = useRouter();
 	const isMobile = useIsMobile();
-	const searchInfo = useMemo(() => parseSearchFromCampaign(campaign), [campaign]);
+	const searchInfo = useMemo(() => parseSearchFromCampaign(), []);
 	
 	// Track hovered contact index for keyboard navigation
 	const [hoveredContactIndex, setHoveredContactIndex] = useState<number | null>(null);
@@ -1069,8 +1067,23 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		const trimmedWhy = (whyValue ?? '').trim();
 		const trimmedWhat = (whatValue ?? '').trim();
 		const trimmedWhere = (whereValue ?? '').trim();
+
+		const dashboardUrl = campaign?.id
+			? `${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`
+			: urls.murmur.dashboard.index;
+
+		if (!trimmedWhat && !trimmedWhere) {
+			try {
+				sessionStorage.removeItem(PENDING_SEARCH_STORAGE_KEY);
+			} catch {
+				// Ignore sessionStorage errors (e.g., disabled storage)
+			}
+			router.push(`${dashboardUrl}${dashboardUrl.includes('?') ? '&' : '?'}pick=1`);
+			return;
+		}
+
 		let searchQuery = '';
-		if (trimmedWhy && (trimmedWhat || trimmedWhere)) {
+		if (trimmedWhy) {
 			searchQuery += trimmedWhy + ' ';
 		}
 		if (trimmedWhat) {
@@ -1081,31 +1094,20 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		}
 		searchQuery = searchQuery.trim();
 
-		const dashboardParams = new URLSearchParams();
-		if (campaign?.id) {
-			dashboardParams.set('fromCampaignId', String(campaign.id));
+		// Store the search query in sessionStorage for the dashboard to pick up.
+		try {
+			sessionStorage.setItem(
+				PENDING_SEARCH_STORAGE_KEY,
+				JSON.stringify({
+					v: 1,
+					query: searchQuery,
+					fromCampaignId: campaign?.id != null ? String(campaign.id) : null,
+				})
+			);
+		} catch {
+			// Ignore sessionStorage errors (e.g., disabled storage)
 		}
 
-		if (searchQuery) {
-			// Store the explicit search query in sessionStorage for the dashboard to pick up
-			try {
-				sessionStorage.setItem('murmur_pending_search', searchQuery);
-			} catch {
-				// Ignore sessionStorage errors (e.g., disabled storage)
-			}
-		} else {
-			dashboardParams.set('pick', '1');
-			try {
-				sessionStorage.removeItem('murmur_pending_search');
-			} catch {
-				// Ignore sessionStorage errors (e.g., disabled storage)
-			}
-		}
-
-		// Navigate to the campaign-scoped dashboard search/map view when possible
-		const dashboardUrl = dashboardParams.toString()
-			? `${urls.murmur.dashboard.index}?${dashboardParams.toString()}`
-			: urls.murmur.dashboard.index;
 		router.push(dashboardUrl);
 	};
 
