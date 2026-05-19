@@ -61,11 +61,12 @@ const isSameLocalDay = (a: Date, b: Date) =>
 	a.getMonth() === b.getMonth() &&
 	a.getDate() === b.getDate();
 
-const CONTACT_ROW_INSET_PX = 6.104;
-const CONTACT_ROW_HEIGHT_PX = 49.657;
-const CONTACT_ROW_RADIUS_PX = 8.269;
-const SUPPLEMENTAL_DRAFT_ROW_HEIGHT_PX = 108;
-const SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX = 7.798;
+	const CONTACT_ROW_INSET_PX = 6.104;
+	const CONTACT_ROW_HEIGHT_PX = 49.657;
+	const CONTACT_ROW_RADIUS_PX = 8.269;
+	const SUPPLEMENTAL_DRAFT_ROW_HEIGHT_PX = 108;
+	const SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX = 7.798;
+	const SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX = 92;
 
 const formatBatchCount = (count: number) => `+${count < 10 ? `0${count}` : count}`;
 
@@ -840,8 +841,14 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		const contact =
 			contactsById.get(draft.contactId) ??
 			((draft.contact as ContactWithName | null) || null);
-		const contactName = getContactDisplayName(contact, 'Unknown Contact');
-		const companyLabel = getContactCompanyLabel(contact);
+		const rawContactName = getContactFullName(contact);
+		const rawCompanyLabel = contact?.company || '';
+		const contactName = rawContactName.includes('@') ? '' : rawContactName;
+		const companyLabel = rawCompanyLabel.includes('@')
+			? !contactName
+				? 'Unknown Contact'
+				: ''
+			: rawCompanyLabel || (!contactName ? 'Unknown Contact' : '');
 		const contactTitle = getContactTitle(contact);
 		const messagePreview = draft.message ? convertHtmlToPlainText(draft.message) : 'No content';
 
@@ -872,57 +879,59 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					if (contact) onContactClick?.(contact);
 				}}
 			>
-				<div className="absolute left-[12px] top-[13px] w-[182px] pointer-events-none">
+				<div className="absolute left-0 top-0 h-[13px] w-full pointer-events-none flex">
+					<div className="h-full w-[115px] shrink-0 bg-[#FFE3AA]" />
+					<div className="h-full flex-1 bg-[#F9FAFB]" />
+				</div>
+
+				<div className="absolute left-3 top-[17px] right-1/2 pr-1 pointer-events-none">
 					<div
-						className="font-bold text-[12px] font-inter text-black leading-[1.1] whitespace-nowrap overflow-hidden"
-						style={{
-							maskImage: 'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
-							WebkitMaskImage:
-								'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
-						}}
+						className="font-inter text-[14.661px] font-medium leading-[19.547px] text-black whitespace-nowrap overflow-hidden text-ellipsis"
+						title={companyLabel}
+					>
+						{companyLabel}
+					</div>
+					<div
+						className="font-inter text-[14.661px] font-normal leading-[19.547px] text-black whitespace-nowrap overflow-hidden text-ellipsis"
+						title={contactName}
 					>
 						{contactName}
 					</div>
-					<div className="mt-[5px] text-[12px] font-inter text-black leading-[1.1] truncate">
-						{companyLabel}
-					</div>
 				</div>
 
-				<div className="absolute top-[10px] right-[8px] w-[169px] flex flex-col items-end gap-[3px] pointer-events-none">
+				<div className="absolute top-[16px] left-1/2 right-2 pl-1 pointer-events-none">
 					{contactTitle ? (
 						<TitleBadge
 							title={contactTitle}
-							className="w-[169px] h-[21px] rounded-[5px] justify-center px-2"
-							textClassName="text-[11px]"
-							restaurantIconSize={14}
-							defaultIconSize={14}
+							className="w-full h-[17px] rounded-[6px] px-2 gap-1"
+							textClassName="text-[10px] text-black leading-none"
+							restaurantIconSize={12}
+							coffeeIconSize={7}
+							defaultIconSize={12}
 						/>
 					) : null}
+				</div>
+
+				<div className="absolute top-[37px] left-1/2 right-2 pl-1 pointer-events-none">
 					<StateLocationRow
 						contact={contact}
-						className="h-[19px] w-[169px]"
-						badgeClassName="w-[29px] h-[19px] rounded-[4px]"
-						badgeTextClassName="text-[10px]"
-						cityClassName="text-[11px] max-w-[130px]"
+						className="h-[16px] w-full gap-1"
+						badgeClassName="box-border w-[29px] h-[16px] rounded-[4px] shrink-0"
+						badgeTextClassName="font-inter text-[10px] leading-none font-bold"
+						cityClassName="text-[10px] text-black leading-none"
 					/>
 				</div>
 
-				<div className="absolute left-[22px] right-[12px] top-[63px] pointer-events-none">
+				<div className="absolute left-3 right-[12px] top-[57px] pointer-events-none">
 					<div
-						className="text-[13px] text-black font-bold leading-none whitespace-nowrap overflow-hidden"
-						style={{
-							WebkitMaskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
-							maskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
-						}}
+						className="font-inter text-[13.215px] text-black font-semibold leading-[21.144px] whitespace-nowrap overflow-hidden text-ellipsis"
+						title={draft.subject || 'No subject'}
 					>
 						{draft.subject || 'No subject'}
 					</div>
 					<div
-						className="mt-[13px] text-[13px] text-black leading-none whitespace-nowrap overflow-hidden"
-						style={{
-							WebkitMaskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
-							maskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
-						}}
+						className="font-inter text-[13.215px] text-black font-normal leading-[21.144px] whitespace-nowrap overflow-hidden text-ellipsis"
+						title={messagePreview}
 					>
 						{messagePreview}
 					</div>
@@ -936,7 +945,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		inboxIndex: number
 	) => {
 		const contact = resolveInboundContact(email, contactByEmail, contactsById);
-		const contactName = getContactDisplayName(contact, email.senderName || email.sender || 'Unknown sender');
+		const contactName = getContactDisplayName(
+			contact,
+			email.senderName || email.sender || 'Unknown sender'
+		);
 		const companyLabel = getContactCompanyLabel(contact);
 		const contactTitle = getContactTitle(contact);
 		const bodyPreview = email.bodyPlain
@@ -949,10 +961,20 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			<div
 				key={`contacts-inbox-${email.id}-${inboxIndex}`}
 				className={cn(
-					'transition-colors relative select-none overflow-hidden border-2 border-[#000000] bg-white h-[64px] rounded-[8px] p-2',
-					isAllTabNavigation ? 'cursor-default' : 'cursor-pointer hover:bg-[#EAF3FB]'
+					'relative select-none overflow-hidden',
+					isAllTabNavigation ? 'cursor-default' : 'cursor-pointer'
 				)}
-				style={{ width: contactRowWidth }}
+				style={{
+					width: contactRowWidth,
+					height: `${SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX}px`,
+					borderRadius: `${SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX}px`,
+					borderTop: '1.955px solid #000000',
+					borderRight: '1.949px solid #000000',
+					borderBottom: '1.949px solid #000000',
+					borderLeft: '1.949px solid #000000',
+					background: '#F9FAFB',
+					boxSizing: 'border-box',
+				}}
 				onMouseEnter={() => {
 					if (!isAllTabNavigation) setHoveredContactIndex(null);
 					onContactHover?.(contact);
@@ -963,37 +985,56 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					if (contact) onContactClick?.(contact);
 				}}
 			>
-				<div className="absolute flex flex-col items-end pointer-events-none top-[6px] right-[6px] gap-[2px] w-[110px]">
+				{/* Layout mirrors supplemental draft rows, but without the top strip. */}
+				<div className="absolute left-3 top-[10px] right-1/2 pr-1 pointer-events-none">
+					<div
+						className="font-inter text-[14.661px] font-medium leading-[19.547px] text-black whitespace-nowrap overflow-hidden text-ellipsis"
+						title={companyLabel}
+					>
+						{companyLabel}
+					</div>
+					<div
+						className="font-inter text-[14.661px] font-normal leading-[19.547px] text-black whitespace-nowrap overflow-hidden text-ellipsis"
+						title={contactName}
+					>
+						{contactName}
+					</div>
+				</div>
+
+				<div className="absolute top-[9px] left-1/2 right-2 pl-1 pointer-events-none">
 					{contactTitle ? (
 						<TitleBadge
 							title={contactTitle}
-							className="w-[110px] h-[10px] rounded-[3.71px] justify-center"
-							textClassName="text-[8px] px-1"
-							restaurantIconSize={8}
-							coffeeIconSize={5}
-							defaultIconSize={8}
+							className="w-full h-[17px] rounded-[6px] px-2 gap-1"
+							textClassName="text-[10px] text-black leading-none"
+							restaurantIconSize={12}
+							coffeeIconSize={7}
+							defaultIconSize={12}
 						/>
 					) : null}
+				</div>
+
+				<div className="absolute top-[30px] left-1/2 right-2 pl-1 pointer-events-none">
 					<StateLocationRow
 						contact={contact}
-						className="gap-1 h-[11.67px] w-full"
-						badgeClassName="w-[17.81px] h-[11.67px] rounded-[3.44px]"
-						badgeTextClassName="text-[8px]"
-						cityClassName="text-[10px] max-w-[80px]"
+						className="h-[16px] w-full gap-1"
+						badgeClassName="box-border w-[29px] h-[16px] rounded-[4px] shrink-0"
+						badgeTextClassName="font-inter text-[10px] leading-none font-bold"
+						cityClassName="text-[10px] text-black leading-none"
 					/>
 				</div>
 
-				<div className="grid grid-cols-1 grid-rows-4 h-full pr-[120px] pl-[22px]">
-					<div className="row-start-1 col-start-1 flex items-center h-[16px]">
-						<div className="font-bold text-[11px] truncate leading-none">{contactName}</div>
-					</div>
-					<div className="row-start-2 col-start-1 flex items-center pr-2 h-[16px]">
-						<div className="text-[11px] text-black truncate leading-none">{companyLabel}</div>
-					</div>
-					<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center h-[16px]">
+				<div className="absolute left-3 right-[12px] top-[42px] pointer-events-none">
+					<div
+						className="font-inter text-[13.215px] text-black font-semibold leading-[21.144px] whitespace-nowrap overflow-hidden text-ellipsis"
+						title={email.subject || 'No subject'}
+					>
 						{email.subject || 'No subject'}
 					</div>
-					<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center h-[16px]">
+					<div
+						className="font-inter text-[13.215px] text-black font-normal leading-[21.144px] whitespace-nowrap overflow-hidden text-ellipsis"
+						title={bodyPreview}
+					>
 						{bodyPreview}
 					</div>
 				</div>
@@ -1763,7 +1804,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 														)}
 													>
 														<div
-															className="font-bold text-[12px] font-inter text-black w-full overflow-hidden whitespace-nowrap leading-[1.1]"
+													className="font-inter text-[14.661px] font-medium leading-[19.547px] text-black text-left w-full overflow-hidden whitespace-nowrap"
 															style={{
 																maskImage:
 																	'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
@@ -1843,7 +1884,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 															'col-start-1 row-start-2 pr-1 flex items-start pt-[2px] overflow-hidden'
 														)}
 													>
-														<div className="text-[12px] font-inter text-black w-full truncate leading-[1.1]">
+												<div className="font-inter text-[14.661px] font-normal leading-[19.547px] text-black text-left w-full truncate">
 															{fullName}
 														</div>
 													</div>
@@ -1927,7 +1968,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 														)}
 													>
 														<div
-															className="font-bold text-[12px] font-inter text-black w-full overflow-hidden whitespace-nowrap leading-[1.1]"
+													className="font-inter text-[14.661px] font-medium leading-[19.547px] text-black text-left w-full overflow-hidden whitespace-nowrap"
 															style={{
 																maskImage:
 																	'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',

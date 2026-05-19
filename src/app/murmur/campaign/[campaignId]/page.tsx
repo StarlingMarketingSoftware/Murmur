@@ -2515,7 +2515,10 @@ const Murmur = () => {
 					className={cn(
 						'min-h-screen relative',
 						!isMobile && 'campaign-map-interactive-page',
-						usePersistentCampaignMapBackground && 'campaign-persistent-map-page'
+						usePersistentCampaignMapBackground && 'campaign-persistent-map-page',
+						usePersistentCampaignMapBackground &&
+							activeView === 'inbox' &&
+							'campaign-inbox-centered-page'
 					)}
 				>
 					{usePersistentCampaignMapBackground && (
@@ -3185,6 +3188,32 @@ const Murmur = () => {
 							transform: translateX(
 								var(${CAMPAIGN_MAP_SHIFT_X_VAR}, ${CAMPAIGN_MAP_FALLBACK_SHIFT_X_PX}px)
 							);
+						}
+
+						/* Inbox is a centered workspace: no right-biased map shift, and the
+						   translucent map backdrop should cover the whole viewport. */
+						.campaign-persistent-map-page.campaign-inbox-centered-page .campaign-map-split-overlay {
+							background: rgba(136, 136, 136, 0.1);
+						}
+
+						.campaign-persistent-map-page.campaign-inbox-centered-page
+							[data-slot='campaign-top-box-wrapper'],
+						.campaign-persistent-map-page.campaign-inbox-centered-page
+							[data-slot='campaign-header'],
+						.campaign-persistent-map-page.campaign-inbox-centered-page
+							[data-slot='campaign-content'] {
+							transform: scale(${CAMPAIGN_MAP_CONTENT_SCALE});
+						}
+
+						.campaign-persistent-map-page.campaign-inbox-centered-page
+							[data-slot='campaign-top-backdrop'],
+						.campaign-persistent-map-page.campaign-inbox-centered-page
+							[data-slot='campaign-top-outline-boxes'],
+						.campaign-persistent-map-page.campaign-inbox-centered-page
+							[data-slot='campaign-top-tabs'],
+						.campaign-persistent-map-page.campaign-inbox-centered-page
+							[data-slot='campaign-top-search-bar'] {
+							transform: none;
 						}
 
 						/* View transition animations - smooth, clean crossfade */
