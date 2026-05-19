@@ -40,9 +40,44 @@ const RESEARCH_PANEL_BANDS = [
 
 const RESEARCH_PANEL_METADATA_TOP = 258;
 const RESEARCH_PANEL_DIVIDER_TOPS = [52, 65, 90, 138, 162, 186, 210, 234, 258] as const;
+const RESEARCH_PANEL_HEADER_NAME_STYLE = {
+	color: '#000',
+	fontFamily: 'Inter',
+	fontSize: '16.748px',
+	fontStyle: 'normal',
+	fontWeight: 500,
+	lineHeight: '22.33px',
+} as const;
 
 const toCssSize = (value: string | number) =>
 	typeof value === 'number' ? `${value}px` : value;
+
+const TEXT_RIGHT_FADE_MASK =
+	'linear-gradient(to right, #000 calc(100% - 24px), transparent)';
+const TEXT_BOTTOM_FADE_MASK =
+	'linear-gradient(to bottom, #000 calc(100% - 14px), transparent)';
+const HEADLINE_BOTTOM_FADE_MASK =
+	'linear-gradient(to bottom, #000 calc(100% - 8px), transparent)';
+
+const singleLineTextFadeStyle = {
+	overflow: 'hidden',
+	textOverflow: 'clip',
+	whiteSpace: 'nowrap',
+	WebkitMaskImage: TEXT_RIGHT_FADE_MASK,
+	maskImage: TEXT_RIGHT_FADE_MASK,
+} as const;
+
+const multiLineTextFadeStyle = {
+	overflow: 'hidden',
+	WebkitMaskImage: TEXT_BOTTOM_FADE_MASK,
+	maskImage: TEXT_BOTTOM_FADE_MASK,
+} as const;
+
+const headlineTextFadeStyle = {
+	overflow: 'hidden',
+	WebkitMaskImage: HEADLINE_BOTTOM_FADE_MASK,
+	maskImage: HEADLINE_BOTTOM_FADE_MASK,
+} as const;
 
 type ContactTitleCategoryKind =
 	| 'restaurant'
@@ -295,7 +330,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	const topDetailStart = headerHeight + 13;
 	const displayName = contact
 		? personalName || companyName || 'Unknown'
-		: 'Loading...';
+		: 'Loading';
 	const showCompanyName = Boolean(personalName && companyName);
 	const latitude =
 		typeof contact?.latitude === 'number' ? contact.latitude.toFixed(4) : '';
@@ -347,7 +382,9 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						...(textStyle || {}),
 					}}
 				>
-					<span className="block w-full truncate">{addressText}</span>
+					<span className="block w-full" style={singleLineTextFadeStyle}>
+						{addressText}
+					</span>
 				</div>
 			),
 		});
@@ -373,10 +410,18 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				>
 					<span
 						style={{
-							display: '-webkit-box',
-							WebkitBoxOrient: 'vertical',
-							WebkitLineClamp: isSingleLineHeadline ? 1 : 2,
-							overflow: 'hidden',
+							display: 'block',
+							width: '100%',
+							height: isSingleLineHeadline
+								? '16.419px'
+								: `${headlineRowHeight}px`,
+							...headlineTextFadeStyle,
+							...(isSingleLineHeadline
+								? {
+										textOverflow: 'clip',
+										whiteSpace: 'nowrap',
+									}
+								: {}),
 						}}
 					>
 						{headlineText}
@@ -413,8 +458,9 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 							</div>
 						)}
 						<span
-							className="truncate"
+							className="block min-w-0 w-full"
 							style={{
+								...singleLineTextFadeStyle,
 								color: '#000',
 								textAlign: 'left',
 								fontFamily: 'Inter',
@@ -446,8 +492,9 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 					}}
 				>
 					<span
-						className="block w-full truncate"
+						className="block w-full"
 						style={{
+							...singleLineTextFadeStyle,
 							color: '#000',
 							textAlign: 'left',
 							fontFamily: 'Inter',
@@ -495,8 +542,9 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 					</div>
 					{cityText && (
 						<span
-							className="truncate"
+							className="block min-w-0 w-full"
 							style={{
+								...singleLineTextFadeStyle,
 								color: '#202020',
 								fontFamily: 'Inter',
 								fontSize: '15.091px',
@@ -527,8 +575,9 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 					}}
 				>
 					<span
-						className="block w-full truncate"
+						className="block w-full"
 						style={{
+							...singleLineTextFadeStyle,
 							color: '#000',
 							textAlign: 'left',
 							fontFamily: 'Inter',
@@ -563,8 +612,9 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 							<WebsiteIcon className="flex-shrink-0" />
 						</div>
 						<span
-							className="truncate"
+							className="block min-w-0 w-full"
 							style={{
+								...singleLineTextFadeStyle,
 								color: '#000',
 								textAlign: 'left',
 								fontFamily: 'Inter',
@@ -664,21 +714,52 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 			<div
 				className={cn(
 					'absolute left-[23px] right-[17px] top-[10px] z-10 font-inter text-left text-black',
-					isCompanyOnlyHeader && 'flex items-center'
+					(isCompanyOnlyHeader || showCompanyName) && 'flex items-center'
 				)}
 				style={{
 					...(textStyle || {}),
-					...(isCompanyOnlyHeader ? { top: 0 } : {}),
-					height: `${isCompanyOnlyHeader ? headerHeight : headerHeight - 10}px`,
+					...(isCompanyOnlyHeader || showCompanyName ? { top: 0 } : {}),
+					height: `${isCompanyOnlyHeader || showCompanyName ? headerHeight : headerHeight - 10}px`,
 				}}
 			>
 				<div className={cn('min-w-0 pr-[130px]', isCompanyOnlyHeader && 'w-full')}>
-					<div className="truncate text-[18px] leading-[1.05] font-normal">
+					<div
+						className={cn(
+							'block w-full min-w-0',
+							!(isCompanyOnlyHeader || showCompanyName) &&
+								'text-[18px] leading-[1.05] font-normal'
+						)}
+						style={{
+							...singleLineTextFadeStyle,
+							...(isCompanyOnlyHeader || showCompanyName
+								? {
+										...RESEARCH_PANEL_HEADER_NAME_STYLE,
+										...(textStyle || {}),
+									}
+								: {}),
+						}}
+					>
 						{displayName}
 					</div>
 					{showCompanyName && (
-						<div className="truncate text-[17px] leading-[1.05] font-normal mt-[2px]">
-							{companyName}
+						<div
+							className="min-w-0 overflow-hidden"
+							style={{
+								display: 'flex',
+								width: '163.01px',
+								height: '29.029px',
+								marginTop: '-10px',
+								flexDirection: 'column',
+								justifyContent: 'center',
+								...(textStyle || {}),
+							}}
+						>
+							<span
+								className="block w-full text-[17px] leading-[1.05] font-normal"
+								style={singleLineTextFadeStyle}
+							>
+								{companyName}
+							</span>
 						</div>
 					)}
 				</div>
@@ -803,11 +884,7 @@ export const ContactResearchHorizontalStrip: FC<
 							<div className="flex-1 mr-[6px] my-[4px] bg-white border border-black rounded-[6px] px-[6px] py-[4px] flex items-center min-w-0">
 								<div
 									className="text-[13px] leading-[1.25] font-inter text-black horizontal-research-bullet-text"
-									style={{
-										display: '-webkit-box',
-										WebkitBoxOrient: 'vertical',
-										overflow: 'hidden',
-									}}
+									style={multiLineTextFadeStyle}
 								>
 									{text}
 								</div>
@@ -829,17 +906,26 @@ export const ContactResearchHorizontalStrip: FC<
 	// Contact info box component (reused in both layouts)
 	const contactInfoBox = (
 		<div className="w-full h-[82px] lg:h-[52px] rounded-[8px] border-2 border-black bg-white px-3 py-[6px] flex items-center justify-between gap-3">
-			<div className="flex flex-col justify-center min-w-0">
-				<div className="font-inter font-bold text-[14px] leading-tight truncate text-black">
+			<div className="flex flex-1 flex-col justify-center min-w-0">
+				<div
+					className="block w-full font-inter font-bold text-[14px] leading-tight text-black"
+					style={singleLineTextFadeStyle}
+				>
 					{displayName}
 				</div>
 				{hasName && contact.company && (
-					<div className="text-[11px] leading-tight text-[#4b4b4b] truncate">
+					<div
+						className="block w-full text-[11px] leading-tight text-[#4b4b4b]"
+						style={singleLineTextFadeStyle}
+					>
 						{contact.company}
 					</div>
 				)}
 				{!hasName && contact.title && (
-					<div className="text-[11px] leading-tight text-[#4b4b4b] truncate">
+					<div
+						className="block w-full text-[11px] leading-tight text-[#4b4b4b]"
+						style={singleLineTextFadeStyle}
+					>
 						{contact.title}
 					</div>
 				)}
@@ -855,18 +941,24 @@ export const ContactResearchHorizontalStrip: FC<
 						</span>
 					)}
 					{contact.city && (
-						<span className="text-[11px] leading-none text-black truncate max-w-[120px]">
+						<span
+							className="block w-[120px] text-[11px] leading-none text-black"
+							style={singleLineTextFadeStyle}
+						>
 							{contact.city}
 						</span>
 					)}
 				</div>
 				{titleCategory && (
 					<div
-						className="max-w-[160px] px-2 py-[2px] rounded-[8px] border border-black flex items-center gap-1"
+						className="w-[160px] px-2 py-[2px] rounded-[8px] border border-black flex items-center gap-1"
 						style={{ backgroundColor: titleCategory.backgroundColor }}
 					>
 						{renderContactTitleCategoryIcon(titleCategory.kind)}
-						<span className="text-[10px] leading-none text-black block truncate">
+						<span
+							className="block min-w-0 flex-1 text-[10px] leading-none text-black"
+							style={singleLineTextFadeStyle}
+						>
 							{titleCategory.label}
 						</span>
 					</div>
@@ -886,14 +978,14 @@ export const ContactResearchHorizontalStrip: FC<
 			style={style}
 			data-hover-description="Research: Background info and notes for the selected contact."
 		>
-			{/* CSS for responsive line clamp on bullet text */}
+			{/* CSS for responsive fade bounds on bullet text */}
 			<style>{`
 				.horizontal-research-bullet-text {
-					-webkit-line-clamp: 4;
+					height: 65px;
 				}
 				@media (min-width: 1024px) {
 					.horizontal-research-bullet-text {
-						-webkit-line-clamp: 2;
+						height: 32.5px;
 					}
 				}
 			`}</style>
