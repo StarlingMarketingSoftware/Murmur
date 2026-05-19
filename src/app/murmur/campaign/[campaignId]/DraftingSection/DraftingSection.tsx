@@ -1822,7 +1822,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		'why' | 'what' | 'where' | null
 	>(null);
 	const [searchWhyValue, setSearchWhyValue] = useState('[Booking]');
-	const [searchWhatValue, setSearchWhatValue] = useState(campaign?.name || '');
+	const [searchWhatValue, setSearchWhatValue] = useState('');
 	const [searchWhereValue, setSearchWhereValue] = useState('');
 	const [userLocationName] = useState<string | null>(null);
 	const [isLoadingLocation] = useState(false);
@@ -1845,12 +1845,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			setSearchWhereValue(contacts[0].state);
 		}
 	}, [contacts, searchWhereValue]);
-
-	useEffect(() => {
-		if (campaign?.name) {
-			setSearchWhatValue(campaign.name);
-		}
-	}, [campaign?.name]);
 
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
@@ -2168,10 +2162,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		const trimmedWhat = (what ?? '').trim();
 		const trimmedWhere = (where ?? '').trim();
 
-		// Match the top campaign search button behavior: route to dashboard map view in
-		// "from campaign" mode, and pass the query via sessionStorage.
+		const dashboardParams = new URLSearchParams();
+		if (campaign?.id) {
+			dashboardParams.set('fromCampaignId', String(campaign.id));
+		}
+
+		// Blank mini-searches should open the curated campaign search flow instead of
+		// falling back to the campaign/list name as an exact query.
 		if (!trimmedWhat && !trimmedWhere) {
-			toast.error('Please enter what you want to search for');
+			dashboardParams.set('pick', '1');
+			try {
+				if (typeof window !== 'undefined') {
+					sessionStorage.removeItem('murmur_pending_search');
+				}
+			} catch {
+				// Ignore sessionStorage errors (e.g., disabled storage)
+			}
+			const curatedDashboardUrl = dashboardParams.toString()
+				? `${urls.murmur.dashboard.index}?${dashboardParams.toString()}`
+				: urls.murmur.dashboard.index;
+			router.push(curatedDashboardUrl);
 			return;
 		}
 
@@ -2197,8 +2207,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			}
 		}
 
-		const dashboardUrl = campaign?.id
-			? `${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`
+		const dashboardUrl = dashboardParams.toString()
+			? `${urls.murmur.dashboard.index}?${dashboardParams.toString()}`
 			: urls.murmur.dashboard.index;
 		router.push(dashboardUrl);
 	};
@@ -2978,6 +2988,31 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 		return map;
 	}, [contacts]);
+	const { data: allInboundEmailsForContactsTable } = useGetInboundEmails({
+		enabled: Boolean(contacts?.length),
+	});
+	const inboxEmailsForContactsExpandedList = useMemo(() => {
+		if (!allInboundEmailsForContactsTable || !contacts?.length) return [];
+		const allowedSenders = new Set(
+			contacts
+				.map((contact) => contact.email?.toLowerCase().trim())
+				.filter((email): email is string => Boolean(email))
+		);
+		if (allowedSenders.size === 0) return [];
+		return allInboundEmailsForContactsTable.filter((email) => {
+			const sender = email.sender?.toLowerCase().trim();
+			return Boolean(sender && allowedSenders.has(sender));
+		});
+	}, [allInboundEmailsForContactsTable, contacts]);
+	const contactsListSupplementalProps = useMemo(
+		() => ({
+			allContacts: contacts || [],
+			drafts: draftEmails,
+			inboxEmails: inboxEmailsForContactsExpandedList,
+			contactByEmail: campaignContactsByEmail,
+		}),
+		[contacts, draftEmails, inboxEmailsForContactsExpandedList, campaignContactsByEmail]
+	);
 
 	const toListNames =
 		campaign?.userContactLists?.map((list) => list.name).join(', ') || '';
@@ -3569,6 +3604,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												>
 											<ContactsExpandedList
 												contacts={contactsForContactsExpandedList}
+												{...contactsListSupplementalProps}
 												{...contactsListTopNavProps}
 												isLoading={isContactsLoading}
 														campaign={campaign}
@@ -4596,9 +4632,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											overflow: 'visible',
 										}}
 									>
-										<ContactsExpandedList
-											contacts={contactsForContactsExpandedList}
-											{...contactsListTopNavProps}
+									<ContactsExpandedList
+										contacts={contactsForContactsExpandedList}
+										{...contactsListSupplementalProps}
+										{...contactsListTopNavProps}
 											isLoading={isContactsLoading}
 											campaign={campaign}
 											enableUsedContactTooltip={false}
@@ -4659,6 +4696,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												>
 											<ContactsExpandedList
 												contacts={contactsForContactsExpandedList}
+												{...contactsListSupplementalProps}
 												{...contactsListTopNavProps}
 												isLoading={isContactsLoading}
 														campaign={campaign}
@@ -5068,6 +5106,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div className="mt-[20px] w-full flex justify-center">
 										<ContactsExpandedList
 											contacts={contactsForContactsExpandedList}
+											{...contactsListSupplementalProps}
 											{...contactsListTopNavProps}
 											isLoading={isContactsLoading}
 													campaign={campaign}
@@ -5467,6 +5506,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												>
 													<ContactsExpandedList
 														contacts={contactsForContactsExpandedList}
+														{...contactsListSupplementalProps}
 														campaign={campaign}
 														activelyDraftingContactIds={
 															activelyDraftingContactIdsForContactsExpandedList
@@ -5701,6 +5741,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												>
 													<ContactsExpandedList
 														contacts={contactsForContactsExpandedList}
+														{...contactsListSupplementalProps}
 														campaign={campaign}
 														activelyDraftingContactIds={
 															activelyDraftingContactIdsForContactsExpandedList
@@ -5881,6 +5922,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										>
 											<ContactsExpandedList
 												contacts={contactsForContactsExpandedList}
+												{...contactsListSupplementalProps}
 												campaign={campaign}
 												activelyDraftingContactIds={
 													activelyDraftingContactIdsForContactsExpandedList
@@ -6011,6 +6053,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div className="mt-[91px] pb-[8px] flex justify-center gap-[15px]">
 												<ContactsExpandedList
 													contacts={contactsForContactsExpandedList}
+													{...contactsListSupplementalProps}
 													campaign={campaign}
 													activelyDraftingContactIds={
 														activelyDraftingContactIdsForContactsExpandedList
@@ -7375,6 +7418,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										<div className="mt-[91px] pb-[8px] flex justify-center gap-[15px]">
 											<ContactsExpandedList
 												contacts={contactsForContactsExpandedList}
+												{...contactsListSupplementalProps}
 												campaign={campaign}
 												activelyDraftingContactIds={
 													activelyDraftingContactIdsForContactsExpandedList
@@ -7442,6 +7486,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											>
 												<ContactsExpandedList
 													contacts={contactsForContactsExpandedList}
+													{...contactsListSupplementalProps}
 													campaign={campaign}
 													activelyDraftingContactIds={
 														activelyDraftingContactIdsForContactsExpandedList

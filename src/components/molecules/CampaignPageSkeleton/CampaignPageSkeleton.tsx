@@ -485,6 +485,9 @@ export const ContactsExpandedListSkeleton: FC = () => {
 	const loadingWaveDurationSeconds = 4.5;
 	const loadingWaveStepSeconds = 0.1;
 	const rowCount = 8;
+	const rowWidthPx = 370.896;
+	const rowHeightPx = 49.657;
+	const rowRadiusPx = 8.269;
 
 	return (
 		<div
@@ -512,12 +515,14 @@ export const ContactsExpandedListSkeleton: FC = () => {
 					<div
 						key={i}
 						className={cn(
-							// Match ContactsExpandedList innerWidth for width={377} (377 - 10 = 367)
-							'w-[367px] h-[49px]',
-							'rounded-[8px] border-2 border-black overflow-hidden',
+							'border-2 border-black overflow-hidden',
 							'contacts-expanded-list-loading-wave-row'
 						)}
 						style={{
+							width: `${rowWidthPx}px`,
+							height: `${rowHeightPx}px`,
+							borderRadius: `${rowRadiusPx}px`,
+							boxSizing: 'border-box',
 							animationDelay: `${-(loadingWaveDurationSeconds - i * loadingWaveStepSeconds)}s`,
 						}}
 					/>

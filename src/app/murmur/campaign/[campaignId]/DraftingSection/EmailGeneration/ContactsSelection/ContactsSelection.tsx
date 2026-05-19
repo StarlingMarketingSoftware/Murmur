@@ -49,27 +49,11 @@ const DEFAULT_STATE_SUGGESTIONS = [
 	{ label: 'California', description: 'contact venues, restaurants and more' },
 ];
 
-// Parse campaign name to extract search components
-// Campaign names are typically formatted as "{what} in {where}" or just "{what}"
+// Keep campaign mini-search empty by default. The dashboard redirect handles blank
+// submissions as curated picks, which avoids exact-searching the campaign/list name.
 export const parseSearchFromCampaign = (campaign?: CampaignWithRelations) => {
-	// Try to get the name from userContactLists first (more accurate), then fall back to campaign name
-	const searchName = campaign?.userContactLists?.[0]?.name || campaign?.name || '';
-
-	// Default values - using "Why", "What", "Where" to match dashboard
-	const why = 'Booking'; // Default assumption
-	let what = '';
-	let where = '';
-
-	// Check if name contains location indicator " in "
-	const inMatch = searchName.match(/^(.+?)\s+in\s+(.+)$/i);
-	if (inMatch) {
-		what = inMatch[1].trim();
-		where = inMatch[2].trim();
-	} else {
-		what = searchName;
-	}
-
-	return { why, what, where };
+	void campaign;
+	return { why: 'Booking', what: '', where: '' };
 };
 
 const FadeOverflowText: FC<{
@@ -1082,32 +1066,47 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		}
 
 		// Fallback: preserve original behavior of kicking off a dashboard search
+		const trimmedWhy = (whyValue ?? '').trim();
+		const trimmedWhat = (whatValue ?? '').trim();
+		const trimmedWhere = (whereValue ?? '').trim();
 		let searchQuery = '';
-		if (whyValue) {
-			searchQuery += whyValue + ' ';
+		if (trimmedWhy && (trimmedWhat || trimmedWhere)) {
+			searchQuery += trimmedWhy + ' ';
 		}
-		if (whatValue) {
-			searchQuery += whatValue;
+		if (trimmedWhat) {
+			searchQuery += trimmedWhat;
 		}
-		if (whereValue) {
-			searchQuery += ' in ' + whereValue;
+		if (trimmedWhere) {
+			searchQuery += ' in ' + trimmedWhere;
 		}
 		searchQuery = searchQuery.trim();
 
+		const dashboardParams = new URLSearchParams();
+		if (campaign?.id) {
+			dashboardParams.set('fromCampaignId', String(campaign.id));
+		}
+
 		if (searchQuery) {
-			// Store the search query in sessionStorage for the dashboard to pick up
+			// Store the explicit search query in sessionStorage for the dashboard to pick up
 			try {
 				sessionStorage.setItem('murmur_pending_search', searchQuery);
 			} catch {
 				// Ignore sessionStorage errors (e.g., disabled storage)
 			}
-
-			// Navigate to the campaign-scoped dashboard search/map view when possible
-			const dashboardUrl = campaign?.id
-				? `${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`
-				: urls.murmur.dashboard.index;
-			router.push(dashboardUrl);
+		} else {
+			dashboardParams.set('pick', '1');
+			try {
+				sessionStorage.removeItem('murmur_pending_search');
+			} catch {
+				// Ignore sessionStorage errors (e.g., disabled storage)
+			}
 		}
+
+		// Navigate to the campaign-scoped dashboard search/map view when possible
+		const dashboardUrl = dashboardParams.toString()
+			? `${urls.murmur.dashboard.index}?${dashboardParams.toString()}`
+			: urls.murmur.dashboard.index;
+		router.push(dashboardUrl);
 	};
 
 	const { data: usedContactIds } = useGetUsedContactIds();

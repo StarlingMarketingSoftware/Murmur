@@ -4436,13 +4436,27 @@ const DashboardContent = () => {
 			}
 
 			hasHydratedFromCampaignUrlRef.current = true;
-			rehydrateCuratedSession({
-				lat: curatedLatParam,
-				lon: curatedLonParam,
-				radiusKm: curatedRadiusKmParam,
-				category: curatedCategoryParam || null,
-				state: curatedStateParam || null,
-			}).catch(() => undefined);
+			const hasCapturedCoords = curatedLatParam != null && curatedLonParam != null;
+			void (async () => {
+				let lat = curatedLatParam;
+				let lon = curatedLonParam;
+				if (!hasCapturedCoords) {
+					try {
+						const loc = await getApproximateLocation();
+						lat = loc.lat;
+						lon = loc.lon;
+					} catch {
+						// Non-fatal: backend can infer from request headers.
+					}
+				}
+				await rehydrateCuratedSession({
+					lat,
+					lon,
+					radiusKm: curatedRadiusKmParam,
+					category: curatedCategoryParam || null,
+					state: curatedStateParam || null,
+				}).catch(() => undefined);
+			})();
 			return;
 		}
 

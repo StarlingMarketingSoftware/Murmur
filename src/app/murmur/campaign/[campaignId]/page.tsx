@@ -1188,18 +1188,20 @@ const Murmur = () => {
 		if (!campaign) return;
 		if (typeof window === 'undefined') return;
 
-		const searchName = campaign?.userContactLists?.[0]?.name || campaign?.name || '';
-		const pendingSearch = searchName ? `[Booking] ${searchName}`.trim() : '';
-		if (pendingSearch) {
-			sessionStorage.setItem('murmur_pending_search', pendingSearch);
+		try {
+			sessionStorage.removeItem('murmur_pending_search');
+		} catch {
+			// sessionStorage may be unavailable — the URL flag below is enough.
 		}
+		const params = new URLSearchParams({
+			fromCampaignId: String(campaign.id),
+			pick: '1',
+		});
 
 		// Hard navigation: a soft router.push sometimes doesn't fully re-mount the
 		// dashboard's map-search mode (especially mid-transition or with cached state),
 		// so use window.location.assign for a reliable, fresh dashboard load.
-		window.location.assign(
-			`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`
-		);
+		window.location.assign(`${urls.murmur.dashboard.index}?${params.toString()}`);
 	}, [campaign]);
 
 	// Navigation back to the dashboard's map/search view. Restores the user's last search

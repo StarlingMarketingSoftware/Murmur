@@ -13,8 +13,12 @@ import {
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { ContactWithName } from '@/types/contact';
-import { CampaignWithRelations } from '@/types';
-import { cn } from '@/utils';
+import type {
+	CampaignWithRelations,
+	EmailWithRelations,
+	InboundEmailWithRelations,
+} from '@/types';
+import { cn, convertHtmlToPlainText } from '@/utils';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation, splitTrailingNumericSuffix } from '@/utils/string';
@@ -56,6 +60,12 @@ const isSameLocalDay = (a: Date, b: Date) =>
 	a.getFullYear() === b.getFullYear() &&
 	a.getMonth() === b.getMonth() &&
 	a.getDate() === b.getDate();
+
+const CONTACT_ROW_INSET_PX = 6.104;
+const CONTACT_ROW_HEIGHT_PX = 49.657;
+const CONTACT_ROW_RADIUS_PX = 8.269;
+const SUPPLEMENTAL_DRAFT_ROW_HEIGHT_PX = 108;
+const SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX = 7.798;
 
 const formatBatchCount = (count: number) => `+${count < 10 ? `0${count}` : count}`;
 
@@ -140,8 +150,185 @@ const FadeOverflowText: FC<{
 	);
 };
 
+const getContactFullName = (contact?: ContactWithName | null) =>
+	contact?.name || `${contact?.firstName || ''} ${contact?.lastName || ''}`.trim();
+
+const getContactDisplayName = (
+	contact?: ContactWithName | null,
+	fallback = 'Contact'
+) =>
+	getContactFullName(contact) || contact?.company || contact?.email || fallback;
+
+const hasSeparateContactName = (contact?: ContactWithName | null) =>
+	Boolean(
+		(contact?.name && contact.name.trim()) ||
+		(contact?.firstName && contact.firstName.trim()) ||
+		(contact?.lastName && contact.lastName.trim())
+	);
+
+const getContactCompanyLabel = (contact?: ContactWithName | null) =>
+	hasSeparateContactName(contact) ? contact?.company || '' : '';
+
+const getContactTitle = (contact?: ContactWithName | null) =>
+	contact?.title || contact?.headline || '';
+
+const getTitleBadgeBgColor = (title: string) =>
+	isRestaurantTitle(title)
+		? '#C3FBD1'
+		: isCoffeeShopTitle(title)
+			? '#D6F1BD'
+			: isMusicVenueTitle(title)
+				? '#B7E5FF'
+				: isMusicFestivalTitle(title)
+					? '#C1D6FF'
+					: isWeddingPlannerTitle(title) || isWeddingVenueTitle(title)
+						? '#FFF2BC'
+						: isWineBeerSpiritsTitle(title)
+							? '#BFC4FF'
+							: '#E8EFFF';
+
+const getTitleBadgeLabel = (title: string) =>
+	isRestaurantTitle(title)
+		? 'Restaurant'
+		: isCoffeeShopTitle(title)
+			? 'Coffee Shop'
+			: isMusicVenueTitle(title)
+				? 'Music Venue'
+				: isMusicFestivalTitle(title)
+					? 'Music Festival'
+					: isWeddingPlannerTitle(title)
+						? 'Wedding Planner'
+						: isWeddingVenueTitle(title)
+							? 'Wedding Venue'
+							: isWineBeerSpiritsTitle(title)
+								? getWineBeerSpiritsLabel(title) ?? title
+								: title;
+
+const TitleBadge: FC<{
+	title: string;
+	className?: string;
+	textClassName?: string;
+	restaurantIconSize?: number;
+	coffeeIconSize?: number;
+	defaultIconSize?: number;
+}> = ({
+	title,
+	className,
+	textClassName,
+	restaurantIconSize = 14,
+	coffeeIconSize = 6,
+	defaultIconSize = 14,
+}) => (
+	<div
+		className={cn('border border-black overflow-hidden flex items-center gap-0.5', className)}
+		style={{ backgroundColor: getTitleBadgeBgColor(title) }}
+	>
+		{isRestaurantTitle(title) && <RestaurantsIcon size={restaurantIconSize} />}
+		{isCoffeeShopTitle(title) && <CoffeeShopsIcon size={coffeeIconSize} />}
+		{isMusicVenueTitle(title) && (
+			<MusicVenuesIcon size={defaultIconSize} className="flex-shrink-0" />
+		)}
+		{isMusicFestivalTitle(title) && (
+			<FestivalsIcon size={defaultIconSize} className="flex-shrink-0" />
+		)}
+		{(isWeddingPlannerTitle(title) || isWeddingVenueTitle(title)) && (
+			<WeddingPlannersIcon size={defaultIconSize} />
+		)}
+		{isWineBeerSpiritsTitle(title) && (
+			<WineBeerSpiritsIcon size={defaultIconSize} className="flex-shrink-0" />
+		)}
+		<ScrollableText
+			text={getTitleBadgeLabel(title)}
+			className={cn('text-black leading-none', textClassName)}
+		/>
+	</div>
+);
+
+const StateLocationRow: FC<{
+	contact?: ContactWithName | null;
+	className?: string;
+	badgeClassName?: string;
+	badgeTextClassName?: string;
+	cityClassName?: string;
+}> = ({ contact, className, badgeClassName, badgeTextClassName, cityClassName }) => {
+	const fullStateName = (contact?.state as string) || '';
+	const stateAbbr = getStateAbbreviation(fullStateName) || '';
+	const normalizedState = fullStateName.trim();
+	const lowercaseCanadianProvinceNames = canadianProvinceNames.map((s) => s.toLowerCase());
+	const isCanadianProvince =
+		lowercaseCanadianProvinceNames.includes(normalizedState.toLowerCase()) ||
+		canadianProvinceAbbreviations.includes(normalizedState.toUpperCase()) ||
+		canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
+	const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+
+	return (
+		<div className={cn('flex items-center justify-start gap-1', className)}>
+			{stateAbbr ? (
+				isCanadianProvince ? (
+					<div
+						className={cn(
+							'inline-flex items-center justify-center border overflow-hidden',
+							badgeClassName
+						)}
+						style={{ borderColor: '#000000' }}
+						title="Canadian province"
+					>
+						<CanadianFlag width="100%" height="100%" className="w-full h-full" />
+					</div>
+				) : isUSAbbr ? (
+					<span
+						className={cn(
+							'inline-flex items-center justify-center border leading-none font-bold',
+							badgeClassName,
+							badgeTextClassName
+						)}
+						style={{
+							backgroundColor: stateBadgeColorMap[stateAbbr] || 'transparent',
+							borderColor: '#000000',
+						}}
+					>
+						{stateAbbr}
+					</span>
+				) : (
+					<span
+						className={cn(
+							'inline-flex items-center justify-center border',
+							badgeClassName
+						)}
+						style={{ borderColor: '#000000' }}
+					/>
+				)
+			) : null}
+			{contact?.city ? (
+				<ScrollableText text={contact.city} className={cn('text-black leading-none', cityClassName)} />
+			) : null}
+		</div>
+	);
+};
+
+const resolveInboundContact = (
+	email: InboundEmailWithRelations,
+	contactByEmail?: Record<string, ContactWithName>,
+	contactsById?: Map<number, ContactWithName>
+) => {
+	const senderKey = email.sender?.toLowerCase().trim();
+	if (senderKey && contactByEmail?.[senderKey]) return contactByEmail[senderKey];
+	if (email.contactId && contactsById?.has(email.contactId)) {
+		return contactsById.get(email.contactId) ?? null;
+	}
+	return (email.contact as ContactWithName | null) ?? null;
+};
+
 export interface ContactsExpandedListProps {
 	contacts: ContactWithName[];
+	/** Optional full campaign contact set used to resolve draft/inbox rows. */
+	allContacts?: ContactWithName[];
+	/** Optional campaign drafts to show below draftable contacts. */
+	drafts?: EmailWithRelations[];
+	/** Optional campaign inbox replies to show below drafts. */
+	inboxEmails?: InboundEmailWithRelations[];
+	/** Optional sender email -> campaign contact map for inbox canonical display. */
+	contactByEmail?: Record<string, ContactWithName>;
 	onHeaderClick?: () => void;
 	onDraftSelected?: (contactIds: number[]) => void;
 	isDraftDisabled?: boolean;
@@ -198,6 +385,10 @@ export interface ContactsExpandedListProps {
 
 export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	contacts,
+	allContacts,
+	drafts,
+	inboxEmails,
+	contactByEmail,
 	onHeaderClick,
 	onContactClick,
 	onContactHover,
@@ -523,13 +714,23 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	// Allow callers to override dimensions; default to the original sidebar size
 	const resolvedWidth = width ?? 376;
 	const resolvedHeight = height ?? 424;
-	// Inner content width (search bar, rows) - leaves ~10px padding on sides
-	const innerWidth = typeof resolvedWidth === 'number' ? resolvedWidth - 10 : 370;
-
 	const isAllTab = height === 263;
 	const isAllTabNavigation = interactionMode === 'allTab';
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
 	const isBottomView = customWhiteSectionHeight === 15 || customWhiteSectionHeight === 16;
+	// The main 377px panel resolves to the spec row width: 370.896px.
+	const contactRowWidth =
+		typeof resolvedWidth === 'number'
+			? `${Math.max(0, resolvedWidth - CONTACT_ROW_INSET_PX)}px`
+			: `calc(${resolvedWidth} - ${CONTACT_ROW_INSET_PX}px)`;
+	const contactRowStyle = !isBottomView
+		? {
+				width: contactRowWidth,
+				height: `${CONTACT_ROW_HEIGHT_PX}px`,
+				borderRadius: `${CONTACT_ROW_RADIUS_PX}px`,
+				boxSizing: 'border-box' as const,
+			}
+		: undefined;
 	// Compressed bottom panel spec: 40px total = 12px white + 28px color.
 	const effectiveWhiteSectionHeight = collapsed && isBottomView ? 12 : whiteSectionHeight;
 	const shouldRenderCollapsedTopBox = collapsed && isBottomView;
@@ -543,7 +744,41 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const collapsedTopBoxHeightPx = 22;
 	const collapsedTopBoxWidthPx = 224;
 	const collapsedTopBoxRadiusPx = 4.7;
-	const shouldShowScrollbar = !isBottomView && contacts.length >= 14;
+	const allCampaignContacts = allContacts ?? contacts;
+	const contactsById = useMemo(() => {
+		const map = new Map<number, ContactWithName>();
+		for (const contact of allCampaignContacts) {
+			map.set(contact.id, contact);
+		}
+		return map;
+	}, [allCampaignContacts]);
+	const contactsByEmail = useMemo(() => {
+		const map = new Map<string, ContactWithName>();
+		for (const contact of allCampaignContacts) {
+			const key = contact.email?.toLowerCase().trim();
+			if (key && !map.has(key)) map.set(key, contact);
+		}
+		if (contactByEmail) {
+			for (const [email, contact] of Object.entries(contactByEmail)) {
+				const key = email.toLowerCase().trim();
+				if (key && !map.has(key)) map.set(key, contact);
+			}
+		}
+		return map;
+	}, [allCampaignContacts, contactByEmail]);
+	const supplementalDraftRows = useMemo(() => drafts ?? [], [drafts]);
+	const supplementalInboxRows = useMemo(() => {
+		const rows = inboxEmails ?? [];
+		const shouldScopeToCampaignContacts = Boolean(allContacts || contactByEmail);
+		if (!shouldScopeToCampaignContacts) return rows;
+		return rows.filter((email) => {
+			const sender = email.sender?.toLowerCase().trim();
+			return Boolean(sender && contactsByEmail.has(sender));
+		});
+	}, [allContacts, contactByEmail, contactsByEmail, inboxEmails]);
+	const totalRenderedRows =
+		contacts.length + supplementalDraftRows.length + supplementalInboxRows.length;
+	const shouldShowScrollbar = !isBottomView && totalRenderedRows >= 14;
 
 	const { data: campaignContactEvents } = useGetCampaignContactEvents(campaign?.id, {
 		enabled: isBottomView && Boolean(campaign?.id),
@@ -600,6 +835,171 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		[bottomViewContactBatches]
 	);
 	const bottomViewPlaceholderCount = Math.max(0, 3 - bottomViewBatchesToShow.length);
+
+	const renderSupplementalDraftRow = (draft: EmailWithRelations, draftIndex: number) => {
+		const contact =
+			contactsById.get(draft.contactId) ??
+			((draft.contact as ContactWithName | null) || null);
+		const contactName = getContactDisplayName(contact, 'Unknown Contact');
+		const companyLabel = getContactCompanyLabel(contact);
+		const contactTitle = getContactTitle(contact);
+		const messagePreview = draft.message ? convertHtmlToPlainText(draft.message) : 'No content';
+
+		return (
+			<div
+				key={`contacts-draft-${draft.id}-${draftIndex}`}
+				className={cn(
+					'relative select-none overflow-hidden bg-[#FFF]',
+					isAllTabNavigation ? 'cursor-default' : 'cursor-pointer'
+				)}
+				style={{
+					width: contactRowWidth,
+					height: `${SUPPLEMENTAL_DRAFT_ROW_HEIGHT_PX}px`,
+					borderRadius: `${SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX}px`,
+					borderTop: '1.955px solid #000000',
+					borderRight: '1.949px solid #000000',
+					borderBottom: '1.949px solid #000000',
+					borderLeft: '1.949px solid #000000',
+					boxSizing: 'border-box',
+				}}
+				onMouseEnter={() => {
+					if (!isAllTabNavigation) setHoveredContactIndex(null);
+					onContactHover?.(contact);
+				}}
+				onClick={(e) => {
+					if (isAllTabNavigation) return;
+					e.stopPropagation();
+					if (contact) onContactClick?.(contact);
+				}}
+			>
+				<div className="absolute left-[12px] top-[13px] w-[182px] pointer-events-none">
+					<div
+						className="font-bold text-[12px] font-inter text-black leading-[1.1] whitespace-nowrap overflow-hidden"
+						style={{
+							maskImage: 'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+							WebkitMaskImage:
+								'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+						}}
+					>
+						{contactName}
+					</div>
+					<div className="mt-[5px] text-[12px] font-inter text-black leading-[1.1] truncate">
+						{companyLabel}
+					</div>
+				</div>
+
+				<div className="absolute top-[10px] right-[8px] w-[169px] flex flex-col items-end gap-[3px] pointer-events-none">
+					{contactTitle ? (
+						<TitleBadge
+							title={contactTitle}
+							className="w-[169px] h-[21px] rounded-[5px] justify-center px-2"
+							textClassName="text-[11px]"
+							restaurantIconSize={14}
+							defaultIconSize={14}
+						/>
+					) : null}
+					<StateLocationRow
+						contact={contact}
+						className="h-[19px] w-[169px]"
+						badgeClassName="w-[29px] h-[19px] rounded-[4px]"
+						badgeTextClassName="text-[10px]"
+						cityClassName="text-[11px] max-w-[130px]"
+					/>
+				</div>
+
+				<div className="absolute left-[22px] right-[12px] top-[63px] pointer-events-none">
+					<div
+						className="text-[13px] text-black font-bold leading-none whitespace-nowrap overflow-hidden"
+						style={{
+							WebkitMaskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
+							maskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
+						}}
+					>
+						{draft.subject || 'No subject'}
+					</div>
+					<div
+						className="mt-[13px] text-[13px] text-black leading-none whitespace-nowrap overflow-hidden"
+						style={{
+							WebkitMaskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
+							maskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
+						}}
+					>
+						{messagePreview}
+					</div>
+				</div>
+			</div>
+		);
+	};
+
+	const renderSupplementalInboxRow = (
+		email: InboundEmailWithRelations,
+		inboxIndex: number
+	) => {
+		const contact = resolveInboundContact(email, contactByEmail, contactsById);
+		const contactName = getContactDisplayName(contact, email.senderName || email.sender || 'Unknown sender');
+		const companyLabel = getContactCompanyLabel(contact);
+		const contactTitle = getContactTitle(contact);
+		const bodyPreview = email.bodyPlain
+			? `${email.bodyPlain.substring(0, 60)}...`
+			: email.bodyHtml
+				? `${email.bodyHtml.replace(/<[^>]*>/g, '').substring(0, 60)}...`
+				: 'No content';
+
+		return (
+			<div
+				key={`contacts-inbox-${email.id}-${inboxIndex}`}
+				className={cn(
+					'transition-colors relative select-none overflow-hidden border-2 border-[#000000] bg-white h-[64px] rounded-[8px] p-2',
+					isAllTabNavigation ? 'cursor-default' : 'cursor-pointer hover:bg-[#EAF3FB]'
+				)}
+				style={{ width: contactRowWidth }}
+				onMouseEnter={() => {
+					if (!isAllTabNavigation) setHoveredContactIndex(null);
+					onContactHover?.(contact);
+				}}
+				onClick={(e) => {
+					if (isAllTabNavigation) return;
+					e.stopPropagation();
+					if (contact) onContactClick?.(contact);
+				}}
+			>
+				<div className="absolute flex flex-col items-end pointer-events-none top-[6px] right-[6px] gap-[2px] w-[110px]">
+					{contactTitle ? (
+						<TitleBadge
+							title={contactTitle}
+							className="w-[110px] h-[10px] rounded-[3.71px] justify-center"
+							textClassName="text-[8px] px-1"
+							restaurantIconSize={8}
+							coffeeIconSize={5}
+							defaultIconSize={8}
+						/>
+					) : null}
+					<StateLocationRow
+						contact={contact}
+						className="gap-1 h-[11.67px] w-full"
+						badgeClassName="w-[17.81px] h-[11.67px] rounded-[3.44px]"
+						badgeTextClassName="text-[8px]"
+						cityClassName="text-[10px] max-w-[80px]"
+					/>
+				</div>
+
+				<div className="grid grid-cols-1 grid-rows-4 h-full pr-[120px] pl-[22px]">
+					<div className="row-start-1 col-start-1 flex items-center h-[16px]">
+						<div className="font-bold text-[11px] truncate leading-none">{contactName}</div>
+					</div>
+					<div className="row-start-2 col-start-1 flex items-center pr-2 h-[16px]">
+						<div className="text-[11px] text-black truncate leading-none">{companyLabel}</div>
+					</div>
+					<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center h-[16px]">
+						{email.subject || 'No subject'}
+					</div>
+					<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center h-[16px]">
+						{bodyPreview}
+					</div>
+				</div>
+			</div>
+		);
+	};
 
 	return (
 		<div
@@ -990,7 +1390,8 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									))}
 								</>
 							) : (
-								contacts.map((contact, contactIndex) => {
+								<>
+									{contacts.map((contact, contactIndex) => {
 									const fullName =
 										contact.name ||
 										`${contact.firstName || ''} ${contact.lastName || ''}`.trim();
@@ -1008,12 +1409,12 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									const contactBgColor = isActivelyDrafting
 										? 'murmur-actively-drafting'
 										: isAllTabNavigation
-											? 'bg-white'
+											? 'bg-[#FFF]'
 											: isSelected
 												? 'bg-[#F5DADA]'
 												: isKeyboardFocused
 													? 'bg-[#FAE6E6]'
-													: 'bg-white hover:bg-[#FAE6E6]';
+													: 'bg-[#FFF] hover:bg-[#FAE6E6]';
 									return (
 										<div
 											key={contact.id}
@@ -1029,10 +1430,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 												isAllTabNavigation ? 'cursor-default' : 'cursor-pointer',
 												isBottomView
 													? 'w-[224px] h-[30px] rounded-[4.7px]'
-													: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px] rounded-[8px]',
+													: 'max-[480px]:w-[96.27vw]',
 												contactBgColor
 											)}
-											style={!isBottomView ? { width: `${innerWidth}px` } : undefined}
+											style={contactRowStyle}
 											onMouseDown={(e) => {
 												if (e.shiftKey) e.preventDefault();
 											}}
@@ -1742,10 +2143,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 											)}
 										</div>
 									);
-								})
+								})}
+									{supplementalDraftRows.map(renderSupplementalDraftRow)}
+									{supplementalInboxRows.map(renderSupplementalInboxRow)}
+								</>
 							)}
 							{Array.from({
-								length: Math.max(0, (!isBottomView ? minRows : 0) - contacts.length),
+								length: Math.max(0, (!isBottomView ? minRows : 0) - totalRenderedRows),
 							}).map((_, idx) => (
 								<div
 									key={`placeholder-${idx}`}
@@ -1753,13 +2157,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 										'select-none overflow-hidden border-2 border-[#000000]',
 										isBottomView
 											? 'w-[224px] h-[30px] rounded-[4.7px]'
-											: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px] rounded-[8px]',
+											: 'max-[480px]:w-[96.27vw]',
 										shouldShowLoadingWave
 											? 'contacts-expanded-list-loading-wave-row'
 											: 'bg-[#EB8586]'
 									)}
 									style={{
-										...(!isBottomView ? { width: `${innerWidth}px` } : {}),
+										...(contactRowStyle ?? {}),
 										...(shouldShowLoadingWave
 											? {
 													animationDelay:
