@@ -2,7 +2,10 @@
 
 import { FC, useRef } from 'react';
 import { cn } from '@/utils';
-import { type CampaignViewType, useCampaignDevice } from '@/contexts/CampaignDeviceContext';
+import {
+	type CampaignViewType,
+	useCampaignDevice,
+} from '@/contexts/CampaignDeviceContext';
 import { setCampaignLoadingWaveStartNow } from '@/utils/campaignLoadingWave';
 
 /**
@@ -32,7 +35,7 @@ export const CampaignPageSkeleton: FC = () => {
 			{/* Top row: matches DraftingSection "Write" tab geometry */}
 			<div className="flex justify-center gap-[32px]">
 				{/* Left side: CampaignHeaderBox + ContactsExpandedList skeleton */}
-				<div className="hidden xl:block pt-[29px]">
+				<div className="hidden xl:block pt-[15px]">
 					<div className="flex flex-col" style={{ gap: '16px' }}>
 						<CampaignHeaderBoxSkeleton />
 						<ContactsExpandedListSkeleton />
@@ -43,7 +46,7 @@ export const CampaignPageSkeleton: FC = () => {
 				<HybridPromptInputSkeleton />
 
 				{/* Right side: ContactResearchPanel skeleton */}
-				<div className="hidden xl:block pt-[29px]">
+				<div className="hidden xl:block pt-[15px]">
 					<ContactResearchPanelSkeleton />
 				</div>
 			</div>
@@ -171,10 +174,19 @@ const CampaignPageMobileInboxSkeleton: FC<{ activeTab: 'inbox' | 'sent' }> = ({
 						<div className="flex flex-col w-full">
 							<div className="flex items-center justify-between gap-3">
 								<div className="h-[14px] rounded bg-[#D9D9D9]" style={{ width: '55%' }} />
-								<div className="h-[14px] rounded bg-[#D9D9D9]" style={{ width: '60px' }} />
+								<div
+									className="h-[14px] rounded bg-[#D9D9D9]"
+									style={{ width: '60px' }}
+								/>
 							</div>
-							<div className="mt-2 h-[12px] rounded bg-[#E5E5E5]" style={{ width: '85%' }} />
-							<div className="mt-2 h-[10px] rounded bg-[#E5E5E5]" style={{ width: '70%' }} />
+							<div
+								className="mt-2 h-[12px] rounded bg-[#E5E5E5]"
+								style={{ width: '85%' }}
+							/>
+							<div
+								className="mt-2 h-[10px] rounded bg-[#E5E5E5]"
+								style={{ width: '70%' }}
+							/>
 						</div>
 					</div>
 				))}
@@ -379,31 +391,32 @@ const CampaignBottomPanelsSkeleton: FC = () => {
 
 /**
  * Skeleton for the CampaignHeaderBox.
- * Dimensions: 375px x 71px
+ * Dimensions: 374px x 59px
  */
 export const CampaignHeaderBoxSkeleton: FC = () => {
 	return (
 		<div
 			className={cn(
-				'bg-white border-[2px] border-black rounded-[8px]',
-				'flex flex-col px-3 pt-0 pb-2 box-border',
+				'border border-black rounded-[8px]',
+				'flex flex-col px-3 pt-0 pb-[6px] box-border',
 				'animate-pulse'
 			)}
 			style={{
-				width: '375px',
-				height: '71px',
-				minHeight: '71px',
-				maxHeight: '71px',
+				width: '374px',
+				height: '59px',
+				minHeight: '59px',
+				maxHeight: '59px',
+				background: 'rgba(255, 255, 255, 0.31)',
 			}}
 		>
 			{/* Campaign Title area */}
-			<div className="h-[26px] overflow-hidden flex-shrink-0" />
+			<div className="h-[28px] overflow-hidden flex-shrink-0 mt-[6px]" />
 
 			{/* Spacer */}
 			<div className="flex-1" />
 
 			{/* To/From Row */}
-			<div className="flex items-center text-[11px] flex-shrink-0">
+			<div className="flex h-0 overflow-hidden items-center text-[11px] flex-shrink-0 invisible">
 				{/* To section */}
 				<div className="flex items-center gap-1 w-1/2">
 					<div
@@ -428,29 +441,32 @@ export const CampaignHeaderBoxSkeleton: FC = () => {
 				</div>
 			</div>
 
+			{/* Spacer */}
+			<div className="flex-1" />
+
 			{/* Metrics Row */}
-			<div className="flex items-center gap-2 mt-1 flex-shrink-0">
+			<div className="flex items-center gap-[20px] -mt-[3px] flex-shrink-0">
 				<div
 					className="rounded-full border border-black"
 					style={{
-						width: '70px',
-						height: '16px',
+						width: '80px',
+						height: '15px',
 						backgroundColor: '#F5DADA',
 					}}
 				/>
 				<div
 					className="rounded-full border border-black"
 					style={{
-						width: '60px',
-						height: '16px',
+						width: '80px',
+						height: '15px',
 						backgroundColor: '#FFE3AA',
 					}}
 				/>
 				<div
 					className="rounded-full border border-black"
 					style={{
-						width: '50px',
-						height: '16px',
+						width: '80px',
+						height: '15px',
 						backgroundColor: '#B0E0A6',
 					}}
 				/>
@@ -461,7 +477,7 @@ export const CampaignHeaderBoxSkeleton: FC = () => {
 
 /**
  * Skeleton for the ContactsExpandedList.
- * Dimensions: 375px x 557px
+ * Dimensions: 377px x 597px
  */
 export const ContactsExpandedListSkeleton: FC = () => {
 	// Keep timing aligned with the real ContactsExpandedList loading wave.
@@ -479,8 +495,8 @@ export const ContactsExpandedListSkeleton: FC = () => {
 				'border border-black'
 			)}
 			style={{
-				width: '375px',
-				height: '557px',
+				width: '377px',
+				height: '597px',
 				background: 'linear-gradient(to bottom, #ffffff 28px, #EB8586 28px)',
 			}}
 		>
@@ -496,8 +512,8 @@ export const ContactsExpandedListSkeleton: FC = () => {
 					<div
 						key={i}
 						className={cn(
-							// Match ContactsExpandedList innerWidth for width={375} (375 - 10 = 365)
-							'w-[365px] h-[49px]',
+							// Match ContactsExpandedList innerWidth for width={377} (377 - 10 = 367)
+							'w-[367px] h-[49px]',
 							'rounded-[8px] border-2 border-black overflow-hidden',
 							'contacts-expanded-list-loading-wave-row'
 						)}
@@ -535,10 +551,7 @@ export const ContactResearchPanelSkeleton: FC = () => {
 
 	return (
 		<div
-			className={cn(
-				'relative rounded-[7px]',
-				'border-[3px] border-black'
-			)}
+			className={cn('relative rounded-[7px]', 'border-[3px] border-black')}
 			style={{
 				width: `${containerWidth}px`,
 				height: '540px',
@@ -548,8 +561,8 @@ export const ContactResearchPanelSkeleton: FC = () => {
 			{/* Header background bar */}
 			<div
 				className={cn(
-					"absolute top-0 left-0 w-full rounded-t-[5px]",
-					"research-panel-loading-wave-box"
+					'absolute top-0 left-0 w-full rounded-t-[5px]',
+					'research-panel-loading-wave-box'
 				)}
 				style={{
 					height: `${headerHeight}px`,
@@ -575,8 +588,8 @@ export const ContactResearchPanelSkeleton: FC = () => {
 			{/* Identity box */}
 			<div
 				className={cn(
-					"absolute border-2 border-black rounded-[10px] overflow-hidden",
-					"research-panel-loading-wave-box"
+					'absolute border-2 border-black rounded-[10px] overflow-hidden',
+					'research-panel-loading-wave-box'
 				)}
 				style={{
 					top: `${identityTop}px`,
@@ -595,53 +608,53 @@ export const ContactResearchPanelSkeleton: FC = () => {
 				const waveIndex = 2 + idx;
 
 				return (
-				<div
-					key={key}
-					className={cn("absolute", "research-panel-loading-wave-box")}
-					style={{
-						top: `${top}px`,
-						left: '50%',
-						transform: 'translateX(-50%)',
-						width: `${boxWidth}px`,
-						height: `${bulletOuterHeight}px`,
-						border: '2px solid #000000',
-						borderRadius: '8px',
-						animationDelay: waveDelayForIndex(waveIndex),
-					}}
-				>
-					{/* Section indicator */}
 					<div
-						className="absolute font-inter font-bold"
+						key={key}
+						className={cn('absolute', 'research-panel-loading-wave-box')}
 						style={{
-							top: '4px',
-							left: '8px',
-							fontSize: '11.5px',
-							color: 'transparent',
+							top: `${top}px`,
+							left: '50%',
+							transform: 'translateX(-50%)',
+							width: `${boxWidth}px`,
+							height: `${bulletOuterHeight}px`,
+							border: '2px solid #000000',
+							borderRadius: '8px',
+							animationDelay: waveDelayForIndex(waveIndex),
 						}}
 					>
-						[{key}]
+						{/* Section indicator */}
+						<div
+							className="absolute font-inter font-bold"
+							style={{
+								top: '4px',
+								left: '8px',
+								fontSize: '11.5px',
+								color: 'transparent',
+							}}
+						>
+							[{key}]
+						</div>
+						{/* Inner content box stroke (keep outline visible while loading) */}
+						<div
+							className="absolute"
+							style={{
+								top: '50%',
+								transform: 'translateY(-50%)',
+								right: '10px',
+								width: `${innerBoxWidth}px`,
+								height: '43px',
+								backgroundColor: 'transparent',
+								border: '1px solid #000000',
+								borderRadius: '6px',
+							}}
+						/>
 					</div>
-					{/* Inner content box stroke (keep outline visible while loading) */}
-					<div
-						className="absolute"
-						style={{
-							top: '50%',
-							transform: 'translateY(-50%)',
-							right: '10px',
-							width: `${innerBoxWidth}px`,
-							height: '43px',
-							backgroundColor: 'transparent',
-							border: '1px solid #000000',
-							borderRadius: '6px',
-						}}
-					/>
-				</div>
 				);
 			})}
 
 			{/* Summary box skeleton */}
 			<div
-				className={cn("absolute", "research-panel-loading-wave-box")}
+				className={cn('absolute', 'research-panel-loading-wave-box')}
 				style={{
 					bottom: '14px',
 					left: '50%',

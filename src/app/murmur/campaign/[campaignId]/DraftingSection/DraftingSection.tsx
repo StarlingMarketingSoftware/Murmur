@@ -1,4 +1,13 @@
-import { FC, Fragment, useCallback, useEffect, useLayoutEffect, useState, useRef, useMemo } from 'react';
+import {
+	FC,
+	Fragment,
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useState,
+	useRef,
+	useMemo,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { gsap } from 'gsap';
@@ -37,10 +46,18 @@ import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/Camp
 import { useGetContacts, useGetLocations } from '@/hooks/queryHooks/useContacts';
 import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { useCreateEmail, useEditEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
-import { EmailStatus, EmailVerificationStatus, DraftingMode, ReviewStatus } from '@/constants/prismaEnums';
+import {
+	EmailStatus,
+	EmailVerificationStatus,
+	DraftingMode,
+	ReviewStatus,
+} from '@/constants/prismaEnums';
 import { resolveAutoSignatureText } from '@/constants/autoSignatures';
 import { SentEmails } from './EmailGeneration/SentEmails/SentEmails';
-import { DraftedEmails, type DraftedEmailsHandle } from './EmailGeneration/DraftedEmails/DraftedEmails';
+import {
+	DraftedEmails,
+	type DraftedEmailsHandle,
+} from './EmailGeneration/DraftedEmails/DraftedEmails';
 import { EmailWithRelations, StripeSubscriptionStatus } from '@/types';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useEditUser } from '@/hooks/queryHooks/useUsers';
@@ -52,7 +69,9 @@ import { ContactWithName } from '@/types/contact';
 import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { TestPreviewPanel } from '@/components/molecules/TestPreviewPanel/TestPreviewPanel';
 import { MiniEmailStructure } from './EmailGeneration/MiniEmailStructure';
-import ContactsExpandedList from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/ContactsExpandedList';
+import ContactsExpandedList, {
+	type ContactsExpandedTopNavStop,
+} from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/ContactsExpandedList';
 import { DraftsExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftsExpandedList';
 import { DraftPreviewExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftPreviewExpandedList';
 import { SentExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/SentExpandedList';
@@ -94,7 +113,16 @@ import { BottomPanelsContainer } from '../../../../../components/atoms/BottomPan
 import type { HistoryAction } from '../../../../../components/atoms/BottomPanelsContainer';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useGetCampaignContactEvents } from '@/hooks/queryHooks/useCampaigns';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
+import {
+	isRestaurantTitle,
+	isCoffeeShopTitle,
+	isMusicVenueTitle,
+	isMusicFestivalTitle,
+	isWeddingPlannerTitle,
+	isWeddingVenueTitle,
+	isWineBeerSpiritsTitle,
+	getWineBeerSpiritsLabel,
+} from '@/utils/restaurantTitle';
 
 type IdentityProfileFields = Identity & {
 	genre?: string | null;
@@ -165,7 +193,7 @@ const stripInjectedSubjectFromTestMessageHtml = (
 
 			// Remove whitespace-only text nodes between nodes to ensure <br><br> is removed cleanly.
 			if (current.nodeType === Node.TEXT_NODE) {
-				if (!((current.textContent || '').trim())) {
+				if (!(current.textContent || '').trim()) {
 					current.parentNode?.removeChild(current);
 				}
 				continue;
@@ -196,6 +224,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		view = 'testing',
 		renderGlobalOverlays = true,
 		onViewReady,
+		goToOverview,
 		goToDrafting,
 		goToWriting,
 		onOpenIdentityDialog,
@@ -216,8 +245,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		mood: globeWeatherMood,
 		temperatureF: globeWeatherTemperatureF,
 		regionCenter: globeWeatherRegionCenter,
-	} =
-		useGlobeWeatherMood();
+	} = useGlobeWeatherMood();
 	const globeNightLighting = useGlobeNightLighting();
 
 	// Let the campaign page know when the destination view has actually rendered,
@@ -299,7 +327,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	// Full Auto "Body" block profile chips (shared with HybridPromptInput)
 	const miniProfileFields = useMemo(() => {
-		const identityProfile = campaign?.identity as IdentityProfileFields | undefined | null;
+		const identityProfile = campaign?.identity as
+			| IdentityProfileFields
+			| undefined
+			| null;
 		if (!identityProfile) return null;
 		return {
 			name: identityProfile.name ?? '',
@@ -318,17 +349,42 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	useEffect(() => setIsClient(true), []);
 	const isDraftingView = view === 'drafting';
 	const isSentView = view === 'sent';
+	const contactsListTopNavStop = useMemo<ContactsExpandedTopNavStop>(() => {
+		if (view === 'overview') return 'all';
+		if (view === 'search') return 'search';
+		if (view === 'testing') return 'write';
+		if (view === 'drafting' || view === 'sent') return 'send';
+		if (view === 'inbox') return 'inbox';
+		return 'all';
+	}, [view]);
+	const contactsListTopNavProps = useMemo(
+		() => ({
+			activeTopNavStop: contactsListTopNavStop,
+			onOpenAll: goToOverview,
+			onOpenSearch: onGoToSearch,
+			onOpenWriting: goToWriting,
+			onOpenSend: goToDrafting,
+			onOpenInbox: goToInbox,
+		}),
+		[contactsListTopNavStop, goToDrafting, goToOverview, goToInbox, goToWriting, onGoToSearch]
+	);
 
 	const draftingOperationsForHeader = useMemo(() => {
 		// Prefer the live preview counters while a batch is visually "playing back" so the
 		// CampaignHeaderBox progress stays in sync with the Contacts pacing + Draft Preview panel.
 		if (isLivePreviewVisible && livePreviewTotal > 0) {
-			const clampedDraftNumber = Math.max(0, Math.min(livePreviewTotal, livePreviewDraftNumber));
+			const clampedDraftNumber = Math.max(
+				0,
+				Math.min(livePreviewTotal, livePreviewDraftNumber)
+			);
 			const current = Math.max(0, clampedDraftNumber - 1);
 			return [{ current, total: livePreviewTotal }];
 		}
 
-		return (draftOperations || []).map((op) => ({ current: op.progress, total: op.total }));
+		return (draftOperations || []).map((op) => ({
+			current: op.progress,
+			total: op.total,
+		}));
 	}, [draftOperations, isLivePreviewVisible, livePreviewDraftNumber, livePreviewTotal]);
 	const activelyDraftingContactIds = useMemo(() => {
 		const ids = new Set<number>();
@@ -367,15 +423,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	}, [onDraftOperationsProgress]);
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
 	const [isKeepingTestDraft, setIsKeepingTestDraft] = useState(false);
-	const [pendingKeptDraftContactId, setPendingKeptDraftContactId] = useState<number | null>(
-		null
-	);
+	const [pendingKeptDraftContactId, setPendingKeptDraftContactId] = useState<
+		number | null
+	>(null);
 	// Ref to the main DraftedEmails instance (center column) so side preview controls can exit regen mode.
 	const draftedEmailsRef = useRef<DraftedEmailsHandle | null>(null);
 	// Tracks whether the DraftedEmails "regen settings preview" (HybridPromptInput) is open for the selected draft.
 	// Used to swap the pinned left column from DraftsExpandedList -> full email preview while regenerating.
-	const [isSelectedDraftRegenSettingsPreviewOpen, setIsSelectedDraftRegenSettingsPreviewOpen] =
-		useState(false);
+	const [
+		isSelectedDraftRegenSettingsPreviewOpen,
+		setIsSelectedDraftRegenSettingsPreviewOpen,
+	] = useState(false);
 	const exitSelectedDraftRegenView = useCallback(() => {
 		draftedEmailsRef.current?.exitRegenSettingsPreview();
 	}, []);
@@ -404,8 +462,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	});
 	// When a draft is OPEN for review/editing, the settings panel should ALWAYS reflect that draft,
 	// even if the user hovers other rows in the list.
-	const draftForSettingsPreview =
-		isDraftingView ? selectedDraft ?? hoveredDraftForSettings : null;
+	const draftForSettingsPreview = isDraftingView
+		? (selectedDraft ?? hoveredDraftForSettings)
+		: null;
 	// Track the profile fields from the draft's snapshot (so we show what was used at generation time)
 	const [draftProfileFieldsForSettings, setDraftProfileFieldsForSettings] =
 		useState<DraftProfileFields | null>(null);
@@ -484,7 +543,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			return sentProfileFieldsForSettings;
 		}
 		return miniProfileFields;
-	}, [isDraftingView, isSentView, draftProfileFieldsForSettings, sentProfileFieldsForSettings, miniProfileFields]);
+	}, [
+		isDraftingView,
+		isSentView,
+		draftProfileFieldsForSettings,
+		sentProfileFieldsForSettings,
+		miniProfileFields,
+	]);
 
 	// Narrow desktop detection for Writing tab compact layout.
 	// Note: widened upper bound from 1280 -> 1317 so the left pinned panel never clips
@@ -499,8 +564,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// Inbox tab stacked layout detection (<= 1279px) - moves research panel below header box on the left
 	const [isInboxTabStacked, setIsInboxTabStacked] = useState(false);
 	// Compact bottom panels at small 16:10 / 16:9 monitor sizes - collapse the bottom 3-box strip to header-only
-	const [areBottomPanelsCollapsedAtCompactBreakpoint, setAreBottomPanelsCollapsedAtCompactBreakpoint] =
-		useState(false);
+	const [
+		areBottomPanelsCollapsedAtCompactBreakpoint,
+		setAreBottomPanelsCollapsedAtCompactBreakpoint,
+	] = useState(false);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		// Matches `DEFAULT_CAMPAIGN_ZOOM` in the campaign page.
@@ -513,7 +580,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			const html = document.documentElement;
 			const zoomStr = window.getComputedStyle(html).zoom;
 			const parsedZoom = zoomStr ? parseFloat(zoomStr) : NaN;
-			const varZoomStr = window.getComputedStyle(html).getPropertyValue(CAMPAIGN_ZOOM_VAR);
+			const varZoomStr = window
+				.getComputedStyle(html)
+				.getPropertyValue(CAMPAIGN_ZOOM_VAR);
 			const parsedVarZoom = varZoomStr ? parseFloat(varZoomStr) : NaN;
 			// Prefer actual zoom() when supported; otherwise fall back to the campaign zoom var.
 			const z =
@@ -549,7 +618,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				Math.abs(screenRatio - IDEAL_16X10)
 			);
 			const isSixteenByTenish = delta16x10 <= 0.14;
-			const delta16x9 = Math.min(Math.abs(ratio - IDEAL_16X9), Math.abs(screenRatio - IDEAL_16X9));
+			const delta16x9 = Math.min(
+				Math.abs(ratio - IDEAL_16X9),
+				Math.abs(screenRatio - IDEAL_16X9)
+			);
 			const isSixteenByNineish = delta16x9 <= 0.08;
 
 			const TOLERANCE_PX = 50;
@@ -560,7 +632,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 			const shouldCollapseBottomPanels =
 				!isMobile &&
-				((isSixteenByTenish && isAtOrBelow16x10) || (isSixteenByNineish && isAtOrBelow16x9));
+				((isSixteenByTenish && isAtOrBelow16x10) ||
+					(isSixteenByNineish && isAtOrBelow16x9));
 			setAreBottomPanelsCollapsedAtCompactBreakpoint(Boolean(shouldCollapseBottomPanels));
 		};
 		checkBreakpoints();
@@ -574,6 +647,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const bottomPanelBoxHeightPx = areBottomPanelsCollapsedAtCompactBreakpoint ? 40 : 117;
 	const bottomPanelCollapsed = areBottomPanelsCollapsedAtCompactBreakpoint;
+	const mainContactsPanelWidthPx = 377;
+	const mainContactsPanelHeightPx = 597;
+	const standardSidePanelTopOffsetPx = 15;
+	const standardSidePanelGapPx = 16;
+	const campaignHeaderBoxHeightPx = 59;
+	const standardResearchPanelHeightPx =
+		campaignHeaderBoxHeightPx + standardSidePanelGapPx + mainContactsPanelHeightPx;
+	const isStandardSidePanelView =
+		view === 'testing' || view === 'drafting' || view === 'sent';
 
 	// --- Pinned left panel (ContactsExpandedList <-> MiniEmailStructure) ---
 	// We intentionally render the correct panel immediately (no height-morph animation),
@@ -622,14 +704,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	// --- Main box morph transition (Writing/Drafts/Sent <-> Search/Inbox) ---
 	type CampaignMainBoxKey = 'writing' | 'drafts' | 'sent' | 'search' | 'inbox';
-	const getCampaignMainBoxKey = useCallback((v: typeof view): CampaignMainBoxKey | null => {
-		if (v === 'testing') return 'writing';
-		if (v === 'drafting') return 'drafts';
-		if (v === 'sent') return 'sent';
-		if (v === 'search') return 'search';
-		if (v === 'inbox') return 'inbox';
-		return null;
-	}, []);
+	const getCampaignMainBoxKey = useCallback(
+		(v: typeof view): CampaignMainBoxKey | null => {
+			if (v === 'testing') return 'writing';
+			if (v === 'drafting') return 'drafts';
+			if (v === 'sent') return 'sent';
+			if (v === 'search') return 'search';
+			if (v === 'inbox') return 'inbox';
+			return null;
+		},
+		[]
+	);
 
 	// --- Research panel morph transition (Standard tabs <-> Search/Inbox) ---
 	type CampaignResearchPanelKey = 'standard' | 'search' | 'inbox';
@@ -666,7 +751,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const mainBoxActiveElRef = useRef<HTMLElement | null>(null);
 
 	// Stores the LAST rendered main box (used as the "from" rect when the view changes).
-	const lastMainBoxKeyRef = useRef<CampaignMainBoxKey | null>(getCampaignMainBoxKey(view));
+	const lastMainBoxKeyRef = useRef<CampaignMainBoxKey | null>(
+		getCampaignMainBoxKey(view)
+	);
 	const lastMainBoxRectRef = useRef<DOMRect | null>(null);
 
 	const researchPanelGhostRef = useRef<HTMLDivElement | null>(null);
@@ -692,7 +779,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		const ghostToFill = mainBoxGhostToFillRef.current;
 		const ghostFromContent = mainBoxGhostFromContentRef.current;
 		const ghostToContent = mainBoxGhostToContentRef.current;
-		if (!ghost || !ghostFromFill || !ghostToFill || !ghostFromContent || !ghostToContent) return;
+		if (!ghost || !ghostFromFill || !ghostToFill || !ghostFromContent || !ghostToContent)
+			return;
 
 		const fromKey = lastMainBoxKeyRef.current;
 		const fromRect = lastMainBoxRectRef.current;
@@ -768,10 +856,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			const clone = source.cloneNode(true) as HTMLElement;
 			clone.removeAttribute('data-campaign-main-box');
 			clone.removeAttribute('id');
-			clone.querySelectorAll('[data-campaign-main-box]').forEach((n) =>
-				(n as HTMLElement).removeAttribute('data-campaign-main-box')
-			);
-			clone.querySelectorAll('[id]').forEach((n) => (n as HTMLElement).removeAttribute('id'));
+			clone
+				.querySelectorAll('[data-campaign-main-box]')
+				.forEach((n) => (n as HTMLElement).removeAttribute('data-campaign-main-box'));
+			clone
+				.querySelectorAll('[id]')
+				.forEach((n) => (n as HTMLElement).removeAttribute('id'));
 			clone.style.position = 'absolute';
 			clone.style.left = '0';
 			clone.style.top = '0';
@@ -850,7 +940,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			// Prime content
 			ghostFromContent.replaceChildren();
 			ghostToContent.replaceChildren();
-			if (fromVisualEl) ghostFromContent.appendChild(buildGhostContentClone(fromVisualEl));
+			if (fromVisualEl)
+				ghostFromContent.appendChild(buildGhostContentClone(fromVisualEl));
 			if (toVisualEl) ghostToContent.appendChild(buildGhostContentClone(toVisualEl));
 			gsap.set(ghostFromContent, { opacity: 1 });
 			gsap.set(ghostToContent, { opacity: 0 });
@@ -894,7 +985,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				}),
 				tweenTo(ghostFromFill, { opacity: 0, duration: morphSeconds, ease: morphEase }),
 				tweenTo(ghostToFill, { opacity: 1, duration: morphSeconds, ease: morphEase }),
-				tweenTo(ghostFromContent, { opacity: 0, duration: morphSeconds, ease: morphEase }),
+				tweenTo(ghostFromContent, {
+					opacity: 0,
+					duration: morphSeconds,
+					ease: morphEase,
+				}),
 				tweenTo(ghostToContent, { opacity: 1, duration: morphSeconds, ease: morphEase }),
 			]);
 			if (mainBoxTransitionIdRef.current !== transitionId) return;
@@ -973,7 +1068,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		const ghostToFill = researchPanelGhostToFillRef.current;
 		const ghostFromContent = researchPanelGhostFromContentRef.current;
 		const ghostToContent = researchPanelGhostToContentRef.current;
-		if (!ghost || !ghostFromFill || !ghostToFill || !ghostFromContent || !ghostToContent) return;
+		if (!ghost || !ghostFromFill || !ghostToFill || !ghostFromContent || !ghostToContent)
+			return;
 
 		const fromKey = lastResearchPanelKeyRef.current;
 		const fromRect = lastResearchPanelRectRef.current;
@@ -983,7 +1079,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		researchPanelActiveElRef.current = null;
 
 		// Only morph when entering/leaving the Search or Inbox tabs.
-		const isMorphEndpoint = (k: CampaignResearchPanelKey) => k === 'search' || k === 'inbox';
+		const isMorphEndpoint = (k: CampaignResearchPanelKey) =>
+			k === 'search' || k === 'inbox';
 		if (
 			!fromKey ||
 			!fromRect ||
@@ -1050,13 +1147,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			clone.removeAttribute('data-research-panel-container');
 			clone.removeAttribute('data-research-panel-variant');
 			clone.removeAttribute('data-hover-description');
-			clone.querySelectorAll('[data-research-panel-container]').forEach((n) =>
-				(n as HTMLElement).removeAttribute('data-research-panel-container')
-			);
-			clone.querySelectorAll('[data-research-panel-variant]').forEach((n) =>
-				(n as HTMLElement).removeAttribute('data-research-panel-variant')
-			);
-			clone.querySelectorAll('[id]').forEach((n) => (n as HTMLElement).removeAttribute('id'));
+			clone
+				.querySelectorAll('[data-research-panel-container]')
+				.forEach((n) =>
+					(n as HTMLElement).removeAttribute('data-research-panel-container')
+				);
+			clone
+				.querySelectorAll('[data-research-panel-variant]')
+				.forEach((n) =>
+					(n as HTMLElement).removeAttribute('data-research-panel-variant')
+				);
+			clone
+				.querySelectorAll('[id]')
+				.forEach((n) => (n as HTMLElement).removeAttribute('id'));
 			clone.style.position = 'absolute';
 			clone.style.left = '0';
 			clone.style.top = '0';
@@ -1140,7 +1243,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			// Prime content
 			ghostFromContent.replaceChildren();
 			ghostToContent.replaceChildren();
-			if (fromVisualEl) ghostFromContent.appendChild(buildGhostContentClone(fromVisualEl));
+			if (fromVisualEl)
+				ghostFromContent.appendChild(buildGhostContentClone(fromVisualEl));
 			if (toVisualEl) ghostToContent.appendChild(buildGhostContentClone(toVisualEl));
 			gsap.set(ghostFromContent, { opacity: 1 });
 			gsap.set(ghostToContent, { opacity: 0 });
@@ -1181,7 +1285,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				}),
 				tweenTo(ghostFromFill, { opacity: 0, duration: morphSeconds, ease: morphEase }),
 				tweenTo(ghostToFill, { opacity: 1, duration: morphSeconds, ease: morphEase }),
-				tweenTo(ghostFromContent, { opacity: 0, duration: morphSeconds, ease: morphEase }),
+				tweenTo(ghostFromContent, {
+					opacity: 0,
+					duration: morphSeconds,
+					ease: morphEase,
+				}),
 				tweenTo(ghostToContent, { opacity: 1, duration: morphSeconds, ease: morphEase }),
 			]);
 			if (researchPanelTransitionIdRef.current !== transitionId) return;
@@ -1257,7 +1365,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		lastMainBoxKeyRef.current = key;
 
 		if (!key) return;
-		const el = document.querySelector(`[data-campaign-main-box="${key}"]`) as HTMLElement | null;
+		const el = document.querySelector(
+			`[data-campaign-main-box="${key}"]`
+		) as HTMLElement | null;
 		if (!el) return;
 
 		const rect = el.getBoundingClientRect();
@@ -1345,14 +1455,18 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			(block: HybridBlockPrompt) => block.type === 'full_automated'
 		);
 		if (hasFullAutomatedBlock) return DraftingMode.ai;
-		const isOnlyTextBlocks = blocks?.every((block: HybridBlockPrompt) => block.type === 'text');
+		const isOnlyTextBlocks = blocks?.every(
+			(block: HybridBlockPrompt) => block.type === 'text'
+		);
 		if (isOnlyTextBlocks) return DraftingMode.handwritten;
 		return DraftingMode.hybrid;
 	}, [form]);
 
 	// Handle regenerating a draft using the current prompt
 	const handleRegenerateDraft = useCallback(
-		async (draft: EmailWithRelations): Promise<{ subject: string; message: string } | null> => {
+		async (
+			draft: EmailWithRelations
+		): Promise<{ subject: string; message: string } | null> => {
 			const contact = contacts?.find((c) => c.id === draft.contactId);
 			if (!contact) {
 				toast.error('Contact not found for this draft');
@@ -1379,7 +1493,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						(fullAutomatedBlock?.value?.trim() ??
 							values.fullAiPrompt?.trim() ??
 							campaign.fullAiPrompt?.trim() ??
-							'') || 'Generate an outreach email.';
+							'') ||
+						'Generate an outreach email.';
 
 					const populatedSystemPrompt = FULL_AI_DRAFTING_SYSTEM_PROMPT.replace(
 						'{recipient_first_name}',
@@ -1399,22 +1514,28 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					const userPrompt = `Sender information (user profile):\n${stringifyJsonSubset(
 						senderProfile,
 						['name', 'bandName', 'genre', 'area', 'bio', 'website']
-					)}\n\nRecipient information:\n${stringifyJsonSubset<Contact>(contact as Contact, [
-						'lastName',
-						'firstName',
-						'email',
-						'company',
-						'address',
-						'city',
-						'state',
-						'country',
-						'website',
-						'phone',
-						'metadata',
-					])}\n\nUser Goal:\n${fullAiPrompt}`;
+					)}\n\nRecipient information:\n${stringifyJsonSubset<Contact>(
+						contact as Contact,
+						[
+							'lastName',
+							'firstName',
+							'email',
+							'company',
+							'address',
+							'city',
+							'state',
+							'country',
+							'website',
+							'phone',
+							'metadata',
+						]
+					)}\n\nUser Goal:\n${fullAiPrompt}`;
 
 					// Pick a random model for regeneration
-					const selectedModel = OPENROUTER_DRAFTING_MODELS[Math.floor(Math.random() * OPENROUTER_DRAFTING_MODELS.length)];
+					const selectedModel =
+						OPENROUTER_DRAFTING_MODELS[
+							Math.floor(Math.random() * OPENROUTER_DRAFTING_MODELS.length)
+						];
 					console.log('[Regenerate] Using OpenRouter model:', selectedModel);
 
 					aiResponse = await callOpenRouter({
@@ -1429,9 +1550,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						},
 					});
 				} else if (draftingMode === DraftingMode.hybrid) {
-					const hybridBlocks = values.hybridBlockPrompts?.filter(
-						(block: HybridBlockPrompt) => block.type !== 'full_automated'
-					) || [];
+					const hybridBlocks =
+						values.hybridBlockPrompts?.filter(
+							(block: HybridBlockPrompt) => block.type !== 'full_automated'
+						) || [];
 
 					if (hybridBlocks.length === 0) {
 						toast.error('Please set up your email template first');
@@ -1472,9 +1594,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 					const stringifiedHybridBlocks = generateEmailTemplateFromBlocks(hybridBlocks);
 					const hybridPrompt =
-						(values.hybridPrompt?.trim() ??
-							campaign.hybridPrompt?.trim() ??
-							'') ||
+						(values.hybridPrompt?.trim() ?? campaign.hybridPrompt?.trim() ?? '') ||
 						'Generate a professional email based on the template below.';
 					const geminiPrompt = `**RECIPIENT**\n${stringifiedRecipient}\n\n**SENDER**\n${stringifiedSender}\n\n**PROMPT**\n${hybridPrompt}\n\n**EMAIL TEMPLATE**\n${stringifiedHybridBlocks}\n\n**PROMPTS**\n${generatePromptsFromBlocks(
 						hybridBlocks
@@ -1512,8 +1632,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					}
 				} catch {
 					const subjectMatch = aiResponse.match(/subject["']?\s*:\s*["']([^"']+)["']/i);
-					const messageMatch = aiResponse.match(/message["']?\s*:\s*["']([\s\S]*?)["']\s*[,}]/i);
-					
+					const messageMatch = aiResponse.match(
+						/message["']?\s*:\s*["']([\s\S]*?)["']\s*[,}]/i
+					);
+
 					parsed = {
 						subject: subjectMatch?.[1] || draft.subject || 'Re: Your inquiry',
 						message: messageMatch?.[1] || aiResponse,
@@ -1522,10 +1644,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 				const cleanedSubject = removeEmDashes(parsed.subject);
 				const cleanedMessageText = removeEmDashes(parsed.message);
-				const cleanedMessageNoSignature = stripEmailSignatureFromAiMessage(cleanedMessageText, {
-					senderName: campaign.identity?.name ?? null,
-					senderBandName: campaign.identity?.bandName ?? null,
-				});
+				const cleanedMessageNoSignature = stripEmailSignatureFromAiMessage(
+					cleanedMessageText,
+					{
+						senderName: campaign.identity?.name ?? null,
+						senderBandName: campaign.identity?.bandName ?? null,
+					}
+				);
 
 				const signatureText = resolveAutoSignatureText({
 					currentSignature: values.signature ?? null,
@@ -1675,13 +1800,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					(clampedPromptScore >= 97
 						? 'Exceptional'
 						: clampedPromptScore >= 91
-						? 'Excellent'
-						: clampedPromptScore >= 83
-						? 'Great'
-						: clampedPromptScore >= 75
-						? 'Good'
-						: 'Keep Going')
-			  }`;
+							? 'Excellent'
+							: clampedPromptScore >= 83
+								? 'Great'
+								: clampedPromptScore >= 75
+									? 'Good'
+									: 'Keep Going')
+				}`;
 
 	const [contactsTabSelectedIds, setContactsTabSelectedIds] = useState<Set<number>>(
 		new Set()
@@ -1878,7 +2003,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								typeof contacts === 'function'
 									? contacts(tab.selectedContacts)
 									: contacts,
-					  }
+						}
 					: tab
 			)
 		);
@@ -2008,7 +2133,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		if (activeSearchTab && !activeSearchTab.query) {
 			setSearchTabs((tabs) =>
 				tabs.map((tab) =>
-					tab.id === activeSearchTabId ? { ...tab, label, query, what: searchWhatValue } : tab
+					tab.id === activeSearchTabId
+						? { ...tab, label, query, what: searchWhatValue }
+						: tab
 				)
 			);
 		} else {
@@ -2132,7 +2259,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	};
 
-	const [draftStatusFilter, setDraftStatusFilter] = useState<'all' | 'approved' | 'rejected'>('all');
+	const [draftStatusFilter, setDraftStatusFilter] = useState<
+		'all' | 'approved' | 'rejected'
+	>('all');
 	const [draftSelectionsByFilter, setDraftSelectionsByFilter] = useState<{
 		all: Set<number>;
 		approved: Set<number>;
@@ -2252,12 +2381,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// For visual alignment, keep newly-drafted contacts visible in the Contacts list until the
 	// live preview advances past them. This does NOT affect the actual drafting backend logic.
 	const shouldPaceContactsList = view === 'testing';
-	const [visualContactedBaselineIds, setVisualContactedBaselineIds] = useState<Set<number>>(
-		() => new Set(contactedContactIds)
-	);
-	const [visualContactedCompletedIds, setVisualContactedCompletedIds] = useState<Set<number>>(
-		() => new Set()
-	);
+	const [visualContactedBaselineIds, setVisualContactedBaselineIds] = useState<
+		Set<number>
+	>(() => new Set(contactedContactIds));
+	const [visualContactedCompletedIds, setVisualContactedCompletedIds] = useState<
+		Set<number>
+	>(() => new Set());
 	const wasLivePreviewVisibleRef = useRef(false);
 	const lastLivePreviewContactIdRef = useRef<number | null>(null);
 
@@ -2336,7 +2465,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const contactsForContactsExpandedList = useMemo(() => {
 		if (!shouldPaceContactsList) return contactsAvailableForDrafting;
 		return (contacts || []).filter((c) => !visualContactedContactIds.has(c.id));
-	}, [contacts, contactsAvailableForDrafting, shouldPaceContactsList, visualContactedContactIds]);
+	}, [
+		contacts,
+		contactsAvailableForDrafting,
+		shouldPaceContactsList,
+		visualContactedContactIds,
+	]);
 
 	const activelyDraftingContactIdsForContactsExpandedList = useMemo(() => {
 		if (!shouldPaceContactsList) return activelyDraftingContactIds;
@@ -2365,7 +2499,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		): HistoryAction[] => {
 			if (items.length === 0) return [];
 
-			const sorted = [...items].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+			const sorted = [...items].sort(
+				(a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+			);
 			const batches: HistoryAction[] = [];
 			let currentCount = 1;
 			let currentEndAt = sorted[0].timestamp;
@@ -2445,8 +2581,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		const receivedBatches = computeBatches(receivedItems, 'received');
 
 		// Combine all batches and sort by timestamp (newest first)
-		return [...contactsBatches, ...draftsBatches, ...sentBatches, ...receivedBatches]
-			.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+		return [
+			...contactsBatches,
+			...draftsBatches,
+			...sentBatches,
+			...receivedBatches,
+		].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 	}, [campaignContactEvents, draftEmails, sentEmails, inboundEmails]);
 
 	const isSendingDisabled = isFreeTrial || (user?.sendingCredits || 0) === 0;
@@ -2454,7 +2594,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [selectedContactForResearch, setSelectedContactForResearch] =
 		useState<ContactWithName | null>(null);
 	const [hoveredContactForResearch, setHoveredContactForResearch] =
-		useState<ContactWithName | null>(null);	
+		useState<ContactWithName | null>(null);
 	const [hasUserSelectedResearchContact, setHasUserSelectedResearchContact] =
 		useState(false);
 	const [showTestPreview, setShowTestPreview] = useState(false);
@@ -2502,7 +2642,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					return false;
 				}
 
-				const identityProfile = campaign.identity as IdentityProfileFields | null | undefined;
+				const identityProfile = campaign.identity as
+					| IdentityProfileFields
+					| null
+					| undefined;
 				const computedProfileFields: DraftProfileFields = {
 					name: identityProfile?.name ?? '',
 					genre: identityProfile?.genre ?? '',
@@ -2535,11 +2678,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				const profileFieldsForSnapshot =
 					existingSnapshot?.profileFields ?? computedProfileFields;
 
-				const messageWithSettings = injectMurmurDraftSettingsSnapshot(cleanedMessageHtml, {
-					version: 1,
-					values: valuesForSnapshot,
-					profileFields: profileFieldsForSnapshot,
-				});
+				const messageWithSettings = injectMurmurDraftSettingsSnapshot(
+					cleanedMessageHtml,
+					{
+						version: 1,
+						values: valuesForSnapshot,
+						profileFields: profileFieldsForSnapshot,
+					}
+				);
 
 				await createEmail({
 					subject,
@@ -2563,20 +2709,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				setIsKeepingTestDraft(false);
 			}
 		},
-		[
-			campaign,
-			contacts,
-			createEmail,
-			form,
-			goToDrafting,
-			isKeepingTestDraft,
-			queryClient,
-		]
+		[campaign, contacts, createEmail, form, goToDrafting, isKeepingTestDraft, queryClient]
 	);
-	const draftsMiniEmailTopHeaderLabel = draftsMiniEmailTopHeaderHeight ? 'Settings' : undefined;
+	const draftsMiniEmailTopHeaderLabel = draftsMiniEmailTopHeaderHeight
+		? 'Settings'
+		: undefined;
 	const draftsMiniEmailSettingsLabels = useMemo(() => {
 		const contact = displayedContactForResearch;
-		if (!draftsMiniEmailTopHeaderHeight || !contact) return { primary: '', secondary: '' };
+		if (!draftsMiniEmailTopHeaderHeight || !contact)
+			return { primary: '', secondary: '' };
 
 		const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
 		const name = (fullName || contact.name || '').trim();
@@ -2929,7 +3070,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									Promotion
 								</div>
 								<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
-									reach out to radio stations, playlists, and more to get your music played
+									reach out to radio stations, playlists, and more to get your music
+									played
 								</div>
 							</div>
 						</div>
@@ -3148,7 +3290,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									</div>
 								) : locationResults && locationResults.length > 0 ? (
 									locationResults.map((loc, idx) => {
-										const { icon, backgroundColor } = getCityIconProps(loc.city, loc.state);
+										const { icon, backgroundColor } = getCityIconProps(
+											loc.city,
+											loc.state
+										);
 										return (
 											<div
 												key={`${loc.city}-${loc.state}-${idx}`}
@@ -3178,7 +3323,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										);
 									})
 								) : (
-									<div className="text-black font-medium font-secondary">No locations found</div>
+									<div className="text-black font-medium font-secondary">
+										No locations found
+									</div>
 								)}
 							</CustomScrollbar>
 						) : (
@@ -3208,7 +3355,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													: 'text-transparent'
 											}`}
 										>
-											{isLoadingLocation ? 'Locating...' : userLocationName || 'Placeholder'}
+											{isLoadingLocation
+												? 'Locating...'
+												: userLocationName || 'Placeholder'}
 										</div>
 									</div>
 								</div>
@@ -3277,55 +3426,60 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												? 'calc(50% + 249px + 37px)' // 37px left of narrow map box (498px / 2 = 249px)
 												: 'calc(50% + 384px + 32px)'
 											: view === 'inbox'
-											? isInboxTabNarrow
-												? 'calc(50% + 276px)' // 258px (half of 516px narrow inbox) + 18px gap
-												: 'calc(50% + 471.5px)'
-											: 'calc(50% + 250px + 32px)',
-									top: view === 'inbox' ? '9px' : '29px',
-									gap: '16px',
+												? isInboxTabNarrow
+													? 'calc(50% + 276px)' // 258px (half of 516px narrow inbox) + 18px gap
+													: 'calc(50% + 471.5px)'
+												: 'calc(50% + 250px + 32px)',
+									top:
+										view === 'inbox'
+											? '9px'
+											: isStandardSidePanelView
+												? `${standardSidePanelTopOffsetPx}px`
+												: '29px',
+									gap: `${standardSidePanelGapPx}px`,
 								}}
 							>
-									<CampaignHeaderBox
-										campaignId={campaign?.id}
-										campaignName={campaign?.name || 'Untitled Campaign'}
-										toListNames={toListNames}
-										fromName={fromName}
-										contactsCount={contactsCount}
-										draftCount={draftCount}
-										sentCount={sentCount}
-										draftingProgress={draftingProgressForHeader}
-										onFromClick={onOpenIdentityDialog}
-										onDraftsClick={goToDrafting}
-										onSentClick={goToSent}
-									/>
-									{view !== 'inbox' &&
-										(isDraftPreviewOpen ? (
-											shouldShowPinnedRegenEmailPreview ? (
+								<CampaignHeaderBox
+									campaignId={campaign?.id}
+									campaignName={campaign?.name || 'Untitled Campaign'}
+									toListNames={toListNames}
+									fromName={fromName}
+									contactsCount={contactsCount}
+									draftCount={draftCount}
+									sentCount={sentCount}
+									draftingProgress={draftingProgressForHeader}
+									onFromClick={onOpenIdentityDialog}
+									onDraftsClick={goToDrafting}
+									onSentClick={goToSent}
+								/>
+								{view !== 'inbox' &&
+									(isDraftPreviewOpen ? (
+										shouldShowPinnedRegenEmailPreview ? (
+											<div
+												data-draft-review-side-preview
+												style={{
+													width: '376px',
+													height: '587px',
+													overflow: 'hidden',
+													position: 'relative',
+												}}
+											>
 												<div
-													data-draft-review-side-preview
 													style={{
-														width: '376px',
-														height: '587px',
-														overflow: 'hidden',
-														position: 'relative',
+														position: 'absolute',
+														top: 0,
+														left: 0,
+														// Important: scale the *original* DraftedEmails review canvas (499x703)
+														// down into the old DraftsExpandedList slot (376x587). Transforms don't
+														// affect layout, so we fix the unscaled canvas size explicitly here to
+														// avoid any centering/offset drift.
+														width: '499px',
+														height: '703px',
+														transform: `scale(${376 / 499}, ${587 / 703})`,
+														transformOrigin: 'top left',
 													}}
 												>
-													<div
-														style={{
-															position: 'absolute',
-															top: 0,
-															left: 0,
-															// Important: scale the *original* DraftedEmails review canvas (499x703)
-															// down into the old DraftsExpandedList slot (376x587). Transforms don't
-															// affect layout, so we fix the unscaled canvas size explicitly here to
-															// avoid any centering/offset drift.
-															width: '499px',
-															height: '703px',
-															transform: `scale(${376 / 499}, ${587 / 703})`,
-															transformOrigin: 'top left',
-														}}
-													>
-														<DraftedEmails
+													<DraftedEmails
 														mainBoxId={undefined}
 														contacts={contacts || []}
 														selectedDraftIds={draftsTabSelectedIds}
@@ -3365,510 +3519,515 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														hideDraftReviewCounter
 														hideDraftReviewActionRow
 													/>
-													</div>
+												</div>
+											</div>
+										) : (
+											<div
+												style={{
+													width: '376px',
+													height: '587px',
+												}}
+											>
+												<DraftsExpandedList
+													drafts={draftEmails}
+													contacts={contacts || []}
+													width={376}
+													height={587}
+													hideSendButton
+													rowWidth={366}
+													rowHeight={92}
+													rejectedDraftIds={rejectedDraftIds}
+													approvedDraftIds={approvedDraftIds}
+													previewedDraftId={selectedDraft?.id}
+													isPreviewMode
+													onDraftPreviewClick={(draft) =>
+														setSelectedDraft((prev) =>
+															prev?.id === draft.id ? null : draft
+														)
+													}
+												/>
+											</div>
+										)
+									) : (
+										<div
+											style={{
+												width: `${mainContactsPanelWidthPx}px`,
+												overflow: 'visible',
+												position: 'relative',
+											}}
+										>
+											{pinnedLeftPanelVariant === 'contacts' ? (
+												<div
+													style={{
+														// Gradual fade-in when entering from inbox/search so the
+														// ContactsExpandedList blends with the morph animations
+														opacity: isEnteringFromMorphView ? 0 : 1,
+														animation: isEnteringFromMorphView
+															? 'miniEmailStructureFadeIn 350ms ease-in 0ms forwards'
+															: 'none',
+													}}
+												>
+											<ContactsExpandedList
+												contacts={contactsForContactsExpandedList}
+												{...contactsListTopNavProps}
+												isLoading={isContactsLoading}
+														campaign={campaign}
+														enableUsedContactTooltip={view === 'testing'}
+														selectedContactIds={contactsTabSelectedIds}
+														activelyDraftingContactIds={
+															activelyDraftingContactIdsForContactsExpandedList
+														}
+														onContactSelectionChange={(updater) =>
+															setContactsTabSelectedIds((prev) => updater(new Set(prev)))
+														}
+														onContactClick={handleResearchContactClick}
+														onContactHover={handleResearchContactHover}
+														onDraftSelected={async (ids) => {
+															await handleGenerateDrafts(ids);
+														}}
+														isDraftDisabled={isGenerationDisabled()}
+														isPendingGeneration={isPendingGeneration}
+														width={mainContactsPanelWidthPx}
+														height={mainContactsPanelHeightPx}
+														minRows={8}
+														onSearchFromMiniBar={handleMiniContactsSearch}
+													/>
 												</div>
 											) : (
 												<div
 													style={{
-														width: '376px',
-														height: '587px',
+														// Gradual fade-in when entering from inbox/search so the
+														// MiniEmailStructure blends with the morph animations
+														opacity: isEnteringFromMorphView ? 0 : 1,
+														animation: isEnteringFromMorphView
+															? 'miniEmailStructureFadeIn 350ms ease-in 0ms forwards'
+															: 'none',
 													}}
 												>
-													<DraftsExpandedList
-														drafts={draftEmails}
-														contacts={contacts || []}
-														width={376}
-														height={587}
-														hideSendButton
-														rowWidth={366}
-														rowHeight={92}
-														rejectedDraftIds={rejectedDraftIds}
-														approvedDraftIds={approvedDraftIds}
-														previewedDraftId={selectedDraft?.id}
-														isPreviewMode
-														onDraftPreviewClick={(draft) =>
-															setSelectedDraft((prev) =>
-																prev?.id === draft.id ? null : draft
+													<MiniEmailStructure
+														form={
+															isDraftingView
+																? draftsSettingsPreviewForm
+																: isSentView
+																	? sentSettingsPreviewForm
+																	: form
+														}
+														readOnly={isDraftingView || isSentView}
+														variant={
+															draftsMiniEmailTopHeaderHeight ? 'settings' : undefined
+														}
+														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+														settingsSecondaryLabel={
+															draftsMiniEmailSettingsLabels.secondary
+														}
+														settingsNameCompanyBgColor={
+															draftsMiniEmailSettingsNameCompanyBgColor
+														}
+														profileFields={profileFieldsForSettings}
+														identityProfile={
+															campaign?.identity as IdentityProfileFields | null
+														}
+														onIdentityUpdate={handleIdentityUpdate}
+														onDraft={() =>
+															handleGenerateDrafts(
+																contactsAvailableForDrafting.map((c) => c.id)
 															)
 														}
+														isDraftDisabled={isGenerationDisabled()}
+														isPendingGeneration={isPendingGeneration}
+														generationProgress={generationProgress}
+														generationTotal={generationTotal}
+														hideTopChrome
+														hideFooter
+														fullWidthMobile
+														hideAddTextButtons
+														// Match the Writing tab contacts list height (597px) so the left panel stays consistent.
+														// Applies on tabs where this pinned panel renders the MiniEmailStructure (Drafts + Sent).
+														height={
+															view === 'drafting' || view === 'sent'
+																? mainContactsPanelHeightPx
+																: undefined
+														}
+														pageFillColor={draftsMiniEmailFillColor}
+														topHeaderHeight={draftsMiniEmailTopHeaderHeight}
+														topHeaderLabel={draftsMiniEmailTopHeaderLabel}
+														hideAllText={
+															// Hide all structure text to show chrome-only skeleton:
+															// - When the Drafts tab has no drafts
+															// - When the Sent tab is in its empty state
+															(view === 'drafting' && draftCount === 0) ||
+															(view === 'sent' && sentCount === 0)
+														}
+														onOpenWriting={goToWriting}
 													/>
 												</div>
-											)
-										) : (
-											<div
-												style={{
-													width: '375px',
-													overflow: 'visible',
-													position: 'relative',
-												}}
-											>
-												{pinnedLeftPanelVariant === 'contacts' ? (
-														<div
-															style={{
-																// Gradual fade-in when entering from inbox/search so the
-																// ContactsExpandedList blends with the morph animations
-																opacity: isEnteringFromMorphView ? 0 : 1,
-																animation: isEnteringFromMorphView
-																	? 'miniEmailStructureFadeIn 350ms ease-in 0ms forwards'
-																	: 'none',
-															}}
-														>
-															<ContactsExpandedList
-																contacts={contactsForContactsExpandedList}
-																isLoading={isContactsLoading}
-																campaign={campaign}
-																enableUsedContactTooltip={view === 'testing'}
-																selectedContactIds={contactsTabSelectedIds}
-																activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
-																onContactSelectionChange={(updater) =>
-																	setContactsTabSelectedIds((prev) =>
-																		updater(new Set(prev))
-																	)
-																}
-																onContactClick={handleResearchContactClick}
-																onContactHover={handleResearchContactHover}
-																onDraftSelected={async (ids) => {
-																	await handleGenerateDrafts(ids);
-																}}
-																isDraftDisabled={
-																	isGenerationDisabled()
-																}
-																isPendingGeneration={isPendingGeneration}
-																width={375}
-																height={557}
-																minRows={8}
-																onSearchFromMiniBar={handleMiniContactsSearch}
-															/>
-														</div>
-													) : (
-														<div
-															style={{
-																// Gradual fade-in when entering from inbox/search so the
-																// MiniEmailStructure blends with the morph animations
-																opacity: isEnteringFromMorphView ? 0 : 1,
-																animation: isEnteringFromMorphView
-																	? 'miniEmailStructureFadeIn 350ms ease-in 0ms forwards'
-																	: 'none',
-															}}
-														>
-														<MiniEmailStructure
-															form={
-																isDraftingView
-																	? draftsSettingsPreviewForm
-																	: isSentView
-																		? sentSettingsPreviewForm
-																		: form
-															}
-															readOnly={isDraftingView || isSentView}
-															variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
-															settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
-															settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-															settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
-															profileFields={profileFieldsForSettings}
-															identityProfile={campaign?.identity as IdentityProfileFields | null}
-															onIdentityUpdate={handleIdentityUpdate}
-															onDraft={() =>
-																handleGenerateDrafts(
-																	contactsAvailableForDrafting.map((c) => c.id)
-																)
-															}
-															isDraftDisabled={
-																isGenerationDisabled()
-															}
-															isPendingGeneration={isPendingGeneration}
-															generationProgress={generationProgress}
-															generationTotal={generationTotal}
-															hideTopChrome
-															hideFooter
-															fullWidthMobile
-															hideAddTextButtons
-															// Match the Writing tab contacts list height (557px) so the left panel stays consistent.
-															// Applies on tabs where this pinned panel renders the MiniEmailStructure (Drafts + Sent).
-															height={
-																view === 'drafting' || view === 'sent'
-																	? 557
-																	: undefined
-															}
-															pageFillColor={draftsMiniEmailFillColor}
-															topHeaderHeight={draftsMiniEmailTopHeaderHeight}
-															topHeaderLabel={draftsMiniEmailTopHeaderLabel}
-															hideAllText={
-																// Hide all structure text to show chrome-only skeleton:
-																// - When the Drafts tab has no drafts
-																// - When the Sent tab is in its empty state
-																(view === 'drafting' && draftCount === 0) ||
-																(view === 'sent' && sentCount === 0)
-															}
-															onOpenWriting={goToWriting}
-														/>
-														</div>
-													)}
-											</div>
-										))}
+											)}
+										</div>
+									))}
 
-									{view === 'testing' &&
-										(isPromptInputHovered || isSuggestionBoxHovered) &&
-										isCustomInstructionsOpen &&
-										(suggestionText1 || suggestionText2) && (
+								{view === 'testing' &&
+									(isPromptInputHovered || isSuggestionBoxHovered) &&
+									isCustomInstructionsOpen &&
+									(suggestionText1 || suggestionText2) && (
+										<div
+											onMouseEnter={() => {
+												clearSuggestionHoverLeaveTimeout();
+												setIsSuggestionBoxHovered(true);
+											}}
+											onMouseLeave={() => setIsSuggestionBoxHovered(false)}
+											style={{
+												width: '405px',
+												height: '348px',
+												position: 'absolute',
+												top: '115px',
+												left: '-15px',
+												zIndex: 30,
+												backgroundColor: '#D6EEEF',
+												border: '2px solid #000000',
+												borderRadius: '7px',
+												overflow: 'hidden',
+											}}
+										>
 											<div
-												onMouseEnter={() => {
-													clearSuggestionHoverLeaveTimeout();
-													setIsSuggestionBoxHovered(true);
-												}}
-												onMouseLeave={() => setIsSuggestionBoxHovered(false)}
 												style={{
-													width: '405px',
-													height: '348px',
-													position: 'absolute',
-													top: '115px',
-													left: '-15px',
-													zIndex: 30,
-													backgroundColor: '#D6EEEF',
-													border: '2px solid #000000',
-													borderRadius: '7px',
-													overflow: 'hidden',
+													height: '28px',
+													display: 'flex',
+													alignItems: 'center',
+													paddingLeft: '9px',
 												}}
 											>
+												<span className="font-inter font-bold text-[12px] leading-none text-black">
+													Suggestion
+												</span>
+											</div>
+											{/* Inner box */}
+											<div
+												style={{
+													position: 'absolute',
+													top: '26px',
+													left: '50%',
+													transform: 'translateX(-50%)',
+													width: '369px',
+													height: '25px',
+													backgroundColor: '#FFFFFF',
+													border: '2px solid #000000',
+													borderRadius: '5px',
+													boxSizing: 'border-box',
+													display: 'flex',
+													alignItems: 'center',
+													gap: '10px',
+													paddingLeft: '8px',
+													paddingRight: '8px',
+												}}
+											>
+												{/* Progress bar (223 x 12) */}
 												<div
 													style={{
-														height: '28px',
-														display: 'flex',
-														alignItems: 'center',
-														paddingLeft: '9px',
+														width: '223px',
+														height: '12px',
+														backgroundColor: '#FFFFFF',
+														border: '2px solid #000000',
+														borderRadius: '8px',
+														overflow: 'hidden',
+														flexShrink: 0,
+														boxSizing: 'border-box',
+														position: 'relative',
 													}}
 												>
-													<span className="font-inter font-bold text-[12px] leading-none text-black">
-														Suggestion
-													</span>
+													<div
+														style={{
+															height: '100%',
+															borderRadius: '999px',
+															backgroundColor: '#36B24A',
+															width: `${promptScoreFillPercent}%`,
+															maxWidth: '100%',
+															transition: 'width 250ms ease-out',
+														}}
+													/>
+												</div>
+												{/* Rating label */}
+												<div
+													style={{
+														fontFamily: 'Inter, system-ui, sans-serif',
+														fontWeight: 700,
+														fontSize: '12px',
+														lineHeight: '14px',
+														color: '#000000',
+														whiteSpace: 'nowrap',
+														overflow: 'hidden',
+														textOverflow: 'ellipsis',
+														flex: 1,
+														minWidth: 0,
+														textAlign: 'right',
+													}}
+												>
+													{promptScoreDisplayLabel}
+												</div>
+											</div>
+											{/* Small box below the first inner box */}
+											<div
+												onClick={() => {
+													if (hasPreviousPrompt) {
+														undoUpscalePrompt();
+													}
+												}}
+												style={{
+													position: 'absolute',
+													top: '61px',
+													left: '22px',
+													width: '39px',
+													height: '32px',
+													backgroundColor: '#C2C2C2',
+													border: '2px solid #000000',
+													borderRadius: '8px',
+													display: 'flex',
+													alignItems: 'center',
+													justifyContent: 'center',
+													cursor: hasPreviousPrompt ? 'pointer' : 'not-allowed',
+												}}
+											>
+												<UndoIcon width="24" height="24" />
+											</div>
+											{/* Box to the right of the small box */}
+											<div
+												onClick={() => {
+													if (!isUpscalingPrompt) {
+														upscalePrompt();
+													}
+												}}
+												style={{
+													position: 'absolute',
+													top: '61px',
+													left: '66px',
+													width: '233px',
+													height: '32px',
+													backgroundColor: '#D7F0FF',
+													border: '2px solid #000000',
+													borderRadius: '8px',
+													display: 'flex',
+													alignItems: 'center',
+													justifyContent: 'space-between',
+													paddingLeft: '10px',
+													paddingRight: '10px',
+													cursor: isUpscalingPrompt ? 'wait' : 'pointer',
+												}}
+											>
+												<span
+													style={{
+														fontFamily: 'Inter, system-ui, sans-serif',
+														fontSize: '17px',
+														fontWeight: 500,
+														color: '#000000',
+														lineHeight: '1',
+													}}
+												>
+													{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Instructions'}
+												</span>
+												<div style={{ flexShrink: 0 }}>
+													<UpscaleIcon width="24" height="24" />
+												</div>
+											</div>
+											<div
+												style={{
+													position: 'absolute',
+													top: '110px',
+													left: '22px',
+													fontFamily: 'Inter, system-ui, sans-serif',
+													fontWeight: 500,
+													fontSize: '17px',
+													lineHeight: '20px',
+													color: '#000000',
+												}}
+											>
+												Custom Instructions
+											</div>
+											{/* Box below the two small boxes */}
+											<div
+												style={{
+													position: 'absolute',
+													top: '147px', // bottom-aligned: 348 - 17 - (56*3 + 8*2) = 147
+													left: '50%',
+													transform: 'translateX(-50%)',
+													width: '362px',
+													height: '56px',
+													backgroundColor: '#A6DDE0',
+													border: '2px solid #000000',
+													borderRadius: '8px',
+												}}
+											>
+												{/* Section indicator */}
+												<div
+													className="absolute font-inter font-bold tabular-nums"
+													style={{
+														top: '4.5px',
+														left: '5px',
+														fontSize: '11.5px',
+														color: '#000000',
+													}}
+												>
+													[1]
 												</div>
 												{/* Inner box */}
 												<div
 													style={{
 														position: 'absolute',
-														top: '26px',
-														left: '50%',
-														transform: 'translateX(-50%)',
-														width: '369px',
-														height: '25px',
+														top: '0',
+														bottom: '0',
+														margin: 'auto',
+														left: '25px',
+														width: '324px',
+														height: '48px',
 														backgroundColor: '#FFFFFF',
 														border: '2px solid #000000',
-														borderRadius: '5px',
-														boxSizing: 'border-box',
+														borderRadius: '8px',
 														display: 'flex',
 														alignItems: 'center',
-														gap: '10px',
-														paddingLeft: '8px',
-														paddingRight: '8px',
+														padding: '4px 8px',
+														overflow: 'hidden',
 													}}
 												>
-													{/* Progress bar (223 x 12) */}
-													<div
-														style={{
-															width: '223px',
-															height: '12px',
-															backgroundColor: '#FFFFFF',
-															border: '2px solid #000000',
-															borderRadius: '8px',
-															overflow: 'hidden',
-															flexShrink: 0,
-															boxSizing: 'border-box',
-															position: 'relative',
-														}}
-													>
-														<div
-															style={{
-																height: '100%',
-																borderRadius: '999px',
-																backgroundColor: '#36B24A',
-																width: `${promptScoreFillPercent}%`,
-																maxWidth: '100%',
-																transition: 'width 250ms ease-out',
-															}}
-														/>
-													</div>
-													{/* Rating label */}
 													<div
 														style={{
 															fontFamily: 'Inter, system-ui, sans-serif',
-															fontWeight: 700,
-															fontSize: '12px',
-															lineHeight: '14px',
+															fontSize: '11px',
+															lineHeight: '1.3',
 															color: '#000000',
-															whiteSpace: 'nowrap',
+															wordBreak: 'break-word',
+															whiteSpace: 'normal',
 															overflow: 'hidden',
 															textOverflow: 'ellipsis',
-															flex: 1,
-															minWidth: 0,
-															textAlign: 'right',
 														}}
 													>
-														{promptScoreDisplayLabel}
-													</div>
-												</div>
-												{/* Small box below the first inner box */}
-												<div
-													onClick={() => {
-														if (hasPreviousPrompt) {
-															undoUpscalePrompt();
-														}
-													}}
-													style={{
-														position: 'absolute',
-														top: '61px',
-														left: '22px',
-														width: '39px',
-														height: '32px',
-														backgroundColor: '#C2C2C2',
-														border: '2px solid #000000',
-														borderRadius: '8px',
-														display: 'flex',
-														alignItems: 'center',
-														justifyContent: 'center',
-														cursor: hasPreviousPrompt ? 'pointer' : 'not-allowed',
-													}}
-												>
-													<UndoIcon width="24" height="24" />
-												</div>
-												{/* Box to the right of the small box */}
-												<div
-													onClick={() => {
-														if (!isUpscalingPrompt) {
-															upscalePrompt();
-														}
-													}}
-													style={{
-														position: 'absolute',
-														top: '61px',
-														left: '66px',
-														width: '233px',
-														height: '32px',
-														backgroundColor: '#D7F0FF',
-														border: '2px solid #000000',
-														borderRadius: '8px',
-														display: 'flex',
-														alignItems: 'center',
-														justifyContent: 'space-between',
-														paddingLeft: '10px',
-														paddingRight: '10px',
-														cursor: isUpscalingPrompt ? 'wait' : 'pointer',
-													}}
-												>
-													<span
-														style={{
-															fontFamily: 'Inter, system-ui, sans-serif',
-															fontSize: '17px',
-															fontWeight: 500,
-															color: '#000000',
-															lineHeight: '1',
-														}}
-													>
-														{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Instructions'}
-													</span>
-													<div style={{ flexShrink: 0 }}>
-														<UpscaleIcon width="24" height="24" />
-													</div>
-												</div>
-												<div
-													style={{
-														position: 'absolute',
-														top: '110px',
-														left: '22px',
-														fontFamily: 'Inter, system-ui, sans-serif',
-														fontWeight: 500,
-														fontSize: '17px',
-														lineHeight: '20px',
-														color: '#000000',
-													}}
-												>
-													Custom Instructions
-												</div>
-												{/* Box below the two small boxes */}
-												<div
-													style={{
-														position: 'absolute',
-														top: '147px', // bottom-aligned: 348 - 17 - (56*3 + 8*2) = 147
-														left: '50%',
-														transform: 'translateX(-50%)',
-														width: '362px',
-														height: '56px',
-														backgroundColor: '#A6DDE0',
-														border: '2px solid #000000',
-														borderRadius: '8px',
-													}}
-												>
-													{/* Section indicator */}
-													<div
-														className="absolute font-inter font-bold tabular-nums"
-														style={{
-															top: '4.5px',
-															left: '5px',
-															fontSize: '11.5px',
-															color: '#000000',
-														}}
-													>
-														[1]
-													</div>
-													{/* Inner box */}
-													<div
-														style={{
-															position: 'absolute',
-															top: '0',
-															bottom: '0',
-															margin: 'auto',
-															left: '25px',
-															width: '324px',
-															height: '48px',
-															backgroundColor: '#FFFFFF',
-															border: '2px solid #000000',
-															borderRadius: '8px',
-															display: 'flex',
-															alignItems: 'center',
-															padding: '4px 8px',
-															overflow: 'hidden',
-														}}
-													>
-														<div
-															style={{
-																fontFamily: 'Inter, system-ui, sans-serif',
-																fontSize: '11px',
-																lineHeight: '1.3',
-																color: '#000000',
-																wordBreak: 'break-word',
-																whiteSpace: 'normal',
-																overflow: 'hidden',
-																textOverflow: 'ellipsis',
-															}}
-														>
-															{suggestionText1 || ''}
-														</div>
-													</div>
-												</div>
-												{/* Second box below */}
-												<div
-													style={{
-														position: 'absolute',
-														top: '211px', // 147px + 56px + 8px
-														left: '50%',
-														transform: 'translateX(-50%)',
-														width: '362px',
-														height: '56px',
-														backgroundColor: '#5BB9CB',
-														border: '2px solid #000000',
-														borderRadius: '8px',
-													}}
-												>
-													{/* Section indicator */}
-													<div
-														className="absolute font-inter font-bold tabular-nums"
-														style={{
-															top: '4.5px',
-															left: '5px',
-															fontSize: '11.5px',
-															color: '#000000',
-														}}
-													>
-														[2]
-													</div>
-													{/* Inner box */}
-													<div
-														style={{
-															position: 'absolute',
-															top: '0',
-															bottom: '0',
-															margin: 'auto',
-															left: '25px',
-															width: '324px',
-															height: '48px',
-															backgroundColor: '#FFFFFF',
-															border: '2px solid #000000',
-															borderRadius: '8px',
-															display: 'flex',
-															alignItems: 'center',
-															padding: '4px 8px',
-															overflow: 'hidden',
-														}}
-													>
-														<div
-															style={{
-																fontFamily: 'Inter, system-ui, sans-serif',
-																fontSize: '11px',
-																lineHeight: '1.3',
-																color: '#000000',
-																wordBreak: 'break-word',
-																whiteSpace: 'normal',
-																overflow: 'hidden',
-																textOverflow: 'ellipsis',
-															}}
-														>
-															{suggestionText2 || ''}
-														</div>
-													</div>
-												</div>
-												{/* Third box below */}
-												<div
-													style={{
-														position: 'absolute',
-														top: '275px', // 211px + 56px + 8px
-														left: '50%',
-														transform: 'translateX(-50%)',
-														width: '362px',
-														height: '56px',
-														backgroundColor: '#35859D',
-														border: '2px solid #000000',
-														borderRadius: '8px',
-													}}
-												>
-													{/* Section indicator */}
-													<div
-														className="absolute font-inter font-bold tabular-nums"
-														style={{
-															top: '4.5px',
-															left: '5px',
-															fontSize: '11.5px',
-															color: '#000000',
-														}}
-													>
-														[3]
-													</div>
-													{/* Inner box */}
-													<div
-														style={{
-															position: 'absolute',
-															top: '0',
-															bottom: '0',
-															margin: 'auto',
-															left: '25px',
-															width: '324px',
-															height: '48px',
-															backgroundColor: '#FFFFFF',
-															border: '2px solid #000000',
-															borderRadius: '8px',
-															display: 'flex',
-															alignItems: 'center',
-															padding: '4px 8px',
-															overflow: 'hidden',
-														}}
-													>
-														<div
-															style={{
-																fontFamily: 'Inter, system-ui, sans-serif',
-																fontSize: '11px',
-																lineHeight: '1.3',
-																color: '#000000',
-																wordBreak: 'break-word',
-																whiteSpace: 'normal',
-																overflow: 'hidden',
-																textOverflow: 'ellipsis',
-															}}
-														>
-															{suggestionText3 || ''}
-														</div>
+														{suggestionText1 || ''}
 													</div>
 												</div>
 											</div>
-										)}
-								</div>
-							)}
+											{/* Second box below */}
+											<div
+												style={{
+													position: 'absolute',
+													top: '211px', // 147px + 56px + 8px
+													left: '50%',
+													transform: 'translateX(-50%)',
+													width: '362px',
+													height: '56px',
+													backgroundColor: '#5BB9CB',
+													border: '2px solid #000000',
+													borderRadius: '8px',
+												}}
+											>
+												{/* Section indicator */}
+												<div
+													className="absolute font-inter font-bold tabular-nums"
+													style={{
+														top: '4.5px',
+														left: '5px',
+														fontSize: '11.5px',
+														color: '#000000',
+													}}
+												>
+													[2]
+												</div>
+												{/* Inner box */}
+												<div
+													style={{
+														position: 'absolute',
+														top: '0',
+														bottom: '0',
+														margin: 'auto',
+														left: '25px',
+														width: '324px',
+														height: '48px',
+														backgroundColor: '#FFFFFF',
+														border: '2px solid #000000',
+														borderRadius: '8px',
+														display: 'flex',
+														alignItems: 'center',
+														padding: '4px 8px',
+														overflow: 'hidden',
+													}}
+												>
+													<div
+														style={{
+															fontFamily: 'Inter, system-ui, sans-serif',
+															fontSize: '11px',
+															lineHeight: '1.3',
+															color: '#000000',
+															wordBreak: 'break-word',
+															whiteSpace: 'normal',
+															overflow: 'hidden',
+															textOverflow: 'ellipsis',
+														}}
+													>
+														{suggestionText2 || ''}
+													</div>
+												</div>
+											</div>
+											{/* Third box below */}
+											<div
+												style={{
+													position: 'absolute',
+													top: '275px', // 211px + 56px + 8px
+													left: '50%',
+													transform: 'translateX(-50%)',
+													width: '362px',
+													height: '56px',
+													backgroundColor: '#35859D',
+													border: '2px solid #000000',
+													borderRadius: '8px',
+												}}
+											>
+												{/* Section indicator */}
+												<div
+													className="absolute font-inter font-bold tabular-nums"
+													style={{
+														top: '4.5px',
+														left: '5px',
+														fontSize: '11.5px',
+														color: '#000000',
+													}}
+												>
+													[3]
+												</div>
+												{/* Inner box */}
+												<div
+													style={{
+														position: 'absolute',
+														top: '0',
+														bottom: '0',
+														margin: 'auto',
+														left: '25px',
+														width: '324px',
+														height: '48px',
+														backgroundColor: '#FFFFFF',
+														border: '2px solid #000000',
+														borderRadius: '8px',
+														display: 'flex',
+														alignItems: 'center',
+														padding: '4px 8px',
+														overflow: 'hidden',
+													}}
+												>
+													<div
+														style={{
+															fontFamily: 'Inter, system-ui, sans-serif',
+															fontSize: '11px',
+															lineHeight: '1.3',
+															color: '#000000',
+															wordBreak: 'break-word',
+															whiteSpace: 'normal',
+															overflow: 'hidden',
+															textOverflow: 'ellipsis',
+														}}
+													>
+														{suggestionText3 || ''}
+													</div>
+												</div>
+											</div>
+										</div>
+									)}
+							</div>
+						)}
 
 						{/* Shared Research / Test Preview panel to the right of the drafting tables / writing view */}
 						{/* Hide when transitioning out from standard-position tabs to prevent double-fade */}
@@ -3882,35 +4041,42 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							!(view === 'search' && isSearchTabNarrow) &&
 							!(view === 'inbox' && isInboxTabStacked) &&
 							!(isTransitioningOut && ['testing', 'drafting', 'sent'].includes(view)) && (
-							<div
-								className="absolute"
-								data-research-panel-container
-								data-research-panel-variant={
-									view === 'search' ? 'search' : view === 'inbox' ? 'inbox' : 'standard'
-								}
-								style={{
-									top: '29px',
-									left:
-										view === 'search'
-											? 'calc(50% + 384px + 32px)'
-											: view === 'inbox'
-											? isInboxTabNarrow
-												? 'calc(50% + 258px + 32px)' // 258px = half of 516px narrow inbox + 32px gap
-												: 'calc(50% + 453.5px + 32px)'
-											: 'calc(50% + 250px + 32px)',
-									// Counter-animate when transitioning in to keep research panel stable
-									...(isTransitioningIn && ['testing', 'drafting', 'sent'].includes(view) ? {
-										animation: 'researchPanelStable 180ms ease-out forwards',
-									} : {}),
-								}}
-							>
+								<div
+									className="absolute"
+									data-research-panel-container
+									data-research-panel-variant={
+										view === 'search' ? 'search' : view === 'inbox' ? 'inbox' : 'standard'
+									}
+									style={{
+										top: isStandardSidePanelView
+											? `${standardSidePanelTopOffsetPx}px`
+											: '29px',
+										left:
+											view === 'search'
+												? 'calc(50% + 384px + 32px)'
+												: view === 'inbox'
+													? isInboxTabNarrow
+														? 'calc(50% + 258px + 32px)' // 258px = half of 516px narrow inbox + 32px gap
+														: 'calc(50% + 453.5px + 32px)'
+													: 'calc(50% + 250px + 32px)',
+										// Counter-animate when transitioning in to keep research panel stable
+										...(isTransitioningIn &&
+										['testing', 'drafting', 'sent'].includes(view)
+											? {
+													animation: 'researchPanelStable 180ms ease-out forwards',
+												}
+											: {}),
+									}}
+								>
 									{isBatchDraftingInProgress ? (
 										<DraftPreviewExpandedList
 											contacts={contacts || []}
 											livePreview={liveDraftPreview}
 											fallbackDraft={draftPreviewFallbackDraft}
 											width={view === 'inbox' ? 259 : 375}
-											height={670}
+											height={
+												isStandardSidePanelView ? standardResearchPanelHeightPx : 670
+											}
 										/>
 									) : view === 'testing' && showTestPreview ? (
 										<TestPreviewPanel
@@ -3950,9 +4116,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 												settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 												settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-												settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
+												settingsNameCompanyBgColor={
+													draftsMiniEmailSettingsNameCompanyBgColor
+												}
 												profileFields={profileFieldsForSettings}
-												identityProfile={campaign?.identity as IdentityProfileFields | null}
+												identityProfile={
+													campaign?.identity as IdentityProfileFields | null
+												}
 												onIdentityUpdate={handleIdentityUpdate}
 												onDraft={() =>
 													handleGenerateDrafts(
@@ -3979,7 +4149,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												hideAllText={
 													// Hide all research text to show a chrome-only skeleton:
 													// - When the Drafts tab has no drafts
-													(view === 'drafting' && draftCount === 0)
+													view === 'drafting' && draftCount === 0
 												}
 												hideSummaryIfBullets
 												// Requested: 300px tall research block in the bottom half.
@@ -3999,6 +4169,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												(view === 'sent' && sentCount === 0)
 											}
 											style={view === 'inbox' ? { width: 259 } : undefined}
+											height={
+												isStandardSidePanelView
+													? standardResearchPanelHeightPx
+													: undefined
+											}
 											boxWidth={view === 'inbox' ? 247 : undefined}
 										/>
 									)}
@@ -4045,9 +4220,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														if (areAllSearchResultsSelected) {
 															setSearchResultsSelectedContacts([]);
 														} else {
-															setSearchResultsSelectedContacts(
-																searchResultsForPanelIds
-															);
+															setSearchResultsSelectedContacts(searchResultsForPanelIds);
 														}
 													}}
 													className="font-secondary text-[11px] font-medium text-black hover:underline text-right pr-1"
@@ -4127,7 +4300,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																								? '#B7E5FF'
 																								: isMusicFestivalTitle(headline)
 																									? '#C1D6FF'
-																									: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																									: isWeddingPlannerTitle(headline) ||
+																										  isWeddingVenueTitle(headline)
 																										? '#FFF2BC'
 																										: isWineBeerSpiritsTitle(headline)
 																											? '#BFC4FF'
@@ -4141,16 +4315,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																					<CoffeeShopsIcon size={7} />
 																				)}
 																				{isMusicVenueTitle(headline) && (
-																					<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																					<MusicVenuesIcon
+																						size={12}
+																						className="flex-shrink-0"
+																					/>
 																				)}
 																				{isMusicFestivalTitle(headline) && (
-																					<FestivalsIcon size={12} className="flex-shrink-0" />
+																					<FestivalsIcon
+																						size={12}
+																						className="flex-shrink-0"
+																					/>
 																				)}
-																				{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																				{(isWeddingPlannerTitle(headline) ||
+																					isWeddingVenueTitle(headline)) && (
 																					<WeddingPlannersIcon size={12} />
 																				)}
 																				{isWineBeerSpiritsTitle(headline) && (
-																					<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
+																					<WineBeerSpiritsIcon
+																						size={12}
+																						className="flex-shrink-0"
+																					/>
 																				)}
 																				<span className="text-[10px] text-black leading-none truncate">
 																					{isRestaurantTitle(headline)
@@ -4166,7 +4350,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																										: isWeddingVenueTitle(headline)
 																											? 'Wedding Venue'
 																											: isWineBeerSpiritsTitle(headline)
-																												? getWineBeerSpiritsLabel(headline)
+																												? getWineBeerSpiritsLabel(
+																														headline
+																													)
 																												: headline}
 																				</span>
 																			</div>
@@ -4230,7 +4416,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																								? '#B7E5FF'
 																								: isMusicFestivalTitle(headline)
 																									? '#C1D6FF'
-																									: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																									: isWeddingPlannerTitle(headline) ||
+																										  isWeddingVenueTitle(headline)
 																										? '#FFF2BC'
 																										: '#E8EFFF',
 																				}}
@@ -4242,12 +4429,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																					<CoffeeShopsIcon size={7} />
 																				)}
 																				{isMusicVenueTitle(headline) && (
-																					<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																					<MusicVenuesIcon
+																						size={12}
+																						className="flex-shrink-0"
+																					/>
 																				)}
 																				{isMusicFestivalTitle(headline) && (
-																					<FestivalsIcon size={12} className="flex-shrink-0" />
+																					<FestivalsIcon
+																						size={12}
+																						className="flex-shrink-0"
+																					/>
 																				)}
-																				{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																				{(isWeddingPlannerTitle(headline) ||
+																					isWeddingVenueTitle(headline)) && (
 																					<WeddingPlannersIcon size={12} />
 																				)}
 																				<span className="text-[10px] text-black leading-none truncate">
@@ -4341,7 +4535,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														type="button"
 														onClick={() => {
 															if (!areAllSearchResultsSelected) {
-																setSearchResultsSelectedContacts(searchResultsForPanelIds);
+																setSearchResultsSelectedContacts(
+																	searchResultsForPanelIds
+																);
 															}
 														}}
 														className="w-[50px] bg-[#7AD47A] hover:bg-[#6AC46A] text-black font-inter text-[13px] flex items-center justify-center transition-colors"
@@ -4368,13 +4564,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										...(isNarrowDesktop || isNarrowestDesktop
 											? {
 													margin: '0 auto',
-													width: '375px',
-											  }
+													width: `${mainContactsPanelWidthPx}px`,
+												}
 											: {
 													left: '96px',
 													top: '0',
-													width: '375px',
-											  }),
+													width: `${mainContactsPanelWidthPx}px`,
+												}),
 										gap: '16px',
 									}}
 								>
@@ -4395,18 +4591,21 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									)}
 									<div
 										style={{
-											width: '375px',
-											height: '557px',
+											width: `${mainContactsPanelWidthPx}px`,
+											height: `${mainContactsPanelHeightPx}px`,
 											overflow: 'visible',
 										}}
 									>
 										<ContactsExpandedList
 											contacts={contactsForContactsExpandedList}
+											{...contactsListTopNavProps}
 											isLoading={isContactsLoading}
 											campaign={campaign}
 											enableUsedContactTooltip={false}
 											selectedContactIds={contactsTabSelectedIds}
-											activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
+											activelyDraftingContactIds={
+												activelyDraftingContactIdsForContactsExpandedList
+											}
 											onContactSelectionChange={(updater) =>
 												setContactsTabSelectedIds((prev) => updater(new Set(prev)))
 											}
@@ -4417,8 +4616,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}}
 											isDraftDisabled={isGenerationDisabled()}
 											isPendingGeneration={isPendingGeneration}
-											width={375}
-											height={557}
+											width={mainContactsPanelWidthPx}
+											height={mainContactsPanelHeightPx}
 											minRows={8}
 											onSearchFromMiniBar={handleMiniContactsSearch}
 										/>
@@ -4458,13 +4657,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														overflow: 'visible',
 													}}
 												>
-													<ContactsExpandedList
-														contacts={contactsForContactsExpandedList}
-														isLoading={isContactsLoading}
+											<ContactsExpandedList
+												contacts={contactsForContactsExpandedList}
+												{...contactsListTopNavProps}
+												isLoading={isContactsLoading}
 														campaign={campaign}
 														enableUsedContactTooltip={view === 'testing'}
 														selectedContactIds={contactsTabSelectedIds}
-														activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
+														activelyDraftingContactIds={
+															activelyDraftingContactIdsForContactsExpandedList
+														}
 														onContactSelectionChange={(updater) =>
 															setContactsTabSelectedIds((prev) => updater(new Set(prev)))
 														}
@@ -4516,7 +4718,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onGoToDrafting={goToDrafting}
 													onGoToInbox={goToInbox}
 													onTestPreviewToggle={setShowTestPreview}
-													onKeepTestDraft={() => handleKeepTestDraft(contacts?.[0] || null)}
+													onKeepTestDraft={() =>
+														handleKeepTestDraft(contacts?.[0] || null)
+													}
 													isKeepingTestDraft={isKeepingTestDraft}
 													draftCount={contactsTabSelectedIds.size}
 													onDraftClick={async () => {
@@ -4528,9 +4732,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															Array.from(contactsTabSelectedIds.values())
 														);
 													}}
-													isDraftDisabled={
-														contactsTabSelectedIds.size === 0
-													}
+													isDraftDisabled={contactsTabSelectedIds.size === 0}
 													onSelectAllContacts={handleSelectAllContacts}
 													isAllContactsSelected={areAllContactsSelected}
 													totalContactCount={contactsAvailableForDrafting.length}
@@ -4555,6 +4757,184 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* Draft button with arrows - spans full width below both columns */}
 										<div className="mt-4 w-full">
 											<div className="flex items-center justify-center gap-[29px] w-full">
+												{/* Left arrow */}
+												<button
+													type="button"
+													onClick={goToPreviousTab}
+													className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+													aria-label="Previous tab"
+												>
+													<LeftArrow width="20" height="39" />
+												</button>
+												{/* Draft button container */}
+												<div
+													ref={draftButtonContainerRef}
+													data-draft-button-container
+													className="group relative h-[40px] flex-1"
+													style={{ maxWidth: '691px' }}
+												>
+													{contactsTabSelectedIds.size > 0 || areAllContactsSelected ? (
+														// Animated draft button with expanding "All" state
+														<button
+															type="button"
+															onClick={async () => {
+																if (contactsTabSelectedIds.size === 0) {
+																	toast.error(
+																		'Select at least one contact to draft emails.'
+																	);
+																	return;
+																}
+																await handleGenerateDrafts(
+																	Array.from(contactsTabSelectedIds.values())
+																);
+															}}
+															disabled={contactsTabSelectedIds.size === 0}
+															className={cn(
+																'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors duration-300',
+																contactsTabSelectedIds.size === 0
+																	? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+																	: areAllContactsSelected
+																		? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
+																		: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+															)}
+														>
+															{/* Normal text - fades out when All selected */}
+															<span
+																className={cn(
+																	'transition-opacity duration-300',
+																	areAllContactsSelected ? 'opacity-0' : 'opacity-100'
+																)}
+															>
+																{isDraftQueueActive
+																	? 'Add Emails to Queue'
+																	: `Draft ${contactsTabSelectedIds.size} ${
+																			contactsTabSelectedIds.size === 1
+																				? 'Contact'
+																				: 'Contacts'
+																		}`}
+															</span>
+															{/* "All" text - fades in when All selected */}
+															<span
+																className={cn(
+																	'absolute inset-0 flex items-center justify-center transition-opacity duration-300',
+																	areAllContactsSelected ? 'opacity-100' : 'opacity-0'
+																)}
+															>
+																{isDraftQueueActive ? (
+																	'Add Emails to Queue'
+																) : (
+																	<>
+																		Draft <span className="font-bold mx-1">All</span>{' '}
+																		{contactsAvailableForDrafting.length} Contacts
+																	</>
+																)}
+															</span>
+															{/* Expanding green overlay from right */}
+															<div
+																className={cn(
+																	'absolute top-0 bottom-0 right-0 bg-[#4DC669] transition-all duration-300 ease-out',
+																	areAllContactsSelected
+																		? 'w-full rounded-[1px]'
+																		: 'w-[62px] rounded-r-[1px]'
+																)}
+																style={{
+																	opacity: areAllContactsSelected ? 0 : 1,
+																	transitionProperty: 'width, opacity',
+																}}
+															/>
+														</button>
+													) : (
+														<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
+															<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
+																Select Contacts and Draft Emails
+															</div>
+															<button
+																type="button"
+																aria-label="Select all contacts"
+																className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
+																onClick={handleSelectAllContacts}
+															>
+																<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
+																All
+															</button>
+														</div>
+													)}
+													{/* "All" button overlay - only visible when not all selected */}
+													{(contactsTabSelectedIds.size > 0 || areAllContactsSelected) &&
+														!areAllContactsSelected && (
+															<button
+																type="button"
+																className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
+																onClick={(e) => {
+																	e.stopPropagation();
+																	handleSelectAllContacts();
+																}}
+															>
+																All
+															</button>
+														)}
+												</div>
+												{/* Right arrow */}
+												<button
+													type="button"
+													onClick={goToNextTab}
+													className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+													aria-label="Next tab"
+												>
+													<RightArrow width="20" height="39" />
+												</button>
+											</div>
+										</div>
+									</div>
+								) : (
+									/* Regular centered layout for wider viewports, or narrowest breakpoint with contacts below */
+									<div className="flex flex-col items-center">
+										<HybridPromptInput
+											trackFocusedField={trackFocusedField}
+											testMessage={campaign?.testMessage}
+											handleGenerateTestDrafts={handleGenerateTestDrafts}
+											isGenerationDisabled={isGenerationDisabled}
+											isPendingGeneration={isPendingGeneration}
+											isTest={isTest}
+											contact={contacts?.[0]}
+											onGoToDrafting={goToDrafting}
+											onGoToInbox={goToInbox}
+											onTestPreviewToggle={setShowTestPreview}
+											draftCount={contactsTabSelectedIds.size}
+											onDraftClick={async () => {
+												if (contactsTabSelectedIds.size === 0) {
+													toast.error('Select at least one contact to draft emails.');
+													return;
+												}
+												await handleGenerateDrafts(
+													Array.from(contactsTabSelectedIds.values())
+												);
+											}}
+											isDraftDisabled={contactsTabSelectedIds.size === 0}
+											onSelectAllContacts={handleSelectAllContacts}
+											isAllContactsSelected={areAllContactsSelected}
+											totalContactCount={contactsAvailableForDrafting.length}
+											onGetSuggestions={handleGetSuggestions}
+											onUpscalePrompt={upscalePrompt}
+											isUpscalingPrompt={isUpscalingPrompt}
+											promptQualityScore={promptQualityScore}
+											promptQualityLabel={promptQualityLabel}
+											hasPreviousPrompt={hasPreviousPrompt}
+											onUndoUpscalePrompt={undoUpscalePrompt}
+											onHoverChange={handlePromptInputHoverChange}
+											onCustomInstructionsOpenChange={setIsCustomInstructionsOpen}
+											isNarrowestDesktop={isNarrowestDesktop}
+											hideDraftButton={isNarrowestDesktop}
+											identity={campaign?.identity}
+											onIdentityUpdate={handleIdentityUpdate}
+											autoOpenProfileTabWhenIncomplete={
+												props.autoOpenProfileTabWhenIncomplete
+											}
+										/>
+										{/* Draft button with arrows at narrowest breakpoint */}
+										{isNarrowestDesktop && (
+											<div className="mt-4 w-full">
+												<div className="flex items-center justify-center gap-[20px] w-full">
 													{/* Left arrow */}
 													<button
 														type="button"
@@ -4566,10 +4946,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													</button>
 													{/* Draft button container */}
 													<div
-														ref={draftButtonContainerRef}
 														data-draft-button-container
-														className="group relative h-[40px] flex-1"
-														style={{ maxWidth: '691px' }}
+														className="group relative h-[40px] w-full max-w-[407px]"
 													>
 														{contactsTabSelectedIds.size > 0 || areAllContactsSelected ? (
 															// Animated draft button with expanding "All" state
@@ -4577,7 +4955,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																type="button"
 																onClick={async () => {
 																	if (contactsTabSelectedIds.size === 0) {
-																		toast.error('Select at least one contact to draft emails.');
+																		toast.error(
+																			'Select at least one contact to draft emails.'
+																		);
 																		return;
 																	}
 																	await handleGenerateDrafts(
@@ -4604,8 +4984,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	{isDraftQueueActive
 																		? 'Add Emails to Queue'
 																		: `Draft ${contactsTabSelectedIds.size} ${
-																				contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'
-																		  }`}
+																				contactsTabSelectedIds.size === 1
+																					? 'Contact'
+																					: 'Contacts'
+																			}`}
 																</span>
 																{/* "All" text - fades in when All selected */}
 																<span
@@ -4654,180 +5036,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															</div>
 														)}
 														{/* "All" button overlay - only visible when not all selected */}
-														{(contactsTabSelectedIds.size > 0 || areAllContactsSelected) && !areAllContactsSelected && (
-															<button
-																type="button"
-																className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
-																onClick={(e) => {
-																	e.stopPropagation();
-																	handleSelectAllContacts();
-																}}
-															>
-																All
-															</button>
-														)}
-													</div>
-													{/* Right arrow */}
-													<button
-														type="button"
-														onClick={goToNextTab}
-														className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-														aria-label="Next tab"
-													>
-														<RightArrow width="20" height="39" />
-													</button>
-											</div>
-										</div>
-									</div>
-								) : (
-									/* Regular centered layout for wider viewports, or narrowest breakpoint with contacts below */
-									<div className="flex flex-col items-center">
-										<HybridPromptInput
-											trackFocusedField={trackFocusedField}
-											testMessage={campaign?.testMessage}
-											handleGenerateTestDrafts={handleGenerateTestDrafts}
-											isGenerationDisabled={isGenerationDisabled}
-											isPendingGeneration={isPendingGeneration}
-											isTest={isTest}
-											contact={contacts?.[0]}
-											onGoToDrafting={goToDrafting}
-											onGoToInbox={goToInbox}
-											onTestPreviewToggle={setShowTestPreview}
-											draftCount={contactsTabSelectedIds.size}
-											onDraftClick={async () => {
-												if (contactsTabSelectedIds.size === 0) {
-													toast.error('Select at least one contact to draft emails.');
-													return;
-												}
-												await handleGenerateDrafts(
-													Array.from(contactsTabSelectedIds.values())
-												);
-											}}
-											isDraftDisabled={
-												contactsTabSelectedIds.size === 0
-											}
-											onSelectAllContacts={handleSelectAllContacts}
-											isAllContactsSelected={areAllContactsSelected}
-											totalContactCount={contactsAvailableForDrafting.length}
-											onGetSuggestions={handleGetSuggestions}
-											onUpscalePrompt={upscalePrompt}
-											isUpscalingPrompt={isUpscalingPrompt}
-											promptQualityScore={promptQualityScore}
-											promptQualityLabel={promptQualityLabel}
-											hasPreviousPrompt={hasPreviousPrompt}
-											onUndoUpscalePrompt={undoUpscalePrompt}
-											onHoverChange={handlePromptInputHoverChange}
-											onCustomInstructionsOpenChange={setIsCustomInstructionsOpen}
-											isNarrowestDesktop={isNarrowestDesktop}
-											hideDraftButton={isNarrowestDesktop}
-											identity={campaign?.identity}
-											onIdentityUpdate={handleIdentityUpdate}
-											autoOpenProfileTabWhenIncomplete={
-												props.autoOpenProfileTabWhenIncomplete
-											}
-										/>
-										{/* Draft button with arrows at narrowest breakpoint */}
-										{isNarrowestDesktop && (
-											<div className="mt-4 w-full">
-												<div className="flex items-center justify-center gap-[20px] w-full">
-														{/* Left arrow */}
-														<button
-															type="button"
-															onClick={goToPreviousTab}
-															className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-															aria-label="Previous tab"
-														>
-															<LeftArrow width="20" height="39" />
-														</button>
-														{/* Draft button container */}
-														<div
-															data-draft-button-container
-															className="group relative h-[40px] w-full max-w-[407px]"
-														>
-															{contactsTabSelectedIds.size > 0 || areAllContactsSelected ? (
-																// Animated draft button with expanding "All" state
-																<button
-																	type="button"
-																	onClick={async () => {
-																		if (contactsTabSelectedIds.size === 0) {
-																			toast.error('Select at least one contact to draft emails.');
-																			return;
-																		}
-																		await handleGenerateDrafts(
-																			Array.from(contactsTabSelectedIds.values())
-																		);
-																	}}
-																	disabled={contactsTabSelectedIds.size === 0}
-																	className={cn(
-																		'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors duration-300',
-																		contactsTabSelectedIds.size === 0
-																			? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
-																			: areAllContactsSelected
-																				? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
-																				: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
-																	)}
-																>
-																	{/* Normal text - fades out when All selected */}
-																	<span
-																		className={cn(
-																			'transition-opacity duration-300',
-																			areAllContactsSelected ? 'opacity-0' : 'opacity-100'
-																		)}
-																	>
-																		{isDraftQueueActive
-																			? 'Add Emails to Queue'
-																			: `Draft ${contactsTabSelectedIds.size} ${
-																					contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'
-																			  }`}
-																	</span>
-																	{/* "All" text - fades in when All selected */}
-																	<span
-																		className={cn(
-																			'absolute inset-0 flex items-center justify-center transition-opacity duration-300',
-																			areAllContactsSelected ? 'opacity-100' : 'opacity-0'
-																		)}
-																	>
-																		{isDraftQueueActive ? (
-																			'Add Emails to Queue'
-																		) : (
-																			<>
-																				Draft <span className="font-bold mx-1">All</span>{' '}
-																				{contactsAvailableForDrafting.length} Contacts
-																			</>
-																		)}
-																	</span>
-																	{/* Expanding green overlay from right */}
-																	<div
-																		className={cn(
-																			'absolute top-0 bottom-0 right-0 bg-[#4DC669] transition-all duration-300 ease-out',
-																			areAllContactsSelected
-																				? 'w-full rounded-[1px]'
-																				: 'w-[62px] rounded-r-[1px]'
-																		)}
-																		style={{
-																			opacity: areAllContactsSelected ? 0 : 1,
-																			transitionProperty: 'width, opacity',
-																		}}
-																	/>
-																</button>
-															) : (
-																<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
-																	<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
-																		Select Contacts and Draft Emails
-																	</div>
-																	<button
-																		type="button"
-																		aria-label="Select all contacts"
-																		className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
-																		onClick={handleSelectAllContacts}
-																	>
-																		<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
-																		All
-																	</button>
-																</div>
-															)}
-															{/* "All" button overlay - only visible when not all selected */}
-															{(contactsTabSelectedIds.size > 0 || areAllContactsSelected) && !areAllContactsSelected && (
+														{(contactsTabSelectedIds.size > 0 ||
+															areAllContactsSelected) &&
+															!areAllContactsSelected && (
 																<button
 																	type="button"
 																	className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
@@ -4839,29 +5050,32 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	All
 																</button>
 															)}
-														</div>
-														{/* Right arrow */}
-														<button
-															type="button"
-															onClick={goToNextTab}
-															className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-															aria-label="Next tab"
-														>
-															<RightArrow width="20" height="39" />
-														</button>
+													</div>
+													{/* Right arrow */}
+													<button
+														type="button"
+														onClick={goToNextTab}
+														className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+														aria-label="Next tab"
+													>
+														<RightArrow width="20" height="39" />
+													</button>
 												</div>
 											</div>
 										)}
 										{/* Contacts table below writing box at narrowest breakpoint */}
 										{isNarrowestDesktop && (
 											<div className="mt-[20px] w-full flex justify-center">
-												<ContactsExpandedList
-													contacts={contactsForContactsExpandedList}
-													isLoading={isContactsLoading}
+										<ContactsExpandedList
+											contacts={contactsForContactsExpandedList}
+											{...contactsListTopNavProps}
+											isLoading={isContactsLoading}
 													campaign={campaign}
 													enableUsedContactTooltip={view === 'testing'}
 													selectedContactIds={contactsTabSelectedIds}
-													activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
+													activelyDraftingContactIds={
+														activelyDraftingContactIdsForContactsExpandedList
+													}
 													onContactSelectionChange={(updater) =>
 														setContactsTabSelectedIds((prev) => updater(new Set(prev)))
 													}
@@ -4951,7 +5165,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											whiteSectionHeight={15}
 											collapsed={bottomPanelCollapsed}
 											hideSendButton={true}
-												onOpenDrafts={goToDrafting}
+											onOpenDrafts={goToDrafting}
 										/>
 										<SentExpandedList
 											sent={sentEmails}
@@ -4960,7 +5174,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											height={bottomPanelBoxHeightPx}
 											whiteSectionHeight={15}
 											collapsed={bottomPanelCollapsed}
-												onOpenSent={goToSent}
+											onOpenSent={goToSent}
 										/>
 										<InboxExpandedList
 											contacts={contacts || []}
@@ -5028,13 +5242,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									) : isNarrowDesktop ? (
 										// Narrow desktop (952px - 1279px): center BOTH the left panel and drafts table together
 										// Fixed width container: left (330) + gap (10) + right (499) = 839px, centered with mx-auto
-										<div className="flex flex-col items-center mx-auto" style={{ width: '839px' }}>
+										<div
+											className="flex flex-col items-center mx-auto"
+											style={{ width: '839px' }}
+										>
 											<div
 												className="flex flex-row items-start gap-[10px] w-full"
 												style={{ position: 'relative' }}
 											>
 												{/* Left column: Campaign Header + Email Structure + Research - fixed 330px */}
-												<div className="flex flex-col flex-shrink-0" style={{ gap: '10px', width: '330px' }}>
+												<div
+													className="flex flex-col flex-shrink-0"
+													style={{ gap: '10px', width: '330px' }}
+												>
 													<CampaignHeaderBox
 														campaignId={campaign?.id}
 														campaignName={campaign?.name || 'Untitled Campaign'}
@@ -5054,12 +5274,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														<MiniEmailStructure
 															form={draftsSettingsPreviewForm}
 															readOnly
-															variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+															variant={
+																draftsMiniEmailTopHeaderHeight ? 'settings' : undefined
+															}
 															settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
-															settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-															settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
+															settingsSecondaryLabel={
+																draftsMiniEmailSettingsLabels.secondary
+															}
+															settingsNameCompanyBgColor={
+																draftsMiniEmailSettingsNameCompanyBgColor
+															}
 															profileFields={profileFieldsForSettings}
-															identityProfile={campaign?.identity as IdentityProfileFields | null}
+															identityProfile={
+																campaign?.identity as IdentityProfileFields | null
+															}
 															onIdentityUpdate={handleIdentityUpdate}
 															onDraft={() =>
 																handleGenerateDrafts(
@@ -5083,30 +5311,33 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															onOpenWriting={goToWriting}
 														/>
 													</div>
-												{/* Research panel - height set so bottom aligns with drafts table (71 + 10 + 316 + 10 + 296 = 703 = drafts table height) */}
-												{isBatchDraftingInProgress ? (
-													<DraftPreviewExpandedList
-														contacts={contacts || []}
-														livePreview={liveDraftPreview}
-														fallbackDraft={draftPreviewFallbackDraft}
-														width={330}
-														height={296}
-													/>
-												) : (
-													<ContactResearchPanel
-														contact={displayedContactForResearch}
-														hideAllText={draftCount === 0}
-														hideSummaryIfBullets={true}
-														height={296}
-														width={330}
-														boxWidth={315}
-														compactHeader
-														style={{ display: 'block' }}
-													/>
-												)}
+													{/* Research panel - height set so bottom aligns with drafts table (59 + 10 + 316 + 10 + 308 = 703 = drafts table height) */}
+													{isBatchDraftingInProgress ? (
+														<DraftPreviewExpandedList
+															contacts={contacts || []}
+															livePreview={liveDraftPreview}
+															fallbackDraft={draftPreviewFallbackDraft}
+															width={330}
+															height={308}
+														/>
+													) : (
+														<ContactResearchPanel
+															contact={displayedContactForResearch}
+															hideAllText={draftCount === 0}
+															hideSummaryIfBullets={true}
+															height={308}
+															width={330}
+															boxWidth={315}
+															compactHeader
+															style={{ display: 'block' }}
+														/>
+													)}
 												</div>
 												{/* Right column: Drafts table - fixed 499px, overflow visible for bottom panels */}
-												<div className="flex-shrink-0 [&>*]:!items-start" style={{ width: '499px', overflow: 'visible' }}>
+												<div
+													className="flex-shrink-0 [&>*]:!items-start"
+													style={{ width: '499px', overflow: 'visible' }}
+												>
 													<DraftedEmails
 														ref={draftedEmailsRef}
 														mainBoxId="drafts"
@@ -5181,7 +5412,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	if (draftsTabSelectedIds.size === 0) return;
 																	await handleSendDrafts();
 																}}
-																disabled={draftsTabSelectedIds.size === 0 || isSendingDisabled}
+																disabled={
+																	draftsTabSelectedIds.size === 0 || isSendingDisabled
+																}
 															>
 																{draftsTabSelectedIds.size > 0
 																	? `Send ${draftsTabSelectedIds.size} Selected`
@@ -5196,7 +5429,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	const allIds = new Set(draftEmails.map((d) => d.id));
 																	const isAllSelected =
 																		draftsTabSelectedIds.size === allIds.size &&
-																		[...allIds].every((id) => draftsTabSelectedIds.has(id));
+																		[...allIds].every((id) =>
+																			draftsTabSelectedIds.has(id)
+																		);
 																	if (isAllSelected) {
 																		setDraftsTabSelectedIds(new Set());
 																	} else {
@@ -5230,34 +5465,36 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													collapsed={bottomPanelCollapsed}
 													historyActions={historyActions}
 												>
-												<ContactsExpandedList
-													contacts={contactsForContactsExpandedList}
-													campaign={campaign}
-													activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
-													width={232}
-													height={bottomPanelBoxHeightPx}
-													enableUsedContactTooltip={false}
-													whiteSectionHeight={15}
-													collapsed={bottomPanelCollapsed}
-													showSearchBar={false}
-												/>
-												<SentExpandedList
-													sent={sentEmails}
-													contacts={contacts || []}
-													width={233}
-													height={bottomPanelBoxHeightPx}
-													whiteSectionHeight={15}
-													collapsed={bottomPanelCollapsed}
-													onOpenSent={goToSent}
-												/>
-												<InboxExpandedList
-													contacts={contacts || []}
-													width={233}
-													height={bottomPanelBoxHeightPx}
-													whiteSectionHeight={15}
-													collapsed={bottomPanelCollapsed}
-													onOpenInbox={goToInbox}
-												/>
+													<ContactsExpandedList
+														contacts={contactsForContactsExpandedList}
+														campaign={campaign}
+														activelyDraftingContactIds={
+															activelyDraftingContactIdsForContactsExpandedList
+														}
+														width={232}
+														height={bottomPanelBoxHeightPx}
+														enableUsedContactTooltip={false}
+														whiteSectionHeight={15}
+														collapsed={bottomPanelCollapsed}
+														showSearchBar={false}
+													/>
+													<SentExpandedList
+														sent={sentEmails}
+														contacts={contacts || []}
+														width={233}
+														height={bottomPanelBoxHeightPx}
+														whiteSectionHeight={15}
+														collapsed={bottomPanelCollapsed}
+														onOpenSent={goToSent}
+													/>
+													<InboxExpandedList
+														contacts={contacts || []}
+														width={233}
+														height={bottomPanelBoxHeightPx}
+														whiteSectionHeight={15}
+														collapsed={bottomPanelCollapsed}
+														onOpenInbox={goToInbox}
+													/>
 												</BottomPanelsContainer>
 											)}
 										</div>
@@ -5266,7 +5503,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										<div className="flex flex-col items-center">
 											<DraftedEmails
 												ref={draftedEmailsRef}
-											mainBoxId="drafts"
+												mainBoxId="drafts"
 												contacts={contacts || []}
 												selectedDraftIds={draftsTabSelectedIds}
 												selectedDraft={selectedDraft}
@@ -5338,7 +5575,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	if (draftsTabSelectedIds.size === 0) return;
 																	await handleSendDrafts();
 																}}
-																disabled={draftsTabSelectedIds.size === 0 || isSendingDisabled}
+																disabled={
+																	draftsTabSelectedIds.size === 0 || isSendingDisabled
+																}
 															>
 																{draftsTabSelectedIds.size > 0
 																	? `Send ${draftsTabSelectedIds.size} Selected`
@@ -5353,7 +5592,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	const allIds = new Set(draftEmails.map((d) => d.id));
 																	const isAllSelected =
 																		draftsTabSelectedIds.size === allIds.size &&
-																		[...allIds].every((id) => draftsTabSelectedIds.has(id));
+																		[...allIds].every((id) =>
+																			draftsTabSelectedIds.has(id)
+																		);
 																	if (isAllSelected) {
 																		setDraftsTabSelectedIds(new Set());
 																	} else {
@@ -5373,118 +5614,128 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														aria-label="Next tab"
 													>
 														<RightArrow width="20" height="39" />
-												</button>
-											</div>
-										)}
-
-										{/* Research panel below send button at narrowest breakpoint (< 952px) */}
-										{isNarrowestDesktop && (
-											<div className="mt-[20px] w-full flex justify-center">
-												{isBatchDraftingInProgress ? (
-													<DraftPreviewExpandedList
-														contacts={contacts || []}
-														livePreview={liveDraftPreview}
-														fallbackDraft={draftPreviewFallbackDraft}
-														width={489}
-														height={400}
-													/>
-												) : (
-													<ContactResearchPanel
-														contact={displayedContactForResearch}
-														hideAllText={draftCount === 0}
-														hideSummaryIfBullets={true}
-														height={400}
-														width={489}
-														boxWidth={474}
-														compactHeader
-														style={{ display: 'block' }}
-													/>
-												)}
-											</div>
-										)}
-
-										{/* MiniEmailStructure below research panel at narrowest breakpoint (< 952px) */}
-										{isNarrowestDesktop && (
-											<div className="mt-[10px] w-full flex justify-center">
-												<div style={{ width: '489px' }}>
-													<MiniEmailStructure
-														form={draftsSettingsPreviewForm}
-														readOnly
-														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
-														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
-														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-														settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
-														profileFields={profileFieldsForSettings}
-														identityProfile={campaign?.identity as IdentityProfileFields | null}
-														onIdentityUpdate={handleIdentityUpdate}
-														onDraft={() =>
-															handleGenerateDrafts(
-																contactsAvailableForDrafting.map((c) => c.id)
-															)
-														}
-														isDraftDisabled={isGenerationDisabled()}
-														isPendingGeneration={isPendingGeneration}
-														generationProgress={generationProgress}
-														generationTotal={generationTotal}
-														hideTopChrome
-														hideFooter
-														fullWidthMobile
-														hideAddTextButtons
-														pageFillColor={draftsMiniEmailFillColor}
-														topHeaderHeight={draftsMiniEmailTopHeaderHeight}
-														topHeaderLabel={draftsMiniEmailTopHeaderLabel}
-														onOpenWriting={goToWriting}
-													/>
+													</button>
 												</div>
-											</div>
-										)}
+											)}
 
-										{/* Bottom Panels: Contacts, Sent, and Inbox - hidden at narrowest breakpoint */}
-										{!isNarrowestDesktop && (
-											<BottomPanelsContainer
-												className={cn(
-													draftEmails.length === 0 ? 'mt-[91px]' : 'mt-[35px]',
-													'pb-[8px] flex justify-center gap-[15px]'
-												)}
-												data-campaign-bottom-anchor
-												collapsed={bottomPanelCollapsed}
-												historyActions={historyActions}
-											>
-												<ContactsExpandedList
-													contacts={contactsForContactsExpandedList}
-													campaign={campaign}
-													activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
-													width={232}
-													height={bottomPanelBoxHeightPx}
-													enableUsedContactTooltip={false}
-													whiteSectionHeight={15}
+											{/* Research panel below send button at narrowest breakpoint (< 952px) */}
+											{isNarrowestDesktop && (
+												<div className="mt-[20px] w-full flex justify-center">
+													{isBatchDraftingInProgress ? (
+														<DraftPreviewExpandedList
+															contacts={contacts || []}
+															livePreview={liveDraftPreview}
+															fallbackDraft={draftPreviewFallbackDraft}
+															width={489}
+															height={400}
+														/>
+													) : (
+														<ContactResearchPanel
+															contact={displayedContactForResearch}
+															hideAllText={draftCount === 0}
+															hideSummaryIfBullets={true}
+															height={400}
+															width={489}
+															boxWidth={474}
+															compactHeader
+															style={{ display: 'block' }}
+														/>
+													)}
+												</div>
+											)}
+
+											{/* MiniEmailStructure below research panel at narrowest breakpoint (< 952px) */}
+											{isNarrowestDesktop && (
+												<div className="mt-[10px] w-full flex justify-center">
+													<div style={{ width: '489px' }}>
+														<MiniEmailStructure
+															form={draftsSettingsPreviewForm}
+															readOnly
+															variant={
+																draftsMiniEmailTopHeaderHeight ? 'settings' : undefined
+															}
+															settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+															settingsSecondaryLabel={
+																draftsMiniEmailSettingsLabels.secondary
+															}
+															settingsNameCompanyBgColor={
+																draftsMiniEmailSettingsNameCompanyBgColor
+															}
+															profileFields={profileFieldsForSettings}
+															identityProfile={
+																campaign?.identity as IdentityProfileFields | null
+															}
+															onIdentityUpdate={handleIdentityUpdate}
+															onDraft={() =>
+																handleGenerateDrafts(
+																	contactsAvailableForDrafting.map((c) => c.id)
+																)
+															}
+															isDraftDisabled={isGenerationDisabled()}
+															isPendingGeneration={isPendingGeneration}
+															generationProgress={generationProgress}
+															generationTotal={generationTotal}
+															hideTopChrome
+															hideFooter
+															fullWidthMobile
+															hideAddTextButtons
+															pageFillColor={draftsMiniEmailFillColor}
+															topHeaderHeight={draftsMiniEmailTopHeaderHeight}
+															topHeaderLabel={draftsMiniEmailTopHeaderLabel}
+															onOpenWriting={goToWriting}
+														/>
+													</div>
+												</div>
+											)}
+
+											{/* Bottom Panels: Contacts, Sent, and Inbox - hidden at narrowest breakpoint */}
+											{!isNarrowestDesktop && (
+												<BottomPanelsContainer
+													className={cn(
+														draftEmails.length === 0 ? 'mt-[91px]' : 'mt-[35px]',
+														'pb-[8px] flex justify-center gap-[15px]'
+													)}
+													data-campaign-bottom-anchor
 													collapsed={bottomPanelCollapsed}
-													showSearchBar={false}
-												/>
-												<SentExpandedList
-													sent={sentEmails}
-													contacts={contacts || []}
-													width={233}
-													height={bottomPanelBoxHeightPx}
-													whiteSectionHeight={15}
-													collapsed={bottomPanelCollapsed}
-													onOpenSent={goToSent}
-												/>
-												<InboxExpandedList
-													contacts={contacts || []}
-													width={233}
-													height={bottomPanelBoxHeightPx}
-													whiteSectionHeight={15}
-													collapsed={bottomPanelCollapsed}
-													onOpenInbox={goToInbox}
-												/>
-											</BottomPanelsContainer>
-										)}
-									</div>
-								)}
-							</div>
-						)}
-					</div>
+													historyActions={historyActions}
+												>
+													<ContactsExpandedList
+														contacts={contactsForContactsExpandedList}
+														campaign={campaign}
+														activelyDraftingContactIds={
+															activelyDraftingContactIdsForContactsExpandedList
+														}
+														width={232}
+														height={bottomPanelBoxHeightPx}
+														enableUsedContactTooltip={false}
+														whiteSectionHeight={15}
+														collapsed={bottomPanelCollapsed}
+														showSearchBar={false}
+													/>
+													<SentExpandedList
+														sent={sentEmails}
+														contacts={contacts || []}
+														width={233}
+														height={bottomPanelBoxHeightPx}
+														whiteSectionHeight={15}
+														collapsed={bottomPanelCollapsed}
+														onOpenSent={goToSent}
+													/>
+													<InboxExpandedList
+														contacts={contacts || []}
+														width={233}
+														height={bottomPanelBoxHeightPx}
+														whiteSectionHeight={15}
+														collapsed={bottomPanelCollapsed}
+														onOpenInbox={goToInbox}
+													/>
+												</BottomPanelsContainer>
+											)}
+										</div>
+									)}
+								</div>
+							)}
+						</div>
 
 						{/* Sent tab - show the sent emails table */}
 						{view === 'sent' && (
@@ -5508,10 +5759,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								) : isNarrowDesktop ? (
 									// Narrow desktop (952px - 1279px): center BOTH the left panel and sent table together
 									// Fixed width container: left (330) + gap (10) + right (499) = 839px, centered with mx-auto
-									<div className="flex flex-col items-center mx-auto" style={{ width: '839px' }}>
+									<div
+										className="flex flex-col items-center mx-auto"
+										style={{ width: '839px' }}
+									>
 										<div className="flex flex-row items-start gap-[10px] w-full">
 											{/* Left column: Campaign Header + Email Structure + Research - fixed 330px */}
-											<div className="flex flex-col flex-shrink-0" style={{ gap: '10px', width: '330px' }}>
+											<div
+												className="flex flex-col flex-shrink-0"
+												style={{ gap: '10px', width: '330px' }}
+											>
 												<CampaignHeaderBox
 													campaignId={campaign?.id}
 													campaignName={campaign?.name || 'Untitled Campaign'}
@@ -5537,12 +5794,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	: form
 														}
 														readOnly={isDraftingView || isSentView}
-														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+														variant={
+															draftsMiniEmailTopHeaderHeight ? 'settings' : undefined
+														}
 														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
-														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-														settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
+														settingsSecondaryLabel={
+															draftsMiniEmailSettingsLabels.secondary
+														}
+														settingsNameCompanyBgColor={
+															draftsMiniEmailSettingsNameCompanyBgColor
+														}
 														profileFields={profileFieldsForSettings}
-														identityProfile={campaign?.identity as IdentityProfileFields | null}
+														identityProfile={
+															campaign?.identity as IdentityProfileFields | null
+														}
 														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
 															handleGenerateDrafts(
@@ -5566,21 +5831,21 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														onOpenWriting={goToWriting}
 													/>
 												</div>
-												{/* Research panel below mini email structure - height set so bottom aligns with sent table (71 + 10 + 316 + 10 + 296 = 703 = sent table height) */}
+												{/* Research panel below mini email structure - height set so bottom aligns with sent table (59 + 10 + 316 + 10 + 308 = 703 = sent table height) */}
 												{isBatchDraftingInProgress ? (
 													<DraftPreviewExpandedList
 														contacts={contacts || []}
 														livePreview={liveDraftPreview}
 														fallbackDraft={draftPreviewFallbackDraft}
 														width={330}
-														height={296}
+														height={308}
 													/>
 												) : (
 													<ContactResearchPanel
 														contact={displayedContactForResearch}
 														hideAllText={sentEmails.length === 0}
 														hideSummaryIfBullets={true}
-														height={296}
+														height={308}
 														width={330}
 														boxWidth={315}
 														compactHeader
@@ -5589,7 +5854,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												)}
 											</div>
 											{/* Right column: Sent table - fixed 499px, overflow visible for bottom panels */}
-											<div className="flex-shrink-0 [&>*]:!items-start" style={{ width: '499px', overflow: 'visible' }}>
+											<div
+												className="flex-shrink-0 [&>*]:!items-start"
+												style={{ width: '499px', overflow: 'visible' }}
+											>
 												<SentEmails
 													mainBoxId="sent"
 													emails={sentEmails}
@@ -5614,7 +5882,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<ContactsExpandedList
 												contacts={contactsForContactsExpandedList}
 												campaign={campaign}
-												activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
+												activelyDraftingContactIds={
+													activelyDraftingContactIdsForContactsExpandedList
+												}
 												width={232}
 												height={bottomPanelBoxHeightPx}
 												enableUsedContactTooltip={false}
@@ -5699,12 +5969,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	: form
 														}
 														readOnly={isDraftingView || isSentView}
-														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+														variant={
+															draftsMiniEmailTopHeaderHeight ? 'settings' : undefined
+														}
 														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
-														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-														settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
+														settingsSecondaryLabel={
+															draftsMiniEmailSettingsLabels.secondary
+														}
+														settingsNameCompanyBgColor={
+															draftsMiniEmailSettingsNameCompanyBgColor
+														}
 														profileFields={profileFieldsForSettings}
-														identityProfile={campaign?.identity as IdentityProfileFields | null}
+														identityProfile={
+															campaign?.identity as IdentityProfileFields | null
+														}
 														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
 															handleGenerateDrafts(
@@ -5734,7 +6012,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<ContactsExpandedList
 													contacts={contactsForContactsExpandedList}
 													campaign={campaign}
-													activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
+													activelyDraftingContactIds={
+														activelyDraftingContactIdsForContactsExpandedList
+													}
 													width={232}
 													height={bottomPanelBoxHeightPx}
 													enableUsedContactTooltip={false}
@@ -5776,7 +6056,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								<div className={isSearchTabNarrow ? 'flex items-start gap-[37px]' : ''}>
 									{/* Left panel - header box + research panel (only at narrow breakpoint) */}
 									{isSearchTabNarrow && !isMobile && !hideHeaderBox && (
-										<div className="flex flex-col" style={{ gap: '16px', paddingTop: '29px' }}>
+										<div
+											className="flex flex-col"
+											style={{ gap: '16px', paddingTop: '29px' }}
+										>
 											<CampaignHeaderBox
 												campaignId={campaign?.id}
 												campaignName={campaign?.name || 'Untitled Campaign'}
@@ -5798,7 +6081,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												}}
 											>
 												{/* Show search results table when search has been performed, otherwise show research panel */}
-												{hasCampaignSearched && !isSearching && searchResultsForPanel.length > 0 ? (
+												{hasCampaignSearched &&
+												!isSearching &&
+												searchResultsForPanel.length > 0 ? (
 													<div
 														className="bg-[#D8E5FB] border-[3px] border-[#143883] rounded-[7px] overflow-hidden flex flex-col"
 														style={{
@@ -5822,17 +6107,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	<button
 																		type="button"
 																		onClick={() => {
-																		if (areAllSearchResultsSelected) {
+																			if (areAllSearchResultsSelected) {
 																				setSearchResultsSelectedContacts([]);
 																			} else {
 																				setSearchResultsSelectedContacts(
-																				searchResultsForPanelIds
+																					searchResultsForPanelIds
 																				);
 																			}
 																		}}
 																		className="font-secondary text-[11px] font-medium text-black hover:underline"
 																	>
-																	{areAllSearchResultsSelected ? 'Deselect all' : 'Select all'}
+																		{areAllSearchResultsSelected
+																			? 'Deselect all'
+																			: 'Select all'}
 																	</button>
 																</div>
 															</div>
@@ -5849,15 +6136,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														>
 															<div className="space-y-[7px]">
 																{searchResultsForPanel.map((contact) => {
-																	const isSelected = searchResultsSelectedContacts.includes(
-																		contact.id
-																	);
+																	const isSelected =
+																		searchResultsSelectedContacts.includes(contact.id);
 																	const firstName = contact.firstName || '';
 																	const lastName = contact.lastName || '';
 																	const fullName =
 																		contact.name || `${firstName} ${lastName}`.trim();
 																	const company = contact.company || '';
-																	const headline = contact.headline || contact.title || '';
+																	const headline =
+																		contact.headline || contact.title || '';
 																	const stateAbbr =
 																		getStateAbbreviation(contact.state || '') || '';
 																	const city = contact.city || '';
@@ -5868,7 +6155,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																			data-contact-id={contact.id}
 																			className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-[#ABABAB] select-none"
 																			style={{
-																				backgroundColor: isSelected ? '#C9EAFF' : '#FFFFFF',
+																				backgroundColor: isSelected
+																					? '#C9EAFF'
+																					: '#FFFFFF',
 																			}}
 																			onClick={() => {
 																				if (isSelected) {
@@ -5899,7 +6188,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																							<div
 																								className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 																								style={{
-																									backgroundColor: isRestaurantTitle(headline)
+																									backgroundColor: isRestaurantTitle(
+																										headline
+																									)
 																										? '#C3FBD1'
 																										: isCoffeeShopTitle(headline)
 																											? '#D6F1BD'
@@ -5907,7 +6198,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																												? '#B7E5FF'
 																												: isMusicFestivalTitle(headline)
 																													? '#C1D6FF'
-																													: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																													: isWeddingPlannerTitle(
+																																headline
+																														  ) ||
+																														  isWeddingVenueTitle(
+																																headline
+																														  )
 																														? '#FFF2BC'
 																														: '#E8EFFF',
 																								}}
@@ -5919,14 +6215,21 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																									<CoffeeShopsIcon size={7} />
 																								)}
 																								{isMusicVenueTitle(headline) && (
-																									<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																									<MusicVenuesIcon
+																										size={12}
+																										className="flex-shrink-0"
+																									/>
 																								)}
 																								{isMusicFestivalTitle(headline) && (
-																									<FestivalsIcon size={12} className="flex-shrink-0" />
+																									<FestivalsIcon
+																										size={12}
+																										className="flex-shrink-0"
+																									/>
 																								)}
-{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
-																								<WeddingPlannersIcon size={12} />
-																							)}
+																								{(isWeddingPlannerTitle(headline) ||
+																									isWeddingVenueTitle(headline)) && (
+																									<WeddingPlannersIcon size={12} />
+																								)}
 																								<span className="text-[10px] text-black leading-none truncate">
 																									{isRestaurantTitle(headline)
 																										? 'Restaurant'
@@ -5936,9 +6239,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																												? 'Music Venue'
 																												: isMusicFestivalTitle(headline)
 																													? 'Music Festival'
-																													: isWeddingPlannerTitle(headline)
+																													: isWeddingPlannerTitle(
+																																headline
+																														  )
 																														? 'Wedding Planner'
-																														: isWeddingVenueTitle(headline)
+																														: isWeddingVenueTitle(
+																																	headline
+																															  )
 																															? 'Wedding Venue'
 																															: headline}
 																								</span>
@@ -5995,7 +6302,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																							<div
 																								className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 																								style={{
-																									backgroundColor: isRestaurantTitle(headline)
+																									backgroundColor: isRestaurantTitle(
+																										headline
+																									)
 																										? '#C3FBD1'
 																										: isCoffeeShopTitle(headline)
 																											? '#D6F1BD'
@@ -6003,7 +6312,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																												? '#B7E5FF'
 																												: isMusicFestivalTitle(headline)
 																													? '#C1D6FF'
-																													: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																													: isWeddingPlannerTitle(
+																																headline
+																														  ) ||
+																														  isWeddingVenueTitle(
+																																headline
+																														  )
 																														? '#FFF2BC'
 																														: '#E8EFFF',
 																								}}
@@ -6015,14 +6329,21 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																									<CoffeeShopsIcon size={7} />
 																								)}
 																								{isMusicVenueTitle(headline) && (
-																									<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																									<MusicVenuesIcon
+																										size={12}
+																										className="flex-shrink-0"
+																									/>
 																								)}
 																								{isMusicFestivalTitle(headline) && (
-																									<FestivalsIcon size={12} className="flex-shrink-0" />
+																									<FestivalsIcon
+																										size={12}
+																										className="flex-shrink-0"
+																									/>
 																								)}
-{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
-																								<WeddingPlannersIcon size={12} />
-																							)}
+																								{(isWeddingPlannerTitle(headline) ||
+																									isWeddingVenueTitle(headline)) && (
+																									<WeddingPlannersIcon size={12} />
+																								)}
 																								<span className="text-[10px] text-black leading-none truncate">
 																									{isRestaurantTitle(headline)
 																										? 'Restaurant'
@@ -6032,9 +6353,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																												? 'Music Venue'
 																												: isMusicFestivalTitle(headline)
 																													? 'Music Festival'
-																													: isWeddingPlannerTitle(headline)
+																													: isWeddingPlannerTitle(
+																																headline
+																														  )
 																														? 'Wedding Planner'
-																														: isWeddingVenueTitle(headline)
+																														: isWeddingVenueTitle(
+																																	headline
+																															  )
 																															? 'Wedding Venue'
 																															: headline}
 																								</span>
@@ -6112,7 +6437,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																		type="button"
 																		onClick={() => {
 																			if (!areAllSearchResultsSelected) {
-																				setSearchResultsSelectedContacts(searchResultsForPanelIds);
+																				setSearchResultsSelectedContacts(
+																					searchResultsForPanelIds
+																				);
 																			}
 																		}}
 																		className="w-[50px] bg-[#7AD47A] hover:bg-[#6AC46A] text-black font-inter text-[13px] flex items-center justify-center transition-colors"
@@ -6124,744 +6451,782 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															</div>
 														)}
 													</div>
+												) : isBatchDraftingInProgress ? (
+													<DraftPreviewExpandedList
+														contacts={contacts || []}
+														livePreview={liveDraftPreview}
+														fallbackDraft={draftPreviewFallbackDraft}
+														width={375}
+														height={557}
+													/>
 												) : (
-													isBatchDraftingInProgress ? (
-														<DraftPreviewExpandedList
-															contacts={contacts || []}
-															livePreview={liveDraftPreview}
-															fallbackDraft={draftPreviewFallbackDraft}
-															width={375}
-															height={557}
-														/>
-													) : (
-														<ContactResearchPanel
-															contact={displayedContactForResearch}
-															hideAllText={contactsAvailableForDrafting.length === 0}
-															className="!block"
-														/>
-													)
+													<ContactResearchPanel
+														contact={displayedContactForResearch}
+														hideAllText={contactsAvailableForDrafting.length === 0}
+														className="!block"
+													/>
 												)}
 											</div>
 										</div>
 									)}
 									{/* Map and button column container */}
 									<div className="flex flex-col items-center">
-									{/* Outer container box */}
-									<div
-										className="relative rounded-[12px] overflow-hidden"
-										data-campaign-main-box="search"
-										style={{
-											width: isSearchTabNarrow ? '498px' : '768px',
-											height: '815px',
-											backgroundColor: '#AFD6EF',
-											border: '3px solid #143883',
-										}}
-									>
-									{/* Search label */}
-									<span
-										className="absolute font-inter font-bold text-[14px] text-black"
-										style={{ top: '5px', left: '16px' }}
-									>
-										Search
-									</span>
-
-									{/* Search tabs header */}
-									<div
-										className="absolute flex items-center"
-										style={{
-											left: '138px',
-											top: '0',
-											right: '14px',
-											height: '36px',
-										}}
-									>
-										{/* Original tab */}
+										{/* Outer container box */}
 										<div
-											className="relative flex items-center justify-center cursor-pointer border-l border-black"
+											className="relative rounded-[12px] overflow-hidden"
+											data-campaign-main-box="search"
 											style={{
-												width: '105px',
-												height: '36px',
-												backgroundColor:
-													activeSearchTabId === null ? '#94c4e4' : '#95D6FF',
-											}}
-											onClick={() => setActiveSearchTabId(null)}
-										>
-											<span className="font-inter font-normal text-[15px] text-black">
-												Original
-											</span>
-										</div>
-										<div className="border-l border-black h-full" />
-
-										{/* Dynamic search tabs */}
-										{searchTabs.map((tab) => (
-											<Fragment key={tab.id}>
-												<div
-													className="relative flex items-center justify-center cursor-pointer group"
-													style={{
-														minWidth: '120px',
-														maxWidth: '220px',
-														height: '36px',
-														backgroundColor:
-															activeSearchTabId === tab.id ? '#94c4e4' : '#95d6ff',
-														paddingLeft: '12px',
-														paddingRight: '28px',
-													}}
-													onClick={() => setActiveSearchTabId(tab.id)}
-												>
-													<span
-														className="font-inter font-normal text-[15px] text-black whitespace-nowrap overflow-hidden"
-														style={{
-															maskImage:
-																'linear-gradient(to right, black calc(100% - 20px), transparent 100%)',
-															WebkitMaskImage:
-																'linear-gradient(to right, black calc(100% - 20px), transparent 100%)',
-														}}
-													>
-														{tab.label}
-													</span>
-													{/* Close button - visible on hover */}
-													<button
-														type="button"
-														className="absolute right-[8px] top-1/2 -translate-y-1/2 w-[16px] h-[16px] hidden group-hover:flex items-center justify-center text-black/60 hover:text-black"
-														onClick={(e) => {
-															e.stopPropagation();
-															handleCloseSearchTab(tab.id);
-														}}
-													>
-														×
-													</button>
-												</div>
-												<div className="border-l border-black h-full" />
-											</Fragment>
-										))}
-
-										{/* Plus button to add new search */}
-										<div
-											className="flex items-center justify-center cursor-pointer"
-											style={{
-												width: '36px',
-												height: '36px',
-											}}
-											onClick={() => {
-												// Create a new empty tab
-												const newTab: SearchTab = {
-													id: `search-${Date.now()}`,
-													label: 'New Search',
-													query: '',
-													what: '',
-													selectedContacts: [],
-													extraContacts: [],
-												};
-												setSearchTabs((tabs) => [...tabs, newTab]);
-												setActiveSearchTabId(newTab.id);
-												// Reset search inputs to placeholders
-												setSearchWhyValue('[Booking]');
-												setSearchWhatValue('');
-												setSearchWhereValue('');
-												// Focus the search bar
-												setSearchActiveSection('what');
-											}}
-										>
-											<span className="font-inter font-normal text-[20px] text-black">
-												+
-											</span>
-										</div>
-									</div>
-
-									{/* Map container */}
-									<div
-										className="absolute"
-										style={{
-											top: '36px',
-											left: '14px',
-											right: '14px',
-											bottom: '14px',
-										}}
-									>
-										{/* Mini searchbar - overlaid on top of map */}
-										<div
-											className="absolute flex items-center z-10"
-											style={{
-												top: '12px',
-												left: '50%',
-												transform: 'translateX(-50%)',
-												width: isSearchTabNarrow ? '380px' : '440px',
-												height: '49px',
-											}}
-										>
-											<div
-												className={`relative w-full h-full bg-white rounded-[8px] border-[3px] border-black flex items-center ${
-													searchActiveSection ? 'bg-[#F3F3F3]' : 'bg-white'
-												}`}
-											>
-												{/* Pills container */}
-												<div
-													className={`absolute left-[6px] top-1/2 -translate-y-1/2 flex items-center rounded-[6px] z-10 group ${
-														searchActiveSection
-															? 'bg-[#F3F3F3] border border-transparent'
-															: 'bg-white border border-black'
-													}`}
-													style={{
-														width: 'calc(100% - 66px)',
-														height: '38px',
-													}}
-												>
-													{/* Sliding active section indicator (matches dashboard) */}
-													<div
-														ref={searchActiveSectionIndicatorRef}
-														className="absolute top-0 left-0 h-full w-1/3 bg-white border border-black rounded-[6px] pointer-events-none z-0"
-														style={{ opacity: 0, willChange: 'transform' }}
-													/>
-													{/* Why pill (Booking/Promotion) */}
-													<div
-														className={`campaign-mini-search-section-why flex-1 flex items-center justify-start border-r border-transparent ${
-															!searchActiveSection ? 'group-hover:border-black/10' : ''
-														} h-full min-w-0 relative pl-[16px] pr-1 cursor-pointer`}
-														onClick={() => setSearchActiveSection('why')}
-													>
-														<div className="w-full h-full flex items-center text-left text-[13px] font-bold font-secondary truncate p-0 relative z-10">
-															{searchWhyValue
-																? searchWhyValue.replace(/[\[\]]/g, '')
-																: 'Why'}
-														</div>
-													</div>
-													{/* What pill */}
-													<div
-														className={`campaign-mini-search-section-what flex-1 flex items-center justify-start border-r border-transparent ${
-															!searchActiveSection ? 'group-hover:border-black/10' : ''
-														} h-full min-w-0 relative pl-[16px] pr-1`}
-													>
-														<input
-															ref={whatInputRef}
-															value={searchWhatValue}
-															onChange={(e) => setSearchWhatValue(e.target.value)}
-															className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
-															style={{
-																maskImage:
-																	'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
-																WebkitMaskImage:
-																	'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
-															}}
-															placeholder="What"
-															onFocus={(e) => {
-																setSearchActiveSection('what');
-																const target = e.target;
-																setTimeout(() => target.setSelectionRange(0, 0), 0);
-															}}
-														/>
-													</div>
-													{/* Where pill */}
-													<div className="campaign-mini-search-section-where flex-1 flex items-center justify-end h-full min-w-0 relative pr-[12px] pl-[16px]">
-														<input
-															ref={whereInputRef}
-															value={searchWhereValue}
-															onChange={(e) => setSearchWhereValue(e.target.value)}
-															onKeyDown={(e) => {
-																if (e.key === 'Enter') {
-																	e.preventDefault();
-																	setSearchActiveSection(null);
-																	handleCampaignSearch();
-																}
-															}}
-															className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
-															style={{
-																maskImage:
-																	'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
-																WebkitMaskImage:
-																	'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
-															}}
-															placeholder="Where"
-															onFocus={(e) => {
-																setSearchActiveSection('where');
-																const target = e.target;
-																setTimeout(
-																	() => target.setSelectionRange(0, target.value.length),
-																	0
-																);
-															}}
-														/>
-													</div>
-												</div>
-												{/* Search button */}
-												<button
-													type="button"
-													className="absolute right-[6px] top-1/2 -translate-y-1/2 flex items-center justify-center cursor-pointer hover:bg-[#a3d9a5] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-													style={{
-														width: '48px',
-														height: '37px',
-														backgroundColor: '#B8E4BE',
-														border: '1px solid #5DAB68',
-														borderRadius: '6px',
-													}}
-													aria-label="Search"
-													onClick={handleCampaignSearch}
-												>
-													<div style={{ transform: 'scale(0.75)', display: 'flex' }}>
-														<SearchIconDesktop />
-													</div>
-												</button>
-											</div>
-										</div>
-										{/* Render search dropdowns via portal */}
-										{renderSearchDropdowns()}
-
-										<div
-											className="relative rounded-[8px] overflow-hidden w-full h-full"
-											style={{
+												width: isSearchTabNarrow ? '498px' : '768px',
+												height: '815px',
+												backgroundColor: '#AFD6EF',
 												border: '3px solid #143883',
 											}}
 										>
-											<SearchResultsMap
-												weatherMood={globeWeatherMood}
-												weatherRegionCenter={globeWeatherRegionCenter}
-												weatherTemperatureF={globeWeatherTemperatureF}
-												nightLighting={globeNightLighting}
-												contacts={
-													activeSearchTabId === null
-														? contacts || [] // Original tab - show campaign contacts
-														: activeCampaignSearchQuery
-														? searchResults || [] // Search tab with query - show results
-														: [] // Empty search tab - show nothing (zoomed out view)
-												}
-												isLoading={activeSearchTabId !== null ? isSearching : false}
-												selectedContacts={
-													activeSearchTabId !== null
-														? searchResultsSelectedContacts
-														: searchTabSelectedContacts
-												}
-												searchQuery={activeSearchTabId !== null ? activeCampaignSearchQuery : undefined}
-												searchWhat={activeSearchTabId !== null ? activeSearchTab?.what : undefined}
-												onMarkerHover={handleResearchContactHover}
-												onToggleSelection={(contactId) => {
-													if (activeSearchTabId !== null) {
-														// Handle selection for search results
-														if (searchResultsSelectedContacts.includes(contactId)) {
-															setSearchResultsSelectedContacts(
-																searchResultsSelectedContacts.filter(
-																	(id) => id !== contactId
-																)
-															);
-														} else {
-															setSearchResultsSelectedContacts([
-																...searchResultsSelectedContacts,
-																contactId,
-															]);
-														}
-
-														// Mirror dashboard UX: when selecting from the map, scroll the contact into view
-														// in the Search Results panel so the user immediately sees it.
-														if (typeof document !== 'undefined') {
-															const tryScroll = (attempt = 0) => {
-																const contactElement = document.querySelector(
-																	`[data-contact-id="${contactId}"]`
-																);
-																if (contactElement) {
-																	contactElement.scrollIntoView({
-																		behavior: 'smooth',
-																		block: 'center',
-																	});
-																	return;
-																}
-																if (attempt < 10) {
-																	setTimeout(() => tryScroll(attempt + 1), 50);
-																}
-															};
-															setTimeout(() => tryScroll(0), 0);
-														}
-													} else {
-														// Handle selection for campaign contacts
-														if (searchTabSelectedContacts.includes(contactId)) {
-															setSearchTabSelectedContacts(
-																searchTabSelectedContacts.filter((id) => id !== contactId)
-															);
-														} else {
-															setSearchTabSelectedContacts([
-																...searchTabSelectedContacts,
-																contactId,
-															]);
-														}
-													}
-												}}
-												onMarkerClick={(contact) => {
-													handleResearchContactClick(contact);
-													// Booking extra/overlay markers can be selected from the map but are not part of the
-													// base `searchResults` list. Add them to the active tab's results list so they
-													// appear in the Search Results panel.
-													if (activeSearchTabId !== null && !baseSearchResultsIdSet.has(contact.id)) {
-														addContactToActiveSearchTabResults(contact);
-													}
-												}}
-												enableStateInteractions
-												onStateSelect={(stateName) => {
-													setSearchActiveSection(null);
-													setSearchWhereValue(stateName);
-													// Trigger search after a short delay to allow state to update
-													setTimeout(() => handleCampaignSearch(), 0);
-												}}
-												lockedStateName={searchWhereValue}
-											/>
-										</div>
-									</div>
-								</div>
-								</div>
-								{/* Close wrapper div for centered left panel + map at narrow breakpoint */}
-							</div>
-							{/* Add to Campaign button below the map - always visible, centered on page at narrow breakpoint */}
-							<div
-								className="flex items-center justify-center gap-[29px]"
-								style={{ marginTop: '25px' }}
-							>
-								{/* Left arrow - only at narrow breakpoint */}
-								{isSearchTabNarrow && (
-									<button
-										type="button"
-										onClick={goToPreviousTab}
-										className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-										aria-label="Previous tab"
-									>
-										<LeftArrow width="20" height="39" />
-									</button>
-								)}
-								{/* Button container */}
-								<div
-									className="relative flex rounded-[6px] border-2 border-black overflow-hidden"
-									style={{
-										width: isNarrowestDesktop ? '407px' : isSearchTabNarrow ? '691px' : '528px',
-										height: '39px',
-									}}
-								>
-									{/* Absolutely centered text */}
-									<span
-										className="absolute inset-0 flex items-center justify-center text-black font-serif font-medium text-[15px] pointer-events-none"
-										style={{ zIndex: 1 }}
-									>
-										{isAddingToCampaign ? (
-											<>
-												<div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin mr-2" />
-												Adding...
-											</>
-										) : (
-											'Add to Campaign'
-										)}
-									</span>
-									{/* Clickable left area */}
-									<button
-										type="button"
-										onClick={handleAddSearchResultsToCampaign}
-										disabled={
-											searchResultsSelectedContacts.length === 0 ||
-											isAddingToCampaign
-										}
-										className="flex-1 bg-[#AFD6EF] hover:bg-[#9BC6DF] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-									/>
-									<div
-										className="w-[2px]"
-										style={{ backgroundColor: '#143883', zIndex: 2 }}
-									/>
-									<button
-										type="button"
-										onClick={() => {
-											if (searchResultsForPanelIds.length > 0 && !areAllSearchResultsSelected) {
-												setSearchResultsSelectedContacts(searchResultsForPanelIds);
-											}
-										}}
-										className="w-[50px] bg-[#43AEEC] hover:bg-[#3A9AD9] text-black font-inter text-[13px] flex items-center justify-center transition-colors"
-										style={{ zIndex: 2 }}
-									>
-										All
-									</button>
-								</div>
-								{/* Right arrow - only at narrow breakpoint */}
-								{isSearchTabNarrow && (
-									<button
-										type="button"
-										onClick={goToNextTab}
-										className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-										aria-label="Next tab"
-									>
-										<RightArrow width="20" height="39" />
-									</button>
-								)}
-							</div>
-							{/* Research panel OR Search results below Add to Campaign button - only at narrowest breakpoint (< 952px) */}
-							{isNarrowestDesktop && (
-								<div className="mt-[70px] w-full flex justify-center">
-									{/* At narrowest breakpoint (< 952px) with search results, show search results table */}
-									{hasCampaignSearched && !isSearching && searchResultsForPanel.length > 0 ? (
-										<div
-											className="bg-[#D8E5FB] border-[3px] border-[#143883] rounded-[7px] overflow-hidden flex flex-col"
-											style={{
-												width: '498px',
-												height: '400px',
-											}}
-										>
-											{/* Fixed header section */}
-											<div
-												className="flex-shrink-0 flex flex-col justify-center px-[6px]"
-												style={{ height: '44px' }}
+											{/* Search label */}
+											<span
+												className="absolute font-inter font-bold text-[14px] text-black"
+												style={{ top: '5px', left: '16px' }}
 											>
-												<div className="flex items-center justify-between">
-													<span className="font-inter text-[13px] font-medium text-black pl-1">
-														Search Results
+												Search
+											</span>
+
+											{/* Search tabs header */}
+											<div
+												className="absolute flex items-center"
+												style={{
+													left: '138px',
+													top: '0',
+													right: '14px',
+													height: '36px',
+												}}
+											>
+												{/* Original tab */}
+												<div
+													className="relative flex items-center justify-center cursor-pointer border-l border-black"
+													style={{
+														width: '105px',
+														height: '36px',
+														backgroundColor:
+															activeSearchTabId === null ? '#94c4e4' : '#95D6FF',
+													}}
+													onClick={() => setActiveSearchTabId(null)}
+												>
+													<span className="font-inter font-normal text-[15px] text-black">
+														Original
 													</span>
-													<div className="flex flex-col items-end">
-														<span className="font-inter text-[11px] text-black">
-															{selectedSearchResultsCount} selected
-														</span>
+												</div>
+												<div className="border-l border-black h-full" />
+
+												{/* Dynamic search tabs */}
+												{searchTabs.map((tab) => (
+													<Fragment key={tab.id}>
+														<div
+															className="relative flex items-center justify-center cursor-pointer group"
+															style={{
+																minWidth: '120px',
+																maxWidth: '220px',
+																height: '36px',
+																backgroundColor:
+																	activeSearchTabId === tab.id ? '#94c4e4' : '#95d6ff',
+																paddingLeft: '12px',
+																paddingRight: '28px',
+															}}
+															onClick={() => setActiveSearchTabId(tab.id)}
+														>
+															<span
+																className="font-inter font-normal text-[15px] text-black whitespace-nowrap overflow-hidden"
+																style={{
+																	maskImage:
+																		'linear-gradient(to right, black calc(100% - 20px), transparent 100%)',
+																	WebkitMaskImage:
+																		'linear-gradient(to right, black calc(100% - 20px), transparent 100%)',
+																}}
+															>
+																{tab.label}
+															</span>
+															{/* Close button - visible on hover */}
+															<button
+																type="button"
+																className="absolute right-[8px] top-1/2 -translate-y-1/2 w-[16px] h-[16px] hidden group-hover:flex items-center justify-center text-black/60 hover:text-black"
+																onClick={(e) => {
+																	e.stopPropagation();
+																	handleCloseSearchTab(tab.id);
+																}}
+															>
+																×
+															</button>
+														</div>
+														<div className="border-l border-black h-full" />
+													</Fragment>
+												))}
+
+												{/* Plus button to add new search */}
+												<div
+													className="flex items-center justify-center cursor-pointer"
+													style={{
+														width: '36px',
+														height: '36px',
+													}}
+													onClick={() => {
+														// Create a new empty tab
+														const newTab: SearchTab = {
+															id: `search-${Date.now()}`,
+															label: 'New Search',
+															query: '',
+															what: '',
+															selectedContacts: [],
+															extraContacts: [],
+														};
+														setSearchTabs((tabs) => [...tabs, newTab]);
+														setActiveSearchTabId(newTab.id);
+														// Reset search inputs to placeholders
+														setSearchWhyValue('[Booking]');
+														setSearchWhatValue('');
+														setSearchWhereValue('');
+														// Focus the search bar
+														setSearchActiveSection('what');
+													}}
+												>
+													<span className="font-inter font-normal text-[20px] text-black">
+														+
+													</span>
+												</div>
+											</div>
+
+											{/* Map container */}
+											<div
+												className="absolute"
+												style={{
+													top: '36px',
+													left: '14px',
+													right: '14px',
+													bottom: '14px',
+												}}
+											>
+												{/* Mini searchbar - overlaid on top of map */}
+												<div
+													className="absolute flex items-center z-10"
+													style={{
+														top: '12px',
+														left: '50%',
+														transform: 'translateX(-50%)',
+														width: isSearchTabNarrow ? '380px' : '440px',
+														height: '49px',
+													}}
+												>
+													<div
+														className={`relative w-full h-full bg-white rounded-[8px] border-[3px] border-black flex items-center ${
+															searchActiveSection ? 'bg-[#F3F3F3]' : 'bg-white'
+														}`}
+													>
+														{/* Pills container */}
+														<div
+															className={`absolute left-[6px] top-1/2 -translate-y-1/2 flex items-center rounded-[6px] z-10 group ${
+																searchActiveSection
+																	? 'bg-[#F3F3F3] border border-transparent'
+																	: 'bg-white border border-black'
+															}`}
+															style={{
+																width: 'calc(100% - 66px)',
+																height: '38px',
+															}}
+														>
+															{/* Sliding active section indicator (matches dashboard) */}
+															<div
+																ref={searchActiveSectionIndicatorRef}
+																className="absolute top-0 left-0 h-full w-1/3 bg-white border border-black rounded-[6px] pointer-events-none z-0"
+																style={{ opacity: 0, willChange: 'transform' }}
+															/>
+															{/* Why pill (Booking/Promotion) */}
+															<div
+																className={`campaign-mini-search-section-why flex-1 flex items-center justify-start border-r border-transparent ${
+																	!searchActiveSection
+																		? 'group-hover:border-black/10'
+																		: ''
+																} h-full min-w-0 relative pl-[16px] pr-1 cursor-pointer`}
+																onClick={() => setSearchActiveSection('why')}
+															>
+																<div className="w-full h-full flex items-center text-left text-[13px] font-bold font-secondary truncate p-0 relative z-10">
+																	{searchWhyValue
+																		? searchWhyValue.replace(/[\[\]]/g, '')
+																		: 'Why'}
+																</div>
+															</div>
+															{/* What pill */}
+															<div
+																className={`campaign-mini-search-section-what flex-1 flex items-center justify-start border-r border-transparent ${
+																	!searchActiveSection
+																		? 'group-hover:border-black/10'
+																		: ''
+																} h-full min-w-0 relative pl-[16px] pr-1`}
+															>
+																<input
+																	ref={whatInputRef}
+																	value={searchWhatValue}
+																	onChange={(e) => setSearchWhatValue(e.target.value)}
+																	className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+																	style={{
+																		maskImage:
+																			'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+																		WebkitMaskImage:
+																			'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+																	}}
+																	placeholder="What"
+																	onFocus={(e) => {
+																		setSearchActiveSection('what');
+																		const target = e.target;
+																		setTimeout(() => target.setSelectionRange(0, 0), 0);
+																	}}
+																/>
+															</div>
+															{/* Where pill */}
+															<div className="campaign-mini-search-section-where flex-1 flex items-center justify-end h-full min-w-0 relative pr-[12px] pl-[16px]">
+																<input
+																	ref={whereInputRef}
+																	value={searchWhereValue}
+																	onChange={(e) => setSearchWhereValue(e.target.value)}
+																	onKeyDown={(e) => {
+																		if (e.key === 'Enter') {
+																			e.preventDefault();
+																			setSearchActiveSection(null);
+																			handleCampaignSearch();
+																		}
+																	}}
+																	className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+																	style={{
+																		maskImage:
+																			'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+																		WebkitMaskImage:
+																			'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+																	}}
+																	placeholder="Where"
+																	onFocus={(e) => {
+																		setSearchActiveSection('where');
+																		const target = e.target;
+																		setTimeout(
+																			() =>
+																				target.setSelectionRange(0, target.value.length),
+																			0
+																		);
+																	}}
+																/>
+															</div>
+														</div>
+														{/* Search button */}
 														<button
 															type="button"
-															onClick={() => {
-																if (areAllSearchResultsSelected) {
-																	setSearchResultsSelectedContacts([]);
-																} else {
-																	setSearchResultsSelectedContacts(
-																		searchResultsForPanelIds
-																	);
-																}
+															className="absolute right-[6px] top-1/2 -translate-y-1/2 flex items-center justify-center cursor-pointer hover:bg-[#a3d9a5] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+															style={{
+																width: '48px',
+																height: '37px',
+																backgroundColor: '#B8E4BE',
+																border: '1px solid #5DAB68',
+																borderRadius: '6px',
 															}}
-															className="font-secondary text-[11px] font-medium text-black hover:underline"
+															aria-label="Search"
+															onClick={handleCampaignSearch}
 														>
-															{areAllSearchResultsSelected ? 'Deselect all' : 'Select all'}
+															<div style={{ transform: 'scale(0.75)', display: 'flex' }}>
+																<SearchIconDesktop />
+															</div>
 														</button>
 													</div>
 												</div>
-											</div>
-											{/* Scrollable contact list */}
-											<CustomScrollbar
-												className="flex-1 min-h-0"
-												contentClassName="px-[6px] pb-[14px]"
-												thumbWidth={2}
-												thumbColor="#000000"
-												trackColor="transparent"
-												offsetRight={-6}
-												disableOverflowClass
-											>
-												<div className="space-y-[7px]">
-													{searchResultsForPanel.map((contact) => {
-														const isSelected = searchResultsSelectedContacts.includes(
-															contact.id
-														);
-														const firstName = contact.firstName || '';
-														const lastName = contact.lastName || '';
-														const fullName =
-															contact.name || `${firstName} ${lastName}`.trim();
-														const company = contact.company || '';
-														const headline = contact.headline || contact.title || '';
-														const stateAbbr =
-															getStateAbbreviation(contact.state || '') || '';
-														const city = contact.city || '';
+												{/* Render search dropdowns via portal */}
+												{renderSearchDropdowns()}
 
-														return (
-															<div
-																key={contact.id}
-																data-contact-id={contact.id}
-																className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-[#ABABAB] select-none"
-																style={{
-																	backgroundColor: isSelected ? '#C9EAFF' : '#FFFFFF',
-																}}
-																onClick={() => {
-																	if (isSelected) {
-																		setSearchResultsSelectedContacts(
-																			searchResultsSelectedContacts.filter(
-																				(id) => id !== contact.id
-																			)
+												<div
+													className="relative rounded-[8px] overflow-hidden w-full h-full"
+													style={{
+														border: '3px solid #143883',
+													}}
+												>
+													<SearchResultsMap
+														weatherMood={globeWeatherMood}
+														weatherRegionCenter={globeWeatherRegionCenter}
+														weatherTemperatureF={globeWeatherTemperatureF}
+														nightLighting={globeNightLighting}
+														contacts={
+															activeSearchTabId === null
+																? contacts || [] // Original tab - show campaign contacts
+																: activeCampaignSearchQuery
+																	? searchResults || [] // Search tab with query - show results
+																	: [] // Empty search tab - show nothing (zoomed out view)
+														}
+														isLoading={activeSearchTabId !== null ? isSearching : false}
+														selectedContacts={
+															activeSearchTabId !== null
+																? searchResultsSelectedContacts
+																: searchTabSelectedContacts
+														}
+														searchQuery={
+															activeSearchTabId !== null
+																? activeCampaignSearchQuery
+																: undefined
+														}
+														searchWhat={
+															activeSearchTabId !== null
+																? activeSearchTab?.what
+																: undefined
+														}
+														onMarkerHover={handleResearchContactHover}
+														onToggleSelection={(contactId) => {
+															if (activeSearchTabId !== null) {
+																// Handle selection for search results
+																if (searchResultsSelectedContacts.includes(contactId)) {
+																	setSearchResultsSelectedContacts(
+																		searchResultsSelectedContacts.filter(
+																			(id) => id !== contactId
+																		)
+																	);
+																} else {
+																	setSearchResultsSelectedContacts([
+																		...searchResultsSelectedContacts,
+																		contactId,
+																	]);
+																}
+
+																// Mirror dashboard UX: when selecting from the map, scroll the contact into view
+																// in the Search Results panel so the user immediately sees it.
+																if (typeof document !== 'undefined') {
+																	const tryScroll = (attempt = 0) => {
+																		const contactElement = document.querySelector(
+																			`[data-contact-id="${contactId}"]`
 																		);
+																		if (contactElement) {
+																			contactElement.scrollIntoView({
+																				behavior: 'smooth',
+																				block: 'center',
+																			});
+																			return;
+																		}
+																		if (attempt < 10) {
+																			setTimeout(() => tryScroll(attempt + 1), 50);
+																		}
+																	};
+																	setTimeout(() => tryScroll(0), 0);
+																}
+															} else {
+																// Handle selection for campaign contacts
+																if (searchTabSelectedContacts.includes(contactId)) {
+																	setSearchTabSelectedContacts(
+																		searchTabSelectedContacts.filter(
+																			(id) => id !== contactId
+																		)
+																	);
+																} else {
+																	setSearchTabSelectedContacts([
+																		...searchTabSelectedContacts,
+																		contactId,
+																	]);
+																}
+															}
+														}}
+														onMarkerClick={(contact) => {
+															handleResearchContactClick(contact);
+															// Booking extra/overlay markers can be selected from the map but are not part of the
+															// base `searchResults` list. Add them to the active tab's results list so they
+															// appear in the Search Results panel.
+															if (
+																activeSearchTabId !== null &&
+																!baseSearchResultsIdSet.has(contact.id)
+															) {
+																addContactToActiveSearchTabResults(contact);
+															}
+														}}
+														enableStateInteractions
+														onStateSelect={(stateName) => {
+															setSearchActiveSection(null);
+															setSearchWhereValue(stateName);
+															// Trigger search after a short delay to allow state to update
+															setTimeout(() => handleCampaignSearch(), 0);
+														}}
+														lockedStateName={searchWhereValue}
+													/>
+												</div>
+											</div>
+										</div>
+									</div>
+									{/* Close wrapper div for centered left panel + map at narrow breakpoint */}
+								</div>
+								{/* Add to Campaign button below the map - always visible, centered on page at narrow breakpoint */}
+								<div
+									className="flex items-center justify-center gap-[29px]"
+									style={{ marginTop: '25px' }}
+								>
+									{/* Left arrow - only at narrow breakpoint */}
+									{isSearchTabNarrow && (
+										<button
+											type="button"
+											onClick={goToPreviousTab}
+											className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+											aria-label="Previous tab"
+										>
+											<LeftArrow width="20" height="39" />
+										</button>
+									)}
+									{/* Button container */}
+									<div
+										className="relative flex rounded-[6px] border-2 border-black overflow-hidden"
+										style={{
+											width: isNarrowestDesktop
+												? '407px'
+												: isSearchTabNarrow
+													? '691px'
+													: '528px',
+											height: '39px',
+										}}
+									>
+										{/* Absolutely centered text */}
+										<span
+											className="absolute inset-0 flex items-center justify-center text-black font-serif font-medium text-[15px] pointer-events-none"
+											style={{ zIndex: 1 }}
+										>
+											{isAddingToCampaign ? (
+												<>
+													<div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin mr-2" />
+													Adding...
+												</>
+											) : (
+												'Add to Campaign'
+											)}
+										</span>
+										{/* Clickable left area */}
+										<button
+											type="button"
+											onClick={handleAddSearchResultsToCampaign}
+											disabled={
+												searchResultsSelectedContacts.length === 0 || isAddingToCampaign
+											}
+											className="flex-1 bg-[#AFD6EF] hover:bg-[#9BC6DF] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+										/>
+										<div
+											className="w-[2px]"
+											style={{ backgroundColor: '#143883', zIndex: 2 }}
+										/>
+										<button
+											type="button"
+											onClick={() => {
+												if (
+													searchResultsForPanelIds.length > 0 &&
+													!areAllSearchResultsSelected
+												) {
+													setSearchResultsSelectedContacts(searchResultsForPanelIds);
+												}
+											}}
+											className="w-[50px] bg-[#43AEEC] hover:bg-[#3A9AD9] text-black font-inter text-[13px] flex items-center justify-center transition-colors"
+											style={{ zIndex: 2 }}
+										>
+											All
+										</button>
+									</div>
+									{/* Right arrow - only at narrow breakpoint */}
+									{isSearchTabNarrow && (
+										<button
+											type="button"
+											onClick={goToNextTab}
+											className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+											aria-label="Next tab"
+										>
+											<RightArrow width="20" height="39" />
+										</button>
+									)}
+								</div>
+								{/* Research panel OR Search results below Add to Campaign button - only at narrowest breakpoint (< 952px) */}
+								{isNarrowestDesktop && (
+									<div className="mt-[70px] w-full flex justify-center">
+										{/* At narrowest breakpoint (< 952px) with search results, show search results table */}
+										{hasCampaignSearched &&
+										!isSearching &&
+										searchResultsForPanel.length > 0 ? (
+											<div
+												className="bg-[#D8E5FB] border-[3px] border-[#143883] rounded-[7px] overflow-hidden flex flex-col"
+												style={{
+													width: '498px',
+													height: '400px',
+												}}
+											>
+												{/* Fixed header section */}
+												<div
+													className="flex-shrink-0 flex flex-col justify-center px-[6px]"
+													style={{ height: '44px' }}
+												>
+													<div className="flex items-center justify-between">
+														<span className="font-inter text-[13px] font-medium text-black pl-1">
+															Search Results
+														</span>
+														<div className="flex flex-col items-end">
+															<span className="font-inter text-[11px] text-black">
+																{selectedSearchResultsCount} selected
+															</span>
+															<button
+																type="button"
+																onClick={() => {
+																	if (areAllSearchResultsSelected) {
+																		setSearchResultsSelectedContacts([]);
 																	} else {
-																		setSearchResultsSelectedContacts([
-																			...searchResultsSelectedContacts,
-																			contact.id,
-																		]);
+																		setSearchResultsSelectedContacts(
+																			searchResultsForPanelIds
+																		);
 																	}
 																}}
+																className="font-secondary text-[11px] font-medium text-black hover:underline"
 															>
-																{fullName ? (
-																	<>
-																		{/* Top Left - Name */}
-																		<div className="pl-3 pr-1 flex items-center h-[23px]">
-																			<div className="font-bold text-[11px] w-full truncate leading-tight">
-																				{fullName}
+																{areAllSearchResultsSelected
+																	? 'Deselect all'
+																	: 'Select all'}
+															</button>
+														</div>
+													</div>
+												</div>
+												{/* Scrollable contact list */}
+												<CustomScrollbar
+													className="flex-1 min-h-0"
+													contentClassName="px-[6px] pb-[14px]"
+													thumbWidth={2}
+													thumbColor="#000000"
+													trackColor="transparent"
+													offsetRight={-6}
+													disableOverflowClass
+												>
+													<div className="space-y-[7px]">
+														{searchResultsForPanel.map((contact) => {
+															const isSelected = searchResultsSelectedContacts.includes(
+																contact.id
+															);
+															const firstName = contact.firstName || '';
+															const lastName = contact.lastName || '';
+															const fullName =
+																contact.name || `${firstName} ${lastName}`.trim();
+															const company = contact.company || '';
+															const headline = contact.headline || contact.title || '';
+															const stateAbbr =
+																getStateAbbreviation(contact.state || '') || '';
+															const city = contact.city || '';
+
+															return (
+																<div
+																	key={contact.id}
+																	data-contact-id={contact.id}
+																	className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-[#ABABAB] select-none"
+																	style={{
+																		backgroundColor: isSelected ? '#C9EAFF' : '#FFFFFF',
+																	}}
+																	onClick={() => {
+																		if (isSelected) {
+																			setSearchResultsSelectedContacts(
+																				searchResultsSelectedContacts.filter(
+																					(id) => id !== contact.id
+																				)
+																			);
+																		} else {
+																			setSearchResultsSelectedContacts([
+																				...searchResultsSelectedContacts,
+																				contact.id,
+																			]);
+																		}
+																	}}
+																>
+																	{fullName ? (
+																		<>
+																			{/* Top Left - Name */}
+																			<div className="pl-3 pr-1 flex items-center h-[23px]">
+																				<div className="font-bold text-[11px] w-full truncate leading-tight">
+																					{fullName}
+																				</div>
 																			</div>
-																		</div>
-																		{/* Top Right - Title/Headline */}
-																		<div className="pr-2 pl-1 flex items-center h-[23px]">
-																			{headline ? (
-																				<div
-																					className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
-																					style={{
-																						backgroundColor: isRestaurantTitle(headline)
-																							? '#C3FBD1'
-																							: isCoffeeShopTitle(headline)
-																								? '#D6F1BD'
-																								: isMusicVenueTitle(headline)
-																									? '#B7E5FF'
-																									: isMusicFestivalTitle(headline)
-																										? '#C1D6FF'
-																										: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																			{/* Top Right - Title/Headline */}
+																			<div className="pr-2 pl-1 flex items-center h-[23px]">
+																				{headline ? (
+																					<div
+																						className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																						style={{
+																							backgroundColor: isRestaurantTitle(headline)
+																								? '#C3FBD1'
+																								: isCoffeeShopTitle(headline)
+																									? '#D6F1BD'
+																									: isMusicVenueTitle(headline)
+																										? '#B7E5FF'
+																										: isMusicFestivalTitle(headline)
+																											? '#C1D6FF'
+																											: isWeddingPlannerTitle(headline) ||
+																												  isWeddingVenueTitle(headline)
+																												? '#FFF2BC'
+																												: '#E8EFFF',
+																						}}
+																					>
+																						{isRestaurantTitle(headline) && (
+																							<RestaurantsIcon size={12} />
+																						)}
+																						{isCoffeeShopTitle(headline) && (
+																							<CoffeeShopsIcon size={7} />
+																						)}
+																						{isMusicVenueTitle(headline) && (
+																							<MusicVenuesIcon
+																								size={12}
+																								className="flex-shrink-0"
+																							/>
+																						)}
+																						{isMusicFestivalTitle(headline) && (
+																							<FestivalsIcon
+																								size={12}
+																								className="flex-shrink-0"
+																							/>
+																						)}
+																						{(isWeddingPlannerTitle(headline) ||
+																							isWeddingVenueTitle(headline)) && (
+																							<WeddingPlannersIcon size={12} />
+																						)}
+																						<span className="text-[10px] text-black leading-none truncate">
+																							{isRestaurantTitle(headline)
+																								? 'Restaurant'
+																								: isCoffeeShopTitle(headline)
+																									? 'Coffee Shop'
+																									: isMusicVenueTitle(headline)
+																										? 'Music Venue'
+																										: isMusicFestivalTitle(headline)
+																											? 'Music Festival'
+																											: isWeddingPlannerTitle(headline)
+																												? 'Wedding Planner'
+																												: isWeddingVenueTitle(headline)
+																													? 'Wedding Venue'
+																													: headline}
+																						</span>
+																					</div>
+																				) : (
+																					<div className="w-full" />
+																				)}
+																			</div>
+																			{/* Bottom Left - Company */}
+																			<div className="pl-3 pr-1 flex items-center h-[22px]">
+																				<div className="text-[11px] text-black w-full truncate leading-tight">
+																					{company}
+																				</div>
+																			</div>
+																			{/* Bottom Right - Location */}
+																			<div className="pr-2 pl-1 flex items-center h-[22px]">
+																				{city || stateAbbr ? (
+																					<div className="flex items-center gap-1 w-full">
+																						{stateAbbr && (
+																							<span
+																								className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+																								style={{
+																									backgroundColor:
+																										stateBadgeColorMap[stateAbbr] ||
+																										'transparent',
+																									borderColor: '#000000',
+																								}}
+																							>
+																								{stateAbbr}
+																							</span>
+																						)}
+																						{city && (
+																							<span className="text-[10px] text-black leading-none truncate">
+																								{city}
+																							</span>
+																						)}
+																					</div>
+																				) : (
+																					<div className="w-full" />
+																				)}
+																			</div>
+																		</>
+																	) : (
+																		<>
+																			{/* No name - Company spans left column */}
+																			<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
+																				<div className="font-bold text-[11px] w-full truncate leading-tight">
+																					{company || '—'}
+																				</div>
+																			</div>
+																			{/* Top Right - Title/Headline */}
+																			<div className="pr-2 pl-1 flex items-center h-[23px]">
+																				{headline ? (
+																					<div
+																						className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																						style={{
+																							backgroundColor: isRestaurantTitle(headline)
+																								? '#C3FBD1'
+																								: isCoffeeShopTitle(headline)
+																									? '#D6F1BD'
+																									: isMusicVenueTitle(headline)
+																										? '#B7E5FF'
+																										: isWeddingPlannerTitle(headline) ||
+																											  isWeddingVenueTitle(headline)
 																											? '#FFF2BC'
 																											: '#E8EFFF',
-																					}}
-																				>
-																					{isRestaurantTitle(headline) && (
-																						<RestaurantsIcon size={12} />
-																					)}
-																					{isCoffeeShopTitle(headline) && (
-																						<CoffeeShopsIcon size={7} />
-																					)}
-																					{isMusicVenueTitle(headline) && (
-																						<MusicVenuesIcon size={12} className="flex-shrink-0" />
-																					)}
-																					{isMusicFestivalTitle(headline) && (
-																						<FestivalsIcon size={12} className="flex-shrink-0" />
-																					)}
-{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
-																								<WeddingPlannersIcon size={12} />
-																							)}
-																					<span className="text-[10px] text-black leading-none truncate">
-																						{isRestaurantTitle(headline)
-																							? 'Restaurant'
-																							: isCoffeeShopTitle(headline)
-																								? 'Coffee Shop'
-																								: isMusicVenueTitle(headline)
-																									? 'Music Venue'
-																									: isMusicFestivalTitle(headline)
-																										? 'Music Festival'
+																						}}
+																					>
+																						{isRestaurantTitle(headline) && (
+																							<RestaurantsIcon size={12} />
+																						)}
+																						{isCoffeeShopTitle(headline) && (
+																							<CoffeeShopsIcon size={7} />
+																						)}
+																						{isMusicVenueTitle(headline) && (
+																							<MusicVenuesIcon
+																								size={12}
+																								className="flex-shrink-0"
+																							/>
+																						)}
+																						{(isWeddingPlannerTitle(headline) ||
+																							isWeddingVenueTitle(headline)) && (
+																							<WeddingPlannersIcon size={12} />
+																						)}
+																						<span className="text-[10px] text-black leading-none truncate">
+																							{isRestaurantTitle(headline)
+																								? 'Restaurant'
+																								: isCoffeeShopTitle(headline)
+																									? 'Coffee Shop'
+																									: isMusicVenueTitle(headline)
+																										? 'Music Venue'
 																										: isWeddingPlannerTitle(headline)
 																											? 'Wedding Planner'
 																											: isWeddingVenueTitle(headline)
 																												? 'Wedding Venue'
 																												: headline}
-																					</span>
-																				</div>
-																			) : (
-																				<div className="w-full" />
-																			)}
-																		</div>
-																		{/* Bottom Left - Company */}
-																		<div className="pl-3 pr-1 flex items-center h-[22px]">
-																			<div className="text-[11px] text-black w-full truncate leading-tight">
-																				{company}
+																						</span>
+																					</div>
+																				) : (
+																					<div className="w-full" />
+																				)}
 																			</div>
-																		</div>
-																		{/* Bottom Right - Location */}
-																		<div className="pr-2 pl-1 flex items-center h-[22px]">
-																			{city || stateAbbr ? (
-																				<div className="flex items-center gap-1 w-full">
-																					{stateAbbr && (
-																						<span
-																							className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
-																							style={{
-																								backgroundColor:
-																									stateBadgeColorMap[stateAbbr] ||
-																									'transparent',
-																								borderColor: '#000000',
-																							}}
-																						>
-																							{stateAbbr}
-																						</span>
-																					)}
-																					{city && (
-																						<span className="text-[10px] text-black leading-none truncate">
-																							{city}
-																						</span>
-																					)}
-																				</div>
-																			) : (
-																				<div className="w-full" />
-																			)}
-																		</div>
-																	</>
-																) : (
-																	<>
-																		{/* No name - Company spans left column */}
-																		<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
-																			<div className="font-bold text-[11px] w-full truncate leading-tight">
-																				{company || '—'}
+																			{/* Bottom Right - Location */}
+																			<div className="pr-2 pl-1 flex items-center h-[22px]">
+																				{city || stateAbbr ? (
+																					<div className="flex items-center gap-1 w-full">
+																						{stateAbbr && (
+																							<span
+																								className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+																								style={{
+																									backgroundColor:
+																										stateBadgeColorMap[stateAbbr] ||
+																										'transparent',
+																									borderColor: '#000000',
+																								}}
+																							>
+																								{stateAbbr}
+																							</span>
+																						)}
+																						{city && (
+																							<span className="text-[10px] text-black leading-none truncate">
+																								{city}
+																							</span>
+																						)}
+																					</div>
+																				) : (
+																					<div className="w-full" />
+																				)}
 																			</div>
-																		</div>
-																		{/* Top Right - Title/Headline */}
-																		<div className="pr-2 pl-1 flex items-center h-[23px]">
-																			{headline ? (
-																				<div
-																					className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
-																					style={{
-																						backgroundColor: isRestaurantTitle(headline)
-																							? '#C3FBD1'
-																							: isCoffeeShopTitle(headline)
-																								? '#D6F1BD'
-																								: isMusicVenueTitle(headline)
-																									? '#B7E5FF'
-																									: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
-																										? '#FFF2BC'
-																										: '#E8EFFF',
-																					}}
-																				>
-																					{isRestaurantTitle(headline) && (
-																						<RestaurantsIcon size={12} />
-																					)}
-																					{isCoffeeShopTitle(headline) && (
-																						<CoffeeShopsIcon size={7} />
-																					)}
-																					{isMusicVenueTitle(headline) && (
-																						<MusicVenuesIcon size={12} className="flex-shrink-0" />
-																					)}
-{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
-																								<WeddingPlannersIcon size={12} />
-																							)}
-																					<span className="text-[10px] text-black leading-none truncate">
-																						{isRestaurantTitle(headline)
-																							? 'Restaurant'
-																							: isCoffeeShopTitle(headline)
-																								? 'Coffee Shop'
-																								: isMusicVenueTitle(headline)
-																									? 'Music Venue'
-																									: isWeddingPlannerTitle(headline)
-																										? 'Wedding Planner'
-																										: isWeddingVenueTitle(headline)
-																											? 'Wedding Venue'
-																											: headline}
-																					</span>
-																				</div>
-																			) : (
-																				<div className="w-full" />
-																			)}
-																		</div>
-																		{/* Bottom Right - Location */}
-																		<div className="pr-2 pl-1 flex items-center h-[22px]">
-																			{city || stateAbbr ? (
-																				<div className="flex items-center gap-1 w-full">
-																					{stateAbbr && (
-																						<span
-																							className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
-																							style={{
-																								backgroundColor:
-																									stateBadgeColorMap[stateAbbr] ||
-																									'transparent',
-																								borderColor: '#000000',
-																							}}
-																						>
-																							{stateAbbr}
-																						</span>
-																					)}
-																					{city && (
-																						<span className="text-[10px] text-black leading-none truncate">
-																							{city}
-																						</span>
-																					)}
-																				</div>
-																			) : (
-																				<div className="w-full" />
-																			)}
-																		</div>
-																	</>
-																)}
-															</div>
-														);
-													})}
-												</div>
-											</CustomScrollbar>
-										</div>
-									) : (
-										isBatchDraftingInProgress ? (
+																		</>
+																	)}
+																</div>
+															);
+														})}
+													</div>
+												</CustomScrollbar>
+											</div>
+										) : isBatchDraftingInProgress ? (
 											<DraftPreviewExpandedList
 												contacts={contacts || []}
 												livePreview={liveDraftPreview}
@@ -6880,11 +7245,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												compactHeader
 												style={{ display: 'block' }}
 											/>
-										)
-									)}
-								</div>
-							)}
-						</div>
+										)}
+									</div>
+								)}
+							</div>
 						)}
 
 						{/* Inbox tab: reuse the dashboard inbox UI, but scoped and labeled by campaign contacts */}
@@ -6914,37 +7278,43 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											isNarrow={true}
 										/>
 										{/* Research panel below inbox - matches InboxSection's container structure (w-full mx-auto px-4 maxWidth 516px) - hidden on mobile */}
-									{!isMobile && (
-										<div className="mt-[20px] w-full flex justify-center px-4">
-											{isBatchDraftingInProgress ? (
-												<DraftPreviewExpandedList
-													contacts={contacts || []}
-													livePreview={liveDraftPreview}
-													fallbackDraft={draftPreviewFallbackDraft}
-													width={516}
-													height={400}
-												/>
-											) : (
-												<ContactResearchPanel
-													contact={displayedContactForResearch}
-													hideAllText={false}
-													hideSummaryIfBullets={true}
-													height={400}
-													width={516}
-													boxWidth={488}
-													compactHeader
-													style={{ display: 'block' }}
-												/>
-											)}
-										</div>
-									)}
+										{!isMobile && (
+											<div className="mt-[20px] w-full flex justify-center px-4">
+												{isBatchDraftingInProgress ? (
+													<DraftPreviewExpandedList
+														contacts={contacts || []}
+														livePreview={liveDraftPreview}
+														fallbackDraft={draftPreviewFallbackDraft}
+														width={516}
+														height={400}
+													/>
+												) : (
+													<ContactResearchPanel
+														contact={displayedContactForResearch}
+														hideAllText={false}
+														hideSummaryIfBullets={true}
+														height={400}
+														width={516}
+														boxWidth={488}
+														compactHeader
+														style={{ display: 'block' }}
+													/>
+												)}
+											</div>
+										)}
 									</div>
 								) : isInboxTabStacked ? (
 									// Stacked layout (952px - 1279px): Header + Research on left, Inbox on right
-									<div className="flex flex-col items-center mx-auto" style={{ width: '909px' }}>
+									<div
+										className="flex flex-col items-center mx-auto"
+										style={{ width: '909px' }}
+									>
 										<div className="flex flex-row items-start gap-[18px] w-full">
 											{/* Left column: Campaign Header + Research Panel */}
-											<div className="flex flex-col flex-shrink-0" style={{ gap: '16px', width: '375px' }}>
+											<div
+												className="flex flex-col flex-shrink-0"
+												style={{ gap: '16px', width: '375px' }}
+											>
 												<CampaignHeaderBox
 													campaignId={campaign?.id}
 													campaignName={campaign?.name || 'Untitled Campaign'}
@@ -6960,20 +7330,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													width={375}
 												/>
 												{/* Research panel below header - full aesthetic matching other tabs */}
-											{/* Height calculated so bottom aligns with inbox: 657px inbox - 71px header - 16px gap = 570px */}
+												{/* Height calculated so bottom aligns with inbox: 657px inbox - 59px header - 16px gap = 582px */}
 												{isBatchDraftingInProgress ? (
 													<DraftPreviewExpandedList
 														contacts={contacts || []}
 														livePreview={liveDraftPreview}
 														fallbackDraft={draftPreviewFallbackDraft}
 														width={375}
-														height={570}
+														height={582}
 													/>
 												) : (
 													<ContactResearchPanel
 														contact={displayedContactForResearch}
 														hideAllText={false}
-														height={570}
+														height={582}
 														style={{ display: 'block' }}
 													/>
 												)}
@@ -7006,7 +7376,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<ContactsExpandedList
 												contacts={contactsForContactsExpandedList}
 												campaign={campaign}
-												activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
+												activelyDraftingContactIds={
+													activelyDraftingContactIdsForContactsExpandedList
+												}
 												width={232}
 												height={bottomPanelBoxHeightPx}
 												enableUsedContactTooltip={false}
@@ -7034,7 +7406,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												whiteSectionHeight={15}
 												collapsed={bottomPanelCollapsed}
 												onOpenSent={goToSent}
-											/>     
+											/>
 										</div>
 									</div>
 								) : (
@@ -7071,7 +7443,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<ContactsExpandedList
 													contacts={contactsForContactsExpandedList}
 													campaign={campaign}
-													activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
+													activelyDraftingContactIds={
+														activelyDraftingContactIdsForContactsExpandedList
+													}
 													width={232}
 													height={bottomPanelBoxHeightPx}
 													enableUsedContactTooltip={false}
@@ -7132,114 +7506,149 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 					{/* Spacer below expanded lists (mobile only; desktop campaign page should not scroll) */}
 					{isMobile && (
-						<div className="relative w-screen max-w-none mt-10 pb-10" aria-hidden="true" />
+						<div
+							className="relative w-screen max-w-none mt-10 pb-10"
+							aria-hidden="true"
+						/>
 					)}
 				</form>
 			</Form>
 
 			{/* Main-box ghost: portal to <body> so "fixed" aligns with viewport (avoid transformed-parent offsets) */}
 
-		{isClient &&
-			createPortal(
-				<div
-					ref={mainBoxGhostRef}
-					aria-hidden="true"
-					style={{
-						position: 'fixed',
-						left: 0,
-						top: 0,
-						width: 0,
-						height: 0,
-						boxSizing: 'border-box',
-						border: '3px solid #000000',
-						borderRadius: '8px',
-						background: 'transparent',
-						opacity: 0,
-						pointerEvents: 'none',
-						zIndex: 2000,
-						overflow: 'hidden',
-					}}
-				>
-					{/* Fill layers for background crossfade */}
+			{isClient &&
+				createPortal(
 					<div
-						ref={mainBoxGhostFromFillRef}
-						style={{ position: 'absolute', inset: 0, opacity: 1, pointerEvents: 'none' }}
-					/>
-					<div
-						ref={mainBoxGhostToFillRef}
-						style={{ position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }}
-					/>
-					{/* Content layers for UI crossfade */}
-					<div
-						ref={mainBoxGhostFromContentRef}
-						style={{ position: 'absolute', inset: 0, opacity: 1, pointerEvents: 'none', overflow: 'hidden' }}
-					/>
-					<div
-						ref={mainBoxGhostToContentRef}
-						style={{ position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none', overflow: 'hidden' }}
-					/>
-				</div>,
-				// Use <html> instead of <body> because Murmur applies fallback scaling
-				// via `html.murmur-compact body { transform: scale(...) }` on browsers
-				// that don't support `zoom` (e.g. Firefox). A transformed <body> would
-				// offset `position: fixed` children and break rect alignment.
-				document.documentElement
-			)}
-
-		{isClient &&
-			createPortal(
-				<div
-					ref={researchPanelGhostRef}
-					aria-hidden="true"
-					style={{
-						position: 'fixed',
-						left: 0,
-						top: 0,
-						width: 0,
-						height: 0,
-						boxSizing: 'border-box',
-						border: '3px solid #000000',
-						borderRadius: '7px',
-						background: 'transparent',
-						opacity: 0,
-						pointerEvents: 'none',
-						zIndex: 2001,
-						overflow: 'hidden',
-					}}
-				>
-					{/* Fill layers for background crossfade */}
-					<div
-						ref={researchPanelGhostFromFillRef}
-						style={{ position: 'absolute', inset: 0, opacity: 1, pointerEvents: 'none' }}
-					/>
-					<div
-						ref={researchPanelGhostToFillRef}
-						style={{ position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }}
-					/>
-					{/* Content layers for UI crossfade */}
-					<div
-						ref={researchPanelGhostFromContentRef}
+						ref={mainBoxGhostRef}
+						aria-hidden="true"
 						style={{
-							position: 'absolute',
-							inset: 0,
-							opacity: 1,
-							pointerEvents: 'none',
-							overflow: 'hidden',
-						}}
-					/>
-					<div
-						ref={researchPanelGhostToContentRef}
-						style={{
-							position: 'absolute',
-							inset: 0,
+							position: 'fixed',
+							left: 0,
+							top: 0,
+							width: 0,
+							height: 0,
+							boxSizing: 'border-box',
+							border: '3px solid #000000',
+							borderRadius: '8px',
+							background: 'transparent',
 							opacity: 0,
 							pointerEvents: 'none',
+							zIndex: 2000,
 							overflow: 'hidden',
 						}}
-					/>
-				</div>,
-				document.documentElement
-			)}
+					>
+						{/* Fill layers for background crossfade */}
+						<div
+							ref={mainBoxGhostFromFillRef}
+							style={{
+								position: 'absolute',
+								inset: 0,
+								opacity: 1,
+								pointerEvents: 'none',
+							}}
+						/>
+						<div
+							ref={mainBoxGhostToFillRef}
+							style={{
+								position: 'absolute',
+								inset: 0,
+								opacity: 0,
+								pointerEvents: 'none',
+							}}
+						/>
+						{/* Content layers for UI crossfade */}
+						<div
+							ref={mainBoxGhostFromContentRef}
+							style={{
+								position: 'absolute',
+								inset: 0,
+								opacity: 1,
+								pointerEvents: 'none',
+								overflow: 'hidden',
+							}}
+						/>
+						<div
+							ref={mainBoxGhostToContentRef}
+							style={{
+								position: 'absolute',
+								inset: 0,
+								opacity: 0,
+								pointerEvents: 'none',
+								overflow: 'hidden',
+							}}
+						/>
+					</div>,
+					// Use <html> instead of <body> because Murmur applies fallback scaling
+					// via `html.murmur-compact body { transform: scale(...) }` on browsers
+					// that don't support `zoom` (e.g. Firefox). A transformed <body> would
+					// offset `position: fixed` children and break rect alignment.
+					document.documentElement
+				)}
+
+			{isClient &&
+				createPortal(
+					<div
+						ref={researchPanelGhostRef}
+						aria-hidden="true"
+						style={{
+							position: 'fixed',
+							left: 0,
+							top: 0,
+							width: 0,
+							height: 0,
+							boxSizing: 'border-box',
+							border: '3px solid #000000',
+							borderRadius: '7px',
+							background: 'transparent',
+							opacity: 0,
+							pointerEvents: 'none',
+							zIndex: 2001,
+							overflow: 'hidden',
+						}}
+					>
+						{/* Fill layers for background crossfade */}
+						<div
+							ref={researchPanelGhostFromFillRef}
+							style={{
+								position: 'absolute',
+								inset: 0,
+								opacity: 1,
+								pointerEvents: 'none',
+							}}
+						/>
+						<div
+							ref={researchPanelGhostToFillRef}
+							style={{
+								position: 'absolute',
+								inset: 0,
+								opacity: 0,
+								pointerEvents: 'none',
+							}}
+						/>
+						{/* Content layers for UI crossfade */}
+						<div
+							ref={researchPanelGhostFromContentRef}
+							style={{
+								position: 'absolute',
+								inset: 0,
+								opacity: 1,
+								pointerEvents: 'none',
+								overflow: 'hidden',
+							}}
+						/>
+						<div
+							ref={researchPanelGhostToContentRef}
+							style={{
+								position: 'absolute',
+								inset: 0,
+								opacity: 0,
+								pointerEvents: 'none',
+								overflow: 'hidden',
+							}}
+						/>
+					</div>,
+					document.documentElement
+				)}
 
 			<UpgradeSubscriptionDrawer
 				message="You have run out of drafting credits! Please upgrade your plan."

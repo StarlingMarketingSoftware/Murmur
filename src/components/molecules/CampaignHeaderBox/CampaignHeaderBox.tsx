@@ -191,24 +191,26 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 		<div
 			data-campaign-header-box="true"
 			className={cn(
-				'relative overflow-visible bg-white border-[2px] border-black rounded-[8px] flex flex-col px-3 pt-0 pb-2 box-border',
+				'relative overflow-visible border border-black rounded-[8px] flex flex-col px-3 pt-0 pb-[6px] box-border',
 				fullWidth && 'w-[96.27vw] max-w-[499px]',
 				className
 			)}
 			style={
 				fullWidth
 					? {
-							height: '71px',
-							minHeight: '71px',
-							maxHeight: '71px',
+							height: '59px',
+							minHeight: '59px',
+							maxHeight: '59px',
+							background: 'rgba(255, 255, 255, 0.31)',
 					  }
 					: {
 							width: `${width}px`,
-							height: '71px',
+							height: '59px',
 							minWidth: `${width}px`,
 							maxWidth: `${width}px`,
-							minHeight: '71px',
-							maxHeight: '71px',
+							minHeight: '59px',
+							maxHeight: '59px',
+							background: 'rgba(255, 255, 255, 0.31)',
 					  }
 			}
 		>
@@ -218,13 +220,13 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					aria-hidden="true"
 					style={{
 						position: 'absolute',
-						// Absolute children position against the padding box; offset by the 2px header border
-						// so this 374x35 box aligns with the header's outer border edges.
-						left: '-2px',
-						right: '-2px',
+						// Absolute children position against the padding box; offset by the 1px header border
+						// so this progress box aligns with the header's outer border edges.
+						left: '-1px',
+						right: '-1px',
 						// Anchor the BOTTOM of the progress box 9px above the header border,
 						// while allowing the box to grow upward for multi-operation stacks.
-						top: '-11px', // 9px gap + 2px header border (padding-box origin)
+						top: '-10px', // 9px gap + 1px header border (padding-box origin)
 						transform: 'translateY(-100%)',
 						boxSizing: 'border-box',
 						border: '2px solid rgba(176, 176, 176, 0.2)',
@@ -344,7 +346,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 			<div
 				aria-hidden="true"
 				className={cn(
-					'flex items-center text-[11px] flex-shrink-0 invisible pointer-events-none',
+					'flex h-0 overflow-hidden items-center text-[11px] flex-shrink-0 invisible pointer-events-none',
 					fullWidth && 'gap-[20px]'
 				)}
 			>
@@ -399,7 +401,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 
 		{/* Metrics Row */}
 		<div
-			className={cn('flex items-center -mt-[6px]', fullWidth ? 'gap-[10px]' : 'gap-[20px]')}
+			className={cn('flex items-center -mt-[3px]', fullWidth ? 'gap-[10px]' : 'gap-[20px]')}
 			onMouseLeave={() => setHoveredMetric(null)}
 		>
 			<button
@@ -484,4 +486,3 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 		</div>
 	);
 };
-

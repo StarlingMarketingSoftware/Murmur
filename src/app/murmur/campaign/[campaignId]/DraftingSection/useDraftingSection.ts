@@ -68,6 +68,10 @@ export interface DraftingSectionProps {
 	 * This should only be enabled on the "active" DraftingSection instance during tab crossfades.
 	 */
 	renderGlobalOverlays?: boolean;
+	/**
+	 * Optional callback to switch the campaign page into the campaign overview / All tab.
+	 */
+	goToOverview?: () => void;
 	goToDrafting?: () => void;
 	/**
 	 * Optional callback to switch the campaign page into the Writing tab.
