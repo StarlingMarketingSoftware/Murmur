@@ -9991,11 +9991,11 @@ const DashboardContent = () => {
 												onClick={() => {
 													if (!mapCampaignId) return;
 													router.push(
-														`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts`
+														`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=inbox`
 													);
 												}}
 											>
-												Send
+												Inbox
 											</button>
 											<button
 												type="button"
@@ -10012,11 +10012,11 @@ const DashboardContent = () => {
 												onClick={() => {
 													if (!mapCampaignId) return;
 													router.push(
-														`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=inbox`
+														`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts`
 													);
 												}}
 											>
-												Inbox
+												Drafts
 											</button>
 										</div>
 									</div>
