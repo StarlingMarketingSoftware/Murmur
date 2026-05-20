@@ -805,13 +805,23 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	// Height constants (desktop only; mobile uses responsive calc())
 	const desktopBoxHeight = desktopHeight ?? 657;
-	const shouldUseCampaignInboxDetailDesign =
+	const shouldUseCampaignInboxCompactDetailDesign =
 		isCampaignInbox &&
 		detailOnly &&
 		!isMobile &&
-		boxWidth >= 863 &&
+		boxWidth >= 501 &&
+		boxWidth < 863 &&
 		desktopBoxHeight >= 668;
-	const campaignInboxDetailInnerWidth = 842;
+	const shouldUseCampaignInboxDetailDesign =
+		(isCampaignInbox &&
+			detailOnly &&
+			!isMobile &&
+			boxWidth >= 863 &&
+			desktopBoxHeight >= 668) ||
+		shouldUseCampaignInboxCompactDetailDesign;
+	const campaignInboxDetailInnerWidth = shouldUseCampaignInboxCompactDetailDesign
+		? Math.max(0, boxWidth - 22)
+		: 842;
 	const campaignInboxDetailHeaderHeight = 46;
 	const campaignInboxDetailThreadHeight = 404;
 	const campaignInboxDetailComposerHeight = 157;
@@ -2578,16 +2588,28 @@ export const InboxSection: FC<InboxSectionProps> = ({
 											border: '2px solid #000000',
 											backgroundColor: '#FFFFFF',
 											boxSizing: 'border-box',
-											padding: '0 15px 0 22px',
+											padding: shouldUseCampaignInboxCompactDetailDesign
+												? '0 8px 0 10px'
+												: '0 15px 0 22px',
 											zIndex: 3,
 										}}
 									>
-										<div className="flex min-w-0 items-center gap-[14px]">
+										<div
+											className="flex min-w-0 items-center"
+											style={{
+												gap: shouldUseCampaignInboxCompactDetailDesign ? '8px' : '14px',
+												flex: '1 1 auto',
+											}}
+										>
 											<div
 												className="flex shrink-0 items-center justify-center rounded-full"
 												style={{
-													width: '27px',
-													height: '27px',
+													width: shouldUseCampaignInboxCompactDetailDesign
+														? '25px'
+														: '27px',
+													height: shouldUseCampaignInboxCompactDetailDesign
+														? '25px'
+														: '27px',
 													backgroundColor: '#86C7E8',
 													...campaignInboxDetailNameTextStyle,
 													color: '#FFFFFF',
@@ -2595,7 +2617,12 @@ export const InboxSection: FC<InboxSectionProps> = ({
 											>
 												{getAvatarInitial(contactName)}
 											</div>
-											<div className="flex min-w-0 items-center gap-[17px]">
+											<div
+												className="flex min-w-0 items-center"
+												style={{
+													gap: shouldUseCampaignInboxCompactDetailDesign ? '8px' : '17px',
+												}}
+											>
 												<span
 													className="truncate"
 													style={campaignInboxDetailNameTextStyle}
@@ -2605,7 +2632,16 @@ export const InboxSection: FC<InboxSectionProps> = ({
 												{companyLabel && (
 													<span
 														className="truncate text-black"
-														style={{ fontSize: '16px', fontWeight: 400, lineHeight: 1 }}
+														style={{
+															fontSize: shouldUseCampaignInboxCompactDetailDesign
+																? '14px'
+																: '16px',
+															fontWeight: 400,
+															lineHeight: 1,
+															maxWidth: shouldUseCampaignInboxCompactDetailDesign
+																? '96px'
+																: undefined,
+														}}
 													>
 														{companyLabel}
 													</span>
@@ -2613,7 +2649,16 @@ export const InboxSection: FC<InboxSectionProps> = ({
 											</div>
 										</div>
 
-										<div className="flex shrink-0 items-center gap-[6px] text-black">
+										<div
+											className="flex min-w-0 items-center text-black"
+											style={{
+												gap: shouldUseCampaignInboxCompactDetailDesign ? '4px' : '6px',
+												flexShrink: shouldUseCampaignInboxCompactDetailDesign ? 1 : 0,
+												maxWidth: shouldUseCampaignInboxCompactDetailDesign
+													? '214px'
+													: undefined,
+											}}
+										>
 											{stateAbbr && (
 												<span
 													className="inline-flex items-center justify-center border border-black"
@@ -2632,22 +2677,40 @@ export const InboxSection: FC<InboxSectionProps> = ({
 											)}
 											{placeLabel && (
 												<span
-													style={{ fontSize: '14px', fontWeight: 400, lineHeight: 1 }}
+													className="truncate"
+													style={{
+														fontSize: shouldUseCampaignInboxCompactDetailDesign
+															? '12px'
+															: '14px',
+														fontWeight: 400,
+														lineHeight: 1,
+														maxWidth: shouldUseCampaignInboxCompactDetailDesign
+															? '54px'
+															: undefined,
+													}}
 												>
 													{placeLabel}
 												</span>
 											)}
 											{headline && (
 												<div
-													className="flex max-w-[180px] items-center gap-1 overflow-hidden border border-black"
+													className="flex items-center gap-1 overflow-hidden border border-black"
 													style={{
 														height: '24px',
 														borderRadius: '6px',
 														backgroundColor: getContactTitleBadgeBackground(headline),
-														padding: '0 8px',
+														padding: shouldUseCampaignInboxCompactDetailDesign
+															? '0 6px'
+															: '0 8px',
+														maxWidth: shouldUseCampaignInboxCompactDetailDesign
+															? '112px'
+															: '180px',
 													}}
 												>
-													{renderContactTitleBadgeIcon(headline, 14)}
+													{renderContactTitleBadgeIcon(
+														headline,
+														shouldUseCampaignInboxCompactDetailDesign ? 12 : 14
+													)}
 													<span
 														className="truncate text-black"
 														style={{ fontSize: '13px', lineHeight: 1 }}

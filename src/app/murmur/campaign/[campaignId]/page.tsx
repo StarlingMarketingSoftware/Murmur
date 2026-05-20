@@ -14,7 +14,14 @@ import { urls } from '@/constants/urls';
 import { cn } from '@/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useMe } from '@/hooks/useMe';
-import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
+import {
+	useState,
+	useEffect,
+	useRef,
+	useCallback,
+	useMemo,
+	useLayoutEffect,
+} from 'react';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
@@ -118,13 +125,31 @@ const getCampaignUrlTabForView = (
 	}
 };
 
+const isCompactCampaignWorkspaceView = (view: ViewType) =>
+	view === 'testing' || view === 'drafting' || view === 'inbox';
+
+const getInitialCampaignWorkspaceViewFromLocation = (): ViewType => {
+	if (typeof window === 'undefined') return 'testing';
+	const params = new URLSearchParams(window.location.search);
+	const tab = params.get('tab');
+	if (
+		params.get('inboxDebug') === '1' &&
+		(!tab || getCampaignViewFromUrlTab(tab) !== 'inbox')
+	) {
+		return 'inbox';
+	}
+	return getCampaignViewFromUrlTab(tab);
+};
+
 // Transition duration in ms - fast enough to feel instant, still smooth
 const TRANSITION_DURATION = 180;
 // Safety valve: if a destination view is unusually slow to paint, don't block the transition forever.
 const MAX_TRANSITION_WAIT_MS = 650;
 
 const CAMPAIGN_MAP_SHIFT_X_VAR = '--murmur-campaign-map-shift-x';
+const CAMPAIGN_TOP_NAV_SHIFT_X_VAR = '--murmur-campaign-top-nav-shift-x';
 const CAMPAIGN_MAP_BACKDROP_START_VAR = '--murmur-campaign-map-backdrop-start';
+const CAMPAIGN_MAP_BACKDROP_END_VAR = '--murmur-campaign-map-backdrop-end';
 const CAMPAIGN_MAP_CONTENT_SCALE = 0.94;
 const CAMPAIGN_MAP_FALLBACK_SHIFT_X_PX = 160;
 const CAMPAIGN_MAP_MIN_SHIFT_X_PX = 88;
@@ -134,6 +159,24 @@ const CAMPAIGN_STANDARD_LEFT_PANEL_LEFT_FROM_CENTER_PX = -657;
 const CAMPAIGN_RESEARCH_RIGHT_GAP_PX = 52;
 const CAMPAIGN_BACKDROP_CONTENT_GUTTER_PX = 52;
 const CAMPAIGN_BACKDROP_TARGET_START_RATIO = 1 / 3;
+const CAMPAIGN_COMPACT_WORKSPACE_BACKDROP_WIDTH_PX = 985;
+const CAMPAIGN_COMPACT_WORKSPACE_LEFT_PANEL_INSET_PX = 52;
+const CAMPAIGN_COMPACT_WORKSPACE_TOP_NAV_INSET_PX = 184;
+const CAMPAIGN_COMPACT_WORKSPACE_MAIN_PANEL_HALF_WIDTH_PX = 250;
+const CAMPAIGN_COMPACT_WORKSPACE_CONTACT_PANEL_WIDTH_PX = 377;
+const CAMPAIGN_COMPACT_WORKSPACE_MAIN_PANEL_GAP_PX = 34;
+const CAMPAIGN_TOP_NAV_UI_SCALE = 0.85;
+const CAMPAIGN_TOP_NAV_SEARCH_BAR_OUTER_WIDTH_PX = 440;
+const CAMPAIGN_TOP_NAV_SEARCH_BAR_INPUT_HEIGHT_PX = 49;
+const CAMPAIGN_TOP_NAV_BACKDROP_BOX_TOP_PX = 9;
+const CAMPAIGN_TOP_NAV_BACKDROP_BOX_WIDTH_PX = Math.round(
+	CAMPAIGN_TOP_NAV_SEARCH_BAR_OUTER_WIDTH_PX * (804 / 488.204)
+);
+const CAMPAIGN_TOP_NAV_BACKDROP_BOX_HEIGHT_PX = Math.round(
+	CAMPAIGN_TOP_NAV_SEARCH_BAR_INPUT_HEIGHT_PX * (102 / 54)
+);
+const CAMPAIGN_TOP_NAV_BACKDROP_VISUAL_WIDTH_PX =
+	CAMPAIGN_TOP_NAV_BACKDROP_BOX_WIDTH_PX * CAMPAIGN_TOP_NAV_UI_SCALE;
 const CAMPAIGN_MAP_SELECT_GRAB_LEFT_PX = 26;
 const CAMPAIGN_MAP_SELECT_GRAB_VIEW_SCALE = 0.74;
 const CAMPAIGN_MAP_SELECT_GRAB_TOP_EXTENT_PX =
@@ -148,30 +191,15 @@ const CAMPAIGN_MAP_SELECT_GRAB_TOP_EXTENT_PX =
 const CAMPAIGN_MAP_SELECT_GRAB_TOTAL_HEIGHT_PX =
 	CAMPAIGN_MAP_SELECT_GRAB_TOP_EXTENT_PX + MAP_SELECT_GRAB_TOOL_COLLAPSED_HEIGHT_PX;
 const CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS = [
-	2.25,
-	2.41,
-	2.57,
-	2.77,
-	3.13,
-	3.9,
-	5,
-	7,
-	8,
-	9,
-	10,
-	11,
-	12,
-	13,
-	14,
-	15,
-	16,
-	17,
-	18.5,
-	20,
+	2.25, 2.41, 2.57, 2.77, 3.13, 3.9, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18.5, 20,
 	22,
 ] as const;
 const CAMPAIGN_MAP_ZOOM_CONTROL_MAX_INDEX = CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS.length - 1;
-type CampaignMapZoomControlRequest = { zoom: number; nonce: number; isDragging?: boolean };
+type CampaignMapZoomControlRequest = {
+	zoom: number;
+	nonce: number;
+	isDragging?: boolean;
+};
 
 const clampCampaignMapZoomControlValue = (levelValue: number) => {
 	if (!Number.isFinite(levelValue)) return 0;
@@ -183,7 +211,8 @@ const getCampaignMapZoomForControlValue = (levelValue: number) => {
 	const lowerIndex = Math.floor(safeValue);
 	const upperIndex = Math.min(lowerIndex + 1, CAMPAIGN_MAP_ZOOM_CONTROL_MAX_INDEX);
 	const progress = safeValue - lowerIndex;
-	const lowerZoom = CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS[lowerIndex] ?? CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS[0];
+	const lowerZoom =
+		CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS[lowerIndex] ?? CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS[0];
 	const upperZoom = CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS[upperIndex] ?? lowerZoom;
 	return lowerZoom + (upperZoom - lowerZoom) * progress;
 };
@@ -210,13 +239,13 @@ const getCampaignMapZoomControlValueForZoom = (zoom: number) => {
 };
 
 const SIXTEEN_BY_TEN_ZOOM_MATCH_TOLERANCE_PX = 50;
-	
+
 // 16:10 resolution-specific zoom levels: [width, height] → zoom
 const SIXTEEN_BY_TEN_ZOOM_MAP: Array<{ w: number; h: number; zoom: number }> = [
 	{ w: 1152, h: 720, zoom: 0.52 },
 	{ w: 1280, h: 800, zoom: 0.6 },
 	{ w: 1440, h: 900, zoom: 0.7 },
-	{ w: 1504, h: 940, zoom: 0.84 },  // 14" MacBook Pro (slightly more zoomed-in)
+	{ w: 1504, h: 940, zoom: 0.84 }, // 14" MacBook Pro (slightly more zoomed-in)
 	{ w: 1664, h: 1040, zoom: 0.77 },
 	{ w: 1920, h: 1200, zoom: 0.95 },
 	{ w: 2048, h: 1280, zoom: 0.95 },
@@ -251,13 +280,15 @@ const SIXTEEN_BY_NINE_FALLBACK_ZOOM = 0.85;
 type SixteenByNineZoomPoint = { w: number; h: number; zoom: number; metric: number };
 
 // Precompute a size metric (diagonal length) so we can smoothly interpolate between tuned points.
-const SIXTEEN_BY_NINE_ZOOM_POINTS: SixteenByNineZoomPoint[] = SIXTEEN_BY_NINE_ZOOM_MAP.map(
-	(entry) => ({ ...entry, metric: Math.hypot(entry.w, entry.h) })
-).sort((a, b) => a.metric - b.metric);
+const SIXTEEN_BY_NINE_ZOOM_POINTS: SixteenByNineZoomPoint[] =
+	SIXTEEN_BY_NINE_ZOOM_MAP.map((entry) => ({
+		...entry,
+		metric: Math.hypot(entry.w, entry.h),
+	})).sort((a, b) => a.metric - b.metric);
 
 // Dynamically import heavy components to reduce initial bundle size and prevent Vercel timeout
-const DraftingSection = nextDynamic(
-	() => import('./DraftingSection/DraftingSection').then((mod) => mod.DraftingSection)
+const DraftingSection = nextDynamic(() =>
+	import('./DraftingSection/DraftingSection').then((mod) => mod.DraftingSection)
 );
 
 const IdentityDialog = nextDynamic(
@@ -566,6 +597,11 @@ const Murmur = () => {
 	const CAMPAIGN_ZOOM_EVENT = 'murmur:campaign-zoom-changed';
 	const CAMPAIGN_SCROLLABLE_CLASS = 'murmur-campaign-scrollable';
 	const CAMPAIGN_FORCE_TRANSFORM_CLASS = 'murmur-campaign-force-transform';
+	const [isCampaignWorkspaceExpanded, setIsCampaignWorkspaceExpanded] = useState(false);
+	const isCampaignWorkspaceExpandedRef = useRef(false);
+	const campaignWorkspaceActiveViewRef = useRef<ViewType>(
+		getInitialCampaignWorkspaceViewFromLocation()
+	);
 	// Allows other effects (e.g. tab switches) to re-register bottom anchors for zoom fitting.
 	const refreshCampaignZoomAnchorObserversRef = useRef<(() => void) | null>(null);
 
@@ -615,7 +651,9 @@ const Murmur = () => {
 			html.classList.remove(CAMPAIGN_FORCE_TRANSFORM_CLASS);
 			html.style.removeProperty(CAMPAIGN_ZOOM_VAR);
 			html.style.removeProperty(CAMPAIGN_MAP_SHIFT_X_VAR);
+			html.style.removeProperty(CAMPAIGN_TOP_NAV_SHIFT_X_VAR);
 			html.style.removeProperty(CAMPAIGN_MAP_BACKDROP_START_VAR);
+			html.style.removeProperty(CAMPAIGN_MAP_BACKDROP_END_VAR);
 			// Clear any inline scroll locks that could prevent scrolling (defensive).
 			try {
 				document.body.style.overflow = '';
@@ -640,7 +678,9 @@ const Murmur = () => {
 			html.classList.remove(CAMPAIGN_FORCE_TRANSFORM_CLASS);
 			html.style.removeProperty(CAMPAIGN_ZOOM_VAR);
 			html.style.removeProperty(CAMPAIGN_MAP_SHIFT_X_VAR);
+			html.style.removeProperty(CAMPAIGN_TOP_NAV_SHIFT_X_VAR);
 			html.style.removeProperty(CAMPAIGN_MAP_BACKDROP_START_VAR);
+			html.style.removeProperty(CAMPAIGN_MAP_BACKDROP_END_VAR);
 			return;
 		}
 
@@ -685,7 +725,11 @@ const Murmur = () => {
 
 			const interpolateZoom = (w: number, h: number) => {
 				const metric = Math.hypot(w, h);
-				if (!Number.isFinite(metric) || metric <= 0 || SIXTEEN_BY_TEN_ZOOM_POINTS.length === 0) {
+				if (
+					!Number.isFinite(metric) ||
+					metric <= 0 ||
+					SIXTEEN_BY_TEN_ZOOM_POINTS.length === 0
+				) {
 					return SIXTEEN_BY_TEN_FALLBACK_ZOOM;
 				}
 
@@ -750,7 +794,11 @@ const Murmur = () => {
 
 			const interpolateZoom = (w: number, h: number) => {
 				const metric = Math.hypot(w, h);
-				if (!Number.isFinite(metric) || metric <= 0 || SIXTEEN_BY_NINE_ZOOM_POINTS.length === 0) {
+				if (
+					!Number.isFinite(metric) ||
+					metric <= 0 ||
+					SIXTEEN_BY_NINE_ZOOM_POINTS.length === 0
+				) {
 					return SIXTEEN_BY_NINE_FALLBACK_ZOOM;
 				}
 
@@ -818,13 +866,21 @@ const Murmur = () => {
 			{
 				// ~1952x1220 with Dock: 1920x1200 tuned zoom feels a hair too large.
 				id: 'dock-1952x1220-max',
-				when: viewportW >= 1900 && viewportW <= 2050 && viewportH >= 1180 && viewportH <= 1245,
+				when:
+					viewportW >= 1900 &&
+					viewportW <= 2050 &&
+					viewportH >= 1180 &&
+					viewportH <= 1245,
 				max: 0.93,
 			},
 			{
 				// ~2144x1340 with Dock: custom preference bump.
 				id: 'dock-2144x1340-min',
-				when: viewportW >= 2100 && viewportW <= 2200 && viewportH >= 1320 && viewportH <= 1380,
+				when:
+					viewportW >= 2100 &&
+					viewportW <= 2200 &&
+					viewportH >= 1320 &&
+					viewportH <= 1380,
 				min: 1.2,
 			},
 		];
@@ -936,35 +992,84 @@ const Murmur = () => {
 
 		const campaignZoom = targetZoom > 0 ? targetZoom : DEFAULT_CAMPAIGN_ZOOM;
 		const layoutViewportW = viewportW / campaignZoom;
-		const targetResearchRightCss =
-			(viewportW - CAMPAIGN_RESEARCH_RIGHT_GAP_PX) / campaignZoom;
-		const calculatedShiftX =
-			targetResearchRightCss -
-			layoutViewportW / 2 -
-			CAMPAIGN_MAP_CONTENT_SCALE * CAMPAIGN_STANDARD_RESEARCH_RIGHT_FROM_CENTER_PX;
-		const campaignMapShiftX = clampZoom(
-			calculatedShiftX,
-			CAMPAIGN_MAP_MIN_SHIFT_X_PX,
-			CAMPAIGN_MAP_MAX_SHIFT_X_PX
-		);
-		const leftContentClusterLeftCss =
-			layoutViewportW / 2 +
-			CAMPAIGN_MAP_CONTENT_SCALE * CAMPAIGN_STANDARD_LEFT_PANEL_LEFT_FROM_CENTER_PX +
-			campaignMapShiftX;
-		const contentAlignedBackdropStartCss =
-			leftContentClusterLeftCss - CAMPAIGN_BACKDROP_CONTENT_GUTTER_PX / campaignZoom;
-		const twoThirdsBackdropStartCss =
-			layoutViewportW * CAMPAIGN_BACKDROP_TARGET_START_RATIO;
-		const campaignBackdropStartCss = clampZoom(
-			Math.min(contentAlignedBackdropStartCss, twoThirdsBackdropStartCss),
-			0,
-			layoutViewportW
-		);
+		const isCompactWorkspaceActive =
+			!isCampaignWorkspaceExpandedRef.current &&
+			isCompactCampaignWorkspaceView(campaignWorkspaceActiveViewRef.current);
+
+		let campaignMapShiftX: number;
+		let campaignTopNavShiftX: number;
+		let campaignBackdropStartCss: number;
+		let campaignBackdropEndCss: number;
+
+		if (isCompactWorkspaceActive) {
+			campaignBackdropStartCss = clampZoom(
+				layoutViewportW - CAMPAIGN_COMPACT_WORKSPACE_BACKDROP_WIDTH_PX,
+				0,
+				layoutViewportW
+			);
+			campaignBackdropEndCss = layoutViewportW;
+
+			const compactLeftContentClusterLeftCss =
+				campaignBackdropStartCss + CAMPAIGN_COMPACT_WORKSPACE_LEFT_PANEL_INSET_PX;
+			const calculatedShiftX =
+				compactLeftContentClusterLeftCss -
+				layoutViewportW / 2 -
+				CAMPAIGN_MAP_CONTENT_SCALE * CAMPAIGN_STANDARD_LEFT_PANEL_LEFT_FROM_CENTER_PX;
+
+			campaignMapShiftX = clampZoom(
+				calculatedShiftX,
+				CAMPAIGN_MAP_MIN_SHIFT_X_PX,
+				CAMPAIGN_MAP_MAX_SHIFT_X_PX
+			);
+
+			const currentTopNavLeftCss =
+				layoutViewportW / 2 - CAMPAIGN_TOP_NAV_BACKDROP_VISUAL_WIDTH_PX / 2;
+			campaignTopNavShiftX =
+				campaignBackdropStartCss +
+				CAMPAIGN_COMPACT_WORKSPACE_TOP_NAV_INSET_PX -
+				currentTopNavLeftCss;
+		} else {
+			const targetResearchRightCss =
+				(viewportW - CAMPAIGN_RESEARCH_RIGHT_GAP_PX) / campaignZoom;
+			const calculatedShiftX =
+				targetResearchRightCss -
+				layoutViewportW / 2 -
+				CAMPAIGN_MAP_CONTENT_SCALE * CAMPAIGN_STANDARD_RESEARCH_RIGHT_FROM_CENTER_PX;
+			campaignMapShiftX = clampZoom(
+				calculatedShiftX,
+				CAMPAIGN_MAP_MIN_SHIFT_X_PX,
+				CAMPAIGN_MAP_MAX_SHIFT_X_PX
+			);
+			campaignTopNavShiftX = campaignMapShiftX;
+
+			const leftContentClusterLeftCss =
+				layoutViewportW / 2 +
+				CAMPAIGN_MAP_CONTENT_SCALE * CAMPAIGN_STANDARD_LEFT_PANEL_LEFT_FROM_CENTER_PX +
+				campaignMapShiftX;
+			const contentAlignedBackdropStartCss =
+				leftContentClusterLeftCss - CAMPAIGN_BACKDROP_CONTENT_GUTTER_PX / campaignZoom;
+			const twoThirdsBackdropStartCss =
+				layoutViewportW * CAMPAIGN_BACKDROP_TARGET_START_RATIO;
+			campaignBackdropStartCss = clampZoom(
+				Math.min(contentAlignedBackdropStartCss, twoThirdsBackdropStartCss),
+				0,
+				layoutViewportW
+			);
+			campaignBackdropEndCss = layoutViewportW;
+		}
 
 		html.style.setProperty(CAMPAIGN_MAP_SHIFT_X_VAR, `${campaignMapShiftX.toFixed(2)}px`);
 		html.style.setProperty(
+			CAMPAIGN_TOP_NAV_SHIFT_X_VAR,
+			`${campaignTopNavShiftX.toFixed(2)}px`
+		);
+		html.style.setProperty(
 			CAMPAIGN_MAP_BACKDROP_START_VAR,
 			`${campaignBackdropStartCss.toFixed(2)}px`
+		);
+		html.style.setProperty(
+			CAMPAIGN_MAP_BACKDROP_END_VAR,
+			`${campaignBackdropEndCss.toFixed(2)}px`
 		);
 
 		const existingOverrideStr = html.style.getPropertyValue(CAMPAIGN_ZOOM_VAR);
@@ -1061,13 +1166,16 @@ const Murmur = () => {
 			if (cancelled) return;
 			if (!io) return;
 			const scope =
-				(document.querySelector('[data-campaign-view-layer="active"]') as HTMLElement | null) ??
-				document.body;
-			scope.querySelectorAll<HTMLElement>('[data-campaign-bottom-anchor]').forEach((el) => {
-				if (observedAnchors.has(el)) return;
-				observedAnchors.add(el);
-				io?.observe(el);
-			});
+				(document.querySelector(
+					'[data-campaign-view-layer="active"]'
+				) as HTMLElement | null) ?? document.body;
+			scope
+				.querySelectorAll<HTMLElement>('[data-campaign-bottom-anchor]')
+				.forEach((el) => {
+					if (observedAnchors.has(el)) return;
+					observedAnchors.add(el);
+					io?.observe(el);
+				});
 		};
 
 		if (isMobile === false && typeof IntersectionObserver !== 'undefined') {
@@ -1105,7 +1213,9 @@ const Murmur = () => {
 		try {
 			document.documentElement.style.removeProperty(CAMPAIGN_ZOOM_VAR);
 			document.documentElement.style.removeProperty(CAMPAIGN_MAP_SHIFT_X_VAR);
+			document.documentElement.style.removeProperty(CAMPAIGN_TOP_NAV_SHIFT_X_VAR);
 			document.documentElement.style.removeProperty(CAMPAIGN_MAP_BACKDROP_START_VAR);
+			document.documentElement.style.removeProperty(CAMPAIGN_MAP_BACKDROP_END_VAR);
 		} catch {
 			// ignore
 		}
@@ -1152,8 +1262,9 @@ const Murmur = () => {
 				mo?.disconnect();
 			});
 			const observeRoot =
-				(document.querySelector('[data-campaign-view-layer="active"]') as HTMLElement | null) ??
-				document.body;
+				(document.querySelector(
+					'[data-campaign-view-layer="active"]'
+				) as HTMLElement | null) ?? document.body;
 			mo.observe(observeRoot, { childList: true, subtree: true });
 		}
 		window.addEventListener('resize', onResize, { passive: true });
@@ -1170,7 +1281,9 @@ const Murmur = () => {
 			document.documentElement.classList.remove(CAMPAIGN_FORCE_TRANSFORM_CLASS);
 			document.documentElement.style.removeProperty(CAMPAIGN_ZOOM_VAR);
 			document.documentElement.style.removeProperty(CAMPAIGN_MAP_SHIFT_X_VAR);
+			document.documentElement.style.removeProperty(CAMPAIGN_TOP_NAV_SHIFT_X_VAR);
 			document.documentElement.style.removeProperty(CAMPAIGN_MAP_BACKDROP_START_VAR);
+			document.documentElement.style.removeProperty(CAMPAIGN_MAP_BACKDROP_END_VAR);
 			if (scheduledRaf !== null) window.cancelAnimationFrame(scheduledRaf);
 			io?.disconnect();
 			mo?.disconnect();
@@ -1185,9 +1298,9 @@ const Murmur = () => {
 	const cameFromSearch = originParam === 'search';
 	const tabParam = searchParams.get('tab');
 	const inboxDebugEnabled = searchParams.get('inboxDebug') === '1';
-	const [inboxMockState, setInboxMockState] = useState<CampaignInboxMockState | undefined>(
-		undefined
-	);
+	const [inboxMockState, setInboxMockState] = useState<
+		CampaignInboxMockState | undefined
+	>(undefined);
 	const [identityDialogOrigin, setIdentityDialogOrigin] = useState<'campaign' | 'search'>(
 		cameFromSearch ? 'search' : 'campaign'
 	);
@@ -1355,7 +1468,7 @@ const Murmur = () => {
 									'New Profile',
 								email: user?.replyToEmail ?? user?.email ?? '',
 							})
-					  )?.id;
+						)?.id;
 
 				if (!identityIdToAssign) {
 					throw new Error('Failed to determine identityId for campaign');
@@ -1384,13 +1497,16 @@ const Murmur = () => {
 		editCampaign,
 		setIsIdentityDialogOpen,
 	]);
-	
+
 	// Determine initial view based on tab query parameter.
 	// Legacy values are still accepted, but the URL is canonicalized to current tab names below.
 	// When `?inboxDebug=1` is set with no `tab=` (or a non-inbox tab), force the inbox tab
 	// so the debug mock data is immediately visible.
 	const getInitialView = (): ViewType => {
-		if (inboxDebugEnabled && (!tabParam || getCampaignViewFromUrlTab(tabParam) !== 'inbox')) {
+		if (
+			inboxDebugEnabled &&
+			(!tabParam || getCampaignViewFromUrlTab(tabParam) !== 'inbox')
+		) {
 			return 'inbox';
 		}
 		return getCampaignViewFromUrlTab(tabParam);
@@ -1400,17 +1516,28 @@ const Murmur = () => {
 	// When the user switches tabs, DraftingSection swaps out and we need to (re)observe
 	// the new bottom anchor(s) so the zoom clamp can auto-correct if they become clipped.
 	useLayoutEffect(() => {
+		campaignWorkspaceActiveViewRef.current = activeView;
 		refreshCampaignZoomAnchorObserversRef.current?.();
-	}, [activeView]);
+		updateCampaignZoomForViewport();
+	}, [activeView, updateCampaignZoomForViewport]);
+	useLayoutEffect(() => {
+		isCampaignWorkspaceExpandedRef.current = isCampaignWorkspaceExpanded;
+		updateCampaignZoomForViewport();
+	}, [isCampaignWorkspaceExpanded, updateCampaignZoomForViewport]);
 	const [draftOperationsProgress, setDraftOperationsProgress] = useState<{
 		visible: boolean;
 		operations: Array<{ current: number; total: number }>;
 	}>({ visible: false, operations: [] });
 	const getInitialInboxSentTab = (): InboxSentTab => getInboxSentTabFromUrlTab(tabParam);
-	const [inboxSentTab, setInboxSentTab] = useState<InboxSentTab>(getInitialInboxSentTab());
-	const [inboxSentTabRequest, setInboxSentTabRequest] = useState<InboxSentTabRequest | null>(() =>
-		getInboxSentTabFromUrlTab(tabParam) === 'sent' ? { tab: 'sent', requestId: 1 } : null
+	const [inboxSentTab, setInboxSentTab] = useState<InboxSentTab>(
+		getInitialInboxSentTab()
 	);
+	const [inboxSentTabRequest, setInboxSentTabRequest] =
+		useState<InboxSentTabRequest | null>(() =>
+			getInboxSentTabFromUrlTab(tabParam) === 'sent'
+				? { tab: 'sent', requestId: 1 }
+				: null
+		);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 
@@ -1444,9 +1571,9 @@ const Murmur = () => {
 	}, [activeView]);
 
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
-	const [mapGrabActiveCategories, setMapGrabActiveCategories] = useState<readonly boolean[]>(
-		() => new Array(MAP_SELECT_GRAB_CATEGORY_COUNT).fill(true)
-	);
+	const [mapGrabActiveCategories, setMapGrabActiveCategories] = useState<
+		readonly boolean[]
+	>(() => new Array(MAP_SELECT_GRAB_CATEGORY_COUNT).fill(true));
 	const handleMapGrabActiveCategoriesChange = useCallback(
 		(active: readonly boolean[]) => {
 			setMapGrabActiveCategories((prev) => {
@@ -1502,7 +1629,10 @@ const Murmur = () => {
 	const handleMapZoomControlValueChange = useCallback(
 		(levelValue: number) => {
 			const safeLevelValue = clampCampaignMapZoomControlValue(levelValue);
-			scheduleMapZoomControlRequest(getCampaignMapZoomForControlValue(safeLevelValue), true);
+			scheduleMapZoomControlRequest(
+				getCampaignMapZoomForControlValue(safeLevelValue),
+				true
+			);
 		},
 		[scheduleMapZoomControlRequest]
 	);
@@ -1523,7 +1653,10 @@ const Murmur = () => {
 					mapZoomControlRequestRafRef.current = null;
 				}
 				pendingMapZoomControlRequestRef.current = null;
-				pushMapZoomControlRequest(getCampaignMapZoomForControlValue(nextControlValue), true);
+				pushMapZoomControlRequest(
+					getCampaignMapZoomForControlValue(nextControlValue),
+					true
+				);
 				return;
 			}
 			pushMapZoomControlRequest(
@@ -1622,12 +1755,14 @@ const Murmur = () => {
 			window.removeEventListener('wheel', onWheelCapture, true);
 		};
 	}, [activeView]);
-	
+
 	// State for top campaigns dropdown
 	const [showTopCampaignsDropdown, setShowTopCampaignsDropdown] = useState(false);
-	
+
 	// State for right box icon selection ('info' or 'circle')
-	const [selectedRightBoxIcon, setSelectedRightBoxIcon] = useState<'info' | 'circle'>('info');
+	const [selectedRightBoxIcon, setSelectedRightBoxIcon] = useState<'info' | 'circle'>(
+		'info'
+	);
 	const topCampaignsDropdownRef = useRef<HTMLDivElement>(null);
 	const topCampaignsFolderButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -1639,9 +1774,9 @@ const Murmur = () => {
 	const DASHBOARD_INBOX_POPUP_SEARCHBAR_BOTTOM_GAP_PX = 26;
 	const DASHBOARD_INBOX_POPUP_MARGIN_PX = 8;
 	const [isDashboardInboxOpen, setIsDashboardInboxOpen] = useState(false);
-	const [dashboardInboxSubtab, setDashboardInboxSubtab] = useState<'messages' | 'campaigns'>(
-		'messages'
-	);
+	const [dashboardInboxSubtab, setDashboardInboxSubtab] = useState<
+		'messages' | 'campaigns'
+	>('messages');
 	const dashboardInboxSearchbarRef = useRef<HTMLButtonElement>(null);
 	const dashboardInboxTriggerRef = useRef<HTMLButtonElement>(null);
 	const dashboardInboxPopupRef = useRef<HTMLDivElement>(null);
@@ -1685,9 +1820,14 @@ const Murmur = () => {
 		let top = rectBottom + DASHBOARD_INBOX_POPUP_SEARCHBAR_BOTTOM_GAP_PX;
 
 		// If it would overflow below, try opening above the trigger.
-		if (top + DASHBOARD_INBOX_POPUP_HEIGHT_PX + DASHBOARD_INBOX_POPUP_MARGIN_PX > viewportH) {
+		if (
+			top + DASHBOARD_INBOX_POPUP_HEIGHT_PX + DASHBOARD_INBOX_POPUP_MARGIN_PX >
+			viewportH
+		) {
 			const aboveTop =
-				rectTop - DASHBOARD_INBOX_POPUP_SEARCHBAR_BOTTOM_GAP_PX - DASHBOARD_INBOX_POPUP_HEIGHT_PX;
+				rectTop -
+				DASHBOARD_INBOX_POPUP_SEARCHBAR_BOTTOM_GAP_PX -
+				DASHBOARD_INBOX_POPUP_HEIGHT_PX;
 			if (aboveTop >= DASHBOARD_INBOX_POPUP_MARGIN_PX) top = aboveTop;
 		}
 
@@ -1709,11 +1849,11 @@ const Murmur = () => {
 		DASHBOARD_INBOX_POPUP_MARGIN_PX,
 		DASHBOARD_INBOX_POPUP_WIDTH_PX,
 	]);
-	
+
 	// Close dropdown when clicking outside (but not on the folder button itself)
 	useEffect(() => {
 		if (!showTopCampaignsDropdown) return;
-		
+
 		const handleClickOutside = (event: MouseEvent) => {
 			const target = event.target as Node;
 			// Don't close if clicking on the folder button (let the toggle handle it)
@@ -1727,7 +1867,7 @@ const Murmur = () => {
 				setShowTopCampaignsDropdown(false);
 			}
 		};
-		
+
 		document.addEventListener('mousedown', handleClickOutside);
 		return () => document.removeEventListener('mousedown', handleClickOutside);
 	}, [showTopCampaignsDropdown]);
@@ -1757,7 +1897,10 @@ const Murmur = () => {
 		const handleClickOutside = (event: MouseEvent) => {
 			const target = event.target as Node;
 			if (dashboardInboxTriggerRef.current?.contains(target)) return;
-			if (dashboardInboxPopupRef.current && !dashboardInboxPopupRef.current.contains(target)) {
+			if (
+				dashboardInboxPopupRef.current &&
+				!dashboardInboxPopupRef.current.contains(target)
+			) {
 				setIsDashboardInboxOpen(false);
 				setDashboardInboxPosition(null);
 			}
@@ -1776,7 +1919,7 @@ const Murmur = () => {
 			window.removeEventListener('keydown', handleKeyDown);
 		};
 	}, [isDashboardInboxOpen]);
-	
+
 	// Track previous view for crossfade transitions
 	const [previousView, setPreviousView] = useState<ViewType | null>(null);
 	const [isTransitioning, setIsTransitioning] = useState(false);
@@ -1787,13 +1930,13 @@ const Murmur = () => {
 
 	// Mobile never supports the Writing ("testing") tab. Clamp immediately so we never mount
 	// HybridPromptInput on mobile (and never transition through it).
-	const MOBILE_ALLOWED_VIEWS: Array<'drafting' | 'inbox'> = [
-		'drafting',
-		'inbox',
-	];
+	const MOBILE_ALLOWED_VIEWS: Array<'drafting' | 'inbox'> = ['drafting', 'inbox'];
 	useLayoutEffect(() => {
 		if (isMobile !== true) return;
-		if (MOBILE_ALLOWED_VIEWS.includes(activeView as (typeof MOBILE_ALLOWED_VIEWS)[number])) return;
+		if (
+			MOBILE_ALLOWED_VIEWS.includes(activeView as (typeof MOBILE_ALLOWED_VIEWS)[number])
+		)
+			return;
 
 		// Cancel any in-flight transitions so we don't briefly show a previous (invalid) view.
 		if (transitionTimeoutRef.current) {
@@ -1812,66 +1955,69 @@ const Murmur = () => {
 		setActiveViewInternal('drafting');
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isMobile, activeView]);
-	
+
 	// Wrapped setActiveView that handles transitions
-	const setActiveView = useCallback((newView: ViewType) => {
-		// Campaign "Sent" is now Inbox -> Sent. Route any "sent" navigation into the inbox's Sent tab.
-		if (newView === 'sent') {
-			requestInboxSentTab('sent');
-			newView = 'inbox';
-		}
-		// Never allow unsupported views on mobile.
-		if (
-			isMobile === true &&
-			!MOBILE_ALLOWED_VIEWS.includes(newView as (typeof MOBILE_ALLOWED_VIEWS)[number])
-		) {
-			newView = 'drafting';
-		}
-		// Dedupe against the *latest requested* view (not just the last committed render) so
-		// rapid flips like A -> B -> A still enqueue the final A update and don't get dropped.
-		if (newView === requestedViewRef.current) return;
-		requestedViewRef.current = newView;
-		
-		// Clear any pending transition timers
-		if (transitionTimeoutRef.current) {
-			clearTimeout(transitionTimeoutRef.current);
-			transitionTimeoutRef.current = null;
-		}
-		if (maxWaitTimeoutRef.current) {
-			clearTimeout(maxWaitTimeoutRef.current);
-			maxWaitTimeoutRef.current = null;
-		}
+	const setActiveView = useCallback(
+		(newView: ViewType) => {
+			// Campaign "Sent" is now Inbox -> Sent. Route any "sent" navigation into the inbox's Sent tab.
+			if (newView === 'sent') {
+				requestInboxSentTab('sent');
+				newView = 'inbox';
+			}
+			// Never allow unsupported views on mobile.
+			if (
+				isMobile === true &&
+				!MOBILE_ALLOWED_VIEWS.includes(newView as (typeof MOBILE_ALLOWED_VIEWS)[number])
+			) {
+				newView = 'drafting';
+			}
+			// Dedupe against the *latest requested* view (not just the last committed render) so
+			// rapid flips like A -> B -> A still enqueue the final A update and don't get dropped.
+			if (newView === requestedViewRef.current) return;
+			requestedViewRef.current = newView;
 
-		// If the user clicks back to the currently committed view while a different view was pending,
-		// treat it as a cancel (no need to stage a crossfade from an uncommitted/never-painted view).
-		if (newView === activeView) {
-			setPreviousView(null);
-			setIsTransitioning(false);
-			setIsFadingOutPreviousView(false);
-			setActiveViewInternal(newView);
-			return;
-		}
+			// Clear any pending transition timers
+			if (transitionTimeoutRef.current) {
+				clearTimeout(transitionTimeoutRef.current);
+				transitionTimeoutRef.current = null;
+			}
+			if (maxWaitTimeoutRef.current) {
+				clearTimeout(maxWaitTimeoutRef.current);
+				maxWaitTimeoutRef.current = null;
+			}
 
-		// Start transition: keep previous view visible while the destination paints.
-		// Desktop: fade out the previous view once the destination is ready.
-		// Mobile: no fade (hard swap) once the destination is ready.
-		setPreviousView(activeView);
-		setIsTransitioning(true);
-		setIsFadingOutPreviousView(false);
-		setActiveViewInternal(newView);
-
-		// Fallback: if we never get a "view ready" callback (should be rare),
-		// end the transition anyway (fade on desktop, hard swap on mobile).
-		maxWaitTimeoutRef.current = setTimeout(() => {
-			if (isMobile === true) {
+			// If the user clicks back to the currently committed view while a different view was pending,
+			// treat it as a cancel (no need to stage a crossfade from an uncommitted/never-painted view).
+			if (newView === activeView) {
 				setPreviousView(null);
 				setIsTransitioning(false);
 				setIsFadingOutPreviousView(false);
+				setActiveViewInternal(newView);
 				return;
 			}
-			setIsFadingOutPreviousView(true);
-		}, MAX_TRANSITION_WAIT_MS);
-	}, [activeView, isMobile, MOBILE_ALLOWED_VIEWS, requestInboxSentTab]);
+
+			// Start transition: keep previous view visible while the destination paints.
+			// Desktop: fade out the previous view once the destination is ready.
+			// Mobile: no fade (hard swap) once the destination is ready.
+			setPreviousView(activeView);
+			setIsTransitioning(true);
+			setIsFadingOutPreviousView(false);
+			setActiveViewInternal(newView);
+
+			// Fallback: if we never get a "view ready" callback (should be rare),
+			// end the transition anyway (fade on desktop, hard swap on mobile).
+			maxWaitTimeoutRef.current = setTimeout(() => {
+				if (isMobile === true) {
+					setPreviousView(null);
+					setIsTransitioning(false);
+					setIsFadingOutPreviousView(false);
+					return;
+				}
+				setIsFadingOutPreviousView(true);
+			}, MAX_TRANSITION_WAIT_MS);
+		},
+		[activeView, isMobile, MOBILE_ALLOWED_VIEWS, requestInboxSentTab]
+	);
 
 	const handleActiveViewReady = useCallback(
 		(readyView: DraftingSectionView) => {
@@ -1938,7 +2084,9 @@ const Murmur = () => {
 			const html = document.documentElement;
 			const zoomStr = window.getComputedStyle(html).zoom;
 			const parsedZoom = zoomStr ? parseFloat(zoomStr) : NaN;
-			const varZoomStr = window.getComputedStyle(html).getPropertyValue(CAMPAIGN_ZOOM_VAR);
+			const varZoomStr = window
+				.getComputedStyle(html)
+				.getPropertyValue(CAMPAIGN_ZOOM_VAR);
 			const parsedVarZoom = varZoomStr ? parseFloat(varZoomStr) : NaN;
 			const z =
 				Number.isFinite(parsedZoom) && parsedZoom > 0 && parsedZoom !== 1
@@ -1961,10 +2109,11 @@ const Murmur = () => {
 
 	// Fetch campaign contacts at the page level so the persistent map can stay interactive on every tab.
 	const contactListIds = campaign?.userContactLists?.map((l) => l.id) || [];
-	const { data: campaignMapContacts, isLoading: isCampaignMapContactsLoading } = useGetContacts({
-		filters: { contactListIds },
-		enabled: contactListIds.length > 0 && !isMobile,
-	});
+	const { data: campaignMapContacts, isLoading: isCampaignMapContactsLoading } =
+		useGetContacts({
+			filters: { contactListIds },
+			enabled: contactListIds.length > 0 && !isMobile,
+		});
 	const { data: headerEmails } = useGetEmails({
 		filters: { campaignId: campaign?.id },
 		enabled: !!campaign?.id && isNarrowestDesktop && !isMobile,
@@ -1972,9 +2121,14 @@ const Murmur = () => {
 
 	// Compute header metrics
 	const headerContactsCount = campaignMapContacts?.length || 0;
-	const headerDraftCount = (headerEmails || []).filter((e) => e.status === EmailStatus.draft).length;
-	const headerSentCount = (headerEmails || []).filter((e) => e.status === EmailStatus.sent).length;
-	const headerToListNames = campaign?.userContactLists?.map((list) => list.name).join(', ') || '';
+	const headerDraftCount = (headerEmails || []).filter(
+		(e) => e.status === EmailStatus.draft
+	).length;
+	const headerSentCount = (headerEmails || []).filter(
+		(e) => e.status === EmailStatus.sent
+	).length;
+	const headerToListNames =
+		campaign?.userContactLists?.map((list) => list.name).join(', ') || '';
 	const headerFromName = campaign?.identity?.name || '';
 
 	const campaignMapContactsForMap = useMemo(
@@ -2033,7 +2187,7 @@ const Murmur = () => {
 						mapViewFrameRadiusPx: 0,
 						mapViewFrameBorderPx: 0,
 						mapProps: persistentCampaignMapProps,
-				  }
+					}
 				: null,
 		[isMobile, persistentCampaignMapProps]
 	);
@@ -2049,14 +2203,30 @@ const Murmur = () => {
 	}, [setPersistentMapConfig]);
 
 	const usePersistentCampaignMapBackground = !isMobile && activeView !== 'overview';
+	const isCampaignWorkspaceToggleVisible =
+		!isMobile &&
+		usePersistentCampaignMapBackground &&
+		isCompactCampaignWorkspaceView(activeView);
+	const requestCampaignWorkspaceExpanded = useCallback(() => {
+		isCampaignWorkspaceExpandedRef.current = true;
+		setIsCampaignWorkspaceExpanded(true);
+		if (typeof window !== 'undefined') {
+			window.requestAnimationFrame(() => updateCampaignZoomForViewport());
+		}
+	}, [updateCampaignZoomForViewport]);
+	const toggleCampaignWorkspaceExpanded = useCallback(() => {
+		setIsCampaignWorkspaceExpanded((prev) => {
+			const next = !prev;
+			isCampaignWorkspaceExpandedRef.current = next;
+			if (typeof window !== 'undefined') {
+				window.requestAnimationFrame(() => updateCampaignZoomForViewport());
+			}
+			return next;
+		});
+	}, [updateCampaignZoomForViewport]);
 
 	// Tab navigation order
-	const tabOrder: ViewType[] = [
-		'testing',
-		'overview',
-		'inbox',
-		'drafting',
-	];
+	const tabOrder: ViewType[] = ['testing', 'overview', 'inbox', 'drafting'];
 
 	const goToPreviousTab = () => {
 		const currentIndex = tabOrder.indexOf(activeView);
@@ -2079,10 +2249,7 @@ const Murmur = () => {
 	};
 
 	// Mobile-specific tab navigation (only the visible tabs on mobile)
-	const mobileTabOrder: Array<'drafting' | 'inbox'> = [
-		'inbox',
-		'drafting',
-	];
+	const mobileTabOrder: Array<'drafting' | 'inbox'> = ['inbox', 'drafting'];
 
 	const goToPreviousMobileTab = () => {
 		const currentIndex = mobileTabOrder.indexOf(activeView as 'drafting' | 'inbox');
@@ -2109,7 +2276,13 @@ const Murmur = () => {
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			// Only handle arrow keys
-			if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+			if (
+				e.key !== 'ArrowLeft' &&
+				e.key !== 'ArrowRight' &&
+				e.key !== 'ArrowUp' &&
+				e.key !== 'ArrowDown'
+			)
+				return;
 
 			// Check if a text input element is focused (don't intercept typing)
 			const activeElement = document.activeElement;
@@ -2174,7 +2347,6 @@ const Murmur = () => {
 		requestInboxSentTab,
 	]);
 
-
 	if (isPendingCampaign || !campaign) {
 		return (
 			<CampaignDeviceProvider isMobile={isMobile} activeView={activeView}>
@@ -2218,1111 +2390,1216 @@ const Murmur = () => {
 		<CampaignDeviceProvider isMobile={isMobile} activeView={activeView}>
 			<HoverDescriptionProvider enabled={selectedRightBoxIcon === 'info'}>
 				<CampaignTopSearchHighlightProvider value={topSearchHighlightCtx}>
-				<div
-					className={cn(
-						'min-h-screen relative',
-						!isMobile && 'campaign-map-interactive-page',
-						usePersistentCampaignMapBackground && 'campaign-persistent-map-page'
-					)}
-				>
-					{usePersistentCampaignMapBackground && (
-						<div className="campaign-map-split-overlay" aria-hidden="true" />
-					)}
-			{/* Top navigation box (ported from dashboard map view).
-			    Translucent backdrop + 5-tab row (Search / Write / [campaign chip] / Inbox / Drafts)
-			    + empty outline boxes flanking a center search pill. Desktop only. */}
-			{!isMobile && (() => {
-				// Constants mirror dashboard/page.tsx:3879-3924 so visual proportions match.
-				const MAP_VIEW_UI_SCALE = 0.85;
-				const MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX = 49;
-				const MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX = 440;
-				const MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX = 9;
-				const MAP_VIEW_TOP_BACKDROP_BOX_WIDTH_PX = Math.round(
-					MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX * (804 / 488.204)
-				);
-				const MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX = Math.round(
-					MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX * (102 / 54)
-				);
-				const MAP_VIEW_TOP_OUTLINE_BOX_WIDTH_PX = Math.round(
-					124 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
-				);
-				const MAP_VIEW_TOP_OUTLINE_BOX_HEIGHT_PX = Math.round(
-					42 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
-				);
-				const MAP_VIEW_TOP_OUTLINE_BOX_LEFT_GAP_PX = Math.round(
-					23 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
-				);
-				const MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_WIDTH_PX = Math.round(
-					105 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
-				);
-				const MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_HEIGHT_PX = Math.round(
-					42 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
-				);
-				const MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_GAP_PX = Math.round(
-					31 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
-				);
-				const MAP_VIEW_SEARCH_BAR_BOTTOM_INSET_PX = 4;
-				const MAP_VIEW_SEARCH_BAR_TOP_PX =
-					MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX +
-					MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX * MAP_VIEW_UI_SCALE -
-					MAP_VIEW_SEARCH_BAR_BOTTOM_INSET_PX -
-					MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX * MAP_VIEW_UI_SCALE;
-				const CAMPAIGN_MAP_TOP_TABS_VISUAL_WIDTH_PX = 560;
-				const CAMPAIGN_MAP_TOP_TABS_WIDTH_PX = Math.round(
-					CAMPAIGN_MAP_TOP_TABS_VISUAL_WIDTH_PX / MAP_VIEW_UI_SCALE
-				);
-
-				const campaignName = campaign?.name || 'Campaign';
-
-				const inactiveTabStyle = (isActive: boolean) => ({
-					color: '#2C2C2C',
-					fontFamily: 'Inter, sans-serif',
-					fontSize: '17px',
-					fontStyle: 'normal' as const,
-					fontWeight: isActive ? 600 : 500,
-					lineHeight: '14px',
-					opacity: isActive ? 1 : 0.5,
-				});
-
-				return (
-					<>
-						{/* Translucent sky-blue backdrop */}
-						<div
-							aria-hidden="true"
-							data-slot="campaign-top-backdrop"
-							className="fixed left-0 right-0 flex justify-center pointer-events-none"
-							style={{
-								top: `${MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX}px`,
-								zIndex: 110,
-							}}
-						>
-							<div
-								style={{
-									transform: `scale(${MAP_VIEW_UI_SCALE})`,
-									transformOrigin: 'top center',
-									width: `${MAP_VIEW_TOP_BACKDROP_BOX_WIDTH_PX}px`,
-									height: `${MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX}px`,
-									borderRadius: '8px',
-									backgroundColor: '#B9EAF1',
-									opacity: 0.9,
-								}}
-							/>
-						</div>
-
-						{/* Tabs row: Search / Write / [campaign chip] / Inbox / Drafts */}
-						<div
-							data-slot="campaign-top-tabs"
-							data-hover-description-suppress="true"
-							className="fixed left-0 right-0 z-[9999] flex items-center justify-center pointer-events-none"
-							style={{ top: '12px', height: '24px' }}
-						>
-							<div
-								className="pointer-events-auto relative"
-								style={{
-									width: `${CAMPAIGN_MAP_TOP_TABS_WIDTH_PX}px`,
-									maxWidth: 'calc(100vw - 64px)',
-									height: '24px',
-									transform: `scale(${MAP_VIEW_UI_SCALE})`,
-									transformOrigin: 'top center',
-								}}
-							>
-								<div
-									className="relative z-[1] grid h-full w-full items-center justify-items-center"
-									style={{
-										gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
-									}}
-								>
-									<button
-										type="button"
-										className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
-										style={inactiveTabStyle(false)}
-										onClick={handleGoToDashboardSearch}
-									>
-										Search
-									</button>
-									<button
-										type="button"
-										className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
-										style={inactiveTabStyle(activeView === 'testing')}
-										onClick={() => setActiveView('testing')}
-									>
-										Write
-									</button>
-									<button
-										type="button"
-										aria-label={campaignName}
-										title={campaignName}
-										className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex min-w-0 items-center justify-center gap-[7px] h-full"
-										onClick={() => setActiveView('overview')}
-										style={{
-											color: '#000',
-											fontFamily: 'Inter, sans-serif',
-											fontSize: '20.719px',
-											fontStyle: 'normal',
-											fontWeight: activeView === 'overview' ? 600 : 500,
-											lineHeight: '17.063px',
-											opacity: activeView === 'overview' ? 1 : 0.72,
-										}}
-									>
-										<svg
-											aria-hidden="true"
-											focusable="false"
-											width="23"
-											height="13"
-											viewBox="0 0 30 17"
-											fill="none"
-											xmlns="http://www.w3.org/2000/svg"
-											className="block flex-shrink-0"
-										>
-											<rect y="2" width="30" height="15" rx="1" fill="#B43A35" />
-											<path
-												d="M0 2C0 0.89543 0.895431 0 2 0H13C14.1046 0 15 0.895431 15 2V4C15 4.55228 14.5523 5 14 5H1C0.447715 5 0 4.55228 0 4V2Z"
-												fill="#B43A35"
-											/>
-										</svg>
-										<span className="min-w-0 truncate">{campaignName}</span>
-									</button>
-									<button
-										type="button"
-										className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
-										style={inactiveTabStyle(activeView === 'inbox')}
-										onClick={() => setActiveView('inbox')}
-									>
-										Inbox
-									</button>
-									<button
-										type="button"
-										className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
-										style={inactiveTabStyle(activeView === 'drafting')}
-										onClick={() => setActiveView('drafting')}
-									>
-										Drafts
-									</button>
-								</div>
-							</div>
-						</div>
-
-						{/* Center pill — 5-icon action row (campaign view variant) */}
-						<div
-							data-slot="campaign-top-search-bar"
-							className="fixed left-0 right-0 flex justify-center pointer-events-none"
-							style={{
-								top: `${MAP_VIEW_SEARCH_BAR_TOP_PX}px`,
-								zIndex: 120,
-							}}
-						>
-							<div
-								className="pointer-events-auto"
-								style={{
-									transform: `scale(${MAP_VIEW_UI_SCALE})`,
-									transformOrigin: 'top center',
-									width: `${MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX}px`,
-									maxWidth: `${MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX}px`,
-									height: `${MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX}px`,
-									borderRadius: '8px',
-									border: '3px solid #000',
-									backgroundColor: '#FFFFFF',
-									boxSizing: 'border-box',
-									display: 'flex',
-									alignItems: 'center',
-									justifyContent: 'space-around',
-									padding: '0 32px',
-									color: '#050505',
-								}}
-							>
-								{(
-									[
-										{ key: 'playbook', Icon: DashboardActionBarPlaybookIcon, label: 'Playbook', width: 24, height: 20 },
-										{ key: 'folder', Icon: DashboardActionBarFolderIcon, label: 'Folder', width: 24, height: 14 },
-										{ key: 'search', Icon: SearchIconDesktop, label: 'Search', width: 22, height: 22 },
-										{ key: 'star', Icon: DashboardActionBarStarIcon, label: 'Starred', width: 22, height: 21 },
-										{ key: 'envelope', Icon: DashboardActionBarEnvelopeIcon, label: 'Messages', width: 22, height: 14 },
-									] as const
-								).map(({ key, Icon, label, width, height }) => (
-									<button
-										key={key}
-										type="button"
-										aria-label={label}
-										style={{
-											background: 'none',
-											border: 'none',
-											padding: '4px 6px',
-											margin: 0,
-											display: 'flex',
-											alignItems: 'center',
-											justifyContent: 'center',
-											cursor: 'pointer',
-											color: '#050505',
-											opacity: 0.55,
-											transition: 'opacity 150ms ease',
-										}}
-									>
-										<Icon width={width} height={height} />
-									</button>
-								))}
-							</div>
-						</div>
-					</>
-				);
-			})()}
-
-			{!isMobile && activeView === 'overview' && (
-				<div
-					data-campaign-interactive-surface
-					className="fixed z-[130] pointer-events-none"
-					style={{
-						left: `${CAMPAIGN_MAP_SELECT_GRAB_LEFT_PX}px`,
-						top: `calc((100dvh - ${
-							CAMPAIGN_MAP_SELECT_GRAB_TOTAL_HEIGHT_PX *
-							CAMPAIGN_MAP_SELECT_GRAB_VIEW_SCALE
-						}px) / 2 + ${
-							CAMPAIGN_MAP_SELECT_GRAB_TOP_EXTENT_PX *
-							CAMPAIGN_MAP_SELECT_GRAB_VIEW_SCALE
-						}px)`,
-						transform: `scale(${CAMPAIGN_MAP_SELECT_GRAB_VIEW_SCALE})`,
-						transformOrigin: 'top left',
-					}}
-				>
-					<div
-						className="absolute left-0 pointer-events-none rounded-[5px] bg-white px-[4px] py-[1px] font-inter text-[11px] font-medium text-black"
-						style={{
-							top: `-${
-								MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
-								MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
-								MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
-								MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
-								MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
-								MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
-								MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
-								MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX +
-								22
-							}px`,
-						}}
-					>
-						Showing
-					</div>
-					<MapSelectGrabTallStackBox
-						className="absolute pointer-events-none"
-						isSelectActive={isSelectMapToolActive}
-						onAllDeselected={() => setActiveMapTool('grab')}
-						onActiveCategoriesChange={handleMapGrabActiveCategoriesChange}
-						style={{
-							left: '-0.5px',
-							top: `-${
-								MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
-								MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
-								MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
-								MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
-								MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
-								MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
-								MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
-								MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX
-							}px`,
-							...(isSelectMapToolActive
-								? {
-										backgroundColor: '#A6DCB3',
-								  }
-								: {}),
-						}}
-					/>
-					<MapSelectGrabStackBox
-						className="absolute left-0 pointer-events-none"
-						isSelectActive={isSelectMapToolActive}
-						selectedContent={<StackBoxSelectStarIcon />}
-						inactiveContent={
-							<MapSelectGrabStackTile backgroundColor="#EFEFEF">
-								<MapStackStarIcon />
-							</MapSelectGrabStackTile>
-						}
-						style={{
-							top: `-${
-								MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
-								MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
-								MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
-								MAP_SELECT_GRAB_STACK_BOX_SIZE_PX
-							}px`,
-						}}
-					>
-						<MapSelectGrabStackTile backgroundColor="#FFBDBD">
-							<MapStackStarIcon />
-						</MapSelectGrabStackTile>
-					</MapSelectGrabStackBox>
-					<MapSelectGrabStackBox
-						className="absolute left-0 pointer-events-none"
-						isSelectActive={isSelectMapToolActive}
-						selectedContent={<StackBoxSelectBlueSparkIcon />}
-						inactiveContent={
-							<MapSelectGrabStackTile backgroundColor="#EFEFEF">
-								<MapStackBlueSparkIcon />
-							</MapSelectGrabStackTile>
-						}
-						onActiveChange={handleMapGrabUncategorizedActiveChange}
-						style={{
-							top: `-${
-								MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
-								MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
-								MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
-								MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
-								MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
-								MAP_SELECT_GRAB_STACK_BOX_SIZE_PX
-							}px`,
-						}}
-					>
-						<MapSelectGrabStackTile backgroundColor="#50A5C970">
-							<MapStackBlueSparkIcon />
-						</MapSelectGrabStackTile>
-					</MapSelectGrabStackBox>
-					<MapSelectGrabStarterBox
-						className="absolute left-0 pointer-events-auto"
-						zoomLevelIndex={mapZoomControlIndex}
-						zoomLevelValue={mapZoomControlDisplayValue}
-						zoomLevelLiveControlRef={mapZoomControlLiveRef}
-						onZoomLevelIndexChange={handleMapZoomControlChange}
-						onZoomLevelValueChange={handleMapZoomControlValueChange}
-						style={{
-							position: 'absolute',
-							left: 0,
-							top: `-${
-								MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
-								MAP_SELECT_GRAB_STARTER_BOX_GAP_PX
-							}px`,
-						}}
-					/>
-					<MapSelectGrabTool
-						activeTool={activeMapTool}
-						onSelectClick={handleSelectMapToolClick}
-						onGrabClick={() => setActiveMapTool('grab')}
-						className="pointer-events-auto"
-					/>
-				</div>
-			)}
-
-			{/* Header row with centered tabs and Clerk icon (from layout).
-			    Desktop tabs are now rendered inside the top nav box above.
-			    The h-[50px] wrapper remains for spacing and to host the mobile header below. */}
-			<div data-slot="campaign-header">
-				<div className="relative h-[50px] flex items-center justify-center">
-				{/* Mobile header - campaign title and tabs */}
-				{isMobile && (
-					<div className="absolute inset-x-0 top-0 flex flex-col mt-3">
-						<div 
-							className="pl-4 pr-20 overflow-hidden"
-							style={{
-								maskImage: 'linear-gradient(to right, black 60%, transparent 95%)',
-								WebkitMaskImage: 'linear-gradient(to right, black 60%, transparent 95%)',
-							}}
-						>
-							<h1 
-								className="text-[22px] font-medium text-left text-black mb-2 leading-7 whitespace-nowrap" 
-								style={{ fontFamily: "'Times New Roman', Times, serif" }}
-							>
-								{campaign?.name || 'Untitled Campaign'}
-							</h1>
-						</div>
-						<div className="flex gap-3 justify-center mt-4">
-							<button
-								type="button"
-								className="font-inter text-[13px] font-medium leading-none bg-[#F5DADA] border border-transparent text-[#6B6B6B] hover:text-black hover:border-black cursor-pointer rounded-full px-3 py-1"
-								onClick={handleGoToDashboardSearch}
-							>
-								Search
-							</button>
-							<button
-								type="button"
-								className={cn(
-									'font-inter text-[13px] font-medium leading-none bg-[#E8EFFF] border cursor-pointer rounded-full px-3 py-1',
-									activeView === 'inbox'
-										? 'text-black border-black'
-										: 'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
-								)}
-								onClick={() => setActiveView('inbox')}
-							>
-								Inbox
-							</button>
-							<button
-								type="button"
-								className={cn(
-									'font-inter text-[13px] font-medium leading-none bg-[#FFE3AA] border cursor-pointer rounded-full px-3 py-1',
-									activeView === 'drafting'
-										? 'text-black border-black'
-										: 'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
-								)}
-								onClick={() => setActiveView('drafting')}
-							>
-								{headerDraftCount.toString().padStart(2, '0')} Drafts
-							</button>
-						</div>
-					</div>
-				)}
-				</div>
-			</div>
-
-			{/* Main content container */}
-			<div data-slot="campaign-content" className="relative">
-				{shouldHideContent && (
 					<div
 						className={cn(
-							'fixed inset-0 z-40 pointer-events-none flex items-center justify-center',
-							isMobile ? 'bg-white' : 'bg-background'
+							'min-h-screen relative',
+							!isMobile && 'campaign-map-interactive-page',
+							usePersistentCampaignMapBackground && 'campaign-persistent-map-page'
 						)}
 					>
-						{cameFromSearch && !campaign.identityId && !isIdentityDialogOpen ? (
-							<div className="text-center">
-								<p className="font-inter text-[14px] text-[#3b3b3b]">
-									Setting up your profile…
-								</p>
-							</div>
-						) : null}
-					</div>
-				)}
-				<div
-					className={cn(
-						'transition-opacity duration-200',
-						shouldHideContent
-							? 'opacity-0 pointer-events-none select-none'
-							: 'opacity-100'
-					)}
-					style={{
-						WebkitTransition: 'opacity 0.2s',
-						transition: 'opacity 0.2s',
-					}}
-				>
-					<IdentityDialog
-						campaign={campaign}
-						title="User Settings"
-						open={isIdentityDialogOpen}
-						onOpenChange={setIsIdentityDialogOpen}
-						backButtonText={
-							identityDialogOrigin === 'search'
-								? 'Back to Search Results'
-								: 'Back to Campaign'
-						}
-					/>
+						{usePersistentCampaignMapBackground && (
+							<div className="campaign-map-split-overlay" aria-hidden="true" />
+						)}
+						{/* Top navigation box (ported from dashboard map view).
+			    Translucent backdrop + 5-tab row (Search / Write / [campaign chip] / Inbox / Drafts)
+			    + empty outline boxes flanking a center search pill. Desktop only. */}
+						{!isMobile &&
+							(() => {
+								// Constants mirror dashboard/page.tsx:3879-3924 so visual proportions match.
+								const MAP_VIEW_UI_SCALE = CAMPAIGN_TOP_NAV_UI_SCALE;
+								const MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX =
+									CAMPAIGN_TOP_NAV_SEARCH_BAR_INPUT_HEIGHT_PX;
+								const MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX =
+									CAMPAIGN_TOP_NAV_SEARCH_BAR_OUTER_WIDTH_PX;
+								const MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX =
+									CAMPAIGN_TOP_NAV_BACKDROP_BOX_TOP_PX;
+								const MAP_VIEW_TOP_BACKDROP_BOX_WIDTH_PX =
+									CAMPAIGN_TOP_NAV_BACKDROP_BOX_WIDTH_PX;
+								const MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX =
+									CAMPAIGN_TOP_NAV_BACKDROP_BOX_HEIGHT_PX;
+								const MAP_VIEW_TOP_OUTLINE_BOX_WIDTH_PX = Math.round(
+									124 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
+								);
+								const MAP_VIEW_TOP_OUTLINE_BOX_HEIGHT_PX = Math.round(
+									42 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
+								);
+								const MAP_VIEW_TOP_OUTLINE_BOX_LEFT_GAP_PX = Math.round(
+									23 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
+								);
+								const MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_WIDTH_PX = Math.round(
+									105 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
+								);
+								const MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_HEIGHT_PX = Math.round(
+									42 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
+								);
+								const MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_GAP_PX = Math.round(
+									31 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
+								);
+								const MAP_VIEW_SEARCH_BAR_BOTTOM_INSET_PX = 4;
+								const MAP_VIEW_SEARCH_BAR_TOP_PX =
+									MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX +
+									MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX * MAP_VIEW_UI_SCALE -
+									MAP_VIEW_SEARCH_BAR_BOTTOM_INSET_PX -
+									MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX * MAP_VIEW_UI_SCALE;
+								const CAMPAIGN_MAP_TOP_TABS_VISUAL_WIDTH_PX = 560;
+								const CAMPAIGN_MAP_TOP_TABS_WIDTH_PX = Math.round(
+									CAMPAIGN_MAP_TOP_TABS_VISUAL_WIDTH_PX / MAP_VIEW_UI_SCALE
+								);
 
-					{/* Campaign Header Box - shown at narrowest breakpoint (< 952px) */}
-					{!isMobile && isNarrowestDesktop && campaign && (
-						<div className="flex justify-center mb-4">
-							<CampaignHeaderBox
-								campaignId={campaign.id}
-								campaignName={campaign.name || 'Untitled Campaign'}
-								toListNames={headerToListNames}
-								fromName={headerFromName}
-								contactsCount={headerContactsCount}
-								draftCount={headerDraftCount}
-								sentCount={headerSentCount}
-								draftingProgress={
-										draftOperationsProgress.visible
-											? draftOperationsProgress.operations
-											: null
+								const campaignName = campaign?.name || 'Campaign';
+
+								const inactiveTabStyle = (isActive: boolean) => ({
+									color: '#2C2C2C',
+									fontFamily: 'Inter, sans-serif',
+									fontSize: '17px',
+									fontStyle: 'normal' as const,
+									fontWeight: isActive ? 600 : 500,
+									lineHeight: '14px',
+									opacity: isActive ? 1 : 0.5,
+								});
+
+								return (
+									<>
+										{/* Translucent sky-blue backdrop */}
+										<div
+											aria-hidden="true"
+											data-slot="campaign-top-backdrop"
+											className="fixed left-0 right-0 flex justify-center pointer-events-none"
+											style={{
+												top: `${MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX}px`,
+												zIndex: 110,
+											}}
+										>
+											<div
+												style={{
+													transform: `scale(${MAP_VIEW_UI_SCALE})`,
+													transformOrigin: 'top center',
+													width: `${MAP_VIEW_TOP_BACKDROP_BOX_WIDTH_PX}px`,
+													height: `${MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX}px`,
+													borderRadius: '8px',
+													backgroundColor: '#B9EAF1',
+													opacity: 0.9,
+												}}
+											/>
+										</div>
+
+										{/* Tabs row: Search / Write / [campaign chip] / Inbox / Drafts */}
+										<div
+											data-slot="campaign-top-tabs"
+											data-hover-description-suppress="true"
+											className="fixed left-0 right-0 z-[9999] flex items-center justify-center pointer-events-none"
+											style={{ top: '12px', height: '24px' }}
+										>
+											<div
+												className="pointer-events-auto relative"
+												style={{
+													width: `${CAMPAIGN_MAP_TOP_TABS_WIDTH_PX}px`,
+													maxWidth: 'calc(100vw - 64px)',
+													height: '24px',
+													transform: `scale(${MAP_VIEW_UI_SCALE})`,
+													transformOrigin: 'top center',
+												}}
+											>
+												<div
+													className="relative z-[1] grid h-full w-full items-center justify-items-center"
+													style={{
+														gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+													}}
+												>
+													<button
+														type="button"
+														className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
+														style={inactiveTabStyle(false)}
+														onClick={handleGoToDashboardSearch}
+													>
+														Search
+													</button>
+													<button
+														type="button"
+														className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
+														style={inactiveTabStyle(activeView === 'testing')}
+														onClick={() => setActiveView('testing')}
+													>
+														Write
+													</button>
+													<button
+														type="button"
+														aria-label={campaignName}
+														title={campaignName}
+														className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex min-w-0 items-center justify-center gap-[7px] h-full"
+														onClick={() => setActiveView('overview')}
+														style={{
+															color: '#000',
+															fontFamily: 'Inter, sans-serif',
+															fontSize: '20.719px',
+															fontStyle: 'normal',
+															fontWeight: activeView === 'overview' ? 600 : 500,
+															lineHeight: '17.063px',
+															opacity: activeView === 'overview' ? 1 : 0.72,
+														}}
+													>
+														<svg
+															aria-hidden="true"
+															focusable="false"
+															width="23"
+															height="13"
+															viewBox="0 0 30 17"
+															fill="none"
+															xmlns="http://www.w3.org/2000/svg"
+															className="block flex-shrink-0"
+														>
+															<rect y="2" width="30" height="15" rx="1" fill="#B43A35" />
+															<path
+																d="M0 2C0 0.89543 0.895431 0 2 0H13C14.1046 0 15 0.895431 15 2V4C15 4.55228 14.5523 5 14 5H1C0.447715 5 0 4.55228 0 4V2Z"
+																fill="#B43A35"
+															/>
+														</svg>
+														<span className="min-w-0 truncate">{campaignName}</span>
+													</button>
+													<button
+														type="button"
+														className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
+														style={inactiveTabStyle(activeView === 'inbox')}
+														onClick={() => setActiveView('inbox')}
+													>
+														Inbox
+													</button>
+													<button
+														type="button"
+														className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
+														style={inactiveTabStyle(activeView === 'drafting')}
+														onClick={() => setActiveView('drafting')}
+													>
+														Drafts
+													</button>
+												</div>
+											</div>
+										</div>
+
+										{/* Center pill — 5-icon action row (campaign view variant) */}
+										<div
+											data-slot="campaign-top-search-bar"
+											className="fixed left-0 right-0 flex justify-center pointer-events-none"
+											style={{
+												top: `${MAP_VIEW_SEARCH_BAR_TOP_PX}px`,
+												zIndex: 120,
+											}}
+										>
+											<div
+												className="pointer-events-auto"
+												style={{
+													transform: `scale(${MAP_VIEW_UI_SCALE})`,
+													transformOrigin: 'top center',
+													width: `${MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX}px`,
+													maxWidth: `${MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX}px`,
+													height: `${MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX}px`,
+													borderRadius: '8px',
+													border: '3px solid #000',
+													backgroundColor: '#FFFFFF',
+													boxSizing: 'border-box',
+													display: 'flex',
+													alignItems: 'center',
+													justifyContent: 'space-around',
+													padding: '0 32px',
+													color: '#050505',
+												}}
+											>
+												{(
+													[
+														{
+															key: 'playbook',
+															Icon: DashboardActionBarPlaybookIcon,
+															label: 'Playbook',
+															width: 24,
+															height: 20,
+														},
+														{
+															key: 'folder',
+															Icon: DashboardActionBarFolderIcon,
+															label: 'Folder',
+															width: 24,
+															height: 14,
+														},
+														{
+															key: 'search',
+															Icon: SearchIconDesktop,
+															label: 'Search',
+															width: 22,
+															height: 22,
+														},
+														{
+															key: 'star',
+															Icon: DashboardActionBarStarIcon,
+															label: 'Starred',
+															width: 22,
+															height: 21,
+														},
+														{
+															key: 'envelope',
+															Icon: DashboardActionBarEnvelopeIcon,
+															label: 'Messages',
+															width: 22,
+															height: 14,
+														},
+													] as const
+												).map(({ key, Icon, label, width, height }) => (
+													<button
+														key={key}
+														type="button"
+														aria-label={label}
+														style={{
+															background: 'none',
+															border: 'none',
+															padding: '4px 6px',
+															margin: 0,
+															display: 'flex',
+															alignItems: 'center',
+															justifyContent: 'center',
+															cursor: 'pointer',
+															color: '#050505',
+															opacity: 0.55,
+															transition: 'opacity 150ms ease',
+														}}
+													>
+														<Icon width={width} height={height} />
+													</button>
+												))}
+											</div>
+										</div>
+									</>
+								);
+							})()}
+
+						{isCampaignWorkspaceToggleVisible && (
+							<button
+								type="button"
+								data-campaign-workspace-toggle
+								aria-label={
+									isCampaignWorkspaceExpanded
+										? 'Collapse campaign workspace'
+										: 'Expand campaign workspace'
 								}
-								onFromClick={() => {
-									setIdentityDialogOrigin('campaign');
-									setIsIdentityDialogOpen(true);
+								onClick={toggleCampaignWorkspaceExpanded}
+								className="fixed flex items-center justify-center border-0 bg-transparent p-0 transition-opacity hover:opacity-70"
+								style={{
+									left: `var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333vw)`,
+									top: '56dvh',
+									transform: 'translateY(-50%)',
+									zIndex: 140,
+									width: '34px',
+									height: '56px',
+									cursor: 'pointer',
+									color: '#777777',
 								}}
-								onDraftsClick={() => setActiveView('drafting')}
-								onSentClick={() => setActiveView('sent')}
-								fullWidth
-							/>
-						</div>
-					)}
-
-
-					<div
-						className={cn('flex justify-center', !shouldApplyWritingTopShift && 'mt-6')}
-						style={
-							shouldApplyWritingTopShift
-								? { marginTop: `${writingContentTopMarginPx}px` }
-								: undefined
-						}
-					>
-						{/* Crossfade transition container */}
-						<div ref={crossfadeContainerRef} className="relative w-full isolate">
-							{/* Current view - always visible (avoid the "white flash" between tabs) */}
-							<div
-								data-campaign-view-layer="active"
-								className={cn(
-									'relative w-full',
-									// Prevent interacting with the destination view while the previous view is still covering it.
-									isTransitioning && previousView && 'pointer-events-none'
-								)}
-								style={{ zIndex: 1 }}
 							>
-								<DraftingSection
-									campaign={campaign}
-									view={activeView}
-									renderGlobalOverlays
-									onViewReady={handleActiveViewReady}
-									onDraftOperationsProgress={setDraftOperationsProgress}
-									autoOpenProfileTabWhenIncomplete={cameFromSearch}
-									inboxSentTabRequest={inboxSentTabRequest}
-									onInboxSentTabChange={setInboxSentTab}
-									goToOverview={() => setActiveView('overview')}
-									goToDrafting={() => setActiveView('drafting')}
-									goToWriting={() => setActiveView('testing')}
-									onGoToSearch={handleOpenDashboardSearchForCampaign}
-									goToInbox={() => setActiveView('inbox')}
-									goToSent={() => setActiveView('sent')}
-									onOpenIdentityDialog={() => {
-										setIdentityDialogOrigin('campaign');
-										setIsIdentityDialogOpen(true);
-									}}
-									goToPreviousTab={goToPreviousTab}
-									goToNextTab={goToNextTab}
-									hideHeaderBox={isNarrowestDesktop && !isMobile}
-									inboxMockState={inboxDebugEnabled ? inboxMockState : undefined}
-								/>
-							</div>
-
-							{/* Previous view - fades out above the current view */}
-							{isTransitioning && previousView && (
-								<div
-									data-campaign-view-layer="previous"
-									className="absolute inset-0 w-full pointer-events-none"
+								<svg
+									width="18"
+									height="34"
+									viewBox="0 0 18 34"
+									fill="none"
+									xmlns="http://www.w3.org/2000/svg"
 									aria-hidden="true"
+									focusable="false"
+								>
+									<path
+										d={
+											isCampaignWorkspaceExpanded ? 'M6 5L14 17L6 29' : 'M12 5L4 17L12 29'
+										}
+										stroke="currentColor"
+										strokeWidth="1.8"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+									/>
+								</svg>
+							</button>
+						)}
+
+						{!isMobile && activeView === 'overview' && (
+							<div
+								data-campaign-interactive-surface
+								className="fixed z-[130] pointer-events-none"
+								style={{
+									left: `${CAMPAIGN_MAP_SELECT_GRAB_LEFT_PX}px`,
+									top: `calc((100dvh - ${
+										CAMPAIGN_MAP_SELECT_GRAB_TOTAL_HEIGHT_PX *
+										CAMPAIGN_MAP_SELECT_GRAB_VIEW_SCALE
+									}px) / 2 + ${
+										CAMPAIGN_MAP_SELECT_GRAB_TOP_EXTENT_PX *
+										CAMPAIGN_MAP_SELECT_GRAB_VIEW_SCALE
+									}px)`,
+									transform: `scale(${CAMPAIGN_MAP_SELECT_GRAB_VIEW_SCALE})`,
+									transformOrigin: 'top left',
+								}}
+							>
+								<div
+									className="absolute left-0 pointer-events-none rounded-[5px] bg-white px-[4px] py-[1px] font-inter text-[11px] font-medium text-black"
 									style={{
-										zIndex: 2,
-										willChange: 'opacity',
-										...(isFadingOutPreviousView
-											? {
-													animation: `viewFadeOut ${TRANSITION_DURATION}ms ease-out forwards`,
-											  }
-											: { opacity: 1 }),
+										top: `-${
+											MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+											MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+											MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+											MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+											MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
+											MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+											MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
+											MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX +
+											22
+										}px`,
 									}}
 								>
-									<DraftingSection
-										campaign={campaign}
-										view={previousView}
-										renderGlobalOverlays={false}
-										autoOpenProfileTabWhenIncomplete={cameFromSearch}
-										inboxSentTabRequest={inboxSentTabRequest}
-										onInboxSentTabChange={setInboxSentTab}
-										goToOverview={() => setActiveView('overview')}
-										goToDrafting={() => setActiveView('drafting')}
-										goToWriting={() => setActiveView('testing')}
-										onGoToSearch={handleOpenDashboardSearchForCampaign}
-										goToInbox={() => setActiveView('inbox')}
-										goToSent={() => setActiveView('sent')}
-										onOpenIdentityDialog={() => {
-											setIdentityDialogOrigin('campaign');
-											setIsIdentityDialogOpen(true);
-										}}
-										goToPreviousTab={goToPreviousTab}
-										goToNextTab={goToNextTab}
-										hideHeaderBox={isNarrowestDesktop && !isMobile}
-										inboxMockState={inboxDebugEnabled ? inboxMockState : undefined}
-									/>
+									Showing
+								</div>
+								<MapSelectGrabTallStackBox
+									className="absolute pointer-events-none"
+									isSelectActive={isSelectMapToolActive}
+									onAllDeselected={() => setActiveMapTool('grab')}
+									onActiveCategoriesChange={handleMapGrabActiveCategoriesChange}
+									style={{
+										left: '-0.5px',
+										top: `-${
+											MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+											MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+											MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+											MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+											MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
+											MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+											MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
+											MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX
+										}px`,
+										...(isSelectMapToolActive
+											? {
+													backgroundColor: '#A6DCB3',
+												}
+											: {}),
+									}}
+								/>
+								<MapSelectGrabStackBox
+									className="absolute left-0 pointer-events-none"
+									isSelectActive={isSelectMapToolActive}
+									selectedContent={<StackBoxSelectStarIcon />}
+									inactiveContent={
+										<MapSelectGrabStackTile backgroundColor="#EFEFEF">
+											<MapStackStarIcon />
+										</MapSelectGrabStackTile>
+									}
+									style={{
+										top: `-${
+											MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+											MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+											MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+											MAP_SELECT_GRAB_STACK_BOX_SIZE_PX
+										}px`,
+									}}
+								>
+									<MapSelectGrabStackTile backgroundColor="#FFBDBD">
+										<MapStackStarIcon />
+									</MapSelectGrabStackTile>
+								</MapSelectGrabStackBox>
+								<MapSelectGrabStackBox
+									className="absolute left-0 pointer-events-none"
+									isSelectActive={isSelectMapToolActive}
+									selectedContent={<StackBoxSelectBlueSparkIcon />}
+									inactiveContent={
+										<MapSelectGrabStackTile backgroundColor="#EFEFEF">
+											<MapStackBlueSparkIcon />
+										</MapSelectGrabStackTile>
+									}
+									onActiveChange={handleMapGrabUncategorizedActiveChange}
+									style={{
+										top: `-${
+											MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+											MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+											MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+											MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+											MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
+											MAP_SELECT_GRAB_STACK_BOX_SIZE_PX
+										}px`,
+									}}
+								>
+									<MapSelectGrabStackTile backgroundColor="#50A5C970">
+										<MapStackBlueSparkIcon />
+									</MapSelectGrabStackTile>
+								</MapSelectGrabStackBox>
+								<MapSelectGrabStarterBox
+									className="absolute left-0 pointer-events-auto"
+									zoomLevelIndex={mapZoomControlIndex}
+									zoomLevelValue={mapZoomControlDisplayValue}
+									zoomLevelLiveControlRef={mapZoomControlLiveRef}
+									onZoomLevelIndexChange={handleMapZoomControlChange}
+									onZoomLevelValueChange={handleMapZoomControlValueChange}
+									style={{
+										position: 'absolute',
+										left: 0,
+										top: `-${
+											MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+											MAP_SELECT_GRAB_STARTER_BOX_GAP_PX
+										}px`,
+									}}
+								/>
+								<MapSelectGrabTool
+									activeTool={activeMapTool}
+									onSelectClick={handleSelectMapToolClick}
+									onGrabClick={() => setActiveMapTool('grab')}
+									className="pointer-events-auto"
+								/>
+							</div>
+						)}
+
+						{/* Header row with centered tabs and Clerk icon (from layout).
+			    Desktop tabs are now rendered inside the top nav box above.
+			    The h-[50px] wrapper remains for spacing and to host the mobile header below. */}
+						<div data-slot="campaign-header">
+							<div className="relative h-[50px] flex items-center justify-center">
+								{/* Mobile header - campaign title and tabs */}
+								{isMobile && (
+									<div className="absolute inset-x-0 top-0 flex flex-col mt-3">
+										<div
+											className="pl-4 pr-20 overflow-hidden"
+											style={{
+												maskImage:
+													'linear-gradient(to right, black 60%, transparent 95%)',
+												WebkitMaskImage:
+													'linear-gradient(to right, black 60%, transparent 95%)',
+											}}
+										>
+											<h1
+												className="text-[22px] font-medium text-left text-black mb-2 leading-7 whitespace-nowrap"
+												style={{ fontFamily: "'Times New Roman', Times, serif" }}
+											>
+												{campaign?.name || 'Untitled Campaign'}
+											</h1>
+										</div>
+										<div className="flex gap-3 justify-center mt-4">
+											<button
+												type="button"
+												className="font-inter text-[13px] font-medium leading-none bg-[#F5DADA] border border-transparent text-[#6B6B6B] hover:text-black hover:border-black cursor-pointer rounded-full px-3 py-1"
+												onClick={handleGoToDashboardSearch}
+											>
+												Search
+											</button>
+											<button
+												type="button"
+												className={cn(
+													'font-inter text-[13px] font-medium leading-none bg-[#E8EFFF] border cursor-pointer rounded-full px-3 py-1',
+													activeView === 'inbox'
+														? 'text-black border-black'
+														: 'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
+												)}
+												onClick={() => setActiveView('inbox')}
+											>
+												Inbox
+											</button>
+											<button
+												type="button"
+												className={cn(
+													'font-inter text-[13px] font-medium leading-none bg-[#FFE3AA] border cursor-pointer rounded-full px-3 py-1',
+													activeView === 'drafting'
+														? 'text-black border-black'
+														: 'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
+												)}
+												onClick={() => setActiveView('drafting')}
+											>
+												{headerDraftCount.toString().padStart(2, '0')} Drafts
+											</button>
+										</div>
+									</div>
+								)}
+							</div>
+						</div>
+
+						{/* Main content container */}
+						<div data-slot="campaign-content" className="relative">
+							{shouldHideContent && (
+								<div
+									className={cn(
+										'fixed inset-0 z-40 pointer-events-none flex items-center justify-center',
+										isMobile ? 'bg-white' : 'bg-background'
+									)}
+								>
+									{cameFromSearch && !campaign.identityId && !isIdentityDialogOpen ? (
+										<div className="text-center">
+											<p className="font-inter text-[14px] text-[#3b3b3b]">
+												Setting up your profile…
+											</p>
+										</div>
+									) : null}
 								</div>
 							)}
-						</div>
-					</div>
-				{/* Crossfade transition animations and mobile-specific styles */}
-					<style jsx global>{`
-						.campaign-persistent-map-page {
-							isolation: isolate;
-							background: transparent;
-						}
+							<div
+								className={cn(
+									'transition-opacity duration-200',
+									shouldHideContent
+										? 'opacity-0 pointer-events-none select-none'
+										: 'opacity-100'
+								)}
+								style={{
+									WebkitTransition: 'opacity 0.2s',
+									transition: 'opacity 0.2s',
+								}}
+							>
+								<IdentityDialog
+									campaign={campaign}
+									title="User Settings"
+									open={isIdentityDialogOpen}
+									onOpenChange={setIsIdentityDialogOpen}
+									backButtonText={
+										identityDialogOrigin === 'search'
+											? 'Back to Search Results'
+											: 'Back to Campaign'
+									}
+								/>
 
-						.campaign-map-interactive-page {
-							z-index: 1;
-							pointer-events: none;
-						}
+								{/* Campaign Header Box - shown at narrowest breakpoint (< 952px) */}
+								{!isMobile && isNarrowestDesktop && campaign && (
+									<div className="flex justify-center mb-4">
+										<CampaignHeaderBox
+											campaignId={campaign.id}
+											campaignName={campaign.name || 'Untitled Campaign'}
+											toListNames={headerToListNames}
+											fromName={headerFromName}
+											contactsCount={headerContactsCount}
+											draftCount={headerDraftCount}
+											sentCount={headerSentCount}
+											draftingProgress={
+												draftOperationsProgress.visible
+													? draftOperationsProgress.operations
+													: null
+											}
+											onFromClick={() => {
+												setIdentityDialogOrigin('campaign');
+												setIsIdentityDialogOpen(true);
+											}}
+											onDraftsClick={() => setActiveView('drafting')}
+											onSentClick={() => setActiveView('sent')}
+											fullWidth
+										/>
+									</div>
+								)}
 
-						.campaign-map-interactive-page [data-slot='campaign-top-tabs'],
-						.campaign-map-interactive-page [data-slot='campaign-top-search-bar'],
-						.campaign-map-interactive-page [data-slot='campaign-header'],
-						.campaign-map-interactive-page [data-campaign-interactive-surface],
-						.campaign-map-interactive-page [data-campaign-header-box],
-						.campaign-map-interactive-page [data-campaign-main-box],
-						.campaign-map-interactive-page [data-research-panel-container],
-						.campaign-map-interactive-page [data-campaign-bottom-anchor],
-						.campaign-map-interactive-page [data-draft-button-container],
-						.campaign-map-interactive-page [data-draft-review-side-preview],
-						.campaign-map-interactive-page [data-left-expanded-panel],
-						.campaign-map-interactive-page [role='dialog'] {
-							pointer-events: auto;
-						}
+								<div
+									className={cn(
+										'flex justify-center',
+										!shouldApplyWritingTopShift && 'mt-6'
+									)}
+									style={
+										shouldApplyWritingTopShift
+											? { marginTop: `${writingContentTopMarginPx}px` }
+											: undefined
+									}
+								>
+									{/* Crossfade transition container */}
+									<div ref={crossfadeContainerRef} className="relative w-full isolate">
+										{/* Current view - always visible (avoid the "white flash" between tabs) */}
+										<div
+											data-campaign-view-layer="active"
+											className={cn(
+												'relative w-full',
+												// Prevent interacting with the destination view while the previous view is still covering it.
+												isTransitioning && previousView && 'pointer-events-none'
+											)}
+											style={{ zIndex: 1 }}
+										>
+											<DraftingSection
+												campaign={campaign}
+												view={activeView}
+												renderGlobalOverlays
+												onViewReady={handleActiveViewReady}
+												onDraftOperationsProgress={setDraftOperationsProgress}
+												autoOpenProfileTabWhenIncomplete={cameFromSearch}
+												inboxSentTabRequest={inboxSentTabRequest}
+												onInboxSentTabChange={setInboxSentTab}
+												goToOverview={() => setActiveView('overview')}
+												goToDrafting={() => setActiveView('drafting')}
+												goToWriting={() => setActiveView('testing')}
+												onGoToSearch={handleOpenDashboardSearchForCampaign}
+												goToInbox={() => setActiveView('inbox')}
+												goToSent={() => setActiveView('sent')}
+												onOpenIdentityDialog={() => {
+													setIdentityDialogOrigin('campaign');
+													setIsIdentityDialogOpen(true);
+												}}
+												goToPreviousTab={goToPreviousTab}
+												goToNextTab={goToNextTab}
+												hideHeaderBox={isNarrowestDesktop && !isMobile}
+												isCampaignWorkspaceExpanded={isCampaignWorkspaceExpanded}
+												onRequestCampaignWorkspaceExpanded={
+													requestCampaignWorkspaceExpanded
+												}
+												inboxMockState={inboxDebugEnabled ? inboxMockState : undefined}
+											/>
+										</div>
 
-						.campaign-map-split-overlay {
-							position: fixed;
-							inset: 0;
-							z-index: 0;
-							pointer-events: none;
-							background: linear-gradient(
-								to right,
-								rgba(136, 136, 136, 0) 0%,
-								rgba(136, 136, 136, 0)
-									var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333%),
-								rgba(136, 136, 136, 0.1)
-									var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333%),
-								rgba(136, 136, 136, 0.1) 100%
-							);
-						}
+										{/* Previous view - fades out above the current view */}
+										{isTransitioning && previousView && (
+											<div
+												data-campaign-view-layer="previous"
+												className="absolute inset-0 w-full pointer-events-none"
+												aria-hidden="true"
+												style={{
+													zIndex: 2,
+													willChange: 'opacity',
+													...(isFadingOutPreviousView
+														? {
+																animation: `viewFadeOut ${TRANSITION_DURATION}ms ease-out forwards`,
+															}
+														: { opacity: 1 }),
+												}}
+											>
+												<DraftingSection
+													campaign={campaign}
+													view={previousView}
+													renderGlobalOverlays={false}
+													autoOpenProfileTabWhenIncomplete={cameFromSearch}
+													inboxSentTabRequest={inboxSentTabRequest}
+													onInboxSentTabChange={setInboxSentTab}
+													goToOverview={() => setActiveView('overview')}
+													goToDrafting={() => setActiveView('drafting')}
+													goToWriting={() => setActiveView('testing')}
+													onGoToSearch={handleOpenDashboardSearchForCampaign}
+													goToInbox={() => setActiveView('inbox')}
+													goToSent={() => setActiveView('sent')}
+													onOpenIdentityDialog={() => {
+														setIdentityDialogOrigin('campaign');
+														setIsIdentityDialogOpen(true);
+													}}
+													goToPreviousTab={goToPreviousTab}
+													goToNextTab={goToNextTab}
+													hideHeaderBox={isNarrowestDesktop && !isMobile}
+													isCampaignWorkspaceExpanded={isCampaignWorkspaceExpanded}
+													onRequestCampaignWorkspaceExpanded={
+														requestCampaignWorkspaceExpanded
+													}
+													inboxMockState={inboxDebugEnabled ? inboxMockState : undefined}
+												/>
+											</div>
+										)}
+									</div>
+								</div>
+								{/* Crossfade transition animations and mobile-specific styles */}
+								<style jsx global>{`
+									.campaign-persistent-map-page {
+										isolation: isolate;
+										background: transparent;
+									}
 
-						.campaign-persistent-map-page [data-slot='campaign-top-box-wrapper'],
-						.campaign-persistent-map-page [data-slot='campaign-header'],
-						.campaign-persistent-map-page [data-slot='campaign-content'] {
-							transform: translateX(
-									var(${CAMPAIGN_MAP_SHIFT_X_VAR}, ${CAMPAIGN_MAP_FALLBACK_SHIFT_X_PX}px)
-								)
-								scale(${CAMPAIGN_MAP_CONTENT_SCALE});
-							transform-origin: top center;
-						}
+									.campaign-map-interactive-page {
+										z-index: 1;
+										pointer-events: none;
+									}
 
-						/* New top nav: shift right to center over the main box.
+									.campaign-map-interactive-page [data-slot='campaign-top-tabs'],
+									.campaign-map-interactive-page [data-slot='campaign-top-search-bar'],
+									.campaign-map-interactive-page [data-slot='campaign-header'],
+									.campaign-map-interactive-page [data-campaign-interactive-surface],
+									.campaign-map-interactive-page [data-campaign-header-box],
+									.campaign-map-interactive-page [data-campaign-main-box],
+									.campaign-map-interactive-page [data-research-panel-container],
+									.campaign-map-interactive-page [data-campaign-workspace-toggle],
+									.campaign-map-interactive-page [data-campaign-bottom-anchor],
+									.campaign-map-interactive-page [data-draft-button-container],
+									.campaign-map-interactive-page [data-draft-review-side-preview],
+									.campaign-map-interactive-page [data-left-expanded-panel],
+									.campaign-map-interactive-page [role='dialog'] {
+										pointer-events: auto;
+									}
+
+									.campaign-map-split-overlay {
+										position: fixed;
+										inset: 0;
+										z-index: 0;
+										pointer-events: none;
+										background: linear-gradient(
+											to right,
+											rgba(136, 136, 136, 0) 0%,
+											rgba(136, 136, 136, 0)
+												var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333%),
+											rgba(136, 136, 136, 0.1)
+												var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333%),
+											rgba(136, 136, 136, 0.1) var(${CAMPAIGN_MAP_BACKDROP_END_VAR}, 100%),
+											rgba(136, 136, 136, 0) var(${CAMPAIGN_MAP_BACKDROP_END_VAR}, 100%),
+											rgba(136, 136, 136, 0) 100%
+										);
+									}
+
+									.campaign-persistent-map-page [data-slot='campaign-top-box-wrapper'],
+									.campaign-persistent-map-page [data-slot='campaign-header'],
+									.campaign-persistent-map-page [data-slot='campaign-content'] {
+										transform: translateX(
+												var(
+													${CAMPAIGN_MAP_SHIFT_X_VAR},
+													${CAMPAIGN_MAP_FALLBACK_SHIFT_X_PX}px
+												)
+											)
+											scale(${CAMPAIGN_MAP_CONTENT_SCALE});
+										transform-origin: top center;
+									}
+
+									/* New top nav: shift right to center over the main box.
 						   Uses the same shift variable as the rest of campaign content, but no
 						   scale — the new nav has its own internal scale (MAP_VIEW_UI_SCALE). */
-						.campaign-persistent-map-page [data-slot='campaign-top-backdrop'],
-						.campaign-persistent-map-page [data-slot='campaign-top-outline-boxes'],
-						.campaign-persistent-map-page [data-slot='campaign-top-tabs'],
-						.campaign-persistent-map-page [data-slot='campaign-top-search-bar'] {
-							transform: translateX(
-								var(${CAMPAIGN_MAP_SHIFT_X_VAR}, ${CAMPAIGN_MAP_FALLBACK_SHIFT_X_PX}px)
-							);
-						}
+									.campaign-persistent-map-page [data-slot='campaign-top-backdrop'],
+									.campaign-persistent-map-page [data-slot='campaign-top-outline-boxes'],
+									.campaign-persistent-map-page [data-slot='campaign-top-tabs'],
+									.campaign-persistent-map-page [data-slot='campaign-top-search-bar'] {
+										transform: translateX(
+											var(
+												${CAMPAIGN_TOP_NAV_SHIFT_X_VAR},
+												var(
+													${CAMPAIGN_MAP_SHIFT_X_VAR},
+													${CAMPAIGN_MAP_FALLBACK_SHIFT_X_PX}px
+												)
+											)
+										);
+									}
 
-						/* View transition animation - simple tab fade */
-						@keyframes viewFadeOut {
-							0% {
-								opacity: 1;
-							}
-							100% {
-								opacity: 0;
-							}
-						}
+									/* View transition animation - simple tab fade */
+									@keyframes viewFadeOut {
+										0% {
+											opacity: 1;
+										}
+										100% {
+											opacity: 0;
+										}
+									}
 
-						/* Mobile styles below */
-						body.murmur-mobile [data-drafting-container] {
-							display: none !important;
-						}
+									/* Mobile styles below */
+									body.murmur-mobile [data-drafting-container] {
+										display: none !important;
+									}
 
-						/* Default: hide the inline header controls (used only in landscape) */
-						body.murmur-mobile .mobile-landscape-inline-controls {
-							display: none !important;
-						}
+									/* Default: hide the inline header controls (used only in landscape) */
+									body.murmur-mobile .mobile-landscape-inline-controls {
+										display: none !important;
+									}
 
-						/* Default: hide the centered metrics overlay (shown only in landscape) */
-						body.murmur-mobile .mobile-landscape-metrics-center {
-							display: none !important;
-						}
+									/* Default: hide the centered metrics overlay (shown only in landscape) */
+									body.murmur-mobile .mobile-landscape-metrics-center {
+										display: none !important;
+									}
 
-						/* Mobile portrait: fix signature block height */
-						@media (max-width: 480px) and (orientation: portrait) {
-							/* Specific case: when Full Auto block exists, set exact 8px gap to Signature while keeping it bottom-anchored */
-							body.murmur-mobile [data-hpi-left-panel]:has([data-block-type='full']) {
-								display: grid !important;
-								grid-template-rows: auto 1fr auto !important;
-								row-gap: 8px !important;
-							}
-							body.murmur-mobile
-								[data-hpi-left-panel]:has([data-block-type='full'])
-								[data-hpi-footer] {
-								margin-top: 0 !important; /* grid controls the 8px gap */
-							}
-							/* Ensure the drafting box doesn't get too small */
-							body.murmur-mobile [data-hpi-container] {
-								min-height: 483px !important;
-							}
-							/* Keep the signature footer anchored to the bottom */
-							body.murmur-mobile [data-hpi-content] {
-								padding-bottom: 0 !important;
-							}
-							body.murmur-mobile [data-hpi-content] > div {
-								padding-bottom: 0 !important; /* override inner pb-3 */
-							}
-							/* Make the gap from Signature to the bottom of the box exactly 8px */
-							body.murmur-mobile [data-hpi-footer] .mb-\[23px\],
-							body.murmur-mobile [data-hpi-footer] .mb-\[9px\] {
-								margin-bottom: 8px !important;
-							}
-							/* Anchor footer at bottom of the drafting box and layer above gradient */
-							body.murmur-mobile [data-hpi-footer] {
-								margin-top: auto !important; /* keep bottom-anchored */
-								position: relative !important;
-								z-index: 10 !important;
-							}
-							/* Ensure signature card and textarea are fully opaque white */
-							body.murmur-mobile [data-hpi-signature-card] {
-								background-color: #ffffff !important;
-								position: relative !important;
-								z-index: 10 !important;
-							}
-							body.murmur-mobile .signature-textarea {
-								background-color: #ffffff !important;
-							}
-							body.murmur-mobile [data-hpi-signature-card] {
-								min-height: 68px !important;
-							}
-							/* Allow the signature textarea to auto-expand on mobile portrait */
-							body.murmur-mobile .signature-textarea {
-								min-height: 44px !important; /* base height */
-								font-size: 12px !important;
-								line-height: 1.2 !important;
-								padding: 2px 0 0 2px !important;
-								overflow: hidden !important;
-								resize: none !important;
-							}
-						}
+									/* Mobile portrait: fix signature block height */
+									@media (max-width: 480px) and (orientation: portrait) {
+										/* Specific case: when Full Auto block exists, set exact 8px gap to Signature while keeping it bottom-anchored */
+										body.murmur-mobile
+											[data-hpi-left-panel]:has([data-block-type='full']) {
+											display: grid !important;
+											grid-template-rows: auto 1fr auto !important;
+											row-gap: 8px !important;
+										}
+										body.murmur-mobile
+											[data-hpi-left-panel]:has([data-block-type='full'])
+											[data-hpi-footer] {
+											margin-top: 0 !important; /* grid controls the 8px gap */
+										}
+										/* Ensure the drafting box doesn't get too small */
+										body.murmur-mobile [data-hpi-container] {
+											min-height: 483px !important;
+										}
+										/* Keep the signature footer anchored to the bottom */
+										body.murmur-mobile [data-hpi-content] {
+											padding-bottom: 0 !important;
+										}
+										body.murmur-mobile [data-hpi-content] > div {
+											padding-bottom: 0 !important; /* override inner pb-3 */
+										}
+										/* Make the gap from Signature to the bottom of the box exactly 8px */
+										body.murmur-mobile [data-hpi-footer] .mb-\[23px\],
+										body.murmur-mobile [data-hpi-footer] .mb-\[9px\] {
+											margin-bottom: 8px !important;
+										}
+										/* Anchor footer at bottom of the drafting box and layer above gradient */
+										body.murmur-mobile [data-hpi-footer] {
+											margin-top: auto !important; /* keep bottom-anchored */
+											position: relative !important;
+											z-index: 10 !important;
+										}
+										/* Ensure signature card and textarea are fully opaque white */
+										body.murmur-mobile [data-hpi-signature-card] {
+											background-color: #ffffff !important;
+											position: relative !important;
+											z-index: 10 !important;
+										}
+										body.murmur-mobile .signature-textarea {
+											background-color: #ffffff !important;
+										}
+										body.murmur-mobile [data-hpi-signature-card] {
+											min-height: 68px !important;
+										}
+										/* Allow the signature textarea to auto-expand on mobile portrait */
+										body.murmur-mobile .signature-textarea {
+											min-height: 44px !important; /* base height */
+											font-size: 12px !important;
+											line-height: 1.2 !important;
+											padding: 2px 0 0 2px !important;
+											overflow: hidden !important;
+											resize: none !important;
+										}
+									}
 
-						/* Mobile landscape: inline header controls, centered metrics, and title layout */
-						@media (orientation: landscape) {
-							/* Left-side expanded panel height cap in mobile landscape (exclude Email Structure) */
-							body.murmur-mobile
-								[data-left-expanded-panel]
-								> div:not([aria-label='Expanded email structure']) {
-								height: 273px !important;
-								max-height: 273px !important;
-								overflow: hidden !important;
-							}
-							/* Ensure inner scroll areas flex correctly within the capped height */
-							body.murmur-mobile
-								[data-left-expanded-panel]
-								> div:not([aria-label='Expanded email structure'])
-								> * {
-								max-height: 100% !important;
-							}
-							/* Row: use a 3-column grid so title/metrics/controls never overlap */
-							body.murmur-mobile .mobile-header-row {
-								display: grid !important;
-								grid-template-columns: 1fr auto 1fr !important; /* left flex, centered auto, right flex */
-								align-items: center !important;
-								gap: 6px !important;
-							}
-							/* Centered metrics: inline in the center grid cell */
-							body.murmur-mobile .mobile-landscape-metrics-center {
-								display: inline-flex !important;
-								gap: 6px !important;
-								position: static !important;
-								left: auto !important;
-								top: auto !important;
-								transform: none !important;
-								z-index: auto !important;
-								pointer-events: auto !important;
-								justify-self: center !important; /* center within middle column */
-								grid-column: 2 / 3 !important;
-							}
-							/* Controls: right grid cell */
-							body.murmur-mobile .mobile-landscape-inline-controls {
-								display: inline-flex !important;
-								gap: 3px; /* tighter spacing to free more room for title */
-								align-items: center !important;
-								position: static !important;
-								left: auto !important;
-								transform: none !important;
-								margin-left: 0 !important;
-								padding-right: 15px !important; /* increased right padding */
-								justify-self: end !important;
-								grid-column: 3 / 4 !important;
-							}
-							/* Title: flex and truncate on the left side */
-							body.murmur-mobile .campaign-title-landscape {
-								margin-left: -8px !important; /* nudge farther left in landscape */
-								padding-left: 15px !important; /* increased left padding */
-								max-width: none;
-								overflow: hidden;
-								white-space: nowrap;
-								text-overflow: ellipsis;
-								flex: 1 1 auto; /* allow the title to use remaining row space */
-								min-width: 0; /* enable proper truncation inside flex layouts */
-							}
-							/* smaller title text only in mobile landscape and enforce truncation */
-							body.murmur-mobile .campaign-title-landscape * {
-								font-size: 15px !important;
-								line-height: 1 !important;
-								text-align: left !important; /* show more of the beginning */
-								max-width: 100% !important;
-								width: 100% !important; /* override inner w-fit to enable truncation */
-								overflow: hidden !important;
-								white-space: nowrap !important;
-								text-overflow: ellipsis !important;
-							}
+									/* Mobile landscape: inline header controls, centered metrics, and title layout */
+									@media (orientation: landscape) {
+										/* Left-side expanded panel height cap in mobile landscape (exclude Email Structure) */
+										body.murmur-mobile
+											[data-left-expanded-panel]
+											> div:not([aria-label='Expanded email structure']) {
+											height: 273px !important;
+											max-height: 273px !important;
+											overflow: hidden !important;
+										}
+										/* Ensure inner scroll areas flex correctly within the capped height */
+										body.murmur-mobile
+											[data-left-expanded-panel]
+											> div:not([aria-label='Expanded email structure'])
+											> * {
+											max-height: 100% !important;
+										}
+										/* Row: use a 3-column grid so title/metrics/controls never overlap */
+										body.murmur-mobile .mobile-header-row {
+											display: grid !important;
+											grid-template-columns: 1fr auto 1fr !important; /* left flex, centered auto, right flex */
+											align-items: center !important;
+											gap: 6px !important;
+										}
+										/* Centered metrics: inline in the center grid cell */
+										body.murmur-mobile .mobile-landscape-metrics-center {
+											display: inline-flex !important;
+											gap: 6px !important;
+											position: static !important;
+											left: auto !important;
+											top: auto !important;
+											transform: none !important;
+											z-index: auto !important;
+											pointer-events: auto !important;
+											justify-self: center !important; /* center within middle column */
+											grid-column: 2 / 3 !important;
+										}
+										/* Controls: right grid cell */
+										body.murmur-mobile .mobile-landscape-inline-controls {
+											display: inline-flex !important;
+											gap: 3px; /* tighter spacing to free more room for title */
+											align-items: center !important;
+											position: static !important;
+											left: auto !important;
+											transform: none !important;
+											margin-left: 0 !important;
+											padding-right: 15px !important; /* increased right padding */
+											justify-self: end !important;
+											grid-column: 3 / 4 !important;
+										}
+										/* Title: flex and truncate on the left side */
+										body.murmur-mobile .campaign-title-landscape {
+											margin-left: -8px !important; /* nudge farther left in landscape */
+											padding-left: 15px !important; /* increased left padding */
+											max-width: none;
+											overflow: hidden;
+											white-space: nowrap;
+											text-overflow: ellipsis;
+											flex: 1 1 auto; /* allow the title to use remaining row space */
+											min-width: 0; /* enable proper truncation inside flex layouts */
+										}
+										/* smaller title text only in mobile landscape and enforce truncation */
+										body.murmur-mobile .campaign-title-landscape * {
+											font-size: 15px !important;
+											line-height: 1 !important;
+											text-align: left !important; /* show more of the beginning */
+											max-width: 100% !important;
+											width: 100% !important; /* override inner w-fit to enable truncation */
+											overflow: hidden !important;
+											white-space: nowrap !important;
+											text-overflow: ellipsis !important;
+										}
 
-							/* Shrink metric boxes a bit to free width for the title */
-							body.murmur-mobile .mobile-landscape-inline-controls .metric-box {
-								width: 70px !important;
-								font-size: 10.5px !important;
-								padding-left: 6px !important;
-								padding-right: 6px !important;
-							}
-							/* Make To/From pills slightly narrower */
-							body.murmur-mobile .mobile-landscape-inline-controls .pill-mini {
-								width: 32px !important;
-								height: 14px !important;
-								border-radius: 5px !important;
-							}
-							body.murmur-mobile .mobile-landscape-inline-controls .pill-mini span {
-								font-size: 9px !important;
-							}
-							/* Tighten spacing before the inline view tabs in landscape */
-							body.murmur-mobile .mobile-landscape-inline-controls .ml-2 {
-								margin-left: 4px !important;
-							}
-							/* Slightly smaller view-tab labels to prioritize title width */
-							body.murmur-mobile .mobile-landscape-inline-controls button {
-								font-size: 14px !important;
-							}
+										/* Shrink metric boxes a bit to free width for the title */
+										body.murmur-mobile .mobile-landscape-inline-controls .metric-box {
+											width: 70px !important;
+											font-size: 10.5px !important;
+											padding-left: 6px !important;
+											padding-right: 6px !important;
+										}
+										/* Make To/From pills slightly narrower */
+										body.murmur-mobile .mobile-landscape-inline-controls .pill-mini {
+											width: 32px !important;
+											height: 14px !important;
+											border-radius: 5px !important;
+										}
+										body.murmur-mobile .mobile-landscape-inline-controls .pill-mini span {
+											font-size: 9px !important;
+										}
+										/* Tighten spacing before the inline view tabs in landscape */
+										body.murmur-mobile .mobile-landscape-inline-controls .ml-2 {
+											margin-left: 4px !important;
+										}
+										/* Slightly smaller view-tab labels to prioritize title width */
+										body.murmur-mobile .mobile-landscape-inline-controls button {
+											font-size: 14px !important;
+										}
 
-							/* Make the preview panel mimic portrait style by hiding its outer chrome */
-							body.murmur-mobile [data-drafting-preview-panel] {
-								background: transparent !important;
-								border: 0 !important;
-								scale: 1 !important;
-								border-radius: 0 !important;
-							}
-							body.murmur-mobile [data-drafting-preview-header] {
-								display: none !important;
-							}
+										/* Make the preview panel mimic portrait style by hiding its outer chrome */
+										body.murmur-mobile [data-drafting-preview-panel] {
+											background: transparent !important;
+											border: 0 !important;
+											scale: 1 !important;
+											border-radius: 0 !important;
+										}
+										body.murmur-mobile [data-drafting-preview-header] {
+											display: none !important;
+										}
 
-							/* Mobile landscape: make Test Preview match main drafting box dimensions */
-							body.murmur-mobile [data-test-preview-wrapper] {
-								width: 96.27vw !important; /* same as main drafting box */
-							}
-							body.murmur-mobile [data-test-preview-wrapper] [data-test-preview-panel] {
-								width: 100% !important; /* fill wrapper */
-								height: 644px !important; /* keep same inner height used in portrait */
-							}
-							/* Show sticky Back to Testing / Go to Drafting footer in landscape on mobile */
-							body.murmur-mobile
-								[data-test-preview-wrapper]
-								.mobile-landscape-sticky-preview-footer {
-								display: block !important;
-							}
-						}
+										/* Mobile landscape: make Test Preview match main drafting box dimensions */
+										body.murmur-mobile [data-test-preview-wrapper] {
+											width: 96.27vw !important; /* same as main drafting box */
+										}
+										body.murmur-mobile
+											[data-test-preview-wrapper]
+											[data-test-preview-panel] {
+											width: 100% !important; /* fill wrapper */
+											height: 644px !important; /* keep same inner height used in portrait */
+										}
+										/* Show sticky Back to Testing / Go to Drafting footer in landscape on mobile */
+										body.murmur-mobile
+											[data-test-preview-wrapper]
+											.mobile-landscape-sticky-preview-footer {
+											display: block !important;
+										}
+									}
 
-						/* At 667px landscape, adjust spacing for less cramped layout */
-						@media (max-width: 667px) and (orientation: landscape) {
-							body.murmur-mobile .campaign-title-landscape {
-								margin-left: -20px;
-							}
-							/* Home button on the right - push it out slightly */
-							body.murmur-mobile button[title='Home'] {
-								margin-right: -4px;
-							}
-						}
+									/* At 667px landscape, adjust spacing for less cramped layout */
+									@media (max-width: 667px) and (orientation: landscape) {
+										body.murmur-mobile .campaign-title-landscape {
+											margin-left: -20px;
+										}
+										/* Home button on the right - push it out slightly */
+										body.murmur-mobile button[title='Home'] {
+											margin-right: -4px;
+										}
+									}
 
-						@media (orientation: landscape) {
-							/* Hide portrait container and bottom tabs while in landscape */
-							body.murmur-mobile [data-slot='mobile-header-controls'] {
-								display: none !important;
-							}
-							body.murmur-mobile .mobile-landscape-hide {
-								display: none !important;
-							}
-							/* Mobile landscape: shrink the Hybrid Prompt Input to its minimal functional height */
-							body.murmur-mobile [data-hpi-container] {
-								min-height: unset !important;
-								margin-bottom: 6px !important;
-							}
-							body.murmur-mobile [data-hpi-left-panel] {
-								padding-top: 6px !important;
-								padding-bottom: 6px !important;
-							}
-							body.murmur-mobile [data-hpi-content] {
-								padding-top: 6px !important;
-								padding-bottom: 0 !important;
-								gap: 8px !important;
-							}
-							/* Mobile landscape: enforce exact 8px gap from subject bar to first block */
-							body.murmur-mobile
-								[data-hpi-left-panel]
-								[data-slot='form-item']:first-of-type {
-								margin-bottom: 0 !important;
-							}
-							/* Remove container top padding and set inner wrapper top padding to 8px */
-							body.murmur-mobile [data-hpi-content] {
-								padding-top: 0 !important;
-								gap: 6px !important; /* keep tighter inter-block spacing */
-							}
-							body.murmur-mobile [data-hpi-content] > div {
-								padding-top: 8px !important; /* overrides pt-[16px]/pt-[8px] utility classes */
-							}
-							/* Subject bar: minimal but legible */
-							body.murmur-mobile .subject-bar {
-								height: 24px !important;
-								min-height: 24px !important;
-								max-height: 24px !important;
-							}
-							/* iPhone landscape: prevent overlap by slightly reducing label size and spacing toggle */
-							body.murmur-mobile .subject-bar .subject-label {
-								font-size: 15px !important;
-							}
-							body.murmur-mobile .subject-bar .subject-toggle {
-								margin-right: 4px !important;
-							}
-							/* Full Auto textarea: reduce height and hide example for space */
-							body.murmur-mobile .full-auto-textarea {
-								height: 90px !important;
-								min-height: 90px !important;
-							}
-							body.murmur-mobile .full-auto-placeholder-example {
-								display: none !important;
-							}
-							/* Mini Email Structure: make Full Auto much shorter in mobile landscape */
-							body.murmur-mobile
-								[aria-label='Expanded email structure']
-								.mini-full-auto-textarea {
-								height: 48px !important;
-								min-height: 48px !important;
-							}
-							/* Reduce extra whitespace under the paragraph slider in the mini card */
-							body.murmur-mobile
-								[aria-label='Expanded email structure']
-								.mini-paragraph-slider {
-								margin-bottom: 0 !important;
-								padding-bottom: 0 !important;
-							}
-							body.murmur-mobile
-								[aria-label='Expanded email structure']
-								.mini-full-auto-card {
-								padding-bottom: 6px !important; /* tighten bottom padding of the card */
-							}
-							body.murmur-mobile
-								[aria-label='Expanded email structure']
-								.mini-full-auto-placeholder {
-								display: block !important;
-								font-size: 9px !important;
-								line-height: 1.15 !important;
-								padding: 4px 6px 2px 0 !important;
-								color: #505050 !important;
-								overflow: hidden !important;
-							}
-							/* Show full guidance text (both lines) but keep smaller sizing */
-							/* Signature area: single-line compact */
-							body.murmur-mobile [data-hpi-footer] {
-								margin-top: 2px !important;
-							}
-							/* Reduce space between last block and signature */
-							body.murmur-mobile [data-hpi-content] [data-block-type]:last-of-type {
-								margin-bottom: 2px !important;
-							}
-							body.murmur-mobile [data-hpi-signature-card] {
-								min-height: 42px !important;
-								padding-top: 4px !important;
-								padding-bottom: 4px !important;
-								display: flex !important;
-								align-items: center !important;
-								gap: 8px !important;
-							}
-							body.murmur-mobile [data-hpi-signature-card] [data-slot='form-label'] {
-								margin: 0 8px 0 0 !important;
-								white-space: nowrap !important;
-							}
-							body.murmur-mobile .signature-textarea {
-								height: 30px !important;
-								min-height: 30px !important;
-								max-height: 30px !important;
-								overflow: hidden !important;
-								resize: none !important;
-								flex: 1 1 auto !important;
-								min-width: 0 !important;
-								font-size: 12px !important; /* match the 'Signature' header size on mobile */
-								line-height: 1.2 !important;
-								padding: 2px 0 0 2px !important;
-							}
-							/* Blocks: tighten vertical chrome */
-							body.murmur-mobile [data-block-type] {
-								margin-top: 6px !important;
-								margin-bottom: 6px !important;
-							}
-							body.murmur-mobile [data-block-type='text'] {
-								min-height: 44px !important;
-							}
-							body.murmur-mobile [data-drag-handle] {
-								height: 24px !important;
-							}
-							/* Show sticky Test; hide in-box Test */
-							body.murmur-mobile .mobile-sticky-test-button {
-								display: block !important;
-							}
-							body.murmur-mobile .w-full > .flex.justify-center.mb-4.w-full {
-								display: none !important;
-							}
-							/* Exact 8px gap between last content block and Signature; keep Signature bottom-anchored */
-							body.murmur-mobile [data-hpi-container] {
-								display: grid !important;
-								grid-template-rows: 1fr auto !important; /* content fills, footer at bottom */
-								align-items: stretch !important;
-								row-gap: 8px !important; /* exact gap above signature */
-							}
-							/* Remove extra bottom spacing inside the content area so the gap is truly 8px */
-							body.murmur-mobile [data-hpi-left-panel] {
-								padding-bottom: 0 !important;
-							}
-							body.murmur-mobile [data-hpi-content] {
-								padding-bottom: 0 !important;
-							}
-							body.murmur-mobile [data-hpi-content] > div {
-								padding-bottom: 0 !important; /* override inner pb-3 */
-							}
-							body.murmur-mobile [data-hpi-content] [data-block-type]:last-of-type {
-								margin-bottom: 0 !important; /* account for any margins on the last block */
-							}
-							/* Rely on grid spacing; do not add margin on footer */
-							body.murmur-mobile [data-hpi-footer] {
-								margin-top: 0 !important; /* override mt-auto/margin rules */
-							}
-							/* Ensure exactly 8px between the bottom of Signature and the bottom of the box */
-							body.murmur-mobile [data-hpi-footer] {
-								padding-bottom: 8px !important;
-							}
-							/* Remove extra bottom margin from the Signature FormItem wrapper */
-							body.murmur-mobile [data-hpi-footer] .mb-\[23px\],
-							body.murmur-mobile [data-hpi-footer] .mb-\[9px\] {
-								margin-bottom: 0 !important;
-							}
-							/* Hide any in-box footer content below Signature in landscape (Test/error), relying on sticky Test */
-							body.murmur-mobile [data-hpi-footer] > .w-full {
-								display: none !important;
-							}
-						}
+									@media (orientation: landscape) {
+										/* Hide portrait container and bottom tabs while in landscape */
+										body.murmur-mobile [data-slot='mobile-header-controls'] {
+											display: none !important;
+										}
+										body.murmur-mobile .mobile-landscape-hide {
+											display: none !important;
+										}
+										/* Mobile landscape: shrink the Hybrid Prompt Input to its minimal functional height */
+										body.murmur-mobile [data-hpi-container] {
+											min-height: unset !important;
+											margin-bottom: 6px !important;
+										}
+										body.murmur-mobile [data-hpi-left-panel] {
+											padding-top: 6px !important;
+											padding-bottom: 6px !important;
+										}
+										body.murmur-mobile [data-hpi-content] {
+											padding-top: 6px !important;
+											padding-bottom: 0 !important;
+											gap: 8px !important;
+										}
+										/* Mobile landscape: enforce exact 8px gap from subject bar to first block */
+										body.murmur-mobile
+											[data-hpi-left-panel]
+											[data-slot='form-item']:first-of-type {
+											margin-bottom: 0 !important;
+										}
+										/* Remove container top padding and set inner wrapper top padding to 8px */
+										body.murmur-mobile [data-hpi-content] {
+											padding-top: 0 !important;
+											gap: 6px !important; /* keep tighter inter-block spacing */
+										}
+										body.murmur-mobile [data-hpi-content] > div {
+											padding-top: 8px !important; /* overrides pt-[16px]/pt-[8px] utility classes */
+										}
+										/* Subject bar: minimal but legible */
+										body.murmur-mobile .subject-bar {
+											height: 24px !important;
+											min-height: 24px !important;
+											max-height: 24px !important;
+										}
+										/* iPhone landscape: prevent overlap by slightly reducing label size and spacing toggle */
+										body.murmur-mobile .subject-bar .subject-label {
+											font-size: 15px !important;
+										}
+										body.murmur-mobile .subject-bar .subject-toggle {
+											margin-right: 4px !important;
+										}
+										/* Full Auto textarea: reduce height and hide example for space */
+										body.murmur-mobile .full-auto-textarea {
+											height: 90px !important;
+											min-height: 90px !important;
+										}
+										body.murmur-mobile .full-auto-placeholder-example {
+											display: none !important;
+										}
+										/* Mini Email Structure: make Full Auto much shorter in mobile landscape */
+										body.murmur-mobile
+											[aria-label='Expanded email structure']
+											.mini-full-auto-textarea {
+											height: 48px !important;
+											min-height: 48px !important;
+										}
+										/* Reduce extra whitespace under the paragraph slider in the mini card */
+										body.murmur-mobile
+											[aria-label='Expanded email structure']
+											.mini-paragraph-slider {
+											margin-bottom: 0 !important;
+											padding-bottom: 0 !important;
+										}
+										body.murmur-mobile
+											[aria-label='Expanded email structure']
+											.mini-full-auto-card {
+											padding-bottom: 6px !important; /* tighten bottom padding of the card */
+										}
+										body.murmur-mobile
+											[aria-label='Expanded email structure']
+											.mini-full-auto-placeholder {
+											display: block !important;
+											font-size: 9px !important;
+											line-height: 1.15 !important;
+											padding: 4px 6px 2px 0 !important;
+											color: #505050 !important;
+											overflow: hidden !important;
+										}
+										/* Show full guidance text (both lines) but keep smaller sizing */
+										/* Signature area: single-line compact */
+										body.murmur-mobile [data-hpi-footer] {
+											margin-top: 2px !important;
+										}
+										/* Reduce space between last block and signature */
+										body.murmur-mobile [data-hpi-content] [data-block-type]:last-of-type {
+											margin-bottom: 2px !important;
+										}
+										body.murmur-mobile [data-hpi-signature-card] {
+											min-height: 42px !important;
+											padding-top: 4px !important;
+											padding-bottom: 4px !important;
+											display: flex !important;
+											align-items: center !important;
+											gap: 8px !important;
+										}
+										body.murmur-mobile
+											[data-hpi-signature-card]
+											[data-slot='form-label'] {
+											margin: 0 8px 0 0 !important;
+											white-space: nowrap !important;
+										}
+										body.murmur-mobile .signature-textarea {
+											height: 30px !important;
+											min-height: 30px !important;
+											max-height: 30px !important;
+											overflow: hidden !important;
+											resize: none !important;
+											flex: 1 1 auto !important;
+											min-width: 0 !important;
+											font-size: 12px !important; /* match the 'Signature' header size on mobile */
+											line-height: 1.2 !important;
+											padding: 2px 0 0 2px !important;
+										}
+										/* Blocks: tighten vertical chrome */
+										body.murmur-mobile [data-block-type] {
+											margin-top: 6px !important;
+											margin-bottom: 6px !important;
+										}
+										body.murmur-mobile [data-block-type='text'] {
+											min-height: 44px !important;
+										}
+										body.murmur-mobile [data-drag-handle] {
+											height: 24px !important;
+										}
+										/* Show sticky Test; hide in-box Test */
+										body.murmur-mobile .mobile-sticky-test-button {
+											display: block !important;
+										}
+										body.murmur-mobile .w-full > .flex.justify-center.mb-4.w-full {
+											display: none !important;
+										}
+										/* Exact 8px gap between last content block and Signature; keep Signature bottom-anchored */
+										body.murmur-mobile [data-hpi-container] {
+											display: grid !important;
+											grid-template-rows: 1fr auto !important; /* content fills, footer at bottom */
+											align-items: stretch !important;
+											row-gap: 8px !important; /* exact gap above signature */
+										}
+										/* Remove extra bottom spacing inside the content area so the gap is truly 8px */
+										body.murmur-mobile [data-hpi-left-panel] {
+											padding-bottom: 0 !important;
+										}
+										body.murmur-mobile [data-hpi-content] {
+											padding-bottom: 0 !important;
+										}
+										body.murmur-mobile [data-hpi-content] > div {
+											padding-bottom: 0 !important; /* override inner pb-3 */
+										}
+										body.murmur-mobile [data-hpi-content] [data-block-type]:last-of-type {
+											margin-bottom: 0 !important; /* account for any margins on the last block */
+										}
+										/* Rely on grid spacing; do not add margin on footer */
+										body.murmur-mobile [data-hpi-footer] {
+											margin-top: 0 !important; /* override mt-auto/margin rules */
+										}
+										/* Ensure exactly 8px between the bottom of Signature and the bottom of the box */
+										body.murmur-mobile [data-hpi-footer] {
+											padding-bottom: 8px !important;
+										}
+										/* Remove extra bottom margin from the Signature FormItem wrapper */
+										body.murmur-mobile [data-hpi-footer] .mb-\[23px\],
+										body.murmur-mobile [data-hpi-footer] .mb-\[9px\] {
+											margin-bottom: 0 !important;
+										}
+										/* Hide any in-box footer content below Signature in landscape (Test/error), relying on sticky Test */
+										body.murmur-mobile [data-hpi-footer] > .w-full {
+											display: none !important;
+										}
+									}
 
-						/* Previously we drew only a bottom divider. Replace with a full header box in landscape. */
-						@media (orientation: landscape) {
-							/* Full-width box around header */
-							body.murmur-mobile [data-slot='campaign-header'] {
-								border: 2px solid #000000 !important;
-								box-sizing: border-box !important;
-							}
-							/* Remove old bottom divider and any gap so header box touches content */
-							body.murmur-mobile [data-slot='campaign-content'] {
-								border-top: 0 !important;
-								margin-top: 0 !important;
-							}
-						}
-					`}</style>
-				</div>
-			</div>
+									/* Previously we drew only a bottom divider. Replace with a full header box in landscape. */
+									@media (orientation: landscape) {
+										/* Full-width box around header */
+										body.murmur-mobile [data-slot='campaign-header'] {
+											border: 2px solid #000000 !important;
+											box-sizing: border-box !important;
+										}
+										/* Remove old bottom divider and any gap so header box touches content */
+										body.murmur-mobile [data-slot='campaign-content'] {
+											border-top: 0 !important;
+											margin-top: 0 !important;
+										}
+									}
+								`}</style>
+							</div>
+						</div>
 
-			{/* Mobile bottom navigation panel */}
-			{isMobile && (
-				<div
-					className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-1"
-					style={{ backgroundColor: '#E1EFF4' }}
-				>
-					<button
-						type="button"
-						onClick={goToPreviousMobileTab}
-						className="bg-transparent border-0 p-1 cursor-pointer hover:opacity-70 transition-opacity"
-						aria-label="Previous tab"
-					>
-						<LeftArrow width={18} height={34} color="#000000" opacity={1} />
-					</button>
-					<button
-						type="button"
-						onClick={goToNextMobileTab}
-						className="bg-transparent border-0 p-1 cursor-pointer hover:opacity-70 transition-opacity"
-						aria-label="Next tab"
-					>
-						<RightArrow width={18} height={34} color="#000000" opacity={1} />
-					</button>
-				</div>
-			)}
-			{inboxDebugEnabled && (
-				<CampaignInboxDebugPanel
-					value={inboxMockState}
-					onChange={setInboxMockState}
-				/>
-			)}
-				</div>
+						{/* Mobile bottom navigation panel */}
+						{isMobile && (
+							<div
+								className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-1"
+								style={{ backgroundColor: '#E1EFF4' }}
+							>
+								<button
+									type="button"
+									onClick={goToPreviousMobileTab}
+									className="bg-transparent border-0 p-1 cursor-pointer hover:opacity-70 transition-opacity"
+									aria-label="Previous tab"
+								>
+									<LeftArrow width={18} height={34} color="#000000" opacity={1} />
+								</button>
+								<button
+									type="button"
+									onClick={goToNextMobileTab}
+									className="bg-transparent border-0 p-1 cursor-pointer hover:opacity-70 transition-opacity"
+									aria-label="Next tab"
+								>
+									<RightArrow width={18} height={34} color="#000000" opacity={1} />
+								</button>
+							</div>
+						)}
+						{inboxDebugEnabled && (
+							<CampaignInboxDebugPanel
+								value={inboxMockState}
+								onChange={setInboxMockState}
+							/>
+						)}
+					</div>
 				</CampaignTopSearchHighlightProvider>
 			</HoverDescriptionProvider>
 		</CampaignDeviceProvider>
@@ -3330,4 +3607,3 @@ const Murmur = () => {
 };
 
 export default Murmur;
-

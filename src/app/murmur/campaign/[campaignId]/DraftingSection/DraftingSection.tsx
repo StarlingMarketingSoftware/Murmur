@@ -1,12 +1,4 @@
-import {
-	FC,
-	Fragment,
-	useCallback,
-	useEffect,
-	useState,
-	useRef,
-	useMemo,
-} from 'react';
+import { FC, Fragment, useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { gsap } from 'gsap';
 import {
@@ -217,6 +209,8 @@ const stripInjectedSubjectFromTestMessageHtml = (
 interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 	onOpenIdentityDialog?: () => void;
 	autoOpenProfileTabWhenIncomplete?: boolean;
+	isCampaignWorkspaceExpanded?: boolean;
+	onRequestCampaignWorkspaceExpanded?: () => void;
 }
 
 type CampaignBottomPanelKind = 'contacts' | 'drafts' | 'sent' | 'inbox';
@@ -230,6 +224,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		goToDrafting,
 		goToWriting,
 		onOpenIdentityDialog,
+		isCampaignWorkspaceExpanded = false,
+		onRequestCampaignWorkspaceExpanded,
 		onGoToSearch,
 		goToInbox,
 		goToSent,
@@ -642,17 +638,32 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const mainContactsPanelHeightPx = 597;
 	const inboxMainPanelWidthPx = 863;
 	const inboxMainPanelHeightPx = 706;
+	const isCampaignWorkspaceCompact =
+		!isCampaignWorkspaceExpanded &&
+		!isMobile &&
+		!isNarrowDesktop &&
+		!isNarrowestDesktop &&
+		(view === 'testing' || view === 'drafting' || view === 'inbox');
+	const activeInboxMainPanelWidthPx = isCampaignWorkspaceCompact
+		? 501
+		: inboxMainPanelWidthPx;
+	const activeInboxMainPanelHeightPx = isCampaignWorkspaceCompact
+		? 703
+		: inboxMainPanelHeightPx;
 	const inboxWideTopMarginPx = 24;
 	const inboxWideBottomPanelMarginTopPx = 114;
 	const sharedWideTabZoomEnvelopeBottomPx =
 		inboxWideTopMarginPx +
-		inboxMainPanelHeightPx +
+		activeInboxMainPanelHeightPx +
 		inboxWideBottomPanelMarginTopPx +
 		bottomPanelBoxHeightPx;
 	const sharedBottomPanelSlotTopPx =
 		sharedWideTabZoomEnvelopeBottomPx - bottomPanelBoxHeightPx;
 	// Keeps the inbox box 36px to the right of the standard left column anchor.
 	const inboxMainPanelShiftRightPx = 185.5;
+	const activeInboxMainPanelShiftRightPx = isCampaignWorkspaceCompact
+		? 0
+		: inboxMainPanelShiftRightPx;
 	const standardSidePanelTopOffsetPx = 15;
 	const standardSidePanelGapPx = 16;
 	const campaignHeaderBoxHeightPx = 59;
@@ -697,7 +708,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	}, [view]);
 	const shouldRenderSharedBottomPanels =
-		sharedBottomPanelKinds.length > 0 && !isMobile && !hideHeaderBox && !isNarrowestDesktop;
+		sharedBottomPanelKinds.length > 0 &&
+		!isMobile &&
+		!hideHeaderBox &&
+		!isNarrowestDesktop;
 	const shouldReserveSharedWideTabZoomEnvelope =
 		!isMobile &&
 		!hideHeaderBox &&
@@ -1923,30 +1937,54 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [hasUserSelectedResearchContact, setHasUserSelectedResearchContact] =
 		useState(false);
 	const [showTestPreview, setShowTestPreview] = useState(false);
+	const handleTestPreviewToggle = useCallback(
+		(open: boolean) => {
+			if (open && isCampaignWorkspaceCompact) {
+				onRequestCampaignWorkspaceExpanded?.();
+			}
+			setShowTestPreview(open);
+		},
+		[isCampaignWorkspaceCompact, onRequestCampaignWorkspaceExpanded]
+	);
+	useEffect(() => {
+		if (renderGlobalOverlays && isCampaignWorkspaceCompact && isBatchDraftingInProgress) {
+			onRequestCampaignWorkspaceExpanded?.();
+		}
+	}, [
+		isBatchDraftingInProgress,
+		isCampaignWorkspaceCompact,
+		onRequestCampaignWorkspaceExpanded,
+		renderGlobalOverlays,
+	]);
 	const [selectedInboxEmailId, setSelectedInboxEmailId] = useState<number | null>(null);
-	const [optimisticInboxReplyByEmailId, setOptimisticInboxReplyByEmailId] =
-		useState<Record<number, number>>({});
+	const [optimisticInboxReplyByEmailId, setOptimisticInboxReplyByEmailId] = useState<
+		Record<number, number>
+	>({});
 	const handleInboxEmailClick = useCallback(
 		(email: { id: number; isSent?: boolean }) => {
 			const tab = email.isSent ? 'sent' : 'inbox';
 			setSelectedInboxEmailId(email.id);
 			setLocalInboxSentTabRequest((prev) => ({
 				tab,
-				requestId: Math.max(prev?.requestId ?? 0, inboxSentTabRequest?.requestId ?? 0) + 1,
+				requestId:
+					Math.max(prev?.requestId ?? 0, inboxSentTabRequest?.requestId ?? 0) + 1,
 				preserveSelection: true,
 			}));
 		},
 		[inboxSentTabRequest?.requestId]
 	);
-	const handleInboxThreadReplySent = useCallback((messageIds: number[], sentAtMs: number) => {
-		setOptimisticInboxReplyByEmailId((prev) => {
-			const next = { ...prev };
-			for (const id of messageIds) {
-				next[id] = Math.max(next[id] ?? 0, sentAtMs);
-			}
-			return next;
-		});
-	}, []);
+	const handleInboxThreadReplySent = useCallback(
+		(messageIds: number[], sentAtMs: number) => {
+			setOptimisticInboxReplyByEmailId((prev) => {
+				const next = { ...prev };
+				for (const id of messageIds) {
+					next[id] = Math.max(next[id] ?? 0, sentAtMs);
+				}
+				return next;
+			});
+		},
+		[]
+	);
 
 	useEffect(() => {
 		setSelectedInboxEmailId(null);
@@ -2402,9 +2440,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						contacts={contactsForContactsExpandedList}
 						{...contactsListSupplementalProps}
 						campaign={campaign}
-						activelyDraftingContactIds={
-							activelyDraftingContactIdsForContactsExpandedList
-						}
+						activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
 						width={bottomPanelBoxWidthPx}
 						height={bottomPanelBoxHeightPx}
 						enableUsedContactTooltip={false}
@@ -3543,6 +3579,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 						{/* Shared Research / Test Preview panel to the right of the drafting tables / writing view */}
 						{!isMobile &&
+							!isCampaignWorkspaceCompact &&
 							// Use our *effective* width breakpoints (which account for campaign zoom),
 							// rather than Tailwind's `xl:` media query which ignores CSS zoom.
 							!isNarrowDesktop &&
@@ -4160,7 +4197,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contact={contacts?.[0]}
 													onGoToDrafting={goToDrafting}
 													onGoToInbox={goToInbox}
-													onTestPreviewToggle={setShowTestPreview}
+													onTestPreviewToggle={handleTestPreviewToggle}
 													onKeepTestDraft={() =>
 														handleKeepTestDraft(contacts?.[0] || null)
 													}
@@ -4342,7 +4379,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											contact={contacts?.[0]}
 											onGoToDrafting={goToDrafting}
 											onGoToInbox={goToInbox}
-											onTestPreviewToggle={setShowTestPreview}
+											onTestPreviewToggle={handleTestPreviewToggle}
 											draftCount={contactsTabSelectedIds.size}
 											onDraftClick={async () => {
 												if (contactsTabSelectedIds.size === 0) {
@@ -4764,16 +4801,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														onRegenSettingsPreviewOpenChange={
 															setIsSelectedDraftRegenSettingsPreviewOpen
 														}
-												rejectedDraftIds={rejectedDraftIds}
-												approvedDraftIds={approvedDraftIds}
-												statusFilter={draftStatusFilter}
-												onStatusFilterChange={setDraftStatusFilter}
-												hideSendButton
-												lockDraftReviewOpen
-												isNarrowDesktop
-												goToPreviousTab={goToPreviousTab}
-												goToNextTab={goToNextTab}
-											/>
+														rejectedDraftIds={rejectedDraftIds}
+														approvedDraftIds={approvedDraftIds}
+														statusFilter={draftStatusFilter}
+														onStatusFilterChange={setDraftStatusFilter}
+														hideSendButton
+														lockDraftReviewOpen
+														isNarrowDesktop
+														goToPreviousTab={goToPreviousTab}
+														goToNextTab={goToNextTab}
+													/>
 												</div>
 											</div>
 											{/* Send Button with arrows - centered relative to full container width */}
@@ -6611,7 +6648,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									<>
 										{/* Center panel: selected email detail */}
 										<div
-											style={{ transform: `translateX(${inboxMainPanelShiftRightPx}px)` }}
+											style={{
+												transform: `translateX(${activeInboxMainPanelShiftRightPx}px)`,
+											}}
 										>
 											<InboxSection
 												allowedSenderEmails={campaignContactEmails}
@@ -6628,8 +6667,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												autoSelectFirstEmail
 												detailOnly
 												hideSelectedEmailBackButton
-												desktopWidth={inboxMainPanelWidthPx}
-												desktopHeight={inboxMainPanelHeightPx}
+												desktopWidth={activeInboxMainPanelWidthPx}
+												desktopHeight={activeInboxMainPanelHeightPx}
 												sampleData={inboxSectionSampleData}
 												onContactSelect={(contact) => {
 													if (contact) {
@@ -6639,7 +6678,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												onContactHover={(contact) => {
 													setHoveredContactForResearch(contact);
 												}}
-												isNarrow={isInboxTabNarrow}
+												isNarrow={isCampaignWorkspaceCompact || isInboxTabNarrow}
 											/>
 										</div>
 									</>
@@ -6650,7 +6689,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{shouldRenderSharedBottomPanels && (
 							<div
 								className="absolute left-0 right-0 z-30 flex justify-center"
-								style={{ top: `${sharedBottomPanelSlotTopPx}px` }}
+								style={{
+									top: `${sharedBottomPanelSlotTopPx}px`,
+									transform: isCampaignWorkspaceCompact
+										? 'translateX(-180px)'
+										: undefined,
+								}}
 							>
 								<BottomPanelsContainer
 									className="flex justify-center gap-[15px]"
