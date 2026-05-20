@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { FC, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
@@ -220,6 +220,15 @@ interface InboxSectionProps {
 	 * Optional callback fired whenever the Inbox/Sent tab changes (user click or auto-default).
 	 */
 	onInboxSentTabChange?: (next: 'inbox' | 'sent') => void;
+
+	/**
+	 * Optional controlled selected email. Used when the email list is rendered outside this panel.
+	 */
+	selectedEmailId?: number | null;
+	onSelectedEmailIdChange?: (next: number | null) => void;
+	autoSelectFirstEmail?: boolean;
+	detailOnly?: boolean;
+	hideSelectedEmailBackButton?: boolean;
 }
 
 /**
@@ -642,6 +651,11 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	scrollbarAlignTrackToScrollContainer = false,
 	inboxSentTabRequest,
 	onInboxSentTabChange,
+	selectedEmailId: controlledSelectedEmailId,
+	onSelectedEmailIdChange,
+	autoSelectFirstEmail = false,
+	detailOnly = false,
+	hideSelectedEmailBackButton = false,
 }) => {
 	const detectedIsMobile = useIsMobile();
 	const isMobile = forceDesktopLayout ? false : Boolean(detectedIsMobile);
@@ -725,6 +739,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	//   briefly show "Sent" and then snap over to "Inbox".
 	const [activeTab, setActiveTab] = useState<'inbox' | 'sent'>(() => {
 		if (inboxSentTabRequest?.tab) return inboxSentTabRequest.tab;
+		if (detailOnly) return 'inbox';
 		if (!isCampaignInbox) return 'inbox';
 		return campaignSentCount > 0 ? 'sent' : 'inbox';
 	});
@@ -732,7 +747,20 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	const hasUserSelectedInboxSentTabRef = useRef(false);
 	const hasAutoInitializedInboxSentTabRef = useRef(false);
 	const hasNotifiedInitialInboxSentTabRef = useRef(false);
-	const [selectedEmailId, setSelectedEmailId] = useState<number | null>(null);
+	const [internalSelectedEmailId, setInternalSelectedEmailId] = useState<number | null>(null);
+	const isSelectedEmailIdControlled = controlledSelectedEmailId !== undefined;
+	const selectedEmailId = isSelectedEmailIdControlled
+		? (controlledSelectedEmailId ?? null)
+		: internalSelectedEmailId;
+	const setSelectedEmailId = useCallback(
+		(next: number | null) => {
+			if (!isSelectedEmailIdControlled) {
+				setInternalSelectedEmailId(next);
+			}
+			onSelectedEmailIdChange?.(next);
+		},
+		[isSelectedEmailIdControlled, onSelectedEmailIdChange]
+	);
 	const [replyMessage, setReplyMessage] = useState('');
 	const [isSending, setIsSending] = useState(false);
 	const [searchQuery, setSearchQuery] = useState('');
@@ -770,7 +798,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 			: inboundEmails;
 
 	const campaignReplyCount = Array.isArray(filteredBySender) ? filteredBySender.length : 0;
-	const shouldAutoDefaultInboxSentTab = isCampaignInbox;
+	const shouldAutoDefaultInboxSentTab = isCampaignInbox && !detailOnly;
 
 	// Campaign page UX: if there are no replies yet, default to "Sent".
 	// Once a reply exists, default to "Inbox". Only auto-decide once per mount (or campaignId change),
@@ -837,6 +865,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		isInboundLoaded,
 		inboundEmailsFromApi,
 		emailsFromApi,
+		setSelectedEmailId,
 		onInboxSentTabChange,
 	]);
 
@@ -907,6 +936,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	});
 
 	const selectedEmail = visibleEmails?.find((email) => email.id === selectedEmailId);
+	const shouldUseDetailChrome = Boolean(selectedEmail) || detailOnly;
 	const selectedSenderKey = selectedEmail?.sender?.toLowerCase().trim();
 	const isSelectedEmailSent = Boolean((selectedEmail as any)?.isSent);
 	const isReplySentThemeActive =
@@ -917,6 +947,22 @@ export const InboxSection: FC<InboxSectionProps> = ({
 				selectedSenderKey &&
 				replyThemeBySender[selectedSenderKey] !== undefined
 		);
+
+	useLayoutEffect(() => {
+		if (!autoSelectFirstEmail) return;
+		if (!visibleEmails) return;
+
+		const hasVisibleSelectedEmail =
+			selectedEmailId !== null &&
+			visibleEmails.some((email) => email.id === selectedEmailId);
+		if (hasVisibleSelectedEmail) return;
+
+		const nextEmailId = visibleEmails[0]?.id ?? null;
+		if (nextEmailId === selectedEmailId) return;
+
+		setSelectedEmailId(nextEmailId);
+		setReplyMessage('');
+	}, [autoSelectFirstEmail, selectedEmailId, setSelectedEmailId, visibleEmails]);
 
 	// If we receive a newer inbound email from a sender we've replied to, revert the UI theme.
 	useEffect(() => {
@@ -1938,21 +1984,21 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					maxHeight: isMobile ? 'calc(100dvh - 160px)' : `${desktopBoxHeight}px`,
 					border: '3px solid #000000',
 					borderRadius: '8px',
-					padding: selectedEmail
+					padding: shouldUseDetailChrome
 						? isMobile
 							? '18px 8px 8px 8px'
 							: '21px 13px 12px 13px'
 						: isMobile
 						? '8px'
 						: '16px',
-					paddingTop: selectedEmail
+					paddingTop: shouldUseDetailChrome
 						? isMobile
 							? '18px'
 							: '21px'
 						: isMobile
 						? '62px'
 						: `${desktopPaddingTopPx}px`, // Adjusted for mobile
-					background: selectedEmail
+					background: shouldUseDetailChrome
 						? isReplySentThemeActive
 							? '#467842'
 							: '#437ec1'
@@ -1971,7 +2017,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 				}}
 			>
 					{/* Back button - shown when email is selected */}
-					{selectedEmail && (
+					{selectedEmail && !hideSelectedEmailBackButton && (
 						<button
 							type="button"
 							onClick={() => {
@@ -1999,7 +2045,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						</button>
 					)}
 				{/* Header chrome with dots and Inbox pill - hidden on mobile */}
-				{!selectedEmail && !isMobile && !isDashboardMode && (
+				{!selectedEmail && !detailOnly && !isMobile && !isDashboardMode && (
 					<InboxSectionHeaderChrome
 						onContactsClick={onGoToContacts}
 						onWriteClick={onGoToWriting}
@@ -2007,7 +2053,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					/>
 				)}
 				{/* Search Bar - positioned 55px from top, left-aligned with emails */}
-				{!selectedEmail && (
+				{!selectedEmail && !detailOnly && (
 					<div
 						style={{
 							position: 'absolute',
@@ -2047,7 +2093,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					</div>
 				)}
 				{/* Top-right toggle */}
-				{!selectedEmail &&
+				{!selectedEmail && !detailOnly &&
 					(showMessagesCampaignsToggle ? (
 						<div
 							style={{
@@ -2531,6 +2577,21 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							)}
 						</div>
 				</div>
+				) : detailOnly ? (
+					<div
+						className="w-full h-full flex items-center justify-center text-center"
+						style={{
+							width: isMobile ? mobileExpandedEmailWidth : `${expandedEmailWidth}px`,
+							border: '3px solid #000000',
+							borderRadius: '8px',
+							backgroundColor: '#5DA0EB',
+							color: '#000000',
+							fontFamily: 'Inter, sans-serif',
+							fontSize: isMobile ? '14px' : '16px',
+						}}
+					>
+						Select an email from the list.
+					</div>
 				) : (
 					/* Email List View */
 					<>

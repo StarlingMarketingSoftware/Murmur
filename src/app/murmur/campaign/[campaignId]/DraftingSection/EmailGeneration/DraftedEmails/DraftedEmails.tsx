@@ -554,7 +554,7 @@ const DraftReviewStackedBackCard: FC<{
 };
 
 export type DraftedEmailsHandle = {
-	/** Exit the embedded regen settings preview (HybridPromptInput) and return to the normal draft editor / approve-reject view. */
+	/** Exit the embedded regen settings preview (HybridPromptInput) and return to the normal draft editor view. */
 	exitRegenSettingsPreview: () => void;
 };
 
@@ -593,7 +593,14 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 		selectedDraftIds,
 		handleSelectAllDrafts,
 	} = useDraftedEmails(props);
-	const { onContactClick, onContactHover, onDraftHover, onRegenerateDraft } = props;
+	const {
+		onContactClick,
+		onContactHover,
+		onDraftHover,
+		onDraftReviewCloseOverride,
+		onRegenSettingsPreviewOpenChange,
+		onRegenerateDraft,
+	} = props;
 	const lockDraftReviewOpen = props.lockDraftReviewOpen ?? false;
 
 	const isMobile = useIsMobile();
@@ -735,52 +742,6 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 			usedContactTooltipCloseTimeoutRef.current = null;
 		}
 	}, []);
-
-	const openUsedContactTooltip = useCallback(
-		(contactId: number, anchorEl?: HTMLElement | null) => {
-			clearUsedContactTooltipCloseTimeout();
-			usedContactAnchorElRef.current = anchorEl ?? null;
-			const el = anchorEl ?? null;
-			if (el) {
-				const rect = el.getBoundingClientRect();
-				const bodyCtx = getBodyScaleContext();
-				const anchorLeftInBody = (rect.left - bodyCtx.left) / bodyCtx.scaleX;
-				const anchorTopInBody = (rect.top - bodyCtx.top) / bodyCtx.scaleY;
-				setUsedContactTooltipPos({
-					// Draft dot is positioned at (rowLeft + 8, rowTop + 11).
-					// Tooltip should start 49px down from the top of the row box.
-					// Tooltip should start 43px to the right of the left edge of the row box:
-					// rowLeft = anchorLeft - 8px  =>  rowLeft + 43 = anchorLeft + 35
-					left: anchorLeftInBody + 35,
-					top: anchorTopInBody + 38,
-				});
-			}
-			// Start with first campaign active, but don't reset if we're already on this contact.
-			setActiveUsedContactCampaignIndex((prev) =>
-				hoveredUsedContactId === contactId ? (prev ?? 0) : 0
-			);
-			setHoveredUsedContactId(contactId);
-		},
-		[clearUsedContactTooltipCloseTimeout, getBodyScaleContext, hoveredUsedContactId]
-	);
-
-	const goToUsedContactCampaign = useCallback(
-		(contactId: number) => {
-			// Only navigate when this contact's hover state is active.
-			if (hoveredUsedContactId !== contactId) return;
-			if (!resolvedUsedContactCampaigns.length) return;
-
-			const idx = Math.min(
-				resolvedUsedContactCampaigns.length - 1,
-				Math.max(0, activeUsedContactCampaignIndex ?? 0)
-			);
-			const selected = resolvedUsedContactCampaigns[idx];
-			if (!selected?.id) return;
-
-			router.push(`/murmur/campaign/${selected.id}`);
-		},
-		[activeUsedContactCampaignIndex, hoveredUsedContactId, resolvedUsedContactCampaigns, router]
-	);
 
 	const scheduleCloseUsedContactTooltip = useCallback(
 		(contactId: number) => {
@@ -954,12 +915,12 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 			if (event.key === 'Escape') {
 				event.stopImmediatePropagation(); // Prevent campaign page tab navigation
 				// Side preview override: allow parent to decide what "close" means in this context.
-				if (props.onDraftReviewCloseOverride) {
-					props.onDraftReviewCloseOverride();
+				if (onDraftReviewCloseOverride) {
+					onDraftReviewCloseOverride();
 					return;
 				}
 
-				// In regenerate view, Esc should exit regen preview (back to the normal editor / approve-reject view),
+				// In regenerate view, Esc should exit regen preview (back to the normal editor view),
 				// not close the entire draft review UI.
 				if (isRegenSettingsPreviewOpen) {
 					setIsRegenSettingsPreviewOpen(false);
@@ -1003,19 +964,19 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 		handleNavigatePrevious,
 		handleNavigateNext,
 		isRegenSettingsPreviewOpen,
-		props.onDraftReviewCloseOverride,
+		onDraftReviewCloseOverride,
 		lockDraftReviewOpen,
 	]);
 
 	const handleRegenerateSelectedDrafts = useCallback(async () => {
-		if (!props.onRegenerateDraft) return;
+		if (!onRegenerateDraft) return;
 		const selected = filteredDrafts.filter((d) => selectedDraftIds.has(d.id));
 		for (const draft of selected) {
 			// Sequential to reuse existing regeneration flow with existing toasts
 			// and state updates.
-			await props.onRegenerateDraft(draft);
+			await onRegenerateDraft(draft);
 		}
-	}, [filteredDrafts, props, selectedDraftIds]);
+	}, [filteredDrafts, onRegenerateDraft, selectedDraftIds]);
 
 	const handleRegenerate = useCallback(async () => {
 		if (!selectedDraft || !onRegenerateDraft || isRegenerating) return;
@@ -1067,8 +1028,8 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 
 	// Notify parent when the embedded regen settings preview is opened/closed.
 	useEffect(() => {
-		props.onRegenSettingsPreviewOpenChange?.(isRegenSettingsPreviewOpen);
-	}, [isRegenSettingsPreviewOpen, props.onRegenSettingsPreviewOpenChange]);
+		onRegenSettingsPreviewOpenChange?.(isRegenSettingsPreviewOpen);
+	}, [isRegenSettingsPreviewOpen, onRegenSettingsPreviewOpenChange]);
 
 	useImperativeHandle(
 		ref,
@@ -1080,13 +1041,13 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 
 	const handleDraftReviewCloseButtonClick = useCallback(() => {
 		// Side preview override: allow parent to decide what "close" means in this context.
-		if (props.onDraftReviewCloseOverride) {
-			props.onDraftReviewCloseOverride();
+		if (onDraftReviewCloseOverride) {
+			onDraftReviewCloseOverride();
 			return;
 		}
 
 		// When we're in regenerate settings preview mode, the "-" button should exit regen mode
-		// (back to the normal editor / approve-reject view), not close the draft entirely.
+		// (back to the normal editor view), not close the draft entirely.
 		if (isRegenSettingsPreviewOpen) {
 			setIsRegenSettingsPreviewOpen(false);
 			return;
@@ -1095,7 +1056,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 		if (lockDraftReviewOpen) return;
 
 		handleBack();
-	}, [props.onDraftReviewCloseOverride, isRegenSettingsPreviewOpen, lockDraftReviewOpen, handleBack]);
+	}, [onDraftReviewCloseOverride, isRegenSettingsPreviewOpen, lockDraftReviewOpen, handleBack]);
 
 	if (selectedDraft) {
 		const contact = contacts?.find((c) => c.id === selectedDraft.contactId);
@@ -1134,7 +1095,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 		const showBottomCounter =
 			!props.hideDraftReviewCounter && (isNarrowestDesktop || isNarrowDesktop);
 		// Show tab navigation arrows only on narrow desktop; hide them on the
-		// narrowest breakpoint when the draft review (Approve/Reject) view is open.
+		// narrowest breakpoint when the draft review action row is open.
 		const showTabNavArrows = showBottomCounter && !isNarrowestDesktop;
 		// Keep the tab navigation arrows aligned with the "Send" button + arrows row
 		// rendered by DraftingSection at the same breakpoint.
@@ -1163,7 +1124,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 			<div
 				ref={draftReviewContainerRef}
 				className={cn("flex flex-col items-center", isMobile && "w-full px-1")}
-				data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
+				data-hover-description="Revise your draft here. Type out your revisions. Send or delete drafts"
 			>
 				<div style={{
 					width: isMobile ? 'calc(100vw - 8px)' : '499px',
@@ -1902,12 +1863,12 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 											height: hasStatusBar ? '527px' : '572px',
 											flex: isMobile ? 1 : undefined,
 										}}
-										data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
+										data-hover-description="Revise your draft here. Type out your revisions. Send or delete drafts"
 									>
 										{/* Check if original message has links - if so, use RichTextEditor for proper link editing */}
 										{selectedDraft?.message && /<a\s+[^>]*href=/i.test(selectedDraft.message) ? (
 											<div
-												data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
+												data-hover-description="Revise your draft here. Type out your revisions. Send or delete drafts"
 												className="w-full h-full"
 											>
 												<CustomScrollbar
@@ -1935,7 +1896,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 												thumbWidth={2}
 												thumbColor="#000000"
 												trackOffset={-6}
-												data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
+												data-hover-description="Revise your draft here. Type out your revisions. Send or delete drafts"
 											/>
 										)}
 									</div>
@@ -2069,21 +2030,15 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										borderBottomLeftRadius: '8px',
 										backgroundColor: '#D5FFCB',
 									}}
-									data-hover-description="Approve you draft. This draft turned out good"
+									data-hover-description="Send this email"
+									disabled={props.isSendingDisabled}
 									onClick={() => {
-										if (selectedDraft) {
-											const isCurrentlyApproved =
-												props.approvedDraftIds?.has(selectedDraft.id) ?? false;
-											props.onApproveDraft?.(selectedDraft.id, isCurrentlyApproved);
-											// Only navigate to next if we're approving, not toggling off
-											if (!isCurrentlyApproved) {
-												handleNavigateNext();
-											}
-										}
+										if (!selectedDraft || props.isSendingDisabled) return;
+										props.setSelectedDraftIds(new Set([selectedDraft.id]));
+										void props.onSend([selectedDraft.id]);
 									}}
 								>
-									<span>Approve</span>
-									{!isMobile && <ApproveCheckIcon />}
+									<span>Send</span>
 								</Button>
 								<Button
 									type="button"
@@ -2124,21 +2079,16 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										borderBottomRightRadius: '8px',
 										backgroundColor: '#E17272',
 									}}
-									data-hover-description="Reject this contact. This isn't deleting it, but putting it into a rejection folder for you to review"
-									onClick={() => {
+									data-hover-description="Delete this draft"
+									disabled={isPendingDeleteEmail}
+									onClick={async (e) => {
 										if (selectedDraft) {
-											const isCurrentlyRejected =
-												props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
-											props.onRejectDraft?.(selectedDraft.id, isCurrentlyRejected);
-											// Only navigate to next if we're rejecting, not toggling off
-											if (!isCurrentlyRejected) {
-												handleNavigateNext();
-											}
+											await handleDeleteDraft(e, selectedDraft.id);
+											setSelectedDraft(null);
 										}
 									}}
 								>
-									<span>Reject</span>
-									{!isMobile && <RejectXIcon />}
+									<span>{isPendingDeleteEmail ? '...' : 'Delete'}</span>
 								</Button>
 							</div>
 							<button
@@ -2343,6 +2293,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 							const isApproved = props.approvedDraftIds?.has(draft.id) ?? false;
 							const isUsedContact = usedContactIdsSet.has(draft.contactId);
 							const isUsedContactHoverCardVisible =
+								isUsedContact &&
 								hoveredUsedContactId === draft.contactId &&
 								Boolean(usedContactTooltipPos) &&
 								Boolean(hoveredUsedContactCampaigns?.length);

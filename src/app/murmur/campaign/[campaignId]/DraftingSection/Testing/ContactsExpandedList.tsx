@@ -70,8 +70,39 @@ const SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX = 92;
 const WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR = '#F5C0BD';
 const WRITE_TAB_SUPPLEMENTAL_BADGE_FILL_COLOR = '#EE9798';
 const WRITE_TAB_SUPPLEMENTAL_ROW_FILL_COLOR = '#EB8586';
+const SHOWING_DRAFT_ROW_FILL_COLOR = '#F8C262';
+const SHOWING_DRAFT_TOP_BAR_COLOR = '#FFE3AA';
+const SELECTED_DRAFT_ROW_FILL_COLOR = '#FDDEA5';
+const SELECTED_DRAFT_TOP_BAR_COLOR = '#F9D387';
 
 const formatBatchCount = (count: number) => `+${count < 10 ? `0${count}` : count}`;
+
+const ShowingDraftViewIcon: FC<{ className?: string; centerFill?: string }> = ({
+	className,
+	centerFill = SHOWING_DRAFT_TOP_BAR_COLOR,
+}) => (
+	<svg
+		viewBox="0 20 16 9"
+		fill="none"
+		xmlns="http://www.w3.org/2000/svg"
+		className={className}
+		aria-hidden="true"
+		focusable="false"
+	>
+		<path
+			d="M7.652 20.84c2.076 0 4.027.687 5.458 1.527.716.42 1.297.876 1.696 1.298.2.21.35.41.45.589.102.18.145.33.145.443 0 .232-.18.556-.586.928-.397.363-.976.742-1.692 1.086-1.431.688-3.386 1.224-5.47 1.224-2.077 0-3.96-.662-5.323-1.45-.681-.395-1.229-.819-1.602-1.203a2.906 2.906 0 01-.42-.527c-.095-.16-.131-.283-.131-.367 0-.085.036-.208.13-.368.093-.157.234-.336.42-.528.374-.384.922-.807 1.603-1.201 1.363-.789 3.246-1.45 5.322-1.45z"
+			fill="#000000"
+			stroke="#7D7D7D"
+			strokeWidth={0.352663}
+		/>
+		<path
+			d="M7.787 20.84c1.595 0 2.94 1.558 2.94 3.548s-1.345 3.547-2.94 3.547-2.938-1.558-2.938-3.547c0-1.99 1.343-3.547 2.938-3.547z"
+			fill={centerFill}
+			stroke="#7D7D7D"
+			strokeWidth={0.352663}
+		/>
+	</svg>
+);
 
 const formatBatchTimestamp = (date: Date) => {
 	const now = new Date();
@@ -89,7 +120,7 @@ const formatBatchTimestamp = (date: Date) => {
 };
 
 export type ContactsExpandedTopNavStop = ContactsHeaderChromeCampaignStop;
-export type ContactsExpandedListFocusMode = 'contacts' | 'drafts';
+export type ContactsExpandedListFocusMode = 'contacts' | 'drafts' | 'inbox';
 
 const FadeOverflowText: FC<{
 	text: string;
@@ -417,6 +448,8 @@ export interface ContactsExpandedListProps {
 	onContactHover?: (contact: ContactWithName | null) => void;
 	onDraftClick?: (draft: EmailWithRelations) => void;
 	onDraftHover?: (draft: EmailWithRelations | null) => void;
+	selectedInboxEmailId?: number | null;
+	onInboxEmailClick?: (email: InboundEmailWithRelations) => void;
 	selectedDraftId?: number | null;
 	selectedDraftIds?: Set<number>;
 	onDraftSelectionChange?: (updater: (prev: Set<number>) => Set<number>) => void;
@@ -476,6 +509,8 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	onContactHover,
 	onDraftClick,
 	onDraftHover,
+	selectedInboxEmailId,
+	onInboxEmailClick,
 	selectedDraftId,
 	selectedDraftIds,
 	onDraftSelectionChange,
@@ -505,6 +540,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		Set<number>
 	>(new Set());
 	const lastClickedRef = useRef<number | null>(null);
+	const lastClickedDraftRef = useRef<number | null>(null);
 	const supplementalDraftRowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 	const lastAutoScrolledDraftIdRef = useRef<number | null>(null);
 
@@ -626,6 +662,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const isControlled = Boolean(selectedContactIds);
 	const currentSelectedIds = selectedContactIds ?? internalSelectedContactIds;
 	const isDraftsFocusMode = focusMode === 'drafts';
+	const isInboxFocusMode = focusMode === 'inbox';
 
 	const updateSelection = useCallback(
 		(updater: (prev: Set<number>) => Set<number>) => {
@@ -839,7 +876,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		`${effectiveWhiteSectionHeight}px, ${panelFillColor} ${effectiveWhiteSectionHeight}px)`;
 	const resolvedActiveTopNavStop: ContactsExpandedTopNavStop =
 		activeTopNavStop ??
-		(isDraftsFocusMode ? 'send' : enableUsedContactTooltip ? 'write' : 'all');
+		(isInboxFocusMode
+			? 'inbox'
+			: isDraftsFocusMode
+				? 'send'
+				: enableUsedContactTooltip
+					? 'write'
+					: 'all');
 	const shouldRedOutContactRows = !isBottomView && isDraftsFocusMode;
 	const shouldRedOutDraftRows =
 		!isBottomView && !isDraftsFocusMode && resolvedActiveTopNavStop === 'write';
@@ -911,6 +954,16 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		: selectedDraftId == null
 			? 0
 			: 1;
+	useEffect(() => {
+		if (!isDraftsFocusMode) {
+			lastClickedDraftRef.current = null;
+			return;
+		}
+
+		if (selectedDraftId != null) {
+			lastClickedDraftRef.current = selectedDraftId;
+		}
+	}, [isDraftsFocusMode, selectedDraftId]);
 	const areAllDraftsSelected = Boolean(
 		selectedDraftIds &&
 		selectableDraftIds.size > 0 &&
@@ -946,9 +999,12 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			return Boolean(sender && contactsByEmail.has(sender));
 		});
 	}, [allContacts, contactByEmail, contactsByEmail, inboxEmails]);
-	const totalRenderedRows =
-		contacts.length + supplementalDraftRows.length + supplementalInboxRows.length;
-	const shouldShowScrollbar = !isBottomView && totalRenderedRows >= 14;
+	const totalRenderedRows = isInboxFocusMode
+		? supplementalInboxRows.length
+		: contacts.length + supplementalDraftRows.length + supplementalInboxRows.length;
+	const shouldShowScrollbar =
+		!isBottomView &&
+		(isInboxFocusMode ? supplementalInboxRows.length >= 6 : totalRenderedRows >= 14);
 
 	const { data: campaignContactEvents } = useGetCampaignContactEvents(campaign?.id, {
 		enabled: isBottomView && Boolean(campaign?.id),
@@ -1024,6 +1080,19 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			: 'No content';
 		const isSelectedDraft = selectedDraftId === draft.id;
 		const isBatchSelectedDraft = selectedDraftIds?.has(draft.id) ?? false;
+		const isShowingDraft = isSelectedDraft;
+		const isInactiveSelectedDraft = isBatchSelectedDraft && !isShowingDraft;
+		const topBarLeftColor = shouldRedOutDraftRows
+			? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
+			: isInactiveSelectedDraft
+				? SELECTED_DRAFT_TOP_BAR_COLOR
+				: SHOWING_DRAFT_TOP_BAR_COLOR;
+		const topBarRightColor = shouldRedOutDraftRows
+			? WRITE_TAB_SUPPLEMENTAL_ROW_FILL_COLOR
+			: isShowingDraft
+				? SHOWING_DRAFT_TOP_BAR_COLOR
+				: '#F9FAFB';
+		const topBarLeftWidthPx = isInactiveSelectedDraft ? 177 : 115;
 
 		return (
 			<div
@@ -1049,7 +1118,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					borderLeft: `1.949px solid ${draftSupplementalBorderColor}`,
 					backgroundColor:
 						draftSupplementalRowFillColor ??
-						(isSelectedDraft || isBatchSelectedDraft ? '#FDDEA5' : '#FFFFFF'),
+						(isShowingDraft
+							? SHOWING_DRAFT_ROW_FILL_COLOR
+							: isInactiveSelectedDraft
+								? SELECTED_DRAFT_ROW_FILL_COLOR
+								: '#FFFFFF'),
 					boxSizing: 'border-box',
 				}}
 				onMouseEnter={() => {
@@ -1057,25 +1130,56 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					onDraftHover?.(draft);
 					onContactHover?.(contact);
 				}}
+				onMouseDown={(e) => {
+					if (e.shiftKey) e.preventDefault();
+				}}
 				onClick={(e) => {
 					if (isAllTabNavigation) return;
 					e.stopPropagation();
+					if (e.shiftKey && onDraftSelectionChange) {
+						e.preventDefault();
+						window.getSelection()?.removeAllRanges();
+
+						const currentIndex = supplementalDraftRows.findIndex(
+							(row) => row.id === draft.id
+						);
+						const anchorDraftId =
+							lastClickedDraftRef.current ?? selectedDraftId ?? draft.id;
+						const anchorIndex = supplementalDraftRows.findIndex(
+							(row) => row.id === anchorDraftId
+						);
+
+						if (currentIndex !== -1 && anchorIndex !== -1) {
+							const start = Math.min(currentIndex, anchorIndex);
+							const end = Math.max(currentIndex, anchorIndex);
+
+							onDraftSelectionChange(() => {
+								const next = new Set<number>();
+								for (let i = start; i <= end; i++) {
+									next.add(supplementalDraftRows[i].id);
+								}
+								return next;
+							});
+						}
+						return;
+					}
+
+					lastClickedDraftRef.current = draft.id;
 					onDraftClick?.(draft);
 					if (contact) onContactClick?.(contact);
 				}}
 			>
 				<div className="absolute left-0 top-0 h-[13px] w-full pointer-events-none flex">
 					<div
-						className={cn(
-							'h-full w-[115px] shrink-0',
-							shouldRedOutDraftRows ? 'bg-[#F5C0BD]' : 'bg-[#FFE3AA]'
-						)}
+						className="h-full shrink-0"
+						style={{
+							width: `${topBarLeftWidthPx}px`,
+							backgroundColor: topBarLeftColor,
+						}}
 					/>
 					<div
-						className={cn(
-							'h-full flex-1',
-							shouldRedOutDraftRows ? 'bg-[#EB8586]' : 'bg-[#F9FAFB]'
-						)}
+						className="h-full flex-1"
+						style={{ backgroundColor: topBarRightColor }}
 					/>
 				</div>
 
@@ -1099,7 +1203,20 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				</div>
 
 				<div className="absolute top-[16px] left-1/2 right-2 pl-1 pointer-events-none">
-					{contactTitle ? (
+					{isShowingDraft ? (
+						<div
+							className="w-full h-[17px] rounded-[6px] pl-2 pr-2 border overflow-hidden flex items-center justify-start gap-2"
+							style={{
+								backgroundColor: SHOWING_DRAFT_TOP_BAR_COLOR,
+								borderColor: draftSupplementalBorderColor,
+							}}
+						>
+							<ShowingDraftViewIcon className="w-[20px] h-[11px] shrink-0" />
+							<span className="font-inter text-[10px] font-medium leading-none text-black">
+								Showing
+							</span>
+						</div>
+					) : contactTitle ? (
 						<TitleBadge
 							title={contactTitle}
 							className="w-full h-[17px] rounded-[6px] px-2 gap-1"
@@ -1186,9 +1303,15 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					borderRight: `1.949px solid ${inboxSupplementalBorderColor}`,
 					borderBottom: `1.949px solid ${inboxSupplementalBorderColor}`,
 					borderLeft: `1.949px solid ${inboxSupplementalBorderColor}`,
-					background: inboxSupplementalRowFillColor ?? '#F9FAFB',
+					background:
+						selectedInboxEmailId === email.id
+							? '#E5F1FF'
+							: inboxSupplementalRowFillColor ?? '#F9FAFB',
 					boxSizing: 'border-box',
 				}}
+				role={!isAllTabNavigation ? 'button' : undefined}
+				aria-pressed={!isAllTabNavigation ? selectedInboxEmailId === email.id : undefined}
+				tabIndex={!isAllTabNavigation ? 0 : undefined}
 				onMouseEnter={() => {
 					if (!isAllTabNavigation) setHoveredContactIndex(null);
 					if (isDraftsFocusMode) onDraftHover?.(null);
@@ -1197,7 +1320,18 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				onClick={(e) => {
 					if (isAllTabNavigation) return;
 					e.stopPropagation();
+					if (onInboxEmailClick) {
+						onInboxEmailClick(email);
+						return;
+					}
 					if (contact) onContactClick?.(contact);
+				}}
+				onKeyDown={(e) => {
+					if (isAllTabNavigation || !onInboxEmailClick) return;
+					if (e.key === 'Enter' || e.key === ' ') {
+						e.preventDefault();
+						onInboxEmailClick(email);
+					}
 				}}
 			>
 				{/* Layout mirrors supplemental draft rows, but without the top strip. */}
@@ -1300,13 +1434,19 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				...(isBottomView ? { cursor: 'pointer' } : {}),
 			}}
 			data-hover-description={
-				isDraftsFocusMode
+				isInboxFocusMode
+					? 'Inbox: This box displays replies from contacts in your campaign.'
+					: isDraftsFocusMode
 					? 'Drafts: This box displays generated drafts and de-emphasizes non-draft campaign activity.'
 					: 'Contacts: This box displays all of the contacts in your campaign. Select contacts to generate drafts.'
 			}
 			role="region"
 			aria-label={
-				isDraftsFocusMode ? 'Expanded drafts preview' : 'Expanded contacts preview'
+				isInboxFocusMode
+					? 'Expanded inbox preview'
+					: isDraftsFocusMode
+						? 'Expanded drafts preview'
+						: 'Expanded contacts preview'
 			}
 			onMouseEnter={() => isBottomView && setIsContainerHovered(true)}
 			onMouseLeave={() => isBottomView && setIsContainerHovered(false)}
@@ -1526,7 +1666,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				</div>
 			)}
 
-			{!collapsed && !isBottomView && !isDraftsFocusMode && (
+			{!collapsed && !isBottomView && !isDraftsFocusMode && !isInboxFocusMode && (
 				<div className="px-3 mt-2 mb-0 flex items-center justify-center relative z-10 text-[13px] font-inter font-medium text-black/70">
 					<span>{isAllTabNavigation ? 0 : selectedCount} Selected</span>
 					{isAllTabNavigation ? (
@@ -1715,6 +1855,8 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 										/>
 									))}
 								</>
+							) : isInboxFocusMode ? (
+								<>{supplementalInboxRows.map(renderSupplementalInboxRow)}</>
 							) : (
 								<>
 									{isDraftsFocusMode &&

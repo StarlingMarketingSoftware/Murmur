@@ -55,6 +55,13 @@ export const ContactsHeaderChrome: FC<{
 	const [isDot3Hovered, setIsDot3Hovered] = useState(false);
 	const [hoveredCampaignStop, setHoveredCampaignStop] =
 		useState<ContactsHeaderChromeCampaignStop | null>(null);
+	// Remembers the most recent hover so the hover pill can fade out from its last
+	// position instead of unmounting/snapping back to the active pill.
+	const [lastHoveredCampaignStop, setLastHoveredCampaignStop] =
+		useState<ContactsHeaderChromeCampaignStop | null>(null);
+	useEffect(() => {
+		if (hoveredCampaignStop) setLastHoveredCampaignStop(hoveredCampaignStop);
+	}, [hoveredCampaignStop]);
 	const wasAnyDotHoveredRef = useRef(false);
 	const isBottomView = typeof whiteSectionHeight === 'number' && whiteSectionHeight <= 16;
 	const isWriteActiveTab = activeTab === 'write';
@@ -200,6 +207,18 @@ export const ContactsHeaderChrome: FC<{
 			? campaignStops.findIndex((stop) => stop.id === hoveredStop)
 			: -1;
 		const hoveredStopConfig = hoveredStopIndex >= 0 ? campaignStops[hoveredStopIndex] : null;
+		// While fading out we keep using the last hovered stop's config so the pill
+		// stays put visually instead of snapping back over the active pill.
+		const displayedHoveredStop =
+			hoveredStop ??
+			(lastHoveredCampaignStop && lastHoveredCampaignStop !== safeActiveStop
+				? lastHoveredCampaignStop
+				: null);
+		const displayedHoveredStopIndex = displayedHoveredStop
+			? campaignStops.findIndex((stop) => stop.id === displayedHoveredStop)
+			: -1;
+		const displayedHoveredStopConfig =
+			displayedHoveredStopIndex >= 0 ? campaignStops[displayedHoveredStopIndex] : null;
 		const stopWidthPercent = 100 / campaignStops.length;
 		const campaignBoxHeight = isBottomView ? 12 : isAllTab ? 20 : 25;
 		const campaignBoxBorderWidth = 2;
@@ -220,7 +239,8 @@ export const ContactsHeaderChrome: FC<{
 		const campaignDotSize = isBottomView ? 5 : isAllTab ? 6 : 9;
 		const campaignFontSize = isBottomView ? '6px' : isAllTab ? '10px' : '13px';
 		const campaignDotColor = hasData ? '#A6A6A6' : '#B0B0B0';
-		const stopTransition = '0.6s cubic-bezier(0.22, 1, 0.36, 1)';
+		const stopTransition = '0.45s cubic-bezier(0.22, 1, 0.36, 1)';
+		const stopFadeTransition = '0.28s cubic-bezier(0.4, 0, 0.2, 1)';
 		const campaignPillEdgeInset = 3;
 		const campaignPillHoverOffset = 6;
 		const getCampaignPillLeft = (index: number, offsetPx = 0) => {
@@ -280,7 +300,7 @@ export const ContactsHeaderChrome: FC<{
 						justifyContent: 'center',
 						zIndex: 2,
 						transform: 'translateY(-50%)',
-						transition: `left ${stopTransition}, background-color ${stopTransition}`,
+						transition: `left ${stopTransition}, background-color ${stopFadeTransition}`,
 						pointerEvents: 'none',
 					}}
 				>
@@ -291,21 +311,24 @@ export const ContactsHeaderChrome: FC<{
 							color: '#000000',
 							marginTop: isBottomView || isAllTab ? '-1px' : 0,
 							opacity: hoveredStopConfig ? 0 : 1,
-							transition: `opacity ${stopTransition}`,
+							transition: `opacity ${stopFadeTransition}`,
 						}}
 					>
 						{activeStopConfig.label}
 					</span>
 				</div>
-				{hoveredStopConfig && (
+				{displayedHoveredStopConfig && (
 					<div
 						style={{
 							position: 'absolute',
 							top: '50%',
-							left: getCampaignPillLeft(hoveredStopIndex, hoveredPillHoverOffset),
+							left: getCampaignPillLeft(
+								displayedHoveredStopIndex,
+								hoveredPillHoverOffset
+							),
 							width: `${campaignPillWidth}px`,
 							height: `${campaignPillHeight}px`,
-							backgroundColor: hoveredStopConfig.backgroundColor,
+							backgroundColor: displayedHoveredStopConfig.backgroundColor,
 							border: `${campaignPillBorderWidth}px solid #000000`,
 							borderRadius: `${campaignPillBorderRadius}px`,
 							boxSizing: 'border-box',
@@ -313,10 +336,11 @@ export const ContactsHeaderChrome: FC<{
 							alignItems: 'center',
 							justifyContent: 'center',
 							zIndex: 3,
-							opacity: 1,
+							opacity: hoveredStopConfig ? 1 : 0,
 							transform: 'translateY(-50%)',
-							transition: `left ${stopTransition}, opacity ${stopTransition}`,
+							transition: `left ${stopTransition}, opacity ${stopFadeTransition}, background-color ${stopFadeTransition}`,
 							pointerEvents: 'none',
+							willChange: 'opacity, left',
 						}}
 					>
 						<span
@@ -327,7 +351,7 @@ export const ContactsHeaderChrome: FC<{
 								marginTop: isBottomView || isAllTab ? '-1px' : 0,
 							}}
 						>
-							{hoveredStopConfig.label}
+							{displayedHoveredStopConfig.label}
 						</span>
 					</div>
 				)}
@@ -384,7 +408,7 @@ export const ContactsHeaderChrome: FC<{
 										borderRadius: '9999px',
 										backgroundColor: campaignDotColor,
 										opacity: isDisplayed ? 0 : 1,
-										transition: `opacity ${stopTransition}`,
+										transition: `opacity ${stopFadeTransition}`,
 									}}
 								/>
 							</button>

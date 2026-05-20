@@ -99,7 +99,7 @@ export interface DraftedEmailsProps {
 	disableOutsideClickClose?: boolean;
 	/** Optional: hide the small approved/rejected counter box (above or bottom-left depending on breakpoint) in draft review UI */
 	hideDraftReviewCounter?: boolean;
-	/** Optional: hide the bottom action row (Approve / Regenerate / Reject + nav arrows) in draft review UI */
+	/** Optional: hide the bottom action row (Send / Regenerate / Delete + nav arrows) in draft review UI */
 	hideDraftReviewActionRow?: boolean;
 	/** Optional: keeps draft review open by hiding/ignoring controls that return to the drafts list */
 	lockDraftReviewOpen?: boolean;
