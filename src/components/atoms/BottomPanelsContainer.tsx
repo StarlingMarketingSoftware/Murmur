@@ -27,7 +27,7 @@ const BUTTON_GAP = 13;
 // Logs button dimensions
 const BUTTON_WIDTH = 28;
 const BUTTON_HEIGHT_EXPANDED = 116;
-const BUTTON_HEIGHT_COLLAPSED = 40;
+const BUTTON_HEIGHT_COLLAPSED = 45;
 
 // History panel dimensions
 const HISTORY_PANEL_WIDTH = 343;

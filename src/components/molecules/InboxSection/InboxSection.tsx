@@ -1,7 +1,6 @@
 'use client';
 
 import { FC, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
@@ -14,13 +13,35 @@ import type { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { urls } from '@/constants/urls';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
+import {
+	isRestaurantTitle,
+	isCoffeeShopTitle,
+	isMusicVenueTitle,
+	isWeddingPlannerTitle,
+	isWeddingVenueTitle,
+	isWineBeerSpiritsTitle,
+	getWineBeerSpiritsLabel,
+} from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { useCampaignTopSearchHighlight } from '@/contexts/CampaignTopSearchHighlightContext';
+import {
+	buildInboxConversations,
+	getInboxMessageTimeMs,
+	getInboxMessageSnippet,
+	inboxConversationContainsEmailId,
+	inboxConversationContainsInboundEmailId,
+	inboxConversationContainsSentEmailId,
+	type InboxConversation,
+	type InboxConversationMessage,
+} from '@/utils/inboxConversations';
+import {
+	InboxRichReplyEditor,
+	isRichTextMessageEmpty,
+} from '@/components/molecules/InboxSection/InboxRichReplyEditor';
 
 /**
  * Strip quoted reply content from email body (e.g., "On Thu, Nov 27, 2025 at 2:36 AM ... wrote:")
@@ -215,7 +236,11 @@ interface InboxSectionProps {
 	 *
 	 * This is used by the campaign page to route "Sent" navigation into the inbox's Sent view.
 	 */
-	inboxSentTabRequest?: { tab: 'inbox' | 'sent'; requestId: number } | null;
+	inboxSentTabRequest?: {
+		tab: 'inbox' | 'sent';
+		requestId: number;
+		preserveSelection?: boolean;
+	} | null;
 	/**
 	 * Optional callback fired whenever the Inbox/Sent tab changes (user click or auto-default).
 	 */
@@ -226,6 +251,7 @@ interface InboxSectionProps {
 	 */
 	selectedEmailId?: number | null;
 	onSelectedEmailIdChange?: (next: number | null) => void;
+	onThreadReplySent?: (messageIds: number[], sentAtMs: number) => void;
 	autoSelectFirstEmail?: boolean;
 	detailOnly?: boolean;
 	hideSelectedEmailBackButton?: boolean;
@@ -244,46 +270,48 @@ const InboxSectionHeaderChrome: FC<{
 	const [isDot2Hovered, setIsDot2Hovered] = useState(false);
 	const [isDot3Hovered, setIsDot3Hovered] = useState(false);
 	const wasAnyDotHoveredRef = useRef(false);
-	
+
 	// Inbox header positions (from existing inline code)
 	const dotTop = 9.5; // top with translateY(-50%)
 	const dotSize = 9;
-	
+
 	// Dot positions
 	const dot1Left = 17;
 	const dot2Left = 78;
 	const dot3Left = 139;
-	
+
 	// Main Inbox pill position
 	const inboxPillLeft = 174;
 	const inboxPillWidth = 66;
 	const inboxPillHeight = 17;
-	
+
 	// Contacts pill dimensions (shown when hovering dot 1)
 	const contactsPillWidth = 66;
 	const contactsPillHeight = 17;
 	const contactsPillLeft = 3;
-	
+
 	// Write pill dimensions (shown when hovering dot 2)
 	const writePillWidth = 56;
 	const writePillHeight = 17;
 	const writePillLeft = 55;
-	
+
 	// Drafts pill dimensions (shown when hovering dot 3)
 	const draftsPillWidth = 56;
 	const draftsPillHeight = 17;
 	const draftsPillLeft = 115;
-	
+
 	const isAnyDotHovered = isDot1Hovered || isDot2Hovered || isDot3Hovered;
 	const isSwitchingBetweenDots = wasAnyDotHoveredRef.current && isAnyDotHovered;
 	const animatedTransition = '0.6s cubic-bezier(0.22, 1, 0.36, 1)';
 	const instantTransition = '0s';
-	const pillOpacityTransition = isSwitchingBetweenDots ? instantTransition : animatedTransition;
-	
+	const pillOpacityTransition = isSwitchingBetweenDots
+		? instantTransition
+		: animatedTransition;
+
 	useEffect(() => {
 		wasAnyDotHoveredRef.current = isAnyDotHovered;
 	}, [isAnyDotHovered]);
-	
+
 	// Inbox pill position when hovered
 	const getInboxPillLeft = () => {
 		if (isDot1Hovered) return inboxPillLeft + 18;
@@ -291,7 +319,7 @@ const InboxSectionHeaderChrome: FC<{
 		if (isDot3Hovered) return inboxPillLeft + 5;
 		return inboxPillLeft;
 	};
-	
+
 	// Hover zones
 	const hoverZoneHeight = 30;
 	const hoverZoneTop = dotTop - hoverZoneHeight / 2;
@@ -306,7 +334,7 @@ const InboxSectionHeaderChrome: FC<{
 	const hoverZone2Width = midpoint2to3 - midpoint1to2;
 	const hoverZone3Left = midpoint2to3;
 	const hoverZone3Width = dot3Center + 30 - midpoint2to3;
-	
+
 	return (
 		<>
 			{/* Inbox pill - transforms to white and moves on hover */}
@@ -365,9 +393,7 @@ const InboxSectionHeaderChrome: FC<{
 					onContactsClick?.();
 				}}
 			>
-				<span className="text-[10px] font-bold text-black leading-none">
-					Contacts
-				</span>
+				<span className="text-[10px] font-bold text-black leading-none">Contacts</span>
 			</div>
 
 			{/* Write pill - shown when hovering dot 2 */}
@@ -396,9 +422,7 @@ const InboxSectionHeaderChrome: FC<{
 					onWriteClick?.();
 				}}
 			>
-				<span className="text-[10px] font-bold text-black leading-none">
-					Write
-				</span>
+				<span className="text-[10px] font-bold text-black leading-none">Write</span>
 			</div>
 
 			{/* Drafts pill - shown when hovering dot 3 */}
@@ -427,9 +451,7 @@ const InboxSectionHeaderChrome: FC<{
 					onDraftsClick?.();
 				}}
 			>
-				<span className="text-[10px] font-bold text-black leading-none">
-					Drafts
-				</span>
+				<span className="text-[10px] font-bold text-black leading-none">Drafts</span>
 			</div>
 
 			{/* Dot 1 - hidden when hovered */}
@@ -624,6 +646,87 @@ const getContactCompanyLabel = (
 	return company.trim();
 };
 
+const formatEmailDetailTimestamp = (value: string | Date | null | undefined): string => {
+	if (!value) return '';
+
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) return '';
+
+	const now = new Date();
+	const diffTime = Math.abs(now.getTime() - date.getTime());
+	const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+	const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+	const monthDay = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+	const time = date
+		.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
+		.toLowerCase();
+	const ago =
+		diffDays === 0 ? 'today' : diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
+
+	return `${dayName}, ${monthDay} ${time} (${ago})`;
+};
+
+const formatCampaignInboxTimestamp = (
+	value: string | Date | null | undefined
+): string => {
+	if (!value) return '';
+
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) return '';
+
+	const time = date
+		.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
+		.replace(/\s?[AP]M/i, '')
+		.replace(':', '.');
+	const diffTime = Math.abs(Date.now() - date.getTime());
+	const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+	const ago =
+		diffDays === 0 ? 'today' : `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+
+	return `${time} (${ago})`;
+};
+
+const getContactTitleBadgeLabel = (title: string): string => {
+	if (isRestaurantTitle(title)) return 'Restaurant';
+	if (isCoffeeShopTitle(title)) return 'Coffee Shop';
+	if (isMusicVenueTitle(title)) return 'Music Venue';
+	if (isWeddingPlannerTitle(title)) return 'Wedding Planner';
+	if (isWeddingVenueTitle(title)) return 'Wedding Venue';
+	if (isWineBeerSpiritsTitle(title)) return getWineBeerSpiritsLabel(title) ?? title;
+	return title;
+};
+
+const getContactTitleBadgeBackground = (title: string): string => {
+	if (isRestaurantTitle(title)) return '#C3FBD1';
+	if (isCoffeeShopTitle(title)) return '#D6F1BD';
+	if (isMusicVenueTitle(title)) return '#B7E5FF';
+	if (isWeddingPlannerTitle(title) || isWeddingVenueTitle(title)) return '#FFF2BC';
+	if (isWineBeerSpiritsTitle(title)) return '#BFC4FF';
+	return '#E8EFFF';
+};
+
+const renderContactTitleBadgeIcon = (title: string, size = 14) => {
+	if (isRestaurantTitle(title)) return <RestaurantsIcon size={size} />;
+	if (isCoffeeShopTitle(title)) return <CoffeeShopsIcon size={Math.round(size * 0.57)} />;
+	if (isMusicVenueTitle(title))
+		return <MusicVenuesIcon size={size} className="flex-shrink-0" />;
+	if (isWeddingPlannerTitle(title) || isWeddingVenueTitle(title)) {
+		return <WeddingPlannersIcon size={size} />;
+	}
+	if (isWineBeerSpiritsTitle(title)) {
+		return <WineBeerSpiritsIcon size={size} className="flex-shrink-0" />;
+	}
+	return null;
+};
+
+const getAvatarInitial = (value: string): string =>
+	value.trim().charAt(0).toUpperCase() || '?';
+
+const INBOX_LAST_SENT_FILL_COLOR = '#7ED29E';
+
+const getConversationSelectionEmail = (conversation: InboxConversation) =>
+	conversation.latestInboundMessage ?? conversation.latestMessage;
+
 export const InboxSection: FC<InboxSectionProps> = ({
 	allowedSenderEmails,
 	contactByEmail,
@@ -653,6 +756,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	onInboxSentTabChange,
 	selectedEmailId: controlledSelectedEmailId,
 	onSelectedEmailIdChange,
+	onThreadReplySent,
 	autoSelectFirstEmail = false,
 	detailOnly = false,
 	hideSelectedEmailBackButton = false,
@@ -665,8 +769,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		setWriteTabHighlighted,
 		setTopSearchHighlighted,
 		setHomeButtonHighlighted,
-	} =
-		useCampaignTopSearchHighlight();
+	} = useCampaignTopSearchHighlight();
 	const rootRef = useRef<HTMLDivElement | null>(null);
 	const isDashboardMode = Boolean(dashboardMode);
 
@@ -699,6 +802,37 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	// Height constants (desktop only; mobile uses responsive calc())
 	const desktopBoxHeight = desktopHeight ?? 657;
+	const shouldUseCampaignInboxDetailDesign =
+		isCampaignInbox &&
+		detailOnly &&
+		!isMobile &&
+		boxWidth >= 863 &&
+		desktopBoxHeight >= 668;
+	const campaignInboxDetailInnerWidth = 842;
+	const campaignInboxDetailHeaderHeight = 46;
+	const campaignInboxDetailThreadHeight = 404;
+	const campaignInboxDetailComposerHeight = 157;
+	const campaignInboxDetailHeaderTop = 18;
+	const campaignInboxDetailThreadGap = 20;
+	const campaignInboxDetailComposerGap = 11;
+	const campaignInboxDetailBottomStripHeight = 36;
+	const campaignInboxDetailNameTextStyle = {
+		color: '#000000',
+		textAlign: 'center' as const,
+		fontFamily: 'Inter, sans-serif',
+		fontSize: '14.894px',
+		fontStyle: 'normal',
+		fontWeight: 700,
+		lineHeight: '19.859px',
+	};
+	const campaignInboxDetailThreadTop =
+		campaignInboxDetailHeaderTop +
+		campaignInboxDetailHeaderHeight +
+		campaignInboxDetailThreadGap;
+	const campaignInboxDetailComposerTop =
+		campaignInboxDetailThreadTop +
+		campaignInboxDetailThreadHeight +
+		campaignInboxDetailComposerGap;
 
 	// Mobile-specific width values (using CSS calc for responsive sizing)
 	// 4px margins on each side for edge-to-edge feel
@@ -724,11 +858,13 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		filters: campaignId ? { campaignId } : undefined,
 		enabled: !isUsingSampleData,
 	});
-	const inboundEmails = isUsingSampleData ? sampleData?.inboundEmails ?? [] : inboundEmailsFromApi;
+	const inboundEmails = isUsingSampleData
+		? (sampleData?.inboundEmails ?? [])
+		: inboundEmailsFromApi;
 	const emails = isUsingSampleData ? undefined : emailsFromApi;
 	const sentEmails = emails?.filter((email) => email.status === 'sent') || [];
 	const campaignSentCount = isUsingSampleData
-		? sampleData?.sentEmails?.length ?? 0
+		? (sampleData?.sentEmails?.length ?? 0)
 		: sentEmails.length;
 	const isSentLoaded = isUsingSampleData || emailsFromApi !== undefined;
 	const isInboundLoaded = isUsingSampleData || inboundEmailsFromApi !== undefined;
@@ -747,7 +883,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	const hasUserSelectedInboxSentTabRef = useRef(false);
 	const hasAutoInitializedInboxSentTabRef = useRef(false);
 	const hasNotifiedInitialInboxSentTabRef = useRef(false);
-	const [internalSelectedEmailId, setInternalSelectedEmailId] = useState<number | null>(null);
+	const [internalSelectedEmailId, setInternalSelectedEmailId] = useState<number | null>(
+		null
+	);
 	const isSelectedEmailIdControlled = controlledSelectedEmailId !== undefined;
 	const selectedEmailId = isSelectedEmailIdControlled
 		? (controlledSelectedEmailId ?? null)
@@ -765,11 +903,13 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	const [isSending, setIsSending] = useState(false);
 	const [searchQuery, setSearchQuery] = useState('');
 	const [sentReplies, setSentReplies] = useState<
-		Record<number, Array<{ message: string; timestamp: Date }>>
+		Record<string, Array<{ message: string; timestamp: Date }>>
 	>({});
 	// Tracks "waiting for their reply" state by sender (used to drive the green reply theme).
 	// Keyed by normalized sender email; value is the timestamp (ms) when we last replied.
-	const [replyThemeBySender, setReplyThemeBySender] = useState<Record<string, number>>({});
+	const [replyThemeBySender, setReplyThemeBySender] = useState<Record<string, number>>(
+		{}
+	);
 
 	const { user } = useMe();
 	const { mutateAsync: sendMailgunMessage } = useSendMailgunMessage({
@@ -784,7 +924,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 				allowedSenderEmails
 					.filter((email): email is string => Boolean(email))
 					.map((email) => email.toLowerCase().trim())
-		  )
+			)
 		: isCampaignInbox
 			? new Set<string>()
 			: null;
@@ -794,10 +934,12 @@ export const InboxSection: FC<InboxSectionProps> = ({
 			? inboundEmails.filter((email) => {
 					const sender = email.sender?.toLowerCase().trim();
 					return !!sender && normalizedAllowedSenders.has(sender);
-			  })
+				})
 			: inboundEmails;
 
-	const campaignReplyCount = Array.isArray(filteredBySender) ? filteredBySender.length : 0;
+	const campaignReplyCount = Array.isArray(filteredBySender)
+		? filteredBySender.length
+		: 0;
 	const shouldAutoDefaultInboxSentTab = isCampaignInbox && !detailOnly;
 
 	// Campaign page UX: if there are no replies yet, default to "Sent".
@@ -872,7 +1014,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	// Convert sent emails to a format compatible with inbox display
 	const normalizedSentEmails: Array<InboundEmailWithRelations & { isSent?: boolean }> =
 		isUsingSampleData
-			? sampleData?.sentEmails ?? []
+			? (sampleData?.sentEmails ?? [])
 			: sentEmails.map(
 					(email) =>
 						({
@@ -886,30 +1028,46 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							strippedText: email.message?.replace(/<[^>]*>/g, '') || '',
 							bodyHtml: email.message || '',
 							receivedAt: email.sentAt || email.createdAt,
+							contactId: email.contactId,
 							contact: email.contact,
-							campaign: null,
+							campaignId: email.campaignId,
+							campaign: email.campaign,
 							originalEmail: null,
+							originalEmailId: null,
 							isSent: true,
-						} as any)
-			  );
+						}) as unknown as InboundEmailWithRelations & { isSent?: boolean }
+				);
 
-	// Choose which emails to display based on active tab
-	const emailsToDisplay = activeTab === 'inbox' ? filteredBySender : normalizedSentEmails;
+	const allInboxConversations = buildInboxConversations([
+		...((filteredBySender ?? []) as InboxConversationMessage[]),
+		...(normalizedSentEmails as InboxConversationMessage[]),
+	]);
+	const inboxConversations = allInboxConversations
+		.filter((conversation) => conversation.inboundMessages.length > 0)
+		.sort(
+			(a, b) =>
+				getInboxMessageTimeMs(getConversationSelectionEmail(b)) -
+				getInboxMessageTimeMs(getConversationSelectionEmail(a))
+		);
 	const isLoading = isUsingSampleData
 		? false
 		: activeTab === 'inbox'
-		? isLoadingInbound
-		: isLoadingEmails;
-	const error = isUsingSampleData ? null : activeTab === 'inbox' ? inboundError : emailsError;
+			? isLoadingInbound
+			: isLoadingEmails;
+	const error = isUsingSampleData
+		? null
+		: activeTab === 'inbox'
+			? inboundError
+			: emailsError;
 
 	// Further filter by search query (sender, subject, body, contact name/company/email)
-	const visibleEmails = emailsToDisplay?.filter((email) => {
+	const emailMatchesSearch = (email: InboxConversationMessage) => {
 		if (!searchQuery.trim()) return true;
 		const query = searchQuery.toLowerCase();
 		const sender = email.sender?.toLowerCase() || '';
 		const senderName = email.senderName?.toLowerCase() || '';
 		const subject = email.subject?.toLowerCase() || '';
-		const body = (email.strippedText || email.bodyPlain || '').toLowerCase();
+		const body = getInboxMessageSnippet(email).toLowerCase();
 
 		const contact: any = resolveContactForEmail(email, contactByEmail);
 		const fullName =
@@ -933,28 +1091,86 @@ export const InboxSection: FC<InboxSectionProps> = ({
 			company.includes(query) ||
 			contactEmail.includes(query)
 		);
+	};
+	const visibleInboxConversations = inboxConversations.filter((conversation) => {
+		if (!searchQuery.trim()) return true;
+		return conversation.messages.some(emailMatchesSearch);
 	});
+	const visibleEmails: InboxConversationMessage[] =
+		activeTab === 'inbox'
+			? visibleInboxConversations.map(getConversationSelectionEmail)
+			: (normalizedSentEmails as InboxConversationMessage[]).filter(emailMatchesSearch);
 
-	const selectedEmail = visibleEmails?.find((email) => email.id === selectedEmailId);
+	const selectedConversation =
+		selectedEmailId !== null
+			? activeTab === 'sent'
+				? (allInboxConversations.find((conversation) =>
+						inboxConversationContainsSentEmailId(conversation, selectedEmailId)
+					) ?? null)
+				: (visibleInboxConversations.find((conversation) =>
+						inboxConversationContainsInboundEmailId(conversation, selectedEmailId)
+					) ??
+					visibleInboxConversations.find((conversation) =>
+						inboxConversationContainsEmailId(conversation, selectedEmailId)
+					) ??
+					null)
+			: null;
+	const selectedEmail = selectedConversation
+		? activeTab === 'sent'
+			? selectedConversation.latestMessage
+			: getConversationSelectionEmail(selectedConversation)
+		: activeTab === 'inbox'
+			? null
+			: (visibleEmails.find((email) => email.id === selectedEmailId) ?? null);
+	const selectedThreadMessages =
+		selectedConversation?.messages ?? (selectedEmail ? [selectedEmail] : []);
+	const selectedConversationReplyKey =
+		selectedConversation?.key ?? selectedEmail?.id.toString() ?? null;
+	const selectedThreadIsConversation = selectedThreadMessages.length > 1;
+	const selectedPendingReplies = selectedConversationReplyKey
+		? sentReplies[selectedConversationReplyKey] || []
+		: [];
+	const currentUserDisplayName =
+		`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.firstName || 'You';
+	const visibleEmailRows =
+		activeTab === 'inbox'
+			? visibleInboxConversations.map((conversation) => ({
+					key: conversation.key,
+					email: getConversationSelectionEmail(conversation),
+					selectionEmail: getConversationSelectionEmail(conversation),
+				}))
+			: visibleEmails.map((email) => ({
+					key: `${email.isSent ? 'sent' : 'email'}-${email.id}`,
+					email,
+					selectionEmail: email,
+		}));
 	const shouldUseDetailChrome = Boolean(selectedEmail) || detailOnly;
 	const selectedSenderKey = selectedEmail?.sender?.toLowerCase().trim();
-	const isSelectedEmailSent = Boolean((selectedEmail as any)?.isSent);
-	const isReplySentThemeActive =
-		Boolean(
-			selectedEmail &&
-				!isSelectedEmailSent &&
-				activeTab === 'inbox' &&
-				selectedSenderKey &&
-				replyThemeBySender[selectedSenderKey] !== undefined
-		);
+	const selectedConversationLatestMessageIsSent = Boolean(
+		selectedConversation?.latestMessage.isSent
+	);
+	const isReplySentThemeActive = Boolean(
+		selectedEmail &&
+		(selectedConversationLatestMessageIsSent ||
+			(selectedSenderKey && replyThemeBySender[selectedSenderKey] !== undefined))
+	);
 
 	useLayoutEffect(() => {
 		if (!autoSelectFirstEmail) return;
-		if (!visibleEmails) return;
+		if (
+			inboxSentTabRequest?.preserveSelection &&
+			lastHandledInboxSentTabRequestIdRef.current !== inboxSentTabRequest.requestId
+		) {
+			return;
+		}
 
 		const hasVisibleSelectedEmail =
 			selectedEmailId !== null &&
-			visibleEmails.some((email) => email.id === selectedEmailId);
+			(activeTab === 'inbox'
+				? visibleInboxConversations.some((conversation) =>
+						inboxConversationContainsInboundEmailId(conversation, selectedEmailId)
+					)
+				: visibleEmails.some((email) => email.id === selectedEmailId));
 		if (hasVisibleSelectedEmail) return;
 
 		const nextEmailId = visibleEmails[0]?.id ?? null;
@@ -962,7 +1178,16 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 		setSelectedEmailId(nextEmailId);
 		setReplyMessage('');
-	}, [autoSelectFirstEmail, selectedEmailId, setSelectedEmailId, visibleEmails]);
+	}, [
+		autoSelectFirstEmail,
+		activeTab,
+		inboxSentTabRequest?.preserveSelection,
+		inboxSentTabRequest?.requestId,
+		selectedEmailId,
+		setSelectedEmailId,
+		visibleEmails,
+		visibleInboxConversations,
+	]);
 
 	// If we receive a newer inbound email from a sender we've replied to, revert the UI theme.
 	useEffect(() => {
@@ -1006,11 +1231,17 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		}
 	}, [selectedEmail, contactByEmail, onContactSelect]);
 
-	const handleSendReply = async () => {
-		if (!selectedEmail || !replyMessage.trim()) return;
+	const handleSendReply = async (messageOverride?: string) => {
+		const messageToSend = messageOverride ?? replyMessage;
+		if (!selectedEmail || isRichTextMessageEmpty(messageToSend)) return;
 
+		const replyKey = selectedConversationReplyKey ?? selectedEmail.id.toString();
 		const senderKey = selectedEmail.sender?.toLowerCase().trim();
 		const repliedAtMs = Date.now();
+		const notifyThreadReplySent = () => {
+			const messageIds = selectedThreadMessages.map((message) => message.id);
+			if (messageIds.length > 0) onThreadReplySent?.(messageIds, repliedAtMs);
+		};
 		// Optimistically flip the UI theme to "sent" (green) for this sender.
 		if (senderKey) {
 			setReplyThemeBySender((prev) => ({ ...prev, [senderKey]: repliedAtMs }));
@@ -1020,13 +1251,16 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		// Just append the reply to the UI immediately.
 		if (isUsingSampleData) {
 			setSentReplies((prev) => {
-				const emailId = selectedEmail.id;
-				const existingReplies = prev[emailId] || [];
+				const existingReplies = prev[replyKey] || [];
 				return {
 					...prev,
-					[emailId]: [...existingReplies, { message: replyMessage, timestamp: new Date() }],
+					[replyKey]: [
+						...existingReplies,
+						{ message: messageToSend, timestamp: new Date() },
+					],
 				};
 			});
+			notifyThreadReplySent();
 			setReplyMessage('');
 			return;
 		}
@@ -1050,7 +1284,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 			await sendMailgunMessage({
 				recipientEmail: selectedEmail.sender,
 				subject: replySubject,
-				message: replyMessage,
+				message: messageToSend,
 				senderEmail: senderEmail,
 				senderName:
 					user?.firstName && user?.lastName
@@ -1062,17 +1296,17 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 			// Store the sent reply
 			setSentReplies((prev) => {
-				const emailId = selectedEmail.id;
-				const existingReplies = prev[emailId] || [];
+				const existingReplies = prev[replyKey] || [];
 				return {
 					...prev,
-					[emailId]: [
+					[replyKey]: [
 						...existingReplies,
-						{ message: replyMessage, timestamp: new Date() },
+						{ message: messageToSend, timestamp: new Date() },
 					],
 				};
 			});
 
+			notifyThreadReplySent();
 			setReplyMessage('');
 		} catch (error) {
 			// If sending fails, revert the optimistic theme flip.
@@ -1177,11 +1411,16 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	}, [demoMode, activeTab, selectedEmailId]);
 
 	// Reset selected email when switching tabs
-	const handleTabChange = (tab: 'inbox' | 'sent') => {
+	const handleTabChange = (
+		tab: 'inbox' | 'sent',
+		options?: { preserveSelection?: boolean }
+	) => {
 		hasUserSelectedInboxSentTabRef.current = true;
 		hasAutoInitializedInboxSentTabRef.current = true;
 		setActiveTab(tab);
-		setSelectedEmailId(null);
+		if (!options?.preserveSelection) {
+			setSelectedEmailId(null);
+		}
 		setReplyMessage('');
 		onInboxSentTabChange?.(tab);
 	};
@@ -1189,9 +1428,12 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	// External request (campaign navigation): switch Inbox/Sent tab on demand.
 	useLayoutEffect(() => {
 		if (!inboxSentTabRequest) return;
-		if (lastHandledInboxSentTabRequestIdRef.current === inboxSentTabRequest.requestId) return;
+		if (lastHandledInboxSentTabRequestIdRef.current === inboxSentTabRequest.requestId)
+			return;
 		lastHandledInboxSentTabRequestIdRef.current = inboxSentTabRequest.requestId;
-		handleTabChange(inboxSentTabRequest.tab);
+		handleTabChange(inboxSentTabRequest.tab, {
+			preserveSelection: inboxSentTabRequest.preserveSelection,
+		});
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [inboxSentTabRequest?.requestId]);
 
@@ -1210,12 +1452,12 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					? '#5AB477'
 					: '#6fa4e1'
 				: isDashboardMode
-				? activeTab === 'sent'
-					? '#5AB477'
-					: '#6fa4e1'
-				: activeTab === 'sent'
-				? 'linear-gradient(to bottom, #FFFFFF 19px, #5AB477 19px)'
-				: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
+					? activeTab === 'sent'
+						? '#5AB477'
+						: '#6fa4e1'
+					: activeTab === 'sent'
+						? 'linear-gradient(to bottom, #FFFFFF 19px, #5AB477 19px)'
+						: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
 		};
 
 		const loadingContent = (
@@ -1491,7 +1733,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		);
 	}
 
-	if (!visibleEmails || visibleEmails.length === 0) {
+	if (visibleEmails.length === 0) {
 		return (
 			<div className={`w-full flex justify-center ${outerPaddingClass}`}>
 				<div
@@ -1714,9 +1956,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						<div
 							style={{
 								position: 'absolute',
-								top: isMobile
-									? '45.5px'
-									: `${desktopSearchTopPx + 0.5}px`, // Centered with search bar
+								top: isMobile ? '45.5px' : `${desktopSearchTopPx + 0.5}px`, // Centered with search bar
 								right: isMobile ? '8px' : '14px', // Right-aligned with emails
 								width: isMobile ? '100px' : '148px',
 								height: isMobile ? '40px' : '47px',
@@ -1807,7 +2047,14 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							className="select-none mb-2 w-full"
 							style={{
 								width: isMobile ? mobileEmailRowWidth : `${emailRowWidth}px`,
-								height: idx >= 1 && idx <= 4 ? (isMobile ? '58px' : '52px') : (isMobile ? '90px' : '78px'),
+								height:
+									idx >= 1 && idx <= 4
+										? isMobile
+											? '58px'
+											: '52px'
+										: isMobile
+											? '90px'
+											: '78px',
 								border: '3px solid #000000',
 								borderRadius: '8px',
 								backgroundColor: '#3277c6',
@@ -1835,18 +2082,18 @@ export const InboxSection: FC<InboxSectionProps> = ({
 										idx === 1 && onGoToDrafting
 											? onGoToDrafting
 											: idx === 2 && onGoToWriting
-											? onGoToWriting
-											: idx === 3 && onGoToSearch
-											? onGoToSearch
-											: idx === 3 && onGoToContacts
-												? onGoToContacts
-											: idx === 4
-											? () => {
-													if (typeof window !== 'undefined') {
-														window.location.assign(urls.murmur.dashboard.index);
-													}
-												}
-											: undefined
+												? onGoToWriting
+												: idx === 3 && onGoToSearch
+													? onGoToSearch
+													: idx === 3 && onGoToContacts
+														? onGoToContacts
+														: idx === 4
+															? () => {
+																	if (typeof window !== 'undefined') {
+																		window.location.assign(urls.murmur.dashboard.index);
+																	}
+																}
+															: undefined
 									}
 									onMouseEnter={
 										idx === 1
@@ -1857,7 +2104,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 													? () => setTopSearchHighlighted(true)
 													: idx === 4
 														? () => setHomeButtonHighlighted(true)
-												: undefined
+														: undefined
 									}
 									onMouseLeave={
 										idx === 1
@@ -1868,7 +2115,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 													? () => setTopSearchHighlighted(false)
 													: idx === 4
 														? () => setHomeButtonHighlighted(false)
-												: undefined
+														: undefined
 									}
 									className={`bg-white transition-colors ${
 										idx === 1
@@ -1879,7 +2126,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 													? 'hover:bg-[#AFD6EF]'
 													: idx === 4
 														? 'hover:bg-[#DBDBDB]'
-												: ''
+														: ''
 									}`}
 									style={{
 										width: isMobile ? 'calc(100% - 24px)' : '314px',
@@ -1982,68 +2229,79 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					height: isMobile ? 'calc(100dvh - 160px)' : `${desktopBoxHeight}px`,
 					minHeight: isMobile ? 'calc(100dvh - 160px)' : `${desktopBoxHeight}px`,
 					maxHeight: isMobile ? 'calc(100dvh - 160px)' : `${desktopBoxHeight}px`,
-					border: '3px solid #000000',
-					borderRadius: '8px',
+					border: shouldUseCampaignInboxDetailDesign
+						? '2px solid #000000'
+						: '3px solid #000000',
+					borderRadius: shouldUseCampaignInboxDetailDesign ? '12px' : '8px',
 					padding: shouldUseDetailChrome
-						? isMobile
-							? '18px 8px 8px 8px'
-							: '21px 13px 12px 13px'
+						? shouldUseCampaignInboxDetailDesign
+							? '0px'
+							: isMobile
+								? '18px 8px 8px 8px'
+								: '21px 13px 12px 13px'
 						: isMobile
-						? '8px'
-						: '16px',
+							? '8px'
+							: '16px',
 					paddingTop: shouldUseDetailChrome
-						? isMobile
-							? '18px'
-							: '21px'
+						? shouldUseCampaignInboxDetailDesign
+							? '0px'
+							: isMobile
+								? '18px'
+								: '21px'
 						: isMobile
-						? '62px'
-						: `${desktopPaddingTopPx}px`, // Adjusted for mobile
-					background: shouldUseDetailChrome
+							? '62px'
+							: `${desktopPaddingTopPx}px`, // Adjusted for mobile
+					background: shouldUseCampaignInboxDetailDesign
 						? isReplySentThemeActive
-							? '#467842'
-							: '#437ec1'
-						: isMobile
-						? activeTab === 'sent'
-							? '#5AB477'
-							: '#6fa4e1'
-						: isDashboardMode
-						? activeTab === 'sent'
-							? '#5AB477'
-							: '#6fa4e1'
-						: activeTab === 'sent'
-						? 'linear-gradient(to bottom, #FFFFFF 19px, #5AB477 19px)'
-						: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
-					overflow: isMobile ? 'hidden' : undefined,
+							? INBOX_LAST_SENT_FILL_COLOR
+							: 'rgba(104, 199, 228, 0.60)'
+						: shouldUseDetailChrome
+							? isReplySentThemeActive
+								? INBOX_LAST_SENT_FILL_COLOR
+								: '#437ec1'
+							: isMobile
+								? activeTab === 'sent'
+									? '#5AB477'
+									: '#6fa4e1'
+								: isDashboardMode
+									? activeTab === 'sent'
+										? '#5AB477'
+										: '#6fa4e1'
+									: activeTab === 'sent'
+										? 'linear-gradient(to bottom, #FFFFFF 19px, #5AB477 19px)'
+										: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
+					overflow: isMobile || shouldUseCampaignInboxDetailDesign ? 'hidden' : undefined,
+					boxSizing: 'border-box',
 				}}
 			>
-					{/* Back button - shown when email is selected */}
-					{selectedEmail && !hideSelectedEmailBackButton && (
-						<button
-							type="button"
-							onClick={() => {
-								setSelectedEmailId(null);
-								setReplyMessage('');
-							}}
-							className="absolute cursor-pointer bg-transparent border-0 p-0 z-10"
-							style={{
-								top: '3px',
-								left: '21px',
-							}}
+				{/* Back button - shown when email is selected */}
+				{selectedEmail && !hideSelectedEmailBackButton && (
+					<button
+						type="button"
+						onClick={() => {
+							setSelectedEmailId(null);
+							setReplyMessage('');
+						}}
+						className="absolute cursor-pointer bg-transparent border-0 p-0 z-10"
+						style={{
+							top: '3px',
+							left: '21px',
+						}}
+					>
+						<svg
+							width="34"
+							height="15"
+							viewBox="0 0 34 15"
+							fill="none"
+							xmlns="http://www.w3.org/2000/svg"
 						>
-							<svg
-								width="34"
-								height="15"
-								viewBox="0 0 34 15"
-								fill="none"
-								xmlns="http://www.w3.org/2000/svg"
-							>
-								<path
-									d="M0.292892 6.65666C-0.0976295 7.04719 -0.0976295 7.68035 0.292892 8.07088L6.65685 14.4348C7.04738 14.8254 7.68054 14.8254 8.07107 14.4348C8.46159 14.0443 8.46159 13.4111 8.07107 13.0206L2.41421 7.36377L8.07107 1.70692C8.46159 1.31639 8.46159 0.683226 8.07107 0.292702C7.68054 -0.0978227 7.04738 -0.0978227 6.65685 0.292702L0.292892 6.65666ZM34 7.36377V6.36377L1 6.36377V7.36377V8.36377L34 8.36377V7.36377Z"
-									fill="white"
-								/>
-							</svg>
-						</button>
-					)}
+							<path
+								d="M0.292892 6.65666C-0.0976295 7.04719 -0.0976295 7.68035 0.292892 8.07088L6.65685 14.4348C7.04738 14.8254 7.68054 14.8254 8.07107 14.4348C8.46159 14.0443 8.46159 13.4111 8.07107 13.0206L2.41421 7.36377L8.07107 1.70692C8.46159 1.31639 8.46159 0.683226 8.07107 0.292702C7.68054 -0.0978227 7.04738 -0.0978227 6.65685 0.292702L0.292892 6.65666ZM34 7.36377V6.36377L1 6.36377V7.36377V8.36377L34 8.36377V7.36377Z"
+								fill="white"
+							/>
+						</svg>
+					</button>
+				)}
 				{/* Header chrome with dots and Inbox pill - hidden on mobile */}
 				{!selectedEmail && !detailOnly && !isMobile && !isDashboardMode && (
 					<InboxSectionHeaderChrome
@@ -2093,7 +2351,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					</div>
 				)}
 				{/* Top-right toggle */}
-				{!selectedEmail && !detailOnly &&
+				{!selectedEmail &&
+					!detailOnly &&
 					(showMessagesCampaignsToggle ? (
 						<div
 							style={{
@@ -2165,8 +2424,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									lineHeight: 1,
 									border: 'none',
 									outline: 'none',
-									backgroundColor:
-										inboxSubtab === 'campaigns' ? '#B3E5FF' : '#4DA6D7',
+									backgroundColor: inboxSubtab === 'campaigns' ? '#B3E5FF' : '#4DA6D7',
 									color: '#000000',
 									fontFamily: 'Inter, sans-serif',
 									fontSize: '15px',
@@ -2209,9 +2467,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									alignItems: 'center',
 									justifyContent: 'center',
 									backgroundColor:
-										activeTab === 'inbox'
-											? 'rgba(93, 171, 104, 0.63)'
-											: 'transparent',
+										activeTab === 'inbox' ? 'rgba(93, 171, 104, 0.63)' : 'transparent',
 									borderRadius: '8px',
 									border: activeTab === 'inbox' ? '2px solid #000000' : 'none',
 									cursor: 'pointer',
@@ -2245,9 +2501,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									alignItems: 'center',
 									justifyContent: 'center',
 									backgroundColor:
-										activeTab === 'sent'
-											? 'rgba(93, 171, 104, 0.63)'
-											: 'transparent',
+										activeTab === 'sent' ? 'rgba(93, 171, 104, 0.63)' : 'transparent',
 									borderRadius: '8px',
 									border: activeTab === 'sent' ? '2px solid #000000' : 'none',
 									cursor: 'pointer',
@@ -2274,309 +2528,601 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					))}
 
 				{selectedEmail ? (
-					/* Expanded Email View Inside Box */
-					<div
-						className="w-full h-full flex flex-col"
-						style={{
-							width: isMobile ? mobileExpandedEmailWidth : `${expandedEmailWidth}px`,
-							border: '3px solid #000000',
-							borderRadius: '8px',
-							backgroundColor: isReplySentThemeActive ? '#5DB169' : '#5DA0EB',
-							overflow: 'hidden',
-						}}
-					>
-						{/* Top Header Section - 880x79px */}
+					shouldUseCampaignInboxDetailDesign ? (
 						<div
-							className={`flex items-center ${isMobile ? 'px-2' : 'px-4'}`}
-							style={{
-								width: '100%',
-								height: isMobile ? '65px' : '79px',
-								minHeight: isMobile ? '65px' : '79px',
-								backgroundColor: '#FFFFFF',
-								borderBottom: '3px solid #000000',
-								borderBottomLeftRadius: '8px',
-								borderBottomRightRadius: '8px',
-							}}
+							className="relative h-full w-full overflow-hidden"
+							style={{ fontFamily: 'Inter, sans-serif' }}
 						>
-							{/* Left side: Name, Company, Subject */}
-							<div
-								className="flex flex-col justify-center min-w-0"
-								style={{ width: isMobile ? '140px' : '200px', flexShrink: 0 }}
-							>
-								<span className={`font-medium truncate ${isMobile ? 'text-[13px]' : ''}`}>
-									{getCanonicalContactName(selectedEmail, contactByEmail)}
-								</span>
-								{(() => {
-									const companyLabel = getContactCompanyLabel(
-										selectedEmail,
-										contactByEmail
-									);
-									if (!companyLabel) return null;
-									return (
-										<span className={`font-inter ${isMobile ? 'text-[12px]' : 'text-[14px]'} text-gray-500 truncate`}>
-											{companyLabel}
-										</span>
-									);
-								})()}
-								<div className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium truncate mt-1`}>
-									{selectedEmail.subject || '(No Subject)'}
-								</div>
-							</div>
-							{/* Right side: Badges + timestamp */}
-							<div className={`flex-1 flex items-center justify-end gap-2 min-w-0 ${isMobile ? 'gap-1' : ''}`}>
-								{/* State/City and Title badges - stacked vertically */}
-								{(() => {
-									const contact = resolveContactForEmail(selectedEmail, contactByEmail);
-									const headline = contact?.headline || contact?.title || '';
-									const stateAbbr = contact
-										? getStateAbbreviation(contact.state || '') || ''
-										: '';
-									const stateName = contact?.state || '';
-									return (
-										<div
-											className="flex flex-col items-start gap-1 flex-shrink-0 mr-auto"
-											style={{ marginLeft: isMobile ? '10%' : '35%' }}
-										>
-											{stateAbbr && (
-												<div className="flex items-center gap-1">
+							{(() => {
+								const contact = resolveContactForEmail(selectedEmail, contactByEmail);
+								const contactName = getCanonicalContactName(
+									selectedEmail,
+									contactByEmail
+								);
+								const companyLabel = getContactCompanyLabel(
+									selectedEmail,
+									contactByEmail
+								);
+								const headline = contact?.headline || contact?.title || '';
+								const stateAbbr = contact
+									? getStateAbbreviation(contact.state || '') || ''
+									: '';
+								const placeLabel =
+									(typeof contact?.city === 'string' && contact.city.trim()) ||
+									(typeof contact?.state === 'string' && contact.state.trim()) ||
+									'';
+
+								return (
+									<div
+										className="flex items-center justify-between gap-4"
+										style={{
+											position: 'absolute',
+											top: `${campaignInboxDetailHeaderTop}px`,
+											left: '50%',
+											transform: 'translateX(-50%)',
+											width: `${campaignInboxDetailInnerWidth}px`,
+											height: `${campaignInboxDetailHeaderHeight}px`,
+											borderRadius: '7px',
+											border: '2px solid #000000',
+											backgroundColor: '#FFFFFF',
+											boxSizing: 'border-box',
+											padding: '0 15px 0 22px',
+											zIndex: 3,
+										}}
+									>
+										<div className="flex min-w-0 items-center gap-[14px]">
+											<div
+												className="flex shrink-0 items-center justify-center rounded-full"
+												style={{
+													width: '27px',
+													height: '27px',
+													backgroundColor: '#86C7E8',
+													...campaignInboxDetailNameTextStyle,
+													color: '#FFFFFF',
+												}}
+											>
+												{getAvatarInitial(contactName)}
+											</div>
+											<div className="flex min-w-0 items-center gap-[17px]">
+												<span
+													className="truncate"
+													style={campaignInboxDetailNameTextStyle}
+												>
+													{contactName}
+												</span>
+												{companyLabel && (
 													<span
-														className={`inline-flex items-center justify-center rounded-[6px] border ${isMobile ? 'text-[10px]' : 'text-[12px]'} leading-none font-bold`}
-														style={{
-															width: isMobile ? '24px' : '28px',
-															height: isMobile ? '16px' : '20px',
-															backgroundColor:
-																stateBadgeColorMap[stateAbbr] || 'transparent',
-															borderColor: '#000000',
-														}}
+														className="truncate text-black"
+														style={{ fontSize: '16px', fontWeight: 400, lineHeight: 1 }}
 													>
-														{stateAbbr}
+														{companyLabel}
 													</span>
-													{!isMobile && stateName && (
-														<span className="text-[12px] text-black">{stateName}</span>
-													)}
-												</div>
+												)}
+											</div>
+										</div>
+
+										<div className="flex shrink-0 items-center gap-[6px] text-black">
+											{stateAbbr && (
+												<span
+													className="inline-flex items-center justify-center border border-black"
+													style={{
+														width: '29px',
+														height: '20px',
+														borderRadius: '6px',
+														backgroundColor: stateBadgeColorMap[stateAbbr] || '#FFF7EF',
+														fontSize: '12px',
+														fontWeight: 500,
+														lineHeight: 1,
+													}}
+												>
+													{stateAbbr}
+												</span>
+											)}
+											{placeLabel && (
+												<span
+													style={{ fontSize: '14px', fontWeight: 400, lineHeight: 1 }}
+												>
+													{placeLabel}
+												</span>
 											)}
 											{headline && (
 												<div
-													className={`${isMobile ? 'h-[16px] max-w-[100px]' : 'h-[21px] max-w-[160px]'} rounded-[6px] px-2 flex items-center border border-black overflow-hidden`}
-													style={{ backgroundColor: '#e8efff' }}
+													className="flex max-w-[180px] items-center gap-1 overflow-hidden border border-black"
+													style={{
+														height: '24px',
+														borderRadius: '6px',
+														backgroundColor: getContactTitleBadgeBackground(headline),
+														padding: '0 8px',
+													}}
 												>
-													<span className={`${isMobile ? 'text-[8px]' : 'text-[10px]'} text-black leading-none truncate`}>
-														{headline}
+													{renderContactTitleBadgeIcon(headline, 14)}
+													<span
+														className="truncate text-black"
+														style={{ fontSize: '13px', lineHeight: 1 }}
+													>
+														{getContactTitleBadgeLabel(headline)}
 													</span>
 												</div>
 											)}
 										</div>
-									);
-								})()}
-								{/* Timestamp */}
-								<div className={`${isMobile ? 'text-xs' : 'text-sm'} text-black whitespace-nowrap flex-shrink-0 ${isMobile ? 'ml-1' : 'ml-4'}`}>
-									{selectedEmail.receivedAt
-										? new Date(selectedEmail.receivedAt)
-												.toLocaleTimeString([], {
-													hour: 'numeric',
-													minute: '2-digit',
-													hour12: true,
-												})
-												.toLowerCase()
-										: ''}
-								</div>
-							</div>
-						</div>
+									</div>
+								);
+							})()}
 
-						{/* Content Section */}
-						<div className="flex-1 w-full flex flex-col min-h-0">
-							<CustomScrollbar
-								className="flex-1 w-full min-h-0"
-								contentClassName={`flex flex-col ${isMobile ? 'pb-[14px]' : 'pb-[18px]'}`}
-								thumbWidth={2}
-								thumbColor={scrollbarThumbColor}
-								trackColor="transparent"
-								offsetRight={scrollbarOffsetRight}
-								alignTrackToScrollContainer={scrollbarAlignTrackToScrollContainer}
-								disableOverflowClass
-								lockHorizontalScroll
+							<div
+								style={{
+									position: 'absolute',
+									top: `${campaignInboxDetailThreadTop}px`,
+									left: '50%',
+									transform: 'translateX(-50%)',
+									width: `${campaignInboxDetailInnerWidth}px`,
+									height: `${campaignInboxDetailThreadHeight}px`,
+									borderRadius: '7px',
+									border: '1.719px solid #000000',
+									backgroundColor: '#FFFFFF',
+									boxSizing: 'border-box',
+									overflow: 'hidden',
+									zIndex: 1,
+								}}
 							>
-								{/* Email Body Box - 828x326px (or 461px when narrow), 19px below header */}
-								<div
-									style={{
-										width: isMobile ? mobileEmailBodyWidth : `${emailBodyWidth}px`,
-										height: isUsingSampleData ? 'auto' : isMobile ? '280px' : '326px',
-										marginTop: isMobile ? '12px' : '19px',
-										marginLeft: activeTab === 'sent' ? 'auto' : 0,
-										marginRight: activeTab === 'sent' ? 0 : 'auto',
-										alignSelf: activeTab === 'sent' ? 'flex-end' : 'flex-start',
-										flexShrink: 0,
-										backgroundColor: activeTab === 'sent' ? '#FFFFFF' : '#E5F1FF',
-										border: '3px solid #000000',
-										borderRadius: '8px',
-										padding: isMobile ? '12px' : '16px',
-										overflowY: isUsingSampleData ? 'visible' : 'auto',
-									}}
+								<CustomScrollbar
+									className="h-full w-full"
+									contentClassName="flex min-h-full flex-col"
+									thumbWidth={2}
+									thumbColor={scrollbarThumbColor}
+									trackColor="transparent"
+									offsetRight={-5}
+									disableOverflowClass
+									lockHorizontalScroll
 								>
-									{/* Date/time header */}
-									<div className="text-sm text-black mb-4">
-										{selectedEmail.receivedAt
-											? (() => {
-													const date = new Date(selectedEmail.receivedAt);
-													const now = new Date();
-													const diffTime = Math.abs(now.getTime() - date.getTime());
-													const diffDays = Math.floor(
-														diffTime / (1000 * 60 * 60 * 24)
-													);
-													const dayName = date.toLocaleDateString('en-US', {
-														weekday: 'long',
-													});
-													const monthDay = date.toLocaleDateString('en-US', {
-														month: 'long',
-														day: 'numeric',
-													});
-													const time = date
-														.toLocaleTimeString([], {
-															hour: 'numeric',
-															minute: '2-digit',
-															hour12: true,
-														})
-														.toLowerCase();
-													const ago =
-														diffDays === 0
-															? 'today'
-															: diffDays === 1
-															? '1 day ago'
-															: `${diffDays} days ago`;
-													return `${dayName}, ${monthDay} ${time} (${ago})`;
-											  })()
-											: ''}
-									</div>
-
-									{/* Email body */}
-									<div className="text-sm">
-										{selectedEmail.bodyHtml ? (
+									{selectedThreadMessages.map((message, index) => {
+										const isSentMessage = Boolean(message.isSent);
+										const isLastThreadItem =
+											index === selectedThreadMessages.length - 1 &&
+											selectedPendingReplies.length === 0;
+										const senderName = isSentMessage
+											? currentUserDisplayName
+											: getCanonicalContactName(message, contactByEmail);
+										const companyLabel = isSentMessage
+											? null
+											: getContactCompanyLabel(message, contactByEmail);
+										const bodyText =
+											stripQuotedReply(message.strippedText || message.bodyPlain || '') ||
+											getInboxMessageSnippet(message) ||
+											'No content';
+										return (
 											<div
-												dangerouslySetInnerHTML={{
-													__html: stripQuotedReplyHtml(selectedEmail.bodyHtml),
+												key={`${isSentMessage ? 'sent' : 'inbound'}-${message.id}-${index}`}
+												style={{
+													backgroundColor: isSentMessage ? '#FFFFFF' : '#E5F1FF',
+													borderBottom: isLastThreadItem ? 'none' : '1.719px solid #000000',
+													padding: '13px 24px 10px 24px',
+													boxSizing: 'border-box',
+													flexShrink: 0,
 												}}
-												className="prose prose-sm max-w-none"
-											/>
-										) : (
-											<div className="whitespace-pre-wrap">
-												{stripQuotedReply(
-													selectedEmail.strippedText || selectedEmail.bodyPlain || ''
-												) || 'No content'}
+											>
+												<div className="flex items-start justify-between gap-4">
+													<div className="flex min-w-0 items-center gap-[12px]">
+														<div
+															className="flex shrink-0 items-center justify-center rounded-full"
+															style={{
+																width: '25px',
+																height: '25px',
+																backgroundColor: isSentMessage ? '#67C76D' : '#86C7E8',
+																...campaignInboxDetailNameTextStyle,
+																color: '#FFFFFF',
+															}}
+														>
+															{getAvatarInitial(senderName)}
+														</div>
+														<span
+															className="truncate"
+															style={campaignInboxDetailNameTextStyle}
+														>
+															{senderName}
+														</span>
+														{companyLabel && (
+															<span
+																className="truncate text-black"
+																style={{
+																	fontSize: '15px',
+																	fontWeight: 400,
+																	lineHeight: 1,
+																}}
+															>
+																{companyLabel}
+															</span>
+														)}
+													</div>
+													<span
+														className="shrink-0 text-black"
+														style={{ fontSize: '14px', lineHeight: 1 }}
+													>
+														{formatCampaignInboxTimestamp(message.receivedAt)}
+													</span>
+												</div>
+												<div
+													className="whitespace-pre-wrap"
+													style={{
+														marginTop: '6px',
+														paddingLeft: '37px',
+														fontSize: '18px',
+														lineHeight: 1.22,
+														color: '#000000',
+													}}
+												>
+													{bodyText}
+												</div>
 											</div>
-										)}
+										);
+									})}
+									{selectedPendingReplies.map((reply, index) => (
+										<div
+											key={`pending-reply-${index}`}
+											style={{
+												backgroundColor: '#FFFFFF',
+												borderBottom:
+													index === selectedPendingReplies.length - 1
+														? 'none'
+														: '1.719px solid #000000',
+												padding: '13px 24px 10px 24px',
+												boxSizing: 'border-box',
+												flexShrink: 0,
+											}}
+										>
+											<div className="flex items-start justify-between gap-4">
+												<div className="flex min-w-0 items-center gap-[12px]">
+													<div
+														className="flex shrink-0 items-center justify-center rounded-full"
+														style={{
+															width: '25px',
+															height: '25px',
+															backgroundColor: '#67C76D',
+															...campaignInboxDetailNameTextStyle,
+															color: '#FFFFFF',
+														}}
+													>
+														{getAvatarInitial(currentUserDisplayName)}
+													</div>
+													<span
+														className="truncate"
+														style={campaignInboxDetailNameTextStyle}
+													>
+														{currentUserDisplayName}
+													</span>
+												</div>
+												<span
+													className="shrink-0 text-black"
+													style={{ fontSize: '14px', lineHeight: 1 }}
+												>
+													{formatCampaignInboxTimestamp(reply.timestamp)}
+												</span>
+											</div>
+											<div
+												style={{
+													marginTop: '8px',
+													paddingLeft: '37px',
+													fontSize: '18px',
+													lineHeight: 1.22,
+													color: '#000000',
+												}}
+												dangerouslySetInnerHTML={{ __html: reply.message }}
+											/>
+										</div>
+									))}
+								</CustomScrollbar>
+							</div>
+
+							{selectedEmail && (
+								<InboxRichReplyEditor
+									value={replyMessage}
+									onChange={setReplyMessage}
+									onSend={handleSendReply}
+									isSending={isSending}
+									variant="floating"
+									containerStyle={{
+										position: 'absolute',
+										top: `${campaignInboxDetailComposerTop}px`,
+										left: '50%',
+										transform: 'translateX(-50%)',
+										width: `${campaignInboxDetailInnerWidth}px`,
+										height: `${campaignInboxDetailComposerHeight}px`,
+										borderRadius: '6.877px',
+										border: '1.719px solid #000000',
+										backgroundColor: '#FFFFFF',
+										boxSizing: 'border-box',
+										zIndex: 2,
+									}}
+								/>
+							)}
+
+							<div
+								aria-hidden="true"
+								style={{
+									position: 'absolute',
+									left: 0,
+									right: 0,
+									bottom: `${campaignInboxDetailBottomStripHeight}px`,
+									height: '2px',
+									backgroundColor: '#000000',
+									zIndex: 4,
+								}}
+							/>
+						</div>
+					) : (
+						/* Expanded Email View Inside Box */
+						<div
+							className="w-full h-full flex flex-col"
+							style={{
+								width: isMobile ? mobileExpandedEmailWidth : `${expandedEmailWidth}px`,
+								border: '3px solid #000000',
+								borderRadius: '8px',
+								backgroundColor: isReplySentThemeActive
+									? INBOX_LAST_SENT_FILL_COLOR
+									: '#5DA0EB',
+								overflow: 'hidden',
+							}}
+						>
+							{/* Top Header Section - 880x79px */}
+							<div
+								className={`flex items-center ${isMobile ? 'px-2' : 'px-4'}`}
+								style={{
+									width: '100%',
+									height: isMobile ? '65px' : '79px',
+									minHeight: isMobile ? '65px' : '79px',
+									backgroundColor: '#FFFFFF',
+									borderBottom: '3px solid #000000',
+									borderBottomLeftRadius: '8px',
+									borderBottomRightRadius: '8px',
+								}}
+							>
+								{/* Left side: Name, Company, Subject */}
+								<div
+									className="flex flex-col justify-center min-w-0"
+									style={{ width: isMobile ? '140px' : '200px', flexShrink: 0 }}
+								>
+									<span
+										className={`font-medium truncate ${isMobile ? 'text-[13px]' : ''}`}
+									>
+										{getCanonicalContactName(selectedEmail, contactByEmail)}
+									</span>
+									{(() => {
+										const companyLabel = getContactCompanyLabel(
+											selectedEmail,
+											contactByEmail
+										);
+										if (!companyLabel) return null;
+										return (
+											<span
+												className={`font-inter ${isMobile ? 'text-[12px]' : 'text-[14px]'} text-gray-500 truncate`}
+											>
+												{companyLabel}
+											</span>
+										);
+									})()}
+									<div
+										className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium truncate mt-1`}
+									>
+										{selectedEmail.subject || '(No Subject)'}
 									</div>
 								</div>
-
-								{/* Sent Replies - Right aligned */}
-								{(sentReplies[selectedEmail.id] || []).map((reply, index) => (
+								{/* Right side: Badges + timestamp */}
+								<div
+									className={`flex-1 flex items-center justify-end gap-2 min-w-0 ${isMobile ? 'gap-1' : ''}`}
+								>
+									{/* State/City and Title badges - stacked vertically */}
+									{(() => {
+										const contact = resolveContactForEmail(selectedEmail, contactByEmail);
+										const headline = contact?.headline || contact?.title || '';
+										const stateAbbr = contact
+											? getStateAbbreviation(contact.state || '') || ''
+											: '';
+										const stateName = contact?.state || '';
+										return (
+											<div
+												className="flex flex-col items-start gap-1 flex-shrink-0 mr-auto"
+												style={{ marginLeft: isMobile ? '10%' : '35%' }}
+											>
+												{stateAbbr && (
+													<div className="flex items-center gap-1">
+														<span
+															className={`inline-flex items-center justify-center rounded-[6px] border ${isMobile ? 'text-[10px]' : 'text-[12px]'} leading-none font-bold`}
+															style={{
+																width: isMobile ? '24px' : '28px',
+																height: isMobile ? '16px' : '20px',
+																backgroundColor:
+																	stateBadgeColorMap[stateAbbr] || 'transparent',
+																borderColor: '#000000',
+															}}
+														>
+															{stateAbbr}
+														</span>
+														{!isMobile && stateName && (
+															<span className="text-[12px] text-black">{stateName}</span>
+														)}
+													</div>
+												)}
+												{headline && (
+													<div
+														className={`${isMobile ? 'h-[16px] max-w-[100px]' : 'h-[21px] max-w-[160px]'} rounded-[6px] px-2 flex items-center border border-black overflow-hidden`}
+														style={{ backgroundColor: '#e8efff' }}
+													>
+														<span
+															className={`${isMobile ? 'text-[8px]' : 'text-[10px]'} text-black leading-none truncate`}
+														>
+															{headline}
+														</span>
+													</div>
+												)}
+											</div>
+										);
+									})()}
+									{/* Timestamp */}
 									<div
-										key={index}
-										style={{
-											width: isMobile ? mobileEmailBodyWidth : `${emailBodyWidth}px`,
-											height: isUsingSampleData ? 'auto' : isMobile ? '200px' : '326px',
-											marginTop: isMobile ? '12px' : '19px',
-											marginRight: 0,
-											alignSelf: 'flex-end',
-											flexShrink: 0,
-											backgroundColor: '#FFFFFF',
-											border: '3px solid #000000',
-											borderRadius: '8px',
-											padding: isMobile ? '12px' : '16px',
-											overflowY: isUsingSampleData ? 'visible' : 'auto',
-										}}
+										className={`${isMobile ? 'text-xs' : 'text-sm'} text-black whitespace-nowrap flex-shrink-0 ${isMobile ? 'ml-1' : 'ml-4'}`}
 									>
-										{/* Date/time header */}
-										<div className="text-sm text-black mb-4">
-											{(() => {
-												const date = reply.timestamp;
-												const now = new Date();
-												const diffTime = Math.abs(now.getTime() - date.getTime());
-												const diffDays = Math.floor(
-													diffTime / (1000 * 60 * 60 * 24)
-												);
-												const dayName = date.toLocaleDateString('en-US', {
-													weekday: 'long',
-												});
-												const monthDay = date.toLocaleDateString('en-US', {
-													month: 'long',
-													day: 'numeric',
-												});
-												const time = date
+										{selectedEmail.receivedAt
+											? new Date(selectedEmail.receivedAt)
 													.toLocaleTimeString([], {
 														hour: 'numeric',
 														minute: '2-digit',
 														hour12: true,
 													})
-													.toLowerCase();
-												const ago =
-													diffDays === 0
-														? 'today'
-														: diffDays === 1
-														? '1 day ago'
-														: `${diffDays} days ago`;
-												return `${dayName}, ${monthDay} ${time} (${ago})`;
-											})()}
-										</div>
-
-										{/* Reply body */}
-										<div className="text-sm whitespace-pre-wrap">{reply.message}</div>
-									</div>
-								))}
-							</CustomScrollbar>
-
-							{/* Reply Box - fixed at bottom (inbox only) */}
-							{activeTab === 'inbox' && (
-								<div
-									className="w-full flex justify-center"
-									style={{
-										marginTop: isMobile ? '14px' : '18px',
-										paddingBottom: isMobile ? '6px' : '10px',
-										flexShrink: 0,
-									}}
-								>
-									<div
-										style={{
-											width: isMobile ? mobileEmailBodyWidth : `${emailBodyWidth}px`,
-											minWidth: isMobile ? undefined : `${emailBodyWidth}px`,
-											maxWidth: isMobile ? undefined : `${emailBodyWidth}px`,
-											border: '3px solid #000000',
-											borderRadius: '8px',
-											backgroundColor: '#FFFFFF',
-											overflow: 'hidden',
-										}}
-									>
-										<textarea
-											value={replyMessage}
-											onChange={(e) => setReplyMessage(e.target.value)}
-											placeholder=""
-											className="w-full resize-none focus:outline-none"
-											style={{
-												height: isMobile ? '90px' : '121px',
-												padding: isMobile ? '12px' : '16px',
-												border: 'none',
-												fontSize: isMobile ? '14px' : '16px',
-											}}
-											disabled={isSending}
-										/>
-										<Button
-											onClick={handleSendReply}
-											disabled={!replyMessage.trim() || isSending}
-											className={`w-full rounded-none bg-[#E1EDF5] text-black disabled:opacity-50 disabled:cursor-not-allowed ${isMobile ? 'text-sm' : ''}`}
-											style={{
-												height: isMobile ? '32px' : '36px',
-												borderTop: '3px solid #000000',
-												borderRadius: 0,
-												fontWeight: 500,
-											}}
-										>
-											{isSending ? 'Sending...' : 'Reply'}
-										</Button>
+													.toLowerCase()
+											: ''}
 									</div>
 								</div>
-							)}
+							</div>
+
+							{/* Content Section */}
+							<div className="flex-1 w-full flex flex-col min-h-0">
+								<CustomScrollbar
+									className="flex-1 w-full min-h-0"
+									contentClassName={`flex flex-col ${isMobile ? 'pb-[14px]' : 'pb-[18px]'}`}
+									thumbWidth={2}
+									thumbColor={scrollbarThumbColor}
+									trackColor="transparent"
+									offsetRight={scrollbarOffsetRight}
+									alignTrackToScrollContainer={scrollbarAlignTrackToScrollContainer}
+									disableOverflowClass
+									lockHorizontalScroll
+								>
+									{/* Email thread: inbound left, outbound right. */}
+									{selectedThreadMessages.map((message, index) => {
+										const isSentMessage = Boolean(message.isSent);
+										const shouldUseCompactBubble =
+											isUsingSampleData || selectedThreadIsConversation;
+										return (
+											<div
+												key={`${isSentMessage ? 'sent' : 'inbound'}-${message.id}-${index}`}
+												style={{
+													width: isMobile ? mobileEmailBodyWidth : `${emailBodyWidth}px`,
+													height: shouldUseCompactBubble
+														? 'auto'
+														: isMobile
+															? '280px'
+															: '326px',
+													minHeight: shouldUseCompactBubble
+														? isMobile
+															? '96px'
+															: '104px'
+														: undefined,
+													marginTop: isMobile ? '12px' : '19px',
+													marginLeft: isSentMessage ? 'auto' : 0,
+													marginRight: isSentMessage ? 0 : 'auto',
+													alignSelf: isSentMessage ? 'flex-end' : 'flex-start',
+													flexShrink: 0,
+													backgroundColor: isSentMessage ? '#FFFFFF' : '#E5F1FF',
+													border: '3px solid #000000',
+													borderRadius: '8px',
+													padding: isMobile ? '12px' : '16px',
+													overflowY: shouldUseCompactBubble ? 'visible' : 'auto',
+												}}
+											>
+												<div className="mb-4 flex items-center justify-between gap-3 text-sm text-black">
+													<span>{formatEmailDetailTimestamp(message.receivedAt)}</span>
+													<span className="text-xs text-gray-500">
+														{isSentMessage
+															? 'You'
+															: getCanonicalContactName(message, contactByEmail)}
+													</span>
+												</div>
+
+												<div className="text-sm">
+													{message.bodyHtml ? (
+														<div
+															dangerouslySetInnerHTML={{
+																__html: stripQuotedReplyHtml(message.bodyHtml),
+															}}
+															className="prose prose-sm max-w-none"
+														/>
+													) : (
+														<div className="whitespace-pre-wrap">
+															{stripQuotedReply(
+																message.strippedText || message.bodyPlain || ''
+															) || 'No content'}
+														</div>
+													)}
+												</div>
+											</div>
+										);
+									})}
+
+									{/* Locally sent replies that have not reloaded from the API yet. */}
+									{(selectedConversationReplyKey
+										? sentReplies[selectedConversationReplyKey] || []
+										: []
+									).map((reply, index) => (
+										<div
+											key={index}
+											style={{
+												width: isMobile ? mobileEmailBodyWidth : `${emailBodyWidth}px`,
+												height:
+													isUsingSampleData || selectedThreadIsConversation
+														? 'auto'
+														: isMobile
+															? '200px'
+															: '326px',
+												minHeight:
+													isUsingSampleData || selectedThreadIsConversation
+														? isMobile
+															? '96px'
+															: '104px'
+														: undefined,
+												marginTop: isMobile ? '12px' : '19px',
+												marginRight: 0,
+												alignSelf: 'flex-end',
+												flexShrink: 0,
+												backgroundColor: '#FFFFFF',
+												border: '3px solid #000000',
+												borderRadius: '8px',
+												padding: isMobile ? '12px' : '16px',
+												overflowY: isUsingSampleData ? 'visible' : 'auto',
+											}}
+										>
+											<div className="mb-4 flex items-center justify-between gap-3 text-sm text-black">
+												<span>{formatEmailDetailTimestamp(reply.timestamp)}</span>
+												<span className="text-xs text-gray-500">You</span>
+											</div>
+											<div
+												className="text-sm"
+												dangerouslySetInnerHTML={{ __html: reply.message }}
+											/>
+										</div>
+									))}
+								</CustomScrollbar>
+
+								{/* Reply Box - fixed at bottom */}
+								{selectedEmail && (
+									<div
+										className="w-full flex justify-center"
+										style={{
+											marginTop: isMobile ? '14px' : '18px',
+											paddingBottom: isMobile ? '6px' : '10px',
+											flexShrink: 0,
+										}}
+									>
+										<InboxRichReplyEditor
+											value={replyMessage}
+											onChange={setReplyMessage}
+											onSend={handleSendReply}
+											isSending={isSending}
+											isMobile={isMobile}
+											variant="stacked"
+											containerStyle={{
+												width: isMobile ? mobileEmailBodyWidth : `${emailBodyWidth}px`,
+												minWidth: isMobile ? undefined : `${emailBodyWidth}px`,
+												maxWidth: isMobile ? undefined : `${emailBodyWidth}px`,
+												border: '3px solid #000000',
+												borderRadius: '8px',
+												backgroundColor: '#FFFFFF',
+											}}
+										/>
+									</div>
+								)}
+							</div>
 						</div>
-				</div>
+					)
 				) : detailOnly ? (
 					<div
 						className="w-full h-full flex items-center justify-center text-center"
@@ -2595,9 +3141,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 				) : (
 					/* Email List View */
 					<>
-						{visibleEmails.map((email) => (
+						{visibleEmailRows.map(({ key, email, selectionEmail }) => (
 							<div
-								key={email.id}
+								key={key}
 								className={`bg-white ${emailRowHoverClassName} cursor-pointer px-4 flex items-center mb-2 w-full max-[480px]:px-2`}
 								style={{
 									width: isMobile ? mobileEmailRowWidth : `${emailRowWidth}px`,
@@ -2607,7 +3153,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									borderRadius: '8px',
 								}}
 								onClick={() => {
-									setSelectedEmailId(email.id);
+									setSelectedEmailId(selectionEmail.id);
 									setReplyMessage('');
 								}}
 								onMouseEnter={() => {
@@ -2626,33 +3172,40 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									{/* Top section on mobile: Name + badges + time */}
 									<div
 										className={`flex ${isMobile ? 'flex-row items-center justify-between w-full' : 'flex-col justify-center min-w-0'}`}
-										style={isMobile ? { marginTop: '6px' } : { width: '200px', flexShrink: 0 }}
+										style={
+											isMobile ? { marginTop: '6px' } : { width: '200px', flexShrink: 0 }
+										}
 									>
-										<div className={`flex items-center ${isMobile ? 'gap-2 flex-1 min-w-0' : 'gap-2'}`}>
-											<span className={`font-medium truncate ${isMobile ? 'text-[14px]' : ''}`}>
+										<div
+											className={`flex items-center ${isMobile ? 'gap-2 flex-1 min-w-0' : 'gap-2'}`}
+										>
+											<span
+												className={`font-medium truncate ${isMobile ? 'text-[14px]' : ''}`}
+											>
 												{getCanonicalContactName(email, contactByEmail)}
 											</span>
 											{/* Badges inline on mobile */}
-											{isMobile && (() => {
-												const contact = resolveContactForEmail(email, contactByEmail);
-												const stateAbbr = contact
-													? getStateAbbreviation(contact.state || '') || ''
-													: '';
-												return stateAbbr ? (
-													<span
-														className="inline-flex items-center justify-center rounded-[4px] border text-[10px] leading-none font-bold flex-shrink-0"
-														style={{
-															width: '28px',
-															height: '16px',
-															backgroundColor:
-																stateBadgeColorMap[stateAbbr] || 'transparent',
-															borderColor: '#000000',
-														}}
-													>
-														{stateAbbr}
-													</span>
-												) : null;
-											})()}
+											{isMobile &&
+												(() => {
+													const contact = resolveContactForEmail(email, contactByEmail);
+													const stateAbbr = contact
+														? getStateAbbreviation(contact.state || '') || ''
+														: '';
+													return stateAbbr ? (
+														<span
+															className="inline-flex items-center justify-center rounded-[4px] border text-[10px] leading-none font-bold flex-shrink-0"
+															style={{
+																width: '28px',
+																height: '16px',
+																backgroundColor:
+																	stateBadgeColorMap[stateAbbr] || 'transparent',
+																borderColor: '#000000',
+															}}
+														>
+															{stateAbbr}
+														</span>
+													) : null;
+												})()}
 										</div>
 										{/* Time on mobile - right aligned */}
 										{isMobile && (
@@ -2669,18 +3222,22 @@ export const InboxSection: FC<InboxSectionProps> = ({
 											</div>
 										)}
 										{/* Company name - only on desktop */}
-										{!isMobile && (() => {
-											const companyLabel = getContactCompanyLabel(email, contactByEmail);
-											if (!companyLabel) return null;
-											return (
-												<span className="font-inter text-[17px] font-medium text-gray-500 truncate">
-													{companyLabel}
-												</span>
-											);
-										})()}
+										{!isMobile &&
+											(() => {
+												const companyLabel = getContactCompanyLabel(
+													email,
+													contactByEmail
+												);
+												if (!companyLabel) return null;
+												return (
+													<span className="font-inter text-[17px] font-medium text-gray-500 truncate">
+														{companyLabel}
+													</span>
+												);
+											})()}
 										{/* Subject - desktop only in this position */}
 										{!isMobile && (
-											<div className="text-sm font-medium truncate mt-1">
+											<div className="text-sm font-medium truncate mt-3">
 												{email.subject || '(No Subject)'}
 											</div>
 										)}
@@ -2689,7 +3246,10 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									{isMobile && (
 										<div className="flex items-center gap-2 mt-1">
 											{(() => {
-												const companyLabel = getContactCompanyLabel(email, contactByEmail);
+												const companyLabel = getContactCompanyLabel(
+													email,
+													contactByEmail
+												);
 												const contact = resolveContactForEmail(email, contactByEmail);
 												const headline = contact?.headline || contact?.title || '';
 												return (
@@ -2709,7 +3269,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																			? '#D6F1BD'
 																			: isMusicVenueTitle(headline)
 																				? '#B7E5FF'
-																				: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																				: isWeddingPlannerTitle(headline) ||
+																					  isWeddingVenueTitle(headline)
 																					? '#FFF2BC'
 																					: isWineBeerSpiritsTitle(headline)
 																						? '#BFC4FF'
@@ -2725,11 +3286,15 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																{isMusicVenueTitle(headline) && (
 																	<MusicVenuesIcon size={10} className="flex-shrink-0" />
 																)}
-																{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																{(isWeddingPlannerTitle(headline) ||
+																	isWeddingVenueTitle(headline)) && (
 																	<WeddingPlannersIcon size={10} />
 																)}
 																{isWineBeerSpiritsTitle(headline) && (
-																	<WineBeerSpiritsIcon size={10} className="flex-shrink-0" />
+																	<WineBeerSpiritsIcon
+																		size={10}
+																		className="flex-shrink-0"
+																	/>
 																)}
 																<span className="text-[9px] text-black leading-none truncate">
 																	{isRestaurantTitle(headline)
@@ -2760,9 +3325,10 @@ export const InboxSection: FC<InboxSectionProps> = ({
 												{email.subject || '(No Subject)'}
 											</div>
 											<div className="text-[11px] text-[#666666] line-clamp-1 min-w-0">
-												{email.strippedText?.slice(0, 80) ||
-													email.bodyPlain?.slice(0, 80) ||
-													''}
+												{`${email.isSent ? 'You: ' : ''}${getInboxMessageSnippet(email)}`.slice(
+													0,
+													80
+												)}
 											</div>
 										</div>
 									)}
@@ -2788,7 +3354,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																			? '#D6F1BD'
 																			: isMusicVenueTitle(headline)
 																				? '#B7E5FF'
-																				: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																				: isWeddingPlannerTitle(headline) ||
+																					  isWeddingVenueTitle(headline)
 																					? '#FFF2BC'
 																					: isWineBeerSpiritsTitle(headline)
 																						? '#BFC4FF'
@@ -2804,11 +3371,15 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																{isMusicVenueTitle(headline) && (
 																	<MusicVenuesIcon size={14} className="flex-shrink-0" />
 																)}
-																{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																{(isWeddingPlannerTitle(headline) ||
+																	isWeddingVenueTitle(headline)) && (
 																	<WeddingPlannersIcon size={14} />
 																)}
 																{isWineBeerSpiritsTitle(headline) && (
-																	<WineBeerSpiritsIcon size={14} className="flex-shrink-0" />
+																	<WineBeerSpiritsIcon
+																		size={14}
+																		className="flex-shrink-0"
+																	/>
 																)}
 																<span className="text-[10px] text-black leading-none truncate">
 																	{isRestaurantTitle(headline)
@@ -2846,9 +3417,10 @@ export const InboxSection: FC<InboxSectionProps> = ({
 											})()}
 											{/* Email body preview */}
 											<div className="flex-1 text-sm text-[#000000] line-clamp-2 min-w-0 pt-[7px]">
-												{email.strippedText?.slice(0, 120) ||
-													email.bodyPlain?.slice(0, 120) ||
-													''}
+												{`${email.isSent ? 'You: ' : ''}${getInboxMessageSnippet(email)}`.slice(
+													0,
+													120
+												)}
 											</div>
 											{/* Date */}
 											<div className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
@@ -2862,7 +3434,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							</div>
 						))}
 						{Array.from({
-							length: Math.max(0, (isMobile ? 4 : 6) - (visibleEmails?.length ?? 0)),
+							length: Math.max(0, (isMobile ? 4 : 6) - visibleEmailRows.length),
 						}).map((_, idx) => (
 							<div
 								key={`inbox-placeholder-${idx}`}

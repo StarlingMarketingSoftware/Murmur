@@ -262,12 +262,15 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 	const isAllTab = height === 347;
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
 	const isBottomView = customWhiteSectionHeight === 15 || customWhiteSectionHeight === 16;
-	// Compressed bottom panel spec: 40px total = 12px white + 28px color.
-	const effectiveWhiteSectionHeight = collapsed && isBottomView ? 12 : whiteSectionHeight;
+	// Compressed bottom panel spec: 45px total = 13px label strip + 26px inner bar.
+	const collapsedOuterWidthPx = 197;
+	const collapsedOuterHeightPx = 45;
+	const collapsedLabelHeightPx = 13;
+	const effectiveWhiteSectionHeight = collapsed && isBottomView ? collapsedLabelHeightPx : whiteSectionHeight;
 	const shouldRenderCollapsedTopBox = collapsed && isBottomView;
-	const collapsedTopBoxHeightPx = 22;
-	const collapsedTopBoxWidthPx = 224;
-	const collapsedTopBoxRadiusPx = 4.7;
+	const collapsedTopBoxHeightPx = 26;
+	const collapsedTopBoxWidthPx = 191;
+	const collapsedTopBoxRadiusPx = 3.33;
 
 	// Filter to only show emails from campaign contacts
 	const inboundEmails = useMemo(() => {
@@ -288,6 +291,8 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 
 	const isFullyEmpty = inboundEmails.length === 0;
 	const placeholderBgColor = isFullyEmpty ? '#3D9DC0' : '#5EB6D6';
+	const collapsedTopColor = '#CCDFF4';
+	const collapsedFillColor = '#5EB6D6';
 
 	// Bottom view: show "batch" boxes instead of individual inbound emails.
 	const bottomViewInboundBatches = useMemo(() => {
@@ -332,7 +337,7 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 		<div
 			className={cn(
 				'relative max-[480px]:w-[96.27vw] rounded-md flex flex-col overflow-visible',
-				// In the compressed bottom-panel view we need exact internal pixel heights (16px white + 24px color).
+				// In the compressed bottom-panel view we need exact internal pixel heights.
 				// Use a stroke via box-shadow so it doesn't consume layout height.
 				shouldRenderCollapsedTopBox
 					? 'border-0'
@@ -343,9 +348,12 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 					: 'border-2 border-black/30'
 			)}
 			style={{
-				width: `${width}px`,
-				height: `${height}px`,
-				background: `linear-gradient(to bottom, #ffffff ${effectiveWhiteSectionHeight}px, #5EB6D6 ${effectiveWhiteSectionHeight}px)`,
+				width: `${shouldRenderCollapsedTopBox ? collapsedOuterWidthPx : width}px`,
+				height: `${shouldRenderCollapsedTopBox ? collapsedOuterHeightPx : height}px`,
+				background: shouldRenderCollapsedTopBox
+					? `linear-gradient(to bottom, ${collapsedTopColor} ${effectiveWhiteSectionHeight}px, ${collapsedFillColor} ${effectiveWhiteSectionHeight}px)`
+					: `linear-gradient(to bottom, #ffffff ${effectiveWhiteSectionHeight}px, ${collapsedFillColor} ${effectiveWhiteSectionHeight}px)`,
+				borderRadius: shouldRenderCollapsedTopBox ? '3.33px' : undefined,
 				boxShadow: shouldRenderCollapsedTopBox
 					? 'inset 0 0 0 2px #000000'
 					: undefined,
@@ -375,10 +383,19 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 				/>
 			)}
 			{/* Header row (no explicit divider; let the background change from white to blue like the main table) */}
-			<InboxHeaderChrome
-				isAllTab={isAllTab}
-				whiteSectionHeight={shouldRenderCollapsedTopBox ? effectiveWhiteSectionHeight : customWhiteSectionHeight}
-			/>
+			{!shouldRenderCollapsedTopBox && (
+				<InboxHeaderChrome
+					isAllTab={isAllTab}
+					whiteSectionHeight={customWhiteSectionHeight}
+				/>
+			)}
+			{shouldRenderCollapsedTopBox && (
+				<div className="absolute left-[8px] top-[1px] z-20 flex h-[13px] items-center pointer-events-none">
+					<span className="font-inter text-[12px] font-semibold leading-none text-black">
+						Inbox
+					</span>
+				</div>
+			)}
 			<div
 				className={cn(
 					'flex items-center gap-2 px-3 shrink-0',
@@ -397,7 +414,7 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 				}}
 			></div>
 
-			{(isAllTab || isBottomView) && (
+			{isAllTab && (
 				<div
 					className="absolute z-20 flex items-center gap-[12px] cursor-pointer"
 					style={{ top: isBottomView ? 1 : 1, right: isBottomView ? 4 : 4 }}
@@ -424,9 +441,9 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 				</div>
 			)}
 
-			{/* Collapsed bottom panels: show only the top "batch" box (22px) centered in the 24px color region */}
+			{/* Collapsed bottom panels: label strip + bottom-aligned summary bar. */}
 			{shouldRenderCollapsedTopBox && (
-				<div className="flex-1 flex items-center justify-center px-[2px]">
+				<div className="flex-1 flex items-end justify-center px-[2px]" style={{ paddingBottom: 3 }}>
 					{bottomViewInboundBatches[0] ? (
 						<div
 							key="inbox-collapsed-batch"
@@ -437,7 +454,7 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 								width: `${collapsedTopBoxWidthPx}px`,
 								height: `${collapsedTopBoxHeightPx}px`,
 								borderRadius: `${collapsedTopBoxRadiusPx}px`,
-								backgroundColor: '#CCDFF4',
+								backgroundColor: collapsedTopColor,
 							}}
 						>
 							<span className="pl-[18px] font-inter font-medium text-[15px] text-black leading-none">

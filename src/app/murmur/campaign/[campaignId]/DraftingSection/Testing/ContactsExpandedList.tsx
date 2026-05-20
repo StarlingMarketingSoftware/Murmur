@@ -26,10 +26,6 @@ import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 import OpenIcon from '@/components/atoms/svg/OpenIcon';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import {
-	getCampaignLoadingWaveElapsedSeconds,
-	getSyncedWaveDelay,
-} from '@/utils/campaignLoadingWave';
-import {
 	canadianProvinceAbbreviations,
 	canadianProvinceNames,
 	stateBadgeColorMap,
@@ -61,6 +57,16 @@ import {
 	RESPONSE_WIDGET_BACKGROUND_BY_TAB,
 	type DashboardResponsesTab,
 } from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesFilterBar';
+import {
+	buildInboxConversations,
+	getInboxMessageTimeMs,
+	getInboxMessageSnippet,
+	inboxConversationContainsEmailId,
+	inboxConversationContainsInboundEmailId,
+	inboxConversationContainsSentEmailId,
+	type InboxConversation,
+	type InboxConversationMessage,
+} from '@/utils/inboxConversations';
 
 const isSameLocalDay = (a: Date, b: Date) =>
 	a.getFullYear() === b.getFullYear() &&
@@ -80,6 +86,7 @@ const SHOWING_DRAFT_ROW_FILL_COLOR = '#F8C262';
 const SHOWING_DRAFT_TOP_BAR_COLOR = '#FFE3AA';
 const SELECTED_DRAFT_ROW_FILL_COLOR = '#FDDEA5';
 const SELECTED_DRAFT_TOP_BAR_COLOR = '#F9D387';
+const INBOX_LAST_SENT_FILL_COLOR = '#7ED29E';
 
 const formatBatchCount = (count: number) => `+${count < 10 ? `0${count}` : count}`;
 
@@ -450,6 +457,33 @@ const resolveInboundContact = (
 	return (email.contact as ContactWithName | null) ?? null;
 };
 
+const normalizeSentEmailForInboxConversation = (
+	email: EmailWithRelations
+): InboxConversationMessage =>
+	({
+		id: email.id,
+		sender: email.contact?.email || '',
+		senderName: email.contact
+			? `${email.contact.firstName || ''} ${email.contact.lastName || ''}`.trim()
+			: '',
+		recipient: '',
+		subject: email.subject || '',
+		bodyPlain: email.message || '',
+		bodyHtml: email.message || '',
+		strippedText: email.message?.replace(/<[^>]*>/g, '') || '',
+		receivedAt: email.sentAt || email.createdAt,
+		contactId: email.contactId,
+		contact: email.contact,
+		campaignId: email.campaignId,
+		campaign: email.campaign,
+		originalEmail: null,
+		originalEmailId: null,
+		isSent: true,
+	}) as unknown as InboxConversationMessage;
+
+const getInboxConversationSelectionEmail = (conversation: InboxConversation) =>
+	conversation.latestInboundMessage ?? conversation.latestMessage;
+
 export interface ContactsExpandedListProps {
 	contacts: ContactWithName[];
 	/** Optional full campaign contact set used to resolve draft/inbox rows. */
@@ -460,6 +494,8 @@ export interface ContactsExpandedListProps {
 	sentEmails?: EmailWithRelations[];
 	/** Optional campaign inbox replies to show below drafts. */
 	inboxEmails?: InboundEmailWithRelations[];
+	/** Locally sent follow-ups keyed by any message ID in the inbox conversation. */
+	optimisticInboxReplyByEmailId?: Record<number, number>;
 	/** Optional sender email -> campaign contact map for inbox canonical display. */
 	contactByEmail?: Record<string, ContactWithName>;
 	onHeaderClick?: () => void;
@@ -475,7 +511,7 @@ export interface ContactsExpandedListProps {
 	onDraftClick?: (draft: EmailWithRelations) => void;
 	onDraftHover?: (draft: EmailWithRelations | null) => void;
 	selectedInboxEmailId?: number | null;
-	onInboxEmailClick?: (email: InboundEmailWithRelations) => void;
+	onInboxEmailClick?: (email: InboxConversationMessage) => void;
 	selectedDraftId?: number | null;
 	selectedDraftIds?: Set<number>;
 	onDraftSelectionChange?: (updater: (prev: Set<number>) => Set<number>) => void;
@@ -530,6 +566,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	drafts,
 	sentEmails,
 	inboxEmails,
+	optimisticInboxReplyByEmailId,
 	contactByEmail,
 	onHeaderClick,
 	onContactClick,
@@ -870,20 +907,19 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const loadingWaveDurationSeconds = 4.5;
 	// Match MapResultsPanelSkeleton step delay exactly for consistent "fluid" feel
 	const loadingWaveStepSeconds = 0.1;
-	// If the page-level CampaignPageSkeleton was shown, sync our wave phase to it so
-	// the animation does not restart when the real component mounts.
-	const syncedWaveElapsedSeconds = useMemo(
-		() => getCampaignLoadingWaveElapsedSeconds(),
-		[]
-	);
 
-	// Allow callers to override dimensions; default to the original sidebar size
-	const resolvedWidth = width ?? 376;
-	const resolvedHeight = height ?? 424;
 	const isAllTab = height === 263;
 	const isAllTabNavigation = interactionMode === 'allTab';
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
 	const isBottomView = customWhiteSectionHeight === 15 || customWhiteSectionHeight === 16;
+	const shouldRenderCollapsedTopBox = collapsed && isBottomView;
+	// Compressed bottom panel spec: 45px total = 13px label strip + 26px inner bar.
+	const collapsedOuterWidthPx = 197;
+	const collapsedOuterHeightPx = 45;
+	const collapsedLabelHeightPx = 13;
+	// Allow callers to override dimensions; default to the original sidebar size.
+	const resolvedWidth = shouldRenderCollapsedTopBox ? collapsedOuterWidthPx : (width ?? 376);
+	const resolvedHeight = shouldRenderCollapsedTopBox ? collapsedOuterHeightPx : (height ?? 424);
 	// The main 377px panel resolves to the spec row width: 370.896px.
 	const contactRowWidth =
 		typeof resolvedWidth === 'number'
@@ -897,15 +933,16 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				boxSizing: 'border-box' as const,
 			}
 		: undefined;
-	// Compressed bottom panel spec: 40px total = 12px white + 28px color.
-	const effectiveWhiteSectionHeight = collapsed && isBottomView ? 12 : whiteSectionHeight;
-	const shouldRenderCollapsedTopBox = collapsed && isBottomView;
+	const effectiveWhiteSectionHeight = shouldRenderCollapsedTopBox ? collapsedLabelHeightPx : whiteSectionHeight;
+	const collapsedTopColor = '#FFB9B9';
 	const panelFillColor = isInboxFocusMode
 		? RESPONSE_WIDGET_BACKGROUND_BY_TAB[inboxPanelTab]
 		: '#EB8586';
 	const headerStripColor =
 		isInboxFocusMode
 			? panelFillColor
+			: shouldRenderCollapsedTopBox
+				? collapsedTopColor
 			: effectiveWhiteSectionHeight === 28
 				? '#FFB9B9'
 				: 'rgba(255, 255, 255, 0.31)';
@@ -957,9 +994,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const inboxSupplementalTextColor = shouldRedOutInboxRows
 		? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
 		: undefined;
-	const collapsedTopBoxHeightPx = 22;
-	const collapsedTopBoxWidthPx = 224;
-	const collapsedTopBoxRadiusPx = 4.7;
+	const collapsedTopBoxHeightPx = 26;
+	const collapsedTopBoxWidthPx = 191;
+	const collapsedTopBoxRadiusPx = 3.33;
 	const allCampaignContacts = allContacts ?? contacts;
 	const contactsById = useMemo(() => {
 		const map = new Map<number, ContactWithName>();
@@ -984,6 +1021,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	}, [allCampaignContacts, contactByEmail]);
 	const supplementalDraftRows = useMemo(() => drafts ?? [], [drafts]);
 	const supplementalSentRows = useMemo(() => sentEmails ?? [], [sentEmails]);
+	const supplementalSentThreadMessages = useMemo(
+		() => supplementalSentRows.map(normalizeSentEmailForInboxConversation),
+		[supplementalSentRows]
+	);
 	const selectableDraftIds = useMemo(
 		() => new Set(supplementalDraftRows.map((draft) => draft.id)),
 		[supplementalDraftRows]
@@ -1038,19 +1079,60 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			return Boolean(sender && contactsByEmail.has(sender));
 		});
 	}, [allContacts, contactByEmail, contactsByEmail, inboxEmails]);
-	const supplementalOpportunityInboxRows = useMemo(
-		() => supplementalInboxRows.filter(isInboxOpportunityEmail),
-		[supplementalInboxRows]
+	const supplementalInboxThreadConversations = useMemo(
+		() =>
+			buildInboxConversations([
+				...(supplementalInboxRows as InboxConversationMessage[]),
+				...supplementalSentThreadMessages,
+			]),
+		[supplementalInboxRows, supplementalSentThreadMessages]
+	);
+	const supplementalSentConversations = useMemo(
+		() =>
+			supplementalInboxThreadConversations.filter(
+				(conversation) =>
+					conversation.sentMessages.length > 0 && Boolean(conversation.latestMessage.isSent)
+			),
+		[supplementalInboxThreadConversations]
+	);
+	const supplementalInboxConversations = useMemo(
+		() =>
+			supplementalInboxThreadConversations
+				.filter((conversation) => conversation.inboundMessages.length > 0)
+				.sort(
+					(a, b) =>
+						getInboxMessageTimeMs(getInboxConversationSelectionEmail(b)) -
+						getInboxMessageTimeMs(getInboxConversationSelectionEmail(a))
+				),
+		[supplementalInboxThreadConversations]
+	);
+	const supplementalOpportunityInboxConversations = useMemo(
+		() =>
+			supplementalInboxConversations.filter((conversation) =>
+				conversation.inboundMessages.some(isInboxOpportunityEmail)
+			),
+		[supplementalInboxConversations]
+	);
+	// Responses sub-tab should NOT also contain opportunity-classified conversations.
+	// Each conversation routes to exactly one of {Responses, Opportunities}: any
+	// conversation containing an opportunity-keyword inbound email is treated as an
+	// opportunity and is excluded from the Responses list.
+	const supplementalInboxConversationsResponsesOnly = useMemo(
+		() =>
+			supplementalInboxConversations.filter(
+				(conversation) => !conversation.inboundMessages.some(isInboxOpportunityEmail)
+			),
+		[supplementalInboxConversations]
 	);
 	const visibleInboxPanelRowCount =
 		inboxPanelTab === 'sent'
-			? supplementalSentRows.length
+			? supplementalSentConversations.length
 			: inboxPanelTab === 'opportunities'
-				? supplementalOpportunityInboxRows.length
-				: supplementalInboxRows.length;
+				? supplementalOpportunityInboxConversations.length
+				: supplementalInboxConversationsResponsesOnly.length;
 	const totalRenderedRows = isInboxFocusMode
 		? visibleInboxPanelRowCount
-		: contacts.length + supplementalDraftRows.length + supplementalInboxRows.length;
+		: contacts.length + supplementalDraftRows.length + supplementalInboxConversations.length;
 	const shouldShowScrollbar =
 		!isBottomView &&
 		(isInboxFocusMode ? visibleInboxPanelRowCount >= 6 : totalRenderedRows >= 14);
@@ -1317,10 +1399,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		);
 	};
 
-	const renderSupplementalInboxRow = (
-		email: InboundEmailWithRelations,
-		inboxIndex: number
-	) => {
+	const renderSupplementalInboxRow = (conversation: InboxConversation, inboxIndex: number) => {
+		const selectionEmail = getInboxConversationSelectionEmail(conversation);
+		const email = selectionEmail;
+		const previewEmail = conversation.latestMessage;
 		const contact = resolveInboundContact(email, contactByEmail, contactsById);
 		const contactName = getContactDisplayName(
 			contact,
@@ -1328,15 +1410,29 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		);
 		const companyLabel = getContactCompanyLabel(contact);
 		const contactTitle = getContactTitle(contact);
-		const bodyPreview = email.bodyPlain
-			? email.bodyPlain
-			: email.bodyHtml
-				? convertHtmlToPlainText(email.bodyHtml)
-				: 'No content';
+		const bodyPreview = `${previewEmail.isSent ? 'You: ' : ''}${
+			getInboxMessageSnippet(previewEmail) || 'No content'
+		}`;
+		const optimisticLastSentAt = conversation.messages.reduce((latest, message) => {
+			const sentAt = optimisticInboxReplyByEmailId?.[message.id];
+			return typeof sentAt === 'number' && sentAt > latest ? sentAt : latest;
+		}, 0);
+		const latestInboundAt = conversation.latestInboundMessage
+			? getInboxMessageTimeMs(conversation.latestInboundMessage)
+			: 0;
+		const isLastInboxMessageSent =
+			conversation.latestMessage.isSent || optimisticLastSentAt > latestInboundAt;
+		const selectedInboxRowFillColor = isLastInboxMessageSent
+			? INBOX_LAST_SENT_FILL_COLOR
+			: '#E5F1FF';
+		const isSelectedInboxConversation =
+			selectedInboxEmailId != null &&
+			(inboxConversationContainsInboundEmailId(conversation, selectedInboxEmailId) ||
+				inboxConversationContainsEmailId(conversation, selectedInboxEmailId));
 
 		return (
 			<div
-				key={`contacts-inbox-${email.id}-${inboxIndex}`}
+				key={`contacts-inbox-${conversation.key}-${inboxIndex}`}
 				className={cn(
 					'relative select-none overflow-hidden',
 					isAllTabNavigation ? 'cursor-default' : 'cursor-pointer'
@@ -1349,14 +1445,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					borderRight: `1.949px solid ${inboxSupplementalBorderColor}`,
 					borderBottom: `1.949px solid ${inboxSupplementalBorderColor}`,
 					borderLeft: `1.949px solid ${inboxSupplementalBorderColor}`,
-					background:
-						selectedInboxEmailId === email.id
-							? '#E5F1FF'
-							: (inboxSupplementalRowFillColor ?? '#F9FAFB'),
+					background: isSelectedInboxConversation
+						? selectedInboxRowFillColor
+						: (inboxSupplementalRowFillColor ?? '#F9FAFB'),
 					boxSizing: 'border-box',
 				}}
 				role={!isAllTabNavigation ? 'button' : undefined}
-				aria-pressed={!isAllTabNavigation ? selectedInboxEmailId === email.id : undefined}
+				aria-pressed={!isAllTabNavigation ? isSelectedInboxConversation : undefined}
 				tabIndex={!isAllTabNavigation ? 0 : undefined}
 				onMouseEnter={() => {
 					if (!isAllTabNavigation) setHoveredContactIndex(null);
@@ -1367,7 +1462,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					if (isAllTabNavigation) return;
 					e.stopPropagation();
 					if (onInboxEmailClick) {
-						onInboxEmailClick(email);
+						onInboxEmailClick(selectionEmail);
 						return;
 					}
 					if (contact) onContactClick?.(contact);
@@ -1376,7 +1471,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					if (isAllTabNavigation || !onInboxEmailClick) return;
 					if (e.key === 'Enter' || e.key === ' ') {
 						e.preventDefault();
-						onInboxEmailClick(email);
+						onInboxEmailClick(selectionEmail);
 					}
 				}}
 			>
@@ -1420,7 +1515,12 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					) : null}
 				</div>
 
-				<div className="absolute top-[30px] left-1/2 right-2 pl-1 pointer-events-none">
+				<div
+					className={cn(
+						'absolute left-1/2 right-2 pl-1 pointer-events-none',
+						contactTitle ? 'top-[30px]' : 'top-[9px]'
+					)}
+				>
 					<StateLocationRow
 						contact={contact}
 						className="h-[16px] w-full gap-1"
@@ -1434,11 +1534,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					/>
 				</div>
 
-				<div className="absolute left-3 right-[12px] top-[42px] pointer-events-none">
+				<div className="absolute left-3 right-[12px] top-[48px] pointer-events-none">
 					<FadeOverflowText
-						text={email.subject || 'No subject'}
+						text={previewEmail.subject || 'No subject'}
 						className={cn(
-							'font-inter text-[13.215px] font-semibold leading-[21.144px]',
+							'font-inter text-[13.215px] font-semibold leading-[17px]',
 							inboxSupplementalTextClassName
 						)}
 						splitNumericSuffix={false}
@@ -1446,7 +1546,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					<FadeOverflowText
 						text={bodyPreview}
 						className={cn(
-							'font-inter text-[13.215px] font-normal leading-[21.144px]',
+							'font-inter text-[13.215px] font-normal leading-[17px]',
 							inboxSupplementalTextClassName
 						)}
 						splitNumericSuffix={false}
@@ -1456,18 +1556,20 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		);
 	};
 
-	const renderSupplementalSentRow = (email: EmailWithRelations, sentIndex: number) => {
-		const contact =
-			contactsById.get(email.contactId) ??
-			((email.contact as ContactWithName | null) || null);
+	const renderSupplementalSentRow = (conversation: InboxConversation, sentIndex: number) => {
+		const email = conversation.latestMessage;
+		const contact = resolveInboundContact(email, contactByEmail, contactsById);
 		const contactName = getContactDisplayName(contact, contact?.email || 'Unknown recipient');
 		const companyLabel = getContactCompanyLabel(contact);
 		const contactTitle = getContactTitle(contact);
-		const messagePreview = email.message ? convertHtmlToPlainText(email.message) : 'No content';
+		const messagePreview = `You: ${getInboxMessageSnippet(email) || 'No content'}`;
+		const isSelectedSentConversation =
+			selectedInboxEmailId != null &&
+			inboxConversationContainsSentEmailId(conversation, selectedInboxEmailId);
 
 		return (
 			<div
-				key={`contacts-inbox-sent-${email.id}-${sentIndex}`}
+				key={`contacts-inbox-sent-${conversation.key}-${sentIndex}`}
 				className={cn(
 					'relative select-none overflow-hidden',
 					isAllTabNavigation ? 'cursor-default' : 'cursor-pointer'
@@ -1480,10 +1582,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					borderRight: `1.949px solid ${inboxSupplementalBorderColor}`,
 					borderBottom: `1.949px solid ${inboxSupplementalBorderColor}`,
 					borderLeft: `1.949px solid ${inboxSupplementalBorderColor}`,
-					background: inboxSupplementalRowFillColor ?? '#F9FAFB',
+					background: isSelectedSentConversation
+						? '#E5F1FF'
+						: (inboxSupplementalRowFillColor ?? '#F9FAFB'),
 					boxSizing: 'border-box',
 				}}
 				role={!isAllTabNavigation ? 'button' : undefined}
+				aria-pressed={!isAllTabNavigation ? isSelectedSentConversation : undefined}
 				tabIndex={!isAllTabNavigation ? 0 : undefined}
 				onMouseEnter={() => {
 					if (!isAllTabNavigation) setHoveredContactIndex(null);
@@ -1493,12 +1598,20 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				onClick={(e) => {
 					if (isAllTabNavigation) return;
 					e.stopPropagation();
+					if (onInboxEmailClick) {
+						onInboxEmailClick(email);
+						return;
+					}
 					if (contact) onContactClick?.(contact);
 				}}
 				onKeyDown={(e) => {
 					if (isAllTabNavigation) return;
 					if (e.key === 'Enter' || e.key === ' ') {
 						e.preventDefault();
+						if (onInboxEmailClick) {
+							onInboxEmailClick(email);
+							return;
+						}
 						if (contact) onContactClick?.(contact);
 					}
 				}}
@@ -1542,7 +1655,12 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					) : null}
 				</div>
 
-				<div className="absolute top-[30px] left-1/2 right-2 pl-1 pointer-events-none">
+				<div
+					className={cn(
+						'absolute left-1/2 right-2 pl-1 pointer-events-none',
+						contactTitle ? 'top-[30px]' : 'top-[9px]'
+					)}
+				>
 					<StateLocationRow
 						contact={contact}
 						className="h-[16px] w-full gap-1"
@@ -1556,11 +1674,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					/>
 				</div>
 
-				<div className="absolute left-3 right-[12px] top-[42px] pointer-events-none">
+				<div className="absolute left-3 right-[12px] top-[48px] pointer-events-none">
 					<FadeOverflowText
 						text={email.subject || 'No subject'}
 						className={cn(
-							'font-inter text-[13.215px] font-semibold leading-[21.144px]',
+							'font-inter text-[13.215px] font-semibold leading-[17px]',
 							inboxSupplementalTextClassName
 						)}
 						splitNumericSuffix={false}
@@ -1568,7 +1686,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					<FadeOverflowText
 						text={messagePreview}
 						className={cn(
-							'font-inter text-[13.215px] font-normal leading-[21.144px]',
+							'font-inter text-[13.215px] font-normal leading-[17px]',
 							inboxSupplementalTextClassName
 						)}
 						splitNumericSuffix={false}
@@ -1582,7 +1700,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		<div
 			className={cn(
 				'relative max-[480px]:w-[96.27vw] rounded-[8px] flex flex-col overflow-visible',
-				// In the compressed bottom-panel view we need exact internal pixel heights (16px white + 24px color).
+				// In the compressed bottom-panel view we need exact internal pixel heights.
 				// Use a stroke via box-shadow so it doesn't consume layout height.
 				shouldRenderCollapsedTopBox
 					? 'border-0'
@@ -1598,6 +1716,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				height:
 					typeof resolvedHeight === 'number' ? `${resolvedHeight}px` : resolvedHeight,
 				background: panelBackground,
+				borderRadius: shouldRenderCollapsedTopBox ? '3.33px' : undefined,
 				boxShadow: shouldRenderCollapsedTopBox ? 'inset 0 0 0 2px #000000' : undefined,
 				...(isBottomView ? { cursor: 'pointer' } : {}),
 			}}
@@ -1698,26 +1817,33 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					}}
 				/>
 			)}
-			<ContactsHeaderChrome
-				variant={isBottomView ? 'legacy' : 'campaignStops'}
-				isAllTab={isAllTab}
-				offsetY={effectiveWhiteSectionHeight === 28 ? 2 : 0}
-				whiteSectionHeight={effectiveWhiteSectionHeight}
-				activeCampaignStop={resolvedActiveTopNavStop}
-				onAllClick={onOpenAll}
-				onSearchClick={onOpenSearch}
-				onWriteClick={onOpenWriting}
-				onSendClick={onOpenSend}
-				onInboxClick={onOpenInbox}
-				// Match the main Contacts tab header chrome animation, but keep the ultra-compact
-				// bottom view static so it doesn't interfere with the "Open" affordance.
-				// Also, when this list is rendered on the Write tab (tooltip-enabled), treat "Write"
-				// as the active tab so hovering "Write" shows the white-placeholder state.
-				activeTab={
-					isDraftsFocusMode ? 'drafts' : enableUsedContactTooltip ? 'write' : 'contacts'
-				}
-				interactive={!isBottomView && !isAllTabNavigation}
-			/>
+			{!shouldRenderCollapsedTopBox && (
+				<ContactsHeaderChrome
+					variant={isBottomView ? 'legacy' : 'campaignStops'}
+					isAllTab={isAllTab}
+					offsetY={effectiveWhiteSectionHeight === 28 ? 2 : 0}
+					whiteSectionHeight={effectiveWhiteSectionHeight}
+					activeCampaignStop={resolvedActiveTopNavStop}
+					onAllClick={onOpenAll}
+					onSearchClick={onOpenSearch}
+					onWriteClick={onOpenWriting}
+					onSendClick={onOpenSend}
+					onInboxClick={onOpenInbox}
+					// When this list is rendered on the Write tab (tooltip-enabled), treat "Write"
+					// as the active tab so hovering "Write" shows the white-placeholder state.
+					activeTab={
+						isDraftsFocusMode ? 'drafts' : enableUsedContactTooltip ? 'write' : 'contacts'
+					}
+					interactive={!isBottomView && !isAllTabNavigation}
+				/>
+			)}
+			{shouldRenderCollapsedTopBox && (
+				<div className="absolute left-[8px] top-[1px] z-20 flex h-[13px] items-center pointer-events-none">
+					<span className="font-inter text-[12px] font-semibold leading-none text-black">
+						Contacts
+					</span>
+				</div>
+			)}
 			<div
 				className={cn(
 					'flex items-center gap-2 px-3 shrink-0',
@@ -1736,7 +1862,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				}}
 			></div>
 
-			{(isAllTab || isBottomView) && (
+			{isAllTab && (
 				<div
 					className={cn(
 						'absolute z-20 flex items-center gap-[12px]',
@@ -1804,9 +1930,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				</div>
 			)}
 
-			{/* Collapsed bottom panels: show only the top "batch" box (22px) centered in the 24px color region */}
+			{/* Collapsed bottom panels: label strip + bottom-aligned summary bar. */}
 			{shouldRenderCollapsedTopBox && (
-				<div className="flex-1 flex items-center justify-center px-[2px]">
+				<div className="flex-1 flex items-end justify-center px-[2px]" style={{ paddingBottom: 3 }}>
 					{bottomViewBatchesToShow[0] ? (
 						<div
 							key="contacts-collapsed-batch"
@@ -2060,10 +2186,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 							) : isInboxFocusMode ? (
 								<>
 									{inboxPanelTab === 'sent'
-										? supplementalSentRows.map(renderSupplementalSentRow)
+										? supplementalSentConversations.map(renderSupplementalSentRow)
 										: inboxPanelTab === 'opportunities'
-											? supplementalOpportunityInboxRows.map(renderSupplementalInboxRow)
-											: supplementalInboxRows.map(renderSupplementalInboxRow)}
+											? supplementalOpportunityInboxConversations.map(renderSupplementalInboxRow)
+											: supplementalInboxConversationsResponsesOnly.map(renderSupplementalInboxRow)}
 								</>
 							) : (
 								<>
@@ -2852,7 +2978,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									})}
 									{!isDraftsFocusMode &&
 										supplementalDraftRows.map(renderSupplementalDraftRow)}
-									{supplementalInboxRows.map(renderSupplementalInboxRow)}
+									{supplementalInboxConversations.map(renderSupplementalInboxRow)}
 								</>
 							)}
 							{Array.from({
@@ -2888,19 +3014,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 											...(inboxPlaceholderStyle ?? contactRowStyle ?? {}),
 											...(shouldShowLoadingWave
 												? {
-														animationDelay:
-															syncedWaveElapsedSeconds !== null
-																? getSyncedWaveDelay({
-																		elapsedSeconds: syncedWaveElapsedSeconds,
-																		durationSeconds: loadingWaveDurationSeconds,
-																		index: idx,
-																		stepSeconds: loadingWaveStepSeconds,
-																	})
-																: `${-(
-																		loadingWaveDurationSeconds -
-																		idx * loadingWaveStepSeconds
-																	)}s`,
-													}
+														animationDelay: `${-(
+															loadingWaveDurationSeconds -
+															idx * loadingWaveStepSeconds
+														)}s`,
+												  }
 												: {}),
 										}}
 									/>

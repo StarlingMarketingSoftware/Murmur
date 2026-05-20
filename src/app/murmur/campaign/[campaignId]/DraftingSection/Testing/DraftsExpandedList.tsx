@@ -19,7 +19,6 @@ import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 import OpenIcon from '@/components/atoms/svg/OpenIcon';
-import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 import {
 	canadianProvinceAbbreviations,
 	canadianProvinceNames,
@@ -303,13 +302,6 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	const { mutateAsync: updateEmail } = useEditEmail({ suppressToasts: true });
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
 
-	// Used contacts indicator
-	const { data: usedContactIds } = useGetUsedContactIds();
-	const usedContactIdsSet = useMemo(
-		() => new Set(usedContactIds || []),
-		[usedContactIds]
-	);
-
 	const handleDraftClick = (draft: EmailWithRelations, e: MouseEvent) => {
 		if (isPreviewMode && onDraftPreviewClick) {
 			onDraftPreviewClick(draft);
@@ -363,12 +355,15 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	const isAllTabNavigation = interactionMode === 'allTab';
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
 	const isBottomView = customWhiteSectionHeight === 15 || customWhiteSectionHeight === 16;
-	// Compressed bottom panel spec: 40px total = 12px white + 28px color.
-	const effectiveWhiteSectionHeight = collapsed && isBottomView ? 12 : whiteSectionHeight;
+	// Compressed bottom panel spec: 45px total = 13px label strip + 26px inner bar.
+	const collapsedOuterWidthPx = 197;
+	const collapsedOuterHeightPx = 45;
+	const collapsedLabelHeightPx = 13;
+	const effectiveWhiteSectionHeight = collapsed && isBottomView ? collapsedLabelHeightPx : whiteSectionHeight;
 	const shouldRenderCollapsedTopBox = collapsed && isBottomView;
-	const collapsedTopBoxHeightPx = 22;
-	const collapsedTopBoxWidthPx = 224;
-	const collapsedTopBoxRadiusPx = 4.7;
+	const collapsedTopBoxHeightPx = 26;
+	const collapsedTopBoxWidthPx = 191;
+	const collapsedTopBoxRadiusPx = 3.33;
 	const resolvedRowWidth = rowWidth ?? 356;
 	const resolvedRowHeight = rowHeight ?? 64;
 	const hasCustomRowSize = Boolean(rowWidth || rowHeight);
@@ -436,6 +431,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 		(isDraftingBatchActive ? 1 : 0) + bottomViewBatchesToShow.length;
 	const bottomViewPlaceholderCount = Math.max(0, 3 - bottomViewRowCount);
 	const bottomViewPlaceholderBgColor = '#F7EBD3';
+	const collapsedTopColor = '#F7EBD3';
+	const collapsedFillColor = '#FFDC9E';
 
 	const horizontalPaddingClass = hasCustomRowSize
 		? 'px-0'
@@ -560,7 +557,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 		<div
 			className={cn(
 				'relative max-[480px]:w-[96.27vw] rounded-md flex flex-col overflow-visible',
-				// In the compressed bottom-panel view we need exact internal pixel heights (16px white + 24px color).
+				// In the compressed bottom-panel view we need exact internal pixel heights.
 				// Use a stroke via box-shadow so it doesn't consume layout height.
 				shouldRenderCollapsedTopBox
 					? 'border-0'
@@ -571,9 +568,12 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 					: 'border-2 border-black/30'
 			)}
 			style={{
-				width: `${width}px`,
-				height: `${height}px`,
-				background: `linear-gradient(to bottom, #ffffff ${effectiveWhiteSectionHeight}px, #FFDC9E ${effectiveWhiteSectionHeight}px)`,
+				width: `${shouldRenderCollapsedTopBox ? collapsedOuterWidthPx : width}px`,
+				height: `${shouldRenderCollapsedTopBox ? collapsedOuterHeightPx : height}px`,
+				background: shouldRenderCollapsedTopBox
+					? `linear-gradient(to bottom, ${collapsedTopColor} ${effectiveWhiteSectionHeight}px, ${collapsedFillColor} ${effectiveWhiteSectionHeight}px)`
+					: `linear-gradient(to bottom, #ffffff ${effectiveWhiteSectionHeight}px, ${collapsedFillColor} ${effectiveWhiteSectionHeight}px)`,
+				borderRadius: shouldRenderCollapsedTopBox ? '3.33px' : undefined,
 				boxShadow: shouldRenderCollapsedTopBox
 					? 'inset 0 0 0 2px #000000'
 					: undefined,
@@ -602,10 +602,19 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 					}}
 				/>
 			)}
-			<DraftsHeaderChrome
-				isAllTab={isAllTab}
-				whiteSectionHeight={shouldRenderCollapsedTopBox ? effectiveWhiteSectionHeight : customWhiteSectionHeight}
-			/>
+			{!shouldRenderCollapsedTopBox && (
+				<DraftsHeaderChrome
+					isAllTab={isAllTab}
+					whiteSectionHeight={customWhiteSectionHeight}
+				/>
+			)}
+			{shouldRenderCollapsedTopBox && (
+				<div className="absolute left-[8px] top-[1px] z-20 flex h-[13px] items-center pointer-events-none">
+					<span className="font-inter text-[12px] font-semibold leading-none text-black">
+						Drafts
+					</span>
+				</div>
+			)}
 			<div
 				className={cn(
 					'flex items-center gap-2 px-3 shrink-0',
@@ -624,7 +633,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 				}}
 			></div>
 
-			{(isAllTab || isBottomView) && (
+			{isAllTab && (
 				<div
 					className={cn(
 						'absolute z-20 flex items-center gap-[12px]',
@@ -654,9 +663,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 				</div>
 			)}
 
-			{/* Collapsed bottom panels: show only the top "batch" box (22px) centered in the 24px color region */}
+			{/* Collapsed bottom panels: label strip + bottom-aligned summary bar. */}
 			{shouldRenderCollapsedTopBox && (
-				<div className="flex-1 flex items-center justify-center px-[2px]">
+				<div className="flex-1 flex items-end justify-center px-[2px]" style={{ paddingBottom: 3 }}>
 					{(() => {
 						// Compressed view uses a distinct "summary" top box:
 						// - Left: drafts count (live progress when generating)
@@ -664,7 +673,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 						const draftCount = drafts.filter((d) => d.status === EmailStatus.draft).length;
 						const leftCount = isDraftingBatchActive ? draftedCount : draftCount;
 						const totalCount = Math.max(0, resolvedGenerationTotal);
-						const rightSegmentWidthPx = 80;
+						const rightSegmentWidthPx = 68;
 
 						return (
 							<div
@@ -674,7 +683,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 									width: `${collapsedTopBoxWidthPx}px`,
 									height: `${collapsedTopBoxHeightPx}px`,
 									borderRadius: `${collapsedTopBoxRadiusPx}px`,
-									backgroundColor: '#F7EBD3',
+									backgroundColor: collapsedTopColor,
 								}}
 							>
 								{/* Left segment */}
@@ -691,7 +700,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 									className="flex items-center justify-center"
 									style={{
 										width: `${rightSegmentWidthPx}px`,
-										backgroundColor: '#FFFFFF',
+										backgroundColor: collapsedTopColor,
 										borderLeft: '2px solid #000000',
 									}}
 								>

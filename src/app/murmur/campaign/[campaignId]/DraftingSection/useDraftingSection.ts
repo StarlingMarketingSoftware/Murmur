@@ -52,7 +52,11 @@ export type DraftingSectionView =
 	| 'inbox';
 
 export type InboxSentTab = 'inbox' | 'sent';
-export type InboxSentTabRequest = { tab: InboxSentTab; requestId: number };
+export type InboxSentTabRequest = {
+	tab: InboxSentTab;
+	requestId: number;
+	preserveSelection?: boolean;
+};
 
 export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
@@ -118,6 +122,12 @@ export interface DraftingSectionProps {
 		visible: boolean;
 		operations: Array<{ current: number; total: number }>;
 	}) => void;
+	/**
+	 * Debug-only: when provided, the Inbox tab is rendered against mocked
+	 * inbound/sent emails instead of the live API responses. Enabled by the
+	 * `?inboxDebug=1` URL flag on the campaign page.
+	 */
+	inboxMockState?: import('../CampaignInboxDebugPanel').CampaignInboxMockState;
 }
 
 type GeneratedEmail = {

@@ -111,6 +111,7 @@ import { BottomPanelsContainer } from '../../../../../components/atoms/BottomPan
 import type { HistoryAction } from '../../../../../components/atoms/BottomPanelsContainer';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useGetCampaignContactEvents } from '@/hooks/queryHooks/useCampaigns';
+import { buildCampaignInboxMockData } from '../CampaignInboxDebugPanel';
 import {
 	isRestaurantTitle,
 	isCoffeeShopTitle,
@@ -218,6 +219,8 @@ interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 	autoOpenProfileTabWhenIncomplete?: boolean;
 }
 
+type CampaignBottomPanelKind = 'contacts' | 'drafts' | 'sent' | 'inbox';
+
 export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const {
 		view = 'testing',
@@ -236,7 +239,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		goToNextTab,
 		hideHeaderBox,
 		onDraftOperationsProgress,
+		inboxMockState,
 	} = props;
+
+	const inboxMockOverrideActive = inboxMockState != null;
+	const inboxMockData = useMemo(
+		() =>
+			inboxMockOverrideActive
+				? buildCampaignInboxMockData(inboxMockState, props.campaign)
+				: null,
+		[inboxMockOverrideActive, inboxMockState, props.campaign]
+	);
 
 	const {
 		mood: globeWeatherMood,
@@ -622,12 +635,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		};
 	}, []);
 
-	const bottomPanelBoxHeightPx = 40;
+	const bottomPanelBoxWidthPx = 197;
+	const bottomPanelBoxHeightPx = 45;
 	const bottomPanelCollapsed = true;
 	const mainContactsPanelWidthPx = 377;
 	const mainContactsPanelHeightPx = 597;
 	const inboxMainPanelWidthPx = 863;
-	const inboxMainPanelHeightPx = 668;
+	const inboxMainPanelHeightPx = 706;
+	const inboxWideTopMarginPx = 24;
+	const inboxWideBottomPanelMarginTopPx = 114;
+	const sharedWideTabZoomEnvelopeBottomPx =
+		inboxWideTopMarginPx +
+		inboxMainPanelHeightPx +
+		inboxWideBottomPanelMarginTopPx +
+		bottomPanelBoxHeightPx;
+	const sharedBottomPanelSlotTopPx =
+		sharedWideTabZoomEnvelopeBottomPx - bottomPanelBoxHeightPx;
 	// Keeps the inbox box 36px to the right of the standard left column anchor.
 	const inboxMainPanelShiftRightPx = 185.5;
 	const standardSidePanelTopOffsetPx = 15;
@@ -659,6 +682,28 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		!(view === 'sent' && isNarrowDesktop) &&
 		!(view === 'search' && isSearchTabNarrow) &&
 		!(view === 'inbox' && isInboxTabStacked);
+	const sharedBottomPanelKinds = useMemo<CampaignBottomPanelKind[]>(() => {
+		switch (view) {
+			case 'testing':
+				return ['drafts', 'sent', 'inbox'];
+			case 'drafting':
+				return ['contacts', 'sent', 'inbox'];
+			case 'sent':
+				return ['contacts', 'drafts', 'inbox'];
+			case 'inbox':
+				return ['contacts', 'drafts', 'sent'];
+			default:
+				return [];
+		}
+	}, [view]);
+	const shouldRenderSharedBottomPanels =
+		sharedBottomPanelKinds.length > 0 && !isMobile && !hideHeaderBox && !isNarrowestDesktop;
+	const shouldReserveSharedWideTabZoomEnvelope =
+		!isMobile &&
+		!hideHeaderBox &&
+		!isNarrowestDesktop &&
+		!shouldRenderSharedBottomPanels &&
+		!isInboxTabStacked;
 
 	const handleRejectDraft = useCallback(
 		async (draftId: number, currentlyRejected?: boolean) => {
@@ -1879,9 +1924,33 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		useState(false);
 	const [showTestPreview, setShowTestPreview] = useState(false);
 	const [selectedInboxEmailId, setSelectedInboxEmailId] = useState<number | null>(null);
+	const [optimisticInboxReplyByEmailId, setOptimisticInboxReplyByEmailId] =
+		useState<Record<number, number>>({});
+	const handleInboxEmailClick = useCallback(
+		(email: { id: number; isSent?: boolean }) => {
+			const tab = email.isSent ? 'sent' : 'inbox';
+			setSelectedInboxEmailId(email.id);
+			setLocalInboxSentTabRequest((prev) => ({
+				tab,
+				requestId: Math.max(prev?.requestId ?? 0, inboxSentTabRequest?.requestId ?? 0) + 1,
+				preserveSelection: true,
+			}));
+		},
+		[inboxSentTabRequest?.requestId]
+	);
+	const handleInboxThreadReplySent = useCallback((messageIds: number[], sentAtMs: number) => {
+		setOptimisticInboxReplyByEmailId((prev) => {
+			const next = { ...prev };
+			for (const id of messageIds) {
+				next[id] = Math.max(next[id] ?? 0, sentAtMs);
+			}
+			return next;
+		});
+	}, []);
 
 	useEffect(() => {
 		setSelectedInboxEmailId(null);
+		setOptimisticInboxReplyByEmailId({});
 	}, [campaign?.id]);
 
 	// When a draft is open, the research panel should stay locked to that draft's contact.
@@ -2248,13 +2317,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	};
 
-	const campaignContactEmails = contacts
+	const campaignContactEmailsReal = contacts
 		? contacts
 				.map((contact) => contact.email)
 				.filter((email): email is string => Boolean(email))
 		: undefined;
+	const campaignContactEmails = inboxMockData
+		? inboxMockData.allowedSenderEmails
+		: campaignContactEmailsReal;
 
-	const campaignContactsByEmail = useMemo(() => {
+	const campaignContactsByEmailReal = useMemo(() => {
 		if (!contacts) return undefined;
 		const map: Record<string, ContactWithName> = {};
 		for (const contact of contacts) {
@@ -2267,10 +2339,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 		return map;
 	}, [contacts]);
+	const campaignContactsByEmail = inboxMockData
+		? inboxMockData.contactByEmail
+		: campaignContactsByEmailReal;
 	const { data: allInboundEmailsForContactsTable } = useGetInboundEmails({
-		enabled: Boolean(contacts?.length),
+		enabled: Boolean(contacts?.length) && !inboxMockOverrideActive,
 	});
-	const inboxEmailsForContactsExpandedList = useMemo(() => {
+	const inboxEmailsForContactsExpandedListReal = useMemo(() => {
 		if (!allInboundEmailsForContactsTable || !contacts?.length) return [];
 		const allowedSenders = new Set(
 			contacts
@@ -2283,21 +2358,105 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			return Boolean(sender && allowedSenders.has(sender));
 		});
 	}, [allInboundEmailsForContactsTable, contacts]);
+	const inboxEmailsForContactsExpandedList = inboxMockData
+		? inboxMockData.inboundEmails
+		: inboxEmailsForContactsExpandedListReal;
 	const contactsListSupplementalProps = useMemo(
 		() => ({
-			allContacts: contacts || [],
+			allContacts: inboxMockData ? inboxMockData.contacts : contacts || [],
 			drafts: draftEmails,
-			sentEmails,
+			sentEmails: inboxMockData ? inboxMockData.sentEmails : sentEmails,
 			inboxEmails: inboxEmailsForContactsExpandedList,
+			optimisticInboxReplyByEmailId,
 			contactByEmail: campaignContactsByEmail,
 		}),
-		[contacts, draftEmails, sentEmails, inboxEmailsForContactsExpandedList, campaignContactsByEmail]
+		[
+			contacts,
+			draftEmails,
+			sentEmails,
+			inboxEmailsForContactsExpandedList,
+			optimisticInboxReplyByEmailId,
+			campaignContactsByEmail,
+			inboxMockData,
+		]
 	);
+
+	const inboxSectionSampleData = inboxMockData
+		? {
+				inboundEmails: inboxMockData.inboundEmails,
+				sentEmails: inboxMockData.sentEmailsAsInbound,
+			}
+		: undefined;
 
 	const toListNames =
 		campaign?.userContactLists?.map((list) => list.name).join(', ') || '';
 	const fromName = campaign?.identity?.name || '';
 	const fromEmail = campaign?.identity?.email || '';
+
+	const renderSharedBottomPanel = (kind: CampaignBottomPanelKind) => {
+		switch (kind) {
+			case 'contacts':
+				return (
+					<ContactsExpandedList
+						key={kind}
+						contacts={contactsForContactsExpandedList}
+						{...contactsListSupplementalProps}
+						campaign={campaign}
+						activelyDraftingContactIds={
+							activelyDraftingContactIdsForContactsExpandedList
+						}
+						width={bottomPanelBoxWidthPx}
+						height={bottomPanelBoxHeightPx}
+						enableUsedContactTooltip={false}
+						whiteSectionHeight={15}
+						collapsed={bottomPanelCollapsed}
+						showSearchBar={false}
+					/>
+				);
+			case 'drafts':
+				return (
+					<DraftsExpandedList
+						key={kind}
+						drafts={draftEmails}
+						contacts={contacts || []}
+						generationProgress={generationProgress}
+						generationTotal={generationTotal}
+						width={bottomPanelBoxWidthPx}
+						height={bottomPanelBoxHeightPx}
+						whiteSectionHeight={15}
+						collapsed={bottomPanelCollapsed}
+						hideSendButton={true}
+						onOpenDrafts={goToDrafting}
+					/>
+				);
+			case 'sent':
+				return (
+					<SentExpandedList
+						key={kind}
+						sent={sentEmails}
+						contacts={contacts || []}
+						width={bottomPanelBoxWidthPx}
+						height={bottomPanelBoxHeightPx}
+						whiteSectionHeight={15}
+						collapsed={bottomPanelCollapsed}
+						onOpenSent={goToSent}
+					/>
+				);
+			case 'inbox':
+				return (
+					<InboxExpandedList
+						key={kind}
+						contacts={contacts || []}
+						width={bottomPanelBoxWidthPx}
+						height={bottomPanelBoxHeightPx}
+						whiteSectionHeight={15}
+						collapsed={bottomPanelCollapsed}
+						onOpenInbox={goToInbox}
+					/>
+				);
+		}
+		return null;
+	};
 
 	// Render search dropdowns for the mini searchbar
 	const renderSearchDropdowns = () => {
@@ -2726,7 +2885,29 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					></div>
 
 					{/* Main content wrapper to anchor the persistent Header Box */}
-					<div className="relative w-full flex flex-col items-center">
+					<div
+						className="relative w-full flex flex-col items-center"
+						style={
+							shouldRenderSharedBottomPanels
+								? { minHeight: `${sharedWideTabZoomEnvelopeBottomPx}px` }
+								: undefined
+						}
+					>
+						{shouldReserveSharedWideTabZoomEnvelope && (
+							<div
+								aria-hidden="true"
+								data-campaign-bottom-anchor
+								style={{
+									position: 'absolute',
+									left: '50%',
+									top: `${sharedWideTabZoomEnvelopeBottomPx - 1}px`,
+									width: '1px',
+									height: '1px',
+									pointerEvents: 'none',
+									background: 'transparent',
+								}}
+							/>
+						)}
 						{/* Persistent Campaign Header Box for specific tabs */}
 						{/* Hide this absolute panel in narrow desktop + testing/contacts mode - we'll use inline layout instead */}
 						{/* Also hide when hideHeaderBox is true (header rendered at page level for narrowest breakpoint) */}
@@ -2772,7 +2953,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										campaign={campaign}
 										focusMode="inbox"
 										selectedInboxEmailId={selectedInboxEmailId}
-										onInboxEmailClick={(email) => setSelectedInboxEmailId(email.id)}
+										onInboxEmailClick={handleInboxEmailClick}
 										onContactHover={handleResearchContactHover}
 										width={mainContactsPanelWidthPx}
 										height={mainContactsPanelHeightPx}
@@ -4409,46 +4590,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										/>
 									</div>
 								)}
-
-								{/* Bottom Panels: Drafts, Sent, and Inbox - hidden at narrowest breakpoint */}
-								{!hideHeaderBox && (
-									<BottomPanelsContainer
-										className="mt-[35px] pb-[8px] flex justify-center gap-[15px]"
-										data-campaign-bottom-anchor
-										collapsed={bottomPanelCollapsed}
-										historyActions={historyActions}
-									>
-										<DraftsExpandedList
-											drafts={draftEmails}
-											contacts={contacts || []}
-											generationProgress={generationProgress}
-											generationTotal={generationTotal}
-											width={233}
-											height={bottomPanelBoxHeightPx}
-											whiteSectionHeight={15}
-											collapsed={bottomPanelCollapsed}
-											hideSendButton={true}
-											onOpenDrafts={goToDrafting}
-										/>
-										<SentExpandedList
-											sent={sentEmails}
-											contacts={contacts || []}
-											width={233}
-											height={bottomPanelBoxHeightPx}
-											whiteSectionHeight={15}
-											collapsed={bottomPanelCollapsed}
-											onOpenSent={goToSent}
-										/>
-										<InboxExpandedList
-											contacts={contacts || []}
-											width={233}
-											height={bottomPanelBoxHeightPx}
-											whiteSectionHeight={15}
-											collapsed={bottomPanelCollapsed}
-											onOpenInbox={goToInbox}
-										/>
-									</BottomPanelsContainer>
-								)}
 							</div>
 						)}
 
@@ -4707,50 +4848,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													</button>
 												</div>
 											)}
-											{/* Bottom Panels: Contacts, Sent, and Inbox - centered relative to container - hidden at narrowest breakpoint */}
-											{!isNarrowestDesktop && (
-												<BottomPanelsContainer
-													className={cn(
-														draftEmails.length === 0 ? 'mt-[91px]' : 'mt-[35px]',
-														'pb-[8px] flex justify-center gap-[15px]'
-													)}
-													data-campaign-bottom-anchor
-													collapsed={bottomPanelCollapsed}
-													historyActions={historyActions}
-												>
-													<ContactsExpandedList
-														contacts={contactsForContactsExpandedList}
-														{...contactsListSupplementalProps}
-														campaign={campaign}
-														activelyDraftingContactIds={
-															activelyDraftingContactIdsForContactsExpandedList
-														}
-														width={232}
-														height={bottomPanelBoxHeightPx}
-														enableUsedContactTooltip={false}
-														whiteSectionHeight={15}
-														collapsed={bottomPanelCollapsed}
-														showSearchBar={false}
-													/>
-													<SentExpandedList
-														sent={sentEmails}
-														contacts={contacts || []}
-														width={233}
-														height={bottomPanelBoxHeightPx}
-														whiteSectionHeight={15}
-														collapsed={bottomPanelCollapsed}
-														onOpenSent={goToSent}
-													/>
-													<InboxExpandedList
-														contacts={contacts || []}
-														width={233}
-														height={bottomPanelBoxHeightPx}
-														whiteSectionHeight={15}
-														collapsed={bottomPanelCollapsed}
-														onOpenInbox={goToInbox}
-													/>
-												</BottomPanelsContainer>
-											)}
 										</div>
 									) : (
 										// Regular centered layout for wider viewports
@@ -4942,51 +5039,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													</div>
 												</div>
 											)}
-
-											{/* Bottom Panels: Contacts, Sent, and Inbox - hidden at narrowest breakpoint */}
-											{!isNarrowestDesktop && (
-												<BottomPanelsContainer
-													className={cn(
-														draftEmails.length === 0 ? 'mt-[91px]' : 'mt-[35px]',
-														'pb-[8px] flex justify-center gap-[15px]'
-													)}
-													data-campaign-bottom-anchor
-													collapsed={bottomPanelCollapsed}
-													historyActions={historyActions}
-												>
-													<ContactsExpandedList
-														contacts={contactsForContactsExpandedList}
-														{...contactsListSupplementalProps}
-														campaign={campaign}
-														activelyDraftingContactIds={
-															activelyDraftingContactIdsForContactsExpandedList
-														}
-														width={232}
-														height={bottomPanelBoxHeightPx}
-														enableUsedContactTooltip={false}
-														whiteSectionHeight={15}
-														collapsed={bottomPanelCollapsed}
-														showSearchBar={false}
-													/>
-													<SentExpandedList
-														sent={sentEmails}
-														contacts={contacts || []}
-														width={233}
-														height={bottomPanelBoxHeightPx}
-														whiteSectionHeight={15}
-														collapsed={bottomPanelCollapsed}
-														onOpenSent={goToSent}
-													/>
-													<InboxExpandedList
-														contacts={contacts || []}
-														width={233}
-														height={bottomPanelBoxHeightPx}
-														whiteSectionHeight={15}
-														collapsed={bottomPanelCollapsed}
-														onOpenInbox={goToInbox}
-													/>
-												</BottomPanelsContainer>
-											)}
 										</div>
 									)}
 								</div>
@@ -5128,48 +5180,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												/>
 											</div>
 										</div>
-										{/* Bottom Panels: Contacts, Drafts, and Inbox - centered relative to container */}
-										<BottomPanelsContainer
-											className="mt-[91px] pb-[8px] flex justify-center gap-[15px]"
-											data-campaign-bottom-anchor
-											collapsed={bottomPanelCollapsed}
-											historyActions={historyActions}
-										>
-											<ContactsExpandedList
-												contacts={contactsForContactsExpandedList}
-												{...contactsListSupplementalProps}
-												campaign={campaign}
-												activelyDraftingContactIds={
-													activelyDraftingContactIdsForContactsExpandedList
-												}
-												width={232}
-												height={bottomPanelBoxHeightPx}
-												enableUsedContactTooltip={false}
-												whiteSectionHeight={15}
-												collapsed={bottomPanelCollapsed}
-												showSearchBar={false}
-											/>
-											<DraftsExpandedList
-												drafts={draftEmails}
-												contacts={contacts || []}
-												generationProgress={generationProgress}
-												generationTotal={generationTotal}
-												width={233}
-												height={bottomPanelBoxHeightPx}
-												whiteSectionHeight={15}
-												collapsed={bottomPanelCollapsed}
-												hideSendButton={true}
-												onOpenDrafts={goToDrafting}
-											/>
-											<InboxExpandedList
-												contacts={contacts || []}
-												width={233}
-												height={bottomPanelBoxHeightPx}
-												whiteSectionHeight={15}
-												collapsed={bottomPanelCollapsed}
-												onOpenInbox={goToInbox}
-											/>
-										</BottomPanelsContainer>
 									</div>
 								) : (
 									// Regular centered layout for wider viewports
@@ -5260,46 +5270,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														onOpenWriting={goToWriting}
 													/>
 												</div>
-											</div>
-										)}
-
-										{/* Bottom Panels: Contacts, Drafts, and Inbox - hidden at narrowest breakpoint (< 952px) */}
-										{!isNarrowestDesktop && (
-											<div className="mt-[91px] pb-[8px] flex justify-center gap-[15px]">
-												<ContactsExpandedList
-													contacts={contactsForContactsExpandedList}
-													{...contactsListSupplementalProps}
-													campaign={campaign}
-													activelyDraftingContactIds={
-														activelyDraftingContactIdsForContactsExpandedList
-													}
-													width={232}
-													height={bottomPanelBoxHeightPx}
-													enableUsedContactTooltip={false}
-													whiteSectionHeight={15}
-													collapsed={bottomPanelCollapsed}
-													showSearchBar={false}
-												/>
-												<DraftsExpandedList
-													drafts={draftEmails}
-													contacts={contacts || []}
-													generationProgress={generationProgress}
-													generationTotal={generationTotal}
-													width={233}
-													height={bottomPanelBoxHeightPx}
-													whiteSectionHeight={15}
-													collapsed={bottomPanelCollapsed}
-													hideSendButton={true}
-													onOpenDrafts={goToDrafting}
-												/>
-												<InboxExpandedList
-													contacts={contacts || []}
-													width={233}
-													height={bottomPanelBoxHeightPx}
-													whiteSectionHeight={15}
-													collapsed={bottomPanelCollapsed}
-													onOpenInbox={goToInbox}
-												/>
 											</div>
 										)}
 									</div>
@@ -6525,6 +6495,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onGoToSearch={onGoToSearch}
 											inboxSentTabRequest={effectiveInboxSentTabRequest}
 											onInboxSentTabChange={onInboxSentTabChange}
+											onThreadReplySent={handleInboxThreadReplySent}
+											sampleData={inboxSectionSampleData}
 											onContactSelect={(contact) => {
 												if (contact) {
 													setSelectedContactForResearch(contact);
@@ -6596,7 +6568,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													campaign={campaign}
 													focusMode="inbox"
 													selectedInboxEmailId={selectedInboxEmailId}
-													onInboxEmailClick={(email) => setSelectedInboxEmailId(email.id)}
+													onInboxEmailClick={handleInboxEmailClick}
 													onContactHover={handleResearchContactHover}
 													width={375}
 													height={582}
@@ -6616,9 +6588,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onInboxSentTabChange={onInboxSentTabChange}
 													selectedEmailId={selectedInboxEmailId}
 													onSelectedEmailIdChange={setSelectedInboxEmailId}
+													onThreadReplySent={handleInboxThreadReplySent}
 													autoSelectFirstEmail
 													detailOnly
 													hideSelectedEmailBackButton
+													sampleData={inboxSectionSampleData}
 													onContactSelect={(contact) => {
 														if (contact) {
 															setSelectedContactForResearch(contact);
@@ -6630,44 +6604,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													isNarrow={true}
 												/>
 											</div>
-										</div>
-										{/* Bottom Panels: Contacts, Drafts, and Sent */}
-										<div className="mt-[91px] pb-[8px] flex justify-center gap-[15px]">
-											<ContactsExpandedList
-												contacts={contactsForContactsExpandedList}
-												{...contactsListSupplementalProps}
-												campaign={campaign}
-												activelyDraftingContactIds={
-													activelyDraftingContactIdsForContactsExpandedList
-												}
-												width={232}
-												height={bottomPanelBoxHeightPx}
-												enableUsedContactTooltip={false}
-												whiteSectionHeight={15}
-												collapsed={bottomPanelCollapsed}
-												showSearchBar={false}
-											/>
-											<DraftsExpandedList
-												drafts={draftEmails}
-												contacts={contacts || []}
-												generationProgress={generationProgress}
-												generationTotal={generationTotal}
-												width={233}
-												height={bottomPanelBoxHeightPx}
-												whiteSectionHeight={15}
-												collapsed={bottomPanelCollapsed}
-												hideSendButton={true}
-												onOpenDrafts={goToDrafting}
-											/>
-											<SentExpandedList
-												sent={sentEmails}
-												contacts={contacts || []}
-												width={233}
-												height={bottomPanelBoxHeightPx}
-												whiteSectionHeight={15}
-												collapsed={bottomPanelCollapsed}
-												onOpenSent={goToSent}
-											/>
 										</div>
 									</div>
 								) : (
@@ -6688,11 +6624,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												onInboxSentTabChange={onInboxSentTabChange}
 												selectedEmailId={selectedInboxEmailId}
 												onSelectedEmailIdChange={setSelectedInboxEmailId}
+												onThreadReplySent={handleInboxThreadReplySent}
 												autoSelectFirstEmail
 												detailOnly
 												hideSelectedEmailBackButton
 												desktopWidth={inboxMainPanelWidthPx}
 												desktopHeight={inboxMainPanelHeightPx}
+												sampleData={inboxSectionSampleData}
 												onContactSelect={(contact) => {
 													if (contact) {
 														setSelectedContactForResearch(contact);
@@ -6704,54 +6642,24 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												isNarrow={isInboxTabNarrow}
 											/>
 										</div>
-
-										{/* Bottom Panels: Contacts, Drafts, and Sent - hidden at narrowest breakpoint (< 952px) */}
-										{!isNarrowestDesktop && (
-											<BottomPanelsContainer
-												className="mt-[114px] pb-[8px] flex justify-center gap-[15px]"
-												data-campaign-bottom-anchor
-												collapsed={bottomPanelCollapsed}
-												historyActions={historyActions}
-											>
-												<ContactsExpandedList
-													contacts={contactsForContactsExpandedList}
-													{...contactsListSupplementalProps}
-													campaign={campaign}
-													activelyDraftingContactIds={
-														activelyDraftingContactIdsForContactsExpandedList
-													}
-													width={232}
-													height={bottomPanelBoxHeightPx}
-													enableUsedContactTooltip={false}
-													whiteSectionHeight={15}
-													collapsed={bottomPanelCollapsed}
-													showSearchBar={false}
-												/>
-												<DraftsExpandedList
-													drafts={draftEmails}
-													contacts={contacts || []}
-													generationProgress={generationProgress}
-													generationTotal={generationTotal}
-													width={233}
-													height={bottomPanelBoxHeightPx}
-													whiteSectionHeight={15}
-													collapsed={bottomPanelCollapsed}
-													hideSendButton={true}
-													onOpenDrafts={goToDrafting}
-												/>
-												<SentExpandedList
-													sent={sentEmails}
-													contacts={contacts || []}
-													width={233}
-													height={bottomPanelBoxHeightPx}
-													whiteSectionHeight={15}
-													collapsed={bottomPanelCollapsed}
-													onOpenSent={goToSent}
-												/>
-											</BottomPanelsContainer>
-										)}
 									</>
 								)}
+							</div>
+						)}
+
+						{shouldRenderSharedBottomPanels && (
+							<div
+								className="absolute left-0 right-0 z-30 flex justify-center"
+								style={{ top: `${sharedBottomPanelSlotTopPx}px` }}
+							>
+								<BottomPanelsContainer
+									className="flex justify-center gap-[15px]"
+									data-campaign-bottom-anchor
+									collapsed={bottomPanelCollapsed}
+									historyActions={historyActions}
+								>
+									{sharedBottomPanelKinds.map(renderSharedBottomPanel)}
+								</BottomPanelsContainer>
 							</div>
 						)}
 

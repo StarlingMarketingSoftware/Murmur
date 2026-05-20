@@ -9,7 +9,6 @@ import type {
 	InboxSentTab,
 	InboxSentTabRequest,
 } from './DraftingSection/useDraftingSection';
-import { CampaignPageSkeleton } from '@/components/molecules/CampaignPageSkeleton/CampaignPageSkeleton';
 import { useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import { cn } from '@/utils';
@@ -69,6 +68,10 @@ import { MapStackBlueSparkIcon } from '@/components/atoms/_svg/MapStackBlueSpark
 import { MapStackStarIcon } from '@/components/atoms/_svg/MapStackStarIcon';
 import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
 import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
+import {
+	CampaignInboxDebugPanel,
+	type CampaignInboxMockState,
+} from './CampaignInboxDebugPanel';
 
 type ViewType = Exclude<DraftingSectionView, 'search'>;
 type CampaignUrlTab = 'write' | 'overview' | 'inbox' | 'sent' | 'drafts';
@@ -254,10 +257,7 @@ const SIXTEEN_BY_NINE_ZOOM_POINTS: SixteenByNineZoomPoint[] = SIXTEEN_BY_NINE_ZO
 
 // Dynamically import heavy components to reduce initial bundle size and prevent Vercel timeout
 const DraftingSection = nextDynamic(
-	() => import('./DraftingSection/DraftingSection').then((mod) => mod.DraftingSection),
-	{
-		loading: () => <CampaignPageSkeleton />,
-	}
+	() => import('./DraftingSection/DraftingSection').then((mod) => mod.DraftingSection)
 );
 
 const IdentityDialog = nextDynamic(
@@ -849,10 +849,8 @@ const Murmur = () => {
 				document.querySelectorAll<HTMLElement>('[data-campaign-bottom-anchor]')
 			);
 			if (anchors.length > 0) {
-				// Reserve a small safety margin so we're not "flush" to the bottom edge.
-				// On short viewports (e.g. when macOS Dock is visible) we use a smaller margin
-				// to avoid forcing the entire UI to scale down too much.
-				const SAFE_BOTTOM_MARGIN_PX = viewportH <= 780 ? 8 : 24;
+				// Keep the campaign bottom panels' measured bottom exactly 22px above the viewport.
+				const SAFE_BOTTOM_MARGIN_PX = 22;
 				const ABSOLUTE_MIN_DOCK_CLAMP_ZOOM = 0.5;
 				const ABSOLUTE_MAX_HEIGHT_FIT_ZOOM = 1.2;
 				const availableH = Math.max(0, viewportH - SAFE_BOTTOM_MARGIN_PX);
@@ -1051,7 +1049,7 @@ const Murmur = () => {
 			});
 		};
 
-		const SAFE_BOTTOM_MARGIN_PX = (viewportH: number) => (viewportH <= 780 ? 8 : 24);
+		const SAFE_BOTTOM_MARGIN_PX = 22;
 
 		// Observe the campaign bottom anchor(s) and re-run zoom fitting if they become clipped.
 		// This fixes intermittent first-load cases where layout settles after our initial measurement
@@ -1082,7 +1080,7 @@ const Murmur = () => {
 					if (html.classList.contains(CAMPAIGN_SCROLLABLE_CLASS)) return;
 
 					const viewportH = window.innerHeight;
-					const safeMargin = SAFE_BOTTOM_MARGIN_PX(viewportH);
+					const safeMargin = SAFE_BOTTOM_MARGIN_PX;
 					for (const entry of entries) {
 						const rect = entry.boundingClientRect;
 						if (rect.width <= 0 || rect.height <= 0) continue;
@@ -1126,19 +1124,14 @@ const Murmur = () => {
 			mo = new MutationObserver(() => {
 				// DraftingSection (and its bottom anchors) mount asynchronously; once present, observe them.
 				refreshBottomAnchors();
-				// IMPORTANT: CampaignPageSkeleton renders an invisible `[data-campaign-bottom-anchor]`
-				// to keep the initial zoom clamp stable while DraftingSection loads.
-				// Wait until the *real* campaign view layer exists (i.e. DraftingSection has mounted)
+				// Wait until the campaign view layer exists (i.e. DraftingSection has mounted)
 				// before performing the "measure real DOM" zoom update + disconnecting this observer.
 				const activeLayer = document.querySelector(
 					'[data-campaign-view-layer="active"]'
 				) as HTMLElement | null;
 				if (!activeLayer) return;
 
-				// Only proceed once a *visible* anchor exists in the active layer.
-				// The DraftingSection dynamic import renders `CampaignPageSkeleton`, which includes an
-				// invisible bottom anchor for stability — but we still need to re-clamp once the real
-				// DraftingSection DOM is mounted (it can shift based on loaded data).
+				// Only proceed once a visible anchor exists in the active layer.
 				const anchors = Array.from(
 					activeLayer.querySelectorAll<HTMLElement>('[data-campaign-bottom-anchor]')
 				);
@@ -1188,10 +1181,13 @@ const Murmur = () => {
 	}, [isMobile, updateCampaignZoomForViewport]);
 
 	const searchParams = useSearchParams();
-	const silentLoad = searchParams.get('silent') === '1';
 	const originParam = searchParams.get('origin');
 	const cameFromSearch = originParam === 'search';
 	const tabParam = searchParams.get('tab');
+	const inboxDebugEnabled = searchParams.get('inboxDebug') === '1';
+	const [inboxMockState, setInboxMockState] = useState<CampaignInboxMockState | undefined>(
+		undefined
+	);
 	const [identityDialogOrigin, setIdentityDialogOrigin] = useState<'campaign' | 'search'>(
 		cameFromSearch ? 'search' : 'campaign'
 	);
@@ -1391,7 +1387,14 @@ const Murmur = () => {
 	
 	// Determine initial view based on tab query parameter.
 	// Legacy values are still accepted, but the URL is canonicalized to current tab names below.
-	const getInitialView = (): ViewType => getCampaignViewFromUrlTab(tabParam);
+	// When `?inboxDebug=1` is set with no `tab=` (or a non-inbox tab), force the inbox tab
+	// so the debug mock data is immediately visible.
+	const getInitialView = (): ViewType => {
+		if (inboxDebugEnabled && (!tabParam || getCampaignViewFromUrlTab(tabParam) !== 'inbox')) {
+			return 'inbox';
+		}
+		return getCampaignViewFromUrlTab(tabParam);
+	};
 
 	const [activeView, setActiveViewInternal] = useState<ViewType>(getInitialView());
 	// When the user switches tabs, DraftingSection swaps out and we need to (re)observe
@@ -2175,7 +2178,7 @@ const Murmur = () => {
 	if (isPendingCampaign || !campaign) {
 		return (
 			<CampaignDeviceProvider isMobile={isMobile} activeView={activeView}>
-				{silentLoad || isMobile === null ? null : <CampaignPageSkeleton />}
+				{null}
 			</CampaignDeviceProvider>
 		);
 	}
@@ -2766,6 +2769,7 @@ const Murmur = () => {
 									goToPreviousTab={goToPreviousTab}
 									goToNextTab={goToNextTab}
 									hideHeaderBox={isNarrowestDesktop && !isMobile}
+									inboxMockState={inboxDebugEnabled ? inboxMockState : undefined}
 								/>
 							</div>
 
@@ -2805,6 +2809,7 @@ const Murmur = () => {
 										goToPreviousTab={goToPreviousTab}
 										goToNextTab={goToNextTab}
 										hideHeaderBox={isNarrowestDesktop && !isMobile}
+										inboxMockState={inboxDebugEnabled ? inboxMockState : undefined}
 									/>
 								</div>
 							)}
@@ -3310,6 +3315,12 @@ const Murmur = () => {
 						<RightArrow width={18} height={34} color="#000000" opacity={1} />
 					</button>
 				</div>
+			)}
+			{inboxDebugEnabled && (
+				<CampaignInboxDebugPanel
+					value={inboxMockState}
+					onChange={setInboxMockState}
+				/>
 			)}
 				</div>
 				</CampaignTopSearchHighlightProvider>
