@@ -45,7 +45,16 @@ import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
+import {
+	isRestaurantTitle,
+	isCoffeeShopTitle,
+	isMusicVenueTitle,
+	isMusicFestivalTitle,
+	isWeddingPlannerTitle,
+	isWeddingVenueTitle,
+	isWineBeerSpiritsTitle,
+	getWineBeerSpiritsLabel,
+} from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
@@ -115,7 +124,11 @@ import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
 import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
 import { ContactWithName } from '@/types/contact';
 import { MapResultsPanelSkeleton } from '@/components/molecules/MapResultsPanelSkeleton/MapResultsPanelSkeleton';
-import { buildAllUsStateNames, getNearestUsStateNames, normalizeUsStateName } from '@/utils/usStates';
+import {
+	buildAllUsStateNames,
+	getNearestUsStateNames,
+	normalizeUsStateName,
+} from '@/utils/usStates';
 import { getApproximateLocation } from '@/utils/approximateLocation';
 import {
 	ContactResearchPanel,
@@ -204,9 +217,7 @@ const parsePendingDashboardSearch = (raw: string): PendingDashboardSearch => {
 			return {
 				query: parsed.query,
 				fromCampaignId:
-					typeof parsed.fromCampaignId === 'string'
-						? parsed.fromCampaignId
-						: null,
+					typeof parsed.fromCampaignId === 'string' ? parsed.fromCampaignId : null,
 			};
 		}
 	} catch {
@@ -488,7 +499,10 @@ const getCompactMapResearchPanelHeightPxForParsed = (metadata: string): number |
 		parsedCount * BULLET_SPACING_PX +
 		BULLET_CONTENT_BOTTOM_PADDING_PX;
 	const heightPx =
-		CONTENT_START_TOP_PX + bulletContentHeightPx + SUMMARY_HEIGHT_PX + SUMMARY_BOTTOM_INSET_PX;
+		CONTENT_START_TOP_PX +
+		bulletContentHeightPx +
+		SUMMARY_HEIGHT_PX +
+		SUMMARY_BOTTOM_INSET_PX;
 
 	return Math.ceil(heightPx);
 };
@@ -886,14 +900,7 @@ const LIVE_MUSIC_SEARCH_SUGGESTION_CATEGORIES = [
 		key: 'cideries',
 		label: 'Cideries',
 		baseScore: 6.1,
-		keywords: [
-			'cideries',
-			'cidery',
-			'cider',
-			'cider house',
-			'folk',
-			'acoustic',
-		],
+		keywords: ['cideries', 'cidery', 'cider', 'cider house', 'folk', 'acoustic'],
 		templates: [
 			{
 				label: 'Cideries with folk nights in {state}',
@@ -943,13 +950,13 @@ const LIVE_MUSIC_SEARCH_SUGGESTION_CATEGORIES = [
 
 const getDefaultInitialDashboardSearchSuggestionSeeds =
 	(): InitialDashboardSearchSuggestionSeed[] =>
-	INITIAL_DASHBOARD_ACTIVE_SEARCH_SUGGESTIONS.map((suggestion, index) => ({
-		label: suggestion.label,
-		state:
-			DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[index] ??
-			DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[0],
-		location: DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_LOCATIONS[index],
-	}));
+		INITIAL_DASHBOARD_ACTIVE_SEARCH_SUGGESTIONS.map((suggestion, index) => ({
+			label: suggestion.label,
+			state:
+				DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[index] ??
+				DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[0],
+			location: DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_LOCATIONS[index],
+		}));
 
 const normalizeSearchSuggestionText = (value: string): string =>
 	value
@@ -1012,7 +1019,8 @@ const coerceInitialDashboardSuggestionState = (
 	value: { name?: unknown; abbr?: unknown } | null | undefined
 ): InitialDashboardSearchSuggestionState | null => {
 	const stateName = typeof value?.name === 'string' ? value.name.trim() : '';
-	const stateAbbr = typeof value?.abbr === 'string' ? value.abbr.trim().toUpperCase() : '';
+	const stateAbbr =
+		typeof value?.abbr === 'string' ? value.abbr.trim().toUpperCase() : '';
 	const canonicalName = normalizeUsStateName(stateName || stateAbbr);
 	if (!canonicalName) return null;
 
@@ -1043,7 +1051,10 @@ const coerceInitialDashboardSuggestionLocation = (
 	if (!cityName) return null;
 
 	const stateText = typeof stateValue === 'string' ? stateValue.trim() : '';
-	const state = coerceInitialDashboardSuggestionState({ name: stateText, abbr: stateText });
+	const state = coerceInitialDashboardSuggestionState({
+		name: stateText,
+		abbr: stateText,
+	});
 	if (!state) return null;
 
 	return {
@@ -1102,15 +1113,12 @@ const getAllInitialDashboardSuggestionLocations = (
 	dedupeInitialDashboardSuggestionLocations([
 		...seeds
 			.map((seed) => seed.location)
-			.filter(
-				(
-					location
-				): location is InitialDashboardSearchSuggestionLocation => Boolean(location)
+			.filter((location): location is InitialDashboardSearchSuggestionLocation =>
+				Boolean(location)
 			),
 		...CITY_LOCATIONS_LIST.map(parseInitialDashboardSuggestionCityLocation).filter(
-			(
-				location
-			): location is InitialDashboardSearchSuggestionLocation => Boolean(location)
+			(location): location is InitialDashboardSearchSuggestionLocation =>
+				Boolean(location)
 		),
 	]);
 
@@ -1135,10 +1143,7 @@ const scoreInitialDashboardSuggestionState = (
 
 	for (let start = 0; start < queryTokens.length; start += 1) {
 		const token = queryTokens[start];
-		if (
-			token === normalizedAbbr &&
-			!AMBIGUOUS_STATE_ABBR_TOKENS.has(token)
-		) {
+		if (token === normalizedAbbr && !AMBIGUOUS_STATE_ABBR_TOKENS.has(token)) {
 			score += 8;
 		}
 
@@ -1169,11 +1174,10 @@ const scoreInitialDashboardSuggestionLocation = (
 		queryTokens,
 		INITIAL_DASHBOARD_SEARCH_LOCATION_ALIASES[location.label] ?? []
 	);
-	let score = scoreInitialDashboardSuggestionState(
-		location.state,
-		normalizedQuery,
-		queryTokens
-	) * 0.45 + aliasScore * 1.4;
+	let score =
+		scoreInitialDashboardSuggestionState(location.state, normalizedQuery, queryTokens) *
+			0.45 +
+		aliasScore * 1.4;
 
 	if (normalizedQuery.length >= 3 && normalizedQuery.includes(normalizedCity)) {
 		score += 12;
@@ -1240,7 +1244,9 @@ const rankInitialDashboardSuggestionStates = (
 ): Array<{ state: InitialDashboardSearchSuggestionState; score: number }> => {
 	const normalizedQuery = normalizeSearchSuggestionText(query);
 	const queryTokens = tokenizeSearchSuggestionText(query);
-	const seedStates = dedupeInitialDashboardSuggestionStates(seeds.map((seed) => seed.state));
+	const seedStates = dedupeInitialDashboardSuggestionStates(
+		seeds.map((seed) => seed.state)
+	);
 	const allStates = dedupeInitialDashboardSuggestionStates([
 		...seedStates,
 		...buildAllUsStateNames()
@@ -1250,7 +1256,9 @@ const rankInitialDashboardSuggestionStates = (
 
 	const ranked = allStates
 		.map((state) => {
-			const seedIndex = seedStates.findIndex((seedState) => seedState.abbr === state.abbr);
+			const seedIndex = seedStates.findIndex(
+				(seedState) => seedState.abbr === state.abbr
+			);
 			const seedBoost = seedIndex >= 0 ? (seedStates.length - seedIndex) * 0.2 : 0;
 			return {
 				state,
@@ -1272,10 +1280,8 @@ const rankInitialDashboardSuggestionLocations = (
 	const queryTokens = tokenizeSearchSuggestionText(query);
 	const seedLocations = seeds
 		.map((seed) => seed.location)
-		.filter(
-			(
-				location
-			): location is InitialDashboardSearchSuggestionLocation => Boolean(location)
+		.filter((location): location is InitialDashboardSearchSuggestionLocation =>
+			Boolean(location)
 		);
 	const allLocations = getAllInitialDashboardSuggestionLocations(seeds);
 
@@ -1328,7 +1334,9 @@ const scoreLiveMusicSearchSuggestionCategory = (
 		)
 	);
 
-	return category.baseScore + categoryScore + genericScore * 0.35 + bestTemplateScore * 0.45;
+	return (
+		category.baseScore + categoryScore + genericScore * 0.35 + bestTemplateScore * 0.45
+	);
 };
 
 const scoreLiveMusicSearchSuggestionTemplate = (
@@ -1375,7 +1383,9 @@ const buildInitialDashboardSearchSuggestions = (
 	const focusedLocation =
 		rankedCityLocations.find((entry) => entry.cityScore >= 7)?.location ?? null;
 	const focusedState =
-		focusedLocation?.state ?? rankedStates.find((entry) => entry.score >= 5)?.state ?? null;
+		focusedLocation?.state ??
+		rankedStates.find((entry) => entry.score >= 5)?.state ??
+		null;
 	const rankedCategories = LIVE_MUSIC_SEARCH_SUGGESTION_CATEGORIES.map((category) => ({
 		category,
 		score: scoreLiveMusicSearchSuggestionCategory(category, normalizedQuery, queryTokens),
@@ -1393,7 +1403,8 @@ const buildInitialDashboardSearchSuggestions = (
 		0,
 		INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT
 	);
-	const fallbackStatePool = statePool.length > 0 ? statePool : seeds.map((seed) => seed.state);
+	const fallbackStatePool =
+		statePool.length > 0 ? statePool : seeds.map((seed) => seed.state);
 	const shouldUseSpecificLocations = Boolean(focusedLocation);
 	const specificLocationPool = shouldUseSpecificLocations
 		? dedupeInitialDashboardSuggestionLocations([
@@ -1518,7 +1529,11 @@ const DASHBOARD_MAP_ZOOM_DEFAULT = 0.85;
 const DASHBOARD_MAP_ZOOM_MATCH_TOLERANCE_PX = 50;
 const DASHBOARD_MAP_ZOOM_MIN = 0.5;
 const DASHBOARD_MAP_ZOOM_MAX = 1.6;
-const DASHBOARD_MAP_SIXTEEN_BY_TEN_ZOOM_MAP: Array<{ w: number; h: number; zoom: number }> = [
+const DASHBOARD_MAP_SIXTEEN_BY_TEN_ZOOM_MAP: Array<{
+	w: number;
+	h: number;
+	zoom: number;
+}> = [
 	{ w: 1152, h: 720, zoom: 0.52 },
 	{ w: 1280, h: 800, zoom: 0.6 },
 	{ w: 1440, h: 900, zoom: 0.7 },
@@ -1539,7 +1554,11 @@ const DASHBOARD_MAP_SIXTEEN_BY_TEN_ZOOM_POINTS: DashboardMapZoomPoint[] =
 		...entry,
 		metric: Math.hypot(entry.w, entry.h),
 	})).sort((a, b) => a.metric - b.metric);
-const DASHBOARD_MAP_SIXTEEN_BY_NINE_ZOOM_MAP: Array<{ w: number; h: number; zoom: number }> = [
+const DASHBOARD_MAP_SIXTEEN_BY_NINE_ZOOM_MAP: Array<{
+	w: number;
+	h: number;
+	zoom: number;
+}> = [
 	{ w: 1280, h: 720, zoom: 0.52 },
 	{ w: 1344, h: 756, zoom: 0.55 },
 	{ w: 1600, h: 900, zoom: 0.68 },
@@ -1662,20 +1681,10 @@ const computeDashboardMapZoomForViewport = (
 	if (viewportW >= 1400 && viewportH <= 780) {
 		targetZoom = clampDashboardMapZoom(targetZoom, 0.7);
 	}
-	if (
-		viewportW >= 1900 &&
-		viewportW <= 2050 &&
-		viewportH >= 1180 &&
-		viewportH <= 1245
-	) {
+	if (viewportW >= 1900 && viewportW <= 2050 && viewportH >= 1180 && viewportH <= 1245) {
 		targetZoom = clampDashboardMapZoom(targetZoom, undefined, 0.93);
 	}
-	if (
-		viewportW >= 2100 &&
-		viewportW <= 2200 &&
-		viewportH >= 1320 &&
-		viewportH <= 1380
-	) {
+	if (viewportW >= 2100 && viewportW <= 2200 && viewportH >= 1320 && viewportH <= 1380) {
 		targetZoom = clampDashboardMapZoom(targetZoom, 1.2);
 	}
 
@@ -1708,27 +1717,8 @@ const MAP_SELECT_GRAB_TOP_EXTENT_PX =
 const MAP_SELECT_GRAB_TOTAL_HEIGHT_PX =
 	MAP_SELECT_GRAB_TOP_EXTENT_PX + MAP_SELECT_GRAB_TOOL_COLLAPSED_HEIGHT_PX;
 const MAP_ZOOM_CONTROL_LEVELS = [
-	2.25,
-	2.41,
-	2.57,
-	2.73,
-	2.88,
-	3.04,
-	3.2,
-	3.52,
-	3.83,
-	4.15,
-	4.47,
-	4.78,
-	5.1,
-	5.34,
-	5.58,
-	5.81,
-	6.05,
-	6.29,
-	6.52,
-	6.76,
-	7,
+	2.25, 2.41, 2.57, 2.73, 2.88, 3.04, 3.2, 3.52, 3.83, 4.15, 4.47, 4.78, 5.1, 5.34, 5.58,
+	5.81, 6.05, 6.29, 6.52, 6.76, 7,
 ] as const;
 const MAP_ZOOM_CONTROL_MAX_INDEX = MAP_ZOOM_CONTROL_LEVELS.length - 1;
 type MapZoomControlRequest = { zoom: number; nonce: number; isDragging?: boolean };
@@ -1751,8 +1741,7 @@ const getMapZoomForControlValue = (levelValue: number) => {
 const getMapZoomControlValueForZoom = (zoom: number) => {
 	if (!Number.isFinite(zoom)) return 0;
 	const minZoom = MAP_ZOOM_CONTROL_LEVELS[0] ?? 0;
-	const maxZoom =
-		MAP_ZOOM_CONTROL_LEVELS[MAP_ZOOM_CONTROL_MAX_INDEX] ?? minZoom;
+	const maxZoom = MAP_ZOOM_CONTROL_LEVELS[MAP_ZOOM_CONTROL_MAX_INDEX] ?? minZoom;
 	if (zoom <= minZoom) return 0;
 	if (zoom >= maxZoom) return MAP_ZOOM_CONTROL_MAX_INDEX;
 
@@ -1901,550 +1890,550 @@ type MapBottomSearchBarProps = {
 	onForYouSubmit?: () => void | Promise<void>;
 };
 
-const MapBottomSearchBar = memo(({
-	value,
-	isExpanded,
-	activeHeight,
-	inputRef,
-	mode = 'anything',
-	appearance = 'default',
-	categoryWhatValue = '',
-	categoryWhereValue = '',
-	activeCategoryField = null,
-	onActivate,
-	onSubmit,
-	onValueChange,
-	onActiveChange,
-	onCategoryFieldFocus,
-	onCategoryWhatChange,
-	onCategoryWhereChange,
-	onCategoryWhatEnter,
-	onCategorySubmit,
-	onForYouSubmit,
-}: MapBottomSearchBarProps) => {
-	const activeCategoryIndicatorRef = useRef<HTMLDivElement>(null);
-	const prevActiveCategoryFieldRef = useRef<'what' | 'where' | null>(null);
-	const categoryWhatInputRef = useRef<HTMLInputElement>(null);
-	const categoryWhereInputRef = useRef<HTMLInputElement>(null);
-	const [isInitialDashboardSearchHovered, setIsInitialDashboardSearchHovered] =
-		useState(false);
-	const isInitialDashboardSearch = appearance === 'initial-dashboard';
+const MapBottomSearchBar = memo(
+	({
+		value,
+		isExpanded,
+		activeHeight,
+		inputRef,
+		mode = 'anything',
+		appearance = 'default',
+		categoryWhatValue = '',
+		categoryWhereValue = '',
+		activeCategoryField = null,
+		onActivate,
+		onSubmit,
+		onValueChange,
+		onActiveChange,
+		onCategoryFieldFocus,
+		onCategoryWhatChange,
+		onCategoryWhereChange,
+		onCategoryWhatEnter,
+		onCategorySubmit,
+		onForYouSubmit,
+	}: MapBottomSearchBarProps) => {
+		const activeCategoryIndicatorRef = useRef<HTMLDivElement>(null);
+		const prevActiveCategoryFieldRef = useRef<'what' | 'where' | null>(null);
+		const categoryWhatInputRef = useRef<HTMLInputElement>(null);
+		const categoryWhereInputRef = useRef<HTMLInputElement>(null);
+		const [isInitialDashboardSearchHovered, setIsInitialDashboardSearchHovered] =
+			useState(false);
+		const isInitialDashboardSearch = appearance === 'initial-dashboard';
 
-	useLayoutEffect(() => {
-		const indicator = activeCategoryIndicatorRef.current;
-		if (!indicator) return;
+		useLayoutEffect(() => {
+			const indicator = activeCategoryIndicatorRef.current;
+			if (!indicator) return;
 
-		gsap.killTweensOf(indicator);
+			gsap.killTweensOf(indicator);
 
-		if (mode !== 'category' || !activeCategoryField) {
-			gsap.set(indicator, {
-				opacity: 0,
-				xPercent: 0,
-				scaleX: 1,
-				transformOrigin: 'center center',
-			});
-			prevActiveCategoryFieldRef.current = null;
-			return;
-		}
+			if (mode !== 'category' || !activeCategoryField) {
+				gsap.set(indicator, {
+					opacity: 0,
+					xPercent: 0,
+					scaleX: 1,
+					transformOrigin: 'center center',
+				});
+				prevActiveCategoryFieldRef.current = null;
+				return;
+			}
 
-		const nextXPercent = activeCategoryField === 'where' ? 100 : 0;
-		const previousField = prevActiveCategoryFieldRef.current;
+			const nextXPercent = activeCategoryField === 'where' ? 100 : 0;
+			const previousField = prevActiveCategoryFieldRef.current;
 
-		if (!previousField) {
-			gsap.set(indicator, {
-				xPercent: nextXPercent,
-				opacity: 1,
-				scaleX: 2,
-				transformOrigin:
-					activeCategoryField === 'where' ? 'right center' : 'left center',
-			});
+			if (!previousField) {
+				gsap.set(indicator, {
+					xPercent: nextXPercent,
+					opacity: 1,
+					scaleX: 2,
+					transformOrigin:
+						activeCategoryField === 'where' ? 'right center' : 'left center',
+				});
+				gsap.to(indicator, {
+					scaleX: 1,
+					duration: 0.6,
+					ease: 'power2.out',
+					overwrite: 'auto',
+				});
+				prevActiveCategoryFieldRef.current = activeCategoryField;
+				return;
+			}
+
+			gsap.set(indicator, { scaleX: 1, transformOrigin: 'center center' });
 			gsap.to(indicator, {
-				scaleX: 1,
+				xPercent: nextXPercent,
 				duration: 0.6,
 				ease: 'power2.out',
 				overwrite: 'auto',
 			});
+			gsap.to(indicator, {
+				opacity: 1,
+				duration: 0.15,
+				ease: 'power2.out',
+				overwrite: 'auto',
+			});
+
 			prevActiveCategoryFieldRef.current = activeCategoryField;
-			return;
+		}, [activeCategoryField, mode]);
+
+		useEffect(() => {
+			if (mode !== 'category') return;
+
+			if (activeCategoryField === 'what') {
+				categoryWhatInputRef.current?.focus();
+			} else if (activeCategoryField === 'where') {
+				categoryWhereInputRef.current?.focus();
+			}
+		}, [activeCategoryField, mode]);
+
+		if (mode === 'for-you') {
+			return (
+				<div
+					aria-label="Search For You on the map"
+					className="relative h-full w-full overflow-hidden pointer-events-auto"
+					style={{
+						borderRadius: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderRadius}px`,
+						border: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderWidth}px solid ${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderColor}`,
+						backgroundColor: '#FFFFFF',
+						boxSizing: 'border-box',
+						cursor: 'pointer',
+					}}
+					onClick={() => onForYouSubmit?.()}
+				>
+					<div
+						className="search-gradient-button absolute overflow-hidden"
+						style={{
+							left: '6px',
+							right: '6px',
+							top: '7px',
+							bottom: '7px',
+							borderRadius: '6px',
+							border: '0.75px solid #595959',
+							opacity: 0.65,
+							boxSizing: 'border-box',
+						}}
+					/>
+					<div className="absolute left-[16px] top-[17px] font-inter text-[17px] leading-none text-white">
+						For You
+					</div>
+					<button
+						type="button"
+						aria-label="Submit For You search"
+						className="absolute flex items-center justify-center"
+						style={{
+							right: '9px',
+							top: '10px',
+							width: '45px',
+							height: '37px',
+							backgroundColor: '#FFFFFF',
+							borderRadius: '8px',
+							border: 0,
+							boxSizing: 'border-box',
+							padding: 0,
+							cursor: 'pointer',
+						}}
+						onClick={(event) => {
+							event.stopPropagation();
+							onForYouSubmit?.();
+						}}
+					>
+						<MapBottomSearchArrowIcon aria-hidden="true" />
+					</button>
+				</div>
+			);
 		}
 
-		gsap.set(indicator, { scaleX: 1, transformOrigin: 'center center' });
-		gsap.to(indicator, {
-			xPercent: nextXPercent,
-			duration: 0.6,
-			ease: 'power2.out',
-			overwrite: 'auto',
-		});
-		gsap.to(indicator, {
-			opacity: 1,
-			duration: 0.15,
-			ease: 'power2.out',
-			overwrite: 'auto',
-		});
+		if (mode === 'category') {
+			const categoryBox = MAP_RESULTS_BOTTOM_CATEGORY_SEARCH_BOX;
+			const whatLabel = categoryWhatValue.trim() || 'Add Recipients';
+			const whereLabel = categoryWhereValue.trim() || 'Search Destinations';
+			const isWhatActive = activeCategoryField === 'what';
+			const isWhereActive = activeCategoryField === 'where';
+			const hasActiveCategoryField = activeCategoryField !== null;
 
-		prevActiveCategoryFieldRef.current = activeCategoryField;
-	}, [activeCategoryField, mode]);
-
-	useEffect(() => {
-		if (mode !== 'category') return;
-
-		if (activeCategoryField === 'what') {
-			categoryWhatInputRef.current?.focus();
-		} else if (activeCategoryField === 'where') {
-			categoryWhereInputRef.current?.focus();
+			return (
+				<div
+					aria-label="Category search on the map"
+					className="map-bottom-category-search relative h-full w-full overflow-hidden pointer-events-auto"
+					style={{
+						borderRadius: `${categoryBox.borderRadius}px`,
+						border: `${categoryBox.borderWidth}px solid ${categoryBox.borderColor}`,
+						backgroundColor: categoryBox.backgroundColor,
+						opacity: categoryBox.opacity,
+						boxSizing: 'border-box',
+					}}
+				>
+					<div
+						className="absolute overflow-hidden"
+						style={{
+							left: '2px',
+							top: '1.5px',
+							width: `${categoryBox.innerWidth}px`,
+							height: `${categoryBox.innerHeight}px`,
+							borderRadius: `${categoryBox.borderRadius}px`,
+							border: 0,
+							backgroundColor: hasActiveCategoryField ? '#EFEFEF' : '#FFFFFF',
+							boxSizing: 'border-box',
+							transition: 'background-color 150ms ease',
+						}}
+					>
+						<div
+							aria-hidden="true"
+							className="absolute inset-0 rounded-[8px] border-2 border-black pointer-events-none"
+							style={{
+								opacity: hasActiveCategoryField ? 0 : 1,
+								zIndex: 1,
+								boxSizing: 'border-box',
+							}}
+						/>
+						<div
+							ref={activeCategoryIndicatorRef}
+							aria-hidden="true"
+							className="absolute top-0 left-0 h-full w-1/2 bg-white border-2 border-black rounded-[8px] pointer-events-none"
+							style={{
+								opacity: 0,
+								zIndex: 1,
+								boxSizing: 'border-box',
+								willChange: 'transform, opacity',
+							}}
+						/>
+						<div
+							className={`absolute top-0 left-0 h-full cursor-pointer overflow-hidden transition-colors duration-150 ${
+								isWhatActive ? '' : 'hover:bg-black/[0.05]'
+							}`}
+							style={{
+								width: '50%',
+								borderTopLeftRadius: `${categoryBox.borderRadius - categoryBox.borderWidth}px`,
+								borderBottomLeftRadius: `${categoryBox.borderRadius - categoryBox.borderWidth}px`,
+								zIndex: 2,
+							}}
+							onMouseDown={(event) => {
+								if ((event.target as HTMLElement).tagName !== 'INPUT') {
+									event.preventDefault();
+								}
+								categoryWhatInputRef.current?.focus();
+								onCategoryFieldFocus?.('what');
+							}}
+						>
+							<div className="absolute left-[18px] top-[12px] font-medium text-[21px] leading-none text-black font-secondary pointer-events-none">
+								What
+							</div>
+							<div className="absolute left-[18px] right-[8px] top-[37px] h-[14px] overflow-hidden">
+								<input
+									ref={categoryWhatInputRef}
+									value={categoryWhatValue}
+									onChange={(event) => onCategoryWhatChange?.(event.target.value)}
+									onKeyDown={(event) => {
+										event.stopPropagation();
+										if (event.key === 'Enter') {
+											event.preventDefault();
+											onCategoryWhatEnter?.();
+										}
+									}}
+									className="absolute inset-0 w-full bg-transparent border-0 outline-none p-0 font-semibold text-[12px] leading-[14px] text-black font-secondary"
+									placeholder="Add Recipients"
+									style={{
+										opacity: isWhatActive ? 1 : 0,
+										pointerEvents: isWhatActive ? 'auto' : 'none',
+									}}
+								/>
+								{!isWhatActive && (
+									<div
+										aria-hidden="true"
+										className="absolute inset-0 font-semibold text-[12px] leading-[14px] whitespace-nowrap overflow-hidden font-secondary pointer-events-none"
+										style={{
+											color: categoryWhatValue.trim() ? '#000000' : 'rgba(0, 0, 0, 0.42)',
+											maskImage: 'linear-gradient(to right, black 82%, transparent 100%)',
+											WebkitMaskImage:
+												'linear-gradient(to right, black 82%, transparent 100%)',
+										}}
+									>
+										{whatLabel}
+									</div>
+								)}
+							</div>
+						</div>
+						<div
+							className={`absolute top-0 right-0 h-full cursor-pointer overflow-hidden transition-colors duration-150 ${
+								isWhereActive ? '' : 'hover:bg-black/[0.05]'
+							}`}
+							style={{
+								width: '50%',
+								borderTopRightRadius: `${categoryBox.borderRadius - categoryBox.borderWidth}px`,
+								borderBottomRightRadius: `${categoryBox.borderRadius - categoryBox.borderWidth}px`,
+								zIndex: 2,
+							}}
+							onMouseDown={(event) => {
+								if ((event.target as HTMLElement).tagName !== 'INPUT') {
+									event.preventDefault();
+								}
+								categoryWhereInputRef.current?.focus();
+								onCategoryFieldFocus?.('where');
+							}}
+						>
+							<div className="absolute left-[18px] top-[12px] font-medium text-[21px] leading-none text-black font-secondary pointer-events-none">
+								Where
+							</div>
+							<div className="absolute left-[18px] right-[8px] top-[37px] h-[14px] overflow-hidden">
+								<input
+									ref={categoryWhereInputRef}
+									value={categoryWhereValue}
+									onChange={(event) => onCategoryWhereChange?.(event.target.value)}
+									onKeyDown={(event) => {
+										event.stopPropagation();
+										if (event.key === 'Enter') {
+											event.preventDefault();
+											onCategorySubmit?.();
+										}
+									}}
+									className="absolute inset-0 w-full bg-transparent border-0 outline-none p-0 font-semibold text-[12px] leading-[14px] text-black font-secondary"
+									placeholder="Search Destinations"
+									style={{
+										opacity: isWhereActive ? 1 : 0,
+										pointerEvents: isWhereActive ? 'auto' : 'none',
+									}}
+								/>
+								{!isWhereActive && (
+									<div
+										aria-hidden="true"
+										className="absolute inset-0 font-semibold text-[12px] leading-[14px] whitespace-nowrap overflow-hidden font-secondary pointer-events-none"
+										style={{
+											color: categoryWhereValue.trim()
+												? '#000000'
+												: 'rgba(0, 0, 0, 0.42)',
+											maskImage: 'linear-gradient(to right, black 82%, transparent 100%)',
+											WebkitMaskImage:
+												'linear-gradient(to right, black 82%, transparent 100%)',
+										}}
+									>
+										{whereLabel}
+									</div>
+								)}
+							</div>
+						</div>
+					</div>
+					<button
+						type="button"
+						aria-label="Submit category search"
+						className="absolute flex items-center justify-center transition-colors duration-100"
+						style={{
+							right: '2px',
+							top: '50%',
+							width: `${categoryBox.submitWidth}px`,
+							height: `${categoryBox.submitHeight}px`,
+							transform: 'translateY(-50%)',
+							backgroundColor: categoryBox.submitBackgroundColor,
+							borderRadius: `${categoryBox.borderRadius}px`,
+							border: 0,
+							boxSizing: 'border-box',
+							padding: 0,
+							cursor: 'pointer',
+						}}
+						onMouseEnter={(event) => {
+							event.currentTarget.style.backgroundColor =
+								categoryBox.submitHoverBackgroundColor;
+						}}
+						onMouseLeave={(event) => {
+							event.currentTarget.style.backgroundColor =
+								categoryBox.submitBackgroundColor;
+						}}
+						onMouseDown={(event) => {
+							event.stopPropagation();
+							event.currentTarget.style.backgroundColor =
+								categoryBox.submitActiveBackgroundColor;
+						}}
+						onMouseUp={(event) => {
+							event.currentTarget.style.backgroundColor =
+								categoryBox.submitHoverBackgroundColor;
+						}}
+						onClick={() => onCategorySubmit?.()}
+					>
+						<MapBottomSearchArrowIcon aria-hidden="true" />
+					</button>
+				</div>
+			);
 		}
-	}, [activeCategoryField, mode]);
 
-	if (mode === 'for-you') {
+		const anythingSearchBox = isInitialDashboardSearch
+			? INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX
+			: MAP_RESULTS_BOTTOM_SEARCH_BOX;
+		const anythingRightReservedWidth = isInitialDashboardSearch
+			? INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonSize +
+				INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonInset +
+				20
+			: MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotWidth + 28;
+		const isInitialDashboardSearchActive =
+			isInitialDashboardSearch &&
+			(isInitialDashboardSearchHovered || isExpanded || value.trim().length > 0);
+
 		return (
 			<div
-				aria-label="Search For You on the map"
+				aria-label="Search anything on the map"
 				className="relative h-full w-full overflow-hidden pointer-events-auto"
 				style={{
-					borderRadius: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderRadius}px`,
-					border: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderWidth}px solid ${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderColor}`,
-					backgroundColor: '#FFFFFF',
+					borderRadius: `${anythingSearchBox.borderRadius}px`,
+					border: `${anythingSearchBox.borderWidth}px solid ${anythingSearchBox.borderColor}`,
+					backgroundColor: anythingSearchBox.backgroundColor,
+					opacity: isInitialDashboardSearch
+						? isInitialDashboardSearchActive
+							? INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.activeOpacity
+							: INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.restingOpacity
+						: MAP_RESULTS_BOTTOM_SEARCH_BOX.opacity,
 					boxSizing: 'border-box',
-					cursor: 'pointer',
+					cursor: 'text',
+					transition: isInitialDashboardSearch ? 'opacity 150ms ease' : undefined,
 				}}
-				onClick={() => onForYouSubmit?.()}
-			>
-				<div
-					className="search-gradient-button absolute overflow-hidden"
-					style={{
-						left: '6px',
-						right: '6px',
-						top: '7px',
-						bottom: '7px',
-						borderRadius: '6px',
-						border: '0.75px solid #595959',
-						opacity: 0.65,
-						boxSizing: 'border-box',
-					}}
-				/>
-				<div className="absolute left-[16px] top-[17px] font-inter text-[17px] leading-none text-white">
-					For You
-				</div>
-				<button
-					type="button"
-					aria-label="Submit For You search"
-					className="absolute flex items-center justify-center"
-					style={{
-						right: '9px',
-						top: '10px',
-						width: '45px',
-						height: '37px',
-						backgroundColor: '#FFFFFF',
-						borderRadius: '8px',
-						border: 0,
-						boxSizing: 'border-box',
-						padding: 0,
-						cursor: 'pointer',
-					}}
-					onClick={(event) => {
-						event.stopPropagation();
-						onForYouSubmit?.();
-					}}
-				>
-					<MapBottomSearchArrowIcon aria-hidden="true" />
-				</button>
-			</div>
-		);
-	}
-
-	if (mode === 'category') {
-		const categoryBox = MAP_RESULTS_BOTTOM_CATEGORY_SEARCH_BOX;
-		const whatLabel = categoryWhatValue.trim() || 'Add Recipients';
-		const whereLabel = categoryWhereValue.trim() || 'Search Destinations';
-		const isWhatActive = activeCategoryField === 'what';
-		const isWhereActive = activeCategoryField === 'where';
-		const hasActiveCategoryField = activeCategoryField !== null;
-
-		return (
-			<div
-				aria-label="Category search on the map"
-				className="map-bottom-category-search relative h-full w-full overflow-hidden pointer-events-auto"
-				style={{
-					borderRadius: `${categoryBox.borderRadius}px`,
-					border: `${categoryBox.borderWidth}px solid ${categoryBox.borderColor}`,
-					backgroundColor: categoryBox.backgroundColor,
-					opacity: categoryBox.opacity,
-					boxSizing: 'border-box',
+				onMouseEnter={() => {
+					if (isInitialDashboardSearch) {
+						setIsInitialDashboardSearchHovered(true);
+					}
+				}}
+				onMouseLeave={() => {
+					if (isInitialDashboardSearch) {
+						setIsInitialDashboardSearchHovered(false);
+					}
+				}}
+				onMouseDown={(event) => {
+					if (event.target !== inputRef.current) {
+						event.preventDefault();
+					}
+					onActivate();
 				}}
 			>
-				<div
-					className="absolute overflow-hidden"
-					style={{
-						left: '2px',
-						top: '1.5px',
-						width: `${categoryBox.innerWidth}px`,
-						height: `${categoryBox.innerHeight}px`,
-						borderRadius: `${categoryBox.borderRadius}px`,
-						border: 0,
-						backgroundColor: hasActiveCategoryField ? '#EFEFEF' : '#FFFFFF',
-						boxSizing: 'border-box',
-						transition: 'background-color 150ms ease',
-					}}
-				>
+				{value.length === 0 && (
 					<div
 						aria-hidden="true"
-						className="absolute inset-0 rounded-[8px] border-2 border-black pointer-events-none"
+						className="absolute flex items-center gap-[4px] font-inter text-[16px] leading-none text-black pointer-events-none"
 						style={{
-							opacity: hasActiveCategoryField ? 0 : 1,
-							zIndex: 1,
-							boxSizing: 'border-box',
-						}}
-					/>
-					<div
-						ref={activeCategoryIndicatorRef}
-						aria-hidden="true"
-						className="absolute top-0 left-0 h-full w-1/2 bg-white border-2 border-black rounded-[8px] pointer-events-none"
-						style={{
-							opacity: 0,
-							zIndex: 1,
-							boxSizing: 'border-box',
-							willChange: 'transform, opacity',
-						}}
-					/>
-					<div
-						className={`absolute top-0 left-0 h-full cursor-pointer overflow-hidden transition-colors duration-150 ${
-							isWhatActive ? '' : 'hover:bg-black/[0.05]'
-						}`}
-						style={{
-							width: '50%',
-							borderTopLeftRadius: `${categoryBox.borderRadius - categoryBox.borderWidth}px`,
-							borderBottomLeftRadius: `${categoryBox.borderRadius - categoryBox.borderWidth}px`,
-							zIndex: 2,
-						}}
-						onMouseDown={(event) => {
-							if ((event.target as HTMLElement).tagName !== 'INPUT') {
-								event.preventDefault();
-							}
-							categoryWhatInputRef.current?.focus();
-							onCategoryFieldFocus?.('what');
+							top: 0,
+							left: isInitialDashboardSearch ? '24px' : '14px',
+							right: `${anythingRightReservedWidth}px`,
+							height: isInitialDashboardSearch
+								? `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.height - 4}px`
+								: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.textRowHeight}px`,
+							fontSize: isInitialDashboardSearch ? '16px' : undefined,
+							fontWeight: isInitialDashboardSearch ? 500 : undefined,
 						}}
 					>
-						<div className="absolute left-[18px] top-[12px] font-medium text-[21px] leading-none text-black font-secondary pointer-events-none">
-							What
-						</div>
-						<div className="absolute left-[18px] right-[8px] top-[37px] h-[14px] overflow-hidden">
-							<input
-								ref={categoryWhatInputRef}
-								value={categoryWhatValue}
-								onChange={(event) => onCategoryWhatChange?.(event.target.value)}
-								onKeyDown={(event) => {
-									event.stopPropagation();
-									if (event.key === 'Enter') {
-										event.preventDefault();
-										onCategoryWhatEnter?.();
-									}
-								}}
-								className="absolute inset-0 w-full bg-transparent border-0 outline-none p-0 font-semibold text-[12px] leading-[14px] text-black font-secondary"
-								placeholder="Add Recipients"
-								style={{
-									opacity: isWhatActive ? 1 : 0,
-									pointerEvents: isWhatActive ? 'auto' : 'none',
-								}}
-							/>
-							{!isWhatActive && (
-								<div
-									aria-hidden="true"
-									className="absolute inset-0 font-semibold text-[12px] leading-[14px] whitespace-nowrap overflow-hidden font-secondary pointer-events-none"
-									style={{
-										color: categoryWhatValue.trim()
-											? '#000000'
-											: 'rgba(0, 0, 0, 0.42)',
-										maskImage: 'linear-gradient(to right, black 82%, transparent 100%)',
-										WebkitMaskImage:
-											'linear-gradient(to right, black 82%, transparent 100%)',
-									}}
-								>
-									{whatLabel}
-								</div>
-							)}
-						</div>
+						{isInitialDashboardSearch ? (
+							<span>Ask Anything</span>
+						) : (
+							<>
+								<span className="font-bold">Search</span>
+								<span>Anything</span>
+							</>
+						)}
 					</div>
-					<div
-						className={`absolute top-0 right-0 h-full cursor-pointer overflow-hidden transition-colors duration-150 ${
-							isWhereActive ? '' : 'hover:bg-black/[0.05]'
-						}`}
-						style={{
-							width: '50%',
-							borderTopRightRadius: `${categoryBox.borderRadius - categoryBox.borderWidth}px`,
-							borderBottomRightRadius: `${categoryBox.borderRadius - categoryBox.borderWidth}px`,
-							zIndex: 2,
-						}}
-						onMouseDown={(event) => {
-							if ((event.target as HTMLElement).tagName !== 'INPUT') {
-								event.preventDefault();
-							}
-							categoryWhereInputRef.current?.focus();
-							onCategoryFieldFocus?.('where');
-						}}
-					>
-						<div className="absolute left-[18px] top-[12px] font-medium text-[21px] leading-none text-black font-secondary pointer-events-none">
-							Where
-						</div>
-						<div className="absolute left-[18px] right-[8px] top-[37px] h-[14px] overflow-hidden">
-							<input
-								ref={categoryWhereInputRef}
-								value={categoryWhereValue}
-								onChange={(event) => onCategoryWhereChange?.(event.target.value)}
-								onKeyDown={(event) => {
-									event.stopPropagation();
-									if (event.key === 'Enter') {
-										event.preventDefault();
-										onCategorySubmit?.();
-									}
-								}}
-								className="absolute inset-0 w-full bg-transparent border-0 outline-none p-0 font-semibold text-[12px] leading-[14px] text-black font-secondary"
-								placeholder="Search Destinations"
-								style={{
-									opacity: isWhereActive ? 1 : 0,
-									pointerEvents: isWhereActive ? 'auto' : 'none',
-								}}
-							/>
-							{!isWhereActive && (
-								<div
-									aria-hidden="true"
-									className="absolute inset-0 font-semibold text-[12px] leading-[14px] whitespace-nowrap overflow-hidden font-secondary pointer-events-none"
-									style={{
-										color: categoryWhereValue.trim()
-											? '#000000'
-											: 'rgba(0, 0, 0, 0.42)',
-										maskImage: 'linear-gradient(to right, black 82%, transparent 100%)',
-										WebkitMaskImage:
-											'linear-gradient(to right, black 82%, transparent 100%)',
-									}}
-								>
-									{whereLabel}
-								</div>
-							)}
-						</div>
-					</div>
-				</div>
-				<button
-					type="button"
-					aria-label="Submit category search"
-					className="absolute flex items-center justify-center transition-colors duration-100"
-					style={{
-						right: '2px',
-						top: '50%',
-						width: `${categoryBox.submitWidth}px`,
-						height: `${categoryBox.submitHeight}px`,
-						transform: 'translateY(-50%)',
-						backgroundColor: categoryBox.submitBackgroundColor,
-						borderRadius: `${categoryBox.borderRadius}px`,
-						border: 0,
-						boxSizing: 'border-box',
-						padding: 0,
-						cursor: 'pointer',
-					}}
-					onMouseEnter={(event) => {
-						event.currentTarget.style.backgroundColor =
-							categoryBox.submitHoverBackgroundColor;
-					}}
-					onMouseLeave={(event) => {
-						event.currentTarget.style.backgroundColor =
-							categoryBox.submitBackgroundColor;
-					}}
-					onMouseDown={(event) => {
+				)}
+				<textarea
+					ref={inputRef}
+					value={value}
+					rows={1}
+					onChange={(event) => onValueChange(event.target.value)}
+					onFocus={() => onActiveChange(true)}
+					onBlur={() => onActiveChange(false)}
+					onKeyDown={(event) => {
 						event.stopPropagation();
-						event.currentTarget.style.backgroundColor =
-							categoryBox.submitActiveBackgroundColor;
+						if (event.key === 'Enter' && !event.shiftKey) {
+							event.preventDefault();
+							onSubmit();
+						}
 					}}
-					onMouseUp={(event) => {
-						event.currentTarget.style.backgroundColor =
-							categoryBox.submitHoverBackgroundColor;
-					}}
-					onClick={() => onCategorySubmit?.()}
-				>
-					<MapBottomSearchArrowIcon aria-hidden="true" />
-				</button>
-			</div>
-		);
-	}
-
-	const anythingSearchBox = isInitialDashboardSearch
-		? INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX
-		: MAP_RESULTS_BOTTOM_SEARCH_BOX;
-	const anythingRightReservedWidth = isInitialDashboardSearch
-		? INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonSize +
-			INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonInset +
-			20
-		: MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotWidth + 28;
-	const isInitialDashboardSearchActive =
-		isInitialDashboardSearch &&
-		(isInitialDashboardSearchHovered || isExpanded || value.trim().length > 0);
-
-	return (
-		<div
-			aria-label="Search anything on the map"
-			className="relative h-full w-full overflow-hidden pointer-events-auto"
-			style={{
-				borderRadius: `${anythingSearchBox.borderRadius}px`,
-				border: `${anythingSearchBox.borderWidth}px solid ${anythingSearchBox.borderColor}`,
-				backgroundColor: anythingSearchBox.backgroundColor,
-				opacity: isInitialDashboardSearch
-					? isInitialDashboardSearchActive
-						? INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.activeOpacity
-						: INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.restingOpacity
-					: MAP_RESULTS_BOTTOM_SEARCH_BOX.opacity,
-				boxSizing: 'border-box',
-				cursor: 'text',
-				transition: isInitialDashboardSearch ? 'opacity 150ms ease' : undefined,
-			}}
-			onMouseEnter={() => {
-				if (isInitialDashboardSearch) {
-					setIsInitialDashboardSearchHovered(true);
-				}
-			}}
-			onMouseLeave={() => {
-				if (isInitialDashboardSearch) {
-					setIsInitialDashboardSearchHovered(false);
-				}
-			}}
-			onMouseDown={(event) => {
-				if (event.target !== inputRef.current) {
-					event.preventDefault();
-				}
-				onActivate();
-			}}
-		>
-			{value.length === 0 && (
-				<div
-					aria-hidden="true"
-					className="absolute flex items-center gap-[4px] font-inter text-[16px] leading-none text-black pointer-events-none"
+					className="absolute bg-transparent border-0 outline-none font-inter text-[16px] text-black"
 					style={{
 						top: 0,
 						left: isInitialDashboardSearch ? '24px' : '14px',
-						right: `${anythingRightReservedWidth}px`,
+						width: `calc(100% - ${anythingRightReservedWidth + (isInitialDashboardSearch ? 24 : 0)}px)`,
+						height: `${
+							isInitialDashboardSearch
+								? activeHeight
+								: isExpanded
+									? activeHeight
+									: MAP_RESULTS_BOTTOM_SEARCH_BOX.textRowHeight
+						}px`,
+						padding: isInitialDashboardSearch ? '8px 0 7px' : '8px 0 6px',
+						opacity: isExpanded || value.length > 0 ? 1 : 0,
+						pointerEvents: isExpanded ? 'auto' : 'none',
+						caretColor: '#000000',
+						lineHeight: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.textLineHeight}px`,
+						resize: 'none',
+						overflow: isExpanded ? 'auto' : 'hidden',
+						whiteSpace: 'pre-wrap',
+						wordBreak: 'break-word',
+						boxSizing: 'border-box',
+					}}
+				/>
+				<button
+					type="button"
+					aria-label="Submit map search"
+					className="absolute flex items-center justify-center transition-colors duration-100"
+					style={{
+						right: isInitialDashboardSearch
+							? `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonInset}px`
+							: 0,
+						top: isInitialDashboardSearch ? '50%' : 0,
+						width: isInitialDashboardSearch
+							? `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonSize}px`
+							: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotWidth}px`,
 						height: isInitialDashboardSearch
-							? `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.height - 4}px`
-							: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.textRowHeight}px`,
-						fontSize: isInitialDashboardSearch ? '16px' : undefined,
-						fontWeight: isInitialDashboardSearch ? 500 : undefined,
+							? `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonSize}px`
+							: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotHeight}px`,
+						transform: isInitialDashboardSearch ? 'translateY(-50%)' : undefined,
+						backgroundColor: isInitialDashboardSearch
+							? INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonBackgroundColor
+							: MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotBackgroundColor,
+						color: isInitialDashboardSearch
+							? INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonIconColor
+							: undefined,
+						borderRadius: isInitialDashboardSearch
+							? `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonRadius}px`
+							: undefined,
+						border: 0,
+						borderLeft: isInitialDashboardSearch
+							? undefined
+							: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderWidth}px solid ${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderColor}`,
+						borderBottom:
+							!isInitialDashboardSearch && isExpanded
+								? `${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderWidth}px solid ${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderColor}`
+								: undefined,
+						boxSizing: 'border-box',
+						cursor: 'pointer',
+						padding: 0,
+					}}
+					onMouseEnter={(event) => {
+						if (isInitialDashboardSearch) return;
+						event.currentTarget.style.backgroundColor =
+							MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotHoverBackgroundColor;
+					}}
+					onMouseLeave={(event) => {
+						if (isInitialDashboardSearch) return;
+						event.currentTarget.style.backgroundColor =
+							MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotBackgroundColor;
+					}}
+					onMouseDown={(event) => {
+						event.stopPropagation();
+						if (isInitialDashboardSearch) return;
+						event.currentTarget.style.backgroundColor =
+							MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotActiveBackgroundColor;
+					}}
+					onMouseUp={(event) => {
+						if (isInitialDashboardSearch) return;
+						event.currentTarget.style.backgroundColor =
+							MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotHoverBackgroundColor;
+					}}
+					onClick={() => {
+						if (value.trim().length > 0) {
+							onSubmit();
+						} else {
+							onActivate();
+						}
 					}}
 				>
-					{isInitialDashboardSearch ? (
-						<span>Ask Anything</span>
-					) : (
-						<>
-							<span className="font-bold">Search</span>
-							<span>Anything</span>
-						</>
-					)}
-				</div>
-			)}
-			<textarea
-				ref={inputRef}
-				value={value}
-				rows={1}
-				onChange={(event) => onValueChange(event.target.value)}
-				onFocus={() => onActiveChange(true)}
-				onBlur={() => onActiveChange(false)}
-				onKeyDown={(event) => {
-					event.stopPropagation();
-					if (event.key === 'Enter' && !event.shiftKey) {
-						event.preventDefault();
-						onSubmit();
-					}
-				}}
-				className="absolute bg-transparent border-0 outline-none font-inter text-[16px] text-black"
-				style={{
-					top: 0,
-					left: isInitialDashboardSearch ? '24px' : '14px',
-					width: `calc(100% - ${anythingRightReservedWidth + (isInitialDashboardSearch ? 24 : 0)}px)`,
-					height: `${
-						isInitialDashboardSearch
-							? activeHeight
-							: isExpanded
-								? activeHeight
-								: MAP_RESULTS_BOTTOM_SEARCH_BOX.textRowHeight
-					}px`,
-					padding: isInitialDashboardSearch ? '8px 0 7px' : '8px 0 6px',
-					opacity: isExpanded || value.length > 0 ? 1 : 0,
-					pointerEvents: isExpanded ? 'auto' : 'none',
-					caretColor: '#000000',
-					lineHeight: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.textLineHeight}px`,
-					resize: 'none',
-					overflow: isExpanded ? 'auto' : 'hidden',
-					whiteSpace: 'pre-wrap',
-					wordBreak: 'break-word',
-					boxSizing: 'border-box',
-				}}
-			/>
-			<button
-				type="button"
-				aria-label="Submit map search"
-				className="absolute flex items-center justify-center transition-colors duration-100"
-				style={{
-					right: isInitialDashboardSearch
-						? `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonInset}px`
-						: 0,
-					top: isInitialDashboardSearch ? '50%' : 0,
-					width: isInitialDashboardSearch
-						? `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonSize}px`
-						: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotWidth}px`,
-					height: isInitialDashboardSearch
-						? `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonSize}px`
-						: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotHeight}px`,
-					transform: isInitialDashboardSearch ? 'translateY(-50%)' : undefined,
-					backgroundColor: isInitialDashboardSearch
-						? INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonBackgroundColor
-						: MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotBackgroundColor,
-					color: isInitialDashboardSearch
-						? INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonIconColor
-						: undefined,
-					borderRadius: isInitialDashboardSearch
-						? `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonRadius}px`
-						: undefined,
-					border: 0,
-					borderLeft: isInitialDashboardSearch
-						? undefined
-						: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderWidth}px solid ${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderColor}`,
-					borderBottom:
-						!isInitialDashboardSearch && isExpanded
-							? `${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderWidth}px solid ${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderColor}`
-							: undefined,
-					boxSizing: 'border-box',
-					cursor: 'pointer',
-					padding: 0,
-				}}
-				onMouseEnter={(event) => {
-					if (isInitialDashboardSearch) return;
-					event.currentTarget.style.backgroundColor =
-						MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotHoverBackgroundColor;
-				}}
-				onMouseLeave={(event) => {
-					if (isInitialDashboardSearch) return;
-					event.currentTarget.style.backgroundColor =
-						MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotBackgroundColor;
-				}}
-				onMouseDown={(event) => {
-					event.stopPropagation();
-					if (isInitialDashboardSearch) return;
-					event.currentTarget.style.backgroundColor =
-						MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotActiveBackgroundColor;
-				}}
-				onMouseUp={(event) => {
-					if (isInitialDashboardSearch) return;
-					event.currentTarget.style.backgroundColor =
-						MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotHoverBackgroundColor;
-				}}
-				onClick={() => {
-					if (value.trim().length > 0) {
-						onSubmit();
-					} else {
-						onActivate();
-					}
-				}}
-			>
-				<MapBottomSearchArrowIcon aria-hidden="true" />
-			</button>
-		</div>
-	);
-});
+					<MapBottomSearchArrowIcon aria-hidden="true" />
+				</button>
+			</div>
+		);
+	}
+);
 MapBottomSearchBar.displayName = 'MapBottomSearchBar';
 
 const getCategorySearchWhyForWhat = (what: string) =>
@@ -2453,364 +2442,360 @@ const getCategorySearchWhyForWhat = (what: string) =>
 type MapBottomSearchFollowupBoxProps = {
 	selectedSearchFollowup: MapBottomSearchFollowupSelection;
 	previewedSearchFollowup: MapBottomSearchFollowupPreview;
-	onSelectedSearchFollowupChange: (
-		selection: MapBottomSearchFollowupSelection
-	) => void;
-	onPreviewSearchFollowupChange: (
-		selection: MapBottomSearchFollowupPreview
-	) => void;
+	onSelectedSearchFollowupChange: (selection: MapBottomSearchFollowupSelection) => void;
+	onPreviewSearchFollowupChange: (selection: MapBottomSearchFollowupPreview) => void;
 };
 
-const MapBottomSearchFollowupBox = memo(({
-	selectedSearchFollowup,
-	previewedSearchFollowup,
-	onSelectedSearchFollowupChange,
-	onPreviewSearchFollowupChange,
-}: MapBottomSearchFollowupBoxProps) => {
-	const segmentBox = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_SEGMENT_BOX;
-	const leftTileBox = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_LEFT_TILE_BOX;
-	const iconLayout = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_ICON_LAYOUT;
-	const profileLeft = segmentBox.advancedWidth + segmentBox.internalDividerWidth;
-	const keywordLeft = profileLeft + segmentBox.segmentWidth;
-	const radiusLeft = keywordLeft + segmentBox.segmentWidth;
-	const [advancedSelections, setAdvancedSelections] =
-		useState<MapBottomSearchAdvancedSelections>({
-			profile: false,
-			keyword: false,
-			radius: false,
-		});
-	const visualSearchFollowup =
-		previewedSearchFollowup === 'anything'
-			? null
-			: previewedSearchFollowup ?? selectedSearchFollowup;
-	const isForYouSelected = selectedSearchFollowup === 'for-you';
-	const isCategorySelected = selectedSearchFollowup === 'category';
-	const isForYouActive = visualSearchFollowup === 'for-you';
-	const isCategoryActive = visualSearchFollowup === 'category';
-	const isAdvancedActive = previewedSearchFollowup === 'anything';
-	const isCompactFollowup = isForYouSelected || isCategorySelected;
-	const isProfileAdvancedSelected = advancedSelections.profile;
-	const isKeywordAdvancedSelected = advancedSelections.keyword;
-	const isRadiusAdvancedSelected = advancedSelections.radius;
+const MapBottomSearchFollowupBox = memo(
+	({
+		selectedSearchFollowup,
+		previewedSearchFollowup,
+		onSelectedSearchFollowupChange,
+		onPreviewSearchFollowupChange,
+	}: MapBottomSearchFollowupBoxProps) => {
+		const segmentBox = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_SEGMENT_BOX;
+		const leftTileBox = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_LEFT_TILE_BOX;
+		const iconLayout = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_ICON_LAYOUT;
+		const profileLeft = segmentBox.advancedWidth + segmentBox.internalDividerWidth;
+		const keywordLeft = profileLeft + segmentBox.segmentWidth;
+		const radiusLeft = keywordLeft + segmentBox.segmentWidth;
+		const [advancedSelections, setAdvancedSelections] =
+			useState<MapBottomSearchAdvancedSelections>({
+				profile: false,
+				keyword: false,
+				radius: false,
+			});
+		const visualSearchFollowup =
+			previewedSearchFollowup === 'anything'
+				? null
+				: (previewedSearchFollowup ?? selectedSearchFollowup);
+		const isForYouSelected = selectedSearchFollowup === 'for-you';
+		const isCategorySelected = selectedSearchFollowup === 'category';
+		const isForYouActive = visualSearchFollowup === 'for-you';
+		const isCategoryActive = visualSearchFollowup === 'category';
+		const isAdvancedActive = previewedSearchFollowup === 'anything';
+		const isCompactFollowup = isForYouSelected || isCategorySelected;
+		const isProfileAdvancedSelected = advancedSelections.profile;
+		const isKeywordAdvancedSelected = advancedSelections.keyword;
+		const isRadiusAdvancedSelected = advancedSelections.radius;
 
-	return (
-		<div
-			className="absolute left-1/2 pointer-events-auto"
-			style={{
-				top: `calc(100% + ${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.gapToSearchBar}px)`,
-				width: `${
-					isCompactFollowup
-						? MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.compactWidth
-						: MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.width
-				}px`,
-				height: `${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.height}px`,
-				transform: 'translateX(-50%)',
-				borderRadius: `${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.borderRadius}px`,
-				border: `${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.borderWidth}px solid ${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.borderColor}`,
-				backgroundColor: MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.backgroundColor,
-				boxSizing: 'border-box',
-			}}
-		>
-			<button
-				type="button"
-				aria-label="Select For You"
-				aria-pressed={isForYouSelected}
-				className="absolute flex items-center justify-center"
+		return (
+			<div
+				className="absolute left-1/2 pointer-events-auto"
 				style={{
-					left: `${leftTileBox.leftOffset}px`,
-					top: '50%',
-					width: `${leftTileBox.size}px`,
-					height: `${leftTileBox.size}px`,
-					transform: 'translateY(-50%)',
-					borderRadius: `${leftTileBox.borderRadius}px`,
-					border: `${leftTileBox.selectedBorderWidth}px solid ${
-						isForYouActive ? leftTileBox.selectedBorderColor : 'transparent'
-					}`,
-					backgroundColor: isForYouActive
-						? leftTileBox.selectedBackgroundColor
-						: leftTileBox.dailyMixBackgroundColor,
+					top: `calc(100% + ${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.gapToSearchBar}px)`,
+					width: `${
+						isCompactFollowup
+							? MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.compactWidth
+							: MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.width
+					}px`,
+					height: `${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.height}px`,
+					transform: 'translateX(-50%)',
+					borderRadius: `${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.borderRadius}px`,
+					border: `${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.borderWidth}px solid ${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.borderColor}`,
+					backgroundColor: MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.backgroundColor,
 					boxSizing: 'border-box',
-					padding: 0,
-					cursor: 'pointer',
 				}}
-				onMouseEnter={() => onPreviewSearchFollowupChange('for-you')}
-				onFocus={() => onPreviewSearchFollowupChange('for-you')}
-				onClick={() =>
-					onSelectedSearchFollowupChange(isForYouSelected ? null : 'for-you')
-				}
 			>
-				<MapBottomSearchForYouIcon
-					aria-hidden="true"
-					textColor={isForYouActive ? '#000000' : undefined}
-					waveColor={isForYouActive ? '#000000' : undefined}
-					style={{
-						display: 'block',
-						width: `${iconLayout.forYou.width}px`,
-						height: `${iconLayout.forYou.height}px`,
-						transform: `translate(${iconLayout.forYou.translateX}px, ${iconLayout.forYou.translateY}px)`,
-					}}
-				/>
-			</button>
-			<button
-				type="button"
-				aria-label="Select Category"
-				aria-pressed={isCategorySelected}
-				className="absolute flex items-center justify-center"
-				style={{
-					left: `${leftTileBox.leftOffset + leftTileBox.size + leftTileBox.gap}px`,
-					top: '50%',
-					width: `${leftTileBox.size}px`,
-					height: `${leftTileBox.size}px`,
-					transform: 'translateY(-50%)',
-					borderRadius: `${leftTileBox.borderRadius}px`,
-					border: `${leftTileBox.selectedBorderWidth}px solid ${
-						isCategoryActive ? leftTileBox.selectedBorderColor : 'transparent'
-					}`,
-					backgroundColor: isCategoryActive
-						? leftTileBox.categorySelectedBackgroundColor
-						: leftTileBox.categoryBackgroundColor,
-					boxSizing: 'border-box',
-					padding: 0,
-					cursor: 'pointer',
-				}}
-				onMouseEnter={() => onPreviewSearchFollowupChange('category')}
-				onFocus={() => onPreviewSearchFollowupChange('category')}
-				onClick={() =>
-					onSelectedSearchFollowupChange(isCategorySelected ? null : 'category')
-				}
-			>
-				<MapBottomSearchCategoryIcon
-					aria-hidden="true"
-					active={isCategoryActive}
-					style={{
-						display: 'block',
-						width: `${isCategoryActive ? 36 : iconLayout.category.width}px`,
-						height: `${isCategoryActive ? 40 : iconLayout.category.height}px`,
-						transform: `translate(${
-							isCategoryActive
-								? iconLayout.category.activeTranslateX
-								: iconLayout.category.translateX
-						}px, ${
-							isCategoryActive
-								? iconLayout.category.activeTranslateY
-								: iconLayout.category.translateY
-						}px)`,
-					}}
-				/>
-			</button>
-			{isCompactFollowup ? (
 				<button
 					type="button"
-					aria-label="Open Advanced options"
-					aria-pressed={isAdvancedActive}
+					aria-label="Select For You"
+					aria-pressed={isForYouSelected}
 					className="absolute flex items-center justify-center"
 					style={{
-						left: `${
-							leftTileBox.leftOffset +
-							2 * leftTileBox.size +
-							2 * leftTileBox.gap
-						}px`,
+						left: `${leftTileBox.leftOffset}px`,
 						top: '50%',
 						width: `${leftTileBox.size}px`,
 						height: `${leftTileBox.size}px`,
 						transform: 'translateY(-50%)',
 						borderRadius: `${leftTileBox.borderRadius}px`,
-						backgroundColor: isAdvancedActive
-							? segmentBox.advancedBackgroundColor
-							: leftTileBox.advancedCompactBackgroundColor,
-						boxSizing: 'border-box',
 						border: `${leftTileBox.selectedBorderWidth}px solid ${
-							isAdvancedActive ? leftTileBox.selectedBorderColor : 'transparent'
+							isForYouActive ? leftTileBox.selectedBorderColor : 'transparent'
 						}`,
+						backgroundColor: isForYouActive
+							? leftTileBox.selectedBackgroundColor
+							: leftTileBox.dailyMixBackgroundColor,
+						boxSizing: 'border-box',
 						padding: 0,
 						cursor: 'pointer',
 					}}
-					onMouseEnter={() => onPreviewSearchFollowupChange('anything')}
-					onFocus={() => onPreviewSearchFollowupChange('anything')}
-					onClick={() => onSelectedSearchFollowupChange(null)}
+					onMouseEnter={() => onPreviewSearchFollowupChange('for-you')}
+					onFocus={() => onPreviewSearchFollowupChange('for-you')}
+					onClick={() =>
+						onSelectedSearchFollowupChange(isForYouSelected ? null : 'for-you')
+					}
 				>
-					<MapBottomSearchAdvancedIcon
+					<MapBottomSearchForYouIcon
 						aria-hidden="true"
-						textColor={isAdvancedActive ? '#000000' : '#8D8D8D'}
-						iconColor={isAdvancedActive ? '#000000' : '#CA7171'}
-						lensFill={isAdvancedActive ? '#FFFFFF' : 'transparent'}
+						textColor={isForYouActive ? '#000000' : undefined}
+						waveColor={isForYouActive ? '#000000' : undefined}
 						style={{
 							display: 'block',
-							width: `${iconLayout.advanced.width}px`,
-							height: `${iconLayout.advanced.height}px`,
-							transform: `translate(${iconLayout.advanced.translateX}px, ${iconLayout.advanced.translateY}px)`,
+							width: `${iconLayout.forYou.width}px`,
+							height: `${iconLayout.forYou.height}px`,
+							transform: `translate(${iconLayout.forYou.translateX}px, ${iconLayout.forYou.translateY}px)`,
 						}}
 					/>
 				</button>
-			) : (
-				<div
-					role="group"
-					aria-label="Advanced filter options"
-					className="absolute"
-					onMouseEnter={() => onPreviewSearchFollowupChange('anything')}
+				<button
+					type="button"
+					aria-label="Select Category"
+					aria-pressed={isCategorySelected}
+					className="absolute flex items-center justify-center"
 					style={{
-						right: `${segmentBox.rightOffset}px`,
+						left: `${leftTileBox.leftOffset + leftTileBox.size + leftTileBox.gap}px`,
 						top: '50%',
-						width: `${segmentBox.width}px`,
-						height: `${segmentBox.height}px`,
+						width: `${leftTileBox.size}px`,
+						height: `${leftTileBox.size}px`,
 						transform: 'translateY(-50%)',
-						borderRadius: `${segmentBox.borderRadius}px`,
-						border: `${segmentBox.dividerWidth}px solid ${segmentBox.borderColor}`,
-						background: `linear-gradient(to right, ${segmentBox.advancedBackgroundColor} 0 ${segmentBox.advancedWidth}px, ${segmentBox.borderColor} ${segmentBox.advancedWidth}px ${profileLeft}px, ${segmentBox.profileBackgroundColor} ${profileLeft}px ${keywordLeft}px, ${segmentBox.keywordBackgroundColor} ${keywordLeft}px ${radiusLeft}px, ${segmentBox.radiusBackgroundColor} ${radiusLeft}px 100%)`,
+						borderRadius: `${leftTileBox.borderRadius}px`,
+						border: `${leftTileBox.selectedBorderWidth}px solid ${
+							isCategoryActive ? leftTileBox.selectedBorderColor : 'transparent'
+						}`,
+						backgroundColor: isCategoryActive
+							? leftTileBox.categorySelectedBackgroundColor
+							: leftTileBox.categoryBackgroundColor,
 						boxSizing: 'border-box',
-						overflow: 'hidden',
+						padding: 0,
+						cursor: 'pointer',
 					}}
+					onMouseEnter={() => onPreviewSearchFollowupChange('category')}
+					onFocus={() => onPreviewSearchFollowupChange('category')}
+					onClick={() =>
+						onSelectedSearchFollowupChange(isCategorySelected ? null : 'category')
+					}
 				>
-					<div
-						className="absolute flex items-center justify-center"
-						style={{
-							left: 0,
-							top: 0,
-							width: `${segmentBox.advancedWidth}px`,
-							height: '100%',
-							transform: 'translateY(3px)',
-						}}
-					>
-						<MapBottomSearchAdvancedIcon />
-					</div>
-					<button
-						type="button"
-						aria-label="Toggle Profile"
-						aria-pressed={isProfileAdvancedSelected}
-						className="absolute flex items-center justify-center"
-						style={{
-							left: `${profileLeft}px`,
-							top: 0,
-							width: `${segmentBox.segmentWidth}px`,
-							height: '100%',
-							backgroundColor: isProfileAdvancedSelected ? '#71C9FD' : 'transparent',
-							border: 0,
-							borderRadius: 0,
-							outline: 'none',
-							appearance: 'none',
-							padding: 0,
-							cursor: 'pointer',
-							zIndex: 1,
-						}}
-						onClick={() =>
-							setAdvancedSelections((current) => ({
-								...current,
-								profile: !current.profile,
-							}))
-						}
-					>
-						<MapBottomSearchProfileIcon
-							aria-hidden="true"
-							textColor={isProfileAdvancedSelected ? '#000000' : undefined}
-							iconColor={isProfileAdvancedSelected ? '#000000' : undefined}
-							avatarFill={isProfileAdvancedSelected ? '#FFFFFF' : undefined}
-							style={{
-								display: 'block',
-								width: `${iconLayout.profile.width}px`,
-								height: `${iconLayout.profile.height}px`,
-							}}
-						/>
-					</button>
-					<button
-						type="button"
-						aria-label="Toggle Keyword"
-						aria-pressed={isKeywordAdvancedSelected}
-						className="absolute flex items-center justify-center"
-						style={{
-							left: `${keywordLeft}px`,
-							top: 0,
-							width: `${segmentBox.segmentWidth}px`,
-							height: '100%',
-							backgroundColor: isKeywordAdvancedSelected
-								? segmentBox.keywordActiveBackgroundColor
-								: 'transparent',
-							border: 0,
-							borderRadius: 0,
-							outline: 'none',
-							appearance: 'none',
-							padding: 0,
-							cursor: 'pointer',
-							zIndex: 1,
-						}}
-						onClick={() =>
-							setAdvancedSelections((current) => ({
-								...current,
-								keyword: !current.keyword,
-							}))
-						}
-					>
-						<MapBottomSearchKeywordIcon
-							aria-hidden="true"
-							textColor={isKeywordAdvancedSelected ? '#000000' : undefined}
-							iconColor={isKeywordAdvancedSelected ? '#000000' : undefined}
-							innerFill={isKeywordAdvancedSelected ? '#FFFFFF' : undefined}
-							style={{
-								display: 'block',
-								width: `${iconLayout.keyword.width}px`,
-								height: `${iconLayout.keyword.height}px`,
-								transform: `translate(${iconLayout.keyword.translateX}px, ${iconLayout.keyword.translateY}px)`,
-							}}
-						/>
-					</button>
-					<button
-						type="button"
-						aria-label="Toggle Radius"
-						aria-pressed={isRadiusAdvancedSelected}
-						className="absolute flex items-center justify-center"
-						style={{
-							left: `${radiusLeft}px`,
-							top: 0,
-							width: `${segmentBox.segmentWidth - segmentBox.internalDividerWidth}px`,
-							height: '100%',
-							backgroundColor: isRadiusAdvancedSelected
-								? segmentBox.radiusActiveBackgroundColor
-								: 'transparent',
-							border: 0,
-							borderTopRightRadius: `${segmentBox.borderRadius - segmentBox.dividerWidth}px`,
-							borderBottomRightRadius: `${segmentBox.borderRadius - segmentBox.dividerWidth}px`,
-							outline: 'none',
-							appearance: 'none',
-							padding: 0,
-							cursor: 'pointer',
-							zIndex: 1,
-						}}
-						onClick={() =>
-							setAdvancedSelections((current) => ({
-								...current,
-								radius: !current.radius,
-							}))
-						}
-					>
-						<MapBottomSearchRadiusIcon
-							aria-hidden="true"
-							textColor={isRadiusAdvancedSelected ? '#000000' : undefined}
-							iconColor={isRadiusAdvancedSelected ? '#000000' : undefined}
-							innerFill={isRadiusAdvancedSelected ? '#FFFFFF' : undefined}
-							style={{
-								display: 'block',
-								width: `${iconLayout.radius.width}px`,
-								height: `${iconLayout.radius.height}px`,
-								transform: `translate(${iconLayout.radius.translateX}px, ${iconLayout.radius.translateY}px)`,
-							}}
-						/>
-					</button>
-					<div
+					<MapBottomSearchCategoryIcon
 						aria-hidden="true"
-						className="absolute pointer-events-none"
+						active={isCategoryActive}
 						style={{
-							left: `${segmentBox.advancedWidth}px`,
-							top: 0,
-							width: `${segmentBox.internalDividerWidth}px`,
-							height: '100%',
-							backgroundColor: segmentBox.borderColor,
-							zIndex: 2,
+							display: 'block',
+							width: `${isCategoryActive ? 36 : iconLayout.category.width}px`,
+							height: `${isCategoryActive ? 40 : iconLayout.category.height}px`,
+							transform: `translate(${
+								isCategoryActive
+									? iconLayout.category.activeTranslateX
+									: iconLayout.category.translateX
+							}px, ${
+								isCategoryActive
+									? iconLayout.category.activeTranslateY
+									: iconLayout.category.translateY
+							}px)`,
 						}}
 					/>
-				</div>
-			)}
-		</div>
-	);
-});
+				</button>
+				{isCompactFollowup ? (
+					<button
+						type="button"
+						aria-label="Open Advanced options"
+						aria-pressed={isAdvancedActive}
+						className="absolute flex items-center justify-center"
+						style={{
+							left: `${
+								leftTileBox.leftOffset + 2 * leftTileBox.size + 2 * leftTileBox.gap
+							}px`,
+							top: '50%',
+							width: `${leftTileBox.size}px`,
+							height: `${leftTileBox.size}px`,
+							transform: 'translateY(-50%)',
+							borderRadius: `${leftTileBox.borderRadius}px`,
+							backgroundColor: isAdvancedActive
+								? segmentBox.advancedBackgroundColor
+								: leftTileBox.advancedCompactBackgroundColor,
+							boxSizing: 'border-box',
+							border: `${leftTileBox.selectedBorderWidth}px solid ${
+								isAdvancedActive ? leftTileBox.selectedBorderColor : 'transparent'
+							}`,
+							padding: 0,
+							cursor: 'pointer',
+						}}
+						onMouseEnter={() => onPreviewSearchFollowupChange('anything')}
+						onFocus={() => onPreviewSearchFollowupChange('anything')}
+						onClick={() => onSelectedSearchFollowupChange(null)}
+					>
+						<MapBottomSearchAdvancedIcon
+							aria-hidden="true"
+							textColor={isAdvancedActive ? '#000000' : '#8D8D8D'}
+							iconColor={isAdvancedActive ? '#000000' : '#CA7171'}
+							lensFill={isAdvancedActive ? '#FFFFFF' : 'transparent'}
+							style={{
+								display: 'block',
+								width: `${iconLayout.advanced.width}px`,
+								height: `${iconLayout.advanced.height}px`,
+								transform: `translate(${iconLayout.advanced.translateX}px, ${iconLayout.advanced.translateY}px)`,
+							}}
+						/>
+					</button>
+				) : (
+					<div
+						role="group"
+						aria-label="Advanced filter options"
+						className="absolute"
+						onMouseEnter={() => onPreviewSearchFollowupChange('anything')}
+						style={{
+							right: `${segmentBox.rightOffset}px`,
+							top: '50%',
+							width: `${segmentBox.width}px`,
+							height: `${segmentBox.height}px`,
+							transform: 'translateY(-50%)',
+							borderRadius: `${segmentBox.borderRadius}px`,
+							border: `${segmentBox.dividerWidth}px solid ${segmentBox.borderColor}`,
+							background: `linear-gradient(to right, ${segmentBox.advancedBackgroundColor} 0 ${segmentBox.advancedWidth}px, ${segmentBox.borderColor} ${segmentBox.advancedWidth}px ${profileLeft}px, ${segmentBox.profileBackgroundColor} ${profileLeft}px ${keywordLeft}px, ${segmentBox.keywordBackgroundColor} ${keywordLeft}px ${radiusLeft}px, ${segmentBox.radiusBackgroundColor} ${radiusLeft}px 100%)`,
+							boxSizing: 'border-box',
+							overflow: 'hidden',
+						}}
+					>
+						<div
+							className="absolute flex items-center justify-center"
+							style={{
+								left: 0,
+								top: 0,
+								width: `${segmentBox.advancedWidth}px`,
+								height: '100%',
+								transform: 'translateY(3px)',
+							}}
+						>
+							<MapBottomSearchAdvancedIcon />
+						</div>
+						<button
+							type="button"
+							aria-label="Toggle Profile"
+							aria-pressed={isProfileAdvancedSelected}
+							className="absolute flex items-center justify-center"
+							style={{
+								left: `${profileLeft}px`,
+								top: 0,
+								width: `${segmentBox.segmentWidth}px`,
+								height: '100%',
+								backgroundColor: isProfileAdvancedSelected ? '#71C9FD' : 'transparent',
+								border: 0,
+								borderRadius: 0,
+								outline: 'none',
+								appearance: 'none',
+								padding: 0,
+								cursor: 'pointer',
+								zIndex: 1,
+							}}
+							onClick={() =>
+								setAdvancedSelections((current) => ({
+									...current,
+									profile: !current.profile,
+								}))
+							}
+						>
+							<MapBottomSearchProfileIcon
+								aria-hidden="true"
+								textColor={isProfileAdvancedSelected ? '#000000' : undefined}
+								iconColor={isProfileAdvancedSelected ? '#000000' : undefined}
+								avatarFill={isProfileAdvancedSelected ? '#FFFFFF' : undefined}
+								style={{
+									display: 'block',
+									width: `${iconLayout.profile.width}px`,
+									height: `${iconLayout.profile.height}px`,
+								}}
+							/>
+						</button>
+						<button
+							type="button"
+							aria-label="Toggle Keyword"
+							aria-pressed={isKeywordAdvancedSelected}
+							className="absolute flex items-center justify-center"
+							style={{
+								left: `${keywordLeft}px`,
+								top: 0,
+								width: `${segmentBox.segmentWidth}px`,
+								height: '100%',
+								backgroundColor: isKeywordAdvancedSelected
+									? segmentBox.keywordActiveBackgroundColor
+									: 'transparent',
+								border: 0,
+								borderRadius: 0,
+								outline: 'none',
+								appearance: 'none',
+								padding: 0,
+								cursor: 'pointer',
+								zIndex: 1,
+							}}
+							onClick={() =>
+								setAdvancedSelections((current) => ({
+									...current,
+									keyword: !current.keyword,
+								}))
+							}
+						>
+							<MapBottomSearchKeywordIcon
+								aria-hidden="true"
+								textColor={isKeywordAdvancedSelected ? '#000000' : undefined}
+								iconColor={isKeywordAdvancedSelected ? '#000000' : undefined}
+								innerFill={isKeywordAdvancedSelected ? '#FFFFFF' : undefined}
+								style={{
+									display: 'block',
+									width: `${iconLayout.keyword.width}px`,
+									height: `${iconLayout.keyword.height}px`,
+									transform: `translate(${iconLayout.keyword.translateX}px, ${iconLayout.keyword.translateY}px)`,
+								}}
+							/>
+						</button>
+						<button
+							type="button"
+							aria-label="Toggle Radius"
+							aria-pressed={isRadiusAdvancedSelected}
+							className="absolute flex items-center justify-center"
+							style={{
+								left: `${radiusLeft}px`,
+								top: 0,
+								width: `${segmentBox.segmentWidth - segmentBox.internalDividerWidth}px`,
+								height: '100%',
+								backgroundColor: isRadiusAdvancedSelected
+									? segmentBox.radiusActiveBackgroundColor
+									: 'transparent',
+								border: 0,
+								borderTopRightRadius: `${segmentBox.borderRadius - segmentBox.dividerWidth}px`,
+								borderBottomRightRadius: `${segmentBox.borderRadius - segmentBox.dividerWidth}px`,
+								outline: 'none',
+								appearance: 'none',
+								padding: 0,
+								cursor: 'pointer',
+								zIndex: 1,
+							}}
+							onClick={() =>
+								setAdvancedSelections((current) => ({
+									...current,
+									radius: !current.radius,
+								}))
+							}
+						>
+							<MapBottomSearchRadiusIcon
+								aria-hidden="true"
+								textColor={isRadiusAdvancedSelected ? '#000000' : undefined}
+								iconColor={isRadiusAdvancedSelected ? '#000000' : undefined}
+								innerFill={isRadiusAdvancedSelected ? '#FFFFFF' : undefined}
+								style={{
+									display: 'block',
+									width: `${iconLayout.radius.width}px`,
+									height: `${iconLayout.radius.height}px`,
+									transform: `translate(${iconLayout.radius.translateX}px, ${iconLayout.radius.translateY}px)`,
+								}}
+							/>
+						</button>
+						<div
+							aria-hidden="true"
+							className="absolute pointer-events-none"
+							style={{
+								left: `${segmentBox.advancedWidth}px`,
+								top: 0,
+								width: `${segmentBox.internalDividerWidth}px`,
+								height: '100%',
+								backgroundColor: segmentBox.borderColor,
+								zIndex: 2,
+							}}
+						/>
+					</div>
+				)}
+			</div>
+		);
+	}
+);
 MapBottomSearchFollowupBox.displayName = 'MapBottomSearchFollowupBox';
 
 const SearchTrayIconTile = ({
@@ -2850,8 +2835,7 @@ const DashboardContent = () => {
 		mood: globeWeatherMood,
 		temperatureF: globeWeatherTemperatureF,
 		regionCenter: globeWeatherRegionCenter,
-	} =
-		useGlobeWeatherMood();
+	} = useGlobeWeatherMood();
 	const globeNightLighting = useGlobeNightLighting();
 
 	// If we navigated here from a campaign, enable "Add to Campaign" mode.
@@ -2908,98 +2892,104 @@ const DashboardContent = () => {
 			const x = Math.sin(seed + i) * 10000;
 			return x - Math.floor(x);
 		};
-		const createPlaceholder = (id: number, lat: number, lng: number, state?: string): ContactWithName => ({
-			id,
-			email: '',
-			name: null,
-			firstName: null,
-			lastName: null,
-			company: null,
-			title: null,
-			headline: null,
-			latitude: lat,
-			longitude: lng,
-			state: state ?? 'California',
-			city: null,
-			country: 'United States',
-			address: null,
-			phone: null,
-			website: null,
-			linkedInUrl: null,
-			photoUrl: null,
-			metadata: null,
-			apolloPersonId: null,
-			contactListId: null,
-			userId: null,
-			isPrivate: false,
-			hasVectorEmbedding: false,
-			userContactListCount: 0,
-			manualDeselections: 0,
-			companyFoundedYear: null,
-			companyIndustry: null,
-			companyKeywords: [],
-			companyLinkedInUrl: null,
-			companyPostalCode: null,
-			companyTechStack: [],
-			companyType: null,
-			lastResearchedDate: null,
-			emailValidatedAt: null,
-			emailValidationStatus: 'unknown',
-			emailValidationSubStatus: null,
-			createdAt: new Date(),
-			updatedAt: new Date(),
-		} as ContactWithName);
+		const createPlaceholder = (
+			id: number,
+			lat: number,
+			lng: number,
+			state?: string
+		): ContactWithName =>
+			({
+				id,
+				email: '',
+				name: null,
+				firstName: null,
+				lastName: null,
+				company: null,
+				title: null,
+				headline: null,
+				latitude: lat,
+				longitude: lng,
+				state: state ?? 'California',
+				city: null,
+				country: 'United States',
+				address: null,
+				phone: null,
+				website: null,
+				linkedInUrl: null,
+				photoUrl: null,
+				metadata: null,
+				apolloPersonId: null,
+				contactListId: null,
+				userId: null,
+				isPrivate: false,
+				hasVectorEmbedding: false,
+				userContactListCount: 0,
+				manualDeselections: 0,
+				companyFoundedYear: null,
+				companyIndustry: null,
+				companyKeywords: [],
+				companyLinkedInUrl: null,
+				companyPostalCode: null,
+				companyTechStack: [],
+				companyType: null,
+				lastResearchedDate: null,
+				emailValidatedAt: null,
+				emailValidationStatus: 'unknown',
+				emailValidationSubStatus: null,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			}) as ContactWithName;
 
 		// Add anchor points in neighboring states to keep the map somewhat zoomed out
 		// and show blue outlines on Arizona and Nevada (visually near California)
-		placeholders.push(createPlaceholder(-1, 36.2, -115.1, 'Nevada'));     // Las Vegas area
-		placeholders.push(createPlaceholder(-2, 39.5, -119.8, 'Nevada'));     // Reno area
-		placeholders.push(createPlaceholder(-3, 33.4, -112.0, 'Arizona'));    // Phoenix area
-		placeholders.push(createPlaceholder(-4, 32.2, -110.9, 'Arizona'));    // Tucson area
+		placeholders.push(createPlaceholder(-1, 36.2, -115.1, 'Nevada')); // Las Vegas area
+		placeholders.push(createPlaceholder(-2, 39.5, -119.8, 'Nevada')); // Reno area
+		placeholders.push(createPlaceholder(-3, 33.4, -112.0, 'Arizona')); // Phoenix area
+		placeholders.push(createPlaceholder(-4, 32.2, -110.9, 'Arizona')); // Tucson area
 
 		// California regions spread across the entire state (all inland, no water)
 		// Kept well east of the coastline to avoid ocean
 		const regions = [
 			// Northern California (inland)
-			{ lat: 41.5, lng: -122.0, spread: 0.8, weight: 8 },   // Redding area
-			{ lat: 40.5, lng: -121.5, spread: 0.7, weight: 6 },   // Shasta
-			{ lat: 41.0, lng: -120.5, spread: 0.8, weight: 5 },   // Modoc
+			{ lat: 41.5, lng: -122.0, spread: 0.8, weight: 8 }, // Redding area
+			{ lat: 40.5, lng: -121.5, spread: 0.7, weight: 6 }, // Shasta
+			{ lat: 41.0, lng: -120.5, spread: 0.8, weight: 5 }, // Modoc
 			// Sacramento Valley
-			{ lat: 39.5, lng: -121.5, spread: 1.0, weight: 12 },  // Sacramento
-			{ lat: 39.0, lng: -121.8, spread: 0.8, weight: 8 },   // Yuba City
-			{ lat: 38.6, lng: -121.3, spread: 0.6, weight: 10 },  // Sacramento city
+			{ lat: 39.5, lng: -121.5, spread: 1.0, weight: 12 }, // Sacramento
+			{ lat: 39.0, lng: -121.8, spread: 0.8, weight: 8 }, // Yuba City
+			{ lat: 38.6, lng: -121.3, spread: 0.6, weight: 10 }, // Sacramento city
 			// Napa/Sonoma (inland from coast)
-			{ lat: 38.5, lng: -122.3, spread: 0.5, weight: 15 },  // Napa
-			{ lat: 38.4, lng: -122.7, spread: 0.4, weight: 12 },  // Sonoma
+			{ lat: 38.5, lng: -122.3, spread: 0.5, weight: 15 }, // Napa
+			{ lat: 38.4, lng: -122.7, spread: 0.4, weight: 12 }, // Sonoma
 			// Bay Area (inland parts)
-			{ lat: 37.7, lng: -121.9, spread: 0.6, weight: 14 },  // East Bay
-			{ lat: 37.4, lng: -121.5, spread: 0.7, weight: 12 },  // San Jose area
-			{ lat: 37.0, lng: -121.8, spread: 0.5, weight: 8 },   // Gilroy
+			{ lat: 37.7, lng: -121.9, spread: 0.6, weight: 14 }, // East Bay
+			{ lat: 37.4, lng: -121.5, spread: 0.7, weight: 12 }, // San Jose area
+			{ lat: 37.0, lng: -121.8, spread: 0.5, weight: 8 }, // Gilroy
 			// Central Valley (entire length)
-			{ lat: 38.0, lng: -120.8, spread: 1.0, weight: 10 },  // Stockton
-			{ lat: 37.5, lng: -120.5, spread: 1.0, weight: 10 },  // Modesto
-			{ lat: 36.7, lng: -119.8, spread: 1.2, weight: 12 },  // Fresno
-			{ lat: 36.0, lng: -119.3, spread: 1.0, weight: 10 },  // Visalia
-			{ lat: 35.4, lng: -119.0, spread: 1.0, weight: 10 },  // Bakersfield
+			{ lat: 38.0, lng: -120.8, spread: 1.0, weight: 10 }, // Stockton
+			{ lat: 37.5, lng: -120.5, spread: 1.0, weight: 10 }, // Modesto
+			{ lat: 36.7, lng: -119.8, spread: 1.2, weight: 12 }, // Fresno
+			{ lat: 36.0, lng: -119.3, spread: 1.0, weight: 10 }, // Visalia
+			{ lat: 35.4, lng: -119.0, spread: 1.0, weight: 10 }, // Bakersfield
 			// Central Coast (inland from coast)
-			{ lat: 35.6, lng: -120.5, spread: 0.6, weight: 10 },  // Paso Robles
-			{ lat: 34.9, lng: -120.2, spread: 0.5, weight: 8 },   // Santa Maria
+			{ lat: 35.6, lng: -120.5, spread: 0.6, weight: 10 }, // Paso Robles
+			{ lat: 34.9, lng: -120.2, spread: 0.5, weight: 8 }, // Santa Maria
 			// Los Angeles Basin (inland)
-			{ lat: 34.1, lng: -117.8, spread: 0.8, weight: 15 },  // Inland Empire
-			{ lat: 34.4, lng: -118.5, spread: 0.6, weight: 12 },  // San Fernando Valley
-			{ lat: 34.0, lng: -117.4, spread: 0.7, weight: 12 },  // Riverside/San Bernardino
-			{ lat: 33.8, lng: -117.9, spread: 0.5, weight: 10 },  // Orange County inland
+			{ lat: 34.1, lng: -117.8, spread: 0.8, weight: 15 }, // Inland Empire
+			{ lat: 34.4, lng: -118.5, spread: 0.6, weight: 12 }, // San Fernando Valley
+			{ lat: 34.0, lng: -117.4, spread: 0.7, weight: 12 }, // Riverside/San Bernardino
+			{ lat: 33.8, lng: -117.9, spread: 0.5, weight: 10 }, // Orange County inland
 			// San Diego (inland)
-			{ lat: 33.0, lng: -116.8, spread: 0.6, weight: 10 },  // Escondido/Temecula
-			{ lat: 32.8, lng: -116.9, spread: 0.5, weight: 8 },   // East San Diego
+			{ lat: 33.0, lng: -116.8, spread: 0.6, weight: 10 }, // Escondido/Temecula
+			{ lat: 32.8, lng: -116.9, spread: 0.5, weight: 8 }, // East San Diego
 			// Desert regions
-			{ lat: 34.5, lng: -116.5, spread: 1.0, weight: 8 },   // High Desert
-			{ lat: 33.8, lng: -116.5, spread: 0.8, weight: 6 },   // Palm Springs area
-			{ lat: 35.5, lng: -117.5, spread: 1.0, weight: 6 },   // Mojave
+			{ lat: 34.5, lng: -116.5, spread: 1.0, weight: 8 }, // High Desert
+			{ lat: 33.8, lng: -116.5, spread: 0.8, weight: 6 }, // Palm Springs area
+			{ lat: 35.5, lng: -117.5, spread: 1.0, weight: 6 }, // Mojave
 			// Sierra Nevada foothills
-			{ lat: 39.0, lng: -120.5, spread: 0.8, weight: 8 },   // Gold Country
-			{ lat: 38.0, lng: -120.0, spread: 0.8, weight: 6 },   // Yosemite foothills
-			{ lat: 37.0, lng: -119.5, spread: 0.7, weight: 5 },   // Southern Sierra
+			{ lat: 39.0, lng: -120.5, spread: 0.8, weight: 8 }, // Gold Country
+			{ lat: 38.0, lng: -120.0, spread: 0.8, weight: 6 }, // Yosemite foothills
+			{ lat: 37.0, lng: -119.5, spread: 0.7, weight: 5 }, // Southern Sierra
 		];
 		// Build weighted list
 		const weightedRegions: typeof regions = [];
@@ -3018,7 +3008,8 @@ const DashboardContent = () => {
 		return placeholders;
 	}, [fromHomeParam]);
 
-	const { data: fromCampaign, isPending: isPendingFromCampaign } = useGetCampaign(fromCampaignIdParam);
+	const { data: fromCampaign, isPending: isPendingFromCampaign } =
+		useGetCampaign(fromCampaignIdParam);
 	const addToCampaignUserContactListId = fromCampaign?.userContactLists?.[0]?.id;
 	const { mutateAsync: editUserContactList, isPending: isPendingAddToCampaign } =
 		useEditUserContactList({ suppressToasts: true });
@@ -3119,19 +3110,21 @@ const DashboardContent = () => {
 		useState<MapBottomSearchFollowupSelection>(null);
 	const [mapBottomSearchFollowupPreview, setMapBottomSearchFollowupPreview] =
 		useState<MapBottomSearchFollowupPreview>(null);
-	const mapBottomSearchFollowupPreviewClearTimeoutRef =
-		useRef<ReturnType<typeof setTimeout> | null>(null);
+	const mapBottomSearchFollowupPreviewClearTimeoutRef = useRef<ReturnType<
+		typeof setTimeout
+	> | null>(null);
 	const [isMapBottomCategoryDropdownActive, setIsMapBottomCategoryDropdownActive] =
 		useState(false);
-	const isMapBottomForYouMode =
-		mapBottomSearchFollowupSelection === 'for-you';
-	const isMapBottomCategoryMode =
-		mapBottomSearchFollowupSelection === 'category';
+	const isMapBottomForYouMode = mapBottomSearchFollowupSelection === 'for-you';
+	const isMapBottomCategoryMode = mapBottomSearchFollowupSelection === 'category';
 
 	// Close why dropdown when clicking outside
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
-			if (whyDropdownRef.current && !whyDropdownRef.current.contains(event.target as Node)) {
+			if (
+				whyDropdownRef.current &&
+				!whyDropdownRef.current.contains(event.target as Node)
+			) {
 				setIsWhyDropdownOpen(false);
 			}
 		};
@@ -3146,7 +3139,10 @@ const DashboardContent = () => {
 	// Close what dropdown when clicking outside
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
-			if (whatDropdownRef.current && !whatDropdownRef.current.contains(event.target as Node)) {
+			if (
+				whatDropdownRef.current &&
+				!whatDropdownRef.current.contains(event.target as Node)
+			) {
 				setIsWhatDropdownOpen(false);
 			}
 		};
@@ -3161,7 +3157,10 @@ const DashboardContent = () => {
 	// Close where dropdown when clicking outside
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
-			if (whereDropdownRef.current && !whereDropdownRef.current.contains(event.target as Node)) {
+			if (
+				whereDropdownRef.current &&
+				!whereDropdownRef.current.contains(event.target as Node)
+			) {
 				setIsWhereDropdownOpen(false);
 			}
 		};
@@ -3177,7 +3176,9 @@ const DashboardContent = () => {
 	const ENABLE_DASHBOARD_INBOX_TAB = false;
 
 	const initialTabFromQuery =
-		ENABLE_DASHBOARD_INBOX_TAB && searchParams.get('tab') === 'inbox' ? 'inbox' : 'search';
+		ENABLE_DASHBOARD_INBOX_TAB && searchParams.get('tab') === 'inbox'
+			? 'inbox'
+			: 'search';
 	const [activeTab, setActiveTab] = useState<'search' | 'inbox'>(initialTabFromQuery);
 	const [hoveredTab, setHoveredTab] = useState<'search' | 'inbox' | null>(null);
 	const inboxView = activeTab === 'inbox';
@@ -3267,11 +3268,8 @@ const DashboardContent = () => {
 		// Selecting a Where without a What would otherwise build a query like
 		// "[Booking] (Maine)" — no category to match against. Default to the
 		// Wine/Beer/Spirits category so the curated search returns real results.
-		const shouldAutoFillWhat =
-			trimmedNewWhere.length > 0 && !initialBaseWhat.trim();
-		const baseWhat = shouldAutoFillWhat
-			? DEFAULT_CATEGORY_SEARCH_WHAT
-			: initialBaseWhat;
+		const shouldAutoFillWhat = trimmedNewWhere.length > 0 && !initialBaseWhat.trim();
+		const baseWhat = shouldAutoFillWhat ? DEFAULT_CATEGORY_SEARCH_WHAT : initialBaseWhat;
 		const baseWhy = shouldAutoFillWhat
 			? getCategorySearchWhyForWhat(baseWhat)
 			: (base?.why ?? whyValue);
@@ -3304,7 +3302,10 @@ const DashboardContent = () => {
 				shouldDirty: true,
 			});
 			// Call onSubmit directly with the search data
-			onSubmit({ searchText: combinedSearch, excludeUsedContacts: form.getValues('excludeUsedContacts') ?? false });
+			onSubmit({
+				searchText: combinedSearch,
+				excludeUsedContacts: form.getValues('excludeUsedContacts') ?? false,
+			});
 		}
 	};
 
@@ -3320,9 +3321,7 @@ const DashboardContent = () => {
 		// Where without What would build "[Booking] (Maine)" with no category — default
 		// to Wine/Beer/Spirits so the curated search has a real category to filter on.
 		const shouldAutoFillWhat = trimmedWhere.length > 0 && !trimmedWhat;
-		const effectiveWhat = shouldAutoFillWhat
-			? DEFAULT_CATEGORY_SEARCH_WHAT
-			: whatValue;
+		const effectiveWhat = shouldAutoFillWhat ? DEFAULT_CATEGORY_SEARCH_WHAT : whatValue;
 		const effectiveWhy = shouldAutoFillWhat
 			? getCategorySearchWhyForWhat(effectiveWhat)
 			: whyValue;
@@ -3333,7 +3332,10 @@ const DashboardContent = () => {
 
 		// Build the combined search query
 		const formattedWhere = trimmedWhere ? `(${trimmedWhere})` : '';
-		const combinedSearch = [effectiveWhy, effectiveWhat, formattedWhere].filter(Boolean).join(' ').trim();
+		const combinedSearch = [effectiveWhy, effectiveWhat, formattedWhere]
+			.filter(Boolean)
+			.join(' ')
+			.trim();
 
 		// Set form value and submit
 		if (combinedSearch && form && onSubmit) {
@@ -3365,8 +3367,7 @@ const DashboardContent = () => {
 
 		// Match the active-section pill timing (0.6s) and easing.
 		const dropdownEase = 'cubic-bezier(0.22, 1, 0.36, 1)';
-		const dropdownTransition =
-			`left 0.6s ${dropdownEase}, height 0.6s ${dropdownEase}`;
+		const dropdownTransition = `left 0.6s ${dropdownEase}, height 0.6s ${dropdownEase}`;
 		// Slightly faster than the pill, per UX request.
 		const dropdownFadeTransition = `opacity 0.35s ${dropdownEase}`;
 		const isMapBottomCategoryDropdown =
@@ -3415,13 +3416,11 @@ const DashboardContent = () => {
 			whereQuery.length > 0
 				? allWhereStateNames.filter((stateName) => {
 						const stateNameLower = stateName.toLowerCase();
-						const stateAbbrLower =
-							getStateAbbreviation(stateName)?.toLowerCase() ?? '';
+						const stateAbbrLower = getStateAbbreviation(stateName)?.toLowerCase() ?? '';
 						return (
-							stateNameLower.includes(whereQuery) ||
-							stateAbbrLower.includes(whereQuery)
+							stateNameLower.includes(whereQuery) || stateAbbrLower.includes(whereQuery)
 						);
-				  })
+					})
 				: DEFAULT_STATE_SUGGESTIONS.map((suggestion) => suggestion.label);
 		const nearbyWhereStateNames =
 			activeSection === 'where' && isMapView && canonicalWhereState
@@ -3457,31 +3456,31 @@ const DashboardContent = () => {
 								transition: dropdownTransition,
 								willChange: 'height',
 								zIndex: 140,
-						  }
+							}
 						: isMapView
-						? {
-								position: 'fixed',
-								// In map view, the mini search bar is overlaid on the map,
-								// so the dropdown should anchor just below it.
-								// Search bar is fixed at 33px and the input is 49px tall; add a small gap.
-								top: '92px',
-								left: isBelowMd ? '50%' : dropdownLeft,
-								transform: isBelowMd ? 'translateX(-50%)' : undefined,
-								height: dropdownHeight,
-								transition: dropdownTransition,
-								willChange: 'left, height',
-								// Ensure dropdown appears above the overlaid search bar.
-								zIndex: 140,
-						  }
-						: {
-								position: 'absolute',
-								top: 'calc(100% + 10px)',
-								left: isBelowMd ? '50%' : dropdownLeft,
-								transform: isBelowMd ? 'translateX(-50%)' : undefined,
-								height: dropdownHeight,
-								transition: dropdownTransition,
-								willChange: 'left, height',
-						  }
+							? {
+									position: 'fixed',
+									// In map view, the mini search bar is overlaid on the map,
+									// so the dropdown should anchor just below it.
+									// Search bar is fixed at 33px and the input is 49px tall; add a small gap.
+									top: '92px',
+									left: isBelowMd ? '50%' : dropdownLeft,
+									transform: isBelowMd ? 'translateX(-50%)' : undefined,
+									height: dropdownHeight,
+									transition: dropdownTransition,
+									willChange: 'left, height',
+									// Ensure dropdown appears above the overlaid search bar.
+									zIndex: 140,
+								}
+							: {
+									position: 'absolute',
+									top: 'calc(100% + 10px)',
+									left: isBelowMd ? '50%' : dropdownLeft,
+									transform: isBelowMd ? 'translateX(-50%)' : undefined,
+									height: dropdownHeight,
+									transition: dropdownTransition,
+									willChange: 'left, height',
+								}
 				}
 			>
 				{/* Cross-fade the inner content so height changes don't "lift" it. */}
@@ -3771,10 +3770,7 @@ const DashboardContent = () => {
 							)}
 
 							{whereDropdownLocations.map((loc, idx) => {
-								const { icon, backgroundColor } = getCityIconProps(
-									loc.city,
-									loc.state
-								);
+								const { icon, backgroundColor } = getCityIconProps(loc.city, loc.state);
 								return (
 									<div
 										key={`${loc.city}-${loc.state}-${loc.label}-${idx}`}
@@ -3940,9 +3936,7 @@ const DashboardContent = () => {
 
 	// Responsive sizing for hero logo (shrink with viewport width, but keep sensible min/max)
 	// NOTE: We keep the same aspect ratio as the previous desktop size (300x79).
-	const logoWidth = isMobile
-		? 'clamp(150px, 45vw, 190px)'
-		: 'clamp(180px, 30vw, 300px)';
+	const logoWidth = isMobile ? 'clamp(150px, 45vw, 190px)' : 'clamp(180px, 30vw, 300px)';
 	const logoHeight = isMobile
 		? 'clamp(39.5px, 11.85vw, 50px)'
 		: 'clamp(47.4px, 7.9vw, 79px)';
@@ -3983,46 +3977,49 @@ const DashboardContent = () => {
 		[]
 	);
 
-	const setHeroSearchGradientPlaybackRate = useCallback((nextPlaybackRate: number | null) => {
-		const gradientEl = heroSearchGradientButtonRef.current;
-		if (!gradientEl) return;
+	const setHeroSearchGradientPlaybackRate = useCallback(
+		(nextPlaybackRate: number | null) => {
+			const gradientEl = heroSearchGradientButtonRef.current;
+			if (!gradientEl) return;
 
-		if (typeof window !== 'undefined') {
-			if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
-		}
-
-		const animations = gradientEl.getAnimations();
-		if (animations.length === 0) return;
-
-		if (typeof nextPlaybackRate === 'number') {
-			// Capture original rates on first hover so we can restore precisely.
-			if (!heroSearchGradientAnimRestoreRef.current) {
-				heroSearchGradientAnimRestoreRef.current = new Map(
-					animations.map((anim) => [anim, anim.playbackRate])
-				);
+			if (typeof window !== 'undefined') {
+				if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
 			}
-			animations.forEach((anim) => {
+
+			const animations = gradientEl.getAnimations();
+			if (animations.length === 0) return;
+
+			if (typeof nextPlaybackRate === 'number') {
+				// Capture original rates on first hover so we can restore precisely.
+				if (!heroSearchGradientAnimRestoreRef.current) {
+					heroSearchGradientAnimRestoreRef.current = new Map(
+						animations.map((anim) => [anim, anim.playbackRate])
+					);
+				}
+				animations.forEach((anim) => {
+					try {
+						anim.updatePlaybackRate(nextPlaybackRate);
+					} catch {
+						// Fallback: set synchronously if updatePlaybackRate isn't available for some reason.
+						anim.playbackRate = nextPlaybackRate;
+					}
+				});
+				return;
+			}
+
+			const restoreMap = heroSearchGradientAnimRestoreRef.current;
+			if (!restoreMap) return;
+			restoreMap.forEach((rate, anim) => {
 				try {
-					anim.updatePlaybackRate(nextPlaybackRate);
+					anim.updatePlaybackRate(rate);
 				} catch {
-					// Fallback: set synchronously if updatePlaybackRate isn't available for some reason.
-					anim.playbackRate = nextPlaybackRate;
+					anim.playbackRate = rate;
 				}
 			});
-			return;
-		}
-
-		const restoreMap = heroSearchGradientAnimRestoreRef.current;
-		if (!restoreMap) return;
-		restoreMap.forEach((rate, anim) => {
-			try {
-				anim.updatePlaybackRate(rate);
-			} catch {
-				anim.playbackRate = rate;
-			}
-		});
-		heroSearchGradientAnimRestoreRef.current = null;
-	}, []);
+			heroSearchGradientAnimRestoreRef.current = null;
+		},
+		[]
+	);
 	// Derive title for contacts without one (e.g., "Restaurants New York")
 	const derivedContactTitle = useMemo(() => {
 		if (!whatValue) return undefined;
@@ -4090,8 +4087,7 @@ const DashboardContent = () => {
 		fromHome: fromHomeParam,
 		disableAutoCreateCampaign: isAddToCampaignMode,
 	});
-	const shouldEnableMapStateCategorySelection =
-		isMapView && isMapBottomCategoryMode;
+	const shouldEnableMapStateCategorySelection = isMapView && isMapBottomCategoryMode;
 
 	const handleMapStateSelect = useCallback(
 		(stateName: string) => {
@@ -4121,7 +4117,9 @@ const DashboardContent = () => {
 			// Keep the last executed Why/What (the map is showing results for this query),
 			// and only swap the state for the next search.
 			const baseWhy = (extractWhyFromSearchQuery(activeSearchQuery) || whyValue).trim();
-			const baseWhat = (extractWhatFromSearchQuery(activeSearchQuery) || whatValue).trim();
+			const baseWhat = (
+				extractWhatFromSearchQuery(activeSearchQuery) || whatValue
+			).trim();
 			triggerSearchWithWhere(nextState, false, { why: baseWhy, what: baseWhat });
 		},
 		[
@@ -4169,8 +4167,7 @@ const DashboardContent = () => {
 				]);
 				if (loc) {
 					inferredWhere =
-						normalizeUsStateName(loc.regionCode) ??
-						normalizeUsStateName(loc.region);
+						normalizeUsStateName(loc.regionCode) ?? normalizeUsStateName(loc.region);
 				}
 			} catch {
 				// Non-fatal — falls through to the random-state fallback below.
@@ -4270,10 +4267,7 @@ const DashboardContent = () => {
 			if (Math.abs(zoom - DASHBOARD_MAP_ZOOM_DEFAULT) < 0.002) {
 				document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
 			} else {
-				document.documentElement.style.setProperty(
-					DASHBOARD_ZOOM_VAR,
-					zoom.toFixed(3)
-				);
+				document.documentElement.style.setProperty(DASHBOARD_ZOOM_VAR, zoom.toFixed(3));
 			}
 		};
 
@@ -4326,8 +4320,7 @@ const DashboardContent = () => {
 			// won't have captured lat/lon in the URL the way a refresh-resume does. Match the
 			// "For You" submit by trying `getApproximateLocation` so the curated picks are
 			// location-aware instead of falling back to an unrestricted sample.
-			const hasCapturedCoords =
-				curatedLatParam != null && curatedLonParam != null;
+			const hasCapturedCoords = curatedLatParam != null && curatedLonParam != null;
 			void (async () => {
 				let lat = curatedLatParam;
 				let lon = curatedLonParam;
@@ -4353,8 +4346,7 @@ const DashboardContent = () => {
 
 		if (!dashboardSearchParam) return;
 
-		const restoredCategorySearch =
-			parseCategorySearchQuery(dashboardSearchParam);
+		const restoredCategorySearch = parseCategorySearchQuery(dashboardSearchParam);
 
 		// If we already have results, don't re-run the hydration search.
 		if (hasSearched && activeSearchQuery.trim().length > 0) {
@@ -4476,8 +4468,7 @@ const DashboardContent = () => {
 
 		if (!fromCampaignSearchParam) return;
 
-		const restoredCategorySearch =
-			parseCategorySearchQuery(fromCampaignSearchParam);
+		const restoredCategorySearch = parseCategorySearchQuery(fromCampaignSearchParam);
 
 		// If we already have results, don't re-run the hydration search.
 		if (hasSearched && activeSearchQuery.trim().length > 0) {
@@ -4574,7 +4565,8 @@ const DashboardContent = () => {
 		// they're distinguished by which `lastXxxArgs` snapshot is set. Persist whichever
 		// mode is active and strip the other so a refresh can't accidentally cross-replay.
 		const inCuratedMode = isCuratedSearchActive && lastCuratedArgs != null;
-		const inFreeTextMode = isCuratedSearchActive && lastFreeTextArgs != null && !inCuratedMode;
+		const inFreeTextMode =
+			isCuratedSearchActive && lastFreeTextArgs != null && !inCuratedMode;
 		writeCuratedParams(params, inCuratedMode ? lastCuratedArgs : null);
 		writeFreeTextParams(
 			params,
@@ -4583,7 +4575,7 @@ const DashboardContent = () => {
 						lat: lastFreeTextArgs?.lat ?? null,
 						lon: lastFreeTextArgs?.lon ?? null,
 						radiusKm: lastFreeTextArgs?.radiusKm ?? null,
-				  }
+					}
 				: null
 		);
 
@@ -4677,7 +4669,8 @@ const DashboardContent = () => {
 		// Curated and free-text travel under their own short-key namespaces so the rehydration
 		// effect can branch on whichever flag is present.
 		const inCuratedMode = isCuratedSearchActive && lastCuratedArgs != null;
-		const inFreeTextMode = isCuratedSearchActive && lastFreeTextArgs != null && !inCuratedMode;
+		const inFreeTextMode =
+			isCuratedSearchActive && lastFreeTextArgs != null && !inCuratedMode;
 		writeCuratedParams(params, inCuratedMode ? lastCuratedArgs : null);
 		writeFreeTextParams(
 			params,
@@ -4686,7 +4679,7 @@ const DashboardContent = () => {
 						lat: lastFreeTextArgs?.lat ?? null,
 						lon: lastFreeTextArgs?.lon ?? null,
 						radiusKm: lastFreeTextArgs?.radiusKm ?? null,
-				  }
+					}
 				: null
 		);
 
@@ -4790,17 +4783,12 @@ const DashboardContent = () => {
 			form.setValue('searchText', FROM_HOME_SEARCH_QUERY);
 			form.handleSubmit(onSubmit)();
 		}, 100);
-	}, [
-		activeSearchQuery,
-		form,
-		fromHomeParam,
-		hasSearched,
-		isSignedIn,
-		onSubmit,
-	]);
+	}, [activeSearchQuery, form, fromHomeParam, hasSearched, isSignedIn, onSubmit]);
 
 	// Batch update for assigning titles to contacts without one
-	const { mutateAsync: batchUpdateContacts } = useBatchUpdateContacts({ suppressToasts: true });
+	const { mutateAsync: batchUpdateContacts } = useBatchUpdateContacts({
+		suppressToasts: true,
+	});
 
 	const handleAddSelectedToCampaign = useCallback(async () => {
 		if (!isAddToCampaignMode) return;
@@ -4825,7 +4813,8 @@ const DashboardContent = () => {
 			// For restaurant/coffee shop searches, update ALL contacts; otherwise only those without a title
 			if (derivedContactTitle && contacts) {
 				const contactsToUpdate = contacts.filter(
-					(c) => selectedContacts.includes(c.id) && 
+					(c) =>
+						selectedContacts.includes(c.id) &&
 						(shouldForceApplyDerivedTitle || (!c.title && !c.headline))
 				);
 				if (contactsToUpdate.length > 0) {
@@ -4885,8 +4874,7 @@ const DashboardContent = () => {
 		setSelectedContacts,
 	]);
 
-	const activeCampaignUserContactListId =
-		activeCampaign?.userContactLists?.[0]?.id;
+	const activeCampaignUserContactListId = activeCampaign?.userContactLists?.[0]?.id;
 
 	const handleAddSelectedToActiveCampaign = useCallback(async () => {
 		if (selectedContacts.length === 0) {
@@ -4944,9 +4932,7 @@ const DashboardContent = () => {
 				`${addedCount} contact${addedCount === 1 ? '' : 's'} added to ${activeCampaign.name}`
 			);
 
-			router.push(
-				`${urls.murmur.campaign.detail(activeCampaignId)}?origin=search`
-			);
+			router.push(`${urls.murmur.campaign.detail(activeCampaignId)}?origin=search`);
 		} catch (error) {
 			console.error('Error adding contacts to active campaign:', error);
 			toast.error('Failed to add contacts to campaign');
@@ -4988,23 +4974,27 @@ const DashboardContent = () => {
 	// Booking zoom-in "extra" pins come from the map-overlay endpoint and are not part of the
 	// primary `contacts` list. Keep a local cache so selected/clicked overlay pins can appear
 	// as rows in the map side panel.
-	const [mapPanelExtraContacts, setMapPanelExtraContacts] = useState<ContactWithName[]>([]);
+	const [mapPanelExtraContacts, setMapPanelExtraContacts] = useState<ContactWithName[]>(
+		[]
+	);
 	// Live (viewport-driven) overlay pins that match the active "What" (Zillow-style panel updates).
 	const [mapPanelVisibleOverlayContacts, setMapPanelVisibleOverlayContacts] = useState<
 		ContactWithName[]
 	>([]);
 	// Sticky (per-selected-contact) search-derived headline so selected items keep their
 	// category identity (e.g. Wedding Planner) across subsequent searches in the same map session.
-	const [selectedContactStickyHeadlineById, setSelectedContactStickyHeadlineById] = useState<
-		Record<number, string>
-	>({});
+	const [selectedContactStickyHeadlineById, setSelectedContactStickyHeadlineById] =
+		useState<Record<number, string>>({});
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
+	const [isMapSearchEngaged, setIsMapSearchEngaged] = useState(true);
+	const [mapSearchAutoFitRequestNonce, setMapSearchAutoFitRequestNonce] = useState(0);
+	const lastMapSearchEngagementKeyRef = useRef('');
 	// Per-category visibility driven by the tall-stack tile toggles in grab mode.
 	// True = tile is colored (visible on map); false = tile is gray (hidden).
 	// Indexes follow MAP_SELECT_GRAB_CATEGORY_TITLE_PREFIXES order.
-	const [mapGrabActiveCategories, setMapGrabActiveCategories] = useState<readonly boolean[]>(
-		() => new Array(MAP_SELECT_GRAB_CATEGORY_COUNT).fill(true)
-	);
+	const [mapGrabActiveCategories, setMapGrabActiveCategories] = useState<
+		readonly boolean[]
+	>(() => new Array(MAP_SELECT_GRAB_CATEGORY_COUNT).fill(true));
 	const handleMapGrabActiveCategoriesChange = useCallback(
 		(active: readonly boolean[]) => {
 			setMapGrabActiveCategories((prev) => {
@@ -5038,15 +5028,19 @@ const DashboardContent = () => {
 	} | null>(null);
 	const mapZoomControlRequestRafRef = useRef<number | null>(null);
 	const [selectAllInViewNonce, setSelectAllInViewNonce] = useState(0);
-	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] = useState<ContactWithName | null>(
+	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] =
+		useState<ContactWithName | null>(null);
+	// When hovering a row in the map side panel, highlight/show the corresponding marker on the map.
+	const [hoveredMapPanelContactId, setHoveredMapPanelContactId] = useState<number | null>(
 		null
 	);
-	// When hovering a row in the map side panel, highlight/show the corresponding marker on the map.
-	const [hoveredMapPanelContactId, setHoveredMapPanelContactId] = useState<number | null>(null);
 	// Show loading in the map panel when:
 	// 1. A search is actively pending/loading, OR
 	// 2. We're in fromHome mode and the search hasn't been executed yet (user not signed in or waiting for search trigger)
-	const isMapResultsLoading = isSearchPending || isLoadingContacts || isRefetchingContacts ||
+	const isMapResultsLoading =
+		isSearchPending ||
+		isLoadingContacts ||
+		isRefetchingContacts ||
 		(fromHomeParam && isMapView && (!isSignedIn || !hasSearched));
 	const shouldRenderSearchResultsStage =
 		activeTab === 'search' &&
@@ -5159,7 +5153,10 @@ const DashboardContent = () => {
 		const refs = [mapPanelRowsDesktopRef.current, mapPanelRowsNarrowRef.current];
 		for (const container of refs) {
 			if (!container) continue;
-			const rows = Array.from(container.children).slice(0, CASCADE_MAX_ROWS) as HTMLElement[];
+			const rows = Array.from(container.children).slice(
+				0,
+				CASCADE_MAX_ROWS
+			) as HTMLElement[];
 			if (rows.length === 0) continue;
 
 			// Set every row to the placeholder wave state before the browser paints.
@@ -5184,35 +5181,40 @@ const DashboardContent = () => {
 
 			// Schedule the cascade: each row flips to its real appearance one at a time.
 			rows.forEach((row, idx) => {
-				const timer = setTimeout(() => {
-					const targetBg =
-						row.dataset.cascadeBg && row.dataset.cascadeBg.length > 0 ? row.dataset.cascadeBg : '#FFFFFF';
-					delete row.dataset.cascadeBg;
+				const timer = setTimeout(
+					() => {
+						const targetBg =
+							row.dataset.cascadeBg && row.dataset.cascadeBg.length > 0
+								? row.dataset.cascadeBg
+								: '#FFFFFF';
+						delete row.dataset.cascadeBg;
 
-					// Freeze the wave at its current color, then tween to the final bg.
-					const waveBg = getComputedStyle(row).backgroundColor;
-					row.style.animation = '';
-					row.style.animationDelay = '';
-					row.style.willChange = '';
-					row.style.backgroundColor = waveBg;
+						// Freeze the wave at its current color, then tween to the final bg.
+						const waveBg = getComputedStyle(row).backgroundColor;
+						row.style.animation = '';
+						row.style.animationDelay = '';
+						row.style.willChange = '';
+						row.style.backgroundColor = waveBg;
 
-					const children = Array.from(row.children) as HTMLElement[];
-					gsap.killTweensOf(row);
-					gsap.killTweensOf(children);
+						const children = Array.from(row.children) as HTMLElement[];
+						gsap.killTweensOf(row);
+						gsap.killTweensOf(children);
 
-					gsap.to(row, {
-						backgroundColor: targetBg,
-						duration: 0.26,
-						ease: 'power1.out',
-					});
-					gsap.to(children, {
-						opacity: 1,
-						duration: 0.22,
-						delay: 0.02,
-						ease: 'power1.out',
-						clearProps: 'opacity',
-					});
-				}, CASCADE_INITIAL_DELAY_MS + idx * CASCADE_STAGGER_MS);
+						gsap.to(row, {
+							backgroundColor: targetBg,
+							duration: 0.26,
+							ease: 'power1.out',
+						});
+						gsap.to(children, {
+							opacity: 1,
+							duration: 0.22,
+							delay: 0.02,
+							ease: 'power1.out',
+							clearProps: 'opacity',
+						});
+					},
+					CASCADE_INITIAL_DELAY_MS + idx * CASCADE_STAGGER_MS
+				);
 				cascadeTimersRef.current.push(timer);
 			});
 		}
@@ -5310,11 +5312,15 @@ const DashboardContent = () => {
 		MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX * MAP_VIEW_UI_SCALE;
 	const SEARCH_THIS_AREA_GAP_PX = 45;
 	const SEARCH_THIS_AREA_BUTTON_TOP_PX =
-		MAP_VIEW_SEARCH_BAR_TOP_PX + MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX + SEARCH_THIS_AREA_GAP_PX;
+		MAP_VIEW_SEARCH_BAR_TOP_PX +
+		MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX +
+		SEARCH_THIS_AREA_GAP_PX;
 
 	const [isSearchThisAreaCtaVisible, setIsSearchThisAreaCtaVisible] = useState(false);
 	const searchThisAreaCtaTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-	const lastSearchThisAreaViewportRef = useRef<SearchThisAreaViewportIdlePayload | null>(null);
+	const lastSearchThisAreaViewportRef = useRef<SearchThisAreaViewportIdlePayload | null>(
+		null
+	);
 
 	const clearSearchThisAreaCtaTimer = useCallback(() => {
 		if (!searchThisAreaCtaTimeoutRef.current) return;
@@ -5330,6 +5336,48 @@ const DashboardContent = () => {
 	const handleMapViewportInteraction = useCallback(() => {
 		hideSearchThisAreaCta();
 	}, [hideSearchThisAreaCta]);
+
+	const mapSearchEngagementKey = useMemo(() => {
+		const query = activeSearchQuery.trim();
+		if (!hasSearched || !query) return '';
+		const bboxKey = mapBboxFilter
+			? `${mapBboxFilter.south.toFixed(4)},${mapBboxFilter.west.toFixed(4)},${mapBboxFilter.north.toFixed(4)},${mapBboxFilter.east.toFixed(4)}`
+			: 'no-bbox';
+		return `${query}|${bboxKey}`;
+	}, [activeSearchQuery, hasSearched, mapBboxFilter]);
+
+	useEffect(() => {
+		if (!mapSearchEngagementKey) {
+			lastMapSearchEngagementKeyRef.current = '';
+			setIsMapSearchEngaged(true);
+			return;
+		}
+
+		if (lastMapSearchEngagementKeyRef.current === mapSearchEngagementKey) return;
+		lastMapSearchEngagementKeyRef.current = mapSearchEngagementKey;
+		setIsMapSearchEngaged(true);
+	}, [mapSearchEngagementKey]);
+
+	const canDisengageMapSearch =
+		isMapView &&
+		hasSearched &&
+		activeSearchQuery.trim().length > 0 &&
+		!isMapResultsLoading;
+
+	const handleEmptyMapClick = useCallback(() => {
+		if (!canDisengageMapSearch) return;
+		setIsMapSearchEngaged(false);
+		setActiveMapTool('grab');
+		setActiveSection(null);
+		hideSearchThisAreaCta();
+	}, [canDisengageMapSearch, hideSearchThisAreaCta]);
+
+	const handleMapTopSearchReengage = useCallback(() => {
+		if (!isMapView || !hasSearched || activeSearchQuery.trim().length === 0) return;
+		setIsMapSearchEngaged(true);
+		setMapSearchAutoFitRequestNonce((nonce) => nonce + 1);
+		hideSearchThisAreaCta();
+	}, [activeSearchQuery, hasSearched, hideSearchThisAreaCta, isMapView]);
 
 	const handleMapViewportZoom = useCallback(
 		(zoom: number) => {
@@ -5409,7 +5457,13 @@ const DashboardContent = () => {
 	// Hide CTA whenever the map view or search state changes.
 	useEffect(() => {
 		hideSearchThisAreaCta();
-	}, [activeSearchQuery, hideSearchThisAreaCta, isMapResultsLoading, isMapView, mapBboxFilter]);
+	}, [
+		activeSearchQuery,
+		hideSearchThisAreaCta,
+		isMapResultsLoading,
+		isMapView,
+		mapBboxFilter,
+	]);
 
 	const handleSelectMapToolClick = useCallback(() => {
 		// First click: activate Select tool. Second click: toggle back to grab.
@@ -5425,10 +5479,12 @@ const DashboardContent = () => {
 
 	const [isMapBottomSearchActive, setIsMapBottomSearchActive] = useState(false);
 	const [mapBottomSearchValue, setMapBottomSearchValue] = useState('');
-	const [initialDashboardSearchSuggestionSeeds, setInitialDashboardSearchSuggestionSeeds] =
-		useState<InitialDashboardSearchSuggestionSeed[]>(
-			getDefaultInitialDashboardSearchSuggestionSeeds
-		);
+	const [
+		initialDashboardSearchSuggestionSeeds,
+		setInitialDashboardSearchSuggestionSeeds,
+	] = useState<InitialDashboardSearchSuggestionSeed[]>(
+		getDefaultInitialDashboardSearchSuggestionSeeds
+	);
 	const [mapBottomSearchActiveHeight, setMapBottomSearchActiveHeight] = useState<number>(
 		MAP_RESULTS_BOTTOM_SEARCH_BOX.activeHeight
 	);
@@ -5462,7 +5518,8 @@ const DashboardContent = () => {
 
 		const loadSuggestions = async () => {
 			const params = new URLSearchParams();
-			let approximateLocation: Awaited<ReturnType<typeof getApproximateLocation>> | null = null;
+			let approximateLocation: Awaited<ReturnType<typeof getApproximateLocation>> | null =
+				null;
 
 			try {
 				const loc = await Promise.race([
@@ -5494,8 +5551,8 @@ const DashboardContent = () => {
 				const data = (await response.json()) as SearchSuggestionsApiResponse;
 				const nearbyStates = (data.location?.nearbyStates ?? [])
 					.map(coerceInitialDashboardSuggestionState)
-					.filter(
-						(state): state is InitialDashboardSearchSuggestionState => Boolean(state)
+					.filter((state): state is InitialDashboardSearchSuggestionState =>
+						Boolean(state)
 					);
 				const responseLocation = coerceInitialDashboardSuggestionLocation(
 					data.location?.city,
@@ -5518,7 +5575,9 @@ const DashboardContent = () => {
 							DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[index] ??
 							DEFAULT_INITIAL_DASHBOARD_SEARCH_SUGGESTION_STATES[0];
 						const location =
-							(index === 0 ? responseLocation ?? approximateSuggestionLocation : null) ??
+							(index === 0
+								? (responseLocation ?? approximateSuggestionLocation)
+								: null) ??
 							allSuggestionLocations.find(
 								(candidate) => candidate.state.abbr === state.abbr
 							) ??
@@ -5526,11 +5585,7 @@ const DashboardContent = () => {
 
 						return { label, state, location };
 					})
-					.filter(
-						(
-							seed
-						): seed is InitialDashboardSearchSuggestionSeed => Boolean(seed)
-					)
+					.filter((seed): seed is InitialDashboardSearchSuggestionSeed => Boolean(seed))
 					.slice(0, INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT);
 
 				if (
@@ -5576,10 +5631,7 @@ const DashboardContent = () => {
 
 		const previousHeight = input.style.height;
 		input.style.height = '0px';
-		const nextHeight = Math.min(
-			maxHeight,
-			Math.max(baseHeight, input.scrollHeight)
-		);
+		const nextHeight = Math.min(maxHeight, Math.max(baseHeight, input.scrollHeight));
 		input.style.height = previousHeight;
 
 		setMapBottomSearchActiveHeight((current) =>
@@ -5599,56 +5651,59 @@ const DashboardContent = () => {
 	// list, and selection just update. Empty input → no-op (don't accidentally
 	// kick off a curated re-roll). Available on the free trial — no demo-mode
 	// gate here.
-	const submitMapBottomSearchQuery = useCallback(async (query: string) => {
-		const q = query.trim();
-		if (!q) return;
-		mapBottomSearchInputRef.current?.blur();
-		setIsMapBottomSearchActive(false);
-		setMapBottomSearchValue('');
-		primeFreeTextSearch(q);
+	const submitMapBottomSearchQuery = useCallback(
+		async (query: string) => {
+			const q = query.trim();
+			if (!q) return;
+			mapBottomSearchInputRef.current?.blur();
+			setIsMapBottomSearchActive(false);
+			setMapBottomSearchValue('');
+			primeFreeTextSearch(q);
 
-		// First search of the session creates the active campaign (in parallel
-		// with the actual search). Skip in URL-pinned add-to-campaign mode and
-		// in fromHome demo mode; in either case there's nothing to materialize.
-		if (!isAddToCampaignMode && !isFromHomeDemoMode) {
-			void ensureActiveCampaign(q);
-		}
-
-		let lat: number | null = null;
-		let lon: number | null = null;
-		try {
-			const loc = await Promise.race([
-				getApproximateLocation(),
-				new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
-			]);
-			if (loc) {
-				lat = loc.lat;
-				lon = loc.lon;
+			// First search of the session creates the active campaign (in parallel
+			// with the actual search). Skip in URL-pinned add-to-campaign mode and
+			// in fromHome demo mode; in either case there's nothing to materialize.
+			if (!isAddToCampaignMode && !isFromHomeDemoMode) {
+				void ensureActiveCampaign(q);
 			}
-		} catch {
-			// If the coarse IP lookup fails, fall back to a zoomed-in map viewport.
-		}
 
-		if (lat == null || lon == null) {
-			const viewport = lastSearchThisAreaViewportRef.current;
-			if (viewport && viewport.zoom >= SEARCH_THIS_AREA_MIN_ZOOM) {
-				lat = viewport.center.lat;
-				lon = viewport.center.lng;
+			let lat: number | null = null;
+			let lon: number | null = null;
+			try {
+				const loc = await Promise.race([
+					getApproximateLocation(),
+					new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+				]);
+				if (loc) {
+					lat = loc.lat;
+					lon = loc.lon;
+				}
+			} catch {
+				// If the coarse IP lookup fails, fall back to a zoomed-in map viewport.
 			}
-		}
 
-		triggerFreeTextSearch(q, {
-			lat: lat ?? undefined,
-			lon: lon ?? undefined,
-			radiusKm: lat != null && lon != null ? 250 : undefined,
-		}).catch(() => undefined);
-	}, [
-		primeFreeTextSearch,
-		triggerFreeTextSearch,
-		ensureActiveCampaign,
-		isAddToCampaignMode,
-		isFromHomeDemoMode,
-	]);
+			if (lat == null || lon == null) {
+				const viewport = lastSearchThisAreaViewportRef.current;
+				if (viewport && viewport.zoom >= SEARCH_THIS_AREA_MIN_ZOOM) {
+					lat = viewport.center.lat;
+					lon = viewport.center.lng;
+				}
+			}
+
+			triggerFreeTextSearch(q, {
+				lat: lat ?? undefined,
+				lon: lon ?? undefined,
+				radiusKm: lat != null && lon != null ? 250 : undefined,
+			}).catch(() => undefined);
+		},
+		[
+			primeFreeTextSearch,
+			triggerFreeTextSearch,
+			ensureActiveCampaign,
+			isAddToCampaignMode,
+			isFromHomeDemoMode,
+		]
+	);
 
 	const handleMapBottomSearchSubmit = useCallback(async () => {
 		await submitMapBottomSearchQuery(mapBottomSearchValue);
@@ -5688,9 +5743,10 @@ const DashboardContent = () => {
 		}, 220);
 	}, [cancelMapBottomSearchFollowupPreviewClear, mapBottomSearchFollowupPreview]);
 
-	useEffect(() => cancelMapBottomSearchFollowupPreviewClear, [
-		cancelMapBottomSearchFollowupPreviewClear,
-	]);
+	useEffect(
+		() => cancelMapBottomSearchFollowupPreviewClear,
+		[cancelMapBottomSearchFollowupPreviewClear]
+	);
 
 	const handleMapBottomForYouSubmit = useCallback(async () => {
 		cancelMapBottomSearchFollowupPreviewClear();
@@ -5849,7 +5905,9 @@ const DashboardContent = () => {
 	]);
 
 	const [isPointerInMapSidePanel, setIsPointerInMapSidePanel] = useState(false);
-	const [selectedCategoryChips, setSelectedCategoryChips] = useState<Set<string>>(new Set());
+	const [selectedCategoryChips, setSelectedCategoryChips] = useState<Set<string>>(
+		new Set()
+	);
 
 	const shouldUseDynamicMapCreateCampaignCta =
 		isMapView &&
@@ -5962,12 +6020,9 @@ const DashboardContent = () => {
 		}, MAP_RESEARCH_PANEL_HOLD_MS);
 	}, [hoveredMapMarkerContact, isMapView, isMapResultsLoading]);
 
-	const handleMapMarkerHover = useCallback(
-		(contact: ContactWithName | null) => {
-			setHoveredMapMarkerContact(contact);
-		},
-		[]
-	);
+	const handleMapMarkerHover = useCallback((contact: ContactWithName | null) => {
+		setHoveredMapMarkerContact(contact);
+	}, []);
 
 	const mapResearchPanelCompactHeightPx = useMemo(() => {
 		const metadata = mapResearchPanelContact?.metadata;
@@ -5999,10 +6054,12 @@ const DashboardContent = () => {
 	const isMusicVenuesSearch =
 		searchWhatLower.includes('music venue') || /^venues?$/.test(searchWhatLower.trim());
 	const isRestaurantsSearch = searchWhatLower.includes('restaurant');
-	const isCoffeeShopsSearch = searchWhatLower.includes('coffee shop') || searchWhatLower.includes('coffee shops');
+	const isCoffeeShopsSearch =
+		searchWhatLower.includes('coffee shop') || searchWhatLower.includes('coffee shops');
 	// Treat "Festivals" as shorthand for "Music Festivals" but avoid matching "Beer Festivals", etc.
 	const isMusicFestivalsSearch =
-		searchWhatLower.includes('music festival') || /^festivals?$/.test(searchWhatLower.trim());
+		searchWhatLower.includes('music festival') ||
+		/^festivals?$/.test(searchWhatLower.trim());
 	const isWeddingPlannersSearch = searchWhatLower.includes('wedding planner');
 
 	const searchedWhere = useMemo(
@@ -6196,7 +6253,9 @@ const DashboardContent = () => {
 		const baseList = !searchedStateAbbrForMap
 			? allContacts
 			: allContacts.filter((contact) => {
-					const contactStateAbbr = getStateAbbreviation(contact.state || '').trim().toUpperCase();
+					const contactStateAbbr = getStateAbbreviation(contact.state || '')
+						.trim()
+						.toUpperCase();
 					return contactStateAbbr === searchedStateAbbrForMap;
 				});
 
@@ -6270,7 +6329,9 @@ const DashboardContent = () => {
 			if (!searchedStateAbbrForMap) continue;
 			const c = byId.get(id);
 			if (!c) continue;
-			const contactStateAbbr = getStateAbbreviation(c.state || '').trim().toUpperCase();
+			const contactStateAbbr = getStateAbbreviation(c.state || '')
+				.trim()
+				.toUpperCase();
 			if (contactStateAbbr && contactStateAbbr !== searchedStateAbbrForMap) {
 				idsToPin.push(id);
 			}
@@ -6287,7 +6348,14 @@ const DashboardContent = () => {
 			}
 			return changed ? Array.from(next) : prev;
 		});
-	}, [isMapView, selectedContacts, contacts, mapPanelExtraContacts, baseContactIdSet, searchedStateAbbrForMap]);
+	}, [
+		isMapView,
+		selectedContacts,
+		contacts,
+		mapPanelExtraContacts,
+		baseContactIdSet,
+		searchedStateAbbrForMap,
+	]);
 
 	// Check if all panel contacts are selected (for map view "Select all" button)
 	const isAllPanelContactsSelected = useMemo(() => {
@@ -6305,17 +6373,37 @@ const DashboardContent = () => {
 	);
 
 	// Maps a contact to one of the chip keys (or null) — mirrors the row renderer's category pill priority.
-	const getChipKeyForContact = useCallback((contact: ContactWithName): string | null => {
-		const isInBase = baseContactIdSet.has(contact.id);
-		const headline = contact.curatedDisplayLabel || contact.headline || contact.title || '';
-		if ((isInBase && isRestaurantsSearch) || isRestaurantTitle(headline)) return 'restaurants';
-		if ((isInBase && isCoffeeShopsSearch) || isCoffeeShopTitle(headline)) return 'coffee-shops';
-		if ((isInBase && isMusicVenuesSearch) || isMusicVenueTitle(headline)) return 'music-venues';
-		if ((isInBase && isMusicFestivalsSearch) || isMusicFestivalTitle(headline)) return 'festivals';
-		if ((isInBase && isWeddingPlannersSearch) || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) return 'wedding-planners';
-		if (isWineBeerSpiritsTitle(headline)) return 'wine-beer-spirits';
-		return null;
-	}, [baseContactIdSet, isRestaurantsSearch, isCoffeeShopsSearch, isMusicVenuesSearch, isMusicFestivalsSearch, isWeddingPlannersSearch]);
+	const getChipKeyForContact = useCallback(
+		(contact: ContactWithName): string | null => {
+			const isInBase = baseContactIdSet.has(contact.id);
+			const headline =
+				contact.curatedDisplayLabel || contact.headline || contact.title || '';
+			if ((isInBase && isRestaurantsSearch) || isRestaurantTitle(headline))
+				return 'restaurants';
+			if ((isInBase && isCoffeeShopsSearch) || isCoffeeShopTitle(headline))
+				return 'coffee-shops';
+			if ((isInBase && isMusicVenuesSearch) || isMusicVenueTitle(headline))
+				return 'music-venues';
+			if ((isInBase && isMusicFestivalsSearch) || isMusicFestivalTitle(headline))
+				return 'festivals';
+			if (
+				(isInBase && isWeddingPlannersSearch) ||
+				isWeddingPlannerTitle(headline) ||
+				isWeddingVenueTitle(headline)
+			)
+				return 'wedding-planners';
+			if (isWineBeerSpiritsTitle(headline)) return 'wine-beer-spirits';
+			return null;
+		},
+		[
+			baseContactIdSet,
+			isRestaurantsSearch,
+			isCoffeeShopsSearch,
+			isMusicVenuesSearch,
+			isMusicFestivalsSearch,
+			isWeddingPlannersSearch,
+		]
+	);
 
 	// Set of chip keys present in the panel results — drives which chips are visible at the bottom.
 	const mapPanelCategoryKeys = useMemo(() => {
@@ -6418,7 +6506,12 @@ const DashboardContent = () => {
 			backgroundColor: TAB_PILL_COLORS[hoveredTab],
 			opacity: 1,
 		});
-		gsap.set(whitePill, { y: 0, yPercent: -50, x: getTabPillXFor(activeTab), opacity: 1 });
+		gsap.set(whitePill, {
+			y: 0,
+			yPercent: -50,
+			x: getTabPillXFor(activeTab),
+			opacity: 1,
+		});
 	}, [activeTab, hoveredTab, hasSearched]);
 
 	useEffect(() => {
@@ -6572,8 +6665,7 @@ const DashboardContent = () => {
 		!fromHomeParam &&
 		!isMapView &&
 		!shouldUnlockLandingDashboardScroll;
-	const shouldLockDashboardPageScroll =
-		isMapView || shouldLockLandingDashboardScroll;
+	const shouldLockDashboardPageScroll = isMapView || shouldLockLandingDashboardScroll;
 
 	// The calendar panel's natural height can exceed the locked-100vh wrapper on shorter
 	// monitors, which clips its bottom row. Treat it the same way the open campaign finder
@@ -6581,8 +6673,7 @@ const DashboardContent = () => {
 	// `h-screen overflow-hidden` clipper) while still preventing the page from scrolling.
 	const isCalendarPanelOpen =
 		!hasSearched && activeTab === 'search' && selectedActionBarIcon === 'calendar';
-	const isOverflowingDashboardPanelOpen =
-		isCampaignFinderOpen || isCalendarPanelOpen;
+	const isOverflowingDashboardPanelOpen = isCampaignFinderOpen || isCalendarPanelOpen;
 
 	// Lock body scroll when in map view or on the initial desktop dashboard.
 	useLayoutEffect(() => {
@@ -6626,7 +6717,6 @@ const DashboardContent = () => {
 		isOverflowingDashboardPanelOpen,
 	]);
 
-
 	// When the campaign finder OR the calendar panel is open we allow the panel to overflow
 	// the viewport (overflow: visible) so it can paint past the locked-100vh wrapper at its
 	// full height. We still want to prevent the *page* from scrolling, so we intercept
@@ -6643,7 +6733,15 @@ const DashboardContent = () => {
 		};
 
 		const preventKeyScroll = (e: KeyboardEvent) => {
-			const scrollKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '];
+			const scrollKeys = [
+				'ArrowUp',
+				'ArrowDown',
+				'PageUp',
+				'PageDown',
+				'Home',
+				'End',
+				' ',
+			];
 			if (!scrollKeys.includes(e.key)) return;
 
 			const target = e.target as HTMLElement;
@@ -7133,6 +7231,9 @@ const DashboardContent = () => {
 	const mapPresentation: 'background' | 'interactive' =
 		!fromHomeParam && !hasSearched ? 'background' : 'interactive';
 	const shouldSpinBackgroundMap = mapPresentation === 'background';
+	const shouldShowSearchGeometryOnMap = !hasSearched || isMapSearchEngaged;
+	const shouldShowAmbientContactsOnMap = canDisengageMapSearch && !isMapSearchEngaged;
+	const shouldPreloadAmbientContactsOnMap = canDisengageMapSearch && isMapSearchEngaged;
 
 	const contactsForMap = useMemo(() => {
 		const sourceContacts =
@@ -7159,31 +7260,31 @@ const DashboardContent = () => {
 	const searchWhatForMap =
 		fromHomeParam && (!isSignedIn || !hasSearched) ? FROM_HOME_WHAT : searchedWhat;
 
-	const lockedStateNameForMap =
-		mapPresentation === 'background'
-			? null
-			: mapBboxFilter
-				? null
-				: fromHomeParam && (!isSignedIn || !hasSearched)
-					? 'CA'
-					: searchedStateAbbrForMap;
+	const lockedStateNameForMap = (() => {
+		if (mapPresentation === 'background') return null;
+		if (!shouldShowSearchGeometryOnMap) return null;
+		if (mapBboxFilter) return null;
+		if (fromHomeParam && (!isSignedIn || !hasSearched)) return 'CA';
+		return searchedStateAbbrForMap;
+	})();
 
 	const skipAutoFitForMap =
-		mapPresentation === 'background'
-			? true
-			: (fromHomeParam && (!isSignedIn || !hasSearched)) || Boolean(mapBboxFilter);
+		mapPresentation === 'background' ||
+		!shouldShowSearchGeometryOnMap ||
+		(fromHomeParam && (!isSignedIn || !hasSearched)) ||
+		Boolean(mapBboxFilter);
 
 	const selectedAreaBoundsForMap = useMemo(
 		() =>
-			mapBboxFilter
+			shouldShowSearchGeometryOnMap && mapBboxFilter
 				? {
 						south: mapBboxFilter.south,
 						west: mapBboxFilter.west,
 						north: mapBboxFilter.north,
 						east: mapBboxFilter.east,
-				  }
+					}
 				: null,
-		[mapBboxFilter]
+		[mapBboxFilter, shouldShowSearchGeometryOnMap]
 	);
 
 	// Fullscreen map view "frame" animation.
@@ -7195,7 +7296,10 @@ const DashboardContent = () => {
 	const MAP_VIEW_FRAME_BORDER_PX = 0;
 	const mapViewFrameTransition = `${DASHBOARD_TO_INTERACTIVE_TRANSITION_MS}ms ${DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING}`;
 	const mapViewInnerInsetPx = MAP_VIEW_FRAME_INSET_PX + MAP_VIEW_FRAME_BORDER_PX;
-	const mapViewInnerRadiusPx = Math.max(0, MAP_VIEW_FRAME_RADIUS_PX - MAP_VIEW_FRAME_BORDER_PX);
+	const mapViewInnerRadiusPx = Math.max(
+		0,
+		MAP_VIEW_FRAME_RADIUS_PX - MAP_VIEW_FRAME_BORDER_PX
+	);
 	const mapViewClip = isMapView
 		? `inset(${mapViewInnerInsetPx}px round ${mapViewInnerRadiusPx}px)`
 		: 'inset(0px round 0px)';
@@ -7324,9 +7428,7 @@ const DashboardContent = () => {
 				const selectedContact = fromBase ?? fromOverlay ?? fromExtra;
 				if (selectedContact) {
 					setMapPanelExtraContacts((prev) =>
-						prev.some((c) => c.id === contactId)
-							? prev
-							: [selectedContact, ...prev]
+						prev.some((c) => c.id === contactId) ? prev : [selectedContact, ...prev]
 					);
 				}
 			}
@@ -7339,9 +7441,7 @@ const DashboardContent = () => {
 			});
 
 			const tryScroll = (attempt = 0) => {
-				const contactElement = document.querySelector(
-					`[data-contact-id="${contactId}"]`
-				);
+				const contactElement = document.querySelector(`[data-contact-id="${contactId}"]`);
 				if (contactElement) {
 					contactElement.scrollIntoView({
 						behavior: 'smooth',
@@ -7372,11 +7472,23 @@ const DashboardContent = () => {
 			nightLighting: globeNightLighting,
 			presentation: mapPresentation,
 			autoSpin: shouldSpinBackgroundMap,
-			contacts: contactsForMap,
-			selectedContacts,
-			externallyHoveredContactId: hoveredMapPanelContactId,
-			searchQuery: activeSearchQuery,
-			searchWhat: searchWhatForMap,
+			contacts: shouldShowSearchGeometryOnMap ? contactsForMap : [],
+			selectedContacts: shouldShowSearchGeometryOnMap ? selectedContacts : [],
+			externallyHoveredContactId: shouldShowSearchGeometryOnMap
+				? hoveredMapPanelContactId
+				: null,
+			searchQuery: shouldShowSearchGeometryOnMap ? activeSearchQuery : '',
+			searchWhat: shouldShowSearchGeometryOnMap ? searchWhatForMap : null,
+			searchEngaged: shouldShowSearchGeometryOnMap,
+			ambientContactsEnabled: shouldShowAmbientContactsOnMap,
+			ambientContactsPreloadEnabled: shouldPreloadAmbientContactsOnMap,
+			ambientActiveCategories: mapGrabActiveCategories,
+			ambientUncategorizedActive: mapGrabUncategorizedActive,
+			autoFitRequestNonce: mapSearchAutoFitRequestNonce,
+			emptyMapClickPrompt:
+				canDisengageMapSearch && isMapSearchEngaged ? 'Click to see all contacts' : null,
+			onEmptyMapClick:
+				canDisengageMapSearch && isMapSearchEngaged ? handleEmptyMapClick : undefined,
 			disableDotWaveReveal: isMapView,
 			selectAllInViewNonce: isMapView ? selectAllInViewNonce : undefined,
 			onVisibleOverlayContactsChange: isMapView
@@ -7393,7 +7505,9 @@ const DashboardContent = () => {
 			lockedStateName: lockedStateNameForMap,
 			skipAutoFit: skipAutoFitForMap,
 			enableStateInteractions: shouldEnableMapStateCategorySelection,
-			onStateSelect: shouldEnableMapStateCategorySelection ? handleMapStateSelect : undefined,
+			onStateSelect: shouldEnableMapStateCategorySelection
+				? handleMapStateSelect
+				: undefined,
 			isLoading: isSearchPending || isLoadingContacts || isRefetchingContacts,
 			onMarkerClick: isMapView ? handleMapMarkerClick : undefined,
 			onToggleSelection: isMapView ? handleMapToggleSelection : undefined,
@@ -7401,12 +7515,14 @@ const DashboardContent = () => {
 		[
 			activeMapTool,
 			activeSearchQuery,
+			canDisengageMapSearch,
 			contactsForMap,
 			globeNightLighting,
 			globeWeatherMood,
 			globeWeatherRegionCenter,
 			globeWeatherTemperatureF,
 			handleMapAreaSelect,
+			handleEmptyMapClick,
 			handleMapMarkerClick,
 			handleMapMarkerHover,
 			handleMapStateSelect,
@@ -7416,11 +7532,15 @@ const DashboardContent = () => {
 			handleMapViewportZoom,
 			handleMapVisibleOverlayContactsChange,
 			hoveredMapPanelContactId,
+			isMapSearchEngaged,
 			isLoadingContacts,
 			isMapView,
 			isRefetchingContacts,
 			isSearchPending,
 			lockedStateNameForMap,
+			mapGrabActiveCategories,
+			mapGrabUncategorizedActive,
+			mapSearchAutoFitRequestNonce,
 			mapPresentation,
 			mapZoomControlRequest,
 			searchWhatForMap,
@@ -7428,6 +7548,9 @@ const DashboardContent = () => {
 			selectedContacts,
 			selectAllInViewNonce,
 			shouldEnableMapStateCategorySelection,
+			shouldShowSearchGeometryOnMap,
+			shouldShowAmbientContactsOnMap,
+			shouldPreloadAmbientContactsOnMap,
 			shouldSpinBackgroundMap,
 			skipAutoFitForMap,
 		]
@@ -7488,7 +7611,11 @@ const DashboardContent = () => {
 				<div style={{ marginTop: hasCampaigns ? '12px' : '40px' }}>
 					<CampaignsInboxView
 						hideSearchBar
-						containerHeight={hasCampaigns ? 'calc(100dvh - 120px - env(safe-area-inset-bottom, 0px))' : 'calc(100dvh - 60px - env(safe-area-inset-bottom, 0px))'}
+						containerHeight={
+							hasCampaigns
+								? 'calc(100dvh - 120px - env(safe-area-inset-bottom, 0px))'
+								: 'calc(100dvh - 60px - env(safe-area-inset-bottom, 0px))'
+						}
 					/>
 				</div>
 			</div>
@@ -7512,16 +7639,16 @@ const DashboardContent = () => {
 		? MAP_RESULTS_BOTTOM_CATEGORY_SEARCH_BOX.width
 		: isMapBottomForYouMode
 			? MAP_RESULTS_BOTTOM_SEARCH_BOX.activeWidth
-		: isMapBottomSearchExpanded
-			? MAP_RESULTS_BOTTOM_SEARCH_BOX.activeWidth
-			: MAP_RESULTS_BOTTOM_SEARCH_BOX.width;
+			: isMapBottomSearchExpanded
+				? MAP_RESULTS_BOTTOM_SEARCH_BOX.activeWidth
+				: MAP_RESULTS_BOTTOM_SEARCH_BOX.width;
 	const mapBottomSearchShellHeight = isMapBottomCategoryMode
 		? MAP_RESULTS_BOTTOM_CATEGORY_SEARCH_BOX.height
 		: isMapBottomForYouMode
 			? MAP_RESULTS_BOTTOM_SEARCH_BOX.activeHeight
-		: isMapBottomSearchExpanded
-			? mapBottomSearchActiveHeight
-			: MAP_RESULTS_BOTTOM_SEARCH_BOX.height;
+			: isMapBottomSearchExpanded
+				? mapBottomSearchActiveHeight
+				: MAP_RESULTS_BOTTOM_SEARCH_BOX.height;
 	const activeMapBottomCategoryField =
 		isMapBottomCategoryMode &&
 		isMapBottomCategoryDropdownActive &&
@@ -7541,9 +7668,7 @@ const DashboardContent = () => {
 		const fullName = contact.name || `${firstName} ${lastName}`.trim();
 		const company = contact.company || '';
 		const searchDerivedHeadline =
-			whatValue && whereValue
-				? `${whatValue} ${whereValue}`
-				: whatValue || '';
+			whatValue && whereValue ? `${whatValue} ${whereValue}` : whatValue || '';
 		const isSpecialCategorySearch =
 			/^restaurants?$/i.test(whatValue.trim()) ||
 			/^coffee\s*shops?$/i.test(whatValue.trim());
@@ -7558,10 +7683,8 @@ const DashboardContent = () => {
 				? searchDerivedHeadline
 				: contactHeadline || searchDerivedHeadline
 			: contactHeadline;
-		const stickyHeadline =
-			selectedContactStickyHeadlineById[contact.id] || '';
-		const headline =
-			isSelected && stickyHeadline ? stickyHeadline : computedHeadline;
+		const stickyHeadline = selectedContactStickyHeadlineById[contact.id] || '';
+		const headline = isSelected && stickyHeadline ? stickyHeadline : computedHeadline;
 		const isRestaurantsSearchForContact = isRestaurantsSearch && isInBaseResults;
 		const isCoffeeShopsSearchForContact = isCoffeeShopsSearch && isInBaseResults;
 		const isMusicVenuesSearchForContact = isMusicVenuesSearch && isInBaseResults;
@@ -7577,37 +7700,49 @@ const DashboardContent = () => {
 				className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-[3px] border-[#ABABAB] select-none relative"
 				style={{
 					backgroundColor: isSelected
-						? (isRestaurantsSearchForContact || isRestaurantTitle(headline))
-							? isHovered ? '#C5F5D1' : '#D7FFE1'
-							: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
-								? isHovered ? '#DDF4CC' : '#EDFEDC'
-								: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
-									? isHovered ? '#C5E8FF' : '#D7F0FF'
-									: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
-										? isHovered ? '#ADD4FF' : '#BFDCFF'
-										: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
-											? isHovered ? '#F5EDCE' : '#FFF8DC'
+						? isRestaurantsSearchForContact || isRestaurantTitle(headline)
+							? isHovered
+								? '#C5F5D1'
+								: '#D7FFE1'
+							: isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline)
+								? isHovered
+									? '#DDF4CC'
+									: '#EDFEDC'
+								: isMusicVenuesSearchForContact || isMusicVenueTitle(headline)
+									? isHovered
+										? '#C5E8FF'
+										: '#D7F0FF'
+									: isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline)
+										? isHovered
+											? '#ADD4FF'
+											: '#BFDCFF'
+										: isWeddingPlannersSearchForContact ||
+											  isWeddingPlannerTitle(headline) ||
+											  isWeddingVenueTitle(headline)
+											? isHovered
+												? '#F5EDCE'
+												: '#FFF8DC'
 											: isWineBeerSpiritsTitle(headline)
-												? isHovered ? '#C8CBFF' : '#DADDFF'
-												: isHovered ? '#BFE3FF' : '#C9EAFF'
+												? isHovered
+													? '#C8CBFF'
+													: '#DADDFF'
+												: isHovered
+													? '#BFE3FF'
+													: '#C9EAFF'
 						: isHovered
 							? '#F3F4F6'
 							: '#FFFFFF',
 				}}
 				onClick={() => {
 					if (isSelected) {
-						setSelectedContacts(
-							selectedContacts.filter((id) => id !== contact.id)
-						);
+						setSelectedContacts(selectedContacts.filter((id) => id !== contact.id));
 					} else {
 						setSelectedContacts([...selectedContacts, contact.id]);
 					}
 				}}
 				onMouseEnter={() => setHoveredMapPanelContactId(contact.id)}
 				onMouseLeave={() =>
-					setHoveredMapPanelContactId((prev) =>
-						prev === contact.id ? null : prev
-					)
+					setHoveredMapPanelContactId((prev) => (prev === contact.id ? null : prev))
 				}
 			>
 				{fullName ? (
@@ -7618,23 +7753,32 @@ const DashboardContent = () => {
 							</div>
 						</div>
 						<div className="pr-2 pl-1 flex items-center h-[23px]">
-							{(headline || isMusicVenuesSearchForContact || isRestaurantsSearchForContact || isCoffeeShopsSearchForContact || isMusicFestivalsSearchForContact || isWeddingPlannersSearchForContact) ? (
+							{headline ||
+							isMusicVenuesSearchForContact ||
+							isRestaurantsSearchForContact ||
+							isCoffeeShopsSearchForContact ||
+							isMusicFestivalsSearchForContact ||
+							isWeddingPlannersSearchForContact ? (
 								<div
 									className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 									style={{
-										backgroundColor: (isRestaurantsSearchForContact || isRestaurantTitle(headline))
-											? '#C3FBD1'
-											: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
-												? '#D6F1BD'
-												: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
-													? '#B7E5FF'
-													: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
-														? '#C1D6FF'
-														: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
-															? '#FFF8DC'
-															: isWineBeerSpiritsTitle(headline)
-																? '#BFC4FF'
-																: '#E8EFFF',
+										backgroundColor:
+											isRestaurantsSearchForContact || isRestaurantTitle(headline)
+												? '#C3FBD1'
+												: isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline)
+													? '#D6F1BD'
+													: isMusicVenuesSearchForContact || isMusicVenueTitle(headline)
+														? '#B7E5FF'
+														: isMusicFestivalsSearchForContact ||
+															  isMusicFestivalTitle(headline)
+															? '#C1D6FF'
+															: isWeddingPlannersSearchForContact ||
+																  isWeddingPlannerTitle(headline) ||
+																  isWeddingVenueTitle(headline)
+																? '#FFF8DC'
+																: isWineBeerSpiritsTitle(headline)
+																	? '#BFC4FF'
+																	: '#E8EFFF',
 									}}
 								>
 									{(isRestaurantsSearchForContact || isRestaurantTitle(headline)) && (
@@ -7646,27 +7790,30 @@ const DashboardContent = () => {
 									{(isMusicVenuesSearchForContact || isMusicVenueTitle(headline)) && (
 										<MusicVenuesIcon size={12} className="flex-shrink-0" />
 									)}
-									{(isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline)) && (
+									{(isMusicFestivalsSearchForContact ||
+										isMusicFestivalTitle(headline)) && (
 										<FestivalsIcon size={12} className="flex-shrink-0" />
 									)}
-									{(isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
-										<WeddingPlannersIcon size={12} />
-									)}
+									{(isWeddingPlannersSearchForContact ||
+										isWeddingPlannerTitle(headline) ||
+										isWeddingVenueTitle(headline)) && <WeddingPlannersIcon size={12} />}
 									{isWineBeerSpiritsTitle(headline) && (
 										<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
 									)}
 									<span className="text-[10px] text-black leading-none truncate">
-										{(isRestaurantsSearchForContact || isRestaurantTitle(headline))
+										{isRestaurantsSearchForContact || isRestaurantTitle(headline)
 											? 'Restaurant'
-											: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
+											: isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline)
 												? 'Coffee Shop'
-												: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
+												: isMusicVenuesSearchForContact || isMusicVenueTitle(headline)
 													? 'Music Venue'
-													: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
+													: isMusicFestivalsSearchForContact ||
+														  isMusicFestivalTitle(headline)
 														? 'Music Festival'
 														: isWeddingVenueTitle(headline)
 															? 'Wedding Venue'
-															: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline))
+															: isWeddingPlannersSearchForContact ||
+																  isWeddingPlannerTitle(headline)
 																? 'Wedding Planner'
 																: isWineBeerSpiritsTitle(headline)
 																	? getWineBeerSpiritsLabel(headline)
@@ -7689,8 +7836,7 @@ const DashboardContent = () => {
 										<span
 											className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
 											style={{
-												backgroundColor:
-													stateBadgeColorMap[stateAbbr] || 'transparent',
+												backgroundColor: stateBadgeColorMap[stateAbbr] || 'transparent',
 												borderColor: '#000000',
 											}}
 										>
@@ -7716,23 +7862,32 @@ const DashboardContent = () => {
 							</div>
 						</div>
 						<div className="pr-2 pl-1 flex items-center h-[23px]">
-							{(headline || isMusicVenuesSearchForContact || isRestaurantsSearchForContact || isCoffeeShopsSearchForContact || isMusicFestivalsSearchForContact || isWeddingPlannersSearchForContact) ? (
+							{headline ||
+							isMusicVenuesSearchForContact ||
+							isRestaurantsSearchForContact ||
+							isCoffeeShopsSearchForContact ||
+							isMusicFestivalsSearchForContact ||
+							isWeddingPlannersSearchForContact ? (
 								<div
 									className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 									style={{
-										backgroundColor: (isRestaurantsSearchForContact || isRestaurantTitle(headline))
-											? '#C3FBD1'
-											: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
-												? '#D6F1BD'
-												: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
-													? '#B7E5FF'
-													: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
-														? '#C1D6FF'
-														: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
-															? '#FFF8DC'
-															: isWineBeerSpiritsTitle(headline)
-																? '#BFC4FF'
-																: '#E8EFFF',
+										backgroundColor:
+											isRestaurantsSearchForContact || isRestaurantTitle(headline)
+												? '#C3FBD1'
+												: isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline)
+													? '#D6F1BD'
+													: isMusicVenuesSearchForContact || isMusicVenueTitle(headline)
+														? '#B7E5FF'
+														: isMusicFestivalsSearchForContact ||
+															  isMusicFestivalTitle(headline)
+															? '#C1D6FF'
+															: isWeddingPlannersSearchForContact ||
+																  isWeddingPlannerTitle(headline) ||
+																  isWeddingVenueTitle(headline)
+																? '#FFF8DC'
+																: isWineBeerSpiritsTitle(headline)
+																	? '#BFC4FF'
+																	: '#E8EFFF',
 									}}
 								>
 									{(isRestaurantsSearchForContact || isRestaurantTitle(headline)) && (
@@ -7744,27 +7899,30 @@ const DashboardContent = () => {
 									{(isMusicVenuesSearchForContact || isMusicVenueTitle(headline)) && (
 										<MusicVenuesIcon size={12} className="flex-shrink-0" />
 									)}
-									{(isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline)) && (
+									{(isMusicFestivalsSearchForContact ||
+										isMusicFestivalTitle(headline)) && (
 										<FestivalsIcon size={12} className="flex-shrink-0" />
 									)}
-									{(isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
-										<WeddingPlannersIcon size={12} />
-									)}
+									{(isWeddingPlannersSearchForContact ||
+										isWeddingPlannerTitle(headline) ||
+										isWeddingVenueTitle(headline)) && <WeddingPlannersIcon size={12} />}
 									{isWineBeerSpiritsTitle(headline) && (
 										<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
 									)}
 									<span className="text-[10px] text-black leading-none truncate">
-										{(isRestaurantsSearchForContact || isRestaurantTitle(headline))
+										{isRestaurantsSearchForContact || isRestaurantTitle(headline)
 											? 'Restaurant'
-											: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
+											: isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline)
 												? 'Coffee Shop'
-												: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
+												: isMusicVenuesSearchForContact || isMusicVenueTitle(headline)
 													? 'Music Venue'
-													: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
+													: isMusicFestivalsSearchForContact ||
+														  isMusicFestivalTitle(headline)
 														? 'Music Festival'
 														: isWeddingVenueTitle(headline)
 															? 'Wedding Venue'
-															: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline))
+															: isWeddingPlannersSearchForContact ||
+																  isWeddingPlannerTitle(headline)
 																? 'Wedding Planner'
 																: isWineBeerSpiritsTitle(headline)
 																	? getWineBeerSpiritsLabel(headline)
@@ -7782,8 +7940,7 @@ const DashboardContent = () => {
 										<span
 											className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
 											style={{
-												backgroundColor:
-													stateBadgeColorMap[stateAbbr] || 'transparent',
+												backgroundColor: stateBadgeColorMap[stateAbbr] || 'transparent',
 												borderColor: '#000000',
 											}}
 										>
@@ -7810,15 +7967,15 @@ const DashboardContent = () => {
 		<>
 			<style jsx global>{`
 				html:has(
-						[data-dashboard-scroll-lock='true']:not([data-campaign-finder-open='true']):not(
-								[data-calendar-panel-open='true']
-							)
-					),
+					[data-dashboard-scroll-lock='true']:not([data-campaign-finder-open='true']):not(
+							[data-calendar-panel-open='true']
+						)
+				),
 				body:has(
-						[data-dashboard-scroll-lock='true']:not([data-campaign-finder-open='true']):not(
-								[data-calendar-panel-open='true']
-							)
-					) {
+					[data-dashboard-scroll-lock='true']:not([data-campaign-finder-open='true']):not(
+							[data-calendar-panel-open='true']
+						)
+				) {
 					overflow: hidden !important;
 					height: 100vh !important;
 					overscroll-behavior: none !important;
@@ -7845,15 +8002,23 @@ const DashboardContent = () => {
 				}
 				.initial-dashboard-search-suggestion {
 					appearance: none;
-					background-color: var(--initial-dashboard-search-suggestion-background, #f8f8f8);
+					background-color: var(
+						--initial-dashboard-search-suggestion-background,
+						#f8f8f8
+					);
 					border: 0;
 					cursor: pointer;
 					opacity: var(--initial-dashboard-search-suggestion-opacity, 0.5);
 					text-align: left;
 					transform: translateY(0) scale(1);
 					transform-origin: center bottom;
-					transition: background-color 120ms ease, box-shadow 120ms ease, opacity 120ms ease, transform 120ms ease;
-					animation: initial-dashboard-search-suggestion-enter 320ms cubic-bezier(0, 0, 0.2, 1) backwards;
+					transition:
+						background-color 120ms ease,
+						box-shadow 120ms ease,
+						opacity 120ms ease,
+						transform 120ms ease;
+					animation: initial-dashboard-search-suggestion-enter 320ms
+						cubic-bezier(0, 0, 0.2, 1) backwards;
 					will-change: opacity, transform;
 				}
 				.initial-dashboard-search-suggestion:hover,
@@ -7887,115 +8052,118 @@ const DashboardContent = () => {
 			`}</style>
 			{/* Shared Mapbox globe background */}
 			{mapPortal}
-			{!hasSearched && activeTab === 'search' && !fromHomeParam && !isMapView && !isNarrowestDesktop && (
-				<div
-					className="fixed left-1/2 pointer-events-none"
-					onMouseEnter={cancelMapBottomSearchFollowupPreviewClear}
-					onMouseLeave={scheduleMapBottomSearchFollowupPreviewClear}
-					style={{
-						bottom: `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.bottomOffset}px`,
-						width: `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.width}px`,
-						height: `${mapBottomSearchActiveHeight}px`,
-						transform: 'translateX(-50%)',
-						transition: 'none',
-						zIndex: 70,
-					}}
-				>
-					{isMapBottomSearchExpanded && !isMapBottomCategoryMode && !isMapBottomForYouMode && (
-						<div
-							aria-label="Search suggestions"
-							className="absolute left-1/2 flex flex-col gap-[5px] pointer-events-none"
-							style={{
-								bottom: 'calc(100% + 12px)',
-								width: '404px',
-								transform: 'translateX(-50%)',
-							}}
-						>
-							{initialDashboardSearchSuggestions.map((label, index) => (
-								<button
-									type="button"
-									aria-label={`Search for ${label}`}
-									key={`initial-dashboard-search-suggestion-${index}`}
-									className="initial-dashboard-search-suggestion pointer-events-auto flex items-center overflow-hidden"
+			{!hasSearched &&
+				activeTab === 'search' &&
+				!fromHomeParam &&
+				!isMapView &&
+				!isNarrowestDesktop && (
+					<div
+						className="fixed left-1/2 pointer-events-none"
+						onMouseEnter={cancelMapBottomSearchFollowupPreviewClear}
+						onMouseLeave={scheduleMapBottomSearchFollowupPreviewClear}
+						style={{
+							bottom: `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.bottomOffset}px`,
+							width: `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.width}px`,
+							height: `${mapBottomSearchActiveHeight}px`,
+							transform: 'translateX(-50%)',
+							transition: 'none',
+							zIndex: 70,
+						}}
+					>
+						{isMapBottomSearchExpanded &&
+							!isMapBottomCategoryMode &&
+							!isMapBottomForYouMode && (
+								<div
+									aria-label="Search suggestions"
+									className="absolute left-1/2 flex flex-col gap-[5px] pointer-events-none"
 									style={{
+										bottom: 'calc(100% + 12px)',
 										width: '404px',
-										height: '29px',
-										borderRadius: '10px',
-										'--initial-dashboard-search-suggestion-background': '#F8F8F8',
-										'--initial-dashboard-search-suggestion-opacity':
-											INITIAL_DASHBOARD_ACTIVE_SEARCH_SUGGESTIONS[index]?.opacity ?? 0.5,
-										animationDelay: `${
-											(initialDashboardSearchSuggestions.length - 1 - index) * 48
-										}ms`,
-										boxSizing: 'border-box',
-										padding: '0 16px',
-									} as React.CSSProperties}
-									onMouseDown={(event) => {
-										event.preventDefault();
-										event.stopPropagation();
-									}}
-									onClick={(event) => {
-										event.stopPropagation();
-										handleInitialDashboardSearchSuggestionClick(label);
+										transform: 'translateX(-50%)',
 									}}
 								>
-									<span
-										className="truncate"
-										style={{
-											color: '#000000',
-											fontFamily: 'Inter, sans-serif',
-											fontSize: '12.809px',
-											fontStyle: 'normal',
-											fontWeight: 400,
-											lineHeight: '20.199px',
-										}}
-									>
-										{label}
-									</span>
-								</button>
-							))}
-						</div>
-					)}
-					<MapBottomSearchBar
-						value={mapBottomSearchValue}
-						isExpanded={isMapBottomSearchExpanded}
-						activeHeight={mapBottomSearchActiveHeight}
-						inputRef={mapBottomSearchInputRef}
-						appearance="initial-dashboard"
-						mode={
-							isMapBottomCategoryMode
-								? 'category'
-								: isMapBottomForYouMode
-									? 'for-you'
-									: 'anything'
-						}
-						categoryWhatValue={whatValue}
-						categoryWhereValue={whereValue}
-						activeCategoryField={activeMapBottomCategoryField}
-						onActivate={handleMapBottomSearchActivate}
-						onSubmit={handleMapBottomSearchSubmit}
-						onValueChange={setMapBottomSearchValue}
-						onActiveChange={setIsMapBottomSearchActive}
-						onCategoryFieldFocus={handleMapBottomCategoryFieldFocus}
-						onCategoryWhatChange={handleMapBottomCategoryWhatChange}
-						onCategoryWhereChange={handleMapBottomCategoryWhereChange}
-						onCategoryWhatEnter={handleMapBottomCategoryWhatEnter}
-						onCategorySubmit={handleMapBottomCategorySubmit}
-						onForYouSubmit={handleMapBottomForYouSubmit}
-					/>
-				</div>
-			)}
+									{initialDashboardSearchSuggestions.map((label, index) => (
+										<button
+											type="button"
+											aria-label={`Search for ${label}`}
+											key={`initial-dashboard-search-suggestion-${index}`}
+											className="initial-dashboard-search-suggestion pointer-events-auto flex items-center overflow-hidden"
+											style={
+												{
+													width: '404px',
+													height: '29px',
+													borderRadius: '10px',
+													'--initial-dashboard-search-suggestion-background': '#F8F8F8',
+													'--initial-dashboard-search-suggestion-opacity':
+														INITIAL_DASHBOARD_ACTIVE_SEARCH_SUGGESTIONS[index]?.opacity ??
+														0.5,
+													animationDelay: `${
+														(initialDashboardSearchSuggestions.length - 1 - index) * 48
+													}ms`,
+													boxSizing: 'border-box',
+													padding: '0 16px',
+												} as React.CSSProperties
+											}
+											onMouseDown={(event) => {
+												event.preventDefault();
+												event.stopPropagation();
+											}}
+											onClick={(event) => {
+												event.stopPropagation();
+												handleInitialDashboardSearchSuggestionClick(label);
+											}}
+										>
+											<span
+												className="truncate"
+												style={{
+													color: '#000000',
+													fontFamily: 'Inter, sans-serif',
+													fontSize: '12.809px',
+													fontStyle: 'normal',
+													fontWeight: 400,
+													lineHeight: '20.199px',
+												}}
+											>
+												{label}
+											</span>
+										</button>
+									))}
+								</div>
+							)}
+						<MapBottomSearchBar
+							value={mapBottomSearchValue}
+							isExpanded={isMapBottomSearchExpanded}
+							activeHeight={mapBottomSearchActiveHeight}
+							inputRef={mapBottomSearchInputRef}
+							appearance="initial-dashboard"
+							mode={
+								isMapBottomCategoryMode
+									? 'category'
+									: isMapBottomForYouMode
+										? 'for-you'
+										: 'anything'
+							}
+							categoryWhatValue={whatValue}
+							categoryWhereValue={whereValue}
+							activeCategoryField={activeMapBottomCategoryField}
+							onActivate={handleMapBottomSearchActivate}
+							onSubmit={handleMapBottomSearchSubmit}
+							onValueChange={setMapBottomSearchValue}
+							onActiveChange={setIsMapBottomSearchActive}
+							onCategoryFieldFocus={handleMapBottomCategoryFieldFocus}
+							onCategoryWhatChange={handleMapBottomCategoryWhatChange}
+							onCategoryWhereChange={handleMapBottomCategoryWhereChange}
+							onCategoryWhatEnter={handleMapBottomCategoryWhatEnter}
+							onCategorySubmit={handleMapBottomCategorySubmit}
+							onForYouSubmit={handleMapBottomForYouSubmit}
+						/>
+					</div>
+				)}
 
 			<div
-				data-dashboard-scroll-lock={
-					shouldLockDashboardPageScroll ? 'true' : undefined
-				}
-				data-campaign-finder-open={
-					isCampaignFinderOpen ? 'true' : undefined
-				}
-				data-calendar-panel-open={
-					isCalendarPanelOpen ? 'true' : undefined
-				}
+				data-dashboard-scroll-lock={shouldLockDashboardPageScroll ? 'true' : undefined}
+				data-campaign-finder-open={isCampaignFinderOpen ? 'true' : undefined}
+				data-calendar-panel-open={isCalendarPanelOpen ? 'true' : undefined}
 				className={
 					shouldLockDashboardPageScroll && !isOverflowingDashboardPanelOpen
 						? 'h-screen overflow-hidden'
@@ -8003,730 +8171,813 @@ const DashboardContent = () => {
 				}
 			>
 				<AppLayout>
-			<div
-				ref={dashboardContentRef}
-				className={`relative min-h-screen dashboard-main-offset w-full max-w-full transition-opacity duration-500 ${bottomPadding} ${
-					hasSearched ? 'search-active' : ''
-				} ${isMapView ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-				style={
-					hasSearched
-						? {
-								transform: 'scale(0.9)',
-								transformOrigin: 'top left',
-								width: '111.11%',
-								maxWidth: '111.11%',
-								minHeight: '111.11vh',
-						  }
-						: undefined
-				}
-			>
-				<div
-					className={`hero-wrapper flex flex-col items-center !z-[40] ${
-						activeTab === 'inbox' ? 'justify-start' : 'justify-center'
-					}`}
-				>
-					<div className="w-full">
+					<div
+						ref={dashboardContentRef}
+						className={`relative min-h-screen dashboard-main-offset w-full max-w-full transition-opacity duration-500 ${bottomPadding} ${
+							hasSearched ? 'search-active' : ''
+						} ${isMapView ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+						style={
+							hasSearched
+								? {
+										transform: 'scale(0.9)',
+										transformOrigin: 'top left',
+										width: '111.11%',
+										maxWidth: '111.11%',
+										minHeight: '111.11vh',
+									}
+								: undefined
+						}
+					>
 						<div
-							className="flex justify-center items-center w-full px-4"
-							style={{
-								marginBottom: '0.75rem',
-								marginTop: activeTab === 'inbox' ? '136px' : '320px',
-							}}
-						>
-							<div className="premium-hero-section flex flex-col items-center justify-center w-full max-w-[600px]">
-								<div
-									className="premium-logo-container flex items-center justify-center"
-									style={{ width: logoWidth, height: logoHeight }}
-								>
-									<MurmurLogoNew width={logoWidth} height={logoHeight} />
-								</div>
-							</div>
-						</div>
-
-						<div
-							className={`search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 max-[480px]:px-2 !z-[50] ${
-								hasSearched ? 'search-bar-active' : ''
+							className={`hero-wrapper flex flex-col items-center !z-[40] ${
+								activeTab === 'inbox' ? 'justify-start' : 'justify-center'
 							}`}
 						>
-							<div
-								className="origin-center w-full"
-								style={{
-									transform:
-										'scale(clamp(0.84, calc(0.72 + (100vw / 3333px)), 1.08))',
-								}}
-							>
-								<div className="search-bar-inner">
-								{hasSearched && activeSearchQuery && (
-									<div className="search-context-label">
-										<span className="search-query-text">{activeSearchQuery}</span>
-									</div>
-								)}
-								{!hasSearched && (
-									<Form {...form}>
-										<form
-											onSubmit={async (e) => {
-												e.preventDefault();
-
-												if (!isSignedIn) {
-													if (hasProblematicBrowser) {
-														console.log(
-															'[Dashboard] Edge/Safari detected, navigating to sign-in page'
-														);
-														if (typeof window !== 'undefined') {
-															sessionStorage.setItem(
-																'redirectAfterSignIn',
-																window.location.pathname
-															);
-														}
-														window.location.href = urls.signIn.index;
-													} else {
-														openSignIn();
-													}
-													return;
-												}
-
-												// Curated path: when why/what/where are all blank, the gradient/search
-												// button surfaces a randomly-curated set of nearby venues/restaurants/
-												// coffee shops/festivals/wineries/breweries via the Elasticsearch
-												// category sampler. Different every click. No location prompt.
-												const isWhyWhatWhereBlank =
-													!whyValue.trim() &&
-													!whatValue.trim() &&
-													!whereValue.trim();
-												if (isWhyWhatWhereBlank && !isFromHomeDemoMode) {
-													setActiveSection(null);
-													// Resolve coarse lat/lon from the user's IP (cached 24h,
-													// no permission prompt). Works locally and in prod —
-													// covers the gaps where Vercel headers aren't populated.
-													let lat: number | null = null;
-													let lon: number | null = null;
-													try {
-														const loc = await getApproximateLocation();
-														lat = loc.lat;
-														lon = loc.lon;
-													} catch {
-														// Non-fatal — backend still infers from headers if present
-														// and falls back to an unrestricted curated set otherwise.
-													}
-													await triggerCuratedSearch({
-														lat: lat ?? undefined,
-														lon: lon ?? undefined,
-													});
-													return;
-												}
-
-												await ensureNonEmptyDashboardSearchOnBlankSubmit();
-												if (activeTab === 'inbox') {
-													transitionToTab('search', {
-														after: () => {
-															form.handleSubmit(onSubmit)();
-														},
-													});
-													return;
-												}
-												form.handleSubmit(onSubmit)(e);
-											}}
-											className={hasSearched ? 'search-form-active' : ''}
+							<div className="w-full">
+								<div
+									className="flex justify-center items-center w-full px-4"
+									style={{
+										marginBottom: '0.75rem',
+										marginTop: activeTab === 'inbox' ? '136px' : '320px',
+									}}
+								>
+									<div className="premium-hero-section flex flex-col items-center justify-center w-full max-w-[600px]">
+										<div
+											className="premium-logo-container flex items-center justify-center"
+											style={{ width: logoWidth, height: logoHeight }}
 										>
-											<FormField
-												control={form.control}
-												name="searchText"
-												render={({ field }) => (
-													<FormItem>
-														<FormControl>
-															{/* Keep the hero search bar from stretching full-width at narrower widths. */}
-															<div className="mx-auto w-full max-w-[603px]">
-																<div
-																	ref={searchContainerRef}
-																	className={`search-input-group relative ${
-																		hasSearched ? 'search-input-group-active' : ''
-																	}`}
-																	onPointerEnter={(event) => {
-																		if (event.pointerType !== 'mouse' && event.pointerType !== 'pen')
-																			return;
-																		// "Almost halt" the animated gradient while hovered.
-																		setHeroSearchGradientPlaybackRate(0.08);
-																	}}
-																	onPointerLeave={(event) => {
-																		if (event.pointerType !== 'mouse' && event.pointerType !== 'pen')
-																			return;
-																		setHeroSearchGradientPlaybackRate(null);
-																	}}
-																>
-																<div
-																	className={`search-wave-container ${
-																		isSearchPending ||
-																		isLoadingContacts ||
-																		isRefetchingContacts
-																			? 'search-wave-loading'
-																			: ''
-																	}`}
-																	style={{
-																		transition: 'none',
-																		opacity: inboxView ? undefined : 0.8,
-																	}}
-																>
-																<Input
-																		className={`search-wave-input !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent ${
-																			inboxView
-																				? '!h-[39px] !border-0'
-																				: '!h-[72px] max-[480px]:!h-[60px] !border-2 !border-black'
-																		} pr-[70px] max-[480px]:pr-[58px] md:pr-[80px]`}
-																		placeholder=""
-																		style={{
-																			accentColor: 'transparent',
-																			transition: 'none',
-																			...(inboxView ? { backgroundColor: '#EFEFEF' } : {}),
-																		}}
-																		autoComplete="off"
-																		autoCorrect="off"
-																		autoCapitalize="off"
-																		spellCheck="false"
-																		{...field}
-																	/>
-																	{/* New 532x64px element - Added border-black and z-20 */}
-																	<div
-																		className={`search-sections-container absolute left-[4px] right-[68px] ${
-																			inboxView ? '' : 'max-[480px]:right-[56px]'
-																		} top-1/2 -translate-y-1/2 ${
-																			inboxView
-																				? 'h-[31px]'
-																				: 'h-[64px] max-[480px]:h-[52px]'
-																		} rounded-[8px] z-20 font-secondary flex items-center ${
-																			inboxView
-																				? 'bg-[#EFEFEF] border-0'
-																				: activeSection
-																					? 'bg-[#EFEFEF] border border-transparent'
-																					: 'bg-white border border-black'
-																		} ${inboxView ? '' : 'invisible pointer-events-none'}`}
-																		style={{ transition: 'none' }}
-																	>
-																	{/* Sliding active tab indicator */}
-																	<div
-																		ref={activeSectionIndicatorRef}
-																		className="absolute top-0 left-0 h-full w-1/3 bg-white border border-black rounded-[8px] pointer-events-none z-10"
-																		style={{ opacity: 0, willChange: 'transform' }}
-																	/>
-																		{/* Why Section */}
-																		<div
-																		className={`relative h-full cursor-pointer border flex-1 min-w-0 ${
-																			activeSection === 'why'
-																				? 'bg-transparent border-transparent rounded-[8px]'
-																				: `border-transparent ${
-																						activeSection
-																							? 'hover:bg-[#F9F9F9]'
-																							: 'hover:bg-black/5'
-																				  } rounded-l-[8px]`
-																		}`}
-																			onClick={() => {
-																				if (isFromHomeDemoMode) {
-																					setShowFreeTrialPrompt(true);
-																					return;
-																				}
-																				setActiveSection('why');
-																			}}
-																		>
+											<MurmurLogoNew width={logoWidth} height={logoHeight} />
+										</div>
+									</div>
+								</div>
+
+								<div
+									className={`search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 max-[480px]:px-2 !z-[50] ${
+										hasSearched ? 'search-bar-active' : ''
+									}`}
+								>
+									<div
+										className="origin-center w-full"
+										style={{
+											transform:
+												'scale(clamp(0.84, calc(0.72 + (100vw / 3333px)), 1.08))',
+										}}
+									>
+										<div className="search-bar-inner">
+											{hasSearched && activeSearchQuery && (
+												<div className="search-context-label">
+													<span className="search-query-text">{activeSearchQuery}</span>
+												</div>
+											)}
+											{!hasSearched && (
+												<Form {...form}>
+													<form
+														onSubmit={async (e) => {
+															e.preventDefault();
+
+															if (!isSignedIn) {
+																if (hasProblematicBrowser) {
+																	console.log(
+																		'[Dashboard] Edge/Safari detected, navigating to sign-in page'
+																	);
+																	if (typeof window !== 'undefined') {
+																		sessionStorage.setItem(
+																			'redirectAfterSignIn',
+																			window.location.pathname
+																		);
+																	}
+																	window.location.href = urls.signIn.index;
+																} else {
+																	openSignIn();
+																}
+																return;
+															}
+
+															// Curated path: when why/what/where are all blank, the gradient/search
+															// button surfaces a randomly-curated set of nearby venues/restaurants/
+															// coffee shops/festivals/wineries/breweries via the Elasticsearch
+															// category sampler. Different every click. No location prompt.
+															const isWhyWhatWhereBlank =
+																!whyValue.trim() &&
+																!whatValue.trim() &&
+																!whereValue.trim();
+															if (isWhyWhatWhereBlank && !isFromHomeDemoMode) {
+																setActiveSection(null);
+																// Resolve coarse lat/lon from the user's IP (cached 24h,
+																// no permission prompt). Works locally and in prod —
+																// covers the gaps where Vercel headers aren't populated.
+																let lat: number | null = null;
+																let lon: number | null = null;
+																try {
+																	const loc = await getApproximateLocation();
+																	lat = loc.lat;
+																	lon = loc.lon;
+																} catch {
+																	// Non-fatal — backend still infers from headers if present
+																	// and falls back to an unrestricted curated set otherwise.
+																}
+																await triggerCuratedSearch({
+																	lat: lat ?? undefined,
+																	lon: lon ?? undefined,
+																});
+																return;
+															}
+
+															await ensureNonEmptyDashboardSearchOnBlankSubmit();
+															if (activeTab === 'inbox') {
+																transitionToTab('search', {
+																	after: () => {
+																		form.handleSubmit(onSubmit)();
+																	},
+																});
+																return;
+															}
+															form.handleSubmit(onSubmit)(e);
+														}}
+														className={hasSearched ? 'search-form-active' : ''}
+													>
+														<FormField
+															control={form.control}
+															name="searchText"
+															render={({ field }) => (
+																<FormItem>
+																	<FormControl>
+																		{/* Keep the hero search bar from stretching full-width at narrower widths. */}
+																		<div className="mx-auto w-full max-w-[603px]">
 																			<div
-																				className={`absolute z-20 left-[24px] max-[480px]:left-[12px] ${
-																					inboxView
-																						? 'top-1/2 -translate-y-1/2 text-[14px]'
-																						: 'top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px]'
-																				} font-bold text-black leading-none`}
-																			>
-																				{inboxView ? (whyValue ? whyValue.replace(/[\[\]]/g, '') : 'Why') : 'Why'}
-																			</div>
-																			<div
-																				className={`absolute z-20 left-[24px] max-[480px]:left-[12px] right-[4px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden ${
-																					inboxView ? 'hidden' : ''
+																				ref={searchContainerRef}
+																				className={`search-input-group relative ${
+																					hasSearched ? 'search-input-group-active' : ''
 																				}`}
+																				onPointerEnter={(event) => {
+																					if (
+																						event.pointerType !== 'mouse' &&
+																						event.pointerType !== 'pen'
+																					)
+																						return;
+																					// "Almost halt" the animated gradient while hovered.
+																					setHeroSearchGradientPlaybackRate(0.08);
+																				}}
+																				onPointerLeave={(event) => {
+																					if (
+																						event.pointerType !== 'mouse' &&
+																						event.pointerType !== 'pen'
+																					)
+																						return;
+																					setHeroSearchGradientPlaybackRate(null);
+																				}}
 																			>
 																				<div
-																					className="absolute top-0 left-0 font-semibold text-[12px] whitespace-nowrap"
+																					className={`search-wave-container ${
+																						isSearchPending ||
+																						isLoadingContacts ||
+																						isRefetchingContacts
+																							? 'search-wave-loading'
+																							: ''
+																					}`}
 																					style={{
-																						height: '12px',
-																						lineHeight: '12px',
-																						padding: '0',
-																						margin: '0',
-																						color:
-																							whyValue && whyValue.trim().length > 0
-																								? '#000000'
-																								: 'rgba(0, 0, 0, 0.42)',
+																						transition: 'none',
+																						opacity: inboxView ? undefined : 0.8,
 																					}}
 																				>
-																					{whyValue || 'Choose Type of Search'}
-																				</div>
-																			</div>
-																		</div>
-																		<div
-																			className={`w-[2px] h-full bg-black/10 flex-shrink-0 ${
-																				activeSection || inboxView ? 'hidden' : ''
-																			}`}
-																		/>
-																		{/* What Section */}
-																		<div
-																		className={`relative h-full cursor-pointer border overflow-hidden flex-1 min-w-0 ${
-																			activeSection === 'what'
-																				? 'bg-transparent border-transparent rounded-[8px]'
-																				: `border-transparent ${
-																						activeSection
-																							? 'hover:bg-[#F9F9F9]'
-																							: 'hover:bg-black/5'
-																				  }`
-																		}`}
-																			onClick={() => {
-																				if (isFromHomeDemoMode) {
-																					setShowFreeTrialPrompt(true);
-																					return;
-																				}
-																				setActiveSection('what');
-																			}}
-																		>
-																			{inboxView ? (
-																				activeSection === 'what' ? (
-																					<input
-																						ref={whatInputRef}
-																						type="text"
-																						value={whatValue}
-																						onChange={(e) => {
-																							if (isFromHomeDemoMode) return;
-																							setWhatValue(e.target.value);
-																						}}
-																						readOnly={isFromHomeDemoMode}
-																						onKeyDown={(e) => {
-																							if (e.key === 'Enter') {
-																								e.preventDefault();
-																								setActiveSection(null);
-																							}
-																						}}
-																					className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
+																					<Input
+																						className={`search-wave-input !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent ${
+																							inboxView
+																								? '!h-[39px] !border-0'
+																								: '!h-[72px] max-[480px]:!h-[60px] !border-2 !border-black'
+																						} pr-[70px] max-[480px]:pr-[58px] md:pr-[80px]`}
+																						placeholder=""
 																						style={{
-																							fontFamily: 'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																							accentColor: 'transparent',
+																							transition: 'none',
+																							...(inboxView
+																								? { backgroundColor: '#EFEFEF' }
+																								: {}),
 																						}}
-																						placeholder="What"
-																						onClick={(e) => e.stopPropagation()}
+																						autoComplete="off"
+																						autoCorrect="off"
+																						autoCapitalize="off"
+																						spellCheck="false"
+																						{...field}
 																					/>
-																				) : (
-																				<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
-																						{whatValue || 'What'}
-																					</div>
-																				)
-																			) : (
-																				<>
-																				<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
-																						What
-																					</div>
-																				<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
-																						{activeSection === 'what' ? (
-																							<input
-																								ref={whatInputRef}
-																								type="text"
-																								value={whatValue}
-																								onChange={(e) => {
-																									if (isFromHomeDemoMode) return;
-																									setWhatValue(e.target.value);
-																								}}
-																								readOnly={isFromHomeDemoMode}
-																								onKeyDown={(e) => {
-																									if (e.key === 'Enter') {
-																										e.preventDefault();
-																										setActiveSection(null);
-																									}
-																								}}
-																							className="absolute z-20 top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
-																								style={{
-																									height: '12px',
-																									lineHeight: '12px',
-																									padding: '0',
-																									margin: '0',
-																									transform: 'translateY(-1px)',
-																									fontFamily:
-																										'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-																								}}
-																								placeholder="Add Recipients"
-																								onClick={(e) => e.stopPropagation()}
-																							/>
-																						) : (
+																					{/* New 532x64px element - Added border-black and z-20 */}
+																					<div
+																						className={`search-sections-container absolute left-[4px] right-[68px] ${
+																							inboxView ? '' : 'max-[480px]:right-[56px]'
+																						} top-1/2 -translate-y-1/2 ${
+																							inboxView
+																								? 'h-[31px]'
+																								: 'h-[64px] max-[480px]:h-[52px]'
+																						} rounded-[8px] z-20 font-secondary flex items-center ${
+																							inboxView
+																								? 'bg-[#EFEFEF] border-0'
+																								: activeSection
+																									? 'bg-[#EFEFEF] border border-transparent'
+																									: 'bg-white border border-black'
+																						} ${inboxView ? '' : 'invisible pointer-events-none'}`}
+																						style={{ transition: 'none' }}
+																					>
+																						{/* Sliding active tab indicator */}
+																						<div
+																							ref={activeSectionIndicatorRef}
+																							className="absolute top-0 left-0 h-full w-1/3 bg-white border border-black rounded-[8px] pointer-events-none z-10"
+																							style={{
+																								opacity: 0,
+																								willChange: 'transform',
+																							}}
+																						/>
+																						{/* Why Section */}
+																						<div
+																							className={`relative h-full cursor-pointer border flex-1 min-w-0 ${
+																								activeSection === 'why'
+																									? 'bg-transparent border-transparent rounded-[8px]'
+																									: `border-transparent ${
+																											activeSection
+																												? 'hover:bg-[#F9F9F9]'
+																												: 'hover:bg-black/5'
+																										} rounded-l-[8px]`
+																							}`}
+																							onClick={() => {
+																								if (isFromHomeDemoMode) {
+																									setShowFreeTrialPrompt(true);
+																									return;
+																								}
+																								setActiveSection('why');
+																							}}
+																						>
 																							<div
-																							className="absolute z-20 top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
-																								style={{
-																									height: '12px',
-																									lineHeight: '12px',
-																									padding: '0',
-																									margin: '0',
-																									color: whatValue ? '#000000' : 'rgba(0, 0, 0, 0.42)',
-																									maskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
-																									WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
-																								}}
+																								className={`absolute z-20 left-[24px] max-[480px]:left-[12px] ${
+																									inboxView
+																										? 'top-1/2 -translate-y-1/2 text-[14px]'
+																										: 'top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px]'
+																								} font-bold text-black leading-none`}
 																							>
-																								{whatValue || 'Add Recipients'}
+																								{inboxView
+																									? whyValue
+																										? whyValue.replace(/[\[\]]/g, '')
+																										: 'Why'
+																									: 'Why'}
 																							</div>
-																						)}
-																					</div>
-																				</>
-																			)}
-																		</div>
-																		<div
-																			className={`w-[2px] h-full bg-black/10 flex-shrink-0 ${
-																				activeSection || inboxView ? 'hidden' : ''
-																			}`}
-																		/>
-																		{/* Where Section */}
-																		<div
-																		className={`relative h-full cursor-pointer border overflow-hidden flex-1 min-w-0 ${
-																			activeSection === 'where'
-																				? 'bg-transparent border-transparent rounded-[8px]'
-																				: `border-transparent ${
-																						activeSection
-																							? 'hover:bg-[#F9F9F9]'
-																							: 'hover:bg-black/5'
-																				  } rounded-r-[8px]`
-																		}`}
-																			onClick={() => {
-																				if (isFromHomeDemoMode) {
-																					setShowFreeTrialPrompt(true);
-																					return;
-																				}
-																				setActiveSection('where');
-																			}}
-																		>
-																			{inboxView ? (
-																				activeSection === 'where' ? (
-																					<input
-																						ref={whereInputRef}
-																						type="text"
-																						value={whereValue}
-																						onChange={(e) => {
-																							if (isFromHomeDemoMode) return;
-																							setWhereValue(e.target.value);
-																							setIsNearMeLocation(false);
-																						}}
-																						readOnly={isFromHomeDemoMode}
-																						onKeyDown={(e) => {
-																							if (e.key === 'Enter') {
-																								e.preventDefault();
-																								void triggerSearchWithCurrentValues();
-																							}
-																						}}
-																					className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
-																						style={{
-																							fontFamily: 'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-																						}}
-																						placeholder="Where"
-																						onClick={(e) => e.stopPropagation()}
-																					/>
-																				) : (
-																				<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
-																						{whereValue || 'Where'}
-																					</div>
-																				)
-																			) : (
-																				<>
-																				<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
-																						Where
-																					</div>
-																				<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
-																						{activeSection === 'where' ? (
-																						<div className="absolute z-20 top-0 left-0 w-full h-full flex items-center gap-[2px]">
-																								<input
-																									ref={whereInputRef}
-																									type="text"
-																									value={whereValue}
-																									onChange={(e) => {
-																										if (isFromHomeDemoMode) return;
-																										setWhereValue(e.target.value);
-																										setIsNearMeLocation(false);
-																									}}
-																									readOnly={isFromHomeDemoMode}
-																									onKeyDown={(e) => {
-																										if (e.key === 'Enter') {
-																											e.preventDefault();
-																											void triggerSearchWithCurrentValues();
-																										}
-																									}}
-																								className="z-20 flex-1 font-semibold text-black text-[12px] bg-transparent outline-none border-none"
+																							<div
+																								className={`absolute z-20 left-[24px] max-[480px]:left-[12px] right-[4px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden ${
+																									inboxView ? 'hidden' : ''
+																								}`}
+																							>
+																								<div
+																									className="absolute top-0 left-0 font-semibold text-[12px] whitespace-nowrap"
 																									style={{
 																										height: '12px',
 																										lineHeight: '12px',
 																										padding: '0',
 																										margin: '0',
-																										transform: 'translateY(-1px)',
-																										fontFamily:
-																											'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																										color:
+																											whyValue &&
+																											whyValue.trim().length > 0
+																												? '#000000'
+																												: 'rgba(0, 0, 0, 0.42)',
 																									}}
-																									placeholder="Search States"
-																									onClick={(e) => e.stopPropagation()}
-																								/>
+																								>
+																									{whyValue || 'Choose Type of Search'}
+																								</div>
 																							</div>
-																						) : (
-																							<div
-																							className="absolute z-20 top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
-																								style={{
-																									height: '12px',
-																									lineHeight: '12px',
-																									padding: '0',
-																									margin: '0',
-																									color: hasWhereValue ? '#000000' : 'rgba(0, 0, 0, 0.42)',
-																									maskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
-																									WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
-																								}}
-																							>
-																								{hasWhereValue ? whereValue : 'Search States'}
-																							</div>
-																						)}
+																						</div>
+																						<div
+																							className={`w-[2px] h-full bg-black/10 flex-shrink-0 ${
+																								activeSection || inboxView ? 'hidden' : ''
+																							}`}
+																						/>
+																						{/* What Section */}
+																						<div
+																							className={`relative h-full cursor-pointer border overflow-hidden flex-1 min-w-0 ${
+																								activeSection === 'what'
+																									? 'bg-transparent border-transparent rounded-[8px]'
+																									: `border-transparent ${
+																											activeSection
+																												? 'hover:bg-[#F9F9F9]'
+																												: 'hover:bg-black/5'
+																										}`
+																							}`}
+																							onClick={() => {
+																								if (isFromHomeDemoMode) {
+																									setShowFreeTrialPrompt(true);
+																									return;
+																								}
+																								setActiveSection('what');
+																							}}
+																						>
+																							{inboxView ? (
+																								activeSection === 'what' ? (
+																									<input
+																										ref={whatInputRef}
+																										type="text"
+																										value={whatValue}
+																										onChange={(e) => {
+																											if (isFromHomeDemoMode) return;
+																											setWhatValue(e.target.value);
+																										}}
+																										readOnly={isFromHomeDemoMode}
+																										onKeyDown={(e) => {
+																											if (e.key === 'Enter') {
+																												e.preventDefault();
+																												setActiveSection(null);
+																											}
+																										}}
+																										className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
+																										style={{
+																											fontFamily:
+																												'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																										}}
+																										placeholder="What"
+																										onClick={(e) => e.stopPropagation()}
+																									/>
+																								) : (
+																									<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
+																										{whatValue || 'What'}
+																									</div>
+																								)
+																							) : (
+																								<>
+																									<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
+																										What
+																									</div>
+																									<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
+																										{activeSection === 'what' ? (
+																											<input
+																												ref={whatInputRef}
+																												type="text"
+																												value={whatValue}
+																												onChange={(e) => {
+																													if (isFromHomeDemoMode) return;
+																													setWhatValue(e.target.value);
+																												}}
+																												readOnly={isFromHomeDemoMode}
+																												onKeyDown={(e) => {
+																													if (e.key === 'Enter') {
+																														e.preventDefault();
+																														setActiveSection(null);
+																													}
+																												}}
+																												className="absolute z-20 top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
+																												style={{
+																													height: '12px',
+																													lineHeight: '12px',
+																													padding: '0',
+																													margin: '0',
+																													transform: 'translateY(-1px)',
+																													fontFamily:
+																														'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																												}}
+																												placeholder="Add Recipients"
+																												onClick={(e) =>
+																													e.stopPropagation()
+																												}
+																											/>
+																										) : (
+																											<div
+																												className="absolute z-20 top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
+																												style={{
+																													height: '12px',
+																													lineHeight: '12px',
+																													padding: '0',
+																													margin: '0',
+																													color: whatValue
+																														? '#000000'
+																														: 'rgba(0, 0, 0, 0.42)',
+																													maskImage:
+																														'linear-gradient(to right, black 80%, transparent 100%)',
+																													WebkitMaskImage:
+																														'linear-gradient(to right, black 80%, transparent 100%)',
+																												}}
+																											>
+																												{whatValue || 'Add Recipients'}
+																											</div>
+																										)}
+																									</div>
+																								</>
+																							)}
+																						</div>
+																						<div
+																							className={`w-[2px] h-full bg-black/10 flex-shrink-0 ${
+																								activeSection || inboxView ? 'hidden' : ''
+																							}`}
+																						/>
+																						{/* Where Section */}
+																						<div
+																							className={`relative h-full cursor-pointer border overflow-hidden flex-1 min-w-0 ${
+																								activeSection === 'where'
+																									? 'bg-transparent border-transparent rounded-[8px]'
+																									: `border-transparent ${
+																											activeSection
+																												? 'hover:bg-[#F9F9F9]'
+																												: 'hover:bg-black/5'
+																										} rounded-r-[8px]`
+																							}`}
+																							onClick={() => {
+																								if (isFromHomeDemoMode) {
+																									setShowFreeTrialPrompt(true);
+																									return;
+																								}
+																								setActiveSection('where');
+																							}}
+																						>
+																							{inboxView ? (
+																								activeSection === 'where' ? (
+																									<input
+																										ref={whereInputRef}
+																										type="text"
+																										value={whereValue}
+																										onChange={(e) => {
+																											if (isFromHomeDemoMode) return;
+																											setWhereValue(e.target.value);
+																											setIsNearMeLocation(false);
+																										}}
+																										readOnly={isFromHomeDemoMode}
+																										onKeyDown={(e) => {
+																											if (e.key === 'Enter') {
+																												e.preventDefault();
+																												void triggerSearchWithCurrentValues();
+																											}
+																										}}
+																										className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
+																										style={{
+																											fontFamily:
+																												'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																										}}
+																										placeholder="Where"
+																										onClick={(e) => e.stopPropagation()}
+																									/>
+																								) : (
+																									<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
+																										{whereValue || 'Where'}
+																									</div>
+																								)
+																							) : (
+																								<>
+																									<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
+																										Where
+																									</div>
+																									<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
+																										{activeSection === 'where' ? (
+																											<div className="absolute z-20 top-0 left-0 w-full h-full flex items-center gap-[2px]">
+																												<input
+																													ref={whereInputRef}
+																													type="text"
+																													value={whereValue}
+																													onChange={(e) => {
+																														if (isFromHomeDemoMode)
+																															return;
+																														setWhereValue(e.target.value);
+																														setIsNearMeLocation(false);
+																													}}
+																													readOnly={isFromHomeDemoMode}
+																													onKeyDown={(e) => {
+																														if (e.key === 'Enter') {
+																															e.preventDefault();
+																															void triggerSearchWithCurrentValues();
+																														}
+																													}}
+																													className="z-20 flex-1 font-semibold text-black text-[12px] bg-transparent outline-none border-none"
+																													style={{
+																														height: '12px',
+																														lineHeight: '12px',
+																														padding: '0',
+																														margin: '0',
+																														transform: 'translateY(-1px)',
+																														fontFamily:
+																															'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																													}}
+																													placeholder="Search States"
+																													onClick={(e) =>
+																														e.stopPropagation()
+																													}
+																												/>
+																											</div>
+																										) : (
+																											<div
+																												className="absolute z-20 top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
+																												style={{
+																													height: '12px',
+																													lineHeight: '12px',
+																													padding: '0',
+																													margin: '0',
+																													color: hasWhereValue
+																														? '#000000'
+																														: 'rgba(0, 0, 0, 0.42)',
+																													maskImage:
+																														'linear-gradient(to right, black 80%, transparent 100%)',
+																													WebkitMaskImage:
+																														'linear-gradient(to right, black 80%, transparent 100%)',
+																												}}
+																											>
+																												{hasWhereValue
+																													? whereValue
+																													: 'Search States'}
+																											</div>
+																										)}
+																									</div>
+																								</>
+																							)}
+																						</div>
 																					</div>
-																				</>
-																			)}
-																		</div>
-																	</div>
-																		{!inboxView && (
-																			<button
-																				type="submit"
-																				aria-label="Search"
-																				ref={heroSearchGradientButtonRef}
-																		className="search-gradient-button search-spotlight-zone search-pond-zone absolute left-[4px] right-[68px] max-[480px]:right-[56px] top-1/2 -translate-y-1/2 h-[64px] max-[480px]:h-[52px] rounded-[8px] z-30 cursor-pointer"
-																		style={{
-																			border: '1px solid #000000',
-																			color: '#FFFFFF',
-																			fontFamily:
-																			'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-																			fontSize: '25px',
-																			fontWeight: 600,
-																			lineHeight: 1,
-																		}}
-																		onClick={() => setActiveSection(null)}
-																		onPointerEnter={updateSpotlightVarsFromPointer}
-																		onPointerMove={updateSpotlightVarsFromPointer}
-																	>
-																		{/* Anisotropic streak field — follows gradient flow */}
-																		<div className="search-refraction-streaks" aria-hidden="true" />
-																		{/* Micro caustics ripple layer */}
-																		<div className="search-refraction-caustics" aria-hidden="true" />
-																		<span className="search-spotlight-content" style={{ position: 'absolute', left: 'calc(50% + 32px)', top: '50%', transform: 'translate(-50%, -50%)' }}>Search</span>
-																	</button>
-																		)}
-																	{/* Desktop Search Button */}
-																		<button
-																			type="submit"
-																			ref={heroSearchIconButtonRef}
-																			className={`dashboard-search-button search-spotlight-zone search-spotlight-zone-sm flex absolute right-[6px] items-center justify-center w-[58px] ${
-																				inboxView
-																					? 'h-[31px]'
-																					: 'h-[62px] max-[480px]:h-[50px] max-[480px]:w-[46px]'
-																			} z-40 cursor-pointer group`}
-																			style={{
-																				top: '50%',
-																				transform: 'translateY(-50%)',
-																				backgroundColor: 'rgba(93, 171, 104, 0.49)',
-																				borderTopRightRadius: '7px',
-																				borderBottomRightRadius: '7px',
-																				borderTopLeftRadius: '0',
-																				borderBottomLeftRadius: '0',
-																				border: '1px solid #5DAB68',
-																				borderLeft: '1px solid #5DAB68',
-																			}}
-																			onPointerEnter={updateSpotlightVarsFromPointer}
-																			onPointerMove={updateSpotlightVarsFromPointer}
-																		>
-																			<span className="search-spotlight-content">
-																				<SearchIconDesktop width={inboxView ? 25 : 26} height={inboxView ? 25 : 28} />
-																			</span>
-																		</button>
-																	{/* Mobile-only submit icon inside input */}
-																	<button
-																		type="submit"
-																		className="search-input-icon-btn hidden"
-																		aria-label="Search"
-																	>
-																		<SearchIconMobile />
-																	</button>
-																</div>
-																{renderDesktopSearchDropdowns()}
-															</div>
-															{!hasSearched && !inboxView && (
-																<div
-																	style={{
-																		borderRadius: 8,
-																		opacity: 0.8,
-																		background: 'rgba(242, 242, 242, 0.20)',
-																		width: 601,
-																		height: 43,
-																		marginTop: 9,
-																		border: '1px solid white',
-																		display: 'flex',
-																		alignItems: 'center',
-																		justifyContent: 'space-around',
-																		padding: '0 24px',
-																		color: '#050505',
-																	}}
-																>
-																	{(
-																		[
-															{ key: 'playbook', Icon: DashboardActionBarPlaybookIcon, label: 'Playbook' },
-															{ key: 'folder', Icon: DashboardActionBarFolderIcon, label: 'Folder' },
-															{ key: 'calendar', Icon: DashboardActionBarCalendarIcon, label: 'Calendar' },
-															{ key: 'star', Icon: DashboardActionBarStarIcon, label: 'Opportunities' },
-															{ key: 'envelope', Icon: DashboardActionBarEnvelopeIcon, label: 'Messages' },
-																		] as const
-																	).map(({ key, Icon, label }) => {
-																		const isSelected = selectedActionBarIcon === key;
-																		return (
-																			<button
-																				key={key}
-																				type="button"
-																				aria-label={label}
-																				aria-pressed={isSelected}
-																				onClick={() => setSelectedActionBarIcon(key)}
-																				style={{
-																					background: 'none',
-																					border: 'none',
-																					padding: '4px 8px',
-																					margin: 0,
-																					display: 'flex',
-																					alignItems: 'center',
-																					justifyContent: 'center',
-																					cursor: 'pointer',
-																					color: '#050505',
-																					opacity: isSelected ? 1 : 0.3,
-																					transition: 'opacity 150ms ease',
-																				}}
-																			>
-																				<Icon />
-																			</button>
-																		);
-																	})}
-																</div>
-															)}
-															</div>
-														</FormControl>
-													</FormItem>
-												)}
-											/>
-											{false && !hasSearched && (
-												<div className="flex flex-row gap-4 items-center justify-between w-full flex-wrap">
-													<div className="flex flex-row gap-4 items-center h-[39px] justify-start flex-shrink-0">
-														<div
-															className="exclude-contacts-box bg-[#EFEFEF] w-[227px] h-[32px] rounded-[8px] flex items-center px-4 my-auto"
-															style={
-																isMobile
-																	? ({
-																			width: '124px',
-																			height: '16px',
-																			padding: '0 6px',
-																			borderRadius: '6px',
-																	  } as React.CSSProperties)
-																	: undefined
-															}
-														>
-															<FormField
-																control={form.control}
-																name="excludeUsedContacts"
-																render={({ field }) => (
-																	<FormItem className="flex flex-row items-center justify-between space-y-0 m-0 w-full gap-3">
-																		<div className="leading-none flex items-center">
-																			<FormLabel
-																				className="font-bold cursor-pointer select-none whitespace-nowrap"
-																				style={
-																					isMobile
-																						? ({
-																								fontSize: '8px',
-																								lineHeight: '10px',
+																					{!inboxView && (
+																						<button
+																							type="submit"
+																							aria-label="Search"
+																							ref={heroSearchGradientButtonRef}
+																							className="search-gradient-button search-spotlight-zone search-pond-zone absolute left-[4px] right-[68px] max-[480px]:right-[56px] top-1/2 -translate-y-1/2 h-[64px] max-[480px]:h-[52px] rounded-[8px] z-30 cursor-pointer"
+																							style={{
+																								border: '1px solid #000000',
+																								color: '#FFFFFF',
 																								fontFamily:
 																									'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-																								fontWeight: 700,
-																								letterSpacing: '0',
-																								whiteSpace: 'nowrap',
-																						  } as React.CSSProperties)
-																						: ({
-																								fontSize: '14px',
-																								lineHeight: '16px',
-																						  } as React.CSSProperties)
-																				}
-																			>
-																				Exclude Used Contacts
-																			</FormLabel>
-																		</div>
-																		<FormControl>
-																			<label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-																				<input
-																					type="checkbox"
-																					className="sr-only peer"
-																					checked={field.value}
-																					onChange={(e) =>
-																						field.onChange(e.target.checked)
-																					}
-																				/>
-																				<div
-																					className={`toggle-switch-track w-[26px] h-4 rounded-full relative overflow-hidden transition-colors duration-200 shadow-none drop-shadow-none ${
-																						field.value ? 'toggle-on' : 'toggle-off'
-																					}`}
-																					style={
-																						{
-																							'--toggle-bg': field.value
-																								? '#5dab68'
-																								: '#E5E5E5',
-																							backgroundColor: 'var(--toggle-bg)',
-																							background: 'var(--toggle-bg)',
-																							...(isMobile
-																								? ({
-																										width: '13px',
-																										minWidth: '13px',
-																										height: '8px',
-																										borderRadius: '9999px',
-																								  } as React.CSSProperties)
-																								: {}),
-																						} as React.CSSProperties
-																					}
-																					data-checked={field.value}
-																					data-debug={JSON.stringify({
-																						value: field.value,
-																						type: typeof field.value,
-																					})}
-																				>
-																					<div
-																						className={`absolute transform transition-transform duration-200 ease-in-out ${
-																							field.value ? 'bg-white' : 'bg-[#050505]'
-																						} rounded-full shadow-none drop-shadow-none`}
-																						style={
-																							isMobile
-																								? ({
-																										width: '6px',
-																										height: '6px',
-																										left: '2px',
-																										top: '50%',
-																										transform: `translateX(${
-																											field.value ? 3 : 0
-																										}px) translateY(-50%)`,
-																								  } as React.CSSProperties)
-																								: ({
-																										top: '50%',
-																										left: '2px',
-																										width: '12px',
-																										height: '12px',
-																										transform: `translateX(${
-																											field.value ? 10 : 0
-																										}px) translateY(-50%)`,
-																								  } as React.CSSProperties)
+																								fontSize: '25px',
+																								fontWeight: 600,
+																								lineHeight: 1,
+																							}}
+																							onClick={() => setActiveSection(null)}
+																							onPointerEnter={
+																								updateSpotlightVarsFromPointer
+																							}
+																							onPointerMove={
+																								updateSpotlightVarsFromPointer
+																							}
+																						>
+																							{/* Anisotropic streak field — follows gradient flow */}
+																							<div
+																								className="search-refraction-streaks"
+																								aria-hidden="true"
+																							/>
+																							{/* Micro caustics ripple layer */}
+																							<div
+																								className="search-refraction-caustics"
+																								aria-hidden="true"
+																							/>
+																							<span
+																								className="search-spotlight-content"
+																								style={{
+																									position: 'absolute',
+																									left: 'calc(50% + 32px)',
+																									top: '50%',
+																									transform: 'translate(-50%, -50%)',
+																								}}
+																							>
+																								Search
+																							</span>
+																						</button>
+																					)}
+																					{/* Desktop Search Button */}
+																					<button
+																						type="submit"
+																						ref={heroSearchIconButtonRef}
+																						className={`dashboard-search-button search-spotlight-zone search-spotlight-zone-sm flex absolute right-[6px] items-center justify-center w-[58px] ${
+																							inboxView
+																								? 'h-[31px]'
+																								: 'h-[62px] max-[480px]:h-[50px] max-[480px]:w-[46px]'
+																						} z-40 cursor-pointer group`}
+																						style={{
+																							top: '50%',
+																							transform: 'translateY(-50%)',
+																							backgroundColor: 'rgba(93, 171, 104, 0.49)',
+																							borderTopRightRadius: '7px',
+																							borderBottomRightRadius: '7px',
+																							borderTopLeftRadius: '0',
+																							borderBottomLeftRadius: '0',
+																							border: '1px solid #5DAB68',
+																							borderLeft: '1px solid #5DAB68',
+																						}}
+																						onPointerEnter={
+																							updateSpotlightVarsFromPointer
 																						}
-																					/>
+																						onPointerMove={updateSpotlightVarsFromPointer}
+																					>
+																						<span className="search-spotlight-content">
+																							<SearchIconDesktop
+																								width={inboxView ? 25 : 26}
+																								height={inboxView ? 25 : 28}
+																							/>
+																						</span>
+																					</button>
+																					{/* Mobile-only submit icon inside input */}
+																					<button
+																						type="submit"
+																						className="search-input-icon-btn hidden"
+																						aria-label="Search"
+																					>
+																						<SearchIconMobile />
+																					</button>
 																				</div>
-																			</label>
-																		</FormControl>
-																	</FormItem>
-																)}
-															/>
-														</div>
-													</div>
-												</div>
+																				{renderDesktopSearchDropdowns()}
+																			</div>
+																			{!hasSearched && !inboxView && (
+																				<div
+																					style={{
+																						borderRadius: 8,
+																						opacity: 0.8,
+																						background: 'rgba(242, 242, 242, 0.20)',
+																						width: 601,
+																						height: 43,
+																						marginTop: 9,
+																						border: '1px solid white',
+																						display: 'flex',
+																						alignItems: 'center',
+																						justifyContent: 'space-around',
+																						padding: '0 24px',
+																						color: '#050505',
+																					}}
+																				>
+																					{(
+																						[
+																							{
+																								key: 'playbook',
+																								Icon: DashboardActionBarPlaybookIcon,
+																								label: 'Playbook',
+																							},
+																							{
+																								key: 'folder',
+																								Icon: DashboardActionBarFolderIcon,
+																								label: 'Folder',
+																							},
+																							{
+																								key: 'calendar',
+																								Icon: DashboardActionBarCalendarIcon,
+																								label: 'Calendar',
+																							},
+																							{
+																								key: 'star',
+																								Icon: DashboardActionBarStarIcon,
+																								label: 'Opportunities',
+																							},
+																							{
+																								key: 'envelope',
+																								Icon: DashboardActionBarEnvelopeIcon,
+																								label: 'Messages',
+																							},
+																						] as const
+																					).map(({ key, Icon, label }) => {
+																						const isSelected =
+																							selectedActionBarIcon === key;
+																						return (
+																							<button
+																								key={key}
+																								type="button"
+																								aria-label={label}
+																								aria-pressed={isSelected}
+																								onClick={() =>
+																									setSelectedActionBarIcon(key)
+																								}
+																								style={{
+																									background: 'none',
+																									border: 'none',
+																									padding: '4px 8px',
+																									margin: 0,
+																									display: 'flex',
+																									alignItems: 'center',
+																									justifyContent: 'center',
+																									cursor: 'pointer',
+																									color: '#050505',
+																									opacity: isSelected ? 1 : 0.3,
+																									transition: 'opacity 150ms ease',
+																								}}
+																							>
+																								<Icon />
+																							</button>
+																						);
+																					})}
+																				</div>
+																			)}
+																		</div>
+																	</FormControl>
+																</FormItem>
+															)}
+														/>
+														{false && !hasSearched && (
+															<div className="flex flex-row gap-4 items-center justify-between w-full flex-wrap">
+																<div className="flex flex-row gap-4 items-center h-[39px] justify-start flex-shrink-0">
+																	<div
+																		className="exclude-contacts-box bg-[#EFEFEF] w-[227px] h-[32px] rounded-[8px] flex items-center px-4 my-auto"
+																		style={
+																			isMobile
+																				? ({
+																						width: '124px',
+																						height: '16px',
+																						padding: '0 6px',
+																						borderRadius: '6px',
+																					} as React.CSSProperties)
+																				: undefined
+																		}
+																	>
+																		<FormField
+																			control={form.control}
+																			name="excludeUsedContacts"
+																			render={({ field }) => (
+																				<FormItem className="flex flex-row items-center justify-between space-y-0 m-0 w-full gap-3">
+																					<div className="leading-none flex items-center">
+																						<FormLabel
+																							className="font-bold cursor-pointer select-none whitespace-nowrap"
+																							style={
+																								isMobile
+																									? ({
+																											fontSize: '8px',
+																											lineHeight: '10px',
+																											fontFamily:
+																												'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																											fontWeight: 700,
+																											letterSpacing: '0',
+																											whiteSpace: 'nowrap',
+																										} as React.CSSProperties)
+																									: ({
+																											fontSize: '14px',
+																											lineHeight: '16px',
+																										} as React.CSSProperties)
+																							}
+																						>
+																							Exclude Used Contacts
+																						</FormLabel>
+																					</div>
+																					<FormControl>
+																						<label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+																							<input
+																								type="checkbox"
+																								className="sr-only peer"
+																								checked={field.value}
+																								onChange={(e) =>
+																									field.onChange(e.target.checked)
+																								}
+																							/>
+																							<div
+																								className={`toggle-switch-track w-[26px] h-4 rounded-full relative overflow-hidden transition-colors duration-200 shadow-none drop-shadow-none ${
+																									field.value ? 'toggle-on' : 'toggle-off'
+																								}`}
+																								style={
+																									{
+																										'--toggle-bg': field.value
+																											? '#5dab68'
+																											: '#E5E5E5',
+																										backgroundColor: 'var(--toggle-bg)',
+																										background: 'var(--toggle-bg)',
+																										...(isMobile
+																											? ({
+																													width: '13px',
+																													minWidth: '13px',
+																													height: '8px',
+																													borderRadius: '9999px',
+																												} as React.CSSProperties)
+																											: {}),
+																									} as React.CSSProperties
+																								}
+																								data-checked={field.value}
+																								data-debug={JSON.stringify({
+																									value: field.value,
+																									type: typeof field.value,
+																								})}
+																							>
+																								<div
+																									className={`absolute transform transition-transform duration-200 ease-in-out ${
+																										field.value
+																											? 'bg-white'
+																											: 'bg-[#050505]'
+																									} rounded-full shadow-none drop-shadow-none`}
+																									style={
+																										isMobile
+																											? ({
+																													width: '6px',
+																													height: '6px',
+																													left: '2px',
+																													top: '50%',
+																													transform: `translateX(${
+																														field.value ? 3 : 0
+																													}px) translateY(-50%)`,
+																												} as React.CSSProperties)
+																											: ({
+																													top: '50%',
+																													left: '2px',
+																													width: '12px',
+																													height: '12px',
+																													transform: `translateX(${
+																														field.value ? 10 : 0
+																													}px) translateY(-50%)`,
+																												} as React.CSSProperties)
+																									}
+																								/>
+																							</div>
+																						</label>
+																					</FormControl>
+																				</FormItem>
+																			)}
+																		/>
+																	</div>
+																</div>
+															</div>
+														)}
+													</form>
+												</Form>
 											)}
-										</form>
-									</Form>
-								)}
+										</div>
+									</div>
 								</div>
-							</div>
-						</div>
 
-						{/* TSV upload is always visible on the search tab, before any search is made */}
-						{/* Hidden: Import button
+								{/* TSV upload is always visible on the search tab, before any search is made */}
+								{/* Hidden: Import button
 						{activeTab === 'search' && (
 							<div className="mt-2 w-full max-w-[532px] mx-auto flex justify-start pl-1">
 								<ContactTSVUploadDialog
@@ -8738,713 +8989,775 @@ const DashboardContent = () => {
 						)}
 						*/}
 
-						{/* Search/Inbox tab toggle - disabled for now (keep code for later) */}
-						{ENABLE_DASHBOARD_INBOX_TAB && !hasSearched && activeTab === 'search' && (
-							<div className="flex justify-center" style={{ marginTop: '92px' }}>
-								<div
-									ref={tabToggleTrackRef}
-									onMouseLeave={() => setHoveredTab(null)}
-									className="relative flex items-center origin-center scale-[0.8] sm:scale-[0.9] lg:scale-100"
-									style={{
-										width: '228px',
-										height: '36px',
-										borderWidth: '3px',
-										borderStyle: 'solid',
-										borderColor: '#7A7A7A',
-										borderRadius: '10px',
-										backgroundColor: '#FFFFFF',
-									}}
-								>
-									{/* Hover preview pill (shows the other tab on hover) */}
-									<div
-										ref={tabToggleHoverPillRef}
-										aria-hidden="true"
-										style={{
-											position: 'absolute',
-											top: '50%',
-											left: 0,
-											width: '85px',
-											height: '17px',
-											borderWidth: '2px',
-											borderStyle: 'solid',
-											borderColor: '#000000',
-											borderRadius: '10px',
-											backgroundColor: TAB_PILL_COLORS.inbox,
-											pointerEvents: 'none',
-											opacity: 0,
-											transform: 'translateX(124px) translateY(-50%)',
-											willChange: 'transform, opacity, background-color',
-											transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
-										}}
-									/>
-									{/* Sliding pill indicator - positioned at search (left) */}
-									<div
-										ref={tabTogglePillRef}
-										style={{
-											position: 'absolute',
-											top: '50%',
-											left: 0,
-											width: '85px',
-											height: '17px',
-											borderWidth: '2px',
-											borderStyle: 'solid',
-											borderColor: '#000000',
-											borderRadius: '10px',
-											backgroundColor: '#DAE6FE',
-											pointerEvents: 'none',
-											transform: 'translateX(13px) translateY(-50%)',
-											willChange: 'transform, background-color',
-										}}
-									/>
-									{/* White overlay pill (visible only during hover-preview) */}
-									<div
-										ref={tabToggleWhitePillRef}
-										aria-hidden="true"
-										style={{
-											position: 'absolute',
-											top: '50%',
-											left: 0,
-											width: '85px',
-											height: '17px',
-											borderWidth: '2px',
-											borderStyle: 'solid',
-											borderColor: '#000000',
-											borderRadius: '10px',
-											backgroundColor: '#FFFFFF',
-											pointerEvents: 'none',
-											opacity: 0,
-											transform: 'translateX(13px) translateY(-50%)',
-											willChange: 'transform, opacity',
-											transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
-										}}
-									/>
-									<button
-										type="button"
-										className="relative z-10 flex-1 h-full flex items-center justify-center font-medium"
-										style={{ fontSize: '14px' }}
-										onMouseEnter={() => setHoveredTab('search')}
-										onClick={() => transitionToTab('search')}
-										aria-pressed={true}
-									>
-										<span
-											className={`inline-block ${isTabPreviewingOther ? 'opacity-0' : 'opacity-100'}`}
+								{/* Search/Inbox tab toggle - disabled for now (keep code for later) */}
+								{ENABLE_DASHBOARD_INBOX_TAB && !hasSearched && activeTab === 'search' && (
+									<div className="flex justify-center" style={{ marginTop: '92px' }}>
+										<div
+											ref={tabToggleTrackRef}
+											onMouseLeave={() => setHoveredTab(null)}
+											className="relative flex items-center origin-center scale-[0.8] sm:scale-[0.9] lg:scale-100"
 											style={{
-												transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+												width: '228px',
+												height: '36px',
+												borderWidth: '3px',
+												borderStyle: 'solid',
+												borderColor: '#7A7A7A',
+												borderRadius: '10px',
+												backgroundColor: '#FFFFFF',
 											}}
 										>
-											Search
-										</span>
-									</button>
-									<button
-										type="button"
-										className="relative z-10 flex-1 h-full flex items-center justify-center font-medium"
-										style={{ fontSize: '14px' }}
-										onMouseEnter={() => setHoveredTab('inbox')}
-										onClick={() => transitionToTab('inbox')}
-										aria-pressed={false}
-									>
-										<span
-											className="inline-block opacity-100"
-											style={{
-												display: 'inline-block',
-												transform: 'translateX(2px)',
-												transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
-											}}
-										>
-											Inbox
-										</span>
-									</button>
-								</div>
-							</div>
-						)}
+											{/* Hover preview pill (shows the other tab on hover) */}
+											<div
+												ref={tabToggleHoverPillRef}
+												aria-hidden="true"
+												style={{
+													position: 'absolute',
+													top: '50%',
+													left: 0,
+													width: '85px',
+													height: '17px',
+													borderWidth: '2px',
+													borderStyle: 'solid',
+													borderColor: '#000000',
+													borderRadius: '10px',
+													backgroundColor: TAB_PILL_COLORS.inbox,
+													pointerEvents: 'none',
+													opacity: 0,
+													transform: 'translateX(124px) translateY(-50%)',
+													willChange: 'transform, opacity, background-color',
+													transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+												}}
+											/>
+											{/* Sliding pill indicator - positioned at search (left) */}
+											<div
+												ref={tabTogglePillRef}
+												style={{
+													position: 'absolute',
+													top: '50%',
+													left: 0,
+													width: '85px',
+													height: '17px',
+													borderWidth: '2px',
+													borderStyle: 'solid',
+													borderColor: '#000000',
+													borderRadius: '10px',
+													backgroundColor: '#DAE6FE',
+													pointerEvents: 'none',
+													transform: 'translateX(13px) translateY(-50%)',
+													willChange: 'transform, background-color',
+												}}
+											/>
+											{/* White overlay pill (visible only during hover-preview) */}
+											<div
+												ref={tabToggleWhitePillRef}
+												aria-hidden="true"
+												style={{
+													position: 'absolute',
+													top: '50%',
+													left: 0,
+													width: '85px',
+													height: '17px',
+													borderWidth: '2px',
+													borderStyle: 'solid',
+													borderColor: '#000000',
+													borderRadius: '10px',
+													backgroundColor: '#FFFFFF',
+													pointerEvents: 'none',
+													opacity: 0,
+													transform: 'translateX(13px) translateY(-50%)',
+													willChange: 'transform, opacity',
+													transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+												}}
+											/>
+											<button
+												type="button"
+												className="relative z-10 flex-1 h-full flex items-center justify-center font-medium"
+												style={{ fontSize: '14px' }}
+												onMouseEnter={() => setHoveredTab('search')}
+												onClick={() => transitionToTab('search')}
+												aria-pressed={true}
+											>
+												<span
+													className={`inline-block ${isTabPreviewingOther ? 'opacity-0' : 'opacity-100'}`}
+													style={{
+														transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+													}}
+												>
+													Search
+												</span>
+											</button>
+											<button
+												type="button"
+												className="relative z-10 flex-1 h-full flex items-center justify-center font-medium"
+												style={{ fontSize: '14px' }}
+												onMouseEnter={() => setHoveredTab('inbox')}
+												onClick={() => transitionToTab('inbox')}
+												aria-pressed={false}
+											>
+												<span
+													className="inline-block opacity-100"
+													style={{
+														display: 'inline-block',
+														transform: 'translateX(2px)',
+														transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+													}}
+												>
+													Inbox
+												</span>
+											</button>
+										</div>
+									</div>
+								)}
 
-						{/* Inbox tab: CampaignsInboxView + toggle - disabled for now (keep code for later) */}
-						{ENABLE_DASHBOARD_INBOX_TAB && !hasSearched && activeTab === 'inbox' && (
-							<div
-								ref={tabbedLandingBoxRef}
-								style={{
-									marginTop: '20px',
-									willChange: 'transform, opacity',
-								}}
-							>
-								{/* 
+								{/* Inbox tab: CampaignsInboxView + toggle - disabled for now (keep code for later) */}
+								{ENABLE_DASHBOARD_INBOX_TAB && !hasSearched && activeTab === 'inbox' && (
+									<div
+										ref={tabbedLandingBoxRef}
+										style={{
+											marginTop: '20px',
+											willChange: 'transform, opacity',
+										}}
+									>
+										{/*
 									Keep the inbox mounted so it can finish loading while the user views
 									the "Campaigns" sub-tab. (Do NOT change the campaign-page popup behavior.)
 								*/}
-								<div style={{ display: inboxSubtab === 'messages' ? 'block' : 'none' }}>
-									<InboxSection
-										desktopHeight={535}
-										dashboardMode
-										loadingVariant="dashboard"
-										inboxSubtab={inboxSubtab}
-										onInboxSubtabChange={setInboxSubtab}
-									/>
-								</div>
-
-								{inboxSubtab === 'campaigns' && (
-									<CampaignsInboxView
-										inboxSubtab={inboxSubtab}
-										onInboxSubtabChange={setInboxSubtab}
-									/>
-								)}
-								{/* Toggle below table for inbox tab */}
-								<div className="flex justify-center" style={{ marginTop: '34px' }}>
-									<div
-										ref={tabToggleTrackRef}
-										onMouseLeave={() => setHoveredTab(null)}
-										className="relative flex items-center"
-										style={{
-											width: '228px',
-											height: '36px',
-											borderWidth: '3px',
-											borderStyle: 'solid',
-											borderColor: '#7A7A7A',
-											borderRadius: '10px',
-											backgroundColor: '#FFFFFF',
-										}}
-									>
-										{/* Hover preview pill (shows the other tab on hover) */}
 										<div
-											ref={tabToggleHoverPillRef}
-											aria-hidden="true"
-											style={{
-												position: 'absolute',
-												top: '50%',
-												left: 0,
-												width: '85px',
-												height: '17px',
-												borderWidth: '2px',
-												borderStyle: 'solid',
-												borderColor: '#000000',
-												borderRadius: '10px',
-												backgroundColor: TAB_PILL_COLORS.search,
-												pointerEvents: 'none',
-												opacity: 0,
-												transform: 'translateX(13px) translateY(-50%)',
-												willChange: 'transform, opacity, background-color',
-												transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
-											}}
-										/>
-										{/* Sliding pill indicator - positioned at inbox (right) */}
-										<div
-											ref={tabTogglePillRef}
-											style={{
-												position: 'absolute',
-												top: '50%',
-												left: 0,
-												width: '85px',
-												height: '17px',
-												borderWidth: '2px',
-												borderStyle: 'solid',
-												borderColor: '#000000',
-												borderRadius: '10px',
-												backgroundColor: '#CBE7D1',
-												pointerEvents: 'none',
-												transform: 'translateX(124px) translateY(-50%)',
-												willChange: 'transform, background-color',
-											}}
-										/>
-										{/* White overlay pill (visible only during hover-preview) */}
-										<div
-											ref={tabToggleWhitePillRef}
-											aria-hidden="true"
-											style={{
-												position: 'absolute',
-												top: '50%',
-												left: 0,
-												width: '85px',
-												height: '17px',
-												borderWidth: '2px',
-												borderStyle: 'solid',
-												borderColor: '#000000',
-												borderRadius: '10px',
-												backgroundColor: '#FFFFFF',
-												pointerEvents: 'none',
-												opacity: 0,
-												transform: 'translateX(124px) translateY(-50%)',
-												willChange: 'transform, opacity',
-												transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
-											}}
-										/>
-										<button
-											type="button"
-											className="relative z-10 flex-1 h-full flex items-center justify-center font-medium"
-											style={{ fontSize: '14px' }}
-											onMouseEnter={() => setHoveredTab('search')}
-											onClick={() => transitionToTab('search')}
-											aria-pressed={false}
+											style={{ display: inboxSubtab === 'messages' ? 'block' : 'none' }}
 										>
-											<span
-												className="inline-block opacity-100"
+											<InboxSection
+												desktopHeight={535}
+												dashboardMode
+												loadingVariant="dashboard"
+												inboxSubtab={inboxSubtab}
+												onInboxSubtabChange={setInboxSubtab}
+											/>
+										</div>
+
+										{inboxSubtab === 'campaigns' && (
+											<CampaignsInboxView
+												inboxSubtab={inboxSubtab}
+												onInboxSubtabChange={setInboxSubtab}
+											/>
+										)}
+										{/* Toggle below table for inbox tab */}
+										<div className="flex justify-center" style={{ marginTop: '34px' }}>
+											<div
+												ref={tabToggleTrackRef}
+												onMouseLeave={() => setHoveredTab(null)}
+												className="relative flex items-center"
 												style={{
-													transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+													width: '228px',
+													height: '36px',
+													borderWidth: '3px',
+													borderStyle: 'solid',
+													borderColor: '#7A7A7A',
+													borderRadius: '10px',
+													backgroundColor: '#FFFFFF',
 												}}
 											>
-												Search
-											</span>
-										</button>
-										<button
-											type="button"
-											className="relative z-10 flex-1 h-full flex items-center justify-center font-medium"
-											style={{ fontSize: '14px' }}
-											onMouseEnter={() => setHoveredTab('inbox')}
-											onClick={() => transitionToTab('inbox')}
-											aria-pressed={true}
-										>
-											<span
-												className={`inline-block ${isTabPreviewingOther ? 'opacity-0' : 'opacity-100'}`}
-												style={{
-													display: 'inline-block',
-													transform: 'translateX(2px)',
-													transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
-												}}
-											>
-												Inbox
-											</span>
-										</button>
-									</div>
-								</div>
-							</div>
-						)}
-					</div>
-				</div>
-
-				{/* Search query display with back button - hidden when in map view */}
-				{hasSearched &&
-					activeSearchQuery &&
-					!isMapView &&
-					activeTab === 'search' &&
-					(isSearchPending || isLoadingContacts || isRefetchingContacts) && (
-						<div className="search-query-display mt-8">
-							<div className="search-query-display-inner">
-								<button
-									onClick={handleEnhancedResetSearch}
-									className="search-back-button"
-									aria-label="Back to search"
-								>
-									<svg
-										width="20"
-										height="20"
-										viewBox="0 0 20 20"
-										fill="none"
-										xmlns="http://www.w3.org/2000/svg"
-										className="search-back-icon"
-									>
-										<path
-											d="M12 16L6 10L12 4"
-											stroke="currentColor"
-											strokeWidth="1.5"
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										/>
-									</svg>
-									<span className="search-back-text">Back</span>
-								</button>
-								<div className="search-query-display-text">
-									<span className="search-query-quote-left">&ldquo;</span>
-									{activeSearchQuery}
-									<span className="search-query-quote-right">&rdquo;</span>
-								</div>
-							</div>
-						</div>
-					)}
-
-			{/* Show the mini search bar and tools when:
-			    1. A search has been executed (normal case), OR
-			    2. We're in fromHome mode with map view (pre-auth demo state) */}
-			{((hasSearched && activeTab === 'search') || (fromHomeParam && isMapView)) &&
-				(isMapView || (!isLoadingContacts && !isRefetchingContacts)) &&
-				(() => {
-						const activeWhyForTray = (
-							fromHomeParam && isMapView && !hasSearched
-								? FROM_HOME_WHY
-								: extractWhyFromSearchQuery(activeSearchQuery) ||
-								  (mapTopSearchDisplay.kind === 'category' && mapTopSearchDisplay.what
-										? getCategorySearchWhyForWhat(mapTopSearchDisplay.what)
-										: '') ||
-								  whyValue
-						).trim();
-						const isPromotionForTray = activeWhyForTray === '[Promotion]';
-						const trayWhy = isPromotionForTray
-							? {
-									backgroundColor: MAP_RESULTS_SEARCH_TRAY.whyBackgroundColors.promotion,
-									icon: <PromotionIcon />,
-							  }
-							: {
-									backgroundColor: MAP_RESULTS_SEARCH_TRAY.whyBackgroundColors.booking,
-									icon: <BookingIcon />,
-							  };
-
-						const effectiveWhatKeyForTray =
-							mapTopSearchDisplay.kind === 'category'
-								? mapTopSearchDisplay.what.trim()
-								: (searchedWhat || '').trim();
-						const whatCfg = MAP_RESULTS_SEARCH_TRAY.whatIconByLabel[effectiveWhatKeyForTray];
-						const TrayWhatIcon = whatCfg?.Icon || MusicVenuesIcon;
-						const trayWhatIconSize =
-							effectiveWhatKeyForTray === 'Wine, Beer, and Spirits' ? 22 : undefined;
-						const trayWhat = {
-							backgroundColor:
-								whatCfg?.backgroundColor ||
-								MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Music Venues'].backgroundColor,
-							icon: <TrayWhatIcon size={trayWhatIconSize} />,
-						};
-
-						const whereCandidate =
-							mapTopSearchDisplay.kind === 'category'
-								? mapTopSearchDisplay.where.trim()
-								: (userLocationName || '').trim();
-						const [whereCity, whereState] = (() => {
-							if (!whereCandidate) return ['', ''];
-							if (whereCandidate.includes(',')) {
-								const parts = whereCandidate.split(',');
-								const city = (parts[0] || '').trim();
-								const state = parts.slice(1).join(',').trim();
-								return [city, state];
-							}
-							return ['', whereCandidate];
-						})();
-						const whereIconProps =
-							!isNearMeLocation && whereState
-								? getCityIconProps(whereCity, whereState)
-								: null;
-						const trayWhere = isNearMeLocation
-							? {
-									backgroundColor: MAP_RESULTS_SEARCH_TRAY.nearMeBackgroundColor,
-									icon: <NearMeIcon />,
-							  }
-							: {
-									backgroundColor:
-										whereIconProps?.backgroundColor ||
-										MAP_RESULTS_SEARCH_TRAY.nearMeBackgroundColor,
-									icon: whereIconProps?.icon || <NearMeIcon />,
-							  };
-						const mapTopSearchLabel = mapTopSearchDisplay.label.trim() || 'Search';
-						const isSplitCategoryTopSearch =
-							mapTopSearchDisplay.kind === 'category' &&
-							mapTopSearchDisplay.what.trim().length > 0 &&
-							mapTopSearchDisplay.whereLabel.trim().length > 0;
-
-						const searchBarBase = (
-							<div
-					className={`results-search-bar-wrapper w-full max-w-[650px] mx-auto px-4 ${
-							// When the horizontal research strip is active (sm–lg desktop),
-							// hide the mini search bar + helper text so the strip owns this area.
-							showHorizontalResearchStrip ? 'sm:hidden xl:block' : ''
-						} relative`}
-							style={
-								isMapView
-									? {
-											// In fullscreen map view we render this via a portal + outer fixed wrapper,
-											// so keep this inner container relative for absolute children.
-											position: 'relative',
-											width: 'min(440px, calc(100vw - 120px))',
-											maxWidth: '440px',
-											padding: 0,
-											backgroundColor: 'transparent',
-											borderBottom: 'none',
-									  }
-									: undefined
-							}
-						>
-								<div
-									className={`results-search-bar-inner ${
-										hoveredContact && !isMapView ? 'invisible' : ''
-									}`}
-								>
-									{isMapView ? (
-										<div
-											className="results-search-form"
-											aria-label={`Active search: ${mapTopSearchLabel}`}
-										>
-											<div className="results-search-input-group">
+												{/* Hover preview pill (shows the other tab on hover) */}
 												<div
-													className="search-wave-container relative"
-													style={{ cursor: 'default' }}
+													ref={tabToggleHoverPillRef}
+													aria-hidden="true"
+													style={{
+														position: 'absolute',
+														top: '50%',
+														left: 0,
+														width: '85px',
+														height: '17px',
+														borderWidth: '2px',
+														borderStyle: 'solid',
+														borderColor: '#000000',
+														borderRadius: '10px',
+														backgroundColor: TAB_PILL_COLORS.search,
+														pointerEvents: 'none',
+														opacity: 0,
+														transform: 'translateX(13px) translateY(-50%)',
+														willChange: 'transform, opacity, background-color',
+														transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+													}}
+												/>
+												{/* Sliding pill indicator - positioned at inbox (right) */}
+												<div
+													ref={tabTogglePillRef}
+													style={{
+														position: 'absolute',
+														top: '50%',
+														left: 0,
+														width: '85px',
+														height: '17px',
+														borderWidth: '2px',
+														borderStyle: 'solid',
+														borderColor: '#000000',
+														borderRadius: '10px',
+														backgroundColor: '#CBE7D1',
+														pointerEvents: 'none',
+														transform: 'translateX(124px) translateY(-50%)',
+														willChange: 'transform, background-color',
+													}}
+												/>
+												{/* White overlay pill (visible only during hover-preview) */}
+												<div
+													ref={tabToggleWhitePillRef}
+													aria-hidden="true"
+													style={{
+														position: 'absolute',
+														top: '50%',
+														left: 0,
+														width: '85px',
+														height: '17px',
+														borderWidth: '2px',
+														borderStyle: 'solid',
+														borderColor: '#000000',
+														borderRadius: '10px',
+														backgroundColor: '#FFFFFF',
+														pointerEvents: 'none',
+														opacity: 0,
+														transform: 'translateX(124px) translateY(-50%)',
+														willChange: 'transform, opacity',
+														transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+													}}
+												/>
+												<button
+													type="button"
+													className="relative z-10 flex-1 h-full flex items-center justify-center font-medium"
+													style={{ fontSize: '14px' }}
+													onMouseEnter={() => setHoveredTab('search')}
+													onClick={() => transitionToTab('search')}
+													aria-pressed={false}
 												>
-													<div
-														className="search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black !bg-white !pr-[12px] !text-black"
+													<span
+														className="inline-block opacity-100"
 														style={{
-															accentColor: 'transparent',
-															cursor: 'default',
-															letterSpacing: 0,
-															padding: 0,
-															userSelect: 'none',
+															transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
 														}}
 													>
+														Search
+													</span>
+												</button>
+												<button
+													type="button"
+													className="relative z-10 flex-1 h-full flex items-center justify-center font-medium"
+													style={{ fontSize: '14px' }}
+													onMouseEnter={() => setHoveredTab('inbox')}
+													onClick={() => transitionToTab('inbox')}
+													aria-pressed={true}
+												>
+													<span
+														className={`inline-block ${isTabPreviewingOther ? 'opacity-0' : 'opacity-100'}`}
+														style={{
+															display: 'inline-block',
+															transform: 'translateX(2px)',
+															transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+														}}
+													>
+														Inbox
+													</span>
+												</button>
+											</div>
+										</div>
+									</div>
+								)}
+							</div>
+						</div>
+
+						{/* Search query display with back button - hidden when in map view */}
+						{hasSearched &&
+							activeSearchQuery &&
+							!isMapView &&
+							activeTab === 'search' &&
+							(isSearchPending || isLoadingContacts || isRefetchingContacts) && (
+								<div className="search-query-display mt-8">
+									<div className="search-query-display-inner">
+										<button
+											onClick={handleEnhancedResetSearch}
+											className="search-back-button"
+											aria-label="Back to search"
+										>
+											<svg
+												width="20"
+												height="20"
+												viewBox="0 0 20 20"
+												fill="none"
+												xmlns="http://www.w3.org/2000/svg"
+												className="search-back-icon"
+											>
+												<path
+													d="M12 16L6 10L12 4"
+													stroke="currentColor"
+													strokeWidth="1.5"
+													strokeLinecap="round"
+													strokeLinejoin="round"
+												/>
+											</svg>
+											<span className="search-back-text">Back</span>
+										</button>
+										<div className="search-query-display-text">
+											<span className="search-query-quote-left">&ldquo;</span>
+											{activeSearchQuery}
+											<span className="search-query-quote-right">&rdquo;</span>
+										</div>
+									</div>
+								</div>
+							)}
+
+						{/* Show the mini search bar and tools when:
+			    1. A search has been executed (normal case), OR
+			    2. We're in fromHome mode with map view (pre-auth demo state) */}
+						{((hasSearched && activeTab === 'search') || (fromHomeParam && isMapView)) &&
+							(isMapView || (!isLoadingContacts && !isRefetchingContacts)) &&
+							(() => {
+								const activeWhyForTray = (
+									fromHomeParam && isMapView && !hasSearched
+										? FROM_HOME_WHY
+										: extractWhyFromSearchQuery(activeSearchQuery) ||
+											(mapTopSearchDisplay.kind === 'category' && mapTopSearchDisplay.what
+												? getCategorySearchWhyForWhat(mapTopSearchDisplay.what)
+												: '') ||
+											whyValue
+								).trim();
+								const isPromotionForTray = activeWhyForTray === '[Promotion]';
+								const trayWhy = isPromotionForTray
+									? {
+											backgroundColor:
+												MAP_RESULTS_SEARCH_TRAY.whyBackgroundColors.promotion,
+											icon: <PromotionIcon />,
+										}
+									: {
+											backgroundColor:
+												MAP_RESULTS_SEARCH_TRAY.whyBackgroundColors.booking,
+											icon: <BookingIcon />,
+										};
+
+								const effectiveWhatKeyForTray =
+									mapTopSearchDisplay.kind === 'category'
+										? mapTopSearchDisplay.what.trim()
+										: (searchedWhat || '').trim();
+								const whatCfg =
+									MAP_RESULTS_SEARCH_TRAY.whatIconByLabel[effectiveWhatKeyForTray];
+								const TrayWhatIcon = whatCfg?.Icon || MusicVenuesIcon;
+								const trayWhatIconSize =
+									effectiveWhatKeyForTray === 'Wine, Beer, and Spirits' ? 22 : undefined;
+								const trayWhat = {
+									backgroundColor:
+										whatCfg?.backgroundColor ||
+										MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Music Venues']
+											.backgroundColor,
+									icon: <TrayWhatIcon size={trayWhatIconSize} />,
+								};
+
+								const whereCandidate =
+									mapTopSearchDisplay.kind === 'category'
+										? mapTopSearchDisplay.where.trim()
+										: (userLocationName || '').trim();
+								const [whereCity, whereState] = (() => {
+									if (!whereCandidate) return ['', ''];
+									if (whereCandidate.includes(',')) {
+										const parts = whereCandidate.split(',');
+										const city = (parts[0] || '').trim();
+										const state = parts.slice(1).join(',').trim();
+										return [city, state];
+									}
+									return ['', whereCandidate];
+								})();
+								const whereIconProps =
+									!isNearMeLocation && whereState
+										? getCityIconProps(whereCity, whereState)
+										: null;
+								const trayWhere = isNearMeLocation
+									? {
+											backgroundColor: MAP_RESULTS_SEARCH_TRAY.nearMeBackgroundColor,
+											icon: <NearMeIcon />,
+										}
+									: {
+											backgroundColor:
+												whereIconProps?.backgroundColor ||
+												MAP_RESULTS_SEARCH_TRAY.nearMeBackgroundColor,
+											icon: whereIconProps?.icon || <NearMeIcon />,
+										};
+								const mapTopSearchLabel = mapTopSearchDisplay.label.trim() || 'Search';
+								const isMapTopSearchReengageAvailable =
+									isMapView && hasSearched && activeSearchQuery.trim().length > 0;
+								const isSplitCategoryTopSearch =
+									mapTopSearchDisplay.kind === 'category' &&
+									mapTopSearchDisplay.what.trim().length > 0 &&
+									mapTopSearchDisplay.whereLabel.trim().length > 0;
+
+								const searchBarBase = (
+									<div
+										className={`results-search-bar-wrapper w-full max-w-[650px] mx-auto px-4 ${
+											// When the horizontal research strip is active (sm–lg desktop),
+											// hide the mini search bar + helper text so the strip owns this area.
+											showHorizontalResearchStrip ? 'sm:hidden xl:block' : ''
+										} relative`}
+										style={
+											isMapView
+												? {
+														// In fullscreen map view we render this via a portal + outer fixed wrapper,
+														// so keep this inner container relative for absolute children.
+														position: 'relative',
+														width: 'min(440px, calc(100vw - 120px))',
+														maxWidth: '440px',
+														padding: 0,
+														backgroundColor: 'transparent',
+														borderBottom: 'none',
+													}
+												: undefined
+										}
+									>
+										<div
+											className={`results-search-bar-inner ${
+												hoveredContact && !isMapView ? 'invisible' : ''
+											}`}
+										>
+											{isMapView ? (
+												<div
+													className="results-search-form"
+													aria-label={`Active search: ${mapTopSearchLabel}`}
+												>
+													<div className="results-search-input-group">
 														<div
-															className={`absolute left-[6px] top-1/2 -translate-y-1/2 flex items-center rounded-[6px] z-10 overflow-hidden border border-black ${
-																mapTopSearchDisplay.kind === 'curated' ? 'search-gradient-button' : ''
-															}`}
+															className="search-wave-container relative"
+															role={
+																isMapTopSearchReengageAvailable ? 'button' : undefined
+															}
+															aria-label={
+																isMapTopSearchReengageAvailable
+																	? `${isMapSearchEngaged ? 'Refocus' : 'Re-engage'} ${mapTopSearchLabel} on the map`
+																	: undefined
+															}
+															tabIndex={isMapTopSearchReengageAvailable ? 0 : undefined}
+															title={
+																isMapTopSearchReengageAvailable
+																	? isMapSearchEngaged
+																		? 'Refocus this search on the map'
+																		: 'Re-engage this search on the map'
+																	: undefined
+															}
+															onClick={
+																isMapTopSearchReengageAvailable
+																	? handleMapTopSearchReengage
+																	: undefined
+															}
+															onKeyDown={
+																isMapTopSearchReengageAvailable
+																	? (event) => {
+																			if (event.key !== 'Enter' && event.key !== ' ')
+																				return;
+																			event.preventDefault();
+																			handleMapTopSearchReengage();
+																		}
+																	: undefined
+															}
 															style={{
-																width: 'calc(100% - 12px)',
-																height: '38px',
-																background:
-																	mapTopSearchDisplay.kind === 'curated'
-																		? undefined
-																		: '#FFFFFF',
+																cursor: isMapTopSearchReengageAvailable
+																	? 'pointer'
+																	: 'default',
 															}}
 														>
-															{mapTopSearchDisplay.kind === 'curated' ? (
-																<div className="flex h-full w-full items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-white">
-																	{mapTopSearchDisplay.label}
-																</div>
-															) : isSplitCategoryTopSearch &&
-															  mapTopSearchDisplay.kind === 'category' ? (
-																<div className="flex h-full w-full items-center font-secondary text-[13px] font-bold leading-none text-black">
-																	<div className="flex h-full min-w-0 flex-1 items-center justify-center px-[12px]">
-																		<span className="truncate">
-																			{mapTopSearchDisplay.what}
-																		</span>
-																	</div>
-																	<div className="h-full w-px flex-shrink-0 bg-black/10" />
-																	<div className="flex h-full min-w-0 flex-1 items-center justify-center px-[12px]">
-																		<span className="truncate">
-																			{mapTopSearchDisplay.whereLabel}
-																		</span>
-																	</div>
-																</div>
-															) : (
-																<div className="flex h-full w-full min-w-0 items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-black">
-																	<span className="truncate">{mapTopSearchLabel}</span>
-																</div>
-															)}
-														</div>
-													</div>
-												</div>
-											</div>
-											{renderDesktopSearchDropdowns()}
-										</div>
-									) : (
-									<Form {...form}>
-										<form
-											onSubmit={async (e) => {
-											e.preventDefault();
-											await ensureNonEmptyDashboardSearchOnBlankSubmit();
-											if (!isSignedIn) {
-												if (hasProblematicBrowser) {
-													console.log(
-														'[Dashboard] Edge/Safari detected, navigating to sign-in page'
-													);
-													if (typeof window !== 'undefined') {
-														sessionStorage.setItem(
-															'redirectAfterSignIn',
-															window.location.pathname
-														);
-													}
-													window.location.href = urls.signIn.index;
-												} else {
-													openSignIn();
-												}
-											} else {
-												form.handleSubmit(onSubmit)(e);
-											}
-										}}
-										className="results-search-form"
-									>
-										<FormField
-											control={form.control}
-											name="searchText"
-											render={({ field }) => (
-												<FormItem className="w-full">
-													<FormControl>
-														<div className="results-search-input-group">
 															<div
-																className={`search-wave-container relative ${
-																	isSearchPending ||
-																	isLoadingContacts ||
-																	isRefetchingContacts
-																		? 'search-wave-loading'
-																		: ''
-																}`}
+																className="search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black !bg-white !pr-[12px] !text-black"
+																style={{
+																	accentColor: 'transparent',
+																	cursor: isMapTopSearchReengageAvailable
+																		? 'pointer'
+																		: 'default',
+																	letterSpacing: 0,
+																	padding: 0,
+																	userSelect: 'none',
+																}}
 															>
-																<Input
-																	className={`search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black ${
-																		isMapView ? '!pr-[12px]' : '!pr-[60px]'
-																	} ${
-																		activeSection ? '!bg-[#F3F3F3]' : '!bg-white'
-																	} ${
-																		field.value === activeSearchQuery &&
-																		(field.value?.trim()?.length ?? 0) > 0
-																			? 'text-center'
-																			: 'text-left'
-																	} ${
-																		!isMobile
-																			? 'text-transparent placeholder:text-transparent'
+																<div
+																	className={`absolute left-[6px] top-1/2 -translate-y-1/2 flex items-center rounded-[6px] z-10 overflow-hidden border border-black ${
+																		mapTopSearchDisplay.kind === 'curated'
+																			? 'search-gradient-button'
 																			: ''
 																	}`}
-																	placeholder='Refine your search... e.g. "Music venues in North Carolina"'
-																	style={{ accentColor: 'transparent' }}
-																	autoComplete="off"
-																	autoCorrect="off"
-																	autoCapitalize="off"
-																	spellCheck="false"
-																	{...field}
-																/>
-																{!isMobile && (
-																	<div
-																		className={`absolute left-[6px] top-1/2 -translate-y-1/2 flex items-center rounded-[6px] z-10 group ${
-																			activeSection
-																				? 'bg-[#F3F3F3] border border-transparent'
-																				: 'bg-white border border-black'
-																		}`}
-																		style={{
-																			width: isMapView
-																				? 'calc(100% - 12px)'
-																				: 'calc(100% - 66px)',
-																			height: '38px',
-																		}}
-																	>
-																		{/* Sliding active section indicator for mini search bar */}
-																		<div
-																			ref={miniActiveSectionIndicatorRef}
-																			className="absolute top-0 left-0 h-full w-1/3 bg-white border border-black rounded-[6px] pointer-events-none z-0"
-																			style={{ opacity: 0, willChange: 'transform' }}
-																		/>
-																		<div
-																			className={`flex-1 flex items-center justify-start border-r border-transparent ${
-																				!activeSection
-																					? 'group-hover:border-black/10'
-																					: ''
-																			} h-full min-w-0 relative pl-[16px] pr-1 mini-search-section-why`}
-																			onClick={() => {
-																				if (isFromHomeDemoMode) {
-																					setShowFreeTrialPrompt(true);
-																					return;
-																				}
-																				setActiveSection('why');
-																			}}
-																		>
-																			<div className="w-full h-full flex items-center text-left text-[13px] font-bold font-secondary truncate p-0 relative z-10 cursor-pointer">
-																				{whyValue
-																					? whyValue.replace(/[\[\]]/g, '')
-																					: 'Why'}
+																	style={{
+																		width: 'calc(100% - 12px)',
+																		height: '38px',
+																		background:
+																			mapTopSearchDisplay.kind === 'curated'
+																				? undefined
+																				: '#FFFFFF',
+																	}}
+																>
+																	{mapTopSearchDisplay.kind === 'curated' ? (
+																		<div className="flex h-full w-full items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-white">
+																			{mapTopSearchDisplay.label}
+																		</div>
+																	) : isSplitCategoryTopSearch &&
+																	  mapTopSearchDisplay.kind === 'category' ? (
+																		<div className="flex h-full w-full items-center font-secondary text-[13px] font-bold leading-none text-black">
+																			<div className="flex h-full min-w-0 flex-1 items-center justify-center px-[12px]">
+																				<span className="truncate">
+																					{mapTopSearchDisplay.what}
+																				</span>
+																			</div>
+																			<div className="h-full w-px flex-shrink-0 bg-black/10" />
+																			<div className="flex h-full min-w-0 flex-1 items-center justify-center px-[12px]">
+																				<span className="truncate">
+																					{mapTopSearchDisplay.whereLabel}
+																				</span>
 																			</div>
 																		</div>
-																		<div
-																			className={`flex-1 flex items-center justify-start border-r border-transparent ${
-																				!activeSection
-																					? 'group-hover:border-black/10'
-																					: ''
-																			} h-full min-w-0 relative pl-[16px] pr-1 mini-search-section-what`}
-																			onClick={() => setActiveSection('what')}
-																		>
-																			<input
-																				value={whatValue}
-																				onChange={(e) => setWhatValue(e.target.value)}
-																				className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary overflow-hidden placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
-																				style={{
-																					maskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
-																					WebkitMaskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
-																				}}
-																				placeholder="What"
-																				onFocus={(e) => {
-																					setActiveSection('what');
-																					const target = e.target;
-																					setTimeout(
-																						() => target.setSelectionRange(0, 0),
-																						0
-																					);
-																				}}
-																			/>
+																	) : (
+																		<div className="flex h-full w-full min-w-0 items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-black">
+																			<span className="truncate">
+																				{mapTopSearchLabel}
+																			</span>
 																		</div>
-																		<div
-																			className={`flex-1 flex items-center justify-end h-full min-w-0 relative ${
-																				isMapView ? 'pr-[12px]' : 'pr-[29px]'
-																			} pl-[16px] mini-search-section-where`}
-																			onClick={() => {
-																				if (isFromHomeDemoMode) {
-																					setShowFreeTrialPrompt(true);
-																					return;
-																				}
-																				setActiveSection('where');
-																			}}
-																		>
-																			<input
-																				value={whereValue}
-																				onChange={(e) => {
-																					if (isFromHomeDemoMode) return;
-																					setWhereValue(e.target.value);
-																					setIsNearMeLocation(false);
-																				}}
-																				onKeyDown={(e) => {
-																					if (e.key === 'Enter') {
-																						e.preventDefault();
-																						void triggerSearchWithCurrentValues();
-																					}
-																				}}
-																				readOnly={isFromHomeDemoMode}
-																				className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary overflow-hidden placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
-																				style={{
-																					maskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
-																					WebkitMaskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
-																				}}
-																				placeholder="Where"
-																				onFocus={(e) => {
-																					if (isFromHomeDemoMode) {
-																						e.target.blur();
-																						setShowFreeTrialPrompt(true);
-																						return;
-																					}
-																					setActiveSection('where');
-																					const target = e.target;
-																					setTimeout(
-																						() =>
-																							target.setSelectionRange(
-																								0,
-																								target.value.length
-																							),
-																						0
-																					);
-																				}}
-																			/>
-																		</div>
-																	</div>
-																)}
-																{!isMapView && (
-																	<button
-																		type="submit"
-																		className="absolute right-[6px] top-1/2 -translate-y-1/2 flex items-center justify-center transition-colors cursor-pointer z-20 hover:bg-[#a3d9a5]"
-																		style={{
-																			width: '48px',
-																			height: '37px',
-																			backgroundColor: '#B8E4BE',
-																			border: '1px solid #5DAB68',
-																			borderTopRightRadius: '6px',
-																			borderBottomRightRadius: '6px',
-																			borderTopLeftRadius: '0',
-																			borderBottomLeftRadius: '0',
-																		}}
-																		aria-label="Search"
-																	>
-																		<div
-																			style={{
-																				transform: 'scale(0.75)',
-																				display: 'flex',
-																			}}
-																		>
-																			<SearchIconDesktop />
-																		</div>
-																	</button>
-																)}
+																	)}
+																</div>
 															</div>
-															{renderDesktopSearchDropdowns()}
 														</div>
-													</FormControl>
-												</FormItem>
-											)}
-										/>
-										{/* Generate action removed; awaiting left-side SVG submit icon */}
-									</form>
-									{!isMapView && (
-										<div className="w-full flex flex-col items-center gap-2 mt-2 results-helper-text">
-											<span
-												className="font-secondary text-center"
-												style={{ fontSize: '13px', fontWeight: 400, color: '#7f7f7f' }}
-											>
-												Select who you want to contact
-											</span>
-											{/* Hidden: Import button
+													</div>
+													{renderDesktopSearchDropdowns()}
+												</div>
+											) : (
+												<Form {...form}>
+													<form
+														onSubmit={async (e) => {
+															e.preventDefault();
+															await ensureNonEmptyDashboardSearchOnBlankSubmit();
+															if (!isSignedIn) {
+																if (hasProblematicBrowser) {
+																	console.log(
+																		'[Dashboard] Edge/Safari detected, navigating to sign-in page'
+																	);
+																	if (typeof window !== 'undefined') {
+																		sessionStorage.setItem(
+																			'redirectAfterSignIn',
+																			window.location.pathname
+																		);
+																	}
+																	window.location.href = urls.signIn.index;
+																} else {
+																	openSignIn();
+																}
+															} else {
+																form.handleSubmit(onSubmit)(e);
+															}
+														}}
+														className="results-search-form"
+													>
+														<FormField
+															control={form.control}
+															name="searchText"
+															render={({ field }) => (
+																<FormItem className="w-full">
+																	<FormControl>
+																		<div className="results-search-input-group">
+																			<div
+																				className={`search-wave-container relative ${
+																					isSearchPending ||
+																					isLoadingContacts ||
+																					isRefetchingContacts
+																						? 'search-wave-loading'
+																						: ''
+																				}`}
+																			>
+																				<Input
+																					className={`search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black ${
+																						isMapView ? '!pr-[12px]' : '!pr-[60px]'
+																					} ${
+																						activeSection ? '!bg-[#F3F3F3]' : '!bg-white'
+																					} ${
+																						field.value === activeSearchQuery &&
+																						(field.value?.trim()?.length ?? 0) > 0
+																							? 'text-center'
+																							: 'text-left'
+																					} ${
+																						!isMobile
+																							? 'text-transparent placeholder:text-transparent'
+																							: ''
+																					}`}
+																					placeholder='Refine your search... e.g. "Music venues in North Carolina"'
+																					style={{ accentColor: 'transparent' }}
+																					autoComplete="off"
+																					autoCorrect="off"
+																					autoCapitalize="off"
+																					spellCheck="false"
+																					{...field}
+																				/>
+																				{!isMobile && (
+																					<div
+																						className={`absolute left-[6px] top-1/2 -translate-y-1/2 flex items-center rounded-[6px] z-10 group ${
+																							activeSection
+																								? 'bg-[#F3F3F3] border border-transparent'
+																								: 'bg-white border border-black'
+																						}`}
+																						style={{
+																							width: isMapView
+																								? 'calc(100% - 12px)'
+																								: 'calc(100% - 66px)',
+																							height: '38px',
+																						}}
+																					>
+																						{/* Sliding active section indicator for mini search bar */}
+																						<div
+																							ref={miniActiveSectionIndicatorRef}
+																							className="absolute top-0 left-0 h-full w-1/3 bg-white border border-black rounded-[6px] pointer-events-none z-0"
+																							style={{
+																								opacity: 0,
+																								willChange: 'transform',
+																							}}
+																						/>
+																						<div
+																							className={`flex-1 flex items-center justify-start border-r border-transparent ${
+																								!activeSection
+																									? 'group-hover:border-black/10'
+																									: ''
+																							} h-full min-w-0 relative pl-[16px] pr-1 mini-search-section-why`}
+																							onClick={() => {
+																								if (isFromHomeDemoMode) {
+																									setShowFreeTrialPrompt(true);
+																									return;
+																								}
+																								setActiveSection('why');
+																							}}
+																						>
+																							<div className="w-full h-full flex items-center text-left text-[13px] font-bold font-secondary truncate p-0 relative z-10 cursor-pointer">
+																								{whyValue
+																									? whyValue.replace(/[\[\]]/g, '')
+																									: 'Why'}
+																							</div>
+																						</div>
+																						<div
+																							className={`flex-1 flex items-center justify-start border-r border-transparent ${
+																								!activeSection
+																									? 'group-hover:border-black/10'
+																									: ''
+																							} h-full min-w-0 relative pl-[16px] pr-1 mini-search-section-what`}
+																							onClick={() => setActiveSection('what')}
+																						>
+																							<input
+																								value={whatValue}
+																								onChange={(e) =>
+																									setWhatValue(e.target.value)
+																								}
+																								className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary overflow-hidden placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+																								style={{
+																									maskImage:
+																										'linear-gradient(to right, black 75%, transparent 100%)',
+																									WebkitMaskImage:
+																										'linear-gradient(to right, black 75%, transparent 100%)',
+																								}}
+																								placeholder="What"
+																								onFocus={(e) => {
+																									setActiveSection('what');
+																									const target = e.target;
+																									setTimeout(
+																										() => target.setSelectionRange(0, 0),
+																										0
+																									);
+																								}}
+																							/>
+																						</div>
+																						<div
+																							className={`flex-1 flex items-center justify-end h-full min-w-0 relative ${
+																								isMapView ? 'pr-[12px]' : 'pr-[29px]'
+																							} pl-[16px] mini-search-section-where`}
+																							onClick={() => {
+																								if (isFromHomeDemoMode) {
+																									setShowFreeTrialPrompt(true);
+																									return;
+																								}
+																								setActiveSection('where');
+																							}}
+																						>
+																							<input
+																								value={whereValue}
+																								onChange={(e) => {
+																									if (isFromHomeDemoMode) return;
+																									setWhereValue(e.target.value);
+																									setIsNearMeLocation(false);
+																								}}
+																								onKeyDown={(e) => {
+																									if (e.key === 'Enter') {
+																										e.preventDefault();
+																										void triggerSearchWithCurrentValues();
+																									}
+																								}}
+																								readOnly={isFromHomeDemoMode}
+																								className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary overflow-hidden placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+																								style={{
+																									maskImage:
+																										'linear-gradient(to right, black 75%, transparent 100%)',
+																									WebkitMaskImage:
+																										'linear-gradient(to right, black 75%, transparent 100%)',
+																								}}
+																								placeholder="Where"
+																								onFocus={(e) => {
+																									if (isFromHomeDemoMode) {
+																										e.target.blur();
+																										setShowFreeTrialPrompt(true);
+																										return;
+																									}
+																									setActiveSection('where');
+																									const target = e.target;
+																									setTimeout(
+																										() =>
+																											target.setSelectionRange(
+																												0,
+																												target.value.length
+																											),
+																										0
+																									);
+																								}}
+																							/>
+																						</div>
+																					</div>
+																				)}
+																				{!isMapView && (
+																					<button
+																						type="submit"
+																						className="absolute right-[6px] top-1/2 -translate-y-1/2 flex items-center justify-center transition-colors cursor-pointer z-20 hover:bg-[#a3d9a5]"
+																						style={{
+																							width: '48px',
+																							height: '37px',
+																							backgroundColor: '#B8E4BE',
+																							border: '1px solid #5DAB68',
+																							borderTopRightRadius: '6px',
+																							borderBottomRightRadius: '6px',
+																							borderTopLeftRadius: '0',
+																							borderBottomLeftRadius: '0',
+																						}}
+																						aria-label="Search"
+																					>
+																						<div
+																							style={{
+																								transform: 'scale(0.75)',
+																								display: 'flex',
+																							}}
+																						>
+																							<SearchIconDesktop />
+																						</div>
+																					</button>
+																				)}
+																			</div>
+																			{renderDesktopSearchDropdowns()}
+																		</div>
+																	</FormControl>
+																</FormItem>
+															)}
+														/>
+														{/* Generate action removed; awaiting left-side SVG submit icon */}
+													</form>
+													{!isMapView && (
+														<div className="w-full flex flex-col items-center gap-2 mt-2 results-helper-text">
+															<span
+																className="font-secondary text-center"
+																style={{
+																	fontSize: '13px',
+																	fontWeight: 400,
+																	color: '#7f7f7f',
+																}}
+															>
+																Select who you want to contact
+															</span>
+															{/* Hidden: Import button
 											<div className="flex justify-center">
 												<ContactTSVUploadDialog
 													isAdmin={user?.role === 'admin'}
@@ -9453,992 +9766,1625 @@ const DashboardContent = () => {
 												/>
 											</div>
 											*/}
+														</div>
+													)}
+												</Form>
+											)}
+										</div>
+										{hoveredContact && !isMobile && !isMapView && (
+											<div className="absolute inset-0 z-[90] pointer-events-none bg-white hidden xl:flex items-start justify-center">
+												<div className="w-full max-w-[1132px] mx-auto px-4 py-3 text-center">
+													<div className="font-secondary font-bold text-[19px] leading-tight truncate">
+														{`${hoveredContact.firstName || ''} ${
+															hoveredContact.lastName || ''
+														}`.trim() ||
+															hoveredContact.name ||
+															hoveredContact.company ||
+															'—'}
+													</div>
+													<div className="mt-1 w-full flex justify-center">
+														<div
+															className="inline-flex items-center justify-center h-[19px] rounded-[8px] px-2 gap-1 whitespace-nowrap"
+															style={{
+																backgroundColor: isRestaurantTitle(
+																	getContactCategoryDisplaySource(hoveredContact)
+																)
+																	? '#C3FBD1'
+																	: isCoffeeShopTitle(
+																				getContactCategoryDisplaySource(hoveredContact)
+																		  )
+																		? '#D6F1BD'
+																		: isMusicVenueTitle(
+																					getContactCategoryDisplaySource(hoveredContact)
+																			  )
+																			? '#B7E5FF'
+																			: isMusicFestivalTitle(
+																						getContactCategoryDisplaySource(
+																							hoveredContact
+																						)
+																				  )
+																				? '#C1D6FF'
+																				: isWeddingPlannerTitle(
+																							getContactCategoryDisplaySource(
+																								hoveredContact
+																							)
+																					  ) ||
+																					  isWeddingVenueTitle(
+																							getContactCategoryDisplaySource(
+																								hoveredContact
+																							)
+																					  )
+																					? '#FFF8DC'
+																					: isWineBeerSpiritsTitle(
+																								getContactCategoryDisplaySource(
+																									hoveredContact
+																								)
+																						  )
+																						? '#BFC4FF'
+																						: '#E8EFFF',
+																border: '0.7px solid #000000',
+															}}
+														>
+															{isRestaurantTitle(
+																getContactCategoryDisplaySource(hoveredContact)
+															) && (
+																<RestaurantsIcon size={12} className="flex-shrink-0" />
+															)}
+															{isCoffeeShopTitle(
+																getContactCategoryDisplaySource(hoveredContact)
+															) && <CoffeeShopsIcon size={7} />}
+															{isMusicVenueTitle(
+																getContactCategoryDisplaySource(hoveredContact)
+															) && (
+																<MusicVenuesIcon size={12} className="flex-shrink-0" />
+															)}
+															{isMusicFestivalTitle(
+																getContactCategoryDisplaySource(hoveredContact)
+															) && <FestivalsIcon size={12} className="flex-shrink-0" />}
+															{(isWeddingPlannerTitle(
+																getContactCategoryDisplaySource(hoveredContact)
+															) ||
+																isWeddingVenueTitle(
+																	getContactCategoryDisplaySource(hoveredContact)
+																)) && <WeddingPlannersIcon size={12} />}
+															{isWineBeerSpiritsTitle(
+																getContactCategoryDisplaySource(hoveredContact)
+															) && (
+																<WineBeerSpiritsIcon
+																	size={12}
+																	className="flex-shrink-0"
+																/>
+															)}
+															<span className="text-[14px] leading-none font-secondary font-medium">
+																{isRestaurantTitle(
+																	getContactCategoryDisplaySource(hoveredContact)
+																)
+																	? 'Restaurant'
+																	: isCoffeeShopTitle(
+																				getContactCategoryDisplaySource(hoveredContact)
+																		  )
+																		? 'Coffee Shop'
+																		: isMusicVenueTitle(
+																					getContactCategoryDisplaySource(hoveredContact)
+																			  )
+																			? 'Music Venue'
+																			: isMusicFestivalTitle(
+																						getContactCategoryDisplaySource(
+																							hoveredContact
+																						)
+																				  )
+																				? 'Music Festival'
+																				: isWeddingVenueTitle(
+																							getContactCategoryDisplaySource(
+																								hoveredContact
+																							)
+																					  )
+																					? 'Wedding Venue'
+																					: isWeddingPlannerTitle(
+																								getContactCategoryDisplaySource(
+																									hoveredContact
+																								)
+																						  )
+																						? 'Wedding Planner'
+																						: isWineBeerSpiritsTitle(
+																									getContactCategoryDisplaySource(
+																										hoveredContact
+																									)
+																							  )
+																							? getWineBeerSpiritsLabel(
+																									getContactCategoryDisplaySource(
+																										hoveredContact
+																									)
+																								)
+																							: getContactCategoryDisplaySource(
+																									hoveredContact
+																								) || '—'}
+															</span>
+														</div>
+													</div>
+													{((hoveredContact.firstName &&
+														hoveredContact.firstName.length > 0) ||
+														(hoveredContact.lastName &&
+															hoveredContact.lastName.length > 0) ||
+														(hoveredContact.name && hoveredContact.name.length > 0)) &&
+													hoveredContact.company ? (
+														<div
+															className="mt-1 text-[14px] leading-tight truncate"
+															style={{ color: '#838383' }}
+														>
+															{hoveredContact.company}
+														</div>
+													) : null}
+													<div
+														className="mt-1 text-[14px] leading-tight truncate"
+														style={{ color: '#838383' }}
+													>
+														{[hoveredContact.city, hoveredContact.state]
+															.filter(Boolean)
+															.join(', ') || '—'}
+													</div>
+												</div>
 											</div>
 										)}
-									</Form>
-									)}
-								</div>
-							{hoveredContact && !isMobile && !isMapView && (
-								<div className="absolute inset-0 z-[90] pointer-events-none bg-white hidden xl:flex items-start justify-center">
-									<div className="w-full max-w-[1132px] mx-auto px-4 py-3 text-center">
-										<div className="font-secondary font-bold text-[19px] leading-tight truncate">
-											{`${hoveredContact.firstName || ''} ${
-												hoveredContact.lastName || ''
-											}`.trim() ||
-												hoveredContact.name ||
-												hoveredContact.company ||
-												'—'}
-										</div>
-										<div className="mt-1 w-full flex justify-center">
-											<div
-												className="inline-flex items-center justify-center h-[19px] rounded-[8px] px-2 gap-1 whitespace-nowrap"
-												style={{
-													backgroundColor: isRestaurantTitle(getContactCategoryDisplaySource(hoveredContact))
-														? '#C3FBD1'
-														: isCoffeeShopTitle(getContactCategoryDisplaySource(hoveredContact))
-															? '#D6F1BD'
-															: isMusicVenueTitle(getContactCategoryDisplaySource(hoveredContact))
-																? '#B7E5FF'
-																: isMusicFestivalTitle(getContactCategoryDisplaySource(hoveredContact))
-																	? '#C1D6FF'
-																	: (isWeddingPlannerTitle(getContactCategoryDisplaySource(hoveredContact)) || isWeddingVenueTitle(getContactCategoryDisplaySource(hoveredContact)))
-																		? '#FFF8DC'
-																		: isWineBeerSpiritsTitle(getContactCategoryDisplaySource(hoveredContact))
-																			? '#BFC4FF'
-																			: '#E8EFFF',
-													border: '0.7px solid #000000',
-												}}
-											>
-												{isRestaurantTitle(getContactCategoryDisplaySource(hoveredContact)) && (
-													<RestaurantsIcon size={12} className="flex-shrink-0" />
-												)}
-												{isCoffeeShopTitle(getContactCategoryDisplaySource(hoveredContact)) && (
-													<CoffeeShopsIcon size={7} />
-												)}
-												{isMusicVenueTitle(getContactCategoryDisplaySource(hoveredContact)) && (
-													<MusicVenuesIcon size={12} className="flex-shrink-0" />
-												)}
-												{isMusicFestivalTitle(getContactCategoryDisplaySource(hoveredContact)) && (
-													<FestivalsIcon size={12} className="flex-shrink-0" />
-												)}
-												{(isWeddingPlannerTitle(getContactCategoryDisplaySource(hoveredContact)) || isWeddingVenueTitle(getContactCategoryDisplaySource(hoveredContact))) && (
-													<WeddingPlannersIcon size={12} />
-												)}
-												{isWineBeerSpiritsTitle(getContactCategoryDisplaySource(hoveredContact)) && (
-													<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
-												)}
-												<span className="text-[14px] leading-none font-secondary font-medium">
-													{isRestaurantTitle(getContactCategoryDisplaySource(hoveredContact))
-														? 'Restaurant'
-														: isCoffeeShopTitle(getContactCategoryDisplaySource(hoveredContact))
-															? 'Coffee Shop'
-															: isMusicVenueTitle(getContactCategoryDisplaySource(hoveredContact))
-																? 'Music Venue'
-																: isMusicFestivalTitle(getContactCategoryDisplaySource(hoveredContact))
-																	? 'Music Festival'
-																	: isWeddingVenueTitle(getContactCategoryDisplaySource(hoveredContact))
-																		? 'Wedding Venue'
-																		: isWeddingPlannerTitle(getContactCategoryDisplaySource(hoveredContact))
-																			? 'Wedding Planner'
-																			: isWineBeerSpiritsTitle(getContactCategoryDisplaySource(hoveredContact))
-																				? getWineBeerSpiritsLabel(getContactCategoryDisplaySource(hoveredContact))
-																				: (getContactCategoryDisplaySource(hoveredContact) || '—')}
-												</span>
-											</div>
-										</div>
-										{((hoveredContact.firstName && hoveredContact.firstName.length > 0) ||
-											(hoveredContact.lastName && hoveredContact.lastName.length > 0) ||
-											(hoveredContact.name && hoveredContact.name.length > 0)) &&
-										hoveredContact.company ? (
-											<div
-												className="mt-1 text-[14px] leading-tight truncate"
-												style={{ color: '#838383' }}
-											>
-												{hoveredContact.company}
-											</div>
-										) : null}
+									</div>
+								);
+
+								const mapTopBackdropBox = isMapView ? (
+									<div
+										aria-hidden="true"
+										className="fixed left-0 right-0 flex justify-center pointer-events-none"
+										style={{
+											top: `${MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX}px`,
+											zIndex: 110,
+										}}
+									>
 										<div
-											className="mt-1 text-[14px] leading-tight truncate"
-											style={{ color: '#838383' }}
-										>
-											{[hoveredContact.city, hoveredContact.state]
-												.filter(Boolean)
-												.join(', ') || '—'}
-										</div>
-									</div>
-								</div>
-							)}
-						</div>
-						);
-
-						const mapTopBackdropBox = isMapView ? (
-							<div
-								aria-hidden="true"
-								className="fixed left-0 right-0 flex justify-center pointer-events-none"
-								style={{
-									top: `${MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX}px`,
-									zIndex: 110,
-								}}
-							>
-								<div
-									style={{
-										transform: `scale(${MAP_VIEW_UI_SCALE})`,
-										transformOrigin: 'top center',
-										width: `${MAP_VIEW_TOP_BACKDROP_BOX_WIDTH_PX}px`,
-										height: `${MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX}px`,
-										borderRadius: '8px',
-										backgroundColor: '#B9EAF1',
-										opacity: 0.9,
-									}}
-								/>
-							</div>
-						) : null;
-
-						const mapTopOutlineBox = isMapView ? (
-							<div
-								className="fixed left-0 right-0 flex justify-center pointer-events-none"
-								style={{
-									top: `${MAP_VIEW_SEARCH_BAR_TOP_PX}px`,
-									zIndex: 115,
-								}}
-							>
-								<div
-									className="relative"
-									style={{
-										transform: `scale(${MAP_VIEW_UI_SCALE})`,
-										transformOrigin: 'top center',
-										width: `${MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX}px`,
-										maxWidth: `${MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX}px`,
-										height: `${MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX}px`,
-									}}
-								>
-									<div
-										className="pointer-events-auto"
-										style={{
-											position: 'absolute',
-											right: `calc(100% + ${MAP_VIEW_TOP_OUTLINE_BOX_LEFT_GAP_PX}px)`,
-											top: '50%',
-											transform: 'translateY(-50%)',
-											width: `${MAP_VIEW_TOP_OUTLINE_BOX_WIDTH_PX}px`,
-											height: `${MAP_VIEW_TOP_OUTLINE_BOX_HEIGHT_PX}px`,
-											border: '1px solid #000',
-											borderRadius: '8px',
-											boxSizing: 'border-box',
-											display: 'flex',
-											alignItems: 'center',
-											justifyContent: 'space-around',
-											padding: '0 6px',
-											color: '#050505',
-										}}
-									>
-										{(
-											[
-												{ key: 'playbook', Icon: DashboardActionBarPlaybookIcon, label: 'Playbook', width: 22, height: 18 },
-												{ key: 'folder', Icon: DashboardActionBarFolderIcon, label: 'Folder', width: 22, height: 13 },
-											] as const
-										).map(({ key, Icon, label, width, height }) => {
-											const isSelected = selectedActionBarIcon === key;
-											return (
-												<button
-													key={key}
-													type="button"
-													aria-label={label}
-													aria-pressed={isSelected}
-													onClick={() => setSelectedActionBarIcon(key)}
-													style={{
-														background: 'none',
-														border: 'none',
-														padding: '2px 4px',
-														margin: 0,
-														display: 'flex',
-														alignItems: 'center',
-														justifyContent: 'center',
-														cursor: 'pointer',
-														color: '#050505',
-														opacity: isSelected ? 1 : 0.3,
-														transition: 'opacity 150ms ease',
-													}}
-												>
-													<Icon width={width} height={height} />
-												</button>
-											);
-										})}
-									</div>
-									<div
-										className="pointer-events-auto"
-										style={{
-											position: 'absolute',
-											left: `calc(100% + ${MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_GAP_PX}px)`,
-											top: '50%',
-											transform: 'translateY(-50%)',
-											width: `${MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_WIDTH_PX}px`,
-											height: `${MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_HEIGHT_PX}px`,
-											border: '1px solid #000',
-											borderRadius: '8px',
-											boxSizing: 'border-box',
-											display: 'flex',
-											alignItems: 'center',
-											justifyContent: 'space-around',
-											padding: '0 8px',
-											color: '#050505',
-										}}
-									>
-										{(
-											[
-												{ key: 'star', Icon: DashboardActionBarStarIcon, label: 'Opportunities', width: 21, height: 20 },
-												{ key: 'envelope', Icon: DashboardActionBarEnvelopeIcon, label: 'Messages', width: 22, height: 13 },
-											] as const
-										).map(({ key, Icon, label, width, height }) => {
-											const isSelected = selectedActionBarIcon === key;
-											return (
-												<button
-													key={key}
-													type="button"
-													aria-label={label}
-													aria-pressed={isSelected}
-													onClick={() => setSelectedActionBarIcon(key)}
-													style={{
-														background: 'none',
-														border: 'none',
-														padding: '2px 4px',
-														margin: 0,
-														display: 'flex',
-														alignItems: 'center',
-														justifyContent: 'center',
-														cursor: 'pointer',
-														color: '#050505',
-														opacity: isSelected ? 1 : 0.3,
-														transition: 'opacity 150ms ease',
-													}}
-												>
-													<Icon width={width} height={height} />
-												</button>
-											);
-										})}
-									</div>
-								</div>
-							</div>
-						) : null;
-
-						const searchBar = isMapView ? (
-							<div
-								className="fixed left-0 right-0 flex justify-center pointer-events-none"
-								style={{
-									top: `${MAP_VIEW_SEARCH_BAR_TOP_PX}px`,
-									zIndex: 120,
-								}}
-							>
-								<div
-									className="pointer-events-auto"
-									style={{
-										transform: `scale(${MAP_VIEW_UI_SCALE})`,
-										transformOrigin: 'top center',
-									}}
-								>
-									{searchBarBase}
-								</div>
-							</div>
-						) : (
-							searchBarBase
-						);
-
-						const mapSelectGrabberTool =
-							isMapView && !isMobile ? (
-								<div
-									className="fixed z-[130] pointer-events-none"
-									style={{
-											left: `${MAP_SELECT_GRAB_LEFT_PX}px`,
-											// The visible column starts `TOP_EXTENT * scale` above this origin.
-											// Pin that visual top to the same zoom-adjusted Y as the right panel.
-											top: `calc(${MAP_VIEW_SIDE_PANEL_TOP_CSS} + ${mapSelectGrabOriginOffsetPx}px - ${MAP_SELECT_GRAB_VISUAL_TOP_NUDGE_UP_CSS})`,
-											transform: `scale(${mapSelectGrabViewScale})`,
-											transformOrigin: 'top left',
-										}}
-								>
-									<MapSelectGrabTallStackBox
-										className="absolute pointer-events-none"
-										isSelectActive={isSelectMapToolActive}
-										onAllDeselected={() => setActiveMapTool('grab')}
-										onActiveCategoriesChange={handleMapGrabActiveCategoriesChange}
-										style={{
-											left: '-0.5px',
-											top: `-${
-												MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
-												MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
-												MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
-												MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
-												MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
-												MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
-												MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
-												MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX
-											}px`,
-											...(isSelectMapToolActive
-												? {
-														backgroundColor: '#A6DCB3',
-														opacity: 0.9,
-												  }
-												: {}),
-										}}
-									/>
-									<MapSelectGrabStackBox
-										className="absolute left-0 pointer-events-none"
-										isSelectActive={isSelectMapToolActive}
-										selectedContent={<StackBoxSelectStarIcon />}
-										inactiveContent={
-											<MapSelectGrabStackTile backgroundColor="#EDF2F0">
-												<MapStackStarIcon fill="#EDF2F0" stroke="#9E9E9E" />
-											</MapSelectGrabStackTile>
-										}
-										style={{
-											top: `-${
-												MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
-												MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
-												MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
-												MAP_SELECT_GRAB_STACK_BOX_SIZE_PX
-											}px`,
-										}}
-									>
-										<MapSelectGrabStackTile backgroundColor="#FFBDBD">
-											<MapStackStarIcon />
-										</MapSelectGrabStackTile>
-									</MapSelectGrabStackBox>
-									<MapSelectGrabStackBox
-										className="absolute left-0 pointer-events-none"
-										isSelectActive={isSelectMapToolActive}
-										selectedContent={<StackBoxSelectBlueSparkIcon />}
-										inactiveContent={
-											<MapSelectGrabStackTile backgroundColor="#EDF2F0">
-												<MapStackBlueSparkIcon fill="#9E9E9E" stroke="#EDF2F0" />
-											</MapSelectGrabStackTile>
-										}
-										onActiveChange={handleMapGrabUncategorizedActiveChange}
-										style={{
-											top: `-${
-												MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
-												MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
-												MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
-												MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
-												MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
-												MAP_SELECT_GRAB_STACK_BOX_SIZE_PX
-											}px`,
-										}}
-									>
-										<MapSelectGrabStackTile backgroundColor="#50A5C970">
-											<MapStackBlueSparkIcon />
-										</MapSelectGrabStackTile>
-									</MapSelectGrabStackBox>
-									<MapSelectGrabStarterBox
-										className="absolute left-0 pointer-events-auto"
-										zoomLevelIndex={mapZoomControlIndex}
-										zoomLevelValue={mapZoomControlDisplayValue}
-										zoomLevelLiveControlRef={mapZoomControlLiveRef}
-										onZoomLevelIndexChange={handleMapZoomControlChange}
-										onZoomLevelValueChange={handleMapZoomControlValueChange}
-										onZoomLevelInteractionChange={
-											handleMapZoomControlInteractionChange
-										}
-										style={{
-											position: 'absolute',
-											left: 0,
-											top: `-${
-												MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
-												MAP_SELECT_GRAB_STARTER_BOX_GAP_PX
-											}px`,
-										}}
-									/>
-									<MapSelectGrabTool
-										activeTool={activeMapTool}
-										onSelectClick={handleSelectMapToolClick}
-										onGrabClick={() => setActiveMapTool('grab')}
-										className="pointer-events-auto"
-									/>
-								</div>
-							) : null;
-
-						const searchThisAreaCta =
-							isMapView && isSearchThisAreaCtaVisible ? (
-								<div
-									className="fixed z-[9999] pointer-events-none left-0 right-0 flex justify-center"
-									style={{
-										top: `${SEARCH_THIS_AREA_BUTTON_TOP_PX}px`,
-									}}
-								>
-									<div
-										className="pointer-events-auto"
-										style={{
-											transform: `scale(${MAP_VIEW_UI_SCALE})`,
-											transformOrigin: 'top center',
-										}}
-									>
-										<button
-											type="button"
-											className="flex items-center justify-center font-secondary font-medium text-[17px] leading-none text-black"
 											style={{
-												width: '212px',
-												height: '39px',
+												transform: `scale(${MAP_VIEW_UI_SCALE})`,
+												transformOrigin: 'top center',
+												width: `${MAP_VIEW_TOP_BACKDROP_BOX_WIDTH_PX}px`,
+												height: `${MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX}px`,
+												borderRadius: '8px',
+												backgroundColor: '#B9EAF1',
 												opacity: 0.9,
-												backgroundColor: '#AFD6EF',
-												border: '2px solid #347AB3',
-												borderRadius: '11px',
-												boxSizing: 'border-box',
 											}}
-											onClick={handleSearchThisAreaClick}
-										>
-											Search this area
-										</button>
+										/>
 									</div>
-								</div>
-							) : null;
+								) : null;
 
-						const mapCampaignId =
-							fromCampaignIdParam || (activeCampaignId != null ? String(activeCampaignId) : '');
-						const mapCampaignName =
-							fromCampaign?.name || activeCampaign?.name || 'Campaign';
-
-						const campaignMapTopTabs =
-							isMapView ? (
-								<div
-									data-slot="campaign-map-top-tabs"
-									className="fixed left-0 right-0 z-[9999] flex items-center justify-center pointer-events-none"
-									style={{
-										top: '12px',
-										height: '24px',
-									}}
-								>
+								const mapTopOutlineBox = isMapView ? (
 									<div
-										className="pointer-events-auto relative"
+										className="fixed left-0 right-0 flex justify-center pointer-events-none"
 										style={{
-											width: `${CAMPAIGN_MAP_TOP_TABS_WIDTH_PX}px`,
-											maxWidth: 'calc(100vw - 64px)',
-											height: '24px',
-											transform: `scale(${MAP_VIEW_UI_SCALE})`,
-											transformOrigin: 'top center',
+											top: `${MAP_VIEW_SEARCH_BAR_TOP_PX}px`,
+											zIndex: 115,
 										}}
 									>
 										<div
-											className="relative z-[1] grid h-full w-full items-center justify-items-center"
+											className="relative"
 											style={{
-												gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+												transform: `scale(${MAP_VIEW_UI_SCALE})`,
+												transformOrigin: 'top center',
+												width: `${MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX}px`,
+												maxWidth: `${MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX}px`,
+												height: `${MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX}px`,
 											}}
 										>
-											<button
-												type="button"
-												className="bg-transparent p-0 m-0 border-0 cursor-default inline-flex items-center justify-center h-full"
+											<div
+												className="pointer-events-auto"
 												style={{
-													color: '#1F1F1F',
-													fontFamily: 'Inter, sans-serif',
-													fontSize: '17px',
-													fontStyle: 'normal',
-													fontWeight: 600,
-													lineHeight: '14px',
+													position: 'absolute',
+													right: `calc(100% + ${MAP_VIEW_TOP_OUTLINE_BOX_LEFT_GAP_PX}px)`,
+													top: '50%',
+													transform: 'translateY(-50%)',
+													width: `${MAP_VIEW_TOP_OUTLINE_BOX_WIDTH_PX}px`,
+													height: `${MAP_VIEW_TOP_OUTLINE_BOX_HEIGHT_PX}px`,
+													border: '1px solid #000',
+													borderRadius: '8px',
+													boxSizing: 'border-box',
+													display: 'flex',
+													alignItems: 'center',
+													justifyContent: 'space-around',
+													padding: '0 6px',
+													color: '#050505',
 												}}
 											>
-												Search
-											</button>
-											<button
-												type="button"
-												className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
-												style={{
-													color: '#2C2C2C',
-													fontFamily: 'Inter, sans-serif',
-													fontSize: '17px',
-													fontStyle: 'normal',
-													fontWeight: 500,
-													lineHeight: '14px',
-													opacity: 0.5,
-												}}
-												onClick={() => {
-													if (!mapCampaignId) return;
-													router.push(
-														`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=write`
+												{(
+													[
+														{
+															key: 'playbook',
+															Icon: DashboardActionBarPlaybookIcon,
+															label: 'Playbook',
+															width: 22,
+															height: 18,
+														},
+														{
+															key: 'folder',
+															Icon: DashboardActionBarFolderIcon,
+															label: 'Folder',
+															width: 22,
+															height: 13,
+														},
+													] as const
+												).map(({ key, Icon, label, width, height }) => {
+													const isSelected = selectedActionBarIcon === key;
+													return (
+														<button
+															key={key}
+															type="button"
+															aria-label={label}
+															aria-pressed={isSelected}
+															onClick={() => setSelectedActionBarIcon(key)}
+															style={{
+																background: 'none',
+																border: 'none',
+																padding: '2px 4px',
+																margin: 0,
+																display: 'flex',
+																alignItems: 'center',
+																justifyContent: 'center',
+																cursor: 'pointer',
+																color: '#050505',
+																opacity: isSelected ? 1 : 0.3,
+																transition: 'opacity 150ms ease',
+															}}
+														>
+															<Icon width={width} height={height} />
+														</button>
 													);
-												}}
-											>
-												Write
-											</button>
-											<button
-												type="button"
-												aria-label={`Open ${mapCampaignName}`}
-												title={mapCampaignName}
-												className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex min-w-0 items-center justify-center gap-[7px] h-full"
+												})}
+											</div>
+											<div
+												className="pointer-events-auto"
 												style={{
-													color: '#000',
-													fontFamily: 'Inter, sans-serif',
-													fontSize: '20.719px',
-													fontStyle: 'normal',
-													fontWeight: 500,
-													lineHeight: '17.063px',
-												}}
-												onClick={() => {
-													if (!mapCampaignId) return;
-													router.push(
-														`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=overview`
-													);
-												}}
-											>
-												<svg
-													aria-hidden="true"
-													focusable="false"
-													width="23"
-													height="13"
-													viewBox="0 0 30 17"
-													fill="none"
-													xmlns="http://www.w3.org/2000/svg"
-													className="block flex-shrink-0"
-												>
-													<rect y="2" width="30" height="15" rx="1" fill="#B43A35" />
-													<path
-														d="M0 2C0 0.89543 0.895431 0 2 0H13C14.1046 0 15 0.895431 15 2V4C15 4.55228 14.5523 5 14 5H1C0.447715 5 0 4.55228 0 4V2Z"
-														fill="#B43A35"
-													/>
-												</svg>
-												<span className="min-w-0 truncate">
-													{mapCampaignName}
-												</span>
-											</button>
-											<button
-												type="button"
-												className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
-												style={{
-													color: '#2C2C2C',
-													fontFamily: 'Inter, sans-serif',
-													fontSize: '17px',
-													fontStyle: 'normal',
-													fontWeight: 500,
-													lineHeight: '14px',
-													opacity: 0.5,
-												}}
-												onClick={() => {
-													if (!mapCampaignId) return;
-													router.push(
-														`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=inbox`
-													);
+													position: 'absolute',
+													left: `calc(100% + ${MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_GAP_PX}px)`,
+													top: '50%',
+													transform: 'translateY(-50%)',
+													width: `${MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_WIDTH_PX}px`,
+													height: `${MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_HEIGHT_PX}px`,
+													border: '1px solid #000',
+													borderRadius: '8px',
+													boxSizing: 'border-box',
+													display: 'flex',
+													alignItems: 'center',
+													justifyContent: 'space-around',
+													padding: '0 8px',
+													color: '#050505',
 												}}
 											>
-												Inbox
-											</button>
-											<button
-												type="button"
-												className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
-												style={{
-													color: '#2C2C2C',
-													fontFamily: 'Inter, sans-serif',
-													fontSize: '17px',
-													fontStyle: 'normal',
-													fontWeight: 500,
-													lineHeight: '14px',
-													opacity: 0.5,
-												}}
-												onClick={() => {
-													if (!mapCampaignId) return;
-													router.push(
-														`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts`
+												{(
+													[
+														{
+															key: 'star',
+															Icon: DashboardActionBarStarIcon,
+															label: 'Opportunities',
+															width: 21,
+															height: 20,
+														},
+														{
+															key: 'envelope',
+															Icon: DashboardActionBarEnvelopeIcon,
+															label: 'Messages',
+															width: 22,
+															height: 13,
+														},
+													] as const
+												).map(({ key, Icon, label, width, height }) => {
+													const isSelected = selectedActionBarIcon === key;
+													return (
+														<button
+															key={key}
+															type="button"
+															aria-label={label}
+															aria-pressed={isSelected}
+															onClick={() => setSelectedActionBarIcon(key)}
+															style={{
+																background: 'none',
+																border: 'none',
+																padding: '2px 4px',
+																margin: 0,
+																display: 'flex',
+																alignItems: 'center',
+																justifyContent: 'center',
+																cursor: 'pointer',
+																color: '#050505',
+																opacity: isSelected ? 1 : 0.3,
+																transition: 'opacity 150ms ease',
+															}}
+														>
+															<Icon width={width} height={height} />
+														</button>
 													);
-												}}
-											>
-												Drafts
-											</button>
+												})}
+											</div>
 										</div>
 									</div>
-								</div>
-							) : null;
+								) : null;
 
-						// In map view, the map itself is rendered via a portal to <body>.
-						// Portal the mini search bar too so it reliably stacks above the map,
-						// regardless of any parent stacking contexts/transforms.
-						if (isMapView && typeof window !== 'undefined') {
-							return createPortal(
-								<>
-									{mapTopBackdropBox}
-									{mapTopOutlineBox}
-									{campaignMapTopTabs}
-									{searchBar}
-									{mapSelectGrabberTool}
-									{searchThisAreaCta}
-								</>,
-								document.body
-							);
-						}
-						return searchBar;
-					})()}
+								const searchBar = isMapView ? (
+									<div
+										className="fixed left-0 right-0 flex justify-center pointer-events-none"
+										style={{
+											top: `${MAP_VIEW_SEARCH_BAR_TOP_PX}px`,
+											zIndex: 120,
+										}}
+									>
+										<div
+											className="pointer-events-auto"
+											style={{
+												transform: `scale(${MAP_VIEW_UI_SCALE})`,
+												transformOrigin: 'top center',
+											}}
+										>
+											{searchBarBase}
+										</div>
+									</div>
+								) : (
+									searchBarBase
+								);
 
-					{shouldRenderSearchResultsStage && (
-					<>
-						{isSearchPending ||
-						  isLoadingContacts ||
-						  isRefetchingContacts ||
-						  (contacts && contacts.length > 0) ||
-						  (isMapView && hasNoSearchResults) ||
-						  (fromHomeParam && isMapView) ||
-						  isError ? (
-							<div className="flex justify-center w-full px-0 sm:px-4 relative">
-								<div className="w-full max-w-full results-appear results-align">
-									{isMapView ? (
-										<>
-											{/* Fullscreen Map View - rendered via portal for true full-page positioning */}
-											{typeof window !== 'undefined' &&
-												createPortal(
-													<>
-													{/* Map container */}
-													<div
-														style={{
-															position: 'fixed',
-															top: 0,
-															left: 0,
-															right: 0,
-															bottom: 0,
-															zIndex: 99,
-															pointerEvents: 'none',
-														}}
+								const mapSelectGrabberTool =
+									isMapView && !isMobile ? (
+										<div
+											className="fixed z-[130] pointer-events-none"
+											style={{
+												left: `${MAP_SELECT_GRAB_LEFT_PX}px`,
+												// The visible column starts `TOP_EXTENT * scale` above this origin.
+												// Pin that visual top to the same zoom-adjusted Y as the right panel.
+												top: `calc(${MAP_VIEW_SIDE_PANEL_TOP_CSS} + ${mapSelectGrabOriginOffsetPx}px - ${MAP_SELECT_GRAB_VISUAL_TOP_NUDGE_UP_CSS})`,
+												transform: `scale(${mapSelectGrabViewScale})`,
+												transformOrigin: 'top left',
+											}}
+										>
+											<MapSelectGrabTallStackBox
+												className="absolute pointer-events-none"
+												isSelectActive={isSelectMapToolActive}
+												onAllDeselected={() => setActiveMapTool('grab')}
+												onActiveCategoriesChange={handleMapGrabActiveCategoriesChange}
+												style={{
+													left: '-0.5px',
+													top: `-${
+														MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+														MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+														MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+														MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+														MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
+														MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+														MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
+														MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX
+													}px`,
+													...(isSelectMapToolActive
+														? {
+																backgroundColor: '#A6DCB3',
+																opacity: 0.9,
+															}
+														: {}),
+												}}
+											/>
+											<MapSelectGrabStackBox
+												className="absolute left-0 pointer-events-none"
+												isSelectActive={isSelectMapToolActive}
+												selectedContent={<StackBoxSelectStarIcon />}
+												inactiveContent={
+													<MapSelectGrabStackTile backgroundColor="#EDF2F0">
+														<MapStackStarIcon fill="#EDF2F0" stroke="#9E9E9E" />
+													</MapSelectGrabStackTile>
+												}
+												style={{
+													top: `-${
+														MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+														MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+														MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+														MAP_SELECT_GRAB_STACK_BOX_SIZE_PX
+													}px`,
+												}}
+											>
+												<MapSelectGrabStackTile backgroundColor="#FFBDBD">
+													<MapStackStarIcon />
+												</MapSelectGrabStackTile>
+											</MapSelectGrabStackBox>
+											<MapSelectGrabStackBox
+												className="absolute left-0 pointer-events-none"
+												isSelectActive={isSelectMapToolActive}
+												selectedContent={<StackBoxSelectBlueSparkIcon />}
+												inactiveContent={
+													<MapSelectGrabStackTile backgroundColor="#EDF2F0">
+														<MapStackBlueSparkIcon fill="#9E9E9E" stroke="#EDF2F0" />
+													</MapSelectGrabStackTile>
+												}
+												onActiveChange={handleMapGrabUncategorizedActiveChange}
+												style={{
+													top: `-${
+														MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+														MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+														MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+														MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+														MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
+														MAP_SELECT_GRAB_STACK_BOX_SIZE_PX
+													}px`,
+												}}
+											>
+												<MapSelectGrabStackTile backgroundColor="#50A5C970">
+													<MapStackBlueSparkIcon />
+												</MapSelectGrabStackTile>
+											</MapSelectGrabStackBox>
+											<MapSelectGrabStarterBox
+												className="absolute left-0 pointer-events-auto"
+												zoomLevelIndex={mapZoomControlIndex}
+												zoomLevelValue={mapZoomControlDisplayValue}
+												zoomLevelLiveControlRef={mapZoomControlLiveRef}
+												onZoomLevelIndexChange={handleMapZoomControlChange}
+												onZoomLevelValueChange={handleMapZoomControlValueChange}
+												onZoomLevelInteractionChange={
+													handleMapZoomControlInteractionChange
+												}
+												style={{
+													position: 'absolute',
+													left: 0,
+													top: `-${
+														MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+														MAP_SELECT_GRAB_STARTER_BOX_GAP_PX
+													}px`,
+												}}
+											/>
+											<MapSelectGrabTool
+												activeTool={activeMapTool}
+												onSelectClick={handleSelectMapToolClick}
+												onGrabClick={() => setActiveMapTool('grab')}
+												className="pointer-events-auto"
+											/>
+										</div>
+									) : null;
+
+								const searchThisAreaCta =
+									isMapView && isSearchThisAreaCtaVisible ? (
+										<div
+											className="fixed z-[9999] pointer-events-none left-0 right-0 flex justify-center"
+											style={{
+												top: `${SEARCH_THIS_AREA_BUTTON_TOP_PX}px`,
+											}}
+										>
+											<div
+												className="pointer-events-auto"
+												style={{
+													transform: `scale(${MAP_VIEW_UI_SCALE})`,
+													transformOrigin: 'top center',
+												}}
+											>
+												<button
+													type="button"
+													className="flex items-center justify-center font-secondary font-medium text-[17px] leading-none text-black"
+													style={{
+														width: '212px',
+														height: '39px',
+														opacity: 0.9,
+														backgroundColor: '#AFD6EF',
+														border: '2px solid #347AB3',
+														borderRadius: '11px',
+														boxSizing: 'border-box',
+													}}
+													onClick={handleSearchThisAreaClick}
+												>
+													Search this area
+												</button>
+											</div>
+										</div>
+									) : null;
+
+								const mapCampaignId =
+									fromCampaignIdParam ||
+									(activeCampaignId != null ? String(activeCampaignId) : '');
+								const mapCampaignName =
+									fromCampaign?.name || activeCampaign?.name || 'Campaign';
+
+								const campaignMapTopTabs = isMapView ? (
+									<div
+										data-slot="campaign-map-top-tabs"
+										className="fixed left-0 right-0 z-[9999] flex items-center justify-center pointer-events-none"
+										style={{
+											top: '12px',
+											height: '24px',
+										}}
+									>
+										<div
+											className="pointer-events-auto relative"
+											style={{
+												width: `${CAMPAIGN_MAP_TOP_TABS_WIDTH_PX}px`,
+												maxWidth: 'calc(100vw - 64px)',
+												height: '24px',
+												transform: `scale(${MAP_VIEW_UI_SCALE})`,
+												transformOrigin: 'top center',
+											}}
+										>
+											<div
+												className="relative z-[1] grid h-full w-full items-center justify-items-center"
+												style={{
+													gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+												}}
+											>
+												<button
+													type="button"
+													className="bg-transparent p-0 m-0 border-0 cursor-default inline-flex items-center justify-center h-full"
+													style={{
+														color: '#1F1F1F',
+														fontFamily: 'Inter, sans-serif',
+														fontSize: '17px',
+														fontStyle: 'normal',
+														fontWeight: 600,
+														lineHeight: '14px',
+													}}
+												>
+													Search
+												</button>
+												<button
+													type="button"
+													className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
+													style={{
+														color: '#2C2C2C',
+														fontFamily: 'Inter, sans-serif',
+														fontSize: '17px',
+														fontStyle: 'normal',
+														fontWeight: 500,
+														lineHeight: '14px',
+														opacity: 0.5,
+													}}
+													onClick={() => {
+														if (!mapCampaignId) return;
+														router.push(
+															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=write`
+														);
+													}}
+												>
+													Write
+												</button>
+												<button
+													type="button"
+													aria-label={`Open ${mapCampaignName}`}
+													title={mapCampaignName}
+													className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex min-w-0 items-center justify-center gap-[7px] h-full"
+													style={{
+														color: '#000',
+														fontFamily: 'Inter, sans-serif',
+														fontSize: '20.719px',
+														fontStyle: 'normal',
+														fontWeight: 500,
+														lineHeight: '17.063px',
+													}}
+													onClick={() => {
+														if (!mapCampaignId) return;
+														router.push(
+															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=overview`
+														);
+													}}
+												>
+													<svg
+														aria-hidden="true"
+														focusable="false"
+														width="23"
+														height="13"
+														viewBox="0 0 30 17"
+														fill="none"
+														xmlns="http://www.w3.org/2000/svg"
+														className="block flex-shrink-0"
 													>
-														<div
-															// Frame is drawn/animated by the shared map portal.
-															// This wrapper exists only to clip/anchor map-view overlays.
-															className="w-full h-full overflow-hidden relative pointer-events-none"
-														>
-															{/* Map is rendered by the shared portal */}
-															{false && (
-																<SearchResultsMap
-																contacts={
-																	// Show placeholder dots while in fromHome loading state
-																	fromHomeParam && (!isSignedIn || !hasSearched)
-																		? fromHomePlaceholderContacts
-																		: (contacts || [])
-																}
-																selectedContacts={selectedContacts}
-																externallyHoveredContactId={hoveredMapPanelContactId}
-																searchQuery={activeSearchQuery}
-																searchWhat={
-																	// Use Wine, Beer, and Spirits color for fromHome placeholder dots
-																	fromHomeParam && (!isSignedIn || !hasSearched)
-																		? FROM_HOME_WHAT
-																		: searchedWhat
-																}
-																selectAllInViewNonce={selectAllInViewNonce}
-																onVisibleOverlayContactsChange={(overlayContacts) => {
-																	setMapPanelVisibleOverlayContacts(overlayContacts);
+														<rect y="2" width="30" height="15" rx="1" fill="#B43A35" />
+														<path
+															d="M0 2C0 0.89543 0.895431 0 2 0H13C14.1046 0 15 0.895431 15 2V4C15 4.55228 14.5523 5 14 5H1C0.447715 5 0 4.55228 0 4V2Z"
+															fill="#B43A35"
+														/>
+													</svg>
+													<span className="min-w-0 truncate">{mapCampaignName}</span>
+												</button>
+												<button
+													type="button"
+													className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
+													style={{
+														color: '#2C2C2C',
+														fontFamily: 'Inter, sans-serif',
+														fontSize: '17px',
+														fontStyle: 'normal',
+														fontWeight: 500,
+														lineHeight: '14px',
+														opacity: 0.5,
+													}}
+													onClick={() => {
+														if (!mapCampaignId) return;
+														router.push(
+															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=inbox`
+														);
+													}}
+												>
+													Inbox
+												</button>
+												<button
+													type="button"
+													className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
+													style={{
+														color: '#2C2C2C',
+														fontFamily: 'Inter, sans-serif',
+														fontSize: '17px',
+														fontStyle: 'normal',
+														fontWeight: 500,
+														lineHeight: '14px',
+														opacity: 0.5,
+													}}
+													onClick={() => {
+														if (!mapCampaignId) return;
+														router.push(
+															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts`
+														);
+													}}
+												>
+													Drafts
+												</button>
+											</div>
+										</div>
+									</div>
+								) : null;
 
-																	// Cache overlay-only contacts so if the user selects one, it can remain
-																	// renderable in the side panel even after panning away.
-																	if (overlayContacts.length > 0) {
-																		setMapPanelExtraContacts((prev) => {
-																			const byId = new Map<number, ContactWithName>();
-																			for (const c of prev) byId.set(c.id, c);
-																			for (const c of overlayContacts) {
-																				if (!byId.has(c.id)) byId.set(c.id, c);
-																			}
-																			return Array.from(byId.values());
-																		});
-																	}
-																}}
-																activeTool={activeMapTool}
-																requestedZoom={mapZoomControlRequest}
-																selectedAreaBounds={selectedAreaBoundsForMap}
-																onViewportInteraction={handleMapViewportInteraction}
-																onViewportZoom={handleMapViewportZoom}
-																onViewportIdle={handleMapViewportIdle}
-																	onAreaSelect={(bounds, payload) => {
-																		const ids = payload?.contactIds ?? [];
-																		const extraContacts = payload?.extraContacts ?? [];
+								// In map view, the map itself is rendered via a portal to <body>.
+								// Portal the mini search bar too so it reliably stacks above the map,
+								// regardless of any parent stacking contexts/transforms.
+								if (isMapView && typeof window !== 'undefined') {
+									return createPortal(
+										<>
+											{mapTopBackdropBox}
+											{mapTopOutlineBox}
+											{campaignMapTopTabs}
+											{searchBar}
+											{mapSelectGrabberTool}
+											{searchThisAreaCta}
+										</>,
+										document.body
+									);
+								}
+								return searchBar;
+							})()}
 
-																		if (ids.length > 0) {
-																			setSelectedContacts((prev) => {
-																				const next = new Set(prev);
-																				for (const id of ids) next.add(id);
-																				return Array.from(next);
-																			});
-																		}
-
-																		// Ensure overlay-only contacts (booking/promotion map overlays) can appear
-																		// as rows in the right-hand panel.
-																		if (extraContacts.length > 0) {
-																			setMapPanelExtraContacts((prev) => {
-																				const byId = new Map<number, ContactWithName>();
-																				for (const c of prev) byId.set(c.id, c);
-																				for (const c of extraContacts) {
-																					if (!byId.has(c.id)) byId.set(c.id, c);
-																				}
-																				return Array.from(byId.values());
-																			});
-																		}
-
-																		// If selected contacts are outside the searched state (or are overlay-only),
-																		// include them in the panel list so the user sees what was selected.
-																		if (ids.length > 0) {
-																			const nextExtraIds: number[] = [];
-																			const byId = new Map<number, ContactWithName>();
-																			for (const c of contacts || []) byId.set(c.id, c);
-
-																			for (const id of ids) {
-																				if (!baseContactIdSet.has(id)) {
-																					nextExtraIds.push(id);
-																					continue;
-																				}
-																				if (!searchedStateAbbrForMap) continue;
-																				const c = byId.get(id);
-																				if (!c) continue;
-																				const contactStateAbbr = getStateAbbreviation(c.state || '')
-																					.trim()
-																					.toUpperCase();
-																				if (contactStateAbbr && contactStateAbbr !== searchedStateAbbrForMap) {
-																					nextExtraIds.push(id);
-																				}
-																			}
-
-																			for (const c of extraContacts) nextExtraIds.push(c.id);
-
-																			if (nextExtraIds.length > 0) {
-																				setMapPanelExtraContactIds((prev) => {
-																					const next = new Set(prev);
-																					for (const id of nextExtraIds) next.add(id);
-																					return Array.from(next);
-																				});
-																			}
-																		}
-
-																		// After selecting an area, immediately switch back to Grab mode
-																		// so the user can pan/zoom without extra clicks.
-																		setActiveMapTool('grab');
+						{shouldRenderSearchResultsStage && (
+							<>
+								{isSearchPending ||
+								isLoadingContacts ||
+								isRefetchingContacts ||
+								(contacts && contacts.length > 0) ||
+								(isMapView && hasNoSearchResults) ||
+								(fromHomeParam && isMapView) ||
+								isError ? (
+									<div className="flex justify-center w-full px-0 sm:px-4 relative">
+										<div className="w-full max-w-full results-appear results-align">
+											{isMapView ? (
+												<>
+													{/* Fullscreen Map View - rendered via portal for true full-page positioning */}
+													{typeof window !== 'undefined' &&
+														createPortal(
+															<>
+																{/* Map container */}
+																<div
+																	style={{
+																		position: 'fixed',
+																		top: 0,
+																		left: 0,
+																		right: 0,
+																		bottom: 0,
+																		zIndex: 99,
+																		pointerEvents: 'none',
 																	}}
-																onMarkerHover={handleMapMarkerHover}
-																lockedStateName={
-																	// When a bbox search is active, don't lock/wash out a single state.
-																	mapBboxFilter
-																		? null
-																		: // Show California outline for fromHome placeholder state
-																		  fromHomeParam && (!isSignedIn || !hasSearched)
-																			? 'CA'
-																			: searchedStateAbbrForMap
-																}
-																skipAutoFit={
-																	// Prevent zoom for fromHome placeholder - keep map zoomed out over US
-																	(fromHomeParam && (!isSignedIn || !hasSearched)) || Boolean(mapBboxFilter)
-																}
-																onStateSelect={handleMapStateSelect}
-																isLoading={isSearchPending || isLoadingContacts || isRefetchingContacts}
-																onMarkerClick={(contact) => {
-																	// Ensure map-only overlay markers (e.g. Booking extra pins) can show up as
-																	// rows in the right-hand panel when selected/clicked.
-																	const isInBaseResults = baseContactIdSet.has(contact.id);
-																	if (!isInBaseResults) {
-																		setMapPanelExtraContacts((prev) =>
-																			prev.some((c) => c.id === contact.id)
-																				? prev
-																				: [contact, ...prev]
-																		);
-																		setMapPanelExtraContactIds((prev) =>
-																			prev.includes(contact.id) ? prev : [...prev, contact.id]
-																		);
-																		return;
-																	}
-
-																	// If the marker is outside the searched state, include it in the
-																	// right-hand map panel list (without changing what the map shows).
-																	if (!searchedStateAbbrForMap) return;
-																	const contactStateAbbr = getStateAbbreviation(contact.state || '')
-																		.trim()
-																		.toUpperCase();
-																	if (contactStateAbbr === searchedStateAbbrForMap) return;
-																	setMapPanelExtraContactIds((prev) =>
-																		prev.includes(contact.id) ? prev : [...prev, contact.id]
-																	);
-																}}
-																onToggleSelection={(contactId) => {
-																	const wasSelected = selectedContacts.includes(contactId);
-
-																	// Ensure the selected contact stays renderable in the side panel across
-																	// subsequent searches by caching the full object.
-																	if (!wasSelected) {
-																		const fromBase = (contacts || []).find((c) => c.id === contactId);
-																		const fromOverlay = mapPanelVisibleOverlayContacts.find(
-																			(c) => c.id === contactId
-																		);
-																		const fromExtra = mapPanelExtraContacts.find(
-																			(c) => c.id === contactId
-																		);
-																		const selectedContact = fromBase ?? fromOverlay ?? fromExtra;
-																		if (selectedContact) {
-																			setMapPanelExtraContacts((prev) =>
-																				prev.some((c) => c.id === contactId)
-																					? prev
-																					: [selectedContact, ...prev]
-																			);
-																		}
-																	}
-
-																	setSelectedContacts((prev) => {
-																		if (prev.includes(contactId)) {
-																			return prev.filter((id) => id !== contactId);
-																		}
-																		return [...prev, contactId];
-																	});
-																	// Scroll to the contact in the side panel
-																	const tryScroll = (attempt = 0) => {
-																		const contactElement = document.querySelector(
-																			`[data-contact-id="${contactId}"]`
-																		);
-																		if (contactElement) {
-																			contactElement.scrollIntoView({
-																				behavior: 'smooth',
-																				block: 'center',
-																			});
-																			return;
-																		}
-																		if (attempt < 10) {
-																			setTimeout(() => tryScroll(attempt + 1), 50);
-																		}
-																	};
-																	setTimeout(() => tryScroll(0), 0);
-																}}
-															/>
-															)}
-															{hasNoSearchResults && !isError && (
-																<div className="absolute inset-0 z-[120] flex items-start justify-center pt-[120px] pointer-events-none">
+																>
 																	<div
-																		className="pointer-events-auto flex flex-col items-center justify-center text-center"
-																		style={{
-																			width: 517,
-																			height: 174,
-																			borderRadius: 8,
-																			backgroundColor: 'rgba(106, 180, 227, 0.8)', // #6AB4E3 @ 80%
-																			border: '3px solid #143883',
-																		}}
+																		// Frame is drawn/animated by the shared map portal.
+																		// This wrapper exists only to clip/anchor map-view overlays.
+																		className="w-full h-full overflow-hidden relative pointer-events-none"
 																	>
-																		<div
-																			className="flex flex-col items-center justify-center gap-[16px]"
-																			style={{ width: 496 }}
-																		>
-																			<div
-																				className="flex items-center justify-center text-center bg-white"
-																				style={{
-																					width: 496,
-																					height: 58,
-																					borderRadius: 8,
-																					border: '2px solid #101010',
+																		{/* Map is rendered by the shared portal */}
+																		{false && (
+																			<SearchResultsMap
+																				contacts={
+																					// Show placeholder dots while in fromHome loading state
+																					fromHomeParam && (!isSignedIn || !hasSearched)
+																						? fromHomePlaceholderContacts
+																						: contacts || []
+																				}
+																				selectedContacts={selectedContacts}
+																				externallyHoveredContactId={
+																					hoveredMapPanelContactId
+																				}
+																				searchQuery={activeSearchQuery}
+																				searchWhat={
+																					// Use Wine, Beer, and Spirits color for fromHome placeholder dots
+																					fromHomeParam && (!isSignedIn || !hasSearched)
+																						? FROM_HOME_WHAT
+																						: searchedWhat
+																				}
+																				selectAllInViewNonce={selectAllInViewNonce}
+																				onVisibleOverlayContactsChange={(
+																					overlayContacts
+																				) => {
+																					setMapPanelVisibleOverlayContacts(
+																						overlayContacts
+																					);
+
+																					// Cache overlay-only contacts so if the user selects one, it can remain
+																					// renderable in the side panel even after panning away.
+																					if (overlayContacts.length > 0) {
+																						setMapPanelExtraContacts((prev) => {
+																							const byId = new Map<
+																								number,
+																								ContactWithName
+																							>();
+																							for (const c of prev) byId.set(c.id, c);
+																							for (const c of overlayContacts) {
+																								if (!byId.has(c.id)) byId.set(c.id, c);
+																							}
+																							return Array.from(byId.values());
+																						});
+																					}
 																				}}
-																			>
-																				<span className="font-secondary font-bold text-[18px] leading-none text-black">
-																					Keep Exploring
-																				</span>
-																			</div>
-																			<div
-																				className="flex items-center justify-center text-center bg-white px-6"
-																				style={{
-																					width: 496,
-																					height: 58,
-																					borderRadius: 8,
-																					border: '2px solid #101010',
+																				activeTool={activeMapTool}
+																				requestedZoom={mapZoomControlRequest}
+																				selectedAreaBounds={selectedAreaBoundsForMap}
+																				onViewportInteraction={
+																					handleMapViewportInteraction
+																				}
+																				onViewportZoom={handleMapViewportZoom}
+																				onViewportIdle={handleMapViewportIdle}
+																				onAreaSelect={(bounds, payload) => {
+																					const ids = payload?.contactIds ?? [];
+																					const extraContacts =
+																						payload?.extraContacts ?? [];
+
+																					if (ids.length > 0) {
+																						setSelectedContacts((prev) => {
+																							const next = new Set(prev);
+																							for (const id of ids) next.add(id);
+																							return Array.from(next);
+																						});
+																					}
+
+																					// Ensure overlay-only contacts (booking/promotion map overlays) can appear
+																					// as rows in the right-hand panel.
+																					if (extraContacts.length > 0) {
+																						setMapPanelExtraContacts((prev) => {
+																							const byId = new Map<
+																								number,
+																								ContactWithName
+																							>();
+																							for (const c of prev) byId.set(c.id, c);
+																							for (const c of extraContacts) {
+																								if (!byId.has(c.id)) byId.set(c.id, c);
+																							}
+																							return Array.from(byId.values());
+																						});
+																					}
+
+																					// If selected contacts are outside the searched state (or are overlay-only),
+																					// include them in the panel list so the user sees what was selected.
+																					if (ids.length > 0) {
+																						const nextExtraIds: number[] = [];
+																						const byId = new Map<
+																							number,
+																							ContactWithName
+																						>();
+																						for (const c of contacts || [])
+																							byId.set(c.id, c);
+
+																						for (const id of ids) {
+																							if (!baseContactIdSet.has(id)) {
+																								nextExtraIds.push(id);
+																								continue;
+																							}
+																							if (!searchedStateAbbrForMap) continue;
+																							const c = byId.get(id);
+																							if (!c) continue;
+																							const contactStateAbbr =
+																								getStateAbbreviation(c.state || '')
+																									.trim()
+																									.toUpperCase();
+																							if (
+																								contactStateAbbr &&
+																								contactStateAbbr !==
+																									searchedStateAbbrForMap
+																							) {
+																								nextExtraIds.push(id);
+																							}
+																						}
+
+																						for (const c of extraContacts)
+																							nextExtraIds.push(c.id);
+
+																						if (nextExtraIds.length > 0) {
+																							setMapPanelExtraContactIds((prev) => {
+																								const next = new Set(prev);
+																								for (const id of nextExtraIds)
+																									next.add(id);
+																								return Array.from(next);
+																							});
+																						}
+																					}
+
+																					// After selecting an area, immediately switch back to Grab mode
+																					// so the user can pan/zoom without extra clicks.
+																					setActiveMapTool('grab');
 																				}}
-																			>
-																				<span className="font-secondary font-bold text-[16px] leading-tight text-black">
-																					Try a new search term to find contacts in this area
-																				</span>
-																			</div>
-																		</div>
-																	</div>
-																</div>
-															)}
-															{/* Search Failed overlay - shown when there's an error */}
-															{isError && (
-																<div className="absolute inset-0 z-[120] flex items-start justify-center pt-[180px] pointer-events-none">
-																	<div
-																		className="pointer-events-auto flex flex-col items-center justify-center text-center"
-																		style={{
-																			width: 517,
-																			padding: '24px 0',
-																			borderRadius: 8,
-																			backgroundColor: 'rgba(106, 180, 227, 0.8)',
-																			border: '3px solid #143883',
-																		}}
-																	>
-																		<div
-																			className="flex flex-col items-center justify-center gap-[16px]"
-																			style={{ width: 496 }}
-																		>
-																			<div
-																				className="flex items-center justify-center text-center bg-white"
-																				style={{
-																					width: 496,
-																					height: 58,
-																					borderRadius: 8,
-																					border: '2px solid #101010',
+																				onMarkerHover={handleMapMarkerHover}
+																				lockedStateName={
+																					// When a bbox search is active, don't lock/wash out a single state.
+																					mapBboxFilter
+																						? null
+																						: // Show California outline for fromHome placeholder state
+																							fromHomeParam &&
+																							  (!isSignedIn || !hasSearched)
+																							? 'CA'
+																							: searchedStateAbbrForMap
+																				}
+																				skipAutoFit={
+																					// Prevent zoom for fromHome placeholder - keep map zoomed out over US
+																					(fromHomeParam &&
+																						(!isSignedIn || !hasSearched)) ||
+																					Boolean(mapBboxFilter)
+																				}
+																				onStateSelect={handleMapStateSelect}
+																				isLoading={
+																					isSearchPending ||
+																					isLoadingContacts ||
+																					isRefetchingContacts
+																				}
+																				onMarkerClick={(contact) => {
+																					// Ensure map-only overlay markers (e.g. Booking extra pins) can show up as
+																					// rows in the right-hand panel when selected/clicked.
+																					const isInBaseResults = baseContactIdSet.has(
+																						contact.id
+																					);
+																					if (!isInBaseResults) {
+																						setMapPanelExtraContacts((prev) =>
+																							prev.some((c) => c.id === contact.id)
+																								? prev
+																								: [contact, ...prev]
+																						);
+																						setMapPanelExtraContactIds((prev) =>
+																							prev.includes(contact.id)
+																								? prev
+																								: [...prev, contact.id]
+																						);
+																						return;
+																					}
+
+																					// If the marker is outside the searched state, include it in the
+																					// right-hand map panel list (without changing what the map shows).
+																					if (!searchedStateAbbrForMap) return;
+																					const contactStateAbbr = getStateAbbreviation(
+																						contact.state || ''
+																					)
+																						.trim()
+																						.toUpperCase();
+																					if (
+																						contactStateAbbr === searchedStateAbbrForMap
+																					)
+																						return;
+																					setMapPanelExtraContactIds((prev) =>
+																						prev.includes(contact.id)
+																							? prev
+																							: [...prev, contact.id]
+																					);
 																				}}
-																			>
-																				<span className="font-secondary font-bold text-[18px] leading-none text-black">
-																					Search Failed
-																				</span>
-																			</div>
-																			<div
-																				className="flex items-center justify-center text-center bg-white px-6"
-																				style={{
-																					width: 496,
-																					minHeight: 58,
-																					borderRadius: 8,
-																					border: '2px solid #101010',
-																					padding: '12px 24px',
+																				onToggleSelection={(contactId) => {
+																					const wasSelected =
+																						selectedContacts.includes(contactId);
+
+																					// Ensure the selected contact stays renderable in the side panel across
+																					// subsequent searches by caching the full object.
+																					if (!wasSelected) {
+																						const fromBase = (contacts || []).find(
+																							(c) => c.id === contactId
+																						);
+																						const fromOverlay =
+																							mapPanelVisibleOverlayContacts.find(
+																								(c) => c.id === contactId
+																							);
+																						const fromExtra = mapPanelExtraContacts.find(
+																							(c) => c.id === contactId
+																						);
+																						const selectedContact =
+																							fromBase ?? fromOverlay ?? fromExtra;
+																						if (selectedContact) {
+																							setMapPanelExtraContacts((prev) =>
+																								prev.some((c) => c.id === contactId)
+																									? prev
+																									: [selectedContact, ...prev]
+																							);
+																						}
+																					}
+
+																					setSelectedContacts((prev) => {
+																						if (prev.includes(contactId)) {
+																							return prev.filter(
+																								(id) => id !== contactId
+																							);
+																						}
+																						return [...prev, contactId];
+																					});
+																					// Scroll to the contact in the side panel
+																					const tryScroll = (attempt = 0) => {
+																						const contactElement = document.querySelector(
+																							`[data-contact-id="${contactId}"]`
+																						);
+																						if (contactElement) {
+																							contactElement.scrollIntoView({
+																								behavior: 'smooth',
+																								block: 'center',
+																							});
+																							return;
+																						}
+																						if (attempt < 10) {
+																							setTimeout(
+																								() => tryScroll(attempt + 1),
+																								50
+																							);
+																						}
+																					};
+																					setTimeout(() => tryScroll(0), 0);
 																				}}
-																			>
-																				<span className="font-secondary font-bold text-[16px] leading-tight text-black">
-																					{error instanceof Error && error.message.includes('timeout')
-																						? 'The search took too long to complete. Please try a more specific query.'
-																						: error instanceof Error
-																						? error.message
-																						: 'Unable to complete your search. Please try again.'}
-																				</span>
+																			/>
+																		)}
+																		{hasNoSearchResults && !isError && (
+																			<div className="absolute inset-0 z-[120] flex items-start justify-center pt-[120px] pointer-events-none">
+																				<div
+																					className="pointer-events-auto flex flex-col items-center justify-center text-center"
+																					style={{
+																						width: 517,
+																						height: 174,
+																						borderRadius: 8,
+																						backgroundColor: 'rgba(106, 180, 227, 0.8)', // #6AB4E3 @ 80%
+																						border: '3px solid #143883',
+																					}}
+																				>
+																					<div
+																						className="flex flex-col items-center justify-center gap-[16px]"
+																						style={{ width: 496 }}
+																					>
+																						<div
+																							className="flex items-center justify-center text-center bg-white"
+																							style={{
+																								width: 496,
+																								height: 58,
+																								borderRadius: 8,
+																								border: '2px solid #101010',
+																							}}
+																						>
+																							<span className="font-secondary font-bold text-[18px] leading-none text-black">
+																								Keep Exploring
+																							</span>
+																						</div>
+																						<div
+																							className="flex items-center justify-center text-center bg-white px-6"
+																							style={{
+																								width: 496,
+																								height: 58,
+																								borderRadius: 8,
+																								border: '2px solid #101010',
+																							}}
+																						>
+																							<span className="font-secondary font-bold text-[16px] leading-tight text-black">
+																								Try a new search term to find contacts in
+																								this area
+																							</span>
+																						</div>
+																					</div>
+																				</div>
 																			</div>
-																			<div
-																				className="flex items-center justify-center text-center bg-white cursor-pointer hover:bg-gray-50 transition-colors"
-																				style={{
-																					width: 496,
-																					height: 58,
-																					borderRadius: 8,
-																					border: '2px solid #101010',
-																				}}
-																				onClick={() => form.handleSubmit(onSubmit)()}
-																			>
-																				<span className="font-secondary font-bold text-[18px] leading-none text-black">
-																					Retry Search
-																				</span>
+																		)}
+																		{/* Search Failed overlay - shown when there's an error */}
+																		{isError && (
+																			<div className="absolute inset-0 z-[120] flex items-start justify-center pt-[180px] pointer-events-none">
+																				<div
+																					className="pointer-events-auto flex flex-col items-center justify-center text-center"
+																					style={{
+																						width: 517,
+																						padding: '24px 0',
+																						borderRadius: 8,
+																						backgroundColor: 'rgba(106, 180, 227, 0.8)',
+																						border: '3px solid #143883',
+																					}}
+																				>
+																					<div
+																						className="flex flex-col items-center justify-center gap-[16px]"
+																						style={{ width: 496 }}
+																					>
+																						<div
+																							className="flex items-center justify-center text-center bg-white"
+																							style={{
+																								width: 496,
+																								height: 58,
+																								borderRadius: 8,
+																								border: '2px solid #101010',
+																							}}
+																						>
+																							<span className="font-secondary font-bold text-[18px] leading-none text-black">
+																								Search Failed
+																							</span>
+																						</div>
+																						<div
+																							className="flex items-center justify-center text-center bg-white px-6"
+																							style={{
+																								width: 496,
+																								minHeight: 58,
+																								borderRadius: 8,
+																								border: '2px solid #101010',
+																								padding: '12px 24px',
+																							}}
+																						>
+																							<span className="font-secondary font-bold text-[16px] leading-tight text-black">
+																								{error instanceof Error &&
+																								error.message.includes('timeout')
+																									? 'The search took too long to complete. Please try a more specific query.'
+																									: error instanceof Error
+																										? error.message
+																										: 'Unable to complete your search. Please try again.'}
+																							</span>
+																						</div>
+																						<div
+																							className="flex items-center justify-center text-center bg-white cursor-pointer hover:bg-gray-50 transition-colors"
+																							style={{
+																								width: 496,
+																								height: 58,
+																								borderRadius: 8,
+																								border: '2px solid #101010',
+																							}}
+																							onClick={() =>
+																								form.handleSubmit(onSubmit)()
+																							}
+																						>
+																							<span className="font-secondary font-bold text-[18px] leading-none text-black">
+																								Retry Search
+																							</span>
+																						</div>
+																					</div>
+																				</div>
 																			</div>
-																		</div>
-																	</div>
-																</div>
-															)}
-															{/* Search Results overlay box on the right side - keep mounted during loading
+																		)}
+																		{/* Search Results overlay box on the right side - keep mounted during loading
 															    so the UI doesn't disappear between state searches. */}
-															{!isNarrowestDesktop && !hasNoSearchResults && (
-																	<div
-																		className="absolute right-[10px] flex flex-col gap-[9px] pointer-events-auto"
-																		onMouseEnter={() => {
-																			if (!shouldUseDynamicMapCreateCampaignCta) return;
-																			setIsPointerInMapSidePanel(true);
-																		}}
-																		onMouseLeave={() => {
-																			if (!shouldUseDynamicMapCreateCampaignCta) return;
-																			setIsPointerInMapSidePanel(false);
-																		}}
-																		style={{
-																			top: MAP_VIEW_SIDE_PANEL_TOP_CSS,
-																			width: '433px',
-																			height: mapResearchPanelContact && mapResearchPanelCompactHeightPx
-																				? mapResearchPanelCompactHeightPx
-																				: 800,
-																			maxHeight: `calc(100% - ${MAP_VIEW_SIDE_PANEL_TOP_CSS} - ${MAP_VIEW_SIDE_PANEL_BOTTOM_GAP_PX}px)`,
-																			overflow: 'hidden',
-																			transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
-																			transformOrigin: 'top right',
-																		}}
-																	>
-																		{/* Selection sub-panel — appears once at least one contact is selected. */}
-																		{selectedContacts.length > 0 && (
+																		{!isNarrowestDesktop && !hasNoSearchResults && (
 																			<div
-																				className="flex flex-col flex-shrink-0"
+																				className="absolute right-[10px] flex flex-col gap-[9px] pointer-events-auto"
+																				onMouseEnter={() => {
+																					if (!shouldUseDynamicMapCreateCampaignCta)
+																						return;
+																					setIsPointerInMapSidePanel(true);
+																				}}
+																				onMouseLeave={() => {
+																					if (!shouldUseDynamicMapCreateCampaignCta)
+																						return;
+																					setIsPointerInMapSidePanel(false);
+																				}}
 																				style={{
-																					maxHeight: '342px',
-																					backgroundColor: 'rgba(175, 214, 239, 0.8)',
-																					border: '3px solid #143883',
-																					borderRadius: '8px',
+																					top: MAP_VIEW_SIDE_PANEL_TOP_CSS,
+																					width: '433px',
+																					height:
+																						mapResearchPanelContact &&
+																						mapResearchPanelCompactHeightPx
+																							? mapResearchPanelCompactHeightPx
+																							: 800,
+																					maxHeight: `calc(100% - ${MAP_VIEW_SIDE_PANEL_TOP_CSS} - ${MAP_VIEW_SIDE_PANEL_BOTTOM_GAP_PX}px)`,
 																					overflow: 'hidden',
+																					transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
+																					transformOrigin: 'top right',
 																				}}
 																			>
-																				<div className="w-full h-[49px] flex-shrink-0 flex items-center justify-center px-4 relative">
-																					<span className="absolute left-[10px] top-1/2 -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
-																						Selection
-																					</span>
-																					<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
-																						{selectedContacts.length}/{mapPanelContacts.length} selected
+																				{/* Selection sub-panel — appears once at least one contact is selected. */}
+																				{selectedContacts.length > 0 && (
+																					<div
+																						className="flex flex-col flex-shrink-0"
+																						style={{
+																							maxHeight: '342px',
+																							backgroundColor: 'rgba(175, 214, 239, 0.8)',
+																							border: '3px solid #143883',
+																							borderRadius: '8px',
+																							overflow: 'hidden',
+																						}}
+																					>
+																						<div className="w-full h-[49px] flex-shrink-0 flex items-center justify-center px-4 relative">
+																							<span className="absolute left-[10px] top-1/2 -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
+																								Selection
+																							</span>
+																							<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
+																								{selectedContacts.length}/
+																								{mapPanelContacts.length} selected
+																							</span>
+																							<button
+																								type="button"
+																								onClick={() =>
+																									handleSelectAll(mapPanelContacts)
+																								}
+																								disabled={isMapResultsLoading}
+																								className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 translate-y-[4px] ${
+																									isMapResultsLoading
+																										? 'opacity-60 pointer-events-none'
+																										: 'hover:underline'
+																								}`}
+																							>
+																								{isAllPanelContactsSelected
+																									? 'Deselect All'
+																									: 'Select all'}
+																							</button>
+																						</div>
+																						<CustomScrollbar
+																							className="flex-1 min-h-0"
+																							contentClassName="p-[6px] pb-[14px] space-y-[7px]"
+																							thumbWidth={2}
+																							thumbColor="#000000"
+																							trackColor="transparent"
+																							offsetRight={-6}
+																							disableOverflowClass
+																						>
+																							<div className="space-y-[7px]">
+																								{mapPanelSelectedContacts.map(
+																									renderMapPanelDesktopRow
+																								)}
+																							</div>
+																						</CustomScrollbar>
+																					</div>
+																				)}
+																				{/* Search Results sub-panel — always present; flexes to fill remaining height. */}
+																				<div
+																					className="flex flex-col flex-1 min-h-0"
+																					style={{
+																						backgroundColor:
+																							mapResearchPanelContact &&
+																							isMapResearchPanelVisible
+																								? '#D8E5FB'
+																								: 'rgba(99, 155, 244, 0.5)',
+																						borderRadius: '8px',
+																						overflow: 'hidden',
+																					}}
+																				>
+																					<div
+																						className="w-full h-[50px] flex-shrink-0 flex items-center justify-center px-4 relative"
+																						style={{
+																							backgroundColor: '#CBF0FF',
+																							border: '2px solid #000',
+																							borderRadius: '8px 8px 0 0',
+																						}}
+																					>
+																						<span className="absolute left-[13px] top-[2px] font-inter text-[15px] font-semibold leading-[20px] text-center text-black">
+																							Search Results
+																						</span>
+																						<div
+																							className="absolute left-[14px] right-[10px] bottom-[7px] flex items-center gap-[12px] overflow-hidden"
+																							style={{
+																								maskImage:
+																									'linear-gradient(to right, black 0, black calc(100% - 40px), transparent 100%)',
+																								WebkitMaskImage:
+																									'linear-gradient(to right, black 0, black calc(100% - 40px), transparent 100%)',
+																							}}
+																						>
+																							{[
+																								{
+																									key: 'restaurants',
+																									pillColor: '#C3FBD1',
+																									label: 'Restaurants',
+																									Icon: RestaurantsIcon,
+																									iconSize: 11,
+																								},
+																								{
+																									key: 'coffee-shops',
+																									pillColor: '#D6F1BD',
+																									label: 'Coffee',
+																									Icon: CoffeeShopsIcon,
+																									iconSize: 6,
+																								},
+																								{
+																									key: 'music-venues',
+																									pillColor: '#B7E5FF',
+																									label: 'Music Venues',
+																									Icon: MusicVenuesIcon,
+																									iconSize: 11,
+																								},
+																								{
+																									key: 'festivals',
+																									pillColor: '#C1D6FF',
+																									label: 'Festivals',
+																									Icon: FestivalsIcon,
+																									iconSize: 11,
+																								},
+																								{
+																									key: 'wedding-planners',
+																									pillColor: '#FFF8DC',
+																									label: 'Weddings',
+																									Icon: WeddingPlannersIcon,
+																									iconSize: 11,
+																								},
+																								{
+																									key: 'wine-beer-spirits',
+																									pillColor: '#BFC4FF',
+																									label: 'Wineries',
+																									Icon: WineBeerSpiritsIcon,
+																									iconSize: 11,
+																								},
+																								{
+																									key: 'radio-stations',
+																									pillColor: '#C5F0CC',
+																									label: 'Radio',
+																									Icon: RadioStationsIcon,
+																									iconSize: 11,
+																								},
+																							]
+																								.filter(({ key }) =>
+																									mapPanelVisibleCategoryKeys.has(key)
+																								)
+																								.map(
+																									({
+																										key,
+																										pillColor,
+																										label,
+																										Icon,
+																										iconSize,
+																									}) => (
+																										<div
+																											key={key}
+																											className="h-[15px] rounded-[7px] px-2 flex items-center gap-1 border border-black flex-shrink-0 cursor-pointer"
+																											style={{
+																												backgroundColor: pillColor,
+																											}}
+																											onClick={() => {
+																												setSelectedCategoryChips(
+																													(prev) => {
+																														const next = new Set(prev);
+																														if (next.has(key))
+																															next.delete(key);
+																														else next.add(key);
+																														return next;
+																													}
+																												);
+																											}}
+																										>
+																											<Icon
+																												size={iconSize}
+																												className="flex-shrink-0"
+																											/>
+																											<span className="text-[10px] text-black leading-none whitespace-nowrap">
+																												{label}
+																											</span>
+																										</div>
+																									)
+																								)}
+																						</div>
+																					</div>
+																					<div
+																						className="flex flex-col flex-1 min-h-0 relative"
+																						style={{
+																							borderLeft: '3px solid #5B7469',
+																							borderRight: '3px solid #5B7469',
+																							borderBottom: '3px solid #5B7469',
+																							borderRadius: '0 0 8px 8px',
+																						}}
+																					>
+																						<CustomScrollbar
+																							className="flex-1 min-h-0"
+																							contentClassName="p-[6px] pb-[78px] space-y-[7px]"
+																							thumbWidth={2}
+																							thumbColor="#000000"
+																							trackColor="transparent"
+																							offsetRight={-6}
+																							disableOverflowClass
+																						>
+																							{isMapResultsLoading ? (
+																								<MapResultsPanelSkeleton
+																									variant="desktop"
+																									rows={Math.max(
+																										mapPanelUnselectedContacts.length,
+																										14
+																									)}
+																								/>
+																							) : (
+																								<div
+																									ref={mapPanelRowsDesktopRef}
+																									className="space-y-[7px]"
+																								>
+																									{mapPanelUnselectedContactsFiltered.map(
+																										renderMapPanelDesktopRow
+																									)}
+																								</div>
+																							)}
+																						</CustomScrollbar>
+																						<div
+																							className="absolute left-1/2 -translate-x-1/2 bottom-[9px] flex items-center gap-[2px] pl-[4px]"
+																							style={{
+																								width: '420px',
+																								height: '55px',
+																								borderRadius: '9.86px',
+																								border: '1.446px solid #000',
+																								backgroundColor: '#65A1B9',
+																							}}
+																						>
+																							{[
+																								{
+																									key: 'music-venues',
+																									color: '#71C9FD',
+																									Icon: MusicVenuesIcon,
+																									size: 32,
+																								},
+																								{
+																									key: 'wine-beer-spirits',
+																									color: '#80AAFF',
+																									Icon: WineBeerSpiritsIcon,
+																									size: 25,
+																								},
+																								{
+																									key: 'restaurants',
+																									color: '#77DD91',
+																									Icon: RestaurantsIcon,
+																									size: 32,
+																								},
+																								{
+																									key: 'coffee-shops',
+																									color: '#A9DE78',
+																									Icon: CoffeeShopsIcon,
+																									size: 18,
+																								},
+																								{
+																									key: 'wedding-planners',
+																									color: '#EED56E',
+																									Icon: WeddingPlannersIcon,
+																									size: 30,
+																								},
+																								{
+																									key: 'festivals',
+																									color: '#80AAFF',
+																									Icon: FestivalsIcon,
+																									size: 32,
+																								},
+																								{
+																									key: 'radio-stations',
+																									color: '#56DA73',
+																									Icon: RadioStationsIcon,
+																									size: 32,
+																								},
+																							]
+																								.filter(({ key }) =>
+																									mapPanelCategoryKeys.has(key)
+																								)
+																								.map(({ key, color, Icon, size }) => {
+																									const isSelected =
+																										selectedCategoryChips.has(key);
+																									return (
+																										<div
+																											key={key}
+																											className="flex items-center justify-center flex-shrink-0 cursor-pointer"
+																											style={{
+																												width: 45,
+																												height: 45,
+																												backgroundColor: isSelected
+																													? 'transparent'
+																													: color,
+																												borderRadius: 6,
+																												border: isSelected
+																													? `2px solid ${color}`
+																													: '1px solid #000',
+																											}}
+																											onClick={() => {
+																												setSelectedCategoryChips(
+																													(prev) => {
+																														const next = new Set(prev);
+																														if (next.has(key))
+																															next.delete(key);
+																														else next.add(key);
+																														return next;
+																													}
+																												);
+																											}}
+																										>
+																											<Icon
+																												size={size}
+																												innerFill={
+																													isSelected ? color : 'white'
+																												}
+																											/>
+																										</div>
+																									);
+																								})}
+																						</div>
+																					</div>
+																				</div>
+																				{!isMapResultsLoading && !fromHomeParam && (
+																					<div className="flex-shrink-0 w-full px-[10px]">
+																						<Button
+																							disabled={primaryCtaPending}
+																							variant="primary-light"
+																							bold
+																							className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#5DAB68] !text-white border border-[#000000] overflow-hidden ${
+																								selectedContacts.length === 0
+																									? 'opacity-[0.62]'
+																									: 'opacity-100'
+																							}`}
+																							style={
+																								selectedContacts.length === 0
+																									? { height: '39px' }
+																									: { height: '39px' }
+																							}
+																							onClick={() => {
+																								if (selectedContacts.length === 0) return;
+																								handlePrimaryCta();
+																							}}
+																						>
+																							<span
+																								className="relative z-20"
+																								style={{
+																									fontFamily: 'Inter, sans-serif',
+																									fontWeight: 700,
+																								}}
+																							>
+																								Add Contacts
+																							</span>
+																						</Button>
+																					</div>
+																				)}
+																				{mapResearchPanelContact && (
+																					<div
+																						className="absolute inset-0 z-50"
+																						style={{
+																							backgroundColor: '#D8E5FB',
+																							opacity: isMapResearchPanelVisible ? 1 : 0,
+																							transition: `opacity ${MAP_RESEARCH_PANEL_FADE_MS}ms ease-out`,
+																							pointerEvents: isMapResearchPanelVisible
+																								? 'auto'
+																								: 'none',
+																						}}
+																					>
+																						<ContactResearchPanel
+																							contact={mapResearchPanelContact}
+																							className="!block !border-0 !bg-transparent !rounded-none"
+																							style={{ width: '100%', height: '100%' }}
+																							boxWidth={405}
+																							height={
+																								mapResearchPanelCompactHeightPx ??
+																								undefined
+																							}
+																							fixedHeightBoxSpacingPx={
+																								MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_SPACING_PX
+																							}
+																							fixedHeightBulletOuterHeightPx={
+																								MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_OUTER_HEIGHT_PX
+																							}
+																							fixedHeightBulletInnerHeightPx={
+																								MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_INNER_HEIGHT_PX
+																							}
+																							expandSummaryToFillHeight
+																						/>
+																					</div>
+																				)}
+																			</div>
+																		)}
+																		{!isMobile &&
+																			!isNarrowestDesktop &&
+																			!hasNoSearchResults && (
+																				<div
+																					className="absolute left-1/2 pointer-events-none"
+																					onMouseEnter={
+																						cancelMapBottomSearchFollowupPreviewClear
+																					}
+																					onMouseLeave={
+																						scheduleMapBottomSearchFollowupPreviewClear
+																					}
+																					style={{
+																						bottom: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.bottomOffset}px`,
+																						width: `${mapBottomSearchShellWidth}px`,
+																						height: `${mapBottomSearchShellHeight}px`,
+																						transform: `translateX(-50%) scale(${MAP_VIEW_BOTTOM_SEARCH_SCALE})`,
+																						transformOrigin: 'bottom center',
+																						transition: 'none',
+																						zIndex: 130,
+																					}}
+																				>
+																					<MapBottomSearchBar
+																						value={mapBottomSearchValue}
+																						isExpanded={isMapBottomSearchExpanded}
+																						activeHeight={mapBottomSearchActiveHeight}
+																						inputRef={mapBottomSearchInputRef}
+																						mode={
+																							isMapBottomCategoryMode
+																								? 'category'
+																								: isMapBottomForYouMode
+																									? 'for-you'
+																									: 'anything'
+																						}
+																						categoryWhatValue={whatValue}
+																						categoryWhereValue={whereValue}
+																						activeCategoryField={
+																							activeMapBottomCategoryField
+																						}
+																						onActivate={handleMapBottomSearchActivate}
+																						onSubmit={handleMapBottomSearchSubmit}
+																						onValueChange={setMapBottomSearchValue}
+																						onActiveChange={setIsMapBottomSearchActive}
+																						onCategoryFieldFocus={
+																							handleMapBottomCategoryFieldFocus
+																						}
+																						onCategoryWhatChange={
+																							handleMapBottomCategoryWhatChange
+																						}
+																						onCategoryWhereChange={
+																							handleMapBottomCategoryWhereChange
+																						}
+																						onCategoryWhatEnter={
+																							handleMapBottomCategoryWhatEnter
+																						}
+																						onCategorySubmit={
+																							handleMapBottomCategorySubmit
+																						}
+																						onForYouSubmit={handleMapBottomForYouSubmit}
+																					/>
+																					<MapBottomSearchFollowupBox
+																						selectedSearchFollowup={
+																							mapBottomSearchFollowupSelection
+																						}
+																						previewedSearchFollowup={
+																							mapBottomSearchFollowupPreview
+																						}
+																						onSelectedSearchFollowupChange={
+																							handleMapBottomSearchFollowupSelectionChange
+																						}
+																						onPreviewSearchFollowupChange={
+																							handleMapBottomSearchFollowupPreviewChange
+																						}
+																					/>
+																				</div>
+																			)}
+																		{/* Single column search results panel overlay at bottom - narrowest breakpoint (< 952px) */}
+																		{/* Keep mounted during loading so UI doesn't disappear between state searches. */}
+																		{isNarrowestDesktop && !hasNoSearchResults && (
+																			<div
+																				className="absolute left-[10px] right-[10px] bottom-[10px] shadow-lg flex flex-col"
+																				style={{
+																					height: '45%',
+																					maxHeight: 'calc(100% - 20px)',
+																					backgroundColor: '#AFD6EF',
+																					border: '3px solid #143883',
+																					overflow: 'hidden',
+																					transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
+																					transformOrigin: 'bottom center',
+																				}}
+																			>
+																				{/* Header area */}
+																				<div className="w-full h-[42px] flex-shrink-0 bg-[#AFD6EF] flex items-center justify-center px-4 relative">
+																					{/* Map label button in top-left of panel header */}
+																					<button
+																						type="button"
+																						onClick={() => setIsMapView(false)}
+																						className="absolute left-[10px] top-[7px] flex items-center justify-center cursor-pointer"
+																						style={{
+																							width: '53px',
+																							height: '19px',
+																							backgroundColor: '#CDEFC3',
+																							borderRadius: '4px',
+																							border: '2px solid #000000',
+																							fontFamily:
+																								'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																							fontSize: '13px',
+																							fontWeight: 600,
+																							lineHeight: '1',
+																						}}
+																					>
+																						Map
+																					</button>
+																					<span className="font-inter text-[13px] font-medium text-black">
+																						{selectedContacts.length} selected
 																					</span>
 																					<button
 																						type="button"
-																						onClick={() => handleSelectAll(mapPanelContacts)}
+																						onClick={() =>
+																							handleSelectAll(mapPanelContacts)
+																						}
 																						disabled={isMapResultsLoading}
-																						className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 translate-y-[4px] ${
+																						className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 -translate-y-1/2 ${
 																							isMapResultsLoading
 																								? 'opacity-60 pointer-events-none'
 																								: 'hover:underline'
 																						}`}
 																					>
-																						{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
+																						{isAllPanelContactsSelected
+																							? 'Deselect All'
+																							: 'Select all'}
 																					</button>
 																				</div>
 																				<CustomScrollbar
@@ -10450,949 +11396,789 @@ const DashboardContent = () => {
 																					offsetRight={-6}
 																					disableOverflowClass
 																				>
-																					<div className="space-y-[7px]">
-																						{mapPanelSelectedContacts.map(renderMapPanelDesktopRow)}
-																					</div>
-																				</CustomScrollbar>
-																			</div>
-																		)}
-																		{/* Search Results sub-panel — always present; flexes to fill remaining height. */}
-																		<div
-																			className="flex flex-col flex-1 min-h-0"
-																			style={{
-																				backgroundColor:
-																					mapResearchPanelContact && isMapResearchPanelVisible
-																						? '#D8E5FB'
-																						: 'rgba(99, 155, 244, 0.5)',
-																				borderRadius: '8px',
-																				overflow: 'hidden',
-																			}}
-																		>
-																			<div
-																				className="w-full h-[50px] flex-shrink-0 flex items-center justify-center px-4 relative"
-																				style={{
-																					backgroundColor: '#CBF0FF',
-																					border: '2px solid #000',
-																					borderRadius: '8px 8px 0 0',
-																				}}
-																			>
-																				<span className="absolute left-[13px] top-[2px] font-inter text-[15px] font-semibold leading-[20px] text-center text-black">
-																					Search Results
-																				</span>
-																				<div
-																					className="absolute left-[14px] right-[10px] bottom-[7px] flex items-center gap-[12px] overflow-hidden"
-																					style={{
-																						maskImage: 'linear-gradient(to right, black 0, black calc(100% - 40px), transparent 100%)',
-																						WebkitMaskImage: 'linear-gradient(to right, black 0, black calc(100% - 40px), transparent 100%)',
-																					}}
-																				>
-																					{[
-																						{ key: 'restaurants', pillColor: '#C3FBD1', label: 'Restaurants', Icon: RestaurantsIcon, iconSize: 11 },
-																						{ key: 'coffee-shops', pillColor: '#D6F1BD', label: 'Coffee', Icon: CoffeeShopsIcon, iconSize: 6 },
-																						{ key: 'music-venues', pillColor: '#B7E5FF', label: 'Music Venues', Icon: MusicVenuesIcon, iconSize: 11 },
-																						{ key: 'festivals', pillColor: '#C1D6FF', label: 'Festivals', Icon: FestivalsIcon, iconSize: 11 },
-																						{ key: 'wedding-planners', pillColor: '#FFF8DC', label: 'Weddings', Icon: WeddingPlannersIcon, iconSize: 11 },
-																						{ key: 'wine-beer-spirits', pillColor: '#BFC4FF', label: 'Wineries', Icon: WineBeerSpiritsIcon, iconSize: 11 },
-																						{ key: 'radio-stations', pillColor: '#C5F0CC', label: 'Radio', Icon: RadioStationsIcon, iconSize: 11 },
-																					].filter(({ key }) => mapPanelVisibleCategoryKeys.has(key)).map(({ key, pillColor, label, Icon, iconSize }) => (
-																						<div
-																							key={key}
-																							className="h-[15px] rounded-[7px] px-2 flex items-center gap-1 border border-black flex-shrink-0 cursor-pointer"
-																							style={{ backgroundColor: pillColor }}
-																							onClick={() => {
-																								setSelectedCategoryChips((prev) => {
-																									const next = new Set(prev);
-																									if (next.has(key)) next.delete(key);
-																									else next.add(key);
-																									return next;
-																								});
-																							}}
-																						>
-																							<Icon size={iconSize} className="flex-shrink-0" />
-																							<span className="text-[10px] text-black leading-none whitespace-nowrap">{label}</span>
-																						</div>
-																					))}
-																				</div>
-																			</div>
-																			<div
-																				className="flex flex-col flex-1 min-h-0 relative"
-																				style={{
-																					borderLeft: '3px solid #5B7469',
-																					borderRight: '3px solid #5B7469',
-																					borderBottom: '3px solid #5B7469',
-																					borderRadius: '0 0 8px 8px',
-																				}}
-																			>
-																				<CustomScrollbar
-																					className="flex-1 min-h-0"
-																					contentClassName="p-[6px] pb-[78px] space-y-[7px]"
-																					thumbWidth={2}
-																					thumbColor="#000000"
-																					trackColor="transparent"
-																					offsetRight={-6}
-																					disableOverflowClass
-																				>
 																					{isMapResultsLoading ? (
 																						<MapResultsPanelSkeleton
-																							variant="desktop"
-																							rows={Math.max(mapPanelUnselectedContacts.length, 14)}
+																							variant="narrow"
+																							rows={Math.max(mapPanelContacts.length, 8)}
 																						/>
 																					) : (
-																						<div ref={mapPanelRowsDesktopRef} className="space-y-[7px]">
-																							{mapPanelUnselectedContactsFiltered.map(renderMapPanelDesktopRow)}
+																						<div
+																							ref={mapPanelRowsNarrowRef}
+																							className="space-y-[7px]"
+																						>
+																							{mapPanelContacts.map((contact) => {
+																								const isSelected =
+																									selectedContacts.includes(contact.id);
+																								const isHovered =
+																									hoveredMapPanelContactId === contact.id;
+																								const isInBaseResults =
+																									baseContactIdSet.has(contact.id);
+																								const firstName = contact.firstName || '';
+																								const lastName = contact.lastName || '';
+																								const fullName =
+																									contact.name ||
+																									`${firstName} ${lastName}`.trim();
+																								const company = contact.company || '';
+																								// For restaurant searches, always use the search-derived headline
+																								// Otherwise, use contact's headline or fall back to search What + Where
+																								const searchDerivedHeadline =
+																									whatValue && whereValue
+																										? `${whatValue} ${whereValue}`
+																										: whatValue || '';
+																								const isRestaurantSearch =
+																									/^restaurants?$/i.test(
+																										whatValue.trim()
+																									);
+																								const curatedDisplayHeadline =
+																									contact.curatedDisplayLabel || '';
+																								// Curated search owns category display explicitly. Do not let
+																								// freeform headlines replace clean SVG/color chips.
+																								const contactHeadline =
+																									curatedDisplayHeadline ||
+																									(isInBaseResults
+																										? contact.headline ||
+																											contact.title ||
+																											''
+																										: contact.title ||
+																											contact.headline ||
+																											'');
+																								const computedHeadline = isInBaseResults
+																									? isRestaurantSearch
+																										? searchDerivedHeadline
+																										: contactHeadline ||
+																											searchDerivedHeadline
+																									: contactHeadline;
+																								const stickyHeadline =
+																									selectedContactStickyHeadlineById[
+																										contact.id
+																									] || '';
+																								const headline =
+																									isSelected && stickyHeadline
+																										? stickyHeadline
+																										: computedHeadline;
+																								const isRestaurantsSearchForContact =
+																									isRestaurantsSearch && isInBaseResults;
+																								const isCoffeeShopsSearchForContact =
+																									isCoffeeShopsSearch && isInBaseResults;
+																								const isMusicVenuesSearchForContact =
+																									isMusicVenuesSearch && isInBaseResults;
+																								const isMusicFestivalsSearchForContact =
+																									isMusicFestivalsSearch &&
+																									isInBaseResults;
+																								const isWeddingPlannersSearchForContact =
+																									isWeddingPlannersSearch &&
+																									isInBaseResults;
+																								const stateAbbr =
+																									getStateAbbreviation(
+																										contact.state || ''
+																									) || '';
+																								const city = contact.city || '';
+
+																								return (
+																									<div
+																										key={contact.id}
+																										data-contact-id={contact.id}
+																										className="cursor-pointer transition-colors flex w-full h-[49px] overflow-hidden rounded-[8px] border-[3px] border-[#ABABAB] select-none relative"
+																										style={{
+																											// Hover should be a subtle darken, not "selected" blue.
+																											// Category-specific selection colors.
+																											backgroundColor: isSelected
+																												? isRestaurantsSearchForContact ||
+																													isRestaurantTitle(headline)
+																													? isHovered
+																														? '#C5F5D1'
+																														: '#D7FFE1'
+																													: isCoffeeShopsSearchForContact ||
+																														  isCoffeeShopTitle(headline)
+																														? isHovered
+																															? '#DDF4CC'
+																															: '#EDFEDC'
+																														: isMusicVenuesSearchForContact ||
+																															  isMusicVenueTitle(
+																																	headline
+																															  )
+																															? isHovered
+																																? '#C5E8FF'
+																																: '#D7F0FF'
+																															: isMusicFestivalsSearchForContact ||
+																																  isMusicFestivalTitle(
+																																		headline
+																																  )
+																																? isHovered
+																																	? '#ADD4FF'
+																																	: '#BFDCFF'
+																																: isWeddingPlannersSearchForContact ||
+																																	  isWeddingPlannerTitle(
+																																			headline
+																																	  ) ||
+																																	  isWeddingVenueTitle(
+																																			headline
+																																	  )
+																																	? isHovered
+																																		? '#F5EDCE'
+																																		: '#FFF8DC'
+																																	: isWineBeerSpiritsTitle(
+																																				headline
+																																		  )
+																																		? isHovered
+																																			? '#C8CBFF'
+																																			: '#DADDFF'
+																																		: isHovered
+																																			? '#BFE3FF'
+																																			: '#C9EAFF'
+																												: isHovered
+																													? '#F3F4F6'
+																													: '#FFFFFF',
+																										}}
+																										onClick={() => {
+																											if (isSelected) {
+																												setSelectedContacts(
+																													selectedContacts.filter(
+																														(id) => id !== contact.id
+																													)
+																												);
+																											} else {
+																												setSelectedContacts([
+																													...selectedContacts,
+																													contact.id,
+																												]);
+																											}
+																										}}
+																										onMouseEnter={() =>
+																											setHoveredMapPanelContactId(
+																												contact.id
+																											)
+																										}
+																										onMouseLeave={() =>
+																											setHoveredMapPanelContactId(
+																												(prev) =>
+																													prev === contact.id
+																														? null
+																														: prev
+																											)
+																										}
+																									>
+																										{/* Left side - Name/Company and Location */}
+																										<div className="flex-1 min-w-0 flex flex-col justify-center pl-3 pr-2">
+																											{fullName ? (
+																												<>
+																													<div className="flex items-center">
+																														<div className="font-bold text-[11px] truncate leading-tight">
+																															{fullName}
+																														</div>
+																													</div>
+																													<div className="flex items-center mt-[2px]">
+																														<div className="text-[11px] text-black truncate leading-tight">
+																															{company}
+																														</div>
+																													</div>
+																												</>
+																											) : (
+																												<div className="flex items-center">
+																													<div className="font-bold text-[11px] truncate leading-tight">
+																														{company || '—'}
+																													</div>
+																												</div>
+																											)}
+																										</div>
+																										{/* Right side - Title (fixed 230px width) */}
+																										<div
+																											className="flex-shrink-0 flex flex-col justify-center pr-2"
+																											style={{ width: '240px' }}
+																										>
+																											{headline ? (
+																												<div
+																													className="overflow-hidden flex items-center px-2 gap-1"
+																													style={{
+																														width: '230px',
+																														height: '19px',
+																														backgroundColor:
+																															isRestaurantsSearchForContact ||
+																															isRestaurantTitle(headline)
+																																? '#C3FBD1'
+																																: isCoffeeShopsSearchForContact ||
+																																	  isCoffeeShopTitle(
+																																			headline
+																																	  )
+																																	? '#D6F1BD'
+																																	: isMusicVenuesSearchForContact ||
+																																		  isMusicVenueTitle(
+																																				headline
+																																		  )
+																																		? '#B7E5FF'
+																																		: isMusicFestivalsSearchForContact ||
+																																			  isMusicFestivalTitle(
+																																					headline
+																																			  )
+																																			? '#C1D6FF'
+																																			: isWeddingPlannersSearchForContact ||
+																																				  isWeddingPlannerTitle(
+																																						headline
+																																				  ) ||
+																																				  isWeddingVenueTitle(
+																																						headline
+																																				  )
+																																				? '#FFF8DC'
+																																				: isWineBeerSpiritsTitle(
+																																							headline
+																																					  )
+																																					? '#BFC4FF'
+																																					: '#E8EFFF',
+																														border: '0.7px solid #000000',
+																														borderRadius: '8px',
+																													}}
+																												>
+																													{(isRestaurantsSearchForContact ||
+																														isRestaurantTitle(
+																															headline
+																														)) && (
+																														<RestaurantsIcon
+																															size={12}
+																															className="flex-shrink-0"
+																														/>
+																													)}
+																													{(isCoffeeShopsSearchForContact ||
+																														isCoffeeShopTitle(
+																															headline
+																														)) && (
+																														<CoffeeShopsIcon size={7} />
+																													)}
+																													{(isMusicVenuesSearchForContact ||
+																														isMusicVenueTitle(
+																															headline
+																														)) && (
+																														<MusicVenuesIcon
+																															size={12}
+																															className="flex-shrink-0"
+																														/>
+																													)}
+																													{(isMusicFestivalsSearchForContact ||
+																														isMusicFestivalTitle(
+																															headline
+																														)) && (
+																														<FestivalsIcon
+																															size={12}
+																															className="flex-shrink-0"
+																														/>
+																													)}
+																													{(isWeddingPlannersSearchForContact ||
+																														isWeddingPlannerTitle(
+																															headline
+																														) ||
+																														isWeddingVenueTitle(
+																															headline
+																														)) && (
+																														<WeddingPlannersIcon
+																															size={12}
+																														/>
+																													)}
+																													{isWineBeerSpiritsTitle(
+																														headline
+																													) && (
+																														<WineBeerSpiritsIcon
+																															size={12}
+																															className="flex-shrink-0"
+																														/>
+																													)}
+																													<span className="text-[14px] text-black leading-none truncate">
+																														{isRestaurantsSearchForContact ||
+																														isRestaurantTitle(headline)
+																															? 'Restaurant'
+																															: isCoffeeShopsSearchForContact ||
+																																  isCoffeeShopTitle(
+																																		headline
+																																  )
+																																? 'Coffee Shop'
+																																: isMusicVenuesSearchForContact ||
+																																	  isMusicVenueTitle(
+																																			headline
+																																	  )
+																																	? 'Music Venue'
+																																	: isMusicFestivalsSearchForContact ||
+																																		  isMusicFestivalTitle(
+																																				headline
+																																		  )
+																																		? 'Music Festival'
+																																		: isWeddingVenueTitle(
+																																					headline
+																																			  )
+																																			? 'Wedding Venue'
+																																			: isWeddingPlannersSearchForContact ||
+																																				  isWeddingPlannerTitle(
+																																						headline
+																																				  )
+																																				? 'Wedding Planner'
+																																				: isWineBeerSpiritsTitle(
+																																							headline
+																																					  )
+																																					? getWineBeerSpiritsLabel(
+																																							headline
+																																						)
+																																					: headline}
+																													</span>
+																												</div>
+																											) : null}
+																											{(city || stateAbbr) && (
+																												<div className="flex items-center gap-1 mt-[4px]">
+																													{stateAbbr && (
+																														<span
+																															className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+																															style={{
+																																backgroundColor:
+																																	stateBadgeColorMap[
+																																		stateAbbr
+																																	] || 'transparent',
+																																borderColor: '#000000',
+																															}}
+																														>
+																															{stateAbbr}
+																														</span>
+																													)}
+																													{city && (
+																														<span className="text-[10px] text-black leading-none truncate">
+																															{city}
+																														</span>
+																													)}
+																												</div>
+																											)}
+																										</div>
+																									</div>
+																								);
+																							})}
 																						</div>
 																					)}
 																				</CustomScrollbar>
-																				<div
-																					className="absolute left-1/2 -translate-x-1/2 bottom-[9px] flex items-center gap-[2px] pl-[4px]"
-																					style={{
-																						width: '420px',
-																						height: '55px',
-																						borderRadius: '9.86px',
-																						border: '1.446px solid #000',
-																						backgroundColor: '#65A1B9',
-																					}}
-																				>
-																					{[
-																						{ key: 'music-venues', color: '#71C9FD', Icon: MusicVenuesIcon, size: 32 },
-																						{ key: 'wine-beer-spirits', color: '#80AAFF', Icon: WineBeerSpiritsIcon, size: 25 },
-																						{ key: 'restaurants', color: '#77DD91', Icon: RestaurantsIcon, size: 32 },
-																						{ key: 'coffee-shops', color: '#A9DE78', Icon: CoffeeShopsIcon, size: 18 },
-																						{ key: 'wedding-planners', color: '#EED56E', Icon: WeddingPlannersIcon, size: 30 },
-																						{ key: 'festivals', color: '#80AAFF', Icon: FestivalsIcon, size: 32 },
-																						{ key: 'radio-stations', color: '#56DA73', Icon: RadioStationsIcon, size: 32 },
-																					].filter(({ key }) => mapPanelCategoryKeys.has(key)).map(({ key, color, Icon, size }) => {
-																						const isSelected = selectedCategoryChips.has(key);
-																						return (
-																							<div
-																								key={key}
-																								className="flex items-center justify-center flex-shrink-0 cursor-pointer"
-																								style={{
-																									width: 45,
-																									height: 45,
-																									backgroundColor: isSelected ? 'transparent' : color,
-																									borderRadius: 6,
-																									border: isSelected ? `2px solid ${color}` : '1px solid #000',
-																								}}
-																								onClick={() => {
-																									setSelectedCategoryChips((prev) => {
-																										const next = new Set(prev);
-																										if (next.has(key)) next.delete(key);
-																										else next.add(key);
-																										return next;
-																									});
-																								}}
-																							>
-																								<Icon size={size} innerFill={isSelected ? color : 'white'} />
-																							</div>
-																						);
-																					})}
-																				</div>
-																			</div>
-																		</div>
-																		{!isMapResultsLoading && !fromHomeParam && (
-																			<div className="flex-shrink-0 w-full px-[10px]">
-																				<Button
-																					disabled={primaryCtaPending}
-																					variant="primary-light"
-																					bold
-																					className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#5DAB68] !text-white border border-[#000000] overflow-hidden ${
-																						selectedContacts.length === 0
-																							? 'opacity-[0.62]'
-																							: 'opacity-100'
-																					}`}
-																					style={
-																						selectedContacts.length === 0
-																							? { height: '39px' }
-																							: { height: '39px' }
-																					}
-																					onClick={() => {
-																						if (selectedContacts.length === 0) return;
-																						handlePrimaryCta();
-																					}}
-																				>
-																					<span
-																						className="relative z-20"
-																						style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}
-																					>
-																						Add Contacts
-																					</span>
-																				</Button>
-																			</div>
-																		)}
-																		{mapResearchPanelContact && (
-																			<div
-																				className="absolute inset-0 z-50"
-																				style={{
-																					backgroundColor: '#D8E5FB',
-																					opacity: isMapResearchPanelVisible ? 1 : 0,
-																					transition: `opacity ${MAP_RESEARCH_PANEL_FADE_MS}ms ease-out`,
-																					pointerEvents: isMapResearchPanelVisible ? 'auto' : 'none',
-																				}}
-																			>
-																				<ContactResearchPanel
-																					contact={mapResearchPanelContact}
-																					className="!block !border-0 !bg-transparent !rounded-none"
-																					style={{ width: '100%', height: '100%' }}
-																					boxWidth={405}
-																					height={mapResearchPanelCompactHeightPx ?? undefined}
-																					fixedHeightBoxSpacingPx={
-																						MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_SPACING_PX
-																					}
-																					fixedHeightBulletOuterHeightPx={
-																						MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_OUTER_HEIGHT_PX
-																					}
-																					fixedHeightBulletInnerHeightPx={
-																						MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_INNER_HEIGHT_PX
-																					}
-																					expandSummaryToFillHeight
-																				/>
-																			</div>
-																		)}
-																	</div>
-																)}
-																{!isMobile && !isNarrowestDesktop && !hasNoSearchResults && (
-																	<div
-																		className="absolute left-1/2 pointer-events-none"
-																		onMouseEnter={
-																			cancelMapBottomSearchFollowupPreviewClear
-																		}
-																		onMouseLeave={
-																			scheduleMapBottomSearchFollowupPreviewClear
-																		}
-																		style={{
-																			bottom: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.bottomOffset}px`,
-																			width: `${mapBottomSearchShellWidth}px`,
-																			height: `${mapBottomSearchShellHeight}px`,
-																			transform: `translateX(-50%) scale(${MAP_VIEW_BOTTOM_SEARCH_SCALE})`,
-																			transformOrigin: 'bottom center',
-																			transition: 'none',
-																			zIndex: 130,
-																		}}
-																	>
-																		<MapBottomSearchBar
-																			value={mapBottomSearchValue}
-																			isExpanded={isMapBottomSearchExpanded}
-																			activeHeight={mapBottomSearchActiveHeight}
-																			inputRef={mapBottomSearchInputRef}
-																			mode={
-																				isMapBottomCategoryMode
-																					? 'category'
-																					: isMapBottomForYouMode
-																						? 'for-you'
-																						: 'anything'
-																			}
-																			categoryWhatValue={whatValue}
-																			categoryWhereValue={whereValue}
-																			activeCategoryField={activeMapBottomCategoryField}
-																			onActivate={handleMapBottomSearchActivate}
-																			onSubmit={handleMapBottomSearchSubmit}
-																			onValueChange={setMapBottomSearchValue}
-																			onActiveChange={setIsMapBottomSearchActive}
-																			onCategoryFieldFocus={handleMapBottomCategoryFieldFocus}
-																			onCategoryWhatChange={handleMapBottomCategoryWhatChange}
-																			onCategoryWhereChange={handleMapBottomCategoryWhereChange}
-																			onCategoryWhatEnter={handleMapBottomCategoryWhatEnter}
-																			onCategorySubmit={handleMapBottomCategorySubmit}
-																			onForYouSubmit={handleMapBottomForYouSubmit}
-																		/>
-																		<MapBottomSearchFollowupBox
-																			selectedSearchFollowup={
-																				mapBottomSearchFollowupSelection
-																			}
-																			previewedSearchFollowup={
-																				mapBottomSearchFollowupPreview
-																			}
-																			onSelectedSearchFollowupChange={
-																				handleMapBottomSearchFollowupSelectionChange
-																			}
-																			onPreviewSearchFollowupChange={
-																				handleMapBottomSearchFollowupPreviewChange
-																			}
-																		/>
-																	</div>
-																)}
-															{/* Single column search results panel overlay at bottom - narrowest breakpoint (< 952px) */}
-															{/* Keep mounted during loading so UI doesn't disappear between state searches. */}
-															{isNarrowestDesktop && !hasNoSearchResults && (
-																	<div
-																		className="absolute left-[10px] right-[10px] bottom-[10px] shadow-lg flex flex-col"
-																		style={{
-																			height: '45%',
-																			maxHeight: 'calc(100% - 20px)',
-																			backgroundColor: '#AFD6EF',
-																			border: '3px solid #143883',
-																			overflow: 'hidden',
-																			transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
-																			transformOrigin: 'bottom center',
-																		}}
-																	>
-																		{/* Header area */}
-																		<div className="w-full h-[42px] flex-shrink-0 bg-[#AFD6EF] flex items-center justify-center px-4 relative">
-																	{/* Map label button in top-left of panel header */}
-																	<button
-																		type="button"
-																		onClick={() => setIsMapView(false)}
-																		className="absolute left-[10px] top-[7px] flex items-center justify-center cursor-pointer"
-																		style={{
-																			width: '53px',
-																			height: '19px',
-																			backgroundColor: '#CDEFC3',
-																			borderRadius: '4px',
-																			border: '2px solid #000000',
-																			fontFamily:
-																				'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-																			fontSize: '13px',
-																			fontWeight: 600,
-																			lineHeight: '1',
-																		}}
-																	>
-																		Map
-																	</button>
-																	<span className="font-inter text-[13px] font-medium text-black">
-																		{selectedContacts.length} selected
-																	</span>
-																	<button
-																		type="button"
-																		onClick={() => handleSelectAll(mapPanelContacts)}
-																		disabled={isMapResultsLoading}
-																		className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 -translate-y-1/2 ${
-																			isMapResultsLoading
-																				? 'opacity-60 pointer-events-none'
-																				: 'hover:underline'
-																		}`}
-																	>
-																		{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
-																	</button>
-																</div>
-																<CustomScrollbar
-																	className="flex-1 min-h-0"
-																	contentClassName="p-[6px] pb-[14px] space-y-[7px]"
-																	thumbWidth={2}
-																	thumbColor="#000000"
-																	trackColor="transparent"
-																	offsetRight={-6}
-																	disableOverflowClass
-																>
-																	{isMapResultsLoading ? (
-																		<MapResultsPanelSkeleton
-																			variant="narrow"
-																			rows={Math.max(mapPanelContacts.length, 8)}
-																		/>
-																	) : (
-																		<div ref={mapPanelRowsNarrowRef} className="space-y-[7px]">
-																		{mapPanelContacts.map((contact) => {
-																		const isSelected = selectedContacts.includes(
-																			contact.id
-																		);
-																		const isHovered = hoveredMapPanelContactId === contact.id;
-																		const isInBaseResults = baseContactIdSet.has(contact.id);
-																		const firstName = contact.firstName || '';
-																		const lastName = contact.lastName || '';
-																		const fullName =
-																			contact.name ||
-																			`${firstName} ${lastName}`.trim();
-																		const company = contact.company || '';
-																		// For restaurant searches, always use the search-derived headline
-																		// Otherwise, use contact's headline or fall back to search What + Where
-																		const searchDerivedHeadline =
-																			whatValue && whereValue
-																				? `${whatValue} ${whereValue}`
-																				: whatValue || '';
-																		const isRestaurantSearch = /^restaurants?$/i.test(whatValue.trim());
-																		const curatedDisplayHeadline =
-																			contact.curatedDisplayLabel || '';
-																		// Curated search owns category display explicitly. Do not let
-																		// freeform headlines replace clean SVG/color chips.
-																		const contactHeadline =
-																			curatedDisplayHeadline ||
-																			(isInBaseResults
-																				? contact.headline || contact.title || ''
-																				: contact.title || contact.headline || '');
-																		const computedHeadline = isInBaseResults
-																			? isRestaurantSearch
-																				? searchDerivedHeadline
-																				: contactHeadline || searchDerivedHeadline
-																			: contactHeadline;
-																		const stickyHeadline =
-																			selectedContactStickyHeadlineById[contact.id] || '';
-																		const headline =
-																			isSelected && stickyHeadline ? stickyHeadline : computedHeadline;
-																		const isRestaurantsSearchForContact = isRestaurantsSearch && isInBaseResults;
-																		const isCoffeeShopsSearchForContact = isCoffeeShopsSearch && isInBaseResults;
-																		const isMusicVenuesSearchForContact = isMusicVenuesSearch && isInBaseResults;
-																		const isMusicFestivalsSearchForContact = isMusicFestivalsSearch && isInBaseResults;
-																		const isWeddingPlannersSearchForContact = isWeddingPlannersSearch && isInBaseResults;
-																		const stateAbbr =
-																			getStateAbbreviation(contact.state || '') || '';
-																		const city = contact.city || '';
-
-																		return (
-																			<div
-																				key={contact.id}
-																				data-contact-id={contact.id}
-																				className="cursor-pointer transition-colors flex w-full h-[49px] overflow-hidden rounded-[8px] border-[3px] border-[#ABABAB] select-none relative"
-																				style={{
-																					// Hover should be a subtle darken, not "selected" blue.
-																					// Category-specific selection colors.
-																					backgroundColor: isSelected
-																						? (isRestaurantsSearchForContact || isRestaurantTitle(headline))
-																							? isHovered ? '#C5F5D1' : '#D7FFE1'
-																							: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
-																								? isHovered ? '#DDF4CC' : '#EDFEDC'
-																								: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
-																									? isHovered ? '#C5E8FF' : '#D7F0FF'
-																									: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
-																										? isHovered ? '#ADD4FF' : '#BFDCFF'
-																										: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
-																											? isHovered ? '#F5EDCE' : '#FFF8DC'
-																											: isWineBeerSpiritsTitle(headline)
-																												? isHovered ? '#C8CBFF' : '#DADDFF'
-																												: isHovered ? '#BFE3FF' : '#C9EAFF'
-																						: isHovered
-																							? '#F3F4F6'
-																							: '#FFFFFF',
-																				}}
-																				onClick={() => {
-																					if (isSelected) {
-																						setSelectedContacts(
-																							selectedContacts.filter(
-																								(id) => id !== contact.id
-																							)
-																						);
-																					} else {
-																						setSelectedContacts([
-																							...selectedContacts,
-																							contact.id,
-																						]);
-																					}
-																				}}
-																				onMouseEnter={() => setHoveredMapPanelContactId(contact.id)}
-																				onMouseLeave={() =>
-																					setHoveredMapPanelContactId((prev) =>
-																						prev === contact.id ? null : prev
-																					)
-																				}
-																			>
-																				{/* Left side - Name/Company and Location */}
-																				<div className="flex-1 min-w-0 flex flex-col justify-center pl-3 pr-2">
-																					{fullName ? (
-																						<>
-																							<div className="flex items-center">
-																								<div className="font-bold text-[11px] truncate leading-tight">
-																									{fullName}
-																								</div>
-																							</div>
-																							<div className="flex items-center mt-[2px]">
-																								<div className="text-[11px] text-black truncate leading-tight">
-																									{company}
-																								</div>
-																							</div>
-																						</>
-																					) : (
-																						<div className="flex items-center">
-																							<div className="font-bold text-[11px] truncate leading-tight">
-																								{company || '—'}
-																							</div>
-																						</div>
-																					)}
-																				</div>
-																				{/* Right side - Title (fixed 230px width) */}
-																				<div className="flex-shrink-0 flex flex-col justify-center pr-2" style={{ width: '240px' }}>
-																					{headline ? (
-																						<div
-																							className="overflow-hidden flex items-center px-2 gap-1"
-																							style={{
-																								width: '230px',
-																								height: '19px',
-																								backgroundColor: (isRestaurantsSearchForContact || isRestaurantTitle(headline))
-																									? '#C3FBD1'
-																									: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
-																										? '#D6F1BD'
-																										: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
-																											? '#B7E5FF'
-																											: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
-																												? '#C1D6FF'
-																												: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
-																													? '#FFF8DC'
-																													: isWineBeerSpiritsTitle(headline)
-																														? '#BFC4FF'
-																														: '#E8EFFF',
-																								border: '0.7px solid #000000',
-																								borderRadius: '8px',
+																				{!isMapResultsLoading && !fromHomeParam && (
+																					<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
+																						<Button
+																							disabled={primaryCtaPending}
+																							variant="primary-light"
+																							bold
+																							className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#5DAB68] !text-white border border-[#000000] overflow-hidden ${
+																								selectedContacts.length === 0
+																									? 'opacity-[0.62]'
+																									: 'opacity-100'
+																							}`}
+																							style={
+																								selectedContacts.length === 0
+																									? { height: '39px' }
+																									: { height: '39px' }
+																							}
+																							onClick={() => {
+																								if (selectedContacts.length === 0) return;
+																								handlePrimaryCta();
 																							}}
 																						>
-																							{(isRestaurantsSearchForContact || isRestaurantTitle(headline)) && (
-																								<RestaurantsIcon size={12} className="flex-shrink-0" />
-																							)}
-																							{(isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline)) && (
-																								<CoffeeShopsIcon size={7} />
-																							)}
-																							{(isMusicVenuesSearchForContact || isMusicVenueTitle(headline)) && (
-																								<MusicVenuesIcon size={12} className="flex-shrink-0" />
-																							)}
-																							{(isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline)) && (
-																								<FestivalsIcon size={12} className="flex-shrink-0" />
-																							)}
-																							{(isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
-																								<WeddingPlannersIcon size={12} />
-																							)}
-																							{isWineBeerSpiritsTitle(headline) && (
-																								<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
-																							)}
-																							<span className="text-[14px] text-black leading-none truncate">
-																								{(isRestaurantsSearchForContact || isRestaurantTitle(headline))
-																									? 'Restaurant'
-																									: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
-																										? 'Coffee Shop'
-																										: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
-																											? 'Music Venue'
-																											: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
-																												? 'Music Festival'
-																												: isWeddingVenueTitle(headline)
-																													? 'Wedding Venue'
-																													: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline))
-																														? 'Wedding Planner'
-																														: isWineBeerSpiritsTitle(headline)
-																															? getWineBeerSpiritsLabel(headline)
-																															: headline}
+																							<span
+																								className="relative z-20"
+																								style={{
+																									fontFamily: 'Inter, sans-serif',
+																									fontWeight: 700,
+																								}}
+																							>
+																								{primaryCtaLabel}
 																							</span>
-																						</div>
-																					) : null}
-																					{(city || stateAbbr) && (
-																						<div className="flex items-center gap-1 mt-[4px]">
-																							{stateAbbr && (
-																								<span
-																									className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
-																									style={{
-																										backgroundColor:
-																											stateBadgeColorMap[
-																												stateAbbr
-																											] || 'transparent',
-																										borderColor: '#000000',
-																									}}
-																								>
-																									{stateAbbr}
+																							<div
+																								className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
+																								onClick={(e) => {
+																									e.stopPropagation();
+																									handleSelectAll(mapPanelContacts);
+																								}}
+																							>
+																								<span className="text-black text-[14px] font-medium">
+																									All
 																								</span>
-																							)}
-																							{city && (
-																								<span className="text-[10px] text-black leading-none truncate">
-																									{city}
-																								</span>
-																							)}
-																						</div>
-																					)}
-																				</div>
+																							</div>
+																							<span
+																								aria-hidden="true"
+																								className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
+																							/>
+																						</Button>
+																					</div>
+																				)}
 																			</div>
-																		);
-																		})}
-																		</div>
-																	)}
-														</CustomScrollbar>
-															{!isMapResultsLoading && !fromHomeParam && (
-																	<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
-																		<Button
-																			disabled={primaryCtaPending}
-																			variant="primary-light"
-																			bold
-																			className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#5DAB68] !text-white border border-[#000000] overflow-hidden ${
-																				selectedContacts.length === 0
-																					? 'opacity-[0.62]'
-																					: 'opacity-100'
-																			}`}
-																			style={
-																				selectedContacts.length === 0
-																					? { height: '39px' }
-																					: { height: '39px' }
+																		)}
+																	</div>
+																</div>
+															</>,
+															document.body
+														)}
+												</>
+											) : (
+												<>
+													{/* Table View (default) */}
+													{/* Map button positioned above table on the right */}
+													<div className="w-full max-w-[1004px] mx-auto flex justify-end mb-[4px] relative z-[80] search-results-map-toggle">
+														<button
+															type="button"
+															onClick={() => setIsMapView(true)}
+															className="bg-white border-2 border-black rounded-[8px] text-[14px] font-medium font-secondary hover:bg-gray-50 transition-colors flex items-center justify-center cursor-pointer"
+															style={{ width: '105px', height: '22px' }}
+														>
+															Map
+														</button>
+													</div>
+													{/* Horizontal research strip for medium-width desktops (when side panel is hidden) */}
+													{showHorizontalResearchStrip && (
+														<ContactResearchHorizontalStrip contact={hoveredContact} />
+													)}
+													<Card className="border-0 shadow-none !p-0 w-full !my-0">
+														<CardContent className="!p-0 w-full">
+															<CustomTable
+																initialSelectAll={false}
+																isSelectable
+																setSelectedRows={setSelectedContacts}
+																data={mapPanelContacts}
+																columns={columns}
+																searchable={false}
+																tableRef={tableRef}
+																rowsPerPage={100}
+																displayRowsPerPage={false}
+																constrainHeight
+																useCustomScrollbar={!isMobileLandscape}
+																scrollbarOffsetRight={-7}
+																containerClassName="search-results-table h-[571px] rounded-[8px] border-[#143883] md:w-[1004px] border-[3px]"
+																tableClassName="w-[calc(100%-12px)] mx-auto border-separate border-spacing-y-[6px]"
+																headerClassName="[&_tr]:border-[#737373]"
+																theadCellClassName="border-[#737373] font-secondary text-[14px] font-medium"
+																rowClassName="border-[#737373] row-hover-scroll bg-white odd:bg-white even:bg-white rounded-[8px] [&>td:first-child]:rounded-l-[8px] [&>td:last-child]:rounded-r-[8px] [&>td]:border-y-2 [&>td:first-child]:border-l-2 [&>td:last-child]:border-r-2 border-none !h-[58px] min-h-[58px] [&>td]:!h-[58px] [&>td]:!py-0"
+																stickyHeaderClassName="bg-[#AFD6EF]"
+																hidePagination
+																onRowHover={
+																	isMobile ? undefined : (row) => setHoveredContact(row)
+																}
+																headerAction={
+																	!isMobile && !fromHomeParam ? (
+																		<button
+																			type="button"
+																			onClick={handlePrimaryCta}
+																			disabled={
+																				selectedContacts.length === 0 || primaryCtaPending
 																			}
-																			onClick={() => {
-																				if (selectedContacts.length === 0) return;
-																				handlePrimaryCta();
+																			className="font-secondary"
+																			style={{
+																				width: '127px',
+																				height: '31px',
+																				background:
+																					selectedContacts.length === 0 ||
+																					primaryCtaPending
+																						? 'rgba(93, 171, 104, 0.1)'
+																						: '#B8E4BE',
+																				border: '2px solid #000000',
+																				color:
+																					selectedContacts.length === 0 ||
+																					primaryCtaPending
+																						? 'rgba(0, 0, 0, 0.4)'
+																						: '#000000',
+																				fontSize: '13px',
+																				fontWeight: 700,
+																				fontFamily: 'Inter, sans-serif',
+																				borderRadius: '8px',
+																				lineHeight: 'normal',
+																				display: 'flex',
+																				alignItems: 'center',
+																				justifyContent: 'center',
+																				padding: '0',
+																				textAlign: 'center',
+																				whiteSpace: 'nowrap',
+																				cursor:
+																					selectedContacts.length === 0 ||
+																					primaryCtaPending
+																						? 'default'
+																						: 'pointer',
+																				opacity:
+																					selectedContacts.length === 0 ||
+																					primaryCtaPending
+																						? 0.6
+																						: 1,
 																			}}
 																		>
-																			<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>
-																				{primaryCtaLabel}
-																			</span>
-																			<div
-																				className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
-																				onClick={(e) => {
-																					e.stopPropagation();
-																					handleSelectAll(mapPanelContacts);
-																				}}
-																			>
-																				<span className="text-black text-[14px] font-medium">
-																					All
-																				</span>
-																			</div>
-																			<span
-																				aria-hidden="true"
-																				className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
-																			/>
-																			</Button>
-																		</div>
-																)}
-																</div>
-															)}
-														</div>
-													</div>
-													</>,
-													document.body
-												)}
-										</>
-									) : (
-										<>
-											{/* Table View (default) */}
-											{/* Map button positioned above table on the right */}
-											<div className="w-full max-w-[1004px] mx-auto flex justify-end mb-[4px] relative z-[80] search-results-map-toggle">
-												<button
-													type="button"
-													onClick={() => setIsMapView(true)}
-													className="bg-white border-2 border-black rounded-[8px] text-[14px] font-medium font-secondary hover:bg-gray-50 transition-colors flex items-center justify-center cursor-pointer"
-													style={{ width: '105px', height: '22px' }}
-												>
-													Map
-												</button>
-											</div>
-											{/* Horizontal research strip for medium-width desktops (when side panel is hidden) */}
-											{showHorizontalResearchStrip && (
-												<ContactResearchHorizontalStrip contact={hoveredContact} />
-											)}
-											<Card className="border-0 shadow-none !p-0 w-full !my-0">
-												<CardContent className="!p-0 w-full">
-													<CustomTable
-														initialSelectAll={false}
-														isSelectable
-														setSelectedRows={setSelectedContacts}
-														data={mapPanelContacts}
-														columns={columns}
-														searchable={false}
-														tableRef={tableRef}
-														rowsPerPage={100}
-														displayRowsPerPage={false}
-														constrainHeight
-														useCustomScrollbar={!isMobileLandscape}
-														scrollbarOffsetRight={-7}
-														containerClassName="search-results-table h-[571px] rounded-[8px] border-[#143883] md:w-[1004px] border-[3px]"
-														tableClassName="w-[calc(100%-12px)] mx-auto border-separate border-spacing-y-[6px]"
-														headerClassName="[&_tr]:border-[#737373]"
-														theadCellClassName="border-[#737373] font-secondary text-[14px] font-medium"
-														rowClassName="border-[#737373] row-hover-scroll bg-white odd:bg-white even:bg-white rounded-[8px] [&>td:first-child]:rounded-l-[8px] [&>td:last-child]:rounded-r-[8px] [&>td]:border-y-2 [&>td:first-child]:border-l-2 [&>td:last-child]:border-r-2 border-none !h-[58px] min-h-[58px] [&>td]:!h-[58px] [&>td]:!py-0"
-														stickyHeaderClassName="bg-[#AFD6EF]"
-														hidePagination
-														onRowHover={
-															isMobile ? undefined : (row) => setHoveredContact(row)
-														}
-														headerAction={
-															!isMobile && !fromHomeParam ? (
-																<button
-																	type="button"
-																	onClick={handlePrimaryCta}
-																	disabled={selectedContacts.length === 0 || primaryCtaPending}
-																	className="font-secondary"
+																			{primaryCtaLabel}
+																		</button>
+																	) : null
+																}
+																headerInlineAction={
+																	<button
+																		onClick={() => handleSelectAll(mapPanelContacts)}
+																		className="text-[14px] font-secondary font-normal text-black hover:underline"
+																		type="button"
+																	>
+																		{isAllPanelContactsSelected
+																			? 'Deselect All'
+																			: 'Select all'}
+																	</button>
+																}
+															/>
+														</CardContent>
+													</Card>
+													{/* Desktop button (non-sticky) */}
+													{!isMobile && !fromHomeParam && (
+														<div className="flex items-center justify-center w-full search-results-cta-wrapper">
+															<Button
+																isLoading={primaryCtaPending}
+																variant="primary-light"
+																bold
+																className="relative w-full max-w-[984px] h-[39px] mx-auto mt-[20px] !bg-[#5DAB68] hover:!bg-[#5DAB68] !text-white border border-[#000000] overflow-hidden"
+																onClick={() => {
+																	if (selectedContacts.length === 0) return;
+																	handlePrimaryCta();
+																}}
+															>
+																<span
+																	className="relative z-20"
 																	style={{
-																		width: '127px',
-																		height: '31px',
-																		background:
-																			selectedContacts.length === 0 || primaryCtaPending
-																				? 'rgba(93, 171, 104, 0.1)'
-																				: '#B8E4BE',
-																		border: '2px solid #000000',
-																		color:
-																			selectedContacts.length === 0 || primaryCtaPending
-																				? 'rgba(0, 0, 0, 0.4)'
-																				: '#000000',
-																		fontSize: '13px',
-																		fontWeight: 700,
 																		fontFamily: 'Inter, sans-serif',
-																		borderRadius: '8px',
-																		lineHeight: 'normal',
-																		display: 'flex',
-																		alignItems: 'center',
-																		justifyContent: 'center',
-																		padding: '0',
-																		textAlign: 'center',
-																		whiteSpace: 'nowrap',
-																		cursor:
-																			selectedContacts.length === 0 || primaryCtaPending
-																				? 'default'
-																				: 'pointer',
-																		opacity: selectedContacts.length === 0 || primaryCtaPending ? 0.6 : 1,
+																		fontWeight: 700,
 																	}}
 																>
 																	{primaryCtaLabel}
-																</button>
-															) : null
-														}
-														headerInlineAction={
-															<button
-																onClick={() => handleSelectAll(mapPanelContacts)}
-																className="text-[14px] font-secondary font-normal text-black hover:underline"
-																type="button"
-															>
-																{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
-															</button>
-														}
-													/>
-												</CardContent>
-											</Card>
-											{/* Desktop button (non-sticky) */}
-											{!isMobile && !fromHomeParam && (
-												<div className="flex items-center justify-center w-full search-results-cta-wrapper">
-													<Button
-														isLoading={primaryCtaPending}
-														variant="primary-light"
-														bold
-														className="relative w-full max-w-[984px] h-[39px] mx-auto mt-[20px] !bg-[#5DAB68] hover:!bg-[#5DAB68] !text-white border border-[#000000] overflow-hidden"
-														onClick={() => {
-															if (selectedContacts.length === 0) return;
-															handlePrimaryCta();
-														}}
-													>
-														<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>
-															{primaryCtaLabel}
-														</span>
-														<div
-															className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
-															onClick={(e) => {
-																e.stopPropagation();
-																handleSelectAll(mapPanelContacts);
-															}}
-														>
-															<span className="text-black text-[14px] font-medium">
-																All
-															</span>
+																</span>
+																<div
+																	className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
+																	onClick={(e) => {
+																		e.stopPropagation();
+																		handleSelectAll(mapPanelContacts);
+																	}}
+																>
+																	<span className="text-black text-[14px] font-medium">
+																		All
+																	</span>
+																</div>
+																<span
+																	aria-hidden="true"
+																	className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
+																/>
+															</Button>
 														</div>
-														<span
-															aria-hidden="true"
-															className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
-														/>
-													</Button>
-												</div>
+													)}
+
+													{/* Mobile sticky button at bottom */}
+													{isMobile &&
+														!fromHomeParam &&
+														typeof window !== 'undefined' &&
+														createPortal(
+															<div className="mobile-sticky-cta">
+																<Button
+																	onClick={handlePrimaryCta}
+																	isLoading={primaryCtaPending}
+																	variant="primary-light"
+																	bold
+																	className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#5DAB68] !text-white border border-[#000000] transition-colors !opacity-100 disabled:!opacity-100"
+																	disabled={
+																		selectedContacts.length === 0 || primaryCtaPending
+																	}
+																>
+																	<span
+																		style={{
+																			fontFamily: 'Inter, sans-serif',
+																			fontWeight: 700,
+																		}}
+																	>
+																		{primaryCtaLabel}
+																	</span>
+																</Button>
+															</div>,
+															document.body
+														)}
+												</>
 											)}
-
-											{/* Mobile sticky button at bottom */}
-											{isMobile &&
-												!fromHomeParam &&
-												typeof window !== 'undefined' &&
-												createPortal(
-													<div className="mobile-sticky-cta">
-														<Button
-															onClick={handlePrimaryCta}
-															isLoading={primaryCtaPending}
-															variant="primary-light"
-															bold
-															className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#5DAB68] !text-white border border-[#000000] transition-colors !opacity-100 disabled:!opacity-100"
-															disabled={selectedContacts.length === 0 || primaryCtaPending}
-														>
-															<span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>
-																{primaryCtaLabel}
-															</span>
-														</Button>
-													</div>,
-													document.body
-												)}
-										</>
-									)}
-								</div>
-								{/* Right-side box */}
-								{!isMobile && hoveredContact && (
-									<div
-										className="hidden xl:block search-results-research-panel"
-										style={{
-											left: 'calc(50% + 502px + 33px)',
-										}}
-									>
-										<ContactResearchPanel contact={hoveredContact} />
-									</div>
-								)}
-							</div>
-						) : hasSearched &&
-						  (contacts === undefined ||
-								(Array.isArray(contacts) && contacts.length === 0)) ? (
-							<div className="mt-10 w-full px-4">
-								<Card className="w-full max-w-full mx-auto">
-									<CardContent className="py-8">
-										<div className="text-center">
-											<Typography variant="h3" className="mb-2">
-												No Results Found
-											</Typography>
-											<Typography className="text-gray-600">
-												No contacts match your search criteria. Try a different search
-												term.
-											</Typography>
 										</div>
-									</CardContent>
-								</Card>
-							</div>
-						) : null}
-					</>
-				)}
+										{/* Right-side box */}
+										{!isMobile && hoveredContact && (
+											<div
+												className="hidden xl:block search-results-research-panel"
+												style={{
+													left: 'calc(50% + 502px + 33px)',
+												}}
+											>
+												<ContactResearchPanel contact={hoveredContact} />
+											</div>
+										)}
+									</div>
+								) : hasSearched &&
+								  (contacts === undefined ||
+										(Array.isArray(contacts) && contacts.length === 0)) ? (
+									<div className="mt-10 w-full px-4">
+										<Card className="w-full max-w-full mx-auto">
+											<CardContent className="py-8">
+												<div className="text-center">
+													<Typography variant="h3" className="mb-2">
+														No Results Found
+													</Typography>
+													<Typography className="text-gray-600">
+														No contacts match your search criteria. Try a different search
+														term.
+													</Typography>
+												</div>
+											</CardContent>
+										</Card>
+									</div>
+								) : null}
+							</>
+						)}
 
-				{/* Panel content for search tab - driven by the action bar icon selection */}
-				{!hasSearched && activeTab === 'search' && (
-					<div
-						ref={tabbedLandingBoxRef}
-						className="campaigns-table-wrapper dashboard-recent-campaigns w-full max-w-[960px] mx-auto px-4"
-						style={{
-							willChange: 'transform, opacity',
-						}}
-					>
-						<div className="mt-[18px] mb-[18px] w-full flex flex-col items-center">
-							{selectedActionBarIcon === 'playbook' && (
-								<DashboardStrategyBox
-									onSearchContacts={handleMapBottomForYouSubmit}
-								/>
-							)}
-							{selectedActionBarIcon === 'calendar' && (
-								<DashboardCalendarPanel mockState={calendarMockState} />
-							)}
-							{selectedActionBarIcon === 'folder' && (
-								<CampaignsTable
-									mockState={campaignsMockState}
-									onMockStateChange={setCampaignsMockState}
-									onFinderOpenChange={setIsCampaignFinderOpen}
-								/>
-							)}
-							{selectedActionBarIcon === 'star' && (
-								<DashboardOpportunitiesWidget
-									enabled={isSignedIn === true}
-									mockState={opportunitiesMockState}
-								/>
-							)}
-							{selectedActionBarIcon === 'envelope' && (
-								<DashboardResponsesWidget
-									enabled={isSignedIn === true}
-									mockState={responsesMockState}
-								/>
-							)}
-						</div>
-					</div>
-				)}
-
-				{campaignsDebugEnabled && (
-					<CampaignsTableDebugPanel
-						value={campaignsMockState}
-						onChange={setCampaignsMockState}
-					/>
-				)}
-
-				{calendarDebugEnabled && (
-					<DashboardCalendarDebugPanel
-						value={calendarMockState}
-						onChange={setCalendarMockState}
-					/>
-				)}
-
-				{opportunitiesDebugEnabled && (
-					<DashboardOpportunitiesDebugPanel
-						value={opportunitiesMockState}
-						onChange={setOpportunitiesMockState}
-					/>
-				)}
-
-				{inboxDebugEnabled && (
-					<DashboardResponsesDebugPanel
-						value={responsesMockState}
-						onChange={setResponsesMockState}
-					/>
-				)}
-
-				{/* Sign-up overlay for "from home" mode when user is not authenticated */}
-				{/* Shows after 3 seconds so user can see the map and placeholders first */}
-				{fromHomeParam &&
-					isAuthLoaded &&
-					isSignedIn === false &&
-					showFromHomeSignUp &&
-					typeof window !== 'undefined' &&
-					createPortal(
-						<div
-							className="fixed inset-0 z-[10000] flex items-center justify-center"
-						>
-							<SignUp
-								appearance={{
-									elements: {
-										rootBox: 'w-full max-w-[420px] mx-4',
-										cardBox: { boxShadow: 'none' },
-										card: {
-											boxShadow: 'none',
-											borderRadius: '16px',
-										},
-										formButtonPrimary:
-											'bg-black hover:bg-gray-800 text-sm normal-case',
-										socialButtonsBlockButton:
-											'border border-gray-300 hover:bg-gray-50',
-										dividerLine: 'bg-gray-200',
-										dividerText: 'text-gray-500',
-										formFieldLabel: 'text-gray-700',
-										formFieldInput:
-											'border-gray-300 focus:border-black focus:ring-black',
-										footerActionLink: 'text-black hover:text-gray-700',
-									},
-								}}
-								routing="hash"
-								forceRedirectUrl={`${urls.murmur.dashboard.index}?fromHome=true`}
-								signInUrl={`/sign-in?redirect_url=${encodeURIComponent(`${urls.murmur.dashboard.index}?fromHome=true`)}`}
-								signInForceRedirectUrl={`${urls.murmur.dashboard.index}?fromHome=true`}
-							/>
-						</div>,
-						document.body
-					)}
-
-				{/* Free trial prompt for "from home" mode when user is authenticated but has no subscription (after 15s) */}
-				{isFreeTrialPromptVisible &&
-					typeof window !== 'undefined' &&
-					createPortal(
-						<div
-							className="fixed inset-0 z-[10000] flex items-center justify-center"
-						>
+						{/* Panel content for search tab - driven by the action bar icon selection */}
+						{!hasSearched && activeTab === 'search' && (
 							<div
-								className="flex flex-col items-center rounded-[16px] pointer-events-auto py-8 px-8"
+								ref={tabbedLandingBoxRef}
+								className="campaigns-table-wrapper dashboard-recent-campaigns w-full max-w-[960px] mx-auto px-4"
 								style={{
-									backgroundColor: '#6FCF84',
-									border: '3px solid #000000',
+									willChange: 'transform, opacity',
 								}}
 							>
-								<button
-									type="button"
-									onClick={handleStartFreeTrial}
-									className="font-semibold text-white rounded-[8px] cursor-pointer hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed"
-									style={{
-										width: '475px',
-										height: '56px',
-										backgroundColor: '#1D942E',
-										border: '3px solid #000000',
-									}}
-								>
-									Start Your Free Trial
-								</button>
-								<div
-									className="flex flex-col items-center justify-center text-center mt-5"
-									style={{
-										fontFamily: '"Times New Roman", Times, serif',
-									}}
-								>
-								<p className="text-lg italic text-black mb-1">
-									&quot;You miss 100% of the shots you don&apos;t take&quot;
-								</p>
-									<p className="text-sm text-black">
-										-Wayne Gretzky
-									</p>
+								<div className="mt-[18px] mb-[18px] w-full flex flex-col items-center">
+									{selectedActionBarIcon === 'playbook' && (
+										<DashboardStrategyBox
+											onSearchContacts={handleMapBottomForYouSubmit}
+										/>
+									)}
+									{selectedActionBarIcon === 'calendar' && (
+										<DashboardCalendarPanel mockState={calendarMockState} />
+									)}
+									{selectedActionBarIcon === 'folder' && (
+										<CampaignsTable
+											mockState={campaignsMockState}
+											onMockStateChange={setCampaignsMockState}
+											onFinderOpenChange={setIsCampaignFinderOpen}
+										/>
+									)}
+									{selectedActionBarIcon === 'star' && (
+										<DashboardOpportunitiesWidget
+											enabled={isSignedIn === true}
+											mockState={opportunitiesMockState}
+										/>
+									)}
+									{selectedActionBarIcon === 'envelope' && (
+										<DashboardResponsesWidget
+											enabled={isSignedIn === true}
+											mockState={responsesMockState}
+										/>
+									)}
 								</div>
 							</div>
-						</div>,
-						document.body
-					)}
-			</div>
+						)}
+
+						{campaignsDebugEnabled && (
+							<CampaignsTableDebugPanel
+								value={campaignsMockState}
+								onChange={setCampaignsMockState}
+							/>
+						)}
+
+						{calendarDebugEnabled && (
+							<DashboardCalendarDebugPanel
+								value={calendarMockState}
+								onChange={setCalendarMockState}
+							/>
+						)}
+
+						{opportunitiesDebugEnabled && (
+							<DashboardOpportunitiesDebugPanel
+								value={opportunitiesMockState}
+								onChange={setOpportunitiesMockState}
+							/>
+						)}
+
+						{inboxDebugEnabled && (
+							<DashboardResponsesDebugPanel
+								value={responsesMockState}
+								onChange={setResponsesMockState}
+							/>
+						)}
+
+						{/* Sign-up overlay for "from home" mode when user is not authenticated */}
+						{/* Shows after 3 seconds so user can see the map and placeholders first */}
+						{fromHomeParam &&
+							isAuthLoaded &&
+							isSignedIn === false &&
+							showFromHomeSignUp &&
+							typeof window !== 'undefined' &&
+							createPortal(
+								<div className="fixed inset-0 z-[10000] flex items-center justify-center">
+									<SignUp
+										appearance={{
+											elements: {
+												rootBox: 'w-full max-w-[420px] mx-4',
+												cardBox: { boxShadow: 'none' },
+												card: {
+													boxShadow: 'none',
+													borderRadius: '16px',
+												},
+												formButtonPrimary:
+													'bg-black hover:bg-gray-800 text-sm normal-case',
+												socialButtonsBlockButton:
+													'border border-gray-300 hover:bg-gray-50',
+												dividerLine: 'bg-gray-200',
+												dividerText: 'text-gray-500',
+												formFieldLabel: 'text-gray-700',
+												formFieldInput:
+													'border-gray-300 focus:border-black focus:ring-black',
+												footerActionLink: 'text-black hover:text-gray-700',
+											},
+										}}
+										routing="hash"
+										forceRedirectUrl={`${urls.murmur.dashboard.index}?fromHome=true`}
+										signInUrl={`/sign-in?redirect_url=${encodeURIComponent(`${urls.murmur.dashboard.index}?fromHome=true`)}`}
+										signInForceRedirectUrl={`${urls.murmur.dashboard.index}?fromHome=true`}
+									/>
+								</div>,
+								document.body
+							)}
+
+						{/* Free trial prompt for "from home" mode when user is authenticated but has no subscription (after 15s) */}
+						{isFreeTrialPromptVisible &&
+							typeof window !== 'undefined' &&
+							createPortal(
+								<div className="fixed inset-0 z-[10000] flex items-center justify-center">
+									<div
+										className="flex flex-col items-center rounded-[16px] pointer-events-auto py-8 px-8"
+										style={{
+											backgroundColor: '#6FCF84',
+											border: '3px solid #000000',
+										}}
+									>
+										<button
+											type="button"
+											onClick={handleStartFreeTrial}
+											className="font-semibold text-white rounded-[8px] cursor-pointer hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed"
+											style={{
+												width: '475px',
+												height: '56px',
+												backgroundColor: '#1D942E',
+												border: '3px solid #000000',
+											}}
+										>
+											Start Your Free Trial
+										</button>
+										<div
+											className="flex flex-col items-center justify-center text-center mt-5"
+											style={{
+												fontFamily: '"Times New Roman", Times, serif',
+											}}
+										>
+											<p className="text-lg italic text-black mb-1">
+												&quot;You miss 100% of the shots you don&apos;t take&quot;
+											</p>
+											<p className="text-sm text-black">-Wayne Gretzky</p>
+										</div>
+									</div>
+								</div>,
+								document.body
+							)}
+					</div>
 				</AppLayout>
 			</div>
-
 		</>
 	);
 };
 
 const Dashboard = () => {
 	return (
-		<Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+		<Suspense
+			fallback={
+				<div className="flex items-center justify-center min-h-screen">Loading...</div>
+			}
+		>
 			<DashboardContent />
 		</Suspense>
 	);

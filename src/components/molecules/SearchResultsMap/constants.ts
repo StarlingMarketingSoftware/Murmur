@@ -695,6 +695,8 @@ export const MAPBOX_LAYER_IDS = {
 	markersAllHit: 'murmur-markers-all-hit',
 	markersAllGlow: 'murmur-markers-all-glow',
 	markersAllDots: 'murmur-markers-all-dots',
+	markersAllFallbackIcons: 'murmur-markers-all-fallback-icons',
+	markersAllFallbackIconsHover: 'murmur-markers-all-fallback-icons-hover',
 	promotionPinHit: 'murmur-promo-pin-hit',
 	promotionPinIcons: 'murmur-promo-pin-icons',
 	promotionPinIconsHover: 'murmur-promo-pin-icons-hover',
@@ -957,6 +959,17 @@ export const ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM = 18;
 export const ALL_CONTACTS_OVERLAY_LIMIT = 2000;
 export const ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR = '#9CA3AF';
 export const ALL_CONTACTS_OVERLAY_TOOLTIP_FILL_COLOR = '#6B7280';
+
+// Disengaged-search ambient atlas: a browse layer for the empty-map state.
+// It starts at North-America/globe zoom and ramps toward a 500-on-screen target
+// without reusing the active search result markers.
+export const AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM = 2.6;
+export const AMBIENT_CONTACTS_OVERLAY_MARKERS_FULL_ZOOM = 5.05;
+export const AMBIENT_CONTACTS_OVERLAY_MIN_DOTS = 180;
+export const AMBIENT_CONTACTS_OVERLAY_TARGET_DOTS = MAX_TOTAL_DOTS;
+export const AMBIENT_CONTACTS_OVERLAY_BUFFER_DOTS = 420;
+export const AMBIENT_CONTACTS_OVERLAY_LIMIT = 1800;
+export const AMBIENT_CONTACTS_UNCATEGORIZED_FILL_COLOR = '#5BB6DD';
 
 export const BOOKING_EXTRA_TITLE_PREFIXES = BOOKING_CONTACT_TITLE_PREFIXES;
 

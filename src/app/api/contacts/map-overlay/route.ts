@@ -19,12 +19,15 @@ import {
 export const maxDuration = 60;
 
 const mapOverlaySchema = z.object({
-	mode: z.enum(['booking', 'promotion', 'all']).optional().default('booking'),
+	mode: z.enum(['booking', 'promotion', 'all', 'ambient']).optional().default('booking'),
 	south: z.coerce.number(),
 	west: z.coerce.number(),
 	north: z.coerce.number(),
 	east: z.coerce.number(),
 	limit: z.coerce.number().optional(),
+	zoom: z.coerce.number().optional(),
+	seed: z.string().optional(),
+	phase: z.enum(['visible', 'buffer']).optional(),
 });
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
@@ -32,6 +35,37 @@ const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(ma
 const DEFAULT_LIMIT = 1200;
 const MAX_LIMIT = 2000;
 const MAP_OVERLAY_QUERY_TIMEOUT_MS = 18000;
+
+type AmbientOverlayContactRow = {
+	id: number;
+	email: string;
+	company: string | null;
+	country: string | null;
+	phone: string | null;
+	state: string | null;
+	website: string | null;
+	address: string | null;
+	city: string | null;
+	firstName: string | null;
+	headline: string | null;
+	lastName: string | null;
+	linkedInUrl: string | null;
+	photoUrl: string | null;
+	title: string | null;
+	metadata: string | null;
+	latitude: number | null;
+	longitude: number | null;
+	name: string | null;
+};
+
+const hashSeedToPositiveInt = (value: string): number => {
+	let hash = 2166136261;
+	for (let i = 0; i < value.length; i += 1) {
+		hash ^= value.charCodeAt(i);
+		hash = Math.imul(hash, 16777619);
+	}
+	return (hash >>> 0) % 2147483647;
+};
 
 const withOverlayBudgetFallback = async <T,>(
 	operation: () => Promise<T>,
@@ -75,6 +109,19 @@ const MAX_LNG_SPAN_DEG_PROMOTION = 360;
 // accidentally querying dense regions at once.
 const MAX_LAT_SPAN_DEG_ALL = 3;
 const MAX_LNG_SPAN_DEG_ALL = 3;
+// Ambient mode is intentionally regional: it powers the disengaged-map atlas at moderate zoom.
+// Keep it wide enough for farther-out multi-state screens but bounded enough for indexed bbox queries.
+const MAX_LAT_SPAN_DEG_AMBIENT = 110;
+const MAX_LNG_SPAN_DEG_AMBIENT = 240;
+
+const getAmbientGridSize = (zoom: number | undefined, latSpan: number, lngSpan: number) => {
+	const safeZoom = Number.isFinite(zoom) ? zoom! : 6;
+	const aspect = lngSpan > 0 && latSpan > 0 ? clamp(lngSpan / latSpan, 0.8, 2.8) : 1.7;
+	const baseCols = safeZoom < 6.25 ? 26 : safeZoom < 8 ? 32 : 40;
+	const cols = Math.max(12, Math.min(54, Math.round(baseCols * Math.sqrt(aspect / 1.7))));
+	const rows = Math.max(8, Math.min(36, Math.round(cols / aspect)));
+	return { cols, rows };
+};
 
 export async function GET(req: NextRequest) {
 	try {
@@ -103,7 +150,7 @@ export async function GET(req: NextRequest) {
 			return apiBadRequest(validated.error);
 		}
 
-		const { mode, south, west, north, east, limit } = validated.data;
+		const { mode, south, west, north, east, limit, zoom, seed, phase } = validated.data;
 		if (![south, west, north, east].every((n) => Number.isFinite(n))) {
 			return apiBadRequest('Invalid bounds');
 		}
@@ -121,23 +168,120 @@ export async function GET(req: NextRequest) {
 
 		const latSpan = maxLat - minLat;
 		const lngSpan = maxLng - minLng;
+		if (latSpan <= 0 || lngSpan <= 0) {
+			return apiBadRequest('Invalid bounds');
+		}
 		const maxLatSpan =
 			mode === 'promotion'
 				? MAX_LAT_SPAN_DEG_PROMOTION
-				: mode === 'all'
-					? MAX_LAT_SPAN_DEG_ALL
-					: MAX_LAT_SPAN_DEG_BOOKING;
+				: mode === 'ambient'
+					? MAX_LAT_SPAN_DEG_AMBIENT
+					: mode === 'all'
+						? MAX_LAT_SPAN_DEG_ALL
+						: MAX_LAT_SPAN_DEG_BOOKING;
 		const maxLngSpan =
 			mode === 'promotion'
 				? MAX_LNG_SPAN_DEG_PROMOTION
-				: mode === 'all'
-					? MAX_LNG_SPAN_DEG_ALL
-					: MAX_LNG_SPAN_DEG_BOOKING;
+				: mode === 'ambient'
+					? MAX_LNG_SPAN_DEG_AMBIENT
+					: mode === 'all'
+						? MAX_LNG_SPAN_DEG_ALL
+						: MAX_LNG_SPAN_DEG_BOOKING;
 		if (latSpan > maxLatSpan || lngSpan > maxLngSpan) {
 			return apiBadRequest('Viewport too large; zoom in to load overlay markers');
 		}
 
 		const take = Math.max(1, Math.min(limit ?? DEFAULT_LIMIT, MAX_LIMIT));
+
+		if (mode === 'ambient') {
+			const ambientSeed = (seed ?? '').trim() || `${minLat},${minLng},${maxLat},${maxLng}`;
+			const seedHash = hashSeedToPositiveInt(ambientSeed);
+			const { cols, rows } = getAmbientGridSize(zoom, latSpan, lngSpan);
+			const ambientTake = Math.min(take, phase === 'visible' ? 760 : MAX_LIMIT);
+			const perCellCategory = Math.max(
+				1,
+				Math.min(4, Math.ceil((ambientTake * 1.4) / Math.max(1, cols * rows)))
+			);
+
+			const contacts = await withOverlayBudgetFallback(
+				() =>
+					prisma.$queryRaw<AmbientOverlayContactRow[]>(Prisma.sql`
+						WITH ranked AS (
+							SELECT
+								"id",
+								"email",
+								"company",
+								"country",
+								"phone",
+								"state",
+								"website",
+								"address",
+								"city",
+								"firstName",
+								"headline",
+								"lastName",
+								"linkedInUrl",
+								"photoUrl",
+								"title",
+								"metadata",
+								"latitude",
+								"longitude",
+								NULLIF(TRIM(CONCAT_WS(' ', NULLIF("firstName", ''), NULLIF("lastName", ''))), '') AS "name",
+								ROW_NUMBER() OVER (
+									PARTITION BY
+										FLOOR((("longitude" - ${minLng}) / ${lngSpan}) * ${cols}),
+										FLOOR((("latitude" - ${minLat}) / ${latSpan}) * ${rows}),
+										CASE
+											WHEN "title" ILIKE 'Radio Stations%' OR "title" ILIKE 'College Radio%' THEN 'radio'
+											WHEN "title" ILIKE 'Wedding Planners%' OR "title" ILIKE 'Wedding Venues%' THEN 'wedding'
+											WHEN "title" ILIKE 'Coffee Shops%' THEN 'coffee'
+											WHEN "title" ILIKE 'Music Festivals%' THEN 'festival'
+											WHEN "title" ILIKE 'Breweries%' OR "title" ILIKE 'Distilleries%' OR "title" ILIKE 'Wineries%' OR "title" ILIKE 'Cideries%' THEN 'winebeer'
+											WHEN "title" ILIKE 'Music Venues%' THEN 'venue'
+											WHEN "title" ILIKE 'Restaurants%' THEN 'restaurant'
+											ELSE 'general'
+										END
+									ORDER BY (("id"::bigint * 1103515245 + ${seedHash}) % 2147483647)
+								) AS rn,
+								(("id"::bigint * 1103515245 + ${seedHash}) % 2147483647) AS stable_key
+							FROM "Contact"
+							WHERE "latitude" IS NOT NULL
+								AND "longitude" IS NOT NULL
+								AND "latitude" >= ${minLat}
+								AND "latitude" <= ${maxLat}
+								AND "longitude" >= ${minLng}
+								AND "longitude" <= ${maxLng}
+						)
+						SELECT
+							"id",
+							"email",
+							"company",
+							"country",
+							"phone",
+							"state",
+							"website",
+							"address",
+							"city",
+							"firstName",
+							"headline",
+							"lastName",
+							"linkedInUrl",
+							"photoUrl",
+							"title",
+							"metadata",
+							"latitude",
+							"longitude",
+							"name"
+						FROM ranked
+						WHERE rn <= ${perCellCategory}
+						ORDER BY rn ASC, stable_key ASC
+						LIMIT ${ambientTake}
+					`),
+				[],
+				`ambient ${phase ?? 'buffer'} overlay query`
+			);
+			return apiResponse(contacts);
+		}
 
 		const bboxWhere: Prisma.ContactWhereInput = {
 			latitude: { gte: minLat, lte: maxLat },

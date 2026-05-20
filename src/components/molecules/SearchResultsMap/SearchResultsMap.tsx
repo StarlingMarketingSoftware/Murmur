@@ -94,6 +94,13 @@ import {
 	ALL_CONTACTS_OVERLAY_LIMIT,
 	ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM,
 	ALL_CONTACTS_OVERLAY_TOOLTIP_FILL_COLOR,
+	AMBIENT_CONTACTS_OVERLAY_BUFFER_DOTS,
+	AMBIENT_CONTACTS_OVERLAY_LIMIT,
+	AMBIENT_CONTACTS_OVERLAY_MARKERS_FULL_ZOOM,
+	AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM,
+	AMBIENT_CONTACTS_OVERLAY_MIN_DOTS,
+	AMBIENT_CONTACTS_OVERLAY_TARGET_DOTS,
+	AMBIENT_CONTACTS_UNCATEGORIZED_FILL_COLOR,
 	AUTO_FIT_CONTACTS_MAX_ZOOM,
 	AUTO_FIT_STATE_MAX_ZOOM,
 	BOOKING_EXTRA_MARKERS_MAX_DOTS,
@@ -346,10 +353,7 @@ import {
 	normalizeLngDeg,
 	smoothstep,
 } from './math';
-import {
-	hashStringToStableKey,
-	washOutHexColor,
-} from './color';
+import { hashStringToStableKey, washOutHexColor } from './color';
 import {
 	computeGlobeFrontHemisphereOpacity,
 	coordinateKey,
@@ -498,6 +502,44 @@ export {
 	DASHBOARD_TO_INTERACTIVE_TRANSITION_MS,
 } from './constants';
 
+const EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_X_PX = 112;
+const EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_TOP_PX = 48;
+const EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_BOTTOM_PX = 24;
+
+type AllContactsOverlayFetchMode = 'all' | 'ambient';
+type AllContactsOverlayFetchPhase = 'visible' | 'buffer';
+type AllContactsOverlayFetchBbox = BoundingBox & {
+	mode: AllContactsOverlayFetchMode;
+	phase: AllContactsOverlayFetchPhase;
+	zoom: number;
+	seed: string;
+};
+
+const AMBIENT_CONTACT_CATEGORY_TITLE_PREFIXES: readonly (readonly string[])[] = [
+	['Radio Stations', 'College Radio'],
+	['Wedding Planners', 'Wedding Venues'],
+	['Coffee Shops'],
+	['Music Festivals'],
+	['Breweries', 'Distilleries', 'Wineries', 'Cideries'],
+	['Music Venues'],
+	['Restaurants'],
+] as const;
+
+const getAmbientContactCategoryIndexFromTitle = (
+	title: string | null | undefined
+): number => {
+	if (!title) return -1;
+	for (let i = 0; i < AMBIENT_CONTACT_CATEGORY_TITLE_PREFIXES.length; i += 1) {
+		for (const prefix of AMBIENT_CONTACT_CATEGORY_TITLE_PREFIXES[i]) {
+			if (startsWithCaseInsensitive(title, prefix)) return i;
+		}
+	}
+	return -1;
+};
+
+const getAmbientContactWhatFromTitle = (title: string | null | undefined): string | null =>
+	getBookingTitlePrefixFromContactTitle(title) ?? getPromotionOverlayWhatFromContactTitle(title);
+
 export interface SearchResultsMapProps {
 	contacts: ContactWithName[];
 	selectedContacts: number[];
@@ -507,6 +549,21 @@ export interface SearchResultsMapProps {
 	searchQuery?: string | null;
 	/** Used to color the default (unselected) result dots by the active "What" search value. */
 	searchWhat?: string | null;
+	/** When false, keeps contacts/results available but hides search-specific geography (blobs/outlines/locked areas). */
+	searchEngaged?: boolean;
+	/** When true, renders a browse-oriented all-contact atlas while search results are visually disengaged. */
+	ambientContactsEnabled?: boolean;
+	/** When true, warms the ambient atlas cache before the user disengages the search. */
+	ambientContactsPreloadEnabled?: boolean;
+	/** Per-category ambient visibility, ordered like the map grab-category stack. */
+	ambientActiveCategories?: readonly boolean[];
+	/** Ambient visibility for contacts that do not map to a known category. */
+	ambientUncategorizedActive?: boolean;
+	/** Increment to ask the map to refit to the active search without changing the query/results. */
+	autoFitRequestNonce?: number;
+	/** Empty-map hover prompt. When present, an empty map click calls `onEmptyMapClick`. */
+	emptyMapClickPrompt?: string | null;
+	onEmptyMapClick?: () => void;
 	/** When set, shows a persistent outline of the selected search area. */
 	selectedAreaBounds?: MapSelectionBounds | null;
 	/**
@@ -608,6 +665,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	externallyHoveredContactId,
 	searchQuery,
 	searchWhat,
+	searchEngaged = true,
+	ambientContactsEnabled = false,
+	ambientContactsPreloadEnabled = false,
+	ambientActiveCategories,
+	ambientUncategorizedActive = true,
+	autoFitRequestNonce = 0,
+	emptyMapClickPrompt = null,
+	onEmptyMapClick,
 	selectedAreaBounds,
 	onViewportInteraction,
 	onViewportZoom,
@@ -709,9 +774,52 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const sunTransitionPhaseEndMs = nightLighting?.phaseEndMs ?? null;
 	const isBackgroundPresentation = presentation === 'background';
 	const shouldAutoSpin = isBackgroundPresentation && autoSpin;
+	const emptyMapPromptText = (emptyMapClickPrompt ?? '').trim();
+	const emptyMapPromptEnabled = Boolean(
+		emptyMapPromptText && onEmptyMapClick && !isBackgroundPresentation && !isLoading
+	);
+	const [emptyMapPromptPoint, setEmptyMapPromptPoint] = useState<{
+		x: number;
+		y: number;
+	} | null>(null);
+	const emptyMapPointerDownClientRef = useRef<{ x: number; y: number } | null>(null);
 	// Keep the latest presentation value available to async Mapbox callbacks (moveend, etc).
 	const presentationRef = useRef<'background' | 'interactive'>(presentation);
 	presentationRef.current = presentation;
+
+	const clearEmptyMapPrompt = useCallback(() => {
+		setEmptyMapPromptPoint(null);
+	}, []);
+
+	const scheduleEmptyMapPrompt = useCallback(
+		(point: { x: number; y: number }) => {
+			if (!emptyMapPromptEnabled) {
+				clearEmptyMapPrompt();
+				return;
+			}
+
+			const width = typeof window !== 'undefined' ? window.innerWidth : 0;
+			const height = typeof window !== 'undefined' ? window.innerHeight : 0;
+			const minX = EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_X_PX;
+			const maxX = width > 0 ? Math.max(minX, width - minX) : point.x;
+			const minY = EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_TOP_PX;
+			const maxY =
+				height > 0
+					? Math.max(minY, height - EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_BOTTOM_PX)
+					: point.y;
+			const nextPoint = {
+				x: width > 0 ? clamp(point.x, minX, maxX) : point.x,
+				y: height > 0 ? clamp(point.y, minY, maxY) : point.y,
+			};
+
+			setEmptyMapPromptPoint(nextPoint);
+		},
+		[clearEmptyMapPrompt, emptyMapPromptEnabled]
+	);
+
+	useEffect(() => {
+		if (!emptyMapPromptEnabled) clearEmptyMapPrompt();
+	}, [clearEmptyMapPrompt, emptyMapPromptEnabled]);
 
 	// Default to enabling state hover/click (hover highlight + click-to-search) when a handler is
 	// provided, so callers don't have to pass an explicit `enableStateInteractions` flag.
@@ -800,7 +908,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const snowStampLoadPromiseRef = useRef<Promise<HTMLImageElement[]> | null>(null);
 	const snowParticlesRef = useRef<SnowParticle[] | null>(null);
 	const cloudsSnowInteractionScratchCanvasRef = useRef<HTMLCanvasElement | null>(null);
-	const cloudsSnowInteractionScratchCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+	const cloudsSnowInteractionScratchCtxRef = useRef<CanvasRenderingContext2D | null>(
+		null
+	);
 	const cloudsSnowInteractionThinStampRef = useRef<HTMLCanvasElement | null>(null);
 	const cloudsSnowInteractionGlowStampRef = useRef<HTMLCanvasElement | null>(null);
 	const prevIsBackgroundPresentationRef = useRef<boolean>(isBackgroundPresentation);
@@ -899,14 +1009,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [promotionOverlayFetchBbox, setPromotionOverlayFetchBbox] =
 		useState<BoundingBox | null>(null);
 
-	// High-zoom "all contacts" overlay (gray dots)
+	// High-zoom "all contacts" overlay plus disengaged ambient atlas.
 	const [allContactsOverlayVisibleContacts, setAllContactsOverlayVisibleContacts] =
 		useState<ContactWithName[]>([]);
 	const allContactsOverlayVisibleIdSetRef = useRef<Set<number>>(new Set());
 	const lastAllContactsOverlayVisibleContactsKeyRef = useRef<string>('');
-	const lastAllContactsOverlayFetchKeyRef = useRef<string>('');
+	const lastAllContactsOverlayVisibleFetchKeyRef = useRef<string>('');
+	const lastAllContactsOverlayBufferFetchKeyRef = useRef<string>('');
 	const [allContactsOverlayFetchBbox, setAllContactsOverlayFetchBbox] =
-		useState<BoundingBox | null>(null);
+		useState<AllContactsOverlayFetchBbox | null>(null);
+	const [allContactsOverlayBufferFetchBbox, setAllContactsOverlayBufferFetchBbox] =
+		useState<AllContactsOverlayFetchBbox | null>(null);
+	const allContactsOverlayLandMaskByIdRef = useRef<Map<number, boolean>>(new Map());
 	// Rectangle selection state (dashboard map select tool)
 	const [isAreaSelecting, setIsAreaSelecting] = useState(false);
 	const selectionStartLatLngRef = useRef<LatLngLiteral | null>(null);
@@ -960,9 +1074,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const curatedOrbEllipseRefs = useRef<Array<SVGEllipseElement | null>>([]);
 	const curatedOrbBloomEllipseRefs = useRef<Array<SVGEllipseElement | null>>([]);
 	const curatedOrbGradientRefs = useRef<Array<SVGRadialGradientElement | null>>([]);
-	const curatedOrbBloomGradientRefs = useRef<
-		Array<SVGRadialGradientElement | null>
-	>([]);
+	const curatedOrbBloomGradientRefs = useRef<Array<SVGRadialGradientElement | null>>([]);
 	const curatedOrbClipPathRefs = useRef<Array<SVGPathElement | null>>([]);
 	const selectedStateGradientSvgRef = useRef<SVGSVGElement | null>(null);
 	const selectedStateGradientEllipseRef = useRef<SVGEllipseElement | null>(null);
@@ -1035,7 +1147,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		} catch {
 			// Non-fatal; map may be mid-teardown.
 		}
-	}, [map, isMapLoaded, isBackgroundPresentation, cameraPadding?.top, cameraPadding?.right, cameraPadding?.bottom, cameraPadding?.left]);
+	}, [
+		map,
+		isMapLoaded,
+		isBackgroundPresentation,
+		cameraPadding?.top,
+		cameraPadding?.right,
+		cameraPadding?.bottom,
+		cameraPadding?.left,
+	]);
 
 	const syncUsOnlyBasemapCartography = useCallback(
 		(mapInstance: mapboxgl.Map | null) => {
@@ -1109,6 +1229,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const isBookingSearch = searchMode === 'booking';
 	const isPromotionSearch = searchMode === 'promotion';
 	const isAnySearch = useMemo(() => Boolean((searchQuery ?? '').trim()), [searchQuery]);
+	const isAmbientContactsEnabled = ambientContactsEnabled && !isBackgroundPresentation;
+	const shouldFetchAmbientContacts =
+		(ambientContactsEnabled || ambientContactsPreloadEnabled) && !isBackgroundPresentation;
 	const onViewportInteractionRef = useRef<
 		SearchResultsMapProps['onViewportInteraction'] | null
 	>(null);
@@ -1168,8 +1291,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		setPromotionOverlayFetchBbox(null);
 		lastPromotionOverlayVisibleContactsKeyRef.current = '';
 		setPromotionOverlayVisibleContacts([]);
-		lastAllContactsOverlayFetchKeyRef.current = '';
+		lastAllContactsOverlayVisibleFetchKeyRef.current = '';
+		lastAllContactsOverlayBufferFetchKeyRef.current = '';
 		setAllContactsOverlayFetchBbox(null);
+		setAllContactsOverlayBufferFetchBbox(null);
 		lastAllContactsOverlayVisibleContactsKeyRef.current = '';
 		setAllContactsOverlayVisibleContacts([]);
 	}, [searchQuery]);
@@ -1510,23 +1635,38 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const updateAllContactsOverlayFetchBbox = useCallback(
 		(mapInstance: mapboxgl.Map | null) => {
 			if (!mapInstance) return;
-
-			// Only run when an explicit search is active (avoid loading the entire dataset in non-search views).
-			if (!isAnySearch) {
-				if (lastAllContactsOverlayFetchKeyRef.current !== '') {
-					lastAllContactsOverlayFetchKeyRef.current = '';
+			const clearAllContactsFetchWindows = () => {
+				if (
+					lastAllContactsOverlayVisibleFetchKeyRef.current !== '' ||
+					lastAllContactsOverlayBufferFetchKeyRef.current !== ''
+				) {
+					lastAllContactsOverlayVisibleFetchKeyRef.current = '';
+					lastAllContactsOverlayBufferFetchKeyRef.current = '';
 					setAllContactsOverlayFetchBbox(null);
+					setAllContactsOverlayBufferFetchBbox(null);
 				}
+			};
+
+			// Search mode uses the close-zoom "all contacts" overlay. Disengaged mode uses
+			// the regional ambient atlas. We also preload ambient while the empty-map prompt
+			// is available so disengaging can render from cache immediately.
+			const overlayMode: AllContactsOverlayFetchMode | null = shouldFetchAmbientContacts
+				? 'ambient'
+				: isAnySearch
+					? 'all'
+					: null;
+			if (!overlayMode) {
+				clearAllContactsFetchWindows();
 				return;
 			}
 
 			const zoomRaw = mapInstance.getZoom() ?? 4;
-			// Only fetch/render the gray-dot overlay when zoomed in very close.
-			if (zoomRaw < ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM) {
-				if (lastAllContactsOverlayFetchKeyRef.current !== '') {
-					lastAllContactsOverlayFetchKeyRef.current = '';
-					setAllContactsOverlayFetchBbox(null);
-				}
+			const minZoom =
+				overlayMode === 'ambient'
+					? AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM
+					: ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM;
+			if (zoomRaw < minZoom) {
+				clearAllContactsFetchWindows();
 				return;
 			}
 
@@ -1542,11 +1682,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Skip antimeridian-crossing viewports (not relevant for our UI).
 			if (east < west) return;
 
-			// Light padding to avoid refetching on small pans.
+			// The visible window is intentionally unpadded in ambient mode so the first
+			// request returns quickly. The padded buffer follows as a separate background
+			// request and merges without clearing the visible chunk.
 			const latSpan = north - south;
 			const lngSpan = east - west;
-			const padLat = latSpan * 0.2;
-			const padLng = lngSpan * 0.2;
+			const padFactor = overlayMode === 'ambient' ? 0.42 : 0.2;
+			const padLat = latSpan * padFactor;
+			const padLng = lngSpan * padFactor;
 
 			const paddedSouth = clamp(south - padLat, -90, 90);
 			const paddedWest = clamp(west - padLng, -180, 180);
@@ -1556,43 +1699,130 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Quantize the fetch window so we don't refetch on tiny pans/zooms.
 			const zoomKey = Math.round(zoomRaw);
 			const quant = getBackgroundDotsQuantizationDeg(zoomKey);
-			const qSouth = Math.floor(paddedSouth / quant) * quant;
-			const qWest = Math.floor(paddedWest / quant) * quant;
-			const qNorth = Math.ceil(paddedNorth / quant) * quant;
-			const qEast = Math.ceil(paddedEast / quant) * quant;
 
-			const nextKey = `${zoomKey}|${qSouth.toFixed(4)}|${qWest.toFixed(4)}|${qNorth.toFixed(
-				4
-			)}|${qEast.toFixed(4)}`;
-			if (nextKey === lastAllContactsOverlayFetchKeyRef.current) return;
+			const buildFetchBbox = (
+				phase: AllContactsOverlayFetchPhase,
+				boundsForPhase: BoundingBox
+			): AllContactsOverlayFetchBbox => {
+				const phaseQuant =
+					overlayMode === 'ambient' && phase === 'visible'
+						? Math.max(0.05, quant * 0.5)
+						: quant;
+				const qSouth = Math.floor(boundsForPhase.minLat / phaseQuant) * phaseQuant;
+				const qWest = Math.floor(boundsForPhase.minLng / phaseQuant) * phaseQuant;
+				const qNorth = Math.ceil(boundsForPhase.maxLat / phaseQuant) * phaseQuant;
+				const qEast = Math.ceil(boundsForPhase.maxLng / phaseQuant) * phaseQuant;
+				const seed = `${overlayMode}|${phase}|${zoomKey}|${qSouth.toFixed(4)}|${qWest.toFixed(4)}|${qNorth.toFixed(4)}|${qEast.toFixed(4)}`;
+				return {
+					minLat: qSouth,
+					minLng: qWest,
+					maxLat: qNorth,
+					maxLng: qEast,
+					mode: overlayMode,
+					phase,
+					zoom: zoomRaw,
+					seed,
+				};
+			};
 
-			lastAllContactsOverlayFetchKeyRef.current = nextKey;
-			setAllContactsOverlayFetchBbox({
-				minLat: qSouth,
-				minLng: qWest,
-				maxLat: qNorth,
-				maxLng: qEast,
+			const visibleFetchBbox = buildFetchBbox('visible', {
+				minLat: overlayMode === 'ambient' ? south : paddedSouth,
+				minLng: overlayMode === 'ambient' ? west : paddedWest,
+				maxLat: overlayMode === 'ambient' ? north : paddedNorth,
+				maxLng: overlayMode === 'ambient' ? east : paddedEast,
 			});
+
+			if (visibleFetchBbox.seed !== lastAllContactsOverlayVisibleFetchKeyRef.current) {
+				lastAllContactsOverlayVisibleFetchKeyRef.current = visibleFetchBbox.seed;
+				setAllContactsOverlayFetchBbox(visibleFetchBbox);
+			}
+
+			if (overlayMode !== 'ambient') {
+				if (lastAllContactsOverlayBufferFetchKeyRef.current !== '') {
+					lastAllContactsOverlayBufferFetchKeyRef.current = '';
+					setAllContactsOverlayBufferFetchBbox(null);
+				}
+				return;
+			}
+
+			const bufferFetchBbox = buildFetchBbox('buffer', {
+				minLat: paddedSouth,
+				minLng: paddedWest,
+				maxLat: paddedNorth,
+				maxLng: paddedEast,
+			});
+
+			if (bufferFetchBbox.seed !== lastAllContactsOverlayBufferFetchKeyRef.current) {
+				lastAllContactsOverlayBufferFetchKeyRef.current = bufferFetchBbox.seed;
+				setAllContactsOverlayBufferFetchBbox(bufferFetchBbox);
+			}
 		},
-		[isAnySearch]
+		[isAnySearch, shouldFetchAmbientContacts]
 	);
 
 	const allContactsOverlayFilters = useMemo(() => {
 		if (!allContactsOverlayFetchBbox) return undefined;
+		const isAmbient = allContactsOverlayFetchBbox.mode === 'ambient';
 		return {
-			mode: 'all' as const,
+			mode: allContactsOverlayFetchBbox.mode,
 			south: allContactsOverlayFetchBbox.minLat,
 			west: allContactsOverlayFetchBbox.minLng,
 			north: allContactsOverlayFetchBbox.maxLat,
 			east: allContactsOverlayFetchBbox.maxLng,
-			limit: ALL_CONTACTS_OVERLAY_LIMIT,
+			limit: isAmbient ? 760 : ALL_CONTACTS_OVERLAY_LIMIT,
+			zoom: allContactsOverlayFetchBbox.zoom,
+			seed: allContactsOverlayFetchBbox.seed,
+			phase: allContactsOverlayFetchBbox.phase,
 		};
 	}, [allContactsOverlayFetchBbox]);
 
-	const { data: allContactsOverlayRawContacts } = useGetContactsMapOverlay({
+	const allContactsOverlayBufferFilters = useMemo(() => {
+		if (!allContactsOverlayBufferFetchBbox) return undefined;
+		return {
+			mode: allContactsOverlayBufferFetchBbox.mode,
+			south: allContactsOverlayBufferFetchBbox.minLat,
+			west: allContactsOverlayBufferFetchBbox.minLng,
+			north: allContactsOverlayBufferFetchBbox.maxLat,
+			east: allContactsOverlayBufferFetchBbox.maxLng,
+			limit: AMBIENT_CONTACTS_OVERLAY_LIMIT,
+			zoom: allContactsOverlayBufferFetchBbox.zoom,
+			seed: allContactsOverlayBufferFetchBbox.seed,
+			phase: allContactsOverlayBufferFetchBbox.phase,
+		};
+	}, [allContactsOverlayBufferFetchBbox]);
+
+	const { data: allContactsOverlayVisibleRawContacts } = useGetContactsMapOverlay({
 		filters: allContactsOverlayFilters,
 		enabled: Boolean(allContactsOverlayFilters),
 	});
+	const { data: allContactsOverlayBufferRawContacts } = useGetContactsMapOverlay({
+		filters: allContactsOverlayBufferFilters,
+		enabled: Boolean(
+			allContactsOverlayBufferFilters && allContactsOverlayVisibleRawContacts !== undefined
+		),
+	});
+
+	const allContactsOverlayRawContacts = useMemo(() => {
+		const visible = allContactsOverlayFetchBbox
+			? (allContactsOverlayVisibleRawContacts ?? [])
+			: [];
+		const buffer = allContactsOverlayBufferFetchBbox
+			? (allContactsOverlayBufferRawContacts ?? [])
+			: [];
+		if (visible.length === 0) return buffer;
+		if (buffer.length === 0) return visible;
+		const byId = new Map<number, ContactWithName>();
+		for (const contact of visible) byId.set(contact.id, contact);
+		for (const contact of buffer) {
+			if (!byId.has(contact.id)) byId.set(contact.id, contact);
+		}
+		return Array.from(byId.values());
+	}, [
+		allContactsOverlayFetchBbox,
+		allContactsOverlayBufferFetchBbox,
+		allContactsOverlayVisibleRawContacts,
+		allContactsOverlayBufferRawContacts,
+	]);
 
 	const bookingExtraOverlayFilters = useMemo(() => {
 		if (!bookingExtraFetchBbox) return undefined;
@@ -1856,7 +2086,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [map, isMapLoaded]);
 
 	const updateCuratedBlobProtectedMarkerIds = useCallback((ids: Set<number>) => {
-		const key = Array.from(ids).sort((a, b) => a - b).join(',');
+		const key = Array.from(ids)
+			.sort((a, b) => a - b)
+			.join(',');
 		if (key === curatedBlobProtectedMarkerIdsKeyRef.current) return;
 		curatedBlobProtectedMarkerIdsKeyRef.current = key;
 		curatedBlobProtectedMarkerIdsRef.current = ids;
@@ -2294,9 +2526,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		try {
 			const lightningSource: { play?: () => void } | null = (() => {
 				try {
-					return map.getSource(MAPBOX_SOURCE_IDS.lightning) as
-						| { play?: () => void }
-						| null;
+					return map.getSource(MAPBOX_SOURCE_IDS.lightning) as {
+						play?: () => void;
+					} | null;
 				} catch {
 					return null;
 				}
@@ -2309,9 +2541,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		try {
 			const snowSource: { play?: () => void } | null = (() => {
 				try {
-					return map.getSource(MAPBOX_SOURCE_IDS.snow) as
-						| { play?: () => void }
-						| null;
+					return map.getSource(MAPBOX_SOURCE_IDS.snow) as { play?: () => void } | null;
 				} catch {
 					return null;
 				}
@@ -2702,7 +2932,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					x: point.x,
 					y: point.y,
 					weight: 0.55 + (point.alpha / 255) * 1.35 + Math.random() * 0.35,
-					radiusPx: lerp(LIGHTNING_CELL_RADIUS_GLOBE_PX * 0.7, LIGHTNING_CELL_RADIUS_GLOBE_PX * 1.4, Math.random()),
+					radiusPx: lerp(
+						LIGHTNING_CELL_RADIUS_GLOBE_PX * 0.7,
+						LIGHTNING_CELL_RADIUS_GLOBE_PX * 1.4,
+						Math.random()
+					),
 				});
 			}
 
@@ -2771,8 +3005,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const lngLat = lightningCanvasPointToLngLat(x, y, w, h);
 				if (!lngLat || !isLngLatInLightningUsRegion(lngLat.lng, lngLat.lat)) continue;
 				const alpha = lightningPotentialAlphaAt(
-					(((x / w) * CLOUDS_CANVAS_SIZE_PX) % CLOUDS_CANVAS_SIZE_PX),
-					((y / h) * CLOUDS_CANVAS_SIZE_PX),
+					((x / w) * CLOUDS_CANVAS_SIZE_PX) % CLOUDS_CANVAS_SIZE_PX,
+					(y / h) * CLOUDS_CANVAS_SIZE_PX,
 					CLOUDS_CANVAS_SIZE_PX,
 					CLOUDS_CANVAS_SIZE_PX
 				);
@@ -2864,8 +3098,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const pulses: StormLightningPulse[] = [];
 			for (let p = 0; p < pulseCount; p++) {
 				const offsetMs = p === 0 ? 0 : 82 + p * (62 + Math.random() * 48);
-				const basePeak =
-					kind === 'dramatic' ? 0.78 : kind === 'sheet' ? 0.5 : 0.62;
+				const basePeak = kind === 'dramatic' ? 0.78 : kind === 'sheet' ? 0.5 : 0.62;
 				const peakOpacity = p === 0 ? basePeak : basePeak * (p === 1 ? 0.48 : 0.28);
 				pulses.push({
 					offsetMs,
@@ -2938,10 +3171,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const canSpawnLightning =
 				Boolean(weatherMoodConfigRef.current.lightning) && lightningIntensity > 0.001;
 
-			const enabled =
-				!prefersReducedMotion &&
-				lightningIntensity > 0.001 &&
-				zoomOk;
+			const enabled = !prefersReducedMotion && lightningIntensity > 0.001 && zoomOk;
 
 			if (!enabled) {
 				lightningWasEnabledRef.current = false;
@@ -3103,11 +3333,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				if (a <= 0.001) continue;
 				a = clamp(a * LIGHTNING_OPACITY_MULTIPLIER * lightningIntensity, 0, 0.95);
 				const occlusion = clamp(e.cloudOcclusion, 0, 1);
-				glowA = clamp(
-					glowA * (0.34 + occlusion * 0.38) * lightningIntensity,
-					0,
-					0.86
-				);
+				glowA = clamp(glowA * (0.34 + occlusion * 0.38) * lightningIntensity, 0, 0.86);
 
 				const stamp = stamps[e.stampIndex % stamps.length];
 				const sw = stamp.naturalWidth || stamp.width || 256;
@@ -3176,14 +3402,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 				lightningCtx.shadowBlur = e.kind === 'dramatic' ? 10 : 5;
 				if (e.kind !== 'sheet') {
-					drawStamp(
-						stamp,
-						coreX,
-						coreY,
-						e.glowScale * 0.54,
-						e.rotationRad,
-						glowA * 0.5
-					);
+					drawStamp(stamp, coreX, coreY, e.glowScale * 0.54, e.rotationRad, glowA * 0.5);
 				}
 				try {
 					lightningCtx.filter = 'none';
@@ -3219,8 +3438,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					opacity: lerp(0.22, 0.58, depth) * lerp(0.66, 1.0, hash01(seed + 49.2)),
 					fallSpeed: lerp(0.52, 1.45, depth) * lerp(0.8, 1.16, hash01(seed + 61.5)),
 					windSpeed:
-						lerp(0.18, 0.95, hash01(seed + 73.4)) *
-						(hash01(seed + 83.9) < 0.44 ? -1 : 1),
+						lerp(0.18, 0.95, hash01(seed + 73.4)) * (hash01(seed + 83.9) < 0.44 ? -1 : 1),
 					windSway: lerp(0.45, 1.4, hash01(seed + 89.6)) * lerp(0.72, 1.28, depth),
 					windPhase: hash01(seed + 92.8) * Math.PI * 2,
 					gustResponsiveness:
@@ -3278,7 +3496,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				if (!ctx) return null;
 				const s = CLOUDS_SNOW_INTERACTION_STAMP_SIZE_PX;
 				const [r, g, b] = rgb;
-				const gradient = ctx.createRadialGradient(s * 0.5, s * 0.5, 0, s * 0.5, s * 0.5, s * 0.5);
+				const gradient = ctx.createRadialGradient(
+					s * 0.5,
+					s * 0.5,
+					0,
+					s * 0.5,
+					s * 0.5,
+					s * 0.5
+				);
 				gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 1)`);
 				gradient.addColorStop(0.24, `rgba(${r}, ${g}, ${b}, 0.58)`);
 				gradient.addColorStop(0.62, `rgba(${r}, ${g}, ${b}, 0.16)`);
@@ -3353,11 +3578,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// Ignore.
 			}
 			for (const impact of impacts) {
-				const alpha = clamp(
-					strength * Math.pow(clamp(impact.alpha01, 0, 1), 0.55),
-					0,
-					1
-				);
+				const alpha = clamp(strength * Math.pow(clamp(impact.alpha01, 0, 1), 0.55), 0, 1);
 				const a = alpha * 0.18;
 				if (a <= 0.001) continue;
 
@@ -3410,22 +3631,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// Ignore.
 			}
 			for (const impact of impacts) {
-				const alpha = clamp(
-					strength * Math.pow(clamp(impact.alpha01, 0, 1), 0.55),
-					0,
-					1
-				);
+				const alpha = clamp(strength * Math.pow(clamp(impact.alpha01, 0, 1), 0.55), 0, 1);
 				const a = alpha * 0.56;
 				if (a <= 0.001) continue;
 
 				const cx = impact.x * scaleX;
 				const cy = impact.y * scaleY;
 				const r = clamp(impact.radiusPx * scale, 9, 44);
-				const drift = clamp(
-					Math.tanh((impact.driftXPx * scaleX) / 12) * 1.8,
-					-1.8,
-					1.8
-				);
+				const drift = clamp(Math.tanh((impact.driftXPx * scaleX) / 12) * 1.8, -1.8, 1.8);
 
 				// Trailing vertical column — three staggered stamps so the wake feels
 				// continuous and "snow-shaped" rather than a circular punch.
@@ -3465,11 +3678,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// Ignore.
 			}
 			for (const impact of impacts) {
-				const alpha = clamp(
-					strength * Math.pow(clamp(impact.alpha01, 0, 1), 0.55),
-					0,
-					1
-				);
+				const alpha = clamp(strength * Math.pow(clamp(impact.alpha01, 0, 1), 0.55), 0, 1);
 				const a = alpha * 0.13;
 				if (a <= 0.001) continue;
 
@@ -3534,7 +3743,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const densityScale = prefersReducedMotion ? 0.55 : 1;
 			const visibleCount = Math.min(
 				particles.length,
-				Math.max(0, Math.round(particles.length * clamp(cfg.snowDensity, 0, 1) * densityScale))
+				Math.max(
+					0,
+					Math.round(particles.length * clamp(cfg.snowDensity, 0, 1) * densityScale)
+				)
 			);
 			if (visibleCount <= 0) return;
 
@@ -3557,8 +3769,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const gustT = tMs / SNOW_GUST_BAND_LOOP_MS;
 			const densityT = tMs / SNOW_DENSITY_BAND_LOOP_MS;
 			const wrap = (value: number, span: number, margin: number) =>
-				(((value + margin) % (span + margin * 2)) + span + margin * 2) %
-					(span + margin * 2) -
+				((((value + margin) % (span + margin * 2)) + span + margin * 2) %
+					(span + margin * 2)) -
 				margin;
 
 			snowCtx.save();
@@ -3599,15 +3811,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						(noise1D(turbulenceT * lerp(0.72, 1.55, p.depth) + p.turbulenceSeed) - 0.5) *
 						2;
 					const localDriftB =
-						(noise1D(turbulenceT * lerp(1.35, 2.35, p.depth) + p.gustSeed + 17.3) -
-							0.5) *
+						(noise1D(turbulenceT * lerp(1.35, 2.35, p.depth) + p.gustSeed + 17.3) - 0.5) *
 						2;
 					const gustBand =
-						(noise1D(baseY * 0.0042 + baseX * 0.0014 + gustT * 1.2 + 210.3) - 0.5) *
-						2;
+						(noise1D(baseY * 0.0042 + baseX * 0.0014 + gustT * 1.2 + 210.3) - 0.5) * 2;
 					const gustFine =
-						(noise1D(baseY * 0.011 - baseX * 0.002 + gustT * 2.1 + p.gustSeed) - 0.5) *
-						2;
+						(noise1D(baseY * 0.011 - baseX * 0.002 + gustT * 2.1 + p.gustSeed) - 0.5) * 2;
 					const windSway =
 						Math.sin(
 							tS * lerp(0.42, 0.95, p.depth) +
@@ -3691,7 +3900,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						y >= 0 &&
 						y <= h
 					) {
-						const alpha01 = clamp(flakeAlpha / Math.max(0.001, SNOW_STAMP_MAX_ALPHA), 0, 1);
+						const alpha01 = clamp(
+							flakeAlpha / Math.max(0.001, SNOW_STAMP_MAX_ALPHA),
+							0,
+							1
+						);
 						const radiusPx = clamp(
 							Math.max(drawW, drawH) * (1.25 + p.depth * 1.55),
 							16,
@@ -3809,8 +4022,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					// mid-alpha edges become a light rim so storm clouds are not flat black.
 					const core = Math.pow(smoothstep(0.42, 0.92, a), 1.28);
 					const edge =
-						Math.pow(smoothstep(0.07, 0.34, a), 0.9) *
-						(1 - smoothstep(0.48, 0.86, a));
+						Math.pow(smoothstep(0.07, 0.34, a), 0.9) * (1 - smoothstep(0.48, 0.86, a));
 
 					if (core > 0.002) {
 						const coreNoise = 0.78 + hash01(x * 13.17 + y * 31.73 + 204.9) * 0.22;
@@ -3920,7 +4132,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					edgePixels > 0 ? putStormMaskPattern(edgeCanvas, edgeData, w, h) : null;
 				cloudsTextureStormReadyRef.current = Boolean(
 					cloudsTextureStormCorePatternRef.current ||
-						cloudsTextureStormEdgePatternRef.current
+					cloudsTextureStormEdgePatternRef.current
 				);
 			} catch {
 				cloudsTextureStormReadyRef.current = false;
@@ -4295,11 +4507,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					}
 
 					try {
-						const { coreData, edgeData, corePixels, edgePixels } = buildStormCloudMaskData(
-							groupDatas[g],
-							w,
-							h
-						);
+						const { coreData, edgeData, corePixels, edgePixels } =
+							buildStormCloudMaskData(groupDatas[g], w, h);
 						const coreCanvas = document.createElement('canvas');
 						coreCanvas.width = w;
 						coreCanvas.height = h;
@@ -4671,20 +4880,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 					if (!useGroups) {
 						if (stormEdgePattern) {
-							fillPatternAt(
-								stormEdgePattern,
-								x0,
-								y0,
-								stormEdgeOpacity * baseLayerAlpha
-							);
+							fillPatternAt(stormEdgePattern, x0, y0, stormEdgeOpacity * baseLayerAlpha);
 						}
 						if (stormCorePattern) {
-							fillPatternAt(
-								stormCorePattern,
-								x0,
-								y0,
-								stormCoreOpacity * baseLayerAlpha
-							);
+							fillPatternAt(stormCorePattern, x0, y0, stormCoreOpacity * baseLayerAlpha);
 						}
 					}
 
@@ -4885,9 +5084,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 			try {
 				(
-					map.getSource(MAPBOX_SOURCE_IDS.snow) as
-						| { pause?: () => void }
-						| undefined
+					map.getSource(MAPBOX_SOURCE_IDS.snow) as { pause?: () => void } | undefined
 				)?.pause?.();
 			} catch {
 				// Ignore.
@@ -5117,14 +5314,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				promoteId: 'key',
 			});
 		}
-			ensureSource(MAPBOX_SOURCE_IDS.resultsOutline);
-			ensureSource(MAPBOX_SOURCE_IDS.lockedOutline);
-			ensureSource(MAPBOX_SOURCE_IDS.curatedBlob);
-			ensureSource(MAPBOX_SOURCE_IDS.markerConstellation);
-			ensureSource(MAPBOX_SOURCE_IDS.markerConstellationSelected);
-			ensureSource(MAPBOX_SOURCE_IDS.markerConstellationNodes);
-			ensureSource(MAPBOX_SOURCE_IDS.selectedAreaRect);
-			ensureSource(MAPBOX_SOURCE_IDS.selectionRect);
+		ensureSource(MAPBOX_SOURCE_IDS.resultsOutline);
+		ensureSource(MAPBOX_SOURCE_IDS.lockedOutline);
+		ensureSource(MAPBOX_SOURCE_IDS.curatedBlob);
+		ensureSource(MAPBOX_SOURCE_IDS.markerConstellation);
+		ensureSource(MAPBOX_SOURCE_IDS.markerConstellationSelected);
+		ensureSource(MAPBOX_SOURCE_IDS.markerConstellationNodes);
+		ensureSource(MAPBOX_SOURCE_IDS.selectedAreaRect);
+		ensureSource(MAPBOX_SOURCE_IDS.selectionRect);
 
 		// State label centroids (one point per state — avoids duplicate labels on MultiPolygon states)
 		ensureSource(MAPBOX_SOURCE_IDS.stateLabels);
@@ -5401,41 +5598,54 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			allOverlayRadiusHigh,
 		];
 
-			const allOverlayGlowRadiusExpr = [
-				'interpolate',
-				['linear'],
-				['zoom'],
+		const allOverlayGlowRadiusExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
 			0,
 			RESULT_DOT_GLOW_RADIUS_MIN_PX * 0.82,
 			RESULT_DOT_ZOOM_MIN,
 			RESULT_DOT_GLOW_RADIUS_MIN_PX * 0.82,
 			RESULT_DOT_ZOOM_MAX,
 			RESULT_DOT_GLOW_RADIUS_MAX_PX * 0.82,
-				24,
-				RESULT_DOT_GLOW_RADIUS_MAX_PX * 0.82,
-			];
-			const constellationNodeRadiusExpr = [
-				'interpolate',
-				['linear'],
-				['zoom'],
-				3,
-				2.1,
-				7,
-				2.9,
-				13,
-				4.1,
-			];
-			const constellationNodeGlowRadiusExpr = [
-				'interpolate',
-				['linear'],
-				['zoom'],
-				3,
-				6,
-				7,
-				8,
-				13,
-				11,
-			];
+			24,
+			RESULT_DOT_GLOW_RADIUS_MAX_PX * 0.82,
+		];
+		const allOverlayStarIconSizeExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			0.34,
+			6,
+			0.38,
+			10,
+			0.5,
+			14,
+			0.62,
+		];
+		const constellationNodeRadiusExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			3,
+			2.1,
+			7,
+			2.9,
+			13,
+			4.1,
+		];
+		const constellationNodeGlowRadiusExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			3,
+			6,
+			7,
+			8,
+			13,
+			11,
+		];
 
 		const pinRadiusLow =
 			Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MIN) / 2;
@@ -5610,10 +5820,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current)
 		);
 
-			// Search-results outlines (blue + black) intentionally removed.
+		// Search-results outlines (blue + black) intentionally removed.
 
-			// Curated-search blob body — unioned regional circle-lobes, behind all dot/pin layers.
-			ensureLayer(
+		// Curated-search blob body — unioned regional circle-lobes, behind all dot/pin layers.
+		ensureLayer(
 			{
 				id: MAPBOX_LAYER_IDS.curatedBlobFill,
 				type: 'fill',
@@ -5657,40 +5867,32 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// the zoom-out. Mapbox clamps outside the stops, so above zoom
 				// 5 the line is at full 5px (normal cluster view) and below
 				// 3.4 it holds at 0.75px.
-				'line-width': [
-					'interpolate',
-					['linear'],
-					['zoom'],
-					3.4,
-					0.75,
-					5,
-					5,
-					],
+				'line-width': ['interpolate', ['linear'], ['zoom'], 3.4, 0.75, 5, 5],
+				'line-blur': 0,
+			},
+		});
+
+		// Locked searched-state border. This is Mapbox-owned, so contact marker
+		// layers render above it when they overlap the selected state's edge.
+		ensureLayer(
+			{
+				id: MAPBOX_LAYER_IDS.lockedOutline,
+				type: 'line',
+				source: MAPBOX_SOURCE_IDS.lockedOutline,
+				layout: { 'line-join': 'round', 'line-cap': 'round' },
+				paint: {
+					'line-color': '#FFFFFF',
+					'line-opacity': 0.98,
+					'line-width': buildLockedStateOutlineWidthExpr(),
 					'line-blur': 0,
 				},
-			});
+			},
+			MAPBOX_LAYER_IDS.markerConstellationGlow
+		);
 
-			// Locked searched-state border. This is Mapbox-owned, so contact marker
-			// layers render above it when they overlap the selected state's edge.
-			ensureLayer(
-				{
-					id: MAPBOX_LAYER_IDS.lockedOutline,
-					type: 'line',
-					source: MAPBOX_SOURCE_IDS.lockedOutline,
-					layout: { 'line-join': 'round', 'line-cap': 'round' },
-					paint: {
-						'line-color': '#FFFFFF',
-						'line-opacity': 0.98,
-						'line-width': buildLockedStateOutlineWidthExpr(),
-						'line-blur': 0,
-					},
-				},
-				MAPBOX_LAYER_IDS.markerConstellationGlow
-			);
-
-			// Frozen per-search constellation linework — understated background geometry
-			// that sits behind the marker dots and never participates in hit testing.
-			ensureLayer({
+		// Frozen per-search constellation linework — understated background geometry
+		// that sits behind the marker dots and never participates in hit testing.
+		ensureLayer({
 			id: MAPBOX_LAYER_IDS.markerConstellationGlow,
 			type: 'line',
 			source: MAPBOX_SOURCE_IDS.markerConstellation,
@@ -5698,137 +5900,97 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			paint: {
 				'line-color': MARKER_CONSTELLATION_HALO_COLOR,
 				'line-opacity': 0,
-				'line-width': [
-					'interpolate',
-					['linear'],
-					['zoom'],
-					3,
-					3.4,
-					7,
-					5.4,
-					13,
-					7.2,
-				],
+				'line-width': ['interpolate', ['linear'], ['zoom'], 3, 3.4, 7, 5.4, 13, 7.2],
 				'line-blur': 1.8,
 			},
 		});
-			ensureLayer({
-				id: MAPBOX_LAYER_IDS.markerConstellationCore,
-				type: 'line',
-				source: MAPBOX_SOURCE_IDS.markerConstellation,
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markerConstellationCore,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.markerConstellation,
 			layout: { 'line-join': 'round', 'line-cap': 'round' },
 			paint: {
 				'line-color': MARKER_CONSTELLATION_LINE_COLOR,
 				'line-opacity': 0,
-				'line-width': [
-					'interpolate',
-					['linear'],
-					['zoom'],
-					3,
-					1.25,
-					7,
-					1.85,
-					13,
-					2.55,
-				],
-					'line-blur': 0,
-				},
-			});
-			ensureLayer({
-				id: MAPBOX_LAYER_IDS.markerConstellationSelectedGlow,
-				type: 'line',
-				source: MAPBOX_SOURCE_IDS.markerConstellationSelected,
+				'line-width': ['interpolate', ['linear'], ['zoom'], 3, 1.25, 7, 1.85, 13, 2.55],
+				'line-blur': 0,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markerConstellationSelectedGlow,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.markerConstellationSelected,
 			layout: { 'line-join': 'round', 'line-cap': 'round' },
 			paint: {
 				'line-color': MARKER_CONSTELLATION_SELECTED_HALO_COLOR,
 				'line-opacity': getSelectedMarkerConstellationZoomFadedOpacity(
 					MARKER_CONSTELLATION_SELECTED_GLOW_OPACITY
 				),
-				'line-width': [
-					'interpolate',
-					['linear'],
-					['zoom'],
-					3,
-					8,
-					7,
-					11,
-					13,
-					15,
-				],
+				'line-width': ['interpolate', ['linear'], ['zoom'], 3, 8, 7, 11, 13, 15],
 				'line-blur': 1.6,
 			},
 		});
-			ensureLayer({
-				id: MAPBOX_LAYER_IDS.markerConstellationSelectedCore,
-				type: 'line',
-				source: MAPBOX_SOURCE_IDS.markerConstellationSelected,
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markerConstellationSelectedCore,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.markerConstellationSelected,
 			layout: { 'line-join': 'round', 'line-cap': 'round' },
 			paint: {
 				'line-color': MARKER_CONSTELLATION_SELECTED_LINE_COLOR,
 				'line-opacity': getSelectedMarkerConstellationZoomFadedOpacity(
 					MARKER_CONSTELLATION_SELECTED_CORE_OPACITY
 				),
-				'line-width': [
+				'line-width': ['interpolate', ['linear'], ['zoom'], 3, 4.8, 7, 6.8, 13, 9.4],
+				'line-blur': 0,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markerConstellationNodeGlow,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.markerConstellationNodes,
+			paint: {
+				'circle-radius': constellationNodeGlowRadiusExpr,
+				'circle-color': MARKER_CONSTELLATION_HALO_COLOR,
+				'circle-opacity': getMarkerConstellationNodeZoomFadedOpacity(
+					MARKER_CONSTELLATION_NODE_GLOW_OPACITY
+				),
+				'circle-blur': 0.72,
+				'circle-stroke-width': 0,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markerConstellationNodeDots,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.markerConstellationNodes,
+			paint: {
+				'circle-radius': constellationNodeRadiusExpr,
+				'circle-color': ['get', 'fillColor'],
+				'circle-opacity': getMarkerConstellationNodeZoomFadedOpacity(
+					MARKER_CONSTELLATION_NODE_OPACITY
+				),
+				'circle-stroke-color': MARKER_CONSTELLATION_HALO_COLOR,
+				'circle-stroke-opacity': getMarkerConstellationNodeZoomFadedOpacity(0.74),
+				'circle-stroke-width': [
 					'interpolate',
 					['linear'],
 					['zoom'],
 					3,
-					4.8,
+					0.45,
 					7,
-					6.8,
+					0.65,
 					13,
-					9.4,
+					0.9,
 				],
-				'line-blur': 0,
 			},
 		});
-			ensureLayer({
-				id: MAPBOX_LAYER_IDS.markerConstellationNodeGlow,
-				type: 'circle',
-				source: MAPBOX_SOURCE_IDS.markerConstellationNodes,
-				paint: {
-					'circle-radius': constellationNodeGlowRadiusExpr,
-					'circle-color': MARKER_CONSTELLATION_HALO_COLOR,
-					'circle-opacity': getMarkerConstellationNodeZoomFadedOpacity(
-						MARKER_CONSTELLATION_NODE_GLOW_OPACITY
-					),
-					'circle-blur': 0.72,
-					'circle-stroke-width': 0,
-				},
-			});
-			ensureLayer({
-				id: MAPBOX_LAYER_IDS.markerConstellationNodeDots,
-				type: 'circle',
-				source: MAPBOX_SOURCE_IDS.markerConstellationNodes,
-				paint: {
-					'circle-radius': constellationNodeRadiusExpr,
-					'circle-color': ['get', 'fillColor'],
-					'circle-opacity': getMarkerConstellationNodeZoomFadedOpacity(
-						MARKER_CONSTELLATION_NODE_OPACITY
-					),
-					'circle-stroke-color': MARKER_CONSTELLATION_HALO_COLOR,
-					'circle-stroke-opacity': getMarkerConstellationNodeZoomFadedOpacity(0.74),
-					'circle-stroke-width': [
-						'interpolate',
-						['linear'],
-						['zoom'],
-						3,
-						0.45,
-						7,
-						0.65,
-						13,
-						0.9,
-					],
-				},
-			});
 
-			// All-contacts overlay (gray dots) — lowest marker priority
-			ensureLayer({
+		// All-contacts overlay (gray dots) — lowest marker priority
+		ensureLayer({
 			id: MAPBOX_LAYER_IDS.markersAllHit,
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersAllOverlay,
 			paint: {
-				'circle-radius': allOverlayRadiusExpr,
+				'circle-radius': allOverlayGlowRadiusExpr,
 				'circle-opacity': 0,
 				'circle-stroke-width': 0,
 			},
@@ -5837,31 +5999,74 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			id: MAPBOX_LAYER_IDS.markersAllGlow,
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersAllOverlay,
+			filter: ['!=', ['get', 'isUncategorized'], true],
 			paint: {
-					'circle-radius': allOverlayGlowRadiusExpr,
-					'circle-color': RESULT_DOT_GLOW_COLOR,
-					'circle-opacity': getSelectedStateOrbZoomFadedOpacity(
-						ALL_CONTACTS_DOT_GLOW_OPACITY,
-						getNormalMarkerFadeOpacityExpr()
-					),
-					'circle-blur': RESULT_DOT_GLOW_BLUR,
-					'circle-stroke-width': 0,
-				},
+				'circle-radius': allOverlayGlowRadiusExpr,
+				'circle-color': RESULT_DOT_GLOW_COLOR,
+				'circle-opacity': getSelectedStateOrbZoomFadedOpacity(
+					ALL_CONTACTS_DOT_GLOW_OPACITY,
+					getNormalMarkerFadeOpacityExpr()
+				),
+				'circle-blur': RESULT_DOT_GLOW_BLUR,
+				'circle-stroke-width': 0,
+			},
 		});
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.markersAllDots,
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersAllOverlay,
-				paint: {
-					'circle-radius': allOverlayRadiusExpr,
-					'circle-color': getMarkerHoverFillColorExpr(),
-					'circle-opacity': getSelectedStateOrbZoomFadedOpacity(
-						1,
-						getNormalMarkerFadeOpacityExpr()
-					),
-					'circle-stroke-color': RESULT_DOT_TRANSPARENT_STROKE_COLOR,
-					'circle-stroke-width': 0,
-				},
+			filter: ['!=', ['get', 'isUncategorized'], true],
+			paint: {
+				'circle-radius': allOverlayRadiusExpr,
+				'circle-color': getMarkerHoverFillColorExpr(),
+				'circle-opacity': getSelectedStateOrbZoomFadedOpacity(
+					1,
+					getNormalMarkerFadeOpacityExpr()
+				),
+				'circle-stroke-color': RESULT_DOT_TRANSPARENT_STROKE_COLOR,
+				'circle-stroke-width': 0,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markersAllFallbackIcons,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.markersAllOverlay,
+			filter: ['==', ['get', 'isUncategorized'], true],
+			layout: {
+				'icon-image': ['get', 'fallbackIcon'],
+				'icon-size': allOverlayStarIconSizeExpr,
+				'icon-anchor': 'top-left',
+				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
+					1,
+					getNormalMarkerFadeOpacityExpr()
+				),
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markersAllFallbackIconsHover,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.markersAllOverlay,
+			filter: ['==', ['get', 'isUncategorized'], true],
+			layout: {
+				'icon-image': ['coalesce', ['get', 'fallbackIconHover'], ['get', 'fallbackIcon']],
+				'icon-size': allOverlayStarIconSizeExpr,
+				'icon-anchor': 'top-left',
+				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': getSelectedStateOrbZoomFadedOpacity(1, [
+					'*',
+					getNormalMarkerFadeOpacityExpr(),
+					getMarkerHoverOpacityExpr(),
+				]),
+			},
 		});
 
 		// Promotion overlay pins (outside locked state / no locked state) — behind primary dots
@@ -5885,17 +6090,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'icon-image': ['get', 'iconDefault'],
 				'icon-size': pinIconSizeExpr,
 				'icon-anchor': 'top-left',
-					'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
-					'icon-allow-overlap': true,
-					'icon-ignore-placement': true,
-				},
-				paint: {
-					'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
-						1,
-						getNormalMarkerFadeOpacityExpr()
-					),
-				},
-			});
+				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
+					1,
+					getNormalMarkerFadeOpacityExpr()
+				),
+			},
+		});
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.promotionPinIconsHover,
 			type: 'symbol',
@@ -5904,17 +6109,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'icon-image': ['coalesce', ['get', 'iconHover'], ['get', 'iconDefault']],
 				'icon-size': pinIconSizeExpr,
 				'icon-anchor': 'top-left',
-					'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
-					'icon-allow-overlap': true,
-					'icon-ignore-placement': true,
-				},
-				paint: {
-					'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
-						1,
-						['*', getNormalMarkerFadeOpacityExpr(), getMarkerHoverOpacityExpr()]
-					),
-				},
-			});
+				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': getSelectedStateOrbZoomFadedOpacity(1, [
+					'*',
+					getNormalMarkerFadeOpacityExpr(),
+					getMarkerHoverOpacityExpr(),
+				]),
+			},
+		});
 
 		// Booking extra pins — behind primary dots
 		// The circle layer doubles as hit area AND visual ring for selection.
@@ -5937,17 +6143,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'icon-image': ['get', 'iconDefault'],
 				'icon-size': pinIconSizeExpr,
 				'icon-anchor': 'top-left',
-					'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
-					'icon-allow-overlap': true,
-					'icon-ignore-placement': true,
-				},
-				paint: {
-					'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
-						1,
-						getNormalMarkerFadeOpacityExpr()
-					),
-				},
-			});
+				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
+					1,
+					getNormalMarkerFadeOpacityExpr()
+				),
+			},
+		});
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.bookingPinIconsMarkerHover,
 			type: 'symbol',
@@ -5956,17 +6162,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'icon-image': ['coalesce', ['get', 'iconHover'], ['get', 'iconDefault']],
 				'icon-size': pinIconSizeExpr,
 				'icon-anchor': 'top-left',
-					'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
-					'icon-allow-overlap': true,
-					'icon-ignore-placement': true,
-				},
-				paint: {
-					'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
-						1,
-						['*', getNormalMarkerFadeOpacityExpr(), getMarkerHoverOpacityExpr()]
-					),
-				},
-			});
+				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': getSelectedStateOrbZoomFadedOpacity(1, [
+					'*',
+					getNormalMarkerFadeOpacityExpr(),
+					getMarkerHoverOpacityExpr(),
+				]),
+			},
+		});
 
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.bookingPinIconsHover,
@@ -5977,17 +6184,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'icon-image': ['get', 'iconHover'],
 				'icon-size': pinIconSizeExpr,
 				'icon-anchor': 'top-left',
-					'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
-					'icon-allow-overlap': true,
-					'icon-ignore-placement': true,
-				},
-				paint: {
-					'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
-						1,
-						getNormalMarkerFadeOpacityExpr()
-					),
-				},
-			});
+				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
+					1,
+					getNormalMarkerFadeOpacityExpr()
+				),
+			},
+		});
 
 		// Promotion overlay dots (inside locked state) — below primary dots
 		ensureLayer({
@@ -6005,30 +6212,30 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersPromotionDot,
 			paint: {
-					'circle-radius': resultDotGlowRadiusExpr,
-					'circle-color': RESULT_DOT_GLOW_COLOR,
-					'circle-opacity': getSelectedStateOrbZoomFadedOpacity(
-						RESULT_DOT_GLOW_OPACITY,
-						getNormalMarkerFadeOpacityExpr()
-					),
-					'circle-blur': RESULT_DOT_GLOW_BLUR,
-					'circle-stroke-width': 0,
-				},
+				'circle-radius': resultDotGlowRadiusExpr,
+				'circle-color': RESULT_DOT_GLOW_COLOR,
+				'circle-opacity': getSelectedStateOrbZoomFadedOpacity(
+					RESULT_DOT_GLOW_OPACITY,
+					getNormalMarkerFadeOpacityExpr()
+				),
+				'circle-blur': RESULT_DOT_GLOW_BLUR,
+				'circle-stroke-width': 0,
+			},
 		});
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.promotionDotDots,
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersPromotionDot,
 			paint: {
-					'circle-radius': resultDotRadiusExpr,
-					'circle-color': getMarkerHoverFillColorExpr(),
-					'circle-opacity': getSelectedStateOrbZoomFadedOpacity(
-						1,
-						getNormalMarkerFadeOpacityExpr()
-					),
-					'circle-stroke-color': RESULT_DOT_TRANSPARENT_STROKE_COLOR,
-					'circle-stroke-width': 0,
-				},
+				'circle-radius': resultDotRadiusExpr,
+				'circle-color': getMarkerHoverFillColorExpr(),
+				'circle-opacity': getSelectedStateOrbZoomFadedOpacity(
+					1,
+					getNormalMarkerFadeOpacityExpr()
+				),
+				'circle-stroke-color': RESULT_DOT_TRANSPARENT_STROKE_COLOR,
+				'circle-stroke-width': 0,
+			},
 		});
 
 		// Primary result dots — top marker priority
@@ -6096,11 +6303,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			source: MAPBOX_SOURCE_IDS.markersBase,
 			filter: ['==', ['get', 'isUncategorized'], true],
 			layout: {
-				'icon-image': [
-					'coalesce',
-					['get', 'fallbackIconHover'],
-					['get', 'fallbackIcon'],
-				],
+				'icon-image': ['coalesce', ['get', 'fallbackIconHover'], ['get', 'fallbackIcon']],
 				'icon-size': pinIconSizeExpr,
 				'icon-anchor': 'top-left',
 				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
@@ -6108,10 +6311,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'icon-ignore-placement': true,
 			},
 			paint: {
-				'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
-					1,
-					['*', getNormalMarkerFadeOpacityExpr(), getMarkerHoverOpacityExpr()]
-				),
+				'icon-opacity': getSelectedStateOrbZoomFadedOpacity(1, [
+					'*',
+					getNormalMarkerFadeOpacityExpr(),
+					getMarkerHoverOpacityExpr(),
+				]),
 			},
 		});
 		ensureLayer({
@@ -6140,11 +6344,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			source: MAPBOX_SOURCE_IDS.markersSelected,
 			minzoom: CURATED_DOT_FADE_END_ZOOM,
 			layout: {
-				'icon-image': [
-					'coalesce',
-					['get', 'selectedIconHover'],
-					['get', 'selectedIcon'],
-				],
+				'icon-image': ['coalesce', ['get', 'selectedIconHover'], ['get', 'selectedIcon']],
 				'icon-size': selectedMarkerIconSizeExpr,
 				'icon-anchor': 'top-left',
 				'icon-offset': [
@@ -6555,7 +6755,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				} catch {
 					revealLoaded = null;
 				}
-				 
+
 				console.debug('[contact-lights]', tag, {
 					zoom: typeof zoom === 'number' ? Number(zoom.toFixed(2)) : zoom,
 					nightT: Number(night.toFixed(2)),
@@ -6599,7 +6799,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				sourceId === MAPBOX_SOURCE_IDS.nightLightsReveal ||
 				isContactLightsUrl(url)
 			) {
-				 
 				console.warn('[contact-lights] tile error', {
 					sourceId,
 					url,
@@ -7104,6 +7303,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return false;
 	}, []);
 
+	const isAllContactsOverlayContactOnLand = useCallback(
+		(contact: ContactWithName, coords: LatLngLiteral): boolean => {
+			// Don't block first paint on the state-prepared polygon payload. Contacts with
+			// valid coordinates are overwhelmingly land-based; once polygons are ready we
+			// cache the exact check per contact id.
+			if (!isStateLayerReady) return true;
+			const cached = allContactsOverlayLandMaskByIdRef.current.get(contact.id);
+			if (cached != null) return cached;
+			const isOnLand = isCoordsInAnyUsState(coords);
+			allContactsOverlayLandMaskByIdRef.current.set(contact.id, isOnLand);
+			return isOnLand;
+		},
+		[isCoordsInAnyUsState, isStateLayerReady]
+	);
+
 	const resultStateKeysSignature = useMemo(
 		() => resultStateKeys.join('|'),
 		[resultStateKeys]
@@ -7123,7 +7337,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
 
-		if (isLoading) {
+		if (isLoading || !searchEngaged) {
 			clearCuratedBlobOutline();
 			return;
 		}
@@ -7151,10 +7365,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 
 		const signature = curatedDots
-			.map(
-				(dot) =>
-					`${dot.id}:${dot.coords.lng.toFixed(5)}:${dot.coords.lat.toFixed(5)}`
-			)
+			.map((dot) => `${dot.id}:${dot.coords.lng.toFixed(5)}:${dot.coords.lat.toFixed(5)}`)
 			.join('|');
 		const nextSignature = `v12:${CURATED_BLOB_MIN_REGION_POINTS}:${CURATED_BLOB_MAX_REGIONS}:${CURATED_BLOB_MAX_REGION_SPAN_KM}:${CURATED_BLOB_SHAPE_STEPS}:${CURATED_BLOB_OUTLINE_SMOOTHING_PASSES}:${CURATED_BLOB_LOBE_MIN_COUNT}:${CURATED_BLOB_LOBE_MAX_COUNT}:${CURATED_BLOB_LOBE_PADDING_KM}:${CURATED_BLOB_LOBE_MIN_RADIUS_KM}:${CURATED_BLOB_LOBE_MAX_RADIUS_KM}:${CURATED_BLOB_LOBE_OVERLAP_RADIUS_RATIO}:${CURATED_BLOB_LOBE_RADIUS_JITTER}:${CURATED_BLOB_SINGLETON_LOBE_RADIUS_KM}:${CURATED_BLOB_SINGLETON_LOBE_OFFSET_KM}:${CURATED_ORB_SMALL_SHAPE_MIN_RADIUS_KM}:${CURATED_ORB_SMALL_SHAPE_THRESHOLD_KM}:${CURATED_BLOB_ORGANIC_WOBBLE}:${signature}`;
 		if (nextSignature === curatedBlobSignatureRef.current) return;
@@ -7204,8 +7415,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (!unionedMercatorMultiPolygon) {
 				try {
 					const { unionClippingMultiPolygons } = await import('@/utils/polygonClipping');
-					unionedMercatorMultiPolygon =
-						unionClippingMultiPolygons(...lobeMultiPolygons);
+					unionedMercatorMultiPolygon = unionClippingMultiPolygons(...lobeMultiPolygons);
 				} catch (err) {
 					console.error('Failed to union curated blob lobes', err);
 				}
@@ -7217,10 +7427,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					: lobeMultiPolygons.flat(),
 				CURATED_BLOB_OUTLINE_SMOOTHING_PASSES
 			);
-			const morphSources =
-				createCuratedBlobMorphSourcesFromMercatorMultiPolygon(
-					naturalMercatorMultiPolygon
-				);
+			const morphSources = createCuratedBlobMorphSourcesFromMercatorMultiPolygon(
+				naturalMercatorMultiPolygon
+			);
 
 			if (morphSources.length === 0) {
 				if (!cancelled) clearCuratedBlobOutline();
@@ -7258,6 +7467,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map,
 		isMapLoaded,
 		isLoading,
+		searchEngaged,
 		contactsWithCoords,
 		getContactCoords,
 		clearCuratedBlobOutline,
@@ -8245,11 +8455,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				setBookingExtraVisibleContacts(nextBookingExtraVisible);
 			}
 
-			// High-zoom gray-dot overlay: show *all* contacts in the viewport (excluding contacts
-			// already rendered as primary dots or overlay pins).
+			// All-contact overlay:
+			// - active-search mode: close-zoom gray/context dots
+			// - disengaged ambient mode: regional contact atlas, sampled to ~500 visible dots
+			const isAmbientAllContactsOverlay =
+				isAmbientContactsEnabled && zoomRaw >= AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM;
+			const isSearchAllContactsOverlay =
+				isAnySearch && zoomRaw >= ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM;
 			const shouldShowAllContactsOverlay =
-				isAnySearch &&
-				zoomRaw >= ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM &&
+				(isAmbientAllContactsOverlay || isSearchAllContactsOverlay) &&
 				allContactsOverlayContactsWithCoords.length > 0;
 			let nextAllContactsOverlayVisible: ContactWithName[] = [];
 			if (shouldShowAllContactsOverlay) {
@@ -8257,22 +8471,193 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				for (const c of nextBookingExtraVisible) excludeIdSet.add(c.id);
 				for (const c of nextPromotionOverlayVisible) excludeIdSet.add(c.id);
 
-				const inBounds: ContactWithName[] = [];
+				const visibleViewportBbox: BoundingBox = {
+					minLat: south,
+					maxLat: north,
+					minLng: west,
+					maxLng: east,
+				};
+
+				const isAmbientContactAllowed = (contact: ContactWithName): boolean => {
+					if (!isAmbientAllContactsOverlay) return true;
+					const categoryIndex = getAmbientContactCategoryIndexFromTitle(contact.title);
+					if (categoryIndex < 0) return ambientUncategorizedActive;
+					return ambientActiveCategories?.[categoryIndex] !== false;
+				};
+
+				const visibleInBounds: ContactWithName[] = [];
+				const bufferInBounds: ContactWithName[] = [];
 				for (const contact of allContactsOverlayContactsWithCoords) {
 					if (excludeIdSet.has(contact.id)) continue;
+					if (!isAmbientContactAllowed(contact)) continue;
 					const coords = getAllContactsOverlayContactCoords(contact);
 					if (!coords) continue;
 					if (!isLatLngInBbox(coords.lat, coords.lng, viewportBbox)) continue;
-					// Never render gray dots in water (e.g. oceans). Treat "land" as inside any US state polygon.
-					if (!isCoordsInAnyUsState(coords)) continue;
-					inBounds.push(contact);
+					// Never render gray dots in water once state polygons are ready. Cached per id.
+					if (!isAllContactsOverlayContactOnLand(contact, coords)) continue;
+					if (isLatLngInBbox(coords.lat, coords.lng, visibleViewportBbox)) {
+						visibleInBounds.push(contact);
+					} else {
+						bufferInBounds.push(contact);
+					}
 				}
 
-				inBounds.sort((a, b) => a.id - b.id);
-				nextAllContactsOverlayVisible = inBounds;
+				if (isAmbientAllContactsOverlay) {
+					const ambientT = smoothstep(
+						0,
+						1,
+						clamp(
+							(zoomRaw - AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM) /
+								(AMBIENT_CONTACTS_OVERLAY_MARKERS_FULL_ZOOM -
+									AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM),
+							0,
+							1
+						)
+					);
+					const visibleTarget = Math.max(
+						AMBIENT_CONTACTS_OVERLAY_MIN_DOTS,
+						Math.round(AMBIENT_CONTACTS_OVERLAY_TARGET_DOTS * ambientT)
+					);
+					const bufferTarget = Math.min(
+						AMBIENT_CONTACTS_OVERLAY_BUFFER_DOTS,
+						Math.round(visibleTarget * 0.85)
+					);
+					const ambientMinSeparationPx = Math.max(
+						7,
+						2 * (markerScale * 0.78) + dotStrokeWeight + 1
+					);
+					const ambientMinSeparationSq =
+						ambientMinSeparationPx * ambientMinSeparationPx;
+
+					const pickAmbientContacts = (
+						candidatesSource: ContactWithName[],
+						bbox: BoundingBox,
+						slots: number,
+						seedSuffix: string
+					): ContactWithName[] => {
+						if (slots <= 0 || candidatesSource.length === 0) return [];
+						const priorityIdSet = new Set<number>(selectedSet);
+						if (hoveredId != null) priorityIdSet.add(hoveredId);
+						for (const id of allContactsOverlayVisibleIdSetRef.current) {
+							priorityIdSet.add(id);
+						}
+
+						const priorityCandidates = candidatesSource.filter((contact) =>
+							priorityIdSet.has(contact.id)
+						);
+						const otherCandidates = candidatesSource.filter(
+							(contact) => !priorityIdSet.has(contact.id)
+						);
+						const poolSlots = slots * 4;
+						let pool: ContactWithName[];
+						if (candidatesSource.length <= poolSlots) {
+							pool = candidatesSource;
+						} else {
+							const remainingSlots = Math.max(0, poolSlots - priorityCandidates.length);
+							const sampledOther = stableViewportSampleContacts(
+								otherCandidates,
+								getAllContactsOverlayContactCoords,
+								bbox,
+								remainingSlots,
+								`${seed}|ambient:${seedSuffix}:pool`
+							);
+							pool = [...priorityCandidates, ...sampledOther];
+						}
+
+						type AmbientCandidate = {
+							contact: ContactWithName;
+							x: number;
+							y: number;
+							isPriority: boolean;
+							key: number;
+						};
+						const candidateContacts: ContactWithName[] = [];
+						const candidateCoords: LatLngLiteral[] = [];
+						for (const contact of pool) {
+							const coords = getAllContactsOverlayContactCoords(contact);
+							if (!coords) continue;
+							candidateContacts.push(contact);
+							candidateCoords.push(coords);
+						}
+						const projectedCandidates = batchLatLngToWorldPixels(
+							candidateCoords,
+							worldSize
+						);
+						const candidates: AmbientCandidate[] = [];
+						for (let i = 0; i < candidateContacts.length; i++) {
+							const contact = candidateContacts[i];
+							const projected = projectedCandidates[i];
+							if (!projected) continue;
+							candidates.push({
+								contact,
+								x: projected.x,
+								y: projected.y,
+								isPriority: priorityIdSet.has(contact.id),
+								key: hashStringToUint32(`${seed}|ambient:${seedSuffix}|${contact.id}`),
+							});
+						}
+						candidates.sort((a, b) => {
+							if (a.isPriority !== b.isPriority) return a.isPriority ? -1 : 1;
+							return a.key - b.key;
+						});
+
+						const picked: ContactWithName[] = [];
+						const grid = new Map<string, Array<{ x: number; y: number }>>();
+						const cellSize = Math.max(6, ambientMinSeparationPx);
+						const hasNeighborWithin = (x: number, y: number): boolean => {
+							const cx = Math.floor(x / cellSize);
+							const cy = Math.floor(y / cellSize);
+							for (let dx = -1; dx <= 1; dx++) {
+								for (let dy = -1; dy <= 1; dy++) {
+									const arr = grid.get(`${cx + dx},${cy + dy}`);
+									if (!arr) continue;
+									for (const p of arr) {
+										const ddx = x - p.x;
+										const ddy = y - p.y;
+										if (ddx * ddx + ddy * ddy < ambientMinSeparationSq) return true;
+									}
+								}
+							}
+							return false;
+						};
+
+						for (const candidate of candidates) {
+							if (picked.length >= slots) break;
+							if (hasNeighborWithin(candidate.x, candidate.y)) continue;
+							picked.push(candidate.contact);
+							const cx = Math.floor(candidate.x / cellSize);
+							const cy = Math.floor(candidate.y / cellSize);
+							const k = `${cx},${cy}`;
+							const arr = grid.get(k);
+							if (arr) arr.push({ x: candidate.x, y: candidate.y });
+							else grid.set(k, [{ x: candidate.x, y: candidate.y }]);
+						}
+						return picked;
+					};
+
+					const pickedVisible = pickAmbientContacts(
+						visibleInBounds,
+						visibleViewportBbox,
+						visibleTarget,
+						'visible'
+					);
+					const pickedVisibleIds = new Set(pickedVisible.map((contact) => contact.id));
+					const pickedBuffer = pickAmbientContacts(
+						bufferInBounds.filter((contact) => !pickedVisibleIds.has(contact.id)),
+						viewportBbox,
+						bufferTarget,
+						'buffer'
+					);
+
+					nextAllContactsOverlayVisible = [...pickedVisible, ...pickedBuffer];
+				} else {
+					nextAllContactsOverlayVisible = visibleInBounds;
+				}
+
+				nextAllContactsOverlayVisible.sort((a, b) => a.id - b.id);
 			}
 
-			const nextAllKey = nextAllContactsOverlayVisible.map((c) => c.id).join(',');
+			const nextAllKey = `${isAmbientAllContactsOverlay ? 'ambient' : 'all'}|${nextAllContactsOverlayVisible.map((c) => c.id).join(',')}`;
 			if (nextAllKey !== lastAllContactsOverlayVisibleContactsKeyRef.current) {
 				lastAllContactsOverlayVisibleContactsKeyRef.current = nextAllKey;
 				setAllContactsOverlayVisibleContacts(nextAllContactsOverlayVisible);
@@ -8294,9 +8679,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			promotionOverlayContactsWithCoords,
 			getPromotionOverlayContactCoords,
 			isAnySearch,
+			isAmbientContactsEnabled,
+			ambientActiveCategories,
+			ambientUncategorizedActive,
 			allContactsOverlayContactsWithCoords,
 			getAllContactsOverlayContactCoords,
-			isCoordsInAnyUsState,
+			isAllContactsOverlayContactOnLand,
 		]
 	);
 
@@ -8318,7 +8706,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!isMapLoaded) return;
 		if (isBackgroundPresentation) return;
 		const requestedZoomValue = requestedZoom?.zoom;
-		if (typeof requestedZoomValue !== 'number' || !Number.isFinite(requestedZoomValue)) return;
+		if (typeof requestedZoomValue !== 'number' || !Number.isFinite(requestedZoomValue))
+			return;
 
 		try {
 			const minZoom = map.getMinZoom();
@@ -8435,13 +8824,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!map || !isMapLoaded) return;
 		if (isBackgroundPresentation) return;
 		const onMoveStart = () => {
+			clearEmptyMapPrompt();
 			onViewportInteractionRef.current?.();
 		};
 		map.on('movestart', onMoveStart);
 		return () => {
 			map.off('movestart', onMoveStart);
 		};
-	}, [map, isMapLoaded, isBackgroundPresentation]);
+	}, [map, isMapLoaded, isBackgroundPresentation, clearEmptyMapPrompt]);
 
 	// Rectangle selection handlers (Mapbox mouse events).
 	useEffect(() => {
@@ -8487,7 +8877,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		// Hide state outlines when using rectangle selection (selectedAreaBounds is set)
 		// Clear outlines while loading or if no result states
-		if (isLoading || !resultStateKeysSignature || selectedAreaBounds) {
+		if (!searchEngaged || isLoading || !resultStateKeysSignature || selectedAreaBounds) {
 			clearResultsOutline();
 			return;
 		}
@@ -8563,6 +8953,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map,
 		isMapLoaded,
 		isStateLayerReady,
+		searchEngaged,
 		isLoading,
 		resultStateKeys,
 		resultStateKeysSignature,
@@ -8656,6 +9047,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// In search mode, use the query string as the stable "search session" key. This avoids
 	// treating resorted/streaming results as a brand new search (which causes map bouncing).
 	const lastSearchQueryKeyRef = useRef<string | null>(null);
+	const lastAutoFitRequestNonceRef = useRef<number>(autoFitRequestNonce ?? 0);
 	// Debounce auto-fit camera moves so rapid result updates don't cause zoom oscillation.
 	const autoFitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -8748,6 +9140,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const searchQueryKey = (searchQuery ?? '').trim();
 		const isSearchMode = searchQueryKey.length > 0;
+		const autoFitRequestNonceValue = autoFitRequestNonce ?? 0;
+		const isAutoFitRequested =
+			autoFitRequestNonceValue !== lastAutoFitRequestNonceRef.current;
 
 		// Check if this is a new set of search results.
 		// In search mode, rely on the query string (stable). Outside of search mode,
@@ -8780,7 +9175,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// Even if we've already fit to contacts, we still want to zoom to the locked state
 		// once the state layer finishes loading (prevents "random" fallback viewports).
 		const shouldFitLockedState =
-			lockedStateKeyIsUsState && isStateLayerReady && !hasFitLockedStateForKey;
+			lockedStateKeyIsUsState &&
+			isStateLayerReady &&
+			(!hasFitLockedStateForKey || isAutoFitRequested);
 
 		// Fit bounds if:
 		// 1. We haven't fit bounds yet (initial load after geocoding)
@@ -8794,11 +9191,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				!hasFitBoundsRef.current ||
 				isNewSearch ||
 				isNewStateSearch ||
+				isAutoFitRequested ||
 				(!lockedStateKeyIsUsState && coordsJustBecameAvailable)
 			: // Outside search mode (campaign contacts view), keep the existing "results changed" behavior.
 				!hasFitBoundsRef.current ||
 				isNewSearch ||
 				isNewStateSearch ||
+				isAutoFitRequested ||
 				contactsWithCoords.length > lastContactsCountRef.current ||
 				Math.abs(contactsWithCoords.length - lastContactsCountRef.current) > 5;
 
@@ -8890,6 +9289,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			// Only mark as "fit" if we actually moved the camera.
 			if (didFit) {
+				lastAutoFitRequestNonceRef.current = autoFitRequestNonceValue;
 				// Clear the user-click flag once we successfully kicked off the cinematic state zoom.
 				if (isUserStateClickCinematic) {
 					pendingStateClickCinematicRef.current = null;
@@ -8959,6 +9359,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isLoading,
 		skipAutoFit,
 		searchQuery,
+		autoFitRequestNonce,
 	]);
 
 	// If auto-fit is disabled, ensure we don't have a queued fit from a prior render.
@@ -9000,6 +9401,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const handleMarkerMouseOver = useCallback(
 		(contact: ContactWithName, domEvent?: MouseEvent | TouchEvent) => {
+			clearEmptyMapPrompt();
 			// Don't trigger hover interactions until sufficiently zoomed in
 			if (zoomLevel < HOVER_INTERACTION_MIN_ZOOM) return;
 
@@ -9025,7 +9427,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			onMarkerHover?.(contact, meta);
 		},
-		[onMarkerHover, zoomLevel]
+		[clearEmptyMapPrompt, onMarkerHover, zoomLevel]
 	);
 
 	const handleMarkerMouseOut = useCallback(
@@ -9181,10 +9583,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				continue;
 			}
 
-			const projectedClip = buildScreenPathFromLngLatMultiPolygon(
-				m,
-				shapeMultiPolygon
-			);
+			const projectedClip = buildScreenPathFromLngLatMultiPolygon(m, shapeMultiPolygon);
 			if (!projectedClip) {
 				hideSlot();
 				continue;
@@ -9210,14 +9609,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			ellipse.setAttribute('cy', centerY.toFixed(2));
 			bloomEllipse.setAttribute('cx', centerX.toFixed(2));
 			bloomEllipse.setAttribute('cy', centerY.toFixed(2));
-			ellipse.setAttribute(
-				'rx',
-				(halfWidth * CURATED_ORB_ELLIPSE_RX_RATIO).toFixed(2)
-			);
-			ellipse.setAttribute(
-				'ry',
-				(halfHeight * CURATED_ORB_ELLIPSE_RY_RATIO).toFixed(2)
-			);
+			ellipse.setAttribute('rx', (halfWidth * CURATED_ORB_ELLIPSE_RX_RATIO).toFixed(2));
+			ellipse.setAttribute('ry', (halfHeight * CURATED_ORB_ELLIPSE_RY_RATIO).toFixed(2));
 			const bloomRadius = Math.max(halfWidth, halfHeight);
 			bloomEllipse.setAttribute('rx', bloomRadius.toFixed(2));
 			bloomEllipse.setAttribute('ry', bloomRadius.toFixed(2));
@@ -9232,10 +9625,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				`translate(${centerX.toFixed(2)} ${centerY.toFixed(2)}) scale(${bloomRadius.toFixed(2)})`
 			);
 			clipPath.setAttribute('d', projectedClip.d);
-			ellipse.setAttribute(
-				'opacity',
-				(colorOpacity * frontHemisphereOpacity).toFixed(3)
-			);
+			ellipse.setAttribute('opacity', (colorOpacity * frontHemisphereOpacity).toFixed(3));
 			bloomEllipse.setAttribute(
 				'opacity',
 				(bloomOpacity * frontHemisphereOpacity).toFixed(3)
@@ -9288,13 +9678,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 									const angle = Math.atan2(dy, dx);
 									const tx = centerMerc.x + Math.cos(angle) * radiusMerc;
 									const ty = centerMerc.y + Math.sin(angle) * radiusMerc;
-									return [
-										point[0] + (tx - point[0]) * t,
-										point[1] + (ty - point[1]) * t,
-									];
+									return [point[0] + (tx - point[0]) * t, point[1] + (ty - point[1]) * t];
 								})
 							)
-					  )
+						)
 		);
 		const lngLatShapes = morphedShapes.map(mercatorMultiPolygonToLngLat);
 		const lngLat = lngLatShapes.flat();
@@ -9343,8 +9730,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const trueNightEase = rawNight * rawNight * (3 - 2 * rawNight);
 		// Let night take over the lighting direction: the warm daytime key fades
 		// out while the moonlit upper-right key and lower-left shadow fade in.
-		const keyNightMul =
-			1 - trueNightEase * (1 - clamp(NIGHT_WARM_KEY_MIN_MUL, 0, 1));
+		const keyNightMul = 1 - trueNightEase * (1 - clamp(NIGHT_WARM_KEY_MIN_MUL, 0, 1));
 		const shadowNightMul =
 			1 - trueNightEase * (1 - clamp(NIGHT_SHADOW_OVERLAY_MUL_MIN, 0, 1));
 
@@ -9359,7 +9745,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			1
 		);
 		const shadowOpacity = clamp(
-			base * cfg.shadowOpacityMultiplier * shadowNightMul * (1 - sunWashSuppression * 0.9),
+			base *
+				cfg.shadowOpacityMultiplier *
+				shadowNightMul *
+				(1 - sunWashSuppression * 0.9),
 			0,
 			1
 		);
@@ -10109,9 +10498,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}`;
 			if (source && selectedStateOutlineSourceKeyRef.current !== outlineKey) {
 				selectedStateOutlineSourceKeyRef.current = outlineKey;
-				source.setData(
-					createOutlineGeoJsonFromMultiPolygon(displayMultiPolygon) as any
-				);
+				source.setData(createOutlineGeoJsonFromMultiPolygon(displayMultiPolygon) as any);
 			}
 
 			return displayMultiPolygon;
@@ -10137,14 +10524,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			bloomEllipse?.setAttribute('opacity', '0');
 		};
 
-		if (
-			!m ||
-			!ellipse ||
-			!bloomEllipse ||
-			!gradient ||
-			!bloomGradient ||
-			!clipPath
-		) {
+		if (!m || !ellipse || !bloomEllipse || !gradient || !bloomGradient || !clipPath) {
 			hide();
 			return;
 		}
@@ -10195,7 +10575,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				? {
 						lat: (bbox.minLat + bbox.maxLat) / 2,
 						lng: (bbox.minLng + bbox.maxLng) / 2,
-				  }
+					}
 				: null);
 		const frontHemisphereOpacity = computeGlobeFrontHemisphereOpacity(
 			m,
@@ -10223,14 +10603,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		ellipse.setAttribute('cy', centerY.toFixed(2));
 		bloomEllipse.setAttribute('cx', centerX.toFixed(2));
 		bloomEllipse.setAttribute('cy', centerY.toFixed(2));
-		ellipse.setAttribute(
-			'rx',
-			(halfWidth * CURATED_ORB_ELLIPSE_RX_RATIO).toFixed(2)
-		);
-		ellipse.setAttribute(
-			'ry',
-			(halfHeight * CURATED_ORB_ELLIPSE_RY_RATIO).toFixed(2)
-		);
+		ellipse.setAttribute('rx', (halfWidth * CURATED_ORB_ELLIPSE_RX_RATIO).toFixed(2));
+		ellipse.setAttribute('ry', (halfHeight * CURATED_ORB_ELLIPSE_RY_RATIO).toFixed(2));
 		bloomEllipse.setAttribute('rx', bloomRadius.toFixed(2));
 		bloomEllipse.setAttribute('ry', bloomRadius.toFixed(2));
 		gradient.setAttribute(
@@ -10244,14 +10618,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			`translate(${centerX.toFixed(2)} ${centerY.toFixed(2)}) scale(${bloomRadius.toFixed(2)})`
 		);
 		clipPath.setAttribute('d', projectedClip.d);
-		ellipse.setAttribute(
-			'opacity',
-			colorOpacity.toFixed(3)
-		);
-		bloomEllipse.setAttribute(
-			'opacity',
-			bloomOpacity.toFixed(3)
-		);
+		ellipse.setAttribute('opacity', colorOpacity.toFixed(3));
+		bloomEllipse.setAttribute('opacity', bloomOpacity.toFixed(3));
 		overlay.style.opacity = '1';
 	}, [getSelectedStateDisplayMultiPolygon]);
 	applySelectedStateGradientStateRef.current = applySelectedStateGradientState;
@@ -10399,11 +10767,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					0,
 					1
 				);
-				const discreteT = clamp(
-					(now - transition.startMs) / transition.discreteMs,
-					0,
-					1
-				);
+				const discreteT = clamp((now - transition.startMs) / transition.discreteMs, 0, 1);
 				const cfg = blendRuntimeMoodConfig(
 					transition.from,
 					transition.to,
@@ -10412,8 +10776,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				);
 
 				if (
-					now - moodTransitionLastPaintMsRef.current >=
-						MOOD_TRANSITION_PAINT_FRAME_MS ||
+					now - moodTransitionLastPaintMsRef.current >= MOOD_TRANSITION_PAINT_FRAME_MS ||
 					continuousT >= 1
 				) {
 					moodTransitionLastPaintMsRef.current = now;
@@ -10446,13 +10809,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 		startWeatherMoodTransition(weatherMood);
-	}, [
-		map,
-		isMapLoaded,
-		weatherMood,
-		applyWeatherMoodConfig,
-		startWeatherMoodTransition,
-	]);
+	}, [map, isMapLoaded, weatherMood, applyWeatherMoodConfig, startWeatherMoodTransition]);
 
 	useEffect(() => {
 		return () => {
@@ -10537,6 +10894,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			MAPBOX_LAYER_IDS.bookingPinHit,
 			MAPBOX_LAYER_IDS.promotionPinHit,
 			MAPBOX_LAYER_IDS.markersAllHit,
+		];
+		const searchAreaHitLayers = [
+			MAPBOX_LAYER_IDS.curatedBlobFill,
+			MAPBOX_LAYER_IDS.curatedBlobCore,
 		];
 
 		const getContactForHit = (layerId: string, id: number): ContactWithName | null => {
@@ -10627,11 +10988,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 
 		const onMouseMove = (e: mapboxgl.MapMouseEvent) => {
-			if (areaSelectionEnabled || isAreaSelecting) return;
+			if (areaSelectionEnabled || isAreaSelecting) {
+				clearEmptyMapPrompt();
+				return;
+			}
 
 			const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
 
-			const markerFeatures = map.queryRenderedFeatures(e.point, { layers: markerHitLayers });
+			const markerFeatures = map.queryRenderedFeatures(e.point, {
+				layers: markerHitLayers,
+			});
 			const topMarker = markerFeatures[0];
 			const markerLayerId = topMarker?.layer?.id;
 			const rawMarkerId = topMarker?.id;
@@ -10646,13 +11012,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const contact = getContactForHit(markerLayerId, markerId);
 				const sourceId = getSourceForHitLayer(markerLayerId);
 				if (contact && sourceId) {
+					clearEmptyMapPrompt();
 					setCursor('pointer');
 					setMarkerVisualHover(sourceId, markerId);
 					clearStateHover();
 					if (
 						zoom >= HOVER_INTERACTION_MIN_ZOOM &&
-						(hoverSourceRef.current !== 'map' ||
-							hoveredMarkerIdRef.current !== markerId)
+						(hoverSourceRef.current !== 'map' || hoveredMarkerIdRef.current !== markerId)
 					) {
 						handleMarkerMouseOver(
 							contact,
@@ -10670,25 +11036,38 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 			setCursor('');
 
+			const searchAreaFeatures = map.queryRenderedFeatures(e.point, {
+				layers: searchAreaHitLayers,
+			});
+			if (searchAreaFeatures.length > 0) {
+				clearEmptyMapPrompt();
+				clearStateHover();
+				return;
+			}
+
 			// Optional state hover highlight (only when state interactions are enabled).
 			if (!stateInteractionsEnabled || !isStateLayerReady) {
 				clearStateHover();
+				scheduleEmptyMapPrompt(e.point);
 				return;
 			}
 			if (zoom > STATE_HOVER_HIGHLIGHT_MAX_ZOOM + 0.001) {
 				clearStateHover();
+				scheduleEmptyMapPrompt(e.point);
 				return;
 			}
 
 			// If a marker is hovered, don't also hover-highlight the state underneath.
 			if (hoverSourceRef.current === 'map' && hoveredMarkerIdRef.current != null) {
 				clearStateHover();
+				clearEmptyMapPrompt();
 				return;
 			}
 			// While zooming-to-state after a state click (or while results are loading), don't show
 			// hover overlays on other states as the camera sweeps.
 			if (stateClickZoomInFlightRef.current || isLoadingRef.current) {
 				clearStateHover();
+				clearEmptyMapPrompt();
 				return;
 			}
 
@@ -10720,8 +11099,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 			hoveredStateIdRef.current = nextStateId;
 			if (nextStateId != null) {
+				clearEmptyMapPrompt();
 				setCursor('pointer');
+			} else {
+				scheduleEmptyMapPrompt(e.point);
 			}
+		};
+
+		const onMouseDown = (e: mapboxgl.MapMouseEvent) => {
+			emptyMapPointerDownClientRef.current = getClientPointFromDomEvent(e.originalEvent);
+			clearEmptyMapPrompt();
 		};
 
 		const onClick = (e: mapboxgl.MapMouseEvent) => {
@@ -10802,14 +11189,31 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 			}
 
+			const downClient = emptyMapPointerDownClientRef.current;
+			emptyMapPointerDownClientRef.current = null;
+			const upClient = getClientPointFromDomEvent(e.originalEvent);
+			const movedAfterPointerDown = Boolean(
+				downClient &&
+				upClient &&
+				(Math.abs(downClient.x - upClient.x) >= 6 ||
+					Math.abs(downClient.y - upClient.y) >= 6)
+			);
+
 			// Click on empty map clears any selected marker panel.
 			setSelectedMarker(null);
+
+			if (!movedAfterPointerDown && emptyMapPromptEnabled && onEmptyMapClick) {
+				clearEmptyMapPrompt();
+				onEmptyMapClick();
+			}
 		};
 
+		map.on('mousedown', onMouseDown);
 		map.on('mousemove', onMouseMove);
 		map.on('click', onClick);
 		const canvas = map.getCanvas();
 		const onCanvasMouseLeave = () => {
+			clearEmptyMapPrompt();
 			clearMarkerVisualHover();
 			const prevHovered = hoveredMarkerIdRef.current;
 			if (hoverSourceRef.current === 'map' && prevHovered != null) {
@@ -10820,6 +11224,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		canvas.addEventListener('mouseleave', onCanvasMouseLeave);
 
 		return () => {
+			map.off('mousedown', onMouseDown);
 			map.off('mousemove', onMouseMove);
 			map.off('click', onClick);
 			canvas.removeEventListener('mouseleave', onCanvasMouseLeave);
@@ -10843,6 +11248,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		bookingExtraContactsById,
 		promotionOverlayContactsById,
 		allOverlayContactsById,
+		clearEmptyMapPrompt,
+		scheduleEmptyMapPrompt,
+		emptyMapPromptEnabled,
+		onEmptyMapClick,
 		handleMarkerMouseOver,
 		handleMarkerMouseOut,
 		handleMarkerClick,
@@ -11092,9 +11501,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const baseDotsWavePendingSearchKeyRef = useRef<string | null>(null);
 	// Tracks the last query key that actually played the base-dot wave animation.
 	const baseDotsWaveLastSearchKeyRef = useRef<string>('');
-	const hoveredMarkerVisualRef = useRef<{ sourceId: string; id: number } | null>(
-		null
-	);
+	const hoveredMarkerVisualRef = useRef<{ sourceId: string; id: number } | null>(null);
 	const markerConstellationEdgesRef = useRef<MarkerConstellationEdge[]>([]);
 	const markerConstellationNodesRef = useRef<MarkerConstellationNode[]>([]);
 	const markerConstellationContactsByIdRef = useRef<Map<number, ContactWithName>>(
@@ -11315,7 +11722,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				contactsForVisibility != null
 					? new Map<number, ContactWithName>(
 							contactsForVisibility.map((contact) => [contact.id, contact])
-					  )
+						)
 					: markerConstellationContactsByIdRef.current;
 			const selectedSet = new Set<number>(selectedContacts);
 
@@ -11443,10 +11850,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						geometry: {
 							type: 'LineString',
 							coordinates: [
-								[
-									previousSelectedPoint.coords.lng,
-									previousSelectedPoint.coords.lat,
-								],
+								[previousSelectedPoint.coords.lng, previousSelectedPoint.coords.lat],
 								[selectedCoords.lng, selectedCoords.lat],
 							],
 						},
@@ -11543,32 +11947,29 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [map, isMapLoaded, selectedContacts, writeMarkerConstellationSourceData]);
 
-	const startMarkerConstellationReveal = useCallback(
-		() => {
-			stopMarkerConstellationReveal();
+	const startMarkerConstellationReveal = useCallback(() => {
+		stopMarkerConstellationReveal();
 
-			if (!map || !isMapLoaded) return;
-			if (markerConstellationEdgesRef.current.length === 0) {
-				markerConstellationRevealDoneRef.current = true;
-				setMarkerConstellationLineOpacity(0, 0, 0);
-				return;
-			}
-
+		if (!map || !isMapLoaded) return;
+		if (markerConstellationEdgesRef.current.length === 0) {
 			markerConstellationRevealDoneRef.current = true;
-			setMarkerConstellationLineOpacity(
-				MARKER_CONSTELLATION_CORE_OPACITY,
-				MARKER_CONSTELLATION_GLOW_OPACITY,
-				MARKER_CONSTELLATION_REVEAL_FADE_MS
-			);
+			setMarkerConstellationLineOpacity(0, 0, 0);
 			return;
-		},
-		[
-			map,
-			isMapLoaded,
-			stopMarkerConstellationReveal,
-			setMarkerConstellationLineOpacity,
-		]
-	);
+		}
+
+		markerConstellationRevealDoneRef.current = true;
+		setMarkerConstellationLineOpacity(
+			MARKER_CONSTELLATION_CORE_OPACITY,
+			MARKER_CONSTELLATION_GLOW_OPACITY,
+			MARKER_CONSTELLATION_REVEAL_FADE_MS
+		);
+		return;
+	}, [
+		map,
+		isMapLoaded,
+		stopMarkerConstellationReveal,
+		setMarkerConstellationLineOpacity,
+	]);
 
 	// Base result dots
 	useEffect(() => {
@@ -11612,23 +12013,34 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 
-			const hasLockedStateSelection = Boolean(
-				lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
-			);
-			const fadeWithSelectedStateOrb = Boolean(
-				hasLockedStateSelection && selectedStateMorphSourceRef.current
-			);
+		if (!searchEngaged) {
+			if (baseDotsWaveCancelRef.current) {
+				baseDotsWaveCancelRef.current();
+				baseDotsWaveCancelRef.current = null;
+			}
+			baseDotsWaveMetaRef.current = null;
+			baseDotsLastDataKeyRef.current = '';
+			source.setData({ type: 'FeatureCollection', features: [] } as any);
+			return;
+		}
 
-			type DotSeed = {
-				id: number;
-				lng: number;
-				lat: number;
-				fillColor: string;
-				hoverFillColor: string;
-				isCurated: boolean;
-				isUncategorized: boolean;
-				fadeWithSelectedStateOrb: boolean;
-			};
+		const hasLockedStateSelection = Boolean(
+			lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
+		);
+		const fadeWithSelectedStateOrb = Boolean(
+			hasLockedStateSelection && selectedStateMorphSourceRef.current
+		);
+
+		type DotSeed = {
+			id: number;
+			lng: number;
+			lat: number;
+			fillColor: string;
+			hoverFillColor: string;
+			isCurated: boolean;
+			isUncategorized: boolean;
+			fadeWithSelectedStateOrb: boolean;
+		};
 		const dots: DotSeed[] = [];
 		let minLng = Number.POSITIVE_INFINITY;
 		let maxLng = Number.NEGATIVE_INFINITY;
@@ -11658,12 +12070,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				id: contact.id,
 				lng: coords.lng,
 				lat: coords.lat,
-					fillColor,
-					hoverFillColor: darkenHexColor(fillColor),
-					isCurated: Boolean(contact.curatedCategory),
-					isUncategorized,
-					fadeWithSelectedStateOrb,
-				});
+				fillColor,
+				hoverFillColor: darkenHexColor(fillColor),
+				isCurated: Boolean(contact.curatedCategory),
+				isUncategorized,
+				fadeWithSelectedStateOrb,
+			});
 			minLng = Math.min(minLng, coords.lng);
 			maxLng = Math.max(maxLng, coords.lng);
 			minLat = Math.min(minLat, coords.lat);
@@ -11698,11 +12110,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				(i > 0 ? ',' : '') +
 				d.id +
 				':' +
-					d.fillColor +
-					':' +
-					(d.isUncategorized ? 'u' : 'c') +
-					':' +
-					(d.fadeWithSelectedStateOrb ? 'f' : 'n');
+				d.fillColor +
+				':' +
+				(d.isUncategorized ? 'u' : 'c') +
+				':' +
+				(d.fadeWithSelectedStateOrb ? 'f' : 'n');
 		}
 		if (dataKey === baseDotsLastDataKeyRef.current) {
 			return;
@@ -11737,18 +12149,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return {
 				type: 'Feature',
 				id: dot.id,
-					properties: {
+				properties: {
 					fillColor: dot.fillColor,
 					hoverFillColor: dot.hoverFillColor,
-						[DOT_WAVE_DELAY_PROP]: delayMs,
-						isCurated: dot.isCurated,
-						isUncategorized: dot.isUncategorized,
-						fadeWithSelectedStateOrb: dot.fadeWithSelectedStateOrb,
-						fallbackIcon: dot.isUncategorized ? uncategorizedContactMarkerImageName : '',
-						fallbackIconHover: dot.isUncategorized
-							? uncategorizedContactMarkerHoverImageName
-							: '',
-					},
+					[DOT_WAVE_DELAY_PROP]: delayMs,
+					isCurated: dot.isCurated,
+					isUncategorized: dot.isUncategorized,
+					fadeWithSelectedStateOrb: dot.fadeWithSelectedStateOrb,
+					fallbackIcon: dot.isUncategorized ? uncategorizedContactMarkerImageName : '',
+					fallbackIconHover: dot.isUncategorized
+						? uncategorizedContactMarkerHoverImageName
+						: '',
+				},
 				geometry: { type: 'Point', coordinates: [dot.lng, dot.lat] },
 			};
 		});
@@ -11847,6 +12259,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map,
 		isMapLoaded,
 		isLoading,
+		searchEngaged,
 		contacts.length,
 		visibleContacts,
 		getContactCoords,
@@ -11876,6 +12289,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 
+		if (!searchEngaged) {
+			if (selectedMarkerFadeRafRef.current != null) {
+				cancelAnimationFrame(selectedMarkerFadeRafRef.current);
+				selectedMarkerFadeRafRef.current = null;
+			}
+			selectedMarkerFadeByIdRef.current.clear();
+			selectedMarkerScaleByIdRef.current.clear();
+			selectedMarkerFeatureByIdRef.current = new Map();
+			source.setData({ type: 'FeatureCollection', features: [] } as any);
+			return;
+		}
+
 		let cancelled = false;
 
 		const run = async () => {
@@ -11884,8 +12309,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const nextSelectedFeaturesById = new Map<number, any>();
 			const fadeWithSelectedStateOrb = Boolean(
 				lockedStateKey &&
-					lockedStateSelectionKeyRef.current === lockedStateKey &&
-					selectedStateMorphSourceRef.current
+				lockedStateSelectionKeyRef.current === lockedStateKey &&
+				selectedStateMorphSourceRef.current
 			);
 
 			const addSelectedMarker = (
@@ -12007,8 +12432,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				);
 				startScaleById.set(
 					id,
-					scaleById.get(id) ??
-						(isSelecting ? SELECTED_MARKER_INITIAL_TRANSFORM_SCALE : 1)
+					scaleById.get(id) ?? (isSelecting ? SELECTED_MARKER_INITIAL_TRANSFORM_SCALE : 1)
 				);
 			}
 
@@ -12038,8 +12462,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					const start = startFadeById.get(id) ?? target;
 					const opacity = start + (target - start) * eased;
 					const startScale = startScaleById.get(id) ?? 1;
-					const targetScale =
-						target > 0 ? 1 : SELECTED_MARKER_INITIAL_TRANSFORM_SCALE;
+					const targetScale = target > 0 ? 1 : SELECTED_MARKER_INITIAL_TRANSFORM_SCALE;
 					const scale = startScale + (targetScale - startScale) * eased;
 
 					if (progress >= 1 && target <= 0) {
@@ -12101,6 +12524,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map,
 		isMapLoaded,
 		isLoading,
+		searchEngaged,
 		selectedContacts,
 		contactsWithCoords,
 		getContactCoords,
@@ -12263,11 +12687,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'circle-opacity',
 				getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
 			);
-			safeSetPaint(
-				MAPBOX_LAYER_IDS.baseDots,
-				'circle-stroke-opacity',
-				0
-			);
+			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity', 0);
 			safeSetPaint(
 				MAPBOX_LAYER_IDS.baseFallbackIcons,
 				'icon-opacity-transition',
@@ -12529,7 +12949,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const isSearchMode = searchKey.length > 0;
 		const loading = Boolean(isLoading);
 
-		if (!isSearchMode || isBackgroundPresentation) {
+		if (!isSearchMode || isBackgroundPresentation || !searchEngaged) {
 			markerConstellationLastSearchKeyRef.current = searchKey;
 			clearMarkerConstellation();
 			return;
@@ -12673,8 +13093,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM,
 				currentZoom
 			);
-			const constellationWorldSize =
-				512 * Math.pow(2, constellationComposeZoom);
+			const constellationWorldSize = 512 * Math.pow(2, constellationComposeZoom);
 
 			let points: MarkerConstellationPoint[] = [];
 			const contactsByPointId = new Map<number, ContactWithName>();
@@ -12782,6 +13201,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isMapLoaded,
 		isLoading,
 		isBackgroundPresentation,
+		searchEngaged,
 		searchQuery,
 		contactsWithCoords,
 		getContactCoords,
@@ -12806,39 +13226,61 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (isLoading) {
 			// Preserve existing overlay dots while parent data is refetching.
 			return;
-			}
+		}
 
-			const fadeWithSelectedStateOrb = Boolean(
-				lockedStateKey &&
-					lockedStateSelectionKeyRef.current === lockedStateKey &&
-					selectedStateMorphSourceRef.current
-			);
-			const features: any[] = [];
-			for (const contact of allContactsOverlayVisibleContacts) {
-				const coords = getAllContactsOverlayContactCoords(contact);
-				if (!coords) continue;
-				features.push({
-					type: 'Feature',
-					id: contact.id,
-					properties: {
-						fillColor: ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR,
-						hoverFillColor: darkenHexColor(ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR),
-						fadeWithSelectedStateOrb,
-					},
-					geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
-				});
-			}
+		if (!searchEngaged && !isAmbientContactsEnabled) {
+			source.setData({ type: 'FeatureCollection', features: [] } as any);
+			return;
+		}
+
+		const fadeWithSelectedStateOrb = Boolean(
+			lockedStateKey &&
+			lockedStateSelectionKeyRef.current === lockedStateKey &&
+			selectedStateMorphSourceRef.current
+		);
+		const features: any[] = [];
+		for (const contact of allContactsOverlayVisibleContacts) {
+			const coords = getAllContactsOverlayContactCoords(contact);
+			if (!coords) continue;
+			const whatForMarker = getAmbientContactWhatFromTitle(contact.title);
+			const isUncategorized = !isCleanMapMarkerCategory(whatForMarker);
+			const fillColor = isAmbientContactsEnabled
+				? whatForMarker
+					? getResultDotColorForWhat(whatForMarker)
+					: AMBIENT_CONTACTS_UNCATEGORIZED_FILL_COLOR
+				: ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR;
+			features.push({
+				type: 'Feature',
+				id: contact.id,
+				properties: {
+					fillColor,
+					hoverFillColor: darkenHexColor(fillColor),
+					fadeWithSelectedStateOrb,
+					isUncategorized,
+					category: whatForMarker ?? '',
+					fallbackIcon: isUncategorized ? uncategorizedContactMarkerImageName : '',
+					fallbackIconHover: isUncategorized
+						? uncategorizedContactMarkerHoverImageName
+						: '',
+				},
+				geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+			});
+		}
 
 		source.setData({ type: 'FeatureCollection', features } as any);
 	}, [
 		map,
 		isMapLoaded,
 		isLoading,
-			allContactsOverlayVisibleContacts,
-			getAllContactsOverlayContactCoords,
-			lockedStateKey,
-			isStateLayerReady,
-		]);
+		searchEngaged,
+		isAmbientContactsEnabled,
+		allContactsOverlayVisibleContacts,
+		getAllContactsOverlayContactCoords,
+		lockedStateKey,
+		isStateLayerReady,
+		uncategorizedContactMarkerImageName,
+		uncategorizedContactMarkerHoverImageName,
+	]);
 
 	// Promotion overlay: split into in-state dots vs out-of-state pins
 	useEffect(() => {
@@ -12856,15 +13298,24 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 
+		if (!searchEngaged) {
+			const empty = { type: 'FeatureCollection', features: [] } as any;
+			dotSource.setData(empty);
+			pinSource.setData(empty);
+			promotionDotIdsRef.current = new Set();
+			promotionPinIdsRef.current = new Set();
+			return;
+		}
+
 		let cancelled = false;
 
 		const run = async () => {
-				const hasLockedStateSelection = Boolean(
-					lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
-				);
-				const fadeWithSelectedStateOrb = Boolean(
-					hasLockedStateSelection && selectedStateMorphSourceRef.current
-				);
+			const hasLockedStateSelection = Boolean(
+				lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
+			);
+			const fadeWithSelectedStateOrb = Boolean(
+				hasLockedStateSelection && selectedStateMorphSourceRef.current
+			);
 
 			const dotFeatures: any[] = [];
 			const pinFeatures: any[] = [];
@@ -12892,16 +13343,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 				if (!shouldUsePinStyle) {
 					dotIds.add(contact.id);
-						dotFeatures.push({
-							type: 'Feature',
-							id: contact.id,
-							properties: {
-								fillColor: dotFillColor,
-								hoverFillColor: darkenHexColor(dotFillColor),
-								fadeWithSelectedStateOrb,
-							},
-							geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
-						});
+					dotFeatures.push({
+						type: 'Feature',
+						id: contact.id,
+						properties: {
+							fillColor: dotFillColor,
+							hoverFillColor: darkenHexColor(dotFillColor),
+							fadeWithSelectedStateOrb,
+						},
+						geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+					});
 					continue;
 				}
 
@@ -12921,12 +13372,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				imagesToEnsure.set(iconDefault, defaultUrl);
 				imagesToEnsure.set(iconHover, hoverUrl);
 
-					pinFeatures.push({
-						type: 'Feature',
-						id: contact.id,
-						properties: { iconDefault, iconHover, fadeWithSelectedStateOrb },
-						geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
-					});
+				pinFeatures.push({
+					type: 'Feature',
+					id: contact.id,
+					properties: { iconDefault, iconHover, fadeWithSelectedStateOrb },
+					geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+				});
 			}
 
 			await Promise.all(
@@ -12952,6 +13403,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map,
 		isMapLoaded,
 		isLoading,
+		searchEngaged,
 		promotionOverlayVisibleContacts,
 		lockedStateKey,
 		isStateLayerReady,
@@ -12975,15 +13427,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 
+		if (!searchEngaged) {
+			source.setData({ type: 'FeatureCollection', features: [] } as any);
+			return;
+		}
+
 		let cancelled = false;
 
 		const run = async () => {
-				const hasLockedStateSelection = Boolean(
-					lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
-				);
-				const fadeWithSelectedStateOrb = Boolean(
-					hasLockedStateSelection && selectedStateMorphSourceRef.current
-				);
+			const hasLockedStateSelection = Boolean(
+				lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
+			);
+			const fadeWithSelectedStateOrb = Boolean(
+				hasLockedStateSelection && selectedStateMorphSourceRef.current
+			);
 
 			const features: any[] = [];
 			const imagesToEnsure = new Map<string, string>(); // name -> url
@@ -13025,12 +13482,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				features.push({
 					type: 'Feature',
 					id: contact.id,
-						properties: {
-							iconDefault,
-							iconHover,
-							category: whatForMarker ?? '',
-							fadeWithSelectedStateOrb,
-						},
+					properties: {
+						iconDefault,
+						iconHover,
+						category: whatForMarker ?? '',
+						fadeWithSelectedStateOrb,
+					},
 					geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
 				});
 			}
@@ -13054,6 +13511,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map,
 		isMapLoaded,
 		isLoading,
+		searchEngaged,
 		bookingExtraVisibleContacts,
 		lockedStateKey,
 		isStateLayerReady,
@@ -13213,6 +13671,35 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		).trim();
 
 		if (kind === 'all') {
+			const whatForMarker = getAmbientContactWhatFromTitle(contact.title);
+			if (whatForMarker) {
+				const dotFillColor = getResultDotColorForWhat(whatForMarker);
+				const normalizedWhat = normalizeWhatKey(whatForMarker);
+				const tooltipFillColor = isSelected
+					? TOOLTIP_FILL_COLOR_SELECTED
+					: (WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? dotFillColor);
+				const width = calculateTooltipWidth(
+					nameForTooltip,
+					companyForTooltip,
+					titleForTooltip,
+					whatForMarker
+				);
+				const height = calculateTooltipHeight(nameForTooltip, companyForTooltip);
+				const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
+				return {
+					url: generateMapTooltipIconUrl(
+						nameForTooltip,
+						companyForTooltip,
+						titleForTooltip,
+						tooltipFillColor,
+						whatForMarker
+					),
+					width,
+					height,
+					anchorY,
+				};
+			}
+
 			const tooltipFillColor = isSelected
 				? TOOLTIP_FILL_COLOR_SELECTED
 				: ALL_CONTACTS_OVERLAY_TOOLTIP_FILL_COLOR;
@@ -13389,15 +13876,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						<stop offset="0.8" stopColor="#FFFFFF" stopOpacity="0.06" />
 						<stop offset="0.92" stopColor="#FFFFFF" stopOpacity="0" />
 					</radialGradient>
-					<clipPath
-						id={selectedStateGradientIds.clipPath}
-						clipPathUnits="userSpaceOnUse"
-					>
-						<path
-							ref={selectedStateGradientClipPathRef}
-							d=""
-							clipRule="evenodd"
-						/>
+					<clipPath id={selectedStateGradientIds.clipPath} clipPathUnits="userSpaceOnUse">
+						<path ref={selectedStateGradientClipPathRef} d="" clipRule="evenodd" />
 					</clipPath>
 				</defs>
 				<ellipse
@@ -13456,11 +13936,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 								gradientUnits="userSpaceOnUse"
 							>
 								<stop offset="0.716346" stopColor="#EFE8D8" stopOpacity="0" />
-								<stop
-									offset="0.783654"
-									stopColor="#FFF8E5"
-									stopOpacity="0.55"
-								/>
+								<stop offset="0.783654" stopColor="#FFF8E5" stopOpacity="0.55" />
 								<stop offset="0.841346" stopColor="#CAD7FF" />
 								<stop offset="0.884615" stopColor="#CBFFE7" />
 								<stop offset="1" stopColor="#F0EBDE" stopOpacity="0.2" />
@@ -13750,6 +14226,40 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							isBackgroundPresentation ? 'border-white' : 'border-gray-900'
 						}`}
 					/>
+				</div>
+			)}
+
+			{/* Empty-map hover prompt: pointer-events none so dragging/panning remains Mapbox-owned. */}
+			{emptyMapPromptEnabled && emptyMapPromptPoint && emptyMapPromptText && (
+				<div
+					aria-hidden="true"
+					style={{
+						position: 'absolute',
+						left: 0,
+						top: 0,
+						transform: `translate(${emptyMapPromptPoint.x}px, ${emptyMapPromptPoint.y}px)`,
+						pointerEvents: 'none',
+						zIndex: HOVER_TOOLTIP_Z_INDEX + 8,
+					}}
+				>
+					<div
+						style={{
+							position: 'relative',
+							transform: 'translate(-50%, calc(-100% - 14px))',
+							backgroundColor: '#000000',
+							color: '#FFFFFF',
+							borderRadius: '8px',
+							padding: '5px 9px',
+							fontFamily: 'Inter, sans-serif',
+							fontSize: '12px',
+							fontWeight: 600,
+							lineHeight: 1.15,
+							letterSpacing: '0.01em',
+							whiteSpace: 'nowrap',
+						}}
+					>
+						{emptyMapPromptText}
+					</div>
 				</div>
 			)}
 

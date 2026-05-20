@@ -430,7 +430,7 @@ export const useGetLocations = (query: string, mode?: 'state' | 'state-first') =
 	});
 };
 
-export type ContactsMapOverlayMode = 'booking' | 'promotion' | 'all';
+export type ContactsMapOverlayMode = 'booking' | 'promotion' | 'all' | 'ambient';
 
 export interface ContactsMapOverlayFilters
 	extends Record<string, string[] | number[] | string | number | boolean | undefined> {
@@ -440,6 +440,9 @@ export interface ContactsMapOverlayFilters
 	north: number;
 	east: number;
 	limit?: number;
+	zoom?: number;
+	seed?: string;
+	phase?: 'visible' | 'buffer';
 }
 
 export const useGetContactsMapOverlay = (options: {
