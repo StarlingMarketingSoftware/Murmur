@@ -3,12 +3,10 @@ import {
 	Fragment,
 	useCallback,
 	useEffect,
-	useLayoutEffect,
 	useState,
 	useRef,
 	useMemo,
 } from 'react';
-import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { gsap } from 'gsap';
 import {
@@ -33,7 +31,6 @@ import {
 	convertAiResponseToRichTextEmail,
 	convertHtmlToPlainText,
 } from '@/utils';
-import { isSafariBrowser } from '@/utils/browserDetection';
 import {
 	extractMurmurDraftSettingsSnapshot,
 	injectMurmurDraftSettingsSnapshot,
@@ -239,8 +236,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		goToNextTab,
 		hideHeaderBox,
 		onDraftOperationsProgress,
-		isTransitioningOut,
-		isTransitioningIn,
 	} = props;
 
 	const {
@@ -252,12 +247,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	// Let the campaign page know when the destination view has actually rendered,
 	// so we can avoid ending the tab crossfade before heavy UI (e.g. HybridPromptInput) is painted.
-	// We also keep a local "painted view" ref so the inbox morph animation can hold its final
-	// frame until the destination view has *actually painted*, avoiding a blank flash.
-	const lastPaintedViewRef = useRef<typeof view>(view);
 	useEffect(() => {
 		if (!renderGlobalOverlays) return;
-		lastPaintedViewRef.current = view;
 		onViewReady?.(view);
 	}, [onViewReady, renderGlobalOverlays, view]);
 	const {
@@ -346,8 +337,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const router = useRouter();
 	const isMobile = useIsMobile();
-	const isSafari = useMemo(() => isSafariBrowser(), []);
-	const [isClient, setIsClient] = useState(false);
 	const [localInboxSentTabRequest, setLocalInboxSentTabRequest] = useState<{
 		tab: 'inbox' | 'sent';
 		requestId: number;
@@ -364,7 +353,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}));
 		goToInbox?.();
 	}, [goToInbox, inboxSentTabRequest?.requestId]);
-	useEffect(() => setIsClient(true), []);
 	const isDraftingView = view === 'drafting';
 	const isSentView = view === 'sent';
 	const contactsListTopNavStop = useMemo<ContactsExpandedTopNavStop>(() => {
@@ -640,8 +628,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const mainContactsPanelHeightPx = 597;
 	const inboxMainPanelWidthPx = 863;
 	const inboxMainPanelHeightPx = 668;
-	// Keeps the inbox box 18px to the right of the standard left column anchor.
-	const inboxMainPanelShiftRightPx = 167.5;
+	// Keeps the inbox box 36px to the right of the standard left column anchor.
+	const inboxMainPanelShiftRightPx = 185.5;
 	const standardSidePanelTopOffsetPx = 15;
 	const standardSidePanelGapPx = 16;
 	const campaignHeaderBoxHeightPx = 59;
@@ -661,28 +649,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		return 'mini';
 	}, [view]);
 
-	// Track previous view to detect when we're transitioning from inbox/search.
-	// When coming from these views, the pinned left panel (ContactsExpandedList or
-	// MiniEmailStructure) should fade in to blend with the morph animations.
-	const prevViewForPinnedPanelRef = useRef<typeof view>(view);
-	const [isEnteringFromMorphView, setIsEnteringFromMorphView] = useState(false);
-	useLayoutEffect(() => {
-		const prevView = prevViewForPinnedPanelRef.current;
-		prevViewForPinnedPanelRef.current = view;
-		// Detect transition from inbox/search to tabs that show the pinned left panel.
-		// This includes: testing/drafting (ContactsExpandedList), sent (MiniEmailStructure)
-		const isMorphOrigin = prevView === 'search' || (prevView === 'inbox' && !isSafari);
-		const showsPinnedPanel = view === 'testing' || view === 'drafting' || view === 'sent';
-		if (isMorphOrigin && showsPinnedPanel) {
-			setIsEnteringFromMorphView(true);
-			// Clear the flag after the morph animation completes (~350ms)
-			const timer = setTimeout(() => setIsEnteringFromMorphView(false), 400);
-			return () => clearTimeout(timer);
-		}
-	}, [isSafari, view]);
-
 	// Mirror the exact render conditions for the absolute pinned left column and for this shell.
-	// We only animate when the shell is actually rendered.
 	const shouldRenderAbsolutePinnedLeftColumn =
 		!isMobile &&
 		!hideHeaderBox &&
@@ -692,717 +659,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		!(view === 'sent' && isNarrowDesktop) &&
 		!(view === 'search' && isSearchTabNarrow) &&
 		!(view === 'inbox' && isInboxTabStacked);
-
-	// (No pinned-left-panel morph animation)
-
-	// --- Main box morph transition (Writing/Drafts/Sent <-> Search/Inbox) ---
-	type CampaignMainBoxKey = 'writing' | 'drafts' | 'sent' | 'search' | 'inbox';
-	const getCampaignMainBoxKey = useCallback(
-		(v: typeof view): CampaignMainBoxKey | null => {
-			if (v === 'testing') return 'writing';
-			if (v === 'drafting') return 'drafts';
-			if (v === 'sent') return 'sent';
-			if (v === 'search') return 'search';
-			return null;
-		},
-		[]
-	);
-
-	// --- Research panel morph transition (Standard tabs <-> Search/Inbox) ---
-	type CampaignResearchPanelKey = 'standard' | 'search' | 'inbox';
-	const getCampaignResearchPanelKey = useCallback(
-		(v: typeof view): CampaignResearchPanelKey | null => {
-			if (v === 'search') return 'search';
-			if (v === 'testing' || v === 'drafting' || v === 'sent') return 'standard';
-			return null;
-		},
-		[]
-	);
-
-	const MAIN_BOX_VISUAL: Record<
-		CampaignMainBoxKey,
-		{ borderWidthPx: number; radiusPx: number; borderColor: string }
-	> = useMemo(
-		() => ({
-			writing: { borderWidthPx: 3, radiusPx: 6, borderColor: '#000000' },
-			drafts: { borderWidthPx: 3, radiusPx: 8, borderColor: '#000000' },
-			sent: { borderWidthPx: 2, radiusPx: 8, borderColor: '#19670F' },
-			search: { borderWidthPx: 3, radiusPx: 12, borderColor: '#143883' },
-			inbox: { borderWidthPx: 3, radiusPx: 8, borderColor: '#000000' },
-		}),
-		[]
-	);
-
-	const mainBoxGhostRef = useRef<HTMLDivElement | null>(null);
-	const mainBoxGhostFromFillRef = useRef<HTMLDivElement | null>(null);
-	const mainBoxGhostToFillRef = useRef<HTMLDivElement | null>(null);
-	const mainBoxGhostFromContentRef = useRef<HTMLDivElement | null>(null);
-	const mainBoxGhostToContentRef = useRef<HTMLDivElement | null>(null);
-	const mainBoxTransitionIdRef = useRef(0);
-	const mainBoxActiveElRef = useRef<HTMLElement | null>(null);
-
-	// Stores the LAST rendered main box (used as the "from" rect when the view changes).
-	const lastMainBoxKeyRef = useRef<CampaignMainBoxKey | null>(
-		getCampaignMainBoxKey(view)
-	);
-	const lastMainBoxRectRef = useRef<DOMRect | null>(null);
-
-	const researchPanelGhostRef = useRef<HTMLDivElement | null>(null);
-	const researchPanelGhostFromFillRef = useRef<HTMLDivElement | null>(null);
-	const researchPanelGhostToFillRef = useRef<HTMLDivElement | null>(null);
-	const researchPanelGhostFromContentRef = useRef<HTMLDivElement | null>(null);
-	const researchPanelGhostToContentRef = useRef<HTMLDivElement | null>(null);
-	const researchPanelTransitionIdRef = useRef(0);
-	const researchPanelActiveElRef = useRef<HTMLElement | null>(null);
-
-	// Stores the LAST rendered research panel (used as the "from" rect when the view changes).
-	const lastResearchPanelKeyRef = useRef<CampaignResearchPanelKey | null>(
-		getCampaignResearchPanelKey(view)
-	);
-	const lastResearchPanelRectRef = useRef<DOMRect | null>(null);
-
-	useLayoutEffect(() => {
-		if (typeof window === 'undefined') return;
-		if (isMobile) return;
-
-		const ghost = mainBoxGhostRef.current;
-		const ghostFromFill = mainBoxGhostFromFillRef.current;
-		const ghostToFill = mainBoxGhostToFillRef.current;
-		const ghostFromContent = mainBoxGhostFromContentRef.current;
-		const ghostToContent = mainBoxGhostToContentRef.current;
-		if (!ghost || !ghostFromFill || !ghostToFill || !ghostFromContent || !ghostToContent)
-			return;
-
-		const fromKey = lastMainBoxKeyRef.current;
-		const fromRect = lastMainBoxRectRef.current;
-		const toKey = getCampaignMainBoxKey(view);
-
-		// Reset any previously "held" element state.
-		mainBoxActiveElRef.current = null;
-
-		// Only morph when entering/leaving the Search or Inbox tabs.
-		const isMorphEndpoint = (k: CampaignMainBoxKey) => k === 'search' || k === 'inbox';
-		if (
-			!fromKey ||
-			!fromRect ||
-			!toKey ||
-			fromKey === toKey ||
-			(!isMorphEndpoint(fromKey) && !isMorphEndpoint(toKey))
-		) {
-			gsap.killTweensOf(ghost);
-			gsap.set(ghost, { opacity: 0 });
-			return;
-		}
-
-		// Safari: the Inbox morph animation is unstable. Hard swap instead.
-		if (isSafari && (fromKey === 'inbox' || toKey === 'inbox')) {
-			gsap.killTweensOf(ghost);
-			gsap.set(ghost, { opacity: 0 });
-			return;
-		}
-
-		const transitionId = ++mainBoxTransitionIdRef.current;
-
-		gsap.killTweensOf(ghost);
-		gsap.killTweensOf(ghostFromFill);
-		gsap.killTweensOf(ghostToFill);
-		gsap.killTweensOf(ghostFromContent);
-		gsap.killTweensOf(ghostToContent);
-
-		// Match normal tab crossfade timing (350ms total).
-		const morphSeconds = 0.35;
-		const morphEase = 'power2.inOut';
-		const HANDOFF_SECONDS = 0.03;
-
-		// Snap to device pixels to keep borders crisp.
-		const dpr = window.devicePixelRatio || 1;
-		const snapPx = (v: number) => Math.round(v * dpr) / dpr;
-		const snapStep = 1 / (dpr || 1);
-
-		const tweenTo = (target: gsap.TweenTarget, vars: gsap.TweenVars) =>
-			new Promise<void>((resolve) => {
-				gsap.to(target, { ...vars, onComplete: resolve });
-			});
-		const nextFrame = () =>
-			new Promise<void>((resolve) => {
-				requestAnimationFrame(() => resolve());
-			});
-
-		const getVisualBoxEl = (wrapper: HTMLElement | null): HTMLElement | null => {
-			if (!wrapper) return null;
-			const inner = wrapper.querySelector('[data-drafting-table]') as HTMLElement | null;
-			return inner ?? wrapper;
-		};
-
-		const copyBackgroundStyles = (fill: HTMLElement, source: HTMLElement) => {
-			const cs = window.getComputedStyle(source);
-			fill.style.backgroundImage = cs.backgroundImage;
-			fill.style.backgroundColor = cs.backgroundColor;
-			fill.style.backgroundRepeat = cs.backgroundRepeat;
-			fill.style.backgroundSize = cs.backgroundSize;
-			fill.style.backgroundPosition = cs.backgroundPosition;
-		};
-
-		const buildGhostContentClone = (source: HTMLElement): HTMLElement => {
-			const clone = source.cloneNode(true) as HTMLElement;
-			clone.removeAttribute('data-campaign-main-box');
-			clone.removeAttribute('id');
-			clone
-				.querySelectorAll('[data-campaign-main-box]')
-				.forEach((n) => (n as HTMLElement).removeAttribute('data-campaign-main-box'));
-			clone
-				.querySelectorAll('[id]')
-				.forEach((n) => (n as HTMLElement).removeAttribute('id'));
-			clone.style.position = 'absolute';
-			clone.style.left = '0';
-			clone.style.top = '0';
-			clone.style.width = '100%';
-			clone.style.height = '100%';
-			clone.style.margin = '0';
-			clone.style.maxWidth = 'none';
-			clone.style.boxSizing = 'border-box';
-			clone.style.border = 'none';
-			clone.style.borderColor = 'transparent';
-			clone.style.outline = 'none';
-			clone.style.background = 'transparent';
-			clone.style.backgroundColor = 'transparent';
-			clone.style.backgroundImage = 'none';
-			clone.setAttribute('aria-hidden', 'true');
-			clone.style.pointerEvents = 'none';
-			return clone;
-		};
-
-		const hideBox = (el: HTMLElement | null) => {
-			if (!el) return null;
-			const prev = { opacity: el.style.opacity, pointerEvents: el.style.pointerEvents };
-			el.style.opacity = '0';
-			el.style.pointerEvents = 'none';
-			return () => {
-				el.style.opacity = prev.opacity;
-				el.style.pointerEvents = prev.pointerEvents;
-			};
-		};
-
-		const cleanupFns: Array<() => void> = [];
-		const scheduleDomCleanup = (fn: () => void) => {
-			const w = window as any;
-			if (typeof w.requestIdleCallback === 'function') {
-				w.requestIdleCallback(fn, { timeout: 750 });
-			} else {
-				window.setTimeout(fn, 0);
-			}
-		};
-
-		(async () => {
-			const fromVisual = MAIN_BOX_VISUAL[fromKey];
-			const toVisual = MAIN_BOX_VISUAL[toKey];
-
-			const zoomStr = window.getComputedStyle(document.documentElement).zoom;
-			const zoom = zoomStr ? parseFloat(zoomStr) : 1;
-			const z = zoom || 1;
-
-			const fromWrapper = document.querySelector(
-				`[data-campaign-main-box="${fromKey}"]`
-			) as HTMLElement | null;
-			const fromVisualEl = getVisualBoxEl(fromWrapper);
-
-			let toWrapper = document.querySelector(
-				`[data-campaign-main-box="${toKey}"]`
-			) as HTMLElement | null;
-			if (!toWrapper) {
-				await nextFrame();
-				if (mainBoxTransitionIdRef.current !== transitionId) return;
-				toWrapper = document.querySelector(
-					`[data-campaign-main-box="${toKey}"]`
-				) as HTMLElement | null;
-			}
-			if (!toWrapper) {
-				gsap.set(ghost, { opacity: 0 });
-				return;
-			}
-			const toVisualEl = getVisualBoxEl(toWrapper);
-
-			// Prime fills
-			if (fromVisualEl) copyBackgroundStyles(ghostFromFill, fromVisualEl);
-			gsap.set(ghostFromFill, { opacity: 1 });
-			if (toVisualEl) copyBackgroundStyles(ghostToFill, toVisualEl);
-			gsap.set(ghostToFill, { opacity: 0 });
-
-			// Prime content
-			ghostFromContent.replaceChildren();
-			ghostToContent.replaceChildren();
-			if (fromVisualEl)
-				ghostFromContent.appendChild(buildGhostContentClone(fromVisualEl));
-			if (toVisualEl) ghostToContent.appendChild(buildGhostContentClone(toVisualEl));
-			gsap.set(ghostFromContent, { opacity: 1 });
-			gsap.set(ghostToContent, { opacity: 0 });
-
-			// Position ghost at from box
-			ghost.style.left = `${snapPx(fromRect.left / z)}px`;
-			ghost.style.top = `${snapPx(fromRect.top / z)}px`;
-			ghost.style.width = `${snapPx(fromRect.width / z)}px`;
-			ghost.style.height = `${snapPx(fromRect.height / z)}px`;
-			ghost.style.borderWidth = `${fromVisual.borderWidthPx}px`;
-			ghost.style.borderColor = fromVisual.borderColor;
-			ghost.style.borderRadius = `${fromVisual.radiusPx}px`;
-			ghost.style.opacity = '1';
-
-			// Hide real boxes
-			const restoreFrom = hideBox(fromWrapper);
-			if (restoreFrom) cleanupFns.push(restoreFrom);
-			const restoreTo = hideBox(toWrapper);
-			if (restoreTo) cleanupFns.push(restoreTo);
-			mainBoxActiveElRef.current = toWrapper;
-
-			const toRect = toWrapper.getBoundingClientRect();
-			const toLeft = snapPx(toRect.left / z);
-			const toTop = snapPx(toRect.top / z);
-			const toWidth = snapPx(toRect.width / z);
-			const toHeight = snapPx(toRect.height / z);
-
-			// Morph ghost + crossfade fills/content
-			await Promise.all([
-				tweenTo(ghost, {
-					left: toLeft,
-					top: toTop,
-					width: toWidth,
-					height: toHeight,
-					borderWidth: `${toVisual.borderWidthPx}px`,
-					borderColor: toVisual.borderColor,
-					borderRadius: `${toVisual.radiusPx}px`,
-					duration: morphSeconds,
-					ease: morphEase,
-					snap: { left: snapStep, top: snapStep, width: snapStep, height: snapStep },
-				}),
-				tweenTo(ghostFromFill, { opacity: 0, duration: morphSeconds, ease: morphEase }),
-				tweenTo(ghostToFill, { opacity: 1, duration: morphSeconds, ease: morphEase }),
-				tweenTo(ghostFromContent, {
-					opacity: 0,
-					duration: morphSeconds,
-					ease: morphEase,
-				}),
-				tweenTo(ghostToContent, { opacity: 1, duration: morphSeconds, ease: morphEase }),
-			]);
-			if (mainBoxTransitionIdRef.current !== transitionId) return;
-
-			// Hand-off: show destination behind ghost, wait, then drop ghost
-			restoreTo?.();
-			await tweenTo(toWrapper, { opacity: 1, duration: HANDOFF_SECONDS, ease: 'none' });
-			if (mainBoxTransitionIdRef.current !== transitionId) return;
-
-			// Inbox -> other tab: if the destination hasn't painted yet, keep the ghost "parked"
-			// at the final position until we know the destination UI is ready to be revealed.
-			const shouldHoldGhostUntilPaint = fromKey === 'inbox' && toKey !== 'inbox';
-			if (shouldHoldGhostUntilPaint && renderGlobalOverlays) {
-				const HOLD_TIMEOUT_MS = 1200;
-				const holdStart = performance.now();
-				while (
-					lastPaintedViewRef.current !== view &&
-					mainBoxTransitionIdRef.current === transitionId &&
-					performance.now() - holdStart < HOLD_TIMEOUT_MS
-				) {
-					await nextFrame();
-				}
-				if (mainBoxTransitionIdRef.current !== transitionId) return;
-
-				// Dissolve the ghost into the real destination so it feels like one continuous motion.
-				await tweenTo(ghost, { opacity: 0, duration: 0.14, ease: 'power1.out' });
-				if (mainBoxTransitionIdRef.current !== transitionId) return;
-			} else {
-				// Preserve existing behavior for non-inbox morphs.
-				gsap.set(ghost, { opacity: 0 });
-			}
-
-			gsap.set(ghostFromFill, { opacity: 1 });
-			gsap.set(ghostToFill, { opacity: 0 });
-			gsap.set(ghostFromContent, { opacity: 1 });
-			gsap.set(ghostToContent, { opacity: 0 });
-
-			scheduleDomCleanup(() => {
-				ghostFromContent.replaceChildren();
-				ghostToContent.replaceChildren();
-			});
-
-			mainBoxActiveElRef.current = null;
-		})();
-
-		return () => {
-			mainBoxTransitionIdRef.current = transitionId + 1;
-			gsap.killTweensOf(ghost);
-			gsap.killTweensOf(ghostFromFill);
-			gsap.killTweensOf(ghostToFill);
-			gsap.killTweensOf(ghostFromContent);
-			gsap.killTweensOf(ghostToContent);
-			const el = mainBoxActiveElRef.current;
-			if (el) {
-				gsap.killTweensOf(el);
-				gsap.set(el, { opacity: 1, clearProps: 'pointerEvents' });
-			}
-			cleanupFns.forEach((fn) => fn());
-			gsap.set(ghost, { opacity: 0 });
-			gsap.set(ghostFromFill, { opacity: 1 });
-			gsap.set(ghostToFill, { opacity: 0 });
-			gsap.set(ghostFromContent, { opacity: 1 });
-			gsap.set(ghostToContent, { opacity: 0 });
-			ghostFromContent.replaceChildren();
-			ghostToContent.replaceChildren();
-			mainBoxActiveElRef.current = null;
-		};
-	}, [view, isMobile, isSafari, MAIN_BOX_VISUAL, getCampaignMainBoxKey]);
-
-	useLayoutEffect(() => {
-		if (typeof window === 'undefined') return;
-		if (isMobile) return;
-
-		const ghost = researchPanelGhostRef.current;
-		const ghostFromFill = researchPanelGhostFromFillRef.current;
-		const ghostToFill = researchPanelGhostToFillRef.current;
-		const ghostFromContent = researchPanelGhostFromContentRef.current;
-		const ghostToContent = researchPanelGhostToContentRef.current;
-		if (!ghost || !ghostFromFill || !ghostToFill || !ghostFromContent || !ghostToContent)
-			return;
-
-		const fromKey = lastResearchPanelKeyRef.current;
-		const fromRect = lastResearchPanelRectRef.current;
-		const toKey = getCampaignResearchPanelKey(view);
-
-		// Reset any previously "held" element state.
-		researchPanelActiveElRef.current = null;
-
-		// Only morph when entering/leaving the Search or Inbox tabs.
-		const isMorphEndpoint = (k: CampaignResearchPanelKey) =>
-			k === 'search' || k === 'inbox';
-		if (
-			!fromKey ||
-			!fromRect ||
-			!toKey ||
-			fromKey === toKey ||
-			(!isMorphEndpoint(fromKey) && !isMorphEndpoint(toKey))
-		) {
-			gsap.killTweensOf(ghost);
-			gsap.set(ghost, { opacity: 0 });
-			return;
-		}
-
-		// Safari: the Inbox morph animation is unstable. Hard swap instead.
-		if (isSafari && (fromKey === 'inbox' || toKey === 'inbox')) {
-			gsap.killTweensOf(ghost);
-			gsap.set(ghost, { opacity: 0 });
-			return;
-		}
-
-		const transitionId = ++researchPanelTransitionIdRef.current;
-
-		gsap.killTweensOf(ghost);
-		gsap.killTweensOf(ghostFromFill);
-		gsap.killTweensOf(ghostToFill);
-		gsap.killTweensOf(ghostFromContent);
-		gsap.killTweensOf(ghostToContent);
-
-		// Match the main box morph timing/ease so the research panel stays in lockstep.
-		const morphSeconds = 0.35;
-		const morphEase = 'power2.inOut';
-		const HANDOFF_SECONDS = 0.03;
-
-		// Snap to device pixels to keep borders crisp.
-		const dpr = window.devicePixelRatio || 1;
-		const snapPx = (v: number) => Math.round(v * dpr) / dpr;
-		const snapStep = 1 / (dpr || 1);
-
-		const tweenTo = (target: gsap.TweenTarget, vars: gsap.TweenVars) =>
-			new Promise<void>((resolve) => {
-				gsap.to(target, { ...vars, onComplete: resolve });
-			});
-		const nextFrame = () =>
-			new Promise<void>((resolve) => {
-				requestAnimationFrame(() => resolve());
-			});
-
-		const getVisualPanelEl = (wrapper: HTMLElement | null): HTMLElement | null => {
-			if (!wrapper) return null;
-			const inner = wrapper.firstElementChild as HTMLElement | null;
-			return inner ?? wrapper;
-		};
-
-		const copyBackgroundStyles = (fill: HTMLElement, source: HTMLElement) => {
-			const cs = window.getComputedStyle(source);
-			fill.style.backgroundImage = cs.backgroundImage;
-			fill.style.backgroundColor = cs.backgroundColor;
-			fill.style.backgroundRepeat = cs.backgroundRepeat;
-			fill.style.backgroundSize = cs.backgroundSize;
-			fill.style.backgroundPosition = cs.backgroundPosition;
-		};
-
-		const buildGhostContentClone = (source: HTMLElement): HTMLElement => {
-			const clone = source.cloneNode(true) as HTMLElement;
-			clone.removeAttribute('data-research-panel-container');
-			clone.removeAttribute('data-research-panel-variant');
-			clone.removeAttribute('data-hover-description');
-			clone
-				.querySelectorAll('[data-research-panel-container]')
-				.forEach((n) =>
-					(n as HTMLElement).removeAttribute('data-research-panel-container')
-				);
-			clone
-				.querySelectorAll('[data-research-panel-variant]')
-				.forEach((n) =>
-					(n as HTMLElement).removeAttribute('data-research-panel-variant')
-				);
-			clone
-				.querySelectorAll('[id]')
-				.forEach((n) => (n as HTMLElement).removeAttribute('id'));
-			clone.style.position = 'absolute';
-			clone.style.left = '0';
-			clone.style.top = '0';
-			clone.style.width = '100%';
-			clone.style.height = '100%';
-			clone.style.margin = '0';
-			clone.style.maxWidth = 'none';
-			clone.style.boxSizing = 'border-box';
-			// Ensure it's visible even if Tailwind's `hidden xl:block` exists on the source.
-			clone.style.display = 'block';
-			clone.style.visibility = 'visible';
-			// Remove outer chrome so the ghost container owns the border/background.
-			clone.style.border = 'none';
-			clone.style.borderColor = 'transparent';
-			clone.style.outline = 'none';
-			clone.style.background = 'transparent';
-			clone.style.backgroundColor = 'transparent';
-			clone.style.backgroundImage = 'none';
-			clone.setAttribute('aria-hidden', 'true');
-			clone.style.pointerEvents = 'none';
-			return clone;
-		};
-
-		const hideBox = (el: HTMLElement | null) => {
-			if (!el) return null;
-			const prev = { opacity: el.style.opacity, pointerEvents: el.style.pointerEvents };
-			el.style.opacity = '0';
-			el.style.pointerEvents = 'none';
-			return () => {
-				el.style.opacity = prev.opacity;
-				el.style.pointerEvents = prev.pointerEvents;
-			};
-		};
-
-		const cleanupFns: Array<() => void> = [];
-		const scheduleDomCleanup = (fn: () => void) => {
-			const w = window as any;
-			if (typeof w.requestIdleCallback === 'function') {
-				w.requestIdleCallback(fn, { timeout: 750 });
-			} else {
-				window.setTimeout(fn, 0);
-			}
-		};
-
-		(async () => {
-			const zoomStr = window.getComputedStyle(document.documentElement).zoom;
-			const zoom = zoomStr ? parseFloat(zoomStr) : 1;
-			const z = zoom || 1;
-
-			const fromWrapper = document.querySelector(
-				`[data-research-panel-variant="${fromKey}"]`
-			) as HTMLElement | null;
-			if (!fromWrapper) {
-				gsap.set(ghost, { opacity: 0 });
-				return;
-			}
-			const fromVisualEl = getVisualPanelEl(fromWrapper);
-
-			let toWrapper = document.querySelector(
-				`[data-research-panel-variant="${toKey}"]`
-			) as HTMLElement | null;
-			if (!toWrapper) {
-				await nextFrame();
-				if (researchPanelTransitionIdRef.current !== transitionId) return;
-				toWrapper = document.querySelector(
-					`[data-research-panel-variant="${toKey}"]`
-				) as HTMLElement | null;
-			}
-			if (!toWrapper) {
-				gsap.set(ghost, { opacity: 0 });
-				return;
-			}
-			const toVisualEl = getVisualPanelEl(toWrapper);
-
-			// Prime fills
-			if (fromVisualEl) copyBackgroundStyles(ghostFromFill, fromVisualEl);
-			gsap.set(ghostFromFill, { opacity: 1 });
-			if (toVisualEl) copyBackgroundStyles(ghostToFill, toVisualEl);
-			gsap.set(ghostToFill, { opacity: 0 });
-
-			// Prime content
-			ghostFromContent.replaceChildren();
-			ghostToContent.replaceChildren();
-			if (fromVisualEl)
-				ghostFromContent.appendChild(buildGhostContentClone(fromVisualEl));
-			if (toVisualEl) ghostToContent.appendChild(buildGhostContentClone(toVisualEl));
-			gsap.set(ghostFromContent, { opacity: 1 });
-			gsap.set(ghostToContent, { opacity: 0 });
-
-			// Position ghost at from panel
-			ghost.style.left = `${snapPx(fromRect.left / z)}px`;
-			ghost.style.top = `${snapPx(fromRect.top / z)}px`;
-			ghost.style.width = `${snapPx(fromRect.width / z)}px`;
-			ghost.style.height = `${snapPx(fromRect.height / z)}px`;
-			ghost.style.borderWidth = '3px';
-			ghost.style.borderColor = '#000000';
-			ghost.style.borderRadius = '7px';
-			ghost.style.opacity = '1';
-
-			// Hide real panels
-			const restoreFrom = hideBox(fromWrapper);
-			if (restoreFrom) cleanupFns.push(restoreFrom);
-			const restoreTo = hideBox(toWrapper);
-			if (restoreTo) cleanupFns.push(restoreTo);
-			researchPanelActiveElRef.current = toWrapper;
-
-			const toRect = toWrapper.getBoundingClientRect();
-			const toLeft = snapPx(toRect.left / z);
-			const toTop = snapPx(toRect.top / z);
-			const toWidth = snapPx(toRect.width / z);
-			const toHeight = snapPx(toRect.height / z);
-
-			// Morph ghost + crossfade fills/content
-			await Promise.all([
-				tweenTo(ghost, {
-					left: toLeft,
-					top: toTop,
-					width: toWidth,
-					height: toHeight,
-					duration: morphSeconds,
-					ease: morphEase,
-					snap: { left: snapStep, top: snapStep, width: snapStep, height: snapStep },
-				}),
-				tweenTo(ghostFromFill, { opacity: 0, duration: morphSeconds, ease: morphEase }),
-				tweenTo(ghostToFill, { opacity: 1, duration: morphSeconds, ease: morphEase }),
-				tweenTo(ghostFromContent, {
-					opacity: 0,
-					duration: morphSeconds,
-					ease: morphEase,
-				}),
-				tweenTo(ghostToContent, { opacity: 1, duration: morphSeconds, ease: morphEase }),
-			]);
-			if (researchPanelTransitionIdRef.current !== transitionId) return;
-
-			// Hand-off: show destination behind ghost, wait, then drop ghost
-			restoreTo?.();
-			await tweenTo(toWrapper, { opacity: 1, duration: HANDOFF_SECONDS, ease: 'none' });
-			if (researchPanelTransitionIdRef.current !== transitionId) return;
-
-			// Mirror the main-box "inbox -> other" hold so the panel doesn't flicker during heavy paints.
-			const shouldHoldGhostUntilPaint = fromKey === 'inbox' && toKey !== 'inbox';
-			if (shouldHoldGhostUntilPaint && renderGlobalOverlays) {
-				const HOLD_TIMEOUT_MS = 1200;
-				const holdStart = performance.now();
-				while (
-					lastPaintedViewRef.current !== view &&
-					researchPanelTransitionIdRef.current === transitionId &&
-					performance.now() - holdStart < HOLD_TIMEOUT_MS
-				) {
-					await nextFrame();
-				}
-				if (researchPanelTransitionIdRef.current !== transitionId) return;
-
-				await tweenTo(ghost, { opacity: 0, duration: 0.14, ease: 'power1.out' });
-				if (researchPanelTransitionIdRef.current !== transitionId) return;
-			} else {
-				gsap.set(ghost, { opacity: 0 });
-			}
-
-			gsap.set(ghostFromFill, { opacity: 1 });
-			gsap.set(ghostToFill, { opacity: 0 });
-			gsap.set(ghostFromContent, { opacity: 1 });
-			gsap.set(ghostToContent, { opacity: 0 });
-
-			scheduleDomCleanup(() => {
-				ghostFromContent.replaceChildren();
-				ghostToContent.replaceChildren();
-			});
-
-			researchPanelActiveElRef.current = null;
-		})();
-
-		return () => {
-			researchPanelTransitionIdRef.current = transitionId + 1;
-			gsap.killTweensOf(ghost);
-			gsap.killTweensOf(ghostFromFill);
-			gsap.killTweensOf(ghostToFill);
-			gsap.killTweensOf(ghostFromContent);
-			gsap.killTweensOf(ghostToContent);
-			const el = researchPanelActiveElRef.current;
-			if (el) {
-				gsap.killTweensOf(el);
-				gsap.set(el, { opacity: 1, clearProps: 'pointerEvents' });
-			}
-			cleanupFns.forEach((fn) => fn());
-			gsap.set(ghost, { opacity: 0 });
-			gsap.set(ghostFromFill, { opacity: 1 });
-			gsap.set(ghostToFill, { opacity: 0 });
-			gsap.set(ghostFromContent, { opacity: 1 });
-			gsap.set(ghostToContent, { opacity: 0 });
-			ghostFromContent.replaceChildren();
-			ghostToContent.replaceChildren();
-			researchPanelActiveElRef.current = null;
-		};
-	}, [view, isMobile, isSafari, getCampaignResearchPanelKey, renderGlobalOverlays]);
-
-	// After every view/layout change, record the current main box rect so we can morph from it next time.
-	useLayoutEffect(() => {
-		if (typeof window === 'undefined') return;
-		if (isMobile) return;
-
-		const key = getCampaignMainBoxKey(view);
-		lastMainBoxKeyRef.current = key;
-
-		if (!key) return;
-		const el = document.querySelector(
-			`[data-campaign-main-box="${key}"]`
-		) as HTMLElement | null;
-		if (!el) return;
-
-		const rect = el.getBoundingClientRect();
-		if (rect.width > 0 && rect.height > 0) {
-			lastMainBoxRectRef.current = rect;
-		}
-	}, [
-		view,
-		isMobile,
-		isNarrowDesktop,
-		isNarrowestDesktop,
-		isSearchTabNarrow,
-		isInboxTabNarrow,
-		isInboxTabStacked,
-		getCampaignMainBoxKey,
-	]);
-
-	// After every view/layout change, record the current research panel rect so we can morph from it next time.
-	useLayoutEffect(() => {
-		if (typeof window === 'undefined') return;
-		if (isMobile) return;
-
-		const key = getCampaignResearchPanelKey(view);
-		lastResearchPanelKeyRef.current = key;
-		if (!key) return;
-
-		const el = document.querySelector(
-			`[data-research-panel-variant="${key}"]`
-		) as HTMLElement | null;
-		if (!el) return;
-
-		const rect = el.getBoundingClientRect();
-		if (rect.width > 0 && rect.height > 0) {
-			lastResearchPanelRectRef.current = rect;
-		}
-	}, [
-		view,
-		isMobile,
-		isSearchTabNarrow,
-		isInboxTabNarrow,
-		isInboxTabStacked,
-		hideHeaderBox,
-		getCampaignResearchPanelKey,
-	]);
 
 	const handleRejectDraft = useCallback(
 		async (draftId: number, currentlyRejected?: boolean) => {
@@ -3031,10 +2287,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		() => ({
 			allContacts: contacts || [],
 			drafts: draftEmails,
+			sentEmails,
 			inboxEmails: inboxEmailsForContactsExpandedList,
 			contactByEmail: campaignContactsByEmail,
 		}),
-		[contacts, draftEmails, inboxEmailsForContactsExpandedList, campaignContactsByEmail]
+		[contacts, draftEmails, sentEmails, inboxEmailsForContactsExpandedList, campaignContactsByEmail]
 	);
 
 	const toListNames =
@@ -3633,16 +2890,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}}
 										>
 											{pinnedLeftPanelVariant === 'contacts' ? (
-												<div
-													style={{
-														// Gradual fade-in when entering from inbox/search so the
-														// ContactsExpandedList blends with the morph animations
-														opacity: isEnteringFromMorphView ? 0 : 1,
-														animation: isEnteringFromMorphView
-															? 'miniEmailStructureFadeIn 350ms ease-in 0ms forwards'
-															: 'none',
-													}}
-												>
+												<div>
 													<ContactsExpandedList
 														contacts={contactsForContactsExpandedList}
 														{...contactsListSupplementalProps}
@@ -3686,16 +2934,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													/>
 												</div>
 											) : (
-												<div
-													style={{
-														// Gradual fade-in when entering from inbox/search so the
-														// MiniEmailStructure blends with the morph animations
-														opacity: isEnteringFromMorphView ? 0 : 1,
-														animation: isEnteringFromMorphView
-															? 'miniEmailStructureFadeIn 350ms ease-in 0ms forwards'
-															: 'none',
-													}}
-												>
+												<div>
 													<MiniEmailStructure
 														form={
 															isDraftingView
@@ -4122,7 +3361,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						)}
 
 						{/* Shared Research / Test Preview panel to the right of the drafting tables / writing view */}
-						{/* Hide when transitioning out from standard-position tabs to prevent double-fade */}
 						{!isMobile &&
 							// Use our *effective* width breakpoints (which account for campaign zoom),
 							// rather than Tailwind's `xl:` media query which ignores CSS zoom.
@@ -4130,14 +3368,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							!isNarrowestDesktop &&
 							['testing', 'drafting', 'sent', 'search'].includes(view) &&
 							!(view === 'search' && hasCampaignSearched) &&
-							!(view === 'search' && isSearchTabNarrow) &&
-							!(isTransitioningOut && ['testing', 'drafting', 'sent'].includes(view)) && (
+							!(view === 'search' && isSearchTabNarrow) && (
 								<div
 									className="absolute"
 									data-research-panel-container
-									data-research-panel-variant={
-										view === 'search' ? 'search' : view === 'inbox' ? 'inbox' : 'standard'
-									}
 									style={{
 										top: isStandardSidePanelView
 											? `${standardSidePanelTopOffsetPx}px`
@@ -4150,13 +3384,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														? 'calc(50% + 258px + 32px)' // 258px = half of 516px narrow inbox + 32px gap
 														: 'calc(50% + 453.5px + 32px)'
 													: 'calc(50% + 250px + 32px)',
-										// Counter-animate when transitioning in to keep research panel stable
-										...(isTransitioningIn &&
-										['testing', 'drafting', 'sent'].includes(view)
-											? {
-													animation: 'researchPanelStable 180ms ease-out forwards',
-												}
-											: {}),
 									}}
 								>
 									{isBatchDraftingInProgress ? (
@@ -7338,9 +6565,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									// Stacked layout (952px - 1279px): keep the left inbox column aligned with other tabs.
 									<div
 										className="flex flex-col items-center mx-auto"
-										style={{ width: '909px' }}
+										style={{ width: '927px' }}
 									>
-										<div className="flex flex-row items-start gap-[18px] w-full">
+										<div className="flex flex-row items-start gap-[36px] w-full">
 											{/* Left column: Campaign Header + Inbox list */}
 											<div
 												className="flex flex-col flex-shrink-0"
@@ -7560,142 +6787,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					)}
 				</form>
 			</Form>
-
-			{/* Main-box ghost: portal to <body> so "fixed" aligns with viewport (avoid transformed-parent offsets) */}
-
-			{isClient &&
-				createPortal(
-					<div
-						ref={mainBoxGhostRef}
-						aria-hidden="true"
-						style={{
-							position: 'fixed',
-							left: 0,
-							top: 0,
-							width: 0,
-							height: 0,
-							boxSizing: 'border-box',
-							border: '3px solid #000000',
-							borderRadius: '8px',
-							background: 'transparent',
-							opacity: 0,
-							pointerEvents: 'none',
-							zIndex: 2000,
-							overflow: 'hidden',
-						}}
-					>
-						{/* Fill layers for background crossfade */}
-						<div
-							ref={mainBoxGhostFromFillRef}
-							style={{
-								position: 'absolute',
-								inset: 0,
-								opacity: 1,
-								pointerEvents: 'none',
-							}}
-						/>
-						<div
-							ref={mainBoxGhostToFillRef}
-							style={{
-								position: 'absolute',
-								inset: 0,
-								opacity: 0,
-								pointerEvents: 'none',
-							}}
-						/>
-						{/* Content layers for UI crossfade */}
-						<div
-							ref={mainBoxGhostFromContentRef}
-							style={{
-								position: 'absolute',
-								inset: 0,
-								opacity: 1,
-								pointerEvents: 'none',
-								overflow: 'hidden',
-							}}
-						/>
-						<div
-							ref={mainBoxGhostToContentRef}
-							style={{
-								position: 'absolute',
-								inset: 0,
-								opacity: 0,
-								pointerEvents: 'none',
-								overflow: 'hidden',
-							}}
-						/>
-					</div>,
-					// Use <html> instead of <body> because Murmur applies fallback scaling
-					// via `html.murmur-compact body { transform: scale(...) }` on browsers
-					// that don't support `zoom` (e.g. Firefox). A transformed <body> would
-					// offset `position: fixed` children and break rect alignment.
-					document.documentElement
-				)}
-
-			{isClient &&
-				createPortal(
-					<div
-						ref={researchPanelGhostRef}
-						aria-hidden="true"
-						style={{
-							position: 'fixed',
-							left: 0,
-							top: 0,
-							width: 0,
-							height: 0,
-							boxSizing: 'border-box',
-							border: '3px solid #000000',
-							borderRadius: '7px',
-							background: 'transparent',
-							opacity: 0,
-							pointerEvents: 'none',
-							zIndex: 2001,
-							overflow: 'hidden',
-						}}
-					>
-						{/* Fill layers for background crossfade */}
-						<div
-							ref={researchPanelGhostFromFillRef}
-							style={{
-								position: 'absolute',
-								inset: 0,
-								opacity: 1,
-								pointerEvents: 'none',
-							}}
-						/>
-						<div
-							ref={researchPanelGhostToFillRef}
-							style={{
-								position: 'absolute',
-								inset: 0,
-								opacity: 0,
-								pointerEvents: 'none',
-							}}
-						/>
-						{/* Content layers for UI crossfade */}
-						<div
-							ref={researchPanelGhostFromContentRef}
-							style={{
-								position: 'absolute',
-								inset: 0,
-								opacity: 1,
-								pointerEvents: 'none',
-								overflow: 'hidden',
-							}}
-						/>
-						<div
-							ref={researchPanelGhostToContentRef}
-							style={{
-								position: 'absolute',
-								inset: 0,
-								opacity: 0,
-								pointerEvents: 'none',
-								overflow: 'hidden',
-							}}
-						/>
-					</div>,
-					document.documentElement
-				)}
 
 			<UpgradeSubscriptionDrawer
 				message="You have run out of drafting credits! Please upgrade your plan."

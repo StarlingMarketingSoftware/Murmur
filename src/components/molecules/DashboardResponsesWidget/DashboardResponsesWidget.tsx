@@ -20,15 +20,17 @@ import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import type { InboundEmailWithRelations } from '@/types';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
-import DashboardActionBarStarIcon from '@/components/atoms/_svg/DashboardActionBarStarIcon';
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 import { cn } from '@/utils/ui';
 import { EmailStatus } from '@/constants/prismaEnums';
 import { urls } from '@/constants/urls';
 import { DashboardOpportunitiesContent } from '@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesWidget';
 import { NewEmailHoverPreview } from '@/components/molecules/DashboardStrategyBox/NewEmailHoverPreview';
-
-type DashboardResponsesTab = 'responses' | 'sent' | 'opportunities';
+import {
+	DashboardResponsesFilterBar,
+	RESPONSE_WIDGET_BACKGROUND_BY_TAB,
+	type DashboardResponsesTab,
+} from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesFilterBar';
 
 export type ResponsesMockTab = 'responses' | 'sent' | 'opportunities';
 
@@ -113,23 +115,6 @@ const buildMockInboundEmail = (
 	} as unknown as InboundEmailWithRelations & { isSent?: boolean };
 };
 
-const RESPONSE_TOGGLE_TABS: Array<{
-	key: DashboardResponsesTab;
-	label: string;
-	width: number;
-	activeFill: string;
-}> = [
-	{ key: 'responses', label: 'Responses', width: 104, activeFill: '#98DAFC' },
-	{ key: 'sent', label: 'Sent', width: 97, activeFill: '#B0E0A6' },
-	{ key: 'opportunities', label: 'Opportunities', width: 145, activeFill: '#FFD5D5' },
-];
-
-const RESPONSE_WIDGET_BACKGROUND_BY_TAB: Record<DashboardResponsesTab, string> = {
-	responses: '#84C1E2',
-	sent: '#6DB97B',
-	opportunities: '#D97676',
-};
-
 const EMPTY_RESPONSE_OUTLINE_ROW_COUNT = 4;
 const EMAIL_PREVIEW_HOVER_DELAY_MS = 1000;
 const EMAIL_PREVIEW_WIDTH_PX = 654;
@@ -196,12 +181,6 @@ const FadeOverflowText: FC<{
 		</span>
 	);
 };
-
-const getResponseToggleDividerColor = (
-	activeTab: DashboardResponsesTab,
-	leftTab: DashboardResponsesTab,
-	rightTab: DashboardResponsesTab
-) => (activeTab === leftTab || activeTab === rightTab ? '#000000' : 'rgba(0,0,0,0.18)');
 
 const getDayOrdinalSuffix = (day: number) => {
 	// 11, 12, 13 are special-cased
@@ -591,66 +570,12 @@ export const DashboardResponsesWidget: FC<{
 					gap: '7px',
 				}}
 			>
-				<div
-					style={{
-						position: 'relative',
-						width: '346px',
-						height: '22px',
-						borderRadius: '6px',
-						backgroundColor: '#FFFFFF',
-						display: 'grid',
-						gridTemplateColumns: RESPONSE_TOGGLE_TABS.map((tab) => `${tab.width}px`).join(' '),
-						overflow: 'hidden',
-						fontFamily: 'Inter, sans-serif',
-						fontSize: '14px',
-						fontWeight: 500,
-						lineHeight: '20px',
-						color: '#000000',
-					}}
-				>
-					{RESPONSE_TOGGLE_TABS.map((tab, index) => {
-						const isActive = activeTab === tab.key;
-						const previousTab = RESPONSE_TOGGLE_TABS[index - 1]?.key;
-						return (
-							<button
-								key={tab.key}
-								type="button"
-								aria-pressed={isActive}
-								onClick={() => setActiveTab(tab.key)}
-								style={{
-									width: '100%',
-									height: '100%',
-									alignSelf: 'stretch',
-									justifySelf: 'stretch',
-									border: 'none',
-									borderLeft: previousTab
-										? `1px solid ${getResponseToggleDividerColor(activeTab, previousTab, tab.key)}`
-										: 'none',
-									boxSizing: 'border-box',
-									background: isActive ? tab.activeFill : '#FFFFFF',
-									font: 'inherit',
-									color: 'inherit',
-									padding: 0,
-									cursor: 'pointer',
-									display: 'flex',
-									alignItems: 'center',
-									justifyContent: 'center',
-									gap: tab.key === 'opportunities' ? '7px' : '0px',
-									whiteSpace: 'nowrap',
-								}}
-							>
-								{tab.key === 'opportunities' && (
-									<DashboardActionBarStarIcon
-										width={15}
-										height={15}
-										style={{ color: '#E32222', flexShrink: 0 }}
-									/>
-								)}
-								<span>{tab.label}</span>
-							</button>
-						);
-					})}
-				</div>
+				<DashboardResponsesFilterBar
+					activeTab={activeTab}
+					onTabChange={setActiveTab}
+					width={346}
+					height={22}
+				/>
 
 				<div
 					style={{

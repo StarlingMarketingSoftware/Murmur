@@ -13,7 +13,6 @@ import { CampaignPageSkeleton } from '@/components/molecules/CampaignPageSkeleto
 import { useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import { cn } from '@/utils';
-import { isSafariBrowser } from '@/utils/browserDetection';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useMe } from '@/hooks/useMe';
 import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
@@ -1782,9 +1781,6 @@ const Murmur = () => {
 	const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const maxWaitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const crossfadeContainerRef = useRef<HTMLDivElement>(null);
-	const headerBoxMoveCleanupRef = useRef<(() => void) | null>(null);
-	const contactsDraftsPillMoveCleanupRef = useRef<(() => void) | null>(null);
-	const isSafari = useMemo(() => isSafariBrowser(), []);
 
 	// Mobile never supports the Writing ("testing") tab. Clamp immediately so we never mount
 	// HybridPromptInput on mobile (and never transition through it).
@@ -1853,26 +1849,6 @@ const Murmur = () => {
 			return;
 		}
 
-		// Safari: disable the Inbox tab transition animation (it breaks badly in WebKit).
-		// We keep the animation for Chrome/Chromium.
-		if (isSafari && (activeView === 'inbox' || newView === 'inbox')) {
-			// Stop any in-flight shared-element animations so we don't leave "ghost" nodes behind.
-			if (headerBoxMoveCleanupRef.current) {
-				headerBoxMoveCleanupRef.current();
-				headerBoxMoveCleanupRef.current = null;
-			}
-			if (contactsDraftsPillMoveCleanupRef.current) {
-				contactsDraftsPillMoveCleanupRef.current();
-				contactsDraftsPillMoveCleanupRef.current = null;
-			}
-
-			setPreviousView(null);
-			setIsTransitioning(false);
-			setIsFadingOutPreviousView(false);
-			setActiveViewInternal(newView);
-			return;
-		}
-		
 		// Start transition: keep previous view visible while the destination paints.
 		// Desktop: fade out the previous view once the destination is ready.
 		// Mobile: no fade (hard swap) once the destination is ready.
@@ -1892,7 +1868,7 @@ const Murmur = () => {
 			}
 			setIsFadingOutPreviousView(true);
 		}, MAX_TRANSITION_WAIT_MS);
-	}, [activeView, isMobile, isSafari, MOBILE_ALLOWED_VIEWS, requestInboxSentTab]);
+	}, [activeView, isMobile, MOBILE_ALLOWED_VIEWS, requestInboxSentTab]);
 
 	const handleActiveViewReady = useCallback(
 		(readyView: DraftingSectionView) => {
@@ -1939,324 +1915,6 @@ const Murmur = () => {
 		}, TRANSITION_DURATION);
 	}, [isFadingOutPreviousView, previousView]);
 
-	// Shared-element move for the CampaignHeaderBox when tab layouts change.
-	// This is intentionally driven by the same fade-start signal so timing matches other tab transitions.
-	useLayoutEffect(() => {
-		if (!isFadingOutPreviousView) return;
-		if (!previousView) return;
-		if (typeof window === 'undefined') return;
-
-		// Cleanup any in-flight header animation.
-		if (headerBoxMoveCleanupRef.current) {
-			headerBoxMoveCleanupRef.current();
-			headerBoxMoveCleanupRef.current = null;
-		}
-
-		// Respect reduced motion.
-		if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
-
-		const container = crossfadeContainerRef.current;
-		if (!container) return;
-
-		const activeRoot = container.querySelector(
-			'[data-campaign-view-layer="active"]'
-		) as HTMLElement | null;
-		const previousRoot = container.querySelector(
-			'[data-campaign-view-layer="previous"]'
-		) as HTMLElement | null;
-		if (!activeRoot || !previousRoot) return;
-
-		const findVisibleHeader = (root: HTMLElement): HTMLElement | null => {
-			const candidates = Array.from(
-				root.querySelectorAll('[data-campaign-header-box]')
-			) as HTMLElement[];
-			for (const el of candidates) {
-				const rect = el.getBoundingClientRect();
-				if (rect.width > 1 && rect.height > 1) return el;
-			}
-			return null;
-		};
-
-		const fromHeader = findVisibleHeader(previousRoot);
-		const toHeader = findVisibleHeader(activeRoot);
-		if (!fromHeader || !toHeader) return;
-
-		const fromRect = fromHeader.getBoundingClientRect();
-		const toRect = toHeader.getBoundingClientRect();
-		if (fromRect.width <= 1 || fromRect.height <= 1 || toRect.width <= 1 || toRect.height <= 1) {
-			return;
-		}
-
-		// Account for any CSS zoom applied to the root element (keeps the ghost aligned at non-1 zoom).
-		const zoomStr = window.getComputedStyle(document.documentElement).zoom;
-		const zoom = zoomStr ? parseFloat(zoomStr) : 1;
-		const z = zoom || 1;
-
-		const dx = (toRect.left - fromRect.left) / z;
-		const dy = (toRect.top - fromRect.top) / z;
-		// If the header didn't move, don't do anything (avoids flicker on same-layout tab switches).
-		if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
-
-		const ghost = fromHeader.cloneNode(true) as HTMLElement;
-		ghost.setAttribute('data-campaign-header-box-ghost', 'true');
-		ghost.style.position = 'fixed';
-		ghost.style.left = `${fromRect.left / z}px`;
-		ghost.style.top = `${fromRect.top / z}px`;
-		ghost.style.right = 'auto';
-		ghost.style.bottom = 'auto';
-		ghost.style.margin = '0';
-		ghost.style.zIndex = '99999';
-		ghost.style.pointerEvents = 'none';
-		ghost.style.willChange = 'transform';
-		ghost.style.transform = 'translate3d(0px, 0px, 0px)';
-
-		// Ensure the ghost uses the measured box size (avoid sublayout style differences).
-		ghost.style.width = `${fromRect.width / z}px`;
-		ghost.style.height = `${fromRect.height / z}px`;
-		ghost.style.maxWidth = `${fromRect.width / z}px`;
-		ghost.style.maxHeight = `${fromRect.height / z}px`;
-
-		// Hide the real headers during the move to avoid "double header" artifacts.
-		const prevFromOpacity = fromHeader.style.opacity;
-		const prevFromPointerEvents = fromHeader.style.pointerEvents;
-		const prevToOpacity = toHeader.style.opacity;
-		const prevToPointerEvents = toHeader.style.pointerEvents;
-		fromHeader.style.opacity = '0';
-		fromHeader.style.pointerEvents = 'none';
-		toHeader.style.opacity = '0';
-		toHeader.style.pointerEvents = 'none';
-
-		document.body.appendChild(ghost);
-
-		const animation = ghost.animate(
-			[
-				{ transform: 'translate3d(0px, 0px, 0px)' },
-				{ transform: `translate3d(${dx}px, ${dy}px, 0px)` },
-			],
-			{
-				duration: TRANSITION_DURATION,
-				easing: 'ease-out',
-				fill: 'forwards',
-			}
-		);
-
-		const cleanup = () => {
-			try {
-				animation.cancel();
-			} catch {
-				// no-op
-			}
-			ghost.remove();
-			fromHeader.style.opacity = prevFromOpacity;
-			fromHeader.style.pointerEvents = prevFromPointerEvents;
-			toHeader.style.opacity = prevToOpacity;
-			toHeader.style.pointerEvents = prevToPointerEvents;
-		};
-
-		headerBoxMoveCleanupRef.current = cleanup;
-
-		animation.onfinish = () => {
-			ghost.remove();
-			// Reveal the destination header.
-			toHeader.style.opacity = prevToOpacity;
-			toHeader.style.pointerEvents = prevToPointerEvents;
-			// Restore the previous header (it's about to be fully faded out / unmounted anyway).
-			fromHeader.style.opacity = prevFromOpacity;
-			fromHeader.style.pointerEvents = prevFromPointerEvents;
-			headerBoxMoveCleanupRef.current = null;
-		};
-
-		return cleanup;
-	}, [activeView, isFadingOutPreviousView, previousView]);
-
-	// Shared-element move for the Drafts/Sent table header pill when switching between those tabs.
-	// This uses the same fade-start signal and duration so the slide is perfectly synced to the tab fade.
-	useLayoutEffect(() => {
-		if (!isFadingOutPreviousView) return;
-		if (!previousView) return;
-		if (typeof window === 'undefined') return;
-
-		// Cleanup any in-flight pill animation.
-		if (contactsDraftsPillMoveCleanupRef.current) {
-			contactsDraftsPillMoveCleanupRef.current();
-			contactsDraftsPillMoveCleanupRef.current = null;
-		}
-
-		const pillViews: ViewType[] = ['drafting', 'sent'];
-		const shouldAnimatePill =
-			pillViews.includes(previousView) &&
-			pillViews.includes(activeView) &&
-			previousView !== activeView;
-		if (!shouldAnimatePill) return;
-
-		// Respect reduced motion.
-		if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
-
-		const container = crossfadeContainerRef.current;
-		if (!container) return;
-
-		const activeRoot = container.querySelector(
-			'[data-campaign-view-layer="active"]'
-		) as HTMLElement | null;
-		const previousRoot = container.querySelector(
-			'[data-campaign-view-layer="previous"]'
-		) as HTMLElement | null;
-		if (!activeRoot || !previousRoot) return;
-
-		const boxIdForView = (v: ViewType) => (v === 'drafting' ? 'drafts' : v);
-
-		const findVisiblePill = (root: HTMLElement, v: ViewType): HTMLElement | null => {
-			const boxId = boxIdForView(v);
-			const mainBox = root.querySelector(
-				`[data-campaign-main-box="${boxId}"]`
-			) as HTMLElement | null;
-			if (!mainBox) return null;
-
-			const candidates = Array.from(
-				mainBox.querySelectorAll('[data-campaign-shared-pill="campaign-tabs-pill"]')
-			) as HTMLElement[];
-			for (const el of candidates) {
-				const rect = el.getBoundingClientRect();
-				if (rect.width > 1 && rect.height > 1) return el;
-			}
-			return null;
-		};
-
-		const fromPill = findVisiblePill(previousRoot, previousView);
-		const toPill = findVisiblePill(activeRoot, activeView);
-		if (!fromPill || !toPill) return;
-
-		const fromRect = fromPill.getBoundingClientRect();
-		const toRect = toPill.getBoundingClientRect();
-		if (
-			fromRect.width <= 1 ||
-			fromRect.height <= 1 ||
-			toRect.width <= 1 ||
-			toRect.height <= 1
-		) {
-			return;
-		}
-
-		// Account for any CSS zoom applied to the root element (keeps the ghost aligned at non-1 zoom).
-		const zoomStr = window.getComputedStyle(document.documentElement).zoom;
-		const zoom = zoomStr ? parseFloat(zoomStr) : 1;
-		const z = zoom || 1;
-
-		const dx = (toRect.left - fromRect.left) / z;
-		const dy = (toRect.top - fromRect.top) / z;
-		// If the pill didn't move, don't do anything (avoids flicker on same-layout tab switches).
-		if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
-
-		// Two ghosts: crossfade the Contacts and Drafts pills mid-flight so label/colors don't snap.
-		const ghostFrom = fromPill.cloneNode(true) as HTMLElement;
-		const ghostTo = toPill.cloneNode(true) as HTMLElement;
-		ghostFrom.setAttribute('data-campaign-shared-pill-ghost', 'from');
-		ghostTo.setAttribute('data-campaign-shared-pill-ghost', 'to');
-
-		const initGhost = (ghostEl: HTMLElement) => {
-			ghostEl.style.position = 'fixed';
-			ghostEl.style.left = `${fromRect.left / z}px`;
-			ghostEl.style.top = `${fromRect.top / z}px`;
-			ghostEl.style.right = 'auto';
-			ghostEl.style.bottom = 'auto';
-			ghostEl.style.margin = '0';
-			ghostEl.style.zIndex = '99999';
-			ghostEl.style.pointerEvents = 'none';
-			ghostEl.style.willChange = 'transform, opacity';
-			ghostEl.style.transform = 'translate3d(0px, 0px, 0px)';
-
-			// Ensure the ghost uses the measured box size (avoid sublayout style differences).
-			ghostEl.style.width = `${fromRect.width / z}px`;
-			ghostEl.style.height = `${fromRect.height / z}px`;
-			ghostEl.style.maxWidth = `${fromRect.width / z}px`;
-			ghostEl.style.maxHeight = `${fromRect.height / z}px`;
-		};
-		initGhost(ghostFrom);
-		initGhost(ghostTo);
-		ghostFrom.style.opacity = '1';
-		ghostTo.style.opacity = '0';
-
-		// Hide the real pills during the move to avoid "double pill" artifacts.
-		const prevFromOpacity = fromPill.style.opacity;
-		const prevFromPointerEvents = fromPill.style.pointerEvents;
-		const prevToOpacity = toPill.style.opacity;
-		const prevToPointerEvents = toPill.style.pointerEvents;
-		fromPill.style.opacity = '0';
-		fromPill.style.pointerEvents = 'none';
-		toPill.style.opacity = '0';
-		toPill.style.pointerEvents = 'none';
-
-		document.body.appendChild(ghostFrom);
-		document.body.appendChild(ghostTo);
-
-		const transformKeyframes: Keyframe[] = [
-			{ transform: 'translate3d(0px, 0px, 0px)' },
-			{ transform: `translate3d(${dx}px, ${dy}px, 0px)` },
-		];
-		const transformTiming: KeyframeAnimationOptions = {
-			duration: TRANSITION_DURATION,
-			easing: 'ease-out',
-			fill: 'forwards',
-		};
-
-		// Concentrate the crossfade in the middle of the travel (avoid end-snap).
-		const opacityKeyframesFrom: Keyframe[] = [
-			{ opacity: 1, offset: 0 },
-			{ opacity: 1, offset: 0.3 },
-			{ opacity: 0, offset: 0.7 },
-			{ opacity: 0, offset: 1 },
-		];
-		const opacityKeyframesTo: Keyframe[] = [
-			{ opacity: 0, offset: 0 },
-			{ opacity: 0, offset: 0.3 },
-			{ opacity: 1, offset: 0.7 },
-			{ opacity: 1, offset: 1 },
-		];
-		const opacityTiming: KeyframeAnimationOptions = {
-			duration: TRANSITION_DURATION,
-			easing: 'linear',
-			fill: 'forwards',
-		};
-
-		const anims: Animation[] = [
-			ghostFrom.animate(transformKeyframes, transformTiming),
-			ghostTo.animate(transformKeyframes, transformTiming),
-			ghostFrom.animate(opacityKeyframesFrom, opacityTiming),
-			ghostTo.animate(opacityKeyframesTo, opacityTiming),
-		];
-
-		const cleanup = () => {
-			try {
-				for (const a of anims) a.cancel();
-			} catch {
-				// no-op
-			}
-			ghostFrom.remove();
-			ghostTo.remove();
-			fromPill.style.opacity = prevFromOpacity;
-			fromPill.style.pointerEvents = prevFromPointerEvents;
-			toPill.style.opacity = prevToOpacity;
-			toPill.style.pointerEvents = prevToPointerEvents;
-		};
-
-		contactsDraftsPillMoveCleanupRef.current = cleanup;
-
-		// Use the "to" opacity animation as the completion signal (same duration as the fade).
-		anims[3].onfinish = () => {
-			ghostFrom.remove();
-			ghostTo.remove();
-			// Reveal the destination pill.
-			toPill.style.opacity = prevToOpacity;
-			toPill.style.pointerEvents = prevToPointerEvents;
-			// Restore the previous pill (it's about to be fully faded out / unmounted anyway).
-			fromPill.style.opacity = prevFromOpacity;
-			fromPill.style.pointerEvents = prevFromPointerEvents;
-			contactsDraftsPillMoveCleanupRef.current = null;
-		};
-
-		return cleanup;
-	}, [activeView, isFadingOutPreviousView, previousView]);
-	
 	// Cleanup timeout on unmount
 	useEffect(() => {
 		return () => {
@@ -3076,96 +2734,80 @@ const Murmur = () => {
 					>
 						{/* Crossfade transition container */}
 						<div ref={crossfadeContainerRef} className="relative w-full isolate">
-							{/* Determine if both views share the same research panel position */}
-							{(() => {
-								const standardPositionTabs: ViewType[] = ['testing', 'drafting', 'sent'];
-								// Only apply the "stable research panel" treatment during the actual fade,
-								// not while we're waiting for the destination view to paint.
-								const bothSharePosition = isFadingOutPreviousView && previousView && 
-									standardPositionTabs.includes(previousView) && 
-									standardPositionTabs.includes(activeView);
-								
-								return (
-									<>
-										{/* Current view - always visible (avoid the "white flash" between tabs) */}
-										<div
-											data-campaign-view-layer="active"
-											className={cn(
-												'relative w-full',
-												// Prevent interacting with the destination view while the previous view is still covering it.
-												isTransitioning && previousView && 'pointer-events-none'
-											)}
-											style={{ zIndex: 1 }}
-										>
-											<DraftingSection
-												campaign={campaign}
-												view={activeView}
-												renderGlobalOverlays
-												onViewReady={handleActiveViewReady}
-												onDraftOperationsProgress={setDraftOperationsProgress}
-												autoOpenProfileTabWhenIncomplete={cameFromSearch}
-												inboxSentTabRequest={inboxSentTabRequest}
-												onInboxSentTabChange={setInboxSentTab}
-												goToOverview={() => setActiveView('overview')}
-												goToDrafting={() => setActiveView('drafting')}
-												goToWriting={() => setActiveView('testing')}
-												onGoToSearch={handleOpenDashboardSearchForCampaign}
-												goToInbox={() => setActiveView('inbox')}
-												goToSent={() => setActiveView('sent')}
-												onOpenIdentityDialog={() => {
-													setIdentityDialogOrigin('campaign');
-													setIsIdentityDialogOpen(true);
-												}}
-												goToPreviousTab={goToPreviousTab}
-												goToNextTab={goToNextTab}
-												hideHeaderBox={isNarrowestDesktop && !isMobile}
-												isTransitioningIn={bothSharePosition ?? undefined}
-											/>
-										</div>
+							{/* Current view - always visible (avoid the "white flash" between tabs) */}
+							<div
+								data-campaign-view-layer="active"
+								className={cn(
+									'relative w-full',
+									// Prevent interacting with the destination view while the previous view is still covering it.
+									isTransitioning && previousView && 'pointer-events-none'
+								)}
+								style={{ zIndex: 1 }}
+							>
+								<DraftingSection
+									campaign={campaign}
+									view={activeView}
+									renderGlobalOverlays
+									onViewReady={handleActiveViewReady}
+									onDraftOperationsProgress={setDraftOperationsProgress}
+									autoOpenProfileTabWhenIncomplete={cameFromSearch}
+									inboxSentTabRequest={inboxSentTabRequest}
+									onInboxSentTabChange={setInboxSentTab}
+									goToOverview={() => setActiveView('overview')}
+									goToDrafting={() => setActiveView('drafting')}
+									goToWriting={() => setActiveView('testing')}
+									onGoToSearch={handleOpenDashboardSearchForCampaign}
+									goToInbox={() => setActiveView('inbox')}
+									goToSent={() => setActiveView('sent')}
+									onOpenIdentityDialog={() => {
+										setIdentityDialogOrigin('campaign');
+										setIsIdentityDialogOpen(true);
+									}}
+									goToPreviousTab={goToPreviousTab}
+									goToNextTab={goToNextTab}
+									hideHeaderBox={isNarrowestDesktop && !isMobile}
+								/>
+							</div>
 
-										{/* Previous view - fades out above the current view */}
-										{isTransitioning && previousView && (
-											<div
-												data-campaign-view-layer="previous"
-												className="absolute inset-0 w-full pointer-events-none"
-												aria-hidden="true"
-												style={{
-													zIndex: 2,
-													willChange: 'opacity',
-													...(isFadingOutPreviousView
-														? {
-																animation: `viewFadeOut ${TRANSITION_DURATION}ms ease-out forwards`,
-														  }
-														: { opacity: 1 }),
-												}}
-											>
-												<DraftingSection
-													campaign={campaign}
-													view={previousView}
-													renderGlobalOverlays={false}
-													autoOpenProfileTabWhenIncomplete={cameFromSearch}
-													inboxSentTabRequest={inboxSentTabRequest}
-													onInboxSentTabChange={setInboxSentTab}
-													goToOverview={() => setActiveView('overview')}
-													goToDrafting={() => setActiveView('drafting')}
-													goToWriting={() => setActiveView('testing')}
-													onGoToSearch={handleOpenDashboardSearchForCampaign}
-													goToInbox={() => setActiveView('inbox')}
-													goToSent={() => setActiveView('sent')}
-													onOpenIdentityDialog={() => {
-														setIdentityDialogOrigin('campaign');
-														setIsIdentityDialogOpen(true);
-													}}
-													goToPreviousTab={goToPreviousTab}
-													goToNextTab={goToNextTab}
-													hideHeaderBox={isNarrowestDesktop && !isMobile}
-													isTransitioningOut={bothSharePosition ?? undefined}
-												/>
-											</div>
-										)}
-									</>
-								);
-							})()}
+							{/* Previous view - fades out above the current view */}
+							{isTransitioning && previousView && (
+								<div
+									data-campaign-view-layer="previous"
+									className="absolute inset-0 w-full pointer-events-none"
+									aria-hidden="true"
+									style={{
+										zIndex: 2,
+										willChange: 'opacity',
+										...(isFadingOutPreviousView
+											? {
+													animation: `viewFadeOut ${TRANSITION_DURATION}ms ease-out forwards`,
+											  }
+											: { opacity: 1 }),
+									}}
+								>
+									<DraftingSection
+										campaign={campaign}
+										view={previousView}
+										renderGlobalOverlays={false}
+										autoOpenProfileTabWhenIncomplete={cameFromSearch}
+										inboxSentTabRequest={inboxSentTabRequest}
+										onInboxSentTabChange={setInboxSentTab}
+										goToOverview={() => setActiveView('overview')}
+										goToDrafting={() => setActiveView('drafting')}
+										goToWriting={() => setActiveView('testing')}
+										onGoToSearch={handleOpenDashboardSearchForCampaign}
+										goToInbox={() => setActiveView('inbox')}
+										goToSent={() => setActiveView('sent')}
+										onOpenIdentityDialog={() => {
+											setIdentityDialogOrigin('campaign');
+											setIsIdentityDialogOpen(true);
+										}}
+										goToPreviousTab={goToPreviousTab}
+										goToNextTab={goToNextTab}
+										hideHeaderBox={isNarrowestDesktop && !isMobile}
+									/>
+								</div>
+							)}
 						</div>
 					</div>
 				{/* Crossfade transition animations and mobile-specific styles */}
@@ -3233,16 +2875,7 @@ const Murmur = () => {
 							);
 						}
 
-						/* View transition animations - smooth, clean crossfade */
-						@keyframes viewFadeIn {
-							0% {
-								opacity: 0;
-							}
-							100% {
-								opacity: 1;
-							}
-						}
-						
+						/* View transition animation - simple tab fade */
 						@keyframes viewFadeOut {
 							0% {
 								opacity: 1;
@@ -3251,29 +2884,7 @@ const Murmur = () => {
 								opacity: 0;
 							}
 						}
-						
-						/* Animation for transitions where research panel should stay stable
-						   The container stays at full opacity so the research panel doesn't fade,
-						   but we use CSS to fade in the rest of the content */
-						@keyframes viewFadeInStableResearch {
-							0% {
-								opacity: 1;
-							}
-							100% {
-								opacity: 1;
-							}
-						}
-						
-						/* When using stable research transition, fade the main content instead */
-						[data-research-panel-container] {
-							/* Research panel container - stays stable */
-						}
-						
-						/* Fade in non-research-panel content when transitioning */
-						.view-fade-in-content > *:not([data-research-panel-container]) {
-							animation: viewFadeIn ${TRANSITION_DURATION}ms ease-out forwards;
-						}
-						
+
 						/* Mobile styles below */
 						body.murmur-mobile [data-drafting-container] {
 							display: none !important;
