@@ -723,6 +723,9 @@ const getAvatarInitial = (value: string): string =>
 	value.trim().charAt(0).toUpperCase() || '?';
 
 const INBOX_LAST_SENT_FILL_COLOR = '#7ED29E';
+const INBOX_MESSENGER_THREAD_BACKGROUND = '#DCF1FF';
+const INBOX_MESSENGER_OUTBOUND_BACKGROUND = '#ACD2FF';
+const INBOX_MESSENGER_INBOUND_BACKGROUND = '#FFFFFF';
 
 const getConversationSelectionEmail = (conversation: InboxConversation) =>
 	conversation.latestInboundMessage ?? conversation.latestMessage;
@@ -1130,6 +1133,15 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	const selectedPendingReplies = selectedConversationReplyKey
 		? sentReplies[selectedConversationReplyKey] || []
 		: [];
+	const selectedThreadIsSingleInboundMessage =
+		selectedThreadMessages.length === 1 &&
+		selectedPendingReplies.length === 0 &&
+		!selectedThreadMessages[0]?.isSent;
+	const selectedVisibleThreadItemCount =
+		selectedThreadMessages.length + selectedPendingReplies.length;
+	const selectedThreadUsesMessengerLayout = selectedVisibleThreadItemCount >= 3;
+	const selectedThreadEvenSplitMinHeight =
+		selectedVisibleThreadItemCount === 2 ? '50%' : undefined;
 	const currentUserDisplayName =
 		`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.firstName || 'You';
 	const visibleEmailRows =
@@ -1143,7 +1155,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					key: `${email.isSent ? 'sent' : 'email'}-${email.id}`,
 					email,
 					selectionEmail: email,
-		}));
+				}));
 	const shouldUseDetailChrome = Boolean(selectedEmail) || detailOnly;
 	const selectedSenderKey = selectedEmail?.sender?.toLowerCase().trim();
 	const selectedConversationLatestMessageIsSent = Boolean(
@@ -2657,9 +2669,13 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									transform: 'translateX(-50%)',
 									width: `${campaignInboxDetailInnerWidth}px`,
 									height: `${campaignInboxDetailThreadHeight}px`,
-									borderRadius: '7px',
-									border: '1.719px solid #000000',
-									backgroundColor: '#FFFFFF',
+									borderRadius: selectedThreadUsesMessengerLayout ? '20px' : '7px',
+									border: selectedThreadUsesMessengerLayout
+										? '3px solid #000000'
+										: '1.719px solid #000000',
+									backgroundColor: selectedThreadUsesMessengerLayout
+										? INBOX_MESSENGER_THREAD_BACKGROUND
+										: '#FFFFFF',
 									boxSizing: 'border-box',
 									overflow: 'hidden',
 									zIndex: 1,
@@ -2667,7 +2683,11 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							>
 								<CustomScrollbar
 									className="h-full w-full"
-									contentClassName="flex min-h-full flex-col"
+									contentClassName={
+										selectedThreadUsesMessengerLayout
+											? 'flex min-h-full flex-col gap-[14px] px-[16px] py-[16px]'
+											: 'flex min-h-full flex-col'
+									}
 									thumbWidth={2}
 									thumbColor={scrollbarThumbColor}
 									trackColor="transparent"
@@ -2677,6 +2697,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 								>
 									{selectedThreadMessages.map((message, index) => {
 										const isSentMessage = Boolean(message.isSent);
+										const shouldFillThreadBox =
+											selectedThreadIsSingleInboundMessage && !isSentMessage;
 										const isLastThreadItem =
 											index === selectedThreadMessages.length - 1 &&
 											selectedPendingReplies.length === 0;
@@ -2690,14 +2712,68 @@ export const InboxSection: FC<InboxSectionProps> = ({
 											stripQuotedReply(message.strippedText || message.bodyPlain || '') ||
 											getInboxMessageSnippet(message) ||
 											'No content';
+										if (selectedThreadUsesMessengerLayout) {
+											return (
+												<div
+													key={`${isSentMessage ? 'sent' : 'inbound'}-${message.id}-${index}`}
+													className="flex w-full items-end"
+													style={{
+														justifyContent: isSentMessage ? 'flex-end' : 'flex-start',
+														gap: '8px',
+														flexShrink: 0,
+													}}
+												>
+													{!isSentMessage && (
+														<div
+															className="flex shrink-0 items-center justify-center rounded-full"
+															style={{
+																width: '26px',
+																height: '26px',
+																backgroundColor: '#67C76D',
+																...campaignInboxDetailNameTextStyle,
+																fontSize: '14px',
+																color: '#FFFFFF',
+															}}
+														>
+															{getAvatarInitial(senderName)}
+														</div>
+													)}
+													<div
+														className="whitespace-pre-wrap"
+														style={{
+															maxWidth: '62%',
+															backgroundColor: isSentMessage
+																? INBOX_MESSENGER_OUTBOUND_BACKGROUND
+																: INBOX_MESSENGER_INBOUND_BACKGROUND,
+															border: '2px solid #000000',
+															borderRadius: isSentMessage
+																? '20px 20px 6px 20px'
+																: '20px 20px 20px 6px',
+															padding: '9px 13px',
+															boxSizing: 'border-box',
+															fontSize: '14px',
+															lineHeight: 1.35,
+															color: '#000000',
+														}}
+													>
+														{bodyText}
+													</div>
+												</div>
+											);
+										}
 										return (
 											<div
 												key={`${isSentMessage ? 'sent' : 'inbound'}-${message.id}-${index}`}
 												style={{
 													backgroundColor: isSentMessage ? '#FFFFFF' : '#E5F1FF',
-													borderBottom: isLastThreadItem ? 'none' : '1.719px solid #000000',
+													borderBottom: isLastThreadItem
+														? 'none'
+														: '1.719px solid #000000',
 													padding: '13px 24px 10px 24px',
 													boxSizing: 'border-box',
+													minHeight: shouldFillThreadBox
+														? '100%'
+														: selectedThreadEvenSplitMinHeight,
 													flexShrink: 0,
 												}}
 											>
@@ -2756,60 +2832,88 @@ export const InboxSection: FC<InboxSectionProps> = ({
 											</div>
 										);
 									})}
-									{selectedPendingReplies.map((reply, index) => (
-										<div
-											key={`pending-reply-${index}`}
-											style={{
-												backgroundColor: '#FFFFFF',
-												borderBottom:
-													index === selectedPendingReplies.length - 1
-														? 'none'
-														: '1.719px solid #000000',
-												padding: '13px 24px 10px 24px',
-												boxSizing: 'border-box',
-												flexShrink: 0,
-											}}
-										>
-											<div className="flex items-start justify-between gap-4">
-												<div className="flex min-w-0 items-center gap-[12px]">
+									{selectedPendingReplies.map((reply, index) => {
+										if (selectedThreadUsesMessengerLayout) {
+											return (
+												<div
+													key={`pending-reply-${index}`}
+													className="flex w-full justify-end"
+													style={{ flexShrink: 0 }}
+												>
 													<div
-														className="flex shrink-0 items-center justify-center rounded-full"
 														style={{
-															width: '25px',
-															height: '25px',
-															backgroundColor: '#67C76D',
-															...campaignInboxDetailNameTextStyle,
-															color: '#FFFFFF',
+															maxWidth: '62%',
+															backgroundColor: INBOX_MESSENGER_OUTBOUND_BACKGROUND,
+															border: '2px solid #000000',
+															borderRadius: '20px 20px 6px 20px',
+															padding: '9px 13px',
+															boxSizing: 'border-box',
+															fontSize: '14px',
+															lineHeight: 1.35,
+															color: '#000000',
 														}}
-													>
-														{getAvatarInitial(currentUserDisplayName)}
+														dangerouslySetInnerHTML={{ __html: reply.message }}
+													/>
+												</div>
+											);
+										}
+
+										return (
+											<div
+												key={`pending-reply-${index}`}
+												style={{
+													backgroundColor: '#FFFFFF',
+													borderBottom:
+														index === selectedPendingReplies.length - 1
+															? 'none'
+															: '1.719px solid #000000',
+													minHeight: selectedThreadEvenSplitMinHeight,
+													padding: '13px 24px 10px 24px',
+													boxSizing: 'border-box',
+													flexShrink: 0,
+												}}
+											>
+												<div className="flex items-start justify-between gap-4">
+													<div className="flex min-w-0 items-center gap-[12px]">
+														<div
+															className="flex shrink-0 items-center justify-center rounded-full"
+															style={{
+																width: '25px',
+																height: '25px',
+																backgroundColor: '#67C76D',
+																...campaignInboxDetailNameTextStyle,
+																color: '#FFFFFF',
+															}}
+														>
+															{getAvatarInitial(currentUserDisplayName)}
+														</div>
+														<span
+															className="truncate"
+															style={campaignInboxDetailNameTextStyle}
+														>
+															{currentUserDisplayName}
+														</span>
 													</div>
 													<span
-														className="truncate"
-														style={campaignInboxDetailNameTextStyle}
+														className="shrink-0 text-black"
+														style={{ fontSize: '14px', lineHeight: 1 }}
 													>
-														{currentUserDisplayName}
+														{formatCampaignInboxTimestamp(reply.timestamp)}
 													</span>
 												</div>
-												<span
-													className="shrink-0 text-black"
-													style={{ fontSize: '14px', lineHeight: 1 }}
-												>
-													{formatCampaignInboxTimestamp(reply.timestamp)}
-												</span>
+												<div
+													style={{
+														marginTop: '8px',
+														paddingLeft: '37px',
+														fontSize: '18px',
+														lineHeight: 1.22,
+														color: '#000000',
+													}}
+													dangerouslySetInnerHTML={{ __html: reply.message }}
+												/>
 											</div>
-											<div
-												style={{
-													marginTop: '8px',
-													paddingLeft: '37px',
-													fontSize: '18px',
-													lineHeight: 1.22,
-													color: '#000000',
-												}}
-												dangerouslySetInnerHTML={{ __html: reply.message }}
-											/>
-										</div>
-									))}
+										);
+									})}
 								</CustomScrollbar>
 							</div>
 
@@ -2978,7 +3082,11 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							<div className="flex-1 w-full flex flex-col min-h-0">
 								<CustomScrollbar
 									className="flex-1 w-full min-h-0"
-									contentClassName={`flex flex-col ${isMobile ? 'pb-[14px]' : 'pb-[18px]'}`}
+									contentClassName={
+										selectedThreadUsesMessengerLayout
+											? 'flex flex-col gap-[14px] px-[16px] py-[16px]'
+											: `flex flex-col ${isMobile ? 'pb-[14px]' : 'pb-[18px]'}`
+									}
 									thumbWidth={2}
 									thumbColor={scrollbarThumbColor}
 									trackColor="transparent"
@@ -2986,12 +3094,77 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									alignTrackToScrollContainer={scrollbarAlignTrackToScrollContainer}
 									disableOverflowClass
 									lockHorizontalScroll
+									style={{
+										backgroundColor: selectedThreadUsesMessengerLayout
+											? INBOX_MESSENGER_THREAD_BACKGROUND
+											: undefined,
+									}}
 								>
 									{/* Email thread: inbound left, outbound right. */}
 									{selectedThreadMessages.map((message, index) => {
 										const isSentMessage = Boolean(message.isSent);
 										const shouldUseCompactBubble =
 											isUsingSampleData || selectedThreadIsConversation;
+										const senderName = isSentMessage
+											? currentUserDisplayName
+											: getCanonicalContactName(message, contactByEmail);
+										const bodyText =
+											stripQuotedReply(message.strippedText || message.bodyPlain || '') ||
+											getInboxMessageSnippet(message) ||
+											'No content';
+
+										if (selectedThreadUsesMessengerLayout) {
+											return (
+												<div
+													key={`${isSentMessage ? 'sent' : 'inbound'}-${message.id}-${index}`}
+													className="flex w-full items-end"
+													style={{
+														justifyContent: isSentMessage ? 'flex-end' : 'flex-start',
+														gap: '8px',
+														flexShrink: 0,
+													}}
+												>
+													{!isSentMessage && (
+														<div
+															className="flex shrink-0 items-center justify-center rounded-full"
+															style={{
+																width: isMobile ? '24px' : '26px',
+																height: isMobile ? '24px' : '26px',
+																backgroundColor: '#67C76D',
+																fontFamily: 'Inter, sans-serif',
+																fontSize: isMobile ? '13px' : '14px',
+																fontWeight: 700,
+																lineHeight: 1,
+																color: '#FFFFFF',
+															}}
+														>
+															{getAvatarInitial(senderName)}
+														</div>
+													)}
+													<div
+														className="whitespace-pre-wrap"
+														style={{
+															maxWidth: isMobile ? '78%' : '62%',
+															backgroundColor: isSentMessage
+																? INBOX_MESSENGER_OUTBOUND_BACKGROUND
+																: INBOX_MESSENGER_INBOUND_BACKGROUND,
+															border: '2px solid #000000',
+															borderRadius: isSentMessage
+																? '20px 20px 6px 20px'
+																: '20px 20px 20px 6px',
+															padding: isMobile ? '8px 12px' : '9px 13px',
+															boxSizing: 'border-box',
+															fontSize: isMobile ? '13px' : '14px',
+															lineHeight: 1.35,
+															color: '#000000',
+														}}
+													>
+														{bodyText}
+													</div>
+												</div>
+											);
+										}
+
 										return (
 											<div
 												key={`${isSentMessage ? 'sent' : 'inbound'}-${message.id}-${index}`}
@@ -3052,44 +3225,71 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									{(selectedConversationReplyKey
 										? sentReplies[selectedConversationReplyKey] || []
 										: []
-									).map((reply, index) => (
-										<div
-											key={index}
-											style={{
-												width: isMobile ? mobileEmailBodyWidth : `${emailBodyWidth}px`,
-												height:
-													isUsingSampleData || selectedThreadIsConversation
-														? 'auto'
-														: isMobile
-															? '200px'
-															: '326px',
-												minHeight:
-													isUsingSampleData || selectedThreadIsConversation
-														? isMobile
-															? '96px'
-															: '104px'
-														: undefined,
-												marginTop: isMobile ? '12px' : '19px',
-												marginRight: 0,
-												alignSelf: 'flex-end',
-												flexShrink: 0,
-												backgroundColor: '#FFFFFF',
-												border: '3px solid #000000',
-												borderRadius: '8px',
-												padding: isMobile ? '12px' : '16px',
-												overflowY: isUsingSampleData ? 'visible' : 'auto',
-											}}
-										>
-											<div className="mb-4 flex items-center justify-between gap-3 text-sm text-black">
-												<span>{formatEmailDetailTimestamp(reply.timestamp)}</span>
-												<span className="text-xs text-gray-500">You</span>
-											</div>
+									).map((reply, index) => {
+										if (selectedThreadUsesMessengerLayout) {
+											return (
+												<div
+													key={index}
+													className="flex w-full justify-end"
+													style={{ flexShrink: 0 }}
+												>
+													<div
+														style={{
+															maxWidth: isMobile ? '78%' : '62%',
+															backgroundColor: INBOX_MESSENGER_OUTBOUND_BACKGROUND,
+															border: '2px solid #000000',
+															borderRadius: '20px 20px 6px 20px',
+															padding: isMobile ? '8px 12px' : '9px 13px',
+															boxSizing: 'border-box',
+															fontSize: isMobile ? '13px' : '14px',
+															lineHeight: 1.35,
+															color: '#000000',
+														}}
+														dangerouslySetInnerHTML={{ __html: reply.message }}
+													/>
+												</div>
+											);
+										}
+
+										return (
 											<div
-												className="text-sm"
-												dangerouslySetInnerHTML={{ __html: reply.message }}
-											/>
-										</div>
-									))}
+												key={index}
+												style={{
+													width: isMobile ? mobileEmailBodyWidth : `${emailBodyWidth}px`,
+													height:
+														isUsingSampleData || selectedThreadIsConversation
+															? 'auto'
+															: isMobile
+																? '200px'
+																: '326px',
+													minHeight:
+														isUsingSampleData || selectedThreadIsConversation
+															? isMobile
+																? '96px'
+																: '104px'
+															: undefined,
+													marginTop: isMobile ? '12px' : '19px',
+													marginRight: 0,
+													alignSelf: 'flex-end',
+													flexShrink: 0,
+													backgroundColor: '#FFFFFF',
+													border: '3px solid #000000',
+													borderRadius: '8px',
+													padding: isMobile ? '12px' : '16px',
+													overflowY: isUsingSampleData ? 'visible' : 'auto',
+												}}
+											>
+												<div className="mb-4 flex items-center justify-between gap-3 text-sm text-black">
+													<span>{formatEmailDetailTimestamp(reply.timestamp)}</span>
+													<span className="text-xs text-gray-500">You</span>
+												</div>
+												<div
+													className="text-sm"
+													dangerouslySetInnerHTML={{ __html: reply.message }}
+												/>
+											</div>
+										);
+									})}
 								</CustomScrollbar>
 
 								{/* Reply Box - fixed at bottom */}
