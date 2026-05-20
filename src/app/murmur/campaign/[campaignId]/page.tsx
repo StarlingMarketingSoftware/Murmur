@@ -195,6 +195,33 @@ const CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS = [
 	22,
 ] as const;
 const CAMPAIGN_MAP_ZOOM_CONTROL_MAX_INDEX = CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS.length - 1;
+
+const resetCampaignDocumentScroll = () => {
+	if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+	const root = document.documentElement;
+	const body = document.body;
+	const hasScrollOffset =
+		window.scrollX !== 0 ||
+		window.scrollY !== 0 ||
+		root.scrollTop !== 0 ||
+		root.scrollLeft !== 0 ||
+		body.scrollTop !== 0 ||
+		body.scrollLeft !== 0;
+
+	if (!hasScrollOffset) return;
+
+	try {
+		window.scrollTo(0, 0);
+	} catch {
+		// ignore
+	}
+	root.scrollTop = 0;
+	root.scrollLeft = 0;
+	body.scrollTop = 0;
+	body.scrollLeft = 0;
+};
+
 type CampaignMapZoomControlRequest = {
 	zoom: number;
 	nonce: number;
@@ -898,6 +925,9 @@ const Murmur = () => {
 		// Normal + narrow: keep compact mode (snug, no page scroll).
 		html.classList.remove(CAMPAIGN_SCROLLABLE_CLASS);
 		html.classList.add(CAMPAIGN_COMPACT_CLASS);
+		// This route is a fixed-position workspace on desktop. If the document keeps a
+		// restored/early wheel scroll offset, rect-based zoom fitting measures the wrong bottom.
+		resetCampaignDocumentScroll();
 
 		// Clamp zoom so the bottom panels remain fully visible (snug, no scroll).
 		try {
@@ -1144,6 +1174,7 @@ const Murmur = () => {
 
 		let cancelled = false;
 		let scheduledRaf: number | null = null;
+		let scrollResetRaf: number | null = null;
 		const scheduleZoomUpdate = () => {
 			if (cancelled) return;
 			if (scheduledRaf !== null) return;
@@ -1151,6 +1182,19 @@ const Murmur = () => {
 				scheduledRaf = null;
 				if (cancelled) return;
 				updateCampaignZoomForViewport();
+			});
+		};
+		const keepCompactPageAtOrigin = () => {
+			if (cancelled) return;
+			const html = document.documentElement;
+			if (!html.classList.contains(CAMPAIGN_COMPACT_CLASS)) return;
+			if (html.classList.contains(CAMPAIGN_SCROLLABLE_CLASS)) return;
+			if (scrollResetRaf !== null) return;
+
+			scrollResetRaf = window.requestAnimationFrame(() => {
+				scrollResetRaf = null;
+				if (cancelled) return;
+				resetCampaignDocumentScroll();
 			});
 		};
 
@@ -1268,6 +1312,7 @@ const Murmur = () => {
 			mo.observe(observeRoot, { childList: true, subtree: true });
 		}
 		window.addEventListener('resize', onResize, { passive: true });
+		window.addEventListener('scroll', keepCompactPageAtOrigin, { passive: true });
 		const onPageShow = (e: PageTransitionEvent) => {
 			if (e.persisted) updateCampaignZoomForViewport();
 		};
@@ -1285,10 +1330,12 @@ const Murmur = () => {
 			document.documentElement.style.removeProperty(CAMPAIGN_MAP_BACKDROP_START_VAR);
 			document.documentElement.style.removeProperty(CAMPAIGN_MAP_BACKDROP_END_VAR);
 			if (scheduledRaf !== null) window.cancelAnimationFrame(scheduledRaf);
+			if (scrollResetRaf !== null) window.cancelAnimationFrame(scrollResetRaf);
 			io?.disconnect();
 			mo?.disconnect();
 			window.cancelAnimationFrame(rafId);
 			window.removeEventListener('resize', onResize);
+			window.removeEventListener('scroll', keepCompactPageAtOrigin);
 			window.removeEventListener('pageshow', onPageShow);
 		};
 	}, [isMobile, updateCampaignZoomForViewport]);
@@ -1524,6 +1571,63 @@ const Murmur = () => {
 		isCampaignWorkspaceExpandedRef.current = isCampaignWorkspaceExpanded;
 		updateCampaignZoomForViewport();
 	}, [isCampaignWorkspaceExpanded, updateCampaignZoomForViewport]);
+
+	// Campaign-only map camera padding: shift the globe left so the interactive viewport
+	// excludes the right-side UI panels. This must not affect dashboard/search and must
+	// reset on the Overview tab.
+	const shouldApplyCampaignMapCameraPadding =
+		isMobile === false && activeView !== 'overview';
+	const [campaignMapCameraPadding, setCampaignMapCameraPadding] =
+		useState<SearchResultsMapProps['cameraPadding']>(null);
+	const recomputeCampaignMapCameraPadding = useCallback(() => {
+		if (typeof window === 'undefined') return;
+		const html = document.documentElement;
+		if (!shouldApplyCampaignMapCameraPadding) {
+			setCampaignMapCameraPadding(null);
+			return;
+		}
+
+		try {
+			const cs = window.getComputedStyle(html);
+			const zoomStr = cs.zoom;
+			const parsedZoom = zoomStr ? parseFloat(zoomStr) : Number.NaN;
+			const varZoomStr = cs.getPropertyValue(CAMPAIGN_ZOOM_VAR);
+			const parsedVarZoom = varZoomStr ? parseFloat(varZoomStr) : Number.NaN;
+			const z =
+				Number.isFinite(parsedZoom) && parsedZoom > 0 && parsedZoom !== 1
+					? parsedZoom
+					: Number.isFinite(parsedVarZoom) && parsedVarZoom > 0
+						? parsedVarZoom
+						: DEFAULT_CAMPAIGN_ZOOM;
+
+			const backdropStartStr =
+				html.style.getPropertyValue(CAMPAIGN_MAP_BACKDROP_START_VAR) ||
+				cs.getPropertyValue(CAMPAIGN_MAP_BACKDROP_START_VAR);
+			const backdropStartCss = backdropStartStr
+				? parseFloat(backdropStartStr)
+				: Number.NaN;
+			if (!Number.isFinite(backdropStartCss) || backdropStartCss <= 0) {
+				setCampaignMapCameraPadding({ right: 0, left: 0, top: 0, bottom: 0 });
+				return;
+			}
+
+			const viewportW = window.innerWidth;
+			// CSS vars are expressed in the unscaled (layout) coordinate space; multiply by the
+			// effective campaign zoom to convert to physical pixels.
+			const backdropStartPx = backdropStartCss * (z || 1);
+			const uiCoveredRightPx = viewportW - backdropStartPx;
+			// Back off a bit from the overlay boundary so the globe doesn't feel "too far left".
+			// This still keeps markers away from the main UI column, but preserves more center mass.
+			const CAMERA_PADDING_BACKOFF_PX = 550;
+			const rightPaddingPx = Math.max(
+				0,
+				Math.round(uiCoveredRightPx - CAMERA_PADDING_BACKOFF_PX)
+			);
+			setCampaignMapCameraPadding({ right: rightPaddingPx, left: 0, top: 0, bottom: 0 });
+		} catch {
+			setCampaignMapCameraPadding(null);
+		}
+	}, [shouldApplyCampaignMapCameraPadding]);
 	const [draftOperationsProgress, setDraftOperationsProgress] = useState<{
 		visible: boolean;
 		operations: Array<{ current: number; total: number }>;
@@ -2153,6 +2257,7 @@ const Murmur = () => {
 			nightLighting: globeNightLighting,
 			presentation: 'interactive',
 			autoSpin: false,
+			cameraPadding: campaignMapCameraPadding,
 			contacts: campaignMapContactsForMap,
 			selectedContacts: [],
 			activeTool: activeMapTool,
@@ -2164,6 +2269,7 @@ const Murmur = () => {
 		}),
 		[
 			activeMapTool,
+			campaignMapCameraPadding,
 			campaignMapContactsForMap,
 			globeNightLighting,
 			globeWeatherMood,
@@ -2195,6 +2301,21 @@ const Murmur = () => {
 	useLayoutEffect(() => {
 		setPersistentMapConfig(persistentCampaignMapConfig);
 	}, [persistentCampaignMapConfig, setPersistentMapConfig]);
+
+	useLayoutEffect(() => {
+		// Keep camera padding synced with campaign zoom + right-side UI coverage.
+		recomputeCampaignMapCameraPadding();
+	}, [recomputeCampaignMapCameraPadding, activeView, isCampaignWorkspaceExpanded]);
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		const onResize = () => recomputeCampaignMapCameraPadding();
+		window.addEventListener('resize', onResize, { passive: true });
+		window.addEventListener(CAMPAIGN_ZOOM_EVENT, onResize as EventListener);
+		return () => {
+			window.removeEventListener('resize', onResize);
+			window.removeEventListener(CAMPAIGN_ZOOM_EVENT, onResize as EventListener);
+		};
+	}, [recomputeCampaignMapCameraPadding]);
 
 	useLayoutEffect(() => {
 		return () => {

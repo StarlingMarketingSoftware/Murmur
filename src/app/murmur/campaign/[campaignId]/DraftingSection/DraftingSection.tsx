@@ -659,6 +659,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		bottomPanelBoxHeightPx;
 	const sharedBottomPanelSlotTopPx =
 		sharedWideTabZoomEnvelopeBottomPx - bottomPanelBoxHeightPx;
+	// Match the back-card offset so the stack keeps a 32px gap from the left panel.
+	const compactDraftReviewStackShiftXPx = 18;
 	// Keeps the inbox box 36px to the right of the standard left column anchor.
 	const inboxMainPanelShiftRightPx = 185.5;
 	const activeInboxMainPanelShiftRightPx = isCampaignWorkspaceCompact
@@ -4888,7 +4890,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 									) : (
 										// Regular centered layout for wider viewports
-										<div className="flex flex-col items-center">
+										<div
+											className="flex flex-col items-center"
+											style={
+												isCampaignWorkspaceCompact &&
+												isDraftPreviewOpen &&
+												!isSelectedDraftRegenSettingsPreviewOpen &&
+												draftEmails.length > 1
+													? {
+															transform: `translateX(${compactDraftReviewStackShiftXPx}px)`,
+														}
+													: undefined
+											}
+										>
 											<DraftedEmails
 												ref={draftedEmailsRef}
 												mainBoxId="drafts"

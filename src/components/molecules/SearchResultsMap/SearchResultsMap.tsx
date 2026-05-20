@@ -555,6 +555,17 @@ export interface SearchResultsMapProps {
 	/** When true, prevents the map from auto-zooming to fit contacts or the locked state. */
 	skipAutoFit?: boolean;
 	/**
+	 * Optional Mapbox camera padding (in px). Useful for layouts where UI covers part
+	 * of the map (e.g. a right-side panel) and the map should behave as if that area
+	 * is not available.
+	 */
+	cameraPadding?: {
+		top?: number;
+		right?: number;
+		bottom?: number;
+		left?: number;
+	} | null;
+	/**
 	 * Controls whether the map should behave like a decorative dashboard background (no interactions,
 	 * optional auto-rotation), or the full interactive results map.
 	 */
@@ -615,6 +626,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	isLoading,
 	disableDotWaveReveal = false,
 	skipAutoFit,
+	cameraPadding = null,
 	presentation = 'interactive',
 	autoSpin = false,
 	weatherMood: weatherMoodProp = 'normal',
@@ -849,6 +861,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [mapLoadError, setMapLoadError] = useState<string | null>(null);
 	const [selectedStateKey, setSelectedStateKey] = useState<string | null>(null);
 	const [zoomLevel, setZoomLevel] = useState(MAP_DEFAULT_ZOOM);
+	// Track last-applied camera padding so we don't spam Mapbox with identical updates.
+	const lastCameraPaddingKeyRef = useRef<string>('');
 	// Live-updated softbox overlay refs. zoomLevel only updates on `moveend`, so
 	// we drive these imperatively from the map's `zoom` event to keep the lighting
 	// fade in lockstep with pinch/scroll/wheel interactions.
@@ -994,6 +1008,34 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		void ensureWasmGeoModuleLoaded();
 	}, []);
+
+	// Apply camera padding (campaign map shift-left uses this).
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		// Never apply UI-driven padding in decorative background mode.
+		if (isBackgroundPresentation) return;
+
+		const safe = (n: unknown) => {
+			const v = typeof n === 'number' && Number.isFinite(n) ? n : 0;
+			return v > 0 ? v : 0;
+		};
+		const next = {
+			top: safe(cameraPadding?.top),
+			right: safe(cameraPadding?.right),
+			bottom: safe(cameraPadding?.bottom),
+			left: safe(cameraPadding?.left),
+		};
+		const key = `${next.top},${next.right},${next.bottom},${next.left}`;
+		if (key === lastCameraPaddingKeyRef.current) return;
+		lastCameraPaddingKeyRef.current = key;
+
+		try {
+			map.setPadding(next);
+		} catch {
+			// Non-fatal; map may be mid-teardown.
+		}
+	}, [map, isMapLoaded, isBackgroundPresentation, cameraPadding?.top, cameraPadding?.right, cameraPadding?.bottom, cameraPadding?.left]);
 
 	const syncUsOnlyBasemapCartography = useCallback(
 		(mapInstance: mapboxgl.Map | null) => {
