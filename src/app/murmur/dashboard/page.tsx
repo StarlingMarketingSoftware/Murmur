@@ -9930,7 +9930,7 @@ const DashboardContent = () => {
 												onClick={() => {
 													if (!mapCampaignId) return;
 													router.push(
-														`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=testing`
+														`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=write`
 													);
 												}}
 											>
@@ -9991,7 +9991,7 @@ const DashboardContent = () => {
 												onClick={() => {
 													if (!mapCampaignId) return;
 													router.push(
-														`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafting`
+														`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts`
 													);
 												}}
 											>

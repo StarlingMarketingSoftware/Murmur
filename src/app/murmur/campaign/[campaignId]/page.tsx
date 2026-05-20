@@ -72,6 +72,49 @@ import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
 import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
 
 type ViewType = Exclude<DraftingSectionView, 'search'>;
+type CampaignUrlTab = 'write' | 'overview' | 'inbox' | 'sent' | 'drafts';
+
+const getCampaignViewFromUrlTab = (tab: string | null): ViewType => {
+	switch (tab?.toLowerCase()) {
+		case 'overview':
+			return 'overview';
+		case 'inbox':
+		case 'sent':
+			return 'inbox';
+		case 'drafts':
+		case 'drafting':
+			return 'drafting';
+		case 'write':
+		case 'testing':
+		case 'contacts':
+		case 'search':
+		case 'all':
+		default:
+			return 'testing';
+	}
+};
+
+const getInboxSentTabFromUrlTab = (tab: string | null): InboxSentTab => {
+	return tab?.toLowerCase() === 'sent' ? 'sent' : 'inbox';
+};
+
+const getCampaignUrlTabForView = (
+	view: ViewType,
+	inboxSentTab: InboxSentTab
+): CampaignUrlTab => {
+	switch (view) {
+		case 'overview':
+			return 'overview';
+		case 'inbox':
+			return inboxSentTab === 'sent' ? 'sent' : 'inbox';
+		case 'sent':
+			return 'sent';
+		case 'drafting':
+			return 'drafts';
+		case 'testing':
+			return 'write';
+	}
+};
 
 // Transition duration in ms - fast enough to feel instant, still smooth
 const TRANSITION_DURATION = 180;
@@ -1347,19 +1390,10 @@ const Murmur = () => {
 		setIsIdentityDialogOpen,
 	]);
 	
-	// Determine initial view based on tab query parameter
-	const getInitialView = (): ViewType => {
-		if (tabParam === 'overview') return 'overview';
-		if (tabParam === 'inbox') return 'inbox';
-		if (tabParam === 'drafting') return 'drafting';
-		// Sent is now a sub-view of Inbox (Inbox -> Sent)
-		if (tabParam === 'sent') return 'inbox';
-		// Legacy/deeplink support: the campaign no longer has in-page Contacts, Search, or All tabs.
-		// The Write tab covers contact management; fall back there.
-		if (tabParam === 'contacts' || tabParam === 'search' || tabParam === 'all') return 'testing';
-		return 'testing';
-	};
-	
+	// Determine initial view based on tab query parameter.
+	// Legacy values are still accepted, but the URL is canonicalized to current tab names below.
+	const getInitialView = (): ViewType => getCampaignViewFromUrlTab(tabParam);
+
 	const [activeView, setActiveViewInternal] = useState<ViewType>(getInitialView());
 	// When the user switches tabs, DraftingSection swaps out and we need to (re)observe
 	// the new bottom anchor(s) so the zoom clamp can auto-correct if they become clipped.
@@ -1370,14 +1404,26 @@ const Murmur = () => {
 		visible: boolean;
 		operations: Array<{ current: number; total: number }>;
 	}>({ visible: false, operations: [] });
-	const getInitialInboxSentTab = (): InboxSentTab => {
-		if (tabParam === 'sent') return 'sent';
-		return 'inbox';
-	};
+	const getInitialInboxSentTab = (): InboxSentTab => getInboxSentTabFromUrlTab(tabParam);
 	const [inboxSentTab, setInboxSentTab] = useState<InboxSentTab>(getInitialInboxSentTab());
 	const [inboxSentTabRequest, setInboxSentTabRequest] = useState<InboxSentTabRequest | null>(() =>
-		tabParam === 'sent' ? { tab: 'sent', requestId: 1 } : null
+		getInboxSentTabFromUrlTab(tabParam) === 'sent' ? { tab: 'sent', requestId: 1 } : null
 	);
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+
+		const nextTab = getCampaignUrlTabForView(activeView, inboxSentTab);
+		const params = new URLSearchParams(window.location.search);
+		if (params.get('tab') === nextTab) return;
+
+		params.set('tab', nextTab);
+		const nextSearch = params.toString();
+		const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}${
+			window.location.hash
+		}`;
+
+		window.history.replaceState(window.history.state, '', nextUrl);
+	}, [activeView, inboxSentTab]);
 	const requestInboxSentTab = useCallback((tab: InboxSentTab) => {
 		setInboxSentTab(tab);
 		setInboxSentTabRequest((prev) => ({

@@ -2066,7 +2066,7 @@ export const DashboardStrategyBox: FC<Props> = ({ className, onSearchContacts })
 		}
 
 		if (action.campaign) {
-			const tab = action.kind === 'draftMessages' ? 'testing' : 'drafting';
+			const tab = action.kind === 'draftMessages' ? 'write' : 'drafts';
 			router.push(
 				`${urls.murmur.campaign.detail(action.campaign.id)}?tab=${tab}&silent=1`
 			);
