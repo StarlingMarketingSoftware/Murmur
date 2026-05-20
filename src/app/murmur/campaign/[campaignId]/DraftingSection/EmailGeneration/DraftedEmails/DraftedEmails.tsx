@@ -16,6 +16,7 @@ import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { Button } from '@/components/ui/button';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 import { cn, convertHtmlToPlainText } from '@/utils';
+import type { EmailWithRelations } from '@/types';
 import { DraftingTable } from '../DraftingTable/DraftingTable';
 import DeleteandOpenIcon from '@/components/atoms/_svg/DeleteandOpen';
 import ApproveCheckIcon from '@/components/atoms/svg/ApproveCheckIcon';
@@ -297,6 +298,261 @@ const DRAFT_ROW_SELECT_ZONE_PX = 115;
 // while allowing the "open" (middle) zone to extend further right.
 const DRAFT_ROW_DELETE_ZONE_PX = 48;
 
+const DraftReviewStackedBackCard: FC<{
+	draft: EmailWithRelations;
+	contacts: ContactWithName[];
+}> = ({ draft, contacts }) => {
+	const contact = contacts?.find((c) => c.id === draft.contactId);
+	const contactTitle = contact?.headline || contact?.title || '';
+	const hasName = Boolean(
+		contact?.name?.trim() || contact?.firstName?.trim() || contact?.lastName?.trim()
+	);
+	const displayName = contact
+		? contact.name?.trim() ||
+		  `${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
+		  ''
+		: '';
+	const companyName = contact?.company || '';
+	const fullStateName = (contact?.state as string) || '';
+	const stateAbbr = getStateAbbreviation(fullStateName) || '';
+	const normalizedState = fullStateName.trim();
+	const lowercaseCanadianProvinceNames = canadianProvinceNames.map((s) => s.toLowerCase());
+	const isCanadianProvince =
+		lowercaseCanadianProvinceNames.includes(normalizedState.toLowerCase()) ||
+		canadianProvinceAbbreviations.includes(normalizedState.toUpperCase()) ||
+		canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
+	const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+	const titleBgColor = isRestaurantTitle(contactTitle)
+		? '#C3FBD1'
+		: isCoffeeShopTitle(contactTitle)
+			? '#D6F1BD'
+			: isMusicVenueTitle(contactTitle)
+				? '#B7E5FF'
+				: isMusicFestivalTitle(contactTitle)
+					? '#C1D6FF'
+					: isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)
+						? '#FFF2BC'
+						: isWineBeerSpiritsTitle(contactTitle)
+							? '#BFC4FF'
+							: '#E8EFFF';
+	const titleLabel = isRestaurantTitle(contactTitle)
+		? 'Restaurant'
+		: isCoffeeShopTitle(contactTitle)
+			? 'Coffee Shop'
+			: isMusicVenueTitle(contactTitle)
+				? 'Music Venue'
+				: isMusicFestivalTitle(contactTitle)
+					? 'Music Festival'
+					: isWeddingPlannerTitle(contactTitle)
+						? 'Wedding Planner'
+						: isWeddingVenueTitle(contactTitle)
+							? 'Wedding Venue'
+							: isWineBeerSpiritsTitle(contactTitle)
+								? getWineBeerSpiritsLabel(contactTitle) ?? contactTitle
+								: contactTitle;
+
+	return (
+		<div
+			aria-hidden="true"
+			style={{
+				position: 'absolute',
+				top: '-19px',
+				left: '-18px',
+				width: '100%',
+				height: '100%',
+				opacity: 0.72,
+				zIndex: 0,
+				pointerEvents: 'none',
+			}}
+		>
+			<div
+				style={{
+					width: '100%',
+					height: '100%',
+					border: '3px solid #000000',
+					borderRadius: '8px',
+					position: 'relative',
+					display: 'flex',
+					flexDirection: 'column',
+					overflow: 'hidden',
+					backgroundColor: '#FFDC9E',
+				}}
+			>
+				<div
+					style={{
+						borderTopLeftRadius: '8px',
+						borderTopRightRadius: '8px',
+						borderBottom: '2px solid #000000',
+						padding: '8px 16px',
+						boxSizing: 'border-box',
+						display: 'flex',
+						justifyContent: 'space-between',
+						alignItems: 'flex-start',
+						height: '48px',
+						backgroundColor: '#FFE4B5',
+						position: 'relative',
+					}}
+				>
+					<div
+						style={{
+							display: 'flex',
+							flexDirection: 'column',
+							justifyContent: 'center',
+							alignSelf: 'stretch',
+							maxWidth: '268px',
+							overflow: 'hidden',
+							transform: 'translateY(-1px)',
+						}}
+					>
+						{hasName && companyName ? (
+							<>
+								<div
+									className="font-inter font-bold text-black leading-none whitespace-nowrap overflow-hidden"
+									style={{
+										fontSize: '17px',
+										lineHeight: '18px',
+										WebkitMaskImage:
+											'linear-gradient(90deg, #000 96%, transparent 100%)',
+										maskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
+									}}
+								>
+									{companyName}
+								</div>
+								<div
+									className="font-inter font-normal text-black leading-none whitespace-nowrap overflow-hidden"
+									style={{
+										fontSize: '11px',
+										lineHeight: '12px',
+										marginTop: '1px',
+										WebkitMaskImage:
+											'linear-gradient(90deg, #000 96%, transparent 100%)',
+										maskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
+									}}
+								>
+									{displayName}
+								</div>
+							</>
+						) : (
+							<div
+								className="font-inter font-bold text-black leading-none whitespace-nowrap overflow-hidden"
+								style={{
+									fontSize: '17px',
+									lineHeight: '18px',
+									WebkitMaskImage:
+										'linear-gradient(90deg, #000 96%, transparent 100%)',
+									maskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
+								}}
+							>
+								{companyName || displayName || 'Unknown Contact'}
+							</div>
+						)}
+					</div>
+					<div
+						className="flex flex-col items-start"
+						style={{
+							position: 'absolute',
+							right: '63px',
+							bottom: '7px',
+							width: '152px',
+						}}
+					>
+						<div
+							className="flex items-center justify-start gap-2 w-full"
+							style={{ marginBottom: contactTitle ? '2px' : 0 }}
+						>
+							{stateAbbr ? (
+								isCanadianProvince ? (
+									<div
+										className="inline-flex items-center justify-center rounded-[4px] border border-black overflow-hidden flex-shrink-0"
+										style={{ width: '28px', height: '15px' }}
+									>
+										<CanadianFlag width="100%" height="100%" className="w-full h-full" />
+									</div>
+								) : isUSAbbr ? (
+									<span
+										className="inline-flex items-center justify-center rounded-[4px] border text-[12px] leading-none font-bold flex-shrink-0"
+										style={{
+											width: '28px',
+											height: '15px',
+											backgroundColor: stateBadgeColorMap[stateAbbr] || 'transparent',
+											borderColor: '#000000',
+										}}
+									>
+										{stateAbbr}
+									</span>
+								) : null
+							) : null}
+
+							{contact?.city ? (
+								<div
+									className="text-[12px] font-inter text-black leading-none truncate"
+									style={{
+										maxWidth: '160px',
+										WebkitMaskImage:
+											'linear-gradient(90deg, #000 92%, transparent 100%)',
+										maskImage: 'linear-gradient(90deg, #000 92%, transparent 100%)',
+									}}
+								>
+									{contact.city}
+								</div>
+							) : null}
+						</div>
+						{contactTitle ? (
+							<div
+								className="rounded-[6px] border border-black px-2 flex items-center justify-start overflow-hidden"
+								style={{
+									width: '152px',
+									height: '18px',
+									backgroundColor: titleBgColor,
+								}}
+							>
+								<span className="text-[11px] font-inter text-black leading-none truncate">
+									{titleLabel}
+								</span>
+							</div>
+						) : null}
+					</div>
+					<div
+						style={{
+							position: 'absolute',
+							top: '17px',
+							right: '21px',
+							width: '16px',
+							height: '2px',
+							backgroundColor: '#000000',
+						}}
+					/>
+				</div>
+
+				<div
+					className="flex-1 overflow-hidden flex flex-col relative"
+					style={{
+						padding: '6px 4px 12px 4px',
+						borderBottomLeftRadius: '5px',
+						borderBottomRightRadius: '5px',
+						backgroundColor: '#FFDC9E',
+					}}
+				>
+					<div className="flex justify-center" style={{ marginBottom: '8px' }}>
+						<div
+							className="font-inter text-[14px] font-extrabold bg-white border-2 border-black rounded-[7px] px-2 overflow-hidden flex items-center"
+							style={{ width: '484px', height: '39px' }}
+						>
+							<span className="truncate">{draft.subject || 'No subject'}</span>
+						</div>
+					</div>
+					<div className="flex justify-center flex-1">
+						<div
+							className="bg-white border-2 border-black rounded-[7px] overflow-hidden"
+							style={{ width: '484px', height: '572px' }}
+						/>
+					</div>
+				</div>
+			</div>
+		</div>
+	);
+};
+
 export type DraftedEmailsHandle = {
 	/** Exit the embedded regen settings preview (HybridPromptInput) and return to the normal draft editor / approve-reject view. */
 	exitRegenSettingsPreview: () => void;
@@ -338,6 +594,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 		handleSelectAllDrafts,
 	} = useDraftedEmails(props);
 	const { onContactClick, onContactHover, onDraftHover, onRegenerateDraft } = props;
+	const lockDraftReviewOpen = props.lockDraftReviewOpen ?? false;
 
 	const isMobile = useIsMobile();
 	const draftReviewContainerRef = useRef<HTMLDivElement | null>(null);
@@ -349,11 +606,11 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 		selectedDraftIdRef.current = selectedDraft?.id ?? null;
 	}, [selectedDraft?.id]);
 
-	// Close the draft review UI when clicking anywhere outside of it.
-	// This should return the user back to the normal drafts table view.
+	// Close the draft review UI when clicking anywhere outside of it, unless this
+	// instance is pinned open for the Drafts tab.
 	useEffect(() => {
 		if (!selectedDraft) return;
-		if (props.disableOutsideClickClose) return;
+		if (props.disableOutsideClickClose || lockDraftReviewOpen) return;
 
 		const handlePointerDown = (event: PointerEvent) => {
 			const container = draftReviewContainerRef.current;
@@ -407,7 +664,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 		return () => {
 			document.removeEventListener('pointerdown', handlePointerDown, true);
 		};
-	}, [selectedDraft, setSelectedDraft, props.disableOutsideClickClose]);
+	}, [selectedDraft, setSelectedDraft, props.disableOutsideClickClose, lockDraftReviewOpen]);
 
 	// Mobile-specific width values (using CSS calc for responsive sizing)
 	// 4px margins on each side for edge-to-edge feel
@@ -688,7 +945,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 	);
 
 	// Keyboard navigation for draft review UI:
-	// - Escape: if regen settings preview is open, exit regen view; otherwise close the review and return to drafts list
+	// - Escape: if regen settings preview is open, exit regen view; otherwise close the review unless it is locked open
 	// - ArrowUp/ArrowDown: navigate between drafts (when not in text entry)
 	useEffect(() => {
 		if (!selectedDraft) return;
@@ -708,6 +965,8 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 					setIsRegenSettingsPreviewOpen(false);
 					return;
 				}
+
+				if (lockDraftReviewOpen) return;
 
 				handleBack();
 				return;
@@ -745,6 +1004,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 		handleNavigateNext,
 		isRegenSettingsPreviewOpen,
 		props.onDraftReviewCloseOverride,
+		lockDraftReviewOpen,
 	]);
 
 	const handleRegenerateSelectedDrafts = useCallback(async () => {
@@ -832,8 +1092,10 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 			return;
 		}
 
+		if (lockDraftReviewOpen) return;
+
 		handleBack();
-	}, [props.onDraftReviewCloseOverride, isRegenSettingsPreviewOpen, handleBack]);
+	}, [props.onDraftReviewCloseOverride, isRegenSettingsPreviewOpen, lockDraftReviewOpen, handleBack]);
 
 	if (selectedDraft) {
 		const contact = contacts?.find((c) => c.id === selectedDraft.contactId);
@@ -878,6 +1140,24 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 		// rendered by DraftingSection at the same breakpoint.
 		const tabNavGap = '29px';
 		const tabNavMiddleWidth = '691px';
+		const selectedDraftIndex = draftEmails.findIndex(
+			(draft) => draft.id === selectedDraft.id
+		);
+		const stackedBackDraftIndex =
+			draftEmails.length > 1
+				? selectedDraftIndex > 0
+					? selectedDraftIndex - 1
+					: selectedDraftIndex === 0
+						? 1
+						: 0
+				: -1;
+		const stackedBackDraft =
+			stackedBackDraftIndex >= 0 ? draftEmails[stackedBackDraftIndex] : null;
+		const shouldShowStackedBackCard =
+			!isMobile &&
+			!isRegenSettingsPreviewOpen &&
+			!props.hideDraftReviewActionRow &&
+			Boolean(stackedBackDraft);
 
 			return (
 			<div
@@ -885,42 +1165,14 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 				className={cn("flex flex-col items-center", isMobile && "w-full px-1")}
 				data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
 			>
-				<div style={{ 
-					width: isMobile ? 'calc(100vw - 8px)' : '499px', 
-					height: isMobile ? 'calc(100dvh - 160px)' : '703px', 
-					position: 'relative' 
+				<div style={{
+					width: isMobile ? 'calc(100vw - 8px)' : '499px',
+					height: isMobile ? 'calc(100dvh - 160px)' : '703px',
+					position: 'relative',
+					overflow: 'visible',
 				}}>
-				{/* Counter box - above preview on wide screens, bottom-left corner on narrow/narrowest breakpoint, hidden on mobile */}
-				{!props.hideDraftReviewCounter && !showBottomCounter && !isMobile && (
-					<div
-						style={{
-							position: 'absolute',
-							top: '-31px',
-							left: '50%',
-							transform: 'translateX(-50%)',
-							width: '95px',
-							height: '21px',
-							border: '2px solid #000000',
-							borderRadius: '8px',
-							backgroundColor: 'transparent',
-							zIndex: 10,
-							display: 'flex',
-							alignItems: 'center',
-							justifyContent: 'center',
-							gap: '8px',
-						}}
-					>
-						{/* Approved count */}
-						<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-							<span className="font-bold text-[12px] text-black" style={{ fontFamily: 'Times New Roman, serif' }}>{approvedCount}</span>
-							<ApproveCheckIcon width={12} height={9} className="text-black" />
-						</div>
-						{/* Rejected count */}
-						<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-							<span className="font-bold text-[12px] text-black" style={{ fontFamily: 'Times New Roman, serif' }}>{rejectedCount}</span>
-							<RejectXIcon width={10} height={10} className="text-black" />
-						</div>
-					</div>
+				{shouldShowStackedBackCard && stackedBackDraft && (
+					<DraftReviewStackedBackCard draft={stackedBackDraft} contacts={contacts || []} />
 				)}
 				{/* Container box with header - matching the table view */}
 				<div
@@ -930,6 +1182,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 						border: '3px solid #000000',
 						borderRadius: '8px',
 						position: 'relative',
+						zIndex: 2,
 						display: 'flex',
 						flexDirection: 'column',
 					}}
@@ -954,23 +1207,24 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 							position: 'relative',
 						}}
 					>
-						{/* Close button */}
-						<Button
-							type="button"
-							variant="ghost"
-							onClick={handleDraftReviewCloseButtonClick}
-							className="absolute rounded z-10 flex items-center justify-center hover:bg-transparent"
-							style={{ 
-								top: '17px', 
-								right: '21px',
-								padding: '8px 12px',
-								margin: '-8px -12px',
-								width: 'auto',
-								height: 'auto'
-							}}
-						>
-							<div style={{ width: '16px', height: '2px', backgroundColor: '#000000' }} />
-						</Button>
+						{!lockDraftReviewOpen && (
+							<Button
+								type="button"
+								variant="ghost"
+								onClick={handleDraftReviewCloseButtonClick}
+								className="absolute rounded z-10 flex items-center justify-center hover:bg-transparent"
+								style={{
+									top: '17px',
+									right: '21px',
+									padding: '8px 12px',
+									margin: '-8px -12px',
+									width: 'auto',
+									height: 'auto',
+								}}
+							>
+								<div style={{ width: '16px', height: '2px', backgroundColor: '#000000' }} />
+							</Button>
+						)}
 						<div style={{
 							display: 'flex',
 							flexDirection: 'column',
@@ -1358,7 +1612,10 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 												'linear-gradient(90deg, #000 92%, transparent 100%)',
 											maskImage: 'linear-gradient(90deg, #000 92%, transparent 100%)',
 										}}
-									>
+								>
+									{lockDraftReviewOpen ? (
+										<span className="whitespace-nowrap">Drafts</span>
+									) : (
 										<button
 											type="button"
 											aria-label="Back to drafts list"
@@ -1372,6 +1629,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										>
 											Drafts
 										</button>
+									)}
 										<span className="mx-[10px] whitespace-nowrap">{'>'}</span>
 										<span className="min-w-0 truncate">
 											{displayName || companyName || 'Unknown Contact'}
@@ -1530,19 +1788,23 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										zIndex: 6,
 									}}
 								>
-									<button
-										type="button"
-										aria-label="Back to drafts list"
-										className="whitespace-nowrap flex-shrink-0 cursor-pointer underline-offset-2 hover:underline"
-										style={{ pointerEvents: 'auto' }}
-										onClick={(e) => {
-											e.preventDefault();
-											e.stopPropagation();
-											handleBack();
-										}}
-									>
-										Drafts
-									</button>
+									{lockDraftReviewOpen ? (
+										<span className="whitespace-nowrap flex-shrink-0">Drafts</span>
+									) : (
+										<button
+											type="button"
+											aria-label="Back to drafts list"
+											className="whitespace-nowrap flex-shrink-0 cursor-pointer underline-offset-2 hover:underline"
+											style={{ pointerEvents: 'auto' }}
+											onClick={(e) => {
+												e.preventDefault();
+												e.stopPropagation();
+												handleBack();
+											}}
+										>
+											Drafts
+										</button>
+									)}
 									<span className="mx-[10px] whitespace-nowrap flex-shrink-0">{'>'}</span>
 									<button
 										type="button"

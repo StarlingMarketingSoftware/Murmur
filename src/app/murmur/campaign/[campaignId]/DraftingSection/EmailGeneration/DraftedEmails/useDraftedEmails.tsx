@@ -101,6 +101,8 @@ export interface DraftedEmailsProps {
 	hideDraftReviewCounter?: boolean;
 	/** Optional: hide the bottom action row (Approve / Regenerate / Reject + nav arrows) in draft review UI */
 	hideDraftReviewActionRow?: boolean;
+	/** Optional: keeps draft review open by hiding/ignoring controls that return to the drafts list */
+	lockDraftReviewOpen?: boolean;
 	/**
 	 * Optional: override the behavior of the draft review header close ("-") button.
 	 * Useful when rendering the draft review UI as a side preview inside regenerate mode.

@@ -70,6 +70,7 @@ import { ContactResearchPanel } from '@/components/molecules/ContactResearchPane
 import { TestPreviewPanel } from '@/components/molecules/TestPreviewPanel/TestPreviewPanel';
 import { MiniEmailStructure } from './EmailGeneration/MiniEmailStructure';
 import ContactsExpandedList, {
+	type ContactsExpandedListFocusMode,
 	type ContactsExpandedTopNavStop,
 } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/ContactsExpandedList';
 import { DraftsExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftsExpandedList';
@@ -358,16 +359,29 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		if (view === 'inbox') return 'inbox';
 		return 'all';
 	}, [view]);
+	const contactsListFocusMode = useMemo<ContactsExpandedListFocusMode>(
+		() => (view === 'drafting' ? 'drafts' : 'contacts'),
+		[view]
+	);
 	const contactsListTopNavProps = useMemo(
 		() => ({
 			activeTopNavStop: contactsListTopNavStop,
+			focusMode: contactsListFocusMode,
 			onOpenAll: goToOverview,
 			onOpenSearch: onGoToSearch,
 			onOpenWriting: goToWriting,
 			onOpenSend: goToDrafting,
 			onOpenInbox: goToInbox,
 		}),
-		[contactsListTopNavStop, goToDrafting, goToOverview, goToInbox, goToWriting, onGoToSearch]
+		[
+			contactsListFocusMode,
+			contactsListTopNavStop,
+			goToDrafting,
+			goToOverview,
+			goToInbox,
+			goToWriting,
+			onGoToSearch,
+		]
 	);
 
 	const draftingOperationsForHeader = useMemo(() => {
@@ -430,7 +444,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// Ref to the main DraftedEmails instance (center column) so side preview controls can exit regen mode.
 	const draftedEmailsRef = useRef<DraftedEmailsHandle | null>(null);
 	// Tracks whether the DraftedEmails "regen settings preview" (HybridPromptInput) is open for the selected draft.
-	// Used to swap the pinned left column from DraftsExpandedList -> full email preview while regenerating.
+	// Used to swap the pinned left column from the drafts activity list -> full email preview while regenerating.
 	const [
 		isSelectedDraftRegenSettingsPreviewOpen,
 		setIsSelectedDraftRegenSettingsPreviewOpen,
@@ -623,7 +637,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const pinnedLeftPanelVariant: PinnedLeftPanelVariant = useMemo(() => {
 		// 'contacts' here refers to the *variant* of the pinned left column
 		// (the ContactsExpandedList shown on the Write tab) — not to a Contacts view.
-		if (view === 'testing' || view === 'search') return 'contacts';
+		if (view === 'testing' || view === 'search' || view === 'drafting') return 'contacts';
 		return 'mini';
 	}, [view]);
 
@@ -636,7 +650,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		const prevView = prevViewForPinnedPanelRef.current;
 		prevViewForPinnedPanelRef.current = view;
 		// Detect transition from inbox/search to tabs that show the pinned left panel.
-		// This includes: testing (ContactsExpandedList), drafting/sent (MiniEmailStructure)
+		// This includes: testing/drafting (ContactsExpandedList), sent (MiniEmailStructure)
 		const isMorphOrigin = prevView === 'search' || (prevView === 'inbox' && !isSafari);
 		const showsPinnedPanel = view === 'testing' || view === 'drafting' || view === 'sent';
 		if (isMorphOrigin && showsPinnedPanel) {
@@ -2277,6 +2291,30 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const sentEmails = (headerEmails || []).filter((e) => e.status === EmailStatus.sent);
 	const sentCount = sentEmails.length;
 
+	// Drafts tab stays in review mode whenever at least one draft exists.
+	useEffect(() => {
+		if (view !== 'drafting') return;
+
+		if (selectedDraft) {
+			const selectedDraftStillExists = draftEmails.some(
+				(draft) => draft.id === selectedDraft.id
+			);
+			if (selectedDraftStillExists) {
+				return;
+			}
+			if (draftEmails.length === 0 && isPendingEmails) return;
+
+			const fallbackDraft = draftEmails[0] ?? null;
+			setSelectedDraft(fallbackDraft);
+			return;
+		}
+
+		const firstDraft = draftEmails[0];
+		if (!firstDraft) return;
+
+		setSelectedDraft(firstDraft);
+	}, [draftEmails, isPendingEmails, selectedDraft, view]);
+
 	// If we just "Kept" a test draft, auto-open its draft in the Drafts tab once it exists.
 	useEffect(() => {
 		if (view !== 'drafting') return;
@@ -2826,6 +2864,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			setHoveredContactForResearch(null);
 		}
 	};
+
+	const handleDraftPreviewClick = useCallback((draft: EmailWithRelations) => {
+		setSelectedDraft(draft);
+	}, []);
 
 	const handleSendDrafts = async (draftIds?: Iterable<number>) => {
 		// If draftIds is provided, ONLY send those drafts (used by draft-review "Send" button).
@@ -3521,23 +3563,30 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													height: '587px',
 												}}
 											>
-												<DraftsExpandedList
-													drafts={draftEmails}
-													contacts={contacts || []}
+												<ContactsExpandedList
+													contacts={contactsForContactsExpandedList}
+													{...contactsListSupplementalProps}
+													{...contactsListTopNavProps}
+													isLoading={isContactsLoading}
+													campaign={campaign}
+													enableUsedContactTooltip={false}
+													selectedDraftId={selectedDraft?.id}
+													selectedDraftIds={draftsTabSelectedIds}
+													onDraftSelectionChange={setDraftsTabSelectedIds}
+													onDraftClick={handleDraftPreviewClick}
+													onDraftHover={setHoveredDraftForSettings}
+													selectedContactIds={contactsTabSelectedIds}
+													activelyDraftingContactIds={
+														activelyDraftingContactIdsForContactsExpandedList
+													}
+													onContactSelectionChange={(updater) =>
+														setContactsTabSelectedIds((prev) => updater(new Set(prev)))
+													}
+													onContactClick={handleResearchContactClick}
+													onContactHover={handleResearchContactHover}
 													width={376}
 													height={587}
-													hideSendButton
-													rowWidth={366}
-													rowHeight={92}
-													rejectedDraftIds={rejectedDraftIds}
-													approvedDraftIds={approvedDraftIds}
-													previewedDraftId={selectedDraft?.id}
-													isPreviewMode
-													onDraftPreviewClick={(draft) =>
-														setSelectedDraft((prev) =>
-															prev?.id === draft.id ? null : draft
-														)
-													}
+													minRows={8}
 												/>
 											</div>
 										)
@@ -3560,13 +3609,28 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															: 'none',
 													}}
 												>
-											<ContactsExpandedList
-												contacts={contactsForContactsExpandedList}
-												{...contactsListSupplementalProps}
-												{...contactsListTopNavProps}
-												isLoading={isContactsLoading}
+													<ContactsExpandedList
+														contacts={contactsForContactsExpandedList}
+														{...contactsListSupplementalProps}
+														{...contactsListTopNavProps}
+														isLoading={isContactsLoading}
 														campaign={campaign}
 														enableUsedContactTooltip={view === 'testing'}
+														selectedDraftId={
+															view === 'drafting' ? selectedDraft?.id : undefined
+														}
+														selectedDraftIds={
+															view === 'drafting' ? draftsTabSelectedIds : undefined
+														}
+														onDraftSelectionChange={
+															view === 'drafting' ? setDraftsTabSelectedIds : undefined
+														}
+														onDraftClick={
+															view === 'drafting' ? handleDraftPreviewClick : undefined
+														}
+														onDraftHover={
+															view === 'drafting' ? setHoveredDraftForSettings : undefined
+														}
 														selectedContactIds={contactsTabSelectedIds}
 														activelyDraftingContactIds={
 															activelyDraftingContactIdsForContactsExpandedList
@@ -4094,64 +4158,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}
 											style={{ width: 375, height: 672, marginTop: -8 }}
 										/>
-									) : view === 'drafting' && Boolean(selectedDraft) ? (
-										<div
-											className="flex flex-col"
-											style={{
-												// Match the legacy research panel footprint so it remains aligned with the rest of the layout.
-												width: 376,
-												height: 670,
-												gap: 12,
-											}}
-										>
-											<MiniEmailStructure
-												form={draftsSettingsPreviewForm}
-												readOnly
-												variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
-												settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
-												settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-												settingsNameCompanyBgColor={
-													draftsMiniEmailSettingsNameCompanyBgColor
-												}
-												profileFields={profileFieldsForSettings}
-												identityProfile={
-													campaign?.identity as IdentityProfileFields | null
-												}
-												onIdentityUpdate={handleIdentityUpdate}
-												onDraft={() =>
-													handleGenerateDrafts(
-														contactsAvailableForDrafting.map((c) => c.id)
-													)
-												}
-												isDraftDisabled={isGenerationDisabled()}
-												isPendingGeneration={isPendingGeneration}
-												generationProgress={generationProgress}
-												generationTotal={generationTotal}
-												hideTopChrome
-												hideFooter
-												hideAddTextButtons
-												// Keep this a tight preview that never shows an inner scrollbar.
-												fitToHeight
-												lockFitToHeightScale
-												// Requested: compressed Settings view height.
-												height={358}
-												pageFillColor={draftsMiniEmailFillColor}
-											/>
-
-											<ContactResearchPanel
-												contact={displayedContactForResearch}
-												hideAllText={
-													// Hide all research text to show a chrome-only skeleton:
-													// - When the Drafts tab has no drafts
-													view === 'drafting' && draftCount === 0
-												}
-												hideSummaryIfBullets
-												// Requested: 300px tall research block in the bottom half.
-												height={300}
-												width={376}
-												boxWidth={361}
-											/>
-										</div>
 									) : (
 										<ContactResearchPanel
 											contact={displayedContactForResearch}
@@ -4590,10 +4596,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											overflow: 'visible',
 										}}
 									>
-									<ContactsExpandedList
-										contacts={contactsForContactsExpandedList}
-										{...contactsListSupplementalProps}
-										{...contactsListTopNavProps}
+										<ContactsExpandedList
+											contacts={contactsForContactsExpandedList}
+											{...contactsListSupplementalProps}
+											{...contactsListTopNavProps}
 											isLoading={isContactsLoading}
 											campaign={campaign}
 											enableUsedContactTooltip={false}
@@ -4652,11 +4658,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														overflow: 'visible',
 													}}
 												>
-											<ContactsExpandedList
-												contacts={contactsForContactsExpandedList}
-												{...contactsListSupplementalProps}
-												{...contactsListTopNavProps}
-												isLoading={isContactsLoading}
+													<ContactsExpandedList
+														contacts={contactsForContactsExpandedList}
+														{...contactsListSupplementalProps}
+														{...contactsListTopNavProps}
+														isLoading={isContactsLoading}
 														campaign={campaign}
 														enableUsedContactTooltip={view === 'testing'}
 														selectedContactIds={contactsTabSelectedIds}
@@ -5062,11 +5068,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* Contacts table below writing box at narrowest breakpoint */}
 										{isNarrowestDesktop && (
 											<div className="mt-[20px] w-full flex justify-center">
-										<ContactsExpandedList
-											contacts={contactsForContactsExpandedList}
-											{...contactsListSupplementalProps}
-											{...contactsListTopNavProps}
-											isLoading={isContactsLoading}
+												<ContactsExpandedList
+													contacts={contactsForContactsExpandedList}
+													{...contactsListSupplementalProps}
+													{...contactsListTopNavProps}
+													isLoading={isContactsLoading}
 													campaign={campaign}
 													enableUsedContactTooltip={view === 'testing'}
 													selectedContactIds={contactsTabSelectedIds}
@@ -5234,6 +5240,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												statusFilter={draftStatusFilter}
 												onStatusFilterChange={setDraftStatusFilter}
 												hideSendButton
+												lockDraftReviewOpen
 											/>
 										</div>
 									) : isNarrowDesktop ? (
@@ -5266,46 +5273,34 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														onSentClick={goToSent}
 														width={330}
 													/>
-													{/* Mini Email Structure panel */}
+													{/* Drafts-mode activity list */}
 													<div style={{ width: '330px' }}>
-														<MiniEmailStructure
-															form={draftsSettingsPreviewForm}
-															readOnly
-															variant={
-																draftsMiniEmailTopHeaderHeight ? 'settings' : undefined
+														<ContactsExpandedList
+															contacts={contactsForContactsExpandedList}
+															{...contactsListSupplementalProps}
+															{...contactsListTopNavProps}
+															isLoading={isContactsLoading}
+															campaign={campaign}
+															enableUsedContactTooltip={false}
+															selectedDraftId={selectedDraft?.id}
+															selectedDraftIds={draftsTabSelectedIds}
+															onDraftSelectionChange={setDraftsTabSelectedIds}
+															onDraftClick={handleDraftPreviewClick}
+															onDraftHover={setHoveredDraftForSettings}
+															selectedContactIds={contactsTabSelectedIds}
+															activelyDraftingContactIds={
+																activelyDraftingContactIdsForContactsExpandedList
 															}
-															settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
-															settingsSecondaryLabel={
-																draftsMiniEmailSettingsLabels.secondary
-															}
-															settingsNameCompanyBgColor={
-																draftsMiniEmailSettingsNameCompanyBgColor
-															}
-															profileFields={profileFieldsForSettings}
-															identityProfile={
-																campaign?.identity as IdentityProfileFields | null
-															}
-															onIdentityUpdate={handleIdentityUpdate}
-															onDraft={() =>
-																handleGenerateDrafts(
-																	contactsAvailableForDrafting.map((c) => c.id)
+															onContactSelectionChange={(updater) =>
+																setContactsTabSelectedIds((prev) =>
+																	updater(new Set(prev))
 																)
 															}
-															isDraftDisabled={isGenerationDisabled()}
-															isPendingGeneration={isPendingGeneration}
-															generationProgress={generationProgress}
-															generationTotal={generationTotal}
-															hideTopChrome
-															hideFooter
-															fullWidthMobile
-															hideAddTextButtons
-															fitToHeight
-															lockFitToHeightScale
+															onContactClick={handleResearchContactClick}
+															onContactHover={handleResearchContactHover}
+															width={330}
 															height={316}
-															pageFillColor={draftsMiniEmailFillColor}
-															topHeaderHeight={draftsMiniEmailTopHeaderHeight}
-															topHeaderLabel={draftsMiniEmailTopHeaderLabel}
-															onOpenWriting={goToWriting}
+															minRows={5}
 														/>
 													</div>
 													{/* Research panel - height set so bottom aligns with drafts table (59 + 10 + 316 + 10 + 308 = 703 = drafts table height) */}
@@ -5368,15 +5363,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														onRegenSettingsPreviewOpenChange={
 															setIsSelectedDraftRegenSettingsPreviewOpen
 														}
-														rejectedDraftIds={rejectedDraftIds}
-														approvedDraftIds={approvedDraftIds}
-														statusFilter={draftStatusFilter}
-														onStatusFilterChange={setDraftStatusFilter}
-														hideSendButton
-														isNarrowDesktop
-														goToPreviousTab={goToPreviousTab}
-														goToNextTab={goToNextTab}
-													/>
+												rejectedDraftIds={rejectedDraftIds}
+												approvedDraftIds={approvedDraftIds}
+												statusFilter={draftStatusFilter}
+												onStatusFilterChange={setDraftStatusFilter}
+												hideSendButton
+												lockDraftReviewOpen
+												isNarrowDesktop
+												goToPreviousTab={goToPreviousTab}
+												goToNextTab={goToNextTab}
+											/>
 												</div>
 											</div>
 											{/* Send Button with arrows - centered relative to full container width */}
@@ -5537,6 +5533,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												statusFilter={draftStatusFilter}
 												onStatusFilterChange={setDraftStatusFilter}
 												hideSendButton={isNarrowestDesktop}
+												lockDraftReviewOpen
 												isNarrowestDesktop={isNarrowestDesktop}
 												isNarrowDesktop={isNarrowDesktop}
 												goToPreviousTab={goToPreviousTab}
@@ -5763,7 +5760,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										style={{ width: '839px' }}
 									>
 										<div className="flex flex-row items-start gap-[10px] w-full">
-											{/* Left column: Campaign Header + Email Structure + Research - fixed 330px */}
+											{/* Left column: Campaign Header + Drafts activity + Research - fixed 330px */}
 											<div
 												className="flex flex-col flex-shrink-0"
 												style={{ gap: '10px', width: '330px' }}
