@@ -70,6 +70,9 @@ export const urls = {
 			contactEvents: {
 				index: ((id) => `/api/campaigns/${id}/contact-events`) as DetailRoute,
 			},
+			contacts: {
+				index: ((id) => `/api/campaigns/${id}/contacts`) as DetailRoute,
+			},
 		},
 		contactList: {
 			index: '/api/contact-list',

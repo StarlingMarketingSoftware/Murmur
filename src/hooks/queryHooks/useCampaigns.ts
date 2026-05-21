@@ -2,6 +2,7 @@ import { PatchCampaignData } from '@/app/api/campaigns/[id]/route';
 import { PostCampaignData } from '@/app/api/campaigns/route';
 import { _fetch } from '@/utils';
 import { CampaignWithRelations, CustomMutationOptions } from '@/types';
+import { ContactWithName } from '@/types/contact';
 import { urls } from '@/constants/urls';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -29,6 +30,9 @@ const QUERY_KEYS = {
 
 const CONTACT_EVENTS_QUERY_KEY = (id: string | number) =>
 	[...QUERY_KEYS.detail(id), 'contact-events'] as const;
+
+const CONTACTS_QUERY_KEY = (id: string | number) =>
+	[...QUERY_KEYS.detail(id), 'contacts'] as const;
 
 interface EditCampaignData {
 	id: string | number;
@@ -85,6 +89,27 @@ export const useGetCampaignContactEvents = (
 			);
 			if (!response.ok) {
 				throw new Error('Failed to fetch campaign contact events');
+			}
+			return response.json();
+		},
+		enabled,
+		staleTime: 1000 * 30,
+	});
+};
+
+export const useGetCampaignContacts = (
+	campaignId?: string | number,
+	options: { enabled?: boolean } = {}
+) => {
+	const enabled = (options.enabled ?? true) && Boolean(campaignId);
+	return useQuery<ContactWithName[]>({
+		queryKey: CONTACTS_QUERY_KEY(String(campaignId || '')),
+		queryFn: async () => {
+			const response = await _fetch(
+				urls.api.campaigns.contacts.index(campaignId as string | number)
+			);
+			if (!response.ok) {
+				throw new Error('Failed to fetch campaign contacts');
 			}
 			return response.json();
 		},

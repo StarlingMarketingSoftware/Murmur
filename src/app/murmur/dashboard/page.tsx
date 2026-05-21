@@ -187,6 +187,7 @@ const CURATED_URL_PARAM_KEYS = ['pick', 'state', 'cat', 'lat', 'lon', 'r'] as co
 // restoring the cached free-text results from sessionStorage).
 const FREETEXT_URL_PARAM_KEYS = ['ft', 'ftLat', 'ftLon', 'ftR'] as const;
 const PENDING_SEARCH_STORAGE_KEY = 'murmur_pending_search';
+const ALL_CONTACTS_MAP_PARAM = 'allContacts';
 
 type CuratedUrlArgs = {
 	lat: number | null;
@@ -2874,6 +2875,7 @@ const DashboardContent = () => {
 	const freeTextLatParam = parseFiniteNumberParam('ftLat');
 	const freeTextLonParam = parseFiniteNumberParam('ftLon');
 	const freeTextRadiusKmParam = parseFiniteNumberParam('ftR');
+	const allContactsMapParam = searchParams.get(ALL_CONTACTS_MAP_PARAM)?.trim() === '1';
 	// "From Home" mode: triggered from landing page search button, shows a pre-configured search
 	// with sign-up modal for unauthenticated users.
 	const fromHomeParam = searchParams.get('fromHome') === 'true';
@@ -4456,13 +4458,27 @@ const DashboardContent = () => {
 			}
 
 			hasHydratedFromCampaignUrlRef.current = true;
-			rehydrateCuratedSession({
-				lat: curatedLatParam,
-				lon: curatedLonParam,
-				radiusKm: curatedRadiusKmParam,
-				category: curatedCategoryParam || null,
-				state: curatedStateParam || null,
-			}).catch(() => undefined);
+			const hasCapturedCoords = curatedLatParam != null && curatedLonParam != null;
+			void (async () => {
+				let lat = curatedLatParam;
+				let lon = curatedLonParam;
+				if (!hasCapturedCoords) {
+					try {
+						const loc = await getApproximateLocation();
+						lat = loc.lat;
+						lon = loc.lon;
+					} catch {
+						// Non-fatal: backend can infer from request headers.
+					}
+				}
+				await rehydrateCuratedSession({
+					lat,
+					lon,
+					radiusKm: curatedRadiusKmParam,
+					category: curatedCategoryParam || null,
+					state: curatedStateParam || null,
+				}).catch(() => undefined);
+			})();
 			return;
 		}
 
@@ -4578,6 +4594,7 @@ const DashboardContent = () => {
 					}
 				: null
 		);
+		params.delete(ALL_CONTACTS_MAP_PARAM);
 
 		const next = params.toString();
 		const current = searchParams.toString();
@@ -4611,12 +4628,18 @@ const DashboardContent = () => {
 		params.delete('fromCampaignId');
 		params.delete('fromCampaignView');
 		params.delete('fromCampaignSearch');
+		params.delete(ALL_CONTACTS_MAP_PARAM);
 		try {
 			localStorage.setItem('murmur_dashboard_last_search', params.toString());
 		} catch {
 			// localStorage may be unavailable (private mode, quota) — non-fatal.
 		}
-	}, [activeSearchQuery, hasSearched, isAddToCampaignMode, searchParams]);
+	}, [
+		activeSearchQuery,
+		hasSearched,
+		isAddToCampaignMode,
+		searchParams,
+	]);
 
 	// When leaving the results view, clear the persisted normal-dashboard search/view params
 	// so we don't unexpectedly re-hydrate a stale search after the user has reset.
@@ -4640,12 +4663,14 @@ const DashboardContent = () => {
 		const had =
 			params.get('view') !== null ||
 			params.get('search') !== null ||
+			params.get(ALL_CONTACTS_MAP_PARAM) !== null ||
 			CURATED_URL_PARAM_KEYS.some((key) => params.get(key) !== null) ||
 			FREETEXT_URL_PARAM_KEYS.some((key) => params.get(key) !== null);
 		if (!had) return;
 
 		params.delete('view');
 		params.delete('search');
+		params.delete(ALL_CONTACTS_MAP_PARAM);
 		writeCuratedParams(params, null);
 		writeFreeTextParams(params, null);
 		const qs = params.toString();
@@ -4682,6 +4707,7 @@ const DashboardContent = () => {
 					}
 				: null
 		);
+		params.delete(ALL_CONTACTS_MAP_PARAM);
 
 		const next = params.toString();
 		const current = searchParams.toString();
@@ -5375,9 +5401,24 @@ const DashboardContent = () => {
 	const handleMapTopSearchReengage = useCallback(() => {
 		if (!isMapView || !hasSearched || activeSearchQuery.trim().length === 0) return;
 		setIsMapSearchEngaged(true);
+		if (allContactsMapParam) {
+			const params = new URLSearchParams(searchParams.toString());
+			params.delete(ALL_CONTACTS_MAP_PARAM);
+			const qs = params.toString();
+			router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+		}
 		setMapSearchAutoFitRequestNonce((nonce) => nonce + 1);
 		hideSearchThisAreaCta();
-	}, [activeSearchQuery, hasSearched, hideSearchThisAreaCta, isMapView]);
+	}, [
+		activeSearchQuery,
+		allContactsMapParam,
+		hasSearched,
+		hideSearchThisAreaCta,
+		isMapView,
+		pathname,
+		router,
+		searchParams,
+	]);
 
 	const handleMapViewportZoom = useCallback(
 		(zoom: number) => {
@@ -5908,6 +5949,35 @@ const DashboardContent = () => {
 	const [selectedCategoryChips, setSelectedCategoryChips] = useState<Set<string>>(
 		new Set()
 	);
+	const hasAppliedInitialAllContactsMapDisengageRef = useRef(false);
+
+	useEffect(() => {
+		if (!allContactsMapParam) {
+			hasAppliedInitialAllContactsMapDisengageRef.current = false;
+			return;
+		}
+		if (hasAppliedInitialAllContactsMapDisengageRef.current) return;
+		if (!hasSearched || !isMapView) return;
+		if (!activeSearchQuery.trim()) return;
+		if (isMapResultsLoading) return;
+
+		hasAppliedInitialAllContactsMapDisengageRef.current = true;
+		setIsMapSearchEngaged(false);
+		setActiveMapTool('grab');
+		setActiveSection(null);
+		setSelectedCategoryChips(new Set());
+		setMapPanelExtraContactIds([]);
+		setMapPanelExtraContacts([]);
+		setMapPanelVisibleOverlayContacts([]);
+		hideSearchThisAreaCta();
+	}, [
+		activeSearchQuery,
+		allContactsMapParam,
+		hasSearched,
+		hideSearchThisAreaCta,
+		isMapResultsLoading,
+		isMapView,
+	]);
 
 	const shouldUseDynamicMapCreateCampaignCta =
 		isMapView &&
@@ -6884,6 +6954,7 @@ const DashboardContent = () => {
 			const hasExplicitSearchContext =
 				curatedModeParam ||
 				freeTextModeParam ||
+				allContactsMapParam ||
 				Boolean(dashboardSearchParam || fromCampaignSearchParam);
 			if (hasExplicitSearchContext) return;
 
@@ -6944,6 +7015,7 @@ const DashboardContent = () => {
 			}, 100);
 		}
 	}, [
+		allContactsMapParam,
 		curatedModeParam,
 		dashboardSearchParam,
 		form,
@@ -9378,7 +9450,9 @@ const DashboardContent = () => {
 										};
 								const mapTopSearchLabel = mapTopSearchDisplay.label.trim() || 'Search';
 								const isMapTopSearchReengageAvailable =
-									isMapView && hasSearched && activeSearchQuery.trim().length > 0;
+									isMapView &&
+									hasSearched &&
+									activeSearchQuery.trim().length > 0;
 								const isSplitCategoryTopSearch =
 									mapTopSearchDisplay.kind === 'category' &&
 									mapTopSearchDisplay.what.trim().length > 0 &&

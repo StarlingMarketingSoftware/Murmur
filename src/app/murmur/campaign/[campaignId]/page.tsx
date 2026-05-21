@@ -36,8 +36,7 @@ import { EnvelopeIcon } from '@/components/atoms/_svg/EnvelopeIcon';
 import nextDynamic from 'next/dynamic';
 import { CampaignsTable } from '@/components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
-import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
-import { useGetContacts } from '@/hooks/queryHooks/useContacts';
+import { useEditCampaign, useGetCampaignContacts } from '@/hooks/queryHooks/useCampaigns';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { useCreateIdentity, useGetIdentities } from '@/hooks/queryHooks/useIdentities';
 import { EmailStatus } from '@/constants/prismaEnums';
@@ -71,6 +70,10 @@ import {
 	type MapZoomControlIndexChangeMeta,
 	type MapZoomControlLiveHandle,
 } from '@/components/molecules/MapSelectGrabTool/MapSelectGrabTool';
+import {
+	getBookingTitlePrefixFromContactTitle,
+	getPromotionOverlayWhatFromContactTitle,
+} from '@/components/molecules/SearchResultsMap/searchMode';
 import { MapStackBlueSparkIcon } from '@/components/atoms/_svg/MapStackBlueSparkIcon';
 import { MapStackStarIcon } from '@/components/atoms/_svg/MapStackStarIcon';
 import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
@@ -178,7 +181,15 @@ const CAMPAIGN_TOP_NAV_BACKDROP_BOX_HEIGHT_PX = Math.round(
 const CAMPAIGN_TOP_NAV_BACKDROP_VISUAL_WIDTH_PX =
 	CAMPAIGN_TOP_NAV_BACKDROP_BOX_WIDTH_PX * CAMPAIGN_TOP_NAV_UI_SCALE;
 const CAMPAIGN_MAP_SELECT_GRAB_LEFT_PX = 26;
-const CAMPAIGN_MAP_SELECT_GRAB_VIEW_SCALE = 0.74;
+
+// Match dashboard map-view scaling so the left-side map tools look identical.
+// See: src/app/murmur/dashboard/page.tsx (mapSelectGrabViewScale)
+const CAMPAIGN_MAP_SELECT_GRAB_MIN_VIEW_SCALE = 0.8;
+const CAMPAIGN_MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE = 0.84;
+const CAMPAIGN_MAP_SELECT_GRAB_MAX_VIEW_SCALE = 0.95;
+const CAMPAIGN_MAP_SELECT_GRAB_SCALE_GROW_START_HEIGHT_PX = 1180;
+const CAMPAIGN_MAP_SELECT_GRAB_SCALE_GROW_END_HEIGHT_PX = 1480;
+const CAMPAIGN_MAP_SELECT_GRAB_VIEWPORT_INSET_PX = 16;
 const CAMPAIGN_MAP_SELECT_GRAB_TOP_EXTENT_PX =
 	MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
 	MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
@@ -190,9 +201,15 @@ const CAMPAIGN_MAP_SELECT_GRAB_TOP_EXTENT_PX =
 	MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX;
 const CAMPAIGN_MAP_SELECT_GRAB_TOTAL_HEIGHT_PX =
 	CAMPAIGN_MAP_SELECT_GRAB_TOP_EXTENT_PX + MAP_SELECT_GRAB_TOOL_COLLAPSED_HEIGHT_PX;
+
+// Keep the left tool stack aligned with the dashboard's map-view chrome.
+const CAMPAIGN_MAP_TOOL_VISUAL_TOP_PX = 106;
+const CAMPAIGN_MAP_TOOL_VISUAL_TOP_CSS = `calc(${CAMPAIGN_MAP_TOOL_VISUAL_TOP_PX}px / var(--murmur-campaign-zoom, 0.85))`;
+const CAMPAIGN_MAP_TOOL_VISUAL_TOP_NUDGE_UP_CSS = `calc(4px / var(--murmur-campaign-zoom, 0.85))`;
 const CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS = [
-	2.25, 2.41, 2.57, 2.77, 3.13, 3.9, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18.5, 20,
-	22,
+	// Match dashboard map-view zoom calibration.
+	2.25, 2.41, 2.57, 2.73, 2.88, 3.04, 3.2, 3.52, 3.83, 4.15, 4.47, 4.78, 5.1, 5.34, 5.58,
+	5.81, 6.05, 6.29, 6.52, 6.76, 7,
 ] as const;
 const CAMPAIGN_MAP_ZOOM_CONTROL_MAX_INDEX = CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS.length - 1;
 
@@ -220,6 +237,10 @@ const resetCampaignDocumentScroll = () => {
 	root.scrollLeft = 0;
 	body.scrollTop = 0;
 	body.scrollLeft = 0;
+};
+
+const clampNumber = (n: number, min: number, max: number): number => {
+	return Math.min(max, Math.max(min, n));
 };
 
 type CampaignMapZoomControlRequest = {
@@ -611,6 +632,7 @@ const Murmur = () => {
 	const { campaign, isPendingCampaign, setIsIdentityDialogOpen, isIdentityDialogOpen } =
 		useCampaignDetail();
 	const isMobile = useIsMobile();
+	const [viewportHeight, setViewportHeight] = useState(0);
 	const setPersistentMapConfig = usePersistentMapSetter();
 	const {
 		mood: globeWeatherMood,
@@ -624,6 +646,43 @@ const Murmur = () => {
 	const CAMPAIGN_ZOOM_EVENT = 'murmur:campaign-zoom-changed';
 	const CAMPAIGN_SCROLLABLE_CLASS = 'murmur-campaign-scrollable';
 	const CAMPAIGN_FORCE_TRANSFORM_CLASS = 'murmur-campaign-force-transform';
+
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		const update = () => setViewportHeight(window.innerHeight);
+		update();
+		window.addEventListener('resize', update, { passive: true });
+		return () => window.removeEventListener('resize', update);
+	}, []);
+
+	const campaignMapSelectGrabViewScale = useMemo(() => {
+		if (isMobile) return 1;
+		const availableHeight =
+			viewportHeight > 0
+				? viewportHeight - CAMPAIGN_MAP_SELECT_GRAB_VIEWPORT_INSET_PX * 2
+				: CAMPAIGN_MAP_SELECT_GRAB_TOTAL_HEIGHT_PX *
+					CAMPAIGN_MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE;
+		const fitScale = availableHeight / CAMPAIGN_MAP_SELECT_GRAB_TOTAL_HEIGHT_PX;
+		const tallViewportProgress = clampNumber(
+			(viewportHeight - CAMPAIGN_MAP_SELECT_GRAB_SCALE_GROW_START_HEIGHT_PX) /
+				(CAMPAIGN_MAP_SELECT_GRAB_SCALE_GROW_END_HEIGHT_PX -
+					CAMPAIGN_MAP_SELECT_GRAB_SCALE_GROW_START_HEIGHT_PX),
+			0,
+			1
+		);
+		const preferredScale =
+			CAMPAIGN_MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE +
+			(CAMPAIGN_MAP_SELECT_GRAB_MAX_VIEW_SCALE -
+				CAMPAIGN_MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE) *
+				tallViewportProgress;
+		return clampNumber(
+			Math.min(fitScale, preferredScale),
+			CAMPAIGN_MAP_SELECT_GRAB_MIN_VIEW_SCALE,
+			CAMPAIGN_MAP_SELECT_GRAB_MAX_VIEW_SCALE
+		);
+	}, [isMobile, viewportHeight]);
+	const campaignMapSelectGrabOriginOffsetPx =
+		CAMPAIGN_MAP_SELECT_GRAB_TOP_EXTENT_PX * campaignMapSelectGrabViewScale;
 	const [isCampaignWorkspaceExpanded, setIsCampaignWorkspaceExpanded] = useState(false);
 	const isCampaignWorkspaceExpandedRef = useRef(false);
 	const campaignWorkspaceActiveViewRef = useRef<ViewType>(
@@ -1396,7 +1455,7 @@ const Murmur = () => {
 		// dashboard's map-search mode (especially mid-transition or with cached state),
 		// so use window.location.assign for a reliable, fresh dashboard load.
 		window.location.assign(
-			`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}&pick=1`
+			`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}&pick=1&allContacts=1`
 		);
 	}, [campaign]);
 
@@ -1574,9 +1633,8 @@ const Murmur = () => {
 
 	// Campaign-only map camera padding: shift the globe left so the interactive viewport
 	// excludes the right-side UI panels. This must not affect dashboard/search and must
-	// reset on the Overview tab.
-	const shouldApplyCampaignMapCameraPadding =
-		isMobile === false && activeView !== 'overview';
+	// reset on the Overview tab unless the Overview right-rail is present.
+	const shouldApplyCampaignMapCameraPadding = isMobile === false;
 	const [campaignMapCameraPadding, setCampaignMapCameraPadding] =
 		useState<SearchResultsMapProps['cameraPadding']>(null);
 	const recomputeCampaignMapCameraPadding = useCallback(() => {
@@ -1585,6 +1643,34 @@ const Murmur = () => {
 		if (!shouldApplyCampaignMapCameraPadding) {
 			setCampaignMapCameraPadding(null);
 			return;
+		}
+
+		// Overview normally has no right-side panels, so we reset padding there unless
+		// the Overview right rail is rendered.
+		if (activeView === 'overview') {
+			try {
+				const rail = document.querySelector<HTMLElement>(
+					'[data-campaign-overview-right-rail="true"]'
+				);
+				const rect = rail?.getBoundingClientRect();
+				if (!rect || rect.width <= 0) {
+					setCampaignMapCameraPadding(null);
+					return;
+				}
+
+				const viewportW = window.innerWidth;
+				const uiCoveredRightPx = viewportW - rect.left;
+				const CAMERA_PADDING_BACKOFF_PX = 28;
+				const rightPaddingPx = Math.max(
+					0,
+					Math.round(uiCoveredRightPx - CAMERA_PADDING_BACKOFF_PX)
+				);
+				setCampaignMapCameraPadding({ right: rightPaddingPx, left: 0, top: 0, bottom: 0 });
+				return;
+			} catch {
+				setCampaignMapCameraPadding(null);
+				return;
+			}
 		}
 
 		try {
@@ -1627,7 +1713,7 @@ const Murmur = () => {
 		} catch {
 			setCampaignMapCameraPadding(null);
 		}
-	}, [shouldApplyCampaignMapCameraPadding]);
+	}, [activeView, shouldApplyCampaignMapCameraPadding]);
 	const [draftOperationsProgress, setDraftOperationsProgress] = useState<{
 		visible: boolean;
 		operations: Array<{ current: number; total: number }>;
@@ -1697,6 +1783,7 @@ const Murmur = () => {
 		setMapGrabUncategorizedActive(isActive);
 	}, []);
 	const [mapZoomControlIndex, setMapZoomControlIndex] = useState(1);
+	const [isMapZoomControlDragging, setIsMapZoomControlDragging] = useState(false);
 	const [mapZoomControlRequest, setMapZoomControlRequest] =
 		useState<CampaignMapZoomControlRequest | null>(null);
 	const mapZoomControlLiveRef = useRef<MapZoomControlLiveHandle | null>(null);
@@ -1740,6 +1827,9 @@ const Murmur = () => {
 		},
 		[scheduleMapZoomControlRequest]
 	);
+	const handleMapZoomControlInteractionChange = useCallback((isDragging: boolean) => {
+		setIsMapZoomControlDragging(isDragging);
+	}, []);
 	const handleMapZoomControlChange = useCallback(
 		(levelIndex: number, meta?: MapZoomControlIndexChangeMeta) => {
 			const safeLevelIndex = Math.min(
@@ -1774,16 +1864,24 @@ const Murmur = () => {
 	const handleSelectMapToolClick = useCallback(() => {
 		setActiveMapTool((prev) => (prev === 'select' ? 'grab' : 'select'));
 	}, []);
-	const handleMapViewportZoom = useCallback((zoom: number) => {
-		const nextControlValue = getCampaignMapZoomControlValueForZoom(zoom);
-		mapZoomControlLiveRef.current?.setLevelValue(nextControlValue);
-	}, []);
-	const handleMapViewportIdle = useCallback((payload: { zoom: number }) => {
-		const nextControlValue = getCampaignMapZoomControlValueForZoom(payload.zoom);
-		setMapZoomControlIndex((current) =>
-			Math.abs(current - nextControlValue) < 0.005 ? current : nextControlValue
-		);
-	}, []);
+	const handleMapViewportZoom = useCallback(
+		(zoom: number) => {
+			if (isMapZoomControlDragging) return;
+			const nextControlValue = getCampaignMapZoomControlValueForZoom(zoom);
+			mapZoomControlLiveRef.current?.setLevelValue(nextControlValue);
+		},
+		[isMapZoomControlDragging]
+	);
+	const handleMapViewportIdle = useCallback(
+		(payload: { zoom: number }) => {
+			if (isMapZoomControlDragging) return;
+			const nextControlValue = getCampaignMapZoomControlValueForZoom(payload.zoom);
+			setMapZoomControlIndex((current) =>
+				Math.abs(current - nextControlValue) < 0.005 ? current : nextControlValue
+			);
+		},
+		[isMapZoomControlDragging]
+	);
 
 	useEffect(() => {
 		return () => {
@@ -2212,11 +2310,9 @@ const Murmur = () => {
 	}, []);
 
 	// Fetch campaign contacts at the page level so the persistent map can stay interactive on every tab.
-	const contactListIds = campaign?.userContactLists?.map((l) => l.id) || [];
 	const { data: campaignMapContacts, isLoading: isCampaignMapContactsLoading } =
-		useGetContacts({
-			filters: { contactListIds },
-			enabled: contactListIds.length > 0 && !isMobile,
+		useGetCampaignContacts(campaign?.id, {
+			enabled: Boolean(campaign?.id) && !isMobile,
 		});
 	const { data: headerEmails } = useGetEmails({
 		filters: { campaignId: campaign?.id },
@@ -2235,19 +2331,36 @@ const Murmur = () => {
 		campaign?.userContactLists?.map((list) => list.name).join(', ') || '';
 	const headerFromName = campaign?.identity?.name || '';
 
-	const campaignMapContactsForMap = useMemo(
-		() =>
-			(campaignMapContacts || []).filter((contact) => {
-				const categoryIndex = getMapSelectGrabCategoryIndexFromContactTitle(
-					contact.curatedDisplayLabel || contact.title || contact.headline || ''
-				);
-				if (categoryIndex >= 0) {
-					return mapGrabActiveCategories[categoryIndex] !== false;
-				}
-				return mapGrabUncategorizedActive;
-			}),
-		[campaignMapContacts, mapGrabActiveCategories, mapGrabUncategorizedActive]
-	);
+	const campaignMapContactsForMap = useMemo(() => {
+		const contacts = campaignMapContacts || [];
+		if (contacts.length === 0) return contacts;
+
+		const out = [] as typeof contacts;
+		for (const contact of contacts) {
+			const titleLike =
+				contact.curatedDisplayLabel || contact.title || contact.headline || '';
+			const categoryIndex = getMapSelectGrabCategoryIndexFromContactTitle(titleLike);
+			if (categoryIndex >= 0) {
+				if (mapGrabActiveCategories[categoryIndex] === false) continue;
+			} else if (!mapGrabUncategorizedActive) {
+				continue;
+			}
+
+			// The map colors result dots by `contact.curatedCategory` (or the active search "What").
+			// Campaign contacts are not a single-category search, so derive a per-contact category
+			// from the stored title prefix.
+			const derivedCategory =
+				getPromotionOverlayWhatFromContactTitle(titleLike) ||
+				getBookingTitlePrefixFromContactTitle(titleLike);
+			out.push(
+				derivedCategory
+					? { ...contact, curatedCategory: derivedCategory }
+					: contact
+			);
+		}
+
+		return out;
+	}, [campaignMapContacts, mapGrabActiveCategories, mapGrabUncategorizedActive]);
 
 	const persistentCampaignMapProps = useMemo<SearchResultsMapProps>(
 		() => ({
@@ -2835,41 +2948,37 @@ const Murmur = () => {
 							</button>
 						)}
 
-						{!isMobile && activeView === 'overview' && (
+					{!isMobile && activeView === 'overview' && (
+						<div
+							data-campaign-interactive-surface
+							data-campaign-overview-left-panel="true"
+							className="fixed z-[130] pointer-events-none"
+							style={{
+								left: `${CAMPAIGN_MAP_SELECT_GRAB_LEFT_PX}px`,
+								top: `calc(${CAMPAIGN_MAP_TOOL_VISUAL_TOP_CSS} + ${campaignMapSelectGrabOriginOffsetPx}px - ${CAMPAIGN_MAP_TOOL_VISUAL_TOP_NUDGE_UP_CSS})`,
+								transform: `scale(${campaignMapSelectGrabViewScale})`,
+								transformOrigin: 'top left',
+							}}
+						>
 							<div
-								data-campaign-interactive-surface
-								className="fixed z-[130] pointer-events-none"
+								data-campaign-overview-showing-pill="true"
+								className="absolute left-0 pointer-events-none rounded-[5px] bg-white px-[4px] py-[1px] font-inter text-[11px] font-medium text-black"
 								style={{
-									left: `${CAMPAIGN_MAP_SELECT_GRAB_LEFT_PX}px`,
-									top: `calc((100dvh - ${
-										CAMPAIGN_MAP_SELECT_GRAB_TOTAL_HEIGHT_PX *
-										CAMPAIGN_MAP_SELECT_GRAB_VIEW_SCALE
-									}px) / 2 + ${
-										CAMPAIGN_MAP_SELECT_GRAB_TOP_EXTENT_PX *
-										CAMPAIGN_MAP_SELECT_GRAB_VIEW_SCALE
-									}px)`,
-									transform: `scale(${CAMPAIGN_MAP_SELECT_GRAB_VIEW_SCALE})`,
-									transformOrigin: 'top left',
+									top: `-${
+										MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+										MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+										MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+										MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+										MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
+										MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+										MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
+										MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX +
+										22
+									}px`,
 								}}
 							>
-								<div
-									className="absolute left-0 pointer-events-none rounded-[5px] bg-white px-[4px] py-[1px] font-inter text-[11px] font-medium text-black"
-									style={{
-										top: `-${
-											MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
-											MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
-											MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
-											MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
-											MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
-											MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
-											MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
-											MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX +
-											22
-										}px`,
-									}}
-								>
-									Showing
-								</div>
+								Showing
+							</div>
 								<MapSelectGrabTallStackBox
 									className="absolute pointer-events-none"
 									isSelectActive={isSelectMapToolActive}
@@ -2941,16 +3050,19 @@ const Murmur = () => {
 										<MapStackBlueSparkIcon />
 									</MapSelectGrabStackTile>
 								</MapSelectGrabStackBox>
-								<MapSelectGrabStarterBox
-									className="absolute left-0 pointer-events-auto"
-									zoomLevelIndex={mapZoomControlIndex}
-									zoomLevelValue={mapZoomControlDisplayValue}
-									zoomLevelLiveControlRef={mapZoomControlLiveRef}
-									onZoomLevelIndexChange={handleMapZoomControlChange}
-									onZoomLevelValueChange={handleMapZoomControlValueChange}
-									style={{
-										position: 'absolute',
-										left: 0,
+									<MapSelectGrabStarterBox
+										className="absolute left-0 pointer-events-auto"
+										zoomLevelIndex={mapZoomControlIndex}
+										zoomLevelValue={mapZoomControlDisplayValue}
+										zoomLevelLiveControlRef={mapZoomControlLiveRef}
+										onZoomLevelIndexChange={handleMapZoomControlChange}
+										onZoomLevelValueChange={handleMapZoomControlValueChange}
+										onZoomLevelInteractionChange={
+											handleMapZoomControlInteractionChange
+										}
+										style={{
+											position: 'absolute',
+											left: 0,
 										top: `-${
 											MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
 											MAP_SELECT_GRAB_STARTER_BOX_GAP_PX

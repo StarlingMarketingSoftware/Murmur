@@ -98,7 +98,12 @@ const CampaignFinderTopBar = ({
 						<span className="campaign-finder-view-label">View</span>
 					</button>
 					<div className="campaign-finder-topbar-search">
-						<SearchIconDesktop width={18} height={20} stroke="#717171" strokeWidth={1.8} />
+						<SearchIconDesktop
+							width={18}
+							height={20}
+							stroke="#717171"
+							strokeWidth={1.8}
+						/>
 						<input
 							type="search"
 							className="campaign-finder-topbar-search-input"
@@ -167,8 +172,9 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 	const [rightFinderSearchQuery, setRightFinderSearchQuery] = useState<string>('');
 	const [campaignFinderViewMode, setCampaignFinderViewMode] =
 		useState<CampaignFinderViewMode>('single');
-	const [campaignFinderHeight, setCampaignFinderHeight] =
-		useState<number>(CAMPAIGN_FINDER_MIN_HEIGHT);
+	const [campaignFinderHeight, setCampaignFinderHeight] = useState<number>(
+		CAMPAIGN_FINDER_MIN_HEIGHT
+	);
 	const [pendingSplitFinderOpen, setPendingSplitFinderOpen] = useState<{
 		campaignId: number;
 		pane: 'left' | 'right';
@@ -211,7 +217,8 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 	}, []);
 
 	// Use compact metrics on mobile OR on narrow desktop (<=960px)
-	const shouldUseCompactMetrics = shouldShowMobileFeatures || (!isMobile && isNarrowDesktop);
+	const shouldUseCompactMetrics =
+		shouldShowMobileFeatures || (!isMobile && isNarrowDesktop);
 	const handleFinderOpenInNewTab = useCallback(
 		(campaignId: number, sourcePane: 'left' | 'right') => {
 			const targetPane = sourcePane === 'left' ? 'right' : 'left';
@@ -263,7 +270,8 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 	const isAddingCampaign = isPendingCreateContactList || isPendingCreateCampaign;
 	const campaignRows = Array.isArray(campaignDataRows) ? campaignDataRows : [];
 	const campaignCount = campaignRows.length;
-	const isSplitFinderView = !shouldShowMobileFeatures && campaignFinderViewMode === 'split';
+	const isSplitFinderView =
+		!shouldShowMobileFeatures && campaignFinderViewMode === 'split';
 	const leftFinderSearchActive = leftFinderSearchQuery.trim().length > 0;
 	const rightFinderSearchActive = rightFinderSearchQuery.trim().length > 0;
 	const activeFinderSearchPane: 'left' | 'right' | null = rightFinderSearchActive
@@ -292,7 +300,10 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 		})
 		.filter((name): name is string => Boolean(name));
 	const shouldShowAddCampaignButton =
-		!isPending && !isFinderLayoutOpen && !isSplitFinderView && campaignCount < MAX_CAMPAIGNS;
+		!isPending &&
+		!isFinderLayoutOpen &&
+		!isSplitFinderView &&
+		campaignCount < MAX_CAMPAIGNS;
 	const campaignsTableScale = shouldScaleDesktopTable
 		? desktopScale
 		: shouldScaleMobileTable
@@ -362,26 +373,26 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 		let raf: number | null = null;
 		const update = () => {
 			if (raf !== null) cancelAnimationFrame(raf);
-				raf = requestAnimationFrame(() => {
-					const rect = el.getBoundingClientRect();
-					const scaleFromLayout =
-						el.offsetWidth > 0 && rect.width > 0 ? rect.width / el.offsetWidth : 1;
-					const tableScale = shouldScaleDesktopTable ? campaignsTableScale : 1;
-					const scale = Math.max(0.1, scaleFromLayout * tableScale);
-					const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-					const availableHeight =
-						(viewportHeight - rect.top - CAMPAIGN_FINDER_VIEWPORT_BOTTOM_GAP) / scale;
+			raf = requestAnimationFrame(() => {
+				const rect = el.getBoundingClientRect();
+				const scaleFromLayout =
+					el.offsetWidth > 0 && rect.width > 0 ? rect.width / el.offsetWidth : 1;
+				const tableScale = shouldScaleDesktopTable ? campaignsTableScale : 1;
+				const scale = Math.max(0.1, scaleFromLayout * tableScale);
+				const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+				const availableHeight =
+					(viewportHeight - rect.top - CAMPAIGN_FINDER_VIEWPORT_BOTTOM_GAP) / scale;
 
-					// Guard against NaN/infinity (can happen during layout/scale transitions).
-					// If that occurs, fall back to the design height rather than letting NaN
-					// propagate and blow the layout up.
-					const boundedAvailableHeight = Number.isFinite(availableHeight)
-						? Math.floor(availableHeight)
-						: CAMPAIGN_FINDER_MAX_HEIGHT;
-					const nextHeight = Math.min(
-						CAMPAIGN_FINDER_MAX_HEIGHT,
-						Math.max(CAMPAIGN_FINDER_MIN_HEIGHT, boundedAvailableHeight)
-					);
+				// Guard against NaN/infinity (can happen during layout/scale transitions).
+				// If that occurs, fall back to the design height rather than letting NaN
+				// propagate and blow the layout up.
+				const boundedAvailableHeight = Number.isFinite(availableHeight)
+					? Math.floor(availableHeight)
+					: CAMPAIGN_FINDER_MAX_HEIGHT;
+				const nextHeight = Math.min(
+					CAMPAIGN_FINDER_MAX_HEIGHT,
+					Math.max(CAMPAIGN_FINDER_MIN_HEIGHT, boundedAvailableHeight)
+				);
 
 				setCampaignFinderHeight((current) =>
 					Math.abs(current - nextHeight) > 1 ? nextHeight : current
@@ -517,7 +528,9 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 						: 1;
 
 					setShouldScaleMobileTable(shouldScale);
-					setMobileScale((prev) => (Math.abs(prev - nextScale) > 0.01 ? nextScale : prev));
+					setMobileScale((prev) =>
+						Math.abs(prev - nextScale) > 0.01 ? nextScale : prev
+					);
 
 					// Reset desktop scaling state while in mobile mode
 					setShouldScaleDesktopTable(false);
@@ -581,18 +594,14 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 		['--campaigns-table-scale' as never]: campaignsTableScale,
 		['--campaigns-finder-height' as never]: `${campaignFinderHeight}px`,
 	} as CSSProperties;
-	const singleFinderPane = isSplitFinderSearchActive && activeFinderSearchPane === 'right'
-		? 'right'
-		: 'left';
-	const singleCampaignsTable = singleFinderPane === 'right'
-		? rightCampaignsTable
-		: leftCampaignsTable;
-	const singleFinderSearchQuery = singleFinderPane === 'right'
-		? rightFinderSearchQuery
-		: leftFinderSearchQuery;
-	const setSingleFinderSearchQuery = singleFinderPane === 'right'
-		? setRightFinderSearchQuery
-		: setLeftFinderSearchQuery;
+	const singleFinderPane =
+		isSplitFinderSearchActive && activeFinderSearchPane === 'right' ? 'right' : 'left';
+	const singleCampaignsTable =
+		singleFinderPane === 'right' ? rightCampaignsTable : leftCampaignsTable;
+	const singleFinderSearchQuery =
+		singleFinderPane === 'right' ? rightFinderSearchQuery : leftFinderSearchQuery;
+	const setSingleFinderSearchQuery =
+		singleFinderPane === 'right' ? setRightFinderSearchQuery : setLeftFinderSearchQuery;
 	const finderTopContent = singleCampaignsTable.isFinderOpen ? (
 		<CampaignFinderTopBar
 			searchValue={singleFinderSearchQuery}
@@ -674,9 +683,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 						ref={desktopMeasureRef}
 						data-ultra-narrow-scale={shouldScaleDesktopTable ? 'true' : undefined}
 						data-mobile-ultra-narrow-scale={shouldScaleMobileTable ? 'true' : undefined}
-						style={
-							campaignsTableStyle
-						}
+						style={campaignsTableStyle}
 					>
 						{shouldShowMobileFeatures ? (
 							<div className="mobile-campaigns-outer-container">

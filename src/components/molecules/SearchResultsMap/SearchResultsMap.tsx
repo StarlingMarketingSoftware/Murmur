@@ -76,6 +76,7 @@ import type {
 	LatLngLiteral,
 	MapSelectionBounds,
 	MarkerConstellationEdge,
+	MarkerConstellationEdgeSeed,
 	MarkerConstellationNode,
 	MarkerConstellationPoint,
 	MarkerHoverMeta,
@@ -403,6 +404,7 @@ import { computeGloomWashFade, computeLightingOverlayOpacity } from './lightingO
 import {
 	buildBeautyMarkerConstellationFormation,
 	buildFallbackMarkerConstellationGroupKeys,
+	buildSelectedMarkerConstellationEdges,
 	markerConstellationPairKey,
 } from './markerConstellation';
 import {
@@ -5926,7 +5928,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'line-opacity': getSelectedMarkerConstellationZoomFadedOpacity(
 					MARKER_CONSTELLATION_SELECTED_GLOW_OPACITY
 				),
-				'line-width': ['interpolate', ['linear'], ['zoom'], 3, 8, 7, 11, 13, 15],
+				'line-width': ['interpolate', ['linear'], ['zoom'], 3, 6, 7, 8.4, 13, 11.2],
 				'line-blur': 1.6,
 			},
 		});
@@ -5940,7 +5942,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'line-opacity': getSelectedMarkerConstellationZoomFadedOpacity(
 					MARKER_CONSTELLATION_SELECTED_CORE_OPACITY
 				),
-				'line-width': ['interpolate', ['linear'], ['zoom'], 3, 4.8, 7, 6.8, 13, 9.4],
+				'line-width': ['interpolate', ['linear'], ['zoom'], 3, 3.4, 7, 4.8, 13, 6.2],
 				'line-blur': 0,
 			},
 		});
@@ -7337,6 +7339,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
 
+		// Curated blob UI is reserved for active search mode.
+		// Campaign pages can still color markers via `contact.curatedCategory`, but should not
+		// render the search-only blob geometry.
+		const searchKey = (searchQuery ?? '').trim();
+		if (!searchKey) {
+			clearCuratedBlobOutline();
+			return;
+		}
+
 		if (isLoading || !searchEngaged) {
 			clearCuratedBlobOutline();
 			return;
@@ -7466,6 +7477,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [
 		map,
 		isMapLoaded,
+		searchQuery,
 		isLoading,
 		searchEngaged,
 		contactsWithCoords,
@@ -10899,6 +10911,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			MAPBOX_LAYER_IDS.curatedBlobFill,
 			MAPBOX_LAYER_IDS.curatedBlobCore,
 		];
+		const isSearchAreaHit = (e: mapboxgl.MapMouseEvent): boolean => {
+			const searchAreaFeatures = map.queryRenderedFeatures(e.point, {
+				layers: searchAreaHitLayers,
+			});
+			if (searchAreaFeatures.length > 0) return true;
+
+			const blobMultiPolygon = curatedBlobLngLatMultiPolygonRef.current;
+			if (!blobMultiPolygon?.length) return false;
+			return pointInMultiPolygon([e.lngLat.lng, e.lngLat.lat], blobMultiPolygon);
+		};
 
 		const getContactForHit = (layerId: string, id: number): ContactWithName | null => {
 			if (layerId === MAPBOX_LAYER_IDS.selectedMarkerIcons) {
@@ -11036,10 +11058,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 			setCursor('');
 
-			const searchAreaFeatures = map.queryRenderedFeatures(e.point, {
-				layers: searchAreaHitLayers,
-			});
-			if (searchAreaFeatures.length > 0) {
+			if (isSearchAreaHit(e)) {
 				clearEmptyMapPrompt();
 				clearStateHover();
 				return;
@@ -11134,6 +11153,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					handleMarkerClick(contact);
 					return;
 				}
+			}
+
+			// Clicks inside curated blobs are intentional search-result interactions, not
+			// empty-map clicks that should disengage the current search.
+			if (isSearchAreaHit(e)) {
+				clearEmptyMapPrompt();
+				clearStateHover();
+				return;
 			}
 
 			// State click (when enabled and zoomed out).
@@ -11514,6 +11541,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const selectedConstellationLineFadeRafRef = useRef<number | null>(null);
 	const selectedConstellationLineOpacityRef = useRef<number>(1);
 	const selectedConstellationHadPathRef = useRef<boolean>(false);
+	const selectedConstellationEdgesRef = useRef<MarkerConstellationEdgeSeed[]>([]);
+	const selectedConstellationGraphKeyRef = useRef<string>('');
 	const markerConstellationNodeIdsRef = useRef<Set<number>>(new Set());
 	const markerConstellationLastSearchKeyRef = useRef<string>((searchQuery ?? '').trim());
 	const markerConstellationComposedSearchKeyRef = useRef<string>('');
@@ -11827,37 +11856,95 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 
 			const selectedLineFeatures: any[] = [];
+			const selectedPointSeeds: Array<{ id: number; coords: LatLngLiteral }> = [];
 			const seenSelectedIds = new Set<number>();
-			let previousSelectedPoint: { id: number; coords: LatLngLiteral } | null = null;
 			for (const id of selectedContacts) {
 				if (seenSelectedIds.has(id)) continue;
 				seenSelectedIds.add(id);
 				const selectedCoords = selectedPointById.get(id);
 				if (!selectedCoords) continue;
+				selectedPointSeeds.push({ id, coords: selectedCoords });
+			}
+			selectedPointSeeds.sort((a, b) => a.id - b.id);
 
-				if (previousSelectedPoint) {
+			if (selectedPointSeeds.length < 2) {
+				selectedConstellationEdgesRef.current = [];
+				selectedConstellationGraphKeyRef.current = '';
+			} else {
+				const selectedGraphKey = selectedPointSeeds
+					.map((point) =>
+						[
+							point.id,
+							point.coords.lng.toFixed(5),
+							point.coords.lat.toFixed(5),
+						].join(':')
+					)
+					.join(',');
+
+				if (selectedConstellationGraphKeyRef.current !== selectedGraphKey) {
+					let selectedComposeZoom = MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM;
+					try {
+						selectedComposeZoom = Math.max(
+							MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM,
+							map.getZoom() ?? MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM
+						);
+					} catch {
+						selectedComposeZoom = MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM;
+					}
+					if (!Number.isFinite(selectedComposeZoom)) {
+						selectedComposeZoom = MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM;
+					}
+
+					const selectedWorldSize = 512 * Math.pow(2, selectedComposeZoom);
+					const selectedGraphPoints: MarkerConstellationPoint[] = [];
+					for (const point of selectedPointSeeds) {
+						const projected = latLngToWorldPixel(point.coords, selectedWorldSize);
+						if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y)) {
+							continue;
+						}
+						selectedGraphPoints.push({
+							id: point.id,
+							coords: point.coords,
+							x: projected.x,
+							y: projected.y,
+							groupKey: 'selected',
+						});
+					}
+
+					const selectedGraphSeed = hashStringToUint32(selectedGraphKey).toString(36);
+					selectedConstellationEdgesRef.current = buildSelectedMarkerConstellationEdges(
+						selectedGraphPoints,
+						`selected|${selectedGraphPoints.length}|${selectedGraphSeed}`
+					);
+					selectedConstellationGraphKeyRef.current = selectedGraphKey;
+				}
+
+				for (const edge of selectedConstellationEdgesRef.current) {
+					const fromCoords = selectedPointById.get(edge.fromId);
+					const toCoords = selectedPointById.get(edge.toId);
+					if (!fromCoords || !toCoords) continue;
+
 					const edgeIndex = selectedLineFeatures.length;
-					const featureId = `selected:${edgeIndex}:${previousSelectedPoint.id}:${id}`;
+					const edgeId = markerConstellationPairKey(edge.fromId, edge.toId);
+					const featureId = `selected:${edgeIndex}:${edgeId}`;
 					dataKeyParts.push(`s:${featureId}`);
 					selectedLineFeatures.push({
 						type: 'Feature',
 						id: featureId,
 						properties: {
 							selectedLineOpacity: selectedConstellationLineOpacityRef.current,
-							fromId: previousSelectedPoint.id,
-							toId: id,
+							fromId: edge.fromId,
+							toId: edge.toId,
 						},
 						geometry: {
 							type: 'LineString',
 							coordinates: [
-								[previousSelectedPoint.coords.lng, previousSelectedPoint.coords.lat],
-								[selectedCoords.lng, selectedCoords.lat],
+								[fromCoords.lng, fromCoords.lat],
+								[toCoords.lng, toCoords.lat],
 							],
 						},
 					});
 				}
-
-				previousSelectedPoint = { id, coords: selectedCoords };
 			}
 
 			const dataKey = dataKeyParts.join(',');

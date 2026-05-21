@@ -1,4 +1,13 @@
-import { FC, Fragment, useCallback, useEffect, useState, useRef, useMemo } from 'react';
+import {
+	FC,
+	Fragment,
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import { useRouter } from 'next/navigation';
 import { gsap } from 'gsap';
 import {
@@ -104,6 +113,8 @@ import type { HistoryAction } from '../../../../../components/atoms/BottomPanels
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useGetCampaignContactEvents } from '@/hooks/queryHooks/useCampaigns';
 import { buildCampaignInboxMockData } from '../CampaignInboxDebugPanel';
+import { CampaignsTableMini } from '@/components/organisms/_tables/CampaignsTable/CampaignsTableMini';
+import { CampaignOverviewStrategyBox } from '@/components/molecules/DashboardStrategyBox/CampaignOverviewStrategyBox';
 import {
 	isRestaurantTitle,
 	isCoffeeShopTitle,
@@ -636,8 +647,124 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const bottomPanelCollapsed = true;
 	const mainContactsPanelWidthPx = 377;
 	const mainContactsPanelHeightPx = 597;
+	const OVERVIEW_CONTACTS_DOCK_GAP_RIGHT_PX = 56;
+	const OVERVIEW_CONTACTS_DOCK_GAP_DOWN_PX = 66;
+	// Pixel-perfect nudge after eyeballing references.
+	const OVERVIEW_CONTACTS_DOCK_NUDGE_LEFT_PX = 6;
+	const OVERVIEW_CONTACTS_DOCK_NUDGE_UP_PX = 8;
+	// Match the campaign page's content scale (so Overview sizes match Write).
+	const OVERVIEW_CONTACTS_DOCK_SCALE = 0.94;
 	const inboxMainPanelWidthPx = 863;
 	const inboxMainPanelHeightPx = 706;
+	const shouldDockOverviewContacts =
+		view === 'overview' && !isMobile && !isNarrowDesktop && !isNarrowestDesktop;
+	const shouldShowOverviewRightRail =
+		view === 'overview' && !isMobile && !isNarrowDesktop && !isNarrowestDesktop;
+	const [overviewContactsDockPos, setOverviewContactsDockPos] = useState<{
+		leftPx: number;
+		topPx: number;
+	} | null>(null);
+	const getEffectiveCampaignZoom = useCallback(() => {
+		if (typeof window === 'undefined') return 0.85;
+		const html = document.documentElement;
+		const zoomStr = window.getComputedStyle(html).zoom;
+		const parsedZoom = zoomStr ? parseFloat(zoomStr) : NaN;
+		const varZoomStr = window
+			.getComputedStyle(html)
+			.getPropertyValue('--murmur-campaign-zoom');
+		const parsedVarZoom = varZoomStr ? parseFloat(varZoomStr) : NaN;
+		const DEFAULT_CAMPAIGN_ZOOM = 0.85;
+		return Number.isFinite(parsedZoom) && parsedZoom > 0 && parsedZoom !== 1
+			? parsedZoom
+			: Number.isFinite(parsedVarZoom) && parsedVarZoom > 0
+				? parsedVarZoom
+				: DEFAULT_CAMPAIGN_ZOOM;
+	}, []);
+	useLayoutEffect(() => {
+		if (typeof window === 'undefined') return;
+		if (!shouldDockOverviewContacts) {
+			setOverviewContactsDockPos((prev) => (prev ? null : prev));
+			return;
+		}
+
+		let raf: number | null = null;
+		const compute = () => {
+			const leftPanel = document.querySelector<HTMLElement>(
+				'[data-campaign-overview-left-panel="true"]'
+			);
+			const showingPill = document.querySelector<HTMLElement>(
+				'[data-campaign-overview-showing-pill="true"]'
+			);
+			if (!leftPanel || !showingPill) return;
+			const leftRect = leftPanel.getBoundingClientRect();
+			const showingRect = showingPill.getBoundingClientRect();
+			const zoom = getEffectiveCampaignZoom();
+			const nextLeft =
+				(
+					leftRect.right +
+					OVERVIEW_CONTACTS_DOCK_GAP_RIGHT_PX -
+					OVERVIEW_CONTACTS_DOCK_NUDGE_LEFT_PX
+				) /
+				(zoom || 1);
+			const nextTop =
+				(
+					showingRect.top +
+					OVERVIEW_CONTACTS_DOCK_GAP_DOWN_PX -
+					OVERVIEW_CONTACTS_DOCK_NUDGE_UP_PX
+				) /
+				(zoom || 1);
+
+			setOverviewContactsDockPos((prev) => {
+				if (
+					prev &&
+					Math.abs(prev.leftPx - nextLeft) < 0.25 &&
+					Math.abs(prev.topPx - nextTop) < 0.25
+				) {
+					return prev;
+				}
+				return { leftPx: nextLeft, topPx: nextTop };
+			});
+		};
+		const schedule = () => {
+			if (raf != null) return;
+			raf = window.requestAnimationFrame(() => {
+				raf = null;
+				compute();
+			});
+		};
+
+		// Compute synchronously on mount/switch to avoid a visible flash at the fallback position.
+		compute();
+		window.addEventListener('resize', schedule, { passive: true });
+		window.addEventListener(
+			'murmur:campaign-zoom-changed',
+			schedule as EventListener
+		);
+		// Keep dock position synced while the left panel animates/scales.
+		let ro: ResizeObserver | null = null;
+		try {
+			if (typeof ResizeObserver !== 'undefined') {
+				const leftPanel = document.querySelector<HTMLElement>(
+					'[data-campaign-overview-left-panel="true"]'
+				);
+				if (leftPanel) {
+					ro = new ResizeObserver(() => schedule());
+					ro.observe(leftPanel);
+				}
+			}
+		} catch {
+			// ignore
+		}
+		return () => {
+			if (raf != null) window.cancelAnimationFrame(raf);
+			window.removeEventListener('resize', schedule);
+			window.removeEventListener(
+				'murmur:campaign-zoom-changed',
+				schedule as EventListener
+			);
+			ro?.disconnect();
+		};
+	}, [getEffectiveCampaignZoom, shouldDockOverviewContacts]);
 	const isCampaignWorkspaceCompact =
 		!isCampaignWorkspaceExpanded &&
 		!isMobile &&
@@ -1475,7 +1602,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			: urls.murmur.dashboard.index;
 
 		// Empty mini searches should behave like the campaign Search button: open the
-		// campaign-scoped curated view instead of searching the campaign name.
+		// campaign-scoped For You map, already disengaged to all contacts.
 		if (!trimmedWhat && !trimmedWhere) {
 			try {
 				if (typeof window !== 'undefined') {
@@ -1484,7 +1611,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			} catch {
 				// Ignore sessionStorage errors (e.g., disabled storage)
 			}
-			router.push(`${dashboardUrl}${dashboardUrl.includes('?') ? '&' : '?'}pick=1`);
+			router.push(
+				`${dashboardUrl}${dashboardUrl.includes('?') ? '&' : '?'}pick=1&allContacts=1`
+			);
 			return;
 		}
 
@@ -4032,16 +4161,74 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								</div>
 							)}
 
-						{view === 'overview' && (
-							<div className="relative w-full min-h-[720px]">
+					{view === 'overview' && (
+						<div className="relative w-full min-h-[720px]">
+							{shouldShowOverviewRightRail && (
 								<div
 									data-campaign-interactive-surface
-									className={cn(
-										'flex flex-col',
-										!isNarrowDesktop && !isNarrowestDesktop && 'absolute'
-									)}
+									data-campaign-overview-right-rail="true"
+									className="fixed flex flex-col"
 									style={{
-										...(isNarrowDesktop || isNarrowestDesktop
+										left: 'calc(50% + 250px + 32px)',
+										// Intentional extra breathing room vs the standard side-panel top.
+										top: '72px',
+										zIndex: 130,
+										gap: '16px',
+									}}
+								>
+									{/* Mini Campaigns table */}
+									<div
+										style={{
+											display: 'flex',
+											width: '371px',
+											height: '135px',
+											justifyContent: 'center',
+											alignItems: 'center',
+											position: 'relative',
+										}}
+									>
+										<div aria-hidden style={{ pointerEvents: 'none' }}>
+											<CampaignsTableMini currentCampaignId={campaign?.id} />
+										</div>
+										{/* Block clicks for now (read-only), but still eat events so the map doesn't grab them. */}
+										<div className="absolute inset-0" style={{ cursor: 'default' }} />
+									</div>
+
+									{/* Mini Strategy box */}
+									<div
+										style={{
+											width: '369px',
+											height: '486px',
+											position: 'relative',
+											overflow: 'hidden',
+										}}
+									>
+										<div aria-hidden style={{ pointerEvents: 'none' }}>
+											<CampaignOverviewStrategyBox />
+										</div>
+										<div className="absolute inset-0" style={{ cursor: 'default' }} />
+									</div>
+								</div>
+							)}
+							<div
+								data-campaign-interactive-surface
+								className={cn(
+									'flex flex-col',
+									shouldDockOverviewContacts
+										? 'fixed'
+										: !isNarrowDesktop && !isNarrowestDesktop
+											? 'absolute'
+											: undefined
+								)}
+								style={{
+									...(shouldDockOverviewContacts && overviewContactsDockPos
+										? {
+												left: `${overviewContactsDockPos.leftPx}px`,
+												top: `${overviewContactsDockPos.topPx}px`,
+												width: `${mainContactsPanelWidthPx}px`,
+												zIndex: 130,
+											}
+										: isNarrowDesktop || isNarrowestDesktop
 											? {
 													margin: '0 auto',
 													width: `${mainContactsPanelWidthPx}px`,
@@ -4050,10 +4237,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													left: '96px',
 													top: '0',
 													width: `${mainContactsPanelWidthPx}px`,
-												}),
-										gap: '16px',
-									}}
-								>
+											}),
+									gap: '16px',
+									...(shouldDockOverviewContacts
+										? {
+												transform: `scale(${OVERVIEW_CONTACTS_DOCK_SCALE})`,
+												transformOrigin: 'top left',
+											}
+										: {}),
+									...(shouldDockOverviewContacts && !overviewContactsDockPos
+										? {
+												opacity: 0,
+												pointerEvents: 'none',
+											}
+										: {}),
+								}}
+							>
 									{!hideHeaderBox && (
 										<CampaignHeaderBox
 											campaignId={campaign?.id}

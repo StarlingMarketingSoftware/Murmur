@@ -22,6 +22,11 @@ import type {
 } from './types';
 import { distancePointToSegmentSq, hashStringToUint32 } from './wasmGeo';
 
+const SELECTED_MARKER_CONSTELLATION_MAX_ANCHORS = 44;
+const SELECTED_MARKER_CONSTELLATION_MIN_ANCHORS = 12;
+const SELECTED_MARKER_CONSTELLATION_MIN_EDGE_PX = 10;
+const SELECTED_MARKER_CONSTELLATION_MAX_EDGE_PX = 420;
+
 // ============================================================================
 // Geometry primitives
 // ============================================================================
@@ -672,6 +677,211 @@ const selectBeautyConstellationPoints = (
 	}
 
 	return selected.sort((a, b) => a.id - b.id);
+};
+
+const getSelectedMarkerConstellationTargetCount = (
+	points: MarkerConstellationPoint[]
+): number => {
+	const n = points.length;
+	if (n <= 18) return n;
+
+	const stats = getMarkerConstellationPointStats(points);
+	const base = Math.round(Math.sqrt(n) * 3.35 + 7);
+	const spanCapacity = Math.floor(stats.diagonal / 32) + 8;
+	return Math.min(
+		n,
+		SELECTED_MARKER_CONSTELLATION_MAX_ANCHORS,
+		Math.max(
+			Math.min(n, SELECTED_MARKER_CONSTELLATION_MIN_ANCHORS),
+			Math.min(base, spanCapacity)
+		)
+	);
+};
+
+const buildSelectedMarkerConstellationEdgesForAnchors = (
+	anchors: MarkerConstellationPoint[],
+	clearancePoints: MarkerConstellationPoint[],
+	seed: string
+): MarkerConstellationEdgeSeed[] => {
+	if (anchors.length < 2) return [];
+	if (anchors.length === 2) {
+		return [{ fromId: anchors[0].id, toId: anchors[1].id }];
+	}
+
+	const sorted = anchors.slice().sort((a, b) => a.id - b.id);
+	const nearestDistances: number[] = [];
+	for (let i = 0; i < sorted.length; i++) {
+		let nearest = Infinity;
+		for (let j = 0; j < sorted.length; j++) {
+			if (i === j) continue;
+			const dx = sorted[i].x - sorted[j].x;
+			const dy = sorted[i].y - sorted[j].y;
+			nearest = Math.min(nearest, Math.hypot(dx, dy));
+		}
+		if (Number.isFinite(nearest)) nearestDistances.push(nearest);
+	}
+
+	nearestDistances.sort((a, b) => a - b);
+	const medianNearest =
+		nearestDistances.length > 0
+			? nearestDistances[Math.floor(nearestDistances.length / 2)]
+			: MARKER_CONSTELLATION_MAX_EDGE_PX;
+	const upperNearest =
+		nearestDistances.length > 0
+			? nearestDistances[Math.floor(nearestDistances.length * 0.75)]
+			: MARKER_CONSTELLATION_MAX_EDGE_PX;
+	const maxEdgePx = Math.min(
+		SELECTED_MARKER_CONSTELLATION_MAX_EDGE_PX,
+		Math.max(150, medianNearest * 2.8, upperNearest * 1.45)
+	);
+
+	const candidates: MarkerConstellationCandidate[] = [];
+	for (let i = 0; i < sorted.length; i++) {
+		for (let j = i + 1; j < sorted.length; j++) {
+			const a = sorted[i];
+			const b = sorted[j];
+			const dx = a.x - b.x;
+			const dy = a.y - b.y;
+			const length = Math.hypot(dx, dy);
+			if (
+				!Number.isFinite(length) ||
+				length < SELECTED_MARKER_CONSTELLATION_MIN_EDGE_PX ||
+				length > maxEdgePx
+			) {
+				continue;
+			}
+
+			const pairKey = markerConstellationPairKey(a.id, b.id);
+			const h = hashStringToUint32(`${seed}|selected:${pairKey}`);
+			const candidate: MarkerConstellationCandidate = {
+				fromId: a.id,
+				toId: b.id,
+				ax: a.x,
+				ay: a.y,
+				bx: b.x,
+				by: b.y,
+				length,
+				score: length + (h / 0xffffffff) * 12,
+			};
+			if (markerConstellationCandidateCutsThroughPoint(candidate, clearancePoints)) {
+				continue;
+			}
+			candidates.push(candidate);
+		}
+	}
+
+	if (candidates.length === 0) return [];
+	candidates.sort((a, b) => a.score - b.score);
+
+	const parent = new Map<number, number>();
+	for (const point of sorted) parent.set(point.id, point.id);
+	const find = (id: number): number => {
+		const p = parent.get(id);
+		if (p == null || p === id) return id;
+		const root = find(p);
+		parent.set(id, root);
+		return root;
+	};
+	const union = (a: number, b: number): boolean => {
+		const rootA = find(a);
+		const rootB = find(b);
+		if (rootA === rootB) return false;
+		parent.set(rootB, rootA);
+		return true;
+	};
+
+	const degree = new Map<number, number>();
+	const chosen: MarkerConstellationCandidate[] = [];
+	const chosenKeys = new Set<string>();
+	const maxDegree = sorted.length >= 10 ? 3 : 2;
+	let branchDegreeThreeCount = 0;
+	const maxBranchDegreeThree =
+		sorted.length >= 18 ? 3 : sorted.length >= 10 ? 1 : 0;
+	const targetEdges =
+		sorted.length <= 16
+			? sorted.length - 1
+			: Math.max(1, Math.floor(sorted.length * 0.72));
+
+	const canUseCandidate = (candidate: MarkerConstellationCandidate): boolean => {
+		const fromDegree = degree.get(candidate.fromId) ?? 0;
+		const toDegree = degree.get(candidate.toId) ?? 0;
+		if (fromDegree >= maxDegree || toDegree >= maxDegree) return false;
+
+		const wouldCreateThird =
+			(maxDegree >= 3 && fromDegree === 2 ? 1 : 0) +
+			(maxDegree >= 3 && toDegree === 2 ? 1 : 0);
+		if (branchDegreeThreeCount + wouldCreateThird > maxBranchDegreeThree) return false;
+		if (markerConstellationWouldCrossExistingEdge(candidate, chosen)) return false;
+		return true;
+	};
+
+	const acceptCandidate = (candidate: MarkerConstellationCandidate) => {
+		chosen.push(candidate);
+		chosenKeys.add(markerConstellationPairKey(candidate.fromId, candidate.toId));
+		const fromDegree = degree.get(candidate.fromId) ?? 0;
+		const toDegree = degree.get(candidate.toId) ?? 0;
+		if (maxDegree >= 3 && fromDegree === 2) branchDegreeThreeCount += 1;
+		if (maxDegree >= 3 && toDegree === 2) branchDegreeThreeCount += 1;
+		degree.set(candidate.fromId, fromDegree + 1);
+		degree.set(candidate.toId, toDegree + 1);
+	};
+
+	for (const candidate of candidates) {
+		if (chosen.length >= targetEdges) break;
+		if (!canUseCandidate(candidate)) continue;
+		if (!union(candidate.fromId, candidate.toId)) continue;
+		acceptCandidate(candidate);
+	}
+
+	const maxExtraEdges = Math.min(
+		Math.max(0, Math.floor(sorted.length * 0.08)),
+		Math.max(0, MARKER_CONSTELLATION_MAX_EDGES - chosen.length)
+	);
+	const extraMaxLength = Math.min(maxEdgePx, medianNearest * 1.85);
+	let addedExtra = 0;
+	for (const candidate of candidates) {
+		if (addedExtra >= maxExtraEdges) break;
+		const key = markerConstellationPairKey(candidate.fromId, candidate.toId);
+		if (chosenKeys.has(key)) continue;
+		if (candidate.length > extraMaxLength) continue;
+		if (!canUseCandidate(candidate)) continue;
+		acceptCandidate(candidate);
+		addedExtra += 1;
+	}
+
+	return chosen.map((edge) => ({ fromId: edge.fromId, toId: edge.toId }));
+};
+
+export const buildSelectedMarkerConstellationEdges = (
+	points: MarkerConstellationPoint[],
+	seed: string
+): MarkerConstellationEdgeSeed[] => {
+	if (points.length < 2) return [];
+	if (points.length === 2) return [{ fromId: points[0].id, toId: points[1].id }];
+
+	const targetCount = getSelectedMarkerConstellationTargetCount(points);
+	const anchors =
+		targetCount >= points.length
+			? points.slice().sort((a, b) => a.id - b.id)
+			: selectBeautyConstellationPoints(
+					points,
+					`${seed}|selected-anchors`,
+					targetCount,
+					34
+				);
+
+	const strictEdges = buildSelectedMarkerConstellationEdgesForAnchors(
+		anchors,
+		points,
+		`${seed}|strict`
+	);
+	if (strictEdges.length > 0) return strictEdges;
+
+	return buildSelectedMarkerConstellationEdgesForAnchors(
+		anchors,
+		anchors,
+		`${seed}|relaxed`
+	);
 };
 
 const scoreBeautyConstellationFormation = (

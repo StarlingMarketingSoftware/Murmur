@@ -1078,7 +1078,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 			} catch {
 				// Ignore sessionStorage errors (e.g., disabled storage)
 			}
-			router.push(`${dashboardUrl}${dashboardUrl.includes('?') ? '&' : '?'}pick=1`);
+			router.push(
+				`${dashboardUrl}${dashboardUrl.includes('?') ? '&' : '?'}pick=1&allContacts=1`
+			);
 			return;
 		}
 
