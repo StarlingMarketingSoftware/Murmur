@@ -99,6 +99,28 @@ type CampaignOverviewBottomBoxesProps = {
 const CAMPAIGN_OVERVIEW_BOTTOM_BOXES_BOTTOM_PX = 10;
 const CAMPAIGN_OVERVIEW_BOTTOM_BOX_SIZE_PX = 39.154;
 const CAMPAIGN_OVERVIEW_ASK_BOX_GAP_PX = 9;
+const CAMPAIGN_OVERVIEW_ASK_BOX_WIDTH_PX = 477;
+const CAMPAIGN_OVERVIEW_ASK_BOX_HEIGHT_PX = 83;
+const CAMPAIGN_OVERVIEW_STATUS_STRIP_GAP_PX = 6;
+const CAMPAIGN_OVERVIEW_STATUS_STRIP_WIDTH_PX = 520;
+const CAMPAIGN_OVERVIEW_STATUS_STRIP_HEIGHT_PX = 37;
+const CAMPAIGN_OVERVIEW_STATUS_TOGGLE_GAP_PX = 6;
+const CAMPAIGN_OVERVIEW_STATUS_TOGGLE_WIDTH_PX = 264;
+const CAMPAIGN_OVERVIEW_STATUS_TOGGLE_HEIGHT_PX = 27;
+const CAMPAIGN_OVERVIEW_ASK_BOX_BOTTOM_PX =
+	CAMPAIGN_OVERVIEW_BOTTOM_BOXES_BOTTOM_PX +
+	CAMPAIGN_OVERVIEW_BOTTOM_BOX_SIZE_PX +
+	CAMPAIGN_OVERVIEW_ASK_BOX_GAP_PX;
+const CAMPAIGN_OVERVIEW_STATUS_STRIP_BOTTOM_PX =
+	CAMPAIGN_OVERVIEW_ASK_BOX_BOTTOM_PX +
+	CAMPAIGN_OVERVIEW_ASK_BOX_HEIGHT_PX +
+	CAMPAIGN_OVERVIEW_STATUS_STRIP_GAP_PX;
+const CAMPAIGN_OVERVIEW_STATUS_TOGGLE_BOTTOM_PX =
+	CAMPAIGN_OVERVIEW_STATUS_STRIP_BOTTOM_PX +
+	CAMPAIGN_OVERVIEW_STATUS_STRIP_HEIGHT_PX +
+	CAMPAIGN_OVERVIEW_STATUS_TOGGLE_GAP_PX;
+
+type CampaignOverviewStatusToggleValue = 'category' | 'status';
 
 type CampaignOverviewAskAnythingBoxProps = {
 	onSubmit: (query: string) => void;
@@ -109,19 +131,15 @@ const CampaignOverviewAskAnythingBox = ({
 }: CampaignOverviewAskAnythingBoxProps) => {
 	const [query, setQuery] = useState('');
 	const inputRef = useRef<HTMLInputElement | null>(null);
-	const bottomOffset =
-		CAMPAIGN_OVERVIEW_BOTTOM_BOXES_BOTTOM_PX +
-		CAMPAIGN_OVERVIEW_BOTTOM_BOX_SIZE_PX +
-		CAMPAIGN_OVERVIEW_ASK_BOX_GAP_PX;
 	const submitQuery = () => onSubmit(query);
 
 	return (
 		<div
 			className="pointer-events-none fixed left-1/2"
 			style={{
-				bottom: bottomOffset,
-				width: 477,
-				height: 83,
+				bottom: CAMPAIGN_OVERVIEW_ASK_BOX_BOTTOM_PX,
+				width: CAMPAIGN_OVERVIEW_ASK_BOX_WIDTH_PX,
+				height: CAMPAIGN_OVERVIEW_ASK_BOX_HEIGHT_PX,
 				transform: 'translateX(-50%)',
 				zIndex: 126,
 			}}
@@ -181,6 +199,196 @@ const CampaignOverviewAskAnythingBox = ({
 				>
 					<MapBottomSearchArrowIcon aria-hidden="true" />
 				</button>
+			</div>
+		</div>
+	);
+};
+
+const CampaignOverviewStatusToggle = () => {
+	const [selected, setSelected] = useState<CampaignOverviewStatusToggleValue>('status');
+	const textStyle: CSSProperties = {
+		color: '#000',
+		fontFamily: 'Inter, sans-serif',
+		fontSize: 17,
+		fontStyle: 'normal',
+		fontWeight: 500,
+		lineHeight: '14px',
+	};
+	const buttonStyle: CSSProperties = {
+		...textStyle,
+		position: 'relative',
+		zIndex: 1,
+		display: 'flex',
+		alignItems: 'center',
+		justifyContent: 'center',
+		width: '50%',
+		height: '100%',
+		border: 0,
+		background: 'transparent',
+		padding: 0,
+		margin: 0,
+		cursor: 'pointer',
+	};
+
+	return (
+		<div
+			className="pointer-events-none fixed left-1/2 flex items-center justify-center font-inter"
+			style={{
+				bottom: CAMPAIGN_OVERVIEW_STATUS_TOGGLE_BOTTOM_PX,
+				width: CAMPAIGN_OVERVIEW_STATUS_STRIP_WIDTH_PX,
+				height: CAMPAIGN_OVERVIEW_STATUS_TOGGLE_HEIGHT_PX,
+				transform: 'translateX(calc(-50% - 24px))',
+				zIndex: 126,
+				gap: 28,
+			}}
+		>
+			<span style={textStyle}>Group</span>
+			<div
+				role="group"
+				aria-label="Campaign overview grouping"
+				className="pointer-events-auto relative flex overflow-hidden"
+				style={{
+					width: CAMPAIGN_OVERVIEW_STATUS_TOGGLE_WIDTH_PX,
+					height: CAMPAIGN_OVERVIEW_STATUS_TOGGLE_HEIGHT_PX,
+					borderRadius: 8,
+				}}
+			>
+				<div
+					aria-hidden="true"
+					className="absolute inset-0"
+					style={{
+						borderRadius: 8,
+						opacity: 0.45,
+						background: '#EEF6F0',
+					}}
+				/>
+				<div
+					aria-hidden="true"
+					className="absolute top-0 h-full transition-all duration-150"
+					style={{
+						left: selected === 'category' ? 0 : '50%',
+						width: '50%',
+						borderRadius: 8,
+						background: selected === 'category' ? '#A7F5B6' : '#BFF7FF',
+					}}
+				/>
+				<button
+					type="button"
+					aria-pressed={selected === 'category'}
+					style={buttonStyle}
+					onClick={() => setSelected('category')}
+				>
+					Category
+				</button>
+				<button
+					type="button"
+					aria-pressed={selected === 'status'}
+					style={buttonStyle}
+					onClick={() => setSelected('status')}
+				>
+					Status
+				</button>
+			</div>
+		</div>
+	);
+};
+
+const CampaignOverviewStatusStrip = () => {
+	const itemStyle: CSSProperties = {
+		display: 'flex',
+		alignItems: 'center',
+		gap: 12,
+		whiteSpace: 'nowrap',
+	};
+
+	return (
+		<div
+			role="group"
+			aria-label="Campaign overview status"
+			className="pointer-events-none fixed left-1/2 font-inter text-black"
+			style={{
+				bottom: CAMPAIGN_OVERVIEW_STATUS_STRIP_BOTTOM_PX,
+				width: CAMPAIGN_OVERVIEW_STATUS_STRIP_WIDTH_PX,
+				height: CAMPAIGN_OVERVIEW_STATUS_STRIP_HEIGHT_PX,
+				transform: 'translateX(-50%)',
+				zIndex: 126,
+			}}
+		>
+			<div
+				aria-hidden="true"
+				className="absolute inset-0"
+				style={{
+					borderRadius: 8,
+					opacity: 0.45,
+					background: '#EEF6F0',
+				}}
+			/>
+			<div
+				className="relative flex h-full items-center justify-between"
+				style={{
+					padding: '0 31px',
+					color: '#000',
+					fontFamily: 'Inter, sans-serif',
+					fontSize: 17,
+					fontStyle: 'normal',
+					fontWeight: 500,
+					lineHeight: '14px',
+				}}
+			>
+				<div style={itemStyle}>
+					<span>Contacts</span>
+					<svg
+						width="18"
+						height="18"
+						viewBox="0 0 18 18"
+						fill="none"
+						xmlns="http://www.w3.org/2000/svg"
+						aria-hidden="true"
+					>
+						<circle cx="9" cy="9" r="9" fill="white" />
+					</svg>
+				</div>
+				<div style={itemStyle}>
+					<span>Drafts</span>
+					<svg
+						width="18"
+						height="18"
+						viewBox="0 0 18 18"
+						fill="none"
+						xmlns="http://www.w3.org/2000/svg"
+						aria-hidden="true"
+					>
+						<circle cx="9" cy="9" r="9" fill="white" />
+						<circle cx="9" cy="9" r="6.4" fill="#9ED8F4" />
+					</svg>
+				</div>
+				<div style={itemStyle}>
+					<span>New Message</span>
+					<svg
+						width="18"
+						height="18"
+						viewBox="0 0 18 18"
+						fill="none"
+						xmlns="http://www.w3.org/2000/svg"
+						aria-hidden="true"
+					>
+						<circle cx="9" cy="9" r="9" fill="white" />
+						<circle cx="9" cy="9" r="6.9" fill="#2B8BB8" />
+					</svg>
+				</div>
+				<div style={itemStyle}>
+					<span>Sent</span>
+					<svg
+						width="18"
+						height="18"
+						viewBox="0 0 18 18"
+						fill="none"
+						xmlns="http://www.w3.org/2000/svg"
+						aria-hidden="true"
+					>
+						<circle cx="9" cy="9" r="7.1" stroke="#9ACDD4" strokeWidth="3" />
+					</svg>
+				</div>
 			</div>
 		</div>
 	);
@@ -2843,6 +3051,8 @@ const Murmur = () => {
 						)}
 						{isMobile === false && activeView === 'overview' && !shouldHideContent && (
 							<>
+								<CampaignOverviewStatusToggle />
+								<CampaignOverviewStatusStrip />
 								<CampaignOverviewAskAnythingBox onSubmit={handleOverviewAskAnythingSubmit} />
 								<CampaignOverviewBottomBoxes
 									contactsCount={headerContactsCount}
