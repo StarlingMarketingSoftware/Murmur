@@ -84,10 +84,11 @@ import {
 } from './CampaignInboxDebugPanel';
 
 type ViewType = Exclude<DraftingSectionView, 'search'>;
-type CampaignUrlTab = 'write' | 'overview' | 'inbox' | 'sent' | 'drafts';
+type CampaignUrlTab = 'write' | 'all' | 'inbox' | 'sent' | 'drafts';
 
 const getCampaignViewFromUrlTab = (tab: string | null): ViewType => {
 	switch (tab?.toLowerCase()) {
+		case 'all':
 		case 'overview':
 			return 'overview';
 		case 'inbox':
@@ -100,7 +101,6 @@ const getCampaignViewFromUrlTab = (tab: string | null): ViewType => {
 		case 'testing':
 		case 'contacts':
 		case 'search':
-		case 'all':
 		default:
 			return 'testing';
 	}
@@ -116,7 +116,7 @@ const getCampaignUrlTabForView = (
 ): CampaignUrlTab => {
 	switch (view) {
 		case 'overview':
-			return 'overview';
+			return 'all';
 		case 'inbox':
 			return inboxSentTab === 'sent' ? 'sent' : 'inbox';
 		case 'sent':

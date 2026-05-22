@@ -10428,7 +10428,7 @@ const DashboardContent = () => {
 													onClick={() => {
 														if (!mapCampaignId) return;
 														router.push(
-															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=overview`
+															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=all`
 														);
 													}}
 												>
