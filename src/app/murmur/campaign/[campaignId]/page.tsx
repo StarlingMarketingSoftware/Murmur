@@ -21,10 +21,12 @@ import {
 	useCallback,
 	useMemo,
 	useLayoutEffect,
+	type CSSProperties,
 } from 'react';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
+import MapBottomSearchArrowIcon from '@/components/atoms/_svg/MapBottomSearchArrowIcon';
 import DashboardActionBarPlaybookIcon from '@/components/atoms/_svg/DashboardActionBarPlaybookIcon';
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 import DashboardActionBarStarIcon from '@/components/atoms/_svg/DashboardActionBarStarIcon';
@@ -38,6 +40,7 @@ import { CampaignsTable } from '@/components/organisms/_tables/CampaignsTable/Ca
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import { useEditCampaign, useGetCampaignContacts } from '@/hooks/queryHooks/useCampaigns';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useCreateIdentity, useGetIdentities } from '@/hooks/queryHooks/useIdentities';
 import { EmailStatus } from '@/constants/prismaEnums';
 import { useQueryClient } from '@tanstack/react-query';
@@ -85,6 +88,172 @@ import {
 
 type ViewType = Exclude<DraftingSectionView, 'search'>;
 type CampaignUrlTab = 'write' | 'all' | 'inbox' | 'sent' | 'drafts';
+
+type CampaignOverviewBottomBoxesProps = {
+	contactsCount: number;
+	draftCount: number;
+	inboxCount: number;
+	sentCount: number;
+};
+
+const CAMPAIGN_OVERVIEW_BOTTOM_BOXES_BOTTOM_PX = 10;
+const CAMPAIGN_OVERVIEW_BOTTOM_BOX_SIZE_PX = 39.154;
+const CAMPAIGN_OVERVIEW_ASK_BOX_GAP_PX = 9;
+
+type CampaignOverviewAskAnythingBoxProps = {
+	onSubmit: (query: string) => void;
+};
+
+const CampaignOverviewAskAnythingBox = ({
+	onSubmit,
+}: CampaignOverviewAskAnythingBoxProps) => {
+	const [query, setQuery] = useState('');
+	const inputRef = useRef<HTMLInputElement | null>(null);
+	const bottomOffset =
+		CAMPAIGN_OVERVIEW_BOTTOM_BOXES_BOTTOM_PX +
+		CAMPAIGN_OVERVIEW_BOTTOM_BOX_SIZE_PX +
+		CAMPAIGN_OVERVIEW_ASK_BOX_GAP_PX;
+	const submitQuery = () => onSubmit(query);
+
+	return (
+		<div
+			className="pointer-events-none fixed left-1/2"
+			style={{
+				bottom: bottomOffset,
+				width: 477,
+				height: 83,
+				transform: 'translateX(-50%)',
+				zIndex: 126,
+			}}
+		>
+			<div
+				aria-label="Ask anything on this campaign"
+				role="group"
+				className="pointer-events-auto relative h-full w-full overflow-hidden font-inter text-black"
+				style={{
+					borderRadius: 10.863,
+					border: '2px solid #000',
+					background: '#EFFFF3',
+					boxSizing: 'border-box',
+				}}
+				onMouseDown={(event) => {
+					if ((event.target as HTMLElement).closest('button')) return;
+					inputRef.current?.focus();
+				}}
+			>
+				<input
+					ref={inputRef}
+					type="text"
+					aria-label="Ask anything"
+					value={query}
+					placeholder="Ask Anything"
+					className="pointer-events-auto absolute border-0 bg-transparent p-0 font-inter font-medium leading-none text-black outline-none placeholder:text-black placeholder:opacity-100"
+					style={{
+						left: 18,
+						top: 9,
+						width: 'calc(100% - 90px)',
+						height: 24,
+						fontSize: 16,
+					}}
+					onChange={(event) => setQuery(event.target.value)}
+					onKeyDown={(event) => {
+						if (event.key === 'Enter') {
+							event.preventDefault();
+							submitQuery();
+						}
+					}}
+				/>
+				<button
+					type="button"
+					aria-label="Open campaign search"
+					className="pointer-events-auto absolute flex items-center justify-center border-0 p-0 text-black"
+					style={{
+						right: 9,
+						top: 9,
+						width: 45,
+						height: 37,
+						borderRadius: 9,
+						background: '#ADFFC2',
+						boxSizing: 'border-box',
+						cursor: 'pointer',
+					}}
+					onClick={submitQuery}
+				>
+					<MapBottomSearchArrowIcon aria-hidden="true" />
+				</button>
+			</div>
+		</div>
+	);
+};
+
+const CampaignOverviewBottomBoxes = ({
+	contactsCount,
+	draftCount,
+	inboxCount,
+	sentCount,
+}: CampaignOverviewBottomBoxesProps) => {
+	const boxStyle: CSSProperties = {
+		width: 39.154,
+		height: 39.154,
+		borderRadius: 7.458,
+		border: '0.725px solid #000',
+		boxSizing: 'border-box',
+		display: 'flex',
+		alignItems: 'center',
+		justifyContent: 'center',
+	};
+	const countStyle: CSSProperties = {
+		fontFamily: 'Inter, sans-serif',
+		fontSize: 12.326,
+		fontStyle: 'normal',
+		fontWeight: 500,
+		lineHeight: '10.151px',
+		color: '#000',
+	};
+	const inactiveBox = (key: string, opacity: number) => (
+		<div
+			key={key}
+			style={{
+				...boxStyle,
+				opacity,
+				background: '#F3EEE1',
+			}}
+		/>
+	);
+
+	return (
+		<div
+			aria-hidden="true"
+			className="pointer-events-none fixed left-0 right-0 flex justify-center"
+			style={{ bottom: CAMPAIGN_OVERVIEW_BOTTOM_BOXES_BOTTOM_PX, zIndex: 125 }}
+		>
+			<div className="flex" style={{ gap: 3 }}>
+				{inactiveBox('left-1', 0.1)}
+				{inactiveBox('left-2', 0.2)}
+				<div style={{ ...boxStyle, background: '#FFFFFF' }}>
+					<SearchIconDesktop width={17} height={18} stroke="#8B8B8B" strokeWidth={2.3} />
+				</div>
+				<div style={{ ...boxStyle, ...countStyle, background: '#EB8586' }}>
+					{contactsCount}
+				</div>
+				<div style={{ ...boxStyle, ...countStyle, background: '#FFE3AA' }}>
+					{draftCount}
+				</div>
+				<div style={{ ...boxStyle, ...countStyle, background: '#6EBED5' }}>
+					{inboxCount}
+				</div>
+				<div style={{ ...boxStyle, ...countStyle, background: '#5AB478' }}>
+					{sentCount}
+				</div>
+				<div style={{ ...boxStyle, background: '#EFD7D3' }}>
+					<DashboardActionBarStarIcon width={15} height={15} style={{ color: '#E32222' }} />
+				</div>
+				{inactiveBox('right-1', 0.2)}
+				{inactiveBox('right-2', 0.1)}
+			</div>
+		</div>
+	);
+};
 
 const getCampaignViewFromUrlTab = (tab: string | null): ViewType => {
 	switch (tab?.toLowerCase()) {
@@ -1461,6 +1630,34 @@ const Murmur = () => {
 
 	// Campaign Search should always stay pinned to the campaign the user is viewing.
 	const handleGoToDashboardSearch = handleOpenDashboardSearchForCampaign;
+	const handleOverviewAskAnythingSubmit = useCallback(
+		(query: string) => {
+			const trimmedQuery = query.trim();
+			if (!trimmedQuery) {
+				handleGoToDashboardSearch();
+				return;
+			}
+
+			if (!campaign) return;
+			if (typeof window === 'undefined') return;
+
+			try {
+				sessionStorage.setItem(
+					'murmur_pending_search',
+					JSON.stringify({
+						v: 1,
+						query: trimmedQuery,
+						fromCampaignId: String(campaign.id),
+					})
+				);
+			} catch {
+				// sessionStorage may be unavailable; navigation can still proceed.
+			}
+
+			window.location.assign(`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`);
+		},
+		[campaign, handleGoToDashboardSearch]
+	);
 
 	// Track highlight state in a ref so the event listener has fresh access without re-binding constantly
 	const isTopSearchHighlightedRef = useRef(isTopSearchHighlighted);
@@ -2316,7 +2513,14 @@ const Murmur = () => {
 		});
 	const { data: headerEmails } = useGetEmails({
 		filters: { campaignId: campaign?.id },
-		enabled: !!campaign?.id && isNarrowestDesktop && !isMobile,
+		enabled:
+			Boolean(campaign?.id) &&
+			isMobile === false &&
+			(isNarrowestDesktop || activeView === 'overview'),
+	});
+	const { data: overviewInboundEmails } = useGetInboundEmails({
+		filters: { campaignId: campaign?.id },
+		enabled: Boolean(campaign?.id) && isMobile === false && activeView === 'overview',
 	});
 
 	// Compute header metrics
@@ -2327,6 +2531,7 @@ const Murmur = () => {
 	const headerSentCount = (headerEmails || []).filter(
 		(e) => e.status === EmailStatus.sent
 	).length;
+	const overviewInboxCount = overviewInboundEmails?.length || 0;
 	const headerToListNames =
 		campaign?.userContactLists?.map((list) => list.name).join(', ') || '';
 	const headerFromName = campaign?.identity?.name || '';
@@ -2635,6 +2840,17 @@ const Murmur = () => {
 					>
 						{usePersistentCampaignMapBackground && (
 							<div className="campaign-map-split-overlay" aria-hidden="true" />
+						)}
+						{isMobile === false && activeView === 'overview' && !shouldHideContent && (
+							<>
+								<CampaignOverviewAskAnythingBox onSubmit={handleOverviewAskAnythingSubmit} />
+								<CampaignOverviewBottomBoxes
+									contactsCount={headerContactsCount}
+									draftCount={headerDraftCount}
+									inboxCount={overviewInboxCount}
+									sentCount={headerSentCount}
+								/>
+							</>
 						)}
 						{/* Top navigation box (ported from dashboard map view).
 			    Translucent backdrop + 5-tab row (Search / Write / [campaign chip] / Inbox / Drafts)
