@@ -26,6 +26,7 @@ const SELECTED_MARKER_CONSTELLATION_MAX_ANCHORS = 44;
 const SELECTED_MARKER_CONSTELLATION_MIN_ANCHORS = 12;
 const SELECTED_MARKER_CONSTELLATION_MIN_EDGE_PX = 10;
 const SELECTED_MARKER_CONSTELLATION_MAX_EDGE_PX = 420;
+const CATEGORY_MARKER_CONSTELLATION_MAX_EDGE_PX = 260;
 
 // ============================================================================
 // Geometry primitives
@@ -139,7 +140,8 @@ const markerConstellationWouldCrossExistingEdge = (
 const buildMarkerConstellationEdgesForGroup = (
 	points: MarkerConstellationPoint[],
 	seed: string,
-	remainingBudget: number
+	remainingBudget: number,
+	maxEdgeCap: number = MARKER_CONSTELLATION_MAX_EDGE_PX
 ): MarkerConstellationEdgeSeed[] => {
 	if (points.length < 2 || remainingBudget <= 0) return [];
 
@@ -162,7 +164,7 @@ const buildMarkerConstellationEdgesForGroup = (
 			? nearestDistances[Math.floor(nearestDistances.length / 2)]
 			: MARKER_CONSTELLATION_MIN_EDGE_PX;
 	const maxEdgePx = Math.min(
-		MARKER_CONSTELLATION_MAX_EDGE_PX,
+		maxEdgeCap,
 		Math.max(MARKER_CONSTELLATION_MIN_EDGE_PX, medianNearest * 2.65)
 	);
 
@@ -327,12 +329,15 @@ export const buildFallbackMarkerConstellationGroupKeys = (
 	return groupKeyById;
 };
 
-const buildMarkerConstellationEdges = (
-	points: MarkerConstellationPoint[],
-	seed: string
-): MarkerConstellationEdgeSeed[] => {
-	if (points.length < 2) return [];
+type MarkerConstellationPointGroup = {
+	key: string;
+	group: MarkerConstellationPoint[];
+	minId: number;
+};
 
+const getOrderedMarkerConstellationPointGroups = (
+	points: MarkerConstellationPoint[]
+): MarkerConstellationPointGroup[] => {
 	const groups = new Map<string, MarkerConstellationPoint[]>();
 	for (const point of points) {
 		const group = groups.get(point.groupKey);
@@ -340,7 +345,7 @@ const buildMarkerConstellationEdges = (
 		else groups.set(point.groupKey, [point]);
 	}
 
-	const orderedGroups = Array.from(groups.entries())
+	return Array.from(groups.entries())
 		.map(([key, group]) => ({
 			key,
 			group: group.slice().sort((a, b) => a.id - b.id),
@@ -348,6 +353,15 @@ const buildMarkerConstellationEdges = (
 		}))
 		.filter(({ group }) => group.length >= 2)
 		.sort((a, b) => a.minId - b.minId || a.key.localeCompare(b.key));
+};
+
+const buildMarkerConstellationEdges = (
+	points: MarkerConstellationPoint[],
+	seed: string
+): MarkerConstellationEdgeSeed[] => {
+	if (points.length < 2) return [];
+
+	const orderedGroups = getOrderedMarkerConstellationPointGroups(points);
 
 	const edges: MarkerConstellationEdgeSeed[] = [];
 	for (const { key, group } of orderedGroups) {
@@ -364,7 +378,8 @@ const buildMarkerConstellationEdges = (
 
 const buildSparseMarkerConstellationEdges = (
 	points: MarkerConstellationPoint[],
-	seed: string
+	seed: string,
+	maxEdgeCap: number = MARKER_CONSTELLATION_SPARSE_FALLBACK_MAX_EDGE_PX
 ): MarkerConstellationEdgeSeed[] => {
 	if (points.length < 2) return [];
 
@@ -391,7 +406,7 @@ const buildSparseMarkerConstellationEdges = (
 			? nearestDistances[Math.floor(nearestDistances.length * 0.75)]
 			: MARKER_CONSTELLATION_MAX_EDGE_PX;
 	const maxEdgePx = Math.min(
-		MARKER_CONSTELLATION_SPARSE_FALLBACK_MAX_EDGE_PX,
+		maxEdgeCap,
 		Math.max(MARKER_CONSTELLATION_MAX_EDGE_PX, medianNearest * 2.5, upperNearest * 1.35)
 	);
 
@@ -474,6 +489,38 @@ const buildSparseMarkerConstellationEdges = (
 		fromId: edge.fromId,
 		toId: edge.toId,
 	}));
+};
+
+const buildCategoryMarkerConstellationEdges = (
+	points: MarkerConstellationPoint[],
+	seed: string
+): MarkerConstellationEdgeSeed[] => {
+	if (points.length < 2) return [];
+
+	const orderedGroups = getOrderedMarkerConstellationPointGroups(points);
+	const edges: MarkerConstellationEdgeSeed[] = [];
+	for (const { key, group } of orderedGroups) {
+		const remainingBudget = MARKER_CONSTELLATION_MAX_EDGES - edges.length;
+		if (remainingBudget <= 0) break;
+
+		let groupEdges = buildMarkerConstellationEdgesForGroup(
+			group,
+			`${seed}|${key}|category`,
+			remainingBudget,
+			CATEGORY_MARKER_CONSTELLATION_MAX_EDGE_PX
+		);
+		if (groupEdges.length === 0 && group.length > 2) {
+			groupEdges = buildSparseMarkerConstellationEdges(
+				group,
+				`${seed}|${key}|category-sparse`,
+				CATEGORY_MARKER_CONSTELLATION_MAX_EDGE_PX
+			);
+		}
+
+		edges.push(...groupEdges.slice(0, remainingBudget));
+	}
+
+	return edges;
 };
 
 // ============================================================================
@@ -1081,6 +1128,23 @@ export const buildBeautyMarkerConstellationFormation = (
 		MARKER_CONSTELLATION_MAX_EDGES * 2
 	);
 	const nodes = [...wide.nodes, ...mid.nodes, ...detail.nodes];
+	const lowZoomNodeIds = new Set<number>();
+	for (const node of nodes) lowZoomNodeIds.add(node.id);
+
+	return { edges, nodes, lowZoomNodeIds };
+};
+
+export const buildCategoryMarkerConstellationFormation = (
+	points: MarkerConstellationPoint[],
+	seed: string
+): MarkerConstellationFormation => {
+	if (points.length < 2) {
+		return { edges: [], nodes: [], lowZoomNodeIds: new Set() };
+	}
+
+	const edgeSeeds = buildCategoryMarkerConstellationEdges(points, seed);
+	const edges = annotateMarkerConstellationEdges('mid', points, edgeSeeds);
+	const nodes = buildMarkerConstellationNodesForLevel('mid', edges);
 	const lowZoomNodeIds = new Set<number>();
 	for (const node of nodes) lowZoomNodeIds.add(node.id);
 

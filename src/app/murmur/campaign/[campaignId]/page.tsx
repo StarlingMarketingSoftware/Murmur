@@ -2373,6 +2373,7 @@ const Murmur = () => {
 			cameraPadding: campaignMapCameraPadding,
 			contacts: campaignMapContactsForMap,
 			selectedContacts: [],
+			categoryConstellationsEnabled: activeView === 'overview',
 			activeTool: activeMapTool,
 			requestedZoom: mapZoomControlRequest,
 			onViewportZoom: handleMapViewportZoom,
@@ -2381,6 +2382,7 @@ const Murmur = () => {
 			skipAutoFit: true,
 		}),
 		[
+			activeView,
 			activeMapTool,
 			campaignMapCameraPadding,
 			campaignMapContactsForMap,

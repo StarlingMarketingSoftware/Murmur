@@ -403,6 +403,7 @@ import {
 import { computeGloomWashFade, computeLightingOverlayOpacity } from './lightingOverlay';
 import {
 	buildBeautyMarkerConstellationFormation,
+	buildCategoryMarkerConstellationFormation,
 	buildFallbackMarkerConstellationGroupKeys,
 	buildSelectedMarkerConstellationEdges,
 	markerConstellationPairKey,
@@ -507,6 +508,7 @@ export {
 const EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_X_PX = 112;
 const EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_TOP_PX = 48;
 const EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_BOTTOM_PX = 24;
+const GENERAL_CONTACT_CONSTELLATION_LINE_COLOR = '#1F2429';
 
 type AllContactsOverlayFetchMode = 'all' | 'ambient';
 type AllContactsOverlayFetchPhase = 'visible' | 'buffer';
@@ -553,6 +555,8 @@ export interface SearchResultsMapProps {
 	searchWhat?: string | null;
 	/** When false, keeps contacts/results available but hides search-specific geography (blobs/outlines/locked areas). */
 	searchEngaged?: boolean;
+	/** When true, connects result dots by category even without an active search query. */
+	categoryConstellationsEnabled?: boolean;
 	/** When true, renders a browse-oriented all-contact atlas while search results are visually disengaged. */
 	ambientContactsEnabled?: boolean;
 	/** When true, warms the ambient atlas cache before the user disengages the search. */
@@ -668,6 +672,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	searchQuery,
 	searchWhat,
 	searchEngaged = true,
+	categoryConstellationsEnabled = false,
 	ambientContactsEnabled = false,
 	ambientContactsPreloadEnabled = false,
 	ambientActiveCategories,
@@ -5900,7 +5905,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			source: MAPBOX_SOURCE_IDS.markerConstellation,
 			layout: { 'line-join': 'round', 'line-cap': 'round' },
 			paint: {
-				'line-color': MARKER_CONSTELLATION_HALO_COLOR,
+				'line-color': [
+					'coalesce',
+					['get', 'lineGlowColor'],
+					MARKER_CONSTELLATION_HALO_COLOR,
+				],
 				'line-opacity': 0,
 				'line-width': ['interpolate', ['linear'], ['zoom'], 3, 3.4, 7, 5.4, 13, 7.2],
 				'line-blur': 1.8,
@@ -5912,7 +5921,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			source: MAPBOX_SOURCE_IDS.markerConstellation,
 			layout: { 'line-join': 'round', 'line-cap': 'round' },
 			paint: {
-				'line-color': MARKER_CONSTELLATION_LINE_COLOR,
+				'line-color': [
+					'coalesce',
+					['get', 'lineColor'],
+					MARKER_CONSTELLATION_LINE_COLOR,
+				],
 				'line-opacity': 0,
 				'line-width': ['interpolate', ['linear'], ['zoom'], 3, 1.25, 7, 1.85, 13, 2.55],
 				'line-blur': 0,
@@ -11530,6 +11543,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const baseDotsWaveLastSearchKeyRef = useRef<string>('');
 	const hoveredMarkerVisualRef = useRef<{ sourceId: string; id: number } | null>(null);
 	const markerConstellationEdgesRef = useRef<MarkerConstellationEdge[]>([]);
+	const markerConstellationUsesCategoryColorsRef = useRef<boolean>(false);
 	const markerConstellationNodesRef = useRef<MarkerConstellationNode[]>([]);
 	const markerConstellationContactsByIdRef = useRef<Map<number, ContactWithName>>(
 		new Map()
@@ -11700,6 +11714,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const clearMarkerConstellation = useCallback(() => {
 		stopMarkerConstellationReveal();
 		markerConstellationEdgesRef.current = [];
+		markerConstellationUsesCategoryColorsRef.current = false;
 		markerConstellationNodesRef.current = [];
 		markerConstellationContactsByIdRef.current = new Map();
 		markerConstellationNodeIdsRef.current = new Set();
@@ -11767,10 +11782,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const toCoords = getContactCoords(toContact);
 				if (!fromCoords || !toCoords) continue;
 
+				let lineColor: string | null = null;
+				let lineGlowColor: string | null = null;
+				if (markerConstellationUsesCategoryColorsRef.current) {
+					const fromCategory = fromContact.curatedCategory ?? null;
+					const toCategory = toContact.curatedCategory ?? null;
+					const fromCategoryKey = fromCategory
+						? normalizeWhatKey(fromCategory)
+						: '__general__';
+					const toCategoryKey = toCategory ? normalizeWhatKey(toCategory) : '__general__';
+					if (fromCategoryKey === toCategoryKey) {
+						lineColor = fromCategory
+							? getResultDotColorForWhat(fromCategory)
+							: GENERAL_CONTACT_CONSTELLATION_LINE_COLOR;
+						lineGlowColor = fromCategory ? lineColor : MARKER_CONSTELLATION_HALO_COLOR;
+					}
+				}
+
 				const edgeId = markerConstellationPairKey(edge.fromId, edge.toId);
 				const featureId = `${edge.level}:${edgeId}`;
 				dataKeyParts.push(
-					`e:${featureId}:${edge.rank.toFixed(3)}:${edge.opacityScale.toFixed(2)}`
+					`e:${featureId}:${lineColor ?? ''}:${edge.rank.toFixed(3)}:${edge.opacityScale.toFixed(2)}`
 				);
 				features.push({
 					type: 'Feature',
@@ -11779,6 +11811,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						level: edge.level,
 						rank: edge.rank,
 						opacityScale: edge.opacityScale,
+						...(lineColor
+							? {
+									lineColor,
+									lineGlowColor: lineGlowColor ?? lineColor,
+								}
+							: {}),
 					},
 					geometry: {
 						type: 'LineString',
@@ -13034,26 +13072,35 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const searchKey = (searchQuery ?? '').trim();
 		const isSearchMode = searchKey.length > 0;
+		const isCategoryConstellationMode = categoryConstellationsEnabled && !isSearchMode;
+		const shouldComposeConstellation = isSearchMode || isCategoryConstellationMode;
+		const constellationKey = isSearchMode
+			? searchKey
+			: isCategoryConstellationMode
+				? '__category-constellations__'
+				: '';
 		const loading = Boolean(isLoading);
 
-		if (!isSearchMode || isBackgroundPresentation || !searchEngaged) {
-			markerConstellationLastSearchKeyRef.current = searchKey;
+		if (!shouldComposeConstellation || isBackgroundPresentation || !searchEngaged) {
+			markerConstellationLastSearchKeyRef.current = constellationKey;
 			clearMarkerConstellation();
 			return;
 		}
 
-		if (searchKey !== markerConstellationLastSearchKeyRef.current) {
-			markerConstellationLastSearchKeyRef.current = searchKey;
+		if (constellationKey !== markerConstellationLastSearchKeyRef.current) {
+			markerConstellationLastSearchKeyRef.current = constellationKey;
 			clearMarkerConstellation();
 		}
 
 		if (loading) {
 			const composedKey = markerConstellationComposedSearchKeyRef.current;
 			const hasComposedForCurrentSearch =
-				composedKey === searchKey || composedKey.startsWith(`${searchKey}|results:`);
+				composedKey === constellationKey ||
+				composedKey.startsWith(`${constellationKey}|results:`);
 			if (!hasComposedForCurrentSearch) {
 				stopMarkerConstellationReveal();
 				markerConstellationEdgesRef.current = [];
+				markerConstellationUsesCategoryColorsRef.current = false;
 				markerConstellationNodesRef.current = [];
 				markerConstellationContactsByIdRef.current = new Map();
 				markerConstellationNodeIdsRef.current = new Set();
@@ -13080,10 +13127,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			.join(',');
 		if (!resultSignature) return;
 
-		const resultKey = `${searchKey}|results:${resultSignature}`;
+		const resultKey = `${constellationKey}|results:${resultSignature}`;
+		const formationVersion = isCategoryConstellationMode ? 'category-v2' : 'beauty-v2';
 		if (
 			markerConstellationComposedSearchKeyRef.current.startsWith(
-				`${resultKey}|beauty-v2:`
+				`${resultKey}|${formationVersion}:`
 			)
 		) {
 			return;
@@ -13114,22 +13162,24 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (cancelled) return;
 
 			const curatedBlobGroupKeyByContactId = new Map<number, string>();
-			const curatedBlobPoints = contactsWithCoords
-				.map((contact) => {
-					if (!contact.curatedCategory) return null;
-					const coords = getContactCoords(contact);
-					if (!coords) return null;
-					return projectCuratedBlobPoint(contact.id, coords);
-				})
-				.filter((point): point is CuratedBlobMercatorPoint => point != null);
+			if (!isCategoryConstellationMode) {
+				const curatedBlobPoints = contactsWithCoords
+					.map((contact) => {
+						if (!contact.curatedCategory) return null;
+						const coords = getContactCoords(contact);
+						if (!coords) return null;
+						return projectCuratedBlobPoint(contact.id, coords);
+					})
+					.filter((point): point is CuratedBlobMercatorPoint => point != null);
 
-			if (curatedBlobPoints.length >= 2) {
-				const clusters = pickAdaptiveCuratedBlobClusters(curatedBlobPoints);
-				clusters.forEach((cluster, index) => {
-					for (const point of cluster.points) {
-						curatedBlobGroupKeyByContactId.set(point.id, `blob:${index}`);
-					}
-				});
+				if (curatedBlobPoints.length >= 2) {
+					const clusters = pickAdaptiveCuratedBlobClusters(curatedBlobPoints);
+					clusters.forEach((cluster, index) => {
+						for (const point of cluster.points) {
+							curatedBlobGroupKeyByContactId.set(point.id, `blob:${index}`);
+						}
+					});
+				}
 			}
 
 			// When a state is locked, prefer in-state contacts so the 180-point cap
@@ -13157,7 +13207,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				contactsForConstellation = contactsForConstellation
 					.map((contact) => ({
 						contact,
-						score: hashStringToUint32(`${searchKey}|constellation|${contact.id}`),
+						score: hashStringToUint32(
+							`${constellationKey}|constellation|${contact.id}`
+						),
 					}))
 					.sort((a, b) => a.score - b.score)
 					.slice(0, MARKER_CONSTELLATION_MAX_POINTS)
@@ -13187,8 +13239,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			for (const contact of contactsForConstellation) {
 				const coords = getContactCoords(contact);
 				if (!coords) continue;
-				const curatedGroupKey = curatedBlobGroupKeyByContactId.get(contact.id);
-				if (curatedBlobGroupKeyByContactId.size > 0 && !curatedGroupKey) continue;
+				let groupKey: string;
+				if (isCategoryConstellationMode) {
+					const categoryKey = contact.curatedCategory
+						? normalizeWhatKey(contact.curatedCategory)
+						: '';
+					groupKey = categoryKey ? `category:${categoryKey}` : 'general';
+				} else {
+					const curatedGroupKey = curatedBlobGroupKeyByContactId.get(contact.id);
+					if (curatedBlobGroupKeyByContactId.size > 0 && !curatedGroupKey) continue;
+					groupKey = curatedGroupKey ?? 'fallback:pending';
+				}
 
 				const projected = latLngToWorldPixel(coords, constellationWorldSize);
 				if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y)) continue;
@@ -13198,12 +13259,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					coords,
 					x: projected.x,
 					y: projected.y,
-					groupKey: curatedGroupKey ?? 'fallback:pending',
+					groupKey,
 				});
 				contactsByPointId.set(contact.id, contact);
 			}
 
-			if (curatedBlobGroupKeyByContactId.size === 0 && points.length >= 2) {
+			if (
+				!isCategoryConstellationMode &&
+				curatedBlobGroupKeyByContactId.size === 0 &&
+				points.length >= 2
+			) {
 				const fallbackGroupKeyById = buildFallbackMarkerConstellationGroupKeys(points);
 				points = points.map((point) => ({
 					...point,
@@ -13219,7 +13284,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						)}:${point.coords.lat.toFixed(5)}`
 				)
 				.join(',');
-			const compositionKey = `${resultKey}|beauty-v2:${pointsSignature}`;
+			const compositionKey = `${resultKey}|${formationVersion}:${pointsSignature}`;
 			if (markerConstellationComposedSearchKeyRef.current === compositionKey) return;
 
 			if (points.length < 2) {
@@ -13227,6 +13292,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// later contactsWithCoords update can retry.
 				stopMarkerConstellationReveal();
 				markerConstellationEdgesRef.current = [];
+				markerConstellationUsesCategoryColorsRef.current = false;
 				markerConstellationNodesRef.current = [];
 				markerConstellationContactsByIdRef.current = new Map();
 				markerConstellationNodeIdsRef.current = new Set();
@@ -13240,18 +13306,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				return;
 			}
 
-			const seed = `${searchKey}|${points.map((point) => point.id).join(',')}`;
-			const formation = buildBeautyMarkerConstellationFormation(
-				points,
-				seed,
-				constellationComposeZoom
-			);
+			const seed = `${constellationKey}|${formationVersion}|${points
+				.map((point) => point.id)
+				.join(',')}`;
+			const formation = isCategoryConstellationMode
+				? buildCategoryMarkerConstellationFormation(points, seed)
+				: buildBeautyMarkerConstellationFormation(
+						points,
+						seed,
+						constellationComposeZoom
+					);
 
 			if (formation.edges.length === 0 && formation.nodes.length === 0) {
 				// No drawable formation. Leave composedKey unset so the next idle update
 				// can retry after a pan/zoom or a denser coordinate update.
 				stopMarkerConstellationReveal();
 				markerConstellationEdgesRef.current = [];
+				markerConstellationUsesCategoryColorsRef.current = false;
 				markerConstellationNodesRef.current = [];
 				markerConstellationContactsByIdRef.current = contactsByPointId;
 				markerConstellationNodeIdsRef.current = new Set();
@@ -13267,6 +13338,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			stopMarkerConstellationReveal();
 			markerConstellationEdgesRef.current = formation.edges;
+			markerConstellationUsesCategoryColorsRef.current = isCategoryConstellationMode;
 			markerConstellationNodesRef.current = formation.nodes;
 			markerConstellationContactsByIdRef.current = contactsByPointId;
 			markerConstellationNodeIdsRef.current = formation.lowZoomNodeIds;
@@ -13289,6 +13361,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isLoading,
 		isBackgroundPresentation,
 		searchEngaged,
+		categoryConstellationsEnabled,
 		searchQuery,
 		contactsWithCoords,
 		getContactCoords,

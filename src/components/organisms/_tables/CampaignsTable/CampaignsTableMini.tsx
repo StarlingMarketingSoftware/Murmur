@@ -16,6 +16,7 @@ import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
+import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 
 type MiniCampaign = {
 	id: number;
@@ -50,6 +51,21 @@ const ROW_PALETTE = [
 	{ folder: '#C5494F', pill: '#B9EAF1', row: '#DFF4E5' },
 	{ folder: '#C94AD8', pill: '#C8C5F4', row: '#F8F8F8' },
 ];
+
+const FOLDER_PILL_LEFT = 11;
+const FOLDER_PILL_WIDTH = 105.331;
+const FOLDER_PILL_HEIGHT = 11.703;
+const METRIC_PILL_WIDTH = 60.845;
+const METRIC_PILL_HEIGHT = 19.316;
+const ROW_HEIGHT = 28;
+const SELECTED_ROW_BOTTOM_BORDER_WIDTH = 1;
+const FOLDER_PILL_TOP_OFFSET = -1.5;
+const METRIC_PILL_TOP_OFFSET = -5;
+const HEADER_HEIGHT = 34;
+const HEADER_LABEL_CENTER_Y = 22;
+const DRAFT_PILL_LEFT = FOLDER_PILL_LEFT + FOLDER_PILL_WIDTH + 8;
+const SENT_PILL_LEFT = DRAFT_PILL_LEFT + METRIC_PILL_WIDTH + 18;
+const UPDATED_PILL_LEFT = SENT_PILL_LEFT + METRIC_PILL_WIDTH + 18;
 
 const formatCount = (value: number | undefined) =>
 	(value ?? 0) >= 1000
@@ -88,28 +104,30 @@ const getUpdatedFill = (value: string | Date | undefined) => {
 };
 
 const MiniFolderIcon = ({ color }: { color: string }) => (
-	<svg width="18" height="13" viewBox="0 0 18 13" fill="none" aria-hidden="true">
-		<path d="M1 3.25C1 2.56 1.56 2 2.25 2H7.4L8.65 3.5H15.75C16.44 3.5 17 4.06 17 4.75V11.25C17 11.94 16.44 12.5 15.75 12.5H2.25C1.56 12.5 1 11.94 1 11.25V3.25Z" fill={color} />
-		<path d="M1 2.25C1 .84 1.84 0 2.25 0H6.15C6.52 0 6.88 .17 7.12 .46L8.4 2H1V2.25Z" fill={color} />
-	</svg>
+	<DashboardActionBarFolderIcon
+		width={16.2}
+		height={9.58}
+		aria-hidden="true"
+		style={{ color, display: 'block' }}
+	/>
 );
 
 const renderCategoryIcon = (key: CampaignDataTypeCategoryKey): ReactNode => {
 	switch (key) {
 		case 'wine_beer_spirits':
-			return <WineBeerSpiritsIcon size={11} className="flex-shrink-0" />;
+			return <WineBeerSpiritsIcon size={8.6} className="flex-shrink-0" />;
 		case 'restaurants':
-			return <RestaurantsIcon size={12} className="flex-shrink-0" />;
+			return <RestaurantsIcon size={9} className="flex-shrink-0" />;
 		case 'coffee_shops':
-			return <CoffeeShopsIcon size={7} className="flex-shrink-0" />;
+			return <CoffeeShopsIcon size={5.7} className="flex-shrink-0" />;
 		case 'music_venues':
-			return <MusicVenuesIcon size={13} className="flex-shrink-0" />;
+			return <MusicVenuesIcon size={9.6} className="flex-shrink-0" />;
 		case 'music_festivals':
-			return <FestivalsIcon size={12} className="flex-shrink-0" />;
+			return <FestivalsIcon size={9} className="flex-shrink-0" />;
 		case 'wedding':
-			return <WeddingPlannersIcon size={12} className="flex-shrink-0" />;
+			return <WeddingPlannersIcon size={9} className="flex-shrink-0" />;
 		case 'radio':
-			return <RadioStationsIcon size={13} className="flex-shrink-0" />;
+			return <RadioStationsIcon size={9.6} className="flex-shrink-0" />;
 	}
 };
 
@@ -117,8 +135,13 @@ const MiniDataBadge = ({ dataType }: { dataType: CampaignDataTypeSummary }) => {
 	if (dataType.kind === 'category') {
 		return (
 			<span
-				className="inline-flex h-[15px] w-[15px] flex-none items-center justify-center overflow-hidden rounded-[4px]"
-				style={{ backgroundColor: CATEGORY_BACKGROUND[dataType.key] }}
+				className="inline-flex flex-none items-center justify-center overflow-hidden"
+				style={{
+					width: 11.703,
+					height: 11.703,
+					borderRadius: 3.1,
+					backgroundColor: CATEGORY_BACKGROUND[dataType.key],
+				}}
 				title={dataType.label}
 			>
 				{renderCategoryIcon(dataType.key)}
@@ -129,11 +152,11 @@ const MiniDataBadge = ({ dataType }: { dataType: CampaignDataTypeSummary }) => {
 	const { icon, backgroundColor } = getCityIconProps('', dataType.key);
 	return (
 		<span
-			className="inline-flex h-[15px] w-[15px] flex-none items-center justify-center overflow-hidden rounded-[4px]"
-			style={{ backgroundColor }}
+			className="inline-flex flex-none items-center justify-center overflow-hidden"
+			style={{ width: 11.703, height: 11.703, borderRadius: 3.1, backgroundColor }}
 			title={dataType.label}
 		>
-			<span className="inline-flex h-full w-full items-center justify-center [&>svg]:block [&>svg]:h-auto [&>svg]:max-h-[10px] [&>svg]:max-w-[11px] [&>svg]:w-auto">
+			<span className="inline-flex h-full w-full items-center justify-center [&>svg]:block [&>svg]:h-auto [&>svg]:max-h-[8px] [&>svg]:max-w-[9px] [&>svg]:w-auto">
 				{icon}
 			</span>
 		</span>
@@ -154,24 +177,33 @@ const FolderPill = ({
 	const overflow = Math.max(0, dataTypes.length - visible.length);
 	return (
 		<div
-			className="flex h-[15px] min-w-0 items-center rounded-[3px] px-[4px]"
-			style={{ backgroundColor: palette.pill, width: 122 }}
+			className="flex min-w-0 items-center overflow-hidden px-[3px]"
+			style={{
+				width: FOLDER_PILL_WIDTH,
+				height: FOLDER_PILL_HEIGHT,
+				boxSizing: 'border-box',
+				borderRadius: 2.5,
+				backgroundColor: palette.pill,
+			}}
 		>
 			<span className="flex-none">
 				<MiniFolderIcon color={palette.folder} />
 			</span>
-			<span className="ml-[7px] min-w-0 truncate font-inter text-[14px] font-medium leading-[15px] text-black">
+			<span
+				className="ml-[5px] min-w-0 truncate font-inter font-medium text-black"
+				style={{ fontSize: 12.555, lineHeight: '11.703px' }}
+			>
 				{row.name || 'Untitled'}
 			</span>
 			{visible.length > 0 ? (
-				<span className="ml-[7px] flex min-w-0 flex-none items-center gap-[3px] overflow-hidden">
+				<span className="ml-[5px] flex min-w-0 flex-none items-center gap-[2px] overflow-hidden">
 					{visible.map((dataType) => (
 						<MiniDataBadge key={`${dataType.kind}-${dataType.key}`} dataType={dataType} />
 					))}
 				</span>
 			) : null}
 			{overflow > 0 || newCount > 0 ? (
-				<span className="ml-[4px] flex-none font-inter text-[8px] font-medium leading-none text-black">
+				<span className="ml-[3px] flex-none font-inter text-[7px] font-medium leading-none text-black">
 					+{overflow > 0 ? overflow : newCount}
 				</span>
 			) : null}
@@ -182,15 +214,22 @@ const FolderPill = ({
 const MetricPill = ({
 	children,
 	background,
-	width = 60,
+	width = METRIC_PILL_WIDTH,
 }: {
 	children: ReactNode;
 	background: string;
 	width?: number;
 }) => (
 	<div
-		className="inline-flex h-[25px] items-center justify-center rounded-[7px] border-[1px] border-black font-inter text-[17px] font-medium leading-none text-black"
-		style={{ width, backgroundColor: background }}
+		className="inline-flex items-center justify-center rounded-[5px] border-[1px] border-black font-inter font-medium text-black"
+		style={{
+			width,
+			height: METRIC_PILL_HEIGHT,
+			boxSizing: 'border-box',
+			backgroundColor: background,
+			fontSize: 12.555,
+			lineHeight: '15.426px',
+		}}
 	>
 		{children}
 	</div>
@@ -236,22 +275,57 @@ export const CampaignsTableMini: FC<Props> = ({ currentCampaignId, className }) 
 		>
 			<div
 				style={{
-					display: 'grid',
-					gridTemplateColumns: '134px 66px 66px 75px',
-					columnGap: 9,
-					alignItems: 'center',
-					height: 41,
-					padding: '0 14px',
+					position: 'relative',
+					height: HEADER_HEIGHT,
 					boxSizing: 'border-box',
-					fontSize: 16,
+					fontSize: 12.555,
+					fontStyle: 'normal',
 					fontWeight: 500,
+					lineHeight: '15.426px',
 					color: '#000',
+					textAlign: 'center',
 				}}
 			>
-				<div>Folders</div>
-				<div style={{ textAlign: 'center' }}>Drafts</div>
-				<div style={{ textAlign: 'center' }}>Sent</div>
-				<div style={{ textAlign: 'center' }}>Updated</div>
+				<div
+					style={{
+						position: 'absolute',
+						left: FOLDER_PILL_LEFT,
+						top: HEADER_LABEL_CENTER_Y + 2,
+						transform: 'translateY(-50%)',
+					}}
+				>
+					Folders
+				</div>
+				<div
+					style={{
+						position: 'absolute',
+						left: DRAFT_PILL_LEFT + METRIC_PILL_WIDTH / 2,
+						top: HEADER_LABEL_CENTER_Y,
+						transform: 'translate(-50%, -50%)',
+					}}
+				>
+					Drafts
+				</div>
+				<div
+					style={{
+						position: 'absolute',
+						left: SENT_PILL_LEFT + METRIC_PILL_WIDTH / 2,
+						top: HEADER_LABEL_CENTER_Y,
+						transform: 'translate(-50%, -50%)',
+					}}
+				>
+					Sent
+				</div>
+				<div
+					style={{
+						position: 'absolute',
+						left: UPDATED_PILL_LEFT + METRIC_PILL_WIDTH / 2,
+						top: HEADER_LABEL_CENTER_Y,
+						transform: 'translate(-50%, -50%)',
+					}}
+				>
+					Updated
+				</div>
 			</div>
 			<div style={{ height: 2, background: '#D0D0D0' }} />
 			<div style={{ height: 17, borderBottom: '1px solid #000' }} />
@@ -266,38 +340,67 @@ export const CampaignsTableMini: FC<Props> = ({ currentCampaignId, className }) 
 			) : (
 				rows.map((row, index) => {
 					const palette = ROW_PALETTE[index] ?? ROW_PALETTE[0];
+					const isSelectedRow = index === 0;
+					const rowContentHeight =
+						ROW_HEIGHT - (isSelectedRow ? SELECTED_ROW_BOTTOM_BORDER_WIDTH : 0);
+					const folderPillTop =
+						(rowContentHeight - FOLDER_PILL_HEIGHT) / 2 + FOLDER_PILL_TOP_OFFSET;
+					const metricPillTop =
+						(rowContentHeight - METRIC_PILL_HEIGHT) / 2 + METRIC_PILL_TOP_OFFSET;
 					return (
 						<div
 							key={row.id}
 							style={{
-								display: 'grid',
-								gridTemplateColumns: '134px 66px 66px 75px',
-								columnGap: 9,
-								alignItems: 'center',
-								height: 28,
-								padding: '0 14px',
+								position: 'relative',
+								height: ROW_HEIGHT,
 								boxSizing: 'border-box',
-								background: index === 0 ? palette.row : '#F8F8F8',
-								borderBottom: index === 0 ? '1px solid #000' : '0',
+								background: isSelectedRow ? palette.row : '#F8F8F8',
+								borderBottom: isSelectedRow ? '1px solid #000' : '0',
 							}}
 						>
-							<FolderPill
-								row={row}
-								palette={palette}
-								newCount={newCountsByCampaign.get(row.id) ?? 0}
-							/>
-							<div className="flex justify-center">
+							<div
+								style={{
+									position: 'absolute',
+									left: FOLDER_PILL_LEFT,
+									top: folderPillTop,
+								}}
+							>
+								<FolderPill
+									row={row}
+									palette={palette}
+									newCount={newCountsByCampaign.get(row.id) ?? 0}
+								/>
+							</div>
+							<div
+								style={{
+									position: 'absolute',
+									left: DRAFT_PILL_LEFT,
+									top: metricPillTop,
+								}}
+							>
 								<MetricPill background={getDraftFill(row.draftCount)}>
 									{formatCount(row.draftCount)}
 								</MetricPill>
 							</div>
-							<div className="flex justify-center">
+							<div
+								style={{
+									position: 'absolute',
+									left: SENT_PILL_LEFT,
+									top: metricPillTop,
+								}}
+							>
 								<MetricPill background={getSentFill(row.sentCount)}>
 									{row.sentCount ?? 0}
 								</MetricPill>
 							</div>
-							<div className="flex justify-center">
-								<MetricPill background={getUpdatedFill(row.updatedAt)} width={64}>
+							<div
+								style={{
+									position: 'absolute',
+									left: UPDATED_PILL_LEFT,
+									top: metricPillTop,
+								}}
+							>
+								<MetricPill background={getUpdatedFill(row.updatedAt)}>
 									{formatUpdated(row.updatedAt)}
 								</MetricPill>
 							</div>

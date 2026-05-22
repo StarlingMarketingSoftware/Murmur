@@ -42,6 +42,9 @@ const FOLDER_COLORS: Record<string, string> = {
 	Capricorn: '#C94AD8',
 };
 
+const STRATEGY_ITEM_WIDTH = 351;
+const SECONDARY_ACTION_HEIGHT = 30;
+
 const stripBody = (raw: string | null | undefined) =>
 	(raw ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -70,7 +73,7 @@ const inboundToStrategyEmail = (
 };
 
 const MiniFolderIcon = ({ color }: { color: string }) => (
-	<svg width="20" height="13" viewBox="0 0 20 13" fill="none" aria-hidden="true">
+	<svg width="16" height="10.4" viewBox="0 0 20 13" fill="none" aria-hidden="true">
 		<path d="M1 3.25C1 2.56 1.56 2 2.25 2H7.65L8.9 3.5H17.75C18.44 3.5 19 4.06 19 4.75V11.25C19 11.94 18.44 12.5 17.75 12.5H2.25C1.56 12.5 1 11.94 1 11.25V3.25Z" fill={color} />
 		<path d="M1 2.25C1 .84 1.84 0 2.25 0H6.15C6.52 0 6.88 .17 7.12 .46L8.4 2H1V2.25Z" fill={color} />
 	</svg>
@@ -83,18 +86,19 @@ const FolderPill = ({ name }: { name: string }) => {
 			style={{
 				display: 'inline-flex',
 				alignItems: 'center',
-				gap: 7,
-				width: 82,
-				height: 15,
-				borderRadius: 3,
+				gap: 4,
+				width: 60.845,
+				height: 19.316,
+				borderRadius: 3.5,
 				background: name === 'Pieces' ? '#C8C5F4' : '#B9EAF1',
-				padding: '0 5px',
+				padding: '0 4px',
 				boxSizing: 'border-box',
 				fontFamily: 'Inter, sans-serif',
-				fontSize: 13,
+				fontSize: 11.5,
 				fontWeight: 500,
 				color: '#000',
-				lineHeight: 1,
+				lineHeight: '15.426px',
+				flexShrink: 0,
 				overflow: 'hidden',
 			}}
 		>
@@ -109,27 +113,27 @@ const FolderPill = ({ name }: { name: string }) => {
 const StrategyEmailRow = ({ email }: { email: StrategyEmail }) => (
 	<div
 		style={{
-			height: 46,
+			height: 43.5,
 			width: 303,
 			borderRadius: 4,
 			background: '#F8F8F8',
 			display: 'grid',
-			gridTemplateColumns: '96px 1fr',
-			gridTemplateRows: '21px 18px',
-			columnGap: 9,
+			gridTemplateColumns: '91px 1fr',
+			gridTemplateRows: '15.426px 19.316px',
+			columnGap: 7,
 			alignItems: 'center',
-			padding: '5px 8px',
+			padding: '4.5px 7px',
 			boxSizing: 'border-box',
 			overflow: 'hidden',
 			fontFamily: 'Inter, sans-serif',
 		}}
 	>
-		<div style={{ display: 'flex', alignItems: 'baseline', gap: 5, minWidth: 0 }}>
+		<div style={{ display: 'flex', alignItems: 'baseline', gap: 4, minWidth: 0 }}>
 			<span
 				style={{
-					fontSize: 13,
+					fontSize: 11.5,
 					fontWeight: 700,
-					lineHeight: '16px',
+					lineHeight: '15.426px',
 					whiteSpace: 'nowrap',
 					overflow: 'hidden',
 					textOverflow: 'ellipsis',
@@ -137,13 +141,13 @@ const StrategyEmailRow = ({ email }: { email: StrategyEmail }) => (
 			>
 				{email.sender}
 			</span>
-			<span style={{ fontSize: 11, color: '#3A3A3A', lineHeight: '13px' }}>{email.badge}</span>
+			<span style={{ fontSize: 9.5, color: '#3A3A3A', lineHeight: '11px' }}>{email.badge}</span>
 		</div>
 		<div
 			style={{
-				fontSize: 13,
+				fontSize: 11.5,
 				fontWeight: 500,
-				lineHeight: '16px',
+				lineHeight: '15.426px',
 				whiteSpace: 'nowrap',
 				overflow: 'hidden',
 				textOverflow: 'clip',
@@ -156,9 +160,9 @@ const StrategyEmailRow = ({ email }: { email: StrategyEmail }) => (
 		</div>
 		<div
 			style={{
-				fontSize: 12,
+				fontSize: 10.5,
 				fontWeight: 400,
-				lineHeight: '15px',
+				lineHeight: '14px',
 				color: '#777',
 				whiteSpace: 'nowrap',
 				overflow: 'hidden',
@@ -181,8 +185,8 @@ const ActionBar = ({
 }) => (
 	<div
 		style={{
-			width: 337,
-			height: 34,
+			width: STRATEGY_ITEM_WIDTH,
+			height: SECONDARY_ACTION_HEIGHT,
 			margin: `${marginTop}px auto 0`,
 			borderRadius: 6,
 			background,
@@ -191,9 +195,9 @@ const ActionBar = ({
 			paddingLeft: 17,
 			boxSizing: 'border-box',
 			fontFamily: 'Inter, sans-serif',
-			fontSize: 17,
+			fontSize: 12.555,
 			fontWeight: 500,
-			lineHeight: '20px',
+			lineHeight: '15.426px',
 			color: '#000',
 			overflow: 'hidden',
 		}}
@@ -237,9 +241,10 @@ export const CampaignOverviewStrategyBox: FC = () => {
 		>
 			<div
 				style={{
-					fontSize: 13,
+					fontSize: 12.555,
 					fontWeight: 500,
-					lineHeight: '19px',
+					lineHeight: '15.426px',
+					color: '#000',
 					paddingLeft: 7,
 					paddingTop: 3,
 				}}
@@ -249,9 +254,9 @@ export const CampaignOverviewStrategyBox: FC = () => {
 
 			<div
 				style={{
-					width: 337,
+					width: STRATEGY_ITEM_WIDTH,
 					height: 156,
-					margin: '18px auto 0',
+					margin: '13px auto 0',
 					borderRadius: 6,
 					background:
 						'linear-gradient(180deg, #A9EDD2 0%, rgba(169, 237, 210, 0.20) 100%)',
@@ -262,11 +267,14 @@ export const CampaignOverviewStrategyBox: FC = () => {
 				<div
 					style={{
 						position: 'absolute',
-						top: 12,
+						top: 14,
 						left: 36,
-						fontSize: 18,
+						fontSize: 12.555,
+						fontStyle: 'normal',
 						fontWeight: 500,
-						lineHeight: '22px',
+						lineHeight: '15.426px',
+						color: '#000',
+						textAlign: 'center',
 						whiteSpace: 'nowrap',
 					}}
 				>
@@ -276,10 +284,10 @@ export const CampaignOverviewStrategyBox: FC = () => {
 					style={{
 						position: 'absolute',
 						left: 15,
-						top: 61,
+						top: 43,
 						display: 'flex',
 						flexDirection: 'column',
-						gap: 6,
+						gap: 5,
 					}}
 				>
 					{emails.slice(0, 2).map((email) => (
@@ -288,14 +296,14 @@ export const CampaignOverviewStrategyBox: FC = () => {
 				</div>
 			</div>
 
-			<ActionBar background="#A9EFB4" marginTop={26}>
+			<ActionBar background="#A9EFB4" marginTop={18}>
 				<span>Send {draftCount} Drafts in</span>
 				<span style={{ marginLeft: 15 }}>
 					<FolderPill name={draftCampaign.name} />
 				</span>
 			</ActionBar>
 
-			<ActionBar background="#C9EFA9" marginTop={28}>
+			<ActionBar background="#C9EFA9" marginTop={18}>
 				Search for new contacts
 			</ActionBar>
 		</div>

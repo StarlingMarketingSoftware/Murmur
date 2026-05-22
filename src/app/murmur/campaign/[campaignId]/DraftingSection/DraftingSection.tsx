@@ -654,6 +654,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const OVERVIEW_CONTACTS_DOCK_NUDGE_UP_PX = 8;
 	// Match the campaign page's content scale (so Overview sizes match Write).
 	const OVERVIEW_CONTACTS_DOCK_SCALE = 0.94;
+	const OVERVIEW_RIGHT_RAIL_WIDTH_PX = 371;
+	const OVERVIEW_RIGHT_RAIL_GAP_FROM_RIGHT_WALL_PX = 130;
+	const OVERVIEW_RIGHT_RAIL_GAP_FROM_HEADER_PX = 74;
 	const inboxMainPanelWidthPx = 863;
 	const inboxMainPanelHeightPx = 706;
 	const shouldDockOverviewContacts =
@@ -661,6 +664,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const shouldShowOverviewRightRail =
 		view === 'overview' && !isMobile && !isNarrowDesktop && !isNarrowestDesktop;
 	const [overviewContactsDockPos, setOverviewContactsDockPos] = useState<{
+		leftPx: number;
+		topPx: number;
+	} | null>(null);
+	const [overviewRightRailPos, setOverviewRightRailPos] = useState<{
 		leftPx: number;
 		topPx: number;
 	} | null>(null);
@@ -680,6 +687,87 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				? parsedVarZoom
 				: DEFAULT_CAMPAIGN_ZOOM;
 	}, []);
+	useLayoutEffect(() => {
+		if (typeof window === 'undefined') return;
+		if (!shouldShowOverviewRightRail) {
+			setOverviewRightRailPos((prev) => (prev ? null : prev));
+			return;
+		}
+
+		let raf: number | null = null;
+		const compute = () => {
+			const headerBackdrop = document.querySelector<HTMLElement>(
+				'[data-slot="campaign-top-backdrop"]'
+			);
+			const headerBox =
+				(headerBackdrop?.firstElementChild as HTMLElement | null) ?? headerBackdrop;
+			const headerRect = headerBox?.getBoundingClientRect();
+			const zoom = getEffectiveCampaignZoom();
+			const safeZoom = zoom || 1;
+			const headerBottomVisualPx =
+				headerRect && headerRect.height > 0
+					? headerRect.bottom
+					: 72 * safeZoom;
+			const nextLeft =
+				(window.innerWidth - OVERVIEW_RIGHT_RAIL_GAP_FROM_RIGHT_WALL_PX) /
+					safeZoom -
+				OVERVIEW_RIGHT_RAIL_WIDTH_PX;
+			const nextTop =
+				(headerBottomVisualPx + OVERVIEW_RIGHT_RAIL_GAP_FROM_HEADER_PX) / safeZoom;
+
+			setOverviewRightRailPos((prev) => {
+				if (
+					prev &&
+					Math.abs(prev.leftPx - nextLeft) < 0.25 &&
+					Math.abs(prev.topPx - nextTop) < 0.25
+				) {
+					return prev;
+				}
+				return { leftPx: nextLeft, topPx: nextTop };
+			});
+		};
+		const schedule = () => {
+			if (raf != null) return;
+			raf = window.requestAnimationFrame(() => {
+				raf = null;
+				compute();
+			});
+		};
+
+		compute();
+		window.addEventListener('resize', schedule, { passive: true });
+		window.addEventListener(
+			'murmur:campaign-zoom-changed',
+			schedule as EventListener
+		);
+
+		let ro: ResizeObserver | null = null;
+		try {
+			if (typeof ResizeObserver !== 'undefined') {
+				const headerBackdrop = document.querySelector<HTMLElement>(
+					'[data-slot="campaign-top-backdrop"]'
+				);
+				const headerBox =
+					(headerBackdrop?.firstElementChild as HTMLElement | null) ?? headerBackdrop;
+				if (headerBox) {
+					ro = new ResizeObserver(() => schedule());
+					ro.observe(headerBox);
+				}
+			}
+		} catch {
+			// ignore
+		}
+
+		return () => {
+			if (raf != null) window.cancelAnimationFrame(raf);
+			window.removeEventListener('resize', schedule);
+			window.removeEventListener(
+				'murmur:campaign-zoom-changed',
+				schedule as EventListener
+			);
+			ro?.disconnect();
+		};
+	}, [getEffectiveCampaignZoom, shouldShowOverviewRightRail]);
 	useLayoutEffect(() => {
 		if (typeof window === 'undefined') return;
 		if (!shouldDockOverviewContacts) {
@@ -4169,9 +4257,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									data-campaign-overview-right-rail="true"
 									className="fixed flex flex-col"
 									style={{
-										left: 'calc(50% + 250px + 32px)',
-										// Intentional extra breathing room vs the standard side-panel top.
-										top: '72px',
+										left: overviewRightRailPos
+											? `${overviewRightRailPos.leftPx}px`
+											: 'calc(50% + 250px + 32px)',
+										top: overviewRightRailPos ? `${overviewRightRailPos.topPx}px` : '72px',
+										width: `${OVERVIEW_RIGHT_RAIL_WIDTH_PX}px`,
 										zIndex: 130,
 										gap: '16px',
 									}}
