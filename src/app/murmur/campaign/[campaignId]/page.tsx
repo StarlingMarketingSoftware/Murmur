@@ -51,7 +51,10 @@ import {
 	type PersistentDashboardMapConfig,
 	usePersistentMapSetter,
 } from '@/contexts/PersistentMapContext';
-import type { SearchResultsMapProps } from '@/components/molecules/SearchResultsMap/SearchResultsMap';
+import type {
+	CampaignContactMapStatus,
+	SearchResultsMapProps,
+} from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import {
 	MapSelectGrabStarterBox,
 	MapSelectGrabStackBox,
@@ -120,7 +123,30 @@ const CAMPAIGN_OVERVIEW_STATUS_TOGGLE_BOTTOM_PX =
 	CAMPAIGN_OVERVIEW_STATUS_STRIP_HEIGHT_PX +
 	CAMPAIGN_OVERVIEW_STATUS_TOGGLE_GAP_PX;
 
-type CampaignOverviewStatusToggleValue = 'category' | 'status';
+type CampaignOverviewMapGrouping = 'category' | 'status';
+type CampaignOverviewStatusKey = CampaignContactMapStatus;
+
+const CAMPAIGN_OVERVIEW_STATUS_KEYS = [
+	'contacts',
+	'drafts',
+	'new-message',
+	'sent',
+] as const satisfies readonly CampaignOverviewStatusKey[];
+
+const getCampaignOverviewStatusFromEmailStatus = (
+	status: string | null | undefined
+): CampaignOverviewStatusKey | null => {
+	switch (status) {
+		case EmailStatus.sent:
+			return 'sent';
+		case EmailStatus.draft:
+		case EmailStatus.scheduled:
+		case EmailStatus.failed:
+			return 'drafts';
+		default:
+			return null;
+	}
+};
 
 type CampaignOverviewAskAnythingBoxProps = {
 	onSubmit: (query: string) => void;
@@ -204,8 +230,15 @@ const CampaignOverviewAskAnythingBox = ({
 	);
 };
 
-const CampaignOverviewStatusToggle = () => {
-	const [selected, setSelected] = useState<CampaignOverviewStatusToggleValue>('status');
+type CampaignOverviewStatusToggleProps = {
+	selected: CampaignOverviewMapGrouping;
+	onChange: (value: CampaignOverviewMapGrouping) => void;
+};
+
+const CampaignOverviewStatusToggle = ({
+	selected,
+	onChange,
+}: CampaignOverviewStatusToggleProps) => {
 	const textStyle: CSSProperties = {
 		color: '#000',
 		fontFamily: 'Inter, sans-serif',
@@ -276,7 +309,7 @@ const CampaignOverviewStatusToggle = () => {
 					type="button"
 					aria-pressed={selected === 'category'}
 					style={buttonStyle}
-					onClick={() => setSelected('category')}
+					onClick={() => onChange('category')}
 				>
 					Category
 				</button>
@@ -284,7 +317,7 @@ const CampaignOverviewStatusToggle = () => {
 					type="button"
 					aria-pressed={selected === 'status'}
 					style={buttonStyle}
-					onClick={() => setSelected('status')}
+					onClick={() => onChange('status')}
 				>
 					Status
 				</button>
@@ -293,13 +326,32 @@ const CampaignOverviewStatusToggle = () => {
 	);
 };
 
-const CampaignOverviewStatusStrip = () => {
+type CampaignOverviewStatusStripProps = {
+	activeStatuses: ReadonlySet<CampaignOverviewStatusKey>;
+	disabled?: boolean;
+	onToggleStatus: (status: CampaignOverviewStatusKey) => void;
+};
+
+const CampaignOverviewStatusStrip = ({
+	activeStatuses,
+	disabled = false,
+	onToggleStatus,
+}: CampaignOverviewStatusStripProps) => {
 	const itemStyle: CSSProperties = {
 		display: 'flex',
 		alignItems: 'center',
 		gap: 12,
 		whiteSpace: 'nowrap',
+		border: 0,
+		background: 'transparent',
+		padding: 0,
+		margin: 0,
+		font: 'inherit',
+		color: 'inherit',
+		cursor: disabled ? 'default' : 'pointer',
 	};
+	const getItemOpacity = (status: CampaignOverviewStatusKey) =>
+		disabled ? 0.55 : activeStatuses.has(status) ? 1 : 0.32;
 
 	return (
 		<div
@@ -335,60 +387,88 @@ const CampaignOverviewStatusStrip = () => {
 					lineHeight: '14px',
 				}}
 			>
-				<div style={itemStyle}>
+				<button
+					type="button"
+					aria-pressed={activeStatuses.has('contacts')}
+					disabled={disabled}
+					className="pointer-events-auto transition-opacity duration-150"
+					style={{ ...itemStyle, opacity: getItemOpacity('contacts') }}
+					onClick={() => onToggleStatus('contacts')}
+				>
 					<span>Contacts</span>
 					<svg
-						width="18"
-						height="18"
-						viewBox="0 0 18 18"
+						width="20"
+						height="20"
+						viewBox="0 0 20 20"
 						fill="none"
 						xmlns="http://www.w3.org/2000/svg"
 						aria-hidden="true"
 					>
-						<circle cx="9" cy="9" r="9" fill="white" />
+						<circle cx="10" cy="10" r="10" fill="white" />
 					</svg>
-				</div>
-				<div style={itemStyle}>
+				</button>
+				<button
+					type="button"
+					aria-pressed={activeStatuses.has('drafts')}
+					disabled={disabled}
+					className="pointer-events-auto transition-opacity duration-150"
+					style={{ ...itemStyle, opacity: getItemOpacity('drafts') }}
+					onClick={() => onToggleStatus('drafts')}
+				>
 					<span>Drafts</span>
 					<svg
-						width="18"
-						height="18"
-						viewBox="0 0 18 18"
+						width="20"
+						height="20"
+						viewBox="0 0 20 20"
 						fill="none"
 						xmlns="http://www.w3.org/2000/svg"
 						aria-hidden="true"
 					>
-						<circle cx="9" cy="9" r="9" fill="white" />
-						<circle cx="9" cy="9" r="6.4" fill="#9ED8F4" />
+						<circle cx="10" cy="10" r="10" fill="white" />
+						<circle cx="10" cy="10" r="7" fill="#9ED8F4" />
 					</svg>
-				</div>
-				<div style={itemStyle}>
+				</button>
+				<button
+					type="button"
+					aria-pressed={activeStatuses.has('new-message')}
+					disabled={disabled}
+					className="pointer-events-auto transition-opacity duration-150"
+					style={{ ...itemStyle, opacity: getItemOpacity('new-message') }}
+					onClick={() => onToggleStatus('new-message')}
+				>
 					<span>New Message</span>
 					<svg
-						width="18"
-						height="18"
-						viewBox="0 0 18 18"
+						width="20"
+						height="20"
+						viewBox="0 0 20 20"
 						fill="none"
 						xmlns="http://www.w3.org/2000/svg"
 						aria-hidden="true"
 					>
-						<circle cx="9" cy="9" r="9" fill="white" />
-						<circle cx="9" cy="9" r="6.9" fill="#2B8BB8" />
+						<circle cx="10" cy="10" r="10" fill="white" />
+						<circle cx="10" cy="10" r="7.4" fill="#2B8BB8" />
 					</svg>
-				</div>
-				<div style={itemStyle}>
+				</button>
+				<button
+					type="button"
+					aria-pressed={activeStatuses.has('sent')}
+					disabled={disabled}
+					className="pointer-events-auto transition-opacity duration-150"
+					style={{ ...itemStyle, opacity: getItemOpacity('sent') }}
+					onClick={() => onToggleStatus('sent')}
+				>
 					<span>Sent</span>
 					<svg
-						width="18"
-						height="18"
-						viewBox="0 0 18 18"
+						width="20"
+						height="20"
+						viewBox="0 0 20 20"
 						fill="none"
 						xmlns="http://www.w3.org/2000/svg"
 						aria-hidden="true"
 					>
-						<circle cx="9" cy="9" r="7.1" stroke="#9ACDD4" strokeWidth="3" />
+						<circle cx="10" cy="10" r="7.6" stroke="#9ACDD4" strokeWidth="3.4" />
 					</svg>
-				</div>
+				</button>
 			</div>
 		</div>
 	);
@@ -2166,6 +2246,26 @@ const Murmur = () => {
 	}, [activeView]);
 
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
+	const [campaignOverviewMapGrouping, setCampaignOverviewMapGrouping] =
+		useState<CampaignOverviewMapGrouping>('status');
+	const [campaignOverviewActiveStatuses, setCampaignOverviewActiveStatuses] = useState<
+		readonly CampaignOverviewStatusKey[]
+	>(() => [...CAMPAIGN_OVERVIEW_STATUS_KEYS]);
+	const campaignOverviewActiveStatusSet = useMemo(
+		() => new Set(campaignOverviewActiveStatuses),
+		[campaignOverviewActiveStatuses]
+	);
+	const handleCampaignOverviewStatusToggle = useCallback(
+		(status: CampaignOverviewStatusKey) => {
+			setCampaignOverviewActiveStatuses((prev) => {
+				if (prev.includes(status)) {
+					return prev.filter((value) => value !== status);
+				}
+				return [...prev, status];
+			});
+		},
+		[]
+	);
 	const [mapGrabActiveCategories, setMapGrabActiveCategories] = useState<
 		readonly boolean[]
 	>(() => new Array(MAP_SELECT_GRAB_CATEGORY_COUNT).fill(true));
@@ -2743,6 +2843,29 @@ const Murmur = () => {
 	const headerToListNames =
 		campaign?.userContactLists?.map((list) => list.name).join(', ') || '';
 	const headerFromName = campaign?.identity?.name || '';
+	const campaignOverviewContactStatusById = useMemo(() => {
+		const statusById = new Map<number, CampaignOverviewStatusKey>();
+		for (const contact of campaignMapContacts || []) {
+			statusById.set(contact.id, 'contacts');
+		}
+
+		const latestEmailByContactId = new Map<number, string>();
+		for (const email of headerEmails || []) {
+			if (latestEmailByContactId.has(email.contactId)) continue;
+			latestEmailByContactId.set(email.contactId, email.status);
+		}
+		for (const [contactId, status] of latestEmailByContactId) {
+			const overviewStatus = getCampaignOverviewStatusFromEmailStatus(status);
+			if (overviewStatus) statusById.set(contactId, overviewStatus);
+		}
+
+		for (const inboundEmail of overviewInboundEmails || []) {
+			if (typeof inboundEmail.contactId !== 'number') continue;
+			statusById.set(inboundEmail.contactId, 'new-message');
+		}
+
+		return statusById;
+	}, [campaignMapContacts, headerEmails, overviewInboundEmails]);
 
 	const campaignMapContactsForMap = useMemo(() => {
 		const contacts = campaignMapContacts || [];
@@ -2750,6 +2873,13 @@ const Murmur = () => {
 
 		const out = [] as typeof contacts;
 		for (const contact of contacts) {
+			if (campaignOverviewMapGrouping === 'status') {
+				const status = campaignOverviewContactStatusById.get(contact.id) ?? 'contacts';
+				if (!campaignOverviewActiveStatusSet.has(status)) continue;
+				out.push(contact);
+				continue;
+			}
+
 			const titleLike =
 				contact.curatedDisplayLabel || contact.title || contact.headline || '';
 			const categoryIndex = getMapSelectGrabCategoryIndexFromContactTitle(titleLike);
@@ -2773,7 +2903,14 @@ const Murmur = () => {
 		}
 
 		return out;
-	}, [campaignMapContacts, mapGrabActiveCategories, mapGrabUncategorizedActive]);
+	}, [
+		campaignMapContacts,
+		campaignOverviewActiveStatusSet,
+		campaignOverviewContactStatusById,
+		campaignOverviewMapGrouping,
+		mapGrabActiveCategories,
+		mapGrabUncategorizedActive,
+	]);
 
 	const persistentCampaignMapProps = useMemo<SearchResultsMapProps>(
 		() => ({
@@ -2786,6 +2923,8 @@ const Murmur = () => {
 			cameraPadding: campaignMapCameraPadding,
 			contacts: campaignMapContactsForMap,
 			selectedContacts: [],
+			campaignContactStatusById: campaignOverviewContactStatusById,
+			campaignMarkerMode: campaignOverviewMapGrouping,
 			categoryConstellationsEnabled: activeView === 'overview',
 			activeTool: activeMapTool,
 			requestedZoom: mapZoomControlRequest,
@@ -2799,6 +2938,8 @@ const Murmur = () => {
 			activeMapTool,
 			campaignMapCameraPadding,
 			campaignMapContactsForMap,
+			campaignOverviewContactStatusById,
+			campaignOverviewMapGrouping,
 			globeNightLighting,
 			globeWeatherMood,
 			globeWeatherRegionCenter,
@@ -3051,8 +3192,15 @@ const Murmur = () => {
 						)}
 						{isMobile === false && activeView === 'overview' && !shouldHideContent && (
 							<>
-								<CampaignOverviewStatusToggle />
-								<CampaignOverviewStatusStrip />
+								<CampaignOverviewStatusToggle
+									selected={campaignOverviewMapGrouping}
+									onChange={setCampaignOverviewMapGrouping}
+								/>
+								<CampaignOverviewStatusStrip
+									activeStatuses={campaignOverviewActiveStatusSet}
+									disabled={campaignOverviewMapGrouping !== 'status'}
+									onToggleStatus={handleCampaignOverviewStatusToggle}
+								/>
 								<CampaignOverviewAskAnythingBox onSubmit={handleOverviewAskAnythingSubmit} />
 								<CampaignOverviewBottomBoxes
 									contactsCount={headerContactsCount}

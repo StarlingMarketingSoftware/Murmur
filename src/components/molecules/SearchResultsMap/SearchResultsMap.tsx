@@ -509,6 +509,57 @@ const EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_X_PX = 112;
 const EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_TOP_PX = 48;
 const EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_BOTTOM_PX = 24;
 const GENERAL_CONTACT_CONSTELLATION_LINE_COLOR = '#1F2429';
+const CAMPAIGN_STATUS_CONSTELLATION_CORE_OPACITY = 1;
+const CAMPAIGN_STATUS_CONSTELLATION_GLOW_OPACITY = 0.18;
+
+export type CampaignContactMapStatus = 'contacts' | 'drafts' | 'new-message' | 'sent';
+
+type CampaignStatusMarkerStyle = {
+	fillColor: string;
+	strokeColor: string;
+	strokeWidth: number;
+	strokeOpacity: number;
+	radiusScale: number;
+	lineColor: string;
+};
+
+const CAMPAIGN_STATUS_MARKER_STYLES: Record<
+	CampaignContactMapStatus,
+	CampaignStatusMarkerStyle
+> = {
+	contacts: {
+		fillColor: '#FFFFFF',
+		strokeColor: '#FFFFFF',
+		strokeWidth: 2,
+		strokeOpacity: 1,
+		radiusScale: SELECTED_MARKER_SCALE_MULTIPLIER,
+		lineColor: '#FFFFFF',
+	},
+	drafts: {
+		fillColor: '#9ED8F4',
+		strokeColor: '#FFFFFF',
+		strokeWidth: 4,
+		strokeOpacity: 1,
+		radiusScale: SELECTED_MARKER_SCALE_MULTIPLIER,
+		lineColor: '#B6B6B6',
+	},
+	'new-message': {
+		fillColor: '#2B8BB8',
+		strokeColor: '#FFFFFF',
+		strokeWidth: 4,
+		strokeOpacity: 1,
+		radiusScale: SELECTED_MARKER_SCALE_MULTIPLIER,
+		lineColor: '#000000',
+	},
+	sent: {
+		fillColor: '#FFFFFF',
+		strokeColor: '#91C9CF',
+		strokeWidth: 4,
+		strokeOpacity: 1,
+		radiusScale: SELECTED_MARKER_SCALE_MULTIPLIER,
+		lineColor: '#91C9CF',
+	},
+};
 
 type AllContactsOverlayFetchMode = 'all' | 'ambient';
 type AllContactsOverlayFetchPhase = 'visible' | 'buffer';
@@ -557,6 +608,10 @@ export interface SearchResultsMapProps {
 	searchEngaged?: boolean;
 	/** When true, connects result dots by category even without an active search query. */
 	categoryConstellationsEnabled?: boolean;
+	/** Campaign overview marker mode. Category mode preserves the normal category-colored markers. */
+	campaignMarkerMode?: 'category' | 'status';
+	/** Per-contact campaign status used when `campaignMarkerMode` is `status`. */
+	campaignContactStatusById?: ReadonlyMap<number, CampaignContactMapStatus>;
 	/** When true, renders a browse-oriented all-contact atlas while search results are visually disengaged. */
 	ambientContactsEnabled?: boolean;
 	/** When true, warms the ambient atlas cache before the user disengages the search. */
@@ -673,6 +728,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	searchWhat,
 	searchEngaged = true,
 	categoryConstellationsEnabled = false,
+	campaignMarkerMode = 'category',
+	campaignContactStatusById,
 	ambientContactsEnabled = false,
 	ambientContactsPreloadEnabled = false,
 	ambientActiveCategories,
@@ -781,6 +838,29 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const sunTransitionPhaseEndMs = nightLighting?.phaseEndMs ?? null;
 	const isBackgroundPresentation = presentation === 'background';
 	const shouldAutoSpin = isBackgroundPresentation && autoSpin;
+	const getCampaignStatusMarkerStyleForContact = useCallback(
+		(contactId: number): CampaignStatusMarkerStyle | null => {
+			if (campaignMarkerMode !== 'status') return null;
+			const status = campaignContactStatusById?.get(contactId) ?? 'contacts';
+			return CAMPAIGN_STATUS_MARKER_STYLES[status];
+		},
+		[campaignContactStatusById, campaignMarkerMode]
+	);
+	const getCampaignStatusForContact = useCallback(
+		(contactId: number): CampaignContactMapStatus =>
+			campaignContactStatusById?.get(contactId) ?? 'contacts',
+		[campaignContactStatusById]
+	);
+	const getCampaignStatusLineStyleForContacts = useCallback(
+		(fromContactId: number, toContactId: number): CampaignStatusMarkerStyle | null => {
+			if (campaignMarkerMode !== 'status') return null;
+			const fromStatus = getCampaignStatusForContact(fromContactId);
+			const toStatus = getCampaignStatusForContact(toContactId);
+			if (fromStatus !== toStatus) return null;
+			return CAMPAIGN_STATUS_MARKER_STYLES[fromStatus];
+		},
+		[campaignMarkerMode, getCampaignStatusForContact]
+	);
 	const emptyMapPromptText = (emptyMapClickPrompt ?? '').trim();
 	const emptyMapPromptEnabled = Boolean(
 		emptyMapPromptText && onEmptyMapClick && !isBackgroundPresentation && !isLoading
@@ -5562,31 +5642,32 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Non-fatal.
 		}
 
+		const resultDotRadiusScaleExpr = ['coalesce', ['get', 'radiusScale'], 1];
 		const resultDotRadiusExpr = [
 			'interpolate',
 			['linear'],
 			['zoom'],
 			0,
-			RESULT_DOT_SCALE_MIN,
+			['*', RESULT_DOT_SCALE_MIN, resultDotRadiusScaleExpr],
 			RESULT_DOT_ZOOM_MIN,
-			RESULT_DOT_SCALE_MIN,
+			['*', RESULT_DOT_SCALE_MIN, resultDotRadiusScaleExpr],
 			RESULT_DOT_ZOOM_MAX,
-			RESULT_DOT_SCALE_MAX,
+			['*', RESULT_DOT_SCALE_MAX, resultDotRadiusScaleExpr],
 			24,
-			RESULT_DOT_SCALE_MAX,
+			['*', RESULT_DOT_SCALE_MAX, resultDotRadiusScaleExpr],
 		];
 		const resultDotGlowRadiusExpr = [
 			'interpolate',
 			['linear'],
 			['zoom'],
 			0,
-			RESULT_DOT_GLOW_RADIUS_MIN_PX,
+			['*', RESULT_DOT_GLOW_RADIUS_MIN_PX, resultDotRadiusScaleExpr],
 			RESULT_DOT_ZOOM_MIN,
-			RESULT_DOT_GLOW_RADIUS_MIN_PX,
+			['*', RESULT_DOT_GLOW_RADIUS_MIN_PX, resultDotRadiusScaleExpr],
 			RESULT_DOT_ZOOM_MAX,
-			RESULT_DOT_GLOW_RADIUS_MAX_PX,
+			['*', RESULT_DOT_GLOW_RADIUS_MAX_PX, resultDotRadiusScaleExpr],
 			24,
-			RESULT_DOT_GLOW_RADIUS_MAX_PX,
+			['*', RESULT_DOT_GLOW_RADIUS_MAX_PX, resultDotRadiusScaleExpr],
 		];
 
 		const allOverlayRadiusLow = RESULT_DOT_SCALE_MIN * 0.72;
@@ -5631,27 +5712,72 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			14,
 			0.62,
 		];
+		const markerConstellationGlowLineWidthExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			3,
+			['case', ['boolean', ['get', 'useSelectedLineWidth'], false], 6, 3.4],
+			7,
+			['case', ['boolean', ['get', 'useSelectedLineWidth'], false], 8.4, 5.4],
+			13,
+			['case', ['boolean', ['get', 'useSelectedLineWidth'], false], 11.2, 7.2],
+		];
+		const markerConstellationCoreLineWidthExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			3,
+			['case', ['boolean', ['get', 'useSelectedLineWidth'], false], 3.4, 1.25],
+			7,
+			['case', ['boolean', ['get', 'useSelectedLineWidth'], false], 4.8, 1.85],
+			13,
+			['case', ['boolean', ['get', 'useSelectedLineWidth'], false], 6.2, 2.55],
+		];
+		const constellationNodeRadiusScaleExpr = ['coalesce', ['get', 'radiusScale'], 1];
 		const constellationNodeRadiusExpr = [
 			'interpolate',
 			['linear'],
 			['zoom'],
 			3,
-			2.1,
+			['*', 2.1, constellationNodeRadiusScaleExpr],
 			7,
-			2.9,
+			['*', 2.9, constellationNodeRadiusScaleExpr],
 			13,
-			4.1,
+			['*', 4.1, constellationNodeRadiusScaleExpr],
 		];
 		const constellationNodeGlowRadiusExpr = [
 			'interpolate',
 			['linear'],
 			['zoom'],
 			3,
-			6,
+			['*', 6, constellationNodeRadiusScaleExpr],
 			7,
-			8,
+			['*', 8, constellationNodeRadiusScaleExpr],
 			13,
-			11,
+			['*', 11, constellationNodeRadiusScaleExpr],
+		];
+		const constellationNodeStrokeWidthExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			3,
+			['coalesce', ['get', 'strokeWidth'], 0.45],
+			7,
+			['coalesce', ['get', 'strokeWidth'], 0.65],
+			13,
+			['coalesce', ['get', 'strokeWidth'], 0.9],
+		];
+		const constellationNodeStrokeOpacityExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			3.6,
+			0,
+			4.2,
+			['coalesce', ['get', 'strokeOpacity'], 0.74],
+			13,
+			['coalesce', ['get', 'strokeOpacity'], 0.74],
 		];
 
 		const pinRadiusLow =
@@ -5911,7 +6037,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					MARKER_CONSTELLATION_HALO_COLOR,
 				],
 				'line-opacity': 0,
-				'line-width': ['interpolate', ['linear'], ['zoom'], 3, 3.4, 7, 5.4, 13, 7.2],
+				'line-width': markerConstellationGlowLineWidthExpr,
 				'line-blur': 1.8,
 			},
 		});
@@ -5927,7 +6053,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					MARKER_CONSTELLATION_LINE_COLOR,
 				],
 				'line-opacity': 0,
-				'line-width': ['interpolate', ['linear'], ['zoom'], 3, 1.25, 7, 1.85, 13, 2.55],
+				'line-width': markerConstellationCoreLineWidthExpr,
 				'line-blur': 0,
 			},
 		});
@@ -5983,19 +6109,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'circle-opacity': getMarkerConstellationNodeZoomFadedOpacity(
 					MARKER_CONSTELLATION_NODE_OPACITY
 				),
-				'circle-stroke-color': MARKER_CONSTELLATION_HALO_COLOR,
-				'circle-stroke-opacity': getMarkerConstellationNodeZoomFadedOpacity(0.74),
-				'circle-stroke-width': [
-					'interpolate',
-					['linear'],
-					['zoom'],
-					3,
-					0.45,
-					7,
-					0.65,
-					13,
-					0.9,
+				'circle-stroke-color': [
+					'coalesce',
+					['get', 'strokeColor'],
+					MARKER_CONSTELLATION_HALO_COLOR,
 				],
+				'circle-stroke-opacity': constellationNodeStrokeOpacityExpr,
+				'circle-stroke-width': constellationNodeStrokeWidthExpr,
 			},
 		});
 
@@ -6288,8 +6408,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'circle-opacity': getCategorizedDotZoomFadedOpacity(
 					getNormalMarkerFadeOpacityExpr()
 				),
-				'circle-stroke-color': RESULT_DOT_TRANSPARENT_STROKE_COLOR,
-				'circle-stroke-width': 0,
+				'circle-stroke-color': [
+					'coalesce',
+					['get', 'strokeColor'],
+					RESULT_DOT_TRANSPARENT_STROKE_COLOR,
+				],
+				'circle-stroke-width': ['coalesce', ['get', 'strokeWidth'], 0],
+				'circle-stroke-opacity': ['coalesce', ['get', 'strokeOpacity'], 0],
 			},
 		});
 		ensureLayer({
@@ -11563,6 +11688,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const markerConstellationRevealCancelRef = useRef<(() => void) | null>(null);
 	const markerConstellationRevealDoneRef = useRef<boolean>(true);
 	const markerConstellationLastDataKeyRef = useRef<string>('');
+	const markerConstellationIsStatusModeRef = useRef<boolean>(false);
 	// Tracks a pending moveend listener registered when compose is deferred for a
 	// camera animation (e.g., autoFit fitBounds after a search from far-out zoom).
 	// Stored on a ref so we can keep it idempotent and avoid stacking listeners.
@@ -11615,7 +11741,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				(map as any).setPaintProperty(
 					MAPBOX_LAYER_IDS.baseDots,
 					'circle-stroke-opacity',
-					0
+					['coalesce', ['get', 'strokeOpacity'], 0]
 				);
 			}
 			if (map.getLayer(MAPBOX_LAYER_IDS.baseFallbackIcons)) {
@@ -11721,6 +11847,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		markerConstellationComposedSearchKeyRef.current = '';
 		markerConstellationRevealDoneRef.current = true;
 		markerConstellationLastDataKeyRef.current = '';
+		markerConstellationIsStatusModeRef.current = false;
 		setMarkerConstellationCompositionNonce((value) => value + 1);
 		setMarkerConstellationLineOpacity(0, 0, 0);
 		if (!map || !isMapLoaded) return;
@@ -11784,7 +11911,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 				let lineColor: string | null = null;
 				let lineGlowColor: string | null = null;
-				if (markerConstellationUsesCategoryColorsRef.current) {
+				let useSelectedLineWidth = false;
+				const campaignStatusLineStyle = getCampaignStatusLineStyleForContacts(
+					fromContact.id,
+					toContact.id
+				);
+				if (campaignStatusLineStyle) {
+					lineColor = campaignStatusLineStyle.lineColor;
+					lineGlowColor = campaignStatusLineStyle.lineColor;
+					useSelectedLineWidth = true;
+				}
+				if (!campaignStatusLineStyle && markerConstellationUsesCategoryColorsRef.current) {
 					const fromCategory = fromContact.curatedCategory ?? null;
 					const toCategory = toContact.curatedCategory ?? null;
 					const fromCategoryKey = fromCategory
@@ -11799,22 +11936,25 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					}
 				}
 
+				const rank = useSelectedLineWidth ? 0 : edge.rank;
+				const opacityScale = useSelectedLineWidth ? 1 : edge.opacityScale;
 				const edgeId = markerConstellationPairKey(edge.fromId, edge.toId);
 				const featureId = `${edge.level}:${edgeId}`;
 				dataKeyParts.push(
-					`e:${featureId}:${lineColor ?? ''}:${edge.rank.toFixed(3)}:${edge.opacityScale.toFixed(2)}`
+					`e:${featureId}:${lineColor ?? ''}:${useSelectedLineWidth ? 'selected' : 'normal'}:${rank.toFixed(3)}:${opacityScale.toFixed(2)}`
 				);
 				features.push({
 					type: 'Feature',
 					id: featureId,
 					properties: {
 						level: edge.level,
-						rank: edge.rank,
-						opacityScale: edge.opacityScale,
+						rank,
+						opacityScale,
 						...(lineColor
 							? {
 									lineColor,
 									lineGlowColor: lineGlowColor ?? lineColor,
+									useSelectedLineWidth,
 								}
 							: {}),
 					},
@@ -11842,21 +11982,32 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					? !isCoordsInLockedState(coords)
 					: false;
 				const whatForContact = contact.curatedCategory ?? searchWhat ?? null;
-				const baseFillColor = getResultDotColorForWhat(whatForContact);
+				const statusMarkerStyle = getCampaignStatusMarkerStyleForContact(contact.id);
+				const baseFillColor =
+					statusMarkerStyle?.fillColor ?? getResultDotColorForWhat(whatForContact);
 				const fillColor = isOutsideLockedState
 					? washOutHexColor(baseFillColor, OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE)
 					: baseFillColor;
+				const strokeColor =
+					statusMarkerStyle?.strokeColor ?? MARKER_CONSTELLATION_HALO_COLOR;
+				const strokeWidth = statusMarkerStyle?.strokeWidth;
+				const strokeOpacity = statusMarkerStyle?.strokeOpacity;
+				const radiusScale = statusMarkerStyle?.radiusScale;
 				const featureId = `${node.level}:${node.id}`;
 				dataKeyParts.push(
-					`n:${featureId}:${fillColor}:${node.rank.toFixed(3)}:${node.opacityScale.toFixed(
-						2
-					)}`
+					`n:${featureId}:${fillColor}:${strokeColor}:${strokeWidth ?? ''}:${
+						strokeOpacity ?? ''
+					}:${radiusScale ?? ''}:${node.rank.toFixed(3)}:${node.opacityScale.toFixed(2)}`
 				);
 				nodeFeatures.push({
 					type: 'Feature',
 					id: featureId,
 					properties: {
 						fillColor,
+						strokeColor,
+						...(strokeWidth != null ? { strokeWidth } : {}),
+						...(strokeOpacity != null ? { strokeOpacity } : {}),
+						...(radiusScale != null ? { radiusScale } : {}),
 						level: node.level,
 						rank: node.rank,
 						opacityScale: node.opacityScale,
@@ -12007,6 +12158,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			bookingExtraVisibleContacts,
 			promotionOverlayVisibleContacts,
 			allContactsOverlayVisibleContacts,
+			getCampaignStatusLineStyleForContacts,
+			getCampaignStatusMarkerStyleForContact,
 			getContactCoords,
 			getBookingExtraContactCoords,
 			getPromotionOverlayContactCoords,
@@ -12083,9 +12236,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 
 		markerConstellationRevealDoneRef.current = true;
+		const coreOpacity = markerConstellationIsStatusModeRef.current
+			? CAMPAIGN_STATUS_CONSTELLATION_CORE_OPACITY
+			: MARKER_CONSTELLATION_CORE_OPACITY;
+		const glowOpacity = markerConstellationIsStatusModeRef.current
+			? CAMPAIGN_STATUS_CONSTELLATION_GLOW_OPACITY
+			: MARKER_CONSTELLATION_GLOW_OPACITY;
 		setMarkerConstellationLineOpacity(
-			MARKER_CONSTELLATION_CORE_OPACITY,
-			MARKER_CONSTELLATION_GLOW_OPACITY,
+			coreOpacity,
+			glowOpacity,
 			MARKER_CONSTELLATION_REVEAL_FADE_MS
 		);
 		return;
@@ -12162,6 +12321,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lat: number;
 			fillColor: string;
 			hoverFillColor: string;
+			strokeColor: string;
+			strokeWidth: number;
+			strokeOpacity: number;
+			radiusScale: number;
 			isCurated: boolean;
 			isUncategorized: boolean;
 			fadeWithSelectedStateOrb: boolean;
@@ -12186,8 +12349,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				? !isCoordsInLockedState(coords)
 				: false;
 			const whatForContact = contact.curatedCategory ?? searchWhat ?? null;
-			const isUncategorized = !isCleanMapMarkerCategory(whatForContact);
-			const baseFillColor = getResultDotColorForWhat(whatForContact);
+			const statusMarkerStyle = getCampaignStatusMarkerStyleForContact(contact.id);
+			const isUncategorized = statusMarkerStyle
+				? false
+				: !isCleanMapMarkerCategory(whatForContact);
+			const baseFillColor =
+				statusMarkerStyle?.fillColor ?? getResultDotColorForWhat(whatForContact);
 			const fillColor = isOutsideLockedState
 				? washOutHexColor(baseFillColor, OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE)
 				: baseFillColor;
@@ -12197,7 +12364,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				lat: coords.lat,
 				fillColor,
 				hoverFillColor: darkenHexColor(fillColor),
-				isCurated: Boolean(contact.curatedCategory),
+				strokeColor: statusMarkerStyle?.strokeColor ?? RESULT_DOT_TRANSPARENT_STROKE_COLOR,
+				strokeWidth: statusMarkerStyle?.strokeWidth ?? 0,
+				strokeOpacity: statusMarkerStyle?.strokeOpacity ?? 0,
+				radiusScale: statusMarkerStyle?.radiusScale ?? 1,
+				isCurated: statusMarkerStyle ? false : Boolean(contact.curatedCategory),
 				isUncategorized,
 				fadeWithSelectedStateOrb,
 			});
@@ -12236,6 +12407,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				d.id +
 				':' +
 				d.fillColor +
+				':' +
+				d.strokeColor +
+				':' +
+				d.strokeWidth +
+				':' +
+				d.strokeOpacity +
+				':' +
+				d.radiusScale +
 				':' +
 				(d.isUncategorized ? 'u' : 'c') +
 				':' +
@@ -12277,6 +12456,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				properties: {
 					fillColor: dot.fillColor,
 					hoverFillColor: dot.hoverFillColor,
+					strokeColor: dot.strokeColor,
+					strokeWidth: dot.strokeWidth,
+					strokeOpacity: dot.strokeOpacity,
+					radiusScale: dot.radiusScale,
 					[DOT_WAVE_DELAY_PROP]: delayMs,
 					isCurated: dot.isCurated,
 					isUncategorized: dot.isUncategorized,
@@ -12395,6 +12578,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		searchQuery,
 		isBackgroundPresentation,
 		disableDotWaveReveal,
+		getCampaignStatusMarkerStyleForContact,
 		stopBaseDotsWaveAndRestoreSteadyRendering,
 		uncategorizedContactMarkerImageName,
 		uncategorizedContactMarkerHoverImageName,
@@ -13048,13 +13232,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!markerConstellationComposedSearchKeyRef.current) return;
 		writeMarkerConstellationSourceData();
 		if (markerConstellationRevealDoneRef.current) {
+			const coreOpacity = markerConstellationIsStatusModeRef.current
+				? CAMPAIGN_STATUS_CONSTELLATION_CORE_OPACITY
+				: MARKER_CONSTELLATION_CORE_OPACITY;
+			const glowOpacity = markerConstellationIsStatusModeRef.current
+				? CAMPAIGN_STATUS_CONSTELLATION_GLOW_OPACITY
+				: MARKER_CONSTELLATION_GLOW_OPACITY;
 			setMarkerConstellationLineOpacity(
-				markerConstellationEdgesRef.current.length > 0
-					? MARKER_CONSTELLATION_CORE_OPACITY
-					: 0,
-				markerConstellationEdgesRef.current.length > 0
-					? MARKER_CONSTELLATION_GLOW_OPACITY
-					: 0,
+				markerConstellationEdgesRef.current.length > 0 ? coreOpacity : 0,
+				markerConstellationEdgesRef.current.length > 0 ? glowOpacity : 0,
 				0
 			);
 		}
@@ -13073,11 +13259,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const searchKey = (searchQuery ?? '').trim();
 		const isSearchMode = searchKey.length > 0;
 		const isCategoryConstellationMode = categoryConstellationsEnabled && !isSearchMode;
+		const isStatusConstellationMode =
+			isCategoryConstellationMode && campaignMarkerMode === 'status';
 		const shouldComposeConstellation = isSearchMode || isCategoryConstellationMode;
 		const constellationKey = isSearchMode
 			? searchKey
 			: isCategoryConstellationMode
-				? '__category-constellations__'
+				? isStatusConstellationMode
+					? '__status-constellations__'
+					: '__category-constellations__'
 				: '';
 		const loading = Boolean(isLoading);
 
@@ -13106,6 +13296,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				markerConstellationNodeIdsRef.current = new Set();
 				markerConstellationComposedSearchKeyRef.current = '';
 				markerConstellationLastDataKeyRef.current = '';
+				markerConstellationIsStatusModeRef.current = false;
 				setMarkerConstellationCompositionNonce((value) => value + 1);
 				setMarkerConstellationLineOpacity(0, 0, 0);
 			}
@@ -13118,7 +13309,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			.map((contact) => {
 				const coords = getContactCoords(contact);
 				if (!coords) return null;
-				return `${contact.id}:${contact.curatedCategory ?? ''}:${coords.lng.toFixed(
+				const groupSignature = isStatusConstellationMode
+					? getCampaignStatusForContact(contact.id)
+					: (contact.curatedCategory ?? '');
+				return `${contact.id}:${groupSignature}:${coords.lng.toFixed(
 					5
 				)}:${coords.lat.toFixed(5)}`;
 			})
@@ -13128,7 +13322,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!resultSignature) return;
 
 		const resultKey = `${constellationKey}|results:${resultSignature}`;
-		const formationVersion = isCategoryConstellationMode ? 'category-v2' : 'beauty-v2';
+		const formationVersion = isStatusConstellationMode
+			? 'status-v1'
+			: isCategoryConstellationMode
+				? 'category-v2'
+				: 'beauty-v2';
 		if (
 			markerConstellationComposedSearchKeyRef.current.startsWith(
 				`${resultKey}|${formationVersion}:`
@@ -13241,10 +13439,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				if (!coords) continue;
 				let groupKey: string;
 				if (isCategoryConstellationMode) {
-					const categoryKey = contact.curatedCategory
-						? normalizeWhatKey(contact.curatedCategory)
-						: '';
-					groupKey = categoryKey ? `category:${categoryKey}` : 'general';
+					if (isStatusConstellationMode) {
+						groupKey = `status:${getCampaignStatusForContact(contact.id)}`;
+					} else {
+						const categoryKey = contact.curatedCategory
+							? normalizeWhatKey(contact.curatedCategory)
+							: '';
+						groupKey = categoryKey ? `category:${categoryKey}` : 'general';
+					}
 				} else {
 					const curatedGroupKey = curatedBlobGroupKeyByContactId.get(contact.id);
 					if (curatedBlobGroupKeyByContactId.size > 0 && !curatedGroupKey) continue;
@@ -13299,6 +13501,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				markerConstellationComposedSearchKeyRef.current = '';
 				markerConstellationRevealDoneRef.current = true;
 				markerConstellationLastDataKeyRef.current = '';
+				markerConstellationIsStatusModeRef.current = false;
 				setMarkerConstellationCompositionNonce((value) => value + 1);
 				setMarkerConstellationLineOpacity(0, 0, 0);
 				writeMarkerConstellationSourceData();
@@ -13329,6 +13532,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				markerConstellationComposedSearchKeyRef.current = '';
 				markerConstellationRevealDoneRef.current = true;
 				markerConstellationLastDataKeyRef.current = '';
+				markerConstellationIsStatusModeRef.current = false;
 				setMarkerConstellationCompositionNonce((value) => value + 1);
 				setMarkerConstellationLineOpacity(0, 0, 0);
 				writeMarkerConstellationSourceData();
@@ -13338,13 +13542,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			stopMarkerConstellationReveal();
 			markerConstellationEdgesRef.current = formation.edges;
-			markerConstellationUsesCategoryColorsRef.current = isCategoryConstellationMode;
+			markerConstellationUsesCategoryColorsRef.current =
+				isCategoryConstellationMode && !isStatusConstellationMode;
 			markerConstellationNodesRef.current = formation.nodes;
 			markerConstellationContactsByIdRef.current = contactsByPointId;
 			markerConstellationNodeIdsRef.current = formation.lowZoomNodeIds;
 			markerConstellationComposedSearchKeyRef.current = compositionKey;
 			markerConstellationRevealDoneRef.current = false;
 			markerConstellationLastDataKeyRef.current = '';
+			markerConstellationIsStatusModeRef.current = isStatusConstellationMode;
 			setMarkerConstellationCompositionNonce((value) => value + 1);
 			setMarkerConstellationLineOpacity(0, 0, 0);
 			writeMarkerConstellationSourceData();
@@ -13361,9 +13567,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isLoading,
 		isBackgroundPresentation,
 		searchEngaged,
+		campaignMarkerMode,
 		categoryConstellationsEnabled,
 		searchQuery,
 		contactsWithCoords,
+		getCampaignStatusForContact,
 		getContactCoords,
 		lockedStateKey,
 		isCoordsInLockedState,
