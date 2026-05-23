@@ -31,10 +31,18 @@ import DashboardActionBarPlaybookIcon from '@/components/atoms/_svg/DashboardAct
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 import DashboardActionBarStarIcon from '@/components/atoms/_svg/DashboardActionBarStarIcon';
 import DashboardActionBarEnvelopeIcon from '@/components/atoms/_svg/DashboardActionBarEnvelopeIcon';
+import { DashboardStrategyBox } from '@/components/molecules/DashboardStrategyBox/DashboardStrategyBox';
+import DashboardOpportunitiesWidget from '@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesWidget';
+import DashboardResponsesWidget from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesWidget';
+import CloseIcon from '@/components/atoms/_svg/CloseIcon';
 import SearchMap from '@/components/atoms/_svg/SearchMap';
 import BottomFolderIcon from '@/components/atoms/_svg/BottomFolderIcon';
 import BottomHomeIcon from '@/components/atoms/_svg/BottomHomeIcon';
 import { EnvelopeIcon } from '@/components/atoms/_svg/EnvelopeIcon';
+import StatusContactsIcon from '@/components/atoms/svg/StatusContactsIcon';
+import StatusDraftsIcon from '@/components/atoms/svg/StatusDraftsIcon';
+import StatusNewMessageIcon from '@/components/atoms/svg/StatusNewMessageIcon';
+import StatusSentIcon from '@/components/atoms/svg/StatusSentIcon';
 import nextDynamic from 'next/dynamic';
 import { CampaignsTable } from '@/components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
@@ -150,14 +158,22 @@ const getCampaignOverviewStatusFromEmailStatus = (
 
 type CampaignOverviewAskAnythingBoxProps = {
 	onSubmit: (query: string) => void;
+	value?: string;
 };
 
 const CampaignOverviewAskAnythingBox = ({
 	onSubmit,
+	value,
 }: CampaignOverviewAskAnythingBoxProps) => {
-	const [query, setQuery] = useState('');
+	const [query, setQuery] = useState(value ?? '');
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const submitQuery = () => onSubmit(query);
+
+	useEffect(() => {
+		// Keep the input in sync with the parent's active query so leaving/re-entering the tab
+		// doesn't desync the right-rail search mode from the visible input state.
+		setQuery(value ?? '');
+	}, [value]);
 
 	return (
 		<div
@@ -232,13 +248,20 @@ const CampaignOverviewAskAnythingBox = ({
 
 type CampaignOverviewStatusToggleProps = {
 	selected: CampaignOverviewMapGrouping;
+	isSearchActive?: boolean;
 	onChange: (value: CampaignOverviewMapGrouping) => void;
 };
 
 const CampaignOverviewStatusToggle = ({
 	selected,
+	isSearchActive = false,
 	onChange,
 }: CampaignOverviewStatusToggleProps) => {
+	const tabCount = isSearchActive ? 3 : 2;
+	const selectedIndex = isSearchActive ? 0 : selected === 'category' ? 0 : 1;
+	const toggleWidth = isSearchActive
+		? CAMPAIGN_OVERVIEW_STATUS_TOGGLE_WIDTH_PX * 1.5
+		: CAMPAIGN_OVERVIEW_STATUS_TOGGLE_WIDTH_PX;
 	const textStyle: CSSProperties = {
 		color: '#000',
 		fontFamily: 'Inter, sans-serif',
@@ -254,7 +277,7 @@ const CampaignOverviewStatusToggle = ({
 		display: 'flex',
 		alignItems: 'center',
 		justifyContent: 'center',
-		width: '50%',
+		width: `${100 / tabCount}%`,
 		height: '100%',
 		border: 0,
 		background: 'transparent',
@@ -281,7 +304,7 @@ const CampaignOverviewStatusToggle = ({
 				aria-label="Campaign overview grouping"
 				className="pointer-events-auto relative flex overflow-hidden"
 				style={{
-					width: CAMPAIGN_OVERVIEW_STATUS_TOGGLE_WIDTH_PX,
+					width: toggleWidth,
 					height: CAMPAIGN_OVERVIEW_STATUS_TOGGLE_HEIGHT_PX,
 					borderRadius: 8,
 				}}
@@ -297,17 +320,34 @@ const CampaignOverviewStatusToggle = ({
 				/>
 				<div
 					aria-hidden="true"
-					className="absolute top-0 h-full transition-all duration-150"
+					className={cn(
+						'absolute top-0 h-full',
+						!isSearchActive && 'transition-all duration-150'
+					)}
 					style={{
-						left: selected === 'category' ? 0 : '50%',
-						width: '50%',
+						left: `${(selectedIndex * 100) / tabCount}%`,
+						width: `${100 / tabCount}%`,
 						borderRadius: 8,
-						background: selected === 'category' ? '#A7F5B6' : '#BFF7FF',
+						background: isSearchActive
+							? '#A7F5D2'
+							: selected === 'category'
+								? '#A7F5B6'
+								: '#BFF7FF',
 					}}
 				/>
+				{isSearchActive ? (
+					<button
+						type="button"
+						aria-pressed={true}
+						style={buttonStyle}
+						onClick={() => undefined}
+					>
+						Search
+					</button>
+				) : null}
 				<button
 					type="button"
-					aria-pressed={selected === 'category'}
+					aria-pressed={!isSearchActive && selected === 'category'}
 					style={buttonStyle}
 					onClick={() => onChange('category')}
 				>
@@ -315,7 +355,7 @@ const CampaignOverviewStatusToggle = ({
 				</button>
 				<button
 					type="button"
-					aria-pressed={selected === 'status'}
+					aria-pressed={!isSearchActive && selected === 'status'}
 					style={buttonStyle}
 					onClick={() => onChange('status')}
 				>
@@ -396,16 +436,7 @@ const CampaignOverviewStatusStrip = ({
 					onClick={() => onToggleStatus('contacts')}
 				>
 					<span>Contacts</span>
-					<svg
-						width="20"
-						height="20"
-						viewBox="0 0 20 20"
-						fill="none"
-						xmlns="http://www.w3.org/2000/svg"
-						aria-hidden="true"
-					>
-						<circle cx="10" cy="10" r="10" fill="white" />
-					</svg>
+					<StatusContactsIcon width={17} height={17} aria-hidden="true" />
 				</button>
 				<button
 					type="button"
@@ -416,17 +447,7 @@ const CampaignOverviewStatusStrip = ({
 					onClick={() => onToggleStatus('drafts')}
 				>
 					<span>Drafts</span>
-					<svg
-						width="20"
-						height="20"
-						viewBox="0 0 20 20"
-						fill="none"
-						xmlns="http://www.w3.org/2000/svg"
-						aria-hidden="true"
-					>
-						<circle cx="10" cy="10" r="10" fill="white" />
-						<circle cx="10" cy="10" r="7" fill="#9ED8F4" />
-					</svg>
+					<StatusDraftsIcon width={17} height={17} aria-hidden="true" />
 				</button>
 				<button
 					type="button"
@@ -437,17 +458,7 @@ const CampaignOverviewStatusStrip = ({
 					onClick={() => onToggleStatus('new-message')}
 				>
 					<span>New Message</span>
-					<svg
-						width="20"
-						height="20"
-						viewBox="0 0 20 20"
-						fill="none"
-						xmlns="http://www.w3.org/2000/svg"
-						aria-hidden="true"
-					>
-						<circle cx="10" cy="10" r="10" fill="white" />
-						<circle cx="10" cy="10" r="7.4" fill="#2B8BB8" />
-					</svg>
+					<StatusNewMessageIcon width={19} height={19} aria-hidden="true" />
 				</button>
 				<button
 					type="button"
@@ -458,16 +469,7 @@ const CampaignOverviewStatusStrip = ({
 					onClick={() => onToggleStatus('sent')}
 				>
 					<span>Sent</span>
-					<svg
-						width="20"
-						height="20"
-						viewBox="0 0 20 20"
-						fill="none"
-						xmlns="http://www.w3.org/2000/svg"
-						aria-hidden="true"
-					>
-						<circle cx="10" cy="10" r="7.6" stroke="#9ACDD4" strokeWidth="3.4" />
-					</svg>
+					<StatusSentIcon width={19} height={19} aria-hidden="true" />
 				</button>
 			</div>
 		</div>
@@ -836,7 +838,7 @@ const DashboardInboxSection = nextDynamic(
 						height: '48px',
 						border: '3px solid #000000',
 						borderRadius: '8px',
-						backgroundColor: '#FFFFFF',
+												backgroundColor: '#FFFFFF',
 						zIndex: 10,
 						display: 'flex',
 						alignItems: 'center',
@@ -1918,34 +1920,16 @@ const Murmur = () => {
 
 	// Campaign Search should always stay pinned to the campaign the user is viewing.
 	const handleGoToDashboardSearch = handleOpenDashboardSearchForCampaign;
-	const handleOverviewAskAnythingSubmit = useCallback(
-		(query: string) => {
-			const trimmedQuery = query.trim();
-			if (!trimmedQuery) {
-				handleGoToDashboardSearch();
-				return;
-			}
-
-			if (!campaign) return;
-			if (typeof window === 'undefined') return;
-
-			try {
-				sessionStorage.setItem(
-					'murmur_pending_search',
-					JSON.stringify({
-						v: 1,
-						query: trimmedQuery,
-						fromCampaignId: String(campaign.id),
-					})
-				);
-			} catch {
-				// sessionStorage may be unavailable; navigation can still proceed.
-			}
-
-			window.location.assign(`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`);
-		},
-		[campaign, handleGoToDashboardSearch]
-	);
+	// Overview (All tab) local search state: when set, the right-rail swaps to the dashboard-style
+	// Search Results panel, but results are filtered to this campaign's contacts.
+	const [overviewSearchQuery, setOverviewSearchQuery] = useState<string | null>(null);
+	const handleOverviewAskAnythingSubmit = useCallback((query: string) => {
+		const trimmedQuery = query.trim();
+		setOverviewSearchQuery(trimmedQuery ? trimmedQuery : null);
+	}, []);
+	const handleClearOverviewSearchQuery = useCallback(() => {
+		setOverviewSearchQuery(null);
+	}, []);
 
 	// Track highlight state in a ref so the event listener has fresh access without re-binding constantly
 	const isTopSearchHighlightedRef = useRef(isTopSearchHighlighted);
@@ -2130,32 +2114,13 @@ const Murmur = () => {
 			return;
 		}
 
-		// Overview normally has no right-side panels, so we reset padding there unless
-		// the Overview right rail is rendered.
+		// Overview ("All" tab): keep the globe centered in the full viewport, matching the
+		// dashboard map. We intentionally do NOT apply right-side camera padding here (even
+		// when the Overview right rail is present), so the globe isn't pushed to the left.
+		// The other (compact) tabs keep their left-shifted padding via the branch below.
 		if (activeView === 'overview') {
-			try {
-				const rail = document.querySelector<HTMLElement>(
-					'[data-campaign-overview-right-rail="true"]'
-				);
-				const rect = rail?.getBoundingClientRect();
-				if (!rect || rect.width <= 0) {
-					setCampaignMapCameraPadding(null);
-					return;
-				}
-
-				const viewportW = window.innerWidth;
-				const uiCoveredRightPx = viewportW - rect.left;
-				const CAMERA_PADDING_BACKOFF_PX = 28;
-				const rightPaddingPx = Math.max(
-					0,
-					Math.round(uiCoveredRightPx - CAMERA_PADDING_BACKOFF_PX)
-				);
-				setCampaignMapCameraPadding({ right: rightPaddingPx, left: 0, top: 0, bottom: 0 });
-				return;
-			} catch {
-				setCampaignMapCameraPadding(null);
-				return;
-			}
+			setCampaignMapCameraPadding(null);
+			return;
 		}
 
 		try {
@@ -2248,6 +2213,13 @@ const Murmur = () => {
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
 	const [campaignOverviewMapGrouping, setCampaignOverviewMapGrouping] =
 		useState<CampaignOverviewMapGrouping>('status');
+	const handleCampaignOverviewMapGroupingChange = useCallback(
+		(grouping: CampaignOverviewMapGrouping) => {
+			setCampaignOverviewMapGrouping(grouping);
+			setOverviewSearchQuery(null);
+		},
+		[]
+	);
 	const [campaignOverviewActiveStatuses, setCampaignOverviewActiveStatuses] = useState<
 		readonly CampaignOverviewStatusKey[]
 	>(() => [...CAMPAIGN_OVERVIEW_STATUS_KEYS]);
@@ -2463,8 +2435,10 @@ const Murmur = () => {
 		};
 	}, [activeView]);
 
-	// State for top campaigns dropdown
+	// State for top toolbar dropdowns
 	const [showTopCampaignsDropdown, setShowTopCampaignsDropdown] = useState(false);
+	const [isTopStrategyDropdownOpen, setIsTopStrategyDropdownOpen] = useState(false);
+	const [isTopOpportunitiesOpen, setIsTopOpportunitiesOpen] = useState(false);
 
 	// State for right box icon selection ('info' or 'circle')
 	const [selectedRightBoxIcon, setSelectedRightBoxIcon] = useState<'info' | 'circle'>(
@@ -2472,22 +2446,21 @@ const Murmur = () => {
 	);
 	const topCampaignsDropdownRef = useRef<HTMLDivElement>(null);
 	const topCampaignsFolderButtonRef = useRef<HTMLButtonElement>(null);
+	const topStrategyDropdownRef = useRef<HTMLDivElement>(null);
+	const topStrategyButtonRef = useRef<HTMLButtonElement>(null);
+	const topOpportunitiesPopupRef = useRef<HTMLDivElement>(null);
+	const topOpportunitiesButtonRef = useRef<HTMLButtonElement>(null);
 
-	// Dashboard Inbox popup (opened from the envelope icon in the top-right box)
-	const DASHBOARD_INBOX_POPUP_WIDTH_PX = 625;
-	const DASHBOARD_INBOX_POPUP_HEIGHT_PX = 561;
-	// Position relative to the top search bar (so it matches design specs).
-	const DASHBOARD_INBOX_POPUP_SEARCHBAR_LEFT_OFFSET_PX = 264;
-	const DASHBOARD_INBOX_POPUP_SEARCHBAR_BOTTOM_GAP_PX = 26;
-	const DASHBOARD_INBOX_POPUP_MARGIN_PX = 8;
-	const [isDashboardInboxOpen, setIsDashboardInboxOpen] = useState(false);
-	const [dashboardInboxSubtab, setDashboardInboxSubtab] = useState<
-		'messages' | 'campaigns'
-	>('messages');
-	const dashboardInboxSearchbarRef = useRef<HTMLButtonElement>(null);
-	const dashboardInboxTriggerRef = useRef<HTMLButtonElement>(null);
-	const dashboardInboxPopupRef = useRef<HTMLDivElement>(null);
-	const [dashboardInboxPosition, setDashboardInboxPosition] = useState<{
+	// Responses popup (opened from the envelope icon in the top action row)
+	const RESPONSES_POPUP_WIDTH_PX = 654;
+	const RESPONSES_POPUP_HEIGHT_PX = 266;
+	const RESPONSES_POPUP_SEARCHBAR_BOTTOM_GAP_PX = 18;
+	const RESPONSES_POPUP_MARGIN_PX = 8;
+	const [isResponsesPopupOpen, setIsResponsesPopupOpen] = useState(false);
+	const responsesPopupAnchorRef = useRef<HTMLDivElement>(null);
+	const responsesPopupTriggerRef = useRef<HTMLButtonElement>(null);
+	const responsesPopupRef = useRef<HTMLDivElement>(null);
+	const [responsesPopupPosition, setResponsesPopupPosition] = useState<{
 		top: number;
 		left: number;
 	} | null>(null);
@@ -2503,58 +2476,58 @@ const Murmur = () => {
 		return DEFAULT_CAMPAIGN_ZOOM;
 	}, [CAMPAIGN_COMPACT_CLASS, CAMPAIGN_ZOOM_VAR, DEFAULT_CAMPAIGN_ZOOM]);
 
-	const updateDashboardInboxPosition = useCallback(() => {
+	const updateResponsesPopupPosition = useCallback(() => {
 		if (typeof window === 'undefined') return;
-		const trigger = dashboardInboxTriggerRef.current;
+		const trigger = responsesPopupTriggerRef.current;
 		if (!trigger) {
 			// If the trigger is unmounted (e.g. narrow breakpoint), close the popup.
-			setIsDashboardInboxOpen(false);
-			setDashboardInboxPosition(null);
+			setIsResponsesPopupOpen(false);
+			setResponsesPopupPosition(null);
 			return;
 		}
 
-		const anchor = dashboardInboxSearchbarRef.current ?? trigger;
+		const anchor = responsesPopupAnchorRef.current ?? trigger;
 		const zoom = getCampaignZoomFactor();
 		const rect = anchor.getBoundingClientRect();
 		const rectTop = rect.top / zoom;
 		const rectLeft = rect.left / zoom;
 		const rectBottom = rect.bottom / zoom;
+		const rectWidth = rect.width / zoom;
 
 		const viewportW = window.innerWidth / zoom;
 		const viewportH = window.innerHeight / zoom;
 
-		let left = rectLeft + DASHBOARD_INBOX_POPUP_SEARCHBAR_LEFT_OFFSET_PX;
-		let top = rectBottom + DASHBOARD_INBOX_POPUP_SEARCHBAR_BOTTOM_GAP_PX;
+		let left = rectLeft + rectWidth / 2 - RESPONSES_POPUP_WIDTH_PX / 2;
+		let top = rectBottom + RESPONSES_POPUP_SEARCHBAR_BOTTOM_GAP_PX;
 
 		// If it would overflow below, try opening above the trigger.
 		if (
-			top + DASHBOARD_INBOX_POPUP_HEIGHT_PX + DASHBOARD_INBOX_POPUP_MARGIN_PX >
+			top + RESPONSES_POPUP_HEIGHT_PX + RESPONSES_POPUP_MARGIN_PX >
 			viewportH
 		) {
 			const aboveTop =
 				rectTop -
-				DASHBOARD_INBOX_POPUP_SEARCHBAR_BOTTOM_GAP_PX -
-				DASHBOARD_INBOX_POPUP_HEIGHT_PX;
-			if (aboveTop >= DASHBOARD_INBOX_POPUP_MARGIN_PX) top = aboveTop;
+				RESPONSES_POPUP_SEARCHBAR_BOTTOM_GAP_PX -
+				RESPONSES_POPUP_HEIGHT_PX;
+			if (aboveTop >= RESPONSES_POPUP_MARGIN_PX) top = aboveTop;
 		}
 
 		left = Math.min(
-			Math.max(left, DASHBOARD_INBOX_POPUP_MARGIN_PX),
-			viewportW - DASHBOARD_INBOX_POPUP_WIDTH_PX - DASHBOARD_INBOX_POPUP_MARGIN_PX
+			Math.max(left, RESPONSES_POPUP_MARGIN_PX),
+			viewportW - RESPONSES_POPUP_WIDTH_PX - RESPONSES_POPUP_MARGIN_PX
 		);
 		top = Math.min(
-			Math.max(top, DASHBOARD_INBOX_POPUP_MARGIN_PX),
-			viewportH - DASHBOARD_INBOX_POPUP_HEIGHT_PX - DASHBOARD_INBOX_POPUP_MARGIN_PX
+			Math.max(top, RESPONSES_POPUP_MARGIN_PX),
+			viewportH - RESPONSES_POPUP_HEIGHT_PX - RESPONSES_POPUP_MARGIN_PX
 		);
 
-		setDashboardInboxPosition({ top, left });
+		setResponsesPopupPosition({ top, left });
 	}, [
 		getCampaignZoomFactor,
-		DASHBOARD_INBOX_POPUP_HEIGHT_PX,
-		DASHBOARD_INBOX_POPUP_SEARCHBAR_BOTTOM_GAP_PX,
-		DASHBOARD_INBOX_POPUP_SEARCHBAR_LEFT_OFFSET_PX,
-		DASHBOARD_INBOX_POPUP_MARGIN_PX,
-		DASHBOARD_INBOX_POPUP_WIDTH_PX,
+		RESPONSES_POPUP_HEIGHT_PX,
+		RESPONSES_POPUP_SEARCHBAR_BOTTOM_GAP_PX,
+		RESPONSES_POPUP_MARGIN_PX,
+		RESPONSES_POPUP_WIDTH_PX,
 	]);
 
 	// Close dropdown when clicking outside (but not on the folder button itself)
@@ -2563,8 +2536,17 @@ const Murmur = () => {
 
 		const handleClickOutside = (event: MouseEvent) => {
 			const target = event.target as Node;
+			const targetElement =
+				target instanceof Element
+					? target
+					: target instanceof Node
+						? target.parentElement
+						: null;
 			// Don't close if clicking on the folder button (let the toggle handle it)
 			if (topCampaignsFolderButtonRef.current?.contains(target)) {
+				return;
+			}
+			if (targetElement?.closest('.campaign-finder-context-menu, .campaign-finder-info-popup')) {
 				return;
 			}
 			if (
@@ -2574,49 +2556,8 @@ const Murmur = () => {
 				setShowTopCampaignsDropdown(false);
 			}
 		};
-
-		document.addEventListener('mousedown', handleClickOutside);
-		return () => document.removeEventListener('mousedown', handleClickOutside);
-	}, [showTopCampaignsDropdown]);
-
-	// Position the dashboard inbox popup as soon as it opens (pre-paint).
-	useLayoutEffect(() => {
-		if (!isDashboardInboxOpen) return;
-		updateDashboardInboxPosition();
-	}, [isDashboardInboxOpen, updateDashboardInboxPosition]);
-
-	// Keep the dashboard inbox popup positioned on resize/scroll while open.
-	useEffect(() => {
-		if (!isDashboardInboxOpen) return;
-		const handleViewportChange = () => updateDashboardInboxPosition();
-		window.addEventListener('resize', handleViewportChange);
-		window.addEventListener('scroll', handleViewportChange, true);
-		return () => {
-			window.removeEventListener('resize', handleViewportChange);
-			window.removeEventListener('scroll', handleViewportChange, true);
-		};
-	}, [isDashboardInboxOpen, updateDashboardInboxPosition]);
-
-	// Close the dashboard inbox popup on outside click / Escape.
-	useEffect(() => {
-		if (!isDashboardInboxOpen) return;
-
-		const handleClickOutside = (event: MouseEvent) => {
-			const target = event.target as Node;
-			if (dashboardInboxTriggerRef.current?.contains(target)) return;
-			if (
-				dashboardInboxPopupRef.current &&
-				!dashboardInboxPopupRef.current.contains(target)
-			) {
-				setIsDashboardInboxOpen(false);
-				setDashboardInboxPosition(null);
-			}
-		};
-
 		const handleKeyDown = (event: KeyboardEvent) => {
-			if (event.key !== 'Escape') return;
-			setIsDashboardInboxOpen(false);
-			setDashboardInboxPosition(null);
+			if (event.key === 'Escape') setShowTopCampaignsDropdown(false);
 		};
 
 		document.addEventListener('mousedown', handleClickOutside);
@@ -2625,7 +2566,123 @@ const Murmur = () => {
 			document.removeEventListener('mousedown', handleClickOutside);
 			window.removeEventListener('keydown', handleKeyDown);
 		};
-	}, [isDashboardInboxOpen]);
+	}, [showTopCampaignsDropdown]);
+
+	useEffect(() => {
+		if (!isTopStrategyDropdownOpen) return;
+
+		const handleClickOutside = (event: MouseEvent) => {
+			const target = event.target as Node;
+			if (topStrategyButtonRef.current?.contains(target)) return;
+			if (
+				topStrategyDropdownRef.current &&
+				!topStrategyDropdownRef.current.contains(target)
+			) {
+				setIsTopStrategyDropdownOpen(false);
+			}
+		};
+
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') setIsTopStrategyDropdownOpen(false);
+		};
+
+		document.addEventListener('mousedown', handleClickOutside);
+		window.addEventListener('keydown', handleKeyDown);
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+			window.removeEventListener('keydown', handleKeyDown);
+		};
+	}, [isTopStrategyDropdownOpen]);
+
+	useEffect(() => {
+		if (!isTopOpportunitiesOpen) return;
+
+		const handleClickOutside = (event: MouseEvent) => {
+			const target = event.target as Node;
+			if (topOpportunitiesButtonRef.current?.contains(target)) return;
+			if (
+				topOpportunitiesPopupRef.current &&
+				!topOpportunitiesPopupRef.current.contains(target)
+			) {
+				setIsTopOpportunitiesOpen(false);
+			}
+		};
+
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') setIsTopOpportunitiesOpen(false);
+		};
+
+		document.addEventListener('mousedown', handleClickOutside);
+		window.addEventListener('keydown', handleKeyDown);
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+			window.removeEventListener('keydown', handleKeyDown);
+		};
+	}, [isTopOpportunitiesOpen]);
+
+	useEffect(() => {
+		setShowTopCampaignsDropdown(false);
+		setIsTopStrategyDropdownOpen(false);
+		setIsTopOpportunitiesOpen(false);
+		setIsResponsesPopupOpen(false);
+		setResponsesPopupPosition(null);
+	}, [activeView]);
+
+	useEffect(() => {
+		if ((overviewSearchQuery ?? '').trim().length > 0) {
+			setShowTopCampaignsDropdown(false);
+			setIsResponsesPopupOpen(false);
+			setResponsesPopupPosition(null);
+		}
+	}, [overviewSearchQuery]);
+
+	// Position the responses popup as soon as it opens (pre-paint).
+	useLayoutEffect(() => {
+		if (!isResponsesPopupOpen) return;
+		updateResponsesPopupPosition();
+	}, [isResponsesPopupOpen, updateResponsesPopupPosition]);
+
+	// Keep the responses popup positioned on resize/scroll while open.
+	useEffect(() => {
+		if (!isResponsesPopupOpen) return;
+		const handleViewportChange = () => updateResponsesPopupPosition();
+		window.addEventListener('resize', handleViewportChange);
+		window.addEventListener('scroll', handleViewportChange, true);
+		return () => {
+			window.removeEventListener('resize', handleViewportChange);
+			window.removeEventListener('scroll', handleViewportChange, true);
+		};
+	}, [isResponsesPopupOpen, updateResponsesPopupPosition]);
+
+	// Close the responses popup on outside click / Escape.
+	useEffect(() => {
+		if (!isResponsesPopupOpen) return;
+
+		const handleClickOutside = (event: MouseEvent) => {
+			const target = event.target as Node;
+			if (responsesPopupTriggerRef.current?.contains(target)) return;
+			if (
+				responsesPopupRef.current &&
+				!responsesPopupRef.current.contains(target)
+			) {
+				setIsResponsesPopupOpen(false);
+				setResponsesPopupPosition(null);
+			}
+		};
+
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key !== 'Escape') return;
+			setIsResponsesPopupOpen(false);
+			setResponsesPopupPosition(null);
+		};
+
+		document.addEventListener('mousedown', handleClickOutside);
+		window.addEventListener('keydown', handleKeyDown);
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+			window.removeEventListener('keydown', handleKeyDown);
+		};
+	}, [isResponsesPopupOpen]);
 
 	// Track previous view for crossfade transitions
 	const [previousView, setPreviousView] = useState<ViewType | null>(null);
@@ -3194,14 +3251,18 @@ const Murmur = () => {
 							<>
 								<CampaignOverviewStatusToggle
 									selected={campaignOverviewMapGrouping}
-									onChange={setCampaignOverviewMapGrouping}
+									isSearchActive={(overviewSearchQuery ?? '').trim().length > 0}
+									onChange={handleCampaignOverviewMapGroupingChange}
 								/>
 								<CampaignOverviewStatusStrip
 									activeStatuses={campaignOverviewActiveStatusSet}
 									disabled={campaignOverviewMapGrouping !== 'status'}
 									onToggleStatus={handleCampaignOverviewStatusToggle}
 								/>
-								<CampaignOverviewAskAnythingBox onSubmit={handleOverviewAskAnythingSubmit} />
+								<CampaignOverviewAskAnythingBox
+									onSubmit={handleOverviewAskAnythingSubmit}
+									value={overviewSearchQuery ?? ''}
+								/>
 								<CampaignOverviewBottomBoxes
 									contactsCount={headerContactsCount}
 									draftCount={headerDraftCount}
@@ -3251,16 +3312,25 @@ const Murmur = () => {
 									MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX * MAP_VIEW_UI_SCALE -
 									MAP_VIEW_SEARCH_BAR_BOTTOM_INSET_PX -
 									MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX * MAP_VIEW_UI_SCALE;
+								const MAP_VIEW_STRATEGY_DROPDOWN_TOP_PX =
+									MAP_VIEW_SEARCH_BAR_TOP_PX +
+									MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX * MAP_VIEW_UI_SCALE +
+									18;
+								const MAP_VIEW_CAMPAIGNS_DROPDOWN_TOP_PX = MAP_VIEW_STRATEGY_DROPDOWN_TOP_PX;
 								const CAMPAIGN_MAP_TOP_TABS_VISUAL_WIDTH_PX = 560;
 								const CAMPAIGN_MAP_TOP_TABS_WIDTH_PX = Math.round(
 									CAMPAIGN_MAP_TOP_TABS_VISUAL_WIDTH_PX / MAP_VIEW_UI_SCALE
 								);
 
-								const campaignName = campaign?.name || 'Campaign';
+																	const campaignName = campaign?.name || 'Campaign';
+																	const isOverviewLocalSearchActive =
+																		activeView === 'overview' &&
+																		(overviewSearchQuery ?? '').trim().length > 0;
+																	const overviewLocalSearchLabel = (overviewSearchQuery ?? '').trim();
 
-								const inactiveTabStyle = (isActive: boolean) => ({
-									color: '#2C2C2C',
-									fontFamily: 'Inter, sans-serif',
+																	const inactiveTabStyle = (isActive: boolean) => ({
+																		color: '#2C2C2C',
+																		fontFamily: 'Inter, sans-serif',
 									fontSize: '17px',
 									fontStyle: 'normal' as const,
 									fontWeight: isActive ? 600 : 500,
@@ -3282,7 +3352,7 @@ const Murmur = () => {
 										>
 											<div
 												style={{
-													transform: `scale(${MAP_VIEW_UI_SCALE})`,
+													transform: `scale(${CAMPAIGN_MAP_CONTENT_SCALE})`,
 													transformOrigin: 'top center',
 													width: `${MAP_VIEW_TOP_BACKDROP_BOX_WIDTH_PX}px`,
 													height: `${MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX}px`,
@@ -3382,100 +3452,307 @@ const Murmur = () => {
 													>
 														Drafts
 													</button>
-												</div>
-											</div>
-										</div>
+																			</div>
+																		</div>
+																	</div>
 
-										{/* Center pill — 5-icon action row (campaign view variant) */}
+																	{/* Center pill — action row (or active overview search) */}
+																	<div
+																		data-slot="campaign-top-search-bar"
+																		className="fixed left-0 right-0 flex justify-center pointer-events-none"
+																		style={{
+																			top: `${MAP_VIEW_SEARCH_BAR_TOP_PX}px`,
+																			zIndex: 120,
+																		}}
+																	>
+																			<div
+																				ref={responsesPopupAnchorRef}
+																				className="pointer-events-auto"
+																			style={{
+																				transform: `scale(${MAP_VIEW_UI_SCALE})`,
+																				transformOrigin: 'top center',
+																				width: `${MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX}px`,
+																				maxWidth: `${MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX}px`,
+																				height: `${MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX}px`,
+																				borderRadius: '8px',
+																				border: '3px solid #000',
+																				background: isOverviewLocalSearchActive
+																					? 'linear-gradient(90deg, #ADFFC2 0%, #EFFFF3 100%)'
+																					: '#FFFFFF',
+																				boxSizing: 'border-box',
+																				display: 'flex',
+																				alignItems: 'center',
+																				justifyContent: 'space-around',
+																				padding: '0 32px',
+																				color: '#050505',
+																			}}
+																		>
+																				{isOverviewLocalSearchActive ? (
+																					<div className="relative flex h-full w-full items-center justify-center">
+																							<span
+																								className="max-w-[calc(100%_-_54px)] truncate font-inter text-[15px] font-semibold leading-none text-black"
+																							title={overviewLocalSearchLabel}
+																							>
+																								{overviewLocalSearchLabel}
+																							</span>
+																							<button
+																								type="button"
+																								aria-label="Exit campaign search"
+																								onClick={handleClearOverviewSearchQuery}
+																								className="absolute right-[8px] top-1/2 flex h-[24px] w-[24px] -translate-y-1/2 items-center justify-center rounded-[6px] border border-black bg-white/70 text-black"
+																							>
+																								<CloseIcon width={10} height={10} />
+																							</button>
+																						</div>
+																				) : (
+																					[
+																							{
+																									key: 'playbook',
+																										Icon: DashboardActionBarPlaybookIcon,
+																										label: 'Playbook',
+																										width: 24,
+																										height: 20,
+																									},
+																									{
+																										key: 'folder',
+																										Icon: DashboardActionBarFolderIcon,
+																										label: 'Folder',
+																										width: 24,
+																										height: 14,
+																									},
+																									{
+																										key: 'search',
+																										Icon: SearchIconDesktop,
+																										label: 'Search',
+																										width: 22,
+																										height: 22,
+																									},
+															{
+																key: 'star',
+																Icon: DashboardActionBarStarIcon,
+																label: 'Opportunities',
+																width: 22,
+																height: 21,
+															},
+																									{
+																										key: 'envelope',
+																										Icon: DashboardActionBarEnvelopeIcon,
+																										label: 'Messages',
+																										width: 22,
+																										height: 14,
+																									},
+													] as const
+												).map(({ key, Icon, label, width, height }) => {
+													const isStrategyButton = key === 'playbook';
+																const isFolderButton = key === 'folder';
+																const isOpportunitiesButton = key === 'star';
+																const isResponsesButton = key === 'envelope';
+																const isSearchButton = key === 'search';
+
+													return (
+														<button
+															key={key}
+															type="button"
+																ref={
+																	isStrategyButton
+																		? topStrategyButtonRef
+																		: isFolderButton
+																			? topCampaignsFolderButtonRef
+																					: isOpportunitiesButton
+																						? topOpportunitiesButtonRef
+																						: isResponsesButton
+																							? responsesPopupTriggerRef
+																							: undefined
+																}
+																aria-label={label}
+																aria-haspopup={
+																			isStrategyButton ||
+																			isFolderButton ||
+																			isOpportunitiesButton ||
+																			isResponsesButton
+																				? 'dialog'
+																		: undefined
+																}
+																aria-expanded={
+																	isStrategyButton
+																		? isTopStrategyDropdownOpen
+																		: isFolderButton
+																			? showTopCampaignsDropdown
+																				: isOpportunitiesButton
+																					? isTopOpportunitiesOpen
+																					: isResponsesButton
+																						? isResponsesPopupOpen
+																						: undefined
+																}
+															onClick={
+																isStrategyButton
+																		? () => {
+																			setShowTopCampaignsDropdown(false);
+																			setIsResponsesPopupOpen(false);
+																			setResponsesPopupPosition(null);
+																			setIsTopOpportunitiesOpen(false);
+																			setIsTopStrategyDropdownOpen((open) => !open);
+																		}
+																		: isFolderButton
+																			? () => {
+																				setIsTopStrategyDropdownOpen(false);
+																				setIsResponsesPopupOpen(false);
+																				setResponsesPopupPosition(null);
+																				setIsTopOpportunitiesOpen(false);
+																				setShowTopCampaignsDropdown((open) => !open);
+																			}
+																		: isOpportunitiesButton
+																				? () => {
+																					setShowTopCampaignsDropdown(false);
+																				setIsResponsesPopupOpen(false);
+																				setResponsesPopupPosition(null);
+																				setIsTopStrategyDropdownOpen(false);
+																				setIsTopOpportunitiesOpen((open) => !open);
+																			}
+																			: isResponsesButton
+																				? () => {
+																					setShowTopCampaignsDropdown(false);
+																					setIsTopStrategyDropdownOpen(false);
+																					setIsTopOpportunitiesOpen(false);
+																					setResponsesPopupPosition(null);
+																					setIsResponsesPopupOpen((open) => !open);
+																				}
+																			: isSearchButton
+																				? handleGoToDashboardSearch
+																			: undefined
+																}
+																	style={{
+																		background: 'none',
+																		border: 'none',
+																		padding: '4px 6px',
+																		margin: 0,
+																		display: 'flex',
+																		alignItems: 'center',
+																		justifyContent: 'center',
+																		cursor: 'pointer',
+																		color: '#050505',
+																opacity:
+																(isStrategyButton && isTopStrategyDropdownOpen) ||
+																(isFolderButton && showTopCampaignsDropdown) ||
+																(isOpportunitiesButton && isTopOpportunitiesOpen) ||
+																(isResponsesButton && isResponsesPopupOpen)
+																? 1
+																: 0.55,
+																		transition: 'opacity 150ms ease',
+																	}}
+																>
+																	<Icon width={width} height={height} />
+																</button>
+															);
+														})
+												}
+											</div>
+																			</div>
+
+									{isTopStrategyDropdownOpen && !isOverviewLocalSearchActive ? (
 										<div
-											data-slot="campaign-top-search-bar"
+											data-slot="campaign-top-strategy-dropdown"
+												className="fixed left-0 right-0 flex justify-center pointer-events-none"
+												style={{
+													top: `${MAP_VIEW_STRATEGY_DROPDOWN_TOP_PX}px`,
+													zIndex: 128,
+												}}
+											>
+												<div
+													ref={topStrategyDropdownRef}
+													data-campaign-interactive-surface
+													role="dialog"
+													aria-label="Strategy"
+													className="pointer-events-auto"
+													style={{
+														// The campaign page already applies a root-level zoom (murmur-campaign-compact).
+														// Scaling this dropdown again makes it noticeably smaller than the dashboard.
+														transformOrigin: 'top center',
+													}}
+												>
+													<DashboardStrategyBox onSearchContacts={handleGoToDashboardSearch} />
+												</div>
+										</div>
+									) : null}
+
+									{showTopCampaignsDropdown && !isOverviewLocalSearchActive ? (
+										<div
+											data-slot="campaign-top-campaigns-dropdown"
 											className="fixed left-0 right-0 flex justify-center pointer-events-none"
 											style={{
-												top: `${MAP_VIEW_SEARCH_BAR_TOP_PX}px`,
-												zIndex: 120,
+												top: `${MAP_VIEW_CAMPAIGNS_DROPDOWN_TOP_PX}px`,
+												zIndex: 128,
 											}}
 										>
 											<div
+												ref={topCampaignsDropdownRef}
+												data-campaign-interactive-surface
+												role="dialog"
+												aria-label="Campaign folders"
 												className="pointer-events-auto"
 												style={{
-													transform: `scale(${MAP_VIEW_UI_SCALE})`,
+													// The campaign page already applies a root-level zoom (murmur-campaign-compact).
+													// Scaling this dropdown again makes it noticeably smaller than the dashboard.
 													transformOrigin: 'top center',
-													width: `${MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX}px`,
-													maxWidth: `${MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX}px`,
-													height: `${MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX}px`,
-													borderRadius: '8px',
-													border: '3px solid #000',
-													backgroundColor: '#FFFFFF',
-													boxSizing: 'border-box',
-													display: 'flex',
-													alignItems: 'center',
-													justifyContent: 'space-around',
-													padding: '0 32px',
-													color: '#050505',
+													width: '743px',
+													maxWidth: 'calc(100vw - 32px)',
 												}}
 											>
-												{(
-													[
-														{
-															key: 'playbook',
-															Icon: DashboardActionBarPlaybookIcon,
-															label: 'Playbook',
-															width: 24,
-															height: 20,
-														},
-														{
-															key: 'folder',
-															Icon: DashboardActionBarFolderIcon,
-															label: 'Folder',
-															width: 24,
-															height: 14,
-														},
-														{
-															key: 'search',
-															Icon: SearchIconDesktop,
-															label: 'Search',
-															width: 22,
-															height: 22,
-														},
-														{
-															key: 'star',
-															Icon: DashboardActionBarStarIcon,
-															label: 'Starred',
-															width: 22,
-															height: 21,
-														},
-														{
-															key: 'envelope',
-															Icon: DashboardActionBarEnvelopeIcon,
-															label: 'Messages',
-															width: 22,
-															height: 14,
-														},
-													] as const
-												).map(({ key, Icon, label, width, height }) => (
-													<button
-														key={key}
-														type="button"
-														aria-label={label}
-														style={{
-															background: 'none',
-															border: 'none',
-															padding: '4px 6px',
-															margin: 0,
-															display: 'flex',
-															alignItems: 'center',
-															justifyContent: 'center',
-															cursor: 'pointer',
-															color: '#050505',
-															opacity: 0.55,
-															transition: 'opacity 150ms ease',
-														}}
-													>
-														<Icon width={width} height={height} />
-													</button>
-												))}
+												<CampaignsTable
+													defaultOpenCampaignId={campaign.id}
+													defaultOpenContactsFolder
+												/>
 											</div>
 										</div>
+									) : null}
+
+										{isTopOpportunitiesOpen && !isOverviewLocalSearchActive ? (
+											<div
+												data-slot="campaign-top-opportunities-popup"
+												className="fixed left-0 right-0 flex justify-center pointer-events-none"
+												style={{
+													top: `${MAP_VIEW_STRATEGY_DROPDOWN_TOP_PX}px`,
+													zIndex: 128,
+												}}
+											>
+												<div
+													ref={topOpportunitiesPopupRef}
+													data-campaign-interactive-surface
+													role="dialog"
+													aria-label="Opportunities"
+													className="pointer-events-auto"
+													style={{
+														// The campaign page already applies a root-level zoom (murmur-campaign-compact).
+														// Scaling this dropdown again makes it noticeably smaller than the dashboard.
+														transformOrigin: 'top center',
+													}}
+												>
+													<DashboardOpportunitiesWidget enabled={isLoaded && !!user} />
+												</div>
+											</div>
+										) : null}
+
+										{isResponsesPopupOpen && responsesPopupPosition && !isOverviewLocalSearchActive ? (
+											<div
+												data-slot="campaign-top-responses-popup"
+												className="fixed pointer-events-none"
+												style={{
+													top: `${responsesPopupPosition.top}px`,
+													left: `${responsesPopupPosition.left}px`,
+													zIndex: 128,
+												}}
+											>
+												<div
+													ref={responsesPopupRef}
+													data-campaign-interactive-surface
+													role="dialog"
+													aria-label="Responses"
+													className="pointer-events-auto"
+												>
+													<DashboardResponsesWidget enabled={isLoaded && !!user} />
+												</div>
+											</div>
+										) : null}
 									</>
 								);
 							})()}
@@ -3808,12 +4085,17 @@ const Murmur = () => {
 											)}
 											style={{ zIndex: 1 }}
 										>
-											<DraftingSection
-												campaign={campaign}
-												view={activeView}
-												renderGlobalOverlays
-												onViewReady={handleActiveViewReady}
-												onDraftOperationsProgress={setDraftOperationsProgress}
+										<DraftingSection
+											campaign={campaign}
+											view={activeView}
+											overviewRightRailSearchQuery={overviewSearchQuery}
+											overviewRightRailSearchContacts={campaignMapContacts ?? []}
+											overviewRightRailSearchContactsLoading={
+												isCampaignMapContactsLoading
+											}
+											renderGlobalOverlays
+											onViewReady={handleActiveViewReady}
+											onDraftOperationsProgress={setDraftOperationsProgress}
 												autoOpenProfileTabWhenIncomplete={cameFromSearch}
 												inboxSentTabRequest={inboxSentTabRequest}
 												onInboxSentTabChange={setInboxSentTab}
@@ -3857,6 +4139,11 @@ const Murmur = () => {
 												<DraftingSection
 													campaign={campaign}
 													view={previousView}
+													overviewRightRailSearchQuery={overviewSearchQuery}
+													overviewRightRailSearchContacts={campaignMapContacts ?? []}
+													overviewRightRailSearchContactsLoading={
+													isCampaignMapContactsLoading
+												}
 													renderGlobalOverlays={false}
 													autoOpenProfileTabWhenIncomplete={cameFromSearch}
 													inboxSentTabRequest={inboxSentTabRequest}
@@ -3949,7 +4236,10 @@ const Murmur = () => {
 									.campaign-persistent-map-page [data-slot='campaign-top-backdrop'],
 									.campaign-persistent-map-page [data-slot='campaign-top-outline-boxes'],
 									.campaign-persistent-map-page [data-slot='campaign-top-tabs'],
-									.campaign-persistent-map-page [data-slot='campaign-top-search-bar'] {
+									.campaign-persistent-map-page [data-slot='campaign-top-search-bar'],
+									.campaign-persistent-map-page [data-slot='campaign-top-strategy-dropdown'],
+									.campaign-persistent-map-page [data-slot='campaign-top-campaigns-dropdown'],
+									.campaign-persistent-map-page [data-slot='campaign-top-opportunities-popup'] {
 										transform: translateX(
 											var(
 												${CAMPAIGN_TOP_NAV_SHIFT_X_VAR},

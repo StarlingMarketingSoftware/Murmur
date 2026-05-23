@@ -1462,6 +1462,8 @@ export const useCampaignsTable = (options?: {
 	onMockStateChange?: (next: CampaignsMockState | undefined) => void;
 	enableFinder?: boolean;
 	finderSearchQuery?: string;
+	initialOpenCampaignId?: number | null;
+	initialOpenContactsFolder?: boolean;
 	onFinderOpenInNewTab?: (campaignId: number) => void;
 }) => {
 	const compactMetrics = options?.compactMetrics ?? false;
@@ -1469,6 +1471,8 @@ export const useCampaignsTable = (options?: {
 	const onMockStateChange = options?.onMockStateChange;
 	const enableFinder = options?.enableFinder ?? true;
 	const finderSearchQuery = options?.finderSearchQuery ?? '';
+	const initialOpenCampaignId = options?.initialOpenCampaignId ?? null;
+	const initialOpenContactsFolder = options?.initialOpenContactsFolder ?? false;
 	const onFinderOpenInNewTab = options?.onFinderOpenInNewTab;
 	const normalizedFinderSearchQuery = normalizeFinderSearchText(finderSearchQuery);
 	const isMockActive = mockState != null;
@@ -1479,6 +1483,7 @@ export const useCampaignsTable = (options?: {
 	const [openFolderKeys, setOpenFolderKeys] = useState<FinderFolderKey[]>([]);
 	const [selectedFinderItemKey, setSelectedFinderItemKey] = useState<string | null>(null);
 	const frozenCampaignOrderRef = useRef<number[] | null>(null);
+	const initialOpenCampaignIdRef = useRef<number | null>(null);
 	const isFinderOpen = enableFinder && openCampaignId !== null;
 	const queryClient = useQueryClient();
 	const [isFinderDropTargetActive, setIsFinderDropTargetActive] = useState(false);
@@ -1899,7 +1904,7 @@ export const useCampaignsTable = (options?: {
 		});
 	}, [displayedCampaignData, isFinderOpen, openCampaignId]);
 	const openFinderForCampaign = useCallback(
-		(campaignId: number | null) => {
+		(campaignId: number | null, expandedFolderKeys: FinderFolderKey[] = []) => {
 			if (!enableFinder || campaignId === null) {
 				closeFinder();
 				return;
@@ -1908,11 +1913,35 @@ export const useCampaignsTable = (options?: {
 			frozenCampaignOrderRef.current =
 				sortedCampaignData?.map((campaign) => campaign.id) ?? null;
 			setOpenCampaignId(campaignId);
-			setOpenFolderKeys([]);
+			setOpenFolderKeys(expandedFolderKeys);
 			setSelectedFinderItemKey(null);
 		},
 		[closeFinder, enableFinder, sortedCampaignData]
 	);
+
+	useEffect(() => {
+		if (!enableFinder || initialOpenCampaignId === null) return;
+		if (initialOpenCampaignIdRef.current === initialOpenCampaignId) return;
+		if (!baseData?.some((campaign) => campaign.id === initialOpenCampaignId)) return;
+
+		openFinderForCampaign(
+			initialOpenCampaignId,
+			initialOpenContactsFolder ? ['contacts'] : []
+		);
+		initialOpenCampaignIdRef.current = initialOpenCampaignId;
+	}, [
+		baseData,
+		enableFinder,
+		initialOpenCampaignId,
+		initialOpenContactsFolder,
+		openFinderForCampaign,
+	]);
+
+	useEffect(() => {
+		if (initialOpenCampaignId === null) {
+			initialOpenCampaignIdRef.current = null;
+		}
+	}, [initialOpenCampaignId]);
 	const isPending = isMockActive ? false : realIsPending;
 	const shouldShowNewMetricSlot = useMemo(() => {
 		if (displayedCampaignData == null) return true;

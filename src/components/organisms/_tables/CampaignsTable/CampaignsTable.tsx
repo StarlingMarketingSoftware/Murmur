@@ -152,6 +152,8 @@ export type CampaignsMockState = {
 type CampaignsTableProps = {
 	mockState?: CampaignsMockState;
 	onMockStateChange?: (next: CampaignsMockState | undefined) => void;
+	defaultOpenCampaignId?: number | null;
+	defaultOpenContactsFolder?: boolean;
 	/** Called whenever the campaign finder (single or split) opens or closes. */
 	onFinderOpenChange?: (isOpen: boolean) => void;
 };
@@ -159,6 +161,8 @@ type CampaignsTableProps = {
 export const CampaignsTable: FC<CampaignsTableProps> = ({
 	mockState,
 	onMockStateChange,
+	defaultOpenCampaignId,
+	defaultOpenContactsFolder,
 	onFinderOpenChange,
 }) => {
 	// Treat all mobile orientations (portrait and landscape) as mobile for this table
@@ -243,6 +247,8 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 		onMockStateChange,
 		enableFinder: !shouldShowMobileFeatures,
 		finderSearchQuery: leftFinderSearchQuery,
+		initialOpenCampaignId: defaultOpenCampaignId,
+		initialOpenContactsFolder: defaultOpenContactsFolder,
 		onFinderOpenInNewTab: (campaignId) => handleFinderOpenInNewTab(campaignId, 'left'),
 	});
 	const rightCampaignsTable = useCampaignsTable({

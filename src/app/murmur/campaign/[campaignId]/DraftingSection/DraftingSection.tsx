@@ -115,6 +115,7 @@ import { useGetCampaignContactEvents } from '@/hooks/queryHooks/useCampaigns';
 import { buildCampaignInboxMockData } from '../CampaignInboxDebugPanel';
 import { CampaignsTableMini } from '@/components/organisms/_tables/CampaignsTable/CampaignsTableMini';
 import { CampaignOverviewStrategyBox } from '@/components/molecules/DashboardStrategyBox/CampaignOverviewStrategyBox';
+import { MapResultsPanelSkeleton } from '@/components/molecules/MapResultsPanelSkeleton/MapResultsPanelSkeleton';
 import {
 	isRestaurantTitle,
 	isCoffeeShopTitle,
@@ -222,6 +223,11 @@ interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 	autoOpenProfileTabWhenIncomplete?: boolean;
 	isCampaignWorkspaceExpanded?: boolean;
 	onRequestCampaignWorkspaceExpanded?: () => void;
+	// Overview (All tab) right-rail search mode: shows dashboard-style Search Results panel
+	// filtered to this campaign's contacts.
+	overviewRightRailSearchQuery?: string | null;
+	overviewRightRailSearchContacts?: ContactWithName[];
+	overviewRightRailSearchContactsLoading?: boolean;
 }
 
 type CampaignBottomPanelKind = 'contacts' | 'drafts' | 'sent' | 'inbox';
@@ -247,6 +253,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		hideHeaderBox,
 		onDraftOperationsProgress,
 		inboxMockState,
+		overviewRightRailSearchQuery,
+		overviewRightRailSearchContacts,
+		overviewRightRailSearchContactsLoading,
 	} = props;
 
 	const inboxMockOverrideActive = inboxMockState != null;
@@ -647,6 +656,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const bottomPanelCollapsed = true;
 	const mainContactsPanelWidthPx = 377;
 	const mainContactsPanelHeightPx = 597;
+	const isOverviewRightRailSearchActive = Boolean(
+		view === 'overview' && (overviewRightRailSearchQuery || '').trim()
+	);
 	const OVERVIEW_CONTACTS_DOCK_GAP_RIGHT_PX = 56;
 	const OVERVIEW_CONTACTS_DOCK_GAP_DOWN_PX = 66;
 	// Pixel-perfect nudge after eyeballing references.
@@ -654,8 +666,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const OVERVIEW_CONTACTS_DOCK_NUDGE_UP_PX = 8;
 	// Match the campaign page's content scale (so Overview sizes match Write).
 	const OVERVIEW_CONTACTS_DOCK_SCALE = 0.94;
-	const OVERVIEW_RIGHT_RAIL_WIDTH_PX = 371;
-	const OVERVIEW_RIGHT_RAIL_GAP_FROM_RIGHT_WALL_PX = 130;
+	// Default right-rail width matches the existing Campaigns mini + Strategy stack.
+	// When the overview right-rail is in search mode, we match the dashboard map-side panel width.
+	const OVERVIEW_RIGHT_RAIL_WIDTH_PX = isOverviewRightRailSearchActive ? 433 : 371;
+	// Match the dashboard map-view panel (right-[10px]).
+	const OVERVIEW_RIGHT_RAIL_GAP_FROM_RIGHT_WALL_PX = isOverviewRightRailSearchActive ? 10 : 130;
 	const OVERVIEW_RIGHT_RAIL_GAP_FROM_HEADER_PX = 74;
 	const inboxMainPanelWidthPx = 863;
 	const inboxMainPanelHeightPx = 706;
@@ -663,6 +678,356 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		view === 'overview' && !isMobile && !isNarrowDesktop && !isNarrowestDesktop;
 	const shouldShowOverviewRightRail =
 		view === 'overview' && !isMobile && !isNarrowDesktop && !isNarrowestDesktop;
+	const shouldShowOverviewRightRailSearchPanel =
+		shouldShowOverviewRightRail && isOverviewRightRailSearchActive;
+	const overviewRightRailSearchText = (overviewRightRailSearchQuery ?? '').trim();
+	const overviewRightRailSearchContactsResolved = useMemo(
+		() => overviewRightRailSearchContacts ?? [],
+		[overviewRightRailSearchContacts]
+	);
+	const [overviewRightRailSelectedContacts, setOverviewRightRailSelectedContacts] =
+		useState<number[]>([]);
+	const [overviewRightRailHoveredContactId, setOverviewRightRailHoveredContactId] =
+		useState<number | null>(null);
+	const [overviewRightRailSelectedCategoryChips, setOverviewRightRailSelectedCategoryChips] =
+		useState<Set<string>>(() => new Set());
+
+	useEffect(() => {
+		// Reset selection + category chip filters whenever the overview right-rail search query changes.
+		// This matches the "fresh panel per search" feel from the dashboard map-side panel.
+		if (!shouldShowOverviewRightRailSearchPanel) return;
+		setOverviewRightRailSelectedContacts([]);
+		setOverviewRightRailSelectedCategoryChips(new Set());
+	}, [overviewRightRailSearchText, shouldShowOverviewRightRailSearchPanel]);
+
+	const overviewRightRailFilteredContacts = useMemo(() => {
+		if (!shouldShowOverviewRightRailSearchPanel) return [];
+		const q = overviewRightRailSearchText.toLowerCase();
+		if (!q) return [];
+		const tokens = q.split(/\s+/g).filter(Boolean);
+		if (tokens.length === 0) return [];
+		const contacts = overviewRightRailSearchContactsResolved;
+		return contacts.filter((c) => {
+			const parts = [
+				c.name,
+				c.firstName,
+				c.lastName,
+				c.company,
+				c.title,
+				c.headline,
+				c.curatedDisplayLabel,
+				c.city,
+				c.state,
+				c.email,
+			]
+				.filter(Boolean)
+				.map((v) => String(v).toLowerCase());
+			const haystack = parts.join(' | ');
+			for (const t of tokens) {
+				if (!haystack.includes(t)) return false;
+			}
+			return true;
+		});
+	}, [
+		overviewRightRailSearchContactsResolved,
+		overviewRightRailSearchText,
+		shouldShowOverviewRightRailSearchPanel,
+	]);
+
+	const overviewRightRailSelectedIdSet = useMemo(
+		() => new Set<number>(overviewRightRailSelectedContacts),
+		[overviewRightRailSelectedContacts]
+	);
+	const overviewRightRailSelectedContactsFull = useMemo(
+		() =>
+			overviewRightRailFilteredContacts.filter((c) =>
+				overviewRightRailSelectedIdSet.has(c.id)
+			),
+		[overviewRightRailFilteredContacts, overviewRightRailSelectedIdSet]
+	);
+	const overviewRightRailUnselectedContactsFull = useMemo(
+		() =>
+			overviewRightRailFilteredContacts.filter(
+				(c) => !overviewRightRailSelectedIdSet.has(c.id)
+			),
+		[overviewRightRailFilteredContacts, overviewRightRailSelectedIdSet]
+	);
+
+	const getOverviewRightRailChipKeyForContact = useCallback(
+		(contact: ContactWithName): string | null => {
+			const headline =
+				contact.curatedDisplayLabel || contact.headline || contact.title || '';
+			if (isRestaurantTitle(headline)) return 'restaurants';
+			if (isCoffeeShopTitle(headline)) return 'coffee-shops';
+			if (isMusicVenueTitle(headline)) return 'music-venues';
+			if (isMusicFestivalTitle(headline)) return 'festivals';
+			if (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+				return 'wedding-planners';
+			if (isWineBeerSpiritsTitle(headline)) return 'wine-beer-spirits';
+			if (/\bradio stations?\b/i.test(headline)) return 'radio-stations';
+			return null;
+		},
+		[]
+	);
+
+	const overviewRightRailCategoryKeys = useMemo(() => {
+		const set = new Set<string>();
+		for (const c of overviewRightRailFilteredContacts) {
+			const key = getOverviewRightRailChipKeyForContact(c);
+			if (key) set.add(key);
+		}
+		return set;
+	}, [overviewRightRailFilteredContacts, getOverviewRightRailChipKeyForContact]);
+
+	const overviewRightRailUnselectedContactsFiltered = useMemo(() => {
+		if (overviewRightRailSelectedCategoryChips.size === 0)
+			return overviewRightRailUnselectedContactsFull;
+		return overviewRightRailUnselectedContactsFull.filter((c) => {
+			const key = getOverviewRightRailChipKeyForContact(c);
+			return !key || !overviewRightRailSelectedCategoryChips.has(key);
+		});
+	}, [
+		overviewRightRailUnselectedContactsFull,
+		overviewRightRailSelectedCategoryChips,
+		getOverviewRightRailChipKeyForContact,
+	]);
+
+	const overviewRightRailVisibleCategoryKeys = useMemo(() => {
+		const set = new Set<string>();
+		for (const c of overviewRightRailUnselectedContactsFiltered) {
+			const key = getOverviewRightRailChipKeyForContact(c);
+			if (key) set.add(key);
+		}
+		return set;
+	}, [overviewRightRailUnselectedContactsFiltered, getOverviewRightRailChipKeyForContact]);
+
+	const renderOverviewRightRailDesktopRow = useCallback(
+		(contact: ContactWithName) => {
+			const isSelected = overviewRightRailSelectedIdSet.has(contact.id);
+			const isHovered = overviewRightRailHoveredContactId === contact.id;
+			const firstName = contact.firstName || '';
+			const lastName = contact.lastName || '';
+			const fullName = contact.name || `${firstName} ${lastName}`.trim();
+			const company = contact.company || '';
+			const headline =
+				contact.curatedDisplayLabel || contact.headline || contact.title || '';
+			const stateAbbr = getStateAbbreviation(contact.state || '') || '';
+			const city = contact.city || '';
+
+			return (
+					key={contact.id}
+					data-contact-id={contact.id}
+					className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-[3px] border-[#ABABAB] select-none relative"
+					style={{
+						backgroundColor: isSelected
+							? isRestaurantTitle(headline)
+								? isHovered
+									? '#C5F5D1'
+									: '#D7FFE1'
+								: isCoffeeShopTitle(headline)
+									? isHovered
+										? '#DDF4CC'
+										: '#EDFEDC'
+									: isMusicVenueTitle(headline)
+										? isHovered
+											? '#C5E8FF'
+											: '#D7F0FF'
+										: isMusicFestivalTitle(headline)
+											? isHovered
+												? '#ADD4FF'
+												: '#BFDCFF'
+											: isWeddingPlannerTitle(headline) ||
+												  isWeddingVenueTitle(headline)
+													? isHovered
+														? '#F5EDCE'
+														: '#FFF8DC'
+												: isWineBeerSpiritsTitle(headline)
+													? isHovered
+														? '#C8CBFF'
+														: '#DADDFF'
+													: isHovered
+														? '#BFE3FF'
+														: '#C9EAFF'
+							: isHovered
+								? '#F3F4F6'
+								: '#FFFFFF',
+					}}
+					onClick={() => {
+						setOverviewRightRailSelectedContacts((prev) => {
+							if (prev.includes(contact.id)) {
+								return prev.filter((id) => id !== contact.id);
+							}
+							return [...prev, contact.id];
+						});
+					}}
+					onMouseEnter={() => setOverviewRightRailHoveredContactId(contact.id)}
+					onMouseLeave={() =>
+						setOverviewRightRailHoveredContactId((prev) =>
+							prev === contact.id ? null : prev
+						)
+					}
+				>
+					{fullName ? (
+						<>
+							<div className="pl-3 pr-1 flex items-center h-[23px]">
+								<div className="font-bold text-[11px] w-full truncate leading-tight">
+									{fullName}
+								</div>
+							</div>
+							<div className="pr-2 pl-1 flex items-center h-[23px]">
+								{headline ? (
+									<div
+										className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+										style={{
+											backgroundColor: isRestaurantTitle(headline)
+												? '#C3FBD1'
+												: isCoffeeShopTitle(headline)
+													? '#D6F1BD'
+													: isMusicVenueTitle(headline)
+														? '#B7E5FF'
+														: isMusicFestivalTitle(headline)
+															? '#C1D6FF'
+															: isWeddingPlannerTitle(headline) ||
+																  isWeddingVenueTitle(headline)
+																? '#FFF8DC'
+																: isWineBeerSpiritsTitle(headline)
+																	? '#BFC4FF'
+																	: '#E8EFFF',
+										}}
+									>
+										{isRestaurantTitle(headline) && (
+											<RestaurantsIcon size={12} className="flex-shrink-0" />
+										)}
+										{isCoffeeShopTitle(headline) && <CoffeeShopsIcon size={7} />}
+										{isMusicVenueTitle(headline) && (
+											<MusicVenuesIcon size={12} className="flex-shrink-0" />
+										)}
+										{isMusicFestivalTitle(headline) && (
+											<FestivalsIcon size={12} className="flex-shrink-0" />
+										)}
+										{(isWeddingPlannerTitle(headline) ||
+											isWeddingVenueTitle(headline)) && (
+											<WeddingPlannersIcon size={12} />
+										)}
+										{isWineBeerSpiritsTitle(headline) && (
+											<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
+										)}
+										<span className="text-[10px] text-black leading-none truncate">
+											{isWineBeerSpiritsTitle(headline)
+												? getWineBeerSpiritsLabel(headline)
+												: headline}
+										</span>
+									</div>
+								) : (
+									<div className="w-full" />
+								)}
+							</div>
+							<div className="pl-3 pr-1 flex items-center h-[22px]">
+								<div className="text-[11px] text-black w-full truncate leading-tight">
+									{company}
+								</div>
+							</div>
+							<div className="pr-2 pl-1 flex items-center h-[22px]">
+								{city || stateAbbr ? (
+									<div className="flex items-center gap-1 w-full">
+										{stateAbbr && (
+											<span
+												className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+												style={{
+													backgroundColor:
+														stateBadgeColorMap[stateAbbr] || 'transparent',
+													borderColor: '#000000',
+												}}
+											>
+												{stateAbbr}
+											</span>
+										)}
+										{city && (
+											<span className="text-[10px] text-black leading-none truncate">
+												{city}
+											</span>
+										)}
+									</div>
+								) : (
+									<div className="w-full" />
+								)}
+							</div>
+						</>
+					) : (
+						<>
+							<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
+								<div className="font-bold text-[11px] w-full truncate leading-tight">
+									{company || '—'}
+								</div>
+							</div>
+							<div className="pr-2 pl-1 flex items-center h-[23px]">
+								{headline ? (
+									<div
+										className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+										style={{
+											backgroundColor: isRestaurantTitle(headline)
+												? '#C3FBD1'
+												: isCoffeeShopTitle(headline)
+													? '#D6F1BD'
+													: isMusicVenueTitle(headline)
+														? '#B7E5FF'
+														: isMusicFestivalTitle(headline)
+															? '#C1D6FF'
+															: isWeddingPlannerTitle(headline) ||
+																  isWeddingVenueTitle(headline)
+																? '#FFF8DC'
+																: isWineBeerSpiritsTitle(headline)
+																	? '#BFC4FF'
+																	: '#E8EFFF',
+										}}
+									>
+										<span className="text-[10px] text-black leading-none truncate">
+											{isWineBeerSpiritsTitle(headline)
+												? getWineBeerSpiritsLabel(headline)
+												: headline}
+										</span>
+									</div>
+								) : (
+									<div className="w-full" />
+								)}
+							</div>
+							<div className="pr-2 pl-1 flex items-center h-[22px]">
+								{city || stateAbbr ? (
+									<div className="flex items-center gap-1 w-full">
+										{stateAbbr && (
+											<span
+												className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+												style={{
+													backgroundColor:
+														stateBadgeColorMap[stateAbbr] || 'transparent',
+													borderColor: '#000000',
+												}}
+											>
+												{stateAbbr}
+											</span>
+										)}
+										{city && (
+											<span className="text-[10px] text-black leading-none truncate">
+												{city}
+											</span>
+										)}
+									</div>
+								) : (
+									<div className="w-full" />
+								)}
+							</div>
+						</>
+					)}
+				</div>
+			);
+		},
+		[
+			overviewRightRailHoveredContactId,
+			overviewRightRailSelectedIdSet,
+			setOverviewRightRailHoveredContactId,
+			setOverviewRightRailSelectedContacts,
+		]
+	);
 	const [overviewContactsDockPos, setOverviewContactsDockPos] = useState<{
 		leftPx: number;
 		topPx: number;
@@ -767,7 +1132,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			);
 			ro?.disconnect();
 		};
-	}, [getEffectiveCampaignZoom, shouldShowOverviewRightRail]);
+	}, [
+		getEffectiveCampaignZoom,
+		shouldShowOverviewRightRail,
+		OVERVIEW_RIGHT_RAIL_WIDTH_PX,
+		OVERVIEW_RIGHT_RAIL_GAP_FROM_RIGHT_WALL_PX,
+	]);
 	useLayoutEffect(() => {
 		if (typeof window === 'undefined') return;
 		if (!shouldDockOverviewContacts) {
@@ -4263,41 +4633,353 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										top: overviewRightRailPos ? `${overviewRightRailPos.topPx}px` : '72px',
 										width: `${OVERVIEW_RIGHT_RAIL_WIDTH_PX}px`,
 										zIndex: 130,
-										gap: '16px',
+										gap: shouldShowOverviewRightRailSearchPanel ? '0px' : '16px',
 									}}
 								>
-									{/* Mini Campaigns table */}
-									<div
-										style={{
-											display: 'flex',
-											width: '371px',
-											height: '135px',
-											justifyContent: 'center',
-											alignItems: 'center',
-											position: 'relative',
-										}}
-									>
-										<div aria-hidden style={{ pointerEvents: 'none' }}>
-											<CampaignsTableMini currentCampaignId={campaign?.id} />
-										</div>
-										{/* Block clicks for now (read-only), but still eat events so the map doesn't grab them. */}
-										<div className="absolute inset-0" style={{ cursor: 'default' }} />
-									</div>
+									{shouldShowOverviewRightRailSearchPanel ? (
+										<div
+											className="flex flex-col gap-[9px] pointer-events-auto"
+											style={{
+												width: '433px',
+												height: 800,
+												maxHeight: 'calc(100dvh - 72px - env(safe-area-inset-bottom, 0px) - 20px)',
+												overflow: 'hidden',
+												transform: 'scale(0.95)',
+												transformOrigin: 'top right',
+											}}
+										>
+											{/* Selection sub-panel — appears once at least one contact is selected. */}
+											{overviewRightRailSelectedContacts.length > 0 && (
+												<div
+													className="flex flex-col flex-shrink-0"
+													style={{
+														maxHeight: '342px',
+														backgroundColor: 'rgba(175, 214, 239, 0.8)',
+														border: '3px solid #143883',
+														borderRadius: '8px',
+														overflow: 'hidden',
+													}}
+												>
+													<div className="w-full h-[49px] flex-shrink-0 flex items-center justify-center px-4 relative">
+														<span className="absolute left-[10px] top-1/2 -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
+															Selection
+														</span>
+														<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
+															{overviewRightRailSelectedContacts.length}/
+															{overviewRightRailFilteredContacts.length} selected
+														</span>
+														<button
+															type="button"
+															onClick={() => {
+																setOverviewRightRailSelectedContacts((prev) => {
+																	if (
+																		prev.length === overviewRightRailFilteredContacts.length &&
+																		overviewRightRailFilteredContacts.every((c) =>
+																			prev.includes(c.id)
+																		)
+																	) {
+																		return [];
+																	}
+																	return overviewRightRailFilteredContacts.map((c) => c.id);
+																});
+															}}
+															className="font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 translate-y-[4px] hover:underline"
+														>
+															{overviewRightRailSelectedContacts.length ===
+																overviewRightRailFilteredContacts.length &&
+																overviewRightRailFilteredContacts.length > 0
+																? 'Deselect All'
+																: 'Select all'}
+														</button>
+													</div>
+													<CustomScrollbar
+														className="flex-1 min-h-0"
+														contentClassName="p-[6px] pb-[14px] space-y-[7px]"
+														thumbWidth={2}
+														thumbColor="#000000"
+														trackColor="transparent"
+														offsetRight={-6}
+														disableOverflowClass
+													>
+														<div className="space-y-[7px]">
+															{overviewRightRailSelectedContactsFull.map(
+																renderOverviewRightRailDesktopRow
+															)}
+														</div>
+													</CustomScrollbar>
+												</div>
+											)}
 
-									{/* Mini Strategy box */}
-									<div
-										style={{
-											width: '369px',
-											height: '486px',
-											position: 'relative',
-											overflow: 'hidden',
-										}}
-									>
-										<div aria-hidden style={{ pointerEvents: 'none' }}>
-											<CampaignOverviewStrategyBox />
+											{/* Search Results sub-panel — always present; flexes to fill remaining height. */}
+											<div
+												className="flex flex-col flex-1 min-h-0"
+												style={{
+													backgroundColor: 'rgba(99, 155, 244, 0.5)',
+													borderRadius: '8px',
+													overflow: 'hidden',
+												}}
+											>
+												<div
+													className="w-full h-[50px] flex-shrink-0 flex items-center justify-center px-4 relative"
+													style={{
+														backgroundColor: '#CBF0FF',
+														border: '2px solid #000',
+														borderRadius: '8px 8px 0 0',
+													}}
+											>
+												<span className="absolute left-[13px] top-[2px] font-inter text-[15px] font-semibold leading-[20px] text-center text-black">
+													Search Results
+												</span>
+												<div
+													className="absolute left-[14px] right-[10px] bottom-[7px] flex items-center gap-[12px] overflow-hidden"
+													style={{
+														maskImage:
+															'linear-gradient(to right, black 0, black calc(100% - 40px), transparent 100%)',
+														WebkitMaskImage:
+															'linear-gradient(to right, black 0, black calc(100% - 40px), transparent 100%)',
+													}}
+												>
+													{[
+														{
+															key: 'restaurants',
+															pillColor: '#C3FBD1',
+															label: 'Restaurants',
+															Icon: RestaurantsIcon,
+															iconSize: 11,
+														},
+														{
+															key: 'coffee-shops',
+															pillColor: '#D6F1BD',
+															label: 'Coffee',
+															Icon: CoffeeShopsIcon,
+															iconSize: 6,
+														},
+														{
+															key: 'music-venues',
+															pillColor: '#B7E5FF',
+															label: 'Music Venues',
+															Icon: MusicVenuesIcon,
+															iconSize: 11,
+														},
+														{
+															key: 'festivals',
+															pillColor: '#C1D6FF',
+															label: 'Festivals',
+															Icon: FestivalsIcon,
+															iconSize: 11,
+														},
+														{
+															key: 'wedding-planners',
+															pillColor: '#FFF8DC',
+															label: 'Weddings',
+															Icon: WeddingPlannersIcon,
+															iconSize: 11,
+														},
+														{
+															key: 'wine-beer-spirits',
+															pillColor: '#BFC4FF',
+															label: 'Wineries',
+															Icon: WineBeerSpiritsIcon,
+															iconSize: 11,
+														},
+														{
+															key: 'radio-stations',
+															pillColor: '#C5F0CC',
+															label: 'Radio',
+															Icon: RadioStationsIcon,
+															iconSize: 11,
+														},
+													]
+															.filter(({ key }) => overviewRightRailVisibleCategoryKeys.has(key))
+															.map(({ key, pillColor, label, Icon, iconSize }) => (
+																<div
+																	key={key}
+																	className="h-[15px] rounded-[7px] px-2 flex items-center gap-1 border border-black flex-shrink-0 cursor-pointer"
+																	style={{ backgroundColor: pillColor }}
+																	onClick={() => {
+																		setOverviewRightRailSelectedCategoryChips((prev) => {
+																			const next = new Set(prev);
+																			if (next.has(key)) next.delete(key);
+																			else next.add(key);
+																			return next;
+																		});
+																	}}
+																>
+																	<Icon size={iconSize} className="flex-shrink-0" />
+																	<span className="text-[10px] text-black leading-none whitespace-nowrap">
+																		{label}
+																	</span>
+																</div>
+															))}
+												</div>
+											</div>
+											<div
+												className="flex flex-col flex-1 min-h-0 relative"
+												style={{
+													borderLeft: '3px solid #5B7469',
+													borderRight: '3px solid #5B7469',
+													borderBottom: '3px solid #5B7469',
+													borderRadius: '0 0 8px 8px',
+												}}
+											>
+												<CustomScrollbar
+													className="flex-1 min-h-0"
+													contentClassName="p-[6px] pb-[78px] space-y-[7px]"
+													thumbWidth={2}
+													thumbColor="#000000"
+													trackColor="transparent"
+													offsetRight={-6}
+													disableOverflowClass
+												>
+													{overviewRightRailSearchContactsLoading ? (
+														<MapResultsPanelSkeleton
+															variant="desktop"
+															rows={Math.max(
+																overviewRightRailUnselectedContactsFiltered.length,
+																14
+															)}
+														/>
+													) : overviewRightRailUnselectedContactsFiltered.length === 0 ? (
+														<div className="w-full h-full flex items-center justify-center p-6">
+															<span className="font-secondary font-bold text-[16px] leading-tight text-black text-center">
+																No results in this campaign.
+															</span>
+														</div>
+													) : (
+														<div className="space-y-[7px]">
+															{overviewRightRailUnselectedContactsFiltered.map(
+																renderOverviewRightRailDesktopRow
+															)}
+														</div>
+													)}
+												</CustomScrollbar>
+												<div
+													className="absolute left-1/2 -translate-x-1/2 bottom-[9px] flex items-center gap-[2px] pl-[4px]"
+													style={{
+														width: '420px',
+														height: '55px',
+														borderRadius: '9.86px',
+														border: '1.446px solid #000',
+														backgroundColor: '#65A1B9',
+													}}
+												>
+													{[
+														{
+															key: 'music-venues',
+															color: '#71C9FD',
+															Icon: MusicVenuesIcon,
+															size: 32,
+														},
+														{
+															key: 'wine-beer-spirits',
+															color: '#80AAFF',
+															Icon: WineBeerSpiritsIcon,
+															size: 25,
+														},
+														{
+															key: 'restaurants',
+															color: '#77DD91',
+															Icon: RestaurantsIcon,
+															size: 32,
+														},
+														{
+															key: 'coffee-shops',
+															color: '#A9DE78',
+															Icon: CoffeeShopsIcon,
+															size: 18,
+														},
+														{
+															key: 'wedding-planners',
+															color: '#EED56E',
+															Icon: WeddingPlannersIcon,
+															size: 30,
+														},
+														{
+															key: 'festivals',
+															color: '#80AAFF',
+															Icon: FestivalsIcon,
+															size: 32,
+														},
+														{
+															key: 'radio-stations',
+															color: '#56DA73',
+															Icon: RadioStationsIcon,
+															size: 32,
+														},
+													]
+															.filter(({ key }) => overviewRightRailCategoryKeys.has(key))
+															.map(({ key, color, Icon, size }) => {
+																const isSelected =
+																	overviewRightRailSelectedCategoryChips.has(key);
+																return (
+																	<div
+																		key={key}
+																		className="flex items-center justify-center flex-shrink-0 cursor-pointer"
+																		style={{
+																			width: 45,
+																			height: 45,
+																			backgroundColor: isSelected ? 'transparent' : color,
+																			borderRadius: 6,
+																			border: isSelected
+																				? `2px solid ${color}`
+																				: '1px solid #000',
+																		}}
+																		onClick={() => {
+																			setOverviewRightRailSelectedCategoryChips((prev) => {
+																				const next = new Set(prev);
+																				if (next.has(key)) next.delete(key);
+																				else next.add(key);
+																				return next;
+																			});
+																		}}
+																	>
+																		<Icon
+																			size={size}
+																			innerFill={isSelected ? color : 'white'}
+																		/>
+																	</div>
+																);
+															})}
+													</div>
+											</div>
 										</div>
-										<div className="absolute inset-0" style={{ cursor: 'default' }} />
 									</div>
+									) : (
+											<>
+												{/* Mini Campaigns table */}
+												<div
+													style={{
+														display: 'flex',
+														width: '371px',
+														height: '135px',
+														justifyContent: 'center',
+														alignItems: 'center',
+														position: 'relative',
+													}}
+												>
+													<div aria-hidden style={{ pointerEvents: 'none' }}>
+														<CampaignsTableMini currentCampaignId={campaign?.id} />
+													</div>
+													{/* Block clicks for now (read-only), but still eat events so the map doesn't grab them. */}
+													<div className="absolute inset-0" style={{ cursor: 'default' }} />
+												</div>
+
+												{/* Mini Strategy box */}
+												<div
+													style={{
+														width: '369px',
+														height: '486px',
+														position: 'relative',
+														overflow: 'hidden',
+													}}
+												>
+													<div aria-hidden style={{ pointerEvents: 'none' }}>
+														<CampaignOverviewStrategyBox />
+													</div>
+													<div className="absolute inset-0" style={{ cursor: 'default' }} />
+												</div>
+											</>
+									)}
 								</div>
 							)}
 							<div

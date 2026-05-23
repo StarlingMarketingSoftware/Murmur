@@ -516,6 +516,8 @@ export type CampaignContactMapStatus = 'contacts' | 'drafts' | 'new-message' | '
 
 type CampaignStatusMarkerStyle = {
 	fillColor: string;
+	/** Multiplies the dot fill opacity; 0 renders a hollow ring (e.g. "sent"). */
+	fillOpacity: number;
 	strokeColor: string;
 	strokeWidth: number;
 	strokeOpacity: number;
@@ -527,38 +529,81 @@ const CAMPAIGN_STATUS_MARKER_STYLES: Record<
 	CampaignContactMapStatus,
 	CampaignStatusMarkerStyle
 > = {
+	// Solid white disc (white fill + white stroke) — matches StatusContactsIcon.
 	contacts: {
 		fillColor: '#FFFFFF',
+		fillOpacity: 1,
 		strokeColor: '#FFFFFF',
 		strokeWidth: 2,
 		strokeOpacity: 1,
 		radiusScale: SELECTED_MARKER_SCALE_MULTIPLIER,
 		lineColor: '#FFFFFF',
 	},
+	// Light-blue fill, white ring — matches StatusDraftsIcon.
 	drafts: {
-		fillColor: '#9ED8F4',
+		fillColor: '#B7E5FF',
+		fillOpacity: 1,
 		strokeColor: '#FFFFFF',
 		strokeWidth: 4,
 		strokeOpacity: 1,
 		radiusScale: SELECTED_MARKER_SCALE_MULTIPLIER,
 		lineColor: '#B6B6B6',
 	},
+	// Deep-blue fill, white ring — matches StatusNewMessageIcon.
 	'new-message': {
-		fillColor: '#2B8BB8',
+		fillColor: '#277CAE',
+		fillOpacity: 1,
 		strokeColor: '#FFFFFF',
 		strokeWidth: 4,
 		strokeOpacity: 1,
 		radiusScale: SELECTED_MARKER_SCALE_MULTIPLIER,
 		lineColor: '#000000',
 	},
+	// Hollow deep-blue ring at 30% opacity (no fill) — matches StatusSentIcon.
+	// fillColor stays a real hex so hover/washout helpers keep working; fillOpacity 0 hides it.
 	sent: {
-		fillColor: '#FFFFFF',
-		strokeColor: '#91C9CF',
+		fillColor: '#277CAE',
+		fillOpacity: 0,
+		strokeColor: '#277CAE',
 		strokeWidth: 4,
-		strokeOpacity: 1,
+		strokeOpacity: 0.3,
 		radiusScale: SELECTED_MARKER_SCALE_MULTIPLIER,
 		lineColor: '#91C9CF',
 	},
+};
+
+// Multiplies a circle layer's fill-opacity expression by the per-feature
+// `fillOpacity` (default 1). Lets a status marker render as a hollow ring
+// (e.g. "sent") without touching non-status dots, which carry no fillOpacity.
+//
+// A "zoom" expression must be the input of the OUTERMOST "step"/"interpolate"
+// (mapbox-gl v3). When `opacityExpr` is itself a top-level zoom curve, wrapping
+// it in ["*", ...] nests the zoom curve and fails style validation with
+// '"zoom" expression may only be used as input to a top-level "step" or
+// "interpolate" expression'. So in that case we distribute the factor into each
+// output stop — exactly equivalent for a per-feature constant — which leaves the
+// zoom curve outermost. Plain (non-zoom) expressions are multiplied directly.
+const FEATURE_FILL_OPACITY_FACTOR: any = ['coalesce', ['get', 'fillOpacity'], 1];
+
+const withFeatureFillOpacity = (opacityExpr: any): any => {
+	if (Array.isArray(opacityExpr)) {
+		const op = opacityExpr[0];
+		const isInterpolate =
+			op === 'interpolate' || op === 'interpolate-hcl' || op === 'interpolate-lab';
+		const isStep = op === 'step';
+		if (isInterpolate || isStep) {
+			// Output values are the second item of each (stop, output) pair:
+			// interpolate -> indices 4, 6, 8, … ; step -> 2, 4, 6, … . The zoom
+			// input (interpolate[2] / step[1]) and the stop inputs stay untouched.
+			const firstOutputIndex = isInterpolate ? 4 : 2;
+			return opacityExpr.map((part: any, i: number) =>
+				i >= firstOutputIndex && i % 2 === 0
+					? ['*', part, FEATURE_FILL_OPACITY_FACTOR]
+					: part
+			);
+		}
+	}
+	return ['*', opacityExpr, FEATURE_FILL_OPACITY_FACTOR];
 };
 
 type AllContactsOverlayFetchMode = 'all' | 'ambient';
@@ -6106,8 +6151,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			paint: {
 				'circle-radius': constellationNodeRadiusExpr,
 				'circle-color': ['get', 'fillColor'],
-				'circle-opacity': getMarkerConstellationNodeZoomFadedOpacity(
-					MARKER_CONSTELLATION_NODE_OPACITY
+				'circle-opacity': withFeatureFillOpacity(
+					getMarkerConstellationNodeZoomFadedOpacity(MARKER_CONSTELLATION_NODE_OPACITY)
 				),
 				'circle-stroke-color': [
 					'coalesce',
@@ -6405,8 +6450,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			paint: {
 				'circle-radius': resultDotRadiusExpr,
 				'circle-color': getMarkerHoverFillColorExpr(),
-				'circle-opacity': getCategorizedDotZoomFadedOpacity(
-					getNormalMarkerFadeOpacityExpr()
+				'circle-opacity': withFeatureFillOpacity(
+					getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
 				),
 				'circle-stroke-color': [
 					'coalesce',
@@ -11736,7 +11781,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				(map as any).setPaintProperty(
 					MAPBOX_LAYER_IDS.baseDots,
 					'circle-opacity',
-					getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
+					withFeatureFillOpacity(
+						getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
+					)
 				);
 				(map as any).setPaintProperty(
 					MAPBOX_LAYER_IDS.baseDots,
@@ -11778,6 +11825,30 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Ignore style timing races.
 		}
 	}, [map, isMapLoaded]);
+
+	// Status mode renders every contact as a campaign-status dot, so the soft glow
+	// halos beneath them read as fuzzy "residue" around the crisp status circles.
+	// Hide those glow layers while in status mode; restore them for category mode.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const hideStatusGlow = campaignMarkerMode === 'status';
+		const glowLayerIds = [
+			MAPBOX_LAYER_IDS.baseGlow,
+			MAPBOX_LAYER_IDS.markerConstellationNodeGlow,
+		];
+		for (const layerId of glowLayerIds) {
+			if (!map.getLayer(layerId)) continue;
+			try {
+				map.setLayoutProperty(
+					layerId,
+					'visibility',
+					hideStatusGlow ? 'none' : 'visible'
+				);
+			} catch {
+				// Ignore style timing races.
+			}
+		}
+	}, [map, isMapLoaded, campaignMarkerMode]);
 
 	// If the user starts panning/zooming while the post-search reveal wave is running,
 	// switch back to steady rendering so newly sampled viewport dots don't appear to vanish.
@@ -11993,6 +12064,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const strokeWidth = statusMarkerStyle?.strokeWidth;
 				const strokeOpacity = statusMarkerStyle?.strokeOpacity;
 				const radiusScale = statusMarkerStyle?.radiusScale;
+				const fillOpacity = statusMarkerStyle?.fillOpacity;
 				const featureId = `${node.level}:${node.id}`;
 				dataKeyParts.push(
 					`n:${featureId}:${fillColor}:${strokeColor}:${strokeWidth ?? ''}:${
@@ -12008,6 +12080,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						...(strokeWidth != null ? { strokeWidth } : {}),
 						...(strokeOpacity != null ? { strokeOpacity } : {}),
 						...(radiusScale != null ? { radiusScale } : {}),
+						...(fillOpacity != null ? { fillOpacity } : {}),
 						level: node.level,
 						rank: node.rank,
 						opacityScale: node.opacityScale,
@@ -12321,6 +12394,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lat: number;
 			fillColor: string;
 			hoverFillColor: string;
+			fillOpacity: number;
 			strokeColor: string;
 			strokeWidth: number;
 			strokeOpacity: number;
@@ -12367,6 +12441,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				strokeColor: statusMarkerStyle?.strokeColor ?? RESULT_DOT_TRANSPARENT_STROKE_COLOR,
 				strokeWidth: statusMarkerStyle?.strokeWidth ?? 0,
 				strokeOpacity: statusMarkerStyle?.strokeOpacity ?? 0,
+				fillOpacity: statusMarkerStyle?.fillOpacity ?? 1,
 				radiusScale: statusMarkerStyle?.radiusScale ?? 1,
 				isCurated: statusMarkerStyle ? false : Boolean(contact.curatedCategory),
 				isUncategorized,
@@ -12456,6 +12531,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				properties: {
 					fillColor: dot.fillColor,
 					hoverFillColor: dot.hoverFillColor,
+					fillOpacity: dot.fillOpacity,
 					strokeColor: dot.strokeColor,
 					strokeWidth: dot.strokeWidth,
 					strokeOpacity: dot.strokeOpacity,
