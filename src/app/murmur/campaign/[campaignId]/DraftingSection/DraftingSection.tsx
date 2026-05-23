@@ -815,6 +815,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			const city = contact.city || '';
 
 			return (
+				<div
 					key={contact.id}
 					data-contact-id={contact.id}
 					className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-[3px] border-[#ABABAB] select-none relative"
