@@ -511,6 +511,8 @@ const EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_BOTTOM_PX = 24;
 const GENERAL_CONTACT_CONSTELLATION_LINE_COLOR = '#1F2429';
 const CAMPAIGN_STATUS_CONSTELLATION_CORE_OPACITY = 1;
 const CAMPAIGN_STATUS_CONSTELLATION_GLOW_OPACITY = 0.18;
+const CAMPAIGN_STATUS_MARKER_RADIUS_SCALE = 1;
+const CAMPAIGN_STATUS_MARKER_STROKE_WIDTH = 2.32338;
 
 export type CampaignContactMapStatus = 'contacts' | 'drafts' | 'new-message' | 'sent';
 
@@ -534,9 +536,9 @@ const CAMPAIGN_STATUS_MARKER_STYLES: Record<
 		fillColor: '#FFFFFF',
 		fillOpacity: 1,
 		strokeColor: '#FFFFFF',
-		strokeWidth: 2,
+		strokeWidth: CAMPAIGN_STATUS_MARKER_STROKE_WIDTH,
 		strokeOpacity: 1,
-		radiusScale: SELECTED_MARKER_SCALE_MULTIPLIER,
+		radiusScale: CAMPAIGN_STATUS_MARKER_RADIUS_SCALE,
 		lineColor: '#FFFFFF',
 	},
 	// Light-blue fill, white ring — matches StatusDraftsIcon.
@@ -544,9 +546,9 @@ const CAMPAIGN_STATUS_MARKER_STYLES: Record<
 		fillColor: '#B7E5FF',
 		fillOpacity: 1,
 		strokeColor: '#FFFFFF',
-		strokeWidth: 4,
+		strokeWidth: CAMPAIGN_STATUS_MARKER_STROKE_WIDTH,
 		strokeOpacity: 1,
-		radiusScale: SELECTED_MARKER_SCALE_MULTIPLIER,
+		radiusScale: CAMPAIGN_STATUS_MARKER_RADIUS_SCALE,
 		lineColor: '#B6B6B6',
 	},
 	// Deep-blue fill, white ring — matches StatusNewMessageIcon.
@@ -554,9 +556,9 @@ const CAMPAIGN_STATUS_MARKER_STYLES: Record<
 		fillColor: '#277CAE',
 		fillOpacity: 1,
 		strokeColor: '#FFFFFF',
-		strokeWidth: 4,
+		strokeWidth: CAMPAIGN_STATUS_MARKER_STROKE_WIDTH,
 		strokeOpacity: 1,
-		radiusScale: SELECTED_MARKER_SCALE_MULTIPLIER,
+		radiusScale: CAMPAIGN_STATUS_MARKER_RADIUS_SCALE,
 		lineColor: '#000000',
 	},
 	// Hollow deep-blue ring at 30% opacity (no fill) — matches StatusSentIcon.
@@ -565,9 +567,9 @@ const CAMPAIGN_STATUS_MARKER_STYLES: Record<
 		fillColor: '#277CAE',
 		fillOpacity: 0,
 		strokeColor: '#277CAE',
-		strokeWidth: 4,
+		strokeWidth: CAMPAIGN_STATUS_MARKER_STROKE_WIDTH,
 		strokeOpacity: 0.3,
-		radiusScale: SELECTED_MARKER_SCALE_MULTIPLIER,
+		radiusScale: CAMPAIGN_STATUS_MARKER_RADIUS_SCALE,
 		lineColor: '#91C9CF',
 	},
 };
@@ -584,8 +586,9 @@ const CAMPAIGN_STATUS_MARKER_STYLES: Record<
 // output stop — exactly equivalent for a per-feature constant — which leaves the
 // zoom curve outermost. Plain (non-zoom) expressions are multiplied directly.
 const FEATURE_FILL_OPACITY_FACTOR: any = ['coalesce', ['get', 'fillOpacity'], 1];
+const FEATURE_STROKE_OPACITY_FACTOR = ['coalesce', ['get', 'strokeOpacity'], 0] as const;
 
-const withFeatureFillOpacity = (opacityExpr: any): any => {
+const withFeatureOpacityFactor = (opacityExpr: any, factorExpr: any): any => {
 	if (Array.isArray(opacityExpr)) {
 		const op = opacityExpr[0];
 		const isInterpolate =
@@ -597,14 +600,18 @@ const withFeatureFillOpacity = (opacityExpr: any): any => {
 			// input (interpolate[2] / step[1]) and the stop inputs stay untouched.
 			const firstOutputIndex = isInterpolate ? 4 : 2;
 			return opacityExpr.map((part: any, i: number) =>
-				i >= firstOutputIndex && i % 2 === 0
-					? ['*', part, FEATURE_FILL_OPACITY_FACTOR]
-					: part
+				i >= firstOutputIndex && i % 2 === 0 ? ['*', part, factorExpr] : part
 			);
 		}
 	}
-	return ['*', opacityExpr, FEATURE_FILL_OPACITY_FACTOR];
+	return ['*', opacityExpr, factorExpr];
 };
+
+const withFeatureFillOpacity = (opacityExpr: any): any =>
+	withFeatureOpacityFactor(opacityExpr, FEATURE_FILL_OPACITY_FACTOR);
+
+const withFeatureStrokeOpacity = (opacityExpr: any): any =>
+	withFeatureOpacityFactor(opacityExpr, FEATURE_STROKE_OPACITY_FACTOR);
 
 type AllContactsOverlayFetchMode = 'all' | 'ambient';
 type AllContactsOverlayFetchPhase = 'visible' | 'buffer';
@@ -5813,17 +5820,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			13,
 			['coalesce', ['get', 'strokeWidth'], 0.9],
 		];
-		const constellationNodeStrokeOpacityExpr = [
-			'interpolate',
-			['linear'],
-			['zoom'],
-			3.6,
-			0,
-			4.2,
-			['coalesce', ['get', 'strokeOpacity'], 0.74],
-			13,
-			['coalesce', ['get', 'strokeOpacity'], 0.74],
-		];
+		const constellationNodeOpacityExpr = getMarkerConstellationNodeZoomFadedOpacity(
+			MARKER_CONSTELLATION_NODE_OPACITY
+		);
 
 		const pinRadiusLow =
 			Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MIN) / 2;
@@ -6151,15 +6150,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			paint: {
 				'circle-radius': constellationNodeRadiusExpr,
 				'circle-color': ['get', 'fillColor'],
-				'circle-opacity': withFeatureFillOpacity(
-					getMarkerConstellationNodeZoomFadedOpacity(MARKER_CONSTELLATION_NODE_OPACITY)
-				),
+				'circle-opacity': withFeatureFillOpacity(constellationNodeOpacityExpr),
 				'circle-stroke-color': [
 					'coalesce',
 					['get', 'strokeColor'],
 					MARKER_CONSTELLATION_HALO_COLOR,
 				],
-				'circle-stroke-opacity': constellationNodeStrokeOpacityExpr,
+				'circle-stroke-opacity': withFeatureStrokeOpacity(
+					constellationNodeOpacityExpr
+				),
 				'circle-stroke-width': constellationNodeStrokeWidthExpr,
 			},
 		});
@@ -6459,7 +6458,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					RESULT_DOT_TRANSPARENT_STROKE_COLOR,
 				],
 				'circle-stroke-width': ['coalesce', ['get', 'strokeWidth'], 0],
-				'circle-stroke-opacity': ['coalesce', ['get', 'strokeOpacity'], 0],
+				'circle-stroke-opacity': withFeatureStrokeOpacity(
+					getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
+				),
 			},
 		});
 		ensureLayer({
@@ -11788,7 +11789,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				(map as any).setPaintProperty(
 					MAPBOX_LAYER_IDS.baseDots,
 					'circle-stroke-opacity',
-					['coalesce', ['get', 'strokeOpacity'], 0]
+					withFeatureStrokeOpacity(
+						getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
+					)
 				);
 			}
 			if (map.getLayer(MAPBOX_LAYER_IDS.baseFallbackIcons)) {
@@ -12604,12 +12607,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					(map as any).setPaintProperty(
 						MAPBOX_LAYER_IDS.baseDots,
 						'circle-opacity',
-						withCategorizedDotOpacity(expr0)
+						withFeatureFillOpacity(withCategorizedDotOpacity(expr0))
 					);
 					(map as any).setPaintProperty(
 						MAPBOX_LAYER_IDS.baseDots,
 						'circle-stroke-opacity',
-						expr0
+						withFeatureStrokeOpacity(expr0)
 					);
 				}
 				if (map.getLayer(MAPBOX_LAYER_IDS.baseFallbackIcons)) {
@@ -13070,9 +13073,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			safeSetPaint(
 				MAPBOX_LAYER_IDS.baseDots,
 				'circle-opacity',
-				getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
+				withFeatureFillOpacity(
+					getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
+				)
 			);
-			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity', 0);
+			safeSetPaint(
+				MAPBOX_LAYER_IDS.baseDots,
+				'circle-stroke-opacity',
+				withFeatureStrokeOpacity(
+					getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
+				)
+			);
 			safeSetPaint(
 				MAPBOX_LAYER_IDS.baseFallbackIcons,
 				'icon-opacity-transition',
@@ -13243,9 +13254,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				safeSetPaint(
 					MAPBOX_LAYER_IDS.baseDots,
 					'circle-opacity',
-					withCategorizedDotOpacity(expr)
+					withFeatureFillOpacity(withCategorizedDotOpacity(expr))
 				);
-				safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity', expr);
+				safeSetPaint(
+					MAPBOX_LAYER_IDS.baseDots,
+					'circle-stroke-opacity',
+					withFeatureStrokeOpacity(expr)
+				);
 				safeSetPaint(MAPBOX_LAYER_IDS.baseFallbackIcons, 'icon-opacity', expr);
 				lastPaintUpdateAt = t;
 			}
@@ -13282,9 +13297,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		safeSetPaint(
 			MAPBOX_LAYER_IDS.baseDots,
 			'circle-opacity',
-			withCategorizedDotOpacity(expr0)
+			withFeatureFillOpacity(withCategorizedDotOpacity(expr0))
 		);
-		safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity', expr0);
+		safeSetPaint(
+			MAPBOX_LAYER_IDS.baseDots,
+			'circle-stroke-opacity',
+			withFeatureStrokeOpacity(expr0)
+		);
 		safeSetPaint(MAPBOX_LAYER_IDS.baseFallbackIcons, 'icon-opacity', expr0);
 
 		rafId = requestAnimationFrame(tick);
