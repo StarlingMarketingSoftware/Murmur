@@ -17,6 +17,7 @@ import { cn } from '@/utils';
 import {
 	DEFAULT_MANUAL_EDITOR_FONT_SIZE,
 	MANUAL_TOOLBAR_BASE_WIDTH,
+	MANUAL_TOOLBAR_COMPACT_WIDTH,
 	ManualTextEditorColorCommand,
 	ManualTextEditorCommand,
 	ManualTextEditorFillIn,
@@ -62,7 +63,7 @@ type InboxRichReplyEditorProps = {
 	onSend: (html: string) => void;
 	isSending: boolean;
 	isMobile?: boolean;
-	variant: 'floating' | 'stacked';
+	variant: 'floating' | 'stacked' | 'pill';
 	containerStyle?: CSSProperties;
 	containerClassName?: string;
 };
@@ -139,6 +140,12 @@ export const InboxRichReplyEditor: FC<InboxRichReplyEditorProps> = ({
 		if (!el) return;
 
 		const update = () => {
+			// The floating composer reserves a fixed-width slot for the compact
+			// (no fill-ins) toolbar, so it always renders at full size and stays
+			// the same height as the Reply button. Don't measure here: the campaign
+			// map view scales its UI with `transform: scale(...)`, and
+			// getBoundingClientRect reports post-transform pixels — measuring would
+			// shrink the toolbar relative to the (logically sized) Reply button.
 			if (variant === 'floating') {
 				setToolbarScale(1);
 				return;
@@ -503,6 +510,7 @@ export const InboxRichReplyEditor: FC<InboxRichReplyEditorProps> = ({
 			selectedTextColor={selectedTextColor}
 			selectedBgColor={selectedBgColor}
 			isLinkActive={isLinkPopoverOpen}
+			hideFillIns={variant === 'floating'}
 			scale={toolbarScale}
 			onFontChange={(nextFont) => {
 				setFont(nextFont);
@@ -525,6 +533,109 @@ export const InboxRichReplyEditor: FC<InboxRichReplyEditorProps> = ({
 
 	const isSendDisabled = isSending || isRichTextMessageEmpty(value);
 
+	// Compact "text message" composer used in the messenger (3+ message) thread view:
+	// a single-line white pill with a small solid-blue Reply button.
+	const pillReplyButtonStyle: CSSProperties = {
+		display: 'flex',
+		height: '31.13px',
+		padding: '0 15.364px',
+		justifyContent: 'center',
+		alignItems: 'center',
+		borderRadius: '20.429px',
+		border: '1.466px solid #000',
+		background: '#A0C6FF',
+		boxSizing: 'border-box',
+		boxShadow: '0 0.733px 1.466px 0 rgba(0, 0, 0, 0.05)',
+		fontFamily: 'Inter, sans-serif',
+		fontSize: '13px',
+		fontWeight: 700,
+		lineHeight: 1,
+	};
+	const pillEditorLineHeight = fontSize * 1.2;
+	const pillEditorVerticalPadding = Math.max(
+		0,
+		(36.967 - 1.672 * 2 - pillEditorLineHeight) / 2
+	);
+
+	if (variant === 'pill') {
+		return (
+			<div
+				className={containerClassName}
+				style={{ ...containerStyle, overflow: 'visible' }}
+			>
+				<div className="flex h-full w-full items-center">
+					<div
+						className="flex w-full items-center"
+						style={{
+							height: '36.967px',
+							borderRadius: '35.021px',
+							border: '1.672px solid #000',
+							background: '#FFF',
+							padding: '0 3.5px 0 18px',
+							boxSizing: 'border-box',
+							gap: '8px',
+							overflow: 'hidden',
+						}}
+					>
+						<div
+							ref={editorRef}
+							contentEditable={!isSending}
+							suppressContentEditableWarning
+							role="textbox"
+							aria-multiline="false"
+							aria-disabled={isSending}
+							data-inbox-rich-reply-editor
+							className={cn(
+								'min-w-0 flex-1 overflow-x-auto overflow-y-hidden whitespace-nowrap',
+								'font-inter text-black outline-none',
+								isSending && 'pointer-events-none opacity-70'
+							)}
+							style={{
+								height: '100%',
+								padding: `${pillEditorVerticalPadding}px 0`,
+								boxSizing: 'border-box',
+								fontFamily: font,
+								fontSize: `${fontSize}px`,
+								lineHeight: `${pillEditorLineHeight}px`,
+							}}
+							onInput={syncEditorToValue}
+							onBlur={syncEditorToValue}
+							onKeyDown={(e) => {
+								if (e.key === 'Enter' && !e.shiftKey) {
+									e.preventDefault();
+									handleSend();
+								}
+							}}
+						/>
+						<Button
+							onClick={handleSend}
+							disabled={isSendDisabled}
+							className="shrink-0 text-black disabled:cursor-not-allowed disabled:opacity-50"
+							style={pillReplyButtonStyle}
+						>
+							Reply
+						</Button>
+					</div>
+				</div>
+			</div>
+		);
+	}
+
+	const replyButtonStyle: CSSProperties = {
+		display: 'flex',
+		height: '32px',
+		padding: '9.013px 0 6.987px 0',
+		justifyContent: 'center',
+		alignItems: 'center',
+		borderRadius: '21px',
+		border: '1.507px solid #000',
+		background: 'linear-gradient(90deg, #A0C6FF 0%, #61A0FF 100%)',
+		boxShadow: '0 0.754px 1.507px 0 rgba(0, 0, 0, 0.05)',
+		fontFamily: 'Inter, sans-serif',
+		fontSize: '14px',
+		fontWeight: 700,
+	};
+
 	if (variant === 'floating') {
 		return (
 			<div
@@ -538,9 +649,10 @@ export const InboxRichReplyEditor: FC<InboxRichReplyEditorProps> = ({
 					ref={toolbarMeasureRef}
 					className="absolute overflow-visible"
 					style={{
-						left: '17px',
+						left: '8px',
 						bottom: '13px',
-						width: `${MANUAL_TOOLBAR_BASE_WIDTH}px`,
+						right: '144px',
+						maxWidth: `${MANUAL_TOOLBAR_COMPACT_WIDTH}px`,
 					}}
 				>
 					{toolbar}
@@ -548,15 +660,12 @@ export const InboxRichReplyEditor: FC<InboxRichReplyEditorProps> = ({
 				<Button
 					onClick={handleSend}
 					disabled={isSendDisabled}
-					className="absolute rounded-full border-2 border-black bg-[#9EC2F6] text-black disabled:cursor-not-allowed disabled:opacity-50"
+					className="absolute text-black disabled:cursor-not-allowed disabled:opacity-50"
 					style={{
-						right: '22px',
+						...replyButtonStyle,
+						right: '8px',
 						bottom: '12px',
-						width: '122px',
-						height: '32px',
-						fontSize: '14px',
-						fontWeight: 700,
-						boxShadow: 'none',
+						width: '123.63px',
 					}}
 				>
 					{isSending ? 'Sending...' : 'Reply'}
@@ -591,13 +700,12 @@ export const InboxRichReplyEditor: FC<InboxRichReplyEditorProps> = ({
 					onClick={handleSend}
 					disabled={isSendDisabled}
 					className={cn(
-						'rounded-full border-2 border-black bg-[#9EC2F6] text-black disabled:cursor-not-allowed disabled:opacity-50',
-						isMobile ? 'w-full text-sm' : 'shrink-0'
+						'text-black disabled:cursor-not-allowed disabled:opacity-50',
+						isMobile ? 'w-full' : 'shrink-0'
 					)}
 					style={{
-						height: isMobile ? '32px' : '32px',
-						width: isMobile ? undefined : '122px',
-						fontWeight: 700,
+						...replyButtonStyle,
+						width: isMobile ? undefined : '123.63px',
 					}}
 				>
 					{isSending ? 'Sending...' : 'Reply'}

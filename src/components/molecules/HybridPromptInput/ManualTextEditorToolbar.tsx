@@ -79,6 +79,7 @@ const MANUAL_EDITOR_COLOR_SWATCHES = [
 ] as const;
 
 export const MANUAL_TOOLBAR_BASE_WIDTH = 430;
+export const MANUAL_TOOLBAR_COMPACT_WIDTH = 323;
 export const MANUAL_TOOLBAR_BASE_HEIGHT = 32;
 export const MANUAL_EDITOR_FONT_SIZE_OPTIONS = [
 	8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 36,
@@ -110,6 +111,7 @@ type ManualTextEditorToolbarProps = {
 	selectedBgColor?: string | null;
 	isLinkActive?: boolean;
 	fillInOptions?: readonly ManualTextEditorFillIn[];
+	hideFillIns?: boolean;
 	scale?: number;
 	className?: string;
 	onFontChange: (font: Font) => void;
@@ -161,6 +163,7 @@ export const ManualTextEditorToolbar: FC<ManualTextEditorToolbarProps> = ({
 	selectedBgColor,
 	isLinkActive = false,
 	fillInOptions = DEFAULT_MANUAL_EDITOR_FILL_INS,
+	hideFillIns = false,
 	scale = 1,
 	className,
 	onFontChange,
@@ -221,25 +224,29 @@ export const ManualTextEditorToolbar: FC<ManualTextEditorToolbarProps> = ({
 		isFontSizeDropdownOpen,
 	]);
 
+	const pillWidth = hideFillIns
+		? MANUAL_TOOLBAR_COMPACT_WIDTH
+		: MANUAL_TOOLBAR_BASE_WIDTH;
+
 	return (
 		<div
 			className={className}
 			style={{
-				width: MANUAL_TOOLBAR_BASE_WIDTH * scale,
+				width: pillWidth * scale,
 				height: MANUAL_TOOLBAR_BASE_HEIGHT * scale,
 			}}
 		>
 			<div
 				style={{
-					width: MANUAL_TOOLBAR_BASE_WIDTH,
+					width: pillWidth,
 					height: MANUAL_TOOLBAR_BASE_HEIGHT,
 					transform: `scale(${scale})`,
 					transformOrigin: 'top left',
 				}}
 			>
 				<div
-					className="w-[430px] h-[32px] rounded-[16px] bg-[#DDE6F5] relative flex items-center overflow-visible"
-					style={{ backgroundColor: '#DDE6F5' }}
+					className="h-[32px] rounded-[16px] bg-[#DDE6F5] relative flex items-center overflow-visible"
+					style={{ backgroundColor: '#DDE6F5', width: `${pillWidth}px` }}
 				>
 					<div
 						ref={fontDropdownRef}
@@ -604,15 +611,18 @@ export const ManualTextEditorToolbar: FC<ManualTextEditorToolbarProps> = ({
 						<LinkIcon />
 					</button>
 
-					<div
-						aria-hidden="true"
-						className="absolute right-[102px] top-1/2 -translate-y-1/2 w-px h-[23px] bg-black"
-					/>
+					{!hideFillIns && (
+						<div
+							aria-hidden="true"
+							className="absolute right-[102px] top-1/2 -translate-y-1/2 w-px h-[23px] bg-black"
+						/>
+					)}
 
-					<div
-						ref={fillInsDropdownRef}
-						className="absolute right-[24px] top-0 h-full flex items-center"
-					>
+					{!hideFillIns && (
+						<div
+							ref={fillInsDropdownRef}
+							className="absolute right-[24px] top-0 h-full flex items-center"
+						>
 						<button
 							type="button"
 							onMouseDown={(e) => e.preventDefault()}
@@ -665,6 +675,7 @@ export const ManualTextEditorToolbar: FC<ManualTextEditorToolbarProps> = ({
 							</div>
 						)}
 					</div>
+					)}
 				</div>
 			</div>
 		</div>

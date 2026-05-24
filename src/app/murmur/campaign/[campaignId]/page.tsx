@@ -1467,8 +1467,18 @@ const Murmur = () => {
 
 		// Clamp zoom so the bottom panels remain fully visible (snug, no scroll).
 		try {
+			// IMPORTANT:
+			// Only measure bottom anchors from the *active* view layer.
+			// During tab switches we can temporarily render both the active and previous
+			// views (crossfade). If we query the whole document we may pick up the previous
+			// view's anchors, which can slightly change the snug-fit zoom and therefore the
+			// computed X-shift. That manifests as a one-time 1-5px horizontal nudge after
+			// leaving the Overview tab.
+			const anchorScope =
+				(document.querySelector('[data-campaign-view-layer="active"]') as HTMLElement | null) ??
+				document.body;
 			const anchors = Array.from(
-				document.querySelectorAll<HTMLElement>('[data-campaign-bottom-anchor]')
+				anchorScope.querySelectorAll<HTMLElement>('[data-campaign-bottom-anchor]')
 			);
 			if (anchors.length > 0) {
 				// Keep the campaign bottom panels' measured bottom exactly 22px above the viewport.

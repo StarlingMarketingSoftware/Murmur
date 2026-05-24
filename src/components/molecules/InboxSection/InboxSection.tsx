@@ -823,8 +823,6 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		? Math.max(0, boxWidth - 22)
 		: 842;
 	const campaignInboxDetailHeaderHeight = 46;
-	const campaignInboxDetailThreadHeight = 404;
-	const campaignInboxDetailComposerHeight = 157;
 	const campaignInboxDetailHeaderTop = 18;
 	const campaignInboxDetailThreadGap = 20;
 	const campaignInboxDetailComposerGap = 11;
@@ -842,10 +840,6 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		campaignInboxDetailHeaderTop +
 		campaignInboxDetailHeaderHeight +
 		campaignInboxDetailThreadGap;
-	const campaignInboxDetailComposerTop =
-		campaignInboxDetailThreadTop +
-		campaignInboxDetailThreadHeight +
-		campaignInboxDetailComposerGap;
 
 	// Mobile-specific width values (using CSS calc for responsive sizing)
 	// 4px margins on each side for edge-to-edge feel
@@ -1150,6 +1144,28 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	const selectedVisibleThreadItemCount =
 		selectedThreadMessages.length + selectedPendingReplies.length;
 	const selectedThreadUsesMessengerLayout = selectedVisibleThreadItemCount >= 3;
+	// In the messenger (3+ message) layout the composer collapses to a single-line
+	// text-message pill; in the non-messenger view it stays the 157px toolbar composer.
+	const campaignInboxDetailComposerHeight = selectedThreadUsesMessengerLayout ? 37 : 157;
+	// Anchor the composer near the bottom of the box (small margin) for the messenger pill
+	// and for the compact (501-wide) detail view, so the email body grows to fill the space
+	// instead of leaving a dead gap at the bottom. The wider/expanded non-messenger view
+	// keeps its fixed 404px body and clears the bottom divider instead.
+	const campaignInboxDetailComposerAnchoredToBottom =
+		selectedThreadUsesMessengerLayout || shouldUseCampaignInboxCompactDetailDesign;
+	const campaignInboxDetailComposerBottomMargin = shouldUseCampaignInboxCompactDetailDesign
+		? 16
+		: 52;
+	const campaignInboxDetailComposerTop = campaignInboxDetailComposerAnchoredToBottom
+		? desktopBoxHeight -
+			campaignInboxDetailComposerBottomMargin -
+			campaignInboxDetailComposerHeight
+		: campaignInboxDetailThreadTop + 404 + campaignInboxDetailComposerGap;
+	const campaignInboxDetailThreadHeight = campaignInboxDetailComposerAnchoredToBottom
+		? campaignInboxDetailComposerTop -
+			campaignInboxDetailComposerGap -
+			campaignInboxDetailThreadTop
+		: 404;
 	const selectedThreadEvenSplitMinHeight =
 		selectedVisibleThreadItemCount === 2 ? '50%' : undefined;
 	const currentUserDisplayName =
@@ -2986,7 +3002,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									onChange={setReplyMessage}
 									onSend={handleSendReply}
 									isSending={isSending}
-									variant="floating"
+									variant={selectedThreadUsesMessengerLayout ? 'pill' : 'floating'}
 									containerStyle={{
 										position: 'absolute',
 										top: `${campaignInboxDetailComposerTop}px`,
@@ -2994,27 +3010,36 @@ export const InboxSection: FC<InboxSectionProps> = ({
 										transform: 'translateX(-50%)',
 										width: `${campaignInboxDetailInnerWidth}px`,
 										height: `${campaignInboxDetailComposerHeight}px`,
-										borderRadius: '6.877px',
-										border: '1.719px solid #000000',
-										backgroundColor: '#FFFFFF',
 										boxSizing: 'border-box',
 										zIndex: 2,
+										// The pill carries its own border/background; the toolbar
+										// composer keeps the white rounded box.
+										...(selectedThreadUsesMessengerLayout
+											? {}
+											: {
+													borderRadius: '6.877px',
+													border: '1.719px solid #000000',
+													backgroundColor: '#FFFFFF',
+												}),
 									}}
 								/>
 							)}
 
-							<div
-								aria-hidden="true"
-								style={{
-									position: 'absolute',
-									left: 0,
-									right: 0,
-									bottom: `${campaignInboxDetailBottomStripHeight}px`,
-									height: '2px',
-									backgroundColor: '#000000',
-									zIndex: 4,
-								}}
-							/>
+							{/* Bottom divider only appears in the wider/expanded detail view. */}
+							{!shouldUseCampaignInboxCompactDetailDesign && (
+								<div
+									aria-hidden="true"
+									style={{
+										position: 'absolute',
+										left: 0,
+										right: 0,
+										bottom: `${campaignInboxDetailBottomStripHeight}px`,
+										height: '2px',
+										backgroundColor: '#000000',
+										zIndex: 4,
+									}}
+								/>
+							)}
 						</div>
 					) : (
 						/* Expanded Email View Inside Box */
