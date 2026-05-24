@@ -178,6 +178,9 @@ export const getSelectedMarkerIconOpacityExpr = (): any => {
 
 export const MARKER_HOVER_DARKEN_AMOUNT = 0.14;
 
+// How much a result dot grows while hovered (multiplies its radius).
+export const MARKER_HOVER_RADIUS_SCALE = 1.2;
+
 export const MARKER_HOVER_FEATURE_STATE_EXPR: any = [
 	'boolean',
 	['feature-state', 'markerHover'],

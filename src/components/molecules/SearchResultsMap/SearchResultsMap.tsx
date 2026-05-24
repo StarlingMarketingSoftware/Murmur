@@ -427,6 +427,8 @@ import {
 } from './wasmGeo';
 import {
 	MARKER_HOVER_DARKEN_AMOUNT,
+	MARKER_HOVER_FEATURE_STATE_EXPR,
+	MARKER_HOVER_RADIUS_SCALE,
 	SELECTED_MARKER_ENTRY_OPACITY,
 	SELECTED_MARKER_FADE_MS,
 	SELECTED_MARKER_INITIAL_TRANSFORM_SCALE,
@@ -5695,18 +5697,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 
 		const resultDotRadiusScaleExpr = ['coalesce', ['get', 'radiusScale'], 1];
+		// Grow the dot slightly while hovered. The hover factor is a per-feature
+		// constant (feature-state), so folding it into each interpolate stop keeps
+		// the "zoom" curve outermost (required by mapbox-gl v3).
+		const resultDotHoverRadiusScaleExpr = [
+			'*',
+			resultDotRadiusScaleExpr,
+			['case', MARKER_HOVER_FEATURE_STATE_EXPR, MARKER_HOVER_RADIUS_SCALE, 1],
+		];
 		const resultDotRadiusExpr = [
 			'interpolate',
 			['linear'],
 			['zoom'],
 			0,
-			['*', RESULT_DOT_SCALE_MIN, resultDotRadiusScaleExpr],
+			['*', RESULT_DOT_SCALE_MIN, resultDotHoverRadiusScaleExpr],
 			RESULT_DOT_ZOOM_MIN,
-			['*', RESULT_DOT_SCALE_MIN, resultDotRadiusScaleExpr],
+			['*', RESULT_DOT_SCALE_MIN, resultDotHoverRadiusScaleExpr],
 			RESULT_DOT_ZOOM_MAX,
-			['*', RESULT_DOT_SCALE_MAX, resultDotRadiusScaleExpr],
+			['*', RESULT_DOT_SCALE_MAX, resultDotHoverRadiusScaleExpr],
 			24,
-			['*', RESULT_DOT_SCALE_MAX, resultDotRadiusScaleExpr],
+			['*', RESULT_DOT_SCALE_MAX, resultDotHoverRadiusScaleExpr],
 		];
 		const resultDotGlowRadiusExpr = [
 			'interpolate',
@@ -12440,7 +12450,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				lng: coords.lng,
 				lat: coords.lat,
 				fillColor,
-				hoverFillColor: darkenHexColor(fillColor),
+				// Status markers keep their fill on hover (darkening a near-white
+				// "contacts" dot makes it vanish into the light map); they grow
+				// instead. Non-status (search/category) dots keep the darken cue.
+				hoverFillColor: statusMarkerStyle ? fillColor : darkenHexColor(fillColor),
 				strokeColor: statusMarkerStyle?.strokeColor ?? RESULT_DOT_TRANSPARENT_STROKE_COLOR,
 				strokeWidth: statusMarkerStyle?.strokeWidth ?? 0,
 				strokeOpacity: statusMarkerStyle?.strokeOpacity ?? 0,

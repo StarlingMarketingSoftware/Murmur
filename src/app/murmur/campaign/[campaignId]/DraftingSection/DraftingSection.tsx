@@ -228,6 +228,7 @@ interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 	overviewRightRailSearchQuery?: string | null;
 	overviewRightRailSearchContacts?: ContactWithName[];
 	overviewRightRailSearchContactsLoading?: boolean;
+	onClearOverviewRightRailSearch?: () => void;
 }
 
 type CampaignBottomPanelKind = 'contacts' | 'drafts' | 'sent' | 'inbox';
@@ -256,6 +257,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		overviewRightRailSearchQuery,
 		overviewRightRailSearchContacts,
 		overviewRightRailSearchContactsLoading,
+		onClearOverviewRightRailSearch,
 	} = props;
 
 	const inboxMockOverrideActive = inboxMockState != null;
@@ -670,7 +672,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// When the overview right-rail is in search mode, we match the dashboard map-side panel width.
 	const OVERVIEW_RIGHT_RAIL_WIDTH_PX = isOverviewRightRailSearchActive ? 433 : 371;
 	// Match the dashboard map-view panel (right-[10px]).
-	const OVERVIEW_RIGHT_RAIL_GAP_FROM_RIGHT_WALL_PX = isOverviewRightRailSearchActive ? 10 : 130;
+	const OVERVIEW_RIGHT_RAIL_GAP_FROM_RIGHT_WALL_PX = isOverviewRightRailSearchActive ? 10 : 40;
 	const OVERVIEW_RIGHT_RAIL_GAP_FROM_HEADER_PX = 74;
 	const inboxMainPanelWidthPx = 863;
 	const inboxMainPanelHeightPx = 706;
@@ -4655,17 +4657,42 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													className="flex flex-col flex-shrink-0"
 													style={{
 														maxHeight: '342px',
-														backgroundColor: 'rgba(175, 214, 239, 0.8)',
-														border: '3px solid #143883',
+														backgroundColor: 'rgba(214, 33, 39, 0.518)',
+														border: '3px solid #000',
 														borderRadius: '8px',
 														overflow: 'hidden',
 													}}
 												>
-													<div className="w-full h-[49px] flex-shrink-0 flex items-center justify-center px-4 relative">
-														<span className="absolute left-[10px] top-1/2 -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
+													<div
+														className="w-full h-[77px] flex-shrink-0 relative"
+														style={{ backgroundColor: '#D66B6F', borderBottom: '2px solid #000' }}
+													>
+														<div
+															className="absolute left-1/2 top-[6px] -translate-x-1/2 flex items-center pl-[12px] pr-[8px] gap-[6px]"
+															style={{
+																width: '419px',
+																height: '33px',
+																borderRadius: '8px',
+																border: '2px solid #000',
+																background: 'linear-gradient(90deg, #ADFFC2 0%, #EFFFF3 100%)',
+															}}
+														>
+															<span className="flex-1 min-w-0 overflow-hidden whitespace-nowrap font-inter text-[13px] font-semibold text-black">
+																{overviewRightRailSearchText}
+															</span>
+															<button
+																type="button"
+																onClick={() => onClearOverviewRightRailSearch?.()}
+																aria-label="Clear search"
+																className="flex-shrink-0 flex items-center justify-center w-[24.927px] h-[23.147px] rounded-[5.342px] bg-[#ABABAB] opacity-80 hover:opacity-100 text-white transition-opacity"
+															>
+																<span className="text-[16px] leading-none -translate-y-[1px]">×</span>
+															</button>
+														</div>
+														<span className="absolute left-[10px] top-[58px] -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
 															Selection
 														</span>
-														<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
+														<span className="absolute left-1/2 top-[58px] -translate-x-1/2 -translate-y-1/2 font-inter text-[13px] font-medium text-black">
 															{overviewRightRailSelectedContacts.length}/
 															{overviewRightRailFilteredContacts.length} selected
 														</span>
@@ -4684,7 +4711,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	return overviewRightRailFilteredContacts.map((c) => c.id);
 																});
 															}}
-															className="font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 translate-y-[4px] hover:underline"
+															className="font-secondary text-[12px] font-medium text-black absolute right-[10px] top-[58px] -translate-y-1/2 hover:underline"
 														>
 															{overviewRightRailSelectedContacts.length ===
 																overviewRightRailFilteredContacts.length &&
@@ -4715,7 +4742,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												className="flex flex-col flex-1 min-h-0"
 												style={{
-													backgroundColor: 'rgba(99, 155, 244, 0.5)',
+													backgroundColor: 'rgba(214, 33, 39, 0.518)',
+													border: '1px solid #000',
 													borderRadius: '8px',
 													overflow: 'hidden',
 												}}
@@ -4723,7 +4751,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<div
 													className="w-full h-[50px] flex-shrink-0 flex items-center justify-center px-4 relative"
 													style={{
-														backgroundColor: '#CBF0FF',
+														backgroundColor: '#E97B7F',
 														border: '2px solid #000',
 														borderRadius: '8px 8px 0 0',
 													}}

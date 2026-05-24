@@ -34,7 +34,6 @@ import DashboardActionBarEnvelopeIcon from '@/components/atoms/_svg/DashboardAct
 import { DashboardStrategyBox } from '@/components/molecules/DashboardStrategyBox/DashboardStrategyBox';
 import DashboardOpportunitiesWidget from '@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesWidget';
 import DashboardResponsesWidget from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesWidget';
-import CloseIcon from '@/components/atoms/_svg/CloseIcon';
 import SearchMap from '@/components/atoms/_svg/SearchMap';
 import BottomFolderIcon from '@/components/atoms/_svg/BottomFolderIcon';
 import BottomHomeIcon from '@/components/atoms/_svg/BottomHomeIcon';
@@ -140,6 +139,20 @@ const CAMPAIGN_OVERVIEW_STATUS_KEYS = [
 	'new-message',
 	'sent',
 ] as const satisfies readonly CampaignOverviewStatusKey[];
+
+const CAMPAIGN_OVERVIEW_STATUS_PILL_HEIGHT_PX = 27;
+const CAMPAIGN_OVERVIEW_STATUS_PILL_RADIUS_PX = 8;
+const CAMPAIGN_OVERVIEW_STATUS_PILL_PADDING_X_PX = 9;
+
+// Every status uses a uniform pill box — same height, radius and horizontal
+// padding, reserved whether lit or not so toggling never shifts the row. Only
+// the background color changes, shown when the status is selected.
+const CAMPAIGN_OVERVIEW_STATUS_PILL_COLOR: Record<CampaignOverviewStatusKey, string> = {
+	contacts: '#FFA6A7',
+	drafts: '#FDDEA5',
+	'new-message': '#AEE1FD',
+	sent: '#AEFDC3',
+};
 
 const getCampaignOverviewStatusFromEmailStatus = (
 	status: string | null | undefined
@@ -367,31 +380,36 @@ const CampaignOverviewStatusToggle = ({
 };
 
 type CampaignOverviewStatusStripProps = {
-	activeStatuses: ReadonlySet<CampaignOverviewStatusKey>;
+	selectedStatuses: ReadonlySet<CampaignOverviewStatusKey>;
 	disabled?: boolean;
 	onToggleStatus: (status: CampaignOverviewStatusKey) => void;
 };
 
 const CampaignOverviewStatusStrip = ({
-	activeStatuses,
+	selectedStatuses,
 	disabled = false,
 	onToggleStatus,
 }: CampaignOverviewStatusStripProps) => {
-	const itemStyle: CSSProperties = {
+	const getItemStyle = (status: CampaignOverviewStatusKey): CSSProperties => ({
 		display: 'flex',
 		alignItems: 'center',
+		justifyContent: 'center',
 		gap: 12,
 		whiteSpace: 'nowrap',
+		height: CAMPAIGN_OVERVIEW_STATUS_PILL_HEIGHT_PX,
+		padding: `0 ${CAMPAIGN_OVERVIEW_STATUS_PILL_PADDING_X_PX}px`,
+		borderRadius: CAMPAIGN_OVERVIEW_STATUS_PILL_RADIUS_PX,
 		border: 0,
-		background: 'transparent',
-		padding: 0,
 		margin: 0,
 		font: 'inherit',
 		color: 'inherit',
+		background:
+			!disabled && selectedStatuses.has(status)
+				? CAMPAIGN_OVERVIEW_STATUS_PILL_COLOR[status]
+				: 'transparent',
+		opacity: disabled ? 0.55 : 1,
 		cursor: disabled ? 'default' : 'pointer',
-	};
-	const getItemOpacity = (status: CampaignOverviewStatusKey) =>
-		disabled ? 0.55 : activeStatuses.has(status) ? 1 : 0.32;
+	});
 
 	return (
 		<div
@@ -418,21 +436,21 @@ const CampaignOverviewStatusStrip = ({
 			<div
 				className="relative flex h-full items-center justify-between"
 				style={{
-					padding: '0 31px',
+					padding: '0 20px',
 					color: '#000',
 					fontFamily: 'Inter, sans-serif',
-					fontSize: 17,
+					fontSize: 15.627,
 					fontStyle: 'normal',
 					fontWeight: 500,
-					lineHeight: '14px',
+					lineHeight: '12.869px',
 				}}
 			>
 				<button
 					type="button"
-					aria-pressed={activeStatuses.has('contacts')}
+					aria-pressed={selectedStatuses.has('contacts')}
 					disabled={disabled}
 					className="pointer-events-auto transition-opacity duration-150"
-					style={{ ...itemStyle, opacity: getItemOpacity('contacts') }}
+					style={getItemStyle('contacts')}
 					onClick={() => onToggleStatus('contacts')}
 				>
 					<span>Contacts</span>
@@ -440,10 +458,10 @@ const CampaignOverviewStatusStrip = ({
 				</button>
 				<button
 					type="button"
-					aria-pressed={activeStatuses.has('drafts')}
+					aria-pressed={selectedStatuses.has('drafts')}
 					disabled={disabled}
 					className="pointer-events-auto transition-opacity duration-150"
-					style={{ ...itemStyle, opacity: getItemOpacity('drafts') }}
+					style={getItemStyle('drafts')}
 					onClick={() => onToggleStatus('drafts')}
 				>
 					<span>Drafts</span>
@@ -451,21 +469,21 @@ const CampaignOverviewStatusStrip = ({
 				</button>
 				<button
 					type="button"
-					aria-pressed={activeStatuses.has('new-message')}
+					aria-pressed={selectedStatuses.has('new-message')}
 					disabled={disabled}
 					className="pointer-events-auto transition-opacity duration-150"
-					style={{ ...itemStyle, opacity: getItemOpacity('new-message') }}
+					style={getItemStyle('new-message')}
 					onClick={() => onToggleStatus('new-message')}
 				>
-					<span>New Message</span>
+					<span>New Messages</span>
 					<StatusNewMessageIcon width={19} height={19} aria-hidden="true" />
 				</button>
 				<button
 					type="button"
-					aria-pressed={activeStatuses.has('sent')}
+					aria-pressed={selectedStatuses.has('sent')}
 					disabled={disabled}
 					className="pointer-events-auto transition-opacity duration-150"
-					style={{ ...itemStyle, opacity: getItemOpacity('sent') }}
+					style={getItemStyle('sent')}
 					onClick={() => onToggleStatus('sent')}
 				>
 					<span>Sent</span>
@@ -2220,21 +2238,33 @@ const Murmur = () => {
 		},
 		[]
 	);
-	const [campaignOverviewActiveStatuses, setCampaignOverviewActiveStatuses] = useState<
-		readonly CampaignOverviewStatusKey[]
-	>(() => [...CAMPAIGN_OVERVIEW_STATUS_KEYS]);
+	// An active All-tab search surfaces a dedicated "Search" tab and shows results by category,
+	// so the map ignores the Category/Status selection and groups by category until search clears.
+	const isOverviewSearchActive = (overviewSearchQuery ?? '').trim().length > 0;
+	const effectiveCampaignOverviewMapGrouping: CampaignOverviewMapGrouping =
+		isOverviewSearchActive ? 'category' : campaignOverviewMapGrouping;
+	const [campaignOverviewSelectedStatuses, setCampaignOverviewSelectedStatuses] =
+		useState<readonly CampaignOverviewStatusKey[]>([]);
+	const campaignOverviewSelectedStatusSet = useMemo(
+		() => new Set(campaignOverviewSelectedStatuses),
+		[campaignOverviewSelectedStatuses]
+	);
+	// Each status toggles independently. With nothing toggled on there is no
+	// filter, so the map shows every status; otherwise it shows the union.
 	const campaignOverviewActiveStatusSet = useMemo(
-		() => new Set(campaignOverviewActiveStatuses),
-		[campaignOverviewActiveStatuses]
+		() =>
+			campaignOverviewSelectedStatuses.length === 0
+				? new Set<CampaignOverviewStatusKey>(CAMPAIGN_OVERVIEW_STATUS_KEYS)
+				: new Set<CampaignOverviewStatusKey>(campaignOverviewSelectedStatuses),
+		[campaignOverviewSelectedStatuses]
 	);
 	const handleCampaignOverviewStatusToggle = useCallback(
 		(status: CampaignOverviewStatusKey) => {
-			setCampaignOverviewActiveStatuses((prev) => {
-				if (prev.includes(status)) {
-					return prev.filter((value) => value !== status);
-				}
-				return [...prev, status];
-			});
+			setCampaignOverviewSelectedStatuses((prev) =>
+				prev.includes(status)
+					? prev.filter((value) => value !== status)
+					: [...prev, status]
+			);
 		},
 		[]
 	);
@@ -2930,7 +2960,7 @@ const Murmur = () => {
 
 		const out = [] as typeof contacts;
 		for (const contact of contacts) {
-			if (campaignOverviewMapGrouping === 'status') {
+			if (effectiveCampaignOverviewMapGrouping === 'status') {
 				const status = campaignOverviewContactStatusById.get(contact.id) ?? 'contacts';
 				if (!campaignOverviewActiveStatusSet.has(status)) continue;
 				out.push(contact);
@@ -2964,7 +2994,7 @@ const Murmur = () => {
 		campaignMapContacts,
 		campaignOverviewActiveStatusSet,
 		campaignOverviewContactStatusById,
-		campaignOverviewMapGrouping,
+		effectiveCampaignOverviewMapGrouping,
 		mapGrabActiveCategories,
 		mapGrabUncategorizedActive,
 	]);
@@ -2981,7 +3011,7 @@ const Murmur = () => {
 			contacts: campaignMapContactsForMap,
 			selectedContacts: [],
 			campaignContactStatusById: campaignOverviewContactStatusById,
-			campaignMarkerMode: campaignOverviewMapGrouping,
+			campaignMarkerMode: effectiveCampaignOverviewMapGrouping,
 			categoryConstellationsEnabled: activeView === 'overview',
 			activeTool: activeMapTool,
 			requestedZoom: mapZoomControlRequest,
@@ -2996,7 +3026,7 @@ const Murmur = () => {
 			campaignMapCameraPadding,
 			campaignMapContactsForMap,
 			campaignOverviewContactStatusById,
-			campaignOverviewMapGrouping,
+			effectiveCampaignOverviewMapGrouping,
 			globeNightLighting,
 			globeWeatherMood,
 			globeWeatherRegionCenter,
@@ -3251,12 +3281,12 @@ const Murmur = () => {
 							<>
 								<CampaignOverviewStatusToggle
 									selected={campaignOverviewMapGrouping}
-									isSearchActive={(overviewSearchQuery ?? '').trim().length > 0}
+									isSearchActive={isOverviewSearchActive}
 									onChange={handleCampaignOverviewMapGroupingChange}
 								/>
 								<CampaignOverviewStatusStrip
-									activeStatuses={campaignOverviewActiveStatusSet}
-									disabled={campaignOverviewMapGrouping !== 'status'}
+									selectedStatuses={campaignOverviewSelectedStatusSet}
+									disabled={effectiveCampaignOverviewMapGrouping !== 'status'}
 									onToggleStatus={handleCampaignOverviewStatusToggle}
 								/>
 								<CampaignOverviewAskAnythingBox
@@ -3499,9 +3529,9 @@ const Murmur = () => {
 																								type="button"
 																								aria-label="Exit campaign search"
 																								onClick={handleClearOverviewSearchQuery}
-																								className="absolute right-[8px] top-1/2 flex h-[24px] w-[24px] -translate-y-1/2 items-center justify-center rounded-[6px] border border-black bg-white/70 text-black"
+																								className="absolute right-[-24px] top-1/2 flex h-[23.147px] w-[24.927px] -translate-y-1/2 items-center justify-center rounded-[5.342px] bg-[#ABABAB] opacity-80 hover:opacity-100 text-white transition-opacity"
 																							>
-																								<CloseIcon width={10} height={10} />
+																								<span className="text-[16px] leading-none -translate-y-[1px]">×</span>
 																							</button>
 																						</div>
 																				) : (
@@ -4089,6 +4119,7 @@ const Murmur = () => {
 											campaign={campaign}
 											view={activeView}
 											overviewRightRailSearchQuery={overviewSearchQuery}
+											onClearOverviewRightRailSearch={handleClearOverviewSearchQuery}
 											overviewRightRailSearchContacts={campaignMapContacts ?? []}
 											overviewRightRailSearchContactsLoading={
 												isCampaignMapContactsLoading
@@ -4140,6 +4171,7 @@ const Murmur = () => {
 													campaign={campaign}
 													view={previousView}
 													overviewRightRailSearchQuery={overviewSearchQuery}
+													onClearOverviewRightRailSearch={handleClearOverviewSearchQuery}
 													overviewRightRailSearchContacts={campaignMapContacts ?? []}
 													overviewRightRailSearchContactsLoading={
 													isCampaignMapContactsLoading
