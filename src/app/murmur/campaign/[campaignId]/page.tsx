@@ -4241,22 +4241,16 @@ const Murmur = () => {
 										pointer-events: auto;
 									}
 
+									/* Opacity band behind the campaign content; pointer-events: auto so the map can't be dragged behind the panels; only the clear map area outside the band stays interactive. */
 									.campaign-map-split-overlay {
 										position: fixed;
-										inset: 0;
+										top: 0;
+										bottom: 0;
+										left: var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333%);
+										right: calc(100% - var(${CAMPAIGN_MAP_BACKDROP_END_VAR}, 100%));
 										z-index: 0;
-										pointer-events: none;
-										background: linear-gradient(
-											to right,
-											rgba(136, 136, 136, 0) 0%,
-											rgba(136, 136, 136, 0)
-												var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333%),
-											rgba(136, 136, 136, 0.1)
-												var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333%),
-											rgba(136, 136, 136, 0.1) var(${CAMPAIGN_MAP_BACKDROP_END_VAR}, 100%),
-											rgba(136, 136, 136, 0) var(${CAMPAIGN_MAP_BACKDROP_END_VAR}, 100%),
-											rgba(136, 136, 136, 0) 100%
-										);
+										pointer-events: auto;
+										background: rgba(136, 136, 136, 0.1);
 									}
 
 									.campaign-persistent-map-page [data-slot='campaign-top-box-wrapper'],

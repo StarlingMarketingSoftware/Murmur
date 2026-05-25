@@ -694,6 +694,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			setIsProfileSidePanelOpen(false);
 		}
 	}, [shouldUseProfileSidePanel, isProfileSidePanelOpen]);
+	useEffect(() => {
+		if (!isProfileSidePanelOpen) return;
+		const handlePointerDown = (event: MouseEvent) => {
+			const target = event.target as HTMLElement | null;
+			if (target?.closest('[data-campaign-profile-side-panel]')) return;
+			setIsProfileSidePanelOpen(false);
+		};
+		document.addEventListener('mousedown', handlePointerDown);
+		return () => document.removeEventListener('mousedown', handlePointerDown);
+	}, [isProfileSidePanelOpen]);
 	const overviewRightRailSearchText = (overviewRightRailSearchQuery ?? '').trim();
 	const overviewRightRailSearchContactsResolved = useMemo(
 		() => overviewRightRailSearchContacts ?? [],
