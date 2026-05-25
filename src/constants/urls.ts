@@ -135,6 +135,13 @@ export const urls = {
 			index: '/api/leads',
 			detail: ((id) => `/api/leads/${id}`) as DetailRoute,
 		},
+		media: {
+			index: '/api/media',
+			detail: ((id) => `/api/media/${id}`) as DetailRoute,
+			uploadUrl: {
+				index: '/api/media/upload-url',
+			},
+		},
 		mailgun: {
 			index: '/api/mailgun',
 		},

@@ -38,6 +38,7 @@ model User {
   signatures               Signature[]
   userContactLists         UserContactList[]
   inboundEmails            InboundEmail[]
+  mediaAssets              MediaAsset[]
 }
 
 model ContactList {
@@ -224,6 +225,27 @@ model Signature {
   @@index([userId])
 }
 
+model MediaAsset {
+  id          Int         @id @default(autoincrement())
+  userId      String
+  kind        MediaKind
+  context     String
+  key         String
+  posterKey   String?
+  filename    String
+  contentType String
+  sizeBytes   Int?
+  durationSec Float?
+  status      MediaStatus @default(uploading)
+  position    Int         @default(0)
+  shareId     String      @unique @default(cuid())
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  user        User        @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+
+  @@index([userId, context])
+}
+
 model EmailVerificationCode {
   id        Int      @id @default(autoincrement())
   email     String
@@ -381,4 +403,16 @@ enum DraftingTone {
   formal
   concise
   casual
+}
+
+enum MediaKind {
+  video
+  audio
+  image
+}
+
+enum MediaStatus {
+  uploading
+  ready
+  failed
 }

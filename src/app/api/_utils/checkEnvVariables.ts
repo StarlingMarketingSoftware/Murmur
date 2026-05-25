@@ -17,6 +17,12 @@ const requiredEnvVars = {
 	MISTRAL_PARAGRAPH_4_AGENT_ID: 'Mistral agent for 4 paragraphs formatting',
 	MISTRAL_PARAGRAPH_5_AGENT_ID: 'Mistral agent for 5 paragraphs formatting',
 	MISTRAL_HYBRID_AGENT_ID: 'Mistral agent for hybrid mode',
+
+	// Cloudflare R2 media storage (profile video/audio/photo uploads)
+	R2_ACCOUNT_ID: 'Cloudflare R2 account id (media uploads)',
+	R2_ACCESS_KEY_ID: 'Cloudflare R2 S3 access key id (media uploads)',
+	R2_SECRET_ACCESS_KEY: 'Cloudflare R2 S3 secret access key (media uploads)',
+	R2_BUCKET: 'Cloudflare R2 bucket name, e.g. murmur (media uploads)',
 };
 
 export function checkRequiredEnvVariables() {

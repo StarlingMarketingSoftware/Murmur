@@ -1,6 +1,12 @@
-import type { ComponentType, SVGProps } from 'react';
+import type { ChangeEvent, ComponentType, SVGProps } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
+import { Music2, Play, Video, X } from 'lucide-react';
+
+import { useDeleteMedia, useGetMedia } from '@/hooks/queryHooks/useMediaAssets';
+import { useMediaUpload, type UploadState } from '@/hooks/useMediaUpload';
+import { MediaPreviewDialog } from '@/components/organisms/_dialogs/MediaPreviewDialog/MediaPreviewDialog';
+import type { MediaAssetDto } from '@/app/api/media/route';
 
 import { GenreClassicalIcon } from '@/components/atoms/_svg/GenreClassicalIcon';
 import { GenreCountryIcon } from '@/components/atoms/_svg/GenreCountryIcon';
@@ -552,6 +558,72 @@ const ProfileAreaMapBox = ({ area, onAreaUpdate }: ProfileAreaMapBoxProps) => {
 	);
 };
 
+const formatMediaDuration = (seconds?: number | null): string => {
+	if (!seconds || !Number.isFinite(seconds)) return '';
+	const mins = Math.floor(seconds / 60);
+	const secs = Math.floor(seconds % 60);
+	return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
+/** A filled media slot: video poster thumbnail or audio tile, with play + delete. */
+const ProfileMediaSlotCard = ({
+	asset,
+	onPlay,
+	onDelete,
+}: {
+	asset: MediaAssetDto;
+	onPlay: () => void;
+	onDelete: () => void;
+}) => {
+	const duration = formatMediaDuration(asset.durationSec);
+	return (
+		<div className="group relative h-[66px] w-[326px] shrink-0 overflow-hidden rounded-[9px] bg-[#F2F7FF]">
+			<button
+				type="button"
+				onClick={onPlay}
+				aria-label={`Play ${asset.filename}`}
+				className="flex h-full w-full items-center gap-[10px] px-[12px] text-left transition hover:brightness-95"
+			>
+				{asset.kind === 'video' && asset.posterUrl ? (
+					// eslint-disable-next-line @next/next/no-img-element -- presigned R2 URL, not a static asset
+					<img
+						src={asset.posterUrl}
+						alt=""
+						className="h-[50px] w-[80px] shrink-0 rounded-[6px] object-cover"
+					/>
+				) : (
+					<span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-[6px] bg-[#D6FFED] text-black">
+						{asset.kind === 'audio' ? (
+							<Music2 className="h-5 w-5" />
+						) : (
+							<Video className="h-5 w-5" />
+						)}
+					</span>
+				)}
+				<span className="flex min-w-0 flex-1 flex-col">
+					<span className="truncate font-inter text-[13px] font-medium text-black">
+						{asset.filename}
+					</span>
+					{duration && (
+						<span className="font-inter text-[11px] text-black/50">{duration}</span>
+					)}
+				</span>
+				<span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-black/70 text-white">
+					<Play className="h-3.5 w-3.5 fill-white" />
+				</span>
+			</button>
+			<button
+				type="button"
+				onClick={onDelete}
+				aria-label={`Remove ${asset.filename}`}
+				className="absolute right-[6px] top-[6px] hidden h-[20px] w-[20px] items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/80 group-hover:flex"
+			>
+				<X className="h-3 w-3" />
+			</button>
+		</div>
+	);
+};
+
 export const ProfileSidePanelBox = ({
 	profileName,
 	profileGenre,
@@ -659,6 +731,48 @@ export const ProfileSidePanelBox = ({
 		!isAreaChooserOpen &&
 		!isPerformingNameEditorOpen
 	);
+
+	// Profile media (video/audio) lives on the account and is fetched independently
+	// of the campaign-scoped profile fields above.
+	const mediaInputRef = useRef<HTMLInputElement>(null);
+	const [previewAsset, setPreviewAsset] = useState<MediaAssetDto | null>(null);
+	const { data: profileMedia = [] } = useGetMedia('profile_media');
+	const { upload: uploadMedia, activeUploads } = useMediaUpload('profile_media');
+	const deleteMedia = useDeleteMedia();
+
+	const mediaSlots: Array<
+		{ type: 'asset'; asset: MediaAssetDto } | { type: 'upload'; upload: UploadState }
+	> = [
+		...profileMedia.map((asset) => ({ type: 'asset' as const, asset })),
+		...activeUploads.map((upload) => ({ type: 'upload' as const, upload })),
+	];
+	const canAddMedia = mediaSlots.length < 3;
+
+	const handleSelectMediaFile = (event: ChangeEvent<HTMLInputElement>) => {
+		const file = event.target.files?.[0];
+		event.target.value = '';
+		if (file) void uploadMedia(file);
+	};
+
+	// Profile photo (avatar) reuses the same media pipeline (context: "avatar", cap 1).
+	const avatarInputRef = useRef<HTMLInputElement>(null);
+	const { data: avatarMedia = [] } = useGetMedia('avatar');
+	const { upload: uploadAvatar, activeUploads: avatarUploads } = useMediaUpload('avatar');
+	const replaceAvatar = useDeleteMedia({ suppressToasts: true });
+	const avatar = avatarMedia.find((item) => item.status === 'ready') ?? null;
+	const isAvatarUploading = avatarUploads.length > 0;
+
+	const handleSelectAvatarFile = async (event: ChangeEvent<HTMLInputElement>) => {
+		const file = event.target.files?.[0];
+		event.target.value = '';
+		if (!file) return;
+		// Avatar is capped at one — clear any existing avatar first so the new upload
+		// isn't rejected by the per-context limit.
+		await Promise.all(
+			avatarMedia.map((item) => replaceAvatar.mutateAsync(item.id).catch(() => {}))
+		);
+		void uploadAvatar(file);
+	};
 
 	const startEditing = () => {
 		if (!isEditable) return;
@@ -774,9 +888,31 @@ export const ProfileSidePanelBox = ({
 			</span>
 			<div className="box-border flex h-[651px] w-[374px] flex-col overflow-hidden rounded-[12px] border-2 border-black bg-[#ABCBF9]">
 				<div className="flex h-[53px] shrink-0 items-center gap-[9px] border-b-2 border-black bg-[#ABCBF9] pl-[23px]">
-					<div className="flex h-[33px] w-[33px] shrink-0 items-center justify-center rounded-full bg-[#7BDB7F] font-inter text-[25px] font-normal leading-none text-white">
-						{displayInitial}
-					</div>
+					<button
+						type="button"
+						onClick={() => avatarInputRef.current?.click()}
+						aria-label="Upload a profile photo"
+						className="relative flex h-[33px] w-[33px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#7BDB7F] font-inter text-[25px] font-normal leading-none text-white transition hover:brightness-95"
+					>
+						{avatar?.url ? (
+							// eslint-disable-next-line @next/next/no-img-element -- presigned R2 URL, not a static asset
+							<img src={avatar.url} alt="" className="h-full w-full object-cover" />
+						) : (
+							displayInitial
+						)}
+						{isAvatarUploading && (
+							<span className="absolute inset-0 flex items-center justify-center bg-black/40 text-[12px]">
+								…
+							</span>
+						)}
+					</button>
+					<input
+						ref={avatarInputRef}
+						type="file"
+						accept="image/*"
+						className="hidden"
+						onChange={handleSelectAvatarFile}
+					/>
 					{isEditingName ? (
 						<input
 							type="text"
@@ -974,25 +1110,105 @@ export const ProfileSidePanelBox = ({
 						{showVideoVerificationSection && (
 							<>
 								<div className="ml-[26px] mt-[20px] w-[236px] font-inter text-[10.5px] font-normal italic leading-[15px] text-black">
-									Add a video to verify your account and improve your profile
+									Add a video or audio clip to verify your account and improve your
+									profile
 								</div>
+								<input
+									ref={mediaInputRef}
+									type="file"
+									accept="video/*,audio/*"
+									className="hidden"
+									onChange={handleSelectMediaFile}
+								/>
 								<div className="mt-[24px] flex flex-col items-center gap-[14px]">
-									{[1, 0.8, 0.5].map((opacity, index) => (
-										<div
-											key={opacity}
-											aria-hidden="true"
-											className="relative h-[66px] w-[326px] shrink-0 rounded-[9px] bg-[#F2F7FF]"
-											style={{ opacity }}
-										>
-											{index === 0 && (
-												<span
-													className="absolute left-1/2 top-1/2 block h-[17px] w-[17px] -translate-x-1/2 -translate-y-1/2"
-													dangerouslySetInnerHTML={{ __html: profileVideoAddIconSvg }}
+									{[0, 1, 2].map((index) => {
+										const slot = mediaSlots[index];
+
+										if (slot?.type === 'asset' && slot.asset.status === 'ready') {
+											const asset = slot.asset;
+											return (
+												<ProfileMediaSlotCard
+													key={asset.id}
+													asset={asset}
+													onPlay={() => setPreviewAsset(asset)}
+													onDelete={() => deleteMedia.mutate(asset.id)}
 												/>
-											)}
-										</div>
-									))}
+											);
+										}
+
+										if (slot?.type === 'asset') {
+											const asset = slot.asset;
+											return (
+												<div
+													key={asset.id}
+													className="relative flex h-[66px] w-[326px] shrink-0 items-center justify-center rounded-[9px] bg-[#F2F7FF] font-inter text-[11px] text-black/50"
+												>
+													{asset.status === 'failed' ? 'Upload failed' : 'Processing…'}
+													<button
+														type="button"
+														onClick={() => deleteMedia.mutate(asset.id)}
+														aria-label="Remove"
+														className="absolute right-[6px] top-[6px] flex h-[20px] w-[20px] items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/80"
+													>
+														<X className="h-3 w-3" />
+													</button>
+												</div>
+											);
+										}
+
+										if (slot?.type === 'upload') {
+											return (
+												<div
+													key={`upload-${index}`}
+													className="flex h-[66px] w-[326px] shrink-0 flex-col items-center justify-center gap-[8px] rounded-[9px] bg-[#F2F7FF] px-[16px]"
+												>
+													<span className="w-full truncate text-center font-inter text-[11px] text-black/70">
+														{slot.upload.filename}
+													</span>
+													<div className="h-[4px] w-full overflow-hidden rounded-full bg-black/10">
+														<div
+															className="h-full rounded-full bg-[#7BDB7F] transition-[width] duration-200"
+															style={{ width: `${slot.upload.progress}%` }}
+														/>
+													</div>
+												</div>
+											);
+										}
+
+										if (index === mediaSlots.length && canAddMedia) {
+											return (
+												<button
+													key={`add-${index}`}
+													type="button"
+													onClick={() => mediaInputRef.current?.click()}
+													aria-label="Add a video or audio clip"
+													className="relative h-[66px] w-[326px] shrink-0 rounded-[9px] bg-[#F2F7FF] transition hover:brightness-95"
+												>
+													<span
+														className="absolute left-1/2 top-1/2 block h-[17px] w-[17px] -translate-x-1/2 -translate-y-1/2"
+														dangerouslySetInnerHTML={{ __html: profileVideoAddIconSvg }}
+													/>
+												</button>
+											);
+										}
+
+										return (
+											<div
+												key={`empty-${index}`}
+												aria-hidden="true"
+												className="h-[66px] w-[326px] shrink-0 rounded-[9px] bg-[#F2F7FF]"
+												style={{ opacity: [1, 0.8, 0.5][index] }}
+											/>
+										);
+									})}
 								</div>
+								<MediaPreviewDialog
+									asset={previewAsset}
+									open={Boolean(previewAsset)}
+									onOpenChange={(open) => {
+										if (!open) setPreviewAsset(null);
+									}}
+								/>
 							</>
 						)}
 					</div>
