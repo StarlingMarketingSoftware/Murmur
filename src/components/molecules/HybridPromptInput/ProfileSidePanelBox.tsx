@@ -1,7 +1,7 @@
 import type { ChangeEvent, ComponentType, SVGProps } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
-import { Music2, Play, Video, X } from 'lucide-react';
+import { Pause, Play, X } from 'lucide-react';
 
 import { useDeleteMedia, useGetMedia } from '@/hooks/queryHooks/useMediaAssets';
 import { useMediaUpload, type UploadState } from '@/hooks/useMediaUpload';
@@ -558,14 +558,37 @@ const ProfileAreaMapBox = ({ area, onAreaUpdate }: ProfileAreaMapBoxProps) => {
 	);
 };
 
-const formatMediaDuration = (seconds?: number | null): string => {
-	if (!seconds || !Number.isFinite(seconds)) return '';
-	const mins = Math.floor(seconds / 60);
-	const secs = Math.floor(seconds % 60);
-	return `${mins}:${secs.toString().padStart(2, '0')}`;
+const profileMediaWaveformBars = [
+	48, 60, 54, 66, 56, 70, 62, 64, 67, 65, 69, 61, 63, 68, 60, 71, 62, 66, 57,
+	65, 60, 69, 62, 61, 66, 72, 64, 68, 56, 62, 73, 66, 60, 69, 67, 64, 57, 62,
+	66, 61, 65, 70, 59, 64, 62, 67, 71, 69, 63, 66, 61, 64, 67, 70, 66, 63, 62,
+	65, 60, 50, 48, 44, 40, 35, 30,
+] as const;
+
+const getMediaDisplayTitle = (filename: string) =>
+	filename.replace(/\.[^/.]+$/, '').trim() || filename;
+
+const ProfileMediaWaveform = () => {
+	const bars = (
+		<div className="flex h-full w-max items-center">
+			{profileMediaWaveformBars.map((height, index) => (
+				<span
+					key={`waveform-${index}`}
+					className="block w-[3px]"
+					style={{ height: `${height}%`, backgroundColor: '#ABAABF' }}
+				/>
+			))}
+		</div>
+	);
+
+	return (
+		<div aria-hidden="true" className="relative h-[32px] w-full overflow-hidden">
+			{bars}
+		</div>
+	);
 };
 
-/** A filled media slot: video poster thumbnail or audio tile, with play + delete. */
+/** A filled media slot: square media artwork, title, waveform, and hover playback. */
 const ProfileMediaSlotCard = ({
 	asset,
 	onPlay,
@@ -575,43 +598,93 @@ const ProfileMediaSlotCard = ({
 	onPlay: () => void;
 	onDelete: () => void;
 }) => {
-	const duration = formatMediaDuration(asset.durationSec);
+	const audioRef = useRef<HTMLAudioElement | null>(null);
+	const [isPlaying, setIsPlaying] = useState(false);
+	const isAudio = asset.kind === 'audio';
+	const displayTitle = getMediaDisplayTitle(asset.filename);
+
+	const handleAudioToggle = async () => {
+		const audio = audioRef.current;
+		if (!audio || !asset.url) return;
+		if (isPlaying) {
+			audio.pause();
+			return;
+		}
+		if (audio.ended) {
+			audio.currentTime = 0;
+		}
+		try {
+			await audio.play();
+		} catch {
+			setIsPlaying(false);
+		}
+	};
+
+	const handleCardClick = () => {
+		if (isAudio) {
+			void handleAudioToggle();
+			return;
+		}
+		onPlay();
+	};
+
+	const playOverlayClassName = isPlaying
+		? 'opacity-100'
+		: 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100';
+
 	return (
 		<div className="group relative h-[66px] w-[326px] shrink-0 overflow-hidden rounded-[9px] bg-[#F2F7FF]">
 			<button
 				type="button"
-				onClick={onPlay}
+				onClick={handleCardClick}
 				aria-label={`Play ${asset.filename}`}
-				className="flex h-full w-full items-center gap-[10px] px-[12px] text-left transition hover:brightness-95"
+				className="flex h-full w-full items-center gap-[13px] px-[12px] text-left transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20"
 			>
-				{asset.kind === 'video' && asset.posterUrl ? (
-					// eslint-disable-next-line @next/next/no-img-element -- presigned R2 URL, not a static asset
-					<img
-						src={asset.posterUrl}
-						alt=""
-						className="h-[50px] w-[80px] shrink-0 rounded-[6px] object-cover"
-					/>
-				) : (
-					<span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-[6px] bg-[#D6FFED] text-black">
-						{asset.kind === 'audio' ? (
-							<Music2 className="h-5 w-5" />
-						) : (
-							<Video className="h-5 w-5" />
-						)}
-					</span>
-				)}
-				<span className="flex min-w-0 flex-1 flex-col">
-					<span className="truncate font-inter text-[13px] font-medium text-black">
-						{asset.filename}
-					</span>
-					{duration && (
-						<span className="font-inter text-[11px] text-black/50">{duration}</span>
+				<span
+					className="relative flex h-[50px] w-[50px] shrink-0 overflow-hidden rounded-[6px]"
+					style={{
+						background:
+							'linear-gradient(145deg, #EF3030 0%, #F44458 36%, #F04CCB 72%, #FF64D8 100%)',
+					}}
+				>
+					{asset.kind === 'video' && asset.posterUrl && (
+						// eslint-disable-next-line @next/next/no-img-element -- presigned R2 URL, not a static asset
+						<img
+							src={asset.posterUrl}
+							alt=""
+							className="h-full w-full object-cover"
+						/>
 					)}
+					<span
+						className={`absolute inset-0 flex items-center justify-center bg-black/10 transition-opacity ${playOverlayClassName}`}
+					>
+						<span className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-black/70 text-white">
+							{isPlaying ? (
+								<Pause className="h-3.5 w-3.5" />
+							) : (
+								<Play className="h-3.5 w-3.5 fill-white" />
+							)}
+						</span>
+					</span>
 				</span>
-				<span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-black/70 text-white">
-					<Play className="h-3.5 w-3.5 fill-white" />
+				<span className="flex min-w-0 flex-1 flex-col justify-center gap-[1px]">
+					<span className="truncate font-inter text-[16px] font-medium leading-[19px] text-black">
+						{displayTitle}
+					</span>
+					<ProfileMediaWaveform />
 				</span>
 			</button>
+			{isAudio && asset.url && (
+				<audio
+					ref={audioRef}
+					src={asset.url}
+					preload="metadata"
+					className="hidden"
+					onPlay={() => setIsPlaying(true)}
+					onPause={() => setIsPlaying(false)}
+					onEnded={() => setIsPlaying(false)}
+				/>
+			)}
 			<button
 				type="button"
 				onClick={onDelete}
