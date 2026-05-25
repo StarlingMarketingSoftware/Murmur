@@ -19,6 +19,7 @@ import {
 import { Form } from '@/components/ui/form';
 import { useForm } from 'react-hook-form';
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
+import { ProfileSidePanelBox } from '@/components/molecules/HybridPromptInput/ProfileSidePanelBox';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 // EmailGeneration kept available but not used in current view
 // import { EmailGeneration } from './EmailGeneration/EmailGeneration';
@@ -682,6 +683,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		view === 'overview' && !isMobile && !isNarrowDesktop && !isNarrowestDesktop;
 	const shouldShowOverviewRightRailSearchPanel =
 		shouldShowOverviewRightRail && isOverviewRightRailSearchActive;
+	const [isProfileSidePanelOpen, setIsProfileSidePanelOpen] = useState(false);
+	const shouldUseProfileSidePanel = view === 'testing' && !isMobile && !isNarrowestDesktop;
+	const handleOpenProfileSidePanel = useCallback(() => {
+		if (!shouldUseProfileSidePanel) return;
+		setIsProfileSidePanelOpen(true);
+	}, [shouldUseProfileSidePanel]);
+	useEffect(() => {
+		if (!shouldUseProfileSidePanel && isProfileSidePanelOpen) {
+			setIsProfileSidePanelOpen(false);
+		}
+	}, [shouldUseProfileSidePanel, isProfileSidePanelOpen]);
 	const overviewRightRailSearchText = (overviewRightRailSearchQuery ?? '').trim();
 	const overviewRightRailSearchContactsResolved = useMemo(
 		() => overviewRightRailSearchContacts ?? [],
@@ -2587,6 +2599,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const displayedContactForResearch = isDraftPreviewOpen
 		? selectedContactForResearch
 		: hoveredContactForResearch || selectedContactForResearch;
+	const profileSidePanelName = miniProfileFields?.name ?? null;
+	const profileSidePanelGenre = miniProfileFields?.genre ?? null;
+	const profileSidePanelArea = miniProfileFields?.area ?? null;
+	const profileSidePanelPerformingName = miniProfileFields?.band ?? null;
+	const profileSidePanelBio = miniProfileFields?.bio ?? null;
 
 	const handleKeepTestDraft = useCallback(
 		async (explicitContact?: ContactWithName | null) => {
@@ -3559,20 +3576,37 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									gap: `${standardSidePanelGapPx}px`,
 								}}
 							>
-								<CampaignHeaderBox
-									campaignId={campaign?.id}
-									campaignName={campaign?.name || 'Untitled Campaign'}
-									toListNames={toListNames}
-									fromName={fromName}
-									contactsCount={contactsCount}
-									draftCount={draftCount}
-									sentCount={sentCount}
-									draftingProgress={draftingProgressForHeader}
-									onFromClick={onOpenIdentityDialog}
-									onDraftsClick={goToDrafting}
-									onSentClick={goToSent}
-								/>
-								{view === 'inbox' && (
+								{view === 'testing' && isProfileSidePanelOpen ? (
+									<ProfileSidePanelBox
+										profileName={profileSidePanelName}
+										profileGenre={profileSidePanelGenre}
+										profileArea={profileSidePanelArea}
+										profilePerformingName={profileSidePanelPerformingName}
+										profileBio={profileSidePanelBio}
+										onProfileNameUpdate={(name) => handleIdentityUpdate({ name })}
+										onProfileGenreUpdate={(genre) => handleIdentityUpdate({ genre })}
+										onProfileAreaUpdate={(area) => handleIdentityUpdate({ area })}
+										onProfilePerformingNameUpdate={(bandName) =>
+											handleIdentityUpdate({ bandName })
+										}
+										onProfileBioUpdate={(bio) => handleIdentityUpdate({ bio })}
+									/>
+								) : (
+									<>
+										<CampaignHeaderBox
+											campaignId={campaign?.id}
+											campaignName={campaign?.name || 'Untitled Campaign'}
+											toListNames={toListNames}
+											fromName={fromName}
+											contactsCount={contactsCount}
+											draftCount={draftCount}
+											sentCount={sentCount}
+											draftingProgress={draftingProgressForHeader}
+											onFromClick={onOpenIdentityDialog}
+											onDraftsClick={goToDrafting}
+											onSentClick={goToSent}
+										/>
+										{view === 'inbox' && (
 									<ContactsExpandedList
 										contacts={contactsForContactsExpandedList}
 										{...contactsListSupplementalProps}
@@ -3804,8 +3838,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											)}
 										</div>
 									))}
+									</>
+								)}
 
 								{view === 'testing' &&
+									!isProfileSidePanelOpen &&
 									(isPromptInputHovered || isSuggestionBoxHovered) &&
 									isCustomInstructionsOpen &&
 									(suggestionText1 || suggestionText2) && (
@@ -5116,7 +5153,24 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										<div className="flex flex-row items-start justify-center gap-[10px]">
 											{/* Left column: Campaign Header + Contacts + Research */}
 											<div className="flex flex-col" style={{ gap: '10px' }}>
-												<CampaignHeaderBox
+										{isProfileSidePanelOpen ? (
+							<ProfileSidePanelBox
+								profileName={profileSidePanelName}
+								profileGenre={profileSidePanelGenre}
+								profileArea={profileSidePanelArea}
+								profilePerformingName={profileSidePanelPerformingName}
+								profileBio={profileSidePanelBio}
+								onProfileNameUpdate={(name) => handleIdentityUpdate({ name })}
+								onProfileGenreUpdate={(genre) => handleIdentityUpdate({ genre })}
+								onProfileAreaUpdate={(area) => handleIdentityUpdate({ area })}
+								onProfilePerformingNameUpdate={(bandName) =>
+									handleIdentityUpdate({ bandName })
+								}
+								onProfileBioUpdate={(bio) => handleIdentityUpdate({ bio })}
+							/>
+												) : (
+													<>
+														<CampaignHeaderBox
 													campaignId={campaign?.id}
 													campaignName={campaign?.name || 'Untitled Campaign'}
 													toListNames={toListNames}
@@ -5186,7 +5240,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														style={{ display: 'block' }}
 													/>
 												)}
-											</div>
+												</>
+											)}
+										</div>
 											{/* Right column: Writing box */}
 											<div>
 												<HybridPromptInput
@@ -5226,14 +5282,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													hasPreviousPrompt={hasPreviousPrompt}
 													onUndoUpscalePrompt={undoUpscalePrompt}
 													onHoverChange={handlePromptInputHoverChange}
-													onCustomInstructionsOpenChange={setIsCustomInstructionsOpen}
-													hideDraftButton={true}
-													identity={campaign?.identity}
-													onIdentityUpdate={handleIdentityUpdate}
-													autoOpenProfileTabWhenIncomplete={
-														props.autoOpenProfileTabWhenIncomplete
-													}
-												/>
+												onCustomInstructionsOpenChange={setIsCustomInstructionsOpen}
+												hideDraftButton={true}
+												identity={campaign?.identity}
+												onIdentityUpdate={handleIdentityUpdate}
+												onProfilePanelOpen={
+													shouldUseProfileSidePanel ? handleOpenProfileSidePanel : undefined
+												}
+												autoOpenProfileTabWhenIncomplete={
+													props.autoOpenProfileTabWhenIncomplete
+												}
+											/>
 											</div>
 										</div>
 										{/* Draft button with arrows - spans full width below both columns */}
@@ -5409,6 +5468,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											hideDraftButton={isNarrowestDesktop}
 											identity={campaign?.identity}
 											onIdentityUpdate={handleIdentityUpdate}
+											onProfilePanelOpen={
+												shouldUseProfileSidePanel ? handleOpenProfileSidePanel : undefined
+											}
 											autoOpenProfileTabWhenIncomplete={
 												props.autoOpenProfileTabWhenIncomplete
 											}
@@ -7546,6 +7608,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onGoToSearch={onGoToSearch}
 											inboxSentTabRequest={effectiveInboxSentTabRequest}
 											onInboxSentTabChange={onInboxSentTabChange}
+											onCampaignInboxEmpty={
+												inboxMockOverrideActive ? undefined : goToOverview
+											}
 											onThreadReplySent={handleInboxThreadReplySent}
 											sampleData={inboxSectionSampleData}
 											onContactSelect={(contact) => {
@@ -7637,6 +7702,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onGoToSearch={onGoToSearch}
 													inboxSentTabRequest={effectiveInboxSentTabRequest}
 													onInboxSentTabChange={onInboxSentTabChange}
+													onCampaignInboxEmpty={
+														inboxMockOverrideActive ? undefined : goToOverview
+													}
 													selectedEmailId={selectedInboxEmailId}
 													onSelectedEmailIdChange={setSelectedInboxEmailId}
 													onThreadReplySent={handleInboxThreadReplySent}
@@ -7675,6 +7743,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												onGoToSearch={onGoToSearch}
 												inboxSentTabRequest={effectiveInboxSentTabRequest}
 												onInboxSentTabChange={onInboxSentTabChange}
+												onCampaignInboxEmpty={
+													inboxMockOverrideActive ? undefined : goToOverview
+												}
 												selectedEmailId={selectedInboxEmailId}
 												onSelectedEmailIdChange={setSelectedInboxEmailId}
 												onThreadReplySent={handleInboxThreadReplySent}

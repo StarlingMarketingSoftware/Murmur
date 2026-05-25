@@ -133,6 +133,240 @@ const HPI_GREEN_BG_GRADIENT =
 const HPI_GREEN_BG_GRADIENT_HOVER =
 	'linear-gradient(to bottom, #A6E2A8 0%, #A6E2A8 25%, #7BDB7E 100%)';
 
+type ProfileSummaryFields = {
+	name: string;
+	genre: string;
+	area: string;
+	band: string;
+	bio: string;
+	links: string;
+};
+
+type ProfileSummaryItem = {
+	key: string;
+	text: string;
+	bgClass: string;
+};
+
+type ProfileSummaryModel = {
+	nameText: string;
+	nameInitial: string;
+	hasName: boolean;
+	items: ProfileSummaryItem[];
+	completionPercent: number;
+	fillWidthPx: number;
+	fillColor: string;
+	darkOverlayOpacity: number;
+	isComplete: boolean;
+};
+
+const PROFILE_SUMMARY_TOP_BAR_WIDTH_PX = 455.57;
+const PROFILE_SUMMARY_FILL_WIDTH_PX_BY_SEQUENTIAL_COUNT = [
+	0,
+	18,
+	187,
+	(187 + 345) / 2,
+	345,
+	(345 + PROFILE_SUMMARY_TOP_BAR_WIDTH_PX) / 2,
+	PROFILE_SUMMARY_TOP_BAR_WIDTH_PX,
+] as const;
+const PROFILE_SUMMARY_MAX_DARK_OVERLAY_OPACITY = 0.2;
+
+const getProfileBioIsComplete = (bio: string) => {
+	const trimmed = bio.trim();
+	if (!trimmed) return false;
+	const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
+	return wordCount >= 7 && /[.!?…]/.test(trimmed);
+};
+
+const buildProfileSummaryModel = (
+	profileFields: Partial<ProfileSummaryFields> | null | undefined
+): ProfileSummaryModel => {
+	const truncate = (value: string, max: number) => {
+		const v = value.trim();
+		if (v.length <= max) return v;
+		return v.slice(0, Math.max(0, max - 1)).trimEnd() + '…';
+	};
+
+	const name = (profileFields?.name ?? '').trim();
+	const genre = (profileFields?.genre ?? '').trim();
+	const area = (profileFields?.area ?? '').trim();
+	const band = (profileFields?.band ?? '').trim();
+	const bio = (profileFields?.bio ?? '').trim();
+	const links = (profileFields?.links ?? '')
+		.split(/\r?\n|,/g)
+		.map((s) => s.trim())
+		.filter(Boolean);
+
+	const items: ProfileSummaryItem[] = [];
+	if (genre) {
+		items.push({ key: 'profile-genre', text: truncate(genre, 24), bgClass: 'bg-[#EBEBEB]' });
+	}
+	if (area) {
+		items.push({ key: 'profile-area', text: truncate(area, 32), bgClass: 'bg-[#EBEBEB]' });
+	}
+	if (band) {
+		items.push({ key: 'profile-band', text: truncate(band, 32), bgClass: 'bg-[#EBEBEB]' });
+	}
+	if (bio) {
+		items.push({ key: 'profile-bio', text: 'Bio', bgClass: 'bg-[#EBEBEB]' });
+	}
+	if (links.length > 0) {
+		items.push({
+			key: 'profile-links',
+			text: links.length === 1 ? 'Link' : `${links.length} Links`,
+			bgClass: 'bg-[#EBEBEB]',
+		});
+	}
+
+	const completedProfileSteps = [
+		Boolean(name),
+		Boolean(genre),
+		Boolean(area),
+		Boolean(band),
+		getProfileBioIsComplete(bio),
+		links.length > 0,
+	];
+	let sequentialCompletedCount = 0;
+	for (const isStepComplete of completedProfileSteps) {
+		if (!isStepComplete) break;
+		sequentialCompletedCount += 1;
+	}
+	const fillWidthPx =
+		PROFILE_SUMMARY_FILL_WIDTH_PX_BY_SEQUENTIAL_COUNT[sequentialCompletedCount] ?? 0;
+	const isComplete = sequentialCompletedCount === completedProfileSteps.length;
+	const completionPercent = Math.round(
+		(fillWidthPx / PROFILE_SUMMARY_TOP_BAR_WIDTH_PX) * 100
+	);
+
+	return {
+		nameText: name || 'Name',
+		nameInitial: name.charAt(0).toUpperCase() || '?',
+		hasName: Boolean(name),
+		items,
+		completionPercent,
+		fillWidthPx,
+		fillColor: isComplete ? '#7BDB7F' : '#95CFFF',
+		darkOverlayOpacity:
+			PROFILE_SUMMARY_MAX_DARK_OVERLAY_OPACITY * (1 - completionPercent / 100),
+		isComplete,
+	};
+};
+
+const ProfileCompletionDarkOverlay = ({
+	opacity,
+	className,
+	zIndex,
+}: {
+	opacity: number;
+	className?: string;
+	zIndex?: number;
+}) => (
+	<div
+		aria-hidden="true"
+		className={cn(
+			'pointer-events-none absolute inset-0 z-10 bg-black transition-opacity duration-200 ease-out',
+			className
+		)}
+		style={{ opacity, zIndex }}
+	/>
+);
+
+const ProfileSummaryBox = ({
+	summary,
+	onOpen,
+}: {
+	summary: ProfileSummaryModel;
+	onOpen?: () => void;
+}) => {
+	const handleOpen = (event: React.MouseEvent<HTMLDivElement>) => {
+		event.stopPropagation();
+		onOpen?.();
+	};
+
+	const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+		if (!onOpen) return;
+		if (event.key !== 'Enter' && event.key !== ' ') return;
+		event.preventDefault();
+		event.stopPropagation();
+		onOpen();
+	};
+
+	return (
+		<div
+			className={cn(
+				'relative z-50 w-[455.57px] max-w-full h-[104px] self-center bg-white rounded-[8px] border-2 border-black overflow-hidden flex flex-col',
+				onOpen ? 'cursor-pointer' : 'cursor-default'
+			)}
+			role={onOpen ? 'button' : undefined}
+			tabIndex={onOpen ? 0 : undefined}
+			aria-label={onOpen ? `Open Profile (${summary.completionPercent}% complete)` : undefined}
+			onClick={onOpen ? handleOpen : undefined}
+			onKeyDown={onOpen ? handleKeyDown : undefined}
+		>
+			<div className="relative h-[26px] shrink-0 border-b border-black bg-white">
+				<div className="absolute inset-0 overflow-hidden">
+					<div
+						aria-hidden="true"
+						className="absolute inset-y-0 left-0 transition-[width,background-color] duration-200 ease-out"
+						style={{
+							width: `min(${summary.fillWidthPx}px, 100%)`,
+							backgroundColor: summary.fillColor,
+						}}
+					/>
+					{summary.fillWidthPx > 0 &&
+						summary.fillWidthPx < PROFILE_SUMMARY_TOP_BAR_WIDTH_PX && (
+							<div
+								aria-hidden="true"
+								className="absolute top-0 bottom-0 w-px bg-black transition-[left] duration-200 ease-out"
+								style={{ left: `min(${summary.fillWidthPx}px, 100%)` }}
+							/>
+						)}
+				</div>
+				<div
+					aria-hidden="true"
+					className="absolute left-[9px] top-1/2 z-20 w-[22px] h-[22px] -translate-y-1/2 rounded-full bg-[#7BDB7F] flex items-center justify-center font-inter font-normal text-[14px] leading-none text-white"
+				>
+					{summary.nameInitial}
+				</div>
+				<div className="relative z-10 h-full flex items-center pr-[8px]">
+					<span
+						className={cn(
+							'ml-[23px] max-w-[calc(100%_-_68px)] min-h-[17px] rounded-[3px] bg-[#D6FFED] pl-[14px] pr-[6px] py-[1px]',
+							'inline-flex items-center font-inter font-normal text-[13px] leading-[16px] text-black truncate',
+							!summary.hasName && 'opacity-50'
+						)}
+					>
+						{summary.nameText}
+					</span>
+					{summary.isComplete && (
+						<span className="ml-auto font-inter font-semibold text-[13px] leading-none text-black">
+							100
+						</span>
+					)}
+				</div>
+			</div>
+			<div className="relative flex-1 min-h-0 px-2 pt-[10px] pb-2 overflow-y-auto overflow-x-hidden hide-native-scrollbar bg-white">
+				<div className="relative z-10 flex flex-wrap gap-x-[6px] gap-y-[8px] content-start">
+					{summary.items.map((item) => (
+						<span
+							key={item.key}
+							className={cn(
+								'inline-flex h-[20.071px] items-center rounded-[7.034px] px-[8px]',
+								'font-inter font-normal text-[13px] leading-[16px] max-[480px]:text-[11px] max-[480px]:leading-[14px]',
+								'text-black max-w-full whitespace-nowrap',
+								item.bgClass
+							)}
+						>
+							{item.text}
+						</span>
+					))}
+				</div>
+			</div>
+		</div>
+	);
+};
+
 interface SortableAIBlockProps {
 	block: {
 		value: HybridBlock;
@@ -361,105 +595,10 @@ const SortableAIBlock = ({
 	const isMobileHook = useIsMobile();
 	const isMobile = forceDesktop ? false : isMobileHook;
 
-	type ProfileFields = {
-		name: string;
-		genre: string;
-		area: string;
-		band: string;
-		bio: string;
-		links: string;
-	};
-
-	type ProfileChipItem = {
-		key: string;
-		text: string;
-		bgClass: string;
-		isEmpty: boolean;
-	};
-
-	const profileChipItems = useMemo<ProfileChipItem[]>(() => {
-		if (!isFullAutomatedBlock) return [];
-		const pf: ProfileFields = {
-			name: profileFields?.name ?? '',
-			genre: profileFields?.genre ?? '',
-			area: profileFields?.area ?? '',
-			band: profileFields?.band ?? '',
-			bio: profileFields?.bio ?? '',
-			links: profileFields?.links ?? '',
-		};
-
-		const truncate = (value: string, max: number) => {
-			const v = value.trim();
-			if (v.length <= max) return v;
-			return v.slice(0, Math.max(0, max - 1)).trimEnd() + '…';
-		};
-
-		const chips: ProfileChipItem[] = [];
-
-		const name = pf.name.trim();
-		const genre = pf.genre.trim();
-		const area = pf.area.trim();
-		const band = pf.band.trim();
-		const bio = pf.bio.trim();
-		const linksRaw = pf.links.trim();
-
-		chips.push({
-			key: 'profile-name',
-			text: name ? `Nme. ${truncate(name, 28)}` : 'Nme.',
-			bgClass: 'bg-[#CAE7FF]',
-			isEmpty: !name,
-		});
-		chips.push({
-			key: 'profile-genre',
-			text: genre ? `Gnre. ${truncate(genre, 22)}` : 'Gnre.',
-			bgClass: 'bg-[#BFE2FF]',
-			isEmpty: !genre,
-		});
-		chips.push({
-			key: 'profile-area',
-			text: area ? `Area. ${truncate(area, 30)}` : 'Area.',
-			bgClass: 'bg-[#CAFDFF]',
-			isEmpty: !area,
-		});
-		chips.push({
-			key: 'profile-band',
-			text: band ? `Artst Nme. ${truncate(band, 30)}` : 'Artst Nme.',
-			bgClass: 'bg-[#C6FFFC]',
-			isEmpty: !band,
-		});
-		chips.push({
-			key: 'profile-bio',
-			text: bio ? `Bio. “${truncate(bio, 48)}”` : 'Bio.',
-			bgClass: 'bg-[#C8FFE1]',
-			isEmpty: !bio,
-		});
-
-		const links = linksRaw
-			.split(/\r?\n|,/g)
-			.map((s) => s.trim())
-			.filter(Boolean);
-
-		if (links.length === 0) {
-			chips.push({
-				key: 'profile-link-0',
-				text: 'Link.',
-				bgClass: 'bg-[#C5F7C9]',
-				isEmpty: true,
-			});
-		} else {
-			for (let i = 0; i < links.length; i++) {
-				const link = links[i];
-				chips.push({
-					key: `profile-link-${i}`,
-					text: `Link. ${truncate(link, 42)}`,
-					bgClass: 'bg-[#C5F7C9]',
-					isEmpty: false,
-				});
-			}
-		}
-
-		return chips;
-	}, [isFullAutomatedBlock, profileFields]);
+	const profileSummary = useMemo(
+		() => (isFullAutomatedBlock ? buildProfileSummaryModel(profileFields) : null),
+		[isFullAutomatedBlock, profileFields]
+	);
 
 	// Full Auto: prompt score meter helpers (display only)
 	const clampedPromptScore = useMemo(() => {
@@ -1103,48 +1242,19 @@ const SortableAIBlock = ({
 									<div className="min-h-[60px] w-full px-1 pb-1">
 										<div
 											className={cn(
-												'w-full rounded-b-[6px] p-2 flex justify-center transition-colors duration-75 ease-out',
+												'relative w-full rounded-b-[6px] p-2 flex justify-center transition-colors duration-75 ease-out overflow-hidden',
 												selectedPowerMode === 'high'
 													? 'bg-[#58A6E5]'
 													: 'bg-[#88C5F7]'
 											)}
 										>
-											<div className="w-[448px] max-w-full flex flex-col items-start">
-												<div
-													className="w-full h-[104px] bg-white rounded-[8px] border border-black px-2 pt-1 pb-2 overflow-y-auto overflow-x-hidden hide-native-scrollbar cursor-pointer"
-													role="button"
-													tabIndex={0}
-													aria-label="Open Profile"
-													onClick={(e) => {
-														e.stopPropagation();
-														onGoToProfileTab?.();
-													}}
-													onKeyDown={(e) => {
-														if (e.key === 'Enter' || e.key === ' ') {
-															e.preventDefault();
-															e.stopPropagation();
-															onGoToProfileTab?.();
-														}
-													}}
-												>
-													<div className="font-inter font-normal text-[13px] leading-[16px] text-black mb-[7px]">
-														Profile
-													</div>
-													<div className="flex flex-wrap gap-x-[6px] gap-y-[10px] content-start">
-														{profileChipItems.map((chip) => (
-															<span
-																key={chip.key}
-																className={cn(
-																	'inline-flex items-center rounded-[5px] px-[5px] py-[0.5px] font-inter font-normal text-[10px] leading-[12px] max-[480px]:text-[8px] max-[480px]:leading-[10px] text-black max-w-full whitespace-nowrap',
-																	chip.bgClass,
-																	chip.isEmpty && 'opacity-50'
-																)}
-															>
-																{chip.text}
-															</span>
-														))}
-													</div>
-												</div>
+											<div className="w-[455.57px] max-[480px]:w-full flex flex-col items-start">
+												{profileSummary && (
+													<ProfileSummaryBox
+														summary={profileSummary}
+														onOpen={onGoToProfileTab}
+													/>
+												)}
 
 												{/* Booking For box (203 x 28px) + dropdown - rendered before Custom Instructions when closed */}
 												{!isCustomInstructionsOpen && (
@@ -2642,6 +2752,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		dataCampaignMainBox,
 		onGoToContacts,
 		onGoToInbox,
+		onProfilePanelOpen,
+		autoOpenProfileTabWhenIncomplete,
 		forceDesktop,
 	} = props;
 
@@ -3644,7 +3756,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	// Track which tab is active: 'main' (the normal Writing view) or 'profile'
 	const [activeTab, setActiveTab] = useState<'main' | 'profile'>(() => {
-		if (!props.autoOpenProfileTabWhenIncomplete) return 'main';
+		if (onProfilePanelOpen) return 'main';
+		if (!autoOpenProfileTabWhenIncomplete) return 'main';
 		const id = identity as {
 			name?: string | null;
 			genre?: string | null;
@@ -3658,6 +3771,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			!(id?.bio ?? '').trim();
 		return isIncomplete ? 'profile' : 'main';
 	});
+	const handleOpenProfile = useCallback(() => {
+		if (onProfilePanelOpen) {
+			onProfilePanelOpen();
+			return;
+		}
+
+		setActiveTab('profile');
+	}, [onProfilePanelOpen]);
 
 	// Auto tab: background gradient wave on "Generate Test" hover (desktop)
 	const [isAutoGenerateTestHovered, setIsAutoGenerateTestHovered] = useState(false);
@@ -3766,86 +3887,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		identityProfile?.website,
 	]);
 
-	// Hybrid: profile chips (match Full Auto Profile section formatting)
-	type HybridProfileChipItem = {
-		key: string;
-		text: string;
-		bgClass: string;
-		isEmpty: boolean;
-	};
-	const hybridProfileChipItems = useMemo<HybridProfileChipItem[]>(() => {
-		const truncate = (value: string, max: number) => {
-			const v = (value || '').trim();
-			if (v.length <= max) return v;
-			return v.slice(0, Math.max(0, max - 1)).trimEnd() + '…';
-		};
-
-		const chips: HybridProfileChipItem[] = [];
-
-		const name = (profileFields?.name ?? '').trim();
-		const genre = (profileFields?.genre ?? '').trim();
-		const area = (profileFields?.area ?? '').trim();
-		const band = (profileFields?.band ?? '').trim();
-		const bio = (profileFields?.bio ?? '').trim();
-		const linksRaw = (profileFields?.links ?? '').trim();
-
-		chips.push({
-			key: 'profile-name',
-			text: name ? `Nme. ${truncate(name, 28)}` : 'Nme.',
-			bgClass: 'bg-[#CAE7FF]',
-			isEmpty: !name,
-		});
-		chips.push({
-			key: 'profile-genre',
-			text: genre ? `Gnre. ${truncate(genre, 22)}` : 'Gnre.',
-			bgClass: 'bg-[#BFE2FF]',
-			isEmpty: !genre,
-		});
-		chips.push({
-			key: 'profile-area',
-			text: area ? `Area. ${truncate(area, 30)}` : 'Area.',
-			bgClass: 'bg-[#CAFDFF]',
-			isEmpty: !area,
-		});
-		chips.push({
-			key: 'profile-band',
-			text: band ? `Artst Nme. ${truncate(band, 30)}` : 'Artst Nme.',
-			bgClass: 'bg-[#C6FFFC]',
-			isEmpty: !band,
-		});
-		chips.push({
-			key: 'profile-bio',
-			text: bio ? `Bio. “${truncate(bio, 48)}”` : 'Bio.',
-			bgClass: 'bg-[#C8FFE1]',
-			isEmpty: !bio,
-		});
-
-		const links = linksRaw
-			.split(/\r?\n|,/g)
-			.map((s) => s.trim())
-			.filter(Boolean);
-
-		if (links.length === 0) {
-			chips.push({
-				key: 'profile-link-0',
-				text: 'Link.',
-				bgClass: 'bg-[#C5F7C9]',
-				isEmpty: true,
-			});
-		} else {
-			for (let i = 0; i < links.length; i++) {
-				const link = links[i];
-				chips.push({
-					key: `profile-link-${i}`,
-					text: `Link. ${truncate(link, 42)}`,
-					bgClass: 'bg-[#C5F7C9]',
-					isEmpty: false,
-				});
-			}
-		}
-
-		return chips;
-	}, [profileFields]);
+	const hybridProfileSummary = useMemo(
+		() => buildProfileSummaryModel(profileFields),
+		[profileFields]
+	);
 
 	// Profile score bar (weighted by UI order; more rules will follow)
 	const PROFILE_PROGRESS_SEQUENCE = [
@@ -4001,12 +4046,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	// If requested by the parent, automatically route the user into the Profile tab
 	// when key profile fields are still missing.
 	useEffect(() => {
-		if (!props.autoOpenProfileTabWhenIncomplete) return;
+		if (!autoOpenProfileTabWhenIncomplete) return;
 		if (!isKeyProfileIncomplete) return;
 		if (didAutoOpenProfileTabRef.current) return;
-		setActiveTab('profile');
+		handleOpenProfile();
 		didAutoOpenProfileTabRef.current = true;
-	}, [props.autoOpenProfileTabWhenIncomplete, isKeyProfileIncomplete]);
+	}, [autoOpenProfileTabWhenIncomplete, isKeyProfileIncomplete, handleOpenProfile]);
 
 	type ProfileField = 'name' | 'genre' | 'area' | 'band' | 'bio' | 'links';
 
@@ -4587,6 +4632,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								<div
 									aria-hidden="true"
 									className="pointer-events-none absolute -inset-[3px] z-[60] rounded-[8px] border-[3px] border-black"
+								/>
+							)}
+							{activeTab === 'main' && selectedModeKey === 'full' && (
+								<ProfileCompletionDarkOverlay
+									opacity={hybridProfileSummary.darkOverlayOpacity}
+									className="rounded-[5px]"
+									zIndex={30}
 								/>
 							)}
 							{/* Auto: hover wave background shift (desktop only) */}
@@ -6319,21 +6371,22 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										{selectedModeKey === 'hybrid' && (
 											<div className="w-full flex flex-col items-center -mt-2 max-[480px]:mt-0">
 												{/* Main content: 468 x 364 box (r=8) */}
-												<div
-													className={cn(
-														showTestPreview
-															? cn('w-[426px]', !forceDesktop && 'max-[480px]:w-[89.33vw]')
-															: cn(!forceDesktop ? 'w-[89.33vw]' : 'w-[468px]', 'max-w-[468px]'),
-														'min-h-[364px] rounded-[8px] border-[3px] border-black bg-[#8989E1] flex flex-col overflow-visible'
-													)}
-													data-hpi-hybrid-main-box
-												>
+											<div
+												className={cn(
+													showTestPreview
+														? cn('w-[426px]', !forceDesktop && 'max-[480px]:w-[89.33vw]')
+														: cn(!forceDesktop ? 'w-[89.33vw]' : 'w-[468px]', 'max-w-[468px]'),
+													'relative min-h-[364px] rounded-[8px] border-[3px] border-black bg-[#8989E1] flex flex-col overflow-visible'
+												)}
+												data-hpi-hybrid-main-box
+											>
+												<ProfileCompletionDarkOverlay
+													opacity={hybridProfileSummary.darkOverlayOpacity}
+													className="rounded-[5px]"
+												/>
 													{/* Header: Body + power mode toggles */}
 													<div
-														className={cn(
-															'h-[27px] flex items-stretch rounded-t-[8px] overflow-hidden',
-															'bg-[#DADAFC]'
-														)}
+														className="h-[27px] flex items-stretch rounded-t-[8px] overflow-hidden bg-[#DADAFC]"
 														data-hpi-hybrid-body-header
 													>
 														<div className="flex-1 flex items-center pl-[16px]">
@@ -6387,46 +6440,15 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														<div className="w-[31px] flex-shrink-0" />
 													</div>
 
-													{/* Top content: Profile + Booking For */}
-													<div className="w-full px-[10px] pt-[14px] pb-[12px]">
-														<div className="w-[448px] max-w-full mx-auto flex flex-col items-start">
-															<div
-																className="w-full h-[104px] bg-white rounded-[8px] border-2 border-black px-2 pt-1 pb-2 overflow-y-auto overflow-x-hidden hide-native-scrollbar cursor-pointer"
-																role="button"
-																tabIndex={0}
-																aria-label="Open Profile"
-																onClick={(e) => {
-																	e.stopPropagation();
-																	setActiveTab('profile');
-																}}
-																onKeyDown={(e) => {
-																	if (e.key === 'Enter' || e.key === ' ') {
-																		e.preventDefault();
-																		e.stopPropagation();
-																		setActiveTab('profile');
-																	}
-																}}
-															>
-																<div className="font-inter font-normal text-[13px] leading-[16px] text-black mb-[7px]">
-																	Profile
-																</div>
-																<div className="flex flex-wrap gap-x-[6px] gap-y-[10px] content-start">
-																	{hybridProfileChipItems.map((chip) => (
-																		<span
-																			key={chip.key}
-																			className={cn(
-																				'inline-flex items-center rounded-[5px] px-[5px] py-[0.5px] font-inter font-normal text-[10px] leading-[12px] text-black max-w-full whitespace-nowrap',
-																				chip.bgClass,
-																				chip.isEmpty && 'opacity-50'
-																			)}
-																		>
-																			{chip.text}
-																		</span>
-																	))}
-																</div>
-															</div>
+												{/* Top content: Profile + Booking For */}
+												<div className="w-full px-[10px] pt-[14px] pb-[12px]">
+													<div className="w-[455.57px] max-[480px]:w-full mx-auto flex flex-col items-start">
+													<ProfileSummaryBox
+														summary={hybridProfileSummary}
+														onOpen={handleOpenProfile}
+													/>
 
-															{/* Booking For */}
+														{/* Booking For */}
 															<BookingForDropdownControl
 																controller={hybridBookingForDropdown}
 																useStaticDropdownPosition={useStaticDropdownPosition}
@@ -7347,9 +7369,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																				? handleCustomInstructionsOpenChange
 																				: undefined
 																		}
-																		profileFields={profileFields}
-																		onGoToProfileTab={() => setActiveTab('profile')}
-																		isDragDisabled={isHybridModeSelected}
+												profileFields={profileFields}
+												onGoToProfileTab={handleOpenProfile}
+												isDragDisabled={isHybridModeSelected}
 																		useStaticDropdownPosition={useStaticDropdownPosition}
 																		forceDesktop={forceDesktop}
 																	/>

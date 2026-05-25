@@ -255,6 +255,12 @@ interface InboxSectionProps {
 	autoSelectFirstEmail?: boolean;
 	detailOnly?: boolean;
 	hideSelectedEmailBackButton?: boolean;
+	/**
+	 * Campaign inbox only: called when the campaign inbox has no messages at all
+	 * (no replies AND nothing sent). The parent should navigate away from the inbox
+	 * view so the box never lands on the empty "Check Back Later" state.
+	 */
+	onCampaignInboxEmpty?: () => void;
 }
 
 /**
@@ -763,6 +769,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	autoSelectFirstEmail = false,
 	detailOnly = false,
 	hideSelectedEmailBackButton = false,
+	onCampaignInboxEmpty,
 }) => {
 	const detectedIsMobile = useIsMobile();
 	const isMobile = forceDesktopLayout ? false : Boolean(detectedIsMobile);
@@ -890,6 +897,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	const hasUserSelectedInboxSentTabRef = useRef(false);
 	const hasAutoInitializedInboxSentTabRef = useRef(false);
 	const hasNotifiedInitialInboxSentTabRef = useRef(false);
+	const hasNotifiedCampaignInboxEmptyRef = useRef(false);
 	const [internalSelectedEmailId, setInternalSelectedEmailId] = useState<number | null>(
 		null
 	);
@@ -956,6 +964,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		hasUserSelectedInboxSentTabRef.current = false;
 		hasAutoInitializedInboxSentTabRef.current = false;
 		hasNotifiedInitialInboxSentTabRef.current = false;
+		hasNotifiedCampaignInboxEmptyRef.current = false;
 	}, [campaignId]);
 
 	// Ensure the parent (campaign page) knows which Inbox/Sent tab is active on first paint.
@@ -1474,6 +1483,51 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		});
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [inboxSentTabRequest?.requestId]);
+
+	// Campaign inbox: never sit on an empty Inbox/Sent tab.
+	// If the active tab has no messages but the other tab does, switch to the tab that
+	// has messages so the box never lands on the empty "Check Back Later" state while any
+	// message exists. If BOTH tabs are empty, the campaign inbox is truly empty — notify
+	// the parent so it can navigate away from the inbox view entirely.
+	useLayoutEffect(() => {
+		if (!isCampaignInbox) return;
+		// Wait for the contact allowlist + email data so we never act on partial data
+		// (which would briefly look empty and bounce the user out mid-load).
+		if (allowedSenderEmails === undefined) return;
+		if (!isInboundLoaded || !isSentLoaded) return;
+
+		const inboxCount = inboxConversations.length;
+		const sentCount = campaignSentCount;
+
+		if (inboxCount === 0 && sentCount === 0) {
+			if (!hasNotifiedCampaignInboxEmptyRef.current) {
+				hasNotifiedCampaignInboxEmptyRef.current = true;
+				onCampaignInboxEmpty?.();
+			}
+			return;
+		}
+		hasNotifiedCampaignInboxEmptyRef.current = false;
+
+		const activeTabIsEmpty = activeTab === 'inbox' ? inboxCount === 0 : sentCount === 0;
+		if (!activeTabIsEmpty) return;
+
+		const nextTab: 'inbox' | 'sent' = activeTab === 'inbox' ? 'sent' : 'inbox';
+		setActiveTab(nextTab);
+		setSelectedEmailId(null);
+		setReplyMessage('');
+		onInboxSentTabChange?.(nextTab);
+	}, [
+		isCampaignInbox,
+		allowedSenderEmails,
+		isInboundLoaded,
+		isSentLoaded,
+		inboxConversations.length,
+		campaignSentCount,
+		activeTab,
+		onCampaignInboxEmpty,
+		onInboxSentTabChange,
+		setSelectedEmailId,
+	]);
 
 	if (isLoading) {
 		const skeletonRowCount = isMobile ? 5 : 6;
