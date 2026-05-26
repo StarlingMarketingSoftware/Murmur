@@ -106,24 +106,15 @@ export const Navbar = () => {
 	].filter((item) => !(user?.role !== 'admin' && item.path === '/admin'));
 
 	const isLanding = pathname === urls.home.index;
-	const isMapPage = pathname === '/map' || pathname.startsWith('/map/');
 	const isPricingPage = pathname === urls.pricing.index || pathname.startsWith(`${urls.pricing.index}/`);
 	const isResourcesPage =
 		pathname === urls.resources.index || pathname.startsWith(`${urls.resources.index}/`);
-	const isResearchPage = pathname === '/research' || pathname.startsWith('/research/');
-	const isInboxPage = pathname === '/inbox' || pathname.startsWith('/inbox/');
-	const isDraftingPage = pathname === '/drafting' || pathname.startsWith('/drafting/');
-	const showBackArrow = isMapPage || isResearchPage || isInboxPage || isDraftingPage;
-	const isLandingNavbarZoom80 = isLanding || isMapPage;
+	const isLandingNavbarZoom80 = isLanding;
 	const isFreeTrial =
 		pathname === urls.freeTrial.index || pathname.startsWith(`${urls.freeTrial.index}/`);
 	// Navbar is transparent only at the very top of the landing page (before any scroll)
 	const isLandingAtTop = isLanding && !scrolled;
 	const isTransparentHeader = isFreeTrial || isLandingAtTop;
-	// Map + Research + Inbox + Drafting pages: navbar should be fully invisible at the top (so the gradient shows behind it),
-	// then become visible once the user scrolls.
-	const isMapTopTransparent =
-		(isMapPage || isResearchPage || isInboxPage || isDraftingPage) && !scrolled;
 	// Hamburger/X icon color based on page and scroll position:
 	// - Landing page over video hero: white icon for visibility
 	// - Scrolled past hero or other pages (lighter background): dark icon
@@ -173,22 +164,20 @@ export const Navbar = () => {
 								'transition-[background-color,backdrop-filter,border-color,box-shadow] duration-500 ease-out',
 								isTransparentHeader
 									? 'bg-transparent'
-									: isMapTopTransparent
-										? 'bg-transparent'
-										: scrolled
-											? [
-												// Liquid glass - refractive blur that distorts but keeps colors vivid
-												'bg-white/[0.1] backdrop-blur-[10px] backdrop-saturate-[1.8] backdrop-brightness-[1.05]',
-												// Thin bright border line
-												'border-b border-white/25',
-												// Subtle inset highlight
-												'shadow-[inset_0_0.5px_0_0_rgba(255,255,255,0.25)]',
-											]
-											: [
-												// Resting state - lighter refractive effect
-												'bg-white/[0.06] backdrop-blur-[6px] backdrop-saturate-[1.5] backdrop-brightness-[1.02]',
-												'border-b border-white/15',
-											],
+									: scrolled
+										? [
+											// Liquid glass - refractive blur that distorts but keeps colors vivid
+											'bg-white/[0.1] backdrop-blur-[10px] backdrop-saturate-[1.8] backdrop-brightness-[1.05]',
+											// Thin bright border line
+											'border-b border-white/25',
+											// Subtle inset highlight
+											'shadow-[inset_0_0.5px_0_0_rgba(255,255,255,0.25)]',
+										]
+										: [
+											// Resting state - lighter refractive effect
+											'bg-white/[0.06] backdrop-blur-[6px] backdrop-saturate-[1.5] backdrop-brightness-[1.02]',
+											'border-b border-white/15',
+										],
 							]
 				)}
 			>
@@ -201,27 +190,7 @@ export const Navbar = () => {
 					>
 						{/* Left Section - Back arrow on feature pages, UserButton on mobile otherwise */}
 						<div className="min-[1145px]:hidden flex items-center">
-							{showBackArrow ? (
-								<Link
-									href="/"
-									className="text-[#060606] hover:text-gray-500 transition-colors"
-									title="Back to Home"
-									aria-label="Back to Home"
-								>
-									<svg
-										width="22"
-										height="13"
-										viewBox="0 0 27 16"
-										fill="none"
-										xmlns="http://www.w3.org/2000/svg"
-									>
-										<path
-											d="M0.292892 7.29289C-0.0976315 7.68342 -0.0976315 8.31658 0.292892 8.70711L6.65685 15.0711C7.04738 15.4616 7.68054 15.4616 8.07107 15.0711C8.46159 14.6805 8.46159 14.0474 8.07107 13.6569L2.41421 8L8.07107 2.34315C8.46159 1.95262 8.46159 1.31946 8.07107 0.928932C7.68054 0.538408 7.04738 0.538408 6.65685 0.928932L0.292892 7.29289ZM27 8V7L1 7V8V9L27 9V8Z"
-											fill="currentColor"
-										/>
-									</svg>
-								</Link>
-							) : isSignedIn ? (
+							{isSignedIn ? (
 								<UserButton
 									appearance={{
 										elements: {
@@ -238,29 +207,8 @@ export const Navbar = () => {
 								<div className={cn(isMobileMenuOpen ? 'w-5 h-5' : 'w-6 h-6')} /> /* Empty spacer */
 							)}
 						</div>
-						{/* Desktop left section - Back arrow on feature pages, spacer otherwise */}
+						{/* Desktop left section - spacer to balance the layout */}
 						<div className="hidden min-[1145px]:flex items-center w-7 h-7">
-							{showBackArrow && (
-								<Link
-									href="/"
-									className="text-[#060606] hover:text-gray-500 transition-colors"
-									title="Back to Home"
-									aria-label="Back to Home"
-								>
-									<svg
-										width="16"
-										height="10"
-										viewBox="0 0 27 16"
-										fill="none"
-										xmlns="http://www.w3.org/2000/svg"
-									>
-										<path
-											d="M0.292892 7.29289C-0.0976315 7.68342 -0.0976315 8.31658 0.292892 8.70711L6.65685 15.0711C7.04738 15.4616 7.68054 15.4616 8.07107 15.0711C8.46159 14.6805 8.46159 14.0474 8.07107 13.6569L2.41421 8L8.07107 2.34315C8.46159 1.95262 8.46159 1.31946 8.07107 0.928932C7.68054 0.538408 7.04738 0.538408 6.65685 0.928932L0.292892 7.29289ZM27 8V7L1 7V8V9L27 9V8Z"
-											fill="currentColor"
-										/>
-									</svg>
-								</Link>
-							)}
 						</div>
 						{/* Desktop Navigation */}
 						<div className="absolute inset-0 hidden min-[1145px]:flex items-center justify-center pointer-events-none">
@@ -490,8 +438,8 @@ export const Navbar = () => {
 				/>
 			</div>
 
-			{/* Spacer - skip on landing, free-trial, and marketing feature pages that want full-bleed gradients */}
-			{!(isLanding || isFreeTrial || isMapPage || isResearchPage || isInboxPage || isDraftingPage) && <div className="h-12" />}
+			{/* Spacer - skip on landing and free-trial pages */}
+			{!(isLanding || isFreeTrial) && <div className="h-12" />}
 		</>
 	);
 };

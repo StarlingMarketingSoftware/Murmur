@@ -26,7 +26,7 @@ export function GlobalScrollbar() {
 		typeof pathname === 'string' && pathname.startsWith('/murmur/campaign');
 	const hideOnMobileByRoute =
 		typeof pathname === 'string' &&
-		new Set(['/', '/map', '/research', '/inbox', '/drafting']).has(pathname);
+		new Set(['/']).has(pathname);
 
 	const updateScrollbar = useCallback(() => {
 		const { scrollTop, scrollHeight, clientHeight } = document.documentElement;

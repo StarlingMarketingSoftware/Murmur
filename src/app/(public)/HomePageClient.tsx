@@ -1376,16 +1376,6 @@ export default function HomePageClient() {
 								<p className="mt-2 font-inter font-normal text-[10px] leading-snug tracking-[0.01em] text-black text-left">
 									Venues, Festivals, Wineries, Breweries, Coffee Shops; Hundreds of thousands of contacts thoroughly verified by musicians.
 								</p>
-								<div className="mt-2 flex justify-center">
-									<Link
-										href="/map"
-										className="landing-learn-research-btn inline-flex h-[32px] w-full items-center justify-center rounded-[5px] bg-transparent"
-									>
-										<span className="font-inter font-normal text-[13px] text-[#5DAB68]">
-											Learn about the Map
-										</span>
-									</Link>
-								</div>
 							</div>
 						</div>
 						<div
@@ -1434,14 +1424,6 @@ export default function HomePageClient() {
 									Take a look through every contact, and you&apos;ll get to see information on what styles they
 									book, their live music schedules, and even how to actually find the right person.
 								</p>
-								<Link
-									href="/research"
-									className="landing-learn-research-btn mt-6 xs:mt-8 inline-flex h-[44px] xs:h-[48px] px-5 xs:px-6 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
-								>
-									<span className="font-inter font-normal text-[17px] xs:text-[19px] sm:text-[21px] text-[#5DAB68]">
-										Learn about research
-									</span>
-								</Link>
 							</div>
 
 							{/* Demo */}
@@ -1502,14 +1484,6 @@ export default function HomePageClient() {
 											Take a look through every contact, and you&apos;ll get to see information on what styles
 											they book, their live music schedules, and even how to actually find the right person.
 										</p>
-										<Link
-											href="/research"
-											className="landing-learn-research-btn mt-14 inline-flex items-center justify-center w-[302px] h-[51px] rounded-[6px] bg-transparent"
-										>
-											<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
-												Learn about research
-											</span>
-										</Link>
 									</div>
 								</div>
 
@@ -1572,14 +1546,6 @@ export default function HomePageClient() {
 									Never miss a reply! Get full context on each response, including what campaign it came from,
 									all in one place.
 								</p>
-								<Link
-									href="/inbox"
-									className="landing-learn-research-btn mt-6 xs:mt-8 inline-flex h-[44px] xs:h-[48px] px-5 xs:px-6 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
-								>
-									<span className="font-inter font-normal text-[17px] xs:text-[19px] sm:text-[21px] text-[#5DAB68]">
-										Learn about Inbox
-									</span>
-								</Link>
 							</div>
 
 							{/* Demo */}
@@ -1644,14 +1610,6 @@ export default function HomePageClient() {
 										Never miss a reply! Get full context on each response, including what campaign it came from,
 										all in one place.
 									</p>
-									<Link
-										href="/inbox"
-										className="landing-learn-research-btn mt-20 inline-flex items-center justify-center w-[260px] h-[51px] rounded-[6px] bg-transparent"
-									>
-										<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
-											Learn about Inbox
-										</span>
-									</Link>
 								</div>
 							</div>
 							</div>
@@ -1671,14 +1629,6 @@ export default function HomePageClient() {
 									Emails not getting responses? Ditch the templates. Murmur drafts pitches based on your bio and
 									date range that venues actually respond to.
 								</p>
-								<Link
-									href="/drafting"
-									className="landing-learn-research-btn mt-6 xs:mt-8 inline-flex h-[44px] xs:h-[48px] px-5 xs:px-6 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
-								>
-									<span className="font-inter font-normal text-[17px] xs:text-[19px] sm:text-[21px] text-[#5DAB68]">
-										Learn about Drafting
-									</span>
-								</Link>
 							</div>
 
 							{/* Demo */}
@@ -1714,14 +1664,6 @@ export default function HomePageClient() {
 										Emails not getting responses? Ditch the templates. Murmur drafts pitches based on your bio
 										and date range that venues actually respond to.
 									</p>
-									<Link
-										href="/drafting"
-										className="landing-learn-research-btn mt-20 inline-flex items-center justify-center w-[288px] h-[51px] rounded-[6px] bg-transparent"
-									>
-										<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
-											Learn about Drafting
-										</span>
-									</Link>
 								</div>
 							</div>
 

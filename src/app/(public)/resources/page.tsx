@@ -16,10 +16,6 @@ import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor
 import { useResourcesPage } from './useResourcesPage';
 import { Typography } from '@/components/ui/typography';
 import { cn } from '@/utils';
-import ResourceMapNav from '@/components/atoms/_svg/ResourceMapNav';
-import ResourceResearchNav from '@/components/atoms/_svg/ResourceResearchNav';
-import ResourceInboxNav from '@/components/atoms/_svg/ResourceInboxNav';
-import ResourceDraftingNav from '@/components/atoms/_svg/ResourceDraftingNav';
 import SearchStep from '@/components/atoms/_svg/SearchStep';
 import SelectContactsMap from '@/components/atoms/_svg/SelectContactsMap';
 import SelectedContactsResource from '@/components/atoms/_svg/SelectedContactsResource';
@@ -231,70 +227,6 @@ const Resources = () => {
 								)}
 							</form>
 						</Form>
-					</div>
-				</div>
-			</section>
-
-			<section className="w-full mt-[61px] h-auto min-[1100px]:h-[611px] bg-[#F9F9F9] pb-12 min-[1100px]:pb-0">
-				<div className="relative mx-auto h-full w-full max-w-[1200px] px-6">
-					<div className="flex flex-col items-center pt-0 sm:pt-8">
-						<Typography
-							variant="h2"
-							className="text-center font-[var(--font-inter)] text-[32px] sm:text-[45px] font-light leading-none"
-						>
-							Learn more about murmur
-						</Typography>
-					</div>
-
-					<div className="mt-8 min-[1100px]:mt-0 min-[1100px]:absolute min-[1100px]:left-1/2 min-[1100px]:-translate-x-1/2 min-[1100px]:bottom-[75px] grid grid-cols-1 min-[1100px]:grid-cols-2 gap-[74px] min-[1100px]:gap-x-[31px] min-[1100px]:gap-y-[38px] justify-items-center">
-						<Link href="/map" className="w-[276px] h-[185px] rounded-[8px] border-[2px] border-[#000000] bg-[#ADD8E7] overflow-hidden block">
-							<div className="h-full flex flex-col">
-								<div className="flex-1 flex items-center justify-center pt-2">
-									<ResourceMapNav />
-								</div>
-								<div className="h-[70px] flex items-center justify-center">
-									<p className="font-[var(--font-inter)] text-[28px] font-semibold text-black leading-none">
-										Map
-									</p>
-								</div>
-							</div>
-						</Link>
-						<Link href="/research" className="w-[276px] h-[185px] rounded-[8px] border-[2px] border-[#000000] bg-[#E9F7FF] overflow-hidden block">
-							<div className="h-full flex flex-col">
-								<div className="flex-1 flex items-center justify-center pt-3">
-									<ResourceResearchNav />
-								</div>
-								<div className="h-[70px] flex items-center justify-center">
-									<p className="font-[var(--font-inter)] text-[28px] font-semibold text-black leading-none">
-										Research
-									</p>
-								</div>
-							</div>
-						</Link>
-						<Link href="/inbox" className="w-[276px] h-[185px] rounded-[8px] border-[2px] border-[#000000] bg-[#6FA4E1] overflow-hidden block">
-							<div className="h-full flex flex-col">
-								<div className="flex-1 flex items-center justify-center pt-2">
-									<ResourceInboxNav className="translate-x-[3px]" />
-								</div>
-								<div className="h-[70px] flex items-center justify-center">
-									<p className="font-[var(--font-inter)] text-[28px] font-semibold text-black leading-none">
-										Inbox
-									</p>
-								</div>
-							</div>
-						</Link>
-						<Link href="/drafting" className="w-[276px] h-[185px] rounded-[8px] border-[2px] border-[#000000] bg-[#FFDC9E] overflow-hidden block">
-							<div className="h-full flex flex-col">
-								<div className="flex-1 flex items-center justify-center pt-4">
-									<ResourceDraftingNav />
-								</div>
-								<div className="h-[70px] flex items-center justify-center">
-									<p className="font-[var(--font-inter)] text-[28px] font-semibold text-black leading-none">
-										Drafting
-									</p>
-								</div>
-							</div>
-						</Link>
 					</div>
 				</div>
 			</section>
