@@ -3116,7 +3116,7 @@ const Murmur = () => {
 			selectedContacts: [],
 			campaignContactStatusById: campaignOverviewContactStatusById,
 			campaignMarkerMode: effectiveMapGroupingForActiveView,
-			categoryConstellationsEnabled: activeView === 'overview',
+			categoryConstellationsEnabled: true,
 			activeTool: activeMapTool,
 			requestedZoom: mapZoomControlRequest,
 			onViewportZoom: handleMapViewportZoom,
@@ -3125,7 +3125,6 @@ const Murmur = () => {
 			skipAutoFit: true,
 		}),
 		[
-			activeView,
 			activeMapTool,
 			campaignMapCameraPadding,
 			campaignMapContactsForMap,
