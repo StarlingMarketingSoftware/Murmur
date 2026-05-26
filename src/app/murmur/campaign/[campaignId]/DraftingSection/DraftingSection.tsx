@@ -7,6 +7,7 @@ import {
 	useMemo,
 	useRef,
 	useState,
+	type CSSProperties,
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { gsap } from 'gsap';
@@ -657,6 +658,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const bottomPanelBoxWidthPx = 197;
 	const bottomPanelBoxHeightPx = 45;
 	const bottomPanelCollapsed = true;
+	const writeDraftBottomBarHeightPx = 40;
+	const writeDraftBottomBarGapPx = 8;
 	const mainContactsPanelWidthPx = 377;
 	const mainContactsPanelHeightPx = 597;
 	const isOverviewRightRailSearchActive = Boolean(
@@ -1269,6 +1272,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		bottomPanelBoxHeightPx;
 	const sharedBottomPanelSlotTopPx =
 		sharedWideTabZoomEnvelopeBottomPx - bottomPanelBoxHeightPx;
+	const writeDraftBottomBarSlotTopPx =
+		sharedBottomPanelSlotTopPx - writeDraftBottomBarHeightPx - writeDraftBottomBarGapPx;
 	// Match the back-card offset so the stack keeps a 32px gap from the left panel.
 	const compactDraftReviewStackShiftXPx = 18;
 	// Keeps the inbox box 36px to the right of the standard left column anchor.
@@ -1319,6 +1324,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				return [];
 		}
 	}, [view]);
+	const shouldRenderWriteBottomDraftBar =
+		view === 'testing' && !isMobile && !hideHeaderBox && !isNarrowestDesktop;
 	const shouldRenderSharedBottomPanels =
 		sharedBottomPanelKinds.length > 0 &&
 		!isMobile &&
@@ -1329,6 +1336,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		!hideHeaderBox &&
 		!isNarrowestDesktop &&
 		!shouldRenderSharedBottomPanels &&
+		!shouldRenderWriteBottomDraftBar &&
 		!isInboxTabStacked;
 
 	const handleRejectDraft = useCallback(
@@ -2438,6 +2446,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		filters: { campaignId: campaign?.id },
 		enabled: Boolean(campaign?.id),
 	});
+	const inboxCount = inboundEmails?.length || 0;
 
 	// Fetch campaign contact events for history panel
 	const { data: campaignContactEvents } = useGetCampaignContactEvents(campaign?.id);
@@ -2831,6 +2840,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	}, [contactsAvailableForDrafting, areAllContactsSelected]);
 
+	const handleDraftSelectedContacts = useCallback(async () => {
+		const selectedIds = Array.from(contactsTabSelectedIds.values());
+		if (selectedIds.length === 0) {
+			toast.error('Select at least one contact to draft emails.');
+			return;
+		}
+		await handleGenerateDrafts(selectedIds);
+	}, [contactsTabSelectedIds, handleGenerateDrafts]);
+
 	// Click-outside handler to deselect when all contacts are selected
 	useEffect(() => {
 		if (!areAllContactsSelected) return;
@@ -3111,6 +3129,151 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				);
 		}
 		return null;
+	};
+
+	const renderWriteBottomDraftBar = () => {
+		const selectedCount = contactsTabSelectedIds.size;
+		const isDraftDisabled = selectedCount === 0;
+		const draftLabel = isDraftQueueActive
+			? 'Add Emails to Queue'
+			: `Draft ${selectedCount} ${selectedCount === 1 ? 'contact' : 'contacts'}`;
+		const boxStyle: CSSProperties = {
+			width: 39.154,
+			height: 39.154,
+			borderRadius: 7.458,
+			border: '0.725px solid #000',
+			boxSizing: 'border-box',
+			display: 'flex',
+			alignItems: 'center',
+			justifyContent: 'center',
+			fontFamily: 'Inter, sans-serif',
+			fontSize: 12.326,
+			fontStyle: 'normal',
+			fontWeight: 500,
+			lineHeight: '10.151px',
+			color: '#000',
+		};
+		const blankBox = (key: string, opacity: number) => (
+			<div
+				key={key}
+				aria-hidden="true"
+				style={{
+					...boxStyle,
+					opacity,
+					background: '#F3EEE1',
+				}}
+			/>
+		);
+		const counterBox = ({
+			label,
+			count,
+			background,
+			onClick,
+		}: {
+			label: string;
+			count: number;
+			background: string;
+			onClick?: () => void;
+		}) => (
+			<button
+				type="button"
+				aria-label={`${count} ${label}`}
+				className="border-0 p-0 transition-opacity duration-150 hover:opacity-85"
+				style={{
+					...boxStyle,
+					background,
+					cursor: onClick ? 'pointer' : 'default',
+				}}
+				onClick={onClick}
+			>
+				{count}
+			</button>
+		);
+
+		return (
+			<div
+				data-draft-button-container
+				className="flex items-center"
+				style={{ gap: 3, height: writeDraftBottomBarHeightPx }}
+			>
+				{blankBox('left-1', 0.1)}
+				{blankBox('left-2', 0.2)}
+				<button
+					type="button"
+					aria-label="Open search"
+					className="border-0 p-0 transition-opacity duration-150 hover:opacity-85"
+					style={{
+						...boxStyle,
+						background: '#FFFFFF',
+						cursor: onGoToSearch ? 'pointer' : 'default',
+					}}
+					onClick={onGoToSearch}
+				>
+					<SearchIconDesktop width={17} height={18} stroke="#8B8B8B" strokeWidth={2.3} />
+				</button>
+				<div
+					className="flex overflow-hidden"
+					style={{
+						width: 472,
+						height: writeDraftBottomBarHeightPx,
+						borderRadius: 5,
+						border: '2px solid #000',
+						boxSizing: 'border-box',
+						background: '#F7E4E4',
+					}}
+				>
+					<button
+						type="button"
+						disabled={isDraftDisabled}
+						className="flex flex-1 items-center justify-center border-0 bg-transparent p-0 font-inter text-[17px] font-normal leading-none text-black"
+						style={{
+							cursor: isDraftDisabled ? 'not-allowed' : 'pointer',
+							opacity: isDraftDisabled ? 0.55 : 1,
+						}}
+						onClick={handleDraftSelectedContacts}
+					>
+						{draftLabel}
+					</button>
+					<button
+						type="button"
+						aria-pressed={areAllContactsSelected}
+						aria-label={areAllContactsSelected ? 'Clear selected contacts' : 'Select all contacts'}
+						disabled={contactsAvailableForDrafting.length === 0}
+						className="flex items-center justify-center border-0 border-l-[2px] border-black p-0 font-inter text-[17px] font-normal leading-none text-black transition-colors duration-150 hover:bg-[#E67677] disabled:cursor-not-allowed disabled:opacity-60"
+						style={{
+							width: 58,
+							background: '#EB8586',
+							cursor:
+								contactsAvailableForDrafting.length === 0 ? 'not-allowed' : 'pointer',
+						}}
+						onClick={(event) => {
+							event.stopPropagation();
+							handleSelectAllContacts();
+						}}
+					>
+						All
+					</button>
+				</div>
+				{counterBox({
+					label: 'drafts',
+					count: draftCount,
+					background: '#FFE3AA',
+					onClick: goToDrafting,
+				})}
+				{counterBox({
+					label: 'sent',
+					count: sentCount,
+					background: '#5AB478',
+					onClick: goToSent,
+				})}
+				{counterBox({
+					label: 'inbox',
+					count: inboxCount,
+					background: '#6EBED5',
+					onClick: goToInbox,
+				})}
+			</div>
+		);
 	};
 
 	// Render search dropdowns for the mini searchbar
@@ -3543,7 +3706,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					<div
 						className="relative w-full flex flex-col items-center"
 						style={
-							shouldRenderSharedBottomPanels
+							shouldRenderSharedBottomPanels || shouldRenderWriteBottomDraftBar
 								? { minHeight: `${sharedWideTabZoomEnvelopeBottomPx}px` }
 								: undefined
 						}
@@ -5306,7 +5469,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										</div>
 										{/* Draft button with arrows - spans full width below both columns */}
-										<div className="mt-4 w-full">
+										{!shouldRenderWriteBottomDraftBar && (
+											<div className="mt-4 w-full">
 											<div className="flex items-center justify-center gap-[29px] w-full">
 												{/* Left arrow */}
 												<button
@@ -5435,7 +5599,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													<RightArrow width="20" height="39" />
 												</button>
 											</div>
-										</div>
+											</div>
+										)}
 									</div>
 								) : (
 									/* Regular centered layout for wider viewports, or narrowest breakpoint with contacts below */
@@ -5475,7 +5640,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onHoverChange={handlePromptInputHoverChange}
 											onCustomInstructionsOpenChange={setIsCustomInstructionsOpen}
 											isNarrowestDesktop={isNarrowestDesktop}
-											hideDraftButton={isNarrowestDesktop}
+											hideDraftButton={shouldRenderWriteBottomDraftBar || isNarrowestDesktop}
 											identity={campaign?.identity}
 											onIdentityUpdate={handleIdentityUpdate}
 											onProfilePanelOpen={
@@ -5961,19 +6126,23 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											)}
 										</div>
 									) : (
-										// Regular centered layout for wider viewports
+										// Regular centered layout for wider viewports.
+										// The draft stack peeks ~19px above its top, so nudge it down to
+										// the left column's anchor so its front card lines up with the
+										// header box (matches the Sent tab).
 										<div
 											className="flex flex-col items-center"
-											style={
-												isCampaignWorkspaceCompact &&
+											style={{
+												marginTop: `${standardSidePanelTopOffsetPx}px`,
+												...(isCampaignWorkspaceCompact &&
 												isDraftPreviewOpen &&
 												!isSelectedDraftRegenSettingsPreviewOpen &&
 												draftEmails.length > 1
 													? {
 															transform: `translateX(${compactDraftReviewStackShiftXPx}px)`,
 														}
-													: undefined
-											}
+													: {}),
+											}}
 										>
 											<DraftedEmails
 												ref={draftedEmailsRef}
@@ -7738,10 +7907,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								) : (
 									// Normal wide layout
 									<>
-										{/* Center panel: selected email detail */}
+										{/* Center panel: selected email detail.
+										    Cancel the wrapping `mt-6` so the box sits flush at the top of
+										    the flow — matching the Write/Drafts right panel, which has no
+										    top margin and so sits slightly above the left header box. */}
 										<div
 											style={{
 												transform: `translateX(${activeInboxMainPanelShiftRightPx}px)`,
+												marginTop: `${-inboxWideTopMarginPx}px`,
 											}}
 										>
 											<InboxSection
@@ -7778,6 +7951,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 									</>
 								)}
+							</div>
+						)}
+
+						{shouldRenderWriteBottomDraftBar && (
+							<div
+								className="absolute left-0 right-0 z-30 flex justify-center"
+								style={{
+									top: `${writeDraftBottomBarSlotTopPx}px`,
+									transform: isCampaignWorkspaceCompact
+										? 'translateX(-180px)'
+										: undefined,
+								}}
+							>
+								{renderWriteBottomDraftBar()}
 							</div>
 						)}
 

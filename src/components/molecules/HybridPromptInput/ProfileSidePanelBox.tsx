@@ -559,10 +559,9 @@ const ProfileAreaMapBox = ({ area, onAreaUpdate }: ProfileAreaMapBoxProps) => {
 };
 
 const profileMediaWaveformBars = [
-	48, 60, 54, 66, 56, 70, 62, 64, 67, 65, 69, 61, 63, 68, 60, 71, 62, 66, 57,
-	65, 60, 69, 62, 61, 66, 72, 64, 68, 56, 62, 73, 66, 60, 69, 67, 64, 57, 62,
-	66, 61, 65, 70, 59, 64, 62, 67, 71, 69, 63, 66, 61, 64, 67, 70, 66, 63, 62,
-	65, 60, 50, 48, 44, 40, 35, 30,
+	48, 60, 54, 66, 56, 70, 62, 64, 67, 65, 69, 61, 63, 68, 60, 71, 62, 66, 57, 65, 60, 69,
+	62, 61, 66, 72, 64, 68, 56, 62, 73, 66, 60, 69, 67, 64, 57, 62, 66, 61, 65, 70, 59, 64,
+	62, 67, 71, 69, 63, 66, 61, 64, 67, 70, 66, 63, 62, 65, 60, 50, 48, 44, 40, 35, 30,
 ] as const;
 
 const getMediaDisplayTitle = (filename: string) =>
@@ -649,11 +648,7 @@ const ProfileMediaSlotCard = ({
 				>
 					{asset.kind === 'video' && asset.posterUrl && (
 						// eslint-disable-next-line @next/next/no-img-element -- presigned R2 URL, not a static asset
-						<img
-							src={asset.posterUrl}
-							alt=""
-							className="h-full w-full object-cover"
-						/>
+						<img src={asset.posterUrl} alt="" className="h-full w-full object-cover" />
 					)}
 					<span
 						className={`absolute inset-0 flex items-center justify-center bg-black/10 transition-opacity ${playOverlayClassName}`}

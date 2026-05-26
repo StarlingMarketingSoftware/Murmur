@@ -106,6 +106,20 @@ type CampaignOverviewBottomBoxesProps = {
 	sentCount: number;
 };
 
+// The overview bottom cluster (status toggle + strip + ask box + count boxes) is
+// laid out at intrinsic sizes that read too large once the whole page is zoomed to
+// ~85%. Scale the cluster as a unit, anchored at its bottom-center (where the count
+// boxes sit), so it shrinks in line with the rest of the page without disturbing the
+// tuned per-panel offsets. Applied via a full-viewport wrapper so the panels' own
+// `position: fixed` resolves against it and their existing positioning still holds.
+const CAMPAIGN_OVERVIEW_CLUSTER_SCALE = 0.85;
+const CAMPAIGN_PRESET_EXPANDED_CONTROLS_MIN_SCALE = 0.68;
+const CAMPAIGN_PRESET_EXPANDED_CONTROLS_MAX_SCALE = 0.8;
+const CAMPAIGN_PRESET_EXPANDED_CONTROLS_SIDE_GUTTER_PX = 24;
+const CAMPAIGN_PRESET_EXPANDED_CONTROLS_NUDGE_UP_PX = 14;
+const CAMPAIGN_PRESET_EXPANDED_TOOL_NUDGE_UP_PX = 62;
+const CAMPAIGN_PRESET_EXPANDED_TOOL_COMPACT_NUDGE_UP_PX = 74;
+
 const CAMPAIGN_OVERVIEW_BOTTOM_BOXES_BOTTOM_PX = 10;
 const CAMPAIGN_OVERVIEW_BOTTOM_BOX_SIZE_PX = 39.154;
 const CAMPAIGN_OVERVIEW_ASK_BOX_GAP_PX = 9;
@@ -130,6 +144,15 @@ const CAMPAIGN_OVERVIEW_STATUS_TOGGLE_BOTTOM_PX =
 	CAMPAIGN_OVERVIEW_STATUS_STRIP_HEIGHT_PX +
 	CAMPAIGN_OVERVIEW_STATUS_TOGGLE_GAP_PX;
 
+// The Write/Drafts/Inbox tabs don't render the bottom count boxes, so the ask
+// box drops to the same bottom margin those boxes use on the overview tab and
+// the status strip stacks just above it — sitting them close to the bottom edge.
+const CAMPAIGN_PRESET_ASK_BOX_BOTTOM_PX = CAMPAIGN_OVERVIEW_BOTTOM_BOXES_BOTTOM_PX;
+const CAMPAIGN_PRESET_STATUS_STRIP_BOTTOM_PX =
+	CAMPAIGN_PRESET_ASK_BOX_BOTTOM_PX +
+	CAMPAIGN_OVERVIEW_ASK_BOX_HEIGHT_PX +
+	CAMPAIGN_OVERVIEW_STATUS_STRIP_GAP_PX;
+
 type CampaignOverviewMapGrouping = 'category' | 'status';
 type CampaignOverviewStatusKey = CampaignContactMapStatus;
 
@@ -139,6 +162,20 @@ const CAMPAIGN_OVERVIEW_STATUS_KEYS = [
 	'new-message',
 	'sent',
 ] as const satisfies readonly CampaignOverviewStatusKey[];
+
+// The Write/Drafts/Inbox tabs are focused, pre-filtered views of the same map.
+// Each one locks the overview status filter to the slice it represents:
+//   Write   → fresh contacts (no email activity yet)
+//   Drafts  → contacts with a draft
+//   Inbox   → contacts we've sent to or who replied
+// The All (overview) tab is absent here so it keeps its user-driven selection.
+const CAMPAIGN_TAB_PRESET_STATUSES: Partial<
+	Record<ViewType, readonly CampaignOverviewStatusKey[]>
+> = {
+	testing: ['contacts'],
+	drafting: ['drafts'],
+	inbox: ['sent', 'new-message'],
+};
 
 const CAMPAIGN_OVERVIEW_STATUS_PILL_HEIGHT_PX = 27;
 const CAMPAIGN_OVERVIEW_STATUS_PILL_RADIUS_PX = 8;
@@ -172,11 +209,18 @@ const getCampaignOverviewStatusFromEmailStatus = (
 type CampaignOverviewAskAnythingBoxProps = {
 	onSubmit: (query: string) => void;
 	value?: string;
+	// Overrides the default viewport-centered `left` so the box can be centered
+	// over the left map region on the split-screen tabs.
+	leftOverride?: string;
+	// Overrides the default `bottom` offset (used to sit it lower on the focused tabs).
+	bottomOverride?: number;
 };
 
 const CampaignOverviewAskAnythingBox = ({
 	onSubmit,
 	value,
+	leftOverride,
+	bottomOverride,
 }: CampaignOverviewAskAnythingBoxProps) => {
 	const [query, setQuery] = useState(value ?? '');
 	const inputRef = useRef<HTMLInputElement | null>(null);
@@ -190,9 +234,10 @@ const CampaignOverviewAskAnythingBox = ({
 
 	return (
 		<div
-			className="pointer-events-none fixed left-1/2"
+			className="pointer-events-none fixed"
 			style={{
-				bottom: CAMPAIGN_OVERVIEW_ASK_BOX_BOTTOM_PX,
+				left: leftOverride ?? '50%',
+				bottom: bottomOverride ?? CAMPAIGN_OVERVIEW_ASK_BOX_BOTTOM_PX,
 				width: CAMPAIGN_OVERVIEW_ASK_BOX_WIDTH_PX,
 				height: CAMPAIGN_OVERVIEW_ASK_BOX_HEIGHT_PX,
 				transform: 'translateX(-50%)',
@@ -382,12 +427,23 @@ const CampaignOverviewStatusToggle = ({
 type CampaignOverviewStatusStripProps = {
 	selectedStatuses: ReadonlySet<CampaignOverviewStatusKey>;
 	disabled?: boolean;
+	// `locked` keeps the selected pills highlighted at full opacity but makes the
+	// strip non-interactive — used on the focused tabs where the filter is fixed.
+	locked?: boolean;
+	// Overrides the default viewport-centered `left` so the strip can be centered
+	// over the left map region on the split-screen tabs.
+	leftOverride?: string;
+	// Overrides the default `bottom` offset (used to sit it lower on the focused tabs).
+	bottomOverride?: number;
 	onToggleStatus: (status: CampaignOverviewStatusKey) => void;
 };
 
 const CampaignOverviewStatusStrip = ({
 	selectedStatuses,
 	disabled = false,
+	locked = false,
+	leftOverride,
+	bottomOverride,
 	onToggleStatus,
 }: CampaignOverviewStatusStripProps) => {
 	const getItemStyle = (status: CampaignOverviewStatusKey): CSSProperties => ({
@@ -404,20 +460,21 @@ const CampaignOverviewStatusStrip = ({
 		font: 'inherit',
 		color: 'inherit',
 		background:
-			!disabled && selectedStatuses.has(status)
+			(!disabled || locked) && selectedStatuses.has(status)
 				? CAMPAIGN_OVERVIEW_STATUS_PILL_COLOR[status]
 				: 'transparent',
-		opacity: disabled ? 0.55 : 1,
-		cursor: disabled ? 'default' : 'pointer',
+		opacity: locked ? 1 : disabled ? 0.55 : 1,
+		cursor: locked || disabled ? 'default' : 'pointer',
 	});
 
 	return (
 		<div
 			role="group"
 			aria-label="Campaign overview status"
-			className="pointer-events-none fixed left-1/2 font-inter text-black"
+			className="pointer-events-none fixed font-inter text-black"
 			style={{
-				bottom: CAMPAIGN_OVERVIEW_STATUS_STRIP_BOTTOM_PX,
+				left: leftOverride ?? '50%',
+				bottom: bottomOverride ?? CAMPAIGN_OVERVIEW_STATUS_STRIP_BOTTOM_PX,
 				width: CAMPAIGN_OVERVIEW_STATUS_STRIP_WIDTH_PX,
 				height: CAMPAIGN_OVERVIEW_STATUS_STRIP_HEIGHT_PX,
 				transform: 'translateX(-50%)',
@@ -448,8 +505,11 @@ const CampaignOverviewStatusStrip = ({
 				<button
 					type="button"
 					aria-pressed={selectedStatuses.has('contacts')}
-					disabled={disabled}
-					className="pointer-events-auto transition-opacity duration-150"
+					disabled={disabled || locked}
+					className={cn(
+						'transition-opacity duration-150',
+						!locked && 'pointer-events-auto'
+					)}
 					style={getItemStyle('contacts')}
 					onClick={() => onToggleStatus('contacts')}
 				>
@@ -459,8 +519,11 @@ const CampaignOverviewStatusStrip = ({
 				<button
 					type="button"
 					aria-pressed={selectedStatuses.has('drafts')}
-					disabled={disabled}
-					className="pointer-events-auto transition-opacity duration-150"
+					disabled={disabled || locked}
+					className={cn(
+						'transition-opacity duration-150',
+						!locked && 'pointer-events-auto'
+					)}
 					style={getItemStyle('drafts')}
 					onClick={() => onToggleStatus('drafts')}
 				>
@@ -470,8 +533,11 @@ const CampaignOverviewStatusStrip = ({
 				<button
 					type="button"
 					aria-pressed={selectedStatuses.has('new-message')}
-					disabled={disabled}
-					className="pointer-events-auto transition-opacity duration-150"
+					disabled={disabled || locked}
+					className={cn(
+						'transition-opacity duration-150',
+						!locked && 'pointer-events-auto'
+					)}
 					style={getItemStyle('new-message')}
 					onClick={() => onToggleStatus('new-message')}
 				>
@@ -481,8 +547,11 @@ const CampaignOverviewStatusStrip = ({
 				<button
 					type="button"
 					aria-pressed={selectedStatuses.has('sent')}
-					disabled={disabled}
-					className="pointer-events-auto transition-opacity duration-150"
+					disabled={disabled || locked}
+					className={cn(
+						'transition-opacity duration-150',
+						!locked && 'pointer-events-auto'
+					)}
 					style={getItemStyle('sent')}
 					onClick={() => onToggleStatus('sent')}
 				>
@@ -1109,6 +1178,7 @@ const Murmur = () => {
 	const { campaign, isPendingCampaign, setIsIdentityDialogOpen, isIdentityDialogOpen } =
 		useCampaignDetail();
 	const isMobile = useIsMobile();
+	const [viewportWidth, setViewportWidth] = useState(0);
 	const [viewportHeight, setViewportHeight] = useState(0);
 	const setPersistentMapConfig = usePersistentMapSetter();
 	const {
@@ -1126,7 +1196,10 @@ const Murmur = () => {
 
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
-		const update = () => setViewportHeight(window.innerHeight);
+		const update = () => {
+			setViewportWidth(window.innerWidth);
+			setViewportHeight(window.innerHeight);
+		};
 		update();
 		window.addEventListener('resize', update, { passive: true });
 		return () => window.removeEventListener('resize', update);
@@ -2268,6 +2341,22 @@ const Murmur = () => {
 				: new Set<CampaignOverviewStatusKey>(campaignOverviewSelectedStatuses),
 		[campaignOverviewSelectedStatuses]
 	);
+	// On the Write/Drafts/Inbox tabs the map filter is locked to the tab's preset
+	// (see CAMPAIGN_TAB_PRESET_STATUSES). These derived values shadow the overview
+	// ones for the map filter only — the overview's own selection state is left
+	// untouched so returning to All restores whatever the user had chosen there.
+	const activeTabPresetStatuses = CAMPAIGN_TAB_PRESET_STATUSES[activeView];
+	const effectiveMapGroupingForActiveView: CampaignOverviewMapGrouping =
+		activeTabPresetStatuses ? 'status' : effectiveCampaignOverviewMapGrouping;
+	const effectiveActiveStatusSetForActiveView = useMemo<
+		ReadonlySet<CampaignOverviewStatusKey>
+	>(
+		() =>
+			activeTabPresetStatuses
+				? new Set<CampaignOverviewStatusKey>(activeTabPresetStatuses)
+				: campaignOverviewActiveStatusSet,
+		[activeTabPresetStatuses, campaignOverviewActiveStatusSet]
+	);
 	const handleCampaignOverviewStatusToggle = useCallback(
 		(status: CampaignOverviewStatusKey) => {
 			setCampaignOverviewSelectedStatuses((prev) =>
@@ -2921,11 +3010,16 @@ const Murmur = () => {
 		enabled:
 			Boolean(campaign?.id) &&
 			isMobile === false &&
-			(isNarrowestDesktop || activeView === 'overview'),
+			(isNarrowestDesktop ||
+				activeView === 'overview' ||
+				isCompactCampaignWorkspaceView(activeView)),
 	});
 	const { data: overviewInboundEmails } = useGetInboundEmails({
 		filters: { campaignId: campaign?.id },
-		enabled: Boolean(campaign?.id) && isMobile === false && activeView === 'overview',
+		enabled:
+			Boolean(campaign?.id) &&
+			isMobile === false &&
+			(activeView === 'overview' || isCompactCampaignWorkspaceView(activeView)),
 	});
 
 	// Compute header metrics
@@ -2970,9 +3064,9 @@ const Murmur = () => {
 
 		const out = [] as typeof contacts;
 		for (const contact of contacts) {
-			if (effectiveCampaignOverviewMapGrouping === 'status') {
+			if (effectiveMapGroupingForActiveView === 'status') {
 				const status = campaignOverviewContactStatusById.get(contact.id) ?? 'contacts';
-				if (!campaignOverviewActiveStatusSet.has(status)) continue;
+				if (!effectiveActiveStatusSetForActiveView.has(status)) continue;
 				out.push(contact);
 				continue;
 			}
@@ -3002,9 +3096,9 @@ const Murmur = () => {
 		return out;
 	}, [
 		campaignMapContacts,
-		campaignOverviewActiveStatusSet,
+		effectiveActiveStatusSetForActiveView,
 		campaignOverviewContactStatusById,
-		effectiveCampaignOverviewMapGrouping,
+		effectiveMapGroupingForActiveView,
 		mapGrabActiveCategories,
 		mapGrabUncategorizedActive,
 	]);
@@ -3021,7 +3115,7 @@ const Murmur = () => {
 			contacts: campaignMapContactsForMap,
 			selectedContacts: [],
 			campaignContactStatusById: campaignOverviewContactStatusById,
-			campaignMarkerMode: effectiveCampaignOverviewMapGrouping,
+			campaignMarkerMode: effectiveMapGroupingForActiveView,
 			categoryConstellationsEnabled: activeView === 'overview',
 			activeTool: activeMapTool,
 			requestedZoom: mapZoomControlRequest,
@@ -3036,7 +3130,7 @@ const Murmur = () => {
 			campaignMapCameraPadding,
 			campaignMapContactsForMap,
 			campaignOverviewContactStatusById,
-			effectiveCampaignOverviewMapGrouping,
+			effectiveMapGroupingForActiveView,
 			globeNightLighting,
 			globeWeatherMood,
 			globeWeatherRegionCenter,
@@ -3254,14 +3348,62 @@ const Murmur = () => {
 	// ensures a premium, smooth transition with no scale effects.
 	const shouldHideContent = isIdentityDialogOpen || !campaign.identityId;
 
+	// The Write/Drafts/Inbox tabs reuse the overview map controls: a status legend
+	// locked to the tab's preset, plus a dimmed, display-only category strip and
+	// search bar. Only on the roomy desktop layout, where the split-screen leaves a
+	// clear left map region for them to sit over.
+	const isPresetMapControlsView =
+		!isMobile &&
+		Boolean(activeTabPresetStatuses) &&
+		!shouldHideContent &&
+		!isNarrowestDesktop;
+	const presetMapControlsLeftCss = `calc(var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333vw) / 2)`;
+	const presetMapControlsScale =
+		isPresetMapControlsView && isCampaignWorkspaceExpanded && viewportWidth > 0
+			? clampNumber(
+					(viewportWidth * CAMPAIGN_BACKDROP_TARGET_START_RATIO -
+						CAMPAIGN_PRESET_EXPANDED_CONTROLS_SIDE_GUTTER_PX) /
+						CAMPAIGN_OVERVIEW_STATUS_STRIP_WIDTH_PX,
+					CAMPAIGN_PRESET_EXPANDED_CONTROLS_MIN_SCALE,
+					CAMPAIGN_PRESET_EXPANDED_CONTROLS_MAX_SCALE
+				)
+			: CAMPAIGN_OVERVIEW_CLUSTER_SCALE;
+	const presetMapToolExtraNudgeUpPx =
+		isPresetMapControlsView && isCampaignWorkspaceExpanded
+			? presetMapControlsScale < 0.78
+				? CAMPAIGN_PRESET_EXPANDED_TOOL_COMPACT_NUDGE_UP_PX
+				: CAMPAIGN_PRESET_EXPANDED_TOOL_NUDGE_UP_PX
+			: 0;
+	const presetMapToolExtraNudgeUpCss = presetMapToolExtraNudgeUpPx
+		? `calc(${presetMapToolExtraNudgeUpPx}px / var(${CAMPAIGN_ZOOM_VAR}, ${DEFAULT_CAMPAIGN_ZOOM}))`
+		: '0px';
+	const presetMapToolTopCss =
+		`calc(${CAMPAIGN_MAP_TOOL_VISUAL_TOP_CSS} + ${campaignMapSelectGrabOriginOffsetPx}px - ` +
+		`${CAMPAIGN_MAP_TOOL_VISUAL_TOP_NUDGE_UP_CSS} - ${presetMapToolExtraNudgeUpCss})`;
+	const presetMapControlsExtraBottomPx =
+		isPresetMapControlsView && isCampaignWorkspaceExpanded
+			? CAMPAIGN_PRESET_EXPANDED_CONTROLS_NUDGE_UP_PX
+			: 0;
+	const presetMapAskBoxBottomPx =
+		CAMPAIGN_PRESET_ASK_BOX_BOTTOM_PX + presetMapControlsExtraBottomPx;
+	const presetMapStatusStripBottomPx =
+		CAMPAIGN_PRESET_STATUS_STRIP_BOTTOM_PX + presetMapControlsExtraBottomPx;
+
 	// Writing + Drafts + Sent + Inbox tab vertical alignment:
-	// Place the top of the main content box exactly 159px from the top of the page
-	// (only in the standard desktop header layout).
+	// Sit the top of the main content box exactly 27px below the bottom edge of the
+	// fixed top nav box (only in the standard desktop header layout).
+	//
+	// The top nav backdrop box is fixed at top:9px and its inner box is scaled by
+	// CAMPAIGN_MAP_CONTENT_SCALE, so its bottom edge resolves to
+	// 9 + (height × scale). We anchor the content box 27px beneath that.
 	//
 	// Notes:
 	// - The campaign header row is a fixed 50px tall.
 	// - DraftingSection contains a small 4px spacer div at the very top (mb-[4px]).
-	const WRITING_BOX_TOP_PX = 159;
+	const CAMPAIGN_TOP_NAV_BOX_BOTTOM_PX =
+		CAMPAIGN_TOP_NAV_BACKDROP_BOX_TOP_PX +
+		CAMPAIGN_TOP_NAV_BACKDROP_BOX_HEIGHT_PX * CAMPAIGN_MAP_CONTENT_SCALE;
+	const WRITING_BOX_TOP_PX = Math.round(CAMPAIGN_TOP_NAV_BOX_BOTTOM_PX + 27);
 	const CAMPAIGN_HEADER_HEIGHT_PX = 50;
 	const DRAFTING_SECTION_TOP_SPACER_PX = 4;
 	const writingContentTopMarginPx =
@@ -3288,7 +3430,14 @@ const Murmur = () => {
 							<div className="campaign-map-split-overlay" aria-hidden="true" />
 						)}
 						{isMobile === false && activeView === 'overview' && !shouldHideContent && (
-							<>
+							<div
+								className="pointer-events-none fixed inset-0"
+								style={{
+									transform: `scale(${CAMPAIGN_OVERVIEW_CLUSTER_SCALE})`,
+									transformOrigin: 'bottom center',
+									zIndex: 126,
+								}}
+							>
 								<CampaignOverviewStatusToggle
 									selected={campaignOverviewMapGrouping}
 									isSearchActive={isOverviewSearchActive}
@@ -3309,6 +3458,153 @@ const Murmur = () => {
 									inboxCount={overviewInboxCount}
 									sentCount={headerSentCount}
 								/>
+							</div>
+						)}
+						{/* Write/Drafts/Inbox tabs: the same legend locked to the tab's
+						    preset (full opacity), plus a dimmed, display-only search bar. */}
+						{isPresetMapControlsView && (
+							<>
+								<div
+									className="pointer-events-none fixed inset-0"
+									style={{
+										transform: `scale(${presetMapControlsScale})`,
+										transformOrigin: `${presetMapControlsLeftCss} bottom`,
+										zIndex: 126,
+									}}
+								>
+									<CampaignOverviewStatusStrip
+										selectedStatuses={effectiveActiveStatusSetForActiveView}
+										locked
+										leftOverride={presetMapControlsLeftCss}
+										bottomOverride={presetMapStatusStripBottomPx}
+										onToggleStatus={() => undefined}
+									/>
+									<div inert aria-hidden="true" style={{ opacity: 0.4 }}>
+										<CampaignOverviewAskAnythingBox
+											onSubmit={() => undefined}
+											value=""
+											leftOverride={presetMapControlsLeftCss}
+											bottomOverride={presetMapAskBoxBottomPx}
+										/>
+									</div>
+								</div>
+								{/* Dimmed, display-only mirror of the overview "Showing" strip.
+								    No data-campaign-overview-* attrs (DraftingSection queries
+								    those) and no mutating callbacks, so it can never disturb the
+								    overview's category/zoom/tool state. `inert` disables all
+								    interaction even though children opt into pointer-events. */}
+								<div inert aria-hidden="true" style={{ opacity: 0.4 }}>
+									<div
+										className="fixed z-[130] pointer-events-none"
+										style={{
+											left: `${CAMPAIGN_MAP_SELECT_GRAB_LEFT_PX}px`,
+											top: presetMapToolTopCss,
+											transform: `scale(${campaignMapSelectGrabViewScale})`,
+											transformOrigin: 'top left',
+										}}
+									>
+										<div
+											className="absolute left-0 pointer-events-none rounded-[5px] bg-white px-[4px] py-[1px] font-inter text-[11px] font-medium text-black"
+											style={{
+												top: `-${
+													MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+													MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+													MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+													MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+													MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
+													MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+													MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
+													MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX +
+													22
+												}px`,
+											}}
+										>
+											Showing
+										</div>
+										<MapSelectGrabTallStackBox
+											className="absolute pointer-events-none"
+											isSelectActive={false}
+											style={{
+												left: '-0.5px',
+												top: `-${
+													MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+													MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+													MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+													MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+													MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
+													MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+													MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
+													MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX
+												}px`,
+											}}
+										/>
+										<MapSelectGrabStackBox
+											className="absolute left-0 pointer-events-none"
+											isSelectActive={false}
+											selectedContent={<StackBoxSelectStarIcon />}
+											inactiveContent={
+												<MapSelectGrabStackTile backgroundColor="#EFEFEF">
+													<MapStackStarIcon />
+												</MapSelectGrabStackTile>
+											}
+											style={{
+												top: `-${
+													MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+													MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+													MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+													MAP_SELECT_GRAB_STACK_BOX_SIZE_PX
+												}px`,
+											}}
+										>
+											<MapSelectGrabStackTile backgroundColor="#FFBDBD">
+												<MapStackStarIcon />
+											</MapSelectGrabStackTile>
+										</MapSelectGrabStackBox>
+										<MapSelectGrabStackBox
+											className="absolute left-0 pointer-events-none"
+											isSelectActive={false}
+											selectedContent={<StackBoxSelectBlueSparkIcon />}
+											inactiveContent={
+												<MapSelectGrabStackTile backgroundColor="#EFEFEF">
+													<MapStackBlueSparkIcon />
+												</MapSelectGrabStackTile>
+											}
+											style={{
+												top: `-${
+													MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+													MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+													MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+													MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+													MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
+													MAP_SELECT_GRAB_STACK_BOX_SIZE_PX
+												}px`,
+											}}
+										>
+											<MapSelectGrabStackTile backgroundColor="#50A5C970">
+												<MapStackBlueSparkIcon />
+											</MapSelectGrabStackTile>
+										</MapSelectGrabStackBox>
+										<MapSelectGrabStarterBox
+											className="absolute left-0 pointer-events-none"
+											zoomLevelIndex={mapZoomControlIndex}
+											zoomLevelValue={mapZoomControlDisplayValue}
+											style={{
+												position: 'absolute',
+												left: 0,
+												top: `-${
+													MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+													MAP_SELECT_GRAB_STARTER_BOX_GAP_PX
+												}px`,
+											}}
+										/>
+										<MapSelectGrabTool
+											activeTool="grab"
+											onSelectClick={() => undefined}
+											onGrabClick={() => undefined}
+											className="pointer-events-none"
+										/>
+									</div>
+								</div>
 							</>
 						)}
 						{/* Top navigation box (ported from dashboard map view).
