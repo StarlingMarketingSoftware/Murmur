@@ -18,6 +18,8 @@ export function ScrollProgress({ className, height = '3px' }: ScrollProgressProp
 	const shouldHide =
 		pathname?.includes('/murmur') ||
 		pathname?.includes('/admin') ||
+		pathname === '/pricing' ||
+		pathname?.startsWith('/pricing/') ||
 		pathname?.includes('/sign-in') ||
 		pathname?.includes('/sign-up');
 

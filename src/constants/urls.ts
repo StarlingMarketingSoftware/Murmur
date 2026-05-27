@@ -8,6 +8,9 @@ export const urls = {
 	about: {
 		index: '/about',
 	},
+	venue: {
+		index: '/venue',
+	},
 	murmur: {
 		index: '/murmur',
 		dashboard: {
@@ -41,12 +44,6 @@ export const urls = {
 	},
 	freeTrial: {
 		index: '/free-trial',
-	},
-	contact: {
-		index: '/contact',
-	},
-	resources: {
-		index: '/resources',
 	},
 	signIn: {
 		index: '/sign-in',

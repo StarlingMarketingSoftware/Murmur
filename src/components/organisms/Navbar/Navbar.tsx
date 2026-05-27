@@ -101,24 +101,23 @@ export const Navbar = () => {
 	const navItems: NavItem[] = [
 		{ path: urls.home.index, label: 'Home' },
 		{ path: urls.pricing.index, label: 'Pricing' },
-		{ path: urls.resources.index, label: 'Resources' },
+		{ path: urls.venue.index, label: 'Venue' },
 		{ path: urls.admin.index, label: 'Admin' },
 	].filter((item) => !(user?.role !== 'admin' && item.path === '/admin'));
 
 	const isLanding = pathname === urls.home.index;
+	const isLandingLikePage = isLanding || pathname === urls.venue.index;
 	const isPricingPage = pathname === urls.pricing.index || pathname.startsWith(`${urls.pricing.index}/`);
-	const isResourcesPage =
-		pathname === urls.resources.index || pathname.startsWith(`${urls.resources.index}/`);
-	const isLandingNavbarZoom80 = isLanding;
+	const isLandingNavbarZoom80 = isLandingLikePage;
 	const isFreeTrial =
 		pathname === urls.freeTrial.index || pathname.startsWith(`${urls.freeTrial.index}/`);
 	// Navbar is transparent only at the very top of the landing page (before any scroll)
-	const isLandingAtTop = isLanding && !scrolled;
+	const isLandingAtTop = isLandingLikePage && !scrolled;
 	const isTransparentHeader = isFreeTrial || isLandingAtTop;
 	// Hamburger/X icon color based on page and scroll position:
 	// - Landing page over video hero: white icon for visibility
 	// - Scrolled past hero or other pages (lighter background): dark icon
-	const isLandingOverVideo = isLanding && !scrolledPastHero;
+	const isLandingOverVideo = isLandingLikePage && !scrolledPastHero;
 	const mobileMenuIconColor = isLandingOverVideo ? 'bg-white/90' : 'bg-gray-700';
 	// Mobile menu text should be white while over the hero video, dark when scrolled past it
 	const isMobileMenuTextLight = isLandingOverVideo;
@@ -157,8 +156,6 @@ export const Navbar = () => {
 									? 'landing-navbar-zoom-80'
 									: isPricingPage
 										? 'pricing-navbar-zoom-80'
-										: isResourcesPage
-											? 'resources-navbar-zoom-80'
 										: 'left-0 right-0',
 								// Smooth transition for background color changes in both directions
 								'transition-[background-color,backdrop-filter,border-color,box-shadow] duration-500 ease-out',
@@ -438,8 +435,13 @@ export const Navbar = () => {
 				/>
 			</div>
 
-			{/* Spacer - skip on landing and free-trial pages */}
-			{!(isLanding || isFreeTrial) && <div className="h-12" />}
+			{/* Spacer - skip on landing/free-trial; on pricing keep it on mobile but drop it on
+			    desktop so the gradient goes full-bleed behind the navbar like the landing page */}
+			{isPricingPage ? (
+				<div className="h-12 lg:hidden" />
+			) : (
+				!(isLandingLikePage || isFreeTrial) && <div className="h-12" />
+			)}
 		</>
 	);
 };
