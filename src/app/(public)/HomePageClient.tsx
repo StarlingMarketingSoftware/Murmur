@@ -1,8 +1,12 @@
 'use client';
 
-import type { CSSProperties } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { urls } from '@/constants/urls';
+import {
+	getMsUntilNextSearchGradientBucket,
+	getSearchGradientForDate,
+} from '@/constants/searchGradients';
 
 export default function HomePageClient({
 	showFreeTrialButton = true,
@@ -11,6 +15,29 @@ export default function HomePageClient({
 	showFreeTrialButton?: boolean;
 	showVenueSignInButton?: boolean;
 }) {
+	useEffect(() => {
+		if (!showVenueSignInButton) return;
+
+		const root = document.documentElement;
+		let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+		const applyForNow = () => {
+			const now = new Date();
+			root.style.setProperty('--search-gradient', getSearchGradientForDate(now));
+			timeoutId = setTimeout(
+				applyForNow,
+				getMsUntilNextSearchGradientBucket(now) + 1000,
+			);
+		};
+
+		applyForNow();
+
+		return () => {
+			if (timeoutId !== undefined) clearTimeout(timeoutId);
+			root.style.removeProperty('--search-gradient');
+		};
+	}, [showVenueSignInButton]);
+
 	return (
 		<main
 			className="flex min-h-screen items-center justify-center p-4"
@@ -45,8 +72,8 @@ export default function HomePageClient({
 							}}
 						/>
 						<Link
-							href={urls.signIn.index}
-							aria-label="Sign in"
+							href={urls.signUp.index}
+							aria-label="Sign up"
 							className="absolute flex items-center transition-opacity hover:opacity-95"
 							style={{
 								left: 'min(9px, 1.14cqw)',
@@ -59,19 +86,21 @@ export default function HomePageClient({
 							}}
 						>
 							<span
-								className="search-gradient-button flex h-full min-w-0 flex-1 items-center justify-center overflow-hidden font-secondary leading-none text-white"
-								style={
-									{
-										'--search-gradient':
-											'linear-gradient(89deg, #6DDA29 -99.19%, #1FAAEA -45.69%, #6DDA29 10.96%, #0D888C 116.62%, #17EC17 228.13%)',
-										borderRadius: 'min(9.178px, 1.16cqw)',
-										border: '1.147px solid #000',
-										boxSizing: 'border-box',
-										fontSize: 'clamp(18px, 3.92cqw, 26px)',
-									} as CSSProperties
-								}
+								className="search-gradient-button flex h-full min-w-0 flex-1 items-center justify-center overflow-hidden"
+								style={{
+									borderRadius: 'min(9.178px, 1.16cqw)',
+									border: '1.147px solid #000',
+									boxSizing: 'border-box',
+									paddingLeft: 'calc(clamp(43px, 8.46cqw, 50px) + min(7px, 0.89cqw))',
+									color: '#FFF',
+									fontFamily: 'Inter, sans-serif',
+									fontSize: 'clamp(18px, 3cqw, 35.708px)',
+									fontStyle: 'normal',
+									fontWeight: 500,
+									lineHeight: 'normal',
+								}}
 							>
-								Sign in
+								Sign up
 							</span>
 							<span
 								className="flex shrink-0 items-center justify-center"
