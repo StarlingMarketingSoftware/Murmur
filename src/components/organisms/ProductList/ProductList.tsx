@@ -24,7 +24,12 @@ export const ProductList: FC<ProductListProps> = (props) => {
 		>
 			{sortedProducts.map((product) => (
 				<div key={product.id}>
-					<ProductCard product={product} user={user} billingCycle={billingCycle} />
+					<ProductCard
+						product={product}
+						user={user}
+						billingCycle={billingCycle}
+						variant="pricing"
+					/>
 				</div>
 			))}
 		</div>
