@@ -11,7 +11,6 @@ import { ThemeProvider } from '@/components/ThemeProvider';
 import StoreProvider from './StoreProvider';
 import { PageTransitionProvider } from '@/contexts/PageTransitionContext';
 import { ScrollProvider } from '@/contexts/ScrollContext';
-import { ScrollProgress } from '@/components/atoms/ScrollProgress/ScrollProgress';
 import { GlobalScrollbar } from '@/components/ui/GlobalScrollbar';
 
 const inter = Inter({
@@ -80,7 +79,6 @@ export default function RootLayout({
 				>
 					<ThemeProvider attribute="class" defaultTheme="light">
 						<ScrollProvider>
-							<ScrollProgress />
 							<PageTransitionProvider>
 								<SubLayout>
 									<main className="flex-1">{children}</main>

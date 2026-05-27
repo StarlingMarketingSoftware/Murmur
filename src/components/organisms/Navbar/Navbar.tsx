@@ -160,7 +160,10 @@ export const Navbar = () => {
 								// Smooth transition for background color changes in both directions
 								'transition-[background-color,backdrop-filter,border-color,box-shadow] duration-500 ease-out',
 								isTransparentHeader
-									? 'bg-transparent'
+									? // Keep the bottom border present (width 1px) but fully transparent so it
+										// fades in via the border-color transition instead of snapping from 0→1px
+										// when navigating to an opaque page (e.g. home/venue → pricing).
+										'bg-transparent border-b border-white/0'
 									: scrolled
 										? [
 											// Liquid glass - refractive blur that distorts but keeps colors vivid
