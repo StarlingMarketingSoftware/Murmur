@@ -188,7 +188,7 @@ export const Navbar = () => {
 							isFreeTrial && 'pt-[4px]'
 						)}
 					>
-						{/* Left Section - Back arrow on feature pages, UserButton on mobile otherwise */}
+						{/* Left Section - UserButton on mobile when signed in, spacer otherwise */}
 						<div className="min-[1145px]:hidden flex items-center">
 							{isSignedIn ? (
 								<UserButton
