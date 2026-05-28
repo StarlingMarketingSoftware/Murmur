@@ -594,6 +594,9 @@ function VenuePortalForm() {
 				website: venue.website ?? '',
 				description: venue.description ?? '',
 			});
+			if (venue.latitude != null && venue.longitude != null) {
+				setLocationCoordinates({ lat: venue.latitude, lng: venue.longitude });
+			}
 		}
 		setHasHydratedForm(true);
 	}, [hasHydratedForm, isLoadingVenue, venue]);
@@ -642,6 +645,8 @@ function VenuePortalForm() {
 			venueName,
 			businessType: trimToNull(form.businessType),
 			address: trimToNull(form.address),
+			latitude: locationCoordinates?.lat ?? null,
+			longitude: locationCoordinates?.lng ?? null,
 			capacityMin: capacityValues.capacityMin,
 			capacityMax: capacityValues.capacityMax,
 			genres: parseGenres(form.genres),
