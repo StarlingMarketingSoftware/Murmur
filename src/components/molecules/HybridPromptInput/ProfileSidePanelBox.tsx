@@ -18,6 +18,10 @@ import { GenreJazzIcon } from '@/components/atoms/_svg/GenreJazzIcon';
 import { GenrePopIcon } from '@/components/atoms/_svg/GenrePopIcon';
 import { GenreRandBIcon } from '@/components/atoms/_svg/GenreRandBIcon';
 import { GenreRockIcon } from '@/components/atoms/_svg/GenreRockIcon';
+import {
+	ProfileAreaMarkerIcon,
+	profileAreaMarkerSvg,
+} from '@/components/atoms/_svg/ProfileAreaMarkerIcon';
 
 type ProfileSidePanelBoxProps = {
 	profileName?: string | null;
@@ -49,14 +53,6 @@ const USER_AREA_ZOOM = 6;
 const SELECTED_AREA_ZOOM = 7;
 const PROFILE_AREA_MARKER_WIDTH = 26;
 const PROFILE_AREA_MARKER_HEIGHT = 32;
-const profileAreaMarkerSvg = `
-	<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 13 16" fill="none">
-		<path d="M6.0005 0.57373L10.5716 2.11649L12.5715 7.36188L9.71455 12.0016L6.28619 16.0013L3.14353 12.2873L0.572266 7.67043L1.14366 4.27635L2.85784 1.80794L6.0005 0.57373Z" fill="#FD7171"/>
-		<path d="M11.4279 6.28727C11.4279 4.92339 10.8861 3.61536 9.92164 2.65095C8.95723 1.68654 7.6492 1.14474 6.28532 1.14474C4.92143 1.14474 3.61341 1.68654 2.649 2.65095C1.68459 3.61536 1.14279 4.92339 1.14279 6.28727C1.14279 8.39685 2.83068 11.1464 6.28532 14.4399C9.73996 11.1464 11.4279 8.39685 11.4279 6.28727ZM6.28532 16.0009C2.09473 12.192 0 8.95339 0 6.28727C0 4.6203 0.662202 3.02161 1.84093 1.84288C3.01965 0.664155 4.61835 0.00195313 6.28532 0.00195312C7.95229 0.00195313 9.55099 0.664155 10.7297 1.84288C11.9084 3.02161 12.5706 4.6203 12.5706 6.28727C12.5706 8.95339 10.4759 12.192 6.28532 16.0009Z" fill="black"/>
-		<path d="M6.2847 8.00132C6.73933 8.00132 7.17533 7.82072 7.4968 7.49925C7.81828 7.17778 7.99888 6.74177 7.99888 6.28714C7.99888 5.83251 7.81828 5.3965 7.4968 5.07503C7.17533 4.75356 6.73933 4.57296 6.2847 4.57296C5.83007 4.57296 5.39406 4.75356 5.07259 5.07503C4.75112 5.3965 4.57052 5.83251 4.57052 6.28714C4.57052 6.74177 4.75112 7.17778 5.07259 7.49925C5.39406 7.82072 5.83007 8.00132 6.2847 8.00132ZM6.2847 9.1441C5.52698 9.1441 4.8003 8.8431 4.26452 8.30732C3.72873 7.77153 3.42773 7.04485 3.42773 6.28714C3.42773 5.52943 3.72873 4.80275 4.26452 4.26696C4.8003 3.73118 5.52698 3.43018 6.2847 3.43018C7.04241 3.43018 7.76909 3.73118 8.30488 4.26696C8.84066 4.80275 9.14166 5.52943 9.14166 6.28714C9.14166 7.04485 8.84066 7.77153 8.30488 8.30732C7.76909 8.8431 7.04241 9.1441 6.2847 9.1441Z" fill="black"/>
-		<circle cx="6.28449" cy="6.28791" r="1.71418" fill="white"/>
-	</svg>
-`;
 const profilePerformingNameIconSvg = `
 	<svg width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
 		<g clip-path="url(#profile-performing-name-icon-clip)">
@@ -143,21 +139,38 @@ const genreOptionRows: GenreOption[][] = [
 	],
 ];
 
-type AreaCoordinates = { lat: number; lng: number };
+export type AreaCoordinates = { lat: number; lng: number };
 
-type ProfileAreaMapBoxProps = {
-	area: string;
-	onAreaUpdate?: (area: string) => void | Promise<void>;
-};
-
-const formatReverseGeocodeArea = (feature: {
+export type ProfileAreaMapFeature = {
+	geometry?: { coordinates?: [number, number] };
 	properties?: {
 		name?: string;
 		full_address?: string;
 		place_formatted?: string;
-		context?: Record<string, { name?: string } | undefined>;
+		context?: Record<
+			string,
+			{ name?: string; region_code?: string; short_code?: string } | undefined
+		>;
 	};
-}) => {
+};
+
+export type ProfileAreaMapBoxProps = {
+	area: string;
+	onAreaUpdate?: (area: string) => void | Promise<void>;
+	className?: string;
+	headerLabel?: string;
+	inputPlaceholder?: string;
+	initiallyEditing?: boolean;
+	reverseGeocodeTypes?: string;
+	forwardGeocodeTypes?: string;
+	formatGeocodeFeature?: (feature: ProfileAreaMapFeature) => string;
+	/** Seed the marker on mount — lets a parent restore the last picked spot. */
+	initialCoordinates?: AreaCoordinates | null;
+	/** Fires whenever the marker is placed (pin drop or search) so a parent can persist it. */
+	onCoordinatesChange?: (coordinates: AreaCoordinates) => void;
+};
+
+const formatReverseGeocodeArea = (feature: ProfileAreaMapFeature) => {
 	const context = feature.properties?.context;
 	const city =
 		context?.place?.name ||
@@ -175,7 +188,19 @@ const formatReverseGeocodeArea = (feature: {
 	);
 };
 
-const ProfileAreaMapBox = ({ area, onAreaUpdate }: ProfileAreaMapBoxProps) => {
+export const ProfileAreaMapBox = ({
+	area,
+	onAreaUpdate,
+	className = 'mt-[5px]',
+	headerLabel = 'Choose your Area',
+	inputPlaceholder = headerLabel,
+	initiallyEditing = false,
+	reverseGeocodeTypes = 'place,locality,district,region',
+	forwardGeocodeTypes,
+	formatGeocodeFeature = formatReverseGeocodeArea,
+	initialCoordinates = null,
+	onCoordinatesChange,
+}: ProfileAreaMapBoxProps) => {
 	const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
 	const mapContainerRef = useRef<HTMLDivElement | null>(null);
 	const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -185,11 +210,13 @@ const ProfileAreaMapBox = ({ area, onAreaUpdate }: ProfileAreaMapBoxProps) => {
 	const [isMapReady, setIsMapReady] = useState(false);
 	const [mapError, setMapError] = useState<string | null>(null);
 	const [areaQuery, setAreaQuery] = useState(area);
-	const [isEditingArea, setIsEditingArea] = useState(false);
+	const [isEditingArea, setIsEditingArea] = useState(initiallyEditing);
 	const [isGeocodingArea, setIsGeocodingArea] = useState(false);
 	const [geocodeError, setGeocodeError] = useState<string | null>(null);
 	const [userLocation, setUserLocation] = useState<AreaCoordinates | null>(null);
-	const [areaCoordinates, setAreaCoordinates] = useState<AreaCoordinates | null>(null);
+	const [areaCoordinates, setAreaCoordinates] = useState<AreaCoordinates | null>(
+		initialCoordinates ?? null
+	);
 	const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
 	const areaStatus = isGeocodingArea
 		? 'Searching area...'
@@ -289,6 +316,7 @@ const ProfileAreaMapBox = ({ area, onAreaUpdate }: ProfileAreaMapBoxProps) => {
 			const myGen = ++geocodeGenRef.current;
 			const fallback = `${next.lat.toFixed(3)}, ${next.lng.toFixed(3)}`;
 			setAreaCoordinates(next);
+			onCoordinatesChange?.(next);
 			setIsReverseGeocoding(true);
 
 			try {
@@ -296,7 +324,7 @@ const ProfileAreaMapBox = ({ area, onAreaUpdate }: ProfileAreaMapBoxProps) => {
 				url.searchParams.set('longitude', String(next.lng));
 				url.searchParams.set('latitude', String(next.lat));
 				url.searchParams.set('limit', '1');
-				url.searchParams.set('types', 'place,locality,district,region');
+				url.searchParams.set('types', reverseGeocodeTypes);
 				url.searchParams.set('access_token', mapboxToken);
 
 				const res = await fetch(url.toString());
@@ -306,18 +334,9 @@ const ProfileAreaMapBox = ({ area, onAreaUpdate }: ProfileAreaMapBoxProps) => {
 					return;
 				}
 
-				const data = (await res.json()) as {
-					features?: Array<{
-						properties?: {
-							name?: string;
-							full_address?: string;
-							place_formatted?: string;
-							context?: Record<string, { name?: string } | undefined>;
-						};
-					}>;
-				};
+				const data = (await res.json()) as { features?: ProfileAreaMapFeature[] };
 				const formatted = data.features?.[0]
-					? formatReverseGeocodeArea(data.features[0])
+					? formatGeocodeFeature(data.features[0])
 					: '';
 				onAreaUpdate?.(formatted || fallback);
 			} catch {
@@ -326,7 +345,13 @@ const ProfileAreaMapBox = ({ area, onAreaUpdate }: ProfileAreaMapBoxProps) => {
 				if (myGen === geocodeGenRef.current) setIsReverseGeocoding(false);
 			}
 		},
-		[mapboxToken, onAreaUpdate]
+		[
+			formatGeocodeFeature,
+			mapboxToken,
+			onAreaUpdate,
+			onCoordinatesChange,
+			reverseGeocodeTypes,
+		]
 	);
 
 	const runAreaGeocode = useCallback(async () => {
@@ -347,6 +372,9 @@ const ProfileAreaMapBox = ({ area, onAreaUpdate }: ProfileAreaMapBoxProps) => {
 			url.searchParams.set('limit', '1');
 			url.searchParams.set('country', 'us');
 			url.searchParams.set('access_token', mapboxToken);
+			if (forwardGeocodeTypes) {
+				url.searchParams.set('types', forwardGeocodeTypes);
+			}
 			if (userLocation) {
 				url.searchParams.set('proximity', `${userLocation.lng},${userLocation.lat}`);
 			}
@@ -358,17 +386,7 @@ const ProfileAreaMapBox = ({ area, onAreaUpdate }: ProfileAreaMapBoxProps) => {
 				return;
 			}
 
-			const data = (await res.json()) as {
-				features?: Array<{
-					geometry?: { coordinates?: [number, number] };
-					properties?: {
-						name?: string;
-						full_address?: string;
-						place_formatted?: string;
-						context?: Record<string, { name?: string } | undefined>;
-					};
-				}>;
-			};
+			const data = (await res.json()) as { features?: ProfileAreaMapFeature[] };
 			const feature = data.features?.[0];
 			const coords = feature?.geometry?.coordinates;
 			if (!feature || !coords || coords.length < 2) {
@@ -377,8 +395,10 @@ const ProfileAreaMapBox = ({ area, onAreaUpdate }: ProfileAreaMapBoxProps) => {
 			}
 
 			const [nextLng, nextLat] = coords;
-			const formatted = formatReverseGeocodeArea(feature) || trimmed;
-			setAreaCoordinates({ lat: nextLat, lng: nextLng });
+			const formatted = formatGeocodeFeature(feature) || trimmed;
+			const nextCoordinates = { lat: nextLat, lng: nextLng };
+			setAreaCoordinates(nextCoordinates);
+			onCoordinatesChange?.(nextCoordinates);
 			setAreaQuery(formatted);
 			setIsEditingArea(false);
 			onAreaUpdate?.(formatted);
@@ -387,7 +407,15 @@ const ProfileAreaMapBox = ({ area, onAreaUpdate }: ProfileAreaMapBoxProps) => {
 		} finally {
 			if (myGen === forwardGeocodeGenRef.current) setIsGeocodingArea(false);
 		}
-	}, [areaQuery, mapboxToken, onAreaUpdate, userLocation]);
+	}, [
+		areaQuery,
+		mapboxToken,
+		onAreaUpdate,
+		onCoordinatesChange,
+		userLocation,
+		forwardGeocodeTypes,
+		formatGeocodeFeature,
+	]);
 
 	useEffect(() => {
 		const map = mapRef.current;
@@ -458,7 +486,9 @@ const ProfileAreaMapBox = ({ area, onAreaUpdate }: ProfileAreaMapBoxProps) => {
 	}, [isMapReady, commitCoordinates]);
 
 	return (
-		<div className="relative mt-[5px] box-border h-[129px] w-[334px] shrink-0 overflow-hidden rounded-[9px] border-[1.526px] border-black bg-white opacity-80">
+		<div
+			className={`relative box-border h-[129px] w-[334px] shrink-0 overflow-hidden rounded-[9px] border-[1.526px] border-black bg-white opacity-80 ${className}`}
+		>
 			<style jsx global>{`
 				.profile-side-panel-area-map-root,
 				.profile-side-panel-area-map-root.mapboxgl-map,
@@ -491,7 +521,8 @@ const ProfileAreaMapBox = ({ area, onAreaUpdate }: ProfileAreaMapBoxProps) => {
 					<input
 						type="text"
 						value={areaQuery}
-						placeholder="Choose your Area"
+						placeholder={inputPlaceholder}
+						aria-label={inputPlaceholder}
 						onChange={(event) => {
 							setAreaQuery(event.target.value);
 							if (geocodeError) setGeocodeError(null);
@@ -524,7 +555,7 @@ const ProfileAreaMapBox = ({ area, onAreaUpdate }: ProfileAreaMapBoxProps) => {
 						}}
 						className="h-full w-full appearance-none border-0 bg-transparent p-0 text-left font-inter text-[17.507px] font-medium leading-[23.342px] text-black"
 					>
-						Choose your Area
+						{headerLabel}
 					</button>
 				)}
 			</div>
@@ -1098,8 +1129,9 @@ export const ProfileSidePanelBox = ({
 								<span
 									aria-hidden="true"
 									className="block h-[16px] w-[13px] shrink-0"
-									dangerouslySetInnerHTML={{ __html: profileAreaMarkerSvg }}
-								/>
+								>
+									<ProfileAreaMarkerIcon className="h-full w-full" />
+								</span>
 								<span className="min-w-0 truncate">{selectedArea}</span>
 							</button>
 						) : showAreaEditor ? (
