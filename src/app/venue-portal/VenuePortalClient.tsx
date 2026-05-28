@@ -6,6 +6,7 @@ import {
 	type KeyboardEvent as ReactKeyboardEvent,
 	type PointerEvent as ReactPointerEvent,
 	type Ref,
+	useCallback,
 	useEffect,
 	useLayoutEffect,
 	useMemo,
@@ -153,6 +154,9 @@ const EMPTY_FORM_STATE: VenueFormState = {
 	website: '',
 	description: '',
 };
+
+// How long to wait after the last edit before auto-saving the venue profile.
+const AUTOSAVE_DEBOUNCE_MS = 800;
 
 const IDLE_MAP_CLIP = 'inset(0px round 0px)';
 const IDLE_MAP_TRANSITION = '0ms ease';
@@ -475,6 +479,38 @@ const parseGenres = (value: string) => {
 		.split(',')
 		.map((genre) => genre.trim())
 		.filter(Boolean);
+};
+
+// Translate the local form/location state into the PATCH payload. Includes the
+// location-derived coordinates + city/state alongside the typed fields. Throws (with a
+// user-facing message) when capacity or hours are malformed, so callers can either
+// surface the error (manual submit) or skip the write (auto-save).
+const buildVenuePayload = (
+	form: VenueFormState,
+	locationParts: { city: string; state: string },
+	locationCoordinates: AreaCoordinates | null
+): PatchVenueData => {
+	const capacityValues = parseCapacity(form.capacity);
+	const hours = parseVenueHours(form.hours);
+
+	return {
+		...parsePayRange(form.payRange),
+		venueName: form.venueName.trim(),
+		businessType: trimToNull(form.businessType),
+		address: trimToNull(form.address),
+		city: trimToNull(locationParts.city),
+		state: trimToNull(locationParts.state),
+		latitude: locationCoordinates?.lat ?? null,
+		longitude: locationCoordinates?.lng ?? null,
+		hours,
+		capacityMin: capacityValues.capacityMin,
+		capacityMax: capacityValues.capacityMax,
+		genres: parseGenres(form.genres),
+		payRange: trimToNull(form.payRange),
+		sound: trimToNull(form.sound),
+		website: trimToNull(form.website),
+		description: trimToNull(form.description),
+	};
 };
 
 type VenueTextFieldProps = {
@@ -1823,6 +1859,9 @@ function VenuePortalForm({ onEnterMapView }: { onEnterMapView: () => void }) {
 	const payRangeMinInputRef = useRef<HTMLInputElement | null>(null);
 	const descriptionInputRef = useRef<HTMLTextAreaElement | null>(null);
 	const websiteInputRef = useRef<HTMLInputElement | null>(null);
+	// Serialized payload of the last save, so the debounced auto-save can skip writes
+	// when nothing changed — including the freshly hydrated profile on load.
+	const lastSavedPayloadRef = useRef<string | null>(null);
 	const completedAddress = form.address.trim();
 	const completedBusinessType = form.businessType.trim();
 	const completedHoursSummary = formatOpenNightsSummary(getOpenNightsCount(form.hours));
@@ -1891,7 +1930,7 @@ function VenuePortalForm({ onEnterMapView }: { onEnterMapView: () => void }) {
 	useEffect(() => {
 		if (hasHydratedForm || isLoadingVenue) return;
 		if (venue) {
-			setForm({
+			const hydratedForm: VenueFormState = {
 				venueName: venue.venueName,
 				businessType: venue.businessType ?? '',
 				address: venue.address ?? '',
@@ -1902,15 +1941,82 @@ function VenuePortalForm({ onEnterMapView }: { onEnterMapView: () => void }) {
 				sound: venue.sound ?? '',
 				website: venue.website ?? '',
 				description: venue.description ?? '',
-			});
-			setLocationParts({ city: venue.city ?? '', state: venue.state ?? '' });
+			};
+			const hydratedLocationParts = {
+				city: venue.city ?? '',
+				state: venue.state ?? '',
+			};
+			const hydratedCoordinates =
+				venue.latitude != null && venue.longitude != null
+					? { lat: venue.latitude, lng: venue.longitude }
+					: null;
+
+			setForm(hydratedForm);
+			setLocationParts(hydratedLocationParts);
 			setHasCompletedHours(venue.hours !== null);
-			if (venue.latitude != null && venue.longitude != null) {
-				setLocationCoordinates({ lat: venue.latitude, lng: venue.longitude });
+			if (hydratedCoordinates) {
+				setLocationCoordinates(hydratedCoordinates);
+			}
+
+			// Treat the just-loaded profile as the saved baseline so auto-save only
+			// persists edits made after load, not the data we just read back.
+			try {
+				lastSavedPayloadRef.current = JSON.stringify(
+					buildVenuePayload(hydratedForm, hydratedLocationParts, hydratedCoordinates)
+				);
+			} catch {
+				lastSavedPayloadRef.current = null;
 			}
 		}
 		setHasHydratedForm(true);
 	}, [hasHydratedForm, isLoadingVenue, venue]);
+
+	const saveVenue = useCallback(
+		async (payload: PatchVenueData) => {
+			// Pre-record so the debounced effect treats this payload as persisted and
+			// won't fire a duplicate write while the request is in flight.
+			lastSavedPayloadRef.current = JSON.stringify(payload);
+			try {
+				await upsertVenue(payload);
+				setFormError(null);
+				setSaved(true);
+			} catch (error) {
+				// Failed — drop the baseline so the next edit retries this change.
+				lastSavedPayloadRef.current = null;
+				setSaved(false);
+				setFormError(error instanceof Error ? error.message : 'Failed to save venue.');
+				throw error;
+			}
+		},
+		[upsertVenue]
+	);
+
+	// A venue name is the minimum the server needs to create the row. null means there
+	// is nothing valid to persist yet (no name, or malformed capacity/hours), so skip.
+	const autoSavePayload = useMemo<PatchVenueData | null>(() => {
+		if (form.venueName.trim().length === 0) return null;
+		try {
+			return buildVenuePayload(form, locationParts, locationCoordinates);
+		} catch {
+			return null;
+		}
+	}, [form, locationParts, locationCoordinates]);
+
+	// Debounced auto-save: persist edits shortly after the user stops changing the form
+	// so the profile saves continuously instead of only when Continue is pressed.
+	useEffect(() => {
+		if (!hasHydratedForm || !autoSavePayload) return;
+		const serialized = JSON.stringify(autoSavePayload);
+		if (serialized === lastSavedPayloadRef.current) return;
+
+		const timer = window.setTimeout(() => {
+			// Re-check at fire time: a manual Continue (or another save) may have already
+			// persisted this exact payload while the timer was pending.
+			if (serialized === lastSavedPayloadRef.current) return;
+			void saveVenue(autoSavePayload).catch(() => undefined);
+		}, AUTOSAVE_DEBOUNCE_MS);
+		return () => window.clearTimeout(timer);
+	}, [autoSavePayload, hasHydratedForm, saveVenue]);
 
 	const updateField = (field: Exclude<keyof VenueFormState, 'hours'>, value: string) => {
 		setSaved(false);
@@ -2217,61 +2323,35 @@ function VenuePortalForm({ onEnterMapView }: { onEnterMapView: () => void }) {
 		)?.toUpperCase() ?? '';
 	const venuePortalUserName = getVenuePortalDisplayName(clerkUser);
 	const venuePortalInitial = getVenuePortalInitial(clerkUser);
+	// Venue name and location are the only required fields; everything else is optional.
+	const hasRequiredFields =
+		form.venueName.trim().length > 0 && completedAddress.length > 0;
+	const canContinue = hasRequiredFields && !isSaving && !isLoadingVenue;
 
 	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
-		const venueName = form.venueName.trim();
-		if (!venueName) {
+		if (!form.venueName.trim()) {
 			setSaved(false);
 			setFormError('Venue name is required to create the venue profile.');
 			return;
 		}
 
-		let capacityValues: ReturnType<typeof parseCapacity>;
+		// Auto-save has usually persisted the profile already, but the user can hit
+		// Continue inside the debounce window — flush a final save before advancing.
+		let payload: PatchVenueData;
 		try {
-			capacityValues = parseCapacity(form.capacity);
+			payload = buildVenuePayload(form, locationParts, locationCoordinates);
 		} catch (error) {
 			setSaved(false);
-			setFormError(error instanceof Error ? error.message : 'Capacity is invalid.');
+			setFormError(error instanceof Error ? error.message : 'Could not save venue.');
 			return;
 		}
 
-		let hours: WeeklyHours | null;
 		try {
-			hours = parseVenueHours(form.hours);
-		} catch (error) {
-			setSaved(false);
-			setFormError(error instanceof Error ? error.message : 'Hours are invalid.');
-			return;
-		}
-
-		const payload: PatchVenueData = {
-			...parsePayRange(form.payRange),
-			venueName,
-			businessType: trimToNull(form.businessType),
-			address: trimToNull(form.address),
-			city: trimToNull(locationParts.city),
-			state: trimToNull(locationParts.state),
-			latitude: locationCoordinates?.lat ?? null,
-			longitude: locationCoordinates?.lng ?? null,
-			hours,
-			capacityMin: capacityValues.capacityMin,
-			capacityMax: capacityValues.capacityMax,
-			genres: parseGenres(form.genres),
-			payRange: trimToNull(form.payRange),
-			sound: trimToNull(form.sound),
-			website: trimToNull(form.website),
-			description: trimToNull(form.description),
-		};
-
-		try {
-			await upsertVenue(payload);
-			setFormError(null);
-			setSaved(true);
+			await saveVenue(payload);
 			onEnterMapView();
-		} catch (error) {
-			setSaved(false);
-			setFormError(error instanceof Error ? error.message : 'Failed to save venue.');
+		} catch {
+			// saveVenue already surfaced the failure via the inline status message.
 		}
 	};
 
@@ -2714,12 +2794,10 @@ function VenuePortalForm({ onEnterMapView }: { onEnterMapView: () => void }) {
 
 				<button
 					type="submit"
-					disabled={isSaving || isLoadingVenue}
+					disabled={!canContinue}
 					className="relative mt-4 flex h-[32px] w-[166px] items-center justify-center rounded-[17px] border border-black bg-[#9ED7FF] font-inter text-[17.542px] font-bold not-italic leading-[normal] text-[#111] disabled:cursor-not-allowed disabled:opacity-60"
 				>
-					<span className="flex h-full items-center">
-						{isSaving ? 'Saving...' : 'Continue'}
-					</span>
+					<span className="flex h-full items-center">Continue</span>
 					<svg
 						aria-hidden="true"
 						className="absolute right-[27px] top-1/2 h-[13px] w-[8px] -translate-y-1/2"
@@ -2736,8 +2814,13 @@ function VenuePortalForm({ onEnterMapView }: { onEnterMapView: () => void }) {
 							Unable to load an existing venue profile. You can still try saving.
 						</p>
 					)}
-					{formError && <p className="text-red-700">{formError}</p>}
-					{saved && <p className="text-emerald-700">Venue profile saved.</p>}
+					{formError ? (
+						<p className="text-red-700">{formError}</p>
+					) : isSaving ? (
+						<p className="text-slate-500">Saving…</p>
+					) : saved ? (
+						<p className="text-emerald-700">All changes saved</p>
+					) : null}
 				</div>
 			</form>
 		</div>
