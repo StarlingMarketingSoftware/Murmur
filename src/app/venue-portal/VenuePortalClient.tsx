@@ -24,6 +24,7 @@ import { PersistentDashboardMap } from '@/components/molecules/PersistentDashboa
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import {
 	ProfileAreaMapBox,
+	profileGenreOptionRows,
 	type AreaCoordinates,
 	type ProfileAreaMapFeature,
 } from '@/components/molecules/HybridPromptInput/ProfileSidePanelBox';
@@ -125,6 +126,10 @@ const RIGHT_GRID_PLACEHOLDER_CLASS =
 const GRID_PLACEHOLDER_LABEL_CLASS = 'min-w-0';
 const VENUE_LOCATION_GEOCODE_TYPES =
 	'address,street,neighborhood,place,locality,district,region,postcode';
+const DEFAULT_CAPACITY_VALUE = 90;
+const CAPACITY_SLIDER_MIN = 0;
+const CAPACITY_SLIDER_MAX = 350;
+const CAPACITY_SLIDER_STEP = 1;
 
 const BUSINESS_TYPE_OPTIONS = [
 	{
@@ -152,11 +157,13 @@ const BUSINESS_TYPE_OPTIONS = [
 		icon: <WineBeerSpiritsIcon size={13} innerFill="#BFC4FF" />,
 	},
 ] as const;
+const PROFILE_GENRE_OPTIONS = profileGenreOptionRows.flat();
 
 const formatVenueLocationFeature = (feature: ProfileAreaMapFeature) => {
 	const properties = feature.properties;
 	const context = properties?.context;
-	const street = properties?.full_address?.split(',')[0]?.trim() || properties?.name || '';
+	const street =
+		properties?.full_address?.split(',')[0]?.trim() || properties?.name || '';
 	const city =
 		context?.place?.name || context?.locality?.name || context?.district?.name || '';
 	const region =
@@ -273,11 +280,51 @@ const parseCapacity = (value: string) => {
 	return { capacityMin, capacityMax };
 };
 
+const formatCapacityPeople = (capacity: number) =>
+	`${capacity} ${capacity === 1 ? 'person' : 'people'}`;
+
+const formatCapacityDisplay = (capacity: string) => {
+	const trimmed = capacity.trim();
+	if (!trimmed) return formatCapacityPeople(DEFAULT_CAPACITY_VALUE);
+
+	try {
+		const { capacityMin, capacityMax } = parseCapacity(trimmed);
+		if (capacityMin !== null && capacityMax !== null && capacityMin !== capacityMax) {
+			return `${capacityMin}-${capacityMax} people`;
+		}
+
+		const capacityValue = capacityMax ?? capacityMin;
+		return capacityValue === null
+			? formatCapacityPeople(DEFAULT_CAPACITY_VALUE)
+			: formatCapacityPeople(capacityValue);
+	} catch {
+		return `${trimmed} people`;
+	}
+};
+
+const getCapacitySliderValue = (capacity: string) => {
+	try {
+		const { capacityMin, capacityMax } = parseCapacity(capacity);
+		return capacityMax ?? capacityMin ?? DEFAULT_CAPACITY_VALUE;
+	} catch {
+		return DEFAULT_CAPACITY_VALUE;
+	}
+};
+
+const getCapacitySliderMax = (capacity: number) =>
+	Math.max(CAPACITY_SLIDER_MAX, capacity);
+
 const parseGenres = (value: string) => {
 	return value
 		.split(',')
 		.map((genre) => genre.trim())
 		.filter(Boolean);
+};
+
+const formatSelectedGenreSummary = (genres: string[]) => {
+	const firstGenre = genres[0] ?? '';
+	if (genres.length <= 1) return firstGenre;
+	return `${firstGenre} +${genres.length - 1}`;
 };
 
 type VenueTextFieldProps = {
@@ -337,8 +384,11 @@ function VenueTextField({
 			: solidWhenEmpty && isEmpty
 				? 'bg-white opacity-100'
 				: 'bg-white opacity-20';
-	const placeholderToneClassName = activeEntry || highlighted ? 'text-black' : 'text-[#9f9f9f]';
-	const borderClassName = activeEntry ? 'border border-black' : 'border-[2px] border-black';
+	const placeholderToneClassName =
+		activeEntry || highlighted ? 'text-black' : 'text-[#9f9f9f]';
+	const borderClassName = activeEntry
+		? 'border border-black'
+		: 'border-[2px] border-black';
 
 	return (
 		<label
@@ -518,6 +568,187 @@ function VenueCompletedHoursButton({
 	);
 }
 
+function CapacityPersonIcon({ className = '' }: { className?: string }) {
+	return (
+		<svg aria-hidden="true" viewBox="0 0 8 20" fill="none" className={className}>
+			<path
+				d="M3.82865 0C4.67695 0 5.36761 0.7979 5.36761 1.77793C5.36761 2.75796 4.67695 3.55586 3.82865 3.55586C2.98034 3.55586 2.28968 2.75796 2.28968 1.77793C2.28968 0.7979 2.98034 0 3.82865 0ZM5.76549 4.01552H1.92183C0.855815 4.01552 0 5.00422 0 6.23576V11.665C0 12.0899 0.292779 12.4455 0.675644 12.4455C1.05851 12.4455 1.35129 12.1073 1.35129 11.665V6.67808C1.35129 6.55666 1.44137 6.45259 1.54647 6.45259C1.65157 6.45259 1.74166 6.55666 1.74166 6.67808V18.4255C1.74166 19.0933 2.16957 19.6397 2.70257 19.6397C3.23558 19.6397 3.66349 19.0933 3.66349 18.4255V12.4629C3.66349 12.3414 3.75358 12.2374 3.85868 12.2374C3.96378 12.2374 4.05386 12.3414 4.05386 12.4629V18.4255C4.05386 19.0933 4.48177 19.6397 5.01478 19.6397C5.54778 19.6397 5.97569 19.0933 5.97569 18.4255V6.67808C5.97569 6.55666 6.06578 6.45259 6.17088 6.45259C6.27598 6.45259 6.36606 6.55666 6.36606 6.67808V11.6736C6.36606 12.0986 6.65884 12.4542 7.04171 12.4542C7.42457 12.4542 7.71735 12.1159 7.71735 11.6736V6.23576C7.68732 5.00422 6.80899 4.01552 5.76549 4.01552Z"
+				fill="currentColor"
+			/>
+		</svg>
+	);
+}
+
+function VenueCompletedCapacityButton({
+	capacity,
+	onClick,
+}: {
+	capacity: string;
+	onClick: () => void;
+}) {
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			className="relative block h-[63px] w-[172px] overflow-hidden rounded-[8px] border-[2px] border-white bg-[#B3E3FF] text-left opacity-90"
+		>
+			<span className="absolute left-[8px] top-[7px] rounded-[4px] bg-[#D6FFED] px-[3px] text-[14px] font-black leading-[14px] text-[#34B965]">
+				Capacity
+			</span>
+			<span className="absolute left-[18px] right-[8px] top-[32px] flex items-center gap-[7px]">
+				<CapacityPersonIcon className="h-[20px] w-[8px] shrink-0 text-black" />
+				<span className="min-w-0 truncate text-[16px] font-medium leading-none text-black">
+					{formatCapacityDisplay(capacity)}
+				</span>
+			</span>
+		</button>
+	);
+}
+
+function VenueActiveGenreButton({ onClick }: { onClick: () => void }) {
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			className="flex h-[63px] w-[210px] items-center justify-center rounded-[8px] border-[2px] border-black bg-[#E6F7FE] text-[24px] font-medium leading-none text-black"
+		>
+			Genre
+		</button>
+	);
+}
+
+function VenueCompletedGenreButton({
+	genres,
+	onClick,
+}: {
+	genres: string[];
+	onClick: () => void;
+}) {
+	const firstGenre = genres[0] ?? '';
+	const selectedOption = PROFILE_GENRE_OPTIONS.find(
+		(option) => option.label === firstGenre
+	);
+	const SelectedIcon = selectedOption?.Icon;
+
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			className="relative block h-[63px] w-[210px] overflow-hidden rounded-[8px] border-[2px] border-white bg-[#B3E3FF] text-left opacity-90"
+		>
+			<span className="absolute left-[8px] top-[7px] rounded-[4px] bg-[#D6FFED] px-[3px] text-[14px] font-black leading-[14px] text-[#34B965]">
+				Genre
+			</span>
+			<span className="absolute left-[28px] right-[8px] top-[32px] flex items-center gap-[6px]">
+				{SelectedIcon && <SelectedIcon aria-hidden="true" className="shrink-0" />}
+				<span className="min-w-0 truncate text-[16px] font-medium leading-none text-black">
+					{formatSelectedGenreSummary(genres)}
+				</span>
+			</span>
+		</button>
+	);
+}
+
+function VenueGenrePicker({
+	selectedGenres,
+	onToggle,
+	className = '',
+}: {
+	selectedGenres: string[];
+	onToggle: (genre: string) => void;
+	className?: string;
+}) {
+	const selectedGenreSet = new Set(selectedGenres.map((genre) => genre.toLowerCase()));
+
+	return (
+		<div
+			className={`relative h-[139px] w-[386px] rounded-[8px] border-[2px] border-black bg-[#E6F7FE] ${className}`}
+		>
+			<span className="absolute left-[8px] top-[7px] rounded-[4px] bg-[#D6FFED] px-[3px] text-[14px] font-black leading-[14px] text-[#34B965]">
+				Genre
+			</span>
+			<div className="absolute left-[34px] right-[34px] top-[32px] flex flex-col gap-[9px]">
+				{profileGenreOptionRows.map((row) => (
+					<div
+						key={row.map((genre) => genre.label).join('-')}
+						className="flex justify-between"
+					>
+						{row.map((genre) => {
+							const Icon = genre.Icon;
+							const isSelected = selectedGenreSet.has(genre.label.toLowerCase());
+
+							return (
+								<button
+									type="button"
+									key={genre.label}
+									onClick={() => onToggle(genre.label)}
+									aria-pressed={isSelected}
+									className={`flex h-[21.374px] appearance-none items-center justify-center gap-[3px] rounded-[7.491px] border-0 px-[4px] font-inter text-[14px] font-medium leading-[21.374px] text-black transition-colors ${
+										isSelected ? 'bg-[#D6FFED]' : 'bg-white hover:bg-[#D6FFED]'
+									}`}
+									style={{ width: `${genre.width}px` }}
+								>
+									{Icon && <Icon aria-hidden="true" className="shrink-0" />}
+									<span>{genre.label}</span>
+								</button>
+							);
+						})}
+					</div>
+				))}
+			</div>
+		</div>
+	);
+}
+
+function VenueCapacityEditor({
+	value,
+	onChange,
+	inputRef,
+	className = '',
+}: {
+	value: string;
+	onChange: (value: string) => void;
+	inputRef?: Ref<HTMLInputElement>;
+	className?: string;
+}) {
+	const sliderValue = getCapacitySliderValue(value);
+	const sliderMax = getCapacitySliderMax(sliderValue);
+	const fillPercent =
+		sliderMax === CAPACITY_SLIDER_MIN
+			? 0
+			: ((sliderValue - CAPACITY_SLIDER_MIN) / (sliderMax - CAPACITY_SLIDER_MIN)) * 100;
+
+	return (
+		<div
+			className={`relative h-[139px] w-[386px] rounded-[8px] border-[2px] border-black bg-[#E6F7FE] ${className}`}
+		>
+			<span className="absolute left-[8px] top-[7px] rounded-[4px] bg-[#D6FFED] px-[3px] text-[14px] font-black leading-[14px] text-[#34B965]">
+				Capacity
+			</span>
+			<div className="absolute left-[18px] top-[35px] flex items-center gap-[8px]">
+				<CapacityPersonIcon className="h-[27px] w-[11px] shrink-0 text-black" />
+				<span className="font-inter text-[16px] font-medium leading-none text-black">
+					{formatCapacityDisplay(value)}
+				</span>
+			</div>
+			<input
+				ref={inputRef}
+				type="range"
+				aria-label="Capacity"
+				min={CAPACITY_SLIDER_MIN}
+				max={sliderMax}
+				step={CAPACITY_SLIDER_STEP}
+				value={sliderValue}
+				onChange={(event) => onChange(event.target.value)}
+				style={{
+					background: `linear-gradient(to right, #000 0%, #000 ${fillPercent}%, #D9D9D9 ${fillPercent}%, #D9D9D9 100%)`,
+				}}
+				className="absolute left-1/2 top-[84px] h-[9px] w-[320px] -translate-x-1/2 cursor-pointer appearance-none rounded-full outline-none [&::-moz-range-progress]:h-[9px] [&::-moz-range-progress]:rounded-full [&::-moz-range-progress]:bg-black [&::-moz-range-thumb]:h-[9px] [&::-moz-range-thumb]:w-[9px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-black [&::-moz-range-track]:h-[9px] [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-transparent [&::-webkit-slider-runnable-track]:h-[9px] [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:h-[9px] [&::-webkit-slider-thumb]:w-[9px] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-black"
+			/>
+		</div>
+	);
+}
+
 function VenueTimePicker({
 	label,
 	value,
@@ -538,7 +769,9 @@ function VenueTimePicker({
 	useEffect(() => {
 		if (!isOpen) return;
 
-		const selectedIndex = VENUE_TIME_OPTIONS.findIndex((option) => option.value === value);
+		const selectedIndex = VENUE_TIME_OPTIONS.findIndex(
+			(option) => option.value === value
+		);
 		const scrollContainer = menuRef.current?.querySelector<HTMLElement>(
 			'.venue-time-picker-scroll'
 		);
@@ -829,21 +1062,32 @@ function VenuePortalForm() {
 	const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false);
 	const [isBusinessTypePickerOpen, setIsBusinessTypePickerOpen] = useState(false);
 	const [isHoursEditorOpen, setIsHoursEditorOpen] = useState(false);
+	const [isCapacityEditorOpen, setIsCapacityEditorOpen] = useState(false);
+	const [isGenrePickerOpen, setIsGenrePickerOpen] = useState(false);
 	const [hasCompletedHours, setHasCompletedHours] = useState(false);
-	const [locationCoordinates, setLocationCoordinates] =
-		useState<AreaCoordinates | null>(null);
+	const [locationCoordinates, setLocationCoordinates] = useState<AreaCoordinates | null>(
+		null
+	);
 	const locationSlotRef = useRef<HTMLDivElement | null>(null);
 	const capacityInputRef = useRef<HTMLInputElement | null>(null);
 	const completedAddress = form.address.trim();
 	const completedBusinessType = form.businessType.trim();
 	const completedHoursSummary = formatOpenNightsSummary(getOpenNightsCount(form.hours));
-	const isInlineEditorOpen = isBusinessTypePickerOpen || isHoursEditorOpen;
-	const portalCardHeightClassName = isHoursEditorOpen
+	const completedCapacity = form.capacity.trim();
+	const selectedGenres = parseGenres(form.genres);
+	const isInlineEditorOpen =
+		isBusinessTypePickerOpen ||
+		isHoursEditorOpen ||
+		isCapacityEditorOpen ||
+		isGenrePickerOpen;
+	const isTallInlineEditorOpen =
+		isHoursEditorOpen || isCapacityEditorOpen || isGenrePickerOpen;
+	const portalCardHeightClassName = isTallInlineEditorOpen
 		? 'h-[670px]'
 		: isBusinessTypePickerOpen
 			? 'h-[653px]'
 			: 'h-[637px]';
-	const portalPanelHeightClassName = isHoursEditorOpen
+	const portalPanelHeightClassName = isTallInlineEditorOpen
 		? 'h-[603px]'
 		: isBusinessTypePickerOpen
 			? 'h-[586px]'
@@ -919,37 +1163,85 @@ function VenuePortalForm() {
 		updateField('address', value);
 		setIsBusinessTypePickerOpen(false);
 		setIsHoursEditorOpen(false);
+		setIsCapacityEditorOpen(false);
+		setIsGenrePickerOpen(false);
 	};
 	const selectBusinessType = (value: string) => {
 		updateField('businessType', value);
 		setIsBusinessTypePickerOpen(false);
 		setIsHoursEditorOpen(false);
+		setIsCapacityEditorOpen(false);
+		setIsGenrePickerOpen(false);
 	};
 	const openHoursEditor = () => {
 		setIsLocationPickerOpen(false);
 		setIsBusinessTypePickerOpen(false);
+		setIsCapacityEditorOpen(false);
+		setIsGenrePickerOpen(false);
 		setIsHoursEditorOpen(true);
+	};
+	const openCapacityEditor = () => {
+		setIsLocationPickerOpen(false);
+		setIsBusinessTypePickerOpen(false);
+		setIsHoursEditorOpen(false);
+		setIsGenrePickerOpen(false);
+		setIsCapacityEditorOpen(true);
+		if (!form.capacity.trim()) {
+			setSaved(false);
+			setFormError(null);
+			setForm((current) =>
+				current.capacity.trim()
+					? current
+					: { ...current, capacity: String(DEFAULT_CAPACITY_VALUE) }
+			);
+		}
+		requestAnimationFrame(() => capacityInputRef.current?.focus());
 	};
 	const completeHoursAndFocusCapacity = () => {
 		setSaved(false);
 		setFormError(null);
 		setHasCompletedHours(true);
-		setIsHoursEditorOpen(false);
-		requestAnimationFrame(() => capacityInputRef.current?.focus());
+		openCapacityEditor();
 	};
 	const handleHoursKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
 		if (event.key !== 'Enter') return;
 		event.preventDefault();
 		completeHoursAndFocusCapacity();
 	};
-	const shouldHighlightLocation =
-		isVenueNameFocused && form.venueName.trim().length > 0;
+	const openGenrePicker = () => {
+		setIsLocationPickerOpen(false);
+		setIsBusinessTypePickerOpen(false);
+		setIsHoursEditorOpen(false);
+		setIsCapacityEditorOpen(false);
+		setIsGenrePickerOpen(true);
+	};
+	const toggleGenre = (genre: string) => {
+		setSaved(false);
+		setFormError(null);
+		setForm((current) => {
+			const currentGenres = parseGenres(current.genres);
+			const normalizedGenre = genre.toLowerCase();
+			const hasGenre = currentGenres.some(
+				(currentGenre) => currentGenre.toLowerCase() === normalizedGenre
+			);
+			const nextGenres = hasGenre
+				? currentGenres.filter(
+						(currentGenre) => currentGenre.toLowerCase() !== normalizedGenre
+					)
+				: [...currentGenres, genre];
+
+			return { ...current, genres: nextGenres.join(', ') };
+		});
+	};
+	const shouldHighlightLocation = isVenueNameFocused && form.venueName.trim().length > 0;
 	const outlinedInitial =
-		(clerkUser?.firstName?.trim()?.[0] ||
+		(
+			clerkUser?.firstName?.trim()?.[0] ||
 			clerkUser?.lastName?.trim()?.[0] ||
 			clerkUser?.primaryEmailAddress?.emailAddress?.trim()?.[0] ||
 			clerkUser?.username?.trim()?.[0] ||
-			'')?.toUpperCase() ?? '';
+			''
+		)?.toUpperCase() ?? '';
 
 	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
@@ -1045,6 +1337,8 @@ function VenuePortalForm() {
 									onFocus={() => {
 										setIsBusinessTypePickerOpen(false);
 										setIsHoursEditorOpen(false);
+										setIsCapacityEditorOpen(false);
+										setIsGenrePickerOpen(false);
 										setIsVenueNameFocused(true);
 									}}
 									onBlur={() => setIsVenueNameFocused(false)}
@@ -1079,6 +1373,8 @@ function VenuePortalForm() {
 											onClick={() => {
 												setIsBusinessTypePickerOpen(false);
 												setIsHoursEditorOpen(false);
+												setIsCapacityEditorOpen(false);
+												setIsGenrePickerOpen(false);
 												setIsLocationPickerOpen(true);
 											}}
 										/>
@@ -1094,6 +1390,8 @@ function VenuePortalForm() {
 											onFocus={() => {
 												setIsBusinessTypePickerOpen(false);
 												setIsHoursEditorOpen(false);
+												setIsCapacityEditorOpen(false);
+												setIsGenrePickerOpen(false);
 												setIsLocationPickerOpen(true);
 											}}
 											className="h-[63px] w-[386px] cursor-pointer"
@@ -1119,6 +1417,8 @@ function VenuePortalForm() {
 											onClick={() => {
 												setIsLocationPickerOpen(false);
 												setIsHoursEditorOpen(false);
+												setIsCapacityEditorOpen(false);
+												setIsGenrePickerOpen(false);
 												setIsBusinessTypePickerOpen(true);
 											}}
 										/>
@@ -1130,11 +1430,15 @@ function VenuePortalForm() {
 											onFocus={() => {
 												setIsLocationPickerOpen(false);
 												setIsHoursEditorOpen(false);
+												setIsCapacityEditorOpen(false);
+												setIsGenrePickerOpen(false);
 												setIsBusinessTypePickerOpen(true);
 											}}
 											readOnly={isBusinessTypePickerOpen}
 											activeEntry={isBusinessTypePickerOpen}
-											solidWhenEmpty={isHoursEditorOpen}
+											solidWhenEmpty={
+												isHoursEditorOpen || isCapacityEditorOpen || isGenrePickerOpen
+											}
 											placeholderShowsPlus={!isBusinessTypePickerOpen}
 											placeholderContentClassName={
 												isBusinessTypePickerOpen
@@ -1161,7 +1465,11 @@ function VenuePortalForm() {
 											onKeyDown={handleHoursKeyDown}
 											readOnly
 											activeEntry={isHoursEditorOpen}
-											solidWhenEmpty={isBusinessTypePickerOpen}
+											solidWhenEmpty={
+												isBusinessTypePickerOpen ||
+												isCapacityEditorOpen ||
+												isGenrePickerOpen
+											}
 											placeholderShowsPlus={!isHoursEditorOpen}
 											placeholderContentClassName={
 												isHoursEditorOpen
@@ -1183,35 +1491,78 @@ function VenuePortalForm() {
 									/>
 								)}
 
-								<div className="mt-[4px] grid grid-cols-[172px_210px] gap-x-[4px] gap-y-[4px]">
-									<VenueTextField
-										label="Capacity"
+								{isCapacityEditorOpen && (
+									<VenueCapacityEditor
 										value={form.capacity}
 										onChange={(value) => updateField('capacity', value)}
 										inputRef={capacityInputRef}
-										onFocus={() => {
-											setIsBusinessTypePickerOpen(false);
-											setIsHoursEditorOpen(false);
-										}}
-										inputMode="numeric"
-										solidWhenEmpty={isInlineEditorOpen}
-										placeholderContentClassName={LEFT_GRID_PLACEHOLDER_CLASS}
-										placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
-										className="h-[63px] w-[172px]"
+										className="mt-[4px]"
 									/>
-									<VenueTextField
-										label="Genres"
-										value={form.genres}
-										onChange={(value) => updateField('genres', value)}
-										onFocus={() => {
-											setIsBusinessTypePickerOpen(false);
-											setIsHoursEditorOpen(false);
-										}}
-										solidWhenEmpty={isInlineEditorOpen}
-										placeholderContentClassName={RIGHT_GRID_PLACEHOLDER_CLASS}
-										placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
-										className="h-[63px] w-[210px]"
+								)}
+
+								<div className="mt-[4px] grid grid-cols-[172px_210px] gap-x-[4px]">
+									{isCapacityEditorOpen ? (
+										<VenueTextField
+											label="Capacity"
+											value=""
+											onChange={() => undefined}
+											onFocus={openCapacityEditor}
+											readOnly
+											activeEntry
+											placeholderShowsPlus={false}
+											placeholderContentClassName="text-left leading-none"
+											placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
+											className="h-[63px] w-[172px] cursor-pointer"
+										/>
+									) : completedCapacity ? (
+										<VenueCompletedCapacityButton
+											capacity={completedCapacity}
+											onClick={openCapacityEditor}
+										/>
+									) : (
+										<VenueTextField
+											label="Capacity"
+											value=""
+											onChange={() => undefined}
+											onFocus={openCapacityEditor}
+											readOnly
+											solidWhenEmpty={isInlineEditorOpen}
+											placeholderContentClassName={LEFT_GRID_PLACEHOLDER_CLASS}
+											placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
+											className="h-[63px] w-[172px] cursor-pointer"
+										/>
+									)}
+									{isGenrePickerOpen ? (
+										<VenueActiveGenreButton onClick={openGenrePicker} />
+									) : selectedGenres.length > 0 ? (
+										<VenueCompletedGenreButton
+											genres={selectedGenres}
+											onClick={openGenrePicker}
+										/>
+									) : (
+										<VenueTextField
+											label="Genre"
+											value=""
+											onChange={() => undefined}
+											onFocus={openGenrePicker}
+											readOnly
+											solidWhenEmpty={isInlineEditorOpen}
+											placeholderContentClassName={RIGHT_GRID_PLACEHOLDER_CLASS}
+											placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
+											className="h-[63px] w-[210px] cursor-pointer"
+										/>
+									)}
+								</div>
+
+								{isGenrePickerOpen && (
+									<VenueGenrePicker
+										selectedGenres={selectedGenres}
+										onToggle={toggleGenre}
+										className="mt-[4px]"
 									/>
+								)}
+
+								<div className="mt-[4px] grid grid-cols-[172px_210px] gap-x-[4px]">
 									<VenueTextField
 										label="Pay Range"
 										value={form.payRange}
@@ -1219,6 +1570,8 @@ function VenuePortalForm() {
 										onFocus={() => {
 											setIsBusinessTypePickerOpen(false);
 											setIsHoursEditorOpen(false);
+											setIsCapacityEditorOpen(false);
+											setIsGenrePickerOpen(false);
 										}}
 										solidWhenEmpty={isInlineEditorOpen}
 										placeholderContentClassName={LEFT_GRID_PLACEHOLDER_CLASS}
@@ -1232,6 +1585,8 @@ function VenuePortalForm() {
 										onFocus={() => {
 											setIsBusinessTypePickerOpen(false);
 											setIsHoursEditorOpen(false);
+											setIsCapacityEditorOpen(false);
+											setIsGenrePickerOpen(false);
 										}}
 										solidWhenEmpty={isInlineEditorOpen}
 										placeholderContentClassName={RIGHT_GRID_PLACEHOLDER_CLASS}
@@ -1247,6 +1602,8 @@ function VenuePortalForm() {
 									onFocus={() => {
 										setIsBusinessTypePickerOpen(false);
 										setIsHoursEditorOpen(false);
+										setIsCapacityEditorOpen(false);
+										setIsGenrePickerOpen(false);
 									}}
 									solidWhenEmpty={isInlineEditorOpen}
 									multiline
@@ -1260,6 +1617,8 @@ function VenuePortalForm() {
 										onFocus={() => {
 											setIsBusinessTypePickerOpen(false);
 											setIsHoursEditorOpen(false);
+											setIsCapacityEditorOpen(false);
+											setIsGenrePickerOpen(false);
 										}}
 										inputMode="url"
 										autoComplete="url"
@@ -1278,7 +1637,9 @@ function VenuePortalForm() {
 					disabled={isSaving || isLoadingVenue}
 					className="relative mt-4 flex h-[32px] w-[166px] items-center justify-center rounded-[17px] border border-black bg-[#9ED7FF] font-inter text-[17.542px] font-bold not-italic leading-[normal] text-[#111] disabled:cursor-not-allowed disabled:opacity-60"
 				>
-					<span className="flex h-full items-center">{isSaving ? 'Saving...' : 'Continue'}</span>
+					<span className="flex h-full items-center">
+						{isSaving ? 'Saving...' : 'Continue'}
+					</span>
 					<svg
 						aria-hidden="true"
 						className="absolute right-[27px] top-1/2 h-[13px] w-[8px] -translate-y-1/2"

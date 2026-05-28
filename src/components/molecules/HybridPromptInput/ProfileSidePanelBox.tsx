@@ -87,7 +87,7 @@ const profileVideoAddIconSvg = `
 const decorativeAreaMapBackground =
 	'linear-gradient(135deg, rgba(63, 191, 214, 0.9) 0%, rgba(63, 191, 214, 0.9) 28%, transparent 28%), linear-gradient(35deg, rgba(178, 233, 207, 0.95) 0%, rgba(178, 233, 207, 0.95) 68%, rgba(134, 219, 185, 0.95) 68%), linear-gradient(110deg, transparent 0 47%, rgba(255, 255, 255, 0.55) 47% 50%, transparent 50%), #B1E6CE';
 
-type GenreOption = {
+export type ProfileGenreOption = {
 	label: string;
 	width: number;
 	Icon?: ComponentType<SVGProps<SVGSVGElement>>;
@@ -119,7 +119,7 @@ const ProfileFieldLabel = ({
 	</div>
 );
 
-const genreOptionRows: GenreOption[][] = [
+export const profileGenreOptionRows: ProfileGenreOption[][] = [
 	[
 		{ label: 'Pop', width: 61.984, Icon: GenrePopIcon },
 		{ label: 'Rock', width: 70, Icon: GenreRockIcon },
@@ -794,7 +794,7 @@ export const ProfileSidePanelBox = ({
 	const selectedArea = selectedAreaDraft;
 	const selectedPerformingName = performingNameDraft.trim();
 	const selectedBio = bioDraft.trim();
-	const selectedGenreOption = genreOptionRows
+	const selectedGenreOption = profileGenreOptionRows
 		.flat()
 		.find((genre) => genre.label === selectedGenre);
 	const SelectedGenreIcon = selectedGenreOption?.Icon;
@@ -1081,7 +1081,7 @@ export const ProfileSidePanelBox = ({
 								<div className="absolute inset-x-0 bottom-0 top-[27px] bg-[#BAD4FA]" />
 								<div className="absolute left-0 top-[27px] w-full border-t-[1.526px] border-black" />
 								<div className="absolute left-[11px] right-[11px] top-[37px] flex flex-col gap-[9px]">
-									{genreOptionRows.map((row) => (
+									{profileGenreOptionRows.map((row) => (
 										<div
 											key={row.map((genre) => genre.label).join('-')}
 											className="flex justify-between"
@@ -1126,10 +1126,7 @@ export const ProfileSidePanelBox = ({
 								onClick={openAreaChooser}
 								className="mt-[5px] flex h-[21.374px] w-fit max-w-[334px] appearance-none items-center gap-[4px] overflow-hidden rounded-[7.491px] border-0 bg-[#F4F4F4] px-[6px] font-inter text-[14px] font-medium leading-[21.374px] text-black transition hover:brightness-95"
 							>
-								<span
-									aria-hidden="true"
-									className="block h-[16px] w-[13px] shrink-0"
-								>
+								<span aria-hidden="true" className="block h-[16px] w-[13px] shrink-0">
 									<ProfileAreaMarkerIcon className="h-full w-full" />
 								</span>
 								<span className="min-w-0 truncate">{selectedArea}</span>
