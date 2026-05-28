@@ -4,10 +4,6 @@ import { type FormEvent, useEffect, useLayoutEffect, useMemo, useState } from 'r
 import { useAuth, UserButton } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { PersistentDashboardMap } from '@/components/molecules/PersistentDashboardMap';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { AccountType } from '@/constants/prismaEnums';
 import { urls } from '@/constants/urls';
 import {
@@ -26,6 +22,10 @@ type VenueFormState = {
 	venueName: string;
 	businessType: string;
 	address: string;
+	capacity: string;
+	genres: string;
+	payRange: string;
+	sound: string;
 	website: string;
 	description: string;
 };
@@ -34,17 +34,205 @@ const EMPTY_FORM_STATE: VenueFormState = {
 	venueName: '',
 	businessType: '',
 	address: '',
+	capacity: '',
+	genres: '',
+	payRange: '',
+	sound: '',
 	website: '',
 	description: '',
 };
 
 const IDLE_MAP_CLIP = 'inset(0px round 0px)';
 const IDLE_MAP_TRANSITION = '0ms ease';
+const LEFT_GRID_PLACEHOLDER_CLASS =
+	'grid w-[126px] grid-cols-[18px_minmax(0,1fr)] items-center gap-[4px] text-left leading-none';
+const RIGHT_GRID_PLACEHOLDER_CLASS =
+	'grid w-[112px] grid-cols-[18px_minmax(0,1fr)] items-center gap-[4px] text-left leading-none';
+const GRID_PLACEHOLDER_LABEL_CLASS = 'min-w-0';
 
 const trimToNull = (value: string): string | null => {
 	const trimmed = value.trim();
 	return trimmed.length > 0 ? trimmed : null;
 };
+
+const formatCapacity = (capacityMin: number | null, capacityMax: number | null) => {
+	if (capacityMin !== null && capacityMax !== null && capacityMin !== capacityMax) {
+		return `${capacityMin}-${capacityMax}`;
+	}
+	if (capacityMax !== null) return String(capacityMax);
+	if (capacityMin !== null) return String(capacityMin);
+	return '';
+};
+
+const parseCapacity = (value: string) => {
+	const trimmed = value.trim();
+	if (!trimmed) {
+		return { capacityMin: null, capacityMax: null };
+	}
+
+	const parts = trimmed
+		.split('-')
+		.map((part) => part.trim())
+		.filter(Boolean);
+
+	if (parts.length === 0 || parts.length > 2) {
+		throw new Error('Capacity should be a number or range, like 90 or 50-120.');
+	}
+
+	const parsed = parts.map((part) => Number(part));
+	if (parsed.some((part) => !Number.isInteger(part) || part < 0)) {
+		throw new Error('Capacity should be a whole number or range.');
+	}
+
+	const capacityMin = parsed[0];
+	const capacityMax = parsed[1] ?? parsed[0];
+	if (capacityMin > capacityMax) {
+		throw new Error('Capacity minimum should be less than or equal to the maximum.');
+	}
+
+	return { capacityMin, capacityMax };
+};
+
+const parseGenres = (value: string) => {
+	return value
+		.split(',')
+		.map((genre) => genre.trim())
+		.filter(Boolean);
+};
+
+type VenueTextFieldProps = {
+	label: string;
+	value: string;
+	onChange: (value: string) => void;
+	className?: string;
+	placeholderContentClassName?: string;
+	placeholderLabelClassName?: string;
+	multiline?: boolean;
+	inputMode?:
+		| 'none'
+		| 'text'
+		| 'tel'
+		| 'url'
+		| 'email'
+		| 'numeric'
+		| 'decimal'
+		| 'search';
+	autoComplete?: string;
+};
+
+function VenueTextField({
+	label,
+	value,
+	onChange,
+	className = '',
+	placeholderContentClassName,
+	placeholderLabelClassName,
+	multiline = false,
+	inputMode,
+	autoComplete,
+}: VenueTextFieldProps) {
+	const controlClassName =
+		'absolute inset-0 h-full w-full bg-transparent px-5 text-left text-[18px] font-medium text-black outline-none';
+
+	return (
+		<label
+			className={`relative block overflow-hidden rounded-[8px] border-[2px] border-black bg-white opacity-20 ${className}`}
+		>
+			{value.trim().length === 0 && (
+				<span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[22px] font-medium text-[#9f9f9f]">
+					<VenuePlaceholderContent
+						label={label}
+						contentClassName={placeholderContentClassName}
+						labelClassName={placeholderLabelClassName}
+					/>
+				</span>
+			)}
+			{multiline ? (
+				<textarea
+					aria-label={label}
+					value={value}
+					onChange={(event) => onChange(event.target.value)}
+					className={`${controlClassName} resize-none py-4 leading-6`}
+				/>
+			) : (
+				<input
+					aria-label={label}
+					value={value}
+					onChange={(event) => onChange(event.target.value)}
+					inputMode={inputMode}
+					autoComplete={autoComplete}
+					className={`${controlClassName} leading-none`}
+				/>
+			)}
+		</label>
+	);
+}
+
+function VenuePlaceholderButton({
+	label,
+	className = '',
+	placeholderContentClassName,
+	placeholderLabelClassName,
+}: {
+	label: string;
+	className?: string;
+	placeholderContentClassName?: string;
+	placeholderLabelClassName?: string;
+}) {
+	return (
+		<button
+			type="button"
+			className={`flex items-center justify-center rounded-[8px] border-[2px] border-black bg-white text-[22px] font-medium text-[#9f9f9f] opacity-20 ${className}`}
+		>
+			<VenuePlaceholderContent
+				label={label}
+				contentClassName={placeholderContentClassName}
+				labelClassName={placeholderLabelClassName}
+			/>
+		</button>
+	);
+}
+
+function VenuePlaceholderContent({
+	label,
+	contentClassName,
+	labelClassName,
+}: {
+	label: string;
+	contentClassName?: string;
+	labelClassName?: string;
+}) {
+	if (!contentClassName) {
+		return <>+ {label}</>;
+	}
+
+	return (
+		<span className={contentClassName}>
+			<span aria-hidden="true">+</span>
+			<span className={labelClassName}>{label}</span>
+		</span>
+	);
+}
+
+function VenuePhotosPlaceholder() {
+	return (
+		<aside className="h-[469px] w-[126px] rounded-[8px] border border-black bg-[#F1FAFF] px-[12px] pb-[99px] opacity-20">
+			<p className="text-[14px] leading-none text-[#8f8f8f]">Photos</p>
+			<div className="mt-[14px] flex flex-col items-center gap-[13px]">
+				<div className="h-[70px] w-[86px] rounded-[10px] bg-white/55" />
+				<div className="h-[70px] w-[86px] rounded-[10px] bg-white/55" />
+				<div className="h-[70px] w-[86px] rounded-[10px] bg-white/55" />
+				<button
+					type="button"
+					aria-label="Add venue photo"
+					className="mt-[2px] flex h-[75px] w-[86px] items-center justify-center rounded-[10px] bg-white/55 text-[34px] font-light leading-none text-[#777]"
+				>
+					+
+				</button>
+			</div>
+		</aside>
+	);
+}
 
 function VenuePortalBackgroundMap() {
 	const setPersistentMapConfig = usePersistentMapSetter();
@@ -142,6 +330,10 @@ function VenuePortalForm() {
 				venueName: venue.venueName,
 				businessType: venue.businessType ?? '',
 				address: venue.address ?? '',
+				capacity: formatCapacity(venue.capacityMin, venue.capacityMax),
+				genres: venue.genres.join(', '),
+				payRange: venue.payRange ?? '',
+				sound: venue.sound ?? '',
 				website: venue.website ?? '',
 				description: venue.description ?? '',
 			});
@@ -164,10 +356,24 @@ function VenuePortalForm() {
 			return;
 		}
 
+		let capacityValues: ReturnType<typeof parseCapacity>;
+		try {
+			capacityValues = parseCapacity(form.capacity);
+		} catch (error) {
+			setSaved(false);
+			setFormError(error instanceof Error ? error.message : 'Capacity is invalid.');
+			return;
+		}
+
 		const payload: PatchVenueData = {
 			venueName,
 			businessType: trimToNull(form.businessType),
 			address: trimToNull(form.address),
+			capacityMin: capacityValues.capacityMin,
+			capacityMax: capacityValues.capacityMax,
+			genres: parseGenres(form.genres),
+			payRange: trimToNull(form.payRange),
+			sound: trimToNull(form.sound),
 			website: trimToNull(form.website),
 			description: trimToNull(form.description),
 		};
@@ -183,117 +389,138 @@ function VenuePortalForm() {
 	};
 
 	return (
-		<div className="relative z-10 flex min-h-[100dvh] w-full items-center justify-center px-4 py-8 sm:px-6">
-			<section className="w-full max-w-[560px] rounded-[28px] border border-black/20 bg-white/90 p-5 shadow-[0_30px_90px_rgba(4,19,48,0.30)] backdrop-blur-xl sm:p-7">
-				<div className="flex items-start justify-between gap-4">
-					<div>
-						<p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-							Venue Portal
-						</p>
-						<h1 className="mt-2 text-[30px] font-semibold leading-none tracking-[-0.04em] text-slate-950 sm:text-[38px]">
-							Set up your venue
-						</h1>
-					</div>
-					<UserButton
-						appearance={{
-							elements: {
-								avatarBox: 'w-8 h-8 ring-1 ring-black/10',
-							},
-						}}
-					/>
-				</div>
+		<div className="relative z-10 flex min-h-[100dvh] w-full flex-col items-center justify-center overflow-x-auto px-4 py-10 sm:px-6">
+			<div className="absolute right-5 top-5 z-20 rounded-full bg-white/75 p-1 shadow-[0_8px_24px_rgba(4,19,48,0.18)] backdrop-blur-md">
+				<UserButton
+					appearance={{
+						elements: {
+							avatarBox: 'w-9 h-9 ring-1 ring-black/10',
+						},
+					}}
+				/>
+			</div>
 
-				<p className="mt-4 text-sm leading-6 text-slate-600">
-					This is the temporary intake form for the venue portal. Submit it to verify
-					the account routing and Prisma venue creation path.
-				</p>
-
-				<form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-					<div className="space-y-2">
-						<Label htmlFor="venue-name">Venue name</Label>
-						<Input
-							id="venue-name"
-							value={form.venueName}
-							onChange={(event) => updateField('venueName', event.target.value)}
-							placeholder="The Echo Room"
-							autoComplete="organization"
-							className="bg-white/85"
-						/>
+			<form className="flex shrink-0 flex-col items-center" onSubmit={handleSubmit}>
+				<section className="flex h-[637px] w-[583px] flex-col items-center rounded-[12px] bg-[rgba(255,255,255,0.65)]">
+					<div className="mt-[13px] flex h-[28px] w-[570px] items-center rounded-[4px] border-[1.056px] border-[#111] bg-white px-[8px] text-[14px] font-semibold leading-none text-black">
+						New Venue
 					</div>
 
-					<div className="grid gap-4 sm:grid-cols-2">
-						<div className="space-y-2">
-							<Label htmlFor="business-type">Business type</Label>
-							<Input
-								id="business-type"
-								value={form.businessType}
-								onChange={(event) => updateField('businessType', event.target.value)}
-								placeholder="Music venue"
-								className="bg-white/85"
-							/>
+					<div className="relative mt-[7px] h-[570px] w-[570px] overflow-hidden rounded-[8px] border border-black bg-[linear-gradient(180deg,#CBEEFD_0%,#FFF_100%)]">
+						<div className="absolute left-[15px] top-[16px]">
+							<label className="block h-[64px] w-[386px] overflow-hidden rounded-[8px] bg-white">
+								<input
+									aria-label="Venue name"
+									value={form.venueName}
+									onChange={(event) => updateField('venueName', event.target.value)}
+									placeholder="Enter Venue Name"
+									autoComplete="organization"
+									className="h-[46px] w-full bg-white px-[10px] text-[28px] font-medium leading-none text-black outline-none placeholder:text-[#828282]"
+								/>
+								<div className="h-[18px] rounded-b-[8px] bg-[#F67C7E]" />
+							</label>
 						</div>
-						<div className="space-y-2">
-							<Label htmlFor="website">Website</Label>
-							<Input
-								id="website"
-								value={form.website}
-								onChange={(event) => updateField('website', event.target.value)}
-								placeholder="https://example.com"
-								autoComplete="url"
-								className="bg-white/85"
-							/>
+
+						<div className="absolute left-[15px] top-[87px] flex items-start gap-[9px]">
+							<div className="w-[386px]">
+								<VenueTextField
+									label="Location"
+									value={form.address}
+									onChange={(value) => updateField('address', value)}
+									autoComplete="street-address"
+									className="h-[63px] w-[386px]"
+								/>
+
+								<div className="mt-[5px] grid grid-cols-[172px_210px] gap-x-[4px] gap-y-[4px]">
+									<VenueTextField
+										label="Business Type"
+										value={form.businessType}
+										onChange={(value) => updateField('businessType', value)}
+										placeholderContentClassName={LEFT_GRID_PLACEHOLDER_CLASS}
+										placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
+										className="h-[63px] w-[172px]"
+									/>
+									<VenuePlaceholderButton
+										label="Hours"
+										placeholderContentClassName={RIGHT_GRID_PLACEHOLDER_CLASS}
+										placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
+										className="h-[63px] w-[210px]"
+									/>
+									<VenueTextField
+										label="Capacity"
+										value={form.capacity}
+										onChange={(value) => updateField('capacity', value)}
+										inputMode="numeric"
+										placeholderContentClassName={LEFT_GRID_PLACEHOLDER_CLASS}
+										placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
+										className="h-[63px] w-[172px]"
+									/>
+									<VenueTextField
+										label="Genres"
+										value={form.genres}
+										onChange={(value) => updateField('genres', value)}
+										placeholderContentClassName={RIGHT_GRID_PLACEHOLDER_CLASS}
+										placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
+										className="h-[63px] w-[210px]"
+									/>
+									<VenueTextField
+										label="Pay Range"
+										value={form.payRange}
+										onChange={(value) => updateField('payRange', value)}
+										placeholderContentClassName={LEFT_GRID_PLACEHOLDER_CLASS}
+										placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
+										className="h-[63px] w-[172px]"
+									/>
+									<VenueTextField
+										label="Sound"
+										value={form.sound}
+										onChange={(value) => updateField('sound', value)}
+										placeholderContentClassName={RIGHT_GRID_PLACEHOLDER_CLASS}
+										placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
+										className="h-[63px] w-[210px]"
+									/>
+								</div>
+
+								<VenueTextField
+									label="Description"
+									value={form.description}
+									onChange={(value) => updateField('description', value)}
+									multiline
+									className="mt-[4px] h-[98px] w-[386px]"
+								/>
+								<VenueTextField
+									label="Website"
+									value={form.website}
+									onChange={(value) => updateField('website', value)}
+									inputMode="url"
+									autoComplete="url"
+									className="mt-[4px] h-[98px] w-[386px]"
+								/>
+							</div>
+
+							<VenuePhotosPlaceholder />
 						</div>
 					</div>
+				</section>
 
-					<div className="space-y-2">
-						<Label htmlFor="address">Address</Label>
-						<Input
-							id="address"
-							value={form.address}
-							onChange={(event) => updateField('address', event.target.value)}
-							placeholder="123 Main St, Los Angeles, CA"
-							autoComplete="street-address"
-							className="bg-white/85"
-						/>
-					</div>
+				<button
+					type="submit"
+					disabled={isSaving || isLoadingVenue}
+					className="mt-4 h-[36px] w-[170px] rounded-full border-[2px] border-black bg-[#9bd2f6] text-[18px] font-semibold leading-none text-black shadow-[0_2px_0_rgba(0,0,0,0.35)] disabled:cursor-not-allowed disabled:opacity-60"
+				>
+					{isSaving ? 'Saving...' : 'Continue'}
+				</button>
 
-					<div className="space-y-2">
-						<Label htmlFor="description">Placeholder notes</Label>
-						<Textarea
-							id="description"
-							value={form.description}
-							onChange={(event) => updateField('description', event.target.value)}
-							placeholder="Anything we should know before replacing this with the full intake form."
-							className="min-h-[96px] bg-white/85"
-						/>
-					</div>
-
+				<div className="mt-2 min-h-[20px] text-center text-[12px] font-medium">
 					{isVenueError && (
-						<p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-							Unable to load an existing venue profile. You can still try saving this form.
+						<p className="text-amber-900">
+							Unable to load an existing venue profile. You can still try saving.
 						</p>
 					)}
-					{formError && (
-						<p className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
-							{formError}
-						</p>
-					)}
-					{saved && (
-						<p className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-							Venue profile saved. Routing and persistence are connected.
-						</p>
-					)}
-
-					<Button
-						type="submit"
-						className="h-12 w-full rounded-xl bg-black text-white hover:bg-black/85"
-						isLoading={isSaving}
-						disabled={isSaving || isLoadingVenue}
-					>
-						Save venue placeholder
-					</Button>
-				</form>
-			</section>
+					{formError && <p className="text-red-700">{formError}</p>}
+					{saved && <p className="text-emerald-700">Venue profile saved.</p>}
+				</div>
+			</form>
 		</div>
 	);
 }
@@ -416,12 +643,8 @@ function VenuePortalContent() {
 						? 'This account is currently standard. Continue through the venue signup entrypoint once and we will convert it before opening the portal.'
 						: 'This signup came from the venue page. We are updating the account before opening the portal.'
 				}
-				actionHref={
-					venuePromotionState === 'failed' ? urls.venueSignUp.index : undefined
-				}
-				actionLabel={
-					venuePromotionState === 'failed' ? 'Continue as venue' : undefined
-				}
+				actionHref={venuePromotionState === 'failed' ? urls.venueSignUp.index : undefined}
+				actionLabel={venuePromotionState === 'failed' ? 'Continue as venue' : undefined}
 			/>
 		);
 	}
