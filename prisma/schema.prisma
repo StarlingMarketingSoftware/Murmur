@@ -219,6 +219,8 @@ model Venue {
   userId       String   @unique
   venueName    String
   address      String?
+  city         String?
+  state        String?
   latitude     Float?
   longitude    Float?
   businessType String?

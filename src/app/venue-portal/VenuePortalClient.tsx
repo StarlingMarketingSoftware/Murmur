@@ -27,6 +27,10 @@ import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon
 import { WebsiteIcon } from '@/components/atoms/_svg/WebsiteIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { PersistentDashboardMap } from '@/components/molecules/PersistentDashboardMap';
+import {
+	DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING,
+	DASHBOARD_TO_INTERACTIVE_TRANSITION_MS,
+} from '@/components/molecules/SearchResultsMap/constants';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import {
 	ProfileAreaMapBox,
@@ -36,6 +40,7 @@ import {
 } from '@/components/molecules/HybridPromptInput/ProfileSidePanelBox';
 import { AccountType } from '@/constants/prismaEnums';
 import { urls } from '@/constants/urls';
+import { US_STATES } from '@/constants/usStates';
 import {
 	PersistentMapProvider,
 	type PersistentDashboardMapConfig,
@@ -215,18 +220,33 @@ const BUSINESS_TYPE_OPTIONS = [
 const VENUE_SOUND_OPTIONS = ['In House', 'No Speakers'] as const;
 const PROFILE_GENRE_OPTIONS = profileGenreOptionRows.flat();
 
+// Pull the structured city + 2-letter US state out of a geocode feature. Used both
+// for the saved address string and for the profile card's location chip.
+const parseVenueLocationParts = (
+	feature: ProfileAreaMapFeature
+): { city: string; state: string } => {
+	const context = feature.properties?.context;
+	const city =
+		context?.place?.name || context?.locality?.name || context?.district?.name || '';
+	const rawRegion =
+		context?.region?.region_code ||
+		context?.region?.short_code?.split('-').pop()?.toUpperCase() ||
+		context?.region?.name ||
+		'';
+	const state =
+		rawRegion.length === 2
+			? rawRegion.toUpperCase()
+			: US_STATES.find((s) => s.name.toLowerCase() === rawRegion.toLowerCase())?.abbr ??
+				rawRegion;
+	return { city, state };
+};
+
 const formatVenueLocationFeature = (feature: ProfileAreaMapFeature) => {
 	const properties = feature.properties;
 	const context = properties?.context;
 	const street =
 		properties?.full_address?.split(',')[0]?.trim() || properties?.name || '';
-	const city =
-		context?.place?.name || context?.locality?.name || context?.district?.name || '';
-	const region =
-		context?.region?.region_code ||
-		context?.region?.short_code?.split('-').pop()?.toUpperCase() ||
-		context?.region?.name ||
-		'';
+	const { city, state: region } = parseVenueLocationParts(feature);
 	const postcode = context?.postcode?.name || '';
 	const cityRegion = [city, [region, postcode].filter(Boolean).join(' ')]
 		.filter(Boolean)
@@ -245,6 +265,34 @@ const formatVenueLocationFeature = (feature: ProfileAreaMapFeature) => {
 		''
 	);
 };
+
+type VenuePortalClerkUser =
+	| {
+			firstName?: string | null;
+			lastName?: string | null;
+			fullName?: string | null;
+			username?: string | null;
+			primaryEmailAddress?: { emailAddress?: string | null } | null;
+	  }
+	| null
+	| undefined;
+
+const getVenuePortalDisplayName = (clerkUser: VenuePortalClerkUser): string => {
+	const clerkFullName = clerkUser?.fullName?.trim();
+	const clerkCombinedName = [clerkUser?.firstName?.trim(), clerkUser?.lastName?.trim()]
+		.filter(Boolean)
+		.join(' ');
+	return (
+		clerkFullName ||
+		clerkCombinedName ||
+		clerkUser?.username?.trim() ||
+		clerkUser?.primaryEmailAddress?.emailAddress?.split('@')[0]?.trim() ||
+		'Venue User'
+	);
+};
+
+const getVenuePortalInitial = (clerkUser: VenuePortalClerkUser): string =>
+	getVenuePortalDisplayName(clerkUser).trim()[0]?.toUpperCase() || 'V';
 
 const trimToNull = (value: string): string | null => {
 	const trimmed = value.trim();
@@ -1559,7 +1607,13 @@ function VenueCompletedLocationButton({
 	);
 }
 
-function VenuePortalBackgroundMap() {
+type VenuePortalView = 'edit' | 'map';
+
+// Single writer for the persistent map config on the venue portal. In the edit view
+// it drives the decorative spinning globe behind the form; once the user hits Continue
+// (view → 'map') it reveals the full interactive map, mirroring the dashboard's
+// background → interactive transition.
+function VenuePortalPersistentMap({ view }: { view: VenuePortalView }) {
 	const setPersistentMapConfig = usePersistentMapSetter();
 	const {
 		mood: globeWeatherMood,
@@ -1568,8 +1622,37 @@ function VenuePortalBackgroundMap() {
 	} = useGlobeWeatherMood();
 	const globeNightLighting = useGlobeNightLighting();
 
-	const mapConfig = useMemo<PersistentDashboardMapConfig>(
-		() => ({
+	const mapConfig = useMemo<PersistentDashboardMapConfig>(() => {
+		const sharedMapProps = {
+			weatherMood: globeWeatherMood,
+			weatherRegionCenter: globeWeatherRegionCenter,
+			weatherTemperatureF: globeWeatherTemperatureF,
+			nightLighting: globeNightLighting,
+			contacts: [],
+			selectedContacts: [],
+			searchQuery: '',
+			searchWhat: null,
+			skipAutoFit: true,
+		};
+
+		if (view === 'map') {
+			return {
+				isMapView: true,
+				mapViewClip: IDLE_MAP_CLIP,
+				mapViewFrameTransition: `${DASHBOARD_TO_INTERACTIVE_TRANSITION_MS}ms ${DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING}`,
+				mapViewFrameInsetPx: 0,
+				mapViewFrameRadiusPx: 0,
+				mapViewFrameBorderPx: 0,
+				mapProps: {
+					...sharedMapProps,
+					presentation: 'interactive',
+					autoSpin: false,
+					searchEngaged: false,
+				},
+			};
+		}
+
+		return {
 			isMapView: false,
 			mapViewClip: IDLE_MAP_CLIP,
 			mapViewFrameTransition: IDLE_MAP_TRANSITION,
@@ -1577,32 +1660,29 @@ function VenuePortalBackgroundMap() {
 			mapViewFrameRadiusPx: 0,
 			mapViewFrameBorderPx: 0,
 			mapProps: {
-				weatherMood: globeWeatherMood,
-				weatherRegionCenter: globeWeatherRegionCenter,
-				weatherTemperatureF: globeWeatherTemperatureF,
-				nightLighting: globeNightLighting,
+				...sharedMapProps,
 				presentation: 'background',
 				autoSpin: true,
-				contacts: [],
-				selectedContacts: [],
-				searchQuery: '',
-				searchWhat: null,
 				searchEngaged: true,
-				skipAutoFit: true,
 			},
-		}),
-		[
-			globeNightLighting,
-			globeWeatherMood,
-			globeWeatherRegionCenter,
-			globeWeatherTemperatureF,
-		]
-	);
+		};
+	}, [
+		view,
+		globeNightLighting,
+		globeWeatherMood,
+		globeWeatherRegionCenter,
+		globeWeatherTemperatureF,
+	]);
 
+	// Push config on every change (like the dashboard) so the view toggle animates
+	// smoothly; clearing on each change would briefly null the config and force the
+	// map to unmount/remount.
 	useLayoutEffect(() => {
 		setPersistentMapConfig(mapConfig);
-		return () => setPersistentMapConfig(null);
 	}, [mapConfig, setPersistentMapConfig]);
+
+	// Clear only when leaving the portal so other routes don't inherit venue config.
+	useLayoutEffect(() => () => setPersistentMapConfig(null), [setPersistentMapConfig]);
 
 	return null;
 }
@@ -1708,7 +1788,7 @@ function VenuePortalSkeleton() {
 	);
 }
 
-function VenuePortalForm() {
+function VenuePortalForm({ onEnterMapView }: { onEnterMapView: () => void }) {
 	const { user: clerkUser } = useUser();
 	const { data: venue, isLoading: isLoadingVenue, isError: isVenueError } = useGetVenue();
 	const { mutateAsync: upsertVenue, isPending: isSaving } = useUpsertVenue({
@@ -1733,6 +1813,10 @@ function VenuePortalForm() {
 	const [locationCoordinates, setLocationCoordinates] = useState<AreaCoordinates | null>(
 		null
 	);
+	const [locationParts, setLocationParts] = useState<{ city: string; state: string }>({
+		city: '',
+		state: '',
+	});
 	const locationSlotRef = useRef<HTMLDivElement | null>(null);
 	const profileFieldsRef = useRef<HTMLDivElement | null>(null);
 	const capacityInputRef = useRef<HTMLInputElement | null>(null);
@@ -1819,6 +1903,7 @@ function VenuePortalForm() {
 				website: venue.website ?? '',
 				description: venue.description ?? '',
 			});
+			setLocationParts({ city: venue.city ?? '', state: venue.state ?? '' });
 			setHasCompletedHours(venue.hours !== null);
 			if (venue.latitude != null && venue.longitude != null) {
 				setLocationCoordinates({ lat: venue.latitude, lng: venue.longitude });
@@ -1865,6 +1950,10 @@ function VenuePortalForm() {
 		setIsPayRangeEditorOpen(false);
 		setIsSoundEditorOpen(false);
 		setActiveTextField(null);
+	};
+	const handleLocationFeatureSelect = (feature: ProfileAreaMapFeature) => {
+		setSaved(false);
+		setLocationParts(parseVenueLocationParts(feature));
 	};
 	const updateLocation = (value: string) => {
 		updateField('address', value);
@@ -2126,20 +2215,8 @@ function VenuePortalForm() {
 			clerkUser?.username?.trim()?.[0] ||
 			''
 		)?.toUpperCase() ?? '';
-	const clerkFullName = clerkUser?.fullName?.trim();
-	const clerkCombinedName = [
-		clerkUser?.firstName?.trim(),
-		clerkUser?.lastName?.trim(),
-	]
-		.filter(Boolean)
-		.join(' ');
-	const venuePortalUserName =
-		clerkFullName ||
-		clerkCombinedName ||
-		clerkUser?.username?.trim() ||
-		clerkUser?.primaryEmailAddress?.emailAddress?.split('@')[0]?.trim() ||
-		'Venue User';
-	const venuePortalInitial = venuePortalUserName.trim()[0]?.toUpperCase() || 'V';
+	const venuePortalUserName = getVenuePortalDisplayName(clerkUser);
+	const venuePortalInitial = getVenuePortalInitial(clerkUser);
 
 	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
@@ -2173,6 +2250,8 @@ function VenuePortalForm() {
 			venueName,
 			businessType: trimToNull(form.businessType),
 			address: trimToNull(form.address),
+			city: trimToNull(locationParts.city),
+			state: trimToNull(locationParts.state),
 			latitude: locationCoordinates?.lat ?? null,
 			longitude: locationCoordinates?.lng ?? null,
 			hours,
@@ -2189,6 +2268,7 @@ function VenuePortalForm() {
 			await upsertVenue(payload);
 			setFormError(null);
 			setSaved(true);
+			onEnterMapView();
 		} catch (error) {
 			setSaved(false);
 			setFormError(error instanceof Error ? error.message : 'Failed to save venue.');
@@ -2283,6 +2363,7 @@ function VenuePortalForm() {
 											reverseGeocodeTypes={VENUE_LOCATION_GEOCODE_TYPES}
 											forwardGeocodeTypes={VENUE_LOCATION_GEOCODE_TYPES}
 											formatGeocodeFeature={formatVenueLocationFeature}
+											onFeatureSelect={handleLocationFeatureSelect}
 										/>
 									) : completedAddress ? (
 										<VenueCompletedLocationButton
@@ -2663,7 +2744,7 @@ function VenuePortalForm() {
 	);
 }
 
-function VenuePortalContent() {
+function VenuePortalContent({ onEnterMapView }: { onEnterMapView: () => void }) {
 	const router = useRouter();
 	const { isLoaded, isSignedIn, userId } = useAuth();
 	const [venuePromotionState, setVenuePromotionState] = useState<
@@ -2777,15 +2858,74 @@ function VenuePortalContent() {
 		);
 	}
 
-	return <VenuePortalForm />;
+	return <VenuePortalForm onEnterMapView={onEnterMapView} />;
+}
+
+// Floating profile summary shown over the interactive map. Clicking it returns to the
+// editing view. Rendered at the portal root (outside the form's compact zoom) so its
+// pixel dimensions stay 1:1 and it layers above the revealed map.
+function VenueProfileMapCard({ onEdit }: { onEdit: () => void }) {
+	const { user: clerkUser } = useUser();
+	const { data: venue } = useGetVenue();
+
+	const name = getVenuePortalDisplayName(clerkUser);
+	const initial = getVenuePortalInitial(clerkUser);
+	const venueName = venue?.venueName?.trim() || 'Your Venue';
+	const businessType = venue?.businessType?.trim() ?? '';
+	const businessTypeIcon = BUSINESS_TYPE_OPTIONS.find(
+		(option) => option.label.toLowerCase() === businessType.toLowerCase()
+	)?.icon;
+	const city = venue?.city?.trim() ?? '';
+	const state = venue?.state?.trim() ?? '';
+	const hasLocation = Boolean(city || state);
+
+	return (
+		<button
+			type="button"
+			onClick={onEdit}
+			aria-label="Edit venue profile"
+			className="fixed left-[24px] top-[24px] z-[100] flex h-[83px] w-[656px] flex-col overflow-hidden rounded-[10px] border-[0.918px] border-[#BABABA] bg-white text-left shadow-[0_8px_24px_rgba(4,19,48,0.12)]"
+		>
+			<div className="flex flex-1 items-center gap-[14px] px-[16px]">
+				<span className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full bg-[#63C766] text-[26px] font-bold leading-none text-white ring-[1.5px] ring-white">
+					{initial}
+				</span>
+				<span className="min-w-0 truncate font-inter text-[28px] font-bold leading-none text-black">
+					{name}
+				</span>
+			</div>
+			<div className="flex h-[30px] items-center gap-[10px] bg-[#CBEEFD] px-[16px]">
+				<span className="min-w-0 truncate font-inter text-[16px] font-bold leading-none text-black">
+					{venueName}
+				</span>
+				{businessType && (
+					<span className="flex h-[22px] shrink-0 items-center gap-[6px] rounded-[8px] bg-[#BBE6FF] px-[8px] font-inter text-[14px] font-medium leading-none text-black">
+						{businessTypeIcon}
+						{businessType}
+					</span>
+				)}
+				{hasLocation && (
+					<span className="flex h-[22px] shrink-0 items-center gap-[6px] rounded-[8px] bg-[#FBD6D7] px-[6px] font-inter text-[14px] font-medium leading-none text-black">
+						<span className="flex items-center gap-[4px] rounded-[6px] bg-[#F7B6B8] px-[5px] py-[3px] font-semibold">
+							<ProfileAreaMarkerIcon width={10} height={12} />
+							{state || city}
+						</span>
+						{state && city ? city : null}
+					</span>
+				)}
+			</div>
+		</button>
+	);
 }
 
 export default function VenuePortalClient() {
+	const [view, setView] = useState<VenuePortalView>('edit');
 	return (
 		<PersistentMapProvider>
 			<PersistentDashboardMap />
-			<VenuePortalBackgroundMap />
-			<VenuePortalContent />
+			<VenuePortalPersistentMap view={view} />
+			<VenuePortalContent onEnterMapView={() => setView('map')} />
+			{view === 'map' && <VenueProfileMapCard onEdit={() => setView('edit')} />}
 		</PersistentMapProvider>
 	);
 }

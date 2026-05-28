@@ -169,6 +169,8 @@ export type ProfileAreaMapBoxProps = {
 	initialCoordinates?: AreaCoordinates | null;
 	/** Fires whenever the marker is placed (pin drop or search) so a parent can persist it. */
 	onCoordinatesChange?: (coordinates: AreaCoordinates) => void;
+	/** Fires with the resolved geocode feature so a parent can read structured parts (city/region). */
+	onFeatureSelect?: (feature: ProfileAreaMapFeature) => void;
 };
 
 const formatReverseGeocodeArea = (feature: ProfileAreaMapFeature) => {
@@ -202,6 +204,7 @@ export const ProfileAreaMapBox = ({
 	initialCoordinates = null,
 	onCoordinatesChange,
 	onAreaCommit,
+	onFeatureSelect,
 }: ProfileAreaMapBoxProps) => {
 	const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
 	const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -337,9 +340,9 @@ export const ProfileAreaMapBox = ({
 				}
 
 				const data = (await res.json()) as { features?: ProfileAreaMapFeature[] };
-				const formatted = data.features?.[0]
-					? formatGeocodeFeature(data.features[0])
-					: '';
+				const feature = data.features?.[0];
+				const formatted = feature ? formatGeocodeFeature(feature) : '';
+				if (feature) onFeatureSelect?.(feature);
 				onAreaUpdate?.(formatted || fallback);
 			} catch {
 				if (myGen === geocodeGenRef.current) onAreaUpdate?.(fallback);
@@ -352,6 +355,7 @@ export const ProfileAreaMapBox = ({
 			mapboxToken,
 			onAreaUpdate,
 			onCoordinatesChange,
+			onFeatureSelect,
 			reverseGeocodeTypes,
 		]
 	);
@@ -403,6 +407,7 @@ export const ProfileAreaMapBox = ({
 			onCoordinatesChange?.(nextCoordinates);
 			setAreaQuery(formatted);
 			setIsEditingArea(false);
+			onFeatureSelect?.(feature);
 			onAreaUpdate?.(formatted);
 			onAreaCommit?.();
 		} catch {
@@ -416,6 +421,7 @@ export const ProfileAreaMapBox = ({
 		onAreaUpdate,
 		onAreaCommit,
 		onCoordinatesChange,
+		onFeatureSelect,
 		userLocation,
 		forwardGeocodeTypes,
 		formatGeocodeFeature,

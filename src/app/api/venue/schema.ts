@@ -25,6 +25,8 @@ export const upsertVenueSchema = z
 	.object({
 		venueName: z.string().min(1).optional(),
 		address: z.string().nullable().optional(),
+		city: z.string().nullable().optional(),
+		state: z.string().nullable().optional(),
 		latitude: z.number().min(-90).max(90).nullable().optional(),
 		longitude: z.number().min(-180).max(180).nullable().optional(),
 		businessType: z.string().nullable().optional(),

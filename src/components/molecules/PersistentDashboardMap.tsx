@@ -29,14 +29,19 @@ export function PersistentDashboardMap() {
 	}, []);
 
 	const isDashboardRoute = pathname === urls.murmur.dashboard.index;
+	const isVenuePortalRoute = pathname === urls.venuePortal.index;
 	const isCampaignRoute =
 		pathname === urls.murmur.campaign.index ||
 		pathname.startsWith(`${urls.murmur.campaign.index}/`);
 
 	const shouldRenderMap = mounted && (Boolean(mapConfig) || isCampaignRoute);
 	const isInteractiveDashboardMap = isDashboardRoute && Boolean(mapConfig?.isMapView);
+	const isInteractiveVenueMap = isVenuePortalRoute && Boolean(mapConfig?.isMapView);
+	// The venue portal reveals the persistent map with the same semantics as the
+	// dashboard (idle background → full interactive) once its config flips isMapView.
+	const isInteractiveRevealMap = isInteractiveDashboardMap || isInteractiveVenueMap;
 	const isInteractiveCampaignMap = isCampaignRoute;
-	const isInteractiveMap = isInteractiveDashboardMap || isInteractiveCampaignMap;
+	const isInteractiveMap = isInteractiveRevealMap || isInteractiveCampaignMap;
 
 	const mapProps = useMemo<SearchResultsMapProps>(
 		() => {
@@ -54,14 +59,14 @@ export function PersistentDashboardMap() {
 
 	if (!shouldRenderMap) return null;
 
-	const mapViewClip = isInteractiveDashboardMap
+	const mapViewClip = isInteractiveRevealMap
 		? mapConfig?.mapViewClip ?? IDLE_CLIP_PATH
 		: IDLE_CLIP_PATH;
 	const mapViewFrameTransition =
 		mapConfig?.mapViewFrameTransition ?? IDLE_FRAME_TRANSITION;
-	const frameInsetPx = isInteractiveDashboardMap ? mapConfig?.mapViewFrameInsetPx ?? 0 : 0;
-	const frameRadiusPx = isInteractiveDashboardMap ? mapConfig?.mapViewFrameRadiusPx ?? 0 : 0;
-	const frameBorderPx = isInteractiveDashboardMap ? mapConfig?.mapViewFrameBorderPx ?? 0 : 0;
+	const frameInsetPx = isInteractiveRevealMap ? mapConfig?.mapViewFrameInsetPx ?? 0 : 0;
+	const frameRadiusPx = isInteractiveRevealMap ? mapConfig?.mapViewFrameRadiusPx ?? 0 : 0;
+	const frameBorderPx = isInteractiveRevealMap ? mapConfig?.mapViewFrameBorderPx ?? 0 : 0;
 
 	return (
 		<>
@@ -70,7 +75,7 @@ export function PersistentDashboardMap() {
 				style={{
 					position: 'fixed',
 					inset: 0,
-					zIndex: isInteractiveDashboardMap ? 98 : isInteractiveCampaignMap ? 0 : -1,
+					zIndex: isInteractiveRevealMap ? 98 : isInteractiveCampaignMap ? 0 : -1,
 					pointerEvents: isInteractiveMap ? 'auto' : 'none',
 				}}
 			>
