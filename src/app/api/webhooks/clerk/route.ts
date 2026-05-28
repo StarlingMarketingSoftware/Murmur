@@ -10,6 +10,7 @@ import {
 	apiResponse,
 	apiServerError,
 	handleApiError,
+	resolveAccountType,
 } from '@/app/api/_utils';
 import { generateMurmurEmail, generateMurmurReplyToEmail } from '@/utils';
 
@@ -81,6 +82,7 @@ export async function POST(req: Request) {
 						firstName: first_name ?? null,
 						lastName: last_name ?? null,
 						murmurEmail,
+						accountType: resolveAccountType(evt.data.unsafe_metadata),
 					},
 				});
 

@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { User } from '@prisma/client';
+import { AccountType } from '@/constants/prismaEnums';
 
 // gets the currently logged in Clerk user, then fetches the local user
 // if user is not authenticated, not found, or error, it returns null
@@ -24,3 +25,14 @@ export const getUser = async (): Promise<User | null> => {
 		return null;
 	}
 };
+
+/**
+ * Resolves a user's account type from Clerk metadata at creation time.
+ * Defaults to `standard` so the normal signup flow is undisturbed; only an
+ * explicit `accountType: 'venue'` (set by the venue signup) yields `venue`.
+ */
+export const resolveAccountType = (metadata: unknown): AccountType =>
+	(metadata as { accountType?: unknown } | null | undefined)?.accountType ===
+	AccountType.venue
+		? AccountType.venue
+		: AccountType.standard;

@@ -8,6 +8,7 @@ import {
 	apiServerError,
 	apiUnauthorized,
 	handleApiError,
+	resolveAccountType,
 } from '@/app/api/_utils';
 import { ApiRouteParams } from '@/types';
 import { NextRequest } from 'next/server';
@@ -83,6 +84,7 @@ export const GET = async function GET(
 							lastName,
 							stripeCustomerId: stripeCustomer.id,
 							murmurEmail,
+							accountType: resolveAccountType(clerkUser.unsafeMetadata),
 						},
 					});
 
@@ -114,6 +116,7 @@ export const GET = async function GET(
 									lastName,
 									stripeCustomerId: stripeCustomer.id,
 									murmurEmail: null,
+									accountType: resolveAccountType(clerkUser.unsafeMetadata),
 								},
 							});
 

@@ -11,6 +11,12 @@ export const urls = {
 	venue: {
 		index: '/venue',
 	},
+	venueSignUp: {
+		index: '/venue-sign-up',
+	},
+	venuePortal: {
+		index: '/venue-portal',
+	},
 	murmur: {
 		index: '/murmur',
 		dashboard: {
@@ -50,6 +56,7 @@ export const urls = {
 	},
 	signUp: {
 		index: '/sign-up',
+		venue: '/sign-up/venue',
 	},
 	api: {
 		apollo: {
@@ -198,6 +205,12 @@ export const urls = {
 		users: {
 			index: '/api/users',
 			detail: ((id) => `/api/users/${id}`) as DetailRoute,
+		},
+		venue: {
+			index: '/api/venue',
+			account: {
+				index: '/api/venue/account',
+			},
 		},
 	},
 };

@@ -71,8 +71,8 @@ export default function HomePageClient({
 								zIndex: 0,
 							}}
 						/>
-						<Link
-							href={urls.signUp.index}
+						<a
+							href={urls.venueSignUp.index}
 							aria-label="Sign up"
 							className="absolute flex items-center transition-opacity hover:opacity-95"
 							style={{
@@ -135,7 +135,7 @@ export default function HomePageClient({
 									/>
 								</svg>
 							</span>
-						</Link>
+						</a>
 					</div>
 				)}
 				{showFreeTrialButton && (
