@@ -20,7 +20,9 @@ import { OutlinedInitialAvatar } from '@/components/atoms/OutlinedInitialAvatar/
 import { PayRangeMoneyIcon } from '@/components/atoms/_svg/PayRangeMoneyIcon';
 import { ProfileAreaMarkerIcon } from '@/components/atoms/_svg/ProfileAreaMarkerIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { VenueSoundIcon } from '@/components/atoms/_svg/VenueSoundIcon';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
+import { WebsiteIcon } from '@/components/atoms/_svg/WebsiteIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { PersistentDashboardMap } from '@/components/molecules/PersistentDashboardMap';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
@@ -106,6 +108,29 @@ type VenueFormState = {
 	description: string;
 };
 
+type VenueProfileFieldKey =
+	| 'location'
+	| 'businessType'
+	| 'hours'
+	| 'capacity'
+	| 'genres'
+	| 'payRange'
+	| 'sound'
+	| 'description'
+	| 'website';
+
+const VENUE_PROFILE_FIELD_ORDER: VenueProfileFieldKey[] = [
+	'location',
+	'businessType',
+	'hours',
+	'capacity',
+	'genres',
+	'payRange',
+	'sound',
+	'description',
+	'website',
+];
+
 const EMPTY_FORM_STATE: VenueFormState = {
 	venueName: '',
 	businessType: '',
@@ -126,6 +151,24 @@ const LEFT_GRID_PLACEHOLDER_CLASS =
 const RIGHT_GRID_PLACEHOLDER_CLASS =
 	'grid w-[112px] grid-cols-[18px_minmax(0,1fr)] items-center gap-[4px] text-left leading-none';
 const GRID_PLACEHOLDER_LABEL_CLASS = 'min-w-0';
+const VENUE_COMPLETED_FIELD_BUTTON_CLASS =
+	'relative block h-[63px] overflow-hidden rounded-[8px] border-[2px] border-white text-left opacity-90';
+const VENUE_COMPLETED_ROW_TONE_CLASSES = {
+	location: 'bg-[#BBE6FF]',
+	basics: 'bg-[#C4E9FF]',
+	details: 'bg-[#CDECFF]',
+	production: 'bg-[#DAF2FF]',
+	description: 'bg-[#E1F3FF]',
+	website: 'bg-[#EAF7FF]',
+} as const;
+const VENUE_COMPLETED_FIELD_LABEL_CLASS =
+	'absolute left-[11px] top-[7px] isolate text-[14px] font-black leading-[14px] text-[#34B965] before:absolute before:bottom-[1px] before:left-[-3px] before:right-[-3px] before:top-[1px] before:-z-10 before:rounded-[4px] before:bg-[#D6FFED] before:content-[""]';
+const VENUE_COMPLETED_FIELD_CONTENT_CLASS =
+	'absolute left-[18px] right-[8px] top-[31px] flex h-[22px] items-center gap-[6px]';
+const VENUE_COMPLETED_FIELD_VALUE_CLASS =
+	'min-w-0 truncate font-inter text-[14px] font-medium leading-[18px] text-black';
+const VENUE_COMPLETED_GENRE_PILL_CLASS =
+	'flex h-[20px] max-w-[91px] shrink-0 items-center justify-center gap-[2px] overflow-hidden rounded-[7px] border border-black px-[4px] font-inter text-[12px] font-medium leading-none text-black';
 const VENUE_LOCATION_GEOCODE_TYPES =
 	'address,street,neighborhood,place,locality,district,region,postcode';
 const DEFAULT_CAPACITY_VALUE = 90;
@@ -164,6 +207,7 @@ const BUSINESS_TYPE_OPTIONS = [
 		icon: <WineBeerSpiritsIcon size={13} innerFill="#BFC4FF" />,
 	},
 ] as const;
+const VENUE_SOUND_OPTIONS = ['In House', 'No Speakers'] as const;
 const PROFILE_GENRE_OPTIONS = profileGenreOptionRows.flat();
 
 const formatVenueLocationFeature = (feature: ProfileAreaMapFeature) => {
@@ -201,6 +245,8 @@ const trimToNull = (value: string): string | null => {
 	const trimmed = value.trim();
 	return trimmed.length > 0 ? trimmed : null;
 };
+
+const formatVenueCoordinate = (coordinate: number) => coordinate.toFixed(4);
 
 const hydrateVenueHours = (hours: WeeklyHours | null): VenueHoursFormState => {
 	const hydratedHours = createEmptyVenueHoursForm();
@@ -379,12 +425,6 @@ const parseGenres = (value: string) => {
 		.filter(Boolean);
 };
 
-const formatSelectedGenreSummary = (genres: string[]) => {
-	const firstGenre = genres[0] ?? '';
-	if (genres.length <= 1) return firstGenre;
-	return `${firstGenre} +${genres.length - 1}`;
-};
-
 type VenueTextFieldProps = {
 	label: string;
 	value: string;
@@ -411,6 +451,7 @@ type VenueTextFieldProps = {
 	onFocus?: () => void;
 	onKeyDown?: (event: ReactKeyboardEvent<HTMLInputElement>) => void;
 	inputRef?: Ref<HTMLInputElement>;
+	textareaRef?: Ref<HTMLTextAreaElement>;
 };
 
 function VenueTextField({
@@ -431,6 +472,7 @@ function VenueTextField({
 	onFocus,
 	onKeyDown,
 	inputRef,
+	textareaRef,
 }: VenueTextFieldProps) {
 	const controlClassName =
 		'absolute inset-0 h-full w-full bg-transparent px-5 text-left text-[18px] font-medium text-black outline-none';
@@ -466,6 +508,7 @@ function VenueTextField({
 			)}
 			{multiline ? (
 				<textarea
+					ref={textareaRef}
 					aria-label={label}
 					value={value}
 					onChange={(event) => onChange(event.target.value)}
@@ -544,12 +587,13 @@ function VenueBusinessTypePicker({
 						<button
 							key={option.label}
 							type="button"
+							aria-pressed={isSelected}
 							onClick={() => onSelect(option.label)}
-							className={`flex h-[16px] items-center rounded-[6px] border border-black bg-white px-[4px] text-left text-[12px] font-medium leading-none text-black ${
-								isSelected ? 'shadow-[inset_0_0_0_1px_#000]' : ''
+							className={`flex h-[18px] items-center rounded-[6px] border border-black px-[4px] text-left text-[11px] font-medium leading-[13px] text-black ${
+								isSelected ? 'bg-[#D6FFED]' : 'bg-white'
 							}`}
 						>
-							<span className="flex w-[17px] shrink-0 items-center justify-center">
+							<span className="flex w-[16px] shrink-0 scale-[0.9] items-center justify-center">
 								{option.icon}
 							</span>
 							<span className="min-w-0 truncate">{option.label}</span>
@@ -563,7 +607,7 @@ function VenueBusinessTypePicker({
 				value={selectedStandardOption ? '' : value}
 				onChange={(event) => onChange(event.target.value)}
 				placeholder="Enter Business Type"
-				className="absolute bottom-[5px] left-[56px] h-[27px] w-[275px] bg-transparent px-[3px] text-[13px] font-medium leading-none text-black outline-none placeholder:text-[#9f9f9f]"
+				className="absolute bottom-[1px] left-[56px] h-[27px] w-[275px] bg-transparent px-[3px] text-[11px] font-medium leading-none text-black outline-none placeholder:text-[#9f9f9f]"
 			/>
 		</div>
 	);
@@ -584,18 +628,18 @@ function VenueCompletedBusinessTypeButton({
 		<button
 			type="button"
 			onClick={onClick}
-			className="relative block h-[63px] w-[172px] overflow-hidden rounded-[8px] border-[2px] border-white bg-[#B3E3FF] text-left opacity-90"
+			className={`${VENUE_COMPLETED_FIELD_BUTTON_CLASS} ${VENUE_COMPLETED_ROW_TONE_CLASSES.basics} w-[172px]`}
 		>
-			<span className="absolute left-[8px] top-[7px] rounded-[4px] bg-[#D6FFED] px-[3px] text-[14px] font-black leading-[14px] text-[#34B965]">
+			<span className={VENUE_COMPLETED_FIELD_LABEL_CLASS}>
 				Business Type
 			</span>
-			<span className="absolute left-[28px] right-[8px] top-[32px] flex items-center gap-[6px]">
+			<span className={VENUE_COMPLETED_FIELD_CONTENT_CLASS}>
 				{selectedOption && (
 					<span className="flex w-[18px] shrink-0 items-center justify-center">
 						{selectedOption.icon}
 					</span>
 				)}
-				<span className="min-w-0 truncate text-[16px] font-medium leading-none text-black">
+				<span className={VENUE_COMPLETED_FIELD_VALUE_CLASS}>
 					{businessType}
 				</span>
 			</span>
@@ -614,13 +658,11 @@ function VenueCompletedHoursButton({
 		<button
 			type="button"
 			onClick={onClick}
-			className="relative block h-[63px] w-[210px] overflow-hidden rounded-[8px] border-[2px] border-white bg-[#B3E3FF] text-left opacity-90"
+			className={`${VENUE_COMPLETED_FIELD_BUTTON_CLASS} ${VENUE_COMPLETED_ROW_TONE_CLASSES.basics} w-[210px]`}
 		>
-			<span className="absolute left-[8px] top-[7px] rounded-[4px] bg-[#D6FFED] px-[3px] text-[14px] font-black leading-[14px] text-[#34B965]">
-				Hours
-			</span>
-			<span className="absolute inset-x-[8px] top-[27px] truncate text-center font-inter text-[20px] font-medium leading-[25px] text-black">
-				{summary}
+			<span className={VENUE_COMPLETED_FIELD_LABEL_CLASS}>Hours</span>
+			<span className={`${VENUE_COMPLETED_FIELD_CONTENT_CLASS} justify-start`}>
+				<span className={VENUE_COMPLETED_FIELD_VALUE_CLASS}>{summary}</span>
 			</span>
 		</button>
 	);
@@ -637,6 +679,141 @@ function CapacityPersonIcon({ className = '' }: { className?: string }) {
 	);
 }
 
+function VenueDescriptionIcon({ className = '' }: { className?: string }) {
+	return (
+		<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className={className}>
+			<circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+			<circle cx="12" cy="8.6" r="3" stroke="currentColor" strokeWidth="2" />
+			<path
+				d="M5.8 19.1C7.05 16.55 9.25 15 12 15C14.75 15 16.95 16.55 18.2 19.1"
+				stroke="currentColor"
+				strokeWidth="2"
+				strokeLinecap="round"
+			/>
+		</svg>
+	);
+}
+
+function VenueDescriptionField({
+	value,
+	onChange,
+	onFocus,
+	onKeyDown,
+	textareaRef,
+	className = '',
+}: {
+	value: string;
+	onChange: (value: string) => void;
+	onFocus: () => void;
+	onKeyDown?: (event: ReactKeyboardEvent<HTMLTextAreaElement>) => void;
+	textareaRef?: Ref<HTMLTextAreaElement>;
+	className?: string;
+}) {
+	return (
+		<label
+			className={`relative block overflow-hidden rounded-[8px] border-[2px] border-black bg-[#E6F7FE] ${className}`}
+		>
+			<span className={VENUE_COMPLETED_FIELD_LABEL_CLASS}>Description</span>
+			<VenueDescriptionIcon className="absolute left-[18px] top-[32px] h-[14px] w-[14px] text-black" />
+			<textarea
+				ref={textareaRef}
+				aria-label="Description"
+				value={value}
+				onChange={(event) => onChange(event.target.value)}
+				onFocus={onFocus}
+				onKeyDown={onKeyDown}
+				placeholder="Enter description"
+				className="absolute bottom-[9px] left-[38px] right-[12px] top-[30px] resize-none bg-transparent font-inter text-[13px] font-medium leading-[18px] text-black outline-none placeholder:text-[#828282]"
+			/>
+		</label>
+	);
+}
+
+function VenueCompletedDescriptionButton({
+	description,
+	onClick,
+	className = '',
+}: {
+	description: string;
+	onClick: () => void;
+	className?: string;
+}) {
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			className={`relative block h-[98px] w-[386px] overflow-hidden rounded-[8px] border-[2px] border-white ${VENUE_COMPLETED_ROW_TONE_CLASSES.description} text-left opacity-90 ${className}`}
+		>
+			<span className={VENUE_COMPLETED_FIELD_LABEL_CLASS}>Description</span>
+			<VenueDescriptionIcon className="absolute left-[18px] top-[32px] h-[14px] w-[14px] text-black" />
+			<span className="absolute bottom-[9px] left-[38px] right-[12px] top-[30px] overflow-hidden whitespace-pre-wrap font-inter text-[13px] font-medium leading-[18px] text-black">
+				{description}
+			</span>
+		</button>
+	);
+}
+
+function VenueWebsiteField({
+	value,
+	onChange,
+	onFocus,
+	onKeyDown,
+	inputRef,
+	className = '',
+}: {
+	value: string;
+	onChange: (value: string) => void;
+	onFocus: () => void;
+	onKeyDown?: (event: ReactKeyboardEvent<HTMLInputElement>) => void;
+	inputRef?: Ref<HTMLInputElement>;
+	className?: string;
+}) {
+	return (
+		<label
+			className={`relative block overflow-hidden rounded-[8px] border-[2px] border-black bg-[#E6F7FE] ${className}`}
+		>
+			<span className={VENUE_COMPLETED_FIELD_LABEL_CLASS}>Website</span>
+			<WebsiteIcon className="absolute left-[18px] top-[32px] h-[14px] w-[14px]" />
+			<input
+				ref={inputRef}
+				aria-label="Website"
+				value={value}
+				onChange={(event) => onChange(event.target.value)}
+				onFocus={onFocus}
+				onKeyDown={onKeyDown}
+				placeholder="Enter website"
+				inputMode="url"
+				autoComplete="url"
+				className="absolute left-[38px] right-[12px] top-[30px] h-[18px] bg-transparent font-inter text-[13px] font-medium leading-[18px] text-black outline-none placeholder:text-[#828282]"
+			/>
+		</label>
+	);
+}
+
+function VenueCompletedWebsiteButton({
+	website,
+	onClick,
+	className = '',
+}: {
+	website: string;
+	onClick: () => void;
+	className?: string;
+}) {
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			className={`relative block h-[98px] w-[386px] overflow-hidden rounded-[8px] border-[2px] border-white ${VENUE_COMPLETED_ROW_TONE_CLASSES.website} text-left opacity-90 ${className}`}
+		>
+			<span className={VENUE_COMPLETED_FIELD_LABEL_CLASS}>Website</span>
+			<WebsiteIcon className="absolute left-[18px] top-[32px] h-[14px] w-[14px]" />
+			<span className="absolute left-[38px] right-[12px] top-[30px] truncate font-inter text-[13px] font-medium leading-[18px] text-black">
+				{website}
+			</span>
+		</button>
+	);
+}
+
 function VenueCompletedCapacityButton({
 	capacity,
 	onClick,
@@ -648,14 +825,14 @@ function VenueCompletedCapacityButton({
 		<button
 			type="button"
 			onClick={onClick}
-			className="relative block h-[63px] w-[172px] overflow-hidden rounded-[8px] border-[2px] border-white bg-[#B3E3FF] text-left opacity-90"
+			className={`${VENUE_COMPLETED_FIELD_BUTTON_CLASS} ${VENUE_COMPLETED_ROW_TONE_CLASSES.details} w-[172px]`}
 		>
-			<span className="absolute left-[8px] top-[7px] rounded-[4px] bg-[#D6FFED] px-[3px] text-[14px] font-black leading-[14px] text-[#34B965]">
+			<span className={VENUE_COMPLETED_FIELD_LABEL_CLASS}>
 				Capacity
 			</span>
-			<span className="absolute left-[18px] right-[8px] top-[32px] flex items-center gap-[7px]">
-				<CapacityPersonIcon className="h-[20px] w-[8px] shrink-0 text-black" />
-				<span className="min-w-0 truncate text-[16px] font-medium leading-none text-black">
+			<span className={VENUE_COMPLETED_FIELD_CONTENT_CLASS}>
+				<CapacityPersonIcon className="h-[18px] w-[7px] shrink-0 text-black" />
+				<span className={VENUE_COMPLETED_FIELD_VALUE_CLASS}>
 					{formatCapacityDisplay(capacity)}
 				</span>
 			</span>
@@ -674,16 +851,50 @@ function VenueCompletedPayRangeButton({
 		<button
 			type="button"
 			onClick={onClick}
-			className="relative block h-[63px] w-[172px] overflow-hidden rounded-[8px] border-[2px] border-white bg-[#B3E3FF] text-left opacity-90"
+			className={`${VENUE_COMPLETED_FIELD_BUTTON_CLASS} ${VENUE_COMPLETED_ROW_TONE_CLASSES.production} w-[172px]`}
 		>
-			<span className="absolute left-[8px] top-[7px] rounded-[4px] bg-[#D6FFED] px-[3px] text-[14px] font-black leading-[14px] text-[#34B965]">
+			<span className={VENUE_COMPLETED_FIELD_LABEL_CLASS}>
 				Pay Range
 			</span>
-			<span className="absolute left-[18px] right-[8px] top-[32px] flex items-center gap-[6px]">
+			<span className={VENUE_COMPLETED_FIELD_CONTENT_CLASS}>
 				<PayRangeMoneyIcon className="h-[16px] w-[16px] shrink-0 translate-y-[0.75px]" />
-				<span className="min-w-0 truncate text-[14px] font-medium leading-none text-black">
+				<span className={VENUE_COMPLETED_FIELD_VALUE_CLASS}>
 					{formatPayRangeDisplay(payRange)}
 				</span>
+			</span>
+		</button>
+	);
+}
+
+function VenueActiveSoundButton({ onClick }: { onClick: () => void }) {
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			className="flex h-[63px] w-[210px] items-center justify-center rounded-[8px] border-[2px] border-black bg-[#E6F7FE] text-[24px] font-medium leading-none text-black"
+		>
+			Sound
+		</button>
+	);
+}
+
+function VenueCompletedSoundButton({
+	sound,
+	onClick,
+}: {
+	sound: string;
+	onClick: () => void;
+}) {
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			className={`${VENUE_COMPLETED_FIELD_BUTTON_CLASS} ${VENUE_COMPLETED_ROW_TONE_CLASSES.production} w-[210px]`}
+		>
+			<span className={VENUE_COMPLETED_FIELD_LABEL_CLASS}>Sound</span>
+			<span className={`${VENUE_COMPLETED_FIELD_CONTENT_CLASS} justify-start`}>
+				<VenueSoundIcon className="h-[17px] w-[17px] shrink-0 text-[#0F0F0F]" />
+				<span className={VENUE_COMPLETED_FIELD_VALUE_CLASS}>{sound}</span>
 			</span>
 		</button>
 	);
@@ -696,7 +907,7 @@ function VenueActiveGenreButton({ onClick }: { onClick: () => void }) {
 			onClick={onClick}
 			className="flex h-[63px] w-[210px] items-center justify-center rounded-[8px] border-[2px] border-black bg-[#E6F7FE] text-[24px] font-medium leading-none text-black"
 		>
-			Genre
+			Genres
 		</button>
 	);
 }
@@ -708,26 +919,37 @@ function VenueCompletedGenreButton({
 	genres: string[];
 	onClick: () => void;
 }) {
-	const firstGenre = genres[0] ?? '';
-	const selectedOption = PROFILE_GENRE_OPTIONS.find(
-		(option) => option.label === firstGenre
-	);
-	const SelectedIcon = selectedOption?.Icon;
+	const visibleGenres = genres.slice(0, 2);
+	const remainingGenreCount = genres.length - visibleGenres.length;
 
 	return (
 		<button
 			type="button"
 			onClick={onClick}
-			className="relative block h-[63px] w-[210px] overflow-hidden rounded-[8px] border-[2px] border-white bg-[#B3E3FF] text-left opacity-90"
+			className={`${VENUE_COMPLETED_FIELD_BUTTON_CLASS} ${VENUE_COMPLETED_ROW_TONE_CLASSES.details} w-[210px]`}
 		>
-			<span className="absolute left-[8px] top-[7px] rounded-[4px] bg-[#D6FFED] px-[3px] text-[14px] font-black leading-[14px] text-[#34B965]">
-				Genre
-			</span>
-			<span className="absolute left-[28px] right-[8px] top-[32px] flex items-center gap-[6px]">
-				{SelectedIcon && <SelectedIcon aria-hidden="true" className="shrink-0" />}
-				<span className="min-w-0 truncate text-[16px] font-medium leading-none text-black">
-					{formatSelectedGenreSummary(genres)}
-				</span>
+			<span className={VENUE_COMPLETED_FIELD_LABEL_CLASS}>Genres</span>
+			<span className="absolute left-[12px] right-[8px] top-[31px] flex h-[22px] items-center gap-[5px] overflow-hidden">
+				{visibleGenres.map((genre) => {
+					const selectedOption = PROFILE_GENRE_OPTIONS.find(
+						(option) => option.label === genre
+					);
+					const SelectedIcon = selectedOption?.Icon;
+
+					return (
+						<span key={genre} className={VENUE_COMPLETED_GENRE_PILL_CLASS}>
+							{SelectedIcon && (
+								<SelectedIcon aria-hidden="true" className="h-[13px] w-auto shrink-0" />
+							)}
+							<span className="min-w-0 truncate">{genre}</span>
+						</span>
+					);
+				})}
+				{remainingGenreCount > 0 && (
+					<span className={VENUE_COMPLETED_GENRE_PILL_CLASS}>
+						+{remainingGenreCount}
+					</span>
+				)}
 			</span>
 		</button>
 	);
@@ -749,7 +971,7 @@ function VenueGenrePicker({
 			className={`relative h-[139px] w-[386px] rounded-[8px] border-[2px] border-black bg-[#E6F7FE] ${className}`}
 		>
 			<span className="absolute left-[8px] top-[7px] rounded-[4px] bg-[#D6FFED] px-[3px] text-[14px] font-black leading-[14px] text-[#34B965]">
-				Genre
+				Genres
 			</span>
 			<div className="absolute left-[34px] right-[34px] top-[32px] flex flex-col gap-[9px]">
 				{profileGenreOptionRows.map((row) => (
@@ -779,6 +1001,45 @@ function VenueGenrePicker({
 						})}
 					</div>
 				))}
+			</div>
+		</div>
+	);
+}
+
+function VenueSoundEditor({
+	value,
+	onSelect,
+	className = '',
+}: {
+	value: string;
+	onSelect: (value: string) => void;
+	className?: string;
+}) {
+	return (
+		<div
+			className={`relative h-[71px] w-[387px] rounded-[8px] border-[2px] border-black bg-[#E6F7FE] ${className}`}
+		>
+			<span className="absolute left-[8px] top-[7px] rounded-[4px] bg-[#D6FFED] px-[3px] text-[14px] font-black leading-[14px] text-[#34B965]">
+				Sound
+			</span>
+			<div className="absolute left-1/2 top-[27px] flex -translate-x-1/2 gap-[12px]">
+				{VENUE_SOUND_OPTIONS.map((option) => {
+					const isSelected = value.trim().toLowerCase() === option.toLowerCase();
+
+					return (
+						<button
+							key={option}
+							type="button"
+							onClick={() => onSelect(option)}
+							aria-pressed={isSelected}
+							className={`flex h-[22px] w-[143px] items-center justify-center rounded-[7px] border border-black text-[16px] font-medium leading-none text-black transition-colors ${
+								isSelected ? 'bg-[#D6FFED]' : 'bg-white hover:bg-[#D6FFED]'
+							}`}
+						>
+							{option}
+						</button>
+					);
+				})}
 			</div>
 		</div>
 	);
@@ -1107,7 +1368,9 @@ function VenueHoursEditor({
 					onClick={() => onToggleDay(day.key)}
 					aria-pressed={!dayHours.isOpen}
 					aria-label={`${day.label} ${dayHours.isOpen ? 'open' : 'closed'}`}
-					className="text-left font-inter text-[15.077px] font-medium not-italic leading-[17.252px] text-[#000]"
+					className={`text-left font-inter text-[15.077px] font-medium not-italic leading-[17.252px] transition-colors ${
+						dayHours.isOpen ? 'text-[#000]' : 'text-black/30'
+					}`}
 				>
 					{day.label}
 				</button>
@@ -1184,17 +1447,17 @@ function VenueCompletedLocationButton({
 		<button
 			type="button"
 			onClick={onClick}
-			className="relative block h-[63px] w-[386px] overflow-hidden rounded-[8px] border-[2px] border-white bg-[#B3E3FF] text-left opacity-90"
+			className={`${VENUE_COMPLETED_FIELD_BUTTON_CLASS} ${VENUE_COMPLETED_ROW_TONE_CLASSES.location} w-[386px]`}
 		>
-			<span className="absolute left-[8px] top-[7px] rounded-[4px] bg-[#D6FFED] px-[3px] text-[14px] font-black leading-[14px] text-[#34B965]">
+			<span className={VENUE_COMPLETED_FIELD_LABEL_CLASS}>
 				Location
 			</span>
-			<span className="absolute left-[22px] right-[10px] top-[30px] flex items-center gap-[7px]">
+			<span className={VENUE_COMPLETED_FIELD_CONTENT_CLASS}>
 				<ProfileAreaMarkerIcon
 					aria-hidden="true"
-					className="block h-[22px] w-[18px] shrink-0"
+					className="block h-[20px] w-[16px] shrink-0"
 				/>
-				<span className="min-w-0 truncate text-[15px] font-medium leading-[20px] text-black">
+				<span className={VENUE_COMPLETED_FIELD_VALUE_CLASS}>
 					{address}
 				</span>
 			</span>
@@ -1298,25 +1561,44 @@ function VenuePortalForm() {
 	const [isCapacityEditorOpen, setIsCapacityEditorOpen] = useState(false);
 	const [isGenrePickerOpen, setIsGenrePickerOpen] = useState(false);
 	const [isPayRangeEditorOpen, setIsPayRangeEditorOpen] = useState(false);
+	const [isSoundEditorOpen, setIsSoundEditorOpen] = useState(false);
+	const [activeTextField, setActiveTextField] = useState<
+		'description' | 'website' | null
+	>(null);
 	const [hasCompletedHours, setHasCompletedHours] = useState(false);
 	const [locationCoordinates, setLocationCoordinates] = useState<AreaCoordinates | null>(
 		null
 	);
 	const locationSlotRef = useRef<HTMLDivElement | null>(null);
+	const profileFieldsRef = useRef<HTMLDivElement | null>(null);
 	const capacityInputRef = useRef<HTMLInputElement | null>(null);
 	const payRangeMinInputRef = useRef<HTMLInputElement | null>(null);
+	const descriptionInputRef = useRef<HTMLTextAreaElement | null>(null);
+	const websiteInputRef = useRef<HTMLInputElement | null>(null);
 	const completedAddress = form.address.trim();
 	const completedBusinessType = form.businessType.trim();
 	const completedHoursSummary = formatOpenNightsSummary(getOpenNightsCount(form.hours));
 	const completedCapacity = form.capacity.trim();
 	const completedPayRange = form.payRange.trim();
+	const completedSound = form.sound.trim();
+	const completedDescription = form.description.trim();
+	const completedWebsite = form.website.trim();
+	const locationCoordinateLabels = locationCoordinates
+		? {
+				latitude: formatVenueCoordinate(locationCoordinates.lat),
+				longitude: formatVenueCoordinate(locationCoordinates.lng),
+			}
+		: null;
+	const isDescriptionEditorOpen = activeTextField === 'description';
+	const isWebsiteEditorOpen = activeTextField === 'website';
 	const selectedGenres = parseGenres(form.genres);
 	const isInlineEditorOpen =
 		isBusinessTypePickerOpen ||
 		isHoursEditorOpen ||
 		isCapacityEditorOpen ||
 		isGenrePickerOpen ||
-		isPayRangeEditorOpen;
+		isPayRangeEditorOpen ||
+		isSoundEditorOpen;
 	const isTallInlineEditorOpen =
 		isHoursEditorOpen ||
 		isCapacityEditorOpen ||
@@ -1346,6 +1628,32 @@ function VenuePortalForm() {
 		document.addEventListener('pointerdown', handlePointerDown);
 		return () => document.removeEventListener('pointerdown', handlePointerDown);
 	}, [isLocationPickerOpen]);
+
+	useEffect(() => {
+		if (!isInlineEditorOpen && activeTextField === null) return;
+		const handleClick = (event: MouseEvent) => {
+			const profileFields = profileFieldsRef.current;
+			const clickStartedInsideProfileFields = profileFields
+				? event.composedPath().includes(profileFields)
+				: false;
+			if (
+				profileFields &&
+				!profileFields.contains(event.target as Node) &&
+				!clickStartedInsideProfileFields
+			) {
+				setActiveTextField(null);
+				setIsBusinessTypePickerOpen(false);
+				setIsHoursEditorOpen(false);
+				setIsCapacityEditorOpen(false);
+				setIsGenrePickerOpen(false);
+				setIsPayRangeEditorOpen(false);
+				setIsSoundEditorOpen(false);
+			}
+		};
+
+		document.addEventListener('click', handleClick);
+		return () => document.removeEventListener('click', handleClick);
+	}, [activeTextField, isInlineEditorOpen]);
 
 	useEffect(() => {
 		if (hasHydratedForm || isLoadingVenue) return;
@@ -1399,36 +1707,54 @@ function VenuePortalForm() {
 			},
 		}));
 	};
-	const updateLocation = (value: string) => {
-		updateField('address', value);
+	const closeProfileEditors = () => {
+		setIsLocationPickerOpen(false);
 		setIsBusinessTypePickerOpen(false);
 		setIsHoursEditorOpen(false);
 		setIsCapacityEditorOpen(false);
 		setIsGenrePickerOpen(false);
 		setIsPayRangeEditorOpen(false);
+		setIsSoundEditorOpen(false);
+		setActiveTextField(null);
+	};
+	const updateLocation = (value: string) => {
+		updateField('address', value);
+		setActiveTextField(null);
+		setIsBusinessTypePickerOpen(false);
+		setIsHoursEditorOpen(false);
+		setIsCapacityEditorOpen(false);
+		setIsGenrePickerOpen(false);
+		setIsPayRangeEditorOpen(false);
+		setIsSoundEditorOpen(false);
 	};
 	const selectBusinessType = (value: string) => {
 		updateField('businessType', value);
+		setActiveTextField(null);
 		setIsBusinessTypePickerOpen(false);
 		setIsHoursEditorOpen(false);
 		setIsCapacityEditorOpen(false);
 		setIsGenrePickerOpen(false);
 		setIsPayRangeEditorOpen(false);
+		setIsSoundEditorOpen(false);
 	};
 	const openHoursEditor = () => {
+		setActiveTextField(null);
 		setIsLocationPickerOpen(false);
 		setIsBusinessTypePickerOpen(false);
 		setIsCapacityEditorOpen(false);
 		setIsGenrePickerOpen(false);
 		setIsPayRangeEditorOpen(false);
+		setIsSoundEditorOpen(false);
 		setIsHoursEditorOpen(true);
 	};
 	const openCapacityEditor = () => {
+		setActiveTextField(null);
 		setIsLocationPickerOpen(false);
 		setIsBusinessTypePickerOpen(false);
 		setIsHoursEditorOpen(false);
 		setIsGenrePickerOpen(false);
 		setIsPayRangeEditorOpen(false);
+		setIsSoundEditorOpen(false);
 		setIsCapacityEditorOpen(true);
 		if (!form.capacity.trim()) {
 			setSaved(false);
@@ -1441,31 +1767,24 @@ function VenuePortalForm() {
 		}
 		requestAnimationFrame(() => capacityInputRef.current?.focus());
 	};
-	const completeHoursAndFocusCapacity = () => {
-		setSaved(false);
-		setFormError(null);
-		setHasCompletedHours(true);
-		openCapacityEditor();
-	};
-	const handleHoursKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
-		if (event.key !== 'Enter') return;
-		event.preventDefault();
-		completeHoursAndFocusCapacity();
-	};
 	const openGenrePicker = () => {
+		setActiveTextField(null);
 		setIsLocationPickerOpen(false);
 		setIsBusinessTypePickerOpen(false);
 		setIsHoursEditorOpen(false);
 		setIsCapacityEditorOpen(false);
 		setIsPayRangeEditorOpen(false);
+		setIsSoundEditorOpen(false);
 		setIsGenrePickerOpen(true);
 	};
 	const openPayRangeEditor = () => {
+		setActiveTextField(null);
 		setIsLocationPickerOpen(false);
 		setIsBusinessTypePickerOpen(false);
 		setIsHoursEditorOpen(false);
 		setIsCapacityEditorOpen(false);
 		setIsGenrePickerOpen(false);
+		setIsSoundEditorOpen(false);
 		setIsPayRangeEditorOpen(true);
 		const { payMin, payMax } = parsePayRange(form.payRange);
 		const nextPayRange =
@@ -1478,6 +1797,161 @@ function VenuePortalForm() {
 		}
 		requestAnimationFrame(() => payRangeMinInputRef.current?.focus());
 	};
+	const openSoundEditor = () => {
+		setActiveTextField(null);
+		setIsLocationPickerOpen(false);
+		setIsBusinessTypePickerOpen(false);
+		setIsHoursEditorOpen(false);
+		setIsCapacityEditorOpen(false);
+		setIsGenrePickerOpen(false);
+		setIsPayRangeEditorOpen(false);
+		setIsSoundEditorOpen(true);
+	};
+	const openDescriptionEditor = () => {
+		closeProfileEditors();
+		setActiveTextField('description');
+		requestAnimationFrame(() => descriptionInputRef.current?.focus());
+	};
+	const openWebsiteEditor = () => {
+		closeProfileEditors();
+		setActiveTextField('website');
+		requestAnimationFrame(() => websiteInputRef.current?.focus());
+	};
+	const getActiveProfileField = (): VenueProfileFieldKey | null => {
+		if (isLocationPickerOpen) return 'location';
+		if (isBusinessTypePickerOpen) return 'businessType';
+		if (isHoursEditorOpen) return 'hours';
+		if (isCapacityEditorOpen) return 'capacity';
+		if (isGenrePickerOpen) return 'genres';
+		if (isPayRangeEditorOpen) return 'payRange';
+		if (isSoundEditorOpen) return 'sound';
+		if (isDescriptionEditorOpen) return 'description';
+		if (isWebsiteEditorOpen) return 'website';
+		return null;
+	};
+	const isProfileFieldComplete = (field: VenueProfileFieldKey) => {
+			switch (field) {
+			case 'location':
+				return completedAddress.length > 0;
+			case 'businessType':
+				return completedBusinessType.length > 0;
+			case 'hours':
+				return hasCompletedHours;
+			case 'capacity':
+				return completedCapacity.length > 0;
+			case 'genres':
+				return selectedGenres.length > 0;
+			case 'payRange':
+				return completedPayRange.length > 0;
+			case 'sound':
+				return completedSound.length > 0;
+			case 'description':
+				return form.description.trim().length > 0;
+			case 'website':
+				return form.website.trim().length > 0;
+		}
+
+		return false;
+	};
+	const openProfileField = (field: VenueProfileFieldKey) => {
+		switch (field) {
+			case 'location':
+				closeProfileEditors();
+				setIsLocationPickerOpen(true);
+				return;
+			case 'businessType':
+				closeProfileEditors();
+				setIsBusinessTypePickerOpen(true);
+				return;
+			case 'hours':
+				openHoursEditor();
+				return;
+			case 'capacity':
+				openCapacityEditor();
+				return;
+			case 'genres':
+				openGenrePicker();
+				return;
+			case 'payRange':
+				openPayRangeEditor();
+				return;
+			case 'sound':
+				openSoundEditor();
+				return;
+			case 'description':
+				closeProfileEditors();
+				setActiveTextField('description');
+				requestAnimationFrame(() => descriptionInputRef.current?.focus());
+				return;
+			case 'website':
+				openWebsiteEditor();
+				return;
+		}
+	};
+	const advanceFromProfileField = (field: VenueProfileFieldKey | null) => {
+		if (!field) return;
+
+		if (field === 'hours') {
+			setSaved(false);
+			setFormError(null);
+			setHasCompletedHours(true);
+		}
+
+		const currentIndex = VENUE_PROFILE_FIELD_ORDER.indexOf(field);
+		const nextField = VENUE_PROFILE_FIELD_ORDER.slice(currentIndex + 1).find(
+			(profileField) => !isProfileFieldComplete(profileField)
+		);
+
+		if (!nextField) {
+			closeProfileEditors();
+			return;
+		}
+
+		openProfileField(nextField);
+	};
+	const handleDescriptionKeyDown = (
+		event: ReactKeyboardEvent<HTMLTextAreaElement>
+	) => {
+		if (event.key !== 'Enter' || event.isComposing) return;
+		event.preventDefault();
+		advanceFromProfileField('description');
+	};
+	const handleWebsiteKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+		if (event.key !== 'Enter' || event.isComposing) return;
+		event.preventDefault();
+		advanceFromProfileField('website');
+	};
+
+	useEffect(() => {
+		const activeField = getActiveProfileField();
+		if (!activeField) return;
+
+		const handleDocumentKeyDown = (event: KeyboardEvent) => {
+			if (event.key !== 'Enter' || event.isComposing || event.defaultPrevented) return;
+
+			const target = event.target;
+			if (!(target instanceof HTMLElement)) return;
+			if (target instanceof HTMLTextAreaElement) return;
+			if (
+				activeField === 'location' &&
+				target instanceof HTMLInputElement &&
+				target.closest('[data-venue-location-picker="true"]')
+			) {
+				return;
+			}
+			if (target instanceof HTMLButtonElement) {
+				if (target.type === 'submit') return;
+				window.setTimeout(() => advanceFromProfileField(activeField), 0);
+				return;
+			}
+
+			event.preventDefault();
+			advanceFromProfileField(activeField);
+		};
+
+		document.addEventListener('keydown', handleDocumentKeyDown);
+		return () => document.removeEventListener('keydown', handleDocumentKeyDown);
+	});
 	const toggleGenre = (genre: string) => {
 		setSaved(false);
 		setFormError(null);
@@ -1599,11 +2073,13 @@ function VenuePortalForm() {
 									value={form.venueName}
 									onChange={(event) => updateField('venueName', event.target.value)}
 									onFocus={() => {
+										setActiveTextField(null);
 										setIsBusinessTypePickerOpen(false);
 										setIsHoursEditorOpen(false);
 										setIsCapacityEditorOpen(false);
 										setIsGenrePickerOpen(false);
 										setIsPayRangeEditorOpen(false);
+										setIsSoundEditorOpen(false);
 										setIsVenueNameFocused(true);
 									}}
 									onBlur={() => setIsVenueNameFocused(false)}
@@ -1611,17 +2087,25 @@ function VenuePortalForm() {
 									autoComplete="organization"
 									className="h-[46px] w-full bg-white px-[10px] text-[28px] font-medium leading-none text-black outline-none placeholder:text-[#828282]"
 								/>
-								<div className="h-[18px] rounded-b-[8px] bg-[#F67C7E]" />
+								<div className="flex h-[18px] items-center justify-end gap-[14px] rounded-b-[8px] bg-[#F67C7E] pr-[14px] font-inter text-[12.062px] font-semibold leading-[25.629px] text-black tabular-nums">
+									{locationCoordinateLabels && (
+										<>
+											<span>{locationCoordinateLabels.latitude}</span>
+											<span>{locationCoordinateLabels.longitude}</span>
+										</>
+									)}
+								</div>
 							</label>
 						</div>
 
 						<div className="absolute left-[15px] top-[87px] flex items-start gap-[9px]">
-							<div className="w-[386px]">
-								<div ref={locationSlotRef}>
+							<div ref={profileFieldsRef} className="w-[386px]">
+								<div ref={locationSlotRef} data-venue-location-picker="true">
 									{isLocationPickerOpen ? (
 										<ProfileAreaMapBox
 											area={form.address}
 											onAreaUpdate={updateLocation}
+											onAreaCommit={() => advanceFromProfileField('location')}
 											initialCoordinates={locationCoordinates}
 											onCoordinatesChange={setLocationCoordinates}
 											className="mt-0 h-[174px] w-[386px] rounded-[8px] border-[2px] opacity-100"
@@ -1636,11 +2120,13 @@ function VenuePortalForm() {
 										<VenueCompletedLocationButton
 											address={completedAddress}
 											onClick={() => {
+												setActiveTextField(null);
 												setIsBusinessTypePickerOpen(false);
 												setIsHoursEditorOpen(false);
 												setIsCapacityEditorOpen(false);
 												setIsGenrePickerOpen(false);
 												setIsPayRangeEditorOpen(false);
+												setIsSoundEditorOpen(false);
 												setIsLocationPickerOpen(true);
 											}}
 										/>
@@ -1654,11 +2140,13 @@ function VenuePortalForm() {
 											solidWhenEmpty={isInlineEditorOpen}
 											readOnly
 											onFocus={() => {
+												setActiveTextField(null);
 												setIsBusinessTypePickerOpen(false);
 												setIsHoursEditorOpen(false);
 												setIsCapacityEditorOpen(false);
 												setIsGenrePickerOpen(false);
 												setIsPayRangeEditorOpen(false);
+												setIsSoundEditorOpen(false);
 												setIsLocationPickerOpen(true);
 											}}
 											className="h-[63px] w-[386px] cursor-pointer"
@@ -1682,11 +2170,13 @@ function VenuePortalForm() {
 										<VenueCompletedBusinessTypeButton
 											businessType={completedBusinessType}
 											onClick={() => {
+												setActiveTextField(null);
 												setIsLocationPickerOpen(false);
 												setIsHoursEditorOpen(false);
 												setIsCapacityEditorOpen(false);
 												setIsGenrePickerOpen(false);
 												setIsPayRangeEditorOpen(false);
+												setIsSoundEditorOpen(false);
 												setIsBusinessTypePickerOpen(true);
 											}}
 										/>
@@ -1696,11 +2186,13 @@ function VenuePortalForm() {
 											value={isBusinessTypePickerOpen ? '' : form.businessType}
 											onChange={(value) => updateField('businessType', value)}
 											onFocus={() => {
+												setActiveTextField(null);
 												setIsLocationPickerOpen(false);
 												setIsHoursEditorOpen(false);
 												setIsCapacityEditorOpen(false);
 												setIsGenrePickerOpen(false);
 												setIsPayRangeEditorOpen(false);
+												setIsSoundEditorOpen(false);
 												setIsBusinessTypePickerOpen(true);
 											}}
 											readOnly={isBusinessTypePickerOpen}
@@ -1729,7 +2221,6 @@ function VenuePortalForm() {
 											value=""
 											onChange={() => undefined}
 											onFocus={openHoursEditor}
-											onKeyDown={handleHoursKeyDown}
 											readOnly
 											activeEntry={isHoursEditorOpen}
 											solidWhenEmpty={isInlineEditorOpen}
@@ -1802,11 +2293,11 @@ function VenuePortalForm() {
 											genres={selectedGenres}
 											onClick={openGenrePicker}
 										/>
-									) : (
-										<VenueTextField
-											label="Genre"
-											value=""
-											onChange={() => undefined}
+								) : (
+									<VenueTextField
+										label="Genres"
+										value=""
+										onChange={() => undefined}
 											onFocus={openGenrePicker}
 											readOnly
 											solidWhenEmpty={isInlineEditorOpen}
@@ -1857,22 +2348,26 @@ function VenuePortalForm() {
 											className="h-[63px] w-[172px] cursor-pointer"
 										/>
 									)}
-									<VenueTextField
-										label="Sound"
-										value={form.sound}
-										onChange={(value) => updateField('sound', value)}
-										onFocus={() => {
-											setIsBusinessTypePickerOpen(false);
-											setIsHoursEditorOpen(false);
-											setIsCapacityEditorOpen(false);
-											setIsGenrePickerOpen(false);
-											setIsPayRangeEditorOpen(false);
-										}}
-										solidWhenEmpty={isInlineEditorOpen}
-										placeholderContentClassName={RIGHT_GRID_PLACEHOLDER_CLASS}
-										placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
-										className="h-[63px] w-[210px]"
-									/>
+									{isSoundEditorOpen ? (
+										<VenueActiveSoundButton onClick={openSoundEditor} />
+									) : completedSound ? (
+										<VenueCompletedSoundButton
+											sound={completedSound}
+											onClick={openSoundEditor}
+										/>
+									) : (
+										<VenueTextField
+											label="Sound"
+											value=""
+											onChange={() => undefined}
+											onFocus={openSoundEditor}
+											readOnly
+											solidWhenEmpty={isInlineEditorOpen}
+											placeholderContentClassName={RIGHT_GRID_PLACEHOLDER_CLASS}
+											placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
+											className="h-[63px] w-[210px] cursor-pointer"
+										/>
+									)}
 								</div>
 
 								{isPayRangeEditorOpen && (
@@ -1884,37 +2379,82 @@ function VenuePortalForm() {
 									/>
 								)}
 
-								<VenueTextField
-									label="Description"
-									value={form.description}
-									onChange={(value) => updateField('description', value)}
-									onFocus={() => {
-										setIsBusinessTypePickerOpen(false);
-										setIsHoursEditorOpen(false);
-										setIsCapacityEditorOpen(false);
-										setIsGenrePickerOpen(false);
-										setIsPayRangeEditorOpen(false);
-									}}
-									solidWhenEmpty={isInlineEditorOpen}
-									multiline
-									className="mt-[4px] h-[98px] w-[386px]"
-								/>
-								{!isLocationPickerOpen && !isInlineEditorOpen && (
-									<VenueTextField
-										label="Website"
-										value={form.website}
-										onChange={(value) => updateField('website', value)}
+								{isSoundEditorOpen && (
+									<VenueSoundEditor
+										value={form.sound}
+										onSelect={(value) => updateField('sound', value)}
+										className="mt-[4px]"
+									/>
+								)}
+
+								{completedDescription && !isDescriptionEditorOpen ? (
+									<VenueCompletedDescriptionButton
+										description={completedDescription}
+										onClick={openDescriptionEditor}
+										className="mt-[4px]"
+									/>
+								) : isDescriptionEditorOpen ? (
+									<VenueDescriptionField
+										value={form.description}
+										onChange={(value) => updateField('description', value)}
 										onFocus={() => {
+											setActiveTextField('description');
 											setIsBusinessTypePickerOpen(false);
 											setIsHoursEditorOpen(false);
 											setIsCapacityEditorOpen(false);
 											setIsGenrePickerOpen(false);
 											setIsPayRangeEditorOpen(false);
+											setIsSoundEditorOpen(false);
 										}}
-										inputMode="url"
-										autoComplete="url"
+										onKeyDown={handleDescriptionKeyDown}
+										textareaRef={descriptionInputRef}
 										className="mt-[4px] h-[98px] w-[386px]"
 									/>
+								) : (
+									<VenueTextField
+										label="Description"
+										value=""
+										onChange={() => undefined}
+										onFocus={openDescriptionEditor}
+										readOnly
+										solidWhenEmpty={isInlineEditorOpen}
+										className="mt-[4px] h-[98px] w-[386px] cursor-pointer"
+									/>
+								)}
+								{!isLocationPickerOpen && !isInlineEditorOpen && (
+									completedWebsite && !isWebsiteEditorOpen ? (
+										<VenueCompletedWebsiteButton
+											website={completedWebsite}
+											onClick={openWebsiteEditor}
+											className="mt-[4px]"
+										/>
+									) : isWebsiteEditorOpen ? (
+										<VenueWebsiteField
+											value={form.website}
+											onChange={(value) => updateField('website', value)}
+											onFocus={() => {
+												setActiveTextField('website');
+												setIsBusinessTypePickerOpen(false);
+												setIsHoursEditorOpen(false);
+												setIsCapacityEditorOpen(false);
+												setIsGenrePickerOpen(false);
+												setIsPayRangeEditorOpen(false);
+												setIsSoundEditorOpen(false);
+											}}
+											onKeyDown={handleWebsiteKeyDown}
+											inputRef={websiteInputRef}
+											className="mt-[4px] h-[98px] w-[386px]"
+										/>
+									) : (
+										<VenueTextField
+											label="Website"
+											value=""
+											onChange={() => undefined}
+											onFocus={openWebsiteEditor}
+											readOnly
+											className="mt-[4px] h-[98px] w-[386px] cursor-pointer"
+										/>
+									)
 								)}
 							</div>
 

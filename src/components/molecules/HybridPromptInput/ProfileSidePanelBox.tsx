@@ -157,6 +157,7 @@ export type ProfileAreaMapFeature = {
 export type ProfileAreaMapBoxProps = {
 	area: string;
 	onAreaUpdate?: (area: string) => void | Promise<void>;
+	onAreaCommit?: () => void;
 	className?: string;
 	headerLabel?: string;
 	inputPlaceholder?: string;
@@ -200,6 +201,7 @@ export const ProfileAreaMapBox = ({
 	formatGeocodeFeature = formatReverseGeocodeArea,
 	initialCoordinates = null,
 	onCoordinatesChange,
+	onAreaCommit,
 }: ProfileAreaMapBoxProps) => {
 	const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
 	const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -402,6 +404,7 @@ export const ProfileAreaMapBox = ({
 			setAreaQuery(formatted);
 			setIsEditingArea(false);
 			onAreaUpdate?.(formatted);
+			onAreaCommit?.();
 		} catch {
 			if (myGen === forwardGeocodeGenRef.current) setGeocodeError('Lookup failed');
 		} finally {
@@ -411,6 +414,7 @@ export const ProfileAreaMapBox = ({
 		areaQuery,
 		mapboxToken,
 		onAreaUpdate,
+		onAreaCommit,
 		onCoordinatesChange,
 		userLocation,
 		forwardGeocodeTypes,
