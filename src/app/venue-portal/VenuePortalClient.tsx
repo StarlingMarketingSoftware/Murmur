@@ -1417,20 +1417,41 @@ function VenueHoursEditor({
 }
 
 function VenuePhotosPlaceholder() {
+	const photoSlotOpacities = [0.6, 0.5, 0.4, 0.3, 0.2];
+
 	return (
-		<aside className="h-[469px] w-[126px] rounded-[8px] border border-black bg-[#F1FAFF] px-[12px] pb-[99px] opacity-20">
+		<aside className="h-[469px] w-[126px] rounded-[8px] border border-black/20 bg-[#F1FAFF] px-[10px] pt-[8px]">
 			<p className="text-[14px] leading-none text-[#8f8f8f]">Photos</p>
-			<div className="mt-[14px] flex flex-col items-center gap-[13px]">
-				<div className="h-[70px] w-[86px] rounded-[10px] bg-white/55" />
-				<div className="h-[70px] w-[86px] rounded-[10px] bg-white/55" />
-				<div className="h-[70px] w-[86px] rounded-[10px] bg-white/55" />
-				<button
-					type="button"
-					aria-label="Add venue photo"
-					className="mt-[2px] flex h-[75px] w-[86px] items-center justify-center rounded-[10px] bg-white/55 text-[34px] font-light leading-none text-[#777]"
-				>
-					+
-				</button>
+			<div className="mt-[6px] flex flex-col items-center gap-[13px]">
+				{photoSlotOpacities.map((opacity, index) => {
+					const isAddSlot = index === photoSlotOpacities.length - 1;
+
+					if (isAddSlot) {
+						return (
+							<button
+								key={opacity}
+								type="button"
+								aria-label="Add venue photo"
+								className="relative flex h-[74px] w-[103px] items-center justify-center rounded-[10.451px] text-[34px] font-light leading-none text-[#777]"
+							>
+								<span
+									aria-hidden="true"
+									className="absolute inset-0 rounded-[10.451px] bg-white"
+									style={{ opacity }}
+								/>
+								<span className="relative">+</span>
+							</button>
+						);
+					}
+
+					return (
+						<div
+							key={opacity}
+							className="h-[74px] w-[103px] rounded-[10.451px] bg-white"
+							style={{ opacity }}
+						/>
+					);
+				})}
 			</div>
 		</aside>
 	);
@@ -1599,21 +1620,6 @@ function VenuePortalForm() {
 		isGenrePickerOpen ||
 		isPayRangeEditorOpen ||
 		isSoundEditorOpen;
-	const isTallInlineEditorOpen =
-		isHoursEditorOpen ||
-		isCapacityEditorOpen ||
-		isGenrePickerOpen ||
-		isPayRangeEditorOpen;
-	const portalCardHeightClassName = isTallInlineEditorOpen
-		? 'h-[670px]'
-		: isBusinessTypePickerOpen
-			? 'h-[653px]'
-			: 'h-[637px]';
-	const portalPanelHeightClassName = isTallInlineEditorOpen
-		? 'h-[603px]'
-		: isBusinessTypePickerOpen
-			? 'h-[586px]'
-			: 'h-[570px]';
 
 	// Close the picker only on an outside click — dropping a pin or searching
 	// should keep it open so the marker stays visible and adjustable.
@@ -2057,14 +2063,14 @@ function VenuePortalForm() {
 
 			<form className="flex shrink-0 flex-col items-center" onSubmit={handleSubmit}>
 				<section
-					className={`flex ${portalCardHeightClassName} w-[583px] flex-col items-center rounded-[12px] bg-[rgba(255,255,255,0.65)]`}
+					className="flex h-[637px] w-[583px] flex-col items-center rounded-[12px] bg-[rgba(255,255,255,0.65)]"
 				>
 					<div className="mt-[13px] flex h-[28px] w-[570px] items-center rounded-[4px] border-[1.056px] border-[#111] bg-white px-[8px] text-[14px] font-semibold leading-none text-black">
 						New Venue
 					</div>
 
 					<div
-						className={`relative mt-[7px] ${portalPanelHeightClassName} w-[570px] overflow-hidden rounded-[8px] border border-black bg-[linear-gradient(180deg,#CBEEFD_0%,#FFF_100%)]`}
+						className="relative mt-[7px] h-[570px] w-[570px] overflow-hidden rounded-[8px] border border-black bg-[linear-gradient(180deg,#CBEEFD_0%,#FFF_100%)]"
 					>
 						<div className="absolute left-[15px] top-[16px]">
 							<label className="block h-[64px] w-[386px] overflow-hidden rounded-[8px] bg-white">
@@ -2085,7 +2091,7 @@ function VenuePortalForm() {
 									onBlur={() => setIsVenueNameFocused(false)}
 									placeholder="Enter Venue Name"
 									autoComplete="organization"
-									className="h-[46px] w-full bg-white px-[10px] text-[28px] font-medium leading-none text-black outline-none placeholder:text-[#828282]"
+									className="h-[46px] w-full bg-white px-[10px] text-[26px] font-medium leading-none text-black outline-none placeholder:text-[#828282]"
 								/>
 								<div className="flex h-[18px] items-center justify-end gap-[14px] rounded-b-[8px] bg-[#F67C7E] pr-[14px] font-inter text-[12.062px] font-semibold leading-[25.629px] text-black tabular-nums">
 									{locationCoordinateLabels && (
