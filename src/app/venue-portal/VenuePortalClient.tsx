@@ -1638,6 +1638,76 @@ function PortalStatusCard({
 	);
 }
 
+// Mirrors the real venue card's chrome exactly (same outer wrapper, compact zoom,
+// pill + section dimensions, "New Venue" header, gradient panel, faint photo slots,
+// and the save-button/error spacers below). Because the shell is byte-for-byte the
+// same as VenuePortalForm's, the box lands in the identical spot when the form mounts
+// — only the field area, pill, avatar, and save button pulse as loading placeholders.
+function VenuePortalSkeleton() {
+	const fieldBarClass = 'h-[63px] rounded-[8px] bg-white/40';
+
+	return (
+		<div className="relative z-10 flex min-h-[100dvh] w-full flex-col items-center justify-center overflow-x-auto px-4 py-10 sm:px-6">
+			<div className="absolute right-4 top-3 z-20 pt-3 pr-4">
+				<div className="h-7 w-7 animate-pulse rounded-full bg-black/10" />
+			</div>
+
+			<div className="venue-portal-compact flex shrink-0 flex-col items-center">
+				<div className="mb-[23px] flex h-[41px] w-[210px] animate-pulse items-center gap-[14px] self-start rounded-[17px] bg-[rgba(254,254,254,0.74)] py-[5px] pl-[7px] pr-[18px]">
+					<div className="h-[30px] w-[30px] shrink-0 rounded-full bg-black/10" />
+					<div className="h-[16px] w-[120px] rounded-full bg-black/10" />
+				</div>
+
+				<section className="flex h-[637px] w-[583px] flex-col items-center rounded-[12px] bg-[rgba(255,255,255,0.65)]">
+					<div className="mt-[13px] flex h-[28px] w-[570px] items-center rounded-[4px] border-[1.056px] border-[#111] bg-white px-[8px] text-[14px] font-semibold leading-none text-black">
+						New Venue
+					</div>
+
+					<div className="relative mt-[7px] h-[570px] w-[570px] overflow-hidden rounded-[8px] border border-black bg-[linear-gradient(180deg,#CBEEFD_0%,#FFF_100%)]">
+						<div className="absolute left-[15px] top-[16px] h-[64px] w-[386px] animate-pulse rounded-[8px] bg-white" />
+
+						<div className="absolute left-[15px] top-[87px] flex items-start gap-[9px]">
+							<div className="flex w-[386px] animate-pulse flex-col gap-[4px]">
+								<div className={`${fieldBarClass} w-[386px]`} />
+								<div className="grid grid-cols-[172px_210px] gap-x-[4px]">
+									<div className={fieldBarClass} />
+									<div className={fieldBarClass} />
+								</div>
+								<div className="grid grid-cols-[172px_210px] gap-x-[4px]">
+									<div className={fieldBarClass} />
+									<div className={fieldBarClass} />
+								</div>
+								<div className="grid grid-cols-[172px_210px] gap-x-[4px]">
+									<div className={fieldBarClass} />
+									<div className={fieldBarClass} />
+								</div>
+								<div className="h-[98px] w-[386px] rounded-[8px] bg-white/40" />
+								<div className="h-[98px] w-[386px] rounded-[8px] bg-white/40" />
+							</div>
+
+							<aside className="h-[469px] w-[126px] rounded-[8px] border border-black/20 bg-[#F1FAFF] px-[10px] pt-[8px]">
+								<p className="text-[14px] leading-none text-[#8f8f8f]">Photos</p>
+								<div className="mt-[6px] flex flex-col items-center gap-[13px]">
+									{VENUE_PHOTO_SLOT_OPACITIES.map((opacity, index) => (
+										<div
+											key={index}
+											className="h-[74px] w-[103px] rounded-[10.451px] bg-white"
+											style={{ opacity }}
+										/>
+									))}
+								</div>
+							</aside>
+						</div>
+					</div>
+				</section>
+
+				<div className="mt-4 h-[32px] w-[166px] animate-pulse rounded-[17px] border border-black/40 bg-[#9ED7FF]/60" />
+				<div className="mt-2 min-h-[20px]" />
+			</div>
+		</div>
+	);
+}
+
 function VenuePortalForm() {
 	const { user: clerkUser } = useUser();
 	const { data: venue, isLoading: isLoadingVenue, isError: isVenueError } = useGetVenue();
@@ -2056,6 +2126,20 @@ function VenuePortalForm() {
 			clerkUser?.username?.trim()?.[0] ||
 			''
 		)?.toUpperCase() ?? '';
+	const clerkFullName = clerkUser?.fullName?.trim();
+	const clerkCombinedName = [
+		clerkUser?.firstName?.trim(),
+		clerkUser?.lastName?.trim(),
+	]
+		.filter(Boolean)
+		.join(' ');
+	const venuePortalUserName =
+		clerkFullName ||
+		clerkCombinedName ||
+		clerkUser?.username?.trim() ||
+		clerkUser?.primaryEmailAddress?.emailAddress?.split('@')[0]?.trim() ||
+		'Venue User';
+	const venuePortalInitial = venuePortalUserName.trim()[0]?.toUpperCase() || 'V';
 
 	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
@@ -2132,7 +2216,18 @@ function VenuePortalForm() {
 				</div>
 			</div>
 
-			<form className="flex shrink-0 flex-col items-center" onSubmit={handleSubmit}>
+			<form
+				className="venue-portal-compact flex shrink-0 flex-col items-center"
+				onSubmit={handleSubmit}
+			>
+				<div className="mb-[23px] flex h-[41px] w-fit min-w-[170px] max-w-[calc(100vw-32px)] self-start items-center gap-[14px] rounded-[17px] bg-[rgba(254,254,254,0.74)] py-[5px] pl-[7px] pr-[18px]">
+					<div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-[#63C766] text-[22px] font-bold leading-none text-white ring-[1.5px] ring-white">
+						{venuePortalInitial}
+					</div>
+					<div className="min-w-0 truncate text-center font-inter text-[21.411px] font-bold leading-[28.548px] text-black">
+						{venuePortalUserName}
+					</div>
+				</div>
 				<section className="flex h-[637px] w-[583px] flex-col items-center rounded-[12px] bg-[rgba(255,255,255,0.65)]">
 					<div className="mt-[13px] flex h-[28px] w-[570px] items-center rounded-[4px] border-[1.056px] border-[#111] bg-white px-[8px] text-[14px] font-semibold leading-none text-black">
 						New Venue
@@ -2632,12 +2727,7 @@ function VenuePortalContent() {
 	]);
 
 	if (!isLoaded || isSignedIn === false) {
-		return (
-			<PortalStatusCard
-				title="Opening venue portal"
-				message="Redirecting you to sign in before loading the portal."
-			/>
-		);
+		return <VenuePortalSkeleton />;
 	}
 
 	if (isUserError) {
@@ -2665,12 +2755,7 @@ function VenuePortalContent() {
 	}
 
 	if (isPendingUser || isLoadingUser || !user) {
-		return (
-			<PortalStatusCard
-				title="Finalizing your venue account"
-				message="We are creating your Murmur user record and checking that this signup came from the venue flow."
-			/>
-		);
+		return <VenuePortalSkeleton />;
 	}
 
 	if (user.accountType !== AccountType.venue) {
