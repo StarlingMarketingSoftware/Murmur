@@ -3,6 +3,7 @@
 import {
 	type FormEvent,
 	type KeyboardEvent as ReactKeyboardEvent,
+	type PointerEvent as ReactPointerEvent,
 	type Ref,
 	useEffect,
 	useLayoutEffect,
@@ -130,6 +131,11 @@ const DEFAULT_CAPACITY_VALUE = 90;
 const CAPACITY_SLIDER_MIN = 0;
 const CAPACITY_SLIDER_MAX = 350;
 const CAPACITY_SLIDER_STEP = 1;
+const DEFAULT_PAY_RANGE_MIN_VALUE = 150;
+const DEFAULT_PAY_RANGE_MAX_VALUE = 2000;
+const PAY_RANGE_SLIDER_MIN = 0;
+const PAY_RANGE_SLIDER_MAX = 4000;
+const PAY_RANGE_SLIDER_STEP = 50;
 
 const BUSINESS_TYPE_OPTIONS = [
 	{
@@ -313,6 +319,57 @@ const getCapacitySliderValue = (capacity: string) => {
 
 const getCapacitySliderMax = (capacity: number) =>
 	Math.max(CAPACITY_SLIDER_MAX, capacity);
+
+const parsePayRange = (value: string) => {
+	const parsed = (value.match(/\d[\d,]*/g) ?? [])
+		.slice(0, 2)
+		.map((part) => Number(part.replaceAll(',', '')))
+		.filter((part) => Number.isInteger(part) && part >= 0);
+
+	if (parsed.length === 0) {
+		return { payMin: null, payMax: null };
+	}
+
+	const firstValue = parsed[0];
+	const secondValue = parsed[1] ?? parsed[0];
+	return {
+		payMin: Math.min(firstValue, secondValue),
+		payMax: Math.max(firstValue, secondValue),
+	};
+};
+
+const formatPayRange = (payMin: number | null, payMax: number | null) => {
+	if (payMin !== null && payMax !== null && payMin !== payMax) {
+		return `$${payMin}-${payMax}`;
+	}
+	if (payMax !== null) return `$${payMax}`;
+	if (payMin !== null) return `$${payMin}`;
+	return '';
+};
+
+const formatPayRangeDisplay = (payRange: string) => {
+	const trimmed = payRange.trim();
+	if (!trimmed) {
+		return formatPayRange(DEFAULT_PAY_RANGE_MIN_VALUE, DEFAULT_PAY_RANGE_MAX_VALUE);
+	}
+
+	const { payMin, payMax } = parsePayRange(trimmed);
+	return formatPayRange(payMin, payMax) || trimmed;
+};
+
+const getPayRangeSliderValues = (payRange: string) => {
+	const { payMin, payMax } = parsePayRange(payRange);
+	return {
+		payMin: payMin ?? DEFAULT_PAY_RANGE_MIN_VALUE,
+		payMax: payMax ?? DEFAULT_PAY_RANGE_MAX_VALUE,
+	};
+};
+
+const getPayRangeSliderMax = (payMax: number) =>
+	Math.max(PAY_RANGE_SLIDER_MAX, payMax);
+
+const getPayRangeSliderPercent = (value: number, sliderMax: number) =>
+	((value - PAY_RANGE_SLIDER_MIN) / (sliderMax - PAY_RANGE_SLIDER_MIN)) * 100;
 
 const parseGenres = (value: string) => {
 	return value
@@ -579,6 +636,53 @@ function CapacityPersonIcon({ className = '' }: { className?: string }) {
 	);
 }
 
+function PayRangeMoneyIcon({ className = '' }: { className?: string }) {
+	return (
+		<svg aria-hidden="true" viewBox="0 0 16 16" fill="none" className={className}>
+			<path
+				d="M7.99791 0.515625C3.87002 0.515625 0.511719 3.87392 0.511719 8.00182C0.511719 12.1306 3.87002 15.4897 7.99791 15.4897C12.1267 15.4897 15.4858 12.1306 15.4858 8.00182C15.4858 3.87392 12.1268 0.515625 7.99791 0.515625ZM7.99791 13.9656C4.7104 13.9656 2.03604 11.2904 2.03604 8.00182C2.03604 4.71448 4.71057 2.04012 7.99791 2.04012C11.2861 2.04012 13.9615 4.71465 13.9615 8.00182C13.9615 11.2902 11.2863 13.9656 7.99791 13.9656Z"
+				fill="#FFE101"
+			/>
+			<path
+				d="M7.99915 0C3.58844 0 0 3.58844 0 7.99915C0 12.4109 3.58844 16 7.99915 16C12.4109 16 16 12.4109 16 7.99915C16 3.58844 12.4109 0 7.99915 0ZM7.99915 15.487C3.87125 15.487 0.512952 12.1279 0.512952 7.99915C0.512952 3.87125 3.87125 0.512952 7.99915 0.512952C12.1279 0.512952 15.487 3.87125 15.487 7.99897C15.487 12.1279 12.1281 15.487 7.99915 15.487Z"
+				fill="black"
+			/>
+			<path
+				d="M8.80844 9.21753C8.80844 9.1464 8.79185 9.11973 8.76689 9.09647C8.76159 9.09151 8.75047 9.08245 8.73047 9.07031V9.34064C8.80844 9.29516 8.80844 9.24352 8.80844 9.21753Z"
+				fill="white"
+			/>
+			<path
+				d="M7.30859 6.50102V6.5188C7.30859 6.57864 7.32723 6.6007 7.34484 6.61694C7.34912 6.6207 7.36331 6.63233 7.3958 6.64926V6.375C7.37511 6.38509 7.36365 6.39347 7.35801 6.39842C7.31731 6.43433 7.30859 6.46545 7.30859 6.50102Z"
+				fill="white"
+			/>
+			<path
+				d="M7.9997 2.55469C4.99517 2.55469 2.55078 4.99908 2.55078 8.00344C2.55078 11.009 4.99517 13.4542 7.9997 13.4542C11.0051 13.4542 13.4503 11.009 13.4503 8.00344C13.4503 4.9989 11.0051 2.55469 7.9997 2.55469ZM10.778 9.11056C10.778 9.41542 10.7565 9.69669 10.6419 9.94616C10.5251 10.1948 10.3791 10.4119 10.1707 10.5937C9.96465 10.7724 9.70629 10.9158 9.42229 11.0203C9.20924 11.0982 9.06818 11.1559 8.72621 11.1923V12.0275H7.35834V11.1731C7.01637 11.1171 6.59934 11.0244 6.2466 10.8972C5.81777 10.7431 5.41528 10.5359 5.06168 10.2815L4.8565 10.1358L5.9378 8.53673L6.15102 8.68908C6.41382 8.87614 6.66158 9.02797 6.91669 9.14065C7.06527 9.20614 7.18736 9.26034 7.35834 9.30291V8.76363C7.01637 8.68994 6.83325 8.60906 6.60276 8.51776C6.31192 8.40371 6.06946 8.26025 5.86856 8.092C5.66149 7.91999 5.53838 7.71242 5.43049 7.47612C5.32363 7.2417 5.30636 6.96522 5.30636 6.65386V6.63625C5.30636 6.34113 5.3279 6.06584 5.43614 5.81792C5.54266 5.56999 5.68594 5.34805 5.89454 5.15963C6.09699 4.97753 6.3415 4.82895 6.63166 4.71815C6.85171 4.63402 7.0162 4.57418 7.35817 4.53998V3.99112H8.72604V4.57486C9.06801 4.62342 9.33816 4.69814 9.59669 4.79748C9.92395 4.92418 10.2447 5.08559 10.5222 5.27709L10.7293 5.41508L9.73809 7.03772L9.5165 6.88041C9.34688 6.76107 9.16222 6.65967 8.97824 6.57948C8.89446 6.54323 8.89702 6.51143 8.72604 6.48322V6.96522C9.06801 7.03908 9.2737 7.12321 9.49872 7.21657C9.78546 7.33643 10.0327 7.48142 10.2278 7.64779C10.4347 7.82373 10.5569 8.03507 10.6595 8.27547C10.7611 8.51519 10.7777 8.78979 10.7777 9.09175V9.11056H10.778Z"
+				fill="white"
+			/>
+			<path
+				d="M8.00093 2.03906C4.71342 2.03906 2.03906 4.71359 2.03906 8.00076C2.03906 11.2891 4.71359 13.9645 8.00093 13.9645C11.2891 13.9645 13.9645 11.2893 13.9645 8.00076C13.9645 4.71342 11.2893 2.03906 8.00093 2.03906ZM8.00093 13.4516C4.9964 13.4516 2.55201 11.0063 2.55201 8.00076C2.55201 4.9964 4.9964 2.55201 8.00093 2.55201C11.0063 2.55201 13.4516 4.9964 13.4516 8.00076C13.4516 11.0063 11.0063 13.4516 8.00093 13.4516Z"
+				fill="black"
+			/>
+			<path
+				d="M9.89646 8.03441C9.74155 7.90241 9.54286 7.78512 9.30588 7.68612C9.05624 7.58267 8.7524 7.49034 8.41591 7.4122L8.21107 7.36603V5.81555L8.53166 5.88839C8.74197 5.93695 8.96374 6.00979 9.18431 6.10486C9.31922 6.16385 9.45293 6.23173 9.58116 6.30833L10.0384 5.56403C9.85012 5.45153 9.64956 5.35389 9.43856 5.27199C9.15678 5.16376 8.81071 5.0887 8.46686 5.04903L8.21141 5.02287V4.5H7.86944V5.00748L7.6275 5.02407C7.3187 5.04561 7.04034 5.10255 6.80319 5.19334C6.57202 5.28157 6.37555 5.39698 6.22064 5.53668C6.06761 5.67483 5.98349 5.83658 5.90569 6.01765C5.82533 6.20198 5.81763 6.40835 5.81763 6.63234V6.64995C5.81763 6.88728 5.82294 7.09229 5.89919 7.25934C5.97562 7.42708 6.06898 7.56933 6.21928 7.69415C6.37829 7.82735 6.57184 7.94242 6.81174 8.03646C7.06736 8.13786 7.35016 8.22933 7.68991 8.30901L7.86944 8.35535V9.92464L7.58304 9.87198C7.28399 9.81966 6.99657 9.73023 6.71479 9.6061C6.49901 9.51086 6.28357 9.39168 6.06454 9.25045L5.55859 10.0004C5.819 10.1644 6.10386 10.302 6.40599 10.4104C6.79686 10.5516 7.20483 10.6424 7.62853 10.6886L7.86944 10.7136V11.5107H8.21141V10.7272L8.46378 10.7057C8.74933 10.6795 9.02444 10.6219 9.26262 10.5349C9.48729 10.4521 9.68683 10.3401 9.8455 10.2028C9.99939 10.0686 10.0871 9.90805 10.1724 9.72647C10.2548 9.54659 10.2632 9.33748 10.2632 9.10682V9.08819C10.2632 8.85531 10.2619 8.64807 10.1875 8.47247C10.1162 8.3061 10.0425 8.15855 9.89646 8.03441ZM7.8691 7.34688L7.56355 7.25883C7.27681 7.18103 7.12515 7.09708 7.01213 6.99449C6.87859 6.87172 6.84303 6.70723 6.84303 6.51744V6.49966C6.84303 6.30901 6.89535 6.13991 7.04274 6.01047C7.17867 5.89284 7.34709 5.82496 7.6222 5.80221L7.86893 5.7793V7.34688H7.8691ZM8.49695 9.92635L8.21124 9.95593V8.36082L8.54021 8.45332C8.81635 8.53163 8.99965 8.61764 9.11386 8.72382C9.24809 8.84898 9.31819 9.01466 9.31819 9.20343C9.31819 9.45204 9.21081 9.8518 8.49695 9.92635Z"
+				fill="#FFE101"
+			/>
+			<path
+				d="M10.2309 7.64104C10.0356 7.4745 9.78531 7.32968 9.49857 7.20982C9.27355 7.11646 9.06786 7.03234 8.72589 6.95847V6.47647C8.89687 6.50468 8.89516 6.53665 8.97895 6.57273C9.16275 6.65292 9.34519 6.75432 9.51498 6.87366L9.74 7.03097L10.7356 5.40833L10.5361 5.27035C10.2586 5.07884 9.9238 4.91761 9.59654 4.79074C9.33784 4.69139 9.06803 4.61667 8.72606 4.56811V3.98438H7.35819V4.53323C7.01622 4.56743 6.84336 4.62727 6.6233 4.7114C6.33331 4.8222 6.08196 4.97078 5.87952 5.15288C5.67092 5.3413 5.54354 5.56307 5.43701 5.81117C5.32878 6.05909 5.30638 6.33455 5.30638 6.6295V6.64711C5.30638 6.9583 5.32724 7.23495 5.43411 7.46937C5.542 7.70567 5.68528 7.91325 5.89234 8.08526C6.09325 8.2535 6.32014 8.39696 6.61099 8.51101C6.84147 8.60231 7.01622 8.68336 7.35819 8.75688V9.29616C7.1872 9.25359 7.06478 9.19939 6.91619 9.1339C6.66109 9.02139 6.40581 8.86939 6.143 8.68233L5.93269 8.52998L4.85156 10.129L5.05486 10.2747C5.40829 10.529 5.81728 10.7362 6.24594 10.8904C6.59868 11.0176 7.01622 11.1103 7.35819 11.1664V12.0208H8.72606V11.1855C9.06803 11.1491 9.21815 11.0915 9.4312 11.0135C9.71503 10.9091 9.97288 10.7656 10.1789 10.5869C10.3873 10.4052 10.5202 10.188 10.6368 9.93941C10.7514 9.68994 10.7779 9.40867 10.7779 9.10381V9.08517C10.7779 8.78304 10.7628 8.50861 10.6613 8.26889C10.5585 8.02815 10.4378 7.81698 10.2309 7.64104ZM10.2647 9.10364C10.2647 9.33429 10.2588 9.54341 10.1763 9.72328C10.091 9.90504 9.98758 10.0654 9.83369 10.1996C9.67502 10.3371 9.4895 10.4489 9.26466 10.5317C9.02648 10.6187 8.74624 10.6763 8.46069 10.7025L8.21294 10.7241V11.5075H7.87097V10.7104L7.63057 10.6854C7.2067 10.6392 6.80523 10.5485 6.41436 10.4072C6.11206 10.2986 5.82532 10.1612 5.56491 9.9972L6.07119 9.24726C6.29022 9.3885 6.50857 9.50767 6.72435 9.60291C7.00613 9.72704 7.28603 9.81647 7.58508 9.86879L7.87114 9.92145V8.35216L7.6875 8.30582C7.34793 8.22615 7.05367 8.13467 6.79804 8.03328C6.55815 7.93924 6.35981 7.82416 6.2008 7.69097C6.0505 7.56632 5.97561 7.42389 5.89918 7.25615C5.82292 7.08893 5.81933 6.88392 5.81933 6.64677V6.62916C5.81933 6.40517 5.82651 6.19879 5.90688 6.01447C5.98467 5.8334 6.08504 5.67164 6.23807 5.53349C6.39298 5.39397 6.58038 5.27838 6.81155 5.19015C7.04888 5.09936 7.32468 5.04242 7.63347 5.02088L7.87131 5.00429V4.49681H8.21328V5.01968L8.46907 5.04584C8.81292 5.08534 9.1448 5.16057 9.42658 5.26881C9.63758 5.35071 9.84583 5.44834 10.0341 5.56085L9.58132 6.30514C9.45308 6.22854 9.32279 6.16049 9.18789 6.10167C8.96732 6.0066 8.74333 5.93393 8.53302 5.8852L8.21345 5.81236V7.36285L8.41829 7.40901C8.75479 7.48715 9.05538 7.57931 9.30501 7.68293C9.542 7.78193 9.74222 7.89922 9.89713 8.03122C10.0432 8.15553 10.1177 8.30292 10.1887 8.46911C10.263 8.64454 10.2651 8.85178 10.2651 9.08483V9.10364H10.2647Z"
+				fill="black"
+			/>
+			<path
+				d="M8.53991 8.45188L8.21094 8.35938V9.95449L8.49665 9.92491C9.21068 9.85019 9.31857 9.4506 9.31857 9.20181C9.31857 9.01305 9.2471 8.84753 9.11288 8.7222C8.99866 8.61619 8.81605 8.53019 8.53991 8.45188ZM8.72902 9.07152C8.74902 9.08366 8.76014 9.09273 8.76544 9.09768C8.7904 9.12094 8.80699 9.14761 8.80699 9.21874C8.80699 9.24456 8.80699 9.29637 8.72902 9.34185V9.07152Z"
+				fill="black"
+			/>
+			<path
+				d="M7.04346 6.01242C6.89607 6.14186 6.84375 6.31096 6.84375 6.50161V6.51939C6.84375 6.70918 6.88821 6.87367 7.02192 6.99643C7.13494 7.09902 7.29036 7.18298 7.57693 7.26077L7.86965 7.34883V5.78125L7.62292 5.80416C7.34764 5.8269 7.17939 5.89461 7.04346 6.01242ZM7.39278 6.64985C7.36046 6.63275 7.34627 6.62129 7.34183 6.61753C7.32421 6.60129 7.30558 6.57906 7.30558 6.51939V6.50161C7.30558 6.46604 7.3143 6.43475 7.35499 6.39902C7.36046 6.39423 7.37209 6.38568 7.39278 6.37559V6.64985Z"
+				fill="black"
+			/>
+		</svg>
+	);
+}
+
 function VenueCompletedCapacityButton({
 	capacity,
 	onClick,
@@ -599,6 +703,32 @@ function VenueCompletedCapacityButton({
 				<CapacityPersonIcon className="h-[20px] w-[8px] shrink-0 text-black" />
 				<span className="min-w-0 truncate text-[16px] font-medium leading-none text-black">
 					{formatCapacityDisplay(capacity)}
+				</span>
+			</span>
+		</button>
+	);
+}
+
+function VenueCompletedPayRangeButton({
+	payRange,
+	onClick,
+}: {
+	payRange: string;
+	onClick: () => void;
+}) {
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			className="relative block h-[63px] w-[172px] overflow-hidden rounded-[8px] border-[2px] border-white bg-[#B3E3FF] text-left opacity-90"
+		>
+			<span className="absolute left-[8px] top-[7px] rounded-[4px] bg-[#D6FFED] px-[3px] text-[14px] font-black leading-[14px] text-[#34B965]">
+				Pay Range
+			</span>
+			<span className="absolute left-[18px] right-[8px] top-[32px] flex items-center gap-[6px]">
+				<PayRangeMoneyIcon className="h-[16px] w-[16px] shrink-0 translate-y-[0.75px]" />
+				<span className="min-w-0 truncate text-[14px] font-medium leading-none text-black">
+					{formatPayRangeDisplay(payRange)}
 				</span>
 			</span>
 		</button>
@@ -745,6 +875,155 @@ function VenueCapacityEditor({
 				}}
 				className="absolute left-1/2 top-[84px] h-[9px] w-[320px] -translate-x-1/2 cursor-pointer appearance-none rounded-full outline-none [&::-moz-range-progress]:h-[9px] [&::-moz-range-progress]:rounded-full [&::-moz-range-progress]:bg-black [&::-moz-range-thumb]:h-[9px] [&::-moz-range-thumb]:w-[9px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-black [&::-moz-range-track]:h-[9px] [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-transparent [&::-webkit-slider-runnable-track]:h-[9px] [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:h-[9px] [&::-webkit-slider-thumb]:w-[9px] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-black"
 			/>
+		</div>
+	);
+}
+
+function VenuePayRangeEditor({
+	value,
+	onChange,
+	minInputRef,
+	className = '',
+}: {
+	value: string;
+	onChange: (value: string) => void;
+	minInputRef?: Ref<HTMLInputElement>;
+	className?: string;
+}) {
+	const sliderTrackRef = useRef<HTMLDivElement | null>(null);
+	const activePayRangeHandleRef = useRef<'min' | 'max' | null>(null);
+	const { payMin, payMax } = getPayRangeSliderValues(value);
+	const sliderMax = getPayRangeSliderMax(payMax);
+	const minValue = Math.min(Math.max(payMin, PAY_RANGE_SLIDER_MIN), sliderMax);
+	const maxValue = Math.min(Math.max(payMax, minValue), sliderMax);
+	const minPercent = getPayRangeSliderPercent(minValue, sliderMax);
+	const maxPercent = getPayRangeSliderPercent(maxValue, sliderMax);
+	const isSingleValue = minValue === maxValue;
+	const sliderInputClassName =
+		'pointer-events-none absolute inset-0 h-[22px] w-full appearance-none bg-transparent outline-none [&::-moz-range-thumb]:h-[22px] [&::-moz-range-thumb]:w-[22px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-transparent [&::-moz-range-track]:h-[22px] [&::-moz-range-track]:bg-transparent [&::-webkit-slider-runnable-track]:h-[22px] [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:h-[22px] [&::-webkit-slider-thumb]:w-[22px] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-transparent';
+
+	const updatePayRange = (nextMin: number, nextMax: number) => {
+		onChange(formatPayRange(Math.min(nextMin, nextMax), Math.max(nextMin, nextMax)));
+	};
+	const getPointerPayValue = (clientX: number) => {
+		const track = sliderTrackRef.current;
+		if (!track) return minValue;
+
+		const rect = track.getBoundingClientRect();
+		const rawPercent = (clientX - rect.left) / rect.width;
+		const clampedPercent = Math.min(1, Math.max(0, rawPercent));
+		const rawValue =
+			PAY_RANGE_SLIDER_MIN + clampedPercent * (sliderMax - PAY_RANGE_SLIDER_MIN);
+
+		return Math.round(rawValue / PAY_RANGE_SLIDER_STEP) * PAY_RANGE_SLIDER_STEP;
+	};
+	const getClosestPayRangeHandle = (nextValue: number) => {
+		if (isSingleValue) return nextValue < minValue ? 'min' : 'max';
+		return Math.abs(nextValue - minValue) <= Math.abs(nextValue - maxValue)
+			? 'min'
+			: 'max';
+	};
+	const updatePayRangeFromPointer = (clientX: number) => {
+		const nextValue = getPointerPayValue(clientX);
+		let activeHandle = activePayRangeHandleRef.current;
+
+		if (isSingleValue && nextValue !== minValue) {
+			activeHandle = nextValue < minValue ? 'min' : 'max';
+			activePayRangeHandleRef.current = activeHandle;
+		}
+		if (!activeHandle) {
+			activeHandle = getClosestPayRangeHandle(nextValue);
+			activePayRangeHandleRef.current = activeHandle;
+		}
+
+		if (activeHandle === 'min') {
+			updatePayRange(Math.min(nextValue, maxValue), maxValue);
+			return;
+		}
+
+		updatePayRange(minValue, Math.max(nextValue, minValue));
+	};
+	const handleSliderPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+		event.preventDefault();
+		activePayRangeHandleRef.current = getClosestPayRangeHandle(
+			getPointerPayValue(event.clientX)
+		);
+		event.currentTarget.setPointerCapture(event.pointerId);
+		updatePayRangeFromPointer(event.clientX);
+	};
+	const handleSliderPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+		if (!activePayRangeHandleRef.current) return;
+		updatePayRangeFromPointer(event.clientX);
+	};
+	const handleSliderPointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
+		activePayRangeHandleRef.current = null;
+		if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+			event.currentTarget.releasePointerCapture(event.pointerId);
+		}
+	};
+
+	return (
+		<div
+			className={`relative h-[139px] w-[386px] rounded-[8px] border-[2px] border-black bg-[#E6F7FE] ${className}`}
+		>
+			<span className="absolute left-[8px] top-[7px] rounded-[4px] bg-[#D6FFED] px-[3px] text-[14px] font-black leading-[14px] text-[#34B965]">
+				Pay Range
+			</span>
+			<div className="absolute left-[18px] top-[37px] flex items-center gap-[7px]">
+				<PayRangeMoneyIcon className="h-[20px] w-[20px] shrink-0 translate-y-[0.5px]" />
+				<span className="font-inter text-[18px] font-medium leading-none text-black">
+					{formatPayRange(minValue, maxValue)}
+				</span>
+			</div>
+
+			<div
+				ref={sliderTrackRef}
+				onPointerDown={handleSliderPointerDown}
+				onPointerMove={handleSliderPointerMove}
+				onPointerUp={handleSliderPointerEnd}
+				onPointerCancel={handleSliderPointerEnd}
+				className="absolute left-1/2 top-[84px] h-[22px] w-[320px] -translate-x-1/2 cursor-grab touch-none active:cursor-grabbing"
+			>
+				<div className="absolute left-0 top-1/2 h-[9px] w-full -translate-y-1/2 rounded-full bg-[#D9D9D9]" />
+				{isSingleValue ? (
+					<div
+						className="absolute top-1/2 h-[13px] w-[13px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#F0E387]"
+						style={{ left: `${minPercent}%` }}
+					/>
+				) : (
+					<div
+						className="absolute top-1/2 h-[9px] -translate-y-1/2 rounded-full bg-[#F0E387]"
+						style={{ left: `${minPercent}%`, right: `${100 - maxPercent}%` }}
+					/>
+				)}
+				<input
+					ref={minInputRef}
+					type="range"
+					aria-label="Minimum pay"
+					min={PAY_RANGE_SLIDER_MIN}
+					max={sliderMax}
+					step={PAY_RANGE_SLIDER_STEP}
+					value={minValue}
+					onChange={(event) =>
+						updatePayRange(Math.min(Number(event.target.value), maxValue), maxValue)
+					}
+					className={`${sliderInputClassName} ${
+						minValue > sliderMax - PAY_RANGE_SLIDER_STEP ? 'z-30' : 'z-20'
+					}`}
+				/>
+				<input
+					type="range"
+					aria-label="Maximum pay"
+					min={PAY_RANGE_SLIDER_MIN}
+					max={sliderMax}
+					step={PAY_RANGE_SLIDER_STEP}
+					value={maxValue}
+					onChange={(event) =>
+						updatePayRange(minValue, Math.max(Number(event.target.value), minValue))
+					}
+					className={`${sliderInputClassName} z-20`}
+				/>
+			</div>
 		</div>
 	);
 }
@@ -1064,24 +1343,31 @@ function VenuePortalForm() {
 	const [isHoursEditorOpen, setIsHoursEditorOpen] = useState(false);
 	const [isCapacityEditorOpen, setIsCapacityEditorOpen] = useState(false);
 	const [isGenrePickerOpen, setIsGenrePickerOpen] = useState(false);
+	const [isPayRangeEditorOpen, setIsPayRangeEditorOpen] = useState(false);
 	const [hasCompletedHours, setHasCompletedHours] = useState(false);
 	const [locationCoordinates, setLocationCoordinates] = useState<AreaCoordinates | null>(
 		null
 	);
 	const locationSlotRef = useRef<HTMLDivElement | null>(null);
 	const capacityInputRef = useRef<HTMLInputElement | null>(null);
+	const payRangeMinInputRef = useRef<HTMLInputElement | null>(null);
 	const completedAddress = form.address.trim();
 	const completedBusinessType = form.businessType.trim();
 	const completedHoursSummary = formatOpenNightsSummary(getOpenNightsCount(form.hours));
 	const completedCapacity = form.capacity.trim();
+	const completedPayRange = form.payRange.trim();
 	const selectedGenres = parseGenres(form.genres);
 	const isInlineEditorOpen =
 		isBusinessTypePickerOpen ||
 		isHoursEditorOpen ||
 		isCapacityEditorOpen ||
-		isGenrePickerOpen;
+		isGenrePickerOpen ||
+		isPayRangeEditorOpen;
 	const isTallInlineEditorOpen =
-		isHoursEditorOpen || isCapacityEditorOpen || isGenrePickerOpen;
+		isHoursEditorOpen ||
+		isCapacityEditorOpen ||
+		isGenrePickerOpen ||
+		isPayRangeEditorOpen;
 	const portalCardHeightClassName = isTallInlineEditorOpen
 		? 'h-[670px]'
 		: isBusinessTypePickerOpen
@@ -1117,7 +1403,7 @@ function VenuePortalForm() {
 				hours: hydrateVenueHours(venue.hours),
 				capacity: formatCapacity(venue.capacityMin, venue.capacityMax),
 				genres: venue.genres.join(', '),
-				payRange: venue.payRange ?? '',
+				payRange: venue.payRange ?? formatPayRange(venue.payMin, venue.payMax),
 				sound: venue.sound ?? '',
 				website: venue.website ?? '',
 				description: venue.description ?? '',
@@ -1165,6 +1451,7 @@ function VenuePortalForm() {
 		setIsHoursEditorOpen(false);
 		setIsCapacityEditorOpen(false);
 		setIsGenrePickerOpen(false);
+		setIsPayRangeEditorOpen(false);
 	};
 	const selectBusinessType = (value: string) => {
 		updateField('businessType', value);
@@ -1172,12 +1459,14 @@ function VenuePortalForm() {
 		setIsHoursEditorOpen(false);
 		setIsCapacityEditorOpen(false);
 		setIsGenrePickerOpen(false);
+		setIsPayRangeEditorOpen(false);
 	};
 	const openHoursEditor = () => {
 		setIsLocationPickerOpen(false);
 		setIsBusinessTypePickerOpen(false);
 		setIsCapacityEditorOpen(false);
 		setIsGenrePickerOpen(false);
+		setIsPayRangeEditorOpen(false);
 		setIsHoursEditorOpen(true);
 	};
 	const openCapacityEditor = () => {
@@ -1185,6 +1474,7 @@ function VenuePortalForm() {
 		setIsBusinessTypePickerOpen(false);
 		setIsHoursEditorOpen(false);
 		setIsGenrePickerOpen(false);
+		setIsPayRangeEditorOpen(false);
 		setIsCapacityEditorOpen(true);
 		if (!form.capacity.trim()) {
 			setSaved(false);
@@ -1213,7 +1503,26 @@ function VenuePortalForm() {
 		setIsBusinessTypePickerOpen(false);
 		setIsHoursEditorOpen(false);
 		setIsCapacityEditorOpen(false);
+		setIsPayRangeEditorOpen(false);
 		setIsGenrePickerOpen(true);
+	};
+	const openPayRangeEditor = () => {
+		setIsLocationPickerOpen(false);
+		setIsBusinessTypePickerOpen(false);
+		setIsHoursEditorOpen(false);
+		setIsCapacityEditorOpen(false);
+		setIsGenrePickerOpen(false);
+		setIsPayRangeEditorOpen(true);
+		const { payMin, payMax } = parsePayRange(form.payRange);
+		const nextPayRange =
+			formatPayRange(payMin, payMax) ||
+			formatPayRange(DEFAULT_PAY_RANGE_MIN_VALUE, DEFAULT_PAY_RANGE_MAX_VALUE);
+		if (form.payRange !== nextPayRange) {
+			setSaved(false);
+			setFormError(null);
+			setForm((current) => ({ ...current, payRange: nextPayRange }));
+		}
+		requestAnimationFrame(() => payRangeMinInputRef.current?.focus());
 	};
 	const toggleGenre = (genre: string) => {
 		setSaved(false);
@@ -1271,6 +1580,7 @@ function VenuePortalForm() {
 		}
 
 		const payload: PatchVenueData = {
+			...parsePayRange(form.payRange),
 			venueName,
 			businessType: trimToNull(form.businessType),
 			address: trimToNull(form.address),
@@ -1339,6 +1649,7 @@ function VenuePortalForm() {
 										setIsHoursEditorOpen(false);
 										setIsCapacityEditorOpen(false);
 										setIsGenrePickerOpen(false);
+										setIsPayRangeEditorOpen(false);
 										setIsVenueNameFocused(true);
 									}}
 									onBlur={() => setIsVenueNameFocused(false)}
@@ -1375,6 +1686,7 @@ function VenuePortalForm() {
 												setIsHoursEditorOpen(false);
 												setIsCapacityEditorOpen(false);
 												setIsGenrePickerOpen(false);
+												setIsPayRangeEditorOpen(false);
 												setIsLocationPickerOpen(true);
 											}}
 										/>
@@ -1392,6 +1704,7 @@ function VenuePortalForm() {
 												setIsHoursEditorOpen(false);
 												setIsCapacityEditorOpen(false);
 												setIsGenrePickerOpen(false);
+												setIsPayRangeEditorOpen(false);
 												setIsLocationPickerOpen(true);
 											}}
 											className="h-[63px] w-[386px] cursor-pointer"
@@ -1419,6 +1732,7 @@ function VenuePortalForm() {
 												setIsHoursEditorOpen(false);
 												setIsCapacityEditorOpen(false);
 												setIsGenrePickerOpen(false);
+												setIsPayRangeEditorOpen(false);
 												setIsBusinessTypePickerOpen(true);
 											}}
 										/>
@@ -1432,13 +1746,12 @@ function VenuePortalForm() {
 												setIsHoursEditorOpen(false);
 												setIsCapacityEditorOpen(false);
 												setIsGenrePickerOpen(false);
+												setIsPayRangeEditorOpen(false);
 												setIsBusinessTypePickerOpen(true);
 											}}
 											readOnly={isBusinessTypePickerOpen}
 											activeEntry={isBusinessTypePickerOpen}
-											solidWhenEmpty={
-												isHoursEditorOpen || isCapacityEditorOpen || isGenrePickerOpen
-											}
+											solidWhenEmpty={isInlineEditorOpen}
 											placeholderShowsPlus={!isBusinessTypePickerOpen}
 											placeholderContentClassName={
 												isBusinessTypePickerOpen
@@ -1465,11 +1778,7 @@ function VenuePortalForm() {
 											onKeyDown={handleHoursKeyDown}
 											readOnly
 											activeEntry={isHoursEditorOpen}
-											solidWhenEmpty={
-												isBusinessTypePickerOpen ||
-												isCapacityEditorOpen ||
-												isGenrePickerOpen
-											}
+											solidWhenEmpty={isInlineEditorOpen}
 											placeholderShowsPlus={!isHoursEditorOpen}
 											placeholderContentClassName={
 												isHoursEditorOpen
@@ -1563,21 +1872,37 @@ function VenuePortalForm() {
 								)}
 
 								<div className="mt-[4px] grid grid-cols-[172px_210px] gap-x-[4px]">
-									<VenueTextField
-										label="Pay Range"
-										value={form.payRange}
-										onChange={(value) => updateField('payRange', value)}
-										onFocus={() => {
-											setIsBusinessTypePickerOpen(false);
-											setIsHoursEditorOpen(false);
-											setIsCapacityEditorOpen(false);
-											setIsGenrePickerOpen(false);
-										}}
-										solidWhenEmpty={isInlineEditorOpen}
-										placeholderContentClassName={LEFT_GRID_PLACEHOLDER_CLASS}
-										placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
-										className="h-[63px] w-[172px]"
-									/>
+									{isPayRangeEditorOpen ? (
+										<VenueTextField
+											label="Pay Range"
+											value=""
+											onChange={() => undefined}
+											onFocus={openPayRangeEditor}
+											readOnly
+											activeEntry
+											placeholderShowsPlus={false}
+											placeholderContentClassName="text-left leading-none"
+											placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
+											className="h-[63px] w-[172px] cursor-pointer"
+										/>
+									) : completedPayRange ? (
+										<VenueCompletedPayRangeButton
+											payRange={completedPayRange}
+											onClick={openPayRangeEditor}
+										/>
+									) : (
+										<VenueTextField
+											label="Pay Range"
+											value=""
+											onChange={() => undefined}
+											onFocus={openPayRangeEditor}
+											readOnly
+											solidWhenEmpty={isInlineEditorOpen}
+											placeholderContentClassName={LEFT_GRID_PLACEHOLDER_CLASS}
+											placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
+											className="h-[63px] w-[172px] cursor-pointer"
+										/>
+									)}
 									<VenueTextField
 										label="Sound"
 										value={form.sound}
@@ -1587,6 +1912,7 @@ function VenuePortalForm() {
 											setIsHoursEditorOpen(false);
 											setIsCapacityEditorOpen(false);
 											setIsGenrePickerOpen(false);
+											setIsPayRangeEditorOpen(false);
 										}}
 										solidWhenEmpty={isInlineEditorOpen}
 										placeholderContentClassName={RIGHT_GRID_PLACEHOLDER_CLASS}
@@ -1594,6 +1920,15 @@ function VenuePortalForm() {
 										className="h-[63px] w-[210px]"
 									/>
 								</div>
+
+								{isPayRangeEditorOpen && (
+									<VenuePayRangeEditor
+										value={form.payRange}
+										onChange={(value) => updateField('payRange', value)}
+										minInputRef={payRangeMinInputRef}
+										className="mt-[4px]"
+									/>
+								)}
 
 								<VenueTextField
 									label="Description"
@@ -1604,6 +1939,7 @@ function VenuePortalForm() {
 										setIsHoursEditorOpen(false);
 										setIsCapacityEditorOpen(false);
 										setIsGenrePickerOpen(false);
+										setIsPayRangeEditorOpen(false);
 									}}
 									solidWhenEmpty={isInlineEditorOpen}
 									multiline
@@ -1619,6 +1955,7 @@ function VenuePortalForm() {
 											setIsHoursEditorOpen(false);
 											setIsCapacityEditorOpen(false);
 											setIsGenrePickerOpen(false);
+											setIsPayRangeEditorOpen(false);
 										}}
 										inputMode="url"
 										autoComplete="url"
