@@ -40,7 +40,7 @@ const kindFromContentType = (type: string): MediaKind | null => {
  * Exposes per-upload state keyed by a temporary id so the UI can show a live
  * placeholder slot until the refetched list returns the real row.
  */
-export function useMediaUpload(context: 'profile_media' | 'avatar') {
+export function useMediaUpload(context: 'profile_media' | 'avatar' | 'venue_photos') {
 	const [uploads, setUploads] = useState<Record<string, UploadState>>({});
 	const requestUploadUrl = useRequestMediaUploadUrl();
 	const updateMedia = useUpdateMedia();

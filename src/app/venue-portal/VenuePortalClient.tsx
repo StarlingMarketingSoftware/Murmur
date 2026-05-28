@@ -1,6 +1,7 @@
 'use client';
 
 import {
+	type ChangeEvent,
 	type FormEvent,
 	type KeyboardEvent as ReactKeyboardEvent,
 	type PointerEvent as ReactPointerEvent,
@@ -13,6 +14,7 @@ import {
 } from 'react';
 import { useAuth, UserButton, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
+import { X } from 'lucide-react';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
@@ -41,9 +43,12 @@ import {
 } from '@/contexts/PersistentMapContext';
 import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
 import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
+import { useMediaUpload, type UploadState } from '@/hooks/useMediaUpload';
 import { useGetUser } from '@/hooks/queryHooks/useUsers';
+import { useGetMedia, useDeleteMedia } from '@/hooks/queryHooks/useMediaAssets';
 import { useGetVenue, useUpsertVenue } from '@/hooks/queryHooks/useVenue';
 import { _fetch } from '@/utils';
+import type { MediaAssetDto } from '@/app/api/media/route';
 import type { PatchVenueData, WeeklyHours } from '@/app/api/venue/schema';
 
 type VenueDayKey = keyof WeeklyHours;
@@ -412,8 +417,7 @@ const getPayRangeSliderValues = (payRange: string) => {
 	};
 };
 
-const getPayRangeSliderMax = (payMax: number) =>
-	Math.max(PAY_RANGE_SLIDER_MAX, payMax);
+const getPayRangeSliderMax = (payMax: number) => Math.max(PAY_RANGE_SLIDER_MAX, payMax);
 
 const getPayRangeSliderPercent = (value: number, sliderMax: number) =>
 	((value - PAY_RANGE_SLIDER_MIN) / (sliderMax - PAY_RANGE_SLIDER_MIN)) * 100;
@@ -630,18 +634,14 @@ function VenueCompletedBusinessTypeButton({
 			onClick={onClick}
 			className={`${VENUE_COMPLETED_FIELD_BUTTON_CLASS} ${VENUE_COMPLETED_ROW_TONE_CLASSES.basics} w-[172px]`}
 		>
-			<span className={VENUE_COMPLETED_FIELD_LABEL_CLASS}>
-				Business Type
-			</span>
+			<span className={VENUE_COMPLETED_FIELD_LABEL_CLASS}>Business Type</span>
 			<span className={VENUE_COMPLETED_FIELD_CONTENT_CLASS}>
 				{selectedOption && (
 					<span className="flex w-[18px] shrink-0 items-center justify-center">
 						{selectedOption.icon}
 					</span>
 				)}
-				<span className={VENUE_COMPLETED_FIELD_VALUE_CLASS}>
-					{businessType}
-				</span>
+				<span className={VENUE_COMPLETED_FIELD_VALUE_CLASS}>{businessType}</span>
 			</span>
 		</button>
 	);
@@ -827,9 +827,7 @@ function VenueCompletedCapacityButton({
 			onClick={onClick}
 			className={`${VENUE_COMPLETED_FIELD_BUTTON_CLASS} ${VENUE_COMPLETED_ROW_TONE_CLASSES.details} w-[172px]`}
 		>
-			<span className={VENUE_COMPLETED_FIELD_LABEL_CLASS}>
-				Capacity
-			</span>
+			<span className={VENUE_COMPLETED_FIELD_LABEL_CLASS}>Capacity</span>
 			<span className={VENUE_COMPLETED_FIELD_CONTENT_CLASS}>
 				<CapacityPersonIcon className="h-[18px] w-[7px] shrink-0 text-black" />
 				<span className={VENUE_COMPLETED_FIELD_VALUE_CLASS}>
@@ -853,9 +851,7 @@ function VenueCompletedPayRangeButton({
 			onClick={onClick}
 			className={`${VENUE_COMPLETED_FIELD_BUTTON_CLASS} ${VENUE_COMPLETED_ROW_TONE_CLASSES.production} w-[172px]`}
 		>
-			<span className={VENUE_COMPLETED_FIELD_LABEL_CLASS}>
-				Pay Range
-			</span>
+			<span className={VENUE_COMPLETED_FIELD_LABEL_CLASS}>Pay Range</span>
 			<span className={VENUE_COMPLETED_FIELD_CONTENT_CLASS}>
 				<PayRangeMoneyIcon className="h-[16px] w-[16px] shrink-0 translate-y-[0.75px]" />
 				<span className={VENUE_COMPLETED_FIELD_VALUE_CLASS}>
@@ -946,9 +942,7 @@ function VenueCompletedGenreButton({
 					);
 				})}
 				{remainingGenreCount > 0 && (
-					<span className={VENUE_COMPLETED_GENRE_PILL_CLASS}>
-						+{remainingGenreCount}
-					</span>
+					<span className={VENUE_COMPLETED_GENRE_PILL_CLASS}>+{remainingGenreCount}</span>
 				)}
 			</span>
 		</button>
@@ -1416,21 +1410,104 @@ function VenueHoursEditor({
 	);
 }
 
+// Venue photos reuse the generic R2 media pipeline under a dedicated context. Since a
+// Venue is 1:1 with its user, keying on `userId` already scopes photos to this venue.
+const VENUE_PHOTO_LIMIT = 5;
+// Five fixed slots; the white backing fades down the column (matches the Figma mock).
+const VENUE_PHOTO_SLOT_OPACITIES = [0.6, 0.5, 0.4, 0.3, 0.2];
+
+type VenuePhotoSlot =
+	| { kind: 'photo'; asset: MediaAssetDto }
+	| { kind: 'upload'; upload: UploadState }
+	| { kind: 'add' }
+	| { kind: 'empty' };
+
 function VenuePhotosPlaceholder() {
-	const photoSlotOpacities = [0.6, 0.5, 0.4, 0.3, 0.2];
+	const fileInputRef = useRef<HTMLInputElement>(null);
+	const { data: photos = [] } = useGetMedia('venue_photos');
+	const { upload, activeUploads } = useMediaUpload('venue_photos');
+	const deletePhoto = useDeleteMedia();
+
+	// Ready photos fill from the top, then any in-flight uploads, then a single add
+	// slot (until the limit), then faint placeholders pad out to the fixed five.
+	const readyPhotos = photos.filter((photo) => photo.status === 'ready');
+	const slots: VenuePhotoSlot[] = [
+		...readyPhotos.map((asset) => ({ kind: 'photo' as const, asset })),
+		...activeUploads.map((uploadState) => ({ kind: 'upload' as const, upload: uploadState })),
+	];
+	if (slots.length < VENUE_PHOTO_LIMIT) {
+		slots.push({ kind: 'add' });
+	}
+	while (slots.length < VENUE_PHOTO_LIMIT) {
+		slots.push({ kind: 'empty' });
+	}
+
+	const handleSelectFile = (event: ChangeEvent<HTMLInputElement>) => {
+		const file = event.target.files?.[0];
+		// Reset so picking the same file again still fires onChange.
+		event.target.value = '';
+		if (file) void upload(file);
+	};
 
 	return (
 		<aside className="h-[469px] w-[126px] rounded-[8px] border border-black/20 bg-[#F1FAFF] px-[10px] pt-[8px]">
 			<p className="text-[14px] leading-none text-[#8f8f8f]">Photos</p>
+			<input
+				ref={fileInputRef}
+				type="file"
+				accept="image/*"
+				className="hidden"
+				onChange={handleSelectFile}
+			/>
 			<div className="mt-[6px] flex flex-col items-center gap-[13px]">
-				{photoSlotOpacities.map((opacity, index) => {
-					const isAddSlot = index === photoSlotOpacities.length - 1;
+				{slots.map((slot, index) => {
+					const opacity = VENUE_PHOTO_SLOT_OPACITIES[index] ?? 0.2;
 
-					if (isAddSlot) {
+					if (slot.kind === 'photo') {
+						return (
+							<div
+								key={`photo-${slot.asset.id}`}
+								className="group relative h-[74px] w-[103px] overflow-hidden rounded-[10.451px] bg-white"
+							>
+								{slot.asset.url && (
+									// eslint-disable-next-line @next/next/no-img-element -- short-lived presigned R2 URL
+									<img
+										src={slot.asset.url}
+										alt=""
+										className="h-full w-full object-cover"
+									/>
+								)}
+								<button
+									type="button"
+									onClick={() => deletePhoto.mutate(slot.asset.id)}
+									aria-label={`Remove ${slot.asset.filename}`}
+									className="absolute right-[4px] top-[4px] hidden h-[18px] w-[18px] items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/80 group-hover:flex"
+								>
+									<X className="h-3 w-3" />
+								</button>
+							</div>
+						);
+					}
+
+					if (slot.kind === 'upload') {
+						return (
+							<div
+								key={`upload-${index}`}
+								className="flex h-[74px] w-[103px] items-center justify-center rounded-[10.451px] bg-white"
+							>
+								<span className="text-[12px] font-medium text-[#777]">
+									{Math.round(slot.upload.progress)}%
+								</span>
+							</div>
+						);
+					}
+
+					if (slot.kind === 'add') {
 						return (
 							<button
-								key={opacity}
+								key="add"
 								type="button"
+								onClick={() => fileInputRef.current?.click()}
 								aria-label="Add venue photo"
 								className="relative flex h-[74px] w-[103px] items-center justify-center rounded-[10.451px] text-[34px] font-light leading-none text-[#777]"
 							>
@@ -1446,7 +1523,7 @@ function VenuePhotosPlaceholder() {
 
 					return (
 						<div
-							key={opacity}
+							key={`empty-${index}`}
 							className="h-[74px] w-[103px] rounded-[10.451px] bg-white"
 							style={{ opacity }}
 						/>
@@ -1470,17 +1547,13 @@ function VenueCompletedLocationButton({
 			onClick={onClick}
 			className={`${VENUE_COMPLETED_FIELD_BUTTON_CLASS} ${VENUE_COMPLETED_ROW_TONE_CLASSES.location} w-[386px]`}
 		>
-			<span className={VENUE_COMPLETED_FIELD_LABEL_CLASS}>
-				Location
-			</span>
+			<span className={VENUE_COMPLETED_FIELD_LABEL_CLASS}>Location</span>
 			<span className={VENUE_COMPLETED_FIELD_CONTENT_CLASS}>
 				<ProfileAreaMarkerIcon
 					aria-hidden="true"
 					className="block h-[20px] w-[16px] shrink-0"
 				/>
-				<span className={VENUE_COMPLETED_FIELD_VALUE_CLASS}>
-					{address}
-				</span>
+				<span className={VENUE_COMPLETED_FIELD_VALUE_CLASS}>{address}</span>
 			</span>
 		</button>
 	);
@@ -1836,7 +1909,7 @@ function VenuePortalForm() {
 		return null;
 	};
 	const isProfileFieldComplete = (field: VenueProfileFieldKey) => {
-			switch (field) {
+		switch (field) {
 			case 'location':
 				return completedAddress.length > 0;
 			case 'businessType':
@@ -1915,9 +1988,7 @@ function VenuePortalForm() {
 
 		openProfileField(nextField);
 	};
-	const handleDescriptionKeyDown = (
-		event: ReactKeyboardEvent<HTMLTextAreaElement>
-	) => {
+	const handleDescriptionKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
 		if (event.key !== 'Enter' || event.isComposing) return;
 		event.preventDefault();
 		advanceFromProfileField('description');
@@ -2062,16 +2133,12 @@ function VenuePortalForm() {
 			</div>
 
 			<form className="flex shrink-0 flex-col items-center" onSubmit={handleSubmit}>
-				<section
-					className="flex h-[637px] w-[583px] flex-col items-center rounded-[12px] bg-[rgba(255,255,255,0.65)]"
-				>
+				<section className="flex h-[637px] w-[583px] flex-col items-center rounded-[12px] bg-[rgba(255,255,255,0.65)]">
 					<div className="mt-[13px] flex h-[28px] w-[570px] items-center rounded-[4px] border-[1.056px] border-[#111] bg-white px-[8px] text-[14px] font-semibold leading-none text-black">
 						New Venue
 					</div>
 
-					<div
-						className="relative mt-[7px] h-[570px] w-[570px] overflow-hidden rounded-[8px] border border-black bg-[linear-gradient(180deg,#CBEEFD_0%,#FFF_100%)]"
-					>
+					<div className="relative mt-[7px] h-[570px] w-[570px] overflow-hidden rounded-[8px] border border-black bg-[linear-gradient(180deg,#CBEEFD_0%,#FFF_100%)]">
 						<div className="absolute left-[15px] top-[16px]">
 							<label className="block h-[64px] w-[386px] overflow-hidden rounded-[8px] bg-white">
 								<input
@@ -2299,11 +2366,11 @@ function VenuePortalForm() {
 											genres={selectedGenres}
 											onClick={openGenrePicker}
 										/>
-								) : (
-									<VenueTextField
-										label="Genres"
-										value=""
-										onChange={() => undefined}
+									) : (
+										<VenueTextField
+											label="Genres"
+											value=""
+											onChange={() => undefined}
 											onFocus={openGenrePicker}
 											readOnly
 											solidWhenEmpty={isInlineEditorOpen}
@@ -2427,8 +2494,9 @@ function VenuePortalForm() {
 										className="mt-[4px] h-[98px] w-[386px] cursor-pointer"
 									/>
 								)}
-								{!isLocationPickerOpen && !isInlineEditorOpen && (
-									completedWebsite && !isWebsiteEditorOpen ? (
+								{!isLocationPickerOpen &&
+									!isInlineEditorOpen &&
+									(completedWebsite && !isWebsiteEditorOpen ? (
 										<VenueCompletedWebsiteButton
 											website={completedWebsite}
 											onClick={openWebsiteEditor}
@@ -2460,8 +2528,7 @@ function VenuePortalForm() {
 											readOnly
 											className="mt-[4px] h-[98px] w-[386px] cursor-pointer"
 										/>
-									)
-								)}
+									))}
 							</div>
 
 							<VenuePhotosPlaceholder />

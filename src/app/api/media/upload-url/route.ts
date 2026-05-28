@@ -19,13 +19,14 @@ import { MediaKind } from '@prisma/client';
 const CONTEXT_CONFIG = {
 	profile_media: { limit: 3, kinds: ['video', 'audio'] as MediaKind[] },
 	avatar: { limit: 1, kinds: ['image'] as MediaKind[] },
+	venue_photos: { limit: 5, kinds: ['image'] as MediaKind[] },
 } as const;
 
 const createUploadUrlSchema = z.object({
 	filename: z.string().min(1).max(255),
 	contentType: z.string().min(1).max(255),
 	kind: z.nativeEnum(MediaKind),
-	context: z.enum(['profile_media', 'avatar']),
+	context: z.enum(['profile_media', 'avatar', 'venue_photos']),
 	posterContentType: z.string().min(1).max(255).optional(),
 });
 export type CreateMediaUploadUrlData = z.infer<typeof createUploadUrlSchema>;
