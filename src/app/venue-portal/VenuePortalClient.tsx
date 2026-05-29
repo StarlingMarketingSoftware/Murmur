@@ -39,10 +39,10 @@ import {
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import {
 	ProfileAreaMapBox,
+	profileGenreOptionRows,
 	type AreaCoordinates,
 	type ProfileAreaMapFeature,
 } from '@/components/molecules/HybridPromptInput/ProfileSidePanelBox';
-import { profileGenreOptionRows } from '@/components/molecules/HybridPromptInput/profileFieldIcons';
 import { AccountType } from '@/constants/prismaEnums';
 import { urls } from '@/constants/urls';
 import { US_STATES } from '@/constants/usStates';
