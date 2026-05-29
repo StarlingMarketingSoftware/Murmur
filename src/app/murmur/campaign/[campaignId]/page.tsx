@@ -9,7 +9,7 @@ import type {
 	InboxSentTab,
 	InboxSentTabRequest,
 } from './DraftingSection/useDraftingSection';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import { cn } from '@/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -1962,6 +1962,7 @@ const Murmur = () => {
 		};
 	}, [isMobile, updateCampaignZoomForViewport]);
 
+	const router = useRouter();
 	const searchParams = useSearchParams();
 	const originParam = searchParams.get('origin');
 	const cameFromSearch = originParam === 'search';
@@ -2006,7 +2007,6 @@ const Murmur = () => {
 	// Moved here to be accessible by the keydown listener
 	const handleOpenDashboardSearchForCampaign = useCallback(() => {
 		if (!campaign) return;
-		if (typeof window === 'undefined') return;
 
 		try {
 			sessionStorage.removeItem('murmur_pending_search');
@@ -2014,13 +2014,21 @@ const Murmur = () => {
 			// sessionStorage may be unavailable — navigation can still proceed.
 		}
 
-		// Hard navigation: a soft router.push sometimes doesn't fully re-mount the
-		// dashboard's map-search mode (especially mid-transition or with cached state),
-		// so use window.location.assign for a reliable, fresh dashboard load.
-		window.location.assign(
+		// Soft client-side navigation: the shared /murmur layout keeps the persistent
+		// Mapbox map mounted across the route swap and the bundle is already parsed, so
+		// there's no white-flash full reload. The dashboard page remounts fresh, so its
+		// URL-param rehydration effects (fromCampaignId / pick / allContacts) re-run and
+		// re-enter map-search mode exactly as a full reload did.
+		router.push(
 			`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}&pick=1&allContacts=1`
 		);
-	}, [campaign]);
+	}, [campaign, router]);
+
+	// Warm the dashboard route's JS chunks while the user is on the campaign page so the
+	// soft navigation above lands instantly.
+	useEffect(() => {
+		router.prefetch(urls.murmur.dashboard.index);
+	}, [router]);
 
 	// Campaign Search should always stay pinned to the campaign the user is viewing.
 	const handleGoToDashboardSearch = handleOpenDashboardSearchForCampaign;
