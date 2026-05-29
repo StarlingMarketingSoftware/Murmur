@@ -590,6 +590,17 @@ const CAMPAIGN_STATUS_MARKER_STYLES: Record<
 const FEATURE_FILL_OPACITY_FACTOR: any = ['coalesce', ['get', 'fillOpacity'], 1];
 const FEATURE_STROKE_OPACITY_FACTOR = ['coalesce', ['get', 'strokeOpacity'], 0] as const;
 
+// Registered venues render larger than a normal dot so they stand out on the map.
+const VENUE_DOT_RADIUS_SCALE = 1.75;
+// Per-feature icon-size multiplier so venue fallback (uncategorized) markers match
+// the 1.75× circle scale. Folded into interpolate stops to keep zoom outermost.
+const VENUE_ICON_SIZE_SCALE_EXPR: any = [
+	'case',
+	['boolean', ['get', 'isVenue'], false],
+	VENUE_DOT_RADIUS_SCALE,
+	1,
+];
+
 const withFeatureOpacityFactor = (opacityExpr: any, factorExpr: any): any => {
 	if (Array.isArray(opacityExpr)) {
 		const op = opacityExpr[0];
@@ -5863,13 +5874,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			['linear'],
 			['zoom'],
 			0,
-			pinIconSizeLow,
+			['*', pinIconSizeLow, VENUE_ICON_SIZE_SCALE_EXPR],
 			RESULT_DOT_ZOOM_MIN,
-			pinIconSizeLow,
+			['*', pinIconSizeLow, VENUE_ICON_SIZE_SCALE_EXPR],
 			RESULT_DOT_ZOOM_MAX,
-			pinIconSizeHigh,
+			['*', pinIconSizeHigh, VENUE_ICON_SIZE_SCALE_EXPR],
 			24,
-			pinIconSizeHigh,
+			['*', pinIconSizeHigh, VENUE_ICON_SIZE_SCALE_EXPR],
 		];
 		const selectedMarkerTransformScaleExpr = [
 			'coalesce',
@@ -12414,6 +12425,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			radiusScale: number;
 			isCurated: boolean;
 			isUncategorized: boolean;
+			isVenue: boolean;
 			fadeWithSelectedStateOrb: boolean;
 		};
 		const dots: DotSeed[] = [];
@@ -12440,6 +12452,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const isUncategorized = statusMarkerStyle
 				? false
 				: !isCleanMapMarkerCategory(whatForContact);
+			const isVenue = contact.venueId != null;
 			const baseFillColor =
 				statusMarkerStyle?.fillColor ?? getResultDotColorForWhat(whatForContact);
 			const fillColor = isOutsideLockedState
@@ -12458,9 +12471,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				strokeWidth: statusMarkerStyle?.strokeWidth ?? 0,
 				strokeOpacity: statusMarkerStyle?.strokeOpacity ?? 0,
 				fillOpacity: statusMarkerStyle?.fillOpacity ?? 1,
-				radiusScale: statusMarkerStyle?.radiusScale ?? 1,
+				radiusScale: isVenue ? VENUE_DOT_RADIUS_SCALE : (statusMarkerStyle?.radiusScale ?? 1),
 				isCurated: statusMarkerStyle ? false : Boolean(contact.curatedCategory),
 				isUncategorized,
+				isVenue,
 				fadeWithSelectedStateOrb,
 			});
 			minLng = Math.min(minLng, coords.lng);
@@ -12509,6 +12523,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				':' +
 				(d.isUncategorized ? 'u' : 'c') +
 				':' +
+				(d.isVenue ? 'v' : 'n') +
+				':' +
 				(d.fadeWithSelectedStateOrb ? 'f' : 'n');
 		}
 		if (dataKey === baseDotsLastDataKeyRef.current) {
@@ -12555,6 +12571,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					[DOT_WAVE_DELAY_PROP]: delayMs,
 					isCurated: dot.isCurated,
 					isUncategorized: dot.isUncategorized,
+					isVenue: dot.isVenue,
 					fadeWithSelectedStateOrb: dot.fadeWithSelectedStateOrb,
 					fallbackIcon: dot.isUncategorized ? uncategorizedContactMarkerImageName : '',
 					fallbackIconHover: dot.isUncategorized

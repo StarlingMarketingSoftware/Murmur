@@ -2967,29 +2967,29 @@ function VenueProfileMapCard({ onEdit }: { onEdit: () => void }) {
 			type="button"
 			onClick={onEdit}
 			aria-label="Edit venue profile"
-			className="fixed left-[24px] top-[24px] z-[100] flex h-[83px] w-[656px] flex-col overflow-hidden rounded-[10px] border-[0.918px] border-[#BABABA] bg-white text-left shadow-[0_8px_24px_rgba(4,19,48,0.12)]"
+			className="fixed left-[24px] top-[24px] z-[100] h-[83px] w-[656px] overflow-hidden rounded-[10px] border-[0.918px] border-[#BABABA] bg-white text-left"
 		>
-			<div className="flex flex-1 items-center gap-[14px] px-[16px]">
-				<span className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full bg-[#63C766] text-[26px] font-bold leading-none text-white ring-[1.5px] ring-white">
+			<div className="absolute left-0 right-0 top-0 flex h-[42px] items-center gap-[14px] px-[16px]">
+				<span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-[#63C766] text-center font-inter text-[21.411px] font-bold not-italic leading-[28.548px] text-white ring-[1.5px] ring-white">
 					{initial}
 				</span>
-				<span className="min-w-0 truncate font-inter text-[28px] font-bold leading-none text-black">
+				<span className="min-w-0 truncate text-center font-inter text-[21.411px] font-bold leading-[28.548px] text-[#000] not-italic">
 					{name}
 				</span>
 			</div>
-			<div className="flex h-[30px] items-center gap-[10px] bg-[#CBEEFD] px-[16px]">
-				<span className="min-w-0 truncate font-inter text-[16px] font-bold leading-none text-black">
+			<div className="absolute bottom-[14px] left-0 right-0 flex h-[27px] items-center bg-[#AEE9F2] px-[16px]">
+				<span className="min-w-0 flex-1 truncate font-inter text-[16px] font-bold leading-none text-black">
 					{venueName}
 				</span>
 				{businessType && (
-					<span className="flex h-[22px] shrink-0 items-center gap-[6px] rounded-[8px] bg-[#BBE6FF] px-[8px] font-inter text-[14px] font-medium leading-none text-black">
+					<span className="flex h-full shrink-0 items-center gap-[8px] bg-[#BBE6FF] px-[14px] font-inter text-[14px] font-medium leading-none text-black">
 						{businessTypeIcon}
 						{businessType}
 					</span>
 				)}
 				{hasLocation && (
-					<span className="flex h-[22px] shrink-0 items-center gap-[6px] rounded-[8px] bg-[#FBD6D7] px-[6px] font-inter text-[14px] font-medium leading-none text-black">
-						<span className="flex items-center gap-[4px] rounded-[6px] bg-[#F7B6B8] px-[5px] py-[3px] font-semibold">
+					<span className="flex h-full shrink-0 items-center gap-[8px] bg-[#FBD6D7] px-[14px] font-inter text-[14px] font-medium leading-none text-black">
+						<span className="flex items-center gap-[4px] rounded-[6px] bg-[#F7B6B8] px-[6px] py-[3px] font-semibold">
 							<ProfileAreaMarkerIcon width={10} height={12} />
 							{state || city}
 						</span>

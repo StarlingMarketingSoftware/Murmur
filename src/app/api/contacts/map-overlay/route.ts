@@ -38,6 +38,7 @@ const MAP_OVERLAY_QUERY_TIMEOUT_MS = 18000;
 
 type AmbientOverlayContactRow = {
 	id: number;
+	venueId: number | null;
 	email: string;
 	company: string | null;
 	country: string | null;
@@ -226,6 +227,7 @@ export async function GET(req: NextRequest) {
 								"metadata",
 								"latitude",
 								"longitude",
+								"venueId",
 								NULLIF(TRIM(CONCAT_WS(' ', NULLIF("firstName", ''), NULLIF("lastName", ''))), '') AS "name",
 								ROW_NUMBER() OVER (
 									PARTITION BY
@@ -271,10 +273,11 @@ export async function GET(req: NextRequest) {
 							"metadata",
 							"latitude",
 							"longitude",
+							"venueId",
 							"name"
 						FROM ranked
-						WHERE rn <= ${perCellCategory}
-						ORDER BY rn ASC, stable_key ASC
+						WHERE rn <= ${perCellCategory} OR "venueId" IS NOT NULL
+						ORDER BY ("venueId" IS NOT NULL) DESC, rn ASC, stable_key ASC
 						LIMIT ${ambientTake}
 					`),
 				[],

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { Prisma } from '@prisma/client';
+import { Prisma, type Venue } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import {
 	apiBadRequest,
@@ -12,6 +12,7 @@ import {
 	handleApiError,
 } from '@/app/api/_utils';
 import { AccountType } from '@/constants/prismaEnums';
+import { syncVenueToContact } from '@/app/api/_utils/venueContactSync';
 import { upsertVenueSchema } from './schema';
 
 // /api/venue is venue-only. Returns null when the caller is a valid venue account,
@@ -84,9 +85,20 @@ export async function PATCH(req: NextRequest) {
 			select: { id: true },
 		});
 
+		// Publish/refresh (or unpublish) the venue's public Contact projection so it
+		// shows on the map + in search. A sync failure must never fail the save.
+		const finalize = async (venue: Venue, created: boolean) => {
+			try {
+				await syncVenueToContact(venue);
+			} catch (error) {
+				console.error('[venue PATCH] syncVenueToContact failed', { userId, error });
+			}
+			return created ? apiCreated(venue) : apiResponse(venue);
+		};
+
 		if (existing) {
 			const venue = await prisma.venue.update({ where: { userId }, data: writeData });
-			return apiResponse(venue);
+			return finalize(venue, false);
 		}
 
 		if (venueName === undefined) {
@@ -97,7 +109,7 @@ export async function PATCH(req: NextRequest) {
 			const venue = await prisma.venue.create({
 				data: { userId, ...rest, ...hoursWrite, venueName },
 			});
-			return apiCreated(venue);
+			return finalize(venue, true);
 		} catch (error) {
 			// Lost a concurrent create race on the unique userId — fall back to update.
 			if (
@@ -105,7 +117,7 @@ export async function PATCH(req: NextRequest) {
 				error.code === 'P2002'
 			) {
 				const venue = await prisma.venue.update({ where: { userId }, data: writeData });
-				return apiResponse(venue);
+				return finalize(venue, false);
 			}
 			throw error;
 		}

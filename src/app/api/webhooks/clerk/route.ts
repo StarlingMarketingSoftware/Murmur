@@ -13,6 +13,7 @@ import {
 	resolveAccountType,
 } from '@/app/api/_utils';
 import { generateMurmurEmail, generateMurmurReplyToEmail } from '@/utils';
+import { unpublishVenueContact } from '@/app/api/_utils/venueContactSync';
 
 export async function POST(req: Request) {
 	const SIGNING_SECRET = process.env.CLERK_SIGNING_SECRET;
@@ -145,6 +146,19 @@ export async function POST(req: Request) {
 		const { id } = evt.data;
 
 		try {
+			// The venue's public Contact projection has userId=null, so it is NOT
+			// cascade-deleted with the user (the cascade removes the Venue row).
+			// Remove the projected contact (+ its ES doc) explicitly first.
+			const venue = id
+				? await prisma.venue.findUnique({
+						where: { userId: id },
+						select: { id: true },
+					})
+				: null;
+			if (venue) {
+				await unpublishVenueContact(venue.id);
+			}
+
 			await prisma.user.delete({
 				where: {
 					clerkId: id,

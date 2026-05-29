@@ -72,6 +72,7 @@ model UserContactList {
 }
 
 model Contact {
+  venueId                  Int?                    @unique
   email                    String
   company                  String?
   country                  String?
