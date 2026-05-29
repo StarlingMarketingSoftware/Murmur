@@ -412,7 +412,7 @@ const DraftReviewStackedBackCard: FC<{
 							flexDirection: 'column',
 							justifyContent: 'center',
 							alignSelf: 'stretch',
-							maxWidth: '268px',
+							maxWidth: 'calc(100% - 215px)',
 							overflow: 'hidden',
 							transform: 'translateY(-1px)',
 						}}
@@ -1252,9 +1252,10 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										flexDirection: 'column',
 										justifyContent: 'center',
 										alignSelf: 'stretch',
-										// Let company/name use more of the header before the right-side state/title pills.
-										// (Right block starts at ~284px from the left inside a 499px header; 268px keeps us flush without overlap.)
-										maxWidth: isMobile ? 'calc(100% - 40px)' : '268px',
+										// Reserve the right-side state/title pills' footprint so the company/name fades
+										// out with a gap before them at any card width, instead of sliding underneath.
+										// (Pills are absolutely positioned 215px in from the header's right edge: right 63 + width 152.)
+										maxWidth: isMobile ? 'calc(100% - 40px)' : 'calc(100% - 215px)',
 										overflow: 'hidden',
 										transform: 'translateY(-1px)',
 									}}
