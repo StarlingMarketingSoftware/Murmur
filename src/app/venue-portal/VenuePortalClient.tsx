@@ -3031,6 +3031,29 @@ function VenueCalendarMapPanel() {
 	);
 }
 
+// Placeholder box 15px below the calendar — future home of the venue's opportunities
+// list, with an "add" (+) pill across the top. Matches the calendar's 656px rendered
+// width (and the 656px profile card) so all three line up flush. The calendar is
+// pinned at top-[98px] and its native 381px outer height (OUTER_HEIGHT_PX in
+// DashboardCalendarPanel) renders at 381 × VENUE_CALENDAR_SCALE.
+const VENUE_OPPORTUNITIES_TOP_PX = Math.round(98 + 381 * VENUE_CALENDAR_SCALE + 15);
+
+function VenueOpportunitiesMapPanel() {
+	return (
+		// Faint white fill + 40% black border via channel alpha (not element opacity)
+		// so the solid-bordered add pill inside isn't dimmed along with the box.
+		<div
+			className="absolute left-0 flex h-[424px] w-[656px] justify-center rounded-[12px] border-[2px] border-black/40 bg-white/40 pt-[16px]"
+			style={{ top: `${VENUE_OPPORTUNITIES_TOP_PX}px` }}
+		>
+			{/* "Add opportunity" pill: 616×40, solid black border, faint green-white fill. */}
+			<div className="flex h-[40px] w-[616px] items-center justify-center rounded-[12px] border-[2px] border-black bg-[rgba(247,255,240,0.46)]">
+				<span className="text-[20px] font-medium leading-none text-black">+</span>
+			</div>
+		</div>
+	);
+}
+
 function VenueMailMapPanel() {
 	return (
 		<div
@@ -3083,6 +3106,7 @@ export default function VenuePortalClient() {
 				>
 					<VenueProfileMapCard onEdit={() => setView('edit')} />
 					<VenueCalendarMapPanel />
+					<VenueOpportunitiesMapPanel />
 				</div>
 			)}
 			{view === 'map' && isMailToolSelected && <VenueMailMapPanel />}

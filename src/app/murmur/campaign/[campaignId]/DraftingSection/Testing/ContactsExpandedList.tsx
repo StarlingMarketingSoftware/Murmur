@@ -91,6 +91,14 @@ const INBOX_LAST_SENT_FILL_COLOR = '#7ED29E';
 const formatBatchCount = (count: number) => `+${count < 10 ? `0${count}` : count}`;
 
 const isInboxOpportunityEmail = (email: InboundEmailWithRelations) => {
+	// Venue↔artist internal DMs are ongoing conversations, not keyword-triaged
+	// cold-email replies — never classify them as Opportunities. They must always
+	// stay in Responses; otherwise a venue reply like "following up here" routes the
+	// whole thread into the Opportunities sub-tab and it vanishes from the Responses
+	// list the inbox defaults to. Projected venue rows carry venueConversationId;
+	// real inbound email replies don't.
+	if (email.venueConversationId != null) return false;
+
 	const text = `${email.subject || ''} ${email.strippedText || ''} ${email.bodyPlain || ''} ${
 		email.bodyHtml ? convertHtmlToPlainText(email.bodyHtml) : ''
 	}`.toLowerCase();
