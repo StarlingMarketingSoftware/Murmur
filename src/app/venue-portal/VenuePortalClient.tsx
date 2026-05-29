@@ -23,10 +23,14 @@ import { OutlinedInitialAvatar } from '@/components/atoms/OutlinedInitialAvatar/
 import { PayRangeMoneyIcon } from '@/components/atoms/_svg/PayRangeMoneyIcon';
 import { ProfileAreaMarkerIcon } from '@/components/atoms/_svg/ProfileAreaMarkerIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { VenuePortalAddIcon } from '@/components/atoms/_svg/VenuePortalAddIcon';
+import { VenuePortalMailIcon } from '@/components/atoms/_svg/VenuePortalMailIcon';
+import { VenuePortalProfileIcon } from '@/components/atoms/_svg/VenuePortalProfileIcon';
 import { VenueSoundIcon } from '@/components/atoms/_svg/VenueSoundIcon';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { WebsiteIcon } from '@/components/atoms/_svg/WebsiteIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
+import DashboardCalendarPanel from '@/components/molecules/DashboardCalendarPanel/DashboardCalendarPanel';
 import { PersistentDashboardMap } from '@/components/molecules/PersistentDashboardMap';
 import {
 	DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING,
@@ -2945,8 +2949,8 @@ function VenuePortalContent({ onEnterMapView }: { onEnterMapView: () => void }) 
 }
 
 // Floating profile summary shown over the interactive map. Clicking it returns to the
-// editing view. Rendered at the portal root (outside the form's compact zoom) so its
-// pixel dimensions stay 1:1 and it layers above the revealed map.
+// editing view. Positioned (absolute) within the map-view wrapper that scales the
+// card + calendar cluster to 75% and layers it above the revealed map.
 function VenueProfileMapCard({ onEdit }: { onEdit: () => void }) {
 	const { user: clerkUser } = useUser();
 	const { data: venue } = useGetVenue();
@@ -2967,7 +2971,7 @@ function VenueProfileMapCard({ onEdit }: { onEdit: () => void }) {
 			type="button"
 			onClick={onEdit}
 			aria-label="Edit venue profile"
-			className="fixed left-[24px] top-[24px] z-[100] h-[83px] w-[656px] overflow-hidden rounded-[10px] border-[0.918px] border-[#BABABA] bg-white text-left"
+			className="absolute left-0 top-0 h-[83px] w-[656px] overflow-hidden rounded-[10px] border-[0.918px] border-[#BABABA] bg-white text-left"
 		>
 			<div className="absolute left-0 right-0 top-0 flex h-[42px] items-center gap-[14px] px-[16px]">
 				<span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-[#63C766] text-center font-inter text-[21.411px] font-bold not-italic leading-[28.548px] text-white ring-[1.5px] ring-white">
@@ -3001,14 +3005,81 @@ function VenueProfileMapCard({ onEdit }: { onEdit: () => void }) {
 	);
 }
 
+// Floating calendar 15px below the profile card. Reuses the dashboard calendar; opens on
+// the current month with today highlighted. The dashboard calendar's native outer width is
+// ~669.794px (7 × 94.542px cells + 8px padding); scale it down so it lines up flush with
+// the 656px-wide card above. Positioned (absolute) 98px below the cluster top — 15px under
+// the 83px card — within the map-view wrapper's 75% scale.
+const VENUE_CALENDAR_SCALE = 656 / 669.794;
+
+function VenueCalendarMapPanel() {
+	const now = new Date();
+	return (
+		<div
+			className="absolute left-0 top-[98px] origin-top-left"
+			style={{ transform: `scale(${VENUE_CALENDAR_SCALE})` }}
+		>
+			<DashboardCalendarPanel
+				mockState={{ year: now.getFullYear(), monthIndex: now.getMonth() }}
+			/>
+		</div>
+	);
+}
+
 export default function VenuePortalClient() {
 	const [view, setView] = useState<VenuePortalView>('edit');
+	const [selectedVenueTool, setSelectedVenueTool] = useState<
+		'add' | 'profile' | 'mail' | null
+	>(null);
+	const toggleVenueTool = (tool: 'add' | 'profile' | 'mail') =>
+		setSelectedVenueTool((current) => (current === tool ? null : tool));
 	return (
 		<PersistentMapProvider>
 			<PersistentDashboardMap />
 			<VenuePortalPersistentMap view={view} />
 			<VenuePortalContent onEnterMapView={() => setView('map')} />
-			{view === 'map' && <VenueProfileMapCard onEdit={() => setView('edit')} />}
+			{/* Scale the profile-card + calendar cluster to 75% (a touch smaller than the
+			    form's .venue-portal-compact 85% zoom), pinned to the 24px top-left corner. */}
+			{view === 'map' && (
+				<div
+					className="fixed left-[24px] top-[24px] z-[100] origin-top-left"
+					style={{ transform: 'scale(0.75)' }}
+				>
+					<VenueProfileMapCard onEdit={() => setView('edit')} />
+					<VenueCalendarMapPanel />
+				</div>
+			)}
+			{view === 'map' && (
+				<div className="fixed left-1/2 top-3 z-[100] flex h-[39.993px] w-[183px] -translate-x-1/2 items-center justify-evenly rounded-[7.272px] border-[1.212px] border-black bg-white">
+					<button
+						type="button"
+						aria-label="Add"
+						aria-pressed={selectedVenueTool === 'add'}
+						onClick={() => toggleVenueTool('add')}
+						className="flex cursor-pointer items-center justify-center p-0"
+					>
+						<VenuePortalAddIcon selected={selectedVenueTool === 'add'} />
+					</button>
+					<button
+						type="button"
+						aria-label="Profile"
+						aria-pressed={selectedVenueTool === 'profile'}
+						onClick={() => toggleVenueTool('profile')}
+						className="flex cursor-pointer items-center justify-center p-0"
+					>
+						<VenuePortalProfileIcon selected={selectedVenueTool === 'profile'} />
+					</button>
+					<button
+						type="button"
+						aria-label="Mail"
+						aria-pressed={selectedVenueTool === 'mail'}
+						onClick={() => toggleVenueTool('mail')}
+						className="flex cursor-pointer items-center justify-center p-0"
+					>
+						<VenuePortalMailIcon selected={selectedVenueTool === 'mail'} />
+					</button>
+				</div>
+			)}
 		</PersistentMapProvider>
 	);
 }
