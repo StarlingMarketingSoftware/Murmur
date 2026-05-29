@@ -1171,6 +1171,11 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 			return (
 				<div
 					ref={draftReviewContainerRef}
+					// In the persistent-map layout the campaign content is pointer-events:none
+					// except for elements tagged as interactive surfaces; without this the draft
+					// preview, in-panel Send/Delete, and the Send/Regenerate/Delete action row
+					// all fall through to the map underneath and can't be clicked.
+					data-campaign-interactive-surface
 					className={cn('flex flex-col items-center', isMobile && 'w-full px-1')}
 					data-hover-description="Revise your draft here. Type out your revisions. Send or delete drafts"
 				>

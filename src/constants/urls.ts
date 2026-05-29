@@ -128,6 +128,15 @@ export const urls = {
 			index: '/api/inbound',
 			detail: ((id) => `/api/inbound/${id}`) as DetailRoute,
 		},
+		messages: {
+			index: '/api/messages',
+		},
+		conversations: {
+			index: '/api/conversations',
+			detail: ((id) => `/api/conversations/${id}`) as DetailRoute,
+			messages: ((id) => `/api/conversations/${id}/messages`) as DetailRoute,
+			read: ((id) => `/api/conversations/${id}/read`) as DetailRoute,
+		},
 		emailVerificationCodes: {
 			index: '/api/email-verification-codes',
 		},

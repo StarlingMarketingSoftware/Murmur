@@ -3,7 +3,11 @@
 import type { CSSProperties, FC } from 'react';
 import DashboardActionBarStarIcon from '@/components/atoms/_svg/DashboardActionBarStarIcon';
 
-export type DashboardResponsesTab = 'responses' | 'sent' | 'opportunities';
+export type DashboardResponsesTab =
+	| 'responses'
+	| 'sent'
+	| 'opportunities'
+	| 'messages';
 
 type ResponseToggleTab = {
 	key: DashboardResponsesTab;
@@ -16,12 +20,14 @@ export const RESPONSE_TOGGLE_TABS: ResponseToggleTab[] = [
 	{ key: 'responses', label: 'Responses', width: 104, activeFill: '#98DAFC' },
 	{ key: 'sent', label: 'Sent', width: 97, activeFill: '#B0E0A6' },
 	{ key: 'opportunities', label: 'Opportunities', width: 145, activeFill: '#FFD5D5' },
+	{ key: 'messages', label: 'Messages', width: 110, activeFill: '#C9E0FF' },
 ];
 
 export const RESPONSE_WIDGET_BACKGROUND_BY_TAB: Record<DashboardResponsesTab, string> = {
 	responses: '#84C1E2',
 	sent: '#6DB97B',
 	opportunities: '#D97676',
+	messages: '#7FA8E0',
 };
 
 const getResponseToggleDividerColor = (
@@ -33,6 +39,7 @@ const getResponseToggleDividerColor = (
 export const DashboardResponsesFilterBar: FC<{
 	activeTab: DashboardResponsesTab;
 	onTabChange?: (tab: DashboardResponsesTab) => void;
+	tabs?: DashboardResponsesTab[];
 	width?: number | string;
 	height?: number | string;
 	fontSize?: number | string;
@@ -42,6 +49,7 @@ export const DashboardResponsesFilterBar: FC<{
 }> = ({
 	activeTab,
 	onTabChange,
+	tabs,
 	width = 346,
 	height = 22,
 	fontSize = 14,
@@ -53,6 +61,12 @@ export const DashboardResponsesFilterBar: FC<{
 	const resolvedHeight = typeof height === 'number' ? `${height}px` : height;
 	const resolvedFontSize = typeof fontSize === 'number' ? `${fontSize}px` : fontSize;
 	const canChangeTab = Boolean(onTabChange);
+
+	// Default bar shows the original three tabs; callers opt into extra tabs
+	// (e.g. "messages") explicitly, so other consumers stay unaffected.
+	const visibleTabs = RESPONSE_TOGGLE_TABS.filter((tab) =>
+		tabs ? tabs.includes(tab.key) : tab.key !== 'messages'
+	);
 
 	return (
 		<div
@@ -66,7 +80,7 @@ export const DashboardResponsesFilterBar: FC<{
 				borderRadius: '6px',
 				backgroundColor: '#FFFFFF',
 				display: 'grid',
-				gridTemplateColumns: RESPONSE_TOGGLE_TABS.map((tab) => `${tab.width}fr`).join(' '),
+				gridTemplateColumns: visibleTabs.map((tab) => `${tab.width}fr`).join(' '),
 				overflow: 'hidden',
 				fontFamily: 'Inter, sans-serif',
 				fontSize: resolvedFontSize,
@@ -76,9 +90,9 @@ export const DashboardResponsesFilterBar: FC<{
 				...style,
 			}}
 		>
-			{RESPONSE_TOGGLE_TABS.map((tab, index) => {
+			{visibleTabs.map((tab, index) => {
 				const isActive = activeTab === tab.key;
-				const previousTab = RESPONSE_TOGGLE_TABS[index - 1]?.key;
+				const previousTab = visibleTabs[index - 1]?.key;
 				return (
 					<button
 						key={tab.key}

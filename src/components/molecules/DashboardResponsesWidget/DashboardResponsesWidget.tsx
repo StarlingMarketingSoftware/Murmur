@@ -31,6 +31,7 @@ import {
 	RESPONSE_WIDGET_BACKGROUND_BY_TAB,
 	type DashboardResponsesTab,
 } from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesFilterBar';
+import { ConversationsPane } from '@/components/organisms/ConversationsPane';
 
 export type ResponsesMockTab = 'responses' | 'sent' | 'opportunities';
 
@@ -303,7 +304,11 @@ export const DashboardResponsesWidget: FC<{
 		left: number;
 	} | null>(null);
 	const { data: inboundEmails, isLoading: isLoadingInboundEmails } = useGetInboundEmails({
-		enabled: enabled && !mockOverrideActive && activeTab !== 'opportunities',
+		enabled:
+			enabled &&
+			!mockOverrideActive &&
+			activeTab !== 'opportunities' &&
+			activeTab !== 'messages',
 	});
 	const { data: sentEmails, isLoading: isLoadingSentEmails } = useGetEmails({
 		enabled: enabled && !mockOverrideActive && activeTab === 'sent',
@@ -573,7 +578,8 @@ export const DashboardResponsesWidget: FC<{
 				<DashboardResponsesFilterBar
 					activeTab={activeTab}
 					onTabChange={setActiveTab}
-					width={346}
+					tabs={['responses', 'sent', 'opportunities', 'messages']}
+					width={440}
 					height={22}
 				/>
 
@@ -583,7 +589,7 @@ export const DashboardResponsesWidget: FC<{
 						height: '22px',
 						borderRadius: '6px',
 						backgroundColor: '#FFFFFF',
-						display: 'flex',
+						display: activeTab === 'messages' ? 'none' : 'flex',
 						alignItems: 'center',
 						gap: '8px',
 						paddingLeft: '10px',
@@ -617,7 +623,14 @@ export const DashboardResponsesWidget: FC<{
 			</div>
 
 			{/* Rows list */}
-			{activeTab === 'opportunities' ? (
+			{activeTab === 'messages' ? (
+				<div
+					className="flex-1 min-h-0 self-center"
+					style={{ width: '639px', marginTop: '9px' }}
+				>
+					<ConversationsPane layout="stacked" className="h-full" />
+				</div>
+			) : activeTab === 'opportunities' ? (
 				<DashboardOpportunitiesContent
 					enabled={enabled}
 					searchQuery={searchQuery}

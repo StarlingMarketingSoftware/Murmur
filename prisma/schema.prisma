@@ -449,3 +449,52 @@ enum MediaStatus {
   ready
   failed
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Internal messaging (venue ↔ standard-user direct messages).
+// STRICTLY ADDITIVE: new models + enum only. Links to existing tables
+// (standardUserId, venueId, emailId, campaignId) are plain SCALAR columns with NO
+// @relation to existing models — resolved by explicit lookups in code — so no
+// existing model is modified and the migration references no existing table. The
+// only relation is Conversation ↔ Message (both new).
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum MessageSender {
+  standard
+  venue
+}
+
+model Conversation {
+  id                 Int       @id @default(autoincrement())
+  standardUserId     String // clerkId of the standard (artist) user
+  venueId            Int // Venue.id (== Contact.venueId)
+  standardLastReadAt DateTime?
+  venueLastReadAt    DateTime?
+  lastMessageAt      DateTime  @default(now())
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  messages Message[]
+
+  @@unique([standardUserId, venueId])
+  @@index([standardUserId, lastMessageAt])
+  @@index([venueId, lastMessageAt])
+}
+
+model Message {
+  id             Int           @id @default(autoincrement())
+  conversationId Int
+  sender         MessageSender
+  senderClerkId  String
+  body           String
+  isHtml         Boolean       @default(false)
+  emailId        Int? // provenance of the diverted first message (scalar, no FK)
+  campaignId     Int? // provenance of the originating campaign (scalar, no FK)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([emailId])
+  @@index([conversationId, id])
+}

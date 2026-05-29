@@ -37,6 +37,11 @@ export const AccountType = {
 	venue: 'venue',
 } as const;
 
+export const MessageSender = {
+	standard: 'standard',
+	venue: 'venue',
+} as const;
+
 export const EmailVerificationStatus = {
 	valid: 'valid',
 	invalid: 'invalid',
@@ -60,6 +65,7 @@ export type DraftingMode = (typeof DraftingMode)[keyof typeof DraftingMode];
 export type DraftingTone = (typeof DraftingTone)[keyof typeof DraftingTone];
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 export type AccountType = (typeof AccountType)[keyof typeof AccountType];
+export type MessageSender = (typeof MessageSender)[keyof typeof MessageSender];
 export type EmailVerificationStatus =
 	(typeof EmailVerificationStatus)[keyof typeof EmailVerificationStatus];
 export type ContactVerificationRequestStatus =

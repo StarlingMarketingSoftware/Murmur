@@ -61,6 +61,7 @@ import {
 import { EmailWithRelations, StripeSubscriptionStatus } from '@/types';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useEditUser } from '@/hooks/queryHooks/useUsers';
+import { useDivertEmailToMessage } from '@/hooks/queryHooks/useConversations';
 import { useEditIdentity } from '@/hooks/queryHooks/useIdentities';
 import { useMe } from '@/hooks/useMe';
 import { useQueryClient } from '@tanstack/react-query';
@@ -333,6 +334,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const { mutateAsync: updateEmail } = useEditEmail({ suppressToasts: true });
 	const { mutateAsync: createEmail } = useCreateEmail({ suppressToasts: true });
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
+	// Venue recipients are delivered as internal messages instead of email.
+	const { mutateAsync: divertEmailToMessage } = useDivertEmailToMessage({
+		suppressToasts: true,
+	});
 	const { mutateAsync: editIdentity } = useEditIdentity({ suppressToasts: true });
 
 	// Handle identity field updates from the profile tab
@@ -2908,37 +2913,61 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			return;
 		}
 
-		if (!campaign?.identity?.email || !campaign?.identity?.name) {
-			toast.error('Please create an Identity before sending emails.');
+		if (!campaign) {
 			return;
 		}
 
-		if (
-			!subscriptionTier &&
-			user?.stripeSubscriptionStatus !== StripeSubscriptionStatus.TRIALING
-		) {
-			toast.error('Please upgrade to a paid plan to send emails.');
-			return;
+		// Venue recipients (contact.venueId set) become internal messages — never
+		// emailed, and they cost no sending credits. Everyone else goes through
+		// Mailgun. NOTE: this venue split must stay in sync with
+		// useConfirmSendDialog.handleSend (the other campaign send path).
+		const venueDrafts = selectedDrafts.filter((d) => d.contact.venueId != null);
+		const emailDrafts = selectedDrafts.filter((d) => d.contact.venueId == null);
+
+		// Identity + plan are required only to send EMAILS, not internal messages.
+		if (emailDrafts.length > 0) {
+			if (!campaign?.identity?.email || !campaign?.identity?.name) {
+				toast.error('Please create an Identity before sending emails.');
+				return;
+			}
+
+			if (
+				!subscriptionTier &&
+				user?.stripeSubscriptionStatus !== StripeSubscriptionStatus.TRIALING
+			) {
+				toast.error('Please upgrade to a paid plan to send emails.');
+				return;
+			}
 		}
 
 		const sendingCredits = user?.sendingCredits || 0;
-		const emailsToSend = selectedDrafts.length;
+		// Credits gate ONLY the email recipients; DMs are always allowed.
+		const emailsWeCanSend = Math.min(emailDrafts.length, sendingCredits);
+		const emailsToProcess = emailDrafts.slice(0, emailsWeCanSend);
 
-		if (sendingCredits === 0) {
+		if (emailDrafts.length > 0 && sendingCredits === 0 && venueDrafts.length === 0) {
 			toast.error(
 				'You have run out of sending credits. Please upgrade your subscription.'
 			);
 			return;
 		}
 
-		const emailsWeCanSend = Math.min(emailsToSend, sendingCredits);
-		const emailsToProcess = selectedDrafts.slice(0, emailsWeCanSend);
+		let emailedCount = 0;
+		let messagedCount = 0;
 
-		let successfulSends = 0;
+		// 1) Internal messages to venue users (no email, no credit cost).
+		for (const email of venueDrafts) {
+			try {
+				await divertEmailToMessage(email.id);
+				messagedCount++;
+				queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id] });
+			} catch (error) {
+				console.error('Failed to deliver internal message:', error);
+			}
+		}
 
-		for (let i = 0; i < emailsToProcess.length; i++) {
-			const email = emailsToProcess[i];
-
+		// 2) Regular emails via Mailgun.
+		for (const email of emailsToProcess) {
 			try {
 				const res = await sendMailgunMessage({
 					subject: email.subject,
@@ -2961,7 +2990,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							sentAt: new Date(),
 						},
 					});
-					successfulSends++;
+					emailedCount++;
 					queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id] });
 				}
 			} catch (error) {
@@ -2969,8 +2998,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			}
 		}
 
-		if (user && successfulSends > 0) {
-			const newCreditBalance = Math.max(0, sendingCredits - successfulSends);
+		// Only emails consume sending credits; internal messages are free.
+		if (user && emailedCount > 0) {
+			const newCreditBalance = Math.max(0, sendingCredits - emailedCount);
 			await editUser({
 				clerkId: user.clerkId,
 				data: { sendingCredits: newCreditBalance },
@@ -2979,13 +3009,18 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 		setDraftsTabSelectedIds(new Set());
 
-		if (successfulSends === emailsToSend) {
-			toast.success(`All ${successfulSends} emails sent successfully!`);
-		} else if (successfulSends > 0) {
-			if (emailsWeCanSend < emailsToSend) {
-				toast.warning(`Sent ${successfulSends} emails before running out of credits.`);
+		const totalProcessed = emailedCount + messagedCount;
+		const emailsToSend = selectedDrafts.length;
+
+		if (totalProcessed === emailsToSend && totalProcessed > 0) {
+			toast.success(
+				`All ${totalProcessed} message${totalProcessed === 1 ? '' : 's'} sent successfully!`
+			);
+		} else if (totalProcessed > 0) {
+			if (emailsWeCanSend < emailDrafts.length) {
+				toast.warning(`Sent ${totalProcessed} before running out of credits.`);
 			} else {
-				toast.warning(`${successfulSends} of ${emailsToSend} emails sent successfully.`);
+				toast.warning(`${totalProcessed} of ${emailsToSend} sent successfully.`);
 			}
 		} else {
 			toast.error('Failed to send emails. Please try again.');

@@ -57,6 +57,8 @@ import { useMediaUpload, type UploadState } from '@/hooks/useMediaUpload';
 import { useGetUser } from '@/hooks/queryHooks/useUsers';
 import { useGetMedia, useDeleteMedia } from '@/hooks/queryHooks/useMediaAssets';
 import { useGetVenue, useUpsertVenue } from '@/hooks/queryHooks/useVenue';
+import { useGetConversations } from '@/hooks/queryHooks/useConversations';
+import { ConversationsPane } from '@/components/organisms/ConversationsPane';
 import { _fetch } from '@/utils';
 import type { MediaAssetDto } from '@/app/api/media/route';
 import type { PatchVenueData, WeeklyHours } from '@/app/api/venue/schema';
@@ -3041,6 +3043,10 @@ function VenueMailMapPanel() {
 				</div>
 				<div className="absolute inset-x-0 bottom-0 top-[30px] bg-[linear-gradient(180deg,#BBD4F7_0%,#FFF_100%)]" />
 				<div className="absolute left-0 right-0 top-[30px] h-[2px] bg-black" />
+				{/* Sender list (left) + open messenger (right) over the blue body. */}
+				<div className="absolute inset-x-0 bottom-0 top-[32px]">
+					<ConversationsPane layout="split" className="h-full w-full" />
+				</div>
 			</div>
 		</div>
 	);
@@ -3054,6 +3060,13 @@ export default function VenuePortalClient() {
 	const isMailToolSelected = selectedVenueTool === 'mail';
 	const toggleVenueTool = (tool: 'add' | 'profile' | 'mail') =>
 		setSelectedVenueTool((current) => (current === tool ? null : tool));
+
+	// Unread badge on the mail tool icon.
+	const { data: venueConversations } = useGetConversations({ enabled: true });
+	const venueUnread = (venueConversations ?? []).reduce(
+		(sum, conversation) => sum + conversation.unreadCount,
+		0
+	);
 	return (
 		<PersistentMapProvider>
 			<PersistentDashboardMap />
@@ -3093,15 +3106,22 @@ export default function VenuePortalClient() {
 					>
 						<VenuePortalProfileIcon selected={selectedVenueTool === 'profile'} />
 					</button>
-					<button
-						type="button"
-						aria-label="Mail"
-						aria-pressed={selectedVenueTool === 'mail'}
-						onClick={() => toggleVenueTool('mail')}
-						className="flex cursor-pointer items-center justify-center p-0"
-					>
-						<VenuePortalMailIcon selected={selectedVenueTool === 'mail'} />
-					</button>
+					<span className="relative flex items-center justify-center">
+						<button
+							type="button"
+							aria-label="Mail"
+							aria-pressed={selectedVenueTool === 'mail'}
+							onClick={() => toggleVenueTool('mail')}
+							className="flex cursor-pointer items-center justify-center p-0"
+						>
+							<VenuePortalMailIcon selected={selectedVenueTool === 'mail'} />
+						</button>
+						{venueUnread > 0 && (
+							<span className="pointer-events-none absolute -right-[6px] -top-[6px] flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-[#2F6FED] px-[4px] text-[10px] font-semibold leading-none text-white">
+								{venueUnread > 99 ? '99+' : venueUnread}
+							</span>
+						)}
+					</span>
 				</div>
 			)}
 		</PersistentMapProvider>
