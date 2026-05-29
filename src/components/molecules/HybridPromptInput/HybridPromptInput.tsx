@@ -34,6 +34,7 @@ import React, {
 	useState,
 	FC,
 	Fragment,
+	ReactNode,
 	useRef,
 	useEffect,
 	useMemo,
@@ -44,6 +45,12 @@ import { createPortal } from 'react-dom';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { TestPreviewPanel } from '../TestPreviewPanel/TestPreviewPanel';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
+import { ProfileAreaMarkerIcon } from '@/components/atoms/_svg/ProfileAreaMarkerIcon';
+import {
+	getProfileGenreIcon,
+	profileBioIconSvg,
+	profilePerformingNameIconSvg,
+} from '@/components/molecules/HybridPromptInput/profileFieldIcons';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
 import UndoIcon from '@/components/atoms/_svg/UndoIcon';
@@ -146,6 +153,7 @@ type ProfileSummaryItem = {
 	key: string;
 	text: string;
 	bgClass: string;
+	icon?: ReactNode;
 };
 
 type ProfileSummaryModel = {
@@ -198,18 +206,62 @@ const buildProfileSummaryModel = (
 		.map((s) => s.trim())
 		.filter(Boolean);
 
+	// Each pill reuses the exact SVG shown for that field in the Profile entry box
+	// (ProfileSidePanelBox): the genre-specific icon, the area pin, the performing-name
+	// disc, and the bio figure. The genre icon is undefined for "Other"/unknown genres.
+	const GenreIcon = getProfileGenreIcon(genre);
+
 	const items: ProfileSummaryItem[] = [];
 	if (genre) {
-		items.push({ key: 'profile-genre', text: truncate(genre, 24), bgClass: 'bg-[#EBEBEB]' });
+		items.push({
+			key: 'profile-genre',
+			text: truncate(genre, 24),
+			bgClass: 'bg-[#EBEBEB]',
+			icon: GenreIcon ? (
+				<GenreIcon aria-hidden="true" className="h-[15px] w-[15px] shrink-0" />
+			) : undefined,
+		});
 	}
 	if (area) {
-		items.push({ key: 'profile-area', text: truncate(area, 32), bgClass: 'bg-[#EBEBEB]' });
+		items.push({
+			key: 'profile-area',
+			text: truncate(area, 32),
+			bgClass: 'bg-[#EBEBEB]',
+			icon: (
+				<ProfileAreaMarkerIcon
+					aria-hidden="true"
+					className="h-[15px] w-[12px] shrink-0"
+				/>
+			),
+		});
 	}
 	if (band) {
-		items.push({ key: 'profile-band', text: truncate(band, 32), bgClass: 'bg-[#EBEBEB]' });
+		items.push({
+			key: 'profile-band',
+			text: truncate(band, 32),
+			bgClass: 'bg-[#EBEBEB]',
+			icon: (
+				<span
+					aria-hidden="true"
+					className="block h-[15px] w-[15px] shrink-0"
+					dangerouslySetInnerHTML={{ __html: profilePerformingNameIconSvg }}
+				/>
+			),
+		});
 	}
 	if (bio) {
-		items.push({ key: 'profile-bio', text: 'Bio', bgClass: 'bg-[#EBEBEB]' });
+		items.push({
+			key: 'profile-bio',
+			text: 'Bio',
+			bgClass: 'bg-[#EBEBEB]',
+			icon: (
+				<span
+					aria-hidden="true"
+					className="block h-[15px] w-[7px] shrink-0"
+					dangerouslySetInnerHTML={{ __html: profileBioIconSvg }}
+				/>
+			),
+		});
 	}
 	if (links.length > 0) {
 		items.push({
@@ -352,13 +404,14 @@ const ProfileSummaryBox = ({
 						<span
 							key={item.key}
 							className={cn(
-								'inline-flex h-[20.071px] items-center rounded-[7.034px] px-[8px]',
+								'inline-flex h-[20.071px] items-center gap-[4px] rounded-[7.034px] px-[10px]',
 								'font-inter font-normal text-[13px] leading-[16px] max-[480px]:text-[11px] max-[480px]:leading-[14px]',
 								'text-black max-w-full whitespace-nowrap',
 								item.bgClass
 							)}
 						>
-							{item.text}
+							{item.icon}
+							<span>{item.text}</span>
 						</span>
 					))}
 				</div>

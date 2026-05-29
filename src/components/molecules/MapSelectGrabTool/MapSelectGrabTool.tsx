@@ -1404,11 +1404,12 @@ export function MapSelectGrabTallStackBox({
 	style?: CSSProperties;
 	isSelectActive?: boolean;
 	onAllDeselected?: () => void;
-	// Fires whenever the user toggles a grab-mode tile, with the full active-by-
-	// index boolean array (length TALL_STACK_CATEGORY_COUNT). Also fires once on
-	// mount with the initial all-active state. Consumers use this to filter
-	// map markers by category. Note: select-mode selections are independent and
-	// not propagated here.
+	// Fires whenever the user toggles a tile (in either grab or select mode),
+	// with the full active-by-index boolean array (length
+	// TALL_STACK_CATEGORY_COUNT). Also fires once on mount with the initial
+	// all-active state. Consumers use this to filter map markers by category. The
+	// array reflects whichever mode is active: grab-mode active tiles or
+	// select-mode selected tiles.
 	onActiveCategoriesChange?: (activeCategories: readonly boolean[]) => void;
 }) {
 	const [selectedCategories, setSelectedCategories] = useState<boolean[]>(() =>
@@ -1420,9 +1421,20 @@ export function MapSelectGrabTallStackBox({
 		() => new Array(TALL_STACK_CATEGORY_COUNT).fill(true)
 	);
 
+	// Propagate the currently-active categories so consumers can filter map
+	// markers. In grab mode that's the per-tile active state; in select mode it's
+	// the per-tile selected state, so deselecting a category in select mode hides
+	// those markers too (not just grab mode).
 	useEffect(() => {
-		onActiveCategoriesChange?.(grabberActiveCategories);
-	}, [grabberActiveCategories, onActiveCategoriesChange]);
+		onActiveCategoriesChange?.(
+			isSelectActive ? selectedCategories : grabberActiveCategories
+		);
+	}, [
+		isSelectActive,
+		selectedCategories,
+		grabberActiveCategories,
+		onActiveCategoriesChange,
+	]);
 
 	const handleToggleCategory = useCallback((index: number) => {
 		setSelectedCategories((prev) => {

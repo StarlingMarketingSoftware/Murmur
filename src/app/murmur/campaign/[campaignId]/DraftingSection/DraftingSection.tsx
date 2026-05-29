@@ -3316,11 +3316,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			label,
 			count,
 			background,
+			opacity,
 			onClick,
 		}: {
 			label: string;
 			count: number;
 			background: string;
+			opacity?: number;
 			onClick?: () => void;
 		}) => (
 			<button
@@ -3330,6 +3332,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				style={{
 					...boxStyle,
 					background,
+					opacity,
 					cursor: onClick ? 'pointer' : 'default',
 				}}
 				onClick={onClick}
@@ -3412,12 +3415,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					label: 'sent',
 					count: sentCount,
 					background: '#5AB478',
+					opacity: 0.2,
 					onClick: goToSent,
 				})}
 				{counterBox({
 					label: 'inbox',
 					count: inboxCount,
 					background: '#6EBED5',
+					opacity: 0.1,
 					onClick: goToInbox,
 				})}
 			</div>

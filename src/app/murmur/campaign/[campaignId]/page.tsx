@@ -229,8 +229,15 @@ const CampaignOverviewAskAnythingBox = ({
 }: CampaignOverviewAskAnythingBoxProps) => {
 	const [query, setQuery] = useState(value ?? '');
 	const [isHovered, setIsHovered] = useState(false);
+	const [isFocused, setIsFocused] = useState(false);
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const submitQuery = () => onSubmit(query);
+
+	// On the preset (Write/Drafts/Inbox) tabs the box reads as a dimmed bar that
+	// lights to full opacity while hovered or focused — mirroring the left
+	// "Showing" strip — yet stays fully typeable so a search can be launched
+	// straight from those tabs.
+	const isLit = !dimUntilHover || isHovered || isFocused;
 
 	useEffect(() => {
 		// Keep the input in sync with the parent's active query so leaving/re-entering the tab
@@ -248,7 +255,7 @@ const CampaignOverviewAskAnythingBox = ({
 				height: CAMPAIGN_OVERVIEW_ASK_BOX_HEIGHT_PX,
 				transform: 'translateX(-50%)',
 				zIndex: 126,
-				opacity: dimUntilHover && !isHovered ? 0.4 : 1,
+				opacity: isLit ? 1 : 0.4,
 				transition: dimUntilHover ? 'opacity 0.18s ease' : undefined,
 			}}
 		>
@@ -265,7 +272,6 @@ const CampaignOverviewAskAnythingBox = ({
 				onMouseEnter={dimUntilHover ? () => setIsHovered(true) : undefined}
 				onMouseLeave={dimUntilHover ? () => setIsHovered(false) : undefined}
 				onMouseDown={(event) => {
-					if (dimUntilHover) return;
 					if ((event.target as HTMLElement).closest('button')) return;
 					inputRef.current?.focus();
 				}}
@@ -276,12 +282,7 @@ const CampaignOverviewAskAnythingBox = ({
 					aria-label="Ask anything"
 					value={query}
 					placeholder="Ask Anything"
-					readOnly={dimUntilHover}
-					tabIndex={dimUntilHover ? -1 : undefined}
-					className={cn(
-						'absolute border-0 bg-transparent p-0 font-inter font-medium leading-none text-black outline-none placeholder:text-black placeholder:opacity-100',
-						dimUntilHover ? 'pointer-events-none' : 'pointer-events-auto'
-					)}
+					className="pointer-events-auto absolute border-0 bg-transparent p-0 font-inter font-medium leading-none text-black outline-none placeholder:text-black placeholder:opacity-100"
 					style={{
 						left: 18,
 						top: 9,
@@ -290,6 +291,8 @@ const CampaignOverviewAskAnythingBox = ({
 						fontSize: 16,
 					}}
 					onChange={(event) => setQuery(event.target.value)}
+					onFocus={() => setIsFocused(true)}
+					onBlur={() => setIsFocused(false)}
 					onKeyDown={(event) => {
 						if (event.key === 'Enter') {
 							event.preventDefault();
@@ -300,12 +303,7 @@ const CampaignOverviewAskAnythingBox = ({
 				<button
 					type="button"
 					aria-label="Open campaign search"
-					tabIndex={dimUntilHover ? -1 : undefined}
-					disabled={dimUntilHover}
-					className={cn(
-						'absolute flex items-center justify-center border-0 p-0 text-black',
-						dimUntilHover ? 'pointer-events-none' : 'pointer-events-auto'
-					)}
+					className="pointer-events-auto absolute flex items-center justify-center border-0 p-0 text-black"
 					style={{
 						right: 9,
 						top: 9,
@@ -314,7 +312,7 @@ const CampaignOverviewAskAnythingBox = ({
 						borderRadius: 9,
 						background: '#ADFFC2',
 						boxSizing: 'border-box',
-						cursor: dimUntilHover ? 'default' : 'pointer',
+						cursor: 'pointer',
 					}}
 					onClick={submitQuery}
 				>
@@ -2975,6 +2973,20 @@ const Murmur = () => {
 		[activeView, isMobile, MOBILE_ALLOWED_VIEWS, requestInboxSentTab]
 	);
 
+	// Launch a campaign search from the Write/Drafts/Inbox tabs: jump to the All
+	// tab, drop that tab's preset status filter (so results aren't scoped to e.g.
+	// just drafts), and run the query there.
+	const handlePresetAskAnythingSubmit = useCallback(
+		(query: string) => {
+			const trimmedQuery = query.trim();
+			if (!trimmedQuery) return;
+			setCampaignOverviewSelectedStatuses([]);
+			setOverviewSearchQuery(trimmedQuery);
+			setActiveView('overview');
+		},
+		[setActiveView]
+	);
+
 	const handleActiveViewReady = useCallback(
 		(readyView: DraftingSectionView) => {
 			// Only start fading once the destination view has actually painted.
@@ -3127,19 +3139,23 @@ const Murmur = () => {
 
 		const out = [] as typeof contacts;
 		for (const contact of contacts) {
-			if (effectiveMapGroupingForActiveView === 'status') {
-				const status = campaignOverviewContactStatusById.get(contact.id) ?? 'contacts';
-				if (!effectiveActiveStatusSetForActiveView.has(status)) continue;
-				out.push(contact);
-				continue;
-			}
-
 			const titleLike =
 				contact.curatedDisplayLabel || contact.title || contact.headline || '';
+
+			// The left-panel category-tile filter applies in every grouping mode, so
+			// deselecting a category hides those markers whether the map is grouped by
+			// status or by category.
 			const categoryIndex = getMapSelectGrabCategoryIndexFromContactTitle(titleLike);
 			if (categoryIndex >= 0) {
 				if (mapGrabActiveCategories[categoryIndex] === false) continue;
 			} else if (!mapGrabUncategorizedActive) {
+				continue;
+			}
+
+			if (effectiveMapGroupingForActiveView === 'status') {
+				const status = campaignOverviewContactStatusById.get(contact.id) ?? 'contacts';
+				if (!effectiveActiveStatusSetForActiveView.has(status)) continue;
+				out.push(contact);
 				continue;
 			}
 
@@ -3544,15 +3560,13 @@ const Murmur = () => {
 										bottomOverride={presetMapStatusStripBottomPx}
 										onToggleStatus={() => undefined}
 									/>
-									<div aria-hidden="true">
-										<CampaignOverviewAskAnythingBox
-											onSubmit={() => undefined}
-											value=""
-											leftOverride={presetMapControlsLeftCss}
-											bottomOverride={presetMapAskBoxBottomPx}
-											dimUntilHover
-										/>
-									</div>
+									<CampaignOverviewAskAnythingBox
+										onSubmit={handlePresetAskAnythingSubmit}
+										value={overviewSearchQuery ?? ''}
+										leftOverride={presetMapControlsLeftCss}
+										bottomOverride={presetMapAskBoxBottomPx}
+										dimUntilHover
+									/>
 								</div>
 								{/* The overview "Showing" strip, mirrored onto the Write/Drafts/Inbox
 								    tabs: dimmed to 0.4 by default, fading to full opacity + becoming
