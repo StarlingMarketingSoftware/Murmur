@@ -3011,6 +3011,9 @@ function VenueProfileMapCard({ onEdit }: { onEdit: () => void }) {
 // the 656px-wide card above. Positioned (absolute) 98px below the cluster top — 15px under
 // the 83px card — within the map-view wrapper's 75% scale.
 const VENUE_CALENDAR_SCALE = 656 / 669.794;
+const VENUE_MAP_OVERLAY_SCALE = 0.8;
+const VENUE_MAP_LEFT_CLUSTER_SCALE = 0.75;
+const VENUE_MAP_LEFT_CLUSTER_MAIL_SCALE = 0.61;
 
 function VenueCalendarMapPanel() {
 	const now = new Date();
@@ -3026,11 +3029,29 @@ function VenueCalendarMapPanel() {
 	);
 }
 
+function VenueMailMapPanel() {
+	return (
+		<div
+			className="fixed left-1/2 top-[112px] z-[99] h-[829px] w-[781px] origin-top rounded-[10px] border-[2px] border-black/40 bg-white/15"
+			style={{ transform: `translateX(-50%) scale(${VENUE_MAP_OVERLAY_SCALE})` }}
+		>
+			<div className="absolute left-[8px] top-[20px] h-[797px] w-[765px] overflow-hidden rounded-[8px] border-[2px] border-black">
+				<div className="absolute inset-x-0 top-0 h-[30px] overflow-hidden">
+					<div className="absolute inset-x-0 top-[-16px] h-[120px] bg-[linear-gradient(180deg,#C1F7BB_0%,#60AE92_100%)]" />
+				</div>
+				<div className="absolute inset-x-0 bottom-0 top-[30px] bg-[linear-gradient(180deg,#BBD4F7_0%,#FFF_100%)]" />
+				<div className="absolute left-0 right-0 top-[30px] h-[2px] bg-black" />
+			</div>
+		</div>
+	);
+}
+
 export default function VenuePortalClient() {
 	const [view, setView] = useState<VenuePortalView>('edit');
 	const [selectedVenueTool, setSelectedVenueTool] = useState<
 		'add' | 'profile' | 'mail' | null
 	>(null);
+	const isMailToolSelected = selectedVenueTool === 'mail';
 	const toggleVenueTool = (tool: 'add' | 'profile' | 'mail') =>
 		setSelectedVenueTool((current) => (current === tool ? null : tool));
 	return (
@@ -3043,12 +3064,15 @@ export default function VenuePortalClient() {
 			{view === 'map' && (
 				<div
 					className="fixed left-[24px] top-[24px] z-[100] origin-top-left"
-					style={{ transform: 'scale(0.75)' }}
+					style={{
+						transform: `scale(${isMailToolSelected ? VENUE_MAP_LEFT_CLUSTER_MAIL_SCALE : VENUE_MAP_LEFT_CLUSTER_SCALE})`,
+					}}
 				>
 					<VenueProfileMapCard onEdit={() => setView('edit')} />
 					<VenueCalendarMapPanel />
 				</div>
 			)}
+			{view === 'map' && isMailToolSelected && <VenueMailMapPanel />}
 			{view === 'map' && (
 				<div className="fixed left-1/2 top-3 z-[100] flex h-[39.993px] w-[183px] -translate-x-1/2 items-center justify-evenly rounded-[7.272px] border-[1.212px] border-black bg-white">
 					<button
