@@ -380,6 +380,16 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const [isTest, setIsTest] = useState<boolean>(false);
 	// Drafting queue: allow multiple drafting operations to be queued while one runs.
 	const [draftOperations, setDraftOperations] = useState<DraftingOperation[]>([]);
+	// Transient "review the batch I just drafted on the Write tab" state. Holds the contact IDs
+	// of batch(es) drafted from the Write tab so those exact drafts surface inline on the Write
+	// tab. In-memory only (a page refresh clears it) and cleared once the batch is fully
+	// sent/deleted — so the Write tab never "prioritizes" pre-existing drafts on reload.
+	const [writeReviewBatchContactIds, setWriteReviewBatchContactIds] = useState<Set<number>>(
+		() => new Set()
+	);
+	const clearWriteReviewBatch = useCallback(() => {
+		setWriteReviewBatchContactIds((prev) => (prev.size === 0 ? prev : new Set()));
+	}, []);
 	const draftOperationsRef = useRef<DraftingOperation[]>([]);
 	const updateDraftOperations = useCallback(
 		(updater: (prev: DraftingOperation[]) => DraftingOperation[]) => {
@@ -3124,6 +3134,15 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 			return;
 		}
 
+		// Drafting from the Write tab arms a transient, inline review of just this batch.
+		if ((props.view ?? 'testing') === 'testing') {
+			setWriteReviewBatchContactIds((prev) => {
+				const next = new Set(prev);
+				for (const id of ids) next.add(id);
+				return next;
+			});
+		}
+
 		const operation: DraftingOperation = {
 			id: makeDraftOperationId(),
 			status: 'queued',
@@ -3319,6 +3338,8 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		isContactsLoading,
 		draftingMode,
 		draftOperations,
+		writeReviewBatchContactIds,
+		clearWriteReviewBatch,
 		form,
 		generationProgress,
 		generationTotal,

@@ -16,6 +16,7 @@ import {
 	useDraftingSection,
 	HybridBlockPrompt,
 	type DraftingFormValues,
+	type DraftingSectionView,
 } from './useDraftingSection';
 import { Form } from '@/components/ui/form';
 import { useForm } from 'react-hook-form';
@@ -318,6 +319,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		draftingRef,
 		emailStructureRef,
 		draftOperations,
+		writeReviewBatchContactIds,
+		clearWriteReviewBatch,
 		isLivePreviewVisible,
 		livePreviewContactId,
 		livePreviewMessage,
@@ -325,6 +328,30 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		livePreviewDraftNumber,
 		livePreviewTotal,
 	} = useDraftingSection(props);
+
+	// --- Transient Write-tab batch review --------------------------------------------------
+	// After drafting from the Write tab, surface that exact batch inline (the Drafts review
+	// layout) in place of the prompt box — until the batch is fully sent/deleted or the page is
+	// refreshed. Only the rendered *content* switches to the drafts experience; the active tab
+	// identity stays "Write": top-nav highlight, URL, the in-list mini-nav pill, and the bottom
+	// Drafts/Sent/Inbox peek panels all keep keying off the real `view`.
+	//
+	// `isWriteReviewActive` can only be true on the Write tab with a batch armed this session,
+	// so `contentView` (and everything derived from it) is identical to `view` in every other
+	// flow — making this change purely additive for the Drafts/Sent/Inbox/Search/Write tabs.
+	//
+	// The flip to the drafts review is gated on `writeReviewPreviewComplete`: the prompt box
+	// (`HybridPromptInput`) stays in place for the whole live-preview animation and we only
+	// transition to the review once the last draft has fully typed out (or, for the
+	// non-streaming handwritten path, once generation settles). That latch is driven by the
+	// effect near `isBatchDraftingInProgress` below. The left-rail live preview is keyed off
+	// `view`/`isBatchDraftingInProgress` (not `contentView`), so it keeps animating regardless.
+	const [writeReviewPreviewComplete, setWriteReviewPreviewComplete] = useState(false);
+	const isWriteReviewActive =
+		view === 'testing' &&
+		writeReviewBatchContactIds.size > 0 &&
+		writeReviewPreviewComplete;
+	const contentView: DraftingSectionView = isWriteReviewActive ? 'drafting' : view;
 
 	const { user, subscriptionTier, isFreeTrial } = useMe();
 	const queryClient = useQueryClient();
@@ -391,7 +418,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}));
 		goToInbox?.();
 	}, [goToInbox, inboxSentTabRequest?.requestId]);
-	const isDraftingView = view === 'drafting';
+	// `contentView` (not `view`) so the Write-tab batch review renders the full drafts
+	// experience (draft preview open, research reflects the open draft, drafts-mode left list).
+	const isDraftingView = contentView === 'drafting';
 	const isSentView = view === 'sent';
 	const contactsListTopNavStop = useMemo<ContactsExpandedTopNavStop>(() => {
 		if (view === 'overview') return 'all';
@@ -402,8 +431,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		return 'all';
 	}, [view]);
 	const contactsListFocusMode = useMemo<ContactsExpandedListFocusMode>(
-		() => (view === 'drafting' ? 'drafts' : 'contacts'),
-		[view]
+		() => (contentView === 'drafting' ? 'drafts' : 'contacts'),
+		[contentView]
 	);
 	const contactsListTopNavProps = useMemo(
 		() => ({
@@ -664,7 +693,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const bottomPanelBoxHeightPx = 45;
 	const bottomPanelCollapsed = true;
 	const writeDraftBottomBarHeightPx = 40;
-	const writeDraftBottomBarGapPx = 8;
+	// Sit the draft bar centered in the gap between the main content boxes' bottom
+	// (left column bottom ≈ 687px) and the bottom panels' top, rather than hugging
+	// the panels. The bar's top = panels top − bar height − this gap.
+	const writeDraftBottomBarGapPx = 58;
 	const mainContactsPanelWidthPx = 377;
 	const mainContactsPanelHeightPx = 597;
 	const isOverviewRightRailSearchActive = Boolean(
@@ -692,7 +724,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const shouldShowOverviewRightRailSearchPanel =
 		shouldShowOverviewRightRail && isOverviewRightRailSearchActive;
 	const [isProfileSidePanelOpen, setIsProfileSidePanelOpen] = useState(false);
-	const shouldUseProfileSidePanel = view === 'testing' && !isMobile && !isNarrowestDesktop;
+	const shouldUseProfileSidePanel =
+		contentView === 'testing' && !isMobile && !isNarrowestDesktop;
 	const handleOpenProfileSidePanel = useCallback(() => {
 		if (!shouldUseProfileSidePanel) return;
 		setIsProfileSidePanelOpen(true);
@@ -1330,7 +1363,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	}, [view]);
 	const shouldRenderWriteBottomDraftBar =
-		view === 'testing' && !isMobile && !hideHeaderBox && !isNarrowestDesktop;
+		contentView === 'testing' && !isMobile && !hideHeaderBox && !isNarrowestDesktop;
 	const shouldRenderSharedBottomPanels =
 		sharedBottomPanelKinds.length > 0 &&
 		!isMobile &&
@@ -2248,46 +2281,117 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const contactsCount = headerContacts?.length || 0;
 	const draftEmails = (headerEmails || []).filter((e) => e.status === EmailStatus.draft);
 	const draftCount = draftEmails.length;
+	// Drafts belonging to the batch the user just drafted from the Write tab (empty otherwise).
+	const batchDrafts = useMemo(
+		() => draftEmails.filter((d) => writeReviewBatchContactIds.has(d.contactId)),
+		[draftEmails, writeReviewBatchContactIds]
+	);
+	// The draft list the drafts layout renders: scoped to the just-drafted batch during the
+	// Write-tab review, the full set on the real Drafts tab. (`draftCount` stays the campaign
+	// total — it feeds the header summary, not the review.)
+	const draftEmailsForView = isWriteReviewActive ? batchDrafts : draftEmails;
 	const sentEmails = (headerEmails || []).filter((e) => e.status === EmailStatus.sent);
 	const sentCount = sentEmails.length;
 
-	// Drafts tab stays in review mode whenever at least one draft exists.
+	// Drafts review stays open whenever at least one (batch-scoped) draft exists.
 	useEffect(() => {
-		if (view !== 'drafting') return;
+		if (contentView !== 'drafting') return;
 
 		if (selectedDraft) {
-			const selectedDraftStillExists = draftEmails.some(
+			const selectedDraftStillExists = draftEmailsForView.some(
 				(draft) => draft.id === selectedDraft.id
 			);
 			if (selectedDraftStillExists) {
 				return;
 			}
-			if (draftEmails.length === 0 && isPendingEmails) return;
+			if (draftEmailsForView.length === 0 && isPendingEmails) return;
 
-			const fallbackDraft = draftEmails[0] ?? null;
+			const fallbackDraft = draftEmailsForView[0] ?? null;
 			setSelectedDraft(fallbackDraft);
 			return;
 		}
 
-		const firstDraft = draftEmails[0];
+		const firstDraft = draftEmailsForView[0];
 		if (!firstDraft) return;
 
 		setSelectedDraft(firstDraft);
-	}, [draftEmails, isPendingEmails, selectedDraft, view]);
+	}, [draftEmailsForView, isPendingEmails, selectedDraft, contentView]);
 
 	// If we just "Kept" a test draft, auto-open its draft in the Drafts tab once it exists.
 	useEffect(() => {
-		if (view !== 'drafting') return;
+		if (contentView !== 'drafting') return;
 		if (!pendingKeptDraftContactId) return;
 		const kept = draftEmails.find((e) => e.contactId === pendingKeptDraftContactId);
 		if (!kept) return;
 		setSelectedDraft(kept);
 		setPendingKeptDraftContactId(null);
-	}, [draftEmails, pendingKeptDraftContactId, view]);
+	}, [draftEmails, pendingKeptDraftContactId, contentView]);
 
 	// When batch drafting is in progress (or still animating queued drafts), swap the campaign
 	// research panel slot to a live "Draft Preview" so users can watch drafts type out from any tab.
 	const isBatchDraftingInProgress = isLivePreviewVisible;
+
+	// Hold the Write tab on the prompt box (`HybridPromptInput`) until the live-preview animation
+	// has fully typed out the batch, then flip to the drafts review (`writeReviewPreviewComplete`).
+	// `wasBatchDraftingRef` records that an animation ran for the currently-armed batch so we can
+	// detect its falling edge — i.e. the moment the last message finished typing (which the hook
+	// only triggers after the final character is committed, so it never cuts off early).
+	const wasBatchDraftingRef = useRef(false);
+	useEffect(() => {
+		// No batch armed → reset for the next Draft click.
+		if (writeReviewBatchContactIds.size === 0) {
+			wasBatchDraftingRef.current = false;
+			setWriteReviewPreviewComplete(false);
+			return;
+		}
+		// Live preview is actively typing this batch → keep showing the prompt box.
+		if (isBatchDraftingInProgress) {
+			wasBatchDraftingRef.current = true;
+			setWriteReviewPreviewComplete(false);
+			return;
+		}
+		// Live preview just finished typing the last message → reveal the drafts review.
+		if (wasBatchDraftingRef.current) {
+			setWriteReviewPreviewComplete(true);
+			return;
+		}
+		// Handwritten / non-streaming path never animates: reveal once generation settles
+		// with at least one batch draft persisted.
+		if (!isPendingGeneration && batchDrafts.length > 0) {
+			setWriteReviewPreviewComplete(true);
+		}
+	}, [
+		writeReviewBatchContactIds.size,
+		isBatchDraftingInProgress,
+		isPendingGeneration,
+		batchDrafts.length,
+	]);
+
+	// Leave the transient Write-tab batch review once the batch is fully sent/deleted. A latch
+	// (`writeReviewSawDraftsRef`) prevents exiting during the gap between clicking Draft and the
+	// first generated draft landing in the cache; we also wait out any in-flight generation.
+	const writeReviewSawDraftsRef = useRef(false);
+	useEffect(() => {
+		if (writeReviewBatchContactIds.size === 0) {
+			writeReviewSawDraftsRef.current = false;
+			return;
+		}
+		if (batchDrafts.length > 0) {
+			writeReviewSawDraftsRef.current = true;
+			return;
+		}
+		// Batch is armed but currently shows no drafts: keep waiting while generation is in
+		// flight, or until at least one batch draft has appeared, before clearing.
+		if (isBatchDraftingInProgress || isPendingGeneration) return;
+		if (!writeReviewSawDraftsRef.current) return;
+		clearWriteReviewBatch();
+	}, [
+		writeReviewBatchContactIds,
+		batchDrafts,
+		isBatchDraftingInProgress,
+		isPendingGeneration,
+		clearWriteReviewBatch,
+	]);
 	const draftPreviewFallbackDraft = useMemo(() => {
 		const first = draftEmails[0];
 		if (!first) return null;
@@ -2346,7 +2450,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// Backend draft rows can be created faster than the Draft Preview panel "types" them out.
 	// For visual alignment, keep newly-drafted contacts visible in the Contacts list until the
 	// live preview advances past them. This does NOT affect the actual drafting backend logic.
-	const shouldPaceContactsList = view === 'testing';
+	const shouldPaceContactsList = contentView === 'testing';
 	const [visualContactedBaselineIds, setVisualContactedBaselineIds] = useState<
 		Set<number>
 	>(() => new Set(contactedContactIds));
@@ -2575,7 +2679,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		[isCampaignWorkspaceCompact, onRequestCampaignWorkspaceExpanded]
 	);
 	useEffect(() => {
-		if (renderGlobalOverlays && isCampaignWorkspaceCompact && isBatchDraftingInProgress) {
+		// On the Write tab the live draft preview now renders inline over the contacts
+		// list in the compact half-screen view, so there's no need to expand the
+		// workspace. Other tabs still expand to surface the preview on the right.
+		if (
+			renderGlobalOverlays &&
+			isCampaignWorkspaceCompact &&
+			isBatchDraftingInProgress &&
+			view !== 'testing'
+		) {
 			onRequestCampaignWorkspaceExpanded?.();
 		}
 	}, [
@@ -2583,6 +2695,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		isCampaignWorkspaceCompact,
 		onRequestCampaignWorkspaceExpanded,
 		renderGlobalOverlays,
+		view,
 	]);
 	const [selectedInboxEmailId, setSelectedInboxEmailId] = useState<number | null>(null);
 	const [optimisticInboxReplyByEmailId, setOptimisticInboxReplyByEmailId] = useState<
@@ -2780,10 +2893,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	}, [contacts, selectedContactForResearch]);
 
-	// When reviewing a draft in the Drafts tab, the research panel should reflect the
-	// currently open draft (not whatever was last hovered in the table).
+	// When reviewing a draft (Drafts tab or the Write-tab batch review), the research panel
+	// should reflect the currently open draft (not whatever was last hovered in the table).
 	useEffect(() => {
-		if (view !== 'drafting') return;
+		if (contentView !== 'drafting') return;
 		if (!selectedDraft) return;
 
 		// Prefer the contacts list (includes computed `name`) when available.
@@ -2804,7 +2917,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		setSelectedContactForResearch(nextContact);
 		setHoveredContactForResearch(null);
 		setHasUserSelectedResearchContact(true);
-	}, [view, selectedDraft?.id, contacts]);
+	}, [contentView, selectedDraft?.id, contacts]);
 
 	useEffect(() => {
 		if (!contactsAvailableForDrafting) return;
@@ -3784,7 +3897,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									gap: `${standardSidePanelGapPx}px`,
 								}}
 							>
-								{view === 'testing' && isProfileSidePanelOpen ? (
+								{contentView === 'testing' && isProfileSidePanelOpen ? (
 									<ProfileSidePanelBox
 										profileName={profileSidePanelName}
 										profileGenre={profileSidePanelGenre}
@@ -3864,7 +3977,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														setSelectedDraft={setSelectedDraft}
 														setIsDraftDialogOpen={setIsDraftDialogOpen}
 														handleDraftSelection={handleDraftSelection}
-														draftEmails={draftEmails}
+														draftEmails={draftEmailsForView}
 														isPendingEmails={isPendingEmails}
 														setSelectedDraftIds={setDraftsTabSelectedIds}
 														onSend={handleSendDrafts}
@@ -3908,6 +4021,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<ContactsExpandedList
 													contacts={contactsForContactsExpandedList}
 													{...contactsListSupplementalProps}
+													drafts={draftEmailsForView}
 													{...contactsListTopNavProps}
 													isLoading={isContactsLoading}
 													campaign={campaign}
@@ -3942,27 +4056,44 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										>
 											{pinnedLeftPanelVariant === 'contacts' ? (
 												<div>
+													{/* While actively batch-drafting in the compact half-screen Write */}
+													{/* view, show the live draft preview over the contacts list at the */}
+													{/* same 377x597 footprint instead of the contacts list itself. */}
+													{view === 'testing' &&
+													isCampaignWorkspaceCompact &&
+													isBatchDraftingInProgress ? (
+														<DraftPreviewExpandedList
+															contacts={contacts || []}
+															livePreview={liveDraftPreview}
+															fallbackDraft={draftPreviewFallbackDraft}
+															width={mainContactsPanelWidthPx}
+															height={mainContactsPanelHeightPx}
+														/>
+													) : (
 													<ContactsExpandedList
 														contacts={contactsForContactsExpandedList}
 														{...contactsListSupplementalProps}
+														drafts={draftEmailsForView}
 														{...contactsListTopNavProps}
 														isLoading={isContactsLoading}
 														campaign={campaign}
-														enableUsedContactTooltip={view === 'testing'}
+														enableUsedContactTooltip={contentView === 'testing'}
 														selectedDraftId={
-															view === 'drafting' ? selectedDraft?.id : undefined
+															contentView === 'drafting' ? selectedDraft?.id : undefined
 														}
 														selectedDraftIds={
-															view === 'drafting' ? draftsTabSelectedIds : undefined
+															contentView === 'drafting' ? draftsTabSelectedIds : undefined
 														}
 														onDraftSelectionChange={
-															view === 'drafting' ? setDraftsTabSelectedIds : undefined
+															contentView === 'drafting'
+																? setDraftsTabSelectedIds
+																: undefined
 														}
 														onDraftClick={
-															view === 'drafting' ? handleDraftPreviewClick : undefined
+															contentView === 'drafting' ? handleDraftPreviewClick : undefined
 														}
 														onDraftHover={
-															view === 'drafting' ? setHoveredDraftForSettings : undefined
+															contentView === 'drafting' ? setHoveredDraftForSettings : undefined
 														}
 														selectedContactIds={contactsTabSelectedIds}
 														activelyDraftingContactIds={
@@ -3983,6 +4114,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														minRows={8}
 														onSearchFromMiniBar={handleMiniContactsSearch}
 													/>
+													)}
 												</div>
 											) : (
 												<div>
@@ -4049,7 +4181,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									</>
 								)}
 
-								{view === 'testing' &&
+								{contentView === 'testing' &&
 									!isProfileSidePanelOpen &&
 									(isPromptInputHovered || isSuggestionBoxHovered) &&
 									isCustomInstructionsOpen &&
@@ -4451,7 +4583,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												isStandardSidePanelView ? standardResearchPanelHeightPx : 670
 											}
 										/>
-									) : view === 'testing' && showTestPreview ? (
+									) : contentView === 'testing' && showTestPreview ? (
 										<TestPreviewPanel
 											setShowTestPreview={setShowTestPreview}
 											testMessage={campaign?.testMessage || ''}
@@ -4480,7 +4612,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												// Hide all research text to show a chrome-only skeleton:
 												// - When the Drafts tab has no drafts
 												// - When the Sent tab is in its empty state
-												(view === 'drafting' && draftCount === 0) ||
+												(contentView === 'drafting' && draftCount === 0) ||
 												(view === 'sent' && sentCount === 0)
 											}
 											style={view === 'inbox' ? { width: 259 } : undefined}
@@ -5352,7 +5484,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							</div>
 						)}
 
-						{view === 'testing' && (
+						{contentView === 'testing' && (
 							<div className="relative">
 								{/* Narrow desktop: grouped layout with left panel + writing box centered together */}
 								{isNarrowDesktop ? (
@@ -5909,7 +6041,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							className={cn('transition-opacity duration-500 ease-in-out')}
 						>
 							{/* Drafts tab - show only the drafts table centered */}
-							{view === 'drafting' && (
+							{contentView === 'drafting' && (
 								<div className={`w-full ${isMobile ? 'mt-6' : 'min-h-[300px]'}`}>
 									{isMobile ? (
 										// Mobile layout: Full-width drafts, no side panels
@@ -5923,7 +6055,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												setSelectedDraft={setSelectedDraft}
 												setIsDraftDialogOpen={setIsDraftDialogOpen}
 												handleDraftSelection={handleDraftSelection}
-												draftEmails={draftEmails}
+												draftEmails={draftEmailsForView}
 												isPendingEmails={isPendingEmails}
 												setSelectedDraftIds={setDraftsTabSelectedIds}
 												onSend={handleSendDrafts}
@@ -5990,6 +6122,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														<ContactsExpandedList
 															contacts={contactsForContactsExpandedList}
 															{...contactsListSupplementalProps}
+															drafts={draftEmailsForView}
 															{...contactsListTopNavProps}
 															isLoading={isContactsLoading}
 															campaign={campaign}
@@ -6051,7 +6184,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														setSelectedDraft={setSelectedDraft}
 														setIsDraftDialogOpen={setIsDraftDialogOpen}
 														handleDraftSelection={handleDraftSelection}
-														draftEmails={draftEmails}
+														draftEmails={draftEmailsForView}
 														isPendingEmails={isPendingEmails}
 														setSelectedDraftIds={setDraftsTabSelectedIds}
 														onSend={handleSendDrafts}
@@ -6088,7 +6221,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												</div>
 											</div>
 											{/* Send Button with arrows - centered relative to full container width */}
-											{draftEmails.length > 0 && !selectedDraft && (
+											{draftEmailsForView.length > 0 && !selectedDraft && (
 												<div className="flex items-center justify-center gap-[29px] mt-4 w-full">
 													{/* Left arrow */}
 													<button
@@ -6131,7 +6264,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																className="w-[89px] h-full flex items-center justify-center font-inter font-normal text-[17px] text-black cursor-pointer border-l-[2px] border-[#000000] bg-[#7CB67C] hover:bg-[#6FA36F]"
 																onClick={(e) => {
 																	e.stopPropagation();
-																	const allIds = new Set(draftEmails.map((d) => d.id));
+																	const allIds = new Set(draftEmailsForView.map((d) => d.id));
 																	const isAllSelected =
 																		draftsTabSelectedIds.size === allIds.size &&
 																		[...allIds].every((id) =>
@@ -6172,7 +6305,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												...(isCampaignWorkspaceCompact &&
 												isDraftPreviewOpen &&
 												!isSelectedDraftRegenSettingsPreviewOpen &&
-												draftEmails.length > 1
+												draftEmailsForView.length > 1
 													? {
 															transform: `translateX(${compactDraftReviewStackShiftXPx}px)`,
 														}
@@ -6188,7 +6321,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												setSelectedDraft={setSelectedDraft}
 												setIsDraftDialogOpen={setIsDraftDialogOpen}
 												handleDraftSelection={handleDraftSelection}
-												draftEmails={draftEmails}
+												draftEmails={draftEmailsForView}
 												isPendingEmails={isPendingEmails}
 												setSelectedDraftIds={setDraftsTabSelectedIds}
 												onSend={handleSendDrafts}
@@ -6225,7 +6358,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											/>
 
 											{/* Send Button with arrows at narrowest breakpoint (< 952px) */}
-											{isNarrowestDesktop && draftEmails.length > 0 && !selectedDraft && (
+											{isNarrowestDesktop && draftEmailsForView.length > 0 && !selectedDraft && (
 												<div className="flex items-center justify-center gap-[20px] mt-4 w-full px-4">
 													{/* Left arrow */}
 													<button
@@ -6268,7 +6401,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																className="w-[89px] h-full flex items-center justify-center font-inter font-normal text-[17px] text-black cursor-pointer border-l-[2px] border-[#000000] bg-[#7CB67C] hover:bg-[#6FA36F]"
 																onClick={(e) => {
 																	e.stopPropagation();
-																	const allIds = new Set(draftEmails.map((d) => d.id));
+																	const allIds = new Set(draftEmailsForView.map((d) => d.id));
 																	const isAllSelected =
 																		draftsTabSelectedIds.size === allIds.size &&
 																		[...allIds].every((id) =>

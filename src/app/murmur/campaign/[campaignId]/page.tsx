@@ -214,6 +214,10 @@ type CampaignOverviewAskAnythingBoxProps = {
 	leftOverride?: string;
 	// Overrides the default `bottom` offset (used to sit it lower on the focused tabs).
 	bottomOverride?: number;
+	// On the Write/Drafts/Inbox preset tabs the box is a dimmed, display-only bar
+	// that lights up to full opacity on hover, mirroring the left "Showing" strip.
+	// Typing, focus and the submit button are disabled while in this mode.
+	dimUntilHover?: boolean;
 };
 
 const CampaignOverviewAskAnythingBox = ({
@@ -221,8 +225,10 @@ const CampaignOverviewAskAnythingBox = ({
 	value,
 	leftOverride,
 	bottomOverride,
+	dimUntilHover = false,
 }: CampaignOverviewAskAnythingBoxProps) => {
 	const [query, setQuery] = useState(value ?? '');
+	const [isHovered, setIsHovered] = useState(false);
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const submitQuery = () => onSubmit(query);
 
@@ -242,6 +248,8 @@ const CampaignOverviewAskAnythingBox = ({
 				height: CAMPAIGN_OVERVIEW_ASK_BOX_HEIGHT_PX,
 				transform: 'translateX(-50%)',
 				zIndex: 126,
+				opacity: dimUntilHover && !isHovered ? 0.4 : 1,
+				transition: dimUntilHover ? 'opacity 0.18s ease' : undefined,
 			}}
 		>
 			<div
@@ -254,7 +262,10 @@ const CampaignOverviewAskAnythingBox = ({
 					background: '#EFFFF3',
 					boxSizing: 'border-box',
 				}}
+				onMouseEnter={dimUntilHover ? () => setIsHovered(true) : undefined}
+				onMouseLeave={dimUntilHover ? () => setIsHovered(false) : undefined}
 				onMouseDown={(event) => {
+					if (dimUntilHover) return;
 					if ((event.target as HTMLElement).closest('button')) return;
 					inputRef.current?.focus();
 				}}
@@ -265,7 +276,12 @@ const CampaignOverviewAskAnythingBox = ({
 					aria-label="Ask anything"
 					value={query}
 					placeholder="Ask Anything"
-					className="pointer-events-auto absolute border-0 bg-transparent p-0 font-inter font-medium leading-none text-black outline-none placeholder:text-black placeholder:opacity-100"
+					readOnly={dimUntilHover}
+					tabIndex={dimUntilHover ? -1 : undefined}
+					className={cn(
+						'absolute border-0 bg-transparent p-0 font-inter font-medium leading-none text-black outline-none placeholder:text-black placeholder:opacity-100',
+						dimUntilHover ? 'pointer-events-none' : 'pointer-events-auto'
+					)}
 					style={{
 						left: 18,
 						top: 9,
@@ -284,7 +300,12 @@ const CampaignOverviewAskAnythingBox = ({
 				<button
 					type="button"
 					aria-label="Open campaign search"
-					className="pointer-events-auto absolute flex items-center justify-center border-0 p-0 text-black"
+					tabIndex={dimUntilHover ? -1 : undefined}
+					disabled={dimUntilHover}
+					className={cn(
+						'absolute flex items-center justify-center border-0 p-0 text-black',
+						dimUntilHover ? 'pointer-events-none' : 'pointer-events-auto'
+					)}
 					style={{
 						right: 9,
 						top: 9,
@@ -293,7 +314,7 @@ const CampaignOverviewAskAnythingBox = ({
 						borderRadius: 9,
 						background: '#ADFFC2',
 						boxSizing: 'border-box',
-						cursor: 'pointer',
+						cursor: dimUntilHover ? 'default' : 'pointer',
 					}}
 					onClick={submitQuery}
 				>
@@ -2019,8 +2040,10 @@ const Murmur = () => {
 		// there's no white-flash full reload. The dashboard page remounts fresh, so its
 		// URL-param rehydration effects (fromCampaignId / pick / allContacts) re-run and
 		// re-enter map-search mode exactly as a full reload did.
+		// `instant=1` is a one-shot signal: the dashboard snaps the persistent map straight to the
+		// search framing (no background-globe flash, no pan-down) only for this tab transition.
 		router.push(
-			`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}&pick=1&allContacts=1`
+			`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}&pick=1&allContacts=1&instant=1`
 		);
 	}, [campaign, router]);
 
@@ -2323,6 +2346,9 @@ const Murmur = () => {
 	}, [activeView]);
 
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
+	// Hover state for the dimmed Write/Drafts/Inbox left "Showing" strip: dimmed
+	// by default, full opacity + interactive while hovered (like the search page).
+	const [isPresetStripHovered, setIsPresetStripHovered] = useState(false);
 	const [campaignOverviewMapGrouping, setCampaignOverviewMapGrouping] =
 		useState<CampaignOverviewMapGrouping>('status');
 	const handleCampaignOverviewMapGroupingChange = useCallback(
@@ -3499,7 +3525,8 @@ const Murmur = () => {
 							</div>
 						)}
 						{/* Write/Drafts/Inbox tabs: the same legend locked to the tab's
-						    preset (full opacity), plus a dimmed, display-only search bar. */}
+						    preset (full opacity), plus a dimmed, display-only search bar
+						    that lights up to full opacity on hover, like the left strip. */}
 						{isPresetMapControlsView && (
 							<>
 								<div
@@ -3517,30 +3544,71 @@ const Murmur = () => {
 										bottomOverride={presetMapStatusStripBottomPx}
 										onToggleStatus={() => undefined}
 									/>
-									<div inert aria-hidden="true" style={{ opacity: 0.4 }}>
+									<div aria-hidden="true">
 										<CampaignOverviewAskAnythingBox
 											onSubmit={() => undefined}
 											value=""
 											leftOverride={presetMapControlsLeftCss}
 											bottomOverride={presetMapAskBoxBottomPx}
+											dimUntilHover
 										/>
 									</div>
 								</div>
-								{/* Dimmed, display-only mirror of the overview "Showing" strip.
-								    No data-campaign-overview-* attrs (DraftingSection queries
-								    those) and no mutating callbacks, so it can never disturb the
-								    overview's category/zoom/tool state. `inert` disables all
-								    interaction even though children opt into pointer-events. */}
-								<div inert aria-hidden="true" style={{ opacity: 0.4 }}>
+								{/* The overview "Showing" strip, mirrored onto the Write/Drafts/Inbox
+								    tabs: dimmed to 0.4 by default, fading to full opacity + becoming
+								    interactive while hovered (like the search page). Wired to the same
+								    map tool / category / zoom handlers as the overview strip. Omits the
+								    data-campaign-overview-* attrs — DraftingSection queries those only to
+								    dock overview contacts, which never happens on these preset tabs. */}
+								<div
+									data-campaign-interactive-surface
+									className="fixed z-[130] pointer-events-none"
+									onMouseEnter={() => setIsPresetStripHovered(true)}
+									onMouseLeave={() => setIsPresetStripHovered(false)}
+									style={{
+										left: `${CAMPAIGN_MAP_SELECT_GRAB_LEFT_PX}px`,
+										top: presetMapToolTopCss,
+										transform: `scale(${campaignMapSelectGrabViewScale})`,
+										transformOrigin: 'top left',
+										opacity: isPresetStripHovered ? 1 : 0.4,
+										transition: 'opacity 0.18s ease',
+									}}
+								>
+									{/* Invisible hit-area spanning the whole column so hovering anywhere
+									    over the strip (including the gaps between the stacked boxes)
+									    keeps it lit and interactive, matching the search page. */}
 									<div
-										className="fixed z-[130] pointer-events-none"
+										aria-hidden="true"
 										style={{
-											left: `${CAMPAIGN_MAP_SELECT_GRAB_LEFT_PX}px`,
-											top: presetMapToolTopCss,
-											transform: `scale(${campaignMapSelectGrabViewScale})`,
-											transformOrigin: 'top left',
+											position: 'absolute',
+											left: '-2px',
+											width: '60px',
+											top: `-${
+												MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+												MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+												MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+												MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+												MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
+												MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+												MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
+												MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX +
+												40
+											}px`,
+											height: `${
+												MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+												MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+												MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+												MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+												MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
+												MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+												MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
+												MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX +
+												200
+											}px`,
+											pointerEvents: 'auto',
 										}}
-									>
+									/>
+									<div className="pointer-events-none">
 										<div
 											className="absolute left-0 pointer-events-none rounded-[5px] bg-white px-[4px] py-[1px] font-inter text-[11px] font-medium text-black"
 											style={{
@@ -3561,7 +3629,9 @@ const Murmur = () => {
 										</div>
 										<MapSelectGrabTallStackBox
 											className="absolute pointer-events-none"
-											isSelectActive={false}
+											isSelectActive={isSelectMapToolActive}
+											onAllDeselected={() => setActiveMapTool('grab')}
+											onActiveCategoriesChange={handleMapGrabActiveCategoriesChange}
 											style={{
 												left: '-0.5px',
 												top: `-${
@@ -3574,11 +3644,16 @@ const Murmur = () => {
 													MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
 													MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX
 												}px`,
+												...(isSelectMapToolActive
+													? {
+														backgroundColor: '#A6DCB3',
+													}
+													: {}),
 											}}
 										/>
 										<MapSelectGrabStackBox
 											className="absolute left-0 pointer-events-none"
-											isSelectActive={false}
+											isSelectActive={isSelectMapToolActive}
 											selectedContent={<StackBoxSelectStarIcon />}
 											inactiveContent={
 												<MapSelectGrabStackTile backgroundColor="#EFEFEF">
@@ -3600,13 +3675,14 @@ const Murmur = () => {
 										</MapSelectGrabStackBox>
 										<MapSelectGrabStackBox
 											className="absolute left-0 pointer-events-none"
-											isSelectActive={false}
+											isSelectActive={isSelectMapToolActive}
 											selectedContent={<StackBoxSelectBlueSparkIcon />}
 											inactiveContent={
 												<MapSelectGrabStackTile backgroundColor="#EFEFEF">
 													<MapStackBlueSparkIcon />
 												</MapSelectGrabStackTile>
 											}
+											onActiveChange={handleMapGrabUncategorizedActiveChange}
 											style={{
 												top: `-${
 													MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
@@ -3623,9 +3699,13 @@ const Murmur = () => {
 											</MapSelectGrabStackTile>
 										</MapSelectGrabStackBox>
 										<MapSelectGrabStarterBox
-											className="absolute left-0 pointer-events-none"
+											className="absolute left-0 pointer-events-auto"
 											zoomLevelIndex={mapZoomControlIndex}
 											zoomLevelValue={mapZoomControlDisplayValue}
+											zoomLevelLiveControlRef={mapZoomControlLiveRef}
+											onZoomLevelIndexChange={handleMapZoomControlChange}
+											onZoomLevelValueChange={handleMapZoomControlValueChange}
+											onZoomLevelInteractionChange={handleMapZoomControlInteractionChange}
 											style={{
 												position: 'absolute',
 												left: 0,
@@ -3636,10 +3716,10 @@ const Murmur = () => {
 											}}
 										/>
 										<MapSelectGrabTool
-											activeTool="grab"
-											onSelectClick={() => undefined}
-											onGrabClick={() => undefined}
-											className="pointer-events-none"
+											activeTool={activeMapTool}
+											onSelectClick={handleSelectMapToolClick}
+											onGrabClick={() => setActiveMapTool('grab')}
+											className="pointer-events-auto"
 										/>
 									</div>
 								</div>

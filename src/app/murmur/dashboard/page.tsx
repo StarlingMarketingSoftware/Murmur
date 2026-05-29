@@ -189,6 +189,11 @@ const FREETEXT_URL_PARAM_KEYS = ['ft', 'ftLat', 'ftLon', 'ftR'] as const;
 const PENDING_SEARCH_STORAGE_KEY = 'murmur_pending_search';
 const ALL_CONTACTS_MAP_PARAM = 'allContacts';
 
+// Bumped once per campaign-tab → search mount (the `instant=1` URL flag). The persistent Mapbox
+// map is a long-lived singleton, so a boolean "instant" prop would only fire on the first switch;
+// a fresh nonce per mount re-arms the instant (duration-0) fit on every subsequent switch.
+let instantTabFitNonceCounter = 0;
+
 type CuratedUrlArgs = {
 	lat: number | null;
 	lon: number | null;
@@ -4692,6 +4697,9 @@ const DashboardContent = () => {
 
 		params.set('fromCampaignView', desiredView);
 		params.set('fromCampaignSearch', activeSearchQuery);
+		// Drop the one-shot tab-transition flag (already captured in component state) so a later
+		// refresh of this URL animates normally instead of snapping.
+		params.delete('instant');
 
 		// Curated and free-text travel under their own short-key namespaces so the rehydration
 		// effect can branch on whichever flag is present.
@@ -7302,8 +7310,19 @@ const DashboardContent = () => {
 	}, [isMapView]);
 
 	// Shared Mapbox layer (background globe + interactive results) — one map instance.
+	// One-shot signal set only by the campaign "Search" tab. Captured once at mount (the URL is
+	// stripped of `instant` after rehydration) so this transition snaps the map straight to the
+	// search framing with no background-globe flash and no pan-down animation.
+	const [isInstantTabTransition] = useState(
+		() => searchParams.get('instant')?.trim() === '1'
+	);
+	const [instantTabFitNonce] = useState(() =>
+		searchParams.get('instant')?.trim() === '1' ? ++instantTabFitNonceCounter : 0
+	);
 	const mapPresentation: 'background' | 'interactive' =
-		!fromHomeParam && !hasSearched ? 'background' : 'interactive';
+		!isInstantTabTransition && !fromHomeParam && !hasSearched
+			? 'background'
+			: 'interactive';
 	const shouldSpinBackgroundMap = mapPresentation === 'background';
 	const shouldShowSearchGeometryOnMap = !hasSearched || isMapSearchEngaged;
 	const shouldShowAmbientContactsOnMap = canDisengageMapSearch && !isMapSearchEngaged;
@@ -7559,6 +7578,7 @@ const DashboardContent = () => {
 			ambientActiveCategories: mapGrabActiveCategories,
 			ambientUncategorizedActive: mapGrabUncategorizedActive,
 			autoFitRequestNonce: mapSearchAutoFitRequestNonce,
+			instantAutoFitNonce: instantTabFitNonce,
 			emptyMapClickPrompt:
 				canDisengageMapSearch && isMapSearchEngaged ? 'Click to see all contacts' : null,
 			onEmptyMapClick:
@@ -7606,6 +7626,7 @@ const DashboardContent = () => {
 			handleMapViewportZoom,
 			handleMapVisibleOverlayContactsChange,
 			hoveredMapPanelContactId,
+			instantTabFitNonce,
 			isMapSearchEngaged,
 			isLoadingContacts,
 			isMapView,

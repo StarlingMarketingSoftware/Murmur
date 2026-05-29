@@ -6441,8 +6441,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													</div>
 
 												{/* Top content: Profile + Booking For */}
-												<div className="w-full px-[10px] pt-[14px] pb-[12px]">
-													<div className="w-[455.57px] max-[480px]:w-full mx-auto flex flex-col items-start">
+												{/* Same 455.57px width as the Auto tab, centered within the body box (no horizontal
+												   padding) so it fills the width like Auto instead of overflowing / shifting right.
+												   The Intro/Research/CTA blocks below keep their own narrower inset layout. */}
+												<div className="w-full pt-[14px] pb-[12px]">
+													<div className="w-[455.57px] max-w-full mx-auto flex flex-col items-start">
 													<ProfileSummaryBox
 														summary={hybridProfileSummary}
 														onOpen={handleOpenProfile}

@@ -687,6 +687,12 @@ export interface SearchResultsMapProps {
 	ambientUncategorizedActive?: boolean;
 	/** Increment to ask the map to refit to the active search without changing the query/results. */
 	autoFitRequestNonce?: number;
+	/**
+	 * Bump to request that the *next* auto-fit be applied instantly (duration 0) instead of an
+	 * animated ease/fly. Consumed once per distinct value; later fits animate normally. Used for the
+	 * campaign-tab → dashboard-search transition, which must land without a pan or globe flash.
+	 */
+	instantAutoFitNonce?: number;
 	/** Empty-map hover prompt. When present, an empty map click calls `onEmptyMapClick`. */
 	emptyMapClickPrompt?: string | null;
 	onEmptyMapClick?: () => void;
@@ -800,6 +806,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	ambientActiveCategories,
 	ambientUncategorizedActive = true,
 	autoFitRequestNonce = 0,
+	instantAutoFitNonce = 0,
 	emptyMapClickPrompt = null,
 	onEmptyMapClick,
 	selectedAreaBounds,
@@ -9265,6 +9272,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// treating resorted/streaming results as a brand new search (which causes map bouncing).
 	const lastSearchQueryKeyRef = useRef<string | null>(null);
 	const lastAutoFitRequestNonceRef = useRef<number>(autoFitRequestNonce ?? 0);
+	// Tracks the last consumed `instantAutoFitNonce` so each distinct value snaps exactly one fit.
+	const lastInstantAutoFitNonceRef = useRef<number>(0);
 	// Debounce auto-fit camera moves so rapid result updates don't cause zoom oscillation.
 	const autoFitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -9452,8 +9461,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			pendingSearch.key === searchQueryKey &&
 			Date.now() - pendingSearch.at < 10_000;
 
+		const instantFitRequested =
+			(instantAutoFitNonce ?? 0) > 0 &&
+			(instantAutoFitNonce ?? 0) !== lastInstantAutoFitNonceRef.current;
 		const autoFitDebounceMs =
-			cinematicAutoFitRef.current || isSearchQueryCinematic ? 0 : 180;
+			instantFitRequested || cinematicAutoFitRef.current || isSearchQueryCinematic
+				? 0
+				: 180;
 		autoFitTimeoutRef.current = setTimeout(() => {
 			// If a cinematic fly-in is already underway, don't restart the camera animation.
 			if (cinematicInFlightRef.current) return;
@@ -9471,8 +9485,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				!!pendingSearchNow &&
 				pendingSearchNow.key === searchQueryKey &&
 				Date.now() - pendingSearchNow.at < 10_000;
-			const durationMs =
-				cinematicNow || isUserStateClickCinematic || isSearchQueryCinematicNow
+			const durationMs = instantFitRequested
+				? 0
+				: cinematicNow || isUserStateClickCinematic || isSearchQueryCinematicNow
 					? DASHBOARD_TO_INTERACTIVE_TRANSITION_MS
 					: 650;
 
@@ -9507,6 +9522,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Only mark as "fit" if we actually moved the camera.
 			if (didFit) {
 				lastAutoFitRequestNonceRef.current = autoFitRequestNonceValue;
+				if (instantFitRequested) {
+					// Mark this nonce consumed; clear pending cinematic intents so the next *real*
+					// search/state-click animates normally instead of inheriting this snap.
+					lastInstantAutoFitNonceRef.current = instantAutoFitNonce ?? 0;
+					pendingSearchQueryCinematicRef.current = null;
+					pendingStateClickCinematicRef.current = null;
+				}
 				// Clear the user-click flag once we successfully kicked off the cinematic state zoom.
 				if (isUserStateClickCinematic) {
 					pendingStateClickCinematicRef.current = null;
@@ -9577,6 +9599,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		skipAutoFit,
 		searchQuery,
 		autoFitRequestNonce,
+		instantAutoFitNonce,
 	]);
 
 	// If auto-fit is disabled, ensure we don't have a queued fit from a prior render.
@@ -9588,15 +9611,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 	}, [skipAutoFit]);
 
-	// Reset bounds tracking when contacts prop is empty (preparing for new search)
+	// Reset bounds tracking when contacts prop is empty (preparing for new search).
+	// Do NOT re-arm while auto-fit is disabled: an empty-contacts frame under skipAutoFit is
+	// always transient (the route-handoff FALLBACK flash between campaign/dashboard, or
+	// background/decorative mode). Re-arming there forces a spurious re-fit when the real
+	// interactive config rehydrates with the same search, overriding the user's camera.
 	useEffect(() => {
+		if (skipAutoFit) return;
 		if (contacts.length === 0) {
 			hasFitBoundsRef.current = false;
 			lastContactsCountRef.current = 0;
 			lastFirstContactIdRef.current = null;
 			lastLockedStateKeyRef.current = null;
 		}
-	}, [contacts]);
+	}, [contacts, skipAutoFit]);
 
 	const handleMarkerClick = (contact: ContactWithName) => {
 		onMarkerClick?.(contact);

@@ -246,8 +246,8 @@ const parseVenueLocationParts = (
 	const state =
 		rawRegion.length === 2
 			? rawRegion.toUpperCase()
-			: US_STATES.find((s) => s.name.toLowerCase() === rawRegion.toLowerCase())?.abbr ??
-				rawRegion;
+			: (US_STATES.find((s) => s.name.toLowerCase() === rawRegion.toLowerCase())?.abbr ??
+				rawRegion);
 	return { city, state };
 };
 
@@ -1523,7 +1523,10 @@ function VenuePhotosPlaceholder() {
 	const readyPhotos = photos.filter((photo) => photo.status === 'ready');
 	const slots: VenuePhotoSlot[] = [
 		...readyPhotos.map((asset) => ({ kind: 'photo' as const, asset })),
-		...activeUploads.map((uploadState) => ({ kind: 'upload' as const, upload: uploadState })),
+		...activeUploads.map((uploadState) => ({
+			kind: 'upload' as const,
+			upload: uploadState,
+		})),
 	];
 	if (slots.length < VENUE_PHOTO_LIMIT) {
 		slots.push({ kind: 'add' });
