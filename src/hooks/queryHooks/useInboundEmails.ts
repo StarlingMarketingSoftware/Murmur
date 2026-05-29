@@ -7,6 +7,12 @@ import { urls } from '@/constants/urls';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+// Phase 1: poll so newly-received replies (Mailgun inbound + venue messages projected
+// into this feed) appear without a manual refresh. Phase 2 flips NEXT_PUBLIC_USE_REALTIME
+// and a Pusher subscription replaces polling — matching useConversations.
+const REALTIME_ENABLED = process.env.NEXT_PUBLIC_USE_REALTIME === 'true';
+const INBOUND_REFETCH_INTERVAL_MS = 15_000;
+
 export const INBOUND_EMAIL_QUERY_KEYS = {
 	all: ['inboundEmails'] as const,
 	list: () => [...INBOUND_EMAIL_QUERY_KEYS.all, 'list'] as const,
@@ -38,6 +44,7 @@ export const useGetInboundEmails = (options: InboundEmailQueryOptions = {}) => {
 			return response.json() as Promise<InboundEmailWithRelations[]>;
 		},
 		enabled: options.enabled,
+		refetchInterval: REALTIME_ENABLED ? false : INBOUND_REFETCH_INTERVAL_MS,
 	});
 };
 

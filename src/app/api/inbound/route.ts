@@ -7,6 +7,7 @@ import {
 	apiUnauthorized,
 	handleApiError,
 } from '@/app/api/_utils';
+import { projectVenueRepliesForUser } from '@/app/api/_utils/venueInboundProjection';
 import { getValidatedParamsFromUrl } from '@/utils';
 import { z } from 'zod';
 import crypto from 'crypto';
@@ -33,23 +34,32 @@ export async function GET(req: NextRequest) {
 
 		const { campaignId, contactId } = validatedFilters.data || {};
 
-		const inboundEmails = await prisma.inboundEmail.findMany({
-			where: {
-				userId,
-				...(campaignId && { campaignId: Number(campaignId) }),
-				...(contactId && { contactId: Number(contactId) }),
-			},
-			include: {
-				contact: true,
-				campaign: true,
-				originalEmail: true,
-			},
-			orderBy: {
-				receivedAt: 'desc',
-			},
-		});
+		// Real Mailgun inbound rows + venue→artist internal messages projected into the
+		// same shape (venue replies live in Conversation/Message, not InboundEmail).
+		const [inboundEmails, venueRows] = await Promise.all([
+			prisma.inboundEmail.findMany({
+				where: {
+					userId,
+					...(campaignId && { campaignId: Number(campaignId) }),
+					...(contactId && { contactId: Number(contactId) }),
+				},
+				include: {
+					contact: true,
+					campaign: true,
+					originalEmail: true,
+				},
+				orderBy: {
+					receivedAt: 'desc',
+				},
+			}),
+			projectVenueRepliesForUser(userId),
+		]);
 
-		return apiResponse(inboundEmails);
+		const merged = [...inboundEmails, ...venueRows].sort(
+			(a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
+		);
+
+		return apiResponse(merged);
 	} catch (error) {
 		return handleApiError(error);
 	}

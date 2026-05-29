@@ -4,6 +4,8 @@ import { FC, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'r
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
+import { useSendConversationReply } from '@/hooks/queryHooks/useConversations';
+import { convertHtmlToPlainText } from '@/utils';
 import { useMe } from '@/hooks/useMe';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
@@ -931,6 +933,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		successMessage: 'Reply sent successfully',
 		errorMessage: 'Failed to send reply',
 	});
+	// Venue replies are internal messages, not emailable contacts; replying must go
+	// back through the messaging system (createReply) rather than Mailgun.
+	const { mutateAsync: sendVenueReply } = useSendConversationReply();
 
 	// If a list of allowed sender emails is provided (e.g. campaign contacts),
 	// hide any inbound emails whose sender address does not match.
@@ -1309,6 +1314,43 @@ export const InboxSection: FC<InboxSectionProps> = ({
 			});
 			notifyThreadReplySent();
 			setReplyMessage('');
+			return;
+		}
+
+		// Venue rows are projected internal messages — route the reply back through the
+		// messaging system instead of Mailgun (their sender is a placeholder address).
+		if (selectedEmail.venueConversationId != null) {
+			setIsSending(true);
+			try {
+				await sendVenueReply({
+					conversationId: selectedEmail.venueConversationId,
+					body: convertHtmlToPlainText(messageToSend),
+				});
+				setSentReplies((prev) => {
+					const existingReplies = prev[replyKey] || [];
+					return {
+						...prev,
+						[replyKey]: [
+							...existingReplies,
+							{ message: messageToSend, timestamp: new Date() },
+						],
+					};
+				});
+				notifyThreadReplySent();
+				setReplyMessage('');
+			} catch (error) {
+				if (senderKey) {
+					setReplyThemeBySender((prev) => {
+						if (prev[senderKey] === undefined) return prev;
+						const next = { ...prev };
+						delete next[senderKey];
+						return next;
+					});
+				}
+				console.error('Failed to send venue reply:', error);
+			} finally {
+				setIsSending(false);
+			}
 			return;
 		}
 

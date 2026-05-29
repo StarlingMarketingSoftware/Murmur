@@ -11,6 +11,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { EMAIL_QUERY_KEYS } from './useEmails';
+import { INBOUND_EMAIL_QUERY_KEYS } from './useInboundEmails';
 
 export const CONVERSATION_QUERY_KEYS = {
 	all: ['conversations'] as const,
@@ -122,6 +123,53 @@ export const useSendReply = (
 				});
 			}
 			queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.list() });
+		},
+	});
+};
+
+/**
+ * Reply within a conversation identified per-call (the conversationId is passed to
+ * `.mutate`, not bound at hook creation). Used by the campaign inbox, where venue
+ * replies are surfaced as inbound-email rows and replying must route back through
+ * the messaging system rather than Mailgun. No optimistic message-cache update —
+ * the inbox renders its own optimistic reply state.
+ */
+export const useSendConversationReply = (options: CustomMutationOptions = {}) => {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async ({
+			conversationId,
+			body,
+		}: {
+			conversationId: number;
+			body: string;
+		}) => {
+			const payload: PostMessageData = { kind: 'reply', conversationId, body };
+			const response = await _fetch(urls.api.messages.index, 'POST', payload);
+			if (!response.ok) {
+				const err = await response.json().catch(() => ({}));
+				throw new Error(err.error || 'Failed to send reply');
+			}
+			return response.json() as Promise<{
+				conversationId: number;
+				message: SerializedMessage;
+			}>;
+		},
+		onSuccess: (data) => {
+			queryClient.invalidateQueries({
+				queryKey: CONVERSATION_QUERY_KEYS.messages(data.conversationId),
+			});
+			queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.list() });
+			// The reply changes what projectVenueRepliesForUser returns in the inbound
+			// feed (venue replies are surfaced there), so refetch the Responses inbox.
+			queryClient.invalidateQueries({ queryKey: INBOUND_EMAIL_QUERY_KEYS.all });
+			options.onSuccess?.();
+		},
+		onError: (error) => {
+			if (!options.suppressToasts) {
+				toast.error(error instanceof Error ? error.message : 'Failed to send reply');
+			}
 		},
 	});
 };

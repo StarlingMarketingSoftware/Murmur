@@ -24,7 +24,17 @@ export type InboundEmailWithRelations = Prisma.InboundEmailGetPayload<{
 		campaign: true;
 		originalEmail: true;
 	};
-}>;
+}> & {
+	/**
+	 * Set ONLY on rows that are venue↔artist internal messages projected into the
+	 * inbound feed by GET /api/inbound — they are not real Mailgun InboundEmail
+	 * rows (their `id` is synthetic/negative). Carries the Conversation id so a
+	 * reply can be routed back through the messaging system (createReply) instead
+	 * of emailing the venue's `noreply.invalid` placeholder address. Absent/undefined
+	 * on real inbound email rows.
+	 */
+	venueConversationId?: number | null;
+};
 
 export type TestDraftEmail = {
 	subject: string;

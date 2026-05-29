@@ -2499,14 +2499,19 @@ const Murmur = () => {
 		};
 	}, []);
 
-	// In the thinnest "scrollable" campaign breakpoint, some nested scroll containers can trap
-	// wheel/trackpad scroll (especially on Write + Inbox), making the page feel "stuck" unless the
-	// cursor is positioned just right.
+	// Wheel/trackpad behavior over the campaign UI, handled per layout mode:
 	//
-	// This capture handler restores expected scroll behavior:
+	// Thinnest "scrollable" breakpoint: some nested scroll containers can trap wheel scroll
+	// (especially on Write + Inbox), making the page feel "stuck" unless the cursor is just right.
 	// - If a nested scroll container under the cursor CAN scroll, let it.
 	// - Otherwise, force the wheel gesture to scroll the PAGE.
 	// - Never interfere with text inputs / editable fields.
+	//
+	// Compact ("nuclear") desktop mode: the page itself must never scroll — panels do their own
+	// scrolling. Over the opacity band that holds the panels, a wheel gesture no nested container
+	// can consume would otherwise nudge the document a few px before keepCompactPageAtOrigin snaps
+	// it back (a visible jitter). Swallow it so the band stays steady; leave the clear map area
+	// outside the band alone so Mapbox wheel-zoom keeps working.
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 
@@ -2538,21 +2543,42 @@ const Murmur = () => {
 		const onWheelCapture = (e: WheelEvent) => {
 			try {
 				const html = document.documentElement;
-				if (!html.classList.contains(CAMPAIGN_SCROLLABLE_CLASS)) return;
-				// Limit to the views that were observed to trap scroll.
-				if (!(activeView === 'testing' || activeView === 'inbox')) return;
-
 				const target = e.target as HTMLElement | null;
 				if (!target) return;
-				if (isEditableTarget(target)) return;
 
-				// Prefer native behavior when the immediate scroll container can handle it.
-				const scrollParent = findScrollableAncestor(target);
-				if (scrollParent && canScrollY(scrollParent, e.deltaY)) return;
+				// Thinnest "scrollable" breakpoint: force the gesture to scroll the page when the
+				// immediate scroll container can't take it.
+				if (html.classList.contains(CAMPAIGN_SCROLLABLE_CLASS)) {
+					// Limit to the views that were observed to trap scroll.
+					if (!(activeView === 'testing' || activeView === 'inbox')) return;
+					if (isEditableTarget(target)) return;
 
-				// Otherwise, force the wheel gesture to scroll the document.
-				e.preventDefault();
-				window.scrollBy({ top: e.deltaY, left: 0, behavior: 'auto' });
+					// Prefer native behavior when the immediate scroll container can handle it.
+					const scrollParent = findScrollableAncestor(target);
+					if (scrollParent && canScrollY(scrollParent, e.deltaY)) return;
+
+					// Otherwise, force the wheel gesture to scroll the document.
+					e.preventDefault();
+					window.scrollBy({ top: e.deltaY, left: 0, behavior: 'auto' });
+					return;
+				}
+
+				// Compact ("nuclear") desktop mode: keep the opacity band steady (no page nudge /
+				// overscroll snap-back), but leave the clear map area free for Mapbox wheel-zoom.
+				if (html.classList.contains(CAMPAIGN_COMPACT_CLASS)) {
+					const overlay = document.querySelector('.campaign-map-split-overlay');
+					if (!overlay) return;
+					const bandRect = overlay.getBoundingClientRect();
+					// Outside the band's horizontal span is the clear map region — let the map zoom.
+					if (e.clientX < bandRect.left || e.clientX > bandRect.right) return;
+
+					// If a nested scroll container under the cursor can consume the delta, let it scroll.
+					const scrollParent = findScrollableAncestor(target);
+					if (scrollParent && canScrollY(scrollParent, e.deltaY)) return;
+
+					// Otherwise swallow it so the panels/band don't jitter.
+					e.preventDefault();
+				}
 			} catch {
 				// ignore
 			}
