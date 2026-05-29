@@ -4400,7 +4400,8 @@ const DashboardContent = () => {
 			setActiveSection(null);
 		}
 
-		// Submit after a short delay to allow state to update.
+		// Defer to the next tick so the restored UI state flushes and paints first, then submit.
+		// Uses 0 (not a wall-clock delay) so there's no perceptible dead time before the search runs.
 		setTimeout(() => {
 			form.setValue('searchText', dashboardSearchParam);
 			form.handleSubmit(onSubmit)();
@@ -4409,7 +4410,7 @@ const DashboardContent = () => {
 			if (dashboardViewParam === 'table') {
 				setTimeout(() => setIsMapView(false), 0);
 			}
-		}, 100);
+		}, 0);
 	}, [
 		activeSearchQuery,
 		curatedCategoryParam,
@@ -4529,7 +4530,8 @@ const DashboardContent = () => {
 			setActiveSection(null);
 		}
 
-		// Submit after a short delay to allow state to update.
+		// Defer to the next tick so the restored UI state flushes and paints first, then submit.
+		// Uses 0 (not a wall-clock delay) so there's no perceptible dead time before the search runs.
 		setTimeout(() => {
 			form.setValue('searchText', fromCampaignSearchParam);
 			form.handleSubmit(onSubmit)();
@@ -4538,7 +4540,7 @@ const DashboardContent = () => {
 			if (fromCampaignViewParam === 'table') {
 				setTimeout(() => setIsMapView(false), 0);
 			}
-		}, 100);
+		}, 0);
 	}, [
 		activeSearchQuery,
 		curatedCategoryParam,

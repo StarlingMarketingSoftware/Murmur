@@ -34,7 +34,14 @@ export function PersistentDashboardMap() {
 		pathname === urls.murmur.campaign.index ||
 		pathname.startsWith(`${urls.murmur.campaign.index}/`);
 
-	const shouldRenderMap = mounted && (Boolean(mapConfig) || isCampaignRoute);
+	// Keep the singleton Mapbox instance mounted across every map-bearing route, even while the
+	// config is momentarily null during a route handoff (e.g. campaign → dashboard, where the
+	// outgoing page clears the config before the incoming page sets it). Without this the map
+	// unmounts and re-initializes mid-navigation, which reads as a flash. Non-map routes still
+	// hide it (none of these flags match and their config is null).
+	const shouldRenderMap =
+		mounted &&
+		(isDashboardRoute || isVenuePortalRoute || isCampaignRoute || Boolean(mapConfig));
 	const isInteractiveDashboardMap = isDashboardRoute && Boolean(mapConfig?.isMapView);
 	const isInteractiveVenueMap = isVenuePortalRoute && Boolean(mapConfig?.isMapView);
 	// The venue portal reveals the persistent map with the same semantics as the

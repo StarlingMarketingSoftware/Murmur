@@ -691,7 +691,7 @@ const getInitialCampaignWorkspaceViewFromLocation = (): ViewType => {
 };
 
 // Transition duration in ms - fast enough to feel instant, still smooth
-const TRANSITION_DURATION = 180;
+const TRANSITION_DURATION = 120;
 // Safety valve: if a destination view is unusually slow to paint, don't block the transition forever.
 const MAX_TRANSITION_WAIT_MS = 650;
 
@@ -1175,8 +1175,11 @@ const Murmur = () => {
 			document.body.classList.remove('murmur-campaign');
 		};
 	}, []);
-	const { campaign, isPendingCampaign, setIsIdentityDialogOpen, isIdentityDialogOpen } =
+	const { campaign, campaignId, isPendingCampaign, setIsIdentityDialogOpen, isIdentityDialogOpen } =
 		useCampaignDetail();
+	// Route id is known immediately (before the detail query resolves), so the contact/email/inbound
+	// queries can fire in parallel with useGetCampaign instead of waiting on campaign?.id.
+	const routeCampaignId = campaignId ? Number(campaignId) : undefined;
 	const isMobile = useIsMobile();
 	const [viewportWidth, setViewportWidth] = useState(0);
 	const [viewportHeight, setViewportHeight] = useState(0);
@@ -3028,22 +3031,22 @@ const Murmur = () => {
 
 	// Fetch campaign contacts at the page level so the persistent map can stay interactive on every tab.
 	const { data: campaignMapContacts, isLoading: isCampaignMapContactsLoading } =
-		useGetCampaignContacts(campaign?.id, {
-			enabled: Boolean(campaign?.id) && !isMobile,
+		useGetCampaignContacts(routeCampaignId, {
+			enabled: Boolean(routeCampaignId) && !isMobile,
 		});
 	const { data: headerEmails } = useGetEmails({
-		filters: { campaignId: campaign?.id },
+		filters: { campaignId: routeCampaignId },
 		enabled:
-			Boolean(campaign?.id) &&
+			Boolean(routeCampaignId) &&
 			isMobile === false &&
 			(isNarrowestDesktop ||
 				activeView === 'overview' ||
 				isCompactCampaignWorkspaceView(activeView)),
 	});
 	const { data: overviewInboundEmails } = useGetInboundEmails({
-		filters: { campaignId: campaign?.id },
+		filters: { campaignId: routeCampaignId },
 		enabled:
-			Boolean(campaign?.id) &&
+			Boolean(routeCampaignId) &&
 			isMobile === false &&
 			(activeView === 'overview' || isCompactCampaignWorkspaceView(activeView)),
 	});
@@ -3183,7 +3186,9 @@ const Murmur = () => {
 		[isMobile, persistentCampaignMapProps]
 	);
 
-	useLayoutEffect(() => {
+	// Deferred to useEffect (not useLayoutEffect) so a tab switch paints the new tab UI immediately;
+	// the background map picks up the new config one frame later (imperceptible behind the content).
+	useEffect(() => {
 		setPersistentMapConfig(persistentCampaignMapConfig);
 	}, [persistentCampaignMapConfig, setPersistentMapConfig]);
 
@@ -3419,15 +3424,15 @@ const Murmur = () => {
 	// fixed top nav box (only in the standard desktop header layout).
 	//
 	// The top nav backdrop box is fixed at top:9px and its inner box is scaled by
-	// CAMPAIGN_MAP_CONTENT_SCALE, so its bottom edge resolves to
-	// 9 + (height × scale). We anchor the content box 27px beneath that.
+	// CAMPAIGN_TOP_NAV_UI_SCALE (matching the dashboard search bar), so its bottom edge
+	// resolves to 9 + (height × scale). We anchor the content box 27px beneath that.
 	//
 	// Notes:
 	// - The campaign header row is a fixed 50px tall.
 	// - DraftingSection contains a small 4px spacer div at the very top (mb-[4px]).
 	const CAMPAIGN_TOP_NAV_BOX_BOTTOM_PX =
 		CAMPAIGN_TOP_NAV_BACKDROP_BOX_TOP_PX +
-		CAMPAIGN_TOP_NAV_BACKDROP_BOX_HEIGHT_PX * CAMPAIGN_MAP_CONTENT_SCALE;
+		CAMPAIGN_TOP_NAV_BACKDROP_BOX_HEIGHT_PX * CAMPAIGN_TOP_NAV_UI_SCALE;
 	const WRITING_BOX_TOP_PX = Math.round(CAMPAIGN_TOP_NAV_BOX_BOTTOM_PX + 27);
 	const CAMPAIGN_HEADER_HEIGHT_PX = 50;
 	const DRAFTING_SECTION_TOP_SPACER_PX = 4;
@@ -3713,7 +3718,7 @@ const Murmur = () => {
 										>
 											<div
 												style={{
-													transform: `scale(${CAMPAIGN_MAP_CONTENT_SCALE})`,
+													transform: `scale(${MAP_VIEW_UI_SCALE})`,
 													transformOrigin: 'top center',
 													width: `${MAP_VIEW_TOP_BACKDROP_BOX_WIDTH_PX}px`,
 													height: `${MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX}px`,
@@ -4439,11 +4444,9 @@ const Murmur = () => {
 										{/* Current view - always visible (avoid the "white flash" between tabs) */}
 										<div
 											data-campaign-view-layer="active"
-											className={cn(
-												'relative w-full',
-												// Prevent interacting with the destination view while the previous view is still covering it.
-												isTransitioning && previousView && 'pointer-events-none'
-											)}
+											// Always interactive: the new tab accepts clicks immediately on switch. The
+											// previous layer fading out above is pointer-events-none, so clicks fall through here.
+											className="relative w-full"
 											style={{ zIndex: 1 }}
 										>
 										<DraftingSection

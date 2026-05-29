@@ -114,7 +114,10 @@ export const useGetCampaignContacts = (
 			return response.json();
 		},
 		enabled,
-		staleTime: 1000 * 30,
+		// 5 min, matching the other campaign queries: avoids refetching contacts on quick
+		// dashboard<->campaign round-trips. Add-contacts mutations invalidate this key, which
+		// forces a refetch regardless of staleTime, so freshness after edits is preserved.
+		staleTime: 1000 * 60 * 5,
 	});
 };
 
