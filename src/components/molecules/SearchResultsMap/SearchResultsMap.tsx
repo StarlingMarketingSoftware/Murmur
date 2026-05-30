@@ -6694,6 +6694,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			dragRotate: false,
 			pitchWithRotate: false,
 			touchPitch: false,
+			// Keep previously-loaded basemap tiles resident across zoom changes so a
+			// deep zoom-in doesn't evict the low-zoom land tiles. Without this, zooming
+			// back out re-requests them and the ocean-blue background flashes through
+			// the land while they reload. Per-source cap; basemap cartography is static.
+			maxTileCacheSize: 512,
+			refreshExpiredTiles: false,
 			...(contactLightsDebugEnabled ? { showTileBoundaries: true } : {}),
 		});
 
