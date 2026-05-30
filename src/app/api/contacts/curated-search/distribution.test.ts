@@ -1102,3 +1102,104 @@ describe('distributeAcrossBuckets — live music tier', () => {
 		assert.equal(counts['Wineries'], 10, 'each category still gets its even share');
 	});
 });
+
+// ---------------------------------------------------------------------------
+// Exactness guard for the curated-search speedup: distributeAcrossBuckets gained
+// an optional shared tier memo so the pipeline can score each contact once
+// across the radius-ladder rungs / pool passes. Because orderingTier is a pure
+// function of the contact, sharing the memo must NOT change the output, the sort,
+// or the number/order of Math.random() draws. These tests pin that invariant by
+// driving Math.random with a fixed PRNG and diffing the exact ordered ids.
+// ---------------------------------------------------------------------------
+describe('distributeAcrossBuckets — shared tier memo is output-neutral', () => {
+	const center = { lat: 39.95, lon: -75.16 };
+
+	// Deterministic LCG so both branches consume an identical random stream.
+	const makePRNG = (seed: number): (() => number) => {
+		let s = seed >>> 0;
+		return () => {
+			s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+			return s / 2 ** 32;
+		};
+	};
+
+	// A mix of tiers: canonical state-suffix titles, live-music metadata, and
+	// thin rows, plus tied rows (same tier) to exercise the within-tier shuffle.
+	const mixedPool = (n: number, idBase: number): any[] =>
+		Array.from({ length: n }, (_, i) => {
+			const id = idBase + i;
+			const variant = i % 4;
+			return stub(id, {
+				title: variant === 0 ? 'Music Venues PA' : 'Music Venues with live shows',
+				metadata: variant === 1 ? 'Live music every Friday, sets at 8pm' : null,
+				website: variant === 2 ? '' : `https://example.com/${id}`,
+				company: variant === 3 ? '' : `Company ${id}`,
+			});
+		});
+
+	const ids = (rows: { id: number }[]): number[] => rows.map((r) => r.id);
+
+	test('empty shared memo == internal memo (identical ordered ids)', () => {
+		const orig = Math.random;
+		try {
+			const pool = mixedPool(60, 1000);
+
+			Math.random = makePRNG(12345);
+			const internal = distributeAcrossBuckets(pool, 25, center, 250);
+
+			Math.random = makePRNG(12345);
+			const shared = distributeAcrossBuckets(pool, 25, center, 250, new Map());
+
+			assert.deepEqual(ids(shared), ids(internal));
+		} finally {
+			Math.random = orig;
+		}
+	});
+
+	test('memo reused across calls on shared objects == fresh memo each call', () => {
+		const orig = Math.random;
+		try {
+			// `narrow` shares object references with `full` (as the radius ladder
+			// does), so the 2nd call reads cached tiers for those objects.
+			const full = mixedPool(50, 2000);
+			const narrow = full.slice(0, 28);
+
+			Math.random = makePRNG(777);
+			const memo = new Map();
+			const s1 = distributeAcrossBuckets(full, 20, center, 250, memo);
+			const s2 = distributeAcrossBuckets(narrow, 20, center, 120, memo);
+
+			Math.random = makePRNG(777);
+			const f1 = distributeAcrossBuckets(full, 20, center, 250);
+			const f2 = distributeAcrossBuckets(narrow, 20, center, 120);
+
+			assert.deepEqual(ids(s1), ids(f1), 'first call output unchanged by shared memo');
+			assert.deepEqual(ids(s2), ids(f2), 'memo reuse on shared objects is output-neutral');
+		} finally {
+			Math.random = orig;
+		}
+	});
+
+	test('pre-seeded correct tiers (cache hit) produce identical output', () => {
+		const orig = Math.random;
+		try {
+			const pool = mixedPool(40, 3000);
+
+			// Prime a memo by running once (fills it with the true tiers), then run
+			// a fresh internal-memo pass on the same RNG seed and object refs.
+			const primed = new Map();
+			Math.random = makePRNG(99);
+			distributeAcrossBuckets(pool, 20, center, 250, primed);
+
+			Math.random = makePRNG(2024);
+			const cached = distributeAcrossBuckets(pool, 18, center, 250, primed);
+
+			Math.random = makePRNG(2024);
+			const fresh = distributeAcrossBuckets(pool, 18, center, 250);
+
+			assert.deepEqual(ids(cached), ids(fresh));
+		} finally {
+			Math.random = orig;
+		}
+	});
+});

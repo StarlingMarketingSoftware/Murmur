@@ -325,7 +325,8 @@ export const distributeAcrossBuckets = (
 	candidates: Contact[],
 	limit: number,
 	center: { lat: number; lon: number } | null,
-	radiusKm: number | null
+	radiusKm: number | null,
+	tierMemo?: Map<Contact, number>
 ): Contact[] => {
 	if (candidates.length === 0 || limit <= 0) return [];
 
@@ -334,7 +335,13 @@ export const distributeAcrossBuckets = (
 	// otherwise re-evaluate it O(log n) times per item, which on a hundreds-row
 	// candidate pool is the difference between a sub-second curated-search
 	// response and a request that exceeds the frontend's 25s timeout.
-	const tierByContact = new Map<Contact, number>();
+	//
+	// An optional caller-supplied memo lets the curated pipeline share tiers
+	// across the radius-ladder rungs and category passes that re-distribute the
+	// same Contact objects, so each contact is scored exactly once per request.
+	// orderingTier is a pure function of the contact, so a shared memo yields
+	// identical values — and therefore an identical sort and RNG-draw sequence.
+	const tierByContact = tierMemo ?? new Map<Contact, number>();
 	const tierOf = (c: Contact): number => {
 		const cached = tierByContact.get(c);
 		if (cached !== undefined) return cached;

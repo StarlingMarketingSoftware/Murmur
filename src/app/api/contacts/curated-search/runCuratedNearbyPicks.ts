@@ -138,9 +138,17 @@ const buildBoundedWhere = (
 	return { AND: conditions };
 };
 
+// The canonical title set is a pure function of the prefix list (~900 strings
+// for the full curated mix) and is identical on every request, so memoize it at
+// module scope keyed by the (ordered) prefix list rather than rebuilding it on
+// each call. IN-clause order does not affect query results.
+const canonicalCategoryTitlesCache = new Map<string, string[]>();
 const buildCanonicalCategoryTitles = (
 	titlePrefixes: readonly string[]
 ): string[] => {
+	const cacheKey = titlePrefixes.join('\n');
+	const cached = canonicalCategoryTitlesCache.get(cacheKey);
+	if (cached) return cached;
 	const titles = new Set<string>();
 	for (const prefix of titlePrefixes) {
 		for (const state of US_STATES) {
@@ -148,7 +156,9 @@ const buildCanonicalCategoryTitles = (
 			titles.add(`${prefix} ${state.abbr}`);
 		}
 	}
-	return [...titles];
+	const result = [...titles];
+	canonicalCategoryTitlesCache.set(cacheKey, result);
+	return result;
 };
 
 const buildCanonicalWhere = (
@@ -168,21 +178,36 @@ const buildCanonicalWhere = (
 	return { AND: conditions };
 };
 
-const matchCategory = (
-	title: string | null,
+// Longest-prefix-first category matcher. The entry list (lowercased prefixes,
+// sorted longest-first) is a pure function of the category set, so the curated
+// pipeline builds it ONCE per distinct category set and reuses it across every
+// candidate instead of rebuilding + re-sorting it on each call. Splitting the
+// build from the per-title lookup keeps the matching semantics byte-identical
+// (category prefixes are ASCII, so lowercasing never changes their length and
+// the longest-first sort is unaffected).
+type CategoryMatchEntry = { prefixLc: string; categoryKey: string };
+
+const buildCategoryMatchEntries = (
 	categories: readonly { label: string; titlePrefixes: readonly string[] }[]
+): CategoryMatchEntry[] => {
+	const flat: CategoryMatchEntry[] = [];
+	for (const c of categories) {
+		const key = c.titlePrefixes[0];
+		for (const p of c.titlePrefixes)
+			flat.push({ prefixLc: p.toLowerCase(), categoryKey: key });
+	}
+	flat.sort((a, b) => b.prefixLc.length - a.prefixLc.length);
+	return flat;
+};
+
+const matchCategoryWithEntries = (
+	title: string | null,
+	entries: readonly CategoryMatchEntry[]
 ): string | null => {
 	if (!title) return null;
 	const lc = title.toLowerCase();
-	type Entry = { prefix: string; categoryKey: string };
-	const flat: Entry[] = [];
-	for (const c of categories) {
-		const key = c.titlePrefixes[0];
-		for (const p of c.titlePrefixes) flat.push({ prefix: p, categoryKey: key });
-	}
-	flat.sort((a, b) => b.prefix.length - a.prefix.length);
-	for (const { prefix, categoryKey } of flat) {
-		if (lc.startsWith(prefix.toLowerCase())) return categoryKey;
+	for (const { prefixLc, categoryKey } of entries) {
+		if (lc.startsWith(prefixLc)) return categoryKey;
 	}
 	return null;
 };
@@ -190,12 +215,22 @@ const matchCategory = (
 const applyRadius = (
 	candidates: Contact[],
 	center: { lat: number; lon: number } | null,
-	radiusKm: number | null
+	radiusKm: number | null,
+	distanceMemo?: Map<Contact, number>
 ): Contact[] => {
 	if (!center || radiusKm == null) return candidates;
 	return candidates.filter((c) => {
 		if (c.latitude == null || c.longitude == null) return false;
-		return distanceKm(center, { lat: c.latitude, lon: c.longitude }) <= radiusKm;
+		// The request center is fixed, so distance to it is a pure function of the
+		// contact — reuse it across the radius-ladder rungs instead of recomputing
+		// the haversine each pass. The same JS distanceKm is used, so the float and
+		// the `<= radiusKm` decision are unchanged.
+		let d = distanceMemo?.get(c);
+		if (d === undefined) {
+			d = distanceKm(center, { lat: c.latitude, lon: c.longitude });
+			distanceMemo?.set(c, d);
+		}
+		return d <= radiusKm;
 	});
 };
 
@@ -205,7 +240,9 @@ const buildCategoryPool = (
 	requestedLimit: number,
 	center: { lat: number; lon: number } | null,
 	requestedRadiusKm: number | null,
-	radiusLadder: (number | null)[]
+	radiusLadder: (number | null)[],
+	tierMemo?: Map<Contact, number>,
+	distanceMemo?: Map<Contact, number>
 ): { contacts: Contact[]; radiusUsed: number | null } => {
 	if (allCandidates.length === 0) return { contacts: [], radiusUsed: requestedRadiusKm };
 
@@ -214,9 +251,15 @@ const buildCategoryPool = (
 	const desiredCount = Math.min(perPoolLimit, Math.max(perCategoryShare, 1));
 
 	for (const r of radiusLadder) {
-		const localized = applyRadius(allCandidates, center, r);
+		const localized = applyRadius(allCandidates, center, r, distanceMemo);
 		if (localized.length === 0) continue;
-		const distributed = distributeAcrossBuckets(localized, perPoolLimit, center, r);
+		const distributed = distributeAcrossBuckets(
+			localized,
+			perPoolLimit,
+			center,
+			r,
+			tierMemo
+		);
 		if (distributed.length > 0) {
 			if (!best || distributed.length > best.contacts.length) {
 				best = { contacts: distributed, radiusUsed: r };
@@ -314,6 +357,14 @@ export const runCuratedNearbyPicks = async (
 	const flatPrefixes = activeCategories.flatMap((c) => c.titlePrefixes);
 	const fetchBbox = bboxFromCenter(effectiveCenter, fetchBboxRadiusKm);
 
+	// Per-request memos so each Contact is categorized, tier-scored, and
+	// distance-checked exactly once — reused across the canonical loop, the
+	// radius ladder, and the canonical + loose pool passes. All are pure functions
+	// of the contact (and the fixed request center), so reuse is byte-identical.
+	const activeCategoryEntries = buildCategoryMatchEntries(activeCategories);
+	const tierMemo = new Map<Contact, number>();
+	const distanceMemo = new Map<Contact, number>();
+
 	type HydratedContact = Awaited<
 		ReturnType<typeof prisma.contact.findMany>
 	>[number];
@@ -324,25 +375,44 @@ export const runCuratedNearbyPicks = async (
 		categoryCandidates.set(category.titlePrefixes[0], []);
 	}
 
+	// Mutate the category's array in place rather than rebuilding it with a spread
+	// on every call. The ES-hydration loop calls appendCandidates once per row, so
+	// the old `[...existing, ...contacts]` was O(n^2) over the growing array. Final
+	// contents and order are identical (append => push to the end; prepend =>
+	// unshift to the front).
 	const appendCandidates = (
 		categoryKey: string,
 		contacts: readonly HydratedContact[]
 	) => {
-		const existing = categoryCandidates.get(categoryKey) ?? [];
-		categoryCandidates.set(categoryKey, [...existing, ...contacts]);
+		if (contacts.length === 0) return;
+		const existing = categoryCandidates.get(categoryKey);
+		if (existing) existing.push(...contacts);
+		else categoryCandidates.set(categoryKey, [...contacts]);
 	};
 
 	const prependCandidates = (
 		categoryKey: string,
 		contacts: readonly HydratedContact[]
 	) => {
-		const existing = categoryCandidates.get(categoryKey) ?? [];
-		categoryCandidates.set(categoryKey, [...contacts, ...existing]);
+		if (contacts.length === 0) return;
+		const existing = categoryCandidates.get(categoryKey);
+		if (existing) existing.unshift(...contacts);
+		else categoryCandidates.set(categoryKey, [...contacts]);
 	};
 
 	const cleanBusinessPredicate = (c: Contact): boolean =>
 		contactLooksLikeBusinessEntity(c) &&
 		!contactLooksLikeEducationInstitution(c);
+
+	// Independent of the ES samplers and of ES-id hydration below, so start it now
+	// to overlap the (large, take=1500) canonical scan with the ES round-trips
+	// instead of running it strictly after them. Merge order is preserved below,
+	// so the assembled candidate lists are unchanged.
+	const canonicalCandidatesPromise = prisma.contact.findMany({
+		where: buildCanonicalWhere(flatPrefixes, fetchBbox),
+		take: CANDIDATE_TAKE,
+		orderBy: [{ id: 'asc' }],
+	});
 
 	const esRows: { categoryKey: string; id: number }[] = [];
 	const esSamples = await Promise.all(
@@ -390,20 +460,34 @@ export const runCuratedNearbyPicks = async (
 		}
 	}
 
+	// ES-id hydration depends on the ES samplers; the canonical scan (already in
+	// flight) depends on neither — await them together so they overlap.
+	const uniqueEsIds =
+		esRows.length > 0 ? [...new Set(esRows.map((row) => row.id))] : [];
+	const hydratedPromise: Promise<HydratedContact[]> =
+		uniqueEsIds.length > 0
+			? prisma.contact.findMany({
+					where: {
+						AND: [
+							{ id: { in: uniqueEsIds } },
+							{ latitude: { not: null } },
+							{ longitude: { not: null } },
+							{ latitude: { gte: fetchBbox.south, lte: fetchBbox.north } },
+							{ longitude: { gte: fetchBbox.west, lte: fetchBbox.east } },
+						],
+					},
+			  })
+			: Promise.resolve([]);
+	const [hydrated, canonicalCandidates] = await Promise.all([
+		hydratedPromise,
+		canonicalCandidatesPromise,
+	]);
+
+	// Merge order is identical to before: ES matches are appended first, then
+	// canonical rows are prepended — so each category's assembled list is the same
+	// regardless of which query resolved first.
 	if (esRows.length > 0) {
 		candidateSources.add('es-per-category');
-		const uniqueEsIds = [...new Set(esRows.map((row) => row.id))];
-		const hydrated = await prisma.contact.findMany({
-			where: {
-				AND: [
-					{ id: { in: uniqueEsIds } },
-					{ latitude: { not: null } },
-					{ longitude: { not: null } },
-					{ latitude: { gte: fetchBbox.south, lte: fetchBbox.north } },
-					{ longitude: { gte: fetchBbox.west, lte: fetchBbox.east } },
-				],
-			},
-		});
 		const byId = new Map(hydrated.map((c) => [c.id, c]));
 		for (const row of esRows) {
 			const contact = byId.get(row.id);
@@ -411,16 +495,14 @@ export const runCuratedNearbyPicks = async (
 		}
 	}
 
-	const canonicalCandidates = await prisma.contact.findMany({
-		where: buildCanonicalWhere(flatPrefixes, fetchBbox),
-		take: CANDIDATE_TAKE,
-		orderBy: [{ id: 'asc' }],
-	});
 	if (canonicalCandidates.length > 0) {
 		candidateSources.add('canonical');
 		const canonicalByCategory = new Map<string, HydratedContact[]>();
 		for (const contact of canonicalCandidates) {
-			const matched = matchCategory(contact.title, activeCategories);
+			const matched = matchCategoryWithEntries(
+				contact.title,
+				activeCategoryEntries
+			);
 			if (!matched) continue;
 			const list = canonicalByCategory.get(matched) ?? [];
 			list.push(contact);
@@ -473,10 +555,14 @@ export const runCuratedNearbyPicks = async (
 	const byCategory = new Map<string, Contact[]>();
 	for (const category of activeCategories) {
 		const categoryKey = category.titlePrefixes[0];
+		// Single-category match entries built once for this category (not per
+		// candidate). Semantics are unchanged from matchCategory(title, [category]).
+		const categoryEntries = buildCategoryMatchEntries([category]);
 		byCategory.set(
 			categoryKey,
 			(categoryCandidates.get(categoryKey) ?? []).filter(
-				(contact) => matchCategory(contact.title, [category]) === categoryKey
+				(contact) =>
+					matchCategoryWithEntries(contact.title, categoryEntries) === categoryKey
 			)
 		);
 	}
@@ -490,7 +576,9 @@ export const runCuratedNearbyPicks = async (
 				limit,
 				hasRealCenter ? effectiveCenter : null,
 				effectiveRadiusKm,
-				radiusLadder
+				radiusLadder,
+				tierMemo,
+				distanceMemo
 			);
 			return {
 				key: canonicalKey,
