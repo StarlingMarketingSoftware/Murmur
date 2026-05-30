@@ -36,27 +36,36 @@ const DEFAULT_LIMIT = 1200;
 const MAX_LIMIT = 2000;
 const MAP_OVERLAY_QUERY_TIMEOUT_MS = 18000;
 
-type AmbientOverlayContactRow = {
+// Research-detail fields (metadata/website/address/companyType/companyFoundedYear) are only read
+// by ContactResearchPanel, which can only open at zoom >= HOVER_INTERACTION_MIN_ZOOM (8). Every
+// overlay that can be researched (booking/promotion/all) is itself only fetched at zoom >= 8, while
+// the large ambient atlas lives at zoom <= 5.05. So below this threshold those fields are dead
+// weight on thousands of rows; we ship only the slim plotting/tooltip set. Sit one level below the
+// zoom-8 panel gate so a refetch already carries the fields by the time the panel can open.
+const OVERLAY_RESEARCH_FIELDS_MIN_ZOOM = 7;
+
+// Shared shape for every map-overlay response row. The core fields are always present
+// (plotting + hover tooltip + the map-panel list row). The research-detail fields are only
+// present when the request is zoomed in enough to reach ContactResearchPanel (see
+// OVERLAY_RESEARCH_FIELDS_MIN_ZOOM); below that they are omitted to keep the payload small.
+type OverlayContactRow = {
 	id: number;
-	venueId: number | null;
-	email: string;
-	company: string | null;
-	country: string | null;
-	phone: string | null;
-	state: string | null;
-	website: string | null;
-	address: string | null;
-	city: string | null;
-	firstName: string | null;
-	headline: string | null;
-	lastName: string | null;
-	linkedInUrl: string | null;
-	photoUrl: string | null;
-	title: string | null;
-	metadata: string | null;
 	latitude: number | null;
 	longitude: number | null;
+	title: string | null;
+	firstName: string | null;
+	lastName: string | null;
 	name: string | null;
+	company: string | null;
+	headline: string | null;
+	venueId: number | null;
+	state: string | null;
+	city: string | null;
+	metadata?: string | null;
+	website?: string | null;
+	address?: string | null;
+	companyType?: string | null;
+	companyFoundedYear?: string | null;
 };
 
 const hashSeedToPositiveInt = (value: string): number => {
@@ -206,25 +215,17 @@ export async function GET(req: NextRequest) {
 
 			const contacts = await withOverlayBudgetFallback(
 				() =>
-					prisma.$queryRaw<AmbientOverlayContactRow[]>(Prisma.sql`
+					prisma.$queryRaw<OverlayContactRow[]>(Prisma.sql`
 						WITH ranked AS (
 							SELECT
 								"id",
-								"email",
 								"company",
-								"country",
-								"phone",
 								"state",
-								"website",
-								"address",
 								"city",
 								"firstName",
 								"headline",
 								"lastName",
-								"linkedInUrl",
-								"photoUrl",
 								"title",
-								"metadata",
 								"latitude",
 								"longitude",
 								"venueId",
@@ -256,21 +257,13 @@ export async function GET(req: NextRequest) {
 						)
 						SELECT
 							"id",
-							"email",
 							"company",
-							"country",
-							"phone",
 							"state",
-							"website",
-							"address",
 							"city",
 							"firstName",
 							"headline",
 							"lastName",
-							"linkedInUrl",
-							"photoUrl",
 							"title",
-							"metadata",
 							"latitude",
 							"longitude",
 							"venueId",
@@ -318,16 +311,50 @@ export async function GET(req: NextRequest) {
 			};
 		}
 
-		const contacts = await withOverlayBudgetFallback(
+		// Ambient already returned above, so this path only runs for booking/promotion/all — all of
+		// which are themselves fetched only at zoom >= 8. Gate the research-detail fields on zoom so
+		// they're present whenever the detail panel can open, and dropped for any lower-zoom fetch.
+		const includeResearchFields =
+			(zoom ?? Number.POSITIVE_INFINITY) >= OVERLAY_RESEARCH_FIELDS_MIN_ZOOM;
+
+		const overlaySelect = {
+			id: true,
+			latitude: true,
+			longitude: true,
+			title: true,
+			firstName: true,
+			lastName: true,
+			company: true,
+			headline: true,
+			venueId: true,
+			state: true,
+			city: true,
+			metadata: includeResearchFields,
+			website: includeResearchFields,
+			address: includeResearchFields,
+			companyType: includeResearchFields,
+			companyFoundedYear: includeResearchFields,
+		} satisfies Prisma.ContactSelect;
+
+		const rows = await withOverlayBudgetFallback(
 			() =>
 				prisma.contact.findMany({
 					where,
 					take,
 					orderBy: [{ id: 'asc' }],
+					select: overlaySelect,
 				}),
 			[],
 			`${mode} overlay query`
 		);
+
+		// Mirror the Prisma `name` result-extension rather than selecting it (selecting an
+		// extension-computed field via `select` is version-fragile). firstName/lastName are
+		// always selected, so derive `name` here exactly as the extension does.
+		const contacts: OverlayContactRow[] = rows.map((row) => ({
+			...row,
+			name: `${row.firstName ?? ''} ${row.lastName ?? ''}`.trim() || null,
+		}));
 
 		return apiResponse(contacts);
 	} catch (error) {
