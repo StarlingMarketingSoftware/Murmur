@@ -62,16 +62,24 @@ export const useGetCampaigns = () => {
 	});
 };
 
+// Exported so callers (e.g. dashboard hover prefetch) can warm the exact same
+// React Query cache entry that useGetCampaign reads — same key, same fetcher.
+export const getCampaignDetailQueryKey = (id: string | number) => QUERY_KEYS.detail(id);
+
+export const fetchCampaignDetail = async (
+	id: string | number
+): Promise<CampaignWithRelations> => {
+	const response = await _fetch(urls.api.campaigns.detail(id));
+	if (!response.ok) {
+		throw new Error('Failed to fetch campaign');
+	}
+	return response.json();
+};
+
 export const useGetCampaign = (id: string) => {
 	return useQuery<CampaignWithRelations>({
-		queryKey: QUERY_KEYS.detail(id),
-		queryFn: async () => {
-			const response = await _fetch(urls.api.campaigns.detail(id));
-			if (!response.ok) {
-				throw new Error('Failed to fetch campaign');
-			}
-			return response.json();
-		},
+		queryKey: getCampaignDetailQueryKey(id),
+		queryFn: () => fetchCampaignDetail(id),
 		enabled: !!id,
 	});
 };

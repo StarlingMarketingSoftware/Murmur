@@ -59,29 +59,39 @@ interface EditContactData {
 	data: PatchContactData;
 }
 
+// Exported so callers (e.g. dashboard hover prefetch) can warm the exact same
+// React Query cache entry that useGetContacts reads — same key, same fetcher.
+export const getContactsListQueryKey = (filters?: ContactFilterData) =>
+	[...QUERY_KEYS.list(), filters] as const;
+
+export const fetchContactsList = async (
+	filters: ContactFilterData | undefined,
+	signal?: AbortSignal
+): Promise<ContactWithName[]> => {
+	const url = appendQueryParamsToUrl(urls.api.contacts.index, filters);
+	// The route's maxDuration is 60s. Give the server enough room to
+	// finish or return its own 504 instead of aborting a slow success.
+	const response = await _fetch(url, undefined, undefined, {
+		signal,
+		timeout: CONTACT_SEARCH_TIMEOUT_MS,
+	});
+
+	if (!response.ok) {
+		const errorMessage = await readResponseErrorMessage(
+			response,
+			'Failed to fetch contacts',
+			CONTACT_SEARCH_TIMEOUT_MS
+		);
+		throw new Error(errorMessage);
+	}
+
+	return response.json() as Promise<ContactWithName[]>;
+};
+
 export const useGetContacts = (options: ContactQueryOptions) => {
 	return useQuery<ContactWithName[]>({
-		queryKey: [...QUERY_KEYS.list(), options.filters],
-		queryFn: async ({ signal }) => {
-			const url = appendQueryParamsToUrl(urls.api.contacts.index, options.filters);
-			// The route's maxDuration is 60s. Give the server enough room to
-			// finish or return its own 504 instead of aborting a slow success.
-			const response = await _fetch(url, undefined, undefined, {
-				signal,
-				timeout: CONTACT_SEARCH_TIMEOUT_MS,
-			});
-
-			if (!response.ok) {
-				const errorMessage = await readResponseErrorMessage(
-					response,
-					'Failed to fetch contacts',
-					CONTACT_SEARCH_TIMEOUT_MS
-				);
-				throw new Error(errorMessage);
-			}
-
-			return response.json() as Promise<ContactWithName[]>;
-		},
+		queryKey: getContactsListQueryKey(options.filters),
+		queryFn: ({ signal }) => fetchContactsList(options.filters, signal),
 		enabled: options.enabled === undefined ? true : options.enabled,
 		// Keep previous results visible while a new search fetches (prevents UI + map flicker).
 		placeholderData: keepPreviousData,

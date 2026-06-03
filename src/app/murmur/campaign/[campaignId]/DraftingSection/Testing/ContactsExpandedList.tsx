@@ -3015,7 +3015,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 												? 'w-[224px] h-[30px] rounded-[4.7px]'
 												: 'max-[480px]:w-[96.27vw]',
 											shouldShowLoadingWave
-												? 'contacts-expanded-list-loading-wave-row'
+												? cn(
+														'contacts-expanded-list-loading-wave-row',
+														isInboxFocusMode &&
+															'contacts-expanded-list-loading-wave-row--inbox'
+												  )
 												: !isInboxFocusMode && 'bg-[#EB8586]'
 										)}
 										style={{

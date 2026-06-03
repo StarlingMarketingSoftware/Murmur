@@ -232,6 +232,22 @@ export const MAP_MIN_ZOOM = 2.25;
 // Dashboard UX: allow state hover highlight one zoom step past the default zoom.
 export const STATE_HOVER_HIGHLIGHT_MAX_ZOOM = MAP_DEFAULT_ZOOM + 1;
 
+// --- Basemap overview prewarming ---------------------------------------------
+// While zoomed in, quietly warm the coarse low-zoom basemap tiles for the wide
+// region a zoom-out would reveal, so the periphery is served from the browser
+// cache instead of streaming in. Only prewarm once we're deep enough that
+// zooming out actually reveals never-loaded periphery.
+export const OVERVIEW_PREWARM_MIN_ZOOM = 8;
+// Overview zooms to warm: ceil(MAP_MIN_ZOOM)=3 up through 6 — the levels a
+// zoom-out settles on. z7+ near the threshold is already covered by the scaled
+// child tiles loaded from the deep view.
+export const OVERVIEW_PREWARM_ZOOMS = [3, 4, 5, 6] as const;
+// Debounce after the map settles, to keep prewarm off the interaction hot path.
+export const OVERVIEW_PREWARM_DEBOUNCE_MS = 350;
+// Dedupe: round center to this many degrees; re-warm only when it moves a tile's
+// worth, so micro-pans at deep zoom don't re-fire the prewarm.
+export const OVERVIEW_PREWARM_CENTER_QUANT_DEG = 1;
+
 // Scroll/pinch zoom feel. Mapbox defaults (wheel 1/450, pinch 1/100) feel
 // jumpy on a Mac trackpad — each tick traverses a lot of zoom, which reads
 // as "aggressive." Lowering both rates produces a slower, more gradual,

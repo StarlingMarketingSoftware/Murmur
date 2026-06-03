@@ -28,7 +28,6 @@ import { X } from 'lucide-react';
 import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/DraftingSection/useDraftingSection';
 import { HybridBlock, Identity } from '@prisma/client';
 import { HybridPromptInputProps, useHybridPromptInput } from './useHybridPromptInput';
-import { WriteTabChromeHeader } from './WriteTabChromeHeader';
 import {
 	BookingForDropdownControl,
 	useBookingForDropdownController,
@@ -3225,8 +3224,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		hideGenerateTestButton,
 		containerHeightPx,
 		dataCampaignMainBox,
-		onGoToContacts,
-		onGoToInbox,
 		onProfilePanelOpen,
 		autoOpenProfileTabWhenIncomplete,
 		forceDesktop,
@@ -5160,14 +5157,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							onMouseEnter={() => onHoverChange?.(true)}
 							onMouseLeave={() => onHoverChange?.(false)}
 						>
-							{/* Write tab chrome header (pill + dots) */}
-							{!isMobile && !compactLeftOnly && (
-								<WriteTabChromeHeader
-									onContactsClick={onGoToContacts}
-									onDraftsClick={onGoToDrafting}
-									onInboxClick={onGoToInbox}
-								/>
-							)}
 							{/* Border overlay to ensure crisp, unbroken stroke at rounded corners */}
 							{!compactLeftOnly && (
 								<div

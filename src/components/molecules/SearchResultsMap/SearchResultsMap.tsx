@@ -281,6 +281,10 @@ import {
 	NIGHT_VIGNETTE_OPACITY,
 	NIGHT_WARM_KEY_MIN_MUL,
 	OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE,
+	OVERVIEW_PREWARM_CENTER_QUANT_DEG,
+	OVERVIEW_PREWARM_DEBOUNCE_MS,
+	OVERVIEW_PREWARM_MIN_ZOOM,
+	OVERVIEW_PREWARM_ZOOMS,
 	PROMOTION_OVERLAY_MARKERS_MAX_PINS,
 	PROMOTION_OVERLAY_MARKERS_MIN_ZOOM,
 	PROMOTION_OVERLAY_TITLE_PREFIXES,
@@ -945,6 +949,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Keep the latest presentation value available to async Mapbox callbacks (moveend, etc).
 	const presentationRef = useRef<'background' | 'interactive'>(presentation);
 	presentationRef.current = presentation;
+	// Basemap overview prewarm (see the prewarm effect below): last-warmed center
+	// key for dedupe, and the pending debounce timer handle.
+	const lastPrewarmKeyRef = useRef<string | null>(null);
+	const prewarmTimerRef = useRef<number | null>(null);
 
 	const clearEmptyMapPrompt = useCallback(() => {
 		setEmptyMapPromptPoint(null);
@@ -6694,11 +6702,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			dragRotate: false,
 			pitchWithRotate: false,
 			touchPitch: false,
-			// Keep previously-loaded basemap tiles resident across zoom changes so a
-			// deep zoom-in doesn't evict the low-zoom land tiles. Without this, zooming
-			// back out re-requests them and the ocean-blue background flashes through
-			// the land while they reload. Per-source cap; basemap cartography is static.
-			maxTileCacheSize: 512,
+			// Retain recently-displayed low-zoom basemap tiles in-memory across a deep
+			// zoom-in so zooming back out renders the center area instantly (no re-parse,
+			// no ocean-blue flash). `minTileCacheSize` is the floor that does this work;
+			// `maxTileCacheSize` is only a sane ceiling. (A bare `maxTileCacheSize` was a
+			// no-op: the cache is dynamically sized ~viewport*5 (~60) and max only clamps
+			// *down*. The floor is the lever.) Per source; ~128 ≈ 2× the dynamic default.
+			minTileCacheSize: 128,
+			maxTileCacheSize: 1024,
 			refreshExpiredTiles: false,
 			...(contactLightsDebugEnabled ? { showTileBoundaries: true } : {}),
 		});
@@ -9046,6 +9057,64 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map.on('zoom', onZoom);
 		return () => {
 			map.off('zoom', onZoom);
+		};
+	}, [map, isMapLoaded, isBackgroundPresentation]);
+
+	// Prewarm the coarse low-zoom basemap for the wide region the user would reveal
+	// on zoom-out, so even the FIRST zoom-out renders already-cached cartography
+	// instead of streaming streets-v12 across the periphery. Uses Mapbox's public,
+	// event-free `jumpTo(preloadOnly)`: it clones the transform (no camera move, no
+	// events) and warms the browser tile cache for that camera. Fires on a debounced
+	// settle so it stays off the interaction hot path.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		if (isBackgroundPresentation) return;
+
+		const prewarm = () => {
+			try {
+				if (typeof map.jumpTo !== 'function') return;
+				// `jumpTo` calls `map.stop()`, which would abort an in-progress camera
+				// animation. Never prewarm while the camera is moving — defer until it
+				// settles so we can't interrupt a fresh gesture started mid-debounce.
+				if (typeof map.isMoving === 'function' && map.isMoving()) {
+					schedule();
+					return;
+				}
+				const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
+				if (zoom < OVERVIEW_PREWARM_MIN_ZOOM) return;
+				if (typeof document !== 'undefined' && document.hidden) return;
+				const c = map.getCenter();
+				if (!c) return;
+				const q = OVERVIEW_PREWARM_CENTER_QUANT_DEG;
+				const key = `${Math.round(c.lng / q) * q}:${Math.round(c.lat / q) * q}`;
+				if (lastPrewarmKeyRef.current === key) return;
+				lastPrewarmKeyRef.current = key;
+				for (const z of OVERVIEW_PREWARM_ZOOMS) {
+					map.jumpTo({ center: [c.lng, c.lat], zoom: z, preloadOnly: true } as any);
+				}
+			} catch {
+				// Non-fatal — prewarm is a pure optimization, never break the map.
+			}
+		};
+
+		const schedule = () => {
+			if (prewarmTimerRef.current != null) {
+				window.clearTimeout(prewarmTimerRef.current);
+			}
+			prewarmTimerRef.current = window.setTimeout(prewarm, OVERVIEW_PREWARM_DEBOUNCE_MS);
+		};
+
+		map.on('moveend', schedule);
+		// Seed once on first settle (covers deep-link-then-zoom-out with no pan).
+		schedule();
+
+		return () => {
+			map.off('moveend', schedule);
+			if (prewarmTimerRef.current != null) {
+				window.clearTimeout(prewarmTimerRef.current);
+				prewarmTimerRef.current = null;
+			}
 		};
 	}, [map, isMapLoaded, isBackgroundPresentation]);
 

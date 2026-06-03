@@ -105,7 +105,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useClerk, useAuth, SignUp } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useBatchUpdateContacts } from '@/hooks/queryHooks/useContacts';
+import {
+	useBatchUpdateContacts,
+	getContactsListQueryKey,
+	fetchContactsList,
+} from '@/hooks/queryHooks/useContacts';
 import { useMe } from '@/hooks/useMe';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
@@ -144,7 +148,16 @@ import DashboardOpportunitiesWidget, {
 	type OpportunitiesMockState,
 } from '@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesWidget';
 import { DashboardOpportunitiesDebugPanel } from '@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesDebugPanel';
-import { useGetCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
+import {
+	useGetCampaign,
+	useGetCampaigns,
+	getCampaignDetailQueryKey,
+	fetchCampaignDetail,
+} from '@/hooks/queryHooks/useCampaigns';
+import {
+	getIdentitiesListQueryKey,
+	fetchIdentitiesList,
+} from '@/hooks/queryHooks/useIdentities';
 import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -4094,6 +4107,111 @@ const DashboardContent = () => {
 		fromHome: fromHomeParam,
 		disableAutoCreateCampaign: isAddToCampaignMode,
 	});
+
+	// --- Search → Campaign hover prefetch -----------------------------------
+	// The map-view top tabs (Write/Campaign/Inbox/Drafts) all router.push to the
+	// same /murmur/campaign/[id] route. Warm that navigation ahead of the click:
+	// Tier 1 = the route's JS chunks (always, on hover); Tier 2/3 = the React Query
+	// cache the campaign page reads on mount (campaign detail + identities + the
+	// heavy contacts list), gated behind real intent. mapCampaignId mirrors the
+	// value the tabs compute below.
+	const mapCampaignId =
+		fromCampaignIdParam ||
+		(activeCampaignId != null ? String(activeCampaignId) : '');
+
+	// The exact contacts filter the campaign page issues (see useDraftingSection):
+	// derived purely from the campaign's contact lists, so the prefetch lands on the
+	// same React Query key. null when the campaign isn't warm enough to build it —
+	// in that case we skip the contacts prefetch rather than miss the key.
+	const prefetchContactsFilter = useMemo(() => {
+		const campaignForPrefetch = fromCampaign ?? activeCampaign;
+		const lists = campaignForPrefetch?.userContactLists;
+		if (!lists) return null;
+		return { contactListIds: lists.map((list) => list.id) };
+	}, [fromCampaign, activeCampaign]);
+
+	const prefetchedCampaignRoutes = useRef<Set<string>>(new Set());
+
+	// Tier 1: warm the campaign route's JS chunks. The ?tab= query doesn't change the
+	// route segment, so the bare path warms all four tabs; prefetch it once.
+	const prefetchCampaignRoute = useCallback(() => {
+		if (!mapCampaignId) return;
+		const href = urls.murmur.campaign.detail(mapCampaignId);
+		if (prefetchedCampaignRoutes.current.has(href)) return;
+		prefetchedCampaignRoutes.current.add(href);
+		router.prefetch(href);
+	}, [router, mapCampaignId]);
+
+	// Tier 2/3: warm the React Query cache the campaign page reads on mount.
+	const prefetchCampaignData = useCallback(() => {
+		if (!mapCampaignId) return;
+		// Tier 2 (cheap): campaign detail is usually already warm via the active-campaign
+		// query, so prefetchQuery is a near-free no-op while it stays fresh.
+		queryClient.prefetchQuery({
+			queryKey: getCampaignDetailQueryKey(mapCampaignId),
+			queryFn: () => fetchCampaignDetail(mapCampaignId),
+			staleTime: 1000 * 60 * 5,
+		});
+		queryClient.prefetchQuery({
+			queryKey: getIdentitiesListQueryKey(),
+			queryFn: () => fetchIdentitiesList(),
+		});
+		// Tier 3 (heavy): the contacts list — only when we can build the exact filter.
+		if (prefetchContactsFilter) {
+			queryClient.prefetchQuery({
+				queryKey: getContactsListQueryKey(prefetchContactsFilter),
+				queryFn: ({ signal }) => fetchContactsList(prefetchContactsFilter, signal),
+				staleTime: 1000 * 60 * 60, // match useGetContacts so the page won't refetch
+			});
+		}
+	}, [queryClient, mapCampaignId, prefetchContactsFilter]);
+
+	// Fire Tier 1 immediately on hover/focus; gate Tier 2/3 behind ~120ms of sustained
+	// hover (or pointerdown) so an incidental pass-over doesn't trigger the large fetch.
+	const campaignPrefetchTimerRef = useRef<number | null>(null);
+
+	const handleCampaignTabPointerEnter = useCallback(() => {
+		prefetchCampaignRoute();
+		if (campaignPrefetchTimerRef.current) {
+			window.clearTimeout(campaignPrefetchTimerRef.current);
+		}
+		campaignPrefetchTimerRef.current = window.setTimeout(() => {
+			campaignPrefetchTimerRef.current = null;
+			prefetchCampaignData();
+		}, 120);
+	}, [prefetchCampaignRoute, prefetchCampaignData]);
+
+	const handleCampaignTabPointerLeave = useCallback(() => {
+		if (campaignPrefetchTimerRef.current) {
+			window.clearTimeout(campaignPrefetchTimerRef.current);
+			campaignPrefetchTimerRef.current = null;
+		}
+	}, []);
+
+	const handleCampaignTabPointerDown = useCallback(() => {
+		// Strong intent (about to click): skip the debounce and warm everything now.
+		if (campaignPrefetchTimerRef.current) {
+			window.clearTimeout(campaignPrefetchTimerRef.current);
+			campaignPrefetchTimerRef.current = null;
+		}
+		prefetchCampaignRoute();
+		prefetchCampaignData();
+	}, [prefetchCampaignRoute, prefetchCampaignData]);
+
+	// Eagerly warm Tier 1 (route JS only) once the map-view tabs are visible and the
+	// target campaign is known — mirrors the campaign page's reverse router.prefetch.
+	useEffect(() => {
+		if (isMapView && mapCampaignId) prefetchCampaignRoute();
+	}, [isMapView, mapCampaignId, prefetchCampaignRoute]);
+
+	useEffect(() => {
+		return () => {
+			if (campaignPrefetchTimerRef.current) {
+				window.clearTimeout(campaignPrefetchTimerRef.current);
+			}
+		};
+	}, []);
+
 	const shouldEnableMapStateCategorySelection = isMapView && isMapBottomCategoryMode;
 
 	const handleMapStateSelect = useCallback(
@@ -10369,9 +10487,8 @@ const DashboardContent = () => {
 										</div>
 									) : null;
 
-								const mapCampaignId =
-									fromCampaignIdParam ||
-									(activeCampaignId != null ? String(activeCampaignId) : '');
+								// mapCampaignId is computed once at component scope (and drives the
+								// hover-prefetch handlers wired onto these tabs below).
 								const mapCampaignName =
 									fromCampaign?.name || activeCampaign?.name || 'Campaign';
 
@@ -10426,6 +10543,10 @@ const DashboardContent = () => {
 														lineHeight: '14px',
 														opacity: 0.5,
 													}}
+													onPointerEnter={handleCampaignTabPointerEnter}
+													onFocus={handleCampaignTabPointerEnter}
+													onPointerLeave={handleCampaignTabPointerLeave}
+													onPointerDown={handleCampaignTabPointerDown}
 													onClick={() => {
 														if (!mapCampaignId) return;
 														router.push(
@@ -10448,6 +10569,10 @@ const DashboardContent = () => {
 														fontWeight: 500,
 														lineHeight: '17.063px',
 													}}
+													onPointerEnter={handleCampaignTabPointerEnter}
+													onFocus={handleCampaignTabPointerEnter}
+													onPointerLeave={handleCampaignTabPointerLeave}
+													onPointerDown={handleCampaignTabPointerDown}
 													onClick={() => {
 														if (!mapCampaignId) return;
 														router.push(
@@ -10485,6 +10610,10 @@ const DashboardContent = () => {
 														lineHeight: '14px',
 														opacity: 0.5,
 													}}
+													onPointerEnter={handleCampaignTabPointerEnter}
+													onFocus={handleCampaignTabPointerEnter}
+													onPointerLeave={handleCampaignTabPointerLeave}
+													onPointerDown={handleCampaignTabPointerDown}
 													onClick={() => {
 														if (!mapCampaignId) return;
 														router.push(
@@ -10506,6 +10635,10 @@ const DashboardContent = () => {
 														lineHeight: '14px',
 														opacity: 0.5,
 													}}
+													onPointerEnter={handleCampaignTabPointerEnter}
+													onFocus={handleCampaignTabPointerEnter}
+													onPointerLeave={handleCampaignTabPointerLeave}
+													onPointerDown={handleCampaignTabPointerDown}
 													onClick={() => {
 														if (!mapCampaignId) return;
 														router.push(

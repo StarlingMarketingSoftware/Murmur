@@ -22,17 +22,26 @@ interface EditIdentityData {
 	data: PatchIdentityData;
 }
 
+// Exported so callers (e.g. dashboard hover prefetch) can warm the exact same
+// React Query cache entry that useGetIdentities reads. The key is the static
+// ['identities','list'] regardless of filters, so a no-filter prefetch matches.
+export const getIdentitiesListQueryKey = () => QUERY_KEYS.list();
+
+export const fetchIdentitiesList = async (
+	filters?: IdentityFilterData
+): Promise<Identity[]> => {
+	const url = appendQueryParamsToUrl(urls.api.identities.index, filters);
+	const response = await _fetch(url);
+	if (!response.ok) {
+		throw new Error('Failed to fetch identities');
+	}
+	return response.json();
+};
+
 export const useGetIdentities = (options: IdentityQueryOptions) => {
 	return useQuery<Identity[]>({
-		queryKey: QUERY_KEYS.list(),
-		queryFn: async () => {
-			const url = appendQueryParamsToUrl(urls.api.identities.index, options.filters);
-			const response = await _fetch(url);
-			if (!response.ok) {
-				throw new Error('Failed to fetch identities');
-			}
-			return response.json();
-		},
+		queryKey: getIdentitiesListQueryKey(),
+		queryFn: () => fetchIdentitiesList(options.filters),
 	});
 };
 

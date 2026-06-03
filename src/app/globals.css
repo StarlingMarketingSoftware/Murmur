@@ -5439,6 +5439,65 @@ body,
 	}
 }
 
+/* Inbox variant: blue ramp, same 4.5s cadence as the red wave so the per-row
+   animationDelay stagger lands identically. */
+.contacts-expanded-list-loading-wave-row.contacts-expanded-list-loading-wave-row--inbox {
+	background-color: #AEE1FD;
+	animation: contactsExpandedListLoadingWaveInbox 4.5s linear infinite;
+}
+
+@keyframes contactsExpandedListLoadingWaveInbox {
+	0%,
+	100% {
+		background-color: #AEE1FD;
+	}
+	6.25% {
+		background-color: #9FD7F4;
+	}
+	12.5% {
+		background-color: #8FCDEC;
+	}
+	18.75% {
+		background-color: #7DC0E1;
+	}
+	25% {
+		background-color: #6EB4D8;
+	}
+	31.25% {
+		background-color: #5AA3CA;
+	}
+	37.5% {
+		background-color: #4690BC;
+	}
+	43.75% {
+		background-color: #2E78A6;
+	}
+	50% {
+		background-color: #1B5F8E;
+	}
+	56.25% {
+		background-color: #2E78A6;
+	}
+	62.5% {
+		background-color: #4690BC;
+	}
+	68.75% {
+		background-color: #5AA3CA;
+	}
+	75% {
+		background-color: #6EB4D8;
+	}
+	81.25% {
+		background-color: #7DC0E1;
+	}
+	87.5% {
+		background-color: #8FCDEC;
+	}
+	93.75% {
+		background-color: #9FD7F4;
+	}
+}
+
 /* --- Research Panel Loading Wave (Hold light briefly, then smooth wave) --- */
 .research-panel-loading-wave-box {
 	background-color: #E9F7FF;
@@ -5473,6 +5532,9 @@ body,
 		animation: none;
 	}
 	.contacts-expanded-list-loading-wave-row {
+		animation: none;
+	}
+	.contacts-expanded-list-loading-wave-row.contacts-expanded-list-loading-wave-row--inbox {
 		animation: none;
 	}
 	.research-panel-loading-wave-box {
