@@ -3832,6 +3832,27 @@ body.murmur-page.murmur-map-view .results-search-input-group .search-wave-contai
 	max-width: 100%;
 }
 
+/* Smooth fade-in for the full-screen map-view overlay groups (top nav + pill, bottom
+   search bar, left rail, right results/selection panel) when entering search/map view.
+   These overlays are portaled to <body>, so they can't inherit a parent fade — each
+   overlay group gets this class so the whole apparatus eases in instead of popping. */
+@keyframes mapOverlayAppear {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+.map-overlay-appear {
+	animation: mapOverlayAppear 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+	.map-overlay-appear {
+		animation: none;
+	}
+}
+
 /* Desktop: position dashboard search results elements at fixed offsets
    from the very top of the page when viewing dashboard search results
    in table view (non-map). */

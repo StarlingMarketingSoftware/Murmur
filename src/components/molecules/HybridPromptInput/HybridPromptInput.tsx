@@ -3224,6 +3224,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		hideGenerateTestButton,
 		containerHeightPx,
 		dataCampaignMainBox,
+		onGoToContacts,
+		onGoToInbox,
 		onProfilePanelOpen,
 		autoOpenProfileTabWhenIncomplete,
 		forceDesktop,

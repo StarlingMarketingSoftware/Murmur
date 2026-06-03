@@ -839,6 +839,31 @@ export const NIGHT_STATE_LINE_OPACITY_MUL_MIN = 1;
 export const NIGHT_STATE_LINE_DARKEN_MAX = 0;
 
 // ============================================================================
+// Base-style place / street labels (selectively re-enabled over the basemap)
+// ============================================================================
+
+// We hide every Mapbox symbol layer EXCEPT city/town labels and the road/street
+// label, then restyle the kept ones for contrast against the cream land
+// (#F1EDE2) and light-gray roads (#E5E9EC): dark ink + a soft near-white cream
+// halo so glyphs stay legible over both. Labels fade in only when zoomed in so
+// the globe/US-wide overview stays clean (state labels carry it).
+export const BASEMAP_LABEL_TEXT_COLOR = STATE_LABEL_COLOR; // '#111827'
+export const BASEMAP_LABEL_HALO_COLOR = 'rgba(248, 246, 240, 0.92)';
+export const BASEMAP_LABEL_HALO_WIDTH = 1.3;
+export const BASEMAP_LABEL_HALO_BLUR = 0.4;
+
+// City/town labels: invisible at globe/US-wide zoom (where the murmur state
+// labels already carry the cartography), then fade in across the regional band
+// so they don't collide with state names.
+export const BASEMAP_SETTLEMENT_LABEL_FADE_START_ZOOM = 6.5;
+export const BASEMAP_SETTLEMENT_LABEL_FADE_END_ZOOM = 8.0;
+
+// Street labels: only at true street-level zoom (Mapbox's road-label layer has a
+// high native minzoom ~12), so streets never compete with city names.
+export const BASEMAP_STREET_LABEL_FADE_START_ZOOM = 12.0;
+export const BASEMAP_STREET_LABEL_FADE_END_ZOOM = 13.0;
+
+// ============================================================================
 // Marker dot styling
 // ============================================================================
 

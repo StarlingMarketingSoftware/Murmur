@@ -104,6 +104,7 @@ import { Card, CardContent } from '@/components/ui/card';
 
 import { useClerk, useAuth, SignUp } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { useDashboardScrollToMap } from '@/hooks/useDashboardScrollToMap';
 import { useDebounce } from '@/hooks/useDebounce';
 import {
 	useBatchUpdateContacts,
@@ -3137,6 +3138,15 @@ const DashboardContent = () => {
 		useState(false);
 	const isMapBottomForYouMode = mapBottomSearchFollowupSelection === 'for-you';
 	const isMapBottomCategoryMode = mapBottomSearchFollowupSelection === 'category';
+	// When the scroll-to-map gesture commits, it fires a "For You" search but holds the top
+	// search pill empty/white until the curated results have actually loaded into the right
+	// panel — then we flip this false and the pill reveals "For You". See handleScrollCommitToMap
+	// and the effect that clears it on results-loaded.
+	const [pendingForYouReveal, setPendingForYouReveal] = useState(false);
+	// Scroll-entry should land in the "show all contacts" (disengaged) view, not focused on the
+	// For You search geometry. Set at commit; consumed once the search has loaded (an effect
+	// below disengages the map). A ref so it survives renders without retriggering effects.
+	const scrollEntryDisengageRef = useRef(false);
 
 	// Close why dropdown when clicking outside
 	useEffect(() => {
@@ -4091,6 +4101,7 @@ const DashboardContent = () => {
 		mapBboxFilter,
 		setMapBboxFilter,
 		triggerCuratedSearch,
+		prefetchCuratedSearch,
 		rehydrateCuratedSession,
 		isCuratedSearchActive,
 		lastCuratedArgs,
@@ -4210,6 +4221,24 @@ const DashboardContent = () => {
 				window.clearTimeout(campaignPrefetchTimerRef.current);
 			}
 		};
+	}, []);
+
+	// Warm the coarse IP geolocation on idle shortly after mount. It's cached 24h, so this takes
+	// the IP round-trip off the critical path of both the first "For You" click and the first
+	// free-text submit (which otherwise races a 3s geolocation lookup before it can search).
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		const warm = () => void getApproximateLocation().catch(() => undefined);
+		const idle = window as unknown as {
+			requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number;
+			cancelIdleCallback?: (handle: number) => void;
+		};
+		if (typeof idle.requestIdleCallback === 'function') {
+			const handle = idle.requestIdleCallback(warm, { timeout: 2000 });
+			return () => idle.cancelIdleCallback?.(handle);
+		}
+		const timer = window.setTimeout(warm, 500);
+		return () => window.clearTimeout(timer);
 	}, []);
 
 	const shouldEnableMapStateCategorySelection = isMapView && isMapBottomCategoryMode;
@@ -5204,6 +5233,29 @@ const DashboardContent = () => {
 	const isSelectMapToolActive = activeMapTool === 'select';
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
+
+	// Reveal the staged "For You" top pill once the scroll-entered curated search has finished
+	// loading results into the right panel (or settled with none). Until then the pill stays
+	// empty/white. Also clear if we somehow leave map view, so the flag can't get stuck.
+	useEffect(() => {
+		if (!pendingForYouReveal) return;
+		if (!isMapView) {
+			setPendingForYouReveal(false);
+			return;
+		}
+		const curatedSettled =
+			isCuratedSearchActive && !isMapResultsLoading && (contacts?.length ?? 0) > 0;
+		if (curatedSettled || hasNoSearchResults) {
+			setPendingForYouReveal(false);
+		}
+	}, [
+		pendingForYouReveal,
+		isMapView,
+		isCuratedSearchActive,
+		isMapResultsLoading,
+		contacts,
+		hasNoSearchResults,
+	]);
 	const mapZoomControlDisplayValue = mapZoomControlIndex;
 	const pushMapZoomControlRequest = useCallback((zoom: number, isDragging = false) => {
 		mapZoomControlRequestNonceRef.current += 1;
@@ -5525,6 +5577,19 @@ const DashboardContent = () => {
 		setActiveSection(null);
 		hideSearchThisAreaCta();
 	}, [canDisengageMapSearch, hideSearchThisAreaCta]);
+
+	// Scroll-entry: the instant the committed For You search registers (hasSearched + a query),
+	// disengage straight into the "show all contacts" view so the focused/engaged search view
+	// never flashes. Defined AFTER the mapSearchEngagementKey effect (which force-engages once
+	// per new search) so our disengage runs last in the same commit and sticks.
+	useEffect(() => {
+		if (!scrollEntryDisengageRef.current) return;
+		if (!hasSearched || activeSearchQuery.trim().length === 0) return;
+		scrollEntryDisengageRef.current = false;
+		setIsMapSearchEngaged(false);
+		setActiveMapTool('grab');
+		setActiveSection(null);
+	}, [hasSearched, activeSearchQuery]);
 
 	const handleMapTopSearchReengage = useCallback(() => {
 		if (!isMapView || !hasSearched || activeSearchQuery.trim().length === 0) return;
@@ -5891,12 +5956,35 @@ const DashboardContent = () => {
 		mapBottomSearchFollowupPreviewClearTimeoutRef.current = null;
 	}, []);
 
+	// Speculatively prefetch the "For You" curated results on hover/focus intent so the click
+	// adopts an in-flight (or finished) fetch instead of starting cold. Mirrors
+	// handleCampaignTabPointerEnter; skipped where For You can't actually run. Resolving
+	// geolocation here (cached 24h) makes the prefetch args match the click's args exactly.
+	const handleForYouPointerIntent = useCallback(async () => {
+		if (isFromHomeDemoMode || isAddToCampaignMode) return;
+		let lat: number | undefined;
+		let lon: number | undefined;
+		try {
+			const loc = await getApproximateLocation();
+			lat = loc.lat ?? undefined;
+			lon = loc.lon ?? undefined;
+		} catch {
+			// Non-fatal: prefetch without coords; the backend infers from headers. If the click
+			// later resolves coords, the args won't match and it simply fetches fresh.
+		}
+		prefetchCuratedSearch({ lat, lon });
+	}, [isFromHomeDemoMode, isAddToCampaignMode, prefetchCuratedSearch]);
+
 	const handleMapBottomSearchFollowupPreviewChange = useCallback(
 		(selection: MapBottomSearchFollowupPreview) => {
 			cancelMapBottomSearchFollowupPreviewClear();
 			setMapBottomSearchFollowupPreview(selection);
+			// Hover/focus on the For You tile is strong intent — warm its curated results now.
+			if (selection === 'for-you') {
+				void handleForYouPointerIntent();
+			}
 		},
-		[cancelMapBottomSearchFollowupPreviewClear]
+		[cancelMapBottomSearchFollowupPreviewClear, handleForYouPointerIntent]
 	);
 
 	const scheduleMapBottomSearchFollowupPreviewClear = useCallback(() => {
@@ -5970,6 +6058,13 @@ const DashboardContent = () => {
 				setIsMapBottomSearchActive(false);
 			}
 
+			// Committing to For You mode is strong intent (the submit click is imminent) — warm
+			// the curated results now so the click adopts an in-flight fetch. Covers the
+			// initial-dashboard path, which selects For You before there's a hover target.
+			if (selection === 'for-you') {
+				void handleForYouPointerIntent();
+			}
+
 			if (selection !== 'category') {
 				if (isMapBottomCategoryDropdownActive) {
 					setActiveSection(null);
@@ -5977,7 +6072,11 @@ const DashboardContent = () => {
 				setIsMapBottomCategoryDropdownActive(false);
 			}
 		},
-		[cancelMapBottomSearchFollowupPreviewClear, isMapBottomCategoryDropdownActive]
+		[
+			cancelMapBottomSearchFollowupPreviewClear,
+			handleForYouPointerIntent,
+			isMapBottomCategoryDropdownActive,
+		]
 	);
 
 	const handleMapBottomCategoryFieldFocus = useCallback(
@@ -7445,6 +7544,27 @@ const DashboardContent = () => {
 	const shouldShowSearchGeometryOnMap = !hasSearched || isMapSearchEngaged;
 	const shouldShowAmbientContactsOnMap = canDisengageMapSearch && !isMapSearchEngaged;
 	const shouldPreloadAmbientContactsOnMap = canDisengageMapSearch && isMapSearchEngaged;
+
+	// Scroll-to-map gesture: scrubbing down on the locked landing hero fades it out and dollies
+	// the map in, then commits by firing the same "For You" curated search a click would — so it
+	// lands in the full search-results UI (right/left panels) with the URL updated, just like a
+	// normal search. The top search pill is staged empty (pendingForYouReveal) until those
+	// results load, then reveals "For You". Armed only in the locked-landing state, on desktop,
+	// with no scroll-hijacking panel open, and not during an instant tab transition.
+	const scrollToMapEnabled =
+		shouldLockLandingDashboardScroll &&
+		!isOverflowingDashboardPanelOpen &&
+		!isInstantTabTransition;
+	const handleScrollCommitToMap = useCallback(() => {
+		setPendingForYouReveal(true);
+		scrollEntryDisengageRef.current = true; // land in "show all contacts", not focused
+		setIsMapView(true); // reveal the map immediately so the gesture flows straight in
+		void handleMapBottomForYouSubmit();
+	}, [setIsMapView, handleMapBottomForYouSubmit]);
+	useDashboardScrollToMap({
+		enabled: scrollToMapEnabled,
+		onCommit: handleScrollCommitToMap,
+	});
 
 	const contactsForMap = useMemo(() => {
 		const sourceContacts =
@@ -8983,6 +9103,7 @@ const DashboardContent = () => {
 																			</div>
 																			{!hasSearched && !inboxView && (
 																				<div
+																					className="dashboard-action-bar"
 																					style={{
 																						borderRadius: 8,
 																						opacity: 0.8,
@@ -9598,6 +9719,10 @@ const DashboardContent = () => {
 									mapTopSearchDisplay.kind === 'category' &&
 									mapTopSearchDisplay.what.trim().length > 0 &&
 									mapTopSearchDisplay.whereLabel.trim().length > 0;
+								// Staged reveal for the scroll-to-map entry: hold the pill empty/white
+								// until the For You results have loaded, then show the gradient pill.
+								const showCuratedPill =
+									mapTopSearchDisplay.kind === 'curated' && !pendingForYouReveal;
 
 								const searchBarBase = (
 									<div
@@ -9685,7 +9810,7 @@ const DashboardContent = () => {
 															>
 																<div
 																	className={`absolute left-[6px] top-1/2 -translate-y-1/2 flex items-center rounded-[6px] z-10 overflow-hidden border border-black ${
-																		mapTopSearchDisplay.kind === 'curated'
+																		showCuratedPill
 																			? 'search-gradient-button'
 																			: ''
 																	}`}
@@ -9693,12 +9818,14 @@ const DashboardContent = () => {
 																		width: 'calc(100% - 12px)',
 																		height: '38px',
 																		background:
-																			mapTopSearchDisplay.kind === 'curated'
+																			showCuratedPill
 																				? undefined
 																				: '#FFFFFF',
 																	}}
 																>
-																	{mapTopSearchDisplay.kind === 'curated' ? (
+																	{pendingForYouReveal ? (
+																		<div className="flex h-full w-full items-center px-[24px]" />
+																	) : mapTopSearchDisplay.kind === 'curated' ? (
 																		<div className="flex h-full w-full items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-white">
 																			{mapTopSearchDisplay.label}
 																		</div>
@@ -10147,7 +10274,7 @@ const DashboardContent = () => {
 								const mapTopBackdropBox = isMapView ? (
 									<div
 										aria-hidden="true"
-										className="fixed left-0 right-0 flex justify-center pointer-events-none"
+										className="fixed left-0 right-0 flex justify-center pointer-events-none map-overlay-appear"
 										style={{
 											top: `${MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX}px`,
 											zIndex: 110,
@@ -10169,7 +10296,7 @@ const DashboardContent = () => {
 
 								const mapTopOutlineBox = isMapView ? (
 									<div
-										className="fixed left-0 right-0 flex justify-center pointer-events-none"
+										className="fixed left-0 right-0 flex justify-center pointer-events-none map-overlay-appear"
 										style={{
 											top: `${MAP_VIEW_SEARCH_BAR_TOP_PX}px`,
 											zIndex: 115,
@@ -10319,7 +10446,7 @@ const DashboardContent = () => {
 
 								const searchBar = isMapView ? (
 									<div
-										className="fixed left-0 right-0 flex justify-center pointer-events-none"
+										className="fixed left-0 right-0 flex justify-center pointer-events-none map-overlay-appear"
 										style={{
 											top: `${MAP_VIEW_SEARCH_BAR_TOP_PX}px`,
 											zIndex: 120,
@@ -10489,13 +10616,15 @@ const DashboardContent = () => {
 
 								// mapCampaignId is computed once at component scope (and drives the
 								// hover-prefetch handlers wired onto these tabs below).
+								// '' — not the literal "Campaign" — while the active campaign is still
+								// resolving, so the tab below renders nothing until a real name loads.
 								const mapCampaignName =
-									fromCampaign?.name || activeCampaign?.name || 'Campaign';
+									fromCampaign?.name || activeCampaign?.name || '';
 
 								const campaignMapTopTabs = isMapView ? (
 									<div
 										data-slot="campaign-map-top-tabs"
-										className="fixed left-0 right-0 z-[9999] flex items-center justify-center pointer-events-none"
+										className="fixed left-0 right-0 z-[9999] flex items-center justify-center pointer-events-none map-overlay-appear"
 										style={{
 											top: '12px',
 											height: '24px',
@@ -10558,8 +10687,8 @@ const DashboardContent = () => {
 												</button>
 												<button
 													type="button"
-													aria-label={`Open ${mapCampaignName}`}
-													title={mapCampaignName}
+													aria-label={mapCampaignName ? `Open ${mapCampaignName}` : 'Open campaign'}
+													title={mapCampaignName || undefined}
 													className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex min-w-0 items-center justify-center gap-[7px] h-full"
 													style={{
 														color: '#000',
@@ -10580,23 +10709,27 @@ const DashboardContent = () => {
 														);
 													}}
 												>
-													<svg
-														aria-hidden="true"
-														focusable="false"
-														width="23"
-														height="13"
-														viewBox="0 0 30 17"
-														fill="none"
-														xmlns="http://www.w3.org/2000/svg"
-														className="block flex-shrink-0"
-													>
-														<rect y="2" width="30" height="15" rx="1" fill="#B43A35" />
-														<path
-															d="M0 2C0 0.89543 0.895431 0 2 0H13C14.1046 0 15 0.895431 15 2V4C15 4.55228 14.5523 5 14 5H1C0.447715 5 0 4.55228 0 4V2Z"
-															fill="#B43A35"
-														/>
-													</svg>
-													<span className="min-w-0 truncate">{mapCampaignName}</span>
+													{mapCampaignName ? (
+														<>
+															<svg
+																aria-hidden="true"
+																focusable="false"
+																width="23"
+																height="13"
+																viewBox="0 0 30 17"
+																fill="none"
+																xmlns="http://www.w3.org/2000/svg"
+																className="block flex-shrink-0"
+															>
+																<rect y="2" width="30" height="15" rx="1" fill="#B43A35" />
+																<path
+																	d="M0 2C0 0.89543 0.895431 0 2 0H13C14.1046 0 15 0.895431 15 2V4C15 4.55228 14.5523 5 14 5H1C0.447715 5 0 4.55228 0 4V2Z"
+																	fill="#B43A35"
+																/>
+															</svg>
+															<span className="min-w-0 truncate">{mapCampaignName}</span>
+														</>
+													) : null}
 												</button>
 												<button
 													type="button"
@@ -10691,6 +10824,7 @@ const DashboardContent = () => {
 															<>
 																{/* Map container */}
 																<div
+																	className="map-overlay-appear"
 																	style={{
 																		position: 'fixed',
 																		top: 0,

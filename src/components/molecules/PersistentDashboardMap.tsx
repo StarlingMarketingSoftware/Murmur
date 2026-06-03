@@ -91,6 +91,14 @@ export function PersistentDashboardMap() {
 						width: '100%',
 						height: '100%',
 						position: 'relative',
+						// Scrub "dolly" for the scroll-to-map gesture. Driven per-frame via the
+						// --map-scrub-scale CSS variable (set on :root by useDashboardScrollToMap);
+						// defaults to `none` so there is zero effect when no scrub is in progress.
+						// This is a pure compositor transform — the Mapbox camera is never touched
+						// during the scrub (its zoom is locked in background presentation).
+						transform: 'var(--map-scrub-scale, none)',
+						transformOrigin: 'center center',
+						willChange: 'transform',
 					}}
 				>
 					<div

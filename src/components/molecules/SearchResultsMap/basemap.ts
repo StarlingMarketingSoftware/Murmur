@@ -1,6 +1,14 @@
 import mapboxgl from 'mapbox-gl';
 import { formatCssColor, parseCssColor } from './color';
 import {
+	BASEMAP_LABEL_HALO_BLUR,
+	BASEMAP_LABEL_HALO_COLOR,
+	BASEMAP_LABEL_HALO_WIDTH,
+	BASEMAP_LABEL_TEXT_COLOR,
+	BASEMAP_SETTLEMENT_LABEL_FADE_END_ZOOM,
+	BASEMAP_SETTLEMENT_LABEL_FADE_START_ZOOM,
+	BASEMAP_STREET_LABEL_FADE_END_ZOOM,
+	BASEMAP_STREET_LABEL_FADE_START_ZOOM,
 	MAP_DEFAULT_ZOOM,
 	MAP_LAND_CREAM,
 	MAP_LANDCOVER_GREEN,
@@ -285,6 +293,44 @@ export const applyNightLandPalette = (mapInstance: mapboxgl.Map, nightT: number)
 // One-time basemap setup (projection, fog, palette, label/border hides)
 // ============================================================================
 
+// Which base-style symbol layers we re-enable: city/town labels and the road
+// label. Everything else (POI, transit, airport, natural, water, country,
+// continent, Mapbox's own state label) stays hidden. Robust to Streets v12
+// naming via id substring + `source-layer`.
+const classifyBasemapLabelLayer = (
+	idLower: string,
+	sourceLayer: string | undefined
+): 'settlement' | 'street' | null => {
+	const src = (sourceLayer ?? '').toLowerCase();
+
+	// Street/road name labels (v12: `road-label-simple`, source-layer `road`).
+	// Exclude route shields / road numbers.
+	if (
+		(src === 'road' || idLower.includes('road-label')) &&
+		idLower.includes('label') &&
+		!idLower.includes('shield') &&
+		!idLower.includes('number')
+	) {
+		return 'street';
+	}
+
+	// Settlement (city / town / village) labels (v12: settlement-*-label,
+	// source-layer `place_label`). Exclude the larger geo labels that also live
+	// in place_label (country/continent/state/marine).
+	if (
+		idLower.includes('settlement') ||
+		((src === 'place_label' || idLower.includes('place-label')) &&
+			!idLower.includes('country') &&
+			!idLower.includes('continent') &&
+			!idLower.includes('state') &&
+			!idLower.includes('marine'))
+	) {
+		return 'settlement';
+	}
+
+	return null;
+};
+
 export const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 	// Projection
 	try {
@@ -325,9 +371,50 @@ export const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 			const sourceLayer = (layer as any)['source-layer'] as string | undefined;
 			const idLower = id.toLowerCase();
 
-			// Text/icon labels
+			// Text/icon labels — keep city/town + street labels, hide everything else.
 			if (type === 'symbol') {
-				mapInstance.setLayoutProperty(id, 'visibility', 'none');
+				const kind = classifyBasemapLabelLayer(idLower, sourceLayer);
+				if (kind === null) {
+					mapInstance.setLayoutProperty(id, 'visibility', 'none');
+					continue;
+				}
+
+				// Keep visible + restyle for contrast against cream land / gray roads,
+				// and gate to zoomed-in only via a Mapbox-native text-opacity ramp (so
+				// it updates per-zoom with no extra render-frame hook).
+				try {
+					mapInstance.setLayoutProperty(id, 'visibility', 'visible');
+					mapInstance.setPaintProperty(id, 'text-color', BASEMAP_LABEL_TEXT_COLOR);
+					mapInstance.setPaintProperty(id, 'text-halo-color', BASEMAP_LABEL_HALO_COLOR);
+					mapInstance.setPaintProperty(id, 'text-halo-width', BASEMAP_LABEL_HALO_WIDTH);
+					mapInstance.setPaintProperty(id, 'text-halo-blur', BASEMAP_LABEL_HALO_BLUR);
+
+					const [startZoom, endZoom] =
+						kind === 'street'
+							? [
+									BASEMAP_STREET_LABEL_FADE_START_ZOOM,
+									BASEMAP_STREET_LABEL_FADE_END_ZOOM,
+								]
+							: [
+									BASEMAP_SETTLEMENT_LABEL_FADE_START_ZOOM,
+									BASEMAP_SETTLEMENT_LABEL_FADE_END_ZOOM,
+								];
+					const fade = [
+						'interpolate',
+						['linear'],
+						['zoom'],
+						startZoom,
+						0,
+						endZoom,
+						1,
+					] as any;
+					mapInstance.setPaintProperty(id, 'text-opacity', fade);
+					// Settlement layers also carry an icon (the city-center dot). Fade it
+					// on the same ramp so the dots don't litter the zoomed-out overview.
+					mapInstance.setPaintProperty(id, 'icon-opacity', fade);
+				} catch {
+					// Data-driven property we can't override — leave the layer as-is.
+				}
 				continue;
 			}
 
