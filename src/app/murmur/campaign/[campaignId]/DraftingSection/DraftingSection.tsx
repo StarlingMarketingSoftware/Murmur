@@ -4640,16 +4640,27 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							!isSearchTabNarrow &&
 							searchResultsForPanel.length > 0 && (
 								<div
-									className="absolute"
+									className="absolute flex flex-col"
 									style={{
 										top: '29px',
 										left: 'calc(50% + 384px + 32px)',
+										gap: '13px',
 									}}
 								>
-									{/* Title above the panel */}
-									<span className="font-inter text-[13px] font-medium text-black mb-1 block">
-										Search Results
-									</span>
+									<CampaignHeaderBox
+										campaignId={campaign?.id}
+										campaignName={campaign?.name || 'Untitled Campaign'}
+										toListNames={toListNames}
+										fromName={fromName}
+										contactsCount={contactsCount}
+										draftCount={draftCount}
+										sentCount={sentCount}
+										draftingProgress={draftingProgressForHeader}
+										onFromClick={onOpenIdentityDialog}
+										onDraftsClick={goToDrafting}
+										onSentClick={goToSent}
+										width={396}
+									/>
 									<div
 										className="bg-[#D8E5FB] border-[3px] border-[#143883] rounded-[7px] overflow-hidden flex flex-col"
 										style={{

@@ -23,6 +23,7 @@ import {
 	useLayoutEffect,
 	type CSSProperties,
 } from 'react';
+import { createPortal } from 'react-dom';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
@@ -2269,18 +2270,31 @@ const Murmur = () => {
 						? parsedVarZoom
 						: DEFAULT_CAMPAIGN_ZOOM;
 
-			const backdropStartStr =
-				html.style.getPropertyValue(CAMPAIGN_MAP_BACKDROP_START_VAR) ||
-				cs.getPropertyValue(CAMPAIGN_MAP_BACKDROP_START_VAR);
-			const backdropStartCss = backdropStartStr
-				? parseFloat(backdropStartStr)
-				: Number.NaN;
-			if (!Number.isFinite(backdropStartCss) || backdropStartCss <= 0) {
-				setCampaignMapCameraPadding({ right: 0, left: 0, top: 0, bottom: 0 });
-				return;
+			const viewportW = window.innerWidth;
+
+			let backdropStartCss: number;
+			if (isCompactCampaignWorkspaceView(activeView)) {
+				// Anchor the globe to the COMPACT backdrop regardless of expand state, so
+				// expanding the workspace never shoves the globe further left (which drags
+				// its globe-projection limb into view as a black ring). Mirrors the compact
+				// branch of updateCampaignZoomForViewport.
+				const layoutViewportW = viewportW / (z || 1);
+				backdropStartCss = Math.max(
+					0,
+					layoutViewportW - CAMPAIGN_COMPACT_WORKSPACE_BACKDROP_WIDTH_PX
+				);
+			} else {
+				const backdropStartStr =
+					html.style.getPropertyValue(CAMPAIGN_MAP_BACKDROP_START_VAR) ||
+					cs.getPropertyValue(CAMPAIGN_MAP_BACKDROP_START_VAR);
+				const parsed = backdropStartStr ? parseFloat(backdropStartStr) : Number.NaN;
+				if (!Number.isFinite(parsed) || parsed <= 0) {
+					setCampaignMapCameraPadding({ right: 0, left: 0, top: 0, bottom: 0 });
+					return;
+				}
+				backdropStartCss = parsed;
 			}
 
-			const viewportW = window.innerWidth;
 			// CSS vars are expressed in the unscaled (layout) coordinate space; multiply by the
 			// effective campaign zoom to convert to physical pixels.
 			const backdropStartPx = backdropStartCss * (z || 1);
@@ -2642,83 +2656,9 @@ const Murmur = () => {
 	const topOpportunitiesButtonRef = useRef<HTMLButtonElement>(null);
 
 	// Responses popup (opened from the envelope icon in the top action row)
-	const RESPONSES_POPUP_WIDTH_PX = 654;
-	const RESPONSES_POPUP_HEIGHT_PX = 266;
-	const RESPONSES_POPUP_SEARCHBAR_BOTTOM_GAP_PX = 18;
-	const RESPONSES_POPUP_MARGIN_PX = 8;
 	const [isResponsesPopupOpen, setIsResponsesPopupOpen] = useState(false);
-	const responsesPopupAnchorRef = useRef<HTMLDivElement>(null);
 	const responsesPopupTriggerRef = useRef<HTMLButtonElement>(null);
 	const responsesPopupRef = useRef<HTMLDivElement>(null);
-	const [responsesPopupPosition, setResponsesPopupPosition] = useState<{
-		top: number;
-		left: number;
-	} | null>(null);
-
-	const getCampaignZoomFactor = useCallback(() => {
-		if (typeof window === 'undefined') return 1;
-		const html = document.documentElement;
-		// Only apply zoom when the campaign page is in its compact/scaled mode.
-		if (!html.classList.contains(CAMPAIGN_COMPACT_CLASS)) return 1;
-		const raw = getComputedStyle(html).getPropertyValue(CAMPAIGN_ZOOM_VAR).trim();
-		const parsed = Number.parseFloat(raw);
-		if (Number.isFinite(parsed) && parsed > 0) return parsed;
-		return DEFAULT_CAMPAIGN_ZOOM;
-	}, [CAMPAIGN_COMPACT_CLASS, CAMPAIGN_ZOOM_VAR, DEFAULT_CAMPAIGN_ZOOM]);
-
-	const updateResponsesPopupPosition = useCallback(() => {
-		if (typeof window === 'undefined') return;
-		const trigger = responsesPopupTriggerRef.current;
-		if (!trigger) {
-			// If the trigger is unmounted (e.g. narrow breakpoint), close the popup.
-			setIsResponsesPopupOpen(false);
-			setResponsesPopupPosition(null);
-			return;
-		}
-
-		const anchor = responsesPopupAnchorRef.current ?? trigger;
-		const zoom = getCampaignZoomFactor();
-		const rect = anchor.getBoundingClientRect();
-		const rectTop = rect.top / zoom;
-		const rectLeft = rect.left / zoom;
-		const rectBottom = rect.bottom / zoom;
-		const rectWidth = rect.width / zoom;
-
-		const viewportW = window.innerWidth / zoom;
-		const viewportH = window.innerHeight / zoom;
-
-		let left = rectLeft + rectWidth / 2 - RESPONSES_POPUP_WIDTH_PX / 2;
-		let top = rectBottom + RESPONSES_POPUP_SEARCHBAR_BOTTOM_GAP_PX;
-
-		// If it would overflow below, try opening above the trigger.
-		if (
-			top + RESPONSES_POPUP_HEIGHT_PX + RESPONSES_POPUP_MARGIN_PX >
-			viewportH
-		) {
-			const aboveTop =
-				rectTop -
-				RESPONSES_POPUP_SEARCHBAR_BOTTOM_GAP_PX -
-				RESPONSES_POPUP_HEIGHT_PX;
-			if (aboveTop >= RESPONSES_POPUP_MARGIN_PX) top = aboveTop;
-		}
-
-		left = Math.min(
-			Math.max(left, RESPONSES_POPUP_MARGIN_PX),
-			viewportW - RESPONSES_POPUP_WIDTH_PX - RESPONSES_POPUP_MARGIN_PX
-		);
-		top = Math.min(
-			Math.max(top, RESPONSES_POPUP_MARGIN_PX),
-			viewportH - RESPONSES_POPUP_HEIGHT_PX - RESPONSES_POPUP_MARGIN_PX
-		);
-
-		setResponsesPopupPosition({ top, left });
-	}, [
-		getCampaignZoomFactor,
-		RESPONSES_POPUP_HEIGHT_PX,
-		RESPONSES_POPUP_SEARCHBAR_BOTTOM_GAP_PX,
-		RESPONSES_POPUP_MARGIN_PX,
-		RESPONSES_POPUP_WIDTH_PX,
-	]);
 
 	// Close dropdown when clicking outside (but not on the folder button itself)
 	useEffect(() => {
@@ -2815,34 +2755,14 @@ const Murmur = () => {
 		setIsTopStrategyDropdownOpen(false);
 		setIsTopOpportunitiesOpen(false);
 		setIsResponsesPopupOpen(false);
-		setResponsesPopupPosition(null);
 	}, [activeView]);
 
 	useEffect(() => {
 		if ((overviewSearchQuery ?? '').trim().length > 0) {
 			setShowTopCampaignsDropdown(false);
 			setIsResponsesPopupOpen(false);
-			setResponsesPopupPosition(null);
 		}
 	}, [overviewSearchQuery]);
-
-	// Position the responses popup as soon as it opens (pre-paint).
-	useLayoutEffect(() => {
-		if (!isResponsesPopupOpen) return;
-		updateResponsesPopupPosition();
-	}, [isResponsesPopupOpen, updateResponsesPopupPosition]);
-
-	// Keep the responses popup positioned on resize/scroll while open.
-	useEffect(() => {
-		if (!isResponsesPopupOpen) return;
-		const handleViewportChange = () => updateResponsesPopupPosition();
-		window.addEventListener('resize', handleViewportChange);
-		window.addEventListener('scroll', handleViewportChange, true);
-		return () => {
-			window.removeEventListener('resize', handleViewportChange);
-			window.removeEventListener('scroll', handleViewportChange, true);
-		};
-	}, [isResponsesPopupOpen, updateResponsesPopupPosition]);
 
 	// Close the responses popup on outside click / Escape.
 	useEffect(() => {
@@ -2856,14 +2776,12 @@ const Murmur = () => {
 				!responsesPopupRef.current.contains(target)
 			) {
 				setIsResponsesPopupOpen(false);
-				setResponsesPopupPosition(null);
 			}
 		};
 
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (event.key !== 'Escape') return;
 			setIsResponsesPopupOpen(false);
-			setResponsesPopupPosition(null);
 		};
 
 		document.addEventListener('mousedown', handleClickOutside);
@@ -3796,17 +3714,21 @@ const Murmur = () => {
 																		(overviewSearchQuery ?? '').trim().length > 0;
 																	const overviewLocalSearchLabel = (overviewSearchQuery ?? '').trim();
 
-																	const inactiveTabStyle = (isActive: boolean) => ({
-																		color: '#2C2C2C',
-																		fontFamily: 'Inter, sans-serif',
+								const inactiveTabStyle = (isActive: boolean) => ({
+									color: '#2C2C2C',
+									fontFamily: 'Inter, sans-serif',
 									fontSize: '17px',
 									fontStyle: 'normal' as const,
 									fontWeight: isActive ? 600 : 500,
 									lineHeight: '14px',
 									opacity: isActive ? 1 : 0.5,
 								});
+								const dashboardInitialPanelClassName =
+									'campaigns-table-wrapper dashboard-recent-campaigns pointer-events-auto w-full max-w-[960px] mx-auto px-4';
+								const dashboardInitialPanelContentClassName =
+									'w-full flex flex-col items-center';
 
-								return (
+								const topNavContent = (
 									<>
 										{/* Translucent sky-blue backdrop */}
 										<div
@@ -3933,9 +3855,8 @@ const Murmur = () => {
 																			zIndex: 120,
 																		}}
 																	>
-																			<div
-																				ref={responsesPopupAnchorRef}
-																				className="pointer-events-auto"
+															<div
+																className="pointer-events-auto"
 																			style={{
 																				transform: `scale(${MAP_VIEW_UI_SCALE})`,
 																				transformOrigin: 'top center',
@@ -4054,37 +3975,33 @@ const Murmur = () => {
 																}
 															onClick={
 																isStrategyButton
+																	? () => {
+																		setShowTopCampaignsDropdown(false);
+																		setIsResponsesPopupOpen(false);
+																		setIsTopOpportunitiesOpen(false);
+																		setIsTopStrategyDropdownOpen((open) => !open);
+																	}
+																		: isFolderButton
+																	? () => {
+																		setIsTopStrategyDropdownOpen(false);
+																		setIsResponsesPopupOpen(false);
+																		setIsTopOpportunitiesOpen(false);
+																		setShowTopCampaignsDropdown((open) => !open);
+																	}
+																		: isOpportunitiesButton
 																		? () => {
 																			setShowTopCampaignsDropdown(false);
-																			setIsResponsesPopupOpen(false);
-																			setResponsesPopupPosition(null);
-																			setIsTopOpportunitiesOpen(false);
-																			setIsTopStrategyDropdownOpen((open) => !open);
-																		}
-																		: isFolderButton
-																			? () => {
-																				setIsTopStrategyDropdownOpen(false);
-																				setIsResponsesPopupOpen(false);
-																				setResponsesPopupPosition(null);
-																				setIsTopOpportunitiesOpen(false);
-																				setShowTopCampaignsDropdown((open) => !open);
-																			}
-																		: isOpportunitiesButton
-																				? () => {
-																					setShowTopCampaignsDropdown(false);
-																				setIsResponsesPopupOpen(false);
-																				setResponsesPopupPosition(null);
-																				setIsTopStrategyDropdownOpen(false);
-																				setIsTopOpportunitiesOpen((open) => !open);
-																			}
+																		setIsResponsesPopupOpen(false);
+																		setIsTopStrategyDropdownOpen(false);
+																		setIsTopOpportunitiesOpen((open) => !open);
+																	}
 																			: isResponsesButton
-																				? () => {
-																					setShowTopCampaignsDropdown(false);
-																					setIsTopStrategyDropdownOpen(false);
-																					setIsTopOpportunitiesOpen(false);
-																					setResponsesPopupPosition(null);
-																					setIsResponsesPopupOpen((open) => !open);
-																				}
+																	? () => {
+																		setShowTopCampaignsDropdown(false);
+																		setIsTopStrategyDropdownOpen(false);
+																		setIsTopOpportunitiesOpen(false);
+																		setIsResponsesPopupOpen((open) => !open);
+																	}
 																			: isSearchButton
 																				? handleGoToDashboardSearch
 																			: undefined
@@ -4117,9 +4034,9 @@ const Murmur = () => {
 											</div>
 																			</div>
 
-									{isTopStrategyDropdownOpen && !isOverviewLocalSearchActive ? (
-										<div
-											data-slot="campaign-top-strategy-dropdown"
+										{isTopStrategyDropdownOpen && !isOverviewLocalSearchActive ? (
+											<div
+												data-slot="campaign-top-strategy-dropdown"
 												className="fixed left-0 right-0 flex justify-center pointer-events-none"
 												style={{
 													top: `${MAP_VIEW_STRATEGY_DROPDOWN_TOP_PX}px`,
@@ -4131,21 +4048,19 @@ const Murmur = () => {
 													data-campaign-interactive-surface
 													role="dialog"
 													aria-label="Strategy"
-													className="pointer-events-auto"
-													style={{
-														// The campaign page already applies a root-level zoom (murmur-campaign-compact).
-														// Scaling this dropdown again makes it noticeably smaller than the dashboard.
-														transformOrigin: 'top center',
-													}}
+													className={dashboardInitialPanelClassName}
+													style={{ transformOrigin: 'top center' }}
 												>
-													<DashboardStrategyBox onSearchContacts={handleGoToDashboardSearch} />
+													<div className={dashboardInitialPanelContentClassName}>
+														<DashboardStrategyBox onSearchContacts={handleGoToDashboardSearch} />
+													</div>
 												</div>
-										</div>
-									) : null}
+											</div>
+										) : null}
 
-									{showTopCampaignsDropdown && !isOverviewLocalSearchActive ? (
-										<div
-											data-slot="campaign-top-campaigns-dropdown"
+										{showTopCampaignsDropdown && !isOverviewLocalSearchActive ? (
+											<div
+												data-slot="campaign-top-campaigns-dropdown"
 											className="fixed left-0 right-0 flex justify-center pointer-events-none"
 											style={{
 												top: `${MAP_VIEW_CAMPAIGNS_DROPDOWN_TOP_PX}px`,
@@ -4154,25 +4069,21 @@ const Murmur = () => {
 										>
 											<div
 												ref={topCampaignsDropdownRef}
-												data-campaign-interactive-surface
-												role="dialog"
-												aria-label="Campaign folders"
-												className="pointer-events-auto"
-												style={{
-													// The campaign page already applies a root-level zoom (murmur-campaign-compact).
-													// Scaling this dropdown again makes it noticeably smaller than the dashboard.
-													transformOrigin: 'top center',
-													width: '743px',
-													maxWidth: 'calc(100vw - 32px)',
-												}}
-											>
-												<CampaignsTable
-													defaultOpenCampaignId={campaign.id}
-													defaultOpenContactsFolder
-												/>
+													data-campaign-interactive-surface
+													role="dialog"
+													aria-label="Campaign folders"
+													className={dashboardInitialPanelClassName}
+													style={{ transformOrigin: 'top center' }}
+												>
+													<div className={dashboardInitialPanelContentClassName}>
+														<CampaignsTable
+															defaultOpenCampaignId={campaign.id}
+															defaultOpenContactsFolder
+														/>
+													</div>
+												</div>
 											</div>
-										</div>
-									) : null}
+										) : null}
 
 										{isTopOpportunitiesOpen && !isOverviewLocalSearchActive ? (
 											<div
@@ -4188,25 +4099,22 @@ const Murmur = () => {
 													data-campaign-interactive-surface
 													role="dialog"
 													aria-label="Opportunities"
-													className="pointer-events-auto"
-													style={{
-														// The campaign page already applies a root-level zoom (murmur-campaign-compact).
-														// Scaling this dropdown again makes it noticeably smaller than the dashboard.
-														transformOrigin: 'top center',
-													}}
+													className={dashboardInitialPanelClassName}
+													style={{ transformOrigin: 'top center' }}
 												>
-													<DashboardOpportunitiesWidget enabled={isLoaded && !!user} />
+													<div className={dashboardInitialPanelContentClassName}>
+														<DashboardOpportunitiesWidget enabled={isLoaded && !!user} />
+													</div>
 												</div>
 											</div>
 										) : null}
 
-										{isResponsesPopupOpen && responsesPopupPosition && !isOverviewLocalSearchActive ? (
+										{isResponsesPopupOpen && !isOverviewLocalSearchActive ? (
 											<div
 												data-slot="campaign-top-responses-popup"
-												className="fixed pointer-events-none"
+												className="fixed left-0 right-0 flex justify-center pointer-events-none"
 												style={{
-													top: `${responsesPopupPosition.top}px`,
-													left: `${responsesPopupPosition.left}px`,
+													top: `${MAP_VIEW_STRATEGY_DROPDOWN_TOP_PX}px`,
 													zIndex: 128,
 												}}
 											>
@@ -4215,14 +4123,22 @@ const Murmur = () => {
 													data-campaign-interactive-surface
 													role="dialog"
 													aria-label="Responses"
-													className="pointer-events-auto"
+													className={dashboardInitialPanelClassName}
 												>
-													<DashboardResponsesWidget enabled={isLoaded && !!user} />
+													<div className={dashboardInitialPanelContentClassName}>
+														<DashboardResponsesWidget enabled={isLoaded && !!user} />
+													</div>
 												</div>
 											</div>
 										) : null}
 									</>
 								);
+
+								if (typeof window !== 'undefined') {
+									return createPortal(topNavContent, document.body);
+								}
+
+								return topNavContent;
 							})()}
 
 						{isCampaignWorkspaceToggleVisible && (
@@ -4676,7 +4592,7 @@ const Murmur = () => {
 										right: calc(100% - var(${CAMPAIGN_MAP_BACKDROP_END_VAR}, 100%));
 										z-index: 0;
 										pointer-events: auto;
-										background: rgba(136, 136, 136, 0.1);
+										background: rgba(136, 136, 136, 0.15);
 									}
 
 									.campaign-persistent-map-page [data-slot='campaign-top-box-wrapper'],

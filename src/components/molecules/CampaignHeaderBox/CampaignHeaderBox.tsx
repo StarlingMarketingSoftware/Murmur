@@ -7,6 +7,7 @@ import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { cn } from '@/utils';
 import { useHoverDescription } from '@/contexts/HoverDescriptionContext';
 import { CampaignTitlePills } from '@/components/molecules/CampaignTitlePills/CampaignTitlePills';
+import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 
 interface CampaignHeaderBoxProps {
 	campaignId: number;
@@ -35,6 +36,9 @@ interface CampaignHeaderBoxProps {
 const getContactsFillColor = (): string => '#F5DADA';
 const getDraftFillColor = (): string => '#FFE3AA';
 const getSentFillColor = (): string => '#B0E0A6';
+
+const FOLDER_BOX_FILL = '#B9EAF1';
+const FOLDER_ICON_COLOR = '#C5494F';
 
 export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	campaignId,
@@ -309,34 +313,51 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					{renderedHoverDescription}
 				</div>
 			) : null}
-			{/* Campaign Title */}
-			<div className="h-[28px] overflow-hidden flex-shrink-0 mt-[6px]">
-				{isEditing ? (
-					<input
-						ref={inputRef}
-						type="text"
-						value={editedName}
-						onChange={(e) => setEditedName(e.target.value)}
-						onBlur={handleSave}
-						onKeyDown={handleKeyDown}
-						className="font-normal text-[26px] leading-none text-black bg-transparent border-none outline-none p-0 m-0 w-full h-[28px]"
-						style={{ fontFamily: 'Times New Roman, Times, serif' }}
+			{/* Campaign Title — folder icon + name inside a light-blue folder box */}
+			<div className="h-[28px] flex-shrink-0 mt-[6px] flex items-center">
+				<div
+					className="flex items-center gap-[8px] overflow-hidden box-border pl-[8px] pr-[28px]"
+					style={{
+						width: 'fit-content',
+						maxWidth: '258px',
+						height: '26px',
+						borderRadius: '6px',
+						background: FOLDER_BOX_FILL,
+					}}
+				>
+					<DashboardActionBarFolderIcon
+						width={26}
+						height={15}
+						aria-hidden="true"
+						style={{ color: FOLDER_ICON_COLOR, flexShrink: 0, display: 'block' }}
 					/>
-				) : (
-					<div
-						className="font-normal text-[26px] leading-none whitespace-nowrap overflow-hidden text-black cursor-text h-[28px]"
-						style={{
-							fontFamily: 'Times New Roman, Times, serif',
-							maskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
-							WebkitMaskImage:
-								'linear-gradient(to right, black 90%, transparent 100%)',
-						}}
-						onClick={() => setIsEditing(true)}
-						title="Click to edit"
-					>
-						<CampaignTitlePills title={campaignName} size="header" />
-					</div>
-				)}
+					{isEditing ? (
+						<input
+							ref={inputRef}
+							type="text"
+							value={editedName}
+							onChange={(e) => setEditedName(e.target.value)}
+							onBlur={handleSave}
+							onKeyDown={handleKeyDown}
+							className="min-w-0 flex-1 font-normal text-[26px] leading-none text-black bg-transparent border-none outline-none p-0 m-0"
+							style={{ fontFamily: 'Times New Roman, Times, serif' }}
+						/>
+					) : (
+						<div
+							className="min-w-0 flex-1 font-normal text-[26px] leading-none whitespace-nowrap overflow-hidden text-black cursor-text"
+							style={{
+								fontFamily: 'Times New Roman, Times, serif',
+								maskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
+								WebkitMaskImage:
+									'linear-gradient(to right, black 90%, transparent 100%)',
+							}}
+							onClick={() => setIsEditing(true)}
+							title="Click to edit"
+						>
+							<CampaignTitlePills title={campaignName} size="header" />
+						</div>
+					)}
+				</div>
 			</div>
 
 			{/* Spacer above To/From */}

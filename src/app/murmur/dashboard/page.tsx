@@ -108,6 +108,7 @@ import { useDashboardScrollToMap } from '@/hooks/useDashboardScrollToMap';
 import { useDebounce } from '@/hooks/useDebounce';
 import {
 	useBatchUpdateContacts,
+	useGetContacts,
 	getContactsListQueryKey,
 	fetchContactsList,
 } from '@/hooks/queryHooks/useContacts';
@@ -141,6 +142,7 @@ import {
 } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
+import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import DashboardResponsesWidget, {
 	type ResponsesMockState,
 } from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesWidget';
@@ -155,6 +157,7 @@ import {
 	getCampaignDetailQueryKey,
 	fetchCampaignDetail,
 } from '@/hooks/queryHooks/useCampaigns';
+import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import {
 	getIdentitiesListQueryKey,
 	fetchIdentitiesList,
@@ -162,6 +165,7 @@ import {
 import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { EmailStatus } from '@prisma/client';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -1722,6 +1726,8 @@ const MAP_SELECT_GRAB_SCALE_GROW_END_HEIGHT_PX = 1480;
 const MAP_SELECT_GRAB_VIEWPORT_INSET_PX = 16;
 const MAP_VIEW_SIDE_PANEL_VISUAL_TOP_PX = 106;
 const MAP_VIEW_SIDE_PANEL_BOTTOM_GAP_PX = 20;
+const MAP_VIEW_CAMPAIGN_HEADER_HEIGHT_PX = 59;
+const MAP_VIEW_CAMPAIGN_HEADER_GAP_PX = 13;
 // Keep both map side panels visually pinned after the dashboard root zoom is applied.
 const MAP_VIEW_SIDE_PANEL_TOP_CSS = `calc(${MAP_VIEW_SIDE_PANEL_VISUAL_TOP_PX}px / var(--murmur-dashboard-zoom, ${DASHBOARD_MAP_ZOOM_DEFAULT}))`;
 const MAP_SELECT_GRAB_VISUAL_TOP_NUDGE_UP_CSS = `calc(4px / var(--murmur-dashboard-zoom, ${DASHBOARD_MAP_ZOOM_DEFAULT}))`;
@@ -3213,8 +3219,24 @@ const DashboardContent = () => {
 	const [hoveredTab, setHoveredTab] = useState<'search' | 'inbox' | null>(null);
 	const inboxView = activeTab === 'inbox';
 	type DashboardActionBarKey = 'playbook' | 'folder' | 'calendar' | 'star' | 'envelope';
+	type DashboardMapTopActionKey = Exclude<DashboardActionBarKey, 'calendar'>;
 	const [selectedActionBarIcon, setSelectedActionBarIcon] =
 		useState<DashboardActionBarKey>('playbook');
+	const [openMapTopAction, setOpenMapTopAction] =
+		useState<DashboardMapTopActionKey | null>(null);
+	const mapTopStrategyButtonRef = useRef<HTMLButtonElement>(null);
+	const mapTopCampaignsFolderButtonRef = useRef<HTMLButtonElement>(null);
+	const mapTopOpportunitiesButtonRef = useRef<HTMLButtonElement>(null);
+	const mapTopResponsesButtonRef = useRef<HTMLButtonElement>(null);
+	const mapTopStrategyDropdownRef = useRef<HTMLDivElement>(null);
+	const mapTopCampaignsDropdownRef = useRef<HTMLDivElement>(null);
+	const mapTopOpportunitiesPopupRef = useRef<HTMLDivElement>(null);
+	const mapTopResponsesPopupRef = useRef<HTMLDivElement>(null);
+	const toggleMapTopAction = (key: DashboardMapTopActionKey) => {
+		setSelectedActionBarIcon(key);
+		setActiveSection(null);
+		setOpenMapTopAction((open) => (open === key ? null : key));
+	};
 	const campaignsDebugEnabled = searchParams.get('campaignsDebug') === '1';
 	const [campaignsMockState, setCampaignsMockState] = useState<
 		CampaignsMockState | undefined
@@ -3235,6 +3257,54 @@ const DashboardContent = () => {
 	const isTabPreviewingOther = hoveredTab != null && hoveredTab !== activeTab;
 	// Dashboard inbox deep-link (`?tab=inbox`) should land on the Campaigns sub-tab.
 	const [inboxSubtab, setInboxSubtab] = useState<'messages' | 'campaigns'>('campaigns');
+	useEffect(() => {
+		if (!openMapTopAction) return;
+
+		const handleClickOutside = (event: MouseEvent) => {
+			const target = event.target as Node;
+			const targetElement =
+				target instanceof Element
+					? target
+					: target instanceof Node
+						? target.parentElement
+						: null;
+			const activeButtonRef =
+				openMapTopAction === 'playbook'
+					? mapTopStrategyButtonRef
+					: openMapTopAction === 'folder'
+						? mapTopCampaignsFolderButtonRef
+						: openMapTopAction === 'star'
+							? mapTopOpportunitiesButtonRef
+							: mapTopResponsesButtonRef;
+			const activePopupRef =
+				openMapTopAction === 'playbook'
+					? mapTopStrategyDropdownRef
+					: openMapTopAction === 'folder'
+						? mapTopCampaignsDropdownRef
+						: openMapTopAction === 'star'
+							? mapTopOpportunitiesPopupRef
+							: mapTopResponsesPopupRef;
+
+			if (activeButtonRef.current?.contains(target)) return;
+			if (targetElement?.closest('.campaign-finder-context-menu, .campaign-finder-info-popup')) {
+				return;
+			}
+			if (activePopupRef.current?.contains(target)) return;
+
+			setOpenMapTopAction(null);
+		};
+
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') setOpenMapTopAction(null);
+		};
+
+		document.addEventListener('mousedown', handleClickOutside);
+		window.addEventListener('keydown', handleKeyDown);
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+			window.removeEventListener('keydown', handleKeyDown);
+		};
+	}, [openMapTopAction]);
 	// Handle tab query parameter
 	// Only react to *URL changes*. If we also depend on `activeTab`, this effect can run
 	// immediately after a click-driven tab switch (before `router.replace` updates the URL),
@@ -4118,6 +4188,10 @@ const DashboardContent = () => {
 		fromHome: fromHomeParam,
 		disableAutoCreateCampaign: isAddToCampaignMode,
 	});
+
+	useEffect(() => {
+		if (!isMapView) setOpenMapTopAction(null);
+	}, [isMapView]);
 
 	// --- Search → Campaign hover prefetch -----------------------------------
 	// The map-view top tabs (Write/Campaign/Inbox/Drafts) all router.push to the
@@ -5233,6 +5307,53 @@ const DashboardContent = () => {
 	const isSelectMapToolActive = activeMapTool === 'select';
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
+	const dashboardMapCampaignForHeader = fromCampaign ?? activeCampaign;
+	const dashboardMapCampaignContactListIds = useMemo(
+		() => dashboardMapCampaignForHeader?.userContactLists?.map((list) => list.id) ?? [],
+		[dashboardMapCampaignForHeader?.userContactLists]
+	);
+	const dashboardMapCampaignContactsFilter = useMemo(
+		() =>
+			dashboardMapCampaignContactListIds.length > 0
+				? { contactListIds: dashboardMapCampaignContactListIds }
+				: undefined,
+		[dashboardMapCampaignContactListIds]
+	);
+	const dashboardMapCampaignEmailFilter = useMemo(
+		() =>
+			dashboardMapCampaignForHeader
+				? { campaignId: dashboardMapCampaignForHeader.id }
+				: undefined,
+		[dashboardMapCampaignForHeader]
+	);
+	const shouldLoadDashboardMapCampaignHeaderMetrics =
+		isMapView &&
+		!isNarrowestDesktop &&
+		!hasNoSearchResults &&
+		Boolean(dashboardMapCampaignForHeader);
+	const { data: dashboardMapHeaderContacts } = useGetContacts({
+		filters: dashboardMapCampaignContactsFilter,
+		enabled:
+			shouldLoadDashboardMapCampaignHeaderMetrics &&
+			Boolean(dashboardMapCampaignContactsFilter),
+	});
+	const { data: dashboardMapHeaderEmails } = useGetEmails({
+		filters: dashboardMapCampaignEmailFilter,
+		enabled:
+			shouldLoadDashboardMapCampaignHeaderMetrics &&
+			Boolean(dashboardMapCampaignEmailFilter),
+	});
+	const dashboardMapHeaderContactsCount = dashboardMapHeaderContacts?.length || 0;
+	const dashboardMapHeaderDraftCount = (dashboardMapHeaderEmails || []).filter(
+		(email) => email.status === EmailStatus.draft
+	).length;
+	const dashboardMapHeaderSentCount = (dashboardMapHeaderEmails || []).filter(
+		(email) => email.status === EmailStatus.sent
+	).length;
+	const dashboardMapHeaderToListNames =
+		dashboardMapCampaignForHeader?.userContactLists?.map((list) => list.name).join(', ') || '';
+	const dashboardMapHeaderFromName = dashboardMapCampaignForHeader?.identity?.name || '';
+	const shouldShowDashboardMapCampaignHeader = Boolean(dashboardMapCampaignForHeader);
 
 	// Reveal the staged "For You" top pill once the scroll-entered curated search has finished
 	// loading results into the right panel (or settled with none). Until then the pill stays
@@ -5444,6 +5565,9 @@ const DashboardContent = () => {
 	const MAP_VIEW_UI_SCALE = isMobile ? 1 : 0.85;
 	const MAP_VIEW_PANEL_SCALE = isMobile ? 1 : 0.95;
 	const MAP_VIEW_BOTTOM_SEARCH_SCALE = isMobile ? 1 : 0.85;
+	const mapViewCampaignHeaderTopOffsetPx =
+		MAP_VIEW_CAMPAIGN_HEADER_HEIGHT_PX * MAP_VIEW_PANEL_SCALE +
+		MAP_VIEW_CAMPAIGN_HEADER_GAP_PX;
 	const mapSelectGrabViewScale = useMemo(() => {
 		if (isMobile) return 1;
 		const availableHeight =
@@ -5516,6 +5640,10 @@ const DashboardContent = () => {
 		MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX * MAP_VIEW_UI_SCALE -
 		MAP_VIEW_SEARCH_BAR_BOTTOM_INSET_PX -
 		MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX * MAP_VIEW_UI_SCALE;
+	const MAP_VIEW_TOP_ACTION_DROPDOWN_TOP_PX =
+		MAP_VIEW_SEARCH_BAR_TOP_PX +
+		MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX * MAP_VIEW_UI_SCALE +
+		18;
 	const SEARCH_THIS_AREA_GAP_PX = 45;
 	const SEARCH_THIS_AREA_BUTTON_TOP_PX =
 		MAP_VIEW_SEARCH_BAR_TOP_PX +
@@ -10347,30 +10475,36 @@ const DashboardContent = () => {
 															width: 22,
 															height: 13,
 														},
-													] as const
-												).map(({ key, Icon, label, width, height }) => {
-													const isSelected = selectedActionBarIcon === key;
-													return (
-														<button
-															key={key}
-															type="button"
-															aria-label={label}
-															aria-pressed={isSelected}
-															onClick={() => setSelectedActionBarIcon(key)}
-															style={{
-																background: 'none',
-																border: 'none',
+											] as const
+										).map(({ key, Icon, label, width, height }) => {
+											const isOpen = openMapTopAction === key;
+											return (
+												<button
+													key={key}
+													type="button"
+													ref={
+														key === 'playbook'
+															? mapTopStrategyButtonRef
+															: mapTopCampaignsFolderButtonRef
+													}
+													aria-label={label}
+													aria-haspopup="dialog"
+													aria-expanded={isOpen}
+													onClick={() => toggleMapTopAction(key)}
+													style={{
+														background: 'none',
+														border: 'none',
 																padding: '2px 4px',
 																margin: 0,
 																display: 'flex',
 																alignItems: 'center',
-																justifyContent: 'center',
-																cursor: 'pointer',
-																color: '#050505',
-																opacity: isSelected ? 1 : 0.3,
-																transition: 'opacity 150ms ease',
-															}}
-														>
+														justifyContent: 'center',
+														cursor: 'pointer',
+														color: '#050505',
+														opacity: isOpen ? 1 : 0.55,
+														transition: 'opacity 150ms ease',
+													}}
+												>
 															<Icon width={width} height={height} />
 														</button>
 													);
@@ -10411,29 +10545,35 @@ const DashboardContent = () => {
 															width: 22,
 															height: 13,
 														},
-													] as const
-												).map(({ key, Icon, label, width, height }) => {
-													const isSelected = selectedActionBarIcon === key;
-													return (
-														<button
-															key={key}
-															type="button"
-															aria-label={label}
-															aria-pressed={isSelected}
-															onClick={() => setSelectedActionBarIcon(key)}
-															style={{
-																background: 'none',
-																border: 'none',
+											] as const
+										).map(({ key, Icon, label, width, height }) => {
+											const isOpen = openMapTopAction === key;
+											return (
+												<button
+													key={key}
+													type="button"
+													ref={
+														key === 'star'
+															? mapTopOpportunitiesButtonRef
+															: mapTopResponsesButtonRef
+													}
+													aria-label={label}
+													aria-haspopup="dialog"
+													aria-expanded={isOpen}
+													onClick={() => toggleMapTopAction(key)}
+													style={{
+														background: 'none',
+														border: 'none',
 																padding: '2px 4px',
 																margin: 0,
 																display: 'flex',
 																alignItems: 'center',
-																justifyContent: 'center',
-																cursor: 'pointer',
-																color: '#050505',
-																opacity: isSelected ? 1 : 0.3,
-																transition: 'opacity 150ms ease',
-															}}
+														justifyContent: 'center',
+														cursor: 'pointer',
+														color: '#050505',
+														opacity: isOpen ? 1 : 0.55,
+														transition: 'opacity 150ms ease',
+													}}
 														>
 															<Icon width={width} height={height} />
 														</button>
@@ -10442,6 +10582,114 @@ const DashboardContent = () => {
 											</div>
 										</div>
 									</div>
+								) : null;
+
+								const mapTopActionDropdowns = isMapView ? (
+									<>
+										{openMapTopAction === 'playbook' ? (
+											<div
+												data-slot="dashboard-map-top-strategy-dropdown"
+												className="fixed left-0 right-0 flex justify-center pointer-events-none map-overlay-appear"
+												style={{
+													top: `${MAP_VIEW_TOP_ACTION_DROPDOWN_TOP_PX}px`,
+													zIndex: 128,
+												}}
+											>
+												<div
+													ref={mapTopStrategyDropdownRef}
+													role="dialog"
+													aria-label="Strategy"
+													className="pointer-events-auto"
+													style={{ transformOrigin: 'top center' }}
+												>
+													<DashboardStrategyBox
+														onSearchContacts={() => {
+															setOpenMapTopAction(null);
+															handleMapBottomForYouSubmit();
+														}}
+													/>
+												</div>
+											</div>
+										) : null}
+
+										{openMapTopAction === 'folder' ? (
+											<div
+												data-slot="dashboard-map-top-campaigns-dropdown"
+												className="fixed left-0 right-0 flex justify-center pointer-events-none map-overlay-appear"
+												style={{
+													top: `${MAP_VIEW_TOP_ACTION_DROPDOWN_TOP_PX}px`,
+													zIndex: 128,
+												}}
+											>
+												<div
+													ref={mapTopCampaignsDropdownRef}
+													role="dialog"
+													aria-label="Campaign folders"
+													className="pointer-events-auto"
+													style={{
+														transformOrigin: 'top center',
+														width: '743px',
+														maxWidth: 'calc(100vw - 32px)',
+													}}
+												>
+													<CampaignsTable
+														mockState={campaignsMockState}
+														onMockStateChange={setCampaignsMockState}
+														defaultOpenCampaignId={fromCampaign?.id ?? activeCampaignId ?? null}
+														defaultOpenContactsFolder
+														onFinderOpenChange={setIsCampaignFinderOpen}
+													/>
+												</div>
+											</div>
+										) : null}
+
+										{openMapTopAction === 'star' ? (
+											<div
+												data-slot="dashboard-map-top-opportunities-popup"
+												className="fixed left-0 right-0 flex justify-center pointer-events-none map-overlay-appear"
+												style={{
+													top: `${MAP_VIEW_TOP_ACTION_DROPDOWN_TOP_PX}px`,
+													zIndex: 128,
+												}}
+											>
+												<div
+													ref={mapTopOpportunitiesPopupRef}
+													role="dialog"
+													aria-label="Opportunities"
+													className="pointer-events-auto"
+													style={{ transformOrigin: 'top center' }}
+												>
+													<DashboardOpportunitiesWidget
+														enabled={isSignedIn === true}
+														mockState={opportunitiesMockState}
+													/>
+												</div>
+											</div>
+										) : null}
+
+										{openMapTopAction === 'envelope' ? (
+											<div
+												data-slot="dashboard-map-top-responses-popup"
+												className="fixed left-0 right-0 flex justify-center pointer-events-none map-overlay-appear"
+												style={{
+													top: `${MAP_VIEW_TOP_ACTION_DROPDOWN_TOP_PX}px`,
+													zIndex: 128,
+												}}
+											>
+												<div
+													ref={mapTopResponsesPopupRef}
+													role="dialog"
+													aria-label="Responses"
+													className="pointer-events-auto"
+												>
+													<DashboardResponsesWidget
+														enabled={isSignedIn === true}
+														mockState={responsesMockState}
+													/>
+												</div>
+											</div>
+										) : null}
+									</>
 								) : null;
 
 								const searchBar = isMapView ? (
@@ -10796,6 +11044,7 @@ const DashboardContent = () => {
 											{mapTopOutlineBox}
 											{campaignMapTopTabs}
 											{searchBar}
+											{mapTopActionDropdowns}
 											{mapSelectGrabberTool}
 											{searchThisAreaCta}
 										</>,
@@ -11206,8 +11455,61 @@ const DashboardContent = () => {
 																				</div>
 																			</div>
 																		)}
-																		{/* Search Results overlay box on the right side - keep mounted during loading
-															    so the UI doesn't disappear between state searches. */}
+														{shouldShowDashboardMapCampaignHeader &&
+															dashboardMapCampaignForHeader &&
+															!isNarrowestDesktop &&
+															!hasNoSearchResults && (
+																<div
+																	className="absolute right-[10px] pointer-events-auto"
+																	onMouseEnter={() => {
+																		if (!shouldUseDynamicMapCreateCampaignCta) return;
+																		setIsPointerInMapSidePanel(true);
+																	}}
+																	onMouseLeave={() => {
+																		if (!shouldUseDynamicMapCreateCampaignCta) return;
+																		setIsPointerInMapSidePanel(false);
+																	}}
+																	style={{
+																		top: `calc(${MAP_VIEW_SIDE_PANEL_TOP_CSS} - ${mapViewCampaignHeaderTopOffsetPx}px)`,
+																		width: '433px',
+																		transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
+																		transformOrigin: 'top right',
+																	}}
+																>
+																	<CampaignHeaderBox
+																		campaignId={dashboardMapCampaignForHeader.id}
+																		campaignName={
+																			dashboardMapCampaignForHeader.name || 'Untitled Campaign'
+																		}
+																		toListNames={dashboardMapHeaderToListNames}
+																		fromName={dashboardMapHeaderFromName}
+																		contactsCount={dashboardMapHeaderContactsCount}
+																		draftCount={dashboardMapHeaderDraftCount}
+																		sentCount={dashboardMapHeaderSentCount}
+																		onContactsClick={() => {
+																			if (!mapCampaignId) return;
+																			router.push(
+																				`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=write`
+																			);
+																		}}
+																		onDraftsClick={() => {
+																			if (!mapCampaignId) return;
+																			router.push(
+																				`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts`
+																			);
+																		}}
+																		onSentClick={() => {
+																			if (!mapCampaignId) return;
+																			router.push(
+																				`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=sent`
+																			);
+																		}}
+																		width={433}
+																	/>
+																</div>
+															)}
+														{/* Search Results overlay box on the right side - keep mounted during loading
+											    so the UI doesn't disappear between state searches. */}
 																		{!isNarrowestDesktop && !hasNoSearchResults && (
 																			<div
 																				className="absolute right-[10px] flex flex-col gap-[9px] pointer-events-auto"
