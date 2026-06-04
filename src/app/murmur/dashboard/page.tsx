@@ -12510,9 +12510,6 @@ const DashboardContent = () => {
 																rowClassName="border-[#737373] row-hover-scroll bg-white odd:bg-white even:bg-white rounded-[8px] [&>td:first-child]:rounded-l-[8px] [&>td:last-child]:rounded-r-[8px] [&>td]:border-y-2 [&>td:first-child]:border-l-2 [&>td:last-child]:border-r-2 border-none !h-[58px] min-h-[58px] [&>td]:!h-[58px] [&>td]:!py-0"
 																stickyHeaderClassName="bg-[#AFD6EF]"
 																hidePagination
-																onRowHover={
-																	isMobile ? undefined : (row) => setHoveredContact(row)
-																}
 																headerAction={
 																	!isMobile && !fromHomeParam ? (
 																		<button
