@@ -7,6 +7,7 @@ import {
 	useCallback,
 	useEffect,
 	useId,
+	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -19,7 +20,7 @@ import {
 	calculateTooltipWidth,
 	calculateTooltipHeight,
 	calculateTooltipAnchorY,
-	generateMapTooltipIconUrl,
+	generateMapTooltipSvg,
 	MAP_TOOLTIP_ANCHOR_X,
 } from '@/components/atoms/_svg/MapTooltipIcon';
 import {
@@ -230,6 +231,7 @@ import {
 	MAPBOX_STYLE,
 	MAP_DEFAULT_ZOOM,
 	MAP_MIN_ZOOM,
+	STATE_LABELS_FULL_OPACITY_ZOOM,
 	MAP_PINCH_ZOOM_RATE,
 	MAP_WHEEL_ZOOM_RATE,
 	MARKER_CONSTELLATION_CORE_OPACITY,
@@ -667,6 +669,9 @@ const getAmbientContactWhatFromTitle = (title: string | null | undefined): strin
 export interface SearchResultsMapProps {
 	contacts: ContactWithName[];
 	selectedContacts: number[];
+	/** Full objects for the selected contacts, so halos persist even when those contacts
+	 *  are not in `contacts`/overlays (e.g. after disengaging search to the ambient atlas). */
+	selectedContactObjects?: ContactWithName[];
 	/** When set, highlights the corresponding marker as hovered (e.g. hovering a row in the map results panel). */
 	externallyHoveredContactId?: number | null;
 	/** Full search query string (e.g. "[Booking] Music Venues (Portland, ME)") */
@@ -735,6 +740,14 @@ export interface SearchResultsMapProps {
 	onMarkerClick?: (contact: ContactWithName) => void;
 	onMarkerHover?: (contact: ContactWithName | null, meta?: MarkerHoverMeta) => void;
 	onToggleSelection?: (contactId: number) => void;
+	/**
+	 * Multi-select action card (dashboard search map). When >= 2 contacts are
+	 * selected, a floating card anchored to the selection centroid offers these
+	 * actions. Providing `onAddSelectionToFolder` is what opts a host into showing
+	 * the card, so it never appears in the campaign/venue maps.
+	 */
+	onAddSelectionToFolder?: () => void;
+	onWriteSelectionMessage?: () => void;
 	onStateSelect?: (stateName: string) => void;
 	enableStateInteractions?: boolean;
 	lockedStateName?: string | null;
@@ -798,6 +811,7 @@ export interface SearchResultsMapProps {
 export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	contacts,
 	selectedContacts,
+	selectedContactObjects = [],
 	externallyHoveredContactId,
 	searchQuery,
 	searchWhat,
@@ -825,6 +839,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	onMarkerClick,
 	onMarkerHover,
 	onToggleSelection,
+	onAddSelectionToFolder,
+	onWriteSelectionMessage,
 	onStateSelect,
 	enableStateInteractions,
 	lockedStateName,
@@ -1128,6 +1144,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [fadingTooltipId, setFadingTooltipId] = useState<number | null>(null);
 	const fadingTooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const mapContainerRef = useRef<HTMLDivElement | null>(null);
+	const hoverTooltipOverlayRef = useRef<HTMLDivElement | null>(null);
 	const mapRef = useRef<mapboxgl.Map | null>(null);
 	const [map, setMap] = useState<mapboxgl.Map | null>(null);
 	const [isMapLoaded, setIsMapLoaded] = useState(false);
@@ -1159,6 +1176,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Keep a "sticky" set of currently-rendered marker ids so zooming can rescale existing markers
 	// and only introduce *new* markers, instead of re-sampling a totally different set each time.
 	const visibleContactIdSetRef = useRef<Set<number>>(new Set());
+	// Identity salt for per-contact dot sampling/hashing. Invariant under zoom & pan
+	// (so the visible dot set doesn't reshuffle when crossing zoom thresholds); resets
+	// only when the underlying result set / locked state changes.
+	const dotSampleSaltRef = useRef<string>('');
 	const [bookingExtraVisibleContacts, setBookingExtraVisibleContacts] = useState<
 		ContactWithName[]
 	>([]);
@@ -2555,7 +2576,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							['zoom'],
 							MAP_MIN_ZOOM,
 							0,
-							MAP_MIN_ZOOM + 1.25,
+							STATE_LABELS_FULL_OPACITY_ZOOM,
 							overlay,
 						]);
 					}
@@ -5757,6 +5778,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			24,
 			['*', RESULT_DOT_GLOW_RADIUS_MAX_PX, resultDotRadiusScaleExpr],
 		];
+		const resultDotHitRadiusExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			['*', RESULT_DOT_GLOW_RADIUS_MIN_PX, resultDotRadiusScaleExpr],
+			RESULT_DOT_ZOOM_MIN,
+			['*', RESULT_DOT_GLOW_RADIUS_MIN_PX, resultDotRadiusScaleExpr],
+			RESULT_DOT_ZOOM_MAX,
+			['*', RESULT_DOT_GLOW_RADIUS_MAX_PX, resultDotRadiusScaleExpr],
+			24,
+			['*', RESULT_DOT_GLOW_RADIUS_MAX_PX, resultDotRadiusScaleExpr],
+		];
 
 		const allOverlayRadiusLow = RESULT_DOT_SCALE_MIN * 0.72;
 		const allOverlayRadiusHigh = RESULT_DOT_SCALE_MAX * 0.72;
@@ -5786,6 +5820,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			RESULT_DOT_GLOW_RADIUS_MAX_PX * 0.82,
 			24,
 			RESULT_DOT_GLOW_RADIUS_MAX_PX * 0.82,
+		];
+		const allOverlayHitRadiusExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			RESULT_DOT_GLOW_RADIUS_MIN_PX * 1.05,
+			RESULT_DOT_ZOOM_MIN,
+			RESULT_DOT_GLOW_RADIUS_MIN_PX * 1.05,
+			RESULT_DOT_ZOOM_MAX,
+			RESULT_DOT_GLOW_RADIUS_MAX_PX * 1.05,
+			24,
+			RESULT_DOT_GLOW_RADIUS_MAX_PX * 1.05,
 		];
 		const allOverlayStarIconSizeExpr = [
 			'interpolate',
@@ -5864,18 +5911,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MIN) / 2;
 		const pinRadiusHigh =
 			Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MAX) / 2;
-		const pinRadiusExpr = [
+		const pinHitRadiusExpr = [
 			'interpolate',
 			['linear'],
 			['zoom'],
 			0,
-			pinRadiusLow,
+			pinRadiusLow + 8,
 			RESULT_DOT_ZOOM_MIN,
-			pinRadiusLow,
+			pinRadiusLow + 8,
 			RESULT_DOT_ZOOM_MAX,
-			pinRadiusHigh,
+			pinRadiusHigh + 9,
 			24,
-			pinRadiusHigh,
+			pinRadiusHigh + 9,
 		];
 
 		const pinIconSizeLow =
@@ -6012,6 +6059,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			type: 'symbol',
 			source: MAPBOX_SOURCE_IDS.stateLabels,
 			minzoom: MAP_MIN_ZOOM,
+			// Per-state zoom gate: small states (DC, territories) only label once
+			// zoomed in; big states label from the wide view. `minZoom` is baked
+			// into each feature by the preprocess script (area-based).
+			filter: ['>=', ['zoom'], ['get', 'minZoom']],
 			layout: {
 				// Abbreviations when zoomed out, full names when zoomed in.
 				'text-field': ['step', ['zoom'], ['get', 'key'], 8.5, ['get', 'name']],
@@ -6019,7 +6070,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'text-font': ['Inter Medium', 'Arial Unicode MS Regular'],
 				'text-allow-overlap': false,
 				'text-ignore-placement': false,
-				'text-padding': 2,
+				// Smaller padding lets more initials survive collision when zoomed out.
+				'text-padding': 1,
+				// Rank 1 = largest state. Lower sort key is placed first and wins
+				// collisions, so big states stay legible far out and crowded small
+				// states (NE corner) fill in as you zoom.
+				'symbol-sort-key': ['get', 'rank'],
 			},
 			paint: {
 				'text-color': STATE_LABEL_COLOR,
@@ -6205,7 +6261,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersAllOverlay,
 			paint: {
-				'circle-radius': allOverlayGlowRadiusExpr,
+				'circle-radius': allOverlayHitRadiusExpr,
 				'circle-opacity': 0,
 				'circle-stroke-width': 0,
 			},
@@ -6291,7 +6347,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersPromotionPin,
 			paint: {
-				'circle-radius': pinRadiusExpr,
+				'circle-radius': pinHitRadiusExpr,
 				'circle-opacity': 0,
 				'circle-stroke-width': 0,
 				'circle-stroke-color': 'transparent',
@@ -6344,7 +6400,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersBookingPin,
 			paint: {
-				'circle-radius': pinRadiusExpr,
+				'circle-radius': pinHitRadiusExpr,
 				'circle-opacity': 0,
 				'circle-stroke-width': 0,
 				'circle-stroke-color': 'transparent',
@@ -6417,7 +6473,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersPromotionDot,
 			paint: {
-				'circle-radius': resultDotRadiusExpr,
+				'circle-radius': resultDotHitRadiusExpr,
 				'circle-opacity': 0,
 				'circle-stroke-width': 0,
 			},
@@ -6459,7 +6515,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersBase,
 			paint: {
-				'circle-radius': resultDotRadiusExpr,
+				'circle-radius': resultDotHitRadiusExpr,
 				'circle-opacity': 0,
 				'circle-stroke-width': 0,
 			},
@@ -8019,6 +8075,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const qEast = Math.round(paddedEast / quant);
 			const seed = `${zoomKey}|${qSouth}|${qWest}|${qNorth}|${qEast}`;
 
+			// Identity salt for per-contact hashing — invariant under zoom/pan so the
+			// non-priority dot fill doesn't reshuffle across zoom thresholds. Resets on a
+			// new result set / locked-state change, which also clears the carry-over set
+			// (see below) so a new search doesn't inherit the prior set's visible dots.
+			const sampleSalt = `${(searchQuery ?? '').trim()}|${lockedStateKey ?? ''}|${baseContactIdSet.size}`;
+			if (sampleSalt !== dotSampleSaltRef.current) {
+				dotSampleSaltRef.current = sampleSalt;
+				visibleContactIdSetRef.current = new Set();
+			}
+
 			const viewportBbox: BoundingBox = {
 				minLat: paddedSouth,
 				maxLat: paddedNorth,
@@ -8335,7 +8401,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					isPriority: priorityIdSet.has(contact.id),
 					isInLockedState,
 					isNearLockedBorder: !!lockedEdgeIdSet && lockedEdgeIdSet.has(contact.id),
-					key: hashStringToUint32(`${seed}|${contact.id}`),
+					key: hashStringToUint32(`${sampleSalt}|${contact.id}`),
 				});
 			}
 
@@ -8514,7 +8580,51 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 			}
 
-			const nextVisibleContacts: ContactWithName[] = picked;
+			// Monotonic stability across zoom: never drop a base dot that was already
+			// visible and is still within the padded viewport. The non-overlap picker
+			// culls priority dots that collide at lower zoom (minSeparationPx grows as
+			// you zoom out), which reads as dots "going away." Re-add those survivors so
+			// the visible set only grows while panning/zooming within the same result
+			// set. Stale dots fall out naturally: a new search clears
+			// `visibleContactIdSetRef` (salt reset above) and contacts that leave the
+			// padded bbox aren't in `inBounds`.
+			const pickedIdSet = new Set<number>(picked.map((c) => c.id));
+			const carryOver: ContactWithName[] = [];
+			for (const contact of inBounds) {
+				if (pickedIdSet.has(contact.id)) continue;
+				if (visibleContactIdSetRef.current.has(contact.id)) carryOver.push(contact);
+			}
+
+			let nextVisibleContacts: ContactWithName[];
+			if (carryOver.length === 0) {
+				nextVisibleContacts = picked;
+			} else if (picked.length + carryOver.length <= maxPrimaryDots) {
+				nextVisibleContacts = [...picked, ...carryOver];
+			} else {
+				// Over budget: keep selected/hovered first, then picked, then as many
+				// carry-overs (stable by id) as fit, so the cap never evicts a selected dot.
+				const keep: ContactWithName[] = [];
+				const keepIds = new Set<number>();
+				const pushKeep = (contact: ContactWithName) => {
+					if (keepIds.has(contact.id)) return;
+					keepIds.add(contact.id);
+					keep.push(contact);
+				};
+				for (const contact of picked) {
+					if (selectedSet.has(contact.id) || (hoveredId != null && contact.id === hoveredId))
+						pushKeep(contact);
+				}
+				for (const contact of picked) {
+					if (keep.length >= maxPrimaryDots) break;
+					pushKeep(contact);
+				}
+				const sortedCarry = carryOver.slice().sort((a, b) => a.id - b.id);
+				for (const contact of sortedCarry) {
+					if (keep.length >= maxPrimaryDots) break;
+					pushKeep(contact);
+				}
+				nextVisibleContacts = keep;
+			}
 
 			// Stabilize ordering to reduce churn in marker source updates.
 			nextVisibleContacts.sort((a, b) => a.id - b.id);
@@ -8617,7 +8727,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							contact,
 							x: projected.x,
 							y: projected.y,
-							key: hashStringToUint32(`${seed}|bookingExtra|${contact.id}`),
+							key: hashStringToUint32(`${sampleSalt}|bookingExtra|${contact.id}`),
 							isSelected: selectedSet.has(contact.id),
 							isPriority: priorityExtraIdSet.has(contact.id),
 						});
@@ -8834,7 +8944,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 								x: projected.x,
 								y: projected.y,
 								isPriority: priorityIdSet.has(contact.id),
-								key: hashStringToUint32(`${seed}|ambient:${seedSuffix}|${contact.id}`),
+								key: hashStringToUint32(`${sampleSalt}|ambient:${seedSuffix}|${contact.id}`),
 							});
 						}
 						candidates.sort((a, b) => {
@@ -8911,6 +9021,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			getContactCoords,
 			baseContactIdSet,
 			selectedContacts,
+			searchQuery,
 			lockedStateKey,
 			isCoordsInLockedState,
 			isBookingSearch,
@@ -11207,6 +11318,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
 
+		// Coalesce mousemove hover detection to one run per animation frame, against the
+		// latest event. Mapbox fires mousemove 60–120×/sec; running the 6-layer
+		// queryRenderedFeatures + setHoveredMarkerId on every event janks rapid sweeps.
+		let mouseMoveRafId: number | null = null;
+		let latestMouseMoveEvent: mapboxgl.MapMouseEvent | null = null;
+
 		const markerHitLayers = [
 			MAPBOX_LAYER_IDS.selectedMarkerIcons,
 			MAPBOX_LAYER_IDS.baseHit,
@@ -11317,7 +11434,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			hoveredStateIdRef.current = null;
 		};
 
-		const onMouseMove = (e: mapboxgl.MapMouseEvent) => {
+		const processMouseMove = (e: mapboxgl.MapMouseEvent) => {
 			if (areaSelectionEnabled || isAreaSelecting) {
 				clearEmptyMapPrompt();
 				return;
@@ -11431,6 +11548,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			} else {
 				scheduleEmptyMapPrompt(e.point);
 			}
+		};
+
+		// Run hover detection at most once per frame, using the latest pointer position.
+		const onMouseMove = (e: mapboxgl.MapMouseEvent) => {
+			latestMouseMoveEvent = e;
+			if (mouseMoveRafId != null) return;
+			mouseMoveRafId = window.requestAnimationFrame(() => {
+				mouseMoveRafId = null;
+				const ev = latestMouseMoveEvent;
+				latestMouseMoveEvent = null;
+				if (ev) processMouseMove(ev);
+			});
 		};
 
 		const onMouseDown = (e: mapboxgl.MapMouseEvent) => {
@@ -11547,7 +11676,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map.on('mousemove', onMouseMove);
 		map.on('click', onClick);
 		const canvas = map.getCanvas();
-		const onCanvasMouseLeave = () => {
+		const isInsideHoverTooltip = (event: MouseEvent): boolean => {
+			const tooltipEl = hoverTooltipOverlayRef.current;
+			if (!tooltipEl) return false;
+
+			const relatedTarget = event.relatedTarget;
+			if (relatedTarget instanceof Node && tooltipEl.contains(relatedTarget)) {
+				return true;
+			}
+
+			const pointTarget = tooltipEl.ownerDocument.elementFromPoint(
+				event.clientX,
+				event.clientY
+			);
+			return Boolean(pointTarget && tooltipEl.contains(pointTarget));
+		};
+		const onCanvasMouseLeave = (event: MouseEvent) => {
+			if (isInsideHoverTooltip(event)) return;
 			clearEmptyMapPrompt();
 			clearMarkerVisualHover();
 			const prevHovered = hoveredMarkerIdRef.current;
@@ -11561,6 +11706,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return () => {
 			map.off('mousedown', onMouseDown);
 			map.off('mousemove', onMouseMove);
+			if (mouseMoveRafId != null) window.cancelAnimationFrame(mouseMoveRafId);
 			map.off('click', onClick);
 			canvas.removeEventListener('mouseleave', onCanvasMouseLeave);
 			try {
@@ -11847,6 +11993,25 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const selectedMarkerFadeByIdRef = useRef<Map<number, number>>(new Map());
 	const selectedMarkerScaleByIdRef = useRef<Map<number, number>>(new Map());
 	const selectedMarkerFeatureByIdRef = useRef<Map<number, any>>(new Map());
+	// Signature of the last-built selected-marker feature set (selected ids + coords +
+	// styling, NOT zoom). Lets the selected-marker effect no-op pure-zoom re-runs so
+	// selected halos don't re-animate/flicker when zooming.
+	const selectedMarkerBuildSignatureRef = useRef<string>('');
+	// Ref mirrors of the overlay arrays so the selected-marker effect can read them
+	// without listing them as deps (they get fresh references on every zoom, which
+	// would otherwise re-trigger the fade animation on each zoom).
+	const bookingExtraVisibleContactsRef = useRef<ContactWithName[]>([]);
+	const promotionOverlayVisibleContactsRef = useRef<ContactWithName[]>([]);
+	const allContactsOverlayVisibleContactsRef = useRef<ContactWithName[]>([]);
+	useEffect(() => {
+		bookingExtraVisibleContactsRef.current = bookingExtraVisibleContacts;
+		promotionOverlayVisibleContactsRef.current = promotionOverlayVisibleContacts;
+		allContactsOverlayVisibleContactsRef.current = allContactsOverlayVisibleContacts;
+	}, [
+		bookingExtraVisibleContacts,
+		promotionOverlayVisibleContacts,
+		allContactsOverlayVisibleContacts,
+	]);
 	const selectedConstellationLineFadeRafRef = useRef<number | null>(null);
 	const selectedConstellationLineOpacityRef = useRef<number>(1);
 	const selectedConstellationHadPathRef = useRef<boolean>(false);
@@ -12035,7 +12200,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[map, isMapLoaded]
 	);
 
-	const clearMarkerConstellation = useCallback(() => {
+	const clearMarkerConstellation = useCallback((includeSelected = true) => {
 		stopMarkerConstellationReveal();
 		markerConstellationEdgesRef.current = [];
 		markerConstellationUsesCategoryColorsRef.current = false;
@@ -12061,7 +12226,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		try {
 			const empty = { type: 'FeatureCollection', features: [] } as any;
 			lineSource?.setData(empty);
-			selectedLineSource?.setData(empty);
+			if (includeSelected) selectedLineSource?.setData(empty);
 			nodeSource?.setData(empty);
 		} catch {
 			// Ignore style timing races.
@@ -12810,7 +12975,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 
-		if (!searchEngaged) {
+		if (!searchEngaged && !isAmbientContactsEnabled) {
 			if (selectedMarkerFadeRafRef.current != null) {
 				cancelAnimationFrame(selectedMarkerFadeRafRef.current);
 				selectedMarkerFadeRafRef.current = null;
@@ -12818,6 +12983,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			selectedMarkerFadeByIdRef.current.clear();
 			selectedMarkerScaleByIdRef.current.clear();
 			selectedMarkerFeatureByIdRef.current = new Map();
+			selectedMarkerBuildSignatureRef.current = '';
 			source.setData({ type: 'FeatureCollection', features: [] } as any);
 			return;
 		}
@@ -12870,7 +13036,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				);
 			}
 
-			for (const contact of bookingExtraVisibleContacts) {
+			// Read overlay arrays from refs (not the effect deps) so zoom-driven overlay
+			// resamples don't re-trigger this effect and restart the fade animation.
+			for (const contact of bookingExtraVisibleContactsRef.current) {
 				addSelectedMarker(
 					contact,
 					getBookingExtraContactCoords(contact),
@@ -12878,7 +13046,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				);
 			}
 
-			for (const contact of promotionOverlayVisibleContacts) {
+			for (const contact of promotionOverlayVisibleContactsRef.current) {
 				addSelectedMarker(
 					contact,
 					getPromotionOverlayContactCoords(contact),
@@ -12886,9 +13054,49 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				);
 			}
 
-			for (const contact of allContactsOverlayVisibleContacts) {
-				addSelectedMarker(contact, getAllContactsOverlayContactCoords(contact), null);
+			for (const contact of allContactsOverlayVisibleContactsRef.current) {
+				addSelectedMarker(
+					contact,
+					getAllContactsOverlayContactCoords(contact),
+					getAmbientContactWhatFromTitle(contact.title)
+				);
 			}
+
+			// Fallback for selected contacts that aren't in the current map dataset/overlays
+			// (e.g. curated selections kept visible after disengaging to the ambient atlas).
+			// Deduped by seenIds, so contacts already added above keep their dot-aligned coords.
+			for (const contact of selectedContactObjects) {
+				addSelectedMarker(
+					contact,
+					getLatLngFromContact(contact),
+					contact.curatedCategory ??
+						searchWhat ??
+						getAmbientContactWhatFromTitle(contact.title) ??
+						null
+				);
+			}
+
+			// Pure-zoom re-runs (overlay arrays changed reference but the selected
+			// subset, its coords, and styling are identical) are no-ops. Skip the
+			// rebuild + re-animation so selected halos stay stable while zooming.
+			const signatureParts: string[] = [];
+			for (const id of Array.from(nextSelectedFeaturesById.keys()).sort((a, b) => a - b)) {
+				const feature = nextSelectedFeaturesById.get(id);
+				const [lng, lat] = feature.geometry.coordinates;
+				signatureParts.push(
+					`${id}:${feature.properties.isUncategorized ? 'u' : 'c'}:${
+						feature.properties.fadeWithSelectedStateOrb ? '1' : '0'
+					}:${lng.toFixed(5)}:${lat.toFixed(5)}`
+				);
+			}
+			const nextSignature = signatureParts.join(',');
+			if (
+				nextSignature === selectedMarkerBuildSignatureRef.current &&
+				selectedMarkerFadeRafRef.current == null
+			) {
+				return;
+			}
+			selectedMarkerBuildSignatureRef.current = nextSignature;
 
 			const selectedMarkerDimensions = {
 				width: SELECTED_CONTACT_MARKER_VIEWBOX_WIDTH,
@@ -12939,6 +13147,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				fadeById.clear();
 				scaleById.clear();
 				selectedMarkerFeatureByIdRef.current = new Map();
+				selectedMarkerBuildSignatureRef.current = '';
 				source.setData({ type: 'FeatureCollection', features: [] } as any);
 				return;
 			}
@@ -13046,15 +13255,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isMapLoaded,
 		isLoading,
 		searchEngaged,
+		isAmbientContactsEnabled,
 		selectedContacts,
+		selectedContactObjects,
 		contactsWithCoords,
 		getContactCoords,
 		searchWhat,
-		bookingExtraVisibleContacts,
 		getBookingExtraContactCoords,
-		promotionOverlayVisibleContacts,
 		getPromotionOverlayContactCoords,
-		allContactsOverlayVisibleContacts,
 		getAllContactsOverlayContactCoords,
 		lockedStateKey,
 		isStateLayerReady,
@@ -13501,7 +13709,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		if (!shouldComposeConstellation || isBackgroundPresentation || !searchEngaged) {
 			markerConstellationLastSearchKeyRef.current = constellationKey;
-			clearMarkerConstellation();
+			clearMarkerConstellation(!isAmbientContactsEnabled);
 			return;
 		}
 
@@ -13795,6 +14003,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isLoading,
 		isBackgroundPresentation,
 		searchEngaged,
+		isAmbientContactsEnabled,
 		campaignMarkerMode,
 		categoryConstellationsEnabled,
 		searchQuery,
@@ -14170,12 +14379,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map.setFilter(layer, categoryFilter);
 	}, [map, isMapLoaded, hoveredBookingExtraCategory]);
 
-	// Larger leave buffer zone - how much extra padding below the tooltip for hysteresis
-	const hoverLeaveBufferPx = useMemo(() => {
-		// The buffer should be roughly the size the hit area used to be (2x marker)
-		// This prevents flicker when moving off the marker
-		return markerScale * 2;
-	}, [markerScale]);
+	// Give the DOM tooltip a real hover target around the SVG so moving from the
+	// marker into the bubble does not cross a tiny Mapbox/DOM dead zone.
+	const hoverTooltipHitSlopPx = useMemo(() => Math.max(14, markerScale * 2), [markerScale]);
 
 	const selectedContactIdSet = useMemo(
 		() => new Set<number>(selectedContacts),
@@ -14205,6 +14411,94 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			map.off('move', update);
 		};
 	}, [map, isMapLoaded, isLoading, selectedMarkerCoords?.lat, selectedMarkerCoords?.lng]);
+
+	// Multi-select action card anchoring. Resolves each selected contact's
+	// coordinates (across the base + overlay coord maps); the card is anchored to
+	// the TOP-most selected dot on screen, scales down with the map and fades out
+	// as the user zooms further out, and re-anchors on every map move — same
+	// projection pattern as the selected-marker "Research" panel above.
+	const selectionActionsOverlayRef = useRef<HTMLDivElement | null>(null);
+	// Zoom level captured when the card first appears; scale/fade are measured
+	// relative to it. Cleared (below) when the selection clears so the next
+	// selection re-captures its own baseline.
+	const selectionBaseZoomRef = useRef<number | null>(null);
+	const selectedAnchorPoints = useMemo(() => {
+		if (selectedContacts.length < 2) return null;
+		const points: LatLngLiteral[] = [];
+		for (const id of selectedContacts) {
+			const coords =
+				coordsByContactId.get(id) ??
+				bookingExtraCoordsByContactId.get(id) ??
+				promotionOverlayCoordsByContactId.get(id) ??
+				allContactsOverlayCoordsByContactId.get(id);
+			if (coords) points.push(coords);
+		}
+		return points.length >= 2 ? points : null;
+	}, [
+		selectedContacts,
+		coordsByContactId,
+		bookingExtraCoordsByContactId,
+		promotionOverlayCoordsByContactId,
+		allContactsOverlayCoordsByContactId,
+	]);
+	useEffect(() => {
+		if (!selectedAnchorPoints) selectionBaseZoomRef.current = null;
+	}, [selectedAnchorPoints]);
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		if (isLoading) return;
+		const el = selectionActionsOverlayRef.current;
+		if (!el || !selectedAnchorPoints) return;
+
+		const update = () => {
+			// Anchor above the TOP-most selected dot on screen (smallest projected y)
+			// so the card sits in the emptier space above the selection rather than
+			// over the cluster, where more dots may still be picked.
+			let top: { x: number; y: number } | null = null;
+			for (const pt of selectedAnchorPoints) {
+				const projected = map.project([pt.lng, pt.lat]);
+				if (!top || projected.y < top.y) {
+					top = { x: projected.x, y: projected.y };
+				}
+			}
+			if (!top) return;
+
+			// Scale with the map (2x per zoom level), capped at 1x when zooming in,
+			// and fade out as the user zooms further out than where the card appeared.
+			if (selectionBaseZoomRef.current == null) {
+				selectionBaseZoomRef.current = map.getZoom();
+			}
+			const zoomDelta = map.getZoom() - selectionBaseZoomRef.current;
+			const scale = Math.min(1, 2 ** zoomDelta);
+			const FADE_START = -0.4;
+			const FADE_END = -2.2;
+			const opacity = Math.max(
+				0,
+				Math.min(1, (zoomDelta - FADE_END) / (FADE_START - FADE_END))
+			);
+
+			// offsetWidth/Height are the UNSCALED box; using them (not
+			// getBoundingClientRect, which includes the scale) keeps the centering
+			// stable as the scale changes. Pivot the scale at the bottom-center so the
+			// card shrinks toward the dot it is anchored above.
+			const w = el.offsetWidth;
+			const h = el.offsetHeight;
+			const x = top.x - w / 2;
+			const y = top.y - h - 40;
+			el.style.transformOrigin = 'bottom center';
+			el.style.transform = `translate(${Math.round(x)}px, ${Math.round(
+				y
+			)}px) scale(${scale})`;
+			el.style.opacity = String(opacity);
+			el.style.pointerEvents = opacity < 0.1 ? 'none' : 'auto';
+		};
+
+		update();
+		map.on('move', update);
+		return () => {
+			map.off('move', update);
+		};
+	}, [map, isMapLoaded, isLoading, selectedAnchorPoints]);
 
 	// Hover tooltip anchoring (single overlay).
 	const hoverTooltipContactId = hoveredMarkerId ?? fadingTooltipId;
@@ -14283,7 +14577,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const height = calculateTooltipHeight(nameForTooltip, companyForTooltip);
 				const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
 				return {
-					url: generateMapTooltipIconUrl(
+					svg: generateMapTooltipSvg(
 						nameForTooltip,
 						companyForTooltip,
 						titleForTooltip,
@@ -14307,7 +14601,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const height = calculateTooltipHeight(nameForTooltip, companyForTooltip);
 			const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
 			return {
-				url: generateMapTooltipIconUrl(
+				svg: generateMapTooltipSvg(
 					nameForTooltip,
 					companyForTooltip,
 					titleForTooltip,
@@ -14349,7 +14643,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
 
 		return {
-			url: generateMapTooltipIconUrl(
+			svg: generateMapTooltipSvg(
 				nameForTooltip,
 				companyForTooltip,
 				titleForTooltip,
@@ -14362,8 +14656,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [hoverTooltipEntry, selectedContactIdSet, searchWhat]);
 
-	const hoverTooltipOverlayRef = useRef<HTMLDivElement | null>(null);
-	useEffect(() => {
+	useLayoutEffect(() => {
 		if (!map || !isMapLoaded) return;
 		if (isLoading) return;
 		const el = hoverTooltipOverlayRef.current;
@@ -14371,9 +14664,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const update = () => {
 			const p = map.project([hoverTooltipCoords.lng, hoverTooltipCoords.lat]);
-			el.style.transform = `translate(${Math.round(p.x - MAP_TOOLTIP_ANCHOR_X)}px, ${Math.round(
-				p.y - hoverTooltipData.anchorY
-			)}px)`;
+			el.style.transform = `translate(${Math.round(
+				p.x - MAP_TOOLTIP_ANCHOR_X - hoverTooltipHitSlopPx
+			)}px, ${Math.round(p.y - hoverTooltipData.anchorY - hoverTooltipHitSlopPx)}px)`;
 		};
 
 		update();
@@ -14389,6 +14682,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		hoverTooltipCoords?.lat,
 		hoverTooltipCoords?.lng,
 		hoverTooltipData?.anchorY,
+		hoverTooltipHitSlopPx,
 	]);
 
 	return (
@@ -14867,14 +15161,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						position: 'absolute',
 						left: 0,
 						top: 0,
-						width: `${hoverTooltipData.width}px`,
-						height: `${hoverTooltipData.height + hoverLeaveBufferPx}px`,
+						width: `${hoverTooltipData.width + hoverTooltipHitSlopPx * 2}px`,
+						height: `${hoverTooltipData.height + hoverTooltipHitSlopPx * 2}px`,
 						pointerEvents:
 							hoverTooltipContactId != null && hoveredMarkerId === hoverTooltipContactId
 								? 'auto'
 								: 'none',
-						display: 'flex',
-						flexDirection: 'column',
+						padding: `${hoverTooltipHitSlopPx}px`,
+						boxSizing: 'border-box',
 						zIndex: HOVER_TOOLTIP_Z_INDEX,
 					}}
 					onMouseEnter={() => handleMarkerMouseOver(hoverTooltipEntry.contact)}
@@ -14893,11 +15187,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							flexShrink: 0,
 						}}
 					>
-						<img
-							src={hoverTooltipData.url}
-							alt=""
-							draggable={false}
-							style={{ width: '100%', height: '100%', display: 'block' }}
+						<div
+							dangerouslySetInnerHTML={{ __html: hoverTooltipData.svg }}
+							style={{
+								width: '100%',
+								height: '100%',
+								display: 'block',
+								lineHeight: 0,
+							}}
 						/>
 					</div>
 				</div>
@@ -15255,6 +15552,81 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					</div>
 				</div>
 			)}
+
+			{/* Multi-select action card — anchored to the selection centroid.
+			    Only rendered on hosts that wire `onAddSelectionToFolder` (the
+			    dashboard search map), and only for 2+ selected contacts. */}
+			{!isLoading &&
+				selectedContacts.length >= 2 &&
+				onAddSelectionToFolder &&
+				selectedAnchorPoints && (
+					<div
+						ref={selectionActionsOverlayRef}
+						style={{
+							position: 'absolute',
+							left: 0,
+							top: 0,
+							opacity: 0,
+							pointerEvents: 'none',
+							zIndex: HOVER_TOOLTIP_Z_INDEX + 11,
+						}}
+						onMouseDown={(e) => e.stopPropagation()}
+						onPointerDown={(e) => e.stopPropagation()}
+					>
+						<div
+							style={{
+								display: 'flex',
+								flexDirection: 'column',
+								gap: '4px',
+								padding: '5px',
+								backgroundColor: '#FFFFFF',
+								borderRadius: '9px',
+								boxSizing: 'border-box',
+							}}
+						>
+							<button
+								type="button"
+								onClick={() => onAddSelectionToFolder?.()}
+								className="font-inter"
+								style={{
+									width: '100%',
+									padding: '5px 10px',
+									backgroundColor: '#EFEFEF',
+									border: 'none',
+									borderRadius: '6px',
+									fontSize: '12px',
+									fontWeight: 500,
+									color: '#000000',
+									textAlign: 'left',
+									whiteSpace: 'nowrap',
+									cursor: 'pointer',
+								}}
+							>
+								Add Contacts to Folder
+							</button>
+							<button
+								type="button"
+								onClick={() => onWriteSelectionMessage?.()}
+								className="font-inter"
+								style={{
+									width: '100%',
+									padding: '5px 10px',
+									backgroundColor: '#EFEFEF',
+									border: 'none',
+									borderRadius: '6px',
+									fontSize: '12px',
+									fontWeight: 500,
+									color: '#000000',
+									textAlign: 'left',
+									whiteSpace: 'nowrap',
+									cursor: 'pointer',
+								}}
+							>
+								Write Message
+							</button>
+						</div>
+					</div>
+				)}
 		</div>
 	);
 };

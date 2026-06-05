@@ -312,7 +312,8 @@ const DRAFT_ROW_DELETE_ZONE_PX = 48;
 const DraftReviewStackedBackCard: FC<{
 	draft: EmailWithRelations;
 	contacts: ContactWithName[];
-}> = ({ draft, contacts }) => {
+	compact?: boolean;
+}> = ({ draft, contacts, compact = false }) => {
 	const contact = contacts?.find((c) => c.id === draft.contactId);
 	const contactTitle = contact?.headline || contact?.title || '';
 	const hasName = Boolean(
@@ -545,7 +546,7 @@ const DraftReviewStackedBackCard: FC<{
 					<div className="flex justify-center" style={{ marginBottom: '8px' }}>
 						<div
 							className="font-inter text-[14px] font-extrabold bg-white border-2 border-black rounded-[7px] px-2 overflow-hidden flex items-center"
-							style={{ width: '484px', height: '39px' }}
+							style={{ width: compact ? '442px' : '484px', height: '39px' }}
 						>
 							<span className="truncate">{draft.subject || 'No subject'}</span>
 						</div>
@@ -553,7 +554,10 @@ const DraftReviewStackedBackCard: FC<{
 					<div className="flex justify-center flex-1">
 						<div
 							className="bg-white border-2 border-black rounded-[7px] overflow-hidden"
-							style={{ width: '484px', height: '572px' }}
+							style={{
+								width: compact ? '442px' : '484px',
+								height: compact ? '342px' : '572px',
+							}}
 						/>
 					</div>
 				</div>
@@ -1134,10 +1138,37 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 			const isDraftRejected = props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
 			const hasStatusBar =
 				(isDraftApproved || isDraftRejected) && !isRegenSettingsPreviewOpen;
+			const isCompactDraftReview = props.compactDraftReview ?? false;
+			const desktopReviewWidthPx = isCompactDraftReview ? 455 : 499;
+			const desktopReviewHeightPx = isCompactDraftReview ? 450 : 703;
+			const desktopBottomStripTopPx = isCompactDraftReview
+				? hasStatusBar
+					? 335
+					: 382
+				: hasStatusBar
+					? 574
+					: 625;
+			const desktopMessageHeightPx = isCompactDraftReview
+				? hasStatusBar
+					? 288
+					: 329
+				: hasStatusBar
+					? 527
+					: 572;
+			const desktopEditorBoxWidthPx = isCompactDraftReview ? 442 : 484;
+			// Compact dashboard review shrinks the Send / Regenerate / Delete action row (buttons +
+			// nav arrows) so it still fits centered above the narrower card; campaign review keeps the
+			// larger sizes.
+			const reviewActionButtonWidthPx = isCompactDraftReview ? 116 : 124;
+			const reviewActionButtonGapPx = isCompactDraftReview ? 11 : 13;
+			const reviewNavArrowMarginPx = isCompactDraftReview ? 17 : 20;
+			const reviewNavArrowWidth = isCompactDraftReview ? 16 : 18;
+			const reviewNavArrowHeight = isCompactDraftReview ? 13 : 15;
+			const draftReviewScrollbarOffset = isCompactDraftReview ? -8 : -6;
 			// Keep the bottom strip (Send / Delete + dividers) a consistent height across drafts.
 			// When a status bar is present, the editor container is shorter; we compensate by slightly
 			// increasing the body box height so the remaining bottom strip stays the same "small" height.
-			const bottomStripTop = hasStatusBar ? '574px' : '625px';
+			const bottomStripTop = `${desktopBottomStripTopPx}px`;
 			const isNarrowestDesktop = props.isNarrowestDesktop ?? false;
 			const isNarrowDesktop = props.isNarrowDesktop ?? false;
 			const showBottomCounter =
@@ -1181,8 +1212,8 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 				>
 					<div
 						style={{
-							width: isMobile ? 'calc(100vw - 8px)' : '499px',
-							height: isMobile ? 'calc(100dvh - 160px)' : '703px',
+							width: isMobile ? 'calc(100vw - 8px)' : `${desktopReviewWidthPx}px`,
+							height: isMobile ? 'calc(100dvh - 160px)' : `${desktopReviewHeightPx}px`,
 							position: 'relative',
 							overflow: 'visible',
 						}}
@@ -1191,6 +1222,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 							<DraftReviewStackedBackCard
 								draft={stackedBackDraft}
 								contacts={contacts || []}
+								compact={isCompactDraftReview}
 							/>
 						)}
 						{/* Container box with header - matching the table view */}
@@ -1619,26 +1651,27 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 							>
 								{!isRegenSettingsPreviewOpen && (
 									<>
-										{/* Vertical divider line 20px from right - bottom area only */}
-										<div
-											style={{
-												position: 'absolute',
-												right: '20px',
-												top: bottomStripTop,
-												bottom: 0,
-												width: '2px',
-												backgroundColor: '#000000',
-												pointerEvents: 'none',
-												zIndex: 6,
-											}}
-										/>
+										{!isCompactDraftReview && (
+											<div
+												style={{
+													position: 'absolute',
+													right: '20px',
+													top: bottomStripTop,
+													bottom: 0,
+													width: '2px',
+													backgroundColor: '#000000',
+													pointerEvents: 'none',
+													zIndex: 6,
+												}}
+											/>
+										)}
 										{/* Bottom-left breadcrumb label (Drafts > Contact) */}
 										{!isMobile && !showBottomCounter && (
 											<div
 												className="absolute flex items-center font-inter font-normal text-[11px] text-black leading-none"
 												style={{
 													left: '12px',
-													right: '212px', // stop before the Send/Delete dividers
+													right: isCompactDraftReview ? '12px' : '212px',
 													top: bottomStripTop,
 													bottom: 0,
 													paddingRight: '12px',
@@ -1671,83 +1704,87 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 												</span>
 											</div>
 										)}
-										{/* Double divider between Delete and Send (two equal-width lines) */}
-										<div
-											style={{
-												position: 'absolute',
-												right: '114px', // flush with Delete's left edge
-												top: bottomStripTop,
-												bottom: 0,
-												width: '2px',
-												backgroundColor: '#000000',
-												pointerEvents: 'none',
-												zIndex: 5,
-											}}
-										/>
-										<div
-											style={{
-												position: 'absolute',
-												// Place the second line so its left edge aligns with Send's right edge (119px).
-												// With a 2px width, `right: 118px` yields left edge at 120px.
-												right: '118px',
-												top: bottomStripTop,
-												bottom: 0,
-												width: '2px',
-												backgroundColor: '#000000',
-												pointerEvents: 'none',
-												zIndex: 5,
-											}}
-										/>
-										{/* Delete button between lines */}
-										<button
-											type="button"
-											onClick={async (e) => {
-												if (selectedDraft) {
-													await handleDeleteDraft(e, selectedDraft.id);
-													setSelectedDraft(null);
-												}
-											}}
-											disabled={isPendingDeleteEmail}
-											className="absolute font-inter text-[14px] font-normal text-black hover:bg-[#E17272] hover:text-white flex items-center justify-center transition-colors leading-none"
-											style={{
-												right: '20px',
-												width: '94px',
-												top: bottomStripTop,
-												bottom: 0,
-											}}
-										>
-											{isPendingDeleteEmail ? '...' : 'Delete'}
-										</button>
-										{/* Fourth divider line 92px to the left of the third one (119 + 92 = 211) */}
-										<div
-											style={{
-												position: 'absolute',
-												right: '212px',
-												top: bottomStripTop,
-												bottom: 0,
-												width: '1.5px',
-												backgroundColor: '#000000',
-											}}
-										/>
-										{/* Send button between lines */}
-										<button
-											type="button"
-											onClick={() => {
-												if (!selectedDraft || props.isSendingDisabled) return;
-												props.setSelectedDraftIds(new Set([selectedDraft.id]));
-												void props.onSend([selectedDraft.id]);
-											}}
-											disabled={props.isSendingDisabled}
-											className="absolute font-inter text-[14px] font-normal text-black hover:bg-[#83C37C] hover:text-white flex items-center justify-center transition-colors leading-none"
-											style={{
-												right: '120px',
-												width: '92px',
-												top: bottomStripTop,
-												bottom: 0,
-											}}
-										>
-											Send
-										</button>
+										{!isCompactDraftReview && (
+											<>
+												{/* Double divider between Delete and Send (two equal-width lines) */}
+												<div
+													style={{
+														position: 'absolute',
+														right: '114px', // flush with Delete's left edge
+														top: bottomStripTop,
+														bottom: 0,
+														width: '2px',
+														backgroundColor: '#000000',
+														pointerEvents: 'none',
+														zIndex: 5,
+													}}
+												/>
+												<div
+													style={{
+														position: 'absolute',
+														// Place the second line so its left edge aligns with Send's right edge (119px).
+														// With a 2px width, `right: 118px` yields left edge at 120px.
+														right: '118px',
+														top: bottomStripTop,
+														bottom: 0,
+														width: '2px',
+														backgroundColor: '#000000',
+														pointerEvents: 'none',
+														zIndex: 5,
+													}}
+												/>
+												{/* Delete button between lines */}
+												<button
+													type="button"
+													onClick={async (e) => {
+														if (selectedDraft) {
+															await handleDeleteDraft(e, selectedDraft.id);
+															setSelectedDraft(null);
+														}
+													}}
+													disabled={isPendingDeleteEmail}
+													className="absolute font-inter text-[14px] font-normal text-black hover:bg-[#E17272] hover:text-white flex items-center justify-center transition-colors leading-none"
+													style={{
+														right: '20px',
+														width: '94px',
+														top: bottomStripTop,
+														bottom: 0,
+													}}
+												>
+													{isPendingDeleteEmail ? '...' : 'Delete'}
+												</button>
+												{/* Fourth divider line 92px to the left of the third one (119 + 92 = 211) */}
+												<div
+													style={{
+														position: 'absolute',
+														right: '212px',
+														top: bottomStripTop,
+														bottom: 0,
+														width: '1.5px',
+														backgroundColor: '#000000',
+													}}
+												/>
+												{/* Send button between lines */}
+												<button
+													type="button"
+													onClick={() => {
+														if (!selectedDraft || props.isSendingDisabled) return;
+														props.setSelectedDraftIds(new Set([selectedDraft.id]));
+														void props.onSend([selectedDraft.id]);
+													}}
+													disabled={props.isSendingDisabled}
+													className="absolute font-inter text-[14px] font-normal text-black hover:bg-[#83C37C] hover:text-white flex items-center justify-center transition-colors leading-none"
+													style={{
+														right: '120px',
+														width: '92px',
+														top: bottomStripTop,
+														bottom: 0,
+													}}
+												>
+													Send
+												</button>
+											</>
+										)}
 										{/* Counter in bottom-left corner - at narrow/narrowest breakpoint */}
 										{showBottomCounter && (
 											<>
@@ -1885,7 +1922,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 											<div
 												className="border-2 border-black rounded-[7px] overflow-hidden test-preview-blank-wave-subject"
 												style={{
-													width: isMobile ? 'calc(100% - 16px)' : '484px',
+													width: isMobile ? 'calc(100% - 16px)' : `${desktopEditorBoxWidthPx}px`,
 													height: '39px',
 													marginBottom: '8px',
 												}}
@@ -1894,8 +1931,10 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 											<div
 												className="border-2 border-black rounded-[7px] overflow-hidden test-preview-blank-wave-body"
 												style={{
-													width: isMobile ? 'calc(100% - 16px)' : '484px',
-													height: '572px',
+													width: isMobile
+														? 'calc(100% - 16px)'
+														: `${desktopEditorBoxWidthPx}px`,
+													height: `${desktopMessageHeightPx}px`,
 													flex: isMobile ? 1 : undefined,
 												}}
 											/>
@@ -1910,8 +1949,10 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 												hideGenerateTestButton
 												hideProfileBottomMiniBox
 												clipProfileTabOverflow
-												manualEntryHeightPx={550}
-												containerHeightPx={625}
+												manualEntryHeightPx={isCompactDraftReview ? 320 : 550}
+												containerHeightPx={
+													isCompactDraftReview ? desktopBottomStripTopPx : 625
+												}
 												useStaticDropdownPosition
 												hideMobileStickyTestFooter
 												dataCampaignMainBox={null}
@@ -1933,7 +1974,10 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 												value={editedSubject}
 												onChange={(e) => setEditedSubject(e.target.value)}
 												className="font-inter text-[14px] font-extrabold bg-white border-2 border-black rounded-[7px] px-2 focus:outline-none focus:ring-0"
-												style={{ width: isMobile ? '100%' : '484px', height: '39px' }}
+												style={{
+													width: isMobile ? '100%' : `${desktopEditorBoxWidthPx}px`,
+													height: '39px',
+												}}
 											/>
 										</div>
 
@@ -1945,8 +1989,8 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 											<div
 												className="bg-white border-2 border-black rounded-[7px] overflow-visible draft-review-box"
 												style={{
-													width: isMobile ? '100%' : '484px',
-													height: hasStatusBar ? '527px' : '572px',
+													width: isMobile ? '100%' : `${desktopEditorBoxWidthPx}px`,
+													height: `${desktopMessageHeightPx}px`,
 													flex: isMobile ? 1 : undefined,
 												}}
 												data-hover-description="Revise your draft here. Type out your revisions. Send or delete drafts"
@@ -1962,7 +2006,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 															className="w-full h-full"
 															thumbWidth={2}
 															thumbColor="#000000"
-															offsetRight={-6}
+															offsetRight={draftReviewScrollbarOffset}
 															contentClassName="[&_.ProseMirror]:min-h-full [&_.ProseMirror]:border-0 [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:focus:ring-0 [&_.ProseMirror]:focus:outline-none"
 														>
 															<RichTextEditor
@@ -1982,7 +2026,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 														placeholder="Type your message here..."
 														thumbWidth={2}
 														thumbColor="#000000"
-														trackOffset={-6}
+														trackOffset={draftReviewScrollbarOffset}
 														data-hover-description="Revise your draft here. Type out your revisions. Send or delete drafts"
 													/>
 												)}
@@ -2103,11 +2147,17 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 											disabled={!hasDrafts}
 											aria-label="View previous draft"
 											className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-											style={{ marginRight: isMobile ? '10px' : '20px' }}
+											style={{ marginRight: isMobile ? '10px' : `${reviewNavArrowMarginPx}px` }}
 										>
-											<LeftArrowReviewIcon />
+											<LeftArrowReviewIcon
+												width={reviewNavArrowWidth}
+												height={reviewNavArrowHeight}
+											/>
 										</button>
-										<div className="flex" style={{ gap: isMobile ? '6px' : '13px' }}>
+										<div
+											className="flex"
+											style={{ gap: isMobile ? '6px' : `${reviewActionButtonGapPx}px` }}
+										>
 											<Button
 												type="button"
 												variant="ghost"
@@ -2116,7 +2166,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 													isMobile ? 'text-[12px]' : 'text-[14px]'
 												)}
 												style={{
-													width: isMobile ? '80px' : '124px',
+													width: isMobile ? '80px' : `${reviewActionButtonWidthPx}px`,
 													height: isMobile ? '36px' : '40px',
 													borderTopLeftRadius: '8px',
 													borderBottomLeftRadius: '8px',
@@ -2141,7 +2191,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 													isMobile ? 'text-[12px]' : 'text-[14px]'
 												)}
 												style={{
-													width: isMobile ? '80px' : '124px',
+													width: isMobile ? '80px' : `${reviewActionButtonWidthPx}px`,
 													height: isMobile ? '36px' : '40px',
 													backgroundColor: isRegenerating ? '#FEF3E0' : '#FFDC9E',
 												}}
@@ -2165,7 +2215,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 													isMobile ? 'text-[12px]' : 'text-[14px]'
 												)}
 												style={{
-													width: isMobile ? '80px' : '124px',
+													width: isMobile ? '80px' : `${reviewActionButtonWidthPx}px`,
 													height: isMobile ? '36px' : '40px',
 													borderTopRightRadius: '8px',
 													borderBottomRightRadius: '8px',
@@ -2189,9 +2239,12 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 											disabled={!hasDrafts}
 											aria-label="View next draft"
 											className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-											style={{ marginLeft: isMobile ? '10px' : '20px' }}
+											style={{ marginLeft: isMobile ? '10px' : `${reviewNavArrowMarginPx}px` }}
 										>
-											<RightArrowReviewIcon />
+											<RightArrowReviewIcon
+												width={reviewNavArrowWidth}
+												height={reviewNavArrowHeight}
+											/>
 										</button>
 									</>
 								)}

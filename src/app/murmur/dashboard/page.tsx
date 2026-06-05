@@ -143,6 +143,7 @@ import {
 import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
+import { DashboardWriteOverlay } from './DashboardWriteOverlay';
 import DashboardResponsesWidget, {
 	type ResponsesMockState,
 } from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesWidget';
@@ -4151,6 +4152,8 @@ const DashboardContent = () => {
 		contacts,
 		columns,
 		setSelectedContacts,
+		isWriteMode,
+		setIsWriteMode,
 		isRefetchingContacts,
 		activeSearchQuery,
 		tableRef,
@@ -4188,6 +4191,13 @@ const DashboardContent = () => {
 		fromHome: fromHomeParam,
 		disableAutoCreateCampaign: isAddToCampaignMode,
 	});
+
+	// True while the dashboard Write overlay shows the post-draft review; keeps the overlay mounted
+	// even if the live map selection changes mid-review.
+	const [isWriteReviewActive, setIsWriteReviewActive] = useState(false);
+	useEffect(() => {
+		if (!isWriteMode) setIsWriteReviewActive(false);
+	}, [isWriteMode]);
 
 	useEffect(() => {
 		if (!isMapView) setOpenMapTopAction(null);
@@ -5206,6 +5216,157 @@ const DashboardContent = () => {
 		router,
 		selectedContacts,
 		setSelectedContacts,
+		shouldForceApplyDerivedTitle,
+	]);
+
+	// Map multi-select "Add Contacts to Folder" action. Adds the selected contacts
+	// to the folder the current search is within the context of (the active
+	// campaign's contact list) WITHOUT navigating away — the user stays on the map
+	// to keep curating. Deliberately separate from handleAddSelectedToActiveCampaign
+	// (which navigates) so the primary-CTA flow is untouched.
+	const handleAddSelectedToContextFolder = useCallback(async () => {
+		if (selectedContacts.length === 0) {
+			toast.error('Please select contacts to add');
+			return;
+		}
+
+		if (!activeCampaignUserContactListId) {
+			toast.error('Active campaign has no contact list yet — try again in a moment.');
+			return;
+		}
+
+		try {
+			if (derivedContactTitle && contacts) {
+				const contactsToUpdate = contacts.filter(
+					(c) =>
+						selectedContacts.includes(c.id) &&
+						(shouldForceApplyDerivedTitle || (!c.title && !c.headline))
+				);
+				if (contactsToUpdate.length > 0) {
+					await batchUpdateContacts({
+						updates: contactsToUpdate.map((c) => ({
+							id: c.id,
+							data: { title: derivedContactTitle },
+						})),
+					});
+				}
+			}
+
+			await editUserContactList({
+				id: activeCampaignUserContactListId,
+				data: {
+					contactOperation: {
+						action: 'connect',
+						contactIds: selectedContacts,
+					},
+				},
+			});
+
+			const addedCount = selectedContacts.length;
+			setSelectedContacts([]);
+
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: ['campaigns'] }),
+				queryClient.invalidateQueries({ queryKey: ['contacts'] }),
+				queryClient.invalidateQueries({ queryKey: ['userContactLists'] }),
+			]);
+
+			const folderName =
+				activeCampaign?.userContactLists?.[0]?.name ?? activeCampaign?.name ?? 'folder';
+			toast.success(
+				`${addedCount} contact${addedCount === 1 ? '' : 's'} added to ${folderName}`
+			);
+		} catch (error) {
+			console.error('Error adding contacts to context folder:', error);
+			toast.error('Failed to add contacts to folder');
+		}
+	}, [
+		activeCampaign,
+		activeCampaignUserContactListId,
+		batchUpdateContacts,
+		contacts,
+		derivedContactTitle,
+		editUserContactList,
+		queryClient,
+		selectedContacts,
+		setSelectedContacts,
+		shouldForceApplyDerivedTitle,
+	]);
+
+	// Map multi-select "Write Message" action. Opens the inline drafting panel over the map for the
+	// current selection, scoped to the campaign the search is in the context of (the one shown in
+	// the header: `fromCampaign ?? activeCampaign`). The panel opens immediately; the contacts are
+	// committed to that campaign's contact list in the background (the drafting engine only drafts
+	// for campaign members, so the panel's Draft button stays gated until they land). Keeps
+	// `selectedContacts` — they are the draft target.
+	const handleWriteSelectionMessage = useCallback(async () => {
+		if (selectedContacts.length === 0) {
+			toast.error('Please select contacts to add');
+			return;
+		}
+
+		const contextCampaign = fromCampaign ?? activeCampaign;
+		const contextUclId = contextCampaign?.userContactLists?.[0]?.id;
+		if (!contextCampaign || !contextUclId) {
+			toast.error('This search isn’t linked to a campaign yet — try again in a moment.');
+			return;
+		}
+
+		// Open the panel right away so the click always produces visible feedback.
+		setIsWriteMode(true);
+
+		try {
+			if (derivedContactTitle && contacts) {
+				const contactsToUpdate = contacts.filter(
+					(c) =>
+						selectedContacts.includes(c.id) &&
+						(shouldForceApplyDerivedTitle || (!c.title && !c.headline))
+				);
+				if (contactsToUpdate.length > 0) {
+					await batchUpdateContacts({
+						updates: contactsToUpdate.map((c) => ({
+							id: c.id,
+							data: { title: derivedContactTitle },
+						})),
+					});
+				}
+			}
+
+			await editUserContactList({
+				id: contextUclId,
+				data: {
+					contactOperation: {
+						action: 'connect',
+						contactIds: selectedContacts,
+					},
+				},
+			});
+
+			// Refresh so the inline drafting panel (and the campaign header counts) see the new
+			// members. Target the exact contacts query the panel reads so we await the right refetch.
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: ['campaigns'] }),
+				queryClient.invalidateQueries({
+					queryKey: getContactsListQueryKey({
+						contactListIds: contextCampaign.userContactLists.map((list) => list.id),
+					}),
+				}),
+				queryClient.invalidateQueries({ queryKey: ['userContactLists'] }),
+			]);
+		} catch (error) {
+			console.error('Error adding contacts to campaign for drafting:', error);
+			toast.error('Failed to add contacts to campaign');
+		}
+	}, [
+		activeCampaign,
+		fromCampaign,
+		batchUpdateContacts,
+		contacts,
+		derivedContactTitle,
+		editUserContactList,
+		queryClient,
+		selectedContacts,
+		setIsWriteMode,
 		shouldForceApplyDerivedTitle,
 	]);
 
@@ -6445,8 +6606,12 @@ const DashboardContent = () => {
 		}, MAP_RESEARCH_PANEL_HOLD_MS);
 	}, [hoveredMapMarkerContact, isMapView, isMapResultsLoading]);
 
-	const handleMapMarkerHover = useCallback((contact: ContactWithName | null) => {
-		setHoveredMapMarkerContact(contact);
+	const handleMapMarkerHover = useCallback(() => {
+		// Research panel on marker hover is intentionally disabled (per request):
+		// hovering a marker must NOT pop up the full-cover research panel over the
+		// Search Results panel. The small in-map marker tooltip is internal to
+		// SearchResultsMap and is unaffected. Left as a no-op so the panel can be
+		// re-enabled with a one-line change if needed.
 	}, []);
 
 	const mapResearchPanelCompactHeightPx = useMemo(() => {
@@ -6728,6 +6893,27 @@ const DashboardContent = () => {
 		selectedContacts,
 		searchedStateAbbrForMap,
 	]);
+
+	// Full objects for the selected contacts so the map can keep their white halos rendered
+	// even after the dataset swaps (e.g. disengaging the search to the ambient atlas), where
+	// the selected ids would otherwise have no coordinate source on the map side.
+	// Resolve from viewport-stable sources only — base results + sticky-pinned selections —
+	// NOT mapPanelContacts, whose visible-overlay churn on every pan/zoom would make this array
+	// (and the map props) change each frame and re-render the map mid-zoom (constellation flicker).
+	const selectedContactObjectsForMap = useMemo(() => {
+		if (selectedContacts.length === 0) return [];
+		const byId = new Map<number, ContactWithName>();
+		for (const c of contacts || []) byId.set(c.id, c);
+		for (const c of mapPanelExtraContacts) {
+			if (!byId.has(c.id)) byId.set(c.id, c);
+		}
+		const out: ContactWithName[] = [];
+		for (const id of selectedContacts) {
+			const c = byId.get(id);
+			if (c) out.push(c);
+		}
+		return out;
+	}, [selectedContacts, contacts, mapPanelExtraContacts]);
 
 	useEffect(() => {
 		// If the user selects contacts that are outside the searched state (or overlay-only),
@@ -7923,6 +8109,30 @@ const DashboardContent = () => {
 		]
 	);
 
+	// Selecting a contact from the right-hand results panel. Mirrors the map-marker
+	// selection path (handleMapToggleSelection) so the map renders the same selected
+	// halo: the full contact object is pinned into mapPanelExtraContacts, which feeds
+	// selectedContactObjectsForMap (the map's coordinate fallback for the halo). Without
+	// this pin, overlay/out-of-state contacts that aren't in the base results have no
+	// coordinate source on the map side, so they render as a bare result dot instead of
+	// the selected halo. Unlike the marker path, it does not auto-scroll the panel (the
+	// clicked row is already in view).
+	const handleMapPanelRowSelect = useCallback(
+		(contact: ContactWithName) => {
+			if (!selectedContacts.includes(contact.id)) {
+				setMapPanelExtraContacts((prev) =>
+					prev.some((c) => c.id === contact.id) ? prev : [contact, ...prev]
+				);
+			}
+			setSelectedContacts((prev) =>
+				prev.includes(contact.id)
+					? prev.filter((id) => id !== contact.id)
+					: [...prev, contact.id]
+			);
+		},
+		[selectedContacts, setSelectedContacts]
+	);
+
 	const persistentMapProps = useMemo<SearchResultsMapProps>(
 		() => ({
 			weatherMood: globeWeatherMood,
@@ -7932,7 +8142,14 @@ const DashboardContent = () => {
 			presentation: mapPresentation,
 			autoSpin: shouldSpinBackgroundMap,
 			contacts: shouldShowSearchGeometryOnMap ? contactsForMap : [],
-			selectedContacts: shouldShowSearchGeometryOnMap ? selectedContacts : [],
+			selectedContacts:
+				shouldShowSearchGeometryOnMap || shouldShowAmbientContactsOnMap
+					? selectedContacts
+					: [],
+			selectedContactObjects:
+				shouldShowSearchGeometryOnMap || shouldShowAmbientContactsOnMap
+					? selectedContactObjectsForMap
+					: [],
 			externallyHoveredContactId: shouldShowSearchGeometryOnMap
 				? hoveredMapPanelContactId
 				: null,
@@ -7971,6 +8188,10 @@ const DashboardContent = () => {
 			isLoading: isSearchPending || isLoadingContacts || isRefetchingContacts,
 			onMarkerClick: isMapView ? handleMapMarkerClick : undefined,
 			onToggleSelection: isMapView ? handleMapToggleSelection : undefined,
+			onAddSelectionToFolder: isMapView
+				? handleAddSelectedToContextFolder
+				: undefined,
+			onWriteSelectionMessage: isMapView ? handleWriteSelectionMessage : undefined,
 		}),
 		[
 			activeMapTool,
@@ -7981,6 +8202,8 @@ const DashboardContent = () => {
 			globeWeatherMood,
 			globeWeatherRegionCenter,
 			globeWeatherTemperatureF,
+			handleAddSelectedToContextFolder,
+			handleWriteSelectionMessage,
 			handleMapAreaSelect,
 			handleEmptyMapClick,
 			handleMapMarkerClick,
@@ -8007,6 +8230,7 @@ const DashboardContent = () => {
 			searchWhatForMap,
 			selectedAreaBoundsForMap,
 			selectedContacts,
+			selectedContactObjectsForMap,
 			selectAllInViewNonce,
 			shouldEnableMapStateCategorySelection,
 			shouldShowSearchGeometryOnMap,
@@ -8161,7 +8385,11 @@ const DashboardContent = () => {
 				className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-[3px] border-[#ABABAB] select-none relative"
 				style={{
 					backgroundColor: isSelected
-						? isRestaurantsSearchForContact || isRestaurantTitle(headline)
+						? isWriteMode
+							? isHovered
+								? '#FAE6E6'
+								: '#F5DADA'
+							: isRestaurantsSearchForContact || isRestaurantTitle(headline)
 							? isHovered
 								? '#C5F5D1'
 								: '#D7FFE1'
@@ -8194,13 +8422,7 @@ const DashboardContent = () => {
 							? '#F3F4F6'
 							: '#FFFFFF',
 				}}
-				onClick={() => {
-					if (isSelected) {
-						setSelectedContacts(selectedContacts.filter((id) => id !== contact.id));
-					} else {
-						setSelectedContacts([...selectedContacts, contact.id]);
-					}
-				}}
+				onClick={() => handleMapPanelRowSelect(contact)}
 				onMouseEnter={() => setHoveredMapPanelContactId(contact.id)}
 				onMouseLeave={() =>
 					setHoveredMapPanelContactId((prev) => (prev === contact.id ? null : prev))
@@ -11508,6 +11730,39 @@ const DashboardContent = () => {
 																	/>
 																</div>
 															)}
+														{/* Inline "Write Message" drafting panel — floats over the map (left of the
+											    right-side panel) for the current selection, scoped to the active campaign. */}
+														{isWriteMode &&
+															dashboardMapCampaignForHeader &&
+															(selectedContacts.length > 0 ||
+																isWriteReviewActive) &&
+															!isNarrowestDesktop &&
+															!hasNoSearchResults && (
+																<div
+																	className="absolute pointer-events-none map-overlay-appear"
+																			style={{
+																				zIndex: 125,
+																				top: `calc(${MAP_VIEW_SIDE_PANEL_TOP_CSS} + ${isWriteReviewActive ? 84 : 36}px)`,
+																				right: 10 + 433 * MAP_VIEW_PANEL_SCALE + 13,
+																			}}
+																>
+																	<div
+																		className="pointer-events-auto"
+																		style={{
+																		}}
+																	>
+																		<DashboardWriteOverlay
+																			campaign={dashboardMapCampaignForHeader}
+																			targetContactIds={selectedContacts}
+																			onSwitchToAddToFolder={() => {
+																				void handleAddSelectedToContextFolder();
+																				setIsWriteMode(false);
+																			}}
+																			onReviewActiveChange={setIsWriteReviewActive}
+																		/>
+																	</div>
+																</div>
+															)}
 														{/* Search Results overlay box on the right side - keep mounted during loading
 											    so the UI doesn't disappear between state searches. */}
 																		{!isNarrowestDesktop && !hasNoSearchResults && (
@@ -12196,20 +12451,7 @@ const DashboardContent = () => {
 																													? '#F3F4F6'
 																													: '#FFFFFF',
 																										}}
-																										onClick={() => {
-																											if (isSelected) {
-																												setSelectedContacts(
-																													selectedContacts.filter(
-																														(id) => id !== contact.id
-																													)
-																												);
-																											} else {
-																												setSelectedContacts([
-																													...selectedContacts,
-																													contact.id,
-																												]);
-																											}
-																										}}
+																										onClick={() => handleMapPanelRowSelect(contact)}
 																										onMouseEnter={() =>
 																											setHoveredMapPanelContactId(
 																												contact.id

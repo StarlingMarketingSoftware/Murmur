@@ -101,6 +101,8 @@ export interface DraftedEmailsProps {
 	hideDraftReviewCounter?: boolean;
 	/** Optional: hide the bottom action row (Send / Regenerate / Delete + nav arrows) in draft review UI */
 	hideDraftReviewActionRow?: boolean;
+	/** Optional: use the shorter dashboard search review card proportions. */
+	compactDraftReview?: boolean;
 	/** Optional: keeps draft review open by hiding/ignoring controls that return to the drafts list */
 	lockDraftReviewOpen?: boolean;
 	/**
@@ -257,7 +259,7 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 						? injectMurmurDraftSettingsSnapshot(
 								htmlMessageBase,
 								draftSettingsSnapshotRef.current
-						  )
+							)
 						: htmlMessageBase;
 				await updateEmail({
 					id: selectedDraft.id.toString(),

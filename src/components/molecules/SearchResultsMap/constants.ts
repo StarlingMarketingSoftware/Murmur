@@ -229,6 +229,9 @@ export const defaultCenter = {
 export const MAP_DEFAULT_ZOOM = 5;
 // Let users zoom out further than the default US-wide view.
 export const MAP_MIN_ZOOM = 2.25;
+// Zoom at which state initials reach full opacity. Kept close to MAP_MIN_ZOOM so
+// labels are legible from the wide continental view, not only when zoomed in.
+export const STATE_LABELS_FULL_OPACITY_ZOOM = MAP_MIN_ZOOM + 0.5;
 // Dashboard UX: allow state hover highlight one zoom step past the default zoom.
 export const STATE_HOVER_HIGHLIGHT_MAX_ZOOM = MAP_DEFAULT_ZOOM + 1;
 

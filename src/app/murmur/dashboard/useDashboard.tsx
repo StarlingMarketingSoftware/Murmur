@@ -301,6 +301,9 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		UserContactList[]
 	>([]);
 	const [selectedContacts, setSelectedContacts] = useState<number[]>([]);
+	// Map "Write Message" flow: when true, the inline drafting panel is open over the search map
+	// for the current `selectedContacts`. Reset alongside selection so it never outlives it.
+	const [isWriteMode, setIsWriteMode] = useState(false);
 	const [isAllSelected, setIsAllSelected] = useState(false);
 	const [activeSearchQuery, setActiveSearchQuery] = useState('');
 	const [activeExcludeUsedContacts, setActiveExcludeUsedContacts] = useState(false);
@@ -658,6 +661,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		// Reset selection when leaving the search/results flow (fresh dashboard start should not
 		// carry over prior selections).
 		setSelectedContacts([]);
+		setIsWriteMode(false);
 		setIsAllSelected(false);
 		form.reset();
 	};
@@ -1633,6 +1637,8 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		columns,
 		setSelectedContacts,
 		selectedContacts,
+		isWriteMode,
+		setIsWriteMode,
 		handleSelectAll,
 		isAllSelected,
 		isRefetchingContacts,

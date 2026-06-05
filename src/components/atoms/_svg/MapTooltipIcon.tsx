@@ -247,25 +247,6 @@ ${normalized}
 </svg>`;
 };
 
-// Generate data URL for use in Google Maps markers
-export const generateMapTooltipIconUrl = (
-	name: string,
-	company: string,
-	title: string,
-	fillColor?: string,
-	searchWhat?: string | null
-): string => {
-	return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-		generateMapTooltipSvg(
-			name,
-			company,
-			title,
-			fillColor ?? DEFAULT_TOOLTIP_FILL_COLOR,
-			searchWhat
-		)
-	)}`;
-};
-
 // Stroke padding added to SVG dimensions
 const STROKE_PADDING = 2;
 
