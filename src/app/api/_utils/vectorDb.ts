@@ -97,10 +97,7 @@ const elasticsearch = new Client({
 let contactsIndexHasGeoCoordinatesFieldPromise: Promise<boolean> | null = null;
 let loggedMissingGeoCoordinatesField = false;
 
-const logMissingGeoCoordinatesFieldOnce = (
-	message: string,
-	error?: unknown
-): void => {
+const logMissingGeoCoordinatesFieldOnce = (message: string, error?: unknown): void => {
 	if (loggedMissingGeoCoordinatesField) return;
 	loggedMissingGeoCoordinatesField = true;
 	if (error) {
@@ -121,8 +118,7 @@ const contactsIndexHasGeoCoordinatesField = async (): Promise<boolean> => {
 				const hasGeoPoint =
 					indexMappings.length > 0 &&
 					indexMappings.every(
-						(mapping) =>
-							mapping.mappings?.properties?.coordinates?.type === 'geo_point'
+						(mapping) => mapping.mappings?.properties?.coordinates?.type === 'geo_point'
 					);
 				if (!hasGeoPoint) {
 					logMissingGeoCoordinatesFieldOnce(
@@ -409,7 +405,7 @@ export const upsertContactToVectorDb = async (
 					? {
 							lat: contact.latitude,
 							lon: contact.longitude,
-					  }
+						}
 					: undefined,
 		},
 	});
@@ -493,13 +489,15 @@ const getWasmScoreHitsFunction = async (): Promise<WasmScoreHitsFunction | null>
 		// eslint-disable-next-line @typescript-eslint/no-require-imports
 		const dynamicRequire: NodeRequire =
 			// eslint-disable-next-line no-underscore-dangle
-			(typeof __non_webpack_require__ !== 'undefined'
-				? __non_webpack_require__
-				: eval('require')) as NodeRequire;
+			(
+				typeof __non_webpack_require__ !== 'undefined'
+					? __non_webpack_require__
+					: eval('require')
+			) as NodeRequire;
 
-		const loaded = dynamicRequire(
-			`${process.cwd()}/rust-scorer/pkg-node`
-		) as Partial<{ score_hits: unknown }> & { default?: Partial<{ score_hits: unknown }> };
+		const loaded = dynamicRequire(`${process.cwd()}/rust-scorer/pkg-node`) as Partial<{
+			score_hits: unknown;
+		}> & { default?: Partial<{ score_hits: unknown }> };
 		const maybeModule = (loaded.default ?? loaded) as Partial<{ score_hits: unknown }>;
 
 		if (typeof maybeModule.score_hits !== 'function') {
@@ -511,7 +509,10 @@ const getWasmScoreHitsFunction = async (): Promise<WasmScoreHitsFunction | null>
 		cachedNodeWasmScoreHits = maybeModule.score_hits as WasmScoreHitsFunction;
 		return cachedNodeWasmScoreHits;
 	} catch (error: unknown) {
-		console.error('[vectorDb] failed to load WASM scorer, using TypeScript fallback', error);
+		console.error(
+			'[vectorDb] failed to load WASM scorer, using TypeScript fallback',
+			error
+		);
 		cachedNodeWasmScoreHits = null;
 		return cachedNodeWasmScoreHits;
 	}
@@ -653,8 +654,8 @@ export const searchSimilarContacts = async (
 				? Math.min(limit * 2, 500)
 				: Math.min(limit * 6, 500)
 			: locationStrategy === 'strict'
-			? limit
-			: Math.min(limit * 3, 500);
+				? limit
+				: Math.min(limit * 3, 500);
 
 	const results = await elasticsearch.search<ContactDocument>({
 		index: INDEX_NAME,
@@ -1634,8 +1635,7 @@ export const sampleContactsByCategory = async (options: CuratedSamplerOptions) =
 		});
 	}
 
-	const baseQuery =
-		filter.length > 0 ? { bool: { filter } } : { match_all: {} };
+	const baseQuery = filter.length > 0 ? { bool: { filter } } : { match_all: {} };
 
 	// Live music boost functions. Each `filter` clause matches a live-music
 	// signal in one of the searchable text fields (title/headline/metadata/
@@ -1690,10 +1690,7 @@ export const sampleContactsByCategory = async (options: CuratedSamplerOptions) =
 		query: {
 			function_score: {
 				query: baseQuery,
-				functions: [
-					{ random_score: { seed, field: '_seq_no' } },
-					...liveMusicFunctions,
-				],
+				functions: [{ random_score: { seed, field: '_seq_no' } }, ...liveMusicFunctions],
 				score_mode: 'sum',
 				boost_mode: 'replace',
 			},
