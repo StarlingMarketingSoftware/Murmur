@@ -602,6 +602,8 @@ export interface FreeTextSearchVariables {
 	radiusKm?: number | null;
 	/** Radius-search mode: makes lat/lon/radiusKm a hard geographic filter server-side. */
 	strictRadius?: boolean;
+	/** Keyword-search mode: direct field matching instead of semantic/category search. */
+	keywordMode?: boolean;
 	limit?: number;
 	// Caller-supplied signal: see CuratedSearchVariables.signal.
 	signal?: AbortSignal;
@@ -623,6 +625,7 @@ export const useFreeTextContactsSearch = (options: CustomMutationOptions = {}) =
 				params.radiusKm = String(vars.radiusKm);
 			}
 			if (vars.strictRadius) params.strictRadius = '1';
+			if (vars.keywordMode) params.keywordMode = '1';
 			if (typeof vars.limit === 'number') params.limit = String(vars.limit);
 			const url = appendQueryParamsToUrl(urls.api.contacts.search.index, params);
 			const response = await _fetch(url, undefined, undefined, {

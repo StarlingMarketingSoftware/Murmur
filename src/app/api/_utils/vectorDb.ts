@@ -1262,6 +1262,159 @@ export const lexicalSearchContacts = async (options: LexicalSearchOptions) => {
 	return { matches, totalFound: matches.length };
 };
 
+export type KeywordSearchOptions = {
+	queryText: string;
+	limit?: number;
+	center?: { lat: number; lon: number } | null;
+	radiusKm?: number | null;
+};
+
+// Direct field-level keyword search for the dashboard Keyword pill. Unlike the
+// normal free-text path, this does not embed the query or route through curated
+// category branches: it simply finds the typed words in contact fields, with
+// higher-signal fields weighted first.
+export const keywordSearchContacts = async (options: KeywordSearchOptions) => {
+	const limit = Math.max(1, Math.min(options.limit ?? 200, 1000));
+	const queryText = options.queryText.trim();
+	if (!queryText) return { matches: [], totalFound: 0 };
+
+	const canUseGeoDistance =
+		options.center && options.radiusKm
+			? await contactsIndexHasGeoCoordinatesField()
+			: false;
+
+	const coreFields = [
+		'companyIndustry^10',
+		'headline^8',
+		'title^7',
+		'company^7',
+		'firstName^6',
+		'lastName^6',
+		'metadata^5',
+		'companyKeywords^4',
+		'companyType^3',
+		'companyTechStack^2',
+		'website^2',
+		'address',
+		'city',
+		'state',
+		'country',
+		'location',
+	] as const;
+	const broadFields = [...coreFields, 'email^2'] as const;
+
+	const must: Record<string, unknown>[] = [
+		{
+			multi_match: {
+				query: queryText,
+				type: 'cross_fields',
+				fields: coreFields,
+				operator: 'and',
+			},
+		},
+	];
+	const should: Record<string, unknown>[] = [
+		{
+			multi_match: {
+				query: queryText,
+				type: 'phrase',
+				fields: coreFields,
+				slop: 1,
+			},
+		},
+		{
+			multi_match: {
+				query: queryText,
+				type: 'phrase_prefix',
+				fields: coreFields,
+			},
+		},
+		{
+			multi_match: {
+				query: queryText,
+				type: 'best_fields',
+				fields: broadFields,
+				operator: 'and',
+				fuzziness: 0,
+			},
+		},
+	];
+
+	const filter: Record<string, unknown>[] = [];
+	if (options.center && options.radiusKm && canUseGeoDistance) {
+		filter.push({
+			geo_distance: {
+				distance: `${Math.max(1, options.radiusKm)}km`,
+				coordinates: { lat: options.center.lat, lon: options.center.lon },
+			},
+		});
+	}
+
+	const results = await elasticsearch.search<ContactDocument>({
+		index: INDEX_NAME,
+		size: limit,
+		query: {
+			bool: {
+				must,
+				should,
+				filter,
+			},
+		},
+		fields: [
+			'contactId',
+			'email',
+			'firstName',
+			'lastName',
+			'company',
+			'title',
+			'headline',
+			'city',
+			'state',
+			'country',
+			'address',
+			'website',
+			'metadata',
+			'companyFoundedYear',
+			'companyType',
+			'companyTechStack',
+			'companyKeywords',
+			'companyIndustry',
+			'location',
+			'coordinates',
+		],
+		_source: false,
+	});
+
+	const matches = results.hits.hits.map((hit) => ({
+		id: hit._id,
+		score: hit._score || 0,
+		metadata: {
+			contactId: hit.fields?.contactId?.[0],
+			email: hit.fields?.email?.[0],
+			firstName: hit.fields?.firstName?.[0] ?? null,
+			lastName: hit.fields?.lastName?.[0] ?? null,
+			company: hit.fields?.company?.[0],
+			title: hit.fields?.title?.[0],
+			headline: hit.fields?.headline?.[0],
+			city: hit.fields?.city?.[0],
+			state: hit.fields?.state?.[0],
+			country: hit.fields?.country?.[0],
+			address: hit.fields?.address?.[0],
+			website: hit.fields?.website?.[0],
+			metadata: hit.fields?.metadata?.[0],
+			companyFoundedYear: hit.fields?.companyFoundedYear?.[0],
+			companyType: hit.fields?.companyType?.[0],
+			companyTechStack: hit.fields?.companyTechStack?.[0],
+			companyKeywords: hit.fields?.companyKeywords?.[0],
+			companyIndustry: hit.fields?.companyIndustry?.[0],
+			location: hit.fields?.location?.[0],
+			coordinates: hit.fields?.coordinates?.[0] || null,
+		},
+	}));
+
+	return { matches, totalFound: matches.length };
+};
+
 // Pure title-prefix retriever for free-text search when a category was parsed
 // from the user's query. Returns the highest-quality (canonical-shaped) rows
 // in that category by leaning on a function_score that weights canonical

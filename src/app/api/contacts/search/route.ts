@@ -9,6 +9,7 @@ import {
 import prisma from '@/lib/prisma';
 import {
 	countPersonTitleMatches,
+	keywordSearchContacts,
 	lexicalSearchContacts,
 	searchSimilarContacts,
 	titlePrefixSearchContacts,
@@ -590,10 +591,88 @@ const localBusinessIntentScore = (
 	);
 };
 
+const extractKeywordTerms = (query: string): string[] => {
+	const seen = new Set<string>();
+	for (const term of query.toLowerCase().match(/[a-z0-9]+/g) ?? []) {
+		if (!term) continue;
+		seen.add(term);
+	}
+	return [...seen];
+};
+
+const tokenizeKeywordText = (value: string | null | undefined): Set<string> =>
+	new Set((value ?? '').toLowerCase().match(/[a-z0-9]+/g) ?? []);
+
+const normalizeKeywordText = (value: string | null | undefined): string =>
+	(value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+const keywordFieldSpecs = (contact: Contact): { value: string; weight: number }[] => [
+	{ value: contact.companyIndustry ?? '', weight: 10 },
+	{ value: contact.headline ?? '', weight: 8 },
+	{ value: contact.title ?? '', weight: 7 },
+	{ value: contact.company ?? '', weight: 7 },
+	{ value: [contact.firstName, contact.lastName].filter(Boolean).join(' '), weight: 7 },
+	{ value: contact.metadata ?? '', weight: 5 },
+	{ value: (contact.companyKeywords ?? []).join(' '), weight: 4 },
+	{ value: contact.companyType ?? '', weight: 3 },
+	{ value: (contact.companyTechStack ?? []).join(' '), weight: 2 },
+	{ value: contact.email ?? '', weight: 2 },
+	{ value: contact.website ?? '', weight: 2 },
+	{ value: contact.address ?? '', weight: 1 },
+	{ value: [contact.city, contact.state, contact.country].filter(Boolean).join(' '), weight: 1 },
+];
+
+const keywordContactScore = (contact: Contact, terms: readonly string[]): number => {
+	if (terms.length === 0) return 0;
+	const phrase = terms.join(' ');
+	let score = 0;
+	for (const field of keywordFieldSpecs(contact)) {
+		const tokens = tokenizeKeywordText(field.value);
+		let fieldHits = 0;
+		for (const term of terms) {
+			if (tokens.has(term)) fieldHits++;
+		}
+		if (fieldHits === 0) continue;
+		score += fieldHits * field.weight;
+
+		const normalized = normalizeKeywordText(field.value);
+		if (normalized === phrase) score += field.weight * terms.length * 4;
+		else if (normalized.startsWith(phrase)) score += field.weight * terms.length * 3;
+		else if (normalized.includes(phrase)) score += field.weight * terms.length * 2;
+	}
+	return score;
+};
+
+const contactMatchesAllKeywordTerms = (
+	contact: Contact,
+	terms: readonly string[]
+): boolean => {
+	if (terms.length === 0) return false;
+	const allTokens = new Set<string>();
+	for (const field of keywordFieldSpecs(contact)) {
+		for (const token of tokenizeKeywordText(field.value)) allTokens.add(token);
+	}
+	return terms.every((term) => allTokens.has(term));
+};
+
 interface RetrieverResult {
 	name: string;
 	ids: number[];
 }
+
+const collectRetrieverIds = (matches: { id: string | undefined }[]): number[] => {
+	const out: number[] = [];
+	const seen = new Set<number>();
+	for (const match of matches) {
+		const idNum = Number(match.id);
+		if (!Number.isFinite(idNum)) continue;
+		const id = Math.trunc(idNum);
+		if (seen.has(id)) continue;
+		seen.add(id);
+		out.push(id);
+	}
+	return out;
+};
 
 const buildRrfRankMap = (results: RetrieverResult[]): Map<number, number> => {
 	const score = new Map<number, number>();
@@ -900,6 +979,80 @@ const emptyFreeTextSearchResponse = (options: {
 	},
 	contacts: [],
 });
+
+const runKeywordSearch = async (options: {
+	rawQuery: string;
+	parsed: ReturnType<typeof parseFreeTextSearchQuery>;
+	centerPoint: { lat: number; lon: number } | null;
+	radiusKm: number | null;
+	requestedLimit: number;
+}): Promise<FreeTextSearchResponse> => {
+	const { rawQuery, parsed, centerPoint, radiusKm, requestedLimit } = options;
+	const terms = extractKeywordTerms(rawQuery);
+	if (terms.length === 0) {
+		return emptyFreeTextSearchResponse({
+			rawQuery,
+			parsed,
+			centerPoint,
+			retrieverBreakdown: { keyword: 0 },
+		});
+	}
+
+	const keywordResult = await keywordSearchContacts({
+		queryText: rawQuery,
+		limit: Math.min(1000, Math.max(PER_RETRIEVER_TAKE, requestedLimit * 10)),
+		center: centerPoint,
+		radiusKm,
+	});
+	const ids = collectRetrieverIds(keywordResult.matches);
+
+	if (ids.length === 0) {
+		return emptyFreeTextSearchResponse({
+			rawQuery,
+			parsed,
+			centerPoint,
+			retrieverBreakdown: { keyword: 0 },
+		});
+	}
+
+	const hydrated = await prisma.contact.findMany({
+		where: { id: { in: ids } },
+	});
+	const rankById = new Map(ids.map((id, index) => [id, index]));
+
+	const matchedContacts = hydrated
+		.filter((contact) => contactMatchesAllKeywordTerms(contact, terms))
+		.map((contact) => ({
+			contact,
+			score: keywordContactScore(contact, terms),
+			rank: rankById.get(contact.id) ?? Number.MAX_SAFE_INTEGER,
+		}))
+		.sort((a, b) => b.score - a.score || a.rank - b.rank)
+		.slice(0, requestedLimit)
+		.map(({ contact }) => contact);
+
+	const finalContacts = matchedContacts.map((contact) => toSearchContact(contact, null));
+
+	return {
+		query: rawQuery,
+		parsed: {
+			categories: parsed.categories,
+			city: parsed.city?.name ?? null,
+			state: parsed.state?.name ?? null,
+			country: parsed.country,
+			restOfQuery: parsed.restOfQuery,
+		},
+		center: centerPoint,
+		radiusKm: centerPoint && radiusKm != null ? radiusKm : null,
+		retrieverBreakdown: {
+			keyword: ids.length,
+			keywordHydrated: hydrated.length,
+			keywordMatched: matchedContacts.length,
+		},
+		cleanlinessBreakdown: cleanlinessBreakdownFor(finalContacts),
+		contacts: finalContacts,
+	};
+};
 
 const runLocalBusinessSearch = async (options: {
 	rawQuery: string;
@@ -1452,6 +1605,9 @@ export async function GET(req: NextRequest) {
 		const overrideLat = parseFloatOrNull(url.searchParams.get('lat'));
 		const overrideLon = parseFloatOrNull(url.searchParams.get('lon'));
 		const overrideRadiusKm = parseFloatOrNull(url.searchParams.get('radiusKm'));
+		const keywordMode =
+			url.searchParams.get('keywordMode') === '1' ||
+			url.searchParams.get('keywordMode') === 'true';
 		// Radius-search mode (the map's "Radius" pill). Unlike the default soft
 		// locality bias, this makes the radius a HARD geographic constraint: the
 		// center/radius come ONLY from the explicit overrides (so parsed place-text
@@ -1551,6 +1707,41 @@ export async function GET(req: NextRequest) {
 				centerPoint,
 				retrieverBreakdown,
 			});
+
+		if (keywordMode) {
+			const keywordCenter = strictRadiusActive ? strictCenter : null;
+			const keywordRadiusKm = strictRadiusActive ? strictRadiusKm : null;
+			const keywordResponse = await withBudgetFallback(
+				() =>
+					runKeywordSearch({
+						rawQuery,
+						parsed,
+						centerPoint: keywordCenter,
+						radiusKm: keywordRadiusKm,
+						requestedLimit,
+					}),
+				{
+					timeoutMs: getSearchRouteTimeoutMs(
+						requestStartedAt,
+						SEARCH_ROUTE_PATH_TIMEOUT_MS
+					),
+					fallback: emptyFreeTextSearchResponse({
+						rawQuery,
+						parsed,
+						centerPoint: keywordCenter,
+						retrieverBreakdown: { keyword: 0, timedOut: 1 },
+					}),
+					tag: 'keyword path',
+					requestId,
+				}
+			);
+			console.info(
+				`[contacts-search][${requestId}] keyword path returned=${keywordResponse.contacts.length} candidates=${keywordResponse.retrieverBreakdown.keyword ?? 0} strictRadius=${strictRadiusActive} totalMs=${Date.now() - requestStartedAt}`
+			);
+			return apiResponse(
+				applyStrictRadiusToResponse(keywordResponse, strictCenter, strictRadiusKm)
+			);
+		}
 
 		// Strict state enforcement. When the user explicitly names a state
 		// (directly via "in arkansas" or transitively via a city in our dictionary

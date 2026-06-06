@@ -73,6 +73,8 @@ type FreeTextSearchArgs = {
 	// Radius-search mode. Part of the cache identity so a strict (hard-filtered)
 	// search isn't served a soft-locality result cached at the same radius.
 	strictRadius: boolean;
+	// Keyword mode swaps the server into direct field matching instead of semantic search.
+	keywordMode: boolean;
 };
 
 // Client-side multi-entry result cache (localStorage). Repeating a recent dashboard search
@@ -80,14 +82,14 @@ type FreeTextSearchArgs = {
 // localStorage (not sessionStorage) so it survives tab close and is shared across tabs within
 // the window. Curated stays non-deterministic on the server — the SWR path in
 // triggerCuratedSearch paints the cache, then swaps in a fresh shuffle.
-const SEARCH_CACHE_VERSION = 2 as const;
+const SEARCH_CACHE_VERSION = 3 as const;
 // Three hours: covers same-session repeats and "I came back after lunch", short enough that a
 // stale contact set is bounded. Curated additionally self-heals via background revalidate.
 const SEARCH_CACHE_MAX_AGE_MS = 3 * 60 * 60 * 1000;
 // Per path. ~50 contacts/entry × ~1.5 KB ≈ <1 MB/path, comfortably under the localStorage budget.
 const SEARCH_CACHE_MAX_ENTRIES = 12;
-const CURATED_CACHE_KEY_PREFIX = 'murmur_search_cache_curated_v2';
-const FREETEXT_CACHE_KEY_PREFIX = 'murmur_search_cache_freetext_v2';
+const CURATED_CACHE_KEY_PREFIX = 'murmur_search_cache_curated_v3';
+const FREETEXT_CACHE_KEY_PREFIX = 'murmur_search_cache_freetext_v3';
 
 // One cached result set: the args that produced it, the display query, and the exact contacts
 // that were rendered (so a replay is byte-identical).
@@ -206,6 +208,7 @@ const normalizeFreeTextArgs = (args: FreeTextSearchArgs): FreeTextSearchArgs => 
 	lon: args.lon == null ? null : roundTo(args.lon, 3),
 	radiusKm: args.radiusKm == null ? null : Math.round(args.radiusKm),
 	strictRadius: args.strictRadius,
+	keywordMode: args.keywordMode,
 });
 
 const curatedArgsEqual = (a: CuratedSearchArgs, b: CuratedSearchArgs): boolean =>
@@ -220,7 +223,8 @@ const freeTextArgsEqual = (a: FreeTextSearchArgs, b: FreeTextSearchArgs): boolea
 	a.lat === b.lat &&
 	a.lon === b.lon &&
 	a.radiusKm === b.radiusKm &&
-	a.strictRadius === b.strictRadius;
+	a.strictRadius === b.strictRadius &&
+	Boolean(a.keywordMode) === Boolean(b.keywordMode);
 
 type CuratedOverrides = {
 	lat?: number | null;
@@ -922,6 +926,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				lon?: number | null;
 				radiusKm?: number | null;
 				strictRadius?: boolean;
+				keywordMode?: boolean;
 			}
 		) => {
 			const q = rawQuery.trim();
@@ -936,6 +941,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				lon: overrides?.lon ?? null,
 				radiusKm: overrides?.radiusKm ?? null,
 				strictRadius: overrides?.strictRadius ?? false,
+				keywordMode: overrides?.keywordMode ?? false,
 			};
 			const shouldUseCache = !rawArgs.strictRadius;
 			const cacheArgs = normalizeFreeTextArgs(rawArgs);
@@ -992,6 +998,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					lon: overrides?.lon ?? undefined,
 					radiusKm: overrides?.radiusKm ?? undefined,
 					strictRadius: overrides?.strictRadius,
+					keywordMode: overrides?.keywordMode,
 					limit: 50,
 					signal: controller.signal,
 				});
@@ -1136,6 +1143,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					lon: args.lon,
 					radiusKm: args.radiusKm,
 					strictRadius: args.strictRadius,
+					keywordMode: args.keywordMode,
 				});
 				return true;
 			} catch {

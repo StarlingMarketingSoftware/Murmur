@@ -209,7 +209,14 @@ const CURATED_URL_PARAM_KEYS = ['pick', 'state', 'cat', 'lat', 'lon', 'r'] as co
 // Distinct from CURATED_URL_PARAM_KEYS so a refresh from a free-text run can't be mistaken
 // for a curated rehydration (which would replay /api/contacts/curated-search instead of
 // restoring the cached free-text results from sessionStorage).
-const FREETEXT_URL_PARAM_KEYS = ['ft', 'ftLat', 'ftLon', 'ftR', 'ftStrict'] as const;
+const FREETEXT_URL_PARAM_KEYS = [
+	'ft',
+	'ftLat',
+	'ftLon',
+	'ftR',
+	'ftStrict',
+	'ftKeyword',
+] as const;
 
 const MILES_TO_KM = 1.609344;
 
@@ -238,6 +245,7 @@ type FreeTextUrlArgs = {
 	lon: number | null;
 	radiusKm: number | null;
 	strictRadius: boolean;
+	keywordMode?: boolean;
 } | null;
 
 type PendingDashboardSearch = {
@@ -315,6 +323,8 @@ const writeFreeTextParams = (params: URLSearchParams, args: FreeTextUrlArgs): vo
 	else params.delete('ftR');
 	if (args.strictRadius) params.set('ftStrict', '1');
 	else params.delete('ftStrict');
+	if (args.keywordMode) params.set('ftKeyword', '1');
+	else params.delete('ftKeyword');
 };
 
 const extractStateAbbrFromSearchQuery = (query: string): string | null => {
@@ -1918,7 +1928,6 @@ type MapBottomSearchFollowupPreview = MapBottomSearchFollowupSelection | 'anythi
 
 type MapBottomSearchAdvancedSelections = {
 	profile: boolean;
-	keyword: boolean;
 };
 
 type MapBottomSearchBarProps = {
@@ -1930,6 +1939,8 @@ type MapBottomSearchBarProps = {
 	appearance?: 'default' | 'initial-dashboard';
 	/** When true (anything mode), shows the gold radius pin before the placeholder. */
 	radiusEnabled?: boolean;
+	/** When true (anything mode), switches placeholder/copy to direct keyword search. */
+	keywordModeEnabled?: boolean;
 	categoryWhatValue?: string;
 	categoryWhereValue?: string;
 	activeCategoryField?: 'what' | 'where' | null;
@@ -1954,6 +1965,7 @@ const MapBottomSearchBar = memo(
 		mode = 'anything',
 		appearance = 'default',
 		radiusEnabled = false,
+		keywordModeEnabled = false,
 		categoryWhatValue = '',
 		categoryWhereValue = '',
 		activeCategoryField = null,
@@ -2320,6 +2332,7 @@ const MapBottomSearchBar = memo(
 		// When radius mode is on, the gold pin sits before the text; nudge the
 		// placeholder text + textarea right so typed text doesn't overlap it.
 		const radiusPinOffset = radiusEnabled && !isInitialDashboardSearch ? 22 : 0;
+		const shouldShowKeywordPlaceholder = keywordModeEnabled && !isInitialDashboardSearch;
 		const isInitialDashboardSearchActive =
 			isInitialDashboardSearch &&
 			(isInitialDashboardSearchHovered || isExpanded || value.trim().length > 0);
@@ -2384,7 +2397,13 @@ const MapBottomSearchBar = memo(
 								}}
 							/>
 						)}
-						{isInitialDashboardSearch ? (
+						{shouldShowKeywordPlaceholder ? (
+							<>
+								<span>Search any</span>
+								<span className="rounded-[5px] bg-[#D4E5FE] px-[4px] py-[2px] font-medium">Keyword</span>
+								<span>here</span>
+							</>
+						) : isInitialDashboardSearch ? (
 							<span>Ask Anything</span>
 						) : (
 							<>
@@ -2514,6 +2533,8 @@ type MapBottomSearchFollowupBoxProps = {
 	previewedSearchFollowup: MapBottomSearchFollowupPreview;
 	onSelectedSearchFollowupChange: (selection: MapBottomSearchFollowupSelection) => void;
 	onPreviewSearchFollowupChange: (selection: MapBottomSearchFollowupPreview) => void;
+	isKeywordModeEnabled: boolean;
+	onKeywordToggle: () => void;
 	isRadiusModeEnabled: boolean;
 	onRadiusToggle: () => void;
 };
@@ -2524,6 +2545,8 @@ const MapBottomSearchFollowupBox = memo(
 		previewedSearchFollowup,
 		onSelectedSearchFollowupChange,
 		onPreviewSearchFollowupChange,
+		isKeywordModeEnabled,
+		onKeywordToggle,
 		isRadiusModeEnabled,
 		onRadiusToggle,
 	}: MapBottomSearchFollowupBoxProps) => {
@@ -2536,7 +2559,6 @@ const MapBottomSearchFollowupBox = memo(
 		const [advancedSelections, setAdvancedSelections] =
 			useState<MapBottomSearchAdvancedSelections>({
 				profile: false,
-				keyword: false,
 			});
 		const visualSearchFollowup =
 			previewedSearchFollowup === 'anything'
@@ -2549,7 +2571,7 @@ const MapBottomSearchFollowupBox = memo(
 		const isAdvancedActive = previewedSearchFollowup === 'anything';
 		const isCompactFollowup = isForYouSelected || isCategorySelected;
 		const isProfileAdvancedSelected = advancedSelections.profile;
-		const isKeywordAdvancedSelected = advancedSelections.keyword;
+		const isKeywordAdvancedSelected = isKeywordModeEnabled;
 		const isRadiusAdvancedSelected = isRadiusModeEnabled;
 
 		return (
@@ -2789,12 +2811,7 @@ const MapBottomSearchFollowupBox = memo(
 								cursor: 'pointer',
 								zIndex: 1,
 							}}
-							onClick={() =>
-								setAdvancedSelections((current) => ({
-									...current,
-									keyword: !current.keyword,
-								}))
-							}
+							onClick={onKeywordToggle}
 						>
 							<MapBottomSearchKeywordIcon
 								aria-hidden="true"
@@ -2943,6 +2960,7 @@ const DashboardContent = () => {
 	const freeTextLonParam = parseFiniteNumberParam('ftLon');
 	const freeTextRadiusKmParam = parseFiniteNumberParam('ftR');
 	const freeTextStrictParam = searchParams.get('ftStrict')?.trim() === '1';
+	const freeTextKeywordParam = searchParams.get('ftKeyword')?.trim() === '1';
 	const allContactsMapParam = searchParams.get(ALL_CONTACTS_MAP_PARAM)?.trim() === '1';
 	// "From Home" mode: triggered from landing page search button, shows a pre-configured search
 	// with sign-up modal for unauthenticated users.
@@ -3185,6 +3203,14 @@ const DashboardContent = () => {
 	> | null>(null);
 	const [isMapBottomCategoryDropdownActive, setIsMapBottomCategoryDropdownActive] =
 		useState(false);
+	const [isKeywordModeEnabled, setIsKeywordModeEnabled] = useState(false);
+	const isKeywordModeEnabledRef = useRef(false);
+	useEffect(() => {
+		isKeywordModeEnabledRef.current = isKeywordModeEnabled;
+	}, [isKeywordModeEnabled]);
+	useEffect(() => {
+		if (freeTextModeParam) setIsKeywordModeEnabled(freeTextKeywordParam);
+	}, [freeTextModeParam, freeTextKeywordParam]);
 
 	// ── Radius search mode (the bottom "Radius" pill) ──────────────────────────
 	const [isRadiusModeEnabled, setIsRadiusModeEnabled] = useState(false);
@@ -4728,6 +4754,7 @@ const DashboardContent = () => {
 				lon: freeTextLonParam,
 				radiusKm: freeTextRadiusKmParam,
 				strictRadius: freeTextStrictParam,
+				keywordMode: freeTextKeywordParam,
 			}).catch(() => undefined);
 			if (dashboardViewParam === 'table') {
 				setTimeout(() => setIsMapView(false), 0);
@@ -4774,9 +4801,11 @@ const DashboardContent = () => {
 		dashboardViewParam,
 		form,
 		freeTextLatParam,
+		freeTextKeywordParam,
 		freeTextLonParam,
 		freeTextModeParam,
 		freeTextRadiusKmParam,
+		freeTextStrictParam,
 		hasSearched,
 		isAddToCampaignMode,
 		isMobile,
@@ -4859,6 +4888,7 @@ const DashboardContent = () => {
 				lon: freeTextLonParam,
 				radiusKm: freeTextRadiusKmParam,
 				strictRadius: freeTextStrictParam,
+				keywordMode: freeTextKeywordParam,
 			}).catch(() => undefined);
 			if (fromCampaignViewParam === 'table') {
 				setTimeout(() => setIsMapView(false), 0);
@@ -4903,9 +4933,11 @@ const DashboardContent = () => {
 		curatedStateParam,
 		form,
 		freeTextLatParam,
+		freeTextKeywordParam,
 		freeTextLonParam,
 		freeTextModeParam,
 		freeTextRadiusKmParam,
+		freeTextStrictParam,
 		fromCampaignSearchParam,
 		fromCampaignViewParam,
 		hasSearched,
@@ -4946,6 +4978,7 @@ const DashboardContent = () => {
 						lon: lastFreeTextArgs?.lon ?? null,
 						radiusKm: lastFreeTextArgs?.radiusKm ?? null,
 						strictRadius: lastFreeTextArgs?.strictRadius ?? false,
+						keywordMode: lastFreeTextArgs?.keywordMode ?? false,
 					}
 				: null
 		);
@@ -5063,6 +5096,7 @@ const DashboardContent = () => {
 						lon: lastFreeTextArgs?.lon ?? null,
 						radiusKm: lastFreeTextArgs?.radiusKm ?? null,
 						strictRadius: lastFreeTextArgs?.strictRadius ?? false,
+						keywordMode: lastFreeTextArgs?.keywordMode ?? false,
 					}
 				: null
 		);
@@ -6326,6 +6360,7 @@ const DashboardContent = () => {
 		async (query: string) => {
 			const q = query.trim();
 			if (!q) return;
+			const keywordMode = isKeywordModeEnabledRef.current;
 			mapBottomSearchInputRef.current?.blur();
 			setIsMapBottomSearchActive(false);
 			setMapBottomSearchValue('');
@@ -6350,9 +6385,15 @@ const DashboardContent = () => {
 						lon: center.lng,
 						radiusKm: radiusMilesRef.current * MILES_TO_KM,
 						strictRadius: true,
+						keywordMode,
 					}).catch(() => undefined);
 					return;
 				}
+			}
+
+			if (keywordMode) {
+				triggerFreeTextSearch(q, { keywordMode: true }).catch(() => undefined);
+				return;
 			}
 
 			let lat: number | null = null;
@@ -6397,6 +6438,10 @@ const DashboardContent = () => {
 	const handleMapBottomSearchSubmit = useCallback(async () => {
 		await submitMapBottomSearchQuery(mapBottomSearchValue);
 	}, [mapBottomSearchValue, submitMapBottomSearchQuery]);
+
+	const handleKeywordToggle = useCallback(() => {
+		setIsKeywordModeEnabled((enabled) => !enabled);
+	}, []);
 
 	// Toggle the radius input mode for future searches. The active map geometry is
 	// driven by the result set that produced it, so toggling off must not re-run or
@@ -6445,6 +6490,7 @@ const DashboardContent = () => {
 				lon: center.lng,
 				radiusKm: lastFreeTextArgs.radiusKm,
 				strictRadius: true,
+				keywordMode: lastFreeTextArgs.keywordMode,
 			}).catch(() => undefined);
 		},
 		[lastFreeTextArgs, triggerFreeTextSearch]
@@ -8666,6 +8712,8 @@ const DashboardContent = () => {
 		(activeSection === 'what' || activeSection === 'where')
 			? activeSection
 			: null;
+	const shouldShowMapBottomKeywordBadge =
+		isKeywordModeEnabled && !isMapBottomCategoryMode && !isMapBottomForYouMode;
 
 	// Renders one contact row in the map-view right-side panel (desktop variant).
 	// Used by both the "Selection" and "Search Results" sub-panels — they differ
@@ -12561,12 +12609,41 @@ const DashboardContent = () => {
 																						onCategorySubmit={
 																							handleMapBottomCategorySubmit
 																						}
-																						onForYouSubmit={handleMapBottomForYouSubmit}
-																						radiusEnabled={isRadiusModeEnabled}
-																					/>
-																					<MapBottomSearchFollowupBox
-																						selectedSearchFollowup={
-																							mapBottomSearchFollowupSelection
+																		onForYouSubmit={handleMapBottomForYouSubmit}
+										radiusEnabled={isRadiusModeEnabled}
+										keywordModeEnabled={isKeywordModeEnabled}
+									/>
+									{shouldShowMapBottomKeywordBadge && (
+										<div
+											aria-hidden="true"
+											className="absolute flex items-center justify-center gap-[6px] pointer-events-none font-inter text-[9px] font-medium text-black"
+											style={{
+												top: 'calc(100% + 4px)',
+												right: 0,
+												width: '148px',
+												height: '13px',
+												borderRadius: '8px',
+												backgroundColor: '#FFFFFF',
+												lineHeight: '20px',
+												textAlign: 'center',
+												zIndex: 1,
+											}}
+										>
+											<span
+												style={{
+													width: '8px',
+													height: '8px',
+													borderRadius: '50%',
+													backgroundColor: '#71A9FD',
+													flexShrink: 0,
+												}}
+											/>
+											<span>keyword search enabled</span>
+										</div>
+									)}
+									<MapBottomSearchFollowupBox
+																		selectedSearchFollowup={
+																			mapBottomSearchFollowupSelection
 																						}
 																						previewedSearchFollowup={
 																							mapBottomSearchFollowupPreview
@@ -12574,12 +12651,14 @@ const DashboardContent = () => {
 																						onSelectedSearchFollowupChange={
 																							handleMapBottomSearchFollowupSelectionChange
 																						}
-																						onPreviewSearchFollowupChange={
-																							handleMapBottomSearchFollowupPreviewChange
-																						}
-																						isRadiusModeEnabled={isRadiusModeEnabled}
-																						onRadiusToggle={handleRadiusToggle}
-																					/>
+																		onPreviewSearchFollowupChange={
+																			handleMapBottomSearchFollowupPreviewChange
+																		}
+																		isKeywordModeEnabled={isKeywordModeEnabled}
+																		onKeywordToggle={handleKeywordToggle}
+																		isRadiusModeEnabled={isRadiusModeEnabled}
+																		onRadiusToggle={handleRadiusToggle}
+																	/>
 																		{isRadiusModeEnabled && (
 																			<MapRadiusSlider
 																				miles={radiusMiles}
