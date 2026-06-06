@@ -66,6 +66,7 @@ import MapBottomSearchForYouIcon from '@/components/atoms/_svg/MapBottomSearchFo
 import MapBottomSearchProfileIcon from '@/components/atoms/_svg/MapBottomSearchProfileIcon';
 import MapBottomSearchKeywordIcon from '@/components/atoms/_svg/MapBottomSearchKeywordIcon';
 import MapBottomSearchRadiusIcon from '@/components/atoms/_svg/MapBottomSearchRadiusIcon';
+import MapSearchRadiusPinIcon from '@/components/atoms/_svg/MapSearchRadiusPinIcon';
 import DashboardActionBarPlaybookIcon from '@/components/atoms/_svg/DashboardActionBarPlaybookIcon';
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 import DashboardActionBarCalendarIcon from '@/components/atoms/_svg/DashboardActionBarCalendarIcon';
@@ -122,6 +123,10 @@ import SearchResultsMap, {
 	DASHBOARD_TO_INTERACTIVE_TRANSITION_MS,
 	type SearchResultsMapProps,
 } from '@/components/molecules/SearchResultsMap/SearchResultsMap';
+import MapRadiusSlider, {
+	RADIUS_DEFAULT_MILES,
+} from '@/components/molecules/MapRadiusSlider';
+import type { LatLngLiteral } from '@/components/molecules/SearchResultsMap/types';
 import {
 	type PersistentDashboardMapConfig,
 	usePersistentMapSetter,
@@ -204,7 +209,14 @@ const CURATED_URL_PARAM_KEYS = ['pick', 'state', 'cat', 'lat', 'lon', 'r'] as co
 // Distinct from CURATED_URL_PARAM_KEYS so a refresh from a free-text run can't be mistaken
 // for a curated rehydration (which would replay /api/contacts/curated-search instead of
 // restoring the cached free-text results from sessionStorage).
-const FREETEXT_URL_PARAM_KEYS = ['ft', 'ftLat', 'ftLon', 'ftR'] as const;
+const FREETEXT_URL_PARAM_KEYS = ['ft', 'ftLat', 'ftLon', 'ftR', 'ftStrict'] as const;
+
+const MILES_TO_KM = 1.609344;
+
+// Browser memory for radius mode (enabled flag + draft/default center + miles), so it's
+// retained across disengage/re-engage, toggling off, and reloads. Only the Radius pill
+// turns the mode off.
+const RADIUS_STORAGE_KEY = 'murmur_radius_mode_v1';
 const PENDING_SEARCH_STORAGE_KEY = 'murmur_pending_search';
 const ALL_CONTACTS_MAP_PARAM = 'allContacts';
 
@@ -225,11 +237,24 @@ type FreeTextUrlArgs = {
 	lat: number | null;
 	lon: number | null;
 	radiusKm: number | null;
+	strictRadius: boolean;
 } | null;
 
 type PendingDashboardSearch = {
 	query: string;
 	fromCampaignId: string | null;
+};
+
+type MapPanelResultsSnapshot = {
+	contacts: ContactWithName[];
+	baseContactIds: number[];
+	whatValue: string;
+	whereValue: string;
+	isRestaurantsSearch: boolean;
+	isCoffeeShopsSearch: boolean;
+	isMusicVenuesSearch: boolean;
+	isMusicFestivalsSearch: boolean;
+	isWeddingPlannersSearch: boolean;
 };
 
 const parsePendingDashboardSearch = (raw: string): PendingDashboardSearch => {
@@ -288,6 +313,8 @@ const writeFreeTextParams = (params: URLSearchParams, args: FreeTextUrlArgs): vo
 	else params.delete('ftLon');
 	if (args.radiusKm != null) params.set('ftR', String(args.radiusKm));
 	else params.delete('ftR');
+	if (args.strictRadius) params.set('ftStrict', '1');
+	else params.delete('ftStrict');
 };
 
 const extractStateAbbrFromSearchQuery = (query: string): string | null => {
@@ -1892,7 +1919,6 @@ type MapBottomSearchFollowupPreview = MapBottomSearchFollowupSelection | 'anythi
 type MapBottomSearchAdvancedSelections = {
 	profile: boolean;
 	keyword: boolean;
-	radius: boolean;
 };
 
 type MapBottomSearchBarProps = {
@@ -1902,6 +1928,8 @@ type MapBottomSearchBarProps = {
 	inputRef: RefObject<HTMLTextAreaElement | null>;
 	mode?: 'anything' | 'category' | 'for-you';
 	appearance?: 'default' | 'initial-dashboard';
+	/** When true (anything mode), shows the gold radius pin before the placeholder. */
+	radiusEnabled?: boolean;
 	categoryWhatValue?: string;
 	categoryWhereValue?: string;
 	activeCategoryField?: 'what' | 'where' | null;
@@ -1925,6 +1953,7 @@ const MapBottomSearchBar = memo(
 		inputRef,
 		mode = 'anything',
 		appearance = 'default',
+		radiusEnabled = false,
 		categoryWhatValue = '',
 		categoryWhereValue = '',
 		activeCategoryField = null,
@@ -2288,6 +2317,9 @@ const MapBottomSearchBar = memo(
 				INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonInset +
 				20
 			: MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotWidth + 28;
+		// When radius mode is on, the gold pin sits before the text; nudge the
+		// placeholder text + textarea right so typed text doesn't overlap it.
+		const radiusPinOffset = radiusEnabled && !isInitialDashboardSearch ? 22 : 0;
 		const isInitialDashboardSearchActive =
 			isInitialDashboardSearch &&
 			(isInitialDashboardSearchHovered || isExpanded || value.trim().length > 0);
@@ -2341,6 +2373,17 @@ const MapBottomSearchBar = memo(
 							fontWeight: isInitialDashboardSearch ? 500 : undefined,
 						}}
 					>
+						{radiusEnabled && !isInitialDashboardSearch && (
+							<MapSearchRadiusPinIcon
+								aria-hidden="true"
+								style={{
+									width: 15,
+									height: 19,
+									flexShrink: 0,
+									display: 'block',
+								}}
+							/>
+						)}
 						{isInitialDashboardSearch ? (
 							<span>Ask Anything</span>
 						) : (
@@ -2368,8 +2411,8 @@ const MapBottomSearchBar = memo(
 					className="absolute bg-transparent border-0 outline-none font-inter text-[16px] text-black"
 					style={{
 						top: 0,
-						left: isInitialDashboardSearch ? '24px' : '14px',
-						width: `calc(100% - ${anythingRightReservedWidth + (isInitialDashboardSearch ? 24 : 0)}px)`,
+						left: isInitialDashboardSearch ? '24px' : `${14 + radiusPinOffset}px`,
+						width: `calc(100% - ${anythingRightReservedWidth + (isInitialDashboardSearch ? 24 : 0) + radiusPinOffset}px)`,
 						height: `${
 							isInitialDashboardSearch
 								? activeHeight
@@ -2471,6 +2514,8 @@ type MapBottomSearchFollowupBoxProps = {
 	previewedSearchFollowup: MapBottomSearchFollowupPreview;
 	onSelectedSearchFollowupChange: (selection: MapBottomSearchFollowupSelection) => void;
 	onPreviewSearchFollowupChange: (selection: MapBottomSearchFollowupPreview) => void;
+	isRadiusModeEnabled: boolean;
+	onRadiusToggle: () => void;
 };
 
 const MapBottomSearchFollowupBox = memo(
@@ -2479,6 +2524,8 @@ const MapBottomSearchFollowupBox = memo(
 		previewedSearchFollowup,
 		onSelectedSearchFollowupChange,
 		onPreviewSearchFollowupChange,
+		isRadiusModeEnabled,
+		onRadiusToggle,
 	}: MapBottomSearchFollowupBoxProps) => {
 		const segmentBox = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_SEGMENT_BOX;
 		const leftTileBox = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_LEFT_TILE_BOX;
@@ -2490,7 +2537,6 @@ const MapBottomSearchFollowupBox = memo(
 			useState<MapBottomSearchAdvancedSelections>({
 				profile: false,
 				keyword: false,
-				radius: false,
 			});
 		const visualSearchFollowup =
 			previewedSearchFollowup === 'anything'
@@ -2504,7 +2550,7 @@ const MapBottomSearchFollowupBox = memo(
 		const isCompactFollowup = isForYouSelected || isCategorySelected;
 		const isProfileAdvancedSelected = advancedSelections.profile;
 		const isKeywordAdvancedSelected = advancedSelections.keyword;
-		const isRadiusAdvancedSelected = advancedSelections.radius;
+		const isRadiusAdvancedSelected = isRadiusModeEnabled;
 
 		return (
 			<div
@@ -2785,12 +2831,7 @@ const MapBottomSearchFollowupBox = memo(
 								cursor: 'pointer',
 								zIndex: 1,
 							}}
-							onClick={() =>
-								setAdvancedSelections((current) => ({
-									...current,
-									radius: !current.radius,
-								}))
-							}
+							onClick={onRadiusToggle}
 						>
 							<MapBottomSearchRadiusIcon
 								aria-hidden="true"
@@ -2901,6 +2942,7 @@ const DashboardContent = () => {
 	const freeTextLatParam = parseFiniteNumberParam('ftLat');
 	const freeTextLonParam = parseFiniteNumberParam('ftLon');
 	const freeTextRadiusKmParam = parseFiniteNumberParam('ftR');
+	const freeTextStrictParam = searchParams.get('ftStrict')?.trim() === '1';
 	const allContactsMapParam = searchParams.get(ALL_CONTACTS_MAP_PARAM)?.trim() === '1';
 	// "From Home" mode: triggered from landing page search button, shows a pre-configured search
 	// with sign-up modal for unauthenticated users.
@@ -3143,6 +3185,78 @@ const DashboardContent = () => {
 	> | null>(null);
 	const [isMapBottomCategoryDropdownActive, setIsMapBottomCategoryDropdownActive] =
 		useState(false);
+
+	// ── Radius search mode (the bottom "Radius" pill) ──────────────────────────
+	const [isRadiusModeEnabled, setIsRadiusModeEnabled] = useState(false);
+	const [radiusCenter, setRadiusCenter] = useState<LatLngLiteral | null>(null);
+	const [radiusMiles, setRadiusMiles] = useState(RADIUS_DEFAULT_MILES);
+	// Ref mirrors so submitMapBottomSearchQuery (a stable useCallback) reads current
+	// radius values without churning its deps on every slider tick.
+	const isRadiusModeEnabledRef = useRef(false);
+	const radiusCenterRef = useRef<LatLngLiteral | null>(null);
+	const radiusMilesRef = useRef(RADIUS_DEFAULT_MILES);
+	// Cancels a stale async geolocation enable (toggled off / re-toggled mid-fetch).
+	const radiusEnableTokenRef = useRef(0);
+	useEffect(() => {
+		isRadiusModeEnabledRef.current = isRadiusModeEnabled;
+	}, [isRadiusModeEnabled]);
+	useEffect(() => {
+		radiusCenterRef.current = radiusCenter;
+	}, [radiusCenter]);
+	useEffect(() => {
+		radiusMilesRef.current = radiusMiles;
+	}, [radiusMiles]);
+
+	// Restore remembered radius mode once on mount, then persist on change. The
+	// `radiusHydrated` gate stops the persist effect from clobbering storage with
+	// defaults before the restore has applied.
+	const [radiusHydrated, setRadiusHydrated] = useState(false);
+	useEffect(() => {
+		if (typeof window === 'undefined') {
+			setRadiusHydrated(true);
+			return;
+		}
+		try {
+			const raw = window.localStorage.getItem(RADIUS_STORAGE_KEY);
+			if (raw) {
+				const saved = JSON.parse(raw) as {
+					enabled?: boolean;
+					center?: { lat: number; lng: number } | null;
+					miles?: number;
+				};
+				if (typeof saved.miles === 'number' && Number.isFinite(saved.miles)) {
+					setRadiusMiles(saved.miles);
+				}
+				if (
+					saved.center &&
+					Number.isFinite(saved.center.lat) &&
+					Number.isFinite(saved.center.lng)
+				) {
+					setRadiusCenter({ lat: saved.center.lat, lng: saved.center.lng });
+				}
+				if (saved.enabled) setIsRadiusModeEnabled(true);
+			}
+		} catch {
+			// Corrupt/unavailable storage — start fresh.
+		}
+		setRadiusHydrated(true);
+	}, []);
+	useEffect(() => {
+		if (!radiusHydrated || typeof window === 'undefined') return;
+		try {
+			window.localStorage.setItem(
+				RADIUS_STORAGE_KEY,
+				JSON.stringify({
+					enabled: isRadiusModeEnabled,
+					center: radiusCenter,
+					miles: radiusMiles,
+				})
+			);
+		} catch {
+			// Ignore quota / private-mode errors.
+		}
+	}, [radiusHydrated, isRadiusModeEnabled, radiusCenter, radiusMiles]);
+
 	const isMapBottomForYouMode = mapBottomSearchFollowupSelection === 'for-you';
 	const isMapBottomCategoryMode = mapBottomSearchFollowupSelection === 'category';
 	// When the scroll-to-map gesture commits, it fires a "For You" search but holds the top
@@ -4613,6 +4727,7 @@ const DashboardContent = () => {
 				lat: freeTextLatParam,
 				lon: freeTextLonParam,
 				radiusKm: freeTextRadiusKmParam,
+				strictRadius: freeTextStrictParam,
 			}).catch(() => undefined);
 			if (dashboardViewParam === 'table') {
 				setTimeout(() => setIsMapView(false), 0);
@@ -4743,6 +4858,7 @@ const DashboardContent = () => {
 				lat: freeTextLatParam,
 				lon: freeTextLonParam,
 				radiusKm: freeTextRadiusKmParam,
+				strictRadius: freeTextStrictParam,
 			}).catch(() => undefined);
 			if (fromCampaignViewParam === 'table') {
 				setTimeout(() => setIsMapView(false), 0);
@@ -4829,6 +4945,7 @@ const DashboardContent = () => {
 						lat: lastFreeTextArgs?.lat ?? null,
 						lon: lastFreeTextArgs?.lon ?? null,
 						radiusKm: lastFreeTextArgs?.radiusKm ?? null,
+						strictRadius: lastFreeTextArgs?.strictRadius ?? false,
 					}
 				: null
 		);
@@ -4945,6 +5062,7 @@ const DashboardContent = () => {
 						lat: lastFreeTextArgs?.lat ?? null,
 						lon: lastFreeTextArgs?.lon ?? null,
 						radiusKm: lastFreeTextArgs?.radiusKm ?? null,
+						strictRadius: lastFreeTextArgs?.strictRadius ?? false,
 					}
 				: null
 		);
@@ -6169,6 +6287,36 @@ const DashboardContent = () => {
 		});
 	}, []);
 
+	// Resolve the radius center. Typed radius searches use only user-location sources
+	// so a new query never inherits the last dragged result center.
+	const resolveRadiusCenter = useCallback(
+		async (options?: { allowViewportFallback?: boolean }): Promise<LatLngLiteral | null> => {
+			const precise = await new Promise<LatLngLiteral | null>((resolve) => {
+				if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
+					resolve(null);
+					return;
+				}
+				navigator.geolocation.getCurrentPosition(
+					(pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+					() => resolve(null),
+					{ enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+				);
+			});
+			if (precise) return precise;
+			try {
+				const loc = await getApproximateLocation();
+				if (loc.lat != null && loc.lon != null) return { lat: loc.lat, lng: loc.lon };
+			} catch {
+				// Coarse lookup failed — fall through to the optional map viewport fallback.
+			}
+			if (options?.allowViewportFallback === false) return null;
+			const viewport = lastSearchThisAreaViewportRef.current;
+			if (viewport) return { lat: viewport.center.lat, lng: viewport.center.lng };
+			return null;
+		},
+		[]
+	);
+
 	// Free-text "Search Anything" submit. Runs the hybrid retriever route and
 	// surfaces results through the same curated-results pipe so map pins,
 	// list, and selection just update. Empty input → no-op (don't accidentally
@@ -6188,6 +6336,23 @@ const DashboardContent = () => {
 			// in fromHome demo mode; in either case there's nothing to materialize.
 			if (!isAddToCampaignMode && !isFromHomeDemoMode) {
 				void ensureActiveCampaign(q);
+			}
+
+			// Radius mode: a fresh typed query starts from the user's default location,
+			// not wherever the previous radius pin was dragged. If user location can't be
+			// resolved, fall through to the normal soft-locality path so the search still runs.
+			if (isRadiusModeEnabledRef.current) {
+				const center = await resolveRadiusCenter({ allowViewportFallback: false });
+				if (center) {
+					setRadiusCenter(center);
+					triggerFreeTextSearch(q, {
+						lat: center.lat,
+						lon: center.lng,
+						radiusKm: radiusMilesRef.current * MILES_TO_KM,
+						strictRadius: true,
+					}).catch(() => undefined);
+					return;
+				}
 			}
 
 			let lat: number | null = null;
@@ -6221,6 +6386,7 @@ const DashboardContent = () => {
 		},
 		[
 			primeFreeTextSearch,
+			resolveRadiusCenter,
 			triggerFreeTextSearch,
 			ensureActiveCampaign,
 			isAddToCampaignMode,
@@ -6231,6 +6397,58 @@ const DashboardContent = () => {
 	const handleMapBottomSearchSubmit = useCallback(async () => {
 		await submitMapBottomSearchQuery(mapBottomSearchValue);
 	}, [mapBottomSearchValue, submitMapBottomSearchQuery]);
+
+	// Toggle the radius input mode for future searches. The active map geometry is
+	// driven by the result set that produced it, so toggling off must not re-run or
+	// visually reinterpret an existing radius-originated search.
+	const handleRadiusToggle = useCallback(() => {
+		// Disable: keep radiusCenter/miles in memory so re-enabling reuses them
+		// without re-prompting for location.
+		if (isRadiusModeEnabledRef.current) {
+			radiusEnableTokenRef.current += 1;
+			setIsRadiusModeEnabled(false);
+			return;
+		}
+		// Enable: reuse a remembered center if we have one; otherwise prompt for
+		// location (with fallbacks). Do NOT run a search here — the circle/blob and
+		// center pin only appear once the user actually runs a radius search.
+		setIsRadiusModeEnabled(true);
+		if (radiusCenterRef.current) return;
+		const token = (radiusEnableTokenRef.current += 1);
+		void (async () => {
+			const resolved = await resolveRadiusCenter();
+			// Aborted if the user toggled off (or re-toggled) while we were resolving.
+			if (radiusEnableTokenRef.current !== token) return;
+			if (!resolved) return;
+			setRadiusCenter(resolved);
+		})();
+	}, [resolveRadiusCenter]);
+
+	// The radius slider is a pre-search filter: changing it only updates the draft
+	// value. The radius is applied on the next explicit search, not by mutating the
+	// already-rendered circle.
+	const handleRadiusMilesChange = useCallback((miles: number) => {
+		setRadiusMiles(miles);
+	}, []);
+
+	// Pin dropped at a new location: rerun the active radius free-text search there.
+	// Keep radiusCenter untouched so typing a new radius search still starts from
+	// the user's draft/default location, not the last dragged result center.
+	const handleRadiusCenterChange = useCallback(
+		(center: LatLngLiteral) => {
+			if (!lastFreeTextArgs?.strictRadius || lastFreeTextArgs.radiusKm == null) return;
+			const q = lastFreeTextArgs.q.trim();
+			if (!q) return;
+
+			triggerFreeTextSearch(q, {
+				lat: center.lat,
+				lon: center.lng,
+				radiusKm: lastFreeTextArgs.radiusKm,
+				strictRadius: true,
+			}).catch(() => undefined);
+		},
+		[lastFreeTextArgs, triggerFreeTextSearch]
+	);
 
 	const handleInitialDashboardSearchSuggestionClick = useCallback(
 		(suggestion: string) => {
@@ -6894,6 +7112,87 @@ const DashboardContent = () => {
 		searchedStateAbbrForMap,
 	]);
 
+	const lastNonEmptyMapPanelResultsRef = useRef<MapPanelResultsSnapshot | null>(null);
+	useEffect(() => {
+		if (!hasSearched) {
+			lastNonEmptyMapPanelResultsRef.current = null;
+			return;
+		}
+		if (!isMapView || isMapResultsLoading || hasNoSearchResults) return;
+		if (mapPanelContacts.length === 0) return;
+
+		lastNonEmptyMapPanelResultsRef.current = {
+			contacts: mapPanelContacts,
+			baseContactIds: Array.from(baseContactIdSet),
+			whatValue,
+			whereValue,
+			isRestaurantsSearch,
+			isCoffeeShopsSearch,
+			isMusicVenuesSearch,
+			isMusicFestivalsSearch,
+			isWeddingPlannersSearch,
+		};
+	}, [
+		baseContactIdSet,
+		hasNoSearchResults,
+		hasSearched,
+		isCoffeeShopsSearch,
+		isMapResultsLoading,
+		isMapView,
+		isMusicFestivalsSearch,
+		isMusicVenuesSearch,
+		isRestaurantsSearch,
+		isWeddingPlannersSearch,
+		mapPanelContacts,
+		whatValue,
+		whereValue,
+	]);
+
+	const lastNonEmptyMapPanelResults = lastNonEmptyMapPanelResultsRef.current;
+	const shouldUseLastMapPanelResults =
+		hasNoSearchResults && Boolean(lastNonEmptyMapPanelResults?.contacts.length);
+	const displayedMapPanelContacts =
+		shouldUseLastMapPanelResults && lastNonEmptyMapPanelResults
+			? lastNonEmptyMapPanelResults.contacts
+			: mapPanelContacts;
+	const displayedBaseContactIdSet = useMemo(
+		() =>
+			shouldUseLastMapPanelResults && lastNonEmptyMapPanelResults
+				? new Set<number>(lastNonEmptyMapPanelResults.baseContactIds)
+				: baseContactIdSet,
+		[baseContactIdSet, lastNonEmptyMapPanelResults, shouldUseLastMapPanelResults]
+	);
+	const displayedWhatValue =
+		shouldUseLastMapPanelResults && lastNonEmptyMapPanelResults
+			? lastNonEmptyMapPanelResults.whatValue
+			: whatValue;
+	const displayedWhereValue =
+		shouldUseLastMapPanelResults && lastNonEmptyMapPanelResults
+			? lastNonEmptyMapPanelResults.whereValue
+			: whereValue;
+	const displayedIsRestaurantsSearch =
+		shouldUseLastMapPanelResults && lastNonEmptyMapPanelResults
+			? lastNonEmptyMapPanelResults.isRestaurantsSearch
+			: isRestaurantsSearch;
+	const displayedIsCoffeeShopsSearch =
+		shouldUseLastMapPanelResults && lastNonEmptyMapPanelResults
+			? lastNonEmptyMapPanelResults.isCoffeeShopsSearch
+			: isCoffeeShopsSearch;
+	const displayedIsMusicVenuesSearch =
+		shouldUseLastMapPanelResults && lastNonEmptyMapPanelResults
+			? lastNonEmptyMapPanelResults.isMusicVenuesSearch
+			: isMusicVenuesSearch;
+	const displayedIsMusicFestivalsSearch =
+		shouldUseLastMapPanelResults && lastNonEmptyMapPanelResults
+			? lastNonEmptyMapPanelResults.isMusicFestivalsSearch
+			: isMusicFestivalsSearch;
+	const displayedIsWeddingPlannersSearch =
+		shouldUseLastMapPanelResults && lastNonEmptyMapPanelResults
+			? lastNonEmptyMapPanelResults.isWeddingPlannersSearch
+			: isWeddingPlannersSearch;
+	const shouldShowMapResultsSidePanel =
+		!hasNoSearchResults || displayedMapPanelContacts.length > 0;
+
 	// Full objects for the selected contacts so the map can keep their white halos rendered
 	// even after the dataset swaps (e.g. disengaging the search to the ambient atlas), where
 	// the selected ids would otherwise have no coordinate source on the map side.
@@ -6970,35 +7269,37 @@ const DashboardContent = () => {
 
 	// Check if all panel contacts are selected (for map view "Select all" button)
 	const isAllPanelContactsSelected = useMemo(() => {
-		if (mapPanelContacts.length === 0) return false;
-		return mapPanelContacts.every((contact) => selectedContacts.includes(contact.id));
-	}, [mapPanelContacts, selectedContacts]);
+		if (displayedMapPanelContacts.length === 0) return false;
+		return displayedMapPanelContacts.every((contact) =>
+			selectedContacts.includes(contact.id)
+		);
+	}, [displayedMapPanelContacts, selectedContacts]);
 
 	const mapPanelSelectedContacts = useMemo(
-		() => mapPanelContacts.filter((c) => selectedContacts.includes(c.id)),
-		[mapPanelContacts, selectedContacts]
+		() => displayedMapPanelContacts.filter((c) => selectedContacts.includes(c.id)),
+		[displayedMapPanelContacts, selectedContacts]
 	);
 	const mapPanelUnselectedContacts = useMemo(
-		() => mapPanelContacts.filter((c) => !selectedContacts.includes(c.id)),
-		[mapPanelContacts, selectedContacts]
+		() => displayedMapPanelContacts.filter((c) => !selectedContacts.includes(c.id)),
+		[displayedMapPanelContacts, selectedContacts]
 	);
 
 	// Maps a contact to one of the chip keys (or null) — mirrors the row renderer's category pill priority.
 	const getChipKeyForContact = useCallback(
 		(contact: ContactWithName): string | null => {
-			const isInBase = baseContactIdSet.has(contact.id);
+			const isInBase = displayedBaseContactIdSet.has(contact.id);
 			const headline =
 				contact.curatedDisplayLabel || contact.headline || contact.title || '';
-			if ((isInBase && isRestaurantsSearch) || isRestaurantTitle(headline))
+			if ((isInBase && displayedIsRestaurantsSearch) || isRestaurantTitle(headline))
 				return 'restaurants';
-			if ((isInBase && isCoffeeShopsSearch) || isCoffeeShopTitle(headline))
+			if ((isInBase && displayedIsCoffeeShopsSearch) || isCoffeeShopTitle(headline))
 				return 'coffee-shops';
-			if ((isInBase && isMusicVenuesSearch) || isMusicVenueTitle(headline))
+			if ((isInBase && displayedIsMusicVenuesSearch) || isMusicVenueTitle(headline))
 				return 'music-venues';
-			if ((isInBase && isMusicFestivalsSearch) || isMusicFestivalTitle(headline))
+			if ((isInBase && displayedIsMusicFestivalsSearch) || isMusicFestivalTitle(headline))
 				return 'festivals';
 			if (
-				(isInBase && isWeddingPlannersSearch) ||
+				(isInBase && displayedIsWeddingPlannersSearch) ||
 				isWeddingPlannerTitle(headline) ||
 				isWeddingVenueTitle(headline)
 			)
@@ -7007,24 +7308,24 @@ const DashboardContent = () => {
 			return null;
 		},
 		[
-			baseContactIdSet,
-			isRestaurantsSearch,
-			isCoffeeShopsSearch,
-			isMusicVenuesSearch,
-			isMusicFestivalsSearch,
-			isWeddingPlannersSearch,
+			displayedBaseContactIdSet,
+			displayedIsRestaurantsSearch,
+			displayedIsCoffeeShopsSearch,
+			displayedIsMusicVenuesSearch,
+			displayedIsMusicFestivalsSearch,
+			displayedIsWeddingPlannersSearch,
 		]
 	);
 
 	// Set of chip keys present in the panel results — drives which chips are visible at the bottom.
 	const mapPanelCategoryKeys = useMemo(() => {
 		const set = new Set<string>();
-		for (const c of mapPanelContacts) {
+		for (const c of displayedMapPanelContacts) {
 			const key = getChipKeyForContact(c);
 			if (key) set.add(key);
 		}
 		return set;
-	}, [mapPanelContacts, getChipKeyForContact]);
+	}, [displayedMapPanelContacts, getChipKeyForContact]);
 
 	// Unselected contacts with the chip-bar category filter applied.
 	const mapPanelUnselectedContactsFiltered = useMemo(() => {
@@ -8133,6 +8434,25 @@ const DashboardContent = () => {
 		[selectedContacts, setSelectedContacts]
 	);
 
+	const activeRadiusSearchOverlay = useMemo<
+		NonNullable<SearchResultsMapProps['radiusOverlay']> | null
+	>(() => {
+		if (!lastFreeTextArgs?.strictRadius || lastFreeTextArgs.radiusKm == null) {
+			return null;
+		}
+
+		const committedCenter =
+			lastFreeTextArgs.lat != null && lastFreeTextArgs.lon != null
+				? { lat: lastFreeTextArgs.lat, lng: lastFreeTextArgs.lon }
+				: null;
+		if (!committedCenter) return null;
+
+		return {
+			center: committedCenter,
+			radiusMiles: lastFreeTextArgs.radiusKm / MILES_TO_KM,
+		};
+	}, [lastFreeTextArgs]);
+
 	const persistentMapProps = useMemo<SearchResultsMapProps>(
 		() => ({
 			weatherMood: globeWeatherMood,
@@ -8192,12 +8512,18 @@ const DashboardContent = () => {
 				? handleAddSelectedToContextFolder
 				: undefined,
 			onWriteSelectionMessage: isMapView ? handleWriteSelectionMessage : undefined,
+			// Drive circle-vs-blob from the active result set, not the bottom
+			// radius toggle. Toggling the icon off only affects the next search.
+			radiusOverlay: activeRadiusSearchOverlay,
+			onRadiusCenterChange: handleRadiusCenterChange,
 		}),
 		[
 			activeMapTool,
+			activeRadiusSearchOverlay,
 			activeSearchQuery,
 			canDisengageMapSearch,
 			contactsForMap,
+			handleRadiusCenterChange,
 			globeNightLighting,
 			globeWeatherMood,
 			globeWeatherRegionCenter,
@@ -8343,20 +8669,22 @@ const DashboardContent = () => {
 
 	// Renders one contact row in the map-view right-side panel (desktop variant).
 	// Used by both the "Selection" and "Search Results" sub-panels — they differ
-	// only in which slice of `mapPanelContacts` they iterate over.
+	// only in which slice of `displayedMapPanelContacts` they iterate over.
 	const renderMapPanelDesktopRow = (contact: ContactWithName) => {
 		const isSelected = selectedContacts.includes(contact.id);
 		const isHovered = hoveredMapPanelContactId === contact.id;
-		const isInBaseResults = baseContactIdSet.has(contact.id);
+		const isInBaseResults = displayedBaseContactIdSet.has(contact.id);
 		const firstName = contact.firstName || '';
 		const lastName = contact.lastName || '';
 		const fullName = contact.name || `${firstName} ${lastName}`.trim();
 		const company = contact.company || '';
 		const searchDerivedHeadline =
-			whatValue && whereValue ? `${whatValue} ${whereValue}` : whatValue || '';
+			displayedWhatValue && displayedWhereValue
+				? `${displayedWhatValue} ${displayedWhereValue}`
+				: displayedWhatValue || '';
 		const isSpecialCategorySearch =
-			/^restaurants?$/i.test(whatValue.trim()) ||
-			/^coffee\s*shops?$/i.test(whatValue.trim());
+			/^restaurants?$/i.test(displayedWhatValue.trim()) ||
+			/^coffee\s*shops?$/i.test(displayedWhatValue.trim());
 		const curatedDisplayHeadline = contact.curatedDisplayLabel || '';
 		const contactHeadline =
 			curatedDisplayHeadline ||
@@ -8370,11 +8698,13 @@ const DashboardContent = () => {
 			: contactHeadline;
 		const stickyHeadline = selectedContactStickyHeadlineById[contact.id] || '';
 		const headline = isSelected && stickyHeadline ? stickyHeadline : computedHeadline;
-		const isRestaurantsSearchForContact = isRestaurantsSearch && isInBaseResults;
-		const isCoffeeShopsSearchForContact = isCoffeeShopsSearch && isInBaseResults;
-		const isMusicVenuesSearchForContact = isMusicVenuesSearch && isInBaseResults;
-		const isMusicFestivalsSearchForContact = isMusicFestivalsSearch && isInBaseResults;
-		const isWeddingPlannersSearchForContact = isWeddingPlannersSearch && isInBaseResults;
+		const isRestaurantsSearchForContact = displayedIsRestaurantsSearch && isInBaseResults;
+		const isCoffeeShopsSearchForContact = displayedIsCoffeeShopsSearch && isInBaseResults;
+		const isMusicVenuesSearchForContact = displayedIsMusicVenuesSearch && isInBaseResults;
+		const isMusicFestivalsSearchForContact =
+			displayedIsMusicFestivalsSearch && isInBaseResults;
+		const isWeddingPlannersSearchForContact =
+			displayedIsWeddingPlannersSearch && isInBaseResults;
 		const stateAbbr = getStateAbbreviation(contact.state || '') || '';
 		const city = contact.city || '';
 
@@ -11561,7 +11891,7 @@ const DashboardContent = () => {
 																				}}
 																			/>
 																		)}
-																		{hasNoSearchResults && !isError && (
+												{hasNoSearchResults && isMapSearchEngaged && !isError && (
 																			<div className="absolute inset-0 z-[120] flex items-start justify-center pt-[120px] pointer-events-none">
 																				<div
 																					className="pointer-events-auto flex flex-col items-center justify-center text-center"
@@ -11677,10 +12007,10 @@ const DashboardContent = () => {
 																				</div>
 																			</div>
 																		)}
-														{shouldShowDashboardMapCampaignHeader &&
-															dashboardMapCampaignForHeader &&
-															!isNarrowestDesktop &&
-															!hasNoSearchResults && (
+												{shouldShowDashboardMapCampaignHeader &&
+													dashboardMapCampaignForHeader &&
+													!isNarrowestDesktop &&
+													shouldShowMapResultsSidePanel && (
 																<div
 																	className="absolute right-[10px] pointer-events-auto"
 																	onMouseEnter={() => {
@@ -11734,10 +12064,10 @@ const DashboardContent = () => {
 											    right-side panel) for the current selection, scoped to the active campaign. */}
 														{isWriteMode &&
 															dashboardMapCampaignForHeader &&
-															(selectedContacts.length > 0 ||
-																isWriteReviewActive) &&
-															!isNarrowestDesktop &&
-															!hasNoSearchResults && (
+													(selectedContacts.length > 0 ||
+														isWriteReviewActive) &&
+													!isNarrowestDesktop &&
+													shouldShowMapResultsSidePanel && (
 																<div
 																	className="absolute pointer-events-none map-overlay-appear"
 																			style={{
@@ -11765,7 +12095,7 @@ const DashboardContent = () => {
 															)}
 														{/* Search Results overlay box on the right side - keep mounted during loading
 											    so the UI doesn't disappear between state searches. */}
-																		{!isNarrowestDesktop && !hasNoSearchResults && (
+																{!isNarrowestDesktop && shouldShowMapResultsSidePanel && (
 																			<div
 																				className="absolute right-[10px] flex flex-col gap-[9px] pointer-events-auto"
 																				onMouseEnter={() => {
@@ -11808,15 +12138,15 @@ const DashboardContent = () => {
 																							<span className="absolute left-[10px] top-1/2 -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
 																								Selection
 																							</span>
-																							<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
-																								{selectedContacts.length}/
-																								{mapPanelContacts.length} selected
-																							</span>
+																				<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
+																					{selectedContacts.length}/
+																					{displayedMapPanelContacts.length} selected
+																				</span>
 																							<button
-																								type="button"
-																								onClick={() =>
-																									handleSelectAll(mapPanelContacts)
-																								}
+																					type="button"
+																					onClick={() =>
+																						handleSelectAll(displayedMapPanelContacts)
+																					}
 																								disabled={isMapResultsLoading}
 																								className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 translate-y-[4px] ${
 																									isMapResultsLoading
@@ -12176,9 +12506,7 @@ const DashboardContent = () => {
 																				)}
 																			</div>
 																		)}
-																		{!isMobile &&
-																			!isNarrowestDesktop &&
-																			!hasNoSearchResults && (
+																{!isMobile && !isNarrowestDesktop && (
 																				<div
 																					className="absolute left-1/2 pointer-events-none"
 																					onMouseEnter={
@@ -12234,6 +12562,7 @@ const DashboardContent = () => {
 																							handleMapBottomCategorySubmit
 																						}
 																						onForYouSubmit={handleMapBottomForYouSubmit}
+																						radiusEnabled={isRadiusModeEnabled}
 																					/>
 																					<MapBottomSearchFollowupBox
 																						selectedSearchFollowup={
@@ -12248,12 +12577,26 @@ const DashboardContent = () => {
 																						onPreviewSearchFollowupChange={
 																							handleMapBottomSearchFollowupPreviewChange
 																						}
+																						isRadiusModeEnabled={isRadiusModeEnabled}
+																						onRadiusToggle={handleRadiusToggle}
 																					/>
+																		{isRadiusModeEnabled && (
+																			<MapRadiusSlider
+																				miles={radiusMiles}
+																				onMilesChange={handleRadiusMilesChange}
+																				className="absolute"
+																				style={{
+																					left: 0,
+																					bottom: 'calc(100% + 12px)',
+																					width: '196px',
+																				}}
+																			/>
+																		)}
 																				</div>
 																			)}
 																		{/* Single column search results panel overlay at bottom - narrowest breakpoint (< 952px) */}
 																		{/* Keep mounted during loading so UI doesn't disappear between state searches. */}
-																		{isNarrowestDesktop && !hasNoSearchResults && (
+																{isNarrowestDesktop && shouldShowMapResultsSidePanel && (
 																			<div
 																				className="absolute left-[10px] right-[10px] bottom-[10px] shadow-lg flex flex-col"
 																				style={{
@@ -12292,10 +12635,10 @@ const DashboardContent = () => {
 																						{selectedContacts.length} selected
 																					</span>
 																					<button
-																						type="button"
-																						onClick={() =>
-																							handleSelectAll(mapPanelContacts)
-																						}
+																		type="button"
+																		onClick={() =>
+																			handleSelectAll(displayedMapPanelContacts)
+																		}
 																						disabled={isMapResultsLoading}
 																						className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 -translate-y-1/2 ${
 																							isMapResultsLoading
@@ -12318,22 +12661,22 @@ const DashboardContent = () => {
 																					disableOverflowClass
 																				>
 																					{isMapResultsLoading ? (
-																						<MapResultsPanelSkeleton
-																							variant="narrow"
-																							rows={Math.max(mapPanelContacts.length, 8)}
-																						/>
+																			<MapResultsPanelSkeleton
+																				variant="narrow"
+																				rows={Math.max(displayedMapPanelContacts.length, 8)}
+																			/>
 																					) : (
 																						<div
 																							ref={mapPanelRowsNarrowRef}
 																							className="space-y-[7px]"
 																						>
-																							{mapPanelContacts.map((contact) => {
+																			{displayedMapPanelContacts.map((contact) => {
 																								const isSelected =
 																									selectedContacts.includes(contact.id);
 																								const isHovered =
 																									hoveredMapPanelContactId === contact.id;
-																								const isInBaseResults =
-																									baseContactIdSet.has(contact.id);
+																					const isInBaseResults =
+																						displayedBaseContactIdSet.has(contact.id);
 																								const firstName = contact.firstName || '';
 																								const lastName = contact.lastName || '';
 																								const fullName =
@@ -12342,14 +12685,14 @@ const DashboardContent = () => {
 																								const company = contact.company || '';
 																								// For restaurant searches, always use the search-derived headline
 																								// Otherwise, use contact's headline or fall back to search What + Where
-																								const searchDerivedHeadline =
-																									whatValue && whereValue
-																										? `${whatValue} ${whereValue}`
-																										: whatValue || '';
-																								const isRestaurantSearch =
-																									/^restaurants?$/i.test(
-																										whatValue.trim()
-																									);
+																					const searchDerivedHeadline =
+																						displayedWhatValue && displayedWhereValue
+																							? `${displayedWhatValue} ${displayedWhereValue}`
+																							: displayedWhatValue || '';
+																					const isRestaurantSearch =
+																						/^restaurants?$/i.test(
+																							displayedWhatValue.trim()
+																						);
 																								const curatedDisplayHeadline =
 																									contact.curatedDisplayLabel || '';
 																								// Curated search owns category display explicitly. Do not let
@@ -12377,18 +12720,18 @@ const DashboardContent = () => {
 																									isSelected && stickyHeadline
 																										? stickyHeadline
 																										: computedHeadline;
-																								const isRestaurantsSearchForContact =
-																									isRestaurantsSearch && isInBaseResults;
-																								const isCoffeeShopsSearchForContact =
-																									isCoffeeShopsSearch && isInBaseResults;
-																								const isMusicVenuesSearchForContact =
-																									isMusicVenuesSearch && isInBaseResults;
-																								const isMusicFestivalsSearchForContact =
-																									isMusicFestivalsSearch &&
-																									isInBaseResults;
-																								const isWeddingPlannersSearchForContact =
-																									isWeddingPlannersSearch &&
-																									isInBaseResults;
+																					const isRestaurantsSearchForContact =
+																						displayedIsRestaurantsSearch && isInBaseResults;
+																					const isCoffeeShopsSearchForContact =
+																						displayedIsCoffeeShopsSearch && isInBaseResults;
+																					const isMusicVenuesSearchForContact =
+																						displayedIsMusicVenuesSearch && isInBaseResults;
+																					const isMusicFestivalsSearchForContact =
+																						displayedIsMusicFestivalsSearch &&
+																						isInBaseResults;
+																					const isWeddingPlannersSearchForContact =
+																						displayedIsWeddingPlannersSearch &&
+																						isInBaseResults;
 																								const stateAbbr =
 																									getStateAbbreviation(
 																										contact.state || ''
@@ -12688,10 +13031,10 @@ const DashboardContent = () => {
 																							</span>
 																							<div
 																								className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
-																								onClick={(e) => {
-																									e.stopPropagation();
-																									handleSelectAll(mapPanelContacts);
-																								}}
+																						onClick={(e) => {
+																							e.stopPropagation();
+																							handleSelectAll(displayedMapPanelContacts);
+																						}}
 																							>
 																								<span className="text-black text-[14px] font-medium">
 																									All

@@ -70,6 +70,9 @@ type FreeTextSearchArgs = {
 	lat: number | null;
 	lon: number | null;
 	radiusKm: number | null;
+	// Radius-search mode. Part of the cache identity so a strict (hard-filtered)
+	// search isn't served a soft-locality result cached at the same radius.
+	strictRadius: boolean;
 };
 
 // Client-side multi-entry result cache (localStorage). Repeating a recent dashboard search
@@ -202,6 +205,7 @@ const normalizeFreeTextArgs = (args: FreeTextSearchArgs): FreeTextSearchArgs => 
 	lat: args.lat == null ? null : roundTo(args.lat, 3),
 	lon: args.lon == null ? null : roundTo(args.lon, 3),
 	radiusKm: args.radiusKm == null ? null : Math.round(args.radiusKm),
+	strictRadius: args.strictRadius,
 });
 
 const curatedArgsEqual = (a: CuratedSearchArgs, b: CuratedSearchArgs): boolean =>
@@ -212,7 +216,11 @@ const curatedArgsEqual = (a: CuratedSearchArgs, b: CuratedSearchArgs): boolean =
 	a.state === b.state;
 
 const freeTextArgsEqual = (a: FreeTextSearchArgs, b: FreeTextSearchArgs): boolean =>
-	a.q === b.q && a.lat === b.lat && a.lon === b.lon && a.radiusKm === b.radiusKm;
+	a.q === b.q &&
+	a.lat === b.lat &&
+	a.lon === b.lon &&
+	a.radiusKm === b.radiusKm &&
+	a.strictRadius === b.strictRadius;
 
 type CuratedOverrides = {
 	lat?: number | null;
@@ -907,7 +915,15 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	// curated session for state purposes — `isCuratedSearchActive` simply means
 	// "results came from a non-/api/contacts source," which applies here too.
 	const triggerFreeTextSearch = useCallback(
-		async (rawQuery: string, overrides?: { lat?: number | null; lon?: number | null; radiusKm?: number | null }) => {
+		async (
+			rawQuery: string,
+			overrides?: {
+				lat?: number | null;
+				lon?: number | null;
+				radiusKm?: number | null;
+				strictRadius?: boolean;
+			}
+		) => {
 			const q = rawQuery.trim();
 			if (!q) return;
 
@@ -919,13 +935,17 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				lat: overrides?.lat ?? null,
 				lon: overrides?.lon ?? null,
 				radiusKm: overrides?.radiusKm ?? null,
+				strictRadius: overrides?.strictRadius ?? false,
 			};
+			const shouldUseCache = !rawArgs.strictRadius;
 			const cacheArgs = normalizeFreeTextArgs(rawArgs);
-			const cachedEntry = findSearchCacheEntry(
-				readSearchCache<FreeTextSearchArgs>(freeTextCacheKey),
-				freeTextArgsEqual,
-				cacheArgs
-			);
+			const cachedEntry = shouldUseCache
+				? findSearchCacheEntry(
+						readSearchCache<FreeTextSearchArgs>(freeTextCacheKey),
+						freeTextArgsEqual,
+						cacheArgs
+				  )
+				: null;
 			if (cachedEntry) {
 				cancelInFlightSearches();
 				++searchGenerationRef.current;
@@ -971,6 +991,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					lat: overrides?.lat ?? undefined,
 					lon: overrides?.lon ?? undefined,
 					radiusKm: overrides?.radiusKm ?? undefined,
+					strictRadius: overrides?.strictRadius,
 					limit: 50,
 					signal: controller.signal,
 				});
@@ -994,11 +1015,13 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				// rehydration path falls through to /api/contacts and contacts come back without
 				// curatedCategory — markers regress to viewport sampling and don't render until
 				// after auto-fit + moveend.
-				writeSearchCacheEntry(
-					freeTextCacheKey,
-					{ ts: Date.now(), args: cacheArgs, query: q, contacts: decoratedContacts },
-					freeTextArgsEqual
-				);
+				if (shouldUseCache) {
+					writeSearchCacheEntry(
+						freeTextCacheKey,
+						{ ts: Date.now(), args: cacheArgs, query: q, contacts: decoratedContacts },
+						freeTextArgsEqual
+					);
+				}
 				return result;
 			} catch (err) {
 				const isAbort =
@@ -1112,6 +1135,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					lat: args.lat,
 					lon: args.lon,
 					radiusKm: args.radiusKm,
+					strictRadius: args.strictRadius,
 				});
 				return true;
 			} catch {
@@ -1122,17 +1146,6 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	);
 
 	const handleSelectAll = (panelContacts?: ContactWithName[]) => {
-		if (!contacts || contacts.length === 0) return;
-
-		if (!isMapView && tableInstance) {
-			if (isAllSelected) {
-				tableInstance.toggleAllRowsSelected(false);
-			} else {
-				tableInstance.toggleAllRowsSelected(true);
-			}
-			return;
-		}
-
 		// In map view with panel contacts, toggle only the panel contacts
 		if (panelContacts && panelContacts.length > 0) {
 			const panelContactIds = panelContacts.map((c) => c.id);
@@ -1152,6 +1165,17 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					(id) => !panelContactIdsSet.has(id)
 				);
 				setSelectedContacts([...existingNonPanelSelections, ...panelContactIds]);
+			}
+			return;
+		}
+
+		if (!contacts || contacts.length === 0) return;
+
+		if (!isMapView && tableInstance) {
+			if (isAllSelected) {
+				tableInstance.toggleAllRowsSelected(false);
+			} else {
+				tableInstance.toggleAllRowsSelected(true);
 			}
 			return;
 		}

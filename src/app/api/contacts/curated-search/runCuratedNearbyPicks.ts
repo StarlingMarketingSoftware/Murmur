@@ -291,6 +291,8 @@ export interface CuratedNearbyPicksOptions {
 	/** Result radius. Ignored when center is null. Defaults to DEFAULT_RADIUS_KM. */
 	radiusKm: number | null;
 	limit: number;
+	/** When true, do not expand beyond the requested radius to backfill sparse results. */
+	strictRadius?: boolean;
 	/** Optional category filter — restrict the curated mix to these prefixes only. */
 	requestedCategoryPrefixes?: readonly BookingContactTitlePrefix[] | null;
 	/** Prefix for log lines so the caller can identify which route triggered this run. */
@@ -310,7 +312,14 @@ export interface CuratedNearbyPicksResult {
 export const runCuratedNearbyPicks = async (
 	options: CuratedNearbyPicksOptions
 ): Promise<CuratedNearbyPicksResult> => {
-	const { center, radiusKm, limit, requestedCategoryPrefixes, logTag } = options;
+	const {
+		center,
+		radiusKm,
+		limit,
+		strictRadius = false,
+		requestedCategoryPrefixes,
+		logTag,
+	} = options;
 
 	const hasRealCenter = center !== null;
 	const effectiveCenter = center ?? FALLBACK_CENTER;
@@ -319,11 +328,13 @@ export const runCuratedNearbyPicks = async (
 		? Math.max(effectiveRadiusKm ?? DEFAULT_RADIUS_KM, DEFAULT_RADIUS_KM) * FETCH_BUFFER
 		: FALLBACK_BBOX_RADIUS_KM;
 	const radiusLadder: (number | null)[] = hasRealCenter
-		? [
-				effectiveRadiusKm ?? DEFAULT_RADIUS_KM,
-				Math.min(fetchBboxRadiusKm, 1500),
-				null,
-		  ]
+		? strictRadius
+			? [effectiveRadiusKm ?? DEFAULT_RADIUS_KM]
+			: [
+					effectiveRadiusKm ?? DEFAULT_RADIUS_KM,
+					Math.min(fetchBboxRadiusKm, 1500),
+					null,
+			  ]
 		: [null];
 
 	const activeCategories = requestedCategoryPrefixes

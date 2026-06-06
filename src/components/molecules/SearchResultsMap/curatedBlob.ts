@@ -57,7 +57,7 @@ const curatedBlobDeterministicUnit = (seed: number): number => {
 	return x - Math.floor(x);
 };
 
-const buildMercatorCircleMultiPolygon = (
+export const buildMercatorCircleMultiPolygon = (
 	coords: LatLngLiteral,
 	radiusKm: number,
 	steps: number,

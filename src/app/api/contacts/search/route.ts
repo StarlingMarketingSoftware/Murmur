@@ -683,12 +683,47 @@ export interface FreeTextSearchResponse {
 	expansionMode?: 'none' | 'national-fallback';
 }
 
+const cleanlinessBreakdownFor = (
+	contacts: readonly FreeTextSearchContact[]
+): Record<CleanlinessTier, number> => {
+	const breakdown: Record<CleanlinessTier, number> = {
+		'canonical-clean': 0,
+		'clean-business': 0,
+		'clean-person': 0,
+		loose: 0,
+	};
+	for (const contact of contacts) breakdown[contact.searchCleanliness] += 1;
+	return breakdown;
+};
+
+const applyStrictRadiusToResponse = (
+	response: FreeTextSearchResponse,
+	center: { lat: number; lon: number } | null,
+	radiusKm: number | null
+): FreeTextSearchResponse => {
+	if (!center || radiusKm == null) return response;
+	const contacts = response.contacts.filter(
+		(contact) =>
+			contact.latitude != null &&
+			contact.longitude != null &&
+			distanceKm(center, { lat: contact.latitude, lon: contact.longitude }) <= radiusKm
+	);
+	return {
+		...response,
+		center,
+		radiusKm,
+		contacts,
+		cleanlinessBreakdown: cleanlinessBreakdownFor(contacts),
+	};
+};
+
 const runCuratedCategorySearch = async (options: {
 	rawQuery: string;
 	parsed: ReturnType<typeof parseFreeTextSearchQuery>;
 	centerPoint: { lat: number; lon: number } | null;
 	radiusKm: number;
 	requestedLimit: number;
+	strictRadius?: boolean;
 }): Promise<FreeTextSearchResponse> => {
 	const {
 		rawQuery,
@@ -696,6 +731,7 @@ const runCuratedCategorySearch = async (options: {
 		centerPoint,
 		radiusKm,
 		requestedLimit,
+		strictRadius = false,
 	} = options;
 	const activeCategories = parsed.categories;
 	const emptyResponse = (retrieverBreakdown: Record<string, number>): FreeTextSearchResponse => ({
@@ -753,11 +789,9 @@ const runCuratedCategorySearch = async (options: {
 	const perCategoryShare = Math.ceil(
 		requestedLimit / Math.max(1, activeCategories.length)
 	);
-	const radiusLadder: (number | null)[] = [
-		requestedRadiusKm,
-		Math.min(fetchBboxRadiusKm, 1500),
-		null,
-	];
+	const radiusLadder: (number | null)[] = strictRadius
+		? [requestedRadiusKm]
+		: [requestedRadiusKm, Math.min(fetchBboxRadiusKm, 1500), null];
 
 	const buildPools = (predicate: (contact: Contact) => boolean): CategoryPool[] =>
 		activeCategories.map((category) => {
@@ -874,6 +908,7 @@ const runLocalBusinessSearch = async (options: {
 	centerPoint: { lat: number; lon: number } | null;
 	radiusKm: number;
 	requestedLimit: number;
+	strictRadius?: boolean;
 }): Promise<FreeTextSearchResponse> => {
 	const {
 		rawQuery,
@@ -882,6 +917,7 @@ const runLocalBusinessSearch = async (options: {
 		centerPoint,
 		radiusKm,
 		requestedLimit,
+		strictRadius = false,
 	} = options;
 	if (!centerPoint) {
 		return emptyFreeTextSearchResponse({
@@ -930,11 +966,9 @@ const runLocalBusinessSearch = async (options: {
 		}))
 		.filter(({ contact, score }) => score > 0 && cleanBusinessCandidate(contact));
 
-	const radiusLadder: (number | null)[] = [
-		radiusKm,
-		Math.min(fetchBboxRadiusKm, 1500),
-		null,
-	];
+	const radiusLadder: (number | null)[] = strictRadius
+		? [radiusKm]
+		: [radiusKm, Math.min(fetchBboxRadiusKm, 1500), null];
 	let selected: Contact[] = [];
 	for (const radius of radiusLadder) {
 		const localized = applyRadius(
@@ -1005,6 +1039,7 @@ const runPlaceOnlyCuratedSearch = async (options: {
 	radiusKm: number;
 	requestedLimit: number;
 	enforcedState: { name: string; abbr: string } | null;
+	strictRadius?: boolean;
 	logTag: string;
 }): Promise<FreeTextSearchResponse> => {
 	const {
@@ -1014,6 +1049,7 @@ const runPlaceOnlyCuratedSearch = async (options: {
 		radiusKm,
 		requestedLimit,
 		enforcedState,
+		strictRadius = false,
 		logTag,
 	} = options;
 
@@ -1021,6 +1057,7 @@ const runPlaceOnlyCuratedSearch = async (options: {
 		center: centerPoint,
 		radiusKm,
 		limit: requestedLimit,
+		strictRadius,
 		logTag,
 	});
 
@@ -1415,6 +1452,27 @@ export async function GET(req: NextRequest) {
 		const overrideLat = parseFloatOrNull(url.searchParams.get('lat'));
 		const overrideLon = parseFloatOrNull(url.searchParams.get('lon'));
 		const overrideRadiusKm = parseFloatOrNull(url.searchParams.get('radiusKm'));
+		// Radius-search mode (the map's "Radius" pill). Unlike the default soft
+		// locality bias, this makes the radius a HARD geographic constraint: the
+		// center/radius come ONLY from the explicit overrides (so parsed place-text
+		// can't move the drawn circle), national fallback is suppressed, and a final
+		// haversine gate drops everything outside the circle.
+		const strictRadius =
+			url.searchParams.get('strictRadius') === '1' ||
+			url.searchParams.get('strictRadius') === 'true';
+		const strictCenter =
+			strictRadius &&
+			overrideLat != null &&
+			Number.isFinite(overrideLat) &&
+			overrideLon != null &&
+			Number.isFinite(overrideLon)
+				? { lat: overrideLat, lon: overrideLon }
+				: null;
+		const strictRadiusKm =
+			strictRadius && overrideRadiusKm != null && Number.isFinite(overrideRadiusKm)
+				? overrideRadiusKm
+				: null;
+		const strictRadiusActive = strictCenter != null && strictRadiusKm != null;
 		const requestedLimit = (() => {
 			const parsed = Number(url.searchParams.get('limit'));
 			if (!Number.isFinite(parsed)) return DEFAULT_LIMIT;
@@ -1457,16 +1515,24 @@ export async function GET(req: NextRequest) {
 		const parsedCenterLon = parsedCityHasExactCenter
 			? parsed.city!.lon
 			: parsed.state?.lon ?? cityStateForCenter?.centroid.lng ?? null;
-		const center = inferCenter(
-			req,
-			{ lat: overrideLat, lon: overrideLon },
-			{
-				lat: parsedCenterLat,
-				lon: parsedCenterLon,
-				city: parsed.city?.name ?? null,
-				state: parsed.state?.name ?? cityStateForCenter?.name ?? null,
-			}
-		);
+		const center: ResolvedCenter = strictRadiusActive
+			? {
+					lat: strictCenter.lat,
+					lon: strictCenter.lon,
+					city: null,
+					region: null,
+					source: 'override',
+			  }
+			: inferCenter(
+					req,
+					{ lat: overrideLat, lon: overrideLon },
+					{
+						lat: parsedCenterLat,
+						lon: parsedCenterLon,
+						city: parsed.city?.name ?? null,
+						state: parsed.state?.name ?? cityStateForCenter?.name ?? null,
+					}
+			  );
 		const hasCenter = center.lat != null && center.lon != null;
 		const centerPoint = hasCenter
 			? { lat: center.lat as number, lon: center.lon as number }
@@ -1491,20 +1557,26 @@ export async function GET(req: NextRequest) {
 		// like "music venues in brooklyn" → NY), we hard-filter every retriever
 		// to that state and apply a final post-hydration safety net. Out-of-state
 		// matches don't help no matter how strong the semantic match is.
-		const enforcedState =
-			parsed.state ??
-			(parsed.city?.state
-				? (() => {
-						const abbr = parsed.city!.state as string;
-						// Resolve the city's state abbr back to a state name for enforcement.
-						const us = US_STATES.find(
-							(s) => s.abbr.toLowerCase() === abbr.toLowerCase()
-						);
-						return us
-							? { name: us.name, abbr: us.abbr, lat: us.centroid.lat, lon: us.centroid.lng }
-							: null;
-				  })()
-				: null);
+		const enforcedState = strictRadiusActive
+			? null
+			: parsed.state ??
+			  (parsed.city?.state
+					? (() => {
+							const abbr = parsed.city!.state as string;
+							// Resolve the city's state abbr back to a state name for enforcement.
+							const us = US_STATES.find(
+								(s) => s.abbr.toLowerCase() === abbr.toLowerCase()
+							);
+							return us
+								? {
+										name: us.name,
+										abbr: us.abbr,
+										lat: us.centroid.lat,
+										lon: us.centroid.lng,
+								  }
+								: null;
+					  })()
+					: null);
 		const enforcedStateValues = enforcedState
 			? [enforcedState.name.toLowerCase(), enforcedState.abbr.toLowerCase()]
 			: null;
@@ -1567,6 +1639,7 @@ export async function GET(req: NextRequest) {
 						centerPoint,
 						radiusKm,
 						requestedLimit,
+						strictRadius: strictRadiusActive,
 					}),
 				{
 					timeoutMs: getSearchRouteTimeoutMs(
@@ -1581,7 +1654,9 @@ export async function GET(req: NextRequest) {
 			console.info(
 				`[contacts-search][${requestId}] local-business path intent=${localBusinessIntent.key} returned=${localBusinessResponse.contacts.length} candidates=${localBusinessResponse.retrieverBreakdown.localBusiness ?? 0} clean=${localBusinessResponse.retrieverBreakdown.localBusinessClean ?? 0} missingLocalityAnchor=${localBusinessResponse.retrieverBreakdown.missingLocalityAnchor ?? 0} totalMs=${Date.now() - requestStartedAt}`
 			);
-			return apiResponse(localBusinessResponse);
+			return apiResponse(
+				applyStrictRadiusToResponse(localBusinessResponse, strictCenter, strictRadiusKm)
+			);
 		}
 
 		// Place-only fallback: the user typed only a city or state (or "best
@@ -1590,10 +1665,17 @@ export async function GET(req: NextRequest) {
 		// surfaces these through the existing curated-results state pipe.
 		// Live-music prioritization is intrinsic to the curated ES sampler.
 		if (isPlaceOnlyQuery(parsed)) {
-			const placeCenter = parsed.city
-				? { lat: parsed.city.lat, lon: parsed.city.lon }
-				: { lat: parsed.state!.lat, lon: parsed.state!.lon };
+			const placeCenter =
+				strictRadiusActive && strictCenter
+					? strictCenter
+					: parsed.city
+					? { lat: parsed.city.lat, lon: parsed.city.lon }
+					: { lat: parsed.state!.lat, lon: parsed.state!.lon };
 			const placeRadiusKm = overrideRadiusKm ?? DEFAULT_LOCALITY_RADIUS_KM;
+			const placeEnforcedState =
+				!strictRadiusActive && parsed.state
+					? { name: parsed.state.name, abbr: parsed.state.abbr }
+					: null;
 			const placeResponse = await withBudgetFallback(
 				() =>
 					runPlaceOnlyCuratedSearch({
@@ -1602,9 +1684,8 @@ export async function GET(req: NextRequest) {
 						centerPoint: placeCenter,
 						radiusKm: placeRadiusKm,
 						requestedLimit,
-						enforcedState: parsed.state
-							? { name: parsed.state.name, abbr: parsed.state.abbr }
-							: null,
+						enforcedState: placeEnforcedState,
+						strictRadius: strictRadiusActive,
 						logTag: `[contacts-search][${requestId}][place-only]`,
 					}),
 				{
@@ -1620,11 +1701,13 @@ export async function GET(req: NextRequest) {
 			console.info(
 				`[contacts-search][${requestId}] place-only path place=${
 					parsed.city?.name ?? parsed.state?.name ?? 'unknown'
-				} stateEnforced=${parsed.state?.abbr ?? 'no'} returned=${
+				} stateEnforced=${placeEnforcedState?.abbr ?? 'no'} returned=${
 					placeResponse.contacts.length
 				} totalMs=${Date.now() - requestStartedAt}`
 			);
-			return apiResponse(placeResponse);
+			return apiResponse(
+				applyStrictRadiusToResponse(placeResponse, strictCenter, strictRadiusKm)
+			);
 		}
 
 		if (
@@ -1639,6 +1722,7 @@ export async function GET(req: NextRequest) {
 						centerPoint,
 						radiusKm,
 						requestedLimit,
+						strictRadius: strictRadiusActive,
 					}),
 				{
 					timeoutMs: getSearchRouteTimeoutMs(
@@ -1653,7 +1737,9 @@ export async function GET(req: NextRequest) {
 			console.info(
 				`[contacts-search][${requestId}] curated-local category path returned=${curatedCategoryResponse.contacts.length} candidates=${curatedCategoryResponse.retrieverBreakdown.curatedLocal ?? 0} missingLocalityAnchor=${curatedCategoryResponse.retrieverBreakdown.missingLocalityAnchor ?? 0} totalMs=${Date.now() - requestStartedAt}`
 			);
-			return apiResponse(curatedCategoryResponse);
+			return apiResponse(
+				applyStrictRadiusToResponse(curatedCategoryResponse, strictCenter, strictRadiusKm)
+			);
 		}
 
 		const fetchStarted = Date.now();
@@ -1921,6 +2007,8 @@ export async function GET(req: NextRequest) {
 		// geo and re-score with locality neutralized.
 		const sparseTrigger: 'countLow' | 'literalLow' | 'both' | null = (() => {
 			if (!useImplicitLocality) return null;
+			// Going national would contradict a hard radius — never relax it.
+			if (strictRadiusActive) return null;
 			if (
 				getSearchRouteTimeoutMs(
 					requestStartedAt,
@@ -2066,6 +2154,27 @@ export async function GET(req: NextRequest) {
 			stage2Ms = Date.now() - stage2StartedAt;
 		}
 
+		// Strict radius: final hard geographic gate. Belt-and-suspenders over the ES
+		// geo filters — kNN has none, null-coord rows can ride RRF, and (fallback is
+		// suppressed above). Guarantees every returned contact sits inside the drawn
+		// circle. Reuses the haversine distanceKm and drops rows missing coordinates.
+		if (strictCenter && strictRadiusKm != null) {
+			finalContacts = finalContacts.filter(
+				(c) =>
+					c.latitude != null &&
+					c.longitude != null &&
+					distanceKm(strictCenter, { lat: c.latitude, lon: c.longitude }) <=
+						strictRadiusKm
+			);
+			cleanlinessBreakdown = {
+				'canonical-clean': 0,
+				'clean-business': 0,
+				'clean-person': 0,
+				loose: 0,
+			};
+			for (const c of finalContacts) cleanlinessBreakdown[c.searchCleanliness] += 1;
+		}
+
 		const fetchMs = Date.now() - fetchStarted;
 		console.info(
 			`[contacts-search][${requestId}] q="${rawQuery}" knn=${knnIds.length} lex=${lexicalIds.length} prefix=${prefixIds.length} hydrated=${hydrated.length} nounLed=${isNounLed} personTarget=${queryTargetsPerson}(matches=${personTargetProbe.matchCount}) droppedPersonOrLoose=${stage1.droppedPersonOrLoose} stage1Returned=${stage1.finalContacts.length} stage1LiteralMatches=${stage1.literalMatchCount} expansionMode=${expansionMode}` +
@@ -2100,9 +2209,11 @@ export async function GET(req: NextRequest) {
 				country: parsed.country,
 				restOfQuery: parsed.restOfQuery,
 			},
-			center: centerPoint,
+			center: strictRadiusActive && strictCenter ? strictCenter : centerPoint,
 			radiusKm:
-				expansionMode === 'national-fallback'
+				strictRadiusActive && strictRadiusKm != null
+					? strictRadiusKm
+					: expansionMode === 'national-fallback'
 					? null
 					: hasCenter
 					? radiusKm

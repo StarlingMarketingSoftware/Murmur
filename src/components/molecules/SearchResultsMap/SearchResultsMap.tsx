@@ -33,6 +33,7 @@ import {
 	MAP_MARKER_PIN_VIEWBOX_WIDTH,
 } from '@/components/atoms/_svg/MapMarkerPinIcon';
 import { generateSelectedCategorizedContactMarkerIconUrl } from '@/components/atoms/_svg/SelectedCategorizedContactMarkerIcon';
+import { profileAreaMarkerSvg } from '@/components/atoms/_svg/ProfileAreaMarkerIcon';
 import {
 	SELECTED_CONTACT_MARKER_CENTER_OUTER_DIAMETER,
 	SELECTED_CONTACT_MARKER_CENTER_X,
@@ -378,6 +379,7 @@ import {
 } from './basemap';
 import {
 	buildCuratedBlobClusterLobeMultiPolygons,
+	buildMercatorCircleMultiPolygon,
 	buildScreenPathFromLngLatMultiPolygon,
 	createCuratedBlobMorphSourcesFromMercatorMultiPolygon,
 	createSelectedStateMorphSource,
@@ -663,8 +665,11 @@ const getAmbientContactCategoryIndexFromTitle = (
 	return -1;
 };
 
-const getAmbientContactWhatFromTitle = (title: string | null | undefined): string | null =>
-	getBookingTitlePrefixFromContactTitle(title) ?? getPromotionOverlayWhatFromContactTitle(title);
+const getAmbientContactWhatFromTitle = (
+	title: string | null | undefined
+): string | null =>
+	getBookingTitlePrefixFromContactTitle(title) ??
+	getPromotionOverlayWhatFromContactTitle(title);
 
 export interface SearchResultsMapProps {
 	contacts: ContactWithName[];
@@ -804,6 +809,15 @@ export interface SearchResultsMapProps {
 	 * uses this to drift slowly from sunrise to sunset.
 	 */
 	nightLighting?: GlobeNightLightingLike | null;
+	/**
+	 * Radius-search overlay. When set, draws a translucent circle (white ring +
+	 * faint fill) of `radiusMiles` around `center` plus a draggable red center pin.
+	 * Null clears the overlay. `radiusMiles` should be the committed search radius,
+	 * not a draft slider value.
+	 */
+	radiusOverlay?: { center: LatLngLiteral; radiusMiles: number } | null;
+	/** Called when the user drops the draggable radius center pin at a new location. */
+	onRadiusCenterChange?: (center: LatLngLiteral) => void;
 }
 
 // NOTE: Night lights are generated offline as raster dot tiles (see scripts/generate_contact_lights_tiles.py).
@@ -855,6 +869,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	weatherTemperatureF = null,
 	nightLighting = null,
 	nightT: nightTProp = null,
+	radiusOverlay = null,
+	onRadiusCenterChange,
 }) => {
 	const curatedOrbSvgIdPrefix = useId().replace(/:/g, '');
 	const curatedOrbSlotIds = useMemo(
@@ -962,6 +978,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		y: number;
 	} | null>(null);
 	const emptyMapPointerDownClientRef = useRef<{ x: number; y: number } | null>(null);
+	const isDraggingRadiusRef = useRef(false);
+	const radiusDragSuppressEmptyMapUntilRef = useRef(0);
+	const shouldSuppressEmptyMapPrompt = useCallback(
+		() =>
+			isDraggingRadiusRef.current ||
+			Date.now() < radiusDragSuppressEmptyMapUntilRef.current,
+		[]
+	);
 	// Keep the latest presentation value available to async Mapbox callbacks (moveend, etc).
 	const presentationRef = useRef<'background' | 'interactive'>(presentation);
 	presentationRef.current = presentation;
@@ -976,7 +1000,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const scheduleEmptyMapPrompt = useCallback(
 		(point: { x: number; y: number }) => {
-			if (!emptyMapPromptEnabled) {
+			if (!emptyMapPromptEnabled || shouldSuppressEmptyMapPrompt()) {
 				clearEmptyMapPrompt();
 				return;
 			}
@@ -997,7 +1021,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			setEmptyMapPromptPoint(nextPoint);
 		},
-		[clearEmptyMapPrompt, emptyMapPromptEnabled]
+		[clearEmptyMapPrompt, emptyMapPromptEnabled, shouldSuppressEmptyMapPrompt]
 	);
 
 	useEffect(() => {
@@ -1419,7 +1443,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const isAnySearch = useMemo(() => Boolean((searchQuery ?? '').trim()), [searchQuery]);
 	const isAmbientContactsEnabled = ambientContactsEnabled && !isBackgroundPresentation;
 	const shouldFetchAmbientContacts =
-		(ambientContactsEnabled || ambientContactsPreloadEnabled) && !isBackgroundPresentation;
+		(ambientContactsEnabled || ambientContactsPreloadEnabled) &&
+		!isBackgroundPresentation;
 	const onViewportInteractionRef = useRef<
 		SearchResultsMapProps['onViewportInteraction'] | null
 	>(null);
@@ -1604,6 +1629,42 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			east,
 		});
 	}, [map, isMapLoaded, selectedAreaBounds, isAreaSelecting, setPolygonSourceBounds]);
+
+	// ── Radius-search overlay (circle + draggable center pin) ──────────────────
+	const onRadiusCenterChangeRef = useRef<
+		SearchResultsMapProps['onRadiusCenterChange'] | null
+	>(null);
+	useEffect(() => {
+		onRadiusCenterChangeRef.current = onRadiusCenterChange ?? null;
+	}, [onRadiusCenterChange]);
+
+	// Latest overlay snapshot, read inside marker drag handlers (whose closures are
+	// created once) so pin drags keep using the committed radius.
+	const radiusOverlayRef = useRef(radiusOverlay);
+	useEffect(() => {
+		radiusOverlayRef.current = radiusOverlay;
+	}, [radiusOverlay]);
+
+	const radiusMarkerRef = useRef<mapboxgl.Marker | null>(null);
+	const radiusMarkerZoomHandlerRef = useRef<(() => void) | null>(null);
+	// The radius circle reuses the curated-blob pipeline (see updateCuratedBlob), so
+	// it appears only once a radius search returns results, rendered as one circle.
+	// The draggable center pin is set up in the marker effect below the blob builder.
+
+	// Detach the zoom listener + marker on unmount (the persistent map is a
+	// singleton that can outlive this component, so a leaked listener would pile
+	// up). The per-overlay effect handles the common clear/redraw cases.
+	useEffect(() => {
+		if (!map) return;
+		return () => {
+			if (radiusMarkerZoomHandlerRef.current) {
+				map.off('zoom', radiusMarkerZoomHandlerRef.current);
+				radiusMarkerZoomHandlerRef.current = null;
+			}
+			radiusMarkerRef.current?.remove();
+			radiusMarkerRef.current = null;
+		};
+	}, [map]);
 
 	// Cancel selection if the tool changes or the map unmounts.
 	useEffect(() => {
@@ -1986,7 +2047,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const { data: allContactsOverlayBufferRawContacts } = useGetContactsMapOverlay({
 		filters: allContactsOverlayBufferFilters,
 		enabled: Boolean(
-			allContactsOverlayBufferFilters && allContactsOverlayVisibleRawContacts !== undefined
+			allContactsOverlayBufferFilters &&
+			allContactsOverlayVisibleRawContacts !== undefined
 		),
 	});
 
@@ -6183,11 +6245,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			source: MAPBOX_SOURCE_IDS.markerConstellation,
 			layout: { 'line-join': 'round', 'line-cap': 'round' },
 			paint: {
-				'line-color': [
-					'coalesce',
-					['get', 'lineColor'],
-					MARKER_CONSTELLATION_LINE_COLOR,
-				],
+				'line-color': ['coalesce', ['get', 'lineColor'], MARKER_CONSTELLATION_LINE_COLOR],
 				'line-opacity': 0,
 				'line-width': markerConstellationCoreLineWidthExpr,
 				'line-blur': 0,
@@ -6248,9 +6306,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					['get', 'strokeColor'],
 					MARKER_CONSTELLATION_HALO_COLOR,
 				],
-				'circle-stroke-opacity': withFeatureStrokeOpacity(
-					constellationNodeOpacityExpr
-				),
+				'circle-stroke-opacity': withFeatureStrokeOpacity(constellationNodeOpacityExpr),
 				'circle-stroke-width': constellationNodeStrokeWidthExpr,
 			},
 		});
@@ -7663,31 +7719,55 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const signature = curatedDots
 			.map((dot) => `${dot.id}:${dot.coords.lng.toFixed(5)}:${dot.coords.lat.toFixed(5)}`)
 			.join('|');
-		const nextSignature = `v12:${CURATED_BLOB_MIN_REGION_POINTS}:${CURATED_BLOB_MAX_REGIONS}:${CURATED_BLOB_MAX_REGION_SPAN_KM}:${CURATED_BLOB_SHAPE_STEPS}:${CURATED_BLOB_OUTLINE_SMOOTHING_PASSES}:${CURATED_BLOB_LOBE_MIN_COUNT}:${CURATED_BLOB_LOBE_MAX_COUNT}:${CURATED_BLOB_LOBE_PADDING_KM}:${CURATED_BLOB_LOBE_MIN_RADIUS_KM}:${CURATED_BLOB_LOBE_MAX_RADIUS_KM}:${CURATED_BLOB_LOBE_OVERLAP_RADIUS_RATIO}:${CURATED_BLOB_LOBE_RADIUS_JITTER}:${CURATED_BLOB_SINGLETON_LOBE_RADIUS_KM}:${CURATED_BLOB_SINGLETON_LOBE_OFFSET_KM}:${CURATED_ORB_SMALL_SHAPE_MIN_RADIUS_KM}:${CURATED_ORB_SMALL_SHAPE_THRESHOLD_KM}:${CURATED_BLOB_ORGANIC_WOBBLE}:${signature}`;
+		const radiusOverlaySig = radiusOverlayRef.current
+			? `r:${radiusOverlayRef.current.center.lat.toFixed(5)}:${radiusOverlayRef.current.center.lng.toFixed(5)}:${radiusOverlayRef.current.radiusMiles}`
+			: 'r:none';
+		const nextSignature = `v12:${CURATED_BLOB_MIN_REGION_POINTS}:${CURATED_BLOB_MAX_REGIONS}:${CURATED_BLOB_MAX_REGION_SPAN_KM}:${CURATED_BLOB_SHAPE_STEPS}:${CURATED_BLOB_OUTLINE_SMOOTHING_PASSES}:${CURATED_BLOB_LOBE_MIN_COUNT}:${CURATED_BLOB_LOBE_MAX_COUNT}:${CURATED_BLOB_LOBE_PADDING_KM}:${CURATED_BLOB_LOBE_MIN_RADIUS_KM}:${CURATED_BLOB_LOBE_MAX_RADIUS_KM}:${CURATED_BLOB_LOBE_OVERLAP_RADIUS_RATIO}:${CURATED_BLOB_LOBE_RADIUS_JITTER}:${CURATED_BLOB_SINGLETON_LOBE_RADIUS_KM}:${CURATED_BLOB_SINGLETON_LOBE_OFFSET_KM}:${CURATED_ORB_SMALL_SHAPE_MIN_RADIUS_KM}:${CURATED_ORB_SMALL_SHAPE_THRESHOLD_KM}:${CURATED_BLOB_ORGANIC_WOBBLE}:${radiusOverlaySig}:${signature}`;
 		if (nextSignature === curatedBlobSignatureRef.current) return;
 
 		let cancelled = false;
 
 		const updateCuratedBlob = async () => {
-			const mercatorPoints = curatedDots
-				.map((dot) => projectCuratedBlobPoint(dot.id, dot.coords))
-				.filter((point): point is CuratedBlobMercatorPoint => point != null);
-
-			if (mercatorPoints.length === 0) {
-				if (!cancelled) clearCuratedBlobOutline();
-				return;
-			}
-
-			const clusters = pickAdaptiveCuratedBlobClusters(mercatorPoints);
+			const radiusOv = radiusOverlayRef.current;
 			const protectedMarkerIds = new Set<number>();
-			for (const cluster of clusters) {
-				for (const point of cluster.points) {
-					protectedMarkerIds.add(point.id);
+			let lobeMultiPolygons: ClippingMultiPolygon[];
+
+			if (radiusOv) {
+				// Radius mode: one circular blob at the radius center, sized to the
+				// committed search radius. Reuses the same blob/orb visuals as a single circle.
+				const circle = buildMercatorCircleMultiPolygon(
+					radiusOv.center,
+					radiusOv.radiusMiles * 1.609344,
+					CURATED_BLOB_SHAPE_STEPS,
+					0,
+					0
+				);
+				if (!circle) {
+					if (!cancelled) clearCuratedBlobOutline();
+					return;
 				}
+				lobeMultiPolygons = [circle];
+				for (const dot of curatedDots) protectedMarkerIds.add(dot.id);
+			} else {
+				const mercatorPoints = curatedDots
+					.map((dot) => projectCuratedBlobPoint(dot.id, dot.coords))
+					.filter((point): point is CuratedBlobMercatorPoint => point != null);
+
+				if (mercatorPoints.length === 0) {
+					if (!cancelled) clearCuratedBlobOutline();
+					return;
+				}
+
+				const clusters = pickAdaptiveCuratedBlobClusters(mercatorPoints);
+				for (const cluster of clusters) {
+					for (const point of cluster.points) {
+						protectedMarkerIds.add(point.id);
+					}
+				}
+				lobeMultiPolygons = clusters.flatMap((cluster, index) =>
+					buildCuratedBlobClusterLobeMultiPolygons(cluster, index)
+				);
 			}
-			const lobeMultiPolygons = clusters.flatMap((cluster, index) =>
-				buildCuratedBlobClusterLobeMultiPolygons(cluster, index)
-			);
 
 			if (lobeMultiPolygons.length === 0) {
 				if (!cancelled) clearCuratedBlobOutline();
@@ -7766,9 +7846,81 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isLoading,
 		searchEngaged,
 		contactsWithCoords,
+		radiusOverlay,
 		getContactCoords,
 		clearCuratedBlobOutline,
 		updateCuratedBlobProtectedMarkerIds,
+	]);
+
+	// Radius-search center pin. Appears alongside the single-circle blob (i.e. only
+	// once a radius search has results), reusing the shared profile-area location
+	// marker SVG — a touch smaller, scaled with zoom. Draggable: dropping it
+	// recenters the radius and re-runs the search.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const showPin = !!radiusOverlay && searchEngaged && contactsWithCoords.length > 0;
+		if (!showPin) {
+			if (radiusMarkerZoomHandlerRef.current) {
+				map.off('zoom', radiusMarkerZoomHandlerRef.current);
+				radiusMarkerZoomHandlerRef.current = null;
+			}
+			radiusMarkerRef.current?.remove();
+			radiusMarkerRef.current = null;
+			return;
+		}
+		const { center } = radiusOverlay;
+		if (!radiusMarkerRef.current) {
+			const el = document.createElement('div');
+			el.dataset.radiusCenterMarker = 'true';
+			el.style.cursor = 'grab';
+			el.style.width = '22px';
+			el.style.height = '27px';
+			const inner = document.createElement('div');
+			inner.style.width = '100%';
+			inner.style.height = '100%';
+			inner.style.transformOrigin = 'bottom center';
+			inner.innerHTML = profileAreaMarkerSvg;
+			el.appendChild(inner);
+
+			const applyRadiusPinZoomScale = () => {
+				const scale = clamp(0.55 + (map.getZoom() - 5) * 0.075, 0.6, 1.15);
+				inner.style.transform = `scale(${scale})`;
+			};
+			applyRadiusPinZoomScale();
+			map.on('zoom', applyRadiusPinZoomScale);
+			radiusMarkerZoomHandlerRef.current = applyRadiusPinZoomScale;
+
+			const marker = new mapboxgl.Marker({
+				element: el,
+				anchor: 'bottom',
+				draggable: true,
+			})
+				.setLngLat([center.lng, center.lat])
+				.addTo(map);
+			marker.on('dragstart', () => {
+				isDraggingRadiusRef.current = true;
+				radiusDragSuppressEmptyMapUntilRef.current = Number.POSITIVE_INFINITY;
+				clearEmptyMapPrompt();
+				el.style.cursor = 'grabbing';
+			});
+			marker.on('dragend', () => {
+				isDraggingRadiusRef.current = false;
+				radiusDragSuppressEmptyMapUntilRef.current = Date.now() + 300;
+				el.style.cursor = 'grab';
+				const ll = marker.getLngLat();
+				onRadiusCenterChangeRef.current?.({ lat: ll.lat, lng: ll.lng });
+			});
+			radiusMarkerRef.current = marker;
+		} else if (!isDraggingRadiusRef.current) {
+			radiusMarkerRef.current.setLngLat([center.lng, center.lat]);
+		}
+	}, [
+		map,
+		isMapLoaded,
+		radiusOverlay,
+		searchEngaged,
+		contactsWithCoords,
+		clearEmptyMapPrompt,
 	]);
 
 	const handleMapMouseUp = useCallback(
@@ -8611,7 +8763,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					keep.push(contact);
 				};
 				for (const contact of picked) {
-					if (selectedSet.has(contact.id) || (hoveredId != null && contact.id === hoveredId))
+					if (
+						selectedSet.has(contact.id) ||
+						(hoveredId != null && contact.id === hoveredId)
+					)
 						pushKeep(contact);
 				}
 				for (const contact of picked) {
@@ -8877,8 +9032,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						7,
 						2 * (markerScale * 0.78) + dotStrokeWeight + 1
 					);
-					const ambientMinSeparationSq =
-						ambientMinSeparationPx * ambientMinSeparationPx;
+					const ambientMinSeparationSq = ambientMinSeparationPx * ambientMinSeparationPx;
 
 					const pickAmbientContacts = (
 						candidatesSource: ContactWithName[],
@@ -8944,7 +9098,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 								x: projected.x,
 								y: projected.y,
 								isPriority: priorityIdSet.has(contact.id),
-								key: hashStringToUint32(`${sampleSalt}|ambient:${seedSuffix}|${contact.id}`),
+								key: hashStringToUint32(
+									`${sampleSalt}|ambient:${seedSuffix}|${contact.id}`
+								),
 							});
 						}
 						candidates.sort((a, b) => {
@@ -11666,7 +11822,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Click on empty map clears any selected marker panel.
 			setSelectedMarker(null);
 
-			if (!movedAfterPointerDown && emptyMapPromptEnabled && onEmptyMapClick) {
+			if (
+				!movedAfterPointerDown &&
+				emptyMapPromptEnabled &&
+				onEmptyMapClick &&
+				!shouldSuppressEmptyMapPrompt()
+			) {
 				clearEmptyMapPrompt();
 				onEmptyMapClick();
 			}
@@ -11731,6 +11892,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		allOverlayContactsById,
 		clearEmptyMapPrompt,
 		scheduleEmptyMapPrompt,
+		shouldSuppressEmptyMapPrompt,
 		emptyMapPromptEnabled,
 		onEmptyMapClick,
 		handleMarkerMouseOver,
@@ -12131,11 +12293,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		for (const layerId of glowLayerIds) {
 			if (!map.getLayer(layerId)) continue;
 			try {
-				map.setLayoutProperty(
-					layerId,
-					'visibility',
-					hideStatusGlow ? 'none' : 'visible'
-				);
+				map.setLayoutProperty(layerId, 'visibility', hideStatusGlow ? 'none' : 'visible');
 			} catch {
 				// Ignore style timing races.
 			}
@@ -12200,43 +12358,41 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[map, isMapLoaded]
 	);
 
-	const clearMarkerConstellation = useCallback((includeSelected = true) => {
-		stopMarkerConstellationReveal();
-		markerConstellationEdgesRef.current = [];
-		markerConstellationUsesCategoryColorsRef.current = false;
-		markerConstellationNodesRef.current = [];
-		markerConstellationContactsByIdRef.current = new Map();
-		markerConstellationNodeIdsRef.current = new Set();
-		markerConstellationComposedSearchKeyRef.current = '';
-		markerConstellationRevealDoneRef.current = true;
-		markerConstellationLastDataKeyRef.current = '';
-		markerConstellationIsStatusModeRef.current = false;
-		setMarkerConstellationCompositionNonce((value) => value + 1);
-		setMarkerConstellationLineOpacity(0, 0, 0);
-		if (!map || !isMapLoaded) return;
-		const lineSource = map.getSource(MAPBOX_SOURCE_IDS.markerConstellation) as
-			| mapboxgl.GeoJSONSource
-			| undefined;
-		const selectedLineSource = map.getSource(
-			MAPBOX_SOURCE_IDS.markerConstellationSelected
-		) as mapboxgl.GeoJSONSource | undefined;
-		const nodeSource = map.getSource(MAPBOX_SOURCE_IDS.markerConstellationNodes) as
-			| mapboxgl.GeoJSONSource
-			| undefined;
-		try {
-			const empty = { type: 'FeatureCollection', features: [] } as any;
-			lineSource?.setData(empty);
-			if (includeSelected) selectedLineSource?.setData(empty);
-			nodeSource?.setData(empty);
-		} catch {
-			// Ignore style timing races.
-		}
-	}, [
-		map,
-		isMapLoaded,
-		stopMarkerConstellationReveal,
-		setMarkerConstellationLineOpacity,
-	]);
+	const clearMarkerConstellation = useCallback(
+		(includeSelected = true) => {
+			stopMarkerConstellationReveal();
+			markerConstellationEdgesRef.current = [];
+			markerConstellationUsesCategoryColorsRef.current = false;
+			markerConstellationNodesRef.current = [];
+			markerConstellationContactsByIdRef.current = new Map();
+			markerConstellationNodeIdsRef.current = new Set();
+			markerConstellationComposedSearchKeyRef.current = '';
+			markerConstellationRevealDoneRef.current = true;
+			markerConstellationLastDataKeyRef.current = '';
+			markerConstellationIsStatusModeRef.current = false;
+			setMarkerConstellationCompositionNonce((value) => value + 1);
+			setMarkerConstellationLineOpacity(0, 0, 0);
+			if (!map || !isMapLoaded) return;
+			const lineSource = map.getSource(MAPBOX_SOURCE_IDS.markerConstellation) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			const selectedLineSource = map.getSource(
+				MAPBOX_SOURCE_IDS.markerConstellationSelected
+			) as mapboxgl.GeoJSONSource | undefined;
+			const nodeSource = map.getSource(MAPBOX_SOURCE_IDS.markerConstellationNodes) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			try {
+				const empty = { type: 'FeatureCollection', features: [] } as any;
+				lineSource?.setData(empty);
+				if (includeSelected) selectedLineSource?.setData(empty);
+				nodeSource?.setData(empty);
+			} catch {
+				// Ignore style timing races.
+			}
+		},
+		[map, isMapLoaded, stopMarkerConstellationReveal, setMarkerConstellationLineOpacity]
+	);
 
 	const writeMarkerConstellationSourceData = useCallback(
 		(contactsForVisibility?: ContactWithName[]): void => {
@@ -12284,7 +12440,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					lineGlowColor = campaignStatusLineStyle.lineColor;
 					useSelectedLineWidth = true;
 				}
-				if (!campaignStatusLineStyle && markerConstellationUsesCategoryColorsRef.current) {
+				if (
+					!campaignStatusLineStyle &&
+					markerConstellationUsesCategoryColorsRef.current
+				) {
 					const fromCategory = fromContact.curatedCategory ?? null;
 					const toCategory = toContact.curatedCategory ?? null;
 					const fromCategoryKey = fromCategory
@@ -12427,11 +12586,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			} else {
 				const selectedGraphKey = selectedPointSeeds
 					.map((point) =>
-						[
-							point.id,
-							point.coords.lng.toFixed(5),
-							point.coords.lat.toFixed(5),
-						].join(':')
+						[point.id, point.coords.lng.toFixed(5), point.coords.lat.toFixed(5)].join(':')
 					)
 					.join(',');
 
@@ -12735,11 +12890,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// "contacts" dot makes it vanish into the light map); they grow
 				// instead. Non-status (search/category) dots keep the darken cue.
 				hoverFillColor: statusMarkerStyle ? fillColor : darkenHexColor(fillColor),
-				strokeColor: statusMarkerStyle?.strokeColor ?? RESULT_DOT_TRANSPARENT_STROKE_COLOR,
+				strokeColor:
+					statusMarkerStyle?.strokeColor ?? RESULT_DOT_TRANSPARENT_STROKE_COLOR,
 				strokeWidth: statusMarkerStyle?.strokeWidth ?? 0,
 				strokeOpacity: statusMarkerStyle?.strokeOpacity ?? 0,
 				fillOpacity: statusMarkerStyle?.fillOpacity ?? 1,
-				radiusScale: isVenue ? VENUE_DOT_RADIUS_SCALE : (statusMarkerStyle?.radiusScale ?? 1),
+				radiusScale: isVenue
+					? VENUE_DOT_RADIUS_SCALE
+					: (statusMarkerStyle?.radiusScale ?? 1),
 				isCurated: statusMarkerStyle ? false : Boolean(contact.curatedCategory),
 				isUncategorized,
 				isVenue,
@@ -13080,7 +13238,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// subset, its coords, and styling are identical) are no-ops. Skip the
 			// rebuild + re-animation so selected halos stay stable while zooming.
 			const signatureParts: string[] = [];
-			for (const id of Array.from(nextSelectedFeaturesById.keys()).sort((a, b) => a - b)) {
+			for (const id of Array.from(nextSelectedFeaturesById.keys()).sort(
+				(a, b) => a - b
+			)) {
 				const feature = nextSelectedFeaturesById.get(id);
 				const [lng, lat] = feature.geometry.coordinates;
 				signatureParts.push(
@@ -13841,9 +14001,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				contactsForConstellation = contactsForConstellation
 					.map((contact) => ({
 						contact,
-						score: hashStringToUint32(
-							`${constellationKey}|constellation|${contact.id}`
-						),
+						score: hashStringToUint32(`${constellationKey}|constellation|${contact.id}`),
 					}))
 					.sort((a, b) => a.score - b.score)
 					.slice(0, MARKER_CONSTELLATION_MAX_POINTS)
@@ -13950,11 +14108,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				.join(',')}`;
 			const formation = isCategoryConstellationMode
 				? buildCategoryMarkerConstellationFormation(points, seed)
-				: buildBeautyMarkerConstellationFormation(
-						points,
-						seed,
-						constellationComposeZoom
-					);
+				: buildBeautyMarkerConstellationFormation(points, seed, constellationComposeZoom);
 
 			if (formation.edges.length === 0 && formation.nodes.length === 0) {
 				// No drawable formation. Leave composedKey unset so the next idle update
@@ -14381,7 +14535,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	// Give the DOM tooltip a real hover target around the SVG so moving from the
 	// marker into the bubble does not cross a tiny Mapbox/DOM dead zone.
-	const hoverTooltipHitSlopPx = useMemo(() => Math.max(14, markerScale * 2), [markerScale]);
+	const hoverTooltipHitSlopPx = useMemo(
+		() => Math.max(14, markerScale * 2),
+		[markerScale]
+	);
 
 	const selectedContactIdSet = useMemo(
 		() => new Set<number>(selectedContacts),
