@@ -1,36 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { Prisma, type Venue } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import {
 	apiBadRequest,
-	apiConflict,
 	apiCreated,
-	apiForbidden,
 	apiResponse,
 	apiUnauthorized,
 	handleApiError,
 } from '@/app/api/_utils';
-import { AccountType } from '@/constants/prismaEnums';
+import { assertVenueAccount } from '@/app/api/_utils/venueAuth';
 import { syncVenueToContact } from '@/app/api/_utils/venueContactSync';
 import { upsertVenueSchema } from './schema';
-
-// /api/venue is venue-only. Returns null when the caller is a valid venue account,
-// otherwise a NextResponse explaining why (still provisioning, or not a venue).
-async function assertVenueAccount(userId: string): Promise<NextResponse | null> {
-	const user = await prisma.user.findUnique({
-		where: { clerkId: userId },
-		select: { accountType: true },
-	});
-	if (!user) {
-		// Right after sign-up the User row can lag the Clerk session — retryable.
-		return apiConflict('Account is still being provisioned, please retry');
-	}
-	if (user.accountType !== AccountType.venue) {
-		return apiForbidden('This endpoint is only available to venue accounts');
-	}
-	return null;
-}
 
 // GET /api/venue — the current user's venue profile (or null if none yet).
 export async function GET() {

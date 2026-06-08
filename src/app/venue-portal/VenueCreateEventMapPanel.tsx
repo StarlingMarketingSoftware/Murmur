@@ -24,6 +24,7 @@ import {
 	VENUE_MAP_OVERLAY_SCALE,
 	VENUE_TIME_OPTIONS,
 } from './constants';
+import { useCreateVenueEvent } from '@/hooks/queryHooks/useVenueEvents';
 
 type VenueCreateEventFormState = {
 	eventName: string;
@@ -31,6 +32,7 @@ type VenueCreateEventFormState = {
 	whoSize: string;
 	whoGenres: string[];
 	when: string;
+	whenDate: string | null;
 	startTime: string;
 	endTime: string;
 	pay: string;
@@ -68,6 +70,7 @@ const EMPTY_CREATE_EVENT_FORM: VenueCreateEventFormState = {
 	whoSize: '',
 	whoGenres: [],
 	when: '',
+	whenDate: null,
 	startTime: VENUE_CREATE_EVENT_DEFAULT_START_TIME,
 	endTime: VENUE_CREATE_EVENT_DEFAULT_END_TIME,
 	pay: '',
@@ -124,6 +127,15 @@ const formatVenueCreateEventDate = (date: Date) =>
 	`${VENUE_CREATE_EVENT_MONTH_LABELS[date.getMonth()]} ${date.getDate()}${getVenueCreateEventOrdinalSuffix(
 		date.getDate()
 	)} ${date.getFullYear()}`;
+
+// Local calendar date (YYYY-MM-DD) of the picked day, built from local Y/M/D parts — NOT
+// date.toISOString(), which would roll to the adjacent day across the UTC boundary.
+const formatVenueCreateEventIsoDate = (date: Date) => {
+	const year = date.getFullYear();
+	const month = `${date.getMonth() + 1}`.padStart(2, '0');
+	const day = `${date.getDate()}`.padStart(2, '0');
+	return `${year}-${month}-${day}`;
+};
 
 const getVenueCreateEventTimeMinutes = (value: string) => {
 	const [rawHours, rawMinutes] = value.split(':');
@@ -189,6 +201,14 @@ export function VenueCreateEventMapPanel() {
 	const setActiveEventFieldElement = useCallback((node: HTMLElement | null) => {
 		activeEventFieldRef.current = node;
 	}, []);
+	const { mutate: createEvent, isPending: isPublishing } = useCreateVenueEvent({
+		onSuccess: () => {
+			setEventForm(EMPTY_CREATE_EVENT_FORM);
+			setActiveEventField('eventName');
+			setPublishState('published');
+			requestAnimationFrame(() => eventNameInputRef.current?.focus());
+		},
+	});
 	const isWhoComplete = Boolean(
 		eventForm.whoSize.trim() && eventForm.whoGenres.length > 0
 	);
@@ -235,6 +255,7 @@ export function VenueCreateEventMapPanel() {
 		setEventForm((current) => ({
 			...current,
 			when: formatVenueCreateEventDate(date),
+			whenDate: formatVenueCreateEventIsoDate(date),
 		}));
 
 		const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1440;
@@ -436,8 +457,33 @@ export function VenueCreateEventMapPanel() {
 			requestAnimationFrame(() => eventNameInputRef.current?.focus());
 			return;
 		}
+		if (isPublishing) return;
 
-		setPublishState('published');
+		// Time fields only mean something once a date is picked; derive UTC instants from the
+		// local date + the raw HH:MM, and otherwise log no date/time at all.
+		const startsAt = eventForm.whenDate
+			? new Date(`${eventForm.whenDate}T${eventForm.startTime}:00`).toISOString()
+			: undefined;
+		const endsAt = eventForm.whenDate
+			? new Date(`${eventForm.whenDate}T${eventForm.endTime}:00`).toISOString()
+			: undefined;
+
+		createEvent({
+			name: eventForm.eventName.trim(),
+			address: eventForm.location.address.trim() || null,
+			placeId: eventForm.location.placeId,
+			latitude: eventForm.location.lat,
+			longitude: eventForm.location.lng,
+			size: eventForm.whoSize || null,
+			genres: eventForm.whoGenres,
+			whenLabel: eventForm.when || null,
+			startTime: eventForm.whenDate ? eventForm.startTime : null,
+			endTime: eventForm.whenDate ? eventForm.endTime : null,
+			startsAt,
+			endsAt,
+			pay: eventForm.pay.trim() || null,
+			details: eventForm.details.trim() || null,
+		});
 	};
 	const isEventNameActive = activeEventField === 'eventName';
 	const isWhereActive = activeEventField === 'where';
@@ -1446,15 +1492,16 @@ export function VenueCreateEventMapPanel() {
 
 				<button
 					type="submit"
-					className="absolute bottom-[9.5px] left-1/2 flex h-[26px] w-[244px] -translate-x-1/2 items-center justify-center rounded-[12.084px] bg-[#F57D7D] font-inter text-[18.909px] font-medium not-italic leading-[18.391px] text-black transition-opacity hover:opacity-90 active:opacity-80"
+					disabled={isPublishing}
+					className="absolute bottom-[9.5px] left-1/2 flex h-[26px] w-[244px] -translate-x-1/2 items-center justify-center rounded-[12.084px] bg-[#F57D7D] font-inter text-[18.909px] font-medium not-italic leading-[18.391px] text-black transition-opacity hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
 				>
-					Publish
+					{isPublishing ? 'Publishing…' : 'Publish'}
 				</button>
 				<p className="sr-only" aria-live="polite">
 					{publishState === 'missing-name'
 						? 'Event name is required.'
 						: publishState === 'published'
-							? 'Event published locally.'
+							? 'Event published.'
 							: ''}
 				</p>
 			</div>

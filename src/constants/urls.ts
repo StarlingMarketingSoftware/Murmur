@@ -220,6 +220,9 @@ export const urls = {
 			account: {
 				index: '/api/venue/account',
 			},
+			events: {
+				index: '/api/venue/events',
+			},
 		},
 	},
 };

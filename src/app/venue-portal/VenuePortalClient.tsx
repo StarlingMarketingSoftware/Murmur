@@ -1,13 +1,13 @@
 'use client';
 
 import {
-		type ChangeEvent,
-		type FocusEvent as ReactFocusEvent,
-		type FormEvent,
-		type KeyboardEvent as ReactKeyboardEvent,
-		type MouseEvent as ReactMouseEvent,
-		type PointerEvent as ReactPointerEvent,
-		type Ref,
+	type ChangeEvent,
+	type FocusEvent as ReactFocusEvent,
+	type FormEvent,
+	type KeyboardEvent as ReactKeyboardEvent,
+	type MouseEvent as ReactMouseEvent,
+	type PointerEvent as ReactPointerEvent,
+	type Ref,
 	useCallback,
 	useEffect,
 	useLayoutEffect,

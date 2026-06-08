@@ -41,6 +41,7 @@ model User {
   inboundEmails            InboundEmail[]
   mediaAssets              MediaAsset[]
   venue                    Venue?
+  events                   Event[]
 }
 
 model ContactList {
@@ -238,6 +239,31 @@ model Venue {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   user         User     @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+}
+
+model Event {
+  id        Int       @id @default(autoincrement())
+  userId    String // clerkId of the venue account that created the event
+  name      String
+  address   String?
+  placeId   String?
+  latitude  Float?
+  longitude Float?
+  size      String? // free text: "Solo" | "Duo" | "Full Band" | "Other" | anything
+  genres    String[]
+  whenLabel String? // faithful display label, e.g. "June 15th 2026"
+  startTime String? // raw "HH:MM" as entered
+  endTime   String? // raw "HH:MM" as entered
+  startsAt  DateTime? // derived UTC instant (picked date + startTime, browser-local)
+  endsAt    DateTime? // derived UTC instant (picked date + endTime, browser-local)
+  pay       String? // free text, e.g. "$150-500"
+  details   String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User      @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([startsAt])
 }
 
 model Signature {
