@@ -1,6 +1,7 @@
 'use client';
 import { useAuth, UserButton, SignUpButton, SignInButton } from '@clerk/nextjs';
 import { urls } from '@/constants/urls';
+import { AccountType } from '@/constants/prismaEnums';
 import { useMe } from '@/hooks/useMe';
 import Link from 'next/link';
 import { cn } from '@/utils';
@@ -23,6 +24,12 @@ export const Navbar = () => {
 		user?.stripeSubscriptionStatus === StripeSubscriptionStatus.ACTIVE ||
 		user?.stripeSubscriptionStatus === StripeSubscriptionStatus.TRIALING;
 	const canAccessApp = hasActiveSubscription || user?.role === 'admin';
+	const isVenue = user?.accountType === AccountType.venue;
+	// Venue accounts reach their portal without an artist subscription.
+	const canEnterApp = isVenue || canAccessApp;
+	const landingTarget = isVenue
+		? urls.venuePortal.index
+		: urls.murmur.dashboard.index;
 
 	// If a signed-in user has an active subscription, keep them out of the landing page.
 	// Also, if they just signed in (modal), send them to the dashboard immediately.
@@ -31,7 +38,7 @@ export const Navbar = () => {
 		prevIsSignedInRef.current = isSignedIn;
 
 		if (!isSignedIn) return;
-		if (!canAccessApp) return;
+		if (!canEnterApp) return;
 
 		const justSignedIn = !wasSignedIn && isSignedIn;
 		const isLanding = pathname === urls.home.index;
@@ -42,8 +49,8 @@ export const Navbar = () => {
 		// (e.g. navigating from the dashboard via a special link).
 		if (!justSignedIn && isActiveLandingView) return;
 
-		router.replace(urls.murmur.dashboard.index);
-	}, [canAccessApp, isSignedIn, pathname, router, searchParams]);
+		router.replace(landingTarget);
+	}, [canEnterApp, landingTarget, isSignedIn, pathname, router, searchParams]);
 
 	useEffect(() => {
 		const update = () => {

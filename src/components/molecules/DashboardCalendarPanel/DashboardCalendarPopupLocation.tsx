@@ -24,6 +24,9 @@ export type CalendarPopupLocationFields = {
 
 type Props = CalendarPopupLocationFields & {
 	onUpdate: (partial: Partial<CalendarPopupLocationFields>) => void;
+	// 'popup' (default) pins the card at the calendar-popup coordinates; 'inline' lets the
+	// card fill a sized parent so the same control can be embedded in other forms.
+	layout?: 'popup' | 'inline';
 };
 
 // Empty-state default. The map drifts to the user's location once geolocation resolves,
@@ -59,6 +62,7 @@ export const DashboardCalendarPopupLocation: FC<Props> = ({
 	lng,
 	drivingDuration,
 	onUpdate,
+	layout = 'popup',
 }) => {
 	const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
 
@@ -71,6 +75,9 @@ export const DashboardCalendarPopupLocation: FC<Props> = ({
 	// Set true when the user activates the pill so the next paint focuses the input.
 	// A ref (not state) so toggling it doesn't itself cause a re-render.
 	const focusInputOnNextRenderRef = useRef(false);
+	// Holds the latest reverse-geocode closure so the once-per-mount map-click handler and the
+	// marker's dragend handler always call the current version (instead of a stale closure).
+	const runReverseGeocodeRef = useRef<((lat: number, lng: number) => void) | null>(null);
 
 	const [query, setQuery] = useState(address);
 	// True while the input is rendered (editing mode); false while the pill is rendered.
@@ -143,6 +150,12 @@ export const DashboardCalendarPopupLocation: FC<Props> = ({
 		map.keyboard.disable();
 		mapRef.current = map;
 
+		// Click anywhere on the map to drop a pin there; the click point is reverse-geocoded
+		// into an address. (A pan is a drag, not a click, so this doesn't fire on pan.)
+		map.on('click', (event) => {
+			runReverseGeocodeRef.current?.(event.lngLat.lat, event.lngLat.lng);
+		});
+
 		map.once('load', () => {
 			setIsMapReady(true);
 			map.resize();
@@ -192,11 +205,20 @@ export const DashboardCalendarPopupLocation: FC<Props> = ({
 					background: '#F56E75',
 					border: '2px solid #000000',
 					boxSizing: 'border-box',
-					cursor: 'default',
+					cursor: 'grab',
 				} satisfies Partial<CSSStyleDeclaration>);
-				markerRef.current = new mapboxgl.Marker({ element: el, anchor: 'center' })
+				markerRef.current = new mapboxgl.Marker({
+					element: el,
+					anchor: 'center',
+					draggable: true,
+				})
 					.setLngLat([lng, lat])
 					.addTo(map);
+				// Drag the pin to fine-tune the location; the dropped point is reverse-geocoded.
+				markerRef.current.on('dragend', () => {
+					const pos = markerRef.current?.getLngLat();
+					if (pos) runReverseGeocodeRef.current?.(pos.lat, pos.lng);
+				});
 			} else {
 				markerRef.current.setLngLat([lng, lat]);
 			}
@@ -321,6 +343,73 @@ export const DashboardCalendarPopupLocation: FC<Props> = ({
 		}
 	}, [query, mapboxToken, userLocation, onUpdate]);
 
+	// Reverse geocode a point dropped/dragged on the map and commit it as the saved location.
+	const runReverseGeocode = useCallback(
+		async (nextLat: number, nextLng: number) => {
+			if (!mapboxToken) return;
+
+			const myGen = ++geocodeGenRef.current;
+			setIsGeocoding(true);
+			setGeocodeError(null);
+			// Drop the pin immediately at the clicked point; the address fills in once the
+			// reverse lookup returns.
+			onUpdate({ lat: nextLat, lng: nextLng, drivingDuration: null });
+			try {
+				const url = new URL('https://api.mapbox.com/search/geocode/v6/reverse');
+				url.searchParams.set('longitude', String(nextLng));
+				url.searchParams.set('latitude', String(nextLat));
+				url.searchParams.set('limit', '1');
+				url.searchParams.set('access_token', mapboxToken);
+				const res = await fetch(url.toString());
+				if (myGen !== geocodeGenRef.current) return;
+				if (!res.ok) {
+					setGeocodeError('Lookup failed');
+					return;
+				}
+				const data = (await res.json()) as {
+					features?: Array<{
+						id?: string;
+						properties?: {
+							mapbox_id?: string;
+							full_address?: string;
+							place_formatted?: string;
+							name?: string;
+						};
+					}>;
+				};
+				if (myGen !== geocodeGenRef.current) return;
+
+				const feature = data.features?.[0];
+				const formatted =
+					feature?.properties?.full_address ||
+					feature?.properties?.place_formatted ||
+					feature?.properties?.name ||
+					`${nextLat.toFixed(5)}, ${nextLng.toFixed(5)}`;
+				const nextPlaceId = feature?.properties?.mapbox_id ?? feature?.id ?? null;
+
+				onUpdate({
+					address: formatted,
+					placeId: nextPlaceId,
+					lat: nextLat,
+					lng: nextLng,
+					drivingDuration: null,
+				});
+				setQuery(formatted);
+				setIsEditing(false);
+			} catch {
+				if (myGen === geocodeGenRef.current) setGeocodeError('Lookup failed');
+			} finally {
+				if (myGen === geocodeGenRef.current) setIsGeocoding(false);
+			}
+		},
+		[mapboxToken, onUpdate]
+	);
+
+	// Keep the ref pointed at the latest closure for the map-click / marker-drag handlers.
+	useEffect(() => {
+		runReverseGeocodeRef.current = runReverseGeocode;
+	}, [runReverseGeocode]);
+
 	const hasSavedLocation = lat != null && lng != null;
 	const showDrivingPill = !isEditing && hasSavedLocation && Boolean(drivingDuration);
 
@@ -358,18 +447,31 @@ export const DashboardCalendarPopupLocation: FC<Props> = ({
 
 	return (
 		<div
-			style={{
-				position: 'absolute',
-				left: '5.5px',
-				top: '164px',
-				width: '284.144px',
-				height: '149.606px',
-				borderRadius: '9.687px',
-				border: '1.643px solid #000000',
-				boxSizing: 'border-box',
-				overflow: 'hidden',
-				background: '#FFFFFF',
-			}}
+			style={
+				layout === 'inline'
+					? {
+							position: 'relative',
+							width: '100%',
+							height: '100%',
+							borderRadius: '9.687px',
+							border: '1.643px solid #000000',
+							boxSizing: 'border-box',
+							overflow: 'hidden',
+							background: '#FFFFFF',
+						}
+					: {
+							position: 'absolute',
+							left: '5.5px',
+							top: '164px',
+							width: '284.144px',
+							height: '149.606px',
+							borderRadius: '9.687px',
+							border: '1.643px solid #000000',
+							boxSizing: 'border-box',
+							overflow: 'hidden',
+							background: '#FFFFFF',
+						}
+			}
 		>
 			<style jsx global>{`
 				/* Mapbox's .mapboxgl-map gets no width/height from its default stylesheet, so we

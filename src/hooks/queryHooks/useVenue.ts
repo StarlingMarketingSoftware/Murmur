@@ -13,7 +13,7 @@ const QUERY_KEYS = {
 // Prisma types `hours` as a loose JsonValue; narrow it to the schema shape for callers.
 export type VenueProfile = Omit<Venue, 'hours'> & { hours: WeeklyHours | null };
 
-export const useGetVenue = () => {
+export const useGetVenue = ({ enabled = true }: { enabled?: boolean } = {}) => {
 	return useQuery<VenueProfile | null>({
 		queryKey: QUERY_KEYS.all,
 		queryFn: async () => {
@@ -23,6 +23,7 @@ export const useGetVenue = () => {
 			}
 			return response.json();
 		},
+		enabled,
 	});
 };
 

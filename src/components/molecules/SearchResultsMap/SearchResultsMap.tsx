@@ -34,6 +34,7 @@ import {
 } from '@/components/atoms/_svg/MapMarkerPinIcon';
 import { generateSelectedCategorizedContactMarkerIconUrl } from '@/components/atoms/_svg/SelectedCategorizedContactMarkerIcon';
 import { profileAreaMarkerSvg } from '@/components/atoms/_svg/ProfileAreaMarkerIcon';
+import { venueHomeIconSvg } from '@/components/atoms/_svg/VenueHomeIcon';
 import {
 	SELECTED_CONTACT_MARKER_CENTER_OUTER_DIAMETER,
 	SELECTED_CONTACT_MARKER_CENTER_X,
@@ -361,7 +362,7 @@ import {
 	normalizeLngDeg,
 	smoothstep,
 } from './math';
-import { hashStringToStableKey, washOutHexColor } from './color';
+import { hashStringToStableKey, mixCssColorString, washOutHexColor } from './color';
 import {
 	computeGlobeFrontHemisphereOpacity,
 	coordinateKey,
@@ -609,6 +610,191 @@ const VENUE_ICON_SIZE_SCALE_EXPR: any = [
 	1,
 ];
 
+type OwnedVenueLocation = LatLngLiteral & { name?: string | null };
+
+const OWNED_VENUE_HOME_ICON_IMAGE_NAME = 'murmur-owned-venue-home-icon-image';
+const OWNED_VENUE_HOME_ICON_URL = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+	venueHomeIconSvg
+)}`;
+const OWNED_VENUE_HOME_ICON_IMAGE_DIMENSIONS = { width: 72, height: 63 } as const;
+const OWNED_VENUE_RING_STEPS = 160;
+const OWNED_VENUE_RADAR_MS = 3400;
+const OWNED_VENUE_RADAR_OUTER_TRAVEL_KM = 10;
+const OWNED_VENUE_RADAR_IDLE_COLOR = 'rgb(255, 255, 255)';
+const OWNED_VENUE_GLOW_IDLE_COLOR = 'rgb(169, 231, 255)';
+const OWNED_VENUE_GLOW_ACTIVE_COLOR = 'rgb(96, 207, 255)';
+const OWNED_VENUE_GLOW_CIRCLES = [
+	{ radiusKm: 340, opacity: 0.03 },
+	{ radiusKm: 240, opacity: 0.05 },
+	{ radiusKm: 150, opacity: 0.075 },
+	{ radiusKm: 82, opacity: 0.12 },
+] as const;
+const OWNED_VENUE_RING_CIRCLES = [
+	{ radiusKm: 26, opacity: 0.86, width: 2.35 },
+	{ radiusKm: 35, opacity: 0.82, width: 2.25 },
+	{ radiusKm: 45, opacity: 0.76, width: 2.12 },
+	{ radiusKm: 58, opacity: 0.69, width: 1.96 },
+	{ radiusKm: 74, opacity: 0.61, width: 1.78 },
+	{ radiusKm: 93, opacity: 0.52, width: 1.58 },
+	{ radiusKm: 116, opacity: 0.43, width: 1.38 },
+	{ radiusKm: 145, opacity: 0.35, width: 1.18 },
+	{ radiusKm: 180, opacity: 0.28, width: 1 },
+	{ radiusKm: 222, opacity: 0.21, width: 0.86 },
+	{ radiusKm: 272, opacity: 0.15, width: 0.72 },
+] as const;
+
+const isValidOwnedVenueLocation = (
+	location: OwnedVenueLocation | null | undefined
+): location is OwnedVenueLocation =>
+	Boolean(
+		location &&
+			Number.isFinite(location.lat) &&
+			Number.isFinite(location.lng) &&
+			location.lat >= -90 &&
+			location.lat <= 90 &&
+			location.lng >= -180 &&
+			location.lng <= 180
+	);
+
+const buildOwnedVenueCircleRing = (
+	center: LatLngLiteral,
+	radiusKm: number
+): number[][] | null => {
+	const circle = buildMercatorCircleMultiPolygon(
+		center,
+		radiusKm,
+		OWNED_VENUE_RING_STEPS,
+		0,
+		0
+	);
+	if (!circle) return null;
+	return mercatorMultiPolygonToLngLat(circle)[0]?.[0] ?? null;
+};
+
+const buildOwnedVenueGlowFeatures = (
+	center: LatLngLiteral,
+	radarPhase = 0,
+	animated = false
+) =>
+	OWNED_VENUE_GLOW_CIRCLES.flatMap((circle, index) => {
+		const lastGlowIndex = OWNED_VENUE_GLOW_CIRCLES.length - 1;
+		const glowPhase = (radarPhase - index * 0.09 + 1) % 1;
+		const rawLift = animated
+			? smoothstep(0.12, 0.34, glowPhase) * (1 - smoothstep(0.66, 0.98, glowPhase))
+			: 0;
+		const falloff = lastGlowIndex > 0 ? 1 - (index / lastGlowIndex) * 0.65 : 1;
+		const lift = rawLift * falloff;
+		const ring = buildOwnedVenueCircleRing(center, circle.radiusKm + lift * 3.5);
+		if (!ring) return [];
+
+		return [
+			{
+				type: 'Feature' as const,
+				id: `owned-venue-glow-${index}`,
+				properties: {
+					color: mixCssColorString(
+						OWNED_VENUE_GLOW_IDLE_COLOR,
+						OWNED_VENUE_GLOW_ACTIVE_COLOR,
+						lift * 0.35
+					),
+					opacity: circle.opacity * (1 + lift * 0.28),
+					sort: OWNED_VENUE_GLOW_CIRCLES.length - index,
+				},
+				geometry: { type: 'Polygon' as const, coordinates: [ring] },
+			},
+		];
+	});
+
+const buildOwnedVenueRadarLineFeatures = (
+	center: LatLngLiteral,
+	radarPhase = 0,
+	{
+		animated = false,
+		bloom = false,
+	}: {
+		animated?: boolean;
+		bloom?: boolean;
+	} = {}
+) => {
+	const lastRingIndex = OWNED_VENUE_RING_CIRCLES.length - 1;
+
+	return OWNED_VENUE_RING_CIRCLES.flatMap((circle, index) => {
+		const nextCircle = OWNED_VENUE_RING_CIRCLES[index + 1];
+		const outerT = lastRingIndex > 0 ? index / lastRingIndex : 0;
+		const ringPhase = (radarPhase - index * 0.066 + 1) % 1;
+		const rawPulse = animated
+			? smoothstep(0.04, 0.22, ringPhase) * (1 - smoothstep(0.52, 0.98, ringPhase))
+			: 0;
+		const pulse = Math.pow(rawPulse, 1.45);
+		const eased = animated ? smoothstep(0, 1, ringPhase) : 0;
+		const travelKm = nextCircle
+			? (nextCircle.radiusKm - circle.radiusKm) * 0.28
+			: OWNED_VENUE_RADAR_OUTER_TRAVEL_KM;
+		const ring = buildOwnedVenueCircleRing(center, circle.radiusKm + travelKm * eased);
+		if (!ring) return [];
+
+		const edgeFade = lastRingIndex > 0 ? lerp(1, 0.84, outerT) : 1;
+		const outerFade = 1 - smoothstep(0.78, 1, outerT) * 0.7;
+		const centerWeight = lastRingIndex > 0 ? 1 - smoothstep(0.25, 0.9, outerT) : 1;
+		if (bloom && centerWeight <= 0) return [];
+
+		const color = bloom
+			? mixCssColorString(
+				OWNED_VENUE_RADAR_IDLE_COLOR,
+				OWNED_VENUE_GLOW_ACTIVE_COLOR,
+				0.18 + pulse * 0.22
+			)
+			: OWNED_VENUE_RADAR_IDLE_COLOR;
+		const opacity = bloom
+			? clamp(circle.opacity * edgeFade * centerWeight * (0.012 + pulse * 0.065), 0, 0.11)
+			: clamp(circle.opacity * edgeFade * outerFade * (0.24 + pulse * 0.2), 0, 0.66);
+		const width = bloom
+			? circle.width * (1.35 + pulse * 1.1)
+			: circle.width * (0.94 + pulse * 0.12);
+
+		return [
+			{
+				type: 'Feature' as const,
+				id: bloom ? `owned-venue-bloom-${index}` : `owned-venue-ring-${index}`,
+				properties: bloom ? { color, opacity, width } : { opacity, width },
+				geometry: { type: 'LineString' as const, coordinates: ring },
+			},
+		];
+	});
+};
+
+const emptyFeatureCollection = (): GeoJSON.FeatureCollection => ({
+	type: 'FeatureCollection',
+	features: [],
+});
+
+const buildOwnedVenueMapOverlayData = (center: LatLngLiteral) => {
+	return {
+		glow: {
+			type: 'FeatureCollection' as const,
+			features: buildOwnedVenueGlowFeatures(center),
+		},
+		rings: {
+			type: 'FeatureCollection' as const,
+			features: buildOwnedVenueRadarLineFeatures(center),
+		},
+		icon: {
+			type: 'FeatureCollection' as const,
+			features: [
+				{
+					type: 'Feature' as const,
+					id: 'owned-venue-icon',
+					properties: {},
+					geometry: {
+						type: 'Point' as const,
+						coordinates: [center.lng, center.lat],
+					},
+				},
+			],
+		},
+	};
+};
+
 const withFeatureOpacityFactor = (opacityExpr: any, factorExpr: any): any => {
 	if (Array.isArray(opacityExpr)) {
 		const op = opacityExpr[0];
@@ -818,6 +1004,8 @@ export interface SearchResultsMapProps {
 	radiusOverlay?: { center: LatLngLiteral; radiusMiles: number } | null;
 	/** Called when the user drops the draggable radius center pin at a new location. */
 	onRadiusCenterChange?: (center: LatLngLiteral) => void;
+	/** Current venue account location; draws the map-anchored home/radar overlay. */
+	ownedVenueLocation?: OwnedVenueLocation | null;
 }
 
 // NOTE: Night lights are generated offline as raster dot tiles (see scripts/generate_contact_lights_tiles.py).
@@ -871,6 +1059,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	nightT: nightTProp = null,
 	radiusOverlay = null,
 	onRadiusCenterChange,
+	ownedVenueLocation = null,
 }) => {
 	const curatedOrbSvgIdPrefix = useId().replace(/:/g, '');
 	const curatedOrbSlotIds = useMemo(
@@ -1647,6 +1836,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const radiusMarkerRef = useRef<mapboxgl.Marker | null>(null);
 	const radiusMarkerZoomHandlerRef = useRef<(() => void) | null>(null);
+	const ownedVenuePulseRafRef = useRef<number | null>(null);
+	const ownedVenueLat = ownedVenueLocation?.lat;
+	const ownedVenueLng = ownedVenueLocation?.lng;
+	const ownedVenueCenter = useMemo<LatLngLiteral | null>(() => {
+		const location =
+			typeof ownedVenueLat === 'number' && typeof ownedVenueLng === 'number'
+				? { lat: ownedVenueLat, lng: ownedVenueLng }
+				: null;
+		return isValidOwnedVenueLocation(location) ? location : null;
+	}, [ownedVenueLat, ownedVenueLng]);
 	// The radius circle reuses the curated-blob pipeline (see updateCuratedBlob), so
 	// it appears only once a radius search returns results, rendered as one circle.
 	// The draggable center pin is set up in the marker effect below the blob builder.
@@ -1665,6 +1864,100 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			radiusMarkerRef.current = null;
 		};
 	}, [map]);
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+
+		const setSourceData = (sourceId: string, data: GeoJSON.FeatureCollection) => {
+			const source = map.getSource(sourceId) as mapboxgl.GeoJSONSource | undefined;
+			source?.setData(data);
+		};
+
+		if (!ownedVenueCenter) {
+			const empty = emptyFeatureCollection();
+			setSourceData(MAPBOX_SOURCE_IDS.ownedVenueGlow, empty);
+			setSourceData(MAPBOX_SOURCE_IDS.ownedVenueRings, empty);
+			setSourceData(MAPBOX_SOURCE_IDS.ownedVenueIcon, empty);
+			return;
+		}
+
+		const overlayData = buildOwnedVenueMapOverlayData(ownedVenueCenter);
+		setSourceData(MAPBOX_SOURCE_IDS.ownedVenueGlow, overlayData.glow);
+		setSourceData(MAPBOX_SOURCE_IDS.ownedVenueRings, overlayData.rings);
+		setSourceData(MAPBOX_SOURCE_IDS.ownedVenueIcon, overlayData.icon);
+	}, [map, isMapLoaded, ownedVenueCenter]);
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+
+		const glowSource = map.getSource(MAPBOX_SOURCE_IDS.ownedVenueGlow) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		const ringsSource = map.getSource(MAPBOX_SOURCE_IDS.ownedVenueRings) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		const pulseSource = map.getSource(MAPBOX_SOURCE_IDS.ownedVenuePulse) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		if (!glowSource || !ringsSource || !pulseSource) return;
+
+		const clearPulse = () => pulseSource.setData(emptyFeatureCollection());
+
+		if (!ownedVenueCenter) {
+			clearPulse();
+			return;
+		}
+
+		let prefersReducedMotion = false;
+		try {
+			prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		} catch {
+			prefersReducedMotion = false;
+		}
+
+		if (prefersReducedMotion) {
+			clearPulse();
+			return;
+		}
+
+		let cancelled = false;
+
+		const animateRadar = (nowMs: number) => {
+			if (cancelled) return;
+
+			const phase = (nowMs % OWNED_VENUE_RADAR_MS) / OWNED_VENUE_RADAR_MS;
+			glowSource.setData({
+				type: 'FeatureCollection',
+				features: buildOwnedVenueGlowFeatures(ownedVenueCenter, phase, true),
+			});
+			ringsSource.setData({
+				type: 'FeatureCollection',
+				features: buildOwnedVenueRadarLineFeatures(ownedVenueCenter, phase, {
+					animated: true,
+				}),
+			});
+			pulseSource.setData({
+				type: 'FeatureCollection',
+				features: buildOwnedVenueRadarLineFeatures(ownedVenueCenter, phase, {
+					animated: true,
+					bloom: true,
+				}),
+			});
+
+			ownedVenuePulseRafRef.current = window.requestAnimationFrame(animateRadar);
+		};
+
+		ownedVenuePulseRafRef.current = window.requestAnimationFrame(animateRadar);
+
+		return () => {
+			cancelled = true;
+			if (ownedVenuePulseRafRef.current != null) {
+				window.cancelAnimationFrame(ownedVenuePulseRafRef.current);
+				ownedVenuePulseRafRef.current = null;
+			}
+			clearPulse();
+		};
+	}, [map, isMapLoaded, ownedVenueCenter]);
 
 	// Cancel selection if the tool changes or the map unmounts.
 	useEffect(() => {
@@ -5583,6 +5876,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		ensureSource(MAPBOX_SOURCE_IDS.markersPromotionDot);
 		ensureSource(MAPBOX_SOURCE_IDS.markersBase);
 		ensureSource(MAPBOX_SOURCE_IDS.markersSelected);
+		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueGlow);
+		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueRings);
+		ensureSource(MAPBOX_SOURCE_IDS.ownedVenuePulse);
+		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueIcon);
 
 		const ensureLayer = (layer: any, beforeId?: string) => {
 			if (mapInstance.getLayer(layer.id)) {
@@ -6029,6 +6326,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			['*', selectedMarkerIconSizeHigh, selectedMarkerTransformScaleExpr],
 			24,
 			['*', selectedMarkerIconSizeHigh, selectedMarkerTransformScaleExpr],
+		];
+		const ownedVenueHomeIconSizeExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			MAP_MIN_ZOOM,
+			0.3,
+			MAP_DEFAULT_ZOOM,
+			0.5,
+			10,
+			0.72,
+			14,
+			0.95,
 		];
 
 		// States: hover fill + hit fill (transparent) + divider lines + interactive borders
@@ -6650,6 +6960,114 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					getNormalMarkerFadeOpacityExpr(),
 					getMarkerHoverOpacityExpr(),
 				]),
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.ownedVenueGlowFill,
+			type: 'fill',
+			source: MAPBOX_SOURCE_IDS.ownedVenueGlow,
+			layout: { 'fill-sort-key': ['get', 'sort'] },
+			paint: {
+				'fill-color': ['coalesce', ['get', 'color'], '#A8E6FF'],
+				'fill-opacity': ['coalesce', ['get', 'opacity'], 0],
+				'fill-antialias': true,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.ownedVenueRingLines,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.ownedVenueRings,
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
+			paint: {
+				'line-color': '#FFFFFF',
+				'line-opacity': ['coalesce', ['get', 'opacity'], 0],
+				'line-width': [
+					'interpolate',
+					['linear'],
+					['zoom'],
+					MAP_MIN_ZOOM,
+					['*', ['coalesce', ['get', 'width'], 1], 0.72],
+					MAP_DEFAULT_ZOOM,
+					['coalesce', ['get', 'width'], 1],
+					10,
+					['*', ['coalesce', ['get', 'width'], 1], 1.1],
+				],
+				'line-blur': 0.18,
+			},
+		});
+		ensureLayer(
+			{
+			id: MAPBOX_LAYER_IDS.ownedVenuePulseLine,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.ownedVenuePulse,
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
+			paint: {
+				'line-color': ['coalesce', ['get', 'color'], '#6BD9FF'],
+				'line-opacity': ['coalesce', ['get', 'opacity'], 0],
+				'line-width': [
+					'interpolate',
+					['linear'],
+					['zoom'],
+					MAP_MIN_ZOOM,
+					['*', ['coalesce', ['get', 'width'], 1], 0.72],
+					MAP_DEFAULT_ZOOM,
+					['coalesce', ['get', 'width'], 1],
+					10,
+					['*', ['coalesce', ['get', 'width'], 1], 1.12],
+				],
+				'line-blur': 1.05,
+			},
+			},
+			MAPBOX_LAYER_IDS.ownedVenueRingLines
+		);
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.ownedVenueHomeGlow,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.ownedVenueIcon,
+			paint: {
+				'circle-color': '#6BD9FF',
+				'circle-radius': [
+					'interpolate',
+					['linear'],
+					['zoom'],
+					MAP_MIN_ZOOM,
+					18,
+					MAP_DEFAULT_ZOOM,
+					34,
+					10,
+					52,
+					14,
+					68,
+				],
+				'circle-opacity': [
+					'interpolate',
+					['linear'],
+					['zoom'],
+					MAP_MIN_ZOOM,
+					0.12,
+					MAP_DEFAULT_ZOOM,
+					0.22,
+					10,
+					0.28,
+					14,
+					0.24,
+				],
+				'circle-blur': 0.92,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.ownedVenueHomeIcon,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.ownedVenueIcon,
+			layout: {
+				'icon-image': OWNED_VENUE_HOME_ICON_IMAGE_NAME,
+				'icon-size': ownedVenueHomeIconSizeExpr,
+				'icon-anchor': 'center',
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': ['interpolate', ['linear'], ['zoom'], MAP_MIN_ZOOM, 0.82, 4, 1],
 			},
 		});
 		ensureLayer({
@@ -12124,6 +12542,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		selectedUncategorizedContactMarkerHoverImageName,
 		selectedUncategorizedContactMarkerHoverUrl,
 	]);
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		void ensureMapImageFromUrl(
+			OWNED_VENUE_HOME_ICON_IMAGE_NAME,
+			OWNED_VENUE_HOME_ICON_URL,
+			OWNED_VENUE_HOME_ICON_IMAGE_DIMENSIONS
+		);
+	}, [map, isMapLoaded, ensureMapImageFromUrl]);
 
 	const promotionPinIdsRef = useRef<Set<number>>(new Set());
 	const promotionDotIdsRef = useRef<Set<number>>(new Set());

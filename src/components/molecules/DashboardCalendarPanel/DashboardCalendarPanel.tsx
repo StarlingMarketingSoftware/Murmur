@@ -22,7 +22,10 @@ export type DashboardCalendarMockState = {
 
 type DashboardCalendarPanelProps = {
 	className?: string;
+	frameless?: boolean;
 	mockState?: DashboardCalendarMockState;
+	onDateSelect?: (date: Date, event: ReactMouseEvent<HTMLButtonElement>) => void;
+	showFullMonth?: boolean;
 };
 
 type CalendarEventDraft = {
@@ -209,9 +212,9 @@ const formatDurationLabel = (startTime: string, endTime: string): string => {
 const hasDraftContent = (draft: CalendarEventDraft): boolean =>
 	Boolean(
 		draft.personName.trim() ||
-			draft.company.trim() ||
-			draft.notes.trim() ||
-			draft.address.trim()
+		draft.company.trim() ||
+		draft.notes.trim() ||
+		draft.address.trim()
 	);
 
 const SMOOTH_SCROLL_LERP = 0.14;
@@ -226,7 +229,10 @@ const clamp = (value: number, min: number, max: number): number =>
 // mockState override (used by `?calendarDebug=1` to preview every layout).
 export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	className,
+	frameless = false,
 	mockState,
+	onDateSelect,
+	showFullMonth = false,
 }) => {
 	// Layout constants (hard dashboard sizing)
 	const COLS = 7;
@@ -234,8 +240,9 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	const CELL_W_PX = 94.542;
 	const CELL_H_PX = 91.224;
 	const INNER_WIDTH_PX = COLS * CELL_W_PX;
-	// Viewport shows ~4 rows plus a sliver of row 5; remaining rows scroll into view.
-	const INNER_HEIGHT_PX = 373;
+	// Default dashboard viewport shows ~4 rows plus a sliver of row 5; compact venue
+	// usage can opt into the full six-row month while keeping the same calendar UI.
+	const INNER_HEIGHT_PX = showFullMonth ? ROWS * CELL_H_PX : 373;
 	const OUTER_PADDING_PX = 4;
 	const OUTER_WIDTH_PX = INNER_WIDTH_PX + OUTER_PADDING_PX * 2;
 	const OUTER_HEIGHT_PX = INNER_HEIGHT_PX + OUTER_PADDING_PX * 2;
@@ -254,8 +261,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	const INITIAL_SCROLL_TOP_PX = MONTH_WINDOW_RADIUS * MONTH_GRID_HEIGHT_PX;
 	const CURRENT_MONTH_MAX_SCROLL_TOP_PX =
 		INITIAL_SCROLL_TOP_PX + MONTH_GRID_HEIGHT_PX - INNER_HEIGHT_PX;
-	const TOTAL_SCROLL_HEIGHT_PX =
-		(MONTH_WINDOW_RADIUS * 2 + 1) * MONTH_GRID_HEIGHT_PX;
+	const TOTAL_SCROLL_HEIGHT_PX = (MONTH_WINDOW_RADIUS * 2 + 1) * MONTH_GRID_HEIGHT_PX;
 	const MAX_SCROLL_TOP_PX = TOTAL_SCROLL_HEIGHT_PX - INNER_HEIGHT_PX;
 	const SCROLLBAR_THUMB_HEIGHT_PX = 30;
 	const SCROLLBAR_TRACK_HEIGHT_PX = INNER_HEIGHT_PX;
@@ -272,11 +278,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	// so previews of arbitrary dates exercise the same highlight code path.
 	const effectiveToday =
 		mockState?.year != null && mockState?.monthIndex != null && mockState?.day != null
-			? new Date(
-					mockState.year,
-					((mockState.monthIndex % 12) + 12) % 12,
-					mockState.day
-				)
+			? new Date(mockState.year, ((mockState.monthIndex % 12) + 12) % 12, mockState.day)
 			: new Date();
 	const panelRef = useRef<HTMLDivElement>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -336,8 +338,10 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	const addDays = (d: Date, days: number): Date =>
 		new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
 
-	const getCellDateForGridIndex = (calendarGridStartDate: Date, gridIndex: number): Date =>
-		addDays(calendarGridStartDate, gridIndex);
+	const getCellDateForGridIndex = (
+		calendarGridStartDate: Date,
+		gridIndex: number
+	): Date => addDays(calendarGridStartDate, gridIndex);
 
 	const isInPrimaryMonth = (date: Date, year: number, monthIndex: number): boolean =>
 		date.getFullYear() === year && date.getMonth() === monthIndex;
@@ -471,7 +475,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		smoothScrollTargetRef.current = INITIAL_SCROLL_TOP_PX;
 		container.scrollTop = INITIAL_SCROLL_TOP_PX;
 		setScrollTop(INITIAL_SCROLL_TOP_PX);
-	}, [INITIAL_SCROLL_TOP_PX, inMonthIndex, inMonthYear]);
+	}, [INITIAL_SCROLL_TOP_PX, INNER_HEIGHT_PX, inMonthIndex, inMonthYear]);
 
 	useEffect(() => {
 		const container = scrollContainerRef.current;
@@ -579,6 +583,8 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 			document.body.style.cursor = '';
 			document.body.style.userSelect = '';
 		};
+		// The dependency list covers the layout constants used by snapToNearestRow.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [
 		CURRENT_MONTH_MAX_SCROLL_TOP_PX,
 		INITIAL_SCROLL_TOP_PX,
@@ -604,9 +610,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 			const panel = panelRef.current;
 			if (panel && panel.contains(target)) {
 				const targetEl = target as HTMLElement;
-				if (
-					targetEl.closest('button[data-dashboard-calendar-cell="true"]')
-				) {
+				if (targetEl.closest('button[data-dashboard-calendar-cell="true"]')) {
 					return;
 				}
 			}
@@ -699,7 +703,8 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 
 	const handleScrollbarTrackMouseDown = (event: ReactMouseEvent<HTMLDivElement>) => {
 		const container = scrollContainerRef.current;
-		if (!container || !scrollbarState.visible || event.target !== event.currentTarget) return;
+		if (!container || !scrollbarState.visible || event.target !== event.currentTarget)
+			return;
 
 		const rect = event.currentTarget.getBoundingClientRect();
 		const clickProgress = clamp((event.clientY - rect.top) / rect.height, 0, 1);
@@ -711,18 +716,20 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 			);
 			smoothScrollTargetRef.current =
 				CURRENT_MONTH_MAX_SCROLL_TOP_PX + clickProgress * maxBeyondCurrent;
-			container.scrollTop = CURRENT_MONTH_MAX_SCROLL_TOP_PX + clickProgress * maxBeyondCurrent;
+			container.scrollTop =
+				CURRENT_MONTH_MAX_SCROLL_TOP_PX + clickProgress * maxBeyondCurrent;
 		} else {
 			smoothScrollTargetRef.current =
 				INITIAL_SCROLL_TOP_PX - (1 - clickProgress) * INITIAL_SCROLL_TOP_PX;
-			container.scrollTop = INITIAL_SCROLL_TOP_PX - (1 - clickProgress) * INITIAL_SCROLL_TOP_PX;
+			container.scrollTop =
+				INITIAL_SCROLL_TOP_PX - (1 - clickProgress) * INITIAL_SCROLL_TOP_PX;
 		}
 
 		snapToNearestRow();
 	};
 
 	const activeDraft = activePopup
-		? eventDrafts[activePopup.key] ?? createDefaultEventDraft(activePopup.date)
+		? (eventDrafts[activePopup.key] ?? createDefaultEventDraft(activePopup.date))
 		: null;
 	const activeTimeRangeError = activeDraft
 		? getSameDayTimeRangeError(activeDraft.startTime, activeDraft.endTime)
@@ -922,7 +929,8 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		if (!activeDraft || activeTimeDropdownField !== field) return null;
 
 		const selectedMinutes = parseClockMinutes(activeDraft[field]);
-		const dropdownLabel = field === 'startTime' ? 'Start time options' : 'End time options';
+		const dropdownLabel =
+			field === 'startTime' ? 'Start time options' : 'End time options';
 
 		return (
 			<div
@@ -985,7 +993,9 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 								role="option"
 								aria-selected={isSelected}
 								aria-disabled={isInvalid}
-								aria-label={optionError ? `${option.label}, ${optionError}` : option.label}
+								aria-label={
+									optionError ? `${option.label}, ${optionError}` : option.label
+								}
 								data-selected-time={isSelected ? 'true' : undefined}
 								data-invalid-time={isInvalid ? 'true' : undefined}
 								onMouseDown={(event) => event.preventDefault()}
@@ -1025,7 +1035,8 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 
 	const renderTimeSelector = (field: TimeDropdownField, ariaLabel: string) => {
 		const isOpen = activeTimeDropdownField === field;
-		const value = activeDraft?.[field]?.trim() || (field === 'startTime' ? 'Start' : 'End');
+		const value =
+			activeDraft?.[field]?.trim() || (field === 'startTime' ? 'Start' : 'End');
 
 		return (
 			<div
@@ -1177,14 +1188,19 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 							key={`${row}-${col}-${isoKey}`}
 							type="button"
 							data-dashboard-calendar-cell="true"
-							aria-label={`Edit event for ${formatCalendarDate(date)}`}
-							onClick={(event) => openEventPopup(event, isoKey, date)}
+							aria-label={`${onDateSelect ? 'Select' : 'Edit event for'} ${formatCalendarDate(date)}`}
+							onClick={(event) => {
+								if (onDateSelect) {
+									onDateSelect(date, event);
+									return;
+								}
+
+								openEventPopup(event, isoKey, date);
+							}}
 							style={{
 								width: '100%',
 								height: `${CELL_H_PX}px`,
-								borderRadius: isHighlighted
-									? '9.747px'
-									: `${CELL_RADIUS_PX}px`,
+								borderRadius: isHighlighted ? '9.747px' : `${CELL_RADIUS_PX}px`,
 								border:
 									isHighlighted || showDraftSummary
 										? '1.175px solid #FFFFFF'
@@ -1272,8 +1288,10 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 				height: `${OUTER_HEIGHT_PX}px`,
 				borderRadius: `${OUTER_RADIUS_PX}px`,
 				overflow: 'visible',
-				backgroundColor: OUTER_BG,
-				boxShadow: `inset 0 0 0 ${OUTER_STROKE_W_PX}px rgba(255, 255, 255, 0.8)`,
+				backgroundColor: frameless ? 'transparent' : OUTER_BG,
+				boxShadow: frameless
+					? 'none'
+					: `inset 0 0 0 ${OUTER_STROKE_W_PX}px rgba(255, 255, 255, 0.8)`,
 				padding: `${OUTER_PADDING_PX}px`,
 				boxSizing: 'border-box',
 				position: 'relative',
@@ -1285,7 +1303,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 					width: `${INNER_WIDTH_PX}px`,
 					height: `${INNER_HEIGHT_PX}px`,
 					borderRadius: `${OUTER_RADIUS_PX}px`,
-					border: `${INNER_STROKE_W_PX}px solid #000000`,
+					border: frameless ? 0 : `${INNER_STROKE_W_PX}px solid #000000`,
 					overflow: 'hidden',
 					boxSizing: 'border-box',
 					backgroundColor: GRID_BG,
@@ -1325,213 +1343,214 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 				activeDraft &&
 				typeof window !== 'undefined' &&
 				createPortal(
-				<div
-					ref={popupRef}
-					role="dialog"
-					aria-modal="false"
-					aria-label="Calendar event editor"
-					style={{
-						position: 'fixed',
-						left: `${activePopup.left}px`,
-						top: `${activePopup.top}px`,
-						width: `${POPUP_WIDTH_PX}px`,
-						height: `${POPUP_HEIGHT_PX}px`,
-						borderRadius: '9px',
-						border: '1.076px solid rgba(255, 255, 255, 0.9)',
-						background: 'rgba(229, 96, 98, 0.82)',
-						backdropFilter: 'blur(22px) saturate(180%)',
-						WebkitBackdropFilter: 'blur(22px) saturate(180%)',
-						boxSizing: 'border-box',
-						overflow: 'visible',
-						zIndex: 2147483600,
-						transformOrigin:
-							activePopup.placement === 'right' ? 'left center' : 'right center',
-						animation: 'dashboardCalendarPopupEnter 160ms cubic-bezier(0.22, 1, 0.36, 1)',
-					}}
-				>
 					<div
+						ref={popupRef}
+						role="dialog"
+						aria-modal="false"
+						aria-label="Calendar event editor"
 						style={{
-							position: 'absolute',
-							left: '12px',
-							top: '9px',
-							right: '12px',
-							height: '44px',
-							display: 'flex',
-							flexDirection: 'column',
-							gap: '2px',
-						}}
-					>
-						<input
-							ref={popupPersonNameInputRef}
-							aria-label="Person or thing"
-							placeholder="New Event"
-							value={activeDraft.personName}
-							onChange={(event) => updateActiveDraft('personName', event.target.value)}
-							style={{
-								...popupInputBaseStyle,
-								...popupTextStyle,
-								height: '21px',
-								color: '#FFFFFF',
-								fontSize: '16px',
-								fontWeight: 700,
-								lineHeight: '19px',
-							}}
-						/>
-						<input
-							aria-label="Company"
-							placeholder="Add Business"
-							value={activeDraft.company}
-							onChange={(event) => updateActiveDraft('company', event.target.value)}
-							style={{
-								...popupInputBaseStyle,
-								...popupTextStyle,
-								height: '21px',
-								color: '#FFFFFF',
-								fontSize: '15px',
-								fontWeight: 400,
-								lineHeight: '18px',
-							}}
-						/>
-					</div>
-
-					<div
-						style={{
-							position: 'absolute',
-							left: '1px',
-							top: '59px',
-							width: '293px',
-							height: '23px',
-							background: '#FFEFF0',
+							position: 'fixed',
+							left: `${activePopup.left}px`,
+							top: `${activePopup.top}px`,
+							width: `${POPUP_WIDTH_PX}px`,
+							height: `${POPUP_HEIGHT_PX}px`,
+							borderRadius: '9px',
+							border: '1.076px solid rgba(255, 255, 255, 0.9)',
+							background: 'rgba(229, 96, 98, 0.82)',
+							backdropFilter: 'blur(22px) saturate(180%)',
+							WebkitBackdropFilter: 'blur(22px) saturate(180%)',
 							boxSizing: 'border-box',
-							padding: '0 11px',
-							display: 'flex',
-							alignItems: 'center',
+							overflow: 'visible',
+							zIndex: 2147483600,
+							transformOrigin:
+								activePopup.placement === 'right' ? 'left center' : 'right center',
+							animation:
+								'dashboardCalendarPopupEnter 160ms cubic-bezier(0.22, 1, 0.36, 1)',
 						}}
 					>
 						<div
-							aria-label="Event date"
 							style={{
-								...popupTextStyle,
-								width: '100%',
-								color: '#000000',
-								fontSize: '16px',
-								fontWeight: 700,
-								lineHeight: '20px',
-								whiteSpace: 'nowrap',
-								overflow: 'hidden',
-								textOverflow: 'ellipsis',
+								position: 'absolute',
+								left: '12px',
+								top: '9px',
+								right: '12px',
+								height: '44px',
+								display: 'flex',
+								flexDirection: 'column',
+								gap: '2px',
 							}}
 						>
-							{activeDraft.date}
+							<input
+								ref={popupPersonNameInputRef}
+								aria-label="Person or thing"
+								placeholder="New Event"
+								value={activeDraft.personName}
+								onChange={(event) => updateActiveDraft('personName', event.target.value)}
+								style={{
+									...popupInputBaseStyle,
+									...popupTextStyle,
+									height: '21px',
+									color: '#FFFFFF',
+									fontSize: '16px',
+									fontWeight: 700,
+									lineHeight: '19px',
+								}}
+							/>
+							<input
+								aria-label="Company"
+								placeholder="Add Business"
+								value={activeDraft.company}
+								onChange={(event) => updateActiveDraft('company', event.target.value)}
+								style={{
+									...popupInputBaseStyle,
+									...popupTextStyle,
+									height: '21px',
+									color: '#FFFFFF',
+									fontSize: '15px',
+									fontWeight: 400,
+									lineHeight: '18px',
+								}}
+							/>
 						</div>
-					</div>
 
-					<div
-						style={{
-							position: 'absolute',
-							left: '1px',
-							top: '84px',
-							width: '293px',
-							height: '23px',
-							background: '#FFEFF0',
-							boxSizing: 'border-box',
-							padding: '0 12px',
-							display: 'flex',
-							alignItems: 'center',
-							justifyContent: 'space-between',
-						}}
-					>
 						<div
-							ref={timePickerRef}
-							aria-invalid={hasTimeRangeError}
-							title={visibleTimeRangeError ?? undefined}
 							style={{
-								height: '17px',
-								borderRadius: '7px',
-								background: hasTimeRangeError ? '#FF3B30' : '#8BF0F7',
-								boxShadow: hasTimeRangeError
-									? '0 0 0 1px rgba(176, 0, 32, 0.7)'
-									: undefined,
-								padding: '0 5px',
+								position: 'absolute',
+								left: '1px',
+								top: '59px',
+								width: '293px',
+								height: '23px',
+								background: '#FFEFF0',
+								boxSizing: 'border-box',
+								padding: '0 11px',
 								display: 'flex',
 								alignItems: 'center',
-								gap: '4px',
-								boxSizing: 'border-box',
 							}}
 						>
-							{renderTimeSelector('startTime', 'Start time')}
-							<span
+							<div
+								aria-label="Event date"
 								style={{
 									...popupTextStyle,
-									color: hasTimeRangeError ? '#FFFFFF' : '#000000',
+									width: '100%',
+									color: '#000000',
 									fontSize: '16px',
-									fontWeight: 500,
-									lineHeight: '16px',
+									fontWeight: 700,
+									lineHeight: '20px',
+									whiteSpace: 'nowrap',
+									overflow: 'hidden',
+									textOverflow: 'ellipsis',
 								}}
 							>
-								-
-							</span>
-							{renderTimeSelector('endTime', 'End time')}
+								{activeDraft.date}
+							</div>
 						</div>
+
 						<div
-							aria-live="polite"
 							style={{
-								...popupTextStyle,
-								color: hasTimeRangeError ? '#B00020' : '#000000',
-								fontSize: hasTimeRangeError ? '11px' : '16px',
-								fontWeight: 700,
-								lineHeight: '20px',
-								minWidth: '74px',
-								textAlign: 'center',
+								position: 'absolute',
+								left: '1px',
+								top: '84px',
+								width: '293px',
+								height: '23px',
+								background: '#FFEFF0',
+								boxSizing: 'border-box',
+								padding: '0 12px',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'space-between',
 							}}
 						>
-							{activeDurationLabel}
+							<div
+								ref={timePickerRef}
+								aria-invalid={hasTimeRangeError}
+								title={visibleTimeRangeError ?? undefined}
+								style={{
+									height: '17px',
+									borderRadius: '7px',
+									background: hasTimeRangeError ? '#FF3B30' : '#8BF0F7',
+									boxShadow: hasTimeRangeError
+										? '0 0 0 1px rgba(176, 0, 32, 0.7)'
+										: undefined,
+									padding: '0 5px',
+									display: 'flex',
+									alignItems: 'center',
+									gap: '4px',
+									boxSizing: 'border-box',
+								}}
+							>
+								{renderTimeSelector('startTime', 'Start time')}
+								<span
+									style={{
+										...popupTextStyle,
+										color: hasTimeRangeError ? '#FFFFFF' : '#000000',
+										fontSize: '16px',
+										fontWeight: 500,
+										lineHeight: '16px',
+									}}
+								>
+									-
+								</span>
+								{renderTimeSelector('endTime', 'End time')}
+							</div>
+							<div
+								aria-live="polite"
+								style={{
+									...popupTextStyle,
+									color: hasTimeRangeError ? '#B00020' : '#000000',
+									fontSize: hasTimeRangeError ? '11px' : '16px',
+									fontWeight: 700,
+									lineHeight: '20px',
+									minWidth: '74px',
+									textAlign: 'center',
+								}}
+							>
+								{activeDurationLabel}
+							</div>
 						</div>
-					</div>
 
-					<div
-						style={{
-							position: 'absolute',
-							left: '9.5px',
-							top: '121px',
-							width: '276px',
-							height: '29px',
-							borderRadius: '7.534px',
-							border: '1.076px solid #FFFFFF',
-							boxSizing: 'border-box',
-							padding: '0 12px',
-							display: 'flex',
-							alignItems: 'center',
-						}}
-					>
-						<input
-							aria-label="Event notes"
-							placeholder="+ Notes"
-							value={activeDraft.notes}
-							onChange={(event) => updateActiveDraft('notes', event.target.value)}
+						<div
 							style={{
-								...popupInputBaseStyle,
-								...popupTextStyle,
-								color: '#FFFFFF',
-								fontSize: '16px',
-								fontWeight: 400,
-								lineHeight: '20px',
+								position: 'absolute',
+								left: '9.5px',
+								top: '121px',
+								width: '276px',
+								height: '29px',
+								borderRadius: '7.534px',
+								border: '1.076px solid #FFFFFF',
+								boxSizing: 'border-box',
+								padding: '0 12px',
+								display: 'flex',
+								alignItems: 'center',
 							}}
-						/>
-					</div>
+						>
+							<input
+								aria-label="Event notes"
+								placeholder="+ Notes"
+								value={activeDraft.notes}
+								onChange={(event) => updateActiveDraft('notes', event.target.value)}
+								style={{
+									...popupInputBaseStyle,
+									...popupTextStyle,
+									color: '#FFFFFF',
+									fontSize: '16px',
+									fontWeight: 400,
+									lineHeight: '20px',
+								}}
+							/>
+						</div>
 
-					<DashboardCalendarPopupLocation
-						key={activePopup.key}
-						address={activeDraft.address}
-						placeId={activeDraft.placeId}
-						lat={activeDraft.lat}
-						lng={activeDraft.lng}
-						drivingDuration={activeDraft.drivingDuration}
-						onUpdate={updateActiveDraftFields}
-					/>
-				</div>,
-				document.body
-			)}
+						<DashboardCalendarPopupLocation
+							key={activePopup.key}
+							address={activeDraft.address}
+							placeId={activeDraft.placeId}
+							lat={activeDraft.lat}
+							lng={activeDraft.lng}
+							drivingDuration={activeDraft.drivingDuration}
+							onUpdate={updateActiveDraftFields}
+						/>
+					</div>,
+					document.body
+				)}
 
 			{scrollbarState.visible && (
 				<div

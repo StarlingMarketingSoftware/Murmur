@@ -677,6 +677,10 @@ export const MAPBOX_SOURCE_IDS = {
 	markersPromotionPin: 'murmur-markers-promo-pin',
 	markersBookingPin: 'murmur-markers-booking-pin',
 	markersSelected: 'murmur-markers-selected',
+	ownedVenueGlow: 'murmur-owned-venue-glow',
+	ownedVenueRings: 'murmur-owned-venue-rings',
+	ownedVenuePulse: 'murmur-owned-venue-pulse',
+	ownedVenueIcon: 'murmur-owned-venue-icon',
 	stateLabels: 'murmur-state-labels',
 } as const;
 
@@ -733,6 +737,11 @@ export const MAPBOX_LAYER_IDS = {
 	baseDots: 'murmur-base-dots',
 	baseFallbackIcons: 'murmur-base-fallback-icons',
 	baseFallbackIconsHover: 'murmur-base-fallback-icons-hover',
+	ownedVenueGlowFill: 'murmur-owned-venue-glow-fill',
+	ownedVenueRingLines: 'murmur-owned-venue-ring-lines',
+	ownedVenuePulseLine: 'murmur-owned-venue-pulse-line',
+	ownedVenueHomeGlow: 'murmur-owned-venue-home-glow',
+	ownedVenueHomeIcon: 'murmur-owned-venue-home-icon',
 	selectedMarkerIcons: 'murmur-selected-marker-icons',
 	selectedMarkerIconsHover: 'murmur-selected-marker-icons-hover',
 	// Rectangles
