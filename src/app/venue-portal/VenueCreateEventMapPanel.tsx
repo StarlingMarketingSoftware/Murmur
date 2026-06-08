@@ -177,7 +177,7 @@ export function VenueCreateEventMapPanel() {
 		'idle'
 	);
 	const [activeEventField, setActiveEventField] =
-		useState<VenueCreateEventActiveField>(null);
+		useState<VenueCreateEventActiveField>('eventName');
 	const [activeWhenPopup, setActiveWhenPopup] =
 		useState<VenueCreateEventWhenPopup | null>(null);
 	const createEventFormRef = useRef<HTMLFormElement | null>(null);
@@ -422,6 +422,12 @@ export function VenueCreateEventMapPanel() {
 			document.removeEventListener('keydown', handleDocumentKeyDown);
 		};
 	}, [activeWhenPopup]);
+	// A new event box opens with Event Name already active (initial activeEventField)
+	// and focused, so the venue can start typing immediately. Clicking off still
+	// collapses it via the pointerdown-outside handler above.
+	useEffect(() => {
+		requestAnimationFrame(() => eventNameInputRef.current?.focus());
+	}, []);
 	const handlePublishEvent = (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		if (!eventForm.eventName.trim()) {

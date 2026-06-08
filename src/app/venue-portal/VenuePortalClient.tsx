@@ -3097,7 +3097,11 @@ function VenueCalendarMapPanel() {
 // DashboardCalendarPanel) renders at 381 × VENUE_CALENDAR_SCALE.
 const VENUE_OPPORTUNITIES_TOP_PX = Math.round(98 + 381 * VENUE_CALENDAR_SCALE + 15);
 
-function VenueOpportunitiesMapPanel() {
+function VenueOpportunitiesMapPanel({
+	onAddOpportunity,
+}: {
+	onAddOpportunity: () => void;
+}) {
 	return (
 		// Faint white fill + 40% black border via channel alpha (not element opacity)
 		// so the solid-bordered add pill inside isn't dimmed along with the box.
@@ -3105,10 +3109,16 @@ function VenueOpportunitiesMapPanel() {
 			className="absolute left-0 flex h-[424px] w-[656px] justify-center rounded-[12px] border-[2px] border-black/40 bg-white/40 pt-[16px]"
 			style={{ top: `${VENUE_OPPORTUNITIES_TOP_PX}px` }}
 		>
-			{/* "Add opportunity" pill: 616×40, solid black border, faint green-white fill. */}
-			<div className="flex h-[40px] w-[616px] items-center justify-center rounded-[12px] border-[2px] border-black bg-[rgba(247,255,240,0.46)]">
+			{/* "Add opportunity" pill: 616×40, solid black border, faint green-white fill.
+			    Opens the create-event panel (same panel as the toolbar's Add tool). */}
+			<button
+				type="button"
+				aria-label="Add opportunity"
+				onClick={onAddOpportunity}
+				className="flex h-[40px] w-[616px] cursor-pointer items-center justify-center rounded-[12px] border-[2px] border-black bg-[rgba(247,255,240,0.46)]"
+			>
 				<span className="text-[20px] font-medium leading-none text-black">+</span>
-			</div>
+			</button>
 		</div>
 	);
 }
@@ -3164,7 +3174,9 @@ export default function VenuePortalClient() {
 				>
 					<VenueProfileMapCard onEdit={() => setView('edit')} />
 					<VenueCalendarMapPanel />
-					<VenueOpportunitiesMapPanel />
+					<VenueOpportunitiesMapPanel
+						onAddOpportunity={() => setSelectedVenueTool('add')}
+					/>
 				</div>
 			)}
 			{view === 'map' && selectedVenueTool === 'add' && <VenueCreateEventMapPanel />}
