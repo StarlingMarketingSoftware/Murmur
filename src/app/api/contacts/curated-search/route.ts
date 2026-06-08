@@ -62,9 +62,24 @@ const CATEGORY_PARAM_ALIASES: Record<string, readonly BookingContactTitlePrefix[
 const resolveRequestedCategoryPrefixes = (
 	value: string | null
 ): readonly BookingContactTitlePrefix[] | null => {
-	const key = normalizeCategoryKey(value);
-	if (!key) return null;
-	return CATEGORY_PARAM_ALIASES[key] ?? null;
+	if (!value) return null;
+	// Accept either a single category or a comma-delimited list. The dashboard's
+	// Profile mode passes a genre-derived subset (e.g. "Music Venues,Breweries")
+	// to tighten the curated tray; a plain single value still resolves as before.
+	const out: BookingContactTitlePrefix[] = [];
+	const seen = new Set<BookingContactTitlePrefix>();
+	for (const segment of value.split(',')) {
+		const key = normalizeCategoryKey(segment);
+		if (!key) continue;
+		const resolved = CATEGORY_PARAM_ALIASES[key];
+		if (!resolved) continue;
+		for (const prefix of resolved) {
+			if (seen.has(prefix)) continue;
+			seen.add(prefix);
+			out.push(prefix);
+		}
+	}
+	return out.length > 0 ? out : null;
 };
 
 const parseFloatOrNull = (value: string | null): number | null => {

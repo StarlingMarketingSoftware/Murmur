@@ -25,6 +25,15 @@ import { WebsiteIcon } from '@/components/atoms/_svg/WebsiteIcon';
 const RESEARCH_PANEL_DEFAULT_WIDTH = 375;
 const RESEARCH_PANEL_DEFAULT_HEIGHT = 672;
 const RESEARCH_PANEL_BORDER_WIDTH = 1.913;
+const RESEARCH_PANEL_ABRIDGED_WIDTH = 272.425;
+const RESEARCH_PANEL_ABRIDGED_HEIGHT = 312.713;
+const RESEARCH_PANEL_ABRIDGED_BORDER_WIDTH = 1.835;
+const RESEARCH_PANEL_ABRIDGED_RADIUS = 11.012;
+const RESEARCH_PANEL_ABRIDGED_HEADER_HEIGHT = 62;
+const RESEARCH_PANEL_ABRIDGED_STRIPE_HEIGHT = 12;
+const RESEARCH_PANEL_ABRIDGED_ADDRESS_HEIGHT = 28;
+const RESEARCH_PANEL_ABRIDGED_HEADLINE_HEIGHT = 36;
+const RESEARCH_PANEL_ABRIDGED_SMALL_ROW_HEIGHT = 22;
 
 const RESEARCH_PANEL_BANDS = [
 	{ top: 0, height: 52, color: '#FFFFFF' },
@@ -217,8 +226,13 @@ const renderContactTitleCategoryIcon = (
 
 export interface ContactResearchPanelProps {
 	contact: ContactWithName | null | undefined;
+	variant?: 'default' | 'abridged';
 	className?: string;
 	style?: React.CSSProperties;
+	/** Overrides the displayed business/category description for compact map hovers. */
+	displayHeadline?: string;
+	/** Overrides category detection when the row uses a search-derived category label. */
+	displayTitleCategory?: string;
 	/**
 	 * When true, renders the full panel chrome but hides all textual content.
 	 * Used for the Drafts tab empty state so research details aren't shown
@@ -309,15 +323,399 @@ const parseMetadataSections = (metadata: string | null | undefined) => {
 	return sections;
 };
 
-export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
+const ContactResearchPanelAbridged: FC<
+	Pick<
+		ContactResearchPanelProps,
+		| 'contact'
+		| 'className'
+		| 'style'
+		| 'hideAllText'
+		| 'displayHeadline'
+		| 'displayTitleCategory'
+	>
+> = ({
 	contact,
 	className,
 	style,
 	hideAllText = false,
+	displayHeadline,
+	displayTitleCategory,
+}) => {
+	const fullName = `${contact?.firstName || ''} ${contact?.lastName || ''}`.trim();
+	const personalName = fullName || contact?.name?.trim() || '';
+	const companyName = contact?.company?.trim() || '';
+	const displayName = contact
+		? personalName || companyName || 'Unknown'
+		: 'Loading';
+	const showCompanyName = Boolean(personalName && companyName);
+	const latitude =
+		typeof contact?.latitude === 'number' ? contact.latitude.toFixed(4) : '';
+	const longitude =
+		typeof contact?.longitude === 'number' ? contact.longitude.toFixed(4) : '';
+	const coordinateText = [latitude, longitude].filter(Boolean).join('   ');
+	const stateAbbr = getStateAbbreviation(contact?.state || '').trim();
+	const cityText = contact?.city?.trim() || '';
+	const addressText = contact?.address?.trim() || '';
+	const headlineText =
+		displayHeadline?.trim() || contact?.headline?.trim() || contact?.title?.trim() || '';
+	const categorySource =
+		displayTitleCategory?.trim() || contact?.title?.trim() || headlineText || '';
+	const titleCategory = getContactTitleCategory(categorySource);
+	const titleCategoryIcon = titleCategory
+		? renderContactTitleCategoryIcon(titleCategory.kind, 14)
+		: null;
+	const companyTypeText = contact?.companyType?.trim() || '';
+	const foundedYearText = contact?.companyFoundedYear?.trim() || '';
+	const websiteText = contact?.website?.trim() || '';
+	const hasKeywords = Boolean(
+		contact?.companyKeywords?.some((keyword) => keyword.trim().length > 0)
+	);
+	const textStyle = hideAllText ? { color: 'transparent' } : undefined;
+	const smallRowHeight = `${RESEARCH_PANEL_ABRIDGED_SMALL_ROW_HEIGHT}px`;
+	const rowTextBase = {
+		color: '#000',
+		fontFamily: 'Inter',
+		fontSize: '14.2px',
+		fontStyle: 'normal',
+		fontWeight: 500,
+		lineHeight: '16px',
+		...(textStyle || {}),
+	} as const;
+	const detailRows: Array<{
+		key: string;
+		color: string;
+		render: (top: number) => React.ReactNode;
+	}> = [];
+
+	if (titleCategory || categorySource) {
+		detailRows.push({
+			key: 'title-category',
+			color: '#D2EFFF',
+			render: (top) => (
+				<div
+					className="absolute left-[20px] right-[13px] z-10 grid grid-cols-[18px_minmax(0,1fr)] items-center gap-x-[6px] overflow-hidden"
+					style={{ top: `${top}px`, height: smallRowHeight }}
+				>
+					<div className="flex items-center justify-start">{titleCategoryIcon}</div>
+					<span
+						className="block w-full min-w-0"
+						style={{ ...singleLineTextFadeStyle, ...rowTextBase }}
+					>
+						{titleCategory?.label || categorySource}
+					</span>
+				</div>
+			),
+		});
+	}
+
+	if (companyTypeText) {
+		detailRows.push({
+			key: 'company-type',
+			color: '#E8F7FF',
+			render: (top) => (
+				<div
+					className="absolute left-[20px] right-[13px] z-10 flex items-center overflow-hidden text-left"
+					style={{ top: `${top}px`, height: smallRowHeight }}
+				>
+					<span
+						className="block w-full"
+						style={{ ...singleLineTextFadeStyle, ...rowTextBase }}
+					>
+						{companyTypeText}
+					</span>
+				</div>
+			),
+		});
+	}
+
+	if (stateAbbr || cityText) {
+		detailRows.push({
+			key: 'location',
+			color: '#EDF8FF',
+			render: (top) => (
+				<div
+					className="absolute left-[20px] right-[13px] z-10 flex items-center gap-[6px] overflow-hidden text-left"
+					style={{ top: `${top}px`, height: smallRowHeight }}
+				>
+					{stateAbbr && <span style={rowTextBase}>{stateAbbr}</span>}
+					{cityText && (
+						<span
+							className="block min-w-0 flex-1"
+							style={{ ...singleLineTextFadeStyle, ...rowTextBase, fontWeight: 700 }}
+						>
+							{cityText}
+						</span>
+					)}
+				</div>
+			),
+		});
+	}
+
+	if (foundedYearText) {
+		detailRows.push({
+			key: 'founded-year',
+			color: '#F4FBFF',
+			render: (top) => (
+				<div
+					className="absolute left-[20px] right-[13px] z-10 flex items-center overflow-hidden text-left"
+					style={{ top: `${top}px`, height: smallRowHeight }}
+				>
+					<span
+						className="block w-full"
+						style={{ ...singleLineTextFadeStyle, ...rowTextBase }}
+					>
+						Founded {foundedYearText}
+					</span>
+				</div>
+			),
+		});
+	}
+
+	if (websiteText) {
+		detailRows.push({
+			key: 'website',
+			color: '#F8FCFF',
+			render: (top) => (
+				<div
+					className="absolute left-[20px] right-[13px] z-10 grid grid-cols-[18px_minmax(0,1fr)] items-center gap-x-[6px] overflow-hidden"
+					style={{ top: `${top}px`, height: smallRowHeight }}
+				>
+					<div className="flex items-center justify-start">
+						<WebsiteIcon size={15} className="flex-shrink-0" />
+					</div>
+					<span
+						className="block w-full min-w-0"
+						style={{ ...singleLineTextFadeStyle, ...rowTextBase }}
+					>
+						Website
+					</span>
+				</div>
+			),
+		});
+	}
+
+	if (hasKeywords) {
+		detailRows.push({
+			key: 'keywords',
+			color: '#FCFDFF',
+			render: (top) => (
+				<div
+					className="absolute left-[20px] right-[13px] z-10 flex items-center overflow-hidden text-left"
+					style={{ top: `${top}px`, height: smallRowHeight }}
+				>
+					<span
+						className="block w-full"
+						style={{ ...singleLineTextFadeStyle, ...rowTextBase }}
+					>
+						Keywords
+					</span>
+				</div>
+			),
+		});
+	}
+
+	detailRows.push({
+		key: 'see-more',
+		color: '#F8FAFF',
+		render: (top) => (
+			<div
+				className="absolute left-[20px] right-[13px] z-10 flex items-center overflow-hidden text-left"
+				style={{ top: `${top}px`, height: smallRowHeight }}
+			>
+				<span
+					className="block w-full"
+					style={{ ...singleLineTextFadeStyle, ...rowTextBase }}
+				>
+					See More...
+				</span>
+			</div>
+		),
+	});
+
+	let nextBandTop = 0;
+	const panelBands: Array<{ key: string; top: number; height: number; color: string }> = [];
+	const pushBand = (key: string, height: number, color: string) => {
+		panelBands.push({ key, top: nextBandTop, height, color });
+		nextBandTop += height;
+	};
+	pushBand('header', RESEARCH_PANEL_ABRIDGED_HEADER_HEIGHT, '#F8FAFF');
+	pushBand('stripe', RESEARCH_PANEL_ABRIDGED_STRIPE_HEIGHT, '#F67C7E');
+	if (addressText) pushBand('address', RESEARCH_PANEL_ABRIDGED_ADDRESS_HEIGHT, '#ABDCF9');
+	if (headlineText) pushBand('headline', RESEARCH_PANEL_ABRIDGED_HEADLINE_HEIGHT, '#BBE0F5');
+	const positionedDetailRows = detailRows.map((row) => {
+		const top = nextBandTop;
+		pushBand(row.key, RESEARCH_PANEL_ABRIDGED_SMALL_ROW_HEIGHT, row.color);
+		return { ...row, top };
+	});
+	const dividerTops = panelBands.slice(1).map((band) => band.top);
+	const panelHeight = Math.min(RESEARCH_PANEL_ABRIDGED_HEIGHT, nextBandTop);
+
+	return (
+		<div
+			data-contact-research-panel="true"
+			data-contact-research-panel-variant="abridged"
+			className={cn('relative block overflow-hidden text-black', className)}
+			style={{
+				width: `${RESEARCH_PANEL_ABRIDGED_WIDTH}px`,
+				height: `${panelHeight}px`,
+				borderRadius: `${RESEARCH_PANEL_ABRIDGED_RADIUS}px`,
+				border: `${RESEARCH_PANEL_ABRIDGED_BORDER_WIDTH}px solid #000`,
+				background: '#F8FAFF',
+				...style,
+			}}
+			data-hover-description="Research: Background info and notes for the selected contact."
+			role="region"
+			aria-label="Abridged research panel"
+		>
+			<div className="absolute inset-0 rounded-[inherit] overflow-hidden">
+				{panelBands.map((band) => (
+					<div
+						key={band.key}
+						className="absolute left-0 right-0"
+						style={{
+							top: `${band.top}px`,
+							height: `${band.height}px`,
+							backgroundColor: band.color,
+						}}
+					/>
+				))}
+			</div>
+
+			{dividerTops.map((top) => (
+				<div
+					key={top}
+					className="absolute left-0 right-0 bg-black"
+					style={{
+						top: `${top}px`,
+						height: `${RESEARCH_PANEL_ABRIDGED_BORDER_WIDTH}px`,
+					}}
+				/>
+			))}
+
+			<div
+				className="absolute left-[14px] right-[10px] top-0 z-10 flex items-center font-inter text-left text-black"
+				style={{ height: `${RESEARCH_PANEL_ABRIDGED_HEADER_HEIGHT}px` }}
+			>
+				<div className="min-w-0 pr-[112px]">
+					<div
+						className="block w-full min-w-0"
+						style={{
+							...singleLineTextFadeStyle,
+							color: '#000',
+							fontFamily: 'Inter',
+							fontSize: '17.5px',
+							fontStyle: 'normal',
+							fontWeight: 500,
+							lineHeight: '20px',
+							...(textStyle || {}),
+						}}
+					>
+						{displayName}
+					</div>
+					{showCompanyName && (
+						<div
+							className="mt-[1px] block w-full min-w-0"
+							style={{
+								...singleLineTextFadeStyle,
+								color: '#000',
+								fontFamily: 'Inter',
+								fontSize: '17px',
+								fontStyle: 'normal',
+								fontWeight: 400,
+								lineHeight: '19px',
+								...(textStyle || {}),
+							}}
+						>
+							{companyName}
+						</div>
+					)}
+				</div>
+				{coordinateText && (
+					<div
+						className="absolute right-0 top-[8px] whitespace-nowrap"
+						style={{
+							color: '#000',
+							fontFamily: 'Inter',
+							fontSize: '11.4px',
+							fontStyle: 'normal',
+							fontWeight: 700,
+							lineHeight: '13px',
+							...(textStyle || {}),
+						}}
+					>
+						{coordinateText}
+					</div>
+				)}
+			</div>
+
+			{addressText && (
+				<div
+					className="absolute left-[16px] right-[10px] z-10 flex items-center justify-center overflow-hidden text-center"
+					style={{
+						top: `${RESEARCH_PANEL_ABRIDGED_HEADER_HEIGHT + RESEARCH_PANEL_ABRIDGED_STRIPE_HEIGHT}px`,
+						height: `${RESEARCH_PANEL_ABRIDGED_ADDRESS_HEIGHT}px`,
+						...rowTextBase,
+					}}
+				>
+					<span className="block w-full" style={singleLineTextFadeStyle}>
+						{addressText}
+					</span>
+				</div>
+			)}
+
+			{headlineText && (
+				<div
+					className="absolute left-[21px] right-[13px] z-10 flex items-center overflow-hidden text-left"
+					style={{
+						top: `${panelBands.find((band) => band.key === 'headline')?.top ?? 0}px`,
+						height: `${RESEARCH_PANEL_ABRIDGED_HEADLINE_HEIGHT}px`,
+						color: '#000',
+						fontFamily: 'Inter',
+						fontSize: '14.2px',
+						fontStyle: 'normal',
+						fontWeight: 700,
+						lineHeight: '18px',
+						...(textStyle || {}),
+					}}
+				>
+					<span className="block w-full" style={headlineTextFadeStyle}>
+						{headlineText}
+					</span>
+				</div>
+			)}
+
+			{positionedDetailRows.map((row) => (
+				<Fragment key={row.key}>{row.render(row.top)}</Fragment>
+			))}
+		</div>
+	);
+};
+
+export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
+	contact,
+	variant = 'default',
+	className,
+	style,
+	hideAllText = false,
+	displayHeadline,
+	displayTitleCategory,
 	height,
 	width,
 	boxWidth,
 }) => {
+	if (variant === 'abridged') {
+		return (
+			<ContactResearchPanelAbridged
+				contact={contact}
+				className={className}
+				style={style}
+				hideAllText={hideAllText}
+				displayHeadline={displayHeadline}
+				displayTitleCategory={displayTitleCategory}
+			/>
+		);
+	}
+
 	const panelWidth = width ?? RESEARCH_PANEL_DEFAULT_WIDTH;
 	const panelHeight = height ?? RESEARCH_PANEL_DEFAULT_HEIGHT;
 	const fullName = `${contact?.firstName || ''} ${contact?.lastName || ''}`.trim();
@@ -328,9 +726,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	);
 	const headerHeight = isCompanyOnlyHeader ? 45 : 52;
 	const topDetailStart = headerHeight + 13;
-	const displayName = contact
-		? personalName || companyName || 'Unknown'
-		: 'Loading';
+	const displayName = contact ? personalName || companyName || 'Unknown' : 'Loading';
 	const showCompanyName = Boolean(personalName && companyName);
 	const latitude =
 		typeof contact?.latitude === 'number' ? contact.latitude.toFixed(4) : '';

@@ -141,6 +141,13 @@ import {
 	normalizeUsStateName,
 } from '@/utils/usStates';
 import { getApproximateLocation } from '@/utils/approximateLocation';
+import { useGetIdentities } from '@/hooks/queryHooks/useIdentities';
+import {
+	deriveProfileSearchSignals,
+	hasUsableProfileSignals,
+	buildProfileSig,
+	type ProfileIdentityInput,
+} from '@/utils/profileSignals';
 import {
 	ContactResearchPanel,
 	ContactResearchHorizontalStrip,
@@ -216,6 +223,7 @@ const FREETEXT_URL_PARAM_KEYS = [
 	'ftR',
 	'ftStrict',
 	'ftKeyword',
+	'ftProfile',
 ] as const;
 
 const MILES_TO_KM = 1.609344;
@@ -246,6 +254,7 @@ type FreeTextUrlArgs = {
 	radiusKm: number | null;
 	strictRadius: boolean;
 	keywordMode?: boolean;
+	profile?: boolean;
 } | null;
 
 type PendingDashboardSearch = {
@@ -325,6 +334,8 @@ const writeFreeTextParams = (params: URLSearchParams, args: FreeTextUrlArgs): vo
 	else params.delete('ftStrict');
 	if (args.keywordMode) params.set('ftKeyword', '1');
 	else params.delete('ftKeyword');
+	if (args.profile) params.set('ftProfile', '1');
+	else params.delete('ftProfile');
 };
 
 const extractStateAbbrFromSearchQuery = (query: string): string | null => {
@@ -1764,6 +1775,9 @@ const MAP_SELECT_GRAB_SCALE_GROW_END_HEIGHT_PX = 1480;
 const MAP_SELECT_GRAB_VIEWPORT_INSET_PX = 16;
 const MAP_VIEW_SIDE_PANEL_VISUAL_TOP_PX = 106;
 const MAP_VIEW_SIDE_PANEL_BOTTOM_GAP_PX = 20;
+const MAP_PANEL_ABRIDGED_RESEARCH_HEIGHT_PX = 292;
+const MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX = 13;
+const MAP_PANEL_ABRIDGED_RESEARCH_CLEAR_DELAY_MS = 220;
 const MAP_VIEW_CAMPAIGN_HEADER_HEIGHT_PX = 59;
 const MAP_VIEW_CAMPAIGN_HEADER_GAP_PX = 13;
 // Keep both map side panels visually pinned after the dashboard root zoom is applied.
@@ -1862,6 +1876,7 @@ const MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_SEGMENT_BOX = {
 	segmentWidth: 47,
 	advancedBackgroundColor: '#FD7171',
 	profileBackgroundColor: '#E0F3FE',
+	profileActiveBackgroundColor: '#71C9FD',
 	keywordBackgroundColor: '#EEF5FF',
 	keywordActiveBackgroundColor: '#71A9FD',
 	radiusBackgroundColor: '#FBF5DE',
@@ -1926,10 +1941,6 @@ const MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_ICON_LAYOUT = {
 type MapBottomSearchFollowupSelection = 'for-you' | 'category' | null;
 type MapBottomSearchFollowupPreview = MapBottomSearchFollowupSelection | 'anything';
 
-type MapBottomSearchAdvancedSelections = {
-	profile: boolean;
-};
-
 type MapBottomSearchBarProps = {
 	value: string;
 	isExpanded: boolean;
@@ -1939,6 +1950,8 @@ type MapBottomSearchBarProps = {
 	appearance?: 'default' | 'initial-dashboard';
 	/** When true (anything mode), shows the gold radius pin before the placeholder. */
 	radiusEnabled?: boolean;
+	/** When true (anything mode), shows the profile avatar before the placeholder. */
+	profileModeEnabled?: boolean;
 	/** When true (anything mode), switches placeholder/copy to direct keyword search. */
 	keywordModeEnabled?: boolean;
 	categoryWhatValue?: string;
@@ -1946,6 +1959,8 @@ type MapBottomSearchBarProps = {
 	activeCategoryField?: 'what' | 'where' | null;
 	onActivate: () => void;
 	onSubmit: () => void;
+	/** When true, the submit button fires even with an empty box (Profile mode). */
+	allowEmptySubmit?: boolean;
 	onValueChange: (value: string) => void;
 	onActiveChange: (active: boolean) => void;
 	onCategoryFieldFocus?: (field: 'what' | 'where') => void;
@@ -1965,12 +1980,14 @@ const MapBottomSearchBar = memo(
 		mode = 'anything',
 		appearance = 'default',
 		radiusEnabled = false,
+		profileModeEnabled = false,
 		keywordModeEnabled = false,
 		categoryWhatValue = '',
 		categoryWhereValue = '',
 		activeCategoryField = null,
 		onActivate,
 		onSubmit,
+		allowEmptySubmit = false,
 		onValueChange,
 		onActiveChange,
 		onCategoryFieldFocus,
@@ -2329,9 +2346,13 @@ const MapBottomSearchBar = memo(
 				INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonInset +
 				20
 			: MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotWidth + 28;
-		// When radius mode is on, the gold pin sits before the text; nudge the
-		// placeholder text + textarea right so typed text doesn't overlap it.
+		// Mode icons sit before the text; nudge the textarea right so typed text
+		// doesn't overlap the same leading slot.
 		const radiusPinOffset = radiusEnabled && !isInitialDashboardSearch ? 22 : 0;
+		const shouldShowProfilePlaceholderIcon =
+			profileModeEnabled && !keywordModeEnabled && !isInitialDashboardSearch;
+		const profileIconOffset = shouldShowProfilePlaceholderIcon ? 24 : 0;
+		const leadingIconOffset = radiusPinOffset + profileIconOffset;
 		const shouldShowKeywordPlaceholder = keywordModeEnabled && !isInitialDashboardSearch;
 		const isInitialDashboardSearchActive =
 			isInitialDashboardSearch &&
@@ -2386,6 +2407,20 @@ const MapBottomSearchBar = memo(
 							fontWeight: isInitialDashboardSearch ? 500 : undefined,
 						}}
 					>
+						{shouldShowProfilePlaceholderIcon && (
+							<MapBottomSearchProfileIcon
+								aria-hidden="true"
+								viewBox="0 0 28 28"
+								textColor="transparent"
+								iconColor="#3498DB"
+								style={{
+									width: 20,
+									height: 20,
+									flexShrink: 0,
+									display: 'block',
+								}}
+							/>
+						)}
 						{radiusEnabled && !isInitialDashboardSearch && (
 							<MapSearchRadiusPinIcon
 								aria-hidden="true"
@@ -2430,8 +2465,8 @@ const MapBottomSearchBar = memo(
 					className="absolute bg-transparent border-0 outline-none font-inter text-[16px] text-black"
 					style={{
 						top: 0,
-						left: isInitialDashboardSearch ? '24px' : `${14 + radiusPinOffset}px`,
-						width: `calc(100% - ${anythingRightReservedWidth + (isInitialDashboardSearch ? 24 : 0) + radiusPinOffset}px)`,
+						left: isInitialDashboardSearch ? '24px' : `${14 + leadingIconOffset}px`,
+						width: `calc(100% - ${anythingRightReservedWidth + (isInitialDashboardSearch ? 24 : 0) + leadingIconOffset}px)`,
 						height: `${
 							isInitialDashboardSearch
 								? activeHeight
@@ -2510,7 +2545,7 @@ const MapBottomSearchBar = memo(
 							MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotHoverBackgroundColor;
 					}}
 					onClick={() => {
-						if (value.trim().length > 0) {
+						if (value.trim().length > 0 || allowEmptySubmit) {
 							onSubmit();
 						} else {
 							onActivate();
@@ -2537,6 +2572,8 @@ type MapBottomSearchFollowupBoxProps = {
 	onKeywordToggle: () => void;
 	isRadiusModeEnabled: boolean;
 	onRadiusToggle: () => void;
+	isProfileModeEnabled: boolean;
+	onProfileToggle: () => void;
 };
 
 const MapBottomSearchFollowupBox = memo(
@@ -2549,6 +2586,8 @@ const MapBottomSearchFollowupBox = memo(
 		onKeywordToggle,
 		isRadiusModeEnabled,
 		onRadiusToggle,
+		isProfileModeEnabled,
+		onProfileToggle,
 	}: MapBottomSearchFollowupBoxProps) => {
 		const segmentBox = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_SEGMENT_BOX;
 		const leftTileBox = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_LEFT_TILE_BOX;
@@ -2556,10 +2595,6 @@ const MapBottomSearchFollowupBox = memo(
 		const profileLeft = segmentBox.advancedWidth + segmentBox.internalDividerWidth;
 		const keywordLeft = profileLeft + segmentBox.segmentWidth;
 		const radiusLeft = keywordLeft + segmentBox.segmentWidth;
-		const [advancedSelections, setAdvancedSelections] =
-			useState<MapBottomSearchAdvancedSelections>({
-				profile: false,
-			});
 		const visualSearchFollowup =
 			previewedSearchFollowup === 'anything'
 				? null
@@ -2570,7 +2605,7 @@ const MapBottomSearchFollowupBox = memo(
 		const isCategoryActive = visualSearchFollowup === 'category';
 		const isAdvancedActive = previewedSearchFollowup === 'anything';
 		const isCompactFollowup = isForYouSelected || isCategorySelected;
-		const isProfileAdvancedSelected = advancedSelections.profile;
+		const isProfileAdvancedSelected = isProfileModeEnabled;
 		const isKeywordAdvancedSelected = isKeywordModeEnabled;
 		const isRadiusAdvancedSelected = isRadiusModeEnabled;
 
@@ -2762,7 +2797,9 @@ const MapBottomSearchFollowupBox = memo(
 								top: 0,
 								width: `${segmentBox.segmentWidth}px`,
 								height: '100%',
-								backgroundColor: isProfileAdvancedSelected ? '#71C9FD' : 'transparent',
+								backgroundColor: isProfileAdvancedSelected
+									? segmentBox.profileActiveBackgroundColor
+									: 'transparent',
 								border: 0,
 								borderRadius: 0,
 								outline: 'none',
@@ -2771,12 +2808,7 @@ const MapBottomSearchFollowupBox = memo(
 								cursor: 'pointer',
 								zIndex: 1,
 							}}
-							onClick={() =>
-								setAdvancedSelections((current) => ({
-									...current,
-									profile: !current.profile,
-								}))
-							}
+							onClick={onProfileToggle}
 						>
 							<MapBottomSearchProfileIcon
 								aria-hidden="true"
@@ -2961,6 +2993,7 @@ const DashboardContent = () => {
 	const freeTextRadiusKmParam = parseFiniteNumberParam('ftR');
 	const freeTextStrictParam = searchParams.get('ftStrict')?.trim() === '1';
 	const freeTextKeywordParam = searchParams.get('ftKeyword')?.trim() === '1';
+	const freeTextProfileParam = searchParams.get('ftProfile')?.trim() === '1';
 	const allContactsMapParam = searchParams.get(ALL_CONTACTS_MAP_PARAM)?.trim() === '1';
 	// "From Home" mode: triggered from landing page search button, shows a pre-configured search
 	// with sign-up modal for unauthenticated users.
@@ -3211,6 +3244,23 @@ const DashboardContent = () => {
 	useEffect(() => {
 		if (freeTextModeParam) setIsKeywordModeEnabled(freeTextKeywordParam);
 	}, [freeTextModeParam, freeTextKeywordParam]);
+
+	// ── Profile search mode (the bottom "Profile" pill) ────────────────────────
+	// Folds identity-derived signals (genre/area/bio) into the search. Page-level
+	// state + ref so the stable submit callback can read it, mirroring keyword/radius.
+	const [isProfileModeEnabled, setIsProfileModeEnabled] = useState(false);
+	const isProfileModeEnabledRef = useRef(false);
+	useEffect(() => {
+		isProfileModeEnabledRef.current = isProfileModeEnabled;
+	}, [isProfileModeEnabled]);
+	useEffect(() => {
+		if (freeTextModeParam) setIsProfileModeEnabled(freeTextProfileParam);
+	}, [freeTextModeParam, freeTextProfileParam]);
+	// One-time-per-session hint when Profile is enabled with an empty profile.
+	const profileHintShownRef = useRef(false);
+	// Lets submitMapBottomSearchQuery (defined before the curated handler) invoke
+	// the empty-query profile path without a forward reference or dep churn.
+	const runProfileTailoredForYouRef = useRef<() => void>(() => {});
 
 	// ── Radius search mode (the bottom "Radius" pill) ──────────────────────────
 	const [isRadiusModeEnabled, setIsRadiusModeEnabled] = useState(false);
@@ -4332,6 +4382,23 @@ const DashboardContent = () => {
 		disableAutoCreateCampaign: isAddToCampaignMode,
 	});
 
+	// Profile search source: the active campaign's identity, falling back to the
+	// user's most-recently-edited identity. Mirrored to a ref so the stable submit
+	// callback reads the latest without churning its deps.
+	const { data: userIdentities } = useGetIdentities({});
+	const resolvedIdentity = useMemo<ProfileIdentityInput | null>(() => {
+		if (activeCampaign?.identity) return activeCampaign.identity;
+		const list = userIdentities ?? [];
+		if (list.length === 0) return null;
+		return [...list].sort(
+			(a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+		)[0];
+	}, [activeCampaign, userIdentities]);
+	const resolvedIdentityRef = useRef<ProfileIdentityInput | null>(null);
+	useEffect(() => {
+		resolvedIdentityRef.current = resolvedIdentity;
+	}, [resolvedIdentity]);
+
 	// True while the dashboard Write overlay shows the post-draft review; keeps the overlay mounted
 	// even if the live map selection changes mid-review.
 	const [isWriteReviewActive, setIsWriteReviewActive] = useState(false);
@@ -4748,14 +4815,31 @@ const DashboardContent = () => {
 		// the map empty until auto-fit + moveend reseed the viewport sample (the original bug).
 		if (freeTextModeParam) {
 			hasHydratedDashboardUrlRef.current = true;
-			rehydrateFreeTextSession({
-				q: dashboardSearchParam,
-				lat: freeTextLatParam,
-				lon: freeTextLonParam,
-				radiusKm: freeTextRadiusKmParam,
-				strictRadius: freeTextStrictParam,
-				keywordMode: freeTextKeywordParam,
-			}).catch(() => undefined);
+			const profileSignals = freeTextProfileParam
+				? deriveProfileSearchSignals(resolvedIdentityRef.current)
+				: null;
+			rehydrateFreeTextSession(
+				{
+					q: dashboardSearchParam,
+					lat: freeTextLatParam,
+					lon: freeTextLonParam,
+					radiusKm: freeTextRadiusKmParam,
+					strictRadius: freeTextStrictParam,
+					keywordMode: freeTextKeywordParam,
+					profileSig: buildProfileSig(
+						profileSignals?.genre,
+						profileSignals?.embedText,
+						profileSignals?.areaText
+					),
+				},
+				profileSignals
+					? {
+							profileGenre: profileSignals.genre,
+							profileEmbedText: profileSignals.embedText,
+							profileArea: profileSignals.areaText,
+					  }
+					: undefined
+			).catch(() => undefined);
 			if (dashboardViewParam === 'table') {
 				setTimeout(() => setIsMapView(false), 0);
 			}
@@ -4802,6 +4886,7 @@ const DashboardContent = () => {
 		form,
 		freeTextLatParam,
 		freeTextKeywordParam,
+		freeTextProfileParam,
 		freeTextLonParam,
 		freeTextModeParam,
 		freeTextRadiusKmParam,
@@ -4882,14 +4967,31 @@ const DashboardContent = () => {
 		// Free-text "Search Anything" rehydration — same treatment as the dashboard flow.
 		if (freeTextModeParam) {
 			hasHydratedFromCampaignUrlRef.current = true;
-			rehydrateFreeTextSession({
-				q: fromCampaignSearchParam,
-				lat: freeTextLatParam,
-				lon: freeTextLonParam,
-				radiusKm: freeTextRadiusKmParam,
-				strictRadius: freeTextStrictParam,
-				keywordMode: freeTextKeywordParam,
-			}).catch(() => undefined);
+			const profileSignals = freeTextProfileParam
+				? deriveProfileSearchSignals(resolvedIdentityRef.current)
+				: null;
+			rehydrateFreeTextSession(
+				{
+					q: fromCampaignSearchParam,
+					lat: freeTextLatParam,
+					lon: freeTextLonParam,
+					radiusKm: freeTextRadiusKmParam,
+					strictRadius: freeTextStrictParam,
+					keywordMode: freeTextKeywordParam,
+					profileSig: buildProfileSig(
+						profileSignals?.genre,
+						profileSignals?.embedText,
+						profileSignals?.areaText
+					),
+				},
+				profileSignals
+					? {
+							profileGenre: profileSignals.genre,
+							profileEmbedText: profileSignals.embedText,
+							profileArea: profileSignals.areaText,
+					  }
+					: undefined
+			).catch(() => undefined);
 			if (fromCampaignViewParam === 'table') {
 				setTimeout(() => setIsMapView(false), 0);
 			}
@@ -4934,6 +5036,7 @@ const DashboardContent = () => {
 		form,
 		freeTextLatParam,
 		freeTextKeywordParam,
+		freeTextProfileParam,
 		freeTextLonParam,
 		freeTextModeParam,
 		freeTextRadiusKmParam,
@@ -4979,6 +5082,7 @@ const DashboardContent = () => {
 						radiusKm: lastFreeTextArgs?.radiusKm ?? null,
 						strictRadius: lastFreeTextArgs?.strictRadius ?? false,
 						keywordMode: lastFreeTextArgs?.keywordMode ?? false,
+						profile: Boolean(lastFreeTextArgs?.profileSig),
 					}
 				: null
 		);
@@ -5097,6 +5201,7 @@ const DashboardContent = () => {
 						radiusKm: lastFreeTextArgs?.radiusKm ?? null,
 						strictRadius: lastFreeTextArgs?.strictRadius ?? false,
 						keywordMode: lastFreeTextArgs?.keywordMode ?? false,
+						profile: Boolean(lastFreeTextArgs?.profileSig),
 					}
 				: null
 		);
@@ -5604,6 +5709,10 @@ const DashboardContent = () => {
 	const [hoveredMapPanelContactId, setHoveredMapPanelContactId] = useState<number | null>(
 		null
 	);
+	const [mapPanelHoverResearchTopPx, setMapPanelHoverResearchTopPx] = useState<
+		number | null
+	>(null);
+	const mapPanelHoverResearchClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	// Show loading in the map panel when:
 	// 1. A search is actively pending/loading, OR
 	// 2. We're in fromHome mode and the search hasn't been executed yet (user not signed in or waiting for search trigger)
@@ -5612,6 +5721,23 @@ const DashboardContent = () => {
 		isLoadingContacts ||
 		isRefetchingContacts ||
 		(fromHomeParam && isMapView && (!isSignedIn || !hasSearched));
+	useEffect(() => {
+		if (isMapView && !isMapResultsLoading) return;
+		if (mapPanelHoverResearchClearTimeoutRef.current) {
+			clearTimeout(mapPanelHoverResearchClearTimeoutRef.current);
+			mapPanelHoverResearchClearTimeoutRef.current = null;
+		}
+		setHoveredMapPanelContactId(null);
+		setMapPanelHoverResearchTopPx(null);
+	}, [isMapResultsLoading, isMapView]);
+	useEffect(() => {
+		return () => {
+			if (mapPanelHoverResearchClearTimeoutRef.current) {
+				clearTimeout(mapPanelHoverResearchClearTimeoutRef.current);
+				mapPanelHoverResearchClearTimeoutRef.current = null;
+			}
+		};
+	}, []);
 	const shouldRenderSearchResultsStage =
 		activeTab === 'search' &&
 		(activeSearchQuery.trim().length > 0 ||
@@ -6359,8 +6485,27 @@ const DashboardContent = () => {
 	const submitMapBottomSearchQuery = useCallback(
 		async (query: string) => {
 			const q = query.trim();
-			if (!q) return;
+			if (!q) {
+				// Profile mode supports an empty box: run a profile-tailored "For You".
+				if (isProfileModeEnabledRef.current) runProfileTailoredForYouRef.current?.();
+				return;
+			}
 			const keywordMode = isKeywordModeEnabledRef.current;
+			// Profile overlay: derive soft signals from the resolved identity. Omitted
+			// in keyword mode (literal field matching ignores semantic/area signals).
+			const profileSignals =
+				isProfileModeEnabledRef.current && !keywordMode
+					? deriveProfileSearchSignals(resolvedIdentityRef.current)
+					: null;
+			const profileOverrides =
+				profileSignals &&
+				(profileSignals.genre || profileSignals.embedText || profileSignals.areaText)
+					? {
+							profileGenre: profileSignals.genre,
+							profileEmbedText: profileSignals.embedText,
+							profileArea: profileSignals.areaText,
+					  }
+					: undefined;
 			mapBottomSearchInputRef.current?.blur();
 			setIsMapBottomSearchActive(false);
 			setMapBottomSearchValue('');
@@ -6386,6 +6531,7 @@ const DashboardContent = () => {
 						radiusKm: radiusMilesRef.current * MILES_TO_KM,
 						strictRadius: true,
 						keywordMode,
+						...profileOverrides,
 					}).catch(() => undefined);
 					return;
 				}
@@ -6393,6 +6539,15 @@ const DashboardContent = () => {
 
 			if (keywordMode) {
 				triggerFreeTextSearch(q, { keywordMode: true }).catch(() => undefined);
+				return;
+			}
+
+			// Profile area anchors the center server-side. A client IP location would
+			// outrank it (overrides beat area), so when we have an area to anchor on,
+			// skip location resolution and let the server geocode it (with its own IP
+			// header fallback if the area is unrecognized).
+			if (profileOverrides?.profileArea) {
+				triggerFreeTextSearch(q, { ...profileOverrides }).catch(() => undefined);
 				return;
 			}
 
@@ -6423,6 +6578,7 @@ const DashboardContent = () => {
 				lat: lat ?? undefined,
 				lon: lon ?? undefined,
 				radiusKm: lat != null && lon != null ? 250 : undefined,
+				...profileOverrides,
 			}).catch(() => undefined);
 		},
 		[
@@ -6441,6 +6597,24 @@ const DashboardContent = () => {
 
 	const handleKeywordToggle = useCallback(() => {
 		setIsKeywordModeEnabled((enabled) => !enabled);
+	}, []);
+
+	const handleProfileToggle = useCallback(() => {
+		setIsProfileModeEnabled((enabled) => {
+			const next = !enabled;
+			// On enable with an empty profile, nudge the user to fill it out (once
+			// per session). The search still runs; augmentation just no-ops until
+			// they add genre/area/bio in campaign drafting.
+			if (
+				next &&
+				!hasUsableProfileSignals(resolvedIdentityRef.current) &&
+				!profileHintShownRef.current
+			) {
+				profileHintShownRef.current = true;
+				toast('Add your genre, area, and bio in campaign drafting to tailor results');
+			}
+			return next;
+		});
 	}, []);
 
 	// Toggle the radius input mode for future searches. The active map geometry is
@@ -6599,6 +6773,59 @@ const DashboardContent = () => {
 		isAddToCampaignMode,
 		isFromHomeDemoMode,
 	]);
+
+	// Empty-box Profile search: a profile-tailored "For You". Genre tightens the
+	// curated category subset (still broad); area sets the center (state-level via
+	// the curated route, else IP/user location). Reuses the curated engine so
+	// results flow through the same rendering/cache path as the For-You tile.
+	const runProfileTailoredForYou = useCallback(async () => {
+		cancelMapBottomSearchFollowupPreviewClear();
+		setMapBottomSearchFollowupPreview(null);
+		setMapBottomSearchFollowupSelection(null);
+		mapBottomSearchInputRef.current?.blur();
+		setIsMapBottomSearchActive(false);
+		setMapBottomSearchValue('');
+		setActiveSection(null);
+
+		if (!isAddToCampaignMode && !isFromHomeDemoMode) {
+			void ensureActiveCampaign('');
+		}
+
+		const signals = deriveProfileSearchSignals(resolvedIdentityRef.current);
+		const category = signals.categorySubset?.length
+			? signals.categorySubset.join(',')
+			: undefined;
+
+		let lat: number | null = null;
+		let lon: number | null = null;
+		try {
+			const loc = await getApproximateLocation();
+			lat = loc.lat;
+			lon = loc.lon;
+		} catch {
+			// Non-fatal: the backend can infer from request headers.
+		}
+
+		try {
+			await triggerCuratedSearch({
+				lat: lat ?? undefined,
+				lon: lon ?? undefined,
+				category,
+				state: signals.areaText ?? undefined,
+			});
+		} catch {
+			// triggerCuratedSearch owns the user-facing error toast.
+		}
+	}, [
+		cancelMapBottomSearchFollowupPreviewClear,
+		triggerCuratedSearch,
+		ensureActiveCampaign,
+		isAddToCampaignMode,
+		isFromHomeDemoMode,
+	]);
+	useEffect(() => {
+		runProfileTailoredForYouRef.current = runProfileTailoredForYou;
+	}, [runProfileTailoredForYou]);
 
 	const handleMapBottomSearchFollowupSelectionChange = useCallback(
 		(selection: MapBottomSearchFollowupSelection) => {
@@ -7391,6 +7618,73 @@ const DashboardContent = () => {
 		}
 		return set;
 	}, [mapPanelUnselectedContactsFiltered, getChipKeyForContact]);
+
+	const mapPanelHoveredResearchContact = useMemo(() => {
+		if (!isMapView || isMapResultsLoading || hoveredMapPanelContactId == null) {
+			return null;
+		}
+
+		const contact = displayedMapPanelContacts.find(
+			(candidate) => candidate.id === hoveredMapPanelContactId
+		);
+		if (!contact) return null;
+
+		const isSelected = selectedContacts.includes(contact.id);
+		const isInBaseResults = displayedBaseContactIdSet.has(contact.id);
+		const searchDerivedHeadline =
+			displayedWhatValue && displayedWhereValue
+				? `${displayedWhatValue} ${displayedWhereValue}`
+				: displayedWhatValue || '';
+		const isSpecialCategorySearch =
+			/^restaurants?$/i.test(displayedWhatValue.trim()) ||
+			/^coffee\s*shops?$/i.test(displayedWhatValue.trim());
+		const curatedDisplayHeadline = contact.curatedDisplayLabel || '';
+		const contactHeadline =
+			curatedDisplayHeadline ||
+			(isInBaseResults
+				? contact.headline || contact.title || ''
+				: contact.title || contact.headline || '');
+		const computedHeadline = isInBaseResults
+			? isSpecialCategorySearch
+				? searchDerivedHeadline
+				: contactHeadline || searchDerivedHeadline
+			: contactHeadline;
+		const stickyHeadline = selectedContactStickyHeadlineById[contact.id] || '';
+		const rowHeadline = isSelected && stickyHeadline ? stickyHeadline : computedHeadline;
+		const displayTitleCategory = displayedIsRestaurantsSearch && isInBaseResults
+			? 'Restaurants'
+			: displayedIsCoffeeShopsSearch && isInBaseResults
+				? 'Coffee Shops'
+				: displayedIsMusicVenuesSearch && isInBaseResults
+					? 'Music Venues'
+					: displayedIsMusicFestivalsSearch && isInBaseResults
+						? 'Music Festivals'
+						: displayedIsWeddingPlannersSearch && isInBaseResults
+							? 'Wedding Planners'
+							: rowHeadline || contact.title || '';
+
+		return {
+			contact,
+			displayHeadline:
+				contact.headline?.trim() || contact.title?.trim() || rowHeadline || '',
+			displayTitleCategory,
+		};
+	}, [
+		displayedBaseContactIdSet,
+		displayedIsCoffeeShopsSearch,
+		displayedIsMusicFestivalsSearch,
+		displayedIsMusicVenuesSearch,
+		displayedIsRestaurantsSearch,
+		displayedIsWeddingPlannersSearch,
+		displayedMapPanelContacts,
+		displayedWhatValue,
+		displayedWhereValue,
+		hoveredMapPanelContactId,
+		isMapResultsLoading,
+		isMapView,
+		selectedContactStickyHeadlineById,
+		selectedContacts,
+	]);
 
 	const getTabPillXFor = (tab: 'search' | 'inbox') => {
 		const track = tabToggleTrackRef.current;
@@ -8198,7 +8492,7 @@ const DashboardContent = () => {
 		searchParams.get('instant')?.trim() === '1' ? ++instantTabFitNonceCounter : 0
 	);
 	const mapPresentation: 'background' | 'interactive' =
-		!isInstantTabTransition && !fromHomeParam && !hasSearched
+		!isInstantTabTransition && !fromHomeParam && !hasSearched && !isMapView
 			? 'background'
 			: 'interactive';
 	const shouldSpinBackgroundMap = mapPresentation === 'background';
@@ -8715,6 +9009,48 @@ const DashboardContent = () => {
 	const shouldShowMapBottomKeywordBadge =
 		isKeywordModeEnabled && !isMapBottomCategoryMode && !isMapBottomForYouMode;
 
+	// Mirrors the keyword badge. Hidden in keyword mode (where Profile is a no-op)
+	// so the two single-slot badges never overlap.
+	const shouldShowMapBottomProfileBadge =
+		isProfileModeEnabled &&
+		!isKeywordModeEnabled &&
+		!isMapBottomCategoryMode &&
+		!isMapBottomForYouMode;
+
+	const updateMapPanelHoverResearchTop = (rowElement: HTMLElement) => {
+		const rawDashboardZoom = window
+			.getComputedStyle(document.documentElement)
+			.getPropertyValue(DASHBOARD_ZOOM_VAR)
+			.trim();
+		const dashboardZoom = Number.parseFloat(rawDashboardZoom) || DASHBOARD_MAP_ZOOM_DEFAULT;
+		const rowRect = rowElement.getBoundingClientRect();
+		const visualCardHeight =
+			MAP_PANEL_ABRIDGED_RESEARCH_HEIGHT_PX * MAP_VIEW_PANEL_SCALE * dashboardZoom;
+		const minVisualTop = 12;
+		const maxVisualTop = Math.max(
+			minVisualTop,
+			window.innerHeight - MAP_VIEW_SIDE_PANEL_BOTTOM_GAP_PX - visualCardHeight
+		);
+		setMapPanelHoverResearchTopPx(
+			clampNumber(rowRect.top, minVisualTop, maxVisualTop) / dashboardZoom
+		);
+	};
+
+	const cancelMapPanelHoverResearchClear = () => {
+		if (!mapPanelHoverResearchClearTimeoutRef.current) return;
+		clearTimeout(mapPanelHoverResearchClearTimeoutRef.current);
+		mapPanelHoverResearchClearTimeoutRef.current = null;
+	};
+
+	const scheduleMapPanelHoverResearchClear = (contactId: number) => {
+		cancelMapPanelHoverResearchClear();
+		mapPanelHoverResearchClearTimeoutRef.current = setTimeout(() => {
+			mapPanelHoverResearchClearTimeoutRef.current = null;
+			setHoveredMapPanelContactId((prev) => (prev === contactId ? null : prev));
+			setMapPanelHoverResearchTopPx(null);
+		}, MAP_PANEL_ABRIDGED_RESEARCH_CLEAR_DELAY_MS);
+	};
+
 	// Renders one contact row in the map-view right-side panel (desktop variant).
 	// Used by both the "Selection" and "Search Results" sub-panels — they differ
 	// only in which slice of `displayedMapPanelContacts` they iterate over.
@@ -8801,10 +9137,14 @@ const DashboardContent = () => {
 							: '#FFFFFF',
 				}}
 				onClick={() => handleMapPanelRowSelect(contact)}
-				onMouseEnter={() => setHoveredMapPanelContactId(contact.id)}
-				onMouseLeave={() =>
-					setHoveredMapPanelContactId((prev) => (prev === contact.id ? null : prev))
-				}
+				onMouseEnter={(event) => {
+					cancelMapPanelHoverResearchClear();
+					setHoveredMapPanelContactId(contact.id);
+					updateMapPanelHoverResearchTop(event.currentTarget);
+				}}
+				onMouseLeave={() => {
+					scheduleMapPanelHoverResearchClear(contact.id);
+				}}
 			>
 				{fullName ? (
 					<>
@@ -9209,6 +9549,7 @@ const DashboardContent = () => {
 							activeCategoryField={activeMapBottomCategoryField}
 							onActivate={handleMapBottomSearchActivate}
 							onSubmit={handleMapBottomSearchSubmit}
+							allowEmptySubmit={isProfileModeEnabled}
 							onValueChange={setMapBottomSearchValue}
 							onActiveChange={setIsMapBottomSearchActive}
 							onCategoryFieldFocus={handleMapBottomCategoryFieldFocus}
@@ -12139,10 +12480,39 @@ const DashboardContent = () => {
 																			onReviewActiveChange={setIsWriteReviewActive}
 																		/>
 																	</div>
-																</div>
-															)}
-														{/* Search Results overlay box on the right side - keep mounted during loading
-											    so the UI doesn't disappear between state searches. */}
+													</div>
+												)}
+												{!isNarrowestDesktop && mapPanelHoveredResearchContact && (
+													<div
+														className="absolute pointer-events-none"
+														style={{
+															zIndex: 124,
+															top:
+																mapPanelHoverResearchTopPx != null
+																	? `${mapPanelHoverResearchTopPx}px`
+																	: MAP_VIEW_SIDE_PANEL_TOP_CSS,
+															right:
+																10 +
+																433 * MAP_VIEW_PANEL_SCALE +
+																MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX,
+															transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
+															transformOrigin: 'top right',
+														}}
+													>
+														<ContactResearchPanel
+															contact={mapPanelHoveredResearchContact.contact}
+															variant="abridged"
+															displayHeadline={
+																mapPanelHoveredResearchContact.displayHeadline
+															}
+															displayTitleCategory={
+																mapPanelHoveredResearchContact.displayTitleCategory
+															}
+														/>
+													</div>
+												)}
+												{/* Search Results overlay box on the right side - keep mounted during loading
+									    so the UI doesn't disappear between state searches. */}
 																{!isNarrowestDesktop && shouldShowMapResultsSidePanel && (
 																			<div
 																				className="absolute right-[10px] flex flex-col gap-[9px] pointer-events-auto"
@@ -12592,6 +12962,7 @@ const DashboardContent = () => {
 																						}
 																						onActivate={handleMapBottomSearchActivate}
 																						onSubmit={handleMapBottomSearchSubmit}
+																						allowEmptySubmit={isProfileModeEnabled}
 																						onValueChange={setMapBottomSearchValue}
 																						onActiveChange={setIsMapBottomSearchActive}
 																						onCategoryFieldFocus={
@@ -12609,8 +12980,9 @@ const DashboardContent = () => {
 																						onCategorySubmit={
 																							handleMapBottomCategorySubmit
 																						}
-																		onForYouSubmit={handleMapBottomForYouSubmit}
+																				onForYouSubmit={handleMapBottomForYouSubmit}
 										radiusEnabled={isRadiusModeEnabled}
+										profileModeEnabled={isProfileModeEnabled}
 										keywordModeEnabled={isKeywordModeEnabled}
 									/>
 									{shouldShowMapBottomKeywordBadge && (
@@ -12641,6 +13013,34 @@ const DashboardContent = () => {
 											<span>keyword search enabled</span>
 										</div>
 									)}
+									{shouldShowMapBottomProfileBadge && (
+										<div
+											aria-hidden="true"
+											className="absolute flex items-center justify-center gap-[6px] pointer-events-none font-inter text-[9px] font-medium text-black"
+											style={{
+												top: 'calc(100% + 4px)',
+												right: 0,
+												width: '148px',
+												height: '13px',
+												borderRadius: '8px',
+												backgroundColor: '#FFFFFF',
+												lineHeight: '20px',
+												textAlign: 'center',
+												zIndex: 1,
+											}}
+										>
+											<span
+												style={{
+													width: '8px',
+													height: '8px',
+													borderRadius: '50%',
+													backgroundColor: '#71C9FD',
+													flexShrink: 0,
+												}}
+											/>
+											<span>Profile search enabled</span>
+										</div>
+									)}
 									<MapBottomSearchFollowupBox
 																		selectedSearchFollowup={
 																			mapBottomSearchFollowupSelection
@@ -12658,6 +13058,8 @@ const DashboardContent = () => {
 																		onKeywordToggle={handleKeywordToggle}
 																		isRadiusModeEnabled={isRadiusModeEnabled}
 																		onRadiusToggle={handleRadiusToggle}
+																		isProfileModeEnabled={isProfileModeEnabled}
+																		onProfileToggle={handleProfileToggle}
 																	/>
 																		{isRadiusModeEnabled && (
 																			<MapRadiusSlider

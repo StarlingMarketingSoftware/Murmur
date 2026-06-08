@@ -28,6 +28,7 @@ import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists
 import { toast } from 'sonner';
 
 import { getStateAbbreviation } from '@/utils/string';
+import { buildProfileSig } from '@/utils/profileSignals';
 import { TableCellTooltip } from '@/components/molecules/TableCellTooltip/TableCellTooltip';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
@@ -75,6 +76,11 @@ type FreeTextSearchArgs = {
 	strictRadius: boolean;
 	// Keyword mode swaps the server into direct field matching instead of semantic search.
 	keywordMode: boolean;
+	// Profile mode: a normalized signature of the identity signals (genre|embedText|
+	// area). Part of the cache identity so profile-tailored results don't collide
+	// with non-profile results, and an identity edit (new signature) busts stale
+	// entries. Empty string when Profile is off.
+	profileSig: string;
 };
 
 // Client-side multi-entry result cache (localStorage). Repeating a recent dashboard search
@@ -209,6 +215,7 @@ const normalizeFreeTextArgs = (args: FreeTextSearchArgs): FreeTextSearchArgs => 
 	radiusKm: args.radiusKm == null ? null : Math.round(args.radiusKm),
 	strictRadius: args.strictRadius,
 	keywordMode: args.keywordMode,
+	profileSig: args.profileSig,
 });
 
 const curatedArgsEqual = (a: CuratedSearchArgs, b: CuratedSearchArgs): boolean =>
@@ -224,7 +231,8 @@ const freeTextArgsEqual = (a: FreeTextSearchArgs, b: FreeTextSearchArgs): boolea
 	a.lon === b.lon &&
 	a.radiusKm === b.radiusKm &&
 	a.strictRadius === b.strictRadius &&
-	Boolean(a.keywordMode) === Boolean(b.keywordMode);
+	Boolean(a.keywordMode) === Boolean(b.keywordMode) &&
+	a.profileSig === b.profileSig;
 
 type CuratedOverrides = {
 	lat?: number | null;
@@ -927,6 +935,9 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				radiusKm?: number | null;
 				strictRadius?: boolean;
 				keywordMode?: boolean;
+				profileGenre?: string | null;
+				profileEmbedText?: string | null;
+				profileArea?: string | null;
 			}
 		) => {
 			const q = rawQuery.trim();
@@ -942,6 +953,11 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				radiusKm: overrides?.radiusKm ?? null,
 				strictRadius: overrides?.strictRadius ?? false,
 				keywordMode: overrides?.keywordMode ?? false,
+				profileSig: buildProfileSig(
+					overrides?.profileGenre,
+					overrides?.profileEmbedText,
+					overrides?.profileArea
+				),
 			};
 			const shouldUseCache = !rawArgs.strictRadius;
 			const cacheArgs = normalizeFreeTextArgs(rawArgs);
@@ -999,6 +1015,9 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					radiusKm: overrides?.radiusKm ?? undefined,
 					strictRadius: overrides?.strictRadius,
 					keywordMode: overrides?.keywordMode,
+					profileGenre: overrides?.profileGenre,
+					profileEmbedText: overrides?.profileEmbedText,
+					profileArea: overrides?.profileArea,
 					limit: 50,
 					signal: controller.signal,
 				});
@@ -1112,7 +1131,14 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	// `curatedCategory` decoration and the map's stable curated marker path stays in effect.
 	// Either way, on success the caller knows it can skip the regular onSubmit fallback.
 	const rehydrateFreeTextSession = useCallback(
-		async (args: FreeTextSearchArgs): Promise<boolean> => {
+		async (
+			args: FreeTextSearchArgs,
+			profileFields?: {
+				profileGenre?: string | null;
+				profileEmbedText?: string | null;
+				profileArea?: string | null;
+			}
+		): Promise<boolean> => {
 			const trimmedQuery = args.q.trim();
 			if (!trimmedQuery) return false;
 
@@ -1144,6 +1170,9 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					radiusKm: args.radiusKm,
 					strictRadius: args.strictRadius,
 					keywordMode: args.keywordMode,
+					profileGenre: profileFields?.profileGenre,
+					profileEmbedText: profileFields?.profileEmbedText,
+					profileArea: profileFields?.profileArea,
 				});
 				return true;
 			} catch {

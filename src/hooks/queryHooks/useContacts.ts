@@ -604,6 +604,12 @@ export interface FreeTextSearchVariables {
 	strictRadius?: boolean;
 	/** Keyword-search mode: direct field matching instead of semantic/category search. */
 	keywordMode?: boolean;
+	/** Profile mode: raw genre, server tokenizes it into a soft ranking multiplier. */
+	profileGenre?: string | null;
+	/** Profile mode: genre + bio keywords appended to the embedding text only. */
+	profileEmbedText?: string | null;
+	/** Profile mode: raw area string, server geocodes it as a soft location anchor. */
+	profileArea?: string | null;
 	limit?: number;
 	// Caller-supplied signal: see CuratedSearchVariables.signal.
 	signal?: AbortSignal;
@@ -626,6 +632,10 @@ export const useFreeTextContactsSearch = (options: CustomMutationOptions = {}) =
 			}
 			if (vars.strictRadius) params.strictRadius = '1';
 			if (vars.keywordMode) params.keywordMode = '1';
+			if (vars.profileGenre) params.profileGenre = vars.profileGenre.slice(0, 120);
+			if (vars.profileEmbedText)
+				params.profileEmbedText = vars.profileEmbedText.slice(0, 200);
+			if (vars.profileArea) params.profileArea = vars.profileArea.slice(0, 120);
 			if (typeof vars.limit === 'number') params.limit = String(vars.limit);
 			const url = appendQueryParamsToUrl(urls.api.contacts.search.index, params);
 			const response = await _fetch(url, undefined, undefined, {

@@ -1316,6 +1316,9 @@ interface ScoreAndInterleaveOptions {
 	// queries we don't want "deli" matching "delicate" or boosting people
 	// whose headline mentions delis in passing.
 	literalSweepMode: boolean;
+	// Profile mode: tokenized genre terms for a gentle, capped ranking lift.
+	// Empty when Profile is off; gated off explicit categories in the body.
+	profileGenreTerms: readonly string[];
 	limit: number;
 }
 
@@ -1347,6 +1350,7 @@ const scoreAndInterleave = (
 		dropPersonOrLoose,
 		queryTargetsPerson,
 		literalSweepMode,
+		profileGenreTerms,
 		limit,
 	} = opts;
 	const cleanlinessTable = queryTargetsPerson
@@ -1477,6 +1481,16 @@ const scoreAndInterleave = (
 		if (softDescriptorScore >= 6) multiplier *= 1.3;
 		else if (softDescriptorScore >= 3) multiplier *= 1.18;
 		else if (softDescriptorScore > 0) multiplier *= 1.08;
+
+		// Profile mode: gently lift contacts whose fields echo the artist's genre.
+		// Capped (<=1.2x) and gated off explicit categories so a typed category
+		// still leads. Soft signal only — never a filter.
+		if (profileGenreTerms.length > 0 && !parsed.hadExplicitCategory) {
+			const genreScore = softDescriptorSignalScore(contact, profileGenreTerms);
+			if (genreScore >= 6) multiplier *= 1.2;
+			else if (genreScore >= 3) multiplier *= 1.12;
+			else if (genreScore > 0) multiplier *= 1.06;
+		}
 
 		if (restOfQueryWordRe) {
 			const titleLc = (contact.title ?? '').toLowerCase();
@@ -1629,6 +1643,24 @@ export async function GET(req: NextRequest) {
 				? overrideRadiusKm
 				: null;
 		const strictRadiusActive = strictCenter != null && strictRadiusKm != null;
+		// Profile mode (dashboard "Profile" pill): soft, identity-derived signals.
+		// profileGenre → a gentle ranking multiplier; profileEmbedText (genre + bio
+		// keywords) → biases the kNN embedding only; profileArea → a soft location
+		// anchor. All subordinate to anything the user typed explicitly.
+		const profileGenre = (url.searchParams.get('profileGenre') ?? '').trim();
+		const profileEmbedText = (url.searchParams.get('profileEmbedText') ?? '').trim();
+		const profileArea = (url.searchParams.get('profileArea') ?? '').trim();
+		const profileActive = !!(profileGenre || profileEmbedText || profileArea);
+		const profileGenreTerms = profileGenre
+			? Array.from(
+					new Set(
+						profileGenre
+							.toLowerCase()
+							.split(/[^a-z0-9]+/)
+							.filter((t) => t.length >= 3)
+					)
+			  )
+			: [];
 		const requestedLimit = (() => {
 			const parsed = Number(url.searchParams.get('limit'));
 			if (!Number.isFinite(parsed)) return DEFAULT_LIMIT;
@@ -1671,6 +1703,43 @@ export async function GET(req: NextRequest) {
 		const parsedCenterLon = parsedCityHasExactCenter
 			? parsed.city!.lon
 			: parsed.state?.lon ?? cityStateForCenter?.centroid.lng ?? null;
+		// Profile area as a SOFT location anchor: only when the user named no place,
+		// gave no override coords, and isn't in strict-radius mode. Reuses the
+		// free-text parser so "Austin" / "Austin, TX" resolve; fail-closed for
+		// unrecognized regions like "Pacific Northwest" (no anchor, no pollution).
+		const profileAreaParsed =
+			profileActive &&
+			profileArea &&
+			!parsed.hadExplicitPlace &&
+			!strictRadiusActive &&
+			overrideLat == null &&
+			overrideLon == null
+				? parseFreeTextSearchQuery(profileArea)
+				: null;
+		let profileAreaCenterLat: number | null = null;
+		let profileAreaCenterLon: number | null = null;
+		let profileAreaCity: string | null = null;
+		let profileAreaState: string | null = null;
+		if (profileAreaParsed?.hadExplicitPlace) {
+			const areaCityState = profileAreaParsed.city?.state
+				? US_STATES.find(
+						(s) =>
+							s.abbr.toLowerCase() ===
+							profileAreaParsed.city!.state!.toLowerCase()
+				  )
+				: null;
+			const areaHasExactCenter =
+				profileAreaParsed.city?.coordinatePrecision === 'city';
+			profileAreaCenterLat = areaHasExactCenter
+				? profileAreaParsed.city!.lat
+				: profileAreaParsed.state?.lat ?? areaCityState?.centroid.lat ?? null;
+			profileAreaCenterLon = areaHasExactCenter
+				? profileAreaParsed.city!.lon
+				: profileAreaParsed.state?.lon ?? areaCityState?.centroid.lng ?? null;
+			profileAreaCity = profileAreaParsed.city?.name ?? null;
+			profileAreaState =
+				profileAreaParsed.state?.name ?? areaCityState?.name ?? null;
+		}
 		const center: ResolvedCenter = strictRadiusActive
 			? {
 					lat: strictCenter.lat,
@@ -1683,10 +1752,14 @@ export async function GET(req: NextRequest) {
 					req,
 					{ lat: overrideLat, lon: overrideLon },
 					{
-						lat: parsedCenterLat,
-						lon: parsedCenterLon,
-						city: parsed.city?.name ?? null,
-						state: parsed.state?.name ?? cityStateForCenter?.name ?? null,
+						lat: parsedCenterLat ?? profileAreaCenterLat,
+						lon: parsedCenterLon ?? profileAreaCenterLon,
+						city: parsed.city?.name ?? profileAreaCity ?? null,
+						state:
+							parsed.state?.name ??
+							cityStateForCenter?.name ??
+							profileAreaState ??
+							null,
 					}
 			  );
 		const hasCenter = center.lat != null && center.lon != null;
@@ -1942,9 +2015,19 @@ export async function GET(req: NextRequest) {
 		// + prefix carry the load (no point burning an embedding on an empty
 		// rest-of-query).
 		const knnBaseText = parsed.restOfQuery.length > 2 ? parsed.restOfQuery : rawQuery;
-		const knnText = parsed.categories.length > 0
+		const knnCategoryText = parsed.categories.length > 0
 			? `${parsed.categories.join(' ')} ${knnBaseText}`.trim()
 			: knnBaseText;
+		// Profile mode biases the semantic embedding toward the artist's genre + a
+		// few bio keywords. This touches ONLY knnText (the embedded string), never
+		// rawQuery — the lexical retriever and literal-title regex keep the user's
+		// exact words. The embedding cache keys on this same string (vectorDb
+		// normalizeQueryEmbeddingKey <-> createTextEmbedding both use restOfQuery =
+		// knnText), so distinct identities never collide in the cache.
+		const knnText =
+			profileActive && profileEmbedText
+				? `${knnCategoryText} ${profileEmbedText}`.trim()
+				: knnCategoryText;
 		const shouldRunKnn = knnText.trim().length > 1;
 
 		type KnnResult = Awaited<ReturnType<typeof searchSimilarContacts>>;
@@ -2178,6 +2261,7 @@ export async function GET(req: NextRequest) {
 			dropPersonOrLoose: true,
 			queryTargetsPerson,
 			literalSweepMode: false,
+			profileGenreTerms,
 			limit: requestedLimit,
 		});
 
@@ -2329,6 +2413,7 @@ export async function GET(req: NextRequest) {
 				dropPersonOrLoose: false,
 				queryTargetsPerson,
 				literalSweepMode: true,
+				profileGenreTerms,
 				limit: Math.min(requestedLimit, NATIONAL_FALLBACK_LIMIT_CAP),
 			});
 			stage2LiteralMatchCount = stage2.literalMatchCount;
