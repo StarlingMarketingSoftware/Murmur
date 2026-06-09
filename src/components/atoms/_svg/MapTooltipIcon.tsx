@@ -28,7 +28,7 @@ const TOOLTIP_CATEGORY_ICON_BASELINE_OFFSET = 5;
 
 // Convert React-style SVG attrs (camelCase) to SVG/XML attrs (kebab-case).
 // The tooltip is rendered via `data:image/svg+xml`, which is parsed as XML.
-const normalizeInlineSvgMarkupForXml = (markup: string): string =>
+export const normalizeInlineSvgMarkupForXml = (markup: string): string =>
 	markup
 		.replaceAll('strokeWidth', 'stroke-width')
 		.replaceAll('strokeLinecap', 'stroke-linecap')

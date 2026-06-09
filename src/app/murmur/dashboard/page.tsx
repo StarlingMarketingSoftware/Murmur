@@ -156,6 +156,8 @@ import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/Ca
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import { DashboardWriteOverlay } from './DashboardWriteOverlay';
+import { MapEventPopupCard, formatMapPostedEventDate } from './MapEventPopupCard';
+import { ApplyModal } from './ApplyModal';
 import DashboardResponsesWidget, {
 	type ResponsesMockState,
 } from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesWidget';
@@ -172,6 +174,7 @@ import {
 } from '@/hooks/queryHooks/useCampaigns';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { useGetMapEvents } from '@/hooks/queryHooks/useGetMapEvents';
+import type { MapEventData } from '@/app/api/events/route';
 import {
 	getIdentitiesListQueryKey,
 	fetchIdentitiesList,
@@ -228,6 +231,9 @@ const FREETEXT_URL_PARAM_KEYS = [
 ] as const;
 
 const MILES_TO_KM = 1.609344;
+
+const MAP_POSTED_EVENT_CARD_WIDTH_PX = 420;
+const MAP_POSTED_EVENT_CARD_HEIGHT_PX = 121;
 
 // Browser memory for radius mode (enabled flag + draft/default center + miles), so it's
 // retained across disengage/re-engage, toggling off, and reloads. Only the Radius pill
@@ -5710,6 +5716,7 @@ const DashboardContent = () => {
 	const [hoveredMapPanelContactId, setHoveredMapPanelContactId] = useState<number | null>(
 		null
 	);
+	const [applyModalOpen, setApplyModalOpen] = useState(false);
 	const [mapPanelHoverResearchTopPx, setMapPanelHoverResearchTopPx] = useState<
 		number | null
 	>(null);
@@ -8536,6 +8543,20 @@ const DashboardContent = () => {
 				})),
 		[mapEvents]
 	);
+	// Renders the event-popup card for the active marker (looked up by id) inside the map's
+	// white inner box. The map owns the popup container/positioning; this owns the content.
+	const renderEventPopupContent = useCallback(
+		(eventId: number) => {
+			const event = mapEvents?.find((e) => e.id === eventId);
+			return event ? (
+				<MapEventPopupCard event={event} onApply={() => setApplyModalOpen(true)} />
+			) : null;
+		},
+		[mapEvents]
+	);
+	const topPostedMapEvent = useMemo<MapEventData | null>(() => {
+		return mapEvents?.[0] ?? null;
+	}, [mapEvents]);
 
 	const contactsForMap = useMemo(() => {
 		const sourceContacts =
@@ -8874,12 +8895,21 @@ const DashboardContent = () => {
 			onRadiusCenterChange: handleRadiusCenterChange,
 			// Venue-posted opportunity markers only on the interactive map, not the globe.
 			events: isMapView ? eventsForMap : [],
+			// Reserve the right-side search-results panel's footprint (433px box at
+			// right:10px, scaled, origin top-right) so the event popup places to the right of
+			// a marker only when it clears the panel, and flips left otherwise.
+			rightSafeAreaPx:
+				isMapView && !isNarrowestDesktop && shouldShowMapResultsSidePanel
+					? Math.round(10 + 433 * MAP_VIEW_PANEL_SCALE)
+					: 0,
+			renderEventPopupContent: isMapView ? renderEventPopupContent : undefined,
 		}),
 		[
 			activeMapTool,
 			activeRadiusSearchOverlay,
 			activeSearchQuery,
 			eventsForMap,
+			renderEventPopupContent,
 			canDisengageMapSearch,
 			contactsForMap,
 			handleRadiusCenterChange,
@@ -8904,6 +8934,7 @@ const DashboardContent = () => {
 			isMapSearchEngaged,
 			isLoadingContacts,
 			isMapView,
+			isNarrowestDesktop,
 			isRefetchingContacts,
 			isSearchPending,
 			lockedStateNameForMap,
@@ -8911,6 +8942,7 @@ const DashboardContent = () => {
 			mapGrabUncategorizedActive,
 			mapSearchAutoFitRequestNonce,
 			mapPresentation,
+			MAP_VIEW_PANEL_SCALE,
 			mapZoomControlRequest,
 			searchWhatForMap,
 			selectedAreaBoundsForMap,
@@ -8918,6 +8950,7 @@ const DashboardContent = () => {
 			selectedContactObjectsForMap,
 			selectAllInViewNonce,
 			shouldEnableMapStateCategorySelection,
+			shouldShowMapResultsSidePanel,
 			shouldShowSearchGeometryOnMap,
 			shouldShowAmbientContactsOnMap,
 			shouldPreloadAmbientContactsOnMap,
@@ -8942,6 +8975,30 @@ const DashboardContent = () => {
 	useLayoutEffect(() => {
 		setPersistentMapConfig(persistentMapConfig);
 	}, [persistentMapConfig, setPersistentMapConfig]);
+
+	// The posted-event card is laid out at a fixed 420×121 design size, but in the
+	// desktop results column it must match the (narrower) result-row width. We
+	// measure the available width and scale the whole card down proportionally so
+	// it keeps its aspect ratio instead of overflowing to the right.
+	// NOTE: these hooks must stay above the early `isMobile` returns below —
+	// React requires the same hook order on every render.
+	const [postedEventCardScale, setPostedEventCardScale] = useState(1);
+	const postedEventCardResizeObserverRef = useRef<ResizeObserver | null>(null);
+	const measurePostedEventCard = useCallback((node: HTMLDivElement | null) => {
+		postedEventCardResizeObserverRef.current?.disconnect();
+		postedEventCardResizeObserverRef.current = null;
+		if (!node) return;
+		const update = () => {
+			const width = node.clientWidth;
+			if (width > 0) {
+				setPostedEventCardScale(Math.min(1, width / MAP_POSTED_EVENT_CARD_WIDTH_PX));
+			}
+		};
+		update();
+		const observer = new ResizeObserver(update);
+		observer.observe(node);
+		postedEventCardResizeObserverRef.current = observer;
+	}, []);
 
 	const mapPortal = null;
 
@@ -9068,6 +9125,131 @@ const DashboardContent = () => {
 			setHoveredMapPanelContactId((prev) => (prev === contactId ? null : prev));
 			setMapPanelHoverResearchTopPx(null);
 		}, MAP_PANEL_ABRIDGED_RESEARCH_CLEAR_DELAY_MS);
+	};
+
+	const renderMapPostedEventCard = (variant: 'desktop' | 'narrow') => {
+		if (!topPostedMapEvent) return null;
+
+		const isNarrow = variant === 'narrow';
+		const eventName = topPostedMapEvent.name.trim() || 'Posted Event';
+		const eventDate = formatMapPostedEventDate(topPostedMapEvent);
+		const venueName = topPostedMapEvent.venueName?.trim() || 'Venue TBA';
+		const venueCity = topPostedMapEvent.venueCity?.trim() || '';
+		const venueStateAbbr =
+			getStateAbbreviation(topPostedMapEvent.venueState || '') ||
+			topPostedMapEvent.venueState?.trim().toUpperCase() ||
+			'';
+
+		const cardSurfaceStyle = {
+			borderRadius: '8px',
+			border: '3px solid #8F2B2B',
+			backgroundColor: '#F9FAFB',
+		};
+
+		const cardBody = (
+			<>
+				<div className="absolute left-[10px] right-[10px] top-[7px] bottom-[42px] min-w-0">
+					<div className="grid h-full min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-[10px]">
+						<div className="min-w-0">
+							<div className="flex min-w-0 items-center gap-[5px]">
+								<MapStackStarIcon size={24} className="flex-shrink-0" />
+								{venueStateAbbr && (
+									<span
+										className="inline-flex h-[19px] w-[35px] flex-shrink-0 items-center justify-center rounded-[5.6px] border font-inter text-[12px] font-bold leading-none text-black"
+										style={{
+											backgroundColor: stateBadgeColorMap[venueStateAbbr] || '#FFF8DC',
+											borderColor: '#000000',
+										}}
+									>
+										{venueStateAbbr}
+									</span>
+								)}
+								{venueCity && (
+									<span className="truncate font-inter text-[12px] leading-none text-black">
+										{venueCity}
+									</span>
+								)}
+							</div>
+							<div className="mt-[4px] truncate font-inter text-[16px] font-bold leading-[19px] text-black">
+								{venueName}
+							</div>
+						</div>
+						<div className="min-w-0 pt-[1px]">
+							<div className="truncate font-inter text-[15px] font-medium leading-[18px] text-black">
+								{eventName}
+							</div>
+							<div className="mt-[3px] inline-flex max-w-full truncate rounded-[4px] bg-[#D6F7FF] px-[4px] py-[1px] font-inter text-[14px] leading-[16px] text-black">
+								{eventDate}
+							</div>
+						</div>
+					</div>
+				</div>
+				<div
+					aria-hidden="true"
+					className="absolute left-0 right-0 bottom-[15px] h-[27px]"
+					style={{ backgroundColor: '#FFD5D5' }}
+				/>
+				<div
+					aria-hidden="true"
+					className="absolute left-0 right-0 bottom-0 h-[15px]"
+					style={{ backgroundColor: '#FF9595' }}
+				/>
+				<button
+					type="button"
+					aria-label={`Apply to ${eventName}`}
+					className="absolute left-[34px] bottom-[15px] flex items-center justify-center font-inter text-[16px] font-medium leading-none text-black"
+					style={{
+						width: '78px',
+						height: '27px',
+						backgroundColor: '#E06D6D',
+					}}
+					onClick={(event) => {
+						event.stopPropagation();
+						setApplyModalOpen(true);
+					}}
+				>
+					Apply
+				</button>
+			</>
+		);
+
+		// Outer wrapper fills the result-row width (capped at the design width) and
+		// reserves the proportional height via aspect-ratio; the inner card is laid
+		// out at its native 420×121 size and scaled down to fit, so the whole card —
+		// text, badges, banners and button — shrinks together instead of overflowing.
+		return (
+			<div
+				key={`posted-event-${topPostedMapEvent.id}`}
+				ref={isNarrow ? undefined : measurePostedEventCard}
+				className="mx-auto flex-shrink-0 overflow-hidden select-none"
+				style={{
+					width: '100%',
+					maxWidth: `${MAP_POSTED_EVENT_CARD_WIDTH_PX}px`,
+					// Match the inner card's rounding so the wrapper's own background
+					// (which the results-cascade animation paints white) is clipped to
+					// the rounded shape instead of bleeding into the corners.
+					borderRadius: '8px',
+					...(isNarrow
+						? {}
+						: {
+								aspectRatio: `${MAP_POSTED_EVENT_CARD_WIDTH_PX} / ${MAP_POSTED_EVENT_CARD_HEIGHT_PX}`,
+							}),
+				}}
+			>
+				<div
+					className="relative overflow-hidden"
+					style={{
+						width: isNarrow ? '100%' : `${MAP_POSTED_EVENT_CARD_WIDTH_PX}px`,
+						height: `${MAP_POSTED_EVENT_CARD_HEIGHT_PX}px`,
+						transformOrigin: 'top left',
+						transform: isNarrow ? undefined : `scale(${postedEventCardScale})`,
+						...cardSurfaceStyle,
+					}}
+				>
+					{cardBody}
+				</div>
+			</div>
+		);
 	};
 
 	// Renders one contact row in the map-view right-side panel (desktop variant).
@@ -12764,16 +12946,17 @@ const DashboardContent = () => {
 																										14
 																									)}
 																								/>
-																							) : (
-																								<div
-																									ref={mapPanelRowsDesktopRef}
-																									className="space-y-[7px]"
-																								>
-																									{mapPanelUnselectedContactsFiltered.map(
-																										renderMapPanelDesktopRow
-																									)}
-																								</div>
-																							)}
+															) : (
+																<div
+																	ref={mapPanelRowsDesktopRef}
+																	className="space-y-[7px]"
+																>
+																	{renderMapPostedEventCard('desktop')}
+																	{mapPanelUnselectedContactsFiltered.map(
+																		renderMapPanelDesktopRow
+																	)}
+																</div>
+															)}
 																						</CustomScrollbar>
 																						<div
 																							className="absolute left-1/2 -translate-x-1/2 bottom-[9px] flex items-center gap-[2px] pl-[4px]"
@@ -13166,13 +13349,14 @@ const DashboardContent = () => {
 																				rows={Math.max(displayedMapPanelContacts.length, 8)}
 																			/>
 																					) : (
-																						<div
-																							ref={mapPanelRowsNarrowRef}
-																							className="space-y-[7px]"
-																						>
-																			{displayedMapPanelContacts.map((contact) => {
-																								const isSelected =
-																									selectedContacts.includes(contact.id);
+																		<div
+																			ref={mapPanelRowsNarrowRef}
+																			className="space-y-[7px]"
+																		>
+															{renderMapPostedEventCard('narrow')}
+															{displayedMapPanelContacts.map((contact) => {
+																				const isSelected =
+																					selectedContacts.includes(contact.id);
 																								const isHovered =
 																									hoveredMapPanelContactId === contact.id;
 																					const isInBaseResults =
@@ -13913,6 +14097,12 @@ const DashboardContent = () => {
 								</div>,
 								document.body
 							)}
+
+						{/* Apply modal - centered two-box overlay (opened from either Apply button) */}
+						<ApplyModal
+							open={applyModalOpen}
+							onClose={() => setApplyModalOpen(false)}
+						/>
 					</div>
 				</AppLayout>
 			</div>

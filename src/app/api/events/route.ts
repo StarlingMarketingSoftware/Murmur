@@ -11,6 +11,12 @@ export type MapEventData = {
 	longitude: number | null;
 	whenLabel: string | null;
 	startsAt: string | null;
+	pay: string | null;
+	details: string | null;
+	venueName: string | null;
+	venueCity: string | null;
+	venueState: string | null;
+	venueBusinessType: string | null;
 };
 
 // GET /api/events — upcoming, located events from every venue, for the shared map.
@@ -38,9 +44,38 @@ export async function GET() {
 				longitude: true,
 				whenLabel: true,
 				startsAt: true,
+				pay: true,
+				details: true,
+				user: {
+					select: {
+						venue: {
+							select: {
+								venueName: true,
+								city: true,
+								state: true,
+								businessType: true,
+							},
+						},
+					},
+				},
 			},
 		});
-		return apiResponse(events);
+		return apiResponse(
+			events.map((event) => ({
+				id: event.id,
+				name: event.name,
+				latitude: event.latitude,
+				longitude: event.longitude,
+				whenLabel: event.whenLabel,
+				startsAt: event.startsAt?.toISOString() ?? null,
+				pay: event.pay,
+				details: event.details,
+				venueName: event.user.venue?.venueName ?? null,
+				venueCity: event.user.venue?.city ?? null,
+				venueState: event.user.venue?.state ?? null,
+				venueBusinessType: event.user.venue?.businessType ?? null,
+			}))
+		);
 	} catch (error) {
 		return handleApiError(error);
 	}

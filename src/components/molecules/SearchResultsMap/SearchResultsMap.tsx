@@ -4,6 +4,7 @@ import {
 	FC,
 	Fragment,
 	memo,
+	type ReactNode,
 	useCallback,
 	useEffect,
 	useId,
@@ -805,6 +806,29 @@ const EVENT_STAR_ICON_URL = `data:image/svg+xml;charset=UTF-8,${encodeURICompone
 )}`;
 const EVENT_STAR_ICON_IMAGE_DIMENSIONS = { width: 54, height: 54 } as const;
 
+// Event opportunity popup (phase 1: shapes + lat/lng only). Outer red box, inner white
+// box inset 5px from the top, and a bottom red strip showing the event coordinates.
+// The card is authored at its natural "design" size, then uniformly scaled down so it
+// reads at the same compact weight as the rest of the map chrome (result rows,
+// tooltips). All inner content (MapEventPopupCard) is pixel-positioned against the
+// design size and scales with it, so only EVENT_POPUP_SCALE needs tuning to resize.
+const EVENT_POPUP_SCALE = 0.75;
+const EVENT_POPUP_DESIGN_W = 356;
+const EVENT_POPUP_DESIGN_H = 457;
+// On-screen footprint after scaling — used by the edge-aware placement math so the
+// popup is positioned and clamped against its actual rendered size.
+const EVENT_POPUP_W = Math.round(EVENT_POPUP_DESIGN_W * EVENT_POPUP_SCALE);
+const EVENT_POPUP_H = Math.round(EVENT_POPUP_DESIGN_H * EVENT_POPUP_SCALE);
+// Gap between the star marker and the popup edge, plus an approximate half-extent of the
+// star glyph on screen (icon-size tops out ~0.66 × 54px ≈ 36px → ~14px half-extent at
+// typical zoom). Used by the edge-aware placement math.
+const EVENT_POPUP_GAP = 14;
+const EVENT_POPUP_STAR_HALF = 14;
+// Grace period before a hover-opened popup closes after the pointer leaves the star.
+// Bridges the star→box gap so the cursor can travel into the (interactive) popup and
+// hover/click it, instead of the popup vanishing the instant the star is no longer hit.
+const EVENT_POPUP_HOVER_CLOSE_DELAY_MS = 150;
+
 // The opportunity markers reuse the owned-venue radar builders per event center,
 // re-keying each feature id so features from different events never collide inside a
 // shared source. This keeps the motion identical to the venue-portal radar.
@@ -1067,6 +1091,13 @@ export interface SearchResultsMapProps {
 	ownedVenueLocation?: OwnedVenueLocation | null;
 	/** Venue-posted events to draw as radar opportunity markers (red star + radar). */
 	events?: MapEvent[];
+	/** Pixels along the right edge obstructed by host UI (e.g. the search-results panel).
+	 *  The event popup places to the right of a marker only when it clears this region,
+	 *  flipping left otherwise. */
+	rightSafeAreaPx?: number;
+	/** Renders the content inside an event popup's white inner box for the active event.
+	 *  The map owns the popup container + positioning; the host owns the event card. */
+	renderEventPopupContent?: (eventId: number) => ReactNode;
 }
 
 // NOTE: Night lights are generated offline as raster dot tiles (see scripts/generate_contact_lights_tiles.py).
@@ -1122,6 +1153,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	onRadiusCenterChange,
 	ownedVenueLocation = null,
 	events = [],
+	rightSafeAreaPx = 0,
+	renderEventPopupContent,
 }) => {
 	const curatedOrbSvgIdPrefix = useId().replace(/:/g, '');
 	const curatedOrbSlotIds = useMemo(
@@ -1415,6 +1448,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
 	const hoveredMarkerIdRef = useRef<number | null>(null);
 	const hoverSourceRef = useRef<'map' | 'external' | null>(null);
+	// Event opportunity popup: hover opens it, click pins it open (pinned wins over hover).
+	// The ref mirrors `hoveredEventId` so the unified pointer handler can read/clear hover
+	// without being added to that effect's dependency array.
+	const [hoveredEventId, setHoveredEventId] = useState<number | null>(null);
+	const [pinnedEventId, setPinnedEventId] = useState<number | null>(null);
+	const hoveredEventIdRef = useRef<number | null>(null);
+	const eventPopupOverlayRef = useRef<HTMLDivElement | null>(null);
+	// Hover-intent close timer + a flag for "pointer is currently over the popup box", so the
+	// hover popup survives the star→box gap and stays open while the cursor is on the card.
+	const eventHoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const isPointerOverEventPopupRef = useRef(false);
 	// Track tooltip that is fading out (for smooth transition)
 	const [fadingTooltipId, setFadingTooltipId] = useState<number | null>(null);
 	const fadingTooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1915,6 +1959,88 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				isValidOwnedVenueLocation({ lat: event.lat, lng: event.lng })
 			),
 		[events]
+	);
+	const eventCentersById = useMemo(() => {
+		const map = new Map<number, MapEvent>();
+		for (const event of eventCenters) map.set(event.id, event);
+		return map;
+	}, [eventCenters]);
+	// Pinned (click) wins over hovered. Deriving the event object via `.get()` makes the
+	// "events emptied / id no longer present" cases collapse to null automatically, so the
+	// popup overlay simply unmounts.
+	const activeEventId = pinnedEventId ?? hoveredEventId;
+	const activeEvent =
+		activeEventId != null ? (eventCentersById.get(activeEventId) ?? null) : null;
+	// Drop hovered/pinned ids whose event has disappeared (e.g. events list changed).
+	useEffect(() => {
+		if (hoveredEventId != null && !eventCentersById.has(hoveredEventId)) {
+			hoveredEventIdRef.current = null;
+			setHoveredEventId(null);
+		}
+		if (pinnedEventId != null && !eventCentersById.has(pinnedEventId)) {
+			setPinnedEventId(null);
+		}
+	}, [eventCentersById, hoveredEventId, pinnedEventId]);
+
+	// Event-popup hover lifecycle. These mirror the contact-tooltip bridge: hovering the star
+	// opens the popup, and a short grace period lets the cursor cross the star→box gap into the
+	// (now interactive) card without it closing. The box's onMouseEnter cancels the pending
+	// close; its onMouseLeave reschedules it. Pinned popups (click) ignore all of this.
+	const cancelEventHoverClose = useCallback(() => {
+		if (eventHoverCloseTimerRef.current) {
+			clearTimeout(eventHoverCloseTimerRef.current);
+			eventHoverCloseTimerRef.current = null;
+		}
+	}, []);
+	const setEventHover = useCallback(
+		(id: number) => {
+			cancelEventHoverClose();
+			if (hoveredEventIdRef.current !== id) {
+				hoveredEventIdRef.current = id;
+				setHoveredEventId(id);
+			}
+		},
+		[cancelEventHoverClose]
+	);
+	const clearEventHoverImmediate = useCallback(() => {
+		cancelEventHoverClose();
+		// Every caller of this is a case where the cursor is provably on the map canvas
+		// (area-select, or hovering a contact marker), not on the box — so the over-box flag
+		// is stale and must be dropped, or it would wedge scheduleEventHoverClose off.
+		isPointerOverEventPopupRef.current = false;
+		if (hoveredEventIdRef.current != null) {
+			hoveredEventIdRef.current = null;
+			setHoveredEventId(null);
+		}
+	}, [cancelEventHoverClose]);
+	const scheduleEventHoverClose = useCallback(() => {
+		// No-op while the cursor is on the box (any stale mousemove frame would otherwise
+		// reschedule a close), if nothing is hovered, or if a close is already pending.
+		if (isPointerOverEventPopupRef.current) return;
+		if (hoveredEventIdRef.current == null) return;
+		if (eventHoverCloseTimerRef.current != null) return;
+		eventHoverCloseTimerRef.current = setTimeout(() => {
+			eventHoverCloseTimerRef.current = null;
+			hoveredEventIdRef.current = null;
+			setHoveredEventId(null);
+		}, EVENT_POPUP_HOVER_CLOSE_DELAY_MS);
+	}, []);
+	// Drop the "pointer over box" flag whenever the popup isn't rendered. React never fires
+	// the box's onMouseLeave on unmount, so if the card disappears while the cursor is inside
+	// it (a new search flips isLoading, or its event leaves the set), the flag would stick
+	// `true` and permanently wedge scheduleEventHoverClose off for every later hover popup.
+	useEffect(() => {
+		if (isLoading || activeEventId == null) {
+			isPointerOverEventPopupRef.current = false;
+		}
+	}, [isLoading, activeEventId]);
+	// Clear any pending close timer + the flag on unmount (the persistent map can outlive this).
+	useEffect(
+		() => () => {
+			cancelEventHoverClose();
+			isPointerOverEventPopupRef.current = false;
+		},
+		[cancelEventHoverClose]
 	);
 	// The radius circle reuses the curated-blob pipeline (see updateCuratedBlob), so
 	// it appears only once a radius search returns results, rendered as one circle.
@@ -12264,6 +12390,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return null;
 		};
 
+		// Event-star hit test. Event features carry a STRING feature id (`event-<id>-icon`),
+		// so the eventId lives in `properties.eventId`, not the feature id. Returns the
+		// numeric event id under the pointer (and present in the current set), else null.
+		const getEventHit = (e: mapboxgl.MapMouseEvent): number | null => {
+			if (eventCentersById.size === 0) return null;
+			const raw = map.queryRenderedFeatures(e.point, {
+				layers: [MAPBOX_LAYER_IDS.eventsStarIcon],
+			})[0]?.properties?.eventId;
+			const id =
+				typeof raw === 'number'
+					? raw
+					: typeof raw === 'string'
+						? Number.parseInt(raw, 10)
+						: NaN;
+			return Number.isFinite(id) && eventCentersById.has(id) ? id : null;
+		};
+
 		const setCursor = (cursor: string) => {
 			// Avoid fighting the rectangle-selection cursor.
 			if (areaSelectionEnabled || isAreaSelecting) return;
@@ -12313,6 +12456,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const processMouseMove = (e: mapboxgl.MapMouseEvent) => {
 			if (areaSelectionEnabled || isAreaSelecting) {
 				clearEmptyMapPrompt();
+				clearEventHoverImmediate();
 				return;
 			}
 
@@ -12336,6 +12480,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const sourceId = getSourceForHitLayer(markerLayerId);
 				if (contact && sourceId) {
 					clearEmptyMapPrompt();
+					clearEventHoverImmediate();
 					setCursor('pointer');
 					setMarkerVisualHover(sourceId, markerId);
 					clearStateHover();
@@ -12358,6 +12503,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				handleMarkerMouseOut(prevHovered);
 			}
 			setCursor('');
+
+			// Event-star hover (independent of the contact/state hover machinery). Contacts
+			// win ties because their branch returns above. Stop before the state-hover and
+			// empty-map-prompt logic so a star hover doesn't also highlight the state under it.
+			const eventHitId = getEventHit(e);
+			if (eventHitId != null) {
+				clearStateHover();
+				clearEmptyMapPrompt();
+				setCursor('pointer');
+				setEventHover(eventHitId);
+				return;
+			}
+			// Pointer left the star to empty map: don't close instantly — give the cursor a grace
+			// window to reach the (interactive) popup box, whose onMouseEnter cancels this close.
+			scheduleEventHoverClose();
 
 			if (isSearchAreaHit(e)) {
 				clearEmptyMapPrompt();
@@ -12468,6 +12628,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 			}
 
+			// Click on an event star pins its popup open (toggle). Returning here also stops
+			// the generic empty-map handling below from firing for star clicks.
+			const eventClickId = getEventHit(e);
+			if (eventClickId != null) {
+				setPinnedEventId((prev) => (prev === eventClickId ? null : eventClickId));
+				setEventHover(eventClickId);
+				return;
+			}
+
 			// Clicks inside curated blobs are intentional search-result interactions, not
 			// empty-map clicks that should disengage the current search.
 			if (isSearchAreaHit(e)) {
@@ -12539,8 +12708,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					Math.abs(downClient.y - upClient.y) >= 6)
 			);
 
-			// Click on empty map clears any selected marker panel.
+			// Click on empty map clears any selected marker panel and dismisses a pinned
+			// event popup.
 			setSelectedMarker(null);
+			setPinnedEventId(null);
 
 			if (
 				!movedAfterPointerDown &&
@@ -12576,6 +12747,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (isInsideHoverTooltip(event)) return;
 			clearEmptyMapPrompt();
 			clearMarkerVisualHover();
+			// Schedule (don't force) the popup close: if the cursor is leaving the canvas to
+			// enter the popup box, the box's onMouseEnter cancels this before it fires.
+			scheduleEventHoverClose();
 			const prevHovered = hoveredMarkerIdRef.current;
 			if (hoverSourceRef.current === 'map' && prevHovered != null) {
 				handleMarkerMouseOut(prevHovered);
@@ -12618,6 +12792,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		handleMarkerMouseOver,
 		handleMarkerMouseOut,
 		handleMarkerClick,
+		eventCentersById,
+		setEventHover,
+		clearEventHoverImmediate,
+		scheduleEventHoverClose,
 	]);
 
 	// ---- Mapbox marker sources (rendered via layers) ----
@@ -15303,6 +15481,99 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [map, isMapLoaded, isLoading, selectedMarkerCoords?.lat, selectedMarkerCoords?.lng]);
 
+	// Event opportunity popup anchoring with edge-aware placement. The EVENT_POPUP_W×_H box flips
+	// above/below/left/right of the star depending on available room in the map container,
+	// then clamps so it always stays fully on screen. Re-runs on every map move (pan/zoom).
+	useLayoutEffect(() => {
+		if (!map || !isMapLoaded || isLoading) return;
+		const el = eventPopupOverlayRef.current;
+		const container = mapContainerRef.current;
+		if (!el || !container || !activeEvent) return;
+
+		const place = () => {
+			const rect = container.getBoundingClientRect();
+			const cw = rect.width;
+			const ch = rect.height;
+			// Right boundary excludes any host UI obstructing the right edge (e.g. the
+			// search-results panel), plus a gap, so the popup is placed to the right of a
+			// marker only when it fully clears that region — otherwise it flips left.
+			const usableRight = Math.max(EVENT_POPUP_W, cw - rightSafeAreaPx - EVENT_POPUP_GAP);
+			// map.project() returns container-relative pixels, matching getBoundingClientRect.
+			const p = map.project([activeEvent.lng, activeEvent.lat]);
+			const offset = EVENT_POPUP_STAR_HALF + EVENT_POPUP_GAP;
+
+			// Room on each side of the star, beyond the star half-extent + gap.
+			const roomAbove = p.y - offset;
+			const roomBelow = ch - p.y - offset;
+			const roomLeft = p.x - offset;
+			const roomRight = usableRight - p.x - offset;
+
+			// Candidate placements (top-left corner of the popup) for each side. Above/below
+			// center horizontally on the marker; left/right center vertically.
+			const above = { x: p.x - EVENT_POPUP_W / 2, y: p.y - offset - EVENT_POPUP_H };
+			const below = { x: p.x - EVENT_POPUP_W / 2, y: p.y + offset };
+			const toRight = { x: p.x + offset, y: p.y - EVENT_POPUP_H / 2 };
+			const toLeft = { x: p.x - offset - EVENT_POPUP_W, y: p.y - EVENT_POPUP_H / 2 };
+
+			const fitsAbove = roomAbove >= EVENT_POPUP_H;
+			const fitsBelow = roomBelow >= EVENT_POPUP_H;
+			// Horizontal side that clears the right-side panel: right preferred, else left.
+			const horizontal =
+				roomRight >= EVENT_POPUP_W ? toRight : roomLeft >= EVENT_POPUP_W ? toLeft : null;
+
+			// Vertical position drives above/below; the middle band uses the sides. A marker
+			// low in the view opens upward, one near the top opens downward, and the middle
+			// third opens to the side (right when it clears the panel, otherwise left).
+			const lowInView = p.y > ch * (2 / 3);
+			const highInView = p.y < ch * (1 / 3);
+
+			let placement: { x: number; y: number };
+			if (lowInView && fitsAbove) {
+				placement = above;
+			} else if (highInView && fitsBelow) {
+				placement = below;
+			} else if (horizontal) {
+				placement = horizontal;
+			} else if (fitsAbove) {
+				placement = above;
+			} else if (fitsBelow) {
+				placement = below;
+			} else {
+				// Nothing fits cleanly (small container): pick the side with the most room and
+				// let the clamp below keep the box on screen.
+				const maxVertical = Math.max(roomAbove, roomBelow);
+				const maxHorizontal = Math.max(roomLeft, roomRight);
+				if (maxHorizontal >= maxVertical) {
+					placement = roomRight >= roomLeft ? toRight : toLeft;
+				} else {
+					placement = roomAbove >= roomBelow ? above : below;
+				}
+			}
+
+			let x = placement.x;
+			let y = placement.y;
+
+			// Clamp so the EVENT_POPUP_W×_H box stays within the usable area (and on the top/left).
+			x = Math.max(0, Math.min(x, usableRight - EVENT_POPUP_W));
+			y = Math.max(0, Math.min(y, ch - EVENT_POPUP_H));
+			el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+		};
+
+		place();
+		map.on('move', place);
+		return () => {
+			map.off('move', place);
+		};
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		activeEvent?.id,
+		activeEvent?.lat,
+		activeEvent?.lng,
+		rightSafeAreaPx,
+	]);
+
 	// Multi-select action card anchoring. Resolves each selected contact's
 	// coordinates (across the base + overlay coord maps); the card is anchored to
 	// the TOP-most selected dot on screen, scales down with the map and fades out
@@ -16440,6 +16711,96 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 								zIndex: -1,
 							}}
 						/>
+					</div>
+				</div>
+			)}
+
+			{/* Event opportunity popup (phase 1: shapes + lat/lng only). Outer red box,
+			    inner white box inset 5px from the top, and a bottom red strip with the
+			    event coordinates. Positioned by the edge-aware placement effect above. */}
+			{!isLoading && activeEvent && (
+				<div
+					ref={eventPopupOverlayRef}
+					style={{
+						position: 'absolute',
+						left: 0,
+						top: 0,
+						width: `${EVENT_POPUP_W}px`,
+						height: `${EVENT_POPUP_H}px`,
+						// Interactive only while this event is the hovered one, so the cursor can travel
+						// into / dwell on the card (entering cancels the pending hover-close; leaving
+						// reschedules it). A purely pinned card reverts to 'none' so it never becomes a
+						// dead zone over the map (pan/zoom/select/marker clicks pass through), mirroring
+						// the contact tooltip's hover-gated pointer capture.
+						pointerEvents: hoveredEventId === activeEvent.id ? 'auto' : 'none',
+						zIndex: HOVER_TOOLTIP_Z_INDEX + 12,
+					}}
+					onMouseEnter={() => {
+						isPointerOverEventPopupRef.current = true;
+						setEventHover(activeEvent.id);
+					}}
+					onMouseLeave={() => {
+						isPointerOverEventPopupRef.current = false;
+						scheduleEventHoverClose();
+					}}
+				>
+					{/* Outer red box — authored at its natural design size and uniformly
+					    scaled down to the footprint above. transform-origin top-left so the
+					    scaled box aligns with the overlay's translate() placement. */}
+					<div
+						style={{
+							position: 'relative',
+							width: `${EVENT_POPUP_DESIGN_W}px`,
+							height: `${EVENT_POPUP_DESIGN_H}px`,
+							transform: `scale(${EVENT_POPUP_SCALE})`,
+							transformOrigin: 'top left',
+							background: '#E06D6D',
+							border: '3px solid #A43B3B',
+							borderRadius: '16px',
+							boxSizing: 'border-box',
+						}}
+					>
+						{/* Inner white box: 347×427, 5px from top, horizontally centered. Hosts the
+						    event card content supplied by the host via renderEventPopupContent. */}
+						<div
+							style={{
+								position: 'absolute',
+								top: '5px',
+								left: 0,
+								right: 0,
+								marginLeft: 'auto',
+								marginRight: 'auto',
+								width: '347px',
+								height: '427px',
+								background: '#FFF',
+								border: '2px solid #000',
+								borderRadius: '12px',
+								boxSizing: 'border-box',
+								overflow: 'hidden',
+							}}
+						>
+							{renderEventPopupContent?.(activeEvent.id)}
+						</div>
+						{/* Bottom red strip: the event's lat/lng (the only text in phase 1). */}
+						<div
+							style={{
+								position: 'absolute',
+								left: 0,
+								right: 0,
+								top: '432px',
+								bottom: 0,
+								paddingLeft: '14px',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'flex-start',
+								color: '#000',
+								fontSize: '12px',
+								lineHeight: 1,
+								fontVariantNumeric: 'tabular-nums',
+							}}
+						>
+							{`${activeEvent.lat.toFixed(4)}  ${activeEvent.lng.toFixed(4)}`}
+						</div>
 					</div>
 				</div>
 			)}
