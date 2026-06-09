@@ -827,7 +827,7 @@ const EVENT_POPUP_STAR_HALF = 14;
 // Grace period before a hover-opened popup closes after the pointer leaves the star.
 // Bridges the star→box gap so the cursor can travel into the (interactive) popup and
 // hover/click it, instead of the popup vanishing the instant the star is no longer hit.
-const EVENT_POPUP_HOVER_CLOSE_DELAY_MS = 150;
+const EVENT_POPUP_HOVER_CLOSE_DELAY_MS = 90;
 
 // The opportunity markers reuse the owned-venue radar builders per event center,
 // re-keying each feature id so features from different events never collide inside a
@@ -1098,6 +1098,8 @@ export interface SearchResultsMapProps {
 	/** Renders the content inside an event popup's white inner box for the active event.
 	 *  The map owns the popup container + positioning; the host owns the event card. */
 	renderEventPopupContent?: (eventId: number) => ReactNode;
+	/** When true, hides and resets event popups while a higher-level modal owns pointer flow. */
+	suppressEventPopups?: boolean;
 }
 
 // NOTE: Night lights are generated offline as raster dot tiles (see scripts/generate_contact_lights_tiles.py).
@@ -1155,6 +1157,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	events = [],
 	rightSafeAreaPx = 0,
 	renderEventPopupContent,
+	suppressEventPopups = false,
 }) => {
 	const curatedOrbSvgIdPrefix = useId().replace(/:/g, '');
 	const curatedOrbSlotIds = useMemo(
@@ -1968,7 +1971,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Pinned (click) wins over hovered. Deriving the event object via `.get()` makes the
 	// "events emptied / id no longer present" cases collapse to null automatically, so the
 	// popup overlay simply unmounts.
-	const activeEventId = pinnedEventId ?? hoveredEventId;
+	const activeEventId = suppressEventPopups ? null : pinnedEventId ?? hoveredEventId;
 	const activeEvent =
 		activeEventId != null ? (eventCentersById.get(activeEventId) ?? null) : null;
 	// Drop hovered/pinned ids whose event has disappeared (e.g. events list changed).
@@ -1994,13 +1997,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, []);
 	const setEventHover = useCallback(
 		(id: number) => {
+			if (suppressEventPopups) return;
 			cancelEventHoverClose();
 			if (hoveredEventIdRef.current !== id) {
 				hoveredEventIdRef.current = id;
 				setHoveredEventId(id);
 			}
 		},
-		[cancelEventHoverClose]
+		[cancelEventHoverClose, suppressEventPopups]
 	);
 	const clearEventHoverImmediate = useCallback(() => {
 		cancelEventHoverClose();
@@ -2034,6 +2038,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			isPointerOverEventPopupRef.current = false;
 		}
 	}, [isLoading, activeEventId]);
+	useEffect(() => {
+		if (!suppressEventPopups) return;
+		cancelEventHoverClose();
+		isPointerOverEventPopupRef.current = false;
+		if (hoveredEventIdRef.current != null) {
+			hoveredEventIdRef.current = null;
+			setHoveredEventId(null);
+		}
+		setPinnedEventId(null);
+	}, [cancelEventHoverClose, suppressEventPopups]);
 	// Clear any pending close timer + the flag on unmount (the persistent map can outlive this).
 	useEffect(
 		() => () => {
@@ -12394,6 +12408,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// so the eventId lives in `properties.eventId`, not the feature id. Returns the
 		// numeric event id under the pointer (and present in the current set), else null.
 		const getEventHit = (e: mapboxgl.MapMouseEvent): number | null => {
+			if (suppressEventPopups) return null;
 			if (eventCentersById.size === 0) return null;
 			const raw = map.queryRenderedFeatures(e.point, {
 				layers: [MAPBOX_LAYER_IDS.eventsStarIcon],
@@ -12793,6 +12808,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		handleMarkerMouseOut,
 		handleMarkerClick,
 		eventCentersById,
+		suppressEventPopups,
 		setEventHover,
 		clearEventHoverImmediate,
 		scheduleEventHoverClose,

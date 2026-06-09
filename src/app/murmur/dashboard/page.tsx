@@ -5717,6 +5717,7 @@ const DashboardContent = () => {
 		null
 	);
 	const [applyModalOpen, setApplyModalOpen] = useState(false);
+	const [applyModalEvent, setApplyModalEvent] = useState<MapEventData | null>(null);
 	const [mapPanelHoverResearchTopPx, setMapPanelHoverResearchTopPx] = useState<
 		number | null
 	>(null);
@@ -8549,7 +8550,13 @@ const DashboardContent = () => {
 		(eventId: number) => {
 			const event = mapEvents?.find((e) => e.id === eventId);
 			return event ? (
-				<MapEventPopupCard event={event} onApply={() => setApplyModalOpen(true)} />
+				<MapEventPopupCard
+					event={event}
+					onApply={() => {
+						setApplyModalEvent(event);
+						setApplyModalOpen(true);
+					}}
+				/>
 			) : null;
 		},
 		[mapEvents]
@@ -8895,6 +8902,7 @@ const DashboardContent = () => {
 			onRadiusCenterChange: handleRadiusCenterChange,
 			// Venue-posted opportunity markers only on the interactive map, not the globe.
 			events: isMapView ? eventsForMap : [],
+			suppressEventPopups: applyModalOpen,
 			// Reserve the right-side search-results panel's footprint (433px box at
 			// right:10px, scaled, origin top-right) so the event popup places to the right of
 			// a marker only when it clears the panel, and flips left otherwise.
@@ -8906,6 +8914,7 @@ const DashboardContent = () => {
 		}),
 		[
 			activeMapTool,
+			applyModalOpen,
 			activeRadiusSearchOverlay,
 			activeSearchQuery,
 			eventsForMap,
@@ -9205,6 +9214,7 @@ const DashboardContent = () => {
 					}}
 					onClick={(event) => {
 						event.stopPropagation();
+						setApplyModalEvent(topPostedMapEvent);
 						setApplyModalOpen(true);
 					}}
 				>
@@ -14101,7 +14111,11 @@ const DashboardContent = () => {
 						{/* Apply modal - centered two-box overlay (opened from either Apply button) */}
 						<ApplyModal
 							open={applyModalOpen}
-							onClose={() => setApplyModalOpen(false)}
+							event={applyModalEvent}
+							onClose={() => {
+								setApplyModalOpen(false);
+								setApplyModalEvent(null);
+							}}
 						/>
 					</div>
 				</AppLayout>
