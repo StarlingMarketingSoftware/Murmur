@@ -37,7 +37,7 @@ export const useUpsertVenue = (options: CustomMutationOptions = {}) => {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: async (data: PatchVenueData) => {
+		mutationFn: async (data: PatchVenueData): Promise<VenueProfile> => {
 			const response = await _fetch(urls.api.venue.index, 'PATCH', data);
 			if (!response.ok) {
 				const errorData = await response.json();
@@ -45,7 +45,12 @@ export const useUpsertVenue = (options: CustomMutationOptions = {}) => {
 			}
 			return response.json();
 		},
-		onSuccess: () => {
+		onSuccess: (venue) => {
+			// Seed the cache with the PATCH response (the same full Venue row GET
+			// returns) so consumers that read the venue right after a save — e.g. the
+			// venue portal flipping to its map view on Continue — see the fresh
+			// coordinates instead of the pre-save row while the refetch is in flight.
+			queryClient.setQueryData(QUERY_KEYS.all, venue);
 			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.all });
 			if (!suppressToasts) {
 				toast.success(successMessage);

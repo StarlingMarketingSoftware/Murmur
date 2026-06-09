@@ -7,12 +7,17 @@ import {
 	useGetMessages,
 	useMarkConversationRead,
 	useSendReply,
+	type ConversationThreadFilter,
 } from '@/hooks/queryHooks/useConversations';
 import type { ConversationCounterpart } from '@/types';
 import { MessageBubble } from './MessageBubble';
 
 interface ConversationThreadProps {
 	conversationId: number;
+	// Which slice of the conversation to show: 'general' = cold-outreach thread,
+	// a number = that application's thread, omitted = merged (artist messenger).
+	// Replies and read-marks stay within the same slice.
+	thread?: ConversationThreadFilter;
 	onBack?: () => void;
 	className?: string;
 }
@@ -60,11 +65,12 @@ function CounterpartHeader({
 
 export function ConversationThread({
 	conversationId,
+	thread,
 	onBack,
 	className,
 }: ConversationThreadProps) {
-	const { data, isLoading } = useGetMessages(conversationId);
-	const sendReply = useSendReply(conversationId, data?.currentUserRole);
+	const { data, isLoading } = useGetMessages(conversationId, { thread });
+	const sendReply = useSendReply(conversationId, data?.currentUserRole, {}, thread);
 	const markRead = useMarkConversationRead();
 	const [draft, setDraft] = useState('');
 	const bottomRef = useRef<HTMLDivElement>(null);
@@ -88,9 +94,12 @@ export function ConversationThread({
 
 	// Mark read on open and when a new counterpart message arrives while open.
 	useEffect(() => {
-		markRead.mutate(conversationId);
+		markRead.mutate({
+			conversationId,
+			applicationId: typeof thread === 'number' ? thread : undefined,
+		});
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [conversationId, latestCounterpartMessageId]);
+	}, [conversationId, thread, latestCounterpartMessageId]);
 
 	// Keep the latest message in view (including our own sends).
 	useEffect(() => {

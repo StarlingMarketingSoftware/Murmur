@@ -1089,6 +1089,22 @@ export interface SearchResultsMapProps {
 	onRadiusCenterChange?: (center: LatLngLiteral) => void;
 	/** Current venue account location; draws the map-anchored home/radar overlay. */
 	ownedVenueLocation?: OwnedVenueLocation | null;
+	/**
+	 * Camera target for entering interactive mode. When set, the background →
+	 * interactive reveal snaps straight here (no zoom-in sweep) instead of gliding
+	 * to the neutral handoff target derived from the decorative globe framing. A
+	 * value that resolves or changes shortly after the reveal (e.g. the venue save
+	 * is still refetching as the portal flips views) still snaps into place — until
+	 * the user moves the camera themselves, after which it is never overridden.
+	 */
+	interactiveEntryCamera?: { center: LatLngLiteral; zoom: number } | null;
+	/** Reports the owned-venue home icon's projected position in viewport px on every
+	 *  camera move/resize. Null when there is no valid venue location, the map is not
+	 *  loaded, or on teardown. `isOnScreen` is false when the icon is outside the
+	 *  viewport (40px pad) or occluded behind the globe at low zoom. */
+	onOwnedVenueAnchorChange?: (
+		anchor: { x: number; y: number; isOnScreen: boolean } | null
+	) => void;
 	/** Venue-posted events to draw as radar opportunity markers (red star + radar). */
 	events?: MapEvent[];
 	/** Pixels along the right edge obstructed by host UI (e.g. the search-results panel).
@@ -1103,6 +1119,12 @@ export interface SearchResultsMapProps {
 }
 
 // NOTE: Night lights are generated offline as raster dot tiles (see scripts/generate_contact_lights_tiles.py).
+
+// Identity key for an interactive entry camera, so a refetch that re-delivers the
+// same values (new object identity) is distinguishable from actually-new values.
+const interactiveEntryCameraKey = (
+	camera: SearchResultsMapProps['interactiveEntryCamera']
+) => (camera ? `${camera.center.lat},${camera.center.lng},${camera.zoom}` : null);
 
 export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	contacts,
@@ -1154,6 +1176,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	radiusOverlay = null,
 	onRadiusCenterChange,
 	ownedVenueLocation = null,
+	interactiveEntryCamera = null,
+	onOwnedVenueAnchorChange,
 	events = [],
 	rightSafeAreaPx = 0,
 	renderEventPopupContent,
@@ -1276,6 +1300,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Keep the latest presentation value available to async Mapbox callbacks (moveend, etc).
 	const presentationRef = useRef<'background' | 'interactive'>(presentation);
 	presentationRef.current = presentation;
+	// Latest interactive entry camera for the map-init/presentation effects.
+	// `pending` means "the user hasn't moved the camera since entering interactive
+	// mode": while it holds, the camera follows the latest entry-camera value, so a
+	// late or corrected arrival (e.g. fresh venue coordinates replacing a stale
+	// cache row right after a save) still lands. `appliedKey` dedupes value-equal
+	// re-deliveries so a confirming refetch causes no camera motion.
+	const interactiveEntryCameraRef = useRef(interactiveEntryCamera);
+	interactiveEntryCameraRef.current = interactiveEntryCamera;
+	const interactiveEntryCameraPendingRef = useRef(false);
+	const interactiveEntryCameraAppliedKeyRef = useRef<string | null>(null);
 	// Basemap overview prewarm (see the prewarm effect below): last-warmed center
 	// key for dedupe, and the pending debounce timer handle.
 	const lastPrewarmKeyRef = useRef<string | null>(null);
@@ -1758,6 +1792,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		onViewportIdleRef.current = onViewportIdle ?? null;
 	}, [onViewportIdle]);
+	const onOwnedVenueAnchorChangeRef = useRef<
+		SearchResultsMapProps['onOwnedVenueAnchorChange'] | null
+	>(null);
+	useEffect(() => {
+		onOwnedVenueAnchorChangeRef.current = onOwnedVenueAnchorChange ?? null;
+	}, [onOwnedVenueAnchorChange]);
 	useEffect(() => {
 		selectedAreaBoundsRef.current = selectedAreaBounds ?? null;
 	}, [selectedAreaBounds]);
@@ -2168,6 +2208,46 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				ownedVenuePulseRafRef.current = null;
 			}
 			clearPulse();
+		};
+	}, [map, isMapLoaded, ownedVenueCenter]);
+
+	// Owned-venue anchor reporting: lets the host (venue portal) pin DOM chrome next to
+	// the home icon. Mirrors the selected-marker overlay pattern (map.project on 'move').
+	useEffect(() => {
+		const notify = (anchor: { x: number; y: number; isOnScreen: boolean } | null) =>
+			onOwnedVenueAnchorChangeRef.current?.(anchor);
+		if (!map || !isMapLoaded || !ownedVenueCenter) {
+			notify(null);
+			return;
+		}
+
+		const update = () => {
+			const container = mapContainerRef.current;
+			if (!container) return;
+			const rect = container.getBoundingClientRect();
+			const p = map.project([ownedVenueCenter.lng, ownedVenueCenter.lat]);
+			// Globe far-side guard: an occluded point round-trips to a different location.
+			const roundTrip = map.unproject(p);
+			const occluded =
+				Math.abs(roundTrip.lng - ownedVenueCenter.lng) > 1 ||
+				Math.abs(roundTrip.lat - ownedVenueCenter.lat) > 1;
+			const pad = 40;
+			const isOnScreen =
+				!occluded &&
+				p.x >= -pad &&
+				p.x <= rect.width + pad &&
+				p.y >= -pad &&
+				p.y <= rect.height + pad;
+			notify({ x: rect.left + p.x, y: rect.top + p.y, isOnScreen });
+		};
+
+		update();
+		map.on('move', update);
+		map.on('resize', update);
+		return () => {
+			map.off('move', update);
+			map.off('resize', update);
+			notify(null);
 		};
 	}, [map, isMapLoaded, ownedVenueCenter]);
 
@@ -7653,12 +7733,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		mapboxgl.accessToken = accessToken;
 
 		const initialPresentation = presentationRef.current;
+		const initialEntryCamera =
+			initialPresentation === 'interactive' ? interactiveEntryCameraRef.current : null;
+		if (initialPresentation === 'interactive') {
+			interactiveEntryCameraPendingRef.current = true;
+			interactiveEntryCameraAppliedKeyRef.current =
+				interactiveEntryCameraKey(initialEntryCamera);
+		}
 		const initialCenter: [number, number] =
 			initialPresentation === 'background'
 				? DASHBOARD_DECORATIVE_CENTER
-				: [defaultCenter.lng, defaultCenter.lat];
+				: initialEntryCamera
+					? [initialEntryCamera.center.lng, initialEntryCamera.center.lat]
+					: [defaultCenter.lng, defaultCenter.lat];
 		const initialZoom =
-			initialPresentation === 'background' ? DASHBOARD_DECORATIVE_ZOOM : MAP_DEFAULT_ZOOM;
+			initialPresentation === 'background'
+				? DASHBOARD_DECORATIVE_ZOOM
+				: (initialEntryCamera?.zoom ?? MAP_DEFAULT_ZOOM);
 		const initialPitch =
 			initialPresentation === 'background' ? DASHBOARD_DECORATIVE_PITCH : 0;
 
@@ -8349,33 +8440,120 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			} catch {}
 
 			// Background presentation uses a screen-space offset to create the "globe peeking"
-			// framing on the dashboard. Start gliding toward a neutral interactive camera
-			// immediately, then let the search/state auto-fit interrupt and continue from the
-			// current camera position once data is ready. This avoids the old instant reset.
+			// framing on the dashboard. With a host-provided entry camera (e.g. the venue
+			// portal centering on the venue home icon), snap straight there so the reveal
+			// is already framed correctly — no zoom-in sweep. Otherwise start gliding
+			// toward a neutral interactive camera, then let the search/state auto-fit
+			// interrupt and continue from the current camera position once data is ready.
+			// This avoids the old instant reset.
+			const entryCamera = interactiveEntryCameraRef.current;
+			interactiveEntryCameraPendingRef.current = true;
+			interactiveEntryCameraAppliedKeyRef.current =
+				interactiveEntryCameraKey(entryCamera);
 			try {
-				const container = map.getContainer?.() as HTMLElement | undefined;
-				const w = container?.clientWidth ?? 0;
-				const h = container?.clientHeight ?? 0;
 				let center: [number, number] = DASHBOARD_DECORATIVE_CENTER;
-				if (w > 0 && h > 0) {
-					const target = map.unproject([
-						w / 2 + DASHBOARD_DECORATIVE_OFFSET_PX[0],
-						h / 2 + DASHBOARD_DECORATIVE_OFFSET_PX[1],
-					]);
-					center = [target.lng, target.lat];
+				let zoom = MAP_DEFAULT_ZOOM;
+				if (entryCamera) {
+					center = [entryCamera.center.lng, entryCamera.center.lat];
+					zoom = entryCamera.zoom;
+				} else {
+					const container = map.getContainer?.() as HTMLElement | undefined;
+					const w = container?.clientWidth ?? 0;
+					const h = container?.clientHeight ?? 0;
+					if (w > 0 && h > 0) {
+						const target = map.unproject([
+							w / 2 + DASHBOARD_DECORATIVE_OFFSET_PX[0],
+							h / 2 + DASHBOARD_DECORATIVE_OFFSET_PX[1],
+						]);
+						center = [target.lng, target.lat];
+					}
 				}
 				map.easeTo({
 					center,
-					zoom: MAP_DEFAULT_ZOOM,
+					zoom,
 					pitch: 0,
 					bearing: 0,
 					offset: [0, 0],
-					duration: DASHBOARD_TO_INTERACTIVE_HANDOFF_GLIDE_MS,
+					duration: entryCamera ? 0 : DASHBOARD_TO_INTERACTIVE_HANDOFF_GLIDE_MS,
 					easing: mapboxEaseOutCubic,
 				});
 			} catch {}
 		}
 	}, [map, isMapLoaded, isBackgroundPresentation, shouldAutoSpin, presentation]);
+
+	// The interactive entry camera can resolve — or be corrected — after the reveal
+	// has already happened (e.g. the venue save's refetch is still in flight while
+	// the portal flips views, so the flip render briefly carries stale coordinates).
+	// While the user hasn't moved the camera since entry, follow the latest value —
+	// same snap semantics as the entry itself.
+	const interactiveEntryCameraLat = interactiveEntryCamera?.center.lat;
+	const interactiveEntryCameraLng = interactiveEntryCamera?.center.lng;
+	const interactiveEntryCameraZoom = interactiveEntryCamera?.zoom;
+	useEffect(() => {
+		if (!map || !isMapLoaded || isBackgroundPresentation) return;
+		if (!interactiveEntryCameraPendingRef.current) return;
+		if (
+			interactiveEntryCameraLat == null ||
+			interactiveEntryCameraLng == null ||
+			interactiveEntryCameraZoom == null
+		) {
+			return;
+		}
+		const key = `${interactiveEntryCameraLat},${interactiveEntryCameraLng},${interactiveEntryCameraZoom}`;
+		if (key === interactiveEntryCameraAppliedKeyRef.current) return;
+		interactiveEntryCameraAppliedKeyRef.current = key;
+		try {
+			map.easeTo({
+				center: [interactiveEntryCameraLng, interactiveEntryCameraLat],
+				zoom: interactiveEntryCameraZoom,
+				pitch: 0,
+				bearing: 0,
+				offset: [0, 0],
+				duration: 0,
+			});
+		} catch {
+			// Ignore (map may be tearing down).
+		}
+	}, [
+		map,
+		isMapLoaded,
+		isBackgroundPresentation,
+		interactiveEntryCameraLat,
+		interactiveEntryCameraLng,
+		interactiveEntryCameraZoom,
+	]);
+
+	// Once the user moves the camera themselves, stop following the entry camera —
+	// never yank the map out from under them. User-driven moves carry
+	// `originalEvent`; programmatic eases do not. Two mapbox-gl quirks: window
+	// resize/orientation/fullscreen changes are forwarded through Map#resize with
+	// `originalEvent` set (not user camera intent — ignore those), and box zoom
+	// fires `movestart` without `originalEvent` (caught via `boxzoomstart`).
+	useEffect(() => {
+		if (!map || !isMapLoaded || isBackgroundPresentation) return;
+		const onUserMoveStart = (event: { originalEvent?: { type?: string } }) => {
+			const originalEvent = event?.originalEvent;
+			if (!originalEvent) return;
+			if (
+				originalEvent.type === 'resize' ||
+				originalEvent.type === 'orientationchange' ||
+				originalEvent.type === 'fullscreenchange' ||
+				originalEvent.type === 'webkitfullscreenchange'
+			) {
+				return;
+			}
+			interactiveEntryCameraPendingRef.current = false;
+		};
+		const onBoxZoomStart = () => {
+			interactiveEntryCameraPendingRef.current = false;
+		};
+		map.on('movestart', onUserMoveStart);
+		map.on('boxzoomstart', onBoxZoomStart);
+		return () => {
+			map.off('movestart', onUserMoveStart);
+			map.off('boxzoomstart', onBoxZoomStart);
+		};
+	}, [map, isMapLoaded, isBackgroundPresentation]);
 
 	// When used as a decorative background, clear any interactive UI state so we don't
 	// "carry" selected/hovered marker panels across view transitions.

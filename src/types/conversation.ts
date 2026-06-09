@@ -26,6 +26,11 @@ export interface ConversationListItem {
 	lastMessagePreview: string;
 	lastMessageAt: string; // ISO
 	unreadCount: number;
+	// Cold campaign outreach: the conversation's first message is a diverted Email.
+	// `subject` is that Email's subject (display only — the Email row may be deleted
+	// later, so `hasDivertOrigin` is the durable signal).
+	hasDivertOrigin: boolean;
+	subject: string | null;
 }
 
 export interface MessagesPage {

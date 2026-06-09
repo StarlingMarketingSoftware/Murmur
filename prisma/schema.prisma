@@ -522,14 +522,33 @@ model Message {
   body           String
   isHtml         Boolean       @default(false)
   emailId        Int? // provenance of the diverted first message (scalar, no FK)
+  applicationId  Int? // provenance of an application-seeded message (scalar, no FK)
   campaignId     Int? // provenance of the originating campaign (scalar, no FK)
+  // Thread partition within the conversation: messages exchanged in the context of
+  // a specific EventApplication carry its id; null = the general/cold-outreach
+  // thread (scalar, no FK). Seeded summaries carry both this and applicationId.
+  threadApplicationId Int?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@unique([emailId])
+  @@unique([applicationId])
   @@index([conversationId, id])
+  @@index([conversationId, threadApplicationId, id])
+}
+
+// Per-side read watermarks for one application thread (the per-pair Conversation
+// watermarks keep governing the general thread). STRICTLY ADDITIVE: new model with
+// a scalar applicationId (no FK), mirroring the EventApplication precedent.
+model ApplicationReadState {
+  id                 Int       @id @default(autoincrement())
+  applicationId      Int       @unique // EventApplication.id (scalar, no FK)
+  venueLastReadAt    DateTime?
+  standardLastReadAt DateTime? // the applicant's watermark for this thread
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

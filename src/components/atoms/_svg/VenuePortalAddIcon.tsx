@@ -2,8 +2,9 @@ import type { SVGProps } from 'react';
 
 export const VenuePortalAddIcon = ({
 	selected = false,
+	selectedFill = '#A6F5A0',
 	...props
-}: SVGProps<SVGSVGElement> & { selected?: boolean }) => (
+}: SVGProps<SVGSVGElement> & { selected?: boolean; selectedFill?: string }) => (
 	<svg
 		width="29"
 		height="27"
@@ -20,7 +21,7 @@ export const VenuePortalAddIcon = ({
 				width="26.5903"
 				height="24.5893"
 				rx="7.29219"
-				fill={selected ? '#A6F5A0' : 'none'}
+				fill={selected ? selectedFill : 'none'}
 				stroke="black"
 				strokeWidth="1.42355"
 			/>

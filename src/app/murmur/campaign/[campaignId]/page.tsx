@@ -2891,6 +2891,20 @@ const Murmur = () => {
 		[activeView, isMobile, MOBILE_ALLOWED_VIEWS, requestInboxSentTab]
 	);
 
+	// Query-only navigations to this campaign (e.g. an opportunities-row deep link
+	// clicked while already on the page) don't remount anything, so the tab-param
+	// useState initializers never re-run — react to the params and switch views.
+	// inboxEmailIdParam is in the deps because a repeat deep link can carry the same
+	// tab with a different target message.
+	const inboxEmailIdParam = searchParams.get('inboxEmailId');
+	useEffect(() => {
+		if (!tabParam) return;
+		const requestedView = getCampaignViewFromUrlTab(tabParam);
+		if (requestedView === activeView) return;
+		setActiveView(requestedView);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [tabParam, inboxEmailIdParam]);
+
 	// Launch a campaign search from the Write/Drafts/Inbox tabs: jump to the All
 	// tab, drop that tab's preset status filter (so results aren't scoped to e.g.
 	// just drafts), and run the query there.

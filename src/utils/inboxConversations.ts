@@ -48,14 +48,24 @@ export const getInboxConversationKey = (email: InboxConversationMessage): string
 	const campaignKey = email.campaignId ?? email.campaign?.id ?? originalEmail?.campaignId ?? 'none';
 	const contactId = email.contactId ?? email.contact?.id ?? originalEmail?.contactId ?? null;
 
-	if (contactId != null) return `${campaignKey}:contact:${contactId}`;
+	// Venue internal messages are threaded per context: each application's chat is
+	// its own conversation, separate from the general/cold-outreach chat with the
+	// same venue. Only application threads get the suffix — general-thread replies
+	// keep the bare key so they still interleave with the artist's diverted sent
+	// email (which has no venue markers and groups by campaign+contact).
+	const venueThreadSuffix =
+		email.venueConversationId != null && email.venueThreadApplicationId != null
+			? `:vthread:${email.venueThreadApplicationId}`
+			: '';
+
+	if (contactId != null) return `${campaignKey}:contact:${contactId}${venueThreadSuffix}`;
 
 	const participant =
 		normalizeInboxEmailAddress(email.sender) || normalizeInboxEmailAddress(email.contact?.email);
-	if (participant) return `${campaignKey}:email:${participant}`;
+	if (participant) return `${campaignKey}:email:${participant}${venueThreadSuffix}`;
 
 	const subject = normalizeThreadSubject(email.subject || originalEmail?.subject);
-	if (subject) return `${campaignKey}:subject:${subject}`;
+	if (subject) return `${campaignKey}:subject:${subject}${venueThreadSuffix}`;
 
 	return `${campaignKey}:message:${email.id}`;
 };

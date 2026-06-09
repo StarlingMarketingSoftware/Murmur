@@ -3,11 +3,9 @@
 import type { CSSProperties, FC } from 'react';
 import DashboardActionBarStarIcon from '@/components/atoms/_svg/DashboardActionBarStarIcon';
 
-export type DashboardResponsesTab =
-	| 'responses'
-	| 'sent'
-	| 'opportunities'
-	| 'messages';
+// Internal venue messages are no longer a separate "Messages" tab — they flow
+// through Responses (venue replies) and Opportunities (application threads).
+export type DashboardResponsesTab = 'responses' | 'sent' | 'opportunities';
 
 type ResponseToggleTab = {
 	key: DashboardResponsesTab;
@@ -20,14 +18,12 @@ export const RESPONSE_TOGGLE_TABS: ResponseToggleTab[] = [
 	{ key: 'responses', label: 'Responses', width: 104, activeFill: '#98DAFC' },
 	{ key: 'sent', label: 'Sent', width: 97, activeFill: '#B0E0A6' },
 	{ key: 'opportunities', label: 'Opportunities', width: 145, activeFill: '#FFD5D5' },
-	{ key: 'messages', label: 'Messages', width: 110, activeFill: '#C9E0FF' },
 ];
 
 export const RESPONSE_WIDGET_BACKGROUND_BY_TAB: Record<DashboardResponsesTab, string> = {
 	responses: '#84C1E2',
 	sent: '#6DB97B',
 	opportunities: '#D97676',
-	messages: '#7FA8E0',
 };
 
 const getResponseToggleDividerColor = (
@@ -62,10 +58,8 @@ export const DashboardResponsesFilterBar: FC<{
 	const resolvedFontSize = typeof fontSize === 'number' ? `${fontSize}px` : fontSize;
 	const canChangeTab = Boolean(onTabChange);
 
-	// Default bar shows the original three tabs; callers opt into extra tabs
-	// (e.g. "messages") explicitly, so other consumers stay unaffected.
 	const visibleTabs = RESPONSE_TOGGLE_TABS.filter((tab) =>
-		tabs ? tabs.includes(tab.key) : tab.key !== 'messages'
+		tabs ? tabs.includes(tab.key) : true
 	);
 
 	return (

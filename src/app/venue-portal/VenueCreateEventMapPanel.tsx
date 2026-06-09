@@ -581,12 +581,13 @@ export function VenueCreateEventMapPanel({ event }: { event?: VenueEvent | null 
 
 	return (
 		// Snug to the right of the calendar cluster. The cluster (left-24, scale 0.7) puts the
-		// 656px calendar's right edge at ~483px, so left-[500px] leaves a ~17px gap; top-[150px]
-		// sits just below the calendar top (56 + 98×0.7 ≈ 125px) and clear of the profile card.
+		// 656px calendar's right edge at ~483px, so left-[500px] leaves a ~17px gap; top-[122px]
+		// sits level with the calendar top (56 + 98×0.7 ≈ 125px), tucked under the tool tab bar.
 		<form
 			ref={createEventFormRef}
 			onSubmit={handlePublishEvent}
-			className="fixed left-[500px] top-[150px] z-[99] h-[727px] w-[456px] origin-top-left rounded-[12px] border-[2px] border-black bg-white"
+			data-venue-tool-ui="true"
+			className="fixed left-[500px] top-[122px] z-[99] h-[727px] w-[456px] origin-top-left rounded-[12px] border-[2px] border-black bg-white"
 			style={{ transform: `scale(${VENUE_MAP_OVERLAY_SCALE})` }}
 		>
 			<div className="absolute left-[12px] top-[4px] font-inter text-[12.358px] font-medium leading-[16.477px] text-black">

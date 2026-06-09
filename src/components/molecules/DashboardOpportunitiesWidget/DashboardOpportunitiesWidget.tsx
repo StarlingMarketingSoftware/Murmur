@@ -10,6 +10,8 @@ import {
 	useState,
 	type CSSProperties,
 } from 'react';
+import { useRouter } from 'next/navigation';
+import { urls } from '@/constants/urls';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import DashboardActionBarStarIcon from '@/components/atoms/_svg/DashboardActionBarStarIcon';
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
@@ -59,6 +61,11 @@ type OpportunityRow = {
 	opportunityDate: string;
 	lastMessage: string;
 	lastReceivedLabel: string;
+	// Application rows with venue responses: unread shows the blue "venue
+	// responded" dot; inboxLink deep-links into the conversation in the campaign
+	// inbox (null when no response yet or no campaign to route through).
+	unread?: boolean;
+	inboxLink?: string | null;
 };
 
 export type OpportunitiesMockRow = {
@@ -554,12 +561,14 @@ const buildApplicationOpportunityRow = (application: MyEventApplication): Opport
 		}
 	}
 
+	const response = application.venueResponse;
+
 	return {
 		source: 'application',
 		id: application.id,
 		status: application.status === 'submitted' ? 'in-progress' : 'closed',
 		contactLabel: event?.venueName?.trim() || 'Venue',
-		exchangeCount: 0,
+		exchangeCount: response?.responseCount ?? 0,
 		folder: '',
 		categoryTitle: event?.venueBusinessType?.trim() || '',
 		city,
@@ -567,10 +576,22 @@ const buildApplicationOpportunityRow = (application: MyEventApplication): Opport
 		stateAbbr,
 		opportunityType: event?.name?.trim() || 'Opportunity',
 		opportunityDate,
-		lastMessage: application.performingName
-			? `You applied as ${application.performingName}.`
-			: 'Application sent.',
-		lastReceivedLabel: formatOpportunityTimestamp(application.createdAt),
+		// Once the venue responds the row previews their latest reply; until then
+		// it shows the submission note.
+		lastMessage: response
+			? response.lastMessagePreview
+			: application.performingName
+				? `You applied as ${application.performingName}.`
+				: 'Application sent.',
+		lastReceivedLabel: formatOpportunityTimestamp(
+			response?.lastMessageAt ?? application.createdAt
+		),
+		unread: (response?.unreadCount ?? 0) > 0,
+		// The projected inbox row id for a venue message is the message id negated.
+		inboxLink:
+			response && response.campaignId != null
+				? `${urls.murmur.campaign.detail(response.campaignId)}?tab=inbox&inboxEmailId=${-response.latestMessageId}&silent=1`
+				: null,
 	};
 };
 
@@ -589,6 +610,7 @@ export const DashboardOpportunitiesContent: FC<{
 	inboundEmailsOverride,
 	isLoadingOverride,
 }) => {
+	const router = useRouter();
 	const mockOverrideActive = mockState != null;
 	const hasInboundEmailsOverride = inboundEmailsOverride != null;
 	const { data: inboundEmails, isLoading: isLoadingEmails } = useGetInboundEmails({
@@ -635,6 +657,10 @@ export const DashboardOpportunitiesContent: FC<{
 			});
 
 			for (const email of sortedEmails) {
+				// Venue internal messages are ongoing chats, not keyword-triaged cold-email
+				// replies (mirrors the ContactsExpandedList exemption) — application
+				// threads already surface through the application rows below.
+				if (email.venueConversationId != null) continue;
 				const threadKey = getOpportunityThreadKey(email);
 				if (seenThreadKeys.has(threadKey)) continue;
 				seenThreadKeys.add(threadKey);
@@ -803,6 +829,11 @@ export const DashboardOpportunitiesContent: FC<{
 								<button
 									key={`${opportunity.source}-${opportunity.id}`}
 									type="button"
+									onClick={
+										opportunity.inboxLink
+											? () => router.push(opportunity.inboxLink!)
+											: undefined
+									}
 									className="text-left hover:brightness-[0.985] transition-[filter]"
 									style={{
 										width: '639px',
@@ -825,6 +856,7 @@ export const DashboardOpportunitiesContent: FC<{
 										padding: 0,
 										fontFamily: 'Inter, sans-serif',
 										color: '#000000',
+										cursor: opportunity.inboxLink ? 'pointer' : 'default',
 									}}
 								>
 									<span
@@ -859,7 +891,20 @@ export const DashboardOpportunitiesContent: FC<{
 											fontWeight: 600,
 											lineHeight: '17.186px',
 										}}
-									>
+								>
+										{opportunity.unread && (
+											<span
+												aria-label="New response"
+												style={{
+													flex: '0 0 auto',
+													width: '8px',
+													height: '8px',
+													borderRadius: '9999px',
+													background: '#2F6FED',
+													alignSelf: 'center',
+												}}
+											/>
+										)}
 										<FadeOverflowText text={opportunity.contactLabel} style={{ minWidth: 0 }} />
 										<span
 											style={{

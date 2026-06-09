@@ -34,6 +34,12 @@ export type InboundEmailWithRelations = Prisma.InboundEmailGetPayload<{
 	 * on real inbound email rows.
 	 */
 	venueConversationId?: number | null;
+	/**
+	 * Which thread of that conversation the venue message belongs to: an
+	 * EventApplication id for application-context messages, null/undefined for the
+	 * general (cold-outreach) thread. Replies route back into the same thread.
+	 */
+	venueThreadApplicationId?: number | null;
 };
 
 export type TestDraftEmail = {

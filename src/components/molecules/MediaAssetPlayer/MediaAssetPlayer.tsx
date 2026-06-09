@@ -11,7 +11,9 @@ const ReactPlayer = dynamic(() => import('react-player/youtube').then((m) => m.d
 });
 
 interface MediaAssetPlayerProps {
-	asset: MediaAssetDto;
+	// Only the playback fields — lets snapshot shapes (e.g. application videos)
+	// play through the same branches as full profile MediaAssetDto rows.
+	asset: Pick<MediaAssetDto, 'url' | 'posterUrl' | 'sourceType' | 'kind'>;
 	className?: string;
 }
 

@@ -33,6 +33,25 @@ export const buildPreview = (body: string, isHtml: boolean, max = 140): string =
 	return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 };
 
+// A conversation holds one general/cold-outreach thread plus one thread per
+// EventApplication, partitioned by Message.threadApplicationId. 'all' is the
+// merged view (the artist's messenger); a number selects that application's thread.
+export type MessageThread = 'all' | 'general' | number;
+
+// Prisma where-fragment selecting one thread. Seeds written before the thread
+// column existed carry only applicationId, hence the OR on the application arm
+// and the double-null on the general arm.
+const threadWhere = (thread: MessageThread) =>
+	thread === 'all'
+		? {}
+		: thread === 'general'
+			? { threadApplicationId: null, applicationId: null }
+			: { OR: [{ threadApplicationId: thread }, { applicationId: thread }] };
+
+// General-thread filter for venue-side list scoping (same shape as
+// threadWhere('general'), named for readability at call sites).
+const GENERAL_THREAD_WHERE = { threadApplicationId: null, applicationId: null } as const;
+
 /** Resolve which side of a conversation `userId` is, or null if not a participant. */
 const resolveRole = async (
 	userId: string,
@@ -155,9 +174,156 @@ export const divertEmailToMessage = async (
 	};
 };
 
+// ── Open application ─────────────────────────────────────────────────────────
+
+const escapeHtml = (value: string): string =>
+	value
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;');
+
+/**
+ * The applicant's "first box" — an HTML snapshot of their application answers,
+ * seeded as the opening message when a venue opens the applicant's thread. Uses
+ * only tags on the sanitizeMessageHtml allowlist (p/strong/br). Exported so the
+ * venue applications list can build matching plain-text previews via buildPreview.
+ */
+export const buildApplicationSummaryHtml = (
+	application: {
+		performingName: string | null;
+		genre: string | null;
+		area: string | null;
+		bio: string | null;
+	},
+	eventName: string | null
+): string => {
+	const parts: string[] = [
+		`<p><strong>${eventName ? `Application — ${escapeHtml(eventName)}` : 'Application'}</strong></p>`,
+	];
+	if (application.performingName?.trim()) {
+		parts.push(
+			`<p><strong>Performing name:</strong> ${escapeHtml(application.performingName.trim())}</p>`
+		);
+	}
+	if (application.genre?.trim()) {
+		parts.push(`<p><strong>Genre:</strong> ${escapeHtml(application.genre.trim())}</p>`);
+	}
+	if (application.area?.trim()) {
+		parts.push(`<p><strong>Area:</strong> ${escapeHtml(application.area.trim())}</p>`);
+	}
+	if (application.bio?.trim()) {
+		parts.push(`<p>${escapeHtml(application.bio.trim()).replace(/\n/g, '<br>')}</p>`);
+	}
+	return parts.join('');
+};
+
+type OpenApplicationCode = 'not_found' | 'forbidden' | 'withdrawn' | 'venue_unavailable';
+
+export type OpenApplicationResult =
+	| { ok: true; conversationId: number; message: SerializedMessage }
+	| { ok: false; code: OpenApplicationCode };
+
+/**
+ * A venue opens an applicant's thread from the Replies inbox: resolve (or create)
+ * the conversation with that applicant and seed it with the application summary as
+ * the applicant's first message. Idempotent: one Message per application (unique
+ * applicationId), so re-opening resolves to the existing conversation + message.
+ */
+export const openApplicationConversation = async (
+	userId: string,
+	applicationId: number
+): Promise<OpenApplicationResult> => {
+	const application = await prisma.eventApplication.findUnique({
+		where: { id: applicationId },
+		select: {
+			id: true,
+			eventId: true,
+			standardUserId: true,
+			venueUserId: true,
+			performingName: true,
+			genre: true,
+			area: true,
+			bio: true,
+			status: true,
+			createdAt: true,
+		},
+	});
+	if (!application) return { ok: false, code: 'not_found' };
+	if (application.venueUserId !== userId) return { ok: false, code: 'forbidden' };
+	if (application.status === 'withdrawn') return { ok: false, code: 'withdrawn' };
+
+	const venue = await prisma.venue.findUnique({
+		where: { userId },
+		select: { id: true },
+	});
+	if (!venue) return { ok: false, code: 'venue_unavailable' };
+
+	// May be null if the event was deleted after the application — header degrades.
+	const event = await prisma.event.findUnique({
+		where: { id: application.eventId },
+		select: { name: true },
+	});
+
+	const message = await prisma.$transaction(async (tx) => {
+		const conversation = await tx.conversation.upsert({
+			where: {
+				standardUserId_venueId: {
+					standardUserId: application.standardUserId,
+					venueId: venue.id,
+				},
+			},
+			// The venue is the actor opening this thread, and the seeded message is
+			// backdated to the submission time, so start the venue's read watermark at
+			// now — no phantom unread badge between seeding and the thread's mark-read.
+			create: {
+				standardUserId: application.standardUserId,
+				venueId: venue.id,
+				lastMessageAt: application.createdAt,
+				venueLastReadAt: new Date(),
+			},
+			update: {},
+			select: { id: true },
+		});
+
+		// One seeded Message per application (unique applicationId) → idempotent on
+		// re-open, mirroring the emailId divert precedent. The seed opens (and lives
+		// in) the application's own thread within the pair conversation.
+		const msg = await tx.message.upsert({
+			where: { applicationId: application.id },
+			create: {
+				conversationId: conversation.id,
+				sender: MessageSender.standard,
+				senderClerkId: application.standardUserId,
+				body: buildApplicationSummaryHtml(application, event?.name ?? null),
+				isHtml: true,
+				applicationId: application.id,
+				threadApplicationId: application.id,
+				createdAt: application.createdAt,
+			},
+			update: {},
+		});
+
+		// Monotonic recency bump — a routine re-open must not move lastMessageAt
+		// backward past newer messages in a pre-existing conversation.
+		await tx.conversation.updateMany({
+			where: { id: conversation.id, lastMessageAt: { lt: msg.createdAt } },
+			data: { lastMessageAt: msg.createdAt },
+		});
+
+		return msg;
+	});
+
+	return {
+		ok: true,
+		conversationId: message.conversationId,
+		message: serializeMessage(message),
+	};
+};
+
 // ── Reply ────────────────────────────────────────────────────────────────────
 
-type ReplyCode = 'not_found' | 'forbidden' | 'empty';
+type ReplyCode = 'not_found' | 'forbidden' | 'empty' | 'invalid_thread';
 
 export type ReplyResult =
 	| { ok: true; conversationId: number; message: SerializedMessage }
@@ -166,7 +332,8 @@ export type ReplyResult =
 export const createReply = async (
 	userId: string,
 	conversationId: number,
-	rawBody: string
+	rawBody: string,
+	threadApplicationId: number | null = null
 ): Promise<ReplyResult> => {
 	const body = rawBody.trim();
 	if (!body) return { ok: false, code: 'empty' };
@@ -180,6 +347,27 @@ export const createReply = async (
 	const role = await resolveRole(userId, conversation);
 	if (!role) return { ok: false, code: 'forbidden' };
 
+	// A thread tag must reference an application between this exact pair.
+	if (threadApplicationId != null) {
+		const [application, venueOwner] = await Promise.all([
+			prisma.eventApplication.findUnique({
+				where: { id: threadApplicationId },
+				select: { standardUserId: true, venueUserId: true },
+			}),
+			prisma.venue.findUnique({
+				where: { id: conversation.venueId },
+				select: { userId: true },
+			}),
+		]);
+		if (
+			!application ||
+			application.standardUserId !== conversation.standardUserId ||
+			application.venueUserId !== venueOwner?.userId
+		) {
+			return { ok: false, code: 'invalid_thread' };
+		}
+	}
+
 	const message = await prisma.$transaction(async (tx) => {
 		const msg = await tx.message.create({
 			data: {
@@ -188,18 +376,37 @@ export const createReply = async (
 				senderClerkId: userId,
 				body,
 				isHtml: false,
+				threadApplicationId,
 			},
 		});
 		await tx.conversation.update({
 			where: { id: conversationId },
 			data: {
 				lastMessageAt: msg.createdAt,
-				// The author has read up to their own message.
+				// The author has read up to their own message. The artist's view is
+				// merged, so their watermark always advances; the venue's conversation
+				// watermark only governs the general thread — an app-thread reply
+				// advances the per-application read state below instead.
 				...(role === 'standard'
 					? { standardLastReadAt: msg.createdAt }
-					: { venueLastReadAt: msg.createdAt }),
+					: threadApplicationId == null
+						? { venueLastReadAt: msg.createdAt }
+						: {}),
 			},
 		});
+		if (threadApplicationId != null) {
+			// The author has read their own app-thread message — advance their side's
+			// per-thread watermark.
+			const readColumn =
+				role === 'venue'
+					? { venueLastReadAt: msg.createdAt }
+					: { standardLastReadAt: msg.createdAt };
+			await tx.applicationReadState.upsert({
+				where: { applicationId: threadApplicationId },
+				create: { applicationId: threadApplicationId, ...readColumn },
+				update: readColumn,
+			});
+		}
 		return msg;
 	});
 
@@ -211,7 +418,8 @@ export const createReply = async (
 
 export const markConversationRead = async (
 	userId: string,
-	conversationId: number
+	conversationId: number,
+	applicationId: number | null = null
 ): Promise<{ ok: true } | { ok: false; code: 'not_found' | 'forbidden' }> => {
 	const conversation = await prisma.conversation.findUnique({
 		where: { id: conversationId },
@@ -221,6 +429,41 @@ export const markConversationRead = async (
 
 	const role = await resolveRole(userId, conversation);
 	if (!role) return { ok: false, code: 'forbidden' };
+
+	// Reading one application's thread advances only that thread's read state for
+	// the caller's side — the conversation watermark keeps governing the general
+	// thread (and the artist's merged view).
+	if (applicationId != null) {
+		const [application, venueOwner] = await Promise.all([
+			prisma.eventApplication.findUnique({
+				where: { id: applicationId },
+				select: { standardUserId: true, venueUserId: true },
+			}),
+			prisma.venue.findUnique({
+				where: { id: conversation.venueId },
+				select: { userId: true },
+			}),
+		]);
+		// The application must belong to this exact pair (same check as createReply's
+		// thread validation) — both its applicant and its venue sides must match.
+		if (
+			!application ||
+			application.standardUserId !== conversation.standardUserId ||
+			application.venueUserId !== venueOwner?.userId
+		) {
+			return { ok: false, code: 'forbidden' };
+		}
+		const readColumn =
+			role === 'venue'
+				? { venueLastReadAt: new Date() }
+				: { standardLastReadAt: new Date() };
+		await prisma.applicationReadState.upsert({
+			where: { applicationId },
+			create: { applicationId, ...readColumn },
+			update: readColumn,
+		});
+		return { ok: true };
+	}
 
 	await prisma.conversation.update({
 		where: { id: conversationId },
@@ -256,20 +499,50 @@ export const listConversationsForUser = async (
 
 	const ids = conversations.map((c) => c.id);
 
-	// Latest message per conversation (for the preview) — one query.
+	// Latest message per conversation (for the preview) — one query. The venue's
+	// inbox lists the GENERAL thread only (application threads surface in the
+	// Replies feed), so its preview/recency must not leak application chatter; the
+	// artist's view stays merged.
 	const latest = await prisma.message.findMany({
-		where: { conversationId: { in: ids } },
+		where: { conversationId: { in: ids }, ...(asVenue ? GENERAL_THREAD_WHERE : {}) },
 		orderBy: [{ conversationId: 'asc' }, { id: 'desc' }],
 		distinct: ['conversationId'],
-		select: { conversationId: true, body: true, isHtml: true },
+		select: { conversationId: true, body: true, isHtml: true, createdAt: true },
 	});
 	const latestByConv = new Map(latest.map((m) => [m.conversationId, m]));
 
+	// Earliest divert per conversation — its presence means cold campaign outreach
+	// exists (the venue UI's "Inbound" signal); join its Email for the campaign
+	// subject. Email rows are deletable (scalar provenance), so the boolean
+	// survives even when the subject doesn't resolve.
+	const first = await prisma.message.findMany({
+		where: { conversationId: { in: ids }, emailId: { not: null } },
+		orderBy: [{ conversationId: 'asc' }, { id: 'asc' }],
+		distinct: ['conversationId'],
+		select: { conversationId: true, emailId: true },
+	});
+	const firstByConv = new Map(first.map((m) => [m.conversationId, m]));
+	const divertEmailIds = first
+		.map((m) => m.emailId)
+		.filter((id): id is number => id != null);
+	const divertEmails = divertEmailIds.length
+		? await prisma.email.findMany({
+				where: { id: { in: divertEmailIds } },
+				select: { id: true, subject: true },
+			})
+		: [];
+	const subjectByEmailId = new Map(divertEmails.map((e) => [e.id, e.subject]));
+
 	// Unread candidates = messages authored by the OTHER side — one query, counted
-	// per-conversation in JS against each conversation's read watermark.
+	// per-conversation in JS against each conversation's read watermark. Venue side
+	// counts the general thread only (application threads track their own state).
 	const otherRole: MessageSenderRole = asVenue ? 'standard' : 'venue';
 	const candidates = await prisma.message.findMany({
-		where: { conversationId: { in: ids }, sender: otherRole },
+		where: {
+			conversationId: { in: ids },
+			sender: otherRole,
+			...(asVenue ? GENERAL_THREAD_WHERE : {}),
+		},
 		select: { conversationId: true, createdAt: true },
 	});
 	const unreadByConv = new Map<number, number>();
@@ -319,12 +592,21 @@ export const listConversationsForUser = async (
 
 	return conversations.map((c) => {
 		const last = latestByConv.get(c.id);
+		const firstDivert = firstByConv.get(c.id);
+		const hasDivertOrigin = firstDivert?.emailId != null;
 		return {
 			id: c.id,
 			counterpart: counterpartByConv.get(c.id) ?? { name: 'Unknown', isVenue: !asVenue },
 			lastMessagePreview: last ? buildPreview(last.body, last.isHtml) : '',
-			lastMessageAt: c.lastMessageAt.toISOString(),
+			// Venue rows time-stamp by their (general-thread) preview message so the
+			// Inbound list isn't re-dated by application chatter.
+			lastMessageAt:
+				asVenue && last ? last.createdAt.toISOString() : c.lastMessageAt.toISOString(),
 			unreadCount: unreadByConv.get(c.id) ?? 0,
+			hasDivertOrigin,
+			subject: hasDivertOrigin
+				? (subjectByEmailId.get(firstDivert!.emailId!) ?? null)
+				: null,
 		};
 	});
 };
@@ -334,7 +616,8 @@ export const getMessagesPage = async (
 	userId: string,
 	conversationId: number,
 	cursor: number | null,
-	limit = 30
+	limit = 30,
+	thread: MessageThread = 'all'
 ): Promise<
 	{ ok: true; page: MessagesPage } | { ok: false; code: 'not_found' | 'forbidden' }
 > => {
@@ -348,7 +631,7 @@ export const getMessagesPage = async (
 	if (!role) return { ok: false, code: 'forbidden' };
 
 	const rows = await prisma.message.findMany({
-		where: { conversationId },
+		where: { conversationId, ...threadWhere(thread) },
 		orderBy: { id: 'desc' },
 		take: limit + 1,
 		...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),

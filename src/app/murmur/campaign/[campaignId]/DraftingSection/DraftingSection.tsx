@@ -9,7 +9,7 @@ import {
 	useState,
 	type CSSProperties,
 } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { gsap } from 'gsap';
 import {
 	DraftingSectionProps,
@@ -2365,7 +2365,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		renderGlobalOverlays,
 		view,
 	]);
-	const [selectedInboxEmailId, setSelectedInboxEmailId] = useState<number | null>(null);
+	const inboxDeepLinkParams = useSearchParams();
+	const [selectedInboxEmailId, setSelectedInboxEmailId] = useState<number | null>(() => {
+		// Deep link (e.g. the dashboard opportunities panel): ?inboxEmailId=<id>
+		// preselects that message's conversation when the inbox opens. Projected
+		// venue messages use negative synthetic ids, so 0 is the only invalid value.
+		const raw = inboxDeepLinkParams.get('inboxEmailId');
+		if (raw == null) return null;
+		const parsed = Number(raw);
+		return Number.isInteger(parsed) && parsed !== 0 ? parsed : null;
+	});
 	const [optimisticInboxReplyByEmailId, setOptimisticInboxReplyByEmailId] = useState<
 		Record<number, number>
 	>({});
@@ -2399,6 +2408,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		setSelectedInboxEmailId(null);
 		setOptimisticInboxReplyByEmailId({});
 	}, [campaign?.id]);
+
+	// Re-seed the deep-linked selection on query-only navigations (e.g. clicking an
+	// opportunity row while already on this campaign — the page doesn't remount, so
+	// the useState initializer above never re-runs) and after the campaign-change
+	// reset just above. The preserve-selection tab request keeps the seeded id from
+	// being auto-selected away while the inbox data loads.
+	const inboxEmailIdParam = inboxDeepLinkParams.get('inboxEmailId');
+	useEffect(() => {
+		if (inboxEmailIdParam == null) return;
+		const parsed = Number(inboxEmailIdParam);
+		if (!Number.isInteger(parsed) || parsed === 0) return;
+		setSelectedInboxEmailId(parsed);
+		setLocalInboxSentTabRequest((prev) => ({
+			tab: 'inbox',
+			requestId:
+				Math.max(prev?.requestId ?? 0, inboxSentTabRequest?.requestId ?? 0) + 1,
+			preserveSelection: true,
+		}));
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [inboxEmailIdParam, campaign?.id]);
 
 	// When a draft is open, the research panel should stay locked to that draft's contact.
 	const displayedContactForResearch = isDraftPreviewOpen

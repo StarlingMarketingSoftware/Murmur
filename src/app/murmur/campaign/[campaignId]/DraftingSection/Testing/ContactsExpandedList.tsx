@@ -1116,15 +1116,22 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	);
 	const supplementalOpportunityInboxConversations = useMemo(
 		() =>
-			supplementalInboxConversations.filter((conversation) =>
-				conversation.inboundMessages.some(isInboxOpportunityEmail)
+			supplementalInboxConversations.filter(
+				(conversation) =>
+					conversation.inboundMessages.some(isInboxOpportunityEmail) ||
+					// Application chats (the venue's replies to an event the artist applied
+					// to) belong under Opportunities — AND stay in Responses below, since
+					// they're real replies too.
+					conversation.inboundMessages.some(
+						(message) => message.venueThreadApplicationId != null
+					)
 			),
 		[supplementalInboxConversations]
 	);
-	// Responses sub-tab should NOT also contain opportunity-classified conversations.
-	// Each conversation routes to exactly one of {Responses, Opportunities}: any
-	// conversation containing an opportunity-keyword inbound email is treated as an
-	// opportunity and is excluded from the Responses list.
+	// Responses sub-tab should NOT also contain opportunity-KEYWORD conversations.
+	// Keyword-classified conversations route to exactly one of {Responses,
+	// Opportunities}; application chats are the exception and appear in both
+	// (isInboxOpportunityEmail exempts venue rows, so they never match here).
 	const supplementalInboxConversationsResponsesOnly = useMemo(
 		() =>
 			supplementalInboxConversations.filter(

@@ -16,7 +16,7 @@ import {
 import type { Event as VenueEvent } from '@prisma/client';
 import { useAuth, UserButton, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
-import { X } from 'lucide-react';
+import { BadgeCheck, X } from 'lucide-react';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
@@ -24,9 +24,6 @@ import { OutlinedInitialAvatar } from '@/components/atoms/OutlinedInitialAvatar/
 import { PayRangeMoneyIcon } from '@/components/atoms/_svg/PayRangeMoneyIcon';
 import { ProfileAreaMarkerIcon } from '@/components/atoms/_svg/ProfileAreaMarkerIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
-import { VenuePortalAddIcon } from '@/components/atoms/_svg/VenuePortalAddIcon';
-import { VenuePortalMailIcon } from '@/components/atoms/_svg/VenuePortalMailIcon';
-import { VenuePortalProfileIcon } from '@/components/atoms/_svg/VenuePortalProfileIcon';
 import { VenueSoundIcon } from '@/components/atoms/_svg/VenueSoundIcon';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { WebsiteIcon } from '@/components/atoms/_svg/WebsiteIcon';
@@ -37,6 +34,7 @@ import {
 	DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING,
 	DASHBOARD_TO_INTERACTIVE_TRANSITION_MS,
 } from '@/components/molecules/SearchResultsMap/constants';
+import type { SearchResultsMapProps } from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import {
 	ProfileAreaMapBox,
@@ -60,17 +58,26 @@ import { useGetMedia, useDeleteMedia } from '@/hooks/queryHooks/useMediaAssets';
 import { useGetVenue, useUpsertVenue } from '@/hooks/queryHooks/useVenue';
 import { useGetVenueEvents } from '@/hooks/queryHooks/useVenueEvents';
 import { useGetConversations } from '@/hooks/queryHooks/useConversations';
-import { ConversationsPane } from '@/components/organisms/ConversationsPane';
+import { useGetVenueApplications } from '@/hooks/queryHooks/useVenueApplications';
 import { _fetch } from '@/utils';
 import type { MediaAssetDto } from '@/app/api/media/route';
 import type { PatchVenueData, WeeklyHours } from '@/app/api/venue/schema';
 import {
 	DASHBOARD_CALENDAR_NATIVE_WIDTH_PX,
 	PROFILE_GENRE_OPTIONS,
+	VENUE_MAP_ENTRY_ZOOM,
 	VENUE_MAP_OVERLAY_SCALE,
 	VENUE_TIME_OPTIONS,
 } from './constants';
+import { VenueChatMapPanel } from './VenueChatMapPanel';
 import { VenueCreateEventMapPanel } from './VenueCreateEventMapPanel';
+import { VenueEventDetailView } from './VenueEventDetailView';
+import { createVenueIconAnchorStore, VenueMapActionPills } from './VenueMapActionPills';
+import { VenueMapToolTabBar } from './VenueMapToolTabBar';
+import {
+	formatVenueOpportunityDate,
+	formatVenueOpportunityTimeRange,
+} from './venueOpportunityFormat';
 
 type VenueDayKey = keyof WeeklyHours;
 type VenueDayHoursForm = {
@@ -308,6 +315,40 @@ const trimToNull = (value: string): string | null => {
 const hasSavedVenueRequiredFields = (
 	venue: { venueName?: string | null; address?: string | null } | null | undefined
 ) => Boolean(venue?.venueName?.trim() && venue.address?.trim());
+
+// Remember (per user, in localStorage) whether the last load had a completed venue
+// profile so the next load can skip the "New Venue" creation skeleton and land
+// straight on the map instead of flashing a placeholder before the data resolves.
+const VENUE_PROFILE_HINT_KEY = 'venue-portal:profile-complete';
+
+// Optimistic read: returns the last stored "complete" flag, used on mount before
+// auth/user/venue have resolved. The view self-corrects from the real data afterward.
+const readVenueProfileComplete = (): boolean => {
+	if (typeof window === 'undefined') return false;
+	try {
+		const raw = window.localStorage.getItem(VENUE_PROFILE_HINT_KEY);
+		return raw ? Boolean(JSON.parse(raw)?.complete) : false;
+	} catch {
+		return false;
+	}
+};
+
+const writeVenueProfileComplete = (userId: string, complete: boolean): void => {
+	if (typeof window === 'undefined') return;
+	try {
+		window.localStorage.setItem(
+			VENUE_PROFILE_HINT_KEY,
+			JSON.stringify({ userId, complete })
+		);
+	} catch {
+		/* private mode / quota — degrade to the current skeleton-then-map behavior */
+	}
+};
+
+// Pre-paint on the client, no-op on the server — lets the initial map-view entry land
+// before the first paint without emitting the SSR "useLayoutEffect does nothing" warning.
+const useIsomorphicLayoutEffect =
+	typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 const formatVenueCoordinate = (coordinate: number) => coordinate.toFixed(4);
 
@@ -1512,26 +1553,33 @@ type VenuePhotoSlot =
 	| { kind: 'add' }
 	| { kind: 'empty' };
 
-function VenuePhotosPlaceholder() {
+function VenuePhotosPlaceholder({ layout = 'sidebar' }: { layout?: 'sidebar' | 'grid' }) {
+	const isGrid = layout === 'grid';
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const { data: photos = [] } = useGetMedia('venue_photos');
 	const { upload, activeUploads } = useMediaUpload('venue_photos');
 	const deletePhoto = useDeleteMedia();
 
 	// Ready photos fill from the top, then any in-flight uploads, then a single add
-	// slot (until the limit), then faint placeholders pad out to the fixed five.
+	// slot (until the limit), then faint placeholders pad out the fixed slot count.
+	// In grid mode the first ready photo is rendered as the panel's hero instead,
+	// but it still counts toward the upload limit.
 	const readyPhotos = photos.filter((photo) => photo.status === 'ready');
 	const slots: VenuePhotoSlot[] = [
-		...readyPhotos.map((asset) => ({ kind: 'photo' as const, asset })),
+		...(isGrid ? readyPhotos.slice(1) : readyPhotos).map((asset) => ({
+			kind: 'photo' as const,
+			asset,
+		})),
 		...activeUploads.map((uploadState) => ({
 			kind: 'upload' as const,
 			upload: uploadState,
 		})),
 	];
-	if (slots.length < VENUE_PHOTO_LIMIT) {
+	if (readyPhotos.length + activeUploads.length < VENUE_PHOTO_LIMIT) {
 		slots.push({ kind: 'add' });
 	}
-	while (slots.length < VENUE_PHOTO_LIMIT) {
+	const slotCount = isGrid ? 6 : VENUE_PHOTO_LIMIT;
+	while (slots.length < slotCount) {
 		slots.push({ kind: 'empty' });
 	}
 
@@ -1543,8 +1591,20 @@ function VenuePhotosPlaceholder() {
 	};
 
 	return (
-		<aside className="h-[469px] w-[126px] rounded-[8px] border border-black/20 bg-[#F1FAFF] px-[10px] pt-[8px]">
-			<p className="text-[14px] leading-none text-[#8f8f8f]">Photos</p>
+		<aside
+			className={
+				isGrid
+					? 'w-full rounded-[8px] border border-black/20 bg-[#F1FAFF] px-[10px] pb-[10px] pt-[8px]'
+					: 'h-[469px] w-[126px] rounded-[8px] border border-black/20 bg-[#F1FAFF] px-[10px] pt-[8px]'
+			}
+		>
+			{isGrid ? (
+				<span className="rounded-[4px] bg-[#D6FFED] px-[3px] text-[14px] font-black leading-[14px] text-[#34B965]">
+					Photos
+				</span>
+			) : (
+				<p className="text-[14px] leading-none text-[#8f8f8f]">Photos</p>
+			)}
 			<input
 				ref={fileInputRef}
 				type="file"
@@ -1552,7 +1612,13 @@ function VenuePhotosPlaceholder() {
 				className="hidden"
 				onChange={handleSelectFile}
 			/>
-			<div className="mt-[6px] flex flex-col items-center gap-[13px]">
+			<div
+				className={
+					isGrid
+						? 'mt-[6px] flex flex-wrap justify-between gap-y-[13px]'
+						: 'mt-[6px] flex flex-col items-center gap-[13px]'
+				}
+			>
 				{slots.map((slot, index) => {
 					const opacity = VENUE_PHOTO_SLOT_OPACITIES[index] ?? 0.2;
 
@@ -1627,6 +1693,35 @@ function VenuePhotosPlaceholder() {
 	);
 }
 
+// Full-width hero for the map view's Profile panel: the first ready venue photo
+// (the same one the grid skips — both read the position-ordered media list).
+// Renders nothing when the venue has no photos, so the panel content starts at
+// the top of the box.
+function VenueProfileHeroPhoto() {
+	const { data: photos = [] } = useGetMedia('venue_photos');
+	const deletePhoto = useDeleteMedia();
+
+	const hero = photos.filter((photo) => photo.status === 'ready')[0];
+	if (!hero) return null;
+
+	return (
+		<div className="group relative h-[217px] min-h-0 w-full shrink overflow-hidden rounded-[8px] border border-black bg-white">
+			{hero.url && (
+				// eslint-disable-next-line @next/next/no-img-element -- short-lived presigned R2 URL
+				<img src={hero.url} alt="" className="h-full w-full object-cover" />
+			)}
+			<button
+				type="button"
+				onClick={() => deletePhoto.mutate(hero.id)}
+				aria-label={`Remove ${hero.filename}`}
+				className="absolute right-[4px] top-[4px] hidden h-[18px] w-[18px] items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/80 group-hover:flex"
+			>
+				<X className="h-3 w-3" />
+			</button>
+		</div>
+	);
+}
+
 function VenueCompletedLocationButton({
 	address,
 	onClick,
@@ -1658,7 +1753,13 @@ type VenuePortalView = 'edit' | 'map';
 // it drives the decorative spinning globe behind the form; once the user hits Continue
 // (view → 'map') it reveals the full interactive map, mirroring the dashboard's
 // background → interactive transition.
-function VenuePortalPersistentMap({ view }: { view: VenuePortalView }) {
+function VenuePortalPersistentMap({
+	view,
+	onOwnedVenueAnchorChange,
+}: {
+	view: VenuePortalView;
+	onOwnedVenueAnchorChange: SearchResultsMapProps['onOwnedVenueAnchorChange'];
+}) {
 	const setPersistentMapConfig = usePersistentMapSetter();
 	const { data: venue } = useGetVenue({ enabled: view === 'map' });
 	const {
@@ -1679,6 +1780,9 @@ function VenuePortalPersistentMap({ view }: { view: VenuePortalView }) {
 			searchQuery: '',
 			searchWhat: null,
 			skipAutoFit: true,
+			// Present in both view branches so the map's final null notification on
+			// teardown is never dropped mid-transition.
+			onOwnedVenueAnchorChange,
 		};
 		const ownedVenueLocation =
 			venue?.latitude != null && venue.longitude != null
@@ -1703,6 +1807,14 @@ function VenuePortalPersistentMap({ view }: { view: VenuePortalView }) {
 					autoSpin: false,
 					searchEngaged: false,
 					ownedVenueLocation,
+					// Land the map-view reveal centered on the venue's home icon instead of
+					// wherever the decorative globe happened to be spinning.
+					interactiveEntryCamera: ownedVenueLocation
+						? {
+								center: { lat: ownedVenueLocation.lat, lng: ownedVenueLocation.lng },
+								zoom: VENUE_MAP_ENTRY_ZOOM,
+							}
+						: null,
 				},
 			};
 		}
@@ -1730,6 +1842,7 @@ function VenuePortalPersistentMap({ view }: { view: VenuePortalView }) {
 		globeWeatherMood,
 		globeWeatherRegionCenter,
 		globeWeatherTemperatureF,
+		onOwnedVenueAnchorChange,
 	]);
 
 	// Push config on every change (like the dashboard) so the view toggle animates
@@ -1846,7 +1959,13 @@ function VenuePortalSkeleton() {
 	);
 }
 
-function VenuePortalForm({ onEnterMapView }: { onEnterMapView: () => void }) {
+function VenuePortalForm({
+	onEnterMapView,
+	variant = 'page',
+}: {
+	onEnterMapView?: () => void;
+	variant?: 'page' | 'panel';
+}) {
 	const { user: clerkUser } = useUser();
 	const { data: venue, isLoading: isLoadingVenue, isError: isVenueError } = useGetVenue();
 	const { mutateAsync: upsertVenue, isPending: isSaving } = useUpsertVenue({
@@ -2039,6 +2158,17 @@ function VenuePortalForm({ onEnterMapView }: { onEnterMapView: () => void }) {
 		}, AUTOSAVE_DEBOUNCE_MS);
 		return () => window.clearTimeout(timer);
 	}, [autoSavePayload, hasHydratedForm, saveVenue]);
+
+	// The map-panel variant has no Continue button to flush a pending debounce, so a
+	// final unmount save keeps edits made just before the panel closes. (The mutation
+	// outlives the component, so the write still lands and invalidates the cache.)
+	const flushAutoSaveRef = useRef<() => void>(() => undefined);
+	flushAutoSaveRef.current = () => {
+		if (!hasHydratedForm || !autoSavePayload) return;
+		if (JSON.stringify(autoSavePayload) === lastSavedPayloadRef.current) return;
+		void saveVenue(autoSavePayload).catch(() => undefined);
+	};
+	useEffect(() => () => flushAutoSaveRef.current(), []);
 
 	const updateField = (field: Exclude<keyof VenueFormState, 'hours'>, value: string) => {
 		setSaved(false);
@@ -2371,11 +2501,469 @@ function VenuePortalForm({ onEnterMapView }: { onEnterMapView: () => void }) {
 
 		try {
 			await saveVenue(payload);
-			onEnterMapView();
+			onEnterMapView?.();
 		} catch {
 			// saveVenue already surfaced the failure via the inline status message.
 		}
 	};
+
+	// Shared between the page card and the panel layout, which size it differently.
+	const renderVenueNameInput = (className: string) => (
+		<input
+			aria-label="Venue name"
+			value={form.venueName}
+			onChange={(event) => updateField('venueName', event.target.value)}
+			onFocus={() => {
+				setActiveTextField(null);
+				setIsBusinessTypePickerOpen(false);
+				setIsHoursEditorOpen(false);
+				setIsCapacityEditorOpen(false);
+				setIsGenrePickerOpen(false);
+				setIsPayRangeEditorOpen(false);
+				setIsSoundEditorOpen(false);
+				setIsVenueNameFocused(true);
+			}}
+			onBlur={() => setIsVenueNameFocused(false)}
+			placeholder="Enter Venue Name"
+			autoComplete="organization"
+			className={className}
+		/>
+	);
+
+	// The fields column is shared verbatim between the standalone edit page and the
+	// map view's Profile panel (variant="panel") — each renders it exactly once.
+	const profileFieldsColumn = (
+		<div ref={profileFieldsRef} className="w-[386px]">
+			<div ref={locationSlotRef} data-venue-location-picker="true">
+				{isLocationPickerOpen ? (
+					<ProfileAreaMapBox
+						area={form.address}
+						onAreaUpdate={updateLocation}
+						onAreaCommit={() => advanceFromProfileField('location')}
+						initialCoordinates={locationCoordinates}
+						onCoordinatesChange={setLocationCoordinates}
+						className="mt-0 h-[174px] w-[386px] rounded-[8px] border-[2px] opacity-100"
+						headerLabel="Enter Location"
+						inputPlaceholder="Enter Location"
+						initiallyEditing
+						reverseGeocodeTypes={VENUE_LOCATION_GEOCODE_TYPES}
+						forwardGeocodeTypes={VENUE_LOCATION_GEOCODE_TYPES}
+						formatGeocodeFeature={formatVenueLocationFeature}
+						onFeatureSelect={handleLocationFeatureSelect}
+					/>
+				) : completedAddress ? (
+					<VenueCompletedLocationButton
+						address={completedAddress}
+						onClick={() => {
+							setActiveTextField(null);
+							setIsBusinessTypePickerOpen(false);
+							setIsHoursEditorOpen(false);
+							setIsCapacityEditorOpen(false);
+							setIsGenrePickerOpen(false);
+							setIsPayRangeEditorOpen(false);
+							setIsSoundEditorOpen(false);
+							setIsLocationPickerOpen(true);
+						}}
+					/>
+				) : (
+					<VenueTextField
+						label="Location"
+						value={form.address}
+						onChange={(value) => updateField('address', value)}
+						autoComplete="street-address"
+						highlighted={shouldHighlightLocation}
+						solidWhenEmpty={isInlineEditorOpen}
+						readOnly
+						onFocus={() => {
+							setActiveTextField(null);
+							setIsBusinessTypePickerOpen(false);
+							setIsHoursEditorOpen(false);
+							setIsCapacityEditorOpen(false);
+							setIsGenrePickerOpen(false);
+							setIsPayRangeEditorOpen(false);
+							setIsSoundEditorOpen(false);
+							setIsLocationPickerOpen(true);
+						}}
+						className="h-[63px] w-[386px] cursor-pointer"
+					/>
+				)}
+			</div>
+
+			{isBusinessTypePickerOpen && (
+				<VenueBusinessTypePicker
+					value={form.businessType}
+					onChange={(value) => updateField('businessType', value)}
+					onSelect={selectBusinessType}
+					className="mt-[5px]"
+				/>
+			)}
+
+			<div
+				className={`${isBusinessTypePickerOpen ? 'mt-[4px]' : 'mt-[5px]'} grid grid-cols-[172px_210px] gap-x-[4px]`}
+			>
+				{!isBusinessTypePickerOpen && completedBusinessType ? (
+					<VenueCompletedBusinessTypeButton
+						businessType={completedBusinessType}
+						onClick={() => {
+							setActiveTextField(null);
+							setIsLocationPickerOpen(false);
+							setIsHoursEditorOpen(false);
+							setIsCapacityEditorOpen(false);
+							setIsGenrePickerOpen(false);
+							setIsPayRangeEditorOpen(false);
+							setIsSoundEditorOpen(false);
+							setIsBusinessTypePickerOpen(true);
+						}}
+					/>
+				) : (
+					<VenueTextField
+						label="Business Type"
+						value={isBusinessTypePickerOpen ? '' : form.businessType}
+						onChange={(value) => updateField('businessType', value)}
+						onFocus={() => {
+							setActiveTextField(null);
+							setIsLocationPickerOpen(false);
+							setIsHoursEditorOpen(false);
+							setIsCapacityEditorOpen(false);
+							setIsGenrePickerOpen(false);
+							setIsPayRangeEditorOpen(false);
+							setIsSoundEditorOpen(false);
+							setIsBusinessTypePickerOpen(true);
+						}}
+						readOnly={isBusinessTypePickerOpen}
+						activeEntry={isBusinessTypePickerOpen}
+						solidWhenEmpty={isInlineEditorOpen}
+						placeholderShowsPlus={!isBusinessTypePickerOpen}
+						placeholderContentClassName={
+							isBusinessTypePickerOpen
+								? 'text-left leading-none'
+								: LEFT_GRID_PLACEHOLDER_CLASS
+						}
+						placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
+						className={`h-[63px] w-[172px] ${
+							isBusinessTypePickerOpen ? 'cursor-pointer' : ''
+						}`}
+					/>
+				)}
+				{hasCompletedHours && !isHoursEditorOpen ? (
+					<VenueCompletedHoursButton
+						summary={completedHoursSummary}
+						onClick={openHoursEditor}
+					/>
+				) : (
+					<VenueTextField
+						label="Hours"
+						value=""
+						onChange={() => undefined}
+						onFocus={openHoursEditor}
+						readOnly
+						activeEntry={isHoursEditorOpen}
+						solidWhenEmpty={isInlineEditorOpen}
+						placeholderShowsPlus={!isHoursEditorOpen}
+						placeholderContentClassName={
+							isHoursEditorOpen ? 'text-left leading-none' : RIGHT_GRID_PLACEHOLDER_CLASS
+						}
+						placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
+						className="h-[63px] w-[210px] cursor-pointer"
+					/>
+				)}
+			</div>
+
+			{isHoursEditorOpen && (
+				<VenueHoursEditor
+					hours={form.hours}
+					onToggleDay={toggleHoursDay}
+					onChangeDay={updateHoursDay}
+					className="mt-[4px]"
+				/>
+			)}
+
+			{isCapacityEditorOpen && (
+				<VenueCapacityEditor
+					value={form.capacity}
+					onChange={(value) => updateField('capacity', value)}
+					inputRef={capacityInputRef}
+					className="mt-[4px]"
+				/>
+			)}
+
+			<div className="mt-[4px] grid grid-cols-[172px_210px] gap-x-[4px]">
+				{isCapacityEditorOpen ? (
+					<VenueTextField
+						label="Capacity"
+						value=""
+						onChange={() => undefined}
+						onFocus={openCapacityEditor}
+						readOnly
+						activeEntry
+						placeholderShowsPlus={false}
+						placeholderContentClassName="text-left leading-none"
+						placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
+						className="h-[63px] w-[172px] cursor-pointer"
+					/>
+				) : completedCapacity ? (
+					<VenueCompletedCapacityButton
+						capacity={completedCapacity}
+						onClick={openCapacityEditor}
+					/>
+				) : (
+					<VenueTextField
+						label="Capacity"
+						value=""
+						onChange={() => undefined}
+						onFocus={openCapacityEditor}
+						readOnly
+						solidWhenEmpty={isInlineEditorOpen}
+						placeholderContentClassName={LEFT_GRID_PLACEHOLDER_CLASS}
+						placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
+						className="h-[63px] w-[172px] cursor-pointer"
+					/>
+				)}
+				{isGenrePickerOpen ? (
+					<VenueActiveGenreButton onClick={openGenrePicker} />
+				) : selectedGenres.length > 0 ? (
+					<VenueCompletedGenreButton genres={selectedGenres} onClick={openGenrePicker} />
+				) : (
+					<VenueTextField
+						label="Genres"
+						value=""
+						onChange={() => undefined}
+						onFocus={openGenrePicker}
+						readOnly
+						solidWhenEmpty={isInlineEditorOpen}
+						placeholderContentClassName={RIGHT_GRID_PLACEHOLDER_CLASS}
+						placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
+						className="h-[63px] w-[210px] cursor-pointer"
+					/>
+				)}
+			</div>
+
+			{isGenrePickerOpen && (
+				<VenueGenrePicker
+					selectedGenres={selectedGenres}
+					onToggle={toggleGenre}
+					className="mt-[4px]"
+				/>
+			)}
+
+			<div className="mt-[4px] grid grid-cols-[172px_210px] gap-x-[4px]">
+				{isPayRangeEditorOpen ? (
+					<VenueTextField
+						label="Pay Range"
+						value=""
+						onChange={() => undefined}
+						onFocus={openPayRangeEditor}
+						readOnly
+						activeEntry
+						placeholderShowsPlus={false}
+						placeholderContentClassName="text-left leading-none"
+						placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
+						className="h-[63px] w-[172px] cursor-pointer"
+					/>
+				) : completedPayRange ? (
+					<VenueCompletedPayRangeButton
+						payRange={completedPayRange}
+						onClick={openPayRangeEditor}
+					/>
+				) : (
+					<VenueTextField
+						label="Pay Range"
+						value=""
+						onChange={() => undefined}
+						onFocus={openPayRangeEditor}
+						readOnly
+						solidWhenEmpty={isInlineEditorOpen}
+						placeholderContentClassName={LEFT_GRID_PLACEHOLDER_CLASS}
+						placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
+						className="h-[63px] w-[172px] cursor-pointer"
+					/>
+				)}
+				{isSoundEditorOpen ? (
+					<VenueActiveSoundButton onClick={openSoundEditor} />
+				) : completedSound ? (
+					<VenueCompletedSoundButton sound={completedSound} onClick={openSoundEditor} />
+				) : (
+					<VenueTextField
+						label="Sound"
+						value=""
+						onChange={() => undefined}
+						onFocus={openSoundEditor}
+						readOnly
+						solidWhenEmpty={isInlineEditorOpen}
+						placeholderContentClassName={RIGHT_GRID_PLACEHOLDER_CLASS}
+						placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
+						className="h-[63px] w-[210px] cursor-pointer"
+					/>
+				)}
+			</div>
+
+			{isPayRangeEditorOpen && (
+				<VenuePayRangeEditor
+					value={form.payRange}
+					onChange={(value) => updateField('payRange', value)}
+					minInputRef={payRangeMinInputRef}
+					className="mt-[4px]"
+				/>
+			)}
+
+			{isSoundEditorOpen && (
+				<VenueSoundEditor
+					value={form.sound}
+					onSelect={(value) => updateField('sound', value)}
+					className="mt-[4px]"
+				/>
+			)}
+
+			{!isPayRangeEditorOpen && completedDescription && !isDescriptionEditorOpen ? (
+				<VenueCompletedDescriptionButton
+					description={completedDescription}
+					onClick={openDescriptionEditor}
+					className="mt-[4px]"
+				/>
+			) : !isPayRangeEditorOpen && isDescriptionEditorOpen ? (
+				<VenueDescriptionField
+					value={form.description}
+					onChange={(value) => updateField('description', value)}
+					onFocus={() => {
+						setActiveTextField('description');
+						setIsBusinessTypePickerOpen(false);
+						setIsHoursEditorOpen(false);
+						setIsCapacityEditorOpen(false);
+						setIsGenrePickerOpen(false);
+						setIsPayRangeEditorOpen(false);
+						setIsSoundEditorOpen(false);
+					}}
+					onKeyDown={handleDescriptionKeyDown}
+					textareaRef={descriptionInputRef}
+					className="mt-[4px] h-[98px] w-[386px]"
+				/>
+			) : !isPayRangeEditorOpen ? (
+				<VenueTextField
+					label="Description"
+					value=""
+					onChange={() => undefined}
+					onFocus={openDescriptionEditor}
+					readOnly
+					solidWhenEmpty={isInlineEditorOpen}
+					className="mt-[4px] h-[98px] w-[386px] cursor-pointer"
+				/>
+			) : null}
+			{!isLocationPickerOpen &&
+				!isInlineEditorOpen &&
+				(completedWebsite && !isWebsiteEditorOpen ? (
+					<VenueCompletedWebsiteButton
+						website={completedWebsite}
+						onClick={openWebsiteEditor}
+						className="mt-[4px]"
+					/>
+				) : isWebsiteEditorOpen ? (
+					<VenueWebsiteField
+						value={form.website}
+						onChange={(value) => updateField('website', value)}
+						onFocus={() => {
+							setActiveTextField('website');
+							setIsBusinessTypePickerOpen(false);
+							setIsHoursEditorOpen(false);
+							setIsCapacityEditorOpen(false);
+							setIsGenrePickerOpen(false);
+							setIsPayRangeEditorOpen(false);
+							setIsSoundEditorOpen(false);
+						}}
+						onKeyDown={handleWebsiteKeyDown}
+						inputRef={websiteInputRef}
+						className="mt-[4px] h-[98px] w-[386px]"
+					/>
+				) : (
+					<VenueTextField
+						label="Website"
+						value=""
+						onChange={() => undefined}
+						onFocus={openWebsiteEditor}
+						readOnly
+						className="mt-[4px] h-[98px] w-[386px] cursor-pointer"
+					/>
+				))}
+		</div>
+	);
+
+	// Standalone edit page card, including the creation-flow "New Venue" header.
+	const profileCard = (
+		<section className="flex h-[637px] w-[583px] flex-col items-center rounded-[12px] bg-[rgba(255,255,255,0.65)]">
+			<div className="mt-[13px] flex h-[28px] w-[570px] items-center rounded-[4px] border-[1.056px] border-[#111] bg-white px-[8px] text-[14px] font-semibold leading-none text-black">
+				New Venue
+			</div>
+
+			<div className="relative mt-[7px] h-[570px] w-[570px] overflow-hidden rounded-[8px] border border-black bg-[linear-gradient(180deg,#CBEEFD_0%,#FFF_100%)]">
+				<div className="absolute left-[15px] top-[16px]">
+					<label className="block h-[64px] w-[386px] overflow-hidden rounded-[8px] bg-white">
+						{renderVenueNameInput(
+							'h-[46px] w-full bg-white px-[10px] text-[26px] font-medium leading-none text-black outline-none placeholder:text-[#828282]'
+						)}
+						<div className="flex h-[18px] items-center justify-end gap-[14px] rounded-b-[8px] bg-[#F67C7E] pr-[14px] font-inter text-[12.062px] font-semibold leading-[25.629px] text-black tabular-nums">
+							{locationCoordinateLabels && (
+								<>
+									<span>{locationCoordinateLabels.latitude}</span>
+									<span>{locationCoordinateLabels.longitude}</span>
+								</>
+							)}
+						</div>
+					</label>
+				</div>
+
+				<div className="absolute left-[15px] top-[87px] flex items-start gap-[9px]">
+					{profileFieldsColumn}
+
+					<VenuePhotosPlaceholder />
+				</div>
+			</div>
+		</section>
+	);
+
+	if (variant === 'panel') {
+		// Native-width layout for the map view's Profile panel: hero photo on top
+		// (hidden when there are no photos), name card + fields on the left, photos
+		// grid + bio on the right. No "New Venue" header here.
+		return (
+			<div className="flex h-full w-full flex-col gap-[8px] p-[8px]">
+				<VenueProfileHeroPhoto />
+				<div className="flex flex-1 items-stretch gap-[9px]">
+					<div className="w-[386px] shrink-0">
+						<div className="overflow-hidden rounded-[8px] bg-white">
+							<div className="flex h-[46px] items-center pr-[10px]">
+								{renderVenueNameInput(
+									'h-full min-w-0 flex-1 bg-white px-[10px] text-[26px] font-medium leading-none text-black outline-none placeholder:text-[#828282]'
+								)}
+								<BadgeCheck
+									aria-hidden="true"
+									className="h-[24px] w-[24px] shrink-0 text-white"
+									fill="#63C766"
+									strokeWidth={1.5}
+								/>
+							</div>
+							<div className="flex h-[18px] items-center justify-end gap-[14px] bg-white pr-[14px] font-inter text-[12.062px] font-semibold text-black tabular-nums">
+								{locationCoordinateLabels && (
+									<>
+										<span>{locationCoordinateLabels.latitude}</span>
+										<span>{locationCoordinateLabels.longitude}</span>
+									</>
+								)}
+							</div>
+							<div className="h-[14px] rounded-b-[8px] bg-[#F67C7E]" />
+						</div>
+						<div className="mt-[7px]">{profileFieldsColumn}</div>
+					</div>
+					<div className="flex min-w-0 flex-1 flex-col gap-[9px]">
+						<VenuePhotosPlaceholder layout="grid" />
+						<div className="flex-1 rounded-[8px] border border-black/20 bg-[#F1FAFF] px-[10px] pt-[8px]">
+							<span className="rounded-[4px] bg-[#D6FFED] px-[3px] text-[14px] font-black leading-[14px] text-[#34B965]">
+								Bio
+							</span>
+						</div>
+					</div>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<div className="relative z-10 flex min-h-[100dvh] w-full flex-col items-center justify-center overflow-x-auto px-4 py-10 sm:px-6">
@@ -2410,411 +2998,7 @@ function VenuePortalForm({ onEnterMapView }: { onEnterMapView: () => void }) {
 						{venuePortalUserName}
 					</div>
 				</div>
-				<section className="flex h-[637px] w-[583px] flex-col items-center rounded-[12px] bg-[rgba(255,255,255,0.65)]">
-					<div className="mt-[13px] flex h-[28px] w-[570px] items-center rounded-[4px] border-[1.056px] border-[#111] bg-white px-[8px] text-[14px] font-semibold leading-none text-black">
-						New Venue
-					</div>
-
-					<div className="relative mt-[7px] h-[570px] w-[570px] overflow-hidden rounded-[8px] border border-black bg-[linear-gradient(180deg,#CBEEFD_0%,#FFF_100%)]">
-						<div className="absolute left-[15px] top-[16px]">
-							<label className="block h-[64px] w-[386px] overflow-hidden rounded-[8px] bg-white">
-								<input
-									aria-label="Venue name"
-									value={form.venueName}
-									onChange={(event) => updateField('venueName', event.target.value)}
-									onFocus={() => {
-										setActiveTextField(null);
-										setIsBusinessTypePickerOpen(false);
-										setIsHoursEditorOpen(false);
-										setIsCapacityEditorOpen(false);
-										setIsGenrePickerOpen(false);
-										setIsPayRangeEditorOpen(false);
-										setIsSoundEditorOpen(false);
-										setIsVenueNameFocused(true);
-									}}
-									onBlur={() => setIsVenueNameFocused(false)}
-									placeholder="Enter Venue Name"
-									autoComplete="organization"
-									className="h-[46px] w-full bg-white px-[10px] text-[26px] font-medium leading-none text-black outline-none placeholder:text-[#828282]"
-								/>
-								<div className="flex h-[18px] items-center justify-end gap-[14px] rounded-b-[8px] bg-[#F67C7E] pr-[14px] font-inter text-[12.062px] font-semibold leading-[25.629px] text-black tabular-nums">
-									{locationCoordinateLabels && (
-										<>
-											<span>{locationCoordinateLabels.latitude}</span>
-											<span>{locationCoordinateLabels.longitude}</span>
-										</>
-									)}
-								</div>
-							</label>
-						</div>
-
-						<div className="absolute left-[15px] top-[87px] flex items-start gap-[9px]">
-							<div ref={profileFieldsRef} className="w-[386px]">
-								<div ref={locationSlotRef} data-venue-location-picker="true">
-									{isLocationPickerOpen ? (
-										<ProfileAreaMapBox
-											area={form.address}
-											onAreaUpdate={updateLocation}
-											onAreaCommit={() => advanceFromProfileField('location')}
-											initialCoordinates={locationCoordinates}
-											onCoordinatesChange={setLocationCoordinates}
-											className="mt-0 h-[174px] w-[386px] rounded-[8px] border-[2px] opacity-100"
-											headerLabel="Enter Location"
-											inputPlaceholder="Enter Location"
-											initiallyEditing
-											reverseGeocodeTypes={VENUE_LOCATION_GEOCODE_TYPES}
-											forwardGeocodeTypes={VENUE_LOCATION_GEOCODE_TYPES}
-											formatGeocodeFeature={formatVenueLocationFeature}
-											onFeatureSelect={handleLocationFeatureSelect}
-										/>
-									) : completedAddress ? (
-										<VenueCompletedLocationButton
-											address={completedAddress}
-											onClick={() => {
-												setActiveTextField(null);
-												setIsBusinessTypePickerOpen(false);
-												setIsHoursEditorOpen(false);
-												setIsCapacityEditorOpen(false);
-												setIsGenrePickerOpen(false);
-												setIsPayRangeEditorOpen(false);
-												setIsSoundEditorOpen(false);
-												setIsLocationPickerOpen(true);
-											}}
-										/>
-									) : (
-										<VenueTextField
-											label="Location"
-											value={form.address}
-											onChange={(value) => updateField('address', value)}
-											autoComplete="street-address"
-											highlighted={shouldHighlightLocation}
-											solidWhenEmpty={isInlineEditorOpen}
-											readOnly
-											onFocus={() => {
-												setActiveTextField(null);
-												setIsBusinessTypePickerOpen(false);
-												setIsHoursEditorOpen(false);
-												setIsCapacityEditorOpen(false);
-												setIsGenrePickerOpen(false);
-												setIsPayRangeEditorOpen(false);
-												setIsSoundEditorOpen(false);
-												setIsLocationPickerOpen(true);
-											}}
-											className="h-[63px] w-[386px] cursor-pointer"
-										/>
-									)}
-								</div>
-
-								{isBusinessTypePickerOpen && (
-									<VenueBusinessTypePicker
-										value={form.businessType}
-										onChange={(value) => updateField('businessType', value)}
-										onSelect={selectBusinessType}
-										className="mt-[5px]"
-									/>
-								)}
-
-								<div
-									className={`${isBusinessTypePickerOpen ? 'mt-[4px]' : 'mt-[5px]'} grid grid-cols-[172px_210px] gap-x-[4px]`}
-								>
-									{!isBusinessTypePickerOpen && completedBusinessType ? (
-										<VenueCompletedBusinessTypeButton
-											businessType={completedBusinessType}
-											onClick={() => {
-												setActiveTextField(null);
-												setIsLocationPickerOpen(false);
-												setIsHoursEditorOpen(false);
-												setIsCapacityEditorOpen(false);
-												setIsGenrePickerOpen(false);
-												setIsPayRangeEditorOpen(false);
-												setIsSoundEditorOpen(false);
-												setIsBusinessTypePickerOpen(true);
-											}}
-										/>
-									) : (
-										<VenueTextField
-											label="Business Type"
-											value={isBusinessTypePickerOpen ? '' : form.businessType}
-											onChange={(value) => updateField('businessType', value)}
-											onFocus={() => {
-												setActiveTextField(null);
-												setIsLocationPickerOpen(false);
-												setIsHoursEditorOpen(false);
-												setIsCapacityEditorOpen(false);
-												setIsGenrePickerOpen(false);
-												setIsPayRangeEditorOpen(false);
-												setIsSoundEditorOpen(false);
-												setIsBusinessTypePickerOpen(true);
-											}}
-											readOnly={isBusinessTypePickerOpen}
-											activeEntry={isBusinessTypePickerOpen}
-											solidWhenEmpty={isInlineEditorOpen}
-											placeholderShowsPlus={!isBusinessTypePickerOpen}
-											placeholderContentClassName={
-												isBusinessTypePickerOpen
-													? 'text-left leading-none'
-													: LEFT_GRID_PLACEHOLDER_CLASS
-											}
-											placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
-											className={`h-[63px] w-[172px] ${
-												isBusinessTypePickerOpen ? 'cursor-pointer' : ''
-											}`}
-										/>
-									)}
-									{hasCompletedHours && !isHoursEditorOpen ? (
-										<VenueCompletedHoursButton
-											summary={completedHoursSummary}
-											onClick={openHoursEditor}
-										/>
-									) : (
-										<VenueTextField
-											label="Hours"
-											value=""
-											onChange={() => undefined}
-											onFocus={openHoursEditor}
-											readOnly
-											activeEntry={isHoursEditorOpen}
-											solidWhenEmpty={isInlineEditorOpen}
-											placeholderShowsPlus={!isHoursEditorOpen}
-											placeholderContentClassName={
-												isHoursEditorOpen
-													? 'text-left leading-none'
-													: RIGHT_GRID_PLACEHOLDER_CLASS
-											}
-											placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
-											className="h-[63px] w-[210px] cursor-pointer"
-										/>
-									)}
-								</div>
-
-								{isHoursEditorOpen && (
-									<VenueHoursEditor
-										hours={form.hours}
-										onToggleDay={toggleHoursDay}
-										onChangeDay={updateHoursDay}
-										className="mt-[4px]"
-									/>
-								)}
-
-								{isCapacityEditorOpen && (
-									<VenueCapacityEditor
-										value={form.capacity}
-										onChange={(value) => updateField('capacity', value)}
-										inputRef={capacityInputRef}
-										className="mt-[4px]"
-									/>
-								)}
-
-								<div className="mt-[4px] grid grid-cols-[172px_210px] gap-x-[4px]">
-									{isCapacityEditorOpen ? (
-										<VenueTextField
-											label="Capacity"
-											value=""
-											onChange={() => undefined}
-											onFocus={openCapacityEditor}
-											readOnly
-											activeEntry
-											placeholderShowsPlus={false}
-											placeholderContentClassName="text-left leading-none"
-											placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
-											className="h-[63px] w-[172px] cursor-pointer"
-										/>
-									) : completedCapacity ? (
-										<VenueCompletedCapacityButton
-											capacity={completedCapacity}
-											onClick={openCapacityEditor}
-										/>
-									) : (
-										<VenueTextField
-											label="Capacity"
-											value=""
-											onChange={() => undefined}
-											onFocus={openCapacityEditor}
-											readOnly
-											solidWhenEmpty={isInlineEditorOpen}
-											placeholderContentClassName={LEFT_GRID_PLACEHOLDER_CLASS}
-											placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
-											className="h-[63px] w-[172px] cursor-pointer"
-										/>
-									)}
-									{isGenrePickerOpen ? (
-										<VenueActiveGenreButton onClick={openGenrePicker} />
-									) : selectedGenres.length > 0 ? (
-										<VenueCompletedGenreButton
-											genres={selectedGenres}
-											onClick={openGenrePicker}
-										/>
-									) : (
-										<VenueTextField
-											label="Genres"
-											value=""
-											onChange={() => undefined}
-											onFocus={openGenrePicker}
-											readOnly
-											solidWhenEmpty={isInlineEditorOpen}
-											placeholderContentClassName={RIGHT_GRID_PLACEHOLDER_CLASS}
-											placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
-											className="h-[63px] w-[210px] cursor-pointer"
-										/>
-									)}
-								</div>
-
-								{isGenrePickerOpen && (
-									<VenueGenrePicker
-										selectedGenres={selectedGenres}
-										onToggle={toggleGenre}
-										className="mt-[4px]"
-									/>
-								)}
-
-								<div className="mt-[4px] grid grid-cols-[172px_210px] gap-x-[4px]">
-									{isPayRangeEditorOpen ? (
-										<VenueTextField
-											label="Pay Range"
-											value=""
-											onChange={() => undefined}
-											onFocus={openPayRangeEditor}
-											readOnly
-											activeEntry
-											placeholderShowsPlus={false}
-											placeholderContentClassName="text-left leading-none"
-											placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
-											className="h-[63px] w-[172px] cursor-pointer"
-										/>
-									) : completedPayRange ? (
-										<VenueCompletedPayRangeButton
-											payRange={completedPayRange}
-											onClick={openPayRangeEditor}
-										/>
-									) : (
-										<VenueTextField
-											label="Pay Range"
-											value=""
-											onChange={() => undefined}
-											onFocus={openPayRangeEditor}
-											readOnly
-											solidWhenEmpty={isInlineEditorOpen}
-											placeholderContentClassName={LEFT_GRID_PLACEHOLDER_CLASS}
-											placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
-											className="h-[63px] w-[172px] cursor-pointer"
-										/>
-									)}
-									{isSoundEditorOpen ? (
-										<VenueActiveSoundButton onClick={openSoundEditor} />
-									) : completedSound ? (
-										<VenueCompletedSoundButton
-											sound={completedSound}
-											onClick={openSoundEditor}
-										/>
-									) : (
-										<VenueTextField
-											label="Sound"
-											value=""
-											onChange={() => undefined}
-											onFocus={openSoundEditor}
-											readOnly
-											solidWhenEmpty={isInlineEditorOpen}
-											placeholderContentClassName={RIGHT_GRID_PLACEHOLDER_CLASS}
-											placeholderLabelClassName={GRID_PLACEHOLDER_LABEL_CLASS}
-											className="h-[63px] w-[210px] cursor-pointer"
-										/>
-									)}
-								</div>
-
-								{isPayRangeEditorOpen && (
-									<VenuePayRangeEditor
-										value={form.payRange}
-										onChange={(value) => updateField('payRange', value)}
-										minInputRef={payRangeMinInputRef}
-										className="mt-[4px]"
-									/>
-								)}
-
-								{isSoundEditorOpen && (
-									<VenueSoundEditor
-										value={form.sound}
-										onSelect={(value) => updateField('sound', value)}
-										className="mt-[4px]"
-									/>
-								)}
-
-								{!isPayRangeEditorOpen &&
-								completedDescription &&
-								!isDescriptionEditorOpen ? (
-									<VenueCompletedDescriptionButton
-										description={completedDescription}
-										onClick={openDescriptionEditor}
-										className="mt-[4px]"
-									/>
-								) : !isPayRangeEditorOpen && isDescriptionEditorOpen ? (
-									<VenueDescriptionField
-										value={form.description}
-										onChange={(value) => updateField('description', value)}
-										onFocus={() => {
-											setActiveTextField('description');
-											setIsBusinessTypePickerOpen(false);
-											setIsHoursEditorOpen(false);
-											setIsCapacityEditorOpen(false);
-											setIsGenrePickerOpen(false);
-											setIsPayRangeEditorOpen(false);
-											setIsSoundEditorOpen(false);
-										}}
-										onKeyDown={handleDescriptionKeyDown}
-										textareaRef={descriptionInputRef}
-										className="mt-[4px] h-[98px] w-[386px]"
-									/>
-								) : !isPayRangeEditorOpen ? (
-									<VenueTextField
-										label="Description"
-										value=""
-										onChange={() => undefined}
-										onFocus={openDescriptionEditor}
-										readOnly
-										solidWhenEmpty={isInlineEditorOpen}
-										className="mt-[4px] h-[98px] w-[386px] cursor-pointer"
-									/>
-								) : null}
-								{!isLocationPickerOpen &&
-									!isInlineEditorOpen &&
-									(completedWebsite && !isWebsiteEditorOpen ? (
-										<VenueCompletedWebsiteButton
-											website={completedWebsite}
-											onClick={openWebsiteEditor}
-											className="mt-[4px]"
-										/>
-									) : isWebsiteEditorOpen ? (
-										<VenueWebsiteField
-											value={form.website}
-											onChange={(value) => updateField('website', value)}
-											onFocus={() => {
-												setActiveTextField('website');
-												setIsBusinessTypePickerOpen(false);
-												setIsHoursEditorOpen(false);
-												setIsCapacityEditorOpen(false);
-												setIsGenrePickerOpen(false);
-												setIsPayRangeEditorOpen(false);
-												setIsSoundEditorOpen(false);
-											}}
-											onKeyDown={handleWebsiteKeyDown}
-											inputRef={websiteInputRef}
-											className="mt-[4px] h-[98px] w-[386px]"
-										/>
-									) : (
-										<VenueTextField
-											label="Website"
-											value=""
-											onChange={() => undefined}
-											onFocus={openWebsiteEditor}
-											readOnly
-											className="mt-[4px] h-[98px] w-[386px] cursor-pointer"
-										/>
-									))}
-							</div>
-
-							<VenuePhotosPlaceholder />
-						</div>
-					</div>
-				</section>
+				{profileCard}
 
 				<button
 					type="submit"
@@ -2851,7 +3035,15 @@ function VenuePortalForm({ onEnterMapView }: { onEnterMapView: () => void }) {
 	);
 }
 
-function VenuePortalContent({ onEnterMapView }: { onEnterMapView: () => void }) {
+function VenuePortalContent({
+	view,
+	onEnterMapView,
+	onExitToEdit,
+}: {
+	view: VenuePortalView;
+	onEnterMapView: () => void;
+	onExitToEdit: () => void;
+}) {
 	const router = useRouter();
 	const { isLoaded, isSignedIn, userId } = useAuth();
 	const [venuePromotionState, setVenuePromotionState] = useState<
@@ -2875,6 +3067,7 @@ function VenuePortalContent({ onEnterMapView }: { onEnterMapView: () => void }) 
 		isError: isSavedVenueError,
 	} = useGetVenue({ enabled: shouldFetchSavedVenue });
 	const hasResolvedInitialVenueViewRef = useRef(false);
+	const hasResolvedOptimisticMapEntryRef = useRef(false);
 
 	useEffect(() => {
 		if (!isLoaded || isSignedIn) return;
@@ -2947,6 +3140,69 @@ function VenuePortalContent({ onEnterMapView }: { onEnterMapView: () => void }) 
 		savedVenue,
 		shouldFetchSavedVenue,
 	]);
+
+	// Keep the localStorage hint current so the next load can skip the "New Venue"
+	// skeleton. Re-runs on every venue resolution (the form auto-saves and invalidates
+	// the ['venue'] query), so the hint tracks the profile as required fields fill in.
+	useEffect(() => {
+		if (
+			!shouldFetchSavedVenue ||
+			isPendingSavedVenue ||
+			isLoadingSavedVenue ||
+			isSavedVenueError ||
+			!userId
+		) {
+			return;
+		}
+		writeVenueProfileComplete(userId, hasSavedVenueRequiredFields(savedVenue));
+	}, [
+		shouldFetchSavedVenue,
+		isPendingSavedVenue,
+		isLoadingSavedVenue,
+		isSavedVenueError,
+		savedVenue,
+		userId,
+	]);
+
+	// The wrapper optimistically enters map view from the stored hint before any data
+	// loads. This makes a single keep-or-exit decision once the real data resolves:
+	// return to edit if this isn't a venue account with a completed profile (stale hint,
+	// account switch, or profile gone incomplete). It is one-time on purpose — after the
+	// initial entry is resolved it never fires again, so it can't yank a user out of the
+	// map mid-edit if they later clear a required field from the Profile panel.
+	useEffect(() => {
+		if (hasResolvedOptimisticMapEntryRef.current) return;
+		if (view !== 'map' || !isLoaded) return;
+		if (isSignedIn === false) return; // the redirect effect handles signed-out
+		if (isPendingUser || isLoadingUser || !user) return; // wait for the account
+		if (user.accountType !== AccountType.venue) {
+			hasResolvedOptimisticMapEntryRef.current = true;
+			onExitToEdit();
+			return;
+		}
+		if (isPendingSavedVenue || isLoadingSavedVenue) return; // wait for the venue
+		hasResolvedOptimisticMapEntryRef.current = true;
+		if (!hasSavedVenueRequiredFields(savedVenue)) {
+			onExitToEdit();
+		}
+	}, [
+		view,
+		isLoaded,
+		isSignedIn,
+		isPendingUser,
+		isLoadingUser,
+		user,
+		isPendingSavedVenue,
+		isLoadingSavedVenue,
+		savedVenue,
+		onExitToEdit,
+	]);
+
+	// In map view the page form would sit invisibly under the interactive map; skip it
+	// so it never mounts alongside the Profile panel's instance of the same form.
+	if (view === 'map') {
+		return null;
+	}
 
 	if (!isLoaded || isSignedIn === false) {
 		return <VenuePortalSkeleton />;
@@ -3074,80 +3330,6 @@ function VenueProfileMapCard({ onEdit }: { onEdit: () => void }) {
 // the 83px card — within the map-view wrapper's cluster scale.
 const VENUE_CALENDAR_SCALE = 656 / DASHBOARD_CALENDAR_NATIVE_WIDTH_PX;
 const VENUE_MAP_LEFT_CLUSTER_SCALE = 0.7;
-const VENUE_MAP_LEFT_CLUSTER_MAIL_SCALE = 0.57;
-const VENUE_OPPORTUNITY_MONTH_LABELS = [
-	'January',
-	'February',
-	'March',
-	'April',
-	'May',
-	'June',
-	'July',
-	'August',
-	'September',
-	'October',
-	'November',
-	'December',
-] as const;
-
-const getVenueOpportunityOrdinalSuffix = (day: number) => {
-	const lastTwo = day % 100;
-	if (lastTwo >= 11 && lastTwo <= 13) return 'th';
-
-	switch (day % 10) {
-		case 1:
-			return 'st';
-		case 2:
-			return 'nd';
-		case 3:
-			return 'rd';
-		default:
-			return 'th';
-	}
-};
-
-const formatVenueOpportunityDateFromValue = (value: Date | string) => {
-	const date = new Date(value);
-	if (Number.isNaN(date.getTime())) return '';
-
-	const day = date.getDate();
-	return `${VENUE_OPPORTUNITY_MONTH_LABELS[date.getMonth()]} ${day}${getVenueOpportunityOrdinalSuffix(day)}`;
-};
-
-const formatVenueOpportunityDate = (
-	whenLabel: string | null | undefined,
-	startsAt: Date | string | null | undefined
-) => {
-	const label = whenLabel?.trim();
-	if (label) return label.replace(/\s+\d{4}$/, '');
-	if (startsAt) return formatVenueOpportunityDateFromValue(startsAt);
-	return 'Date TBD';
-};
-
-const formatVenueOpportunityTimeValue = (value: string | null | undefined) => {
-	if (!value) return '';
-
-	const [hoursText, minutesText = '00'] = value.split(':');
-	const hours = Number(hoursText);
-	const minutes = Number(minutesText);
-	if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return value;
-
-	const hour = hours % 12 || 12;
-	const minuteLabel = minutes === 0 ? '' : `:${String(minutes).padStart(2, '0')}`;
-	const meridiem = hours < 12 ? 'am' : 'pm';
-	return `${hour}${minuteLabel}${meridiem}`;
-};
-
-const formatVenueOpportunityTimeRange = (
-	startTime: string | null | undefined,
-	endTime: string | null | undefined
-) => {
-	const startLabel = formatVenueOpportunityTimeValue(startTime);
-	const endLabel = formatVenueOpportunityTimeValue(endTime);
-
-	if (startLabel && endLabel) return `${startLabel}-${endLabel}`;
-	return startLabel || endLabel || 'Time TBD';
-};
 
 function VenueCalendarMapPanel() {
 	const now = new Date();
@@ -3170,6 +3352,38 @@ function VenueCalendarMapPanel() {
 // DashboardCalendarPanel) renders at 381 × VENUE_CALENDAR_SCALE.
 const VENUE_OPPORTUNITIES_TOP_PX = Math.round(98 + 381 * VENUE_CALENDAR_SCALE + 15);
 
+// Single event entry row, shared between the inline Events box (642px rows) and
+// the Events tool panel (748px rows) so the two lists stay visually identical.
+function VenueOpportunityRow({
+	opportunity,
+	onEdit,
+	widthPx,
+}: {
+	opportunity: VenueEvent;
+	onEdit: (eventId: number) => void;
+	widthPx: number;
+}) {
+	return (
+		<button
+			type="button"
+			onClick={() => onEdit(opportunity.id)}
+			aria-label={`Edit ${opportunity.name}`}
+			className="flex h-[40px] shrink-0 items-center rounded-[12px] border-[2px] border-black bg-[#F7FFF0] px-[30px] font-inter text-black"
+			style={{ width: `${widthPx}px` }}
+		>
+			<span className="min-w-0 flex-1 truncate text-[22px] font-medium leading-none">
+				{opportunity.name}
+			</span>
+			<span className="ml-[18px] flex h-[24px] w-[112px] shrink-0 items-center justify-center rounded-[8px] border-[1.5px] border-black bg-[#FF818A] text-[16px] font-medium leading-none">
+				{formatVenueOpportunityDate(opportunity.whenLabel, opportunity.startsAt)}
+			</span>
+			<span className="ml-[28px] w-[94px] shrink-0 text-center text-[16px] font-medium leading-none">
+				{formatVenueOpportunityTimeRange(opportunity.startTime, opportunity.endTime)}
+			</span>
+		</button>
+	);
+}
+
 function VenueOpportunitiesMapPanel({
 	opportunities,
 	onAddOpportunity,
@@ -3191,26 +3405,12 @@ function VenueOpportunitiesMapPanel({
 			</div>
 			<div className="flex min-h-0 flex-1 flex-col gap-[9px] overflow-y-auto">
 				{opportunities.map((opportunity) => (
-					<button
-						type="button"
+					<VenueOpportunityRow
 						key={opportunity.id}
-						onClick={() => onEditOpportunity(opportunity.id)}
-						aria-label={`Edit ${opportunity.name}`}
-						className="flex h-[40px] w-[642px] shrink-0 items-center rounded-[12px] border-[2px] border-black bg-[#F7FFF0] px-[30px] font-inter text-black"
-					>
-						<span className="min-w-0 flex-1 truncate text-[22px] font-medium leading-none">
-							{opportunity.name}
-						</span>
-						<span className="ml-[18px] flex h-[24px] w-[112px] shrink-0 items-center justify-center rounded-[8px] border-[1.5px] border-black bg-[#FF818A] text-[16px] font-medium leading-none">
-							{formatVenueOpportunityDate(opportunity.whenLabel, opportunity.startsAt)}
-						</span>
-						<span className="ml-[28px] w-[94px] shrink-0 text-center text-[16px] font-medium leading-none">
-							{formatVenueOpportunityTimeRange(
-								opportunity.startTime,
-								opportunity.endTime
-							)}
-						</span>
-					</button>
+						opportunity={opportunity}
+						onEdit={onEditOpportunity}
+						widthPx={642}
+					/>
 				))}
 				{/* Opens the create-event panel (same panel as the toolbar's Add tool). */}
 				<button
@@ -3226,22 +3426,100 @@ function VenueOpportunitiesMapPanel({
 	);
 }
 
-function VenueMailMapPanel() {
+// Floating events panel for the toolbar's Events tab. Same chrome and footprint
+// as the chat panel; the body reuses the inline Events box's entry rows (widened
+// to 748px) on a light-green band, with a full-width divider after the last
+// entry and the add pill below it on the gradient. Clicking a row switches the
+// inner box to the event's detail view (applicant list); the panel-local
+// selection resets naturally when the tool closes (the panel unmounts).
+function VenueEventsMapPanel({
+	opportunities,
+	applicantCountByEventId,
+	onAddOpportunity,
+	onEditOpportunity,
+}: {
+	opportunities: VenueEvent[];
+	applicantCountByEventId: Map<number, number>;
+	onAddOpportunity: () => void;
+	onEditOpportunity: (eventId: number) => void;
+}) {
+	const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+	// Derived so a deleted event falls back to the list instead of a dead detail view.
+	const selectedEvent =
+		opportunities.find((opportunity) => opportunity.id === selectedEventId) ?? null;
 	return (
 		<div
-			className="fixed left-1/2 top-[112px] z-[99] h-[829px] w-[781px] origin-top rounded-[10px] border-[2px] border-black/40 bg-white/15"
-			style={{ transform: `translateX(-50%) scale(${VENUE_MAP_OVERLAY_SCALE})` }}
+			data-venue-tool-ui="true"
+			className="fixed left-[500px] top-[122px] z-[99] h-[829px] w-[781px] origin-top-left rounded-[12px] border-[2px] border-black/40 bg-white/40"
+			style={{ transform: `scale(${VENUE_MAP_OVERLAY_SCALE})` }}
 		>
-			<div className="absolute left-[8px] top-[20px] h-[797px] w-[765px] overflow-hidden rounded-[8px] border-[2px] border-black">
-				<div className="absolute inset-x-0 top-0 h-[30px] overflow-hidden">
-					<div className="absolute inset-x-0 top-[-16px] h-[120px] bg-[linear-gradient(180deg,#C1F7BB_0%,#60AE92_100%)]" />
-				</div>
-				<div className="absolute inset-x-0 bottom-0 top-[30px] bg-[linear-gradient(180deg,#BBD4F7_0%,#FFF_100%)]" />
-				<div className="absolute left-0 right-0 top-[30px] h-[2px] bg-black" />
-				{/* Sender list (left) + open messenger (right) over the blue body. */}
-				<div className="absolute inset-x-0 bottom-0 top-[32px]">
-					<ConversationsPane layout="split" className="h-full w-full" />
-				</div>
+			<div className="absolute left-[12px] top-[4px] font-inter text-[12.358px] font-medium leading-[16.477px] text-black">
+				Events
+			</div>
+			{/* left-[6px] centers the 765px box in the outer's 777px content area
+			    (781 minus the 2px borders). */}
+			<div className="absolute left-[6px] top-[20px] h-[797px] w-[765px] overflow-hidden rounded-[12px] border-[2px] border-black">
+				{selectedEvent ? (
+					<VenueEventDetailView
+						events={opportunities}
+						selectedEventId={selectedEvent.id}
+						applicantCountByEventId={applicantCountByEventId}
+						onSelectEvent={setSelectedEventId}
+						onAddEvent={onAddOpportunity}
+						onEditEvent={onEditOpportunity}
+					/>
+				) : (
+					<>
+						{/* Gradient carries the Figma layer's 0.9 opacity on its own background
+						    layer (not the box) so the rows above stay fully solid. */}
+						<div className="absolute inset-0 bg-[linear-gradient(180deg,#C1F7BB_0%,#60AE92_100%)] opacity-90" />
+						<div className="absolute inset-0 flex flex-col overflow-y-auto">
+							<div className="flex shrink-0 flex-col items-center gap-[9px] bg-[#BAE3B6] py-[10px]">
+								{opportunities.map((opportunity) => (
+									<VenueOpportunityRow
+										key={opportunity.id}
+										opportunity={opportunity}
+										onEdit={setSelectedEventId}
+										widthPx={748}
+									/>
+								))}
+							</div>
+							<div className="h-[2px] shrink-0 bg-black" />
+							{/* Opens the create-event panel (same panel as the toolbar's Add tool). */}
+							<button
+								type="button"
+								aria-label="Add opportunity"
+								onClick={onAddOpportunity}
+								className="mt-[10px] flex h-[40px] w-[748px] shrink-0 cursor-pointer items-center justify-center gap-[8px] self-center rounded-[12px] border-[2px] border-black bg-[rgba(247,255,240,0.46)]"
+							>
+								<span className="text-[20px] font-medium leading-none text-black">+</span>
+								<span className="text-[16px] font-medium leading-none text-black">
+									add
+								</span>
+							</button>
+						</div>
+					</>
+				)}
+			</div>
+		</div>
+	);
+}
+
+// Floating profile panel for the toolbar's Profile tab. Same footprint as the
+// chat panel (829×781 outer, 797×765 inner) so the boxes read as siblings; the
+// body renders the form's panel variant at its native 765px width.
+function VenueProfileMapPanel() {
+	return (
+		<div
+			data-venue-tool-ui="true"
+			className="fixed left-[500px] top-[122px] z-[99] h-[829px] w-[781px] origin-top-left rounded-[8px] border border-black bg-[linear-gradient(180deg,#ABF_0%,#EAF5FD_27.95%)]"
+			style={{ transform: `scale(${VENUE_MAP_OVERLAY_SCALE})` }}
+		>
+			<div className="absolute left-[12px] top-[4px] font-inter text-[12.358px] font-medium leading-[16.477px] text-black">
+				Profile
+			</div>
+			<div className="absolute left-[7px] top-[20px] h-[797px] w-[765px] overflow-hidden rounded-[8px] border border-black bg-[#CDE8FD]">
+				<VenuePortalForm variant="panel" />
 			</div>
 		</div>
 	);
@@ -3249,8 +3527,17 @@ function VenueMailMapPanel() {
 
 export default function VenuePortalClient() {
 	const [view, setView] = useState<VenuePortalView>('edit');
+	// Returning venues with a completed profile (per the localStorage hint) land straight
+	// on the map instead of flashing the "New Venue" creation skeleton. Runs pre-paint so
+	// the first visible frame is already the map; VenuePortalContent self-corrects back to
+	// edit if the resolved data shows this isn't a completed venue profile after all.
+	useIsomorphicLayoutEffect(() => {
+		if (readVenueProfileComplete()) {
+			setView('map');
+		}
+	}, []);
 	const [selectedVenueTool, setSelectedVenueTool] = useState<
-		'add' | 'profile' | 'mail' | null
+		'add' | 'profile' | 'mail' | 'events' | null
 	>(null);
 	const [editingVenueEventId, setEditingVenueEventId] = useState<number | null>(null);
 	const isMailToolSelected = selectedVenueTool === 'mail';
@@ -3266,33 +3553,93 @@ export default function VenuePortalClient() {
 		setEditingVenueEventId(eventId);
 		setSelectedVenueTool('add');
 	};
-	const toggleVenueTool = (tool: 'add' | 'profile' | 'mail') => {
+	// Select-only on purpose: re-clicking (or double-clicking) the active tab must
+	// not close the open panel or reset its state.
+	const selectVenueTool = (tool: 'add' | 'profile' | 'mail' | 'events') => {
+		if (selectedVenueTool === tool) return;
 		if (tool === 'add') {
 			setEditingVenueEventId(null);
 		}
-		setSelectedVenueTool((current) => (current === tool ? null : tool));
+		setSelectedVenueTool(tool);
 	};
 
-	// Unread badge on the mail tool icon.
+	// Clicking off the tool UI (onto the map around it) closes the open tool and
+	// brings the pill stack back. The tab bar, the open panels, and the left
+	// cluster are tagged data-venue-tool-ui so interactions inside them don't
+	// dismiss.
+	useEffect(() => {
+		if (view !== 'map' || selectedVenueTool === null) return;
+		const handlePointerDown = (event: PointerEvent) => {
+			const target = event.target;
+			if (target instanceof Element && target.closest('[data-venue-tool-ui="true"]')) {
+				return;
+			}
+			setSelectedVenueTool(null);
+		};
+		document.addEventListener('pointerdown', handlePointerDown);
+		return () => document.removeEventListener('pointerdown', handlePointerDown);
+	}, [view, selectedVenueTool]);
+
+	// The map reports the home icon's projected position at 60fps during pans; route
+	// it through a mutable store so the pill stack can follow without re-rendering
+	// the whole portal tree per frame.
+	const [anchorStore] = useState(createVenueIconAnchorStore);
+	const handleOwnedVenueAnchorChange = useCallback<
+		NonNullable<SearchResultsMapProps['onOwnedVenueAnchorChange']>
+	>((anchor) => anchorStore.set(anchor), [anchorStore]);
+
+	// Unread badge on the mail tool icon: general-thread (Inbound) unread from the
+	// conversations list plus per-application-thread (Replies) unread — the two
+	// counts partition the messages, so the sum never double-counts.
 	const { data: venueConversations } = useGetConversations({ enabled: true });
-	const venueUnread = (venueConversations ?? []).reduce(
-		(sum, conversation) => sum + conversation.unreadCount,
-		0
-	);
+	const { data: venueApplications } = useGetVenueApplications({ enabled: true });
+	const venueUnread =
+		(venueConversations ?? []).reduce(
+			(sum, conversation) => sum + conversation.unreadCount,
+			0
+		) +
+		(venueApplications ?? []).reduce(
+			(sum, application) => sum + (application.conversation?.unreadCount ?? 0),
+			0
+		);
+	// Per-event applicant counts for the Events panel, derived from the inbox rows
+	// already polled above (submitted-only, 30s cadence) — no extra API surface.
+	const applicantCountByEventId = useMemo(() => {
+		const counts = new Map<number, number>();
+		for (const application of venueApplications ?? []) {
+			counts.set(application.eventId, (counts.get(application.eventId) ?? 0) + 1);
+		}
+		return counts;
+	}, [venueApplications]);
 	return (
 		<PersistentMapProvider>
 			<PersistentDashboardMap />
-			<VenuePortalPersistentMap view={view} />
-			<VenuePortalContent onEnterMapView={() => setView('map')} />
+			<VenuePortalPersistentMap
+				view={view}
+				onOwnedVenueAnchorChange={handleOwnedVenueAnchorChange}
+			/>
+			<VenuePortalContent
+				view={view}
+				onEnterMapView={() => setView('map')}
+				onExitToEdit={() => setView('edit')}
+			/>
 			{/* Keep the profile-card + calendar cluster compact and slightly lower on the map. */}
 			{view === 'map' && (
 				<div
+					data-venue-tool-ui="true"
 					className="fixed left-[24px] top-[56px] z-[100] origin-top-left"
 					style={{
-						transform: `scale(${isMailToolSelected ? VENUE_MAP_LEFT_CLUSTER_MAIL_SCALE : VENUE_MAP_LEFT_CLUSTER_SCALE})`,
+						transform: `scale(${VENUE_MAP_LEFT_CLUSTER_SCALE})`,
 					}}
 				>
-					<VenueProfileMapCard onEdit={() => setView('edit')} />
+					<VenueProfileMapCard
+						onEdit={() => {
+							// Close any open tool so returning to the map doesn't reopen the
+							// Profile panel over the form the user just left.
+							setSelectedVenueTool(null);
+							setView('edit');
+						}}
+					/>
 					<VenueCalendarMapPanel />
 					<VenueOpportunitiesMapPanel
 						opportunities={opportunities}
@@ -3304,53 +3651,33 @@ export default function VenuePortalClient() {
 			{view === 'map' && selectedVenueTool === 'add' && (
 				<VenueCreateEventMapPanel event={editingVenueEvent} />
 			)}
-			{view === 'map' && isMailToolSelected && <VenueMailMapPanel />}
-			{view === 'map' && (
-				<div className="fixed left-1/2 top-3 z-[100] flex h-[35px] w-[160px] -translate-x-1/2 items-center justify-evenly rounded-[6.5px] border border-black bg-white">
-					<button
-						type="button"
-						aria-label="Add"
-						aria-pressed={selectedVenueTool === 'add'}
-						onClick={() => toggleVenueTool('add')}
-						className="flex cursor-pointer items-center justify-center p-0"
-					>
-						<VenuePortalAddIcon
-							selected={selectedVenueTool === 'add'}
-							className="h-[23px] w-auto"
-						/>
-					</button>
-					<button
-						type="button"
-						aria-label="Profile"
-						aria-pressed={selectedVenueTool === 'profile'}
-						onClick={() => toggleVenueTool('profile')}
-						className="flex cursor-pointer items-center justify-center p-0"
-					>
-						<VenuePortalProfileIcon
-							selected={selectedVenueTool === 'profile'}
-							className="h-[23px] w-auto"
-						/>
-					</button>
-					<span className="relative flex items-center justify-center">
-						<button
-							type="button"
-							aria-label="Mail"
-							aria-pressed={selectedVenueTool === 'mail'}
-							onClick={() => toggleVenueTool('mail')}
-							className="flex cursor-pointer items-center justify-center p-0"
-						>
-							<VenuePortalMailIcon
-								selected={selectedVenueTool === 'mail'}
-								className="h-[20px] w-auto"
-							/>
-						</button>
-						{venueUnread > 0 && (
-							<span className="pointer-events-none absolute -right-[5px] -top-[5px] flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-[#2F6FED] px-[3px] text-[9px] font-semibold leading-none text-white">
-								{venueUnread > 99 ? '99+' : venueUnread}
-							</span>
-						)}
-					</span>
-				</div>
+			{view === 'map' && isMailToolSelected && <VenueChatMapPanel />}
+			{view === 'map' && selectedVenueTool === 'events' && (
+				<VenueEventsMapPanel
+					opportunities={opportunities}
+					applicantCountByEventId={applicantCountByEventId}
+					onAddOpportunity={openCreateOpportunity}
+					onEditOpportunity={openEditOpportunity}
+				/>
+			)}
+			{view === 'map' && selectedVenueTool === 'profile' && <VenueProfileMapPanel />}
+			{/* The pill stack and the tool tab bar swap: pills while nothing is open,
+			    the horizontal bar (above the open panel) while a tool is selected. */}
+			{view === 'map' && selectedVenueTool !== null && (
+				<VenueMapToolTabBar
+					selectedTool={selectedVenueTool}
+					onToolSelect={selectVenueTool}
+					unreadCount={venueUnread}
+				/>
+			)}
+			{view === 'map' && selectedVenueTool === null && (
+				<VenueMapActionPills
+					anchorStore={anchorStore}
+					selectedTool={selectedVenueTool}
+					onToolSelect={selectVenueTool}
+					unreadCount={venueUnread}
+					clusterScale={VENUE_MAP_LEFT_CLUSTER_SCALE}
+				/>
 			)}
 		</PersistentMapProvider>
 	);

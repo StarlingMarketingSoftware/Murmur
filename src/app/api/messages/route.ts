@@ -10,16 +10,28 @@ import {
 	apiUnauthorizedResource,
 	handleApiError,
 } from '@/app/api/_utils';
-import { createReply, divertEmailToMessage } from '@/app/api/_utils/messaging';
+import {
+	createReply,
+	divertEmailToMessage,
+	openApplicationConversation,
+} from '@/app/api/_utils/messaging';
 
-// Send a message: either divert a drafted Email to a venue user (`divert`) or
-// reply within an existing conversation (`reply`).
+// Send a message: divert a drafted Email to a venue user (`divert`), reply within
+// an existing conversation (`reply`), or open an applicant's thread seeded with
+// their application summary (`openApplication`, venue side).
 const postMessageSchema = z.discriminatedUnion('kind', [
 	z.object({ kind: z.literal('divert'), emailId: z.number().int().positive() }),
 	z.object({
 		kind: z.literal('reply'),
 		conversationId: z.number().int().positive(),
 		body: z.string().min(1).max(10000),
+		// Targets one application's thread within the conversation; omitted = the
+		// general thread ('all'-view replies are general too).
+		threadApplicationId: z.number().int().positive().optional(),
+	}),
+	z.object({
+		kind: z.literal('openApplication'),
+		applicationId: z.number().int().positive(),
 	}),
 ]);
 export type PostMessageData = z.infer<typeof postMessageSchema>;
@@ -57,10 +69,36 @@ export async function POST(req: NextRequest) {
 			});
 		}
 
+		if (parsed.data.kind === 'openApplication') {
+			const result = await openApplicationConversation(
+				userId,
+				parsed.data.applicationId
+			);
+			if (!result.ok) {
+				switch (result.code) {
+					case 'not_found':
+						return apiNotFound('Application not found');
+					case 'forbidden':
+						return apiUnauthorizedResource();
+					case 'withdrawn':
+						return apiConflict({ error: 'application_withdrawn' });
+					case 'venue_unavailable':
+						return apiConflict({ error: 'venue_unavailable' });
+					default:
+						return apiBadRequest('Unable to open conversation');
+				}
+			}
+			return apiCreated({
+				conversationId: result.conversationId,
+				message: result.message,
+			});
+		}
+
 		const result = await createReply(
 			userId,
 			parsed.data.conversationId,
-			parsed.data.body
+			parsed.data.body,
+			parsed.data.threadApplicationId ?? null
 		);
 		if (!result.ok) {
 			switch (result.code) {
@@ -70,6 +108,8 @@ export async function POST(req: NextRequest) {
 					return apiUnauthorizedResource();
 				case 'empty':
 					return apiBadRequest('Message body is required');
+				case 'invalid_thread':
+					return apiBadRequest('Application thread does not match this conversation');
 				default:
 					return apiBadRequest('Unable to send message');
 			}

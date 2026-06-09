@@ -34,3 +34,22 @@ export const formatInboxTimestamp = (value: string | Date | null | undefined) =>
 	const day = date.getDate();
 	return `${month} ${day}${getDayOrdinalSuffix(day)}`;
 };
+
+// Event-countdown label for inbox pills: whole days until the event's start day →
+// "5d" ("0d" on the day itself). Past events fall back to the inbox date label.
+export const formatEventCountdown = (startsAt: string | Date | null | undefined) => {
+	if (!startsAt) return '';
+	const date = new Date(startsAt);
+	if (Number.isNaN(date.getTime())) return '';
+
+	const startOfToday = new Date();
+	startOfToday.setHours(0, 0, 0, 0);
+	const startOfEventDay = new Date(date);
+	startOfEventDay.setHours(0, 0, 0, 0);
+	const days = Math.round(
+		(startOfEventDay.getTime() - startOfToday.getTime()) / 86_400_000
+	);
+
+	if (days < 0) return formatInboxTimestamp(date);
+	return `${days}d`;
+};

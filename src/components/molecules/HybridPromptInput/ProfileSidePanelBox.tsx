@@ -557,7 +557,7 @@ const profileMediaWaveformBars = [
 const getMediaDisplayTitle = (filename: string) =>
 	filename.replace(/\.[^/.]+$/, '').trim() || filename;
 
-const ProfileMediaWaveform = () => {
+export const ProfileMediaWaveform = () => {
 	const bars = (
 		<div className="flex h-full w-max items-center">
 			{profileMediaWaveformBars.map((height, index) => (

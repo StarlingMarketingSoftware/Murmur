@@ -46,7 +46,9 @@ export const projectVenueRepliesForUser = async (
 
 	// Provenance: a venue reply itself carries no emailId/campaignId — those live on
 	// the diverted (artist) message that opened the thread. Attribute each reply to
-	// the most-recent diverted message in its conversation.
+	// the most-recent diverted message in its conversation. Application-thread
+	// replies skip this attribution entirely (their context is the event, not a
+	// campaign) — see the threadApplicationId branch below.
 	const divertedMessages = await prisma.message.findMany({
 		where: { conversationId: { in: conversationIds }, emailId: { not: null } },
 		orderBy: { id: 'desc' },
@@ -64,6 +66,33 @@ export const projectVenueRepliesForUser = async (
 			});
 		}
 	}
+
+	// Event names for application-thread replies — shown as the row subject so the
+	// artist's inbox labels the chat with the opportunity it belongs to.
+	const threadApplicationIds = [
+		...new Set(
+			venueMessages
+				.map((m) => m.threadApplicationId)
+				.filter((id): id is number => id != null)
+		),
+	];
+	const threadApplications = threadApplicationIds.length
+		? await prisma.eventApplication.findMany({
+				where: { id: { in: threadApplicationIds } },
+				select: { id: true, eventId: true },
+			})
+		: [];
+	const threadEventIds = [...new Set(threadApplications.map((a) => a.eventId))];
+	const threadEvents = threadEventIds.length
+		? await prisma.event.findMany({
+				where: { id: { in: threadEventIds } },
+				select: { id: true, name: true },
+			})
+		: [];
+	const eventNameById = new Map(threadEvents.map((e) => [e.id, e.name]));
+	const eventNameByApplicationId = new Map(
+		threadApplications.map((a) => [a.id, eventNameById.get(a.eventId) ?? null])
+	);
 
 	// Batch-load the relations the Responses UI renders.
 	const venueIds = [...new Set(conversations.map((c) => c.venueId))];
@@ -94,7 +123,12 @@ export const projectVenueRepliesForUser = async (
 		const venueId = venueIdByConversation.get(message.conversationId);
 		if (venueId == null) continue;
 		const contact = contactByVenueId.get(venueId) ?? null;
-		const provenance = provenanceByConversation.get(message.conversationId);
+		// Application-thread replies belong to the opportunity, not to a campaign:
+		// no divert provenance, and the subject is the event's name.
+		const isApplicationThread = message.threadApplicationId != null;
+		const provenance = isApplicationThread
+			? undefined
+			: provenanceByConversation.get(message.conversationId);
 		const campaignId = provenance?.campaignId ?? null;
 		const originalEmailId = provenance?.emailId ?? null;
 
@@ -114,7 +148,9 @@ export const projectVenueRepliesForUser = async (
 			recipient: '',
 			to: null,
 			from: null,
-			subject: originalEmail?.subject ?? null,
+			subject: isApplicationThread
+				? (eventNameByApplicationId.get(message.threadApplicationId!) ?? 'Application')
+				: (originalEmail?.subject ?? null),
 			date: null,
 			mimeVersion: null,
 			inReplyTo: null,
@@ -150,6 +186,9 @@ export const projectVenueRepliesForUser = async (
 			campaign,
 			originalEmail,
 			venueConversationId: message.conversationId,
+			// Venue-authored messages carry their thread tag directly (only seeded
+			// summaries use applicationId, and those are standard-authored).
+			venueThreadApplicationId: message.threadApplicationId,
 		});
 	}
 

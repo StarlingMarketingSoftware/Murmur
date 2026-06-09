@@ -9,7 +9,10 @@ import type {
 } from '@/app/api/events/[id]/applications/route';
 import type { MyEventApplicationsResponse } from '@/app/api/events/applications/route';
 
-export type { MyEventApplication } from '@/app/api/events/applications/route';
+export type {
+	MyEventApplication,
+	MyApplicationVenueResponse,
+} from '@/app/api/events/applications/route';
 
 export const EVENT_APPLICATION_QUERY_KEYS = {
 	all: ['eventApplications'] as const,
@@ -29,6 +32,9 @@ export const useGetMyEventApplications = (options: CustomQueryOptions = {}) => {
 			return data.applications;
 		},
 		enabled: options.enabled,
+		// The response now carries venue-reply state (the opportunities "venue
+		// responded" indicator) — poll on the messaging Phase-1 cadence.
+		refetchInterval: 30_000,
 	});
 };
 

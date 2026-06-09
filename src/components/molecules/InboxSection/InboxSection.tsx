@@ -4,7 +4,10 @@ import { FC, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'r
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
-import { useSendConversationReply } from '@/hooks/queryHooks/useConversations';
+import {
+	useMarkConversationRead,
+	useSendConversationReply,
+} from '@/hooks/queryHooks/useConversations';
 import { convertHtmlToPlainText } from '@/utils';
 import { useMe } from '@/hooks/useMe';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -936,6 +939,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	// Venue replies are internal messages, not emailable contacts; replying must go
 	// back through the messaging system (createReply) rather than Mailgun.
 	const { mutateAsync: sendVenueReply } = useSendConversationReply();
+	const markConversationRead = useMarkConversationRead();
 
 	// If a list of allowed sender emails is provided (e.g. campaign contacts),
 	// hide any inbound emails whose sender address does not match.
@@ -1143,6 +1147,24 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		: activeTab === 'inbox'
 			? null
 			: (visibleEmails.find((email) => email.id === selectedEmailId) ?? null);
+	// Viewing a venue conversation marks its thread read (application threads have
+	// their own watermark; the general thread uses the conversation's) so the
+	// opportunities "venue responded" dot and unread counts clear. Delayed a beat:
+	// the campaign page mounts a short-lived ghost DraftingSection during tab
+	// transitions whose auto-selection must not silently consume unread state.
+	const selectedVenueConversationId = selectedEmail?.venueConversationId ?? null;
+	const selectedVenueThreadApplicationId = selectedEmail?.venueThreadApplicationId ?? null;
+	useEffect(() => {
+		if (selectedVenueConversationId == null) return;
+		const timer = setTimeout(() => {
+			markConversationRead.mutate({
+				conversationId: selectedVenueConversationId,
+				applicationId: selectedVenueThreadApplicationId ?? undefined,
+			});
+		}, 1000);
+		return () => clearTimeout(timer);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [selectedVenueConversationId, selectedVenueThreadApplicationId, selectedEmail?.id]);
 	const selectedThreadMessages =
 		selectedConversation?.messages ?? (selectedEmail ? [selectedEmail] : []);
 	const selectedConversationReplyKey =
@@ -1209,6 +1231,12 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	useLayoutEffect(() => {
 		if (!autoSelectFirstEmail) return;
+		// Don't judge (and wipe) an externally-seeded selection — e.g. the
+		// opportunities deep link — against a still-loading, briefly-empty list.
+		// Campaign inboxes also filter by the contact allowlist, so wait for it too
+		// (same guard the auto-default and never-empty effects use).
+		if (isCampaignInbox && allowedSenderEmails === undefined) return;
+		if (activeTab === 'inbox' ? !isInboundLoaded : !isSentLoaded) return;
 		if (
 			inboxSentTabRequest?.preserveSelection &&
 			lastHandledInboxSentTabRequestIdRef.current !== inboxSentTabRequest.requestId
@@ -1231,10 +1259,14 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		setSelectedEmailId(nextEmailId);
 		setReplyMessage('');
 	}, [
+		allowedSenderEmails,
 		autoSelectFirstEmail,
 		activeTab,
 		inboxSentTabRequest?.preserveSelection,
 		inboxSentTabRequest?.requestId,
+		isCampaignInbox,
+		isInboundLoaded,
+		isSentLoaded,
 		selectedEmailId,
 		setSelectedEmailId,
 		visibleEmails,
@@ -1325,6 +1357,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 				await sendVenueReply({
 					conversationId: selectedEmail.venueConversationId,
 					body: convertHtmlToPlainText(messageToSend),
+					// Keep the reply in the same thread the venue wrote from (an
+					// application's thread or the general one).
+					threadApplicationId: selectedEmail.venueThreadApplicationId ?? undefined,
 				});
 				setSentReplies((prev) => {
 					const existingReplies = prev[replyKey] || [];
