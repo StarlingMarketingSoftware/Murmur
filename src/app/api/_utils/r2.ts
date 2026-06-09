@@ -107,3 +107,21 @@ export async function deleteObject(key: string): Promise<void> {
 		throw new Error(`R2 delete failed for ${key} (status ${res.status})`);
 	}
 }
+
+/**
+ * Server-side object copy (S3 CopyObject) — a PUT to the destination carrying an
+ * `x-amz-copy-source` header. Used to FREEZE a profile video into an application:
+ * the application-scoped copy is independent of the source object, so the venue's
+ * record survives the artist later deleting the source from their profile pool.
+ * Keys are already sanitized to a URL-safe subset by `buildMediaKey`, so the
+ * copy-source path needs no further encoding.
+ */
+export async function copyObject(sourceKey: string, destKey: string): Promise<void> {
+	const res = await getClient().fetch(objectUrl(destKey), {
+		method: 'PUT',
+		headers: { 'x-amz-copy-source': `/${BUCKET}/${sourceKey}` },
+	});
+	if (!res.ok) {
+		throw new Error(`R2 copy failed ${sourceKey} -> ${destKey} (status ${res.status})`);
+	}
+}

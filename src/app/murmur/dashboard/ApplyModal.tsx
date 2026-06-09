@@ -28,6 +28,7 @@ import {
 } from '@/hooks/queryHooks/useMediaAssets';
 import { useMediaUpload, type UploadState } from '@/hooks/useMediaUpload';
 import { MediaAssetPlayer } from '@/components/molecules/MediaAssetPlayer/MediaAssetPlayer';
+import { useApplyToEvent } from '@/hooks/queryHooks/useEventApplications';
 
 // Drop a file extension for display; YouTube embeds already have a clean "YouTube video".
 const getApplyMediaTitle = (filename: string) => filename.replace(/\.[^/.]+$/, '') || filename;
@@ -121,6 +122,12 @@ export function ApplyModal({
 	const { upload: uploadMedia, activeUploads } = useMediaUpload('profile_media');
 	const deleteMedia = useDeleteMedia();
 	const createEmbed = useCreateMediaEmbed();
+	const applyToEvent = useApplyToEvent({
+		onSuccess: () => {
+			toast.success('Application sent');
+			onClose();
+		},
+	});
 
 	useEffect(() => {
 		if (!open) return;
@@ -934,10 +941,25 @@ export function ApplyModal({
 						</div>
 					</div>
 
-					{/* Apply button — visual only for now (no submit endpoint wired). */}
+					{/* Apply button — submits the application for this event (snapshot answers
+					    + frozen copies of the selected profile videos). */}
 					<button
 						type="button"
-						onClick={(e) => e.stopPropagation()}
+						disabled={applyToEvent.isPending}
+						onClick={(e) => {
+							e.stopPropagation();
+							if (!event || applyToEvent.isPending) return;
+							applyToEvent.mutate({
+								eventId: event.id,
+								genre: selectedGenre ?? undefined,
+								area: selectedArea ?? undefined,
+								performingName: selectedPerformingName ?? undefined,
+								bio: selectedBio ?? undefined,
+								mediaAssetIds: profileMedia
+									.filter((m) => m.status === 'ready')
+									.map((m) => m.id),
+							});
+						}}
 						style={{
 							position: 'absolute',
 							left: 0,
@@ -957,11 +979,12 @@ export function ApplyModal({
 							lineHeight: '18.391px',
 							color: '#000',
 							border: 'none',
-							cursor: 'pointer',
+							cursor: applyToEvent.isPending ? 'default' : 'pointer',
+							opacity: applyToEvent.isPending ? 0.6 : 1,
 							fontFamily: 'inherit',
 						}}
 					>
-						Apply
+						{applyToEvent.isPending ? 'Applying…' : 'Apply'}
 					</button>
 				</div>
 			</div>

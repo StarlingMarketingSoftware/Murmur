@@ -21,6 +21,10 @@ import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
+import {
+	useGetMyEventApplications,
+	type MyEventApplication,
+} from '@/hooks/queryHooks/useEventApplications';
 import type { InboundEmailWithRelations } from '@/types';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
@@ -39,6 +43,9 @@ import {
 export type OpportunityStatus = 'booked' | 'closed' | 'in-progress';
 
 type OpportunityRow = {
+	// `id` is only unique within a source (an email id can equal an application id),
+	// so React keys are `${source}-${id}`.
+	source: 'inbound' | 'mock' | 'application';
 	id: number;
 	status: OpportunityStatus;
 	contactLabel: string;
@@ -490,6 +497,7 @@ const buildOpportunityRow = (
 	if (!status) return null;
 
 	return {
+		source: 'inbound',
 		id: email.id,
 		status,
 		contactLabel: getContactLabel(email),
@@ -510,6 +518,7 @@ const buildMockOpportunityRow = (row: OpportunitiesMockRow, index: number): Oppo
 	const stateAbbr = (row.stateAbbr || '').trim().toUpperCase();
 	const location = row.location?.trim() || '';
 	return {
+		source: 'mock',
 		id: -(index + 1),
 		status: row.status ?? 'booked',
 		contactLabel: row.contactLabel?.trim() || 'Mock Venue',
@@ -523,6 +532,45 @@ const buildMockOpportunityRow = (row: OpportunitiesMockRow, index: number): Oppo
 		opportunityDate: row.opportunityDate?.trim() || 'Date TBD',
 		lastMessage: row.lastMessage?.trim() || '',
 		lastReceivedLabel: row.lastReceivedLabel?.trim() || '',
+	};
+};
+
+// An opportunity the user actively applied to. Submissions surface as In Progress
+// (the application enum is only submitted/withdrawn — no booked/closed lifecycle yet).
+const buildApplicationOpportunityRow = (application: MyEventApplication): OpportunityRow => {
+	const event = application.event;
+	const city = event?.venueCity?.trim() || '';
+	const stateAbbr = event?.venueState
+		? getStateAbbreviation(event.venueState)?.trim().toUpperCase() || ''
+		: '';
+
+	let opportunityDate = event?.whenLabel
+		? extractOpportunityDateLabel(event.whenLabel)
+		: 'Date TBD';
+	if (opportunityDate === 'Date TBD' && event?.startsAt) {
+		const startsAt = new Date(event.startsAt);
+		if (!Number.isNaN(startsAt.getTime())) {
+			opportunityDate = formatMonthDay(startsAt.getMonth(), startsAt.getDate());
+		}
+	}
+
+	return {
+		source: 'application',
+		id: application.id,
+		status: application.status === 'submitted' ? 'in-progress' : 'closed',
+		contactLabel: event?.venueName?.trim() || 'Venue',
+		exchangeCount: 0,
+		folder: '',
+		categoryTitle: event?.venueBusinessType?.trim() || '',
+		city,
+		location: [city, stateAbbr].filter(Boolean).join(', '),
+		stateAbbr,
+		opportunityType: event?.name?.trim() || 'Opportunity',
+		opportunityDate,
+		lastMessage: application.performingName
+			? `You applied as ${application.performingName}.`
+			: 'Application sent.',
+		lastReceivedLabel: formatOpportunityTimestamp(application.createdAt),
 	};
 };
 
@@ -544,6 +592,9 @@ export const DashboardOpportunitiesContent: FC<{
 	const mockOverrideActive = mockState != null;
 	const hasInboundEmailsOverride = inboundEmailsOverride != null;
 	const { data: inboundEmails, isLoading: isLoadingEmails } = useGetInboundEmails({
+		enabled: enabled && !mockOverrideActive && !hasInboundEmailsOverride,
+	});
+	const { data: myApplications } = useGetMyEventApplications({
 		enabled: enabled && !mockOverrideActive && !hasInboundEmailsOverride,
 	});
 	const sourceInboundEmails = useMemo(
@@ -590,10 +641,15 @@ export const DashboardOpportunitiesContent: FC<{
 				const row = buildOpportunityRow(email, Math.max(1, threadExchangeCounts[threadKey] || 1));
 				if (row) rows.push(row);
 			}
+
+			// The user's own submitted applications (newest-first from the API) lead the
+			// list so they're visible at the top of the In Progress tab.
+			const applicationRows = (myApplications ?? []).map(buildApplicationOpportunityRow);
+			rows = [...applicationRows, ...rows];
 		}
 
 		return rows;
-	}, [mockOverrideActive, mockState?.rows, sourceInboundEmails, threadExchangeCounts]);
+	}, [mockOverrideActive, mockState?.rows, myApplications, sourceInboundEmails, threadExchangeCounts]);
 
 	const opportunities = useMemo(() => {
 		const q = searchQuery.trim().toLowerCase();
@@ -745,7 +801,7 @@ export const DashboardOpportunitiesContent: FC<{
 							);
 							return (
 								<button
-									key={opportunity.id}
+									key={`${opportunity.source}-${opportunity.id}`}
 									type="button"
 									className="text-left hover:brightness-[0.985] transition-[filter]"
 									style={{
@@ -819,7 +875,7 @@ export const DashboardOpportunitiesContent: FC<{
 										</span>
 									</span>
 
-									{!isCompactClosedRow && (
+									{!isCompactClosedRow && opportunity.folder && (
 										<span
 											style={{
 												position: 'absolute',

@@ -230,6 +230,8 @@ export const urls = {
 		},
 		events: {
 			index: '/api/events',
+			applications: ((id) => `/api/events/${id}/applications`) as DetailRoute,
+			myApplications: '/api/events/applications',
 		},
 	},
 };

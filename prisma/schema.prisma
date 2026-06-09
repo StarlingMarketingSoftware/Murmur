@@ -531,3 +531,67 @@ model Message {
   @@unique([emailId])
   @@index([conversationId, id])
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Event applications (standard-user → venue Event).
+// STRICTLY ADDITIVE: new models + enum only. Links to existing tables (eventId,
+// standardUserId, venueUserId, sourceMediaAssetId) are plain SCALAR columns with NO
+// @relation to Event / User / MediaAsset — resolved by explicit lookups in code —
+// so no existing model is modified and the migration references no existing table.
+// The only relation is EventApplication ↔ ApplicationVideo (both new), mirroring
+// the Conversation ↔ Message precedent. Submitted videos are FROZEN: each upload is
+// copied to an application-scoped R2 key at apply time, so a venue's record survives
+// the artist later deleting the source video from their profile pool.
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum ApplicationStatus {
+  submitted
+  withdrawn
+}
+
+model EventApplication {
+  id             Int    @id @default(autoincrement())
+  eventId        Int // Event.id (the opportunity). Scalar, no FK.
+  standardUserId String // clerkId of the applying standard user. Scalar, no FK.
+  venueUserId    String // == Event.userId (venue owner clerkId), denormalized at apply time.
+
+  // Point-in-time snapshot of the modal answers (seeded from Identity but freely
+  // edited in the modal — so we snapshot the submitted values, not a FK).
+  genre          String?
+  area           String?
+  performingName String?
+  bio            String?
+
+  status    ApplicationStatus @default(submitted)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  videos ApplicationVideo[]
+
+  @@unique([eventId, standardUserId])
+  @@index([eventId, createdAt])
+  @@index([standardUserId, createdAt])
+  @@index([venueUserId, createdAt])
+}
+
+model ApplicationVideo {
+  id                 Int  @id @default(autoincrement())
+  applicationId      Int
+  sourceMediaAssetId Int? // provenance: profile MediaAsset it was copied from (scalar, no FK).
+
+  // Immutable snapshot copied at apply time — independent of the artist's profile pool.
+  kind        MediaKind
+  sourceType  MediaSource
+  key         String? // application-scoped R2 key (copied object). Null for youtube.
+  posterKey   String? // application-scoped R2 key for the poster. Null for youtube.
+  embedUrl    String? // youtube watch URL (sourceType = youtube; no R2 copy).
+  filename    String?
+  contentType String?
+  durationSec Float?
+  position    Int         @default(0)
+  createdAt   DateTime    @default(now())
+
+  application EventApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+}
