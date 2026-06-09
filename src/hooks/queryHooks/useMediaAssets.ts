@@ -7,6 +7,10 @@ import {
 	CreateMediaUploadUrlData,
 	CreateMediaUploadUrlResponse,
 } from '@/app/api/media/upload-url/route';
+import {
+	CreateMediaEmbedData,
+	CreateMediaEmbedResponse,
+} from '@/app/api/media/embed/route';
 import { MediaAssetDto } from '@/app/api/media/route';
 import { UpdateMediaData } from '@/app/api/media/[id]/route';
 
@@ -44,6 +48,24 @@ export const useRequestMediaUploadUrl = () => {
 				throw new Error(errorData.error || 'Failed to start upload');
 			}
 			return response.json() as Promise<CreateMediaUploadUrlResponse>;
+		},
+	});
+};
+
+export const useCreateMediaEmbed = () => {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: async (data: CreateMediaEmbedData) => {
+			const response = await _fetch(urls.api.media.embed.index, 'POST', data);
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(errorData.error || 'Failed to add video');
+			}
+			return response.json() as Promise<CreateMediaEmbedResponse>;
+		},
+		// Embeds are born ready, so invalidate immediately to surface the new slot.
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: MEDIA_QUERY_KEYS.all });
 		},
 	});
 };

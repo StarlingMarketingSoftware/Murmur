@@ -48,7 +48,8 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 		}
 
 		// Two-phase upload guard: only flip to `ready` once the object actually landed.
-		if (validatedData.data.status === 'ready') {
+		// Embeds have no R2 object and are born `ready`, so they skip this check.
+		if (validatedData.data.status === 'ready' && asset.sourceType === 'upload') {
 			const landed = await objectExists(asset.key);
 			if (!landed) {
 				return apiBadRequest('Upload not found in storage; cannot mark ready.');
@@ -84,9 +85,12 @@ export async function DELETE(req: NextRequest, { params }: { params: ApiRoutePar
 			return apiUnauthorizedResource();
 		}
 
-		await deleteObject(asset.key);
-		if (asset.posterKey) {
-			await deleteObject(asset.posterKey);
+		// Embeds (youtube) have no R2 object — only uploads need their bytes removed.
+		if (asset.sourceType === 'upload') {
+			await deleteObject(asset.key);
+			if (asset.posterKey) {
+				await deleteObject(asset.posterKey);
+			}
 		}
 
 		await prisma.mediaAsset.delete({

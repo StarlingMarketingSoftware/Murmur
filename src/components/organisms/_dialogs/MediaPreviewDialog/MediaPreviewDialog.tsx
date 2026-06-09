@@ -1,7 +1,7 @@
 'use client';
 
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { R2MediaPlayer } from '@/components/molecules/R2MediaPlayer/R2MediaPlayer';
+import { MediaAssetPlayer } from '@/components/molecules/MediaAssetPlayer/MediaAssetPlayer';
 import type { MediaAssetDto } from '@/app/api/media/route';
 
 interface MediaPreviewDialogProps {
@@ -22,8 +22,8 @@ export function MediaPreviewDialog({
 				<DialogTitle className="sr-only">
 					{asset?.filename ?? 'Media preview'}
 				</DialogTitle>
-				{asset?.url ? (
-					<R2MediaPlayer src={asset.url} kind={asset.kind} poster={asset.posterUrl} />
+				{asset ? (
+					<MediaAssetPlayer asset={asset} />
 				) : (
 					<p className="text-center text-sm text-muted-foreground">
 						This media isn’t available to play.

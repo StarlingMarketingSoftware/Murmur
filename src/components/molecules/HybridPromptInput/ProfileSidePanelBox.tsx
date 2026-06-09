@@ -1,9 +1,14 @@
 import type { ChangeEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
-import { Pause, Play, X } from 'lucide-react';
+import { Pause, Play, Upload, X } from 'lucide-react';
+import { toast } from 'sonner';
 
-import { useDeleteMedia, useGetMedia } from '@/hooks/queryHooks/useMediaAssets';
+import {
+	useCreateMediaEmbed,
+	useDeleteMedia,
+	useGetMedia,
+} from '@/hooks/queryHooks/useMediaAssets';
 import { useMediaUpload, type UploadState } from '@/hooks/useMediaUpload';
 import { MediaPreviewDialog } from '@/components/organisms/_dialogs/MediaPreviewDialog/MediaPreviewDialog';
 import type { MediaAssetDto } from '@/app/api/media/route';
@@ -788,10 +793,14 @@ export const ProfileSidePanelBox = ({
 	// Profile media (video/audio) lives on the account and is fetched independently
 	// of the campaign-scoped profile fields above.
 	const mediaInputRef = useRef<HTMLInputElement>(null);
+	const addAnchorRef = useRef<HTMLDivElement | null>(null);
 	const [previewAsset, setPreviewAsset] = useState<MediaAssetDto | null>(null);
+	const [isYouTubeInputOpen, setIsYouTubeInputOpen] = useState(false);
+	const [youTubeDraft, setYouTubeDraft] = useState('');
 	const { data: profileMedia = [] } = useGetMedia('profile_media');
 	const { upload: uploadMedia, activeUploads } = useMediaUpload('profile_media');
 	const deleteMedia = useDeleteMedia();
+	const createEmbed = useCreateMediaEmbed();
 
 	const mediaSlots: Array<
 		{ type: 'asset'; asset: MediaAssetDto } | { type: 'upload'; upload: UploadState }
@@ -806,6 +815,33 @@ export const ProfileSidePanelBox = ({
 		event.target.value = '';
 		if (file) void uploadMedia(file);
 	};
+	const openYouTubeInput = () => {
+		setYouTubeDraft('');
+		setIsYouTubeInputOpen(true);
+	};
+	const commitYouTube = async () => {
+		const url = youTubeDraft.trim();
+		if (!url) return;
+		try {
+			await createEmbed.mutateAsync({ url, context: 'profile_media' });
+			setYouTubeDraft('');
+			setIsYouTubeInputOpen(false);
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : 'Failed to add video');
+		}
+	};
+
+	// Close the YouTube input on an outside click.
+	useEffect(() => {
+		if (!isYouTubeInputOpen) return;
+		const onDown = (e: MouseEvent) => {
+			if (addAnchorRef.current && !addAnchorRef.current.contains(e.target as Node)) {
+				setIsYouTubeInputOpen(false);
+			}
+		};
+		document.addEventListener('mousedown', onDown);
+		return () => document.removeEventListener('mousedown', onDown);
+	}, [isYouTubeInputOpen]);
 
 	// Profile photo (avatar) reuses the same media pipeline (context: "avatar", cap 1).
 	const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -1228,18 +1264,59 @@ export const ProfileSidePanelBox = ({
 
 										if (index === mediaSlots.length && canAddMedia) {
 											return (
-												<button
+												<div
 													key={`add-${index}`}
-													type="button"
-													onClick={() => mediaInputRef.current?.click()}
-													aria-label="Add a video or audio clip"
-													className="relative h-[66px] w-[326px] shrink-0 rounded-[9px] bg-[#F2F7FF] transition hover:brightness-95"
+													ref={addAnchorRef}
+													className="w-[326px] shrink-0"
 												>
-													<span
-														className="absolute left-1/2 top-1/2 block h-[17px] w-[17px] -translate-x-1/2 -translate-y-1/2"
-														dangerouslySetInnerHTML={{ __html: profileVideoAddIconSvg }}
-													/>
-												</button>
+													{isYouTubeInputOpen ? (
+														<input
+															type="text"
+															value={youTubeDraft}
+															onChange={(e) => setYouTubeDraft(e.target.value)}
+															onKeyDown={(e) => {
+																if (e.key === 'Enter') {
+																	e.preventDefault();
+																	void commitYouTube();
+																} else if (e.key === 'Escape') {
+																	e.preventDefault();
+																	setIsYouTubeInputOpen(false);
+																}
+															}}
+															autoFocus
+															placeholder="Paste a YouTube link, then press Enter"
+															aria-label="YouTube link"
+															className="h-[66px] w-[326px] rounded-[9px] bg-[#F2F7FF] px-[16px] font-inter text-[13px] font-medium text-black outline-none placeholder:text-black/40"
+														/>
+													) : (
+														<div className="group relative h-[66px] w-[326px] overflow-hidden rounded-[9px] bg-[#F2F7FF]">
+															{/* Default: the add icon, fades out on hover. */}
+															<span
+																className="pointer-events-none absolute left-1/2 top-1/2 block h-[17px] w-[17px] -translate-x-1/2 -translate-y-1/2 transition-opacity group-hover:opacity-0"
+																dangerouslySetInnerHTML={{ __html: profileVideoAddIconSvg }}
+															/>
+															{/* On hover: two options overlaid inside the same fixed-height box. */}
+															<div className="pointer-events-none absolute inset-0 flex flex-col font-inter text-[13px] font-medium text-black opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+																<button
+																	type="button"
+																	onClick={() => mediaInputRef.current?.click()}
+																	className="flex flex-1 items-center gap-[8px] px-[16px] text-left transition hover:brightness-95"
+																>
+																	<Upload className="h-[14px] w-[14px]" />
+																	Upload a clip
+																</button>
+																<button
+																	type="button"
+																	onClick={openYouTubeInput}
+																	className="flex flex-1 items-center gap-[8px] border-t border-black/10 px-[16px] text-left transition hover:brightness-95"
+																>
+																	<Play className="h-[14px] w-[14px] fill-black" />
+																	Paste YouTube link
+																</button>
+															</div>
+														</div>
+													)}
+												</div>
 											);
 										}
 

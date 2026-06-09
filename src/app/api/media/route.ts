@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 import { apiResponse, apiUnauthorized, handleApiError } from '@/app/api/_utils';
 import { getPresignedGetUrl } from '@/app/api/_utils/r2';
 import { MediaAsset } from '@prisma/client';
+import { extractYouTubeId, youTubeThumbnailUrl } from '@/utils/youtube';
 
 /**
  * Media row as returned to the owning client: raw R2 keys are dropped and replaced
@@ -30,6 +31,15 @@ export async function GET(req: NextRequest) {
 
 		const data: MediaAssetDto[] = await Promise.all(
 			assets.map(async ({ key, posterKey, ...rest }) => {
+				// YouTube embeds have no R2 object: serve the watch URL + CDN thumbnail directly.
+				if (rest.sourceType === 'youtube') {
+					const videoId = rest.embedUrl ? extractYouTubeId(rest.embedUrl) : null;
+					return {
+						...rest,
+						url: rest.embedUrl,
+						posterUrl: videoId ? youTubeThumbnailUrl(videoId) : null,
+					};
+				}
 				const ready = rest.status === 'ready';
 				return {
 					...rest,

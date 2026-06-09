@@ -292,6 +292,8 @@ model MediaAsset {
   durationSec Float?
   status      MediaStatus @default(uploading)
   position    Int         @default(0)
+  sourceType  MediaSource @default(upload)
+  embedUrl    String?
   shareId     String      @unique @default(cuid())
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -474,6 +476,11 @@ enum MediaStatus {
   uploading
   ready
   failed
+}
+
+enum MediaSource {
+  upload
+  youtube
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

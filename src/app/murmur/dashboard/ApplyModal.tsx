@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { Play, Upload, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { MapStackStarIcon } from '@/components/atoms/_svg/MapStackStarIcon';
 import { normalizeInlineSvgMarkupForXml } from '@/components/atoms/_svg/MapTooltipIcon';
@@ -18,6 +20,66 @@ import { mapBusinessTypeToCategory } from '@/constants/contactCategories';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { useMe } from '@/hooks/useMe';
 import { getStateAbbreviation } from '@/utils/string';
+import type { MediaAssetDto } from '@/app/api/media/route';
+import {
+	useCreateMediaEmbed,
+	useDeleteMedia,
+	useGetMedia,
+} from '@/hooks/queryHooks/useMediaAssets';
+import { useMediaUpload, type UploadState } from '@/hooks/useMediaUpload';
+import { MediaAssetPlayer } from '@/components/molecules/MediaAssetPlayer/MediaAssetPlayer';
+
+// Drop a file extension for display; YouTube embeds already have a clean "YouTube video".
+const getApplyMediaTitle = (filename: string) => filename.replace(/\.[^/.]+$/, '') || filename;
+
+/** A ready video slot (273px) — thumbnail, title, play, and delete-on-hover. */
+const ApplyMediaSlotCard = ({
+	asset,
+	onPlay,
+	onDelete,
+}: {
+	asset: MediaAssetDto;
+	onPlay: () => void;
+	onDelete: () => void;
+}) => (
+	<div className="group relative h-[66px] w-[273px] shrink-0 overflow-hidden rounded-[9px] bg-[#F2F7FF]">
+		<button
+			type="button"
+			onClick={onPlay}
+			aria-label={`Play ${asset.filename}`}
+			className="flex h-full w-full items-center gap-[10px] px-[10px] text-left transition hover:brightness-95"
+		>
+			<span
+				className="relative flex h-[48px] w-[48px] shrink-0 items-center justify-center overflow-hidden rounded-[6px]"
+				style={{
+					background:
+						'linear-gradient(145deg, #EF3030 0%, #F44458 36%, #F04CCB 72%, #FF64D8 100%)',
+				}}
+			>
+				{asset.posterUrl && (
+					// eslint-disable-next-line @next/next/no-img-element -- presigned R2 / YouTube CDN URL
+					<img src={asset.posterUrl} alt="" className="h-full w-full object-cover" />
+				)}
+				<span className="absolute inset-0 flex items-center justify-center bg-black/10">
+					<span className="flex h-[24px] w-[24px] items-center justify-center rounded-full bg-black/70 text-white">
+						<Play className="h-3 w-3 fill-white" />
+					</span>
+				</span>
+			</span>
+			<span className="min-w-0 flex-1 truncate font-inter text-[14px] font-medium leading-[18px] text-black">
+				{getApplyMediaTitle(asset.filename)}
+			</span>
+		</button>
+		<button
+			type="button"
+			onClick={onDelete}
+			aria-label={`Remove ${asset.filename}`}
+			className="absolute right-[6px] top-[6px] hidden h-[20px] w-[20px] items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/80 group-hover:flex"
+		>
+			<X className="h-3 w-3" />
+		</button>
+	</div>
+);
 
 // Centered two-box overlay opened from either Apply button (the posted-event card in the
 // search-results panel and the map event popup). Rendered via a portal to <body> so it sits
@@ -48,6 +110,17 @@ export function ApplyModal({
 	const [selectedBio, setSelectedBio] = useState<string | null>(null);
 	const [bioDraft, setBioDraft] = useState('');
 	const [isBioEditorOpen, setIsBioEditorOpen] = useState(false);
+
+	// Video section: account-level media shared with the profile (context 'profile_media').
+	const mediaInputRef = useRef<HTMLInputElement>(null);
+	const addAnchorRef = useRef<HTMLDivElement | null>(null);
+	const [isYouTubeInputOpen, setIsYouTubeInputOpen] = useState(false);
+	const [youTubeDraft, setYouTubeDraft] = useState('');
+	const [previewAsset, setPreviewAsset] = useState<MediaAssetDto | null>(null);
+	const { data: profileMedia = [] } = useGetMedia('profile_media');
+	const { upload: uploadMedia, activeUploads } = useMediaUpload('profile_media');
+	const deleteMedia = useDeleteMedia();
+	const createEmbed = useCreateMediaEmbed();
 
 	useEffect(() => {
 		if (!open) return;
@@ -80,7 +153,50 @@ export function ApplyModal({
 		return () => document.removeEventListener('mousedown', onDown);
 	}, [isAreaChooserOpen]);
 
+	// Close the YouTube input on an outside click (keep the modal open).
+	useEffect(() => {
+		if (!isYouTubeInputOpen) return;
+		const onDown = (e: MouseEvent) => {
+			if (addAnchorRef.current && !addAnchorRef.current.contains(e.target as Node)) {
+				setIsYouTubeInputOpen(false);
+			}
+		};
+		document.addEventListener('mousedown', onDown);
+		return () => document.removeEventListener('mousedown', onDown);
+	}, [isYouTubeInputOpen]);
+
 	const { user } = useMe();
+
+	// Ready assets + in-flight uploads, capped at 3 (shared with the profile pool).
+	const mediaSlots: Array<
+		{ type: 'asset'; asset: MediaAssetDto } | { type: 'upload'; upload: UploadState }
+	> = [
+		...profileMedia.map((asset) => ({ type: 'asset' as const, asset })),
+		...activeUploads.map((upload) => ({ type: 'upload' as const, upload })),
+	];
+	const canAddMedia = mediaSlots.length < 3;
+
+	const handleSelectMediaFile = (e: ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		e.target.value = '';
+		if (file) void uploadMedia(file);
+	};
+	const openFilePicker = () => mediaInputRef.current?.click();
+	const openYouTubeInput = () => {
+		setYouTubeDraft('');
+		setIsYouTubeInputOpen(true);
+	};
+	const commitYouTube = async () => {
+		const url = youTubeDraft.trim();
+		if (!url) return;
+		try {
+			await createEmbed.mutateAsync({ url, context: 'profile_media' });
+			setYouTubeDraft('');
+			setIsYouTubeInputOpen(false);
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : 'Failed to add video');
+		}
+	};
 
 	const selectedGenreOption = profileGenreOptionRows
 		.flat()
@@ -141,6 +257,7 @@ export function ApplyModal({
 	if (!open || typeof window === 'undefined') return null;
 
 	return createPortal(
+		<>
 		<div
 			className="fixed inset-0 z-[100001] flex items-center justify-center"
 			style={{ pointerEvents: 'auto' }}
@@ -690,41 +807,129 @@ export function ApplyModal({
 								>
 									Add a video to verify your account and improve your profile
 								</span>
-								<div
-									style={{
-										width: '273px',
-										height: '66px',
-										borderRadius: '9px',
-										background: '#F2F7FF',
-										display: 'flex',
-										alignItems: 'center',
-										justifyContent: 'center',
-										color: '#8A8A8E',
-										fontSize: '22px',
-										fontWeight: 300,
-										lineHeight: 1,
-									}}
-								>
-									+
-								</div>
-								<div
-									style={{
-										width: '273px',
-										height: '66px',
-										borderRadius: '9px',
-										background: '#F2F7FF',
-										opacity: 0.8,
-									}}
+								<input
+									ref={mediaInputRef}
+									type="file"
+									accept="video/*"
+									className="hidden"
+									onChange={handleSelectMediaFile}
 								/>
-								<div
-									style={{
-										width: '273px',
-										height: '66px',
-										borderRadius: '9px',
-										background: '#F2F7FF',
-										opacity: 0.5,
-									}}
-								/>
+								{[0, 1, 2].map((index) => {
+									const slot = mediaSlots[index];
+
+									if (slot?.type === 'asset' && slot.asset.status === 'ready') {
+										const asset = slot.asset;
+										return (
+											<ApplyMediaSlotCard
+												key={asset.id}
+												asset={asset}
+												onPlay={() => setPreviewAsset(asset)}
+												onDelete={() => deleteMedia.mutate(asset.id)}
+											/>
+										);
+									}
+
+									if (slot?.type === 'asset') {
+										const asset = slot.asset;
+										return (
+											<div
+												key={asset.id}
+												className="relative flex h-[66px] w-[273px] shrink-0 items-center justify-center rounded-[9px] bg-[#F2F7FF] font-inter text-[11px] text-black/50"
+											>
+												{asset.status === 'failed' ? 'Upload failed' : 'Processing…'}
+												<button
+													type="button"
+													onClick={() => deleteMedia.mutate(asset.id)}
+													aria-label="Remove"
+													className="absolute right-[6px] top-[6px] flex h-[20px] w-[20px] items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/80"
+												>
+													<X className="h-3 w-3" />
+												</button>
+											</div>
+										);
+									}
+
+									if (slot?.type === 'upload') {
+										return (
+											<div
+												key={`upload-${index}`}
+												className="flex h-[66px] w-[273px] shrink-0 flex-col items-center justify-center gap-[8px] rounded-[9px] bg-[#F2F7FF] px-[16px]"
+											>
+												<span className="w-full truncate text-center font-inter text-[11px] text-black/70">
+													{slot.upload.filename}
+												</span>
+												<div className="h-[4px] w-full overflow-hidden rounded-full bg-black/10">
+													<div
+														className="h-full rounded-full bg-[#7BDB7F] transition-[width] duration-200"
+														style={{ width: `${slot.upload.progress}%` }}
+													/>
+												</div>
+											</div>
+										);
+									}
+
+									if (index === mediaSlots.length && canAddMedia) {
+										return (
+											<div key="add" ref={addAnchorRef} className="w-[273px] shrink-0">
+												{isYouTubeInputOpen ? (
+													<input
+														type="text"
+														value={youTubeDraft}
+														onChange={(e) => setYouTubeDraft(e.target.value)}
+														onKeyDown={(e) => {
+															if (e.key === 'Enter') {
+																e.preventDefault();
+																void commitYouTube();
+															} else if (e.key === 'Escape') {
+																e.preventDefault();
+																setIsYouTubeInputOpen(false);
+															}
+														}}
+														autoFocus
+														placeholder="Paste a YouTube link, then press Enter"
+														aria-label="YouTube link"
+														className="h-[66px] w-[273px] rounded-[9px] bg-[#F2F7FF] px-[14px] font-inter text-[13px] font-medium text-black outline-none placeholder:text-[#8A8A8E]"
+													/>
+												) : (
+													<div className="group relative h-[66px] w-[273px] overflow-hidden rounded-[9px] bg-[#F2F7FF]">
+														{/* Default: a centered + that fades out on hover. */}
+														<span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[22px] font-light leading-none text-[#8A8A8E] transition-opacity group-hover:opacity-0">
+															+
+														</span>
+														{/* On hover: two options overlaid inside the same fixed-height box. */}
+														<div className="pointer-events-none absolute inset-0 flex flex-col font-inter text-[13px] font-medium text-black opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+															<button
+																type="button"
+																onClick={openFilePicker}
+																className="flex flex-1 items-center gap-[8px] px-[14px] text-left transition hover:brightness-95"
+															>
+																<Upload className="h-[14px] w-[14px]" />
+																Upload a video
+															</button>
+															<button
+																type="button"
+																onClick={openYouTubeInput}
+																className="flex flex-1 items-center gap-[8px] border-t border-black/10 px-[14px] text-left transition hover:brightness-95"
+															>
+																<Play className="h-[14px] w-[14px] fill-black" />
+																Paste YouTube link
+															</button>
+														</div>
+													</div>
+												)}
+											</div>
+										);
+									}
+
+									return (
+										<div
+											key={`empty-${index}`}
+											aria-hidden="true"
+											className="h-[66px] w-[273px] shrink-0 rounded-[9px] bg-[#F2F7FF]"
+											style={{ opacity: [1, 0.8, 0.5][index] }}
+										/>
+									);
+								})}
 							</div>
 						</div>
 					</div>
@@ -760,7 +965,22 @@ export function ApplyModal({
 					</button>
 				</div>
 			</div>
-		</div>,
+		</div>
+			{previewAsset && (
+				<div
+					className="fixed inset-0 z-[100002] flex items-center justify-center"
+					style={{ pointerEvents: 'auto', background: 'rgba(0,0,0,0.6)' }}
+					onClick={() => setPreviewAsset(null)}
+				>
+					<div
+						onClick={(e) => e.stopPropagation()}
+						style={{ width: '720px', maxWidth: '90vw' }}
+					>
+						<MediaAssetPlayer asset={previewAsset} />
+					</div>
+				</div>
+			)}
+		</>,
 		document.body
 	);
 }

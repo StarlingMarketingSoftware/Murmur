@@ -154,6 +154,9 @@ export const urls = {
 			uploadUrl: {
 				index: '/api/media/upload-url',
 			},
+			embed: {
+				index: '/api/media/embed',
+			},
 		},
 		mailgun: {
 			index: '/api/mailgun',
