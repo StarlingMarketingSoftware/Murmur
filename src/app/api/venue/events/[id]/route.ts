@@ -38,7 +38,7 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 		}
 
 		const existingEvent = await prisma.event.findFirst({
-			where: { id: eventId, userId },
+			where: { id: eventId, userId, isActive: true },
 		});
 		if (!existingEvent) {
 			return apiNotFound();
@@ -50,6 +50,45 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 		});
 
 		return apiResponse(updatedEvent);
+	} catch (error) {
+		return handleApiError(error);
+	}
+}
+
+// DELETE /api/venue/events/:id — soft-delete one event owned by the current venue
+// account (flips isActive; the row stays so application/message history keeps
+// resolving the event).
+export async function DELETE(_req: NextRequest, { params }: { params: ApiRouteParams }) {
+	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
+		const guard = await assertVenueAccount(userId);
+		if (guard) {
+			return guard;
+		}
+
+		const { id } = await params;
+		const eventId = Number(id);
+		if (!Number.isInteger(eventId)) {
+			return apiBadRequest('Invalid event id');
+		}
+
+		const existingEvent = await prisma.event.findFirst({
+			where: { id: eventId, userId, isActive: true },
+		});
+		if (!existingEvent) {
+			return apiNotFound();
+		}
+
+		await prisma.event.update({
+			where: { id: eventId },
+			data: { isActive: false },
+		});
+
+		return apiResponse({ success: true });
 	} catch (error) {
 		return handleApiError(error);
 	}

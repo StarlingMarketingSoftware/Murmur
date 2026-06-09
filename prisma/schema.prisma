@@ -258,6 +258,7 @@ model Event {
   endsAt    DateTime? // derived UTC instant (picked date + endTime, browser-local)
   pay       String? // free text, e.g. "$150-500"
   details   String?
+  isActive  Boolean   @default(true) // soft-delete flag: venue "deletes" hide the event, the row stays
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   user      User      @relation(fields: [userId], references: [clerkId], onDelete: Cascade)

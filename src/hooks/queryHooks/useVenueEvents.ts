@@ -58,6 +58,39 @@ export const useCreateVenueEvent = (options: CustomMutationOptions = {}) => {
 	});
 };
 
+export const useDeleteVenueEvent = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Event deleted',
+		errorMessage = 'Failed to delete event',
+		onSuccess: onSuccessCallback,
+	} = options;
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async (id: number) => {
+			const response = await _fetch(urls.api.venue.events.detail(id), 'DELETE');
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(errorData.error || 'Failed to delete event');
+			}
+			return response.json();
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
+			if (!suppressToasts) {
+				toast.success(successMessage);
+			}
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
+			}
+		},
+	});
+};
+
 export const useUpdateVenueEvent = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,

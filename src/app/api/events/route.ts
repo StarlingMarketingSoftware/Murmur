@@ -31,6 +31,7 @@ export async function GET() {
 
 		const events = await prisma.event.findMany({
 			where: {
+				isActive: true,
 				latitude: { not: null },
 				longitude: { not: null },
 				// Upcoming only: future start, or no date set yet.

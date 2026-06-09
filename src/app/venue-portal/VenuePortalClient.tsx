@@ -56,7 +56,10 @@ import { useMediaUpload, type UploadState } from '@/hooks/useMediaUpload';
 import { useGetUser } from '@/hooks/queryHooks/useUsers';
 import { useGetMedia, useDeleteMedia } from '@/hooks/queryHooks/useMediaAssets';
 import { useGetVenue, useUpsertVenue } from '@/hooks/queryHooks/useVenue';
-import { useGetVenueEvents } from '@/hooks/queryHooks/useVenueEvents';
+import {
+	useDeleteVenueEvent,
+	useGetVenueEvents,
+} from '@/hooks/queryHooks/useVenueEvents';
 import { useGetConversations } from '@/hooks/queryHooks/useConversations';
 import { useGetVenueApplications } from '@/hooks/queryHooks/useVenueApplications';
 import { _fetch } from '@/utils';
@@ -3352,6 +3355,41 @@ function VenueCalendarMapPanel() {
 // DashboardCalendarPanel) renders at 381 × VENUE_CALENDAR_SCALE.
 const VENUE_OPPORTUNITIES_TOP_PX = Math.round(98 + 381 * VENUE_CALENDAR_SCALE + 15);
 
+// Hover-revealed soft-delete affordance for an event row: an X that swaps to a
+// "Delete?" confirm pill on click. The confirm state only holds while the cursor
+// stays on the pill (onMouseLeave resets it), so stray clicks can't delete.
+function VenueOpportunityDeleteButton({
+	eventId,
+	onDeleted,
+}: {
+	eventId: number;
+	onDeleted?: () => void;
+}) {
+	const [confirming, setConfirming] = useState(false);
+	const deleteEvent = useDeleteVenueEvent({ onSuccess: onDeleted });
+	return confirming ? (
+		<button
+			type="button"
+			onClick={() => deleteEvent.mutate(eventId)}
+			onMouseLeave={() => setConfirming(false)}
+			disabled={deleteEvent.isPending}
+			aria-label="Confirm delete event"
+			className="flex h-[24px] shrink-0 items-center justify-center rounded-full bg-[#FF4D5E] px-[10px] font-inter text-[12px] font-medium leading-none text-white transition hover:bg-[#E5394A] disabled:opacity-60"
+		>
+			Delete?
+		</button>
+	) : (
+		<button
+			type="button"
+			onClick={() => setConfirming(true)}
+			aria-label="Delete event"
+			className="flex shrink-0 items-center justify-center text-black transition hover:opacity-60"
+		>
+			<X className="h-[22px] w-[22px]" strokeWidth={2.5} />
+		</button>
+	);
+}
+
 // Single event entry row, shared between the inline Events box (642px rows) and
 // the Events tool panel (748px rows) so the two lists stay visually identical.
 function VenueOpportunityRow({
@@ -3393,24 +3431,48 @@ function VenueOpportunitiesMapPanel({
 	onAddOpportunity: () => void;
 	onEditOpportunity: (eventId: number) => void;
 }) {
+	// The hover-delete X sits just outside the box's right border, so it can't live
+	// inside the clipping overflow-y-auto list. The hovered row's measured offsetTop
+	// (same coordinate space as the root's absolute children) + the list's scrollTop
+	// position one X on the unclipped panel root instead. The hover state persists
+	// while the cursor travels from row to X; the root's mouse-leave clears it.
+	const [hovered, setHovered] = useState<{ id: number; top: number } | null>(null);
+	const [listScrollTop, setListScrollTop] = useState(0);
+	const hoveredOpportunity = hovered
+		? (opportunities.find((opportunity) => opportunity.id === hovered.id) ?? null)
+		: null;
+	// Hide the X once the hovered row scrolls out of the box (rows start ~25px in;
+	// content ends at 413px in root-padding coordinates).
+	const deleteRowTop = hovered ? hovered.top - listScrollTop : 0;
 	return (
 		// Faint white fill + 40% black border via channel alpha (not element opacity)
 		// so the solid-bordered rows inside aren't dimmed along with the box.
 		<div
 			className="absolute left-0 flex h-[424px] w-[656px] flex-col rounded-[12px] border-[2px] border-black/40 bg-white/40 px-[5px] py-[7px]"
 			style={{ top: `${VENUE_OPPORTUNITIES_TOP_PX}px` }}
+			onMouseLeave={() => setHovered(null)}
 		>
 			<div className="mb-[6px] px-[4px] font-inter text-[12px] font-medium leading-none text-black">
 				Events
 			</div>
-			<div className="flex min-h-0 flex-1 flex-col gap-[9px] overflow-y-auto">
+			<div
+				className="flex min-h-0 flex-1 flex-col gap-[9px] overflow-y-auto"
+				onScroll={(event) => setListScrollTop(event.currentTarget.scrollTop)}
+			>
 				{opportunities.map((opportunity) => (
-					<VenueOpportunityRow
+					<div
 						key={opportunity.id}
-						opportunity={opportunity}
-						onEdit={onEditOpportunity}
-						widthPx={642}
-					/>
+						className="shrink-0"
+						onMouseEnter={(event) =>
+							setHovered({ id: opportunity.id, top: event.currentTarget.offsetTop })
+						}
+					>
+						<VenueOpportunityRow
+							opportunity={opportunity}
+							onEdit={onEditOpportunity}
+							widthPx={642}
+						/>
+					</div>
 				))}
 				{/* Opens the create-event panel (same panel as the toolbar's Add tool). */}
 				<button
@@ -3422,6 +3484,17 @@ function VenueOpportunitiesMapPanel({
 					<span className="text-[20px] font-medium leading-none text-black">+</span>
 				</button>
 			</div>
+			{hoveredOpportunity && deleteRowTop >= 24 && deleteRowTop <= 373 && (
+				<div
+					className="absolute left-[659px] z-10 flex h-[40px] items-center"
+					style={{ top: `${deleteRowTop}px` }}
+				>
+					<VenueOpportunityDeleteButton
+						eventId={hoveredOpportunity.id}
+						onDeleted={() => setHovered(null)}
+					/>
+				</div>
+			)}
 		</div>
 	);
 }
@@ -3444,14 +3517,28 @@ function VenueEventsMapPanel({
 	onEditOpportunity: (eventId: number) => void;
 }) {
 	const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+	// The inner list box is overflow-hidden, so the hover-delete X can't sit next to
+	// a row there. Instead the hovered row's measured offsetTop (relative to the
+	// inset-0 scroller, shifted by the inner box's 20px top + 2px border into the
+	// root's coordinate space) + the list's scrollTop position an X rendered on the
+	// unclipped panel root, just right of the inner box. The hover state persists
+	// while the cursor travels from row to X; the panel root's mouse-leave clears it.
+	const [hovered, setHovered] = useState<{ id: number; top: number } | null>(null);
+	const [listScrollTop, setListScrollTop] = useState(0);
 	// Derived so a deleted event falls back to the list instead of a dead detail view.
 	const selectedEvent =
 		opportunities.find((opportunity) => opportunity.id === selectedEventId) ?? null;
+	const hoveredOpportunity = hovered
+		? (opportunities.find((opportunity) => opportunity.id === hovered.id) ?? null)
+		: null;
+	// Hide the X once the hovered row scrolls out of the inner box (22..815 content).
+	const deleteRowTop = hovered ? hovered.top - listScrollTop : 0;
 	return (
 		<div
 			data-venue-tool-ui="true"
 			className="fixed left-[500px] top-[122px] z-[99] h-[829px] w-[781px] origin-top-left rounded-[12px] border-[2px] border-black/40 bg-white/40"
 			style={{ transform: `scale(${VENUE_MAP_OVERLAY_SCALE})` }}
+			onMouseLeave={() => setHovered(null)}
 		>
 			<div className="absolute left-[12px] top-[4px] font-inter text-[12.358px] font-medium leading-[16.477px] text-black">
 				Events
@@ -3473,15 +3560,27 @@ function VenueEventsMapPanel({
 						{/* Gradient carries the Figma layer's 0.9 opacity on its own background
 						    layer (not the box) so the rows above stay fully solid. */}
 						<div className="absolute inset-0 bg-[linear-gradient(180deg,#C1F7BB_0%,#60AE92_100%)] opacity-90" />
-						<div className="absolute inset-0 flex flex-col overflow-y-auto">
+						<div
+							className="absolute inset-0 flex flex-col overflow-y-auto"
+							onScroll={(event) => setListScrollTop(event.currentTarget.scrollTop)}
+						>
 							<div className="flex shrink-0 flex-col items-center gap-[9px] bg-[#BAE3B6] py-[10px]">
 								{opportunities.map((opportunity) => (
-									<VenueOpportunityRow
+									<div
 										key={opportunity.id}
-										opportunity={opportunity}
-										onEdit={setSelectedEventId}
-										widthPx={748}
-									/>
+										onMouseEnter={(event) =>
+											setHovered({
+												id: opportunity.id,
+												top: 22 + event.currentTarget.offsetTop,
+											})
+										}
+									>
+										<VenueOpportunityRow
+											opportunity={opportunity}
+											onEdit={setSelectedEventId}
+											widthPx={748}
+										/>
+									</div>
 								))}
 							</div>
 							<div className="h-[2px] shrink-0 bg-black" />
@@ -3501,6 +3600,20 @@ function VenueEventsMapPanel({
 					</>
 				)}
 			</div>
+			{!selectedEvent &&
+				hoveredOpportunity &&
+				deleteRowTop >= 22 &&
+				deleteRowTop <= 775 && (
+					<div
+						className="absolute left-[775px] z-10 flex h-[40px] items-center"
+						style={{ top: `${deleteRowTop}px` }}
+					>
+						<VenueOpportunityDeleteButton
+							eventId={hoveredOpportunity.id}
+							onDeleted={() => setHovered(null)}
+						/>
+					</div>
+				)}
 		</div>
 	);
 }

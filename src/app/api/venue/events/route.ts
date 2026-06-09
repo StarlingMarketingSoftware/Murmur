@@ -53,7 +53,7 @@ export async function GET() {
 		}
 
 		const events = await prisma.event.findMany({
-			where: { userId },
+			where: { userId, isActive: true },
 			orderBy: { startsAt: 'asc' },
 		});
 		return apiResponse(events);

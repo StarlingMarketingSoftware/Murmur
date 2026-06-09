@@ -54,8 +54,8 @@ export async function POST(req: NextRequest, { params }: { params: ApiRouteParam
 
 		// Confirm the event exists and capture the owning venue (denormalized onto the
 		// application for direct venue-side lookups). Event.userId is the venue clerkId.
-		const event = await prisma.event.findUnique({
-			where: { id: eventId },
+		const event = await prisma.event.findFirst({
+			where: { id: eventId, isActive: true },
 			select: { userId: true },
 		});
 		if (!event) {
