@@ -2,10 +2,8 @@
 
 import {
 	type ChangeEvent,
-	type FocusEvent as ReactFocusEvent,
 	type FormEvent,
 	type KeyboardEvent as ReactKeyboardEvent,
-	type MouseEvent as ReactMouseEvent,
 	type PointerEvent as ReactPointerEvent,
 	type Ref,
 	useCallback,
@@ -59,6 +57,7 @@ import { useMediaUpload, type UploadState } from '@/hooks/useMediaUpload';
 import { useGetUser } from '@/hooks/queryHooks/useUsers';
 import { useGetMedia, useDeleteMedia } from '@/hooks/queryHooks/useMediaAssets';
 import { useGetVenue, useUpsertVenue } from '@/hooks/queryHooks/useVenue';
+import { useGetVenueEvents } from '@/hooks/queryHooks/useVenueEvents';
 import { useGetConversations } from '@/hooks/queryHooks/useConversations';
 import { ConversationsPane } from '@/components/organisms/ConversationsPane';
 import { _fetch } from '@/utils';
@@ -3075,6 +3074,79 @@ function VenueProfileMapCard({ onEdit }: { onEdit: () => void }) {
 const VENUE_CALENDAR_SCALE = 656 / DASHBOARD_CALENDAR_NATIVE_WIDTH_PX;
 const VENUE_MAP_LEFT_CLUSTER_SCALE = 0.7;
 const VENUE_MAP_LEFT_CLUSTER_MAIL_SCALE = 0.57;
+const VENUE_OPPORTUNITY_MONTH_LABELS = [
+	'January',
+	'February',
+	'March',
+	'April',
+	'May',
+	'June',
+	'July',
+	'August',
+	'September',
+	'October',
+	'November',
+	'December',
+] as const;
+
+const getVenueOpportunityOrdinalSuffix = (day: number) => {
+	const lastTwo = day % 100;
+	if (lastTwo >= 11 && lastTwo <= 13) return 'th';
+
+	switch (day % 10) {
+		case 1:
+			return 'st';
+		case 2:
+			return 'nd';
+		case 3:
+			return 'rd';
+		default:
+			return 'th';
+	}
+};
+
+const formatVenueOpportunityDateFromValue = (value: Date | string) => {
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) return '';
+
+	const day = date.getDate();
+	return `${VENUE_OPPORTUNITY_MONTH_LABELS[date.getMonth()]} ${day}${getVenueOpportunityOrdinalSuffix(day)}`;
+};
+
+const formatVenueOpportunityDate = (
+	whenLabel: string | null | undefined,
+	startsAt: Date | string | null | undefined
+) => {
+	const label = whenLabel?.trim();
+	if (label) return label.replace(/\s+\d{4}$/, '');
+	if (startsAt) return formatVenueOpportunityDateFromValue(startsAt);
+	return 'Date TBD';
+};
+
+const formatVenueOpportunityTimeValue = (value: string | null | undefined) => {
+	if (!value) return '';
+
+	const [hoursText, minutesText = '00'] = value.split(':');
+	const hours = Number(hoursText);
+	const minutes = Number(minutesText);
+	if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return value;
+
+	const hour = hours % 12 || 12;
+	const minuteLabel = minutes === 0 ? '' : `:${String(minutes).padStart(2, '0')}`;
+	const meridiem = hours < 12 ? 'am' : 'pm';
+	return `${hour}${minuteLabel}${meridiem}`;
+};
+
+const formatVenueOpportunityTimeRange = (
+	startTime: string | null | undefined,
+	endTime: string | null | undefined
+) => {
+	const startLabel = formatVenueOpportunityTimeValue(startTime);
+	const endLabel = formatVenueOpportunityTimeValue(endTime);
+
+	if (startLabel && endLabel) return `${startLabel}-${endLabel}`;
+	return startLabel || endLabel || 'Time TBD';
+};
 
 function VenueCalendarMapPanel() {
 	const now = new Date();
@@ -3102,23 +3174,49 @@ function VenueOpportunitiesMapPanel({
 }: {
 	onAddOpportunity: () => void;
 }) {
+	const { data: venueEvents } = useGetVenueEvents();
+	const opportunities = venueEvents ?? [];
+
 	return (
 		// Faint white fill + 40% black border via channel alpha (not element opacity)
-		// so the solid-bordered add pill inside isn't dimmed along with the box.
+		// so the solid-bordered rows inside aren't dimmed along with the box.
 		<div
-			className="absolute left-0 flex h-[424px] w-[656px] justify-center rounded-[12px] border-[2px] border-black/40 bg-white/40 pt-[16px]"
+			className="absolute left-0 flex h-[424px] w-[656px] flex-col rounded-[12px] border-[2px] border-black/40 bg-white/40 px-[5px] py-[7px]"
 			style={{ top: `${VENUE_OPPORTUNITIES_TOP_PX}px` }}
 		>
-			{/* "Add opportunity" pill: 616×40, solid black border, faint green-white fill.
-			    Opens the create-event panel (same panel as the toolbar's Add tool). */}
-			<button
-				type="button"
-				aria-label="Add opportunity"
-				onClick={onAddOpportunity}
-				className="flex h-[40px] w-[616px] cursor-pointer items-center justify-center rounded-[12px] border-[2px] border-black bg-[rgba(247,255,240,0.46)]"
-			>
-				<span className="text-[20px] font-medium leading-none text-black">+</span>
-			</button>
+			<div className="mb-[6px] px-[4px] font-inter text-[12px] font-medium leading-none text-black">
+				Events
+			</div>
+			<div className="flex min-h-0 flex-1 flex-col gap-[9px] overflow-y-auto">
+				{opportunities.map((opportunity) => (
+					<div
+						key={opportunity.id}
+						className="flex h-[40px] w-[642px] shrink-0 items-center rounded-[12px] border-[2px] border-black bg-[#F7FFF0] px-[30px] font-inter text-black"
+					>
+						<span className="min-w-0 flex-1 truncate text-[22px] font-medium leading-none">
+							{opportunity.name}
+						</span>
+						<span className="ml-[18px] flex h-[24px] w-[112px] shrink-0 items-center justify-center rounded-[8px] border-[1.5px] border-black bg-[#FF818A] text-[16px] font-medium leading-none">
+							{formatVenueOpportunityDate(opportunity.whenLabel, opportunity.startsAt)}
+						</span>
+						<span className="ml-[28px] w-[94px] shrink-0 text-center text-[16px] font-medium leading-none">
+							{formatVenueOpportunityTimeRange(
+								opportunity.startTime,
+								opportunity.endTime
+							)}
+						</span>
+					</div>
+				))}
+				{/* Opens the create-event panel (same panel as the toolbar's Add tool). */}
+				<button
+					type="button"
+					aria-label="Add opportunity"
+					onClick={onAddOpportunity}
+					className="flex h-[40px] w-[642px] shrink-0 cursor-pointer items-center justify-center rounded-[12px] border-[2px] border-black bg-[rgba(247,255,240,0.46)]"
+				>
+					<span className="text-[20px] font-medium leading-none text-black">+</span>
+				</button>
+			</div>
 		</div>
 	);
 }
