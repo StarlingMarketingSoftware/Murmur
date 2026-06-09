@@ -13,6 +13,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import type { Event as VenueEvent } from '@prisma/client';
 import { useAuth, UserButton, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
@@ -2275,12 +2276,12 @@ function VenuePortalForm({ onEnterMapView }: { onEnterMapView: () => void }) {
 		openProfileField(nextField);
 	};
 	const handleDescriptionKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-		if (event.key !== 'Enter' || event.isComposing) return;
+		if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
 		event.preventDefault();
 		advanceFromProfileField('description');
 	};
 	const handleWebsiteKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
-		if (event.key !== 'Enter' || event.isComposing) return;
+		if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
 		event.preventDefault();
 		advanceFromProfileField('website');
 	};
@@ -3170,13 +3171,14 @@ function VenueCalendarMapPanel() {
 const VENUE_OPPORTUNITIES_TOP_PX = Math.round(98 + 381 * VENUE_CALENDAR_SCALE + 15);
 
 function VenueOpportunitiesMapPanel({
+	opportunities,
 	onAddOpportunity,
+	onEditOpportunity,
 }: {
+	opportunities: VenueEvent[];
 	onAddOpportunity: () => void;
+	onEditOpportunity: (eventId: number) => void;
 }) {
-	const { data: venueEvents } = useGetVenueEvents();
-	const opportunities = venueEvents ?? [];
-
 	return (
 		// Faint white fill + 40% black border via channel alpha (not element opacity)
 		// so the solid-bordered rows inside aren't dimmed along with the box.
@@ -3189,8 +3191,11 @@ function VenueOpportunitiesMapPanel({
 			</div>
 			<div className="flex min-h-0 flex-1 flex-col gap-[9px] overflow-y-auto">
 				{opportunities.map((opportunity) => (
-					<div
+					<button
+						type="button"
 						key={opportunity.id}
+						onClick={() => onEditOpportunity(opportunity.id)}
+						aria-label={`Edit ${opportunity.name}`}
 						className="flex h-[40px] w-[642px] shrink-0 items-center rounded-[12px] border-[2px] border-black bg-[#F7FFF0] px-[30px] font-inter text-black"
 					>
 						<span className="min-w-0 flex-1 truncate text-[22px] font-medium leading-none">
@@ -3205,7 +3210,7 @@ function VenueOpportunitiesMapPanel({
 								opportunity.endTime
 							)}
 						</span>
-					</div>
+					</button>
 				))}
 				{/* Opens the create-event panel (same panel as the toolbar's Add tool). */}
 				<button
@@ -3247,9 +3252,26 @@ export default function VenuePortalClient() {
 	const [selectedVenueTool, setSelectedVenueTool] = useState<
 		'add' | 'profile' | 'mail' | null
 	>(null);
+	const [editingVenueEventId, setEditingVenueEventId] = useState<number | null>(null);
 	const isMailToolSelected = selectedVenueTool === 'mail';
-	const toggleVenueTool = (tool: 'add' | 'profile' | 'mail') =>
+	const { data: venueEvents } = useGetVenueEvents({ enabled: view === 'map' });
+	const opportunities = venueEvents ?? [];
+	const editingVenueEvent =
+		opportunities.find((opportunity) => opportunity.id === editingVenueEventId) ?? null;
+	const openCreateOpportunity = () => {
+		setEditingVenueEventId(null);
+		setSelectedVenueTool('add');
+	};
+	const openEditOpportunity = (eventId: number) => {
+		setEditingVenueEventId(eventId);
+		setSelectedVenueTool('add');
+	};
+	const toggleVenueTool = (tool: 'add' | 'profile' | 'mail') => {
+		if (tool === 'add') {
+			setEditingVenueEventId(null);
+		}
 		setSelectedVenueTool((current) => (current === tool ? null : tool));
+	};
 
 	// Unread badge on the mail tool icon.
 	const { data: venueConversations } = useGetConversations({ enabled: true });
@@ -3273,11 +3295,15 @@ export default function VenuePortalClient() {
 					<VenueProfileMapCard onEdit={() => setView('edit')} />
 					<VenueCalendarMapPanel />
 					<VenueOpportunitiesMapPanel
-						onAddOpportunity={() => setSelectedVenueTool('add')}
+						opportunities={opportunities}
+						onAddOpportunity={openCreateOpportunity}
+						onEditOpportunity={openEditOpportunity}
 					/>
 				</div>
 			)}
-			{view === 'map' && selectedVenueTool === 'add' && <VenueCreateEventMapPanel />}
+			{view === 'map' && selectedVenueTool === 'add' && (
+				<VenueCreateEventMapPanel event={editingVenueEvent} />
+			)}
 			{view === 'map' && isMailToolSelected && <VenueMailMapPanel />}
 			{view === 'map' && (
 				<div className="fixed left-1/2 top-3 z-[100] flex h-[35px] w-[160px] -translate-x-1/2 items-center justify-evenly rounded-[6.5px] border border-black bg-white">

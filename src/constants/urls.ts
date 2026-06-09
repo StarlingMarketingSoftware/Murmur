@@ -222,6 +222,7 @@ export const urls = {
 			},
 			events: {
 				index: '/api/venue/events',
+				detail: ((id) => `/api/venue/events/${id}`) as DetailRoute,
 			},
 		},
 	},

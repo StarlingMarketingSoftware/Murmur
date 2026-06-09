@@ -4,7 +4,7 @@ import { urls } from '@/constants/urls';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { Event as VenueEvent } from '@prisma/client';
-import type { PostEventData } from '@/app/api/venue/events/schema';
+import type { PostEventData, UpdateEventData } from '@/app/api/venue/events/schema';
 
 const QUERY_KEYS = {
 	all: ['venue', 'events'] as const,
@@ -40,6 +40,39 @@ export const useCreateVenueEvent = (options: CustomMutationOptions = {}) => {
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to publish event');
+			}
+			return response.json();
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
+			if (!suppressToasts) {
+				toast.success(successMessage);
+			}
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
+			}
+		},
+	});
+};
+
+export const useUpdateVenueEvent = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Event updated',
+		errorMessage = 'Failed to update event',
+		onSuccess: onSuccessCallback,
+	} = options;
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async ({ id, data }: { id: number; data: UpdateEventData }) => {
+			const response = await _fetch(urls.api.venue.events.detail(id), 'PATCH', data);
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(errorData.error || 'Failed to update event');
 			}
 			return response.json();
 		},

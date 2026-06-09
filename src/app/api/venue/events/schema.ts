@@ -32,4 +32,7 @@ export const createEventSchema = z
 		message: 'endsAt must be after startsAt',
 	});
 
+export const updateEventSchema = createEventSchema;
+
 export type PostEventData = z.infer<typeof createEventSchema>;
+export type UpdateEventData = z.infer<typeof updateEventSchema>;

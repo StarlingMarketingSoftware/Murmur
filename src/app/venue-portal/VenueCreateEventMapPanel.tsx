@@ -11,6 +11,7 @@ import {
 	useState,
 } from 'react';
 import { createPortal } from 'react-dom';
+import type { Event as VenueEvent } from '@prisma/client';
 import { PayRangeMoneyIcon } from '@/components/atoms/_svg/PayRangeMoneyIcon';
 import DashboardCalendarPanel from '@/components/molecules/DashboardCalendarPanel/DashboardCalendarPanel';
 import {
@@ -24,7 +25,10 @@ import {
 	VENUE_MAP_OVERLAY_SCALE,
 	VENUE_TIME_OPTIONS,
 } from './constants';
-import { useCreateVenueEvent } from '@/hooks/queryHooks/useVenueEvents';
+import {
+	useCreateVenueEvent,
+	useUpdateVenueEvent,
+} from '@/hooks/queryHooks/useVenueEvents';
 
 type VenueCreateEventFormState = {
 	eventName: string;
@@ -137,6 +141,32 @@ const formatVenueCreateEventIsoDate = (date: Date) => {
 	return `${year}-${month}-${day}`;
 };
 
+const createVenueEventFormFromEvent = (event: VenueEvent): VenueCreateEventFormState => {
+	const startsAt = event.startsAt ? new Date(event.startsAt) : null;
+	const hasValidStartsAt = Boolean(startsAt && !Number.isNaN(startsAt.getTime()));
+
+	return {
+		eventName: event.name,
+		location: {
+			address: event.address ?? '',
+			placeId: event.placeId,
+			lat: event.latitude,
+			lng: event.longitude,
+			drivingDuration: null,
+		},
+		whoSize: event.size ?? '',
+		whoGenres: event.genres,
+		when:
+			event.whenLabel ??
+			(hasValidStartsAt && startsAt ? formatVenueCreateEventDate(startsAt) : ''),
+		whenDate: hasValidStartsAt && startsAt ? formatVenueCreateEventIsoDate(startsAt) : null,
+		startTime: event.startTime ?? VENUE_CREATE_EVENT_DEFAULT_START_TIME,
+		endTime: event.endTime ?? VENUE_CREATE_EVENT_DEFAULT_END_TIME,
+		pay: event.pay ?? '',
+		details: event.details ?? '',
+	};
+};
+
 const getVenueCreateEventTimeMinutes = (value: string) => {
 	const [rawHours, rawMinutes] = value.split(':');
 	const hours = Number(rawHours);
@@ -181,13 +211,13 @@ const getNextVenueCreateEventEndTime = (startTime: string) => {
 	);
 };
 
-export function VenueCreateEventMapPanel() {
-	const [eventForm, setEventForm] = useState<VenueCreateEventFormState>(
-		EMPTY_CREATE_EVENT_FORM
+export function VenueCreateEventMapPanel({ event }: { event?: VenueEvent | null }) {
+	const [eventForm, setEventForm] = useState<VenueCreateEventFormState>(() =>
+		event ? createVenueEventFormFromEvent(event) : EMPTY_CREATE_EVENT_FORM
 	);
-	const [publishState, setPublishState] = useState<'idle' | 'missing-name' | 'published'>(
-		'idle'
-	);
+	const [publishState, setPublishState] = useState<
+		'idle' | 'missing-name' | 'published' | 'saved'
+	>('idle');
 	const [activeEventField, setActiveEventField] =
 		useState<VenueCreateEventActiveField>('eventName');
 	const [activeWhenPopup, setActiveWhenPopup] =
@@ -198,10 +228,12 @@ export function VenueCreateEventMapPanel() {
 	const detailsInputRef = useRef<HTMLTextAreaElement | null>(null);
 	const activeEventFieldRef = useRef<HTMLElement | null>(null);
 	const whenPopupRef = useRef<HTMLDivElement | null>(null);
+	const editingEventId = event?.id ?? null;
+	const isEditingEvent = editingEventId != null;
 	const setActiveEventFieldElement = useCallback((node: HTMLElement | null) => {
 		activeEventFieldRef.current = node;
 	}, []);
-	const { mutate: createEvent, isPending: isPublishing } = useCreateVenueEvent({
+	const { mutate: createEvent, isPending: isCreatingEvent } = useCreateVenueEvent({
 		onSuccess: () => {
 			setEventForm(EMPTY_CREATE_EVENT_FORM);
 			setActiveEventField('eventName');
@@ -209,6 +241,12 @@ export function VenueCreateEventMapPanel() {
 			requestAnimationFrame(() => eventNameInputRef.current?.focus());
 		},
 	});
+	const { mutate: updateEvent, isPending: isUpdatingEvent } = useUpdateVenueEvent({
+		onSuccess: () => {
+			setPublishState('saved');
+		},
+	});
+	const isSavingEvent = isCreatingEvent || isUpdatingEvent;
 	const isWhoComplete = Boolean(
 		eventForm.whoSize.trim() && eventForm.whoGenres.length > 0
 	);
@@ -251,6 +289,13 @@ export function VenueCreateEventMapPanel() {
 		setActiveEventField('details');
 		requestAnimationFrame(() => detailsInputRef.current?.focus());
 	};
+	useEffect(() => {
+		setEventForm(event ? createVenueEventFormFromEvent(event) : EMPTY_CREATE_EVENT_FORM);
+		setPublishState('idle');
+		setActiveEventField('eventName');
+		setActiveWhenPopup(null);
+		requestAnimationFrame(() => eventNameInputRef.current?.focus());
+	}, [event]);
 	const selectEventDate = (date: Date, event?: ReactMouseEvent<HTMLButtonElement>) => {
 		setEventForm((current) => ({
 			...current,
@@ -372,7 +417,7 @@ export function VenueCreateEventMapPanel() {
 		}
 	}, [activeEventField, isWhoComplete]);
 	const handleEventNameKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
-		if (event.key !== 'Enter' || event.isComposing) return;
+		if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
 		event.preventDefault();
 		if (!eventForm.eventName.trim()) {
 			setPublishState('missing-name');
@@ -443,12 +488,6 @@ export function VenueCreateEventMapPanel() {
 			document.removeEventListener('keydown', handleDocumentKeyDown);
 		};
 	}, [activeWhenPopup]);
-	// A new event box opens with Event Name already active (initial activeEventField)
-	// and focused, so the venue can start typing immediately. Clicking off still
-	// collapses it via the pointerdown-outside handler above.
-	useEffect(() => {
-		requestAnimationFrame(() => eventNameInputRef.current?.focus());
-	}, []);
 	const handlePublishEvent = (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		if (!eventForm.eventName.trim()) {
@@ -457,7 +496,7 @@ export function VenueCreateEventMapPanel() {
 			requestAnimationFrame(() => eventNameInputRef.current?.focus());
 			return;
 		}
-		if (isPublishing) return;
+		if (isSavingEvent) return;
 
 		// Time fields only mean something once a date is picked; derive UTC instants from the
 		// local date + the raw HH:MM, and otherwise log no date/time at all.
@@ -468,7 +507,7 @@ export function VenueCreateEventMapPanel() {
 			? new Date(`${eventForm.whenDate}T${eventForm.endTime}:00`).toISOString()
 			: undefined;
 
-		createEvent({
+		const payload = {
 			name: eventForm.eventName.trim(),
 			address: eventForm.location.address.trim() || null,
 			placeId: eventForm.location.placeId,
@@ -483,7 +522,14 @@ export function VenueCreateEventMapPanel() {
 			endsAt,
 			pay: eventForm.pay.trim() || null,
 			details: eventForm.details.trim() || null,
-		});
+		};
+
+		if (editingEventId != null) {
+			updateEvent({ id: editingEventId, data: payload });
+			return;
+		}
+
+		createEvent(payload);
 	};
 	const isEventNameActive = activeEventField === 'eventName';
 	const isWhereActive = activeEventField === 'where';
@@ -525,6 +571,13 @@ export function VenueCreateEventMapPanel() {
 	const eventWhenSummary = isWhenFilled
 		? `${eventForm.when}, ${eventTimeRangeLabel}`
 		: '';
+	const submitButtonLabel = isSavingEvent
+		? isEditingEvent
+			? 'Saving…'
+			: 'Publishing…'
+		: isEditingEvent
+			? 'Save'
+			: 'Publish';
 
 	return (
 		// Snug to the right of the calendar cluster. The cluster (left-24, scale 0.7) puts the
@@ -537,7 +590,7 @@ export function VenueCreateEventMapPanel() {
 			style={{ transform: `scale(${VENUE_MAP_OVERLAY_SCALE})` }}
 		>
 			<div className="absolute left-[12px] top-[4px] font-inter text-[12.358px] font-medium leading-[16.477px] text-black">
-				New Event
+				{isEditingEvent ? 'Edit Event' : 'New Event'}
 			</div>
 			<div className="absolute left-[4px] top-[20px] h-[701px] w-[444px] rounded-[12px] border-[2px] border-black bg-white">
 				<div className="absolute left-1/2 top-[19px] h-[637px] w-[420px] -translate-x-1/2 overflow-hidden rounded-[12px] border-[2px] border-black bg-white">
@@ -1492,16 +1545,18 @@ export function VenueCreateEventMapPanel() {
 
 				<button
 					type="submit"
-					disabled={isPublishing}
+					disabled={isSavingEvent}
 					className="absolute bottom-[9.5px] left-1/2 flex h-[26px] w-[244px] -translate-x-1/2 items-center justify-center rounded-[12.084px] bg-[#F57D7D] font-inter text-[18.909px] font-medium not-italic leading-[18.391px] text-black transition-opacity hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
 				>
-					{isPublishing ? 'Publishing…' : 'Publish'}
+					{submitButtonLabel}
 				</button>
 				<p className="sr-only" aria-live="polite">
 					{publishState === 'missing-name'
 						? 'Event name is required.'
 						: publishState === 'published'
 							? 'Event published.'
+							: publishState === 'saved'
+								? 'Event saved.'
 							: ''}
 				</p>
 			</div>
