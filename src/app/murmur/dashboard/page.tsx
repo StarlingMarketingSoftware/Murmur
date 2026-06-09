@@ -171,6 +171,7 @@ import {
 	fetchCampaignDetail,
 } from '@/hooks/queryHooks/useCampaigns';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { useGetMapEvents } from '@/hooks/queryHooks/useGetMapEvents';
 import {
 	getIdentitiesListQueryKey,
 	fetchIdentitiesList,
@@ -8521,6 +8522,21 @@ const DashboardContent = () => {
 		onCommit: handleScrollCommitToMap,
 	});
 
+	// Upcoming venue-posted events → radar opportunity markers on the interactive map.
+	const { data: mapEvents } = useGetMapEvents({ enabled: isMapView });
+	const eventsForMap = useMemo<SearchResultsMapProps['events']>(
+		() =>
+			(mapEvents ?? [])
+				.filter((event) => event.latitude != null && event.longitude != null)
+				.map((event) => ({
+					id: event.id,
+					lat: event.latitude as number,
+					lng: event.longitude as number,
+					name: event.name,
+				})),
+		[mapEvents]
+	);
+
 	const contactsForMap = useMemo(() => {
 		const sourceContacts =
 			fromHomeParam && (!isSignedIn || !hasSearched)
@@ -8856,11 +8872,14 @@ const DashboardContent = () => {
 			// radius toggle. Toggling the icon off only affects the next search.
 			radiusOverlay: activeRadiusSearchOverlay,
 			onRadiusCenterChange: handleRadiusCenterChange,
+			// Venue-posted opportunity markers only on the interactive map, not the globe.
+			events: isMapView ? eventsForMap : [],
 		}),
 		[
 			activeMapTool,
 			activeRadiusSearchOverlay,
 			activeSearchQuery,
+			eventsForMap,
 			canDisengageMapSearch,
 			contactsForMap,
 			handleRadiusCenterChange,

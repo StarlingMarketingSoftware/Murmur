@@ -225,5 +225,8 @@ export const urls = {
 				detail: ((id) => `/api/venue/events/${id}`) as DetailRoute,
 			},
 		},
+		events: {
+			index: '/api/events',
+		},
 	},
 };

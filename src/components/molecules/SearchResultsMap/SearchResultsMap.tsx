@@ -35,6 +35,7 @@ import {
 import { generateSelectedCategorizedContactMarkerIconUrl } from '@/components/atoms/_svg/SelectedCategorizedContactMarkerIcon';
 import { profileAreaMarkerSvg } from '@/components/atoms/_svg/ProfileAreaMarkerIcon';
 import { venueHomeIconSvg } from '@/components/atoms/_svg/VenueHomeIcon';
+import { mapStackStarIconSvg } from '@/components/atoms/_svg/MapStackStarIcon';
 import {
 	SELECTED_CONTACT_MARKER_CENTER_OUTER_DIAMETER,
 	SELECTED_CONTACT_MARKER_CENTER_X,
@@ -795,6 +796,64 @@ const buildOwnedVenueMapOverlayData = (center: LatLngLiteral) => {
 	};
 };
 
+// A venue-posted event to render on the shared map as a radar opportunity marker.
+type MapEvent = LatLngLiteral & { id: number; name?: string | null };
+
+const EVENT_STAR_ICON_IMAGE_NAME = 'murmur-event-star-icon-image';
+const EVENT_STAR_ICON_URL = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+	mapStackStarIconSvg
+)}`;
+const EVENT_STAR_ICON_IMAGE_DIMENSIONS = { width: 54, height: 54 } as const;
+
+// The opportunity markers reuse the owned-venue radar builders per event center,
+// re-keying each feature id so features from different events never collide inside a
+// shared source. This keeps the motion identical to the venue-portal radar.
+const buildEventsGlowFeatures = (events: MapEvent[], radarPhase = 0, animated = false) =>
+	events.flatMap((event) =>
+		buildOwnedVenueGlowFeatures(event, radarPhase, animated).map((feature) => ({
+			...feature,
+			id: `event-${event.id}-${feature.id}`,
+		}))
+	);
+
+const buildEventsRadarLineFeatures = (
+	events: MapEvent[],
+	radarPhase = 0,
+	opts: { animated?: boolean; bloom?: boolean } = {}
+) =>
+	events.flatMap((event) =>
+		buildOwnedVenueRadarLineFeatures(event, radarPhase, opts).map((feature) => ({
+			...feature,
+			id: `event-${event.id}-${feature.id}`,
+		}))
+	);
+
+const buildEventsIconFeatures = (events: MapEvent[]) =>
+	events.map((event) => ({
+		type: 'Feature' as const,
+		id: `event-${event.id}-icon`,
+		properties: { eventId: event.id },
+		geometry: {
+			type: 'Point' as const,
+			coordinates: [event.lng, event.lat],
+		},
+	}));
+
+const buildEventsMapOverlayData = (events: MapEvent[]) => ({
+	glow: {
+		type: 'FeatureCollection' as const,
+		features: buildEventsGlowFeatures(events),
+	},
+	rings: {
+		type: 'FeatureCollection' as const,
+		features: buildEventsRadarLineFeatures(events),
+	},
+	icon: {
+		type: 'FeatureCollection' as const,
+		features: buildEventsIconFeatures(events),
+	},
+});
+
 const withFeatureOpacityFactor = (opacityExpr: any, factorExpr: any): any => {
 	if (Array.isArray(opacityExpr)) {
 		const op = opacityExpr[0];
@@ -1006,6 +1065,8 @@ export interface SearchResultsMapProps {
 	onRadiusCenterChange?: (center: LatLngLiteral) => void;
 	/** Current venue account location; draws the map-anchored home/radar overlay. */
 	ownedVenueLocation?: OwnedVenueLocation | null;
+	/** Venue-posted events to draw as radar opportunity markers (red star + radar). */
+	events?: MapEvent[];
 }
 
 // NOTE: Night lights are generated offline as raster dot tiles (see scripts/generate_contact_lights_tiles.py).
@@ -1060,6 +1121,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	radiusOverlay = null,
 	onRadiusCenterChange,
 	ownedVenueLocation = null,
+	events = [],
 }) => {
 	const curatedOrbSvgIdPrefix = useId().replace(/:/g, '');
 	const curatedOrbSlotIds = useMemo(
@@ -1846,6 +1908,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				: null;
 		return isValidOwnedVenueLocation(location) ? location : null;
 	}, [ownedVenueLat, ownedVenueLng]);
+	const eventsPulseRafRef = useRef<number | null>(null);
+	const eventCenters = useMemo<MapEvent[]>(
+		() =>
+			events.filter((event) =>
+				isValidOwnedVenueLocation({ lat: event.lat, lng: event.lng })
+			),
+		[events]
+	);
 	// The radius circle reuses the curated-blob pipeline (see updateCuratedBlob), so
 	// it appears only once a radius search returns results, rendered as one circle.
 	// The draggable center pin is set up in the marker effect below the blob builder.
@@ -1958,6 +2028,102 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			clearPulse();
 		};
 	}, [map, isMapLoaded, ownedVenueCenter]);
+
+	// Event opportunity markers: same radar machinery as the owned venue, but anchored
+	// to many event centers at once (red star icon instead of the home icon).
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+
+		const setSourceData = (sourceId: string, data: GeoJSON.FeatureCollection) => {
+			const source = map.getSource(sourceId) as mapboxgl.GeoJSONSource | undefined;
+			source?.setData(data);
+		};
+
+		if (eventCenters.length === 0) {
+			const empty = emptyFeatureCollection();
+			setSourceData(MAPBOX_SOURCE_IDS.eventsGlow, empty);
+			setSourceData(MAPBOX_SOURCE_IDS.eventsRings, empty);
+			setSourceData(MAPBOX_SOURCE_IDS.eventsIcon, empty);
+			return;
+		}
+
+		const overlayData = buildEventsMapOverlayData(eventCenters);
+		setSourceData(MAPBOX_SOURCE_IDS.eventsGlow, overlayData.glow);
+		setSourceData(MAPBOX_SOURCE_IDS.eventsRings, overlayData.rings);
+		setSourceData(MAPBOX_SOURCE_IDS.eventsIcon, overlayData.icon);
+	}, [map, isMapLoaded, eventCenters]);
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+
+		const glowSource = map.getSource(MAPBOX_SOURCE_IDS.eventsGlow) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		const ringsSource = map.getSource(MAPBOX_SOURCE_IDS.eventsRings) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		const pulseSource = map.getSource(MAPBOX_SOURCE_IDS.eventsPulse) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		if (!glowSource || !ringsSource || !pulseSource) return;
+
+		const clearPulse = () => pulseSource.setData(emptyFeatureCollection());
+
+		if (eventCenters.length === 0) {
+			clearPulse();
+			return;
+		}
+
+		let prefersReducedMotion = false;
+		try {
+			prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		} catch {
+			prefersReducedMotion = false;
+		}
+
+		if (prefersReducedMotion) {
+			clearPulse();
+			return;
+		}
+
+		let cancelled = false;
+
+		const animateRadar = (nowMs: number) => {
+			if (cancelled) return;
+
+			const phase = (nowMs % OWNED_VENUE_RADAR_MS) / OWNED_VENUE_RADAR_MS;
+			glowSource.setData({
+				type: 'FeatureCollection',
+				features: buildEventsGlowFeatures(eventCenters, phase, true),
+			});
+			ringsSource.setData({
+				type: 'FeatureCollection',
+				features: buildEventsRadarLineFeatures(eventCenters, phase, {
+					animated: true,
+				}),
+			});
+			pulseSource.setData({
+				type: 'FeatureCollection',
+				features: buildEventsRadarLineFeatures(eventCenters, phase, {
+					animated: true,
+					bloom: true,
+				}),
+			});
+
+			eventsPulseRafRef.current = window.requestAnimationFrame(animateRadar);
+		};
+
+		eventsPulseRafRef.current = window.requestAnimationFrame(animateRadar);
+
+		return () => {
+			cancelled = true;
+			if (eventsPulseRafRef.current != null) {
+				window.cancelAnimationFrame(eventsPulseRafRef.current);
+				eventsPulseRafRef.current = null;
+			}
+			clearPulse();
+		};
+	}, [map, isMapLoaded, eventCenters]);
 
 	// Cancel selection if the tool changes or the map unmounts.
 	useEffect(() => {
@@ -5880,6 +6046,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueRings);
 		ensureSource(MAPBOX_SOURCE_IDS.ownedVenuePulse);
 		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueIcon);
+		ensureSource(MAPBOX_SOURCE_IDS.eventsGlow);
+		ensureSource(MAPBOX_SOURCE_IDS.eventsRings);
+		ensureSource(MAPBOX_SOURCE_IDS.eventsPulse);
+		ensureSource(MAPBOX_SOURCE_IDS.eventsIcon);
 
 		const ensureLayer = (layer: any, beforeId?: string) => {
 			if (mapInstance.getLayer(layer.id)) {
@@ -6339,6 +6509,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			0.72,
 			14,
 			0.95,
+		];
+		// Track the contact result dots' zoom anchors. Star image is 54px natural; these
+		// give ~18px at min zoom and ~20px at the default zoom (MAP_DEFAULT_ZOOM=5),
+		// growing to ~36px when zoomed in — a clear marker that reads bigger than a dot
+		// without the oversized original.
+		const eventStarIconSizeExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			0.33,
+			RESULT_DOT_ZOOM_MIN,
+			0.33,
+			RESULT_DOT_ZOOM_MAX,
+			0.66,
+			24,
+			0.66,
 		];
 
 		// States: hover fill + hit fill (transparent) + divider lines + interactive borders
@@ -7062,6 +7249,117 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			layout: {
 				'icon-image': OWNED_VENUE_HOME_ICON_IMAGE_NAME,
 				'icon-size': ownedVenueHomeIconSizeExpr,
+				'icon-anchor': 'center',
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': ['interpolate', ['linear'], ['zoom'], MAP_MIN_ZOOM, 0.82, 4, 1],
+			},
+		});
+		// Event opportunity markers — same radar layer stack as the owned venue, but
+		// fed by the events* sources and centered on the red star icon.
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.eventsGlowFill,
+			type: 'fill',
+			source: MAPBOX_SOURCE_IDS.eventsGlow,
+			layout: { 'fill-sort-key': ['get', 'sort'] },
+			paint: {
+				'fill-color': ['coalesce', ['get', 'color'], '#A8E6FF'],
+				'fill-opacity': ['coalesce', ['get', 'opacity'], 0],
+				'fill-antialias': true,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.eventsRingLines,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.eventsRings,
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
+			paint: {
+				'line-color': '#FFFFFF',
+				'line-opacity': ['coalesce', ['get', 'opacity'], 0],
+				'line-width': [
+					'interpolate',
+					['linear'],
+					['zoom'],
+					MAP_MIN_ZOOM,
+					['*', ['coalesce', ['get', 'width'], 1], 0.72],
+					MAP_DEFAULT_ZOOM,
+					['coalesce', ['get', 'width'], 1],
+					10,
+					['*', ['coalesce', ['get', 'width'], 1], 1.1],
+				],
+				'line-blur': 0.18,
+			},
+		});
+		ensureLayer(
+			{
+			id: MAPBOX_LAYER_IDS.eventsPulseLine,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.eventsPulse,
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
+			paint: {
+				'line-color': ['coalesce', ['get', 'color'], '#6BD9FF'],
+				'line-opacity': ['coalesce', ['get', 'opacity'], 0],
+				'line-width': [
+					'interpolate',
+					['linear'],
+					['zoom'],
+					MAP_MIN_ZOOM,
+					['*', ['coalesce', ['get', 'width'], 1], 0.72],
+					MAP_DEFAULT_ZOOM,
+					['coalesce', ['get', 'width'], 1],
+					10,
+					['*', ['coalesce', ['get', 'width'], 1], 1.12],
+				],
+				'line-blur': 1.05,
+			},
+			},
+			MAPBOX_LAYER_IDS.eventsRingLines
+		);
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.eventsStarGlow,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.eventsIcon,
+			paint: {
+				'circle-color': '#6BD9FF',
+				// Soft halo a bit larger than the star, on the dots' anchors.
+				'circle-radius': [
+					'interpolate',
+					['linear'],
+					['zoom'],
+					0,
+					13,
+					RESULT_DOT_ZOOM_MIN,
+					13,
+					RESULT_DOT_ZOOM_MAX,
+					30,
+					24,
+					30,
+				],
+				'circle-opacity': [
+					'interpolate',
+					['linear'],
+					['zoom'],
+					MAP_MIN_ZOOM,
+					0.12,
+					MAP_DEFAULT_ZOOM,
+					0.22,
+					10,
+					0.28,
+					14,
+					0.24,
+				],
+				'circle-blur': 0.92,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.eventsStarIcon,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.eventsIcon,
+			layout: {
+				'icon-image': EVENT_STAR_ICON_IMAGE_NAME,
+				'icon-size': eventStarIconSizeExpr,
 				'icon-anchor': 'center',
 				'icon-allow-overlap': true,
 				'icon-ignore-placement': true,
@@ -12549,6 +12847,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			OWNED_VENUE_HOME_ICON_IMAGE_NAME,
 			OWNED_VENUE_HOME_ICON_URL,
 			OWNED_VENUE_HOME_ICON_IMAGE_DIMENSIONS
+		);
+		void ensureMapImageFromUrl(
+			EVENT_STAR_ICON_IMAGE_NAME,
+			EVENT_STAR_ICON_URL,
+			EVENT_STAR_ICON_IMAGE_DIMENSIONS
 		);
 	}, [map, isMapLoaded, ensureMapImageFromUrl]);
 
