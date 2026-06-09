@@ -3182,6 +3182,17 @@ const Murmur = () => {
 	}, [setPersistentMapConfig]);
 
 	const usePersistentCampaignMapBackground = !isMobile && activeView !== 'overview';
+	// The top-nav is portaled to document.body (createPortal below), so the in-tree
+	// `.campaign-persistent-map-page` selector can't reach it. Mirror that exact
+	// condition with a body class so the top-nav translateX shift still applies.
+	useEffect(() => {
+		if (typeof document === 'undefined') return;
+		const body = document.body;
+		body.classList.toggle('murmur-campaign-persistent-map', usePersistentCampaignMapBackground);
+		return () => {
+			body.classList.remove('murmur-campaign-persistent-map');
+		};
+	}, [usePersistentCampaignMapBackground]);
 	const isCampaignWorkspaceToggleVisible =
 		!isMobile &&
 		usePersistentCampaignMapBackground &&
@@ -4611,13 +4622,13 @@ const Murmur = () => {
 									/* New top nav: shift right to center over the main box.
 						   Uses the same shift variable as the rest of campaign content, but no
 						   scale — the new nav has its own internal scale (MAP_VIEW_UI_SCALE). */
-									.campaign-persistent-map-page [data-slot='campaign-top-backdrop'],
-									.campaign-persistent-map-page [data-slot='campaign-top-outline-boxes'],
-									.campaign-persistent-map-page [data-slot='campaign-top-tabs'],
-									.campaign-persistent-map-page [data-slot='campaign-top-search-bar'],
-									.campaign-persistent-map-page [data-slot='campaign-top-strategy-dropdown'],
-									.campaign-persistent-map-page [data-slot='campaign-top-campaigns-dropdown'],
-									.campaign-persistent-map-page [data-slot='campaign-top-opportunities-popup'] {
+									body.murmur-campaign-persistent-map [data-slot='campaign-top-backdrop'],
+									body.murmur-campaign-persistent-map [data-slot='campaign-top-outline-boxes'],
+									body.murmur-campaign-persistent-map [data-slot='campaign-top-tabs'],
+									body.murmur-campaign-persistent-map [data-slot='campaign-top-search-bar'],
+									body.murmur-campaign-persistent-map [data-slot='campaign-top-strategy-dropdown'],
+									body.murmur-campaign-persistent-map [data-slot='campaign-top-campaigns-dropdown'],
+									body.murmur-campaign-persistent-map [data-slot='campaign-top-opportunities-popup'] {
 										transform: translateX(
 											var(
 												${CAMPAIGN_TOP_NAV_SHIFT_X_VAR},
