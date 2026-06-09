@@ -649,12 +649,12 @@ const isValidOwnedVenueLocation = (
 ): location is OwnedVenueLocation =>
 	Boolean(
 		location &&
-			Number.isFinite(location.lat) &&
-			Number.isFinite(location.lng) &&
-			location.lat >= -90 &&
-			location.lat <= 90 &&
-			location.lng >= -180 &&
-			location.lng <= 180
+		Number.isFinite(location.lat) &&
+		Number.isFinite(location.lng) &&
+		location.lat >= -90 &&
+		location.lat <= 90 &&
+		location.lng >= -180 &&
+		location.lng <= 180
 	);
 
 const buildOwnedVenueCircleRing = (
@@ -741,10 +741,10 @@ const buildOwnedVenueRadarLineFeatures = (
 
 		const color = bloom
 			? mixCssColorString(
-				OWNED_VENUE_RADAR_IDLE_COLOR,
-				OWNED_VENUE_GLOW_ACTIVE_COLOR,
-				0.18 + pulse * 0.22
-			)
+					OWNED_VENUE_RADAR_IDLE_COLOR,
+					OWNED_VENUE_GLOW_ACTIVE_COLOR,
+					0.18 + pulse * 0.22
+				)
 			: OWNED_VENUE_RADAR_IDLE_COLOR;
 		const opacity = bloom
 			? clamp(circle.opacity * edgeFade * centerWeight * (0.012 + pulse * 0.065), 0, 0.11)
@@ -1980,7 +1980,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		let prefersReducedMotion = false;
 		try {
-			prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+			prefersReducedMotion = window.matchMedia(
+				'(prefers-reduced-motion: reduce)'
+			).matches;
 		} catch {
 			prefersReducedMotion = false;
 		}
@@ -2076,7 +2078,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		let prefersReducedMotion = false;
 		try {
-			prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+			prefersReducedMotion = window.matchMedia(
+				'(prefers-reduced-motion: reduce)'
+			).matches;
 		} catch {
 			prefersReducedMotion = false;
 		}
@@ -7184,26 +7188,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		});
 		ensureLayer(
 			{
-			id: MAPBOX_LAYER_IDS.ownedVenuePulseLine,
-			type: 'line',
-			source: MAPBOX_SOURCE_IDS.ownedVenuePulse,
-			layout: { 'line-join': 'round', 'line-cap': 'round' },
-			paint: {
-				'line-color': ['coalesce', ['get', 'color'], '#6BD9FF'],
-				'line-opacity': ['coalesce', ['get', 'opacity'], 0],
-				'line-width': [
-					'interpolate',
-					['linear'],
-					['zoom'],
-					MAP_MIN_ZOOM,
-					['*', ['coalesce', ['get', 'width'], 1], 0.72],
-					MAP_DEFAULT_ZOOM,
-					['coalesce', ['get', 'width'], 1],
-					10,
-					['*', ['coalesce', ['get', 'width'], 1], 1.12],
-				],
-				'line-blur': 1.05,
-			},
+				id: MAPBOX_LAYER_IDS.ownedVenuePulseLine,
+				type: 'line',
+				source: MAPBOX_SOURCE_IDS.ownedVenuePulse,
+				layout: { 'line-join': 'round', 'line-cap': 'round' },
+				paint: {
+					'line-color': ['coalesce', ['get', 'color'], '#6BD9FF'],
+					'line-opacity': ['coalesce', ['get', 'opacity'], 0],
+					'line-width': [
+						'interpolate',
+						['linear'],
+						['zoom'],
+						MAP_MIN_ZOOM,
+						['*', ['coalesce', ['get', 'width'], 1], 0.72],
+						MAP_DEFAULT_ZOOM,
+						['coalesce', ['get', 'width'], 1],
+						10,
+						['*', ['coalesce', ['get', 'width'], 1], 1.12],
+					],
+					'line-blur': 1.05,
+				},
 			},
 			MAPBOX_LAYER_IDS.ownedVenueRingLines
 		);
@@ -7294,26 +7298,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		});
 		ensureLayer(
 			{
-			id: MAPBOX_LAYER_IDS.eventsPulseLine,
-			type: 'line',
-			source: MAPBOX_SOURCE_IDS.eventsPulse,
-			layout: { 'line-join': 'round', 'line-cap': 'round' },
-			paint: {
-				'line-color': ['coalesce', ['get', 'color'], '#6BD9FF'],
-				'line-opacity': ['coalesce', ['get', 'opacity'], 0],
-				'line-width': [
-					'interpolate',
-					['linear'],
-					['zoom'],
-					MAP_MIN_ZOOM,
-					['*', ['coalesce', ['get', 'width'], 1], 0.72],
-					MAP_DEFAULT_ZOOM,
-					['coalesce', ['get', 'width'], 1],
-					10,
-					['*', ['coalesce', ['get', 'width'], 1], 1.12],
-				],
-				'line-blur': 1.05,
-			},
+				id: MAPBOX_LAYER_IDS.eventsPulseLine,
+				type: 'line',
+				source: MAPBOX_SOURCE_IDS.eventsPulse,
+				layout: { 'line-join': 'round', 'line-cap': 'round' },
+				paint: {
+					'line-color': ['coalesce', ['get', 'color'], '#6BD9FF'],
+					'line-opacity': ['coalesce', ['get', 'opacity'], 0],
+					'line-width': [
+						'interpolate',
+						['linear'],
+						['zoom'],
+						MAP_MIN_ZOOM,
+						['*', ['coalesce', ['get', 'width'], 1], 0.72],
+						MAP_DEFAULT_ZOOM,
+						['coalesce', ['get', 'width'], 1],
+						10,
+						['*', ['coalesce', ['get', 'width'], 1], 1.12],
+					],
+					'line-blur': 1.05,
+				},
 			},
 			MAPBOX_LAYER_IDS.eventsRingLines
 		);
