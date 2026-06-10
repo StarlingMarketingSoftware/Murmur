@@ -505,6 +505,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 								? user?.customDomain
 								: user?.murmurEmail,
 						replyToEmail: user?.replyToEmail ?? user?.murmurEmail ?? undefined,
+						template: 'newMessage',
+						campaignId: campaign.id,
 					});
 					if (res.success) {
 						await updateEmail({

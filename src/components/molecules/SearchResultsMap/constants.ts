@@ -579,6 +579,13 @@ export const STREET_VIEW_MAX_PITCH = 60;
 export const STREET_VIEW_PITCH_EASE_MS = 450;
 // Dead-band so the pitch reconciler's own moveend settles as a no-op.
 export const STREET_VIEW_PITCH_EPSILON_DEG = 0.5;
+// Per-frame dead-band for the continuous gesture-zoom pitch coupler (much tighter
+// than the moveend settle pass — it only suppresses redundant same-frame writes).
+export const STREET_VIEW_PITCH_FRAME_EPSILON_DEG = 0.05;
+// Persistent research cards at street zoom: cap how many render at once (nearest
+// to the viewport center win) so dense blocks can't wall the screen with 280px
+// cards, and the per-card research backfill fan-out stays bounded.
+export const STREET_VIEW_MAX_PERSISTENT_CARDS = 16;
 // 3D buildings rise in just before the pitch ramp starts.
 export const STREET_VIEW_BUILDINGS_MIN_ZOOM = 15;
 export const STREET_VIEW_BUILDINGS_RISE_FULL_ZOOM = 15.75;

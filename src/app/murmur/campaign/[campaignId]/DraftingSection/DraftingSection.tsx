@@ -82,10 +82,6 @@ import {
 	normalizeSentEmailForInboxConversation,
 	type InboxConversation,
 } from '@/utils/inboxConversations';
-import {
-	inferOpportunityStatus,
-	type OpportunityStatus,
-} from '@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesWidget';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
 import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
@@ -235,6 +231,17 @@ interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 }
 
 type CampaignBottomPanelKind = 'contacts' | 'drafts' | 'sent' | 'inbox';
+
+// Row-aligned abridged research card hovered to the left of the pinned contact
+// list (Write / Drafts / Inbox tabs). Mirrors the dashboard map-panel hover
+// research convention (gap + delayed clear).
+const ROW_HOVER_RESEARCH_CARD_WIDTH_PX = 272.425; // ContactResearchPanel abridged width
+const ROW_HOVER_RESEARCH_CARD_HEIGHT_PX = 313; // ceil of abridged max height
+const ROW_HOVER_RESEARCH_GAP_PX = 13;
+const ROW_HOVER_RESEARCH_DOCKED_LEFT_PX = -(
+	ROW_HOVER_RESEARCH_CARD_WIDTH_PX + ROW_HOVER_RESEARCH_GAP_PX
+);
+const ROW_HOVER_RESEARCH_CLEAR_DELAY_MS = 220;
 
 export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const {
@@ -638,7 +645,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [isSearchTabNarrow, setIsSearchTabNarrow] = useState(false);
 	// Inbox tab narrow detection (<= 1520px) - reduces inbox box width to 516px
 	const [isInboxTabNarrow, setIsInboxTabNarrow] = useState(false);
-	// Inbox tab stacked layout detection (<= 1279px) - moves research panel below header box on the left
+	// Inbox tab stacked layout detection (<= 1279px) - moves research panel below header box on the left.
+	// The inbox render also stacks across the whole isNarrowDesktop band (< 1317px), so the
+	// wide 863px panel never renders once the page centers; this state stays <= 1279 because
+	// shouldReserveSharedWideTabZoomEnvelope (overview/search) depends on it as-is.
 	const [isInboxTabStacked, setIsInboxTabStacked] = useState(false);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
@@ -708,8 +718,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const OVERVIEW_RIGHT_RAIL_GAP_FROM_HEADER_PX = 74;
 	const inboxMainPanelWidthPx = 863;
 	const inboxMainPanelHeightPx = 706;
+	// Overview degrades progressively as the viewport narrows: the right rail goes
+	// first (isNarrowDesktop), then the docked contacts column (isNarrowestDesktop).
 	const shouldDockOverviewContacts =
-		view === 'overview' && !isMobile && !isNarrowDesktop && !isNarrowestDesktop;
+		view === 'overview' && !isMobile && !isNarrowestDesktop;
 	const shouldShowOverviewRightRail =
 		view === 'overview' && !isMobile && !isNarrowDesktop && !isNarrowestDesktop;
 	const shouldShowOverviewRightRailSearchPanel =
@@ -1338,7 +1350,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		!(view === 'drafting' && isNarrowDesktop) &&
 		!(view === 'sent' && isNarrowDesktop) &&
 		!(view === 'search' && isSearchTabNarrow) &&
-		!(view === 'inbox' && isInboxTabStacked);
+		!(view === 'inbox' && (isInboxTabStacked || isNarrowDesktop));
 	const sharedBottomPanelKinds = useMemo<CampaignBottomPanelKind[]>(() => {
 		switch (view) {
 			case 'testing':
@@ -2372,6 +2384,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		useState<ContactWithName | null>(null);
 	const [hasUserSelectedResearchContact, setHasUserSelectedResearchContact] =
 		useState(false);
+	// Row-aligned abridged research card left of the pinned list (Write/Drafts/Inbox).
+	// Additive to the standard research panels — fully separate state.
+	const [rowHoverResearchContact, setRowHoverResearchContact] =
+		useState<ContactWithName | null>(null);
+	const [rowHoverResearchTopPx, setRowHoverResearchTopPx] = useState(0);
+	const [rowHoverResearchLeftPx, setRowHoverResearchLeftPx] = useState(
+		ROW_HOVER_RESEARCH_DOCKED_LEFT_PX
+	);
+	const rowHoverResearchClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const [showTestPreview, setShowTestPreview] = useState(false);
 	const handleTestPreviewToggle = useCallback(
 		(open: boolean) => {
@@ -2787,6 +2808,92 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	};
 
+	const cancelRowHoverResearchClear = useCallback(() => {
+		if (!rowHoverResearchClearTimeoutRef.current) return;
+		clearTimeout(rowHoverResearchClearTimeoutRef.current);
+		rowHoverResearchClearTimeoutRef.current = null;
+	}, []);
+
+	const scheduleRowHoverResearchClear = useCallback(() => {
+		cancelRowHoverResearchClear();
+		rowHoverResearchClearTimeoutRef.current = setTimeout(() => {
+			rowHoverResearchClearTimeoutRef.current = null;
+			setRowHoverResearchContact(null);
+		}, ROW_HOVER_RESEARCH_CLEAR_DELAY_MS);
+	}, [cancelRowHoverResearchClear]);
+
+	const handleContactRowHoverResearch = useCallback(
+		(contact: ContactWithName | null, rowElement: HTMLElement | null) => {
+			if (!contact || !rowElement) {
+				// Row mouseleave, or a row with no resolvable contact: show nothing for
+				// it, and fade any visible card after the shared delay (avoids flicker
+				// when the pointer crosses an unmatched inbox row between matched ones).
+				scheduleRowHoverResearchClear();
+				return;
+			}
+			const anchor = rowElement.closest<HTMLElement>('[data-row-hover-research-anchor]');
+			if (!anchor) return;
+			cancelRowHoverResearchClear();
+			const anchorRect = anchor.getBoundingClientRect();
+			const rowRect = rowElement.getBoundingClientRect();
+			// Rects are post-transform; absolute `top` inside the anchor is pre-transform.
+			// The rect/offset ratio captures the full cumulative scale (campaign zoom,
+			// incl. the Safari transform fallback, and the 0.94 campaign-content scale).
+			const scale = anchor.offsetHeight > 0 ? anchorRect.height / anchor.offsetHeight : 1;
+			const rawTopPx = (rowRect.top - anchorRect.top) / (scale || 1);
+			const maxTopPx = Math.max(0, anchor.offsetHeight - ROW_HOVER_RESEARCH_CARD_HEIGHT_PX);
+			setRowHoverResearchTopPx(Math.min(Math.max(rawTopPx, 0), maxTopPx));
+			// When the split stages leave a clear map strip left of the translucent
+			// band, move the card out of the band: right edge one gap left of the band
+			// edge. Centered/scrollable stages pin the band to x=0, so the fits-left-
+			// of-the-band check fails and the card keeps its default list dock.
+			let leftPx = ROW_HOVER_RESEARCH_DOCKED_LEFT_PX;
+			const splitOverlay = document.querySelector('.campaign-map-split-overlay');
+			if (splitOverlay) {
+				const overlayLeftPx = splitOverlay.getBoundingClientRect().left;
+				const cardFootprintRealPx =
+					(ROW_HOVER_RESEARCH_CARD_WIDTH_PX + ROW_HOVER_RESEARCH_GAP_PX) * (scale || 1);
+				if (overlayLeftPx > cardFootprintRealPx) {
+					leftPx = Math.min(
+						leftPx,
+						(overlayLeftPx - anchorRect.left) / (scale || 1) +
+							ROW_HOVER_RESEARCH_DOCKED_LEFT_PX
+					);
+				}
+			}
+			setRowHoverResearchLeftPx(leftPx);
+			setRowHoverResearchContact(contact);
+		},
+		[cancelRowHoverResearchClear, scheduleRowHoverResearchClear]
+	);
+
+	const isRowHoverResearchEnabled =
+		!isMobile && (view === 'testing' || view === 'drafting' || view === 'inbox');
+
+	useEffect(() => {
+		// Never carry a card across tab switches; also cleans the timer on unmount.
+		cancelRowHoverResearchClear();
+		setRowHoverResearchContact(null);
+		return cancelRowHoverResearchClear;
+	}, [view, cancelRowHoverResearchClear]);
+
+	useEffect(() => {
+		// The card's left offset is captured per-hover relative to the backdrop
+		// band; a resize/zoom change moves the band, so drop the card instead of
+		// leaving it at a stale offset (next row hover recomputes).
+		if (typeof window === 'undefined') return;
+		const clearCard = () => {
+			cancelRowHoverResearchClear();
+			setRowHoverResearchContact(null);
+		};
+		window.addEventListener('resize', clearCard);
+		window.addEventListener('murmur:campaign-zoom-changed', clearCard);
+		return () => {
+			window.removeEventListener('resize', clearCard);
+			window.removeEventListener('murmur:campaign-zoom-changed', clearCard);
+		};
+	}, [cancelRowHoverResearchClear]);
+
 	const handleDraftPreviewClick = useCallback((draft: EmailWithRelations) => {
 		setSelectedDraft(draft);
 	}, []);
@@ -2863,7 +2970,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			conversations: [] as InboxConversation[],
 			drafts: [] as EmailWithRelations[],
 			plainContacts: [] as ContactWithName[],
-			opportunityStatusByKey: new Map<string, OpportunityStatus>(),
 		};
 		if (isMobile !== true) return empty;
 
@@ -2880,16 +2986,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			...inboxEmailsForContactsExpandedList,
 			...sentForSummary.map(normalizeSentEmailForInboxConversation),
 		]).filter((conversation) => conversation.inboundMessages.length > 0);
-
-		// Opportunity classification mirrors the dashboard widget (venue internal
-		// threads are exempt there too).
-		const opportunityStatusByKey = new Map<string, OpportunityStatus>();
-		for (const conversation of conversations) {
-			const latestInbound = conversation.latestInboundMessage;
-			if (!latestInbound || latestInbound.venueConversationId != null) continue;
-			const status = inferOpportunityStatus(latestInbound);
-			if (status) opportunityStatusByKey.set(conversation.key, status);
-		}
 
 		const conversationContactIds = new Set<number>();
 		const conversationEmails = new Set<string>();
@@ -2927,7 +3023,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			conversations,
 			drafts: draftsForSummary,
 			plainContacts,
-			opportunityStatusByKey,
 		};
 	}, [isMobile, headerEmails, headerContacts, inboxEmailsForContactsExpandedList]);
 
@@ -3030,6 +3125,24 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		campaign?.userContactLists?.map((list) => list.name).join(', ') || '';
 	const fromName = campaign?.identity?.name || '';
 	const fromEmail = campaign?.identity?.email || '';
+
+	// Abridged research card top-aligned to the hovered row, docked left of the
+	// pinned list (pushed further left to clear the translucent band when the
+	// split map strip is visible). Rendered inside the
+	// [data-row-hover-research-anchor] wrapper.
+	const renderRowHoverResearchCard = () =>
+		isRowHoverResearchEnabled && rowHoverResearchContact ? (
+			<div
+				className="absolute pointer-events-none"
+				style={{
+					zIndex: 40,
+					top: `${rowHoverResearchTopPx}px`,
+					left: `${rowHoverResearchLeftPx}px`,
+				}}
+			>
+				<ContactResearchPanel contact={rowHoverResearchContact} variant="abridged" />
+			</div>
+		) : null;
 
 	const renderSharedBottomPanel = (kind: CampaignBottomPanelKind) => {
 		switch (kind) {
@@ -3748,19 +3861,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onSentClick={goToSent}
 										/>
 										{view === 'inbox' && (
-									<ContactsExpandedList
-										contacts={contactsForContactsExpandedList}
-										{...contactsListSupplementalProps}
-										{...contactsListTopNavProps}
-										isLoading={isContactsLoading}
-										campaign={campaign}
-										focusMode="inbox"
-										selectedInboxEmailId={selectedInboxEmailId}
-										onInboxEmailClick={handleInboxEmailClick}
-										onContactHover={handleResearchContactHover}
-										width={mainContactsPanelWidthPx}
-										height={mainContactsPanelHeightPx}
-									/>
+									<div data-row-hover-research-anchor style={{ position: 'relative' }}>
+										<ContactsExpandedList
+											contacts={contactsForContactsExpandedList}
+											{...contactsListSupplementalProps}
+											{...contactsListTopNavProps}
+											isLoading={isContactsLoading}
+											campaign={campaign}
+											focusMode="inbox"
+											selectedInboxEmailId={selectedInboxEmailId}
+											onInboxEmailClick={handleInboxEmailClick}
+											onContactHover={handleResearchContactHover}
+											onContactRowHover={
+												isRowHoverResearchEnabled ? handleContactRowHoverResearch : undefined
+											}
+											width={mainContactsPanelWidthPx}
+											height={mainContactsPanelHeightPx}
+										/>
+										{renderRowHoverResearchCard()}
+									</div>
 								)}
 								{view !== 'inbox' &&
 									(isDraftPreviewOpen ? (
@@ -3833,9 +3952,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										) : (
 											<div
+												data-row-hover-research-anchor
 												style={{
 													width: '376px',
 													height: '587px',
+													position: 'relative',
 												}}
 											>
 												<ContactsExpandedList
@@ -3860,14 +3981,21 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													}
 													onContactClick={handleResearchContactClick}
 													onContactHover={handleResearchContactHover}
+													onContactRowHover={
+														isRowHoverResearchEnabled
+															? handleContactRowHoverResearch
+															: undefined
+													}
 													width={376}
 													height={587}
 													minRows={8}
 												/>
+												{renderRowHoverResearchCard()}
 											</div>
 										)
 									) : (
 										<div
+											data-row-hover-research-anchor
 											style={{
 												width: `${mainContactsPanelWidthPx}px`,
 												overflow: 'visible',
@@ -3924,6 +4052,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														}
 														onContactClick={handleResearchContactClick}
 														onContactHover={handleResearchContactHover}
+														onContactRowHover={
+															isRowHoverResearchEnabled
+																? handleContactRowHoverResearch
+																: undefined
+														}
 														onDraftSelected={async (ids) => {
 															await handleGenerateDrafts(ids);
 														}}
@@ -3996,6 +4129,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													/>
 												</div>
 											)}
+											{renderRowHoverResearchCard()}
 										</div>
 									))}
 									</>
@@ -5194,11 +5328,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														position: 'relative',
 													}}
 												>
-													<div aria-hidden style={{ pointerEvents: 'none' }}>
-														<CampaignsTableMini currentCampaignId={campaign?.id} />
-													</div>
-													{/* Block clicks for now (read-only), but still eat events so the map doesn't grab them. */}
-													<div className="absolute inset-0" style={{ cursor: 'default' }} />
+													<CampaignsTableMini
+														currentCampaignId={campaign?.id}
+														onSelectCampaign={(id) =>
+															router.push(`${urls.murmur.campaign.detail(id)}?tab=all`)
+														}
+													/>
 												</div>
 
 												{/* Mini Strategy box */}
@@ -5219,6 +5354,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									)}
 								</div>
 							)}
+							{shouldDockOverviewContacts && (
 							<div
 								data-campaign-interactive-surface
 								className={cn(
@@ -5312,6 +5448,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										/>
 									</div>
 								</div>
+							)}
 							</div>
 						)}
 
@@ -5323,7 +5460,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* Row with both columns */}
 										<div className="flex flex-row items-start justify-center gap-[10px]">
 											{/* Left column: Campaign Header + Contacts + Research */}
-											<div className="flex flex-col" style={{ gap: '10px' }}>
+											<div
+												data-campaign-interactive-surface
+												className="flex flex-col"
+												style={{ gap: '10px' }}
+											>
 										{isProfileSidePanelOpen ? (
 							<ProfileSidePanelBox
 								profileName={profileSidePanelName}
@@ -5415,7 +5556,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											)}
 										</div>
 											{/* Right column: Writing box */}
-											<div>
+											<div data-campaign-interactive-surface>
 												<HybridPromptInput
 													trackFocusedField={trackFocusedField}
 													testMessage={campaign?.testMessage}
@@ -5473,6 +5614,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												{/* Left arrow */}
 												<button
 													type="button"
+													data-campaign-interactive-surface
 													onClick={goToPreviousTab}
 													className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
 													aria-label="Previous tab"
@@ -5590,6 +5732,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												{/* Right arrow */}
 												<button
 													type="button"
+													data-campaign-interactive-surface
 													onClick={goToNextTab}
 													className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
 													aria-label="Next tab"
@@ -5920,13 +6063,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 									) : isNarrowDesktop ? (
 										// Narrow desktop (952px - 1279px): center BOTH the left panel and drafts table together
-										// Fixed width container: left (330) + gap (10) + right (499) = 839px, centered with mx-auto
+										// Fixed width container: left (330) + gap (28) + right (499) = 857px, centered with mx-auto.
+										// Gap must stay > 18px: the open draft review's stacked back card pokes 18px
+										// left of the right column, and a smaller gap makes it overlap the left panels.
 										<div
 											className="flex flex-col items-center mx-auto"
-											style={{ width: '839px' }}
+											style={{ width: '857px' }}
 										>
 											<div
-												className="flex flex-row items-start gap-[10px] w-full"
+												className="flex flex-row items-start gap-[28px] w-full"
 												style={{ position: 'relative' }}
 											>
 												{/* Left column: Campaign Header + Email Structure + Research - fixed 330px */}
@@ -6629,7 +6774,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												conversations={mobileSummaryData.conversations}
 												drafts={mobileSummaryData.drafts}
 												plainContacts={mobileSummaryData.plainContacts}
-												opportunityStatusByKey={mobileSummaryData.opportunityStatusByKey}
 												contactByEmail={campaignContactsByEmail}
 												scrollRequest={mobileSummaryScrollRequest}
 												onOpenConversation={(key) =>
@@ -7925,8 +8069,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										)}
 									</div>
-								) : isInboxTabStacked ? (
-									// Stacked layout (952px - 1279px): keep the left inbox column aligned with other tabs.
+								) : isInboxTabStacked || isNarrowDesktop ? (
+									// Stacked layout (952px - 1317px): keep the left inbox column aligned with other tabs.
 									<div
 										className="flex flex-col items-center mx-auto"
 										style={{ width: '927px' }}

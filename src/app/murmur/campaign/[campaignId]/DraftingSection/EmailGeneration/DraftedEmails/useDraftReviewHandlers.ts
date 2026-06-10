@@ -486,6 +486,8 @@ export const useDraftReviewHandlers = ({
 							? user?.customDomain
 							: user?.murmurEmail,
 					replyToEmail: user?.replyToEmail ?? user?.murmurEmail ?? undefined,
+					template: 'newMessage',
+					campaignId: campaign.id,
 				});
 
 				if (res.success) {

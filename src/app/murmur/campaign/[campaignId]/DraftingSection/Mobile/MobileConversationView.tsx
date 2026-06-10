@@ -32,6 +32,11 @@ import {
 const USER_AVATAR_FILL = '#67C76D';
 const CONTACT_AVATAR_FILL = '#86C7E8';
 const INBOUND_BLOCK_FILL = '#E5F1FF';
+// Messenger (3+ item) thread colors — keep in sync with the desktop campaign
+// inbox's INBOX_MESSENGER_* constants (InboxSection.tsx).
+const MESSENGER_THREAD_BACKGROUND = '#DCF1FF';
+const MESSENGER_OUTBOUND_BACKGROUND = '#ACD2FF';
+const MESSENGER_INBOUND_BACKGROUND = '#FFFFFF';
 
 const getAvatarInitial = (value: string): string =>
 	value.trim().charAt(0).toUpperCase() || '?';
@@ -55,14 +60,20 @@ const getMessageBody = (message: InboxConversationMessage): string =>
 	getInboxMessageSnippet(message) ||
 	'No content';
 
-const Avatar: FC<{ initial: string; fill: string; size?: number }> = ({
+const Avatar: FC<{ initial: string; fill: string; size?: number; fontSize?: number }> = ({
 	initial,
 	fill,
 	size = 25,
+	fontSize,
 }) => (
 	<span
 		className="rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold"
-		style={{ width: size, height: size, backgroundColor: fill, fontSize: size * 0.52 }}
+		style={{
+			width: size,
+			height: size,
+			backgroundColor: fill,
+			fontSize: fontSize ?? size * 0.52,
+		}}
 	>
 		{initial}
 	</span>
@@ -100,6 +111,11 @@ export const MobileConversationView: FC<MobileConversationViewProps> = ({
 
 	const latestMessage = conversation.latestMessage;
 	const latestInbound = conversation.latestInboundMessage;
+
+	// Mirrors the desktop inbox rule exactly (InboxSection.tsx
+	// selectedVisibleThreadItemCount >= 3): short threads keep the email-block
+	// UI; 3+ visible items (messages + optimistic replies) render as chat bubbles.
+	const usesMessengerLayout = conversation.messages.length + pendingReplies.length >= 3;
 
 	// Default expansion: the latest inbound message, plus the latest message when it's
 	// the user's own reply. Older messages collapse to one-line rows.
@@ -239,6 +255,50 @@ export const MobileConversationView: FC<MobileConversationViewProps> = ({
 	const renderMessage = (message: InboxConversationMessage) => {
 		const isSent = Boolean(message.isSent);
 		const senderName = isSent ? userName : contactName;
+
+		if (usesMessengerLayout) {
+			return (
+				<div
+					key={`${isSent ? 'sent' : 'inbound'}-${message.id}`}
+					className="flex w-full items-end"
+					style={{
+						justifyContent: isSent ? 'flex-end' : 'flex-start',
+						gap: '8px',
+						flexShrink: 0,
+					}}
+				>
+					{/* Desktop messenger mode uses green for inbound avatars (not the
+					    contact blue) — keep parity. */}
+					{!isSent && (
+						<Avatar
+							initial={getAvatarInitial(senderName)}
+							fill={USER_AVATAR_FILL}
+							size={24}
+							fontSize={13}
+						/>
+					)}
+					<div
+						className="whitespace-pre-wrap"
+						style={{
+							maxWidth: '78%',
+							backgroundColor: isSent
+								? MESSENGER_OUTBOUND_BACKGROUND
+								: MESSENGER_INBOUND_BACKGROUND,
+							border: '2px solid #000000',
+							borderRadius: isSent ? '20px 20px 6px 20px' : '20px 20px 20px 6px',
+							padding: '8px 12px',
+							boxSizing: 'border-box',
+							fontSize: '13px',
+							lineHeight: 1.35,
+							color: '#000000',
+						}}
+					>
+						{getMessageBody(message)}
+					</div>
+				</div>
+			);
+		}
+
 		const isExpanded = expandedIds.has(message.id);
 
 		if (!isExpanded) {
@@ -315,32 +375,64 @@ export const MobileConversationView: FC<MobileConversationViewProps> = ({
 			/>
 
 			<div
-				className="flex-1 min-h-0 overflow-y-auto"
-				style={{ WebkitOverflowScrolling: 'touch' }}
+				className={cn(
+					'flex-1 min-h-0 overflow-y-auto',
+					usesMessengerLayout && 'flex flex-col gap-[14px] px-[16px] py-[16px]'
+				)}
+				style={{
+					WebkitOverflowScrolling: 'touch',
+					backgroundColor: usesMessengerLayout ? MESSENGER_THREAD_BACKGROUND : undefined,
+				}}
 			>
 				{conversation.messages.map(renderMessage)}
 				{/* Optimistic replies not yet in the inbound feed */}
-				{pendingReplies.map((reply, index) => (
-					<div key={`pending-${index}`} className="border-b border-black/15 bg-white">
-						<div className="flex items-center gap-[10px] px-4 pt-[13px]">
-							<Avatar initial={getAvatarInitial(userName)} fill={USER_AVATAR_FILL} />
-							<span className="font-inter text-[15px] font-bold text-black truncate">
-								{userName}
-							</span>
-							<span className="ml-auto flex-shrink-0 font-inter text-[12px] text-black/70">
-								{formatThreadTimestamp(reply.timestamp)}
-							</span>
-						</div>
-						<div className="px-4 pb-[14px]">
+				{pendingReplies.map((reply, index) =>
+					usesMessengerLayout ? (
+						<div
+							key={`pending-${index}`}
+							className="flex w-full justify-end"
+							style={{ flexShrink: 0 }}
+						>
 							<div
-								className="font-inter text-[14px] leading-[1.4] text-black mt-[8px] pl-[35px] [&_p]:m-0"
+								className="[&_p]:m-0"
+								style={{
+									maxWidth: '78%',
+									backgroundColor: MESSENGER_OUTBOUND_BACKGROUND,
+									border: '2px solid #000000',
+									borderRadius: '20px 20px 6px 20px',
+									padding: '8px 12px',
+									boxSizing: 'border-box',
+									fontSize: '13px',
+									lineHeight: 1.35,
+									color: '#000000',
+								}}
 								dangerouslySetInnerHTML={{
 									__html: sanitizeMessageHtml(reply.message),
 								}}
 							/>
 						</div>
-					</div>
-				))}
+					) : (
+						<div key={`pending-${index}`} className="border-b border-black/15 bg-white">
+							<div className="flex items-center gap-[10px] px-4 pt-[13px]">
+								<Avatar initial={getAvatarInitial(userName)} fill={USER_AVATAR_FILL} />
+								<span className="font-inter text-[15px] font-bold text-black truncate">
+									{userName}
+								</span>
+								<span className="ml-auto flex-shrink-0 font-inter text-[12px] text-black/70">
+									{formatThreadTimestamp(reply.timestamp)}
+								</span>
+							</div>
+							<div className="px-4 pb-[14px]">
+								<div
+									className="font-inter text-[14px] leading-[1.4] text-black mt-[8px] pl-[35px] [&_p]:m-0"
+									dangerouslySetInnerHTML={{
+										__html: sanitizeMessageHtml(reply.message),
+									}}
+								/>
+							</div>
+						</div>
+					)
+				)}
 				<div ref={bottomRef} />
 			</div>
 

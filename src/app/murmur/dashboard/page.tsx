@@ -524,6 +524,15 @@ const MAP_RESULTS_BOTTOM_SEARCH_BOX = {
 	opacity: 0.8,
 } as const;
 
+// Map-view chrome width breakpoints, in *layout px* (window.innerWidth ÷ the map-view
+// zoom — the chrome lays out under the html `zoom` var, so raw-px thresholds would
+// fire at different visual states per monitor). Below MID the centered top assembly
+// (~616px visual) collides with the right results panel footprint, so the centered
+// chrome re-centers over the map strip left of the panel; below COMPRESSED even that
+// strip is too narrow and the results panel becomes a full-width bottom sheet.
+const MAP_CHROME_MID_MAX_LAYOUT_WIDTH_PX = 1490;
+const MAP_CHROME_COMPRESSED_MAX_LAYOUT_WIDTH_PX = 1080;
+
 const INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX = {
 	width: 418,
 	height: 39,
@@ -1491,21 +1500,32 @@ const buildInitialDashboardSearchSuggestions = (
 const DASHBOARD_MAP_ZOOM_DEFAULT = 0.85;
 // Baseline zoom for the non-map dashboard (initial/hero + results views). The fullscreen
 // map view keeps its own resolution-aware zoom anchored to DASHBOARD_MAP_ZOOM_DEFAULT.
-// Unlike the map tables (tuned for physical chrome size), this keeps the hero cluster's
-// footprint relative to the viewport: 0.81 at/below a laptop-class anchor, growing
-// linearly on larger monitors so the layout doesn't shrink into a sea of map.
+// At/above the 1512×945 anchor the zoom grows with the monitor (so the layout doesn't
+// shrink into a sea of map). Below the anchor it HOLDS at 0.81 — the hero keeps its
+// full size and the map margin around it compresses — until the window can no longer
+// fit the hero cluster's fixed footprint; from there it scales down just enough to
+// fit, so the content stays as big as the window allows while remaining one uniform
+// unit (every hero element is anchor-frozen px).
 const DASHBOARD_INITIAL_ZOOM = 0.81;
 const DASHBOARD_INITIAL_ZOOM_ANCHOR_W = 1512;
 const DASHBOARD_INITIAL_ZOOM_ANCHOR_H = 945;
 const DASHBOARD_INITIAL_ZOOM_MAX = 1.15;
+const DASHBOARD_INITIAL_ZOOM_MIN = 0.2;
+// Hero cluster footprint in CSS px at zoom 1. Width: the search input-group is 603px
+// × its 1.08 inner scale ≈ 651, plus breathing room. Height: logo offset through the
+// strategy box bottom ≈ 761, plus the Ask-Anything bar pinned underneath.
+const DASHBOARD_HERO_FIT_W = 700;
+const DASHBOARD_HERO_FIT_H = 840;
 const computeDashboardInitialZoomForViewport = (w: number, h: number): number => {
 	const scale = Math.min(
 		w / DASHBOARD_INITIAL_ZOOM_ANCHOR_W,
 		h / DASHBOARD_INITIAL_ZOOM_ANCHOR_H,
 	);
+	const grown = DASHBOARD_INITIAL_ZOOM * Math.max(1, scale);
+	const fit = Math.min(w / DASHBOARD_HERO_FIT_W, h / DASHBOARD_HERO_FIT_H);
 	return clampNumber(
-		DASHBOARD_INITIAL_ZOOM * scale,
-		DASHBOARD_INITIAL_ZOOM,
+		Math.min(grown, fit),
+		DASHBOARD_INITIAL_ZOOM_MIN,
 		DASHBOARD_INITIAL_ZOOM_MAX,
 	);
 };
@@ -2491,6 +2511,8 @@ type MapBottomSearchFollowupBoxProps = {
 	onRadiusToggle: () => void;
 	isProfileModeEnabled: boolean;
 	onProfileToggle: () => void;
+	// Positional overrides (e.g. flip above the search bar in compressed chrome).
+	style?: React.CSSProperties;
 };
 
 const MapBottomSearchFollowupBox = memo(
@@ -2505,6 +2527,7 @@ const MapBottomSearchFollowupBox = memo(
 		onRadiusToggle,
 		isProfileModeEnabled,
 		onProfileToggle,
+		style: styleOverride,
 	}: MapBottomSearchFollowupBoxProps) => {
 		const segmentBox = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_SEGMENT_BOX;
 		const leftTileBox = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_LEFT_TILE_BOX;
@@ -2542,6 +2565,7 @@ const MapBottomSearchFollowupBox = memo(
 					border: `${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.borderWidth}px solid ${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.borderColor}`,
 					backgroundColor: MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.backgroundColor,
 					boxSizing: 'border-box',
+					...styleOverride,
 				}}
 			>
 				<button
@@ -3463,28 +3487,44 @@ const DashboardContent = () => {
 	const [userLocationName, setUserLocationName] = useState<string | null>(null);
 	const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
-	// Narrowest desktop detection (< 952px) - single column layout for map view
 	const [isBelowMd, setIsBelowMd] = useState(false);
-	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
 	const [isXlDesktop, setIsXlDesktop] = useState(false);
 	const [viewportHeight, setViewportHeight] = useState(0);
+	// Map-view chrome width state: 'full' (today's layout), 'mid' (centered chrome
+	// re-centers over the map strip beside the right panel), 'compressed' (results
+	// panel becomes a bottom sheet under the top-half map).
+	const [mapChromeState, setMapChromeState] = useState<'full' | 'mid' | 'compressed'>(
+		'full'
+	);
 
-	// Detect narrow desktop breakpoint
-	useEffect(() => {
+	// Detect desktop width breakpoints. Layout effect so a narrow first paint (e.g. a
+	// ?fromHome=1 deep link straight into map view) never flashes the wide chrome.
+	useLayoutEffect(() => {
 		if (typeof window === 'undefined') return;
 
 		const handleResize = () => {
 			const width = window.innerWidth;
 			setIsBelowMd(width < 768);
-			setIsNarrowestDesktop(width < 952);
 			setIsXlDesktop(width >= 1280);
 			setViewportHeight(window.innerHeight);
+			// Same zoom the map-view layout effect applies, so chrome state and zoom
+			// always change together from the same inputs.
+			const layoutWidth =
+				width / computeDashboardMapZoomForViewport(width, window.innerHeight);
+			setMapChromeState(
+				layoutWidth < MAP_CHROME_COMPRESSED_MAX_LAYOUT_WIDTH_PX
+					? 'compressed'
+					: layoutWidth < MAP_CHROME_MID_MAX_LAYOUT_WIDTH_PX
+						? 'mid'
+						: 'full'
+			);
 		};
 
 		handleResize();
 		window.addEventListener('resize', handleResize);
 		return () => window.removeEventListener('resize', handleResize);
 	}, []);
+	const isCompressedMapChrome = mapChromeState === 'compressed';
 
 	// Helper to trigger search with a specific "where" value (called when clicking state from dropdown)
 	const triggerSearchWithWhere = (
@@ -3704,8 +3744,9 @@ const DashboardContent = () => {
 							: {
 									position: 'absolute',
 									top: 'calc(100% + 10px)',
-									left: isBelowMd ? '50%' : dropdownLeft,
-									transform: isBelowMd ? 'translateX(-50%)' : undefined,
+									// Anchored in zoomed hero px; the root zoom keeps it
+									// proportional at every window width.
+									left: dropdownLeft,
 									height: dropdownHeight,
 									transition: dropdownTransition,
 									willChange: 'left, height',
@@ -4163,12 +4204,11 @@ const DashboardContent = () => {
 		};
 	}, [isMobile]);
 
-	// Responsive sizing for hero logo (shrink with viewport width, but keep sensible min/max)
-	// NOTE: We keep the same aspect ratio as the previous desktop size (300x79).
-	const logoWidth = isMobile ? 'clamp(150px, 45vw, 190px)' : 'clamp(180px, 30vw, 300px)';
-	const logoHeight = isMobile
-		? 'clamp(39.5px, 11.85vw, 50px)'
-		: 'clamp(47.4px, 7.9vw, 79px)';
+	// Hero logo sizing. Desktop is frozen at the 1512×945 anchor size (300x79): the whole
+	// dashboard scales uniformly via the root zoom, so any vw-based sizing here would
+	// double-scale and break the hero's proportions at narrow window widths.
+	const logoWidth = isMobile ? 'clamp(150px, 45vw, 190px)' : '300px';
+	const logoHeight = isMobile ? 'clamp(39.5px, 11.85vw, 50px)' : '79px';
 	const hasProblematicBrowser = isProblematicBrowser();
 	useMe(); // Hook call for side effects
 	const tabToggleTrackRef = useRef<HTMLDivElement>(null);
@@ -4599,9 +4639,11 @@ const DashboardContent = () => {
 	const DASHBOARD_COMPACT_CLASS = 'murmur-dashboard-compact';
 	const DASHBOARD_ZOOM_VAR = '--murmur-dashboard-zoom';
 	const DASHBOARD_INITIAL_ZOOM_VAR = '--murmur-dashboard-initial-zoom';
+	const DASHBOARD_VIEWPORT_H_VAR = '--murmur-dashboard-viewport-h';
 
 	// Apply dashboard-only compact class + viewport-aware zoom; clear on mobile/unmount.
-	useEffect(() => {
+	// Layout effect so narrow windows never paint a frame at the unscaled fallback zoom.
+	useLayoutEffect(() => {
 		if (isMobile === null) return;
 		if (isMobile) {
 			document.documentElement.classList.remove(DASHBOARD_COMPACT_CLASS);
@@ -4620,12 +4662,20 @@ const DashboardContent = () => {
 			);
 			// Publish what the non-map dashboard uses on this monitor (the map-view
 			// campaigns dropdown reads it), and pin the page zoom to it unless map view
-			// owns the var (the map-view layout effect adds DASHBOARD_MAP_COMPACT_CLASS
-			// before passive effects run in the same commit, so we never pave over the
-			// per-monitor map zoom).
+			// owns the var. On a map-view commit the map-view layout effect is declared
+			// after this one, so it runs later in the same pre-paint flush and overwrites
+			// the var; the class check covers the window-resize listener path so we never
+			// pave over the per-monitor map zoom while map view is up.
 			document.documentElement.style.setProperty(
 				DASHBOARD_INITIAL_ZOOM_VAR,
 				zoom.toFixed(3),
+			);
+			// Real window height in px: under the root zoom, 100vh renders at
+			// 100vh·zoom (shorter than the window), so the scroll-locked landing
+			// wrapper sizes itself with `viewport-h / zoom` instead of h-screen.
+			document.documentElement.style.setProperty(
+				DASHBOARD_VIEWPORT_H_VAR,
+				`${window.innerHeight}px`,
 			);
 			if (!document.documentElement.classList.contains(DASHBOARD_MAP_COMPACT_CLASS)) {
 				document.documentElement.style.setProperty(DASHBOARD_ZOOM_VAR, zoom.toFixed(3));
@@ -4640,6 +4690,7 @@ const DashboardContent = () => {
 			document.documentElement.classList.remove(DASHBOARD_COMPACT_CLASS);
 			document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
 			document.documentElement.style.removeProperty(DASHBOARD_INITIAL_ZOOM_VAR);
+			document.documentElement.style.removeProperty(DASHBOARD_VIEWPORT_H_VAR);
 		};
 	}, [isMobile]);
 
@@ -4705,10 +4756,10 @@ const DashboardContent = () => {
 		// Don't auto-trigger auth flows; only run if already signed in.
 		if (!isSignedIn) return;
 		// Wait for the mobile/desktop probe to resolve before flipping into map view. Two
-		// dashboard effects co-own `--murmur-dashboard-zoom`: a useLayoutEffect sets the
-		// per-monitor map zoom, and a useEffect on the same commit sets the non-map baseline
-		// (DASHBOARD_INITIAL_ZOOM) — but only when map view doesn't already own the var (it
-		// checks for DASHBOARD_MAP_COMPACT_CLASS). Gating on `isMobile !== null` still makes
+		// dashboard layout effects co-own `--murmur-dashboard-zoom`: the map-view one sets
+		// the per-monitor map zoom, and the earlier-declared one sets the viewport-aware
+		// non-map baseline — but only when map view doesn't already own the var (it checks
+		// for DASHBOARD_MAP_COMPACT_CLASS). Gating on `isMobile !== null` still makes
 		// the curated path fire on a later commit so the two effects can't collide in the
 		// very render where `isMobile` first resolves (the historical "everything is tiny"
 		// bug).
@@ -5633,6 +5684,20 @@ const DashboardContent = () => {
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
 	const [isMapSearchEngaged, setIsMapSearchEngaged] = useState(true);
 	const [mapSearchAutoFitRequestNonce, setMapSearchAutoFitRequestNonce] = useState(0);
+	// Crossing the compressed-chrome boundary hides/shows the left rail and swaps the
+	// results panel between the right edge and a bottom sheet: never strand the
+	// area-select tool with its toggle hidden, and re-fit the camera so markers stay
+	// inside the newly visible map area.
+	const prevCompressedMapChromeRef = useRef<boolean | null>(null);
+	useEffect(() => {
+		const prev = prevCompressedMapChromeRef.current;
+		prevCompressedMapChromeRef.current = isCompressedMapChrome;
+		if (prev === null || prev === isCompressedMapChrome) return;
+		if (isCompressedMapChrome) {
+			setActiveMapTool((tool) => (tool === 'select' ? 'grab' : tool));
+		}
+		setMapSearchAutoFitRequestNonce((nonce) => nonce + 1);
+	}, [isCompressedMapChrome]);
 	const lastMapSearchEngagementKeyRef = useRef('');
 	// Per-category visibility driven by the tall-stack tile toggles in grab mode.
 	// True = tile is colored (visible on map); false = tile is gray (hidden).
@@ -5752,12 +5817,12 @@ const DashboardContent = () => {
 	);
 	// Mobile pick flow renders its own campaign header over the map, so metrics must
 	// load there too — even during the pre-results window (isMapView still false) and
-	// on phone widths (isNarrowestDesktop is always true under 952px).
+	// on phone widths (the compressed chrome state is always active there).
 	const isMobileAddToCampaignSearch = isMobile === true && isAddToCampaignMode;
 	const shouldLoadDashboardMapCampaignHeaderMetrics = isMobileAddToCampaignSearch
 		? Boolean(dashboardMapCampaignForHeader)
 		: isMapView &&
-			!isNarrowestDesktop &&
+			!isCompressedMapChrome &&
 			!hasNoSearchResults &&
 			Boolean(dashboardMapCampaignForHeader);
 	const { data: dashboardMapHeaderContacts } = useGetContacts({
@@ -5890,7 +5955,6 @@ const DashboardContent = () => {
 	// One by one from top to bottom each row flips to its normal white state
 	// with content, like the list is being populated in real-time.
 	const mapPanelRowsDesktopRef = useRef<HTMLDivElement>(null);
-	const mapPanelRowsNarrowRef = useRef<HTMLDivElement>(null);
 	const prevMapResultsLoadingRef = useRef(isMapResultsLoading);
 	const cascadeTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -5917,7 +5981,7 @@ const DashboardContent = () => {
 		for (const t of cascadeTimersRef.current) clearTimeout(t);
 		cascadeTimersRef.current = [];
 
-		const refs = [mapPanelRowsDesktopRef.current, mapPanelRowsNarrowRef.current];
+		const refs = [mapPanelRowsDesktopRef.current];
 		for (const container of refs) {
 			if (!container) continue;
 			const allRows = Array.from(container.children) as HTMLElement[];
@@ -6058,6 +6122,11 @@ const DashboardContent = () => {
 	const MAP_VIEW_UI_SCALE = isMobile ? 1 : 0.85;
 	const MAP_VIEW_PANEL_SCALE = isMobile ? 1 : 0.95;
 	const MAP_VIEW_BOTTOM_SEARCH_SCALE = isMobile ? 1 : 0.85;
+	// Right results panel footprint (433px box at right:10px, scaled, origin top-right).
+	const MAP_VIEW_RIGHT_PANEL_EDGE_PX = Math.round(10 + 433 * MAP_VIEW_PANEL_SCALE);
+	// The panel edge plus a comfort gap — what centered chrome reserves on the right
+	// when it re-centers over the map strip in the mid chrome state.
+	const MAP_VIEW_RIGHT_PANEL_FOOTPRINT_PX = MAP_VIEW_RIGHT_PANEL_EDGE_PX + 13;
 	const mapViewCampaignHeaderTopOffsetPx =
 		MAP_VIEW_CAMPAIGN_HEADER_HEIGHT_PX * MAP_VIEW_PANEL_SCALE +
 		MAP_VIEW_CAMPAIGN_HEADER_GAP_PX;
@@ -7062,7 +7131,7 @@ const DashboardContent = () => {
 		isXlDesktop &&
 		!isMapResultsLoading &&
 		!hasNoSearchResults &&
-		!isNarrowestDesktop;
+		!isCompressedMapChrome;
 
 	const isMapPanelCreateCampaignVisible =
 		!shouldUseDynamicMapCreateCampaignCta || isPointerInMapSidePanel;
@@ -7565,6 +7634,10 @@ const DashboardContent = () => {
 			: isWeddingPlannersSearch;
 	const shouldShowMapResultsSidePanel =
 		!hasNoSearchResults || displayedMapPanelContacts.length > 0;
+	// Mid chrome state only matters while the right panel actually occupies the right
+	// edge — with no panel there is nothing to re-center away from.
+	const isMidMapChrome =
+		isMapView && mapChromeState === 'mid' && shouldShowMapResultsSidePanel;
 
 	// Full objects for the selected contacts so the map can keep their white halos rendered
 	// even after the dataset swaps (e.g. disengaging the search to the ambient atlas), where
@@ -8955,6 +9028,33 @@ const DashboardContent = () => {
 		};
 	}, [lastFreeTextArgs]);
 
+	// Compressed chrome: the bottom sheet covers the lower half of the viewport, so
+	// camera fits must land markers in the visible top-half strip. Values are real px —
+	// the map canvas counter-zooms the dashboard zoom var, and viewportHeight is real px.
+	// Desktop only: phones satisfy the width check too but render the mobile chrome,
+	// which has no bottom sheet.
+	const compressedMapChromePadding = useMemo(
+		() =>
+			isMapView &&
+			isMobile === false &&
+			isCompressedMapChrome &&
+			shouldShowMapResultsSidePanel
+				? {
+						top: 120,
+						right: 40,
+						bottom: Math.round(viewportHeight / 2) + 24,
+						left: 40,
+					}
+				: undefined,
+		[
+			isMapView,
+			isMobile,
+			isCompressedMapChrome,
+			shouldShowMapResultsSidePanel,
+			viewportHeight,
+		]
+	);
+
 	const persistentMapProps = useMemo<SearchResultsMapProps>(
 		() => ({
 			weatherMood: globeWeatherMood,
@@ -8971,11 +9071,11 @@ const DashboardContent = () => {
 			cameraPadding:
 				isMobile === true && isAddToCampaignMode
 					? { top: 170, right: 30, bottom: 120, left: 30 }
-					: undefined,
+					: compressedMapChromePadding,
 			autoFitPadding:
 				isMobile === true && isAddToCampaignMode
 					? { top: 170, right: 30, bottom: 120, left: 30 }
-					: undefined,
+					: compressedMapChromePadding,
 			autoSpin: shouldSpinBackgroundMap,
 			contacts: shouldShowSearchGeometryOnMap ? contactsForMap : [],
 			selectedContacts:
@@ -9039,8 +9139,8 @@ const DashboardContent = () => {
 			// right:10px, scaled, origin top-right) so the event popup places to the right of
 			// a marker only when it clears the panel, and flips left otherwise.
 			rightSafeAreaPx:
-				isMapView && !isNarrowestDesktop && shouldShowMapResultsSidePanel
-					? Math.round(10 + 433 * MAP_VIEW_PANEL_SCALE)
+				isMapView && !isCompressedMapChrome && shouldShowMapResultsSidePanel
+					? MAP_VIEW_RIGHT_PANEL_EDGE_PX
 					: 0,
 			renderEventPopupContent: isMapView ? renderEventPopupContent : undefined,
 		}),
@@ -9052,6 +9152,7 @@ const DashboardContent = () => {
 			eventsForMap,
 			renderEventPopupContent,
 			canDisengageMapSearch,
+			compressedMapChromePadding,
 			contactsForMap,
 			handleRadiusCenterChange,
 			globeNightLighting,
@@ -9077,7 +9178,7 @@ const DashboardContent = () => {
 			isLoadingContacts,
 			isMapView,
 			isMobile,
-			isNarrowestDesktop,
+			isCompressedMapChrome,
 			isRefetchingContacts,
 			isSearchPending,
 			lockedStateNameForMap,
@@ -9086,7 +9187,7 @@ const DashboardContent = () => {
 			mapGrabUncategorizedActive,
 			mapSearchAutoFitRequestNonce,
 			mapPresentation,
-			MAP_VIEW_PANEL_SCALE,
+			MAP_VIEW_RIGHT_PANEL_EDGE_PX,
 			mapZoomControlRequest,
 			searchWhatForMap,
 			selectedAreaBoundsForMap,
@@ -9121,12 +9222,14 @@ const DashboardContent = () => {
 	}, [persistentMapConfig, setPersistentMapConfig]);
 
 	// The posted-event card is laid out at a fixed 420×121 design size, but in the
-	// desktop results column it must match the (narrower) result-row width. We
-	// measure the available width and scale the whole card down proportionally so
-	// it keeps its aspect ratio instead of overflowing to the right.
+	// desktop results column it must match the result-row width. We measure the
+	// available width: narrower columns scale the whole card down proportionally
+	// (keeping its aspect ratio instead of overflowing to the right), while wider
+	// columns stretch the card to the full row width like the contact rows.
 	// NOTE: these hooks must stay above the early `isMobile` returns below —
 	// React requires the same hook order on every render.
 	const [postedEventCardScale, setPostedEventCardScale] = useState(1);
+	const [postedEventCardStretch, setPostedEventCardStretch] = useState(false);
 	const postedEventCardResizeObserverRef = useRef<ResizeObserver | null>(null);
 	const measurePostedEventCard = useCallback((node: HTMLDivElement | null) => {
 		postedEventCardResizeObserverRef.current?.disconnect();
@@ -9136,6 +9239,7 @@ const DashboardContent = () => {
 			const width = node.clientWidth;
 			if (width > 0) {
 				setPostedEventCardScale(Math.min(1, width / MAP_POSTED_EVENT_CARD_WIDTH_PX));
+				setPostedEventCardStretch(width >= MAP_POSTED_EVENT_CARD_WIDTH_PX);
 			}
 		};
 		update();
@@ -9186,8 +9290,6 @@ const DashboardContent = () => {
 						listContacts={displayedMapPanelContacts}
 						selectedContactIds={selectedContacts}
 						onToggleContact={handleMapPanelRowSelect}
-						onSelectAll={() => handleSelectAll(displayedMapPanelContacts)}
-						onDeselectAll={() => setSelectedContacts([])}
 						isLoading={isMapResultsLoading}
 						hasNoResults={hasNoSearchResults}
 						hasSearched={hasSearched}
@@ -9434,10 +9536,14 @@ const DashboardContent = () => {
 			</>
 		);
 
-		// Outer wrapper fills the result-row width (capped at the design width) and
-		// reserves the proportional height via aspect-ratio; the inner card is laid
-		// out at its native 420×121 size and scaled down to fit, so the whole card —
-		// text, badges, banners and button — shrinks together instead of overflowing.
+		// Outer wrapper fills the result-row width. In columns narrower than the
+		// 420px design width it caps at that width, reserves the proportional
+		// height via aspect-ratio, and scales the natively-laid-out 420×121 card
+		// down to fit, so the whole card — text, badges, banners and button —
+		// shrinks together instead of overflowing. In wider columns the card
+		// stretches to the full row width (its layers are left/right-anchored)
+		// so it lines up with the contact rows instead of floating centered.
+		const stretchToRowWidth = !isNarrow && postedEventCardStretch;
 		return (
 			<div
 				key={`posted-event-${topPostedMapEvent.id}`}
@@ -9445,12 +9551,14 @@ const DashboardContent = () => {
 				className="mx-auto flex-shrink-0 overflow-hidden select-none"
 				style={{
 					width: '100%',
-					maxWidth: `${MAP_POSTED_EVENT_CARD_WIDTH_PX}px`,
+					maxWidth: stretchToRowWidth
+						? undefined
+						: `${MAP_POSTED_EVENT_CARD_WIDTH_PX}px`,
 					// Match the inner card's rounding so the wrapper's own background
 					// (which the results-cascade animation paints white) is clipped to
 					// the rounded shape instead of bleeding into the corners.
 					borderRadius: '8px',
-					...(isNarrow
+					...(isNarrow || stretchToRowWidth
 						? {}
 						: {
 								aspectRatio: `${MAP_POSTED_EVENT_CARD_WIDTH_PX} / ${MAP_POSTED_EVENT_CARD_HEIGHT_PX}`,
@@ -9460,10 +9568,16 @@ const DashboardContent = () => {
 				<div
 					className="relative overflow-hidden"
 					style={{
-						width: isNarrow ? '100%' : `${MAP_POSTED_EVENT_CARD_WIDTH_PX}px`,
+						width:
+							isNarrow || stretchToRowWidth
+								? '100%'
+								: `${MAP_POSTED_EVENT_CARD_WIDTH_PX}px`,
 						height: `${MAP_POSTED_EVENT_CARD_HEIGHT_PX}px`,
 						transformOrigin: 'top left',
-						transform: isNarrow ? undefined : `scale(${postedEventCardScale})`,
+						transform:
+							isNarrow || stretchToRowWidth
+								? undefined
+								: `scale(${postedEventCardScale})`,
 						...cardSurfaceStyle,
 					}}
 				>
@@ -9789,6 +9903,10 @@ const DashboardContent = () => {
 	return (
 		<>
 			<style jsx global>{`
+				/* Height note: under the root dashboard zoom, 100vh renders at 100vh·zoom —
+				   shorter than the real window — so html/body (overflow hidden) would clip
+				   the hero cluster's bottom on short monitors. Real innerHeight (published
+				   as --murmur-dashboard-viewport-h) ÷ zoom always renders one full window. */
 				html:has(
 					[data-dashboard-scroll-lock='true']:not([data-campaign-finder-open='true']):not(
 							[data-calendar-panel-open='true']
@@ -9800,7 +9918,10 @@ const DashboardContent = () => {
 						)
 				) {
 					overflow: hidden !important;
-					height: 100vh !important;
+					height: calc(
+						var(--murmur-dashboard-viewport-h, 100vh) /
+							var(--murmur-dashboard-zoom, 1)
+					) !important;
 					overscroll-behavior: none !important;
 				}
 				html:has([data-dashboard-scroll-lock='true'][data-campaign-finder-open='true']),
@@ -9808,7 +9929,10 @@ const DashboardContent = () => {
 				body:has([data-dashboard-scroll-lock='true'][data-campaign-finder-open='true']),
 				body:has([data-dashboard-scroll-lock='true'][data-calendar-panel-open='true']) {
 					overflow: visible !important;
-					height: 100vh !important;
+					height: calc(
+						var(--murmur-dashboard-viewport-h, 100vh) /
+							var(--murmur-dashboard-zoom, 1)
+					) !important;
 					overscroll-behavior: none !important;
 				}
 				#map-search-tray-what-dropdown-container .scrollbar-hide,
@@ -9878,8 +10002,7 @@ const DashboardContent = () => {
 			{!hasSearched &&
 				activeTab === 'search' &&
 				!fromHomeParam &&
-				!isMapView &&
-				!isNarrowestDesktop && (
+				!isMapView && (
 					<div
 						className="fixed left-1/2 pointer-events-none"
 						onMouseEnter={cancelMapBottomSearchFollowupPreviewClear}
@@ -9998,6 +10121,17 @@ const DashboardContent = () => {
 						? 'h-screen overflow-hidden'
 						: undefined
 				}
+				style={
+					shouldLockLandingDashboardScroll && !isOverflowingDashboardPanelOpen
+						? {
+								// Under the root zoom, h-screen renders at 100vh·zoom — shorter
+								// than the real window — and clips the hero cluster's bottom on
+								// short monitors. Real innerHeight ÷ zoom always renders exactly
+								// one full window tall regardless of vh-under-zoom semantics.
+								height: `calc(var(${DASHBOARD_VIEWPORT_H_VAR}, 100vh) / var(${DASHBOARD_ZOOM_VAR}, 1))`,
+							}
+						: undefined
+				}
 			>
 				<AppLayout>
 					<div
@@ -10048,15 +10182,16 @@ const DashboardContent = () => {
 								</div>
 
 								<div
-									className={`search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 max-[480px]:px-2 !z-[50] ${
+									className={`search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 !z-[50] ${
 										hasSearched ? 'search-bar-active' : ''
 									}`}
 								>
 									<div
 										className="origin-center w-full"
 										style={{
-											transform:
-												'scale(clamp(0.84, calc(0.72 + (100vw / 3333px)), 1.08))',
+											// Frozen at the saturated anchor value: the root zoom owns
+											// responsive scaling, so a vw-based scale would double-apply.
+											transform: 'scale(1.08)',
 										}}
 									>
 										<div className="search-bar-inner">
@@ -10180,8 +10315,8 @@ const DashboardContent = () => {
 																						className={`search-wave-input !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent ${
 																							inboxView
 																								? '!h-[39px] !border-0'
-																								: '!h-[72px] max-[480px]:!h-[60px] !border-2 !border-black'
-																						} pr-[70px] max-[480px]:pr-[58px] md:pr-[80px]`}
+																								: '!h-[72px] !border-2 !border-black'
+																						} pr-[80px]`}
 																						placeholder=""
 																						style={{
 																							accentColor: 'transparent',
@@ -10198,12 +10333,10 @@ const DashboardContent = () => {
 																					/>
 																					{/* New 532x64px element - Added border-black and z-20 */}
 																					<div
-																						className={`search-sections-container absolute left-[4px] right-[68px] ${
-																							inboxView ? '' : 'max-[480px]:right-[56px]'
-																						} top-1/2 -translate-y-1/2 ${
+																						className={`search-sections-container absolute left-[4px] right-[68px] top-1/2 -translate-y-1/2 ${
 																							inboxView
 																								? 'h-[31px]'
-																								: 'h-[64px] max-[480px]:h-[52px]'
+																								: 'h-[64px]'
 																						} rounded-[8px] z-20 font-secondary flex items-center ${
 																							inboxView
 																								? 'bg-[#EFEFEF] border-0'
@@ -10242,10 +10375,10 @@ const DashboardContent = () => {
 																							}}
 																						>
 																							<div
-																								className={`absolute z-20 left-[24px] max-[480px]:left-[12px] ${
+																								className={`absolute z-20 left-[24px] ${
 																									inboxView
 																										? 'top-1/2 -translate-y-1/2 text-[14px]'
-																										: 'top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px]'
+																										: 'top-[10px] text-[22px]'
 																								} font-bold text-black leading-none`}
 																							>
 																								{inboxView
@@ -10255,7 +10388,7 @@ const DashboardContent = () => {
 																									: 'Why'}
 																							</div>
 																							<div
-																								className={`absolute z-20 left-[24px] max-[480px]:left-[12px] right-[4px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden ${
+																								className={`absolute z-20 left-[24px] right-[4px] top-[42px] h-[12px] overflow-hidden ${
 																									inboxView ? 'hidden' : ''
 																								}`}
 																							>
@@ -10318,7 +10451,7 @@ const DashboardContent = () => {
 																												setActiveSection(null);
 																											}
 																										}}
-																										className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
+																										className="absolute z-20 left-[24px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
 																										style={{
 																											fontFamily:
 																												'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
@@ -10327,16 +10460,16 @@ const DashboardContent = () => {
 																										onClick={(e) => e.stopPropagation()}
 																									/>
 																								) : (
-																									<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
+																									<div className="absolute z-20 left-[24px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
 																										{whatValue || 'What'}
 																									</div>
 																								)
 																							) : (
 																								<>
-																									<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
+																									<div className="absolute z-20 left-[24px] top-[10px] text-[22px] font-bold text-black leading-none">
 																										What
 																									</div>
-																									<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
+																									<div className="absolute z-20 left-[24px] right-[8px] top-[42px] h-[12px] overflow-hidden">
 																										{activeSection === 'what' ? (
 																											<input
 																												ref={whatInputRef}
@@ -10434,7 +10567,7 @@ const DashboardContent = () => {
 																												void triggerSearchWithCurrentValues();
 																											}
 																										}}
-																										className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
+																										className="absolute z-20 left-[24px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
 																										style={{
 																											fontFamily:
 																												'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
@@ -10443,16 +10576,16 @@ const DashboardContent = () => {
 																										onClick={(e) => e.stopPropagation()}
 																									/>
 																								) : (
-																									<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
+																									<div className="absolute z-20 left-[24px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
 																										{whereValue || 'Where'}
 																									</div>
 																								)
 																							) : (
 																								<>
-																									<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
+																									<div className="absolute z-20 left-[24px] top-[10px] text-[22px] font-bold text-black leading-none">
 																										Where
 																									</div>
-																									<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
+																									<div className="absolute z-20 left-[24px] right-[8px] top-[42px] h-[12px] overflow-hidden">
 																										{activeSection === 'where' ? (
 																											<div className="absolute z-20 top-0 left-0 w-full h-full flex items-center gap-[2px]">
 																												<input
@@ -10520,7 +10653,7 @@ const DashboardContent = () => {
 																							type="submit"
 																							aria-label="Search"
 																							ref={heroSearchGradientButtonRef}
-																							className="search-gradient-button search-spotlight-zone search-pond-zone absolute left-[4px] right-[68px] max-[480px]:right-[56px] top-1/2 -translate-y-1/2 h-[64px] max-[480px]:h-[52px] rounded-[8px] z-30 cursor-pointer"
+																							className="search-gradient-button search-spotlight-zone search-pond-zone absolute left-[4px] right-[68px] top-1/2 -translate-y-1/2 h-[64px] rounded-[8px] z-30 cursor-pointer"
 																							style={{
 																								border: '1px solid #000000',
 																								color: '#FFFFFF',
@@ -10568,7 +10701,7 @@ const DashboardContent = () => {
 																						className={`dashboard-search-button search-spotlight-zone search-spotlight-zone-sm flex absolute right-[6px] items-center justify-center w-[58px] ${
 																							inboxView
 																								? 'h-[31px]'
-																								: 'h-[62px] max-[480px]:h-[50px] max-[480px]:w-[46px]'
+																								: 'h-[62px]'
 																						} z-40 cursor-pointer group`}
 																						style={{
 																							top: '50%',
@@ -11781,6 +11914,10 @@ const DashboardContent = () => {
 										style={{
 											top: `${MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX}px`,
 											zIndex: 110,
+											// Mid chrome: center over the map strip left of the results panel.
+											paddingRight: isMidMapChrome
+												? `${MAP_VIEW_RIGHT_PANEL_FOOTPRINT_PX}px`
+												: undefined,
 										}}
 									>
 										<div
@@ -11803,6 +11940,9 @@ const DashboardContent = () => {
 										style={{
 											top: `${MAP_VIEW_SEARCH_BAR_TOP_PX}px`,
 											zIndex: 115,
+											paddingRight: isMidMapChrome
+												? `${MAP_VIEW_RIGHT_PANEL_FOOTPRINT_PX}px`
+												: undefined,
 										}}
 									>
 										<div
@@ -12076,6 +12216,9 @@ const DashboardContent = () => {
 										style={{
 											top: `${MAP_VIEW_SEARCH_BAR_TOP_PX}px`,
 											zIndex: 120,
+											paddingRight: isMidMapChrome
+												? `${MAP_VIEW_RIGHT_PANEL_FOOTPRINT_PX}px`
+												: undefined,
 										}}
 									>
 										<div
@@ -12093,7 +12236,9 @@ const DashboardContent = () => {
 								);
 
 								const mapSelectGrabberTool =
-									isMapView && !isMobile ? (
+									// Compressed chrome: the bottom sheet owns the lower half, so the
+									// tall left rail has no room — hide it (matches mobile).
+									isMapView && !isMobile && !isCompressedMapChrome ? (
 										<div
 											className="fixed z-[130] pointer-events-none"
 											style={{
@@ -12255,13 +12400,18 @@ const DashboardContent = () => {
 										style={{
 											top: '12px',
 											height: '24px',
+											paddingRight: isMidMapChrome
+												? `${MAP_VIEW_RIGHT_PANEL_FOOTPRINT_PX}px`
+												: undefined,
 										}}
 									>
 										<div
 											className="pointer-events-auto relative"
 											style={{
 												width: `${CAMPAIGN_MAP_TOP_TABS_WIDTH_PX}px`,
-												maxWidth: 'calc(100vw - 64px)',
+												maxWidth: isMidMapChrome
+													? `calc(100vw - ${MAP_VIEW_RIGHT_PANEL_FOOTPRINT_PX}px - 64px)`
+													: 'calc(100vw - 64px)',
 												height: '24px',
 												transform: `scale(${MAP_VIEW_UI_SCALE})`,
 												transformOrigin: 'top center',
@@ -12719,7 +12869,14 @@ const DashboardContent = () => {
 																			/>
 																		)}
 												{hasNoSearchResults && isMapSearchEngaged && !isError && (
-																			<div className="absolute inset-0 z-[120] flex items-start justify-center pt-[120px] pointer-events-none">
+																			<div
+																				className="absolute inset-0 z-[120] flex items-start justify-center pt-[120px] pointer-events-none"
+																				style={{
+																					paddingRight: isMidMapChrome
+																						? `${MAP_VIEW_RIGHT_PANEL_FOOTPRINT_PX}px`
+																						: undefined,
+																				}}
+																			>
 																				<div
 																					className="pointer-events-auto flex flex-col items-center justify-center text-center"
 																					style={{
@@ -12767,7 +12924,14 @@ const DashboardContent = () => {
 																		)}
 																		{/* Search Failed overlay - shown when there's an error */}
 																		{isError && (
-																			<div className="absolute inset-0 z-[120] flex items-start justify-center pt-[180px] pointer-events-none">
+																			<div
+																				className="absolute inset-0 z-[120] flex items-start justify-center pt-[180px] pointer-events-none"
+																				style={{
+																					paddingRight: isMidMapChrome
+																						? `${MAP_VIEW_RIGHT_PANEL_FOOTPRINT_PX}px`
+																						: undefined,
+																				}}
+																			>
 																				<div
 																					className="pointer-events-auto flex flex-col items-center justify-center text-center"
 																					style={{
@@ -12836,7 +13000,7 @@ const DashboardContent = () => {
 																		)}
 												{shouldShowDashboardMapCampaignHeader &&
 													dashboardMapCampaignForHeader &&
-													!isNarrowestDesktop &&
+													!isCompressedMapChrome &&
 													shouldShowMapResultsSidePanel && (
 																<div
 																	className="absolute right-[10px] pointer-events-auto"
@@ -12893,7 +13057,7 @@ const DashboardContent = () => {
 															dashboardMapCampaignForHeader &&
 													(selectedContacts.length > 0 ||
 														isWriteReviewActive) &&
-													!isNarrowestDesktop &&
+													!isCompressedMapChrome &&
 													shouldShowMapResultsSidePanel && (
 																<div
 																	className="absolute pointer-events-none map-overlay-appear"
@@ -12920,7 +13084,7 @@ const DashboardContent = () => {
 																	</div>
 													</div>
 												)}
-												{!isNarrowestDesktop &&
+												{!isCompressedMapChrome &&
 													mapPanelHoveredResearchContact &&
 													!mapResearchPanelContact && (
 													<div
@@ -12956,7 +13120,7 @@ const DashboardContent = () => {
 												)}
 												{/* Marker-hover research group: abridged card + Description box,
 												    statically docked beside the results panel or the left rail. */}
-												{!isMobile && !isNarrowestDesktop && mapResearchPanelContact && (
+												{!isMobile && !isCompressedMapChrome && mapResearchPanelContact && (
 													<div
 														className="absolute pointer-events-none"
 														style={{
@@ -13019,11 +13183,12 @@ const DashboardContent = () => {
 														/>
 													</div>
 												)}
-												{/* Search Results overlay box on the right side - keep mounted during loading
-									    so the UI doesn't disappear between state searches. */}
-																{!isNarrowestDesktop && shouldShowMapResultsSidePanel && (
+												{/* Search Results overlay box — right side panel on wide desktops, full-width
+									    bottom sheet under the top-half map in compressed chrome. Keep mounted during
+									    loading so the UI doesn't disappear between state searches. */}
+																{shouldShowMapResultsSidePanel && (
 																			<div
-																				className="absolute right-[10px] flex flex-col gap-[9px] pointer-events-auto"
+																				className="absolute flex flex-col gap-[9px] pointer-events-auto"
 																				onMouseEnter={() => {
 																					if (!shouldUseDynamicMapCreateCampaignCta)
 																						return;
@@ -13034,22 +13199,85 @@ const DashboardContent = () => {
 																						return;
 																					setIsPointerInMapSidePanel(false);
 																				}}
-																				style={{
-																					top: MAP_VIEW_SIDE_PANEL_TOP_CSS,
-																					width: '433px',
-																					height: 800,
-																					maxHeight: `calc(100% - ${MAP_VIEW_SIDE_PANEL_TOP_CSS} - ${MAP_VIEW_SIDE_PANEL_BOTTOM_GAP_PX}px)`,
-																					overflow: 'hidden',
-																					transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
-																					transformOrigin: 'top right',
-																				}}
+																				style={
+																					isCompressedMapChrome
+																						? {
+																								left: 10,
+																								right: 10,
+																								bottom: 10,
+																								height: 'calc(50% - 20px)',
+																								overflow: 'hidden',
+																							}
+																						: {
+																								right: 10,
+																								top: MAP_VIEW_SIDE_PANEL_TOP_CSS,
+																								width: '433px',
+																								height: 800,
+																								maxHeight: `calc(100% - ${MAP_VIEW_SIDE_PANEL_TOP_CSS} - ${MAP_VIEW_SIDE_PANEL_BOTTOM_GAP_PX}px)`,
+																								overflow: 'hidden',
+																								transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
+																								transformOrigin: 'top right',
+																							}
+																				}
 																			>
+																				{/* Compressed-only sheet header: Map button, selection count, Select all. */}
+																				{isCompressedMapChrome && (
+																					<div
+																						className="w-full h-[42px] flex-shrink-0 flex items-center justify-center px-4 relative"
+																						style={{
+																							backgroundColor: 'rgba(175, 214, 239, 0.8)',
+																							border: '3px solid #143883',
+																							borderRadius: '8px',
+																						}}
+																					>
+																						<button
+																							type="button"
+																							onClick={() => setIsMapView(false)}
+																							className="absolute left-[10px] top-1/2 -translate-y-1/2 flex items-center justify-center cursor-pointer"
+																							style={{
+																								width: '53px',
+																								height: '19px',
+																								backgroundColor: '#CDEFC3',
+																								borderRadius: '4px',
+																								border: '2px solid #000000',
+																								fontFamily:
+																									'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																								fontSize: '13px',
+																								fontWeight: 600,
+																								lineHeight: '1',
+																							}}
+																						>
+																							Map
+																						</button>
+																						<span className="font-inter text-[13px] font-medium text-black">
+																							{selectedContacts.length} selected
+																						</span>
+																						<button
+																							type="button"
+																							onClick={() =>
+																								handleSelectAll(displayedMapPanelContacts)
+																							}
+																							disabled={isMapResultsLoading}
+																							className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 -translate-y-1/2 ${
+																								isMapResultsLoading
+																									? 'opacity-60 pointer-events-none'
+																									: 'hover:underline'
+																							}`}
+																						>
+																							{isAllPanelContactsSelected
+																								? 'Deselect All'
+																								: 'Select all'}
+																						</button>
+																					</div>
+																				)}
 																				{/* Selection sub-panel — appears once at least one contact is selected. */}
 																				{selectedContacts.length > 0 && (
 																					<div
 																						className="flex flex-col flex-shrink-0"
 																						style={{
-																							maxHeight: '342px',
+																							maxHeight: isCompressedMapChrome
+																								? '30%'
+																								: '342px',
 																							backgroundColor: 'rgba(175, 214, 239, 0.8)',
 																							border: '3px solid #143883',
 																							borderRadius: '8px',
@@ -13243,10 +13471,14 @@ const DashboardContent = () => {
 																						>
 																							{isMapResultsLoading ? (
 																								<MapResultsPanelSkeleton
-																									variant="desktop"
+																									variant={
+																										isCompressedMapChrome
+																											? 'narrow'
+																											: 'desktop'
+																									}
 																									rows={Math.max(
 																										mapPanelUnselectedContacts.length,
-																										14
+																										isCompressedMapChrome ? 8 : 14
 																									)}
 																								/>
 															) : (
@@ -13363,7 +13595,11 @@ const DashboardContent = () => {
 																					</div>
 																				</div>
 																				{!isMapResultsLoading && !fromHomeParam && (
-																					<div className="flex-shrink-0 w-full px-[10px]">
+																					<div
+																						className={`flex-shrink-0 w-full px-[10px] ${
+																							isCompressedMapChrome ? 'pb-[4px]' : ''
+																						}`}
+																					>
 																						<Button
 																							disabled={primaryCtaPending}
 																							variant="primary-light"
@@ -13397,7 +13633,7 @@ const DashboardContent = () => {
 																				)}
 																			</div>
 																		)}
-																{!isMobile && !isNarrowestDesktop && (
+																{!isMobile && (
 																				<div
 																					className="absolute left-1/2 pointer-events-none"
 																					onMouseEnter={
@@ -13407,7 +13643,15 @@ const DashboardContent = () => {
 																						scheduleMapBottomSearchFollowupPreviewClear
 																					}
 																					style={{
-																						bottom: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.bottomOffset}px`,
+																						// Compressed chrome: float just above the bottom results
+																						// sheet (sheet top sits at calc(50% - 10px) from the bottom).
+																						bottom: isCompressedMapChrome
+																							? 'calc(50% + 14px)'
+																							: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.bottomOffset}px`,
+																						// Mid chrome: center over the map strip left of the panel.
+																						left: isMidMapChrome
+																							? `calc(50% - ${MAP_VIEW_RIGHT_PANEL_FOOTPRINT_PX / 2}px)`
+																							: undefined,
 																						width: `${mapBottomSearchShellWidth}px`,
 																						height: `${mapBottomSearchShellHeight}px`,
 																						transform: `translateX(-50%) scale(${MAP_VIEW_BOTTOM_SEARCH_SCALE})`,
@@ -13533,6 +13777,17 @@ const DashboardContent = () => {
 																		onRadiusToggle={handleRadiusToggle}
 																		isProfileModeEnabled={isProfileModeEnabled}
 																		onProfileToggle={handleProfileToggle}
+																		// Compressed chrome: the results sheet sits below the bar, so
+																		// the pills flip above it (stacking over the radius slider
+																		// when that is open).
+																		style={
+																			isCompressedMapChrome
+																				? {
+																						top: 'auto',
+																						bottom: `calc(100% + ${isRadiusModeEnabled ? 53 : 20}px)`,
+																					}
+																				: undefined
+																		}
 																	/>
 																		{isRadiusModeEnabled && (
 																			<MapRadiusSlider
@@ -13548,462 +13803,6 @@ const DashboardContent = () => {
 																		)}
 																				</div>
 																			)}
-																		{/* Single column search results panel overlay at bottom - narrowest breakpoint (< 952px) */}
-																		{/* Keep mounted during loading so UI doesn't disappear between state searches. */}
-																{isNarrowestDesktop && shouldShowMapResultsSidePanel && (
-																			<div
-																				className="absolute left-[10px] right-[10px] bottom-[10px] shadow-lg flex flex-col"
-																				style={{
-																					height: '45%',
-																					maxHeight: 'calc(100% - 20px)',
-																					backgroundColor: '#AFD6EF',
-																					border: '3px solid #143883',
-																					overflow: 'hidden',
-																					transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
-																					transformOrigin: 'bottom center',
-																				}}
-																			>
-																				{/* Header area */}
-																				<div className="w-full h-[42px] flex-shrink-0 bg-[#AFD6EF] flex items-center justify-center px-4 relative">
-																					{/* Map label button in top-left of panel header */}
-																					<button
-																						type="button"
-																						onClick={() => setIsMapView(false)}
-																						className="absolute left-[10px] top-[7px] flex items-center justify-center cursor-pointer"
-																						style={{
-																							width: '53px',
-																							height: '19px',
-																							backgroundColor: '#CDEFC3',
-																							borderRadius: '4px',
-																							border: '2px solid #000000',
-																							fontFamily:
-																								'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-																							fontSize: '13px',
-																							fontWeight: 600,
-																							lineHeight: '1',
-																						}}
-																					>
-																						Map
-																					</button>
-																					<span className="font-inter text-[13px] font-medium text-black">
-																						{selectedContacts.length} selected
-																					</span>
-																					<button
-																		type="button"
-																		onClick={() =>
-																			handleSelectAll(displayedMapPanelContacts)
-																		}
-																						disabled={isMapResultsLoading}
-																						className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 -translate-y-1/2 ${
-																							isMapResultsLoading
-																								? 'opacity-60 pointer-events-none'
-																								: 'hover:underline'
-																						}`}
-																					>
-																						{isAllPanelContactsSelected
-																							? 'Deselect All'
-																							: 'Select all'}
-																					</button>
-																				</div>
-																				<CustomScrollbar
-																					className="flex-1 min-h-0"
-																					contentClassName="p-[6px] pb-[14px] space-y-[7px]"
-																					thumbWidth={2}
-																					thumbColor="#000000"
-																					trackColor="transparent"
-																					offsetRight={-6}
-																					disableOverflowClass
-																				>
-																					{isMapResultsLoading ? (
-																			<MapResultsPanelSkeleton
-																				variant="narrow"
-																				rows={Math.max(displayedMapPanelContacts.length, 8)}
-																			/>
-																					) : (
-																		<div
-																			ref={mapPanelRowsNarrowRef}
-																			className="space-y-[7px]"
-																		>
-															{renderMapPostedEventCard('narrow')}
-															{displayedMapPanelContacts.map((contact) => {
-																				const isSelected =
-																					selectedContacts.includes(contact.id);
-																								const isHovered =
-																									hoveredMapPanelContactId === contact.id;
-																					const isInBaseResults =
-																						displayedBaseContactIdSet.has(contact.id);
-																								const firstName = contact.firstName || '';
-																								const lastName = contact.lastName || '';
-																								const fullName =
-																									contact.name ||
-																									`${firstName} ${lastName}`.trim();
-																								const company = contact.company || '';
-																								// For restaurant searches, always use the search-derived headline
-																								// Otherwise, use contact's headline or fall back to search What + Where
-																					const searchDerivedHeadline =
-																						displayedWhatValue && displayedWhereValue
-																							? `${displayedWhatValue} ${displayedWhereValue}`
-																							: displayedWhatValue || '';
-																					const isRestaurantSearch =
-																						/^restaurants?$/i.test(
-																							displayedWhatValue.trim()
-																						);
-																								const curatedDisplayHeadline =
-																									contact.curatedDisplayLabel || '';
-																								// Curated search owns category display explicitly. Do not let
-																								// freeform headlines replace clean SVG/color chips.
-																								const contactHeadline =
-																									curatedDisplayHeadline ||
-																									(isInBaseResults
-																										? contact.headline ||
-																											contact.title ||
-																											''
-																										: contact.title ||
-																											contact.headline ||
-																											'');
-																								const computedHeadline = isInBaseResults
-																									? isRestaurantSearch
-																										? searchDerivedHeadline
-																										: contactHeadline ||
-																											searchDerivedHeadline
-																									: contactHeadline;
-																								const stickyHeadline =
-																									selectedContactStickyHeadlineById[
-																										contact.id
-																									] || '';
-																								const headline =
-																									isSelected && stickyHeadline
-																										? stickyHeadline
-																										: computedHeadline;
-																					const isRestaurantsSearchForContact =
-																						displayedIsRestaurantsSearch && isInBaseResults;
-																					const isCoffeeShopsSearchForContact =
-																						displayedIsCoffeeShopsSearch && isInBaseResults;
-																					const isMusicVenuesSearchForContact =
-																						displayedIsMusicVenuesSearch && isInBaseResults;
-																					const isMusicFestivalsSearchForContact =
-																						displayedIsMusicFestivalsSearch &&
-																						isInBaseResults;
-																					const isWeddingPlannersSearchForContact =
-																						displayedIsWeddingPlannersSearch &&
-																						isInBaseResults;
-																								const stateAbbr =
-																									getStateAbbreviation(
-																										contact.state || ''
-																									) || '';
-																								const city = contact.city || '';
-
-																								return (
-																									<div
-																										key={contact.id}
-																										data-contact-id={contact.id}
-																										className="cursor-pointer transition-colors flex w-full h-[49px] overflow-hidden rounded-[8px] border-[3px] border-[#ABABAB] select-none relative"
-																										style={{
-																											// Hover should be a subtle darken, not "selected" blue.
-																											// Category-specific selection colors.
-																											backgroundColor: isSelected
-																												? isRestaurantsSearchForContact ||
-																													isRestaurantTitle(headline)
-																													? isHovered
-																														? '#C5F5D1'
-																														: '#D7FFE1'
-																													: isCoffeeShopsSearchForContact ||
-																														  isCoffeeShopTitle(headline)
-																														? isHovered
-																															? '#DDF4CC'
-																															: '#EDFEDC'
-																														: isMusicVenuesSearchForContact ||
-																															  isMusicVenueTitle(
-																																	headline
-																															  )
-																															? isHovered
-																																? '#C5E8FF'
-																																: '#D7F0FF'
-																															: isMusicFestivalsSearchForContact ||
-																																  isMusicFestivalTitle(
-																																		headline
-																																  )
-																																? isHovered
-																																	? '#ADD4FF'
-																																	: '#BFDCFF'
-																																: isWeddingPlannersSearchForContact ||
-																																	  isWeddingPlannerTitle(
-																																			headline
-																																	  ) ||
-																																	  isWeddingVenueTitle(
-																																			headline
-																																	  )
-																																	? isHovered
-																																		? '#F5EDCE'
-																																		: '#FFF8DC'
-																																	: isWineBeerSpiritsTitle(
-																																				headline
-																																		  )
-																																		? isHovered
-																																			? '#C8CBFF'
-																																			: '#DADDFF'
-																																		: isHovered
-																																			? '#BFE3FF'
-																																			: '#C9EAFF'
-																												: isHovered
-																													? '#F3F4F6'
-																													: '#FFFFFF',
-																										}}
-																										onClick={() => handleMapPanelRowSelect(contact)}
-																										onMouseEnter={() =>
-																											setHoveredMapPanelContactId(
-																												contact.id
-																											)
-																										}
-																										onMouseLeave={() =>
-																											setHoveredMapPanelContactId(
-																												(prev) =>
-																													prev === contact.id
-																														? null
-																														: prev
-																											)
-																										}
-																									>
-																										{/* Left side - Name/Company and Location */}
-																										<div className="flex-1 min-w-0 flex flex-col justify-center pl-3 pr-2">
-																											{fullName ? (
-																												<>
-																													<div className="flex items-center">
-																														<div className="font-bold text-[11px] truncate leading-tight">
-																															{fullName}
-																														</div>
-																													</div>
-																													<div className="flex items-center mt-[2px]">
-																														<div className="text-[11px] text-black truncate leading-tight">
-																															{company}
-																														</div>
-																													</div>
-																												</>
-																											) : (
-																												<div className="flex items-center">
-																													<div className="font-bold text-[11px] truncate leading-tight">
-																														{company || '—'}
-																													</div>
-																												</div>
-																											)}
-																										</div>
-																										{/* Right side - Title (fixed 230px width) */}
-																										<div
-																											className="flex-shrink-0 flex flex-col justify-center pr-2"
-																											style={{ width: '240px' }}
-																										>
-																											{headline ? (
-																												<div
-																													className="overflow-hidden flex items-center px-2 gap-1"
-																													style={{
-																														width: '230px',
-																														height: '19px',
-																														backgroundColor:
-																															isRestaurantsSearchForContact ||
-																															isRestaurantTitle(headline)
-																																? '#C3FBD1'
-																																: isCoffeeShopsSearchForContact ||
-																																	  isCoffeeShopTitle(
-																																			headline
-																																	  )
-																																	? '#D6F1BD'
-																																	: isMusicVenuesSearchForContact ||
-																																		  isMusicVenueTitle(
-																																				headline
-																																		  )
-																																		? '#B7E5FF'
-																																		: isMusicFestivalsSearchForContact ||
-																																			  isMusicFestivalTitle(
-																																					headline
-																																			  )
-																																			? '#C1D6FF'
-																																			: isWeddingPlannersSearchForContact ||
-																																				  isWeddingPlannerTitle(
-																																						headline
-																																				  ) ||
-																																				  isWeddingVenueTitle(
-																																						headline
-																																				  )
-																																				? '#FFF8DC'
-																																				: isWineBeerSpiritsTitle(
-																																							headline
-																																					  )
-																																					? '#BFC4FF'
-																																					: '#E8EFFF',
-																														border: '0.7px solid #000000',
-																														borderRadius: '8px',
-																													}}
-																												>
-																													{(isRestaurantsSearchForContact ||
-																														isRestaurantTitle(
-																															headline
-																														)) && (
-																														<RestaurantsIcon
-																															size={12}
-																															className="flex-shrink-0"
-																														/>
-																													)}
-																													{(isCoffeeShopsSearchForContact ||
-																														isCoffeeShopTitle(
-																															headline
-																														)) && (
-																														<CoffeeShopsIcon size={7} />
-																													)}
-																													{(isMusicVenuesSearchForContact ||
-																														isMusicVenueTitle(
-																															headline
-																														)) && (
-																														<MusicVenuesIcon
-																															size={12}
-																															className="flex-shrink-0"
-																														/>
-																													)}
-																													{(isMusicFestivalsSearchForContact ||
-																														isMusicFestivalTitle(
-																															headline
-																														)) && (
-																														<FestivalsIcon
-																															size={12}
-																															className="flex-shrink-0"
-																														/>
-																													)}
-																													{(isWeddingPlannersSearchForContact ||
-																														isWeddingPlannerTitle(
-																															headline
-																														) ||
-																														isWeddingVenueTitle(
-																															headline
-																														)) && (
-																														<WeddingPlannersIcon
-																															size={12}
-																														/>
-																													)}
-																													{isWineBeerSpiritsTitle(
-																														headline
-																													) && (
-																														<WineBeerSpiritsIcon
-																															size={12}
-																															className="flex-shrink-0"
-																														/>
-																													)}
-																													<span className="text-[14px] text-black leading-none truncate">
-																														{isRestaurantsSearchForContact ||
-																														isRestaurantTitle(headline)
-																															? 'Restaurant'
-																															: isCoffeeShopsSearchForContact ||
-																																  isCoffeeShopTitle(
-																																		headline
-																																  )
-																																? 'Coffee Shop'
-																																: isMusicVenuesSearchForContact ||
-																																	  isMusicVenueTitle(
-																																			headline
-																																	  )
-																																	? 'Music Venue'
-																																	: isMusicFestivalsSearchForContact ||
-																																		  isMusicFestivalTitle(
-																																				headline
-																																		  )
-																																		? 'Music Festival'
-																																		: isWeddingVenueTitle(
-																																					headline
-																																			  )
-																																			? 'Wedding Venue'
-																																			: isWeddingPlannersSearchForContact ||
-																																				  isWeddingPlannerTitle(
-																																						headline
-																																				  )
-																																				? 'Wedding Planner'
-																																				: isWineBeerSpiritsTitle(
-																																							headline
-																																					  )
-																																					? getWineBeerSpiritsLabel(
-																																							headline
-																																						)
-																																					: headline}
-																													</span>
-																												</div>
-																											) : null}
-																											{(city || stateAbbr) && (
-																												<div className="flex items-center gap-1 mt-[4px]">
-																													{stateAbbr && (
-																														<span
-																															className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
-																															style={{
-																																backgroundColor:
-																																	stateBadgeColorMap[
-																																		stateAbbr
-																																	] || 'transparent',
-																																borderColor: '#000000',
-																															}}
-																														>
-																															{stateAbbr}
-																														</span>
-																													)}
-																													{city && (
-																														<span className="text-[10px] text-black leading-none truncate">
-																															{city}
-																														</span>
-																													)}
-																												</div>
-																											)}
-																										</div>
-																									</div>
-																								);
-																							})}
-																						</div>
-																					)}
-																				</CustomScrollbar>
-																				{!isMapResultsLoading && !fromHomeParam && (
-																					<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
-																						<Button
-																							disabled={primaryCtaPending}
-																							variant="primary-light"
-																							bold
-																							className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#5DAB68] !text-white border border-[#000000] overflow-hidden ${
-																								selectedContacts.length === 0
-																									? 'opacity-[0.62]'
-																									: 'opacity-100'
-																							}`}
-																							style={
-																								selectedContacts.length === 0
-																									? { height: '39px' }
-																									: { height: '39px' }
-																							}
-																							onClick={() => {
-																								if (selectedContacts.length === 0) return;
-																								handlePrimaryCta();
-																							}}
-																						>
-																							<span
-																								className="relative z-20"
-																								style={{
-																									fontFamily: 'Inter, sans-serif',
-																									fontWeight: 700,
-																								}}
-																							>
-																								{primaryCtaLabel}
-																							</span>
-																							<div
-																								className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
-																						onClick={(e) => {
-																							e.stopPropagation();
-																							handleSelectAll(displayedMapPanelContacts);
-																						}}
-																							>
-																								<span className="text-black text-[14px] font-medium">
-																									All
-																								</span>
-																							</div>
-																							<span
-																								aria-hidden="true"
-																								className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
-																							/>
-																						</Button>
-																					</div>
-																				)}
-																			</div>
-																		)}
 																	</div>
 																</div>
 															</>,

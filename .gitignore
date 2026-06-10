@@ -51,3 +51,6 @@ public/exports/*
 
 # rust wasm build artifacts
 /rust-scorer/target/
+
+# generated email previews
+scripts/.preview/

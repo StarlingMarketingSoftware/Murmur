@@ -24,7 +24,7 @@ export const MobileSearchResultRowCard: FC<{
 	return (
 		<div
 			data-contact-id={contact.id}
-			className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-[#ABABAB] select-none"
+			className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-[#ABABAB] select-none shadow-[0_4px_4px_rgba(0,0,0,0.25)]"
 			style={{ backgroundColor: isSelected ? '#C9EAFF' : '#FFFFFF' }}
 			onClick={onToggle}
 		>

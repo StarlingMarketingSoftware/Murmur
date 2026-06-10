@@ -1763,7 +1763,7 @@ const SortableAIBlock = ({
 
 																									<div className="flex items-center justify-center gap-[24px]">
 																										<div
-																											className="w-[364px] h-[42px] rounded-[8px] bg-[#E2E2E2] flex items-center px-[18px]"
+																											className="w-[364px] h-[42px] rounded-[8px] bg-[#D2EFFF] flex items-center px-[18px]"
 																											data-hover-description-suppress="true"
 																										>
 																											<span className="font-inter font-semibold text-[16px] leading-[16px] text-black">
@@ -1771,7 +1771,7 @@ const SortableAIBlock = ({
 																											</span>
 																										</div>
 																										<div
-																											className="w-[364px] h-[42px] rounded-[8px] bg-[#E2E2E2] flex items-center px-[18px]"
+																											className="w-[364px] h-[42px] rounded-[8px] bg-[#D2EFFF] flex items-center px-[18px]"
 																											data-hover-description-suppress="true"
 																										>
 																											<span className="font-inter font-semibold text-[16px] leading-[16px] text-black">
@@ -1918,7 +1918,7 @@ const SortableAIBlock = ({
 
 																								return (
 																									<div
-																										className="w-[364px] h-[312px] rounded-[8px] bg-[#E2E2E2] p-[18px] flex flex-col"
+																										className="w-[364px] h-[312px] rounded-[8px] bg-[#D2EFFF] p-[18px] flex flex-col"
 																										data-hover-description-suppress="true"
 																									>
 																										<div className="grid grid-cols-7 text-center">
@@ -2717,7 +2717,7 @@ const SortableAIBlock = ({
 
 																									<div className="flex items-center justify-center gap-[24px]">
 																										<div
-																											className="w-[364px] h-[42px] rounded-[8px] bg-[#E2E2E2] flex items-center px-[18px]"
+																											className="w-[364px] h-[42px] rounded-[8px] bg-[#D2EFFF] flex items-center px-[18px]"
 																											data-hover-description-suppress="true"
 																										>
 																											<span className="font-inter font-semibold text-[16px] leading-[16px] text-black">
@@ -2725,7 +2725,7 @@ const SortableAIBlock = ({
 																											</span>
 																										</div>
 																										<div
-																											className="w-[364px] h-[42px] rounded-[8px] bg-[#E2E2E2] flex items-center px-[18px]"
+																											className="w-[364px] h-[42px] rounded-[8px] bg-[#D2EFFF] flex items-center px-[18px]"
 																											data-hover-description-suppress="true"
 																										>
 																											<span className="font-inter font-semibold text-[16px] leading-[16px] text-black">
@@ -2868,7 +2868,7 @@ const SortableAIBlock = ({
 
 																								return (
 																									<div
-																										className="w-[364px] h-[312px] rounded-[8px] bg-[#E2E2E2] p-[18px] flex flex-col"
+																										className="w-[364px] h-[312px] rounded-[8px] bg-[#D2EFFF] p-[18px] flex flex-col"
 																										data-hover-description-suppress="true"
 																									>
 																										<div className="grid grid-cols-7 text-center">

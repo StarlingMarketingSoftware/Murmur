@@ -9,7 +9,6 @@ import {
 	normalizeInboxEmailAddress,
 	type InboxConversation,
 } from '@/utils/inboxConversations';
-import type { OpportunityStatus } from '@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesWidget';
 import { EmailWithRelations } from '@/types';
 import { ContactWithName } from '@/types/contact';
 import { MobileSearchCategoryPill } from './MobileCampaignSearchHeader';
@@ -127,8 +126,6 @@ interface MobileCampaignSummaryProps {
 	drafts: EmailWithRelations[];
 	/** Contacts with no conversation and no draft, recency desc. */
 	plainContacts: ContactWithName[];
-	/** Conversations classified as opportunities (key → status). */
-	opportunityStatusByKey: Map<string, OpportunityStatus>;
 	/** Campaign contacts indexed by normalized email for canonical names. */
 	contactByEmail?: Record<string, ContactWithName>;
 	scrollRequest: MobileSummaryScrollRequest | null;
@@ -143,7 +140,6 @@ export const MobileCampaignSummary: FC<MobileCampaignSummaryProps> = ({
 	conversations,
 	drafts,
 	plainContacts,
-	opportunityStatusByKey,
 	contactByEmail,
 	scrollRequest,
 	onOpenConversation,
@@ -151,7 +147,6 @@ export const MobileCampaignSummary: FC<MobileCampaignSummaryProps> = ({
 	onGoToSearch,
 	className,
 }) => {
-	const [segment, setSegment] = useState<'messages' | 'opportunities'>('messages');
 	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 	const conversationsRef = useRef<HTMLDivElement | null>(null);
 	const draftsRef = useRef<HTMLDivElement | null>(null);
@@ -161,32 +156,19 @@ export const MobileCampaignSummary: FC<MobileCampaignSummaryProps> = ({
 	const isEmpty =
 		conversations.length === 0 && drafts.length === 0 && plainContacts.length === 0;
 
-	// Header pill scroll requests: jump to the section anchor (always from the
-	// Messages segment — Opportunities hides drafts/contacts entirely).
+	// Header pill scroll requests: jump to the section anchor.
 	useEffect(() => {
 		if (!scrollRequest) return;
-		setSegment('messages');
 		const refBySection = {
 			conversations: conversationsRef,
 			drafts: draftsRef,
 			contacts: contactsRef,
 		} as const;
-		// Wait a frame so the Messages segment is rendered before scrolling.
-		const frame = requestAnimationFrame(() => {
-			refBySection[scrollRequest.section].current?.scrollIntoView({
-				behavior: 'smooth',
-				block: 'start',
-			});
+		refBySection[scrollRequest.section].current?.scrollIntoView({
+			behavior: 'smooth',
+			block: 'start',
 		});
-		return () => cancelAnimationFrame(frame);
 	}, [scrollRequest]);
-
-	const visibleConversations =
-		segment === 'opportunities'
-			? conversations.filter((conversation) =>
-					opportunityStatusByKey.has(conversation.key)
-				)
-			: conversations;
 
 	return (
 		<div className={cn('relative flex flex-col min-h-0', className)}>
@@ -200,34 +182,9 @@ export const MobileCampaignSummary: FC<MobileCampaignSummaryProps> = ({
 					style={{ WebkitOverflowScrolling: 'touch' }}
 					onScroll={(e) => setIsScrolled(e.currentTarget.scrollTop > 80)}
 				>
-					{/* Messages | Opportunities segmented bar */}
-					<div className="flex h-[44px] rounded-[10px] border-2 border-black overflow-hidden mb-[10px]">
-						<button
-							type="button"
-							onClick={() => setSegment('messages')}
-							className="flex-1 flex items-center justify-center font-inter text-[15px] font-semibold text-black border-r border-black/40"
-							style={{
-								backgroundColor: segment === 'messages' ? '#A8C4FA' : '#CFDDFC',
-							}}
-						>
-							Messages
-						</button>
-						<button
-							type="button"
-							onClick={() => setSegment('opportunities')}
-							className="flex-1 flex items-center justify-center gap-1.5 font-inter text-[15px] font-semibold text-black"
-							style={{
-								backgroundColor: segment === 'opportunities' ? '#A8C4FA' : '#CFDDFC',
-							}}
-						>
-							<span className="text-[#E14B4B] text-[16px] leading-none">✷</span>
-							Opportunities
-						</button>
-					</div>
-
 					{/* Conversations (ongoing first) */}
 					<div ref={conversationsRef} className="flex flex-col gap-[10px]">
-						{visibleConversations.map((conversation) => {
+						{conversations.map((conversation) => {
 							const contact = resolveConversationContact(conversation, contactByEmail);
 							const latest = conversation.latestMessage;
 							const inbound = conversation.latestInboundMessage ?? latest;
@@ -262,88 +219,79 @@ export const MobileCampaignSummary: FC<MobileCampaignSummaryProps> = ({
 								</button>
 							);
 						})}
-						{segment === 'opportunities' && visibleConversations.length === 0 && (
-							<div className="font-inter text-[13px] text-black text-center py-6">
-								No opportunities yet
-							</div>
-						)}
 					</div>
 
-					{segment === 'messages' && (
-						<>
-							{/* Drafts */}
-							<div
-								ref={draftsRef}
-								className={cn(
-									'flex flex-col gap-[10px]',
-									visibleConversations.length > 0 && 'mt-[10px]'
-								)}
-							>
-								{drafts.map((draft) => {
-									const contact = draft.contact as ContactWithName;
-									return (
-										<button
-											key={draft.id}
-											type="button"
-											onClick={() => onOpenDraft(draft.id)}
-											className="w-full text-left rounded-[10px] border-2 border-black overflow-hidden"
-											style={{ backgroundColor: DRAFT_BODY_FILL }}
-										>
-											<div className="flex">
-												<div
-													className="h-[14px] w-[38%] rounded-br-[6px]"
-													style={{ backgroundColor: DRAFT_TOP_BAR_FILL }}
-												/>
-											</div>
-											<div className="px-3 pt-[3px] pb-[9px]">
-												<SummaryCardIdentityRow
-													name={getContactDisplayName(contact, null, contact?.email)}
-													company={contact?.company || ''}
-													headline={contact?.headline || contact?.title || ''}
-													state={contact?.state || ''}
-												/>
-												<SummaryPreviewLines
-													subject={draft.subject || ''}
-													preview={(draft.message || '')
-														.replace(/<[^>]*>/g, ' ')
-														.replace(/\s+/g, ' ')
-														.trim()}
-												/>
-											</div>
-										</button>
-									);
-								})}
-							</div>
-
-							{/* Plain contacts */}
-							<div
-								ref={contactsRef}
-								className={cn(
-									'flex flex-col gap-[10px]',
-									(visibleConversations.length > 0 || drafts.length > 0) && 'mt-[10px]'
-								)}
-							>
-								{plainContacts.map((contact) => (
-									<div
-										key={contact.id}
-										className="w-full rounded-[10px] border-2 border-black bg-[#F7F8FA] px-3 py-[9px]"
-									>
-										<SummaryCardIdentityRow
-											name={getContactDisplayName(contact, null, contact.email)}
-											company={contact.company || ''}
-											headline={contact.headline || contact.title || ''}
-											state={contact.state || ''}
+					{/* Drafts */}
+					<div
+						ref={draftsRef}
+						className={cn(
+							'flex flex-col gap-[10px]',
+							conversations.length > 0 && 'mt-[10px]'
+						)}
+					>
+						{drafts.map((draft) => {
+							const contact = draft.contact as ContactWithName;
+							return (
+								<button
+									key={draft.id}
+									type="button"
+									onClick={() => onOpenDraft(draft.id)}
+									className="w-full text-left rounded-[10px] border-2 border-black overflow-hidden"
+									style={{ backgroundColor: DRAFT_BODY_FILL }}
+								>
+									<div className="flex">
+										<div
+											className="h-[14px] w-[38%] rounded-br-[6px]"
+											style={{ backgroundColor: DRAFT_TOP_BAR_FILL }}
 										/>
 									</div>
-								))}
-							</div>
+									<div className="px-3 pt-[3px] pb-[9px]">
+										<SummaryCardIdentityRow
+											name={getContactDisplayName(contact, null, contact?.email)}
+											company={contact?.company || ''}
+											headline={contact?.headline || contact?.title || ''}
+											state={contact?.state || ''}
+										/>
+										<SummaryPreviewLines
+											subject={draft.subject || ''}
+											preview={(draft.message || '')
+												.replace(/<[^>]*>/g, ' ')
+												.replace(/\s+/g, ' ')
+												.trim()}
+										/>
+									</div>
+								</button>
+							);
+						})}
+					</div>
 
-							{isEmpty && (
-								<div className="font-inter text-[14px] text-black text-center py-10">
-									No contacts yet — search the map to add some.
-								</div>
-							)}
-						</>
+					{/* Plain contacts */}
+					<div
+						ref={contactsRef}
+						className={cn(
+							'flex flex-col gap-[10px]',
+							(conversations.length > 0 || drafts.length > 0) && 'mt-[10px]'
+						)}
+					>
+						{plainContacts.map((contact) => (
+							<div
+								key={contact.id}
+								className="w-full rounded-[10px] border-2 border-black bg-[#F7F8FA] px-3 py-[9px]"
+							>
+								<SummaryCardIdentityRow
+									name={getContactDisplayName(contact, null, contact.email)}
+									company={contact.company || ''}
+									headline={contact.headline || contact.title || ''}
+									state={contact.state || ''}
+								/>
+							</div>
+						))}
+					</div>
+
+					{isEmpty && (
+						<div className="font-inter text-[14px] text-black text-center py-10">
+							No contacts yet — search the map to add some.
+						</div>
 					)}
 
 					{/* Spacer so the floating "+" never covers the last card */}

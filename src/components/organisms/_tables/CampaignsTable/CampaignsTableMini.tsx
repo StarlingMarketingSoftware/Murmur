@@ -35,6 +35,7 @@ type MiniInboundEmail = {
 type Props = {
 	currentCampaignId?: number | null;
 	className?: string;
+	onSelectCampaign?: (campaignId: number) => void;
 };
 
 const CATEGORY_BACKGROUND: Record<CampaignDataTypeCategoryKey, string> = {
@@ -48,9 +49,11 @@ const CATEGORY_BACKGROUND: Record<CampaignDataTypeCategoryKey, string> = {
 };
 
 const ROW_PALETTE = [
-	{ folder: '#C5494F', pill: '#B9EAF1', row: '#DFF4E5' },
-	{ folder: '#C94AD8', pill: '#C8C5F4', row: '#F8F8F8' },
+	{ folder: '#C5494F', pill: '#B9EAF1' },
+	{ folder: '#C94AD8', pill: '#C8C5F4' },
 ];
+
+const SELECTED_ROW_BACKGROUND = '#DFF4E5';
 
 const FOLDER_PILL_LEFT = 11;
 const FOLDER_PILL_WIDTH = 105.331;
@@ -235,7 +238,11 @@ const MetricPill = ({
 	</div>
 );
 
-export const CampaignsTableMini: FC<Props> = ({ currentCampaignId, className }) => {
+export const CampaignsTableMini: FC<Props> = ({
+	currentCampaignId,
+	className,
+	onSelectCampaign,
+}) => {
 	const { data: campaignsData, isPending } = useGetCampaigns();
 	const { data: inboundEmails } = useGetInboundEmails({ enabled: true });
 
@@ -250,16 +257,20 @@ export const CampaignsTableMini: FC<Props> = ({ currentCampaignId, className }) 
 	}, [inboundEmails]);
 
 	const rows = useMemo(() => {
-		const campaigns = ((campaignsData ?? []) as MiniCampaign[]).slice();
-		if (currentCampaignId) {
-			campaigns.sort((a, b) => {
-				if (a.id === currentCampaignId) return -1;
-				if (b.id === currentCampaignId) return 1;
-				return 0;
-			});
-		}
-		return campaigns.slice(0, 2);
+		const campaigns = (campaignsData ?? []) as MiniCampaign[];
+		const current = currentCampaignId
+			? campaigns.find((c) => c.id === currentCampaignId)
+			: undefined;
+		if (!current) return campaigns.slice(0, 2);
+		const firstOther = campaigns.find((c) => c.id !== currentCampaignId);
+		// Keep the fetched order so rows don't swap when the viewed campaign changes.
+		return campaigns.filter((c) => c === current || c === firstOther);
 	}, [campaignsData, currentCampaignId]);
+
+	const selectedIndex = Math.max(
+		0,
+		currentCampaignId ? rows.findIndex((r) => r.id === currentCampaignId) : 0
+	);
 
 	return (
 		<div
@@ -328,7 +339,12 @@ export const CampaignsTableMini: FC<Props> = ({ currentCampaignId, className }) 
 				</div>
 			</div>
 			<div style={{ height: 2, background: '#D0D0D0' }} />
-			<div style={{ height: 17, borderBottom: '1px solid #000' }} />
+			<div
+				style={{
+					height: 17,
+					borderBottom: selectedIndex === 0 ? '1px solid #000' : '0',
+				}}
+			/>
 			{isPending ? (
 				<div className="flex h-[56px] items-center justify-center font-inter text-[12px] text-black/50">
 					Loading folders
@@ -340,22 +356,28 @@ export const CampaignsTableMini: FC<Props> = ({ currentCampaignId, className }) 
 			) : (
 				rows.map((row, index) => {
 					const palette = ROW_PALETTE[index] ?? ROW_PALETTE[0];
-					const isSelectedRow = index === 0;
+					const isSelectedRow = index === selectedIndex;
+					// The selected row is framed by dividers: its own bottom border plus the
+					// bottom border of whatever sits directly above it (header spacer or row).
+					const hasBottomBorder = isSelectedRow || index === selectedIndex - 1;
 					const rowContentHeight =
-						ROW_HEIGHT - (isSelectedRow ? SELECTED_ROW_BOTTOM_BORDER_WIDTH : 0);
+						ROW_HEIGHT - (hasBottomBorder ? SELECTED_ROW_BOTTOM_BORDER_WIDTH : 0);
 					const folderPillTop =
 						(rowContentHeight - FOLDER_PILL_HEIGHT) / 2 + FOLDER_PILL_TOP_OFFSET;
 					const metricPillTop =
 						(rowContentHeight - METRIC_PILL_HEIGHT) / 2 + METRIC_PILL_TOP_OFFSET;
+					const isClickable = !!onSelectCampaign && row.id !== currentCampaignId;
 					return (
 						<div
 							key={row.id}
+							onClick={isClickable ? () => onSelectCampaign(row.id) : undefined}
 							style={{
 								position: 'relative',
 								height: ROW_HEIGHT,
 								boxSizing: 'border-box',
-								background: isSelectedRow ? palette.row : '#F8F8F8',
-								borderBottom: isSelectedRow ? '1px solid #000' : '0',
+								background: isSelectedRow ? SELECTED_ROW_BACKGROUND : '#F8F8F8',
+								borderBottom: hasBottomBorder ? '1px solid #000' : '0',
+								cursor: isClickable ? 'pointer' : 'default',
 							}}
 						>
 							<div

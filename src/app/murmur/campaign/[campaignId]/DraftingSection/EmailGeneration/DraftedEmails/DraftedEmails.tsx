@@ -2070,10 +2070,11 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 								// Ensure this row has a stable width so centering math is correct
 								// (otherwise it can shrink-to-fit in narrow layouts and appear shifted right).
 								width: '100%',
-								// For narrow desktop (two-column layout), shift left by 170px to center on page
+								// For narrow desktop (two-column layout), shift left by (left column 330 + gap 28) / 2
+								// to center on page. Keep in sync with the drafts-tab narrow layout in DraftingSection.
 								// For narrowest desktop (single-column), no shift needed as layout is already centered
 								...(isNarrowDesktop && !isMobile
-									? { transform: 'translateX(-170px)' }
+									? { transform: 'translateX(-179px)' }
 									: {}),
 								...(showTabNavArrows && !isMobile ? { gap: tabNavGap } : {}),
 							}}

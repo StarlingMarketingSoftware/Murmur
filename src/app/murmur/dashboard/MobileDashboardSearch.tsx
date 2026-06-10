@@ -3,6 +3,7 @@
 import { FC, useMemo, useRef, useState } from 'react';
 import BulletListIcon from '@/components/atoms/_svg/BulletListIcon';
 import MapBottomSearchArrowIcon from '@/components/atoms/_svg/MapBottomSearchArrowIcon';
+import MapViewToggleIcon from '@/components/atoms/_svg/MapViewToggleIcon';
 import { MapResultsPanelSkeleton } from '@/components/molecules/MapResultsPanelSkeleton/MapResultsPanelSkeleton';
 import { MobileCampaignSearchHeader } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Mobile/MobileCampaignSearchHeader';
 import { MobileSearchResultRowCard } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Mobile/MobileSearchResultRowCard';
@@ -29,8 +30,6 @@ export const MobileDashboardSearch: FC<{
 	listContacts: ContactWithName[];
 	selectedContactIds: number[];
 	onToggleContact: (contact: ContactWithName) => void;
-	onSelectAll: () => void;
-	onDeselectAll: () => void;
 	isLoading: boolean;
 	hasNoResults: boolean;
 	/** Gates the List/Map toggle (no list before the first committed search). */
@@ -54,8 +53,6 @@ export const MobileDashboardSearch: FC<{
 	listContacts,
 	selectedContactIds,
 	onToggleContact,
-	onSelectAll,
-	onDeselectAll,
 	isLoading,
 	hasNoResults,
 	hasSearched,
@@ -73,12 +70,6 @@ export const MobileDashboardSearch: FC<{
 		() => new Set<number>(selectedContactIds),
 		[selectedContactIds]
 	);
-	const selectedInListCount = useMemo(
-		() => listContacts.reduce((count, c) => count + (selectedIdSet.has(c.id) ? 1 : 0), 0),
-		[listContacts, selectedIdSet]
-	);
-	const areAllListSelected =
-		listContacts.length > 0 && selectedInListCount === listContacts.length;
 
 	const handleSubmit = () => {
 		onSubmitSearch();
@@ -151,7 +142,7 @@ export const MobileDashboardSearch: FC<{
 
 				{/* Middle: list panel (list mode) or spacer (map mode) */}
 				{viewMode === 'list' ? (
-					<div className="pointer-events-auto flex-1 min-h-0 mt-2 mx-2 bg-[#D8E5FB] border-2 border-black rounded-[10px] flex flex-col overflow-hidden">
+					<div className="pointer-events-auto flex-1 min-h-0 mt-2 mx-2 border-2 border-black rounded-[10px] flex flex-col overflow-hidden">
 						{/* Panel header: label + query chip + close */}
 						<div className="flex-shrink-0 flex items-stretch h-[40px] border-b-2 border-black bg-white">
 							<div className="flex items-center px-3 bg-[#B9EAF1] border-r-2 border-black">
@@ -159,8 +150,7 @@ export const MobileDashboardSearch: FC<{
 									Search Results
 								</span>
 							</div>
-							<div className="flex-1 min-w-0 flex items-center gap-1.5 px-2">
-								<BulletListIcon className="flex-shrink-0" />
+							<div className="flex-1 min-w-0 flex items-center px-2">
 								<span className="font-inter text-[13px] text-black truncate">
 									{queryPillLabel ?? ''}
 								</span>
@@ -177,28 +167,9 @@ export const MobileDashboardSearch: FC<{
 								✕
 							</button>
 						</div>
-						{/* Selection sub-row */}
-						<div className="flex-shrink-0 flex items-center justify-between px-3 h-[26px] border-b border-[#ABABAB]">
-							<span className="font-inter text-[11px] text-black">
-								{selectedInListCount} selected
-							</span>
-							<button
-								type="button"
-								onClick={() => {
-									if (areAllListSelected) {
-										onDeselectAll();
-									} else {
-										onSelectAll();
-									}
-								}}
-								className="font-secondary text-[11px] font-medium text-black hover:underline"
-							>
-								{areAllListSelected ? 'Deselect all' : 'Select all'}
-							</button>
-						</div>
 						{/* Rows (native momentum scroll) */}
 						<div
-							className="flex-1 min-h-0 overflow-y-auto px-2 py-2"
+							className="flex-1 min-h-0 overflow-y-auto px-2 pt-2 pb-[72px]"
 							style={{ WebkitOverflowScrolling: 'touch' }}
 						>
 							{isLoading ? (
@@ -225,27 +196,32 @@ export const MobileDashboardSearch: FC<{
 					<div className="flex-1 min-h-0" />
 				)}
 
-				{/* Bottom-center toggles */}
-				<div className="flex flex-col items-center gap-2 pt-2 pb-2 px-3">
-					{hasSearched && (
-						<button
-							type="button"
-							onClick={() => setViewMode(viewMode === 'map' ? 'list' : 'map')}
-							className="pointer-events-auto h-[32px] px-4 rounded-full bg-[#EFEFEF] border border-transparent flex items-center gap-2 font-inter text-[15px] font-medium text-black"
-						>
-							<BulletListIcon />
-							{viewMode === 'map' ? 'List' : 'Map'}
-						</button>
-					)}
-				</div>
-
-				{/* Bottom bar: search input + submit + Add */}
+				{/* Bottom bar: search input + submit + Add (+ floating List/Map toggle above) */}
 				<div
-					className="pointer-events-auto flex items-center gap-2 px-3 pt-1"
+					className="pointer-events-auto relative flex items-center gap-2 px-3 pt-1 mt-2"
 					style={{
 						paddingBottom: 'calc(8px + env(safe-area-inset-bottom))',
 					}}
 				>
+					{hasSearched && (
+						<button
+							type="button"
+							onClick={() => setViewMode(viewMode === 'map' ? 'list' : 'map')}
+							className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 h-[36px] px-4 rounded-[8px] bg-[#D6D6D6] flex items-center justify-center gap-1.5 font-inter text-[15px] font-medium text-black"
+						>
+							{viewMode === 'map' ? (
+								<>
+									<BulletListIcon width={18} height={13} />
+									List
+								</>
+							) : (
+								<>
+									<MapViewToggleIcon width={19} height={18} />
+									Map
+								</>
+							)}
+						</button>
+					)}
 					<div className="flex-1 flex h-[44px] rounded-full border-2 border-black overflow-hidden bg-white min-w-0">
 						<div className="relative flex-1 min-w-0 h-full">
 							<input

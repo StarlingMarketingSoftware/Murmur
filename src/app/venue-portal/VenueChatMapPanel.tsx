@@ -208,10 +208,14 @@ function ThreadListCard({
 // cards on the left, the open thread on the right.
 export function VenueChatMapPanel({
 	initialThread,
+	onThreadOpened,
 }: {
 	// Deep link from the notifications panel: open straight onto this thread. Read
 	// once at mount — the parent remounts the panel (via key) per deep link.
 	initialThread?: { conversationId: number; thread: ConversationThreadFilter } | null;
+	// Reports user-initiated thread opens so the parent can dock them as the
+	// last-active thread. Not fired for initialThread — the parent set that itself.
+	onThreadOpened?: (conversationId: number, thread: ConversationThreadFilter) => void;
 } = {}) {
 	const [activeSection, setActiveSection] = useState<'replies' | 'inbound'>(
 		initialThread?.thread === 'general' ? 'inbound' : 'replies'
@@ -247,6 +251,7 @@ export function VenueChatMapPanel({
 	const openThread = (conversationId: number, thread: ConversationThreadFilter) => {
 		cancelOpenIntent();
 		setSelectedThread({ conversationId, thread });
+		onThreadOpened?.(conversationId, thread);
 	};
 
 	const handleSegmentClick = (section: 'replies' | 'inbound') => {
@@ -256,9 +261,10 @@ export function VenueChatMapPanel({
 	};
 
 	const handleReplyRowClick = (row: VenueApplicationRow) => {
-		openReplyRow(row, (conversationId, thread) =>
-			setSelectedThread({ conversationId, thread })
-		);
+		openReplyRow(row, (conversationId, thread) => {
+			setSelectedThread({ conversationId, thread });
+			onThreadOpened?.(conversationId, thread);
+		});
 	};
 
 	const segmentClassName = (active: boolean, activeBackground: string) =>

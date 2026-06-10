@@ -220,24 +220,26 @@ export const ContactsHeaderChrome: FC<{
 		const displayedHoveredStopConfig =
 			displayedHoveredStopIndex >= 0 ? campaignStops[displayedHoveredStopIndex] : null;
 		const stopWidthPercent = 100 / campaignStops.length;
-		const campaignBoxHeight = isBottomView ? 12 : isAllTab ? 20 : 25;
+		// isAllTab metrics are the full-view metrics scaled by 0.875 (330/377 panel width)
+		// so the compact narrow-desktop header reads as a smaller copy of the full header.
+		const campaignBoxHeight = isBottomView ? 12 : isAllTab ? 21.9 : 25;
 		const campaignBoxBorderWidth = 2;
 		const campaignBoxTopBase =
 			whiteSectionHeight !== undefined
 				? (whiteSectionHeight - campaignBoxHeight) / 2
 				: 2;
 		const campaignBoxTop = Math.max(0, campaignBoxTopBase + offsetY);
-		const campaignBoxInsetX = isBottomView ? 4 : isAllTab ? 8 : 4;
-		const campaignPillWidth = isBottomView ? 40 : isAllTab ? 50 : 74.064;
-		const campaignPillHeight = isBottomView ? 10 : isAllTab ? 15 : 18.9;
+		const campaignBoxInsetX = isBottomView ? 4 : isAllTab ? 3.5 : 4;
+		const campaignPillWidth = isBottomView ? 40 : isAllTab ? 64.8 : 74.064;
+		const campaignPillHeight = isBottomView ? 10 : isAllTab ? 16.5 : 18.9;
 		// Center the pill vertically using top: 50% + translateY(-50%). This avoids
 		// sub-pixel position math (e.g. 0.55px) caused by the fractional pill height
 		// (18.9px) and fractional border width (1.85px), which can make the pill
 		// appear visually off-center in the green campaign-stops container.
-		const campaignPillBorderRadius = isBottomView ? 5 : isAllTab ? 7.5 : 12.025;
-		const campaignPillBorderWidth = isBottomView ? 2 : isAllTab ? 2 : 1.85;
-		const campaignDotSize = isBottomView ? 5 : isAllTab ? 6 : 9;
-		const campaignFontSize = isBottomView ? '6px' : isAllTab ? '10px' : '13px';
+		const campaignPillBorderRadius = isBottomView ? 5 : isAllTab ? 10.5 : 12.025;
+		const campaignPillBorderWidth = isBottomView ? 2 : isAllTab ? 1.6 : 1.85;
+		const campaignDotSize = isBottomView ? 5 : isAllTab ? 7.9 : 9;
+		const campaignFontSize = isBottomView ? '6px' : isAllTab ? '11.4px' : '13px';
 		const campaignDotColor = hasData ? '#A6A6A6' : '#B0B0B0';
 		const stopTransition = '0.45s cubic-bezier(0.22, 1, 0.36, 1)';
 		const stopFadeTransition = '0.28s cubic-bezier(0.4, 0, 0.2, 1)';
@@ -309,7 +311,7 @@ export const ContactsHeaderChrome: FC<{
 						style={{
 							fontSize: campaignFontSize,
 							color: '#000000',
-							marginTop: isBottomView || isAllTab ? '-1px' : 0,
+							marginTop: isBottomView ? '-1px' : 0,
 							opacity: hoveredStopConfig ? 0 : 1,
 							transition: `opacity ${stopFadeTransition}`,
 						}}
@@ -348,7 +350,7 @@ export const ContactsHeaderChrome: FC<{
 							style={{
 								fontSize: campaignFontSize,
 								color: '#000000',
-								marginTop: isBottomView || isAllTab ? '-1px' : 0,
+								marginTop: isBottomView ? '-1px' : 0,
 							}}
 						>
 							{displayedHoveredStopConfig.label}

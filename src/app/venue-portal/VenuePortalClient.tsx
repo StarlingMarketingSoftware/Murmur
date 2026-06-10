@@ -62,9 +62,13 @@ import {
 } from '@/hooks/queryHooks/useVenueEvents';
 import {
 	useGetConversations,
+	useOpenApplicationConversation,
 	type ConversationThreadFilter,
 } from '@/hooks/queryHooks/useConversations';
-import { useGetVenueApplications } from '@/hooks/queryHooks/useVenueApplications';
+import {
+	useGetVenueApplications,
+	type VenueEventApplicant,
+} from '@/hooks/queryHooks/useVenueApplications';
 import { _fetch } from '@/utils';
 import type { MediaAssetDto } from '@/app/api/media/route';
 import type { PatchVenueData, WeeklyHours } from '@/app/api/venue/schema';
@@ -79,6 +83,7 @@ import {
 import { MobileVenuePortal } from './mobile/MobileVenuePortal';
 import { VenueChatMapPanel } from './VenueChatMapPanel';
 import { VenueCreateEventMapPanel } from './VenueCreateEventMapPanel';
+import { VenueDockedChatPanel } from './VenueDockedChatPanel';
 import { VenueEventDetailView } from './VenueEventDetailView';
 import { createVenueIconAnchorStore, VenueMapActionPills } from './VenueMapActionPills';
 import { VenueMapToolTabBar } from './VenueMapToolTabBar';
@@ -3504,6 +3509,7 @@ function VenueEventsMapPanel({
 	onSelectEvent,
 	onAddOpportunity,
 	onEditOpportunity,
+	onViewApplicant,
 }: {
 	opportunities: VenueEvent[];
 	applicantCountByEventId: Map<number, number>;
@@ -3511,6 +3517,7 @@ function VenueEventsMapPanel({
 	onSelectEvent: (eventId: number) => void;
 	onAddOpportunity: () => void;
 	onEditOpportunity: (eventId: number) => void;
+	onViewApplicant?: (applicant: VenueEventApplicant) => void;
 }) {
 	// The inner list box is overflow-hidden, so the hover-delete X can't sit next to
 	// a row there. Instead the hovered row's measured offsetTop (relative to the
@@ -3549,6 +3556,7 @@ function VenueEventsMapPanel({
 						onSelectEvent={onSelectEvent}
 						onAddEvent={onAddOpportunity}
 						onEditEvent={onEditOpportunity}
+						onViewApplicant={onViewApplicant}
 					/>
 				) : (
 					<>
@@ -3719,7 +3727,28 @@ export default function VenuePortalClient() {
 		conversationId: number;
 		thread: ConversationThreadFilter;
 	} | null>(null);
+	// Last-active thread for the docked chat panel: never cleared, only replaced,
+	// so the conversation stays pinned to the map while the user moves between
+	// tools. Hidden only while the Chat tool itself is open.
+	const [dockedThread, setDockedThread] = useState<{
+		conversationId: number;
+		thread: ConversationThreadFilter;
+	} | null>(null);
+	// Latest-wins guard for Events-driven background seeds: only the most recently
+	// viewed applicant's seed may dock, and any explicit thread open cancels it.
+	const dockedSeedRequestRef = useRef<number | null>(null);
+	const handleThreadActivated = useCallback(
+		(conversationId: number, thread: ConversationThreadFilter) => {
+			dockedSeedRequestRef.current = null;
+			setDockedThread({ conversationId, thread });
+		},
+		[]
+	);
 	const openChatThread = (conversationId: number, thread: ConversationThreadFilter) => {
+		// Deep links dock the thread too, so it's still on screen after the chat
+		// tool closes — and the remounted panel needn't re-report its initialThread.
+		dockedSeedRequestRef.current = null;
+		setDockedThread({ conversationId, thread });
 		// Set directly: selectVenueTool early-returns when 'mail' is already active,
 		// and its mail branch would clear the link we just set.
 		setChatDeepLink({ nonce: Date.now(), conversationId, thread });
@@ -3806,6 +3835,30 @@ export default function VenuePortalClient() {
 			(sum, application) => sum + (application.conversation?.unreadCount ?? 0),
 			0
 		);
+	// Docked-chat auto-switch: viewing an applicant in the Events tool (expanding
+	// their row, opening their video) docks their thread, seeding the conversation
+	// first when none exists. Mirrors useVenueChatInbox's openReplyRow: dock
+	// immediately off the Replies row when the conversation exists (plus the same
+	// idempotent seed-ensure — the pair conversation may predate the application),
+	// otherwise seed and dock on success.
+	const openDockedApplication = useOpenApplicationConversation({ suppressToasts: true });
+	const handleViewApplicant = (applicant: VenueEventApplicant) => {
+		const row = (venueApplications ?? []).find((item) => item.id === applicant.id);
+		if (row?.conversation != null) {
+			dockedSeedRequestRef.current = null;
+			setDockedThread({ conversationId: row.conversation.id, thread: row.id });
+			openDockedApplication.mutate(row.id);
+			return;
+		}
+		dockedSeedRequestRef.current = applicant.id;
+		openDockedApplication.mutate(applicant.id, {
+			onSuccess: ({ conversationId }) => {
+				if (dockedSeedRequestRef.current !== applicant.id) return;
+				dockedSeedRequestRef.current = null;
+				setDockedThread({ conversationId, thread: applicant.id });
+			},
+		});
+	};
 	// Per-event applicant counts for the Events panel, derived from the inbox rows
 	// already polled above (submitted-only, 30s cadence) — no extra API surface.
 	const applicantCountByEventId = useMemo(() => {
@@ -3889,6 +3942,7 @@ export default function VenuePortalClient() {
 				<VenueChatMapPanel
 					key={chatDeepLink?.nonce ?? 'list'}
 					initialThread={chatDeepLink}
+					onThreadOpened={handleThreadActivated}
 				/>
 			)}
 			{isMobile === false && view === 'map' && selectedVenueTool === 'events' && (
@@ -3899,6 +3953,18 @@ export default function VenuePortalClient() {
 					onSelectEvent={setEventsToolSelectedEventId}
 					onAddOpportunity={openCreateOpportunity}
 					onEditOpportunity={openEditOpportunity}
+					onViewApplicant={handleViewApplicant}
+				/>
+			)}
+			{/* The docked last-active thread; keyed so a thread switch resets the
+			    ConversationThread draft (a half-typed reply must not carry across
+			    counterparts). */}
+			{isMobile === false && view === 'map' && !isMailToolSelected && dockedThread && (
+				<VenueDockedChatPanel
+					key={`${dockedThread.conversationId}:${dockedThread.thread}`}
+					conversationId={dockedThread.conversationId}
+					thread={dockedThread.thread}
+					onExpand={() => openChatThread(dockedThread.conversationId, dockedThread.thread)}
 				/>
 			)}
 			{isMobile === false && view === 'map' && selectedVenueTool === 'profile' && (

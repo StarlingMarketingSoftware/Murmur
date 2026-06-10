@@ -4055,23 +4055,25 @@ body.murmur-mobile .results-align {
 
 /* Short landscape monitors: keep the initial dashboard landing view single-screen.
    (Calendar panel is taller than the campaigns table, so we compact the hero block
-   rather than unlocking page scroll.) */
+   rather than unlocking page scroll.)
+   Not on the zoomed desktop dashboard (.murmur-dashboard-compact): its root zoom
+   scales the whole layout to the viewport, so the anchor-height hero always fits. */
 @media (max-height: 820px) and (orientation: landscape) {
-	.hero-wrapper {
+	html:not(.murmur-dashboard-compact) .hero-wrapper {
 		min-height: 520px !important;
 		height: 520px !important;
 	}
 }
 
 @media (max-height: 800px) and (orientation: landscape) {
-	.hero-wrapper {
+	html:not(.murmur-dashboard-compact) .hero-wrapper {
 		min-height: 480px !important;
 		height: 480px !important;
 	}
 }
 
 @media (max-height: 720px) and (orientation: landscape) {
-	.hero-wrapper {
+	html:not(.murmur-dashboard-compact) .hero-wrapper {
 		min-height: 430px !important;
 		height: 430px !important;
 	}
@@ -4263,32 +4265,34 @@ body.murmur-mobile .results-align {
 	margin-top: -76px;
 }
 
-/* Portrait monitors: lower the dashboard to avoid top clipping */
+/* Portrait monitors: lower the dashboard to avoid top clipping.
+   Not on the zoomed desktop dashboard (.murmur-dashboard-compact): a narrow desktop
+   window is portrait, and these would restructure the uniformly scaled hero. */
 @media (orientation: portrait) {
-	.dashboard-main-offset {
+	html:not(.murmur-dashboard-compact) .dashboard-main-offset {
 		margin-top: 16px;
 	}
 
 	/* Keep search results view at previous position on portrait */
-	.dashboard-main-offset.search-active {
+	html:not(.murmur-dashboard-compact) .dashboard-main-offset.search-active {
 		margin-top: 6px;
 	}
 }
 
 /* Adjust table position for portrait orientation screens to prevent overlap */
 @media (orientation: portrait) {
-	.campaigns-table-wrapper {
+	html:not(.murmur-dashboard-compact) .campaigns-table-wrapper {
 		margin-top: 0px; /* Tight spacing for portrait screens */
 	}
 
 	/* Add extra spacing between search area and table on portrait */
-	.hero-wrapper {
+	html:not(.murmur-dashboard-compact) .hero-wrapper {
 		min-height: auto !important; /* Allow flexible height on portrait */
 		height: auto !important; /* Allow flexible height */
 	}
 
 	/* Ensure search bar area has enough bottom spacing */
-	.search-bar-wrapper {
+	html:not(.murmur-dashboard-compact) .search-bar-wrapper {
 		margin-bottom: 40px;
 	}
 }
@@ -4302,12 +4306,12 @@ body.murmur-mobile .results-align {
 
 /* Mobile portrait specific fix to ensure no white margin */
 @media (max-width: 640px) and (orientation: portrait) {
-	.campaigns-table-wrapper {
+	html:not(.murmur-dashboard-compact) .campaigns-table-wrapper {
 		margin-top: 0px !important; /* Tight spacing */
 	}
 
 	/* Ensure the dashboard offset doesn't interfere */
-	.dashboard-main-offset {
+	html:not(.murmur-dashboard-compact) .dashboard-main-offset {
 		margin-top: 0;
 		padding-top: 80px;
 	}
@@ -6012,10 +6016,12 @@ body.murmur-mobile .search-results-table thead[data-slot='table-header'] {
 	margin-bottom: -6px !important;
 }
 
-/* Mobile: ensure the initial dashboard search input is 41px tall */
+/* Mobile: ensure the initial dashboard search input is 41px tall.
+   Not on the zoomed desktop dashboard (.murmur-dashboard-compact): it scales
+   uniformly via root zoom, so width-based fallbacks must not restyle the hero. */
 @media (max-width: 640px) {
 	/* Target only the hero/initial search input, not the results view */
-	.search-wave-input:not(.results-search-input) {
+	html:not(.murmur-dashboard-compact) .search-wave-input:not(.results-search-input) {
 		height: 41px !important;
 		font-size: 13px !important;
 	}
@@ -6031,15 +6037,15 @@ body.murmur-mobile .search-bar-wrapper {
 	margin-top: 30px !important;
 }
 @media (max-width: 640px) {
-	.search-bar-wrapper {
+	html:not(.murmur-dashboard-compact) .search-bar-wrapper {
 		margin-top: 30px;
 	}
 	/* Make room for the right icon in the initial input */
-	.search-wave-input:not(.results-search-input) {
+	html:not(.murmur-dashboard-compact) .search-wave-input:not(.results-search-input) {
 		padding-right: 44px !important;
 	}
 	/* Prevent placeholder text from overlapping the icon */
-	.search-input-group .custom-placeholder {
+	html:not(.murmur-dashboard-compact) .search-input-group .custom-placeholder {
 		right: 44px !important;
 	}
 }
@@ -6183,12 +6189,12 @@ body.murmur-mobile .search-bar-wrapper .flex-wrap > .h-\[39px\] {
 
 /* Width-based fallback for responsive mode/devtools */
 @media (max-width: 640px) {
-	.search-bar-wrapper .flex-wrap > .h-\[39px\] {
+	html:not(.murmur-dashboard-compact) .search-bar-wrapper .flex-wrap > .h-\[39px\] {
 		height: auto !important;
 		min-height: 16px !important;
 		align-self: flex-start !important;
 	}
-	.exclude-contacts-box {
+	html:not(.murmur-dashboard-compact) .exclude-contacts-box {
 		margin-top: 0 !important;
 		margin-bottom: 0 !important;
 		align-self: flex-start !important;
@@ -6198,21 +6204,24 @@ body.murmur-mobile .search-bar-wrapper .flex-wrap > .h-\[39px\] {
 /* Width-based mobile fallback: ensure 3px gap below the search bar even when
    the runtime mobile class is not present (e.g., devtools responsive mode). */
 @media (max-width: 640px) {
-	.search-bar-wrapper [data-slot='form-item'] {
+	html:not(.murmur-dashboard-compact) .search-bar-wrapper [data-slot='form-item'] {
 		margin-bottom: 0 !important;
 	}
-	.search-bar-wrapper .search-input-group {
+	html:not(.murmur-dashboard-compact) .search-bar-wrapper .search-input-group {
 		margin-bottom: 0 !important;
 	}
-	.search-bar-wrapper form > [data-slot='form-item'] {
+	html:not(.murmur-dashboard-compact) .search-bar-wrapper form > [data-slot='form-item'] {
 		margin-bottom: 0 !important;
 	}
-	.search-bar-wrapper form > .flex-wrap {
+	html:not(.murmur-dashboard-compact) .search-bar-wrapper form > .flex-wrap {
 		margin-top: 3px !important;
 		padding-top: 0 !important;
 	}
 	/* Adjacent sibling fallback as well */
-	.search-bar-wrapper [data-slot='form-item'] + .flex-wrap {
+	html:not(.murmur-dashboard-compact)
+		.search-bar-wrapper
+		[data-slot='form-item']
+		+ .flex-wrap {
 		margin-top: 3px !important;
 		padding-top: 0 !important;
 	}
@@ -6250,6 +6259,44 @@ body.murmur-mobile .search-bar-wrapper .flex-wrap > .h-\[39px\] {
 		padding-right: 1.25rem !important;
 		font-size: 1.0625rem;
 	}
+}
+
+/* Zoomed desktop dashboard: same hero input styling at EVERY window width — the root
+   zoom owns responsive scaling, so the styling above must not key off real width. */
+html.murmur-dashboard-compact .search-bar-wrapper:not(.search-bar-active) .search-input-group {
+	width: 603px !important;
+	max-width: 603px !important;
+	min-width: 603px !important;
+	margin-left: auto !important;
+	margin-right: auto !important;
+}
+
+html.murmur-dashboard-compact
+	.search-bar-wrapper:not(.search-bar-active)
+	.search-wave-container {
+	width: 100% !important;
+	min-width: 100% !important;
+	max-width: 100% !important;
+	border-radius: 8px !important;
+	background: #f2f2f2 !important;
+}
+
+html.murmur-dashboard-compact
+	.search-bar-wrapper:not(.search-bar-active)
+	.search-wave-container::before {
+	background: #f2f2f2 !important;
+	border-radius: 8px !important;
+}
+
+html.murmur-dashboard-compact
+	.search-bar-wrapper:not(.search-bar-active)
+	.search-wave-input:not(.results-search-input) {
+	width: 100% !important;
+	height: 72px !important;
+	border-radius: 8px !important;
+	padding-left: 1.25rem !important;
+	padding-right: 1.25rem !important;
+	font-size: 1.0625rem;
 }
 
 /* Mobile-only button inside the initial search input */

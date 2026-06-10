@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Event as VenueEvent } from '@prisma/client';
 import { Play } from 'lucide-react';
@@ -517,10 +517,14 @@ function EventApplicantsBox({
 	event,
 	fallbackApplicantCount,
 	onEditEvent,
+	onViewApplicant,
 }: {
 	event: VenueEvent;
 	fallbackApplicantCount: number;
 	onEditEvent: (eventId: number) => void;
+	// Reports the applicant currently being viewed (expanded row in List view, the
+	// open video's owner in Media view) so the docked chat can follow along.
+	onViewApplicant?: (applicant: VenueEventApplicant) => void;
 }) {
 	const { data: applicants, isPending, isError } = useGetVenueEventApplicants(event.id);
 	const [expandedApplicantId, setExpandedApplicantId] = useState<number | null>(null);
@@ -548,6 +552,18 @@ function EventApplicantsBox({
 			}
 			return { ...prev, [videoId]: value };
 		});
+	// Only non-null activations report: collapsing a row or closing a video keeps
+	// the docked chat on its last thread, and the key={event.id} remount on event
+	// switch reports nothing until the user views someone.
+	const activeApplicant =
+		viewMode === 'media'
+			? (videoItems.find((item) => item.video.id === openVideoId)?.applicant ?? null)
+			: expandedApplicant;
+	const activeApplicantId = activeApplicant?.id ?? null;
+	useEffect(() => {
+		if (activeApplicant) onViewApplicant?.(activeApplicant);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [activeApplicantId]);
 	return (
 		<div className="flex h-full w-[540px] shrink-0 flex-col overflow-hidden rounded-[12px] border-[2px] border-black bg-[#F3FFF0]">
 			<div className="flex shrink-0 justify-center pt-[9px]">
@@ -704,6 +720,7 @@ export function VenueEventDetailView({
 	onSelectEvent,
 	onAddEvent,
 	onEditEvent,
+	onViewApplicant,
 }: {
 	events: VenueEvent[];
 	selectedEventId: number;
@@ -711,6 +728,7 @@ export function VenueEventDetailView({
 	onSelectEvent: (eventId: number) => void;
 	onAddEvent: () => void;
 	onEditEvent: (eventId: number) => void;
+	onViewApplicant?: (applicant: VenueEventApplicant) => void;
 }) {
 	const selectedEvent = events.find((event) => event.id === selectedEventId) ?? null;
 	return (
@@ -743,6 +761,7 @@ export function VenueEventDetailView({
 					event={selectedEvent}
 					fallbackApplicantCount={applicantCountByEventId.get(selectedEvent.id) ?? 0}
 					onEditEvent={onEditEvent}
+					onViewApplicant={onViewApplicant}
 				/>
 			)}
 		</div>

@@ -742,6 +742,13 @@ const CAMPAIGN_COMPACT_WORKSPACE_TOP_NAV_INSET_PX = 184;
 const CAMPAIGN_COMPACT_WORKSPACE_MAIN_PANEL_HALF_WIDTH_PX = 250;
 const CAMPAIGN_COMPACT_WORKSPACE_CONTACT_PANEL_WIDTH_PX = 377;
 const CAMPAIGN_COMPACT_WORKSPACE_MAIN_PANEL_GAP_PX = 34;
+// Below this layout-px width, non-overview tabs drop the split map strip: the translucent
+// band covers the full viewport and the workspace centers (shift = 0). Mirrors
+// DraftingSection's isNarrowDesktop upper bound (< 1317), where the grouped layouts begin.
+const CAMPAIGN_CENTERED_STAGE_COMPACT_MAX_LAYOUT_W_PX = 1317;
+// The standard right-anchored cluster (Sent / expanded workspace) spans ±657·0.94 from
+// center; with the 88px min shift clamp it clips the right edge below ~1418 layout px.
+const CAMPAIGN_CENTERED_STAGE_STANDARD_MAX_LAYOUT_W_PX = 1418;
 const CAMPAIGN_TOP_NAV_UI_SCALE = 0.85;
 const CAMPAIGN_TOP_NAV_SEARCH_BAR_OUTER_WIDTH_PX = 440;
 const CAMPAIGN_TOP_NAV_SEARCH_BAR_INPUT_HEIGHT_PX = 49;
@@ -1681,7 +1688,21 @@ const Murmur = () => {
 		let campaignBackdropStartCss: number;
 		let campaignBackdropEndCss: number;
 
-		if (isCompactWorkspaceActive) {
+		const centeredStageMaxLayoutW = isCompactWorkspaceActive
+			? CAMPAIGN_CENTERED_STAGE_COMPACT_MAX_LAYOUT_W_PX
+			: CAMPAIGN_CENTERED_STAGE_STANDARD_MAX_LAYOUT_W_PX;
+		const isCenteredStage =
+			campaignWorkspaceActiveViewRef.current !== 'overview' &&
+			layoutViewportW < centeredStageMaxLayoutW;
+
+		if (isCenteredStage) {
+			// Narrow windows: drop the split map strip entirely — the translucent band
+			// covers the full viewport and the grouped/stacked workspace centers unshifted.
+			campaignMapShiftX = 0;
+			campaignTopNavShiftX = 0;
+			campaignBackdropStartCss = 0;
+			campaignBackdropEndCss = layoutViewportW;
+		} else if (isCompactWorkspaceActive) {
 			campaignBackdropStartCss = clampZoom(
 				layoutViewportW - CAMPAIGN_COMPACT_WORKSPACE_BACKDROP_WIDTH_PX,
 				0,
@@ -2312,6 +2333,21 @@ const Murmur = () => {
 						: DEFAULT_CAMPAIGN_ZOOM;
 
 			const viewportW = window.innerWidth;
+
+			// Centered stage: the band covers the full viewport, so there is no clear
+			// map strip to keep markers inside — center the globe like the overview tab.
+			// Mirrors the centered branch of updateCampaignZoomForViewport.
+			const layoutViewportWForStage = viewportW / (z || 1);
+			const isCompactWorkspaceActiveForStage =
+				isCompactCampaignWorkspaceView(activeView) &&
+				!isCampaignWorkspaceExpandedRef.current;
+			const centeredStageMaxLayoutW = isCompactWorkspaceActiveForStage
+				? CAMPAIGN_CENTERED_STAGE_COMPACT_MAX_LAYOUT_W_PX
+				: CAMPAIGN_CENTERED_STAGE_STANDARD_MAX_LAYOUT_W_PX;
+			if (layoutViewportWForStage < centeredStageMaxLayoutW) {
+				setCampaignMapCameraPadding(null);
+				return;
+			}
 
 			let backdropStartCss: number;
 			if (isCompactCampaignWorkspaceView(activeView)) {
@@ -3035,6 +3071,12 @@ const Murmur = () => {
 
 	// Narrowest desktop detection (< 952px) - header box above tabs
 	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
+	// Centered-stage detection: mirrors the backdrop/shift branches in
+	// updateCampaignZoomForViewport so the over-map chrome can hide once the
+	// translucent band covers the full viewport.
+	const [isCampaignChromeCentered, setIsCampaignChromeCentered] = useState(false);
+	const [isCampaignStandardStageNarrow, setIsCampaignStandardStageNarrow] =
+		useState(false);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		const checkBreakpoints = () => {
@@ -3054,6 +3096,12 @@ const Murmur = () => {
 			const effectiveWidth = window.innerWidth / (z || 1);
 
 			setIsNarrowestDesktop(effectiveWidth < 952);
+			setIsCampaignChromeCentered(
+				effectiveWidth < CAMPAIGN_CENTERED_STAGE_COMPACT_MAX_LAYOUT_W_PX
+			);
+			setIsCampaignStandardStageNarrow(
+				effectiveWidth < CAMPAIGN_CENTERED_STAGE_STANDARD_MAX_LAYOUT_W_PX
+			);
 		};
 		checkBreakpoints();
 		window.addEventListener('resize', checkBreakpoints);
@@ -3267,7 +3315,11 @@ const Murmur = () => {
 	const isCampaignWorkspaceToggleVisible =
 		!isMobile &&
 		usePersistentCampaignMapBackground &&
-		isCompactCampaignWorkspaceView(activeView);
+		isCompactCampaignWorkspaceView(activeView) &&
+		// Below the compact centered-stage threshold the grouped layouts ignore the
+		// expanded state, so the toggle is moot. Between 1317–1418 it stays reachable
+		// (at the window's left edge) so an expanded workspace can be collapsed back.
+		!isCampaignChromeCentered;
 	const requestCampaignWorkspaceExpanded = useCallback(() => {
 		isCampaignWorkspaceExpandedRef.current = true;
 		setIsCampaignWorkspaceExpanded(true);
@@ -3402,11 +3454,18 @@ const Murmur = () => {
 	// locked to the tab's preset, plus a dimmed, display-only category strip and
 	// search bar. Only on the roomy desktop layout, where the split-screen leaves a
 	// clear left map region for them to sit over.
+	// Once the centered stage kicks in (the band covers the full viewport) there is
+	// no clear map strip left, so the controls hide. The expanded workspace uses the
+	// standard (wider) cluster, which centers at the higher 1418 threshold.
+	const isCampaignMapStageCentered =
+		isCampaignChromeCentered ||
+		(isCampaignWorkspaceExpanded && isCampaignStandardStageNarrow);
 	const isPresetMapControlsView =
 		!isMobile &&
 		Boolean(activeTabPresetStatuses) &&
 		!shouldHideContent &&
-		!isNarrowestDesktop;
+		!isNarrowestDesktop &&
+		!isCampaignMapStageCentered;
 	const presetMapControlsLeftCss = `calc(var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333vw) / 2)`;
 	const presetMapControlsScale =
 		isPresetMapControlsView && isCampaignWorkspaceExpanded && viewportWidth > 0
@@ -4479,8 +4538,9 @@ const Murmur = () => {
 									}
 								/>
 
-								{/* Campaign Header Box - shown at narrowest breakpoint (< 952px) */}
-								{!isMobile && isNarrowestDesktop && campaign && (
+								{/* Campaign Header Box - shown at narrowest breakpoint (< 952px).
+								    Excluded on the All tab, where the whole contacts column hides instead. */}
+								{!isMobile && isNarrowestDesktop && activeView !== 'overview' && campaign && (
 									<div className="flex justify-center mb-4">
 										<CampaignHeaderBox
 											campaignId={campaign.id}
@@ -4657,6 +4717,20 @@ const Murmur = () => {
 										background: rgba(136, 136, 136, 0.15);
 									}
 
+									/* ≤776px scrollable mode strips the inline shift/backdrop vars; without
+									   these overrides the fallbacks (33.333% band, 160px shift) misalign the
+									   stacked layout. Pin the band full-width and center the content. */
+									html.murmur-campaign-scrollable .campaign-map-split-overlay {
+										left: 0;
+										right: 0;
+									}
+
+									html.murmur-campaign-scrollable .campaign-persistent-map-page [data-slot='campaign-top-box-wrapper'],
+									html.murmur-campaign-scrollable .campaign-persistent-map-page [data-slot='campaign-header'],
+									html.murmur-campaign-scrollable .campaign-persistent-map-page [data-slot='campaign-content'] {
+										transform: translateX(0) scale(${CAMPAIGN_MAP_CONTENT_SCALE});
+									}
+
 									.campaign-persistent-map-page [data-slot='campaign-top-box-wrapper'],
 									.campaign-persistent-map-page [data-slot='campaign-header'],
 									.campaign-persistent-map-page [data-slot='campaign-content'] {
@@ -4689,6 +4763,17 @@ const Murmur = () => {
 												)
 											)
 										);
+									}
+
+									/* ≤776px scrollable mode: keep the portaled top nav at its natural centered spot. */
+									html.murmur-campaign-scrollable body.murmur-campaign-persistent-map [data-slot='campaign-top-backdrop'],
+									html.murmur-campaign-scrollable body.murmur-campaign-persistent-map [data-slot='campaign-top-outline-boxes'],
+									html.murmur-campaign-scrollable body.murmur-campaign-persistent-map [data-slot='campaign-top-tabs'],
+									html.murmur-campaign-scrollable body.murmur-campaign-persistent-map [data-slot='campaign-top-search-bar'],
+									html.murmur-campaign-scrollable body.murmur-campaign-persistent-map [data-slot='campaign-top-strategy-dropdown'],
+									html.murmur-campaign-scrollable body.murmur-campaign-persistent-map [data-slot='campaign-top-campaigns-dropdown'],
+									html.murmur-campaign-scrollable body.murmur-campaign-persistent-map [data-slot='campaign-top-opportunities-popup'] {
+										transform: none;
 									}
 
 									/* View transition animation - simple tab fade */

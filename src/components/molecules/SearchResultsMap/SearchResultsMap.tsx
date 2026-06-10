@@ -348,10 +348,12 @@ import {
 	STREET_VIEW_BUILDINGS_RISE_FULL_ZOOM,
 	STREET_VIEW_BUILDING_COLOR,
 	STREET_VIEW_BUILDING_OPACITY,
+	STREET_VIEW_MAX_PERSISTENT_CARDS,
 	STREET_VIEW_MAX_PITCH,
 	STREET_VIEW_MIN_ZOOM,
 	STREET_VIEW_PITCH_EASE_MS,
 	STREET_VIEW_PITCH_EPSILON_DEG,
+	STREET_VIEW_PITCH_FRAME_EPSILON_DEG,
 	STREET_VIEW_PITCH_RAMP_FULL_ZOOM,
 	STREET_VIEW_PITCH_RAMP_START_ZOOM,
 	SUN_TRANSITION_CLOUD_CATCHLIGHT_OPACITY_MULT,
@@ -508,6 +510,7 @@ import {
 	normalizeStateKey,
 	parseMetadataSections,
 } from './metadata';
+import { StreetViewContactCard } from './StreetViewContactCard';
 import {
 	WHAT_TO_HOVER_TOOLTIP_FILL_COLOR,
 	bookingTitlePrefixMatchesSearchWhatKey,
@@ -1551,6 +1554,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const mapContainerRef = useRef<HTMLDivElement | null>(null);
 	const hoverTooltipOverlayRef = useRef<HTMLDivElement | null>(null);
 	const streetCardOverlayRef = useRef<HTMLDivElement | null>(null);
+	// Persistent street-view research cards: container + per-contact card elements,
+	// positioned imperatively by a single shared 'move' listener.
+	const streetCardsContainerRef = useRef<HTMLDivElement | null>(null);
+	const streetCardElsByContactIdRef = useRef<Map<number, HTMLDivElement>>(new Map());
+	const registerStreetCardEl = useCallback(
+		(contactId: number, el: HTMLDivElement | null) => {
+			if (el) {
+				streetCardElsByContactIdRef.current.set(contactId, el);
+			} else {
+				streetCardElsByContactIdRef.current.delete(contactId);
+			}
+		},
+		[]
+	);
 	const mapRef = useRef<mapboxgl.Map | null>(null);
 	const [map, setMap] = useState<mapboxgl.Map | null>(null);
 	// Mobile gets a lower interactive zoom floor so the full globe fits the narrow
@@ -8438,6 +8455,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const secondsPerRevolution = 3000;
 				const distancePerSecond = 360 / secondsPerRevolution;
 				const animationDurationMs = 1000;
+				// Cap per-tick elapsed time: background tabs suspend the ease, and an
+				// uncapped dt on tab return would visibly snap the globe forward.
+				const maxTickDtMs = 2000;
 
 				const normalizeLng = (lng: number) => ((((lng + 180) % 360) + 360) % 360) - 180;
 
@@ -8445,10 +8465,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const maxDriftDeg = 35; // keep camera within a US-visible band
 				let direction: 1 | -1 = 1;
 				let currentLng = normalizeLng(map.getCenter()?.lng ?? baseLng);
+				// Seed one full step back so the kick-off tick advances a full increment.
+				let lastTickMs = performance.now() - animationDurationMs;
 
 				const spinGlobe = () => {
 					try {
-						currentLng = normalizeLng(currentLng + direction * distancePerSecond);
+						// Advance by wall-clock elapsed time, not per event: map.resize()
+						// (e.g. while the window is being drag-resized) fires extra moveend
+						// events, and a fixed per-tick step would speed up the spin.
+						const now = performance.now();
+						const dtMs = Math.min(now - lastTickMs, maxTickDtMs);
+						lastTickMs = now;
+						currentLng = normalizeLng(
+							currentLng + direction * distancePerSecond * (dtMs / 1000)
+						);
 						const drift = normalizeLng(currentLng - baseLng);
 						if (drift > maxDriftDeg) {
 							currentLng = normalizeLng(baseLng + maxDriftDeg);
@@ -10645,6 +10675,46 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				cancelAnimationFrame(frameId);
 				frameId = null;
 			}
+		};
+	}, [map, isMapLoaded, isBackgroundPresentation, streetViewEnabled]);
+
+	// Street-level 3D: continuous pitch ramp during user zoom gestures, so the
+	// camera tilts WHILE zooming instead of after the gesture settles. Writes
+	// map.transform.pitch directly (the exact write jumpTo performs internally:
+	// the setter clamps to [minPitch, maxPitch] and recalcs matrices) because
+	// every public camera mutator funnels through stop(), which resets all
+	// gesture handlers — freezing wheel smoothing and killing a live pinch. The
+	// gesture pipeline applies deltas only (tr.pitch += pitchDelta) and no zoom
+	// handler emits pitchDelta (touchPitch/pitchWithRotate are off on this map),
+	// so these writes are never overwritten. e.originalEvent separates user
+	// input (wheel/pinch frames; dblclick/inertia eases, which never touch
+	// pitch) from programmatic flights/handoffs, which stay owned by the
+	// moveend reconcile above — that effect remains the settle pass and the
+	// fallback if mapbox internals ever change shape.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		if (isBackgroundPresentation) return;
+		if (!streetViewEnabled) return;
+
+		const onZoomFrame = (e: { originalEvent?: Event }) => {
+			try {
+				if (!e.originalEvent) return; // programmatic camera move — skip
+				const tr = map.transform;
+				if (!tr || typeof tr.pitch !== 'number') return; // private-API fence
+				const target = computeStreetViewPitch(map.getZoom() ?? MAP_DEFAULT_ZOOM);
+				if (Math.abs(tr.pitch - target) < STREET_VIEW_PITCH_FRAME_EPSILON_DEG) return;
+				tr.pitch = target;
+				map.triggerRepaint(); // no-op mid-render; safety net otherwise
+			} catch {
+				// Fence: on any mapbox internals change, fall back to the
+				// moveend reconcile (today's behavior).
+			}
+		};
+
+		map.on('zoom', onZoomFrame);
+		return () => {
+			map.off('zoom', onZoomFrame);
 		};
 	}, [map, isMapLoaded, isBackgroundPresentation, streetViewEnabled]);
 
@@ -13323,11 +13393,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map.on('click', onClick);
 		const canvas = map.getCanvas();
 		const isInsideHoverTooltip = (event: MouseEvent): boolean => {
-			// Covers both the slim SVG tooltip and the street-view research card —
-			// whichever overlay is mounted keeps hover alive across canvas → DOM moves.
+			// Covers the slim SVG tooltip, the ambient street-view hover card, and the
+			// persistent street-view card layer — whichever overlay is mounted keeps
+			// hover alive across canvas → DOM moves.
 			for (const tooltipEl of [
 				hoverTooltipOverlayRef.current,
 				streetCardOverlayRef.current,
+				streetCardsContainerRef.current,
 			]) {
 				if (!tooltipEl) continue;
 
@@ -16308,10 +16380,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		getAllContactsOverlayContactCoords,
 	]);
 
-	// Street-view research card: parallel render path to the slim SVG tooltip,
-	// engaged only at street zoom on surfaces that opted in.
+	// Street-view research cards, engaged only at street zoom on surfaces that
+	// opted in. Base/booking/promotion markers get PERSISTENT cards (see
+	// streetCardEntries below); this hover-gated single-card path now serves
+	// only the ambient 'all'-contacts gray dots, which stay hover-only.
 	const isStreetCardMode = streetViewEnabled && zoomLevel >= STREET_VIEW_MIN_ZOOM;
-	const streetCardContact = isStreetCardMode ? (hoverTooltipEntry?.contact ?? null) : null;
+	const streetCardContact =
+		isStreetCardMode && hoverTooltipEntry?.kind === 'all'
+			? hoverTooltipEntry.contact
+			: null;
 	// Slim overlay payloads (booking/promotion/all — see api/contacts/map-overlay) omit
 	// metadata/address; backfill via the per-contact research endpoint (30-min cache).
 	const streetCardNeedsBackfill =
@@ -16323,7 +16400,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		);
 
 	const streetCardData = useMemo(() => {
-		if (!isStreetCardMode || !hoverTooltipEntry) return null;
+		if (!isStreetCardMode || !hoverTooltipEntry || hoverTooltipEntry.kind !== 'all')
+			return null;
 		const contact = hoverTooltipEntry.contact;
 		const kind = hoverTooltipEntry.kind;
 		const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
@@ -16368,6 +16446,80 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		baseContactIdSet,
 		isBookingSearch,
 		bookingExtraVisibleContacts,
+	]);
+
+	// Persistent street-view research cards: one per visible search-result dot and
+	// booking/promotion pin (ambient 'all' dots excluded — they keep the hover-only
+	// card above). Capped to the markers nearest the viewport center so dense
+	// blocks can't wall the screen, then id-sorted so render order (and therefore
+	// paint stacking among equal z-indexes) stays stable while panning.
+	const streetCardEntries = useMemo(() => {
+		if (!isStreetCardMode || isBackgroundPresentation) return [];
+		type StreetCardEntry = {
+			contact: ContactWithName;
+			coords: LatLngLiteral;
+			isSelected: boolean;
+			isSelectionEligible: boolean;
+		};
+		const seenIds = new Set<number>();
+		const candidates: StreetCardEntry[] = [];
+		const collect = (
+			contacts: ContactWithName[],
+			getCoords: (contact: ContactWithName) => LatLngLiteral | null
+		) => {
+			for (const contact of contacts) {
+				if (seenIds.has(contact.id)) continue;
+				const coords = getCoords(contact);
+				if (!coords) continue;
+				seenIds.add(contact.id);
+				candidates.push({
+					contact,
+					coords,
+					isSelected: selectedContactIdSet.has(contact.id),
+					isSelectionEligible: isSelectionToggleEligible(contact),
+				});
+			}
+		};
+		collect(visibleContacts, getContactCoords);
+		collect(bookingExtraVisibleContacts, getBookingExtraContactCoords);
+		collect(promotionOverlayVisibleContacts, getPromotionOverlayContactCoords);
+
+		let kept = candidates;
+		if (candidates.length > STREET_VIEW_MAX_PERSISTENT_CARDS) {
+			// Membership (not render order) is distance-ranked. Recomputed only when a
+			// visible list's identity changes — a pure pan inside the padded bbox keeps
+			// the same set, which is the stability we want.
+			const center = map?.getCenter();
+			if (center) {
+				kept = candidates
+					.slice()
+					.sort((a, b) => {
+						const da =
+							(a.coords.lat - center.lat) ** 2 + (a.coords.lng - center.lng) ** 2;
+						const db =
+							(b.coords.lat - center.lat) ** 2 + (b.coords.lng - center.lng) ** 2;
+						return da - db;
+					})
+					.slice(0, STREET_VIEW_MAX_PERSISTENT_CARDS);
+			} else {
+				kept = candidates.slice(0, STREET_VIEW_MAX_PERSISTENT_CARDS);
+			}
+		}
+
+		return kept.slice().sort((a, b) => a.contact.id - b.contact.id);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [
+		isStreetCardMode,
+		isBackgroundPresentation,
+		visibleContacts,
+		bookingExtraVisibleContacts,
+		promotionOverlayVisibleContacts,
+		getContactCoords,
+		getBookingExtraContactCoords,
+		getPromotionOverlayContactCoords,
+		selectedContactIdSet,
+		baseContactIdSet,
+		isBookingSearch,
 	]);
 
 	const hoverTooltipData = useMemo(() => {
@@ -16546,6 +16698,36 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		hoverTooltipCoords?.lat,
 		hoverTooltipCoords?.lng,
 	]);
+
+	// Persistent street-view cards positioning: ONE shared listener re-projects every
+	// mounted card (same outer-anchor/inner-self-center scheme as the hover card
+	// above). 'moveend' is included because the continuous pitch coupler writes the
+	// transform without firing 'move' — the gesture's own frames cover the ramp, but
+	// the final frame's pitch lands after the last 'move', so the settle pass here
+	// squares the cards with the settled camera. Both handlers MUST stay read-only
+	// (project only — see the synchronous-moveend hazard on the pitch reconciler).
+	useLayoutEffect(() => {
+		if (!map || !isMapLoaded) return;
+		if (isLoading) return;
+		if (!isStreetCardMode || streetCardEntries.length === 0) return;
+
+		const update = () => {
+			for (const entry of streetCardEntries) {
+				const el = streetCardElsByContactIdRef.current.get(entry.contact.id);
+				if (!el) continue;
+				const p = map.project([entry.coords.lng, entry.coords.lat]);
+				el.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px)`;
+			}
+		};
+
+		update();
+		map.on('move', update);
+		map.on('moveend', update);
+		return () => {
+			map.off('move', update);
+			map.off('moveend', update);
+		};
+	}, [map, isMapLoaded, isLoading, isStreetCardMode, streetCardEntries]);
 
 	return (
 		<div
@@ -17063,7 +17245,39 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				</div>
 			)}
 
-			{/* Street-view research card (replaces the slim tooltip at street zoom) */}
+			{/* Persistent street-view research cards (search-result dots + booking/
+			    promotion pins). Positions are set imperatively by the shared 'move'
+			    listener; hover raises a card within this container. */}
+			{!isLoading && isStreetCardMode && streetCardEntries.length > 0 && (
+				<div
+					ref={streetCardsContainerRef}
+					style={{
+						position: 'absolute',
+						left: 0,
+						top: 0,
+						zIndex: HOVER_TOOLTIP_Z_INDEX,
+						pointerEvents: 'none',
+					}}
+				>
+					{streetCardEntries.map((entry) => (
+						<StreetViewContactCard
+							key={entry.contact.id}
+							contact={entry.contact}
+							coords={entry.coords}
+							isSelected={entry.isSelected}
+							isSelectionEligible={entry.isSelectionEligible}
+							isHovered={hoveredMarkerId === entry.contact.id}
+							onHoverStart={handleMarkerMouseOver}
+							onHoverEnd={handleMarkerMouseOut}
+							onToggleSelection={onToggleSelection}
+							registerEl={registerStreetCardEl}
+						/>
+					))}
+				</div>
+			)}
+
+			{/* Street-view research card for ambient 'all'-contacts dots only (those
+			    stay hover-gated; everything else has a persistent card above). */}
 			{!isLoading && isStreetCardMode && hoverTooltipEntry && hoverTooltipCoords && streetCardData && (
 				<div
 					ref={streetCardOverlayRef}
@@ -17071,7 +17285,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						position: 'absolute',
 						left: 0,
 						top: 0,
-						zIndex: HOVER_TOOLTIP_Z_INDEX,
+						// Above the persistent cards (hover intent), below the
+						// selected-marker panel (+10).
+						zIndex: HOVER_TOOLTIP_Z_INDEX + 5,
 						pointerEvents: 'none',
 					}}
 				>

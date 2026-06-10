@@ -493,6 +493,14 @@ export interface ContactsExpandedListProps {
 	isLoading?: boolean;
 	onContactClick?: (contact: ContactWithName | null) => void;
 	onContactHover?: (contact: ContactWithName | null) => void;
+	/**
+	 * Row-geometry hover for the left-docked abridged research card.
+	 * Fires (contact|null, rowEl) on row mouseenter and (null, null) on row mouseleave.
+	 */
+	onContactRowHover?: (
+		contact: ContactWithName | null,
+		rowElement: HTMLElement | null
+	) => void;
 	onDraftClick?: (draft: EmailWithRelations) => void;
 	onDraftHover?: (draft: EmailWithRelations | null) => void;
 	selectedInboxEmailId?: number | null;
@@ -556,6 +564,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	onHeaderClick,
 	onContactClick,
 	onContactHover,
+	onContactRowHover,
 	onDraftClick,
 	onDraftHover,
 	selectedInboxEmailId,
@@ -895,7 +904,8 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 
 	const isAllTab = height === 263;
 	const isAllTabNavigation = interactionMode === 'allTab';
-	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
+	// Compact (narrow-desktop) header is the full 28px header scaled by 0.875.
+	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 24.5 : 28);
 	const isBottomView = customWhiteSectionHeight === 15 || customWhiteSectionHeight === 16;
 	const shouldRenderCollapsedTopBox = collapsed && isBottomView;
 	// Compressed bottom panel spec: 45px total = 13px label strip + 26px inner bar.
@@ -928,7 +938,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			? panelFillColor
 			: shouldRenderCollapsedTopBox
 				? collapsedTopColor
-			: effectiveWhiteSectionHeight === 28
+			: effectiveWhiteSectionHeight === 28 || isAllTab
 				? '#FFB9B9'
 				: 'rgba(255, 255, 255, 0.31)';
 	const panelBackground =
@@ -1248,11 +1258,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 								: '#FFFFFF'),
 					boxSizing: 'border-box',
 				}}
-				onMouseEnter={() => {
+				onMouseEnter={(e) => {
 					if (!isAllTabNavigation) setHoveredContactIndex(null);
 					onDraftHover?.(draft);
 					onContactHover?.(contact);
+					onContactRowHover?.(contact, e.currentTarget);
 				}}
+				onMouseLeave={() => onContactRowHover?.(null, null)}
 				onMouseDown={(e) => {
 					if (e.shiftKey) e.preventDefault();
 				}}
@@ -1445,11 +1457,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				role={!isAllTabNavigation ? 'button' : undefined}
 				aria-pressed={!isAllTabNavigation ? isSelectedInboxConversation : undefined}
 				tabIndex={!isAllTabNavigation ? 0 : undefined}
-				onMouseEnter={() => {
+				onMouseEnter={(e) => {
 					if (!isAllTabNavigation) setHoveredContactIndex(null);
 					if (isDraftsFocusMode) onDraftHover?.(null);
 					onContactHover?.(contact);
+					onContactRowHover?.(contact, e.currentTarget);
 				}}
+				onMouseLeave={() => onContactRowHover?.(null, null)}
 				onClick={(e) => {
 					if (isAllTabNavigation) return;
 					e.stopPropagation();
@@ -1582,11 +1596,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				role={!isAllTabNavigation ? 'button' : undefined}
 				aria-pressed={!isAllTabNavigation ? isSelectedSentConversation : undefined}
 				tabIndex={!isAllTabNavigation ? 0 : undefined}
-				onMouseEnter={() => {
+				onMouseEnter={(e) => {
 					if (!isAllTabNavigation) setHoveredContactIndex(null);
 					if (isDraftsFocusMode) onDraftHover?.(null);
 					onContactHover?.(contact);
+					onContactRowHover?.(contact, e.currentTarget);
 				}}
+				onMouseLeave={() => onContactRowHover?.(null, null)}
 				onClick={(e) => {
 					if (isAllTabNavigation) return;
 					e.stopPropagation();
@@ -1813,7 +1829,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				<ContactsHeaderChrome
 					variant={isBottomView ? 'legacy' : 'campaignStops'}
 					isAllTab={isAllTab}
-					offsetY={effectiveWhiteSectionHeight === 28 ? 2 : 0}
+					offsetY={effectiveWhiteSectionHeight === 28 ? 2 : isAllTab ? 1.75 : 0}
 					whiteSectionHeight={effectiveWhiteSectionHeight}
 					activeCampaignStop={resolvedActiveTopNavStop}
 					onAllClick={onOpenAll}
@@ -1857,10 +1873,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			{isAllTab && (
 				<div
 					className={cn(
-						'absolute z-20 flex items-center gap-[12px]',
+						'absolute z-20 flex items-center',
 						isAllTabNavigation ? 'pointer-events-none cursor-default' : 'cursor-pointer'
 					)}
-					style={{ top: isBottomView ? 1 : -1, right: isBottomView ? 4 : 4 }}
+					// Seated in the right end of the campaign-stops chrome bar (top 3.05px, 21.9px tall).
+					style={{ top: 7.5, right: 9 }}
 					onClick={onOpenContacts}
 					role={onOpenContacts ? 'button' : undefined}
 					tabIndex={onOpenContacts ? 0 : undefined}
@@ -1872,23 +1889,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						}
 					}}
 				>
-					<span
-						className={cn(
-							'font-medium leading-none text-[#B3B3B3] font-inter',
-							isBottomView ? 'text-[8px]' : 'text-[10px]'
-						)}
-					>
-						Open
-					</span>
-					<div
-						className="flex items-center"
-						style={{ marginTop: isBottomView ? 0 : '1px' }}
-					>
-						<OpenIcon
-							width={isBottomView ? 10 : undefined}
-							height={isBottomView ? 10 : undefined}
-						/>
-					</div>
+					<OpenIcon />
 				</div>
 			)}
 
@@ -2018,6 +2019,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						setHoveredContactIndex(null);
 						onDraftHover?.(null);
 						onContactHover?.(null);
+						onContactRowHover?.(null, null);
 					}}
 				>
 					{enableUsedContactTooltip &&
@@ -2243,11 +2245,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 												onMouseDown={(e) => {
 													if (e.shiftKey) e.preventDefault();
 												}}
-												onMouseEnter={() => {
+												onMouseEnter={(e) => {
 													if (!isAllTabNavigation) setHoveredContactIndex(contactIndex);
 													if (isDraftsFocusMode) onDraftHover?.(null);
 													onContactHover?.(contact);
+													onContactRowHover?.(contact, e.currentTarget);
 												}}
+												onMouseLeave={() => onContactRowHover?.(null, null)}
 												onClick={(e) => {
 													if (isAllTabNavigation) return;
 													if (isDraftsFocusMode) {
