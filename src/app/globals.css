@@ -5076,9 +5076,14 @@ html.murmur-campaign-scrollable [data-lenis-prevent] {
 	overscroll-behavior-y: auto !important;
 }
 
-/* Dashboard compact scaling (defaults to 85%, can be driven by JS via --murmur-dashboard-zoom) */
+/* Dashboard compact scaling, driven by JS via --murmur-dashboard-zoom. The non-map
+   dashboard pins the var to a viewport-aware baseline (0.81 at laptop sizes, larger
+   on bigger monitors); map view sets a per-monitor zoom. The fallbacks only cover the
+   window before those effects run. The map rule must stay AFTER the non-map rule:
+   both classes can be present in map view, and source order decides which fallback
+   wins when the var is unset. */
 html.murmur-compact.murmur-dashboard-compact {
-	zoom: var(--murmur-dashboard-zoom, 0.85);
+	zoom: var(--murmur-dashboard-zoom, 0.81);
 }
 
 html.murmur-compact.murmur-dashboard-map-compact {

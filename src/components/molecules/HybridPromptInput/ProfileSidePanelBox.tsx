@@ -94,6 +94,7 @@ export type ProfileAreaMapFeature = {
 	geometry?: { coordinates?: [number, number] };
 	properties?: {
 		name?: string;
+		mapbox_id?: string;
 		full_address?: string;
 		place_formatted?: string;
 		context?: Record<

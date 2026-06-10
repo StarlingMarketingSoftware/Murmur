@@ -18,6 +18,9 @@ export const PROFILE_GENRE_OPTIONS = profileGenreOptionRows.flat();
 // venue map panels scale against it. See VENUE_CALENDAR_SCALE / VENUE_CREATE_EVENT_CALENDAR_SCALE.
 export const DASHBOARD_CALENDAR_NATIVE_WIDTH_PX = 669.794;
 export const VENUE_MAP_OVERLAY_SCALE = 0.8;
+// Scale for the map view's corner clusters (left profile/calendar/events stack
+// and the right notifications panel).
+export const VENUE_MAP_LEFT_CLUSTER_SCALE = 0.7;
 
 // Zoom for the map view's entry camera, centered on the venue's home icon —
 // frames a few neighboring states around the venue (~600mi tall viewport).

@@ -44,7 +44,6 @@ import {
 import { profileGenreOptionRows } from '@/components/molecules/HybridPromptInput/profileFieldIcons';
 import { AccountType } from '@/constants/prismaEnums';
 import { urls } from '@/constants/urls';
-import { US_STATES } from '@/constants/usStates';
 import {
 	PersistentMapProvider,
 	type PersistentDashboardMapConfig,
@@ -60,7 +59,10 @@ import {
 	useDeleteVenueEvent,
 	useGetVenueEvents,
 } from '@/hooks/queryHooks/useVenueEvents';
-import { useGetConversations } from '@/hooks/queryHooks/useConversations';
+import {
+	useGetConversations,
+	type ConversationThreadFilter,
+} from '@/hooks/queryHooks/useConversations';
 import { useGetVenueApplications } from '@/hooks/queryHooks/useVenueApplications';
 import { _fetch } from '@/utils';
 import type { MediaAssetDto } from '@/app/api/media/route';
@@ -69,6 +71,7 @@ import {
 	DASHBOARD_CALENDAR_NATIVE_WIDTH_PX,
 	PROFILE_GENRE_OPTIONS,
 	VENUE_MAP_ENTRY_ZOOM,
+	VENUE_MAP_LEFT_CLUSTER_SCALE,
 	VENUE_MAP_OVERLAY_SCALE,
 	VENUE_TIME_OPTIONS,
 } from './constants';
@@ -77,12 +80,18 @@ import { VenueCreateEventMapPanel } from './VenueCreateEventMapPanel';
 import { VenueEventDetailView } from './VenueEventDetailView';
 import { createVenueIconAnchorStore, VenueMapActionPills } from './VenueMapActionPills';
 import { VenueMapToolTabBar } from './VenueMapToolTabBar';
+import { VenueNotificationsMapPanel } from './VenueNotificationsMapPanel';
 import {
 	formatApplicantCount,
 	formatVenueOpportunityDate,
 	formatVenueOpportunityTimeRange,
 	isVenueOpportunityLive,
 } from './venueOpportunityFormat';
+import {
+	formatVenueLocationFeature,
+	parseVenueLocationParts,
+	VENUE_LOCATION_GEOCODE_TYPES,
+} from './venueLocationFormat';
 
 type VenueDayKey = keyof WeeklyHours;
 type VenueDayHoursForm = {
@@ -198,8 +207,6 @@ const VENUE_COMPLETED_FIELD_VALUE_CLASS =
 	'min-w-0 truncate font-inter text-[14px] font-medium leading-[18px] text-black';
 const VENUE_COMPLETED_GENRE_PILL_CLASS =
 	'flex h-[20px] max-w-[91px] shrink-0 items-center justify-center gap-[2px] overflow-hidden rounded-[7px] border border-black px-[4px] font-inter text-[12px] font-medium leading-none text-black';
-const VENUE_LOCATION_GEOCODE_TYPES =
-	'address,street,neighborhood,place,locality,district,region,postcode';
 const DEFAULT_CAPACITY_VALUE = 90;
 const CAPACITY_SLIDER_MIN = 0;
 const CAPACITY_SLIDER_MAX = 350;
@@ -237,52 +244,6 @@ const BUSINESS_TYPE_OPTIONS = [
 	},
 ] as const;
 const VENUE_SOUND_OPTIONS = ['In House', 'No Speakers'] as const;
-
-// Pull the structured city + 2-letter US state out of a geocode feature. Used both
-// for the saved address string and for the profile card's location chip.
-const parseVenueLocationParts = (
-	feature: ProfileAreaMapFeature
-): { city: string; state: string } => {
-	const context = feature.properties?.context;
-	const city =
-		context?.place?.name || context?.locality?.name || context?.district?.name || '';
-	const rawRegion =
-		context?.region?.region_code ||
-		context?.region?.short_code?.split('-').pop()?.toUpperCase() ||
-		context?.region?.name ||
-		'';
-	const state =
-		rawRegion.length === 2
-			? rawRegion.toUpperCase()
-			: (US_STATES.find((s) => s.name.toLowerCase() === rawRegion.toLowerCase())?.abbr ??
-				rawRegion);
-	return { city, state };
-};
-
-const formatVenueLocationFeature = (feature: ProfileAreaMapFeature) => {
-	const properties = feature.properties;
-	const context = properties?.context;
-	const street =
-		properties?.full_address?.split(',')[0]?.trim() || properties?.name || '';
-	const { city, state: region } = parseVenueLocationParts(feature);
-	const postcode = context?.postcode?.name || '';
-	const cityRegion = [city, [region, postcode].filter(Boolean).join(' ')]
-		.filter(Boolean)
-		.join(', ');
-	const streetDuplicatesCity =
-		street.length > 0 && city.length > 0 && street.toLowerCase() === city.toLowerCase();
-	const formattedAddress = [streetDuplicatesCity ? '' : street, cityRegion]
-		.filter(Boolean)
-		.join(', ');
-
-	return (
-		(cityRegion ? formattedAddress : '') ||
-		properties?.full_address ||
-		properties?.place_formatted ||
-		properties?.name ||
-		''
-	);
-};
 
 type VenuePortalClerkUser =
 	| {
@@ -3334,7 +3295,6 @@ function VenueProfileMapCard({ onEdit }: { onEdit: () => void }) {
 // the 656px-wide card above. Positioned (absolute) 98px below the cluster top — 15px under
 // the 83px card — within the map-view wrapper's cluster scale.
 const VENUE_CALENDAR_SCALE = 656 / DASHBOARD_CALENDAR_NATIVE_WIDTH_PX;
-const VENUE_MAP_LEFT_CLUSTER_SCALE = 0.7;
 
 function VenueCalendarMapPanel() {
 	const now = new Date();
@@ -3730,6 +3690,20 @@ export default function VenuePortalClient() {
 		setEventsToolSelectedEventId(eventId);
 		setSelectedVenueTool('events');
 	};
+	// Deep link from the notifications panel into the chat panel. The nonce keys
+	// VenueChatMapPanel so each card click remounts it onto the target thread even
+	// when the chat tool is already open.
+	const [chatDeepLink, setChatDeepLink] = useState<{
+		nonce: number;
+		conversationId: number;
+		thread: ConversationThreadFilter;
+	} | null>(null);
+	const openChatThread = (conversationId: number, thread: ConversationThreadFilter) => {
+		// Set directly: selectVenueTool early-returns when 'mail' is already active,
+		// and its mail branch would clear the link we just set.
+		setChatDeepLink({ nonce: Date.now(), conversationId, thread });
+		setSelectedVenueTool('mail');
+	};
 	// Select-only on purpose: re-clicking (or double-clicking) the active tab must
 	// not close the open panel or reset its state.
 	const selectVenueTool = (tool: 'add' | 'profile' | 'mail' | 'events') => {
@@ -3740,6 +3714,10 @@ export default function VenuePortalClient() {
 		// Opening Events from the pills/tab bar always starts at the list view.
 		if (tool === 'events') {
 			setEventsToolSelectedEventId(null);
+		}
+		// Opening Chat from the pills/tab bar always starts at the inbox list.
+		if (tool === 'mail') {
+			setChatDeepLink(null);
 		}
 		setSelectedVenueTool(tool);
 	};
@@ -3854,10 +3832,26 @@ export default function VenuePortalClient() {
 					/>
 				</div>
 			)}
+			{view === 'map' && (
+				<VenueNotificationsMapPanel
+					conversations={venueConversations}
+					applications={venueApplications}
+					totalUnread={venueUnread}
+					opportunities={opportunities}
+					applicantCountByEventId={applicantCountByEventId}
+					onOpenThread={openChatThread}
+					onOpenEvent={openOpportunityDetail}
+				/>
+			)}
 			{view === 'map' && selectedVenueTool === 'add' && (
 				<VenueCreateEventMapPanel event={editingVenueEvent} />
 			)}
-			{view === 'map' && isMailToolSelected && <VenueChatMapPanel />}
+			{view === 'map' && isMailToolSelected && (
+				<VenueChatMapPanel
+					key={chatDeepLink?.nonce ?? 'list'}
+					initialThread={chatDeepLink}
+				/>
+			)}
 			{view === 'map' && selectedVenueTool === 'events' && (
 				<VenueEventsMapPanel
 					opportunities={opportunities}

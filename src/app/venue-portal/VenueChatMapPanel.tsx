@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ConversationThread } from '@/components/organisms/ConversationsPane';
 import {
@@ -127,7 +127,7 @@ function InboundRow({
 	);
 }
 
-function CardPill({ icon, label }: { icon?: ReactNode; label: string }) {
+export function CardPill({ icon, label }: { icon?: ReactNode; label: string }) {
 	return (
 		<span className="flex h-[20px] min-w-0 items-center gap-[4px] rounded-full border border-black bg-white px-[8px]">
 			{icon}
@@ -224,14 +224,22 @@ function ThreadListCard({
 // applications) over Inbound (cold campaign conversations) — and clicking a row
 // swaps the body for a two-column messenger: the active section's conversation
 // cards on the left, the open thread on the right.
-export function VenueChatMapPanel() {
-	const [activeSection, setActiveSection] = useState<'replies' | 'inbound'>('replies');
+export function VenueChatMapPanel({
+	initialThread,
+}: {
+	// Deep link from the notifications panel: open straight onto this thread. Read
+	// once at mount — the parent remounts the panel (via key) per deep link.
+	initialThread?: { conversationId: number; thread: ConversationThreadFilter } | null;
+} = {}) {
+	const [activeSection, setActiveSection] = useState<'replies' | 'inbound'>(
+		initialThread?.thread === 'general' ? 'inbound' : 'replies'
+	);
 	// An open thread view: the pair conversation plus which slice of it — an
 	// application's thread (Replies row) or the general thread (Inbound row).
 	const [selectedThread, setSelectedThread] = useState<{
 		conversationId: number;
 		thread: ConversationThreadFilter;
-	} | null>(null);
+	} | null>(initialThread ?? null);
 	const [pendingApplicationId, setPendingApplicationId] = useState<number | null>(null);
 
 	const { data: applications, isLoading: repliesLoading } = useGetVenueApplications({
@@ -245,6 +253,15 @@ export function VenueChatMapPanel() {
 	// Background seed-ensure for rows whose conversation already exists — the
 	// thread is open and usable either way, so a failure here must not toast.
 	const ensureApplicationSeed = useOpenApplicationConversation({ suppressToasts: true });
+
+	// Deep-linked application threads get the same idempotent seed-ensure a manual
+	// Replies-card click performs (the pair conversation may predate the application).
+	useEffect(() => {
+		if (initialThread && typeof initialThread.thread === 'number') {
+			ensureApplicationSeed.mutate(initialThread.thread);
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	// Group applications by event, soonest event first (null dates last); newest
 	// activity first within each event.

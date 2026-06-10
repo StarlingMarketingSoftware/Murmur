@@ -14,11 +14,8 @@ import { createPortal } from 'react-dom';
 import type { Event as VenueEvent } from '@prisma/client';
 import { PayRangeMoneyIcon } from '@/components/atoms/_svg/PayRangeMoneyIcon';
 import DashboardCalendarPanel from '@/components/molecules/DashboardCalendarPanel/DashboardCalendarPanel';
-import {
-	DashboardCalendarPopupLocation,
-	type CalendarPopupLocationFields,
-} from '@/components/molecules/DashboardCalendarPanel/DashboardCalendarPopupLocation';
 import { profileGenreOptionRows } from '@/components/molecules/HybridPromptInput/profileFieldIcons';
+import { ProfileAreaMapBox } from '@/components/molecules/HybridPromptInput/ProfileSidePanelBox';
 import {
 	DASHBOARD_CALENDAR_NATIVE_WIDTH_PX,
 	PROFILE_GENRE_OPTIONS,
@@ -26,13 +23,25 @@ import {
 	VENUE_TIME_OPTIONS,
 } from './constants';
 import {
+	formatVenueLocationFeature,
+	VENUE_LOCATION_GEOCODE_TYPES,
+} from './venueLocationFormat';
+import {
 	useCreateVenueEvent,
 	useUpdateVenueEvent,
 } from '@/hooks/queryHooks/useVenueEvents';
 
+type VenueCreateEventLocation = {
+	address: string;
+	// Stores Mapbox's `mapbox_id` (legacy "placeId" name kept for the persisted Event shape).
+	placeId: string | null;
+	lat: number | null;
+	lng: number | null;
+};
+
 type VenueCreateEventFormState = {
 	eventName: string;
-	location: CalendarPopupLocationFields;
+	location: VenueCreateEventLocation;
 	whoSize: string;
 	whoGenres: string[];
 	when: string;
@@ -70,7 +79,7 @@ const VENUE_CREATE_EVENT_WHEN_POPUP_GAP_PX = 10;
 
 const EMPTY_CREATE_EVENT_FORM: VenueCreateEventFormState = {
 	eventName: '',
-	location: { address: '', placeId: null, lat: null, lng: null, drivingDuration: null },
+	location: { address: '', placeId: null, lat: null, lng: null },
 	whoSize: '',
 	whoGenres: [],
 	when: '',
@@ -152,7 +161,6 @@ const createVenueEventFormFromEvent = (event: VenueEvent): VenueCreateEventFormS
 			placeId: event.placeId,
 			lat: event.latitude,
 			lng: event.longitude,
-			drivingDuration: null,
 		},
 		whoSize: event.size ?? '',
 		whoGenres: event.genres,
@@ -261,7 +269,7 @@ export function VenueCreateEventMapPanel({ event }: { event?: VenueEvent | null 
 		setEventForm((current) => ({ ...current, [field]: value }));
 		setPublishState('idle');
 	};
-	const updateEventLocation = (partial: Partial<CalendarPopupLocationFields>) => {
+	const updateEventLocation = (partial: Partial<VenueCreateEventLocation>) => {
 		setEventForm((current) => ({
 			...current,
 			location: { ...current.location, ...partial },
@@ -720,14 +728,27 @@ export function VenueCreateEventMapPanel({ event }: { event?: VenueEvent | null 
 									Where
 								</span>
 								<div className="absolute left-[15px] top-[30px] h-[150px] w-[390px]">
-									<DashboardCalendarPopupLocation
-										layout="inline"
-										address={eventForm.location.address}
-										placeId={eventForm.location.placeId}
-										lat={eventForm.location.lat}
-										lng={eventForm.location.lng}
-										drivingDuration={eventForm.location.drivingDuration}
-										onUpdate={updateEventLocation}
+									<ProfileAreaMapBox
+										area={eventForm.location.address}
+										onAreaUpdate={(address) => updateEventLocation({ address })}
+										initialCoordinates={
+											eventForm.location.lat != null && eventForm.location.lng != null
+												? { lat: eventForm.location.lat, lng: eventForm.location.lng }
+												: null
+										}
+										onCoordinatesChange={({ lat, lng }) =>
+											updateEventLocation({ lat, lng, placeId: null })
+										}
+										onFeatureSelect={(feature) =>
+											updateEventLocation({ placeId: feature.properties?.mapbox_id ?? null })
+										}
+										className="mt-0 h-[150px] w-[390px] rounded-[8px] border-[2px] opacity-100"
+										headerLabel="Add Location"
+										inputPlaceholder="Add Location"
+										initiallyEditing
+										reverseGeocodeTypes={VENUE_LOCATION_GEOCODE_TYPES}
+										forwardGeocodeTypes={VENUE_LOCATION_GEOCODE_TYPES}
+										formatGeocodeFeature={formatVenueLocationFeature}
 									/>
 								</div>
 							</div>

@@ -37,11 +37,11 @@ const MAX_LIMIT = 2000;
 const MAP_OVERLAY_QUERY_TIMEOUT_MS = 18000;
 
 // Research-detail fields (metadata/website/address/companyType/companyFoundedYear) are only read
-// by ContactResearchPanel, which can only open at zoom >= HOVER_INTERACTION_MIN_ZOOM (8). Every
-// overlay that can be researched (booking/promotion/all) is itself only fetched at zoom >= 8, while
-// the large ambient atlas lives at zoom <= 5.05. So below this threshold those fields are dead
-// weight on thousands of rows; we ship only the slim plotting/tooltip set. Sit one level below the
-// zoom-8 panel gate so a refetch already carries the fields by the time the panel can open.
+// by ContactResearchPanel. On thousands of rows they are dead weight, so low-zoom fetches ship
+// only the slim plotting/tooltip set (the ambient atlas always does — its raw SQL never selects
+// them). Slim rows are not a dead end: when one is hovered, the dashboard backfills these fields
+// per-contact via GET /api/contacts/[id]/research (see useContactWithResearch in
+// murmur/dashboard/page.tsx), so the research panel still populates.
 const OVERLAY_RESEARCH_FIELDS_MIN_ZOOM = 7;
 
 // Shared shape for every map-overlay response row. The core fields are always present

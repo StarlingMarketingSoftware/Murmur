@@ -5,6 +5,7 @@ import { ContactFilterData, PostContactData } from '@/app/api/contacts/route';
 import { appendQueryParamsToUrl } from '@/utils';
 import { PostBatchContactData } from '@/app/api/contacts/batch/route';
 import { PatchContactData } from '@/app/api/contacts/[id]/route';
+import { GetContactResearchData } from '@/app/api/contacts/[id]/research/route';
 import { PostBulkUpdateContactData } from '@/app/api/contacts/bulk-update/route';
 import { _fetch } from '@/utils';
 import { urls } from '@/constants/urls';
@@ -503,6 +504,37 @@ export const useGetContactsMapOverlay = (options: {
 		retry: false,
 		staleTime: 1000 * 60 * 5, // 5 minutes
 		gcTime: 1000 * 60 * 30, // Keep in cache for 30 minutes
+	});
+};
+
+// Backfills the research-detail fields for a single contact when a hovered map-overlay
+// row arrived without them (slim payload — see api/contacts/map-overlay).
+export const useGetContactResearch = (contactId: number | null) => {
+	return useQuery<GetContactResearchData>({
+		queryKey: [...QUERY_KEYS.detail(contactId ?? 'none'), 'research'],
+		queryFn: async ({ signal }) => {
+			const response = await _fetch(
+				urls.api.contacts.research(contactId!),
+				undefined,
+				undefined,
+				{ signal }
+			);
+			if (!response.ok) {
+				const errorMessage = await readResponseErrorMessage(
+					response,
+					'Failed to fetch contact research'
+				);
+				throw new Error(errorMessage);
+			}
+			return response.json() as Promise<GetContactResearchData>;
+		},
+		enabled: contactId != null,
+		refetchOnMount: false,
+		refetchOnReconnect: false,
+		refetchOnWindowFocus: false,
+		retry: false,
+		staleTime: 1000 * 60 * 30, // research metadata rarely changes
+		gcTime: 1000 * 60 * 30,
 	});
 };
 

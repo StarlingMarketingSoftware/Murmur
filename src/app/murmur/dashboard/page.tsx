@@ -110,6 +110,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import {
 	useBatchUpdateContacts,
 	useGetContacts,
+	useGetContactResearch,
 	getContactsListQueryKey,
 	fetchContactsList,
 } from '@/hooks/queryHooks/useContacts';
@@ -1479,6 +1480,26 @@ const buildInitialDashboardSearchSuggestions = (
 // `SIXTEEN_BY_TEN_ZOOM_MAP` / `SIXTEEN_BY_NINE_ZOOM_MAP` tables so the dashboard map-view
 // chrome lands at the same physical size as the campaign chrome on every monitor.
 const DASHBOARD_MAP_ZOOM_DEFAULT = 0.85;
+// Baseline zoom for the non-map dashboard (initial/hero + results views). The fullscreen
+// map view keeps its own resolution-aware zoom anchored to DASHBOARD_MAP_ZOOM_DEFAULT.
+// Unlike the map tables (tuned for physical chrome size), this keeps the hero cluster's
+// footprint relative to the viewport: 0.81 at/below a laptop-class anchor, growing
+// linearly on larger monitors so the layout doesn't shrink into a sea of map.
+const DASHBOARD_INITIAL_ZOOM = 0.81;
+const DASHBOARD_INITIAL_ZOOM_ANCHOR_W = 1512;
+const DASHBOARD_INITIAL_ZOOM_ANCHOR_H = 945;
+const DASHBOARD_INITIAL_ZOOM_MAX = 1.15;
+const computeDashboardInitialZoomForViewport = (w: number, h: number): number => {
+	const scale = Math.min(
+		w / DASHBOARD_INITIAL_ZOOM_ANCHOR_W,
+		h / DASHBOARD_INITIAL_ZOOM_ANCHOR_H,
+	);
+	return clampNumber(
+		DASHBOARD_INITIAL_ZOOM * scale,
+		DASHBOARD_INITIAL_ZOOM,
+		DASHBOARD_INITIAL_ZOOM_MAX,
+	);
+};
 const DASHBOARD_MAP_ZOOM_MATCH_TOLERANCE_PX = 50;
 const DASHBOARD_MAP_ZOOM_MIN = 0.5;
 const DASHBOARD_MAP_ZOOM_MAX = 1.6;
@@ -2822,6 +2843,25 @@ const SearchTrayIconTile = ({
 			{children}
 		</div>
 	);
+};
+
+// Map-overlay rows can arrive without the research-detail fields (slim payload — see
+// api/contacts/map-overlay). When a hovered contact is missing them entirely (key absent;
+// null means fetched-but-empty), lazily fetch and merge them so the hover research panel
+// fills in instead of rendering blank.
+const useContactWithResearch = (contact: ContactWithName | null) => {
+	// Cast for the `in` check: ContactWithName declares `metadata`, so TS would
+	// otherwise narrow the no-key branch (a slim overlay row) to `never`.
+	const needsResearch =
+		contact != null && !('metadata' in (contact as Record<string, unknown>));
+	const { data: research } = useGetContactResearch(
+		contact && needsResearch ? contact.id : null
+	);
+	return useMemo(() => {
+		if (!contact) return null;
+		if (!research || research.id !== contact.id) return contact;
+		return { ...contact, ...research };
+	}, [contact, research]);
 };
 
 const DashboardContent = () => {
@@ -4547,22 +4587,45 @@ const DashboardContent = () => {
 	const DASHBOARD_MAP_COMPACT_CLASS = 'murmur-dashboard-map-compact';
 	const DASHBOARD_COMPACT_CLASS = 'murmur-dashboard-compact';
 	const DASHBOARD_ZOOM_VAR = '--murmur-dashboard-zoom';
+	const DASHBOARD_INITIAL_ZOOM_VAR = '--murmur-dashboard-initial-zoom';
 
-	// Apply dashboard-only compact class + clear zoom var on mobile/unmount.
+	// Apply dashboard-only compact class + viewport-aware zoom; clear on mobile/unmount.
 	useEffect(() => {
 		if (isMobile === null) return;
 		if (isMobile) {
 			document.documentElement.classList.remove(DASHBOARD_COMPACT_CLASS);
 			document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
+			document.documentElement.style.removeProperty(DASHBOARD_INITIAL_ZOOM_VAR);
 			return;
 		}
 
-		// Keep the dashboard at its CSS baseline zoom (avoid "whole page" rescaling on desktop window resize).
-		document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
+		const applyInitialZoom = () => {
+			const zoom = computeDashboardInitialZoomForViewport(
+				window.innerWidth,
+				window.innerHeight,
+			);
+			// Publish what the non-map dashboard uses on this monitor (the map-view
+			// campaigns dropdown reads it), and pin the page zoom to it unless map view
+			// owns the var (the map-view layout effect adds DASHBOARD_MAP_COMPACT_CLASS
+			// before passive effects run in the same commit, so we never pave over the
+			// per-monitor map zoom).
+			document.documentElement.style.setProperty(
+				DASHBOARD_INITIAL_ZOOM_VAR,
+				zoom.toFixed(3),
+			);
+			if (!document.documentElement.classList.contains(DASHBOARD_MAP_COMPACT_CLASS)) {
+				document.documentElement.style.setProperty(DASHBOARD_ZOOM_VAR, zoom.toFixed(3));
+			}
+		};
+
+		applyInitialZoom();
 		document.documentElement.classList.add(DASHBOARD_COMPACT_CLASS);
+		window.addEventListener('resize', applyInitialZoom);
 		return () => {
+			window.removeEventListener('resize', applyInitialZoom);
 			document.documentElement.classList.remove(DASHBOARD_COMPACT_CLASS);
 			document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
+			document.documentElement.style.removeProperty(DASHBOARD_INITIAL_ZOOM_VAR);
 		};
 	}, [isMobile]);
 
@@ -4583,7 +4646,15 @@ const DashboardContent = () => {
 
 		if (!isMapView) {
 			document.documentElement.classList.remove(DASHBOARD_MAP_COMPACT_CLASS);
-			document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
+			// Restore the non-map baseline (the dashboard-compact effect only re-runs on
+			// isMobile changes, so it can't do this for us when we leave map view).
+			document.documentElement.style.setProperty(
+				DASHBOARD_ZOOM_VAR,
+				computeDashboardInitialZoomForViewport(
+					window.innerWidth,
+					window.innerHeight,
+				).toFixed(3),
+			);
 			return;
 		}
 
@@ -4594,13 +4665,9 @@ const DashboardContent = () => {
 			const w = window.innerWidth;
 			const h = window.innerHeight;
 			const zoom = computeDashboardMapZoomForViewport(w, h);
-			// Match the campaign behaviour: when the computed zoom equals the CSS default, remove the
-			// inline override so the value reverts cleanly instead of paving over the default.
-			if (Math.abs(zoom - DASHBOARD_MAP_ZOOM_DEFAULT) < 0.002) {
-				document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
-			} else {
-				document.documentElement.style.setProperty(DASHBOARD_ZOOM_VAR, zoom.toFixed(3));
-			}
+			// Always set the var inline: the non-map baseline (DASHBOARD_INITIAL_ZOOM) differs
+			// from the map default, so an unset var no longer means "the right zoom applies".
+			document.documentElement.style.setProperty(DASHBOARD_ZOOM_VAR, zoom.toFixed(3));
 		};
 
 		applyMapViewZoom();
@@ -4622,13 +4689,13 @@ const DashboardContent = () => {
 		// Don't auto-trigger auth flows; only run if already signed in.
 		if (!isSignedIn) return;
 		// Wait for the mobile/desktop probe to resolve before flipping into map view. Two
-		// dashboard effects co-own `--murmur-dashboard-zoom`: a useLayoutEffect sets it to
-		// '1' on map view, a useEffect on the same commit removes it on desktop. If we set
-		// `isMapView=true` in the very render where `isMobile` first resolves, the desktop
-		// effect runs *after* the layout effect and wipes the var, leaving the page at the
-		// 0.85 default while map-view UI panels still scale themselves 0.85 — net ~0.72 (the
-		// "everything is tiny" bug). Gating on `isMobile !== null` makes the curated path
-		// fire on a later commit so the two effects can't collide.
+		// dashboard effects co-own `--murmur-dashboard-zoom`: a useLayoutEffect sets the
+		// per-monitor map zoom, and a useEffect on the same commit sets the non-map baseline
+		// (DASHBOARD_INITIAL_ZOOM) — but only when map view doesn't already own the var (it
+		// checks for DASHBOARD_MAP_COMPACT_CLASS). Gating on `isMobile !== null` still makes
+		// the curated path fire on a later commit so the two effects can't collide in the
+		// very render where `isMobile` first resolves (the historical "everything is tiny"
+		// bug).
 		if (isMobile === null) return;
 
 		// Curated rehydration takes precedence: the regular onSubmit path runs a free-text
@@ -7694,6 +7761,13 @@ const DashboardContent = () => {
 		[getMapResearchDisplayFields, mapResearchPanelContact]
 	);
 
+	// Hovered overlay markers/rows may be slim map-overlay payloads; backfill their
+	// research fields so the hover research panels don't render blank.
+	const mapResearchPanelContactEnriched = useContactWithResearch(mapResearchPanelContact);
+	const mapPanelHoveredResearchContactEnriched = useContactWithResearch(
+		mapPanelHoveredResearchContact?.contact ?? null
+	);
+
 	const getTabPillXFor = (tab: 'search' | 'inbox') => {
 		const track = tabToggleTrackRef.current;
 		const pill = tabTogglePillRef.current;
@@ -9819,7 +9893,14 @@ const DashboardContent = () => {
 											className="premium-logo-container flex items-center justify-center"
 											style={{ width: logoWidth, height: logoHeight }}
 										>
-											<MurmurLogoNew width={logoWidth} height={logoHeight} />
+											{/* Scale the SVG, not the container: the container's transform/opacity
+											    are driven by useDashboardScrollToMap + .search-active, and keeping
+											    its layout box unchanged leaves the search bar position intact. */}
+											<MurmurLogoNew
+												width={logoWidth}
+												height={logoHeight}
+												className="origin-bottom scale-[1.5] -translate-x-[15%] translate-y-[40px]"
+											/>
 										</div>
 									</div>
 								</div>
@@ -11780,9 +11861,9 @@ const DashboardContent = () => {
 													className="campaigns-table-wrapper dashboard-recent-campaigns pointer-events-auto w-full max-w-[960px] mx-auto px-4"
 													style={{
 														transformOrigin: 'top center',
-														// The initial dashboard renders at the 0.85 baseline zoom; cancel the
-														// per-monitor map-view zoom so this dropdown matches it on every screen.
-														zoom: 'calc(0.85 / var(--murmur-dashboard-zoom, 0.85))',
+														// The initial dashboard renders at the viewport-aware initial-zoom baseline;
+														// cancel the per-monitor map-view zoom so this dropdown matches it on every screen.
+														zoom: `calc(var(${DASHBOARD_INITIAL_ZOOM_VAR}, ${DASHBOARD_INITIAL_ZOOM}) / var(--murmur-dashboard-zoom, ${DASHBOARD_MAP_ZOOM_DEFAULT}))`,
 													}}
 												>
 													<div className="w-full flex flex-col items-center">
@@ -12717,7 +12798,10 @@ const DashboardContent = () => {
 														}}
 													>
 														<ContactResearchPanel
-															contact={mapPanelHoveredResearchContact.contact}
+															contact={
+																mapPanelHoveredResearchContactEnriched ??
+																mapPanelHoveredResearchContact.contact
+															}
 															variant="abridged"
 															displayHeadline={
 																mapPanelHoveredResearchContact.displayHeadline
@@ -12766,7 +12850,7 @@ const DashboardContent = () => {
 															}}
 														>
 															<ContactResearchPanel
-																contact={mapResearchPanelContact}
+																contact={mapResearchPanelContactEnriched ?? mapResearchPanelContact}
 																variant="abridged"
 																displayHeadline={
 																	mapMarkerResearchDisplayFields?.displayHeadline
@@ -12781,8 +12865,14 @@ const DashboardContent = () => {
 															style={{
 																top: `${MAP_MARKER_RESEARCH_DESCRIPTION_TOP_PX}px`,
 															}}
-															metadata={mapResearchPanelContact.metadata}
-															fallbackText={mapResearchPanelContact.headline || ''}
+															metadata={
+																(mapResearchPanelContactEnriched ?? mapResearchPanelContact)
+																	.metadata
+															}
+															fallbackText={
+																(mapResearchPanelContactEnriched ?? mapResearchPanelContact)
+																	.headline || ''
+															}
 															expanded={isMapMarkerResearchExpanded}
 														/>
 													</div>
@@ -13997,7 +14087,7 @@ const DashboardContent = () => {
 									willChange: 'transform, opacity',
 								}}
 							>
-								<div className="mt-[18px] mb-[18px] w-full flex flex-col items-center">
+								<div className="mt-[30px] mb-[18px] w-full flex flex-col items-center">
 									{selectedActionBarIcon === 'playbook' && (
 										<DashboardStrategyBox
 											onSearchContacts={handleMapBottomForYouSubmit}
