@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { urls } from '@/constants/urls';
 import {
 	getMsUntilNextSearchGradientBucket,
 	getSearchGradientForDate,
 } from '@/constants/searchGradients';
+import { StartFreeTrialModal } from '@/components/organisms/StartFreeTrialModal';
 
 export default function HomePageClient({
 	showFreeTrialButton = true,
@@ -15,6 +16,8 @@ export default function HomePageClient({
 	showFreeTrialButton?: boolean;
 	showVenueSignInButton?: boolean;
 }) {
+	const [trialClicked, setTrialClicked] = useState(false);
+
 	useEffect(() => {
 		if (!showVenueSignInButton) return;
 
@@ -141,12 +144,25 @@ export default function HomePageClient({
 				{showFreeTrialButton && (
 					<Link
 						href={urls.freeTrial.index}
+						onClick={(event) => {
+							event.preventDefault();
+							// Clear any stale post-sign-in redirect (e.g. from a previous
+							// /free-trial visit) so signing up stays on this page.
+							sessionStorage.removeItem('redirectAfterSignIn');
+							setTrialClicked(true);
+						}}
 						className="absolute inset-x-0 bottom-0 flex h-[52px] items-center justify-center bg-[#408249] text-lg font-medium text-white transition-opacity hover:opacity-95"
 					>
 						Start Free Trial
 					</Link>
 				)}
 			</div>
+			{/* Mounted outside the card: its container-type traps position:fixed children. */}
+			{showFreeTrialButton && (
+				<Suspense fallback={null}>
+					<StartFreeTrialModal open={trialClicked} />
+				</Suspense>
+			)}
 		</main>
 	);
 }

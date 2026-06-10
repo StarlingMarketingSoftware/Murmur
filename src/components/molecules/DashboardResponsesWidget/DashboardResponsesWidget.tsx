@@ -16,7 +16,9 @@ import {
 	useAssignInboundEmailToCampaign,
 	useGetInboundEmails,
 } from '@/hooks/queryHooks/useInboundEmails';
+import { useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { getCampaignFolderScheme } from '@/components/molecules/CampaignsInboxView/campaignRowMetrics';
 import type { InboundEmailWithRelations } from '@/types';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
@@ -287,7 +289,12 @@ export const DashboardResponsesWidget: FC<{
 	enabled?: boolean;
 	className?: string;
 	mockState?: ResponsesMockState;
-}> = ({ enabled = true, className, mockState }) => {
+	/**
+	 * Mobile dashboard layout: fluid width/height, transparent container (rows
+	 * float over the map), tap-to-open rows, no hover preview.
+	 */
+	mobile?: boolean;
+}> = ({ enabled = true, className, mockState, mobile = false }) => {
 	const router = useRouter();
 	const mockOverrideActive = mockState != null;
 	const widgetRef = useRef<HTMLDivElement>(null);
@@ -312,6 +319,16 @@ export const DashboardResponsesWidget: FC<{
 	const { mutateAsync: assignInboundEmailToCampaign } = useAssignInboundEmailToCampaign({
 		suppressToasts: true,
 	});
+	// Mobile chips reuse the folder-card color scheme so each campaign's chip
+	// matches its card on the Folders tab (cycled by list index, same as there).
+	const { data: chipCampaigns } = useGetCampaigns();
+	const campaignIndexById = useMemo(() => {
+		const map = new Map<number, number>();
+		(chipCampaigns ?? []).forEach((campaign: { id: number }, index: number) => {
+			map.set(campaign.id, index);
+		});
+		return map;
+	}, [chipCampaigns]);
 
 	const normalizedSentEmails = useMemo(
 		() =>
@@ -536,13 +553,18 @@ export const DashboardResponsesWidget: FC<{
 			ref={widgetRef}
 			className={cn('flex flex-col items-center', className)}
 			style={{
-				width: '654px',
-				height: '266px',
+				width: mobile ? '100%' : '654px',
+				height: mobile ? '100%' : '266px',
 				boxSizing: 'border-box',
 				borderRadius: '8px',
-				backgroundColor: RESPONSE_WIDGET_BACKGROUND_BY_TAB[activeTab],
-				paddingTop: '9px',
-				paddingBottom: '6px',
+				// Mobile rows float directly over the map — no container fill.
+				backgroundColor: mobile
+					? 'transparent'
+					: RESPONSE_WIDGET_BACKGROUND_BY_TAB[activeTab],
+				paddingTop: mobile ? '10px' : '9px',
+				paddingBottom: mobile ? '10px' : '6px',
+				paddingLeft: mobile ? '16px' : undefined,
+				paddingRight: mobile ? '16px' : undefined,
 			}}
 		>
 			{showEmailPreview &&
@@ -566,8 +588,8 @@ export const DashboardResponsesWidget: FC<{
 			{/* Top controls */}
 			<div
 				style={{
-					width: '639px',
-					height: '22px',
+					width: mobile ? '100%' : '639px',
+					height: mobile ? '30px' : '22px',
 					display: 'flex',
 					alignItems: 'center',
 					gap: '7px',
@@ -576,14 +598,16 @@ export const DashboardResponsesWidget: FC<{
 				<DashboardResponsesFilterBar
 					activeTab={activeTab}
 					onTabChange={setActiveTab}
-					width={440}
-					height={22}
+					width={mobile ? '100%' : 440}
+					height={mobile ? 30 : 22}
+					fontSize={mobile ? 15 : 14}
+					style={mobile ? { flex: 1, minWidth: 0 } : undefined}
 				/>
 
 				<div
 					style={{
-						width: '136px',
-						height: '22px',
+						width: mobile ? '90px' : '136px',
+						height: mobile ? '30px' : '22px',
 						borderRadius: '6px',
 						backgroundColor: '#FFFFFF',
 						display: 'flex',
@@ -592,6 +616,7 @@ export const DashboardResponsesWidget: FC<{
 						paddingLeft: '10px',
 						paddingRight: '10px',
 						boxSizing: 'border-box',
+						flexShrink: 0,
 					}}
 				>
 					<span style={{ display: 'flex', flexShrink: 0 }}>
@@ -600,7 +625,9 @@ export const DashboardResponsesWidget: FC<{
 					<input
 						value={searchQuery}
 						onChange={(e) => setSearchQuery(e.target.value)}
-						placeholder={activeTab === 'opportunities' ? 'Search' : 'Search Mail'}
+						placeholder={
+							mobile ? 'Mail' : activeTab === 'opportunities' ? 'Search' : 'Search Mail'
+						}
 						className="min-w-0 placeholder:text-black placeholder:opacity-100"
 						style={{
 							flex: 1,
@@ -625,6 +652,7 @@ export const DashboardResponsesWidget: FC<{
 					enabled={enabled}
 					searchQuery={searchQuery}
 					inboundEmailsOverride={opportunityMockEmails}
+					fluid={mobile}
 				/>
 			) : (
 				<CustomScrollbar
@@ -636,19 +664,24 @@ export const DashboardResponsesWidget: FC<{
 					offsetRight={-12}
 					lockHorizontalScroll
 					style={{
-						width: '639px',
+						width: mobile ? '100%' : '639px',
 						marginTop: '9px',
 					}}
 				>
 					{/* Blue gaps between rows */}
-					<div className="w-full flex flex-col items-center gap-[6px] pb-[6px]">
+					<div
+						className={cn(
+							'w-full flex flex-col items-center',
+							mobile ? 'gap-[10px] pb-[10px]' : 'gap-[6px] pb-[6px]'
+						)}
+					>
 						{isLoading ? (
 							Array.from({ length: 3 }).map((_, idx) => (
 								<div
 									key={`responses-loading-${idx}`}
 									style={{
-										width: '639px',
-										height: '48px',
+										width: mobile ? '100%' : '639px',
+										height: mobile ? '64px' : '48px',
 										borderRadius: '6.389px',
 										backgroundColor: '#FEFEFE',
 										opacity: 0.6,
@@ -663,8 +696,8 @@ export const DashboardResponsesWidget: FC<{
 										key={`responses-empty-outline-${index}`}
 										aria-hidden="true"
 										style={{
-											width: '639px',
-											height: '48px',
+											width: mobile ? '100%' : '639px',
+											height: mobile ? '64px' : '48px',
 											borderRadius: '6.389px',
 											border: '1px solid #000000',
 											background: 'transparent',
@@ -685,6 +718,15 @@ export const DashboardResponsesWidget: FC<{
 							const timeLabel = formatInboxTimestamp(email.receivedAt);
 							const isOpened = openedEmailIds[rowKey] === true;
 							const rowFill = isOpened ? '#E6E6E6' : '#FEFEFE';
+							const emailCampaignId = email.campaignId ?? email.campaign?.id;
+							const campaignIndex =
+								emailCampaignId != null
+									? campaignIndexById.get(emailCampaignId)
+									: undefined;
+							const chipScheme =
+								mobile && campaignIndex != null
+									? getCampaignFolderScheme(campaignIndex)
+									: { card: '#B9BBF1', folder: '#C847CB' };
 
 							return (
 								<button
@@ -692,26 +734,36 @@ export const DashboardResponsesWidget: FC<{
 									type="button"
 									className="text-left hover:brightness-[0.985] transition-[filter]"
 									style={{
-										width: '639px',
-										height: '48px',
+										width: mobile ? '100%' : '639px',
+										height: mobile ? '64px' : '48px',
 										borderRadius: '6.389px',
 										backgroundColor: rowFill,
 										border: 'none',
 										boxShadow: '0px 1px 0px rgba(0,0,0,0.05)',
 										boxSizing: 'border-box',
 										overflow: 'hidden',
-										padding: '7px 31px 9px 27px',
+										padding: mobile ? '0 14px' : '7px 31px 9px 27px',
 										display: 'flex',
-										alignItems: 'flex-start',
-										gap: '18px',
+										alignItems: mobile ? 'center' : 'flex-start',
+										gap: mobile ? '12px' : '18px',
 										fontFamily: 'Inter, sans-serif',
 										color: '#000000',
 										cursor: 'pointer',
 									}}
-									onClick={() => handleEmailClick(email, rowKey)}
-									onDoubleClick={() => handleEmailDoubleClick(email, rowKey)}
-									onMouseEnter={() => handleEmailHoverStart(email, rowKey)}
-									onMouseLeave={hideEmailPreview}
+									onClick={
+										mobile
+											? // Touch: a single tap opens the conversation (double-tap
+												// is unreliable on iOS and hover doesn't exist).
+												() => void handleEmailDoubleClick(email, rowKey)
+											: () => handleEmailClick(email, rowKey)
+									}
+									onDoubleClick={
+										mobile ? undefined : () => handleEmailDoubleClick(email, rowKey)
+									}
+									onMouseEnter={
+										mobile ? undefined : () => handleEmailHoverStart(email, rowKey)
+									}
+									onMouseLeave={mobile ? undefined : hideEmailPreview}
 								>
 									{/* Sender + campaign */}
 									<div
@@ -767,7 +819,7 @@ export const DashboardResponsesWidget: FC<{
 												width: '80px',
 												height: '15px',
 												borderRadius: '3px',
-												background: '#B9BBF1',
+												background: chipScheme.card,
 												display: 'flex',
 												alignItems: 'center',
 												overflow: 'hidden',
@@ -779,7 +831,7 @@ export const DashboardResponsesWidget: FC<{
 											<DashboardActionBarFolderIcon
 												width={20}
 												height={12}
-												style={{ color: '#C847CB', flex: '0 0 auto' }}
+												style={{ color: chipScheme.folder, flex: '0 0 auto' }}
 											/>
 											<FadeOverflowText
 												text={campaignLabel}

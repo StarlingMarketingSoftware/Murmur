@@ -8,6 +8,7 @@ import {
 	useRef,
 	useState,
 	type CSSProperties,
+	type ReactNode,
 } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { gsap } from 'gsap';
@@ -68,6 +69,10 @@ import { DraftPreviewExpandedList } from '@/app/murmur/campaign/[campaignId]/Dra
 import { SentExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/SentExpandedList';
 import { InboxExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/InboxExpandedList';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
+import type {
+	AreaSelectPayload,
+	MapSelectionBounds,
+} from '@/components/molecules/SearchResultsMap/types';
 import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
 import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
@@ -82,6 +87,9 @@ import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
+import BulletListIcon from '@/components/atoms/_svg/BulletListIcon';
+import MapBottomSearchArrowIcon from '@/components/atoms/_svg/MapBottomSearchArrowIcon';
+import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 import UndoIcon from '@/components/atoms/_svg/UndoIcon';
 import UpscaleIcon from '@/components/atoms/_svg/UpscaleIcon';
 import { getCityIconProps } from '@/utils/cityIcons';
@@ -200,6 +208,301 @@ const stripInjectedSubjectFromTestMessageHtml = (
 	} catch {
 		return { messageHtml: html, injectedSubject: '' };
 	}
+};
+
+const MobileSearchCategoryPill: FC<{ headline: string }> = ({ headline }) => (
+	<div
+		className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+		style={{
+			backgroundColor: isRestaurantTitle(headline)
+				? '#C3FBD1'
+				: isCoffeeShopTitle(headline)
+					? '#D6F1BD'
+					: isMusicVenueTitle(headline)
+						? '#B7E5FF'
+						: isMusicFestivalTitle(headline)
+							? '#C1D6FF'
+							: isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)
+								? '#FFF2BC'
+								: '#E8EFFF',
+		}}
+	>
+		{isRestaurantTitle(headline) && <RestaurantsIcon size={12} />}
+		{isCoffeeShopTitle(headline) && <CoffeeShopsIcon size={7} />}
+		{isMusicVenueTitle(headline) && (
+			<MusicVenuesIcon size={12} className="flex-shrink-0" />
+		)}
+		{isMusicFestivalTitle(headline) && (
+			<FestivalsIcon size={12} className="flex-shrink-0" />
+		)}
+		{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+			<WeddingPlannersIcon size={12} />
+		)}
+		<span className="text-[10px] text-black leading-none truncate">
+			{isRestaurantTitle(headline)
+				? 'Restaurant'
+				: isCoffeeShopTitle(headline)
+					? 'Coffee Shop'
+					: isMusicVenueTitle(headline)
+						? 'Music Venue'
+						: isMusicFestivalTitle(headline)
+							? 'Music Festival'
+							: isWeddingPlannerTitle(headline)
+								? 'Wedding Planner'
+								: isWeddingVenueTitle(headline)
+									? 'Wedding Venue'
+									: headline}
+		</span>
+	</div>
+);
+
+// Full-width Search Results row for the mobile list view — same layout/tokens as the
+// desktop Search Results panel rows.
+const MobileSearchResultRowCard: FC<{
+	contact: ContactWithName;
+	isSelected: boolean;
+	onToggle: () => void;
+}> = ({ contact, isSelected, onToggle }) => {
+	const firstName = contact.firstName || '';
+	const lastName = contact.lastName || '';
+	const fullName = contact.name || `${firstName} ${lastName}`.trim();
+	const company = contact.company || '';
+	const headline = contact.headline || contact.title || '';
+	const stateAbbr = getStateAbbreviation(contact.state || '') || '';
+	const city = contact.city || '';
+
+	return (
+		<div
+			data-contact-id={contact.id}
+			className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-[#ABABAB] select-none"
+			style={{ backgroundColor: isSelected ? '#C9EAFF' : '#FFFFFF' }}
+			onClick={onToggle}
+		>
+			{fullName ? (
+				<div className="pl-3 pr-1 flex items-center h-[23px]">
+					<div className="font-bold text-[11px] w-full truncate leading-tight">
+						{fullName}
+					</div>
+				</div>
+			) : (
+				<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
+					<div className="font-bold text-[11px] w-full truncate leading-tight">
+						{company || '—'}
+					</div>
+				</div>
+			)}
+			{/* Top Right - Title/Headline */}
+			<div className="pr-2 pl-1 flex items-center h-[23px]">
+				{headline ? (
+					<MobileSearchCategoryPill headline={headline} />
+				) : (
+					<div className="w-full" />
+				)}
+			</div>
+			{/* Bottom Left - Company (only when a name occupies the top-left cell) */}
+			{fullName ? (
+				<div className="pl-3 pr-1 flex items-center h-[22px]">
+					<div className="text-[11px] text-black w-full truncate leading-tight">
+						{company}
+					</div>
+				</div>
+			) : null}
+			{/* Bottom Right - Location */}
+			<div className="pr-2 pl-1 flex items-center h-[22px]">
+				{city || stateAbbr ? (
+					<div className="flex items-center gap-1 w-full">
+						{stateAbbr && (
+							<span
+								className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+								style={{
+									backgroundColor: stateBadgeColorMap[stateAbbr] || 'transparent',
+									borderColor: '#000000',
+								}}
+							>
+								{stateAbbr}
+							</span>
+						)}
+						{city && (
+							<span className="text-[10px] text-black leading-none truncate">
+								{city}
+							</span>
+						)}
+					</div>
+				) : (
+					<div className="w-full" />
+				)}
+			</div>
+		</div>
+	);
+};
+
+type MobileChipTile = { key: string; background: string; icon: ReactNode };
+
+// Compact "+N" chip next to the campaign name: leads with the campaign's top contact
+// category and top state, then counts the remaining distinct ones.
+const MobileCampaignIconChip: FC<{ contacts: ContactWithName[] }> = ({ contacts }) => {
+	const { tiles, overflowCount } = useMemo(() => {
+		const categoryCounts = new Map<string, number>();
+		const stateCounts = new Map<string, number>();
+		for (const contact of contacts) {
+			const headline = contact.headline || contact.title || '';
+			const category = !headline
+				? null
+				: isRestaurantTitle(headline)
+					? 'restaurant'
+					: isCoffeeShopTitle(headline)
+						? 'coffee-shop'
+						: isMusicVenueTitle(headline)
+							? 'music-venue'
+							: isMusicFestivalTitle(headline)
+								? 'music-festival'
+								: isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)
+									? 'wedding'
+									: isWineBeerSpiritsTitle(headline)
+										? 'wine-beer-spirits'
+										: null;
+			if (category) categoryCounts.set(category, (categoryCounts.get(category) ?? 0) + 1);
+			const stateAbbr = getStateAbbreviation(contact.state || '');
+			if (stateAbbr) stateCounts.set(stateAbbr, (stateCounts.get(stateAbbr) ?? 0) + 1);
+		}
+
+		const byCountDesc = (a: [string, number], b: [string, number]) => b[1] - a[1];
+		const categoryTiles: MobileChipTile[] = Array.from(categoryCounts.entries())
+			.sort(byCountDesc)
+			.map(([key]) => {
+				switch (key) {
+					case 'restaurant':
+						return { key, background: '#C3FBD1', icon: <RestaurantsIcon size={12} /> };
+					case 'coffee-shop':
+						return { key, background: '#D6F1BD', icon: <CoffeeShopsIcon size={9} /> };
+					case 'music-venue':
+						return { key, background: '#B7E5FF', icon: <MusicVenuesIcon size={12} /> };
+					case 'music-festival':
+						return { key, background: '#C1D6FF', icon: <FestivalsIcon size={12} /> };
+					case 'wedding':
+						return { key, background: '#FFF2BC', icon: <WeddingPlannersIcon size={12} /> };
+					default:
+						return { key, background: '#E8EFFF', icon: <WineBeerSpiritsIcon size={12} /> };
+				}
+			});
+		const stateTiles: MobileChipTile[] = Array.from(stateCounts.entries())
+			.sort(byCountDesc)
+			.map(([abbr]) => {
+				const cityIconProps = getCityIconProps('', abbr);
+				return {
+					key: `state-${abbr}`,
+					background: cityIconProps.backgroundColor,
+					icon: cityIconProps.icon,
+				};
+			});
+
+		// Interleave so the chip leads with the top category and the top state.
+		const ordered: MobileChipTile[] = [];
+		if (categoryTiles[0]) ordered.push(categoryTiles[0]);
+		if (stateTiles[0]) ordered.push(stateTiles[0]);
+		ordered.push(...categoryTiles.slice(1), ...stateTiles.slice(1));
+
+		return { tiles: ordered.slice(0, 2), overflowCount: Math.max(0, ordered.length - 2) };
+	}, [contacts]);
+
+	if (tiles.length === 0) return null;
+
+	return (
+		<div className="flex items-center gap-[3px] h-[24px] rounded-[6px] border border-black bg-white/80 px-1 flex-shrink-0">
+			{tiles.map((tile) => (
+				<span
+					key={tile.key}
+					className="w-[18px] h-[18px] rounded-[4px] flex items-center justify-center overflow-hidden [&_svg]:max-w-[14px] [&_svg]:max-h-[14px]"
+					style={{ backgroundColor: tile.background }}
+				>
+					{tile.icon}
+				</span>
+			))}
+			{overflowCount > 0 && (
+				<span className="font-inter text-[11px] font-semibold text-black px-[2px]">
+					+{overflowCount}
+				</span>
+			)}
+		</div>
+	);
+};
+
+// Campaign header overlay for the mobile Search view: folder + name + icon chip on top,
+// metric pills below (tokens copied from CampaignHeaderBox).
+const MobileCampaignSearchHeader: FC<{
+	campaignName: string;
+	contacts: ContactWithName[];
+	contactsCount: number;
+	draftCount: number;
+	sentCount: number;
+	newMessageCount: number;
+	onDraftsClick?: () => void;
+	onSentClick?: () => void;
+	onNewMessageClick?: () => void;
+}> = ({
+	campaignName,
+	contacts,
+	contactsCount,
+	draftCount,
+	sentCount,
+	newMessageCount,
+	onDraftsClick,
+	onSentClick,
+	onNewMessageClick,
+}) => {
+	const formatCount = (count: number, label: string) =>
+		count === 0 ? label : `${count.toString().padStart(2, '0')} ${label}`;
+	const pillClassName =
+		'inline-flex items-center justify-center h-[20px] rounded-full border border-black px-2 font-inter text-[11px] font-semibold leading-none text-black whitespace-nowrap';
+
+	return (
+		<div className="pointer-events-auto flex flex-col gap-2">
+			<div className="flex items-center gap-2 min-w-0">
+				<div className="flex items-center gap-2 h-[30px] rounded-[6px] bg-[#B9EAF1] pl-2 pr-3 min-w-0">
+					<DashboardActionBarFolderIcon
+						width={26}
+						height={15}
+						className="flex-shrink-0 text-[#C5494F]"
+					/>
+					<span
+						className="text-[20px] leading-none text-black truncate"
+						style={{ fontFamily: "'Times New Roman', Times, serif" }}
+					>
+						{campaignName}
+					</span>
+				</div>
+				<MobileCampaignIconChip contacts={contacts} />
+			</div>
+			<div className="flex items-center gap-2 min-w-0">
+				<span className={cn(pillClassName, 'bg-[#F5DADA]')}>
+					{formatCount(contactsCount, 'Contacts')}
+				</span>
+				<button
+					type="button"
+					className={cn(pillClassName, 'bg-[#FFE3AA] cursor-pointer')}
+					onClick={onDraftsClick}
+				>
+					{formatCount(draftCount, 'Drafts')}
+				</button>
+				<button
+					type="button"
+					className={cn(pillClassName, 'bg-[#B0E0A6] cursor-pointer')}
+					onClick={onSentClick}
+				>
+					{formatCount(sentCount, 'Sent')}
+				</button>
+				{newMessageCount > 0 && (
+					<button
+						type="button"
+						className={cn(pillClassName, 'bg-[#B9EAF1] cursor-pointer ml-auto')}
+						onClick={onNewMessageClick}
+					>
+						{newMessageCount} New Message{newMessageCount === 1 ? '' : 's'}
+					</button>
+				)}
+			</div>
+		</div>
+	);
 };
 
 interface ExtendedDraftingSectionProps extends DraftingSectionProps {
@@ -1595,6 +1898,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [searchTabs, setSearchTabs] = useState<SearchTab[]>([]);
 	const [activeSearchTabId, setActiveSearchTabId] = useState<string | null>(null);
 
+	// Mobile search view: map/list mode, the area-select tool, and the bottom-bar input.
+	const [mobileSearchViewMode, setMobileSearchViewMode] = useState<'map' | 'list'>('map');
+	const [mobileMapTool, setMobileMapTool] = useState<'select' | 'grab'>('grab');
+	const [mobileSearchInputValue, setMobileSearchInputValue] = useState('');
+	const mobileSearchInputRef = useRef<HTMLInputElement | null>(null);
+
+	useEffect(() => {
+		if (view === 'search') return;
+		setMobileSearchViewMode('map');
+		setMobileMapTool('grab');
+		setMobileSearchInputValue('');
+	}, [view]);
+
 	// Get active tab data
 	const activeSearchTab = searchTabs.find((tab) => tab.id === activeSearchTabId);
 	const hasCampaignSearched = activeSearchTabId !== null;
@@ -1712,6 +2028,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		[activeSearchTabId]
 	);
 
+	// Mobile area select: merge the box-selected ids into the active tab's selection and
+	// surface overlay-only contacts in the Search Results list (mirrors the dashboard).
+	const handleMobileAreaSelect = (
+		_bounds: MapSelectionBounds,
+		payload?: AreaSelectPayload
+	) => {
+		const ids = payload?.contactIds ?? [];
+		const extras = payload?.extraContacts ?? [];
+		if (ids.length > 0) {
+			setSearchResultsSelectedContacts((prev) => Array.from(new Set([...prev, ...ids])));
+		}
+		for (const contact of extras) {
+			addContactToActiveSearchTabResults(contact);
+		}
+	};
+
 	// Hook for adding contacts to the campaign's user contact list
 	const { mutateAsync: editUserContactList, isPending: isAddingToCampaign } =
 		useEditUserContactList({
@@ -1764,6 +2096,48 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			setActiveSearchTabId(newTab.id);
 		}
 		setSearchActiveSection(null);
+	};
+
+	// Mobile free-text search: a single tab updated in place, so the "recent search" box
+	// always shows the latest query; selection/extras reset so Add can't include stale picks.
+	const handleMobileCampaignSearch = () => {
+		const query = mobileSearchInputValue.trim();
+		if (!query) {
+			toast.error('Please enter what you want to search for');
+			return;
+		}
+
+		if (activeSearchTabId) {
+			setSearchTabs((tabs) =>
+				tabs.map((tab) =>
+					tab.id === activeSearchTabId
+						? {
+								...tab,
+								label: query,
+								query,
+								what: '',
+								selectedContacts: [],
+								extraContacts: [],
+							}
+						: tab
+				)
+			);
+		} else {
+			const newTab: SearchTab = {
+				id: `search-${Date.now()}`,
+				label: query,
+				query,
+				what: '',
+				selectedContacts: [],
+				extraContacts: [],
+			};
+			setSearchTabs((tabs) => [...tabs, newTab]);
+			setActiveSearchTabId(newTab.id);
+		}
+
+		setMobileSearchViewMode('map');
+		setMobileSearchInputValue('');
+		mobileSearchInputRef.current?.blur();
 	};
 
 	// Handler for triggering search from the mini searchbar in the contacts panel
@@ -6320,8 +6694,323 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							</div>
 						)}
 
+						{/* Search tab (mobile): fullscreen map with campaign header overlay, recent
+						    search box, list mode, and a bottom search/Add bar. Gated on
+						    renderGlobalOverlays so the crossfade "previous view" instance never
+						    mounts a second map or duplicate fixed bar. */}
+						{view === 'search' && isMobile === true && renderGlobalOverlays && (
+							<div className="fixed inset-0 z-30 overflow-hidden">
+								{/* Fullscreen results map (stays mounted under the list view) */}
+								<div className="absolute inset-0">
+									<SearchResultsMap
+										weatherMood={globeWeatherMood}
+										weatherRegionCenter={globeWeatherRegionCenter}
+										weatherTemperatureF={globeWeatherTemperatureF}
+										nightLighting={globeNightLighting}
+										contacts={
+											activeSearchTabId === null
+												? contacts || [] // No search yet - show campaign contacts
+												: activeCampaignSearchQuery
+													? searchResults || []
+													: []
+										}
+										isLoading={activeSearchTabId !== null ? isSearching : false}
+										selectedContacts={
+											activeSearchTabId !== null
+												? searchResultsSelectedContacts
+												: searchTabSelectedContacts
+										}
+										searchQuery={
+											activeSearchTabId !== null ? activeCampaignSearchQuery : undefined
+										}
+										searchWhat={
+											activeSearchTabId !== null ? activeSearchTab?.what : undefined
+										}
+										activeTool={mobileMapTool}
+										onAreaSelect={handleMobileAreaSelect}
+										cameraPadding={{ top: 170, bottom: 140 }}
+										onToggleSelection={(contactId) => {
+											if (activeSearchTabId !== null) {
+												if (searchResultsSelectedContacts.includes(contactId)) {
+													setSearchResultsSelectedContacts(
+														searchResultsSelectedContacts.filter(
+															(id) => id !== contactId
+														)
+													);
+												} else {
+													setSearchResultsSelectedContacts([
+														...searchResultsSelectedContacts,
+														contactId,
+													]);
+												}
+											} else {
+												if (searchTabSelectedContacts.includes(contactId)) {
+													setSearchTabSelectedContacts(
+														searchTabSelectedContacts.filter((id) => id !== contactId)
+													);
+												} else {
+													setSearchTabSelectedContacts([
+														...searchTabSelectedContacts,
+														contactId,
+													]);
+												}
+											}
+										}}
+										onMarkerClick={(contact) => {
+											// Overlay-only markers (e.g. Booking extra pins) aren't part of the
+											// base results list - add them so they appear in the list view.
+											if (
+												activeSearchTabId !== null &&
+												!baseSearchResultsIdSet.has(contact.id)
+											) {
+												addContactToActiveSearchTabResults(contact);
+											}
+										}}
+									/>
+								</div>
+
+								{/* Searching spinner over the map */}
+								{isSearching && mobileSearchViewMode === 'map' && (
+									<div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+										<div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin" />
+									</div>
+								)}
+
+								{/* No-results card over the map */}
+								{mobileSearchViewMode === 'map' &&
+									hasCampaignSearched &&
+									!isSearching &&
+									searchResultsForPanel.length === 0 && (
+										<div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none px-8">
+											<div className="bg-white border border-black rounded-[10px] px-4 py-3 font-inter text-[13px] text-black max-w-full truncate">
+												No results for &quot;{activeSearchTab?.query}&quot;
+											</div>
+										</div>
+									)}
+
+								{/* Overlay chrome */}
+								<div className="absolute inset-0 z-20 flex flex-col pointer-events-none">
+									{/* Top: campaign header + pills (+ recent search in map mode) */}
+									<div className="px-3 pt-3 flex flex-col gap-2">
+										<MobileCampaignSearchHeader
+											campaignName={campaign?.name || 'Untitled Campaign'}
+											contacts={headerContacts ?? []}
+											contactsCount={contactsCount}
+											draftCount={draftCount}
+											sentCount={sentCount}
+											newMessageCount={inboxCount}
+											onDraftsClick={goToDrafting}
+											onSentClick={goToSent}
+											onNewMessageClick={goToInbox}
+										/>
+										{mobileSearchViewMode === 'map' &&
+											(activeSearchTab?.query ?? '').trim().length > 0 && (
+												<div className="pointer-events-auto h-[40px] bg-white rounded-[10px] border border-black flex items-center pl-3 pr-2 gap-2">
+													<span className="font-inter text-[14px] text-black flex-1 min-w-0 truncate">
+														{activeSearchTab?.query}
+													</span>
+													<button
+														type="button"
+														aria-label="Clear search"
+														onClick={() => {
+															if (activeSearchTabId) {
+																handleCloseSearchTab(activeSearchTabId);
+															}
+														}}
+														className="w-[26px] h-[24px] rounded-[6px] bg-[#ABABAB]/80 hover:bg-[#ABABAB] flex items-center justify-center text-black text-[14px] leading-none flex-shrink-0"
+													>
+														✕
+													</button>
+												</div>
+											)}
+									</div>
+
+									{/* Middle: list panel (list mode) or spacer (map mode) */}
+									{mobileSearchViewMode === 'list' ? (
+										<div className="pointer-events-auto flex-1 min-h-0 mt-2 mx-2 bg-[#D8E5FB] border-2 border-black rounded-[10px] flex flex-col overflow-hidden">
+											{/* Panel header: label + query chip + close */}
+											<div className="flex-shrink-0 flex items-stretch h-[40px] border-b-2 border-black bg-white">
+												<div className="flex items-center px-3 bg-[#B9EAF1] border-r-2 border-black">
+													<span className="font-inter text-[13px] font-semibold text-black whitespace-nowrap">
+														Search Results
+													</span>
+												</div>
+												<div className="flex-1 min-w-0 flex items-center gap-1.5 px-2">
+													<BulletListIcon className="flex-shrink-0" />
+													<span className="font-inter text-[13px] text-black truncate">
+														{activeSearchTab?.query}
+													</span>
+												</div>
+												<button
+													type="button"
+													aria-label="Clear search"
+													onClick={() => {
+														if (activeSearchTabId) {
+															handleCloseSearchTab(activeSearchTabId);
+														}
+														setMobileSearchViewMode('map');
+													}}
+													className="self-center mr-2 w-[26px] h-[24px] rounded-[6px] bg-[#ABABAB]/80 hover:bg-[#ABABAB] flex items-center justify-center text-black text-[14px] leading-none flex-shrink-0"
+												>
+													✕
+												</button>
+											</div>
+											{/* Selection sub-row */}
+											<div className="flex-shrink-0 flex items-center justify-between px-3 h-[26px] border-b border-[#ABABAB]">
+												<span className="font-inter text-[11px] text-black">
+													{selectedSearchResultsCount} selected
+												</span>
+												<button
+													type="button"
+													onClick={() => {
+														if (areAllSearchResultsSelected) {
+															setSearchResultsSelectedContacts([]);
+														} else {
+															setSearchResultsSelectedContacts(
+																searchResultsForPanelIds
+															);
+														}
+													}}
+													className="font-secondary text-[11px] font-medium text-black hover:underline"
+												>
+													{areAllSearchResultsSelected ? 'Deselect all' : 'Select all'}
+												</button>
+											</div>
+											{/* Rows (native momentum scroll) */}
+											<div
+												className="flex-1 min-h-0 overflow-y-auto px-2 py-2"
+												style={{ WebkitOverflowScrolling: 'touch' }}
+											>
+												{isSearching ? (
+													<MapResultsPanelSkeleton variant="narrow" />
+												) : searchResultsForPanel.length === 0 ? (
+													<div className="font-inter text-[13px] text-black text-center pt-6">
+														No results for &quot;{activeSearchTab?.query}&quot;
+													</div>
+												) : (
+													<div className="space-y-[7px]">
+														{searchResultsForPanel.map((contact) => (
+															<MobileSearchResultRowCard
+																key={contact.id}
+																contact={contact}
+																isSelected={searchResultsSelectedIdSet.has(contact.id)}
+																onToggle={() => {
+																	if (searchResultsSelectedIdSet.has(contact.id)) {
+																		setSearchResultsSelectedContacts(
+																			searchResultsSelectedContacts.filter(
+																				(id) => id !== contact.id
+																			)
+																		);
+																	} else {
+																		setSearchResultsSelectedContacts([
+																			...searchResultsSelectedContacts,
+																			contact.id,
+																		]);
+																	}
+																}}
+															/>
+														))}
+													</div>
+												)}
+											</div>
+										</div>
+									) : (
+										<div className="flex-1 min-h-0" />
+									)}
+
+									{/* Bottom-center toggles */}
+									<div className="flex flex-col items-center gap-2 pt-2 pb-2 px-3">
+										{mobileSearchViewMode === 'map' && hasCampaignSearched && (
+											<button
+												type="button"
+												onClick={() =>
+													setMobileMapTool(
+														mobileMapTool === 'select' ? 'grab' : 'select'
+													)
+												}
+												className={cn(
+													'pointer-events-auto h-[30px] px-4 rounded-[8px] border flex items-center font-inter text-[13px] font-medium text-black',
+													mobileMapTool === 'select'
+														? 'border-black'
+														: 'border-transparent'
+												)}
+												style={{
+													backgroundColor:
+														mobileMapTool === 'select' ? '#4CDE71' : '#EFEFEF',
+												}}
+											>
+												Select Area
+											</button>
+										)}
+										{hasCampaignSearched && (
+											<button
+												type="button"
+												onClick={() =>
+													setMobileSearchViewMode(
+														mobileSearchViewMode === 'map' ? 'list' : 'map'
+													)
+												}
+												className="pointer-events-auto h-[32px] px-4 rounded-[8px] bg-[#EFEFEF] border border-transparent flex items-center gap-2 font-inter text-[15px] font-medium text-black"
+											>
+												<BulletListIcon />
+												{mobileSearchViewMode === 'map' ? 'List' : 'Map'}
+											</button>
+										)}
+									</div>
+
+									{/* Bottom bar: search input + submit + Add */}
+									<div
+										className="pointer-events-auto flex items-center gap-2 px-3 pt-1"
+										style={{
+											paddingBottom: 'calc(8px + env(safe-area-inset-bottom))',
+										}}
+									>
+										<div className="flex-1 flex h-[44px] rounded-full border-2 border-black overflow-hidden bg-white min-w-0">
+											<input
+												ref={mobileSearchInputRef}
+												type="text"
+												value={mobileSearchInputValue}
+												onChange={(e) => setMobileSearchInputValue(e.target.value)}
+												onKeyDown={(e) => {
+													if (e.key === 'Enter') {
+														e.preventDefault();
+														handleMobileCampaignSearch();
+													}
+												}}
+												placeholder="Search Anything"
+												aria-label="Search anything"
+												className="flex-1 min-w-0 h-full bg-transparent border-0 outline-none px-4 font-inter font-medium text-[16px] text-black placeholder:text-black"
+											/>
+											<button
+												type="button"
+												aria-label="Search"
+												onClick={handleMobileCampaignSearch}
+												className="w-[54px] h-full flex items-center justify-center border-l-2 border-black flex-shrink-0"
+												style={{ backgroundColor: '#A8C7FA' }}
+											>
+												<MapBottomSearchArrowIcon />
+											</button>
+										</div>
+										<button
+											type="button"
+											onClick={handleAddSearchResultsToCampaign}
+											disabled={isAddingToCampaign}
+											className="h-[44px] px-6 rounded-full border-2 border-black font-inter font-semibold text-[16px] text-black flex items-center justify-center flex-shrink-0"
+											style={{ backgroundColor: '#B8E4BE' }}
+										>
+											{isAddingToCampaign ? (
+												<div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+											) : (
+												'Add'
+											)}
+										</button>
+									</div>
+								</div>
+							</div>
+						)}
+
 						{/* Search tab - show the campaign contacts on a map */}
-						{view === 'search' && (
+						{view === 'search' && isMobile !== true && (
 							<div className="flex flex-col items-center justify-center min-h-[300px]">
 								{/* Wrapper to center both left panel and map as one unit at narrow breakpoint */}
 								<div className={isSearchTabNarrow ? 'flex items-start gap-[37px]' : ''}>

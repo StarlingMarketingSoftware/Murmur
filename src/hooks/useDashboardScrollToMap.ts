@@ -9,7 +9,9 @@ import { useLenis } from '@/contexts/ScrollContext';
  * The landing dashboard is hard scroll-locked (`html/body { overflow:hidden; height:100vh }`),
  * so there is no real scroll distance to drive a transition with. Instead we intercept the
  * wheel/touch gesture, accumulate it into a normalized progress `p ∈ [0,1]`, and scrub a
- * reversible "peek": the hero (logo / search bar / action grid) fades out while the persistent
+ * reversible "peek": the hero (logo / search bar / action grid), the landing panel below it
+ * (Strategy box et al.) and the fixed Ask Anything bar fade out — top elements drift up,
+ * bottom elements sink down — while the persistent
  * map dollies in via a pure-CSS scale (the `--map-scrub-scale` variable read by
  * PersistentDashboardMap). The Mapbox camera is never touched during the scrub — its zoom is
  * locked in background presentation, and driving it per-frame would fight that lock and the
@@ -45,6 +47,9 @@ const HERO_TRANSLATE_PX = 60;
 const HERO_SCALE_DROP = 0.04;
 const LOGO_TRANSLATE_PX = 90;
 const ACTION_BAR_TRANSLATE_PX = 24;
+const SEARCH_BAR_TRANSLATE_PX = 28; // drifts up with the logo
+const PANEL_TRANSLATE_PX = 32; // landing panel (Strategy box et al.) sinks down
+const ASK_BAR_TRANSLATE_PX = 16; // fixed bottom bar sinks toward the edge
 
 const clamp01 = (n: number) => (n < 0 ? 0 : n > 1 ? 1 : n);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -81,9 +86,18 @@ export function useDashboardScrollToMap({
 		const logo = document.querySelector<HTMLElement>('.premium-logo-container');
 		const searchBar = document.querySelector<HTMLElement>('.search-bar-wrapper');
 		const actionBar = document.querySelector<HTMLElement>('.dashboard-action-bar');
-		const heroTargets = [heroWrapper, logo, searchBar, actionBar].filter(
-			(el): el is HTMLElement => el != null
+		const landingPanel = document.querySelector<HTMLElement>(
+			'.dashboard-landing-panel'
 		);
+		const askBar = document.querySelector<HTMLElement>('.dashboard-ask-bar-scrub');
+		const heroTargets = [
+			heroWrapper,
+			logo,
+			searchBar,
+			actionBar,
+			landingPanel,
+			askBar,
+		].filter((el): el is HTMLElement => el != null);
 
 		const reduceMotion =
 			window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -145,11 +159,25 @@ export function useDashboardScrollToMap({
 				1 - smoothstep(0, 0.5, p),
 				`translateY(${-LOGO_TRANSLATE_PX * p}px)`
 			);
-			setOpacityTransform(searchBar, 1 - smoothstep(0.1, 0.7, p));
+			setOpacityTransform(
+				searchBar,
+				1 - smoothstep(0.1, 0.7, p),
+				`translateY(${-SEARCH_BAR_TRANSLATE_PX * p}px)`
+			);
 			setOpacityTransform(
 				actionBar,
 				1 - smoothstep(0, 0.45, p),
 				`translateY(${ACTION_BAR_TRANSLATE_PX * p}px)`
+			);
+			setOpacityTransform(
+				landingPanel,
+				1 - smoothstep(0.05, 0.6, p),
+				`translateY(${PANEL_TRANSLATE_PX * p}px)`
+			);
+			setOpacityTransform(
+				askBar,
+				1 - smoothstep(0.15, 0.6, p),
+				`translateY(${ASK_BAR_TRANSLATE_PX * p}px)`
 			);
 			root.style.setProperty('--map-scrub-scale', `scale(${1 + MAP_DOLLY_MAX * p})`);
 		};

@@ -1453,14 +1453,18 @@ export function MapSelectGrabTallStackBox({
 	}, []);
 
 	const handleClickAll = useCallback(() => {
-		setSelectedCategories(new Array(TALL_STACK_CATEGORY_COUNT).fill(false));
+		setSelectedCategories((prev) =>
+			new Array(TALL_STACK_CATEGORY_COUNT).fill(prev.every((sel) => !sel))
+		);
 	}, []);
 
-	// Grab-mode "All": deactivate every category tile in this bar. The star and
-	// blue-spark stack boxes below the bar hold their own state, so they stay
-	// active.
+	// Grab-mode "All": toggle every category tile in this bar — deactivate all,
+	// or reactivate all when every tile is already off. The star and blue-spark
+	// stack boxes below the bar hold their own state, so they stay active.
 	const handleClickAllGrabber = useCallback(() => {
-		setGrabberActiveCategories(new Array(TALL_STACK_CATEGORY_COUNT).fill(false));
+		setGrabberActiveCategories((prev) =>
+			new Array(TALL_STACK_CATEGORY_COUNT).fill(prev.every((active) => !active))
+		);
 	}, []);
 
 	// Each time the select tool is (re-)activated, reset all categories to selected.
@@ -1472,6 +1476,9 @@ export function MapSelectGrabTallStackBox({
 
 	// When the user deselects every category in select mode, exit back to grab.
 	const allCategoriesDeselected = selectedCategories.every((sel) => !sel);
+	const allGrabberCategoriesInactive = grabberActiveCategories.every(
+		(active) => !active
+	);
 	useEffect(() => {
 		if (isSelectActive && allCategoriesDeselected) {
 			onAllDeselected?.();
@@ -1568,7 +1575,11 @@ export function MapSelectGrabTallStackBox({
 							<button
 								type="button"
 								onClick={handleClickAll}
-								aria-label="Deselect all categories"
+								aria-label={
+									allCategoriesDeselected
+										? 'Select all categories'
+										: 'Deselect all categories'
+								}
 								style={{
 									...sharedAllLabelStyle,
 									padding: 0,
@@ -1585,7 +1596,11 @@ export function MapSelectGrabTallStackBox({
 						<button
 							type="button"
 							onClick={handleClickAllGrabber}
-							aria-label="Deactivate all categories"
+							aria-label={
+								allGrabberCategoriesInactive
+									? 'Activate all categories'
+									: 'Deactivate all categories'
+							}
 							style={{
 								...sharedAllLabelStyle,
 								padding: 0,

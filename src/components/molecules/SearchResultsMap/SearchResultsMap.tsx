@@ -2376,26 +2376,29 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return () => window.removeEventListener('keydown', onKeyDown);
 	}, [isAreaSelecting, clearSelectionRect]);
 
-	// If the user releases the mouse outside the map, ensure we don't get "stuck" selecting.
+	// If the user releases the mouse (or lifts the finger) outside the map, ensure we
+	// don't get "stuck" selecting.
 	useEffect(() => {
 		if (!isAreaSelecting) return;
-		// Defer so the map's own mouseup handler can run first.
-		const onWindowMouseUp = () => setTimeout(() => clearSelectionRect(), 0);
-		window.addEventListener('mouseup', onWindowMouseUp);
-		return () => window.removeEventListener('mouseup', onWindowMouseUp);
+		// Defer so the map's own mouseup/touchend handler can run first.
+		const onWindowPointerEnd = () => setTimeout(() => clearSelectionRect(), 0);
+		window.addEventListener('mouseup', onWindowPointerEnd);
+		window.addEventListener('touchend', onWindowPointerEnd);
+		window.addEventListener('touchcancel', onWindowPointerEnd);
+		return () => {
+			window.removeEventListener('mouseup', onWindowPointerEnd);
+			window.removeEventListener('touchend', onWindowPointerEnd);
+			window.removeEventListener('touchcancel', onWindowPointerEnd);
+		};
 	}, [isAreaSelecting, clearSelectionRect]);
 
-	const handleMapMouseDown = useCallback(
-		(e: mapboxgl.MapMouseEvent) => {
-			if (!areaSelectionEnabled) return;
-
-			// Only left-click starts a selection.
-			const domEv = e.originalEvent;
-			if (domEv.button !== 0) return;
-
-			const start = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+	const beginAreaSelection = useCallback(
+		(
+			start: { lat: number; lng: number },
+			startClient: { x: number; y: number } | null
+		) => {
 			selectionStartLatLngRef.current = start;
-			selectionStartClientRef.current = getClientPointFromDomEvent(domEv);
+			selectionStartClientRef.current = startClient;
 			setIsAreaSelecting(true);
 
 			const bounds: MapSelectionBounds = {
@@ -2407,15 +2410,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			selectionBoundsRef.current = bounds;
 			setPolygonSourceBounds(MAPBOX_SOURCE_IDS.selectionRect, bounds);
 		},
-		[areaSelectionEnabled, setPolygonSourceBounds]
+		[setPolygonSourceBounds]
 	);
 
-	const handleMapMouseMove = useCallback(
-		(e: mapboxgl.MapMouseEvent) => {
+	const updateAreaSelection = useCallback(
+		(current: { lat: number; lng: number }) => {
 			if (!isAreaSelecting) return;
 			const start = selectionStartLatLngRef.current;
 			if (!start) return;
-			const current = { lat: e.lngLat.lat, lng: e.lngLat.lng };
 			const bounds: MapSelectionBounds = {
 				south: Math.min(start.lat, current.lat),
 				west: Math.min(start.lng, current.lng),
@@ -2426,6 +2428,61 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			setPolygonSourceBounds(MAPBOX_SOURCE_IDS.selectionRect, bounds);
 		},
 		[isAreaSelecting, setPolygonSourceBounds]
+	);
+
+	const handleMapMouseDown = useCallback(
+		(e: mapboxgl.MapMouseEvent) => {
+			if (!areaSelectionEnabled) return;
+
+			// Only left-click starts a selection.
+			const domEv = e.originalEvent;
+			if (domEv.button !== 0) return;
+
+			beginAreaSelection(
+				{ lat: e.lngLat.lat, lng: e.lngLat.lng },
+				getClientPointFromDomEvent(domEv)
+			);
+		},
+		[areaSelectionEnabled, beginAreaSelection]
+	);
+
+	const handleMapMouseMove = useCallback(
+		(e: mapboxgl.MapMouseEvent) => {
+			updateAreaSelection({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+		},
+		[updateAreaSelection]
+	);
+
+	// Touch adapters: Mapbox does not synthesize mouse events from touches, so the
+	// rectangle selection needs its own touch handlers (single-finger drag draws the
+	// box; a second finger cancels so pinch-zoom never fights an in-progress selection).
+	const handleMapTouchStart = useCallback(
+		(e: mapboxgl.MapTouchEvent) => {
+			if (!areaSelectionEnabled) return;
+			if (e.originalEvent.touches.length > 1) {
+				clearSelectionRect();
+				return;
+			}
+			e.preventDefault();
+			beginAreaSelection(
+				{ lat: e.lngLat.lat, lng: e.lngLat.lng },
+				getClientPointFromDomEvent(e.originalEvent)
+			);
+		},
+		[areaSelectionEnabled, beginAreaSelection, clearSelectionRect]
+	);
+
+	const handleMapTouchMove = useCallback(
+		(e: mapboxgl.MapTouchEvent) => {
+			if (!isAreaSelecting) return;
+			if (e.originalEvent.touches.length > 1) {
+				clearSelectionRect();
+				return;
+			}
+			e.preventDefault();
+			updateAreaSelection({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+		},
+		[isAreaSelecting, clearSelectionRect, updateAreaSelection]
 	);
 
 	const updateBookingExtraFetchBbox = useCallback(
@@ -8962,19 +9019,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		clearEmptyMapPrompt,
 	]);
 
-	const handleMapMouseUp = useCallback(
-		(e: mapboxgl.MapMouseEvent) => {
+	const completeAreaSelection = useCallback(
+		(
+			end: { lat: number; lng: number },
+			endClient: { x: number; y: number } | null
+		) => {
 			if (!isAreaSelecting) return;
 			const start = selectionStartLatLngRef.current;
 			if (!start) {
 				clearSelectionRect();
 				return;
 			}
-			const end = { lat: e.lngLat.lat, lng: e.lngLat.lng };
 
 			// Ignore tiny "click" selections (treat as cancel).
 			const startClient = selectionStartClientRef.current;
-			const endClient = getClientPointFromDomEvent(e.originalEvent);
 			const dx = startClient && endClient ? Math.abs(endClient.x - startClient.x) : 0;
 			const dy = startClient && endClient ? Math.abs(endClient.y - startClient.y) : 0;
 			const movedEnough = dx >= 6 || dy >= 6;
@@ -9089,6 +9147,30 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			allContactsOverlayCoordsByContactId,
 			baseContactIdSet,
 		]
+	);
+
+	const handleMapMouseUp = useCallback(
+		(e: mapboxgl.MapMouseEvent) => {
+			completeAreaSelection(
+				{ lat: e.lngLat.lat, lng: e.lngLat.lng },
+				getClientPointFromDomEvent(e.originalEvent)
+			);
+		},
+		[completeAreaSelection]
+	);
+
+	const handleMapTouchEnd = useCallback(
+		(e: mapboxgl.MapTouchEvent) => {
+			if (!isAreaSelecting) return;
+			// `touches` is empty on touchend — the lifted finger lives in `changedTouches`.
+			const changed = e.originalEvent.changedTouches;
+			const endClient =
+				changed && changed.length > 0
+					? { x: changed[0].clientX, y: changed[0].clientY }
+					: getClientPointFromDomEvent(e.originalEvent);
+			completeAreaSelection({ lat: e.lngLat.lat, lng: e.lngLat.lng }, endClient);
+		},
+		[isAreaSelecting, completeAreaSelection]
 	);
 
 	// Dashboard UX: "All" button selects all markers currently visible in the viewport that
@@ -10438,17 +10520,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [map, isMapLoaded, isBackgroundPresentation, clearEmptyMapPrompt]);
 
-	// Rectangle selection handlers (Mapbox mouse events).
+	// Rectangle selection handlers (Mapbox mouse + touch events).
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
 		if (isBackgroundPresentation) return;
 		map.on('mousedown', handleMapMouseDown);
 		map.on('mousemove', handleMapMouseMove);
 		map.on('mouseup', handleMapMouseUp);
+		map.on('touchstart', handleMapTouchStart);
+		map.on('touchmove', handleMapTouchMove);
+		map.on('touchend', handleMapTouchEnd);
 		return () => {
 			map.off('mousedown', handleMapMouseDown);
 			map.off('mousemove', handleMapMouseMove);
 			map.off('mouseup', handleMapMouseUp);
+			map.off('touchstart', handleMapTouchStart);
+			map.off('touchmove', handleMapTouchMove);
+			map.off('touchend', handleMapTouchEnd);
 		};
 	}, [
 		map,
@@ -10457,6 +10545,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		handleMapMouseDown,
 		handleMapMouseMove,
 		handleMapMouseUp,
+		handleMapTouchStart,
+		handleMapTouchMove,
+		handleMapTouchEnd,
 	]);
 
 	// Toggle map interaction mode for rectangle selection.

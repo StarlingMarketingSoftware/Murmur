@@ -26,6 +26,12 @@ type DashboardCalendarPanelProps = {
 	mockState?: DashboardCalendarMockState;
 	onDateSelect?: (date: Date, event: ReactMouseEvent<HTMLButtonElement>) => void;
 	showFullMonth?: boolean;
+	/**
+	 * Override the visible window height (unscaled px). Used by the mobile
+	 * dashboard, which scales the whole panel down to viewport width and needs
+	 * a taller window than the desktop's fixed 373px / six-row layouts.
+	 */
+	innerHeightPx?: number;
 };
 
 type CalendarEventDraft = {
@@ -221,9 +227,28 @@ const SMOOTH_SCROLL_LERP = 0.14;
 const WHEEL_SCROLL_MULTIPLIER = 1.12;
 // Quiet period after the last wheel event before we ease to the nearest month boundary.
 const WHEEL_SNAP_DELAY_MS = 150;
+// How far a touch fling projects the release velocity before settling on a row.
+const TOUCH_FLING_MS = 160;
 
 const clamp = (value: number, min: number, max: number): number =>
 	Math.min(Math.max(value, min), max);
+
+// Width constants live at module scope so the mobile wrapper can compute its
+// scale factor from the exported outer width.
+const COLS = 7;
+const CELL_W_PX = 94.542;
+const OUTER_PADDING_PX = 4;
+export const DASHBOARD_CALENDAR_OUTER_WIDTH_PX = COLS * CELL_W_PX + OUTER_PADDING_PX * 2;
+
+// `position: fixed` coordinates live in the zoomed CSS coordinate space under
+// `html.murmur-compact { zoom }`, while getBoundingClientRect/innerWidth report
+// visual px — divide by the root zoom before positioning fixed portals.
+const getRootZoom = (): number => {
+	if (typeof window === 'undefined') return 1;
+	const zoomStr = window.getComputedStyle(document.documentElement).zoom;
+	const parsed = zoomStr ? parseFloat(zoomStr) : NaN;
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+};
 
 // Aesthetic calendar panel for the dashboard action bar. Accepts an optional
 // mockState override (used by `?calendarDebug=1` to preview every layout).
@@ -233,17 +258,15 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	mockState,
 	onDateSelect,
 	showFullMonth = false,
+	innerHeightPx,
 }) => {
 	// Layout constants (hard dashboard sizing)
-	const COLS = 7;
 	const ROWS = 6;
-	const CELL_W_PX = 94.542;
 	const CELL_H_PX = 91.224;
 	const INNER_WIDTH_PX = COLS * CELL_W_PX;
 	// Default dashboard viewport shows ~4 rows plus a sliver of row 5; compact venue
 	// usage can opt into the full six-row month while keeping the same calendar UI.
-	const INNER_HEIGHT_PX = showFullMonth ? ROWS * CELL_H_PX : 373;
-	const OUTER_PADDING_PX = 4;
+	const INNER_HEIGHT_PX = innerHeightPx ?? (showFullMonth ? ROWS * CELL_H_PX : 373);
 	const OUTER_WIDTH_PX = INNER_WIDTH_PX + OUTER_PADDING_PX * 2;
 	const OUTER_HEIGHT_PX = INNER_HEIGHT_PX + OUTER_PADDING_PX * 2;
 	const OUTER_RADIUS_PX = 22;
@@ -381,6 +404,13 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	};
 
 	const getScrollbarState = (nextScrollTop: number): CalendarScrollbarState => {
+		// The up/down scrollbar math assumes the window is smaller than one month
+		// grid; the taller mobile window has no meaningful "beyond current month"
+		// direction, so the scrollbar stays hidden there.
+		if (INNER_HEIGHT_PX >= MONTH_GRID_HEIGHT_PX) {
+			return { visible: false, direction: null, thumbTop: 0 };
+		}
+
 		if (nextScrollTop < INITIAL_SCROLL_TOP_PX - 1) {
 			const progress = clamp(
 				(INITIAL_SCROLL_TOP_PX - nextScrollTop) / INITIAL_SCROLL_TOP_PX,
@@ -528,6 +558,102 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [MAX_SCROLL_TOP_PX]);
 
+	// Touch scrolling (mobile): drives the same smooth-scroll machinery as the
+	// wheel path. The container is overflow:hidden, so without this iOS would
+	// hand the pan gesture to the page behind the calendar.
+	useEffect(() => {
+		const container = scrollContainerRef.current;
+		if (!container) return;
+		if (MAX_SCROLL_TOP_PX <= 0) return;
+
+		let lastY: number | null = null;
+		let lastMoveTime = 0;
+		let velocityPxPerMs = 0;
+
+		// Finger deltas arrive in visual px while scrollTop is in unscaled layout
+		// px — divide by the ancestor scale (the mobile dashboard wraps the panel
+		// in a transform: scale() to fit the viewport width).
+		const getVisualScale = () => {
+			const width = container.getBoundingClientRect().width;
+			return container.offsetWidth > 0 && width > 0 ? width / container.offsetWidth : 1;
+		};
+
+		const handleTouchStart = (event: TouchEvent) => {
+			if (event.touches.length !== 1) return;
+			lastY = event.touches[0].clientY;
+			lastMoveTime = event.timeStamp;
+			velocityPxPerMs = 0;
+			if (wheelSnapTimeoutRef.current != null) {
+				clearTimeout(wheelSnapTimeoutRef.current);
+				wheelSnapTimeoutRef.current = null;
+			}
+			if (smoothScrollRafRef.current == null) {
+				smoothScrollTargetRef.current = container.scrollTop;
+			}
+		};
+
+		const handleTouchMove = (event: TouchEvent) => {
+			if (lastY == null || event.touches.length !== 1) return;
+			// Keep the page from scrolling/rubber-banding behind the calendar.
+			event.preventDefault();
+
+			const y = event.touches[0].clientY;
+			const deltaLayoutPx = (lastY - y) / getVisualScale();
+			const elapsedMs = event.timeStamp - lastMoveTime;
+			if (elapsedMs > 0) {
+				velocityPxPerMs = deltaLayoutPx / elapsedMs;
+			}
+			lastY = y;
+			lastMoveTime = event.timeStamp;
+
+			smoothScrollTargetRef.current = clamp(
+				smoothScrollTargetRef.current + deltaLayoutPx,
+				0,
+				MAX_SCROLL_TOP_PX
+			);
+			if (smoothScrollRafRef.current == null) {
+				smoothScrollRafRef.current = requestAnimationFrame(animateSmoothScroll);
+			}
+		};
+
+		const handleTouchEnd = () => {
+			if (lastY == null) return;
+			lastY = null;
+
+			// Light fling: project the release velocity briefly, then settle on a row.
+			smoothScrollTargetRef.current = clamp(
+				smoothScrollTargetRef.current + velocityPxPerMs * TOUCH_FLING_MS,
+				0,
+				MAX_SCROLL_TOP_PX
+			);
+			velocityPxPerMs = 0;
+			if (smoothScrollRafRef.current == null) {
+				smoothScrollRafRef.current = requestAnimationFrame(animateSmoothScroll);
+			}
+
+			if (wheelSnapTimeoutRef.current != null) {
+				clearTimeout(wheelSnapTimeoutRef.current);
+			}
+			wheelSnapTimeoutRef.current = setTimeout(() => {
+				wheelSnapTimeoutRef.current = null;
+				snapToNearestRow();
+			}, WHEEL_SNAP_DELAY_MS);
+		};
+
+		container.addEventListener('touchstart', handleTouchStart, { passive: true });
+		container.addEventListener('touchmove', handleTouchMove, { passive: false });
+		container.addEventListener('touchend', handleTouchEnd);
+		container.addEventListener('touchcancel', handleTouchEnd);
+
+		return () => {
+			container.removeEventListener('touchstart', handleTouchStart);
+			container.removeEventListener('touchmove', handleTouchMove);
+			container.removeEventListener('touchend', handleTouchEnd);
+			container.removeEventListener('touchcancel', handleTouchEnd);
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [MAX_SCROLL_TOP_PX]);
+
 	useEffect(() => {
 		if (!isDraggingScrollbar) return;
 
@@ -640,9 +766,15 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 			handleDismiss();
 		};
 
+		// On touch devices the on-screen keyboard fires window resizes whenever a
+		// popup input gains focus — dismissing there would make the popup untypable.
+		const dismissOnResize = !window.matchMedia('(pointer: coarse)').matches;
+
 		document.addEventListener('mousedown', handleMouseDown);
 		document.addEventListener('keydown', handleKeyDown);
-		window.addEventListener('resize', handleDismiss);
+		if (dismissOnResize) {
+			window.addEventListener('resize', handleDismiss);
+		}
 		// Capture-phase scroll listener catches scroll on any ancestor (including the
 		// calendar's internal scroll container during wheel-snap between months), while
 		// allowing internal popup controls like the time dropdown to scroll normally.
@@ -651,7 +783,9 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		return () => {
 			document.removeEventListener('mousedown', handleMouseDown);
 			document.removeEventListener('keydown', handleKeyDown);
-			window.removeEventListener('resize', handleDismiss);
+			if (dismissOnResize) {
+				window.removeEventListener('resize', handleDismiss);
+			}
 			window.removeEventListener('scroll', handleScrollDismiss, true);
 		};
 	}, [activePopup, activeTimeDropdownField]);
@@ -670,9 +804,17 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		return () => document.removeEventListener('mousedown', handleMouseDown);
 	}, [activeTimeDropdownField]);
 
-	// Focus the name input when a popup opens.
+	// Focus the name input when a popup opens. Skipped for touch devices: there,
+	// autofocus raises the keyboard, whose window resize would instantly dismiss
+	// the popup via the resize handler above.
 	useEffect(() => {
 		if (!activePopup) return;
+		if (
+			typeof window !== 'undefined' &&
+			window.matchMedia('(pointer: coarse)').matches
+		) {
+			return;
+		}
 		const id = requestAnimationFrame(() => {
 			popupPersonNameInputRef.current?.focus();
 		});
@@ -863,9 +1005,33 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		key: string,
 		date: Date
 	) => {
-		const cellRect = event.currentTarget.getBoundingClientRect();
-		const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1440;
-		const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 900;
+		// Abandon any in-flight smooth-scroll settle: its next frame would move the
+		// container and trip the scroll-dismiss listener right after the popup opens.
+		if (smoothScrollRafRef.current != null) {
+			cancelAnimationFrame(smoothScrollRafRef.current);
+			smoothScrollRafRef.current = null;
+		}
+		if (wheelSnapTimeoutRef.current != null) {
+			clearTimeout(wheelSnapTimeoutRef.current);
+			wheelSnapTimeoutRef.current = null;
+		}
+		if (scrollContainerRef.current) {
+			smoothScrollTargetRef.current = scrollContainerRef.current.scrollTop;
+		}
+
+		// Convert visual px (gBCR/innerWidth) to the zoomed CSS coordinate space
+		// that the fixed-position portal is laid out in.
+		const rootZoom = getRootZoom();
+		const visualRect = event.currentTarget.getBoundingClientRect();
+		const cellRect = {
+			left: visualRect.left / rootZoom,
+			right: visualRect.right / rootZoom,
+			top: visualRect.top / rootZoom,
+		};
+		const viewportWidth =
+			(typeof window !== 'undefined' ? window.innerWidth : 1440) / rootZoom;
+		const viewportHeight =
+			(typeof window !== 'undefined' ? window.innerHeight : 900) / rootZoom;
 
 		// Apple-style placement: prefer right of the cell, flip to the left when there
 		// isn't room. The popup is allowed to overhang the panel edges; it's only
@@ -1322,7 +1488,9 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 							msOverflowStyle: 'none',
 							overscrollBehavior: 'contain',
 							WebkitOverflowScrolling: 'touch',
-							touchAction: 'pan-y',
+							// The container is overflow:hidden, so 'pan-y' would just chain
+							// the gesture to the page; the touch handlers above own it instead.
+							touchAction: 'none',
 						} as CSSProperties
 					}
 				>

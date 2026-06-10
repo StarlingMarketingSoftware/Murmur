@@ -15,6 +15,14 @@ import EmptyMobile from '@/components/atoms/_svg/EmptyMobile';
 import { OutlinedInitialAvatar } from '@/components/atoms/OutlinedInitialAvatar/OutlinedInitialAvatar';
 import { urls } from '@/constants/urls';
 import { mmdd } from '@/utils';
+import {
+	getCreatedFillColor,
+	getDraftFillColor,
+	getInboxDateLabel,
+	getSentFillColor,
+	getUpdatedFillColor,
+	getVisibleInboxCount,
+} from './campaignRowMetrics';
 
 type InboxSubtab = 'messages' | 'campaigns';
 
@@ -306,84 +314,6 @@ const CampaignsInboxViewSkeleton: FC<CampaignsInboxViewSkeletonProps> = ({
 	);
 };
 
-// Color functions matching useCampaignsTable exactly
-const getDraftFillColor = (value: number): string => {
-	const v = Math.max(0, Math.min(value, 50));
-	if (v === 0) return '#FFFFFF';
-	if (v <= 6.25) return '#FFFBF3';
-	if (v <= 12.5) return '#FFF7E7';
-	if (v <= 18.75) return '#FFF3DB';
-	if (v <= 25) return '#FFEFCE';
-	if (v <= 31.25) return '#FFEBC2';
-	if (v <= 37.5) return '#FFE7B6';
-	return '#FFE3AA';
-};
-
-const getSentFillColor = (value: number): string => {
-	const v = Math.max(0, Math.min(value, 50));
-	if (v === 0) return '#FFFFFF';
-	if (v > 1) return '#F3FCF1';
-	return '#FFFFFF';
-};
-
-const getUpdatedFillColor = (updatedAt: Date): string => {
-	const startOfDay = (d: Date) => {
-		const x = new Date(d);
-		x.setHours(0, 0, 0, 0);
-		return x;
-	};
-	const now = startOfDay(new Date());
-	const then = startOfDay(updatedAt);
-	const msInDay = 24 * 60 * 60 * 1000;
-	const days = Math.max(0, Math.floor((now.getTime() - then.getTime()) / msInDay));
-
-	if (days === 0) return '#FFFFFF';
-	if (days <= 3) return '#FBEEEE';
-	if (days <= 7) return '#F8DDDD';
-	if (days <= 14) return '#F4CCCC';
-	if (days <= 30) return '#F0BABA';
-	if (days <= 45) return '#ECA9A9';
-	if (days <= 60) return '#E99898';
-	return '#E58787';
-};
-
-const getCreatedFillColor = (createdAt: Date): string => {
-	const startOfDay = (d: Date) => {
-		const x = new Date(d);
-		x.setHours(0, 0, 0, 0);
-		return x;
-	};
-	const now = startOfDay(new Date());
-	const then = startOfDay(createdAt);
-	const msInDay = 24 * 60 * 60 * 1000;
-	const days = Math.max(0, Math.floor((now.getTime() - then.getTime()) / msInDay));
-
-	if (days === 0) return '#FFFFFF';
-	if (days === 1) return '#F4F7FF';
-	if (days <= 3) return '#E9F0FF';
-	if (days <= 7) return '#DEE8FF';
-	if (days <= 14) return '#D3E0FF';
-	if (days <= 30) return '#C8D8FF';
-	if (days <= 60) return '#BDD1FF';
-	return '#B2C9FF';
-};
-
-const getInboxDateLabel = (date: Date): string => {
-	const startOfDay = (d: Date) => {
-		const x = new Date(d);
-		x.setHours(0, 0, 0, 0);
-		return x;
-	};
-	const now = startOfDay(new Date());
-	const then = startOfDay(date);
-	const msInDay = 24 * 60 * 60 * 1000;
-	const days = Math.max(0, Math.floor((now.getTime() - then.getTime()) / msInDay));
-
-	if (days === 0) return 'Today';
-	if (days === 1) return 'Yesterday';
-	return mmdd(date);
-};
-
 export const CampaignsInboxView: FC<CampaignsInboxViewProps> = ({
 	hideSearchBar = false,
 	containerHeight,
@@ -451,29 +381,11 @@ export const CampaignsInboxView: FC<CampaignsInboxViewProps> = ({
 	// Use draftCount, sentCount, and contactEmails directly from the API response
 	// Calculate visibleInboxCount: inbound emails where sender matches a contact email in the campaign
 	const campaignsWithCounts: CampaignWithCounts[] =
-		campaigns?.map((campaign: CampaignWithCounts) => {
-			// Create a normalized set of contact emails for efficient lookup
-			const contactEmailsSet = new Set(
-				(campaign.contactEmails || [])
-					.filter((email): email is string => Boolean(email))
-					.map((email) => email.toLowerCase().trim())
-			);
-
-			// Count inbound emails where the sender matches a contact email in this campaign
-			const visibleInboxCount =
-				contactEmailsSet.size > 0 && inboundEmails
-					? inboundEmails.filter((e) => {
-							const sender = e.sender?.toLowerCase().trim();
-							return sender && contactEmailsSet.has(sender);
-					  }).length
-					: 0;
-
-			return {
-				...campaign,
-				// draftCount and sentCount come from the API response
-				visibleInboxCount,
-			};
-		}) || [];
+		campaigns?.map((campaign: CampaignWithCounts) => ({
+			...campaign,
+			// draftCount and sentCount come from the API response
+			visibleInboxCount: getVisibleInboxCount(campaign.contactEmails, inboundEmails),
+		})) || [];
 
 	// Filter campaigns by search query
 	const filteredCampaigns = campaignsWithCounts.filter((campaign) => {

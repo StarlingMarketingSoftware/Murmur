@@ -28,6 +28,12 @@ import DashboardCalendarPanel, {
 	type DashboardCalendarMockState,
 } from '@/components/molecules/DashboardCalendarPanel/DashboardCalendarPanel';
 import { DashboardCalendarDebugPanel } from '@/components/molecules/DashboardCalendarPanel/DashboardCalendarDebugPanel';
+import { MobileDashboardCalendar } from '@/components/molecules/DashboardCalendarPanel/MobileDashboardCalendar';
+import {
+	MobileDashboardTabBar,
+	type MobileDashboardTab,
+} from '@/components/molecules/MobileDashboardTabBar/MobileDashboardTabBar';
+import { MobileFolderCards } from '@/components/molecules/MobileFolderCards/MobileFolderCards';
 import { useDashboard } from './useDashboard';
 import { urls } from '@/constants/urls';
 import {
@@ -3340,6 +3346,8 @@ const DashboardContent = () => {
 	type DashboardMapTopActionKey = Exclude<DashboardActionBarKey, 'calendar'>;
 	const [selectedActionBarIcon, setSelectedActionBarIcon] =
 		useState<DashboardActionBarKey>('playbook');
+	// Mobile dashboard tab bar selection (folders / calendar / inbox).
+	const [mobileActiveTab, setMobileActiveTab] = useState<MobileDashboardTab>('folders');
 	const [openMapTopAction, setOpenMapTopAction] =
 		useState<DashboardMapTopActionKey | null>(null);
 	const mapTopStrategyButtonRef = useRef<HTMLButtonElement>(null);
@@ -9090,43 +9098,54 @@ const DashboardContent = () => {
 		return <div className="min-h-screen w-full">{mapPortal}</div>;
 	}
 
-	// Mobile dashboard: show only the campaigns inbox table (no search bar, no tab toggle).
+	// Mobile dashboard: tabbed app frame over the persistent map (folders /
+	// calendar / inbox, switched by the white tab bar). Without campaigns the
+	// original "open on desktop" empty state still renders.
 	if (isMobile) {
+		if (!hasCampaigns) {
+			return (
+				<div className="min-h-screen w-full">
+					{mapPortal}
+					<div style={{ marginTop: '40px' }}>
+						<CampaignsInboxView
+							hideSearchBar
+							containerHeight="calc(100dvh - 60px - env(safe-area-inset-bottom, 0px))"
+						/>
+					</div>
+				</div>
+			);
+		}
+
 		return (
-			<div className="min-h-screen w-full">
+			<div
+				className="w-full flex flex-col"
+				style={{ height: '100dvh', overflow: 'hidden' }}
+			>
 				{mapPortal}
 
-				{/* Only show logo above box when there are campaigns */}
-				{hasCampaigns && (
-					<div className="w-full">
-						<div
-							className="flex justify-center items-center w-full px-4"
-							style={{
-								marginBottom: '0.5rem',
-								marginTop: '40px',
-							}}
-						>
-							<div className="premium-hero-section flex flex-col items-center justify-center w-full max-w-[600px]">
-								<div
-									className="premium-logo-container flex items-center justify-center"
-									style={{ width: logoWidth, height: logoHeight }}
-								>
-									<MurmurLogoNew width={logoWidth} height={logoHeight} />
-								</div>
-							</div>
-						</div>
-					</div>
-				)}
+				{/* Logo row — left-aligned over the map; the Clerk avatar stays fixed top-right */}
+				<div
+					className="flex items-center justify-start"
+					style={{ padding: '14px 0 10px 20px', flexShrink: 0 }}
+				>
+					<MurmurLogoNew width={logoWidth} height={logoHeight} />
+				</div>
 
-				<div style={{ marginTop: hasCampaigns ? '12px' : '40px' }}>
-					<CampaignsInboxView
-						hideSearchBar
-						containerHeight={
-							hasCampaigns
-								? 'calc(100dvh - 120px - env(safe-area-inset-bottom, 0px))'
-								: 'calc(100dvh - 60px - env(safe-area-inset-bottom, 0px))'
-						}
-					/>
+				<MobileDashboardTabBar
+					activeTab={mobileActiveTab}
+					onTabChange={setMobileActiveTab}
+				/>
+
+				<div className="flex-1 min-h-0 w-full" style={{ overflow: 'hidden' }}>
+					{mobileActiveTab === 'folders' && <MobileFolderCards className="h-full" />}
+					{mobileActiveTab === 'calendar' && <MobileDashboardCalendar />}
+					{mobileActiveTab === 'inbox' && (
+						<DashboardResponsesWidget
+							mobile
+							enabled={isSignedIn === true}
+							mockState={responsesMockState}
+						/>
+					)}
 				</div>
 			</div>
 		);
@@ -9756,94 +9775,99 @@ const DashboardContent = () => {
 							zIndex: 70,
 						}}
 					>
-						{isMapBottomSearchExpanded &&
-							!isMapBottomCategoryMode &&
-							!isMapBottomForYouMode && (
-								<div
-									aria-label="Search suggestions"
-									className="absolute left-1/2 flex flex-col gap-[5px] pointer-events-none"
-									style={{
-										bottom: 'calc(100% + 12px)',
-										width: '404px',
-										transform: 'translateX(-50%)',
-									}}
-								>
-									{initialDashboardSearchSuggestions.map((label, index) => (
-										<button
-											type="button"
-											aria-label={`Search for ${label}`}
-											key={`initial-dashboard-search-suggestion-${index}`}
-											className="initial-dashboard-search-suggestion pointer-events-auto flex items-center overflow-hidden"
-											style={
-												{
-													width: '404px',
-													height: '29px',
-													borderRadius: '10px',
-													'--initial-dashboard-search-suggestion-background': '#F8F8F8',
-													'--initial-dashboard-search-suggestion-opacity':
-														INITIAL_DASHBOARD_ACTIVE_SEARCH_SUGGESTIONS[index]?.opacity ??
-														0.5,
-													animationDelay: `${
-														(initialDashboardSearchSuggestions.length - 1 - index) * 48
-													}ms`,
-													boxSizing: 'border-box',
-													padding: '0 16px',
-												} as React.CSSProperties
-											}
-											onMouseDown={(event) => {
-												event.preventDefault();
-												event.stopPropagation();
-											}}
-											onClick={(event) => {
-												event.stopPropagation();
-												handleInitialDashboardSearchSuggestionClick(label);
-											}}
-										>
-											<span
-												className="truncate"
-												style={{
-													color: '#000000',
-													fontFamily: 'Inter, sans-serif',
-													fontSize: '12.809px',
-													fontStyle: 'normal',
-													fontWeight: 400,
-													lineHeight: '20.199px',
+						{/* Inner scrub target: the wheel-to-map gesture animates this div's
+						    opacity/transform, leaving the React-owned translateX(-50%) on the
+						    fixed wrapper above untouched. */}
+						<div className="dashboard-ask-bar-scrub relative h-full w-full pointer-events-none">
+							{isMapBottomSearchExpanded &&
+								!isMapBottomCategoryMode &&
+								!isMapBottomForYouMode && (
+									<div
+										aria-label="Search suggestions"
+										className="absolute left-1/2 flex flex-col gap-[5px] pointer-events-none"
+										style={{
+											bottom: 'calc(100% + 12px)',
+											width: '404px',
+											transform: 'translateX(-50%)',
+										}}
+									>
+										{initialDashboardSearchSuggestions.map((label, index) => (
+											<button
+												type="button"
+												aria-label={`Search for ${label}`}
+												key={`initial-dashboard-search-suggestion-${index}`}
+												className="initial-dashboard-search-suggestion pointer-events-auto flex items-center overflow-hidden"
+												style={
+													{
+														width: '404px',
+														height: '29px',
+														borderRadius: '10px',
+														'--initial-dashboard-search-suggestion-background': '#F8F8F8',
+														'--initial-dashboard-search-suggestion-opacity':
+															INITIAL_DASHBOARD_ACTIVE_SEARCH_SUGGESTIONS[index]?.opacity ??
+															0.5,
+														animationDelay: `${
+															(initialDashboardSearchSuggestions.length - 1 - index) * 48
+														}ms`,
+														boxSizing: 'border-box',
+														padding: '0 16px',
+													} as React.CSSProperties
+												}
+												onMouseDown={(event) => {
+													event.preventDefault();
+													event.stopPropagation();
+												}}
+												onClick={(event) => {
+													event.stopPropagation();
+													handleInitialDashboardSearchSuggestionClick(label);
 												}}
 											>
-												{label}
-											</span>
-										</button>
-									))}
-								</div>
-							)}
-						<MapBottomSearchBar
-							value={mapBottomSearchValue}
-							isExpanded={isMapBottomSearchExpanded}
-							activeHeight={mapBottomSearchActiveHeight}
-							inputRef={mapBottomSearchInputRef}
-							appearance="initial-dashboard"
-							mode={
-								isMapBottomCategoryMode
-									? 'category'
-									: isMapBottomForYouMode
-										? 'for-you'
-										: 'anything'
-							}
-							categoryWhatValue={whatValue}
-							categoryWhereValue={whereValue}
-							activeCategoryField={activeMapBottomCategoryField}
-							onActivate={handleMapBottomSearchActivate}
-							onSubmit={handleMapBottomSearchSubmit}
-							allowEmptySubmit={isProfileModeEnabled}
-							onValueChange={setMapBottomSearchValue}
-							onActiveChange={setIsMapBottomSearchActive}
-							onCategoryFieldFocus={handleMapBottomCategoryFieldFocus}
-							onCategoryWhatChange={handleMapBottomCategoryWhatChange}
-							onCategoryWhereChange={handleMapBottomCategoryWhereChange}
-							onCategoryWhatEnter={handleMapBottomCategoryWhatEnter}
-							onCategorySubmit={handleMapBottomCategorySubmit}
-							onForYouSubmit={handleMapBottomForYouSubmit}
-						/>
+												<span
+													className="truncate"
+													style={{
+														color: '#000000',
+														fontFamily: 'Inter, sans-serif',
+														fontSize: '12.809px',
+														fontStyle: 'normal',
+														fontWeight: 400,
+														lineHeight: '20.199px',
+													}}
+												>
+													{label}
+												</span>
+											</button>
+										))}
+									</div>
+								)}
+							<MapBottomSearchBar
+								value={mapBottomSearchValue}
+								isExpanded={isMapBottomSearchExpanded}
+								activeHeight={mapBottomSearchActiveHeight}
+								inputRef={mapBottomSearchInputRef}
+								appearance="initial-dashboard"
+								mode={
+									isMapBottomCategoryMode
+										? 'category'
+										: isMapBottomForYouMode
+											? 'for-you'
+											: 'anything'
+								}
+								categoryWhatValue={whatValue}
+								categoryWhereValue={whereValue}
+								activeCategoryField={activeMapBottomCategoryField}
+								onActivate={handleMapBottomSearchActivate}
+								onSubmit={handleMapBottomSearchSubmit}
+								allowEmptySubmit={isProfileModeEnabled}
+								onValueChange={setMapBottomSearchValue}
+								onActiveChange={setIsMapBottomSearchActive}
+								onCategoryFieldFocus={handleMapBottomCategoryFieldFocus}
+								onCategoryWhatChange={handleMapBottomCategoryWhatChange}
+								onCategoryWhereChange={handleMapBottomCategoryWhereChange}
+								onCategoryWhatEnter={handleMapBottomCategoryWhatEnter}
+								onCategorySubmit={handleMapBottomCategorySubmit}
+								onForYouSubmit={handleMapBottomForYouSubmit}
+							/>
+						</div>
 					</div>
 				)}
 
@@ -14087,7 +14111,9 @@ const DashboardContent = () => {
 									willChange: 'transform, opacity',
 								}}
 							>
-								<div className="mt-[30px] mb-[18px] w-full flex flex-col items-center">
+								{/* Inner div (not tabbedLandingBoxRef) is the scroll-to-map scrub target so it
+								    doesn't fight the GSAP tab-transition fade on the outer ref. */}
+								<div className="dashboard-landing-panel mt-[30px] mb-[18px] w-full flex flex-col items-center">
 									{selectedActionBarIcon === 'playbook' && (
 										<DashboardStrategyBox
 											onSearchContacts={handleMapBottomForYouSubmit}

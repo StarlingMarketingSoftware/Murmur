@@ -9,7 +9,8 @@ export type CampaignViewType =
 	| 'drafting'
 	| 'sent'
 	| 'inbox'
-	| 'all';
+	| 'all'
+	| 'search';
 
 export type CampaignDeviceContextValue = {
 	/**

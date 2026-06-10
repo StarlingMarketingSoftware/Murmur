@@ -602,6 +602,8 @@ export const DashboardOpportunitiesContent: FC<{
 	mockState?: OpportunitiesMockState;
 	inboundEmailsOverride?: InboundEmailWithRelations[];
 	isLoadingOverride?: boolean;
+	/** Fill the parent width instead of the fixed 639px desktop layout. */
+	fluid?: boolean;
 }> = ({
 	enabled = true,
 	searchQuery,
@@ -609,6 +611,7 @@ export const DashboardOpportunitiesContent: FC<{
 	mockState,
 	inboundEmailsOverride,
 	isLoadingOverride,
+	fluid = false,
 }) => {
 	const router = useRouter();
 	const mockOverrideActive = mockState != null;
@@ -705,8 +708,16 @@ export const DashboardOpportunitiesContent: FC<{
 
 	if (!enabled) return null;
 
+	const rowWidth = fluid ? '100%' : '639px';
+
 	return (
-		<div className={cn('flex w-[639px] flex-1 flex-col self-center min-h-0', className)}>
+		<div
+			className={cn(
+				'flex flex-1 flex-col self-center min-h-0',
+				fluid ? 'w-full' : 'w-[639px]',
+				className
+			)}
+		>
 			<div
 				className="relative"
 				onClick={() => setActiveStatus(null)}
@@ -763,7 +774,7 @@ export const DashboardOpportunitiesContent: FC<{
 				offsetRight={-12}
 				lockHorizontalScroll
 				style={{
-					width: '639px',
+					width: rowWidth,
 					marginTop: '8px',
 				}}
 			>
@@ -773,7 +784,7 @@ export const DashboardOpportunitiesContent: FC<{
 							<div
 								key={`opportunity-loading-${index}`}
 								style={{
-									width: '639px',
+									width: rowWidth,
 									height: '48px',
 									borderRadius: '6.389px',
 									background: '#FEFEFE',
@@ -789,7 +800,7 @@ export const DashboardOpportunitiesContent: FC<{
 									key={`opportunity-empty-outline-${index}`}
 									aria-hidden="true"
 									style={{
-										width: '639px',
+										width: rowWidth,
 										height: '48px',
 										borderRadius: '6.389px',
 										border: '1px solid #000000',
@@ -803,7 +814,7 @@ export const DashboardOpportunitiesContent: FC<{
 						<div
 							className="flex items-center justify-center text-center"
 							style={{
-								width: '639px',
+								width: rowWidth,
 								height: '48px',
 								borderRadius: '6.389px',
 								background: '#FEFEFE',
@@ -836,7 +847,7 @@ export const DashboardOpportunitiesContent: FC<{
 									}
 									className="text-left hover:brightness-[0.985] transition-[filter]"
 									style={{
-										width: '639px',
+										width: rowWidth,
 										height: isCompactClosedRow ? '25px' : '48px',
 										borderRadius: '6.389px',
 										border: isExpiredOpportunity ? '1px solid #000000' : 'none',
@@ -878,7 +889,9 @@ export const DashboardOpportunitiesContent: FC<{
 											position: 'absolute',
 											left: '27px',
 											top: isCompactClosedRow ? '4px' : '7px',
-											width: '190px',
+											// On fluid (mobile) widths, keep the label clear of the
+											// right-anchored date pill.
+											width: fluid ? 'min(190px, calc(100% - 130px))' : '190px',
 											height: '17.186px',
 											display: 'flex',
 											alignItems: isCompactClosedRow ? 'center' : 'baseline',

@@ -97,8 +97,8 @@ import {
 	type CampaignInboxMockState,
 } from './CampaignInboxDebugPanel';
 
-type ViewType = Exclude<DraftingSectionView, 'search'>;
-type CampaignUrlTab = 'write' | 'all' | 'inbox' | 'sent' | 'drafts';
+type ViewType = DraftingSectionView;
+type CampaignUrlTab = 'write' | 'all' | 'inbox' | 'sent' | 'drafts' | 'search';
 
 type CampaignOverviewBottomBoxesProps = {
 	contactsCount: number;
@@ -691,6 +691,8 @@ const getCampaignUrlTabForView = (
 			return 'drafts';
 		case 'testing':
 			return 'write';
+		case 'search':
+			return 'search';
 	}
 };
 
@@ -2802,7 +2804,11 @@ const Murmur = () => {
 
 	// Mobile never supports the Writing ("testing") tab. Clamp immediately so we never mount
 	// HybridPromptInput on mobile (and never transition through it).
-	const MOBILE_ALLOWED_VIEWS: Array<'drafting' | 'inbox'> = ['drafting', 'inbox'];
+	const MOBILE_ALLOWED_VIEWS: Array<'search' | 'drafting' | 'inbox'> = [
+		'search',
+		'drafting',
+		'inbox',
+	];
 	useLayoutEffect(() => {
 		if (isMobile !== true) return;
 		if (
@@ -2823,8 +2829,8 @@ const Murmur = () => {
 		setPreviousView(null);
 		setIsTransitioning(false);
 		setIsFadingOutPreviousView(false);
-		requestedViewRef.current = 'drafting';
-		setActiveViewInternal('drafting');
+		requestedViewRef.current = 'search';
+		setActiveViewInternal('search');
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isMobile, activeView]);
 
@@ -2836,12 +2842,16 @@ const Murmur = () => {
 				requestInboxSentTab('sent');
 				newView = 'inbox';
 			}
+			// The Search view is mobile-only.
+			if (isMobile !== true && newView === 'search') {
+				newView = 'testing';
+			}
 			// Never allow unsupported views on mobile.
 			if (
 				isMobile === true &&
 				!MOBILE_ALLOWED_VIEWS.includes(newView as (typeof MOBILE_ALLOWED_VIEWS)[number])
 			) {
-				newView = 'drafting';
+				newView = 'search';
 			}
 			// Dedupe against the *latest requested* view (not just the last committed render) so
 			// rapid flips like A -> B -> A still enqueue the final A update and don't get dropped.
@@ -3253,10 +3263,16 @@ const Murmur = () => {
 	};
 
 	// Mobile-specific tab navigation (only the visible tabs on mobile)
-	const mobileTabOrder: Array<'drafting' | 'inbox'> = ['inbox', 'drafting'];
+	const mobileTabOrder: Array<'search' | 'inbox' | 'drafting'> = [
+		'search',
+		'inbox',
+		'drafting',
+	];
 
 	const goToPreviousMobileTab = () => {
-		const currentIndex = mobileTabOrder.indexOf(activeView as 'drafting' | 'inbox');
+		const currentIndex = mobileTabOrder.indexOf(
+			activeView as (typeof mobileTabOrder)[number]
+		);
 		if (currentIndex > 0) {
 			setActiveView(mobileTabOrder[currentIndex - 1]);
 		} else {
@@ -3266,7 +3282,9 @@ const Murmur = () => {
 	};
 
 	const goToNextMobileTab = () => {
-		const currentIndex = mobileTabOrder.indexOf(activeView as 'drafting' | 'inbox');
+		const currentIndex = mobileTabOrder.indexOf(
+			activeView as (typeof mobileTabOrder)[number]
+		);
 		if (currentIndex >= 0 && currentIndex < mobileTabOrder.length - 1) {
 			setActiveView(mobileTabOrder[currentIndex + 1]);
 		} else {
@@ -4372,8 +4390,13 @@ const Murmur = () => {
 										<div className="flex gap-3 justify-center mt-4">
 											<button
 												type="button"
-												className="font-inter text-[13px] font-medium leading-none bg-[#F5DADA] border border-transparent text-[#6B6B6B] hover:text-black hover:border-black cursor-pointer rounded-full px-3 py-1"
-												onClick={handleGoToDashboardSearch}
+												className={cn(
+													'font-inter text-[13px] font-medium leading-none bg-[#F5DADA] border cursor-pointer rounded-full px-3 py-1',
+													activeView === 'search'
+														? 'text-black border-black'
+														: 'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
+												)}
+												onClick={() => setActiveView('search')}
 											>
 												Search
 											</button>
@@ -5076,8 +5099,8 @@ const Murmur = () => {
 							</div>
 						</div>
 
-						{/* Mobile bottom navigation panel */}
-						{isMobile && (
+						{/* Mobile bottom navigation panel (the Search view brings its own bottom bar) */}
+						{isMobile && activeView !== 'search' && (
 							<div
 								className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-1"
 								style={{ backgroundColor: '#E1EFF4' }}
