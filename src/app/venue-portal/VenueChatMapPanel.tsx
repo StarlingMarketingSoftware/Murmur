@@ -1,35 +1,17 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ConversationThread } from '@/components/organisms/ConversationsPane';
-import {
-	useGetConversations,
-	useOpenApplicationConversation,
-	type ConversationThreadFilter,
-} from '@/hooks/queryHooks/useConversations';
-import {
-	useGetVenueApplications,
-	type VenueApplicationRow,
-} from '@/hooks/queryHooks/useVenueApplications';
+import { type ConversationThreadFilter } from '@/hooks/queryHooks/useConversations';
+import { type VenueApplicationRow } from '@/hooks/queryHooks/useVenueApplications';
 import { formatEventCountdown, formatInboxTimestamp } from '@/utils/datetime';
 import type { ConversationListItem } from '@/types';
 import { OutlinedInitialAvatar } from '@/components/atoms/OutlinedInitialAvatar/OutlinedInitialAvatar';
 import { ProfileAreaMarkerIcon } from '@/components/atoms/_svg/ProfileAreaMarkerIcon';
 import { getProfileGenreIcon } from '@/components/molecules/HybridPromptInput/profileFieldIcons';
 import { VENUE_MAP_OVERLAY_SCALE } from './constants';
-
-// Per-event pill tint, cycling soonest-event-first like the Figma mock.
-const EVENT_PILL_COLORS = ['#BCC4FF', '#BCE2FF'];
-
-type ReplyGroup = {
-	eventId: number;
-	rows: VenueApplicationRow[];
-	startsAt: string | null;
-};
-
-const replyRowActivity = (row: VenueApplicationRow) =>
-	row.conversation?.lastMessageAt ?? row.createdAt;
+import { EVENT_PILL_COLORS, replyRowActivity, useVenueChatInbox } from './useVenueChatInbox';
 
 function SectionNotice({ children }: { children: ReactNode }) {
 	return (
@@ -240,19 +222,18 @@ export function VenueChatMapPanel({
 		conversationId: number;
 		thread: ConversationThreadFilter;
 	} | null>(initialThread ?? null);
-	const [pendingApplicationId, setPendingApplicationId] = useState<number | null>(null);
 
-	const { data: applications, isLoading: repliesLoading } = useGetVenueApplications({
-		enabled: true,
-	});
-	// Cache-shared with the tool tab bar's unread badge query.
-	const { data: conversations, isLoading: conversationsLoading } = useGetConversations({
-		enabled: true,
-	});
-	const openApplication = useOpenApplicationConversation();
-	// Background seed-ensure for rows whose conversation already exists — the
-	// thread is open and usable either way, so a failure here must not toast.
-	const ensureApplicationSeed = useOpenApplicationConversation({ suppressToasts: true });
+	const {
+		replyGroups,
+		flatReplies,
+		inboundConversations,
+		repliesLoading,
+		conversationsLoading,
+		pendingApplicationId,
+		openReplyRow,
+		cancelOpenIntent,
+		ensureApplicationSeed,
+	} = useVenueChatInbox();
 
 	// Deep-linked application threads get the same idempotent seed-ensure a manual
 	// Replies-card click performs (the pair conversation may predate the application).
@@ -263,94 +244,21 @@ export function VenueChatMapPanel({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	// Group applications by event, soonest event first (null dates last); newest
-	// activity first within each event.
-	const replyGroups = useMemo(() => {
-		const byEvent = new Map<number, ReplyGroup>();
-		for (const row of applications ?? []) {
-			const group = byEvent.get(row.eventId) ?? {
-				eventId: row.eventId,
-				rows: [],
-				startsAt: row.event?.startsAt ?? null,
-			};
-			group.rows.push(row);
-			byEvent.set(row.eventId, group);
-		}
-		const groups = [...byEvent.values()].sort((a, b) => {
-			if (a.startsAt == null) return b.startsAt == null ? 0 : 1;
-			if (b.startsAt == null) return -1;
-			return Date.parse(a.startsAt) - Date.parse(b.startsAt);
-		});
-		for (const group of groups) {
-			group.rows.sort(
-				(a, b) => Date.parse(replyRowActivity(b)) - Date.parse(replyRowActivity(a))
-			);
-		}
-		return groups;
-	}, [applications]);
-
-	// Left-rail card order for the open-thread view: plain recency. The cards
-	// carry no event pill, so the list view's by-event grouping would read as
-	// arbitrary interleaving here.
-	const flatReplies = useMemo(
-		() =>
-			[...(applications ?? [])].sort(
-				(a, b) => Date.parse(replyRowActivity(b)) - Date.parse(replyRowActivity(a))
-			),
-		[applications]
-	);
-
-	// Conversations with general-thread content: cold campaign outreach, plus the
-	// safety net of any untagged artist message (venue-side preview/recency are
-	// general-scoped, so a non-empty preview ⇔ general messages exist — without
-	// this, such a message would be unreachable and its unread badge stuck). The
-	// row opens the GENERAL thread; applications live behind the Replies rows.
-	// Sorted by the general-thread timestamp the row displays, since the server
-	// list is ordered by whole-conversation recency (app chatter included).
-	const inboundConversations = useMemo(
-		() =>
-			(conversations ?? [])
-				.filter(
-					(conversation) =>
-						conversation.hasDivertOrigin || conversation.lastMessagePreview !== ''
-				)
-				.sort((a, b) => Date.parse(b.lastMessageAt) - Date.parse(a.lastMessageAt)),
-		[conversations]
-	);
-
-	// The application row whose seeding click should open the thread when the
-	// mutation lands. Cleared whenever the user navigates elsewhere, so a slow
-	// response can't yank the view away from what they're looking at.
-	const openIntentRef = useRef<number | null>(null);
-
 	const openThread = (conversationId: number, thread: ConversationThreadFilter) => {
-		openIntentRef.current = null;
+		cancelOpenIntent();
 		setSelectedThread({ conversationId, thread });
 	};
 
 	const handleSegmentClick = (section: 'replies' | 'inbound') => {
-		openIntentRef.current = null;
+		cancelOpenIntent();
 		setActiveSection(section);
 		setSelectedThread(null);
 	};
 
 	const handleReplyRowClick = (row: VenueApplicationRow) => {
-		if (row.conversation != null) {
-			openThread(row.conversation.id, row.id);
-			// Idempotently ensure this application's seed message exists in its thread
-			// (the pair conversation may predate the application via cold outreach).
-			ensureApplicationSeed.mutate(row.id);
-			return;
-		}
-		if (pendingApplicationId != null) return;
-		setPendingApplicationId(row.id);
-		openIntentRef.current = row.id;
-		openApplication.mutate(row.id, {
-			onSuccess: ({ conversationId }) => {
-				if (openIntentRef.current === row.id) openThread(conversationId, row.id);
-			},
-			onSettled: () => setPendingApplicationId(null),
-		});
+		openReplyRow(row, (conversationId, thread) =>
+			setSelectedThread({ conversationId, thread })
+		);
 	};
 
 	const segmentClassName = (active: boolean, activeBackground: string) =>

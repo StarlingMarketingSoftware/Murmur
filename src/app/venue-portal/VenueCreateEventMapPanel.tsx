@@ -31,7 +31,7 @@ import {
 	useUpdateVenueEvent,
 } from '@/hooks/queryHooks/useVenueEvents';
 
-type VenueCreateEventLocation = {
+export type VenueCreateEventLocation = {
 	address: string;
 	// Stores Mapbox's `mapbox_id` (legacy "placeId" name kept for the persisted Event shape).
 	placeId: string | null;
@@ -39,7 +39,7 @@ type VenueCreateEventLocation = {
 	lng: number | null;
 };
 
-type VenueCreateEventFormState = {
+export type VenueCreateEventFormState = {
 	eventName: string;
 	location: VenueCreateEventLocation;
 	whoSize: string;
@@ -70,14 +70,14 @@ type VenueCreateEventWhenPopup = {
 	top: number;
 };
 
-const VENUE_CREATE_EVENT_DEFAULT_START_TIME = '09:00';
-const VENUE_CREATE_EVENT_DEFAULT_END_TIME = '13:00';
+export const VENUE_CREATE_EVENT_DEFAULT_START_TIME = '09:00';
+export const VENUE_CREATE_EVENT_DEFAULT_END_TIME = '13:00';
 const VENUE_CREATE_EVENT_WHEN_POPUP_WIDTH_PX = 244;
 const VENUE_CREATE_EVENT_WHEN_POPUP_HEIGHT_PX = 96;
 const VENUE_CREATE_EVENT_WHEN_POPUP_MARGIN_PX = 12;
 const VENUE_CREATE_EVENT_WHEN_POPUP_GAP_PX = 10;
 
-const EMPTY_CREATE_EVENT_FORM: VenueCreateEventFormState = {
+export const EMPTY_CREATE_EVENT_FORM: VenueCreateEventFormState = {
 	eventName: '',
 	location: { address: '', placeId: null, lat: null, lng: null },
 	whoSize: '',
@@ -89,13 +89,13 @@ const EMPTY_CREATE_EVENT_FORM: VenueCreateEventFormState = {
 	pay: '',
 	details: '',
 };
-const VENUE_CREATE_EVENT_SIZE_OPTIONS = [
+export const VENUE_CREATE_EVENT_SIZE_OPTIONS = [
 	{ label: 'Solo', width: 50 },
 	{ label: 'Duo', width: 49 },
 	{ label: 'Full Band', width: 77 },
 	{ label: 'Other', width: 54 },
 ] as const;
-const VENUE_CREATE_EVENT_LABEL_CLASS =
+export const VENUE_CREATE_EVENT_LABEL_CLASS =
 	'isolate inline-block font-inter text-[12.35px] font-black not-italic leading-[22.175px] text-[#55C47A] before:absolute before:left-[-3px] before:right-[-3px] before:top-[4px] before:bottom-[4px] before:-z-10 before:rounded-[3.6px] before:bg-[#D6FFED] before:content-[""]';
 const VENUE_CREATE_EVENT_INPUT_CLASS =
 	'w-full border-0 bg-transparent p-0 font-inter text-black outline-none placeholder:text-black/35';
@@ -136,21 +136,23 @@ const getVenueCreateEventOrdinalSuffix = (day: number) => {
 	}
 };
 
-const formatVenueCreateEventDate = (date: Date) =>
+export const formatVenueCreateEventDate = (date: Date) =>
 	`${VENUE_CREATE_EVENT_MONTH_LABELS[date.getMonth()]} ${date.getDate()}${getVenueCreateEventOrdinalSuffix(
 		date.getDate()
 	)} ${date.getFullYear()}`;
 
 // Local calendar date (YYYY-MM-DD) of the picked day, built from local Y/M/D parts — NOT
 // date.toISOString(), which would roll to the adjacent day across the UTC boundary.
-const formatVenueCreateEventIsoDate = (date: Date) => {
+export const formatVenueCreateEventIsoDate = (date: Date) => {
 	const year = date.getFullYear();
 	const month = `${date.getMonth() + 1}`.padStart(2, '0');
 	const day = `${date.getDate()}`.padStart(2, '0');
 	return `${year}-${month}-${day}`;
 };
 
-const createVenueEventFormFromEvent = (event: VenueEvent): VenueCreateEventFormState => {
+export const createVenueEventFormFromEvent = (
+	event: VenueEvent
+): VenueCreateEventFormState => {
 	const startsAt = event.startsAt ? new Date(event.startsAt) : null;
 	const hasValidStartsAt = Boolean(startsAt && !Number.isNaN(startsAt.getTime()));
 
@@ -175,7 +177,7 @@ const createVenueEventFormFromEvent = (event: VenueEvent): VenueCreateEventFormS
 	};
 };
 
-const getVenueCreateEventTimeMinutes = (value: string) => {
+export const getVenueCreateEventTimeMinutes = (value: string) => {
 	const [rawHours, rawMinutes] = value.split(':');
 	const hours = Number(rawHours);
 	const minutes = Number(rawMinutes);
@@ -184,13 +186,13 @@ const getVenueCreateEventTimeMinutes = (value: string) => {
 	return hours * 60 + minutes;
 };
 
-const formatVenueCreateEventTimeLabel = (value: string) => {
+export const formatVenueCreateEventTimeLabel = (value: string) => {
 	const label =
 		VENUE_TIME_OPTIONS.find((option) => option.value === value)?.label ?? value;
 	return label.replace(':00 ', ' ');
 };
 
-const formatVenueCreateEventDuration = (startTime: string, endTime: string) => {
+export const formatVenueCreateEventDuration = (startTime: string, endTime: string) => {
 	const startMinutes = getVenueCreateEventTimeMinutes(startTime);
 	const endMinutes = getVenueCreateEventTimeMinutes(endTime);
 	if (startMinutes == null || endMinutes == null || endMinutes <= startMinutes) {
@@ -207,7 +209,7 @@ const formatVenueCreateEventDuration = (startTime: string, endTime: string) => {
 	return `${hourLabel} ${minutes} min`;
 };
 
-const getNextVenueCreateEventEndTime = (startTime: string) => {
+export const getNextVenueCreateEventEndTime = (startTime: string) => {
 	const startMinutes = getVenueCreateEventTimeMinutes(startTime);
 	if (startMinutes == null) return VENUE_CREATE_EVENT_DEFAULT_END_TIME;
 
@@ -217,6 +219,36 @@ const getNextVenueCreateEventEndTime = (startTime: string) => {
 			return optionMinutes != null && optionMinutes > startMinutes;
 		})?.value ?? VENUE_CREATE_EVENT_DEFAULT_END_TIME
 	);
+};
+
+// Shared by the desktop panel and the mobile create tab so both publish
+// identical payloads. Time fields only mean something once a date is picked;
+// derive UTC instants from the local date + the raw HH:MM, and otherwise log
+// no date/time at all.
+export const buildVenueEventPayload = (eventForm: VenueCreateEventFormState) => {
+	const startsAt = eventForm.whenDate
+		? new Date(`${eventForm.whenDate}T${eventForm.startTime}:00`).toISOString()
+		: undefined;
+	const endsAt = eventForm.whenDate
+		? new Date(`${eventForm.whenDate}T${eventForm.endTime}:00`).toISOString()
+		: undefined;
+
+	return {
+		name: eventForm.eventName.trim(),
+		address: eventForm.location.address.trim() || null,
+		placeId: eventForm.location.placeId,
+		latitude: eventForm.location.lat,
+		longitude: eventForm.location.lng,
+		size: eventForm.whoSize || null,
+		genres: eventForm.whoGenres,
+		whenLabel: eventForm.when || null,
+		startTime: eventForm.whenDate ? eventForm.startTime : null,
+		endTime: eventForm.whenDate ? eventForm.endTime : null,
+		startsAt,
+		endsAt,
+		pay: eventForm.pay.trim() || null,
+		details: eventForm.details.trim() || null,
+	};
 };
 
 export function VenueCreateEventMapPanel({ event }: { event?: VenueEvent | null }) {
@@ -506,31 +538,7 @@ export function VenueCreateEventMapPanel({ event }: { event?: VenueEvent | null 
 		}
 		if (isSavingEvent) return;
 
-		// Time fields only mean something once a date is picked; derive UTC instants from the
-		// local date + the raw HH:MM, and otherwise log no date/time at all.
-		const startsAt = eventForm.whenDate
-			? new Date(`${eventForm.whenDate}T${eventForm.startTime}:00`).toISOString()
-			: undefined;
-		const endsAt = eventForm.whenDate
-			? new Date(`${eventForm.whenDate}T${eventForm.endTime}:00`).toISOString()
-			: undefined;
-
-		const payload = {
-			name: eventForm.eventName.trim(),
-			address: eventForm.location.address.trim() || null,
-			placeId: eventForm.location.placeId,
-			latitude: eventForm.location.lat,
-			longitude: eventForm.location.lng,
-			size: eventForm.whoSize || null,
-			genres: eventForm.whoGenres,
-			whenLabel: eventForm.when || null,
-			startTime: eventForm.whenDate ? eventForm.startTime : null,
-			endTime: eventForm.whenDate ? eventForm.endTime : null,
-			startsAt,
-			endsAt,
-			pay: eventForm.pay.trim() || null,
-			details: eventForm.details.trim() || null,
-		};
+		const payload = buildVenueEventPayload(eventForm);
 
 		if (editingEventId != null) {
 			updateEvent({ id: editingEventId, data: payload });

@@ -1,6 +1,54 @@
-import type { InboundEmailWithRelations } from '@/types';
+import type { EmailWithRelations, InboundEmailWithRelations } from '@/types';
 
 export type InboxConversationMessage = InboundEmailWithRelations & { isSent?: boolean };
+
+/**
+ * Projects a sent campaign email into the inbound-message shape so it can be
+ * threaded into an InboxConversation alongside real replies.
+ */
+export const normalizeSentEmailForInboxConversation = (
+	email: EmailWithRelations
+): InboxConversationMessage =>
+	({
+		id: email.id,
+		sender: email.contact?.email || '',
+		senderName: email.contact
+			? `${email.contact.firstName || ''} ${email.contact.lastName || ''}`.trim()
+			: '',
+		recipient: '',
+		subject: email.subject || '',
+		bodyPlain: email.message || '',
+		bodyHtml: email.message || '',
+		strippedText: email.message?.replace(/<[^>]*>/g, '') || '',
+		receivedAt: email.sentAt || email.createdAt,
+		contactId: email.contactId,
+		contact: email.contact,
+		campaignId: email.campaignId,
+		campaign: email.campaign,
+		originalEmail: null,
+		originalEmailId: null,
+		isSent: true,
+	}) as unknown as InboxConversationMessage;
+
+/**
+ * Strip quoted reply content from email body (e.g., "On Thu, Nov 27, 2025 at 2:36 AM ... wrote:")
+ */
+export const stripQuotedReply = (text: string): string => {
+	// Match patterns like "On [day], [month] [date], [year] at [time] [name] <email> wrote:"
+	// or "On [date], [name] wrote:" and everything after
+	const patterns = [
+		/\n*On\s+[A-Za-z]{3},\s+[A-Za-z]{3}\s+\d{1,2},\s+\d{4}\s+at\s+\d{1,2}:\d{2}\s*[AP]M\s+.*?wrote:[\s\S]*/i,
+		/\n*On\s+[A-Za-z]+,\s+[A-Za-z]+\s+\d{1,2},\s+\d{4}\s+at\s+\d{1,2}:\d{2}\s*[AP]M\s+.*?wrote:[\s\S]*/i,
+		/\n*On\s+\d{1,2}\/\d{1,2}\/\d{2,4}.*?wrote:[\s\S]*/i,
+		/\n*On\s+.*?\s+wrote:[\s\S]*/i,
+	];
+
+	let result = text;
+	for (const pattern of patterns) {
+		result = result.replace(pattern, '');
+	}
+	return result.trim();
+};
 
 export type InboxConversation = {
 	key: string;

@@ -20,6 +20,9 @@ interface ConversationThreadProps {
 	thread?: ConversationThreadFilter;
 	onBack?: () => void;
 	variant?: ConversationThreadVariant;
+	// Skip the counterpart header — for hosts (e.g. the mobile venue thread
+	// screen) that render their own richer header above the thread.
+	hideHeader?: boolean;
 	className?: string;
 }
 
@@ -84,6 +87,7 @@ export function ConversationThread({
 	thread,
 	onBack,
 	variant = 'default',
+	hideHeader = false,
 	className,
 }: ConversationThreadProps) {
 	const { data, isLoading } = useGetMessages(conversationId, { thread });
@@ -167,11 +171,13 @@ export function ConversationThread({
 
 	return (
 		<div className={cn('flex h-full flex-col bg-white/70', className)}>
-			<CounterpartHeader
-				counterpart={data?.counterpart}
-				onBack={onBack}
-				variant={variant}
-			/>
+			{!hideHeader && (
+				<CounterpartHeader
+					counterpart={data?.counterpart}
+					onBack={onBack}
+					variant={variant}
+				/>
+			)}
 			<CustomScrollbar className="min-h-0 flex-1" contentClassName="px-[14px] py-[12px]">
 				<div className="flex flex-col gap-[8px]">
 					{isLoading && (

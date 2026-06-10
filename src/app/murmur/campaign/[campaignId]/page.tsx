@@ -24,8 +24,6 @@ import {
 	type CSSProperties,
 } from 'react';
 import { createPortal } from 'react-dom';
-import LeftArrow from '@/components/atoms/_svg/LeftArrow';
-import RightArrow from '@/components/atoms/_svg/RightArrow';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import MapBottomSearchArrowIcon from '@/components/atoms/_svg/MapBottomSearchArrowIcon';
 import DashboardActionBarPlaybookIcon from '@/components/atoms/_svg/DashboardActionBarPlaybookIcon';
@@ -98,7 +96,7 @@ import {
 } from './CampaignInboxDebugPanel';
 
 type ViewType = DraftingSectionView;
-type CampaignUrlTab = 'write' | 'all' | 'inbox' | 'sent' | 'drafts' | 'search';
+type CampaignUrlTab = 'write' | 'all' | 'inbox' | 'sent' | 'drafts' | 'summary';
 
 type CampaignOverviewBottomBoxesProps = {
 	contactsCount: number;
@@ -663,10 +661,14 @@ const getCampaignViewFromUrlTab = (tab: string | null): ViewType => {
 		case 'drafts':
 		case 'drafting':
 			return 'drafting';
+		case 'search':
+			// Legacy deep link: search now lives on the dashboard pick flow. A redirect
+			// effect sends ?tab=search there; render Summary in the meantime (mobile-safe
+			// — never mounts HybridPromptInput; the desktop clamp coerces it to 'testing').
+			return 'summary';
 		case 'write':
 		case 'testing':
 		case 'contacts':
-		case 'search':
 		default:
 			return 'testing';
 	}
@@ -692,7 +694,11 @@ const getCampaignUrlTabForView = (
 		case 'testing':
 			return 'write';
 		case 'search':
-			return 'search';
+			// Unreachable once nothing sets the in-campaign 'search' view; kept for
+			// exhaustiveness while DraftingSectionView still carries it.
+			return 'summary';
+		case 'summary':
+			return 'summary';
 	}
 };
 
@@ -2043,10 +2049,43 @@ const Murmur = () => {
 		// re-enter map-search mode exactly as a full reload did.
 		// `instant=1` is a one-shot signal: the dashboard snaps the persistent map straight to the
 		// search framing (no background-globe flash, no pan-down) only for this tab transition.
+		// Mobile omits allContacts=1 so the entry stays engaged on the fresh "For You"
+		// curated picks (the pill + pins) instead of disengaging to ambient all-contacts.
 		router.push(
-			`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}&pick=1&allContacts=1&instant=1`
+			`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}&pick=1${
+				isMobile === true ? '' : '&allContacts=1'
+			}&instant=1`
 		);
-	}, [campaign, router]);
+	}, [campaign, isMobile, router]);
+
+	// Legacy ?tab=search deep link (the in-campaign mobile search view is gone — search
+	// lives on the dashboard pick flow). Capture the param once on mount: the tab URL
+	// mirror below rewrites tab=search to the rendered view's tab in the same commit,
+	// so the live searchParams value can't be trusted across commits. Redirect once
+	// isMobile resolves (the device decides the entry URL), using the route campaignId
+	// so this works before the campaign query lands. router.replace keeps Back from
+	// bouncing through the redirect.
+	const [hadSearchTabDeepLink, setHadSearchTabDeepLink] = useState(() => {
+		if (typeof window === 'undefined') return false;
+		const tab = new URLSearchParams(window.location.search).get('tab');
+		return tab?.toLowerCase() === 'search';
+	});
+	useEffect(() => {
+		if (!hadSearchTabDeepLink) return;
+		if (isMobile === null) return;
+		if (!routeCampaignId) return;
+		setHadSearchTabDeepLink(false);
+		try {
+			sessionStorage.removeItem('murmur_pending_search');
+		} catch {
+			// sessionStorage may be unavailable — navigation can still proceed.
+		}
+		router.replace(
+			`${urls.murmur.dashboard.index}?fromCampaignId=${routeCampaignId}&pick=1${
+				isMobile ? '' : '&allContacts=1'
+			}&instant=1`
+		);
+	}, [hadSearchTabDeepLink, isMobile, routeCampaignId, router]);
 
 	// Warm the dashboard route's JS chunks while the user is on the campaign page so the
 	// soft navigation above lands instantly.
@@ -2803,12 +2842,9 @@ const Murmur = () => {
 	const crossfadeContainerRef = useRef<HTMLDivElement>(null);
 
 	// Mobile never supports the Writing ("testing") tab. Clamp immediately so we never mount
-	// HybridPromptInput on mobile (and never transition through it).
-	const MOBILE_ALLOWED_VIEWS: Array<'search' | 'drafting' | 'inbox'> = [
-		'search',
-		'drafting',
-		'inbox',
-	];
+	// HybridPromptInput on mobile (and never transition through it). Search lives on the
+	// dashboard pick flow — Summary is the only in-campaign mobile view.
+	const MOBILE_ALLOWED_VIEWS: Array<'summary'> = ['summary'];
 	useLayoutEffect(() => {
 		if (isMobile !== true) return;
 		if (
@@ -2829,8 +2865,19 @@ const Murmur = () => {
 		setPreviousView(null);
 		setIsTransitioning(false);
 		setIsFadingOutPreviousView(false);
-		requestedViewRef.current = 'search';
-		setActiveViewInternal('search');
+		requestedViewRef.current = 'summary';
+		setActiveViewInternal('summary');
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [isMobile, activeView]);
+
+	// Desktop never supports the mobile-only Search/Summary views (e.g. a ?tab=search
+	// deep link from the mobile dashboard opened on desktop). setActiveView already
+	// coerces these; this covers the URL-initialized state.
+	useLayoutEffect(() => {
+		if (isMobile !== false) return;
+		if (activeView !== 'search' && activeView !== 'summary') return;
+		requestedViewRef.current = 'testing';
+		setActiveViewInternal('testing');
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isMobile, activeView]);
 
@@ -2842,8 +2889,8 @@ const Murmur = () => {
 				requestInboxSentTab('sent');
 				newView = 'inbox';
 			}
-			// The Search view is mobile-only.
-			if (isMobile !== true && newView === 'search') {
+			// The Search and Summary views are mobile-only.
+			if (isMobile !== true && (newView === 'search' || newView === 'summary')) {
 				newView = 'testing';
 			}
 			// Never allow unsupported views on mobile.
@@ -2851,7 +2898,7 @@ const Murmur = () => {
 				isMobile === true &&
 				!MOBILE_ALLOWED_VIEWS.includes(newView as (typeof MOBILE_ALLOWED_VIEWS)[number])
 			) {
-				newView = 'search';
+				newView = 'summary';
 			}
 			// Dedupe against the *latest requested* view (not just the last committed render) so
 			// rapid flips like A -> B -> A still enqueue the final A update and don't get dropped.
@@ -3262,37 +3309,6 @@ const Murmur = () => {
 		}
 	};
 
-	// Mobile-specific tab navigation (only the visible tabs on mobile)
-	const mobileTabOrder: Array<'search' | 'inbox' | 'drafting'> = [
-		'search',
-		'inbox',
-		'drafting',
-	];
-
-	const goToPreviousMobileTab = () => {
-		const currentIndex = mobileTabOrder.indexOf(
-			activeView as (typeof mobileTabOrder)[number]
-		);
-		if (currentIndex > 0) {
-			setActiveView(mobileTabOrder[currentIndex - 1]);
-		} else {
-			// Wrap around to the last mobile tab
-			setActiveView(mobileTabOrder[mobileTabOrder.length - 1]);
-		}
-	};
-
-	const goToNextMobileTab = () => {
-		const currentIndex = mobileTabOrder.indexOf(
-			activeView as (typeof mobileTabOrder)[number]
-		);
-		if (currentIndex >= 0 && currentIndex < mobileTabOrder.length - 1) {
-			setActiveView(mobileTabOrder[currentIndex + 1]);
-		} else {
-			// Wrap around to the first mobile tab
-			setActiveView(mobileTabOrder[0]);
-		}
-	};
-
 	// Keyboard navigation: arrow keys to switch tabs when no text input is focused
 	// Left/Right: cycle through tabs. Up/Down: toggle the Inbox <-> Sent sub-view.
 	useEffect(() => {
@@ -3340,19 +3356,12 @@ const Murmur = () => {
 				return;
 			}
 
-			// Use mobile tab order on mobile, desktop tab order otherwise
-			if (isMobile === true) {
-				if (e.key === 'ArrowLeft') {
-					goToPreviousMobileTab();
-				} else {
-					goToNextMobileTab();
-				}
+			// Mobile has a single view (Summary) — nothing to cycle.
+			if (isMobile === true) return;
+			if (e.key === 'ArrowLeft') {
+				goToPreviousTab();
 			} else {
-				if (e.key === 'ArrowLeft') {
-					goToPreviousTab();
-				} else {
-					goToNextTab();
-				}
+				goToNextTab();
 			}
 		};
 
@@ -4392,11 +4401,9 @@ const Murmur = () => {
 												type="button"
 												className={cn(
 													'font-inter text-[13px] font-medium leading-none bg-[#F5DADA] border cursor-pointer rounded-full px-3 py-1',
-													activeView === 'search'
-														? 'text-black border-black'
-														: 'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
+													'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
 												)}
-												onClick={() => setActiveView('search')}
+												onClick={handleOpenDashboardSearchForCampaign}
 											>
 												Search
 											</button>
@@ -4541,6 +4548,7 @@ const Murmur = () => {
 												onGoToSearch={handleOpenDashboardSearchForCampaign}
 												goToInbox={() => setActiveView('inbox')}
 												goToSent={() => setActiveView('sent')}
+												goToSummary={() => setActiveView('summary')}
 												onOpenIdentityDialog={() => {
 													setIdentityDialogOrigin('campaign');
 													setIsIdentityDialogOpen(true);
@@ -4591,6 +4599,7 @@ const Murmur = () => {
 													onGoToSearch={handleOpenDashboardSearchForCampaign}
 													goToInbox={() => setActiveView('inbox')}
 													goToSent={() => setActiveView('sent')}
+													goToSummary={() => setActiveView('summary')}
 													onOpenIdentityDialog={() => {
 														setIdentityDialogOrigin('campaign');
 														setIsIdentityDialogOpen(true);
@@ -5099,30 +5108,6 @@ const Murmur = () => {
 							</div>
 						</div>
 
-						{/* Mobile bottom navigation panel (the Search view brings its own bottom bar) */}
-						{isMobile && activeView !== 'search' && (
-							<div
-								className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-1"
-								style={{ backgroundColor: '#E1EFF4' }}
-							>
-								<button
-									type="button"
-									onClick={goToPreviousMobileTab}
-									className="bg-transparent border-0 p-1 cursor-pointer hover:opacity-70 transition-opacity"
-									aria-label="Previous tab"
-								>
-									<LeftArrow width={18} height={34} color="#000000" opacity={1} />
-								</button>
-								<button
-									type="button"
-									onClick={goToNextMobileTab}
-									className="bg-transparent border-0 p-1 cursor-pointer hover:opacity-70 transition-opacity"
-									aria-label="Next tab"
-								>
-									<RightArrow width={18} height={34} color="#000000" opacity={1} />
-								</button>
-							</div>
-						)}
 						{inboxDebugEnabled && (
 							<CampaignInboxDebugPanel
 								value={inboxMockState}

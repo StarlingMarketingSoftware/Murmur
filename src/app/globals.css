@@ -515,6 +515,17 @@ body {
 	}
 }
 
+/* Dimmed backdrop behind the touch-device modal presentation of the calendar popup. */
+
+@keyframes dashboardCalendarBackdropEnter {
+	0% {
+		opacity: 0;
+	}
+	100% {
+		opacity: 1;
+	}
+}
+
 /* TipTap Placeholder Styles */
 .is-editor-empty:first-child::before {
 	content: attr(data-placeholder);
@@ -4953,6 +4964,14 @@ html.murmur-compact {
 	}
 }
 
+/* Mobile campaign search/summary overlay: counter the compact zoom so the inline
+   Mapbox canvas sizes in true viewport pixels (it measures via getBoundingClientRect,
+   so under zoom it renders ~10% short — black band at right/bottom). Mirrors the
+   PersistentDashboardMap counter-zoom pattern. */
+html.murmur-compact .mobile-campaign-search-overlay {
+	zoom: calc(1 / 0.9);
+}
+
 /* Research public page scaling (80%) */
 html.murmur-research-compact {
 	zoom: 0.8;
@@ -5553,6 +5572,86 @@ body,
 	}
 }
 
+/* --- Mobile Folder Cards Loading Wave (cycles the 4 campaign folder scheme pastels) --- */
+.mobile-folder-cards-loading-wave-card {
+	background-color: #b9eaf1;
+	animation: mobileFolderCardsLoadingWave 4.8s ease-in-out infinite;
+	will-change: background-color;
+}
+
+@keyframes mobileFolderCardsLoadingWave {
+	0%,
+	100% {
+		background-color: #b9eaf1;
+	}
+	25% {
+		background-color: #cdcff9;
+	}
+	50% {
+		background-color: #bff2c8;
+	}
+	75% {
+		background-color: #ffe9c9;
+	}
+}
+
+/* --- Mobile Venue Cards Loading Wave (cycles the venue portal pastels) --- */
+.mobile-venue-cards-loading-wave-card {
+	background-color: #f3fff0;
+	animation: mobileVenueCardsLoadingWave 4.8s ease-in-out infinite;
+	will-change: background-color;
+}
+
+@keyframes mobileVenueCardsLoadingWave {
+	0%,
+	100% {
+		background-color: #f3fff0;
+	}
+	25% {
+		background-color: #c5eda0;
+	}
+	50% {
+		background-color: #bcf1fa;
+	}
+	75% {
+		background-color: #d6ffed;
+	}
+}
+
+/* --- Dashboard Responses Loading Wave (row white toward the responses-tab blue) --- */
+.dashboard-responses-loading-wave-row {
+	background-color: #fefefe;
+	animation: dashboardResponsesLoadingWave 2.5s ease-in-out infinite;
+	will-change: background-color;
+}
+
+@keyframes dashboardResponsesLoadingWave {
+	0%,
+	100% {
+		background-color: #fefefe;
+	}
+	50% {
+		background-color: #cdedfe;
+	}
+}
+
+/* --- Dashboard Opportunities Loading Wave (row white toward the opportunities pink) --- */
+.dashboard-opportunities-loading-wave-row {
+	background-color: #fefefe;
+	animation: dashboardOpportunitiesLoadingWave 2.5s ease-in-out infinite;
+	will-change: background-color;
+}
+
+@keyframes dashboardOpportunitiesLoadingWave {
+	0%,
+	100% {
+		background-color: #fefefe;
+	}
+	50% {
+		background-color: #ffe3e3;
+	}
+}
+
 @media (prefers-reduced-motion: reduce) {
 	.map-results-panel-loading-wave-row {
 		animation: none;
@@ -5564,6 +5663,18 @@ body,
 		animation: none;
 	}
 	.research-panel-loading-wave-box {
+		animation: none;
+	}
+	.mobile-folder-cards-loading-wave-card {
+		animation: none;
+	}
+	.mobile-venue-cards-loading-wave-card {
+		animation: none;
+	}
+	.dashboard-responses-loading-wave-row {
+		animation: none;
+	}
+	.dashboard-opportunities-loading-wave-row {
 		animation: none;
 	}
 }

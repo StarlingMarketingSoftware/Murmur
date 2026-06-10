@@ -676,17 +676,96 @@ export const DashboardResponsesWidget: FC<{
 						)}
 					>
 						{isLoading ? (
+							// Wave skeleton rows mirroring the loaded row anatomy; negative
+							// delays stagger the wave so it reads downward.
 							Array.from({ length: 3 }).map((_, idx) => (
 								<div
 									key={`responses-loading-${idx}`}
+									aria-hidden="true"
+									className="dashboard-responses-loading-wave-row"
 									style={{
 										width: mobile ? '100%' : '639px',
 										height: mobile ? '64px' : '48px',
 										borderRadius: '6.389px',
-										backgroundColor: '#FEFEFE',
-										opacity: 0.6,
+										animationDelay: `${-(2.5 - idx * 0.25)}s`,
+										boxShadow: '0px 1px 0px rgba(0,0,0,0.05)',
+										boxSizing: 'border-box',
+										overflow: 'hidden',
+										padding: mobile ? '0 14px' : '7px 31px 9px 27px',
+										display: 'flex',
+										alignItems: 'center',
+										gap: mobile ? '12px' : '18px',
 									}}
-								/>
+								>
+									{/* Sender + campaign chip */}
+									<div
+										style={{
+											flex: '0 0 auto',
+											width: '120px',
+											height: '32px',
+											display: 'flex',
+											flexDirection: 'column',
+											justifyContent: 'space-between',
+										}}
+									>
+										<span
+											style={{
+												width: '96px',
+												height: '13px',
+												borderRadius: '4px',
+												backgroundColor: 'rgba(0,0,0,0.10)',
+											}}
+										/>
+										<span
+											style={{
+												width: '80px',
+												height: '15px',
+												borderRadius: '3px',
+												backgroundColor: 'rgba(0,0,0,0.10)',
+											}}
+										/>
+									</div>
+
+									{/* Subject + snippet */}
+									<div
+										style={{
+											flex: '1 1 auto',
+											minWidth: 0,
+											height: '32px',
+											display: 'flex',
+											flexDirection: 'column',
+											justifyContent: 'space-between',
+										}}
+									>
+										<span
+											style={{
+												width: '45%',
+												height: '13px',
+												borderRadius: '4px',
+												backgroundColor: 'rgba(0,0,0,0.10)',
+											}}
+										/>
+										<span
+											style={{
+												width: '70%',
+												height: '13px',
+												borderRadius: '4px',
+												backgroundColor: 'rgba(0,0,0,0.10)',
+											}}
+										/>
+									</div>
+
+									{/* Timestamp */}
+									<span
+										style={{
+											flex: '0 0 auto',
+											width: '56px',
+											height: '13px',
+											borderRadius: '4px',
+											backgroundColor: 'rgba(0,0,0,0.10)',
+										}}
+									/>
+								</div>
 							))
 						) : visibleEmails.length === 0 ? (
 							<>

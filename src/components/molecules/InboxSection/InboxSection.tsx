@@ -40,6 +40,7 @@ import {
 	inboxConversationContainsEmailId,
 	inboxConversationContainsInboundEmailId,
 	inboxConversationContainsSentEmailId,
+	stripQuotedReply,
 	type InboxConversation,
 	type InboxConversationMessage,
 } from '@/utils/inboxConversations';
@@ -47,26 +48,6 @@ import {
 	InboxRichReplyEditor,
 	isRichTextMessageEmpty,
 } from '@/components/molecules/InboxSection/InboxRichReplyEditor';
-
-/**
- * Strip quoted reply content from email body (e.g., "On Thu, Nov 27, 2025 at 2:36 AM ... wrote:")
- */
-const stripQuotedReply = (text: string): string => {
-	// Match patterns like "On [day], [month] [date], [year] at [time] [name] <email> wrote:"
-	// or "On [date], [name] wrote:" and everything after
-	const patterns = [
-		/\n*On\s+[A-Za-z]{3},\s+[A-Za-z]{3}\s+\d{1,2},\s+\d{4}\s+at\s+\d{1,2}:\d{2}\s*[AP]M\s+.*?wrote:[\s\S]*/i,
-		/\n*On\s+[A-Za-z]+,\s+[A-Za-z]+\s+\d{1,2},\s+\d{4}\s+at\s+\d{1,2}:\d{2}\s*[AP]M\s+.*?wrote:[\s\S]*/i,
-		/\n*On\s+\d{1,2}\/\d{1,2}\/\d{2,4}.*?wrote:[\s\S]*/i,
-		/\n*On\s+.*?\s+wrote:[\s\S]*/i,
-	];
-
-	let result = text;
-	for (const pattern of patterns) {
-		result = result.replace(pattern, '');
-	}
-	return result.trim();
-};
 
 /**
  * Strip quoted reply content from HTML email body

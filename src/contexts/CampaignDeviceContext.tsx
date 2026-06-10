@@ -10,7 +10,8 @@ export type CampaignViewType =
 	| 'sent'
 	| 'inbox'
 	| 'all'
-	| 'search';
+	| 'search'
+	| 'summary';
 
 export type CampaignDeviceContextValue = {
 	/**

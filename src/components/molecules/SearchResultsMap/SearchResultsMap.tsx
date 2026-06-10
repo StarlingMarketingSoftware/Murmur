@@ -16,7 +16,11 @@ import {
 import mapboxgl from 'mapbox-gl';
 import { ContactWithName } from '@/types/contact';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
-import { useGetContactsMapOverlay } from '@/hooks/queryHooks/useContacts';
+import {
+	useGetContactResearch,
+	useGetContactsMapOverlay,
+} from '@/hooks/queryHooks/useContacts';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import {
 	calculateTooltipWidth,
 	calculateTooltipHeight,
@@ -140,6 +144,7 @@ import {
 	CONTACT_LIGHTS_REVEAL_TILES_URL_TEMPLATE,
 	CONTACT_LIGHTS_TILES_BOUNDS,
 	CONTACT_LIGHTS_TILES_MAX_ZOOM,
+	CONTACT_LIGHTS_TILES_MIN_ZOOM,
 	CONTACT_LIGHTS_TILES_URL_TEMPLATE,
 	CURATED_BLOB_LOBE_MAX_COUNT,
 	CURATED_BLOB_LOBE_MAX_RADIUS_KM,
@@ -235,6 +240,7 @@ import {
 	MAPBOX_STYLE,
 	MAP_DEFAULT_ZOOM,
 	MAP_MIN_ZOOM,
+	MOBILE_MAP_MIN_ZOOM,
 	STATE_LABELS_FULL_OPACITY_ZOOM,
 	MAP_PINCH_ZOOM_RATE,
 	MAP_WHEEL_ZOOM_RATE,
@@ -338,6 +344,16 @@ import {
 	STATE_OUTLINE_URL,
 	STATE_PREPARED_POLYGONS_URL,
 	STATE_PROCESSED_GEOJSON_URL,
+	STREET_VIEW_BUILDINGS_MIN_ZOOM,
+	STREET_VIEW_BUILDINGS_RISE_FULL_ZOOM,
+	STREET_VIEW_BUILDING_COLOR,
+	STREET_VIEW_BUILDING_OPACITY,
+	STREET_VIEW_MAX_PITCH,
+	STREET_VIEW_MIN_ZOOM,
+	STREET_VIEW_PITCH_EASE_MS,
+	STREET_VIEW_PITCH_EPSILON_DEG,
+	STREET_VIEW_PITCH_RAMP_FULL_ZOOM,
+	STREET_VIEW_PITCH_RAMP_START_ZOOM,
 	SUN_TRANSITION_CLOUD_CATCHLIGHT_OPACITY_MULT,
 	SUN_TRANSITION_PROGRESS_PAINT_STEPS,
 	SUN_TRANSITION_SPACE_GLOW_BG,
@@ -1046,10 +1062,30 @@ export interface SearchResultsMapProps {
 		left?: number;
 	} | null;
 	/**
+	 * Optional padding (in px) for auto-fit camera moves (fitBounds). Use when fixed UI
+	 * chrome overlays the map (e.g. the mobile search view) so fitted results land in
+	 * the uncovered area. Clamped to the canvas size so Mapbox's "cannot fit" bail is
+	 * unreachable on small viewports. Defaults preserve the historical insets
+	 * (50px contacts / 100px state).
+	 */
+	autoFitPadding?: {
+		top: number;
+		right: number;
+		bottom: number;
+		left: number;
+	} | null;
+	/**
 	 * Controls whether the map should behave like a decorative dashboard background (no interactions,
 	 * optional auto-rotation), or the full interactive results map.
 	 */
 	presentation?: 'background' | 'interactive';
+	/**
+	 * When true (interactive presentation only), deep zoom transitions the camera into a
+	 * pitched street-level 3D view with extruded buildings, and marker hover shows the
+	 * rich research card instead of the slim tooltip. Opt-in so only the dashboard
+	 * map-search surface gets it (not campaign/venue/mobile maps).
+	 */
+	streetViewEnabled?: boolean;
 	/** When true (and `presentation="background"`), auto-rotate the globe. */
 	autoSpin?: boolean;
 	/**
@@ -1126,6 +1162,17 @@ const interactiveEntryCameraKey = (
 	camera: SearchResultsMapProps['interactiveEntryCamera']
 ) => (camera ? `${camera.center.lat},${camera.center.lng},${camera.zoom}` : null);
 
+// Street-view pitch as a continuous function of zoom: flat below the ramp,
+// linearly tilting to STREET_VIEW_MAX_PITCH at full street zoom.
+const computeStreetViewPitch = (zoom: number): number => {
+	if (zoom <= STREET_VIEW_PITCH_RAMP_START_ZOOM) return 0;
+	if (zoom >= STREET_VIEW_PITCH_RAMP_FULL_ZOOM) return STREET_VIEW_MAX_PITCH;
+	const t =
+		(zoom - STREET_VIEW_PITCH_RAMP_START_ZOOM) /
+		(STREET_VIEW_PITCH_RAMP_FULL_ZOOM - STREET_VIEW_PITCH_RAMP_START_ZOOM);
+	return STREET_VIEW_MAX_PITCH * t;
+};
+
 export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	contacts,
 	selectedContacts,
@@ -1166,7 +1213,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	disableDotWaveReveal = false,
 	skipAutoFit,
 	cameraPadding = null,
+	autoFitPadding = null,
 	presentation = 'interactive',
+	streetViewEnabled = false,
 	autoSpin = false,
 	weatherMood: weatherMoodProp = 'normal',
 	weatherRegionCenter = null,
@@ -1501,8 +1550,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const fadingTooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const mapContainerRef = useRef<HTMLDivElement | null>(null);
 	const hoverTooltipOverlayRef = useRef<HTMLDivElement | null>(null);
+	const streetCardOverlayRef = useRef<HTMLDivElement | null>(null);
 	const mapRef = useRef<mapboxgl.Map | null>(null);
 	const [map, setMap] = useState<mapboxgl.Map | null>(null);
+	// Mobile gets a lower interactive zoom floor so the full globe fits the narrow
+	// viewport. Kept in a ref because the camera-constraint paths below (decorative
+	// transitions, post-cinematic restore) re-apply the floor when they settle.
+	const isMobile = useIsMobile();
+	const interactiveMinZoomRef = useRef(MAP_MIN_ZOOM);
 	const [isMapLoaded, setIsMapLoaded] = useState(false);
 	const initialZoomConstraintsRef = useRef<{ minZoom: number; maxZoom: number } | null>(
 		null
@@ -6278,6 +6333,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						type: 'raster',
 						tiles: [CONTACT_LIGHTS_TILES_URL_TEMPLATE],
 						tileSize: 512,
+						minzoom: CONTACT_LIGHTS_TILES_MIN_ZOOM,
 						maxzoom: CONTACT_LIGHTS_TILES_MAX_ZOOM,
 						bounds: CONTACT_LIGHTS_TILES_BOUNDS,
 					} as any);
@@ -6287,6 +6343,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						type: 'raster',
 						tiles: [CONTACT_LIGHTS_REVEAL_TILES_URL_TEMPLATE],
 						tileSize: 512,
+						minzoom: CONTACT_LIGHTS_TILES_MIN_ZOOM,
 						maxzoom: CONTACT_LIGHTS_TILES_MAX_ZOOM,
 						bounds: CONTACT_LIGHTS_TILES_BOUNDS,
 					} as any);
@@ -6350,6 +6407,68 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 			mapInstance.addLayer(layer);
 		};
+
+		// 3D buildings for the street-level view. Inserted beneath the basemap's first
+		// symbol layer (labels stay readable) and beneath every appended murmur-* overlay.
+		// Always added (minzoom-gated, so free at normal zooms); visibility is toggled by
+		// the streetViewEnabled effect because this runs at 'load'/'style.load', when the
+		// persistent dashboard map can still be in background presentation.
+		{
+			let firstBasemapSymbolLayerId: string | undefined;
+			try {
+				for (const layer of mapInstance.getStyle()?.layers ?? []) {
+					if (!layer.id || layer.id.startsWith('murmur-')) continue;
+					if (layer.type === 'symbol') {
+						firstBasemapSymbolLayerId = layer.id;
+						break;
+					}
+				}
+			} catch {
+				// Fall through — appended on top of the basemap is still acceptable.
+			}
+			ensureLayer(
+				{
+					id: MAPBOX_LAYER_IDS.streetViewBuildings,
+					type: 'fill-extrusion',
+					source: 'composite',
+					'source-layer': 'building',
+					filter: ['==', ['get', 'extrude'], 'true'],
+					minzoom: STREET_VIEW_BUILDINGS_MIN_ZOOM,
+					layout: { visibility: 'none' },
+					paint: {
+						'fill-extrusion-color': STREET_VIEW_BUILDING_COLOR,
+						'fill-extrusion-height': [
+							'interpolate',
+							['linear'],
+							['zoom'],
+							STREET_VIEW_BUILDINGS_MIN_ZOOM,
+							0,
+							STREET_VIEW_BUILDINGS_RISE_FULL_ZOOM,
+							['get', 'height'],
+						],
+						'fill-extrusion-base': [
+							'interpolate',
+							['linear'],
+							['zoom'],
+							STREET_VIEW_BUILDINGS_MIN_ZOOM,
+							0,
+							STREET_VIEW_BUILDINGS_RISE_FULL_ZOOM,
+							['get', 'min_height'],
+						],
+						'fill-extrusion-opacity': [
+							'interpolate',
+							['linear'],
+							['zoom'],
+							STREET_VIEW_BUILDINGS_MIN_ZOOM,
+							0,
+							STREET_VIEW_BUILDINGS_RISE_FULL_ZOOM,
+							STREET_VIEW_BUILDING_OPACITY,
+						],
+					},
+				},
+				firstBasemapSymbolLayerId
+			);
+		}
 
 		const cfg = weatherMoodConfigRef.current;
 		const cloudsOpacityExpr = buildCloudsOpacityExpr(
@@ -8226,6 +8345,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const pendingMinZoomRestoreRef = useRef(false);
 	const hasAttachedMinZoomRestoreRef = useRef(false);
+
+	// Keep the interactive zoom floor in sync with the device class. Skip while the
+	// decorative lock or a temporarily relaxed floor is active — those paths re-apply
+	// the floor from the ref once the camera settles.
+	useEffect(() => {
+		interactiveMinZoomRef.current = isMobile ? MOBILE_MAP_MIN_ZOOM : MAP_MIN_ZOOM;
+		if (!map) return;
+		if (presentationRef.current === 'background') return;
+		if (pendingMinZoomRestoreRef.current) return;
+		try {
+			map.setMinZoom(interactiveMinZoomRef.current);
+		} catch {
+			// Ignore (map may be tearing down).
+		}
+	}, [map, isMobile]);
+
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
 
@@ -8466,14 +8601,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		try {
 			map.stop();
 		} catch {}
-		// Restore interactive zoom constraints. If we're coming from the decorative globe (zoom < MAP_MIN_ZOOM),
-		// temporarily allow that starting zoom so the camera move begins exactly from the dashboard view.
+		// Restore interactive zoom constraints. If we're coming from the decorative globe (zoom < the
+		// interactive floor), temporarily allow that starting zoom so the camera move begins exactly
+		// from the dashboard view.
 		try {
 			const currentZoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
-			const safeMinZoom = Math.min(MAP_MIN_ZOOM, currentZoom);
+			const interactiveMinZoom = interactiveMinZoomRef.current;
+			const safeMinZoom = Math.min(interactiveMinZoom, currentZoom);
 			map.setMinZoom(safeMinZoom);
 			map.setMaxZoom(DEFAULT_MAX_ZOOM_FALLBACK);
-			if (safeMinZoom < MAP_MIN_ZOOM) {
+			if (safeMinZoom < interactiveMinZoom) {
 				pendingMinZoomRestoreRef.current = true;
 			}
 		} catch {
@@ -8659,6 +8796,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const ro = new ResizeObserver(() => scheduleResize());
 		ro.observe(container);
 
+		// Mobile browsers change the layout viewport when the URL bar / keyboard
+		// shows or hides; mapbox-gl only listens to window resize, and the container
+		// observer can miss these transitions — track the visual viewport directly so
+		// the canvas never ends up shorter than its container (black band).
+		window.visualViewport?.addEventListener('resize', scheduleResize);
+		window.addEventListener('orientationchange', scheduleResize);
+
 		// Burst of retries to catch portal/fixed layout settling.
 		const timers: ReturnType<typeof setTimeout>[] = [];
 		for (const ms of [0, 50, 150, 300, 600]) {
@@ -8667,6 +8811,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		return () => {
 			ro.disconnect();
+			window.visualViewport?.removeEventListener('resize', scheduleResize);
+			window.removeEventListener('orientationchange', scheduleResize);
 			for (const t of timers) clearTimeout(t);
 			if (resizeDebounce) clearTimeout(resizeDebounce);
 		};
@@ -10448,6 +10594,120 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [map, isMapLoaded, isBackgroundPresentation]);
 
+	// Street-level 3D: couple camera pitch to the settled zoom. Reconciles on
+	// 'moveend' only — never per zoom frame — because setPitch/jumpTo fire a
+	// synchronous moveend (storming the heavy viewport-idle pipeline) and stop()
+	// any in-flight easeTo/fitBounds. Two subtleties make the reconcile deferred
+	// by one frame with an isEasing/isMoving re-check:
+	// - moveends fired by *interrupting* an ease (every input/render frame of an
+	//   active gesture calls map stop()) report isEasing() === false, so a
+	//   synchronous reconcile would re-arm at frame rate for the whole gesture;
+	// - starting an ease synchronously from inside another ease's stop() leaves
+	//   two render-frame chains running concurrently.
+	// After the one-frame deferral only a genuinely settled camera starts the
+	// pitch ease. The ramp is continuous, so leaving street zoom naturally
+	// returns pitch to 0; the epsilon dead-band makes the pitch ease's own
+	// moveend a terminating no-op.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		if (isBackgroundPresentation) return;
+		if (!streetViewEnabled) return;
+
+		let frameId: number | null = null;
+		const reconcilePitch = () => {
+			if (frameId !== null) return;
+			frameId = requestAnimationFrame(() => {
+				frameId = null;
+				try {
+					if (map.isEasing() || map.isMoving()) return;
+					const target = computeStreetViewPitch(map.getZoom() ?? MAP_DEFAULT_ZOOM);
+					const current = map.getPitch() ?? 0;
+					if (Math.abs(current - target) < STREET_VIEW_PITCH_EPSILON_DEG) return;
+					map.easeTo({
+						pitch: target,
+						duration: STREET_VIEW_PITCH_EASE_MS,
+						easing: mapboxEaseOutCubic,
+						essential: true,
+					});
+				} catch {
+					// Non-fatal.
+				}
+			});
+		};
+
+		map.on('moveend', reconcilePitch);
+		// Align immediately on enable / re-entry to the search surface.
+		reconcilePitch();
+		return () => {
+			map.off('moveend', reconcilePitch);
+			if (frameId !== null) {
+				cancelAnimationFrame(frameId);
+				frameId = null;
+			}
+		};
+	}, [map, isMapLoaded, isBackgroundPresentation, streetViewEnabled]);
+
+	// Show the 3D buildings only on surfaces that opted into street view.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		try {
+			if (!map.getLayer(MAPBOX_LAYER_IDS.streetViewBuildings)) return;
+			map.setLayoutProperty(
+				MAPBOX_LAYER_IDS.streetViewBuildings,
+				'visibility',
+				streetViewEnabled && !isBackgroundPresentation ? 'visible' : 'none'
+			);
+		} catch {
+			// Non-fatal.
+		}
+	}, [map, isMapLoaded, isBackgroundPresentation, streetViewEnabled]);
+
+	// If street view is disabled while pitched (e.g. the host toggles the prop while
+	// staying interactive), ease back to the flat top-down camera. The background
+	// handoff is excluded: it owns pitch explicitly (0 / DASHBOARD_DECORATIVE_PITCH).
+	// Same one-frame deferral + settled-camera re-check as the street-view pitch
+	// reconciler above: in particular this must never stop() an in-flight
+	// background → interactive handoff glide (which already lands at pitch 0).
+	// Reconciling on moveend covers a prop flip that lands mid-animation.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		if (streetViewEnabled) return;
+		if (isBackgroundPresentation) return;
+
+		let frameId: number | null = null;
+		const flattenPitch = () => {
+			if (frameId !== null) return;
+			frameId = requestAnimationFrame(() => {
+				frameId = null;
+				try {
+					if (map.isEasing() || map.isMoving()) return;
+					if ((map.getPitch() ?? 0) <= STREET_VIEW_PITCH_EPSILON_DEG) return;
+					map.easeTo({
+						pitch: 0,
+						duration: STREET_VIEW_PITCH_EASE_MS,
+						easing: mapboxEaseOutCubic,
+						essential: true,
+					});
+				} catch {
+					// Non-fatal.
+				}
+			});
+		};
+
+		map.on('moveend', flattenPitch);
+		flattenPitch();
+		return () => {
+			map.off('moveend', flattenPitch);
+			if (frameId !== null) {
+				cancelAnimationFrame(frameId);
+				frameId = null;
+			}
+		};
+	}, [map, isMapLoaded, isBackgroundPresentation, streetViewEnabled]);
+
 	// Prewarm the coarse low-zoom basemap for the wide region the user would reveal
 	// on zoom-out, so even the FIRST zoom-out renders already-cached cartography
 	// instead of streaming streets-v12 across the periphery. Uses Mapbox's public,
@@ -10749,6 +11009,40 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Debounce auto-fit camera moves so rapid result updates don't cause zoom oscillation.
 	const autoFitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+	// Keep the latest autoFitPadding without churning the fit callbacks' identity (the
+	// host passes an inline object literal).
+	const autoFitPaddingRef = useRef(autoFitPadding);
+	autoFitPaddingRef.current = autoFitPadding;
+
+	// Resolve the padding for a fitBounds call: the host's chrome-aware autoFitPadding
+	// when provided, scaled down so the bounds always have ≥80px of canvas to land in
+	// (Mapbox bails out of fits whose padding exceeds the canvas), else the fallback.
+	const resolveAutoFitPadding = useCallback(
+		(
+			mapInstance: mapboxgl.Map,
+			fallback: { top: number; right: number; bottom: number; left: number }
+		) => {
+			const requested = autoFitPaddingRef.current;
+			if (!requested) return fallback;
+			const container = mapInstance.getContainer();
+			let { top, right, bottom, left } = requested;
+			const maxVertical = Math.max(0, container.clientHeight - 80);
+			const maxHorizontal = Math.max(0, container.clientWidth - 80);
+			if (top + bottom > maxVertical && top + bottom > 0) {
+				const scale = maxVertical / (top + bottom);
+				top *= scale;
+				bottom *= scale;
+			}
+			if (left + right > maxHorizontal && left + right > 0) {
+				const scale = maxHorizontal / (left + right);
+				left *= scale;
+				right *= scale;
+			}
+			return { top, right, bottom, left };
+		},
+		[]
+	);
+
 	// Helper to fit map bounds with padding
 	const fitMapToBounds = useCallback(
 		(
@@ -10773,7 +11067,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			const dur = opts?.durationMs ?? 650;
 			mapInstance.fitBounds(bounds, {
-				padding: { top: 50, right: 50, bottom: 50, left: 50 },
+				padding: resolveAutoFitPadding(mapInstance, {
+					top: 50,
+					right: 50,
+					bottom: 50,
+					left: 50,
+				}),
 				maxZoom: AUTO_FIT_CONTACTS_MAX_ZOOM,
 				pitch: 0,
 				bearing: 0,
@@ -10783,7 +11082,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				...(dur > 1000 ? { easing: mapboxEaseOutCubic } : {}),
 			});
 		},
-		[getContactCoords]
+		[getContactCoords, resolveAutoFitPadding]
 	);
 
 	// Helper to fit map to a state's bounds
@@ -10806,7 +11105,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					[bbox.maxLng, bbox.maxLat],
 				],
 				{
-					padding: { top: 100, right: 100, bottom: 100, left: 100 },
+					padding: resolveAutoFitPadding(mapInstance, {
+						top: 100,
+						right: 100,
+						bottom: 100,
+						left: 100,
+					}),
 					maxZoom: AUTO_FIT_STATE_MAX_ZOOM,
 					pitch: 0,
 					bearing: 0,
@@ -10819,7 +11123,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			return true;
 		},
-		[]
+		[resolveAutoFitPadding]
 	);
 
 	// Fit bounds when contacts with coordinates change (or when the locked state changes).
@@ -11012,8 +11316,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				hasFitBoundsRef.current = true;
 				lastContactsCountRef.current = contactsWithCoords.length;
 
-				// If we temporarily allowed zoom < MAP_MIN_ZOOM to start the animation from the
-				// decorative globe, restore the normal constraint once the camera settles.
+				// If we temporarily allowed zoom below the interactive floor to start the animation
+				// from the decorative globe, restore the normal constraint once the camera settles.
 				if (pendingMinZoomRestoreRef.current && !hasAttachedMinZoomRestoreRef.current) {
 					hasAttachedMinZoomRestoreRef.current = true;
 					try {
@@ -11021,7 +11325,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							hasAttachedMinZoomRestoreRef.current = false;
 							pendingMinZoomRestoreRef.current = false;
 							try {
-								map.setMinZoom(MAP_MIN_ZOOM);
+								map.setMinZoom(interactiveMinZoomRef.current);
 							} catch {}
 						});
 					} catch {
@@ -11098,20 +11402,25 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 	}, [contacts, skipAutoFit]);
 
-	const handleMarkerClick = (contact: ContactWithName) => {
-		onMarkerClick?.(contact);
-		// Toggle selection when clicking on a marker.
-		// - Always allow selection toggling for primary result set.
-		// - In Booking mode, also allow toggling on the zoom-in "extra" pins (even though they
-		//   come from the map-overlay endpoint rather than the primary results list).
+	// Selection toggling is allowed for:
+	// - the primary result set;
+	// - in Booking mode, the zoom-in "extra" pins (even though they come from the
+	//   map-overlay endpoint rather than the primary results list);
+	// - at extremely high zoom, the "all contacts" gray-dot overlay.
+	// Shared by marker clicks and the street-view card's selection button.
+	const isSelectionToggleEligible = (contact: ContactWithName): boolean => {
 		const isPrimaryResult = baseContactIdSet.has(contact.id);
 		const isBookingExtraResult =
 			isBookingSearch && bookingExtraVisibleContacts.some((c) => c.id === contact.id);
-		// - At extremely high zoom, also allow toggling for the "all contacts" gray-dot overlay.
 		const isAllContactsOverlayResult = allContactsOverlayVisibleIdSetRef.current.has(
 			contact.id
 		);
-		if (isPrimaryResult || isBookingExtraResult || isAllContactsOverlayResult) {
+		return isPrimaryResult || isBookingExtraResult || isAllContactsOverlayResult;
+	};
+
+	const handleMarkerClick = (contact: ContactWithName) => {
+		onMarkerClick?.(contact);
+		if (isSelectionToggleEligible(contact)) {
 			onToggleSelection?.(contact.id);
 		}
 	};
@@ -13014,19 +13323,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map.on('click', onClick);
 		const canvas = map.getCanvas();
 		const isInsideHoverTooltip = (event: MouseEvent): boolean => {
-			const tooltipEl = hoverTooltipOverlayRef.current;
-			if (!tooltipEl) return false;
+			// Covers both the slim SVG tooltip and the street-view research card —
+			// whichever overlay is mounted keeps hover alive across canvas → DOM moves.
+			for (const tooltipEl of [
+				hoverTooltipOverlayRef.current,
+				streetCardOverlayRef.current,
+			]) {
+				if (!tooltipEl) continue;
 
-			const relatedTarget = event.relatedTarget;
-			if (relatedTarget instanceof Node && tooltipEl.contains(relatedTarget)) {
-				return true;
+				const relatedTarget = event.relatedTarget;
+				if (relatedTarget instanceof Node && tooltipEl.contains(relatedTarget)) {
+					return true;
+				}
+
+				const pointTarget = tooltipEl.ownerDocument.elementFromPoint(
+					event.clientX,
+					event.clientY
+				);
+				if (pointTarget && tooltipEl.contains(pointTarget)) return true;
 			}
-
-			const pointTarget = tooltipEl.ownerDocument.elementFromPoint(
-				event.clientX,
-				event.clientY
-			);
-			return Boolean(pointTarget && tooltipEl.contains(pointTarget));
+			return false;
 		};
 		const onCanvasMouseLeave = (event: MouseEvent) => {
 			if (isInsideHoverTooltip(event)) return;
@@ -15992,6 +16308,68 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		getAllContactsOverlayContactCoords,
 	]);
 
+	// Street-view research card: parallel render path to the slim SVG tooltip,
+	// engaged only at street zoom on surfaces that opted in.
+	const isStreetCardMode = streetViewEnabled && zoomLevel >= STREET_VIEW_MIN_ZOOM;
+	const streetCardContact = isStreetCardMode ? (hoverTooltipEntry?.contact ?? null) : null;
+	// Slim overlay payloads (booking/promotion/all — see api/contacts/map-overlay) omit
+	// metadata/address; backfill via the per-contact research endpoint (30-min cache).
+	const streetCardNeedsBackfill =
+		streetCardContact != null &&
+		(!streetCardContact.metadata || !streetCardContact.address);
+	const { data: streetCardResearch, isLoading: isStreetCardResearchLoading } =
+		useGetContactResearch(
+			streetCardNeedsBackfill && streetCardContact ? streetCardContact.id : null
+		);
+
+	const streetCardData = useMemo(() => {
+		if (!isStreetCardMode || !hoverTooltipEntry) return null;
+		const contact = hoverTooltipEntry.contact;
+		const kind = hoverTooltipEntry.kind;
+		const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+		const name = fullName || contact.name || contact.company || 'Unknown';
+		const company = fullName || contact.name ? contact.company || '' : '';
+		// Same per-kind category resolution as the slim tooltip (see hoverTooltipData).
+		const whatForMarker =
+			kind === 'base'
+				? (contact.curatedCategory ?? searchWhat ?? null)
+				: kind === 'booking'
+					? (getBookingTitlePrefixFromContactTitle(contact.title) ?? null)
+					: kind === 'promotion'
+						? (getPromotionOverlayWhatFromContactTitle(contact.title) ?? null)
+						: (getAmbientContactWhatFromTitle(contact.title) ?? null);
+		const accentColor = getResultDotColorForWhat(whatForMarker);
+		const cityStateFallback = [
+			contact.city,
+			getStateAbbreviation(contact.state || '') || contact.state,
+		]
+			.filter(Boolean)
+			.join(', ');
+		const address = contact.address || streetCardResearch?.address || cityStateFallback;
+		const metadata = contact.metadata || streetCardResearch?.metadata || null;
+		const sections = parseMetadataSections(metadata);
+		const blurb = sections['1'] ?? (metadata?.trim() || '');
+		return {
+			name,
+			company,
+			accentColor,
+			address,
+			blurb,
+			isSelected: selectedContactIdSet.has(contact.id),
+			isSelectionEligible: isSelectionToggleEligible(contact),
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [
+		isStreetCardMode,
+		hoverTooltipEntry,
+		searchWhat,
+		streetCardResearch,
+		selectedContactIdSet,
+		baseContactIdSet,
+		isBookingSearch,
+		bookingExtraVisibleContacts,
+	]);
+
 	const hoverTooltipData = useMemo(() => {
 		if (!hoverTooltipEntry) return null;
 		const contact = hoverTooltipEntry.contact;
@@ -16126,11 +16504,47 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map,
 		isMapLoaded,
 		isLoading,
+		// The street-card mode flip unmounts/remounts this overlay (same hover
+		// target, same coords), so it must re-run the effect: cleanup detaches the
+		// 'move' listener bound to the old element and the remounted tooltip is
+		// positioned before paint.
+		isStreetCardMode,
 		hoverTooltipContactId,
 		hoverTooltipCoords?.lat,
 		hoverTooltipCoords?.lng,
 		hoverTooltipData?.anchorY,
 		hoverTooltipHitSlopPx,
+	]);
+
+	// Street-view research card positioning: the outer overlay anchors at the marker's
+	// projected point only; an inner div self-centers above it (translate(-50%, -100%)),
+	// so async research data changing the card's height never needs a re-measure.
+	// map.project runs through the full camera matrix, so the pitched street camera
+	// is handled for free.
+	useLayoutEffect(() => {
+		if (!map || !isMapLoaded) return;
+		if (isLoading) return;
+		const el = streetCardOverlayRef.current;
+		if (!el || !isStreetCardMode || !hoverTooltipCoords) return;
+
+		const update = () => {
+			const p = map.project([hoverTooltipCoords.lng, hoverTooltipCoords.lat]);
+			el.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px)`;
+		};
+
+		update();
+		map.on('move', update);
+		return () => {
+			map.off('move', update);
+		};
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		isStreetCardMode,
+		hoverTooltipContactId,
+		hoverTooltipCoords?.lat,
+		hoverTooltipCoords?.lng,
 	]);
 
 	return (
@@ -16601,8 +17015,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				</div>
 			)}
 
-			{/* Hover SVG tooltip (single overlay; positioned via map.project) */}
-			{!isLoading && hoverTooltipEntry && hoverTooltipCoords && hoverTooltipData && (
+			{/* Hover SVG tooltip (single overlay; positioned via map.project). At street
+			    zoom the rich research card below replaces it. */}
+			{!isLoading && !isStreetCardMode && hoverTooltipEntry && hoverTooltipCoords && hoverTooltipData && (
 				<div
 					ref={hoverTooltipOverlayRef}
 					style={{
@@ -16642,6 +17057,123 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 								height: '100%',
 								display: 'block',
 								lineHeight: 0,
+							}}
+						/>
+					</div>
+				</div>
+			)}
+
+			{/* Street-view research card (replaces the slim tooltip at street zoom) */}
+			{!isLoading && isStreetCardMode && hoverTooltipEntry && hoverTooltipCoords && streetCardData && (
+				<div
+					ref={streetCardOverlayRef}
+					style={{
+						position: 'absolute',
+						left: 0,
+						top: 0,
+						zIndex: HOVER_TOOLTIP_Z_INDEX,
+						pointerEvents: 'none',
+					}}
+				>
+					{/* Self-centers above the marker point; the transparent bottom padding
+					    bridges the marker→card gap so hover never crosses a dead zone. */}
+					<div
+						style={{
+							transform: 'translate(-50%, -100%)',
+							paddingBottom: '18px',
+							pointerEvents:
+								hoverTooltipContactId != null && hoveredMarkerId === hoverTooltipContactId
+									? 'auto'
+									: 'none',
+							opacity:
+								hoverTooltipContactId != null && hoveredMarkerId === hoverTooltipContactId
+									? 1
+									: 0,
+							transition: 'opacity 150ms ease-in-out',
+						}}
+						onMouseEnter={() => handleMarkerMouseOver(hoverTooltipEntry.contact)}
+						onMouseLeave={() => handleMarkerMouseOut(hoverTooltipEntry.contact.id)}
+					>
+						<div
+							className="relative w-[280px] rounded-[10px] bg-white overflow-hidden font-inter"
+							style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }}
+						>
+							{/* Name / company / coordinates */}
+							<div className="px-3 pt-3 pb-2">
+								<div className="font-bold text-[14px] leading-tight text-black truncate">
+									{streetCardData.name}
+								</div>
+								{streetCardData.company && (
+									<div className="text-[12px] leading-tight text-black/70 truncate mt-[2px]">
+										{streetCardData.company}
+									</div>
+								)}
+								<div className="text-[10px] leading-none text-black/50 mt-[6px] tabular-nums">
+									{hoverTooltipCoords.lat.toFixed(4)} {hoverTooltipCoords.lng.toFixed(4)}
+								</div>
+							</div>
+							{/* Category-colored accent divider */}
+							<div
+								className="w-full"
+								style={{ height: '3px', backgroundColor: streetCardData.accentColor }}
+							/>
+							{/* Address + research blurb */}
+							<div className="px-3 py-2">
+								{streetCardData.address && (
+									<div className="text-[12px] font-semibold text-black leading-snug">
+										{streetCardData.address}
+									</div>
+								)}
+								{streetCardData.blurb ? (
+									<div
+										className="text-[11px] text-black/70 leading-snug mt-1"
+										style={{
+											display: '-webkit-box',
+											WebkitLineClamp: 3,
+											WebkitBoxOrient: 'vertical',
+											overflow: 'hidden',
+										}}
+									>
+										{streetCardData.blurb}
+									</div>
+								) : isStreetCardResearchLoading ? (
+									<div className="text-[11px] italic text-black/40 mt-1">Researching…</div>
+								) : null}
+							</div>
+							{/* Selection toggle (hidden for contacts the marker click also ignores) */}
+							{streetCardData.isSelectionEligible && (
+								<button
+									type="button"
+									className="w-full h-[34px] text-[12px] font-bold text-black transition-colors"
+									style={{
+										backgroundColor: streetCardData.isSelected ? '#9BC6DF' : '#C9EAFF',
+										borderTop: '1px solid rgba(0,0,0,0.15)',
+									}}
+									onClick={(e) => {
+										e.stopPropagation();
+										onToggleSelection?.(hoverTooltipEntry.contact.id);
+									}}
+								>
+									{streetCardData.isSelected ? 'Remove from Selection' : 'Add to Selection'}
+								</button>
+							)}
+						</div>
+						{/* Pointer triangle (sits in the bottom hover-bridge padding) */}
+						<div
+							className="absolute left-1/2 -translate-x-1/2"
+							style={{
+								bottom: '8px',
+								width: 0,
+								height: 0,
+								borderLeft: '8px solid transparent',
+								borderRight: '8px solid transparent',
+								borderTop: `10px solid ${
+									streetCardData.isSelectionEligible
+										? streetCardData.isSelected
+											? '#9BC6DF'
+											: '#C9EAFF'
+										: '#FFFFFF'
+								}`,
 							}}
 						/>
 					</div>

@@ -459,7 +459,9 @@ const getOpportunityThreadKey = (email: InboundEmailWithRelations) => {
 	return `${email.campaignId ?? 'none'}:${(email.sender || '').toLowerCase().trim()}`;
 };
 
-const inferOpportunityStatus = (email: InboundEmailWithRelations): OpportunityStatus | null => {
+export const inferOpportunityStatus = (
+	email: InboundEmailWithRelations
+): OpportunityStatus | null => {
 	const text = `${email.subject || ''} ${getEmailSnippet(email)}`.toLowerCase();
 
 	if (
@@ -778,19 +780,76 @@ export const DashboardOpportunitiesContent: FC<{
 					marginTop: '8px',
 				}}
 			>
-				<div className="flex flex-col items-center gap-[5px] pb-[1px]">
+				{/* w-full: rows are width:100%, so on fluid (mobile) widths the column
+				    must take the scroll container's width or every row collapses to 0. */}
+				<div className="w-full flex flex-col items-center gap-[5px] pb-[1px]">
 					{isLoading ? (
+						// Wave skeleton rows mirroring the loaded row anatomy; negative
+						// delays stagger the wave so it reads downward.
 						Array.from({ length: 3 }).map((_, index) => (
 							<div
 								key={`opportunity-loading-${index}`}
+								aria-hidden="true"
+								className="dashboard-opportunities-loading-wave-row"
 								style={{
 									width: rowWidth,
 									height: '48px',
 									borderRadius: '6.389px',
-									background: '#FEFEFE',
-									opacity: 0.65,
+									animationDelay: `${-(2.5 - index * 0.25)}s`,
+									boxShadow: '0px 1px 0px rgba(0, 0, 0, 0.05)',
+									boxSizing: 'border-box',
+									position: 'relative',
+									overflow: 'hidden',
 								}}
-							/>
+							>
+								{/* Status accent bar */}
+								<span
+									style={{
+										position: 'absolute',
+										left: 0,
+										top: 0,
+										width: '6px',
+										height: '100%',
+										background: 'rgba(0,0,0,0.10)',
+									}}
+								/>
+								{/* Contact label */}
+								<span
+									style={{
+										position: 'absolute',
+										left: '27px',
+										top: '9px',
+										width: '120px',
+										height: '13px',
+										borderRadius: '4px',
+										background: 'rgba(0,0,0,0.10)',
+									}}
+								/>
+								{/* Folder chip */}
+								<span
+									style={{
+										position: 'absolute',
+										left: '27px',
+										bottom: '9px',
+										width: '80px',
+										height: '15px',
+										borderRadius: '3px',
+										background: 'rgba(0,0,0,0.10)',
+									}}
+								/>
+								{/* Date pill */}
+								<span
+									style={{
+										position: 'absolute',
+										right: '10px',
+										top: '7px',
+										width: '82px',
+										height: '17px',
+										borderRadius: '4.502px',
+										background: 'rgba(0,0,0,0.10)',
+									}}
+								/>
+							</div>
 						))
 					) : isFullyEmpty ? (
 						<>

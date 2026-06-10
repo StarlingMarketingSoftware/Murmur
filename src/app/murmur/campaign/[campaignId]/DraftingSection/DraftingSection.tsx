@@ -8,7 +8,6 @@ import {
 	useRef,
 	useState,
 	type CSSProperties,
-	type ReactNode,
 } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { gsap } from 'gsap';
@@ -38,7 +37,7 @@ import DraftingStatusPanel from '@/app/murmur/campaign/[campaignId]/DraftingSect
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import { useGetContacts, useGetLocations } from '@/hooks/queryHooks/useContacts';
 import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
-import { useCreateEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { useCreateEmail, useDeleteEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
 import {
 	EmailStatus,
 	EmailVerificationStatus,
@@ -68,11 +67,26 @@ import { DraftsExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingS
 import { DraftPreviewExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftPreviewExpandedList';
 import { SentExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/SentExpandedList';
 import { InboxExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/InboxExpandedList';
+import { MobileCampaignSearchHeader } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Mobile/MobileCampaignSearchHeader';
+import {
+	MobileCampaignSummary,
+	type MobileSummaryScrollRequest,
+	type MobileSummarySection,
+} from '@/app/murmur/campaign/[campaignId]/DraftingSection/Mobile/MobileCampaignSummary';
+import { MobileConversationView } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Mobile/MobileConversationView';
+import { MobileDraftReviewView } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Mobile/MobileDraftReviewView';
+import {
+	buildInboxConversations,
+	inboxConversationContainsEmailId,
+	normalizeInboxEmailAddress,
+	normalizeSentEmailForInboxConversation,
+	type InboxConversation,
+} from '@/utils/inboxConversations';
+import {
+	inferOpportunityStatus,
+	type OpportunityStatus,
+} from '@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesWidget';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
-import type {
-	AreaSelectPayload,
-	MapSelectionBounds,
-} from '@/components/molecules/SearchResultsMap/types';
 import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
 import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
@@ -87,9 +101,6 @@ import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
-import BulletListIcon from '@/components/atoms/_svg/BulletListIcon';
-import MapBottomSearchArrowIcon from '@/components/atoms/_svg/MapBottomSearchArrowIcon';
-import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 import UndoIcon from '@/components/atoms/_svg/UndoIcon';
 import UpscaleIcon from '@/components/atoms/_svg/UpscaleIcon';
 import { getCityIconProps } from '@/utils/cityIcons';
@@ -210,301 +221,6 @@ const stripInjectedSubjectFromTestMessageHtml = (
 	}
 };
 
-const MobileSearchCategoryPill: FC<{ headline: string }> = ({ headline }) => (
-	<div
-		className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
-		style={{
-			backgroundColor: isRestaurantTitle(headline)
-				? '#C3FBD1'
-				: isCoffeeShopTitle(headline)
-					? '#D6F1BD'
-					: isMusicVenueTitle(headline)
-						? '#B7E5FF'
-						: isMusicFestivalTitle(headline)
-							? '#C1D6FF'
-							: isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)
-								? '#FFF2BC'
-								: '#E8EFFF',
-		}}
-	>
-		{isRestaurantTitle(headline) && <RestaurantsIcon size={12} />}
-		{isCoffeeShopTitle(headline) && <CoffeeShopsIcon size={7} />}
-		{isMusicVenueTitle(headline) && (
-			<MusicVenuesIcon size={12} className="flex-shrink-0" />
-		)}
-		{isMusicFestivalTitle(headline) && (
-			<FestivalsIcon size={12} className="flex-shrink-0" />
-		)}
-		{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
-			<WeddingPlannersIcon size={12} />
-		)}
-		<span className="text-[10px] text-black leading-none truncate">
-			{isRestaurantTitle(headline)
-				? 'Restaurant'
-				: isCoffeeShopTitle(headline)
-					? 'Coffee Shop'
-					: isMusicVenueTitle(headline)
-						? 'Music Venue'
-						: isMusicFestivalTitle(headline)
-							? 'Music Festival'
-							: isWeddingPlannerTitle(headline)
-								? 'Wedding Planner'
-								: isWeddingVenueTitle(headline)
-									? 'Wedding Venue'
-									: headline}
-		</span>
-	</div>
-);
-
-// Full-width Search Results row for the mobile list view — same layout/tokens as the
-// desktop Search Results panel rows.
-const MobileSearchResultRowCard: FC<{
-	contact: ContactWithName;
-	isSelected: boolean;
-	onToggle: () => void;
-}> = ({ contact, isSelected, onToggle }) => {
-	const firstName = contact.firstName || '';
-	const lastName = contact.lastName || '';
-	const fullName = contact.name || `${firstName} ${lastName}`.trim();
-	const company = contact.company || '';
-	const headline = contact.headline || contact.title || '';
-	const stateAbbr = getStateAbbreviation(contact.state || '') || '';
-	const city = contact.city || '';
-
-	return (
-		<div
-			data-contact-id={contact.id}
-			className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-[#ABABAB] select-none"
-			style={{ backgroundColor: isSelected ? '#C9EAFF' : '#FFFFFF' }}
-			onClick={onToggle}
-		>
-			{fullName ? (
-				<div className="pl-3 pr-1 flex items-center h-[23px]">
-					<div className="font-bold text-[11px] w-full truncate leading-tight">
-						{fullName}
-					</div>
-				</div>
-			) : (
-				<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
-					<div className="font-bold text-[11px] w-full truncate leading-tight">
-						{company || '—'}
-					</div>
-				</div>
-			)}
-			{/* Top Right - Title/Headline */}
-			<div className="pr-2 pl-1 flex items-center h-[23px]">
-				{headline ? (
-					<MobileSearchCategoryPill headline={headline} />
-				) : (
-					<div className="w-full" />
-				)}
-			</div>
-			{/* Bottom Left - Company (only when a name occupies the top-left cell) */}
-			{fullName ? (
-				<div className="pl-3 pr-1 flex items-center h-[22px]">
-					<div className="text-[11px] text-black w-full truncate leading-tight">
-						{company}
-					</div>
-				</div>
-			) : null}
-			{/* Bottom Right - Location */}
-			<div className="pr-2 pl-1 flex items-center h-[22px]">
-				{city || stateAbbr ? (
-					<div className="flex items-center gap-1 w-full">
-						{stateAbbr && (
-							<span
-								className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
-								style={{
-									backgroundColor: stateBadgeColorMap[stateAbbr] || 'transparent',
-									borderColor: '#000000',
-								}}
-							>
-								{stateAbbr}
-							</span>
-						)}
-						{city && (
-							<span className="text-[10px] text-black leading-none truncate">
-								{city}
-							</span>
-						)}
-					</div>
-				) : (
-					<div className="w-full" />
-				)}
-			</div>
-		</div>
-	);
-};
-
-type MobileChipTile = { key: string; background: string; icon: ReactNode };
-
-// Compact "+N" chip next to the campaign name: leads with the campaign's top contact
-// category and top state, then counts the remaining distinct ones.
-const MobileCampaignIconChip: FC<{ contacts: ContactWithName[] }> = ({ contacts }) => {
-	const { tiles, overflowCount } = useMemo(() => {
-		const categoryCounts = new Map<string, number>();
-		const stateCounts = new Map<string, number>();
-		for (const contact of contacts) {
-			const headline = contact.headline || contact.title || '';
-			const category = !headline
-				? null
-				: isRestaurantTitle(headline)
-					? 'restaurant'
-					: isCoffeeShopTitle(headline)
-						? 'coffee-shop'
-						: isMusicVenueTitle(headline)
-							? 'music-venue'
-							: isMusicFestivalTitle(headline)
-								? 'music-festival'
-								: isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)
-									? 'wedding'
-									: isWineBeerSpiritsTitle(headline)
-										? 'wine-beer-spirits'
-										: null;
-			if (category) categoryCounts.set(category, (categoryCounts.get(category) ?? 0) + 1);
-			const stateAbbr = getStateAbbreviation(contact.state || '');
-			if (stateAbbr) stateCounts.set(stateAbbr, (stateCounts.get(stateAbbr) ?? 0) + 1);
-		}
-
-		const byCountDesc = (a: [string, number], b: [string, number]) => b[1] - a[1];
-		const categoryTiles: MobileChipTile[] = Array.from(categoryCounts.entries())
-			.sort(byCountDesc)
-			.map(([key]) => {
-				switch (key) {
-					case 'restaurant':
-						return { key, background: '#C3FBD1', icon: <RestaurantsIcon size={12} /> };
-					case 'coffee-shop':
-						return { key, background: '#D6F1BD', icon: <CoffeeShopsIcon size={9} /> };
-					case 'music-venue':
-						return { key, background: '#B7E5FF', icon: <MusicVenuesIcon size={12} /> };
-					case 'music-festival':
-						return { key, background: '#C1D6FF', icon: <FestivalsIcon size={12} /> };
-					case 'wedding':
-						return { key, background: '#FFF2BC', icon: <WeddingPlannersIcon size={12} /> };
-					default:
-						return { key, background: '#E8EFFF', icon: <WineBeerSpiritsIcon size={12} /> };
-				}
-			});
-		const stateTiles: MobileChipTile[] = Array.from(stateCounts.entries())
-			.sort(byCountDesc)
-			.map(([abbr]) => {
-				const cityIconProps = getCityIconProps('', abbr);
-				return {
-					key: `state-${abbr}`,
-					background: cityIconProps.backgroundColor,
-					icon: cityIconProps.icon,
-				};
-			});
-
-		// Interleave so the chip leads with the top category and the top state.
-		const ordered: MobileChipTile[] = [];
-		if (categoryTiles[0]) ordered.push(categoryTiles[0]);
-		if (stateTiles[0]) ordered.push(stateTiles[0]);
-		ordered.push(...categoryTiles.slice(1), ...stateTiles.slice(1));
-
-		return { tiles: ordered.slice(0, 2), overflowCount: Math.max(0, ordered.length - 2) };
-	}, [contacts]);
-
-	if (tiles.length === 0) return null;
-
-	return (
-		<div className="flex items-center gap-[3px] h-[24px] rounded-[6px] border border-black bg-white/80 px-1 flex-shrink-0">
-			{tiles.map((tile) => (
-				<span
-					key={tile.key}
-					className="w-[18px] h-[18px] rounded-[4px] flex items-center justify-center overflow-hidden [&_svg]:max-w-[14px] [&_svg]:max-h-[14px]"
-					style={{ backgroundColor: tile.background }}
-				>
-					{tile.icon}
-				</span>
-			))}
-			{overflowCount > 0 && (
-				<span className="font-inter text-[11px] font-semibold text-black px-[2px]">
-					+{overflowCount}
-				</span>
-			)}
-		</div>
-	);
-};
-
-// Campaign header overlay for the mobile Search view: folder + name + icon chip on top,
-// metric pills below (tokens copied from CampaignHeaderBox).
-const MobileCampaignSearchHeader: FC<{
-	campaignName: string;
-	contacts: ContactWithName[];
-	contactsCount: number;
-	draftCount: number;
-	sentCount: number;
-	newMessageCount: number;
-	onDraftsClick?: () => void;
-	onSentClick?: () => void;
-	onNewMessageClick?: () => void;
-}> = ({
-	campaignName,
-	contacts,
-	contactsCount,
-	draftCount,
-	sentCount,
-	newMessageCount,
-	onDraftsClick,
-	onSentClick,
-	onNewMessageClick,
-}) => {
-	const formatCount = (count: number, label: string) =>
-		count === 0 ? label : `${count.toString().padStart(2, '0')} ${label}`;
-	const pillClassName =
-		'inline-flex items-center justify-center h-[20px] rounded-full border border-black px-2 font-inter text-[11px] font-semibold leading-none text-black whitespace-nowrap';
-
-	return (
-		<div className="pointer-events-auto flex flex-col gap-2">
-			<div className="flex items-center gap-2 min-w-0">
-				<div className="flex items-center gap-2 h-[30px] rounded-[6px] bg-[#B9EAF1] pl-2 pr-3 min-w-0">
-					<DashboardActionBarFolderIcon
-						width={26}
-						height={15}
-						className="flex-shrink-0 text-[#C5494F]"
-					/>
-					<span
-						className="text-[20px] leading-none text-black truncate"
-						style={{ fontFamily: "'Times New Roman', Times, serif" }}
-					>
-						{campaignName}
-					</span>
-				</div>
-				<MobileCampaignIconChip contacts={contacts} />
-			</div>
-			<div className="flex items-center gap-2 min-w-0">
-				<span className={cn(pillClassName, 'bg-[#F5DADA]')}>
-					{formatCount(contactsCount, 'Contacts')}
-				</span>
-				<button
-					type="button"
-					className={cn(pillClassName, 'bg-[#FFE3AA] cursor-pointer')}
-					onClick={onDraftsClick}
-				>
-					{formatCount(draftCount, 'Drafts')}
-				</button>
-				<button
-					type="button"
-					className={cn(pillClassName, 'bg-[#B0E0A6] cursor-pointer')}
-					onClick={onSentClick}
-				>
-					{formatCount(sentCount, 'Sent')}
-				</button>
-				{newMessageCount > 0 && (
-					<button
-						type="button"
-						className={cn(pillClassName, 'bg-[#B9EAF1] cursor-pointer ml-auto')}
-						onClick={onNewMessageClick}
-					>
-						{newMessageCount} New Message{newMessageCount === 1 ? '' : 's'}
-					</button>
-				)}
-			</div>
-		</div>
-	);
-};
-
 interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 	onOpenIdentityDialog?: () => void;
 	autoOpenProfileTabWhenIncomplete?: boolean;
@@ -534,6 +250,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		onGoToSearch,
 		goToInbox,
 		goToSent,
+		goToSummary,
 		inboxSentTabRequest,
 		onInboxSentTabChange,
 		goToPreviousTab,
@@ -1898,19 +1615,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [searchTabs, setSearchTabs] = useState<SearchTab[]>([]);
 	const [activeSearchTabId, setActiveSearchTabId] = useState<string | null>(null);
 
-	// Mobile search view: map/list mode, the area-select tool, and the bottom-bar input.
-	const [mobileSearchViewMode, setMobileSearchViewMode] = useState<'map' | 'list'>('map');
-	const [mobileMapTool, setMobileMapTool] = useState<'select' | 'grab'>('grab');
-	const [mobileSearchInputValue, setMobileSearchInputValue] = useState('');
-	const mobileSearchInputRef = useRef<HTMLInputElement | null>(null);
-
-	useEffect(() => {
-		if (view === 'search') return;
-		setMobileSearchViewMode('map');
-		setMobileMapTool('grab');
-		setMobileSearchInputValue('');
-	}, [view]);
-
 	// Get active tab data
 	const activeSearchTab = searchTabs.find((tab) => tab.id === activeSearchTabId);
 	const hasCampaignSearched = activeSearchTabId !== null;
@@ -2028,22 +1732,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		[activeSearchTabId]
 	);
 
-	// Mobile area select: merge the box-selected ids into the active tab's selection and
-	// surface overlay-only contacts in the Search Results list (mirrors the dashboard).
-	const handleMobileAreaSelect = (
-		_bounds: MapSelectionBounds,
-		payload?: AreaSelectPayload
-	) => {
-		const ids = payload?.contactIds ?? [];
-		const extras = payload?.extraContacts ?? [];
-		if (ids.length > 0) {
-			setSearchResultsSelectedContacts((prev) => Array.from(new Set([...prev, ...ids])));
-		}
-		for (const contact of extras) {
-			addContactToActiveSearchTabResults(contact);
-		}
-	};
-
 	// Hook for adding contacts to the campaign's user contact list
 	const { mutateAsync: editUserContactList, isPending: isAddingToCampaign } =
 		useEditUserContactList({
@@ -2096,48 +1784,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			setActiveSearchTabId(newTab.id);
 		}
 		setSearchActiveSection(null);
-	};
-
-	// Mobile free-text search: a single tab updated in place, so the "recent search" box
-	// always shows the latest query; selection/extras reset so Add can't include stale picks.
-	const handleMobileCampaignSearch = () => {
-		const query = mobileSearchInputValue.trim();
-		if (!query) {
-			toast.error('Please enter what you want to search for');
-			return;
-		}
-
-		if (activeSearchTabId) {
-			setSearchTabs((tabs) =>
-				tabs.map((tab) =>
-					tab.id === activeSearchTabId
-						? {
-								...tab,
-								label: query,
-								query,
-								what: '',
-								selectedContacts: [],
-								extraContacts: [],
-							}
-						: tab
-				)
-			);
-		} else {
-			const newTab: SearchTab = {
-				id: `search-${Date.now()}`,
-				label: query,
-				query,
-				what: '',
-				selectedContacts: [],
-				extraContacts: [],
-			};
-			setSearchTabs((tabs) => [...tabs, newTab]);
-			setActiveSearchTabId(newTab.id);
-		}
-
-		setMobileSearchViewMode('map');
-		setMobileSearchInputValue('');
-		mobileSearchInputRef.current?.blur();
 	};
 
 	// Handler for triggering search from the mini searchbar in the contacts panel
@@ -2206,9 +1852,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		router.push(dashboardUrl);
 	};
 
-	// Handler for adding selected search results to campaign
+	// Handler for adding selected search results to campaign. Selection lives on the
+	// active tab when one exists, else on the null-tab state (mobile For You / campaign
+	// contacts) — desktop call sites only render with an active tab, so they're unchanged.
 	const handleAddSearchResultsToCampaign = async () => {
-		if (searchResultsSelectedContacts.length === 0) {
+		const selectedIds =
+			activeSearchTabId !== null
+				? searchResultsSelectedContacts
+				: searchTabSelectedContacts;
+		if (selectedIds.length === 0) {
 			toast.error('Please select contacts to add');
 			return;
 		}
@@ -2225,15 +1877,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				data: {
 					contactOperation: {
 						action: 'connect',
-						contactIds: searchResultsSelectedContacts,
+						contactIds: selectedIds,
 					},
 				},
 			});
 
-			const addedCount = searchResultsSelectedContacts.length;
+			const addedCount = selectedIds.length;
 
 			// Clear selection
-			setSearchResultsSelectedContacts([]);
+			if (activeSearchTabId !== null) {
+				setSearchResultsSelectedContacts([]);
+			} else {
+				setSearchTabSelectedContacts([]);
+			}
 
 			// Invalidate queries to refresh the campaign data and contacts
 			queryClient.invalidateQueries({
@@ -2249,6 +1905,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			toast.success(
 				`${addedCount} contact${addedCount > 1 ? 's' : ''} added to campaign!`
 			);
+
+			// Mobile: adding from the Search view lands on the Summary view, where the
+			// new contacts appear in the list.
+			if (isMobile === true) {
+				goToSummary?.();
+			}
 		} catch (error) {
 			console.error('Error adding contacts to campaign:', error);
 			toast.error('Failed to add contacts to campaign');
@@ -2778,9 +2440,57 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		[]
 	);
 
+	// Mobile Summary view: which fullscreen overlay (chat / draft review) is open,
+	// the header-pill scroll target, and this session's send/delete counters.
+	const [mobileSummarySelection, setMobileSummarySelection] = useState<
+		{ kind: 'conversation'; key: string } | { kind: 'draft'; id: number } | null
+	>(null);
+	const [mobileSummaryScrollRequest, setMobileSummaryScrollRequest] =
+		useState<MobileSummaryScrollRequest | null>(null);
+	const [mobileSessionSentCount, setMobileSessionSentCount] = useState(0);
+	const [mobileSessionDeletedCount, setMobileSessionDeletedCount] = useState(0);
+	const { mutateAsync: deleteDraftEmail } = useDeleteEmail();
+
+	// Header pills (both mobile views) scroll to their Summary section instead of
+	// switching tabs; from the Search view this navigates to the Summary first.
+	const requestMobileSummarySection = useCallback(
+		(section: MobileSummarySection) => {
+			setMobileSummaryScrollRequest((prev) => ({
+				section,
+				requestId: (prev?.requestId ?? 0) + 1,
+			}));
+			if (view !== 'summary') goToSummary?.();
+		},
+		[view, goToSummary]
+	);
+
+	// Deep link from the dashboard mobile search header pills:
+	// ?summarySection=drafts|contacts|conversations scrolls the Summary there on
+	// arrival. Consumed once per param value; gated on renderGlobalOverlays so the
+	// transient crossfade instance can't double-fire.
+	const summarySectionParam = inboxDeepLinkParams.get('summarySection');
+	const consumedSummarySectionRef = useRef<string | null>(null);
+	useEffect(() => {
+		if (isMobile !== true || !renderGlobalOverlays) return;
+		if (!summarySectionParam) return;
+		if (consumedSummarySectionRef.current === summarySectionParam) return;
+		if (
+			summarySectionParam !== 'drafts' &&
+			summarySectionParam !== 'contacts' &&
+			summarySectionParam !== 'conversations'
+		) {
+			return;
+		}
+		consumedSummarySectionRef.current = summarySectionParam;
+		requestMobileSummarySection(summarySectionParam);
+	}, [isMobile, renderGlobalOverlays, summarySectionParam, requestMobileSummarySection]);
+
 	useEffect(() => {
 		setSelectedInboxEmailId(null);
 		setOptimisticInboxReplyByEmailId({});
+		setMobileSummarySelection(null);
+		setMobileSessionSentCount(0);
+		setMobileSessionDeletedCount(0);
 	}, [campaign?.id]);
 
 	// Re-seed the deep-linked selection on query-only navigations (e.g. clicking an
@@ -3144,6 +2854,170 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			inboxMockData,
 		]
 	);
+
+	// Mobile Summary view data: ongoing conversations (≥1 inbound reply) first, then
+	// drafts, then the remaining plain contacts. Conversations thread the campaign's
+	// sent emails in alongside replies so the fullscreen chat shows both sides.
+	const mobileSummaryData = useMemo(() => {
+		const empty = {
+			conversations: [] as InboxConversation[],
+			drafts: [] as EmailWithRelations[],
+			plainContacts: [] as ContactWithName[],
+			opportunityStatusByKey: new Map<string, OpportunityStatus>(),
+		};
+		if (isMobile !== true) return empty;
+
+		const draftsForSummary = (headerEmails || [])
+			.filter((email) => email.status === EmailStatus.draft)
+			.sort(
+				(a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+			);
+		const sentForSummary = (headerEmails || []).filter(
+			(email) => email.status === EmailStatus.sent
+		);
+
+		const conversations = buildInboxConversations([
+			...inboxEmailsForContactsExpandedList,
+			...sentForSummary.map(normalizeSentEmailForInboxConversation),
+		]).filter((conversation) => conversation.inboundMessages.length > 0);
+
+		// Opportunity classification mirrors the dashboard widget (venue internal
+		// threads are exempt there too).
+		const opportunityStatusByKey = new Map<string, OpportunityStatus>();
+		for (const conversation of conversations) {
+			const latestInbound = conversation.latestInboundMessage;
+			if (!latestInbound || latestInbound.venueConversationId != null) continue;
+			const status = inferOpportunityStatus(latestInbound);
+			if (status) opportunityStatusByKey.set(conversation.key, status);
+		}
+
+		const conversationContactIds = new Set<number>();
+		const conversationEmails = new Set<string>();
+		for (const conversation of conversations) {
+			for (const message of conversation.messages) {
+				if (message.contactId != null) conversationContactIds.add(message.contactId);
+				const sender = normalizeInboxEmailAddress(message.sender);
+				if (sender) conversationEmails.add(sender);
+			}
+		}
+		const draftedContactIds = new Set(draftsForSummary.map((draft) => draft.contactId));
+
+		// Plain contacts sort by latest send activity so sent-without-reply floats up.
+		const latestSentAtByContactId = new Map<number, number>();
+		for (const email of sentForSummary) {
+			const at = new Date(email.sentAt || email.createdAt).getTime();
+			if (Number.isNaN(at)) continue;
+			const prev = latestSentAtByContactId.get(email.contactId) ?? 0;
+			if (at > prev) latestSentAtByContactId.set(email.contactId, at);
+		}
+		const plainContactSortKey = (contact: ContactWithName) =>
+			latestSentAtByContactId.get(contact.id) ??
+			new Date(contact.createdAt).getTime() ??
+			0;
+		const plainContacts = (headerContacts || [])
+			.filter((contact) => {
+				if (conversationContactIds.has(contact.id)) return false;
+				const email = contact.email?.toLowerCase().trim();
+				if (email && conversationEmails.has(email)) return false;
+				return !draftedContactIds.has(contact.id);
+			})
+			.sort((a, b) => plainContactSortKey(b) - plainContactSortKey(a));
+
+		return {
+			conversations,
+			drafts: draftsForSummary,
+			plainContacts,
+			opportunityStatusByKey,
+		};
+	}, [isMobile, headerEmails, headerContacts, inboxEmailsForContactsExpandedList]);
+
+	const selectedMobileDraft =
+		mobileSummarySelection?.kind === 'draft'
+			? (mobileSummaryData.drafts.find(
+					(draft) => draft.id === mobileSummarySelection.id
+				) ?? null)
+			: null;
+	const selectedMobileConversation =
+		mobileSummarySelection?.kind === 'conversation'
+			? (mobileSummaryData.conversations.find(
+					(conversation) => conversation.key === mobileSummarySelection.key
+				) ?? null)
+			: null;
+	const selectedMobileConversationContact = useMemo(() => {
+		if (!selectedMobileConversation) return null;
+		const message =
+			selectedMobileConversation.latestInboundMessage ??
+			selectedMobileConversation.latestMessage;
+		const senderKey = normalizeInboxEmailAddress(message.sender);
+		return (
+			(senderKey ? campaignContactsByEmail?.[senderKey] : null) ??
+			((message.contact as ContactWithName | null) || null)
+		);
+	}, [selectedMobileConversation, campaignContactsByEmail]);
+
+	// Drop a stale draft selection (e.g. the draft was sent/deleted from elsewhere).
+	useEffect(() => {
+		if (
+			mobileSummarySelection?.kind === 'draft' &&
+			!isPendingEmails &&
+			!selectedMobileDraft
+		) {
+			setMobileSummarySelection(null);
+		}
+	}, [mobileSummarySelection, isPendingEmails, selectedMobileDraft]);
+
+	// Leaving the Summary view closes any open fullscreen overlay.
+	useEffect(() => {
+		if (view !== 'summary' && mobileSummarySelection !== null) {
+			setMobileSummarySelection(null);
+		}
+	}, [view, mobileSummarySelection]);
+
+	// Advance to the next draft in the summary order after a send/delete; close back
+	// to the list when none remain. "Next" comes from the pre-mutation snapshot so the
+	// React Query invalidation can't shift it mid-flight.
+	const advanceFromMobileDraft = useCallback(
+		(draftId: number) => {
+			const ordered = mobileSummaryData.drafts;
+			const index = ordered.findIndex((draft) => draft.id === draftId);
+			const next = index >= 0 ? ordered[index + 1] : undefined;
+			setMobileSummarySelection(next ? { kind: 'draft', id: next.id } : null);
+		},
+		[mobileSummaryData.drafts]
+	);
+	const handleMobileDraftSend = useCallback(async () => {
+		if (mobileSummarySelection?.kind !== 'draft') return false;
+		const draftId = mobileSummarySelection.id;
+		const processed = await handleSendDrafts([draftId]);
+		if (processed > 0) {
+			setMobileSessionSentCount((count) => count + 1);
+			advanceFromMobileDraft(draftId);
+			return true;
+		}
+		// A guard blocked the send (it already toasted) — stay on the draft.
+		return false;
+	}, [mobileSummarySelection, handleSendDrafts, advanceFromMobileDraft]);
+	const handleMobileDraftDelete = useCallback(async () => {
+		if (mobileSummarySelection?.kind !== 'draft') return;
+		const draftId = mobileSummarySelection.id;
+		await deleteDraftEmail(draftId);
+		setMobileSessionDeletedCount((count) => count + 1);
+		advanceFromMobileDraft(draftId);
+	}, [mobileSummarySelection, deleteDraftEmail, advanceFromMobileDraft]);
+
+	// Mobile deep link (?inboxEmailId=...): open that message's conversation fullscreen.
+	useEffect(() => {
+		if (isMobile !== true || inboxEmailIdParam == null) return;
+		const parsed = Number(inboxEmailIdParam);
+		if (!Number.isInteger(parsed) || parsed === 0) return;
+		const conversation = mobileSummaryData.conversations.find((candidate) =>
+			inboxConversationContainsEmailId(candidate, parsed)
+		);
+		if (conversation) {
+			setMobileSummarySelection({ kind: 'conversation', key: conversation.key });
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [isMobile, inboxEmailIdParam, mobileSummaryData.conversations.length]);
 
 	const inboxSectionSampleData = inboxMockData
 		? {
@@ -6694,318 +6568,101 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							</div>
 						)}
 
-						{/* Search tab (mobile): fullscreen map with campaign header overlay, recent
-						    search box, list mode, and a bottom search/Add bar. Gated on
+						{/* Summary (mobile): fullscreen campaign-contacts map with the activity
+						    list laid over it. (Search lives on the dashboard pick flow.) Gated on
 						    renderGlobalOverlays so the crossfade "previous view" instance never
 						    mounts a second map or duplicate fixed bar. */}
-						{view === 'search' && isMobile === true && renderGlobalOverlays && (
-							<div className="fixed inset-0 z-30 overflow-hidden">
-								{/* Fullscreen results map (stays mounted under the list view) */}
+						{view === 'summary' &&
+							isMobile === true &&
+							renderGlobalOverlays && (
+							<div className="fixed inset-0 z-30 overflow-hidden mobile-campaign-search-overlay">
+								{/* Fullscreen campaign-contacts map (under the activity list) */}
 								<div className="absolute inset-0">
 									<SearchResultsMap
 										weatherMood={globeWeatherMood}
 										weatherRegionCenter={globeWeatherRegionCenter}
 										weatherTemperatureF={globeWeatherTemperatureF}
 										nightLighting={globeNightLighting}
-										contacts={
-											activeSearchTabId === null
-												? contacts || [] // No search yet - show campaign contacts
-												: activeCampaignSearchQuery
-													? searchResults || []
-													: []
-										}
-										isLoading={activeSearchTabId !== null ? isSearching : false}
-										selectedContacts={
-											activeSearchTabId !== null
-												? searchResultsSelectedContacts
-												: searchTabSelectedContacts
-										}
-										searchQuery={
-											activeSearchTabId !== null ? activeCampaignSearchQuery : undefined
-										}
-										searchWhat={
-											activeSearchTabId !== null ? activeSearchTab?.what : undefined
-										}
-										activeTool={mobileMapTool}
-										onAreaSelect={handleMobileAreaSelect}
-										cameraPadding={{ top: 170, bottom: 140 }}
+										contacts={contacts || []}
+										selectedContacts={searchTabSelectedContacts}
+										cameraPadding={{ top: 170, right: 30, bottom: 120, left: 30 }}
+										autoFitPadding={{ top: 170, right: 30, bottom: 120, left: 30 }}
 										onToggleSelection={(contactId) => {
-											if (activeSearchTabId !== null) {
-												if (searchResultsSelectedContacts.includes(contactId)) {
-													setSearchResultsSelectedContacts(
-														searchResultsSelectedContacts.filter(
-															(id) => id !== contactId
-														)
-													);
-												} else {
-													setSearchResultsSelectedContacts([
-														...searchResultsSelectedContacts,
-														contactId,
-													]);
-												}
+											if (searchTabSelectedContacts.includes(contactId)) {
+												setSearchTabSelectedContacts(
+													searchTabSelectedContacts.filter((id) => id !== contactId)
+												);
 											} else {
-												if (searchTabSelectedContacts.includes(contactId)) {
-													setSearchTabSelectedContacts(
-														searchTabSelectedContacts.filter((id) => id !== contactId)
-													);
-												} else {
-													setSearchTabSelectedContacts([
-														...searchTabSelectedContacts,
-														contactId,
-													]);
-												}
-											}
-										}}
-										onMarkerClick={(contact) => {
-											// Overlay-only markers (e.g. Booking extra pins) aren't part of the
-											// base results list - add them so they appear in the list view.
-											if (
-												activeSearchTabId !== null &&
-												!baseSearchResultsIdSet.has(contact.id)
-											) {
-												addContactToActiveSearchTabResults(contact);
+												setSearchTabSelectedContacts([
+													...searchTabSelectedContacts,
+													contactId,
+												]);
 											}
 										}}
 									/>
 								</div>
 
-								{/* Searching spinner over the map */}
-								{isSearching && mobileSearchViewMode === 'map' && (
-									<div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-										<div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin" />
+								{/* Overlay chrome (Summary): campaign header + activity list over the map */}
+								{view === 'summary' && (
+									<div className="absolute inset-0 z-20 flex flex-col pointer-events-none">
+										<div className="px-3 pt-3">
+											<MobileCampaignSearchHeader
+												campaignName={campaign?.name || 'Untitled Campaign'}
+												contacts={headerContacts ?? []}
+												contactsCount={contactsCount}
+												draftCount={draftCount}
+												sentCount={sentCount}
+												newMessageCount={inboxCount}
+												onDraftsClick={() => requestMobileSummarySection('drafts')}
+												onSentClick={() => requestMobileSummarySection('contacts')}
+												onNewMessageClick={() =>
+													requestMobileSummarySection('conversations')
+												}
+											/>
+										</div>
+										<div
+											className="pointer-events-auto flex-1 min-h-0 mt-2 mx-2 flex flex-col"
+											style={{ marginBottom: 'calc(8px + env(safe-area-inset-bottom))' }}
+										>
+											<MobileCampaignSummary
+												className="flex-1 min-h-0"
+												conversations={mobileSummaryData.conversations}
+												drafts={mobileSummaryData.drafts}
+												plainContacts={mobileSummaryData.plainContacts}
+												opportunityStatusByKey={mobileSummaryData.opportunityStatusByKey}
+												contactByEmail={campaignContactsByEmail}
+												scrollRequest={mobileSummaryScrollRequest}
+												onOpenConversation={(key) =>
+													setMobileSummarySelection({ kind: 'conversation', key })
+												}
+												onOpenDraft={(id) =>
+													setMobileSummarySelection({ kind: 'draft', id })
+												}
+												onGoToSearch={() => onGoToSearch?.()}
+											/>
+										</div>
 									</div>
 								)}
 
-								{/* No-results card over the map */}
-								{mobileSearchViewMode === 'map' &&
-									hasCampaignSearched &&
-									!isSearching &&
-									searchResultsForPanel.length === 0 && (
-										<div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none px-8">
-											<div className="bg-white border border-black rounded-[10px] px-4 py-3 font-inter text-[13px] text-black max-w-full truncate">
-												No results for &quot;{activeSearchTab?.query}&quot;
-											</div>
-										</div>
-									)}
-
-								{/* Overlay chrome */}
-								<div className="absolute inset-0 z-20 flex flex-col pointer-events-none">
-									{/* Top: campaign header + pills (+ recent search in map mode) */}
-									<div className="px-3 pt-3 flex flex-col gap-2">
-										<MobileCampaignSearchHeader
-											campaignName={campaign?.name || 'Untitled Campaign'}
-											contacts={headerContacts ?? []}
-											contactsCount={contactsCount}
-											draftCount={draftCount}
-											sentCount={sentCount}
-											newMessageCount={inboxCount}
-											onDraftsClick={goToDrafting}
-											onSentClick={goToSent}
-											onNewMessageClick={goToInbox}
-										/>
-										{mobileSearchViewMode === 'map' &&
-											(activeSearchTab?.query ?? '').trim().length > 0 && (
-												<div className="pointer-events-auto h-[40px] bg-white rounded-[10px] border border-black flex items-center pl-3 pr-2 gap-2">
-													<span className="font-inter text-[14px] text-black flex-1 min-w-0 truncate">
-														{activeSearchTab?.query}
-													</span>
-													<button
-														type="button"
-														aria-label="Clear search"
-														onClick={() => {
-															if (activeSearchTabId) {
-																handleCloseSearchTab(activeSearchTabId);
-															}
-														}}
-														className="w-[26px] h-[24px] rounded-[6px] bg-[#ABABAB]/80 hover:bg-[#ABABAB] flex items-center justify-center text-black text-[14px] leading-none flex-shrink-0"
-													>
-														✕
-													</button>
-												</div>
-											)}
-									</div>
-
-									{/* Middle: list panel (list mode) or spacer (map mode) */}
-									{mobileSearchViewMode === 'list' ? (
-										<div className="pointer-events-auto flex-1 min-h-0 mt-2 mx-2 bg-[#D8E5FB] border-2 border-black rounded-[10px] flex flex-col overflow-hidden">
-											{/* Panel header: label + query chip + close */}
-											<div className="flex-shrink-0 flex items-stretch h-[40px] border-b-2 border-black bg-white">
-												<div className="flex items-center px-3 bg-[#B9EAF1] border-r-2 border-black">
-													<span className="font-inter text-[13px] font-semibold text-black whitespace-nowrap">
-														Search Results
-													</span>
-												</div>
-												<div className="flex-1 min-w-0 flex items-center gap-1.5 px-2">
-													<BulletListIcon className="flex-shrink-0" />
-													<span className="font-inter text-[13px] text-black truncate">
-														{activeSearchTab?.query}
-													</span>
-												</div>
-												<button
-													type="button"
-													aria-label="Clear search"
-													onClick={() => {
-														if (activeSearchTabId) {
-															handleCloseSearchTab(activeSearchTabId);
-														}
-														setMobileSearchViewMode('map');
-													}}
-													className="self-center mr-2 w-[26px] h-[24px] rounded-[6px] bg-[#ABABAB]/80 hover:bg-[#ABABAB] flex items-center justify-center text-black text-[14px] leading-none flex-shrink-0"
-												>
-													✕
-												</button>
-											</div>
-											{/* Selection sub-row */}
-											<div className="flex-shrink-0 flex items-center justify-between px-3 h-[26px] border-b border-[#ABABAB]">
-												<span className="font-inter text-[11px] text-black">
-													{selectedSearchResultsCount} selected
-												</span>
-												<button
-													type="button"
-													onClick={() => {
-														if (areAllSearchResultsSelected) {
-															setSearchResultsSelectedContacts([]);
-														} else {
-															setSearchResultsSelectedContacts(
-																searchResultsForPanelIds
-															);
-														}
-													}}
-													className="font-secondary text-[11px] font-medium text-black hover:underline"
-												>
-													{areAllSearchResultsSelected ? 'Deselect all' : 'Select all'}
-												</button>
-											</div>
-											{/* Rows (native momentum scroll) */}
-											<div
-												className="flex-1 min-h-0 overflow-y-auto px-2 py-2"
-												style={{ WebkitOverflowScrolling: 'touch' }}
-											>
-												{isSearching ? (
-													<MapResultsPanelSkeleton variant="narrow" />
-												) : searchResultsForPanel.length === 0 ? (
-													<div className="font-inter text-[13px] text-black text-center pt-6">
-														No results for &quot;{activeSearchTab?.query}&quot;
-													</div>
-												) : (
-													<div className="space-y-[7px]">
-														{searchResultsForPanel.map((contact) => (
-															<MobileSearchResultRowCard
-																key={contact.id}
-																contact={contact}
-																isSelected={searchResultsSelectedIdSet.has(contact.id)}
-																onToggle={() => {
-																	if (searchResultsSelectedIdSet.has(contact.id)) {
-																		setSearchResultsSelectedContacts(
-																			searchResultsSelectedContacts.filter(
-																				(id) => id !== contact.id
-																			)
-																		);
-																	} else {
-																		setSearchResultsSelectedContacts([
-																			...searchResultsSelectedContacts,
-																			contact.id,
-																		]);
-																	}
-																}}
-															/>
-														))}
-													</div>
-												)}
-											</div>
-										</div>
-									) : (
-										<div className="flex-1 min-h-0" />
-									)}
-
-									{/* Bottom-center toggles */}
-									<div className="flex flex-col items-center gap-2 pt-2 pb-2 px-3">
-										{mobileSearchViewMode === 'map' && hasCampaignSearched && (
-											<button
-												type="button"
-												onClick={() =>
-													setMobileMapTool(
-														mobileMapTool === 'select' ? 'grab' : 'select'
-													)
-												}
-												className={cn(
-													'pointer-events-auto h-[30px] px-4 rounded-[8px] border flex items-center font-inter text-[13px] font-medium text-black',
-													mobileMapTool === 'select'
-														? 'border-black'
-														: 'border-transparent'
-												)}
-												style={{
-													backgroundColor:
-														mobileMapTool === 'select' ? '#4CDE71' : '#EFEFEF',
-												}}
-											>
-												Select Area
-											</button>
-										)}
-										{hasCampaignSearched && (
-											<button
-												type="button"
-												onClick={() =>
-													setMobileSearchViewMode(
-														mobileSearchViewMode === 'map' ? 'list' : 'map'
-													)
-												}
-												className="pointer-events-auto h-[32px] px-4 rounded-[8px] bg-[#EFEFEF] border border-transparent flex items-center gap-2 font-inter text-[15px] font-medium text-black"
-											>
-												<BulletListIcon />
-												{mobileSearchViewMode === 'map' ? 'List' : 'Map'}
-											</button>
-										)}
-									</div>
-
-									{/* Bottom bar: search input + submit + Add */}
-									<div
-										className="pointer-events-auto flex items-center gap-2 px-3 pt-1"
-										style={{
-											paddingBottom: 'calc(8px + env(safe-area-inset-bottom))',
-										}}
-									>
-										<div className="flex-1 flex h-[44px] rounded-full border-2 border-black overflow-hidden bg-white min-w-0">
-											<input
-												ref={mobileSearchInputRef}
-												type="text"
-												value={mobileSearchInputValue}
-												onChange={(e) => setMobileSearchInputValue(e.target.value)}
-												onKeyDown={(e) => {
-													if (e.key === 'Enter') {
-														e.preventDefault();
-														handleMobileCampaignSearch();
-													}
-												}}
-												placeholder="Search Anything"
-												aria-label="Search anything"
-												className="flex-1 min-w-0 h-full bg-transparent border-0 outline-none px-4 font-inter font-medium text-[16px] text-black placeholder:text-black"
-											/>
-											<button
-												type="button"
-												aria-label="Search"
-												onClick={handleMobileCampaignSearch}
-												className="w-[54px] h-full flex items-center justify-center border-l-2 border-black flex-shrink-0"
-												style={{ backgroundColor: '#A8C7FA' }}
-											>
-												<MapBottomSearchArrowIcon />
-											</button>
-										</div>
-										<button
-											type="button"
-											onClick={handleAddSearchResultsToCampaign}
-											disabled={isAddingToCampaign}
-											className="h-[44px] px-6 rounded-full border-2 border-black font-inter font-semibold text-[16px] text-black flex items-center justify-center flex-shrink-0"
-											style={{ backgroundColor: '#B8E4BE' }}
-										>
-											{isAddingToCampaign ? (
-												<div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-											) : (
-												'Add'
-											)}
-										</button>
-									</div>
-								</div>
+								{/* Fullscreen overlays opened from the Summary list */}
+								{view === 'summary' && selectedMobileConversation && (
+									<MobileConversationView
+										conversation={selectedMobileConversation}
+										contact={selectedMobileConversationContact}
+										onClose={() => setMobileSummarySelection(null)}
+										onThreadReplySent={handleInboxThreadReplySent}
+									/>
+								)}
+								{view === 'summary' && selectedMobileDraft && (
+									<MobileDraftReviewView
+										draft={selectedMobileDraft}
+										sentCount={mobileSessionSentCount}
+										deletedCount={mobileSessionDeletedCount}
+										onSend={handleMobileDraftSend}
+										onDelete={handleMobileDraftDelete}
+										onClose={() => setMobileSummarySelection(null)}
+									/>
+								)}
 							</div>
 						)}
 

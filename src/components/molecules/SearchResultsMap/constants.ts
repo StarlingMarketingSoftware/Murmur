@@ -229,6 +229,9 @@ export const defaultCenter = {
 export const MAP_DEFAULT_ZOOM = 5;
 // Let users zoom out further than the default US-wide view.
 export const MAP_MIN_ZOOM = 2.25;
+// Phones are narrow enough that the desktop floor still crops the globe; ~1
+// fits the full globe on a ~390px-wide viewport.
+export const MOBILE_MAP_MIN_ZOOM = 1;
 // Zoom at which state initials reach full opacity. Kept close to MAP_MIN_ZOOM so
 // labels are legible from the wide continental view, not only when zoomed in.
 export const STATE_LABELS_FULL_OPACITY_ZOOM = MAP_MIN_ZOOM + 0.5;
@@ -425,6 +428,10 @@ export const CONTACT_LIGHTS_TILES_URL_TEMPLATE = '/maps/contact_lights/{z}/{x}/{
 // like dots revealing left-to-right. We crossfade to the real tiles after the intro.
 export const CONTACT_LIGHTS_REVEAL_TILES_URL_TEMPLATE =
 	'/maps/contact_lights_reveal/{z}/{x}/{y}.png?v=9';
+// Tiles only exist for z2..z6 (generate_contact_lights_tiles.py defaults).
+// The mobile full-globe floor sits below z2, so the source must declare its
+// real minzoom or Mapbox requests missing z0/z1 tiles there.
+export const CONTACT_LIGHTS_TILES_MIN_ZOOM = 2;
 export const CONTACT_LIGHTS_TILES_MAX_ZOOM = 6;
 // CONUS-ish bounds (limits Mapbox tile requests).
 export const CONTACT_LIGHTS_TILES_BOUNDS: [number, number, number, number] = [
@@ -556,6 +563,27 @@ export const DASHBOARD_TO_INTERACTIVE_HANDOFF_GLIDE_MS = 1800;
 // ============================================================================
 
 export const MAPBOX_STYLE = 'mapbox://styles/mapbox/streets-v12';
+
+// ============================================================================
+// Street-level 3D view (dashboard map search)
+// ============================================================================
+
+// Zoom depth at which "street mode" engages (rich hover research card replaces
+// the slim SVG tooltip).
+export const STREET_VIEW_MIN_ZOOM = 15.5;
+// Camera pitch ramps from flat to STREET_VIEW_MAX_PITCH across this zoom window,
+// so a "super close" zoom lands at full tilt.
+export const STREET_VIEW_PITCH_RAMP_START_ZOOM = 15.5;
+export const STREET_VIEW_PITCH_RAMP_FULL_ZOOM = 17.5;
+export const STREET_VIEW_MAX_PITCH = 60;
+export const STREET_VIEW_PITCH_EASE_MS = 450;
+// Dead-band so the pitch reconciler's own moveend settles as a no-op.
+export const STREET_VIEW_PITCH_EPSILON_DEG = 0.5;
+// 3D buildings rise in just before the pitch ramp starts.
+export const STREET_VIEW_BUILDINGS_MIN_ZOOM = 15;
+export const STREET_VIEW_BUILDINGS_RISE_FULL_ZOOM = 15.75;
+export const STREET_VIEW_BUILDING_COLOR = '#E3DCD0';
+export const STREET_VIEW_BUILDING_OPACITY = 0.9;
 
 // Viewer-anchored softbox lighting for the globe.
 //
@@ -689,6 +717,8 @@ export const MAPBOX_SOURCE_IDS = {
 } as const;
 
 export const MAPBOX_LAYER_IDS = {
+	// Street-level 3D
+	streetViewBuildings: 'murmur-3d-buildings',
 	// Globe overlays
 	clouds: 'murmur-clouds-raster',
 	lightning: 'murmur-lightning-raster',

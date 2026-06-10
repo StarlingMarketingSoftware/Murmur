@@ -45,6 +45,7 @@ import { ContactWithName } from '@/types/contact';
 
 export type DraftingSectionView =
 	| 'search'
+	| 'summary'
 	| 'overview'
 	| 'testing'
 	| 'drafting'
@@ -85,6 +86,10 @@ export interface DraftingSectionProps {
 	 * Optional callback to switch the campaign page into the Search tab.
 	 */
 	onGoToSearch?: () => void;
+	/**
+	 * Optional callback to switch the campaign page into the mobile Summary view.
+	 */
+	goToSummary?: () => void;
 	/**
 	 * Optional callback to switch the campaign page into the Inbox tab.
 	 */

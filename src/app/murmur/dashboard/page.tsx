@@ -34,6 +34,7 @@ import {
 	type MobileDashboardTab,
 } from '@/components/molecules/MobileDashboardTabBar/MobileDashboardTabBar';
 import { MobileFolderCards } from '@/components/molecules/MobileFolderCards/MobileFolderCards';
+import { MobileDashboardSearch } from '@/app/murmur/dashboard/MobileDashboardSearch';
 import { useDashboard } from './useDashboard';
 import { urls } from '@/constants/urls';
 import {
@@ -43,6 +44,7 @@ import {
 import { isProblematicBrowser } from '@/utils/browserDetection';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
 import { BookingIcon } from '@/components/atoms/_svg/BookingIcon';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
@@ -184,6 +186,7 @@ import {
 	fetchCampaignDetail,
 } from '@/hooks/queryHooks/useCampaigns';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useGetMapEvents } from '@/hooks/queryHooks/useGetMapEvents';
 import type { MapEventData } from '@/app/api/events/route';
 import {
@@ -2877,7 +2880,7 @@ const DashboardContent = () => {
 	const router = useRouter();
 	const pathname = usePathname();
 	const isMobile = useIsMobile();
-	const { data: campaigns } = useGetCampaigns();
+	const { data: campaigns, isLoading: isLoadingCampaigns } = useGetCampaigns();
 	const hasCampaigns = campaigns && campaigns.length > 0;
 	const queryClient = useQueryClient();
 	const setPersistentMapConfig = usePersistentMapSetter();
@@ -4602,7 +4605,10 @@ const DashboardContent = () => {
 		if (isMobile === null) return;
 		if (isMobile) {
 			document.documentElement.classList.remove(DASHBOARD_COMPACT_CLASS);
-			document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
+			// Mobile keeps only the base murmur-compact zoom (0.9). Pin the var to it so
+			// the persistent map's counter-zoom (1/var, fallback 0.85) cancels exactly —
+			// an unset var leaves the canvas ~6% oversized and skews marker tap targets.
+			document.documentElement.style.setProperty(DASHBOARD_ZOOM_VAR, '0.9');
 			document.documentElement.style.removeProperty(DASHBOARD_INITIAL_ZOOM_VAR);
 			return;
 		}
@@ -4648,7 +4654,9 @@ const DashboardContent = () => {
 		// Never shrink the mobile map UI (it's already heavily tuned).
 		if (isMobile) {
 			document.documentElement.classList.remove(DASHBOARD_MAP_COMPACT_CLASS);
-			document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
+			// Same as the dashboard-compact effect above: pin the var to the base
+			// murmur-compact zoom so the persistent map's counter-zoom cancels exactly.
+			document.documentElement.style.setProperty(DASHBOARD_ZOOM_VAR, '0.9');
 			return;
 		}
 
@@ -5742,11 +5750,16 @@ const DashboardContent = () => {
 				: undefined,
 		[dashboardMapCampaignForHeader]
 	);
-	const shouldLoadDashboardMapCampaignHeaderMetrics =
-		isMapView &&
-		!isNarrowestDesktop &&
-		!hasNoSearchResults &&
-		Boolean(dashboardMapCampaignForHeader);
+	// Mobile pick flow renders its own campaign header over the map, so metrics must
+	// load there too — even during the pre-results window (isMapView still false) and
+	// on phone widths (isNarrowestDesktop is always true under 952px).
+	const isMobileAddToCampaignSearch = isMobile === true && isAddToCampaignMode;
+	const shouldLoadDashboardMapCampaignHeaderMetrics = isMobileAddToCampaignSearch
+		? Boolean(dashboardMapCampaignForHeader)
+		: isMapView &&
+			!isNarrowestDesktop &&
+			!hasNoSearchResults &&
+			Boolean(dashboardMapCampaignForHeader);
 	const { data: dashboardMapHeaderContacts } = useGetContacts({
 		filters: dashboardMapCampaignContactsFilter,
 		enabled:
@@ -5759,6 +5772,14 @@ const DashboardContent = () => {
 			shouldLoadDashboardMapCampaignHeaderMetrics &&
 			Boolean(dashboardMapCampaignEmailFilter),
 	});
+	// New-messages pill on the mobile pick-flow header (mirrors the campaign page's
+	// inbox count).
+	const { data: mobileSearchInboundEmails } = useGetInboundEmails({
+		filters: { campaignId: dashboardMapCampaignForHeader?.id },
+		enabled:
+			isMobileAddToCampaignSearch && Boolean(dashboardMapCampaignForHeader?.id),
+	});
+	const mobileSearchNewMessageCount = mobileSearchInboundEmails?.length || 0;
 	const dashboardMapHeaderContactsCount = dashboardMapHeaderContacts?.length || 0;
 	const dashboardMapHeaderDraftCount = (dashboardMapHeaderEmails || []).filter(
 		(email) => email.status === EmailStatus.draft
@@ -6313,6 +6334,22 @@ const DashboardContent = () => {
 
 	const [isMapBottomSearchActive, setIsMapBottomSearchActive] = useState(false);
 	const [mapBottomSearchValue, setMapBottomSearchValue] = useState('');
+
+	// Mobile pick-flow exit (browser back / any navigation that strips the pick
+	// params): same-route navigations don't remount DashboardContent, so the search
+	// state and the rehydration one-shot must be reset by hand. Without this the
+	// persistent map stays at z-98 pointer-events:auto and bricks the tab frame, and
+	// a re-entry would skip rehydration (stale curated shuffle — results must stay
+	// fresh per entry).
+	useEffect(() => {
+		if (isMobile !== true || isAddToCampaignMode) return;
+		hasHydratedFromCampaignUrlRef.current = false;
+		if (!hasSearched && !isMapView) return;
+		handleResetSearch();
+		setIsMapView(false);
+		setMapBottomSearchValue('');
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [isMobile, isAddToCampaignMode, hasSearched, isMapView]);
 	const [
 		initialDashboardSearchSuggestionSeeds,
 		setInitialDashboardSearchSuggestionSeeds,
@@ -8925,6 +8962,20 @@ const DashboardContent = () => {
 			weatherTemperatureF: globeWeatherTemperatureF,
 			nightLighting: globeNightLighting,
 			presentation: mapPresentation,
+			// Street view is a desktop-only affordance; never engage it under the
+			// mobile pick-flow chrome.
+			streetViewEnabled: isMapView && isMobile === false,
+			// Mobile pick flow: keep camera fits clear of the fixed chrome (campaign
+			// header on top, search bar at the bottom) — same insets the in-campaign
+			// mobile map used.
+			cameraPadding:
+				isMobile === true && isAddToCampaignMode
+					? { top: 170, right: 30, bottom: 120, left: 30 }
+					: undefined,
+			autoFitPadding:
+				isMobile === true && isAddToCampaignMode
+					? { top: 170, right: 30, bottom: 120, left: 30 }
+					: undefined,
 			autoSpin: shouldSpinBackgroundMap,
 			contacts: shouldShowSearchGeometryOnMap ? contactsForMap : [],
 			selectedContacts:
@@ -9021,9 +9072,11 @@ const DashboardContent = () => {
 			handleMapVisibleOverlayContactsChange,
 			hoveredMapPanelContactId,
 			instantTabFitNonce,
+			isAddToCampaignMode,
 			isMapSearchEngaged,
 			isLoadingContacts,
 			isMapView,
+			isMobile,
 			isNarrowestDesktop,
 			isRefetchingContacts,
 			isSearchPending,
@@ -9099,10 +9152,57 @@ const DashboardContent = () => {
 	}
 
 	// Mobile dashboard: tabbed app frame over the persistent map (folders /
-	// calendar / inbox, switched by the white tab bar). Without campaigns the
-	// original "open on desktop" empty state still renders.
+	// calendar / inbox, switched by the white tab bar). While campaigns load the
+	// frame renders normally (MobileFolderCards shows its own wave skeletons);
+	// only the true loaded-and-empty state falls back to the original "open on
+	// desktop" CampaignsInboxView empty state.
 	if (isMobile) {
-		if (!hasCampaigns) {
+		// Pick flow (add contacts to a campaign): the search chrome renders over the
+		// persistent map, driven by the same search machinery as desktop. Gated on the
+		// URL params alone so the chrome is already up while the entry search is still
+		// fetching.
+		if (isAddToCampaignMode) {
+			return (
+				<div className="min-h-screen w-full">
+					{mapPortal}
+					<MobileDashboardSearch
+						campaignName={fromCampaign?.name || 'Untitled Campaign'}
+						headerContacts={dashboardMapHeaderContacts ?? []}
+						contactsCount={dashboardMapHeaderContactsCount}
+						draftCount={dashboardMapHeaderDraftCount}
+						sentCount={dashboardMapHeaderSentCount}
+						newMessageCount={mobileSearchNewMessageCount}
+						onOpenCampaignSummary={(section) =>
+							router.push(
+								`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&summarySection=${section}`
+							)
+						}
+						queryPillLabel={
+							canDisengageMapSearch && isMapSearchEngaged
+								? mapTopSearchDisplay.label
+								: null
+						}
+						onClearQuery={handleEmptyMapClick}
+						listContacts={displayedMapPanelContacts}
+						selectedContactIds={selectedContacts}
+						onToggleContact={handleMapPanelRowSelect}
+						onSelectAll={() => handleSelectAll(displayedMapPanelContacts)}
+						onDeselectAll={() => setSelectedContacts([])}
+						isLoading={isMapResultsLoading}
+						hasNoResults={hasNoSearchResults}
+						hasSearched={hasSearched}
+						searchValue={mapBottomSearchValue}
+						onSearchValueChange={setMapBottomSearchValue}
+						onSubmitSearch={handleMapBottomSearchSubmit}
+						canAddSelected={selectedContacts.length > 0}
+						onAddSelected={handleAddSelectedToCampaign}
+						isAddPending={isPendingAddToCampaign}
+					/>
+				</div>
+			);
+		}
+
+		if (!isLoadingCampaigns && !hasCampaigns) {
 			return (
 				<div className="min-h-screen w-full">
 					{mapPortal}
@@ -9134,6 +9234,24 @@ const DashboardContent = () => {
 				<MobileDashboardTabBar
 					activeTab={mobileActiveTab}
 					onTabChange={setMobileActiveTab}
+					onSearchClick={
+						activeCampaignId != null
+							? () => {
+									try {
+										sessionStorage.removeItem('murmur_pending_search');
+									} catch {
+										// sessionStorage may be unavailable — navigation can still proceed.
+									}
+									// Same-route param push (no remount): the pick-mode exit effect
+									// resets the rehydration one-shot so this entry always runs a
+									// fresh For You curated search. Params are built fresh — never
+									// from searchParams — so no stale curated keys leak in.
+									router.push(
+										`${urls.murmur.dashboard.index}?fromCampaignId=${activeCampaignId}&pick=1&instant=1`
+									);
+								}
+							: undefined
+					}
 				/>
 
 				<div className="flex-1 min-h-0 w-full" style={{ overflow: 'hidden' }}>
@@ -14273,7 +14391,10 @@ const Dashboard = () => {
 	return (
 		<Suspense
 			fallback={
-				<div className="flex items-center justify-center min-h-screen">Loading...</div>
+				<div className="flex min-h-screen flex-col items-center justify-center gap-4">
+					<MurmurLogoNew width={180} height={32} />
+					<Spinner size="large" color="foreground" />
+				</div>
 			}
 		>
 			<DashboardContent />

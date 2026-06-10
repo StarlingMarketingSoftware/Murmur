@@ -64,6 +64,7 @@ import {
 	inboxConversationContainsEmailId,
 	inboxConversationContainsInboundEmailId,
 	inboxConversationContainsSentEmailId,
+	normalizeSentEmailForInboxConversation,
 	type InboxConversation,
 	type InboxConversationMessage,
 } from '@/utils/inboxConversations';
@@ -464,30 +465,6 @@ const resolveInboundContact = (
 	}
 	return (email.contact as ContactWithName | null) ?? null;
 };
-
-const normalizeSentEmailForInboxConversation = (
-	email: EmailWithRelations
-): InboxConversationMessage =>
-	({
-		id: email.id,
-		sender: email.contact?.email || '',
-		senderName: email.contact
-			? `${email.contact.firstName || ''} ${email.contact.lastName || ''}`.trim()
-			: '',
-		recipient: '',
-		subject: email.subject || '',
-		bodyPlain: email.message || '',
-		bodyHtml: email.message || '',
-		strippedText: email.message?.replace(/<[^>]*>/g, '') || '',
-		receivedAt: email.sentAt || email.createdAt,
-		contactId: email.contactId,
-		contact: email.contact,
-		campaignId: email.campaignId,
-		campaign: email.campaign,
-		originalEmail: null,
-		originalEmailId: null,
-		isSent: true,
-	}) as unknown as InboxConversationMessage;
 
 const getInboxConversationSelectionEmail = (conversation: InboxConversation) =>
 	conversation.latestInboundMessage ?? conversation.latestMessage;

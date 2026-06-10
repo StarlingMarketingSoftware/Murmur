@@ -51,6 +51,7 @@ import {
 } from '@/contexts/PersistentMapContext';
 import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
 import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { useMediaUpload, type UploadState } from '@/hooks/useMediaUpload';
 import { useGetUser } from '@/hooks/queryHooks/useUsers';
 import { useGetMedia, useDeleteMedia } from '@/hooks/queryHooks/useMediaAssets';
@@ -75,6 +76,7 @@ import {
 	VENUE_MAP_OVERLAY_SCALE,
 	VENUE_TIME_OPTIONS,
 } from './constants';
+import { MobileVenuePortal } from './mobile/MobileVenuePortal';
 import { VenueChatMapPanel } from './VenueChatMapPanel';
 import { VenueCreateEventMapPanel } from './VenueCreateEventMapPanel';
 import { VenueEventDetailView } from './VenueEventDetailView';
@@ -93,13 +95,13 @@ import {
 	VENUE_LOCATION_GEOCODE_TYPES,
 } from './venueLocationFormat';
 
-type VenueDayKey = keyof WeeklyHours;
+export type VenueDayKey = keyof WeeklyHours;
 type VenueDayHoursForm = {
 	isOpen: boolean;
 	open: string;
 	close: string;
 };
-type VenueHoursFormState = Record<VenueDayKey, VenueDayHoursForm>;
+export type VenueHoursFormState = Record<VenueDayKey, VenueDayHoursForm>;
 
 const DEFAULT_VENUE_OPEN_TIME = '12:00';
 const DEFAULT_VENUE_CLOSE_TIME = '23:00';
@@ -130,7 +132,7 @@ const createEmptyVenueHoursForm = (): VenueHoursFormState => {
 	return hours;
 };
 
-type VenueFormState = {
+export type VenueFormState = {
 	venueName: string;
 	businessType: string;
 	address: string;
@@ -166,7 +168,7 @@ const VENUE_PROFILE_FIELD_ORDER: VenueProfileFieldKey[] = [
 	'website',
 ];
 
-const EMPTY_FORM_STATE: VenueFormState = {
+export const EMPTY_FORM_STATE: VenueFormState = {
 	venueName: '',
 	businessType: '',
 	address: '',
@@ -180,7 +182,7 @@ const EMPTY_FORM_STATE: VenueFormState = {
 };
 
 // How long to wait after the last edit before auto-saving the venue profile.
-const AUTOSAVE_DEBOUNCE_MS = 800;
+export const AUTOSAVE_DEBOUNCE_MS = 800;
 
 const IDLE_MAP_CLIP = 'inset(0px round 0px)';
 const IDLE_MAP_TRANSITION = '0ms ease';
@@ -207,17 +209,17 @@ const VENUE_COMPLETED_FIELD_VALUE_CLASS =
 	'min-w-0 truncate font-inter text-[14px] font-medium leading-[18px] text-black';
 const VENUE_COMPLETED_GENRE_PILL_CLASS =
 	'flex h-[20px] max-w-[91px] shrink-0 items-center justify-center gap-[2px] overflow-hidden rounded-[7px] border border-black px-[4px] font-inter text-[12px] font-medium leading-none text-black';
-const DEFAULT_CAPACITY_VALUE = 90;
+export const DEFAULT_CAPACITY_VALUE = 90;
 const CAPACITY_SLIDER_MIN = 0;
 const CAPACITY_SLIDER_MAX = 350;
 const CAPACITY_SLIDER_STEP = 1;
-const DEFAULT_PAY_RANGE_MIN_VALUE = 150;
-const DEFAULT_PAY_RANGE_MAX_VALUE = 2000;
+export const DEFAULT_PAY_RANGE_MIN_VALUE = 150;
+export const DEFAULT_PAY_RANGE_MAX_VALUE = 2000;
 const PAY_RANGE_SLIDER_MIN = 0;
 const PAY_RANGE_SLIDER_MAX = 4000;
 const PAY_RANGE_SLIDER_STEP = 50;
 
-const BUSINESS_TYPE_OPTIONS = [
+export const BUSINESS_TYPE_OPTIONS = [
 	{
 		label: 'Music Venue',
 		icon: <MusicVenuesIcon size={12} innerFill="#9BEAF7" />,
@@ -278,7 +280,7 @@ const trimToNull = (value: string): string | null => {
 	return trimmed.length > 0 ? trimmed : null;
 };
 
-const hasSavedVenueRequiredFields = (
+export const hasSavedVenueRequiredFields = (
 	venue: { venueName?: string | null; address?: string | null } | null | undefined
 ) => Boolean(venue?.venueName?.trim() && venue.address?.trim());
 
@@ -289,7 +291,7 @@ const VENUE_PROFILE_HINT_KEY = 'venue-portal:profile-complete';
 
 // Optimistic read: returns the last stored "complete" flag, used on mount before
 // auth/user/venue have resolved. The view self-corrects from the real data afterward.
-const readVenueProfileComplete = (): boolean => {
+export const readVenueProfileComplete = (): boolean => {
 	if (typeof window === 'undefined') return false;
 	try {
 		const raw = window.localStorage.getItem(VENUE_PROFILE_HINT_KEY);
@@ -299,7 +301,7 @@ const readVenueProfileComplete = (): boolean => {
 	}
 };
 
-const writeVenueProfileComplete = (userId: string, complete: boolean): void => {
+export const writeVenueProfileComplete = (userId: string, complete: boolean): void => {
 	if (typeof window === 'undefined') return;
 	try {
 		window.localStorage.setItem(
@@ -316,9 +318,9 @@ const writeVenueProfileComplete = (userId: string, complete: boolean): void => {
 const useIsomorphicLayoutEffect =
 	typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
-const formatVenueCoordinate = (coordinate: number) => coordinate.toFixed(4);
+export const formatVenueCoordinate = (coordinate: number) => coordinate.toFixed(4);
 
-const hydrateVenueHours = (hours: WeeklyHours | null): VenueHoursFormState => {
+export const hydrateVenueHours = (hours: WeeklyHours | null): VenueHoursFormState => {
 	const hydratedHours = createEmptyVenueHoursForm();
 	if (!hours) return hydratedHours;
 
@@ -359,13 +361,13 @@ const parseVenueHours = (hours: VenueHoursFormState): WeeklyHours | null => {
 	return hasHours ? weeklyHours : null;
 };
 
-const getOpenNightsCount = (hours: VenueHoursFormState) =>
+export const getOpenNightsCount = (hours: VenueHoursFormState) =>
 	VENUE_HOURS_DAYS.reduce((total, day) => total + (hours[day.key].isOpen ? 1 : 0), 0);
 
-const formatOpenNightsSummary = (count: number) =>
+export const formatOpenNightsSummary = (count: number) =>
 	`${count} ${count === 1 ? 'night' : 'nights'}/week`;
 
-const formatCapacity = (capacityMin: number | null, capacityMax: number | null) => {
+export const formatCapacity = (capacityMin: number | null, capacityMax: number | null) => {
 	if (capacityMin !== null && capacityMax !== null && capacityMin !== capacityMax) {
 		return `${capacityMin}-${capacityMax}`;
 	}
@@ -406,7 +408,7 @@ const parseCapacity = (value: string) => {
 const formatCapacityPeople = (capacity: number) =>
 	`${capacity} ${capacity === 1 ? 'person' : 'people'}`;
 
-const formatCapacityDisplay = (capacity: string) => {
+export const formatCapacityDisplay = (capacity: string) => {
 	const trimmed = capacity.trim();
 	if (!trimmed) return formatCapacityPeople(DEFAULT_CAPACITY_VALUE);
 
@@ -455,7 +457,7 @@ const parsePayRange = (value: string) => {
 	};
 };
 
-const formatPayRange = (payMin: number | null, payMax: number | null) => {
+export const formatPayRange = (payMin: number | null, payMax: number | null) => {
 	if (payMin !== null && payMax !== null && payMin !== payMax) {
 		return `$${payMin}-${payMax}`;
 	}
@@ -464,7 +466,7 @@ const formatPayRange = (payMin: number | null, payMax: number | null) => {
 	return '';
 };
 
-const formatPayRangeDisplay = (payRange: string) => {
+export const formatPayRangeDisplay = (payRange: string) => {
 	const trimmed = payRange.trim();
 	if (!trimmed) {
 		return formatPayRange(DEFAULT_PAY_RANGE_MIN_VALUE, DEFAULT_PAY_RANGE_MAX_VALUE);
@@ -487,7 +489,7 @@ const getPayRangeSliderMax = (payMax: number) => Math.max(PAY_RANGE_SLIDER_MAX, 
 const getPayRangeSliderPercent = (value: number, sliderMax: number) =>
 	((value - PAY_RANGE_SLIDER_MIN) / (sliderMax - PAY_RANGE_SLIDER_MIN)) * 100;
 
-const parseGenres = (value: string) => {
+export const parseGenres = (value: string) => {
 	return value
 		.split(',')
 		.map((genre) => genre.trim())
@@ -498,7 +500,7 @@ const parseGenres = (value: string) => {
 // location-derived coordinates + city/state alongside the typed fields. Throws (with a
 // user-facing message) when capacity or hours are malformed, so callers can either
 // surface the error (manual submit) or skip the write (auto-save).
-const buildVenuePayload = (
+export const buildVenuePayload = (
 	form: VenueFormState,
 	locationParts: { city: string; state: string },
 	locationCoordinates: AreaCoordinates | null
@@ -657,7 +659,7 @@ function VenuePlaceholderContent({
 	);
 }
 
-function VenueBusinessTypePicker({
+export function VenueBusinessTypePicker({
 	value,
 	onChange,
 	onSelect,
@@ -791,7 +793,7 @@ function VenueDescriptionIcon({ className = '' }: { className?: string }) {
 	);
 }
 
-function VenueDescriptionField({
+export function VenueDescriptionField({
 	value,
 	onChange,
 	onFocus,
@@ -850,7 +852,7 @@ function VenueCompletedDescriptionButton({
 	);
 }
 
-function VenueWebsiteField({
+export function VenueWebsiteField({
 	value,
 	onChange,
 	onFocus,
@@ -1046,7 +1048,7 @@ function VenueCompletedGenreButton({
 	);
 }
 
-function VenueGenrePicker({
+export function VenueGenrePicker({
 	selectedGenres,
 	onToggle,
 	className = '',
@@ -1097,7 +1099,7 @@ function VenueGenrePicker({
 	);
 }
 
-function VenueSoundEditor({
+export function VenueSoundEditor({
 	value,
 	onSelect,
 	className = '',
@@ -1136,7 +1138,7 @@ function VenueSoundEditor({
 	);
 }
 
-function VenueCapacityEditor({
+export function VenueCapacityEditor({
 	value,
 	onChange,
 	inputRef,
@@ -1185,7 +1187,7 @@ function VenueCapacityEditor({
 	);
 }
 
-function VenuePayRangeEditor({
+export function VenuePayRangeEditor({
 	value,
 	onChange,
 	minInputRef,
@@ -1435,7 +1437,7 @@ function VenueTimePicker({
 	);
 }
 
-function VenueHoursEditor({
+export function VenueHoursEditor({
 	hours,
 	onToggleDay,
 	onChangeDay,
@@ -1519,7 +1521,15 @@ type VenuePhotoSlot =
 	| { kind: 'add' }
 	| { kind: 'empty' };
 
-function VenuePhotosPlaceholder({ layout = 'sidebar' }: { layout?: 'sidebar' | 'grid' }) {
+export function VenuePhotosPlaceholder({
+	layout = 'sidebar',
+	// Touch surfaces have no hover, so the mobile profile tab opts into an
+	// always-visible delete button on each photo.
+	alwaysShowDelete = false,
+}: {
+	layout?: 'sidebar' | 'grid';
+	alwaysShowDelete?: boolean;
+}) {
 	const isGrid = layout === 'grid';
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const { data: photos = [] } = useGetMedia('venue_photos');
@@ -1606,7 +1616,9 @@ function VenuePhotosPlaceholder({ layout = 'sidebar' }: { layout?: 'sidebar' | '
 									type="button"
 									onClick={() => deletePhoto.mutate(slot.asset.id)}
 									aria-label={`Remove ${slot.asset.filename}`}
-									className="absolute right-[4px] top-[4px] hidden h-[18px] w-[18px] items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/80 group-hover:flex"
+									className={`absolute right-[4px] top-[4px] h-[18px] w-[18px] items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/80 ${
+										alwaysShowDelete ? 'flex' : 'hidden group-hover:flex'
+									}`}
 								>
 									<X className="h-3 w-3" />
 								</button>
@@ -3653,7 +3665,14 @@ function isWithinVenueToolUi(event: PointerEvent): boolean {
 	return false;
 }
 
+// Referentially-stable no-op for the mobile branch's VenuePortalContent props
+// (they're effect dependencies inside it).
+const NOOP = () => {};
+
 export default function VenuePortalClient() {
+	// null while detection resolves — desktop overlays and the mobile frame both
+	// wait for a definite answer; only the persistent map renders that frame.
+	const isMobile = useIsMobile();
 	const [view, setView] = useState<VenuePortalView>('edit');
 	// Returning venues with a completed profile (per the localStorage hint) land straight
 	// on the map instead of flashing the "New Venue" creation skeleton. Runs pre-paint so
@@ -3674,7 +3693,9 @@ export default function VenuePortalClient() {
 		number | null
 	>(null);
 	const isMailToolSelected = selectedVenueTool === 'mail';
-	const { data: venueEvents } = useGetVenueEvents({ enabled: view === 'map' });
+	const { data: venueEvents } = useGetVenueEvents({
+		enabled: view === 'map' || isMobile === true,
+	});
 	const opportunities = venueEvents ?? [];
 	const editingVenueEvent =
 		opportunities.find((opportunity) => opportunity.id === editingVenueEventId) ?? null;
@@ -3796,18 +3817,36 @@ export default function VenuePortalClient() {
 	}, [venueApplications]);
 	return (
 		<PersistentMapProvider>
+			{/* The map mounts outside the isMobile branch so it's already up during the
+			    null detection frame and never remounts when the branch resolves. */}
 			<PersistentDashboardMap />
 			<VenuePortalPersistentMap
-				view={view}
+				view={isMobile ? 'map' : view}
 				onOwnedVenueAnchorChange={handleOwnedVenueAnchorChange}
 			/>
-			<VenuePortalContent
-				view={view}
-				onEnterMapView={() => setView('map')}
-				onExitToEdit={() => setView('edit')}
-			/>
+			{/* Mobile: VenuePortalContent renders null at view="map" but still runs its
+			    effects — signed-out redirect, standard→venue promotion, profile-complete
+			    hint — so the mobile frame gets the gating for free. Incomplete profiles
+			    land on the Profile tab (MobileVenuePortal) instead of the edit page. */}
+			{isMobile === true && (
+				<>
+					<VenuePortalContent view="map" onEnterMapView={NOOP} onExitToEdit={NOOP} />
+					<MobileVenuePortal
+						opportunities={opportunities}
+						applicantCountByEventId={applicantCountByEventId}
+						unreadCount={venueUnread}
+					/>
+				</>
+			)}
+			{isMobile === false && (
+				<VenuePortalContent
+					view={view}
+					onEnterMapView={() => setView('map')}
+					onExitToEdit={() => setView('edit')}
+				/>
+			)}
 			{/* Keep the profile-card + calendar cluster compact and slightly lower on the map. */}
-			{view === 'map' && (
+			{isMobile === false && view === 'map' && (
 				<div
 					data-venue-tool-ui="true"
 					className="fixed left-[24px] top-[56px] z-[100] origin-top-left"
@@ -3832,7 +3871,7 @@ export default function VenuePortalClient() {
 					/>
 				</div>
 			)}
-			{view === 'map' && (
+			{isMobile === false && view === 'map' && (
 				<VenueNotificationsMapPanel
 					conversations={venueConversations}
 					applications={venueApplications}
@@ -3843,16 +3882,16 @@ export default function VenuePortalClient() {
 					onOpenEvent={openOpportunityDetail}
 				/>
 			)}
-			{view === 'map' && selectedVenueTool === 'add' && (
+			{isMobile === false && view === 'map' && selectedVenueTool === 'add' && (
 				<VenueCreateEventMapPanel event={editingVenueEvent} />
 			)}
-			{view === 'map' && isMailToolSelected && (
+			{isMobile === false && view === 'map' && isMailToolSelected && (
 				<VenueChatMapPanel
 					key={chatDeepLink?.nonce ?? 'list'}
 					initialThread={chatDeepLink}
 				/>
 			)}
-			{view === 'map' && selectedVenueTool === 'events' && (
+			{isMobile === false && view === 'map' && selectedVenueTool === 'events' && (
 				<VenueEventsMapPanel
 					opportunities={opportunities}
 					applicantCountByEventId={applicantCountByEventId}
@@ -3862,17 +3901,19 @@ export default function VenuePortalClient() {
 					onEditOpportunity={openEditOpportunity}
 				/>
 			)}
-			{view === 'map' && selectedVenueTool === 'profile' && <VenueProfileMapPanel />}
+			{isMobile === false && view === 'map' && selectedVenueTool === 'profile' && (
+				<VenueProfileMapPanel />
+			)}
 			{/* The pill stack and the tool tab bar swap: pills while nothing is open,
 			    the horizontal bar (above the open panel) while a tool is selected. */}
-			{view === 'map' && selectedVenueTool !== null && (
+			{isMobile === false && view === 'map' && selectedVenueTool !== null && (
 				<VenueMapToolTabBar
 					selectedTool={selectedVenueTool}
 					onToolSelect={selectVenueTool}
 					unreadCount={venueUnread}
 				/>
 			)}
-			{view === 'map' && selectedVenueTool === null && (
+			{isMobile === false && view === 'map' && selectedVenueTool === null && (
 				<VenueMapActionPills
 					anchorStore={anchorStore}
 					selectedTool={selectedVenueTool}

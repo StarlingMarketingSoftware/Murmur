@@ -38,6 +38,13 @@ const CARD_STYLE: CSSProperties = {
 	textAlign: 'left',
 };
 
+// 4 keyframe stops over 4.8s => 1.2s per scheme; negative delays start card i on
+// scheme i so the skeleton stack reads as cycling through the folder pastels.
+const SKELETON_WAVE_DURATION_S = 4.8;
+const SKELETON_WAVE_STEP_S = 1.2;
+
+const SKELETON_BLOCK_FILL = 'rgba(0,0,0,0.08)';
+
 const PILL_STYLE: CSSProperties = {
 	height: '24px',
 	borderRadius: '12px',
@@ -77,10 +84,86 @@ export const MobileFolderCards: FC<{ className?: string }> = ({ className }) => 
 				? Array.from({ length: 3 }).map((_, idx) => (
 						<div
 							key={`mobile-folder-skeleton-${idx}`}
-							className="animate-pulse"
-							style={{ ...CARD_STYLE, backgroundColor: '#EAEAEA' }}
+							className="mobile-folder-cards-loading-wave-card"
+							style={{
+								...CARD_STYLE,
+								animationDelay: `${-(SKELETON_WAVE_DURATION_S - idx * SKELETON_WAVE_STEP_S)}s`,
+							}}
 							aria-hidden="true"
-						/>
+						>
+							<div
+								style={{
+									display: 'flex',
+									alignItems: 'center',
+									gap: '10px',
+									maxWidth: 'calc(100% - 200px)',
+								}}
+							>
+								<span
+									style={{
+										width: '28px',
+										height: '17px',
+										borderRadius: '4px',
+										backgroundColor: SKELETON_BLOCK_FILL,
+										flexShrink: 0,
+									}}
+								/>
+								<span
+									style={{
+										width: '96px',
+										height: '14px',
+										borderRadius: '7px',
+										backgroundColor: SKELETON_BLOCK_FILL,
+									}}
+								/>
+							</div>
+
+							<span style={{ height: '20px' }} />
+
+							<div
+								style={{
+									position: 'absolute',
+									right: '12px',
+									top: '50%',
+									transform: 'translateY(-50%)',
+									display: 'flex',
+									flexDirection: 'column',
+									gap: '8px',
+								}}
+							>
+								{[0, 1].map((rowIdx) => (
+									<div
+										key={rowIdx}
+										style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+									>
+										<span
+											style={{
+												width: '90px',
+												height: '24px',
+												borderRadius: '12px',
+												backgroundColor: SKELETON_BLOCK_FILL,
+											}}
+										/>
+										<span
+											style={{
+												width: '1.5px',
+												height: '16px',
+												backgroundColor: 'rgba(0,0,0,0.25)',
+												flexShrink: 0,
+											}}
+										/>
+										<span
+											style={{
+												width: '88px',
+												height: '24px',
+												borderRadius: '12px',
+												backgroundColor: SKELETON_BLOCK_FILL,
+											}}
+										/>
+									</div>
+								))}
+							</div>
+						</div>
 				  ))
 				: (campaigns as CampaignWithCounts[] | undefined)?.map((campaign, index) => {
 						const scheme = getCampaignFolderScheme(index);

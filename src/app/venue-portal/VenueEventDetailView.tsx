@@ -30,18 +30,18 @@ import {
 } from './venueOpportunityFormat';
 
 // Same artwork fallback gradient as the profile media slot cards.
-const MEDIA_THUMB_GRADIENT =
+export const MEDIA_THUMB_GRADIENT =
 	'linear-gradient(145deg, #EF3030 0%, #F44458 36%, #F04CCB 72%, #FF64D8 100%)';
 
-const getMediaDisplayTitle = (filename: string) =>
+export const getMediaDisplayTitle = (filename: string) =>
 	filename.replace(/\.[^/.]+$/, '').trim() || filename;
 
 // Poster for uploads/youtube; images have no poster, so fall back to the image itself.
-const mediaThumbSrc = (video: VenueEventApplicationVideo) =>
+export const mediaThumbSrc = (video: VenueEventApplicationVideo) =>
 	video.posterUrl ?? (video.kind === 'image' ? video.url : null);
 
 // Rating → traffic-light color per the Figma media-view mockups.
-const ratingColor = (rating: number) =>
+export const ratingColor = (rating: number) =>
 	rating <= 2 ? '#EF3030' : rating === 3 ? '#FFC53D' : '#34A853';
 
 // One media-view tile: a submitted video plus the applicant it belongs to.
@@ -58,7 +58,7 @@ function EventDatePill({ event }: { event: VenueEvent }) {
 	);
 }
 
-function GenrePill({ genre }: { genre: string }) {
+export function GenrePill({ genre }: { genre: string }) {
 	const GenreIcon = getProfileGenreIcon(genre);
 	return (
 		<span className="flex h-[21.374px] w-fit max-w-full shrink-0 items-center gap-[3px] overflow-hidden rounded-[7.491px] bg-[#F4F4F4] px-[6px] font-inter text-[14px] font-medium leading-[21.374px] text-black">
@@ -315,13 +315,15 @@ function ApplicantRow({
 
 // Five clickable stars; re-clicking the current rating clears it. Stars of a
 // rated video take the traffic-light color, unrated ones use the outline color.
-function VideoRatingStars({
+// buttonClassName lets touch surfaces add hit-slop without changing desktop pixels.
+export function VideoRatingStars({
 	rating,
 	onRate,
 	starWidth,
 	starHeight,
 	gap,
 	unratedOutline = '#FFFFFF',
+	buttonClassName = '',
 }: {
 	rating: number;
 	onRate: (value: number) => void;
@@ -329,6 +331,7 @@ function VideoRatingStars({
 	starHeight: number;
 	gap: number;
 	unratedOutline?: string;
+	buttonClassName?: string;
 }) {
 	return (
 		<div className="flex items-center" style={{ gap: `${gap}px` }}>
@@ -339,7 +342,7 @@ function VideoRatingStars({
 					aria-label={`Rate ${value} of 5`}
 					aria-pressed={rating === value}
 					onClick={() => onRate(value === rating ? 0 : value)}
-					className="cursor-pointer"
+					className={`cursor-pointer ${buttonClassName}`}
 				>
 					<VenueRatingStarIcon
 						width={starWidth}

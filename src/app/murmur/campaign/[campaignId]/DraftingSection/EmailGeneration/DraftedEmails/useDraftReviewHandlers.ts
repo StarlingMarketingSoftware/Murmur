@@ -399,7 +399,9 @@ export const useDraftReviewHandlers = ({
 		]
 	);
 
-	const handleSendDrafts = async (draftIds?: Iterable<number>) => {
+	// Returns the number of drafts actually processed (emailed + messaged); 0 when a
+	// guard blocked the send (the guard already toasted).
+	const handleSendDrafts = async (draftIds?: Iterable<number>): Promise<number> => {
 		// If draftIds is provided, ONLY send those drafts (used by draft-review "Send" button).
 		// Otherwise, send the current selection (and never default to "all drafts" when selection is empty).
 		const explicitIds = draftIds ? new Set(Array.from(draftIds)) : null;
@@ -412,11 +414,11 @@ export const useDraftReviewHandlers = ({
 
 		if (selectedDrafts.length === 0) {
 			toast.error('Select emails to send.');
-			return;
+			return 0;
 		}
 
 		if (!campaign) {
-			return;
+			return 0;
 		}
 
 		// Venue recipients (contact.venueId set) become internal messages — never
@@ -430,7 +432,7 @@ export const useDraftReviewHandlers = ({
 		if (emailDrafts.length > 0) {
 			if (!campaign?.identity?.email || !campaign?.identity?.name) {
 				toast.error('Please create an Identity before sending emails.');
-				return;
+				return 0;
 			}
 
 			if (
@@ -438,7 +440,7 @@ export const useDraftReviewHandlers = ({
 				user?.stripeSubscriptionStatus !== StripeSubscriptionStatus.TRIALING
 			) {
 				toast.error('Please upgrade to a paid plan to send emails.');
-				return;
+				return 0;
 			}
 		}
 
@@ -451,7 +453,7 @@ export const useDraftReviewHandlers = ({
 			toast.error(
 				'You have run out of sending credits. Please upgrade your subscription.'
 			);
-			return;
+			return 0;
 		}
 
 		let emailedCount = 0;
@@ -529,6 +531,8 @@ export const useDraftReviewHandlers = ({
 		} else {
 			toast.error('Failed to send emails. Please try again.');
 		}
+
+		return totalProcessed;
 	};
 
 	return {

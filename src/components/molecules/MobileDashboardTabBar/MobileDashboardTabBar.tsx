@@ -17,7 +17,9 @@ const TABS = [
 export const MobileDashboardTabBar: FC<{
 	activeTab: MobileDashboardTab;
 	onTabChange: (tab: MobileDashboardTab) => void;
-}> = ({ activeTab, onTabChange }) => {
+	/** Navigates away (active campaign search); button is disabled while undefined. */
+	onSearchClick?: () => void;
+}> = ({ activeTab, onTabChange, onSearchClick }) => {
 	return (
 		<div
 			className="w-full flex items-center justify-around"
@@ -62,10 +64,11 @@ export const MobileDashboardTabBar: FC<{
 				);
 			})}
 
-			{/* Search is intentionally not wired up yet */}
 			<button
 				type="button"
 				aria-label="Search"
+				onClick={onSearchClick}
+				disabled={!onSearchClick}
 				style={{
 					background: 'none',
 					border: 'none',
@@ -75,6 +78,7 @@ export const MobileDashboardTabBar: FC<{
 					alignItems: 'center',
 					color: '#000000',
 					opacity: 0.35,
+					cursor: onSearchClick ? 'pointer' : 'default',
 				}}
 			>
 				<SearchIconDesktop width={18} height={18} stroke="black" strokeWidth={2} />
