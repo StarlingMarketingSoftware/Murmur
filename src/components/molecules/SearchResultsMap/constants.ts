@@ -1008,7 +1008,7 @@ export const BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR = '#000000';
 export const HOVER_TOOLTIP_Z_INDEX = 1_000_000;
 // Minimum zoom level required to trigger hover tooltips and research highlights on markers.
 // Below this zoom level, markers are too dense and small for hover interactions to be useful.
-export const HOVER_INTERACTION_MIN_ZOOM = 8;
+export const HOVER_INTERACTION_MIN_ZOOM = 6;
 export const BOOKING_EXTRA_MARKERS_MIN_ZOOM = 8;
 // Keep extra markers capped so map remains responsive.
 export const BOOKING_EXTRA_MARKERS_MAX_DOTS = 160;

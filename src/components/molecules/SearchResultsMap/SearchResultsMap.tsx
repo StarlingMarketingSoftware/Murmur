@@ -1103,7 +1103,7 @@ export interface SearchResultsMapProps {
 	 *  loaded, or on teardown. `isOnScreen` is false when the icon is outside the
 	 *  viewport (40px pad) or occluded behind the globe at low zoom. */
 	onOwnedVenueAnchorChange?: (
-		anchor: { x: number; y: number; isOnScreen: boolean } | null
+		anchor: { x: number; y: number; isOnScreen: boolean; zoom: number } | null
 	) => void;
 	/** Venue-posted events to draw as radar opportunity markers (red star + radar). */
 	events?: MapEvent[];
@@ -2214,8 +2214,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Owned-venue anchor reporting: lets the host (venue portal) pin DOM chrome next to
 	// the home icon. Mirrors the selected-marker overlay pattern (map.project on 'move').
 	useEffect(() => {
-		const notify = (anchor: { x: number; y: number; isOnScreen: boolean } | null) =>
-			onOwnedVenueAnchorChangeRef.current?.(anchor);
+		const notify = (
+			anchor: { x: number; y: number; isOnScreen: boolean; zoom: number } | null
+		) => onOwnedVenueAnchorChangeRef.current?.(anchor);
 		if (!map || !isMapLoaded || !ownedVenueCenter) {
 			notify(null);
 			return;
@@ -2238,7 +2239,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				p.x <= rect.width + pad &&
 				p.y >= -pad &&
 				p.y <= rect.height + pad;
-			notify({ x: rect.left + p.x, y: rect.top + p.y, isOnScreen });
+			notify({ x: rect.left + p.x, y: rect.top + p.y, isOnScreen, zoom: map.getZoom() });
 		};
 
 		update();

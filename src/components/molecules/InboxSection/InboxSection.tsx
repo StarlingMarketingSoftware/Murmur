@@ -1607,6 +1607,134 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	]);
 
 	if (isLoading) {
+		// Campaign inbox detail design loads into the teal detail box (header pill +
+		// thread + composer), so mirror that layout instead of the list-style skeleton.
+		if (shouldUseCampaignInboxDetailDesign) {
+			const detailSkeletonPanelStyle = {
+				position: 'absolute' as const,
+				left: '50%',
+				transform: 'translateX(-50%)',
+				width: `${campaignInboxDetailInnerWidth}px`,
+				backgroundColor: '#FFFFFF',
+				boxSizing: 'border-box' as const,
+			};
+			return (
+				<div className={`w-full flex justify-center ${outerPaddingClass}`}>
+					<div
+						data-campaign-main-box="inbox"
+						className="relative animate-pulse overflow-hidden"
+						style={{
+							width: `${boxWidth}px`,
+							maxWidth: `${boxWidth}px`,
+							height: `${desktopBoxHeight}px`,
+							border: '2px solid #000000',
+							borderRadius: '12px',
+							background: 'rgba(104, 199, 228, 0.60)',
+							boxSizing: 'border-box',
+						}}
+						role="status"
+						aria-busy="true"
+						aria-label="Loading emails"
+					>
+						<span className="sr-only">Loading emails…</span>
+
+						{/* Contact header pill skeleton */}
+						<div
+							className="flex items-center justify-between gap-4"
+							style={{
+								...detailSkeletonPanelStyle,
+								top: `${campaignInboxDetailHeaderTop}px`,
+								height: `${campaignInboxDetailHeaderHeight}px`,
+								borderRadius: '7px',
+								border: '2px solid #000000',
+								padding: shouldUseCampaignInboxCompactDetailDesign
+									? '0 8px 0 10px'
+									: '0 15px 0 22px',
+							}}
+						>
+							<div
+								className="flex min-w-0 items-center"
+								style={{
+									gap: shouldUseCampaignInboxCompactDetailDesign ? '8px' : '14px',
+								}}
+							>
+								<div
+									className="shrink-0 rounded-full bg-[#D9D9D9]"
+									style={{ width: '27px', height: '27px' }}
+								/>
+								<div className="h-[14px] w-[140px] rounded bg-[#D9D9D9]" />
+								<div className="h-[12px] w-[90px] rounded bg-[#E5E5E5]" />
+							</div>
+							<div className="flex shrink-0 items-center gap-[6px]">
+								<div className="h-[20px] w-[29px] rounded-[6px] bg-[#E5E5E5]" />
+								<div className="h-[24px] w-[120px] rounded-[6px] bg-[#E5E5E5]" />
+							</div>
+						</div>
+
+						{/* Thread panel skeleton */}
+						<div
+							style={{
+								...detailSkeletonPanelStyle,
+								top: `${campaignInboxDetailThreadTop}px`,
+								height: `${campaignInboxDetailThreadHeight}px`,
+								borderRadius: '7px',
+								border: '1.719px solid #000000',
+								padding: '13px 24px',
+								overflow: 'hidden',
+							}}
+						>
+							<div className="flex items-start justify-between gap-4">
+								<div className="flex min-w-0 items-center gap-[12px]">
+									<div
+										className="shrink-0 rounded-full bg-[#D9D9D9]"
+										style={{ width: '25px', height: '25px' }}
+									/>
+									<div className="h-[14px] w-[120px] rounded bg-[#D9D9D9]" />
+								</div>
+								<div className="h-[12px] w-[70px] shrink-0 rounded bg-[#E5E5E5]" />
+							</div>
+							<div style={{ marginTop: '16px', paddingLeft: '37px' }}>
+								<div className="h-[12px] w-[85%] rounded bg-[#E5E5E5]" />
+								<div className="mt-2 h-[12px] w-[70%] rounded bg-[#E5E5E5]" />
+								<div className="mt-2 h-[12px] w-[78%] rounded bg-[#E5E5E5]" />
+								<div className="mt-2 h-[12px] w-[40%] rounded bg-[#E5E5E5]" />
+							</div>
+						</div>
+
+						{/* Composer skeleton */}
+						<div
+							className="flex items-start"
+							style={{
+								...detailSkeletonPanelStyle,
+								top: `${campaignInboxDetailComposerTop}px`,
+								height: `${campaignInboxDetailComposerHeight}px`,
+								borderRadius: '6.877px',
+								border: '1.719px solid #000000',
+								padding: '14px 16px',
+							}}
+						>
+							<div className="h-[12px] w-[160px] rounded bg-[#E5E5E5]" />
+						</div>
+
+						{/* Bottom divider strip (wide detail view only) */}
+						{!shouldUseCampaignInboxCompactDetailDesign && (
+							<div
+								aria-hidden="true"
+								style={{
+									position: 'absolute',
+									left: 0,
+									right: 0,
+									bottom: `${campaignInboxDetailBottomStripHeight}px`,
+									height: '2px',
+									backgroundColor: '#000000',
+								}}
+							/>
+						)}
+					</div>
+				</div>
+			);
+		}
+
 		const skeletonRowCount = isMobile ? 5 : 6;
 		const loadingContainerStyle = {
 			width: isMobile ? mobileBoxWidth : `${boxWidth}px`,

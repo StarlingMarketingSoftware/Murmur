@@ -14,6 +14,9 @@ import {
 } from '@/hooks/queryHooks/useVenueApplications';
 import { formatEventCountdown, formatInboxTimestamp } from '@/utils/datetime';
 import type { ConversationListItem } from '@/types';
+import { OutlinedInitialAvatar } from '@/components/atoms/OutlinedInitialAvatar/OutlinedInitialAvatar';
+import { ProfileAreaMarkerIcon } from '@/components/atoms/_svg/ProfileAreaMarkerIcon';
+import { getProfileGenreIcon } from '@/components/molecules/HybridPromptInput/profileFieldIcons';
 import { VENUE_MAP_OVERLAY_SCALE } from './constants';
 
 // Per-event pill tint, cycling soonest-event-first like the Figma mock.
@@ -55,8 +58,8 @@ function ReplyRow({
 			type="button"
 			onClick={onClick}
 			disabled={pending}
-			className={`flex h-[50px] w-full shrink-0 items-center gap-[14px] border-b border-white/50 px-[18px] text-left ${
-				pending ? 'cursor-wait opacity-60' : 'cursor-pointer hover:bg-white/30'
+			className={`flex h-[31px] w-full shrink-0 items-center gap-[14px] px-[18px] text-left ${
+				pending ? 'cursor-wait opacity-60' : 'cursor-pointer hover:bg-white/40'
 			}`}
 		>
 			<span className="flex w-[210px] shrink-0 items-center gap-[8px]">
@@ -101,7 +104,7 @@ function InboundRow({
 		<button
 			type="button"
 			onClick={onClick}
-			className="flex h-[50px] w-full shrink-0 cursor-pointer items-center gap-[14px] border-b border-white/50 px-[18px] text-left hover:bg-white/30"
+			className="flex h-[31px] w-full shrink-0 cursor-pointer items-center gap-[14px] bg-[#DCEAFB] px-[18px] text-left hover:bg-[#ECF4FD]"
 		>
 			<span className="flex w-[210px] shrink-0 items-center gap-[8px]">
 				{conversation.unreadCount > 0 && (
@@ -124,10 +127,103 @@ function InboundRow({
 	);
 }
 
+function CardPill({ icon, label }: { icon?: ReactNode; label: string }) {
+	return (
+		<span className="flex h-[20px] min-w-0 items-center gap-[4px] rounded-full border border-black bg-white px-[8px]">
+			{icon}
+			<span className="min-w-0 truncate font-inter text-[11px] font-medium leading-none text-black">
+				{label}
+			</span>
+		</span>
+	);
+}
+
+// Compact conversation card for the left rail of the open-thread view: avatar +
+// name + time, genre/location pills, preview. Every card carries the 1px black
+// border at 9px radius; only the selected one fills white.
+function ThreadListCard({
+	name,
+	timestamp,
+	preview,
+	genre,
+	area,
+	unread,
+	selected,
+	pending = false,
+	onClick,
+}: {
+	name: string;
+	timestamp: string;
+	preview: string;
+	genre: string | null;
+	area: string | null;
+	unread: boolean;
+	selected: boolean;
+	pending?: boolean;
+	onClick: () => void;
+}) {
+	const GenreIcon = getProfileGenreIcon(genre);
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			disabled={pending}
+			className={`mx-auto flex h-[85px] w-[266px] shrink-0 flex-col justify-between rounded-[9px] border border-black px-[10px] py-[7px] text-left ${
+				selected ? 'bg-white' : 'bg-transparent hover:bg-white/40'
+			} ${pending ? 'cursor-wait opacity-60' : 'cursor-pointer'}`}
+		>
+			<span className="flex w-full items-center gap-[8px]">
+				<OutlinedInitialAvatar
+					initial={name.trim()[0]?.toUpperCase() || '?'}
+					className="h-[24px] w-[24px] shrink-0 border-black text-[12px] text-black"
+				/>
+				{unread && (
+					<span className="h-[8px] w-[8px] shrink-0 rounded-full bg-[#2F6FED]" />
+				)}
+				<span className="min-w-0 truncate font-inter text-[14px] font-bold text-black">
+					{name}
+				</span>
+				<span className="ml-auto shrink-0 font-inter text-[11px] leading-none text-black/50">
+					{timestamp}
+				</span>
+			</span>
+			{(genre || area) && (
+				<span className="flex w-full min-w-0 items-center gap-[6px]">
+					{genre && (
+						<CardPill
+							icon={
+								GenreIcon && (
+									<GenreIcon aria-hidden="true" className="h-[12px] w-[12px] shrink-0" />
+								)
+							}
+							label={genre}
+						/>
+					)}
+					{area && (
+						<CardPill
+							icon={
+								<ProfileAreaMarkerIcon
+									aria-hidden="true"
+									className="h-[12px] w-[10px] shrink-0"
+								/>
+							}
+							label={area}
+						/>
+					)}
+				</span>
+			)}
+			<span className="w-full min-w-0 truncate font-inter text-[12px] leading-none text-black/60">
+				{preview}
+			</span>
+		</button>
+	);
+}
+
 // Floating chat panel for the toolbar's Chat tab. Same chrome and footprint as
 // the events/profile panels; the body is a two-section inbox — Replies (event
 // applications) over Inbound (cold campaign conversations) — and clicking a row
-// swaps the whole body for the standard messenger thread.
+// swaps the body for a two-column messenger: the active section's conversation
+// cards on the left, the open thread on the right.
 export function VenueChatMapPanel() {
 	const [activeSection, setActiveSection] = useState<'replies' | 'inbound'>('replies');
 	// An open thread view: the pair conversation plus which slice of it — an
@@ -175,6 +271,17 @@ export function VenueChatMapPanel() {
 		}
 		return groups;
 	}, [applications]);
+
+	// Left-rail card order for the open-thread view: plain recency. The cards
+	// carry no event pill, so the list view's by-event grouping would read as
+	// arbitrary interleaving here.
+	const flatReplies = useMemo(
+		() =>
+			[...(applications ?? [])].sort(
+				(a, b) => Date.parse(replyRowActivity(b)) - Date.parse(replyRowActivity(a))
+			),
+		[applications]
+	);
 
 	// Conversations with general-thread content: cold campaign outreach, plus the
 	// safety net of any untagged artist message (venue-side preview/recency are
@@ -230,8 +337,8 @@ export function VenueChatMapPanel() {
 	};
 
 	const segmentClassName = (active: boolean, activeBackground: string) =>
-		`flex h-[24px] items-center rounded-[6px] border border-black px-[16px] font-inter text-[13px] font-semibold leading-none ${
-			active ? `${activeBackground} text-black` : 'bg-white/60 text-black/50'
+		`flex h-full items-center px-[14px] text-left font-inter text-[13px] font-semibold leading-none text-black ${
+			active ? activeBackground : 'bg-white'
 		}`;
 
 	return (
@@ -249,13 +356,14 @@ export function VenueChatMapPanel() {
 				<div className="absolute inset-x-0 top-0 h-[30px] overflow-hidden">
 					<div className="absolute inset-x-0 top-[-16px] h-[120px] bg-[linear-gradient(180deg,#C1F7BB_0%,#60AE92_100%)]" />
 				</div>
-				{/* Replies | Inbound segmented control on the green band. */}
-				<div className="absolute left-[8px] top-[3px] z-10 flex items-center gap-[6px]">
+				{/* Replies | Inbound segmented control on the green band: one 235×22
+				    rounded box split at 90px, active half tinted, inactive half white. */}
+				<div className="absolute left-[8px] top-[4px] z-10 flex h-[22px] w-[235px] overflow-hidden rounded-[6px]">
 					<button
 						type="button"
 						aria-pressed={activeSection === 'replies'}
 						onClick={() => handleSegmentClick('replies')}
-						className={segmentClassName(activeSection === 'replies', 'bg-[#D8D2FF]')}
+						className={`w-[90px] ${segmentClassName(activeSection === 'replies', 'bg-[#DBDAFE]')}`}
 					>
 						Replies
 					</button>
@@ -263,7 +371,7 @@ export function VenueChatMapPanel() {
 						type="button"
 						aria-pressed={activeSection === 'inbound'}
 						onClick={() => handleSegmentClick('inbound')}
-						className={segmentClassName(activeSection === 'inbound', 'bg-white')}
+						className={`flex-1 ${segmentClassName(activeSection === 'inbound', 'bg-[#BCE2FF]')}`}
 					>
 						Inbound
 					</button>
@@ -271,31 +379,90 @@ export function VenueChatMapPanel() {
 				<div className="absolute left-0 right-0 top-[30px] h-[2px] bg-black" />
 
 				{selectedThread != null ? (
-					// Open thread replaces both sections below the green header.
-					<div className="absolute inset-x-0 bottom-0 top-[32px] bg-[linear-gradient(180deg,#BBD4F7_0%,#FFF_100%)]">
-						<ConversationThread
-							conversationId={selectedThread.conversationId}
-							thread={selectedThread.thread}
-							onBack={() => setSelectedThread(null)}
-							className="h-full bg-transparent"
-						/>
+					// Open thread: the active section's conversation cards on a 279px left
+					// rail, a vertical divider dropping from the header rule, and the
+					// thread on the right. Back to the full list = the segment buttons.
+					<div className="absolute inset-x-0 bottom-0 top-[32px] flex bg-[linear-gradient(180deg,#BBD4F7_0%,#FFF_100%)]">
+						<div className="flex w-[279px] shrink-0 flex-col">
+							<div className="px-[12px] pb-[6px] pt-[8px] font-inter text-[12px] font-semibold text-black">
+								{activeSection === 'replies' ? 'Replies' : 'Inbound'}
+							</div>
+							<div className="flex min-h-0 flex-1 flex-col gap-[8px] overflow-y-auto pb-[10px]">
+								{activeSection === 'replies' ? (
+									<>
+										{repliesLoading && <SectionNotice>Loading…</SectionNotice>}
+										{!repliesLoading && flatReplies.length === 0 && (
+											<SectionNotice>No applications yet.</SectionNotice>
+										)}
+										{flatReplies.map((row) => (
+											<ThreadListCard
+												key={row.id}
+												name={row.applicantName}
+												timestamp={formatInboxTimestamp(replyRowActivity(row))}
+												preview={
+													row.conversation?.lastMessagePreview || row.applicationPreview
+												}
+												genre={row.genre}
+												area={row.area}
+												unread={(row.conversation?.unreadCount ?? 0) > 0}
+												selected={selectedThread.thread === row.id}
+												pending={pendingApplicationId === row.id}
+												onClick={() => handleReplyRowClick(row)}
+											/>
+										))}
+									</>
+								) : (
+									<>
+										{conversationsLoading && <SectionNotice>Loading…</SectionNotice>}
+										{!conversationsLoading && inboundConversations.length === 0 && (
+											<SectionNotice>No inbound messages yet.</SectionNotice>
+										)}
+										{inboundConversations.map((conversation) => (
+											<ThreadListCard
+												key={conversation.id}
+												name={conversation.counterpart.name}
+												timestamp={formatInboxTimestamp(conversation.lastMessageAt)}
+												preview={conversation.lastMessagePreview || 'No messages yet'}
+												genre={conversation.counterpart.genre ?? null}
+												area={conversation.counterpart.area ?? null}
+												unread={conversation.unreadCount > 0}
+												selected={
+													selectedThread.thread === 'general' &&
+													selectedThread.conversationId === conversation.id
+												}
+												onClick={() => openThread(conversation.id, 'general')}
+											/>
+										))}
+									</>
+								)}
+							</div>
+						</div>
+						<div className="w-[2px] shrink-0 bg-black" />
+						<div className="min-w-0 flex-1">
+							<ConversationThread
+								conversationId={selectedThread.conversationId}
+								thread={selectedThread.thread}
+								variant="venueMap"
+								className="h-full bg-transparent"
+							/>
+						</div>
 					</div>
 				) : (
 					<div className="absolute inset-x-0 bottom-0 top-[32px] flex flex-col">
 						{/* ── Replies: applications to my events ── */}
 						<div
-							className={`shrink-0 bg-[linear-gradient(180deg,#D1CEFF_0%,#FFF_100%)] transition-[height] duration-200 ${
+							className={`shrink-0 bg-[linear-gradient(180deg,#D1CEFF_0%,#BCE2FF_50%,#FFF_100%)] ${
 								activeSection === 'replies' ? 'h-[380px]' : 'h-[190px]'
 							}`}
 						>
-							<div className="h-full overflow-y-auto">
+							<div className="flex h-full flex-col gap-[16px] overflow-y-auto py-[16px]">
 								{repliesLoading && <SectionNotice>Loading…</SectionNotice>}
 								{!repliesLoading && replyGroups.length === 0 && (
 									<SectionNotice>No applications yet.</SectionNotice>
 								)}
 								{replyGroups.map((group, groupIndex) => (
-									<div key={group.eventId}>
-										{groupIndex > 0 && <div className="h-[8px] bg-white/40" />}
+									<div key={group.eventId} className="flex flex-col gap-[16px]">
+										{groupIndex > 0 && <div className="h-[8px] shrink-0 bg-[#BCE2FF]" />}
 										{group.rows.map((row) => (
 											<ReplyRow
 												key={row.id}
@@ -316,13 +483,13 @@ export function VenueChatMapPanel() {
 						<button
 							type="button"
 							onClick={() => handleSegmentClick('inbound')}
-							className="flex h-[30px] shrink-0 items-center bg-[#9DBFF0] px-[18px] font-inter text-[14px] font-semibold text-black"
+							className="flex h-[30px] shrink-0 items-center bg-[#BBD4F7] px-[18px] font-inter text-[14px] font-semibold text-black"
 						>
 							Inbound
 						</button>
 						{/* ── Inbound: cold campaign conversations ── */}
-						<div className="min-h-0 flex-1 bg-[linear-gradient(180deg,#BBD4F7_0%,#FFF_100%)]">
-							<div className="h-full overflow-y-auto">
+						<div className="min-h-0 flex-1 bg-[#BBD4F7]">
+							<div className="flex h-full flex-col gap-[16px] overflow-y-auto pb-[16px]">
 								{conversationsLoading && <SectionNotice>Loading…</SectionNotice>}
 								{!conversationsLoading && inboundConversations.length === 0 && (
 									<SectionNotice>No inbound messages yet.</SectionNotice>

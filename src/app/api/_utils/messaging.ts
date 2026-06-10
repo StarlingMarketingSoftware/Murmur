@@ -558,18 +558,39 @@ export const listConversationsForUser = async (
 	const counterpartByConv = new Map<number, ConversationCounterpart>();
 	if (asVenue) {
 		const clerkIds = [...new Set(conversations.map((c) => c.standardUserId))];
-		const users = await prisma.user.findMany({
-			where: { clerkId: { in: clerkIds } },
-			select: { clerkId: true, firstName: true, lastName: true, email: true },
-		});
+		const [users, identities] = await Promise.all([
+			prisma.user.findMany({
+				where: { clerkId: { in: clerkIds } },
+				select: { clerkId: true, firstName: true, lastName: true, email: true },
+			}),
+			// Genre/area chips come from the artist's profile. A user can hold
+			// multiple identities — pick the most recently updated, deterministically.
+			prisma.identity.findMany({
+				where: { userId: { in: clerkIds } },
+				orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+				select: { userId: true, genre: true, area: true },
+			}),
+		]);
 		const byClerk = new Map(users.map((u) => [u.clerkId, u]));
+		const identityByUser = new Map<string, (typeof identities)[number]>();
+		for (const identity of identities) {
+			if (!identityByUser.has(identity.userId)) {
+				identityByUser.set(identity.userId, identity);
+			}
+		}
 		for (const c of conversations) {
 			const u = byClerk.get(c.standardUserId);
 			const name =
 				[u?.firstName, u?.lastName].filter(Boolean).join(' ').trim() ||
 				u?.email ||
 				'Unknown';
-			counterpartByConv.set(c.id, { name, isVenue: false });
+			const identity = identityByUser.get(c.standardUserId);
+			counterpartByConv.set(c.id, {
+				name,
+				isVenue: false,
+				genre: identity?.genre ?? null,
+				area: identity?.area ?? null,
+			});
 		}
 	} else {
 		const venueIds = [...new Set(conversations.map((c) => c.venueId))];

@@ -4,7 +4,11 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Event as VenueEvent } from '@prisma/client';
 import { Play } from 'lucide-react';
+import { MapStackStarIcon } from '@/components/atoms/_svg/MapStackStarIcon';
 import { ProfileAreaMarkerIcon } from '@/components/atoms/_svg/ProfileAreaMarkerIcon';
+import { VenueListViewIcon } from '@/components/atoms/_svg/VenueListViewIcon';
+import { VenueMediaViewIcon } from '@/components/atoms/_svg/VenueMediaViewIcon';
+import { VenueRatingStarIcon } from '@/components/atoms/_svg/VenueRatingStarIcon';
 import { ProfileMediaWaveform } from '@/components/molecules/HybridPromptInput/ProfileSidePanelBox';
 import {
 	getProfileGenreIcon,
@@ -12,14 +16,17 @@ import {
 	profilePerformingNameIconSvg,
 } from '@/components/molecules/HybridPromptInput/profileFieldIcons';
 import { MediaAssetPlayer } from '@/components/molecules/MediaAssetPlayer/MediaAssetPlayer';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import {
 	useGetVenueEventApplicants,
 	type VenueEventApplicant,
 	type VenueEventApplicationVideo,
 } from '@/hooks/queryHooks/useVenueApplications';
 import {
+	formatApplicantCount,
 	formatVenueOpportunityDate,
 	formatVenueOpportunityTimeRange,
+	isVenueOpportunityLive,
 } from './venueOpportunityFormat';
 
 // Same artwork fallback gradient as the profile media slot cards.
@@ -33,8 +40,15 @@ const getMediaDisplayTitle = (filename: string) =>
 const mediaThumbSrc = (video: VenueEventApplicationVideo) =>
 	video.posterUrl ?? (video.kind === 'image' ? video.url : null);
 
-const formatApplicantCount = (count: number) =>
-	`${count} applicant${count === 1 ? '' : 's'}`;
+// Rating → traffic-light color per the Figma media-view mockups.
+const ratingColor = (rating: number) =>
+	rating <= 2 ? '#EF3030' : rating === 3 ? '#FFC53D' : '#34A853';
+
+// One media-view tile: a submitted video plus the applicant it belongs to.
+type ApplicantVideoItem = {
+	applicant: VenueEventApplicant;
+	video: VenueEventApplicationVideo;
+};
 
 function EventDatePill({ event }: { event: VenueEvent }) {
 	return (
@@ -266,25 +280,25 @@ function ApplicantRow({
 			type="button"
 			onClick={onToggle}
 			aria-expanded={expanded}
-			className={`flex h-[44px] w-full shrink-0 cursor-pointer items-center gap-[12px] px-[20px] text-left font-inter transition hover:brightness-95 ${
-				striped ? 'bg-[#E4F5E0]' : 'bg-white'
+			className={`flex h-[27px] w-[508px] shrink-0 cursor-pointer items-center gap-[8px] self-center px-[10px] text-left font-inter transition hover:brightness-95 ${
+				striped ? 'bg-[#FAF7F7]' : 'bg-white'
 			}`}
 		>
 			<span
-				className={`min-w-0 flex-1 truncate text-[17px] leading-none text-black ${
+				className={`min-w-0 flex-1 truncate text-[14px] leading-none text-black ${
 					expanded ? 'font-bold' : 'font-semibold'
 				}`}
 			>
 				{applicant.applicantName}
 			</span>
 			{applicant.genre && <GenrePill genre={applicant.genre} />}
-			<span className="flex shrink-0 gap-[6px]">
+			<span className="flex shrink-0 gap-[4px]">
 				{applicant.videos.map((video) => {
 					const thumbSrc = mediaThumbSrc(video);
 					return (
 						<span
 							key={video.id}
-							className="h-[28px] w-[28px] shrink-0 overflow-hidden rounded-[6px]"
+							className="h-[20px] w-[20px] shrink-0 overflow-hidden rounded-[4px]"
 							style={{ background: MEDIA_THUMB_GRADIENT }}
 						>
 							{thumbSrc && (
@@ -299,9 +313,203 @@ function ApplicantRow({
 	);
 }
 
-// The right box: selected event's header (name, count, date, details quote, edit)
-// over the scrolling applicant list. Owns the expanded-applicant selection; the
-// parent remounts it (key={event.id}) when the event switches so expansion resets.
+// Five clickable stars; re-clicking the current rating clears it. Stars of a
+// rated video take the traffic-light color, unrated ones use the outline color.
+function VideoRatingStars({
+	rating,
+	onRate,
+	starWidth,
+	starHeight,
+	gap,
+	unratedOutline = '#FFFFFF',
+}: {
+	rating: number;
+	onRate: (value: number) => void;
+	starWidth: number;
+	starHeight: number;
+	gap: number;
+	unratedOutline?: string;
+}) {
+	return (
+		<div className="flex items-center" style={{ gap: `${gap}px` }}>
+			{[1, 2, 3, 4, 5].map((value) => (
+				<button
+					key={value}
+					type="button"
+					aria-label={`Rate ${value} of 5`}
+					aria-pressed={rating === value}
+					onClick={() => onRate(value === rating ? 0 : value)}
+					className="cursor-pointer"
+				>
+					<VenueRatingStarIcon
+						width={starWidth}
+						height={starHeight}
+						filled={rating > 0 && value <= rating}
+						color={ratingColor(rating)}
+						outlineColor={rating > 0 ? ratingColor(rating) : unratedOutline}
+					/>
+				</button>
+			))}
+		</div>
+	);
+}
+
+// One media-view tile: thumbnail with the applicant's name pill and a star row.
+// The open button, pill and stars are absolutely-positioned siblings (never
+// nested) so star clicks don't open the tile and no <button> nests in another.
+function MediaGridTile({
+	item,
+	size,
+	rating,
+	playing = false,
+	onOpen,
+	onRate,
+}: {
+	item: ApplicantVideoItem;
+	size: 'lg' | 'sm';
+	rating: number;
+	playing?: boolean;
+	onOpen: () => void;
+	onRate: (value: number) => void;
+}) {
+	const thumbSrc = mediaThumbSrc(item.video);
+	const lg = size === 'lg';
+	return (
+		<div
+			className={`relative shrink-0 overflow-hidden rounded-[6px] border-[2px] ${
+				lg ? 'h-[181px] w-[173.125px]' : 'h-[88px] w-[101px]'
+			}`}
+			style={{
+				background: MEDIA_THUMB_GRADIENT,
+				borderColor: playing
+					? '#34A853'
+					: rating > 0
+						? ratingColor(rating)
+						: 'transparent',
+			}}
+		>
+			<button
+				type="button"
+				onClick={onOpen}
+				aria-label={
+					playing
+						? `Close ${item.applicant.applicantName}'s media`
+						: `Open ${item.applicant.applicantName}'s media`
+				}
+				className={`absolute inset-0 cursor-pointer ${playing ? 'opacity-50' : ''}`}
+			>
+				{thumbSrc && (
+					// eslint-disable-next-line @next/next/no-img-element -- presigned R2 / YouTube CDN URL, not a static asset
+					<img src={thumbSrc} alt="" className="h-full w-full object-cover" />
+				)}
+			</button>
+			<span
+				className={`pointer-events-none absolute truncate rounded-full bg-black/55 font-inter font-medium leading-none text-white ${
+					lg
+						? 'left-[6px] top-[6px] max-w-[calc(100%-12px)] px-[7px] py-[3px] text-[11px]'
+						: 'left-[4px] top-[4px] max-w-[calc(100%-8px)] px-[5px] py-[2px] text-[9px]'
+				} ${playing ? 'opacity-50' : ''}`}
+			>
+				{item.applicant.applicantName}
+			</span>
+			<div
+				className={`absolute left-1/2 -translate-x-1/2 ${lg ? 'bottom-[6px]' : 'bottom-[4px]'}`}
+			>
+				<VideoRatingStars
+					rating={rating}
+					onRate={onRate}
+					starWidth={lg ? 13 : 9}
+					starHeight={lg ? 12 : 8}
+					gap={lg ? 3 : 2}
+				/>
+			</div>
+		</div>
+	);
+}
+
+// Media mode of the applicants box: a 3-col grid of all submitted videos, or —
+// when one is open — a player card over a denser 5-col grid. The open item is
+// derived (never stored) so a withdrawn applicant on refetch falls back to the
+// grid, matching the expandedApplicant idiom.
+function ApplicantsMediaView({
+	items,
+	openVideoId,
+	ratings,
+	onOpenVideo,
+	onRate,
+}: {
+	items: ApplicantVideoItem[];
+	openVideoId: number | null;
+	ratings: Record<number, number>;
+	onOpenVideo: (videoId: number | null) => void;
+	onRate: (videoId: number, value: number) => void;
+}) {
+	const openItem = items.find(({ video }) => video.id === openVideoId) ?? null;
+	if (!openItem) {
+		return (
+			<div className="mx-auto grid w-[525px] grid-cols-[repeat(3,173.125px)] justify-between gap-y-[6px]">
+				{items.map((item) => (
+					<MediaGridTile
+						key={item.video.id}
+						item={item}
+						size="lg"
+						rating={ratings[item.video.id] ?? 0}
+						onOpen={() => onOpenVideo(item.video.id)}
+						onRate={(value) => onRate(item.video.id, value)}
+					/>
+				))}
+			</div>
+		);
+	}
+	return (
+		<div className="flex flex-col items-center gap-[10px]">
+			<div className="w-[525px] shrink-0 rounded-[12px] border-[2px] border-black bg-white p-[10px]">
+				<div className="relative overflow-hidden rounded-[8px]">
+					<MediaAssetPlayer asset={openItem.video} className="w-full" />
+					{/* pointer-events-none so the overlay never blocks player controls */}
+					<span className="pointer-events-none absolute left-[8px] top-[8px] flex items-center gap-[6px]">
+						<span className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[#1E4620] font-inter text-[13px] font-bold leading-none text-white">
+							{openItem.applicant.applicantName.charAt(0).toUpperCase()}
+						</span>
+						<span className="rounded-full bg-black/55 px-[8px] py-[4px] font-inter text-[12px] font-medium leading-none text-white">
+							{openItem.applicant.applicantName}
+						</span>
+					</span>
+				</div>
+				<div className="mt-[8px] flex justify-center">
+					<VideoRatingStars
+						rating={ratings[openItem.video.id] ?? 0}
+						onRate={(value) => onRate(openItem.video.id, value)}
+						starWidth={26}
+						starHeight={24}
+						gap={6}
+						unratedOutline="#B2B2B2"
+					/>
+				</div>
+			</div>
+			<div className="grid w-[525px] grid-cols-[repeat(5,101px)] justify-between gap-y-[5px] pb-[2px]">
+				{items.map((item) => (
+					<MediaGridTile
+						key={item.video.id}
+						item={item}
+						size="sm"
+						rating={ratings[item.video.id] ?? 0}
+						playing={item.video.id === openItem.video.id}
+						onOpen={() =>
+							onOpenVideo(item.video.id === openItem.video.id ? null : item.video.id)
+						}
+						onRate={(value) => onRate(item.video.id, value)}
+					/>
+				))}
+			</div>
+		</div>
+	);
+}
+
+// The right box: a floating white header card (star, name, pills, details quote,
+// edit, list/media view toggle) over the scrolling applicant list. Owns the
+// expanded-applicant selection; the parent remounts it (key={event.id}) when the
+// event switches so expansion resets.
 function EventApplicantsBox({
 	event,
 	fallbackApplicantCount,
@@ -313,70 +521,171 @@ function EventApplicantsBox({
 }) {
 	const { data: applicants, isPending, isError } = useGetVenueEventApplicants(event.id);
 	const [expandedApplicantId, setExpandedApplicantId] = useState<number | null>(null);
+	const [viewMode, setViewMode] = useState<'list' | 'media'>('list');
+	const [openVideoId, setOpenVideoId] = useState<number | null>(null);
+	// UI-only for now — ratings live in local state until a backend exists. Kept
+	// here (not in the media view) so toggling List↔Media doesn't lose them.
+	const [videoRatings, setVideoRatings] = useState<Record<number, number>>({});
 	// Derived, never stored: an applicant disappearing on refetch (withdrawal)
 	// collapses the card automatically.
 	const expandedApplicant =
 		applicants?.find((applicant) => applicant.id === expandedApplicantId) ?? null;
 	const applicantCount = applicants?.length ?? fallbackApplicantCount;
 	const details = event.details?.trim();
+	const videoItems: ApplicantVideoItem[] =
+		applicants?.flatMap((applicant) =>
+			applicant.videos.map((video) => ({ applicant, video }))
+		) ?? [];
+	const rateVideo = (videoId: number, value: number) =>
+		setVideoRatings((prev) => {
+			if (value === 0) {
+				const rest = { ...prev };
+				delete rest[videoId];
+				return rest;
+			}
+			return { ...prev, [videoId]: value };
+		});
 	return (
 		<div className="flex h-full w-[540px] shrink-0 flex-col overflow-hidden rounded-[12px] border-[2px] border-black bg-[#F3FFF0]">
-			<div className="flex shrink-0 flex-col gap-[8px] px-[20px] pb-[12px] pt-[16px] font-inter text-black">
-				<div className="flex items-center gap-[12px]">
-					<span className="min-w-0 flex-1 truncate text-[28px] font-bold leading-none">
-						{event.name}
-					</span>
-					<button
-						type="button"
-						onClick={() => onEditEvent(event.id)}
-						aria-label={`Edit ${event.name}`}
-						className="flex h-[24px] shrink-0 cursor-pointer items-center rounded-[8px] border-[1.5px] border-black bg-white px-[10px] text-[13px] font-medium leading-none transition hover:brightness-95"
-					>
-						edit
-					</button>
+			<div className="flex shrink-0 justify-center pt-[9px]">
+				<div className="flex h-[86px] w-[525px] flex-col justify-center gap-[5px] rounded-[12px] border-[2px] border-black bg-white px-[12px] font-inter text-black">
+					<div className="flex h-[24px] items-center gap-[6px]">
+						<MapStackStarIcon size={20} className="shrink-0" />
+						<span className="min-w-0 flex-1 truncate text-[20px] font-bold leading-none">
+							{event.name}
+						</span>
+						<span className="flex h-[22px] shrink-0 items-center justify-center rounded-[8px] border-[1.5px] border-black bg-[#F7EFC0] px-[8px] text-[12px] font-medium leading-none">
+							{formatApplicantCount(applicantCount)}
+						</span>
+						<EventDatePill event={event} />
+						{isVenueOpportunityLive(event) && (
+							<span className="flex h-[22px] w-[53px] shrink-0 items-center justify-center gap-[4px] rounded-[6.866px] border-[0.858px] border-black bg-[#C5EDA0] text-[12px] font-medium leading-none">
+								<span
+									aria-hidden="true"
+									className="h-[7px] w-[7px] rounded-full bg-[#34A853]"
+								/>
+								Live
+							</span>
+						)}
+						<button
+							type="button"
+							onClick={() => onEditEvent(event.id)}
+							aria-label={`Edit ${event.name}`}
+							className="flex h-[20px] shrink-0 cursor-pointer items-center rounded-[6px] border-[1.5px] border-black bg-white px-[8px] text-[11px] font-medium leading-none transition hover:brightness-95"
+						>
+							edit
+						</button>
+					</div>
+					{details && (
+						<span className="w-full truncate text-center text-[12px] italic leading-[14px] text-black/70">
+							“{details}”
+						</span>
+					)}
+					<div className="flex h-[19px] items-center justify-between">
+						<div className="flex items-center gap-[8px]">
+							<button
+								type="button"
+								onClick={() => setViewMode('list')}
+								aria-pressed={viewMode === 'list'}
+								className={`flex h-[19px] w-[54px] cursor-pointer items-center justify-center gap-[3px] ${
+									viewMode === 'list' ? 'bg-[#BCFFBD]' : ''
+								}`}
+							>
+								<VenueListViewIcon selected={viewMode === 'list'} className="shrink-0" />
+								<span
+									className={`text-[12px] font-medium leading-none ${
+										viewMode === 'list' ? 'text-black' : 'text-[#B2B2B2]'
+									}`}
+								>
+									List
+								</span>
+							</button>
+							<button
+								type="button"
+								onClick={() => {
+									// Re-clicking Media while a video is open returns to the grid.
+									if (viewMode === 'media') setOpenVideoId(null);
+									setViewMode('media');
+								}}
+								aria-pressed={viewMode === 'media'}
+								className={`flex h-[19px] w-[70px] cursor-pointer items-center justify-center gap-[3px] ${
+									viewMode === 'media' ? 'bg-[#BCEFFF]' : ''
+								}`}
+							>
+								<VenueMediaViewIcon selected={viewMode === 'media'} className="shrink-0" />
+								<span
+									className={`text-[12px] font-medium leading-none ${
+										viewMode === 'media' ? 'text-black' : 'text-[#B2B2B2]'
+									}`}
+								>
+									Media
+								</span>
+							</button>
+						</div>
+						<span className="flex h-[19px] shrink-0 items-center rounded-[6px] bg-[#EDEDED] px-[8px] text-[11px] font-medium leading-none text-[#9A9A9A]">
+							0 Starred
+						</span>
+					</div>
 				</div>
-				<div className="flex items-center gap-[10px]">
-					<span className="flex h-[24px] shrink-0 items-center justify-center rounded-[8px] border-[1.5px] border-black bg-[#F7EFC0] px-[10px] text-[14px] font-medium leading-none">
-						{formatApplicantCount(applicantCount)}
-					</span>
-					<EventDatePill event={event} />
-					<span className="min-w-0 truncate text-[16px] font-medium leading-none">
-						{formatVenueOpportunityTimeRange(event.startTime, event.endTime)}
-					</span>
-				</div>
-				{details && (
-					<span className="truncate text-[14px] italic leading-none text-black/70">
-						“{details}”
-					</span>
-				)}
 			</div>
-			<div className="h-[2px] shrink-0 bg-black" />
-			<div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-				{isPending ? (
-					<SectionNotice>Loading…</SectionNotice>
-				) : isError ? (
-					<SectionNotice>Couldn’t load applicants.</SectionNotice>
-				) : !applicants || applicants.length === 0 ? (
-					<SectionNotice>No applicants yet.</SectionNotice>
+			{!isPending &&
+			!isError &&
+			applicants &&
+			applicants.length > 0 &&
+			viewMode === 'media' ? (
+				videoItems.length === 0 ? (
+					<div className="flex min-h-0 flex-1 flex-col pt-[8px]">
+						<SectionNotice>No media submitted yet.</SectionNotice>
+					</div>
 				) : (
-					<>
-						{expandedApplicant && <ApplicantDetailCard applicant={expandedApplicant} />}
-						{applicants.map((applicant, index) => (
-							<ApplicantRow
-								key={applicant.id}
-								applicant={applicant}
-								striped={index % 2 === 0}
-								expanded={applicant.id === expandedApplicantId}
-								onToggle={() =>
-									setExpandedApplicantId(
-										applicant.id === expandedApplicantId ? null : applicant.id
-									)
-								}
-							/>
-						))}
-					</>
-				)}
-			</div>
+					// key remounts the scroller on open/close so the player card is in
+					// view at scrollTop 0 (CustomScrollbar has no imperative scroll API).
+					// offsetRight 0 keeps the thumb just inside the box's right border —
+					// the default -4 would be clipped by the box's overflow-hidden.
+					<CustomScrollbar
+						key={openVideoId ?? 'grid'}
+						className="min-h-0 w-full flex-1"
+						thumbWidth={2}
+						offsetRight={0}
+						contentClassName="pt-[8px] pb-[12px]"
+					>
+						<ApplicantsMediaView
+							items={videoItems}
+							openVideoId={openVideoId}
+							ratings={videoRatings}
+							onOpenVideo={setOpenVideoId}
+							onRate={rateVideo}
+						/>
+					</CustomScrollbar>
+				)
+			) : (
+				<div className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-[8px]">
+					{isPending ? (
+						<SectionNotice>Loading…</SectionNotice>
+					) : isError ? (
+						<SectionNotice>Couldn’t load applicants.</SectionNotice>
+					) : !applicants || applicants.length === 0 ? (
+						<SectionNotice>No applicants yet.</SectionNotice>
+					) : (
+						<>
+							{expandedApplicant && <ApplicantDetailCard applicant={expandedApplicant} />}
+							{applicants.map((applicant, index) => (
+								<ApplicantRow
+									key={applicant.id}
+									applicant={applicant}
+									striped={index % 2 === 1}
+									expanded={applicant.id === expandedApplicantId}
+									onToggle={() =>
+										setExpandedApplicantId(
+											applicant.id === expandedApplicantId ? null : applicant.id
+										)
+									}
+								/>
+							))}
+						</>
+					)}
+				</div>
+			)}
 		</div>
 	);
 }

@@ -10,7 +10,7 @@ import {
 	type ConversationThreadFilter,
 } from '@/hooks/queryHooks/useConversations';
 import type { ConversationCounterpart } from '@/types';
-import { MessageBubble } from './MessageBubble';
+import { MessageBubble, type ConversationThreadVariant } from './MessageBubble';
 
 interface ConversationThreadProps {
 	conversationId: number;
@@ -19,16 +19,32 @@ interface ConversationThreadProps {
 	// Replies and read-marks stay within the same slice.
 	thread?: ConversationThreadFilter;
 	onBack?: () => void;
+	variant?: ConversationThreadVariant;
 	className?: string;
 }
 
 function CounterpartHeader({
 	counterpart,
 	onBack,
+	variant,
 }: {
 	counterpart?: ConversationCounterpart;
 	onBack?: () => void;
+	variant: ConversationThreadVariant;
 }) {
+	if (variant === 'venueMap') {
+		// Figma restyle: grey bar with only the bold counterpart name — no back
+		// chevron (the panel's segment buttons return to the list), no pills.
+		return (
+			<div className="flex h-[40px] shrink-0 items-center border-b border-black bg-[#EFEFEF] px-[14px]">
+				{counterpart && (
+					<span className="min-w-0 truncate font-inter text-[16px] font-bold text-black">
+						{counterpart.name}
+					</span>
+				)}
+			</div>
+		);
+	}
 	if (!counterpart) return <div className="h-[45px] border-b border-black/10" />;
 	const { name, isVenue, businessType, city, state } = counterpart;
 	return (
@@ -67,6 +83,7 @@ export function ConversationThread({
 	conversationId,
 	thread,
 	onBack,
+	variant = 'default',
 	className,
 }: ConversationThreadProps) {
 	const { data, isLoading } = useGetMessages(conversationId, { thread });
@@ -113,9 +130,48 @@ export function ConversationThread({
 		sendReply.mutate(body);
 	};
 
+	// Shared input/button elements; the footer chrome around them differs per
+	// variant (default = bordered row, venueMap = single black-bordered capsule).
+	const input = (
+		<input
+			value={draft}
+			onChange={(event) => setDraft(event.target.value)}
+			onKeyDown={(event) => {
+				if (event.key === 'Enter' && !event.shiftKey) {
+					event.preventDefault();
+					handleSend();
+				}
+			}}
+			placeholder="Type a message…"
+			className={
+				variant === 'venueMap'
+					? 'h-[30px] min-w-0 flex-1 bg-transparent font-inter text-[14px] text-black outline-none'
+					: 'h-[36px] flex-1 rounded-[18px] border border-black/15 bg-white px-[14px] font-inter text-[14px] outline-none'
+			}
+		/>
+	);
+	const replyButton = (
+		<button
+			type="button"
+			onClick={handleSend}
+			disabled={!draft.trim() || sendReply.isPending}
+			className={
+				variant === 'venueMap'
+					? 'h-[30px] shrink-0 rounded-full border border-black bg-[#ACD2FF] px-[18px] font-inter text-[14px] font-semibold text-black transition-opacity disabled:opacity-50'
+					: 'h-[36px] shrink-0 rounded-[18px] bg-[#2F6FED] px-[18px] font-inter text-[14px] font-semibold text-white transition-opacity disabled:opacity-50'
+			}
+		>
+			Reply
+		</button>
+	);
+
 	return (
 		<div className={cn('flex h-full flex-col bg-white/70', className)}>
-			<CounterpartHeader counterpart={data?.counterpart} onBack={onBack} />
+			<CounterpartHeader
+				counterpart={data?.counterpart}
+				onBack={onBack}
+				variant={variant}
+			/>
 			<CustomScrollbar className="min-h-0 flex-1" contentClassName="px-[14px] py-[12px]">
 				<div className="flex flex-col gap-[8px]">
 					{isLoading && (
@@ -132,33 +188,25 @@ export function ConversationThread({
 							message={message}
 							currentUserRole={data.currentUserRole}
 							counterpartInitial={counterpartInitial}
+							variant={variant}
 						/>
 					))}
 					<div ref={bottomRef} />
 				</div>
 			</CustomScrollbar>
-			<div className="flex items-center gap-[8px] border-t border-black/10 px-[12px] py-[10px]">
-				<input
-					value={draft}
-					onChange={(event) => setDraft(event.target.value)}
-					onKeyDown={(event) => {
-						if (event.key === 'Enter' && !event.shiftKey) {
-							event.preventDefault();
-							handleSend();
-						}
-					}}
-					placeholder="Type a message…"
-					className="h-[36px] flex-1 rounded-[18px] border border-black/15 bg-white px-[14px] font-inter text-[14px] outline-none"
-				/>
-				<button
-					type="button"
-					onClick={handleSend}
-					disabled={!draft.trim() || sendReply.isPending}
-					className="h-[36px] shrink-0 rounded-[18px] bg-[#2F6FED] px-[18px] font-inter text-[14px] font-semibold text-white transition-opacity disabled:opacity-50"
-				>
-					Reply
-				</button>
-			</div>
+			{variant === 'venueMap' ? (
+				<div className="px-[12px] py-[10px]">
+					<div className="flex items-center gap-[8px] rounded-full border border-black bg-white py-[4px] pl-[16px] pr-[5px]">
+						{input}
+						{replyButton}
+					</div>
+				</div>
+			) : (
+				<div className="flex items-center gap-[8px] border-t border-black/10 px-[12px] py-[10px]">
+					{input}
+					{replyButton}
+				</div>
+			)}
 		</div>
 	);
 }

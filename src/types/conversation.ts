@@ -18,6 +18,10 @@ export interface ConversationCounterpart {
 	businessType?: string | null;
 	city?: string | null;
 	state?: string | null;
+	// Artist profile chips (venue-side lists only), from the artist's most
+	// recently updated Identity. Absent for venue counterparts.
+	genre?: string | null;
+	area?: string | null;
 }
 
 export interface ConversationListItem {

@@ -4098,7 +4098,12 @@ const Murmur = () => {
 													role="dialog"
 													aria-label="Campaign folders"
 													className={dashboardInitialPanelClassName}
-													style={{ transformOrigin: 'top center' }}
+													style={{
+														transformOrigin: 'top center',
+														// The initial dashboard renders at the 0.85 baseline zoom; cancel the
+														// per-monitor campaign zoom so this dropdown matches it on every screen.
+														zoom: 'calc(0.85 / var(--murmur-campaign-zoom, 0.85))',
+													}}
 												>
 													<div className={dashboardInitialPanelContentClassName}>
 														<CampaignsTable

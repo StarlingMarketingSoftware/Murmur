@@ -9,7 +9,12 @@ import { VenuePortalProfileIcon } from '@/components/atoms/_svg/VenuePortalProfi
 // The map reports the owned-venue home icon's projected viewport position on every
 // camera frame (see SearchResultsMap's onOwnedVenueAnchorChange). The store keeps
 // those 60fps updates out of React state so only this component's DOM moves.
-export type VenueIconAnchor = { x: number; y: number; isOnScreen: boolean };
+export type VenueIconAnchor = {
+	x: number;
+	y: number;
+	isOnScreen: boolean;
+	zoom: number;
+};
 
 export type VenueIconAnchorStore = {
 	get: () => VenueIconAnchor | null;
@@ -48,6 +53,10 @@ const VIEWPORT_MARGIN = 16;
 const DOCKED_TOP = 120;
 const LEFT_CLUSTER_X = 24;
 const LEFT_CLUSTER_NATIVE_W = 656;
+// Below this zoom the view is continent/globe scale and the home icon no longer has
+// a meaningful neighborhood — dock instead of chasing the icon across the viewport.
+// (Map min zoom is 2.25; the venue entry camera lands at 6.2.)
+const ANCHOR_MIN_ZOOM = 4;
 
 const clamp = (value: number, min: number, max: number) =>
 	Math.min(Math.max(value, min), Math.max(min, max));
@@ -84,7 +93,8 @@ export function VenueMapActionPills({
 			const minX =
 				LEFT_CLUSTER_X + LEFT_CLUSTER_NATIVE_W * clusterScale + VIEWPORT_MARGIN;
 			const maxX = vw - stackW - VIEWPORT_MARGIN;
-			const isAnchored = anchor != null && anchor.isOnScreen;
+			const isAnchored =
+				anchor != null && anchor.isOnScreen && anchor.zoom >= ANCHOR_MIN_ZOOM;
 
 			let x: number;
 			let y: number;

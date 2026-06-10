@@ -78,8 +78,10 @@ import { VenueEventDetailView } from './VenueEventDetailView';
 import { createVenueIconAnchorStore, VenueMapActionPills } from './VenueMapActionPills';
 import { VenueMapToolTabBar } from './VenueMapToolTabBar';
 import {
+	formatApplicantCount,
 	formatVenueOpportunityDate,
 	formatVenueOpportunityTimeRange,
+	isVenueOpportunityLive,
 } from './venueOpportunityFormat';
 
 type VenueDayKey = keyof WeeklyHours;
@@ -3392,44 +3394,60 @@ function VenueOpportunityDeleteButton({
 
 // Single event entry row, shared between the inline Events box (642px rows) and
 // the Events tool panel (748px rows) so the two lists stay visually identical.
+// Pill metrics (104/164/53 × 22, 6.866px radius, 0.858px stroke) come from Figma.
 function VenueOpportunityRow({
 	opportunity,
-	onEdit,
+	applicantCount,
+	onOpen,
 	widthPx,
 }: {
 	opportunity: VenueEvent;
-	onEdit: (eventId: number) => void;
+	applicantCount: number;
+	onOpen: (eventId: number) => void;
 	widthPx: number;
 }) {
 	return (
 		<button
 			type="button"
-			onClick={() => onEdit(opportunity.id)}
-			aria-label={`Edit ${opportunity.name}`}
-			className="flex h-[40px] shrink-0 items-center rounded-[12px] border-[2px] border-black bg-[#F7FFF0] px-[30px] font-inter text-black"
+			onClick={() => onOpen(opportunity.id)}
+			aria-label={`View ${opportunity.name}`}
+			className="flex h-[40px] shrink-0 items-center rounded-[12px] border-[2px] border-black bg-[#F7FFF0] px-[20px] font-inter text-black"
 			style={{ width: `${widthPx}px` }}
 		>
-			<span className="min-w-0 flex-1 truncate text-[22px] font-medium leading-none">
+			<span className="min-w-0 flex-1 truncate text-left text-[16px] font-medium leading-none">
 				{opportunity.name}
 			</span>
-			<span className="ml-[18px] flex h-[24px] w-[112px] shrink-0 items-center justify-center rounded-[8px] border-[1.5px] border-black bg-[#FF818A] text-[16px] font-medium leading-none">
-				{formatVenueOpportunityDate(opportunity.whenLabel, opportunity.startsAt)}
+			<span className="ml-[16px] flex h-[22px] w-[104px] shrink-0 items-center justify-center rounded-[6.866px] border-[0.858px] border-black bg-[#F4EEC6] text-[12px] font-medium leading-none">
+				{formatApplicantCount(applicantCount)}
 			</span>
-			<span className="ml-[28px] w-[94px] shrink-0 text-center text-[16px] font-medium leading-none">
-				{formatVenueOpportunityTimeRange(opportunity.startTime, opportunity.endTime)}
+			<span className="ml-[48px] flex h-[22px] w-[164px] shrink-0 items-center justify-between rounded-[6.866px] border-[0.858px] border-black bg-[#FF9797] px-[10px] text-[12px] font-medium leading-none">
+				<span className="min-w-0 truncate">
+					{formatVenueOpportunityDate(opportunity.whenLabel, opportunity.startsAt)}
+				</span>
+				<span className="shrink-0 whitespace-nowrap">
+					{formatVenueOpportunityTimeRange(opportunity.startTime, opportunity.endTime)}
+				</span>
 			</span>
+			{isVenueOpportunityLive(opportunity) && (
+				<span className="ml-[48px] flex h-[22px] w-[53px] shrink-0 items-center justify-center gap-[4px] rounded-[6.866px] border-[0.858px] border-black bg-[#C5EDA0] text-[12px] font-medium leading-none">
+					<span aria-hidden="true" className="h-[7px] w-[7px] rounded-full bg-[#34A853]" />
+					Live
+				</span>
+			)}
 		</button>
 	);
 }
 
 function VenueOpportunitiesMapPanel({
 	opportunities,
+	applicantCountByEventId,
 	onAddOpportunity,
-	onEditOpportunity,
+	onOpenOpportunity,
 }: {
 	opportunities: VenueEvent[];
+	applicantCountByEventId: Map<number, number>;
 	onAddOpportunity: () => void;
-	onEditOpportunity: (eventId: number) => void;
+	onOpenOpportunity: (eventId: number) => void;
 }) {
 	// The hover-delete X sits just outside the box's right border, so it can't live
 	// inside the clipping overflow-y-auto list. The hovered row's measured offsetTop
@@ -3469,7 +3487,8 @@ function VenueOpportunitiesMapPanel({
 					>
 						<VenueOpportunityRow
 							opportunity={opportunity}
-							onEdit={onEditOpportunity}
+							applicantCount={applicantCountByEventId.get(opportunity.id) ?? 0}
+							onOpen={onOpenOpportunity}
 							widthPx={642}
 						/>
 					</div>
@@ -3503,20 +3522,24 @@ function VenueOpportunitiesMapPanel({
 // as the chat panel; the body reuses the inline Events box's entry rows (widened
 // to 748px) on a light-green band, with a full-width divider after the last
 // entry and the add pill below it on the gradient. Clicking a row switches the
-// inner box to the event's detail view (applicant list); the panel-local
-// selection resets naturally when the tool closes (the panel unmounts).
+// inner box to the event's detail view (applicant list); the selection lives in
+// the parent so the inline Events box can open this panel straight onto a
+// detail view, and resets when the tool is re-selected from the pills/tab bar.
 function VenueEventsMapPanel({
 	opportunities,
 	applicantCountByEventId,
+	selectedEventId,
+	onSelectEvent,
 	onAddOpportunity,
 	onEditOpportunity,
 }: {
 	opportunities: VenueEvent[];
 	applicantCountByEventId: Map<number, number>;
+	selectedEventId: number | null;
+	onSelectEvent: (eventId: number) => void;
 	onAddOpportunity: () => void;
 	onEditOpportunity: (eventId: number) => void;
 }) {
-	const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
 	// The inner list box is overflow-hidden, so the hover-delete X can't sit next to
 	// a row there. Instead the hovered row's measured offsetTop (relative to the
 	// inset-0 scroller, shifted by the inner box's 20px top + 2px border into the
@@ -3551,7 +3574,7 @@ function VenueEventsMapPanel({
 						events={opportunities}
 						selectedEventId={selectedEvent.id}
 						applicantCountByEventId={applicantCountByEventId}
-						onSelectEvent={setSelectedEventId}
+						onSelectEvent={onSelectEvent}
 						onAddEvent={onAddOpportunity}
 						onEditEvent={onEditOpportunity}
 					/>
@@ -3577,7 +3600,8 @@ function VenueEventsMapPanel({
 									>
 										<VenueOpportunityRow
 											opportunity={opportunity}
-											onEdit={setSelectedEventId}
+											applicantCount={applicantCountByEventId.get(opportunity.id) ?? 0}
+											onOpen={onSelectEvent}
 											widthPx={748}
 										/>
 									</div>
@@ -3638,6 +3662,37 @@ function VenueProfileMapPanel() {
 	);
 }
 
+// Dismissal geometry for the map tool panels. Movement at/over the drag
+// threshold on either axis marks the gesture as a pan, not a click — the same
+// 6px convention as SearchResultsMap's empty-map-click suppression. The buffer
+// inflates every tool element's visual rect so near-miss clicks (including the
+// ~8px seam between the tab bar and the panel below it) don't dismiss.
+const VENUE_TOOL_DISMISS_DRAG_PX = 6;
+const VENUE_TOOL_DISMISS_BUFFER_PX = 12;
+
+// True when the pointer event lands inside the tool cluster: within a tagged
+// element's DOM subtree, or within the buffered visual bounds of any visible
+// tagged element (getBoundingClientRect already reflects the overlay scales).
+function isWithinVenueToolUi(event: PointerEvent): boolean {
+	const target = event.target;
+	if (target instanceof Element && target.closest('[data-venue-tool-ui="true"]')) {
+		return true;
+	}
+	for (const element of document.querySelectorAll('[data-venue-tool-ui="true"]')) {
+		const rect = element.getBoundingClientRect();
+		if (rect.width === 0 || rect.height === 0) continue;
+		if (
+			event.clientX >= rect.left - VENUE_TOOL_DISMISS_BUFFER_PX &&
+			event.clientX <= rect.right + VENUE_TOOL_DISMISS_BUFFER_PX &&
+			event.clientY >= rect.top - VENUE_TOOL_DISMISS_BUFFER_PX &&
+			event.clientY <= rect.bottom + VENUE_TOOL_DISMISS_BUFFER_PX
+		) {
+			return true;
+		}
+	}
+	return false;
+}
+
 export default function VenuePortalClient() {
 	const [view, setView] = useState<VenuePortalView>('edit');
 	// Returning venues with a completed profile (per the localStorage hint) land straight
@@ -3653,6 +3708,11 @@ export default function VenuePortalClient() {
 		'add' | 'profile' | 'mail' | 'events' | null
 	>(null);
 	const [editingVenueEventId, setEditingVenueEventId] = useState<number | null>(null);
+	// Detail-view selection for the Events tool panel, lifted here so the inline
+	// Events box can open the panel directly onto an event's detail view.
+	const [eventsToolSelectedEventId, setEventsToolSelectedEventId] = useState<
+		number | null
+	>(null);
 	const isMailToolSelected = selectedVenueTool === 'mail';
 	const { data: venueEvents } = useGetVenueEvents({ enabled: view === 'map' });
 	const opportunities = venueEvents ?? [];
@@ -3666,6 +3726,10 @@ export default function VenuePortalClient() {
 		setEditingVenueEventId(eventId);
 		setSelectedVenueTool('add');
 	};
+	const openOpportunityDetail = (eventId: number) => {
+		setEventsToolSelectedEventId(eventId);
+		setSelectedVenueTool('events');
+	};
 	// Select-only on purpose: re-clicking (or double-clicking) the active tab must
 	// not close the open panel or reset its state.
 	const selectVenueTool = (tool: 'add' | 'profile' | 'mail' | 'events') => {
@@ -3673,24 +3737,52 @@ export default function VenuePortalClient() {
 		if (tool === 'add') {
 			setEditingVenueEventId(null);
 		}
+		// Opening Events from the pills/tab bar always starts at the list view.
+		if (tool === 'events') {
+			setEventsToolSelectedEventId(null);
+		}
 		setSelectedVenueTool(tool);
 	};
 
 	// Clicking off the tool UI (onto the map around it) closes the open tool and
-	// brings the pill stack back. The tab bar, the open panels, and the left
-	// cluster are tagged data-venue-tool-ui so interactions inside them don't
-	// dismiss.
+	// brings the pill stack back. Dismissal is a full click gesture, not a raw
+	// pointerdown: the pointer must go down AND come up outside the tool cluster
+	// without dragging in between — so panning the map never closes the panel,
+	// and near-miss clicks beside the panels are forgiven (isWithinVenueToolUi).
 	useEffect(() => {
 		if (view !== 'map' || selectedVenueTool === null) return;
+		let down: { pointerId: number; x: number; y: number } | null = null;
 		const handlePointerDown = (event: PointerEvent) => {
-			const target = event.target;
-			if (target instanceof Element && target.closest('[data-venue-tool-ui="true"]')) {
+			down = null;
+			if (!event.isPrimary) return;
+			if (event.pointerType === 'mouse' && event.button !== 0) return;
+			if (isWithinVenueToolUi(event)) return;
+			down = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+		};
+		const handlePointerUp = (event: PointerEvent) => {
+			const start = down;
+			down = null;
+			if (!start || event.pointerId !== start.pointerId) return;
+			if (
+				Math.abs(event.clientX - start.x) >= VENUE_TOOL_DISMISS_DRAG_PX ||
+				Math.abs(event.clientY - start.y) >= VENUE_TOOL_DISMISS_DRAG_PX
+			) {
 				return;
 			}
+			if (isWithinVenueToolUi(event)) return;
 			setSelectedVenueTool(null);
 		};
+		const handlePointerCancel = () => {
+			down = null;
+		};
 		document.addEventListener('pointerdown', handlePointerDown);
-		return () => document.removeEventListener('pointerdown', handlePointerDown);
+		document.addEventListener('pointerup', handlePointerUp);
+		document.addEventListener('pointercancel', handlePointerCancel);
+		return () => {
+			document.removeEventListener('pointerdown', handlePointerDown);
+			document.removeEventListener('pointerup', handlePointerUp);
+			document.removeEventListener('pointercancel', handlePointerCancel);
+		};
 	}, [view, selectedVenueTool]);
 
 	// The map reports the home icon's projected position at 60fps during pans; route
@@ -3756,8 +3848,9 @@ export default function VenuePortalClient() {
 					<VenueCalendarMapPanel />
 					<VenueOpportunitiesMapPanel
 						opportunities={opportunities}
+						applicantCountByEventId={applicantCountByEventId}
 						onAddOpportunity={openCreateOpportunity}
-						onEditOpportunity={openEditOpportunity}
+						onOpenOpportunity={openOpportunityDetail}
 					/>
 				</div>
 			)}
@@ -3769,6 +3862,8 @@ export default function VenuePortalClient() {
 				<VenueEventsMapPanel
 					opportunities={opportunities}
 					applicantCountByEventId={applicantCountByEventId}
+					selectedEventId={eventsToolSelectedEventId}
+					onSelectEvent={setEventsToolSelectedEventId}
 					onAddOpportunity={openCreateOpportunity}
 					onEditOpportunity={openEditOpportunity}
 				/>

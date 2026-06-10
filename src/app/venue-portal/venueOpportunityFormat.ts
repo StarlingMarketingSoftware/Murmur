@@ -1,5 +1,7 @@
-// Date/time display formatting for venue opportunity (event) rows, shared by the
+// Display formatting for venue opportunity (event) rows, shared by the
 // VenuePortalClient lists and the Events panel's detail view.
+import type { Event as VenueEvent } from '@prisma/client';
+
 const VENUE_OPPORTUNITY_MONTH_LABELS = [
 	'January',
 	'February',
@@ -63,6 +65,9 @@ const formatVenueOpportunityTimeValue = (value: string | null | undefined) => {
 	return `${hour}${minuteLabel}${meridiem}`;
 };
 
+export const formatApplicantCount = (count: number) =>
+	`${count} applicant${count === 1 ? '' : 's'}`;
+
 export const formatVenueOpportunityTimeRange = (
 	startTime: string | null | undefined,
 	endTime: string | null | undefined
@@ -73,3 +78,8 @@ export const formatVenueOpportunityTimeRange = (
 	if (startLabel && endLabel) return `${startLabel}-${endLabel}`;
 	return startLabel || endLabel || 'Time TBD';
 };
+
+// "Live" mirrors the artist-facing /api/events visibility filter: an active event
+// with a future (or unset) start is still discoverable and open to applications.
+export const isVenueOpportunityLive = (opportunity: VenueEvent) =>
+	!opportunity.startsAt || new Date(opportunity.startsAt).getTime() >= Date.now();

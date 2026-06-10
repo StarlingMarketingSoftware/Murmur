@@ -126,7 +126,10 @@ import SearchResultsMap, {
 import MapRadiusSlider, {
 	RADIUS_DEFAULT_MILES,
 } from '@/components/molecules/MapRadiusSlider';
-import type { LatLngLiteral } from '@/components/molecules/SearchResultsMap/types';
+import type {
+	LatLngLiteral,
+	MarkerHoverMeta,
+} from '@/components/molecules/SearchResultsMap/types';
 import {
 	type PersistentDashboardMapConfig,
 	usePersistentMapSetter,
@@ -152,6 +155,7 @@ import {
 	ContactResearchPanel,
 	ContactResearchHorizontalStrip,
 } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
+import { ContactResearchDescriptionBox } from '@/components/molecules/ContactResearchPanel/ContactResearchDescriptionBox';
 import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
@@ -452,139 +456,8 @@ const formatMapTopSearchWhereLabel = (where: string): string => {
 	return /^in\s+/i.test(trimmed) ? trimmed : `in ${trimmed}`;
 };
 
-const countParsedResearchSections = (metadata: string | null | undefined): number => {
-	if (!metadata) return 0;
-
-	// Extract all [n] sections first.
-	const allSections: Record<string, string> = {};
-	const regex = /\[(\d+)\]\s*([\s\S]*?)(?=\[\d+\]|$)/g;
-	let match: RegExpExecArray | null;
-	while ((match = regex.exec(metadata)) !== null) {
-		const sectionNum = match[1];
-		const content = match[2]?.trim() ?? '';
-		allSections[sectionNum] = content;
-	}
-
-	// Count sequential sections starting from [1] with meaningful content.
-	let expectedNum = 1;
-	let validCount = 0;
-	while (allSections[String(expectedNum)]) {
-		const content = allSections[String(expectedNum)] ?? '';
-		const meaningfulContent = content.replace(/[.\s,;:!?'"()\-–—]/g, '').trim();
-		if (meaningfulContent.length < 5) break;
-		validCount++;
-		expectedNum++;
-	}
-
-	return validCount;
-};
-
-const estimateWrappedLineCount = (text: string, charsPerLine: number): number => {
-	if (!text) return 0;
-	const lines = text.split(/\r?\n/);
-	let total = 0;
-	for (const rawLine of lines) {
-		const line = rawLine.trim();
-		if (!line) {
-			total += 1;
-			continue;
-		}
-		total += Math.max(1, Math.ceil(line.length / charsPerLine));
-	}
-	return total;
-};
-
 const clampNumber = (n: number, min: number, max: number): number => {
 	return Math.min(max, Math.max(min, n));
-};
-
-/**
- * For the map hover "Research" overlay, collapse the right-side panel height when the research
- * is *unparsed summary-only* and short (roughly a single paragraph), to avoid large empty space.
- */
-const getCompactMapResearchPanelHeightPx = (metadata: string): number | null => {
-	const text = metadata.trim();
-	if (!text) return null;
-
-	// Heuristic tuned to the map panel widths (boxWidth={405}) and 15px text at 1.5 line-height.
-	const approxLines = estimateWrappedLineCount(text, 52);
-
-	// If the unparsed text is long, keep the full panel height for readability.
-	if (approxLines > 12) return null;
-
-	// ContactResearchPanel summary-only (with a fixed height prop) effectively needs:
-	// height ≈ (lines * lineHeight) + chrome/padding.
-	const LINE_HEIGHT_PX = 23; // 15px * 1.5 ≈ 22.5
-	const BASE_OVERHEAD_PX = 130;
-	const rawHeight = Math.ceil(approxLines * LINE_HEIGHT_PX + BASE_OVERHEAD_PX);
-
-	// Cap to the panel's natural unparsed height so it never feels cramped or oversized.
-	return clampNumber(rawHeight, 310, 423);
-};
-
-const MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_SPACING_PX = 73;
-const MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_OUTER_HEIGHT_PX = 59;
-const MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_INNER_HEIGHT_PX = 50;
-
-/**
- * For parsed bullets + summary (bottom box) in the map panel, grow the summary box height
- * with longer metadata so more text is visible without scrolling.
- *
- * Tuned to ContactResearchPanel's 15px text at 1.5 line-height and p-3 padding.
- */
-const getMapPanelParsedSummaryBoxHeightPx = (metadata: string): number => {
-	const text = metadata.trim();
-	if (!text) return 197;
-
-	const approxLines = estimateWrappedLineCount(text, 52);
-	const targetLines = clampNumber(approxLines, 6, 12);
-
-	// Inner white box: (lines * lineHeight) + padding; outer adds a fixed chrome overhead.
-	const LINE_HEIGHT_PX = 23;
-	const INNER_PADDING_PX = 24; // p-3 top+bottom
-	const OUTER_OVERHEAD_PX = 15; // legacy: 197 outer -> 182 inner
-	const inner = Math.ceil(targetLines * LINE_HEIGHT_PX + INNER_PADDING_PX);
-	const outer = inner + OUTER_OVERHEAD_PX;
-
-	return clampNumber(outer, 197, 315);
-};
-
-/**
- * For the map hover "Research" overlay, compute a compact height when the research panel is
- * showing parsed bullets *and* the bottom summary box (to remove the large empty gap between them).
- *
- * NOTE: This is tuned to the `ContactResearchPanel` compact sizing that kicks in when a fixed
- * `height` prop is provided (smaller bullets/spacing).
- */
-const getCompactMapResearchPanelHeightPxForParsed = (metadata: string): number | null => {
-	const parsedCountRaw = countParsedResearchSections(metadata);
-	if (parsedCountRaw < 3) return null;
-
-	// `ContactResearchPanel` renders at most [1]-[5]
-	const parsedCount = clampNumber(parsedCountRaw, 3, 5);
-
-	// These constants mirror `ContactResearchPanel`'s non-compact header + compact (fixed height) bullets.
-	const HEADER_HEIGHT_PX = 24;
-	const CONTENT_START_TOP_PX = HEADER_HEIGHT_PX + 43; // header + divider + contact bar + divider
-	const BULLET_SPACING_PX = MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_SPACING_PX;
-	const SUMMARY_HEIGHT_PX = getMapPanelParsedSummaryBoxHeightPx(metadata);
-	const SUMMARY_BOTTOM_INSET_PX = 14;
-	// Mirrors `ContactResearchPanel`'s content height estimation for bullets in fixed-height mode.
-	// (See `contentHeight` inside the panel's `if (height)` branch.)
-	const BULLET_CONTENT_TOP_PADDING_PX = 6;
-	const BULLET_CONTENT_BOTTOM_PADDING_PX = 10;
-
-	const bulletContentHeightPx =
-		BULLET_CONTENT_TOP_PADDING_PX +
-		parsedCount * BULLET_SPACING_PX +
-		BULLET_CONTENT_BOTTOM_PADDING_PX;
-	const heightPx =
-		CONTENT_START_TOP_PX +
-		bulletContentHeightPx +
-		SUMMARY_HEIGHT_PX +
-		SUMMARY_BOTTOM_INSET_PX;
-
-	return Math.ceil(heightPx);
 };
 
 const MAP_RESULTS_SEARCH_TRAY_WHAT_ICON_BY_LABEL: Record<
@@ -1785,6 +1658,13 @@ const MAP_VIEW_SIDE_PANEL_BOTTOM_GAP_PX = 20;
 const MAP_PANEL_ABRIDGED_RESEARCH_HEIGHT_PX = 292;
 const MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX = 13;
 const MAP_PANEL_ABRIDGED_RESEARCH_CLEAR_DELAY_MS = 220;
+// Marker-hover research group (abridged card + Description box docked left/right).
+const MAP_MARKER_RESEARCH_GROUP_WIDTH_PX = 272.425; // abridged card width
+// ceil(312.713 max abridged card height) + 13 gap — fixed so the Description box
+// never shifts vertically with the card's variable band count.
+const MAP_MARKER_RESEARCH_DESCRIPTION_TOP_PX = 326;
+const MAP_MARKER_RESEARCH_LEFT_DOCK_LEFT_PX = 110; // clears the left select/grab rail
+const MAP_MARKER_RESEARCH_DOCK_FLIP_MARGIN_PX = 24;
 const MAP_VIEW_CAMPAIGN_HEADER_HEIGHT_PX = 59;
 const MAP_VIEW_CAMPAIGN_HEADER_GAP_PX = 13;
 // Keep both map side panels visually pinned after the dashboard root zoom is applied.
@@ -5698,6 +5578,12 @@ const DashboardContent = () => {
 	const handleMapGrabUncategorizedActiveChange = useCallback((isActive: boolean) => {
 		setMapGrabUncategorizedActive(isActive);
 	}, []);
+	// Visibility for venue-posted event markers (the red-star radar icons).
+	// Driven by the red-star stack box's grab-mode toggle.
+	const [mapGrabEventsActive, setMapGrabEventsActive] = useState(true);
+	const handleMapGrabEventsActiveChange = useCallback((isActive: boolean) => {
+		setMapGrabEventsActive(isActive);
+	}, []);
 	const [mapZoomControlIndex, setMapZoomControlIndex] = useState(1);
 	const [isMapZoomControlDragging, setIsMapZoomControlDragging] = useState(false);
 	const [mapZoomControlRequest, setMapZoomControlRequest] =
@@ -5712,6 +5598,13 @@ const DashboardContent = () => {
 	const [selectAllInViewNonce, setSelectAllInViewNonce] = useState(0);
 	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] =
 		useState<ContactWithName | null>(null);
+	// Marker-hover research group docking: right (beside Search Results) unless the
+	// hovered marker sits under that dock, then left (beside the select/grab rail).
+	const [mapMarkerResearchDockSide, setMapMarkerResearchDockSide] = useState<
+		'left' | 'right'
+	>('right');
+	// Tab toggles the Description box; persists across hovered contacts until collapsed.
+	const [isMapMarkerResearchExpanded, setIsMapMarkerResearchExpanded] = useState(false);
 	// When hovering a row in the map side panel, highlight/show the corresponding marker on the map.
 	const [hoveredMapPanelContactId, setHoveredMapPanelContactId] = useState<number | null>(
 		null
@@ -5912,7 +5805,10 @@ const DashboardContent = () => {
 	const WAVE_ROW_STEP_DELAY_SECONDS = 0.1;
 	const CASCADE_INITIAL_DELAY_MS = 120;
 	const CASCADE_STAGGER_MS = 100;
-	const CASCADE_MAX_ROWS = 14;
+	// How far above/below the scroll viewport a row may sit and still be treated
+	// as "visible" for the cascade, so a row half-clipped at the fold still
+	// reveals instead of leaving a hard seam.
+	const CASCADE_FOLD_TOLERANCE_PX = 40;
 
 	// useLayoutEffect: runs synchronously BEFORE the browser paints so the user
 	// never sees a flash of white rows — they start as placeholders.
@@ -5928,14 +5824,67 @@ const DashboardContent = () => {
 		const refs = [mapPanelRowsDesktopRef.current, mapPanelRowsNarrowRef.current];
 		for (const container of refs) {
 			if (!container) continue;
-			const rows = Array.from(container.children).slice(
-				0,
-				CASCADE_MAX_ROWS
-			) as HTMLElement[];
-			if (rows.length === 0) continue;
+			const allRows = Array.from(container.children) as HTMLElement[];
+			if (allRows.length === 0) continue;
 
-			// Set every row to the placeholder wave state before the browser paints.
-			rows.forEach((row, idx) => {
+			// Cascade only the rows the user is actually looking at, so the reveal
+			// always starts from the top of the viewport at *any* scroll position
+			// (not just when scrolled to the top). The scrollable viewport is the
+			// CustomScrollbar's internal overflow container — this rows wrapper's
+			// direct parent.
+			const scroller = container.parentElement;
+			const viewportRect = scroller?.getBoundingClientRect();
+			const viewTop = viewportRect
+				? viewportRect.top - CASCADE_FOLD_TOLERANCE_PX
+				: -Infinity;
+			const viewBottom = viewportRect
+				? viewportRect.bottom + CASCADE_FOLD_TOLERANCE_PX
+				: Infinity;
+
+			// Measure pass (read-only — classify every row before any style writes
+			// so we don't thrash layout).
+			const visibleRows: HTMLElement[] = [];
+			const offscreenRows: HTMLElement[] = [];
+			for (const row of allRows) {
+				const rect = row.getBoundingClientRect();
+				const isVisible =
+					rect.width > 0 &&
+					rect.height > 0 &&
+					rect.bottom > viewTop &&
+					rect.top < viewBottom;
+				(isVisible ? visibleRows : offscreenRows).push(row);
+			}
+
+			// Snap off-screen rows straight to their final painted state. This stops
+			// the "sharp cutoff": rows scrolled out of view never get left in the
+			// placeholder wave, and — because rows are keyed by contact.id so React
+			// reuses DOM nodes — a node carrying stale styles from an interrupted
+			// earlier cascade can't get stuck invisible. Don't touch backgroundColor
+			// on contact rows (React owns it); only the event/opportunity card's
+			// wrapper bg is painted by the cascade, so clear that one.
+			for (const row of offscreenRows) {
+				gsap.killTweensOf(row);
+				gsap.killTweensOf(Array.from(row.children));
+				row.style.animation = '';
+				row.style.animationDelay = '';
+				row.style.willChange = '';
+				row.style.borderColor = '';
+				delete row.dataset.cascadeBg;
+				if (!row.hasAttribute('data-contact-id')) {
+					row.style.backgroundColor = '';
+				}
+				for (const child of Array.from(row.children) as HTMLElement[]) {
+					child.style.opacity = '';
+					child.style.visibility = '';
+				}
+			}
+
+			if (visibleRows.length === 0) continue;
+
+			// Set every visible row to the placeholder wave state before the browser
+			// paints. `idx` is local to the visible set, so the topmost visible row
+			// reveals first.
+			visibleRows.forEach((row, idx) => {
 				// Preserve the *real* background (set by React) so we can restore it.
 				row.dataset.cascadeBg = row.style.backgroundColor;
 				// Keep the normal outline; remove any stale inline override.
@@ -5955,7 +5904,7 @@ const DashboardContent = () => {
 			});
 
 			// Schedule the cascade: each row flips to its real appearance one at a time.
-			rows.forEach((row, idx) => {
+			visibleRows.forEach((row, idx) => {
 				const timer = setTimeout(
 					() => {
 						const targetBg =
@@ -7106,24 +7055,54 @@ const DashboardContent = () => {
 		}, MAP_RESEARCH_PANEL_HOLD_MS);
 	}, [hoveredMapMarkerContact, isMapView, isMapResultsLoading]);
 
-	const handleMapMarkerHover = useCallback(() => {
-		// Research panel on marker hover is intentionally disabled (per request):
-		// hovering a marker must NOT pop up the full-cover research panel over the
-		// Search Results panel. The small in-map marker tooltip is internal to
-		// SearchResultsMap and is unaffected. Left as a no-op so the panel can be
-		// re-enabled with a one-line change if needed.
-	}, []);
+	const handleMapMarkerHover = useCallback(
+		(contact: ContactWithName | null, meta?: MarkerHoverMeta) => {
+			// Pick the dock side once per hover-start so it never flickers; when meta
+			// is absent (tooltip-overlay re-entry) or hover ends, keep the prior side.
+			if (contact && meta) {
+				const rawDashboardZoom = window
+					.getComputedStyle(document.documentElement)
+					.getPropertyValue(DASHBOARD_ZOOM_VAR)
+					.trim();
+				const dashboardZoom =
+					Number.parseFloat(rawDashboardZoom) || DASHBOARD_MAP_ZOOM_DEFAULT;
+				// CSS-px width of the right-docked group + the results panel beside it.
+				const rightDockBandCssPx =
+					10 +
+					433 * MAP_VIEW_PANEL_SCALE +
+					MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX +
+					MAP_MARKER_RESEARCH_GROUP_WIDTH_PX * MAP_VIEW_PANEL_SCALE +
+					MAP_MARKER_RESEARCH_DOCK_FLIP_MARGIN_PX;
+				setMapMarkerResearchDockSide(
+					meta.clientX >= window.innerWidth - rightDockBandCssPx * dashboardZoom
+						? 'left'
+						: 'right'
+				);
+			}
+			setHoveredMapMarkerContact(contact);
+		},
+		[MAP_VIEW_PANEL_SCALE]
+	);
 
-	const mapResearchPanelCompactHeightPx = useMemo(() => {
-		const metadata = mapResearchPanelContact?.metadata;
-		if (!metadata || metadata.trim().length === 0) return null;
-		// Prefer a compact height for parsed bullets + summary (removes the big dead space gap).
-		const parsedHeight = getCompactMapResearchPanelHeightPxForParsed(metadata);
-		if (parsedHeight) return parsedHeight;
-
-		// Fallback: only compact summary-only research when it is short enough.
-		return getCompactMapResearchPanelHeightPx(metadata);
-	}, [mapResearchPanelContact?.metadata]);
+	// Tab toggles the marker-hover Description box while the panel is visible.
+	useEffect(() => {
+		if (!isMapView || !isMapResearchPanelVisible) return;
+		const handleResearchTabToggle = (event: KeyboardEvent) => {
+			if (event.key !== 'Tab') return;
+			const target = event.target as HTMLElement | null;
+			if (
+				target &&
+				(target.isContentEditable ||
+					['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+			) {
+				return;
+			}
+			event.preventDefault();
+			setIsMapMarkerResearchExpanded((prev) => !prev);
+		};
+		window.addEventListener('keydown', handleResearchTabToggle);
+		return () => window.removeEventListener('keydown', handleResearchTabToggle);
+	}, [isMapView, isMapResearchPanelVisible]);
 
 	const searchedStateAbbr = useMemo(
 		() => extractStateAbbrFromSearchQuery(activeSearchQuery),
@@ -7628,6 +7607,66 @@ const DashboardContent = () => {
 		return set;
 	}, [mapPanelUnselectedContactsFiltered, getChipKeyForContact]);
 
+	// Bottom category-tile box — only once results are loaded and at least one maps to a category.
+	const showMapPanelCategoryBox = !isMapResultsLoading && mapPanelCategoryKeys.size > 0;
+
+	const getMapResearchDisplayFields = useCallback(
+		(contact: ContactWithName) => {
+			const isSelected = selectedContacts.includes(contact.id);
+			const isInBaseResults = displayedBaseContactIdSet.has(contact.id);
+			const searchDerivedHeadline =
+				displayedWhatValue && displayedWhereValue
+					? `${displayedWhatValue} ${displayedWhereValue}`
+					: displayedWhatValue || '';
+			const isSpecialCategorySearch =
+				/^restaurants?$/i.test(displayedWhatValue.trim()) ||
+				/^coffee\s*shops?$/i.test(displayedWhatValue.trim());
+			const curatedDisplayHeadline = contact.curatedDisplayLabel || '';
+			const contactHeadline =
+				curatedDisplayHeadline ||
+				(isInBaseResults
+					? contact.headline || contact.title || ''
+					: contact.title || contact.headline || '');
+			const computedHeadline = isInBaseResults
+				? isSpecialCategorySearch
+					? searchDerivedHeadline
+					: contactHeadline || searchDerivedHeadline
+				: contactHeadline;
+			const stickyHeadline = selectedContactStickyHeadlineById[contact.id] || '';
+			const rowHeadline =
+				isSelected && stickyHeadline ? stickyHeadline : computedHeadline;
+			const displayTitleCategory = displayedIsRestaurantsSearch && isInBaseResults
+				? 'Restaurants'
+				: displayedIsCoffeeShopsSearch && isInBaseResults
+					? 'Coffee Shops'
+					: displayedIsMusicVenuesSearch && isInBaseResults
+						? 'Music Venues'
+						: displayedIsMusicFestivalsSearch && isInBaseResults
+							? 'Music Festivals'
+							: displayedIsWeddingPlannersSearch && isInBaseResults
+								? 'Wedding Planners'
+								: rowHeadline || contact.title || '';
+
+			return {
+				displayHeadline:
+					contact.headline?.trim() || contact.title?.trim() || rowHeadline || '',
+				displayTitleCategory,
+			};
+		},
+		[
+			displayedBaseContactIdSet,
+			displayedIsCoffeeShopsSearch,
+			displayedIsMusicFestivalsSearch,
+			displayedIsMusicVenuesSearch,
+			displayedIsRestaurantsSearch,
+			displayedIsWeddingPlannersSearch,
+			displayedWhatValue,
+			displayedWhereValue,
+			selectedContactStickyHeadlineById,
+			selectedContacts,
+		]
+	);
+
 	const mapPanelHoveredResearchContact = useMemo(() => {
 		if (!isMapView || isMapResultsLoading || hoveredMapPanelContactId == null) {
 			return null;
@@ -7638,62 +7677,22 @@ const DashboardContent = () => {
 		);
 		if (!contact) return null;
 
-		const isSelected = selectedContacts.includes(contact.id);
-		const isInBaseResults = displayedBaseContactIdSet.has(contact.id);
-		const searchDerivedHeadline =
-			displayedWhatValue && displayedWhereValue
-				? `${displayedWhatValue} ${displayedWhereValue}`
-				: displayedWhatValue || '';
-		const isSpecialCategorySearch =
-			/^restaurants?$/i.test(displayedWhatValue.trim()) ||
-			/^coffee\s*shops?$/i.test(displayedWhatValue.trim());
-		const curatedDisplayHeadline = contact.curatedDisplayLabel || '';
-		const contactHeadline =
-			curatedDisplayHeadline ||
-			(isInBaseResults
-				? contact.headline || contact.title || ''
-				: contact.title || contact.headline || '');
-		const computedHeadline = isInBaseResults
-			? isSpecialCategorySearch
-				? searchDerivedHeadline
-				: contactHeadline || searchDerivedHeadline
-			: contactHeadline;
-		const stickyHeadline = selectedContactStickyHeadlineById[contact.id] || '';
-		const rowHeadline = isSelected && stickyHeadline ? stickyHeadline : computedHeadline;
-		const displayTitleCategory = displayedIsRestaurantsSearch && isInBaseResults
-			? 'Restaurants'
-			: displayedIsCoffeeShopsSearch && isInBaseResults
-				? 'Coffee Shops'
-				: displayedIsMusicVenuesSearch && isInBaseResults
-					? 'Music Venues'
-					: displayedIsMusicFestivalsSearch && isInBaseResults
-						? 'Music Festivals'
-						: displayedIsWeddingPlannersSearch && isInBaseResults
-							? 'Wedding Planners'
-							: rowHeadline || contact.title || '';
-
-		return {
-			contact,
-			displayHeadline:
-				contact.headline?.trim() || contact.title?.trim() || rowHeadline || '',
-			displayTitleCategory,
-		};
+		return { contact, ...getMapResearchDisplayFields(contact) };
 	}, [
-		displayedBaseContactIdSet,
-		displayedIsCoffeeShopsSearch,
-		displayedIsMusicFestivalsSearch,
-		displayedIsMusicVenuesSearch,
-		displayedIsRestaurantsSearch,
-		displayedIsWeddingPlannersSearch,
 		displayedMapPanelContacts,
-		displayedWhatValue,
-		displayedWhereValue,
+		getMapResearchDisplayFields,
 		hoveredMapPanelContactId,
 		isMapResultsLoading,
 		isMapView,
-		selectedContactStickyHeadlineById,
-		selectedContacts,
 	]);
+
+	const mapMarkerResearchDisplayFields = useMemo(
+		() =>
+			mapResearchPanelContact
+				? getMapResearchDisplayFields(mapResearchPanelContact)
+				: null,
+		[getMapResearchDisplayFields, mapResearchPanelContact]
+	);
 
 	const getTabPillXFor = (tab: 'search' | 'inbox') => {
 		const track = tabToggleTrackRef.current;
@@ -8901,7 +8900,7 @@ const DashboardContent = () => {
 			radiusOverlay: activeRadiusSearchOverlay,
 			onRadiusCenterChange: handleRadiusCenterChange,
 			// Venue-posted opportunity markers only on the interactive map, not the globe.
-			events: isMapView ? eventsForMap : [],
+			events: isMapView && mapGrabEventsActive ? eventsForMap : [],
 			suppressEventPopups: applyModalOpen,
 			// Reserve the right-side search-results panel's footprint (433px box at
 			// right:10px, scaled, origin top-right) so the event popup places to the right of
@@ -8948,6 +8947,7 @@ const DashboardContent = () => {
 			isSearchPending,
 			lockedStateNameForMap,
 			mapGrabActiveCategories,
+			mapGrabEventsActive,
 			mapGrabUncategorizedActive,
 			mapSearchAutoFitRequestNonce,
 			mapPresentation,
@@ -11777,20 +11777,23 @@ const DashboardContent = () => {
 													ref={mapTopCampaignsDropdownRef}
 													role="dialog"
 													aria-label="Campaign folders"
-													className="pointer-events-auto"
+													className="campaigns-table-wrapper dashboard-recent-campaigns pointer-events-auto w-full max-w-[960px] mx-auto px-4"
 													style={{
 														transformOrigin: 'top center',
-														width: '743px',
-														maxWidth: 'calc(100vw - 32px)',
+														// The initial dashboard renders at the 0.85 baseline zoom; cancel the
+														// per-monitor map-view zoom so this dropdown matches it on every screen.
+														zoom: 'calc(0.85 / var(--murmur-dashboard-zoom, 0.85))',
 													}}
 												>
-													<CampaignsTable
-														mockState={campaignsMockState}
-														onMockStateChange={setCampaignsMockState}
-														defaultOpenCampaignId={fromCampaign?.id ?? activeCampaignId ?? null}
-														defaultOpenContactsFolder
-														onFinderOpenChange={setIsCampaignFinderOpen}
-													/>
+													<div className="w-full flex flex-col items-center">
+														<CampaignsTable
+															mockState={campaignsMockState}
+															onMockStateChange={setCampaignsMockState}
+															defaultOpenCampaignId={fromCampaign?.id ?? activeCampaignId ?? null}
+															defaultOpenContactsFolder
+															onFinderOpenChange={setIsCampaignFinderOpen}
+														/>
+													</div>
 												</div>
 											</div>
 										) : null}
@@ -11913,6 +11916,7 @@ const DashboardContent = () => {
 														<MapStackStarIcon fill="#EDF2F0" stroke="#9E9E9E" />
 													</MapSelectGrabStackTile>
 												}
+												onActiveChange={handleMapGrabEventsActiveChange}
 												style={{
 													top: `-${
 														MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
@@ -12693,7 +12697,9 @@ const DashboardContent = () => {
 																	</div>
 													</div>
 												)}
-												{!isNarrowestDesktop && mapPanelHoveredResearchContact && (
+												{!isNarrowestDesktop &&
+													mapPanelHoveredResearchContact &&
+													!mapResearchPanelContact && (
 													<div
 														className="absolute pointer-events-none"
 														style={{
@@ -12722,6 +12728,65 @@ const DashboardContent = () => {
 														/>
 													</div>
 												)}
+												{/* Marker-hover research group: abridged card + Description box,
+												    statically docked beside the results panel or the left rail. */}
+												{!isMobile && !isNarrowestDesktop && mapResearchPanelContact && (
+													<div
+														className="absolute pointer-events-none"
+														style={{
+															zIndex: 124,
+															top: MAP_VIEW_SIDE_PANEL_TOP_CSS,
+															...(mapMarkerResearchDockSide === 'right'
+																? {
+																		right:
+																			10 +
+																			433 * MAP_VIEW_PANEL_SCALE +
+																			MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX,
+																	}
+																: { left: MAP_MARKER_RESEARCH_LEFT_DOCK_LEFT_PX }),
+															width: `${MAP_MARKER_RESEARCH_GROUP_WIDTH_PX}px`,
+															transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
+															transformOrigin:
+																mapMarkerResearchDockSide === 'right'
+																	? 'top right'
+																	: 'top left',
+															opacity: isMapResearchPanelVisible ? 1 : 0,
+															transition: `opacity ${MAP_RESEARCH_PANEL_FADE_MS}ms ease-out`,
+														}}
+													>
+														{/* Bottom-align the card to its slot so shorter cards slide down,
+														    keeping a constant gap above the static Description box. */}
+														<div
+															className="absolute left-0 top-0 flex w-full flex-col justify-end"
+															style={{
+																height: `${
+																	MAP_MARKER_RESEARCH_DESCRIPTION_TOP_PX -
+																	MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX
+																}px`,
+															}}
+														>
+															<ContactResearchPanel
+																contact={mapResearchPanelContact}
+																variant="abridged"
+																displayHeadline={
+																	mapMarkerResearchDisplayFields?.displayHeadline
+																}
+																displayTitleCategory={
+																	mapMarkerResearchDisplayFields?.displayTitleCategory
+																}
+															/>
+														</div>
+														<ContactResearchDescriptionBox
+															className="absolute left-0"
+															style={{
+																top: `${MAP_MARKER_RESEARCH_DESCRIPTION_TOP_PX}px`,
+															}}
+															metadata={mapResearchPanelContact.metadata}
+															fallbackText={mapResearchPanelContact.headline || ''}
+															expanded={isMapMarkerResearchExpanded}
+														/>
+													</div>
+												)}
 												{/* Search Results overlay box on the right side - keep mounted during loading
 									    so the UI doesn't disappear between state searches. */}
 																{!isNarrowestDesktop && shouldShowMapResultsSidePanel && (
@@ -12740,11 +12805,7 @@ const DashboardContent = () => {
 																				style={{
 																					top: MAP_VIEW_SIDE_PANEL_TOP_CSS,
 																					width: '433px',
-																					height:
-																						mapResearchPanelContact &&
-																						mapResearchPanelCompactHeightPx
-																							? mapResearchPanelCompactHeightPx
-																							: 800,
+																					height: 800,
 																					maxHeight: `calc(100% - ${MAP_VIEW_SIDE_PANEL_TOP_CSS} - ${MAP_VIEW_SIDE_PANEL_BOTTOM_GAP_PX}px)`,
 																					overflow: 'hidden',
 																					transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
@@ -12809,11 +12870,7 @@ const DashboardContent = () => {
 																				<div
 																					className="flex flex-col flex-1 min-h-0"
 																					style={{
-																						backgroundColor:
-																							mapResearchPanelContact &&
-																							isMapResearchPanelVisible
-																								? '#D8E5FB'
-																								: 'rgba(99, 155, 244, 0.5)',
+																						backgroundColor: 'rgba(99, 155, 244, 0.5)',
 																						borderRadius: '8px',
 																						overflow: 'hidden',
 																					}}
@@ -12941,7 +12998,11 @@ const DashboardContent = () => {
 																					>
 																						<CustomScrollbar
 																							className="flex-1 min-h-0"
-																							contentClassName="p-[6px] pb-[78px] space-y-[7px]"
+																							contentClassName={`p-[6px] ${
+																								showMapPanelCategoryBox
+																									? 'pb-[78px]'
+																									: 'pb-[14px]'
+																							} space-y-[7px]`}
 																							thumbWidth={2}
 																							thumbColor="#000000"
 																							trackColor="transparent"
@@ -12968,103 +13029,105 @@ const DashboardContent = () => {
 																</div>
 															)}
 																						</CustomScrollbar>
-																						<div
-																							className="absolute left-1/2 -translate-x-1/2 bottom-[9px] flex items-center gap-[2px] pl-[4px]"
-																							style={{
-																								width: '420px',
-																								height: '55px',
-																								borderRadius: '9.86px',
-																								border: '1.446px solid #000',
-																								backgroundColor: '#65A1B9',
-																							}}
-																						>
-																							{[
-																								{
-																									key: 'music-venues',
-																									color: '#71C9FD',
-																									Icon: MusicVenuesIcon,
-																									size: 32,
-																								},
-																								{
-																									key: 'wine-beer-spirits',
-																									color: '#80AAFF',
-																									Icon: WineBeerSpiritsIcon,
-																									size: 25,
-																								},
-																								{
-																									key: 'restaurants',
-																									color: '#77DD91',
-																									Icon: RestaurantsIcon,
-																									size: 32,
-																								},
-																								{
-																									key: 'coffee-shops',
-																									color: '#A9DE78',
-																									Icon: CoffeeShopsIcon,
-																									size: 18,
-																								},
-																								{
-																									key: 'wedding-planners',
-																									color: '#EED56E',
-																									Icon: WeddingPlannersIcon,
-																									size: 30,
-																								},
-																								{
-																									key: 'festivals',
-																									color: '#80AAFF',
-																									Icon: FestivalsIcon,
-																									size: 32,
-																								},
-																								{
-																									key: 'radio-stations',
-																									color: '#56DA73',
-																									Icon: RadioStationsIcon,
-																									size: 32,
-																								},
-																							]
-																								.filter(({ key }) =>
-																									mapPanelCategoryKeys.has(key)
-																								)
-																								.map(({ key, color, Icon, size }) => {
-																									const isSelected =
-																										selectedCategoryChips.has(key);
-																									return (
-																										<div
-																											key={key}
-																											className="flex items-center justify-center flex-shrink-0 cursor-pointer"
-																											style={{
-																												width: 45,
-																												height: 45,
-																												backgroundColor: isSelected
-																													? 'transparent'
-																													: color,
-																												borderRadius: 6,
-																												border: isSelected
-																													? `2px solid ${color}`
-																													: '1px solid #000',
-																											}}
-																											onClick={() => {
-																												setSelectedCategoryChips(
-																													(prev) => {
-																														const next = new Set(prev);
-																														if (next.has(key))
-																															next.delete(key);
-																														else next.add(key);
-																														return next;
+																						{showMapPanelCategoryBox && (
+																							<div
+																								className="absolute left-1/2 -translate-x-1/2 bottom-[9px] flex items-center gap-[2px] pl-[4px]"
+																								style={{
+																									width: '420px',
+																									height: '55px',
+																									borderRadius: '9.86px',
+																									border: '1.446px solid #000',
+																									backgroundColor: '#65A1B9',
+																								}}
+																							>
+																								{[
+																									{
+																										key: 'music-venues',
+																										color: '#71C9FD',
+																										Icon: MusicVenuesIcon,
+																										size: 32,
+																									},
+																									{
+																										key: 'wine-beer-spirits',
+																										color: '#80AAFF',
+																										Icon: WineBeerSpiritsIcon,
+																										size: 25,
+																									},
+																									{
+																										key: 'restaurants',
+																										color: '#77DD91',
+																										Icon: RestaurantsIcon,
+																										size: 32,
+																									},
+																									{
+																										key: 'coffee-shops',
+																										color: '#A9DE78',
+																										Icon: CoffeeShopsIcon,
+																										size: 18,
+																									},
+																									{
+																										key: 'wedding-planners',
+																										color: '#EED56E',
+																										Icon: WeddingPlannersIcon,
+																										size: 30,
+																									},
+																									{
+																										key: 'festivals',
+																										color: '#80AAFF',
+																										Icon: FestivalsIcon,
+																										size: 32,
+																									},
+																									{
+																										key: 'radio-stations',
+																										color: '#56DA73',
+																										Icon: RadioStationsIcon,
+																										size: 32,
+																									},
+																								]
+																									.filter(({ key }) =>
+																										mapPanelCategoryKeys.has(key)
+																									)
+																									.map(({ key, color, Icon, size }) => {
+																										const isSelected =
+																											selectedCategoryChips.has(key);
+																										return (
+																											<div
+																												key={key}
+																												className="flex items-center justify-center flex-shrink-0 cursor-pointer"
+																												style={{
+																													width: 45,
+																													height: 45,
+																													backgroundColor: isSelected
+																														? 'transparent'
+																														: color,
+																													borderRadius: 6,
+																													border: isSelected
+																														? `2px solid ${color}`
+																														: '1px solid #000',
+																												}}
+																												onClick={() => {
+																													setSelectedCategoryChips(
+																														(prev) => {
+																															const next = new Set(prev);
+																															if (next.has(key))
+																																next.delete(key);
+																															else next.add(key);
+																															return next;
+																														}
+																													);
+																												}}
+																											>
+																												<Icon
+																													size={size}
+																													innerFill={
+																														isSelected ? color : 'white'
 																													}
-																												);
-																											}}
-																										>
-																											<Icon
-																												size={size}
-																												innerFill={
-																													isSelected ? color : 'white'
-																												}
-																											/>
-																										</div>
-																									);
-																								})}
-																						</div>
+																												/>
+																											</div>
+																										);
+																									})}
+																							</div>
+																						)}
 																					</div>
 																				</div>
 																				{!isMapResultsLoading && !fromHomeParam && (
@@ -13098,40 +13161,6 @@ const DashboardContent = () => {
 																								Add Contacts
 																							</span>
 																						</Button>
-																					</div>
-																				)}
-																				{mapResearchPanelContact && (
-																					<div
-																						className="absolute inset-0 z-50"
-																						style={{
-																							backgroundColor: '#D8E5FB',
-																							opacity: isMapResearchPanelVisible ? 1 : 0,
-																							transition: `opacity ${MAP_RESEARCH_PANEL_FADE_MS}ms ease-out`,
-																							pointerEvents: isMapResearchPanelVisible
-																								? 'auto'
-																								: 'none',
-																						}}
-																					>
-																						<ContactResearchPanel
-																							contact={mapResearchPanelContact}
-																							className="!block !border-0 !bg-transparent !rounded-none"
-																							style={{ width: '100%', height: '100%' }}
-																							boxWidth={405}
-																							height={
-																								mapResearchPanelCompactHeightPx ??
-																								undefined
-																							}
-																							fixedHeightBoxSpacingPx={
-																								MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_SPACING_PX
-																							}
-																							fixedHeightBulletOuterHeightPx={
-																								MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_OUTER_HEIGHT_PX
-																							}
-																							fixedHeightBulletInnerHeightPx={
-																								MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_INNER_HEIGHT_PX
-																							}
-																							expandSummaryToFillHeight
-																						/>
 																					</div>
 																				)}
 																			</div>

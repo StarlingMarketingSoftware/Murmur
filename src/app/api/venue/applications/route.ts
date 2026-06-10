@@ -27,6 +27,8 @@ export type VenueApplicationRow = {
 	eventId: number;
 	standardUserId: string;
 	applicantName: string;
+	genre: string | null; // application-time snapshot (EventApplication.genre)
+	area: string | null; // application-time snapshot (EventApplication.area)
 	createdAt: string; // ISO submission time (row time when no conversation yet)
 	applicationPreview: string; // plain-text preview of the (eventual) summary message
 	// null if the event was deleted after the application was submitted.
@@ -163,6 +165,8 @@ export async function GET() {
 					eventId: application.eventId,
 					standardUserId: application.standardUserId,
 					applicantName,
+					genre: application.genre,
+					area: application.area,
 					createdAt: application.createdAt.toISOString(),
 					applicationPreview: buildPreview(
 						buildApplicationSummaryHtml(application, event?.name ?? null),

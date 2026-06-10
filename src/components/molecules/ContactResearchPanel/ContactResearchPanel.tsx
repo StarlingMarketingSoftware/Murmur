@@ -678,7 +678,17 @@ const ContactResearchPanelAbridged: FC<
 						...(textStyle || {}),
 					}}
 				>
-					<span className="block w-full" style={headlineTextFadeStyle}>
+					<span
+						className="block w-full"
+						style={{
+							// Clamp to the band's two 18px lines so long headlines
+							// ellipsize instead of clipping mid-line.
+							display: '-webkit-box',
+							WebkitBoxOrient: 'vertical',
+							WebkitLineClamp: 2,
+							overflow: 'hidden',
+						}}
+					>
 						{headlineText}
 					</span>
 				</div>

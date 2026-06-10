@@ -1456,6 +1456,13 @@ export function MapSelectGrabTallStackBox({
 		setSelectedCategories(new Array(TALL_STACK_CATEGORY_COUNT).fill(false));
 	}, []);
 
+	// Grab-mode "All": deactivate every category tile in this bar. The star and
+	// blue-spark stack boxes below the bar hold their own state, so they stay
+	// active.
+	const handleClickAllGrabber = useCallback(() => {
+		setGrabberActiveCategories(new Array(TALL_STACK_CATEGORY_COUNT).fill(false));
+	}, []);
+
 	// Each time the select tool is (re-)activated, reset all categories to selected.
 	useEffect(() => {
 		if (isSelectActive) {
@@ -1575,9 +1582,20 @@ export function MapSelectGrabTallStackBox({
 						);
 					}
 					return (
-						<div aria-hidden="true" style={sharedAllLabelStyle}>
+						<button
+							type="button"
+							onClick={handleClickAllGrabber}
+							aria-label="Deactivate all categories"
+							style={{
+								...sharedAllLabelStyle,
+								padding: 0,
+								margin: 0,
+								cursor: 'pointer',
+								pointerEvents: 'auto',
+							}}
+						>
 							{allLabelChildren}
-						</div>
+						</button>
 					);
 				})()}
 				{selectedRuns.map(([startIdx, endIdx]) => {
