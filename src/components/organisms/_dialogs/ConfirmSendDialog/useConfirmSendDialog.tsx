@@ -17,6 +17,12 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useDivertEmailToMessage } from '@/hooks/queryHooks/useConversations';
+import { ContactWithName } from '@/types/contact';
+import {
+	getSendDwellMs,
+	useSendingSessionActions,
+	waitForSendDwell,
+} from '@/contexts/SendingSessionContext';
 
 export interface ConfirmSendDialogProps {
 	draftEmails: EmailWithRelations[];
@@ -75,6 +81,9 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 		suppressToasts: true,
 	});
 
+	// No-op outside the SendingSessionProvider (mounted in MurmurLayoutClient).
+	const sendingActions = useSendingSessionActions();
+
 	const handleSend = async () => {
 		if (!campaign) {
 			return null;
@@ -118,65 +127,101 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 		setIsOpen(false);
 		setSendingProgress(0);
 
+		// Drive the campaign-global sending UI alongside the legacy setSendingProgress
+		// counter; queue mirrors the processing order below (DMs, then capped emails).
+		const sendQueue = [...venueDrafts, ...emailsToProcess];
+		const sessionStarted = sendingActions.startSession({
+			campaignId: campaign.id,
+			queue: sendQueue.map((email) => ({
+				emailId: email.id,
+				contactId: email.contactId,
+				contact: email.contact as ContactWithName,
+				kind: email.contact.venueId != null ? 'venueMessage' : 'email',
+				subject: email.subject,
+			})),
+		});
+		if (!sessionStarted) {
+			toast.error('A send is already in progress.');
+			return;
+		}
+		// No sending UI without the provider — skip the dwell.
+		const dwellMs = sendingActions.hasProvider ? getSendDwellMs(sendQueue.length) : 0;
+
 		let emailedCount = 0;
 		let messagedCount = 0;
 
-		// 1) Internal messages to venue users (no email, no credit cost).
-		for (const email of venueDrafts) {
-			try {
-				await divertEmailToMessage(email.id);
-				messagedCount++;
-				setSendingProgress((prev) => prev + 1);
-				queryClient.invalidateQueries({ queryKey: ['campaign', Number(campaignId)] });
-			} catch (error) {
-				console.error('Failed to deliver internal message:', error);
-				// Continue with the next recipient even if one fails.
-			}
-		}
-
-		// 2) Regular emails via Mailgun.
-		for (const email of emailsToProcess) {
-			try {
-				const res = await sendMailgunMessage({
-					subject: email.subject,
-					message: email.message,
-					recipientEmail: email.contact.email,
-					senderEmail: campaign?.identity?.email,
-					senderName: campaign?.identity?.name,
-					originEmail:
-						user?.customDomain && user?.customDomain !== ''
-							? user?.customDomain
-							: user?.murmurEmail,
-					replyToEmail: user?.replyToEmail ?? user?.murmurEmail ?? undefined,
-					template: 'newMessage',
-					campaignId: campaign.id,
-				});
-
-				if (res.success) {
-					await updateEmail({
-						id: email.id.toString(),
-						data: {
-							status: EmailStatus.sent,
-							sentAt: new Date(),
-						},
-					});
-					emailedCount++;
+		try {
+			// 1) Internal messages to venue users (no email, no credit cost).
+			for (const email of venueDrafts) {
+				const dwellStart = Date.now();
+				sendingActions.beginEmail(email.id);
+				try {
+					await divertEmailToMessage(email.id);
+					messagedCount++;
 					setSendingProgress((prev) => prev + 1);
+					sendingActions.completeEmail(email.id);
 					queryClient.invalidateQueries({ queryKey: ['campaign', Number(campaignId)] });
+				} catch (error) {
+					console.error('Failed to deliver internal message:', error);
+					sendingActions.failEmail(email.id);
+					// Continue with the next recipient even if one fails.
 				}
-			} catch (error) {
-				console.error('Failed to send email:', error);
-				// Continue with next email even if one fails
+				await waitForSendDwell(dwellStart, dwellMs);
 			}
-		}
 
-		// Only emails consume sending credits; internal messages are free.
-		if (user && emailedCount > 0) {
-			const newCreditBalance = Math.max(0, sendingCredits - emailedCount);
-			await editUser({
-				clerkId: user.clerkId,
-				data: { sendingCredits: newCreditBalance },
-			});
+			// 2) Regular emails via Mailgun.
+			for (const email of emailsToProcess) {
+				const dwellStart = Date.now();
+				sendingActions.beginEmail(email.id);
+				try {
+					const res = await sendMailgunMessage({
+						subject: email.subject,
+						message: email.message,
+						recipientEmail: email.contact.email,
+						senderEmail: campaign?.identity?.email,
+						senderName: campaign?.identity?.name,
+						originEmail:
+							user?.customDomain && user?.customDomain !== ''
+								? user?.customDomain
+								: user?.murmurEmail,
+						replyToEmail: user?.replyToEmail ?? user?.murmurEmail ?? undefined,
+						template: 'newMessage',
+						campaignId: campaign.id,
+					});
+
+					if (res.success) {
+						await updateEmail({
+							id: email.id.toString(),
+							data: {
+								status: EmailStatus.sent,
+								sentAt: new Date(),
+							},
+						});
+						emailedCount++;
+						setSendingProgress((prev) => prev + 1);
+						sendingActions.completeEmail(email.id);
+						queryClient.invalidateQueries({ queryKey: ['campaign', Number(campaignId)] });
+					} else {
+						sendingActions.failEmail(email.id);
+					}
+				} catch (error) {
+					console.error('Failed to send email:', error);
+					sendingActions.failEmail(email.id);
+					// Continue with next email even if one fails
+				}
+				await waitForSendDwell(dwellStart, dwellMs);
+			}
+
+			// Only emails consume sending credits; internal messages are free.
+			if (user && emailedCount > 0) {
+				const newCreditBalance = Math.max(0, sendingCredits - emailedCount);
+				await editUser({
+					clerkId: user.clerkId,
+					data: { sendingCredits: newCreditBalance },
+				});
+			}
+		} finally {
+			sendingActions.finishSession();
 		}
 
 		// Show final status message.

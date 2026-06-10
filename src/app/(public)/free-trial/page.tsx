@@ -10,7 +10,6 @@ import { StripeEmbeddedCheckoutModal } from '@/components/organisms/StripeEmbedd
 import {
 	FREE_TRIAL_CLERK_APPEARANCE,
 	FreeTrialClerkGlobalStyles,
-	getOauthFlow,
 } from '@/components/organisms/FreeTrialClerkTheme';
 import { useFreeTrialCheckout } from '@/hooks/useFreeTrialCheckout';
 
@@ -27,8 +26,6 @@ export default function FreeTrialPage() {
 
 	const authMode = searchParams.get('auth');
 	const showSignIn = authMode === 'sign-in';
-
-	const oauthFlow = getOauthFlow();
 
 	const buildAuthUrl = (mode: 'sign-in' | 'sign-up') => {
 		const nextParams = new URLSearchParams(searchParams.toString());
@@ -186,7 +183,7 @@ export default function FreeTrialPage() {
 							{showSignIn ? (
 								<SignIn
 									routing="hash"
-									oauthFlow={oauthFlow}
+									oauthFlow="redirect"
 									signUpUrl={signUpUrl}
 									forceRedirectUrl={urls.freeTrial.index}
 									fallbackRedirectUrl={urls.freeTrial.index}
@@ -197,7 +194,7 @@ export default function FreeTrialPage() {
 							) : (
 								<SignUp
 									routing="hash"
-									oauthFlow={oauthFlow}
+									oauthFlow="redirect"
 									signInUrl={signInUrl}
 									forceRedirectUrl={urls.freeTrial.index}
 									fallbackRedirectUrl={urls.freeTrial.index}

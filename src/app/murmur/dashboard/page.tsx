@@ -44,7 +44,6 @@ import {
 import { isProblematicBrowser } from '@/utils/browserDetection';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
-import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
 import { BookingIcon } from '@/components/atoms/_svg/BookingIcon';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
@@ -141,14 +140,18 @@ import type {
 } from '@/components/molecules/SearchResultsMap/types';
 import {
 	type PersistentDashboardMapConfig,
+	usePersistentMapReady,
 	usePersistentMapSetter,
 } from '@/contexts/PersistentMapContext';
+import { DashboardBootBackdrop } from '@/components/molecules/DashboardBootBackdrop/DashboardBootBackdrop';
 import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
 import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
 import { ContactWithName } from '@/types/contact';
 import { MapResultsPanelSkeleton } from '@/components/molecules/MapResultsPanelSkeleton/MapResultsPanelSkeleton';
 import {
 	buildAllUsStateNames,
+	extractUsStateNameFromText,
+	getNearestUsStateNameForPoint,
 	getNearestUsStateNames,
 	normalizeUsStateName,
 } from '@/utils/usStates';
@@ -188,6 +191,7 @@ import {
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useGetMapEvents } from '@/hooks/queryHooks/useGetMapEvents';
+import { useGetMyEventApplications } from '@/hooks/queryHooks/useEventApplications';
 import type { MapEventData } from '@/app/api/events/route';
 import {
 	getIdentitiesListQueryKey,
@@ -197,6 +201,8 @@ import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { EmailStatus } from '@prisma/client';
+import { useSendingSessionState } from '@/contexts/SendingSessionContext';
+import { SearchSendingOverlay } from '@/components/molecules/SendingProgress/SearchSendingOverlay';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -248,6 +254,17 @@ const MILES_TO_KM = 1.609344;
 
 const MAP_POSTED_EVENT_CARD_WIDTH_PX = 420;
 const MAP_POSTED_EVENT_CARD_HEIGHT_PX = 121;
+// Collapsed-deck chrome (all in the card's 420-wide design space): each card
+// edge peeking above the front card is offset up by the step and inset more
+// per depth level, deck-of-cards style.
+const MAP_POSTED_EVENT_DECK_EDGE_STEP_PX = 6;
+const MAP_POSTED_EVENT_DECK_EDGE_INSET_PX = 6;
+const MAP_POSTED_EVENT_DECK_MAX_EDGES = 3;
+const MAP_POSTED_EVENT_CARD_SURFACE_STYLE = {
+	borderRadius: '8px',
+	border: '3px solid #8F2B2B',
+	backgroundColor: '#F9FAFB',
+} as const;
 
 // Browser memory for radius mode (enabled flag + draft/default center + miles), so it's
 // retained across disengage/re-engage, toggling off, and reloads. Only the Radius pill
@@ -532,6 +549,14 @@ const MAP_RESULTS_BOTTOM_SEARCH_BOX = {
 // strip is too narrow and the results panel becomes a full-width bottom sheet.
 const MAP_CHROME_MID_MAX_LAYOUT_WIDTH_PX = 1490;
 const MAP_CHROME_COMPRESSED_MAX_LAYOUT_WIDTH_PX = 1080;
+
+// Cinematic boot splash over the cold-loading map: minimum on-screen time (so a fast
+// cached load never flashes the starfield), fade-out duration, and a safety cap that
+// dismisses the splash even if Mapbox errors or never loads.
+const DASHBOARD_BOOT_MIN_VISIBLE_MS = 1200;
+const DASHBOARD_BOOT_FADE_MS = 800;
+const DASHBOARD_BOOT_MAX_WAIT_MS = 10000;
+type DashboardBootPhase = 'active' | 'fading' | 'done';
 
 const INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX = {
 	width: 418,
@@ -2918,6 +2943,14 @@ const DashboardContent = () => {
 	// If we navigated here from a campaign, enable "Add to Campaign" mode.
 	const fromCampaignIdParam = searchParams.get('fromCampaignId')?.trim() || '';
 	const isAddToCampaignMode = Boolean(fromCampaignIdParam);
+	// Campaign send session (provider lives in MurmurLayoutClient, so a batch
+	// started on the campaign page stays live across the pick-flow navigation).
+	const sendingSession = useSendingSessionState();
+	const showMapSendingOverlay =
+		isAddToCampaignMode &&
+		isMobile === false &&
+		(sendingSession.status === 'sending' || sendingSession.status === 'done') &&
+		!sendingSession.dismissed;
 	// Persisted (URL) search + view state for the normal dashboard flow so refresh keeps the user
 	// in the same results view (map/table) instead of resetting back to the initial search screen.
 	const dashboardViewParam = searchParams.get('view')?.trim() || '';
@@ -8127,6 +8160,79 @@ const DashboardContent = () => {
 		!hasSearched && activeTab === 'search' && selectedActionBarIcon === 'calendar';
 	const isOverflowingDashboardPanelOpen = isCampaignFinderOpen || isCalendarPanelOpen;
 
+	// Cinematic boot splash: a dark starfield + skeleton hero chrome shown over the
+	// cold-loading map, fading into the globe once Mapbox's `load` fires. Lazy init
+	// from the layout-persistent ready flag so client-side route returns (dashboard →
+	// campaign → dashboard, map still mounted/loaded) skip the splash entirely.
+	const isPersistentMapReady = usePersistentMapReady();
+	const [bootPhase, setBootPhase] = useState<DashboardBootPhase>(() =>
+		isPersistentMapReady ? 'done' : 'active'
+	);
+	const bootStartRef = useRef(Date.now());
+
+	// Map ready → hold until the minimum splash time has elapsed, then start the fade.
+	useEffect(() => {
+		if (bootPhase !== 'active' || !isPersistentMapReady) return;
+		const elapsed = Date.now() - bootStartRef.current;
+		const timer = setTimeout(
+			() => setBootPhase('fading'),
+			Math.max(0, DASHBOARD_BOOT_MIN_VISIBLE_MS - elapsed)
+		);
+		return () => clearTimeout(timer);
+	}, [bootPhase, isPersistentMapReady]);
+
+	useEffect(() => {
+		if (bootPhase !== 'fading') return;
+		const timer = setTimeout(() => setBootPhase('done'), DASHBOARD_BOOT_FADE_MS);
+		return () => clearTimeout(timer);
+	}, [bootPhase]);
+
+	// Safety cap: never hold the splash past the max wait (map error / blocked tiles);
+	// what's revealed underneath is the map's own dark loading mask — same as today.
+	useEffect(() => {
+		if (bootPhase !== 'active') return;
+		const elapsed = Date.now() - bootStartRef.current;
+		const timer = setTimeout(
+			() => setBootPhase('fading'),
+			Math.max(0, DASHBOARD_BOOT_MAX_WAIT_MS - elapsed)
+		);
+		return () => clearTimeout(timer);
+	}, [bootPhase]);
+
+	// Abort instantly anywhere off the clean desktop landing (mobile tree, deep-linked
+	// search/map-view/?fromHome, or a search/scroll-to-map commit mid-splash): the
+	// skeleton chrome only exists on the locked landing hero, and once the map jumps
+	// to its interactive z-index the splash must not linger underneath.
+	useEffect(() => {
+		if (bootPhase === 'done') return;
+		if (isMobile === true || (isMobile === false && !shouldLockLandingDashboardScroll)) {
+			setBootPhase('done');
+		}
+	}, [bootPhase, isMobile, shouldLockLandingDashboardScroll]);
+
+	// Body classes drive the boot chrome skin (globals.css "dashboard cinematic boot"
+	// block). Classes rather than prop-threading because the skinned elements span the
+	// hero and the ask-anything bar, which lives outside the scroll-lock wrapper.
+	useLayoutEffect(() => {
+		const body = document.body;
+		body.classList.toggle(
+			'dashboard-booting',
+			bootPhase === 'active' && shouldLockLandingDashboardScroll
+		);
+		body.classList.toggle(
+			'dashboard-boot-fading',
+			bootPhase === 'fading' && shouldLockLandingDashboardScroll
+		);
+		return () => {
+			body.classList.remove('dashboard-booting', 'dashboard-boot-fading');
+		};
+	}, [bootPhase, shouldLockLandingDashboardScroll]);
+
+	// The hero Input's border is layered Tailwind `!important` utilities, which CSS in
+	// globals.css cannot reliably beat — so its boot skin swaps the classes in JSX.
+	const isBootSkin = bootPhase === 'active' && shouldLockLandingDashboardScroll;
+	const isBootTransition = bootPhase !== 'done' && shouldLockLandingDashboardScroll;
+
 	// Lock body scroll when in map view or on the initial desktop dashboard.
 	useLayoutEffect(() => {
 		if (shouldLockDashboardPageScroll) {
@@ -8723,9 +8829,26 @@ const DashboardContent = () => {
 
 	// Upcoming venue-posted events → radar opportunity markers on the interactive map.
 	const { data: mapEvents } = useGetMapEvents({ enabled: isMapView });
+	// Submitted applications hide their events from BOTH the map markers and the
+	// results-panel deck (withdrawn ones stay visible so the user can re-apply).
+	// useApplyToEvent invalidates ['eventApplications'] on success, so both update
+	// right after an apply without touching the shared /api/events cache.
+	const { data: myEventApplications, isPending: isMyEventApplicationsPending } =
+		useGetMyEventApplications({ enabled: isMapView && isSignedIn === true });
+	const appliedEventIds = useMemo(() => {
+		const ids = new Set<number>();
+		for (const application of myEventApplications ?? []) {
+			if (application.status === 'submitted') ids.add(application.eventId);
+		}
+		return ids;
+	}, [myEventApplications]);
+	const unappliedMapEvents = useMemo<MapEventData[]>(
+		() => (mapEvents ?? []).filter((event) => !appliedEventIds.has(event.id)),
+		[mapEvents, appliedEventIds]
+	);
 	const eventsForMap = useMemo<SearchResultsMapProps['events']>(
 		() =>
-			(mapEvents ?? [])
+			unappliedMapEvents
 				.filter((event) => event.latitude != null && event.longitude != null)
 				.map((event) => ({
 					id: event.id,
@@ -8733,13 +8856,13 @@ const DashboardContent = () => {
 					lng: event.longitude as number,
 					name: event.name,
 				})),
-		[mapEvents]
+		[unappliedMapEvents]
 	);
 	// Renders the event-popup card for the active marker (looked up by id) inside the map's
 	// white inner box. The map owns the popup container/positioning; this owns the content.
 	const renderEventPopupContent = useCallback(
 		(eventId: number) => {
-			const event = mapEvents?.find((e) => e.id === eventId);
+			const event = unappliedMapEvents.find((e) => e.id === eventId);
 			return event ? (
 				<MapEventPopupCard
 					event={event}
@@ -8750,11 +8873,31 @@ const DashboardContent = () => {
 				/>
 			) : null;
 		},
-		[mapEvents]
+		[unappliedMapEvents]
 	);
-	const topPostedMapEvent = useMemo<MapEventData | null>(() => {
-		return mapEvents?.[0] ?? null;
-	}, [mapEvents]);
+	// The user's "general area" for the results-panel deck: their profile state plus
+	// its 5 nearest states. Null = no parseable profile state = no geo filter. The
+	// map markers are never geo-filtered — only the panel is area-scoped.
+	const panelAreaStateSet = useMemo<Set<string> | null>(() => {
+		const userStateName = extractUsStateNameFromText(resolvedIdentity?.area);
+		if (!userStateName) return null;
+		return new Set([userStateName, ...getNearestUsStateNames(userStateName, 5)]);
+	}, [resolvedIdentity?.area]);
+	// In-area unapplied opportunities for the panel deck. API order is startsAt asc,
+	// so the front card is the soonest. The EVENT's own coords decide its state —
+	// venueState is the venue's HOME state and an event can be posted elsewhere
+	// (nearest-centroid border error is benign: the set spans 6 states). Coordless
+	// rows (impossible via /api/events today) fall back to venueState.
+	const panelPostedEvents = useMemo<MapEventData[]>(() => {
+		if (!panelAreaStateSet) return unappliedMapEvents;
+		return unappliedMapEvents.filter((event) => {
+			const stateName =
+				event.latitude != null && event.longitude != null
+					? getNearestUsStateNameForPoint(event.latitude, event.longitude)
+					: normalizeUsStateName(event.venueState);
+			return stateName != null && panelAreaStateSet.has(stateName);
+		});
+	}, [unappliedMapEvents, panelAreaStateSet]);
 
 	const contactsForMap = useMemo(() => {
 		const sourceContacts =
@@ -9230,6 +9373,10 @@ const DashboardContent = () => {
 	// React requires the same hook order on every render.
 	const [postedEventCardScale, setPostedEventCardScale] = useState(1);
 	const [postedEventCardStretch, setPostedEventCardStretch] = useState(false);
+	// Whether the >1-opportunity deck is spread into a vertical list. No reset
+	// effect: rendering branches on the live panelPostedEvents.length, so a stale
+	// `true` is moot once the deck shrinks to 0/1 cards.
+	const [arePostedEventsExpanded, setArePostedEventsExpanded] = useState(false);
 	const postedEventCardResizeObserverRef = useRef<ResizeObserver | null>(null);
 	const measurePostedEventCard = useCallback((node: HTMLDivElement | null) => {
 		postedEventCardResizeObserverRef.current?.disconnect();
@@ -9252,7 +9399,16 @@ const DashboardContent = () => {
 
 	// Return null during initial load to prevent hydration mismatch
 	if (isMobile === null) {
-		return <div className="min-h-screen w-full">{mapPortal}</div>;
+		// The boot backdrop here is the SSR/first-paint output — it keeps the page dark
+		// before the device branch resolves (mobile sees at most a brief dark frame).
+		return (
+			<div className="min-h-screen w-full">
+				{mapPortal}
+				{bootPhase !== 'done' && (
+					<DashboardBootBackdrop fading={bootPhase === 'fading'} />
+				)}
+			</div>
+		);
 	}
 
 	// Mobile dashboard: tabbed app frame over the persistent map (folders /
@@ -9449,32 +9605,52 @@ const DashboardContent = () => {
 		}, MAP_PANEL_ABRIDGED_RESEARCH_CLEAR_DELAY_MS);
 	};
 
-	const renderMapPostedEventCard = (variant: 'desktop' | 'narrow') => {
-		if (!topPostedMapEvent) return null;
+	// Deck chrome shown on a posted-event card: total in-area opportunity count plus
+	// the expand/collapse affordance. Null = plain card (single card, or rows 2..N
+	// of the expanded list).
+	type PostedEventDeckChrome = { deckCount: number; expanded: boolean };
 
-		const isNarrow = variant === 'narrow';
-		const eventName = topPostedMapEvent.name.trim() || 'Posted Event';
-		const eventDate = formatMapPostedEventDate(topPostedMapEvent);
-		const venueName = topPostedMapEvent.venueName?.trim() || 'Venue TBA';
-		const venueCity = topPostedMapEvent.venueCity?.trim() || '';
+	// The 420×121 design-px content of one posted-event card. Shared by the
+	// standalone/expanded cards and the collapsed deck's front card, so the deck
+	// face stays byte-identical to the plain card.
+	const renderMapPostedEventCardBody = (
+		event: MapEventData,
+		chrome: PostedEventDeckChrome | null
+	) => {
+		const eventName = event.name.trim() || 'Posted Event';
+		const eventDate = formatMapPostedEventDate(event);
+		const venueName = event.venueName?.trim() || 'Venue TBA';
+		const venueCity = event.venueCity?.trim() || '';
 		const venueStateAbbr =
-			getStateAbbreviation(topPostedMapEvent.venueState || '') ||
-			topPostedMapEvent.venueState?.trim().toUpperCase() ||
+			getStateAbbreviation(event.venueState || '') ||
+			event.venueState?.trim().toUpperCase() ||
 			'';
 
-		const cardSurfaceStyle = {
-			borderRadius: '8px',
-			border: '3px solid #8F2B2B',
-			backgroundColor: '#F9FAFB',
-		};
-
-		const cardBody = (
+		return (
 			<>
 				<div className="absolute left-[10px] right-[10px] top-[7px] bottom-[42px] min-w-0">
 					<div className="grid h-full min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-[10px]">
 						<div className="min-w-0">
 							<div className="flex min-w-0 items-center gap-[5px]">
-								<MapStackStarIcon size={24} className="flex-shrink-0" />
+								<span className="relative flex-shrink-0">
+									<MapStackStarIcon size={24} />
+									{chrome && !chrome.expanded && (
+										<span
+											className="absolute flex items-center justify-center rounded-full font-inter text-[10px] font-bold leading-none"
+											style={{
+												top: '-5px',
+												right: '-7px',
+												minWidth: '15px',
+												height: '15px',
+												padding: '0 3px',
+												backgroundColor: '#F8A6A6',
+												color: '#8F2B2B',
+											}}
+										>
+											{chrome.deckCount}
+										</span>
+									)}
+								</span>
 								{venueStateAbbr && (
 									<span
 										className="inline-flex h-[19px] w-[35px] flex-shrink-0 items-center justify-center rounded-[5.6px] border font-inter text-[12px] font-bold leading-none text-black"
@@ -9525,40 +9701,80 @@ const DashboardContent = () => {
 						height: '27px',
 						backgroundColor: '#E06D6D',
 					}}
-					onClick={(event) => {
-						event.stopPropagation();
-						setApplyModalEvent(topPostedMapEvent);
+					onClick={(mouseEvent) => {
+						mouseEvent.stopPropagation();
+						setApplyModalEvent(event);
 						setApplyModalOpen(true);
 					}}
 				>
 					Apply
 				</button>
+				{chrome && (
+					<button
+						type="button"
+						aria-expanded={chrome.expanded}
+						aria-label={
+							chrome.expanded
+								? 'Collapse opportunities'
+								: `Expand ${chrome.deckCount} opportunities`
+						}
+						className="absolute bottom-[5px] right-[9px] flex items-center gap-[5px]"
+						onClick={(mouseEvent) => {
+							// The collapsed deck's front card also toggles — don't double-fire.
+							mouseEvent.stopPropagation();
+							setArePostedEventsExpanded((prev) => !prev);
+						}}
+					>
+						<span
+							className="font-inter text-[11px] lowercase leading-none"
+							style={{ color: '#6B7280' }}
+						>
+							{chrome.expanded ? 'collapse' : 'expand'}
+						</span>
+						<span
+							className="flex h-[22px] w-[22px] items-center justify-center rounded-full font-inter text-[12px] font-bold leading-none text-white"
+							style={{ backgroundColor: '#CE0202', border: '2px solid #FFFFFF' }}
+						>
+							{chrome.deckCount}
+						</span>
+					</button>
+				)}
 			</>
 		);
+	};
 
-		// Outer wrapper fills the result-row width. In columns narrower than the
-		// 420px design width it caps at that width, reserves the proportional
-		// height via aspect-ratio, and scales the natively-laid-out 420×121 card
-		// down to fit, so the whole card — text, badges, banners and button —
-		// shrinks together instead of overflowing. In wider columns the card
-		// stretches to the full row width (its layers are left/right-anchored)
-		// so it lines up with the contact rows instead of floating centered.
-		const stretchToRowWidth = !isNarrow && postedEventCardStretch;
+	// Outer wrapper fills the result-row width. In columns narrower than the
+	// 420px design width it caps at that width, reserves the proportional
+	// height via aspect-ratio, and scales the natively-laid-out 420×121 card
+	// down to fit, so the whole card — text, badges, banners and button —
+	// shrinks together instead of overflowing. In wider columns the card
+	// stretches to the full row width (its layers are left/right-anchored)
+	// so it lines up with the contact rows instead of floating centered.
+	// `withMeasureRef` attaches the shared ResizeObserver — exactly ONE rendered
+	// card (or the deck wrapper) carries it; the scale it produces is shared.
+	const renderMapPostedEventCard = (
+		event: MapEventData,
+		chrome: PostedEventDeckChrome | null,
+		withMeasureRef: boolean,
+		animateAppear = false
+	) => {
 		return (
 			<div
-				key={`posted-event-${topPostedMapEvent.id}`}
-				ref={isNarrow ? undefined : measurePostedEventCard}
-				className="mx-auto flex-shrink-0 overflow-hidden select-none"
+				key={`posted-event-${event.id}`}
+				ref={withMeasureRef ? measurePostedEventCard : undefined}
+				className={`mx-auto flex-shrink-0 overflow-hidden select-none${
+					animateAppear ? ' map-overlay-appear' : ''
+				}`}
 				style={{
 					width: '100%',
-					maxWidth: stretchToRowWidth
+					maxWidth: postedEventCardStretch
 						? undefined
 						: `${MAP_POSTED_EVENT_CARD_WIDTH_PX}px`,
 					// Match the inner card's rounding so the wrapper's own background
 					// (which the results-cascade animation paints white) is clipped to
 					// the rounded shape instead of bleeding into the corners.
 					borderRadius: '8px',
-					...(isNarrow || stretchToRowWidth
+					...(postedEventCardStretch
 						? {}
 						: {
 								aspectRatio: `${MAP_POSTED_EVENT_CARD_WIDTH_PX} / ${MAP_POSTED_EVENT_CARD_HEIGHT_PX}`,
@@ -9568,22 +9784,126 @@ const DashboardContent = () => {
 				<div
 					className="relative overflow-hidden"
 					style={{
-						width:
-							isNarrow || stretchToRowWidth
-								? '100%'
-								: `${MAP_POSTED_EVENT_CARD_WIDTH_PX}px`,
+						width: postedEventCardStretch
+							? '100%'
+							: `${MAP_POSTED_EVENT_CARD_WIDTH_PX}px`,
 						height: `${MAP_POSTED_EVENT_CARD_HEIGHT_PX}px`,
 						transformOrigin: 'top left',
-						transform:
-							isNarrow || stretchToRowWidth
-								? undefined
-								: `scale(${postedEventCardScale})`,
-						...cardSurfaceStyle,
+						transform: postedEventCardStretch
+							? undefined
+							: `scale(${postedEventCardScale})`,
+						...MAP_POSTED_EVENT_CARD_SURFACE_STYLE,
 					}}
 				>
-					{cardBody}
+					{renderMapPostedEventCardBody(event, chrome)}
 				</div>
 			</div>
+		);
+	};
+
+	// Collapsed deck: the front card (soonest event) at full size with up to
+	// three card edges peeking above it. Everything lives inside the one scaled
+	// 420-coordinate block, so the existing scale transform shrinks edges,
+	// bubbles and badges together with the card.
+	const renderMapPostedEventsDeck = (events: MapEventData[]) => {
+		const [frontEvent] = events;
+		const deckEdgeCount = Math.min(events.length - 1, MAP_POSTED_EVENT_DECK_MAX_EDGES);
+		const deckPadPx = deckEdgeCount * MAP_POSTED_EVENT_DECK_EDGE_STEP_PX;
+		const deckHeightPx = MAP_POSTED_EVENT_CARD_HEIGHT_PX + deckPadPx;
+		return (
+			<div
+				key="posted-event-deck"
+				ref={measurePostedEventCard}
+				className="mx-auto flex-shrink-0 overflow-hidden select-none"
+				style={{
+					width: '100%',
+					maxWidth: postedEventCardStretch
+						? undefined
+						: `${MAP_POSTED_EVENT_CARD_WIDTH_PX}px`,
+					borderRadius: '8px',
+					...(postedEventCardStretch
+						? {}
+						: {
+								aspectRatio: `${MAP_POSTED_EVENT_CARD_WIDTH_PX} / ${deckHeightPx}`,
+							}),
+				}}
+			>
+				<div
+					className="relative"
+					style={{
+						width: postedEventCardStretch
+							? '100%'
+							: `${MAP_POSTED_EVENT_CARD_WIDTH_PX}px`,
+						height: `${deckHeightPx}px`,
+						transformOrigin: 'top left',
+						transform: postedEventCardStretch
+							? undefined
+							: `scale(${postedEventCardScale})`,
+					}}
+				>
+					{/* Peeking card edges, back-most first — DOM order paints the stack. */}
+					{Array.from({ length: deckEdgeCount }, (_, i) => {
+						const depth = deckEdgeCount - i;
+						return (
+							<div
+								key={`posted-event-deck-edge-${depth}`}
+								aria-hidden="true"
+								className="absolute"
+								style={{
+									top: `${deckPadPx - depth * MAP_POSTED_EVENT_DECK_EDGE_STEP_PX}px`,
+									left: `${depth * MAP_POSTED_EVENT_DECK_EDGE_INSET_PX}px`,
+									right: `${depth * MAP_POSTED_EVENT_DECK_EDGE_INSET_PX}px`,
+									height: '24px',
+									...MAP_POSTED_EVENT_CARD_SURFACE_STYLE,
+								}}
+							/>
+						);
+					})}
+					{/* Front card — today's card face, clickable to spread the deck. The
+					    Apply and expand buttons inside stopPropagation, so they keep
+					    working without toggling. */}
+					<div
+						className="absolute left-0 right-0 cursor-pointer overflow-hidden"
+						style={{
+							top: `${deckPadPx}px`,
+							height: `${MAP_POSTED_EVENT_CARD_HEIGHT_PX}px`,
+							...MAP_POSTED_EVENT_CARD_SURFACE_STYLE,
+						}}
+						onClick={() => setArePostedEventsExpanded(true)}
+					>
+						{renderMapPostedEventCardBody(frontEvent, {
+							deckCount: events.length,
+							expanded: false,
+						})}
+					</div>
+				</div>
+			</div>
+		);
+	};
+
+	// Posted-events section at the top of the Search Results rows: nothing when
+	// no in-area unapplied opportunities, today's plain card for exactly one,
+	// otherwise the stacked deck / expanded vertical list.
+	const renderMapPostedEventsSection = () => {
+		// Signed in: wait for the applications query so an already-applied card
+		// never flashes and then vanishes (pending only before the first fetch
+		// resolves; a failed query falls through to the unfiltered list).
+		if (isSignedIn && isMyEventApplicationsPending) return null;
+		const events = panelPostedEvents;
+		if (events.length === 0) return null;
+		if (events.length === 1) return renderMapPostedEventCard(events[0], null, true);
+		if (!arePostedEventsExpanded) return renderMapPostedEventsDeck(events);
+		return (
+			<>
+				{events.map((event, index) =>
+					renderMapPostedEventCard(
+						event,
+						index === 0 ? { deckCount: events.length, expanded: true } : null,
+						index === 0,
+						true
+					)
+				)}
+			</>
 		);
 	};
 
@@ -9999,12 +10319,18 @@ const DashboardContent = () => {
 			`}</style>
 			{/* Shared Mapbox globe background */}
 			{mapPortal}
+			{/* Boot splash starfield: fixed at z -1 like the map but later in the DOM, so it
+			    paints above the canvas while staying under all static-flow hero content. Kept
+			    outside the content wrapper so the hasSearched transform can never capture it. */}
+			{bootPhase !== 'done' && shouldLockLandingDashboardScroll && (
+				<DashboardBootBackdrop fading={bootPhase === 'fading'} />
+			)}
 			{!hasSearched &&
 				activeTab === 'search' &&
 				!fromHomeParam &&
 				!isMapView && (
 					<div
-						className="fixed left-1/2 pointer-events-none"
+						className="dashboard-ask-anything-root fixed left-1/2 pointer-events-none"
 						onMouseEnter={cancelMapBottomSearchFollowupPreviewClear}
 						onMouseLeave={scheduleMapBottomSearchFollowupPreviewClear}
 						style={{
@@ -10175,7 +10501,7 @@ const DashboardContent = () => {
 											<MurmurLogoNew
 												width={logoWidth}
 												height={logoHeight}
-												className="origin-bottom scale-[1.5] -translate-x-[15%] translate-y-[40px]"
+												className="dashboard-hero-logo origin-bottom scale-[1.5] -translate-x-[15%] translate-y-[40px]"
 											/>
 										</div>
 									</div>
@@ -10315,12 +10641,20 @@ const DashboardContent = () => {
 																						className={`search-wave-input !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent ${
 																							inboxView
 																								? '!h-[39px] !border-0'
-																								: '!h-[72px] !border-2 !border-black'
+																								: isBootSkin
+																									? '!h-[72px] !border-2 !border-[#caccce]'
+																									: '!h-[72px] !border-2 !border-black'
+																						} ${
+																							isBootTransition
+																								? 'transition-[border-color] duration-700'
+																								: ''
 																						} pr-[80px]`}
 																						placeholder=""
 																						style={{
 																							accentColor: 'transparent',
-																							transition: 'none',
+																							// The boot crossfade needs the border-color transition
+																							// class to win; otherwise transitions stay disabled.
+																							transition: isBootTransition ? undefined : 'none',
 																							...(inboxView
 																								? { backgroundColor: '#EFEFEF' }
 																								: {}),
@@ -12576,6 +12910,19 @@ const DashboardContent = () => {
 											{mapTopActionDropdowns}
 											{mapSelectGrabberTool}
 											{searchThisAreaCta}
+											{showMapSendingOverlay && (
+												<div
+													className="fixed map-overlay-appear"
+													style={{
+														top: '110px',
+														left: 'max(80px, calc(50% - 480px))',
+														zIndex: 9990,
+														pointerEvents: 'none',
+													}}
+												>
+													<SearchSendingOverlay />
+												</div>
+											)}
 										</>,
 										document.body
 									);
@@ -13486,7 +13833,7 @@ const DashboardContent = () => {
 																	ref={mapPanelRowsDesktopRef}
 																	className="space-y-[7px]"
 																>
-																	{renderMapPostedEventCard('desktop')}
+																	{renderMapPostedEventsSection()}
 																	{mapPanelUnselectedContactsFiltered.map(
 																		renderMapPanelDesktopRow
 																	)}
@@ -14190,9 +14537,14 @@ const Dashboard = () => {
 	return (
 		<Suspense
 			fallback={
-				<div className="flex min-h-screen flex-col items-center justify-center gap-4">
-					<MurmurLogoNew width={180} height={32} />
-					<Spinner size="large" color="foreground" />
+				// Matches the cinematic boot splash (dark starfield + boot-skinned logo) so a
+				// suspended first render is visually seamless with the post-hydration splash.
+				<div
+					className="flex min-h-screen flex-col items-center justify-center gap-4"
+					style={{ backgroundColor: '#1f2123' }}
+				>
+					<DashboardBootBackdrop />
+					<MurmurLogoNew width={180} height={32} className="murmur-logo-boot" />
 				</div>
 			}
 		>

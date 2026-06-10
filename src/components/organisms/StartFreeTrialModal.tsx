@@ -9,7 +9,6 @@ import { StripeEmbeddedCheckoutModal } from '@/components/organisms/StripeEmbedd
 import {
 	FREE_TRIAL_CLERK_APPEARANCE,
 	FreeTrialClerkGlobalStyles,
-	getOauthFlow,
 } from '@/components/organisms/FreeTrialClerkTheme';
 
 // Clerk redirects back to the landing page with this param after auth completes;
@@ -39,9 +38,10 @@ export function StartFreeTrialModal({ open }: StartFreeTrialModalProps) {
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 
-		// A mobile OAuth redirect returns on a fresh page load at /#/sso-callback;
-		// Clerk needs a mounted SignUp/SignIn to finish the handshake, so re-open
-		// the popup and leave the URL alone until the flow completes.
+		// OAuth always uses a full-page redirect (the popup flow doesn't reliably
+		// complete sign-in with hash routing), returning on a fresh page load at
+		// /#/sso-callback; Clerk needs a mounted SignUp/SignIn to finish the
+		// handshake, so re-open the popup and leave the URL alone until it completes.
 		if (window.location.hash.startsWith('#/sso-callback')) {
 			setLatchedOpen(true);
 			return;
@@ -105,7 +105,7 @@ export function StartFreeTrialModal({ open }: StartFreeTrialModalProps) {
 					(showSignIn ? (
 						<SignIn
 							routing="hash"
-							oauthFlow={getOauthFlow()}
+							oauthFlow="redirect"
 							signUpUrl={`${urls.home.index}?auth=sign-up`}
 							forceRedirectUrl={TRIAL_RETURN_URL}
 							fallbackRedirectUrl={TRIAL_RETURN_URL}
@@ -116,7 +116,7 @@ export function StartFreeTrialModal({ open }: StartFreeTrialModalProps) {
 					) : (
 						<SignUp
 							routing="hash"
-							oauthFlow={getOauthFlow()}
+							oauthFlow="redirect"
 							signInUrl={`${urls.home.index}?auth=sign-in`}
 							forceRedirectUrl={TRIAL_RETURN_URL}
 							fallbackRedirectUrl={TRIAL_RETURN_URL}

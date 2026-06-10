@@ -65,6 +65,9 @@ import ContactsExpandedList, {
 } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/ContactsExpandedList';
 import { DraftsExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftsExpandedList';
 import { DraftPreviewExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftPreviewExpandedList';
+import { SendingExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/SendingExpandedList';
+import { SearchSendingOverlay } from '@/components/molecules/SendingProgress/SearchSendingOverlay';
+import { useSendingSessionState } from '@/contexts/SendingSessionContext';
 import { SentExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/SentExpandedList';
 import { InboxExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/InboxExpandedList';
 import { MobileCampaignSearchHeader } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Mobile/MobileCampaignSearchHeader';
@@ -2009,6 +2012,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const sentEmails = (headerEmails || []).filter((e) => e.status === EmailStatus.sent);
 	const sentCount = sentEmails.length;
 
+	// Campaign-global "actively sending" session (driven by the send loops). While
+	// visible, the left expanded panel swaps to the sending list and — on the search
+	// tab — the floating sending overlay renders over the map instead.
+	const sendingSession = useSendingSessionState();
+	const isSendingUiVisible =
+		(sendingSession.status === 'sending' || sendingSession.status === 'done') &&
+		!sendingSession.dismissed;
+	const showSearchSendingOverlay =
+		view === 'search' &&
+		!isMobile &&
+		!isSearchTabNarrow &&
+		renderGlobalOverlays &&
+		isSendingUiVisible;
+
 	// Drafts review stays open whenever at least one (batch-scoped) draft exists.
 	useEffect(() => {
 		if (contentView !== 'drafting') return;
@@ -2032,6 +2049,30 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 		setSelectedDraft(firstDraft);
 	}, [draftEmailsForView, isPendingEmails, selectedDraft, contentView]);
+
+	// While a send session runs, keep the draft review stack on the actively
+	// sending draft so the front card advances one-to-the-next per send. Sent
+	// drafts leave draftEmailsForView via the per-send invalidation, and the
+	// fallback effect above restores normal selection once the batch finishes.
+	useEffect(() => {
+		if (contentView !== 'drafting') return;
+		if (sendingSession.status !== 'sending' || sendingSession.dismissed) return;
+		const activeEmailId =
+			sendingSession.queue[sendingSession.activeIndex]?.emailId ?? null;
+		if (activeEmailId == null) return;
+		const activeDraft = draftEmailsForView.find((d) => d.id === activeEmailId);
+		if (activeDraft && selectedDraft?.id !== activeDraft.id) {
+			setSelectedDraft(activeDraft);
+		}
+	}, [
+		contentView,
+		sendingSession.status,
+		sendingSession.dismissed,
+		sendingSession.activeIndex,
+		sendingSession.queue,
+		draftEmailsForView,
+		selectedDraft,
+	]);
 
 	// If we just "Kept" a test draft, auto-open its draft in the Drafts tab once it exists.
 	useEffect(() => {
@@ -3810,7 +3851,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{/* Persistent Campaign Header Box for specific tabs */}
 						{/* Hide this absolute panel in narrow desktop + testing/contacts mode - we'll use inline layout instead */}
 						{/* Also hide when hideHeaderBox is true (header rendered at page level for narrowest breakpoint) */}
-						{shouldRenderAbsolutePinnedLeftColumn && (
+						{showSearchSendingOverlay && (
+							<div
+								className="absolute hidden lg:flex flex-col"
+								style={{
+									right: 'calc(50% + 384px + 32px)',
+									top: '29px',
+									zIndex: 130,
+								}}
+							>
+								<SearchSendingOverlay />
+							</div>
+						)}
+						{shouldRenderAbsolutePinnedLeftColumn && !showSearchSendingOverlay && (
 							<div
 								data-campaign-interactive-surface
 								className="absolute hidden lg:flex flex-col"
@@ -3882,7 +3935,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									</div>
 								)}
 								{view !== 'inbox' &&
-									(isDraftPreviewOpen ? (
+									(isSendingUiVisible ? (
+										<SendingExpandedList
+											width={mainContactsPanelWidthPx}
+											height={mainContactsPanelHeightPx}
+										/>
+									) : isDraftPreviewOpen ? (
 										shouldShowPinnedRegenEmailPreview ? (
 											<div
 												data-draft-review-side-preview
@@ -5504,6 +5562,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														overflow: 'visible',
 													}}
 												>
+													{isSendingUiVisible ? (
+														<SendingExpandedList width={330} height={263} />
+													) : (
 													<ContactsExpandedList
 														contacts={contactsForContactsExpandedList}
 														{...contactsListSupplementalProps}
@@ -5530,6 +5591,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														minRows={5}
 														onSearchFromMiniBar={handleMiniContactsSearch}
 													/>
+													)}
 												</div>
 												{/* Compact Research panel */}
 												{isBatchDraftingInProgress ? (
@@ -5926,6 +5988,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* Contacts table below writing box at narrowest breakpoint */}
 										{isNarrowestDesktop && (
 											<div className="mt-[20px] w-full flex justify-center">
+												{isSendingUiVisible ? (
+													<SendingExpandedList width={489} height={349} />
+												) : (
 												<ContactsExpandedList
 													contacts={contactsForContactsExpandedList}
 													{...contactsListSupplementalProps}
@@ -5951,6 +6016,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													minRows={5}
 													onSearchFromMiniBar={handleMiniContactsSearch}
 												/>
+												)}
 											</div>
 										)}
 										{/* Research panel below contacts at narrowest breakpoint */}
@@ -6095,6 +6161,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													/>
 													{/* Drafts-mode activity list */}
 													<div style={{ width: '330px' }}>
+														{isSendingUiVisible ? (
+															<SendingExpandedList width={330} height={316} />
+														) : (
 														<ContactsExpandedList
 															contacts={contactsForContactsExpandedList}
 															{...contactsListSupplementalProps}
@@ -6123,6 +6192,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															height={316}
 															minRows={5}
 														/>
+														)}
 													</div>
 													{/* Research panel - height set so bottom aligns with drafts table (59 + 10 + 316 + 10 + 308 = 703 = drafts table height) */}
 													{isBatchDraftingInProgress ? (

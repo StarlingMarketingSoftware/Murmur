@@ -6,7 +6,10 @@ import SearchResultsMap, {
 	type SearchResultsMapProps,
 } from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import { urls } from '@/constants/urls';
-import { usePersistentMapValue } from '@/contexts/PersistentMapContext';
+import {
+	usePersistentMapReadySetter,
+	usePersistentMapValue,
+} from '@/contexts/PersistentMapContext';
 
 const IDLE_CLIP_PATH = 'inset(0px round 0px)';
 const IDLE_FRAME_TRANSITION = '0ms ease';
@@ -22,6 +25,7 @@ const FALLBACK_MAP_PROPS: SearchResultsMapProps = {
 export function PersistentDashboardMap() {
 	const pathname = usePathname();
 	const mapConfig = usePersistentMapValue();
+	const setPersistentMapReady = usePersistentMapReadySetter();
 	const [mounted, setMounted] = useState(false);
 
 	useEffect(() => {
@@ -112,7 +116,12 @@ export function PersistentDashboardMap() {
 							overflow: 'hidden',
 						}}
 					>
-						<SearchResultsMap {...mapProps} />
+						{/* onMapLoadedChange stays after the spread so a host-config mapProps
+						    update can never clobber the readiness wiring. */}
+						<SearchResultsMap
+							{...mapProps}
+							onMapLoadedChange={setPersistentMapReady}
+						/>
 					</div>
 
 					<div

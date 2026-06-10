@@ -8066,3 +8066,202 @@ body.murmur-mobile .search-input-icon-btn {
 		width: 32px;
 	}
 }
+
+/* === Dashboard cinematic boot ============================================
+   Initial-dashboard loading state: a dark starfield (DashboardBootBackdrop)
+   covers the cold-loading Mapbox canvas while body.dashboard-booting reskins
+   the hero chrome as outlined skeletons (white logo triangles, dark search
+   bar/toolbar). body.dashboard-boot-fading carries the transitions so every
+   property crossfades back to its normal value as the backdrop fades out.
+   Lives here (not styled-jsx) because the backdrop must be dark from the
+   server-rendered first paint. */
+
+.dashboard-boot-backdrop {
+	position: fixed;
+	inset: 0;
+	/* Same z as the map's .dashboard-globe-bg but later in the DOM, so it paints
+	   above the canvas while staying under all static-flow page content. */
+	z-index: -1;
+	background-color: #1f2123;
+	pointer-events: none;
+}
+
+/* Pre-map paint: html/body only go transparent once .dashboard-globe-bg mounts,
+   so keep the page itself dark while the splash exists. */
+html:has(.dashboard-boot-backdrop) {
+	background-color: #1f2123 !important;
+}
+
+/* Mirror the persistent map's counter-zoom so the backdrop covers the true
+   viewport (and star sizes stay design-true) under the dashboard root zoom. */
+html.murmur-compact .dashboard-boot-backdrop {
+	zoom: calc(1 / var(--murmur-dashboard-zoom, var(--murmur-campaign-zoom, 0.85)));
+}
+
+.dashboard-boot-backdrop--fading {
+	opacity: 0;
+	transition: opacity 800ms ease;
+}
+
+.dashboard-boot-starfield {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+}
+
+.dashboard-boot-vignette {
+	position: absolute;
+	inset: 0;
+	background: radial-gradient(
+		ellipse 75% 60% at 50% 44%,
+		transparent 55%,
+		rgba(0, 0, 0, 0.4) 100%
+	);
+}
+
+@keyframes dashboard-boot-twinkle {
+	0%,
+	100% {
+		opacity: var(--boot-star-o, 0.8);
+	}
+	50% {
+		opacity: 0.08;
+	}
+}
+
+.boot-star--twinkle {
+	animation: dashboard-boot-twinkle 3000ms ease-in-out infinite;
+}
+
+/* --- Logo skin: fast-forward triangles white, shards black, wordmark hidden.
+   .murmur-logo-boot is the standalone variant for the Suspense fallback. */
+body.dashboard-booting .dashboard-hero-logo .murmur-logo-word,
+.murmur-logo-boot .murmur-logo-word {
+	opacity: 0;
+}
+body.dashboard-booting .dashboard-hero-logo .murmur-logo-tri,
+.murmur-logo-boot .murmur-logo-tri {
+	fill: #ffffff;
+	stroke: #ffffff;
+}
+body.dashboard-booting .dashboard-hero-logo .murmur-logo-shard,
+.murmur-logo-boot .murmur-logo-shard {
+	fill: #000000;
+	stroke: #000000;
+}
+/* Wordmark hidden → center the visible mark over the search bar. Mark center sits
+   at 44.9px of the 300px hero box after the 1.5 bottom-origin scale; +52.5% of the
+   box brings it to the middle (unlayered `translate` beats the layered utility). */
+body.dashboard-booting .dashboard-hero-logo {
+	translate: 52.5% 40px;
+}
+/* Fallback-logo variant (180px box, no scale utilities): mark center 27px → +35%. */
+.murmur-logo-boot {
+	translate: 35% 0;
+}
+
+/* --- Search bar skeleton: dark fill, light outline, empty outlined button. */
+body.dashboard-booting .hero-wrapper {
+	pointer-events: none;
+}
+/* Specificity note: the hero-width rules above (`html.murmur-dashboard-compact
+   .search-bar-wrapper:not(.search-bar-active) .search-wave-container`, ~line 6275)
+   pin the resting fill to #f2f2f2 at (0,4,1) — the doubled class outranks them. */
+body.dashboard-booting .search-bar-wrapper .search-wave-container.search-wave-container {
+	background: #191b1d !important;
+	opacity: 1 !important;
+}
+body.dashboard-booting .search-wave-container::before {
+	opacity: 0; /* the white inner-gradient sheen */
+}
+body.dashboard-booting .search-wave-input.search-wave-input {
+	border-color: #caccce !important; /* outranks the unlayered :hover/:focus rules above */
+	background: transparent !important;
+	-webkit-backdrop-filter: none !important;
+	backdrop-filter: none !important;
+	caret-color: transparent;
+}
+body.dashboard-booting .search-gradient-button {
+	opacity: 0 !important;
+}
+body.dashboard-booting .dashboard-search-button {
+	background-color: transparent !important;
+	border: 2px solid #caccce !important;
+}
+body.dashboard-booting .dashboard-search-button .search-spotlight-content {
+	opacity: 0;
+}
+
+/* --- Action toolbar: dark fill, light border, uniformly dim icons. */
+body.dashboard-booting .dashboard-action-bar {
+	background: #191b1d !important;
+	border: 2px solid #caccce !important;
+}
+body.dashboard-booting .dashboard-action-bar button {
+	color: #caccce !important;
+	opacity: 0.3 !important;
+}
+
+/* --- Everything else on the landing hides until the reveal. */
+body.dashboard-booting .dashboard-recent-campaigns,
+body.dashboard-booting .dashboard-ask-anything-root,
+body.dashboard-booting .clerk-user-button {
+	opacity: 0 !important;
+}
+body.dashboard-booting .dashboard-ask-anything-root,
+body.dashboard-booting .dashboard-ask-anything-root * {
+	pointer-events: none !important;
+}
+
+/* --- Crossfade back: transitions live only on the fading class, so swapping
+   dashboard-booting → dashboard-boot-fading in one commit animates every skinned
+   property to its normal value, then both classes drop at 'done'. */
+body.dashboard-boot-fading .dashboard-hero-logo {
+	transition: translate 800ms ease;
+}
+body.dashboard-boot-fading .dashboard-hero-logo path {
+	transition:
+		fill 800ms ease,
+		stroke 800ms ease,
+		opacity 800ms ease;
+}
+/* !important: several of these carry inline `transition: none` (wave container) or
+   inline micro-transitions (action-bar buttons) that would make the crossfade snap. */
+body.dashboard-boot-fading .search-wave-container,
+body.dashboard-boot-fading .search-wave-container::before,
+body.dashboard-boot-fading .search-gradient-button,
+body.dashboard-boot-fading .dashboard-search-button,
+body.dashboard-boot-fading .dashboard-search-button .search-spotlight-content,
+body.dashboard-boot-fading .dashboard-action-bar,
+body.dashboard-boot-fading .dashboard-action-bar button,
+body.dashboard-boot-fading .dashboard-recent-campaigns,
+body.dashboard-boot-fading .dashboard-ask-anything-root,
+body.dashboard-boot-fading .clerk-user-button {
+	transition:
+		opacity 700ms ease,
+		background-color 700ms ease,
+		border-color 700ms ease,
+		color 700ms ease !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.boot-star--twinkle {
+		animation: none;
+	}
+	.dashboard-boot-backdrop--fading,
+	body.dashboard-boot-fading .dashboard-hero-logo,
+	body.dashboard-boot-fading .dashboard-hero-logo path,
+	body.dashboard-boot-fading .search-wave-container,
+	body.dashboard-boot-fading .search-wave-container::before,
+	body.dashboard-boot-fading .search-gradient-button,
+	body.dashboard-boot-fading .dashboard-search-button,
+	body.dashboard-boot-fading .dashboard-search-button .search-spotlight-content,
+	body.dashboard-boot-fading .dashboard-action-bar,
+	body.dashboard-boot-fading .dashboard-action-bar button,
+	body.dashboard-boot-fading .dashboard-recent-campaigns,
+	body.dashboard-boot-fading .dashboard-ask-anything-root,
+	body.dashboard-boot-fading .clerk-user-button {
+		transition-duration: 1ms !important;
+	}
+}

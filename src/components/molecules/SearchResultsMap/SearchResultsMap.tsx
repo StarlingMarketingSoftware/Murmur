@@ -1047,6 +1047,11 @@ export interface SearchResultsMapProps {
 	/** When true, hides the state outlines (useful while search is loading). */
 	isLoading?: boolean;
 	/**
+	 * Reports map readiness: called with true once Mapbox's `load` event fires (style + first
+	 * render complete), and with false on map teardown/recreate or unmount.
+	 */
+	onMapLoadedChange?: (loaded: boolean) => void;
+	/**
 	 * When true, disables the base-dot "wave reveal" animation.
 	 * Useful in fullscreen/cinematic map transitions where hiding dots causes visible flicker.
 	 */
@@ -1213,6 +1218,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	enableStateInteractions,
 	lockedStateName,
 	isLoading,
+	onMapLoadedChange,
 	disableDotWaveReveal = false,
 	skipAutoFit,
 	cameraPadding = null,
@@ -1581,6 +1587,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	);
 	const backgroundSpinCleanupRef = useRef<(() => void) | null>(null);
 	const [mapLoadError, setMapLoadError] = useState<string | null>(null);
+	// Ref-based notify keeps the map-init effect's deps untouched while reporting
+	// readiness to the host (load → true, teardown/recreate → false, unmount → false).
+	const onMapLoadedChangeRef = useRef(onMapLoadedChange);
+	useEffect(() => {
+		onMapLoadedChangeRef.current = onMapLoadedChange;
+	});
+	useEffect(() => {
+		onMapLoadedChangeRef.current?.(isMapLoaded);
+	}, [isMapLoaded]);
+	useEffect(() => () => onMapLoadedChangeRef.current?.(false), []);
 	const [selectedStateKey, setSelectedStateKey] = useState<string | null>(null);
 	const [zoomLevel, setZoomLevel] = useState(MAP_DEFAULT_ZOOM);
 	// Track last-applied camera padding so we don't spam Mapbox with identical updates.

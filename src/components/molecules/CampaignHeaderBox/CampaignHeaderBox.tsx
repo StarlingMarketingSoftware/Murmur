@@ -6,6 +6,7 @@ import { urls } from '@/constants/urls';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { cn } from '@/utils';
 import { useHoverDescription } from '@/contexts/HoverDescriptionContext';
+import { useSendingSessionState } from '@/contexts/SendingSessionContext';
 import { CampaignTitlePills } from '@/components/molecules/CampaignTitlePills/CampaignTitlePills';
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 
@@ -65,6 +66,17 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	const [renderedHoverDescription, setRenderedHoverDescription] = useState('');
 	const [isHoverDescriptionVisible, setIsHoverDescriptionVisible] = useState(false);
 	const hoverDescriptionTimeoutRef = useRef<number | null>(null);
+
+	// "{N} in send queue" pill while the campaign send session runs (idle default
+	// outside the SendingSessionProvider).
+	const sendingSession = useSendingSessionState();
+	const sendQueueRemaining =
+		sendingSession.status === 'sending' && !sendingSession.dismissed
+			? Math.max(
+					0,
+					sendingSession.total - sendingSession.sentCount - sendingSession.failedCount
+				)
+			: 0;
 
 	const draftingOperationsRaw = draftingProgress ?? [];
 	const draftingOperations = draftingOperationsRaw.filter(
@@ -363,6 +375,18 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 						</div>
 					)}
 				</div>
+				{sendQueueRemaining > 0 ? (
+					<div
+						className="ml-[8px] flex items-center px-2 whitespace-nowrap font-inter font-semibold text-[12px] leading-none text-black"
+						style={{
+							height: '26px',
+							borderRadius: '6px',
+							background: '#85D790',
+						}}
+					>
+						{sendQueueRemaining} in send queue
+					</div>
+				) : null}
 			</div>
 
 			{/* Spacer above To/From */}

@@ -18,6 +18,7 @@ import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptio
 import { cn, convertHtmlToPlainText } from '@/utils';
 import type { EmailWithRelations } from '@/types';
 import type { ContactWithName } from '@/types/contact';
+import { useSendingSessionState } from '@/contexts/SendingSessionContext';
 import { DraftingTable } from '../DraftingTable/DraftingTable';
 import DeleteandOpenIcon from '@/components/atoms/_svg/DeleteandOpen';
 import ApproveCheckIcon from '@/components/atoms/svg/ApproveCheckIcon';
@@ -313,7 +314,9 @@ const DraftReviewStackedBackCard: FC<{
 	draft: EmailWithRelations;
 	contacts: ContactWithName[];
 	compact?: boolean;
-}> = ({ draft, contacts, compact = false }) => {
+	/** Green chrome while a send session is running. */
+	sendingChrome?: boolean;
+}> = ({ draft, contacts, compact = false, sendingChrome = false }) => {
 	const contact = contacts?.find((c) => c.id === draft.contactId);
 	const contactTitle = contact?.headline || contact?.title || '';
 	const hasName = Boolean(
@@ -389,7 +392,7 @@ const DraftReviewStackedBackCard: FC<{
 					display: 'flex',
 					flexDirection: 'column',
 					overflow: 'hidden',
-					backgroundColor: '#FFDC9E',
+					backgroundColor: sendingChrome ? '#85D790' : '#FFDC9E',
 				}}
 			>
 				<div
@@ -403,7 +406,7 @@ const DraftReviewStackedBackCard: FC<{
 						justifyContent: 'space-between',
 						alignItems: 'flex-start',
 						height: '48px',
-						backgroundColor: '#FFE4B5',
+						backgroundColor: sendingChrome ? '#85D790' : '#FFE4B5',
 						position: 'relative',
 					}}
 				>
@@ -620,6 +623,13 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 		const lockDraftReviewOpen = props.lockDraftReviewOpen ?? false;
 
 		const isMobile = useIsMobile();
+		// Green review chrome while the campaign send session runs (idle default
+		// outside the SendingSessionProvider, e.g. the dashboard review).
+		const sendingSession = useSendingSessionState();
+		const isSendingChrome =
+			sendingSession.status === 'sending' && !sendingSession.dismissed;
+		const reviewHeaderColor = isSendingChrome ? '#85D790' : '#FFE4B5';
+		const reviewFillColor = isSendingChrome ? '#85D790' : '#FFDC9E';
 		const draftReviewContainerRef = useRef<HTMLDivElement | null>(null);
 		// Keep a ref to the currently-open draft id so async regen doesn't stomp UI state
 		// if the user navigates to another draft mid-request.
@@ -1223,6 +1233,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 								draft={stackedBackDraft}
 								contacts={contacts || []}
 								compact={isCompactDraftReview}
+								sendingChrome={isSendingChrome}
 							/>
 						)}
 						{/* Container box with header - matching the table view */}
@@ -1254,7 +1265,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 									justifyContent: 'space-between',
 									alignItems: 'flex-start',
 									height: '48px',
-									backgroundColor: '#FFE4B5',
+									backgroundColor: reviewHeaderColor,
 									position: 'relative',
 								}}
 							>
@@ -1467,7 +1478,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 							{!isRegenSettingsPreviewOpen && isDraftApproved && (
 								<div
 									style={{
-										backgroundColor: '#FFDC9E',
+										backgroundColor: reviewFillColor,
 										paddingTop: '6px',
 										paddingBottom: '11px',
 									}}
@@ -1551,7 +1562,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 							{!isRegenSettingsPreviewOpen && isDraftRejected && (
 								<div
 									style={{
-										backgroundColor: '#FFDC9E',
+										backgroundColor: reviewFillColor,
 										paddingTop: '6px',
 										paddingBottom: '11px',
 									}}
@@ -1646,7 +1657,9 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 											: '6px 4px 12px 4px',
 									borderBottomLeftRadius: '5px',
 									borderBottomRightRadius: '5px',
-									backgroundColor: isRegenSettingsPreviewOpen ? '#FFE3B3' : '#FFDC9E',
+									backgroundColor: isRegenSettingsPreviewOpen
+										? '#FFE3B3'
+										: reviewFillColor,
 								}}
 							>
 								{!isRegenSettingsPreviewOpen && (

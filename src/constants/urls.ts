@@ -119,6 +119,7 @@ export const urls = {
 				index: '/api/contacts/geocode',
 			},
 			research: ((id) => `/api/contacts/${id}/research`) as DetailRoute,
+			note: ((id) => `/api/contacts/${id}/note`) as DetailRoute,
 			detail: ((id) => `/api/contacts/${id}`) as DetailRoute,
 		},
 		emails: {

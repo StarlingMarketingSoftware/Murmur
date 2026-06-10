@@ -628,3 +628,15 @@ model EmailSuppression {
   @@unique([email, userId])
   @@index([email])
 }
+
+model ContactNote {
+  id        Int      @id @default(autoincrement())
+  userId    String // owner's clerkId; intentionally no FK
+  contactId Int // Contact.id; intentionally no FK
+  content   String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, contactId])
+  @@index([contactId])
+}

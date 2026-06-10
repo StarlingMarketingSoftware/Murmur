@@ -9,6 +9,7 @@ import HomeIcon from '@/components/atoms/_svg/HomeIcon';
 import { OutlinedInitialAvatar } from '@/components/atoms/OutlinedInitialAvatar/OutlinedInitialAvatar';
 import { PersistentDashboardMap } from '@/components/molecules/PersistentDashboardMap';
 import { PersistentMapProvider } from '@/contexts/PersistentMapContext';
+import { SendingSessionProvider } from '@/contexts/SendingSessionContext';
 
 export default function MurmurLayoutClient({ children }: { children: React.ReactNode }) {
 	const { isSignedIn } = useAuth();
@@ -80,6 +81,7 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 	}, []);
 
 	return (
+		<SendingSessionProvider>
 		<PersistentMapProvider>
 			<PersistentDashboardMap />
 			{/* Persistent Clerk login icon in top right corner */}
@@ -176,6 +178,7 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 				}
 			`}</style>
 		</PersistentMapProvider>
+		</SendingSessionProvider>
 	);
 }
 

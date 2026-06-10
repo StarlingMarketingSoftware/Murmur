@@ -1,5 +1,21 @@
-import { FC, Fragment, useMemo } from 'react';
+'use client';
+
+import {
+	FC,
+	Fragment,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
+import { useAuth } from '@clerk/nextjs';
+import { debounce } from 'lodash';
 import { ContactWithName } from '@/types/contact';
+import {
+	useGetContactNote,
+	useUpsertContactNote,
+} from '@/hooks/queryHooks/useContactNotes';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { cn } from '@/utils';
@@ -34,6 +50,10 @@ const RESEARCH_PANEL_ABRIDGED_STRIPE_HEIGHT = 12;
 const RESEARCH_PANEL_ABRIDGED_ADDRESS_HEIGHT = 28;
 const RESEARCH_PANEL_ABRIDGED_HEADLINE_HEIGHT = 36;
 const RESEARCH_PANEL_ABRIDGED_SMALL_ROW_HEIGHT = 22;
+// Leftover metadata-area space required to show the inline Notes box
+// ("Notes" label + a usable ~5-line textarea); below this we show "+Notes".
+const NOTES_MIN_INLINE_SPACE_PX = 130;
+const NOTES_EXPANDED_HEIGHT_PX = 280;
 
 const RESEARCH_PANEL_BANDS = [
 	{ top: 0, height: 52, color: '#FFFFFF' },
@@ -701,6 +721,184 @@ const ContactResearchPanelAbridged: FC<
 	);
 };
 
+// Metadata scroll area of the full-size panel, plus the per-user Notes UI.
+// Notes only activate when contactId is non-null (full-size, signed-in hosts);
+// otherwise this renders the metadata area exactly as before.
+const ResearchMetadataNotesArea: FC<{
+	metadataTop: number;
+	metadataText: string;
+	textStyle?: { color: string };
+	contactId: number | null;
+}> = ({ metadataTop, metadataText, textStyle, contactId }) => {
+	const { isSignedIn } = useAuth();
+	const enabled = Boolean(isSignedIn && contactId);
+
+	const areaRef = useRef<HTMLDivElement>(null);
+	const textRef = useRef<HTMLDivElement>(null);
+	const [leftoverPx, setLeftoverPx] = useState<number | null>(null);
+	const [isExpanded, setIsExpanded] = useState(false);
+
+	useLayoutEffect(() => {
+		if (!enabled) {
+			return;
+		}
+		const measure = () => {
+			const area = areaRef.current;
+			if (!area) {
+				return;
+			}
+			const textHeight = textRef.current?.offsetHeight ?? 0;
+			setLeftoverPx(area.clientHeight - textHeight);
+		};
+		measure();
+		const observer = new ResizeObserver(measure);
+		if (areaRef.current) {
+			observer.observe(areaRef.current);
+		}
+		if (textRef.current) {
+			observer.observe(textRef.current);
+		}
+		return () => observer.disconnect();
+	}, [enabled, metadataText]);
+
+	const { data: note, isFetched } = useGetContactNote(enabled ? contactId : null);
+	const { mutate: saveNote } = useUpsertContactNote({ suppressToasts: true });
+	const [draft, setDraft] = useState<string | null>(null);
+
+	const debouncedSave = useMemo(
+		() =>
+			debounce((id: number, content: string) => {
+				saveNote({ contactId: id, content });
+			}, 1500),
+		[saveNote]
+	);
+	// Reset edit state when the contact changes; the cleanup flushes any pending
+	// save (lodash flush re-invokes with the last args, which still carry the
+	// previous contact id) and also covers unmount.
+	useEffect(() => {
+		setDraft(null);
+		setIsExpanded(false);
+		return () => {
+			debouncedSave.flush();
+		};
+	}, [contactId, debouncedSave]);
+
+	const noteValue = draft ?? note?.content ?? '';
+	const handleNoteChange = (value: string) => {
+		setDraft(value);
+		if (contactId) {
+			debouncedSave(contactId, value);
+		}
+	};
+
+	const mode: 'none' | 'inline' | 'collapsible' =
+		!enabled || leftoverPx === null
+			? 'none'
+			: leftoverPx >= NOTES_MIN_INLINE_SPACE_PX
+				? 'inline'
+				: 'collapsible';
+	// Never show an editable box before the existing note has loaded, so an
+	// empty draft can't overwrite saved content.
+	const showNotesUi = mode !== 'none' && isFetched;
+
+	return (
+		<div
+			className="research-panel-metadata-scroll absolute left-0 right-0 bottom-0 z-10"
+			style={{ top: `${metadataTop}px` }}
+		>
+			<div className="h-full pl-[23px] pr-[17px] pt-[11px] pb-[22px] overflow-hidden">
+				<div ref={areaRef} className="h-full">
+					<CustomScrollbar
+						className="h-full"
+						thumbWidth={0}
+						thumbColor="transparent"
+						trackColor="transparent"
+						lockHorizontalScroll
+					>
+						<div
+							ref={textRef}
+							className="whitespace-pre-wrap break-words"
+							style={{
+								color: '#000',
+								fontFamily: 'Inter',
+								fontSize: '14.349px',
+								fontStyle: 'normal',
+								fontWeight: 400,
+								lineHeight: '121.531%',
+								...(textStyle || {}),
+							}}
+						>
+							{metadataText}
+						</div>
+					</CustomScrollbar>
+				</div>
+			</div>
+
+			{showNotesUi && mode === 'inline' && (
+				<div
+					data-contact-notes="inline"
+					className="absolute left-[23px] right-[17px] bottom-[16px] z-20 flex flex-col"
+					style={{ height: `${Math.max(leftoverPx! - 12, 0)}px` }}
+					onWheel={(e) => e.stopPropagation()}
+				>
+					<div className="font-inter text-[14.349px] font-semibold text-black">
+						Notes
+					</div>
+					<textarea
+						value={noteValue}
+						onChange={(e) => handleNoteChange(e.target.value)}
+						placeholder="Add notes…"
+						className="mt-[4px] w-full min-h-0 flex-1 resize-none rounded-[8px] border-0 bg-[#E6F6FF] px-[10px] py-[8px] font-inter text-[14.349px] text-black outline-none"
+						style={{ lineHeight: '121.531%' }}
+					/>
+				</div>
+			)}
+
+			{showNotesUi && mode === 'collapsible' && !isExpanded && (
+				<button
+					type="button"
+					data-contact-notes="toggle"
+					onClick={() => setIsExpanded(true)}
+					className="absolute bottom-[5px] left-[23px] z-20 rounded-[4px] bg-[#FCFDFF]/90 px-[3px] font-inter text-[14.349px] font-semibold text-black"
+				>
+					+Notes
+				</button>
+			)}
+
+			{showNotesUi && mode === 'collapsible' && isExpanded && (
+				<div
+					data-contact-notes="expanded"
+					className="absolute inset-x-0 bottom-0 z-20 flex flex-col bg-[#FCFDFF] pl-[23px] pr-[17px] pt-[6px] pb-[16px]"
+					style={{
+						height: `${Math.min(
+							NOTES_EXPANDED_HEIGHT_PX,
+							(areaRef.current?.clientHeight ?? NOTES_EXPANDED_HEIGHT_PX) - 60
+						)}px`,
+						borderTop: `${RESEARCH_PANEL_BORDER_WIDTH}px solid #000`,
+					}}
+					onWheel={(e) => e.stopPropagation()}
+				>
+					<button
+						type="button"
+						onClick={() => setIsExpanded(false)}
+						className="self-start font-inter text-[14.349px] font-semibold text-black"
+					>
+						Notes
+					</button>
+					<textarea
+						autoFocus
+						value={noteValue}
+						onChange={(e) => handleNoteChange(e.target.value)}
+						placeholder="Add notes…"
+						className="mt-[4px] w-full min-h-0 flex-1 resize-none rounded-[8px] border-0 bg-[#E6F6FF] px-[10px] py-[8px] font-inter text-[14.349px] text-black outline-none"
+						style={{ lineHeight: '121.531%' }}
+					/>
+				</div>
+			)}
+		</div>
+	);
+};
+
 export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	contact,
 	variant = 'default',
@@ -756,6 +954,16 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	const websiteText = contact?.website?.trim() || '';
 	const metadataText = contact?.metadata || '';
 	const textStyle = hideAllText ? { color: 'transparent' } : undefined;
+	// Notes only apply to the full-size panel (375×672, e.g. the campaign
+	// standard side panel passes height=672 explicitly); compact mounts pass
+	// smaller sizes and are excluded.
+	const notesEligible =
+		!hideAllText &&
+		panelWidth === RESEARCH_PANEL_DEFAULT_WIDTH &&
+		panelHeight === RESEARCH_PANEL_DEFAULT_HEIGHT &&
+		boxWidth === undefined &&
+		typeof contact?.id === 'number';
+	const notesContactId = notesEligible && contact ? contact.id : null;
 	const headlineWidth =
 		boxWidth ?? (typeof style?.width === 'number' ? style.width : panelWidth);
 	const headlineCharsPerLine = Math.max(1, Math.floor((headlineWidth - 40) / 7.5));
@@ -1190,35 +1398,12 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				<Fragment key={row.key}>{row.render(row.top)}</Fragment>
 			))}
 
-			<div
-				className="research-panel-metadata-scroll absolute left-0 right-0 bottom-0 z-10"
-				style={{ top: `${metadataTop}px` }}
-			>
-				<div className="h-full pl-[23px] pr-[17px] pt-[11px] pb-[22px] overflow-hidden">
-					<CustomScrollbar
-						className="h-full"
-						thumbWidth={0}
-						thumbColor="transparent"
-						trackColor="transparent"
-						lockHorizontalScroll
-					>
-						<div
-							className="whitespace-pre-wrap break-words"
-							style={{
-								color: '#000',
-								fontFamily: 'Inter',
-								fontSize: '14.349px',
-								fontStyle: 'normal',
-								fontWeight: 400,
-								lineHeight: '121.531%',
-								...(textStyle || {}),
-							}}
-						>
-							{metadataText}
-						</div>
-					</CustomScrollbar>
-				</div>
-			</div>
+			<ResearchMetadataNotesArea
+				metadataTop={metadataTop}
+				metadataText={metadataText}
+				textStyle={textStyle}
+				contactId={notesContactId}
+			/>
 		</div>
 	);
 };

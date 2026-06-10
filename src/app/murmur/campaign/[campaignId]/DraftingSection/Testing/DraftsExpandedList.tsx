@@ -13,6 +13,11 @@ import { EmailStatus } from '@/constants/prismaEnums';
 import { useGetCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { EmailWithRelations } from '@/types';
 import { ContactWithName } from '@/types/contact';
+import {
+	getSendDwellMs,
+	useSendingSessionActions,
+	waitForSendDwell,
+} from '@/contexts/SendingSessionContext';
 import { cn, convertHtmlToPlainText } from '@/utils';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
@@ -301,6 +306,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	});
 	const { mutateAsync: updateEmail } = useEditEmail({ suppressToasts: true });
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
+	const sendingActions = useSendingSessionActions();
 
 	const handleDraftClick = (draft: EmailWithRelations, e: MouseEvent) => {
 		if (isPreviewMode && onDraftPreviewClick) {
@@ -473,12 +479,35 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 		const emailsWeCanSend = Math.min(selectedDrafts.length, sendingCredits);
 		const emailsToProcess = selectedDrafts.slice(0, emailsWeCanSend);
 
+		// Drive the campaign-global sending UI; queue mirrors the processing order below.
+		const sessionStarted = sendingActions.startSession({
+			campaignId: campaign.id,
+			queue: emailsToProcess.map((email) => ({
+				emailId: email.id as number,
+				contactId: email.contactId,
+				contact: (contacts.find((c) => c.id === email.contactId) ??
+					email.contact) as ContactWithName,
+				kind: 'email',
+				subject: email.subject,
+			})),
+		});
+		if (!sessionStarted) {
+			toast.error('A send is already in progress.');
+			return;
+		}
+		// No sending UI without the provider — skip the dwell.
+		const dwellMs = sendingActions.hasProvider
+			? getSendDwellMs(emailsToProcess.length)
+			: 0;
+
 		setIsSending(true);
 		if (onSendingPreviewReset) onSendingPreviewReset();
 		let successfulSends = 0;
 		try {
 			for (let i = 0; i < emailsToProcess.length; i++) {
 				const email = emailsToProcess[i];
+				const dwellStart = Date.now();
+				sendingActions.beginEmail(email.id as number);
 				if (onSendingPreviewUpdate) {
 					onSendingPreviewUpdate({
 						contactId: email.contactId,
@@ -491,6 +520,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 
 					if (!recipientEmail) {
 						console.error('No recipient email found for draft:', email.id);
+						sendingActions.failEmail(email.id as number);
 						continue;
 					}
 
@@ -514,11 +544,16 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							data: { status: EmailStatus.sent, sentAt: new Date() },
 						});
 						successfulSends++;
+						sendingActions.completeEmail(email.id as number);
 						if (onSendingPreviewReset) onSendingPreviewReset();
+					} else {
+						sendingActions.failEmail(email.id as number);
 					}
 				} catch (err) {
 					console.error('Failed to send email:', err);
+					sendingActions.failEmail(email.id as number);
 				}
+				await waitForSendDwell(dwellStart, dwellMs);
 			}
 
 			// Update credits per user with this
@@ -550,6 +585,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 				toast.error('Failed to send emails. Please try again.');
 			}
 		} finally {
+			sendingActions.finishSession();
 			setIsSending(false);
 			// Clear live Send Preview in status panel
 			if (onSendingPreviewReset) onSendingPreviewReset();

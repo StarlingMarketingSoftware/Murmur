@@ -280,7 +280,7 @@ const getTitleBadgeLabel = (title: string) =>
 								? (getWineBeerSpiritsLabel(title) ?? title)
 								: title;
 
-const TitleBadge: FC<{
+export const TitleBadge: FC<{
 	title: string;
 	className?: string;
 	textClassName?: string;
@@ -364,7 +364,7 @@ const TitleBadge: FC<{
 	</div>
 );
 
-const StateLocationRow: FC<{
+export const StateLocationRow: FC<{
 	contact?: ContactWithName | null;
 	className?: string;
 	badgeClassName?: string;

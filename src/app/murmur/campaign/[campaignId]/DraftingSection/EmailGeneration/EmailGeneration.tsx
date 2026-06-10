@@ -239,6 +239,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 
 	// Custom send handler without dialog dependencies
 	// If `draftIds` is provided, only those drafts are sent (used by draft-review "Send" buttons).
+	// NOTE: this component is currently unmounted; if revived, this loop must drive
+	// SendingSessionContext like useDraftReviewHandlers.handleSendDrafts does.
 	const handleSend = async (draftIds?: Iterable<number>) => {
 		const explicitIds = draftIds ? new Set(Array.from(draftIds)) : null;
 

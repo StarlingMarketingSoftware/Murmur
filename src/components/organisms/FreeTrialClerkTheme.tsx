@@ -51,22 +51,6 @@ export const FREE_TRIAL_CLERK_APPEARANCE = {
 	},
 } as const;
 
-// Use a popup OAuth flow on desktop so the account chooser doesn't take over the page.
-// On mobile/touch devices, use full-page redirects because popups are often blocked or unusable.
-export function getOauthFlow(): 'redirect' | 'popup' {
-	if (typeof window === 'undefined') return 'popup';
-	if (typeof window.matchMedia !== 'function') return 'popup';
-
-	// Tailwind md breakpoint. Use it only in combination with `hover: none` to avoid treating
-	// narrow desktop windows as "mobile".
-	const isSmallScreen = window.matchMedia('(max-width: 767px)').matches;
-	const hasNoHover = window.matchMedia('(hover: none)').matches;
-	const hasCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
-
-	const isProbablyMobile = hasNoHover && (hasCoarsePointer || isSmallScreen);
-	return isProbablyMobile ? 'redirect' : 'popup';
-}
-
 export function FreeTrialClerkGlobalStyles() {
 	return (
 		<style jsx global>{`
