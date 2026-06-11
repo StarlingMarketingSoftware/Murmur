@@ -1,7 +1,7 @@
 'use client';
 
-import { Fragment, useState } from 'react';
-import type { Event as VenueEvent } from '@prisma/client';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import type { VenueEventWithBooking as VenueEvent } from '@/app/api/venue/events/route';
 import { ChevronLeft, X } from 'lucide-react';
 import { MapStackStarIcon } from '@/components/atoms/_svg/MapStackStarIcon';
 import { VenueListViewIcon } from '@/components/atoms/_svg/VenueListViewIcon';
@@ -9,24 +9,26 @@ import { VenueMediaViewIcon } from '@/components/atoms/_svg/VenueMediaViewIcon';
 import { MediaAssetPlayer } from '@/components/molecules/MediaAssetPlayer/MediaAssetPlayer';
 import {
 	useGetVenueEventApplicants,
+	useRateApplicationVideo,
 	type VenueEventApplicant,
 	type VenueEventApplicationVideo,
 } from '@/hooks/queryHooks/useVenueApplications';
 import {
 	GenrePill,
+	getApplicantRating,
 	MEDIA_THUMB_GRADIENT,
 	mediaThumbSrc,
 	ratingColor,
 	VideoRatingStars,
 } from '../VenueEventDetailView';
 import {
+	findBookedApplicant,
 	formatApplicantCount,
 	formatVenueOpportunityDate,
 	isVenueOpportunityLive,
 } from '../venueOpportunityFormat';
 import {
 	ApplicantRatingStars,
-	getApplicantRating,
 	MobileApplicantProfileCard,
 } from './MobileApplicantProfileCard';
 
@@ -183,12 +185,22 @@ export function MobileVenueEventDetail({
 	onEditEvent: (eventId: number) => void;
 }) {
 	const { data: applicants, isPending, isError } = useGetVenueEventApplicants(event.id);
+	const { mutate: rateApplicationVideo } = useRateApplicationVideo(event.id);
 	const [viewMode, setViewMode] = useState<'list' | 'media'>('list');
 	const [expandedApplicantId, setExpandedApplicantId] = useState<number | null>(null);
 	const [openVideoId, setOpenVideoId] = useState<number | null>(null);
-	// UI-only for now — ratings live in local state until a backend exists. Kept
-	// at the screen level so List/Media and the open player share them.
-	const [videoRatings, setVideoRatings] = useState<Record<number, number>>({});
+
+	// A confirmed booking auto-opens the booked artist's card, once, on the first
+	// applicants payload (the key={event.id} remount in MobileVenueEventsTab
+	// re-arms it per event) — a manual collapse sticks across refetches and a
+	// booking that confirms while the view is open never yanks the list.
+	const bookingAutoOpenAttemptedRef = useRef(false);
+	useEffect(() => {
+		if (bookingAutoOpenAttemptedRef.current || !applicants) return;
+		bookingAutoOpenAttemptedRef.current = true;
+		const bookedApplicant = findBookedApplicant(applicants, event.booking);
+		if (bookedApplicant) setExpandedApplicantId(bookedApplicant.id);
+	}, [applicants, event.booking]);
 
 	const applicantCount = applicants?.length ?? fallbackApplicantCount;
 	const details = event.details?.trim();
@@ -200,15 +212,13 @@ export function MobileVenueEventDetail({
 	// collapses the open player back to the grid (desktop idiom).
 	const openItem = videoItems.find(({ video }) => video.id === openVideoId) ?? null;
 
+	// Ratings are persisted per-user (optimistically patched into the applicants
+	// cache); grid tiles and the open player consume a videoId→rating record.
+	const videoRatings: Record<number, number> = Object.fromEntries(
+		videoItems.map(({ video }) => [video.id, video.rating])
+	);
 	const rateVideo = (videoId: number, value: number) =>
-		setVideoRatings((prev) => {
-			if (value === 0) {
-				const rest = { ...prev };
-				delete rest[videoId];
-				return rest;
-			}
-			return { ...prev, [videoId]: value };
-		});
+		rateApplicationVideo({ videoId, rating: value });
 
 	return (
 		<div className="relative flex h-full flex-col">
@@ -220,7 +230,11 @@ export function MobileVenueEventDetail({
 					paddingBottom: 'calc(72px + env(safe-area-inset-bottom, 0px))',
 				}}
 			>
-				<div className="flex shrink-0 flex-col gap-[8px] rounded-[9.496px] border-[2.374px] border-black bg-[#DFF6CE] p-[10px] font-inter text-black">
+				<div
+					className={`flex shrink-0 flex-col gap-[8px] rounded-[9.496px] border-[2.374px] border-black p-[10px] font-inter text-black ${
+						event.booking ? 'bg-[#C5EDA0]' : 'bg-[#DFF6CE]'
+					}`}
+				>
 					<div className="flex items-center gap-[6px]">
 						<button
 							type="button"
@@ -253,7 +267,19 @@ export function MobileVenueEventDetail({
 						<span className="flex h-[22px] shrink-0 items-center justify-center rounded-[8px] border-[1.5px] border-black bg-[#FF818A] px-[8px] text-[12px] font-medium leading-none">
 							{formatVenueOpportunityDate(event.whenLabel, event.startsAt)}
 						</span>
-						{isVenueOpportunityLive(event) && (
+						{event.booking ? (
+							// A confirmed booking outranks Live — the event is no longer seeking.
+							<span
+								title={`${event.booking.artistName}${event.booking.date ? ` — ${event.booking.date}` : ''}`}
+								className="flex h-[22px] shrink-0 items-center justify-center gap-[4px] rounded-[8px] border-[1.5px] border-black bg-[#B7FFC5] px-[8px] text-[12px] font-medium leading-none"
+							>
+								<span
+									aria-hidden="true"
+									className="h-[7px] w-[7px] rounded-full bg-[#34A853]"
+								/>
+								Booked
+							</span>
+						) : isVenueOpportunityLive(event) ? (
 							<span className="flex h-[22px] shrink-0 items-center justify-center gap-[4px] rounded-[8px] border-[1.5px] border-black bg-[#C5EDA0] px-[8px] text-[12px] font-medium leading-none">
 								<span
 									aria-hidden="true"
@@ -261,7 +287,7 @@ export function MobileVenueEventDetail({
 								/>
 								Live
 							</span>
-						)}
+						) : null}
 					</div>
 					{details && (
 						<span
@@ -336,7 +362,6 @@ export function MobileVenueEventDetail({
 								applicant={openItem.applicant}
 								playingVideoId={openItem.video.id}
 								onOpenVideo={(id) => setOpenVideoId(id)}
-								videoRatings={videoRatings}
 							/>
 						</div>
 					) : (
@@ -358,7 +383,7 @@ export function MobileVenueEventDetail({
 							<Fragment key={applicant.id}>
 								<MobileApplicantRow
 									applicant={applicant}
-									rating={getApplicantRating(applicant, videoRatings)}
+									rating={getApplicantRating(applicant)}
 									striped={index % 2 === 1}
 									expanded={applicant.id === expandedApplicantId}
 									onToggle={() =>
@@ -374,7 +399,6 @@ export function MobileVenueEventDetail({
 											setViewMode('media');
 											setOpenVideoId(videoId);
 										}}
-										videoRatings={videoRatings}
 										className="m-[10px]"
 									/>
 								)}

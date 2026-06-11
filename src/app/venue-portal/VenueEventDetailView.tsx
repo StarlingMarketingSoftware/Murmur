@@ -20,10 +20,12 @@ import { MediaAssetPlayer } from '@/components/molecules/MediaAssetPlayer/MediaA
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import {
 	useGetVenueEventApplicants,
+	useRateApplicationVideo,
 	type VenueEventApplicant,
 	type VenueEventApplicationVideo,
 } from '@/hooks/queryHooks/useVenueApplications';
 import {
+	findBookedApplicant,
 	formatApplicantCount,
 	formatVenueOpportunityDate,
 	formatVenueOpportunityTimeRange,
@@ -52,6 +54,50 @@ export const mediaThumbSrc = (video: VenueEventApplicationVideo) =>
 // Rating → traffic-light color per the Figma media-view mockups.
 export const ratingColor = (rating: number) =>
 	rating <= 2 ? '#EF3030' : rating === 3 ? '#FFC53D' : '#34A853';
+
+// The applicant-summary badge star is a constant gold (not traffic-light): it
+// summarizes an average, per the Figma list/header mockups.
+export const RATING_STAR_GOLD = '#FFC53D';
+
+// An applicant's rating is the average of this user's rated videos on the
+// application (rating 0 rows are "unrated" and excluded); 0 = nothing rated.
+export const getApplicantRating = (applicant: VenueEventApplicant) => {
+	const rated = applicant.videos.filter((video) => video.rating > 0);
+	if (rated.length === 0) return 0;
+	return rated.reduce((sum, video) => sum + video.rating, 0) / rated.length;
+};
+
+// "4.666… → 4.67", "4.5 → 4.5", "5 → 5" — two decimals max, no trailing zeros.
+export const formatApplicantRating = (rating: number) =>
+	String(Math.round(rating * 100) / 100);
+
+// Gold star + numeric average. Plain spans (no button) so it can live inside
+// the <button> list rows; `light` switches the numeral to white for the dark
+// detail-card header.
+export function ApplicantAverageRating({
+	rating,
+	light = false,
+}: {
+	rating: number;
+	light?: boolean;
+}) {
+	return (
+		<span className="flex shrink-0 items-center gap-[4px]">
+			<VenueRatingStarIcon
+				width={14}
+				height={13}
+				filled
+				color={RATING_STAR_GOLD}
+				outlineColor={RATING_STAR_GOLD}
+			/>
+			<span
+				className={`text-[14px] font-bold leading-none ${light ? 'text-white' : 'text-black'}`}
+			>
+				{formatApplicantRating(rating)}
+			</span>
+		</span>
+	);
+}
 
 // One media-view tile: a submitted video plus the applicant it belongs to.
 type ApplicantVideoItem = {
@@ -119,6 +165,8 @@ function SectionNotice({ children }: { children: ReactNode }) {
 
 // One event card in the detail view's left rail; clicking switches the selected
 // event. Past cards use the same camouflaged fill treatment as the Events list.
+// Booked cards override camouflage (a booked card must read booked) but keep the
+// selected blue, and show the booked artist's name in place of the count pill.
 function EventSidebarCard({
 	event,
 	applicantCount,
@@ -132,11 +180,16 @@ function EventSidebarCard({
 	camouflaged?: boolean;
 	onSelect: () => void;
 }) {
-	const cardFillClassName = camouflaged
-		? 'bg-transparent'
-		: selected
+	const booked = event.booking != null;
+	const cardFillClassName = booked
+		? selected
 			? 'bg-[#CEF4FF]'
-			: 'bg-white hover:brightness-95';
+			: 'bg-[#C5EDA0] hover:brightness-95'
+		: camouflaged
+			? 'bg-transparent'
+			: selected
+				? 'bg-[#CEF4FF]'
+				: 'bg-white hover:brightness-95';
 	const pillFillClassName = camouflaged ? 'bg-transparent' : 'bg-[#F7EFC0]';
 	return (
 		<button
@@ -148,12 +201,21 @@ function EventSidebarCard({
 			<span className="w-full truncate text-[16px] font-bold leading-none">
 				{event.name}
 			</span>
-			<span className="flex items-center gap-[6px]">
-				<span
-					className={`flex h-[22px] shrink-0 items-center justify-center rounded-[8px] border-[1.5px] border-black px-[8px] text-[12px] font-medium leading-none ${pillFillClassName}`}
-				>
-					{formatApplicantCount(applicantCount)}
-				</span>
+			<span className="flex w-full min-w-0 items-center gap-[6px]">
+				{event.booking ? (
+					<span
+						title={event.booking.artistName}
+						className="flex h-[22px] min-w-0 max-w-[100px] items-center justify-center rounded-[8px] border-[1.5px] border-black bg-[#5EAD52] px-[8px] text-[12px] font-medium leading-none text-white"
+					>
+						<span className="min-w-0 truncate">{event.booking.artistName}</span>
+					</span>
+				) : (
+					<span
+						className={`flex h-[22px] shrink-0 items-center justify-center rounded-[8px] border-[1.5px] border-black px-[8px] text-[12px] font-medium leading-none ${pillFillClassName}`}
+					>
+						{formatApplicantCount(applicantCount)}
+					</span>
+				)}
 				{event.booking && (
 					<span
 						title={`${event.booking.artistName}${event.booking.date ? ` — ${event.booking.date}` : ''}`}
@@ -165,7 +227,7 @@ function EventSidebarCard({
 				)}
 			</span>
 			<span className="flex w-full items-center gap-[8px]">
-				<EventDatePill event={event} camouflaged={camouflaged} />
+				<EventDatePill event={event} camouflaged={camouflaged && !booked} />
 				<span className="min-w-0 truncate text-[13px] font-medium leading-none">
 					{formatVenueOpportunityTimeRange(event.startTime, event.endTime)}
 				</span>
@@ -227,10 +289,12 @@ function ApplicantMediaItem({
 // The expanded application snapshot: answers on the left, submitted media on the right.
 function ApplicantDetailCard({ applicant }: { applicant: VenueEventApplicant }) {
 	const [openMediaId, setOpenMediaId] = useState<number | null>(null);
+	const rating = getApplicantRating(applicant);
 	return (
 		<div className="mx-[12px] my-[10px] shrink-0 overflow-hidden rounded-[12px] border-[2px] border-black bg-white font-inter">
-			<div className="flex h-[36px] shrink-0 items-center bg-[#1E4620] px-[14px] text-[18px] font-bold leading-none text-white">
+			<div className="flex h-[36px] shrink-0 items-center gap-[10px] bg-[#1E4620] px-[14px] text-[18px] font-bold leading-none text-white">
 				<span className="min-w-0 truncate">{applicant.applicantName}</span>
+				{rating > 0 && <ApplicantAverageRating rating={rating} light />}
 			</div>
 			<div className="flex gap-[14px] p-[14px]">
 				<div className="flex w-[230px] shrink-0 flex-col items-start">
@@ -313,6 +377,7 @@ function ApplicantRow({
 	expanded: boolean;
 	onToggle: () => void;
 }) {
+	const rating = getApplicantRating(applicant);
 	return (
 		<button
 			type="button"
@@ -329,6 +394,7 @@ function ApplicantRow({
 			>
 				{applicant.applicantName}
 			</span>
+			{rating > 0 && <ApplicantAverageRating rating={rating} />}
 			{applicant.genre && <GenrePill genre={applicant.genre} />}
 			<span className="flex shrink-0 gap-[4px]">
 				{applicant.videos.map((video) => {
@@ -565,31 +631,47 @@ function EventApplicantsBox({
 	onViewApplicant?: (applicant: VenueEventApplicant) => void;
 }) {
 	const { data: applicants, isPending, isError } = useGetVenueEventApplicants(event.id);
+	const { mutate: rateApplicationVideo } = useRateApplicationVideo(event.id);
 	const [expandedApplicantId, setExpandedApplicantId] = useState<number | null>(null);
 	const [viewMode, setViewMode] = useState<'list' | 'media'>('list');
 	const [openVideoId, setOpenVideoId] = useState<number | null>(null);
-	// UI-only for now — ratings live in local state until a backend exists. Kept
-	// here (not in the media view) so toggling List↔Media doesn't lose them.
-	const [videoRatings, setVideoRatings] = useState<Record<number, number>>({});
 	// Derived, never stored: an applicant disappearing on refetch (withdrawal)
 	// collapses the card automatically.
 	const expandedApplicant =
 		applicants?.find((applicant) => applicant.id === expandedApplicantId) ?? null;
+	// A confirmed booking auto-opens the booked artist's card, once, on the first
+	// applicants payload (the key={event.id} remount re-arms it per event) — so a
+	// manual collapse sticks across refetches and a booking that confirms while
+	// the view is open never yanks the list. The skip ref keeps this programmatic
+	// expansion from reporting to onViewApplicant below: auto-opening must not
+	// switch the docked chat (that would drop a half-typed draft and mark the
+	// booked artist's thread read without the venue ever clicking anything).
+	const bookingAutoOpenAttemptedRef = useRef(false);
+	const skipNextViewReportRef = useRef(false);
+	useEffect(() => {
+		if (bookingAutoOpenAttemptedRef.current || !applicants) return;
+		bookingAutoOpenAttemptedRef.current = true;
+		const bookedApplicant = findBookedApplicant(applicants, event.booking);
+		if (!bookedApplicant) return;
+		skipNextViewReportRef.current = true;
+		setExpandedApplicantId(bookedApplicant.id);
+	}, [applicants, event.booking]);
 	const applicantCount = applicants?.length ?? fallbackApplicantCount;
 	const details = event.details?.trim();
 	const videoItems: ApplicantVideoItem[] =
 		applicants?.flatMap((applicant) =>
 			applicant.videos.map((video) => ({ applicant, video }))
 		) ?? [];
+	// Ratings are persisted per-user (optimistically patched into the applicants
+	// cache); the media view still consumes them as a videoId→rating record.
+	const videoRatings: Record<number, number> = Object.fromEntries(
+		videoItems.map(({ video }) => [video.id, video.rating])
+	);
 	const rateVideo = (videoId: number, value: number) =>
-		setVideoRatings((prev) => {
-			if (value === 0) {
-				const rest = { ...prev };
-				delete rest[videoId];
-				return rest;
-			}
-			return { ...prev, [videoId]: value };
-		});
+		rateApplicationVideo({ videoId, rating: value });
+	const starredCount = (applicants ?? []).filter(
+		(applicant) => getApplicantRating(applicant) > 0
+	).length;
 	// Only non-null activations report: collapsing a row or closing a video keeps
 	// the docked chat on its last thread, and the key={event.id} remount on event
 	// switch reports nothing until the user views someone.
@@ -599,13 +681,21 @@ function EventApplicantsBox({
 			: expandedApplicant;
 	const activeApplicantId = activeApplicant?.id ?? null;
 	useEffect(() => {
+		if (skipNextViewReportRef.current) {
+			skipNextViewReportRef.current = false;
+			return;
+		}
 		if (activeApplicant) onViewApplicant?.(activeApplicant);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [activeApplicantId]);
 	return (
 		<div className="flex h-full w-[540px] shrink-0 flex-col overflow-hidden rounded-[12px] border-[2px] border-black bg-[#F3FFF0]">
 			<div className="flex shrink-0 justify-center pt-[9px]">
-				<div className="flex h-[86px] w-[525px] flex-col justify-center gap-[5px] rounded-[12px] border-[2px] border-black bg-white px-[12px] font-inter text-black">
+				<div
+					className={`flex h-[86px] w-[525px] flex-col justify-center gap-[5px] rounded-[12px] border-[2px] border-black px-[12px] font-inter text-black ${
+						event.booking ? 'bg-[#C5EDA0]' : 'bg-white'
+					}`}
+				>
 					<div className="flex h-[24px] items-center gap-[6px]">
 						<MapStackStarIcon size={20} className="shrink-0" />
 						<span className="min-w-0 flex-1 truncate text-[20px] font-bold leading-none">
@@ -692,7 +782,7 @@ function EventApplicantsBox({
 							</button>
 						</div>
 						<span className="flex h-[19px] shrink-0 items-center rounded-[6px] bg-[#EDEDED] px-[8px] text-[11px] font-medium leading-none text-[#9A9A9A]">
-							0 Starred
+							{starredCount} Starred
 						</span>
 					</div>
 				</div>

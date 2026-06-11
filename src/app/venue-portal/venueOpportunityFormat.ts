@@ -83,3 +83,19 @@ export const formatVenueOpportunityTimeRange = (
 // with a future (or unset) start is still discoverable and open to applications.
 export const isVenueOpportunityLive = (opportunity: VenueEvent) =>
 	!opportunity.startsAt || new Date(opportunity.startsAt).getTime() >= Date.now();
+
+// Resolves the booked artist's row in an event's applicant list. Confirmed
+// bookings always carry the application id they were opened from, so the id
+// match is authoritative; null means the application was withdrawn after the
+// confirm (the applicants endpoint only returns submitted ones) and callers
+// should simply skip their booked-applicant affordance. Structurally typed so
+// this file stays free of API-route imports.
+export const findBookedApplicant = <A extends { id: number }>(
+	applicants: A[] | undefined,
+	booking: { threadApplicationId: number | null } | null
+): A | null => {
+	if (!booking || booking.threadApplicationId == null) return null;
+	return (
+		applicants?.find((applicant) => applicant.id === booking.threadApplicationId) ?? null
+	);
+};

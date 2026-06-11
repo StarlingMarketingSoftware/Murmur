@@ -19,7 +19,8 @@ interface StreetViewContactCardProps {
 	isHovered: boolean;
 	onHoverStart: (contact: ContactWithName) => void;
 	onHoverEnd: (contactId: number) => void;
-	onToggleSelection?: (contactId: number) => void;
+	/** Receives the full contact — overlay-only contacts aren't resolvable by id upstream. */
+	onToggleSelection?: (contact: ContactWithName) => void;
 	/**
 	 * Feeds the parent's contactId → element map; the parent positions the card
 	 * imperatively (el.style.transform) on map 'move', so this component must
@@ -145,7 +146,7 @@ const StreetViewContactCardImpl: React.FC<StreetViewContactCardProps> = ({
 							}}
 							onClick={(e) => {
 								e.stopPropagation();
-								onToggleSelection?.(contact.id);
+								onToggleSelection?.(contact);
 							}}
 						>
 							{isSelected ? 'Remove from Selection' : 'Add to Selection'}

@@ -11530,6 +11530,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 	};
 
+	// Street-view card "Add to Selection" must follow the marker-click contract:
+	// onMarkerClick first, so the consumer can pin overlay-only contacts (ambient
+	// dots, non-matching booking/promotion pins) into its results panel — a bare
+	// onToggleSelection(id) leaves the dashboard with an id it can't resolve to a
+	// row. Stable identity so the memoized persistent cards don't re-render.
+	// (The cards only render this button for selection-eligible contacts.)
+	const handleStreetCardToggleSelection = useCallback(
+		(contact: ContactWithName) => {
+			onMarkerClick?.(contact);
+			onToggleSelection?.(contact.id);
+		},
+		[onMarkerClick, onToggleSelection]
+	);
+
 	const handleMarkerMouseOver = useCallback(
 		(contact: ContactWithName, domEvent?: MouseEvent | TouchEvent) => {
 			clearEmptyMapPrompt();
@@ -17459,7 +17473,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							isHovered={hoveredMarkerId === entry.contact.id}
 							onHoverStart={handleMarkerMouseOver}
 							onHoverEnd={handleMarkerMouseOut}
-							onToggleSelection={onToggleSelection}
+							onToggleSelection={handleStreetCardToggleSelection}
 							registerEl={registerStreetCardEl}
 						/>
 					))}
@@ -17557,7 +17571,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 									}}
 									onClick={(e) => {
 										e.stopPropagation();
-										onToggleSelection?.(hoverTooltipEntry.contact.id);
+										handleStreetCardToggleSelection(hoverTooltipEntry.contact);
 									}}
 								>
 									{streetCardData.isSelected ? 'Remove from Selection' : 'Add to Selection'}

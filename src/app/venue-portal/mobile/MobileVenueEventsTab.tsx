@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
-import type { Event as VenueEvent } from '@prisma/client';
+import type { VenueEventWithBooking as VenueEvent } from '@/app/api/venue/events/route';
 import {
 	useDeleteVenueEvent,
 	useGetVenueEvents,
@@ -44,7 +44,9 @@ function MobileVenueEventCard({
 				type="button"
 				onClick={onOpen}
 				aria-label={`View ${opportunity.name}`}
-				className="flex min-h-[92px] w-full flex-col justify-between rounded-[9.496px] border-[2.374px] border-black bg-[#F7FFF0] p-[12px] text-left font-inter text-black"
+				className={`flex min-h-[92px] w-full flex-col justify-between rounded-[9.496px] border-[2.374px] border-black p-[12px] text-left font-inter text-black ${
+					opportunity.booking ? 'bg-[#C5EDA0]' : 'bg-[#F7FFF0]'
+				}`}
 			>
 				<span className="block w-full truncate pr-[32px] text-[18px] font-bold leading-tight">
 					{opportunity.name}
@@ -56,10 +58,25 @@ function MobileVenueEventCard({
 					<span className="shrink-0 text-[13px] font-medium leading-none">
 						{formatVenueOpportunityTimeRange(opportunity.startTime, opportunity.endTime)}
 					</span>
-					<span className="flex h-[24px] shrink-0 items-center justify-center rounded-[8px] border-[1.5px] border-black bg-[#F7EFC0] px-[10px] text-[13px] font-medium leading-none">
-						{formatApplicantCount(applicantCount)}
-					</span>
-					{isVenueOpportunityLive(opportunity) && (
+					{opportunity.booking ? (
+						<span className="flex h-[24px] w-fit max-w-full shrink-0 items-center justify-center overflow-hidden rounded-[8px] border-[1.5px] border-black bg-[#5EAD52] px-[10px] text-[13px] font-medium leading-none text-white">
+							<span className="min-w-0 truncate">{opportunity.booking.artistName}</span>
+						</span>
+					) : (
+						<span className="flex h-[24px] shrink-0 items-center justify-center rounded-[8px] border-[1.5px] border-black bg-[#F7EFC0] px-[10px] text-[13px] font-medium leading-none">
+							{formatApplicantCount(applicantCount)}
+						</span>
+					)}
+					{opportunity.booking ? (
+						// A confirmed booking outranks Live — the event is no longer seeking.
+						<span className="flex h-[24px] shrink-0 items-center justify-center gap-[5px] rounded-[8px] border-[1.5px] border-black bg-[#B7FFC5] px-[10px] text-[13px] font-medium leading-none">
+							<span
+								aria-hidden="true"
+								className="h-[7px] w-[7px] rounded-full bg-[#34A853]"
+							/>
+							Booked
+						</span>
+					) : isVenueOpportunityLive(opportunity) ? (
 						<span className="flex h-[24px] shrink-0 items-center justify-center gap-[5px] rounded-[8px] border-[1.5px] border-black bg-[#C5EDA0] px-[10px] text-[13px] font-medium leading-none">
 							<span
 								aria-hidden="true"
@@ -67,7 +84,7 @@ function MobileVenueEventCard({
 							/>
 							Live
 						</span>
-					)}
+					) : null}
 				</span>
 			</button>
 			{confirming ? (

@@ -10,22 +10,18 @@ import {
 import type { VenueEventApplicant } from '@/hooks/queryHooks/useVenueApplications';
 import {
 	GenrePill,
+	getApplicantRating,
 	MEDIA_THUMB_GRADIENT,
 	mediaThumbSrc,
 	ratingColor,
 } from '../VenueEventDetailView';
 
-// An applicant's rating is derived from their videos' local ratings (max wins);
-// 0 means nothing rated yet. UI-only — there is no ratings backend.
-export const getApplicantRating = (
-	applicant: VenueEventApplicant,
-	videoRatings: Record<number, number>
-) =>
-	applicant.videos.reduce((max, video) => Math.max(max, videoRatings[video.id] ?? 0), 0);
-
 // Five NON-interactive stars (plain icons, no buttons) so this row can safely
-// live inside other <button>s like the list rows.
+// live inside other <button>s like the list rows. The rating is an average and
+// can be fractional — round it so fill count and traffic-light color behave
+// (ratingColor's `=== 3` band assumes an integer).
 export function ApplicantRatingStars({ rating }: { rating: number }) {
+	const fill = Math.round(rating);
 	return (
 		<span className="flex shrink-0 items-center gap-[2px]">
 			{[1, 2, 3, 4, 5].map((value) => (
@@ -33,9 +29,9 @@ export function ApplicantRatingStars({ rating }: { rating: number }) {
 					key={value}
 					width={12}
 					height={11}
-					filled={value <= rating}
-					color={ratingColor(rating)}
-					outlineColor={ratingColor(rating)}
+					filled={value <= fill}
+					color={ratingColor(fill)}
+					outlineColor={ratingColor(fill)}
 				/>
 			))}
 		</span>
@@ -61,18 +57,16 @@ function EmptyFieldValue() {
 // Ratings are read-only here; rating happens in the media view's open player.
 export function MobileApplicantProfileCard({
 	applicant,
-	videoRatings,
 	onOpenVideo,
 	playingVideoId,
 	className,
 }: {
 	applicant: VenueEventApplicant;
-	videoRatings: Record<number, number>;
 	onOpenVideo?: (videoId: number) => void;
 	playingVideoId?: number | null;
 	className?: string;
 }) {
-	const rating = getApplicantRating(applicant, videoRatings);
+	const rating = getApplicantRating(applicant);
 	return (
 		<div
 			className={`overflow-hidden rounded-[12px] border-[2px] border-black bg-white font-inter ${

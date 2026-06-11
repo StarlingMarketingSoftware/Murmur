@@ -248,6 +248,9 @@ export const urls = {
 			account: {
 				index: '/api/venue/account',
 			},
+			applicationVideos: {
+				rating: ((id) => `/api/venue/application-videos/${id}/rating`) as DetailRoute,
+			},
 			events: {
 				index: '/api/venue/events',
 				detail: ((id) => `/api/venue/events/${id}`) as DetailRoute,

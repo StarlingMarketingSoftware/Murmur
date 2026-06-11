@@ -3388,7 +3388,10 @@ function VenueOpportunityDeleteButton({
 // Expired rows keep an invisible stand-in for the Live pill so the applicant/date
 // pills hold identical x-positions; `camouflaged` swaps the fills to the Events
 // panel's band green by default (outlines and text stay) for rows hidden above
-// its fold.
+// its fold. Booked rows ignore camouflage entirely (green row, salmon date pill —
+// a booked row must read booked even when scrolled back into view) and swap the
+// fixed-width applicants pill for a content-fit artist-name pill; the title is
+// the only flex-1 child, so the date/status columns stay aligned across rows.
 function VenueOpportunityRow({
 	opportunity,
 	applicantCount,
@@ -3404,9 +3407,15 @@ function VenueOpportunityRow({
 	camouflaged?: boolean;
 	camouflagedFillClassName?: string;
 }) {
-	const rowFillClassName = camouflaged ? camouflagedFillClassName : 'bg-[#F7FFF0]';
+	const booked = opportunity.booking != null;
+	const rowFillClassName = booked
+		? 'bg-[#C5EDA0]'
+		: camouflaged
+			? camouflagedFillClassName
+			: 'bg-[#F7FFF0]';
 	const applicantFillClassName = camouflaged ? camouflagedFillClassName : 'bg-[#F4EEC6]';
-	const dateFillClassName = camouflaged ? camouflagedFillClassName : 'bg-[#FF9797]';
+	const dateFillClassName =
+		camouflaged && !booked ? camouflagedFillClassName : 'bg-[#FF9797]';
 
 	return (
 		<button
@@ -3419,11 +3428,20 @@ function VenueOpportunityRow({
 			<span className="min-w-0 flex-1 truncate text-left text-[16px] font-medium leading-none">
 				{opportunity.name}
 			</span>
-			<span
-				className={`ml-[16px] flex h-[22px] w-[104px] shrink-0 items-center justify-center rounded-[6.866px] border-[0.858px] border-black text-[12px] font-medium leading-none ${applicantFillClassName}`}
-			>
-				{formatApplicantCount(applicantCount)}
-			</span>
+			{opportunity.booking ? (
+				<span
+					title={opportunity.booking.artistName}
+					className="ml-[16px] flex h-[22px] max-w-[150px] shrink-0 items-center justify-center rounded-[6.866px] border-[0.858px] border-black bg-[#5EAD52] px-[10px] text-[12px] font-medium leading-none text-white"
+				>
+					<span className="min-w-0 truncate">{opportunity.booking.artistName}</span>
+				</span>
+			) : (
+				<span
+					className={`ml-[16px] flex h-[22px] w-[104px] shrink-0 items-center justify-center rounded-[6.866px] border-[0.858px] border-black text-[12px] font-medium leading-none ${applicantFillClassName}`}
+				>
+					{formatApplicantCount(applicantCount)}
+				</span>
+			)}
 			<span
 				className={`ml-[48px] flex h-[22px] w-[164px] shrink-0 items-center justify-between rounded-[6.866px] border-[0.858px] border-black px-[10px] text-[12px] font-medium leading-none ${dateFillClassName}`}
 			>
@@ -3474,9 +3492,11 @@ function VenueOpportunitiesMapPanel({
 }) {
 	// The hover-delete X sits just outside the box's right border, so it can't live
 	// inside the clipped custom-scroll list. The hovered row's measured offsetTop
-	// (same coordinate space as the root's absolute children) + the list's scrollTop
-	// position one X on the unclipped panel root instead. The hover state persists
-	// while the cursor travels from row to X; the root's mouse-leave clears it.
+	// (relative to the CustomScrollbar wrapper, shifted by the 25px above it — 7px
+	// root padding + 12px "Events" label + 6px label margin — into the root's
+	// coordinate space) + the list's scrollTop position one X on the unclipped panel
+	// root instead. The hover state persists while the cursor travels from row to X;
+	// the root's mouse-leave clears it.
 	const [hovered, setHovered] = useState<{ id: number; top: number } | null>(null);
 	const [listScrollTop, setListScrollTop] = useState(0);
 	const [hasVisibleListOverflow, setHasVisibleListOverflow] = useState(false);
@@ -3562,7 +3582,10 @@ function VenueOpportunitiesMapPanel({
 								key={opportunity.id}
 								className="shrink-0"
 								onMouseEnter={(event) =>
-									setHovered({ id: opportunity.id, top: event.currentTarget.offsetTop })
+									setHovered({
+										id: opportunity.id,
+										top: 25 + event.currentTarget.offsetTop,
+									})
 								}
 							>
 								<VenueOpportunityRow
@@ -3583,7 +3606,10 @@ function VenueOpportunitiesMapPanel({
 							key={opportunity.id}
 							className="shrink-0"
 							onMouseEnter={(event) =>
-								setHovered({ id: opportunity.id, top: event.currentTarget.offsetTop })
+								setHovered({
+									id: opportunity.id,
+									top: 25 + event.currentTarget.offsetTop,
+								})
 							}
 						>
 							<VenueOpportunityRow

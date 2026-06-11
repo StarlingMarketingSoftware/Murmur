@@ -22,6 +22,7 @@ export type VenueEventApplicationVideo = {
 	position: number;
 	url: string | null; // presigned R2 GET (upload) or YouTube watch URL (youtube)
 	posterUrl: string | null; // presigned poster (upload) or YouTube CDN thumbnail
+	rating: number; // this venue user's personal rating; 0 = unrated
 };
 
 export type VenueEventApplicant = {
@@ -90,6 +91,17 @@ export async function GET(_req: NextRequest, { params }: { params: ApiRouteParam
 			},
 		});
 
+		// This venue user's personal ratings for the listed videos, batched and keyed
+		// by videoId (hits the (userId, videoId) unique index). rating 0 = cleared.
+		const videoIds = applications.flatMap((a) => a.videos.map((v) => v.id));
+		const ratings = videoIds.length
+			? await prisma.applicationVideoRating.findMany({
+					where: { userId, videoId: { in: videoIds } },
+					select: { videoId: true, rating: true },
+				})
+			: [];
+		const ratingByVideoId = new Map(ratings.map((r) => [r.videoId, r.rating]));
+
 		const applicantIds = [...new Set(applications.map((a) => a.standardUserId))];
 		const users = applicantIds.length
 			? await prisma.user.findMany({
@@ -115,6 +127,7 @@ export async function GET(_req: NextRequest, { params }: { params: ApiRouteParam
 							contentType,
 							...rest
 						}): Promise<VenueEventApplicationVideo> => {
+							const rating = ratingByVideoId.get(rest.id) ?? 0;
 							// YouTube embeds have no R2 object: watch URL + CDN thumbnail.
 							if (rest.sourceType === 'youtube') {
 								const videoId = embedUrl ? extractYouTubeId(embedUrl) : null;
@@ -122,6 +135,7 @@ export async function GET(_req: NextRequest, { params }: { params: ApiRouteParam
 									...rest,
 									url: embedUrl,
 									posterUrl: videoId ? youTubeThumbnailUrl(videoId) : null,
+									rating,
 								};
 							}
 							return {
@@ -130,6 +144,7 @@ export async function GET(_req: NextRequest, { params }: { params: ApiRouteParam
 								posterUrl: posterKey
 									? await getPresignedGetUrl(posterKey, 'image/jpeg')
 									: null,
+								rating,
 							};
 						}
 					)

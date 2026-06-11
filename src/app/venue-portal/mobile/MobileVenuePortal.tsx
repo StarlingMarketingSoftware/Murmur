@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { Event as VenueEvent } from '@prisma/client';
+// VenueEventWithBooking (not the bare prisma Event): the GET payload carries the
+// confirmed-booking attribution the booked-state UI renders from.
+import type { VenueEventWithBooking as VenueEvent } from '@/app/api/venue/events/route';
 import { useGetVenue } from '@/hooks/queryHooks/useVenue';
 import {
 	hasSavedVenueRequiredFields,

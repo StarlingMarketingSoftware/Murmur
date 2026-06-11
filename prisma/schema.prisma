@@ -703,3 +703,23 @@ model CalendarEntry {
 
   @@unique([userId, date])
 }
+
+// A venue user's personal 1–5 star rating of one submitted application video.
+// STRICTLY ADDITIVE: scalar ids, no FK relations (ContactNote pattern).
+// applicationId + standardUserId are denormalized at write time for per-
+// application averages and future artist-level views. rating 0 = cleared
+// (rows are never hard-deleted).
+model ApplicationVideoRating {
+  id             Int      @id @default(autoincrement())
+  userId         String // venue owner's clerkId; intentionally no FK
+  videoId        Int // ApplicationVideo.id; intentionally no FK
+  applicationId  Int // EventApplication.id, denormalized
+  standardUserId String // applying artist's clerkId, denormalized
+  rating         Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, videoId])
+  @@index([userId, applicationId])
+  @@index([userId, standardUserId])
+}

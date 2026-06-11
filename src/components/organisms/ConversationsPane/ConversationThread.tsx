@@ -128,10 +128,10 @@ function VenueChatActionButton({
 			onClick={onClick}
 			disabled={disabled}
 			className={cn(
-				'inline-flex w-full max-w-full items-center overflow-hidden rounded-[12px] border-[2px] border-[#85919A] bg-white/20 font-inter font-bold leading-none text-[#85919A] transition hover:border-black hover:bg-[#ACD2FF] hover:text-black active:border-black active:bg-[#ACD2FF] active:text-black disabled:cursor-not-allowed disabled:hover:border-[#85919A] disabled:hover:bg-white/20 disabled:hover:text-[#85919A]',
+				'inline-flex w-full max-w-full items-center overflow-hidden border-[2px] border-[#85919A] bg-white/20 font-inter font-bold leading-none text-[#85919A] transition hover:border-black hover:bg-[#ACD2FF] hover:text-black active:border-black active:bg-[#ACD2FF] active:text-black disabled:cursor-not-allowed disabled:hover:border-[#85919A] disabled:hover:bg-white/20 disabled:hover:text-[#85919A]',
 				compact
-					? 'h-[32px] gap-[8px] px-[10px] text-[14px]'
-					: 'h-[38px] gap-[10px] px-[13px] text-[16px]',
+					? 'h-[32px] gap-[8px] rounded-[12px] px-[10px] text-[14px]'
+					: 'h-[26px] gap-[6px] rounded-[9px] px-[9px] text-[12px]',
 				disabled && 'opacity-75'
 			)}
 		>
@@ -162,6 +162,7 @@ export function ConversationThread({
 	const cancelBookingRequest = useCancelBookingRequest(conversationId, thread);
 	const queryClient = useQueryClient();
 	const [draft, setDraft] = useState('');
+	const [isComposerFocused, setIsComposerFocused] = useState(false);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -188,6 +189,9 @@ export function ConversationThread({
 		counterpartFirstName !== '';
 	const showVenueConversationActions = thread !== 'general';
 	const canRequestBooking = showVenueActionButtons && activeBookingRequest == null;
+	// Composing (focused input or a non-empty draft) hides the action stack; the
+	// buttons come back once the field is blurred and empty again.
+	const isComposing = isComposerFocused || draft !== '';
 
 	// The artist confirms on their own schedule (the 10s poll delivers it) — when
 	// the active request flips pending→confirmed, refresh the venue's calendar and
@@ -271,6 +275,8 @@ export function ConversationThread({
 			ref={inputRef}
 			value={draft}
 			onChange={(event) => setDraft(event.target.value)}
+			onFocus={() => setIsComposerFocused(true)}
+			onBlur={() => setIsComposerFocused(false)}
 			onKeyDown={(event) => {
 				if (event.key === 'Enter' && !event.shiftKey) {
 					event.preventDefault();
@@ -365,7 +371,6 @@ export function ConversationThread({
 									counterpartFirstName={counterpartFirstName}
 									date={message.bookingRequest.date}
 									pending={message.id < 0}
-									compact={useDockedVenueMapComposer}
 									onCancel={
 										data.currentUserRole === 'venue' &&
 										message.bookingRequest.status === 'pending' &&
@@ -375,7 +380,7 @@ export function ConversationThread({
 									}
 									className={
 										useDockedVenueMapComposer
-											? 'mx-[8px] w-auto overflow-hidden rounded-[4px]'
+											? '-mx-[8px] w-auto'
 											: '-mx-[14px] w-auto'
 									}
 								/>
@@ -403,7 +408,6 @@ export function ConversationThread({
 								perspective={data?.currentUserRole === 'venue' ? 'venue' : 'artist'}
 								counterpartFirstName={counterpartFirstName}
 								date={activeBookingRequest.date}
-								compact={useDockedVenueMapComposer}
 								onCancel={
 									data?.currentUserRole === 'venue' &&
 									activeBookingRequest.status === 'pending' &&
@@ -413,20 +417,20 @@ export function ConversationThread({
 								}
 								className={
 									useDockedVenueMapComposer
-										? 'mx-[8px] w-auto overflow-hidden rounded-[4px]'
+										? '-mx-[8px] w-auto'
 										: '-mx-[14px] w-auto'
 								}
 							/>
 						)}
 					{/* Action stack rides at the end of the conversation (scrolls with the
 					    messages) rather than pinned above the composer. */}
-					{showVenueActionButtons && (
+					{showVenueActionButtons && !isComposing && (
 						<div
 							className={cn(
 								'mt-auto grid max-w-full grid-cols-[max-content] justify-end self-end px-[4px]',
 								useDockedVenueMapComposer
 									? 'gap-[16px] pb-[18px] pt-[24px]'
-									: 'gap-[14px] pt-[24px]'
+									: 'gap-[8px] pt-[16px]'
 							)}
 						>
 							{showVenueConversationActions && (
@@ -435,7 +439,7 @@ export function ConversationThread({
 										icon={
 											<VenueChatBubbleActionIcon
 												className={
-													useDockedVenueMapComposer ? 'h-[16px] w-[16px]' : 'h-[20px] w-[20px]'
+													useDockedVenueMapComposer ? 'h-[16px] w-[16px]' : 'h-[14px] w-[14px]'
 												}
 											/>
 										}
@@ -447,7 +451,7 @@ export function ConversationThread({
 										icon={
 											<VenueInviteConnectIcon
 												className={
-													useDockedVenueMapComposer ? 'h-[15px] w-[17px]' : 'h-[18px] w-[20px]'
+													useDockedVenueMapComposer ? 'h-[15px] w-[17px]' : 'h-[12px] w-[14px]'
 												}
 											/>
 										}
@@ -461,7 +465,7 @@ export function ConversationThread({
 							<VenueChatActionButton
 								icon={
 									<CalendarPlusIcon
-										className={useDockedVenueMapComposer ? 'h-[16px] w-[16px]' : 'h-[20px] w-[20px]'}
+										className={useDockedVenueMapComposer ? 'h-[16px] w-[16px]' : 'h-[14px] w-[14px]'}
 									/>
 								}
 								label={`Request to book ${counterpartFirstName}`}
