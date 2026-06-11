@@ -667,6 +667,53 @@ export const NIGHT_CLOSE_FOG_ALPHA_DAY = 1.0;
 export const NIGHT_CLOSE_FOG_ALPHA_NIGHT = 0.42;
 
 // ============================================================================
+// Unsubscribe burn ("globe on fire")
+// ============================================================================
+
+// The unsubscribe flow progressively tints the globe toward an apocalyptic
+// look as the user advances through the steps (see unsubscribeBurnState.ts).
+// Values below are endpoints the basemap appliers mix their normally-composed
+// day/night/mood output toward. `_MID` values are a keyframe at burnT=0.5 so
+// the ramp reads "warm → charred gray-brown → apocalypse" rather than one
+// linear lerp; `_HOT` values are the burnT=1 endpoints.
+export const UNSUBSCRIBE_BURN_TRANSITION_MS = 1500;
+
+export const UNSUBSCRIBE_BURN_AMBIENT_LIGHT_COLOR = 'rgb(150, 45, 18)';
+export const UNSUBSCRIBE_BURN_AMBIENT_LIGHT_INTENSITY = 0.3;
+export const UNSUBSCRIBE_BURN_KEY_LIGHT_COLOR = 'rgb(255, 110, 45)';
+export const UNSUBSCRIBE_BURN_KEY_LIGHT_INTENSITY = 1.9;
+
+export const UNSUBSCRIBE_BURN_CLOSE_FOG_COLOR = 'rgba(255, 96, 32, 0.55)';
+// Atmosphere rim: deep red mid-burn, white-hot at full burn.
+export const UNSUBSCRIBE_BURN_HIGH_COLOR_MID = 'rgb(185, 38, 10)';
+export const UNSUBSCRIBE_BURN_HIGH_COLOR_HOT = 'rgb(255, 238, 215)';
+export const UNSUBSCRIBE_BURN_SPACE_COLOR = 'rgb(26, 5, 2)';
+export const UNSUBSCRIBE_BURN_STAR_INTENSITY = 0.25;
+export const UNSUBSCRIBE_BURN_HORIZON_BLEND = 0.1;
+
+export const UNSUBSCRIBE_BURN_LAND_MID = '#9C7A5C';
+export const UNSUBSCRIBE_BURN_LAND_HOT = '#221912';
+export const UNSUBSCRIBE_BURN_OCEAN_MID = '#41768A';
+export const UNSUBSCRIBE_BURN_OCEAN_HOT = '#1C272D';
+export const UNSUBSCRIBE_BURN_LANDCOVER_MID = '#7E8168';
+export const UNSUBSCRIBE_BURN_LANDCOVER_HOT = '#241F18';
+
+// Ember tint for the contact-lights raster dots (`raster-color` ramp). The
+// tiles are uniform warm-white dots, so ramping on raster-value gives a
+// hot-core / dark-rim ember falloff at the resampled dot edges for free.
+export const UNSUBSCRIBE_BURN_EMBER_EDGE_COLOR = 'rgba(70, 8, 0, 0)';
+export const UNSUBSCRIBE_BURN_EMBER_DIM_COLOR = 'rgb(160, 40, 8)';
+export const UNSUBSCRIBE_BURN_EMBER_HOT_COLOR_MID = 'rgb(255, 150, 60)';
+export const UNSUBSCRIBE_BURN_EMBER_HOT_COLOR_HOT = 'rgb(255, 58, 26)';
+
+// DOM overlay washes (multiply char + screen under-glow).
+export const UNSUBSCRIBE_BURN_WASH_COLOR = 'rgb(98, 28, 12)';
+export const UNSUBSCRIBE_BURN_WASH_MAX_OPACITY = 0.45;
+export const UNSUBSCRIBE_BURN_GLOW_MAX_OPACITY = 0.55;
+export const UNSUBSCRIBE_BURN_GLOW_BG =
+	'radial-gradient(ellipse 85% 85% at 50% 46%, rgba(255, 92, 28, 0.55) 0%, rgba(255, 40, 10, 0.22) 45%, rgba(0, 0, 0, 0) 72%)';
+
+// ============================================================================
 // World-land fill layer
 // ============================================================================
 

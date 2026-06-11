@@ -12,8 +12,28 @@ import {
 	useVerifyDeletionCode,
 } from '@/hooks/queryHooks/useAccountDeletion';
 import { urls } from '@/constants/urls';
+import { setUnsubscribeBurnTarget } from '@/components/molecules/SearchResultsMap/unsubscribeBurnState';
 
-type UnsubscribeStep = 'confirm' | 'offer' | 'lastChance' | 'survey' | 'code';
+type UnsubscribeStep =
+	| 'confirm'
+	| 'offer'
+	| 'lastChance'
+	| 'survey'
+	| 'code'
+	| 'done';
+
+// The globe behind the flow burns progressively (comedic effect): each step
+// publishes its burn level and the map tweens toward it. 1 = apocalypse.
+// The fire is already clearly visible on the first step — the arc escalates
+// from "burning" to "apocalyptic", not from "normal".
+const BURN_LEVEL_BY_STEP: Record<UnsubscribeStep, number> = {
+	confirm: 0.3,
+	offer: 0.42,
+	lastChance: 0.55,
+	survey: 0.7,
+	code: 0.85,
+	done: 1,
+};
 
 const SURVEY_OPTIONS = [
 	'Too expensive for me right now',
@@ -58,6 +78,14 @@ export function UnsubscribeFlow() {
 		window.addEventListener('keydown', onKey);
 		return () => window.removeEventListener('keydown', onKey);
 	}, [exitFlow]);
+
+	useEffect(() => {
+		setUnsubscribeBurnTarget(BURN_LEVEL_BY_STEP[step]);
+	}, [step]);
+
+	// Any exit path (Escape, No, Claim Offer, overlay click) unmounts the flow;
+	// the globe heals back to normal from wherever the burn was.
+	useEffect(() => () => setUnsubscribeBurnTarget(0), []);
 
 	if (typeof window === 'undefined') return null;
 
@@ -109,13 +137,14 @@ export function UnsubscribeFlow() {
 									// TODO(unsubscribe): trigger the actual cancellation
 									// (Stripe cancel + 30-day deletion mark) when that
 									// endpoint lands; verification row is the proof.
-									exitFlow();
+									setStep('done');
 								},
 							}
 						)
 					}
 				/>
 			)}
+			{step === 'done' && <DoneStep />}
 		</div>,
 		document.body
 	);
@@ -425,5 +454,24 @@ function CodeStep({
 				</div>
 			</div>
 		</FlowFrame>
+	);
+}
+
+// Final screen: plain text over the fully-burning globe — no FlowFrame and no
+// stopPropagation, so the existing overlay click (and Escape) exits the flow.
+function DoneStep() {
+	return (
+		<div
+			className="flex max-w-[640px] flex-col items-center gap-[28px] px-[24px] text-center font-inter text-white"
+			style={{ textShadow: '0 1px 14px rgba(0, 0, 0, 0.65)' }}
+		>
+			<h1 className="text-[17px] font-semibold">You are now Unsubscribed</h1>
+			<p className="text-[15.5px] font-semibold leading-[1.5]">
+				&ldquo;Why do you go away? So that you can come back. So that you can see the
+				place you came from with new eyes and extra colors. And the people there see
+				you differently, too. Coming back to where you started is not the same as
+				never leaving.&rdquo; &mdash; Terry Pratchett
+			</p>
+		</div>
 	);
 }

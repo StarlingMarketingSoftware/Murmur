@@ -361,12 +361,21 @@ import {
 	SUN_TRANSITION_SPACE_GLOW_BG,
 	SUN_TRANSITION_SPACE_GLOW_OPACITY_MULT,
 	TOOLTIP_FILL_COLOR_SELECTED,
+	UNSUBSCRIBE_BURN_GLOW_BG,
+	UNSUBSCRIBE_BURN_GLOW_MAX_OPACITY,
+	UNSUBSCRIBE_BURN_TRANSITION_MS,
+	UNSUBSCRIBE_BURN_WASH_COLOR,
+	UNSUBSCRIBE_BURN_WASH_MAX_OPACITY,
 	US_ONLY_BASEMAP_CLIP_MAX_ZOOM,
 	VIEWPORT_BBOX_PAD_FACTOR,
 	defaultCenter,
 	stateBadgeColorMap,
 } from './constants';
 import { setDashboardGlobeSpinLng } from './dashboardGlobeSpinState';
+import {
+	getUnsubscribeBurnTarget,
+	subscribeUnsubscribeBurn,
+} from './unsubscribeBurnState';
 import {
 	bboxFromMultiPolygon,
 	boundsToPolygonFeatureCollection,
@@ -394,9 +403,11 @@ import {
 	applyMapboxFogForMoodAndNight,
 	applyMurmurGlobeLighting,
 	applyNightLandPalette,
+	applyUnsubscribeBurnEmberTint,
 	applyUsOnlyBasemapCartography,
 	ensureWorldLandFill,
 	restoreBasemapCartography,
+	unsubscribeBurnEase,
 } from './basemap';
 import {
 	buildCuratedBlobClusterLobeMultiPolygons,
@@ -1525,6 +1536,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// updates can stay fully imperative without React re-render jitter.
 	const nightTRef = useRef<number>(nightT);
 	nightTRef.current = nightT;
+	// Unsubscribe burn factor (0=normal, 1=apocalypse), tweened by the burn
+	// effect toward the unsubscribe flow's published target. A ref (like
+	// `nightTRef`) so every pipeline reapplication can read the live value.
+	const unsubscribeBurnTRef = useRef<number>(0);
 	// 0..1 fade that suppresses the lights overlay until tiles are ready, avoiding
 	// the half-loaded "patchy" initial look.
 	const nightLightsLoadTRef = useRef<number>(0);
@@ -1616,6 +1631,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const lightingOverlayNightShadeRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayMoonRimRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayNightVignetteRef = useRef<HTMLDivElement | null>(null);
+	const lightingOverlayBurnWashRef = useRef<HTMLDivElement | null>(null);
+	const lightingOverlayBurnGlowRef = useRef<HTMLDivElement | null>(null);
 	const [visibleContacts, setVisibleContacts] = useState<ContactWithName[]>([]);
 	// Keep a "sticky" set of currently-rendered marker ids so zooming can rescale existing markers
 	// and only introduce *new* markers, instead of re-sampling a totally different set each time.
@@ -8013,11 +8030,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				nightTRef.current,
 				weatherMoodConfigRef.current
 			);
-			applyMurmurGlobeLighting(mapInstance);
+			applyMurmurGlobeLighting(mapInstance, unsubscribeBurnTRef.current);
 			applyMapboxFogForMoodAndNight(
 				mapInstance,
 				weatherMoodConfigRef.current,
-				initialVisualNightT
+				initialVisualNightT,
+				unsubscribeBurnTRef.current
 			);
 			// Add Murmur sources/layers (including clouds + world-land fill) as early as
 			// possible so they can begin loading before the first reveal.
@@ -8030,11 +8048,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				nightTRef.current,
 				weatherMoodConfigRef.current
 			);
-			applyMurmurGlobeLighting(mapInstance);
+			applyMurmurGlobeLighting(mapInstance, unsubscribeBurnTRef.current);
 			applyMapboxFogForMoodAndNight(
 				mapInstance,
 				weatherMoodConfigRef.current,
-				initialVisualNightT
+				initialVisualNightT,
+				unsubscribeBurnTRef.current
 			);
 			ensureMapboxSourcesAndLayers(mapInstance);
 
@@ -8141,7 +8160,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// `rotate` fires continuously during interaction; the call is cheap (no
 		// layer reshuffling) because setLights only updates the existing light defs.
 		const onRotate = () => {
-			applyMurmurGlobeLighting(mapInstance);
+			applyMurmurGlobeLighting(mapInstance, unsubscribeBurnTRef.current);
 		};
 
 		mapInstance.on('load', onLoad);
@@ -11962,8 +11981,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// Make lights appear earlier in dusk/dawn (and feel more "present" at night)
 		// without showing them during full daylight.
 		const nightForLights = Math.pow(night, 0.65);
+		// Unsubscribe burn: surface the dots as embers even in full daylight,
+		// scaling with the burn factor (their ember tint is owned by the burn
+		// tween via `applyUnsubscribeBurnEmberTint`). Same fast-start power
+		// curve as `nightForLights` so embers read clearly from the first step.
+		const unsubscribeBurn = unsubscribeBurnEase(unsubscribeBurnTRef.current);
+		const burnForLights = Math.pow(unsubscribeBurn, 0.65);
 		const lightsBase =
-			nightForLights *
+			Math.max(nightForLights, burnForLights) *
 			(NIGHT_US_LIGHTS_OPACITY + zoomOutLift) *
 			computeNightLightsFade(zoom) *
 			loadT;
@@ -12111,6 +12136,24 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		);
 		if (lightingOverlayNightDarkWashRef.current)
 			lightingOverlayNightDarkWashRef.current.style.opacity = String(nightDarkOpacity);
+
+		// Unsubscribe burn washes — uniform multiply char plus a late-stage
+		// screen-blend ember under-glow (only emerges past mid-burn). Both are
+		// 0 outside the unsubscribe flow.
+		const burnWashOpacity = clamp(
+			unsubscribeBurn * UNSUBSCRIBE_BURN_WASH_MAX_OPACITY,
+			0,
+			1
+		);
+		const burnGlowOpacity = clamp(
+			smoothstep(0.45, 1, unsubscribeBurn) * UNSUBSCRIBE_BURN_GLOW_MAX_OPACITY,
+			0,
+			1
+		);
+		if (lightingOverlayBurnWashRef.current)
+			lightingOverlayBurnWashRef.current.style.opacity = String(burnWashOpacity);
+		if (lightingOverlayBurnGlowRef.current)
+			lightingOverlayBurnGlowRef.current.style.opacity = String(burnGlowOpacity);
 	}, []);
 
 	const repaintSunTransitionCanvas = useCallback((nowMs: number, force = false) => {
@@ -12493,10 +12536,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!map) return;
 		if (!isMapLoaded) return;
 		const visualNightT = computeMoodVisualNightT(nightT, weatherMoodConfigRef.current);
-		applyMurmurGlobeLighting(map);
-		applyNightLandPalette(map, visualNightT);
+		applyMurmurGlobeLighting(map, unsubscribeBurnTRef.current);
+		applyNightLandPalette(map, visualNightT, unsubscribeBurnTRef.current);
 		applyStateOverlayNightColors(map, visualNightT);
-		applyMapboxFogForMoodAndNight(map, weatherMoodConfigRef.current, visualNightT);
+		applyMapboxFogForMoodAndNight(
+			map,
+			weatherMoodConfigRef.current,
+			visualNightT,
+			unsubscribeBurnTRef.current
+		);
 	}, [nightT, weatherMood, map, isMapLoaded]);
 
 	// During sunrise/sunset, `useGlobeNightLighting` intentionally avoids React
@@ -12533,10 +12581,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				runtimeNightT,
 				weatherMoodConfigRef.current
 			);
-			applyMurmurGlobeLighting(map);
-			applyNightLandPalette(map, visualNightT);
+			applyMurmurGlobeLighting(map, unsubscribeBurnTRef.current);
+			applyNightLandPalette(map, visualNightT, unsubscribeBurnTRef.current);
 			applyStateOverlayNightColors(map, visualNightT);
-			applyMapboxFogForMoodAndNight(map, weatherMoodConfigRef.current, visualNightT);
+			applyMapboxFogForMoodAndNight(
+				map,
+				weatherMoodConfigRef.current,
+				visualNightT,
+				unsubscribeBurnTRef.current
+			);
 			applyStateOverlayOpacity(
 				stateOverlayOpacityRef.current,
 				stateOverlayModeRef.current
@@ -12574,6 +12627,91 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		applyLightingOverlayOpacity,
 		applyStateOverlayOpacity,
 	]);
+
+	// Unsubscribe burn ("globe on fire"): tween the visual burn factor toward
+	// the flow's published target and repaint the burn-aware appliers each
+	// frame. Burn composes *inside* the night/mood pipeline, so the periodic
+	// reapplications elsewhere repaint (rather than wipe) the current level.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+
+		let rafId: number | null = null;
+
+		const applyBurnFrame = () => {
+			const burn = unsubscribeBurnTRef.current;
+			const visualNightT = computeMoodVisualNightT(
+				nightTRef.current,
+				weatherMoodConfigRef.current
+			);
+			applyMurmurGlobeLighting(map, burn);
+			applyNightLandPalette(map, visualNightT, burn);
+			applyMapboxFogForMoodAndNight(
+				map,
+				weatherMoodConfigRef.current,
+				visualNightT,
+				burn
+			);
+			applyUnsubscribeBurnEmberTint(map, burn);
+			applyLightingOverlayOpacity();
+			try {
+				map.triggerRepaint();
+			} catch {
+				// Non-fatal.
+			}
+		};
+
+		// Tuning/screenshot escape hatch: `?devBurnT=0.5` pins the burn factor.
+		const devBurnRaw =
+			typeof window === 'undefined'
+				? null
+				: new URLSearchParams(window.location.search).get('devBurnT');
+		const devBurnT = devBurnRaw == null ? null : Number(devBurnRaw);
+		if (devBurnT != null && Number.isFinite(devBurnT)) {
+			unsubscribeBurnTRef.current = clamp(devBurnT, 0, 1);
+			applyBurnFrame();
+			return;
+		}
+
+		const seekTo = (target: number) => {
+			if (rafId != null) cancelAnimationFrame(rafId);
+			rafId = null;
+			const from = unsubscribeBurnTRef.current;
+			if (Math.abs(target - from) < 0.001) {
+				unsubscribeBurnTRef.current = target;
+				applyBurnFrame();
+				return;
+			}
+			const startMs = performance.now();
+			const tick = () => {
+				const t = clamp(
+					(performance.now() - startMs) / UNSUBSCRIBE_BURN_TRANSITION_MS,
+					0,
+					1
+				);
+				const eased = t * t * (3 - 2 * t);
+				unsubscribeBurnTRef.current = lerp(from, target, eased);
+				applyBurnFrame();
+				if (t < 1) {
+					rafId = requestAnimationFrame(tick);
+					return;
+				}
+				rafId = null;
+			};
+			tick();
+		};
+
+		// Catch up if the flow advanced before the map was ready (or after a
+		// style reload re-asserted the unburned look).
+		if (getUnsubscribeBurnTarget() !== unsubscribeBurnTRef.current) {
+			seekTo(getUnsubscribeBurnTarget());
+		}
+		const unsubscribe = subscribeUnsubscribeBurn(seekTo);
+		return () => {
+			unsubscribe();
+			if (rafId != null) cancelAnimationFrame(rafId);
+		};
+	}, [map, isMapLoaded, applyLightingOverlayOpacity]);
 
 	const getSelectedStateDisplayMultiPolygon = useCallback(
 		(mapInstance: mapboxgl.Map): ClippingMultiPolygon | null => {
@@ -12765,7 +12903,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const onZoomEnd = () =>
 			applyNightLandPalette(
 				map,
-				computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current)
+				computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current),
+				unsubscribeBurnTRef.current
 			);
 		map.on('zoomend', onZoomEnd);
 		return () => {
@@ -12828,9 +12967,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const visualNightT = computeMoodVisualNightT(nightTRef.current, cfg);
 			// Atmosphere fog tint — combined with night-aware modulation so the
 			// star glow / space haze / muted limb-mist react in a single pass.
-			applyMapboxFogForMoodAndNight(m, cfg, visualNightT);
-			applyMurmurGlobeLighting(m);
-			applyNightLandPalette(m, visualNightT);
+			applyMapboxFogForMoodAndNight(m, cfg, visualNightT, unsubscribeBurnTRef.current);
+			applyMurmurGlobeLighting(m, unsubscribeBurnTRef.current);
+			applyNightLandPalette(m, visualNightT, unsubscribeBurnTRef.current);
 			applyStateOverlayNightColors(m, visualNightT);
 			applyStateOverlayOpacity(
 				stateOverlayOpacityRef.current,
@@ -17155,6 +17294,40 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					background: NIGHT_VIGNETTE_BG,
 					mixBlendMode: 'multiply',
 					zIndex: 1,
+				}}
+			/>
+			{/*
+			  Unsubscribe burn washes. The flow's "globe on fire" effect: a uniform
+			  multiply char that reddens/darkens what the basemap paint can't reach
+			  (clouds, lighting overlays), plus a late-stage screen-blend ember
+			  under-glow. Opacities owned by applyLightingOverlayOpacity; both stay
+			  0 outside the unsubscribe flow, so initial opacity is set explicitly
+			  to avoid a dark-red first paint before the first apply runs.
+			*/}
+			<div
+				ref={lightingOverlayBurnWashRef}
+				aria-hidden
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					background: UNSUBSCRIBE_BURN_WASH_COLOR,
+					mixBlendMode: 'multiply',
+					zIndex: 1,
+					opacity: 0,
+				}}
+			/>
+			<div
+				ref={lightingOverlayBurnGlowRef}
+				aria-hidden
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					background: UNSUBSCRIBE_BURN_GLOW_BG,
+					mixBlendMode: 'screen',
+					zIndex: 1,
+					opacity: 0,
 				}}
 			/>
 			{mapLoadError && (

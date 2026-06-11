@@ -52,6 +52,12 @@ export const urls = {
 		},
 		detail: ((id) => `/pricing/${id}`) as DetailRoute,
 	},
+	privacy: {
+		index: '/privacy',
+	},
+	terms: {
+		index: '/terms',
+	},
 	signIn: {
 		index: '/sign-in',
 	},

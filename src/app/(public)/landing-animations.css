@@ -981,3 +981,17 @@ body {
 		--drafting-feature-scale: calc((100vw - 32px) / 1354px);
 	}
 }
+
+/* --- Home hero stack: scale down on short viewports so the page never scrolls.
+   `zoom` (not transform) so layout height shrinks with the artwork; the repo
+   already relies on zoom for landing scaling (.landing-zoom-80). */
+@media (max-height: 780px) {
+	.landing-home-stack {
+		zoom: 0.85;
+	}
+}
+@media (max-height: 660px) {
+	.landing-home-stack {
+		zoom: 0.72;
+	}
+}

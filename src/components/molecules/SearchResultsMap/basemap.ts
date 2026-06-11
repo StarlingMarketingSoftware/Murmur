@@ -1,5 +1,5 @@
 import mapboxgl from 'mapbox-gl';
-import { formatCssColor, parseCssColor } from './color';
+import { formatCssColor, parseCssColor, parseHexColor } from './color';
 import {
 	BASEMAP_LABEL_HALO_BLUR,
 	BASEMAP_LABEL_HALO_COLOR,
@@ -13,6 +13,7 @@ import {
 	MAP_LAND_CREAM,
 	MAP_LANDCOVER_GREEN,
 	MAP_OCEAN_BLUE,
+	MAPBOX_LAYER_IDS,
 	MAP_WORLD_LAND_LAYER_ID,
 	MAP_WORLD_LAND_SOURCE_ID,
 	MAP_WORLD_LAND_SOURCE_LAYER,
@@ -29,41 +30,115 @@ import {
 	NIGHT_SPACE_COLOR_NIGHT,
 	NIGHT_STAR_INTENSITY_DAY,
 	NIGHT_STAR_INTENSITY_NIGHT,
+	UNSUBSCRIBE_BURN_AMBIENT_LIGHT_COLOR,
+	UNSUBSCRIBE_BURN_AMBIENT_LIGHT_INTENSITY,
+	UNSUBSCRIBE_BURN_CLOSE_FOG_COLOR,
+	UNSUBSCRIBE_BURN_EMBER_DIM_COLOR,
+	UNSUBSCRIBE_BURN_EMBER_EDGE_COLOR,
+	UNSUBSCRIBE_BURN_EMBER_HOT_COLOR_HOT,
+	UNSUBSCRIBE_BURN_EMBER_HOT_COLOR_MID,
+	UNSUBSCRIBE_BURN_HIGH_COLOR_HOT,
+	UNSUBSCRIBE_BURN_HIGH_COLOR_MID,
+	UNSUBSCRIBE_BURN_HORIZON_BLEND,
+	UNSUBSCRIBE_BURN_KEY_LIGHT_COLOR,
+	UNSUBSCRIBE_BURN_KEY_LIGHT_INTENSITY,
+	UNSUBSCRIBE_BURN_LAND_HOT,
+	UNSUBSCRIBE_BURN_LAND_MID,
+	UNSUBSCRIBE_BURN_LANDCOVER_HOT,
+	UNSUBSCRIBE_BURN_LANDCOVER_MID,
+	UNSUBSCRIBE_BURN_OCEAN_HOT,
+	UNSUBSCRIBE_BURN_OCEAN_MID,
+	UNSUBSCRIBE_BURN_SPACE_COLOR,
+	UNSUBSCRIBE_BURN_STAR_INTENSITY,
 } from './constants';
 import { clamp, lerp } from './math';
 import { scaleMapboxOpacityExpr } from './searchMode';
 import type {
 	BasemapCartographyClipState,
 	GeoJsonGeometry,
+	ParsedCssColor,
 } from './types';
+
+// ============================================================================
+// Unsubscribe burn ("globe on fire") mixing
+// ============================================================================
+
+// The unsubscribe flow drives a burnT factor (0 = normal, 1 = apocalypse).
+// Burn is composed as the *outermost* lerp: each applier below computes its
+// normal day/night/mood output first, then mixes that result toward the burn
+// targets — so the pipeline's frequent reapplications repaint the burn rather
+// than wiping it, and burnT=0 stays identical to the unburned look.
+
+// Linear shaping: the fire must read clearly from the very first unsubscribe
+// step (the step levels themselves define the dramatic arc), so no easing
+// that would suppress the low end. Kept as the single shaping hook in case
+// the curve needs tuning later.
+export const unsubscribeBurnEase = (burnT: number) => clamp(burnT, 0, 1);
+
+// `mixCssColorString` only parses rgb()/rgba(); the basemap palette constants
+// are hex, so the burn mixer accepts both.
+const parseBurnColor = (value: string): ParsedCssColor | null => {
+	const rgba = parseCssColor(value);
+	if (rgba) return rgba;
+	const hex = parseHexColor(value);
+	return hex ? [hex.r, hex.g, hex.b, 1] : null;
+};
+
+const mixBurnColor = (from: string, to: string, t: number) => {
+	const a = parseBurnColor(from);
+	const b = parseBurnColor(to);
+	if (!a || !b) return t < 0.5 ? from : to;
+	const p = clamp(t, 0, 1);
+	return formatCssColor([
+		lerp(a[0], b[0], p),
+		lerp(a[1], b[1], p),
+		lerp(a[2], b[2], p),
+		lerp(a[3], b[3], p),
+	]);
+};
+
+// Three-stop ramp: base → mid (burnT 0.5) → hot (burnT 1).
+const burnMixColor3 = (base: string, mid: string, hot: string, burnT: number) => {
+	const b = unsubscribeBurnEase(burnT);
+	return b <= 0.5 ? mixBurnColor(base, mid, b * 2) : mixBurnColor(mid, hot, (b - 0.5) * 2);
+};
 
 // ============================================================================
 // Globe lighting (viewer-anchored softbox key + ambient)
 // ============================================================================
 
-export const applyMurmurGlobeLighting = (mapInstance: mapboxgl.Map) => {
+export const applyMurmurGlobeLighting = (mapInstance: mapboxgl.Map, burnT = 0) => {
 	try {
 		const bearing =
 			typeof mapInstance.getBearing === 'function' ? mapInstance.getBearing() : 0;
 		const azimuth =
 			(MURMUR_GLOBE_LIGHT_VIEWER_AZIMUTH_OFFSET_DEG + (bearing || 0) + 360) % 360;
 		const polar = MURMUR_GLOBE_LIGHT_POLAR_DEG;
+		const burn = unsubscribeBurnEase(burnT);
 
 		(mapInstance as any).setLights?.([
 			{
 				id: 'murmur-ambient',
 				type: 'ambient',
 				properties: {
-					color: 'rgb(120, 150, 185)',
-					intensity: 0.18,
+					color: mixBurnColor(
+						'rgb(120, 150, 185)',
+						UNSUBSCRIBE_BURN_AMBIENT_LIGHT_COLOR,
+						burn
+					),
+					intensity: lerp(0.18, UNSUBSCRIBE_BURN_AMBIENT_LIGHT_INTENSITY, burn),
 				},
 			},
 			{
 				id: 'murmur-key',
 				type: 'directional',
 				properties: {
-					color: 'rgb(255, 244, 220)',
-					intensity: 1.6,
+					color: mixBurnColor(
+						'rgb(255, 244, 220)',
+						UNSUBSCRIBE_BURN_KEY_LIGHT_COLOR,
+						burn
+					),
+					intensity: lerp(1.6, UNSUBSCRIBE_BURN_KEY_LIGHT_INTENSITY, burn),
 					direction: [azimuth, polar],
 					'cast-shadows': true,
 					'shadow-intensity': 0.95,
@@ -171,7 +246,8 @@ const getBasemapRoadOpacityBase = (mapInstance: mapboxgl.Map, layerId: string) =
 export const applyMapboxFogForMoodAndNight = (
 	mapInstance: mapboxgl.Map,
 	cfg: { fogColor: string; fogHighColor: string; fogHorizonBlend: number },
-	nightT: number
+	nightT: number,
+	burnT = 0
 ) => {
 	try {
 		const t = clamp(nightT, 0, 1);
@@ -194,13 +270,22 @@ export const applyMapboxFogForMoodAndNight = (
 			? formatCssColor([baseClose[0], baseClose[1], baseClose[2], baseClose[3] * alphaScale])
 			: cfg.fogColor;
 
+		// Unsubscribe burn: mix the composed values toward the burning
+		// atmosphere. The rim (`high-color`) ramps deep-red then white-hot.
+		const burn = unsubscribeBurnEase(burnT);
+
 		(mapInstance as any).setFog?.({
 			...existingFog,
-			color: closeFogColor,
-			'high-color': cfg.fogHighColor,
-			'horizon-blend': cfg.fogHorizonBlend,
-			'star-intensity': starIntensity,
-			'space-color': spaceColor,
+			color: mixBurnColor(closeFogColor, UNSUBSCRIBE_BURN_CLOSE_FOG_COLOR, burn),
+			'high-color': burnMixColor3(
+				cfg.fogHighColor,
+				UNSUBSCRIBE_BURN_HIGH_COLOR_MID,
+				UNSUBSCRIBE_BURN_HIGH_COLOR_HOT,
+				burnT
+			),
+			'horizon-blend': lerp(cfg.fogHorizonBlend, UNSUBSCRIBE_BURN_HORIZON_BLEND, burn),
+			'star-intensity': lerp(starIntensity, UNSUBSCRIBE_BURN_STAR_INTENSITY, burn),
+			'space-color': mixBurnColor(spaceColor, UNSUBSCRIBE_BURN_SPACE_COLOR, burn),
 		});
 	} catch {
 		// Non-fatal.
@@ -211,9 +296,38 @@ export const applyMapboxFogForMoodAndNight = (
 // Land/water/road palette application (per render frame)
 // ============================================================================
 
-export const applyNightLandPalette = (mapInstance: mapboxgl.Map, nightT: number) => {
+export const applyNightLandPalette = (
+	mapInstance: mapboxgl.Map,
+	nightT: number,
+	burnT = 0
+) => {
 	const zoom = mapInstance.getZoom() ?? MAP_DEFAULT_ZOOM;
-	const palette = getMapPalette();
+	const basePalette = getMapPalette();
+	// Unsubscribe burn: char the continents (cream → gray-brown → charcoal)
+	// while the ocean holds its teal early on, per the reference design.
+	const palette =
+		burnT > 0
+			? {
+					ocean: burnMixColor3(
+						basePalette.ocean,
+						UNSUBSCRIBE_BURN_OCEAN_MID,
+						UNSUBSCRIBE_BURN_OCEAN_HOT,
+						burnT
+					),
+					land: burnMixColor3(
+						basePalette.land,
+						UNSUBSCRIBE_BURN_LAND_MID,
+						UNSUBSCRIBE_BURN_LAND_HOT,
+						burnT
+					),
+					landcover: burnMixColor3(
+						basePalette.landcover,
+						UNSUBSCRIBE_BURN_LANDCOVER_MID,
+						UNSUBSCRIBE_BURN_LANDCOVER_HOT,
+						burnT
+					),
+				}
+			: basePalette;
 	const roadOpacityMul = 1 - getNightRoadHideT(nightT, zoom);
 
 	try {
@@ -286,6 +400,58 @@ export const applyNightLandPalette = (mapInstance: mapboxgl.Map, nightT: number)
 		}
 	} catch {
 		// Non-fatal.
+	}
+};
+
+// ============================================================================
+// Unsubscribe burn ember tint (contact-lights raster dots)
+// ============================================================================
+
+// Tints the warm-white contact-lights dots into embers via a `raster-color`
+// ramp (the dots' visibility floor lives in `applyLightingOverlayOpacity`).
+// Nothing else in the pipeline touches `raster-color`, so this is applied
+// only by the burn tween; at burnT=0 the property is removed so the dots
+// return to their native warm-white look.
+export const applyUnsubscribeBurnEmberTint = (
+	mapInstance: mapboxgl.Map,
+	burnT: number
+) => {
+	const burn = unsubscribeBurnEase(burnT);
+	const ramp =
+		burn <= 0
+			? undefined
+			: [
+					'interpolate',
+					['linear'],
+					['raster-value'],
+					0,
+					UNSUBSCRIBE_BURN_EMBER_EDGE_COLOR,
+					0.55,
+					UNSUBSCRIBE_BURN_EMBER_DIM_COLOR,
+					1,
+					// Orange embers mid-burn, saturated red at full burn.
+					mixBurnColor(
+						UNSUBSCRIBE_BURN_EMBER_HOT_COLOR_MID,
+						UNSUBSCRIBE_BURN_EMBER_HOT_COLOR_HOT,
+						clamp((burn - 0.5) * 2, 0, 1)
+					),
+				];
+	const layerIds = [
+		MAPBOX_LAYER_IDS.nightLightsSpaceGlow,
+		MAPBOX_LAYER_IDS.nightLightsSpaceGlow2,
+		MAPBOX_LAYER_IDS.nightLightsRevealGlow,
+		MAPBOX_LAYER_IDS.nightLightsReveal,
+		MAPBOX_LAYER_IDS.nightLightsGlow,
+		MAPBOX_LAYER_IDS.nightLightsCloseGlow,
+		MAPBOX_LAYER_IDS.nightLights,
+	];
+	for (const id of layerIds) {
+		try {
+			if (!mapInstance.getLayer(id)) continue;
+			mapInstance.setPaintProperty(id, 'raster-color', ramp as any);
+		} catch {
+			// Non-fatal.
+		}
 	}
 };
 
