@@ -121,6 +121,8 @@ export type ProfileAreaMapBoxProps = {
 	onCoordinatesChange?: (coordinates: AreaCoordinates) => void;
 	/** Fires with the resolved geocode feature so a parent can read structured parts (city/region). */
 	onFeatureSelect?: (feature: ProfileAreaMapFeature) => void;
+	/** Camera zoom once a location is picked — street-level pickers want closer than the regional default. */
+	selectedZoom?: number;
 };
 
 const formatReverseGeocodeArea = (feature: ProfileAreaMapFeature) => {
@@ -155,6 +157,7 @@ export const ProfileAreaMapBox = ({
 	onCoordinatesChange,
 	onAreaCommit,
 	onFeatureSelect,
+	selectedZoom = SELECTED_AREA_ZOOM,
 }: ProfileAreaMapBoxProps) => {
 	const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
 	const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -423,13 +426,13 @@ export const ProfileAreaMapBox = ({
 		map.easeTo({
 			center: [markerPosition.lng, markerPosition.lat],
 			zoom: areaCoordinates
-				? SELECTED_AREA_ZOOM
+				? selectedZoom
 				: hasConcretePosition
 					? USER_AREA_ZOOM
 					: DEFAULT_AREA_ZOOM,
 			duration: hasConcretePosition ? 350 : 0,
 		});
-	}, [areaCoordinates, userLocation, isMapReady, commitCoordinates]);
+	}, [areaCoordinates, userLocation, isMapReady, commitCoordinates, selectedZoom]);
 
 	useEffect(() => {
 		const map = mapRef.current;

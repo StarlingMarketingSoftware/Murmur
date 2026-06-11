@@ -1,5 +1,5 @@
 'use client';
-import { useAuth, UserButton, SignUpButton, SignInButton } from '@clerk/nextjs';
+import { useAuth, UserButton, SignInButton } from '@clerk/nextjs';
 import { urls } from '@/constants/urls';
 import { AccountType } from '@/constants/prismaEnums';
 import { useMe } from '@/hooks/useMe';
@@ -285,51 +285,18 @@ export const Navbar = () => {
 										}}
 									/>
 								) : (
-									<div className="flex items-center">
-										<Link
-											href={urls.home.startFreeTrial}
-											className="mr-6 flex items-center justify-center text-white text-[12px] font-medium tracking-[0.02em] transition-all duration-300 hover:opacity-90"
-											style={{
-												width: '219px',
-												height: '33px',
-												backgroundColor: '#53B060',
-												border: '1px solid #118521',
-												borderRadius: '8px',
-											}}
-										>
-											Start Free Trial
-										</Link>
-										<SignInButton mode="modal">
-											<button
-												className={cn(
-													'relative px-4 text-[12px] font-medium tracking-[0.02em] transition-all duration-300',
-													'after:absolute after:bottom-[-8px] after:left-4 after:right-4 after:h-[1px]',
-													'after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-center',
-													'text-gray-700/70 hover:text-gray-900 after:bg-gray-900'
-												)}
-											>
-												Sign in
-											</button>
-										</SignInButton>
-										<div
+									<SignInButton mode="modal" withSignUp>
+										<button
 											className={cn(
-												'w-[1px] h-4 mx-3',
-												'bg-gray-300/50'
+												'relative px-4 text-[12px] font-medium tracking-[0.02em] transition-all duration-300',
+												'after:absolute after:bottom-[-8px] after:left-4 after:right-4 after:h-[1px]',
+												'after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-center',
+												'text-gray-700/70 hover:text-gray-900 after:bg-gray-900'
 											)}
-										/>
-										<SignUpButton mode="modal">
-											<button
-												className={cn(
-													'relative px-4 text-[12px] font-medium tracking-[0.02em] transition-all duration-300',
-													'after:absolute after:bottom-[-8px] after:left-4 after:right-4 after:h-[1px]',
-													'after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-center',
-													'text-gray-700/70 hover:text-gray-900 after:bg-gray-900'
-												)}
-											>
-												Sign up
-											</button>
-										</SignUpButton>
-									</div>
+										>
+											Sign in
+										</button>
+									</SignInButton>
 								)}
 							</div>
 						</div>
@@ -384,8 +351,8 @@ export const Navbar = () => {
 									'px-5 py-4 border-t transition-colors duration-300',
 									isMobileMenuTextLight ? 'border-white/20' : 'border-gray-200/20'
 								)}>
-									<div className="flex space-x-6">
-										<SignInButton mode="modal">
+									<div className="flex">
+										<SignInButton mode="modal" withSignUp>
 											<button
 												className={cn(
 													'flex-1 py-2.5 text-center text-[14px] font-secondary transition-colors duration-300',
@@ -398,19 +365,6 @@ export const Navbar = () => {
 												Sign in
 											</button>
 										</SignInButton>
-										<SignUpButton mode="modal">
-											<button
-												className={cn(
-													'flex-1 py-2.5 text-center text-[14px] font-secondary transition-colors duration-300',
-													isMobileMenuTextLight
-														? 'text-white/80 hover:text-white'
-														: 'text-gray-600 hover:text-gray-900'
-												)}
-												onClick={() => setMobileMenuOpen(false)}
-											>
-												Sign up
-											</button>
-										</SignUpButton>
 									</div>
 								</div>
 							)}

@@ -1,6 +1,10 @@
 import type { NextConfig } from 'next';
+import withBundleAnalyzer from '@next/bundle-analyzer';
 
 const nextConfig: NextConfig = {
+	// Default '.next'. Set NEXT_DIST_DIR for measurement/CI builds so they don't
+	// clobber the dev server's .next (build and start must use the same value).
+	distDir: process.env.NEXT_DIST_DIR || '.next',
 	images: {
 		remotePatterns: [
 			{
@@ -25,6 +29,22 @@ const nextConfig: NextConfig = {
 				source: '/free-trial',
 				destination: '/?trial=1',
 				permanent: false,
+			},
+		];
+	},
+	async headers() {
+		return [
+			{
+				// Geo payloads are immutable per deploy; long-cache them so Mapbox's
+				// worker-side setData(URL) fetch is a cache hit, not a revalidation.
+				// Cache-bust via a ?v= query param when the files change.
+				source: '/geo/:path*',
+				headers: [
+					{
+						key: 'Cache-Control',
+						value: 'public, max-age=31536000, immutable',
+					},
+				],
 			},
 		];
 	},
@@ -73,4 +93,4 @@ const nextConfig: NextConfig = {
 	},
 };
 
-export default nextConfig;
+export default withBundleAnalyzer({ enabled: process.env.ANALYZE === '1' })(nextConfig);

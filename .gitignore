@@ -15,7 +15,11 @@
 
 # next.js
 /.next/
+/.next-*/
 /out/
+
+# memory measurement runs (scripts/measure-dashboard-memory.mjs)
+/.memory-baselines/
 
 # production
 /build

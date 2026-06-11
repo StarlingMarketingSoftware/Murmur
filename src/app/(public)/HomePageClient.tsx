@@ -8,7 +8,10 @@ import {
 	getSearchGradientForDate,
 } from '@/constants/searchGradients';
 import { StartFreeTrialModal } from '@/components/organisms/StartFreeTrialModal';
-import { TrustedByLogoOrbit } from '@/components/molecules/TrustedByLogoOrbit/TrustedByLogoOrbit';
+import {
+	TrustedByLogoGrid,
+	TrustedByLogoOrbit,
+} from '@/components/molecules/TrustedByLogoOrbit/TrustedByLogoOrbit';
 import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
 
 export default function HomePageClient({
@@ -47,8 +50,8 @@ export default function HomePageClient({
 
 	return (
 		<main
-			className={`relative flex min-h-screen items-center justify-center overflow-x-clip ${
-				isHomeVariant ? 'px-4 pb-10 pt-6' : 'p-4'
+			className={`landing-page relative flex min-h-screen items-center justify-center overflow-x-clip ${
+				isHomeVariant ? 'px-4 pb-16 pt-6 lg:pb-10' : 'p-4'
 			}`}
 			style={{ background: 'linear-gradient(180deg, #FFF 0%, #FFF 50%, #D5F1FF 100%)' }}
 		>
@@ -60,7 +63,7 @@ export default function HomePageClient({
 				}`}
 			>
 				{isHomeVariant && (
-					<div className="mb-3 flex items-end gap-3">
+					<div className="mb-3 flex flex-col gap-1 lg:flex-row lg:items-end lg:gap-3">
 						<MurmurLogoNew width="150px" height="27px" />
 						<span
 							className="pb-[2px] text-[16px] font-medium"
@@ -71,7 +74,9 @@ export default function HomePageClient({
 					</div>
 				)}
 				<div
-					className="relative h-[505px] w-[596px] max-w-full overflow-hidden rounded-[11.54px] bg-[#F5F5F7]"
+					className={`relative w-[596px] max-w-full overflow-hidden rounded-[11.54px] bg-[#F5F5F7] ${
+						isHomeVariant ? 'aspect-[596/505]' : 'h-[505px]'
+					}`}
 					style={{
 						containerType: 'inline-size',
 						...(showVenueSignInButton
@@ -196,11 +201,15 @@ export default function HomePageClient({
 							Murmur brings together more than 100,000+ venues, festivals, and radio
 							stations, with tools to actually reach them.
 						</p>
-						<span className="mt-1.5 text-[13px]" style={{ color: '#8E8E93' }}>
+						<span
+							className="mt-1.5 hidden text-[13px] lg:inline"
+							style={{ color: '#8E8E93' }}
+						>
 							Trusted by
 						</span>
 					</div>
 				)}
+				{isHomeVariant && <TrustedByLogoGrid className="mt-5 lg:hidden" />}
 			</div>
 			{/* Mounted outside the card: its container-type traps position:fixed children. */}
 			{showFreeTrialButton && (

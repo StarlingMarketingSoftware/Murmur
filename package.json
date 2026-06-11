@@ -115,6 +115,7 @@
 	},
 	"devDependencies": {
 		"@eslint/eslintrc": "^3",
+		"@next/bundle-analyzer": "^16.2.9",
 		"@tailwindcss/postcss": "^4.0.15",
 		"@tailwindcss/typography": "^0.5.16",
 		"@types/google.maps": "^3.58.1",
@@ -128,6 +129,7 @@
 		"dotenv": "^17.2.1",
 		"eslint": "^9",
 		"eslint-config-next": "15.2.2",
+		"playwright-core": "^1.60.0",
 		"prisma": "^6.19.0",
 		"tailwindcss": "^4.1.11",
 		"ts-node": "^10.9.2",

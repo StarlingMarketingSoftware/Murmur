@@ -32,6 +32,7 @@ body {
 		position: static !important;
 		touch-action: pan-y !important;
 		-webkit-overflow-scrolling: touch !important;
+		overscroll-behavior-y: auto !important;
 	}
 
 	html:has(.landing-page) body {
@@ -42,6 +43,11 @@ body {
 		position: static !important;
 		touch-action: pan-y !important;
 		-webkit-overflow-scrolling: touch !important;
+		/* advanced-scroll.css sets body { overscroll-behavior: none }, which makes
+		   <body> a scroll boundary that blocks native touch scrolling from ever
+		   reaching the root scroller (desktop never notices because Lenis scrolls
+		   programmatically; mobile destroys Lenis and relies on native gestures). */
+		overscroll-behavior-y: auto !important;
 	}
 
 	/* Ensure the main landing-page element allows content to flow */
@@ -984,13 +990,15 @@ body {
 
 /* --- Home hero stack: scale down on short viewports so the page never scrolls.
    `zoom` (not transform) so layout height shrinks with the artwork; the repo
-   already relies on zoom for landing scaling (.landing-zoom-80). */
-@media (max-height: 780px) {
+   already relies on zoom for landing scaling (.landing-zoom-80).
+   Desktop-only: below lg the stack ends in the static logo grid and the page
+   scrolls at full size instead. */
+@media (min-width: 1024px) and (max-height: 780px) {
 	.landing-home-stack {
 		zoom: 0.85;
 	}
 }
-@media (max-height: 660px) {
+@media (min-width: 1024px) and (max-height: 660px) {
 	.landing-home-stack {
 		zoom: 0.72;
 	}

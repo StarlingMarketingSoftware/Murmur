@@ -4,6 +4,7 @@ import {
 	FC,
 	useEffect,
 	useLayoutEffect,
+	useMemo,
 	useRef,
 	useState,
 	type CSSProperties,
@@ -11,8 +12,36 @@ import {
 	type UIEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { debounce } from 'lodash';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { DashboardCalendarPopupLocation } from './DashboardCalendarPopupLocation';
+import {
+	useDeleteCalendarEntry,
+	useGetCalendarEntries,
+	useUpsertCalendarEntry,
+} from '@/hooks/queryHooks/useCalendarEntries';
+import {
+	type CalendarEventDraft,
+	type TimeDropdownField,
+	type TimeOption,
+	MONTH_LABELS_UPPER,
+	MONTH_LABELS_SHORT,
+	TIME_OPTIONS,
+	createDefaultEventDraft,
+	draftToUpsertBody,
+	entryToDraft,
+	formatCalendarDate,
+	formatDurationLabel,
+	getAdjustedEndOption,
+	getCellBackground,
+	getMonthGridSpec,
+	getSameDayTimeRangeError,
+	getTimeChoiceError,
+	isDraftPersistable,
+	parseClockMinutes,
+	toIsoKey,
+	weekdayLabel,
+} from './calendarShared';
 
 export type DashboardCalendarMockState = {
 	year?: number;
@@ -32,20 +61,11 @@ type DashboardCalendarPanelProps = {
 	 * a taller window than the desktop's fixed 373px / six-row layouts.
 	 */
 	innerHeightPx?: number;
-};
-
-type CalendarEventDraft = {
-	personName: string;
-	company: string;
-	date: string;
-	startTime: string;
-	endTime: string;
-	notes: string;
-	address: string;
-	placeId: string | null;
-	lat: number | null;
-	lng: number | null;
-	drivingDuration: string | null;
+	/**
+	 * Two-way sync drafts with the per-user /api/calendar store. Off by default
+	 * so venue date-pickers and debug previews stay local-only.
+	 */
+	persistEvents?: boolean;
 };
 
 type ActiveCalendarPopup = {
@@ -61,168 +81,6 @@ type ActiveCalendarPopup = {
 type CalendarScrollbarState =
 	| { visible: false; direction: null; thumbTop: number }
 	| { visible: true; direction: 'up' | 'down'; thumbTop: number };
-
-type TimeDropdownField = 'startTime' | 'endTime';
-
-type TimeOption = {
-	label: string;
-	minutes: number;
-};
-
-const MONTH_LABELS_UPPER = [
-	'JAN',
-	'FEB',
-	'MAR',
-	'APR',
-	'MAY',
-	'JUN',
-	'JUL',
-	'AUG',
-	'SEP',
-	'OCT',
-	'NOV',
-	'DEC',
-] as const;
-
-const MONTH_LABELS_SHORT = [
-	'Jan',
-	'Feb',
-	'Mar',
-	'Apr',
-	'May',
-	'Jun',
-	'Jul',
-	'Aug',
-	'Sep',
-	'Oct',
-	'Nov',
-	'Dec',
-] as const;
-
-const MONTH_LABELS_FULL = [
-	'January',
-	'February',
-	'March',
-	'April',
-	'May',
-	'June',
-	'July',
-	'August',
-	'September',
-	'October',
-	'November',
-	'December',
-] as const;
-
-const toIsoKey = (date: Date): string =>
-	`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
-		date.getDate()
-	).padStart(2, '0')}`;
-
-const getOrdinalSuffix = (day: number): string => {
-	const lastTwo = day % 100;
-	if (lastTwo >= 11 && lastTwo <= 13) return 'th';
-
-	switch (day % 10) {
-		case 1:
-			return 'st';
-		case 2:
-			return 'nd';
-		case 3:
-			return 'rd';
-		default:
-			return 'th';
-	}
-};
-
-const formatCalendarDate = (date: Date): string =>
-	`${MONTH_LABELS_FULL[date.getMonth()]} ${date.getDate()}${getOrdinalSuffix(
-		date.getDate()
-	)} ${date.getFullYear()}`;
-
-const TIME_OPTIONS: TimeOption[] = Array.from({ length: 24 }, (_, index) => {
-	const totalMinutes = index * 60;
-	const hours24 = Math.floor(totalMinutes / 60);
-	const minutes = totalMinutes % 60;
-	const hours12 = hours24 % 12 || 12;
-	const meridiem = hours24 < 12 ? 'am' : 'pm';
-	const minuteLabel = minutes === 0 ? '' : `:${String(minutes).padStart(2, '0')}`;
-
-	return {
-		label: `${hours12}${minuteLabel} ${meridiem}`,
-		minutes: totalMinutes,
-	};
-});
-
-const createDefaultEventDraft = (date: Date): CalendarEventDraft => ({
-	personName: '',
-	company: '',
-	date: formatCalendarDate(date),
-	startTime: '9 am',
-	endTime: '1 pm',
-	notes: '',
-	address: '',
-	placeId: null,
-	lat: null,
-	lng: null,
-	drivingDuration: null,
-});
-
-const parseClockMinutes = (value: string): number | null => {
-	const match = value
-		.trim()
-		.toLowerCase()
-		.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
-	if (!match) return null;
-
-	let hours = Number(match[1]);
-	const minutes = match[2] ? Number(match[2]) : 0;
-	if (!Number.isFinite(hours) || !Number.isFinite(minutes) || minutes > 59) {
-		return null;
-	}
-
-	const meridiem = match[3];
-	if (meridiem) {
-		if (hours < 1 || hours > 12) return null;
-		if (hours === 12) hours = 0;
-		if (meridiem === 'pm') hours += 12;
-	} else if (hours > 23) {
-		return null;
-	}
-
-	return hours * 60 + minutes;
-};
-
-const getSameDayTimeRangeError = (startTime: string, endTime: string): string | null => {
-	const startMinutes = parseClockMinutes(startTime);
-	const endMinutes = parseClockMinutes(endTime);
-	if (startMinutes == null || endMinutes == null) return null;
-
-	return endMinutes <= startMinutes ? 'Time range must stay within one day' : null;
-};
-
-const formatDurationLabel = (startTime: string, endTime: string): string => {
-	const startMinutes = parseClockMinutes(startTime);
-	const endMinutes = parseClockMinutes(endTime);
-	if (startMinutes == null || endMinutes == null) return 'Duration';
-
-	const durationMinutes = endMinutes - startMinutes;
-	if (durationMinutes <= 0) return 'Pick Valid Time';
-
-	const hours = Math.floor(durationMinutes / 60);
-	const minutes = durationMinutes % 60;
-	if (hours > 0 && minutes === 0) return `${hours} hr${hours === 1 ? '' : 's'}`;
-	if (hours > 0) return `${hours}h ${minutes}m`;
-	return `${minutes} min`;
-};
-
-const hasDraftContent = (draft: CalendarEventDraft): boolean =>
-	Boolean(
-		draft.personName.trim() ||
-		draft.company.trim() ||
-		draft.notes.trim() ||
-		draft.address.trim()
-	);
 
 const SMOOTH_SCROLL_LERP = 0.14;
 const WHEEL_SCROLL_MULTIPLIER = 1.12;
@@ -260,6 +118,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	onDateSelect,
 	showFullMonth = false,
 	innerHeightPx,
+	persistEvents = false,
 }) => {
 	// Layout constants (hard dashboard sizing)
 	const ROWS = 6;
@@ -274,6 +133,8 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	const OUTER_BG = 'rgba(164, 221, 239, 0.8)'; // #A4DDEF @ 0.8
 	const OUTER_STROKE_W_PX = 1.424;
 
+	// Full 6-row height. Only the scrollbar-visibility threshold now — real month
+	// blocks are 4–5 rows tall (see getMonthGridSpec).
 	const MONTH_GRID_HEIGHT_PX = ROWS * CELL_H_PX;
 	const CELL_RADIUS_PX = 10;
 	const CELL_BORDER = '1px solid #E0E0E0';
@@ -282,11 +143,6 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	// Months rendered before and after the current month, enabling wheel scrolling
 	// between adjacent months. 6 → half a year of history + lookahead in each direction.
 	const MONTH_WINDOW_RADIUS = 6;
-	const INITIAL_SCROLL_TOP_PX = MONTH_WINDOW_RADIUS * MONTH_GRID_HEIGHT_PX;
-	const CURRENT_MONTH_MAX_SCROLL_TOP_PX =
-		INITIAL_SCROLL_TOP_PX + MONTH_GRID_HEIGHT_PX - INNER_HEIGHT_PX;
-	const TOTAL_SCROLL_HEIGHT_PX = (MONTH_WINDOW_RADIUS * 2 + 1) * MONTH_GRID_HEIGHT_PX;
-	const MAX_SCROLL_TOP_PX = TOTAL_SCROLL_HEIGHT_PX - INNER_HEIGHT_PX;
 	const SCROLLBAR_THUMB_HEIGHT_PX = 30;
 	const SCROLLBAR_TRACK_HEIGHT_PX = INNER_HEIGHT_PX;
 	const SCROLLBAR_TRAVEL_PX = SCROLLBAR_TRACK_HEIGHT_PX - SCROLLBAR_THUMB_HEIGHT_PX;
@@ -304,6 +160,32 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		mockState?.year != null && mockState?.monthIndex != null && mockState?.day != null
 			? new Date(mockState.year, ((mockState.monthIndex % 12) + 12) % 12, mockState.day)
 			: new Date();
+
+	// Variable-height month blocks: each block owns only the weeks whose Sunday
+	// falls in its month (getMonthGridSpec), so consecutive blocks tile without
+	// repeating boundary weeks. Block tops are prefix sums of the week counts.
+	const monthWeekCounts = Array.from(
+		{ length: MONTH_WINDOW_RADIUS * 2 + 1 },
+		(_, i) =>
+			getMonthGridSpec(inMonthYear, inMonthIndex + i - MONTH_WINDOW_RADIUS).weekCount
+	);
+	const monthTopOffsetsPx: number[] = [];
+	let windowRowCount = 0;
+	for (const weeks of monthWeekCounts) {
+		monthTopOffsetsPx.push(windowRowCount * CELL_H_PX);
+		windowRowCount += weeks;
+	}
+	const INITIAL_SCROLL_TOP_PX = monthTopOffsetsPx[MONTH_WINDOW_RADIUS];
+	// Clamped: a 4-row month is shorter than the default 373px viewport.
+	const CURRENT_MONTH_MAX_SCROLL_TOP_PX = Math.max(
+		INITIAL_SCROLL_TOP_PX,
+		INITIAL_SCROLL_TOP_PX +
+			monthWeekCounts[MONTH_WINDOW_RADIUS] * CELL_H_PX -
+			INNER_HEIGHT_PX
+	);
+	const TOTAL_SCROLL_HEIGHT_PX = windowRowCount * CELL_H_PX;
+	const MAX_SCROLL_TOP_PX = TOTAL_SCROLL_HEIGHT_PX - INNER_HEIGHT_PX;
+
 	const panelRef = useRef<HTMLDivElement>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const popupRef = useRef<HTMLDivElement>(null);
@@ -326,6 +208,76 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	const [timeRangeError, setTimeRangeError] = useState<string | null>(null);
 	const [eventDrafts, setEventDrafts] = useState<Record<string, CalendarEventDraft>>({});
 
+	const { data: calendarEntriesData } = useGetCalendarEntries({ enabled: persistEvents });
+	const { mutateAsync: upsertCalendarEntry } = useUpsertCalendarEntry({
+		suppressToasts: true,
+	});
+	const { mutateAsync: deleteCalendarEntry } = useDeleteCalendarEntry({
+		suppressToasts: true,
+	});
+
+	// Server entries projected into draft shape, keyed by ISO date.
+	const serverDrafts = useMemo(() => {
+		if (!persistEvents || !calendarEntriesData) {
+			return {} as Record<string, CalendarEventDraft>;
+		}
+		const map: Record<string, CalendarEventDraft> = {};
+		for (const entry of calendarEntriesData.entries) {
+			map[entry.date] = entryToDraft(entry);
+		}
+		return map;
+	}, [persistEvents, calendarEntriesData]);
+
+	// Layered merge, derived at render: local session edits always win, so a
+	// refetch can never clobber in-progress typing. An emptied local draft acts
+	// as its own tombstone — it overlays the server draft and fails
+	// isDraftPersistable, hiding the card while the debounced DELETE is in flight.
+	const effectiveDrafts = useMemo(
+		() => ({ ...serverDrafts, ...eventDrafts }),
+		[serverDrafts, eventDrafts]
+	);
+
+	// Consulted via ref so the debounced closure sees the latest server state.
+	const serverDraftsRef = useRef(serverDrafts);
+	serverDraftsRef.current = serverDrafts;
+
+	// Single-flight FIFO queue: chains every PATCH/DELETE so a slow upsert can
+	// never be overtaken by a subsequent delete (or vice versa) and resurrect a row.
+	const syncChainRef = useRef<Promise<unknown>>(Promise.resolve());
+
+	const syncDraft = useMemo(
+		() =>
+			debounce((isoKey: string, draft: CalendarEventDraft, date: Date) => {
+				const run = isDraftPersistable(draft, date)
+					? () => {
+							const body = draftToUpsertBody(isoKey, draft);
+							if (!serverDraftsRef.current[isoKey]) {
+								// Fresh dashboard create: explicitly clear any provenance left
+								// on a soft-deleted row for this date, so an unrelated old
+								// conversation can't flip back to "Booked" on revival. Existing
+								// live entries omit provenance so PATCH merge preserves the
+								// inbox's conversation link through dashboard edits.
+								body.campaignId = null;
+								body.contactId = null;
+							}
+							return upsertCalendarEntry(body);
+						}
+					: () => deleteCalendarEntry({ date: isoKey });
+				syncChainRef.current = syncChainRef.current.then(run, run).catch(() => {
+					// Autosave failures are silent; the local draft keeps the user's text.
+				});
+			}, 600),
+		[upsertCalendarEntry, deleteCalendarEntry]
+	);
+
+	// Flush the pending save when the popup switches cells, closes, or the panel
+	// unmounts (lodash flush re-invokes with the last args).
+	useEffect(() => {
+		return () => {
+			syncDraft.flush();
+		};
+	}, [activePopup?.key, syncDraft]);
+
 	const monthLabelStyle = {
 		color: '#343434',
 		fontFamily:
@@ -347,18 +299,6 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	};
 	const OUTSIDE_MONTH_TEXT_COLOR = 'rgba(0, 0, 0, 0.22)';
 
-	const weekdayLabel = (date: Date): string => {
-		// Match screenshot abbreviations.
-		const d = date.getDay();
-		if (d === 0) return 'Sun';
-		if (d === 1) return 'Mon';
-		if (d === 2) return 'Tues';
-		if (d === 3) return 'Wed';
-		if (d === 4) return 'Thurs';
-		if (d === 5) return 'Fri';
-		return 'Sat';
-	};
-
 	const addDays = (d: Date, days: number): Date =>
 		new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
 
@@ -370,39 +310,8 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	const isInPrimaryMonth = (date: Date, year: number, monthIndex: number): boolean =>
 		date.getFullYear() === year && date.getMonth() === monthIndex;
 
-	// Month-specific diagonal color palettes (6-color band per month).
-	const MONTH_COLOR_PALETTES = [
-		// January
-		['#FFFFFF', '#F5FEFF', '#E7FCFF', '#DBFAFF', '#C7EFF6', '#AEE9F2'],
-		// February
-		['#FFFFFF', '#F5FBFF', '#E7F5FF', '#DBF0FF', '#C7E1F6', '#AED5F2'],
-		// March
-		['#FFFFFF', '#F5F7FF', '#E7EDFF', '#DBE3FF', '#C7D1F6', '#AEBDF2'],
-		// April
-		['#FFFFFF', '#F6F5FF', '#EBE7FF', '#E0DBFF', '#CDC7F6', '#B7AEF2'],
-		// May
-		['#FFFFFF', '#FAF5FF', '#F3E7FF', '#ECDBFF', '#DDC7F6', '#CFAEF2'],
-		// June
-		['#FFFFFF', '#FFF5FF', '#FFE7FE', '#FFDBFE', '#F6C7F4', '#F2AEEF'],
-		// July
-		['#FFFFFF', '#FFF5F7', '#FFE7ED', '#FFDBE4', '#F6C7D2', '#F2AEBE'],
-		// August
-		['#FFFFFF', '#FFF9F5', '#FFF1E7', '#FFE9DB', '#F6D9C7', '#F2C9AE'],
-		// September
-		['#FFFFFF', '#FFFCF5', '#FFF9E7', '#FFF5DB', '#F6E9C7', '#F2E0AE'],
-		// October
-		['#FFFFFF', '#FDFFF5', '#FBFFE7', '#F9FFDB', '#EEF6C7', '#E6F2AE'],
-		// November
-		['#FFFFFF', '#F7FFF5', '#EDFFE7', '#E4FFDB', '#D2F6C7', '#BFF2AE'],
-		// December
-		['#FFFFFF', '#F5FFFA', '#E7FFF3', '#DBFFED', '#C7F6DE', '#AEF2D0'],
-	] as const;
-
-	const getCellBackground = (monthIndex: number, row: number, col: number): string => {
-		const d = row + col;
-		const palette = MONTH_COLOR_PALETTES[monthIndex];
-		return palette[d % palette.length] ?? '#FFFFFF';
-	};
+	// Month-specific diagonal color palettes live in calendarShared (also used by
+	// the inbox booking dropdown, which mirrors this grid's look).
 
 	const getScrollbarState = (nextScrollTop: number): CalendarScrollbarState => {
 		// The up/down scrollbar math assumes the window is smaller than one month
@@ -885,7 +794,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	};
 
 	const activeDraft = activePopup
-		? (eventDrafts[activePopup.key] ?? createDefaultEventDraft(activePopup.date))
+		? (effectiveDrafts[activePopup.key] ?? createDefaultEventDraft(activePopup.date))
 		: null;
 	const isModalPopup = activePopup?.placement === 'center';
 	const activeTimeRangeError = activeDraft
@@ -912,72 +821,25 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		return () => cancelAnimationFrame(rafId);
 	}, [activeTimeDropdownField, activeDraft?.endTime, activeDraft?.startTime]);
 
+	const updateActiveDraftFields = (partial: Partial<CalendarEventDraft>) => {
+		if (!activePopup) return;
+		const { key, date } = activePopup;
+		// Base on the layered lookup so the first edit of a persisted entry starts
+		// from its server values, then schedule the debounced sync with the result.
+		const base =
+			eventDrafts[key] ?? serverDrafts[key] ?? createDefaultEventDraft(date);
+		const nextDraft = { ...base, ...partial };
+		setEventDrafts((drafts) => ({ ...drafts, [key]: nextDraft }));
+		if (persistEvents) {
+			syncDraft(key, nextDraft, date);
+		}
+	};
+
 	const updateActiveDraft = <K extends keyof CalendarEventDraft>(
 		field: K,
 		value: CalendarEventDraft[K]
 	) => {
-		if (!activePopup) return;
-
-		const { key, date } = activePopup;
-		setEventDrafts((drafts) => ({
-			...drafts,
-			[key]: {
-				...(drafts[key] ?? createDefaultEventDraft(date)),
-				[field]: value,
-			},
-		}));
-	};
-
-	const updateActiveDraftFields = (partial: Partial<CalendarEventDraft>) => {
-		if (!activePopup) return;
-		const { key, date } = activePopup;
-		setEventDrafts((drafts) => ({
-			...drafts,
-			[key]: {
-				...(drafts[key] ?? createDefaultEventDraft(date)),
-				...partial,
-			},
-		}));
-	};
-
-	const getAdjustedEndOption = (
-		startMinutes: number,
-		draft: CalendarEventDraft
-	): TimeOption | null => {
-		const laterOptions = TIME_OPTIONS.filter((option) => option.minutes > startMinutes);
-		if (laterOptions.length === 0) return null;
-
-		const currentStartMinutes = parseClockMinutes(draft.startTime);
-		const currentEndMinutes = parseClockMinutes(draft.endTime);
-		const currentDurationMinutes =
-			currentStartMinutes != null &&
-			currentEndMinutes != null &&
-			currentEndMinutes > currentStartMinutes
-				? currentEndMinutes - currentStartMinutes
-				: 60;
-
-		return (
-			laterOptions.find(
-				(option) => option.minutes >= startMinutes + currentDurationMinutes
-			) ?? laterOptions[laterOptions.length - 1]
-		);
-	};
-
-	const getTimeChoiceError = (
-		field: TimeDropdownField,
-		option: TimeOption,
-		draft: CalendarEventDraft
-	): string | null => {
-		if (field === 'startTime') {
-			return getAdjustedEndOption(option.minutes, draft) == null
-				? 'Start must leave room for an end time'
-				: null;
-		}
-
-		const startMinutes = parseClockMinutes(draft.startTime);
-		return startMinutes != null && option.minutes <= startMinutes
-			? 'End must be after start'
-			: null;
+		updateActiveDraftFields({ [field]: value } as Partial<CalendarEventDraft>);
 	};
 
 	const selectTimeOption = (field: TimeDropdownField, option: TimeOption) => {
@@ -1299,75 +1161,45 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		const monthStart = new Date(inMonthYear, inMonthIndex + monthOffset, 1);
 		const gridMonthYear = monthStart.getFullYear();
 		const gridMonthIndex = monthStart.getMonth();
-		const gridCalendarStartDate = new Date(
+		const { startDate: gridCalendarStartDate, weekCount } = getMonthGridSpec(
 			gridMonthYear,
-			gridMonthIndex,
-			1 - monthStart.getDay()
+			gridMonthIndex
 		);
 		const gridMonthLabel = MONTH_LABELS_UPPER[gridMonthIndex];
-		const gridMonthShort = MONTH_LABELS_SHORT[gridMonthIndex];
 
 		return (
 			<div
 				key={`${gridMonthYear}-${gridMonthIndex}`}
 				style={{
 					width: '100%',
-					height: `${MONTH_GRID_HEIGHT_PX}px`,
+					height: `${weekCount * CELL_H_PX}px`,
 					display: 'grid',
 					gridTemplateColumns: `repeat(${COLS}, 1fr)`,
-					gridTemplateRows: `repeat(${ROWS}, ${CELL_H_PX}px)`,
+					gridTemplateRows: `repeat(${weekCount}, ${CELL_H_PX}px)`,
 					gap: 0,
 					alignContent: 'start',
 					justifyContent: 'start',
 					backgroundColor: GRID_BG,
 				}}
 			>
-				{/* Cell 0: month label only */}
-				<div
-					style={{
-						width: '100%',
-						height: `${CELL_H_PX}px`,
-						borderRadius: `${CELL_RADIUS_PX}px`,
-						border: CELL_BORDER,
-						backgroundColor: getCellBackground(gridMonthIndex, 0, 0),
-						boxSizing: 'border-box',
-						padding: '9px 9px',
-						...monthLabelStyle,
-						display: 'flex',
-						alignItems: 'flex-start',
-						justifyContent: 'flex-start',
-					}}
-				>
-					{gridMonthLabel}
-				</div>
-
-				{/* Remaining 41 day cells */}
-				{Array.from({ length: ROWS * COLS - 1 }, (_, idx) => {
-					const gridIndex = idx + 1;
+				{Array.from({ length: weekCount * COLS }, (_, gridIndex) => {
 					const row = Math.floor(gridIndex / COLS);
 					const col = gridIndex % COLS;
 					const date = getCellDateForGridIndex(gridCalendarStartDate, gridIndex);
 					const inPrimary = isInPrimaryMonth(date, gridMonthYear, gridMonthIndex);
+					// Cell 0 (the month's first Sunday) carries the big month label and
+					// moves its own date number to the bottom-right corner.
+					const isLabelCell = gridIndex === 0;
 					const isTopRow = row === 0;
-					const isFirstOfMonth =
-						date.getFullYear() === gridMonthYear &&
-						date.getMonth() === gridMonthIndex &&
-						date.getDate() === 1;
+					const isFirstOfMonth = date.getDate() === 1;
 					const isToday =
-						inPrimary &&
 						date.getFullYear() === effectiveToday.getFullYear() &&
 						date.getMonth() === effectiveToday.getMonth() &&
 						date.getDate() === effectiveToday.getDate();
 
 					const isoKey = toIsoKey(date);
-					const draft = eventDrafts[isoKey];
-					const defaultDraft = createDefaultEventDraft(date);
-					const showDraftSummary =
-						draft != null &&
-						(hasDraftContent(draft) ||
-							draft.date !== defaultDraft.date ||
-							draft.startTime.trim() !== defaultDraft.startTime ||
-							draft.endTime.trim() !== defaultDraft.endTime);
+					const draft = effectiveDrafts[isoKey];
+					const showDraftSummary = draft != null && isDraftPersistable(draft, date);
 					// A draft on today's cell still shows the red event card; the green
 					// "today" pill only appears when the cell has no scheduled event.
 					const isHighlighted = isToday && !showDraftSummary;
@@ -1389,7 +1221,9 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 						label = `${weekdayLabel(date)} ${date.getDate()}`;
 					}
 					if (isFirstOfMonth) {
-						label = `${gridMonthShort} ${weekdayLabel(date)} 1`;
+						// The date's own month: a "1" can sit in the previous month's
+						// trailing row (its only occurrence), incl. across year boundaries.
+						label = `${MONTH_LABELS_SHORT[date.getMonth()]} ${weekdayLabel(date)} 1`;
 					}
 
 					return (
@@ -1424,31 +1258,50 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 								WebkitAppearance: 'none',
 							}}
 						>
-							<div
-								style={{
-									position: 'absolute',
-									top: '10px',
-									left: '12px',
-									right: '12px',
-									textAlign: 'right',
-									...IN_MONTH_TEXT,
-									color: textColor,
-									whiteSpace: 'nowrap',
-									overflow: 'hidden',
-									textOverflow: 'ellipsis',
-									pointerEvents: 'none',
-									fontWeight: isHighlighted ? 700 : IN_MONTH_TEXT.fontWeight,
-								}}
-							>
-								{label}
-							</div>
+							{isLabelCell && (
+								<div
+									style={{
+										position: 'absolute',
+										top: '9px',
+										left: '9px',
+										right: '9px',
+										textAlign: 'left',
+										...monthLabelStyle,
+										...(showDraftSummary ? { color: '#FFFFFF' } : {}),
+										whiteSpace: 'nowrap',
+										pointerEvents: 'none',
+									}}
+								>
+									{gridMonthLabel}
+								</div>
+							)}
+							{!(isLabelCell && showDraftSummary) && (
+								<div
+									style={{
+										position: 'absolute',
+										...(isLabelCell ? { bottom: '10px' } : { top: '10px' }),
+										left: '12px',
+										right: '12px',
+										textAlign: 'right',
+										...IN_MONTH_TEXT,
+										color: textColor,
+										whiteSpace: 'nowrap',
+										overflow: 'hidden',
+										textOverflow: 'ellipsis',
+										pointerEvents: 'none',
+										fontWeight: isHighlighted ? 700 : IN_MONTH_TEXT.fontWeight,
+									}}
+								>
+									{label}
+								</div>
+							)}
 							{showDraftSummary && (
 								<div
 									style={{
 										position: 'absolute',
 										left: '9px',
 										right: '8px',
-										top: '33px',
+										...(isLabelCell ? { bottom: '8px' } : { top: '33px' }),
 										textAlign: 'left',
 										color: '#FFFFFF',
 										fontFamily:

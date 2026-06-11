@@ -640,3 +640,26 @@ model ContactNote {
   @@unique([userId, contactId])
   @@index([contactId])
 }
+
+model CalendarEntry {
+  id              Int      @id @default(autoincrement())
+  userId          String
+  date            String
+  personName      String   @default("")
+  company         String   @default("")
+  startTime       String   @default("")
+  endTime         String   @default("")
+  notes           String   @default("")
+  address         String   @default("")
+  placeId         String?
+  latitude        Float?
+  longitude       Float?
+  drivingDuration String?
+  campaignId      Int? // Campaign.id provenance from the inbox booking flow; intentionally no FK
+  contactId       Int? // Contact.id provenance; intentionally no FK
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, date])
+}

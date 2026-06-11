@@ -7,7 +7,7 @@ export default function TermsOfServicePage() {
 	return (
 		<>
 			<h1>Terms of Service</h1>
-			<p className="legal-updated">Last updated: June 10, 2026</p>
+			<p className="legal-updated">Last updated: June 11, 2026</p>
 
 			<p>
 				These Terms of Service (the &ldquo;Terms&rdquo;) are a binding agreement
@@ -87,7 +87,10 @@ export default function TermsOfServicePage() {
 				<li>
 					If a free trial is offered, your trial converts automatically to a paid
 					subscription at the end of the trial period unless you cancel before the
-					trial ends. A payment method may be required to start a trial.
+					trial ends. A payment method may be required to start a trial. It is your
+					responsibility to cancel before the trial ends if you do not wish to be
+					charged; charges resulting from a trial converting to a paid subscription
+					are not refundable (see Section 7).
 				</li>
 				<li>
 					Subscriptions renew automatically at the end of each billing period
@@ -131,10 +134,14 @@ export default function TermsOfServicePage() {
 			<p>
 				Except where required by applicable law, all fees are non-refundable, including
 				for partial billing periods and unused credits. The free trial is the intended
-				way to evaluate the Service before paying. We may, at our sole discretion,
-				issue refunds or credits in particular cases (for example, billing errors)
-				without waiving this policy. Payment disputes or chargebacks filed in bad faith
-				may result in suspension of your account.
+				way to evaluate the Service before paying. In particular, charges that result
+				from a free trial converting to a paid subscription, or from your failure to
+				cancel a trial or subscription before it renews — including where you forgot to
+				cancel, did not use the Service, or did not intend to continue — are not
+				eligible for a refund under any circumstances. We may, at our sole discretion,
+				issue refunds or credits for billing errors on our part without waiving this
+				policy. Payment disputes or chargebacks filed in bad faith may result in
+				suspension of your account.
 			</p>
 
 			<h2>8. Acceptable Use and Anti-Spam Policy</h2>

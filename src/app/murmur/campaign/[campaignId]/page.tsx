@@ -4242,7 +4242,10 @@ const Murmur = () => {
 													className={dashboardInitialPanelClassName}
 												>
 													<div className={dashboardInitialPanelContentClassName}>
-														<DashboardResponsesWidget enabled={isLoaded && !!user} />
+														<DashboardResponsesWidget
+															enabled={isLoaded && !!user}
+															previewPlacement="below"
+														/>
 													</div>
 												</div>
 											</div>

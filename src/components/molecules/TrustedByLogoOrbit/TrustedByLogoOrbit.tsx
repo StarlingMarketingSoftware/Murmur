@@ -76,6 +76,40 @@ const BOTTOM_EDGE_MARGIN_PX = 30;
 // Clamp the frame delta so returning from a background tab doesn't jump.
 const MAX_FRAME_DELTA_MS = 100;
 
+/** Static trusted-by grid for viewports below the lg orbit breakpoint. */
+export function TrustedByLogoGrid({ className = '' }: { className?: string }) {
+	return (
+		<div
+			aria-hidden="true"
+			className={`flex flex-wrap justify-center gap-y-7 ${className}`}
+			style={{
+				// Echo the orbit's fade-at-top: the first row reads faint under the copy.
+				WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, #000 45%)',
+				maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, #000 45%)',
+			}}
+		>
+			{ORBIT_LOGOS.map((logo) => (
+				<div key={logo.src} className="flex w-1/4 items-center justify-center px-2">
+					{/* eslint-disable-next-line @next/next/no-img-element -- decorative trusted-by art; next/image adds nothing here */}
+					<img
+						src={logo.src}
+						alt=""
+						width={logo.width}
+						height={logo.height}
+						decoding="async"
+						draggable={false}
+						className="h-auto max-h-11 w-auto max-w-full"
+						style={{
+							...(logo.grayscale ? { filter: 'grayscale(1)' } : {}),
+							...(logo.baseOpacity !== undefined ? { opacity: logo.baseOpacity } : {}),
+						}}
+					/>
+				</div>
+			))}
+		</div>
+	);
+}
+
 export function TrustedByLogoOrbit({
 	anchorRef,
 }: {

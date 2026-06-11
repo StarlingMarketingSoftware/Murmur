@@ -274,13 +274,20 @@ const getRootZoom = (): number => {
 	return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 };
 
-const computeEmailPreviewPosition = (rect: DOMRect): { top: number; left: number } => {
+const computeEmailPreviewPosition = (
+	rect: DOMRect,
+	placement: 'above' | 'below'
+): { top: number; left: number } => {
 	const z = getRootZoom();
 	const cssTop = rect.top / z;
+	const cssBottom = rect.bottom / z;
 	const cssLeft = rect.left / z;
 	const cssWidth = rect.width / z;
 	return {
-		top: cssTop - EMAIL_PREVIEW_HEIGHT_PX - EMAIL_PREVIEW_GAP_PX,
+		top:
+			placement === 'below'
+				? cssBottom + EMAIL_PREVIEW_GAP_PX
+				: cssTop - EMAIL_PREVIEW_HEIGHT_PX - EMAIL_PREVIEW_GAP_PX,
 		left: cssLeft + (cssWidth - EMAIL_PREVIEW_WIDTH_PX) / 2,
 	};
 };
@@ -294,7 +301,20 @@ export const DashboardResponsesWidget: FC<{
 	 * float over the map), tap-to-open rows, no hover preview.
 	 */
 	mobile?: boolean;
-}> = ({ enabled = true, className, mockState, mobile = false }) => {
+	/**
+	 * Where the hover email preview opens relative to the widget. Use 'below'
+	 * when the widget is a dropdown from the top bar (preview would otherwise
+	 * cover the bar / extend upward off-screen). Defaults to 'above' for the
+	 * bottom-anchored dashboard widget.
+	 */
+	previewPlacement?: 'above' | 'below';
+}> = ({
+	enabled = true,
+	className,
+	mockState,
+	mobile = false,
+	previewPlacement = 'above',
+}) => {
 	const router = useRouter();
 	const mockOverrideActive = mockState != null;
 	const widgetRef = useRef<HTMLDivElement>(null);
@@ -406,9 +426,9 @@ export const DashboardResponsesWidget: FC<{
 	const updateEmailPreviewPosition = useCallback(() => {
 		const rect = widgetRef.current?.getBoundingClientRect();
 		if (rect && rect.width > 0) {
-			setPreviewPosition(computeEmailPreviewPosition(rect));
+			setPreviewPosition(computeEmailPreviewPosition(rect, previewPlacement));
 		}
-	}, []);
+	}, [previewPlacement]);
 
 	const hideEmailPreview = useCallback(() => {
 		clearEmailPreviewTimer();

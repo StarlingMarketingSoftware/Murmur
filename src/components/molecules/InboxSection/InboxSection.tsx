@@ -48,6 +48,28 @@ import {
 	InboxRichReplyEditor,
 	isRichTextMessageEmpty,
 } from '@/components/molecules/InboxSection/InboxRichReplyEditor';
+import {
+	InboxBookingCalendarDropdown,
+	type BookingPrefillFields,
+} from '@/components/molecules/InboxSection/InboxBookingCalendarDropdown';
+import {
+	findBookingForConversation,
+	useGetCalendarEntries,
+	useUpsertCalendarEntry,
+} from '@/hooks/queryHooks/useCalendarEntries';
+import {
+	DEFAULT_END_TIME,
+	DEFAULT_START_TIME,
+	formatCalendarDate,
+	parseIsoKey,
+	toIsoKey,
+} from '@/components/molecules/DashboardCalendarPanel/calendarShared';
+import {
+	extractFirstMentionedDate,
+	readBookedBannerAnswers,
+	recordBookedBannerAnswer,
+	type BookedBannerAnswer,
+} from '@/utils/bookingDates';
 
 /**
  * Strip quoted reply content from HTML email body
@@ -716,6 +738,11 @@ const getAvatarInitial = (value: string): string =>
 
 const INBOX_LAST_SENT_FILL_COLOR = '#7ED29E';
 const INBOX_MESSENGER_THREAD_BACKGROUND = '#DCF1FF';
+
+// "Has this been booked?" banner above the campaign inbox box. The box shifts
+// down by the offset (banner height + gap) while the banner is visible.
+const BOOKED_BANNER_HEIGHT_PX = 28;
+const BOOKED_BANNER_OFFSET_PX = BOOKED_BANNER_HEIGHT_PX + 6;
 const INBOX_MESSENGER_OUTBOUND_BACKGROUND = '#ACD2FF';
 const INBOX_MESSENGER_INBOUND_BACKGROUND = '#FFFFFF';
 
@@ -829,7 +856,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		fontWeight: 700,
 		lineHeight: '19.859px',
 	};
-	const campaignInboxDetailThreadTop =
+	const campaignInboxDetailBaseThreadTop =
 		campaignInboxDetailHeaderTop +
 		campaignInboxDetailHeaderHeight +
 		campaignInboxDetailThreadGap;
@@ -844,6 +871,21 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	const outerPaddingClass = isMobile ? 'px-1' : noOuterPadding ? 'px-0' : 'px-4';
 	const isUsingSampleData = Boolean(sampleData);
+
+	const { data: calendarEntriesData } = useGetCalendarEntries({
+		enabled: isCampaignInbox && Boolean(detailOnly) && !isUsingSampleData,
+	});
+	const calendarEntries = calendarEntriesData?.entries;
+	const upsertCalendarEntry = useUpsertCalendarEntry();
+	const bookedBannerRef = useRef<HTMLDivElement | null>(null);
+	const [bookedBannerNoAnswers, setBookedBannerNoAnswers] = useState<
+		Record<string, BookedBannerAnswer>
+	>(() => readBookedBannerAnswers());
+	const [bookingDropdown, setBookingDropdown] = useState<{
+		conversationKey: string;
+		initialFocusDateIso: string | null;
+		autoExpand: boolean;
+	} | null>(null);
 
 	const {
 		data: inboundEmailsFromApi,
@@ -1161,6 +1203,163 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	const selectedVisibleThreadItemCount =
 		selectedThreadMessages.length + selectedPendingReplies.length;
 	const selectedThreadUsesMessengerLayout = selectedVisibleThreadItemCount >= 3;
+
+	// ----- "Has this been booked?" banner + booking calendar state -----
+	const selectedConversationLatestInbound = selectedConversation?.latestInboundMessage ?? null;
+	const selectedConversationContact = selectedConversationLatestInbound
+		? resolveContactForEmail(selectedConversationLatestInbound, contactByEmail)
+		: null;
+	const selectedConversationContactId: number | null =
+		selectedConversationContact?.id ?? selectedConversationLatestInbound?.contactId ?? null;
+	const selectedConversationBooking =
+		isCampaignInbox && selectedConversationContactId != null
+			? (findBookingForConversation(
+					calendarEntries,
+					campaignId,
+					selectedConversationContactId
+				) ?? null)
+			: null;
+
+	const bookedBannerEligible =
+		shouldUseCampaignInboxDetailDesign &&
+		isCampaignInbox &&
+		activeTab === 'inbox' &&
+		!isUsingSampleData &&
+		selectedConversation != null &&
+		selectedConversation.inboundMessages.length > 0;
+
+	const isBookingDropdownOpen =
+		bookedBannerEligible && bookingDropdown?.conversationKey === selectedConversation?.key;
+	type BookedBannerState = 'hidden' | 'question' | 'yes-pending' | 'booked';
+	const bookedBannerState: BookedBannerState =
+		!bookedBannerEligible ||
+		(selectedConversation && bookedBannerNoAnswers[selectedConversation.key] === 'no')
+			? 'hidden'
+			: selectedConversationBooking
+				? 'booked'
+				: isBookingDropdownOpen
+					? 'yes-pending'
+					: 'question';
+
+	// Drop stale dropdown state when the selection moves to another conversation.
+	const selectedConversationKey = selectedConversation?.key ?? null;
+	useEffect(() => {
+		setBookingDropdown((prev) =>
+			prev && prev.conversationKey !== selectedConversationKey ? null : prev
+		);
+	}, [selectedConversationKey]);
+
+	const bookingPrefillFields: BookingPrefillFields = {
+		personName: selectedConversationLatestInbound
+			? getCanonicalContactName(selectedConversationLatestInbound, contactByEmail)
+			: '',
+		company: selectedConversationLatestInbound
+			? getContactCompanyLabel(selectedConversationLatestInbound, contactByEmail) || ''
+			: '',
+		address: [
+			selectedConversationContact?.address,
+			selectedConversationContact?.city,
+			selectedConversationContact?.state,
+		]
+			.filter(
+				(part): part is string => typeof part === 'string' && part.trim().length > 0
+			)
+			.map((part) => part.trim())
+			.join(', '),
+		latitude:
+			typeof selectedConversationContact?.latitude === 'number'
+				? selectedConversationContact.latitude
+				: null,
+		longitude:
+			typeof selectedConversationContact?.longitude === 'number'
+				? selectedConversationContact.longitude
+				: null,
+		// When the contact can't be resolved the booking still saves, but the
+		// banner can't re-derive its "booked" state afterwards (rare; accepted).
+		contactId: selectedConversationContactId,
+	};
+
+	const buildPrefilledBookingInput = (dateIso: string) => ({
+		date: dateIso,
+		personName: bookingPrefillFields.personName,
+		company: bookingPrefillFields.company,
+		startTime: DEFAULT_START_TIME,
+		endTime: DEFAULT_END_TIME,
+		notes: '',
+		address: bookingPrefillFields.address,
+		placeId: null,
+		latitude: bookingPrefillFields.latitude,
+		longitude: bookingPrefillFields.longitude,
+		drivingDuration: null,
+		campaignId: campaignId as number,
+		contactId: bookingPrefillFields.contactId,
+	});
+
+	const getInboundPlainText = (message: InboxConversationMessage): string => {
+		const raw =
+			message.strippedText?.trim() ||
+			message.bodyPlain?.trim() ||
+			(message.bodyHtml ? convertHtmlToPlainText(stripQuotedReplyHtml(message.bodyHtml)) : '');
+		return stripQuotedReply(raw || '');
+	};
+
+	const handleBookedYes = () => {
+		if (!selectedConversation || !isCampaignInbox) return;
+		let detectedIso: string | null = null;
+		for (const message of [...selectedConversation.inboundMessages].reverse()) {
+			const detected = extractFirstMentionedDate(getInboundPlainText(message));
+			if (detected) {
+				detectedIso = toIsoKey(detected);
+				break;
+			}
+		}
+		const occupant = detectedIso
+			? (calendarEntries ?? []).find((entry) => entry.date === detectedIso)
+			: undefined;
+		let placed = false;
+		if (detectedIso && !occupant) {
+			upsertCalendarEntry.mutate(buildPrefilledBookingInput(detectedIso));
+			placed = true;
+		} else if (
+			occupant &&
+			occupant.campaignId === campaignId &&
+			occupant.contactId === selectedConversationContactId
+		) {
+			placed = true;
+		}
+		// A date occupied by another booking is never overwritten (one per day):
+		// the dropdown just opens focused on that month with nothing placed.
+		setBookingDropdown({
+			conversationKey: selectedConversation.key,
+			initialFocusDateIso: detectedIso,
+			autoExpand: placed,
+		});
+	};
+
+	const handleBookedNo = () => {
+		if (!selectedConversation) return;
+		recordBookedBannerAnswer(selectedConversation.key, 'no');
+		setBookedBannerNoAnswers((prev) => ({ ...prev, [selectedConversation.key]: 'no' }));
+	};
+
+	const reopenBookingDropdown = () => {
+		if (!selectedConversation || !selectedConversationBooking) return;
+		setBookingDropdown({
+			conversationKey: selectedConversation.key,
+			initialFocusDateIso: selectedConversationBooking.date,
+			autoExpand: true,
+		});
+	};
+
+	const showBookedHeaderStrip = bookedBannerEligible && selectedConversationBooking != null;
+	// Booked strip (22px) + 4px gap pushes the thread box down; the composer
+	// stays put, so the non-anchored fixed thread height shrinks by the offset.
+	const campaignInboxDetailBookedStripOffset = showBookedHeaderStrip ? 26 : 0;
+	const campaignInboxDetailThreadTop =
+		campaignInboxDetailBaseThreadTop + campaignInboxDetailBookedStripOffset;
+	const campaignInboxDetailFixedThreadHeight =
+		404 - campaignInboxDetailBookedStripOffset;
+
 	// In the messenger (3+ message) layout the composer collapses to a single-line
 	// text-message pill; in the non-messenger view it stays the 157px toolbar composer.
 	const campaignInboxDetailComposerHeight = selectedThreadUsesMessengerLayout ? 37 : 157;
@@ -1177,12 +1376,14 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		? desktopBoxHeight -
 			campaignInboxDetailComposerBottomMargin -
 			campaignInboxDetailComposerHeight
-		: campaignInboxDetailThreadTop + 404 + campaignInboxDetailComposerGap;
+		: campaignInboxDetailThreadTop +
+			campaignInboxDetailFixedThreadHeight +
+			campaignInboxDetailComposerGap;
 	const campaignInboxDetailThreadHeight = campaignInboxDetailComposerAnchoredToBottom
 		? campaignInboxDetailComposerTop -
 			campaignInboxDetailComposerGap -
 			campaignInboxDetailThreadTop
-		: 404;
+		: campaignInboxDetailFixedThreadHeight;
 	const selectedThreadEvenSplitMinHeight =
 		selectedVisibleThreadItemCount === 2 ? '50%' : undefined;
 	const currentUserDisplayName =
@@ -2487,10 +2688,178 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	return (
 		<div
 			ref={rootRef}
-			className={`w-full flex justify-center ${outerPaddingClass} ${
+			className={`relative w-full flex justify-center ${outerPaddingClass} ${
 				demoMode ? 'pointer-events-none select-none' : ''
 			}`}
+			style={{
+				// The banner claims the box's original top edge; the whole box shifts
+				// down by the banner's footprint so nothing hides under the top bar.
+				transform:
+					bookedBannerState !== 'hidden'
+						? `translateY(${BOOKED_BANNER_OFFSET_PX}px)`
+						: undefined,
+				transition: 'transform 180ms ease-out',
+				// The dropdown is portaled above fixed chrome; keep this shifted subtree
+				// above nearby inbox content while it is open.
+				zIndex: isBookingDropdownOpen ? 70 : undefined,
+			}}
 		>
+			{bookedBannerState !== 'hidden' && (
+				<div
+					ref={bookedBannerRef}
+					data-campaign-interactive-surface
+					style={{
+						position: 'absolute',
+						// Banner sits where the box top used to be (the root is shifted
+						// down by the same offset), so the toolbar above stays clear.
+						top: `${-BOOKED_BANNER_OFFSET_PX}px`,
+						left: '50%',
+						marginLeft: `${-boxWidth / 2}px`,
+						width: '400px',
+						height: `${BOOKED_BANNER_HEIGHT_PX}px`,
+						zIndex: 30,
+					}}
+				>
+					{bookedBannerState === 'booked' && selectedConversationBooking ? (
+						<button
+							type="button"
+							onClick={reopenBookingDropdown}
+							style={{
+								width: '100%',
+								height: '100%',
+								borderRadius: '12px',
+								border: '2px solid #000000',
+								background: '#B7FFC5',
+								display: 'flex',
+								alignItems: 'center',
+								padding: '0 12px',
+								gap: '12px',
+								cursor: 'pointer',
+								fontFamily: 'Inter, sans-serif',
+								fontSize: '12px',
+								color: '#000000',
+							}}
+						>
+							<span style={{ fontWeight: 700 }}>
+								{formatCalendarDate(parseIsoKey(selectedConversationBooking.date))}
+							</span>
+							<span style={{ fontWeight: 600 }}>
+								{selectedConversationBooking.startTime || DEFAULT_START_TIME} -{' '}
+								{selectedConversationBooking.endTime || DEFAULT_END_TIME}
+							</span>
+						</button>
+					) : bookedBannerState === 'yes-pending' ? (
+						<div
+							style={{
+								width: '100%',
+								height: '100%',
+								borderRadius: '12px',
+								border: '2px solid #000000',
+								background: '#F8FAFF',
+								position: 'relative',
+							}}
+						>
+							{/* Morph state: just the green Yes chip, at the question-state Yes x. */}
+							<button
+								type="button"
+								onClick={() => setBookingDropdown(null)}
+								style={{
+									position: 'absolute',
+									right: '114px',
+									top: '2px',
+									width: '96px',
+									height: '20px',
+									borderRadius: '10px',
+									border: '0.858px solid #000000',
+									background: '#B7FFC5',
+									fontFamily: 'Inter, sans-serif',
+									fontSize: '11px',
+									fontWeight: 600,
+									color: '#000000',
+									cursor: 'pointer',
+								}}
+							>
+								Yes
+							</button>
+						</div>
+					) : (
+						<div
+							style={{
+								width: '100%',
+								height: '100%',
+								borderRadius: '12px',
+								border: '2px solid #000000',
+								background: '#F8FAFF',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'space-between',
+								padding: '0 10px 0 14px',
+								boxSizing: 'border-box',
+							}}
+						>
+							<span
+								style={{
+									fontFamily: 'Inter, sans-serif',
+									fontSize: '13px',
+									fontWeight: 700,
+									color: '#000000',
+								}}
+							>
+								Has this been booked?
+							</span>
+							<div style={{ display: 'flex', gap: '8px' }}>
+								<button
+									type="button"
+									onClick={handleBookedYes}
+									style={{
+										width: '96px',
+										height: '20px',
+										borderRadius: '10px',
+										border: '0.858px solid #000000',
+										background: '#B7FFC5',
+										fontFamily: 'Inter, sans-serif',
+										fontSize: '11px',
+										fontWeight: 600,
+										color: '#000000',
+										cursor: 'pointer',
+									}}
+								>
+									Yes
+								</button>
+								<button
+									type="button"
+									onClick={handleBookedNo}
+									style={{
+										width: '96px',
+										height: '20px',
+										borderRadius: '10px',
+										border: '0.858px solid #000000',
+										background: '#B7E5FF',
+										fontFamily: 'Inter, sans-serif',
+										fontSize: '11px',
+										fontWeight: 600,
+										color: '#000000',
+										cursor: 'pointer',
+									}}
+								>
+									No
+								</button>
+							</div>
+						</div>
+					)}
+				</div>
+			)}
+			{isBookingDropdownOpen && bookingDropdown && isCampaignInbox && (
+				<InboxBookingCalendarDropdown
+					campaignId={campaignId as number}
+					prefill={bookingPrefillFields}
+					initialFocusDateIso={bookingDropdown.initialFocusDateIso}
+					autoExpandInitialDate={bookingDropdown.autoExpand}
+					anchorRef={rootRef}
+					bannerRef={bookedBannerRef}
+					onClose={() => setBookingDropdown(null)}
+				/>
+			)}
 			<CustomScrollbar
 				data-campaign-main-box="inbox"
 				className="flex flex-col items-center relative"
@@ -2979,6 +3348,45 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									</div>
 								);
 							})()}
+
+							{showBookedHeaderStrip && selectedConversationBooking && (
+								<button
+									type="button"
+									onClick={reopenBookingDropdown}
+									style={{
+										position: 'absolute',
+										top: `${
+											campaignInboxDetailHeaderTop + campaignInboxDetailHeaderHeight + 4
+										}px`,
+										left: '50%',
+										transform: 'translateX(-50%)',
+										width: `${campaignInboxDetailInnerWidth}px`,
+										height: '22px',
+										borderRadius: '6px',
+										border: '1.5px solid #000000',
+										backgroundColor: '#B7FFC5',
+										display: 'flex',
+										alignItems: 'center',
+										gap: '10px',
+										padding: '0 12px',
+										boxSizing: 'border-box',
+										cursor: 'pointer',
+										zIndex: 2,
+										fontFamily: 'Inter, sans-serif',
+										color: '#000000',
+									}}
+								>
+									<span style={{ fontSize: '12px', fontWeight: 700, lineHeight: 1 }}>
+										Booked
+									</span>
+									<span style={{ fontSize: '12px', fontWeight: 500, lineHeight: 1 }}>
+										{formatCalendarDate(parseIsoKey(selectedConversationBooking.date))}
+										{'  '}
+										{selectedConversationBooking.startTime || DEFAULT_START_TIME} -{' '}
+										{selectedConversationBooking.endTime || DEFAULT_END_TIME}
+									</span>
+								</button>
+							)}
 
 							<div
 								style={{

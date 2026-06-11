@@ -11,7 +11,9 @@ import {
  * panel down to the viewport width and stretches its visible window to fill
  * the available height (a uniformly scaled-down desktop calendar, per Figma).
  */
-export const MobileDashboardCalendar: FC = () => {
+export const MobileDashboardCalendar: FC<{ persistEvents?: boolean }> = ({
+	persistEvents = false,
+}) => {
 	const [area, setArea] = useState<{ width: number; height: number } | null>(null);
 	const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
@@ -58,6 +60,7 @@ export const MobileDashboardCalendar: FC = () => {
 						// the static Jan 2026 design baseline). Omitting `day` keeps the
 						// real-date "today" highlight.
 						mockState={{ year: today.getFullYear(), monthIndex: today.getMonth() }}
+						persistEvents={persistEvents}
 					/>
 				</div>
 			)}

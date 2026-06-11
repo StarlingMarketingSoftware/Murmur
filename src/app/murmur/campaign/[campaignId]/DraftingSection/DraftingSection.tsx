@@ -155,6 +155,29 @@ const DEFAULT_STATE_SUGGESTIONS = [
 ];
 const PENDING_SEARCH_STORAGE_KEY = 'murmur_pending_search';
 
+// Dummy contacts behind the Overview right-rail "no results" state — decorative
+// ghost rows only (mirrors the Figma mock), never real data.
+const OVERVIEW_NO_RESULTS_GHOST_CONTACTS = [
+	{
+		name: 'Alex Young',
+		company: 'Consequence Media',
+		chipLabel: 'Coffee Shop',
+		chipColor: '#D6F1BD',
+		category: 'coffee-shops',
+		stateAbbr: 'NY',
+		city: 'New York',
+	},
+	{
+		name: 'Ann Ovidio',
+		company: 'The Umbrella',
+		chipLabel: 'Restaurant',
+		chipColor: '#C3FBD1',
+		category: 'restaurants',
+		stateAbbr: 'NY',
+		city: 'New York',
+	},
+] as const;
+
 const stripInjectedSubjectFromTestMessageHtml = (
 	rawHtml: string
 ): { messageHtml: string; injectedSubject: string } => {
@@ -5268,6 +5291,83 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																14
 															)}
 														/>
+													) : overviewRightRailFilteredContacts.length === 0 ? (
+														<div className="flex flex-col">
+															<button
+																type="button"
+																onClick={() =>
+																	handleMiniContactsSearch({
+																		why: '',
+																		what: overviewRightRailSearchText,
+																		where: '',
+																	})
+																}
+																className="mx-auto mt-[24px] flex-shrink-0 rounded-full bg-white px-[18px] py-[9px] font-inter text-[15px] font-semibold leading-none text-black shadow-[0_2px_6px_rgba(0,0,0,0.3)] transition-colors hover:bg-[#F3F4F6]"
+															>
+																Add new contacts that match search
+															</button>
+															<div
+																aria-hidden="true"
+																className="mt-[28px] space-y-[7px] pointer-events-none select-none"
+															>
+																{Array.from({ length: 7 }, (_, index) => {
+																	const ghost =
+																		OVERVIEW_NO_RESULTS_GHOST_CONTACTS[
+																			index % OVERVIEW_NO_RESULTS_GHOST_CONTACTS.length
+																		];
+																	return (
+																		<div
+																			key={index}
+																			className="grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-[3px] border-[#ABABAB] bg-white"
+																			style={{ opacity: 0.85 - (index * 0.7) / 6 }}
+																		>
+																			<div className="pl-3 pr-1 flex items-center h-[23px]">
+																				<div className="font-bold text-[11px] w-full truncate leading-tight">
+																					{ghost.name}
+																				</div>
+																			</div>
+																			<div className="pr-2 pl-1 flex items-center h-[23px]">
+																				<div
+																					className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																					style={{ backgroundColor: ghost.chipColor }}
+																				>
+																					{ghost.category === 'coffee-shops' ? (
+																						<CoffeeShopsIcon size={7} />
+																					) : (
+																						<RestaurantsIcon size={12} className="flex-shrink-0" />
+																					)}
+																					<span className="text-[10px] text-black leading-none truncate">
+																						{ghost.chipLabel}
+																					</span>
+																				</div>
+																			</div>
+																			<div className="pl-3 pr-1 flex items-center h-[22px]">
+																				<div className="text-[11px] text-black w-full truncate leading-tight">
+																					{ghost.company}
+																				</div>
+																			</div>
+																			<div className="pr-2 pl-1 flex items-center h-[22px]">
+																				<div className="flex items-center gap-1 w-full">
+																					<span
+																						className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+																						style={{
+																							backgroundColor:
+																								stateBadgeColorMap[ghost.stateAbbr] || 'transparent',
+																							borderColor: '#000000',
+																						}}
+																					>
+																						{ghost.stateAbbr}
+																					</span>
+																					<span className="text-[10px] text-black leading-none truncate">
+																						{ghost.city}
+																					</span>
+																				</div>
+																			</div>
+																		</div>
+																	);
+																})}
+															</div>
+														</div>
 													) : overviewRightRailUnselectedContactsFiltered.length === 0 ? (
 														<div className="w-full h-full flex items-center justify-center p-6">
 															<span className="font-secondary font-bold text-[16px] leading-tight text-black text-center">

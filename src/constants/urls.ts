@@ -83,6 +83,9 @@ export const urls = {
 				index: '/api/auth/check-admin',
 			},
 		},
+		calendar: {
+			index: '/api/calendar',
+		},
 		campaigns: {
 			index: '/api/campaigns',
 			detail: ((id) => `/api/campaigns/${id}`) as DetailRoute,

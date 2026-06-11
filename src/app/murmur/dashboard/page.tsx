@@ -9530,7 +9530,9 @@ const DashboardContent = () => {
 
 				<div className="flex-1 min-h-0 w-full" style={{ overflow: 'hidden' }}>
 					{mobileActiveTab === 'folders' && <MobileFolderCards className="h-full" />}
-					{mobileActiveTab === 'calendar' && <MobileDashboardCalendar />}
+					{mobileActiveTab === 'calendar' && (
+					<MobileDashboardCalendar persistEvents={isSignedIn === true} />
+				)}
 					{mobileActiveTab === 'inbox' && (
 						<DashboardResponsesWidget
 							mobile
@@ -12558,6 +12560,7 @@ const DashboardContent = () => {
 													<DashboardResponsesWidget
 														enabled={isSignedIn === true}
 														mockState={responsesMockState}
+														previewPlacement="below"
 													/>
 												</div>
 											</div>
@@ -14405,7 +14408,10 @@ const DashboardContent = () => {
 										/>
 									)}
 									{selectedActionBarIcon === 'calendar' && (
-										<DashboardCalendarPanel mockState={calendarMockState} />
+										<DashboardCalendarPanel
+											mockState={calendarMockState}
+											persistEvents={isSignedIn === true}
+										/>
 									)}
 									{selectedActionBarIcon === 'folder' && (
 										<CampaignsTable
