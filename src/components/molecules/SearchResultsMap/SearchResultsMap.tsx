@@ -16761,20 +16761,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				overflow: 'hidden',
 			}}
 		>
-			{!isBackgroundPresentation && (
-				<style>{`
-					.murmur-search-results-map--interactive .mapboxgl-ctrl-bottom-left {
-						left: 8px !important;
-						bottom: 6px !important;
-					}
-					.murmur-search-results-map--interactive .mapboxgl-ctrl-bottom-left .mapboxgl-ctrl-logo {
-						display: block !important;
-						transform: scale(0.6);
-						transform-origin: 0 100%;
-						opacity: 0.8;
-					}
-				`}</style>
-			)}
+			{/* Three-class selectors so the logo out-specifies the
+			    `.dashboard-globe-bg .mapboxgl-ctrl-logo { display: none }` hide rule in
+			    every presentation, including the background globe. */}
+			<style>{`
+				.murmur-search-results-map .mapboxgl-ctrl-bottom-left {
+					left: 8px !important;
+					bottom: 6px !important;
+				}
+				.murmur-search-results-map .mapboxgl-ctrl-bottom-left .mapboxgl-ctrl-logo {
+					display: block !important;
+					transform: scale(0.6);
+					transform-origin: 0 100%;
+					opacity: 0.8;
+				}
+			`}</style>
 			<div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
 			{/*
 			  Selected state wash. This reuses the curated blob gradient language,

@@ -174,6 +174,7 @@ import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/Camp
 import { DashboardWriteOverlay } from './DashboardWriteOverlay';
 import { MapEventPopupCard, formatMapPostedEventDate } from './MapEventPopupCard';
 import { ApplyModal } from './ApplyModal';
+import { UnsubscribeFlow } from '@/components/organisms/UnsubscribeFlow/UnsubscribeFlow';
 import DashboardResponsesWidget, {
 	type ResponsesMockState,
 } from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesWidget';
@@ -2991,6 +2992,9 @@ const DashboardContent = () => {
 	// "From Home" mode: triggered from landing page search button, shows a pre-configured search
 	// with sign-up modal for unauthenticated users.
 	const fromHomeParam = searchParams.get('fromHome') === 'true';
+	// Unsubscribe flow (settings-styled overlay over the bare globe). URL-driven so a
+	// refresh stays in the flow and the campaign page's settings gear can deep-link here.
+	const isUnsubscribeFlowOpen = searchParams.get('unsubscribe')?.trim() === '1';
 	const FROM_HOME_SEARCH_QUERY = '[Booking] Wine, Beer, and Spirits (California)';
 	const FROM_HOME_WHY = '[Booking]';
 	const FROM_HOME_WHAT = DEFAULT_CATEGORY_SEARCH_WHAT;
@@ -8773,6 +8777,17 @@ const DashboardContent = () => {
 		}
 	};
 
+	// Entering the unsubscribe flow must land on the bare spinning globe: leave map
+	// view and clear any active search (idempotent — runs once, then the guard fails).
+	useEffect(() => {
+		if (!isUnsubscribeFlowOpen) return;
+		if (!isMapView && !hasSearched) return;
+		setIsMapView(false);
+		setHoveredContact(null);
+		handleEnhancedResetSearch();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [isUnsubscribeFlowOpen, isMapView, hasSearched]);
+
 	useEffect(() => {
 		if (typeof document === 'undefined') return;
 
@@ -8815,7 +8830,8 @@ const DashboardContent = () => {
 	const scrollToMapEnabled =
 		shouldLockLandingDashboardScroll &&
 		!isOverflowingDashboardPanelOpen &&
-		!isInstantTabTransition;
+		!isInstantTabTransition &&
+		!isUnsubscribeFlowOpen;
 	const handleScrollCommitToMap = useCallback(() => {
 		setPendingForYouReveal(true);
 		scrollEntryDisengageRef.current = true; // land in "show all contacts", not focused
@@ -10328,7 +10344,8 @@ const DashboardContent = () => {
 			{!hasSearched &&
 				activeTab === 'search' &&
 				!fromHomeParam &&
-				!isMapView && (
+				!isMapView &&
+				!isUnsubscribeFlowOpen && (
 					<div
 						className="dashboard-ask-anything-root fixed left-1/2 pointer-events-none"
 						onMouseEnter={cancelMapBottomSearchFollowupPreviewClear}
@@ -10464,7 +10481,11 @@ const DashboardContent = () => {
 						ref={dashboardContentRef}
 						className={`relative min-h-screen dashboard-main-offset w-full max-w-full transition-opacity duration-500 ${bottomPadding} ${
 							hasSearched ? 'search-active' : ''
-						} ${isMapView ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+						} ${
+							isMapView || isUnsubscribeFlowOpen
+								? 'opacity-0 pointer-events-none'
+								: 'opacity-100'
+						}`}
 						style={
 							hasSearched
 								? {
@@ -14526,6 +14547,9 @@ const DashboardContent = () => {
 								setApplyModalEvent(null);
 							}}
 						/>
+
+						{/* Unsubscribe flow — settings-styled multi-step overlay over the bare globe */}
+						{isUnsubscribeFlowOpen && isSignedIn && <UnsubscribeFlow />}
 					</div>
 				</AppLayout>
 			</div>

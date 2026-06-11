@@ -35,14 +35,14 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 			style={{ pointerEvents: 'auto' }}
 			onClick={onClose}
 		>
-			<SettingsWindow />
+			<SettingsWindow onClose={onClose} />
 		</div>,
 		document.body
 	);
 }
 
 // Data hooks live here so the queries only run once the window is actually opened.
-function SettingsWindow() {
+function SettingsWindow({ onClose }: { onClose: () => void }) {
 	const { user, subscriptionTier } = useMe();
 	const { user: clerkUser } = useUser();
 	const { data: identities } = useGetIdentities({});
@@ -179,9 +179,19 @@ function SettingsWindow() {
 						Change Plan
 					</button>
 
-					<span className="mb-[28px] mt-[38px] w-fit text-[17px] font-semibold">
+					<button
+						type="button"
+						onClick={() => {
+							// Close ourselves: a query-only navigation doesn't change `pathname`,
+							// so the layout's pathname-change auto-close won't fire when the
+							// user is already on the dashboard.
+							onClose();
+							router.push(urls.murmur.dashboard.unsubscribe);
+						}}
+						className="mb-[28px] mt-[38px] w-fit cursor-pointer text-left text-[17px] font-semibold transition-opacity hover:opacity-80"
+					>
 						Unsubscribe
-					</span>
+					</button>
 				</div>
 			</CustomScrollbar>
 		</div>

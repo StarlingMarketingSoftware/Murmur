@@ -23,6 +23,8 @@ export const urls = {
 		index: '/murmur',
 		dashboard: {
 			index: '/murmur/dashboard',
+			// Opens the multi-step unsubscribe flow over the bare globe.
+			unsubscribe: '/murmur/dashboard?unsubscribe=1',
 		},
 		campaign: {
 			index: '/murmur/campaign',
@@ -58,6 +60,14 @@ export const urls = {
 		venue: '/sign-up/venue',
 	},
 	api: {
+		account: {
+			deleteVerification: {
+				index: '/api/account/delete-verification',
+				verify: {
+					index: '/api/account/delete-verification/verify',
+				},
+			},
+		},
 		apollo: {
 			index: '/api/apollo',
 		},
