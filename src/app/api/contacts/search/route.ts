@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { Contact } from '@prisma/client';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import {
 	apiResponse,
 	apiUnauthorized,
@@ -1611,6 +1612,9 @@ export async function GET(req: NextRequest) {
 	req.signal.addEventListener('abort', onAbort, { once: true });
 
 	try {
+		const limited = await withRateLimit(req, 'search-heavy', 'contacts-search');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) return apiUnauthorized();
 

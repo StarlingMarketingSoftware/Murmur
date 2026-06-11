@@ -10,9 +10,11 @@ import {
 	apiUnauthorized,
 	apiUnauthorizedResource,
 	handleApiError,
+	allContactsGlobalOrOwned,
 } from '@/app/api/_utils';
 import { EmailStatus } from '@prisma/client';
 import { getValidatedParamsFromUrl } from '@/utils';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 
 const postSingleEmailSchema = z.object({
 	subject: z.string().min(1),
@@ -23,7 +25,10 @@ const postSingleEmailSchema = z.object({
 	contactId: z.number().int().positive(),
 });
 
-const postEmailSchema = z.union([postSingleEmailSchema, z.array(postSingleEmailSchema)]);
+const postEmailSchema = z.union([
+	postSingleEmailSchema,
+	z.array(postSingleEmailSchema).max(1000),
+]);
 
 const emailFilterSchema = z.object({
 	campaignId: z.coerce.number().int().positive().optional(),
@@ -35,6 +40,9 @@ export type EmailFilterData = z.infer<typeof emailFilterSchema>;
 
 export async function GET(req: NextRequest) {
 	try {
+		const limited = await withRateLimit(req, 'read-cheap', 'emails');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
@@ -69,6 +77,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
 	try {
+		const limited = await withRateLimit(req, 'mutation', 'emails');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
@@ -125,6 +136,18 @@ export async function POST(req: NextRequest) {
 
 		if (campaign.userId !== userId) {
 			return apiUnauthorizedResource();
+		}
+
+		// Every referenced contact must be global or the caller's own — an Email row
+		// pointing at another user's private contact would expose that contact via
+		// the GET read-back (which includes the full contact record).
+		if (
+			!(await allContactsGlobalOrOwned(
+				emailsArray.map((e) => e.contactId),
+				userId
+			))
+		) {
+			return apiBadRequest('One or more contacts are invalid');
 		}
 
 		const normalizeSentAt = (sentAt: string | null | undefined) => {

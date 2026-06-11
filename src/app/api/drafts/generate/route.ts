@@ -1,4 +1,5 @@
 import { apiBadRequest, apiForbidden, apiUnauthorized } from '@/app/api/_utils';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import { fetchOpenRouter } from '@/app/api/_utils/openrouter';
 import { OPENROUTER_DRAFTING_MODELS, getRandomDraftingSystemPrompt } from '@/constants/ai';
 import prisma from '@/lib/prisma';
@@ -80,9 +81,9 @@ const postGenerateDraftsSchema = z
 		prompt: z.string().min(1),
 		bookingFor: z.string().optional(),
 		identity: identitySchema,
-		contactIds: z.array(z.number().int().positive()).min(1).optional(),
+		contactIds: z.array(z.number().int().positive()).min(1).max(500).optional(),
 		firstContact: contactSchema.optional(),
-		contacts: z.array(contactSchema).min(1).optional(),
+		contacts: z.array(contactSchema).min(1).max(500).optional(),
 		models: z.array(z.string().min(1)).optional(),
 		concurrency: z.number().int().min(1).max(20).optional(),
 	})
@@ -347,6 +348,9 @@ const createSseEvent = (event: string, payload: object): string =>
 
 export async function POST(request: NextRequest) {
 	const requestReceivedAt = performance.now();
+
+	const limited = await withRateLimit(request, 'ai-burst-guard', 'drafts-generate');
+	if (limited) return limited;
 
 	const { userId } = await auth();
 	if (!userId) {

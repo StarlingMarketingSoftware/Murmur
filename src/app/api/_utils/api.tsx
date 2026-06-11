@@ -105,6 +105,17 @@ export const apiGatewayTimeout = (
 	return NextResponse.json({ success: false, error: message }, { status: 504 });
 };
 
+export const apiTooManyRequests = (
+	message: string = 'Rate limit exceeded. Please try again later.',
+	retryAfterSeconds: number = 60
+): NextResponse => {
+	console.error(message);
+	return NextResponse.json(
+		{ success: false, error: message },
+		{ status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } }
+	);
+};
+
 export const handleApiError = (error: Error | unknown): NextResponse => {
 	console.error(error);
 	if (error instanceof z.ZodError) {

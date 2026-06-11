@@ -8,6 +8,7 @@ import {
 	handleApiError,
 } from '@/app/api/_utils';
 import { projectVenueRepliesForUser } from '@/app/api/_utils/venueInboundProjection';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import { getValidatedParamsFromUrl } from '@/utils';
 import { z } from 'zod';
 import crypto from 'crypto';
@@ -25,6 +26,9 @@ export type InboundEmailFilterData = z.infer<typeof inboundEmailFilterSchema>;
  */
 export async function GET(req: NextRequest) {
 	try {
+		const limited = await withRateLimit(req, 'search-heavy', 'inbound');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
@@ -71,6 +75,14 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
 	try {
+		// Public webhook (no Clerk session) — cap by IP to blunt forged-payload floods.
+		// Mailgun delivers all users' inbound mail from a small shared IP pool, so this
+		// needs the same generous circuit-breaker as the Clerk/Stripe webhooks.
+		const limited = await withRateLimit(req, 'public-unauth', 'inbound-webhook', {
+			ip: [{ tokens: 600, window: '60 s' }],
+		});
+		if (limited) return limited;
+
 		// Mailgun sends data as multipart/form-data or application/x-www-form-urlencoded
 		const formData = await req.formData();
 
@@ -153,24 +165,25 @@ export async function POST(req: NextRequest) {
 			}
 		}
 
-		// Optional: Verify Mailgun signature (recommended for production)
-		if (
-			process.env.MAILGUN_WEBHOOK_SIGNING_KEY &&
-			mailgunTimestamp &&
-			mailgunToken &&
-			mailgunSignature
-		) {
-			const isValid = verifyMailgunSignature(
-				process.env.MAILGUN_WEBHOOK_SIGNING_KEY,
-				mailgunTimestamp,
-				mailgunToken,
-				mailgunSignature
+		// Verify the Mailgun signature BEFORE any DB work. This webhook is publicly
+		// reachable (it carries no Clerk session), so the signature is the ONLY thing
+		// authenticating the sender — fail closed if it is missing, invalid, or the
+		// signing key is not configured, otherwise anyone could inject forged replies.
+		const signingKey = process.env.MAILGUN_WEBHOOK_SIGNING_KEY;
+		if (!signingKey) {
+			console.error(
+				'[inbound] MAILGUN_WEBHOOK_SIGNING_KEY is not set — rejecting inbound webhook.'
 			);
-
-			if (!isValid) {
-				console.error('Invalid Mailgun signature');
-				return apiServerError('Invalid webhook signature');
-			}
+			return apiServerError('Inbound webhook is not configured');
+		}
+		if (
+			!mailgunTimestamp ||
+			!mailgunToken ||
+			!mailgunSignature ||
+			!verifyMailgunSignature(signingKey, mailgunTimestamp, mailgunToken, mailgunSignature)
+		) {
+			console.error('Invalid or missing Mailgun signature');
+			return apiUnauthorized('Invalid webhook signature');
 		}
 
 		// Try to find associated user by recipient email

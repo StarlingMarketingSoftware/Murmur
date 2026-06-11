@@ -11,9 +11,17 @@ import {
 	apiServerError,
 	handleApiError,
 } from '@/app/api/_utils';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import { StripeSubscriptionStatus } from '@/types';
 
 export async function POST(req: Request) {
+	// Generous IP circuit-breaker against webhook-URL floods; high enough not to drop
+	// legitimate Stripe delivery bursts (Stripe retries on non-2xx anyway).
+	const limited = await withRateLimit(req, 'public-unauth', 'webhooks-stripe', {
+		ip: [{ tokens: 600, window: '60 s' }],
+	});
+	if (limited) return limited;
+
 	const body = await req.text();
 	const headersList = await headers();
 	const signature = headersList.get('stripe-signature') || '';

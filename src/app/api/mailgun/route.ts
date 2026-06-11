@@ -10,6 +10,7 @@ import {
 	apiUnauthorizedResource,
 	handleApiError,
 } from '@/app/api/_utils';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import { buildUnsubscribeToken } from '@/app/api/_utils/unsubscribe';
 import {
 	renderNewMessageEmailHtml,
@@ -52,10 +53,32 @@ export type PostMailgunData = z.infer<typeof postMailgunSchema>;
 
 export async function POST(request: Request) {
 	try {
+		const limited = await withRateLimit(request, 'paid-external', 'mailgun');
+		if (limited) return limited;
+
+		// Auth gates BOTH branches — the generic (non-template) send must not be an open relay.
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
 		const data = await request.json();
 		const validatedData = postMailgunSchema.safeParse(data);
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);
+		}
+
+		// Server-side credit gate (check-only; the client performs the decrement):
+		// exhausted accounts must not be able to keep sending via direct API calls.
+		const sender = await prisma.user.findUnique({
+			where: { clerkId: userId },
+			select: { sendingCredits: true },
+		});
+		if (!sender) {
+			return apiUnauthorized();
+		}
+		if (sender.sendingCredits <= 0) {
+			return apiBadRequest('No sending credits remaining');
 		}
 		const {
 			recipientEmail,
@@ -75,10 +98,6 @@ export async function POST(request: Request) {
 		const extraHeaders: Record<string, string> = {};
 
 		if (template === 'newMessage') {
-			const { userId } = await auth();
-			if (!userId) {
-				return apiUnauthorized();
-			}
 			const campaign = await prisma.campaign.findUnique({
 				where: { id: campaignId! },
 				include: { identity: true },

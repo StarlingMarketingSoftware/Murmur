@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import {
 	apiBadRequest,
 	apiResponse,
@@ -1255,6 +1256,9 @@ const extractParentheticalLocation = (query: string): ParentheticalLocation | nu
 export async function GET(req: NextRequest) {
 	const requestStartedAtMs = Date.now();
 	try {
+		const limited = await withRateLimit(req, 'search-heavy', 'contacts');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
@@ -4231,6 +4235,8 @@ export async function GET(req: NextRequest) {
 							id: {
 								in: numberContactListIds,
 							},
+							// the referenced lists must belong to the caller
+							userId,
 						},
 					},
 					emailValidationStatus: {
@@ -4662,6 +4668,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
 	try {
+		const limited = await withRateLimit(req, 'mutation', 'contacts');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 
 		if (!userId) {

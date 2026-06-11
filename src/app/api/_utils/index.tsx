@@ -4,5 +4,6 @@ export * from './gemini';
 export * from './mistral';
 export * from './openai';
 export * from './openrouter';
+export * from './ownership';
 export * from './user';
 export * from './zerobounce';

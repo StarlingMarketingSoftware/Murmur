@@ -5,19 +5,23 @@ import { z } from 'zod';
 import {
 	apiBadRequest,
 	apiCreated,
+	apiForbidden,
 	apiServerError,
 	apiUnauthorized,
+	getIsAdmin,
 	handleApiError,
 	processZeroBounceResults,
 	verifyEmailsWithZeroBounce,
 	waitForZeroBounceCompletion,
 } from '@/app/api/_utils';
-import { Contact, EmailVerificationStatus } from '@prisma/client';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
+import { Contact, EmailVerificationStatus, UserRole } from '@prisma/client';
 import { ContactPartialWithRequiredEmail } from '@/types/contact';
 
 const batchCreateContactSchema = z.object({
 	isPrivate: z.boolean().optional().default(false),
-	contacts: z.array(
+	contacts: z
+		.array(
 		z.object({
 			firstName: z.string().optional(),
 			lastName: z.string().optional(),
@@ -42,7 +46,9 @@ const batchCreateContactSchema = z.object({
 			companyKeywords: z.array(z.string()).optional(),
 			companyIndustry: z.string().optional(),
 		})
-	),
+		)
+		.min(1)
+		.max(5000),
 });
 export type PostBatchContactData = z.infer<typeof batchCreateContactSchema>;
 export type PostBatchContactDataResponse = {
@@ -55,6 +61,9 @@ export type PostBatchContactDataResponse = {
 
 export async function POST(req: NextRequest) {
 	try {
+		const limited = await withRateLimit(req, 'paid-external', 'contacts-batch');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
@@ -68,6 +77,13 @@ export async function POST(req: NextRequest) {
 
 		const { contacts, isPrivate } = validatedData.data;
 
+		// Only admins may create GLOBAL (non-private) contacts — the curated DB is
+		// admin-managed. The upload dialog already sends isPrivate for non-admins;
+		// this closes the direct-API path.
+		if (!isPrivate && !(await getIsAdmin(userId))) {
+			return apiForbidden('Only admins can create global contacts');
+		}
+
 		// Remove duplicate email addresses, keeping only the first occurrence of each email
 		const uniqueContacts = contacts.filter((contact, index, arr) => {
 			return (
@@ -78,6 +94,20 @@ export async function POST(req: NextRequest) {
 		const duplicatesRemoved = contacts.length - uniqueContacts.length;
 
 		if (isPrivate) {
+			// Server-side enforcement of the verification-credit gate the client applies
+			// (useContactTSVUploadDialog) — a direct API call would otherwise bypass it and
+			// spend ZeroBounce verifications without limit.
+			const importingUser = await prisma.user.findUnique({
+				where: { clerkId: userId },
+				select: { role: true, verificationCredits: true },
+			});
+			const isAdmin = importingUser?.role === UserRole.admin;
+			if (!isAdmin && uniqueContacts.length > (importingUser?.verificationCredits ?? 0)) {
+				return apiForbidden(
+					'Insufficient verification credits for this import. Please upgrade your plan.'
+				);
+			}
+
 			const existingContacts = await prisma.contact.findMany({
 				where: {
 					email: {

@@ -10,6 +10,7 @@ import {
 } from '@/app/api/_utils';
 import { z } from 'zod';
 import { getUser, provisionLocalUser } from '../../_utils';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import { urls } from '@/constants/urls';
 import { BASE_URL } from '@/constants';
 import prisma from '@/lib/prisma';
@@ -25,6 +26,9 @@ export type PostCheckoutSessionData = z.infer<typeof stripeCheckoutRequestSchema
 
 export async function POST(req: Request) {
 	try {
+		const limited = await withRateLimit(req, 'paid-external', 'stripe-checkout');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();

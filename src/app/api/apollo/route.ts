@@ -17,19 +17,23 @@ import {
 	fetchApolloContacts,
 	transformApolloContact,
 } from '@/app/api/_utils';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 
 import { ApolloPerson } from '@/types/apollo';
 import { Contact, EmailVerificationStatus } from '@prisma/client';
 import { upsertContactToVectorDb } from '../_utils/vectorDb';
 
 const postApolloContactsSchema = z.object({
-	query: z.string(),
-	limit: z.coerce.number().default(20),
+	query: z.string().min(1).max(2000),
+	limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 export type PostApolloContactsData = z.infer<typeof postApolloContactsSchema>;
 
 export async function POST(req: NextRequest) {
 	try {
+		const limited = await withRateLimit(req, 'paid-external', 'apollo');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();

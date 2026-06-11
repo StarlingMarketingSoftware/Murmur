@@ -7,7 +7,9 @@ import {
 	apiNoContent,
 	apiNotFound,
 	apiResponse,
+	apiForbidden,
 	apiUnauthorized,
+	getIsAdmin,
 	handleApiError,
 } from '@/app/api/_utils';
 import { ApiRouteParams } from '@/types';
@@ -23,6 +25,11 @@ export async function GET(req: NextRequest, { params }: { params: ApiRouteParams
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
+		}
+
+		// Leads are marketing email captures with no per-user owner — admin-only.
+		if (!(await getIsAdmin(userId))) {
+			return apiForbidden();
 		}
 
 		const { id } = await params;
@@ -43,6 +50,11 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
+		}
+
+		// Leads are marketing email captures with no per-user owner — admin-only.
+		if (!(await getIsAdmin(userId))) {
+			return apiForbidden();
 		}
 
 		const { id } = await params;
@@ -70,6 +82,11 @@ export async function DELETE(req: NextRequest, { params }: { params: ApiRoutePar
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
+		}
+
+		// Leads are marketing email captures with no per-user owner — admin-only.
+		if (!(await getIsAdmin(userId))) {
+			return apiForbidden();
 		}
 
 		const { id } = await params;

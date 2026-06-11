@@ -8,6 +8,8 @@ import {
 	apiNotFound,
 	apiResponse,
 	apiUnauthorized,
+	apiUnauthorizedResource,
+	getIsAdmin,
 	handleApiError,
 } from '@/app/api/_utils';
 import { ApiRouteParams } from '@/types';
@@ -30,7 +32,6 @@ const updateContactSchema = z.object({
 	photoUrl: z.string().optional().nullable(),
 	metadata: z.string().optional().nullable(),
 	isPrivate: z.boolean().optional(),
-	userId: z.string().optional().nullable(),
 });
 export type PatchContactData = z.infer<typeof updateContactSchema>;
 
@@ -46,6 +47,19 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 		const validatedData = updateContactSchema.safeParse(body);
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);
+		}
+
+		const existingContact = await prisma.contact.findUnique({
+			where: { id: Number(id) },
+			select: { userId: true },
+		});
+		if (!existingContact) {
+			return apiNotFound();
+		}
+		// Global curated contacts (userId null) are admin-managed; users may only
+		// edit their own imported contacts.
+		if (existingContact.userId !== userId && !(await getIsAdmin(userId))) {
+			return apiUnauthorizedResource();
 		}
 
 		const updatedContact = await prisma.contact.update({
@@ -79,6 +93,12 @@ export async function DELETE(req: NextRequest, { params }: { params: ApiRoutePar
 
 		if (!existingContact) {
 			return apiNotFound();
+		}
+
+		// Global curated contacts (userId null) are admin-managed; users may only
+		// delete their own imported contacts.
+		if (existingContact.userId !== userId && !(await getIsAdmin(userId))) {
+			return apiUnauthorizedResource();
 		}
 
 		await prisma.contact.delete({

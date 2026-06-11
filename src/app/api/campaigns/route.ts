@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import prisma from '@/lib/prisma';
 import { AiModel, Prisma, Status } from '@prisma/client';
 import {
@@ -9,6 +10,9 @@ import {
 	apiResponse,
 	apiUnauthorized,
 	handleApiError,
+	allContactsGlobalOrOwned,
+	allContactListsGlobalOrOwned,
+	allUserContactListsOwned,
 } from '@/app/api/_utils';
 import { z } from 'zod';
 import {
@@ -127,9 +131,9 @@ const postCampaignSchema = z.object({
 	testSubject: z.string().optional(),
 	senderEmail: z.string().email().optional(),
 	senderName: z.string().optional(),
-	contacts: z.array(z.number()).optional(),
-	contactLists: z.array(z.number()).optional(),
-	userContactLists: z.array(z.number()).optional(),
+	contacts: z.array(z.number()).max(100000).optional(),
+	contactLists: z.array(z.number()).max(1000).optional(),
+	userContactLists: z.array(z.number()).max(1000).optional(),
 });
 export type PostCampaignData = z.infer<typeof postCampaignSchema>;
 
@@ -143,6 +147,9 @@ const campaignDataTypeContactSelect = {
 
 export async function POST(req: NextRequest) {
 	try {
+		const limited = await withRateLimit(req, 'mutation', 'campaigns');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
@@ -154,6 +161,16 @@ export async function POST(req: NextRequest) {
 			return apiBadRequest(validatedData.error);
 		}
 		const { contacts, contactLists, userContactLists, name } = validatedData.data;
+
+		// Referenced resources must be global or the caller's own — otherwise any
+		// user could attach (and later read) other users' private contacts/lists.
+		if (
+			!(await allContactsGlobalOrOwned(contacts ?? [], userId)) ||
+			!(await allContactListsGlobalOrOwned(contactLists ?? [], userId)) ||
+			!(await allUserContactListsOwned(userContactLists ?? [], userId))
+		) {
+			return apiBadRequest('One or more contacts or contact lists are invalid');
+		}
 
 		const activeCount = await prisma.campaign.count({
 			where: { userId, status: Status.active },
@@ -212,8 +229,11 @@ export async function POST(req: NextRequest) {
 	}
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
 	try {
+		const limited = await withRateLimit(req, 'search-heavy', 'campaigns');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();

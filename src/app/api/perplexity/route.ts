@@ -4,6 +4,7 @@ import {
 	apiUnauthorized,
 	handleApiError,
 } from '@/app/api/_utils';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
@@ -15,14 +16,17 @@ const postPerplexitySchema = z.object({
 	model: z.enum(
 		Object.keys(PERPLEXITY_MODEL_OPTIONS) as [PerplexityModel, ...PerplexityModel[]]
 	),
-	rolePrompt: z.string().min(1),
-	userPrompt: z.string().min(1),
+	rolePrompt: z.string().min(1).max(100000),
+	userPrompt: z.string().min(1).max(100000),
 });
 
 export type PostPerplexityData = z.infer<typeof postPerplexitySchema>;
 
 export async function POST(request: NextRequest) {
 	try {
+		const limited = await withRateLimit(request, 'ai-expensive', 'perplexity');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();

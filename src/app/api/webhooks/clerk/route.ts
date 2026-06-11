@@ -12,10 +12,18 @@ import {
 	handleApiError,
 	resolveAccountType,
 } from '@/app/api/_utils';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import { generateMurmurEmail, generateMurmurReplyToEmail } from '@/utils';
 import { unpublishVenueContact } from '@/app/api/_utils/venueContactSync';
 
 export async function POST(req: Request) {
+	// Generous IP circuit-breaker against webhook-URL floods; high enough not to drop
+	// legitimate Clerk delivery bursts.
+	const limited = await withRateLimit(req, 'public-unauth', 'webhooks-clerk', {
+		ip: [{ tokens: 600, window: '60 s' }],
+	});
+	if (limited) return limited;
+
 	const SIGNING_SECRET = process.env.CLERK_SIGNING_SECRET;
 
 	if (!SIGNING_SECRET) {

@@ -5,6 +5,7 @@ import {
 	handleApiError,
 } from '@/app/api/_utils';
 import { fetchMistral } from '@/app/api/_utils';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import {
 	MISTRAL_HYBRID_AGENT_KEYS,
 	MISTRAL_PARAGRAPH_AGENT_KEYS,
@@ -21,8 +22,8 @@ const postMistralSchema = z.object({
 		...MISTRAL_PARAGRAPH_AGENT_KEYS,
 		...MISTRAL_HYBRID_AGENT_KEYS,
 	]),
-	prompt: z.string().min(1),
-	content: z.string().min(1),
+	prompt: z.string().min(1).max(100000),
+	content: z.string().min(1).max(100000),
 });
 
 export type PostMistralData = z.infer<typeof postMistralSchema>;
@@ -31,6 +32,9 @@ export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
 	try {
+		const limited = await withRateLimit(request, 'ai-expensive', 'mistral');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();

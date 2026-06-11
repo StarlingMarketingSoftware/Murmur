@@ -1,6 +1,6 @@
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
-import { Prisma, User } from '@prisma/client';
+import { Prisma, User, UserRole } from '@prisma/client';
 import { AccountType } from '@/constants/prismaEnums';
 import { stripe } from '@/stripe/client';
 import { generateMurmurEmail, generateMurmurReplyToEmail } from '@/utils';
@@ -33,6 +33,15 @@ export const getUser = async (): Promise<User | null> => {
  * Defaults to `standard` so the normal signup flow is undisturbed; only an
  * explicit `accountType: 'venue'` (set by the venue signup) yields `venue`.
  */
+// true iff the given Clerk user's local row has the admin role
+export const getIsAdmin = async (clerkId: string): Promise<boolean> => {
+	const user = await prisma.user.findUnique({
+		where: { clerkId },
+		select: { role: true },
+	});
+	return user?.role === UserRole.admin;
+};
+
 export const resolveAccountType = (metadata: unknown): AccountType =>
 	(metadata as { accountType?: unknown } | null | undefined)?.accountType ===
 	AccountType.venue
