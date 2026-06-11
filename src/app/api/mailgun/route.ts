@@ -68,18 +68,6 @@ export async function POST(request: Request) {
 			return apiBadRequest(validatedData.error);
 		}
 
-		// Server-side credit gate (check-only; the client performs the decrement):
-		// exhausted accounts must not be able to keep sending via direct API calls.
-		const sender = await prisma.user.findUnique({
-			where: { clerkId: userId },
-			select: { sendingCredits: true },
-		});
-		if (!sender) {
-			return apiUnauthorized();
-		}
-		if (sender.sendingCredits <= 0) {
-			return apiBadRequest('No sending credits remaining');
-		}
 		const {
 			recipientEmail,
 			subject,
@@ -90,6 +78,22 @@ export async function POST(request: Request) {
 			template,
 			campaignId,
 		} = validatedData.data;
+
+		// Server-side credit gate (check-only; the client performs the decrement).
+		// Only campaign cold sends ('newMessage') consume sending credits — replies to
+		// inbound mail use the generic branch and are intentionally NOT gated.
+		if (template === 'newMessage') {
+			const sender = await prisma.user.findUnique({
+				where: { clerkId: userId },
+				select: { sendingCredits: true },
+			});
+			if (!sender) {
+				return apiUnauthorized();
+			}
+			if (sender.sendingCredits <= 0) {
+				return apiBadRequest('No sending credits remaining');
+			}
+		}
 
 		let outgoingSubject = subject;
 		let fromName = senderName;
