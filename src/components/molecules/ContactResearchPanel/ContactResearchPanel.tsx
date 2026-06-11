@@ -899,6 +899,142 @@ const ResearchMetadataNotesArea: FC<{
 	);
 };
 
+const SKELETON_BAR_CLASS = 'animate-pulse rounded-[4px] bg-black/10';
+
+// Shimmer rows mirroring RESEARCH_PANEL_BANDS (one entry per detail band).
+const RESEARCH_PANEL_SKELETON_ROWS: Array<{
+	top: number;
+	height: number;
+	bars: string[];
+	iconSize?: number;
+}> = [
+	{ top: 65, height: 25, bars: ['74%'] },
+	{ top: 90, height: 48, bars: ['86%', '58%'] },
+	{ top: 138, height: 24, bars: ['44%'], iconSize: 16 },
+	{ top: 162, height: 24, bars: ['52%'] },
+	{ top: 186, height: 24, bars: ['38%'] },
+	{ top: 210, height: 24, bars: ['30%'] },
+	{ top: 234, height: 24, bars: ['34%'], iconSize: 18 },
+];
+
+// Loading placeholder mirroring the default panel chrome (bands, dividers,
+// metadata area) so the loaded panel swaps in without layout shift.
+const ContactResearchPanelSkeleton: FC<{
+	width: string | number;
+	height: string | number;
+	className?: string;
+	style?: React.CSSProperties;
+}> = ({ width, height, className, style }) => (
+	<div
+		data-contact-research-panel="true"
+		aria-hidden="true"
+		className={cn(
+			'relative block overflow-hidden rounded-[11.48px] border-[1.913px] border-black bg-[#F8FAFF]',
+			className
+		)}
+		style={{
+			width: toCssSize(width),
+			height: toCssSize(height),
+			...style,
+		}}
+		data-hover-description="Research: Background info and notes for the selected contact."
+	>
+		<div className="absolute inset-0 rounded-[inherit] overflow-hidden">
+			{RESEARCH_PANEL_BANDS.map((band) => (
+				<div
+					key={`${band.top}-${band.color}`}
+					className="absolute left-0 right-0"
+					style={{
+						top: `${band.top}px`,
+						height: `${band.height}px`,
+						backgroundColor: band.color,
+					}}
+				/>
+			))}
+			<div
+				className="absolute left-0 right-0 bottom-0"
+				style={{
+					top: `${RESEARCH_PANEL_METADATA_TOP}px`,
+					backgroundColor: '#FCFDFF',
+				}}
+			/>
+		</div>
+
+		{RESEARCH_PANEL_DIVIDER_TOPS.map((top) => (
+			<div
+				key={top}
+				className="absolute left-0 right-0 bg-black"
+				style={{
+					top: `${top}px`,
+					height: `${RESEARCH_PANEL_BORDER_WIDTH}px`,
+				}}
+			/>
+		))}
+
+		<div
+			className={cn(
+				SKELETON_BAR_CLASS,
+				'absolute left-[23px] top-[13px] z-10 h-[16px] w-[48%]'
+			)}
+		/>
+		<div
+			className={cn(
+				SKELETON_BAR_CLASS,
+				'absolute right-[17px] top-[31px] z-10 h-[10px] w-[96px]'
+			)}
+			style={{ animationDelay: '80ms' }}
+		/>
+
+		{RESEARCH_PANEL_SKELETON_ROWS.map((row, rowIndex) => (
+			<div
+				key={row.top}
+				className="absolute left-[23px] right-[17px] z-10 flex flex-col justify-center gap-[8px]"
+				style={{ top: `${row.top}px`, height: `${row.height}px` }}
+			>
+				{row.bars.map((barWidth, barIndex) => (
+					<div key={barWidth} className="flex items-center gap-[8px]">
+						{barIndex === 0 && row.iconSize != null && (
+							<div
+								className={cn(SKELETON_BAR_CLASS, 'shrink-0 rounded-full')}
+								style={{
+									width: `${row.iconSize}px`,
+									height: `${row.iconSize}px`,
+									animationDelay: `${(rowIndex + 2) * 80}ms`,
+								}}
+							/>
+						)}
+						<div
+							className={cn(SKELETON_BAR_CLASS, 'h-[12px]')}
+							style={{
+								width: barWidth,
+								animationDelay: `${(rowIndex + 2) * 80}ms`,
+							}}
+						/>
+					</div>
+				))}
+			</div>
+		))}
+
+		<div
+			className="absolute inset-x-0 bottom-0 z-10 overflow-hidden pl-[23px] pr-[17px] pt-[14px]"
+			style={{ top: `${RESEARCH_PANEL_METADATA_TOP}px` }}
+		>
+			<div className="flex flex-col gap-[10px]">
+				{['100%', '92%', '96%', '62%'].map((barWidth, lineIndex) => (
+					<div
+						key={barWidth}
+						className={cn(SKELETON_BAR_CLASS, 'h-[12px]')}
+						style={{
+							width: barWidth,
+							animationDelay: `${(lineIndex + 9) * 80}ms`,
+						}}
+					/>
+				))}
+			</div>
+		</div>
+	</div>
+);
+
 export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	contact,
 	variant = 'default',
@@ -926,6 +1062,18 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 
 	const panelWidth = width ?? RESEARCH_PANEL_DEFAULT_WIDTH;
 	const panelHeight = height ?? RESEARCH_PANEL_DEFAULT_HEIGHT;
+
+	if (!contact && !hideAllText) {
+		return (
+			<ContactResearchPanelSkeleton
+				width={panelWidth}
+				height={panelHeight}
+				className={className}
+				style={style}
+			/>
+		);
+	}
+
 	const fullName = `${contact?.firstName || ''} ${contact?.lastName || ''}`.trim();
 	const personalName = fullName || contact?.name?.trim() || '';
 	const companyName = contact?.company?.trim() || '';

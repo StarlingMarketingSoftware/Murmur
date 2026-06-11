@@ -4665,7 +4665,7 @@ const DashboardContent = () => {
 
 	// Free trial CTA for fromHome demo mode
 	const handleStartFreeTrial = useCallback(() => {
-		router.push(urls.freeTrial.index);
+		router.push(urls.home.startFreeTrial);
 	}, [router]);
 
 	const DASHBOARD_MAP_COMPACT_CLASS = 'murmur-dashboard-map-compact';

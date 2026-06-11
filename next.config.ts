@@ -17,6 +17,17 @@ const nextConfig: NextConfig = {
 	},
 	productionBrowserSourceMaps: false,
 	transpilePackages: ['gsap', 'lenis'],
+	// The standalone /free-trial page was removed in favor of the landing page's
+	// StartFreeTrialModal; keep old external links working.
+	async redirects() {
+		return [
+			{
+				source: '/free-trial',
+				destination: '/?trial=1',
+				permanent: false,
+			},
+		];
+	},
 	// Optimize for Vercel deployment
 	compiler: {
 		removeConsole: process.env.NODE_ENV === 'production',

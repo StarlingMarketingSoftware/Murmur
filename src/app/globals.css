@@ -4522,9 +4522,13 @@ body.murmur-page.murmur-map-view {
 	background: #afd6ef;
 }
 
-/* Move Clerk user button below the map view header */
+/* Map view: lift the settings/avatar icons into the free band above the
+   search-results campaign card (top ≈45 visual px), so they stay visible
+   instead of being covered by the right-side panel chrome. The interactive
+   reveal map canvas stacks at z-98, so the icons need z-99+ here. */
 body.murmur-page.murmur-map-view .clerk-user-button {
-	top: 44px;
+	top: 2px;
+	z-index: 99;
 }
 
 /* Also ensure the hero wrapper can contain the growing search bar */

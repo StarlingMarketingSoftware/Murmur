@@ -59,10 +59,11 @@ export const LandingHeroSearchBar = ({
 		event?.preventDefault();
 		setActiveSection(null);
 
-		// On mobile (below `md`) route to free-trial instead of the dashboard.
+		// On mobile (below `md`) route to the landing free-trial popup instead of
+		// the dashboard.
 		const isMobile = window.matchMedia('(max-width: 767px)').matches;
 		if (isMobile) {
-			router.push(urls.freeTrial.index);
+			router.push(urls.home.startFreeTrial);
 			return;
 		}
 

@@ -14,7 +14,7 @@ import {
 // Clerk redirects back to the landing page with this param after auth completes;
 // the param is consumed (popup re-opens at the checkout step) and immediately
 // stripped from the URL so a refresh lands on a clean landing page.
-const TRIAL_RETURN_URL = `${urls.home.index}?trial=1`;
+const TRIAL_RETURN_URL = urls.home.startFreeTrial;
 
 interface StartFreeTrialModalProps {
 	open: boolean;
@@ -71,14 +71,17 @@ export function StartFreeTrialModal({ open }: StartFreeTrialModalProps) {
 			return;
 		}
 
-		// Signed out: keep `auth` while the popup is open (it drives the
-		// sign-up ↔ sign-in toggle); strip `trial` so a refresh stays closed.
-		stripParams(isOpen);
+		// Signed out: `trial=1` also opens the popup (free-trial CTAs elsewhere
+		// navigate to `/?trial=1`). Keep `auth` while the popup is open (it drives
+		// the sign-up ↔ sign-in toggle); strip `trial` so a refresh stays closed.
+		const wantsTrial = searchParams.get('trial') === '1';
+		if (wantsTrial) setLatchedOpen(true);
+		stripParams(isOpen || wantsTrial);
 	}, [isLoaded, isSignedIn, searchParams, isOpen]);
 
-	// A signed-out /free-trial visit leaves `redirectAfterSignIn` behind; without
-	// this, RedirectAfterSignIn (sublayout.tsx) would yank a fresh sign-up away
-	// from the popup.
+	// Other pages set `redirectAfterSignIn` before kicking off auth (e.g. the
+	// dashboard's Edge/Safari sign-in fallback); without this, RedirectAfterSignIn
+	// (sublayout.tsx) would yank a fresh sign-up away from the popup.
 	useEffect(() => {
 		if (!isOpen || !isLoaded || isSignedIn) return;
 		sessionStorage.removeItem('redirectAfterSignIn');

@@ -4,6 +4,8 @@ export const urls = {
 	home: {
 		index: '/',
 		activeLanding: '/?activeLanding=1',
+		// Opens the landing page's StartFreeTrialModal (sign-up → checkout).
+		startFreeTrial: '/?trial=1',
 	},
 	about: {
 		index: '/about',
@@ -47,9 +49,6 @@ export const urls = {
 			index: '/pricing/free-trial',
 		},
 		detail: ((id) => `/pricing/${id}`) as DetailRoute,
-	},
-	freeTrial: {
-		index: '/free-trial',
 	},
 	signIn: {
 		index: '/sign-in',
@@ -139,9 +138,6 @@ export const urls = {
 			messages: ((id) => `/api/conversations/${id}/messages`) as DetailRoute,
 			read: ((id) => `/api/conversations/${id}/read`) as DetailRoute,
 		},
-		emailVerificationCodes: {
-			index: '/api/email-verification-codes',
-		},
 		identities: {
 			index: '/api/identities',
 			detail: ((id) => `/api/identities/${id}`) as DetailRoute,
@@ -187,6 +183,9 @@ export const urls = {
 				index: '/api/stripe/checkout',
 			},
 			portal: {
+				changePlan: {
+					index: '/api/stripe/portal/change-plan',
+				},
 				manageSubscription: {
 					index: '/api/stripe/portal/manage-subscription',
 				},

@@ -18,6 +18,8 @@ interface CustomScrollbarProps
 	contentClassName?: string;
 	/** When true, show a full-height thumb even if there is no overflow. */
 	alwaysShow?: boolean;
+	/** Fixed thumb height in px instead of the proportional height (capped to the container). */
+	thumbHeightOverride?: number;
 	/** When true, do not apply the Tailwind overflow-y-auto class to the inner container. */
 	disableOverflowClass?: boolean;
 	/**
@@ -43,6 +45,7 @@ export function CustomScrollbar({
 	offsetRight = -4,
 	contentClassName,
 	alwaysShow = false,
+	thumbHeightOverride,
 	disableOverflowClass = false,
 	alignTrackToScrollContainer = false,
 	onScroll,
@@ -87,14 +90,16 @@ export function CustomScrollbar({
 		}
 
 		// Calculate thumb height and position
-		const calculatedThumbHeight = Math.max(scrollRatio * clientHeight, 30);
+		const calculatedThumbHeight = thumbHeightOverride
+			? Math.min(thumbHeightOverride, clientHeight)
+			: Math.max(scrollRatio * clientHeight, 30);
 		const maxScrollTop = scrollHeight - clientHeight;
 		const thumbPosition =
 			(scrollTop / maxScrollTop) * (clientHeight - calculatedThumbHeight);
 
 		setThumbHeight(calculatedThumbHeight);
 		setThumbTop(thumbPosition);
-	}, [alwaysShow, alignTrackToScrollContainer]);
+	}, [alwaysShow, alignTrackToScrollContainer, thumbHeightOverride]);
 
 	const handleScroll = useCallback(() => {
 		updateScrollbar();

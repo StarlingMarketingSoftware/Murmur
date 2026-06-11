@@ -116,11 +116,9 @@ export const Navbar = () => {
 	const isLandingLikePage = isLanding || pathname === urls.venue.index;
 	const isPricingPage = pathname === urls.pricing.index || pathname.startsWith(`${urls.pricing.index}/`);
 	const isLandingNavbarZoom80 = isLandingLikePage;
-	const isFreeTrial =
-		pathname === urls.freeTrial.index || pathname.startsWith(`${urls.freeTrial.index}/`);
 	// Navbar is transparent only at the very top of the landing page (before any scroll)
 	const isLandingAtTop = isLandingLikePage && !scrolled;
-	const isTransparentHeader = isFreeTrial || isLandingAtTop;
+	const isTransparentHeader = isLandingAtTop;
 	// Hamburger/X icon color based on page and scroll position:
 	// - Landing page over video hero: white icon for visibility
 	// - Scrolled past hero or other pages (lighter background): dark icon
@@ -128,12 +126,6 @@ export const Navbar = () => {
 	const mobileMenuIconColor = isLandingOverVideo ? 'bg-white/90' : 'bg-gray-700';
 	// Mobile menu text should be white while over the hero video, dark when scrolled past it
 	const isMobileMenuTextLight = isLandingOverVideo;
-
-	// On `/free-trial` we show either the Clerk auth flow or embedded Stripe checkout;
-	// hide the header entirely in both cases so it doesn't distract or clip.
-	if (isFreeTrial) {
-		return null;
-	}
 
 	return (
 		<>
@@ -191,8 +183,7 @@ export const Navbar = () => {
 				<div className="w-full">
 					<div
 						className={cn(
-							'flex items-center justify-between h-12 px-5 sm:px-6 min-[1145px]:px-12',
-							isFreeTrial && 'pt-[4px]'
+							'flex items-center justify-between h-12 px-5 sm:px-6 min-[1145px]:px-12'
 						)}
 					>
 						{/* Left Section - UserButton on mobile when signed in, spacer otherwise */}
@@ -296,7 +287,7 @@ export const Navbar = () => {
 								) : (
 									<div className="flex items-center">
 										<Link
-											href={urls.freeTrial.index}
+											href={urls.home.startFreeTrial}
 											className="mr-6 flex items-center justify-center text-white text-[12px] font-medium tracking-[0.02em] transition-all duration-300 hover:opacity-90"
 											style={{
 												width: '219px',
@@ -445,12 +436,12 @@ export const Navbar = () => {
 				/>
 			</div>
 
-			{/* Spacer - skip on landing/free-trial; on pricing keep it on mobile but drop it on
+			{/* Spacer - skip on landing; on pricing keep it on mobile but drop it on
 			    desktop so the gradient goes full-bleed behind the navbar like the landing page */}
 			{isPricingPage ? (
 				<div className="h-12 lg:hidden" />
 			) : (
-				!(isLandingLikePage || isFreeTrial) && <div className="h-12" />
+				!isLandingLikePage && <div className="h-12" />
 			)}
 		</>
 	);

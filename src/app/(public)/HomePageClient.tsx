@@ -143,11 +143,11 @@ export default function HomePageClient({
 				)}
 				{showFreeTrialButton && (
 					<Link
-						href={urls.freeTrial.index}
+						href={urls.home.startFreeTrial}
 						onClick={(event) => {
 							event.preventDefault();
-							// Clear any stale post-sign-in redirect (e.g. from a previous
-							// /free-trial visit) so signing up stays on this page.
+							// Clear any stale post-sign-in redirect (e.g. from the dashboard's
+							// sign-in fallback) so signing up stays on this page.
 							sessionStorage.removeItem('redirectAfterSignIn');
 							setTrialClicked(true);
 						}}
