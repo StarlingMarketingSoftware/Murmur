@@ -117,6 +117,9 @@ export const useSendReply = (
 					sender: currentUserRole,
 					body,
 					isHtml: false,
+					applicationId: null,
+					bookingRequestId: null,
+					bookingRequest: null,
 					createdAt: new Date().toISOString(),
 				};
 				queryClient.setQueryData<MessagesPage>(key, {

@@ -33,6 +33,12 @@ export type MyApplicationVenueResponse = {
 	unreadCount: number; // venue messages newer than the artist's thread watermark
 };
 
+export type MyApplicationBooking = {
+	requestId: number;
+	status: 'pending' | 'confirmed';
+	date: string | null; // set when confirmed
+};
+
 export type MyEventApplication = {
 	id: number;
 	eventId: number;
@@ -45,6 +51,9 @@ export type MyEventApplication = {
 	// null if the event was deleted after the application was submitted.
 	event: MyApplicationEvent | null;
 	venueResponse: MyApplicationVenueResponse | null;
+	// Active booking-request handshake for this application (drives the Booked
+	// label on the artist's opportunity row; canceled requests don't surface).
+	booking: MyApplicationBooking | null;
 };
 
 export type MyEventApplicationsResponse = { applications: MyEventApplication[] };
@@ -123,6 +132,19 @@ export async function GET() {
 		const conversationIds = conversations.map((c) => c.id);
 		const applicationIds = applications.map((a) => a.id);
 
+		// Started before (and awaited after) the conversation lookups — it only
+		// needs applicationIds, so it rides the same roundtrip window.
+		const bookingRowsPromise = applicationIds.length
+			? prisma.bookingRequest.findMany({
+					where: {
+						threadApplicationId: { in: applicationIds },
+						status: { not: 'canceled' },
+					},
+					orderBy: { id: 'desc' },
+					select: { id: true, threadApplicationId: true, status: true, date: true },
+				})
+			: Promise.resolve([]);
+
 		const [venueThreadMessages, readStates, provenanceDiverts] = conversationIds.length
 			? await Promise.all([
 					prisma.message.findMany({
@@ -153,6 +175,16 @@ export async function GET() {
 					}),
 				])
 			: [[], [], []];
+		const bookingRows = await bookingRowsPromise;
+		const bookingByApp = new Map<number, (typeof bookingRows)[number]>();
+		for (const booking of bookingRows) {
+			if (
+				booking.threadApplicationId != null &&
+				!bookingByApp.has(booking.threadApplicationId)
+			) {
+				bookingByApp.set(booking.threadApplicationId, booking);
+			}
+		}
 		const readStateByApp = new Map(
 			readStates.map((s) => [s.applicationId, s.standardLastReadAt])
 		);
@@ -215,6 +247,16 @@ export async function GET() {
 									unreadCount: unreadByApp.get(application.id) ?? 0,
 								}
 							: null,
+					booking: (() => {
+						const booking = bookingByApp.get(application.id);
+						return booking
+							? {
+									requestId: booking.id,
+									status: booking.status as 'pending' | 'confirmed',
+									date: booking.date,
+								}
+							: null;
+					})(),
 				};
 			}),
 		});

@@ -15,6 +15,7 @@ import prisma from '@/lib/prisma';
 import { MessageSender } from '@prisma/client';
 import { convertHtmlToPlainText } from '@/utils';
 import type { InboundEmailWithRelations } from '@/types';
+import { loadBookingRequestMap } from './bookingRequests';
 
 /**
  * Project the venue-authored messages in a standard (artist) user's conversations
@@ -66,6 +67,14 @@ export const projectVenueRepliesForUser = async (
 			});
 		}
 	}
+
+	// Live booking-request state for projected request-delivery messages — the
+	// artist's inbox renders those rows as a confirm banner with CURRENT status.
+	const bookingRequestById = await loadBookingRequestMap(
+		venueMessages
+			.map((m) => m.bookingRequestId)
+			.filter((id): id is number => id != null)
+	);
 
 	// Event names for application-thread replies — shown as the row subject so the
 	// artist's inbox labels the chat with the opportunity it belongs to.
@@ -189,6 +198,10 @@ export const projectVenueRepliesForUser = async (
 			// Venue-authored messages carry their thread tag directly (only seeded
 			// summaries use applicationId, and those are standard-authored).
 			venueThreadApplicationId: message.threadApplicationId,
+			venueBookingRequest:
+				message.bookingRequestId != null
+					? (bookingRequestById.get(message.bookingRequestId) ?? null)
+					: null,
 		});
 	}
 

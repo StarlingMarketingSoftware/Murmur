@@ -529,6 +529,9 @@ model Message {
   // a specific EventApplication carry its id; null = the general/cold-outreach
   // thread (scalar, no FK). Seeded summaries carry both this and applicationId.
   threadApplicationId Int?
+  // Booking-request delivery: set on the Message that carries a BookingRequest so
+  // it rides the thread like any reply (scalar, no FK; additive column).
+  bookingRequestId Int?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -550,6 +553,42 @@ model ApplicationReadState {
   standardLastReadAt DateTime? // the applicant's watermark for this thread
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
+}
+
+enum BookingRequestStatus {
+  pending
+  confirmed
+  canceled
+}
+
+// A venue's "Request to book {artist}" handshake inside one conversation thread.
+// STRICTLY ADDITIVE: new model with scalar ids only (no FK relations), mirroring
+// the EventApplication / ApplicationReadState precedent. Participant ids are
+// denormalized at creation so cancel/confirm authorize without joins. The request
+// is delivered as an in-thread Message (Message.bookingRequestId) so previews,
+// unread counts, and the venue inbound projection work unchanged.
+model BookingRequest {
+  id                  Int                  @id @default(autoincrement())
+  conversationId      Int // Conversation.id (scalar, no FK)
+  threadApplicationId Int? // EventApplication.id; null = the general/cold-outreach thread (scalar, no FK)
+  eventId             Int? // Event.id, denormalized from the application at request time (scalar, no FK)
+  venueUserId         String // venue owner clerkId (== Venue.userId at request time)
+  standardUserId      String // artist clerkId (== Conversation.standardUserId)
+  venueId             Int // Venue.id (== Conversation.venueId)
+  status              BookingRequestStatus @default(pending)
+  // 'YYYY-MM-DD' local-date key, matching CalendarEntry.date; null until the artist
+  // confirms (the server never derives a calendar day from the event's UTC instant).
+  date                String?
+  requestedAt         DateTime             @default(now())
+  confirmedAt         DateTime?
+  canceledAt          DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([conversationId, threadApplicationId, status])
+  @@index([eventId, status])
+  @@index([standardUserId, status])
+  @@index([venueUserId, status])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -657,6 +696,7 @@ model CalendarEntry {
   drivingDuration String?
   campaignId      Int? // Campaign.id provenance from the inbox booking flow; intentionally no FK
   contactId       Int? // Contact.id provenance; intentionally no FK
+  bookingRequestId Int? // BookingRequest.id provenance for confirmed bookings; intentionally no FK
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

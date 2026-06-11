@@ -22,6 +22,12 @@ export type VenueApplicationConversation = {
 	lastMessageAt: string; // ISO
 };
 
+export type VenueApplicationBooking = {
+	requestId: number;
+	status: 'pending' | 'confirmed';
+	date: string | null; // set when confirmed
+};
+
 export type VenueApplicationRow = {
 	id: number; // EventApplication.id — payload for the openApplication message kind
 	eventId: number;
@@ -35,6 +41,9 @@ export type VenueApplicationRow = {
 	event: VenueApplicationEvent | null;
 	// null until the venue opens the thread (or the applicant messaged them first).
 	conversation: VenueApplicationConversation | null;
+	// Active booking-request handshake for this application's thread (canceled
+	// requests don't surface — the venue can simply re-request).
+	booking: VenueApplicationBooking | null;
 };
 
 export type VenueApplicationsResponse = { applications: VenueApplicationRow[] };
@@ -110,7 +119,7 @@ export async function GET() {
 		// with its own venue read watermark in ApplicationReadState — so preview,
 		// recency, and unread are computed per thread, not per conversation.
 		const applicationIds = applications.map((a) => a.id);
-		const [threadMessages, readStates] = await Promise.all([
+		const [threadMessages, readStates, bookingRows] = await Promise.all([
 			prisma.message.findMany({
 				where: {
 					OR: [
@@ -132,7 +141,24 @@ export async function GET() {
 				where: { applicationId: { in: applicationIds } },
 				select: { applicationId: true, venueLastReadAt: true },
 			}),
+			prisma.bookingRequest.findMany({
+				where: {
+					threadApplicationId: { in: applicationIds },
+					status: { not: 'canceled' },
+				},
+				orderBy: { id: 'desc' },
+				select: { id: true, threadApplicationId: true, status: true, date: true },
+			}),
 		]);
+		const bookingByApp = new Map<number, (typeof bookingRows)[number]>();
+		for (const booking of bookingRows) {
+			if (
+				booking.threadApplicationId != null &&
+				!bookingByApp.has(booking.threadApplicationId)
+			) {
+				bookingByApp.set(booking.threadApplicationId, booking);
+			}
+		}
 		const readStateByApp = new Map(
 			readStates.map((s) => [s.applicationId, s.venueLastReadAt])
 		);
@@ -160,6 +186,7 @@ export async function GET() {
 					'Unknown';
 				const conversation = conversationByApplicant.get(application.standardUserId);
 				const last = latestByApp.get(application.id);
+				const booking = bookingByApp.get(application.id);
 				return {
 					id: application.id,
 					eventId: application.eventId,
@@ -190,6 +217,13 @@ export async function GET() {
 								lastMessageAt: (
 									last?.createdAt ?? application.createdAt
 								).toISOString(),
+							}
+						: null,
+					booking: booking
+						? {
+								requestId: booking.id,
+								status: booking.status as 'pending' | 'confirmed',
+								date: booking.date,
 							}
 						: null,
 				};

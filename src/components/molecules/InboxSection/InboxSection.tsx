@@ -12,6 +12,7 @@ import { convertHtmlToPlainText } from '@/utils';
 import { useMe } from '@/hooks/useMe';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
+import { BookingRequestBanner } from '@/components/molecules/BookingRequestBanner/BookingRequestBanner';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import type { InboundEmailWithRelations } from '@/types';
 import type { ContactWithName } from '@/types/contact';
@@ -54,6 +55,7 @@ import {
 } from '@/components/molecules/InboxSection/InboxBookingCalendarDropdown';
 import {
 	findBookingForConversation,
+	useDeleteCalendarEntry,
 	useGetCalendarEntries,
 	useUpsertCalendarEntry,
 } from '@/hooks/queryHooks/useCalendarEntries';
@@ -877,6 +879,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	});
 	const calendarEntries = calendarEntriesData?.entries;
 	const upsertCalendarEntry = useUpsertCalendarEntry();
+	const deleteCalendarEntry = useDeleteCalendarEntry({ suppressToasts: true });
 	const bookedBannerRef = useRef<HTMLDivElement | null>(null);
 	const [bookedBannerNoAnswers, setBookedBannerNoAnswers] = useState<
 		Record<string, BookedBannerAnswer>
@@ -885,7 +888,15 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		conversationKey: string;
 		initialFocusDateIso: string | null;
 		autoExpand: boolean;
+		// 'confirm' = opened from a venue booking request; the dropdown grows a
+		// footer that routes the placed entry through the confirm endpoint.
+		mode: 'plain' | 'confirm';
+		bookingRequestId: number | null;
+		// Date the confirm-chip click provisionally placed (so closing without
+		// confirming can take it back); null when nothing was auto-placed.
+		provisionalDateIso: string | null;
 	} | null>(null);
+	const bookingRequestBannerRef = useRef<HTMLDivElement | null>(null);
 
 	const {
 		data: inboundEmailsFromApi,
@@ -1220,16 +1231,51 @@ export const InboxSection: FC<InboxSectionProps> = ({
 				) ?? null)
 			: null;
 
+	// Venue-ness of the THREAD, not just its newest inbound row — the general
+	// venue thread shares its conversation key with real email replies from the
+	// same contact, so one selected thread can mix both.
+	const selectedThreadHasVenueRows = selectedThreadMessages.some(
+		(message) => message.venueConversationId != null
+	);
+
 	const bookedBannerEligible =
 		shouldUseCampaignInboxDetailDesign &&
 		isCampaignInbox &&
 		activeTab === 'inbox' &&
 		!isUsingSampleData &&
 		selectedConversation != null &&
-		selectedConversation.inboundMessages.length > 0;
+		selectedConversation.inboundMessages.length > 0 &&
+		// Venue/opportunity threads use the booking-request handshake instead —
+		// the "Has this been booked?" banner is for outbound email contacts only.
+		!selectedThreadHasVenueRows;
+
+	// ----- Venue booking-request confirm flow -----
+	// The newest non-canceled request delivered in this thread (projected rows
+	// carry live state via venueBookingRequest).
+	const selectedActiveBookingRequestMessage = (() => {
+		for (let i = selectedThreadMessages.length - 1; i >= 0; i--) {
+			const request = selectedThreadMessages[i].venueBookingRequest;
+			if (request && request.status !== 'canceled') return selectedThreadMessages[i];
+		}
+		return null;
+	})();
+	const selectedPendingBookingRequest =
+		selectedActiveBookingRequestMessage?.venueBookingRequest?.status === 'pending'
+			? selectedActiveBookingRequestMessage.venueBookingRequest
+			: null;
+	// Deliberately NOT gated on the detail design: every campaign-inbox layout
+	// that renders the thread also renders the confirm chip, and the dropdown
+	// anchors to the section root, which exists in all of them.
+	const bookingConfirmEligible =
+		isCampaignInbox &&
+		activeTab === 'inbox' &&
+		!isUsingSampleData &&
+		selectedThreadHasVenueRows &&
+		selectedPendingBookingRequest != null;
 
 	const isBookingDropdownOpen =
-		bookedBannerEligible && bookingDropdown?.conversationKey === selectedConversation?.key;
+		(bookedBannerEligible || bookingConfirmEligible) &&
+		bookingDropdown?.conversationKey === selectedConversation?.key;
 	type BookedBannerState = 'hidden' | 'question' | 'yes-pending' | 'booked';
 	const bookedBannerState: BookedBannerState =
 		!bookedBannerEligible ||
@@ -1241,12 +1287,20 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					? 'yes-pending'
 					: 'question';
 
-	// Drop stale dropdown state when the selection moves to another conversation.
+	// Drop stale dropdown state when the selection moves to another conversation —
+	// taking back any confirm-mode provisional placement with it (idempotent
+	// DELETE, so a StrictMode double-run is harmless).
 	const selectedConversationKey = selectedConversation?.key ?? null;
+	const deleteCalendarEntryRef = useRef(deleteCalendarEntry.mutate);
+	deleteCalendarEntryRef.current = deleteCalendarEntry.mutate;
 	useEffect(() => {
-		setBookingDropdown((prev) =>
-			prev && prev.conversationKey !== selectedConversationKey ? null : prev
-		);
+		setBookingDropdown((prev) => {
+			if (!prev || prev.conversationKey === selectedConversationKey) return prev;
+			if (prev.mode === 'confirm' && prev.provisionalDateIso) {
+				deleteCalendarEntryRef.current({ date: prev.provisionalDateIso });
+			}
+			return null;
+		});
 	}, [selectedConversationKey]);
 
 	const bookingPrefillFields: BookingPrefillFields = {
@@ -1333,6 +1387,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 			conversationKey: selectedConversation.key,
 			initialFocusDateIso: detectedIso,
 			autoExpand: placed,
+			mode: 'plain',
+			bookingRequestId: null,
+			provisionalDateIso: null,
 		});
 	};
 
@@ -1348,6 +1405,75 @@ export const InboxSection: FC<InboxSectionProps> = ({
 			conversationKey: selectedConversation.key,
 			initialFocusDateIso: selectedConversationBooking.date,
 			autoExpand: true,
+			mode: 'plain',
+			bookingRequestId: null,
+			provisionalDateIso: null,
+		});
+	};
+
+	// Confirm a venue booking request: pre-place the event's date when it's known
+	// and free (same mechanics as handleBookedYes), then open the dropdown in
+	// confirm mode — its footer routes the placed entry through the confirm
+	// endpoint, which also writes the venue's calendar.
+	const handleConfirmBookingRequestClick = () => {
+		if (!selectedConversation || !isCampaignInbox || !selectedPendingBookingRequest) {
+			return;
+		}
+		// The chip stays visible while the dropdown is open (it's excluded from
+		// click-outside) — a re-click must not place a second provisional entry.
+		if (isBookingDropdownOpen && bookingDropdown?.mode === 'confirm') return;
+		// The event's calendar day: prefer the faithful display label ("June 15th
+		// 2026") over re-deriving from the UTC instant, which can shift a day.
+		let requestedIso: string | null = null;
+		if (selectedPendingBookingRequest.eventWhenLabel) {
+			const parsed = extractFirstMentionedDate(
+				selectedPendingBookingRequest.eventWhenLabel
+			);
+			if (parsed) requestedIso = toIsoKey(parsed);
+		}
+		if (!requestedIso && selectedPendingBookingRequest.eventStartsAt) {
+			const startsAt = new Date(selectedPendingBookingRequest.eventStartsAt);
+			if (!Number.isNaN(startsAt.getTime())) requestedIso = toIsoKey(startsAt);
+		}
+		const occupant = requestedIso
+			? (calendarEntries ?? []).find((entry) => entry.date === requestedIso)
+			: undefined;
+		let placed = false;
+		let provisionalDateIso: string | null = null;
+		if (requestedIso && !occupant) {
+			upsertCalendarEntry.mutate(buildPrefilledBookingInput(requestedIso));
+			placed = true;
+			provisionalDateIso = requestedIso;
+		} else if (
+			occupant &&
+			occupant.campaignId === campaignId &&
+			occupant.contactId === selectedConversationContactId
+		) {
+			placed = true;
+		}
+		setBookingDropdown({
+			conversationKey: selectedConversation.key,
+			initialFocusDateIso: requestedIso,
+			autoExpand: placed,
+			mode: 'confirm',
+			bookingRequestId: selectedPendingBookingRequest.id,
+			provisionalDateIso,
+		});
+	};
+
+	// Closing a confirm-mode dropdown WITHOUT confirming takes back the entry the
+	// chip click auto-placed (unlike the plain flow's "Yes", opening the confirm
+	// popup asserts nothing). Deliberate placements made inside the popup stay.
+	const closeBookingDropdown = (options?: { confirmed?: boolean }) => {
+		setBookingDropdown((previous) => {
+			if (
+				previous?.mode === 'confirm' &&
+				previous.provisionalDateIso &&
+				!options?.confirmed
+			) {
+				deleteCalendarEntry.mutate({ date: previous.provisionalDateIso });
+			}
+			return null;
 		});
 	};
 
@@ -2856,8 +2982,18 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					initialFocusDateIso={bookingDropdown.initialFocusDateIso}
 					autoExpandInitialDate={bookingDropdown.autoExpand}
 					anchorRef={rootRef}
-					bannerRef={bookedBannerRef}
-					onClose={() => setBookingDropdown(null)}
+					bannerRef={
+						bookingDropdown.mode === 'confirm' ? bookingRequestBannerRef : bookedBannerRef
+					}
+					confirmMode={
+						bookingDropdown.mode === 'confirm' && bookingDropdown.bookingRequestId != null
+							? {
+									bookingRequestId: bookingDropdown.bookingRequestId,
+									onConfirmed: () => closeBookingDropdown({ confirmed: true }),
+								}
+							: undefined
+					}
+					onClose={() => closeBookingDropdown()}
 				/>
 			)}
 			<CustomScrollbar
@@ -3423,6 +3559,53 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									lockHorizontalScroll
 								>
 									{selectedThreadMessages.map((message, index) => {
+										// Venue booking-request rows render as the handshake banner
+										// (confirm chip while pending, green strip once booked, muted
+										// trace when the venue withdrew it) instead of a bubble/card.
+										const venueBookingRequest = message.venueBookingRequest;
+										if (venueBookingRequest != null) {
+											const rowKey = `booking-${message.id}-${index}`;
+											if (venueBookingRequest.status === 'canceled') {
+												return (
+													<div
+														key={rowKey}
+														className="self-center py-[4px] text-center italic"
+														style={{
+															fontSize: '13px',
+															color: 'rgba(0, 0, 0, 0.4)',
+															flexShrink: 0,
+														}}
+													>
+														Booking request canceled
+													</div>
+												);
+											}
+											const isActiveRequestMessage =
+												selectedActiveBookingRequestMessage?.id === message.id;
+											return (
+												<BookingRequestBanner
+													key={rowKey}
+													status={venueBookingRequest.status}
+													perspective="artist"
+													date={venueBookingRequest.date}
+													bannerRef={
+														isActiveRequestMessage ? bookingRequestBannerRef : undefined
+													}
+													onConfirm={
+														isActiveRequestMessage &&
+														bookingConfirmEligible &&
+														venueBookingRequest.status === 'pending'
+															? handleConfirmBookingRequestClick
+															: undefined
+													}
+													className={
+														selectedThreadUsesMessengerLayout
+															? '-mx-[16px] w-auto shrink-0'
+															: 'shrink-0'
+													}
+												/>
+											);
+										}
 										const isSentMessage = Boolean(message.isSent);
 										const shouldFillThreadBox =
 											selectedThreadIsSingleInboundMessage && !isSentMessage;
@@ -3838,6 +4021,53 @@ export const InboxSection: FC<InboxSectionProps> = ({
 								>
 									{/* Email thread: inbound left, outbound right. */}
 									{selectedThreadMessages.map((message, index) => {
+										// Venue booking-request rows render as the handshake banner;
+										// the confirm chip wires up whenever the confirm flow is
+										// eligible (campaign inbox), independent of layout tier.
+										const venueBookingRequest = message.venueBookingRequest;
+										if (venueBookingRequest != null) {
+											const rowKey = `booking-${message.id}-${index}`;
+											if (venueBookingRequest.status === 'canceled') {
+												return (
+													<div
+														key={rowKey}
+														className="self-center py-[4px] text-center italic"
+														style={{
+															fontSize: '13px',
+															color: 'rgba(0, 0, 0, 0.4)',
+															flexShrink: 0,
+														}}
+													>
+														Booking request canceled
+													</div>
+												);
+											}
+											const isActiveRequestMessage =
+												selectedActiveBookingRequestMessage?.id === message.id;
+											return (
+												<BookingRequestBanner
+													key={rowKey}
+													status={venueBookingRequest.status}
+													perspective="artist"
+													date={venueBookingRequest.date}
+													bannerRef={
+														isActiveRequestMessage ? bookingRequestBannerRef : undefined
+													}
+													onConfirm={
+														isActiveRequestMessage &&
+														bookingConfirmEligible &&
+														venueBookingRequest.status === 'pending'
+															? handleConfirmBookingRequestClick
+															: undefined
+													}
+													className={
+														selectedThreadUsesMessengerLayout
+															? '-mx-[16px] w-auto shrink-0'
+															: 'shrink-0'
+													}
+												/>
+											);
+										}
 										const isSentMessage = Boolean(message.isSent);
 										const shouldUseCompactBubble =
 											isUsingSampleData || selectedThreadIsConversation;

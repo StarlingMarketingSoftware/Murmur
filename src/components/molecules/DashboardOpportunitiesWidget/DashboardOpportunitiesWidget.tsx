@@ -545,7 +545,7 @@ const buildMockOpportunityRow = (row: OpportunitiesMockRow, index: number): Oppo
 };
 
 // An opportunity the user actively applied to. Submissions surface as In Progress
-// (the application enum is only submitted/withdrawn — no booked/closed lifecycle yet).
+// until the venue's booking request is confirmed, which flips the row to Booked.
 const buildApplicationOpportunityRow = (application: MyEventApplication): OpportunityRow => {
 	const event = application.event;
 	const city = event?.venueCity?.trim() || '';
@@ -568,7 +568,12 @@ const buildApplicationOpportunityRow = (application: MyEventApplication): Opport
 	return {
 		source: 'application',
 		id: application.id,
-		status: application.status === 'submitted' ? 'in-progress' : 'closed',
+		status:
+			application.booking?.status === 'confirmed'
+				? 'booked'
+				: application.status === 'submitted'
+					? 'in-progress'
+					: 'closed',
 		contactLabel: event?.venueName?.trim() || 'Venue',
 		exchangeCount: response?.responseCount ?? 0,
 		folder: '',

@@ -12,7 +12,10 @@ import { formatInboxTimestamp } from '@/utils/datetime';
 import type { ConversationListItem } from '@/types';
 import { CardPill } from './VenueChatMapPanel';
 import { VENUE_MAP_LEFT_CLUSTER_SCALE } from './constants';
-import { formatVenueOpportunityDate } from './venueOpportunityFormat';
+import {
+	formatVenueOpportunityDate,
+	isVenueOpportunityLive,
+} from './venueOpportunityFormat';
 
 // One inbox item eligible for the notification card: a general (cold-outreach)
 // conversation or an application thread, normalized to the fields the card shows.
@@ -54,6 +57,10 @@ export function VenueNotificationsMapPanel({
 	onOpenEvent: (eventId: number) => void;
 }) {
 	const [collapsed, setCollapsed] = useState(false);
+
+	// The digest surfaces only live events; past ones stay reachable through the
+	// Events panel's above-the-fold history instead of lingering as notifications.
+	const liveOpportunities = opportunities.filter(isVenueOpportunityLive);
 
 	// Newest unread inbound message across both inbox sections (falling back to
 	// newest overall when everything is read). General conversations use the same
@@ -210,12 +217,12 @@ export function VenueNotificationsMapPanel({
 							Your Events
 						</div>
 						<div className="flex min-h-0 flex-col gap-[10px] overflow-y-auto">
-							{opportunities.length === 0 ? (
+							{liveOpportunities.length === 0 ? (
 								<div className="py-[12px] text-center font-inter text-[13px] text-black/40">
 									No events yet.
 								</div>
 							) : (
-								opportunities.map((event) => (
+								liveOpportunities.map((event) => (
 									<button
 										key={event.id}
 										type="button"

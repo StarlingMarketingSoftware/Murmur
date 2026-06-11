@@ -13,7 +13,8 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import type { Event as VenueEvent } from '@prisma/client';
+// Venue events carry confirmed-booking attribution from GET /api/venue/events.
+import type { VenueEventWithBooking as VenueEvent } from '@/app/api/venue/events/route';
 import { useAuth, UserButton, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { BadgeCheck, X } from 'lucide-react';
@@ -56,9 +57,12 @@ import { useMediaUpload, type UploadState } from '@/hooks/useMediaUpload';
 import { useGetUser } from '@/hooks/queryHooks/useUsers';
 import { useGetMedia, useDeleteMedia } from '@/hooks/queryHooks/useMediaAssets';
 import { useGetVenue, useUpsertVenue } from '@/hooks/queryHooks/useVenue';
+import { useQueryClient } from '@tanstack/react-query';
+import { CALENDAR_ENTRY_QUERY_KEYS } from '@/hooks/queryHooks/useCalendarEntries';
 import {
 	useDeleteVenueEvent,
 	useGetVenueEvents,
+	VENUE_EVENT_QUERY_KEYS,
 } from '@/hooks/queryHooks/useVenueEvents';
 import {
 	useGetConversations,
@@ -372,7 +376,10 @@ export const getOpenNightsCount = (hours: VenueHoursFormState) =>
 export const formatOpenNightsSummary = (count: number) =>
 	`${count} ${count === 1 ? 'night' : 'nights'}/week`;
 
-export const formatCapacity = (capacityMin: number | null, capacityMax: number | null) => {
+export const formatCapacity = (
+	capacityMin: number | null,
+	capacityMax: number | null
+) => {
 	if (capacityMin !== null && capacityMax !== null && capacityMin !== capacityMax) {
 		return `${capacityMin}-${capacityMax}`;
 	}
@@ -3320,8 +3327,14 @@ function VenueCalendarMapPanel() {
 			className="absolute left-0 top-[98px] origin-top-left"
 			style={{ transform: `scale(${VENUE_CALENDAR_SCALE})` }}
 		>
+			{/* mockState only anchors the month window (today-highlight stays real);
+			    persistEvents makes it live so confirmed artist bookings land here.
+			    popupScale: the event editor portals to body (fixed), so it must be
+			    handed the cluster × calendar scale to render at this view's size. */}
 			<DashboardCalendarPanel
 				mockState={{ year: now.getFullYear(), monthIndex: now.getMonth() }}
+				persistEvents
+				popupScale={VENUE_MAP_LEFT_CLUSTER_SCALE * VENUE_CALENDAR_SCALE}
 			/>
 		</div>
 	);
@@ -3372,32 +3385,48 @@ function VenueOpportunityDeleteButton({
 // Single event entry row, shared between the inline Events box (642px rows) and
 // the Events tool panel (748px rows) so the two lists stay visually identical.
 // Pill metrics (104/164/53 × 22, 6.866px radius, 0.858px stroke) come from Figma.
+// Expired rows keep an invisible stand-in for the Live pill so the applicant/date
+// pills hold identical x-positions; `camouflaged` swaps the fills to the Events
+// panel's band green by default (outlines and text stay) for rows hidden above
+// its fold.
 function VenueOpportunityRow({
 	opportunity,
 	applicantCount,
 	onOpen,
 	widthPx,
+	camouflaged = false,
+	camouflagedFillClassName = 'bg-[#BAE3B6]',
 }: {
 	opportunity: VenueEvent;
 	applicantCount: number;
 	onOpen: (eventId: number) => void;
 	widthPx: number;
+	camouflaged?: boolean;
+	camouflagedFillClassName?: string;
 }) {
+	const rowFillClassName = camouflaged ? camouflagedFillClassName : 'bg-[#F7FFF0]';
+	const applicantFillClassName = camouflaged ? camouflagedFillClassName : 'bg-[#F4EEC6]';
+	const dateFillClassName = camouflaged ? camouflagedFillClassName : 'bg-[#FF9797]';
+
 	return (
 		<button
 			type="button"
 			onClick={() => onOpen(opportunity.id)}
 			aria-label={`View ${opportunity.name}`}
-			className="flex h-[40px] shrink-0 items-center rounded-[12px] border-[2px] border-black bg-[#F7FFF0] px-[20px] font-inter text-black"
+			className={`flex h-[40px] shrink-0 items-center rounded-[12px] border-[2px] border-black px-[20px] font-inter text-black ${rowFillClassName}`}
 			style={{ width: `${widthPx}px` }}
 		>
 			<span className="min-w-0 flex-1 truncate text-left text-[16px] font-medium leading-none">
 				{opportunity.name}
 			</span>
-			<span className="ml-[16px] flex h-[22px] w-[104px] shrink-0 items-center justify-center rounded-[6.866px] border-[0.858px] border-black bg-[#F4EEC6] text-[12px] font-medium leading-none">
+			<span
+				className={`ml-[16px] flex h-[22px] w-[104px] shrink-0 items-center justify-center rounded-[6.866px] border-[0.858px] border-black text-[12px] font-medium leading-none ${applicantFillClassName}`}
+			>
 				{formatApplicantCount(applicantCount)}
 			</span>
-			<span className="ml-[48px] flex h-[22px] w-[164px] shrink-0 items-center justify-between rounded-[6.866px] border-[0.858px] border-black bg-[#FF9797] px-[10px] text-[12px] font-medium leading-none">
+			<span
+				className={`ml-[48px] flex h-[22px] w-[164px] shrink-0 items-center justify-between rounded-[6.866px] border-[0.858px] border-black px-[10px] text-[12px] font-medium leading-none ${dateFillClassName}`}
+			>
 				<span className="min-w-0 truncate">
 					{formatVenueOpportunityDate(opportunity.whenLabel, opportunity.startsAt)}
 				</span>
@@ -3405,11 +3434,28 @@ function VenueOpportunityRow({
 					{formatVenueOpportunityTimeRange(opportunity.startTime, opportunity.endTime)}
 				</span>
 			</span>
-			{isVenueOpportunityLive(opportunity) && (
-				<span className="ml-[48px] flex h-[22px] w-[53px] shrink-0 items-center justify-center gap-[4px] rounded-[6.866px] border-[0.858px] border-black bg-[#C5EDA0] text-[12px] font-medium leading-none">
-					<span aria-hidden="true" className="h-[7px] w-[7px] rounded-full bg-[#34A853]" />
+			{opportunity.booking ? (
+				// A confirmed booking outranks Live — the event is no longer seeking.
+				<span
+					title={`${opportunity.booking.artistName}${opportunity.booking.date ? ` — ${opportunity.booking.date}` : ''}`}
+					className="ml-[48px] flex h-[22px] w-[68px] shrink-0 items-center justify-center gap-[4px] rounded-[6.866px] border-[0.858px] border-black bg-[#B7FFC5] text-[12px] font-medium leading-none"
+				>
+					<span
+						aria-hidden="true"
+						className="h-[7px] w-[7px] rounded-full bg-[#34A853]"
+					/>
+					Booked
+				</span>
+			) : isVenueOpportunityLive(opportunity) ? (
+				<span className="ml-[48px] flex h-[22px] w-[68px] shrink-0 items-center justify-center gap-[4px] rounded-[6.866px] border-[0.858px] border-black bg-[#C5EDA0] text-[12px] font-medium leading-none">
+					<span
+						aria-hidden="true"
+						className="h-[7px] w-[7px] rounded-full bg-[#34A853]"
+					/>
 					Live
 				</span>
+			) : (
+				<span aria-hidden="true" className="ml-[48px] h-[22px] w-[68px] shrink-0" />
 			)}
 		</button>
 	);
@@ -3427,15 +3473,63 @@ function VenueOpportunitiesMapPanel({
 	onOpenOpportunity: (eventId: number) => void;
 }) {
 	// The hover-delete X sits just outside the box's right border, so it can't live
-	// inside the clipping overflow-y-auto list. The hovered row's measured offsetTop
+	// inside the clipped custom-scroll list. The hovered row's measured offsetTop
 	// (same coordinate space as the root's absolute children) + the list's scrollTop
 	// position one X on the unclipped panel root instead. The hover state persists
 	// while the cursor travels from row to X; the root's mouse-leave clears it.
 	const [hovered, setHovered] = useState<{ id: number; top: number } | null>(null);
 	const [listScrollTop, setListScrollTop] = useState(0);
+	const [hasVisibleListOverflow, setHasVisibleListOverflow] = useState(false);
 	const hoveredOpportunity = hovered
 		? (opportunities.find((opportunity) => opportunity.id === hovered.id) ?? null)
 		: null;
+	const pastOpportunities: VenueEvent[] = [];
+	const liveOpportunities: VenueEvent[] = [];
+	for (const opportunity of opportunities) {
+		(isVenueOpportunityLive(opportunity) ? liveOpportunities : pastOpportunities).push(
+			opportunity
+		);
+	}
+	const pastIdsKey = pastOpportunities.map((opportunity) => opportunity.id).join(',');
+	const listScrollerRef = useRef<HTMLDivElement | null>(null);
+	const pastSectionRef = useRef<HTMLDivElement | null>(null);
+	const seenPastIdsRef = useRef<Set<string> | null>(null);
+	// Match the full Events panel: expired rows sit above the fold and reveal only
+	// when the user scrolls up.
+	useLayoutEffect(() => {
+		const scroller = listScrollerRef.current;
+		if (!scroller) return;
+		const previous = seenPastIdsRef.current;
+		const nextIds = pastIdsKey === '' ? [] : pastIdsKey.split(',');
+		seenPastIdsRef.current = new Set(nextIds);
+		if (previous && nextIds.every((id) => previous.has(id))) return;
+		const pinToLiveRows = () => {
+			const nextScrollTop = pastSectionRef.current?.offsetHeight ?? 0;
+			scroller.scrollTop = nextScrollTop;
+			setListScrollTop(scroller.scrollTop);
+		};
+		pinToLiveRows();
+		const frame = window.requestAnimationFrame(pinToLiveRows);
+		return () => window.cancelAnimationFrame(frame);
+	}, [pastIdsKey]);
+	useLayoutEffect(() => {
+		const scroller = listScrollerRef.current;
+		if (!scroller) return;
+
+		const updateOverflow = () => {
+			const pastHeight = pastSectionRef.current?.offsetHeight ?? 0;
+			setHasVisibleListOverflow(
+				scroller.scrollHeight - pastHeight > scroller.clientHeight + 1
+			);
+		};
+		updateOverflow();
+		const resizeObserver = new ResizeObserver(updateOverflow);
+		resizeObserver.observe(scroller);
+		if (pastSectionRef.current) {
+			resizeObserver.observe(pastSectionRef.current);
+		}
+		return () => resizeObserver.disconnect();
+	}, [liveOpportunities.length, pastIdsKey]);
 	// Hide the X once the hovered row scrolls out of the box (rows start ~25px in;
 	// content ends at 413px in root-padding coordinates).
 	const deleteRowTop = hovered ? hovered.top - listScrollTop : 0;
@@ -3450,36 +3544,67 @@ function VenueOpportunitiesMapPanel({
 			<div className="mb-[6px] px-[4px] font-inter text-[12px] font-medium leading-none text-black">
 				Events
 			</div>
-			<div
-				className="flex min-h-0 flex-1 flex-col gap-[9px] overflow-y-auto"
+			<CustomScrollbar
+				scrollContainerRef={listScrollerRef}
+				className="min-h-0 flex-1"
+				contentClassName="flex flex-col"
+				thumbWidth={2}
+				thumbColor={hasVisibleListOverflow ? '#000000' : 'transparent'}
+				thumbHeightOverride={124}
+				offsetRight={-14}
+				lockHorizontalScroll
 				onScroll={(event) => setListScrollTop(event.currentTarget.scrollTop)}
 			>
-				{opportunities.map((opportunity) => (
-					<div
-						key={opportunity.id}
-						className="shrink-0"
-						onMouseEnter={(event) =>
-							setHovered({ id: opportunity.id, top: event.currentTarget.offsetTop })
-						}
-					>
-						<VenueOpportunityRow
-							opportunity={opportunity}
-							applicantCount={applicantCountByEventId.get(opportunity.id) ?? 0}
-							onOpen={onOpenOpportunity}
-							widthPx={642}
-						/>
+				{pastOpportunities.length > 0 && (
+					<div ref={pastSectionRef} className="flex shrink-0 flex-col gap-[9px] pb-[9px]">
+						{pastOpportunities.map((opportunity) => (
+							<div
+								key={opportunity.id}
+								className="shrink-0"
+								onMouseEnter={(event) =>
+									setHovered({ id: opportunity.id, top: event.currentTarget.offsetTop })
+								}
+							>
+								<VenueOpportunityRow
+									opportunity={opportunity}
+									applicantCount={applicantCountByEventId.get(opportunity.id) ?? 0}
+									onOpen={onOpenOpportunity}
+									widthPx={642}
+									camouflaged
+									camouflagedFillClassName="bg-transparent"
+								/>
+							</div>
+						))}
 					</div>
-				))}
-				{/* Opens the create-event panel (same panel as the toolbar's Add tool). */}
-				<button
-					type="button"
-					aria-label="Add opportunity"
-					onClick={onAddOpportunity}
-					className="flex h-[40px] w-[642px] shrink-0 cursor-pointer items-center justify-center rounded-[12px] border-[2px] border-black bg-[rgba(247,255,240,0.46)]"
-				>
-					<span className="text-[20px] font-medium leading-none text-black">+</span>
-				</button>
-			</div>
+				)}
+				<div className="flex min-h-full shrink-0 flex-col gap-[9px]">
+					{liveOpportunities.map((opportunity) => (
+						<div
+							key={opportunity.id}
+							className="shrink-0"
+							onMouseEnter={(event) =>
+								setHovered({ id: opportunity.id, top: event.currentTarget.offsetTop })
+							}
+						>
+							<VenueOpportunityRow
+								opportunity={opportunity}
+								applicantCount={applicantCountByEventId.get(opportunity.id) ?? 0}
+								onOpen={onOpenOpportunity}
+								widthPx={642}
+							/>
+						</div>
+					))}
+					{/* Opens the create-event panel (same panel as the toolbar's Add tool). */}
+					<button
+						type="button"
+						aria-label="Add opportunity"
+						onClick={onAddOpportunity}
+						className="flex h-[40px] w-[642px] shrink-0 cursor-pointer items-center justify-center rounded-[12px] border-[2px] border-black bg-[rgba(247,255,240,0.46)]"
+					>
+						<span className="text-[20px] font-medium leading-none text-black">+</span>
+					</button>
+				</div>
+			</CustomScrollbar>
 			{hoveredOpportunity && deleteRowTop >= 24 && deleteRowTop <= 373 && (
 				<div
 					className="absolute left-[659px] z-10 flex h-[40px] items-center"
@@ -3498,10 +3623,13 @@ function VenueOpportunitiesMapPanel({
 // Floating events panel for the toolbar's Events tab. Same chrome and footprint
 // as the chat panel; the body reuses the inline Events box's entry rows (widened
 // to 748px) on a light-green band, with a full-width divider after the last
-// entry and the add pill below it on the gradient. Clicking a row switches the
-// inner box to the event's detail view (applicant list); the selection lives in
-// the parent so the inline Events box can open this panel straight onto a
-// detail view, and resets when the tool is re-selected from the pills/tab bar.
+// entry and the add pill below it on the gradient. Expired events render
+// camouflaged in a band above the live rows, hidden past the list's pinned
+// scroll position until the user scrolls up (see the pin effect inside).
+// Clicking a row switches the inner box to the event's detail view (applicant
+// list); the selection lives in the parent so the inline Events box can open
+// this panel straight onto a detail view, and resets when the tool is
+// re-selected from the pills/tab bar.
 function VenueEventsMapPanel({
 	opportunities,
 	applicantCountByEventId,
@@ -3530,6 +3658,56 @@ function VenueEventsMapPanel({
 	// Derived so a deleted event falls back to the list instead of a dead detail view.
 	const selectedEvent =
 		opportunities.find((opportunity) => opportunity.id === selectedEventId) ?? null;
+	// Past/live partition is recomputed per render (not memoized) so it shares the
+	// same Date.now() frame as the rows' own Live-pill check.
+	const pastOpportunities: VenueEvent[] = [];
+	const liveOpportunities: VenueEvent[] = [];
+	for (const opportunity of opportunities) {
+		(isVenueOpportunityLive(opportunity) ? liveOpportunities : pastOpportunities).push(
+			opportunity
+		);
+	}
+	const pastIdsKey = pastOpportunities.map((opportunity) => opportunity.id).join(',');
+	const listScrollerRef = useRef<HTMLDivElement | null>(null);
+	const liveSectionRef = useRef<HTMLDivElement | null>(null);
+	const [isLedgerScrollbarVisible, setIsLedgerScrollbarVisible] = useState(false);
+	// Past ids the pin effect has already accounted for; null forces a re-pin (set
+	// while the detail view has the list scroller unmounted).
+	const seenPastIdsRef = useRef<Set<string> | null>(null);
+	const isListView = selectedEvent === null;
+	// Pin the initial scroll to the live section so the visible list renders exactly
+	// like a live-only list; expired rows sit above the fold and reveal only by
+	// scrolling up. Re-pins when the list scroller (re)mounts (the detail view swaps
+	// it out) or when a NEW past id appears (an event expiring mid-session), but not
+	// on removals — deleting past rows while inspecting them must not yank the view
+	// back down. Layout effect so the first paint is already pinned; the assignment
+	// fires onScroll, keeping listScrollTop in step for the delete-X math.
+	useLayoutEffect(() => {
+		if (!isListView) {
+			seenPastIdsRef.current = null;
+			return;
+		}
+		const scroller = listScrollerRef.current;
+		const liveSection = liveSectionRef.current;
+		if (!scroller || !liveSection) return;
+		const previous = seenPastIdsRef.current;
+		const nextIds = pastIdsKey === '' ? [] : pastIdsKey.split(',');
+		seenPastIdsRef.current = new Set(nextIds);
+		if (previous && nextIds.every((id) => previous.has(id))) return;
+		// offsetTop is scroller-relative and pre-transform, so it equals the past
+		// band's height whether or not the live content itself overflows the box.
+		scroller.scrollTop = liveSection.offsetTop;
+	}, [isListView, pastIdsKey]);
+	useLayoutEffect(() => {
+		if (!isListView) {
+			setIsLedgerScrollbarVisible(false);
+			return;
+		}
+		const scroller = listScrollerRef.current;
+		const liveSection = liveSectionRef.current;
+		if (!scroller || !liveSection) return;
+		setIsLedgerScrollbarVisible(liveSection.offsetHeight > scroller.clientHeight + 1);
+	}, [isListView, liveOpportunities.length]);
 	const hoveredOpportunity = hovered
 		? (opportunities.find((opportunity) => opportunity.id === hovered.id) ?? null)
 		: null;
@@ -3547,7 +3725,9 @@ function VenueEventsMapPanel({
 			</div>
 			{/* left-[6px] centers the 765px box in the outer's 777px content area
 			    (781 minus the 2px borders). */}
-			<div className="absolute left-[6px] top-[20px] h-[797px] w-[765px] overflow-hidden rounded-[12px] border-[2px] border-black">
+			<div
+				className={`absolute left-[6px] top-[20px] h-[797px] w-[765px] rounded-[12px] border-[2px] border-black ${selectedEvent ? 'overflow-hidden' : 'overflow-visible'}`}
+			>
 				{selectedEvent ? (
 					<VenueEventDetailView
 						events={opportunities}
@@ -3562,45 +3742,89 @@ function VenueEventsMapPanel({
 					<>
 						{/* Gradient carries the Figma layer's 0.9 opacity on its own background
 						    layer (not the box) so the rows above stay fully solid. */}
-						<div className="absolute inset-0 bg-[linear-gradient(180deg,#C1F7BB_0%,#60AE92_100%)] opacity-90" />
-						<div
-							className="absolute inset-0 flex flex-col overflow-y-auto"
+						<div className="absolute inset-0 rounded-[10px] bg-[linear-gradient(180deg,#C1F7BB_0%,#60AE92_100%)] opacity-90" />
+						<CustomScrollbar
+							scrollContainerRef={listScrollerRef}
+							className="absolute inset-0"
+							contentClassName="flex flex-col rounded-[10px]"
+							thumbWidth={2}
+							thumbHeightOverride={170}
+							offsetRight={-16}
+							hideThumb={!isLedgerScrollbarVisible}
+							lockHorizontalScroll
 							onScroll={(event) => setListScrollTop(event.currentTarget.scrollTop)}
 						>
-							<div className="flex shrink-0 flex-col items-center gap-[9px] bg-[#BAE3B6] py-[10px]">
-								{opportunities.map((opportunity) => (
-									<div
-										key={opportunity.id}
-										onMouseEnter={(event) =>
-											setHovered({
-												id: opportunity.id,
-												top: 22 + event.currentTarget.offsetTop,
-											})
-										}
-									>
-										<VenueOpportunityRow
-											opportunity={opportunity}
-											applicantCount={applicantCountByEventId.get(opportunity.id) ?? 0}
-											onOpen={onSelectEvent}
-											widthPx={748}
-										/>
-									</div>
-								))}
+							{/* Expired rows sit above the live section's fold (see the pin
+							    effect). No bottom padding — the live band's own pt-[10px] closes
+							    the band-colored seam. Statically positioned so row offsetTop
+							    stays scroller-relative for the delete-X math. */}
+							{pastOpportunities.length > 0 && (
+								<div className="flex shrink-0 flex-col items-center gap-[9px] bg-[#BAE3B6] pt-[10px]">
+									{pastOpportunities.map((opportunity) => (
+										<div
+											key={opportunity.id}
+											onMouseEnter={(event) =>
+												setHovered({
+													id: opportunity.id,
+													top: 22 + event.currentTarget.offsetTop,
+												})
+											}
+										>
+											<VenueOpportunityRow
+												opportunity={opportunity}
+												applicantCount={applicantCountByEventId.get(opportunity.id) ?? 0}
+												onOpen={onSelectEvent}
+												widthPx={748}
+												camouflaged
+											/>
+										</div>
+									))}
+								</div>
+							)}
+							{/* min-h-full pins max-scrollTop to the past band's height when the
+							    live content is short, making the pinned view exactly the
+							    live-only layout. shrink-0 is load-bearing: min-h-full replaces
+							    the flex min-height:auto floor, so without it overflowing live
+							    content would get squashed. Must stay statically positioned
+							    (delete-X offsetTop coordinate space). */}
+							<div ref={liveSectionRef} className="flex min-h-full shrink-0 flex-col">
+								<div className="flex shrink-0 flex-col items-center gap-[9px] bg-[#BAE3B6] py-[10px]">
+									{liveOpportunities.map((opportunity) => (
+										<div
+											key={opportunity.id}
+											onMouseEnter={(event) =>
+												setHovered({
+													id: opportunity.id,
+													top: 22 + event.currentTarget.offsetTop,
+												})
+											}
+										>
+											<VenueOpportunityRow
+												opportunity={opportunity}
+												applicantCount={applicantCountByEventId.get(opportunity.id) ?? 0}
+												onOpen={onSelectEvent}
+												widthPx={748}
+											/>
+										</div>
+									))}
+								</div>
+								<div className="h-[2px] shrink-0 bg-black" />
+								{/* Opens the create-event panel (same panel as the toolbar's Add tool). */}
+								<button
+									type="button"
+									aria-label="Add opportunity"
+									onClick={onAddOpportunity}
+									className="mt-[10px] flex h-[40px] w-[748px] shrink-0 cursor-pointer items-center justify-center gap-[8px] self-center rounded-[12px] border-[2px] border-black bg-[rgba(247,255,240,0.46)]"
+								>
+									<span className="text-[20px] font-medium leading-none text-black">
+										+
+									</span>
+									<span className="text-[16px] font-medium leading-none text-black">
+										add
+									</span>
+								</button>
 							</div>
-							<div className="h-[2px] shrink-0 bg-black" />
-							{/* Opens the create-event panel (same panel as the toolbar's Add tool). */}
-							<button
-								type="button"
-								aria-label="Add opportunity"
-								onClick={onAddOpportunity}
-								className="mt-[10px] flex h-[40px] w-[748px] shrink-0 cursor-pointer items-center justify-center gap-[8px] self-center rounded-[12px] border-[2px] border-black bg-[rgba(247,255,240,0.46)]"
-							>
-								<span className="text-[20px] font-medium leading-none text-black">+</span>
-								<span className="text-[16px] font-medium leading-none text-black">
-									add
-								</span>
-							</button>
-						</div>
+						</CustomScrollbar>
 					</>
 				)}
 			</div>
@@ -3609,7 +3833,7 @@ function VenueEventsMapPanel({
 				deleteRowTop >= 22 &&
 				deleteRowTop <= 775 && (
 					<div
-						className="absolute left-[775px] z-10 flex h-[40px] items-center"
+						className="absolute left-[788px] z-10 flex h-[40px] items-center"
 						style={{ top: `${deleteRowTop}px` }}
 					>
 						<VenueOpportunityDeleteButton
@@ -3826,6 +4050,36 @@ export default function VenuePortalClient() {
 	// counts partition the messages, so the sum never double-counts.
 	const { data: venueConversations } = useGetConversations({ enabled: true });
 	const { data: venueApplications } = useGetVenueApplications({ enabled: true });
+
+	// An artist confirming a booking happens on THEIR client — this side only
+	// learns through polling. The applications list (30s poll) carries per-thread
+	// booking status, so diff it and refresh the calendar + Booked-pill queries
+	// (neither polls on its own) the moment a new confirmation appears.
+	const bookingHeartbeatQueryClient = useQueryClient();
+	const seenConfirmedBookingAppsRef = useRef<Set<number> | null>(null);
+	useEffect(() => {
+		if (!venueApplications) return;
+		const confirmed = new Set(
+			venueApplications
+				.filter((application) => application.booking?.status === 'confirmed')
+				.map((application) => application.id)
+		);
+		const previous = seenConfirmedBookingAppsRef.current;
+		seenConfirmedBookingAppsRef.current = confirmed;
+		if (previous == null) return; // seed on first data — no flash refetch on load
+		let hasNewConfirmation = false;
+		confirmed.forEach((id) => {
+			if (!previous.has(id)) hasNewConfirmation = true;
+		});
+		if (hasNewConfirmation) {
+			bookingHeartbeatQueryClient.invalidateQueries({
+				queryKey: CALENDAR_ENTRY_QUERY_KEYS.all,
+			});
+			bookingHeartbeatQueryClient.invalidateQueries({
+				queryKey: VENUE_EVENT_QUERY_KEYS.all,
+			});
+		}
+	}, [venueApplications, bookingHeartbeatQueryClient]);
 	const venueUnread =
 		(venueConversations ?? []).reduce(
 			(sum, conversation) => sum + conversation.unreadCount,
@@ -3924,7 +4178,10 @@ export default function VenuePortalClient() {
 					/>
 				</div>
 			)}
-			{isMobile === false && view === 'map' && (
+			{/* Hidden while the docked chat is up: its newest-message card duplicates
+			    the thread already pinned to the corner, and the two would crowd the
+			    same right edge. */}
+			{isMobile === false && view === 'map' && (isMailToolSelected || !dockedThread) && (
 				<VenueNotificationsMapPanel
 					conversations={venueConversations}
 					applications={venueApplications}
@@ -3964,7 +4221,9 @@ export default function VenuePortalClient() {
 					key={`${dockedThread.conversationId}:${dockedThread.thread}`}
 					conversationId={dockedThread.conversationId}
 					thread={dockedThread.thread}
-					onExpand={() => openChatThread(dockedThread.conversationId, dockedThread.thread)}
+					onExpand={() =>
+						openChatThread(dockedThread.conversationId, dockedThread.thread)
+					}
 				/>
 			)}
 			{isMobile === false && view === 'map' && selectedVenueTool === 'profile' && (

@@ -96,6 +96,7 @@ export function MobileVenueChatThread({
 					thread={thread}
 					variant="venueMap"
 					hideHeader
+					enableBookingRequest
 					className="min-h-0 flex-1 bg-transparent"
 				/>
 			</div>

@@ -1,14 +1,25 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/utils/ui';
+import { CalendarPlusIcon } from '@/components/atoms/_svg/CalendarPlusIcon';
+import { BookingRequestBanner } from '@/components/molecules/BookingRequestBanner/BookingRequestBanner';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import {
+	useCancelBookingRequest,
+	useCreateBookingRequest,
+} from '@/hooks/queryHooks/useBookingRequests';
+import { CALENDAR_ENTRY_QUERY_KEYS } from '@/hooks/queryHooks/useCalendarEntries';
 import {
 	useGetMessages,
 	useMarkConversationRead,
 	useSendReply,
 	type ConversationThreadFilter,
 } from '@/hooks/queryHooks/useConversations';
+import { VENUE_APPLICATION_QUERY_KEYS } from '@/hooks/queryHooks/useVenueApplications';
+import { VENUE_EVENT_QUERY_KEYS } from '@/hooks/queryHooks/useVenueEvents';
 import type { ConversationCounterpart } from '@/types';
 import { MessageBubble, type ConversationThreadVariant } from './MessageBubble';
 
@@ -23,6 +34,16 @@ interface ConversationThreadProps {
 	// Skip the counterpart header — for hosts (e.g. the mobile venue thread
 	// screen) that render their own richer header above the thread.
 	hideHeader?: boolean;
+	// Rendered in place of the seeded application-summary message's bubble (the
+	// one carrying applicationId) — venue surfaces show it as a structured card.
+	applicationCard?: ReactNode;
+	// Pinned between the message scroll area and the input row (e.g. the venue
+	// docked chat's request-to-book pill).
+	aboveInput?: ReactNode;
+	// Venue hosts opt in to the booking-request handshake: the "Request to book"
+	// button (once the venue has messaged and no request is active) plus the
+	// in-thread request/booked banner.
+	enableBookingRequest?: boolean;
 	className?: string;
 }
 
@@ -88,11 +109,17 @@ export function ConversationThread({
 	onBack,
 	variant = 'default',
 	hideHeader = false,
+	applicationCard,
+	aboveInput,
+	enableBookingRequest = false,
 	className,
 }: ConversationThreadProps) {
 	const { data, isLoading } = useGetMessages(conversationId, { thread });
 	const sendReply = useSendReply(conversationId, data?.currentUserRole, {}, thread);
 	const markRead = useMarkConversationRead();
+	const createBookingRequest = useCreateBookingRequest(conversationId, thread);
+	const cancelBookingRequest = useCancelBookingRequest(conversationId, thread);
+	const queryClient = useQueryClient();
 	const [draft, setDraft] = useState('');
 	const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -100,8 +127,52 @@ export function ConversationThread({
 		() => data?.counterpart.name?.trim()[0]?.toUpperCase() || '?',
 		[data?.counterpart.name]
 	);
+	const counterpartFirstName =
+		data?.counterpart.name?.trim().split(/\s+/)[0] ?? '';
 
 	const messageCount = data?.items.length ?? 0;
+
+	// Page-level active request (server keeps it non-canceled) — drives the
+	// button↔banner swap even when the delivering message paginated out.
+	const activeBookingRequest =
+		enableBookingRequest &&
+		data?.bookingRequest &&
+		data.bookingRequest.status !== 'canceled'
+			? data.bookingRequest
+			: null;
+	const showRequestButton =
+		enableBookingRequest &&
+		data?.currentUserRole === 'venue' &&
+		data.venueHasMessaged &&
+		activeBookingRequest == null &&
+		counterpartFirstName !== '';
+
+	// The artist confirms on their own schedule (the 10s poll delivers it) — when
+	// the active request flips pending→confirmed, refresh the venue's calendar and
+	// Booked labels without waiting for a remount. Scoped to the REQUEST id, not
+	// just the status: hosts that swap threads in place (the Chat tool re-renders
+	// one instance with new props) must not read one thread's 'pending' against
+	// another thread's 'confirmed' as a flip.
+	const activeBookingStatus = activeBookingRequest?.status ?? null;
+	const activeBookingId = activeBookingRequest?.id ?? null;
+	const previousBookingRef = useRef<{
+		id: number | null;
+		status: typeof activeBookingStatus;
+	}>({ id: null, status: null });
+	useEffect(() => {
+		const previous = previousBookingRef.current;
+		previousBookingRef.current = { id: activeBookingId, status: activeBookingStatus };
+		if (!enableBookingRequest) return;
+		if (
+			previous.status === 'pending' &&
+			activeBookingStatus === 'confirmed' &&
+			previous.id === activeBookingId
+		) {
+			queryClient.invalidateQueries({ queryKey: CALENDAR_ENTRY_QUERY_KEYS.all });
+			queryClient.invalidateQueries({ queryKey: VENUE_EVENT_QUERY_KEYS.all });
+			queryClient.invalidateQueries({ queryKey: VENUE_APPLICATION_QUERY_KEYS.all });
+		}
+	}, [activeBookingId, activeBookingStatus, enableBookingRequest, queryClient]);
 
 	// Id of the newest message authored by the OTHER side. Drives mark-read so we
 	// don't re-POST on our own (optimistic) sends or on every 10s poll tick.
@@ -188,18 +259,89 @@ export function ConversationThread({
 							No messages yet.
 						</div>
 					)}
-					{data?.items.map((message) => (
-						<MessageBubble
-							key={message.id}
-							message={message}
-							currentUserRole={data.currentUserRole}
-							counterpartInitial={counterpartInitial}
-							variant={variant}
-						/>
-					))}
+					{data?.items.map((message) =>
+						applicationCard != null && message.applicationId != null ? (
+							<Fragment key={message.id}>{applicationCard}</Fragment>
+						) : message.bookingRequest != null ? (
+							message.bookingRequest.status === 'canceled' ? (
+								// The venue withdrew it; their thread shows nothing (the button
+								// returning is the affordance), the other side keeps a muted trace.
+								data.currentUserRole === 'venue' ? null : (
+									<div
+										key={message.id}
+										className="self-center py-[2px] font-inter text-[12px] italic text-black/40"
+									>
+										Booking request canceled
+									</div>
+								)
+							) : (
+								<BookingRequestBanner
+									key={message.id}
+									status={message.bookingRequest.status}
+									perspective={data.currentUserRole === 'venue' ? 'venue' : 'artist'}
+									counterpartFirstName={counterpartFirstName}
+									date={message.bookingRequest.date}
+									pending={message.id < 0}
+									onCancel={
+										data.currentUserRole === 'venue' &&
+										message.bookingRequest.status === 'pending' &&
+										message.bookingRequest.id > 0
+											? () => cancelBookingRequest.mutate(message.bookingRequest!.id)
+											: undefined
+									}
+									className="-mx-[14px] w-auto"
+								/>
+							)
+						) : (
+							<MessageBubble
+								key={message.id}
+								message={message}
+								currentUserRole={data.currentUserRole}
+								counterpartInitial={counterpartInitial}
+								variant={variant}
+							/>
+						)
+					)}
+					{/* Fallback: the active request's delivery message can paginate out of
+					    the loaded page — the page-level state still renders the banner so
+					    the venue keeps its status (and the cancel affordance). */}
+					{activeBookingRequest != null &&
+						activeBookingRequest.status !== 'canceled' &&
+						!(data?.items ?? []).some(
+							(message) => message.bookingRequest?.id === activeBookingRequest.id
+						) && (
+							<BookingRequestBanner
+								status={activeBookingRequest.status}
+								perspective={data?.currentUserRole === 'venue' ? 'venue' : 'artist'}
+								counterpartFirstName={counterpartFirstName}
+								date={activeBookingRequest.date}
+								onCancel={
+									data?.currentUserRole === 'venue' &&
+									activeBookingRequest.status === 'pending' &&
+									activeBookingRequest.id > 0
+										? () => cancelBookingRequest.mutate(activeBookingRequest.id)
+										: undefined
+								}
+								className="-mx-[14px] w-auto"
+							/>
+						)}
 					<div ref={bottomRef} />
 				</div>
 			</CustomScrollbar>
+			{showRequestButton && (
+				<div className="flex justify-end px-[12px] pt-[10px]">
+					<button
+						type="button"
+						onClick={() => createBookingRequest.mutate()}
+						disabled={createBookingRequest.isPending}
+						className="flex h-[34px] items-center gap-[8px] rounded-[12px] border-2 border-black bg-[#F8FAFF] px-[14px] font-inter text-[16px] font-bold text-[#75808A] transition hover:brightness-95 disabled:opacity-60"
+					>
+						<CalendarPlusIcon className="h-[18px] w-[18px] shrink-0" />
+						Request to book {counterpartFirstName}
+					</button>
+				</div>
+			)}
+			{aboveInput}
 			{variant === 'venueMap' ? (
 				<div className="px-[12px] py-[10px]">
 					<div className="flex items-center gap-[8px] rounded-full border border-black bg-white py-[4px] pl-[16px] pr-[5px]">

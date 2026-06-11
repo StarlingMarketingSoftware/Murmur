@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ConversationThread } from '@/components/organisms/ConversationsPane';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { type ConversationThreadFilter } from '@/hooks/queryHooks/useConversations';
 import { type VenueApplicationRow } from '@/hooks/queryHooks/useVenueApplications';
 import { formatEventCountdown, formatInboxTimestamp } from '@/utils/datetime';
@@ -122,7 +123,8 @@ export function CardPill({ icon, label }: { icon?: ReactNode; label: string }) {
 
 // Compact conversation card for the left rail of the open-thread view: avatar +
 // name + time, genre/location pills, preview. Every card carries the 1px black
-// border at 9px radius; only the selected one fills white.
+// border at 9px radius; cards fill white, except the selected one which goes
+// transparent so the darker panel gradient shows through.
 function ThreadListCard({
 	name,
 	timestamp,
@@ -151,7 +153,7 @@ function ThreadListCard({
 			onClick={onClick}
 			disabled={pending}
 			className={`mx-auto flex h-[85px] w-[266px] shrink-0 flex-col justify-between rounded-[9px] border border-black px-[10px] py-[7px] text-left ${
-				selected ? 'bg-white' : 'bg-transparent hover:bg-white/40'
+				selected ? 'bg-transparent' : 'bg-white hover:bg-white/40'
 			} ${pending ? 'cursor-wait opacity-60' : 'cursor-pointer'}`}
 		>
 			<span className="flex w-full items-center gap-[8px]">
@@ -283,7 +285,11 @@ export function VenueChatMapPanel({
 			<div className="absolute left-[12px] top-[4px] font-inter text-[12.358px] font-medium leading-[16.477px] text-black">
 				Chat
 			</div>
-			<div className="absolute left-[8px] top-[20px] h-[797px] w-[765px] overflow-hidden rounded-[8px] border-[2px] border-black">
+			<div
+				className={`absolute left-[8px] top-[20px] h-[797px] w-[765px] rounded-[8px] border-[2px] border-black ${
+					selectedThread == null ? 'overflow-visible' : 'overflow-hidden'
+				}`}
+			>
 				<div className="absolute inset-x-0 top-0 h-[30px] overflow-hidden">
 					<div className="absolute inset-x-0 top-[-16px] h-[120px] bg-[linear-gradient(180deg,#C1F7BB_0%,#60AE92_100%)]" />
 				</div>
@@ -374,19 +380,27 @@ export function VenueChatMapPanel({
 								conversationId={selectedThread.conversationId}
 								thread={selectedThread.thread}
 								variant="venueMap"
+								enableBookingRequest
 								className="h-full bg-transparent"
 							/>
 						</div>
 					</div>
 				) : (
-					<div className="absolute inset-x-0 bottom-0 top-[32px] flex flex-col">
+					<CustomScrollbar
+						className="absolute inset-x-0 bottom-0 top-[32px]"
+						contentClassName="flex min-h-full flex-col"
+						thumbWidth={2}
+						thumbHeightOverride={170}
+						offsetRight={-16}
+						lockHorizontalScroll
+					>
 						{/* ── Replies: applications to my events ── */}
 						<div
 							className={`shrink-0 bg-[linear-gradient(180deg,#D1CEFF_0%,#BCE2FF_50%,#FFF_100%)] ${
-								activeSection === 'replies' ? 'h-[380px]' : 'h-[190px]'
+								activeSection === 'replies' ? 'min-h-[380px]' : 'min-h-[190px]'
 							}`}
 						>
-							<div className="flex h-full flex-col gap-[16px] overflow-y-auto py-[16px]">
+							<div className="flex flex-col gap-[16px] py-[16px]">
 								{repliesLoading && <SectionNotice>Loading…</SectionNotice>}
 								{!repliesLoading && replyGroups.length === 0 && (
 									<SectionNotice>No applications yet.</SectionNotice>
@@ -419,8 +433,8 @@ export function VenueChatMapPanel({
 							Inbound
 						</button>
 						{/* ── Inbound: cold campaign conversations ── */}
-						<div className="min-h-0 flex-1 bg-[#BBD4F7]">
-							<div className="flex h-full flex-col gap-[16px] overflow-y-auto pb-[16px]">
+						<div className="flex flex-1 flex-col bg-[#BBD4F7]">
+							<div className="flex flex-col gap-[16px] pb-[16px]">
 								{conversationsLoading && <SectionNotice>Loading…</SectionNotice>}
 								{!conversationsLoading && inboundConversations.length === 0 && (
 									<SectionNotice>No inbound messages yet.</SectionNotice>
@@ -434,7 +448,7 @@ export function VenueChatMapPanel({
 								))}
 							</div>
 						</div>
-					</div>
+					</CustomScrollbar>
 				)}
 			</div>
 		</div>

@@ -36,6 +36,7 @@ import {
 	toIsoKey,
 	weekdayLabel,
 } from '@/components/molecules/DashboardCalendarPanel/calendarShared';
+import { useConfirmBookingRequest } from '@/hooks/queryHooks/useBookingRequests';
 import {
 	findBookingForConversation,
 	useDeleteCalendarEntry,
@@ -71,6 +72,13 @@ type InboxBookingCalendarDropdownProps = {
 	anchorRef: RefObject<HTMLDivElement | null>;
 	/** Excluded from click-outside — the banner toggles the dropdown itself. */
 	bannerRef: RefObject<HTMLDivElement | null>;
+	/**
+	 * Booking-request confirm mode: everything works as usual (the artist places/
+	 * edits their provisional entry), plus a footer "Confirm booking" bar that
+	 * sends the placed entry through the booking-confirm endpoint (which also
+	 * writes the venue's calendar) instead of leaving a bare calendar entry.
+	 */
+	confirmMode?: { bookingRequestId: number; onConfirmed: () => void };
 	onClose: () => void;
 };
 
@@ -108,6 +116,9 @@ const MONTH_WINDOW_RADIUS = 6;
 const SMOOTH_SCROLL_LERP = 0.14;
 const WHEEL_SCROLL_MULTIPLIER = 1.12;
 const WHEEL_SNAP_DELAY_MS = 150;
+// Cumulative wheel |deltaY| required to dismiss an open event popup — smaller
+// (trackpad-inertia) nudges are swallowed so they can't kill the popup mid-edit.
+const POPUP_WHEEL_DISMISS_THRESHOLD_PX = 36;
 // Dashboard event-popup dimensions (DashboardCalendarPanel POPUP_*_PX).
 const POPUP_WIDTH_PX = 295;
 const POPUP_HEIGHT_PX = 361;
@@ -188,6 +199,7 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 	autoExpandInitialDate,
 	anchorRef,
 	bannerRef,
+	confirmMode,
 	onClose,
 }) => {
 	const panelRef = useRef<HTMLDivElement | null>(null);
@@ -451,6 +463,26 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 		autosaveTimerRef.current = setTimeout(() => flushAutosaveRef.current(), 600);
 	};
 
+	// Confirm-mode footer action: commit in-flight edits, then send the placed
+	// entry's final field set through the booking-confirm endpoint. Pending draft
+	// values are merged in directly — flushAutosave's PATCH round-trip may not
+	// have landed in the cache yet.
+	const confirmBooking = useConfirmBookingRequest();
+	const handleConfirmBooking = () => {
+		const entry = conversationEntryRef.current;
+		if (!entry || !confirmMode || confirmBooking.isPending) return;
+		const pendingDraft =
+			activeEntryRef.current?.date === entry.date ? pendingAutosaveRef.current : null;
+		flushAutosave();
+		confirmBooking.mutate(
+			{
+				requestId: confirmMode.bookingRequestId,
+				data: { ...entryToUpsertInput(entry), ...(pendingDraft ?? {}) },
+			},
+			{ onSuccess: confirmMode.onConfirmed }
+		);
+	};
+
 	useEffect(() => {
 		return () => {
 			flushAutosaveRef.current();
@@ -512,6 +544,8 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 	activeTimeDropdownFieldRef.current = activeTimeDropdownField;
 	const activePopupRef = useRef(activePopup);
 	activePopupRef.current = activePopup;
+	// Cumulative wheel delta while the popup is open; reset on every popup open.
+	const popupWheelAccumRef = useRef(0);
 	useEffect(() => {
 		const handleMouseDown = (event: MouseEvent) => {
 			const target = event.target as Node;
@@ -526,6 +560,9 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 				return;
 			}
 			if (activePopupRef.current) {
+				// Flush synchronously BEFORE the close — the debounced autosave reads
+				// activeEntryRef, which nulls on the render after the popup closes.
+				flushAutosaveRef.current();
 				setActivePopup(null);
 				return;
 			}
@@ -602,8 +639,16 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 			event.stopPropagation();
 
 			// The popup anchors to a cell that is about to move — dismiss it, like
-			// the dashboard's scroll-dismiss behavior.
+			// the dashboard's scroll-dismiss behavior. Small (inertia) deltas are
+			// swallowed entirely — no scroll, no snap re-arm — so an accidental
+			// nudge can't kill the popup mid-edit; the flush commits pending edits
+			// and must run BEFORE the close (activeEntryRef nulls next render).
+			// deltaMode 1 = line-based wheels (Firefox), ~3/tick.
 			if (activePopupRef.current) {
+				popupWheelAccumRef.current +=
+					Math.abs(event.deltaY) * (event.deltaMode === 1 ? 16 : 1);
+				if (popupWheelAccumRef.current < POPUP_WHEEL_DISMISS_THRESHOLD_PX) return;
+				flushAutosaveRef.current();
 				setActivePopup(null);
 				setActiveTimeDropdownField(null);
 			}
@@ -668,6 +713,21 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 	const openPopupForCell = (cellEl: HTMLElement, dateIso: string) => {
 		const panel = panelRef.current;
 		if (!panel) return;
+		// Abandon any in-flight scroll settle (like the dashboard's openEventPopup):
+		// with small wheel deltas swallowed while the popup is open, a pending snap
+		// would otherwise move the grid under the popup's frozen panel-local coords.
+		if (smoothScrollRafRef.current != null) {
+			cancelAnimationFrame(smoothScrollRafRef.current);
+			smoothScrollRafRef.current = null;
+		}
+		if (wheelSnapTimeoutRef.current != null) {
+			clearTimeout(wheelSnapTimeoutRef.current);
+			wheelSnapTimeoutRef.current = null;
+		}
+		if (scrollContainerRef.current) {
+			smoothScrollTargetRef.current = scrollContainerRef.current.scrollTop;
+		}
+		popupWheelAccumRef.current = 0;
 		const panelRect = panel.getBoundingClientRect();
 		const cellRect = cellEl.getBoundingClientRect();
 		// Both rects share every ancestor transform (campaign zoom/scale), so the
@@ -698,6 +758,9 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 		const iso = toIsoKey(date);
 		const cellEl = event.currentTarget;
 		const occupant = entriesByDate.get(iso);
+		// Commit any pending popup edits up front — every branch below closes,
+		// switches, or moves the popup, after which the debounced autosave no-ops.
+		flushAutosave();
 		if (occupant && !isConversationEntry(occupant)) return; // one booking per day
 		if (occupant) {
 			if (activePopup?.dateIso === iso) {
@@ -708,7 +771,6 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 			}
 			return;
 		}
-		flushAutosave();
 		const sourceEntry = conversationEntryRef.current;
 		const oldDate = lastOwnDateRef.current ?? sourceEntry?.date ?? null;
 		if (sourceEntry) {
@@ -957,6 +1019,22 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 		);
 	};
 
+	// Enter in a popup text field commits + closes the editor (the booked cell
+	// stays as confirmation). Attached per-input (never on the dialog) so the
+	// location box's own geocode-on-Enter keeps working. Flush runs synchronously
+	// BEFORE the close — activeEntryRef nulls on the render after the popup closes.
+	const handlePopupInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+		if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+		event.preventDefault();
+		// Mirror the Escape layering: an open time dropdown closes first.
+		if (activeTimeDropdownField) {
+			setActiveTimeDropdownField(null);
+			return;
+		}
+		flushAutosave();
+		setActivePopup(null);
+	};
+
 	const handleDeleteBooking = () => {
 		const entry = activeEntryRef.current;
 		if (!entry) return;
@@ -1022,6 +1100,7 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 						onChange={(event) =>
 							scheduleAutosave({ ...draft, personName: event.target.value })
 						}
+						onKeyDown={handlePopupInputKeyDown}
 						style={{
 							...popupInputBaseStyle,
 							...popupTextStyle,
@@ -1039,6 +1118,7 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 						onChange={(event) =>
 							scheduleAutosave({ ...draft, company: event.target.value })
 						}
+						onKeyDown={handlePopupInputKeyDown}
 						style={{
 							...popupInputBaseStyle,
 							...popupTextStyle,
@@ -1167,6 +1247,7 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 						onChange={(event) =>
 							scheduleAutosave({ ...draft, notes: event.target.value })
 						}
+						onKeyDown={handlePopupInputKeyDown}
 						style={{
 							...popupInputBaseStyle,
 							...popupTextStyle,
@@ -1420,7 +1501,7 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 			ref={panelRef}
 			data-campaign-interactive-surface
 			role="dialog"
-			aria-label="Add booking to calendar"
+			aria-label={confirmMode ? 'Confirm booking' : 'Add booking to calendar'}
 			style={{
 				position: 'fixed',
 				top: `${portalPosition.top}px`,
@@ -1453,7 +1534,7 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 					color: '#000000',
 				}}
 			>
-				Add booking to calendar
+				{confirmMode ? 'Confirm booking' : 'Add booking to calendar'}
 			</div>
 			<div
 				style={{
@@ -1533,6 +1614,31 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 					)}
 				</div>
 			</div>
+			{confirmMode && (
+				<button
+					type="button"
+					onClick={handleConfirmBooking}
+					disabled={!conversationEntry || confirmBooking.isPending}
+					style={{
+						width: '100%',
+						height: '30px',
+						marginTop: '10px',
+						borderRadius: '8px',
+						border: '2px solid #000000',
+						background: '#B7FFC5',
+						fontFamily: 'Inter, sans-serif',
+						fontSize: '13px',
+						fontWeight: 700,
+						color: '#000000',
+						cursor: !conversationEntry || confirmBooking.isPending ? 'default' : 'pointer',
+						opacity: !conversationEntry || confirmBooking.isPending ? 0.5 : 1,
+					}}
+				>
+					{conversationEntry
+						? `Confirm booking — ${formatCalendarDate(parseIsoKey(conversationEntry.date))}`
+						: 'Pick a date to confirm'}
+				</button>
+			)}
 			{renderEventPopup()}
 		</div>,
 		document.documentElement

@@ -10,13 +10,12 @@ import {
 	type VenueApplicationRow,
 } from '@/hooks/queryHooks/useVenueApplications';
 
-// Per-event pill tint, cycling soonest-event-first like the Figma mock.
+// Per-event pill tint, cycling in list order like the Figma mock.
 export const EVENT_PILL_COLORS = ['#BCC4FF', '#BCE2FF'];
 
 export type ReplyGroup = {
 	eventId: number;
 	rows: VenueApplicationRow[];
-	startsAt: string | null;
 };
 
 export const replyRowActivity = (row: VenueApplicationRow) =>
@@ -39,29 +38,26 @@ export function useVenueChatInbox() {
 	// thread is open and usable either way, so a failure here must not toast.
 	const ensureApplicationSeed = useOpenApplicationConversation({ suppressToasts: true });
 
-	// Group applications by event, soonest event first (null dates last); newest
-	// activity first within each event.
+	// Group applications by event; newest activity first within each event, and
+	// groups ordered by their own newest activity so the most recent reply is
+	// always the top row of the list.
 	const replyGroups = useMemo(() => {
 		const byEvent = new Map<number, ReplyGroup>();
 		for (const row of applications ?? []) {
-			const group = byEvent.get(row.eventId) ?? {
-				eventId: row.eventId,
-				rows: [],
-				startsAt: row.event?.startsAt ?? null,
-			};
+			const group = byEvent.get(row.eventId) ?? { eventId: row.eventId, rows: [] };
 			group.rows.push(row);
 			byEvent.set(row.eventId, group);
 		}
-		const groups = [...byEvent.values()].sort((a, b) => {
-			if (a.startsAt == null) return b.startsAt == null ? 0 : 1;
-			if (b.startsAt == null) return -1;
-			return Date.parse(a.startsAt) - Date.parse(b.startsAt);
-		});
+		const groups = [...byEvent.values()];
 		for (const group of groups) {
 			group.rows.sort(
 				(a, b) => Date.parse(replyRowActivity(b)) - Date.parse(replyRowActivity(a))
 			);
 		}
+		groups.sort(
+			(a, b) =>
+				Date.parse(replyRowActivity(b.rows[0])) - Date.parse(replyRowActivity(a.rows[0]))
+		);
 		return groups;
 	}, [applications]);
 

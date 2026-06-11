@@ -119,6 +119,15 @@ export async function PATCH(req: NextRequest) {
 			drivingDuration: rest.drivingDuration ?? null,
 		};
 
+		// A soft-deleted row's booking claim is dead; release it before the revive
+		// below can resurrect it (confirmBookingRequest treats bookingRequestId on
+		// an active row as a live foreign claim, which would make this date
+		// permanently unconfirmable). Active rows keep their claim.
+		await prisma.calendarEntry.updateMany({
+			where: { userId, date, isActive: false, bookingRequestId: { not: null } },
+			data: { bookingRequestId: null },
+		});
+
 		const entry = await prisma.calendarEntry.upsert({
 			where: { userId_date: { userId, date } },
 			create: {

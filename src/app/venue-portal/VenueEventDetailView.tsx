@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { Event as VenueEvent } from '@prisma/client';
+// Venue events carry confirmed-booking attribution from GET /api/venue/events.
+import type { VenueEventWithBooking as VenueEvent } from '@/app/api/venue/events/route';
 import { Play } from 'lucide-react';
 import { MapStackStarIcon } from '@/components/atoms/_svg/MapStackStarIcon';
 import { ProfileAreaMarkerIcon } from '@/components/atoms/_svg/ProfileAreaMarkerIcon';
@@ -99,7 +100,7 @@ function SectionNotice({ children }: { children: ReactNode }) {
 }
 
 // One event card in the detail view's left rail; clicking switches the selected
-// event. The selected card reads solid white against the translucent siblings.
+// event. Unselected cards stay white; the selected card uses the light-blue fill.
 function EventSidebarCard({
 	event,
 	applicantCount,
@@ -117,14 +118,25 @@ function EventSidebarCard({
 			onClick={onSelect}
 			aria-label={`View applicants for ${event.name}`}
 			className={`flex w-full shrink-0 cursor-pointer flex-col items-start gap-[6px] rounded-[12px] border-[2px] border-black p-[10px] text-left font-inter text-black transition ${
-				selected ? 'bg-white' : 'bg-white/30 hover:bg-white/50'
+				selected ? 'bg-[#CEF4FF]' : 'bg-white hover:brightness-95'
 			}`}
 		>
 			<span className="w-full truncate text-[16px] font-bold leading-none">
 				{event.name}
 			</span>
-			<span className="flex h-[22px] shrink-0 items-center justify-center rounded-[8px] border-[1.5px] border-black bg-[#F7EFC0] px-[8px] text-[12px] font-medium leading-none">
-				{formatApplicantCount(applicantCount)}
+			<span className="flex items-center gap-[6px]">
+				<span className="flex h-[22px] shrink-0 items-center justify-center rounded-[8px] border-[1.5px] border-black bg-[#F7EFC0] px-[8px] text-[12px] font-medium leading-none">
+					{formatApplicantCount(applicantCount)}
+				</span>
+				{event.booking && (
+					<span
+						title={`${event.booking.artistName}${event.booking.date ? ` — ${event.booking.date}` : ''}`}
+						className="flex h-[22px] shrink-0 items-center justify-center gap-[4px] rounded-[6.866px] border-[0.858px] border-black bg-[#B7FFC5] px-[8px] text-[12px] font-medium leading-none"
+					>
+						<span aria-hidden="true" className="h-[7px] w-[7px] rounded-full bg-[#34A853]" />
+						Booked
+					</span>
+				)}
 			</span>
 			<span className="flex w-full items-center gap-[8px]">
 				<EventDatePill event={event} />
@@ -577,7 +589,19 @@ function EventApplicantsBox({
 							{formatApplicantCount(applicantCount)}
 						</span>
 						<EventDatePill event={event} />
-						{isVenueOpportunityLive(event) && (
+						{event.booking ? (
+							// A confirmed booking outranks Live — the event is no longer seeking.
+							<span
+								title={`${event.booking.artistName}${event.booking.date ? ` — ${event.booking.date}` : ''}`}
+								className="flex h-[22px] shrink-0 items-center justify-center gap-[4px] rounded-[6.866px] border-[0.858px] border-black bg-[#B7FFC5] px-[8px] text-[12px] font-medium leading-none"
+							>
+								<span
+									aria-hidden="true"
+									className="h-[7px] w-[7px] rounded-full bg-[#34A853]"
+								/>
+								Booked
+							</span>
+						) : isVenueOpportunityLive(event) ? (
 							<span className="flex h-[22px] w-[53px] shrink-0 items-center justify-center gap-[4px] rounded-[6.866px] border-[0.858px] border-black bg-[#C5EDA0] text-[12px] font-medium leading-none">
 								<span
 									aria-hidden="true"
@@ -585,7 +609,7 @@ function EventApplicantsBox({
 								/>
 								Live
 							</span>
-						)}
+						) : null}
 						<button
 							type="button"
 							onClick={() => onEditEvent(event.id)}
@@ -731,29 +755,83 @@ export function VenueEventDetailView({
 	onViewApplicant?: (applicant: VenueEventApplicant) => void;
 }) {
 	const selectedEvent = events.find((event) => event.id === selectedEventId) ?? null;
+	const pastEvents: VenueEvent[] = [];
+	const liveEvents: VenueEvent[] = [];
+	for (const event of events) {
+		(isVenueOpportunityLive(event) ? liveEvents : pastEvents).push(event);
+	}
+	const pastIdsKey = pastEvents.map((event) => event.id).join(',');
+	const eventRailScrollerRef = useRef<HTMLDivElement | null>(null);
+	const liveEventsSectionRef = useRef<HTMLDivElement | null>(null);
+	const seenPastIdsRef = useRef<Set<string> | null>(null);
+
+	// Match the Events list: expired events sit above the fold and reveal only when
+	// the user scrolls up. Do not re-pin for removals so deleting a past row while
+	// viewing it does not yank the rail back down.
+	useLayoutEffect(() => {
+		const scroller = eventRailScrollerRef.current;
+		const liveSection = liveEventsSectionRef.current;
+		if (!scroller || !liveSection) return;
+
+		const previous = seenPastIdsRef.current;
+		const nextIds = pastIdsKey === '' ? [] : pastIdsKey.split(',');
+		seenPastIdsRef.current = new Set(nextIds);
+		if (previous && nextIds.every((id) => previous.has(id))) return;
+
+		scroller.scrollTop = liveSection.offsetTop;
+	}, [pastIdsKey]);
+
 	return (
 		// The backdrop gradient carries its alpha in its second stop, so no separate
 		// opacity layer is needed (unlike the list mode's opacity-90 trick).
 		<div className="flex h-full w-full gap-[4px] bg-[linear-gradient(180deg,#5EAD52_0%,rgba(255,255,255,0.42)_100%)] p-[2px]">
-			<div className="flex h-full w-[213px] shrink-0 flex-col gap-[8px] overflow-y-auto rounded-[12px] border-[2px] border-black bg-[linear-gradient(180deg,#C1F7BB_0%,#60AE92_100%)] p-[8px]">
-				{events.map((event) => (
-					<EventSidebarCard
-						key={event.id}
-						event={event}
-						applicantCount={applicantCountByEventId.get(event.id) ?? 0}
-						selected={event.id === selectedEventId}
-						onSelect={() => onSelectEvent(event.id)}
-					/>
-				))}
-				{/* Opens the create-event panel (same panel as the toolbar's Add tool). */}
-				<button
-					type="button"
-					aria-label="Add opportunity"
-					onClick={onAddEvent}
-					className="flex h-[40px] w-full shrink-0 cursor-pointer items-center justify-center rounded-[12px] border-[2px] border-black bg-white transition hover:brightness-95"
+			<div className="h-full w-[213px] shrink-0 rounded-[12px] border-[2px] border-black bg-[linear-gradient(180deg,#C1F7BB_0%,#60AE92_100%)] p-[8px]">
+				<CustomScrollbar
+					scrollContainerRef={eventRailScrollerRef}
+					className="h-full w-full"
+					contentClassName="flex flex-col rounded-[10px]"
+					thumbWidth={2}
+					thumbHeightOverride={72}
+					offsetRight={-10}
+					lockHorizontalScroll
 				>
-					<span className="text-[20px] font-medium leading-none text-black">+</span>
-				</button>
+					{pastEvents.length > 0 && (
+						<div className="flex shrink-0 flex-col gap-[8px] pb-[8px]">
+							{pastEvents.map((event) => (
+								<EventSidebarCard
+									key={event.id}
+									event={event}
+									applicantCount={applicantCountByEventId.get(event.id) ?? 0}
+									selected={event.id === selectedEventId}
+									onSelect={() => onSelectEvent(event.id)}
+								/>
+							))}
+						</div>
+					)}
+					<div
+						ref={liveEventsSectionRef}
+						className="flex min-h-full shrink-0 flex-col gap-[8px]"
+					>
+						{liveEvents.map((event) => (
+							<EventSidebarCard
+								key={event.id}
+								event={event}
+								applicantCount={applicantCountByEventId.get(event.id) ?? 0}
+								selected={event.id === selectedEventId}
+								onSelect={() => onSelectEvent(event.id)}
+							/>
+						))}
+						{/* Opens the create-event panel (same panel as the toolbar's Add tool). */}
+						<button
+							type="button"
+							aria-label="Add opportunity"
+							onClick={onAddEvent}
+							className="flex h-[98px] w-full shrink-0 cursor-pointer items-center justify-center rounded-[12px] border-[2px] border-black bg-white transition hover:brightness-95"
+						>
+							<span className="text-[20px] font-medium leading-none text-black">+</span>
+						</button>
+					</div>
+				</CustomScrollbar>
 			</div>
 			{selectedEvent && (
 				<EventApplicantsBox

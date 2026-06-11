@@ -63,6 +63,7 @@ test('serializeMessage maps a Message row to the API shape', () => {
 		emailId: null,
 		applicationId: null,
 		threadApplicationId: null,
+		bookingRequestId: null,
 		campaignId: null,
 		createdAt,
 		updatedAt: createdAt,
@@ -74,6 +75,47 @@ test('serializeMessage maps a Message row to the API shape', () => {
 		sender: 'standard',
 		body: 'hi',
 		isHtml: false,
+		applicationId: null,
+		bookingRequestId: null,
+		bookingRequest: null,
 		createdAt: '2026-05-29T12:00:00.000Z',
 	});
+});
+
+test('serializeMessage attaches live booking-request state from the lookup map', () => {
+	const createdAt = new Date('2026-06-11T12:00:00.000Z');
+	const row: Message = {
+		id: 5,
+		conversationId: 2,
+		sender: 'venue',
+		senderClerkId: 'user_venue',
+		body: 'Booking request — Jazz Night',
+		isHtml: false,
+		emailId: null,
+		applicationId: null,
+		threadApplicationId: 9,
+		bookingRequestId: 41,
+		campaignId: null,
+		createdAt,
+		updatedAt: createdAt,
+	};
+	const liveState = {
+		id: 41,
+		conversationId: 2,
+		threadApplicationId: 9,
+		eventId: 3,
+		status: 'confirmed' as const,
+		date: '2026-06-15',
+		requestedAt: '2026-06-11T12:00:00.000Z',
+		confirmedAt: '2026-06-11T13:00:00.000Z',
+		canceledAt: null,
+		eventName: 'Jazz Night',
+		eventStartsAt: '2026-06-15T23:00:00.000Z',
+		eventWhenLabel: 'June 15th 2026',
+	};
+	const out = serializeMessage(row, new Map([[41, liveState]]));
+	assert.equal(out.bookingRequestId, 41);
+	assert.deepEqual(out.bookingRequest, liveState);
+	// A message whose request is missing from the map degrades to null state.
+	assert.equal(serializeMessage(row, new Map()).bookingRequest, null);
 });

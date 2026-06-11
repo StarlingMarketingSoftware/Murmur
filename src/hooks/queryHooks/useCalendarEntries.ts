@@ -10,12 +10,19 @@ import {
 import { _fetch } from '@/utils';
 import { urls } from '@/constants/urls';
 
-const QUERY_KEYS = {
+export const CALENDAR_ENTRY_QUERY_KEYS = {
 	all: ['calendar-entries'] as const,
-	list: () => [...QUERY_KEYS.all, 'list'] as const,
+	list: () => [...CALENDAR_ENTRY_QUERY_KEYS.all, 'list'] as const,
 } as const;
+// Local alias — exported so the booking-request mutations can invalidate it.
+const QUERY_KEYS = CALENDAR_ENTRY_QUERY_KEYS;
 
-export const useGetCalendarEntries = (options?: { enabled?: boolean }) => {
+export const useGetCalendarEntries = (options?: {
+	enabled?: boolean;
+	// Booked entries can be written by the OTHER side of a booking-request
+	// handshake — live calendar surfaces pass a poll interval to pick those up.
+	refetchInterval?: number;
+}) => {
 	return useQuery<GetCalendarEntriesData>({
 		queryKey: QUERY_KEYS.list(),
 		queryFn: async () => {
@@ -28,6 +35,7 @@ export const useGetCalendarEntries = (options?: { enabled?: boolean }) => {
 		enabled: options?.enabled ?? true,
 		retry: false,
 		refetchOnWindowFocus: false,
+		refetchInterval: options?.refetchInterval ?? false,
 	});
 };
 

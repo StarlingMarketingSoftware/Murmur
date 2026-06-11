@@ -3,16 +3,17 @@ import { CustomMutationOptions } from '@/types';
 import { urls } from '@/constants/urls';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import type { Event as VenueEvent } from '@prisma/client';
+import type { VenueEventWithBooking } from '@/app/api/venue/events/route';
 import type { PostEventData, UpdateEventData } from '@/app/api/venue/events/schema';
 
-const QUERY_KEYS = {
+export const VENUE_EVENT_QUERY_KEYS = {
 	all: ['venue', 'events'] as const,
-	list: () => [...QUERY_KEYS.all, 'list'] as const,
+	list: () => [...VENUE_EVENT_QUERY_KEYS.all, 'list'] as const,
 };
+const QUERY_KEYS = VENUE_EVENT_QUERY_KEYS;
 
 export const useGetVenueEvents = ({ enabled = true }: { enabled?: boolean } = {}) => {
-	return useQuery<VenueEvent[]>({
+	return useQuery<VenueEventWithBooking[]>({
 		queryKey: QUERY_KEYS.list(),
 		queryFn: async () => {
 			const response = await _fetch(urls.api.venue.events.index);

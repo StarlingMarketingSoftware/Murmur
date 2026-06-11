@@ -83,6 +83,11 @@ export const urls = {
 				index: '/api/auth/check-admin',
 			},
 		},
+		bookingRequests: {
+			index: '/api/booking-requests',
+			cancel: ((id) => `/api/booking-requests/${id}/cancel`) as DetailRoute,
+			confirm: ((id) => `/api/booking-requests/${id}/confirm`) as DetailRoute,
+		},
 		calendar: {
 			index: '/api/calendar',
 		},

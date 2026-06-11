@@ -11,19 +11,32 @@ import type {
 	ConversationListItem,
 	MessageSenderRole,
 	MessagesPage,
+	SerializedBookingRequest,
 	SerializedMessage,
 } from '@/types';
+import { loadBookingRequestMap, serializeBookingRequestRows } from './bookingRequests';
 
 /** A contact is a published venue user exactly when it carries a venueId. */
 export const isVenueContact = (contact: { venueId: number | null }): boolean =>
 	contact.venueId != null;
 
-export const serializeMessage = (message: Message): SerializedMessage => ({
+export const serializeMessage = (
+	message: Message,
+	bookingRequestById?: Map<number, SerializedBookingRequest>
+): SerializedMessage => ({
 	id: message.id,
 	conversationId: message.conversationId,
 	sender: message.sender,
 	body: message.body,
 	isHtml: message.isHtml,
+	applicationId: message.applicationId,
+	bookingRequestId: message.bookingRequestId,
+	// Live state — attached at read time so the UI reflects the request's CURRENT
+	// status, not the status when the message was written.
+	bookingRequest:
+		message.bookingRequestId != null
+			? (bookingRequestById?.get(message.bookingRequestId) ?? null)
+			: null,
 	createdAt: message.createdAt.toISOString(),
 });
 
@@ -660,9 +673,60 @@ export const getMessagesPage = async (
 	const hasMore = rows.length > limit;
 	const pageRows = hasMore ? rows.slice(0, limit) : rows;
 	const nextCursor = hasMore ? pageRows[pageRows.length - 1].id : null;
-	const items = [...pageRows].reverse().map(serializeMessage); // ascending
 
-	const counterpart = await getCounterpart(role, conversation);
+	const [counterpart, bookingRequestById, activeBookingRow, venueMessage] =
+		await Promise.all([
+			getCounterpart(role, conversation),
+			loadBookingRequestMap(
+				pageRows
+					.map((m) => m.bookingRequestId)
+					.filter((id): id is number => id != null)
+			),
+			// Page-level active request for THIS thread view — the banner/button must
+			// stay correct even when the delivering message paginated out of the page.
+			// The merged 'all' view (the artist's messenger) has no single thread, so
+			// it carries none.
+			thread === 'all'
+				? Promise.resolve(null)
+				: prisma.bookingRequest.findFirst({
+						where: {
+							conversationId,
+							threadApplicationId: thread === 'general' ? null : thread,
+							status: { not: 'canceled' },
+						},
+						orderBy: { id: 'desc' },
+					}),
+			// "Request to book" precondition: the venue has authored ≥1 message in
+			// this thread view (server-computed — the loaded page may not reach back
+			// far enough).
+			prisma.message.findFirst({
+				where: {
+					conversationId,
+					sender: MessageSender.venue,
+					...threadWhere(thread),
+				},
+				select: { id: true },
+			}),
+		]);
+	const items = [...pageRows]
+		.reverse()
+		.map((m) => serializeMessage(m, bookingRequestById)); // ascending
+	// The active request's delivery message is usually in the page — reuse its
+	// already-serialized state; only a paginated-out request costs an extra query.
+	const bookingRequest = activeBookingRow
+		? (bookingRequestById.get(activeBookingRow.id) ??
+			(await serializeBookingRequestRows([activeBookingRow]))[0])
+		: null;
 
-	return { ok: true, page: { items, nextCursor, currentUserRole: role, counterpart } };
+	return {
+		ok: true,
+		page: {
+			items,
+			nextCursor,
+			currentUserRole: role,
+			counterpart,
+			bookingRequest,
+			venueHasMessaged: venueMessage != null,
+		},
+	};
 };

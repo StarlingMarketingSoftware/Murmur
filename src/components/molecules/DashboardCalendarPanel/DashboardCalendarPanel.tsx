@@ -8,6 +8,7 @@ import {
 	useRef,
 	useState,
 	type CSSProperties,
+	type KeyboardEvent as ReactKeyboardEvent,
 	type MouseEvent as ReactMouseEvent,
 	type UIEvent,
 } from 'react';
@@ -66,6 +67,12 @@ type DashboardCalendarPanelProps = {
 	 * so venue date-pickers and debug previews stay local-only.
 	 */
 	persistEvents?: boolean;
+	/**
+	 * Visual scale for the event-editor popup. The popup portals to body with
+	 * position: fixed, so it ignores ancestor transforms — hosts that shrink the
+	 * calendar (venue map view) pass their composite scale to match.
+	 */
+	popupScale?: number;
 };
 
 type ActiveCalendarPopup = {
@@ -86,6 +93,9 @@ const SMOOTH_SCROLL_LERP = 0.14;
 const WHEEL_SCROLL_MULTIPLIER = 1.12;
 // Quiet period after the last wheel event before we ease to the nearest month boundary.
 const WHEEL_SNAP_DELAY_MS = 150;
+// Cumulative wheel |deltaY| required to dismiss an open event popup — smaller
+// (trackpad-inertia) nudges are swallowed so they can't kill the popup mid-edit.
+const POPUP_WHEEL_DISMISS_THRESHOLD_PX = 36;
 // How far a touch fling projects the release velocity before settling on a row.
 const TOUCH_FLING_MS = 160;
 
@@ -119,6 +129,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	showFullMonth = false,
 	innerHeightPx,
 	persistEvents = false,
+	popupScale = 1,
 }) => {
 	// Layout constants (hard dashboard sizing)
 	const ROWS = 6;
@@ -148,6 +159,10 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	const SCROLLBAR_TRAVEL_PX = SCROLLBAR_TRACK_HEIGHT_PX - SCROLLBAR_THUMB_HEIGHT_PX;
 	const POPUP_WIDTH_PX = 295;
 	const POPUP_HEIGHT_PX = 361;
+	// On-screen footprint after popupScale — the anchored (left/right) placement
+	// math uses these; the center touch-modal stays unscaled.
+	const POPUP_VISUAL_WIDTH_PX = POPUP_WIDTH_PX * popupScale;
+	const POPUP_VISUAL_HEIGHT_PX = POPUP_HEIGHT_PX * popupScale;
 
 	// Active month/year + optional highlighted day (defaults to Jan 2026 — the
 	// original static design baseline).
@@ -203,12 +218,26 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	const [scrollTop, setScrollTop] = useState(INITIAL_SCROLL_TOP_PX);
 	const [isDraggingScrollbar, setIsDraggingScrollbar] = useState(false);
 	const [activePopup, setActivePopup] = useState<ActiveCalendarPopup | null>(null);
+	// Mirrored for the wheel handler, whose effect deliberately doesn't
+	// re-subscribe on popup changes (its cleanup would kill in-flight scrolls).
+	const activePopupRef = useRef<ActiveCalendarPopup | null>(activePopup);
+	activePopupRef.current = activePopup;
+	// Cumulative wheel delta while a popup is open; reset on every popup open.
+	const popupWheelAccumRef = useRef(0);
+	// Cell clicks are swallowed until this timestamp after the Delete button
+	// unmounts the popup mid-double-click (see deleteActiveEvent).
+	const deleteClickGuardUntilRef = useRef(0);
 	const [activeTimeDropdownField, setActiveTimeDropdownField] =
 		useState<TimeDropdownField | null>(null);
 	const [timeRangeError, setTimeRangeError] = useState<string | null>(null);
 	const [eventDrafts, setEventDrafts] = useState<Record<string, CalendarEventDraft>>({});
 
-	const { data: calendarEntriesData } = useGetCalendarEntries({ enabled: persistEvents });
+	// 60s poll: booking-request confirms write entries from the OTHER user's
+	// client, so a mounted live calendar needs its own heartbeat to show them.
+	const { data: calendarEntriesData } = useGetCalendarEntries({
+		enabled: persistEvents,
+		refetchInterval: 60_000,
+	});
 	const { mutateAsync: upsertCalendarEntry } = useUpsertCalendarEntry({
 		suppressToasts: true,
 	});
@@ -244,6 +273,11 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	// Single-flight FIFO queue: chains every PATCH/DELETE so a slow upsert can
 	// never be overtaken by a subsequent delete (or vice versa) and resurrect a row.
 	const syncChainRef = useRef<Promise<unknown>>(Promise.resolve());
+	// Dates deleted this session whose recreate hasn't been sent yet. The stale-ref
+	// guard below misses a recreate chained behind an in-flight DELETE (the chained
+	// run executes before the post-DELETE re-render refreshes serverDraftsRef), so
+	// this set is what guarantees a revived row never keeps old booking provenance.
+	const locallyDeletedKeysRef = useRef<Set<string>>(new Set());
 
 	const syncDraft = useMemo(
 		() =>
@@ -251,7 +285,10 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 				const run = isDraftPersistable(draft, date)
 					? () => {
 							const body = draftToUpsertBody(isoKey, draft);
-							if (!serverDraftsRef.current[isoKey]) {
+							if (
+								!serverDraftsRef.current[isoKey] ||
+								locallyDeletedKeysRef.current.has(isoKey)
+							) {
 								// Fresh dashboard create: explicitly clear any provenance left
 								// on a soft-deleted row for this date, so an unrelated old
 								// conversation can't flip back to "Booked" on revival. Existing
@@ -260,9 +297,25 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 								body.campaignId = null;
 								body.contactId = null;
 							}
+							locallyDeletedKeysRef.current.delete(isoKey);
 							return upsertCalendarEntry(body);
 						}
-					: () => deleteCalendarEntry({ date: isoKey });
+					: () => {
+							locallyDeletedKeysRef.current.add(isoKey);
+							return deleteCalendarEntry({ date: isoKey }).then(() => {
+								// Prune the tombstone once the row is gone: the overlay would
+								// otherwise mask an entry created server-side on this date for
+								// the rest of the mount (e.g. a booking confirmed while the
+								// venue map view stays open). Skip if the user typed again.
+								setEventDrafts((drafts) => {
+									const current = drafts[isoKey];
+									if (!current || isDraftPersistable(current, date)) return drafts;
+									const next = { ...drafts };
+									delete next[isoKey];
+									return next;
+								});
+							});
+						};
 				syncChainRef.current = syncChainRef.current.then(run, run).catch(() => {
 					// Autosave failures are silent; the local draft keeps the user's text.
 				});
@@ -428,6 +481,17 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 
 			event.preventDefault();
 			event.stopPropagation();
+
+			// While the event popup is open, swallow small (inertia) deltas entirely —
+			// no target update, rAF, or snap re-arm — so an accidental nudge can't
+			// dismiss it. Past the threshold, fall through: the container scroll trips
+			// the window-capture scroll-dismiss listener, whose close path flushes the
+			// pending draft sync. deltaMode 1 = line-based wheels (Firefox), ~3/tick.
+			if (activePopupRef.current) {
+				popupWheelAccumRef.current +=
+					Math.abs(event.deltaY) * (event.deltaMode === 1 ? 16 : 1);
+				if (popupWheelAccumRef.current < POPUP_WHEEL_DISMISS_THRESHOLD_PX) return;
+			}
 
 			if (smoothScrollRafRef.current == null) {
 				smoothScrollTargetRef.current = container.scrollTop;
@@ -883,11 +947,43 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		setActivePopup(null);
 	};
 
+	// Delete = overlay an empty draft (the standard tombstone: hides the red card,
+	// fails isDraftPersistable so the sync issues the idempotent DELETE) and close —
+	// closing flushes the debounced sync via the [activePopup?.key] cleanup above.
+	const deleteActiveEvent = () => {
+		if (!activePopup) return;
+		const { key, date } = activePopup;
+		const emptyDraft = createDefaultEventDraft(date);
+		setEventDrafts((drafts) => ({ ...drafts, [key]: emptyDraft }));
+		if (persistEvents) {
+			syncDraft(key, emptyDraft, date);
+		}
+		// The popup unmounts on this click, so the second click of a double-click
+		// would land on the day cell underneath and instantly reopen an editor.
+		deleteClickGuardUntilRef.current = Date.now() + 400;
+		closeActivePopup();
+	};
+
+	// Enter in a popup text field commits + closes: closing flushes the debounced
+	// sync via the [activePopup?.key] cleanup above. Attached per-input (never on
+	// the dialog) so the location box's own geocode-on-Enter keeps working.
+	const handlePopupInputKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+		if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+		event.preventDefault();
+		// Mirror the Escape layering: an open time dropdown closes first.
+		if (activeTimeDropdownField) {
+			setActiveTimeDropdownField(null);
+			return;
+		}
+		closeActivePopup();
+	};
+
 	const openEventPopup = (
 		event: ReactMouseEvent<HTMLButtonElement>,
 		key: string,
 		date: Date
 	) => {
+		if (Date.now() < deleteClickGuardUntilRef.current) return;
 		// Abandon any in-flight smooth-scroll settle: its next frame would move the
 		// container and trip the scroll-dismiss listener right after the popup opens.
 		if (smoothScrollRafRef.current != null) {
@@ -901,6 +997,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		if (scrollContainerRef.current) {
 			smoothScrollTargetRef.current = scrollContainerRef.current.scrollTop;
 		}
+		popupWheelAccumRef.current = 0;
 
 		// Convert visual px (gBCR/innerWidth) to the zoomed CSS coordinate space
 		// that the fixed-position portal is laid out in.
@@ -919,6 +1016,8 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		// Touch devices: present as a centered, top-anchored modal over a dimmed
 		// backdrop (decided at open time — no hook, no hydration concerns). The
 		// anchored popover would cover most of a phone screen with no way to tap off.
+		// Unscaled on purpose: the modal anchors to the viewport, not the (possibly
+		// shrunken) calendar, and popupScale would only shrink its touch targets.
 		if (window.matchMedia('(pointer: coarse)').matches) {
 			setActiveTimeDropdownField(null);
 			setTimeRangeError(null);
@@ -946,32 +1045,35 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 
 		let placement: 'right' | 'left';
 		let left: number;
-		if (roomRight >= POPUP_WIDTH_PX + VIEWPORT_MARGIN_PX) {
+		if (roomRight >= POPUP_VISUAL_WIDTH_PX + VIEWPORT_MARGIN_PX) {
 			placement = 'right';
 			left = cellRect.right + POPUP_CELL_GAP_PX;
-		} else if (roomLeft >= POPUP_WIDTH_PX + VIEWPORT_MARGIN_PX) {
+		} else if (roomLeft >= POPUP_VISUAL_WIDTH_PX + VIEWPORT_MARGIN_PX) {
 			placement = 'left';
-			left = cellRect.left - POPUP_WIDTH_PX - POPUP_CELL_GAP_PX;
+			left = cellRect.left - POPUP_VISUAL_WIDTH_PX - POPUP_CELL_GAP_PX;
 		} else if (roomRight >= roomLeft) {
 			placement = 'right';
 			left = clamp(
 				cellRect.right + POPUP_CELL_GAP_PX,
 				VIEWPORT_MARGIN_PX,
-				viewportWidth - POPUP_WIDTH_PX - VIEWPORT_MARGIN_PX
+				viewportWidth - POPUP_VISUAL_WIDTH_PX - VIEWPORT_MARGIN_PX
 			);
 		} else {
 			placement = 'left';
 			left = clamp(
-				cellRect.left - POPUP_WIDTH_PX - POPUP_CELL_GAP_PX,
+				cellRect.left - POPUP_VISUAL_WIDTH_PX - POPUP_CELL_GAP_PX,
 				VIEWPORT_MARGIN_PX,
-				viewportWidth - POPUP_WIDTH_PX - VIEWPORT_MARGIN_PX
+				viewportWidth - POPUP_VISUAL_WIDTH_PX - VIEWPORT_MARGIN_PX
 			);
 		}
 
 		const top = clamp(
 			cellRect.top,
 			VIEWPORT_MARGIN_PX,
-			Math.max(viewportHeight - POPUP_HEIGHT_PX - VIEWPORT_MARGIN_PX, VIEWPORT_MARGIN_PX)
+			Math.max(
+				viewportHeight - POPUP_VISUAL_HEIGHT_PX - VIEWPORT_MARGIN_PX,
+				VIEWPORT_MARGIN_PX
+			)
 		);
 
 		setActiveTimeDropdownField(null);
@@ -1411,6 +1513,9 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 						{isModalPopup && (
 							<div
 								aria-hidden="true"
+								// Tagged so venue-portal outside-click tool dismissal ignores the
+								// body-portaled backdrop (inert on the artist dashboard).
+								data-venue-tool-ui="true"
 								// onClick (not onPointerDown): the backdrop is still mounted when
 								// the tap's click dispatches, so iOS's delayed compat click can't
 								// fall through to a day cell underneath and instantly reopen.
@@ -1425,35 +1530,53 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 								}}
 							/>
 						)}
+						{/* Position + popupScale live on this wrapper: the dialog's transform
+						    belongs to its enter animation, and left/top already point at the
+						    scaled footprint's top-left corner. The center (touch-modal)
+						    placement stays unscaled to keep its touch targets full-size. */}
 						<div
-							ref={popupRef}
-							role="dialog"
-							aria-modal={isModalPopup ? 'true' : 'false'}
-							aria-label="Calendar event editor"
 							style={{
 								position: 'fixed',
 								left: `${activePopup.left}px`,
 								top: `${activePopup.top}px`,
 								width: `${POPUP_WIDTH_PX}px`,
 								height: `${POPUP_HEIGHT_PX}px`,
-								borderRadius: '9px',
-								border: '1.076px solid rgba(255, 255, 255, 0.9)',
-								background: 'rgba(229, 96, 98, 0.82)',
-								backdropFilter: 'blur(22px) saturate(180%)',
-								WebkitBackdropFilter: 'blur(22px) saturate(180%)',
-								boxSizing: 'border-box',
-								overflow: 'visible',
+								transform: `scale(${isModalPopup ? 1 : popupScale})`,
+								transformOrigin: 'top left',
 								zIndex: 2147483600,
-								transformOrigin:
-									activePopup.placement === 'center'
-										? 'center top'
-										: activePopup.placement === 'right'
-											? 'left center'
-											: 'right center',
-								animation:
-									'dashboardCalendarPopupEnter 160ms cubic-bezier(0.22, 1, 0.36, 1)',
 							}}
 						>
+							<div
+								ref={popupRef}
+								role="dialog"
+								aria-modal={isModalPopup ? 'true' : 'false'}
+								aria-label="Calendar event editor"
+								// Tagged so venue-portal outside-click tool dismissal ignores the
+								// body-portaled editor (inert on the artist dashboard).
+								data-venue-tool-ui="true"
+								style={{
+									position: 'absolute',
+									left: 0,
+									top: 0,
+									width: `${POPUP_WIDTH_PX}px`,
+									height: `${POPUP_HEIGHT_PX}px`,
+									borderRadius: '9px',
+									border: '1.076px solid rgba(255, 255, 255, 0.9)',
+									background: 'rgba(229, 96, 98, 0.82)',
+									backdropFilter: 'blur(22px) saturate(180%)',
+									WebkitBackdropFilter: 'blur(22px) saturate(180%)',
+									boxSizing: 'border-box',
+									overflow: 'visible',
+									transformOrigin:
+										activePopup.placement === 'center'
+											? 'center top'
+											: activePopup.placement === 'right'
+												? 'left center'
+												: 'right center',
+									animation:
+										'dashboardCalendarPopupEnter 160ms cubic-bezier(0.22, 1, 0.36, 1)',
+								}}
+							>
 							<div
 								style={{
 									position: 'absolute',
@@ -1474,6 +1597,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 									onChange={(event) =>
 										updateActiveDraft('personName', event.target.value)
 									}
+									onKeyDown={handlePopupInputKeyDown}
 									style={{
 										...popupInputBaseStyle,
 										...popupTextStyle,
@@ -1489,6 +1613,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 									placeholder="Add Business"
 									value={activeDraft.company}
 									onChange={(event) => updateActiveDraft('company', event.target.value)}
+									onKeyDown={handlePopupInputKeyDown}
 									style={{
 										...popupInputBaseStyle,
 										...popupTextStyle,
@@ -1616,6 +1741,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 									placeholder="+ Notes"
 									value={activeDraft.notes}
 									onChange={(event) => updateActiveDraft('notes', event.target.value)}
+									onKeyDown={handlePopupInputKeyDown}
 									style={{
 										...popupInputBaseStyle,
 										...popupTextStyle,
@@ -1697,6 +1823,35 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 									Done
 								</button>
 							)}
+
+							{/* Modal placement reserves the bottom band for ✕/Done. */}
+							{!isModalPopup && (
+								<button
+									type="button"
+									aria-label="Delete event"
+									onClick={deleteActiveEvent}
+									style={{
+										position: 'absolute',
+										left: '50%',
+										bottom: '9px',
+										transform: 'translateX(-50%)',
+										height: '27px',
+										padding: '0 22px',
+										borderRadius: '999px',
+										border: '1.076px solid rgba(255, 255, 255, 0.9)',
+										background: '#FFFFFF',
+										color: '#F14048',
+										cursor: 'pointer',
+										...popupTextStyle,
+										fontSize: '14px',
+										fontWeight: 700,
+										lineHeight: '1',
+									}}
+								>
+									Delete
+								</button>
+							)}
+							</div>
 						</div>
 					</>,
 					document.body

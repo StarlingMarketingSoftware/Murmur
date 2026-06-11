@@ -22,7 +22,6 @@ export default function HomePageClient({
 	showVenueSignInButton?: boolean;
 }) {
 	const [trialClicked, setTrialClicked] = useState(false);
-	const isHomeVariant = !showVenueSignInButton;
 	const stackRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -50,54 +49,48 @@ export default function HomePageClient({
 
 	return (
 		<main
-			className={`landing-page relative flex min-h-screen items-center justify-center overflow-x-clip ${
-				isHomeVariant ? 'px-4 pb-16 pt-6 lg:pb-10' : 'p-4'
-			}`}
+			className="landing-page relative flex min-h-screen items-center justify-center overflow-x-clip px-4 pb-16 pt-6 lg:pb-10"
 			style={{ background: 'linear-gradient(180deg, #FFF 0%, #FFF 50%, #D5F1FF 100%)' }}
 		>
-			{isHomeVariant && <TrustedByLogoOrbit anchorRef={stackRef} />}
+			<TrustedByLogoOrbit anchorRef={stackRef} />
 			<div
 				ref={stackRef}
-				className={`relative z-10 flex w-full max-w-[596px] flex-col ${
-					isHomeVariant ? 'landing-home-stack' : ''
-				}`}
+				className="landing-home-stack relative z-10 flex w-full max-w-[596px] flex-col"
 			>
-				{isHomeVariant && (
-					<div className="mb-3 flex flex-col gap-1 lg:flex-row lg:items-end lg:gap-3">
-						<MurmurLogoNew width="150px" height="27px" />
-						<span
-							className="pb-[2px] text-[16px] font-medium"
-							style={{ color: '#8E8E93' }}
-						>
-							Live-Music Booking for Musicians
-						</span>
-					</div>
-				)}
+				<div className="mb-3 flex flex-col gap-1 lg:flex-row lg:items-end lg:gap-3">
+					<MurmurLogoNew width="150px" height="27px" />
+					<span
+						className="pb-[2px] text-[16px] font-medium"
+						style={{ color: '#8E8E93' }}
+					>
+						Live-Music Booking for Musicians
+					</span>
+				</div>
 				<div
-					className={`relative w-[596px] max-w-full overflow-hidden rounded-[11.54px] bg-[#F5F5F7] ${
-						isHomeVariant ? 'aspect-[596/505]' : 'h-[505px]'
-					}`}
-					style={{
-						containerType: 'inline-size',
-						...(showVenueSignInButton
-							? { border: '2px solid #000', boxSizing: 'border-box' }
-							: {}),
-					}}
+					className="relative aspect-[596/505] w-[596px] max-w-full overflow-hidden rounded-[11.54px] bg-[#F5F5F7]"
+					style={{ containerType: 'inline-size' }}
 				>
+					{/* eslint-disable-next-line @next/next/no-img-element -- static landing preview; next/image adds nothing here */}
+					<img
+						src="/photos/dashboardPreview.jpg"
+						alt="Murmur dashboard with a campaign map and search results"
+						className="absolute inset-0 h-full w-full object-cover object-[75%_50%]"
+					/>
 					{showVenueSignInButton && (
 						<div
 							className="absolute inset-x-0 bottom-0"
 							style={{
 								height: 'clamp(47px, 8.72cqw, 53px)',
-								borderTop: '2px solid #000',
-								boxShadow: '0 -1px 0 #C9D3D6',
+								background: '#F5F5F7',
+								border: '2px solid #000',
+								borderRadius: '0 0 11.54px 11.54px',
 								boxSizing: 'border-box',
 							}}
 						>
 							<div
 								className="absolute inset-0"
 								style={{
-									borderRadius: 'min(7.54px, 0.96cqw) min(7.54px, 0.96cqw) 0 0',
+									borderRadius: 'min(7.54px, 0.96cqw) min(7.54px, 0.96cqw) 9.5px 9.5px',
 									opacity: 0.5,
 									background: 'rgba(254, 254, 254, 0.74)',
 									zIndex: 0,
@@ -186,30 +179,28 @@ export default function HomePageClient({
 						</Link>
 					)}
 				</div>
-				{isHomeVariant && (
-					<div className="mt-7 flex flex-col items-center gap-2 px-4 text-center">
-						<h2
-							className="text-[18px] font-medium leading-tight"
-							style={{ color: '#6E6E73' }}
-						>
-							The whole world at your fingertips
-						</h2>
-						<p
-							className="max-w-[400px] text-[13px] leading-snug"
-							style={{ color: '#86868B' }}
-						>
-							Murmur brings together more than 100,000+ venues, festivals, and radio
-							stations, with tools to actually reach them.
-						</p>
-						<span
-							className="mt-1.5 hidden text-[13px] lg:inline"
-							style={{ color: '#8E8E93' }}
-						>
-							Trusted by
-						</span>
-					</div>
-				)}
-				{isHomeVariant && <TrustedByLogoGrid className="mt-5 lg:hidden" />}
+				<div className="mt-7 flex flex-col items-center gap-2 px-4 text-center">
+					<h2
+						className="text-[18px] font-medium leading-tight"
+						style={{ color: '#6E6E73' }}
+					>
+						The whole world at your fingertips
+					</h2>
+					<p
+						className="max-w-[400px] text-[13px] leading-snug"
+						style={{ color: '#86868B' }}
+					>
+						Murmur brings together more than 100,000+ venues, festivals, and radio
+						stations, with tools to actually reach them.
+					</p>
+					<span
+						className="mt-1.5 hidden text-[13px] lg:inline"
+						style={{ color: '#8E8E93' }}
+					>
+						Trusted by
+					</span>
+				</div>
+				<TrustedByLogoGrid className="mt-5 lg:hidden" />
 			</div>
 			{/* Mounted outside the card: its container-type traps position:fixed children. */}
 			{showFreeTrialButton && (
