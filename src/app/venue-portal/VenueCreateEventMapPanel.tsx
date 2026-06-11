@@ -30,6 +30,7 @@ import {
 	useCreateVenueEvent,
 	useUpdateVenueEvent,
 } from '@/hooks/queryHooks/useVenueEvents';
+import { useGetVenue, type VenueProfile } from '@/hooks/queryHooks/useVenue';
 
 export type VenueCreateEventLocation = {
 	address: string;
@@ -177,6 +178,36 @@ export const createVenueEventFormFromEvent = (
 	};
 };
 
+const formatVenueEventPayRange = (payMin: number | null, payMax: number | null) => {
+	if (payMin !== null && payMax !== null && payMin !== payMax) {
+		return `$${payMin}-${payMax}`;
+	}
+	if (payMax !== null) return `$${payMax}`;
+	if (payMin !== null) return `$${payMin}`;
+	return '';
+};
+
+export const createVenueEventFormFromVenueProfile = (
+	venue: VenueProfile | null | undefined
+): VenueCreateEventFormState => {
+	if (!venue) return EMPTY_CREATE_EVENT_FORM;
+
+	const hasVenueCoordinates = venue.latitude != null && venue.longitude != null;
+
+	return {
+		...EMPTY_CREATE_EVENT_FORM,
+		location: {
+			address: venue.address?.trim() ?? '',
+			placeId: null,
+			lat: hasVenueCoordinates ? venue.latitude : null,
+			lng: hasVenueCoordinates ? venue.longitude : null,
+		},
+		whoGenres: [...venue.genres],
+		pay: venue.payRange?.trim() || formatVenueEventPayRange(venue.payMin, venue.payMax),
+		details: venue.description?.trim() ?? '',
+	};
+};
+
 export const getVenueCreateEventTimeMinutes = (value: string) => {
 	const [rawHours, rawMinutes] = value.split(':');
 	const hours = Number(rawHours);
@@ -252,14 +283,18 @@ export const buildVenueEventPayload = (eventForm: VenueCreateEventFormState) => 
 };
 
 export function VenueCreateEventMapPanel({ event }: { event?: VenueEvent | null }) {
+	const { data: venueProfile } = useGetVenue();
 	const [eventForm, setEventForm] = useState<VenueCreateEventFormState>(() =>
-		event ? createVenueEventFormFromEvent(event) : EMPTY_CREATE_EVENT_FORM
+		event
+			? createVenueEventFormFromEvent(event)
+			: createVenueEventFormFromVenueProfile(venueProfile)
 	);
 	const [publishState, setPublishState] = useState<
 		'idle' | 'missing-name' | 'published' | 'saved'
 	>('idle');
-	const [activeEventField, setActiveEventField] =
-		useState<VenueCreateEventActiveField>('eventName');
+	const [activeEventField, setActiveEventField] = useState<VenueCreateEventActiveField>(
+		event ? 'eventName' : null
+	);
 	const [activeWhenPopup, setActiveWhenPopup] =
 		useState<VenueCreateEventWhenPopup | null>(null);
 	const createEventFormRef = useRef<HTMLFormElement | null>(null);
@@ -270,15 +305,17 @@ export function VenueCreateEventMapPanel({ event }: { event?: VenueEvent | null 
 	const whenPopupRef = useRef<HTMLDivElement | null>(null);
 	const editingEventId = event?.id ?? null;
 	const isEditingEvent = editingEventId != null;
+	const activeEditingEventIdRef = useRef<number | null>(editingEventId);
+	const hasEditedCreateEventRef = useRef(false);
 	const setActiveEventFieldElement = useCallback((node: HTMLElement | null) => {
 		activeEventFieldRef.current = node;
 	}, []);
 	const { mutate: createEvent, isPending: isCreatingEvent } = useCreateVenueEvent({
 		onSuccess: () => {
-			setEventForm(EMPTY_CREATE_EVENT_FORM);
-			setActiveEventField('eventName');
+			hasEditedCreateEventRef.current = false;
+			setEventForm(createVenueEventFormFromVenueProfile(venueProfile));
+			setActiveEventField(null);
 			setPublishState('published');
-			requestAnimationFrame(() => eventNameInputRef.current?.focus());
 		},
 	});
 	const { mutate: updateEvent, isPending: isUpdatingEvent } = useUpdateVenueEvent({
@@ -297,11 +334,16 @@ export function VenueCreateEventMapPanel({ event }: { event?: VenueEvent | null 
 	const isPayFilled = eventForm.pay.trim().length > 0;
 	const isDetailsFilled = eventForm.details.trim().length > 0;
 	const wasWhoCompleteRef = useRef(isWhoComplete);
+	const markCreateEventEdited = () => {
+		hasEditedCreateEventRef.current = true;
+	};
 	const updateEventField = (field: VenueCreateEventTextField, value: string) => {
+		markCreateEventEdited();
 		setEventForm((current) => ({ ...current, [field]: value }));
 		setPublishState('idle');
 	};
 	const updateEventLocation = (partial: Partial<VenueCreateEventLocation>) => {
+		markCreateEventEdited();
 		setEventForm((current) => ({
 			...current,
 			location: { ...current.location, ...partial },
@@ -330,13 +372,30 @@ export function VenueCreateEventMapPanel({ event }: { event?: VenueEvent | null 
 		requestAnimationFrame(() => detailsInputRef.current?.focus());
 	};
 	useEffect(() => {
-		setEventForm(event ? createVenueEventFormFromEvent(event) : EMPTY_CREATE_EVENT_FORM);
+		const didSwitchEditingTarget = activeEditingEventIdRef.current !== editingEventId;
+		if (didSwitchEditingTarget) {
+			activeEditingEventIdRef.current = editingEventId;
+			hasEditedCreateEventRef.current = false;
+		}
+
+		if (event) {
+			setEventForm(createVenueEventFormFromEvent(event));
+			setPublishState('idle');
+			setActiveEventField('eventName');
+			setActiveWhenPopup(null);
+			requestAnimationFrame(() => eventNameInputRef.current?.focus());
+			return;
+		}
+
+		if (hasEditedCreateEventRef.current) return;
+
+		setEventForm(createVenueEventFormFromVenueProfile(venueProfile));
 		setPublishState('idle');
-		setActiveEventField('eventName');
+		setActiveEventField(null);
 		setActiveWhenPopup(null);
-		requestAnimationFrame(() => eventNameInputRef.current?.focus());
-	}, [event]);
+	}, [editingEventId, event, venueProfile]);
 	const selectEventDate = (date: Date, event?: ReactMouseEvent<HTMLButtonElement>) => {
+		markCreateEventEdited();
 		setEventForm((current) => ({
 			...current,
 			when: formatVenueCreateEventDate(date),
@@ -404,6 +463,7 @@ export function VenueCreateEventMapPanel({ event }: { event?: VenueEvent | null 
 		setPublishState('idle');
 	};
 	const updateEventTimeField = (field: VenueCreateEventTimeField, value: string) => {
+		markCreateEventEdited();
 		setEventForm((current) => {
 			if (field === 'startTime') {
 				const startMinutes = getVenueCreateEventTimeMinutes(value);
@@ -425,10 +485,12 @@ export function VenueCreateEventMapPanel({ event }: { event?: VenueEvent | null 
 		setPublishState('idle');
 	};
 	const selectEventSize = (size: string) => {
+		markCreateEventEdited();
 		setEventForm((current) => ({ ...current, whoSize: size }));
 		setPublishState('idle');
 	};
 	const toggleEventGenre = (genre: string) => {
+		markCreateEventEdited();
 		setEventForm((current) => {
 			const normalizedGenre = genre.toLowerCase();
 			const hasGenre = current.whoGenres.some(

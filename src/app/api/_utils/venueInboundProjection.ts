@@ -15,6 +15,10 @@ import prisma from '@/lib/prisma';
 import { MessageSender } from '@prisma/client';
 import { convertHtmlToPlainText } from '@/utils';
 import type { InboundEmailWithRelations } from '@/types';
+import {
+	parseVenueMessageAction,
+	stripVenueMessageActionMarker,
+} from '@/utils/venueMessageActions';
 import { loadBookingRequestMap } from './bookingRequests';
 
 /**
@@ -144,7 +148,10 @@ export const projectVenueRepliesForUser = async (
 		const campaign = campaignId != null ? (campaignById.get(campaignId) ?? null) : null;
 		const originalEmail =
 			originalEmailId != null ? (emailById.get(originalEmailId) ?? null) : null;
-		const plainBody = message.isHtml ? convertHtmlToPlainText(message.body) : message.body;
+		const venueAction = parseVenueMessageAction(message.body);
+		const plainBody = stripVenueMessageActionMarker(
+			message.isHtml ? convertHtmlToPlainText(message.body) : message.body
+		);
 
 		rows.push({
 			// Synthetic negative id: never collides with positive real inbound ids, and
@@ -202,6 +209,7 @@ export const projectVenueRepliesForUser = async (
 				message.bookingRequestId != null
 					? (bookingRequestById.get(message.bookingRequestId) ?? null)
 					: null,
+			venueAction,
 		});
 	}
 

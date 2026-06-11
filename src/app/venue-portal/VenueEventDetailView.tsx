@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 // Venue events carry confirmed-booking attribution from GET /api/venue/events.
 import type { VenueEventWithBooking as VenueEvent } from '@/app/api/venue/events/route';
 import { Play } from 'lucide-react';
@@ -34,6 +34,14 @@ import {
 export const MEDIA_THUMB_GRADIENT =
 	'linear-gradient(145deg, #EF3030 0%, #F44458 36%, #F04CCB 72%, #FF64D8 100%)';
 
+const APPLICANT_ROW_GRID_STYLE: CSSProperties = {
+	backgroundImage:
+		'repeating-linear-gradient(to bottom, #FFFFFF 0px, #FFFFFF 27px, #FAF7F7 27px, #FAF7F7 54px)',
+	backgroundPosition: 'top center',
+	backgroundRepeat: 'repeat-y',
+	backgroundSize: '508px 54px',
+};
+
 export const getMediaDisplayTitle = (filename: string) =>
 	filename.replace(/\.[^/.]+$/, '').trim() || filename;
 
@@ -51,9 +59,19 @@ type ApplicantVideoItem = {
 	video: VenueEventApplicationVideo;
 };
 
-function EventDatePill({ event }: { event: VenueEvent }) {
+function EventDatePill({
+	event,
+	camouflaged = false,
+}: {
+	event: VenueEvent;
+	camouflaged?: boolean;
+}) {
 	return (
-		<span className="flex h-[24px] w-[112px] shrink-0 items-center justify-center rounded-[8px] border-[1.5px] border-black bg-[#FF818A] text-[14px] font-medium leading-none">
+		<span
+			className={`flex h-[24px] w-[112px] shrink-0 items-center justify-center rounded-[8px] border-[1.5px] border-black text-[14px] font-medium leading-none ${
+				camouflaged ? 'bg-transparent' : 'bg-[#FF818A]'
+			}`}
+		>
 			{formatVenueOpportunityDate(event.whenLabel, event.startsAt)}
 		</span>
 	);
@@ -100,32 +118,40 @@ function SectionNotice({ children }: { children: ReactNode }) {
 }
 
 // One event card in the detail view's left rail; clicking switches the selected
-// event. Unselected cards stay white; the selected card uses the light-blue fill.
+// event. Past cards use the same camouflaged fill treatment as the Events list.
 function EventSidebarCard({
 	event,
 	applicantCount,
 	selected,
+	camouflaged = false,
 	onSelect,
 }: {
 	event: VenueEvent;
 	applicantCount: number;
 	selected: boolean;
+	camouflaged?: boolean;
 	onSelect: () => void;
 }) {
+	const cardFillClassName = camouflaged
+		? 'bg-transparent'
+		: selected
+			? 'bg-[#CEF4FF]'
+			: 'bg-white hover:brightness-95';
+	const pillFillClassName = camouflaged ? 'bg-transparent' : 'bg-[#F7EFC0]';
 	return (
 		<button
 			type="button"
 			onClick={onSelect}
 			aria-label={`View applicants for ${event.name}`}
-			className={`flex w-full shrink-0 cursor-pointer flex-col items-start gap-[6px] rounded-[12px] border-[2px] border-black p-[10px] text-left font-inter text-black transition ${
-				selected ? 'bg-[#CEF4FF]' : 'bg-white hover:brightness-95'
-			}`}
+			className={`flex w-full shrink-0 cursor-pointer flex-col items-start gap-[6px] rounded-[12px] border-[2px] border-black p-[10px] text-left font-inter text-black transition ${cardFillClassName}`}
 		>
 			<span className="w-full truncate text-[16px] font-bold leading-none">
 				{event.name}
 			</span>
 			<span className="flex items-center gap-[6px]">
-				<span className="flex h-[22px] shrink-0 items-center justify-center rounded-[8px] border-[1.5px] border-black bg-[#F7EFC0] px-[8px] text-[12px] font-medium leading-none">
+				<span
+					className={`flex h-[22px] shrink-0 items-center justify-center rounded-[8px] border-[1.5px] border-black px-[8px] text-[12px] font-medium leading-none ${pillFillClassName}`}
+				>
 					{formatApplicantCount(applicantCount)}
 				</span>
 				{event.booking && (
@@ -139,7 +165,7 @@ function EventSidebarCard({
 				)}
 			</span>
 			<span className="flex w-full items-center gap-[8px]">
-				<EventDatePill event={event} />
+				<EventDatePill event={event} camouflaged={camouflaged} />
 				<span className="min-w-0 truncate text-[13px] font-medium leading-none">
 					{formatVenueOpportunityTimeRange(event.startTime, event.endTime)}
 				</span>
@@ -707,24 +733,30 @@ function EventApplicantsBox({
 						<SectionNotice>Loading…</SectionNotice>
 					) : isError ? (
 						<SectionNotice>Couldn’t load applicants.</SectionNotice>
-					) : !applicants || applicants.length === 0 ? (
-						<SectionNotice>No applicants yet.</SectionNotice>
 					) : (
 						<>
 							{expandedApplicant && <ApplicantDetailCard applicant={expandedApplicant} />}
-							{applicants.map((applicant, index) => (
-								<ApplicantRow
-									key={applicant.id}
-									applicant={applicant}
-									striped={index % 2 === 1}
-									expanded={applicant.id === expandedApplicantId}
-									onToggle={() =>
-										setExpandedApplicantId(
-											applicant.id === expandedApplicantId ? null : applicant.id
-										)
-									}
-								/>
-							))}
+							<div
+								className="flex w-full flex-1 flex-col"
+								style={APPLICANT_ROW_GRID_STYLE}
+							>
+								{(!applicants || applicants.length === 0) && (
+									<span className="sr-only">No applicants yet.</span>
+								)}
+								{(applicants ?? []).map((applicant, index) => (
+									<ApplicantRow
+										key={applicant.id}
+										applicant={applicant}
+										striped={index % 2 === 1}
+										expanded={applicant.id === expandedApplicantId}
+										onToggle={() =>
+											setExpandedApplicantId(
+												applicant.id === expandedApplicantId ? null : applicant.id
+											)
+										}
+									/>
+								))}
+							</div>
 						</>
 					)}
 				</div>
@@ -803,6 +835,7 @@ export function VenueEventDetailView({
 									event={event}
 									applicantCount={applicantCountByEventId.get(event.id) ?? 0}
 									selected={event.id === selectedEventId}
+									camouflaged
 									onSelect={() => onSelectEvent(event.id)}
 								/>
 							))}

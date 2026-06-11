@@ -14,6 +14,10 @@ import type {
 	SerializedBookingRequest,
 	SerializedMessage,
 } from '@/types';
+import {
+	parseVenueMessageAction,
+	stripVenueMessageActionMarker,
+} from '@/utils/venueMessageActions';
 import { loadBookingRequestMap, serializeBookingRequestRows } from './bookingRequests';
 
 /** A contact is a published venue user exactly when it carries a venueId. */
@@ -27,7 +31,7 @@ export const serializeMessage = (
 	id: message.id,
 	conversationId: message.conversationId,
 	sender: message.sender,
-	body: message.body,
+	body: stripVenueMessageActionMarker(message.body),
 	isHtml: message.isHtml,
 	applicationId: message.applicationId,
 	bookingRequestId: message.bookingRequestId,
@@ -37,12 +41,16 @@ export const serializeMessage = (
 		message.bookingRequestId != null
 			? (bookingRequestById?.get(message.bookingRequestId) ?? null)
 			: null,
+	venueAction:
+		message.sender === MessageSender.venue ? parseVenueMessageAction(message.body) : null,
 	createdAt: message.createdAt.toISOString(),
 });
 
 /** Plain-text, truncated preview of a message body for the inbox list. */
 export const buildPreview = (body: string, isHtml: boolean, max = 140): string => {
-	const text = (isHtml ? convertHtmlToPlainText(body) : body).replace(/\s+/g, ' ').trim();
+	const text = stripVenueMessageActionMarker(isHtml ? convertHtmlToPlainText(body) : body)
+		.replace(/\s+/g, ' ')
+		.trim();
 	return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 };
 
@@ -230,6 +238,19 @@ export const buildApplicationSummaryHtml = (
 	}
 	return parts.join('');
 };
+
+/**
+ * The artist-facing "sent application" body: the exact venue-visible summary plus
+ * a videos line appended HERE — never inside buildApplicationSummaryHtml, whose
+ * output seeds venue threads and must stay byte-identical.
+ */
+export const buildSentApplicationHtml = (
+	summaryHtml: string,
+	videoCount: number
+): string =>
+	videoCount > 0
+		? `${summaryHtml}<p><strong>Videos:</strong> ${videoCount} attached</p>`
+		: summaryHtml;
 
 type OpenApplicationCode = 'not_found' | 'forbidden' | 'withdrawn' | 'venue_unavailable';
 
@@ -674,40 +695,28 @@ export const getMessagesPage = async (
 	const pageRows = hasMore ? rows.slice(0, limit) : rows;
 	const nextCursor = hasMore ? pageRows[pageRows.length - 1].id : null;
 
-	const [counterpart, bookingRequestById, activeBookingRow, venueMessage] =
-		await Promise.all([
-			getCounterpart(role, conversation),
-			loadBookingRequestMap(
-				pageRows
-					.map((m) => m.bookingRequestId)
-					.filter((id): id is number => id != null)
-			),
-			// Page-level active request for THIS thread view — the banner/button must
-			// stay correct even when the delivering message paginated out of the page.
-			// The merged 'all' view (the artist's messenger) has no single thread, so
-			// it carries none.
-			thread === 'all'
-				? Promise.resolve(null)
-				: prisma.bookingRequest.findFirst({
-						where: {
-							conversationId,
-							threadApplicationId: thread === 'general' ? null : thread,
-							status: { not: 'canceled' },
-						},
-						orderBy: { id: 'desc' },
-					}),
-			// "Request to book" precondition: the venue has authored ≥1 message in
-			// this thread view (server-computed — the loaded page may not reach back
-			// far enough).
-			prisma.message.findFirst({
-				where: {
-					conversationId,
-					sender: MessageSender.venue,
-					...threadWhere(thread),
-				},
-				select: { id: true },
-			}),
-		]);
+	const [counterpart, bookingRequestById, activeBookingRow] = await Promise.all([
+		getCounterpart(role, conversation),
+		loadBookingRequestMap(
+			pageRows
+				.map((m) => m.bookingRequestId)
+				.filter((id): id is number => id != null)
+		),
+		// Page-level active request for THIS thread view — the banner/button must
+		// stay correct even when the delivering message paginated out of the page.
+		// The merged 'all' view (the artist's messenger) has no single thread, so
+		// it carries none.
+		thread === 'all'
+			? Promise.resolve(null)
+			: prisma.bookingRequest.findFirst({
+					where: {
+						conversationId,
+						threadApplicationId: thread === 'general' ? null : thread,
+						status: { not: 'canceled' },
+					},
+					orderBy: { id: 'desc' },
+				}),
+	]);
 	const items = [...pageRows]
 		.reverse()
 		.map((m) => serializeMessage(m, bookingRequestById)); // ascending
@@ -726,7 +735,6 @@ export const getMessagesPage = async (
 			currentUserRole: role,
 			counterpart,
 			bookingRequest,
-			venueHasMessaged: venueMessage != null,
 		},
 	};
 };

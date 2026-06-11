@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Event as VenueEvent } from '@prisma/client';
 import { PayRangeMoneyIcon } from '@/components/atoms/_svg/PayRangeMoneyIcon';
 import DashboardCalendarPanel from '@/components/molecules/DashboardCalendarPanel/DashboardCalendarPanel';
@@ -13,11 +13,12 @@ import {
 	useCreateVenueEvent,
 	useUpdateVenueEvent,
 } from '@/hooks/queryHooks/useVenueEvents';
+import { useGetVenue } from '@/hooks/queryHooks/useVenue';
 import { DASHBOARD_CALENDAR_NATIVE_WIDTH_PX, VENUE_TIME_OPTIONS } from '../constants';
 import {
 	buildVenueEventPayload,
 	createVenueEventFormFromEvent,
-	EMPTY_CREATE_EVENT_FORM,
+	createVenueEventFormFromVenueProfile,
 	formatVenueCreateEventDate,
 	formatVenueCreateEventDuration,
 	formatVenueCreateEventIsoDate,
@@ -61,13 +62,18 @@ export function MobileVenueCreateTab({
 	event: VenueEvent | null;
 	onSaved: () => void;
 }) {
+	const { data: venueProfile } = useGetVenue();
 	const [eventForm, setEventForm] = useState<VenueCreateEventFormState>(() =>
-		event ? createVenueEventFormFromEvent(event) : EMPTY_CREATE_EVENT_FORM
+		event
+			? createVenueEventFormFromEvent(event)
+			: createVenueEventFormFromVenueProfile(venueProfile)
 	);
 	const [activeBand, setActiveBand] = useState<MobileVenueCreateBand>(null);
 	const [publishState, setPublishState] = useState<'idle' | 'missing-name'>('idle');
 	const eventNameInputRef = useRef<HTMLInputElement | null>(null);
 	const isEditing = event != null;
+	const activeEditingEventIdRef = useRef<number | null>(event?.id ?? null);
+	const hasEditedCreateEventRef = useRef(false);
 
 	const { mutate: createEvent, isPending: isCreatingEvent } = useCreateVenueEvent({
 		onSuccess: onSaved,
@@ -76,6 +82,29 @@ export function MobileVenueCreateTab({
 		onSuccess: onSaved,
 	});
 	const isSavingEvent = isCreatingEvent || isUpdatingEvent;
+	const markCreateEventEdited = () => {
+		hasEditedCreateEventRef.current = true;
+	};
+
+	useEffect(() => {
+		const editingEventId = event?.id ?? null;
+		const didSwitchEditingTarget = activeEditingEventIdRef.current !== editingEventId;
+		if (didSwitchEditingTarget) {
+			activeEditingEventIdRef.current = editingEventId;
+			hasEditedCreateEventRef.current = false;
+		}
+
+		if (event) {
+			setEventForm(createVenueEventFormFromEvent(event));
+			setPublishState('idle');
+			return;
+		}
+
+		if (hasEditedCreateEventRef.current) return;
+
+		setEventForm(createVenueEventFormFromVenueProfile(venueProfile));
+		setPublishState('idle');
+	}, [event, venueProfile]);
 
 	// Calendar scale: measure the band's inner width (ResizeObserver callback
 	// ref) and scale the native-width calendar down to fit.
@@ -97,10 +126,12 @@ export function MobileVenueCreateTab({
 		field: 'eventName' | 'pay' | 'details',
 		value: string
 	) => {
+		markCreateEventEdited();
 		setEventForm((current) => ({ ...current, [field]: value }));
 		setPublishState('idle');
 	};
 	const updateEventLocation = (partial: Partial<VenueCreateEventLocation>) => {
+		markCreateEventEdited();
 		setEventForm((current) => ({
 			...current,
 			location: { ...current.location, ...partial },
@@ -108,6 +139,7 @@ export function MobileVenueCreateTab({
 		setPublishState('idle');
 	};
 	const selectEventDate = (date: Date) => {
+		markCreateEventEdited();
 		setEventForm((current) => ({
 			...current,
 			when: formatVenueCreateEventDate(date),
@@ -116,6 +148,7 @@ export function MobileVenueCreateTab({
 		setPublishState('idle');
 	};
 	const updateEventTimeField = (field: MobileVenueCreateTimeField, value: string) => {
+		markCreateEventEdited();
 		setEventForm((current) => {
 			if (field === 'startTime') {
 				const startMinutes = getVenueCreateEventTimeMinutes(value);
@@ -142,6 +175,7 @@ export function MobileVenueCreateTab({
 	// Auto-advance Who -> When on the incomplete -> complete transition (inline
 	// equivalent of the desktop's wasWhoComplete ref effect).
 	const selectEventSize = (size: string) => {
+		markCreateEventEdited();
 		setEventForm((current) => ({ ...current, whoSize: size }));
 		setPublishState('idle');
 		if (!isWhoComplete && eventForm.whoGenres.length > 0) {
@@ -149,6 +183,7 @@ export function MobileVenueCreateTab({
 		}
 	};
 	const toggleEventGenre = (genre: string) => {
+		markCreateEventEdited();
 		const normalizedGenre = genre.toLowerCase();
 		const hasGenre = eventForm.whoGenres.some(
 			(currentGenre) => currentGenre.toLowerCase() === normalizedGenre

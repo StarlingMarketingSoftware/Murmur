@@ -2,7 +2,11 @@ import { auth } from '@clerk/nextjs/server';
 import { MessageSender, type ApplicationStatus } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { apiResponse, apiUnauthorized, handleApiError } from '@/app/api/_utils';
-import { buildPreview } from '@/app/api/_utils/messaging';
+import {
+	buildApplicationSummaryHtml,
+	buildPreview,
+	buildSentApplicationHtml,
+} from '@/app/api/_utils/messaging';
 
 // Event/venue details for an opportunity the user applied to. Mirrors MapEventData;
 // `startsAt` is serialized to an ISO string over the wire.
@@ -39,6 +43,14 @@ export type MyApplicationBooking = {
 	date: string | null; // set when confirmed
 };
 
+// The venue's projection Contact row (Contact.venueId is unique) — lets the campaign
+// inbox key/scope a synthesized "sent application" row the same way it scopes the
+// venue's projected replies. Null when the venue or its contact row is gone.
+export type MyApplicationVenueContact = {
+	id: number;
+	email: string;
+};
+
 export type MyEventApplication = {
 	id: number;
 	eventId: number;
@@ -48,6 +60,10 @@ export type MyEventApplication = {
 	genre: string | null;
 	area: string | null;
 	videoCount: number;
+	// The application exactly as the venue sees it (the seeded thread-opening
+	// message), plus a videos line — rendered as the artist's "sent" inbox item.
+	summaryHtml: string;
+	venueContact: MyApplicationVenueContact | null;
 	// null if the event was deleted after the application was submitted.
 	event: MyApplicationEvent | null;
 	venueResponse: MyApplicationVenueResponse | null;
@@ -80,6 +96,7 @@ export async function GET() {
 				performingName: true,
 				genre: true,
 				area: true,
+				bio: true,
 				_count: { select: { videos: true } },
 			},
 		});
@@ -122,12 +139,22 @@ export async function GET() {
 					.filter((id): id is number => id != null)
 			),
 		];
-		const conversations = venueIds.length
-			? await prisma.conversation.findMany({
-					where: { standardUserId: userId, venueId: { in: venueIds } },
-					select: { id: true, venueId: true },
-				})
-			: [];
+		const [conversations, venueContacts] = venueIds.length
+			? await Promise.all([
+					prisma.conversation.findMany({
+						where: { standardUserId: userId, venueId: { in: venueIds } },
+						select: { id: true, venueId: true },
+					}),
+					// Contact.venueId is unique — one projection contact per venue.
+					prisma.contact.findMany({
+						where: { venueId: { in: venueIds } },
+						select: { id: true, email: true, venueId: true },
+					}),
+				])
+			: [[], []];
+		const venueContactByVenueId = new Map(
+			venueContacts.map((c) => [c.venueId as number, { id: c.id, email: c.email }])
+		);
 		const conversationByVenueId = new Map(conversations.map((c) => [c.venueId, c.id]));
 		const conversationIds = conversations.map((c) => c.id);
 		const applicationIds = applications.map((a) => a.id);
@@ -221,6 +248,12 @@ export async function GET() {
 					genre: application.genre,
 					area: application.area,
 					videoCount: application._count.videos,
+					summaryHtml: buildSentApplicationHtml(
+						buildApplicationSummaryHtml(application, event?.name ?? null),
+						application._count.videos
+					),
+					venueContact:
+						venueId != null ? (venueContactByVenueId.get(venueId) ?? null) : null,
 					event: event
 						? {
 								id: event.id,

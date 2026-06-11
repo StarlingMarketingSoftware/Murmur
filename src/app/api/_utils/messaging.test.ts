@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import {
 	buildApplicationSummaryHtml,
 	buildPreview,
+	buildSentApplicationHtml,
 	isVenueContact,
 	serializeMessage,
 } from './messaging';
+import { buildVenueInviteToConnectBody } from '@/utils/venueMessageActions';
 import type { Message } from '@prisma/client';
 
 test('isVenueContact detects published venue contacts via venueId', () => {
@@ -16,6 +18,10 @@ test('isVenueContact detects published venue contacts via venueId', () => {
 test('buildPreview strips HTML and collapses whitespace', () => {
 	assert.equal(buildPreview('<p>Hello   <b>there</b></p>', true), 'Hello there');
 	assert.equal(buildPreview('plain  text\n line', false), 'plain text line');
+});
+
+test('buildPreview hides venue action markers', () => {
+	assert.equal(buildPreview(buildVenueInviteToConnectBody(), false), 'Invite to connect');
 });
 
 test('buildPreview truncates with an ellipsis', () => {
@@ -51,6 +57,16 @@ test('buildApplicationSummaryHtml degrades when the event is gone and fields are
 	assert.equal(html, '<p><strong>Application</strong></p>');
 });
 
+test('buildSentApplicationHtml appends a videos line without touching the summary', () => {
+	const summary = '<p><strong>Application — Jazz Night</strong></p>';
+	assert.equal(
+		buildSentApplicationHtml(summary, 2),
+		`${summary}<p><strong>Videos:</strong> 2 attached</p>`
+	);
+	// No videos → the venue-visible summary passes through byte-identical.
+	assert.equal(buildSentApplicationHtml(summary, 0), summary);
+});
+
 test('serializeMessage maps a Message row to the API shape', () => {
 	const createdAt = new Date('2026-05-29T12:00:00.000Z');
 	const row: Message = {
@@ -78,7 +94,33 @@ test('serializeMessage maps a Message row to the API shape', () => {
 		applicationId: null,
 		bookingRequestId: null,
 		bookingRequest: null,
+		venueAction: null,
 		createdAt: '2026-05-29T12:00:00.000Z',
+	});
+});
+
+test('serializeMessage exposes venue invite actions without the hidden marker', () => {
+	const createdAt = new Date('2026-06-11T12:00:00.000Z');
+	const row: Message = {
+		id: 4,
+		conversationId: 2,
+		sender: 'venue',
+		senderClerkId: 'user_venue',
+		body: buildVenueInviteToConnectBody(),
+		isHtml: false,
+		emailId: null,
+		applicationId: null,
+		threadApplicationId: null,
+		bookingRequestId: null,
+		campaignId: null,
+		createdAt,
+		updatedAt: createdAt,
+	};
+	const out = serializeMessage(row);
+	assert.equal(out.body, 'Invite to connect');
+	assert.deepEqual(out.venueAction, {
+		kind: 'invite-to-connect',
+		label: 'Invite to connect',
 	});
 });
 
@@ -116,6 +158,7 @@ test('serializeMessage attaches live booking-request state from the lookup map',
 	const out = serializeMessage(row, new Map([[41, liveState]]));
 	assert.equal(out.bookingRequestId, 41);
 	assert.deepEqual(out.bookingRequest, liveState);
+	assert.equal(out.venueAction, null);
 	// A message whose request is missing from the map degrades to null state.
 	assert.equal(serializeMessage(row, new Map()).bookingRequest, null);
 });

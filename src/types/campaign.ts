@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import type { SerializedBookingRequest } from './conversation';
+import type { SerializedVenueMessageAction } from '@/utils/venueMessageActions';
 
 // Enums
 export type CampaignWithRelations = Prisma.CampaignGetPayload<{
@@ -46,6 +47,11 @@ export type InboundEmailWithRelations = Prisma.InboundEmailGetPayload<{
 	 * booking request (Message.bookingRequestId). Absent on real inbound rows.
 	 */
 	venueBookingRequest?: SerializedBookingRequest | null;
+	/**
+	 * Special venue-authored action row projected into Responses, e.g. an
+	 * invite-to-connect ping.
+	 */
+	venueAction?: SerializedVenueMessageAction | null;
 };
 
 export type TestDraftEmail = {

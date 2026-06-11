@@ -1,4 +1,5 @@
 import type { EmailWithRelations, InboundEmailWithRelations } from '@/types';
+import type { MyEventApplication } from '@/app/api/events/applications/route';
 
 export type InboxConversationMessage = InboundEmailWithRelations & { isSent?: boolean };
 
@@ -29,6 +30,58 @@ export const normalizeSentEmailForInboxConversation = (
 		originalEmailId: null,
 		isSent: true,
 	}) as unknown as InboxConversationMessage;
+
+// Offsets synthesized application-row ids past every projected venue row id
+// (-message.id): selection fallbacks compare raw ids across the sent/inbound
+// spaces (e.g. inboxConversationContainsEmailId), so the spaces must not alias.
+export const APPLICATION_SENT_ROW_ID_OFFSET = 1_000_000_000;
+
+/**
+ * Projects the artist's own submitted event application into the inbound-message
+ * shape as a "sent" item, so each applied event threads as its own conversation
+ * (the `venueThreadApplicationId` key suffix) with the application as its first
+ * message — mirroring the summary card the venue sees. Returns null when the
+ * venue's projection contact is gone (the row could never be keyed or scoped).
+ */
+export const normalizeApplicationForInboxConversation = (
+	application: MyEventApplication
+): InboxConversationMessage | null => {
+	if (!application.venueContact) return null;
+	// Paragraph/line breaks become newlines: thread bubbles render this as
+	// whitespace-pre-wrap plain text, while snippets collapse whitespace anyway.
+	const plainSummary = application.summaryHtml
+		.replace(/<br\s*\/?>/gi, '\n')
+		.replace(/<\/p>/gi, '\n')
+		.replace(/<[^>]*>/g, '')
+		.replace(/\n{2,}/g, '\n')
+		.trim();
+	return {
+		id: -(APPLICATION_SENT_ROW_ID_OFFSET + application.id),
+		sender: application.venueContact.email,
+		senderName: application.event?.venueName || 'Venue',
+		recipient: '',
+		subject: application.event?.name || 'Application',
+		bodyPlain: plainSummary,
+		bodyHtml: application.summaryHtml,
+		strippedText: plainSummary,
+		receivedAt: application.createdAt,
+		contactId: application.venueContact.id,
+		contact: null,
+		campaignId: null,
+		campaign: null,
+		originalEmail: null,
+		originalEmailId: null,
+		venueConversationId: application.venueResponse?.conversationId ?? null,
+		venueThreadApplicationId: application.id,
+		isSent: true,
+	} as unknown as InboxConversationMessage;
+};
+
+/** A synthesized application row — read-only: it has no reply channel until the
+ * venue engages (replying would otherwise fall through to Mailgun and email the
+ * venue contact's placeholder address). */
+export const isApplicationSentRow = (email: InboxConversationMessage): boolean =>
+	Boolean(email.isSent) && email.id <= -APPLICATION_SENT_ROW_ID_OFFSET;
 
 /**
  * Strip quoted reply content from email body (e.g., "On Thu, Nov 27, 2025 at 2:36 AM ... wrote:")
@@ -100,9 +153,11 @@ export const getInboxConversationKey = (email: InboxConversationMessage): string
 	// its own conversation, separate from the general/cold-outreach chat with the
 	// same venue. Only application threads get the suffix — general-thread replies
 	// keep the bare key so they still interleave with the artist's diverted sent
-	// email (which has no venue markers and groups by campaign+contact).
+	// email (which has no venue markers and groups by campaign+contact). Keyed on
+	// the thread tag alone: synthesized "sent application" rows must land in the
+	// event thread before any Conversation row exists.
 	const venueThreadSuffix =
-		email.venueConversationId != null && email.venueThreadApplicationId != null
+		email.venueThreadApplicationId != null
 			? `:vthread:${email.venueThreadApplicationId}`
 			: '';
 

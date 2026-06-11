@@ -2,6 +2,10 @@ import type { PostMessageData } from '@/app/api/messages/route';
 import { _fetch } from '@/utils';
 import { urls } from '@/constants/urls';
 import {
+	parseVenueMessageAction,
+	stripVenueMessageActionMarker,
+} from '@/utils/venueMessageActions';
+import {
 	CustomMutationOptions,
 	ConversationListItem,
 	MessageSenderRole,
@@ -115,11 +119,13 @@ export const useSendReply = (
 					id: -Date.now(), // temp negative id; replaced on settle
 					conversationId,
 					sender: currentUserRole,
-					body,
+					body: stripVenueMessageActionMarker(body),
 					isHtml: false,
 					applicationId: null,
 					bookingRequestId: null,
 					bookingRequest: null,
+					venueAction:
+						currentUserRole === 'venue' ? parseVenueMessageAction(body) : null,
 					createdAt: new Date().toISOString(),
 				};
 				queryClient.setQueryData<MessagesPage>(key, {

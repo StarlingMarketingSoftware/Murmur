@@ -25,6 +25,7 @@ import { getStateAbbreviation, splitTrailingNumericSuffix } from '@/utils/string
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 import OpenIcon from '@/components/atoms/svg/OpenIcon';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
+import { CalendarPlusIcon } from '@/components/atoms/_svg/CalendarPlusIcon';
 import {
 	canadianProvinceAbbreviations,
 	canadianProvinceNames,
@@ -64,10 +65,12 @@ import {
 	inboxConversationContainsEmailId,
 	inboxConversationContainsInboundEmailId,
 	inboxConversationContainsSentEmailId,
+	normalizeApplicationForInboxConversation,
 	normalizeSentEmailForInboxConversation,
 	type InboxConversation,
 	type InboxConversationMessage,
 } from '@/utils/inboxConversations';
+import { useGetMyEventApplications } from '@/hooks/queryHooks/useEventApplications';
 
 const isSameLocalDay = (a: Date, b: Date) =>
 	a.getFullYear() === b.getFullYear() &&
@@ -361,6 +364,30 @@ export const TitleBadge: FC<{
 			text={getTitleBadgeLabel(title)}
 			className={cn('leading-none', textClassName)}
 		/>
+	</div>
+);
+
+// Labels a per-application (event) thread row with its opportunity name —
+// calendar icon + amber fill so the row reads as an event, not a venue email.
+export const EventThreadBadge: FC<{
+	name: string;
+	className?: string;
+	textClassName?: string;
+	strokeColor?: string;
+	textColor?: string;
+	showStroke?: boolean;
+}> = ({ name, className, textClassName, strokeColor, textColor, showStroke = true }) => (
+	<div
+		className={cn('border overflow-hidden flex items-center gap-0.5', className)}
+		style={{
+			backgroundColor: '#FFE2C8',
+			borderColor: showStroke ? (strokeColor ?? '#000000') : 'transparent',
+			borderWidth: showStroke ? undefined : 0,
+			color: textColor ?? '#000000',
+		}}
+	>
+		<CalendarPlusIcon className="h-[12px] w-[12px] shrink-0" />
+		<ScrollableText text={name} className={cn('leading-none', textClassName)} />
 	</div>
 );
 
@@ -1074,13 +1101,29 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			return Boolean(sender && contactsByEmail.has(sender));
 		});
 	}, [allContacts, contactByEmail, contactsByEmail, inboxEmails]);
+	// The artist's submitted applications thread in as per-event "sent" items,
+	// scoped by the same campaign-contacts rule as the inbound rows above.
+	const { data: myApplications } = useGetMyEventApplications();
+	const supplementalApplicationRows = useMemo(() => {
+		const rows = (myApplications ?? [])
+			.filter((application) => application.status === 'submitted')
+			.map(normalizeApplicationForInboxConversation)
+			.filter((row): row is InboxConversationMessage => row != null);
+		const shouldScopeToCampaignContacts = Boolean(allContacts || contactByEmail);
+		if (!shouldScopeToCampaignContacts) return rows;
+		return rows.filter((row) => {
+			const sender = row.sender?.toLowerCase().trim();
+			return Boolean(sender && contactsByEmail.has(sender));
+		});
+	}, [allContacts, contactByEmail, contactsByEmail, myApplications]);
 	const supplementalInboxThreadConversations = useMemo(
 		() =>
 			buildInboxConversations([
 				...(supplementalInboxRows as InboxConversationMessage[]),
 				...supplementalSentThreadMessages,
+				...supplementalApplicationRows,
 			]),
-		[supplementalInboxRows, supplementalSentThreadMessages]
+		[supplementalInboxRows, supplementalSentThreadMessages, supplementalApplicationRows]
 	);
 	const supplementalSentConversations = useMemo(
 		() =>
@@ -1414,6 +1457,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		);
 		const companyLabel = getContactCompanyLabel(contact);
 		const contactTitle = getContactTitle(contact);
+		// Event-thread rows are labeled with their opportunity (the row's subject is
+		// the event name) instead of the generic venue-type chip.
+		const threadEventName =
+			email.venueThreadApplicationId != null ? email.subject || '' : '';
 		const bodyPreview = `${previewEmail.isSent ? 'You: ' : ''}${
 			getInboxMessageSnippet(previewEmail) || 'No content'
 		}`;
@@ -1502,7 +1549,19 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				</div>
 
 				<div className="absolute top-[9px] left-1/2 right-2 pl-1 pointer-events-none">
-					{contactTitle ? (
+					{threadEventName ? (
+						<EventThreadBadge
+							name={threadEventName}
+							className="w-full h-[17px] rounded-[6px] px-2 gap-1"
+							textClassName={cn(
+								'text-[10px] leading-none',
+								inboxSupplementalTextClassName
+							)}
+							strokeColor={inboxSupplementalBorderColor}
+							textColor={inboxSupplementalTextColor}
+							showStroke={!shouldRedOutInboxRows}
+						/>
+					) : contactTitle ? (
 						<TitleBadge
 							title={contactTitle}
 							className="w-full h-[17px] rounded-[6px] px-2 gap-1"
@@ -1524,7 +1583,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				<div
 					className={cn(
 						'absolute left-1/2 right-2 pl-1 pointer-events-none',
-						contactTitle ? 'top-[30px]' : 'top-[9px]'
+						threadEventName || contactTitle ? 'top-[30px]' : 'top-[9px]'
 					)}
 				>
 					<StateLocationRow
@@ -1568,6 +1627,8 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		const contactName = getContactDisplayName(contact, contact?.email || 'Unknown recipient');
 		const companyLabel = getContactCompanyLabel(contact);
 		const contactTitle = getContactTitle(contact);
+		const threadEventName =
+			email.venueThreadApplicationId != null ? email.subject || '' : '';
 		const messagePreview = `You: ${getInboxMessageSnippet(email) || 'No content'}`;
 		const isSelectedSentConversation =
 			selectedInboxEmailId != null &&
@@ -1644,7 +1705,19 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				</div>
 
 				<div className="absolute top-[9px] left-1/2 right-2 pl-1 pointer-events-none">
-					{contactTitle ? (
+					{threadEventName ? (
+						<EventThreadBadge
+							name={threadEventName}
+							className="w-full h-[17px] rounded-[6px] px-2 gap-1"
+							textClassName={cn(
+								'text-[10px] leading-none',
+								inboxSupplementalTextClassName
+							)}
+							strokeColor={inboxSupplementalBorderColor}
+							textColor={inboxSupplementalTextColor}
+							showStroke={!shouldRedOutInboxRows}
+						/>
+					) : contactTitle ? (
 						<TitleBadge
 							title={contactTitle}
 							className="w-full h-[17px] rounded-[6px] px-2 gap-1"
@@ -1666,7 +1739,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				<div
 					className={cn(
 						'absolute left-1/2 right-2 pl-1 pointer-events-none',
-						contactTitle ? 'top-[30px]' : 'top-[9px]'
+						threadEventName || contactTitle ? 'top-[30px]' : 'top-[9px]'
 					)}
 				>
 					<StateLocationRow

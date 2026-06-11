@@ -12,7 +12,9 @@ import { convertHtmlToPlainText } from '@/utils';
 import { useMe } from '@/hooks/useMe';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
+import { CalendarPlusIcon } from '@/components/atoms/_svg/CalendarPlusIcon';
 import { BookingRequestBanner } from '@/components/molecules/BookingRequestBanner/BookingRequestBanner';
+import { VenueInviteToConnectBanner } from '@/components/molecules/VenueInviteToConnectBanner/VenueInviteToConnectBanner';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import type { InboundEmailWithRelations } from '@/types';
 import type { ContactWithName } from '@/types/contact';
@@ -41,10 +43,13 @@ import {
 	inboxConversationContainsEmailId,
 	inboxConversationContainsInboundEmailId,
 	inboxConversationContainsSentEmailId,
+	isApplicationSentRow,
+	normalizeApplicationForInboxConversation,
 	stripQuotedReply,
 	type InboxConversation,
 	type InboxConversationMessage,
 } from '@/utils/inboxConversations';
+import { useGetMyEventApplications } from '@/hooks/queryHooks/useEventApplications';
 import {
 	InboxRichReplyEditor,
 	isRichTextMessageEmpty,
@@ -738,6 +743,31 @@ const renderContactTitleBadgeIcon = (title: string, size = 14) => {
 const getAvatarInitial = (value: string): string =>
 	value.trim().charAt(0).toUpperCase() || '?';
 
+// Labels a per-application (event) thread with its opportunity name — calendar
+// icon + amber fill so it reads as an event, distinct from the venue-type badge.
+const InboxEventPill: FC<{ name: string; compact?: boolean }> = ({ name, compact }) => (
+	<div
+		className="flex items-center gap-1 overflow-hidden border border-black flex-shrink-0"
+		style={{
+			height: compact ? '16px' : '24px',
+			borderRadius: compact ? '4px' : '6px',
+			backgroundColor: '#FFE2C8',
+			padding: compact ? '0 5px' : '0 8px',
+			maxWidth: compact ? '140px' : '180px',
+		}}
+	>
+		<CalendarPlusIcon
+			className={compact ? 'h-[10px] w-[10px] shrink-0' : 'h-[14px] w-[14px] shrink-0'}
+		/>
+		<span
+			className="truncate text-black"
+			style={{ fontSize: compact ? '9px' : '13px', lineHeight: 1 }}
+		>
+			{name}
+		</span>
+	</div>
+);
+
 const INBOX_LAST_SENT_FILL_COLOR = '#7ED29E';
 const INBOX_MESSENGER_THREAD_BACKGROUND = '#DCF1FF';
 
@@ -911,6 +941,11 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		filters: campaignId ? { campaignId } : undefined,
 		enabled: !isUsingSampleData,
 	});
+	// The artist's submitted applications become per-event "sent" items below —
+	// each one threads as its own event conversation alongside the venue's replies.
+	const { data: myApplications } = useGetMyEventApplications({
+		enabled: !isUsingSampleData,
+	});
 	const inboundEmails = isUsingSampleData
 		? (sampleData?.inboundEmails ?? [])
 		: inboundEmailsFromApi;
@@ -994,6 +1029,19 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					return !!sender && normalizedAllowedSenders.has(sender);
 				})
 			: inboundEmails;
+
+	// Synthesized per-event "sent application" rows, scoped by the same sender
+	// allowlist as the venue's projected replies (the row's sender is the venue
+	// contact's email, so it shows exactly where those replies show).
+	const applicationSentRows: InboxConversationMessage[] = (myApplications ?? [])
+		.filter((application) => application.status === 'submitted')
+		.map(normalizeApplicationForInboxConversation)
+		.filter((row): row is InboxConversationMessage => row != null)
+		.filter((row) => {
+			if (!normalizedAllowedSenders) return true;
+			const sender = row.sender?.toLowerCase().trim();
+			return !!sender && normalizedAllowedSenders.has(sender);
+		});
 
 	const campaignReplyCount = Array.isArray(filteredBySender)
 		? filteredBySender.length
@@ -1100,6 +1148,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	const allInboxConversations = buildInboxConversations([
 		...((filteredBySender ?? []) as InboxConversationMessage[]),
 		...(normalizedSentEmails as InboxConversationMessage[]),
+		...applicationSentRows,
 	]);
 	const inboxConversations = allInboxConversations
 		.filter((conversation) => conversation.inboundMessages.length > 0)
@@ -1158,7 +1207,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	const visibleEmails: InboxConversationMessage[] =
 		activeTab === 'inbox'
 			? visibleInboxConversations.map(getConversationSelectionEmail)
-			: (normalizedSentEmails as InboxConversationMessage[]).filter(emailMatchesSearch);
+			: ([...normalizedSentEmails, ...applicationSentRows] as InboxConversationMessage[])
+					.sort((a, b) => getInboxMessageTimeMs(b) - getInboxMessageTimeMs(a))
+					.filter(emailMatchesSearch);
 
 	const selectedConversation =
 		selectedEmailId !== null
@@ -1181,6 +1232,10 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		: activeTab === 'inbox'
 			? null
 			: (visibleEmails.find((email) => email.id === selectedEmailId) ?? null);
+	// A selected application row is read-only — without it, handleSendReply's
+	// Mailgun fallback would email the venue contact's placeholder address.
+	const selectedIsApplicationRow =
+		selectedEmail != null && isApplicationSentRow(selectedEmail);
 	// Viewing a venue conversation marks its thread read (application threads have
 	// their own watermark; the general thread uses the conversation's) so the
 	// opportunities "venue responded" dot and unread counts clear. Delayed a beat:
@@ -1626,6 +1681,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	const handleSendReply = async (messageOverride?: string) => {
 		const messageToSend = messageOverride ?? replyMessage;
 		if (!selectedEmail || isRichTextMessageEmpty(messageToSend)) return;
+		// Application rows have no reply channel (see selectedIsApplicationRow).
+		if (isApplicationSentRow(selectedEmail)) return;
 
 		const replyKey = selectedConversationReplyKey ?? selectedEmail.id.toString();
 		const senderKey = selectedEmail.sender?.toLowerCase().trim();
@@ -3480,6 +3537,10 @@ export const InboxSection: FC<InboxSectionProps> = ({
 													</span>
 												</div>
 											)}
+											{selectedVenueThreadApplicationId != null &&
+												selectedEmail.subject && (
+													<InboxEventPill name={selectedEmail.subject} />
+												)}
 										</div>
 									</div>
 								);
@@ -3559,6 +3620,21 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									lockHorizontalScroll
 								>
 									{selectedThreadMessages.map((message, index) => {
+										const venueAction = message.venueAction;
+										if (venueAction?.kind === 'invite-to-connect') {
+											return (
+												<VenueInviteToConnectBanner
+													key={`venue-action-${message.id}-${index}`}
+													perspective="artist"
+													counterpartName={getCanonicalContactName(message, contactByEmail)}
+													className={
+														selectedThreadUsesMessengerLayout
+															? 'w-full shrink-0'
+															: 'm-[12px] w-auto shrink-0'
+													}
+												/>
+											);
+										}
 										// Venue booking-request rows render as the handshake banner
 										// (confirm chip while pending, green strip once booked, muted
 										// trace when the venue withdrew it) instead of a bubble/card.
@@ -3588,6 +3664,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 													status={venueBookingRequest.status}
 													perspective="artist"
 													date={venueBookingRequest.date}
+													eventName={venueBookingRequest.eventName}
+													eventDateLabel={venueBookingRequest.eventWhenLabel}
 													bannerRef={
 														isActiveRequestMessage ? bookingRequestBannerRef : undefined
 													}
@@ -3827,7 +3905,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 								</CustomScrollbar>
 							</div>
 
-							{selectedEmail && (
+							{selectedEmail && !selectedIsApplicationRow && (
 								<InboxRichReplyEditor
 									value={replyMessage}
 									onChange={setReplyMessage}
@@ -3977,6 +4055,13 @@ export const InboxSection: FC<InboxSectionProps> = ({
 														</span>
 													</div>
 												)}
+												{selectedVenueThreadApplicationId != null &&
+													selectedEmail.subject && (
+														<InboxEventPill
+															name={selectedEmail.subject}
+															compact={isMobile}
+														/>
+													)}
 											</div>
 										);
 									})()}
@@ -4021,6 +4106,21 @@ export const InboxSection: FC<InboxSectionProps> = ({
 								>
 									{/* Email thread: inbound left, outbound right. */}
 									{selectedThreadMessages.map((message, index) => {
+										const venueAction = message.venueAction;
+										if (venueAction?.kind === 'invite-to-connect') {
+											return (
+												<VenueInviteToConnectBanner
+													key={`venue-action-${message.id}-${index}`}
+													perspective="artist"
+													counterpartName={getCanonicalContactName(message, contactByEmail)}
+													className={
+														selectedThreadUsesMessengerLayout
+															? 'w-full shrink-0'
+															: 'm-[12px] w-auto shrink-0'
+													}
+												/>
+											);
+										}
 										// Venue booking-request rows render as the handshake banner;
 										// the confirm chip wires up whenever the confirm flow is
 										// eligible (campaign inbox), independent of layout tier.
@@ -4050,6 +4150,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 													status={venueBookingRequest.status}
 													perspective="artist"
 													date={venueBookingRequest.date}
+													eventName={venueBookingRequest.eventName}
+													eventDateLabel={venueBookingRequest.eventWhenLabel}
 													bannerRef={
 														isActiveRequestMessage ? bookingRequestBannerRef : undefined
 													}
@@ -4259,7 +4361,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 								</CustomScrollbar>
 
 								{/* Reply Box - fixed at bottom */}
-								{selectedEmail && (
+								{selectedEmail && !selectedIsApplicationRow && (
 									<div
 										className="w-full flex justify-center"
 										style={{
@@ -4425,6 +4527,10 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																{companyLabel}
 															</span>
 														)}
+														{email.venueThreadApplicationId != null &&
+															email.subject && (
+																<InboxEventPill name={email.subject} compact />
+															)}
 														{headline && (
 															<div
 																className="h-[16px] max-w-[140px] rounded-[4px] px-1.5 flex items-center gap-0.5 border border-black overflow-hidden flex-shrink-0"
@@ -4510,6 +4616,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 													: '';
 												return (
 													<>
+														{email.venueThreadApplicationId != null &&
+															email.subject && <InboxEventPill name={email.subject} />}
 														{headline && (
 															<div
 																className="h-[21px] max-w-[160px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden flex-shrink-0"

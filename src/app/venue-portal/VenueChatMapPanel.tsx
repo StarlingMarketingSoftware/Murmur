@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ConversationThread } from '@/components/organisms/ConversationsPane';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
@@ -12,7 +12,13 @@ import { OutlinedInitialAvatar } from '@/components/atoms/OutlinedInitialAvatar/
 import { ProfileAreaMarkerIcon } from '@/components/atoms/_svg/ProfileAreaMarkerIcon';
 import { getProfileGenreIcon } from '@/components/molecules/HybridPromptInput/profileFieldIcons';
 import { VENUE_MAP_OVERLAY_SCALE } from './constants';
-import { EVENT_PILL_COLORS, replyRowActivity, useVenueChatInbox } from './useVenueChatInbox';
+import {
+	EVENT_PILL_COLORS,
+	isReplyRowEventLive,
+	replyRowActivity,
+	useVenueChatInbox,
+	type ReplyGroup,
+} from './useVenueChatInbox';
 
 function SectionNotice({ children }: { children: ReactNode }) {
 	return (
@@ -241,6 +247,87 @@ export function VenueChatMapPanel({
 		ensureApplicationSeed,
 	} = useVenueChatInbox();
 
+	// Past/live partition is recomputed per render (not memoized) so it shares the
+	// same Date.now() frame as the rows' own countdown formatting (same convention
+	// as the Events panel's ledger).
+	const pastReplyGroups: ReplyGroup[] = [];
+	const liveReplyGroups: ReplyGroup[] = [];
+	for (const group of replyGroups) {
+		(isReplyRowEventLive(group.rows[0]) ? liveReplyGroups : pastReplyGroups).push(group);
+	}
+	const pastIdsKey = pastReplyGroups.map((group) => group.eventId).join(',');
+	// Same partition for the open-thread rail's flat list (row-level — the rail
+	// carries no event grouping).
+	const pastFlatReplies: VenueApplicationRow[] = [];
+	const liveFlatReplies: VenueApplicationRow[] = [];
+	for (const row of flatReplies) {
+		(isReplyRowEventLive(row) ? liveFlatReplies : pastFlatReplies).push(row);
+	}
+	const railPastIdsKey = pastFlatReplies.map((row) => row.id).join(',');
+	const liveReplyRowCount = liveReplyGroups.reduce(
+		(count, group) => count + group.rows.length,
+		0
+	);
+	const listScrollerRef = useRef<HTMLDivElement | null>(null);
+	const liveSectionRef = useRef<HTMLDivElement | null>(null);
+	const [isLedgerScrollbarVisible, setIsLedgerScrollbarVisible] = useState(false);
+	// Past ids the pin effect has already accounted for; null forces a re-pin (set
+	// while the open-thread view has the list scroller unmounted).
+	const seenPastIdsRef = useRef<Set<string> | null>(null);
+	const isListView = selectedThread == null;
+	// Pin the initial scroll to the live section so the visible inbox renders
+	// exactly like a live-only list; replies for outdated opportunities sit above
+	// the fold and reveal only by scrolling up (the Events panel's ledger). Re-pins
+	// when the list scroller (re)mounts (the open-thread view swaps it out) or when
+	// a NEW past event id appears (an event expiring mid-session), but not on
+	// removals. Layout effect so the first paint is already pinned.
+	useLayoutEffect(() => {
+		if (!isListView) {
+			seenPastIdsRef.current = null;
+			return;
+		}
+		const scroller = listScrollerRef.current;
+		const liveSection = liveSectionRef.current;
+		if (!scroller || !liveSection) return;
+		const previous = seenPastIdsRef.current;
+		const nextIds = pastIdsKey === '' ? [] : pastIdsKey.split(',');
+		seenPastIdsRef.current = new Set(nextIds);
+		if (previous && nextIds.every((id) => previous.has(id))) return;
+		// offsetTop is scroller-relative, so it equals the past band's height whether
+		// or not the live content itself overflows the box.
+		scroller.scrollTop = liveSection.offsetTop;
+	}, [isListView, pastIdsKey]);
+	useLayoutEffect(() => {
+		if (!isListView) {
+			setIsLedgerScrollbarVisible(false);
+			return;
+		}
+		const scroller = listScrollerRef.current;
+		const liveSection = liveSectionRef.current;
+		if (!scroller || !liveSection) return;
+		setIsLedgerScrollbarVisible(liveSection.offsetHeight > scroller.clientHeight + 1);
+	}, [isListView, activeSection, liveReplyRowCount, inboundConversations.length]);
+	// The open-thread rail gets the same ledger pin: cards for outdated
+	// opportunities sit above the fold and reveal only by scrolling up.
+	const railScrollerRef = useRef<HTMLDivElement | null>(null);
+	const railLiveSectionRef = useRef<HTMLDivElement | null>(null);
+	const railSeenPastIdsRef = useRef<Set<string> | null>(null);
+	const isRepliesRail = selectedThread != null && activeSection === 'replies';
+	useLayoutEffect(() => {
+		if (!isRepliesRail) {
+			railSeenPastIdsRef.current = null;
+			return;
+		}
+		const scroller = railScrollerRef.current;
+		const liveSection = railLiveSectionRef.current;
+		if (!scroller || !liveSection) return;
+		const previous = railSeenPastIdsRef.current;
+		const nextIds = railPastIdsKey === '' ? [] : railPastIdsKey.split(',');
+		railSeenPastIdsRef.current = new Set(nextIds);
+		if (previous && nextIds.every((id) => previous.has(id))) return;
+		scroller.scrollTop = liveSection.offsetTop;
+	}, [isRepliesRail, railPastIdsKey]);
+
 	// Deep-linked application threads get the same idempotent seed-ensure a manual
 	// Replies-card click performs (the pair conversation may predate the application).
 	useEffect(() => {
@@ -324,29 +411,69 @@ export function VenueChatMapPanel({
 							<div className="px-[12px] pb-[6px] pt-[8px] font-inter text-[12px] font-semibold text-black">
 								{activeSection === 'replies' ? 'Replies' : 'Inbound'}
 							</div>
-							<div className="flex min-h-0 flex-1 flex-col gap-[8px] overflow-y-auto pb-[10px]">
+							{/* CustomScrollbar (not a plain overflow div) so wheel scrolling
+							    works under Lenis, with the thumb permanently hidden — the rail
+							    scrolls (revealing the ledger above) without ever showing a
+							    scrollbar. */}
+							<CustomScrollbar
+								scrollContainerRef={railScrollerRef}
+								className="min-h-0 flex-1"
+								contentClassName="flex flex-col gap-[8px] pb-[10px]"
+								hideThumb
+								lockHorizontalScroll
+							>
 								{activeSection === 'replies' ? (
 									<>
-										{repliesLoading && <SectionNotice>Loading…</SectionNotice>}
-										{!repliesLoading && flatReplies.length === 0 && (
-											<SectionNotice>No applications yet.</SectionNotice>
+										{/* Ledger: cards for outdated opportunities, above the live
+										    section's fold (see the rail pin effect). */}
+										{pastFlatReplies.length > 0 && (
+											<div className="flex shrink-0 flex-col gap-[8px] opacity-70">
+												{pastFlatReplies.map((row) => (
+													<ThreadListCard
+														key={row.id}
+														name={row.applicantName}
+														timestamp={formatInboxTimestamp(replyRowActivity(row))}
+														preview={
+															row.conversation?.lastMessagePreview ||
+															row.applicationPreview
+														}
+														genre={row.genre}
+														area={row.area}
+														unread={(row.conversation?.unreadCount ?? 0) > 0}
+														selected={selectedThread.thread === row.id}
+														pending={pendingApplicationId === row.id}
+														onClick={() => handleReplyRowClick(row)}
+													/>
+												))}
+											</div>
 										)}
-										{flatReplies.map((row) => (
-											<ThreadListCard
-												key={row.id}
-												name={row.applicantName}
-												timestamp={formatInboxTimestamp(replyRowActivity(row))}
-												preview={
-													row.conversation?.lastMessagePreview || row.applicationPreview
-												}
-												genre={row.genre}
-												area={row.area}
-												unread={(row.conversation?.unreadCount ?? 0) > 0}
-												selected={selectedThread.thread === row.id}
-												pending={pendingApplicationId === row.id}
-												onClick={() => handleReplyRowClick(row)}
-											/>
-										))}
+										{/* min-h-full pins max-scrollTop to the past band's height so
+										    the pinned view is exactly the live-only rail. */}
+										<div
+											ref={railLiveSectionRef}
+											className="flex min-h-full shrink-0 flex-col gap-[8px]"
+										>
+											{repliesLoading && <SectionNotice>Loading…</SectionNotice>}
+											{!repliesLoading && flatReplies.length === 0 && (
+												<SectionNotice>No applications yet.</SectionNotice>
+											)}
+											{liveFlatReplies.map((row) => (
+												<ThreadListCard
+													key={row.id}
+													name={row.applicantName}
+													timestamp={formatInboxTimestamp(replyRowActivity(row))}
+													preview={
+														row.conversation?.lastMessagePreview || row.applicationPreview
+													}
+													genre={row.genre}
+													area={row.area}
+													unread={(row.conversation?.unreadCount ?? 0) > 0}
+													selected={selectedThread.thread === row.id}
+													pending={pendingApplicationId === row.id}
+													onClick={() => handleReplyRowClick(row)}
+												/>
+											))}
+										</div>
 									</>
 								) : (
 									<>
@@ -372,7 +499,7 @@ export function VenueChatMapPanel({
 										))}
 									</>
 								)}
-							</div>
+							</CustomScrollbar>
 						</div>
 						<div className="w-[2px] shrink-0 bg-black" />
 						<div className="min-w-0 flex-1">
@@ -387,65 +514,97 @@ export function VenueChatMapPanel({
 					</div>
 				) : (
 					<CustomScrollbar
+						scrollContainerRef={listScrollerRef}
 						className="absolute inset-x-0 bottom-0 top-[32px]"
-						contentClassName="flex min-h-full flex-col"
+						contentClassName="flex flex-col"
 						thumbWidth={2}
 						thumbHeightOverride={170}
 						offsetRight={-16}
+						hideThumb={!isLedgerScrollbarVisible}
 						lockHorizontalScroll
 					>
-						{/* ── Replies: applications to my events ── */}
-						<div
-							className={`shrink-0 bg-[linear-gradient(180deg,#D1CEFF_0%,#BCE2FF_50%,#FFF_100%)] ${
-								activeSection === 'replies' ? 'min-h-[380px]' : 'min-h-[190px]'
-							}`}
-						>
-							<div className="flex flex-col gap-[16px] py-[16px]">
-								{repliesLoading && <SectionNotice>Loading…</SectionNotice>}
-								{!repliesLoading && replyGroups.length === 0 && (
-									<SectionNotice>No applications yet.</SectionNotice>
-								)}
-								{replyGroups.map((group, groupIndex) => (
-									<div key={group.eventId} className="flex flex-col gap-[16px]">
-										{groupIndex > 0 && <div className="h-[8px] shrink-0 bg-[#BCE2FF]" />}
-										{group.rows.map((row) => (
-											<ReplyRow
-												key={row.id}
-												row={row}
-												pillColor={
-													EVENT_PILL_COLORS[groupIndex % EVENT_PILL_COLORS.length]
-												}
-												pending={pendingApplicationId === row.id}
-												onClick={() => handleReplyRowClick(row)}
-											/>
-										))}
-									</div>
-								))}
+						{/* ── Ledger: replies for outdated opportunities, above the live
+						    section's fold (see the pin effect). Camouflaged pills on the
+						    gradient's start color so the band reads as plain rows, and the
+						    seam with the live band below is invisible. */}
+						{pastReplyGroups.length > 0 && (
+							<div className="shrink-0 bg-[#D1CEFF]">
+								<div className="flex flex-col gap-[16px] py-[16px] opacity-70">
+									{pastReplyGroups.map((group) => (
+										<div key={group.eventId} className="flex flex-col gap-[16px]">
+											{group.rows.map((row) => (
+												<ReplyRow
+													key={row.id}
+													row={row}
+													pillColor="#D1CEFF"
+													pending={pendingApplicationId === row.id}
+													onClick={() => handleReplyRowClick(row)}
+												/>
+											))}
+										</div>
+									))}
+								</div>
 							</div>
-						</div>
-						<div className="h-[2px] shrink-0 bg-black" />
-						{/* ── Inbound band header (second click target for the segment) ── */}
-						<button
-							type="button"
-							onClick={() => handleSegmentClick('inbound')}
-							className="flex h-[30px] shrink-0 items-center bg-[#BBD4F7] px-[18px] font-inter text-[14px] font-semibold text-black"
-						>
-							Inbound
-						</button>
-						{/* ── Inbound: cold campaign conversations ── */}
-						<div className="flex flex-1 flex-col bg-[#BBD4F7]">
-							<div className="flex flex-col gap-[16px] pb-[16px]">
-								{conversationsLoading && <SectionNotice>Loading…</SectionNotice>}
-								{!conversationsLoading && inboundConversations.length === 0 && (
-									<SectionNotice>No inbound messages yet.</SectionNotice>
-								)}
-								{inboundConversations.map((conversation) => (
-									<InboundRow
-										key={conversation.id}
-										conversation={conversation}
-										onClick={() => openThread(conversation.id, 'general')}
-									/>
-								))}
+						)}
+						{/* min-h-full pins max-scrollTop to the past band's height when the
+						    live content is short, making the pinned view exactly the
+						    live-only layout. shrink-0 is load-bearing: min-h-full replaces
+						    the flex min-height:auto floor, so without it overflowing live
+						    content would get squashed. */}
+						<div ref={liveSectionRef} className="flex min-h-full shrink-0 flex-col">
+							{/* ── Replies: applications to my live events ── */}
+							<div
+								className={`shrink-0 bg-[linear-gradient(180deg,#D1CEFF_0%,#BCE2FF_50%,#FFF_100%)] ${
+									activeSection === 'replies' ? 'min-h-[380px]' : 'min-h-[190px]'
+								}`}
+							>
+								<div className="flex flex-col gap-[16px] py-[16px]">
+									{repliesLoading && <SectionNotice>Loading…</SectionNotice>}
+									{!repliesLoading && replyGroups.length === 0 && (
+										<SectionNotice>No applications yet.</SectionNotice>
+									)}
+									{liveReplyGroups.map((group, groupIndex) => (
+										<div key={group.eventId} className="flex flex-col gap-[16px]">
+											{groupIndex > 0 && <div className="h-[8px] shrink-0 bg-[#BCE2FF]" />}
+											{group.rows.map((row) => (
+												<ReplyRow
+													key={row.id}
+													row={row}
+													pillColor={
+														EVENT_PILL_COLORS[groupIndex % EVENT_PILL_COLORS.length]
+													}
+													pending={pendingApplicationId === row.id}
+													onClick={() => handleReplyRowClick(row)}
+												/>
+											))}
+										</div>
+									))}
+								</div>
+							</div>
+							<div className="h-[2px] shrink-0 bg-black" />
+							{/* ── Inbound band header (second click target for the segment) ── */}
+							<button
+								type="button"
+								onClick={() => handleSegmentClick('inbound')}
+								className="flex h-[30px] shrink-0 items-center bg-[#BBD4F7] px-[18px] font-inter text-[14px] font-semibold text-black"
+							>
+								Inbound
+							</button>
+							{/* ── Inbound: cold campaign conversations ── */}
+							<div className="flex flex-1 flex-col bg-[#BBD4F7]">
+								<div className="flex flex-col gap-[16px] pb-[16px]">
+									{conversationsLoading && <SectionNotice>Loading…</SectionNotice>}
+									{!conversationsLoading && inboundConversations.length === 0 && (
+										<SectionNotice>No inbound messages yet.</SectionNotice>
+									)}
+									{inboundConversations.map((conversation) => (
+										<InboundRow
+											key={conversation.id}
+											conversation={conversation}
+											onClick={() => openThread(conversation.id, 'general')}
+										/>
+									))}
+								</div>
 							</div>
 						</div>
 					</CustomScrollbar>

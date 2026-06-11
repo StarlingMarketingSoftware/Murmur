@@ -90,6 +90,7 @@ export const useCreateBookingRequest = (
 					applicationId: null,
 					bookingRequestId: optimisticRequest.id,
 					bookingRequest: optimisticRequest,
+					venueAction: null,
 					createdAt: new Date().toISOString(),
 				};
 				queryClient.setQueryData<MessagesPage>(key, {

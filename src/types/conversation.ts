@@ -1,6 +1,8 @@
 // Shared shapes for the internal-messaging feature (venue ↔ standard-user DMs).
 // Used by the API routes, the React Query hooks, and the UI components.
 
+import type { SerializedVenueMessageAction } from '@/utils/venueMessageActions';
+
 export type MessageSenderRole = 'standard' | 'venue';
 
 export type BookingRequestStatusValue = 'pending' | 'confirmed' | 'canceled';
@@ -40,6 +42,9 @@ export interface SerializedMessage {
 	// the thread UIs swap that message's bubble for the booking-request banner.
 	bookingRequestId: number | null;
 	bookingRequest: SerializedBookingRequest | null;
+	// Special venue-authored action rows (currently invite-to-connect) are stored as
+	// normal Message rows and interpreted at read time, avoiding a schema change.
+	venueAction: SerializedVenueMessageAction | null;
 	createdAt: string; // ISO
 }
 
@@ -77,7 +82,4 @@ export interface MessagesPage {
 	// 'all' view) — page-level so the venue banner/button stay correct even when the
 	// delivering message has paginated out of `items`.
 	bookingRequest: SerializedBookingRequest | null;
-	// Whether the venue side has authored ≥1 message in this thread view — the
-	// "Request to book" button precondition, server-computed for the same reason.
-	venueHasMessaged: boolean;
 }

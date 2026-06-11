@@ -2,11 +2,9 @@
 
 import { useLayoutEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Maximize2 } from 'lucide-react';
 import { OutlinedInitialAvatar } from '@/components/atoms/OutlinedInitialAvatar/OutlinedInitialAvatar';
 import { ProfileAreaMarkerIcon } from '@/components/atoms/_svg/ProfileAreaMarkerIcon';
 import {
-	getProfileGenreIcon,
 	profileBioIconSvg,
 	profilePerformingNameIconSvg,
 } from '@/components/molecules/HybridPromptInput/profileFieldIcons';
@@ -20,7 +18,6 @@ import {
 	useGetVenueEventApplicants,
 	type VenueEventApplicant,
 } from '@/hooks/queryHooks/useVenueApplications';
-import { CardPill } from './VenueChatMapPanel';
 import { GenrePill, MEDIA_THUMB_GRADIENT, mediaThumbSrc } from './VenueEventDetailView';
 import { VENUE_MAP_LEFT_CLUSTER_SCALE, VENUE_MAP_OVERLAY_SCALE } from './constants';
 
@@ -63,6 +60,27 @@ function SnapshotChip({ icon, label }: { icon: ReactNode; label: string }) {
 			{icon}
 			<span className="min-w-0 truncate">{label}</span>
 		</span>
+	);
+}
+
+function DockedExpandIcon({ className }: { className?: string }) {
+	return (
+		<svg
+			viewBox="0 0 24 24"
+			fill="none"
+			xmlns="http://www.w3.org/2000/svg"
+			className={className}
+			aria-hidden="true"
+		>
+			<path d="M4 9V4H9" stroke="currentColor" strokeWidth="2" strokeLinecap="square" />
+			<path d="M4 4L10 10" stroke="currentColor" strokeWidth="2" strokeLinecap="square" />
+			<path d="M20 9V4H15" stroke="currentColor" strokeWidth="2" strokeLinecap="square" />
+			<path d="M20 4L14 10" stroke="currentColor" strokeWidth="2" strokeLinecap="square" />
+			<path d="M4 15V20H9" stroke="currentColor" strokeWidth="2" strokeLinecap="square" />
+			<path d="M4 20L10 14" stroke="currentColor" strokeWidth="2" strokeLinecap="square" />
+			<path d="M20 15V20H15" stroke="currentColor" strokeWidth="2" strokeLinecap="square" />
+			<path d="M20 20L14 14" stroke="currentColor" strokeWidth="2" strokeLinecap="square" />
+		</svg>
 	);
 }
 
@@ -159,8 +177,7 @@ export function VenueDockedChatPanel({
 	onExpand: () => void;
 }) {
 	// Header identity comes from the inbox lists (cache-shared with the portal
-	// root's 30s polls — no new request): the messages response carries no
-	// genre/area for artist counterparts. Application threads resolve from the
+	// root's 30s polls — no new request). Application threads resolve from the
 	// Replies row; general threads (or a row gone with its deleted event) fall
 	// back to the conversation list's counterpart.
 	const { data: conversations } = useGetConversations({ enabled: true });
@@ -172,9 +189,6 @@ export function VenueDockedChatPanel({
 	const conversation =
 		(conversations ?? []).find((item) => item.id === conversationId) ?? null;
 	const name = applicationRow?.applicantName ?? conversation?.counterpart.name ?? '';
-	const genre = applicationRow?.genre ?? conversation?.counterpart.genre ?? null;
-	const area = applicationRow?.area ?? conversation?.counterpart.area ?? null;
-	const GenreIcon = getProfileGenreIcon(genre);
 	// Full application snapshot (performing name, bio, media) for the structured
 	// card — the same per-event endpoint the Events detail view uses, so presigned
 	// media URLs are only minted for this thread's event.
@@ -195,47 +209,33 @@ export function VenueDockedChatPanel({
 			{/* Tool-panel chrome at the Figma-native 515×658, scaled by the corner
 			    clusters' 0.7 like everything else on the map — or smaller when the
 			    viewport can't fit that beside the tool panels (see useDockedChatScale). */}
-			<div className="relative h-[658px] w-[515px] rounded-[10px] border-[2px] border-black/40 bg-white/15">
-				<div className="absolute left-[12px] top-[4px] font-inter text-[12.358px] font-medium leading-[16.477px] text-black">
-					Chat
+			<div
+				className="relative h-[658px] w-[515px] overflow-hidden rounded-[14px] border-[2px] border-black"
+				style={{
+					background:
+						'linear-gradient(180deg, #A1D8FC 0%, rgba(220, 241, 255, 0.50) 100%)',
+				}}
+			>
+				<div className="absolute left-[16px] top-[1px] z-20 font-inter text-[12px] font-medium leading-[12px] text-black">
+					Messages
 				</div>
-				<div className="absolute left-[7px] top-[20px] flex h-[626px] w-[497px] flex-col overflow-hidden rounded-[8px] border-[2px] border-black bg-[#BBD4F7]">
-					<div className="flex h-[40px] shrink-0 items-center gap-[6px] border-b-[2px] border-black bg-white px-[12px]">
-						<span className="min-w-0 shrink truncate font-inter text-[15px] font-bold text-black">
+				<div className="absolute left-[7px] top-[14px] h-[584px] w-[501px] rounded-[14px] border-[2px] border-black bg-[#DCF1FF]" />
+				<div className="absolute left-[11px] top-[22px] z-20 flex h-[35px] items-center gap-[4px]">
+					<div className="flex h-[35px] w-[447px] items-center overflow-hidden rounded-[8px] border-[2px] border-black bg-white px-[14px]">
+						<span className="min-w-0 truncate font-inter text-[19px] font-bold leading-none text-black">
 							{name}
 						</span>
-						{/* Once the application card carries the chips below, the header
-						    keeps just the name (per the Figma mock). */}
-						{!applicant && genre && (
-							<CardPill
-								icon={
-									GenreIcon && (
-										<GenreIcon aria-hidden="true" className="h-[12px] w-[12px] shrink-0" />
-									)
-								}
-								label={genre}
-							/>
-						)}
-						{!applicant && area && (
-							<CardPill
-								icon={
-									<ProfileAreaMarkerIcon
-										aria-hidden="true"
-										className="h-[12px] w-[10px] shrink-0"
-									/>
-								}
-								label={area}
-							/>
-						)}
-						<button
-							type="button"
-							onClick={onExpand}
-							aria-label="Open in Chat"
-							className="ml-auto flex h-[24px] w-[24px] shrink-0 cursor-pointer items-center justify-center rounded-[6px] border border-black bg-white text-black transition hover:brightness-95"
-						>
-							<Maximize2 className="h-[13px] w-[13px]" strokeWidth={2.25} />
-						</button>
 					</div>
+					<button
+						type="button"
+						onClick={onExpand}
+						aria-label="Open in Chat"
+						className="flex h-[35px] w-[40px] shrink-0 cursor-pointer items-center justify-center rounded-[8px] border-[2px] border-black bg-white text-black transition hover:brightness-95"
+					>
+						<DockedExpandIcon className="h-[25px] w-[25px]" />
+					</button>
+				</div>
+				<div className="absolute left-[7px] top-[60px] h-[598px] w-[501px]">
 					<ConversationThread
 						conversationId={conversationId}
 						thread={thread}
@@ -245,7 +245,8 @@ export function VenueDockedChatPanel({
 							applicant ? <DockedApplicationCard applicant={applicant} /> : undefined
 						}
 						enableBookingRequest
-						className="min-h-0 flex-1 bg-transparent"
+						venueMapComposerLayout="docked"
+						className="!bg-transparent"
 					/>
 				</div>
 			</div>

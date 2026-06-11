@@ -119,6 +119,7 @@ const serializeDeliveryMessage = (
 	applicationId: message.applicationId,
 	bookingRequestId: message.bookingRequestId,
 	bookingRequest: request,
+	venueAction: null,
 	createdAt: message.createdAt.toISOString(),
 });
 

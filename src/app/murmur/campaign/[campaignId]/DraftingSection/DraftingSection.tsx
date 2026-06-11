@@ -81,10 +81,13 @@ import { MobileDraftReviewView } from '@/app/murmur/campaign/[campaignId]/Drafti
 import {
 	buildInboxConversations,
 	inboxConversationContainsEmailId,
+	normalizeApplicationForInboxConversation,
 	normalizeInboxEmailAddress,
 	normalizeSentEmailForInboxConversation,
 	type InboxConversation,
+	type InboxConversationMessage,
 } from '@/utils/inboxConversations';
+import { useGetMyEventApplications } from '@/hooks/queryHooks/useEventApplications';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
 import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
@@ -3026,6 +3029,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		]
 	);
 
+	// The artist's submitted applications thread into the mobile conversations as
+	// per-event "sent" items (same scoping as the inbox rows: campaign contacts).
+	const { data: myEventApplications } = useGetMyEventApplications({
+		enabled: isMobile === true && !inboxMockData,
+	});
+
 	// Mobile Summary view data: ongoing conversations (≥1 inbound reply) first, then
 	// drafts, then the remaining plain contacts. Conversations thread the campaign's
 	// sent emails in alongside replies so the fullscreen chat shows both sides.
@@ -3046,9 +3055,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			(email) => email.status === EmailStatus.sent
 		);
 
+		const applicationRows = (myEventApplications ?? [])
+			.filter((application) => application.status === 'submitted')
+			.map(normalizeApplicationForInboxConversation)
+			.filter((row): row is InboxConversationMessage => row != null)
+			.filter((row) => {
+				const sender = row.sender?.toLowerCase().trim();
+				return Boolean(sender && campaignContactsByEmail?.[sender]);
+			});
+
 		const conversations = buildInboxConversations([
 			...inboxEmailsForContactsExpandedList,
 			...sentForSummary.map(normalizeSentEmailForInboxConversation),
+			...applicationRows,
 		]).filter((conversation) => conversation.inboundMessages.length > 0);
 
 		const conversationContactIds = new Set<number>();
@@ -3088,7 +3107,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			drafts: draftsForSummary,
 			plainContacts,
 		};
-	}, [isMobile, headerEmails, headerContacts, inboxEmailsForContactsExpandedList]);
+	}, [
+		isMobile,
+		headerEmails,
+		headerContacts,
+		inboxEmailsForContactsExpandedList,
+		myEventApplications,
+		campaignContactsByEmail,
+	]);
 
 	const selectedMobileDraft =
 		mobileSummarySelection?.kind === 'draft'

@@ -21,6 +21,14 @@ export type ReplyGroup = {
 export const replyRowActivity = (row: VenueApplicationRow) =>
 	row.conversation?.lastMessageAt ?? row.createdAt;
 
+// Mirrors isVenueOpportunityLive for the serialized application-row event: a
+// future (or unset) start is live; a passed date — or a deleted event — makes
+// the opportunity outdated, so its replies belong in the ledger band above the
+// live rows (same treatment as the Events panel's expired rows).
+export const isReplyRowEventLive = (row: VenueApplicationRow) =>
+	row.event != null &&
+	(!row.event.startsAt || Date.parse(row.event.startsAt) >= Date.now());
+
 // The venue inbox's data + open-row flow, shared by the desktop chat panel and
 // the mobile chat tab so the grouping/filtering/seeding semantics can't drift.
 export function useVenueChatInbox() {
