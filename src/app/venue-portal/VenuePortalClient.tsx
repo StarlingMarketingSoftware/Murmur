@@ -4262,21 +4262,18 @@ export default function VenuePortalClient() {
 				view === 'map' &&
 				layout.showNotifications &&
 				(isMailToolSelected || !dockedThread) && (
-				<VenueNotificationsMapPanel
-					conversations={venueConversations}
-					applications={venueApplications}
-					totalUnread={venueUnread}
-					opportunities={opportunities}
-					applicantCountByEventId={applicantCountByEventId}
-					onOpenThread={openChatThread}
-					onOpenEvent={openOpportunityDetail}
-				/>
-			)}
+					<VenueNotificationsMapPanel
+						conversations={venueConversations}
+						applications={venueApplications}
+						totalUnread={venueUnread}
+						opportunities={opportunities}
+						applicantCountByEventId={applicantCountByEventId}
+						onOpenThread={openChatThread}
+						onOpenEvent={openOpportunityDetail}
+					/>
+				)}
 			{isMobile === false && view === 'map' && selectedVenueTool === 'add' && (
-				<VenueCreateEventMapPanel
-					event={editingVenueEvent}
-					frame={layout.createPanel}
-				/>
+				<VenueCreateEventMapPanel event={editingVenueEvent} frame={layout.createPanel} />
 			)}
 			{isMobile === false && view === 'map' && isMailToolSelected && (
 				<VenueChatMapPanel
@@ -4308,16 +4305,16 @@ export default function VenuePortalClient() {
 				!isMailToolSelected &&
 				layout.dockedChatVisible &&
 				dockedThread && (
-				<VenueDockedChatPanel
-					key={`${dockedThread.conversationId}:${dockedThread.thread}`}
-					conversationId={dockedThread.conversationId}
-					thread={dockedThread.thread}
-					onExpand={() =>
-						openChatThread(dockedThread.conversationId, dockedThread.thread)
-					}
-					scale={layout.dockedChatScale}
-				/>
-			)}
+					<VenueDockedChatPanel
+						key={`${dockedThread.conversationId}:${dockedThread.thread}`}
+						conversationId={dockedThread.conversationId}
+						thread={dockedThread.thread}
+						onExpand={() =>
+							openChatThread(dockedThread.conversationId, dockedThread.thread)
+						}
+						scale={layout.dockedChatScale}
+					/>
+				)}
 			{isMobile === false && view === 'map' && selectedVenueTool === 'profile' && (
 				<VenueProfileMapPanel frame={layout.panel} />
 			)}
@@ -4328,27 +4325,27 @@ export default function VenuePortalClient() {
 			{isMobile === false &&
 				view === 'map' &&
 				(selectedVenueTool !== null || layout.tier === 'compact') && (
-				<VenueMapToolTabBar
-					selectedTool={selectedVenueTool}
-					onToolSelect={selectVenueTool}
-					unreadCount={venueUnread}
-					frame={layout.bar}
-					compact={layout.tier === 'compact'}
-				/>
-			)}
+					<VenueMapToolTabBar
+						selectedTool={selectedVenueTool}
+						onToolSelect={selectVenueTool}
+						unreadCount={venueUnread}
+						frame={layout.bar}
+						compact={layout.tier === 'compact'}
+					/>
+				)}
 			{isMobile === false &&
 				view === 'map' &&
 				selectedVenueTool === null &&
 				layout.tier !== 'compact' && (
-				<VenueMapActionPills
-					anchorStore={anchorStore}
-					selectedTool={selectedVenueTool}
-					onToolSelect={selectVenueTool}
-					unreadCount={venueUnread}
-					clusterScale={VENUE_MAP_LEFT_CLUSTER_SCALE}
-					dockMinX={layout.pillsDockMinX}
-				/>
-			)}
+					<VenueMapActionPills
+						anchorStore={anchorStore}
+						selectedTool={selectedVenueTool}
+						onToolSelect={selectVenueTool}
+						unreadCount={venueUnread}
+						clusterScale={VENUE_MAP_LEFT_CLUSTER_SCALE}
+						dockMinX={layout.pillsDockMinX}
+					/>
+				)}
 		</PersistentMapProvider>
 	);
 }

@@ -28,6 +28,7 @@ import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptio
 import { cn } from '@/utils';
 import { markAfterPaint } from '@/utils/perfMarks';
 import {
+	CAMPAIGN_SIDE_SHIFT_VAR,
 	CAMPAIGN_SNUG_MAX_HEIGHT_FIT_ZOOM,
 	CAMPAIGN_SNUG_MIN_EFFECTIVE_WIDTH_PX,
 	CAMPAIGN_SNUG_SAFE_BOTTOM_MARGIN_PX,
@@ -756,6 +757,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// The E value the committed DOM currently reflects — compute() measures the DOM,
 	// so its correction must be applied relative to this, not to in-flight state.
 	const appliedEnvelopeExtraRef = useRef(0);
+	// The E we last stepped away from — used to suppress exact one-step round
+	// trips (see the boundary-flutter guard in compute()).
+	const lastEnvelopeStepFromRef = useRef<number | null>(null);
 	useLayoutEffect(() => {
 		if (appliedEnvelopeExtraRef.current === extraEnvelopeHeightPx) return;
 		appliedEnvelopeExtraRef.current = extraEnvelopeHeightPx;
@@ -829,6 +833,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			// The ±4px hysteresis stops the correction loop once converged.
 			const next = Math.max(0, Math.floor((appliedE + deficitLayoutPx) / 4) * 4);
 			if (Math.abs(next - appliedE) < 4) return;
+			// Boundary flutter guard: a measurement sitting exactly on a 4px
+			// quantization boundary flips floor() by one step on alternate frames;
+			// stepping straight back to the E we just left would ping-pong forever
+			// (each flip re-triggers a zoom re-fit — a perpetual per-frame loop).
+			if (Math.abs(next - appliedE) === 4 && next === lastEnvelopeStepFromRef.current)
+				return;
+			lastEnvelopeStepFromRef.current = appliedE;
 			setExtraEnvelopeHeightPx(next);
 		};
 		const schedule = () => {
@@ -1312,12 +1323,24 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				headerRect && headerRect.height > 0
 					? headerRect.bottom
 					: 72 * safeZoom;
+			// Ride the side-chrome centering shift (written by the campaign zoom pass)
+			// so the Folders/Strategy rail comes down with the left rail on tall monitors.
+			const sideShiftStr = window
+				.getComputedStyle(document.documentElement)
+				.getPropertyValue(CAMPAIGN_SIDE_SHIFT_VAR);
+			const parsedSideShift = sideShiftStr ? parseFloat(sideShiftStr) : NaN;
+			const sideShiftVisualPx = Number.isFinite(parsedSideShift)
+				? parsedSideShift
+				: 0;
 			const nextLeft =
 				(window.innerWidth - OVERVIEW_RIGHT_RAIL_GAP_FROM_RIGHT_WALL_PX) /
 					safeZoom -
 				OVERVIEW_RIGHT_RAIL_WIDTH_PX;
 			const nextTop =
-				(headerBottomVisualPx + OVERVIEW_RIGHT_RAIL_GAP_FROM_HEADER_PX) / safeZoom;
+				(headerBottomVisualPx +
+					OVERVIEW_RIGHT_RAIL_GAP_FROM_HEADER_PX +
+					sideShiftVisualPx) /
+				safeZoom;
 
 			setOverviewRightRailPos((prev) => {
 				if (
@@ -1340,9 +1363,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 		compute();
 		window.addEventListener('resize', schedule, { passive: true });
+		// Synchronous on zoom-changed: the page dispatches it from its layout-effect
+		// pass (pre-paint) after writing new geometry vars on a tab switch; an rAF
+		// here would paint one frame with the rail at the stale position.
 		window.addEventListener(
 			'murmur:campaign-zoom-changed',
-			schedule as EventListener
+			compute as EventListener
 		);
 
 		let ro: ResizeObserver | null = null;
@@ -1367,7 +1393,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			window.removeEventListener('resize', schedule);
 			window.removeEventListener(
 				'murmur:campaign-zoom-changed',
-				schedule as EventListener
+				compute as EventListener
 			);
 			ro?.disconnect();
 		};
@@ -1433,9 +1459,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		// Compute synchronously on mount/switch to avoid a visible flash at the fallback position.
 		compute();
 		window.addEventListener('resize', schedule, { passive: true });
+		// Synchronous on zoom-changed: the page dispatches it from its layout-effect
+		// pass (pre-paint) after writing new geometry vars on a tab switch; an rAF
+		// here would paint one frame with the dock at the stale position.
 		window.addEventListener(
 			'murmur:campaign-zoom-changed',
-			schedule as EventListener
+			compute as EventListener
 		);
 		// Keep dock position synced while the left panel animates/scales.
 		let ro: ResizeObserver | null = null;
@@ -1457,7 +1486,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			window.removeEventListener('resize', schedule);
 			window.removeEventListener(
 				'murmur:campaign-zoom-changed',
-				schedule as EventListener
+				compute as EventListener
 			);
 			ro?.disconnect();
 		};
@@ -3235,6 +3264,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const { data: myEventApplications } = useGetMyEventApplications({
 		enabled: isMobile === true && !inboxMockData,
 	});
+
+	// Summary list is "loading" until both the campaign contacts and emails resolve —
+	// before that, all three lists are empty and the empty state would flash. The mock
+	// harness supplies its own data, so it never shows the skeleton.
+	const isMobileSummaryLoading =
+		!inboxMockData && (isContactsLoading || isPendingEmails);
 
 	// Mobile Summary view data: ongoing conversations (≥1 inbound reply) first, then
 	// drafts, then the remaining plain contacts. Conversations thread the campaign's
@@ -7206,6 +7241,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												drafts={mobileSummaryData.drafts}
 												plainContacts={mobileSummaryData.plainContacts}
 												contactByEmail={campaignContactsByEmail}
+												isLoading={isMobileSummaryLoading}
 												scrollRequest={mobileSummaryScrollRequest}
 												onOpenConversation={(key) =>
 													setMobileSummarySelection({ kind: 'conversation', key })

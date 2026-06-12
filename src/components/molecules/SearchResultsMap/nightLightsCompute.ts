@@ -65,13 +65,17 @@ export const computeNightLightsFade = (zoom: number) => {
 	return Math.pow(inv, 2.25);
 };
 
-export const computeNightLightsZoomOutLift = (zoom: number) => {
-	if (zoom <= NIGHT_LIGHTS_ZOOM_OUT_LIFT_START_ZOOM) {
+// `floorDelta` (viewport-proportional raise of the interactive zoom floor)
+// shifts the ramp so the full brightness lift still lands at the floor on
+// large monitors.
+export const computeNightLightsZoomOutLift = (zoom: number, floorDelta = 0) => {
+	const z = zoom - floorDelta;
+	if (z <= NIGHT_LIGHTS_ZOOM_OUT_LIFT_START_ZOOM) {
 		return NIGHT_LIGHTS_ZOOM_OUT_LIFT_MAX;
 	}
-	if (zoom >= NIGHT_LIGHTS_ZOOM_OUT_LIFT_END_ZOOM) return 0;
+	if (z >= NIGHT_LIGHTS_ZOOM_OUT_LIFT_END_ZOOM) return 0;
 	const t =
-		(zoom - NIGHT_LIGHTS_ZOOM_OUT_LIFT_START_ZOOM) /
+		(z - NIGHT_LIGHTS_ZOOM_OUT_LIFT_START_ZOOM) /
 		(NIGHT_LIGHTS_ZOOM_OUT_LIFT_END_ZOOM - NIGHT_LIGHTS_ZOOM_OUT_LIFT_START_ZOOM);
 	const inv = 1 - Math.max(0, Math.min(1, t));
 	// Reverse ease-out: keep some lift up through the decorative globe range,
@@ -89,11 +93,15 @@ export const computeNightLightsGlowFade = (zoom: number) => {
 	return 1 - t * t;
 };
 
-export const computeNightLightsSpaceGlowFade = (zoom: number) => {
-	if (zoom <= NIGHT_LIGHTS_SPACE_GLOW_FADE_START_ZOOM) return 1;
-	if (zoom >= NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM) return 0;
+// `floorDelta` shifts the fade so the "US sparkling from space" bloom is still
+// fully present at the raised interactive floor on large monitors. The glow
+// layers' static maxzoom is widened by the max delta to match.
+export const computeNightLightsSpaceGlowFade = (zoom: number, floorDelta = 0) => {
+	const z = zoom - floorDelta;
+	if (z <= NIGHT_LIGHTS_SPACE_GLOW_FADE_START_ZOOM) return 1;
+	if (z >= NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM) return 0;
 	const t =
-		(zoom - NIGHT_LIGHTS_SPACE_GLOW_FADE_START_ZOOM) /
+		(z - NIGHT_LIGHTS_SPACE_GLOW_FADE_START_ZOOM) /
 		(NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM - NIGHT_LIGHTS_SPACE_GLOW_FADE_START_ZOOM);
 	const inv = 1 - clamp(t, 0, 1);
 	// Space-only: keep it present across the fully zoomed-out "US from space" range,

@@ -5098,6 +5098,34 @@ html.murmur-compact .mobile-campaign-search-overlay {
 	zoom: calc(1 / 0.9);
 }
 
+/* Mobile dashboard search keyboard state. The overlay's visualViewport hook
+   shrinks the fixed overlay to the visual viewport and sets [data-keyboard-open]
+   while the iOS keyboard is up: the bottom map fade reveals (map fades out just
+   above the keyboard) and the bar drops its safe-area padding (the keyboard
+   covers the home-indicator region). Keyed on the child classes — the bare
+   overlay class is shared with the mobile campaign summary overlay. */
+.mobile-campaign-search-overlay .mobile-search-keyboard-fade {
+	background: linear-gradient(
+		to bottom,
+		rgba(255, 255, 255, 0) 0%,
+		rgba(255, 255, 255, 0.9) 100%
+	);
+	opacity: 0;
+	transition: opacity 200ms ease;
+}
+
+.mobile-campaign-search-overlay[data-keyboard-open] .mobile-search-keyboard-fade {
+	opacity: 1;
+}
+
+.mobile-campaign-search-overlay .mobile-search-bottom-bar {
+	padding-bottom: calc(8px + env(safe-area-inset-bottom));
+}
+
+.mobile-campaign-search-overlay[data-keyboard-open] .mobile-search-bottom-bar {
+	padding-bottom: 8px;
+}
+
 /* Research public page scaling (80%) */
 html.murmur-research-compact {
 	zoom: 0.8;
@@ -5208,6 +5236,14 @@ html.murmur-compact.murmur-campaign-compact.murmur-campaign-force-transform body
 html.murmur-compact.murmur-campaign-compact.murmur-campaign-force-transform:has(
 		.dashboard-globe-bg
 	) {
+	background-color: #afd6ef !important;
+}
+
+/* Mobile dashboard: anything iOS exposes beyond the rendered content (keyboard
+   pan, toolbar transitions, rubber band) should read as map water, not the
+   browser's white canvas. Same precedent as the campaign rule above; the class
+   is added by the dashboard's mobile marker effect. */
+html.murmur-compact.murmur-mobile-dashboard:has(.dashboard-globe-bg) {
 	background-color: #afd6ef !important;
 }
 
@@ -5752,6 +5788,29 @@ body,
 	}
 }
 
+/* --- Mobile Campaign Summary Loading Wave (cycles the summary card pastels) --- */
+.mobile-campaign-summary-loading-wave-card {
+	background-color: #f7f8fa;
+	animation: mobileCampaignSummaryLoadingWave 4.8s ease-in-out infinite;
+	will-change: background-color;
+}
+
+@keyframes mobileCampaignSummaryLoadingWave {
+	0%,
+	100% {
+		background-color: #f7f8fa;
+	}
+	25% {
+		background-color: #d6e2ff;
+	}
+	50% {
+		background-color: #fff8e7;
+	}
+	75% {
+		background-color: #fdfdfd;
+	}
+}
+
 /* --- Mobile Venue Cards Loading Wave (cycles the venue portal pastels) --- */
 .mobile-venue-cards-loading-wave-card {
 	background-color: #f3fff0;
@@ -5823,6 +5882,9 @@ body,
 		animation: none;
 	}
 	.mobile-folder-cards-loading-wave-card {
+		animation: none;
+	}
+	.mobile-campaign-summary-loading-wave-card {
 		animation: none;
 	}
 	.mobile-venue-cards-loading-wave-card {

@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useMemo, useRef, useState } from 'react';
+import { FC, RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import BulletListIcon from '@/components/atoms/_svg/BulletListIcon';
 import MapBottomSearchArrowIcon from '@/components/atoms/_svg/MapBottomSearchArrowIcon';
 import MapViewToggleIcon from '@/components/atoms/_svg/MapViewToggleIcon';
@@ -10,6 +10,44 @@ import { MobileSearchResultRowCard } from '@/app/murmur/campaign/[campaignId]/Dr
 import { ContactWithName } from '@/types/contact';
 
 export type MobileDashboardSearchSummarySection = 'drafts' | 'contacts' | 'conversations';
+
+// Shrink the fixed overlay to the visual viewport while the iOS keyboard is up
+// so the bottom search bar rides just above it, and flag the state via a
+// data-keyboard-open attribute for CSS (bottom map fade, safe-area padding).
+// Mirrors the venue chat pattern (MobileVenueChatThread.useVisualViewportHeight):
+// height-only detection, direct style/attribute writes on the node — no
+// re-renders. offsetTop is included so the bar still hugs the keyboard when iOS
+// pans the visual viewport; the scale guard skips pinch-zoom false positives.
+// Net zoom inside the overlay is 1.0 (root murmur-compact 0.9 × counter 1/0.9),
+// so visualViewport CSS px map 1:1 onto the inline height, and the explicit
+// height wins over inset-0's bottom:0.
+function useKeyboardViewportShrink(ref: RefObject<HTMLDivElement | null>) {
+	useEffect(() => {
+		if (typeof window === 'undefined' || !window.visualViewport) return;
+		const viewport = window.visualViewport;
+		const node = ref.current;
+		if (!node) return;
+		const update = () => {
+			const isKeyboardOpen =
+				viewport.height < window.innerHeight - 1 && viewport.scale < 1.05;
+			if (isKeyboardOpen) {
+				node.style.height = `${viewport.offsetTop + viewport.height}px`;
+				node.setAttribute('data-keyboard-open', 'true');
+			} else {
+				node.style.height = '';
+				node.removeAttribute('data-keyboard-open');
+			}
+		};
+		viewport.addEventListener('resize', update);
+		viewport.addEventListener('scroll', update);
+		return () => {
+			viewport.removeEventListener('resize', update);
+			viewport.removeEventListener('scroll', update);
+			node.style.height = '';
+			node.removeAttribute('data-keyboard-open');
+		};
+	}, [ref]);
+}
 
 // Mobile chrome for the dashboard pick flow (add-to-campaign search). Renders ONLY
 // UI above the persistent singleton map: the map itself lives in MurmurLayoutClient
@@ -65,6 +103,8 @@ export const MobileDashboardSearch: FC<{
 }) => {
 	const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
 	const searchInputRef = useRef<HTMLInputElement | null>(null);
+	const overlayRef = useRef<HTMLDivElement | null>(null);
+	useKeyboardViewportShrink(overlayRef);
 
 	const selectedIdSet = useMemo(
 		() => new Set<number>(selectedContactIds),
@@ -78,7 +118,10 @@ export const MobileDashboardSearch: FC<{
 	};
 
 	return (
-		<div className="fixed inset-0 z-[99] overflow-hidden pointer-events-none mobile-campaign-search-overlay">
+		<div
+			ref={overlayRef}
+			className="fixed inset-0 z-[99] overflow-hidden pointer-events-none mobile-campaign-search-overlay"
+		>
 			{/* Searching spinner over the map */}
 			{isLoading && viewMode === 'map' && (
 				<div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
@@ -93,6 +136,17 @@ export const MobileDashboardSearch: FC<{
 						No results for &quot;{queryPillLabel ?? searchValue}&quot;
 					</div>
 				</div>
+			)}
+
+			{/* Keyboard-open map fade: the map runs down to the keyboard and softly
+			    fades out beneath the search bar. Pure gradient — backdrop-blur is
+			    disabled over the map on Safari for perf. Revealed via the
+			    [data-keyboard-open] CSS in globals.css. */}
+			{viewMode === 'map' && (
+				<div
+					aria-hidden="true"
+					className="mobile-search-keyboard-fade absolute inset-x-0 bottom-0 h-[140px] z-10 pointer-events-none"
+				/>
 			)}
 
 			<div className="absolute inset-0 z-20 flex flex-col pointer-events-none">
@@ -196,13 +250,11 @@ export const MobileDashboardSearch: FC<{
 					<div className="flex-1 min-h-0" />
 				)}
 
-				{/* Bottom bar: search input + submit + Add (+ floating List/Map toggle above) */}
-				<div
-					className="pointer-events-auto relative flex items-center gap-2 px-3 pt-1 mt-2"
-					style={{
-						paddingBottom: 'calc(8px + env(safe-area-inset-bottom))',
-					}}
-				>
+				{/* Bottom bar: search input + submit + Add (+ floating List/Map toggle above).
+				    Bottom padding lives in CSS (mobile-search-bottom-bar) so the
+				    [data-keyboard-open] state can drop the safe-area inset — the keyboard
+				    covers the home-indicator region. */}
+				<div className="mobile-search-bottom-bar pointer-events-auto relative flex items-center gap-2 px-3 pt-1 mt-2">
 					{hasSearched && (
 						<button
 							type="button"

@@ -242,7 +242,8 @@ import {
 	MAP_DEFAULT_ZOOM,
 	MAP_MIN_ZOOM,
 	MOBILE_MAP_MIN_ZOOM,
-	STATE_LABELS_FULL_OPACITY_ZOOM,
+	INTERACTIVE_MAP_MIN_ZOOM_DELTA_MAX,
+	getInteractiveMapMinZoomDelta,
 	MAP_PINCH_ZOOM_RATE,
 	MAP_WHEEL_ZOOM_RATE,
 	MARKER_CONSTELLATION_CORE_OPACITY,
@@ -500,9 +501,12 @@ import { SNOWFLAKE_STAMPS_URL, buildSnowOpacityExpr } from './snow';
 import {
 	applyStateOverlayNightColors,
 	buildLockedStateOutlineWidthExpr,
+	buildStateDividerLineOpacityExpr,
 	buildStateDividerLineWidthExpr,
 	buildStateInteractiveBorderColorExpr,
+	buildStateInteractiveBorderOpacityExpr,
 	buildStateInteractiveBorderWidthExpr,
+	buildStateLabelsTextOpacityExpr,
 } from './stateOverlayStyle';
 import {
 	computeSunTransitionLayerOpacity,
@@ -1092,6 +1096,15 @@ export interface SearchResultsMapProps {
 	 */
 	onMapLoadedChange?: (loaded: boolean) => void;
 	/**
+	 * Reports the *computed* interactive zoom floor: desktop MAP_MIN_ZOOM plus the
+	 * viewport-proportional delta (large monitors), mobile MOBILE_MAP_MIN_ZOOM.
+	 * Fires when the value changes AND when the callback attaches (the persistent
+	 * singleton map outlives route handoffs, so host pages attach this after map
+	 * mount and need the current floor immediately). Never reports the transient
+	 * relaxed floors used during background→interactive camera sweeps.
+	 */
+	onInteractiveMinZoomChange?: (minZoom: number) => void;
+	/**
 	 * When true, disables the base-dot "wave reveal" animation.
 	 * Useful in fullscreen/cinematic map transitions where hiding dots causes visible flicker.
 	 */
@@ -1259,6 +1272,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	lockedStateName,
 	isLoading,
 	onMapLoadedChange,
+	onInteractiveMinZoomChange,
 	disableDotWaveReveal = false,
 	skipAutoFit,
 	cameraPadding = null,
@@ -1637,6 +1651,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// transitions, post-cinematic restore) re-apply the floor when they settle.
 	const isMobile = useIsMobile();
 	const interactiveMinZoomRef = useRef(MAP_MIN_ZOOM);
+	// Viewport-proportional raise of the desktop floor (0 at ≤1920×1080). Every
+	// near-floor visual ramp shifts by this delta so the fully-zoomed-out globe
+	// looks identical on every monitor. Refs (not state): consumers are imperative
+	// map callbacks and per-tick closures.
+	const interactiveFloorDeltaRef = useRef(0);
+	// Last delta whose parity anchors were actually applied to the style — gates
+	// the (rare, resize-time) setPaintProperty re-application bundle.
+	const lastParityAppliedFloorDeltaRef = useRef(0);
+	const lastReportedInteractiveMinZoomRef = useRef<number | null>(null);
+	const reapplyFloorParityRef = useRef<(() => boolean) | null>(null);
+	const isMobileRef = useRef(isMobile);
+	isMobileRef.current = isMobile;
 	const [isMapLoaded, setIsMapLoaded] = useState(false);
 	const initialZoomConstraintsRef = useRef<{ minZoom: number; maxZoom: number } | null>(
 		null
@@ -1653,6 +1679,77 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		onMapLoadedChangeRef.current?.(isMapLoaded);
 	}, [isMapLoaded]);
 	useEffect(() => () => onMapLoadedChangeRef.current?.(false), []);
+	const onInteractiveMinZoomChangeRef = useRef(onInteractiveMinZoomChange);
+	useEffect(() => {
+		onInteractiveMinZoomChangeRef.current = onInteractiveMinZoomChange;
+		// The singleton map outlives route handoffs; host pages attach this callback
+		// after mount via a mapProps swap, so re-fire the current floor at them.
+		if (
+			onInteractiveMinZoomChange &&
+			lastReportedInteractiveMinZoomRef.current != null
+		) {
+			onInteractiveMinZoomChange(lastReportedInteractiveMinZoomRef.current);
+		}
+	}, [onInteractiveMinZoomChange]);
+	// While easing from the decorative globe (zoom below the interactive floor) the
+	// floor is temporarily relaxed; these track the pending restore (see the
+	// background→interactive transition and the post-auto-fit moveend restore).
+	const pendingMinZoomRestoreRef = useRef(false);
+	const hasAttachedMinZoomRestoreRef = useRef(false);
+
+	// Single compute+apply+report function for the interactive zoom floor. Reads
+	// only refs (deps []) so the map-init effect, the resize pipeline and the
+	// device-class effect can all share it.
+	const syncInteractiveFloor = useCallback(() => {
+		// useIsMobile() returns null while detecting; treat as desktop (matches the
+		// previous `isMobile ? … : …` falsy branch).
+		const mobile = isMobileRef.current === true;
+		let delta = 0;
+		if (!mobile) {
+			// Container client dims are the same CSS-px units mapbox uses to size the
+			// globe on its canvas — correct under counter-zoom / Safari force-transform.
+			const container = mapContainerRef.current ?? mapRef.current?.getContainer() ?? null;
+			if (container) {
+				delta = getInteractiveMapMinZoomDelta(
+					container.clientWidth,
+					container.clientHeight
+				);
+			}
+		}
+		interactiveFloorDeltaRef.current = delta;
+		const floor = mobile ? MOBILE_MAP_MIN_ZOOM : MAP_MIN_ZOOM + delta;
+		interactiveMinZoomRef.current = floor;
+
+		// Report the COMPUTED floor upward (never transient relaxed map.getMinZoom()).
+		if (lastReportedInteractiveMinZoomRef.current !== floor) {
+			lastReportedInteractiveMinZoomRef.current = floor;
+			onInteractiveMinZoomChangeRef.current?.(floor);
+		}
+
+		// Apply, unless the decorative lock or a relaxed floor owns the constraints —
+		// those paths re-apply interactiveMinZoomRef.current once the camera settles.
+		const m = mapRef.current;
+		if (
+			m &&
+			presentationRef.current !== 'background' &&
+			!pendingMinZoomRestoreRef.current
+		) {
+			try {
+				m.setMinZoom(floor);
+			} catch {
+				// Ignore (map may be tearing down).
+			}
+		}
+
+		// Shift the near-floor visual ramps exactly once per delta change. The gate
+		// only advances when re-application actually ran against a loaded style
+		// (ensureMapboxSourcesAndLayers also bakes the current delta at creation).
+		if (lastParityAppliedFloorDeltaRef.current !== delta) {
+			if (reapplyFloorParityRef.current?.() === true) {
+				lastParityAppliedFloorDeltaRef.current = delta;
+			}
+		}
+	}, []);
 	const [selectedStateKey, setSelectedStateKey] = useState<string | null>(null);
 	const [zoomLevel, setZoomLevel] = useState(MAP_DEFAULT_ZOOM);
 	// Track last-applied camera padding so we don't spam Mapbox with identical updates.
@@ -2809,9 +2906,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 
 			const zoomRaw = mapInstance.getZoom() ?? 4;
+			// Ambient gate shifts with the interactive floor so the dot-free
+			// fully-zoomed-out browse state survives on large monitors.
 			const minZoom =
 				overlayMode === 'ambient'
-					? AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM
+					? AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM +
+						interactiveFloorDeltaRef.current
 					: ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM;
 			if (zoomRaw < minZoom) {
 				clearAllContactsFetchWindows();
@@ -3525,21 +3625,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			);
 
 			// Labels fade with the overall overlay opacity (mode doesn't matter), and
-			// additionally fade out near MAP_MIN_ZOOM so they're invisible when fully zoomed out.
+			// additionally fade out near the interactive floor so they're invisible
+			// when fully zoomed out (floor-delta-shifted on large monitors).
 			if (map.getLayer(MAPBOX_LAYER_IDS.statesLabels)) {
 				try {
 					if (overlay <= 0.001) {
 						map.setPaintProperty(MAPBOX_LAYER_IDS.statesLabels, 'text-opacity', 0);
 					} else {
-						map.setPaintProperty(MAPBOX_LAYER_IDS.statesLabels, 'text-opacity', [
-							'interpolate',
-							['linear'],
-							['zoom'],
-							MAP_MIN_ZOOM,
-							0,
-							STATE_LABELS_FULL_OPACITY_ZOOM,
-							overlay,
-						]);
+						map.setPaintProperty(
+							MAPBOX_LAYER_IDS.statesLabels,
+							'text-opacity',
+							buildStateLabelsTextOpacityExpr(
+								overlay,
+								interactiveFloorDeltaRef.current
+							) as any
+						);
 					}
 				} catch {
 					// Ignore.
@@ -3931,7 +4031,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const baseMax = fast
 				? LIGHTNING_FIRST_FLASH_MAX_INTERVAL_MS
 				: LIGHTNING_MAX_INTERVAL_MS;
-			const boostT = getLightningZoomedOutBoostT(opts?.zoom ?? getCurrentLightningZoom());
+			const boostT = getLightningZoomedOutBoostT(
+				opts?.zoom ?? getCurrentLightningZoom(),
+				interactiveFloorDeltaRef.current
+			);
 			const min = baseMin + (LIGHTNING_ZOOMED_OUT_MIN_INTERVAL_MS - baseMin) * boostT;
 			const max = baseMax + (LIGHTNING_ZOOMED_OUT_MAX_INTERVAL_MS - baseMax) * boostT;
 			const wait = min + Math.random() * Math.max(0, max - min);
@@ -4207,7 +4310,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (!Array.isArray(stamps) || stamps.length === 0) return null;
 
 			const zoom = getCurrentLightningZoom();
-			const boostT = getLightningZoomedOutBoostT(zoom);
+			const boostT = getLightningZoomedOutBoostT(zoom, interactiveFloorDeltaRef.current);
 			const maxActiveEvents = Math.round(
 				LIGHTNING_MAX_ACTIVE_EVENTS +
 					(LIGHTNING_ZOOMED_OUT_MAX_ACTIVE_EVENTS - LIGHTNING_MAX_ACTIVE_EVENTS) * boostT
@@ -4362,7 +4465,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 			if (canSpawnLightning && nowMs >= lightningNextFlashAtMsRef.current) {
 				const spawnCount =
-					Math.random() < 0.08 * getLightningZoomedOutBoostT(currentZoom) ? 2 : 1;
+					Math.random() <
+					0.08 *
+						getLightningZoomedOutBoostT(currentZoom, interactiveFloorDeltaRef.current)
+						? 2
+						: 1;
 				let lastCell: StormLightningCell | null = null;
 				for (let i = 0; i < spawnCount; i++) {
 					const spawnedCell = spawnLightningEvent(
@@ -6682,7 +6789,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const cloudsOpacityExpr = buildCloudsOpacityExpr(
 			cfg.cloudOpacityGlobeZoom,
 			cfg.cloudOpacityDecorativeZoom,
-			cfg.cloudDeepZoomOpacity
+			cfg.cloudDeepZoomOpacity,
+			interactiveFloorDeltaRef.current
 		);
 
 		if (mapInstance.getSource(MAPBOX_SOURCE_IDS.dayFarSideShade)) {
@@ -6789,8 +6897,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					id: MAPBOX_LAYER_IDS.nightLightsSpaceGlow,
 					type: 'raster',
 					source: MAPBOX_SOURCE_IDS.nightLights,
-					// Only relevant for the "from space" view.
-					maxzoom: NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM + 0.01,
+					// Only relevant for the "from space" view. The fade itself is computed
+					// at runtime (floor-delta-shifted on large monitors), so widen the cull
+					// window by the max delta; the runtime opacity flips visibility:none
+					// outside the visible band, so the extra range costs nothing.
+					maxzoom:
+						NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM +
+						INTERACTIVE_MAP_MIN_ZOOM_DELTA_MAX +
+						0.01,
 					paint: {
 						'raster-opacity': 0,
 						// Avoid Mapbox's per-tile crossfade (it can look like a "hair texture"
@@ -6805,7 +6919,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					id: MAPBOX_LAYER_IDS.nightLightsSpaceGlow2,
 					type: 'raster',
 					source: MAPBOX_SOURCE_IDS.nightLights,
-					maxzoom: NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM + 0.01,
+					maxzoom:
+						NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM +
+						INTERACTIVE_MAP_MIN_ZOOM_DELTA_MAX +
+						0.01,
 					paint: {
 						'raster-opacity': 0,
 						'raster-fade-duration': 0,
@@ -7138,38 +7255,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		];
 
 		// States: hover fill + hit fill (transparent) + divider lines + interactive borders
-		const isStateSelectedExpr = ['boolean', ['feature-state', 'selected'], false];
-
 		const stateDividerLineWidthExpr = buildStateDividerLineWidthExpr();
-		const stateDividerLineOpacityExpr = [
-			'interpolate',
-			['linear'],
-			['zoom'],
-			MAP_MIN_ZOOM,
-			0,
-			MAP_MIN_ZOOM + 1.25,
-			0.5,
-			5,
-			0.65,
-			STATE_DIVIDER_LINES_MAX_ZOOM,
-			0.74,
-		];
+		const stateDividerLineOpacityExpr = buildStateDividerLineOpacityExpr(
+			interactiveFloorDeltaRef.current
+		);
 		const stateInteractiveBorderWidthExpr = buildStateInteractiveBorderWidthExpr();
-		const stateInteractiveBorderOpacityExpr = [
-			'interpolate',
-			['linear'],
-			['zoom'],
-			MAP_MIN_ZOOM,
-			['case', isStateSelectedExpr, 0, 0],
-			MAP_MIN_ZOOM + 1.25,
-			['case', isStateSelectedExpr, 1, 0.6],
-			5,
-			['case', isStateSelectedExpr, 1, 0.75],
-			9,
-			['case', isStateSelectedExpr, 1, 0.82],
-			14,
-			['case', isStateSelectedExpr, 1, 0.7],
-		];
+		const stateInteractiveBorderOpacityExpr = buildStateInteractiveBorderOpacityExpr(
+			interactiveFloorDeltaRef.current
+		);
 		const stateInteractiveBorderColorExpr = buildStateInteractiveBorderColorExpr(
 			computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current)
 		);
@@ -8039,6 +8132,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			source: MAPBOX_SOURCE_IDS.selectionRect,
 			paint: { 'line-color': '#143883', 'line-opacity': 1, 'line-width': 2 },
 		});
+
+		// All floor-shifted expressions above were built with the current floor
+		// delta, so creation/style-reload bakes it — keep the parity gate in step.
+		lastParityAppliedFloorDeltaRef.current = interactiveFloorDeltaRef.current;
 	}, []);
 
 	useEffect(() => {
@@ -8138,6 +8235,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const initialPitch =
 			initialPresentation === 'background' ? DASHBOARD_DECORATIVE_PITCH : 0;
 
+		// Compute the viewport-proportional floor from the (already measurable)
+		// container before construction; the map is still null so this only
+		// computes + reports.
+		syncInteractiveFloor();
+
 		const mapInstance = new mapboxgl.Map({
 			container: mapContainerRef.current,
 			style: MAPBOX_STYLE,
@@ -8145,7 +8247,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			zoom: initialZoom,
 			pitch: initialPitch,
 			bearing: 0,
-			minZoom: MAP_MIN_ZOOM,
+			minZoom: interactiveMinZoomRef.current,
 			attributionControl: true,
 			dragRotate: false,
 			pitchWithRotate: false,
@@ -8353,7 +8455,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			setMap(null);
 			setIsMapLoaded(false);
 		};
-	}, [ensureMapboxSourcesAndLayers, contactLightsDebugEnabled]);
+	}, [ensureMapboxSourcesAndLayers, contactLightsDebugEnabled, syncInteractiveFloor]);
 
 	// Debug: detect missing tiles / error events for the contact-lights raster overlay.
 	useEffect(() => {
@@ -8371,7 +8473,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			try {
 				const zoom = map.getZoom();
 				const night = clamp(nightTRef.current, 0, 1);
-				const zoomOutLift = computeNightLightsZoomOutLift(zoom);
+				const zoomOutLift = computeNightLightsZoomOutLift(
+					zoom,
+					interactiveFloorDeltaRef.current
+				);
 				const loadT =
 					clamp(nightLightsLoadTRef.current, 0, 1) *
 					clamp(nightLightsZoomLoadTRef.current, 0, 1);
@@ -8419,7 +8524,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const finalSpaceGlowOpacity = clamp(
 					lightsBase *
 						NIGHT_LIGHTS_SPACE_GLOW_OPACITY_MULT *
-						computeNightLightsSpaceGlowFade(zoom) *
+						computeNightLightsSpaceGlowFade(zoom, interactiveFloorDeltaRef.current) *
 						introFinalMul,
 					0,
 					1
@@ -8557,23 +8662,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const backgroundCinematicMoveEndHandlerRef = useRef<(() => void) | null>(null);
 
-	const pendingMinZoomRestoreRef = useRef(false);
-	const hasAttachedMinZoomRestoreRef = useRef(false);
-
-	// Keep the interactive zoom floor in sync with the device class. Skip while the
-	// decorative lock or a temporarily relaxed floor is active — those paths re-apply
-	// the floor from the ref once the camera settles.
+	// Keep the interactive zoom floor in sync with the device class and viewport
+	// size. Skip-while-locked semantics live inside syncInteractiveFloor.
 	useEffect(() => {
-		interactiveMinZoomRef.current = isMobile ? MOBILE_MAP_MIN_ZOOM : MAP_MIN_ZOOM;
-		if (!map) return;
-		if (presentationRef.current === 'background') return;
-		if (pendingMinZoomRestoreRef.current) return;
-		try {
-			map.setMinZoom(interactiveMinZoomRef.current);
-		} catch {
-			// Ignore (map may be tearing down).
-		}
-	}, [map, isMobile]);
+		syncInteractiveFloor();
+	}, [map, isMobile, syncInteractiveFloor]);
 
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
@@ -8770,6 +8863,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				cinematicInFlightTimerRef.current = setTimeout(() => {
 					cinematicInFlightRef.current = false;
 					cinematicInFlightTimerRef.current = null;
+					// Pick up any viewport change whose resize was skipped mid-sweep.
+					syncInteractiveFloor();
 				}, dur + 150);
 
 				try {
@@ -8901,7 +8996,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				});
 			} catch {}
 		}
-	}, [map, isMapLoaded, isBackgroundPresentation, shouldAutoSpin, presentation]);
+	}, [
+		map,
+		isMapLoaded,
+		isBackgroundPresentation,
+		shouldAutoSpin,
+		presentation,
+		syncInteractiveFloor,
+	]);
 
 	// The interactive entry camera can resolve — or be corrected — after the reveal
 	// has already happened (e.g. the venue save's refetch is still in flight while
@@ -9002,12 +9104,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const safeResize = () => {
 			// During the cinematic background→interactive sweep, the container isn't truly
 			// resizing (we animate via clip-path). Skip resize to avoid interrupting fitBounds.
+			// (The cinematic-end timeout re-syncs the floor for resizes skipped here.)
 			if (cinematicInFlightRef.current) return;
 			try {
 				map.resize();
 			} catch {
 				/* map may be tearing down */
 			}
+			// Viewport size feeds the interactive zoom floor; re-sync after the canvas
+			// picks up the new container dimensions.
+			syncInteractiveFloor();
 		};
 
 		const scheduleResize = () => {
@@ -9060,7 +9166,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			for (const t of timers) clearTimeout(t);
 			if (resizeDebounce) clearTimeout(resizeDebounce);
 		};
-	}, [map]);
+	}, [map, syncInteractiveFloor]);
 
 	// Compute valid coords once and keep a per-contact lookup for stable rendering.
 	// Also apply a small deterministic offset for duplicate coordinate groups so every result is visible.
@@ -10473,7 +10579,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// - active-search mode: close-zoom gray/context dots
 			// - disengaged ambient mode: regional contact atlas, sampled to ~500 visible dots
 			const isAmbientAllContactsOverlay =
-				isAmbientContactsEnabled && zoomRaw >= AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM;
+				isAmbientContactsEnabled &&
+				zoomRaw >=
+					AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM + interactiveFloorDeltaRef.current;
 			const isSearchAllContactsOverlay =
 				isAnySearch && zoomRaw >= ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM;
 			const shouldShowAllContactsOverlay =
@@ -10521,7 +10629,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						0,
 						1,
 						clamp(
-							(zoomRaw - AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM) /
+							(zoomRaw -
+								interactiveFloorDeltaRef.current -
+								AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM) /
 								(AMBIENT_CONTACTS_OVERLAY_MARKERS_FULL_ZOOM -
 									AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM),
 							0,
@@ -11627,6 +11737,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					cinematicInFlightTimerRef.current = setTimeout(() => {
 						cinematicInFlightRef.current = false;
 						cinematicInFlightTimerRef.current = null;
+						// Pick up any viewport change whose resize was skipped mid-sweep.
+						syncInteractiveFloor();
 					}, durationMs + 100); // small buffer past the animation end
 				}
 			}
@@ -11657,6 +11769,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		searchQuery,
 		autoFitRequestNonce,
 		instantAutoFitNonce,
+		syncInteractiveFloor,
 	]);
 
 	// If auto-fit is disabled, ensure we don't have a queued fit from a prior render.
@@ -11864,7 +11977,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const orb = curatedOrbRef.current;
 		if (!m || !orb) return;
 		const zoom = m.getZoom() ?? MAP_DEFAULT_ZOOM;
-		const bloomT = computeCuratedOrbT(zoom);
+		const bloomT = computeCuratedOrbT(zoom, interactiveFloorDeltaRef.current);
 		const colorOpacity = CURATED_ORB_COLOR_BLEND_OPACITY * (1 - bloomT);
 		const bloomOpacity = CURATED_ORB_BLOOM_OPACITY * bloomT;
 		const shapeMultiPolygons = curatedBlobLngLatShapeMultiPolygonsRef.current;
@@ -11979,7 +12092,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 		const zoom = m.getZoom() ?? MAP_DEFAULT_ZOOM;
-		const t = computeCuratedOrbT(zoom);
+		const t = computeCuratedOrbT(zoom, interactiveFloorDeltaRef.current);
 		if (Math.abs(t - lastBlobMorphTAppliedRef.current) < 0.001) {
 			applyCuratedOrbStateRef.current?.();
 			return;
@@ -12044,7 +12157,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const applyLightingOverlayOpacity = useCallback(() => {
 		if (!mapRef.current) return;
 		const zoom = mapRef.current.getZoom() ?? MAP_DEFAULT_ZOOM;
-		const base = computeLightingOverlayOpacity(zoom);
+		const base = computeLightingOverlayOpacity(zoom, interactiveFloorDeltaRef.current);
 		const cfg = weatherMoodConfigRef.current;
 		const rawNight = clamp(nightTRef.current, 0, 1);
 		const night = computeMoodVisualNightT(nightTRef.current, cfg);
@@ -12177,7 +12290,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		// US night lights (Mapbox raster dot-tiles layer) — helps keep the globe readable at night
 		// without turning the whole basemap into a "night mode" style.
-		const zoomOutLift = computeNightLightsZoomOutLift(zoom);
+		const zoomOutLift = computeNightLightsZoomOutLift(
+			zoom,
+			interactiveFloorDeltaRef.current
+		);
 		const loadT =
 			clamp(nightLightsLoadTRef.current, 0, 1) *
 			clamp(nightLightsZoomLoadTRef.current, 0, 1);
@@ -12220,7 +12336,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const finalSpaceGlowOpacity = clamp(
 			lightsBase *
 				NIGHT_LIGHTS_SPACE_GLOW_OPACITY_MULT *
-				computeNightLightsSpaceGlowFade(zoom) *
+				computeNightLightsSpaceGlowFade(zoom, interactiveFloorDeltaRef.current) *
 				introFinalMul,
 			0,
 			1
@@ -12917,7 +13033,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (!selection?.length) return null;
 
 			const zoom = mapInstance.getZoom() ?? MAP_DEFAULT_ZOOM;
-			const t = computeCuratedOrbT(zoom);
+			const t = computeCuratedOrbT(zoom, interactiveFloorDeltaRef.current);
 			const morphSource = selectedStateMorphSourceRef.current;
 			const shouldUseCircleMorph = Boolean(morphSource && t > 0.001);
 
@@ -13035,7 +13151,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			hide();
 			return;
 		}
-		const bloomT = computeCuratedOrbT(zoom);
+		const bloomT = computeCuratedOrbT(zoom, interactiveFloorDeltaRef.current);
 		const colorOpacity =
 			SELECTED_STATE_GRADIENT_COLOR_OPACITY * (1 - bloomT) * frontHemisphereOpacity;
 		const bloomOpacity =
@@ -13128,7 +13244,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const opacityExpr = buildCloudsOpacityExpr(
 					cfg.cloudOpacityGlobeZoom,
 					cfg.cloudOpacityDecorativeZoom,
-					cfg.cloudDeepZoomOpacity
+					cfg.cloudDeepZoomOpacity,
+					interactiveFloorDeltaRef.current
 				);
 				if (m.getLayer(MAPBOX_LAYER_IDS.clouds)) {
 					m.setPaintProperty(
@@ -13185,8 +13302,51 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// Non-fatal.
 			}
 		},
+		// NOTE: besides mood changes, reapplyFloorShiftedAnchors re-runs this whole
+		// bundle when the viewport-proportional floor delta changes (rare resize) —
+		// additions here inherit that trigger and must stay idempotent.
 		[applyLightingOverlayOpacity, applyStateOverlayOpacity]
 	);
+
+	// Re-applies every floor-shifted visual anchor after the interactive floor
+	// delta changes (rare: monitor/window resize). Returns true only when the
+	// style was actually updated so syncInteractiveFloor's once-per-delta gate
+	// stays correct; layer creation (ensureMapboxSourcesAndLayers) bakes the
+	// current delta itself.
+	const reapplyFloorShiftedAnchors = useCallback((): boolean => {
+		const m = mapRef.current;
+		if (!m || !isMapLoaded) return false;
+		const delta = interactiveFloorDeltaRef.current;
+
+		// Divider/border base opacity expressions: rebuild shifted and swap the
+		// cached base BEFORE applyStateOverlayOpacity scales it by the current
+		// overlay/mode multipliers.
+		stateLineOpacityBaseRef.current = {
+			dividers: buildStateDividerLineOpacityExpr(delta),
+			borders: buildStateInteractiveBorderOpacityExpr(delta),
+		};
+
+		// Clouds expr, softbox + night-lights tick, state overlay opacities
+		// (incl. the shifted labels expr) — all flow through the mood path.
+		applyWeatherMoodConfig(weatherMoodConfigRef.current);
+
+		// Curated orb morph + selected-state gradient recompute their t on the
+		// shifted ramp (t-cached, so cheap when nothing changed).
+		applyBlobMorphRef.current?.();
+		applyCuratedOrbStateRef.current?.();
+		applySelectedStateGradientStateRef.current?.();
+
+		// Ambient atlas: re-evaluate the shifted fetch gate + render gate/density.
+		updateAllContactsOverlayFetchBbox(m);
+		recomputeViewportDots(m);
+		return true;
+	}, [
+		isMapLoaded,
+		applyWeatherMoodConfig,
+		updateAllContactsOverlayFetchBbox,
+		recomputeViewportDots,
+	]);
+	reapplyFloorParityRef.current = reapplyFloorShiftedAnchors;
 
 	const startWeatherMoodTransition = useCallback(
 		(mood: WeatherMood) => {

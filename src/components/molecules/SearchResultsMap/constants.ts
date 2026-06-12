@@ -232,6 +232,46 @@ export const MAP_MIN_ZOOM = 2.25;
 // Phones are narrow enough that the desktop floor still crops the globe; ~1
 // fits the full globe on a ~390px-wide viewport.
 export const MOBILE_MAP_MIN_ZOOM = 1;
+// --- Viewport-proportional interactive zoom floor ----------------------------
+// MAP_MIN_ZOOM frames the fully-zoomed-out globe "perfectly" on a 1920×1080
+// viewport (~72% of viewport height). The map canvas renders at native viewport
+// pixels while Mapbox draws the globe at a fixed pixel diameter per zoom, so on
+// larger monitors the globe at the fixed floor occupies a shrinking fraction of
+// the screen. Mapbox zoom is log2 of scale: raising the floor by log2(viewport
+// growth) keeps the globe the same fraction of the viewport on every monitor.
+// min(w-ratio, h-ratio) picks the limiting dimension; viewports at or below the
+// reference keep today's floor exactly.
+export const INTERACTIVE_MIN_ZOOM_REFERENCE_WIDTH_PX = 1920;
+export const INTERACTIVE_MIN_ZOOM_REFERENCE_HEIGHT_PX = 1080;
+// Cap ≈ 5K territory; beyond this the floor stops rising (stays below the
+// decorative globe lock at zoom 4).
+export const INTERACTIVE_MAP_MIN_ZOOM_DELTA_MAX = 1.25;
+// Quantize so drag-resizes don't re-trigger style re-application every debounce
+// tick for sub-perceptual changes (0.05 zoom ≈ 3.5% globe size).
+const INTERACTIVE_MIN_ZOOM_DELTA_STEP = 0.05;
+
+export const getInteractiveMapMinZoomDelta = (
+	widthPx: number,
+	heightPx: number
+): number => {
+	if (
+		!Number.isFinite(widthPx) ||
+		!Number.isFinite(heightPx) ||
+		widthPx <= 0 ||
+		heightPx <= 0
+	) {
+		return 0;
+	}
+	const scale = Math.min(
+		widthPx / INTERACTIVE_MIN_ZOOM_REFERENCE_WIDTH_PX,
+		heightPx / INTERACTIVE_MIN_ZOOM_REFERENCE_HEIGHT_PX
+	);
+	if (!(scale > 1)) return 0;
+	const raw = Math.min(Math.log2(scale), INTERACTIVE_MAP_MIN_ZOOM_DELTA_MAX);
+	return (
+		Math.round(raw / INTERACTIVE_MIN_ZOOM_DELTA_STEP) * INTERACTIVE_MIN_ZOOM_DELTA_STEP
+	);
+};
 // Zoom at which state initials reach full opacity. Kept close to MAP_MIN_ZOOM so
 // labels are legible from the wide continental view, not only when zoomed in.
 export const STATE_LABELS_FULL_OPACITY_ZOOM = MAP_MIN_ZOOM + 0.5;

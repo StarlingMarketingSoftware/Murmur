@@ -15,11 +15,14 @@ export const LIGHTNING_STAMPS_URL = (i: number) =>
 
 // At fully zoomed-out globe view we boost lightning frequency / scale so the
 // effect reads from far away. This `t` ramps 1 → 0 as the user zooms in.
-export const getLightningZoomedOutBoostT = (zoom: number) => {
-	if (zoom <= LIGHTNING_ZOOMED_OUT_BOOST_FULL_ZOOM) return 1;
-	if (zoom >= LIGHTNING_ZOOMED_OUT_BOOST_END_ZOOM) return 0;
+// `floorDelta` (the viewport-proportional raise of the interactive zoom floor)
+// shifts the ramp so full boost still engages at the floor on large monitors.
+export const getLightningZoomedOutBoostT = (zoom: number, floorDelta = 0) => {
+	const z = zoom - floorDelta;
+	if (z <= LIGHTNING_ZOOMED_OUT_BOOST_FULL_ZOOM) return 1;
+	if (z >= LIGHTNING_ZOOMED_OUT_BOOST_END_ZOOM) return 0;
 	const t =
-		(LIGHTNING_ZOOMED_OUT_BOOST_END_ZOOM - zoom) /
+		(LIGHTNING_ZOOMED_OUT_BOOST_END_ZOOM - z) /
 		(LIGHTNING_ZOOMED_OUT_BOOST_END_ZOOM - LIGHTNING_ZOOMED_OUT_BOOST_FULL_ZOOM);
 	const clamped = clamp(t, 0, 1);
 	return clamped * clamped * (3 - 2 * clamped);

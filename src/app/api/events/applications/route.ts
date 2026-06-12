@@ -65,6 +65,7 @@ export type MyEventApplication = {
 	performingName: string | null;
 	genre: string | null;
 	area: string | null;
+	bio: string | null;
 	videoCount: number;
 	// The application exactly as the venue sees it (the seeded thread-opening
 	// message), plus a videos line — rendered as the artist's "sent" inbox item.
@@ -278,6 +279,7 @@ export async function GET() {
 					performingName: application.performingName,
 					genre: application.genre,
 					area: application.area,
+					bio: application.bio,
 					videoCount: application._count.videos,
 					summaryHtml: buildSentApplicationHtml(
 						buildApplicationSummaryHtml(application, event?.name ?? null),

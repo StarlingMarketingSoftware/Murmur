@@ -37,6 +37,8 @@
     "**/*.ts",
     "**/*.tsx",
     ".next-baseline/types/**/*.ts",
+    ".next-build-check/types/**/*.ts",
+    ".next-build-verify/types/**/*.ts",
     ".next-safari-fix/types/**/*.ts",
     ".next-safariperf/types/**/*.ts",
     ".next-verify-dev/types/**/*.ts",
@@ -45,7 +47,7 @@
     ".next-zoom-verify/types/**/*.ts",
     ".next/types/**/*.ts",
     "next-env.d.ts",
-    ".next-build-check/types/**/*.ts"
+    ".next-minzoom-verify/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
