@@ -1731,6 +1731,7 @@ const MAP_SELECT_GRAB_SCALE_GROW_END_HEIGHT_PX = 1480;
 const MAP_SELECT_GRAB_VIEWPORT_INSET_PX = 16;
 const MAP_VIEW_SIDE_PANEL_VISUAL_TOP_PX = 106;
 const MAP_VIEW_SIDE_PANEL_BOTTOM_GAP_PX = 20;
+const MAP_VIEW_SIDE_PANEL_GROUP_NUDGE_UP_PX = 24;
 const MAP_PANEL_ABRIDGED_RESEARCH_HEIGHT_PX = 292;
 const MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX = 13;
 const MAP_PANEL_ABRIDGED_RESEARCH_CLEAR_DELAY_MS = 220;
@@ -1745,6 +1746,7 @@ const MAP_VIEW_CAMPAIGN_HEADER_HEIGHT_PX = 59;
 const MAP_VIEW_CAMPAIGN_HEADER_GAP_PX = 13;
 // Keep both map side panels visually pinned after the dashboard root zoom is applied.
 const MAP_VIEW_SIDE_PANEL_TOP_CSS = `calc(${MAP_VIEW_SIDE_PANEL_VISUAL_TOP_PX}px / var(--murmur-dashboard-zoom, ${DASHBOARD_MAP_ZOOM_DEFAULT}))`;
+const MAP_VIEW_SIDE_PANEL_GROUP_TOP_CSS = `calc((${MAP_VIEW_SIDE_PANEL_VISUAL_TOP_PX}px - ${MAP_VIEW_SIDE_PANEL_GROUP_NUDGE_UP_PX}px) / var(--murmur-dashboard-zoom, ${DASHBOARD_MAP_ZOOM_DEFAULT}))`;
 const MAP_SELECT_GRAB_VISUAL_TOP_NUDGE_UP_CSS = `calc(4px / var(--murmur-dashboard-zoom, ${DASHBOARD_MAP_ZOOM_DEFAULT}))`;
 const MAP_SELECT_GRAB_TOP_EXTENT_PX =
 	MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
@@ -6167,6 +6169,17 @@ const DashboardContent = () => {
 	const mapViewCampaignHeaderTopOffsetPx =
 		MAP_VIEW_CAMPAIGN_HEADER_HEIGHT_PX * MAP_VIEW_PANEL_SCALE +
 		MAP_VIEW_CAMPAIGN_HEADER_GAP_PX;
+	const mapViewResultsPanelTopOffsetPx = shouldShowDashboardMapCampaignHeader
+		? mapViewCampaignHeaderTopOffsetPx
+		: 0;
+	const mapViewSidePanelGroupTopCss = shouldShowDashboardMapCampaignHeader
+		? MAP_VIEW_SIDE_PANEL_GROUP_TOP_CSS
+		: MAP_VIEW_SIDE_PANEL_TOP_CSS;
+	const mapViewResultsPanelTopCss =
+		mapViewResultsPanelTopOffsetPx > 0
+			? `calc(${mapViewSidePanelGroupTopCss} + ${mapViewResultsPanelTopOffsetPx}px)`
+			: mapViewSidePanelGroupTopCss;
+	const mapViewResultsPanelMaxHeightCss = `calc(100% - ${mapViewSidePanelGroupTopCss} - ${MAP_VIEW_SIDE_PANEL_BOTTOM_GAP_PX + mapViewResultsPanelTopOffsetPx}px)`;
 	const mapSelectGrabViewScale = useMemo(() => {
 		if (isMobile) return 1;
 		const availableHeight =
@@ -12602,7 +12615,7 @@ const DashboardContent = () => {
 											style={{
 												left: `${MAP_SELECT_GRAB_LEFT_PX}px`,
 												// The visible column starts `TOP_EXTENT * scale` above this origin.
-												// Pin that visual top to the same zoom-adjusted Y as the right panel.
+												// Pin that visual top to the canonical side-panel Y.
 												top: `calc(${MAP_VIEW_SIDE_PANEL_TOP_CSS} + ${mapSelectGrabOriginOffsetPx}px - ${MAP_SELECT_GRAB_VISUAL_TOP_NUDGE_UP_CSS})`,
 												transform: `scale(${mapSelectGrabViewScale})`,
 												transformOrigin: 'top left',
@@ -13384,7 +13397,7 @@ const DashboardContent = () => {
 																		setIsPointerInMapSidePanel(false);
 																	}}
 																	style={{
-																		top: `calc(${MAP_VIEW_SIDE_PANEL_TOP_CSS} - ${mapViewCampaignHeaderTopOffsetPx}px)`,
+																		top: mapViewSidePanelGroupTopCss,
 																		width: '433px',
 																		transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
 																		transformOrigin: 'top right',
@@ -13579,13 +13592,13 @@ const DashboardContent = () => {
 																								height: 'calc(50% - 20px)',
 																								overflow: 'hidden',
 																							}
-																						: {
-																								right: 10,
-																								top: MAP_VIEW_SIDE_PANEL_TOP_CSS,
-																								width: '433px',
-																								height: 800,
-																								maxHeight: `calc(100% - ${MAP_VIEW_SIDE_PANEL_TOP_CSS} - ${MAP_VIEW_SIDE_PANEL_BOTTOM_GAP_PX}px)`,
-																								overflow: 'hidden',
+																		: {
+																				right: 10,
+																				top: mapViewResultsPanelTopCss,
+																				width: '433px',
+																				height: 800,
+																				maxHeight: mapViewResultsPanelMaxHeightCss,
+																				overflow: 'hidden',
 																								transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
 																								transformOrigin: 'top right',
 																							}
