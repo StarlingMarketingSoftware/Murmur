@@ -12143,11 +12143,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		try {
 			const m = mapRef.current;
 			if (m) {
-				setRasterOpacityIfChanged(
-					m,
-					MAPBOX_LAYER_IDS.dayFarSideShade,
-					dayShadeOpacity
-				);
+				setRasterOpacityIfChanged(m, MAPBOX_LAYER_IDS.dayFarSideShade, dayShadeOpacity);
 				setRasterOpacityIfChanged(
 					m,
 					MAPBOX_LAYER_IDS.sunTransition,
@@ -12279,11 +12275,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					MAPBOX_LAYER_IDS.nightLightsReveal,
 					revealCrispOpacity
 				);
-				setRasterOpacityIfChanged(
-					m,
-					MAPBOX_LAYER_IDS.nightLightsGlow,
-					finalGlowOpacity
-				);
+				setRasterOpacityIfChanged(m, MAPBOX_LAYER_IDS.nightLightsGlow, finalGlowOpacity);
 				setRasterOpacityIfChanged(
 					m,
 					MAPBOX_LAYER_IDS.nightLightsCloseGlow,
