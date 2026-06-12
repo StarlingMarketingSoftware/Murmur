@@ -8948,8 +8948,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// shows or hides; mapbox-gl only listens to window resize, and the container
 		// observer can miss these transitions — track the visual viewport directly so
 		// the canvas never ends up shorter than its container (black band).
+		window.addEventListener('resize', scheduleResize, { passive: true });
 		window.visualViewport?.addEventListener('resize', scheduleResize);
 		window.addEventListener('orientationchange', scheduleResize);
+		window.addEventListener(
+			'murmur:campaign-zoom-changed',
+			scheduleResize as EventListener
+		);
+		document.addEventListener('fullscreenchange', scheduleResize);
+		document.addEventListener('webkitfullscreenchange', scheduleResize as EventListener);
 
 		// Burst of retries to catch portal/fixed layout settling.
 		const timers: ReturnType<typeof setTimeout>[] = [];
@@ -8959,8 +8966,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		return () => {
 			ro.disconnect();
+			window.removeEventListener('resize', scheduleResize);
 			window.visualViewport?.removeEventListener('resize', scheduleResize);
 			window.removeEventListener('orientationchange', scheduleResize);
+			window.removeEventListener(
+				'murmur:campaign-zoom-changed',
+				scheduleResize as EventListener
+			);
+			document.removeEventListener('fullscreenchange', scheduleResize);
+			document.removeEventListener(
+				'webkitfullscreenchange',
+				scheduleResize as EventListener
+			);
 			for (const t of timers) clearTimeout(t);
 			if (resizeDebounce) clearTimeout(resizeDebounce);
 		};

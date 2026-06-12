@@ -5123,8 +5123,8 @@ html.murmur-compact.murmur-campaign-compact {
    to avoid any chance of double-scaling. */
 html.murmur-compact.murmur-campaign-compact.murmur-campaign-force-transform {
 	zoom: 1 !important;
-	/* Resolvable base for body's percentage height compensation below. */
-	height: 100%;
+	/* Real viewport height; Safari can leave percentage heights stale while resizing/fullscreening. */
+	height: var(--murmur-campaign-viewport-h, 100vh);
 }
 
 html.murmur-compact.murmur-campaign-compact.murmur-campaign-force-transform body {
@@ -5132,13 +5132,15 @@ html.murmur-compact.murmur-campaign-compact.murmur-campaign-force-transform body
 	/* Using `top left` prevents the whole page from drifting right after scale. */
 	transform-origin: top left;
 	width: calc(100% / var(--murmur-campaign-zoom, 0.85));
-	/* Height must be compensated like width: the transformed body is the
-	   containing block for every fixed descendant (incl. the persistent map),
-	   so without this the page's visual height is zoom × viewport and the
-	   bottom strip paints the root background (white). min-height too, or
-	   Tailwind's min-h-screen on body wins whenever zoom > 1. */
-	height: calc(100% / var(--murmur-campaign-zoom, 0.85));
-	min-height: calc(100% / var(--murmur-campaign-zoom, 0.85));
+	/* Height must be compensated from real innerHeight: Safari can resolve
+	   `100%` through a stale transformed html/body chain during fullscreen
+	   or rapid vertical resize, detaching bottom-anchored campaign chrome. */
+	height: calc(
+		var(--murmur-campaign-viewport-h, 100vh) / var(--murmur-campaign-zoom, 0.85)
+	);
+	min-height: calc(
+		var(--murmur-campaign-viewport-h, 100vh) / var(--murmur-campaign-zoom, 0.85)
+	);
 }
 
 /* Residual gaps behind the transformed body (sub-pixel rounding, first paint)
@@ -5196,7 +5198,7 @@ html.murmur-compact.murmur-dashboard-map-compact {
 
 @supports not (zoom: 1) {
 	html.murmur-compact.murmur-campaign-compact {
-		height: 100%;
+		height: var(--murmur-campaign-viewport-h, 100vh);
 	}
 
 	html.murmur-compact.murmur-campaign-compact body {
@@ -5204,8 +5206,12 @@ html.murmur-compact.murmur-dashboard-map-compact {
 		transform-origin: top center;
 		width: calc(100% / var(--murmur-campaign-zoom, 0.85));
 		/* Same height compensation as the Safari force-transform path above. */
-		height: calc(100% / var(--murmur-campaign-zoom, 0.85));
-		min-height: calc(100% / var(--murmur-campaign-zoom, 0.85));
+		height: calc(
+			var(--murmur-campaign-viewport-h, 100vh) / var(--murmur-campaign-zoom, 0.85)
+		);
+		min-height: calc(
+			var(--murmur-campaign-viewport-h, 100vh) / var(--murmur-campaign-zoom, 0.85)
+		);
 	}
 
 	html.murmur-compact.murmur-dashboard-compact body,

@@ -1238,6 +1238,7 @@ const Murmur = () => {
 	const globeNightLighting = useGlobeNightLighting();
 	const CAMPAIGN_COMPACT_CLASS = 'murmur-campaign-compact';
 	const CAMPAIGN_ZOOM_VAR = '--murmur-campaign-zoom';
+	const CAMPAIGN_VIEWPORT_H_VAR = '--murmur-campaign-viewport-h';
 	const DEFAULT_CAMPAIGN_ZOOM = 0.85;
 	const CAMPAIGN_ZOOM_EVENT = 'murmur:campaign-zoom-changed';
 	const CAMPAIGN_SCROLLABLE_CLASS = 'murmur-campaign-scrollable';
@@ -1299,6 +1300,7 @@ const Murmur = () => {
 		// (address-bar/show-hide), which can accidentally flip us back into the no-scroll "nuclear" mode
 		// mid-scroll. Use the stable layout viewport width for breakpoint decisions.
 		const stableViewportW = window.innerWidth;
+		const stableViewportH = window.innerHeight;
 
 		// Safari desktop: prefer transform-based scaling (root `zoom` can mis-render and/or double-scale).
 		let shouldForceTransform = false;
@@ -1335,6 +1337,7 @@ const Murmur = () => {
 			html.classList.remove(CAMPAIGN_COMPACT_CLASS);
 			html.classList.remove(CAMPAIGN_FORCE_TRANSFORM_CLASS);
 			html.style.removeProperty(CAMPAIGN_ZOOM_VAR);
+			html.style.removeProperty(CAMPAIGN_VIEWPORT_H_VAR);
 			html.style.removeProperty(CAMPAIGN_MAP_SHIFT_X_VAR);
 			html.style.removeProperty(CAMPAIGN_TOP_NAV_SHIFT_X_VAR);
 			html.style.removeProperty(CAMPAIGN_MAP_BACKDROP_START_VAR);
@@ -1362,6 +1365,7 @@ const Murmur = () => {
 			html.classList.remove(CAMPAIGN_COMPACT_CLASS);
 			html.classList.remove(CAMPAIGN_FORCE_TRANSFORM_CLASS);
 			html.style.removeProperty(CAMPAIGN_ZOOM_VAR);
+			html.style.removeProperty(CAMPAIGN_VIEWPORT_H_VAR);
 			html.style.removeProperty(CAMPAIGN_MAP_SHIFT_X_VAR);
 			html.style.removeProperty(CAMPAIGN_TOP_NAV_SHIFT_X_VAR);
 			html.style.removeProperty(CAMPAIGN_MAP_BACKDROP_START_VAR);
@@ -1374,9 +1378,10 @@ const Murmur = () => {
 		// CSS `zoom` to the root element, which can create a feedback loop that progressively shrinks
 		// the campaign UI on first load. `innerWidth/innerHeight` reflect the stable layout viewport
 		// we want for resolution mapping + snug-fit clamping.
-		const viewportH = window.innerHeight;
-		const viewportW = window.innerWidth;
+		const viewportH = stableViewportH;
+		const viewportW = stableViewportW;
 		if (viewportH <= 0 || viewportW <= 0) return;
+		html.style.setProperty(CAMPAIGN_VIEWPORT_H_VAR, `${viewportH}px`);
 
 		const ratio = viewportW / viewportH;
 		const IDEAL_16X10 = 16 / 10; // 1.6
@@ -1792,7 +1797,16 @@ const Murmur = () => {
 				? existingOverride
 				: DEFAULT_CAMPAIGN_ZOOM;
 
-		if (Math.abs(existingZoom - targetZoom) < 0.002) return;
+		if (Math.abs(existingZoom - targetZoom) < 0.002) {
+			try {
+				window.dispatchEvent(
+					new CustomEvent(CAMPAIGN_ZOOM_EVENT, { detail: { zoom: targetZoom } })
+				);
+			} catch {
+				// no-op
+			}
+			return;
+		}
 
 		if (Math.abs(targetZoom - DEFAULT_CAMPAIGN_ZOOM) < 0.002) {
 			html.style.removeProperty(CAMPAIGN_ZOOM_VAR);
@@ -1858,6 +1872,7 @@ const Murmur = () => {
 		let cancelled = false;
 		let scheduledRaf: number | null = null;
 		let scrollResetRaf: number | null = null;
+		const resizeSettleTimers: ReturnType<typeof setTimeout>[] = [];
 		const scheduleZoomUpdate = () => {
 			if (cancelled) return;
 			if (scheduledRaf !== null) return;
@@ -1931,14 +1946,36 @@ const Murmur = () => {
 			);
 		}
 
-		const onResize = () => {
-			// Ensure we register any newly-rendered anchors after responsive/layout changes.
+		const clearResizeSettleTimers = () => {
+			while (resizeSettleTimers.length > 0) {
+				const timer = resizeSettleTimers.pop();
+				if (timer) clearTimeout(timer);
+			}
+		};
+
+		const scheduleZoomSettlePasses = () => {
 			refreshBottomAnchors();
 			scheduleZoomUpdate();
+			clearResizeSettleTimers();
+			for (const ms of [50, 150, 300]) {
+				resizeSettleTimers.push(
+					setTimeout(() => {
+						if (cancelled) return;
+						refreshBottomAnchors();
+						scheduleZoomUpdate();
+					}, ms)
+				);
+			}
+		};
+
+		const onResize = () => {
+			// Safari fullscreen / rapid vertical resize settles over multiple frames.
+			scheduleZoomSettlePasses();
 		};
 		// Defensive: clear any stale campaign zoom (e.g. Safari BFCache restores).
 		try {
 			document.documentElement.style.removeProperty(CAMPAIGN_ZOOM_VAR);
+			document.documentElement.style.removeProperty(CAMPAIGN_VIEWPORT_H_VAR);
 			document.documentElement.style.removeProperty(CAMPAIGN_MAP_SHIFT_X_VAR);
 			document.documentElement.style.removeProperty(CAMPAIGN_TOP_NAV_SHIFT_X_VAR);
 			document.documentElement.style.removeProperty(CAMPAIGN_MAP_BACKDROP_START_VAR);
@@ -1997,9 +2034,11 @@ const Murmur = () => {
 		window.addEventListener('resize', onResize, { passive: true });
 		window.addEventListener('scroll', keepCompactPageAtOrigin, { passive: true });
 		const onPageShow = (e: PageTransitionEvent) => {
-			if (e.persisted) updateCampaignZoomForViewport();
+			if (e.persisted) scheduleZoomSettlePasses();
 		};
 		window.addEventListener('pageshow', onPageShow);
+		document.addEventListener('fullscreenchange', onResize);
+		document.addEventListener('webkitfullscreenchange', onResize as EventListener);
 
 		return () => {
 			cancelled = true;
@@ -2008,18 +2047,22 @@ const Murmur = () => {
 			document.documentElement.classList.remove(CAMPAIGN_SCROLLABLE_CLASS);
 			document.documentElement.classList.remove(CAMPAIGN_FORCE_TRANSFORM_CLASS);
 			document.documentElement.style.removeProperty(CAMPAIGN_ZOOM_VAR);
+			document.documentElement.style.removeProperty(CAMPAIGN_VIEWPORT_H_VAR);
 			document.documentElement.style.removeProperty(CAMPAIGN_MAP_SHIFT_X_VAR);
 			document.documentElement.style.removeProperty(CAMPAIGN_TOP_NAV_SHIFT_X_VAR);
 			document.documentElement.style.removeProperty(CAMPAIGN_MAP_BACKDROP_START_VAR);
 			document.documentElement.style.removeProperty(CAMPAIGN_MAP_BACKDROP_END_VAR);
 			if (scheduledRaf !== null) window.cancelAnimationFrame(scheduledRaf);
 			if (scrollResetRaf !== null) window.cancelAnimationFrame(scrollResetRaf);
+			clearResizeSettleTimers();
 			io?.disconnect();
 			mo?.disconnect();
 			window.cancelAnimationFrame(rafId);
 			window.removeEventListener('resize', onResize);
 			window.removeEventListener('scroll', keepCompactPageAtOrigin);
 			window.removeEventListener('pageshow', onPageShow);
+			document.removeEventListener('fullscreenchange', onResize);
+			document.removeEventListener('webkitfullscreenchange', onResize as EventListener);
 		};
 	}, [isMobile, updateCampaignZoomForViewport]);
 
