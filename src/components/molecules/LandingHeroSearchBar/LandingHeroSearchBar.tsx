@@ -59,10 +59,11 @@ export const LandingHeroSearchBar = ({
 		event?.preventDefault();
 		setActiveSection(null);
 
-		// On mobile (below `md`) route to free-trial instead of the dashboard.
+		// On mobile (below `md`) route to the landing free-trial popup instead of
+		// the dashboard.
 		const isMobile = window.matchMedia('(max-width: 767px)').matches;
 		if (isMobile) {
-			router.push(urls.freeTrial.index);
+			router.push(urls.home.startFreeTrial);
 			return;
 		}
 
@@ -1025,13 +1026,13 @@ export const LandingHeroSearchBar = ({
 										style={{
 											top: '50%',
 											transform: 'translateY(-50%)',
-											backgroundColor: 'rgba(93, 171, 104, 0.49)',
+											backgroundColor: '#4DC864',
 											borderTopRightRadius: '7px',
 											borderBottomRightRadius: '7px',
 											borderTopLeftRadius: '0',
 											borderBottomLeftRadius: '0',
-											border: '1px solid #5DAB68',
-											borderLeft: '1px solid #5DAB68',
+											border: '1px solid #4DC864',
+											borderLeft: '1px solid #4DC864',
 										}}
 										aria-label="Search"
 										onClick={(e) => {
@@ -1051,4 +1052,3 @@ export const LandingHeroSearchBar = ({
 		</div>
 	);
 };
-

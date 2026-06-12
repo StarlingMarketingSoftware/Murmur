@@ -3,14 +3,14 @@ import { stripe } from '../../../../stripe/client';
 import Stripe from 'stripe';
 import {
 	apiBadRequest,
-	apiNotFound,
 	apiResponse,
 	apiServerError,
 	apiUnauthorized,
 	handleApiError,
 } from '@/app/api/_utils';
 import { z } from 'zod';
-import { getUser } from '../../_utils';
+import { getUser, provisionLocalUser } from '../../_utils';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import { urls } from '@/constants/urls';
 import { BASE_URL } from '@/constants';
 import prisma from '@/lib/prisma';
@@ -26,6 +26,9 @@ export type PostCheckoutSessionData = z.infer<typeof stripeCheckoutRequestSchema
 
 export async function POST(req: Request) {
 	try {
+		const limited = await withRateLimit(req, 'paid-external', 'stripe-checkout');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
@@ -43,9 +46,11 @@ export async function POST(req: Request) {
 			return apiBadRequest('Price ID is required');
 		}
 
-		const user = await getUser();
+		let user = await getUser();
 		if (!user) {
-			return apiNotFound('User not found');
+			// Clerk webhook hasn't provisioned the local user yet (e.g. local dev
+			// without ngrok, or webhook lag right after sign-up) — provision on demand.
+			user = await provisionLocalUser(userId);
 		}
 
 		let stripeCustomerId = user.stripeCustomerId;

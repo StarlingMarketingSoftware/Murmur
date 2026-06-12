@@ -3,9 +3,16 @@ import React, { FC } from 'react';
 interface MusicVenuesIconProps {
 	size?: number;
 	className?: string;
+	innerFill?: string;
+	outlineFill?: string;
 }
 
-export const MusicVenuesIcon: FC<MusicVenuesIconProps> = ({ size = 29, className }) => {
+export const MusicVenuesIcon: FC<MusicVenuesIconProps> = ({
+	size = 29,
+	className,
+	innerFill = 'white',
+	outlineFill = 'black',
+}) => {
 	// Original aspect ratio is 29:23, so height = size * (23/29)
 	const height = size * (23 / 29);
 	return (
@@ -22,24 +29,24 @@ export const MusicVenuesIcon: FC<MusicVenuesIconProps> = ({ size = 29, className
 				y="0.37"
 				width="11.6808"
 				height="21.6174"
-				fill="white"
-				stroke="black"
+				fill={innerFill}
+				stroke={outlineFill}
 				strokeWidth="0.74"
 			/>
 			<circle
 				cx="22.7898"
 				cy="4.95974"
 				r="2.11415"
-				fill="white"
-				stroke="black"
+				fill={innerFill}
+				stroke={outlineFill}
 				strokeWidth="0.74"
 			/>
 			<circle
 				cx="22.7896"
 				cy="16.7672"
 				r="3.97727"
-				fill="white"
-				stroke="black"
+				fill={innerFill}
+				stroke={outlineFill}
 				strokeWidth="0.74"
 			/>
 			<rect
@@ -47,27 +54,26 @@ export const MusicVenuesIcon: FC<MusicVenuesIconProps> = ({ size = 29, className
 				y="0.37"
 				width="11.6808"
 				height="21.6174"
-				fill="white"
-				stroke="black"
+				fill={innerFill}
+				stroke={outlineFill}
 				strokeWidth="0.74"
 			/>
 			<circle
 				cx="6.21071"
 				cy="4.95974"
 				r="2.11415"
-				fill="white"
-				stroke="black"
+				fill={innerFill}
+				stroke={outlineFill}
 				strokeWidth="0.74"
 			/>
 			<circle
 				cx="6.21055"
 				cy="16.7672"
 				r="3.97727"
-				fill="white"
-				stroke="black"
+				fill={innerFill}
+				stroke={outlineFill}
 				strokeWidth="0.74"
 			/>
 		</svg>
 	);
 };
-

@@ -5,13 +5,21 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { EmailVerificationStatus } from '@/constants/prismaEnums';
 import type { UserContactList } from '@prisma/client';
-import { useEffect, useState, useMemo, useCallback } from 'react';
-import { useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import {
+	CampaignApiError,
+	useActiveCampaign,
+	useCreateCampaign,
+	useGetCampaigns,
+} from '@/hooks/queryHooks/useCampaigns';
 import { urls } from '@/constants/urls';
 import {
 	useBatchUpdateContacts,
+	useCuratedContactsSearch,
+	useFreeTextContactsSearch,
 	useGetContacts,
 	useGetUsedContactIds,
+	type CuratedSearchResult,
 } from '@/hooks/queryHooks/useContacts';
 import { ColumnDef, Table } from '@tanstack/react-table';
 import { ContactWithName } from '@/types/contact';
@@ -19,7 +27,8 @@ import { useCreateApolloContacts } from '@/hooks/queryHooks/useApollo';
 import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { toast } from 'sonner';
 
-import { capitalize, getStateAbbreviation } from '@/utils/string';
+import { getStateAbbreviation } from '@/utils/string';
+import { buildProfileSig } from '@/utils/profileSignals';
 import { TableCellTooltip } from '@/components/molecules/TableCellTooltip/TableCellTooltip';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
@@ -32,6 +41,29 @@ import {
 	stateBadgeColorMap,
 } from '@/constants/ui';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { generateCampaignName } from '@/utils/campaignNames';
+import { markAfterPaint, markPerf } from '@/utils/perfMarks';
+// The search-result localStorage cache, its arg types/normalizers, and the speculative
+// curated-fetch slot live in searchResultCache.ts so the campaign page's Search-tab
+// prefetch can share them without dragging in this hook.
+import {
+	CURATED_CACHE_KEY_PREFIX,
+	FREETEXT_CACHE_KEY_PREFIX,
+	curatedArgsEqual,
+	findSearchCacheEntry,
+	freeTextArgsEqual,
+	normalizeCuratedArgs,
+	normalizeFreeTextArgs,
+	isSpeculativeCuratedFetchFresh,
+	readSearchCache,
+	searchCacheKey,
+	speculativeCuratedSlot,
+	toCuratedArgs,
+	writeSearchCacheEntry,
+	type CuratedOverrides,
+	type CuratedSearchArgs,
+	type FreeTextSearchArgs,
+} from './searchResultCache';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
@@ -40,6 +72,12 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
+const getRandomSearchResultLimit = (): number =>
+	Math.floor(Math.random() * 21) + 30;
+
+const isTimeoutError = (error: unknown): boolean =>
+	error instanceof Error && /\b(timeout|timed\s*out)\b/i.test(error.message);
+
 interface UseDashboardOptions {
 	/** Derived title to assign to contacts without a title when creating a campaign */
 	derivedTitle?: string;
@@ -47,10 +85,19 @@ interface UseDashboardOptions {
 	forceApplyDerivedTitle?: boolean;
 	/** If true, indicates user came from landing page and is in demo mode (allows one specific search without subscription) */
 	fromHome?: boolean;
+	/** When true, search submissions skip the implicit-campaign auto-create path
+	 * (e.g., the user is in URL-pinned add-to-campaign mode and is explicitly
+	 * searching to find more contacts for a specific other campaign). */
+	disableAutoCreateCampaign?: boolean;
 }
 
 export const useDashboard = (options: UseDashboardOptions = {}) => {
-	const { derivedTitle, forceApplyDerivedTitle = false, fromHome = false } = options;
+	const {
+		derivedTitle,
+		forceApplyDerivedTitle = false,
+		fromHome = false,
+		disableAutoCreateCampaign = false,
+	} = options;
 	/* UI */
 	const [hasSearched, setHasSearched] = useState(false);
 
@@ -99,9 +146,13 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		UserContactList[]
 	>([]);
 	const [selectedContacts, setSelectedContacts] = useState<number[]>([]);
+	// Map "Write Message" flow: when true, the inline drafting panel is open over the search map
+	// for the current `selectedContacts`. Reset alongside selection so it never outlives it.
+	const [isWriteMode, setIsWriteMode] = useState(false);
 	const [isAllSelected, setIsAllSelected] = useState(false);
 	const [activeSearchQuery, setActiveSearchQuery] = useState('');
 	const [activeExcludeUsedContacts, setActiveExcludeUsedContacts] = useState(false);
+	const [searchRunId, setSearchRunId] = useState(0);
 	// Optional map-driven bounding box filter (rectangle selection tool in map view).
 	const [mapBboxFilter, setMapBboxFilter] = useState<{
 		south: number;
@@ -121,13 +172,35 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	// Immediate search pending state - set true instantly on search click
 	const [isSearchPending, setIsSearchPending] = useState(false);
 
+	// Curated search results: populated by triggerCuratedSearch (gradient/search button click
+	// when the why/what/where fields are blank). When this is set, we surface these contacts
+	// instead of the standard /api/contacts results so the existing map + UI rendering picks
+	// them up without a separate code path.
+	const [curatedContacts, setCuratedContacts] = useState<ContactWithName[] | null>(null);
+	const [isCuratedSearchActive, setIsCuratedSearchActive] = useState(false);
+	// True while a cached curated result is on screen and a fresh shuffle is being fetched in
+	// the background (stale-while-revalidate). Drives a subtle, non-blocking "refreshing" hint.
+	const [isRevalidatingCurated, setIsRevalidatingCurated] = useState(false);
+	const [pendingFreeTextQuery, setPendingFreeTextQuery] = useState<string | null>(null);
+	// Snapshot of the args that produced the current curated results. Captured here so the
+	// dashboard URL-mirror can persist them and the page can re-run the same curated search
+	// after a browser refresh. Keys are the exact override fields accepted by triggerCuratedSearch.
+	const [lastCuratedArgs, setLastCuratedArgs] = useState<CuratedSearchArgs | null>(null);
+	// Same idea as lastCuratedArgs, but for free-text "Search Anything" runs. The URL alone
+	// can't distinguish a free-text result from the regular vector search (the query string is
+	// the only signal), so this flag is what lets the URL-mirror tag the URL with `ft=1` and
+	// the rehydration path know to restore from the free-text session cache instead of
+	// kicking off a regular onSubmit.
+	const [lastFreeTextArgs, setLastFreeTextArgs] = useState<FreeTextSearchArgs | null>(null);
+
 	const {
-		data: contacts,
+		data: rawContacts,
 		isPending: isPendingContacts,
-		isLoading: isLoadingContacts,
+		isLoading: isLoadingRawContacts,
 		error,
-		isRefetching: isRefetchingContacts,
-		isError,
+		isRefetching: isRefetchingRawContacts,
+		isError: isRawContactsError,
+		isLoadingError: isRawContactsLoadingError,
 	} = useGetContacts({
 		filters: {
 			query: activeSearchQuery,
@@ -135,6 +208,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				process.env.NODE_ENV === 'production' ? EmailVerificationStatus.valid : undefined,
 			useVectorSearch: true,
 			limit,
+			searchRunId,
 			excludeUsedContacts: activeExcludeUsedContacts,
 			bboxSouth: mapBboxFilter?.south,
 			bboxWest: mapBboxFilter?.west,
@@ -143,8 +217,96 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			bboxTitlePrefix: mapBboxFilter?.titlePrefix ?? undefined,
 			fromHome,
 		},
-		enabled: hasSearched && !!activeSearchQuery && activeSearchQuery.trim().length > 0,
+		enabled:
+			hasSearched &&
+			!isCuratedSearchActive &&
+			!!activeSearchQuery &&
+			activeSearchQuery.trim().length > 0,
 	});
+
+	const contacts = useMemo(
+		() => (isCuratedSearchActive ? curatedContacts ?? [] : rawContacts),
+		[isCuratedSearchActive, curatedContacts, rawContacts]
+	);
+	const hasRawContacts = Array.isArray(rawContacts) && rawContacts.length > 0;
+	const shouldSurfaceContactSearchError =
+		!isCuratedSearchActive &&
+		isRawContactsError &&
+		(isRawContactsLoadingError || !hasRawContacts || !isTimeoutError(error));
+
+	const {
+		mutateAsync: runCuratedSearch,
+		isPending: isPendingCuratedSearch,
+	} = useCuratedContactsSearch({ suppressToasts: true });
+
+	const {
+		mutateAsync: runFreeTextSearch,
+		isPending: isPendingFreeTextSearch,
+	} = useFreeTextContactsSearch({ suppressToasts: true });
+
+	// Cancel-the-previous-search machinery. Curated and free-text are mutually
+	// exclusive flavors of "the search that's currently painting the map," so a
+	// new run of *either* must abort *both* in-flight controllers — otherwise an
+	// older curated request can complete after a newer free-text one and clobber
+	// the rendered results.
+	//
+	// `searchGenerationRef` is belt + suspenders: even if an abort doesn't fully
+	// short-circuit (e.g. response already buffered), we compare the generation
+	// captured at call-time against the latest one and silently drop stale data.
+	const curatedAbortRef = useRef<AbortController | null>(null);
+	const freeTextAbortRef = useRef<AbortController | null>(null);
+	const searchGenerationRef = useRef(0);
+
+	// Per-user cache keys (see the cache helpers at module scope). Memoized so they're stable
+	// references inside the search callbacks' dependency arrays.
+	const curatedCacheKey = useMemo(
+		() => searchCacheKey(CURATED_CACHE_KEY_PREFIX, user?.id),
+		[user?.id]
+	);
+	const freeTextCacheKey = useMemo(
+		() => searchCacheKey(FREETEXT_CACHE_KEY_PREFIX, user?.id),
+		[user?.id]
+	);
+
+	// Speculative "For You" prefetch slot: a curated fetch kicked off on hover/focus
+	// intent, before the click. The click (and a cache-hit's background revalidate)
+	// adopts this in-flight promise instead of firing a second request. Module-scope
+	// (speculativeCuratedSlot) so a fetch fired on the CAMPAIGN page's Search tab
+	// survives the route swap and is adopted here after this hook remounts.
+	// True while an adopted campaign-origin fetch is in flight: those don't run through
+	// the curated mutation, so isPendingCuratedSearch stays false for them — without
+	// this, the clear-pending effect below would wipe isSearchPending mid-fetch and the
+	// UI would flash "No Results Found" (and prematurely disengage allContacts mode).
+	const [isAdoptedCuratedFetchPending, setIsAdoptedCuratedFetchPending] = useState(false);
+	// Generation guard for clearing: only the call that last set the flag may clear it.
+	const adoptedCuratedGenerationRef = useRef(0);
+
+	const cancelInFlightSearches = useCallback(() => {
+		curatedAbortRef.current?.abort();
+		curatedAbortRef.current = null;
+		freeTextAbortRef.current?.abort();
+		freeTextAbortRef.current = null;
+	}, []);
+
+	useEffect(() => {
+		return () => {
+			curatedAbortRef.current?.abort();
+			freeTextAbortRef.current?.abort();
+		};
+	}, []);
+
+	const isLoadingContacts = isCuratedSearchActive
+		? // While revalidating a cache hit, the cached picks are already on screen — the
+		  // background curated fetch must NOT surface as a blocking load (that would defeat the
+		  // instant paint). All other curated/free-text pending states still count as loading.
+		  (isPendingCuratedSearch ||
+				isAdoptedCuratedFetchPending ||
+				isPendingFreeTextSearch ||
+				pendingFreeTextQuery !== null) &&
+			!isRevalidatingCurated
+		: isLoadingRawContacts;
+	const isRefetchingContacts = isCuratedSearchActive ? false : isRefetchingRawContacts;
+
 	const { mutateAsync: importApolloContacts, isPending: isPendingImportApolloContacts } =
 		useCreateApolloContacts({});
 
@@ -188,7 +350,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	}, [hasSearched, activeSearchQuery, form]);
 
 	useEffect(() => {
-		if (isError && error && hasSearched && activeSearchQuery) {
+		if (shouldSurfaceContactSearchError && error && hasSearched && activeSearchQuery) {
 			console.error('Contact search error details:', {
 				error,
 				message: error instanceof Error ? error.message : 'Unknown error',
@@ -198,9 +360,9 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					limit,
 				},
 			});
-			if (error instanceof Error && error.message.includes('timeout')) {
+			if (isTimeoutError(error)) {
 				toast.error(
-					'Search timed out after 25 seconds. Please try a more specific search query.'
+					'Search took too long to complete. Existing results were kept where possible; try a more specific query.'
 				);
 			} else if (error instanceof Error) {
 				toast.error(`Search failed: ${error.message}`);
@@ -208,7 +370,14 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				toast.error('Failed to load contacts. Please try again.');
 			}
 		}
-	}, [isError, error, hasSearched, activeSearchQuery, activeExcludeUsedContacts, limit]);
+	}, [
+		shouldSurfaceContactSearchError,
+		error,
+		hasSearched,
+		activeSearchQuery,
+		activeExcludeUsedContacts,
+		limit,
+	]);
 
 	const { mutateAsync: createContactList, isPending: isPendingCreateContactList } =
 		useCreateUserContactList({
@@ -225,7 +394,69 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			suppressToasts: true,
 		});
 
+	const {
+		activeCampaignId,
+		activeCampaign,
+		isResolving: isResolvingActiveCampaign,
+		setActiveCampaignId,
+	} = useActiveCampaign();
+
+	const { data: existingCampaigns } = useGetCampaigns();
+
+	const existingCampaignNames = useMemo<string[]>(() => {
+		const list = (existingCampaigns ?? []) as Array<{ name?: string }>;
+		return list
+			.map((c) => c.name)
+			.filter((n): n is string => typeof n === 'string' && n.length > 0);
+	}, [existingCampaigns]);
+
 	const { data: usedContactIds } = useGetUsedContactIds();
+
+	const creatingCampaignRef = useRef<Promise<number> | null>(null);
+
+	const ensureActiveCampaign = useCallback(
+		async (searchQuery: string): Promise<number | null> => {
+			void searchQuery;
+			if (activeCampaignId != null) return activeCampaignId;
+			if (creatingCampaignRef.current) return creatingCampaignRef.current;
+
+			const promise = (async () => {
+				const name = generateCampaignName(existingCampaignNames);
+				const newUcl = await createContactList({ name, contactIds: [] });
+				const campaign = await createCampaign({
+					name,
+					userContactLists: [newUcl.id],
+				});
+				setActiveCampaignId(campaign.id);
+				return campaign.id as number;
+			})();
+
+			creatingCampaignRef.current = promise;
+			try {
+				const id = await promise;
+				return id;
+			} catch (err) {
+				if (err instanceof CampaignApiError && err.code === 'CAMPAIGN_CAP_REACHED') {
+					toast.error(
+						err.message ||
+							'You have reached the maximum of 5 active campaigns. Delete one to create a new one.'
+					);
+				} else {
+					toast.error('Could not start a campaign for this search.');
+				}
+				return null;
+			} finally {
+				creatingCampaignRef.current = null;
+			}
+		},
+		[
+			activeCampaignId,
+			createContactList,
+			createCampaign,
+			existingCampaignNames,
+			setActiveCampaignId,
+		]
+	);
 
 	/* HANDLERS */
 	const onSubmit = async (data: FormData) => {
@@ -239,37 +470,592 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		setIsSearchPending(true);
 		// New searches clear any prior map selection box filter.
 		setMapBboxFilter(null);
+		setPendingFreeTextQuery(null);
+		// A real query overrides any active curated session. The persistent result cache is
+		// left intact (keyed by args + TTL) so re-running a prior curated/free-text search
+		// stays instant; the URL mirror — not storage — decides what rehydrates on refresh.
+		setIsCuratedSearchActive(false);
+		setCuratedContacts(null);
+		setLastCuratedArgs(null);
+		setLastFreeTextArgs(null);
+		setIsRevalidatingCurated(false);
 		// Update search parameters
 		setActiveSearchQuery(data.searchText);
 		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? false);
-		setLimit(500);
+		setLimit(getRandomSearchResultLimit());
+		setSearchRunId((runId) => runId + 1);
 		setHasSearched(true);
 		setIsMapView(true);
+
+		// Demo users (no subscription, came from landing page) shouldn't materialize
+		// a real campaign. The URL-pinned add-to-campaign flow targets a specific
+		// other campaign and must not touch the active one. Everyone else's first
+		// search lands inside their active campaign, auto-creating one in parallel
+		// with the search if none exists.
+		if (!isFromHomeDemoMode && !disableAutoCreateCampaign) {
+			void ensureActiveCampaign(data.searchText);
+		}
 	};
 
 	const handleResetSearch = () => {
 		setHasSearched(false);
 		setActiveSearchQuery('');
+		setSearchRunId(0);
 		setMapBboxFilter(null);
+		setPendingFreeTextQuery(null);
+		setIsCuratedSearchActive(false);
+		setCuratedContacts(null);
+		setLastCuratedArgs(null);
+		setLastFreeTextArgs(null);
+		setIsRevalidatingCurated(false);
+		// The persistent result cache survives a reset so an immediate re-search is instant.
 		// Reset selection when leaving the search/results flow (fresh dashboard start should not
 		// carry over prior selections).
 		setSelectedContacts([]);
+		setIsWriteMode(false);
 		setIsAllSelected(false);
 		form.reset();
 	};
 
-	const handleSelectAll = (panelContacts?: ContactWithName[]) => {
-		if (!contacts || contacts.length === 0) return;
+	// Build the curated mutation vars from override fields (+ fixed limit/signal).
+	const buildCuratedVars = useCallback(
+		(overrides: CuratedOverrides | undefined, signal: AbortSignal) => ({
+			lat: overrides?.lat ?? undefined,
+			lon: overrides?.lon ?? undefined,
+			radiusKm: overrides?.radiusKm ?? undefined,
+			category: overrides?.category ?? undefined,
+			state: overrides?.state ?? undefined,
+			limit: 50,
+			signal,
+		}),
+		[]
+	);
 
-		if (!isMapView && tableInstance) {
-			if (isAllSelected) {
-				tableInstance.toggleAllRowsSelected(false);
-			} else {
-				tableInstance.toggleAllRowsSelected(true);
+	// Adopt a matching in-flight speculative prefetch if present, else start a fresh fetch.
+	// Returns the controller actually doing the work so the caller can wire abort/cleanup,
+	// plus whether the promise came from outside the curated mutation (campaign-origin) —
+	// the caller must surface pending state for those itself.
+	const resolveCuratedResult = useCallback(
+		(
+			overrides: CuratedOverrides | undefined
+		): {
+			promise: Promise<CuratedSearchResult>;
+			controller: AbortController;
+			isExternal: boolean;
+		} => {
+			const rawArgs = toCuratedArgs(overrides);
+			const spec = speculativeCuratedSlot.current;
+			if (spec && curatedArgsEqual(spec.args, rawArgs)) {
+				speculativeCuratedSlot.current = null;
+				if (isSpeculativeCuratedFetchFresh(spec)) {
+					return {
+						promise: spec.promise,
+						controller: spec.controller,
+						isExternal: spec.origin === 'campaign',
+					};
+				}
+				// Too old to trust (module-scope slot outlives mounts) — drop it.
+				spec.controller.abort();
 			}
-			return;
-		}
+			const controller = new AbortController();
+			const promise = runCuratedSearch(buildCuratedVars(overrides, controller.signal));
+			return { promise, controller, isExternal: false };
+		},
+		[buildCuratedVars, runCuratedSearch]
+	);
 
+	// Speculative "For You" prefetch fired on hover/focus intent (see page.tsx). Computes one
+	// curated shuffle ahead of the click and stashes the in-flight promise; the click (or a
+	// cache-hit's background revalidate) adopts it. Touches no UI state — invisible until used.
+	const prefetchCuratedSearch = useCallback(
+		(overrides?: CuratedOverrides) => {
+			const args = toCuratedArgs(overrides);
+			const existing = speculativeCuratedSlot.current;
+			if (
+				existing &&
+				curatedArgsEqual(existing.args, args) &&
+				isSpeculativeCuratedFetchFresh(existing)
+			) {
+				return;
+			}
+			// Replace a stale/expired speculative request — abort the old one.
+			existing?.controller.abort();
+			const controller = new AbortController();
+			const promise = runCuratedSearch(buildCuratedVars(overrides, controller.signal));
+			// Keep an unconsumed rejection from becoming an unhandled promise rejection;
+			// the real consumer re-awaits and surfaces errors itself.
+			promise.catch(() => undefined);
+			speculativeCuratedSlot.current = {
+				args,
+				promise,
+				controller,
+				origin: 'dashboard',
+				startedAt: Date.now(),
+			};
+		},
+		[buildCuratedVars, runCuratedSearch]
+	);
+
+	// Surprise-me curated search: triggered by the gradient/search button when the why/what/where
+	// fields are blank. Builds a balanced nearby tray across clean booking categories.
+	// Different every click. No OpenAI calls — Elasticsearch recall + server cleanup.
+	const triggerCuratedSearch = useCallback(
+		async (overrides?: CuratedOverrides): Promise<CuratedSearchResult | undefined> => {
+			// Capture the exact args we ran with so we can replay this curated search after a
+			// browser refresh (the URL-mirror in dashboard/page.tsx serializes these). The
+			// rounded `cacheArgs` are the localStorage cache match key.
+			const capturedArgs = toCuratedArgs(overrides);
+			const cacheArgs = normalizeCuratedArgs(capturedArgs);
+			const cached = findSearchCacheEntry(
+				readSearchCache<CuratedSearchArgs>(curatedCacheKey),
+				curatedArgsEqual,
+				cacheArgs
+			);
+
+			// ---- Cache hit: stale-while-revalidate. Paint the cached shuffle instantly, then
+			// fetch a fresh one in the background and swap it in (preserves per-click variety). ----
+			if (cached) {
+				cancelInFlightSearches();
+				const myGeneration = ++searchGenerationRef.current;
+				setMapBboxFilter(null);
+				setPendingFreeTextQuery(null);
+				setIsCuratedSearchActive(true);
+				setHasSearched(true);
+				setIsMapView(true);
+				setLastFreeTextArgs(null);
+				setLastCuratedArgs(capturedArgs);
+				setCuratedContacts(cached.contacts);
+				setActiveSearchQuery(cached.query);
+				setIsSearchPending(false);
+				setIsRevalidatingCurated(true);
+				markAfterPaint('murmur:pick:results-paint', 'murmur:pick:click');
+
+				const { promise, controller } = resolveCuratedResult(overrides);
+				curatedAbortRef.current = controller;
+				try {
+					const result = await promise;
+					if (myGeneration !== searchGenerationRef.current) return result;
+					setCuratedContacts(result.contacts);
+					const where = result.city ?? result.region ?? overrides?.state ?? 'your area';
+					const query = `Curated picks near ${where}`;
+					setActiveSearchQuery(query);
+					writeSearchCacheEntry(
+						curatedCacheKey,
+						{ ts: Date.now(), args: cacheArgs, query, contacts: result.contacts },
+						curatedArgsEqual
+					);
+					return result;
+				} catch (err) {
+					// The cached picks are valid content — keep them on screen for any failure or
+					// abort. No toast (the user already has results); just log a real error.
+					const isAbort =
+						controller.signal.aborted ||
+						(err instanceof Error && err.name === 'AbortError');
+					if (!isAbort && !isTimeoutError(err)) {
+						console.warn('[curated-search] background revalidate failed', err);
+					}
+					return undefined;
+				} finally {
+					if (curatedAbortRef.current === controller) {
+						curatedAbortRef.current = null;
+					}
+					if (myGeneration === searchGenerationRef.current) {
+						setIsRevalidatingCurated(false);
+					}
+				}
+			}
+
+			// ---- Cache miss: full fetch (adopting a hover prefetch if one is in flight). ----
+			// Cancel any prior in-flight search (curated *or* free-text). They share the same
+			// on-screen state, so a stale completion would clobber us.
+			cancelInFlightSearches();
+			const myGeneration = ++searchGenerationRef.current;
+			const previousSearchState = {
+				activeSearchQuery,
+				curatedContacts,
+				hasSearched,
+				isCuratedSearchActive,
+				lastCuratedArgs,
+				lastFreeTextArgs,
+			};
+
+			setIsSearchPending(true);
+			setIsRevalidatingCurated(false);
+			setPendingFreeTextQuery(null);
+			setMapBboxFilter(null);
+			setIsCuratedSearchActive(true);
+			setHasSearched(true);
+			setIsMapView(true);
+			// Curated and free-text are mutually exclusive flavours of `isCuratedSearchActive`;
+			// clear the free-text marker so the URL-mirror doesn't keep tagging the URL with
+			// `ft=1` while we're showing curated picks.
+			setLastFreeTextArgs(null);
+			setLastCuratedArgs(capturedArgs);
+
+			const { promise, controller, isExternal } = resolveCuratedResult(overrides);
+			curatedAbortRef.current = controller;
+			if (isExternal) {
+				// Campaign-origin adopted fetch: not a mutation, so isPendingCuratedSearch
+				// won't cover it — surface our own pending state for isLoadingContacts.
+				adoptedCuratedGenerationRef.current = myGeneration;
+				setIsAdoptedCuratedFetchPending(true);
+			}
+			try {
+				const result = await promise;
+				// A newer search has started since we kicked off — drop this result on
+				// the floor so we don't overwrite whatever the newer call rendered.
+				if (myGeneration !== searchGenerationRef.current) return result;
+				setCuratedContacts(result.contacts);
+				markAfterPaint('murmur:pick:results-paint', 'murmur:pick:click');
+				const where = result.city ?? result.region ?? overrides?.state ?? 'your area';
+				const query = `Curated picks near ${where}`;
+				setActiveSearchQuery(query);
+				// Cache the *exact* contacts we just rendered so a repeat (or refresh) on the same
+				// args paints instantly. The server still reshuffles on the next miss/revalidate.
+				writeSearchCacheEntry(
+					curatedCacheKey,
+					{ ts: Date.now(), args: cacheArgs, query, contacts: result.contacts },
+					curatedArgsEqual
+				);
+				return result;
+			} catch (err) {
+				const isAbort =
+					controller.signal.aborted ||
+					(err instanceof Error && err.name === 'AbortError');
+				if (isAbort) {
+					// User-initiated cancel (newer search took over). Don't toast and
+					// don't reset state — the newer search is already managing it.
+					throw err;
+				}
+				toast.error(
+					isTimeoutError(err)
+						? 'Curated search took too long. Existing results were kept.'
+						: err instanceof Error
+						? err.message
+						: 'Failed to load curated picks'
+				);
+				if (myGeneration === searchGenerationRef.current) {
+					setActiveSearchQuery(previousSearchState.activeSearchQuery);
+					setCuratedContacts(previousSearchState.curatedContacts);
+					setHasSearched(previousSearchState.hasSearched);
+					setIsCuratedSearchActive(previousSearchState.isCuratedSearchActive);
+					setLastCuratedArgs(previousSearchState.lastCuratedArgs);
+					setLastFreeTextArgs(previousSearchState.lastFreeTextArgs);
+				}
+				throw err;
+			} finally {
+				if (curatedAbortRef.current === controller) {
+					curatedAbortRef.current = null;
+				}
+				// Only the call that last set the adopted flag may clear it (a newer
+				// adopted call may have re-armed it for its own fetch).
+				if (adoptedCuratedGenerationRef.current === myGeneration) {
+					setIsAdoptedCuratedFetchPending(false);
+				}
+				if (myGeneration === searchGenerationRef.current) {
+					setIsSearchPending(false);
+				}
+			}
+		},
+		[
+			activeSearchQuery,
+			cancelInFlightSearches,
+			curatedCacheKey,
+			curatedContacts,
+			hasSearched,
+			isCuratedSearchActive,
+			lastCuratedArgs,
+			lastFreeTextArgs,
+			resolveCuratedResult,
+		]
+	);
+
+	const primeFreeTextSearch = useCallback((rawQuery: string) => {
+		const q = rawQuery.trim();
+		if (!q) return;
+
+		setIsSearchPending(true);
+		setIsRevalidatingCurated(false);
+		setPendingFreeTextQuery(q);
+		setMapBboxFilter(null);
+		setIsCuratedSearchActive(true);
+		setHasSearched(true);
+		setIsMapView(true);
+		setLastCuratedArgs(null);
+		// Drop in-memory args while pending so URL mirroring does not label stale
+		// results as current. Keep contacts and sessionStorage until resolution so
+		// a timeout cannot blank the map.
+		setLastFreeTextArgs(null);
+		setActiveSearchQuery(q);
+	}, []);
+
+	// Free-text "Search Anything" entry point. Hits /api/contacts/search which
+	// runs the hybrid retriever (kNN + lexical + optional title-prefix) and the
+	// cleanliness/category/locality multipliers, and surfaces the results
+	// through the same curated-results state pipe so map pins, list rendering,
+	// and selection all "just work" without a parallel UI path. Treated as a
+	// curated session for state purposes — `isCuratedSearchActive` simply means
+	// "results came from a non-/api/contacts source," which applies here too.
+	const triggerFreeTextSearch = useCallback(
+		async (
+			rawQuery: string,
+			overrides?: {
+				lat?: number | null;
+				lon?: number | null;
+				radiusKm?: number | null;
+				strictRadius?: boolean;
+				keywordMode?: boolean;
+				profileGenre?: string | null;
+				profileEmbedText?: string | null;
+				profileArea?: string | null;
+			}
+		) => {
+			const q = rawQuery.trim();
+			if (!q) return;
+
+			// Exact-cache hit: free-text ranking is deterministic per (query, geo), so a recent
+			// identical search paints instantly with zero network. (Curated, which reshuffles, is
+			// handled by stale-while-revalidate in triggerCuratedSearch instead.)
+			const rawArgs: FreeTextSearchArgs = {
+				q,
+				lat: overrides?.lat ?? null,
+				lon: overrides?.lon ?? null,
+				radiusKm: overrides?.radiusKm ?? null,
+				strictRadius: overrides?.strictRadius ?? false,
+				keywordMode: overrides?.keywordMode ?? false,
+				profileSig: buildProfileSig(
+					overrides?.profileGenre,
+					overrides?.profileEmbedText,
+					overrides?.profileArea
+				),
+			};
+			const shouldUseCache = !rawArgs.strictRadius;
+			const cacheArgs = normalizeFreeTextArgs(rawArgs);
+			const cachedEntry = shouldUseCache
+				? findSearchCacheEntry(
+						readSearchCache<FreeTextSearchArgs>(freeTextCacheKey),
+						freeTextArgsEqual,
+						cacheArgs
+				  )
+				: null;
+			if (cachedEntry) {
+				cancelInFlightSearches();
+				++searchGenerationRef.current;
+				setMapBboxFilter(null);
+				setPendingFreeTextQuery(null);
+				setIsCuratedSearchActive(true);
+				setHasSearched(true);
+				setIsMapView(true);
+				setLastCuratedArgs(null);
+				setLastFreeTextArgs(rawArgs);
+				setCuratedContacts(cachedEntry.contacts);
+				setActiveSearchQuery(cachedEntry.query);
+				setIsSearchPending(false);
+				setIsRevalidatingCurated(false);
+				// Refresh recency (move to MRU) so the entry survives eviction longer.
+				writeSearchCacheEntry(
+					freeTextCacheKey,
+					{ ...cachedEntry, ts: Date.now() },
+					freeTextArgsEqual
+				);
+				return;
+			}
+
+			// Cancel any prior in-flight search (curated *or* free-text). They share
+			// the same on-screen state, so a stale completion would clobber us.
+			cancelInFlightSearches();
+			const myGeneration = ++searchGenerationRef.current;
+			const controller = new AbortController();
+			freeTextAbortRef.current = controller;
+			const previousSearchState = {
+				activeSearchQuery,
+				curatedContacts,
+				hasSearched,
+				isCuratedSearchActive,
+				lastCuratedArgs,
+				lastFreeTextArgs,
+			};
+
+			primeFreeTextSearch(q);
+			try {
+				const result = await runFreeTextSearch({
+					q,
+					lat: overrides?.lat ?? undefined,
+					lon: overrides?.lon ?? undefined,
+					radiusKm: overrides?.radiusKm ?? undefined,
+					strictRadius: overrides?.strictRadius,
+					keywordMode: overrides?.keywordMode,
+					profileGenre: overrides?.profileGenre,
+					profileEmbedText: overrides?.profileEmbedText,
+					profileArea: overrides?.profileArea,
+					limit: 50,
+					signal: controller.signal,
+				});
+				if (myGeneration !== searchGenerationRef.current) return result;
+				// SearchResultsMap gates its blob/orb UI on `Boolean(curatedCategory)`. Free-text
+				// results don't carry one, so without this decoration they'd render as plain dots
+				// instead of the curated cluster visual. Prefer the per-contact category match,
+				// then the parsed query category, then a neutral sentinel as a last resort.
+				const fallbackCategory = result.parsed.categories[0] ?? '_freetext';
+				const decoratedContacts: ContactWithName[] = result.contacts.map((c) => {
+					if (c.curatedCategory) return c;
+					const match = (c as ContactWithName & { searchCategoryMatch?: string | null })
+						.searchCategoryMatch;
+					return { ...c, curatedCategory: match ?? fallbackCategory };
+				});
+				setCuratedContacts(decoratedContacts);
+				setLastFreeTextArgs(rawArgs);
+				// Cache the *exact* contacts we just rendered (with their curatedCategory
+				// decoration intact) so a repeat (or refresh) on the same query restores the same
+				// list and the map's stable curated marker path stays in effect. Without it, the
+				// rehydration path falls through to /api/contacts and contacts come back without
+				// curatedCategory — markers regress to viewport sampling and don't render until
+				// after auto-fit + moveend.
+				if (shouldUseCache) {
+					writeSearchCacheEntry(
+						freeTextCacheKey,
+						{ ts: Date.now(), args: cacheArgs, query: q, contacts: decoratedContacts },
+						freeTextArgsEqual
+					);
+				}
+				return result;
+			} catch (err) {
+				const isAbort =
+					controller.signal.aborted ||
+					(err instanceof Error && err.name === 'AbortError');
+				if (isAbort) {
+					throw err;
+				}
+				toast.error(
+					isTimeoutError(err)
+						? 'Search took too long to complete. Existing results were kept.'
+						: err instanceof Error
+						? err.message
+						: 'Failed to run search'
+				);
+				if (myGeneration === searchGenerationRef.current) {
+					setActiveSearchQuery(previousSearchState.activeSearchQuery);
+					setCuratedContacts(previousSearchState.curatedContacts);
+					setHasSearched(previousSearchState.hasSearched);
+					setIsCuratedSearchActive(previousSearchState.isCuratedSearchActive);
+					setLastCuratedArgs(previousSearchState.lastCuratedArgs);
+					setLastFreeTextArgs(previousSearchState.lastFreeTextArgs);
+				}
+				throw err;
+			} finally {
+				if (freeTextAbortRef.current === controller) {
+					freeTextAbortRef.current = null;
+				}
+				if (myGeneration === searchGenerationRef.current) {
+					setPendingFreeTextQuery(null);
+					setIsSearchPending(false);
+				}
+			}
+		},
+		[
+			activeSearchQuery,
+			cancelInFlightSearches,
+			curatedContacts,
+			freeTextCacheKey,
+			hasSearched,
+			isCuratedSearchActive,
+			lastCuratedArgs,
+			lastFreeTextArgs,
+			primeFreeTextSearch,
+			runFreeTextSearch,
+		]
+	);
+
+	// Restore a curated session from sessionStorage if the cache key matches the requested
+	// args; otherwise fall through to a fresh server call. Used on browser refresh so the
+	// user sees the *same* shuffle they were just looking at, not a new random one.
+	const rehydrateCuratedSession = useCallback(
+		async (args: CuratedSearchArgs) => {
+			const cached = findSearchCacheEntry(
+				readSearchCache<CuratedSearchArgs>(curatedCacheKey),
+				curatedArgsEqual,
+				normalizeCuratedArgs(args)
+			);
+			if (cached) {
+				markPerf('murmur:pick:cache-hit');
+				setMapBboxFilter(null);
+				setPendingFreeTextQuery(null);
+				setIsCuratedSearchActive(true);
+				setHasSearched(true);
+				setIsMapView(true);
+				setLastCuratedArgs(args);
+				setLastFreeTextArgs(null);
+				setCuratedContacts(cached.contacts);
+				setActiveSearchQuery(cached.query);
+				setIsSearchPending(false);
+				markAfterPaint('murmur:pick:results-paint', 'murmur:pick:click');
+				return;
+			}
+			markPerf('murmur:pick:cache-miss');
+			await triggerCuratedSearch(args);
+		},
+		[curatedCacheKey, triggerCuratedSearch]
+	);
+
+	// Restore a free-text "Search Anything" session. If sessionStorage holds the same query
+	// the URL is asking for, restore in-memory immediately (no network). Otherwise — typically
+	// a refresh in a fresh tab where sessionStorage didn't carry over — replay the search
+	// via the canonical `triggerFreeTextSearch` so the result still comes back with
+	// `curatedCategory` decoration and the map's stable curated marker path stays in effect.
+	// Either way, on success the caller knows it can skip the regular onSubmit fallback.
+	const rehydrateFreeTextSession = useCallback(
+		async (
+			args: FreeTextSearchArgs,
+			profileFields?: {
+				profileGenre?: string | null;
+				profileEmbedText?: string | null;
+				profileArea?: string | null;
+			}
+		): Promise<boolean> => {
+			const trimmedQuery = args.q.trim();
+			if (!trimmedQuery) return false;
+
+			const cached = findSearchCacheEntry(
+				readSearchCache<FreeTextSearchArgs>(freeTextCacheKey),
+				freeTextArgsEqual,
+				normalizeFreeTextArgs(args)
+			);
+			if (cached) {
+				setMapBboxFilter(null);
+				setPendingFreeTextQuery(null);
+				setIsCuratedSearchActive(true);
+				setHasSearched(true);
+				setIsMapView(true);
+				setLastCuratedArgs(null);
+				setLastFreeTextArgs(args);
+				setCuratedContacts(cached.contacts);
+				setActiveSearchQuery(cached.query);
+				setIsSearchPending(false);
+				return true;
+			}
+
+			// Cache miss: replay the search using the URL-encoded args so we end up with the
+			// same shape of state we'd have post-search (decorated contacts, curated path).
+			try {
+				await triggerFreeTextSearch(trimmedQuery, {
+					lat: args.lat,
+					lon: args.lon,
+					radiusKm: args.radiusKm,
+					strictRadius: args.strictRadius,
+					keywordMode: args.keywordMode,
+					profileGenre: profileFields?.profileGenre,
+					profileEmbedText: profileFields?.profileEmbedText,
+					profileArea: profileFields?.profileArea,
+				});
+				return true;
+			} catch {
+				return false;
+			}
+		},
+		[freeTextCacheKey, triggerFreeTextSearch]
+	);
+
+	const handleSelectAll = (panelContacts?: ContactWithName[]) => {
 		// In map view with panel contacts, toggle only the panel contacts
 		if (panelContacts && panelContacts.length > 0) {
 			const panelContactIds = panelContacts.map((c) => c.id);
@@ -289,6 +1075,17 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					(id) => !panelContactIdsSet.has(id)
 				);
 				setSelectedContacts([...existingNonPanelSelections, ...panelContactIds]);
+			}
+			return;
+		}
+
+		if (!contacts || contacts.length === 0) return;
+
+		if (!isMapView && tableInstance) {
+			if (isAllSelected) {
+				tableInstance.toggleAllRowsSelected(false);
+			} else {
+				tableInstance.toggleAllRowsSelected(true);
 			}
 			return;
 		}
@@ -343,22 +1140,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			await batchUpdateContacts({ updates });
 		}
 
-		const generateCampaignName = (searchQuery: string): string => {
-			let cleanedQuery = searchQuery.replace(/^\[(booking|promotion)\]\s*/i, '');
-
-			const locationMatch = cleanedQuery.match(/\(([^)]+)\)\s*$/);
-			const location = locationMatch ? locationMatch[1] : null;
-
-			cleanedQuery = cleanedQuery.replace(/\s*\([^)]+\)\s*$/, '').trim();
-
-			if (location) {
-				return capitalize(`${cleanedQuery} in ${location}`);
-			}
-
-			return capitalize(cleanedQuery);
-		};
-
-		const defaultName = generateCampaignName(activeSearchQuery);
+		const defaultName = generateCampaignName(existingCampaignNames);
 		if (currentTab === 'search') {
 			const newUserContactList = await createContactList({
 				name: defaultName,
@@ -371,7 +1153,9 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			});
 
 			if (campaign) {
-				startTransition(`${urls.murmur.campaign.detail(campaign.id)}?silent=1&origin=search`);
+				startTransition(
+					`${urls.murmur.campaign.detail(campaign.id)}?silent=1&origin=search&added=1`
+				);
 			}
 		} else if (currentTab === 'list') {
 			if (selectedContactListRows.length === 0) {
@@ -432,21 +1216,6 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				header: () => <span className="sr-only">Name</span>,
 				cell: ({ row }) => {
 					const contact = row.original as ContactWithName;
-					const isUsed = usedContactIdsSet.has(contact.id);
-					const renderUsedIndicator = () => (
-						<span
-							className="inline-block shrink-0 mr-2"
-							title={isUsed ? 'Used in a previous campaign' : undefined}
-							style={{
-								width: '16px',
-								height: '16px',
-								borderRadius: '50%',
-								border: '1px solid #000000',
-								backgroundColor: '#DAE6FE',
-								visibility: isUsed ? 'visible' : 'hidden',
-							}}
-						/>
-					);
 					// Compute name from firstName and lastName fields
 					const hasName = contactHasName(contact);
 					const nameValue = hasName ? computeName(contact) : '';
@@ -470,7 +1239,6 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					if (!hasName && !hasCompany) {
 						return (
 							<div className="flex items-start gap-2">
-								{renderUsedIndicator()}
 								<div className="flex flex-col gap-0.5 py-1">
 									<div className="truncate">
 										<span className="select-none text-gray-300 dark:text-gray-700">
@@ -490,7 +1258,6 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 						if (!hasName && hasCompany) {
 							return (
 								<div className="flex items-center gap-2">
-									{renderUsedIndicator()}
 									<div className="flex flex-col justify-center py-1 h-[2.75rem]">
 										<div className="truncate font-bold font-inter text-[15px]">
 											<TableCellTooltip
@@ -506,7 +1273,6 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 						}
 						return (
 							<div className="flex items-start gap-2">
-								{renderUsedIndicator()}
 								<div className="flex flex-col gap-0.5 py-1">
 									<div className="truncate font-bold font-inter text-[15px]">
 										<TableCellTooltip
@@ -526,7 +1292,6 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 
 					return (
 						<div className="flex items-center gap-2">
-							{renderUsedIndicator()}
 							<div className="flex flex-col gap-0.5 py-1">
 								<div className="truncate font-bold font-inter text-[15px]">
 									<TableCellTooltip
@@ -799,8 +1564,8 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		contacts,
 		isPendingContacts,
 		isLoadingContacts,
-		error,
-		isError,
+		error: shouldSurfaceContactSearchError ? error : null,
+		isError: shouldSurfaceContactSearchError,
 		handleImportApolloContacts,
 		setSelectedContactListRows,
 		handleCreateCampaign,
@@ -808,6 +1573,8 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		columns,
 		setSelectedContacts,
 		selectedContacts,
+		isWriteMode,
+		setIsWriteMode,
 		handleSelectAll,
 		isAllSelected,
 		isRefetchingContacts,
@@ -837,5 +1604,22 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		isSearchPending,
 		mapBboxFilter,
 		setMapBboxFilter,
+		triggerCuratedSearch,
+		prefetchCuratedSearch,
+		rehydrateCuratedSession,
+		isCuratedSearchActive,
+		isPendingCuratedSearch,
+		isRevalidatingCurated,
+		lastCuratedArgs,
+		primeFreeTextSearch,
+		triggerFreeTextSearch,
+		rehydrateFreeTextSession,
+		isPendingFreeTextSearch,
+		lastFreeTextArgs,
+		activeCampaignId,
+		activeCampaign,
+		isResolvingActiveCampaign,
+		setActiveCampaignId,
+		ensureActiveCampaign,
 	};
 };

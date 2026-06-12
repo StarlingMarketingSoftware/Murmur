@@ -6,6 +6,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FC, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 
+const isTimeoutError = (error: unknown): boolean =>
+	error instanceof Error && /\b(timeout|timed\s*out)\b/i.test(error.message);
+
 const queryClient = new QueryClient({
 	defaultOptions: {
 		queries: {
@@ -14,7 +17,7 @@ const queryClient = new QueryClient({
 			refetchOnReconnect: true,
 			retry: (failureCount, error) => {
 				// Don't retry on timeout errors or after 2 attempts
-				if (error instanceof Error && error.message.includes('timeout')) {
+				if (isTimeoutError(error)) {
 					return false;
 				}
 				return failureCount < 2;

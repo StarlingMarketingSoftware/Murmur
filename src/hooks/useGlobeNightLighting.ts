@@ -222,5 +222,7 @@ export function useGlobeNightLighting(): GlobeNightLightingState {
 		};
 	}, [devOverride, transitionMs, phaseTick]);
 
-	return { ...computed, isLoading: false };
+	// Stabilize the returned object so memoized consumers (e.g. SearchResultsMap)
+	// can skip re-rendering when nothing here actually changed.
+	return useMemo(() => ({ ...computed, isLoading: false }), [computed]);
 }

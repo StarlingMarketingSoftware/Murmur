@@ -43,7 +43,7 @@ export const useViewEditEmailDialog = (props: ViewEditEmailDialogProps) => {
 
 	const handleSave = async (data: z.infer<typeof editEmailSchema>) => {
 		if (!email) {
-			toast.error('No email selected.');
+			toast.error('No message selected.');
 			return;
 		}
 		await editEmail({

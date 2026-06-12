@@ -5,14 +5,16 @@ import { z } from 'zod';
 import {
 	apiBadRequest,
 	apiCreated,
+	apiForbidden,
 	apiResponse,
 	apiUnauthorized,
+	getIsAdmin,
 	handleApiError,
 } from '@/app/api/_utils';
 import { getValidatedParamsFromUrl } from '@/utils';
 
 const postLeadSchema = z.object({
-	email: z.string().email(),
+	email: z.string().email().max(254),
 });
 const getLeadFilterSchema = z.object({
 	email: z.string().email().optional(),
@@ -26,6 +28,11 @@ export async function GET(req: NextRequest) {
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
+		}
+
+		// Leads are marketing email captures with no per-user owner — admin-only.
+		if (!(await getIsAdmin(userId))) {
+			return apiForbidden();
 		}
 
 		const validatedFilters = getValidatedParamsFromUrl(req.url, getLeadFilterSchema);
@@ -53,6 +60,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
 	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
 		const body = await req.json();
 		const validatedData = postLeadSchema.safeParse(body);
 		if (!validatedData.success) {

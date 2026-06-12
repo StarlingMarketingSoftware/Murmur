@@ -9,13 +9,20 @@ import RejectXIcon from '@/components/atoms/svg/RejectXIcon';
 import { useCampaignTopSearchHighlight } from '@/contexts/CampaignTopSearchHighlightContext';
 import { DraftingTableSkeleton } from './DraftingTableSkeleton';
 
+export type ContactsHeaderChromeCampaignStop = 'all' | 'search' | 'write' | 'send' | 'inbox';
+
 export const ContactsHeaderChrome: FC<{
 	offsetY?: number;
 	hasData?: boolean;
 	isAllTab?: boolean;
 	whiteSectionHeight?: number;
+	variant?: 'legacy' | 'campaignStops';
+	activeCampaignStop?: ContactsHeaderChromeCampaignStop;
+	onAllClick?: () => void;
+	onSearchClick?: () => void;
 	onWriteClick?: () => void;
 	onDraftsClick?: () => void;
+	onSendClick?: () => void;
 	onInboxClick?: () => void;
 	/**
 	 * Which campaign tab is currently active.
@@ -32,8 +39,13 @@ export const ContactsHeaderChrome: FC<{
 	hasData = true,
 	isAllTab = false,
 	whiteSectionHeight,
+	variant = 'legacy',
+	activeCampaignStop = 'all',
+	onAllClick,
+	onSearchClick,
 	onWriteClick,
 	onDraftsClick,
+	onSendClick,
 	onInboxClick,
 	activeTab = 'contacts',
 	interactive = true,
@@ -41,6 +53,15 @@ export const ContactsHeaderChrome: FC<{
 	const [isDot1Hovered, setIsDot1Hovered] = useState(false);
 	const [isDot2Hovered, setIsDot2Hovered] = useState(false);
 	const [isDot3Hovered, setIsDot3Hovered] = useState(false);
+	const [hoveredCampaignStop, setHoveredCampaignStop] =
+		useState<ContactsHeaderChromeCampaignStop | null>(null);
+	// Remembers the most recent hover so the hover pill can fade out from its last
+	// position instead of unmounting/snapping back to the active pill.
+	const [lastHoveredCampaignStop, setLastHoveredCampaignStop] =
+		useState<ContactsHeaderChromeCampaignStop | null>(null);
+	useEffect(() => {
+		if (hoveredCampaignStop) setLastHoveredCampaignStop(hoveredCampaignStop);
+	}, [hoveredCampaignStop]);
 	const wasAnyDotHoveredRef = useRef(false);
 	const isBottomView = typeof whiteSectionHeight === 'number' && whiteSectionHeight <= 16;
 	const isWriteActiveTab = activeTab === 'write';
@@ -131,6 +152,274 @@ export const ContactsHeaderChrome: FC<{
 	// Zone 3: extends from midpoint2to3 to after dot3
 	const hoverZone3Left = midpoint2to3;
 	const hoverZone3Width = dot3Center + 30 - midpoint2to3; // 30px after dot3 center
+
+	if (variant === 'campaignStops') {
+		const campaignStops: Array<{
+			id: ContactsHeaderChromeCampaignStop;
+			label: string;
+			backgroundColor: string;
+			onClick?: () => void;
+		}> = [
+			{
+				id: 'all',
+				label: 'All',
+				backgroundColor: 'rgba(255, 255, 255, 0.31)',
+				onClick: onAllClick,
+			},
+			{
+				id: 'search',
+				label: 'Search',
+				backgroundColor: '#CBEFF8',
+				onClick: onSearchClick,
+			},
+			{
+				id: 'write',
+				label: 'Write',
+				backgroundColor: '#FB8E8B',
+				onClick: onWriteClick,
+			},
+			{
+				id: 'inbox',
+				label: 'Inbox',
+				backgroundColor: '#CCDFF4',
+				onClick: onInboxClick,
+			},
+			{
+				id: 'send',
+				label: 'Drafts',
+				backgroundColor: '#EFDAAF',
+				onClick: onSendClick,
+			},
+		];
+		const safeActiveStop = campaignStops.some((stop) => stop.id === activeCampaignStop)
+			? activeCampaignStop
+			: 'all';
+		const activeStopIndex = Math.max(
+			0,
+			campaignStops.findIndex((stop) => stop.id === safeActiveStop)
+		);
+		const activeStopConfig = campaignStops[activeStopIndex];
+		const hoveredStop =
+			hoveredCampaignStop && hoveredCampaignStop !== safeActiveStop
+				? hoveredCampaignStop
+				: null;
+		const hoveredStopIndex = hoveredStop
+			? campaignStops.findIndex((stop) => stop.id === hoveredStop)
+			: -1;
+		const hoveredStopConfig = hoveredStopIndex >= 0 ? campaignStops[hoveredStopIndex] : null;
+		// While fading out we keep using the last hovered stop's config so the pill
+		// stays put visually instead of snapping back over the active pill.
+		const displayedHoveredStop =
+			hoveredStop ??
+			(lastHoveredCampaignStop && lastHoveredCampaignStop !== safeActiveStop
+				? lastHoveredCampaignStop
+				: null);
+		const displayedHoveredStopIndex = displayedHoveredStop
+			? campaignStops.findIndex((stop) => stop.id === displayedHoveredStop)
+			: -1;
+		const displayedHoveredStopConfig =
+			displayedHoveredStopIndex >= 0 ? campaignStops[displayedHoveredStopIndex] : null;
+		const stopWidthPercent = 100 / campaignStops.length;
+		// isAllTab metrics are the full-view metrics scaled by 0.875 (330/377 panel width)
+		// so the compact narrow-desktop header reads as a smaller copy of the full header.
+		const campaignBoxHeight = isBottomView ? 12 : isAllTab ? 21.9 : 25;
+		const campaignBoxBorderWidth = 2;
+		const campaignBoxTopBase =
+			whiteSectionHeight !== undefined
+				? (whiteSectionHeight - campaignBoxHeight) / 2
+				: 2;
+		const campaignBoxTop = Math.max(0, campaignBoxTopBase + offsetY);
+		const campaignBoxInsetX = isBottomView ? 4 : isAllTab ? 3.5 : 4;
+		const campaignPillWidth = isBottomView ? 40 : isAllTab ? 64.8 : 74.064;
+		const campaignPillHeight = isBottomView ? 10 : isAllTab ? 16.5 : 18.9;
+		// Center the pill vertically using top: 50% + translateY(-50%). This avoids
+		// sub-pixel position math (e.g. 0.55px) caused by the fractional pill height
+		// (18.9px) and fractional border width (1.85px), which can make the pill
+		// appear visually off-center in the green campaign-stops container.
+		const campaignPillBorderRadius = isBottomView ? 5 : isAllTab ? 10.5 : 12.025;
+		const campaignPillBorderWidth = isBottomView ? 2 : isAllTab ? 1.6 : 1.85;
+		const campaignDotSize = isBottomView ? 5 : isAllTab ? 7.9 : 9;
+		const campaignFontSize = isBottomView ? '6px' : isAllTab ? '11.4px' : '13px';
+		const campaignDotColor = hasData ? '#A6A6A6' : '#B0B0B0';
+		const stopTransition = '0.45s cubic-bezier(0.22, 1, 0.36, 1)';
+		const stopFadeTransition = '0.28s cubic-bezier(0.4, 0, 0.2, 1)';
+		const campaignPillEdgeInset = 3;
+		const campaignPillHoverOffset = 6;
+		const getCampaignPillLeft = (index: number, offsetPx = 0) => {
+			const offsetExpression = offsetPx
+				? ` ${offsetPx > 0 ? '+' : '-'} ${Math.abs(offsetPx)}px`
+				: '';
+
+			return `clamp(${campaignPillEdgeInset}px, calc(${index * stopWidthPercent}% + ${stopWidthPercent / 2}% - ${campaignPillWidth / 2}px${offsetExpression}), calc(100% - ${campaignPillWidth + campaignPillEdgeInset}px))`;
+		};
+		const isHoveredStopAdjacent =
+			hoveredStopIndex >= 0 && Math.abs(activeStopIndex - hoveredStopIndex) === 1;
+		const activePillHoverDirection =
+			isHoveredStopAdjacent && hoveredStopIndex < activeStopIndex ? 1 : -1;
+		const activePillHoverOffset = isHoveredStopAdjacent
+			? activePillHoverDirection * campaignPillHoverOffset
+			: 0;
+		const hoveredPillHoverOffset =
+			isHoveredStopAdjacent &&
+			((activeStopIndex === 0 && activePillHoverDirection < 0) ||
+				(activeStopIndex === campaignStops.length - 1 && activePillHoverDirection > 0))
+				? -activePillHoverOffset
+				: 0;
+
+		return (
+			<div
+				style={{
+					position: 'absolute',
+					top: `${campaignBoxTop}px`,
+					left: `${campaignBoxInsetX}px`,
+					right: `${campaignBoxInsetX}px`,
+					height: `${campaignBoxHeight}px`,
+					borderRadius: '8px',
+					border: `${campaignBoxBorderWidth}px solid #000000`,
+					background: '#BBDDD4',
+					boxSizing: 'border-box',
+					zIndex: 10,
+				}}
+				onMouseLeave={() => setHoveredCampaignStop(null)}
+			>
+				<div
+					data-campaign-shared-pill="campaign-tabs-pill"
+					data-campaign-shared-pill-variant="contacts-campaign-stops"
+					style={{
+						position: 'absolute',
+						top: '50%',
+						left: getCampaignPillLeft(activeStopIndex, activePillHoverOffset),
+						width: `${campaignPillWidth}px`,
+						height: `${campaignPillHeight}px`,
+						backgroundColor: hoveredStopConfig
+							? '#FFFFFF'
+							: activeStopConfig.backgroundColor,
+						border: `${campaignPillBorderWidth}px solid #000000`,
+						borderRadius: `${campaignPillBorderRadius}px`,
+						boxSizing: 'border-box',
+						display: 'flex',
+						alignItems: 'center',
+						justifyContent: 'center',
+						zIndex: 2,
+						transform: 'translateY(-50%)',
+						transition: `left ${stopTransition}, background-color ${stopFadeTransition}`,
+						pointerEvents: 'none',
+					}}
+				>
+					<span
+						className="font-semibold font-inter leading-none"
+						style={{
+							fontSize: campaignFontSize,
+							color: '#000000',
+							marginTop: isBottomView ? '-1px' : 0,
+							opacity: hoveredStopConfig ? 0 : 1,
+							transition: `opacity ${stopFadeTransition}`,
+						}}
+					>
+						{activeStopConfig.label}
+					</span>
+				</div>
+				{displayedHoveredStopConfig && (
+					<div
+						style={{
+							position: 'absolute',
+							top: '50%',
+							left: getCampaignPillLeft(
+								displayedHoveredStopIndex,
+								hoveredPillHoverOffset
+							),
+							width: `${campaignPillWidth}px`,
+							height: `${campaignPillHeight}px`,
+							backgroundColor: displayedHoveredStopConfig.backgroundColor,
+							border: `${campaignPillBorderWidth}px solid #000000`,
+							borderRadius: `${campaignPillBorderRadius}px`,
+							boxSizing: 'border-box',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							zIndex: 3,
+							opacity: hoveredStopConfig ? 1 : 0,
+							transform: 'translateY(-50%)',
+							transition: `left ${stopTransition}, opacity ${stopFadeTransition}, background-color ${stopFadeTransition}`,
+							pointerEvents: 'none',
+							willChange: 'opacity, left',
+						}}
+					>
+						<span
+							className="font-semibold font-inter leading-none"
+							style={{
+								fontSize: campaignFontSize,
+								color: '#000000',
+								marginTop: isBottomView ? '-1px' : 0,
+							}}
+						>
+							{displayedHoveredStopConfig.label}
+						</span>
+					</div>
+				)}
+				<div
+					style={{
+						position: 'relative',
+						display: 'grid',
+						gridTemplateColumns: `repeat(${campaignStops.length}, minmax(0, 1fr))`,
+						width: '100%',
+						height: '100%',
+						zIndex: 3,
+					}}
+				>
+					{campaignStops.map((stop) => {
+						const isDisplayed = stop.id === safeActiveStop || stop.id === hoveredStop;
+						const canClick = Boolean(stop.onClick);
+
+						return (
+							<button
+								key={stop.id}
+								type="button"
+								aria-label={stop.label}
+								aria-current={stop.id === safeActiveStop ? 'page' : undefined}
+								tabIndex={interactive && canClick ? 0 : -1}
+								onMouseEnter={() => {
+									if (interactive) setHoveredCampaignStop(stop.id);
+								}}
+								onFocus={() => {
+									if (interactive) setHoveredCampaignStop(stop.id);
+								}}
+								onBlur={() => setHoveredCampaignStop(null)}
+								onClick={(e) => {
+									e.stopPropagation();
+									if (!interactive) return;
+									stop.onClick?.();
+								}}
+								style={{
+									appearance: 'none',
+									background: 'transparent',
+									border: 0,
+									padding: 0,
+									margin: 0,
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center',
+									cursor: interactive && canClick ? 'pointer' : 'default',
+								}}
+							>
+								<span
+									aria-hidden="true"
+									style={{
+										width: `${campaignDotSize}px`,
+										height: `${campaignDotSize}px`,
+										borderRadius: '9999px',
+										backgroundColor: campaignDotColor,
+										opacity: isDisplayed ? 0 : 1,
+										transition: `opacity ${stopFadeTransition}`,
+									}}
+								/>
+							</button>
+						);
+					})}
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<>

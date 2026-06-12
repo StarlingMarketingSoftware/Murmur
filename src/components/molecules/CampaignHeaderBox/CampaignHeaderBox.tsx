@@ -6,7 +6,9 @@ import { urls } from '@/constants/urls';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { cn } from '@/utils';
 import { useHoverDescription } from '@/contexts/HoverDescriptionContext';
+import { useSendingSessionState } from '@/contexts/SendingSessionContext';
 import { CampaignTitlePills } from '@/components/molecules/CampaignTitlePills/CampaignTitlePills';
+import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 
 interface CampaignHeaderBoxProps {
 	campaignId: number;
@@ -36,6 +38,9 @@ const getContactsFillColor = (): string => '#F5DADA';
 const getDraftFillColor = (): string => '#FFE3AA';
 const getSentFillColor = (): string => '#B0E0A6';
 
+const FOLDER_BOX_FILL = '#B9EAF1';
+const FOLDER_ICON_COLOR = '#C5494F';
+
 export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	campaignId,
 	campaignName,
@@ -62,6 +67,17 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	const [isHoverDescriptionVisible, setIsHoverDescriptionVisible] = useState(false);
 	const hoverDescriptionTimeoutRef = useRef<number | null>(null);
 
+	// "{N} in send queue" pill while the campaign send session runs (idle default
+	// outside the SendingSessionProvider).
+	const sendingSession = useSendingSessionState();
+	const sendQueueRemaining =
+		sendingSession.status === 'sending' && !sendingSession.dismissed
+			? Math.max(
+					0,
+					sendingSession.total - sendingSession.sentCount - sendingSession.failedCount
+				)
+			: 0;
+
 	const draftingOperationsRaw = draftingProgress ?? [];
 	const draftingOperations = draftingOperationsRaw.filter(
 		(op) => typeof op.total === 'number' && op.total > 0 && typeof op.current === 'number'
@@ -76,12 +92,14 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					const op = draftingOperations[0];
 					const step = Math.min(op.total, Math.max(0, op.current) + 1);
 					return `Drafting ${step}/${op.total} email${op.total === 1 ? '' : 's'}`;
-			  })()
+				})()
 			: `${draftingOperations.length} operations in progress`
 		: '';
 
 	// Track which metric box is hovered for chrome-style animation
-	const [hoveredMetric, setHoveredMetric] = useState<'contacts' | 'drafts' | 'sent' | null>(null);
+	const [hoveredMetric, setHoveredMetric] = useState<
+		'contacts' | 'drafts' | 'sent' | null
+	>(null);
 
 	const { mutate: editCampaign } = useEditCampaign({
 		suppressToasts: true,
@@ -191,25 +209,27 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 		<div
 			data-campaign-header-box="true"
 			className={cn(
-				'relative overflow-visible bg-white border-[2px] border-black rounded-[8px] flex flex-col px-3 pt-0 pb-2 box-border',
+				'relative overflow-visible border border-black rounded-[8px] flex flex-col px-3 pt-0 pb-[6px] box-border',
 				fullWidth && 'w-[96.27vw] max-w-[499px]',
 				className
 			)}
 			style={
 				fullWidth
 					? {
-							height: '71px',
-							minHeight: '71px',
-							maxHeight: '71px',
-					  }
+							height: '59px',
+							minHeight: '59px',
+							maxHeight: '59px',
+							background: 'rgba(255, 255, 255, 0.31)',
+						}
 					: {
 							width: `${width}px`,
-							height: '71px',
+							height: '59px',
 							minWidth: `${width}px`,
 							maxWidth: `${width}px`,
-							minHeight: '71px',
-							maxHeight: '71px',
-					  }
+							minHeight: '59px',
+							maxHeight: '59px',
+							background: 'rgba(255, 255, 255, 0.31)',
+						}
 			}
 		>
 			{/* Drafting progress box (shown above the header; must NOT shift layout) */}
@@ -218,13 +238,13 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					aria-hidden="true"
 					style={{
 						position: 'absolute',
-						// Absolute children position against the padding box; offset by the 2px header border
-						// so this 374x35 box aligns with the header's outer border edges.
-						left: '-2px',
-						right: '-2px',
+						// Absolute children position against the padding box; offset by the 1px header border
+						// so this progress box aligns with the header's outer border edges.
+						left: '-1px',
+						right: '-1px',
 						// Anchor the BOTTOM of the progress box 9px above the header border,
 						// while allowing the box to grow upward for multi-operation stacks.
-						top: '-11px', // 9px gap + 2px header border (padding-box origin)
+						top: '-10px', // 9px gap + 1px header border (padding-box origin)
 						transform: 'translateY(-100%)',
 						boxSizing: 'border-box',
 						border: '2px solid rgba(176, 176, 176, 0.2)',
@@ -246,7 +266,11 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 				>
 					<div
 						className="font-inter font-medium text-black"
-						style={{ fontSize: '11px', lineHeight: '11px', transform: 'translateY(-1px)' }}
+						style={{
+							fontSize: '11px',
+							lineHeight: '11px',
+							transform: 'translateY(-1px)',
+						}}
 					>
 						{draftingLabel}
 					</div>
@@ -307,34 +331,62 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					{renderedHoverDescription}
 				</div>
 			) : null}
-			{/* Campaign Title */}
-			<div className="h-[28px] overflow-hidden flex-shrink-0 mt-[6px]">
-				{isEditing ? (
-					<input
-						ref={inputRef}
-						type="text"
-						value={editedName}
-						onChange={(e) => setEditedName(e.target.value)}
-						onBlur={handleSave}
-						onKeyDown={handleKeyDown}
-						className="font-normal text-[26px] leading-none text-black bg-transparent border-none outline-none p-0 m-0 w-full h-[28px]"
-						style={{ fontFamily: 'Times New Roman, Times, serif' }}
+			{/* Campaign Title — folder icon + name inside a light-blue folder box */}
+			<div className="h-[28px] flex-shrink-0 mt-[6px] flex items-center">
+				<div
+					className="flex items-center gap-[8px] overflow-hidden box-border pl-[8px] pr-[28px]"
+					style={{
+						width: 'fit-content',
+						maxWidth: '258px',
+						height: '26px',
+						borderRadius: '6px',
+						background: FOLDER_BOX_FILL,
+					}}
+				>
+					<DashboardActionBarFolderIcon
+						width={26}
+						height={15}
+						aria-hidden="true"
+						style={{ color: FOLDER_ICON_COLOR, flexShrink: 0, display: 'block' }}
 					/>
-				) : (
+					{isEditing ? (
+						<input
+							ref={inputRef}
+							type="text"
+							value={editedName}
+							onChange={(e) => setEditedName(e.target.value)}
+							onBlur={handleSave}
+							onKeyDown={handleKeyDown}
+							className="min-w-0 flex-1 font-normal text-[26px] leading-none text-black bg-transparent border-none outline-none p-0 m-0"
+							style={{ fontFamily: 'Times New Roman, Times, serif' }}
+						/>
+					) : (
+						<div
+							className="min-w-0 flex-1 font-normal text-[26px] leading-none whitespace-nowrap overflow-hidden text-black cursor-text"
+							style={{
+								fontFamily: 'Times New Roman, Times, serif',
+								maskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
+								WebkitMaskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
+							}}
+							onClick={() => setIsEditing(true)}
+							title="Click to edit"
+						>
+							<CampaignTitlePills title={campaignName} size="header" />
+						</div>
+					)}
+				</div>
+				{sendQueueRemaining > 0 ? (
 					<div
-						className="font-normal text-[26px] leading-none whitespace-nowrap overflow-hidden text-black cursor-text h-[28px]"
+						className="ml-[8px] flex items-center px-2 whitespace-nowrap font-inter font-semibold text-[12px] leading-none text-black"
 						style={{
-							fontFamily: 'Times New Roman, Times, serif',
-							maskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
-							WebkitMaskImage:
-								'linear-gradient(to right, black 90%, transparent 100%)',
+							height: '26px',
+							borderRadius: '6px',
+							background: '#85D790',
 						}}
-						onClick={() => setIsEditing(true)}
-						title="Click to edit"
 					>
-						<CampaignTitlePills title={campaignName} size="header" />
+						{sendQueueRemaining} in send queue
 					</div>
-				)}
+				) : null}
 			</div>
 
 			{/* Spacer above To/From */}
@@ -344,7 +396,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 			<div
 				aria-hidden="true"
 				className={cn(
-					'flex items-center text-[11px] flex-shrink-0 invisible pointer-events-none',
+					'flex h-0 overflow-hidden items-center text-[11px] flex-shrink-0 invisible pointer-events-none',
 					fullWidth && 'gap-[20px]'
 				)}
 			>
@@ -397,91 +449,95 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 			{/* Spacer below To/From */}
 			<div className="flex-1" />
 
-		{/* Metrics Row */}
-		<div
-			className={cn('flex items-center -mt-[6px]', fullWidth ? 'gap-[10px]' : 'gap-[20px]')}
-			onMouseLeave={() => setHoveredMetric(null)}
-		>
-			<button
-				type="button"
-				onClick={onContactsClick}
-				onMouseEnter={() => setHoveredMetric('contacts')}
-				className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold cursor-pointer hover:brightness-95"
-				style={{
-					backgroundColor:
-						hoveredMetric !== null && hoveredMetric !== 'contacts'
-							? '#FFFFFF'
-							: getContactsFillColor(),
-					borderWidth: '1px',
-					width: '80px',
-					height: '15px',
-					fontSize: '10px',
-					transition: 'background-color 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
-				}}
+			{/* Metrics Row */}
+			<div
+				className={cn(
+					'flex items-center -mt-[3px]',
+					fullWidth ? 'gap-[10px]' : 'gap-[20px]'
+				)}
+				onMouseLeave={() => setHoveredMetric(null)}
 			>
-				<span
+				<button
+					type="button"
+					onClick={onContactsClick}
+					onMouseEnter={() => setHoveredMetric('contacts')}
+					className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold cursor-pointer hover:brightness-95"
 					style={{
-						opacity: hoveredMetric !== null && hoveredMetric !== 'contacts' ? 0 : 1,
-						transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+						backgroundColor:
+							hoveredMetric !== null && hoveredMetric !== 'contacts'
+								? '#FFFFFF'
+								: getContactsFillColor(),
+						borderWidth: '1px',
+						width: '80px',
+						height: '15px',
+						fontSize: '10px',
+						transition: 'background-color 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
 					}}
 				>
-					{`${String(contactsCount).padStart(2, '0')} Contacts`}
-				</span>
-			</button>
-			<button
-				type="button"
-				onClick={onDraftsClick}
-				onMouseEnter={() => setHoveredMetric('drafts')}
-				className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold cursor-pointer hover:brightness-95"
-				style={{
-					backgroundColor:
-						hoveredMetric !== null && hoveredMetric !== 'drafts'
-							? '#FFFFFF'
-							: getDraftFillColor(),
-					borderWidth: '1px',
-					width: '80px',
-					height: '15px',
-					fontSize: '10px',
-					transition: 'background-color 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
-				}}
-			>
-				<span
+					<span
+						style={{
+							opacity: hoveredMetric !== null && hoveredMetric !== 'contacts' ? 0 : 1,
+							transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+						}}
+					>
+						{`${String(contactsCount).padStart(2, '0')} Contacts`}
+					</span>
+				</button>
+				<button
+					type="button"
+					onClick={onDraftsClick}
+					onMouseEnter={() => setHoveredMetric('drafts')}
+					className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold cursor-pointer hover:brightness-95"
 					style={{
-						opacity: hoveredMetric !== null && hoveredMetric !== 'drafts' ? 0 : 1,
-						transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+						backgroundColor:
+							hoveredMetric !== null && hoveredMetric !== 'drafts'
+								? '#FFFFFF'
+								: getDraftFillColor(),
+						borderWidth: '1px',
+						width: '80px',
+						height: '15px',
+						fontSize: '10px',
+						transition: 'background-color 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
 					}}
 				>
-					{draftCount === 0 ? 'Drafts' : `${String(draftCount).padStart(2, '0')} Drafts`}
-				</span>
-			</button>
-			<button
-				type="button"
-				onClick={onSentClick}
-				onMouseEnter={() => setHoveredMetric('sent')}
-				className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold cursor-pointer hover:brightness-95"
-				style={{
-					backgroundColor:
-						hoveredMetric !== null && hoveredMetric !== 'sent'
-							? '#FFFFFF'
-							: getSentFillColor(),
-					borderWidth: '1px',
-					width: '80px',
-					height: '15px',
-					fontSize: '10px',
-					transition: 'background-color 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
-				}}
-			>
-				<span
+					<span
+						style={{
+							opacity: hoveredMetric !== null && hoveredMetric !== 'drafts' ? 0 : 1,
+							transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+						}}
+					>
+						{draftCount === 0
+							? 'Drafts'
+							: `${String(draftCount).padStart(2, '0')} Drafts`}
+					</span>
+				</button>
+				<button
+					type="button"
+					onClick={onSentClick}
+					onMouseEnter={() => setHoveredMetric('sent')}
+					className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold cursor-pointer hover:brightness-95"
 					style={{
-						opacity: hoveredMetric !== null && hoveredMetric !== 'sent' ? 0 : 1,
-						transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+						backgroundColor:
+							hoveredMetric !== null && hoveredMetric !== 'sent'
+								? '#FFFFFF'
+								: getSentFillColor(),
+						borderWidth: '1px',
+						width: '80px',
+						height: '15px',
+						fontSize: '10px',
+						transition: 'background-color 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
 					}}
 				>
-					{sentCount === 0 ? 'Sent' : `${String(sentCount).padStart(2, '0')} Sent`}
-				</span>
-			</button>
-		</div>
+					<span
+						style={{
+							opacity: hoveredMetric !== null && hoveredMetric !== 'sent' ? 0 : 1,
+							transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+						}}
+					>
+						{sentCount === 0 ? 'Sent' : `${String(sentCount).padStart(2, '0')} Sent`}
+					</span>
+				</button>
+			</div>
 		</div>
 	);
 };
-

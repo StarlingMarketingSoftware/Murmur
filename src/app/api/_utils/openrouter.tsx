@@ -208,3 +208,93 @@ export const fetchOpenRouter = async (
 		}
 	}
 };
+
+export const fetchOpenRouterEmbedding = async (
+	input: string,
+	options?: {
+		model?: string;
+		timeoutMs?: number;
+		dimensions?: number;
+	}
+): Promise<number[]> => {
+	const controller = new AbortController();
+	const timeoutMs = options?.timeoutMs ?? 15000;
+	const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+	const apiKey = process.env.OPENROUTER_API_KEY;
+	if (!apiKey) {
+		throw new Error('OPENROUTER_API_KEY environment variable is not set');
+	}
+
+	try {
+		const response = await fetch('https://openrouter.ai/api/v1/embeddings', {
+			method: 'POST',
+			headers: {
+				Authorization: `Bearer ${apiKey}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				input,
+				model: options?.model ?? 'openai/text-embedding-3-small',
+				...(typeof options?.dimensions === 'number'
+					? { dimensions: options.dimensions }
+					: {}),
+			}),
+			signal: controller.signal,
+		});
+
+		const raw = await response.text();
+		let res: any = null;
+		try {
+			res = raw ? JSON.parse(raw) : null;
+		} catch {
+			res = null;
+		}
+
+		if (!response.ok) {
+			const msg =
+				res?.error?.message ||
+				res?.message ||
+				(raw ? raw.slice(0, 500) : null) ||
+				'OpenRouter embedding request failed';
+			const error = new Error(msg) as Error & { code?: string; status?: number };
+			error.status = response.status;
+			if (response.status === 429) {
+				error.code = 'rate_limited';
+			} else if (response.status >= 500) {
+				error.code = 'upstream';
+			}
+			throw error;
+		}
+
+		const embedding = res?.data?.[0]?.embedding;
+		if (
+			!Array.isArray(embedding) ||
+			embedding.length === 0 ||
+			!embedding.every((value: unknown) => typeof value === 'number')
+		) {
+			throw new Error('Invalid embedding response from OpenRouter');
+		}
+
+		return embedding;
+	} catch (error) {
+		if (error instanceof Error && error.name === 'AbortError') {
+			const timeoutError = new Error('OpenRouter embedding request timed out') as Error & {
+				code?: string;
+				status?: number;
+			};
+			timeoutError.name = 'AbortError';
+			timeoutError.code = 'timeout';
+			throw timeoutError;
+		}
+		if (error instanceof TypeError) {
+			const networkError = new Error(error.message || 'Network error') as Error & {
+				code?: string;
+			};
+			networkError.code = 'network';
+			throw networkError;
+		}
+		throw error;
+	} finally {
+		clearTimeout(timeoutId);
+	}
+};

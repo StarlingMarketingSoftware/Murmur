@@ -7,8 +7,10 @@ import {
 	apiUnauthorized,
 	handleApiError,
 	apiBadRequest,
+	getIsAdmin,
 } from '@/app/api/_utils';
 import { upsertContactToVectorDb } from '../../_utils/vectorDb';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import { EmailVerificationStatus } from '@prisma/client';
 
 const updateContactSchema = z.object({
@@ -28,19 +30,20 @@ const updateContactSchema = z.object({
 	photoUrl: z.string().optional().nullable(),
 	metadata: z.string().optional().nullable(),
 	isPrivate: z.boolean().optional(),
-	userId: z.string().optional().nullable(),
 	emailValidationStatus: z.nativeEnum(EmailVerificationStatus).optional(),
 	emailValidatedAt: z.date().optional(),
 	manualDeselections: z.number().optional(),
 });
 
 const bulkUpdateSchema = z.object({
-	updates: z.array(
-		z.object({
-			id: z.number(),
-			data: updateContactSchema,
-		})
-	),
+	updates: z
+		.array(
+			z.object({
+				id: z.number(),
+				data: updateContactSchema,
+			})
+		)
+		.max(1000),
 });
 
 export type PostBulkUpdateContactData = z.infer<typeof bulkUpdateSchema>;
@@ -66,6 +69,9 @@ const EMBEDDING_RELEVANT_FIELDS = new Set<keyof z.infer<typeof updateContactSche
 
 export async function PATCH(req: NextRequest) {
 	try {
+		const limited = await withRateLimit(req, 'mutation', 'contacts-bulk-update');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
@@ -79,11 +85,37 @@ export async function PATCH(req: NextRequest) {
 
 		const { updates } = validatedData.data;
 
+		// Authorization model: users may edit their own imported contacts freely;
+		// on GLOBAL curated contacts (userId null) they may only adjust the
+		// search-curation fields the dashboard writes; admins may edit anything.
+		const isAdmin = await getIsAdmin(userId);
+		const targets = await prisma.contact.findMany({
+			where: { id: { in: updates.map((u) => u.id) } },
+			select: { id: true, userId: true },
+		});
+		const targetOwnerById = new Map(targets.map((t) => [t.id, t.userId]));
+		const GLOBAL_CONTACT_FIELDS = new Set(['manualDeselections', 'title']);
+
+		const isUpdateAuthorized = (update: (typeof updates)[number]): boolean => {
+			if (isAdmin) return true;
+			if (!targetOwnerById.has(update.id)) return false;
+			const ownerId = targetOwnerById.get(update.id);
+			if (ownerId === userId) return true;
+			if (ownerId === null) {
+				return Object.keys(update.data).every((key) => GLOBAL_CONTACT_FIELDS.has(key));
+			}
+			return false;
+		};
+
 		// Process updates in batches for better performance
 		const updatedContacts = [];
 		const failedUpdates = [];
 
 		for (const update of updates) {
+			if (!isUpdateAuthorized(update)) {
+				failedUpdates.push({ id: update.id, error: 'Not authorized' });
+				continue;
+			}
 			try {
 				const updatedContact = await prisma.contact.update({
 					where: { id: update.id },

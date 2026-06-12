@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { auth } from '@clerk/nextjs/server';
 import { UserRole } from '@prisma/client';
 import { geocodeContact } from '@/utils/geocoding';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 
 /**
  * POST /api/contacts/geocode
@@ -14,6 +15,9 @@ import { geocodeContact } from '@/utils/geocoding';
  */
 export async function POST(req: NextRequest) {
   try {
+    const limited = await withRateLimit(req, 'paid-external', 'contacts-geocode');
+    if (limited) return limited;
+
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

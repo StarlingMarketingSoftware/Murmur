@@ -4,14 +4,27 @@ export const urls = {
 	home: {
 		index: '/',
 		activeLanding: '/?activeLanding=1',
+		// Opens the landing page's StartFreeTrialModal (sign-up → checkout).
+		startFreeTrial: '/?trial=1',
 	},
 	about: {
 		index: '/about',
+	},
+	venue: {
+		index: '/venue',
+	},
+	venueSignUp: {
+		index: '/venue-sign-up',
+	},
+	venuePortal: {
+		index: '/venue-portal',
 	},
 	murmur: {
 		index: '/murmur',
 		dashboard: {
 			index: '/murmur/dashboard',
+			// Opens the multi-step unsubscribe flow over the bare globe.
+			unsubscribe: '/murmur/dashboard?unsubscribe=1',
 		},
 		campaign: {
 			index: '/murmur/campaign',
@@ -39,22 +52,28 @@ export const urls = {
 		},
 		detail: ((id) => `/pricing/${id}`) as DetailRoute,
 	},
-	freeTrial: {
-		index: '/free-trial',
+	privacy: {
+		index: '/privacy',
 	},
-	contact: {
-		index: '/contact',
-	},
-	resources: {
-		index: '/resources',
+	terms: {
+		index: '/terms',
 	},
 	signIn: {
 		index: '/sign-in',
 	},
 	signUp: {
 		index: '/sign-up',
+		venue: '/sign-up/venue',
 	},
 	api: {
+		account: {
+			deleteVerification: {
+				index: '/api/account/delete-verification',
+				verify: {
+					index: '/api/account/delete-verification/verify',
+				},
+			},
+		},
 		apollo: {
 			index: '/api/apollo',
 		},
@@ -64,11 +83,22 @@ export const urls = {
 				index: '/api/auth/check-admin',
 			},
 		},
+		bookingRequests: {
+			index: '/api/booking-requests',
+			cancel: ((id) => `/api/booking-requests/${id}/cancel`) as DetailRoute,
+			confirm: ((id) => `/api/booking-requests/${id}/confirm`) as DetailRoute,
+		},
+		calendar: {
+			index: '/api/calendar',
+		},
 		campaigns: {
 			index: '/api/campaigns',
 			detail: ((id) => `/api/campaigns/${id}`) as DetailRoute,
 			contactEvents: {
 				index: ((id) => `/api/campaigns/${id}/contact-events`) as DetailRoute,
+			},
+			contacts: {
+				index: ((id) => `/api/campaigns/${id}/contacts`) as DetailRoute,
 			},
 		},
 		contactList: {
@@ -81,6 +111,12 @@ export const urls = {
 		},
 		contacts: {
 			index: '/api/contacts',
+			curatedSearch: {
+				index: '/api/contacts/curated-search',
+			},
+			search: {
+				index: '/api/contacts/search',
+			},
 			mapOverlay: {
 				index: '/api/contacts/map-overlay',
 			},
@@ -105,6 +141,8 @@ export const urls = {
 			geocode: {
 				index: '/api/contacts/geocode',
 			},
+			research: ((id) => `/api/contacts/${id}/research`) as DetailRoute,
+			note: ((id) => `/api/contacts/${id}/note`) as DetailRoute,
 			detail: ((id) => `/api/contacts/${id}`) as DetailRoute,
 		},
 		emails: {
@@ -115,8 +153,14 @@ export const urls = {
 			index: '/api/inbound',
 			detail: ((id) => `/api/inbound/${id}`) as DetailRoute,
 		},
-		emailVerificationCodes: {
-			index: '/api/email-verification-codes',
+		messages: {
+			index: '/api/messages',
+		},
+		conversations: {
+			index: '/api/conversations',
+			detail: ((id) => `/api/conversations/${id}`) as DetailRoute,
+			messages: ((id) => `/api/conversations/${id}/messages`) as DetailRoute,
+			read: ((id) => `/api/conversations/${id}/read`) as DetailRoute,
 		},
 		identities: {
 			index: '/api/identities',
@@ -125,6 +169,16 @@ export const urls = {
 		leads: {
 			index: '/api/leads',
 			detail: ((id) => `/api/leads/${id}`) as DetailRoute,
+		},
+		media: {
+			index: '/api/media',
+			detail: ((id) => `/api/media/${id}`) as DetailRoute,
+			uploadUrl: {
+				index: '/api/media/upload-url',
+			},
+			embed: {
+				index: '/api/media/embed',
+			},
 		},
 		mailgun: {
 			index: '/api/mailgun',
@@ -153,6 +207,9 @@ export const urls = {
 				index: '/api/stripe/checkout',
 			},
 			portal: {
+				changePlan: {
+					index: '/api/stripe/portal/change-plan',
+				},
 				manageSubscription: {
 					index: '/api/stripe/portal/manage-subscription',
 				},
@@ -185,6 +242,28 @@ export const urls = {
 		users: {
 			index: '/api/users',
 			detail: ((id) => `/api/users/${id}`) as DetailRoute,
+		},
+		venue: {
+			index: '/api/venue',
+			account: {
+				index: '/api/venue/account',
+			},
+			applicationVideos: {
+				rating: ((id) => `/api/venue/application-videos/${id}/rating`) as DetailRoute,
+			},
+			events: {
+				index: '/api/venue/events',
+				detail: ((id) => `/api/venue/events/${id}`) as DetailRoute,
+				applications: ((id) => `/api/venue/events/${id}/applications`) as DetailRoute,
+			},
+			applications: {
+				index: '/api/venue/applications',
+			},
+		},
+		events: {
+			index: '/api/events',
+			applications: ((id) => `/api/events/${id}/applications`) as DetailRoute,
+			myApplications: '/api/events/applications',
 		},
 	},
 };

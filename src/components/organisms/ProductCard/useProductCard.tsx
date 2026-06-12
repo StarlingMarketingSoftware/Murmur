@@ -14,6 +14,7 @@ export interface ProductCardProps {
 	user: User | null | undefined;
 	isLink?: boolean;
 	billingCycle: BillingCycle;
+	variant?: 'default' | 'pricing';
 }
 
 export interface GetButtonOptions {

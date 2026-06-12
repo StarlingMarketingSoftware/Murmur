@@ -1,14 +1,25 @@
 import { FC } from 'react';
 import { ProductListProps, useProductList } from './useProductList';
 import { ProductCard } from '../ProductCard/ProductCard';
-import { Spinner } from '@/components/atoms/Spinner/Spinner';
+import { ProductCardSkeleton } from '../ProductCard/ProductCardSkeleton';
 import { cn } from '@/utils';
+
+const gridClassName = cn(
+	'grid grid-cols-1 gap-x-[22px] gap-y-6 sm:gap-y-[50px] w-fit mx-auto place-items-center',
+	'lg:grid-cols-2'
+);
 
 export const ProductList: FC<ProductListProps> = (props) => {
 	const { sortedProducts, user, isPendingProducts, billingCycle } = useProductList(props);
 
 	if (isPendingProducts) {
-		return <Spinner />;
+		return (
+			<div className={gridClassName}>
+				{Array.from({ length: 2 }).map((_, index) => (
+					<ProductCardSkeleton key={index} />
+				))}
+			</div>
+		);
 	}
 
 	if (!sortedProducts) {
@@ -16,15 +27,15 @@ export const ProductList: FC<ProductListProps> = (props) => {
 	}
 
 	return (
-		<div
-			className={cn(
-				'grid grid-cols-1 gap-x-[22px] gap-y-6 sm:gap-y-[50px] w-fit mx-auto place-items-center',
-				'lg:grid-cols-2'
-			)}
-		>
+		<div className={gridClassName}>
 			{sortedProducts.map((product) => (
 				<div key={product.id}>
-					<ProductCard product={product} user={user} billingCycle={billingCycle} />
+					<ProductCard
+						product={product}
+						user={user}
+						billingCycle={billingCycle}
+						variant="pricing"
+					/>
 				</div>
 			))}
 		</div>

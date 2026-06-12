@@ -1,25 +1,55 @@
 'use client';
 
-import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+	FC,
+	Fragment,
+	memo,
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useId,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ContactWithName } from '@/types/contact';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
-import { useGetContactsMapOverlay } from '@/hooks/queryHooks/useContacts';
+import {
+	useGetContactResearch,
+	useGetContactsMapOverlay,
+} from '@/hooks/queryHooks/useContacts';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import {
 	calculateTooltipWidth,
 	calculateTooltipHeight,
 	calculateTooltipAnchorY,
-	generateMapTooltipIconUrl,
+	generateMapTooltipSvg,
 	MAP_TOOLTIP_ANCHOR_X,
 } from '@/components/atoms/_svg/MapTooltipIcon';
 import {
 	generateMapMarkerPinIconUrl,
+	generateUncategorizedContactMarkerIconUrl,
 	MAP_MARKER_PIN_CIRCLE_CENTER_X,
 	MAP_MARKER_PIN_CIRCLE_CENTER_Y,
 	MAP_MARKER_PIN_CIRCLE_DIAMETER,
 	MAP_MARKER_PIN_VIEWBOX_HEIGHT,
 	MAP_MARKER_PIN_VIEWBOX_WIDTH,
 } from '@/components/atoms/_svg/MapMarkerPinIcon';
+import { generateSelectedCategorizedContactMarkerIconUrl } from '@/components/atoms/_svg/SelectedCategorizedContactMarkerIcon';
+import { profileAreaMarkerSvg } from '@/components/atoms/_svg/ProfileAreaMarkerIcon';
+import { venueHomeIconSvg } from '@/components/atoms/_svg/VenueHomeIcon';
+import { mapStackStarIconSvg } from '@/components/atoms/_svg/MapStackStarIcon';
+import {
+	SELECTED_CONTACT_MARKER_CENTER_OUTER_DIAMETER,
+	SELECTED_CONTACT_MARKER_CENTER_X,
+	SELECTED_CONTACT_MARKER_CENTER_Y,
+	SELECTED_CONTACT_MARKER_VIEWBOX_HEIGHT,
+	SELECTED_CONTACT_MARKER_VIEWBOX_WIDTH,
+} from '@/components/atoms/_svg/SelectedContactMarkerIcon';
+import { generateSelectedUncategorizedContactMarkerIconUrl } from '@/components/atoms/_svg/SelectedUncategorizedContactMarkerIcon';
+import { isCleanMapMarkerCategory } from '@/components/atoms/_svg/mapTooltipCategoryIcons';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
@@ -32,1309 +62,982 @@ import {
 	isWineBeerSpiritsTitle,
 	getWineBeerSpiritsLabel,
 } from '@/utils/restaurantTitle';
+import { isSafariBrowser } from '@/utils/browserDetection';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { WeatherMood } from '@/lib/weather/regions';
 import {
 	getMoodConfig,
-	MoodVisualConfig,
 	SOFTBOX_DARK_POOL_BG,
 	SOFTBOX_WARM_KEY_BG,
 } from '@/lib/weather/moodConfig';
+import type {
+	AreaSelectPayload,
+	BasemapCartographyClipState,
+	BoundingBox,
+	ClippingCoord,
+	ClippingMultiPolygon,
+	CuratedBlobMercatorPoint,
+	CuratedBlobMorphSource,
+	DotWaveMeta,
+	GeoJsonFeatureCollection,
+	GeoJsonGeometry,
+	GlobeNightLightingLike,
+	LatLngLiteral,
+	MapSelectionBounds,
+	MarkerConstellationEdge,
+	MarkerConstellationEdgeSeed,
+	MarkerConstellationNode,
+	MarkerConstellationPoint,
+	MarkerHoverMeta,
+	PreparedClippingPolygon,
+	RuntimeMoodVisualConfig,
+	SnowCloudInteractionImpact,
+	SnowParticle,
+	StormLightningCell,
+	StormLightningEvent,
+	StormLightningEventKind,
+	StormLightningPulse,
+} from './types';
+import {
+	ALL_CONTACTS_DOT_GLOW_OPACITY,
+	ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR,
+	ALL_CONTACTS_OVERLAY_LIMIT,
+	ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM,
+	ALL_CONTACTS_OVERLAY_TOOLTIP_FILL_COLOR,
+	AMBIENT_CONTACTS_OVERLAY_BUFFER_DOTS,
+	AMBIENT_CONTACTS_OVERLAY_LIMIT,
+	AMBIENT_CONTACTS_OVERLAY_MARKERS_FULL_ZOOM,
+	AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM,
+	AMBIENT_CONTACTS_OVERLAY_MIN_DOTS,
+	AMBIENT_CONTACTS_OVERLAY_TARGET_DOTS,
+	AMBIENT_CONTACTS_UNCATEGORIZED_FILL_COLOR,
+	AUTO_FIT_CONTACTS_MAX_ZOOM,
+	AUTO_FIT_STATE_MAX_ZOOM,
+	BOOKING_EXTRA_MARKERS_MAX_DOTS,
+	BOOKING_EXTRA_MARKERS_MIN_ZOOM,
+	BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR,
+	CLOUDS_CANVAS_COORDINATES,
+	CLOUDS_CANVAS_SIZE_PX,
+	CLOUDS_CANVAS_TEXTURE_URL,
+	CLOUDS_DRIFT_AMPLITUDE_X_PX,
+	CLOUDS_DRIFT_AMPLITUDE_Y_PX,
+	CLOUDS_DRIFT_BASE_ZOOM,
+	CLOUDS_DRIFT_LOOP_MS,
+	CLOUDS_DRIFT_SPEED_X_PX_PER_S,
+	CLOUDS_DRIFT_SPEED_Y_PX_PER_S,
+	CLOUDS_DRIFT_TIME_SCALE,
+	CLOUDS_DRIFT_UPDATE_MS,
+	CLOUDS_DRIFT_ZOOM_SCALE_EXP,
+	CLOUDS_DRIFT_ZOOM_SCALE_MAX,
+	CLOUDS_DRIFT_ZOOM_SCALE_MIN,
+	CLOUDS_OVERLAY_FADE_OUT_END_ZOOM,
+	CLOUDS_OVERLAY_FADE_OUT_START_ZOOM,
+	CLOUDS_SNOW_INTERACTION_MAX_REFRACT_SHIFT_PX,
+	CLOUDS_SNOW_INTERACTION_STAMP_SIZE_PX,
+	CLOUDS_SNOW_INTERACTION_TARGET_IMPACTS,
+	CLOUDS_SNOW_INTERACTION_TARGET_IMPACTS_REDUCED,
+	CLOUDS_TILES_MAX_ZOOM,
+	CLOUDS_TILES_URL_TEMPLATE,
+	CLOUDS_TURBULENCE_AMPLITUDE_X_PX,
+	CLOUDS_TURBULENCE_LOOP_MS,
+	CLOUDS_TURBULENCE_STRIP_PX,
+	CONTACT_LIGHTS_REVEAL_TILES_URL_TEMPLATE,
+	CONTACT_LIGHTS_TILES_BOUNDS,
+	CONTACT_LIGHTS_TILES_MAX_ZOOM,
+	CONTACT_LIGHTS_TILES_MIN_ZOOM,
+	CONTACT_LIGHTS_TILES_URL_TEMPLATE,
+	CURATED_BLOB_LOBE_MAX_COUNT,
+	CURATED_BLOB_LOBE_MAX_RADIUS_KM,
+	CURATED_BLOB_LOBE_MIN_COUNT,
+	CURATED_BLOB_LOBE_MIN_RADIUS_KM,
+	CURATED_BLOB_LOBE_OVERLAP_RADIUS_RATIO,
+	CURATED_BLOB_LOBE_PADDING_KM,
+	CURATED_BLOB_LOBE_RADIUS_JITTER,
+	CURATED_BLOB_MAX_REGIONS,
+	CURATED_BLOB_MAX_REGION_SPAN_KM,
+	CURATED_BLOB_MIN_REGION_POINTS,
+	CURATED_BLOB_ORGANIC_WOBBLE,
+	CURATED_BLOB_OUTLINE_SMOOTHING_PASSES,
+	CURATED_BLOB_SHAPE_STEPS,
+	CURATED_BLOB_SINGLETON_LOBE_OFFSET_KM,
+	CURATED_BLOB_SINGLETON_LOBE_RADIUS_KM,
+	CURATED_DOT_FADE_END_ZOOM,
+	CURATED_ORB_SMALL_SHAPE_MIN_RADIUS_KM,
+	CURATED_ORB_SMALL_SHAPE_THRESHOLD_KM,
+	CURATED_ORB_BLOOM_OPACITY,
+	CURATED_ORB_COLOR_BLEND_OPACITY,
+	CURATED_ORB_ELLIPSE_RX_RATIO,
+	CURATED_ORB_ELLIPSE_RY_RATIO,
+	CURATED_ORB_GRADIENT_ROTATION_DEG,
+	CURATED_ORB_GRADIENT_SCALE_X_RATIO,
+	CURATED_ORB_GRADIENT_SCALE_Y_RATIO,
+	CURATED_ORB_SLOT_COUNT,
+	CURATED_STABLE_MARKER_MAX_DOTS,
+	DASHBOARD_DECORATIVE_CENTER,
+	DASHBOARD_DECORATIVE_OFFSET_PX,
+	DASHBOARD_DECORATIVE_PITCH,
+	DASHBOARD_DECORATIVE_ZOOM,
+	DASHBOARD_TO_INTERACTIVE_HANDOFF_GLIDE_MS,
+	DASHBOARD_TO_INTERACTIVE_TRANSITION_MS,
+	DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX,
+	DAY_FAR_SIDE_SHADE_MIN_REPAINT_DELTA_DEG,
+	DAY_FAR_SIDE_SHADE_OPACITY_MULTIPLIER,
+	DAY_FAR_SIDE_SHADE_REPAINT_MS,
+	DEFAULT_MAX_ZOOM_FALLBACK,
+	DOT_WAVE_DELAY_PROP,
+	DOT_WAVE_EASING,
+	DOT_WAVE_FADE_MS,
+	DOT_WAVE_FRAME_MS,
+	DOT_WAVE_SMOOTH_TRANSITION_MS,
+	EMPTY_POLYGON_FC,
+	HOT_TEMPERATURE_THRESHOLD_F,
+	HOT_WASH_OPACITY,
+	HOVER_INTERACTION_MIN_ZOOM,
+	HOVER_TOOLTIP_Z_INDEX,
+	LIGHTNING_ALTITUDE_CLOSE_PX,
+	LIGHTNING_ALTITUDE_GLOBE_PX,
+	LIGHTNING_CANVAS_COORDINATES,
+	LIGHTNING_CANVAS_HEIGHT_PX,
+	LIGHTNING_CANVAS_WIDTH_PX,
+	LIGHTNING_CATCHLIGHT_OPACITY,
+	LIGHTNING_CELL_RADIUS_CLOSE_PX,
+	LIGHTNING_CELL_RADIUS_GLOBE_PX,
+	LIGHTNING_CLUSTER_CHANCE_MAX,
+	LIGHTNING_CLUSTER_CHANCE_MIN,
+	LIGHTNING_DRAMATIC_STRIKE_CHANCE,
+	LIGHTNING_FIRST_FLASH_MAX_INTERVAL_MS,
+	LIGHTNING_FIRST_FLASH_MIN_INTERVAL_MS,
+	LIGHTNING_HIDE_AT_OR_ABOVE_ZOOM,
+	LIGHTNING_LAYER_OPACITY,
+	LIGHTNING_MAX_ACTIVE_EVENTS,
+	LIGHTNING_MAX_INTERVAL_MS,
+	LIGHTNING_MERCATOR_MAX_LAT,
+	LIGHTNING_MIN_INTERVAL_MS,
+	LIGHTNING_OPACITY_MULTIPLIER,
+	LIGHTNING_POTENTIAL_TEXTURE_URL,
+	LIGHTNING_REGION_BIAS_CHANCE,
+	LIGHTNING_RESTRIKE_MAX_INTERVAL_MS,
+	LIGHTNING_RESTRIKE_MAX_REMAINING_FLASHES,
+	LIGHTNING_RESTRIKE_MIN_INTERVAL_MS,
+	LIGHTNING_RESTRIKE_MIN_REMAINING_FLASHES,
+	LIGHTNING_SCALE_CLOSE_MAX,
+	LIGHTNING_SCALE_CLOSE_MIN,
+	LIGHTNING_SCALE_GLOBE_MAX,
+	LIGHTNING_SCALE_GLOBE_MIN,
+	LIGHTNING_SHEET_FLASH_CHANCE,
+	LIGHTNING_STAMPS_COUNT,
+	LIGHTNING_STORM_CELL_COUNT,
+	LIGHTNING_US_BOUNDS,
+	LIGHTNING_US_POSITION_TRIES,
+	LIGHTNING_ZOOMED_OUT_MAX_ACTIVE_EVENTS,
+	LIGHTNING_ZOOMED_OUT_MAX_INTERVAL_MS,
+	LIGHTNING_ZOOMED_OUT_MIN_INTERVAL_MS,
+	MANUAL_NIGHT_T_OVERRIDE,
+	MANUAL_WEATHER_MOOD_OVERRIDE,
+	MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F,
+	MAPBOX_LAYER_IDS,
+	MAPBOX_SOURCE_IDS,
+	MAPBOX_STYLE,
+	MAP_DEFAULT_ZOOM,
+	MAP_MIN_ZOOM,
+	MOBILE_MAP_MIN_ZOOM,
+	STATE_LABELS_FULL_OPACITY_ZOOM,
+	MAP_PINCH_ZOOM_RATE,
+	MAP_WHEEL_ZOOM_RATE,
+	MARKER_CONSTELLATION_CORE_OPACITY,
+	MARKER_CONSTELLATION_GLOW_OPACITY,
+	MARKER_CONSTELLATION_HALO_COLOR,
+	MARKER_CONSTELLATION_LINE_COLOR,
+	MARKER_CONSTELLATION_MAX_POINTS,
+	MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM,
+	MARKER_CONSTELLATION_NODE_GLOW_OPACITY,
+	MARKER_CONSTELLATION_NODE_OPACITY,
+	MARKER_CONSTELLATION_REVEAL_FADE_MS,
+	MARKER_CONSTELLATION_SELECTED_CORE_OPACITY,
+	MARKER_CONSTELLATION_SELECTED_GLOW_OPACITY,
+	MARKER_CONSTELLATION_SELECTED_HALO_COLOR,
+	MARKER_CONSTELLATION_SELECTED_LINE_COLOR,
+	MAX_TOTAL_DOTS,
+	MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX,
+	MOOD_CONTINUOUS_TRANSITION_MS,
+	MOOD_DISCRETE_EFFECT_FADE_MS,
+	MOOD_TRANSITION_PAINT_FRAME_MS,
+	NIGHT_DARK_WASH_OPACITY,
+	NIGHT_FACE_SHADE_BG,
+	NIGHT_FACE_SHADE_OPACITY,
+	NIGHT_GLOOM_WASH_OPACITY,
+	NIGHT_LIGHTS_CLOSE_GLOW_OPACITY_MULT,
+	NIGHT_LIGHTS_FADE_END_ZOOM,
+	NIGHT_LIGHTS_GLOW_OPACITY_MULT,
+	NIGHT_LIGHTS_INTRO_CROSSFADE_MS,
+	NIGHT_LIGHTS_INTRO_REVEAL_MS,
+	NIGHT_LIGHTS_LOAD_FADE_MS,
+	NIGHT_LIGHTS_LOAD_POLL_MS,
+	NIGHT_LIGHTS_SPACE_GLOW_EXTRA_PASS_OPACITY_MUL,
+	NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM,
+	NIGHT_LIGHTS_SPACE_GLOW_OPACITY_MULT,
+	NIGHT_LIGHTS_ZOOM_LOAD_DIM_FLOOR,
+	NIGHT_LIGHTS_ZOOM_LOAD_FADE_MS,
+	NIGHT_LIGHTS_ZOOM_LOAD_OUT_FADE_MS,
+	NIGHT_LIGHTS_ZOOM_LOAD_POLL_MS,
+	NIGHT_LOWER_LEFT_SHADOW_BG,
+	NIGHT_LOWER_LEFT_SHADOW_OPACITY,
+	NIGHT_MOONLIGHT_KEY_BG,
+	NIGHT_MOONLIGHT_KEY_OPACITY,
+	NIGHT_MOON_RIM_BG,
+	NIGHT_MOON_RIM_OPACITY,
+	NIGHT_SHADOW_OVERLAY_MUL_MIN,
+	NIGHT_STATE_LINE_OPACITY_MUL_MIN,
+	NIGHT_US_LIGHTS_OPACITY,
+	NIGHT_VIGNETTE_BG,
+	NIGHT_VIGNETTE_OPACITY,
+	NIGHT_WARM_KEY_MIN_MUL,
+	OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE,
+	OVERVIEW_PREWARM_CENTER_QUANT_DEG,
+	OVERVIEW_PREWARM_DEBOUNCE_MS,
+	OVERVIEW_PREWARM_MIN_ZOOM,
+	OVERVIEW_PREWARM_ZOOMS,
+	PROMOTION_OVERLAY_MARKERS_MAX_PINS,
+	PROMOTION_OVERLAY_MARKERS_MIN_ZOOM,
+	PROMOTION_OVERLAY_TITLE_PREFIXES,
+	RESULT_DOT_GLOW_BLUR,
+	RESULT_DOT_GLOW_COLOR,
+	RESULT_DOT_GLOW_OPACITY,
+	RESULT_DOT_GLOW_RADIUS_MAX_PX,
+	RESULT_DOT_GLOW_RADIUS_MIN_PX,
+	RESULT_DOT_SCALE_MAX,
+	RESULT_DOT_SCALE_MIN,
+	RESULT_DOT_STROKE_COLOR_DEFAULT,
+	RESULT_DOT_TRANSPARENT_STROKE_COLOR,
+	RESULT_DOT_ZOOM_MAX,
+	RESULT_DOT_ZOOM_MIN,
+	SAFARI_CLOUDS_DRIFT_UPDATE_MS,
+	SAFARI_CLOUDS_IDLE_AFTER_MS,
+	SAFARI_CLOUDS_IDLE_DRIFT_UPDATE_MS,
+	SELECTED_STATE_GRADIENT_BLOOM_OPACITY,
+	SELECTED_STATE_GRADIENT_COLOR_OPACITY,
+	SNOWFLAKE_STAMPS_COUNT,
+	SNOW_BASE_FALL_PX_PER_S,
+	SNOW_BASE_WIND_PX_PER_S,
+	SNOW_CANVAS_SIZE_PX,
+	SNOW_DENSITY_BAND_LOOP_MS,
+	SNOW_EDDY_DRIFT_BASE_PX,
+	SNOW_GUST_BAND_LOOP_MS,
+	SNOW_GUST_PUSH_BASE_PX,
+	SNOW_HIDE_AT_OR_ABOVE_ZOOM,
+	SNOW_MAX_PARTICLES,
+	SNOW_ROTATED_PARTICLE_DEPTH_MIN,
+	SNOW_STAMP_ALPHA_MULTIPLIER,
+	SNOW_STAMP_MAX_ALPHA,
+	SNOW_STAMP_MAX_SIZE_PX,
+	SNOW_STAMP_MIN_SIZE_PX,
+	SNOW_TURBULENCE_LOOP_MS,
+	SNOW_US_SIDE_CENTER_LNG,
+	SNOW_US_SIDE_FADE_END_DEG,
+	SNOW_US_SIDE_FADE_START_DEG,
+	SNOW_WIND_SWAY_BASE_PX,
+	STATE_DIVIDER_COLOR,
+	STATE_DIVIDER_LINES_MAX_ZOOM,
+	STATE_HIGHLIGHT_COLOR,
+	STATE_HIGHLIGHT_OPACITY,
+	STATE_HOVER_HIGHLIGHT_MAX_ZOOM,
+	STATE_LABELS_URL,
+	STATE_LABEL_COLOR,
+	STATE_META_URL,
+	STATE_OUTLINE_URL,
+	STATE_PREPARED_POLYGONS_URL,
+	STATE_PROCESSED_GEOJSON_URL,
+	STREET_VIEW_BUILDINGS_MIN_ZOOM,
+	STREET_VIEW_BUILDINGS_RISE_FULL_ZOOM,
+	STREET_VIEW_BUILDING_COLOR,
+	STREET_VIEW_BUILDING_OPACITY,
+	STREET_VIEW_MAX_PERSISTENT_CARDS,
+	STREET_VIEW_MAX_PITCH,
+	STREET_VIEW_MIN_ZOOM,
+	STREET_VIEW_PITCH_EASE_MS,
+	STREET_VIEW_PITCH_EPSILON_DEG,
+	STREET_VIEW_PITCH_FRAME_EPSILON_DEG,
+	STREET_VIEW_PITCH_RAMP_FULL_ZOOM,
+	STREET_VIEW_PITCH_RAMP_START_ZOOM,
+	SUN_TRANSITION_CLOUD_CATCHLIGHT_OPACITY_MULT,
+	SUN_TRANSITION_PROGRESS_PAINT_STEPS,
+	SUN_TRANSITION_SPACE_GLOW_BG,
+	SUN_TRANSITION_SPACE_GLOW_OPACITY_MULT,
+	TOOLTIP_FILL_COLOR_SELECTED,
+	UNSUBSCRIBE_BURN_GLOW_BG,
+	UNSUBSCRIBE_BURN_GLOW_MAX_OPACITY,
+	UNSUBSCRIBE_BURN_TRANSITION_MS,
+	UNSUBSCRIBE_BURN_WASH_COLOR,
+	UNSUBSCRIBE_BURN_WASH_MAX_OPACITY,
+	US_ONLY_BASEMAP_CLIP_MAX_ZOOM,
+	VIEWPORT_BBOX_PAD_FACTOR,
+	defaultCenter,
+	stateBadgeColorMap,
+} from './constants';
+import { setDashboardGlobeSpinLng } from './dashboardGlobeSpinState';
+import {
+	getUnsubscribeBurnTarget,
+	subscribeUnsubscribeBurn,
+} from './unsubscribeBurnState';
+import {
+	bboxFromMultiPolygon,
+	boundsToPolygonFeatureCollection,
+	createOutlineGeoJsonFromMultiPolygon,
+	geoJsonGeometryToClippingMultiPolygon,
+	isLatLngInBbox,
+} from './geometry';
+import {
+	angularLngDistanceDeg,
+	clamp,
+	lerp,
+	mapboxEaseOutCubic,
+	normalizeLngDeg,
+	smoothstep,
+} from './math';
+import { hashStringToStableKey, mixCssColorString, washOutHexColor } from './color';
+import {
+	computeGlobeFrontHemisphereOpacity,
+	coordinateKey,
+	getLatLngFromContact,
+	jitterDuplicateCoords,
+} from './coordinates';
+import {
+	applyFreeTrialMapVisualTuning,
+	applyMapboxFogForMoodAndNight,
+	applyMurmurGlobeLighting,
+	applyNightLandPalette,
+	applyUnsubscribeBurnEmberTint,
+	applyUsOnlyBasemapCartography,
+	ensureWorldLandFill,
+	restoreBasemapCartography,
+	unsubscribeBurnEase,
+} from './basemap';
+import {
+	buildCuratedBlobClusterLobeMultiPolygons,
+	buildMercatorCircleMultiPolygon,
+	buildScreenPathFromLngLatMultiPolygon,
+	createCuratedBlobMorphSourcesFromMercatorMultiPolygon,
+	createSelectedStateMorphSource,
+	mercatorMultiPolygonToLngLat,
+	morphCuratedBlobSourceToLngLat,
+	pickAdaptiveCuratedBlobClusters,
+	projectCuratedBlobPoint,
+	smoothCuratedBlobMultiPolygon,
+} from './curatedBlob';
+import {
+	buildCloudsOpacityExpr,
+	drawCloudExtraPasses,
+	getCloudsPolarFadeMask,
+} from './clouds';
+import {
+	DAY_FAR_SIDE_SHADE_CENTER_LNG,
+	createDayFarSideShadeCanvas,
+	getDayFarSideShadeCenterLng,
+	getDayFarSideShadeDayProgress,
+	paintDayFarSideShadeCanvas,
+} from './dayFarSideShade';
+import { computeDotWaveDelayMs, computeDotWaveTravelMs } from './dotWave';
+import {
+	LIGHTNING_STAMPS_URL,
+	buildLightningOpacityExpr,
+	getLightningZoomedInT,
+	getLightningZoomedOutBoostT,
+} from './lightning';
+import { computeGloomWashFade, computeLightingOverlayOpacity } from './lightingOverlay';
+import {
+	buildBeautyMarkerConstellationFormation,
+	buildCategoryMarkerConstellationFormation,
+	buildFallbackMarkerConstellationGroupKeys,
+	buildSelectedMarkerConstellationEdges,
+	markerConstellationPairKey,
+} from './markerConstellation';
+import {
+	buildOuterRingWorldSegments,
+	isWorldPointNearSegments,
+	pointInClippingPolygon,
+	pointInMultiPolygon,
+} from './polygons';
+import {
+	batchLatLngToWorldPixels,
+	ensureWasmGeoModuleLoaded,
+	getBackgroundDotsQuantizationDeg,
+	getClientPointFromDomEvent,
+	getWasmGeoModuleSync,
+	hashStringToUint32,
+	latLngToWorldPixel,
+	logWasmGeoRuntimeError,
+	stableViewportSampleContacts,
+} from './wasmGeo';
+import {
+	MARKER_HOVER_DARKEN_AMOUNT,
+	MARKER_HOVER_FEATURE_STATE_EXPR,
+	MARKER_HOVER_RADIUS_SCALE,
+	SELECTED_MARKER_ENTRY_OPACITY,
+	SELECTED_MARKER_FADE_MS,
+	SELECTED_MARKER_INITIAL_TRANSFORM_SCALE,
+	SELECTED_MARKER_SCALE_MULTIPLIER,
+	computeCuratedOrbT,
+	darkenHexColor,
+	getCategorizedDotGlowZoomFadedOpacity,
+	getCategorizedDotZoomFadedOpacity,
+	getMarkerConstellationNodeZoomFadedOpacity,
+	getMarkerConstellationZoomFadedOpacity,
+	getMarkerHoverFillColorExpr,
+	getMarkerHoverOpacityExpr,
+	getNormalMarkerFadeOpacityExpr,
+	getSelectedMarkerConstellationZoomFadedOpacity,
+	getSelectedMarkerHoverIconOpacityExpr,
+	getSelectedMarkerIconOpacityExpr,
+	getSelectedStateOrbZoomFadedOpacity,
+} from './mapExpressions';
+import {
+	blendRuntimeMoodConfig,
+	computeMoodVisualNightT,
+	toRuntimeMoodConfig,
+} from './moodConfig';
+import { SNOWFLAKE_STAMPS_URL, buildSnowOpacityExpr } from './snow';
+import {
+	applyStateOverlayNightColors,
+	buildLockedStateOutlineWidthExpr,
+	buildStateDividerLineWidthExpr,
+	buildStateInteractiveBorderColorExpr,
+	buildStateInteractiveBorderWidthExpr,
+} from './stateOverlayStyle';
+import {
+	computeSunTransitionLayerOpacity,
+	createSunTransitionCanvas,
+	getSunTransitionVisualState,
+	paintSunTransitionCanvas,
+} from './sunTransition';
+import {
+	computeNightLightsCloseGlowMul,
+	computeNightLightsCrispMul,
+	computeNightLightsFade,
+	computeNightLightsGlowFade,
+	computeNightLightsSpaceGlowFade,
+	computeNightLightsZoomOutLift,
+	computeRuntimeNightT,
+	getDevMoodTransitionMs,
+} from './nightLightsCompute';
+import {
+	getStateAbbreviation,
+	normalizeStateKey,
+	parseMetadataSections,
+} from './metadata';
+import { StreetViewContactCard } from './StreetViewContactCard';
+import {
+	WHAT_TO_HOVER_TOOLTIP_FILL_COLOR,
+	bookingTitlePrefixMatchesSearchWhatKey,
+	extractSearchModeFromQueryPrefix,
+	getBookingTitlePrefixFromContactTitle,
+	getLockedStateMarkerShareForZoom,
+	getPromotionOverlayWhatFromContactTitle,
+	getResultDotColorForWhat,
+	getResultDotScaleForZoom,
+	getResultDotStrokeWeightForZoom,
+	inferSearchModeFromSearchWhat,
+	isPromotionOverlayListTitle,
+	normalizeWhatKey,
+	scaleMapboxOpacityExpr,
+	startsWithCaseInsensitive,
+	withCategorizedDotOpacity,
+	withResultDotGlowOpacity,
+} from './searchMode';
 
-type LatLngLiteral = { lat: number; lng: number };
-type MarkerHoverMeta = { clientX: number; clientY: number };
-type GlobeSunPhase = 'night' | 'sunrise' | 'day' | 'sunset';
-type GlobeNightLightingLike = {
-	nightT?: number | null;
-	phase: GlobeSunPhase;
-	phaseStartMs: number;
-	phaseEndMs: number;
-	transitionMs?: number;
-	isLoading?: boolean;
-};
+// Re-export externally-consumed constants for callers that import from this file
+// (e.g. dashboard/page.tsx). The values themselves now live in `./constants`.
+export {
+	DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING,
+	DASHBOARD_TO_INTERACTIVE_TRANSITION_MS,
+} from './constants';
 
-type ClippingCoord = [number, number]; // [lng, lat]
-type ClippingRing = ClippingCoord[];
-type ClippingPolygon = ClippingRing[];
-type ClippingMultiPolygon = ClippingPolygon[];
+// Safari/WebKit: canvas→GPU-texture uploads are far slower than Chrome's, and any
+// *playing* Mapbox canvas source forces the map to re-render (and re-upload every
+// playing canvas) every frame, forever — the map never idles. In Safari we keep the
+// animated canvas sources paused between content updates instead. Module-level:
+// the UA never changes within a session (false during SSR; the map only runs client-side).
+const SAFARI_CANVAS_PERF_MODE = isSafariBrowser();
 
-type BoundingBox = { minLat: number; maxLat: number; minLng: number; maxLng: number };
-type PreparedClippingPolygon = { polygon: ClippingPolygon; bbox: BoundingBox };
-
-type MapSelectionBounds = { south: number; west: number; north: number; east: number };
-type AreaSelectPayload = {
-	/** Contact ids inside the rectangle selection (primary results + matching overlay markers). */
-	contactIds: number[];
-	/**
-	 * Overlay contacts (not part of the primary `contacts` prop) that were selected, so the
-	 * parent can render them in a side panel list.
-	 */
-	extraContacts: ContactWithName[];
-};
-
-type GeoJsonGeometry =
-	| {
-			type: 'Polygon';
-			// GeoJSON coords: [lng, lat]
-			coordinates: number[][][];
-	  }
-	| {
-			type: 'MultiPolygon';
-			// GeoJSON coords: [lng, lat]
-			coordinates: number[][][][];
-	  };
-
-type GeoJsonFeatureCollection = {
-	type: 'FeatureCollection';
-	features: Array<{
-		type: 'Feature';
-		id?: string | number;
-		properties?: Record<string, unknown>;
-		geometry: GeoJsonGeometry;
-	}>;
-};
-
-type StormLightningPulse = {
-	offsetMs: number;
-	peakOpacity: number;
-	rampUpMs: number;
-	holdMs: number;
-	rampDownMs: number;
-	glowOpacityMultiplier: number;
-};
-
-type StormLightningEventKind = 'sheet' | 'strike' | 'dramatic';
-
-type StormLightningEvent = {
-	id: number;
-	startMs: number;
-	endMs: number;
-	kind: StormLightningEventKind;
-	// Position in the dedicated lightning canvas coordinate system.
-	x: number;
-	y: number;
-	coreScale: number;
-	glowScale: number;
-	sheetScaleX: number;
-	sheetScaleY: number;
-	rotationRad: number;
-	sheetRotationRad: number;
-	stampIndex: number;
-	cellIndex: number;
-	jitterX: number;
-	jitterY: number;
-	altitudePx: number;
-	parallaxPhase: number;
-	cloudOcclusion: number;
-	sheetDriftX: number;
-	sheetDriftY: number;
-	pulses: StormLightningPulse[];
-};
-
-type StormLightningCell = {
-	x: number;
-	y: number;
-	weight: number;
-	radiusPx: number;
-};
-
-type SnowParticle = {
-	x: number;
-	y: number;
-	depth: number;
-	size: number;
-	opacity: number;
-	fallSpeed: number;
-	windSpeed: number;
-	windSway: number;
-	windPhase: number;
-	gustResponsiveness: number;
-	wobble: number;
-	wobblePhase: number;
-	stampIndex: number;
-	turbulenceSeed: number;
-	gustSeed: number;
-	densitySeed: number;
-	scaleJitter: number;
-	stretch: number;
-	rotation: number;
-	rotationSpeed: number;
-};
-
-type SnowCloudInteractionImpact = {
-	// Snow-canvas coordinate system (full-world Mercator, SNOW_CANVAS_SIZE_PX²).
-	x: number;
-	y: number;
-	// Radius in snow-canvas pixels (converted to clouds-canvas pixels at draw time).
-	radiusPx: number;
-	// 0..1 normalized strength derived from particle alpha.
-	alpha01: number;
-	// Horizontal drift proxy (snow-canvas px). Used to bias the refraction direction.
-	driftXPx: number;
-	depth: number;
-};
-
-const closeRing = (ring: ClippingRing): ClippingRing => {
-	if (ring.length === 0) return ring;
-	const first = ring[0];
-	const last = ring[ring.length - 1];
-	if (first[0] === last[0] && first[1] === last[1]) return ring;
-	return [...ring, first];
-};
-
-const absRingArea = (ring: ClippingRing): number => {
-	if (ring.length < 3) return 0;
-	let area2 = 0;
-	for (let i = 0; i < ring.length; i++) {
-		const [x1, y1] = ring[i];
-		const [x2, y2] = ring[(i + 1) % ring.length];
-		area2 += x1 * y2 - x2 * y1;
+// Upload the current canvas content to the source's GPU texture once, leaving the
+// source paused afterwards (CanvasSource.pause() runs prepare() — a synchronous
+// texture.update — before clearing its playing flag).
+const uploadCanvasSourceOnce = (
+	src: { play?: () => void; pause?: () => void } | null | undefined
+) => {
+	try {
+		src?.play?.();
+		src?.pause?.();
+	} catch {
+		// Non-fatal.
 	}
-	return Math.abs(area2 / 2);
 };
 
-type OutlinePolygonFeatureCollection = {
-	type: 'FeatureCollection';
-	features: Array<{
-		type: 'Feature';
-		properties: Record<string, unknown>;
-		geometry: {
-			type: 'Polygon';
-			// GeoJSON coords: [lng, lat]
-			coordinates: number[][][];
-		};
-	}>;
+const EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_X_PX = 112;
+const EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_TOP_PX = 48;
+const EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_BOTTOM_PX = 24;
+const GENERAL_CONTACT_CONSTELLATION_LINE_COLOR = '#1F2429';
+const CAMPAIGN_STATUS_CONSTELLATION_CORE_OPACITY = 1;
+const CAMPAIGN_STATUS_CONSTELLATION_GLOW_OPACITY = 0.18;
+const CAMPAIGN_STATUS_MARKER_RADIUS_SCALE = 1;
+const CAMPAIGN_STATUS_MARKER_STROKE_WIDTH = 2.32338;
+
+export type CampaignContactMapStatus = 'contacts' | 'drafts' | 'new-message' | 'sent';
+
+type CampaignStatusMarkerStyle = {
+	fillColor: string;
+	/** Multiplies the dot fill opacity; 0 renders a hollow ring (e.g. "sent"). */
+	fillOpacity: number;
+	strokeColor: string;
+	strokeWidth: number;
+	strokeOpacity: number;
+	radiusScale: number;
+	lineColor: string;
 };
 
-const createOutlineGeoJsonFromMultiPolygon = (
-	multiPolygon: ClippingMultiPolygon
-): OutlinePolygonFeatureCollection => {
-	const features: OutlinePolygonFeatureCollection['features'] = [];
-	for (const clippingPolygon of multiPolygon) {
-		if (!clippingPolygon?.length) continue;
-
-		const outerRing = clippingPolygon.reduce<ClippingRing | null>((best, ring) => {
-			if (!ring?.length) return best;
-			if (!best) return ring;
-			return absRingArea(ring) > absRingArea(best) ? ring : best;
-		}, null);
-
-		if (!outerRing) continue;
-
-		const coords = closeRing(
-			outerRing.filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat))
-		);
-		if (coords.length < 4) continue;
-
-		features.push({
-			type: 'Feature',
-			properties: {},
-			geometry: {
-				type: 'Polygon',
-				coordinates: [coords.map(([lng, lat]) => [lng, lat])],
-			},
-		});
-	}
-	return { type: 'FeatureCollection', features };
+const CAMPAIGN_STATUS_MARKER_STYLES: Record<
+	CampaignContactMapStatus,
+	CampaignStatusMarkerStyle
+> = {
+	// Solid white disc (white fill + white stroke) — matches StatusContactsIcon.
+	contacts: {
+		fillColor: '#FFFFFF',
+		fillOpacity: 1,
+		strokeColor: '#FFFFFF',
+		strokeWidth: CAMPAIGN_STATUS_MARKER_STROKE_WIDTH,
+		strokeOpacity: 1,
+		radiusScale: CAMPAIGN_STATUS_MARKER_RADIUS_SCALE,
+		lineColor: '#FFFFFF',
+	},
+	// Light-blue fill, white ring — matches StatusDraftsIcon.
+	drafts: {
+		fillColor: '#B7E5FF',
+		fillOpacity: 1,
+		strokeColor: '#FFFFFF',
+		strokeWidth: CAMPAIGN_STATUS_MARKER_STROKE_WIDTH,
+		strokeOpacity: 1,
+		radiusScale: CAMPAIGN_STATUS_MARKER_RADIUS_SCALE,
+		lineColor: '#B6B6B6',
+	},
+	// Deep-blue fill, white ring — matches StatusNewMessageIcon.
+	'new-message': {
+		fillColor: '#277CAE',
+		fillOpacity: 1,
+		strokeColor: '#FFFFFF',
+		strokeWidth: CAMPAIGN_STATUS_MARKER_STROKE_WIDTH,
+		strokeOpacity: 1,
+		radiusScale: CAMPAIGN_STATUS_MARKER_RADIUS_SCALE,
+		lineColor: '#000000',
+	},
+	// Hollow deep-blue ring at 30% opacity (no fill) — matches StatusSentIcon.
+	// fillColor stays a real hex so hover/washout helpers keep working; fillOpacity 0 hides it.
+	sent: {
+		fillColor: '#277CAE',
+		fillOpacity: 0,
+		strokeColor: '#277CAE',
+		strokeWidth: CAMPAIGN_STATUS_MARKER_STROKE_WIDTH,
+		strokeOpacity: 0.3,
+		radiusScale: CAMPAIGN_STATUS_MARKER_RADIUS_SCALE,
+		lineColor: '#91C9CF',
+	},
 };
 
-const geoJsonRingToClippingRing = (ring: number[][]): ClippingRing => {
-	const coords = ring
-		.map((pair): ClippingCoord => [pair?.[0] as number, pair?.[1] as number])
-		.filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat));
-	if (coords.length < 3) return [];
-	return closeRing(coords);
-};
+// Multiplies a circle layer's fill-opacity expression by the per-feature
+// `fillOpacity` (default 1). Lets a status marker render as a hollow ring
+// (e.g. "sent") without touching non-status dots, which carry no fillOpacity.
+//
+// A "zoom" expression must be the input of the OUTERMOST "step"/"interpolate"
+// (mapbox-gl v3). When `opacityExpr` is itself a top-level zoom curve, wrapping
+// it in ["*", ...] nests the zoom curve and fails style validation with
+// '"zoom" expression may only be used as input to a top-level "step" or
+// "interpolate" expression'. So in that case we distribute the factor into each
+// output stop — exactly equivalent for a per-feature constant — which leaves the
+// zoom curve outermost. Plain (non-zoom) expressions are multiplied directly.
+const FEATURE_FILL_OPACITY_FACTOR: any = ['coalesce', ['get', 'fillOpacity'], 1];
+const FEATURE_STROKE_OPACITY_FACTOR = ['coalesce', ['get', 'strokeOpacity'], 0] as const;
 
-const geoJsonPolygonToClippingPolygon = (
-	polygonCoords: number[][][]
-): ClippingPolygon => {
-	const rings = (polygonCoords ?? [])
-		.map((ring) => geoJsonRingToClippingRing(ring))
-		.filter((ring) => ring.length >= 4);
-	return rings;
-};
+// Registered venues render larger than a normal dot so they stand out on the map.
+const VENUE_DOT_RADIUS_SCALE = 1.75;
+// Per-feature icon-size multiplier so venue fallback (uncategorized) markers match
+// the 1.75× circle scale. Folded into interpolate stops to keep zoom outermost.
+const VENUE_ICON_SIZE_SCALE_EXPR: any = [
+	'case',
+	['boolean', ['get', 'isVenue'], false],
+	VENUE_DOT_RADIUS_SCALE,
+	1,
+];
 
-const geoJsonGeometryToClippingMultiPolygon = (
-	geometry: GeoJsonGeometry | null | undefined
-): ClippingMultiPolygon | null => {
-	if (!geometry) return null;
-	if (geometry.type === 'Polygon') {
-		const poly = geoJsonPolygonToClippingPolygon(geometry.coordinates);
-		return poly.length ? [poly] : null;
-	}
-	if (geometry.type === 'MultiPolygon') {
-		const polys = (geometry.coordinates ?? [])
-			.map((polyCoords) => geoJsonPolygonToClippingPolygon(polyCoords))
-			.filter((poly) => poly.length);
-		return polys.length ? polys : null;
-	}
-	return null;
-};
+type OwnedVenueLocation = LatLngLiteral & { name?: string | null };
 
-const EMPTY_POLYGON_FC: OutlinePolygonFeatureCollection = {
-	type: 'FeatureCollection',
-	features: [],
-};
+const OWNED_VENUE_HOME_ICON_IMAGE_NAME = 'murmur-owned-venue-home-icon-image';
+const OWNED_VENUE_HOME_ICON_URL = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+	venueHomeIconSvg
+)}`;
+const OWNED_VENUE_HOME_ICON_IMAGE_DIMENSIONS = { width: 72, height: 63 } as const;
+const OWNED_VENUE_RING_STEPS = 160;
+const OWNED_VENUE_RADAR_MS = 3400;
+// Radar sweeps animate via 3 GeoJSON setData calls per frame (reparse +
+// re-tessellation + forced repaint); 30fps over a 3.4s period is ~113 steps —
+// visually identical to 60fps at half the cost.
+const RADAR_FRAME_MS = 33;
+const OWNED_VENUE_RADAR_OUTER_TRAVEL_KM = 10;
+const OWNED_VENUE_RADAR_IDLE_COLOR = 'rgb(255, 255, 255)';
+const OWNED_VENUE_GLOW_IDLE_COLOR = 'rgb(169, 231, 255)';
+const OWNED_VENUE_GLOW_ACTIVE_COLOR = 'rgb(96, 207, 255)';
+const OWNED_VENUE_GLOW_CIRCLES = [
+	{ radiusKm: 340, opacity: 0.03 },
+	{ radiusKm: 240, opacity: 0.05 },
+	{ radiusKm: 150, opacity: 0.075 },
+	{ radiusKm: 82, opacity: 0.12 },
+] as const;
+const OWNED_VENUE_RING_CIRCLES = [
+	{ radiusKm: 26, opacity: 0.86, width: 2.35 },
+	{ radiusKm: 35, opacity: 0.82, width: 2.25 },
+	{ radiusKm: 45, opacity: 0.76, width: 2.12 },
+	{ radiusKm: 58, opacity: 0.69, width: 1.96 },
+	{ radiusKm: 74, opacity: 0.61, width: 1.78 },
+	{ radiusKm: 93, opacity: 0.52, width: 1.58 },
+	{ radiusKm: 116, opacity: 0.43, width: 1.38 },
+	{ radiusKm: 145, opacity: 0.35, width: 1.18 },
+	{ radiusKm: 180, opacity: 0.28, width: 1 },
+	{ radiusKm: 222, opacity: 0.21, width: 0.86 },
+	{ radiusKm: 272, opacity: 0.15, width: 0.72 },
+] as const;
 
-const boundsToPolygonFeatureCollection = (
-	bounds: MapSelectionBounds,
-	properties: Record<string, unknown> = {}
-): OutlinePolygonFeatureCollection => {
-	const ring: number[][] = [
-		[bounds.west, bounds.south],
-		[bounds.east, bounds.south],
-		[bounds.east, bounds.north],
-		[bounds.west, bounds.north],
-		[bounds.west, bounds.south],
-	];
-	return {
-		type: 'FeatureCollection',
-		features: [
-			{
-				type: 'Feature',
-				properties,
-				geometry: { type: 'Polygon', coordinates: [ring] },
-			},
-		],
-	};
-};
-
-const coerceFiniteNumber = (value: unknown): number | null => {
-	if (value == null) return null;
-	if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-	if (typeof value === 'string') {
-		const trimmed = value.trim();
-		if (!trimmed) return null;
-		// Handle common "decimal comma" formats (e.g. "39,1234")
-		const normalized =
-			trimmed.includes(',') && !trimmed.includes('.')
-				? trimmed.replace(',', '.')
-				: trimmed;
-		const n = Number(normalized);
-		return Number.isFinite(n) ? n : null;
-	}
-
-	// Prisma can sometimes surface numeric-like objects; Number(...) is a safe coercion attempt.
-	const n = Number((value as { valueOf?: () => unknown })?.valueOf?.() ?? value);
-	return Number.isFinite(n) ? n : null;
-};
-
-const getLatLngFromContact = (contact: ContactWithName): LatLngLiteral | null => {
-	const anyContact = contact as unknown as Record<string, unknown>;
-	const lat = coerceFiniteNumber(
-		anyContact.latitude ?? anyContact.lat ?? anyContact.Latitude ?? anyContact.LATITUDE
+const isValidOwnedVenueLocation = (
+	location: OwnedVenueLocation | null | undefined
+): location is OwnedVenueLocation =>
+	Boolean(
+		location &&
+		Number.isFinite(location.lat) &&
+		Number.isFinite(location.lng) &&
+		location.lat >= -90 &&
+		location.lat <= 90 &&
+		location.lng >= -180 &&
+		location.lng <= 180
 	);
-	const lng = coerceFiniteNumber(
-		anyContact.longitude ??
-			anyContact.lng ??
-			anyContact.lon ??
-			anyContact.Longitude ??
-			anyContact.LONGITUDE
-	);
 
-	if (lat == null || lng == null) return null;
-	// Treat (0,0) as "unknown" coordinates (common placeholder) to avoid the map jumping to Africa.
-	// This product is US-focused; a true (0,0) contact would be in the Gulf of Guinea.
-	if (Math.abs(lat) < 1e-9 && Math.abs(lng) < 1e-9) return null;
-	// Defensive sanity bounds: out-of-range coords render unpredictably.
-	if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
-	return { lat, lng };
-};
-
-const coordinateKey = (coords: LatLngLiteral) =>
-	`${coords.lat.toFixed(5)},${coords.lng.toFixed(5)}`;
-
-// Deterministic "spiderfy" offset for exact/near-exact duplicate coordinates so markers don't fully overlap.
-const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ~2.399963...
-const DUPLICATE_JITTER_BASE_DEG = 0.0015; // ~167m latitude; visible at mid zoom levels
-const jitterDuplicateCoords = (base: LatLngLiteral, index: number): LatLngLiteral => {
-	const angle = index * GOLDEN_ANGLE;
-	const radius = DUPLICATE_JITTER_BASE_DEG * Math.sqrt(index);
-	const dx = radius * Math.cos(angle);
-	const dy = radius * Math.sin(angle);
-	const latRad = (base.lat * Math.PI) / 180;
-	const lngScale = Math.max(0.2, Math.cos(latRad));
-	return {
-		lat: base.lat + dy,
-		lng: base.lng + dx / lngScale,
-	};
-};
-
-const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-const smoothstep = (edge0: number, edge1: number, x: number) => {
-	const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
-	return t * t * (3 - 2 * t);
-};
-const normalizeLngDeg = (lng: number) => ((((lng + 180) % 360) + 360) % 360) - 180;
-const angularLngDistanceDeg = (a: number, b: number) =>
-	Math.abs(normalizeLngDeg(a - b));
-const computeMoodVisualNightT = (nightT: number, cfg: MoodVisualConfig) =>
-	clamp(Math.max(nightT, cfg.nightVisualBlend), 0, 1);
-
-type RuntimeMoodVisualConfig = MoodVisualConfig & {
-	warmSoftboxOpacityMultiplier: number;
-	darkSoftboxOpacityMultiplier: number;
-	lightningIntensity: number;
-};
-
-type ParsedCssColor = [number, number, number, number];
-
-const parseCssColor = (value: string): ParsedCssColor | null => {
-	const match = value
-		.trim()
-		.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)$/i);
-	if (!match) return null;
-	const r = clamp(Number(match[1]), 0, 255);
-	const g = clamp(Number(match[2]), 0, 255);
-	const b = clamp(Number(match[3]), 0, 255);
-	const a = match[4] == null ? 1 : clamp(Number(match[4]), 0, 1);
-	if (![r, g, b, a].every(Number.isFinite)) return null;
-	return [r, g, b, a];
-};
-
-const formatCssColor = ([r, g, b, a]: ParsedCssColor) =>
-	a >= 0.999
-		? `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`
-		: `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${Number(a.toFixed(3))})`;
-
-const mixCssColorString = (from: string, to: string, t: number) => {
-	const a = parseCssColor(from);
-	const b = parseCssColor(to);
-	if (!a || !b) return t < 0.5 ? from : to;
-	const p = clamp(t, 0, 1);
-	return formatCssColor([
-		lerp(a[0], b[0], p),
-		lerp(a[1], b[1], p),
-		lerp(a[2], b[2], p),
-		lerp(a[3], b[3], p),
-	]);
-};
-
-const toRuntimeMoodConfig = (cfg: MoodVisualConfig): RuntimeMoodVisualConfig => ({
-	...cfg,
-	warmSoftboxOpacityMultiplier:
-		cfg.softboxBlendMode === 'screen' ? cfg.softboxOpacityMultiplier : 0,
-	darkSoftboxOpacityMultiplier:
-		cfg.softboxBlendMode === 'multiply' ? cfg.softboxOpacityMultiplier : 0,
-	lightningIntensity: cfg.lightning ? cfg.lightningIntensity : 0,
-});
-
-const blendRuntimeMoodConfig = (
-	from: RuntimeMoodVisualConfig,
-	to: RuntimeMoodVisualConfig,
-	continuousT: number,
-	discreteT: number
-): RuntimeMoodVisualConfig => {
-	const c = clamp(continuousT, 0, 1);
-	const d = clamp(discreteT, 0, 1);
-
-	return {
-		...to,
-		cloudOpacityGlobeZoom: lerp(from.cloudOpacityGlobeZoom, to.cloudOpacityGlobeZoom, c),
-		cloudOpacityDecorativeZoom: lerp(
-			from.cloudOpacityDecorativeZoom,
-			to.cloudOpacityDecorativeZoom,
-			c
-		),
-		cloudDriftSpeedMultiplier: lerp(
-			from.cloudDriftSpeedMultiplier,
-			to.cloudDriftSpeedMultiplier,
-			c
-		),
-		cloudTurbulenceMultiplier: lerp(
-			from.cloudTurbulenceMultiplier,
-			to.cloudTurbulenceMultiplier,
-			c
-		),
-		cloudBrightnessMin: lerp(from.cloudBrightnessMin, to.cloudBrightnessMin, c),
-		cloudBrightnessMax: lerp(from.cloudBrightnessMax, to.cloudBrightnessMax, c),
-		cloudExtraPasses: lerp(from.cloudExtraPasses, to.cloudExtraPasses, d),
-		cloudExtraPassAlpha: lerp(from.cloudExtraPassAlpha, to.cloudExtraPassAlpha, c),
-		cloudLayerSpread: lerp(from.cloudLayerSpread, to.cloudLayerSpread, c),
-		cloudSecondaryLayerOpacity: lerp(
-			from.cloudSecondaryLayerOpacity,
-			to.cloudSecondaryLayerOpacity,
-			c
-		),
-		cloudHazeLayerOpacity: lerp(from.cloudHazeLayerOpacity, to.cloudHazeLayerOpacity, c),
-		cloudFineVeilOpacity: lerp(
-			from.cloudFineVeilOpacity,
-			to.cloudFineVeilOpacity,
-			c
-		),
-		cloudStormWindMultiplier: lerp(
-			from.cloudStormWindMultiplier,
-			to.cloudStormWindMultiplier,
-			c
-		),
-		cloudCoreShadowOpacity: lerp(
-			from.cloudCoreShadowOpacity,
-			to.cloudCoreShadowOpacity,
-			c
-		),
-		cloudEdgeLiftOpacity: lerp(from.cloudEdgeLiftOpacity, to.cloudEdgeLiftOpacity, c),
-		cloudDeepZoomOpacity: lerp(from.cloudDeepZoomOpacity, to.cloudDeepZoomOpacity, d),
-		snowOpacity: lerp(from.snowOpacity, to.snowOpacity, d),
-		snowDensity: lerp(from.snowDensity, to.snowDensity, d),
-		snowFallSpeed: lerp(from.snowFallSpeed, to.snowFallSpeed, c),
-		snowWind: lerp(from.snowWind, to.snowWind, c),
-		snowDepthParallax: lerp(from.snowDepthParallax, to.snowDepthParallax, c),
-		fogColor: mixCssColorString(from.fogColor, to.fogColor, c),
-		fogHighColor: mixCssColorString(from.fogHighColor, to.fogHighColor, c),
-		fogHorizonBlend: lerp(from.fogHorizonBlend, to.fogHorizonBlend, c),
-		softboxOpacityMultiplier: lerp(
-			from.softboxOpacityMultiplier,
-			to.softboxOpacityMultiplier,
-			c
-		),
-		shadowOpacityMultiplier: lerp(
-			from.shadowOpacityMultiplier,
-			to.shadowOpacityMultiplier,
-			c
-		),
-		nightVisualBlend: lerp(from.nightVisualBlend, to.nightVisualBlend, c),
-		gloomWashOpacity: lerp(from.gloomWashOpacity, to.gloomWashOpacity, c),
-		lightningSpread: lerp(from.lightningSpread, to.lightningSpread, c),
-		lightningBurstiness: lerp(from.lightningBurstiness, to.lightningBurstiness, c),
-		lightningTint: [
-			lerp(from.lightningTint[0], to.lightningTint[0], c),
-			lerp(from.lightningTint[1], to.lightningTint[1], c),
-			lerp(from.lightningTint[2], to.lightningTint[2], c),
-		],
-		warmSoftboxOpacityMultiplier: lerp(
-			from.warmSoftboxOpacityMultiplier,
-			to.warmSoftboxOpacityMultiplier,
-			c
-		),
-		darkSoftboxOpacityMultiplier: lerp(
-			from.darkSoftboxOpacityMultiplier,
-			to.darkSoftboxOpacityMultiplier,
-			c
-		),
-		lightningIntensity: lerp(from.lightningIntensity, to.lightningIntensity, d),
-		lightning: to.lightning,
-	};
-};
-
-type WasmGeoModule = {
-	lat_lng_to_world_pixel: (
-		lat: number,
-		lng: number,
-		worldSize: number
-	) => Float64Array | ArrayLike<number>;
-	distance_point_to_segment_sq: (
-		px: number,
-		py: number,
-		ax: number,
-		ay: number,
-		bx: number,
-		by: number
-	) => number;
-	point_in_ring: (px: number, py: number, ring: Float64Array) => boolean;
-	is_point_near_segments: (
-		x: number,
-		y: number,
-		segments: Float64Array,
-		thresholdPx: number
-	) => boolean;
-	batch_lat_lng_to_world_pixel: (
-		coords: Float64Array,
-		worldSize: number
-	) => Float64Array | ArrayLike<number>;
-	pick_non_overlapping_indices: (
-		xy: Float64Array,
-		priority_order: Uint32Array,
-		in_locked_order: Uint32Array,
-		out_locked_order: Uint32Array,
-		in_locked_mask: Uint8Array,
-		max_primary_dots: number,
-		in_locked_share: number,
-		hard_cap_outside_by_in_locked: boolean,
-		min_separation_sq: number,
-		cell_size: number
-	) => Uint32Array;
-	stable_viewport_sample: (
-		coords: Float64Array,
-		ids: Uint32Array,
-		minLat: number,
-		maxLat: number,
-		minLng: number,
-		maxLng: number,
-		slots: number,
-		seed: number
-	) => Uint32Array;
-	union_multi_polygons?: (multiPolygons: ClippingMultiPolygon[]) => ClippingMultiPolygon;
-};
-
-const USE_WASM_GEO = process.env.NEXT_PUBLIC_USE_WASM_GEO === 'true';
-
-let cachedWasmGeoModule: WasmGeoModule | null = null;
-let wasmGeoModulePromise: Promise<WasmGeoModule | null> | null = null;
-let hasLoggedWasmGeoLoadError = false;
-let hasLoggedWasmGeoRuntimeError = false;
-
-const logWasmGeoLoadError = (error: unknown): void => {
-	if (hasLoggedWasmGeoLoadError) return;
-	hasLoggedWasmGeoLoadError = true;
-	console.error(
-		'[SearchResultsMap] failed to load WASM geo module, using TypeScript fallback',
-		error
-	);
-};
-
-const logWasmGeoRuntimeError = (error: unknown): void => {
-	if (hasLoggedWasmGeoRuntimeError) return;
-	hasLoggedWasmGeoRuntimeError = true;
-	console.error(
-		'[SearchResultsMap] WASM geo call failed, using TypeScript fallback',
-		error
-	);
-};
-
-const toFloat64Array = (value: Float64Array | ArrayLike<number>): Float64Array =>
-	value instanceof Float64Array ? value : Float64Array.from(value);
-
-const getWasmGeoModuleSync = (): WasmGeoModule | null => cachedWasmGeoModule;
-
-const ensureWasmGeoModuleLoaded = async (): Promise<WasmGeoModule | null> => {
-	if (!USE_WASM_GEO) return null;
-	if (cachedWasmGeoModule) return cachedWasmGeoModule;
-
-	if (!wasmGeoModulePromise) {
-		wasmGeoModulePromise = import('../../../../rust-scorer/pkg-web')
-			.then(async (module) => {
-				// wasm-pack `--target web` exports an async init function as the default export.
-				// We must call it (once) before using the named wrapper exports.
-				const maybeInit = (module as { default?: unknown }).default;
-				if (typeof maybeInit === 'function') {
-					try {
-						await (maybeInit as () => Promise<unknown>)();
-					} catch (error: unknown) {
-						logWasmGeoLoadError(error);
-						return null;
-					}
-				}
-
-				const maybeModule = module as Partial<WasmGeoModule>;
-				if (
-					typeof maybeModule.lat_lng_to_world_pixel !== 'function' ||
-					typeof maybeModule.distance_point_to_segment_sq !== 'function' ||
-					typeof maybeModule.point_in_ring !== 'function' ||
-					typeof maybeModule.is_point_near_segments !== 'function' ||
-					typeof maybeModule.batch_lat_lng_to_world_pixel !== 'function' ||
-					typeof maybeModule.pick_non_overlapping_indices !== 'function' ||
-					typeof maybeModule.stable_viewport_sample !== 'function'
-				) {
-					return null;
-				}
-
-				// Smoke test: confirm calls don't throw post-init.
-				try {
-					const projected = toFloat64Array(maybeModule.lat_lng_to_world_pixel(0, 0, 256));
-					if (
-						projected.length < 2 ||
-						!Number.isFinite(projected[0]) ||
-						!Number.isFinite(projected[1])
-					)
-						return null;
-				} catch (error: unknown) {
-					logWasmGeoLoadError(error);
-					return null;
-				}
-
-				cachedWasmGeoModule = maybeModule as WasmGeoModule;
-				if (process.env.NODE_ENV !== 'production') {
-					console.info('[SearchResultsMap] WASM geo module loaded');
-				}
-				return cachedWasmGeoModule;
-			})
-			.catch((error: unknown) => {
-				logWasmGeoLoadError(error);
-				return null;
-			});
-	}
-
-	return wasmGeoModulePromise;
-};
-
-const ringFlatCache = new WeakMap<ClippingRing, Float64Array>();
-
-const flattenRing = (ring: ClippingRing): Float64Array => {
-	const cached = ringFlatCache.get(ring);
-	if (cached) return cached;
-	const flat = new Float64Array(ring.length * 2);
-	for (let i = 0; i < ring.length; i++) {
-		const [x, y] = ring[i];
-		flat[i * 2] = x;
-		flat[i * 2 + 1] = y;
-	}
-	ringFlatCache.set(ring, flat);
-	return flat;
-};
-
-const getClientPointFromDomEvent = (
-	domEvent: unknown
-): { x: number; y: number } | null => {
-	const ev = domEvent as Partial<MouseEvent & TouchEvent & PointerEvent> | null;
-	if (!ev) return null;
-	if (
-		typeof (ev as MouseEvent).clientX === 'number' &&
-		typeof (ev as MouseEvent).clientY === 'number'
-	) {
-		return { x: (ev as MouseEvent).clientX, y: (ev as MouseEvent).clientY };
-	}
-	const touches = (ev as TouchEvent).touches;
-	if (touches && touches.length > 0) {
-		return { x: touches[0].clientX, y: touches[0].clientY };
-	}
-	return null;
-};
-
-const hashStringToUint32 = (str: string): number => {
-	// FNV-1a 32-bit
-	let h = 2166136261;
-	for (let i = 0; i < str.length; i++) {
-		h ^= str.charCodeAt(i);
-		h = Math.imul(h, 16777619);
-	}
-	return h >>> 0;
-};
-
-// Hard cap for total dots rendered in the viewport (contacts + background dots).
-// Rendering more than this tends to overload many machines at low zoom levels.
-const MAX_TOTAL_DOTS = 500;
-
-const getBackgroundDotsQuantizationDeg = (zoom: number): number => {
-	// Controls when we regenerate dots as the viewport changes.
-	if (zoom <= 4) return 0.75;
-	if (zoom <= 6) return 0.4;
-	if (zoom <= 8) return 0.22;
-	if (zoom <= 10) return 0.12;
-	if (zoom <= 12) return 0.08;
-	return 0.05;
-};
-
-const bboxFromMultiPolygon = (multiPolygon: ClippingMultiPolygon): BoundingBox | null => {
-	let minLat = Infinity;
-	let maxLat = -Infinity;
-	let minLng = Infinity;
-	let maxLng = -Infinity;
-	for (const poly of multiPolygon) {
-		for (const ring of poly) {
-			for (const [lng, lat] of ring) {
-				if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
-				minLat = Math.min(minLat, lat);
-				maxLat = Math.max(maxLat, lat);
-				minLng = Math.min(minLng, lng);
-				maxLng = Math.max(maxLng, lng);
-			}
-		}
-	}
-	if (
-		!Number.isFinite(minLat) ||
-		!Number.isFinite(maxLat) ||
-		!Number.isFinite(minLng) ||
-		!Number.isFinite(maxLng)
-	) {
-		return null;
-	}
-	return { minLat, maxLat, minLng, maxLng };
-};
-
-const isLatLngInBbox = (lat: number, lng: number, bbox: BoundingBox): boolean =>
-	lat >= bbox.minLat && lat <= bbox.maxLat && lng >= bbox.minLng && lng <= bbox.maxLng;
-
-type ScoredContact = { contact: ContactWithName; score: number };
-
-const stableViewportSampleContacts = (
-	contacts: ContactWithName[],
-	getCoords: (contact: ContactWithName) => LatLngLiteral | null,
-	viewportBbox: BoundingBox,
-	slots: number,
-	seed: string
-): ContactWithName[] => {
-	if (slots <= 0 || contacts.length === 0) return [];
-	if (contacts.length <= slots) return contacts;
-
-	const wasm = getWasmGeoModuleSync();
-	if (wasm) {
-		try {
-			// Build flat typed arrays from contacts
-			const n = contacts.length;
-			const coordsFlat = new Float64Array(n * 2);
-			const idsFlat = new Uint32Array(n);
-			for (let i = 0; i < n; i++) {
-				const c = getCoords(contacts[i]);
-				if (c) {
-					coordsFlat[i * 2] = c.lat;
-					coordsFlat[i * 2 + 1] = c.lng;
-				} else {
-					coordsFlat[i * 2] = NaN;
-					coordsFlat[i * 2 + 1] = NaN;
-				}
-				idsFlat[i] = contacts[i].id;
-			}
-			const seedHash = hashStringToUint32(seed);
-			const indices = wasm.stable_viewport_sample(
-				coordsFlat,
-				idsFlat,
-				viewportBbox.minLat,
-				viewportBbox.maxLat,
-				viewportBbox.minLng,
-				viewportBbox.maxLng,
-				slots,
-				seedHash
-			);
-			const result: ContactWithName[] = [];
-			for (let i = 0; i < indices.length; i++) {
-				result.push(contacts[indices[i]]!);
-			}
-			return result;
-		} catch (err) {
-			logWasmGeoRuntimeError(err);
-		}
-	}
-
-	const latSpan = viewportBbox.maxLat - viewportBbox.minLat;
-	const lngSpan = viewportBbox.maxLng - viewportBbox.minLng;
-	if (
-		!Number.isFinite(latSpan) ||
-		!Number.isFinite(lngSpan) ||
-		latSpan <= 0 ||
-		lngSpan <= 0
-	) {
-		// Fallback: deterministic sample by hash order.
-		return contacts
-			.map((contact) => ({
-				contact,
-				score: hashStringToUint32(`${seed}|${contact.id}`),
-			}))
-			.sort((a, b) => a.score - b.score)
-			.slice(0, slots)
-			.map((x) => x.contact);
-	}
-
-	// Bin into a viewport grid and sample per-cell so spatial density is preserved.
-	const grid = Math.max(8, Math.min(64, Math.round(Math.sqrt(slots) * 1.15)));
-	const latStep = latSpan / grid;
-	const lngStep = lngSpan / grid;
-	if (
-		!Number.isFinite(latStep) ||
-		!Number.isFinite(lngStep) ||
-		latStep <= 0 ||
-		lngStep <= 0
-	) {
-		return contacts
-			.map((contact) => ({
-				contact,
-				score: hashStringToUint32(`${seed}|${contact.id}`),
-			}))
-			.sort((a, b) => a.score - b.score)
-			.slice(0, slots)
-			.map((x) => x.contact);
-	}
-
-	const cellMap = new Map<string, ScoredContact[]>();
-	for (const contact of contacts) {
-		const coords = getCoords(contact);
-		if (!coords) continue;
-		if (!isLatLngInBbox(coords.lat, coords.lng, viewportBbox)) continue;
-
-		const x = clamp(
-			Math.floor((coords.lng - viewportBbox.minLng) / lngStep),
-			0,
-			grid - 1
-		);
-		const y = clamp(
-			Math.floor((coords.lat - viewportBbox.minLat) / latStep),
-			0,
-			grid - 1
-		);
-		const key = `${x},${y}`;
-		const score = hashStringToUint32(`${seed}|${contact.id}`);
-		const existing = cellMap.get(key);
-		if (existing) existing.push({ contact, score });
-		else cellMap.set(key, [{ contact, score }]);
-	}
-
-	const cells = Array.from(cellMap.entries()).map(([key, items]) => {
-		items.sort((a, b) => a.score - b.score);
-		return { key, items, weight: items.length };
-	});
-	if (cells.length === 0) return [];
-
-	// If we have more non-empty cells than slots, select which cells to represent using
-	// weighted sampling (cells with more contacts are more likely to be shown).
-	if (cells.length >= slots) {
-		const cellChoices = cells
-			.map((cell) => {
-				const u = (hashStringToUint32(`${seed}|cell|${cell.key}`) + 1) / 4294967296;
-				const w = Math.max(1, cell.weight);
-				// Efraimidis-Spirakis weighted sampling key: log(u)/w (higher is better).
-				const cellScore = Math.log(u) / w;
-				return { ...cell, cellScore };
-			})
-			.sort((a, b) => b.cellScore - a.cellScore)
-			.slice(0, slots);
-
-		return cellChoices.map((cell) => cell.items[0]!.contact);
-	}
-
-	// Otherwise, include one per cell, then allocate remaining slots proportionally to cell density.
-	const picked: ContactWithName[] = cells.map((cell) => cell.items[0]!.contact);
-	const remainingSlots = slots - picked.length;
-	if (remainingSlots <= 0) return picked;
-
-	const totalRemaining = cells.reduce(
-		(sum, cell) => sum + Math.max(0, cell.items.length - 1),
+const buildOwnedVenueCircleRing = (
+	center: LatLngLiteral,
+	radiusKm: number
+): number[][] | null => {
+	const circle = buildMercatorCircleMultiPolygon(
+		center,
+		radiusKm,
+		OWNED_VENUE_RING_STEPS,
+		0,
 		0
 	);
-	if (totalRemaining <= 0) return picked;
+	if (!circle) return null;
+	return mercatorMultiPolygonToLngLat(circle)[0]?.[0] ?? null;
+};
 
-	const allocs = cells.map((cell) => {
-		const remaining = Math.max(0, cell.items.length - 1);
-		const exact = (remainingSlots * remaining) / totalRemaining;
-		const base = Math.min(remaining, Math.floor(exact));
-		const frac = exact - base;
-		const tie = hashStringToUint32(`${seed}|rem|${cell.key}`);
-		return { key: cell.key, items: cell.items, base, frac, remaining, tie };
+const buildOwnedVenueGlowFeatures = (
+	center: LatLngLiteral,
+	radarPhase = 0,
+	animated = false
+) =>
+	OWNED_VENUE_GLOW_CIRCLES.flatMap((circle, index) => {
+		const lastGlowIndex = OWNED_VENUE_GLOW_CIRCLES.length - 1;
+		const glowPhase = (radarPhase - index * 0.09 + 1) % 1;
+		const rawLift = animated
+			? smoothstep(0.12, 0.34, glowPhase) * (1 - smoothstep(0.66, 0.98, glowPhase))
+			: 0;
+		const falloff = lastGlowIndex > 0 ? 1 - (index / lastGlowIndex) * 0.65 : 1;
+		const lift = rawLift * falloff;
+		const ring = buildOwnedVenueCircleRing(center, circle.radiusKm + lift * 3.5);
+		if (!ring) return [];
+
+		return [
+			{
+				type: 'Feature' as const,
+				id: `owned-venue-glow-${index}`,
+				properties: {
+					color: mixCssColorString(
+						OWNED_VENUE_GLOW_IDLE_COLOR,
+						OWNED_VENUE_GLOW_ACTIVE_COLOR,
+						lift * 0.35
+					),
+					opacity: circle.opacity * (1 + lift * 0.28),
+					sort: OWNED_VENUE_GLOW_CIRCLES.length - index,
+				},
+				geometry: { type: 'Polygon' as const, coordinates: [ring] },
+			},
+		];
 	});
 
-	const used = allocs.reduce((sum, a) => sum + a.base, 0);
-	let remainder = Math.max(0, remainingSlots - used);
+const buildOwnedVenueRadarLineFeatures = (
+	center: LatLngLiteral,
+	radarPhase = 0,
+	{
+		animated = false,
+		bloom = false,
+	}: {
+		animated?: boolean;
+		bloom?: boolean;
+	} = {}
+) => {
+	const lastRingIndex = OWNED_VENUE_RING_CIRCLES.length - 1;
 
-	allocs.sort((a, b) => {
-		if (b.frac !== a.frac) return b.frac - a.frac;
-		return a.tie - b.tie;
+	return OWNED_VENUE_RING_CIRCLES.flatMap((circle, index) => {
+		const nextCircle = OWNED_VENUE_RING_CIRCLES[index + 1];
+		const outerT = lastRingIndex > 0 ? index / lastRingIndex : 0;
+		const ringPhase = (radarPhase - index * 0.066 + 1) % 1;
+		const rawPulse = animated
+			? smoothstep(0.04, 0.22, ringPhase) * (1 - smoothstep(0.52, 0.98, ringPhase))
+			: 0;
+		const pulse = Math.pow(rawPulse, 1.45);
+		const eased = animated ? smoothstep(0, 1, ringPhase) : 0;
+		const travelKm = nextCircle
+			? (nextCircle.radiusKm - circle.radiusKm) * 0.28
+			: OWNED_VENUE_RADAR_OUTER_TRAVEL_KM;
+		const ring = buildOwnedVenueCircleRing(center, circle.radiusKm + travelKm * eased);
+		if (!ring) return [];
+
+		const edgeFade = lastRingIndex > 0 ? lerp(1, 0.84, outerT) : 1;
+		const outerFade = 1 - smoothstep(0.78, 1, outerT) * 0.7;
+		const centerWeight = lastRingIndex > 0 ? 1 - smoothstep(0.25, 0.9, outerT) : 1;
+		if (bloom && centerWeight <= 0) return [];
+
+		const color = bloom
+			? mixCssColorString(
+					OWNED_VENUE_RADAR_IDLE_COLOR,
+					OWNED_VENUE_GLOW_ACTIVE_COLOR,
+					0.18 + pulse * 0.22
+				)
+			: OWNED_VENUE_RADAR_IDLE_COLOR;
+		const opacity = bloom
+			? clamp(circle.opacity * edgeFade * centerWeight * (0.012 + pulse * 0.065), 0, 0.11)
+			: clamp(circle.opacity * edgeFade * outerFade * (0.24 + pulse * 0.2), 0, 0.66);
+		const width = bloom
+			? circle.width * (1.35 + pulse * 1.1)
+			: circle.width * (0.94 + pulse * 0.12);
+
+		return [
+			{
+				type: 'Feature' as const,
+				id: bloom ? `owned-venue-bloom-${index}` : `owned-venue-ring-${index}`,
+				properties: bloom ? { color, opacity, width } : { opacity, width },
+				geometry: { type: 'LineString' as const, coordinates: ring },
+			},
+		];
 	});
-
-	for (let i = 0; i < allocs.length && remainder > 0; i++) {
-		const a = allocs[i];
-		if (a.base < a.remaining) {
-			a.base += 1;
-			remainder--;
-		}
-	}
-
-	for (const a of allocs) {
-		const take = Math.min(a.base, a.remaining);
-		for (let i = 1; i <= take; i++) {
-			const item = a.items[i];
-			if (item) picked.push(item.contact);
-		}
-	}
-
-	return picked.slice(0, slots);
 };
 
-type WorldSegment = {
-	ax: number;
-	ay: number;
-	bx: number;
-	by: number;
-	minX: number;
-	maxX: number;
-	minY: number;
-	maxY: number;
-};
+const emptyFeatureCollection = (): GeoJSON.FeatureCollection => ({
+	type: 'FeatureCollection',
+	features: [],
+});
 
-const worldSegmentsFlatCache = new WeakMap<WorldSegment[], Float64Array>();
-
-const flattenWorldSegments = (segments: WorldSegment[]): Float64Array => {
-	const cached = worldSegmentsFlatCache.get(segments);
-	if (cached) return cached;
-	const flat = new Float64Array(segments.length * 8);
-	for (let i = 0; i < segments.length; i++) {
-		const s = segments[i];
-		const baseIdx = i * 8;
-		flat[baseIdx] = s.ax;
-		flat[baseIdx + 1] = s.ay;
-		flat[baseIdx + 2] = s.bx;
-		flat[baseIdx + 3] = s.by;
-		flat[baseIdx + 4] = s.minX;
-		flat[baseIdx + 5] = s.maxX;
-		flat[baseIdx + 6] = s.minY;
-		flat[baseIdx + 7] = s.maxY;
-	}
-	worldSegmentsFlatCache.set(segments, flat);
-	return flat;
-};
-
-const latLngToWorldPixel = (
-	coords: LatLngLiteral,
-	worldSize: number
-): { x: number; y: number } => {
-	const wasmGeo = getWasmGeoModuleSync();
-	if (wasmGeo) {
-		try {
-			const projected = toFloat64Array(
-				wasmGeo.lat_lng_to_world_pixel(coords.lat, coords.lng, worldSize)
-			);
-			if (projected.length >= 2) {
-				const x = projected[0];
-				const y = projected[1];
-				if (Number.isFinite(x) && Number.isFinite(y)) return { x, y };
-			}
-		} catch (error: unknown) {
-			logWasmGeoRuntimeError(error);
-		}
-	}
-
-	// Web Mercator world pixel coords at the current zoom.
-	const latClamped = clamp(coords.lat, -85, 85);
-	const siny = Math.sin((latClamped * Math.PI) / 180);
-	const x = ((coords.lng + 180) / 360) * worldSize;
-	const y = (0.5 - Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)) * worldSize;
-	return { x, y };
-};
-
-const batchLatLngToWorldPixels = (
-	coordsList: LatLngLiteral[],
-	worldSize: number
-): Array<{ x: number; y: number }> => {
-	if (coordsList.length === 0) return [];
-
-	const wasmGeo = getWasmGeoModuleSync();
-	if (wasmGeo) {
-		const flat = new Float64Array(coordsList.length * 2);
-		for (let i = 0; i < coordsList.length; i++) {
-			const coords = coordsList[i];
-			flat[i * 2] = coords.lat;
-			flat[i * 2 + 1] = coords.lng;
-		}
-
-		try {
-			const projected = toFloat64Array(
-				wasmGeo.batch_lat_lng_to_world_pixel(flat, worldSize)
-			);
-			if (projected.length >= coordsList.length * 2) {
-				const out = new Array<{ x: number; y: number }>(coordsList.length);
-				for (let i = 0; i < coordsList.length; i++) {
-					out[i] = { x: projected[i * 2], y: projected[i * 2 + 1] };
-				}
-				return out;
-			}
-		} catch (error: unknown) {
-			logWasmGeoRuntimeError(error);
-		}
-	}
-
-	return coordsList.map((coords) => latLngToWorldPixel(coords, worldSize));
-};
-
-const distancePointToSegmentSq = (
-	px: number,
-	py: number,
-	ax: number,
-	ay: number,
-	bx: number,
-	by: number
-): number => {
-	const wasmGeo = getWasmGeoModuleSync();
-	if (wasmGeo) {
-		try {
-			const distSq = wasmGeo.distance_point_to_segment_sq(px, py, ax, ay, bx, by);
-			if (Number.isFinite(distSq)) return distSq;
-		} catch (error: unknown) {
-			logWasmGeoRuntimeError(error);
-		}
-	}
-
-	const abx = bx - ax;
-	const aby = by - ay;
-	const apx = px - ax;
-	const apy = py - ay;
-	const denom = abx * abx + aby * aby;
-	if (denom <= 0) return apx * apx + apy * apy;
-	let t = (apx * abx + apy * aby) / denom;
-	t = clamp(t, 0, 1);
-	const cx = ax + t * abx;
-	const cy = ay + t * aby;
-	const dx = px - cx;
-	const dy = py - cy;
-	return dx * dx + dy * dy;
-};
-
-const buildOuterRingWorldSegments = (
-	multiPolygon: ClippingMultiPolygon,
-	worldSize: number
-): WorldSegment[] => {
-	const segments: WorldSegment[] = [];
-	for (const polygon of multiPolygon) {
-		if (!polygon?.length) continue;
-		const outerRing = polygon.reduce<ClippingRing | null>((best, ring) => {
-			if (!ring?.length) return best;
-			if (!best) return ring;
-			return absRingArea(ring) > absRingArea(best) ? ring : best;
-		}, null);
-		if (!outerRing || outerRing.length < 2) continue;
-
-		for (let i = 0; i < outerRing.length - 1; i++) {
-			const a = outerRing[i];
-			const b = outerRing[i + 1];
-			if (!a || !b) continue;
-			const [lngA, latA] = a;
-			const [lngB, latB] = b;
-			if (
-				!Number.isFinite(lngA) ||
-				!Number.isFinite(latA) ||
-				!Number.isFinite(lngB) ||
-				!Number.isFinite(latB)
-			)
-				continue;
-			const wa = latLngToWorldPixel({ lat: latA, lng: lngA }, worldSize);
-			const wb = latLngToWorldPixel({ lat: latB, lng: lngB }, worldSize);
-			segments.push({
-				ax: wa.x,
-				ay: wa.y,
-				bx: wb.x,
-				by: wb.y,
-				minX: Math.min(wa.x, wb.x),
-				maxX: Math.max(wa.x, wb.x),
-				minY: Math.min(wa.y, wb.y),
-				maxY: Math.max(wa.y, wb.y),
-			});
-		}
-	}
-	return segments;
-};
-
-const isWorldPointNearSegments = (
-	x: number,
-	y: number,
-	segments: WorldSegment[],
-	thresholdPx: number
-): boolean => {
-	const wasmGeo = getWasmGeoModuleSync();
-	if (wasmGeo && segments.length > 0) {
-		try {
-			return wasmGeo.is_point_near_segments(
-				x,
-				y,
-				flattenWorldSegments(segments),
-				thresholdPx
-			);
-		} catch (error: unknown) {
-			logWasmGeoRuntimeError(error);
-		}
-	}
-
-	const t = Math.max(0, thresholdPx);
-	const tSq = t * t;
-	for (const s of segments) {
-		// Cheap bbox reject (expanded by threshold).
-		if (x < s.minX - t || x > s.maxX + t || y < s.minY - t || y > s.maxY + t) continue;
-		const dSq = distancePointToSegmentSq(x, y, s.ax, s.ay, s.bx, s.by);
-		if (dSq < tSq) return true;
-	}
-	return false;
-};
-
-const pointInRing = (point: ClippingCoord, ring: ClippingRing): boolean => {
-	const [x, y] = point;
-	const wasmGeo = getWasmGeoModuleSync();
-	if (wasmGeo) {
-		try {
-			return wasmGeo.point_in_ring(x, y, flattenRing(ring));
-		} catch (error: unknown) {
-			logWasmGeoRuntimeError(error);
-		}
-	}
-
-	let inside = false;
-	for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-		const [xi, yi] = ring[i];
-		const [xj, yj] = ring[j];
-		const intersects =
-			yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi + 0.0) + xi;
-		if (intersects) inside = !inside;
-	}
-	return inside;
-};
-
-const pointInClippingPolygon = (
-	point: ClippingCoord,
-	polygon: ClippingPolygon
-): boolean => {
-	if (!polygon?.length) return false;
-	const outerRing = polygon.reduce<ClippingRing | null>((best, ring) => {
-		if (!ring?.length) return best;
-		if (!best) return ring;
-		return absRingArea(ring) > absRingArea(best) ? ring : best;
-	}, null);
-	if (!outerRing) return false;
-	if (!pointInRing(point, outerRing)) return false;
-	// Treat all other rings as holes.
-	for (const ring of polygon) {
-		if (ring === outerRing) continue;
-		if (ring?.length && pointInRing(point, ring)) return false;
-	}
-	return true;
-};
-
-const pointInMultiPolygon = (
-	point: ClippingCoord,
-	multiPolygon: ClippingMultiPolygon
-): boolean => {
-	for (const polygon of multiPolygon) {
-		if (pointInClippingPolygon(point, polygon)) return true;
-	}
-	return false;
-};
-
-// State badge colors matching dashboard
-const stateBadgeColorMap: Record<string, string> = {
-	AL: '#E57373',
-	AK: '#64B5F6',
-	AZ: '#FFD54F',
-	AR: '#81C784',
-	CA: '#BA68C8',
-	CO: '#4DD0E1',
-	CT: '#FF8A65',
-	DE: '#A1887F',
-	FL: '#4DB6AC',
-	GA: '#7986CB',
-	HI: '#F06292',
-	ID: '#AED581',
-	IL: '#FFB74D',
-	IN: '#90A4AE',
-	IA: '#DCE775',
-	KS: '#FFF176',
-	KY: '#4FC3F7',
-	LA: '#CE93D8',
-	ME: '#80CBC4',
-	MD: '#FFCC80',
-	MA: '#B39DDB',
-	MI: '#80DEEA',
-	MN: '#C5E1A5',
-	MS: '#EF9A9A',
-	MO: '#BCAAA4',
-	MT: '#B0BEC5',
-	NE: '#E6EE9C',
-	NV: '#FFE082',
-	NH: '#81D4FA',
-	NJ: '#F48FB1',
-	NM: '#FFAB91',
-	NY: '#9FA8DA',
-	NC: '#A5D6A7',
-	ND: '#CFD8DC',
-	OH: '#FFF59D',
-	OK: '#FF8A80',
-	OR: '#80CBC4',
-	PA: '#EA80FC',
-	RI: '#8C9EFF',
-	SC: '#FFCDD2',
-	SD: '#E1BEE7',
-	TN: '#DCEDC8',
-	TX: '#FFE0B2',
-	UT: '#B2EBF2',
-	VT: '#C8E6C9',
-	VA: '#D1C4E9',
-	WA: '#B2DFDB',
-	WV: '#FFE57F',
-	WI: '#F8BBD9',
-	WY: '#FFCCBC',
-	DC: '#E0E0E0',
-};
-
-// Helper to get state abbreviation
-const getStateAbbreviation = (state: string): string | null => {
-	if (!state) return null;
-	const upper = state.toUpperCase().trim();
-	if (upper.length === 2 && stateBadgeColorMap[upper]) return upper;
-	const stateMap: Record<string, string> = {
-		ALABAMA: 'AL',
-		ALASKA: 'AK',
-		ARIZONA: 'AZ',
-		ARKANSAS: 'AR',
-		CALIFORNIA: 'CA',
-		COLORADO: 'CO',
-		CONNECTICUT: 'CT',
-		DELAWARE: 'DE',
-		FLORIDA: 'FL',
-		GEORGIA: 'GA',
-		HAWAII: 'HI',
-		IDAHO: 'ID',
-		ILLINOIS: 'IL',
-		INDIANA: 'IN',
-		IOWA: 'IA',
-		KANSAS: 'KS',
-		KENTUCKY: 'KY',
-		LOUISIANA: 'LA',
-		MAINE: 'ME',
-		MARYLAND: 'MD',
-		MASSACHUSETTS: 'MA',
-		MICHIGAN: 'MI',
-		MINNESOTA: 'MN',
-		MISSISSIPPI: 'MS',
-		MISSOURI: 'MO',
-		MONTANA: 'MT',
-		NEBRASKA: 'NE',
-		NEVADA: 'NV',
-		'NEW HAMPSHIRE': 'NH',
-		'NEW JERSEY': 'NJ',
-		'NEW MEXICO': 'NM',
-		'NEW YORK': 'NY',
-		'NORTH CAROLINA': 'NC',
-		'NORTH DAKOTA': 'ND',
-		OHIO: 'OH',
-		OKLAHOMA: 'OK',
-		OREGON: 'OR',
-		PENNSYLVANIA: 'PA',
-		'RHODE ISLAND': 'RI',
-		'SOUTH CAROLINA': 'SC',
-		'SOUTH DAKOTA': 'SD',
-		TENNESSEE: 'TN',
-		TEXAS: 'TX',
-		UTAH: 'UT',
-		VERMONT: 'VT',
-		VIRGINIA: 'VA',
-		WASHINGTON: 'WA',
-		'WEST VIRGINIA': 'WV',
-		WISCONSIN: 'WI',
-		WYOMING: 'WY',
-		'DISTRICT OF COLUMBIA': 'DC',
+const buildOwnedVenueMapOverlayData = (center: LatLngLiteral) => {
+	return {
+		glow: {
+			type: 'FeatureCollection' as const,
+			features: buildOwnedVenueGlowFeatures(center),
+		},
+		rings: {
+			type: 'FeatureCollection' as const,
+			features: buildOwnedVenueRadarLineFeatures(center),
+		},
+		icon: {
+			type: 'FeatureCollection' as const,
+			features: [
+				{
+					type: 'Feature' as const,
+					id: 'owned-venue-icon',
+					properties: {},
+					geometry: {
+						type: 'Point' as const,
+						coordinates: [center.lng, center.lat],
+					},
+				},
+			],
+		},
 	};
-	return stateMap[upper] || null;
 };
 
-// Parse metadata sections [1], [2], etc.
-// Returns sections if at least 1 valid section exists (more lenient than dashboard's 3)
-const parseMetadataSections = (
-	metadata: string | null | undefined
-): Record<string, string> => {
-	if (!metadata) return {};
-	const allSections: Record<string, string> = {};
-	const regex = /\[(\d+)\]\s*([\s\S]*?)(?=\[\d+\]|$)/g;
-	let match;
-	while ((match = regex.exec(metadata)) !== null) {
-		allSections[match[1]] = match[2].trim();
+// A venue-posted event to render on the shared map as a radar opportunity marker.
+type MapEvent = LatLngLiteral & { id: number; name?: string | null };
+
+const EVENT_STAR_ICON_IMAGE_NAME = 'murmur-event-star-icon-image';
+const EVENT_STAR_ICON_URL = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+	mapStackStarIconSvg
+)}`;
+const EVENT_STAR_ICON_IMAGE_DIMENSIONS = { width: 54, height: 54 } as const;
+
+// Event opportunity popup (phase 1: shapes + lat/lng only). Outer red box, inner white
+// box inset 5px from the top, and a bottom red strip showing the event coordinates.
+// The card is authored at its natural "design" size, then uniformly scaled down so it
+// reads at the same compact weight as the rest of the map chrome (result rows,
+// tooltips). All inner content (MapEventPopupCard) is pixel-positioned against the
+// design size and scales with it, so only EVENT_POPUP_SCALE needs tuning to resize.
+const EVENT_POPUP_SCALE = 0.75;
+const EVENT_POPUP_DESIGN_W = 356;
+const EVENT_POPUP_DESIGN_H = 457;
+// On-screen footprint after scaling — used by the edge-aware placement math so the
+// popup is positioned and clamped against its actual rendered size.
+const EVENT_POPUP_W = Math.round(EVENT_POPUP_DESIGN_W * EVENT_POPUP_SCALE);
+const EVENT_POPUP_H = Math.round(EVENT_POPUP_DESIGN_H * EVENT_POPUP_SCALE);
+// Gap between the star marker and the popup edge, plus an approximate half-extent of the
+// star glyph on screen (icon-size tops out ~0.66 × 54px ≈ 36px → ~14px half-extent at
+// typical zoom). Used by the edge-aware placement math.
+const EVENT_POPUP_GAP = 14;
+const EVENT_POPUP_STAR_HALF = 14;
+// Grace period before a hover-opened popup closes after the pointer leaves the star.
+// Bridges the star→box gap so the cursor can travel into the (interactive) popup and
+// hover/click it, instead of the popup vanishing the instant the star is no longer hit.
+const EVENT_POPUP_HOVER_CLOSE_DELAY_MS = 90;
+
+// The opportunity markers reuse the owned-venue radar builders per event center,
+// re-keying each feature id so features from different events never collide inside a
+// shared source. This keeps the motion identical to the venue-portal radar.
+const buildEventsGlowFeatures = (events: MapEvent[], radarPhase = 0, animated = false) =>
+	events.flatMap((event) =>
+		buildOwnedVenueGlowFeatures(event, radarPhase, animated).map((feature) => ({
+			...feature,
+			id: `event-${event.id}-${feature.id}`,
+		}))
+	);
+
+const buildEventsRadarLineFeatures = (
+	events: MapEvent[],
+	radarPhase = 0,
+	opts: { animated?: boolean; bloom?: boolean } = {}
+) =>
+	events.flatMap((event) =>
+		buildOwnedVenueRadarLineFeatures(event, radarPhase, opts).map((feature) => ({
+			...feature,
+			id: `event-${event.id}-${feature.id}`,
+		}))
+	);
+
+const buildEventsIconFeatures = (events: MapEvent[]) =>
+	events.map((event) => ({
+		type: 'Feature' as const,
+		id: `event-${event.id}-icon`,
+		properties: { eventId: event.id },
+		geometry: {
+			type: 'Point' as const,
+			coordinates: [event.lng, event.lat],
+		},
+	}));
+
+const buildEventsMapOverlayData = (events: MapEvent[]) => ({
+	glow: {
+		type: 'FeatureCollection' as const,
+		features: buildEventsGlowFeatures(events),
+	},
+	rings: {
+		type: 'FeatureCollection' as const,
+		features: buildEventsRadarLineFeatures(events),
+	},
+	icon: {
+		type: 'FeatureCollection' as const,
+		features: buildEventsIconFeatures(events),
+	},
+});
+
+const withFeatureOpacityFactor = (opacityExpr: any, factorExpr: any): any => {
+	if (Array.isArray(opacityExpr)) {
+		const op = opacityExpr[0];
+		const isInterpolate =
+			op === 'interpolate' || op === 'interpolate-hcl' || op === 'interpolate-lab';
+		const isStep = op === 'step';
+		if (isInterpolate || isStep) {
+			// Output values are the second item of each (stop, output) pair:
+			// interpolate -> indices 4, 6, 8, … ; step -> 2, 4, 6, … . The zoom
+			// input (interpolate[2] / step[1]) and the stop inputs stay untouched.
+			const firstOutputIndex = isInterpolate ? 4 : 2;
+			return opacityExpr.map((part: any, i: number) =>
+				i >= firstOutputIndex && i % 2 === 0 ? ['*', part, factorExpr] : part
+			);
+		}
 	}
-	const sections: Record<string, string> = {};
-	let expectedNum = 1;
-	while (allSections[String(expectedNum)]) {
-		const content = allSections[String(expectedNum)];
-		const meaningfulContent = content.replace(/[.\s,;:!?'"()\-–—]/g, '').trim();
-		if (meaningfulContent.length < 5) break;
-		sections[String(expectedNum)] = content;
-		expectedNum++;
-	}
-	// Return sections if we have at least 1 valid section
-	return Object.keys(sections).length >= 1 ? sections : {};
+	return ['*', opacityExpr, factorExpr];
 };
 
-interface SearchResultsMapProps {
+const withFeatureFillOpacity = (opacityExpr: any): any =>
+	withFeatureOpacityFactor(opacityExpr, FEATURE_FILL_OPACITY_FACTOR);
+
+const withFeatureStrokeOpacity = (opacityExpr: any): any =>
+	withFeatureOpacityFactor(opacityExpr, FEATURE_STROKE_OPACITY_FACTOR);
+
+type AllContactsOverlayFetchMode = 'all' | 'ambient';
+type AllContactsOverlayFetchPhase = 'visible' | 'buffer';
+type AllContactsOverlayFetchBbox = BoundingBox & {
+	mode: AllContactsOverlayFetchMode;
+	phase: AllContactsOverlayFetchPhase;
+	zoom: number;
+	seed: string;
+};
+
+const AMBIENT_CONTACT_CATEGORY_TITLE_PREFIXES: readonly (readonly string[])[] = [
+	['Radio Stations', 'College Radio'],
+	['Wedding Planners', 'Wedding Venues'],
+	['Coffee Shops'],
+	['Music Festivals'],
+	['Breweries', 'Distilleries', 'Wineries', 'Cideries'],
+	['Music Venues'],
+	['Restaurants'],
+] as const;
+
+const getAmbientContactCategoryIndexFromTitle = (
+	title: string | null | undefined
+): number => {
+	if (!title) return -1;
+	for (let i = 0; i < AMBIENT_CONTACT_CATEGORY_TITLE_PREFIXES.length; i += 1) {
+		for (const prefix of AMBIENT_CONTACT_CATEGORY_TITLE_PREFIXES[i]) {
+			if (startsWithCaseInsensitive(title, prefix)) return i;
+		}
+	}
+	return -1;
+};
+
+const getAmbientContactWhatFromTitle = (
+	title: string | null | undefined
+): string | null =>
+	getBookingTitlePrefixFromContactTitle(title) ??
+	getPromotionOverlayWhatFromContactTitle(title);
+
+export interface SearchResultsMapProps {
 	contacts: ContactWithName[];
 	selectedContacts: number[];
+	/** Full objects for the selected contacts, so halos persist even when those contacts
+	 *  are not in `contacts`/overlays (e.g. after disengaging search to the ambient atlas). */
+	selectedContactObjects?: ContactWithName[];
 	/** When set, highlights the corresponding marker as hovered (e.g. hovering a row in the map results panel). */
 	externallyHoveredContactId?: number | null;
 	/** Full search query string (e.g. "[Booking] Music Venues (Portland, ME)") */
 	searchQuery?: string | null;
 	/** Used to color the default (unselected) result dots by the active "What" search value. */
 	searchWhat?: string | null;
+	/** When false, keeps contacts/results available but hides search-specific geography (blobs/outlines/locked areas). */
+	searchEngaged?: boolean;
+	/** When true, connects result dots by category even without an active search query. */
+	categoryConstellationsEnabled?: boolean;
+	/** Campaign overview marker mode. Category mode preserves the normal category-colored markers. */
+	campaignMarkerMode?: 'category' | 'status';
+	/** Per-contact campaign status used when `campaignMarkerMode` is `status`. */
+	campaignContactStatusById?: ReadonlyMap<number, CampaignContactMapStatus>;
+	/** When true, renders a browse-oriented all-contact atlas while search results are visually disengaged. */
+	ambientContactsEnabled?: boolean;
+	/** When true, warms the ambient atlas cache before the user disengages the search. */
+	ambientContactsPreloadEnabled?: boolean;
+	/** Per-category ambient visibility, ordered like the map grab-category stack. */
+	ambientActiveCategories?: readonly boolean[];
+	/** Ambient visibility for contacts that do not map to a known category. */
+	ambientUncategorizedActive?: boolean;
+	/** Increment to ask the map to refit to the active search without changing the query/results. */
+	autoFitRequestNonce?: number;
+	/**
+	 * Bump to request that the *next* auto-fit be applied instantly (duration 0) instead of an
+	 * animated ease/fly. Consumed once per distinct value; later fits animate normally. Used for the
+	 * campaign-tab → dashboard-search transition, which must land without a pan or globe flash.
+	 */
+	instantAutoFitNonce?: number;
+	/** Empty-map hover prompt. When present, an empty map click calls `onEmptyMapClick`. */
+	emptyMapClickPrompt?: string | null;
+	onEmptyMapClick?: () => void;
 	/** When set, shows a persistent outline of the selected search area. */
 	selectedAreaBounds?: MapSelectionBounds | null;
 	/**
@@ -1342,6 +1045,11 @@ interface SearchResultsMapProps {
 	 * Useful for dismissing transient UI (e.g. "Search this area" CTA).
 	 */
 	onViewportInteraction?: () => void;
+	/**
+	 * Called during live zoom gestures so parent UI can track the camera without
+	 * waiting for Mapbox's `moveend`.
+	 */
+	onViewportZoom?: (zoom: number) => void;
 	/**
 	 * Called when the viewport becomes idle after panning/zooming (Mapbox `moveend`).
 	 * Useful for syncing viewport-derived state in the parent.
@@ -1354,6 +1062,8 @@ interface SearchResultsMapProps {
 	}) => void;
 	/** Dashboard/tooling mode (e.g. `"select"` enables rectangle selection). */
 	activeTool?: string | null;
+	/** Imperative zoom request from dashboard map chrome. */
+	requestedZoom?: { zoom: number; nonce: number; isDragging?: boolean } | null;
 	/** Changes when the dashboard triggers "select all in view". */
 	selectAllInViewNonce?: number;
 
@@ -1363,11 +1073,24 @@ interface SearchResultsMapProps {
 	onMarkerClick?: (contact: ContactWithName) => void;
 	onMarkerHover?: (contact: ContactWithName | null, meta?: MarkerHoverMeta) => void;
 	onToggleSelection?: (contactId: number) => void;
+	/**
+	 * Multi-select action card (dashboard search map). When >= 2 contacts are
+	 * selected, a floating card anchored to the selection centroid offers these
+	 * actions. Providing `onAddSelectionToFolder` is what opts a host into showing
+	 * the card, so it never appears in the campaign/venue maps.
+	 */
+	onAddSelectionToFolder?: () => void;
+	onWriteSelectionMessage?: () => void;
 	onStateSelect?: (stateName: string) => void;
 	enableStateInteractions?: boolean;
 	lockedStateName?: string | null;
 	/** When true, hides the state outlines (useful while search is loading). */
 	isLoading?: boolean;
+	/**
+	 * Reports map readiness: called with true once Mapbox's `load` event fires (style + first
+	 * render complete), and with false on map teardown/recreate or unmount.
+	 */
+	onMapLoadedChange?: (loaded: boolean) => void;
 	/**
 	 * When true, disables the base-dot "wave reveal" animation.
 	 * Useful in fullscreen/cinematic map transitions where hiding dots causes visible flicker.
@@ -1376,10 +1099,41 @@ interface SearchResultsMapProps {
 	/** When true, prevents the map from auto-zooming to fit contacts or the locked state. */
 	skipAutoFit?: boolean;
 	/**
+	 * Optional Mapbox camera padding (in px). Useful for layouts where UI covers part
+	 * of the map (e.g. a right-side panel) and the map should behave as if that area
+	 * is not available.
+	 */
+	cameraPadding?: {
+		top?: number;
+		right?: number;
+		bottom?: number;
+		left?: number;
+	} | null;
+	/**
+	 * Optional padding (in px) for auto-fit camera moves (fitBounds). Use when fixed UI
+	 * chrome overlays the map (e.g. the mobile search view) so fitted results land in
+	 * the uncovered area. Clamped to the canvas size so Mapbox's "cannot fit" bail is
+	 * unreachable on small viewports. Defaults preserve the historical insets
+	 * (50px contacts / 100px state).
+	 */
+	autoFitPadding?: {
+		top: number;
+		right: number;
+		bottom: number;
+		left: number;
+	} | null;
+	/**
 	 * Controls whether the map should behave like a decorative dashboard background (no interactions,
 	 * optional auto-rotation), or the full interactive results map.
 	 */
 	presentation?: 'background' | 'interactive';
+	/**
+	 * When true (interactive presentation only), deep zoom transitions the camera into a
+	 * pitched street-level 3D view with extruded buildings, and marker hover shows the
+	 * rich research card instead of the slim tooltip. Opt-in so only the dashboard
+	 * map-search surface gets it (not campaign/venue/mobile maps).
+	 */
+	streetViewEnabled?: boolean;
 	/** When true (and `presentation="background"`), auto-rotate the globe. */
 	autoSpin?: boolean;
 	/**
@@ -1408,2131 +1162,144 @@ interface SearchResultsMapProps {
 	 * uses this to drift slowly from sunrise to sunset.
 	 */
 	nightLighting?: GlobeNightLightingLike | null;
+	/**
+	 * Radius-search overlay. When set, draws a translucent circle (white ring +
+	 * faint fill) of `radiusMiles` around `center` plus a draggable red center pin.
+	 * Null clears the overlay. `radiusMiles` should be the committed search radius,
+	 * not a draft slider value.
+	 */
+	radiusOverlay?: { center: LatLngLiteral; radiusMiles: number } | null;
+	/** Called when the user drops the draggable radius center pin at a new location. */
+	onRadiusCenterChange?: (center: LatLngLiteral) => void;
+	/** Current venue account location; draws the map-anchored home/radar overlay. */
+	ownedVenueLocation?: OwnedVenueLocation | null;
+	/**
+	 * Camera target for entering interactive mode. When set, the background →
+	 * interactive reveal snaps straight here (no zoom-in sweep) instead of gliding
+	 * to the neutral handoff target derived from the decorative globe framing. A
+	 * value that resolves or changes shortly after the reveal (e.g. the venue save
+	 * is still refetching as the portal flips views) still snaps into place — until
+	 * the user moves the camera themselves, after which it is never overridden.
+	 */
+	interactiveEntryCamera?: { center: LatLngLiteral; zoom: number } | null;
+	/** Reports the owned-venue home icon's projected position in viewport px on every
+	 *  camera move/resize. Null when there is no valid venue location, the map is not
+	 *  loaded, or on teardown. `isOnScreen` is false when the icon is outside the
+	 *  viewport (40px pad) or occluded behind the globe at low zoom. */
+	onOwnedVenueAnchorChange?: (
+		anchor: { x: number; y: number; isOnScreen: boolean; zoom: number } | null
+	) => void;
+	/** Venue-posted events to draw as radar opportunity markers (red star + radar). */
+	events?: MapEvent[];
+	/** Pixels along the right edge obstructed by host UI (e.g. the search-results panel).
+	 *  The event popup places to the right of a marker only when it clears this region,
+	 *  flipping left otherwise. */
+	rightSafeAreaPx?: number;
+	/** Renders the content inside an event popup's white inner box for the active event.
+	 *  The map owns the popup container + positioning; the host owns the event card. */
+	renderEventPopupContent?: (eventId: number) => ReactNode;
+	/** When true, hides and resets event popups while a higher-level modal owns pointer flow. */
+	suppressEventPopups?: boolean;
 }
 
-const defaultCenter = {
-	lat: 39.8283, // Center of US
-	lng: -98.5795,
-};
-
-const MAP_DEFAULT_ZOOM = 5;
-// Let users zoom out further than the default US-wide view.
-const MAP_MIN_ZOOM = 2.25;
-// Dashboard UX: allow state hover highlight one zoom step past the default zoom.
-const STATE_HOVER_HIGHLIGHT_MAX_ZOOM = MAP_DEFAULT_ZOOM + 1;
-
-// Decorative dashboard background framing. Keep these in sync with the background-mode
-// camera settings so the initial mount doesn't "pop" after the map loads.
-const DASHBOARD_DECORATIVE_ZOOM = 4.0;
-const DASHBOARD_DECORATIVE_PITCH = 15;
-const DASHBOARD_DECORATIVE_OFFSET_PX: [number, number] = [0, 140]; // push center down -> see more top/horizon
-const DASHBOARD_DECORATIVE_CENTER: [number, number] = [
-	defaultCenter.lng,
-	defaultCenter.lat,
-];
-
-// Softbox lighting overlay fades out as the user zooms in — the "lit sphere"
-// read only makes sense at globe/continent distance. Fully on at globe zoom,
-// linearly off by the time we're into state-level detail.
-// Anchor the fade to the globe→flat-map transition: full at globe zoom, gone
-// by the time the viewport is filled with flat map (no visible curvature).
-const LIGHTING_OVERLAY_FADE_START_ZOOM = 2.5;
-const LIGHTING_OVERLAY_FADE_END_ZOOM = 5;
-
-const computeLightingOverlayOpacity = (zoom: number) => {
-	if (zoom <= LIGHTING_OVERLAY_FADE_START_ZOOM) return 1;
-	if (zoom >= LIGHTING_OVERLAY_FADE_END_ZOOM) return 0;
-	const t =
-		(zoom - LIGHTING_OVERLAY_FADE_START_ZOOM) /
-		(LIGHTING_OVERLAY_FADE_END_ZOOM - LIGHTING_OVERLAY_FADE_START_ZOOM);
-	// Ease-in cubic: stays near full, then drops off fast near the end.
-	return 1 - t * t * t;
-};
-
-// Dark "gloom wash" persists much further than the softbox/shadow overlays so
-// stormy still feels overcast when the user zooms in to city detail.
-// Held at full strength through country zoom, then linearly fades out as the
-// clouds themselves disappear.
-const GLOOM_WASH_FADE_START_ZOOM = 8;
-const GLOOM_WASH_FADE_END_ZOOM = 10.5;
-const computeGloomWashFade = (zoom: number) => {
-	if (zoom <= GLOOM_WASH_FADE_START_ZOOM) return 1;
-	if (zoom >= GLOOM_WASH_FADE_END_ZOOM) return 0;
-	return (
-		1 -
-		(zoom - GLOOM_WASH_FADE_START_ZOOM) /
-			(GLOOM_WASH_FADE_END_ZOOM - GLOOM_WASH_FADE_START_ZOOM)
-	);
-};
-
-// Clouds overlay: subtle patchy clouds for the zoomed-out globe view.
-// Implemented as a local raster tile source so it stays glued to the globe as it rotates.
-// NOTE: include a version query param to bust browser caches when we regenerate tiles.
-const CLOUDS_TILES_URL_TEMPLATE = '/maps/clouds/{z}/{x}/{y}.png?v=23';
-const CLOUDS_TILES_MAX_ZOOM = 3;
-// Tune for "satellite-read" clarity without becoming a weather overlay.
-// (Per-mood opacities now live in src/lib/weather/moodConfig.ts; the `normal`
-// mood preserves the historical 0.78 / 0.66 values.)
-// Keep clouds around slightly past the initial interactive view; fade by state-level zoom.
-const CLOUDS_OVERLAY_FADE_OUT_START_ZOOM = 8.0;
-const CLOUDS_OVERLAY_FADE_OUT_END_ZOOM = 10.5;
-const CLOUDS_CANVAS_TEXTURE_URL = '/maps/clouds/0/0/0.png?v=23';
-const CLOUDS_CANVAS_SIZE_PX = 512;
-// Storm lightning assets: flash stamps + a low-res potential mask to bias
-// flashes toward storm cores.
-const LIGHTNING_STAMPS_COUNT = 24;
-const LIGHTNING_STAMPS_VERSION = 5;
-const LIGHTNING_POTENTIAL_VERSION = 1;
-const LIGHTNING_STAMPS_URL = (i: number) =>
-	`/maps/lightning_stamps/flash_${String(i).padStart(2, '0')}.png?v=${LIGHTNING_STAMPS_VERSION}`;
-const LIGHTNING_POTENTIAL_TEXTURE_URL = `/maps/lightning_potential/0/0/0.png?v=${LIGHTNING_POTENTIAL_VERSION}`;
-const LIGHTNING_CANVAS_WIDTH_PX = 1024;
-const LIGHTNING_CANVAS_HEIGHT_PX = 1024;
-// Keep lightning visible through the full clouds fade-out band so it's still present
-// in typical "interactive" zoom ranges (it will naturally dim with raster-opacity).
-const LIGHTNING_HIDE_AT_OR_ABOVE_ZOOM = CLOUDS_OVERLAY_FADE_OUT_END_ZOOM;
-// Show a first flash quickly when stormy lightning turns on so it reads as "connected".
-const LIGHTNING_FIRST_FLASH_MIN_INTERVAL_MS = 180;
-const LIGHTNING_FIRST_FLASH_MAX_INTERVAL_MS = 950;
-const LIGHTNING_MIN_INTERVAL_MS = 1400;
-const LIGHTNING_MAX_INTERVAL_MS = 4200;
-const LIGHTNING_MAX_ACTIVE_EVENTS = 10;
-const LIGHTNING_ZOOMED_OUT_MAX_ACTIVE_EVENTS = 14;
-const LIGHTNING_MERCATOR_MAX_LAT = 85.051129;
-const LIGHTNING_ZOOMED_OUT_BOOST_FULL_ZOOM = MAP_MIN_ZOOM + 0.35;
-const LIGHTNING_ZOOMED_OUT_BOOST_END_ZOOM = 4.35;
-const LIGHTNING_ZOOMED_OUT_MIN_INTERVAL_MS = 900;
-const LIGHTNING_ZOOMED_OUT_MAX_INTERVAL_MS = 2600;
-const LIGHTNING_CLUSTER_CHANCE_MIN = 0.08;
-const LIGHTNING_CLUSTER_CHANCE_MAX = 0.18;
-const LIGHTNING_RESTRIKE_MIN_INTERVAL_MS = 95;
-const LIGHTNING_RESTRIKE_MAX_INTERVAL_MS = 320;
-const LIGHTNING_RESTRIKE_MIN_REMAINING_FLASHES = 1;
-const LIGHTNING_RESTRIKE_MAX_REMAINING_FLASHES = 2;
-const LIGHTNING_SCALE_ZOOM_START = 5.2;
-const LIGHTNING_SCALE_ZOOM_END = CLOUDS_OVERLAY_FADE_OUT_END_ZOOM;
-const LIGHTNING_US_BOUNDS: [number, number, number, number] = [-125.5, 24.0, -66.0, 50.0];
-// Use the same world-Mercator geometry as the clouds canvas. Canvas sources only
-// reliably render in this map when they span the full Mercator world (small
-// regional canvases can fall out of the globe-projection sample path).
-const LIGHTNING_CANVAS_COORDINATES: [
-	[number, number],
-	[number, number],
-	[number, number],
-	[number, number],
-] = [
-	[-180, 85.051129],
-	[180, 85.051129],
-	[180, -85.051129],
-	[-180, -85.051129],
-];
-const LIGHTNING_STORM_CELL_COUNT = 6;
-const LIGHTNING_REGION_BIAS_CHANCE = 0.34;
-// Cell radii in lightning-canvas pixels. The lightning canvas is full-world
-// Mercator (LIGHTNING_CANVAS_WIDTH_PX × LIGHTNING_CANVAS_HEIGHT_PX), so CONUS
-// occupies roughly 165 px wide × 80 px tall at 1024×1024.
-const LIGHTNING_CELL_RADIUS_GLOBE_PX = 28;
-const LIGHTNING_CELL_RADIUS_CLOSE_PX = 9;
-const LIGHTNING_DRAMATIC_STRIKE_CHANCE = 0.08;
-const LIGHTNING_SHEET_FLASH_CHANCE = 0.68;
-const LIGHTNING_ALTITUDE_GLOBE_PX = 13;
-const LIGHTNING_ALTITUDE_CLOSE_PX = 4;
-const LIGHTNING_CATCHLIGHT_OPACITY = 0.22;
-// Stamp scale is relative to the full lightning canvas. The new stamps are 320 px
-// wide; with these values a globe-zoom dramatic strike paints ~80 px wide across
-// the whole world canvas — roughly half the CONUS footprint.
-const LIGHTNING_SCALE_GLOBE_MIN = 0.16;
-const LIGHTNING_SCALE_GLOBE_MAX = 0.32;
-const LIGHTNING_SCALE_CLOSE_MIN = 0.05;
-const LIGHTNING_SCALE_CLOSE_MAX = 0.11;
-const LIGHTNING_US_POSITION_TRIES = 72;
-const LIGHTNING_OPACITY_MULTIPLIER = 1.08;
-const LIGHTNING_LAYER_OPACITY = 0.92;
-const SNOWFLAKE_STAMPS_COUNT = 20;
-const SNOWFLAKE_STAMPS_VERSION = 7;
-const SNOWFLAKE_STAMPS_URL = (i: number) =>
-	`/maps/snowflake_stamps/drop_${String(i).padStart(2, '0')}.png?v=${SNOWFLAKE_STAMPS_VERSION}`;
-const SNOW_CANVAS_SIZE_PX = 1024;
-const SNOW_MAX_PARTICLES = 1800;
-const SNOW_LAYER_OPACITY = 1.0;
-const SNOW_HIDE_AT_OR_ABOVE_ZOOM = CLOUDS_OVERLAY_FADE_OUT_END_ZOOM;
-const SNOW_BASE_FALL_PX_PER_S = 9.2;
-const SNOW_BASE_WIND_PX_PER_S = 1.2;
-const SNOW_WIND_SWAY_BASE_PX = 3.4;
-const SNOW_GUST_PUSH_BASE_PX = 4.8;
-const SNOW_EDDY_DRIFT_BASE_PX = 2.2;
-const SNOW_TURBULENCE_LOOP_MS = 37_000;
-const SNOW_GUST_BAND_LOOP_MS = 29_000;
-const SNOW_DENSITY_BAND_LOOP_MS = 46_000;
-const SNOW_STAMP_MIN_SIZE_PX = 12;
-const SNOW_STAMP_MAX_SIZE_PX = 34;
-const SNOW_STAMP_ALPHA_MULTIPLIER = 1.72;
-const SNOW_STAMP_MAX_ALPHA = 0.96;
-const SNOW_ROTATED_PARTICLE_DEPTH_MIN = 0.82;
-const SNOW_US_SIDE_CENTER_LNG = defaultCenter.lng;
-const SNOW_US_SIDE_FADE_START_DEG = 78;
-const SNOW_US_SIDE_FADE_END_DEG = 94;
-// Snow→cloud interaction: keep subtle (reads as atmospheric refraction, not holes).
-const CLOUDS_SNOW_INTERACTION_STAMP_SIZE_PX = 96;
-const CLOUDS_SNOW_INTERACTION_TARGET_IMPACTS = 360;
-const CLOUDS_SNOW_INTERACTION_TARGET_IMPACTS_REDUCED = 140;
-const CLOUDS_SNOW_INTERACTION_MAX_REFRACT_SHIFT_PX = 3.2;
-
-const getLightningZoomedOutBoostT = (zoom: number) => {
-	if (zoom <= LIGHTNING_ZOOMED_OUT_BOOST_FULL_ZOOM) return 1;
-	if (zoom >= LIGHTNING_ZOOMED_OUT_BOOST_END_ZOOM) return 0;
-	const t =
-		(LIGHTNING_ZOOMED_OUT_BOOST_END_ZOOM - zoom) /
-		(LIGHTNING_ZOOMED_OUT_BOOST_END_ZOOM - LIGHTNING_ZOOMED_OUT_BOOST_FULL_ZOOM);
-	const clamped = clamp(t, 0, 1);
-	return clamped * clamped * (3 - 2 * clamped);
-};
-
-const getLightningZoomedInT = (zoom: number) => {
-	if (zoom <= LIGHTNING_SCALE_ZOOM_START) return 0;
-	if (zoom >= LIGHTNING_SCALE_ZOOM_END) return 1;
-	const t =
-		(zoom - LIGHTNING_SCALE_ZOOM_START) /
-		(LIGHTNING_SCALE_ZOOM_END - LIGHTNING_SCALE_ZOOM_START);
-	const clamped = clamp(t, 0, 1);
-	return clamped * clamped * (3 - 2 * clamped);
-};
-
-// Contact-lights overlay: dot-only night lights derived from contact coordinates.
-// Implemented as local raster tiles (like clouds) so it stays glued to the globe.
-// NOTE: include a version query param to bust browser caches when tiles regenerate.
-const CONTACT_LIGHTS_TILES_URL_TEMPLATE = '/maps/contact_lights/{z}/{x}/{y}.png?v=9';
-// "Intro reveal" tiles: same dots, but alpha is biased west->east so a global fade-in reads
-// like dots revealing left-to-right. We crossfade to the real tiles after the intro.
-const CONTACT_LIGHTS_REVEAL_TILES_URL_TEMPLATE =
-	'/maps/contact_lights_reveal/{z}/{x}/{y}.png?v=9';
-const CONTACT_LIGHTS_TILES_MAX_ZOOM = 6;
-// CONUS-ish bounds (limits Mapbox tile requests).
-const CONTACT_LIGHTS_TILES_BOUNDS: [number, number, number, number] = [
-	-125.5, // lon min
-	24.0, // lat min
-	-66.0, // lon max
-	50.0, // lat max
-];
-const WEB_MERCATOR_MAX_LAT = 85.051129;
-// Full WebMercator bounds (lat clamp) so the texture maps cleanly across the globe.
-const CLOUDS_CANVAS_COORDINATES: [
-	[number, number],
-	[number, number],
-	[number, number],
-	[number, number],
-] = [
-	[-180, WEB_MERCATOR_MAX_LAT],
-	[180, WEB_MERCATOR_MAX_LAT],
-	[180, -WEB_MERCATOR_MAX_LAT],
-	[-180, -WEB_MERCATOR_MAX_LAT],
-];
-// Latitude band over which the cloud/snow canvas alpha tapers to zero. Hides
-// the Mercator-vs-globe distortion that otherwise smears the polar rows of the
-// flat canvas into a visible ring around each pole. Mirrors the day-shade
-// `polarTaperT` (see paintDayFarSideShadeCanvas) but starts a little earlier,
-// since cloud texture detail makes the smear more visible than the shade's
-// flat fill does.
-const CLOUDS_POLAR_TAPER_START_DEG = 55;
-const CLOUDS_POLAR_TAPER_END_DEG = 82;
-const DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX = 512;
-// Stored in the texture alpha; tuned to read as a clear "this side is in shadow"
-// without becoming a night-mode look. The opacity multiplier below stacks on top.
-const DAY_FAR_SIDE_SHADE_MAX_ALPHA = 0.32;
-const DAY_FAR_SIDE_SHADE_OPACITY_MULTIPLIER = 1.0;
-const DAY_FAR_SIDE_SHADE_CENTER_LNG = normalizeLngDeg(defaultCenter.lng + 180);
-const DAY_FAR_SIDE_SHADE_DAYTIME_DRIFT_DEG = 76;
-const DAY_FAR_SIDE_SHADE_FADE_START_DEG = 24;
-const DAY_FAR_SIDE_SHADE_FADE_END_DEG = 154;
-const DAY_FAR_SIDE_SHADE_FADE_POWER = 1.32;
-const DAY_FAR_SIDE_SHADE_REPAINT_MS = 4_000;
-const DAY_FAR_SIDE_SHADE_MIN_REPAINT_DELTA_DEG = 0.02;
-const getDayFarSideShadeDayProgress = (
-	nightLighting: GlobeNightLightingLike | null | undefined,
-	nowMs: number
-) => {
-	if (!nightLighting) return 0;
-	if (nightLighting.phase === 'sunrise') return 0;
-	if (nightLighting.phase === 'sunset') return 1;
-	if (nightLighting.phase !== 'day') return 0;
-
-	const startMs = nightLighting.phaseStartMs;
-	const endMs = nightLighting.phaseEndMs;
-	const durationMs = endMs - startMs;
-	if (!Number.isFinite(durationMs) || durationMs <= 0) return 0;
-	return clamp((nowMs - startMs) / durationMs, 0, 1);
-};
-const getDayFarSideShadeCenterLng = (dayProgress: number) =>
-	normalizeLngDeg(
-		DAY_FAR_SIDE_SHADE_CENTER_LNG +
-			clamp(dayProgress, 0, 1) * DAY_FAR_SIDE_SHADE_DAYTIME_DRIFT_DEG
-	);
-const paintDayFarSideShadeCanvas = (
-	canvas: HTMLCanvasElement,
-	centerLng: number = DAY_FAR_SIDE_SHADE_CENTER_LNG
-) => {
-	canvas.width = DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX;
-	canvas.height = DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX;
-
-	const ctx = canvas.getContext('2d');
-	if (!ctx) return false;
-
-	const w = canvas.width;
-	const h = canvas.height;
-	const imageData = ctx.createImageData(w, h);
-	const data = imageData.data;
-
-	for (let y = 0; y < h; y += 1) {
-		const mercatorY = (y + 0.5) / h;
-		const lat =
-			(Math.atan(Math.sinh(Math.PI * (1 - 2 * mercatorY))) * 180) / Math.PI;
-		const latRad = (lat * Math.PI) / 180;
-
-		for (let x = 0; x < w; x += 1) {
-			const lng = ((x + 0.5) / w) * 360 - 180;
-			const lngRad = (lng * Math.PI) / 180;
-			const wobble =
-				9 * Math.sin(latRad * 2.1 + lngRad * 1.15) +
-				5 * Math.sin(lngRad * 2.7 - latRad * 0.8);
-			const distToAsiaSide = angularLngDistanceDeg(lng + wobble, centerLng);
-			const farSideT = Math.pow(
-				1 -
-					smoothstep(
-						DAY_FAR_SIDE_SHADE_FADE_START_DEG,
-						DAY_FAR_SIDE_SHADE_FADE_END_DEG,
-						distToAsiaSide
-					),
-				DAY_FAR_SIDE_SHADE_FADE_POWER
-			);
-			const usProtectionT = smoothstep(
-				40,
-				78,
-				angularLngDistanceDeg(lng, defaultCenter.lng)
-			);
-			const polarTaperT = 1 - smoothstep(62, 80, Math.abs(lat));
-			const northTopTaperT = 1 - smoothstep(50, 74, lat) * 0.5;
-			const alpha =
-				DAY_FAR_SIDE_SHADE_MAX_ALPHA *
-				farSideT *
-				usProtectionT *
-				polarTaperT *
-				northTopTaperT;
-
-			const idx = (y * w + x) * 4;
-			data[idx] = 4;
-			data[idx + 1] = 8;
-			data[idx + 2] = 22;
-			data[idx + 3] = Math.round(clamp(alpha, 0, DAY_FAR_SIDE_SHADE_MAX_ALPHA) * 255);
-		}
-	}
-
-	ctx.putImageData(imageData, 0, 0);
-	return true;
-};
-const createDayFarSideShadeCanvas = (): HTMLCanvasElement | null => {
-	if (typeof document === 'undefined') return null;
-
-	const canvas = document.createElement('canvas');
-	if (!paintDayFarSideShadeCanvas(canvas)) return null;
-	return canvas;
-};
-
-// Vertical 1px-wide alpha mask whose alpha follows the inverse Mercator
-// formula, so the taper is geographically correct (latitude-pinned) rather
-// than just a screen-space gradient. Cached at module scope and reused as a
-// `destination-in` source in the cloud and snow draw loops.
-let cloudsPolarFadeMaskCanvas: HTMLCanvasElement | null = null;
-const buildCloudsPolarFadeMaskCanvas = (
-	sizePx: number
-): HTMLCanvasElement | null => {
-	if (typeof document === 'undefined') return null;
-	const mask = document.createElement('canvas');
-	mask.width = 1;
-	mask.height = sizePx;
-	const ctx = mask.getContext('2d');
-	if (!ctx) return null;
-	const img = ctx.createImageData(1, sizePx);
-	const data = img.data;
-	for (let y = 0; y < sizePx; y += 1) {
-		const mercatorY = (y + 0.5) / sizePx;
-		const lat =
-			(Math.atan(Math.sinh(Math.PI * (1 - 2 * mercatorY))) * 180) / Math.PI;
-		const t =
-			1 -
-			smoothstep(
-				CLOUDS_POLAR_TAPER_START_DEG,
-				CLOUDS_POLAR_TAPER_END_DEG,
-				Math.abs(lat)
-			);
-		const a = Math.round(clamp(t, 0, 1) * 255);
-		const i = y * 4;
-		data[i] = 255;
-		data[i + 1] = 255;
-		data[i + 2] = 255;
-		data[i + 3] = a;
-	}
-	ctx.putImageData(img, 0, 0);
-	return mask;
-};
-const getCloudsPolarFadeMask = (sizePx: number): HTMLCanvasElement | null => {
-	const existing = cloudsPolarFadeMaskCanvas;
-	if (existing && existing.height === sizePx) return existing;
-	const next = buildCloudsPolarFadeMaskCanvas(sizePx);
-	cloudsPolarFadeMaskCanvas = next;
-	return next;
-};
-
-type SunTransitionVisualState = {
-	phase: 'sunrise' | 'sunset';
-	progress: number;
-	intensity: number;
-	centerLng: number;
-	direction: 1 | -1;
-};
-
-const SUN_TRANSITION_CANVAS_SIZE_PX = 512;
-const SUN_TRANSITION_LAYER_MAX_OPACITY = 0.96;
-const SUN_TRANSITION_CLOUD_CATCHLIGHT_OPACITY_MULT = 0.28;
-const SUN_TRANSITION_SPACE_GLOW_OPACITY_MULT = 0.16;
-const SUN_TRANSITION_MAX_PIXEL_ALPHA = 0.62;
-const SUN_TRANSITION_COLOR_ALPHA_MULT = 1.42;
-const SUN_TRANSITION_CLOSE_FADE_START_ZOOM = 4.8;
-const SUN_TRANSITION_CLOSE_FADE_END_ZOOM = 6.1;
-const SUN_TRANSITION_PROGRESS_PAINT_STEPS = 520;
-const SUN_TRANSITION_SUNRISE_START_OFFSET_DEG = 54;
-const SUN_TRANSITION_SUNRISE_END_OFFSET_DEG = -48;
-const SUN_TRANSITION_SUNSET_START_OFFSET_DEG = -48;
-const SUN_TRANSITION_SUNSET_END_OFFSET_DEG = 54;
-
-const getSunTransitionVisualState = (
-	nightLighting: GlobeNightLightingLike | null | undefined,
-	nowMs: number
-): SunTransitionVisualState | null => {
-	if (!nightLighting) return null;
-	const phase = nightLighting?.phase;
-	if (phase !== 'sunrise' && phase !== 'sunset') return null;
-
-	const startMs = nightLighting.phaseStartMs;
-	const endMs = nightLighting.phaseEndMs;
-	const durationMs = endMs - startMs;
-	if (!Number.isFinite(durationMs) || durationMs <= 0) return null;
-
-	const progress = clamp((nowMs - startMs) / durationMs, 0, 1);
-	const sweepT = smoothstep(0, 1, progress);
-	const [startOffset, endOffset] =
-		phase === 'sunrise'
-			? [SUN_TRANSITION_SUNRISE_START_OFFSET_DEG, SUN_TRANSITION_SUNRISE_END_OFFSET_DEG]
-			: [SUN_TRANSITION_SUNSET_START_OFFSET_DEG, SUN_TRANSITION_SUNSET_END_OFFSET_DEG];
-	const centerLng = normalizeLngDeg(defaultCenter.lng + lerp(startOffset, endOffset, sweepT));
-	const bell = Math.sin(progress * Math.PI);
-	const intensity = Math.pow(Math.max(0, bell), 0.62);
-
-	if (intensity <= 0.001) return null;
-
-	return {
-		phase,
-		progress,
-		intensity,
-		centerLng,
-		direction: phase === 'sunrise' ? 1 : -1,
-	};
-};
-
-const computeSunTransitionZoomOpacity = (zoom: number) => {
-	const globeFade = computeLightingOverlayOpacity(zoom);
-	const closeFade =
-		1 -
-		smoothstep(
-			SUN_TRANSITION_CLOSE_FADE_START_ZOOM,
-			SUN_TRANSITION_CLOSE_FADE_END_ZOOM,
-			zoom
-		);
-	return clamp(globeFade * closeFade, 0, 1);
-};
-
-const computeSunTransitionLayerOpacity = (
-	visual: SunTransitionVisualState | null,
-	zoom: number
-) => {
-	if (!visual) return 0;
-	return clamp(
-		computeSunTransitionZoomOpacity(zoom) *
-			SUN_TRANSITION_LAYER_MAX_OPACITY *
-			visual.intensity,
-		0,
-		1
-	);
-};
-
-const addSunTransitionColor = (
-	acc: { r: number; g: number; b: number; a: number },
-	signedDistDeg: number,
-	centerDeg: number,
-	widthDeg: number,
-	rgb: [number, number, number],
-	alpha: number
-) => {
-	if (alpha <= 0) return;
-	const x = (signedDistDeg - centerDeg) / widthDeg;
-	const a = alpha * Math.exp(-x * x);
-	if (a <= 0.0001) return;
-	acc.r += rgb[0] * a;
-	acc.g += rgb[1] * a;
-	acc.b += rgb[2] * a;
-	acc.a += a;
-};
-
-const paintSunTransitionCanvas = (
-	canvas: HTMLCanvasElement,
-	visual: SunTransitionVisualState | null
-) => {
-	canvas.width = SUN_TRANSITION_CANVAS_SIZE_PX;
-	canvas.height = SUN_TRANSITION_CANVAS_SIZE_PX;
-
-	const ctx = canvas.getContext('2d');
-	if (!ctx) return false;
-	ctx.clearRect(0, 0, canvas.width, canvas.height);
-	if (!visual) return true;
-
-	const w = canvas.width;
-	const h = canvas.height;
-	const imageData = ctx.createImageData(w, h);
-	const data = imageData.data;
-	const p = visual.progress;
-	const sunriseT = visual.phase === 'sunrise' ? p : 1 - p;
-	const violetGate =
-		visual.phase === 'sunrise'
-			? 1 - smoothstep(0.52, 0.98, p) * 0.66
-			: smoothstep(0.14, 0.82, p);
-	const roseGate =
-		visual.phase === 'sunrise'
-			? 1 - smoothstep(0.72, 1, p) * 0.28
-			: smoothstep(0.06, 0.72, p);
-	const warmGate =
-		visual.phase === 'sunrise'
-			? smoothstep(0.12, 0.66, p)
-			: 1 - smoothstep(0.44, 0.98, p) * 0.52;
-	const goldGate =
-		visual.phase === 'sunrise'
-			? smoothstep(0.32, 0.88, p)
-			: 1 - smoothstep(0.16, 0.78, p);
-	const paleGate =
-		visual.phase === 'sunrise'
-			? smoothstep(0.52, 0.96, p)
-			: 1 - smoothstep(0.08, 0.6, p);
-
-	for (let y = 0; y < h; y += 1) {
-		const mercatorY = (y + 0.5) / h;
-		const lat =
-			(Math.atan(Math.sinh(Math.PI * (1 - 2 * mercatorY))) * 180) / Math.PI;
-		const latRad = (lat * Math.PI) / 180;
-		const absLat = Math.abs(lat);
-		const polarTaper = 1 - smoothstep(62, 84, absLat);
-		const midLatLift = 0.72 + 0.28 * (1 - smoothstep(8, 58, absLat));
-
-		for (let x = 0; x < w; x += 1) {
-			const lng = ((x + 0.5) / w) * 360 - 180;
-			const lngRad = (lng * Math.PI) / 180;
-			const wobble =
-				8.5 * Math.sin(latRad * 1.55 + lngRad * 0.74 + sunriseT * 1.8) +
-				4.25 * Math.sin(lngRad * 2.2 - latRad * 0.9 - sunriseT * 2.4);
-			const arrowTilt = lat * 0.16 * visual.direction;
-			const signedDist =
-				normalizeLngDeg(lng + wobble + arrowTilt - visual.centerLng) *
-				visual.direction;
-			const latAlpha = polarTaper * midLatLift;
-			if (latAlpha <= 0.001) continue;
-
-			const acc = { r: 0, g: 0, b: 0, a: 0 };
-			const intensity = visual.intensity * latAlpha * SUN_TRANSITION_COLOR_ALPHA_MULT;
-			addSunTransitionColor(acc, signedDist, -62, 34, [12, 24, 72], 0.08 * intensity);
-			addSunTransitionColor(acc, signedDist, -43, 25, [78, 55, 145], 0.13 * intensity * violetGate);
-			addSunTransitionColor(acc, signedDist, -28, 20, [178, 62, 142], 0.16 * intensity * violetGate);
-			addSunTransitionColor(acc, signedDist, -13, 19, [238, 94, 116], 0.2 * intensity * roseGate);
-			addSunTransitionColor(acc, signedDist, 4, 17, [255, 137, 82], 0.18 * intensity * warmGate);
-			addSunTransitionColor(acc, signedDist, 18, 14, [255, 188, 82], 0.15 * intensity * goldGate);
-			addSunTransitionColor(acc, signedDist, 31, 12, [255, 236, 172], 0.1 * intensity * paleGate);
-
-			const alpha = clamp(acc.a, 0, SUN_TRANSITION_MAX_PIXEL_ALPHA);
-			if (alpha <= 0.001) continue;
-
-			const idx = (y * w + x) * 4;
-			data[idx] = Math.round(clamp(acc.r / acc.a, 0, 255));
-			data[idx + 1] = Math.round(clamp(acc.g / acc.a, 0, 255));
-			data[idx + 2] = Math.round(clamp(acc.b / acc.a, 0, 255));
-			data[idx + 3] = Math.round(alpha * 255);
-		}
-	}
-
-	ctx.putImageData(imageData, 0, 0);
-	return true;
-};
-
-const createSunTransitionCanvas = (): HTMLCanvasElement | null => {
-	if (typeof document === 'undefined') return null;
-
-	const canvas = document.createElement('canvas');
-	if (!paintSunTransitionCanvas(canvas, null)) return null;
-	return canvas;
-};
-// Clouds drift animation parameters.
-// We animate the *canvas source* (not Mapbox raster paint), so units are in the canvas'
-// pixel grid. We apply a light zoom-based scale so drift stays noticeable while clouds
-// are still visible, without getting overly fast near fade-out.
-// Target frame cadence for the clouds canvas animation. Keeping this near ~60fps
-// helps the drift feel smooth without forcing Mapbox to repaint at very high rates.
-const CLOUDS_DRIFT_UPDATE_MS = 16;
-const CLOUDS_DRIFT_LOOP_MS = 180_000;
-const CLOUDS_DRIFT_BASE_ZOOM = 4.0;
-const CLOUDS_DRIFT_AMPLITUDE_X_PX = 12;
-const CLOUDS_DRIFT_AMPLITUDE_Y_PX = 4;
-const CLOUDS_DRIFT_SPEED_X_PX_PER_S = 0.35;
-const CLOUDS_DRIFT_SPEED_Y_PX_PER_S = 0.0;
-// Global tuning knob: < 1 = slower clouds, > 1 = faster clouds.
-const CLOUDS_DRIFT_TIME_SCALE = 0.8;
-// Inverse zoom scaling: at higher zoom levels the same world-distance covers more
-// screen pixels, so we slow the underlying texture drift so on-screen speed stays
-// roughly consistent (and doesn't feel "too fast" when zoomed in).
-const CLOUDS_DRIFT_ZOOM_SCALE_EXP = 1.0;
-const CLOUDS_DRIFT_ZOOM_SCALE_MIN = 0.01;
-const CLOUDS_DRIFT_ZOOM_SCALE_MAX = 4.0;
-// Adds subtle "alive" motion within the cloud shapes by warping the texture slightly as
-// it drifts. Keep extremely small so this reads as atmospheric turbulence (not pulsing).
-const CLOUDS_TURBULENCE_STRIP_PX = 32;
-const CLOUDS_TURBULENCE_LOOP_MS = 90_000;
-const CLOUDS_TURBULENCE_AMPLITUDE_X_PX = 1.3;
-const CLOUDS_EXTRA_PASS_OFFSETS: Array<[number, number]> = [
-	[0.5, 0.5],
-	[-0.31, 0.37],
-	[0.18, -0.29],
-	[-0.58, -0.14],
-	[0.36, -0.47],
-	[-0.12, 0.72],
-	[0.64, -0.18],
-	[-0.42, -0.54],
-];
-
-const drawCloudExtraPasses = (
-	ctx: CanvasRenderingContext2D,
-	w: number,
-	h: number,
-	extraPasses: number,
-	offsetShift = 0,
-	passAlphaMultiplier = 1,
-	passSpreadMultiplier = 1
-) => {
-	const count = clamp(extraPasses, 0, CLOUDS_EXTRA_PASS_OFFSETS.length);
-	const passAlpha = clamp(passAlphaMultiplier, 0, 1);
-	const passSpread = clamp(passSpreadMultiplier, 0.35, 2.5);
-	const fullPasses = Math.floor(count);
-	const fractionalPass = count - fullPasses;
-	const totalPasses = fullPasses + (fractionalPass > 0.001 ? 1 : 0);
-	if (totalPasses <= 0 || passAlpha <= 0.001) return;
-
-	const baseAlpha = ctx.globalAlpha;
-	for (let p = 0; p < totalPasses; p++) {
-		const alphaMul = p < fullPasses ? 1 : fractionalPass;
-		if (alphaMul <= 0.001) continue;
-		const [oxT, oyT] =
-			CLOUDS_EXTRA_PASS_OFFSETS[
-				(p + offsetShift) % CLOUDS_EXTRA_PASS_OFFSETS.length
-			];
-		ctx.globalAlpha = baseAlpha * alphaMul * passAlpha;
-		ctx.translate(w * oxT * passSpread, h * oyT * passSpread);
-		ctx.fillRect(-w * 2, -h * 2, w * 5, h * 5);
-	}
-	ctx.globalAlpha = baseAlpha;
-};
-
-const buildCloudsOpacityExpr = (
-	globeZoomOpacity: number,
-	decorativeZoomOpacity: number,
-	deepZoomFloor: number = 0
-) => [
-	'interpolate',
-	['linear'],
-	['zoom'],
-	0,
-	globeZoomOpacity,
-	MAP_MIN_ZOOM,
-	globeZoomOpacity,
-	4,
-	decorativeZoomOpacity,
-	CLOUDS_OVERLAY_FADE_OUT_START_ZOOM,
-	decorativeZoomOpacity,
-	CLOUDS_OVERLAY_FADE_OUT_END_ZOOM,
-	deepZoomFloor,
-	22,
-	deepZoomFloor,
-];
-
-const buildSnowOpacityExpr = (opacity: number) => {
-	const o = clamp(opacity * SNOW_LAYER_OPACITY, 0, 1);
-	return [
-		'interpolate',
-		['linear'],
-		['zoom'],
-		0,
-		o,
-		MAP_MIN_ZOOM,
-		o,
-		DASHBOARD_DECORATIVE_ZOOM,
-		o * 0.98,
-		CLOUDS_OVERLAY_FADE_OUT_START_ZOOM,
-		o * 0.62,
-		SNOW_HIDE_AT_OR_ABOVE_ZOOM,
-		0,
-		22,
-		0,
-	];
-};
-
-const buildLightningOpacityExpr = (intensity: number) => [
-	'interpolate',
-	['linear'],
-	['zoom'],
-	0,
-	intensity,
-	MAP_MIN_ZOOM,
-	intensity,
-	4,
-	intensity,
-	CLOUDS_OVERLAY_FADE_OUT_START_ZOOM,
-	intensity * 0.9,
-	CLOUDS_OVERLAY_FADE_OUT_END_ZOOM,
-	0,
-	22,
-	0,
-];
-
-const AUTO_FIT_CONTACTS_MAX_ZOOM = 10;
-const AUTO_FIT_STATE_MAX_ZOOM = 5;
-const DEFAULT_MAX_ZOOM_FALLBACK = 22;
-
-export const DASHBOARD_TO_INTERACTIVE_TRANSITION_MS = 7200;
-export const DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING =
-	'cubic-bezier(0.22, 1, 0.36, 1)';
-
-const MAPBOX_STYLE = 'mapbox://styles/mapbox/streets-v12';
-
-// Viewer-anchored softbox lighting for the globe.
-//
-// Mapbox directional-light `direction: [azimuth, polar]` is defined in WORLD space
-// (azimuth 0 = north, 90 = east, 180 = south, 270 = west). If we leave it static,
-// rotating the camera's bearing makes the lit hemisphere drift across the screen.
-//
-// To make the "softbox" feel like it lives in the viewer's room (upper-left, slightly
-// behind the viewer) instead of bolted to the Earth, we re-derive the world azimuth
-// each time the camera bearing changes. At bearing 0, viewer-left = world-west (270°).
-// When bearing rotates clockwise by B degrees, viewer-left in world space rotates by
-// +B, so: azimuth = (270 + bearing) mod 360.
-//
-// Panning (changing center lat/lng) in globe projection doesn't rotate the viewport's
-// up-axis relative to world-north, so no compensation is needed there — the light
-// already stays on the viewer's left for free.
-const MURMUR_GLOBE_LIGHT_VIEWER_AZIMUTH_OFFSET_DEG = 270;
-// Polar is measured from straight-up (0 = overhead). 75° sits the softbox low
-// and side-on — this is what creates a clearly visible terminator across the
-// globe rather than a flat, evenly-lit disc.
-const MURMUR_GLOBE_LIGHT_POLAR_DEG = 75;
-
-const applyMurmurGlobeLighting = (mapInstance: mapboxgl.Map) => {
-	try {
-		const bearing =
-			typeof mapInstance.getBearing === 'function' ? mapInstance.getBearing() : 0;
-		const azimuth =
-			(MURMUR_GLOBE_LIGHT_VIEWER_AZIMUTH_OFFSET_DEG + (bearing || 0) + 360) % 360;
-		const polar = MURMUR_GLOBE_LIGHT_POLAR_DEG;
-
-		(mapInstance as any).setLights?.([
-			{
-				id: 'murmur-ambient',
-				type: 'ambient',
-				properties: {
-					color: 'rgb(120, 150, 185)',
-					intensity: 0.18,
-				},
-			},
-			{
-				id: 'murmur-key',
-				type: 'directional',
-				properties: {
-					color: 'rgb(255, 244, 220)',
-					intensity: 1.6,
-					direction: [azimuth, polar],
-					'cast-shadows': true,
-					'shadow-intensity': 0.95,
-				},
-			},
-		]);
-	} catch {
-		// Non-fatal on older Mapbox styles that don't support setLights.
-	}
-};
-
-// Mapbox Streets v12 has no "land" fill layer covering every continent — the cream land
-// tone is just the background layer showing through gaps in landuse/landcover/water.
-// That means *any* time tiles are streaming in (initial load, a sudden zoom-out, a pan
-// into untiled territory), the background is all the user sees, and there is no single
-// color that reads correctly for both land and water.
-//
-// Fix: paint the background permanently ocean-blue (so untiled sphere reads as water)
-// and add a separate cream-colored fill layer sourced from Mapbox's free vector tileset
-// `mapbox.country-boundaries-v1`, which has complete world coverage (every country, plus
-// Antarctica) and is extremely lightweight. Country tiles cache at all zooms, so after
-// the first paint the continents stay cream through every subsequent zoom/pan; water
-// fills still draw blue on top, so lakes/rivers inside countries look right.
-const MAP_OCEAN_BLUE = '#62C7E3';
-const MAP_LAND_CREAM = '#F1EDE2';
-const MAP_LANDCOVER_GREEN = '#B3E6D7';
-
-const NIGHT_HIDE_ROADS_START_T = 0.18;
-const NIGHT_HIDE_ROADS_END_T = 0.42;
-// Roads compete with the contact-lights overlay at globe zoom, but they matter for
-// legibility at city zoom. Fade the road-hiding back out as the user zooms in.
-const NIGHT_HIDE_ROADS_RESTORE_START_ZOOM = 5.5;
-const NIGHT_HIDE_ROADS_RESTORE_END_ZOOM = 9.0;
-
-const mixCssRgb = (
-	from: [number, number, number],
-	to: [number, number, number],
-	t: number
-) => {
-	const p = clamp(t, 0, 1);
-	return `rgb(${Math.round(from[0] + (to[0] - from[0]) * p)}, ${Math.round(
-		from[1] + (to[1] - from[1]) * p
-	)}, ${Math.round(from[2] + (to[2] - from[2]) * p)})`;
-};
-
-// Visual night intentionally keeps the day basemap palette — the night look is
-// driven by DOM overlays + globe lighting, not by recoloring tiles. This getter
-// stays as a single source of truth for the basemap colors.
-const getMapPalette = () => ({
-	ocean: MAP_OCEAN_BLUE,
-	land: MAP_LAND_CREAM,
-	landcover: MAP_LANDCOVER_GREEN,
-});
-
-const getNightRoadHideT = (nightT: number, zoom: number) => {
-	const night = clamp(nightT, 0, 1);
-	if (night <= NIGHT_HIDE_ROADS_START_T) return 0;
-
-	const t =
-		night >= NIGHT_HIDE_ROADS_END_T
-			? 1
-			: (night - NIGHT_HIDE_ROADS_START_T) /
-				(NIGHT_HIDE_ROADS_END_T - NIGHT_HIDE_ROADS_START_T);
-	const nightHideT = t * t * (3 - 2 * t);
-
-	if (zoom <= NIGHT_HIDE_ROADS_RESTORE_START_ZOOM) return nightHideT;
-	if (zoom >= NIGHT_HIDE_ROADS_RESTORE_END_ZOOM) return 0;
-	const zt =
-		(zoom - NIGHT_HIDE_ROADS_RESTORE_START_ZOOM) /
-		(NIGHT_HIDE_ROADS_RESTORE_END_ZOOM - NIGHT_HIDE_ROADS_RESTORE_START_ZOOM);
-	const z2 = clamp(zt, 0, 1);
-	const restoreT = z2 * z2 * (3 - 2 * z2);
-	return nightHideT * (1 - restoreT);
-};
-
-const basemapRoadOpacityBaseByMap = new WeakMap<mapboxgl.Map, Map<string, any | null>>();
-
-const getBasemapRoadOpacityBase = (mapInstance: mapboxgl.Map, layerId: string) => {
-	let byLayerId = basemapRoadOpacityBaseByMap.get(mapInstance);
-	if (!byLayerId) {
-		byLayerId = new Map();
-		basemapRoadOpacityBaseByMap.set(mapInstance, byLayerId);
-	}
-
-	if (byLayerId.has(layerId)) return byLayerId.get(layerId) ?? null;
-
-	try {
-		const base = mapInstance.getPaintProperty(layerId, 'line-opacity') as any;
-		byLayerId.set(layerId, base == null ? null : base);
-		return base == null ? null : base;
-	} catch {
-		byLayerId.set(layerId, null);
-		return null;
-	}
-};
-
-// Night-aware atmosphere — layered on top of the mood-driven fog so the
-// existing Mapbox stars/atmosphere read differently when night falls without
-// adding any new overlay. Three coupled adjustments, all subtle:
-//
-//   * `star-intensity` ramps 0.9 → 1.0. Mapbox caps at 1, so we use the full
-//     remaining headroom; the perceived glow comes from the stars hitting their
-//     ceiling while the surrounding palette darkens.
-//   * Close-fog `color` keeps the mood's hue but its alpha scales down at
-//     night. This pulls the limb-hugging mist *off* the globe so the haze
-//     stops reading as exhalation from the planet's surface.
-//   * `space-color` lifts a hair from pure black toward a deeply cool void.
-//     This is the atmospheric scatter the user wants — it sits in the space
-//     around the globe (driven by Mapbox's camera/projection, so it adapts
-//     to zoom and panning automatically — not an overlay we'd have to mask
-//     against the earth).
-const NIGHT_STAR_INTENSITY_DAY = 0.85;
-const NIGHT_STAR_INTENSITY_NIGHT = 1.0;
-const NIGHT_SPACE_COLOR_DAY: ParsedCssColor = [0, 0, 0, 1];
-const NIGHT_SPACE_COLOR_NIGHT: ParsedCssColor = [7, 13, 24, 1];
-const NIGHT_CLOSE_FOG_ALPHA_DAY = 1.0;
-const NIGHT_CLOSE_FOG_ALPHA_NIGHT = 0.42;
-
-const applyMapboxFogForMoodAndNight = (
-	mapInstance: mapboxgl.Map,
-	cfg: { fogColor: string; fogHighColor: string; fogHorizonBlend: number },
-	nightT: number
-) => {
-	try {
-		const t = clamp(nightT, 0, 1);
-		const existingFog = (mapInstance as any).getFog?.() ?? {};
-
-		const starIntensity = lerp(NIGHT_STAR_INTENSITY_DAY, NIGHT_STAR_INTENSITY_NIGHT, t);
-		const spaceColor = formatCssColor([
-			lerp(NIGHT_SPACE_COLOR_DAY[0], NIGHT_SPACE_COLOR_NIGHT[0], t),
-			lerp(NIGHT_SPACE_COLOR_DAY[1], NIGHT_SPACE_COLOR_NIGHT[1], t),
-			lerp(NIGHT_SPACE_COLOR_DAY[2], NIGHT_SPACE_COLOR_NIGHT[2], t),
-			1,
-		]);
-
-		// Scale only the alpha of the mood's chosen close-fog color so the hue
-		// remains the mood's; we are dialing how *present* the limb mist is, not
-		// recoloring it.
-		const baseClose = parseCssColor(cfg.fogColor);
-		const alphaScale = lerp(NIGHT_CLOSE_FOG_ALPHA_DAY, NIGHT_CLOSE_FOG_ALPHA_NIGHT, t);
-		const closeFogColor = baseClose
-			? formatCssColor([baseClose[0], baseClose[1], baseClose[2], baseClose[3] * alphaScale])
-			: cfg.fogColor;
-
-		(mapInstance as any).setFog?.({
-			...existingFog,
-			color: closeFogColor,
-			'high-color': cfg.fogHighColor,
-			'horizon-blend': cfg.fogHorizonBlend,
-			'star-intensity': starIntensity,
-			'space-color': spaceColor,
-		});
-	} catch {
-		// Non-fatal.
-	}
-};
-
-const applyNightLandPalette = (mapInstance: mapboxgl.Map, nightT: number) => {
-	const zoom = mapInstance.getZoom() ?? MAP_DEFAULT_ZOOM;
-	const palette = getMapPalette();
-	const roadOpacityMul = 1 - getNightRoadHideT(nightT, zoom);
-
-	try {
-		if (mapInstance.getLayer(MAP_WORLD_LAND_LAYER_ID)) {
-			mapInstance.setPaintProperty(MAP_WORLD_LAND_LAYER_ID, 'fill-color', palette.land);
-		}
-	} catch {
-		// Non-fatal.
-	}
-
-	try {
-		const style = mapInstance.getStyle();
-		for (const layer of style.layers ?? []) {
-			const id = (layer as any)?.id as string | undefined;
-			if (!id || id.startsWith('murmur-')) continue;
-
-			const type = (layer as any).type as string | undefined;
-			const sourceLayer = (layer as any)['source-layer'] as string | undefined;
-			const idLower = id.toLowerCase();
-
-			try {
-				if (type === 'background') {
-					mapInstance.setPaintProperty(id, 'background-color', palette.ocean);
-				} else if (
-					type === 'fill' &&
-					(idLower === 'water' || idLower.startsWith('water'))
-				) {
-					mapInstance.setPaintProperty(id, 'fill-color', palette.ocean);
-				} else if (
-					type === 'fill' &&
-					(idLower.includes('landcover') ||
-						idLower.includes('national-park') ||
-						idLower.includes('pitch') ||
-						idLower === 'park' ||
-						idLower.startsWith('park'))
-				) {
-					mapInstance.setPaintProperty(id, 'fill-color', palette.landcover);
-				} else if (
-					type === 'fill' &&
-					(idLower.includes('landuse') || idLower === 'land')
-				) {
-					mapInstance.setPaintProperty(id, 'fill-color', palette.land);
-				} else if (
-					type === 'line' &&
-					(sourceLayer === 'road' ||
-						idLower.includes('road') ||
-						idLower.includes('motorway') ||
-						idLower.includes('highway') ||
-						idLower.includes('bridge') ||
-						idLower.includes('tunnel'))
-				) {
-					const baseOpacity = getBasemapRoadOpacityBase(mapInstance, id);
-					if (roadOpacityMul <= 0.001) {
-						mapInstance.setPaintProperty(id, 'line-opacity', 0);
-					} else if (baseOpacity == null) {
-						mapInstance.setPaintProperty(id, 'line-opacity', roadOpacityMul);
-					} else if (roadOpacityMul >= 0.999) {
-						mapInstance.setPaintProperty(id, 'line-opacity', baseOpacity);
-					} else {
-						mapInstance.setPaintProperty(
-							id,
-							'line-opacity',
-							scaleMapboxOpacityExpr(baseOpacity, roadOpacityMul)
-						);
-					}
-				}
-			} catch {
-				// Data-driven color expression we can't override — skip.
-			}
-		}
-	} catch {
-		// Non-fatal.
-	}
-};
-
-const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
-	// Projection
-	try {
-		mapInstance.setProjection({ name: 'globe' } as any);
-	} catch {
-		// Non-fatal.
-	}
-
-	// Fog / atmosphere (subtle glow) — cooler, less saturated to match a Google-Earth-style tone.
-	try {
-		const existingFog = (mapInstance as any).getFog?.() ?? {};
-		(mapInstance as any).setFog?.({
-			...existingFog,
-			color: 'rgba(180, 210, 215, 0.32)',
-			'high-color': 'rgb(18, 44, 78)',
-			'space-color': 'rgb(0, 0, 0)',
-			'star-intensity': 0.9,
-			'horizon-blend': 0.022,
-		});
-	} catch {
-		// Non-fatal.
-	}
-
-	// Softbox key light, anchored to the viewer (not to the world). See
-	// applyMurmurGlobeLighting for the bearing-compensation trick that keeps the
-	// light on the viewer's upper-left regardless of how the globe is spun.
-	applyMurmurGlobeLighting(mapInstance);
-
-	// Basemap layer cleanup (hide words + borders; keep our layers) + cooler palette recolor.
-	try {
-		const style = mapInstance.getStyle();
-		for (const layer of style.layers ?? []) {
-			const id = (layer as any)?.id as string | undefined;
-			if (!id) continue;
-			if (id.startsWith('murmur-')) continue;
-
-			const type = (layer as any).type as string | undefined;
-			const sourceLayer = (layer as any)['source-layer'] as string | undefined;
-			const idLower = id.toLowerCase();
-
-			// Text/icon labels
-			if (type === 'symbol') {
-				mapInstance.setLayoutProperty(id, 'visibility', 'none');
-				continue;
-			}
-
-			// Political/administrative boundaries (borders)
-			if (
-				type === 'line' &&
-				(idLower.includes('admin') ||
-					idLower.includes('boundary') ||
-					idLower.includes('border'))
-			) {
-				mapInstance.setLayoutProperty(id, 'visibility', 'none');
-				continue;
-			}
-
-			// Roads / highways — recolor to a soft light gray (lighter than state borders).
-			if (
-				type === 'line' &&
-				(sourceLayer === 'road' ||
-					idLower.includes('road') ||
-					idLower.includes('motorway') ||
-					idLower.includes('highway') ||
-					idLower.includes('bridge') ||
-					idLower.includes('tunnel'))
-			) {
-				try {
-					mapInstance.setPaintProperty(id, 'line-color', '#E5E9EC');
-				} catch {
-					// Data-driven color expression we can't override — skip.
-				}
-				continue;
-			}
-
-			// Tone: shift the base palette toward a cooler, softer look (muted teal water,
-			// warm cream land, sage vegetation). Wrapped per-layer so data-driven expressions
-			// we can't overwrite just get skipped.
-			try {
-				if (type === 'background') {
-					// Permanently ocean-blue so any untiled sphere (initial load, zoom-outs,
-					// pans into untiled areas) reads as water. The cream land tone comes
-					// from the `murmur-world-land-fill` layer added in ensureMapboxSourcesAndLayers.
-					mapInstance.setPaintProperty(id, 'background-color', MAP_OCEAN_BLUE);
-				} else if (
-					type === 'fill' &&
-					(idLower === 'water' || idLower.startsWith('water'))
-				) {
-					mapInstance.setPaintProperty(id, 'fill-color', MAP_OCEAN_BLUE);
-				} else if (
-					type === 'fill' &&
-					(idLower.includes('landcover') ||
-						idLower.includes('national-park') ||
-						idLower.includes('pitch') ||
-						idLower === 'park' ||
-						idLower.startsWith('park'))
-				) {
-					mapInstance.setPaintProperty(id, 'fill-color', MAP_LANDCOVER_GREEN);
-				} else if (type === 'fill' && idLower.includes('landuse')) {
-					mapInstance.setPaintProperty(id, 'fill-color', MAP_LAND_CREAM);
-				} else if (type === 'fill' && idLower === 'land') {
-					mapInstance.setPaintProperty(id, 'fill-color', MAP_LAND_CREAM);
-				}
-			} catch {
-				// Layer color isn't a plain literal — leave as-is.
-			}
-		}
-	} catch {
-		// Non-fatal.
-	}
-};
-
-// IDs for the world-land fill layer (cream land coverage) sourced from Mapbox's
-// free `country-boundaries-v1` tileset. Adding this layer means the background
-// layer can stay permanently ocean-blue without blue leaking through in "bare
-// land" areas between landuse/landcover polygons — on initial load, during
-// zoom-outs, and during pans into untiled territory.
-const MAP_WORLD_LAND_SOURCE_ID = 'murmur-world-land';
-const MAP_WORLD_LAND_LAYER_ID = 'murmur-world-land-fill';
-const MAP_WORLD_LAND_TILESET_URL = 'mapbox://mapbox.country-boundaries-v1';
-const MAP_WORLD_LAND_SOURCE_LAYER = 'country_boundaries';
-
-const ensureWorldLandFill = (mapInstance: mapboxgl.Map) => {
-	try {
-		if (!mapInstance.getSource(MAP_WORLD_LAND_SOURCE_ID)) {
-			mapInstance.addSource(MAP_WORLD_LAND_SOURCE_ID, {
-				type: 'vector',
-				url: MAP_WORLD_LAND_TILESET_URL,
-			} as any);
-		}
-	} catch {
-		// If source add fails (offline / token scoped out) the background stays
-		// ocean-blue everywhere, which is a graceful degradation.
-		return;
-	}
-
-	if (mapInstance.getLayer(MAP_WORLD_LAND_LAYER_ID)) return;
-
-	// Insert the land fill as the first layer above `background` so every other
-	// Mapbox layer (water, landuse, roads, labels) draws on top. We can't assume
-	// any particular layer name exists, so we look up the first non-background,
-	// non-`murmur-` layer and insert before it.
-	let beforeId: string | undefined;
-	try {
-		const style = mapInstance.getStyle();
-		for (const layer of style?.layers ?? []) {
-			const id = (layer as any)?.id as string | undefined;
-			if (!id) continue;
-			if (id.startsWith('murmur-')) continue;
-			if ((layer as any)?.type === 'background') continue;
-			beforeId = id;
-			break;
-		}
-	} catch {
-		// Fall through — we'll just append without a `before` target.
-	}
-
-	try {
-		mapInstance.addLayer(
-			{
-				id: MAP_WORLD_LAND_LAYER_ID,
-				type: 'fill',
-				source: MAP_WORLD_LAND_SOURCE_ID,
-				'source-layer': MAP_WORLD_LAND_SOURCE_LAYER,
-				paint: {
-					'fill-color': MAP_LAND_CREAM,
-					'fill-antialias': true,
-				},
-			} as any,
-			beforeId
-		);
-	} catch {
-		// Non-fatal.
-	}
-};
-
-// Performance: the `within` filter is helpful when zoomed out (to hide Canada/Mexico labels/roads),
-// but it adds overhead at high zoom where there are many more road/label features.
-// Only apply the US-only basemap clipping up to this zoom level.
-const US_ONLY_BASEMAP_CLIP_MAX_ZOOM = 7;
-
-const MAPBOX_SOURCE_IDS = {
-	clouds: 'murmur-clouds',
-	lightning: 'murmur-lightning',
-	snow: 'murmur-snow',
-	dayFarSideShade: 'murmur-day-far-side-shade',
-	sunTransition: 'murmur-sun-transition',
-	nightLights: 'murmur-night-lights',
-	nightLightsReveal: 'murmur-night-lights-reveal',
-	states: 'murmur-states',
-	resultsOutline: 'murmur-results-outline',
-	lockedOutline: 'murmur-locked-outline',
-	selectionRect: 'murmur-selection-rect',
-	selectedAreaRect: 'murmur-selected-area-rect',
-	markersBase: 'murmur-markers-base',
-	markersPromotionDot: 'murmur-markers-promo-dot',
-	markersAllOverlay: 'murmur-markers-all-overlay',
-	markersPromotionPin: 'murmur-markers-promo-pin',
-	markersBookingPin: 'murmur-markers-booking-pin',
-	stateLabels: 'murmur-state-labels',
-} as const;
-
-const MAPBOX_LAYER_IDS = {
-	// Globe overlays
-	clouds: 'murmur-clouds-raster',
-	lightning: 'murmur-lightning-raster',
-	snow: 'murmur-snow-raster',
-	dayFarSideShade: 'murmur-day-far-side-shade-raster',
-	sunTransition: 'murmur-sun-transition-raster',
-	sunTransitionCloudCatchlight: 'murmur-sun-transition-cloud-catchlight-raster',
-	nightLightsSpaceGlow: 'murmur-night-lights-space-glow',
-	nightLightsSpaceGlow2: 'murmur-night-lights-space-glow-2',
-	nightLightsGlow: 'murmur-night-lights-glow',
-	nightLightsCloseGlow: 'murmur-night-lights-close-glow',
-	nightLights: 'murmur-night-lights-raster',
-	nightLightsRevealGlow: 'murmur-night-lights-reveal-glow',
-	nightLightsReveal: 'murmur-night-lights-reveal-raster',
-	// States
-	statesFillHit: 'murmur-states-fill-hit',
-	statesFillHover: 'murmur-states-fill-hover',
-	statesDividers: 'murmur-states-dividers',
-	statesBordersInteractive: 'murmur-states-borders-interactive',
-	statesLabels: 'murmur-states-labels',
-	// Outlines
-	resultsOutline: 'murmur-results-outline-line',
-	lockedOutline: 'murmur-locked-outline-line',
-	// Markers (hit layers are used for hover/click priority)
-	markersAllHit: 'murmur-markers-all-hit',
-	markersAllDots: 'murmur-markers-all-dots',
-	promotionPinHit: 'murmur-promo-pin-hit',
-	promotionPinIcons: 'murmur-promo-pin-icons',
-	bookingPinHit: 'murmur-booking-pin-hit',
-	bookingPinIcons: 'murmur-booking-pin-icons',
-	bookingPinIconsHover: 'murmur-booking-pin-icons-hover',
-	promotionDotHit: 'murmur-promo-dot-hit',
-	promotionDotDots: 'murmur-promo-dot-dots',
-	baseHit: 'murmur-base-hit',
-	baseDots: 'murmur-base-dots',
-	// Rectangles
-	selectedAreaRect: 'murmur-selected-area-rect-line',
-	selectionRectFill: 'murmur-selection-rect-fill',
-	selectionRectLine: 'murmur-selection-rect-line',
-} as const;
-
-// --- Dot reveal animation (search results) ---
-// Compute a per-dot reveal delay (ms) based on longitude so dots fade in as a smooth left→right wave.
-// We drive the animation by updating a single paint expression over time.
-const DOT_WAVE_DELAY_PROP = '__murmurWaveDelayMs';
-const DOT_WAVE_TRAVEL_MS_MIN = 900;
-const DOT_WAVE_TRAVEL_MS_MAX = 1600;
-// Each dot fades up over this duration once the wave reaches it.
-// A wide band means many dots coexist at different partial opacities, so no visible "edge".
-const DOT_WAVE_FADE_MS = 1200;
-// Per-dot jitter range (ms). Large enough to separate dots at the same longitude into
-// individually-timed reveals rather than batches that pop in together.
-const DOT_WAVE_JITTER_MS = 350;
-// Throttle paint updates (~60fps) for smoothness.
-const DOT_WAVE_FRAME_MS = 16;
-// Mapbox transition duration between throttled paint updates. Keep short so individual dot
-// timings stay crisp rather than being temporally blurred into batches.
-const DOT_WAVE_SMOOTH_TRANSITION_MS = 25;
-// Ease-out curve for per-dot opacity ramp. Dots gently emerge then settle into full opacity.
-const DOT_WAVE_EASING: any = ['cubic-bezier', 0.33, 0, 0.2, 1];
-
-type DotWaveMeta = {
-	maxDelayMs: number;
-};
-
-const computeDotWaveTravelMs = (featureCount: number): number => {
-	if (!Number.isFinite(featureCount) || featureCount <= 0) return DOT_WAVE_TRAVEL_MS_MIN;
-	const raw = 800 + Math.sqrt(featureCount) * 22;
-	return clamp(Math.round(raw), DOT_WAVE_TRAVEL_MS_MIN, DOT_WAVE_TRAVEL_MS_MAX);
-};
-
-const computeDotWaveDelayMs = (
-	featureId: number,
-	lng: number,
-	lat: number,
-	minLng: number,
-	maxLng: number,
-	minLat: number,
-	maxLat: number,
-	travelMs: number
-): number => {
-	const denomLng = maxLng - minLng;
-	const tLng =
-		!Number.isFinite(denomLng) || denomLng <= 1e-9
-			? 0
-			: clamp((lng - minLng) / denomLng, 0, 1);
-
-	const denomLat = maxLat - minLat;
-	const tLat =
-		!Number.isFinite(denomLat) || denomLat <= 1e-9
-			? 0.5
-			: clamp((lat - minLat) / denomLat, 0, 1);
-	const latUndulation = (Math.sin(tLat * Math.PI) - 0.5) * 0.14 * travelMs;
-
-	const h = (featureId * 2654435761) >>> 0;
-	const jitter =
-		DOT_WAVE_JITTER_MS > 0 ? ((h & 0xffff) / 0x10000) * DOT_WAVE_JITTER_MS : 0;
-
-	return Math.max(0, tLng * travelMs + latUndulation + jitter);
-};
-
-type BasemapCartographyClipState = {
-	layerIds: string[];
-	originalFilters: Map<string, any | null>;
-};
-
-const getBasemapCartographyLayerIds = (mapInstance: mapboxgl.Map): string[] => {
-	const layers = mapInstance.getStyle()?.layers ?? [];
-	const ids: string[] = [];
-
-	for (const layer of layers as any[]) {
-		const id = layer?.id as string | undefined;
-		if (!id) continue;
-		// Never touch our custom layers.
-		if (id.startsWith('murmur-')) continue;
-
-		const type = layer?.type as string | undefined;
-		if (type === 'symbol') {
-			ids.push(id);
-			continue;
-		}
-		if (type === 'line') {
-			// Only clip *roads* (not coastlines/admin boundaries/etc) to avoid extra work.
-			const sourceLayer = (layer?.['source-layer'] as string | undefined) ?? '';
-			if (sourceLayer === 'road' || id.includes('road')) {
-				ids.push(id);
-			}
-		}
-	}
-
-	return ids;
-};
-
-const applyUsOnlyBasemapCartography = (
-	mapInstance: mapboxgl.Map,
-	usGeometry: Extract<GeoJsonGeometry, { type: 'MultiPolygon' }>,
-	clipState: BasemapCartographyClipState
-) => {
-	if (clipState.layerIds.length === 0) {
-		clipState.layerIds = getBasemapCartographyLayerIds(mapInstance);
-	}
-
-	for (const id of clipState.layerIds) {
-		try {
-			if (!clipState.originalFilters.has(id)) {
-				const original = mapInstance.getFilter(id) as any;
-				clipState.originalFilters.set(id, original ?? null);
-			}
-
-			const existingFilter = clipState.originalFilters.get(id) as any;
-			const withinFilter = ['within', usGeometry] as any;
-			const nextFilter = existingFilter
-				? (['all', existingFilter, withinFilter] as any)
-				: withinFilter;
-			mapInstance.setFilter(id, nextFilter);
-		} catch {
-			// Ignore layers that disappear or can't be mutated.
-		}
-	}
-};
-
-const restoreBasemapCartography = (
-	mapInstance: mapboxgl.Map,
-	clipState: BasemapCartographyClipState
-) => {
-	if (clipState.layerIds.length === 0) return;
-	for (const id of clipState.layerIds) {
-		try {
-			if (!clipState.originalFilters.has(id)) continue;
-			const original = clipState.originalFilters.get(id) ?? null;
-			mapInstance.setFilter(id, original);
-		} catch {
-			// Ignore.
-		}
-	}
-};
-
-const STATE_PROCESSED_GEOJSON_URL = '/geo/us-states-processed.json';
-const STATE_META_URL = '/geo/us-states-meta.json';
-const STATE_LABELS_URL = '/geo/us-states-labels.json';
-const STATE_OUTLINE_URL = '/geo/us-states-outline.json';
-const STATE_PREPARED_POLYGONS_URL = '/geo/us-states-prepared-polygons.json';
-const STATE_HIGHLIGHT_COLOR = '#5DAB68';
-const STATE_HIGHLIGHT_OPACITY = 0.68;
-const STATE_DIVIDER_COLOR = '#64748B';
-const STATE_LABEL_COLOR = '#111827';
-// When zoomed out to a US-wide view, show subtle state divider lines (like Zillow).
-// Keep these behind the blue/black search-area outlines.
-const STATE_DIVIDER_LINES_MAX_ZOOM = 8;
-// Night mode keeps the same map palette as day, so state boundaries keep day contrast.
-const NIGHT_STATE_LINE_OPACITY_MUL_MIN = 1;
-const NIGHT_STATE_LINE_DARKEN_MAX = 0;
-
-const getNightStateLineDarkenT = (nightT: number) => {
-	const night = clamp(nightT, 0, 1);
-	const eased = night * night * (3 - 2 * night);
-	return clamp(eased * NIGHT_STATE_LINE_DARKEN_MAX, 0, 1);
-};
-
-const buildStateDividerLineWidthExpr = () => [
-	'interpolate',
-	['linear'],
-	['zoom'],
-	MAP_MIN_ZOOM,
-	0.8,
-	5,
-	1.0,
-	STATE_DIVIDER_LINES_MAX_ZOOM,
-	1.4,
-];
-
-const buildStateInteractiveBorderWidthExpr = () => {
-	const isSelected = ['boolean', ['feature-state', 'selected'], false];
-	return [
-		'interpolate',
-		['linear'],
-		['zoom'],
-		MAP_MIN_ZOOM,
-		// Selected state should be only subtly emphasized.
-		['case', isSelected, 1.2, 0.7],
-		5,
-		['case', isSelected, 1.4, 0.85],
-		9,
-		['case', isSelected, 1.4, 0.85],
-		14,
-		['case', isSelected, 1.2, 0.6],
-	];
-};
-
-const buildStateInteractiveBorderColorExpr = (nightT: number) => {
-	const darkenT = getNightStateLineDarkenT(nightT);
-	const darken = (rgb: [number, number, number]) => mixCssRgb(rgb, [0, 0, 0], darkenT);
-	const isSelected = ['boolean', ['feature-state', 'selected'], false];
-	return [
-		'interpolate',
-		['linear'],
-		['zoom'],
-		MAP_MIN_ZOOM,
-		['case', isSelected, darken([136, 150, 171]), darken([148, 163, 184])],
-		6,
-		['case', isSelected, darken([136, 150, 171]), darken([148, 163, 184])],
-		14,
-		['case', isSelected, darken([195, 206, 211]), darken([207, 216, 220])],
-	];
-};
-
-const applyStateOverlayNightColors = (mapInstance: mapboxgl.Map, nightT: number) => {
-	const darkenT = getNightStateLineDarkenT(nightT);
-	const dividerColor = mixCssRgb([100, 116, 139], [0, 0, 0], darkenT);
-	const borderColor = buildStateInteractiveBorderColorExpr(nightT);
-	const labelColor = STATE_LABEL_COLOR;
-	const labelHaloOpacity = 0;
-
-	try {
-		if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesDividers)) {
-			mapInstance.setPaintProperty(
-				MAPBOX_LAYER_IDS.statesDividers,
-				'line-color',
-				dividerColor
-			);
-			mapInstance.setPaintProperty(
-				MAPBOX_LAYER_IDS.statesDividers,
-				'line-width',
-				buildStateDividerLineWidthExpr() as any
-			);
-		}
-		if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesBordersInteractive)) {
-			mapInstance.setPaintProperty(
-				MAPBOX_LAYER_IDS.statesBordersInteractive,
-				'line-color',
-				borderColor as any
-			);
-			mapInstance.setPaintProperty(
-				MAPBOX_LAYER_IDS.statesBordersInteractive,
-				'line-width',
-				buildStateInteractiveBorderWidthExpr() as any
-			);
-		}
-		if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesLabels)) {
-			mapInstance.setPaintProperty(
-				MAPBOX_LAYER_IDS.statesLabels,
-				'text-color',
-				labelColor
-			);
-			mapInstance.setPaintProperty(
-				MAPBOX_LAYER_IDS.statesLabels,
-				'text-halo-color',
-				`rgba(2, 8, 23, ${labelHaloOpacity.toFixed(3)})`
-			);
-			mapInstance.setPaintProperty(MAPBOX_LAYER_IDS.statesLabels, 'text-halo-width', 0);
-			mapInstance.setPaintProperty(MAPBOX_LAYER_IDS.statesLabels, 'text-halo-blur', 0);
-		}
-	} catch {
-		// Non-fatal.
-	}
-};
-
-// Marker dot colors by search "What" value (dashboard/drafting search).
-const DEFAULT_RESULT_DOT_COLOR = '#D21E1F';
-const RESULT_DOT_ZOOM_MIN = 4;
-const RESULT_DOT_ZOOM_MAX = 14;
-const RESULT_DOT_SCALE_MIN = 3;
-const RESULT_DOT_SCALE_MAX = 11;
-// Overlay pins look too small when zoomed out; keep their circle readable without
-// overpowering the search tray/category icons.
-const MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX = 16;
-// Stroke weight should be thinner when zoomed out and approach ~3px when zoomed in.
-const RESULT_DOT_STROKE_WEIGHT_MIN_PX = 1.5;
-const RESULT_DOT_STROKE_WEIGHT_MAX_PX = 3;
-const RESULT_DOT_STROKE_COLOR_DEFAULT = '#FFFFFF';
-const RESULT_DOT_STROKE_COLOR_SELECTED = '#15C948';
-// Fill color for the hover tooltip SVG when the contact is selected.
-const TOOLTIP_FILL_COLOR_SELECTED = '#258530';
-const BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR = '#000000';
-
-// Keep hover tooltip above all map markers so it never gets covered.
-const HOVER_TOOLTIP_Z_INDEX = 1_000_000;
-// Minimum zoom level required to trigger hover tooltips and research highlights on markers.
-// Below this zoom level, markers are too dense and small for hover interactions to be useful.
-const HOVER_INTERACTION_MIN_ZOOM = 8;
-const BOOKING_EXTRA_MARKERS_MIN_ZOOM = 8;
-// Keep extra markers capped so map remains responsive.
-const BOOKING_EXTRA_MARKERS_MAX_DOTS = 160;
-// Promotion searches: show state-wide radio list pins as overlay markers.
-// Match booking's zoom threshold for consistent UX across modes.
-const PROMOTION_OVERLAY_MARKERS_MIN_ZOOM = 8;
-// Defensive cap; expected to be ~2 per state.
-const PROMOTION_OVERLAY_MARKERS_MAX_PINS = 220;
-
-// "All contacts" gray-dot overlay: only show when zoomed in *extremely* close.
-const ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM = 18;
-const ALL_CONTACTS_OVERLAY_LIMIT = 2000;
-const ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR = '#9CA3AF';
-const ALL_CONTACTS_OVERLAY_TOOLTIP_FILL_COLOR = '#6B7280';
-
-const BOOKING_EXTRA_TITLE_PREFIXES = [
-	'Music Venues',
-	'Coffee Shops',
-	'Restaurants',
-	'Music Festivals',
-	'Breweries',
-	'Wineries',
-	'Wedding Planners',
-	'Wedding Venues',
-	// Also supported by the booking search backend; include if present.
-	'Distilleries',
-	'Cideries',
-] as const;
-
-const PROMOTION_OVERLAY_TITLE_PREFIXES = ['Radio Stations', 'College Radio'] as const;
-
-const startsWithCaseInsensitive = (
-	value: string | null | undefined,
-	prefix: string
-): boolean => {
-	if (!value) return false;
-	const p = prefix.trim().toLowerCase();
-	if (!p) return false;
-	return value.trim().toLowerCase().startsWith(p);
-};
-
-const getBookingTitlePrefixFromContactTitle = (
-	title: string | null | undefined
-): string | null => {
-	if (!title) return null;
-	for (const prefix of BOOKING_EXTRA_TITLE_PREFIXES) {
-		if (startsWithCaseInsensitive(title, prefix)) return prefix;
-	}
-	return null;
-};
-
-const isPromotionOverlayListTitle = (title: string | null | undefined): boolean => {
-	if (!title) return false;
-	return PROMOTION_OVERLAY_TITLE_PREFIXES.some((p) =>
-		startsWithCaseInsensitive(title, p)
-	);
-};
-
-// Promotion overlay pins should use the Radio Stations visual language (icon + color).
-const getPromotionOverlayWhatFromContactTitle = (
-	title: string | null | undefined
-): string | null => (isPromotionOverlayListTitle(title) ? 'Radio Stations' : null);
-
-type SearchMode = 'booking' | 'promotion';
-
-const extractSearchModeFromQueryPrefix = (
-	query: string | null | undefined
-): SearchMode | null => {
-	const s = (query ?? '').trim().toLowerCase();
-	if (s.startsWith('[booking]')) return 'booking';
-	if (s.startsWith('[promotion]')) return 'promotion';
-	return null;
-};
-
-// When the query string no longer embeds "[Booking]"/"[Promotion]", infer mode from the
-// dashboard's structured "What" input so overlays + pin styling behave the same.
-const inferSearchModeFromSearchWhat = (
-	searchWhat: string | null | undefined
-): SearchMode | null => {
-	const w = (searchWhat ?? '').trim().toLowerCase();
-	if (!w) return null;
-
-	// Promotion modes (radio outreach)
-	if (
-		w.includes('radio station') ||
-		w.includes('radio stations') ||
-		w.includes('college radio')
-	) {
-		return 'promotion';
-	}
-
-	// Booking modes (venues/restaurants/etc.)
-	if (
-		w === 'venues' ||
-		w === 'venue' ||
-		w.includes('music venue') ||
-		w.includes('restaurant') ||
-		w.includes('coffee shop') ||
-		w === 'festivals' ||
-		w === 'festival' ||
-		w.includes('music festival') ||
-		w.includes('brewery') ||
-		w.includes('winery') ||
-		w.includes('distillery') ||
-		w.includes('cidery') ||
-		w.includes('wedding planner') ||
-		w.includes('wedding venue') ||
-		w.includes('wine, beer') ||
-		w.includes('wine beer')
-	) {
-		return 'booking';
-	}
-
-	return null;
-};
-const normalizeWhatKey = (value: string): string =>
-	value
-		.trim()
-		.toLowerCase()
-		.replace(/&/g, 'and')
-		.replace(/[^a-z0-9]+/g, ' ')
-		.trim()
-		.replace(/\s+/g, ' ');
-
-// Booking overlay "alcohol" subcategories should be treated as part of the broader
-// "Wine, Beer, and Spirits" search "What" (even though the overlay titles are
-// "Wineries <state>", "Breweries <state>", etc).
-const WINE_BEER_SPIRITS_WHAT_KEY = normalizeWhatKey('Wine, Beer, and Spirits');
-const WINE_BEER_SPIRITS_BOOKING_PREFIX_KEYS = new Set<string>([
-	normalizeWhatKey('Wineries'),
-	normalizeWhatKey('Breweries'),
-	normalizeWhatKey('Distilleries'),
-	normalizeWhatKey('Cideries'),
-]);
-
-const bookingTitlePrefixMatchesSearchWhatKey = (
-	prefix: string,
-	normalizedSearchWhatKey: string
-): boolean => {
-	const prefixKey = normalizeWhatKey(prefix);
-	if (prefixKey === normalizedSearchWhatKey) return true;
-	if (
-		normalizedSearchWhatKey === WINE_BEER_SPIRITS_WHAT_KEY &&
-		WINE_BEER_SPIRITS_BOOKING_PREFIX_KEYS.has(prefixKey)
-	) {
-		return true;
-	}
-	return false;
-};
-
-const WHAT_TO_RESULT_DOT_COLOR: Record<string, string> = {
-	[normalizeWhatKey('Radio Stations')]: '#56DA73',
-	[normalizeWhatKey('Venues')]: '#00CBFB',
-	[normalizeWhatKey('Music Venues')]: '#00CBFB',
-	[normalizeWhatKey('Festivals')]: '#2D27DC',
-	[normalizeWhatKey('Music Festivals')]: '#2D27DC',
-	[normalizeWhatKey('Restaurants')]: '#1EA300',
-	[normalizeWhatKey('Coffee Shops')]: '#8BD003',
-	[normalizeWhatKey('Wedding Planners')]: '#D6990A',
-	[normalizeWhatKey('Wine Beer and spirits')]: '#981AEC',
-	[normalizeWhatKey('Wine, Beer, and Spirits')]: '#981AEC',
-	[normalizeWhatKey('Wine, Beer, Spirits')]: '#981AEC',
-	// Booking extras: map alcohol-related categories to the Wine/Beer/Spirits palette.
-	[normalizeWhatKey('Breweries')]: '#981AEC',
-	[normalizeWhatKey('Wineries')]: '#981AEC',
-	[normalizeWhatKey('Distilleries')]: '#981AEC',
-	[normalizeWhatKey('Cideries')]: '#981AEC',
-	// Booking extras: show wedding venues with the same palette as wedding planners.
-	[normalizeWhatKey('Wedding Venues')]: '#D6990A',
-};
-
-// Hover tooltip (SVG bubble) fill colors by search "What" value.
-// These are intentionally allowed to differ from the dot colors.
-const WHAT_TO_HOVER_TOOLTIP_FILL_COLOR: Record<string, string> = {
-	// Promotion: match the search tray palette.
-	[normalizeWhatKey('Radio Stations')]: '#56DA73',
-	// Music venues should be a lighter blue on hover.
-	[normalizeWhatKey('Venues')]: '#71C9FD',
-	[normalizeWhatKey('Music Venues')]: '#71C9FD',
-
-	// Wine/beer/spirits should be periwinkle on hover.
-	[normalizeWhatKey('Wine, Beer, and Spirits')]: '#80AAFF',
-	[normalizeWhatKey('Wine, Beer, Spirits')]: '#80AAFF',
-	[normalizeWhatKey('Wine Beer and Spirits')]: '#80AAFF',
-	[normalizeWhatKey('Wine Beer Spirits')]: '#80AAFF',
-	// Defensive: handle a misspelling we've seen in copy.
-	[normalizeWhatKey('Wine, Beer, and Spiriti')]: '#80AAFF',
-	[normalizeWhatKey('Wine Beer and Spiriti')]: '#80AAFF',
-	[normalizeWhatKey('Wine Beer Spiriti')]: '#80AAFF',
-
-	// Keep existing behavior for festivals.
-	[normalizeWhatKey('Festivals')]: '#80AAFF',
-	[normalizeWhatKey('Music Festivals')]: '#80AAFF',
-};
-
-const getResultDotColorForWhat = (searchWhat?: string | null): string => {
-	if (!searchWhat) return DEFAULT_RESULT_DOT_COLOR;
-	const key = normalizeWhatKey(searchWhat);
-	return WHAT_TO_RESULT_DOT_COLOR[key] ?? DEFAULT_RESULT_DOT_COLOR;
-};
-
-const getResultDotTForZoom = (zoom: number): number => {
-	const clampedZoom = clamp(zoom, RESULT_DOT_ZOOM_MIN, RESULT_DOT_ZOOM_MAX);
-	return (
-		(clampedZoom - RESULT_DOT_ZOOM_MIN) / (RESULT_DOT_ZOOM_MAX - RESULT_DOT_ZOOM_MIN)
-	);
-};
-
-const getResultDotScaleForZoom = (zoom: number): number => {
-	const t = getResultDotTForZoom(zoom);
-	return RESULT_DOT_SCALE_MIN + t * (RESULT_DOT_SCALE_MAX - RESULT_DOT_SCALE_MIN);
-};
-
-const getResultDotStrokeWeightForZoom = (zoom: number): number => {
-	const t = getResultDotTForZoom(zoom);
-	return (
-		RESULT_DOT_STROKE_WEIGHT_MIN_PX +
-		t * (RESULT_DOT_STROKE_WEIGHT_MAX_PX - RESULT_DOT_STROKE_WEIGHT_MIN_PX)
-	);
-};
-
-// When very zoomed out, we want the searched/locked state to visually "win" so the user
-// can understand where the bulk of results are. As you zoom in, we ease back toward a
-// more natural distribution.
-const LOCKED_STATE_MARKER_BIAS_ZOOM_START = RESULT_DOT_ZOOM_MIN; // 4
-const LOCKED_STATE_MARKER_BIAS_ZOOM_END = STATE_DIVIDER_LINES_MAX_ZOOM; // 8
-const LOCKED_STATE_MARKER_BIAS_SHARE_MAX = 0.92; // at zoom ~4
-const LOCKED_STATE_MARKER_BIAS_SHARE_MIN = 0.6; // by zoom ~8
-
-const getLockedStateMarkerShareForZoom = (zoom: number): number => {
-	const denom = LOCKED_STATE_MARKER_BIAS_ZOOM_END - LOCKED_STATE_MARKER_BIAS_ZOOM_START;
-	if (!Number.isFinite(denom) || denom <= 0) return LOCKED_STATE_MARKER_BIAS_SHARE_MIN;
-	const t = clamp((zoom - LOCKED_STATE_MARKER_BIAS_ZOOM_START) / denom, 0, 1);
-	return (
-		LOCKED_STATE_MARKER_BIAS_SHARE_MAX +
-		t * (LOCKED_STATE_MARKER_BIAS_SHARE_MIN - LOCKED_STATE_MARKER_BIAS_SHARE_MAX)
-	);
-};
-
-// When a search/locked state is active, de-emphasize out-of-state markers by making them
-// look like they'd be at 50% opacity on a white background (but keep fillOpacity=1).
-const OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE = 0.5;
-
-type RgbColor = { r: number; g: number; b: number };
-
-const parseHexColor = (hex: string): RgbColor | null => {
-	const trimmed = hex.trim();
-	if (!trimmed.startsWith('#')) return null;
-	const raw = trimmed.slice(1);
-	const isShort = raw.length === 3;
-	const isLong = raw.length === 6;
-	if (!isShort && !isLong) return null;
-
-	const expand = (c: string) => `${c}${c}`;
-	const rHex = isShort ? expand(raw[0]!) : raw.slice(0, 2);
-	const gHex = isShort ? expand(raw[1]!) : raw.slice(2, 4);
-	const bHex = isShort ? expand(raw[2]!) : raw.slice(4, 6);
-
-	const r = Number.parseInt(rHex, 16);
-	const g = Number.parseInt(gHex, 16);
-	const b = Number.parseInt(bHex, 16);
-	if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) return null;
-	return { r, g, b };
-};
-
-const toHexByte = (n: number): string => {
-	const clamped = clamp(Math.round(n), 0, 255);
-	return clamped.toString(16).padStart(2, '0').toUpperCase();
-};
-
-const washOutHexColor = (hex: string, mixToWhite: number): string => {
-	const rgb = parseHexColor(hex);
-	if (!rgb) return hex;
-	const t = clamp(mixToWhite, 0, 1);
-
-	// Blend toward white → lighter and less saturated (pastel).
-	const r = rgb.r + (255 - rgb.r) * t;
-	const g = rgb.g + (255 - rgb.g) * t;
-	const b = rgb.b + (255 - rgb.b) * t;
-
-	return `#${toHexByte(r)}${toHexByte(g)}${toHexByte(b)}`;
-};
-
-const hashStringToStableKey = (input: string): string => {
-	// Small deterministic hash for cache keys / image ids.
-	// (Not cryptographically secure; just stable and fast.)
-	let hash = 5381;
-	for (let i = 0; i < input.length; i++) {
-		hash = (hash * 33) ^ input.charCodeAt(i);
-	}
-	return (hash >>> 0).toString(36);
-};
-
-const scaleMapboxOpacityExpr = (expr: any, mul: number): any => {
-	if (typeof expr === 'number') return expr * mul;
-	if (!Array.isArray(expr) || expr.length === 0) return expr;
-
-	const op = expr[0];
-
-	if (op === 'interpolate') {
-		// ['interpolate', method, input, z1, v1, z2, v2, ...]
-		const result = [...expr];
-		for (let i = 4; i < result.length; i += 2) {
-			result[i] = scaleMapboxOpacityExpr(result[i], mul);
-		}
-		return result;
-	}
-
-	if (op === 'step') {
-		// ['step', input, defaultVal, z1, v1, z2, v2, ...]
-		const result = [...expr];
-		result[2] = scaleMapboxOpacityExpr(result[2], mul);
-		for (let i = 4; i < result.length; i += 2) {
-			result[i] = scaleMapboxOpacityExpr(result[i], mul);
-		}
-		return result;
-	}
-
-	if (op === 'case') {
-		// ['case', cond1, val1, cond2, val2, ..., fallback]
-		const result = [...expr];
-		for (let i = 2; i < result.length - 1; i += 2) {
-			result[i] = scaleMapboxOpacityExpr(result[i], mul);
-		}
-		result[result.length - 1] = scaleMapboxOpacityExpr(result[result.length - 1], mul);
-		return result;
-	}
-
-	return expr;
-};
-
-const normalizeStateKey = (state?: string | null): string | null => {
-	if (!state) return null;
-	const abbr = getStateAbbreviation(state);
-	if (abbr) return abbr;
-	return state.trim().toUpperCase();
-};
-
-// MANUAL WEATHER MOOD OVERRIDE FOR TESTING.
-// Set to one of: 'sunny' | 'normal' | 'cloudy' | 'stormy' | 'snowy'
-// Set back to null to use the real weather mood from the user's region.
-const MANUAL_WEATHER_MOOD_OVERRIDE: WeatherMood | null = null;
-
-// MANUAL TEMPERATURE OVERRIDE FOR TESTING (Fahrenheit).
-// Set to a number (e.g. 92) to test the > 80°F brightness lift.
-// Set back to null to use the real temperature from the user's region.
-const MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F: number | null = null;
-
-// MANUAL NIGHT OVERRIDE FOR TESTING.
-// Set to a number between 0 and 1 (e.g. 1 for deep night, 0 for full day).
-// Set back to null to use the real regional day/night cycle.
-const MANUAL_NIGHT_T_OVERRIDE: number | null = null;
-
-const MOOD_CONTINUOUS_TRANSITION_MS = 90_000;
-const MOOD_DISCRETE_EFFECT_FADE_MS = 8_000;
-const MOOD_TRANSITION_PAINT_FRAME_MS = 16;
-
-const getDevMoodTransitionMs = (): number | null => {
-	if (typeof window === 'undefined') return null;
-	try {
-		const raw = new URLSearchParams(window.location.search).get('devMoodTransitionMs');
-		if (!raw) return null;
-		const n = Number(raw);
-		if (!Number.isFinite(n)) return null;
-		return clamp(Math.round(n), 1_000, 15 * 60_000);
-	} catch {
-		return null;
-	}
-};
-
-const easeInOutCubic = (t: number): number => {
-	const x = clamp(t, 0, 1);
-	return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
-};
-
-const computeRuntimeNightT = (
-	nightLighting: GlobeNightLightingLike | null | undefined,
-	fallbackNightT: number,
-	nowMs: number = Date.now()
-) => {
-	if (!nightLighting) return clamp(fallbackNightT, 0, 1);
-
-	if (nightLighting.phase === 'sunrise' || nightLighting.phase === 'sunset') {
-		const durationMs = nightLighting.phaseEndMs - nightLighting.phaseStartMs;
-		if (!Number.isFinite(durationMs) || durationMs <= 0) {
-			return clamp(fallbackNightT, 0, 1);
-		}
-		const t = clamp((nowMs - nightLighting.phaseStartMs) / durationMs, 0, 1);
-		const eased = easeInOutCubic(t);
-		return nightLighting.phase === 'sunrise' ? 1 - eased : eased;
-	}
-
-	return clamp(nightLighting.nightT ?? fallbackNightT, 0, 1);
-};
-
-// Threshold above which the globe gets a uniform warm brightness lift on top
-// of the active mood (only applies when the mood uses a bright screen-blend
-// softbox — applying a brightening wash to the dark-pool moods would defeat
-// the stormy gloom).
-const HOT_TEMPERATURE_THRESHOLD_F = 80;
-// Uniform warm-white wash opacity when "hot". Multiplied by the same zoom
-// fade as the other lighting overlays so the wash disappears at city zoom.
-const HOT_WASH_OPACITY = 0.13;
-
-// Night lighting (moon backlight).
-// Implemented as DOM overlays (screen + multiply) so the lighting stays viewer-anchored
-// and can be art-directed independently of the basemap.
-const NIGHT_GLOOM_WASH_OPACITY = 0;
-const NIGHT_MOONLIGHT_KEY_OPACITY = 0.48;
-const NIGHT_LOWER_LEFT_SHADOW_OPACITY = 0.94;
-const NIGHT_WARM_KEY_MIN_MUL = 0.04;
-// Neutral night-only dimmer. This darkens the normal day-colored basemap without
-// shifting land/ocean hues back toward a separate night palette.
-const NIGHT_DARK_WASH_OPACITY = 0.17;
-// Keep the night basemap visually matched to the normal day map.
-const NIGHT_FACE_SHADE_OPACITY = 0;
-// US night visibility: dot-only contact-lights tiles (not a heatmap). Kept
-// well below 1 so the lights read as a soft glow rather than a stark
-// NASA-earth-at-night photo (which feels eerie/lonely on its own).
-const NIGHT_US_LIGHTS_OPACITY = 0.55;
-const NIGHT_MOON_RIM_OPACITY = 0;
-const NIGHT_SHADOW_OVERLAY_MUL_MIN = 0.18;
-
-// City-lights persistence: this is primarily a "zoomed out / from space" aesthetic.
-// Fade out aggressively as we approach state/city zoom so it doesn't compete with markers.
-const NIGHT_LIGHTS_FADE_START_ZOOM = 3.7;
-// Keep visible through a "medium" multi-state view, then drop off quickly before city-level zoom.
-const NIGHT_LIGHTS_FADE_END_ZOOM = 6.65;
-// When the map first mounts, the lights tiles can appear in patches as they stream
-// in. We keep the overlay hidden until the raster source reports "loaded", then
-// fade it in so the first impression feels deliberate.
-const NIGHT_LIGHTS_LOAD_POLL_MS = 120;
-const NIGHT_LIGHTS_LOAD_FADE_MS = 750;
-// Zoom interaction: hide while tiles stream, then fade back in quickly.
-const NIGHT_LIGHTS_ZOOM_LOAD_POLL_MS = 90;
-const NIGHT_LIGHTS_ZOOM_LOAD_FADE_MS = 320;
-const NIGHT_LIGHTS_ZOOM_LOAD_OUT_FADE_MS = 140;
-// Keep lights present during zoom gestures (no "blink"), but dim slightly so
-// intermediate overzoomed raster state is less noticeable.
-const NIGHT_LIGHTS_ZOOM_LOAD_DIM_FLOOR = 0.72;
-// Intro animation: reveal left-to-right, then crossfade to the real tiles.
-const NIGHT_LIGHTS_INTRO_REVEAL_MS = 900;
-const NIGHT_LIGHTS_INTRO_CROSSFADE_MS = 260;
-
-const computeNightLightsFade = (zoom: number) => {
-	if (zoom <= NIGHT_LIGHTS_FADE_START_ZOOM) return 1;
-	if (zoom >= NIGHT_LIGHTS_FADE_END_ZOOM) return 0;
-	const t =
-		(zoom - NIGHT_LIGHTS_FADE_START_ZOOM) /
-		(NIGHT_LIGHTS_FADE_END_ZOOM - NIGHT_LIGHTS_FADE_START_ZOOM);
-	const inv = 1 - clamp(t, 0, 1);
-	// Steep fade: drops quickly after the start zoom so the overlay doesn't read as texture.
-	return Math.pow(inv, 2.25);
-};
-
-// Zoomed-out visibility: at the minimum zoom the US is only a few screen pixels wide,
-// so we apply a small opacity lift so the dots still read as a faint glow.
-const NIGHT_LIGHTS_ZOOM_OUT_LIFT_START_ZOOM = MAP_MIN_ZOOM;
-const NIGHT_LIGHTS_ZOOM_OUT_LIFT_END_ZOOM = NIGHT_LIGHTS_FADE_START_ZOOM;
-const NIGHT_LIGHTS_ZOOM_OUT_LIFT_MAX = 0.62;
-// Extra "bloom" pass: a low-zoom glow layer that makes the US read as sparkling
-// from far zoom without turning the crisp dot layer into a blur.
-const NIGHT_LIGHTS_GLOW_OPACITY_MULT = 0.75;
-// Fade the glow out by "medium" zoom so the pattern reads as city clusters, not
-// a noisy texture. (We still keep the crisp dot layer.)
-const NIGHT_LIGHTS_GLOW_FADE_START_ZOOM = 3.2;
-const NIGHT_LIGHTS_GLOW_FADE_END_ZOOM = 4.2;
-// Extra "space" glow: a short-lived boost that makes the US read from fully zoomed-out
-// view, then disappears before any state-level interaction.
-const NIGHT_LIGHTS_SPACE_GLOW_OPACITY_MULT = 1.55;
-// A second space-only pass (same tiles) to push the glow to be visible from "space"
-// without changing the dot tile generation.
-const NIGHT_LIGHTS_SPACE_GLOW_EXTRA_PASS_OPACITY_MUL = 0.85;
-const NIGHT_LIGHTS_SPACE_GLOW_FADE_START_ZOOM = MAP_MIN_ZOOM;
-const NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM = 3.55;
-
-// Zoomed-in behavior: instead of many crisp points at mid zoom (which can read as "hair"),
-// crossfade toward a very subtle, local glow pass.
-const NIGHT_LIGHTS_CRISP_FADE_OUT_START_ZOOM = 4.05;
-const NIGHT_LIGHTS_CRISP_FADE_OUT_END_ZOOM = 4.55;
-const NIGHT_LIGHTS_CLOSE_GLOW_FADE_IN_START_ZOOM = 4.05;
-const NIGHT_LIGHTS_CLOSE_GLOW_FADE_IN_END_ZOOM = 4.35;
-const NIGHT_LIGHTS_CLOSE_GLOW_OPACITY_MULT = 0.55;
-
-const computeNightLightsZoomOutLift = (zoom: number) => {
-	if (zoom <= NIGHT_LIGHTS_ZOOM_OUT_LIFT_START_ZOOM) {
-		return NIGHT_LIGHTS_ZOOM_OUT_LIFT_MAX;
-	}
-	if (zoom >= NIGHT_LIGHTS_ZOOM_OUT_LIFT_END_ZOOM) return 0;
-	const t =
-		(zoom - NIGHT_LIGHTS_ZOOM_OUT_LIFT_START_ZOOM) /
-		(NIGHT_LIGHTS_ZOOM_OUT_LIFT_END_ZOOM - NIGHT_LIGHTS_ZOOM_OUT_LIFT_START_ZOOM);
-	const inv = 1 - Math.max(0, Math.min(1, t));
-	// Reverse ease-out: keep some lift up through the decorative globe range,
-	// then taper off by the default interactive zoom.
-	return NIGHT_LIGHTS_ZOOM_OUT_LIFT_MAX * Math.pow(inv, 1.35);
-};
-
-const computeNightLightsGlowFade = (zoom: number) => {
-	if (zoom <= NIGHT_LIGHTS_GLOW_FADE_START_ZOOM) return 1;
-	if (zoom >= NIGHT_LIGHTS_GLOW_FADE_END_ZOOM) return 0;
-	const t =
-		(zoom - NIGHT_LIGHTS_GLOW_FADE_START_ZOOM) /
-		(NIGHT_LIGHTS_GLOW_FADE_END_ZOOM - NIGHT_LIGHTS_GLOW_FADE_START_ZOOM);
-	// Ease-out: hold most of the glow, then drop off as we approach state-level zoom.
-	return 1 - t * t;
-};
-
-const computeNightLightsSpaceGlowFade = (zoom: number) => {
-	if (zoom <= NIGHT_LIGHTS_SPACE_GLOW_FADE_START_ZOOM) return 1;
-	if (zoom >= NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM) return 0;
-	const t =
-		(zoom - NIGHT_LIGHTS_SPACE_GLOW_FADE_START_ZOOM) /
-		(NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM - NIGHT_LIGHTS_SPACE_GLOW_FADE_START_ZOOM);
-	const inv = 1 - clamp(t, 0, 1);
-	// Space-only: keep it present across the fully zoomed-out "US from space" range,
-	// then drop quickly before state-level interaction.
-	return inv * inv;
-};
-
-const computeNightLightsCrispMul = (zoom: number) => {
-	if (zoom <= NIGHT_LIGHTS_CRISP_FADE_OUT_START_ZOOM) return 1;
-	if (zoom >= NIGHT_LIGHTS_CRISP_FADE_OUT_END_ZOOM) return 0;
-	const t =
-		(zoom - NIGHT_LIGHTS_CRISP_FADE_OUT_START_ZOOM) /
-		(NIGHT_LIGHTS_CRISP_FADE_OUT_END_ZOOM - NIGHT_LIGHTS_CRISP_FADE_OUT_START_ZOOM);
-	const inv = 1 - clamp(t, 0, 1);
-	// Ease-out: hold crisp longer, then drop as we approach state-level zoom.
-	return inv * inv;
-};
-
-const computeNightLightsCloseGlowMul = (zoom: number) => {
-	if (zoom <= NIGHT_LIGHTS_CLOSE_GLOW_FADE_IN_START_ZOOM) return 0;
-	if (zoom >= NIGHT_LIGHTS_CLOSE_GLOW_FADE_IN_END_ZOOM) return 1;
-	const t =
-		(zoom - NIGHT_LIGHTS_CLOSE_GLOW_FADE_IN_START_ZOOM) /
-		(NIGHT_LIGHTS_CLOSE_GLOW_FADE_IN_END_ZOOM -
-			NIGHT_LIGHTS_CLOSE_GLOW_FADE_IN_START_ZOOM);
-	// Ease-in: let dots dominate, then let glow take over smoothly.
-	return clamp(t, 0, 1) * clamp(t, 0, 1);
-};
-
-// Night key light: a cool, white-blue ambient wash from the upper-right so full
-// night has its own moonlit direction instead of borrowing the daytime sun wash.
-const NIGHT_MOONLIGHT_KEY_BG = [
-	'radial-gradient(ellipse 178% 150% at 112% -18%, rgba(255, 255, 255, 0.20) 0%, rgba(240, 250, 255, 0.15) 28%, rgba(219, 237, 255, 0.09) 55%, rgba(191, 216, 244, 0.035) 84%, rgba(191, 216, 244, 0) 100%)',
-	'radial-gradient(ellipse 124% 104% at 86% 8%, rgba(247, 252, 255, 0.07) 0%, rgba(224, 240, 255, 0.052) 46%, rgba(206, 226, 248, 0.024) 78%, rgba(206, 226, 248, 0) 100%)',
-	'radial-gradient(ellipse 152% 112% at 74% 30%, rgba(214, 231, 255, 0.034) 0%, rgba(186, 210, 238, 0.02) 58%, rgba(186, 210, 238, 0) 92%)',
-].join(', ');
-
-// Night counter-shade: a broad lower-left dark pool, opposite the daytime
-// upper-left key / lower-right shadow so night reads as a distinct composition.
-const NIGHT_LOWER_LEFT_SHADOW_BG = [
-	'radial-gradient(ellipse 162% 154% at -20% 114%, rgba(0, 3, 14, 0.80) 0%, rgba(2, 8, 26, 0.61) 28%, rgba(6, 15, 38, 0.38) 54%, rgba(10, 22, 50, 0.15) 78%, rgba(10, 22, 50, 0) 100%)',
-	'radial-gradient(ellipse 100% 86% at 14% 80%, rgba(1, 5, 18, 0.32) 0%, rgba(5, 13, 34, 0.18) 48%, rgba(5, 13, 34, 0) 84%)',
-].join(', ');
-
-// Standby shade paint for the night overlay. The overlay opacity is kept at 0 so
-// the visible night map stays matched to the normal daytime palette.
-const NIGHT_FACE_SHADE_BG =
-	'radial-gradient(ellipse 145% 145% at 58% 60%, rgba(14, 22, 42, 0.32) 0%, rgba(14, 22, 42, 0.27) 30%, rgba(14, 22, 42, 0.17) 54%, rgba(14, 22, 42, 0.07) 70%, rgba(14, 22, 42, 0) 84%, rgba(14, 22, 42, 0) 100%)';
-
-// Cinematic vignette: a viewport-anchored darkening at the corners that pulls the
-// eye toward the globe at night. Multiplied so it composites with the deep-space
-// color and the night map without crushing to pure black. The center is fully
-// transparent for ~40% of the radius so the globe itself stays untouched.
-const NIGHT_VIGNETTE_OPACITY = 0.95;
-const NIGHT_VIGNETTE_BG =
-	'radial-gradient(ellipse 110% 110% at 50% 50%, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 38%, rgba(2, 6, 16, 0.10) 58%, rgba(1, 4, 12, 0.26) 78%, rgba(0, 2, 8, 0.46) 92%, rgba(0, 1, 5, 0.58) 100%)';
-
-// Rear rim light: edge-weighted cool-white glow that reads as the moon sitting
-// behind the Earth (not perfectly centered, shifted toward upper-left bias).
-const NIGHT_MOON_RIM_BG = [
-	'radial-gradient(ellipse 178% 178% at 58% 60%, rgba(235, 248, 255, 0) 0%, rgba(235, 248, 255, 0) 62%, rgba(225, 242, 255, 0.05) 76%, rgba(232, 247, 255, 0.18) 86%, rgba(248, 253, 255, 0.62) 94%, rgba(248, 253, 255, 0.14) 100%)',
-	'radial-gradient(ellipse 128% 128% at 58% 60%, rgba(235, 248, 255, 0) 0%, rgba(235, 248, 255, 0) 72%, rgba(226, 244, 255, 0.08) 82%, rgba(242, 251, 255, 0.50) 91%, rgba(255, 255, 255, 0.06) 97%, rgba(235, 248, 255, 0) 100%)',
-	'radial-gradient(ellipse 78% 78% at 14% 14%, rgba(255, 255, 255, 0.14) 0%, rgba(230, 246, 255, 0.06) 26%, rgba(255, 255, 255, 0) 48%)',
-].join(', ');
-
-const SUN_TRANSITION_SPACE_GLOW_BG = [
-	'radial-gradient(ellipse 78% 58% at 8% 6%, rgba(255, 198, 116, 0.34) 0%, rgba(255, 162, 102, 0.18) 28%, rgba(255, 162, 102, 0.06) 54%, rgba(255, 162, 102, 0) 76%)',
-	'radial-gradient(ellipse 58% 44% at 18% 14%, rgba(217, 86, 184, 0.18) 0%, rgba(142, 88, 210, 0.09) 42%, rgba(142, 88, 210, 0) 78%)',
-	'radial-gradient(ellipse 120% 84% at -18% -14%, rgba(255, 238, 182, 0.13) 0%, rgba(255, 210, 150, 0.06) 48%, rgba(255, 210, 150, 0) 82%)',
-].join(', ');
-
 // NOTE: Night lights are generated offline as raster dot tiles (see scripts/generate_contact_lights_tiles.py).
+
+// Identity key for an interactive entry camera, so a refetch that re-delivers the
+// same values (new object identity) is distinguishable from actually-new values.
+const interactiveEntryCameraKey = (
+	camera: SearchResultsMapProps['interactiveEntryCamera']
+) => (camera ? `${camera.center.lat},${camera.center.lng},${camera.zoom}` : null);
+
+// Street-view pitch as a continuous function of zoom: flat below the ramp,
+// linearly tilting to STREET_VIEW_MAX_PITCH at full street zoom.
+const computeStreetViewPitch = (zoom: number): number => {
+	if (zoom <= STREET_VIEW_PITCH_RAMP_START_ZOOM) return 0;
+	if (zoom >= STREET_VIEW_PITCH_RAMP_FULL_ZOOM) return STREET_VIEW_MAX_PITCH;
+	const t =
+		(zoom - STREET_VIEW_PITCH_RAMP_START_ZOOM) /
+		(STREET_VIEW_PITCH_RAMP_FULL_ZOOM - STREET_VIEW_PITCH_RAMP_START_ZOOM);
+	return STREET_VIEW_MAX_PITCH * t;
+};
 
 export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	contacts,
 	selectedContacts,
+	selectedContactObjects = [],
 	externallyHoveredContactId,
 	searchQuery,
 	searchWhat,
+	searchEngaged = true,
+	categoryConstellationsEnabled = false,
+	campaignMarkerMode = 'category',
+	campaignContactStatusById,
+	ambientContactsEnabled = false,
+	ambientContactsPreloadEnabled = false,
+	ambientActiveCategories,
+	ambientUncategorizedActive = true,
+	autoFitRequestNonce = 0,
+	instantAutoFitNonce = 0,
+	emptyMapClickPrompt = null,
+	onEmptyMapClick,
 	selectedAreaBounds,
 	onViewportInteraction,
+	onViewportZoom,
 	onViewportIdle,
 	activeTool,
+	requestedZoom,
 	selectAllInViewNonce,
 	onAreaSelect,
 	onVisibleOverlayContactsChange,
 	onMarkerClick,
 	onMarkerHover,
 	onToggleSelection,
+	onAddSelectionToFolder,
+	onWriteSelectionMessage,
 	onStateSelect,
 	enableStateInteractions,
 	lockedStateName,
 	isLoading,
+	onMapLoadedChange,
 	disableDotWaveReveal = false,
 	skipAutoFit,
+	cameraPadding = null,
+	autoFitPadding = null,
 	presentation = 'interactive',
+	streetViewEnabled = false,
 	autoSpin = false,
 	weatherMood: weatherMoodProp = 'normal',
 	weatherRegionCenter = null,
 	weatherTemperatureF = null,
 	nightLighting = null,
 	nightT: nightTProp = null,
+	radiusOverlay = null,
+	onRadiusCenterChange,
+	ownedVenueLocation = null,
+	interactiveEntryCamera = null,
+	onOwnedVenueAnchorChange,
+	events = [],
+	rightSafeAreaPx = 0,
+	renderEventPopupContent,
+	suppressEventPopups = false,
 }) => {
+	const curatedOrbSvgIdPrefix = useId().replace(/:/g, '');
+	const curatedOrbSlotIds = useMemo(
+		() =>
+			Array.from({ length: CURATED_ORB_SLOT_COUNT }, (_, index) => ({
+				gradient: `${curatedOrbSvgIdPrefix}-curated-orb-gradient-${index}`,
+				bloomGradient: `${curatedOrbSvgIdPrefix}-curated-orb-bloom-gradient-${index}`,
+				clipPath: `${curatedOrbSvgIdPrefix}-curated-orb-clip-${index}`,
+			})),
+		[curatedOrbSvgIdPrefix]
+	);
+	const selectedStateGradientIds = useMemo(
+		() => ({
+			gradient: `${curatedOrbSvgIdPrefix}-selected-state-gradient`,
+			bloomGradient: `${curatedOrbSvgIdPrefix}-selected-state-bloom-gradient`,
+			clipPath: `${curatedOrbSvgIdPrefix}-selected-state-clip`,
+		}),
+		[curatedOrbSvgIdPrefix]
+	);
+
 	const contactLightsTilesEnabled = useMemo(() => {
 		// Enabled by default (it's a lightweight raster overlay), but allow a
 		// URL escape hatch to disable while tuning: `?devContactLights=0`.
@@ -3588,9 +1355,97 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const sunTransitionPhaseEndMs = nightLighting?.phaseEndMs ?? null;
 	const isBackgroundPresentation = presentation === 'background';
 	const shouldAutoSpin = isBackgroundPresentation && autoSpin;
+	const getCampaignStatusMarkerStyleForContact = useCallback(
+		(contactId: number): CampaignStatusMarkerStyle | null => {
+			if (campaignMarkerMode !== 'status') return null;
+			const status = campaignContactStatusById?.get(contactId) ?? 'contacts';
+			return CAMPAIGN_STATUS_MARKER_STYLES[status];
+		},
+		[campaignContactStatusById, campaignMarkerMode]
+	);
+	const getCampaignStatusForContact = useCallback(
+		(contactId: number): CampaignContactMapStatus =>
+			campaignContactStatusById?.get(contactId) ?? 'contacts',
+		[campaignContactStatusById]
+	);
+	const getCampaignStatusLineStyleForContacts = useCallback(
+		(fromContactId: number, toContactId: number): CampaignStatusMarkerStyle | null => {
+			if (campaignMarkerMode !== 'status') return null;
+			const fromStatus = getCampaignStatusForContact(fromContactId);
+			const toStatus = getCampaignStatusForContact(toContactId);
+			if (fromStatus !== toStatus) return null;
+			return CAMPAIGN_STATUS_MARKER_STYLES[fromStatus];
+		},
+		[campaignMarkerMode, getCampaignStatusForContact]
+	);
+	const emptyMapPromptText = (emptyMapClickPrompt ?? '').trim();
+	const emptyMapPromptEnabled = Boolean(
+		emptyMapPromptText && onEmptyMapClick && !isBackgroundPresentation && !isLoading
+	);
+	const [emptyMapPromptPoint, setEmptyMapPromptPoint] = useState<{
+		x: number;
+		y: number;
+	} | null>(null);
+	const emptyMapPointerDownClientRef = useRef<{ x: number; y: number } | null>(null);
+	const isDraggingRadiusRef = useRef(false);
+	const radiusDragSuppressEmptyMapUntilRef = useRef(0);
+	const shouldSuppressEmptyMapPrompt = useCallback(
+		() =>
+			isDraggingRadiusRef.current ||
+			Date.now() < radiusDragSuppressEmptyMapUntilRef.current,
+		[]
+	);
 	// Keep the latest presentation value available to async Mapbox callbacks (moveend, etc).
 	const presentationRef = useRef<'background' | 'interactive'>(presentation);
 	presentationRef.current = presentation;
+	// Latest interactive entry camera for the map-init/presentation effects.
+	// `pending` means "the user hasn't moved the camera since entering interactive
+	// mode": while it holds, the camera follows the latest entry-camera value, so a
+	// late or corrected arrival (e.g. fresh venue coordinates replacing a stale
+	// cache row right after a save) still lands. `appliedKey` dedupes value-equal
+	// re-deliveries so a confirming refetch causes no camera motion.
+	const interactiveEntryCameraRef = useRef(interactiveEntryCamera);
+	interactiveEntryCameraRef.current = interactiveEntryCamera;
+	const interactiveEntryCameraPendingRef = useRef(false);
+	const interactiveEntryCameraAppliedKeyRef = useRef<string | null>(null);
+	// Basemap overview prewarm (see the prewarm effect below): last-warmed center
+	// key for dedupe, and the pending debounce timer handle.
+	const lastPrewarmKeyRef = useRef<string | null>(null);
+	const prewarmTimerRef = useRef<number | null>(null);
+
+	const clearEmptyMapPrompt = useCallback(() => {
+		setEmptyMapPromptPoint(null);
+	}, []);
+
+	const scheduleEmptyMapPrompt = useCallback(
+		(point: { x: number; y: number }) => {
+			if (!emptyMapPromptEnabled || shouldSuppressEmptyMapPrompt()) {
+				clearEmptyMapPrompt();
+				return;
+			}
+
+			const width = typeof window !== 'undefined' ? window.innerWidth : 0;
+			const height = typeof window !== 'undefined' ? window.innerHeight : 0;
+			const minX = EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_X_PX;
+			const maxX = width > 0 ? Math.max(minX, width - minX) : point.x;
+			const minY = EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_TOP_PX;
+			const maxY =
+				height > 0
+					? Math.max(minY, height - EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_BOTTOM_PX)
+					: point.y;
+			const nextPoint = {
+				x: width > 0 ? clamp(point.x, minX, maxX) : point.x,
+				y: height > 0 ? clamp(point.y, minY, maxY) : point.y,
+			};
+
+			setEmptyMapPromptPoint(nextPoint);
+		},
+		[clearEmptyMapPrompt, emptyMapPromptEnabled, shouldSuppressEmptyMapPrompt]
+	);
+
+	useEffect(() => {
+		if (!emptyMapPromptEnabled) clearEmptyMapPrompt();
+	}, [clearEmptyMapPrompt, emptyMapPromptEnabled]);
 
 	// Default to enabling state hover/click (hover highlight + click-to-search) when a handler is
 	// provided, so callers don't have to pass an explicit `enableStateInteractions` flag.
@@ -3653,6 +1508,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	]);
 	const cloudsDriftRafRef = useRef<number | null>(null);
 	const cloudsDriftLastFrameMsRef = useRef<number>(0);
+	// Last camera-motion timestamp; drives the Safari idle drift cadence.
+	const cloudsDriftLastCameraMoveMsRef = useRef<number>(0);
+	// Last raster-opacity applied per layer by applyLightingOverlayOpacity (it
+	// runs on every zoom frame; skipping unchanged values avoids restarting
+	// mapbox paint transitions, which keep the render loop warm — a WebKit-felt
+	// cost). Cleared in ensureMapboxSourcesAndLayers so style reloads re-assert.
+	const lightingRasterOpacityAppliedRef = useRef<Record<string, number>>({});
+	const lightingLayerVisibilityAppliedRef = useRef<Record<string, string>>({});
 	const cloudsDriftOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 	const cloudsDriftOffsetSecondaryRef = useRef<{ x: number; y: number }>({
 		x: 0,
@@ -3673,13 +1536,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const lightningRestrikeCellRef = useRef<StormLightningCell | null>(null);
 	const lightningEventIdRef = useRef<number>(1);
 	const lightningWasEnabledRef = useRef<boolean>(false);
+	// Safari perf mode: whether the lightning/snow canvases uploaded last tick, so the
+	// final cleared canvas still reaches the GPU one tick after a flash/mood ends.
+	const lightningUploadWasActiveRef = useRef<boolean>(false);
+	const snowUploadWasActiveRef = useRef<boolean>(false);
 	const snowCanvasRef = useRef<HTMLCanvasElement | null>(null);
 	const snowCanvasCtxRef = useRef<CanvasRenderingContext2D | null>(null);
 	const snowStampImagesRef = useRef<HTMLImageElement[] | null>(null);
 	const snowStampLoadPromiseRef = useRef<Promise<HTMLImageElement[]> | null>(null);
 	const snowParticlesRef = useRef<SnowParticle[] | null>(null);
 	const cloudsSnowInteractionScratchCanvasRef = useRef<HTMLCanvasElement | null>(null);
-	const cloudsSnowInteractionScratchCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+	const cloudsSnowInteractionScratchCtxRef = useRef<CanvasRenderingContext2D | null>(
+		null
+	);
 	const cloudsSnowInteractionThinStampRef = useRef<HTMLCanvasElement | null>(null);
 	const cloudsSnowInteractionGlowStampRef = useRef<HTMLCanvasElement | null>(null);
 	const prevIsBackgroundPresentationRef = useRef<boolean>(isBackgroundPresentation);
@@ -3708,6 +1577,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// updates can stay fully imperative without React re-render jitter.
 	const nightTRef = useRef<number>(nightT);
 	nightTRef.current = nightT;
+	// Unsubscribe burn factor (0=normal, 1=apocalypse), tweened by the burn
+	// effect toward the unsubscribe flow's published target. A ref (like
+	// `nightTRef`) so every pipeline reapplication can read the live value.
+	const unsubscribeBurnTRef = useRef<number>(0);
 	// 0..1 fade that suppresses the lights overlay until tiles are ready, avoiding
 	// the half-loaded "patchy" initial look.
 	const nightLightsLoadTRef = useRef<number>(0);
@@ -3726,20 +1599,64 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
 	const hoveredMarkerIdRef = useRef<number | null>(null);
 	const hoverSourceRef = useRef<'map' | 'external' | null>(null);
+	// Event opportunity popup: hover opens it, click pins it open (pinned wins over hover).
+	// The ref mirrors `hoveredEventId` so the unified pointer handler can read/clear hover
+	// without being added to that effect's dependency array.
+	const [hoveredEventId, setHoveredEventId] = useState<number | null>(null);
+	const [pinnedEventId, setPinnedEventId] = useState<number | null>(null);
+	const hoveredEventIdRef = useRef<number | null>(null);
+	const eventPopupOverlayRef = useRef<HTMLDivElement | null>(null);
+	// Hover-intent close timer + a flag for "pointer is currently over the popup box", so the
+	// hover popup survives the star→box gap and stays open while the cursor is on the card.
+	const eventHoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const isPointerOverEventPopupRef = useRef(false);
 	// Track tooltip that is fading out (for smooth transition)
 	const [fadingTooltipId, setFadingTooltipId] = useState<number | null>(null);
 	const fadingTooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const mapContainerRef = useRef<HTMLDivElement | null>(null);
+	const hoverTooltipOverlayRef = useRef<HTMLDivElement | null>(null);
+	const streetCardOverlayRef = useRef<HTMLDivElement | null>(null);
+	// Persistent street-view research cards: container + per-contact card elements,
+	// positioned imperatively by a single shared 'move' listener.
+	const streetCardsContainerRef = useRef<HTMLDivElement | null>(null);
+	const streetCardElsByContactIdRef = useRef<Map<number, HTMLDivElement>>(new Map());
+	const registerStreetCardEl = useCallback(
+		(contactId: number, el: HTMLDivElement | null) => {
+			if (el) {
+				streetCardElsByContactIdRef.current.set(contactId, el);
+			} else {
+				streetCardElsByContactIdRef.current.delete(contactId);
+			}
+		},
+		[]
+	);
 	const mapRef = useRef<mapboxgl.Map | null>(null);
 	const [map, setMap] = useState<mapboxgl.Map | null>(null);
+	// Mobile gets a lower interactive zoom floor so the full globe fits the narrow
+	// viewport. Kept in a ref because the camera-constraint paths below (decorative
+	// transitions, post-cinematic restore) re-apply the floor when they settle.
+	const isMobile = useIsMobile();
+	const interactiveMinZoomRef = useRef(MAP_MIN_ZOOM);
 	const [isMapLoaded, setIsMapLoaded] = useState(false);
 	const initialZoomConstraintsRef = useRef<{ minZoom: number; maxZoom: number } | null>(
 		null
 	);
 	const backgroundSpinCleanupRef = useRef<(() => void) | null>(null);
 	const [mapLoadError, setMapLoadError] = useState<string | null>(null);
+	// Ref-based notify keeps the map-init effect's deps untouched while reporting
+	// readiness to the host (load → true, teardown/recreate → false, unmount → false).
+	const onMapLoadedChangeRef = useRef(onMapLoadedChange);
+	useEffect(() => {
+		onMapLoadedChangeRef.current = onMapLoadedChange;
+	});
+	useEffect(() => {
+		onMapLoadedChangeRef.current?.(isMapLoaded);
+	}, [isMapLoaded]);
+	useEffect(() => () => onMapLoadedChangeRef.current?.(false), []);
 	const [selectedStateKey, setSelectedStateKey] = useState<string | null>(null);
 	const [zoomLevel, setZoomLevel] = useState(MAP_DEFAULT_ZOOM);
+	// Track last-applied camera padding so we don't spam Mapbox with identical updates.
+	const lastCameraPaddingKeyRef = useRef<string>('');
 	// Live-updated softbox overlay refs. zoomLevel only updates on `moveend`, so
 	// we drive these imperatively from the map's `zoom` event to keep the lighting
 	// fade in lockstep with pinch/scroll/wheel interactions.
@@ -3755,10 +1672,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const lightingOverlayNightShadeRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayMoonRimRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayNightVignetteRef = useRef<HTMLDivElement | null>(null);
+	const lightingOverlayBurnWashRef = useRef<HTMLDivElement | null>(null);
+	const lightingOverlayBurnGlowRef = useRef<HTMLDivElement | null>(null);
 	const [visibleContacts, setVisibleContacts] = useState<ContactWithName[]>([]);
 	// Keep a "sticky" set of currently-rendered marker ids so zooming can rescale existing markers
 	// and only introduce *new* markers, instead of re-sampling a totally different set each time.
 	const visibleContactIdSetRef = useRef<Set<number>>(new Set());
+	// Identity salt for per-contact dot sampling/hashing. Invariant under zoom & pan
+	// (so the visible dot set doesn't reshuffle when crossing zoom thresholds); resets
+	// only when the underlying result set / locked state changes.
+	const dotSampleSaltRef = useRef<string>('');
 	const [bookingExtraVisibleContacts, setBookingExtraVisibleContacts] = useState<
 		ContactWithName[]
 	>([]);
@@ -3776,14 +1699,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [promotionOverlayFetchBbox, setPromotionOverlayFetchBbox] =
 		useState<BoundingBox | null>(null);
 
-	// High-zoom "all contacts" overlay (gray dots)
+	// High-zoom "all contacts" overlay plus disengaged ambient atlas.
 	const [allContactsOverlayVisibleContacts, setAllContactsOverlayVisibleContacts] =
 		useState<ContactWithName[]>([]);
 	const allContactsOverlayVisibleIdSetRef = useRef<Set<number>>(new Set());
 	const lastAllContactsOverlayVisibleContactsKeyRef = useRef<string>('');
-	const lastAllContactsOverlayFetchKeyRef = useRef<string>('');
+	const lastAllContactsOverlayVisibleFetchKeyRef = useRef<string>('');
+	const lastAllContactsOverlayBufferFetchKeyRef = useRef<string>('');
 	const [allContactsOverlayFetchBbox, setAllContactsOverlayFetchBbox] =
-		useState<BoundingBox | null>(null);
+		useState<AllContactsOverlayFetchBbox | null>(null);
+	const [allContactsOverlayBufferFetchBbox, setAllContactsOverlayBufferFetchBbox] =
+		useState<AllContactsOverlayFetchBbox | null>(null);
+	const allContactsOverlayLandMaskByIdRef = useRef<Map<number, boolean>>(new Map());
 	// Rectangle selection state (dashboard map select tool)
 	const [isAreaSelecting, setIsAreaSelecting] = useState(false);
 	const selectionStartLatLngRef = useRef<LatLngLiteral | null>(null);
@@ -3825,6 +1752,44 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const resultsSelectionMultiPolygonRef = useRef<ClippingMultiPolygon | null>(null);
 	const resultsSelectionBboxRef = useRef<BoundingBox | null>(null);
 	const resultsSelectionSignatureRef = useRef<string>('');
+	const curatedBlobSignatureRef = useRef<string>('');
+	const curatedBlobProtectedMarkerIdsRef = useRef<Set<number>>(new Set());
+	const curatedBlobProtectedMarkerIdsKeyRef = useRef<string>('');
+	const [curatedBlobProtectedMarkerIdsNonce, setCuratedBlobProtectedMarkerIdsNonce] =
+		useState(0);
+	const curatedBlobOrbTargetsRef = useRef<
+		Array<{ center: LatLngLiteral; radiusKm: number | null }>
+	>([]);
+	const curatedOrbRef = useRef<SVGSVGElement | null>(null);
+	const curatedOrbEllipseRefs = useRef<Array<SVGEllipseElement | null>>([]);
+	const curatedOrbBloomEllipseRefs = useRef<Array<SVGEllipseElement | null>>([]);
+	const curatedOrbGradientRefs = useRef<Array<SVGRadialGradientElement | null>>([]);
+	const curatedOrbBloomGradientRefs = useRef<Array<SVGRadialGradientElement | null>>([]);
+	const curatedOrbClipPathRefs = useRef<Array<SVGPathElement | null>>([]);
+	const selectedStateGradientSvgRef = useRef<SVGSVGElement | null>(null);
+	const selectedStateGradientEllipseRef = useRef<SVGEllipseElement | null>(null);
+	const selectedStateGradientBloomEllipseRef = useRef<SVGEllipseElement | null>(null);
+	const selectedStateGradientRef = useRef<SVGRadialGradientElement | null>(null);
+	const selectedStateGradientBloomRef = useRef<SVGRadialGradientElement | null>(null);
+	const selectedStateGradientClipPathRef = useRef<SVGPathElement | null>(null);
+	const selectedStateMorphSourceRef = useRef<CuratedBlobMorphSource | null>(null);
+	const selectedStateDisplayMultiPolygonRef = useRef<ClippingMultiPolygon | null>(null);
+	const selectedStateLastMorphTAppliedRef = useRef<number>(Number.NaN);
+	const selectedStateOutlineSourceKeyRef = useRef<string>('');
+	const curatedBlobLngLatMultiPolygonRef = useRef<ClippingMultiPolygon | null>(null);
+	const curatedBlobLngLatShapeMultiPolygonsRef = useRef<ClippingMultiPolygon[]>([]);
+	// Source-of-truth for the blob outline morph: the natural smoothed cluster
+	// geometries in Mercator space, plus each cluster's own circle target.
+	// Each zoom event lerps every vertex from its natural position toward a
+	// point on that cluster's circle, parameterized by `t`.
+	const naturalBlobMorphSourceRef = useRef<CuratedBlobMorphSource[] | null>(null);
+	const lastBlobMorphTAppliedRef = useRef<number>(Number.NaN);
+	// Set below from `applyCuratedOrbState` so earlier hooks (e.g. the blob
+	// update effect) can request a one-shot orb refresh after centroid changes
+	// without taking the callback as a dependency.
+	const applyCuratedOrbStateRef = useRef<(() => void) | null>(null);
+	const applySelectedStateGradientStateRef = useRef<(() => void) | null>(null);
+	const applyBlobMorphRef = useRef<(() => void) | null>(null);
 	const lastVisibleContactsKeyRef = useRef<string>('');
 	const usStatesPolygonsRef = useRef<PreparedClippingPolygon[] | null>(null);
 	const selectedStateKeyRef = useRef<string | null>(null);
@@ -3845,6 +1810,42 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		void ensureWasmGeoModuleLoaded();
 	}, []);
+
+	// Apply camera padding (campaign map shift-left uses this).
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		// Never apply UI-driven padding in decorative background mode.
+		if (isBackgroundPresentation) return;
+
+		const safe = (n: unknown) => {
+			const v = typeof n === 'number' && Number.isFinite(n) ? n : 0;
+			return v > 0 ? v : 0;
+		};
+		const next = {
+			top: safe(cameraPadding?.top),
+			right: safe(cameraPadding?.right),
+			bottom: safe(cameraPadding?.bottom),
+			left: safe(cameraPadding?.left),
+		};
+		const key = `${next.top},${next.right},${next.bottom},${next.left}`;
+		if (key === lastCameraPaddingKeyRef.current) return;
+		lastCameraPaddingKeyRef.current = key;
+
+		try {
+			map.setPadding(next);
+		} catch {
+			// Non-fatal; map may be mid-teardown.
+		}
+	}, [
+		map,
+		isMapLoaded,
+		isBackgroundPresentation,
+		cameraPadding?.top,
+		cameraPadding?.right,
+		cameraPadding?.bottom,
+		cameraPadding?.left,
+	]);
 
 	const syncUsOnlyBasemapCartography = useCallback(
 		(mapInstance: mapboxgl.Map | null) => {
@@ -3918,17 +1919,31 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const isBookingSearch = searchMode === 'booking';
 	const isPromotionSearch = searchMode === 'promotion';
 	const isAnySearch = useMemo(() => Boolean((searchQuery ?? '').trim()), [searchQuery]);
+	const isAmbientContactsEnabled = ambientContactsEnabled && !isBackgroundPresentation;
+	const shouldFetchAmbientContacts =
+		(ambientContactsEnabled || ambientContactsPreloadEnabled) &&
+		!isBackgroundPresentation;
 	const onViewportInteractionRef = useRef<
 		SearchResultsMapProps['onViewportInteraction'] | null
 	>(null);
+	const onViewportZoomRef = useRef<SearchResultsMapProps['onViewportZoom'] | null>(null);
 	const onViewportIdleRef = useRef<SearchResultsMapProps['onViewportIdle'] | null>(null);
 	const selectedAreaBoundsRef = useRef<MapSelectionBounds | null>(null);
 	useEffect(() => {
 		onViewportInteractionRef.current = onViewportInteraction ?? null;
 	}, [onViewportInteraction]);
 	useEffect(() => {
+		onViewportZoomRef.current = onViewportZoom ?? null;
+	}, [onViewportZoom]);
+	useEffect(() => {
 		onViewportIdleRef.current = onViewportIdle ?? null;
 	}, [onViewportIdle]);
+	const onOwnedVenueAnchorChangeRef = useRef<
+		SearchResultsMapProps['onOwnedVenueAnchorChange'] | null
+	>(null);
+	useEffect(() => {
+		onOwnedVenueAnchorChangeRef.current = onOwnedVenueAnchorChange ?? null;
+	}, [onOwnedVenueAnchorChange]);
 	useEffect(() => {
 		selectedAreaBoundsRef.current = selectedAreaBounds ?? null;
 	}, [selectedAreaBounds]);
@@ -3973,8 +1988,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		setPromotionOverlayFetchBbox(null);
 		lastPromotionOverlayVisibleContactsKeyRef.current = '';
 		setPromotionOverlayVisibleContacts([]);
-		lastAllContactsOverlayFetchKeyRef.current = '';
+		lastAllContactsOverlayVisibleFetchKeyRef.current = '';
+		lastAllContactsOverlayBufferFetchKeyRef.current = '';
 		setAllContactsOverlayFetchBbox(null);
+		setAllContactsOverlayBufferFetchBbox(null);
 		lastAllContactsOverlayVisibleContactsKeyRef.current = '';
 		setAllContactsOverlayVisibleContacts([]);
 	}, [searchQuery]);
@@ -4097,6 +2114,400 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		});
 	}, [map, isMapLoaded, selectedAreaBounds, isAreaSelecting, setPolygonSourceBounds]);
 
+	// ── Radius-search overlay (circle + draggable center pin) ──────────────────
+	const onRadiusCenterChangeRef = useRef<
+		SearchResultsMapProps['onRadiusCenterChange'] | null
+	>(null);
+	useEffect(() => {
+		onRadiusCenterChangeRef.current = onRadiusCenterChange ?? null;
+	}, [onRadiusCenterChange]);
+
+	// Latest overlay snapshot, read inside marker drag handlers (whose closures are
+	// created once) so pin drags keep using the committed radius.
+	const radiusOverlayRef = useRef(radiusOverlay);
+	useEffect(() => {
+		radiusOverlayRef.current = radiusOverlay;
+	}, [radiusOverlay]);
+
+	const radiusMarkerRef = useRef<mapboxgl.Marker | null>(null);
+	const radiusMarkerZoomHandlerRef = useRef<(() => void) | null>(null);
+	const ownedVenuePulseRafRef = useRef<number | null>(null);
+	const ownedVenueLat = ownedVenueLocation?.lat;
+	const ownedVenueLng = ownedVenueLocation?.lng;
+	const ownedVenueCenter = useMemo<LatLngLiteral | null>(() => {
+		const location =
+			typeof ownedVenueLat === 'number' && typeof ownedVenueLng === 'number'
+				? { lat: ownedVenueLat, lng: ownedVenueLng }
+				: null;
+		return isValidOwnedVenueLocation(location) ? location : null;
+	}, [ownedVenueLat, ownedVenueLng]);
+	const eventsPulseRafRef = useRef<number | null>(null);
+	const eventCenters = useMemo<MapEvent[]>(
+		() =>
+			events.filter((event) =>
+				isValidOwnedVenueLocation({ lat: event.lat, lng: event.lng })
+			),
+		[events]
+	);
+	const eventCentersById = useMemo(() => {
+		const map = new Map<number, MapEvent>();
+		for (const event of eventCenters) map.set(event.id, event);
+		return map;
+	}, [eventCenters]);
+	// Pinned (click) wins over hovered. Deriving the event object via `.get()` makes the
+	// "events emptied / id no longer present" cases collapse to null automatically, so the
+	// popup overlay simply unmounts.
+	const activeEventId = suppressEventPopups ? null : (pinnedEventId ?? hoveredEventId);
+	const activeEvent =
+		activeEventId != null ? (eventCentersById.get(activeEventId) ?? null) : null;
+	// Drop hovered/pinned ids whose event has disappeared (e.g. events list changed).
+	useEffect(() => {
+		if (hoveredEventId != null && !eventCentersById.has(hoveredEventId)) {
+			hoveredEventIdRef.current = null;
+			setHoveredEventId(null);
+		}
+		if (pinnedEventId != null && !eventCentersById.has(pinnedEventId)) {
+			setPinnedEventId(null);
+		}
+	}, [eventCentersById, hoveredEventId, pinnedEventId]);
+
+	// Event-popup hover lifecycle. These mirror the contact-tooltip bridge: hovering the star
+	// opens the popup, and a short grace period lets the cursor cross the star→box gap into the
+	// (now interactive) card without it closing. The box's onMouseEnter cancels the pending
+	// close; its onMouseLeave reschedules it. Pinned popups (click) ignore all of this.
+	const cancelEventHoverClose = useCallback(() => {
+		if (eventHoverCloseTimerRef.current) {
+			clearTimeout(eventHoverCloseTimerRef.current);
+			eventHoverCloseTimerRef.current = null;
+		}
+	}, []);
+	const setEventHover = useCallback(
+		(id: number) => {
+			if (suppressEventPopups) return;
+			cancelEventHoverClose();
+			if (hoveredEventIdRef.current !== id) {
+				hoveredEventIdRef.current = id;
+				setHoveredEventId(id);
+			}
+		},
+		[cancelEventHoverClose, suppressEventPopups]
+	);
+	const clearEventHoverImmediate = useCallback(() => {
+		cancelEventHoverClose();
+		// Every caller of this is a case where the cursor is provably on the map canvas
+		// (area-select, or hovering a contact marker), not on the box — so the over-box flag
+		// is stale and must be dropped, or it would wedge scheduleEventHoverClose off.
+		isPointerOverEventPopupRef.current = false;
+		if (hoveredEventIdRef.current != null) {
+			hoveredEventIdRef.current = null;
+			setHoveredEventId(null);
+		}
+	}, [cancelEventHoverClose]);
+	const scheduleEventHoverClose = useCallback(() => {
+		// No-op while the cursor is on the box (any stale mousemove frame would otherwise
+		// reschedule a close), if nothing is hovered, or if a close is already pending.
+		if (isPointerOverEventPopupRef.current) return;
+		if (hoveredEventIdRef.current == null) return;
+		if (eventHoverCloseTimerRef.current != null) return;
+		eventHoverCloseTimerRef.current = setTimeout(() => {
+			eventHoverCloseTimerRef.current = null;
+			hoveredEventIdRef.current = null;
+			setHoveredEventId(null);
+		}, EVENT_POPUP_HOVER_CLOSE_DELAY_MS);
+	}, []);
+	// Drop the "pointer over box" flag whenever the popup isn't rendered. React never fires
+	// the box's onMouseLeave on unmount, so if the card disappears while the cursor is inside
+	// it (a new search flips isLoading, or its event leaves the set), the flag would stick
+	// `true` and permanently wedge scheduleEventHoverClose off for every later hover popup.
+	useEffect(() => {
+		if (isLoading || activeEventId == null) {
+			isPointerOverEventPopupRef.current = false;
+		}
+	}, [isLoading, activeEventId]);
+	useEffect(() => {
+		if (!suppressEventPopups) return;
+		cancelEventHoverClose();
+		isPointerOverEventPopupRef.current = false;
+		if (hoveredEventIdRef.current != null) {
+			hoveredEventIdRef.current = null;
+			setHoveredEventId(null);
+		}
+		setPinnedEventId(null);
+	}, [cancelEventHoverClose, suppressEventPopups]);
+	// Clear any pending close timer + the flag on unmount (the persistent map can outlive this).
+	useEffect(
+		() => () => {
+			cancelEventHoverClose();
+			isPointerOverEventPopupRef.current = false;
+		},
+		[cancelEventHoverClose]
+	);
+	// The radius circle reuses the curated-blob pipeline (see updateCuratedBlob), so
+	// it appears only once a radius search returns results, rendered as one circle.
+	// The draggable center pin is set up in the marker effect below the blob builder.
+
+	// Detach the zoom listener + marker on unmount (the persistent map is a
+	// singleton that can outlive this component, so a leaked listener would pile
+	// up). The per-overlay effect handles the common clear/redraw cases.
+	useEffect(() => {
+		if (!map) return;
+		return () => {
+			if (radiusMarkerZoomHandlerRef.current) {
+				map.off('zoom', radiusMarkerZoomHandlerRef.current);
+				radiusMarkerZoomHandlerRef.current = null;
+			}
+			radiusMarkerRef.current?.remove();
+			radiusMarkerRef.current = null;
+		};
+	}, [map]);
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+
+		const setSourceData = (sourceId: string, data: GeoJSON.FeatureCollection) => {
+			const source = map.getSource(sourceId) as mapboxgl.GeoJSONSource | undefined;
+			source?.setData(data);
+		};
+
+		if (!ownedVenueCenter) {
+			const empty = emptyFeatureCollection();
+			setSourceData(MAPBOX_SOURCE_IDS.ownedVenueGlow, empty);
+			setSourceData(MAPBOX_SOURCE_IDS.ownedVenueRings, empty);
+			setSourceData(MAPBOX_SOURCE_IDS.ownedVenueIcon, empty);
+			return;
+		}
+
+		const overlayData = buildOwnedVenueMapOverlayData(ownedVenueCenter);
+		setSourceData(MAPBOX_SOURCE_IDS.ownedVenueGlow, overlayData.glow);
+		setSourceData(MAPBOX_SOURCE_IDS.ownedVenueRings, overlayData.rings);
+		setSourceData(MAPBOX_SOURCE_IDS.ownedVenueIcon, overlayData.icon);
+	}, [map, isMapLoaded, ownedVenueCenter]);
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+
+		const glowSource = map.getSource(MAPBOX_SOURCE_IDS.ownedVenueGlow) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		const ringsSource = map.getSource(MAPBOX_SOURCE_IDS.ownedVenueRings) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		const pulseSource = map.getSource(MAPBOX_SOURCE_IDS.ownedVenuePulse) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		if (!glowSource || !ringsSource || !pulseSource) return;
+
+		const clearPulse = () => pulseSource.setData(emptyFeatureCollection());
+
+		if (!ownedVenueCenter) {
+			clearPulse();
+			return;
+		}
+
+		let prefersReducedMotion = false;
+		try {
+			prefersReducedMotion = window.matchMedia(
+				'(prefers-reduced-motion: reduce)'
+			).matches;
+		} catch {
+			prefersReducedMotion = false;
+		}
+
+		if (prefersReducedMotion) {
+			clearPulse();
+			return;
+		}
+
+		let cancelled = false;
+
+		let lastFrameMs = 0;
+		const animateRadar = (nowMs: number) => {
+			if (cancelled) return;
+			if (nowMs - lastFrameMs < RADAR_FRAME_MS) {
+				ownedVenuePulseRafRef.current = window.requestAnimationFrame(animateRadar);
+				return;
+			}
+			lastFrameMs = nowMs;
+
+			const phase = (nowMs % OWNED_VENUE_RADAR_MS) / OWNED_VENUE_RADAR_MS;
+			glowSource.setData({
+				type: 'FeatureCollection',
+				features: buildOwnedVenueGlowFeatures(ownedVenueCenter, phase, true),
+			});
+			ringsSource.setData({
+				type: 'FeatureCollection',
+				features: buildOwnedVenueRadarLineFeatures(ownedVenueCenter, phase, {
+					animated: true,
+				}),
+			});
+			pulseSource.setData({
+				type: 'FeatureCollection',
+				features: buildOwnedVenueRadarLineFeatures(ownedVenueCenter, phase, {
+					animated: true,
+					bloom: true,
+				}),
+			});
+
+			ownedVenuePulseRafRef.current = window.requestAnimationFrame(animateRadar);
+		};
+
+		ownedVenuePulseRafRef.current = window.requestAnimationFrame(animateRadar);
+
+		return () => {
+			cancelled = true;
+			if (ownedVenuePulseRafRef.current != null) {
+				window.cancelAnimationFrame(ownedVenuePulseRafRef.current);
+				ownedVenuePulseRafRef.current = null;
+			}
+			clearPulse();
+		};
+	}, [map, isMapLoaded, ownedVenueCenter]);
+
+	// Owned-venue anchor reporting: lets the host (venue portal) pin DOM chrome next to
+	// the home icon. Mirrors the selected-marker overlay pattern (map.project on 'move').
+	useEffect(() => {
+		const notify = (
+			anchor: { x: number; y: number; isOnScreen: boolean; zoom: number } | null
+		) => onOwnedVenueAnchorChangeRef.current?.(anchor);
+		if (!map || !isMapLoaded || !ownedVenueCenter) {
+			notify(null);
+			return;
+		}
+
+		const update = () => {
+			const container = mapContainerRef.current;
+			if (!container) return;
+			const rect = container.getBoundingClientRect();
+			const p = map.project([ownedVenueCenter.lng, ownedVenueCenter.lat]);
+			// Globe far-side guard: an occluded point round-trips to a different location.
+			const roundTrip = map.unproject(p);
+			const occluded =
+				Math.abs(roundTrip.lng - ownedVenueCenter.lng) > 1 ||
+				Math.abs(roundTrip.lat - ownedVenueCenter.lat) > 1;
+			const pad = 40;
+			const isOnScreen =
+				!occluded &&
+				p.x >= -pad &&
+				p.x <= rect.width + pad &&
+				p.y >= -pad &&
+				p.y <= rect.height + pad;
+			notify({ x: rect.left + p.x, y: rect.top + p.y, isOnScreen, zoom: map.getZoom() });
+		};
+
+		update();
+		map.on('move', update);
+		map.on('resize', update);
+		return () => {
+			map.off('move', update);
+			map.off('resize', update);
+			notify(null);
+		};
+	}, [map, isMapLoaded, ownedVenueCenter]);
+
+	// Event opportunity markers: same radar machinery as the owned venue, but anchored
+	// to many event centers at once (red star icon instead of the home icon).
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+
+		const setSourceData = (sourceId: string, data: GeoJSON.FeatureCollection) => {
+			const source = map.getSource(sourceId) as mapboxgl.GeoJSONSource | undefined;
+			source?.setData(data);
+		};
+
+		if (eventCenters.length === 0) {
+			const empty = emptyFeatureCollection();
+			setSourceData(MAPBOX_SOURCE_IDS.eventsGlow, empty);
+			setSourceData(MAPBOX_SOURCE_IDS.eventsRings, empty);
+			setSourceData(MAPBOX_SOURCE_IDS.eventsIcon, empty);
+			return;
+		}
+
+		const overlayData = buildEventsMapOverlayData(eventCenters);
+		setSourceData(MAPBOX_SOURCE_IDS.eventsGlow, overlayData.glow);
+		setSourceData(MAPBOX_SOURCE_IDS.eventsRings, overlayData.rings);
+		setSourceData(MAPBOX_SOURCE_IDS.eventsIcon, overlayData.icon);
+	}, [map, isMapLoaded, eventCenters]);
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+
+		const glowSource = map.getSource(MAPBOX_SOURCE_IDS.eventsGlow) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		const ringsSource = map.getSource(MAPBOX_SOURCE_IDS.eventsRings) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		const pulseSource = map.getSource(MAPBOX_SOURCE_IDS.eventsPulse) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		if (!glowSource || !ringsSource || !pulseSource) return;
+
+		const clearPulse = () => pulseSource.setData(emptyFeatureCollection());
+
+		if (eventCenters.length === 0) {
+			clearPulse();
+			return;
+		}
+
+		let prefersReducedMotion = false;
+		try {
+			prefersReducedMotion = window.matchMedia(
+				'(prefers-reduced-motion: reduce)'
+			).matches;
+		} catch {
+			prefersReducedMotion = false;
+		}
+
+		if (prefersReducedMotion) {
+			clearPulse();
+			return;
+		}
+
+		let cancelled = false;
+
+		let lastFrameMs = 0;
+		const animateRadar = (nowMs: number) => {
+			if (cancelled) return;
+			if (nowMs - lastFrameMs < RADAR_FRAME_MS) {
+				eventsPulseRafRef.current = window.requestAnimationFrame(animateRadar);
+				return;
+			}
+			lastFrameMs = nowMs;
+
+			const phase = (nowMs % OWNED_VENUE_RADAR_MS) / OWNED_VENUE_RADAR_MS;
+			glowSource.setData({
+				type: 'FeatureCollection',
+				features: buildEventsGlowFeatures(eventCenters, phase, true),
+			});
+			ringsSource.setData({
+				type: 'FeatureCollection',
+				features: buildEventsRadarLineFeatures(eventCenters, phase, {
+					animated: true,
+				}),
+			});
+			pulseSource.setData({
+				type: 'FeatureCollection',
+				features: buildEventsRadarLineFeatures(eventCenters, phase, {
+					animated: true,
+					bloom: true,
+				}),
+			});
+
+			eventsPulseRafRef.current = window.requestAnimationFrame(animateRadar);
+		};
+
+		eventsPulseRafRef.current = window.requestAnimationFrame(animateRadar);
+
+		return () => {
+			cancelled = true;
+			if (eventsPulseRafRef.current != null) {
+				window.cancelAnimationFrame(eventsPulseRafRef.current);
+				eventsPulseRafRef.current = null;
+			}
+			clearPulse();
+		};
+	}, [map, isMapLoaded, eventCenters]);
+
 	// Cancel selection if the tool changes or the map unmounts.
 	useEffect(() => {
 		if (!areaSelectionEnabled && isAreaSelecting) {
@@ -4123,26 +2534,29 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return () => window.removeEventListener('keydown', onKeyDown);
 	}, [isAreaSelecting, clearSelectionRect]);
 
-	// If the user releases the mouse outside the map, ensure we don't get "stuck" selecting.
+	// If the user releases the mouse (or lifts the finger) outside the map, ensure we
+	// don't get "stuck" selecting.
 	useEffect(() => {
 		if (!isAreaSelecting) return;
-		// Defer so the map's own mouseup handler can run first.
-		const onWindowMouseUp = () => setTimeout(() => clearSelectionRect(), 0);
-		window.addEventListener('mouseup', onWindowMouseUp);
-		return () => window.removeEventListener('mouseup', onWindowMouseUp);
+		// Defer so the map's own mouseup/touchend handler can run first.
+		const onWindowPointerEnd = () => setTimeout(() => clearSelectionRect(), 0);
+		window.addEventListener('mouseup', onWindowPointerEnd);
+		window.addEventListener('touchend', onWindowPointerEnd);
+		window.addEventListener('touchcancel', onWindowPointerEnd);
+		return () => {
+			window.removeEventListener('mouseup', onWindowPointerEnd);
+			window.removeEventListener('touchend', onWindowPointerEnd);
+			window.removeEventListener('touchcancel', onWindowPointerEnd);
+		};
 	}, [isAreaSelecting, clearSelectionRect]);
 
-	const handleMapMouseDown = useCallback(
-		(e: mapboxgl.MapMouseEvent) => {
-			if (!areaSelectionEnabled) return;
-
-			// Only left-click starts a selection.
-			const domEv = e.originalEvent;
-			if (domEv.button !== 0) return;
-
-			const start = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+	const beginAreaSelection = useCallback(
+		(
+			start: { lat: number; lng: number },
+			startClient: { x: number; y: number } | null
+		) => {
 			selectionStartLatLngRef.current = start;
-			selectionStartClientRef.current = getClientPointFromDomEvent(domEv);
+			selectionStartClientRef.current = startClient;
 			setIsAreaSelecting(true);
 
 			const bounds: MapSelectionBounds = {
@@ -4154,15 +2568,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			selectionBoundsRef.current = bounds;
 			setPolygonSourceBounds(MAPBOX_SOURCE_IDS.selectionRect, bounds);
 		},
-		[areaSelectionEnabled, setPolygonSourceBounds]
+		[setPolygonSourceBounds]
 	);
 
-	const handleMapMouseMove = useCallback(
-		(e: mapboxgl.MapMouseEvent) => {
+	const updateAreaSelection = useCallback(
+		(current: { lat: number; lng: number }) => {
 			if (!isAreaSelecting) return;
 			const start = selectionStartLatLngRef.current;
 			if (!start) return;
-			const current = { lat: e.lngLat.lat, lng: e.lngLat.lng };
 			const bounds: MapSelectionBounds = {
 				south: Math.min(start.lat, current.lat),
 				west: Math.min(start.lng, current.lng),
@@ -4173,6 +2586,61 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			setPolygonSourceBounds(MAPBOX_SOURCE_IDS.selectionRect, bounds);
 		},
 		[isAreaSelecting, setPolygonSourceBounds]
+	);
+
+	const handleMapMouseDown = useCallback(
+		(e: mapboxgl.MapMouseEvent) => {
+			if (!areaSelectionEnabled) return;
+
+			// Only left-click starts a selection.
+			const domEv = e.originalEvent;
+			if (domEv.button !== 0) return;
+
+			beginAreaSelection(
+				{ lat: e.lngLat.lat, lng: e.lngLat.lng },
+				getClientPointFromDomEvent(domEv)
+			);
+		},
+		[areaSelectionEnabled, beginAreaSelection]
+	);
+
+	const handleMapMouseMove = useCallback(
+		(e: mapboxgl.MapMouseEvent) => {
+			updateAreaSelection({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+		},
+		[updateAreaSelection]
+	);
+
+	// Touch adapters: Mapbox does not synthesize mouse events from touches, so the
+	// rectangle selection needs its own touch handlers (single-finger drag draws the
+	// box; a second finger cancels so pinch-zoom never fights an in-progress selection).
+	const handleMapTouchStart = useCallback(
+		(e: mapboxgl.MapTouchEvent) => {
+			if (!areaSelectionEnabled) return;
+			if (e.originalEvent.touches.length > 1) {
+				clearSelectionRect();
+				return;
+			}
+			e.preventDefault();
+			beginAreaSelection(
+				{ lat: e.lngLat.lat, lng: e.lngLat.lng },
+				getClientPointFromDomEvent(e.originalEvent)
+			);
+		},
+		[areaSelectionEnabled, beginAreaSelection, clearSelectionRect]
+	);
+
+	const handleMapTouchMove = useCallback(
+		(e: mapboxgl.MapTouchEvent) => {
+			if (!isAreaSelecting) return;
+			if (e.originalEvent.touches.length > 1) {
+				clearSelectionRect();
+				return;
+			}
+			e.preventDefault();
+			updateAreaSelection({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+		},
+		[isAreaSelecting, clearSelectionRect, updateAreaSelection]
 	);
 
 	const updateBookingExtraFetchBbox = useCallback(
@@ -4315,23 +2783,38 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const updateAllContactsOverlayFetchBbox = useCallback(
 		(mapInstance: mapboxgl.Map | null) => {
 			if (!mapInstance) return;
-
-			// Only run when an explicit search is active (avoid loading the entire dataset in non-search views).
-			if (!isAnySearch) {
-				if (lastAllContactsOverlayFetchKeyRef.current !== '') {
-					lastAllContactsOverlayFetchKeyRef.current = '';
+			const clearAllContactsFetchWindows = () => {
+				if (
+					lastAllContactsOverlayVisibleFetchKeyRef.current !== '' ||
+					lastAllContactsOverlayBufferFetchKeyRef.current !== ''
+				) {
+					lastAllContactsOverlayVisibleFetchKeyRef.current = '';
+					lastAllContactsOverlayBufferFetchKeyRef.current = '';
 					setAllContactsOverlayFetchBbox(null);
+					setAllContactsOverlayBufferFetchBbox(null);
 				}
+			};
+
+			// Search mode uses the close-zoom "all contacts" overlay. Disengaged mode uses
+			// the regional ambient atlas. We also preload ambient while the empty-map prompt
+			// is available so disengaging can render from cache immediately.
+			const overlayMode: AllContactsOverlayFetchMode | null = shouldFetchAmbientContacts
+				? 'ambient'
+				: isAnySearch
+					? 'all'
+					: null;
+			if (!overlayMode) {
+				clearAllContactsFetchWindows();
 				return;
 			}
 
 			const zoomRaw = mapInstance.getZoom() ?? 4;
-			// Only fetch/render the gray-dot overlay when zoomed in very close.
-			if (zoomRaw < ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM) {
-				if (lastAllContactsOverlayFetchKeyRef.current !== '') {
-					lastAllContactsOverlayFetchKeyRef.current = '';
-					setAllContactsOverlayFetchBbox(null);
-				}
+			const minZoom =
+				overlayMode === 'ambient'
+					? AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM
+					: ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM;
+			if (zoomRaw < minZoom) {
+				clearAllContactsFetchWindows();
 				return;
 			}
 
@@ -4347,11 +2830,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Skip antimeridian-crossing viewports (not relevant for our UI).
 			if (east < west) return;
 
-			// Light padding to avoid refetching on small pans.
+			// The visible window is intentionally unpadded in ambient mode so the first
+			// request returns quickly. The padded buffer follows as a separate background
+			// request and merges without clearing the visible chunk.
 			const latSpan = north - south;
 			const lngSpan = east - west;
-			const padLat = latSpan * 0.2;
-			const padLng = lngSpan * 0.2;
+			const padFactor = overlayMode === 'ambient' ? 0.42 : 0.2;
+			const padLat = latSpan * padFactor;
+			const padLng = lngSpan * padFactor;
 
 			const paddedSouth = clamp(south - padLat, -90, 90);
 			const paddedWest = clamp(west - padLng, -180, 180);
@@ -4361,43 +2847,131 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Quantize the fetch window so we don't refetch on tiny pans/zooms.
 			const zoomKey = Math.round(zoomRaw);
 			const quant = getBackgroundDotsQuantizationDeg(zoomKey);
-			const qSouth = Math.floor(paddedSouth / quant) * quant;
-			const qWest = Math.floor(paddedWest / quant) * quant;
-			const qNorth = Math.ceil(paddedNorth / quant) * quant;
-			const qEast = Math.ceil(paddedEast / quant) * quant;
 
-			const nextKey = `${zoomKey}|${qSouth.toFixed(4)}|${qWest.toFixed(4)}|${qNorth.toFixed(
-				4
-			)}|${qEast.toFixed(4)}`;
-			if (nextKey === lastAllContactsOverlayFetchKeyRef.current) return;
+			const buildFetchBbox = (
+				phase: AllContactsOverlayFetchPhase,
+				boundsForPhase: BoundingBox
+			): AllContactsOverlayFetchBbox => {
+				const phaseQuant =
+					overlayMode === 'ambient' && phase === 'visible'
+						? Math.max(0.05, quant * 0.5)
+						: quant;
+				const qSouth = Math.floor(boundsForPhase.minLat / phaseQuant) * phaseQuant;
+				const qWest = Math.floor(boundsForPhase.minLng / phaseQuant) * phaseQuant;
+				const qNorth = Math.ceil(boundsForPhase.maxLat / phaseQuant) * phaseQuant;
+				const qEast = Math.ceil(boundsForPhase.maxLng / phaseQuant) * phaseQuant;
+				const seed = `${overlayMode}|${phase}|${zoomKey}|${qSouth.toFixed(4)}|${qWest.toFixed(4)}|${qNorth.toFixed(4)}|${qEast.toFixed(4)}`;
+				return {
+					minLat: qSouth,
+					minLng: qWest,
+					maxLat: qNorth,
+					maxLng: qEast,
+					mode: overlayMode,
+					phase,
+					zoom: zoomRaw,
+					seed,
+				};
+			};
 
-			lastAllContactsOverlayFetchKeyRef.current = nextKey;
-			setAllContactsOverlayFetchBbox({
-				minLat: qSouth,
-				minLng: qWest,
-				maxLat: qNorth,
-				maxLng: qEast,
+			const visibleFetchBbox = buildFetchBbox('visible', {
+				minLat: overlayMode === 'ambient' ? south : paddedSouth,
+				minLng: overlayMode === 'ambient' ? west : paddedWest,
+				maxLat: overlayMode === 'ambient' ? north : paddedNorth,
+				maxLng: overlayMode === 'ambient' ? east : paddedEast,
 			});
+
+			if (visibleFetchBbox.seed !== lastAllContactsOverlayVisibleFetchKeyRef.current) {
+				lastAllContactsOverlayVisibleFetchKeyRef.current = visibleFetchBbox.seed;
+				setAllContactsOverlayFetchBbox(visibleFetchBbox);
+			}
+
+			if (overlayMode !== 'ambient') {
+				if (lastAllContactsOverlayBufferFetchKeyRef.current !== '') {
+					lastAllContactsOverlayBufferFetchKeyRef.current = '';
+					setAllContactsOverlayBufferFetchBbox(null);
+				}
+				return;
+			}
+
+			const bufferFetchBbox = buildFetchBbox('buffer', {
+				minLat: paddedSouth,
+				minLng: paddedWest,
+				maxLat: paddedNorth,
+				maxLng: paddedEast,
+			});
+
+			if (bufferFetchBbox.seed !== lastAllContactsOverlayBufferFetchKeyRef.current) {
+				lastAllContactsOverlayBufferFetchKeyRef.current = bufferFetchBbox.seed;
+				setAllContactsOverlayBufferFetchBbox(bufferFetchBbox);
+			}
 		},
-		[isAnySearch]
+		[isAnySearch, shouldFetchAmbientContacts]
 	);
 
 	const allContactsOverlayFilters = useMemo(() => {
 		if (!allContactsOverlayFetchBbox) return undefined;
+		const isAmbient = allContactsOverlayFetchBbox.mode === 'ambient';
 		return {
-			mode: 'all' as const,
+			mode: allContactsOverlayFetchBbox.mode,
 			south: allContactsOverlayFetchBbox.minLat,
 			west: allContactsOverlayFetchBbox.minLng,
 			north: allContactsOverlayFetchBbox.maxLat,
 			east: allContactsOverlayFetchBbox.maxLng,
-			limit: ALL_CONTACTS_OVERLAY_LIMIT,
+			limit: isAmbient ? 760 : ALL_CONTACTS_OVERLAY_LIMIT,
+			zoom: allContactsOverlayFetchBbox.zoom,
+			seed: allContactsOverlayFetchBbox.seed,
+			phase: allContactsOverlayFetchBbox.phase,
 		};
 	}, [allContactsOverlayFetchBbox]);
 
-	const { data: allContactsOverlayRawContacts } = useGetContactsMapOverlay({
+	const allContactsOverlayBufferFilters = useMemo(() => {
+		if (!allContactsOverlayBufferFetchBbox) return undefined;
+		return {
+			mode: allContactsOverlayBufferFetchBbox.mode,
+			south: allContactsOverlayBufferFetchBbox.minLat,
+			west: allContactsOverlayBufferFetchBbox.minLng,
+			north: allContactsOverlayBufferFetchBbox.maxLat,
+			east: allContactsOverlayBufferFetchBbox.maxLng,
+			limit: AMBIENT_CONTACTS_OVERLAY_LIMIT,
+			zoom: allContactsOverlayBufferFetchBbox.zoom,
+			seed: allContactsOverlayBufferFetchBbox.seed,
+			phase: allContactsOverlayBufferFetchBbox.phase,
+		};
+	}, [allContactsOverlayBufferFetchBbox]);
+
+	const { data: allContactsOverlayVisibleRawContacts } = useGetContactsMapOverlay({
 		filters: allContactsOverlayFilters,
 		enabled: Boolean(allContactsOverlayFilters),
 	});
+	const { data: allContactsOverlayBufferRawContacts } = useGetContactsMapOverlay({
+		filters: allContactsOverlayBufferFilters,
+		enabled: Boolean(
+			allContactsOverlayBufferFilters &&
+			allContactsOverlayVisibleRawContacts !== undefined
+		),
+	});
+
+	const allContactsOverlayRawContacts = useMemo(() => {
+		const visible = allContactsOverlayFetchBbox
+			? (allContactsOverlayVisibleRawContacts ?? [])
+			: [];
+		const buffer = allContactsOverlayBufferFetchBbox
+			? (allContactsOverlayBufferRawContacts ?? [])
+			: [];
+		if (visible.length === 0) return buffer;
+		if (buffer.length === 0) return visible;
+		const byId = new Map<number, ContactWithName>();
+		for (const contact of visible) byId.set(contact.id, contact);
+		for (const contact of buffer) {
+			if (!byId.has(contact.id)) byId.set(contact.id, contact);
+		}
+		return Array.from(byId.values());
+	}, [
+		allContactsOverlayFetchBbox,
+		allContactsOverlayBufferFetchBbox,
+		allContactsOverlayVisibleRawContacts,
+		allContactsOverlayBufferRawContacts,
+	]);
 
 	const bookingExtraOverlayFilters = useMemo(() => {
 		if (!bookingExtraFetchBbox) return undefined;
@@ -4660,7 +3234,37 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		source?.setData(EMPTY_POLYGON_FC as any);
 	}, [map, isMapLoaded]);
 
+	const updateCuratedBlobProtectedMarkerIds = useCallback((ids: Set<number>) => {
+		const key = Array.from(ids)
+			.sort((a, b) => a - b)
+			.join(',');
+		if (key === curatedBlobProtectedMarkerIdsKeyRef.current) return;
+		curatedBlobProtectedMarkerIdsKeyRef.current = key;
+		curatedBlobProtectedMarkerIdsRef.current = ids;
+		setCuratedBlobProtectedMarkerIdsNonce((value) => value + 1);
+	}, []);
+
+	const clearCuratedBlobOutline = useCallback(() => {
+		curatedBlobSignatureRef.current = '';
+		updateCuratedBlobProtectedMarkerIds(new Set());
+		curatedBlobOrbTargetsRef.current = [];
+		curatedBlobLngLatMultiPolygonRef.current = null;
+		curatedBlobLngLatShapeMultiPolygonsRef.current = [];
+		naturalBlobMorphSourceRef.current = null;
+		lastBlobMorphTAppliedRef.current = Number.NaN;
+		applyCuratedOrbStateRef.current?.();
+		if (!map || !isMapLoaded) return;
+		const source = map.getSource(MAPBOX_SOURCE_IDS.curatedBlob) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		source?.setData(EMPTY_POLYGON_FC as GeoJSON.FeatureCollection);
+	}, [map, isMapLoaded, updateCuratedBlobProtectedMarkerIds]);
+
 	const clearSearchedStateOutline = useCallback(() => {
+		selectedStateMorphSourceRef.current = null;
+		selectedStateDisplayMultiPolygonRef.current = null;
+		selectedStateLastMorphTAppliedRef.current = Number.NaN;
+		selectedStateOutlineSourceKeyRef.current = '';
 		if (!map || !isMapLoaded) return;
 		const source = map.getSource(MAPBOX_SOURCE_IDS.lockedOutline) as
 			| mapboxgl.GeoJSONSource
@@ -4933,7 +3537,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							['zoom'],
 							MAP_MIN_ZOOM,
 							0,
-							MAP_MIN_ZOOM + 1.25,
+							STATE_LABELS_FULL_OPACITY_ZOOM,
 							overlay,
 						]);
 					}
@@ -5061,41 +3665,46 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!isCanvasSource) return;
 
 		// Ensure Mapbox is actively sampling the canvas each frame.
+		// Safari: the tick below re-uploads after each draw instead; keep the source
+		// paused between ticks so the map can idle (see SAFARI_CANVAS_PERF_MODE).
 		try {
 			cloudsSource.play?.();
+			if (SAFARI_CANVAS_PERF_MODE) cloudsSource.pause?.();
 		} catch {
 			// Ignore.
 		}
 
 		// Mirror the same play() guarantee for the dedicated lightning canvas source.
-		try {
-			const lightningSource: { play?: () => void } | null = (() => {
-				try {
-					return map.getSource(MAPBOX_SOURCE_IDS.lightning) as
-						| { play?: () => void }
-						| null;
-				} catch {
-					return null;
-				}
-			})();
-			lightningSource?.play?.();
-		} catch {
-			// Ignore.
-		}
+		// Safari: skipped — the tick uploads the lightning/snow canvases only while
+		// their weather visuals are actually active.
+		if (!SAFARI_CANVAS_PERF_MODE) {
+			try {
+				const lightningSource: { play?: () => void } | null = (() => {
+					try {
+						return map.getSource(MAPBOX_SOURCE_IDS.lightning) as {
+							play?: () => void;
+						} | null;
+					} catch {
+						return null;
+					}
+				})();
+				lightningSource?.play?.();
+			} catch {
+				// Ignore.
+			}
 
-		try {
-			const snowSource: { play?: () => void } | null = (() => {
-				try {
-					return map.getSource(MAPBOX_SOURCE_IDS.snow) as
-						| { play?: () => void }
-						| null;
-				} catch {
-					return null;
-				}
-			})();
-			snowSource?.play?.();
-		} catch {
-			// Ignore.
+			try {
+				const snowSource: { play?: () => void } | null = (() => {
+					try {
+						return map.getSource(MAPBOX_SOURCE_IDS.snow) as { play?: () => void } | null;
+					} catch {
+						return null;
+					}
+				})();
+				snowSource?.play?.();
+			} catch {
+				// Ignore.
+			}
 		}
 
 		const loadTexture = (): Promise<HTMLImageElement> => {
@@ -5479,7 +4088,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					x: point.x,
 					y: point.y,
 					weight: 0.55 + (point.alpha / 255) * 1.35 + Math.random() * 0.35,
-					radiusPx: lerp(LIGHTNING_CELL_RADIUS_GLOBE_PX * 0.7, LIGHTNING_CELL_RADIUS_GLOBE_PX * 1.4, Math.random()),
+					radiusPx: lerp(
+						LIGHTNING_CELL_RADIUS_GLOBE_PX * 0.7,
+						LIGHTNING_CELL_RADIUS_GLOBE_PX * 1.4,
+						Math.random()
+					),
 				});
 			}
 
@@ -5548,8 +4161,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const lngLat = lightningCanvasPointToLngLat(x, y, w, h);
 				if (!lngLat || !isLngLatInLightningUsRegion(lngLat.lng, lngLat.lat)) continue;
 				const alpha = lightningPotentialAlphaAt(
-					(((x / w) * CLOUDS_CANVAS_SIZE_PX) % CLOUDS_CANVAS_SIZE_PX),
-					((y / h) * CLOUDS_CANVAS_SIZE_PX),
+					((x / w) * CLOUDS_CANVAS_SIZE_PX) % CLOUDS_CANVAS_SIZE_PX,
+					(y / h) * CLOUDS_CANVAS_SIZE_PX,
 					CLOUDS_CANVAS_SIZE_PX,
 					CLOUDS_CANVAS_SIZE_PX
 				);
@@ -5641,8 +4254,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const pulses: StormLightningPulse[] = [];
 			for (let p = 0; p < pulseCount; p++) {
 				const offsetMs = p === 0 ? 0 : 82 + p * (62 + Math.random() * 48);
-				const basePeak =
-					kind === 'dramatic' ? 0.78 : kind === 'sheet' ? 0.5 : 0.62;
+				const basePeak = kind === 'dramatic' ? 0.78 : kind === 'sheet' ? 0.5 : 0.62;
 				const peakOpacity = p === 0 ? basePeak : basePeak * (p === 1 ? 0.48 : 0.28);
 				pulses.push({
 					offsetMs,
@@ -5715,10 +4327,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const canSpawnLightning =
 				Boolean(weatherMoodConfigRef.current.lightning) && lightningIntensity > 0.001;
 
-			const enabled =
-				!prefersReducedMotion &&
-				lightningIntensity > 0.001 &&
-				zoomOk;
+			const enabled = !prefersReducedMotion && lightningIntensity > 0.001 && zoomOk;
 
 			if (!enabled) {
 				lightningWasEnabledRef.current = false;
@@ -5880,11 +4489,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				if (a <= 0.001) continue;
 				a = clamp(a * LIGHTNING_OPACITY_MULTIPLIER * lightningIntensity, 0, 0.95);
 				const occlusion = clamp(e.cloudOcclusion, 0, 1);
-				glowA = clamp(
-					glowA * (0.34 + occlusion * 0.38) * lightningIntensity,
-					0,
-					0.86
-				);
+				glowA = clamp(glowA * (0.34 + occlusion * 0.38) * lightningIntensity, 0, 0.86);
 
 				const stamp = stamps[e.stampIndex % stamps.length];
 				const sw = stamp.naturalWidth || stamp.width || 256;
@@ -5953,14 +4558,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 				lightningCtx.shadowBlur = e.kind === 'dramatic' ? 10 : 5;
 				if (e.kind !== 'sheet') {
-					drawStamp(
-						stamp,
-						coreX,
-						coreY,
-						e.glowScale * 0.54,
-						e.rotationRad,
-						glowA * 0.5
-					);
+					drawStamp(stamp, coreX, coreY, e.glowScale * 0.54, e.rotationRad, glowA * 0.5);
 				}
 				try {
 					lightningCtx.filter = 'none';
@@ -5996,8 +4594,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					opacity: lerp(0.22, 0.58, depth) * lerp(0.66, 1.0, hash01(seed + 49.2)),
 					fallSpeed: lerp(0.52, 1.45, depth) * lerp(0.8, 1.16, hash01(seed + 61.5)),
 					windSpeed:
-						lerp(0.18, 0.95, hash01(seed + 73.4)) *
-						(hash01(seed + 83.9) < 0.44 ? -1 : 1),
+						lerp(0.18, 0.95, hash01(seed + 73.4)) * (hash01(seed + 83.9) < 0.44 ? -1 : 1),
 					windSway: lerp(0.45, 1.4, hash01(seed + 89.6)) * lerp(0.72, 1.28, depth),
 					windPhase: hash01(seed + 92.8) * Math.PI * 2,
 					gustResponsiveness:
@@ -6055,7 +4652,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				if (!ctx) return null;
 				const s = CLOUDS_SNOW_INTERACTION_STAMP_SIZE_PX;
 				const [r, g, b] = rgb;
-				const gradient = ctx.createRadialGradient(s * 0.5, s * 0.5, 0, s * 0.5, s * 0.5, s * 0.5);
+				const gradient = ctx.createRadialGradient(
+					s * 0.5,
+					s * 0.5,
+					0,
+					s * 0.5,
+					s * 0.5,
+					s * 0.5
+				);
 				gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 1)`);
 				gradient.addColorStop(0.24, `rgba(${r}, ${g}, ${b}, 0.58)`);
 				gradient.addColorStop(0.62, `rgba(${r}, ${g}, ${b}, 0.16)`);
@@ -6130,11 +4734,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// Ignore.
 			}
 			for (const impact of impacts) {
-				const alpha = clamp(
-					strength * Math.pow(clamp(impact.alpha01, 0, 1), 0.55),
-					0,
-					1
-				);
+				const alpha = clamp(strength * Math.pow(clamp(impact.alpha01, 0, 1), 0.55), 0, 1);
 				const a = alpha * 0.18;
 				if (a <= 0.001) continue;
 
@@ -6187,22 +4787,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// Ignore.
 			}
 			for (const impact of impacts) {
-				const alpha = clamp(
-					strength * Math.pow(clamp(impact.alpha01, 0, 1), 0.55),
-					0,
-					1
-				);
+				const alpha = clamp(strength * Math.pow(clamp(impact.alpha01, 0, 1), 0.55), 0, 1);
 				const a = alpha * 0.56;
 				if (a <= 0.001) continue;
 
 				const cx = impact.x * scaleX;
 				const cy = impact.y * scaleY;
 				const r = clamp(impact.radiusPx * scale, 9, 44);
-				const drift = clamp(
-					Math.tanh((impact.driftXPx * scaleX) / 12) * 1.8,
-					-1.8,
-					1.8
-				);
+				const drift = clamp(Math.tanh((impact.driftXPx * scaleX) / 12) * 1.8, -1.8, 1.8);
 
 				// Trailing vertical column — three staggered stamps so the wake feels
 				// continuous and "snow-shaped" rather than a circular punch.
@@ -6242,11 +4834,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// Ignore.
 			}
 			for (const impact of impacts) {
-				const alpha = clamp(
-					strength * Math.pow(clamp(impact.alpha01, 0, 1), 0.55),
-					0,
-					1
-				);
+				const alpha = clamp(strength * Math.pow(clamp(impact.alpha01, 0, 1), 0.55), 0, 1);
 				const a = alpha * 0.13;
 				if (a <= 0.001) continue;
 
@@ -6311,7 +4899,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const densityScale = prefersReducedMotion ? 0.55 : 1;
 			const visibleCount = Math.min(
 				particles.length,
-				Math.max(0, Math.round(particles.length * clamp(cfg.snowDensity, 0, 1) * densityScale))
+				Math.max(
+					0,
+					Math.round(particles.length * clamp(cfg.snowDensity, 0, 1) * densityScale)
+				)
 			);
 			if (visibleCount <= 0) return;
 
@@ -6334,8 +4925,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const gustT = tMs / SNOW_GUST_BAND_LOOP_MS;
 			const densityT = tMs / SNOW_DENSITY_BAND_LOOP_MS;
 			const wrap = (value: number, span: number, margin: number) =>
-				(((value + margin) % (span + margin * 2)) + span + margin * 2) %
-					(span + margin * 2) -
+				((((value + margin) % (span + margin * 2)) + span + margin * 2) %
+					(span + margin * 2)) -
 				margin;
 
 			snowCtx.save();
@@ -6376,15 +4967,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						(noise1D(turbulenceT * lerp(0.72, 1.55, p.depth) + p.turbulenceSeed) - 0.5) *
 						2;
 					const localDriftB =
-						(noise1D(turbulenceT * lerp(1.35, 2.35, p.depth) + p.gustSeed + 17.3) -
-							0.5) *
+						(noise1D(turbulenceT * lerp(1.35, 2.35, p.depth) + p.gustSeed + 17.3) - 0.5) *
 						2;
 					const gustBand =
-						(noise1D(baseY * 0.0042 + baseX * 0.0014 + gustT * 1.2 + 210.3) - 0.5) *
-						2;
+						(noise1D(baseY * 0.0042 + baseX * 0.0014 + gustT * 1.2 + 210.3) - 0.5) * 2;
 					const gustFine =
-						(noise1D(baseY * 0.011 - baseX * 0.002 + gustT * 2.1 + p.gustSeed) - 0.5) *
-						2;
+						(noise1D(baseY * 0.011 - baseX * 0.002 + gustT * 2.1 + p.gustSeed) - 0.5) * 2;
 					const windSway =
 						Math.sin(
 							tS * lerp(0.42, 0.95, p.depth) +
@@ -6468,7 +5056,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						y >= 0 &&
 						y <= h
 					) {
-						const alpha01 = clamp(flakeAlpha / Math.max(0.001, SNOW_STAMP_MAX_ALPHA), 0, 1);
+						const alpha01 = clamp(
+							flakeAlpha / Math.max(0.001, SNOW_STAMP_MAX_ALPHA),
+							0,
+							1
+						);
 						const radiusPx = clamp(
 							Math.max(drawW, drawH) * (1.25 + p.depth * 1.55),
 							16,
@@ -6586,8 +5178,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					// mid-alpha edges become a light rim so storm clouds are not flat black.
 					const core = Math.pow(smoothstep(0.42, 0.92, a), 1.28);
 					const edge =
-						Math.pow(smoothstep(0.07, 0.34, a), 0.9) *
-						(1 - smoothstep(0.48, 0.86, a));
+						Math.pow(smoothstep(0.07, 0.34, a), 0.9) * (1 - smoothstep(0.48, 0.86, a));
 
 					if (core > 0.002) {
 						const coreNoise = 0.78 + hash01(x * 13.17 + y * 31.73 + 204.9) * 0.22;
@@ -6697,7 +5288,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					edgePixels > 0 ? putStormMaskPattern(edgeCanvas, edgeData, w, h) : null;
 				cloudsTextureStormReadyRef.current = Boolean(
 					cloudsTextureStormCorePatternRef.current ||
-						cloudsTextureStormEdgePatternRef.current
+					cloudsTextureStormEdgePatternRef.current
 				);
 			} catch {
 				cloudsTextureStormReadyRef.current = false;
@@ -7072,11 +5663,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					}
 
 					try {
-						const { coreData, edgeData, corePixels, edgePixels } = buildStormCloudMaskData(
-							groupDatas[g],
-							w,
-							h
-						);
+						const { coreData, edgeData, corePixels, edgePixels } =
+							buildStormCloudMaskData(groupDatas[g], w, h);
 						const coreCanvas = document.createElement('canvas');
 						coreCanvas.width = w;
 						coreCanvas.height = h;
@@ -7448,20 +6036,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 					if (!useGroups) {
 						if (stormEdgePattern) {
-							fillPatternAt(
-								stormEdgePattern,
-								x0,
-								y0,
-								stormEdgeOpacity * baseLayerAlpha
-							);
+							fillPatternAt(stormEdgePattern, x0, y0, stormEdgeOpacity * baseLayerAlpha);
 						}
 						if (stormCorePattern) {
-							fillPatternAt(
-								stormCorePattern,
-								x0,
-								y0,
-								stormCoreOpacity * baseLayerAlpha
-							);
+							fillPatternAt(stormCorePattern, x0, y0, stormCoreOpacity * baseLayerAlpha);
 						}
 					}
 
@@ -7547,11 +6125,54 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 		};
 
+		const driftUpdateMs = SAFARI_CANVAS_PERF_MODE
+			? SAFARI_CLOUDS_DRIFT_UPDATE_MS
+			: CLOUDS_DRIFT_UPDATE_MS;
 		const tick = (now: number, img: HTMLImageElement, pattern: CanvasPattern | null) => {
 			if (canceled) return;
 
+			// Safari: every drift tick forces a whole-map repaint (triggerRepaint
+			// below). Skip ticks entirely while the weather visuals are invisible
+			// (deep zoom in moods with no deep-zoom cloud veil; lightning and snow
+			// are also hidden at CLOUDS_OVERLAY_FADE_OUT_END_ZOOM), and at rest
+			// drop the cadence — sub-pixel drift at 10fps reads the same.
+			let effectiveDriftMs = driftUpdateMs;
+			if (SAFARI_CANVAS_PERF_MODE) {
+				const cfg = weatherMoodConfigRef.current;
+				let zoom: number | null = null;
+				try {
+					zoom = map.getZoom();
+				} catch {
+					zoom = null;
+				}
+				if (
+					zoom != null &&
+					zoom >= CLOUDS_OVERLAY_FADE_OUT_END_ZOOM &&
+					cfg.cloudDeepZoomOpacity <= 0.001 &&
+					lightningEventsRef.current.length === 0 &&
+					!lightningUploadWasActiveRef.current &&
+					!snowUploadWasActiveRef.current
+				) {
+					// Keep dt sane for the eventual resume, keep the rAF chain
+					// alive, do no draw/upload/repaint work: the map truly idles.
+					cloudsDriftLastFrameMsRef.current = now;
+					cloudsDriftRafRef.current = requestAnimationFrame((t) => tick(t, img, pattern));
+					return;
+				}
+				try {
+					if (
+						!map.isMoving() &&
+						now - cloudsDriftLastCameraMoveMsRef.current > SAFARI_CLOUDS_IDLE_AFTER_MS
+					) {
+						effectiveDriftMs = SAFARI_CLOUDS_IDLE_DRIFT_UPDATE_MS;
+					}
+				} catch {
+					// Keep the normal cadence.
+				}
+			}
+
 			const last = cloudsDriftLastFrameMsRef.current;
-			if (!last || now - last >= CLOUDS_DRIFT_UPDATE_MS) {
+			if (!last || now - last >= effectiveDriftMs) {
 				const dtS = last ? (now - last) / 1000 : 0;
 				cloudsDriftLastFrameMsRef.current = now;
 				const dtReal = clamp(dtS, 0, 0.25);
@@ -7571,6 +6192,45 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					drawSnow(cloudsDriftSimTimeMsRef.current);
 				} catch {
 					// Ignore.
+				}
+				if (SAFARI_CANVAS_PERF_MODE) {
+					// Upload this tick's content, then leave the sources paused so the map
+					// idles between ticks instead of re-uploading every canvas every frame.
+					uploadCanvasSourceOnce(cloudsSource);
+
+					// Lightning/snow upload only while visually active, plus one trailing
+					// tick so the final cleared canvas reaches the GPU (drawLightning and
+					// drawSnow clearRect every tick).
+					const cfg = weatherMoodConfigRef.current;
+					const lightningActive = lightningEventsRef.current.length > 0;
+					if (lightningActive || lightningUploadWasActiveRef.current) {
+						try {
+							uploadCanvasSourceOnce(
+								map.getSource(MAPBOX_SOURCE_IDS.lightning) as {
+									play?: () => void;
+									pause?: () => void;
+								} | null
+							);
+						} catch {
+							// Ignore.
+						}
+					}
+					lightningUploadWasActiveRef.current = lightningActive;
+
+					const snowActive = cfg.snowOpacity > 0.001 && cfg.snowDensity > 0.001;
+					if (snowActive || snowUploadWasActiveRef.current) {
+						try {
+							uploadCanvasSourceOnce(
+								map.getSource(MAPBOX_SOURCE_IDS.snow) as {
+									play?: () => void;
+									pause?: () => void;
+								} | null
+							);
+						} catch {
+							// Ignore.
+						}
+					}
+					snowUploadWasActiveRef.current = snowActive;
 				}
 				// In some Mapbox GL configurations `animate: true` is not enough to force
 				// continuous sampling; request repaint after every animated canvas is current.
@@ -7650,8 +6310,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// If the texture fails to load, just leave clouds static.
 			});
 
+		// Stamp camera motion so the Safari idle drift cadence can re-engage the
+		// normal cadence the moment the user (or an ease) moves the camera.
+		const stampCameraMove = () => {
+			cloudsDriftLastCameraMoveMsRef.current = performance.now();
+		};
+		stampCameraMove();
+		map.on('move', stampCameraMove);
+
 		return () => {
 			canceled = true;
+			map.off('move', stampCameraMove);
 			lightningWasEnabledRef.current = false;
 			lightningEventsRef.current = [];
 			lightningNextFlashAtMsRef.current = 0;
@@ -7662,9 +6331,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 			try {
 				(
-					map.getSource(MAPBOX_SOURCE_IDS.snow) as
-						| { pause?: () => void }
-						| undefined
+					map.getSource(MAPBOX_SOURCE_IDS.snow) as { pause?: () => void } | undefined
 				)?.pause?.();
 			} catch {
 				// Ignore.
@@ -7722,6 +6389,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			sunTransitionCanvasRef.current = createSunTransitionCanvas();
 		}
 
+		// Style (re)loads reset paint/layout values; drop the lighting memos so
+		// the next applyLightingOverlayOpacity re-asserts every layer.
+		lightingRasterOpacityAppliedRef.current = {};
+		lightingLayerVisibilityAppliedRef.current = {};
+
 		// World-land fill (cream continents under the ocean-blue background). Idempotent;
 		// safe if style.load already added it earlier.
 		ensureWorldLandFill(mapInstance);
@@ -7755,7 +6427,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				} as any);
 				// Start sampling immediately (the drift loop will draw once the texture loads).
 				try {
-					(mapInstance.getSource(MAPBOX_SOURCE_IDS.clouds) as any)?.play?.();
+					const cloudsSrc = mapInstance.getSource(MAPBOX_SOURCE_IDS.clouds) as any;
+					cloudsSrc?.play?.();
+					if (SAFARI_CANVAS_PERF_MODE) cloudsSrc?.pause?.();
 				} catch {
 					// Ignore.
 				}
@@ -7780,11 +6454,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						animate: true,
 						coordinates: LIGHTNING_CANVAS_COORDINATES,
 					} as unknown as mapboxgl.AnySourceData);
-					(
-						mapInstance.getSource(MAPBOX_SOURCE_IDS.lightning) as
-							| { play?: () => void }
-							| undefined
-					)?.play?.();
+					const lightningSrc = mapInstance.getSource(MAPBOX_SOURCE_IDS.lightning) as
+						| { play?: () => void; pause?: () => void }
+						| undefined;
+					lightningSrc?.play?.();
+					if (SAFARI_CANVAS_PERF_MODE) lightningSrc?.pause?.();
 				} catch {
 					// Non-fatal; storm mood simply renders without the dedicated lightning layer.
 				}
@@ -7801,11 +6475,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						animate: true,
 						coordinates: CLOUDS_CANVAS_COORDINATES,
 					} as unknown as mapboxgl.AnySourceData);
-					(
-						mapInstance.getSource(MAPBOX_SOURCE_IDS.snow) as
-							| { play?: () => void }
-							| undefined
-					)?.play?.();
+					const snowSrc = mapInstance.getSource(MAPBOX_SOURCE_IDS.snow) as
+						| { play?: () => void; pause?: () => void }
+						| undefined;
+					snowSrc?.play?.();
+					if (SAFARI_CANVAS_PERF_MODE) snowSrc?.pause?.();
 				} catch {
 					// Non-fatal; snowy mood simply renders without the particle layer.
 				}
@@ -7827,11 +6501,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						animate: true,
 						coordinates: CLOUDS_CANVAS_COORDINATES,
 					} as unknown as mapboxgl.AnySourceData);
-					(
-						mapInstance.getSource(MAPBOX_SOURCE_IDS.dayFarSideShade) as
-							| { play?: () => void }
-							| undefined
-					)?.play?.();
+					const shadeSrc = mapInstance.getSource(MAPBOX_SOURCE_IDS.dayFarSideShade) as
+						| { play?: () => void; pause?: () => void }
+						| undefined;
+					shadeSrc?.play?.();
+					if (SAFARI_CANVAS_PERF_MODE) shadeSrc?.pause?.();
 				} catch {
 					// Non-fatal; the background globe simply renders without the extra shade.
 				}
@@ -7848,11 +6522,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						animate: true,
 						coordinates: CLOUDS_CANVAS_COORDINATES,
 					} as unknown as mapboxgl.AnySourceData);
-					(
-						mapInstance.getSource(MAPBOX_SOURCE_IDS.sunTransition) as
-							| { play?: () => void }
-							| undefined
-					)?.play?.();
+					const sunSrc = mapInstance.getSource(MAPBOX_SOURCE_IDS.sunTransition) as
+						| { play?: () => void; pause?: () => void }
+						| undefined;
+					sunSrc?.play?.();
+					if (SAFARI_CANVAS_PERF_MODE) sunSrc?.pause?.();
 				} catch {
 					// Non-fatal; sunrise still falls back to the normal day/night fade.
 				}
@@ -7867,6 +6541,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						type: 'raster',
 						tiles: [CONTACT_LIGHTS_TILES_URL_TEMPLATE],
 						tileSize: 512,
+						minzoom: CONTACT_LIGHTS_TILES_MIN_ZOOM,
 						maxzoom: CONTACT_LIGHTS_TILES_MAX_ZOOM,
 						bounds: CONTACT_LIGHTS_TILES_BOUNDS,
 					} as any);
@@ -7876,6 +6551,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						type: 'raster',
 						tiles: [CONTACT_LIGHTS_REVEAL_TILES_URL_TEMPLATE],
 						tileSize: 512,
+						minzoom: CONTACT_LIGHTS_TILES_MIN_ZOOM,
 						maxzoom: CONTACT_LIGHTS_TILES_MAX_ZOOM,
 						bounds: CONTACT_LIGHTS_TILES_BOUNDS,
 					} as any);
@@ -7896,6 +6572,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 		ensureSource(MAPBOX_SOURCE_IDS.resultsOutline);
 		ensureSource(MAPBOX_SOURCE_IDS.lockedOutline);
+		ensureSource(MAPBOX_SOURCE_IDS.curatedBlob);
+		ensureSource(MAPBOX_SOURCE_IDS.markerConstellation);
+		ensureSource(MAPBOX_SOURCE_IDS.markerConstellationSelected);
+		ensureSource(MAPBOX_SOURCE_IDS.markerConstellationNodes);
 		ensureSource(MAPBOX_SOURCE_IDS.selectedAreaRect);
 		ensureSource(MAPBOX_SOURCE_IDS.selectionRect);
 
@@ -7908,6 +6588,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		ensureSource(MAPBOX_SOURCE_IDS.markersBookingPin);
 		ensureSource(MAPBOX_SOURCE_IDS.markersPromotionDot);
 		ensureSource(MAPBOX_SOURCE_IDS.markersBase);
+		ensureSource(MAPBOX_SOURCE_IDS.markersSelected);
+		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueGlow);
+		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueRings);
+		ensureSource(MAPBOX_SOURCE_IDS.ownedVenuePulse);
+		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueIcon);
+		ensureSource(MAPBOX_SOURCE_IDS.eventsGlow);
+		ensureSource(MAPBOX_SOURCE_IDS.eventsRings);
+		ensureSource(MAPBOX_SOURCE_IDS.eventsPulse);
+		ensureSource(MAPBOX_SOURCE_IDS.eventsIcon);
 
 		const ensureLayer = (layer: any, beforeId?: string) => {
 			if (mapInstance.getLayer(layer.id)) {
@@ -7926,6 +6615,68 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 			mapInstance.addLayer(layer);
 		};
+
+		// 3D buildings for the street-level view. Inserted beneath the basemap's first
+		// symbol layer (labels stay readable) and beneath every appended murmur-* overlay.
+		// Always added (minzoom-gated, so free at normal zooms); visibility is toggled by
+		// the streetViewEnabled effect because this runs at 'load'/'style.load', when the
+		// persistent dashboard map can still be in background presentation.
+		{
+			let firstBasemapSymbolLayerId: string | undefined;
+			try {
+				for (const layer of mapInstance.getStyle()?.layers ?? []) {
+					if (!layer.id || layer.id.startsWith('murmur-')) continue;
+					if (layer.type === 'symbol') {
+						firstBasemapSymbolLayerId = layer.id;
+						break;
+					}
+				}
+			} catch {
+				// Fall through — appended on top of the basemap is still acceptable.
+			}
+			ensureLayer(
+				{
+					id: MAPBOX_LAYER_IDS.streetViewBuildings,
+					type: 'fill-extrusion',
+					source: 'composite',
+					'source-layer': 'building',
+					filter: ['==', ['get', 'extrude'], 'true'],
+					minzoom: STREET_VIEW_BUILDINGS_MIN_ZOOM,
+					layout: { visibility: 'none' },
+					paint: {
+						'fill-extrusion-color': STREET_VIEW_BUILDING_COLOR,
+						'fill-extrusion-height': [
+							'interpolate',
+							['linear'],
+							['zoom'],
+							STREET_VIEW_BUILDINGS_MIN_ZOOM,
+							0,
+							STREET_VIEW_BUILDINGS_RISE_FULL_ZOOM,
+							['get', 'height'],
+						],
+						'fill-extrusion-base': [
+							'interpolate',
+							['linear'],
+							['zoom'],
+							STREET_VIEW_BUILDINGS_MIN_ZOOM,
+							0,
+							STREET_VIEW_BUILDINGS_RISE_FULL_ZOOM,
+							['get', 'min_height'],
+						],
+						'fill-extrusion-opacity': [
+							'interpolate',
+							['linear'],
+							['zoom'],
+							STREET_VIEW_BUILDINGS_MIN_ZOOM,
+							0,
+							STREET_VIEW_BUILDINGS_RISE_FULL_ZOOM,
+							STREET_VIEW_BUILDING_OPACITY,
+						],
+					},
+				},
+				firstBasemapSymbolLayerId
+			);
+		}
 
 		const cfg = weatherMoodConfigRef.current;
 		const cloudsOpacityExpr = buildCloudsOpacityExpr(
@@ -8130,31 +6881,53 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Non-fatal.
 		}
 
+		const resultDotRadiusScaleExpr = ['coalesce', ['get', 'radiusScale'], 1];
+		// Grow the dot slightly while hovered. The hover factor is a per-feature
+		// constant (feature-state), so folding it into each interpolate stop keeps
+		// the "zoom" curve outermost (required by mapbox-gl v3).
+		const resultDotHoverRadiusScaleExpr = [
+			'*',
+			resultDotRadiusScaleExpr,
+			['case', MARKER_HOVER_FEATURE_STATE_EXPR, MARKER_HOVER_RADIUS_SCALE, 1],
+		];
 		const resultDotRadiusExpr = [
 			'interpolate',
 			['linear'],
 			['zoom'],
 			0,
-			RESULT_DOT_SCALE_MIN,
+			['*', RESULT_DOT_SCALE_MIN, resultDotHoverRadiusScaleExpr],
 			RESULT_DOT_ZOOM_MIN,
-			RESULT_DOT_SCALE_MIN,
+			['*', RESULT_DOT_SCALE_MIN, resultDotHoverRadiusScaleExpr],
 			RESULT_DOT_ZOOM_MAX,
-			RESULT_DOT_SCALE_MAX,
+			['*', RESULT_DOT_SCALE_MAX, resultDotHoverRadiusScaleExpr],
 			24,
-			RESULT_DOT_SCALE_MAX,
+			['*', RESULT_DOT_SCALE_MAX, resultDotHoverRadiusScaleExpr],
 		];
-		const resultDotStrokeExpr = [
+		const resultDotGlowRadiusExpr = [
 			'interpolate',
 			['linear'],
 			['zoom'],
 			0,
-			RESULT_DOT_STROKE_WEIGHT_MIN_PX,
+			['*', RESULT_DOT_GLOW_RADIUS_MIN_PX, resultDotRadiusScaleExpr],
 			RESULT_DOT_ZOOM_MIN,
-			RESULT_DOT_STROKE_WEIGHT_MIN_PX,
+			['*', RESULT_DOT_GLOW_RADIUS_MIN_PX, resultDotRadiusScaleExpr],
 			RESULT_DOT_ZOOM_MAX,
-			RESULT_DOT_STROKE_WEIGHT_MAX_PX,
+			['*', RESULT_DOT_GLOW_RADIUS_MAX_PX, resultDotRadiusScaleExpr],
 			24,
-			RESULT_DOT_STROKE_WEIGHT_MAX_PX,
+			['*', RESULT_DOT_GLOW_RADIUS_MAX_PX, resultDotRadiusScaleExpr],
+		];
+		const resultDotHitRadiusExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			['*', RESULT_DOT_GLOW_RADIUS_MIN_PX, resultDotRadiusScaleExpr],
+			RESULT_DOT_ZOOM_MIN,
+			['*', RESULT_DOT_GLOW_RADIUS_MIN_PX, resultDotRadiusScaleExpr],
+			RESULT_DOT_ZOOM_MAX,
+			['*', RESULT_DOT_GLOW_RADIUS_MAX_PX, resultDotRadiusScaleExpr],
+			24,
+			['*', RESULT_DOT_GLOW_RADIUS_MAX_PX, resultDotRadiusScaleExpr],
 		];
 
 		const allOverlayRadiusLow = RESULT_DOT_SCALE_MIN * 0.72;
@@ -8173,38 +6946,121 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			allOverlayRadiusHigh,
 		];
 
-		const allOverlayStrokeLow = Math.max(1, RESULT_DOT_STROKE_WEIGHT_MIN_PX * 0.85);
-		const allOverlayStrokeHigh = Math.max(1, RESULT_DOT_STROKE_WEIGHT_MAX_PX * 0.85);
-		const allOverlayStrokeExpr = [
+		const allOverlayGlowRadiusExpr = [
 			'interpolate',
 			['linear'],
 			['zoom'],
 			0,
-			allOverlayStrokeLow,
+			RESULT_DOT_GLOW_RADIUS_MIN_PX * 0.82,
 			RESULT_DOT_ZOOM_MIN,
-			allOverlayStrokeLow,
+			RESULT_DOT_GLOW_RADIUS_MIN_PX * 0.82,
 			RESULT_DOT_ZOOM_MAX,
-			allOverlayStrokeHigh,
+			RESULT_DOT_GLOW_RADIUS_MAX_PX * 0.82,
 			24,
-			allOverlayStrokeHigh,
+			RESULT_DOT_GLOW_RADIUS_MAX_PX * 0.82,
 		];
+		const allOverlayHitRadiusExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			RESULT_DOT_GLOW_RADIUS_MIN_PX * 1.05,
+			RESULT_DOT_ZOOM_MIN,
+			RESULT_DOT_GLOW_RADIUS_MIN_PX * 1.05,
+			RESULT_DOT_ZOOM_MAX,
+			RESULT_DOT_GLOW_RADIUS_MAX_PX * 1.05,
+			24,
+			RESULT_DOT_GLOW_RADIUS_MAX_PX * 1.05,
+		];
+		const allOverlayStarIconSizeExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			0.34,
+			6,
+			0.38,
+			10,
+			0.5,
+			14,
+			0.62,
+		];
+		const markerConstellationGlowLineWidthExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			3,
+			['case', ['boolean', ['get', 'useSelectedLineWidth'], false], 6, 3.4],
+			7,
+			['case', ['boolean', ['get', 'useSelectedLineWidth'], false], 8.4, 5.4],
+			13,
+			['case', ['boolean', ['get', 'useSelectedLineWidth'], false], 11.2, 7.2],
+		];
+		const markerConstellationCoreLineWidthExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			3,
+			['case', ['boolean', ['get', 'useSelectedLineWidth'], false], 3.4, 1.25],
+			7,
+			['case', ['boolean', ['get', 'useSelectedLineWidth'], false], 4.8, 1.85],
+			13,
+			['case', ['boolean', ['get', 'useSelectedLineWidth'], false], 6.2, 2.55],
+		];
+		const constellationNodeRadiusScaleExpr = ['coalesce', ['get', 'radiusScale'], 1];
+		const constellationNodeRadiusExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			3,
+			['*', 2.1, constellationNodeRadiusScaleExpr],
+			7,
+			['*', 2.9, constellationNodeRadiusScaleExpr],
+			13,
+			['*', 4.1, constellationNodeRadiusScaleExpr],
+		];
+		const constellationNodeGlowRadiusExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			3,
+			['*', 6, constellationNodeRadiusScaleExpr],
+			7,
+			['*', 8, constellationNodeRadiusScaleExpr],
+			13,
+			['*', 11, constellationNodeRadiusScaleExpr],
+		];
+		const constellationNodeStrokeWidthExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			3,
+			['coalesce', ['get', 'strokeWidth'], 0.45],
+			7,
+			['coalesce', ['get', 'strokeWidth'], 0.65],
+			13,
+			['coalesce', ['get', 'strokeWidth'], 0.9],
+		];
+		const constellationNodeOpacityExpr = getMarkerConstellationNodeZoomFadedOpacity(
+			MARKER_CONSTELLATION_NODE_OPACITY
+		);
 
 		const pinRadiusLow =
 			Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MIN) / 2;
 		const pinRadiusHigh =
 			Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MAX) / 2;
-		const pinRadiusExpr = [
+		const pinHitRadiusExpr = [
 			'interpolate',
 			['linear'],
 			['zoom'],
 			0,
-			pinRadiusLow,
+			pinRadiusLow + 8,
 			RESULT_DOT_ZOOM_MIN,
-			pinRadiusLow,
+			pinRadiusLow + 8,
 			RESULT_DOT_ZOOM_MAX,
-			pinRadiusHigh,
+			pinRadiusHigh + 9,
 			24,
-			pinRadiusHigh,
+			pinRadiusHigh + 9,
 		];
 
 		const pinIconSizeLow =
@@ -8218,13 +7074,67 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			['linear'],
 			['zoom'],
 			0,
-			pinIconSizeLow,
+			['*', pinIconSizeLow, VENUE_ICON_SIZE_SCALE_EXPR],
 			RESULT_DOT_ZOOM_MIN,
-			pinIconSizeLow,
+			['*', pinIconSizeLow, VENUE_ICON_SIZE_SCALE_EXPR],
 			RESULT_DOT_ZOOM_MAX,
-			pinIconSizeHigh,
+			['*', pinIconSizeHigh, VENUE_ICON_SIZE_SCALE_EXPR],
 			24,
-			pinIconSizeHigh,
+			['*', pinIconSizeHigh, VENUE_ICON_SIZE_SCALE_EXPR],
+		];
+		const selectedMarkerTransformScaleExpr = [
+			'coalesce',
+			['get', 'selectedMarkerScale'],
+			1,
+		];
+		const selectedMarkerIconSizeLow =
+			(SELECTED_MARKER_SCALE_MULTIPLIER * 2 * RESULT_DOT_SCALE_MIN) /
+			SELECTED_CONTACT_MARKER_CENTER_OUTER_DIAMETER;
+		const selectedMarkerIconSizeHigh =
+			(SELECTED_MARKER_SCALE_MULTIPLIER * 2 * RESULT_DOT_SCALE_MAX) /
+			SELECTED_CONTACT_MARKER_CENTER_OUTER_DIAMETER;
+		const selectedMarkerIconSizeExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			CURATED_DOT_FADE_END_ZOOM,
+			['*', selectedMarkerIconSizeLow, selectedMarkerTransformScaleExpr],
+			RESULT_DOT_ZOOM_MIN,
+			['*', selectedMarkerIconSizeLow, selectedMarkerTransformScaleExpr],
+			RESULT_DOT_ZOOM_MAX,
+			['*', selectedMarkerIconSizeHigh, selectedMarkerTransformScaleExpr],
+			24,
+			['*', selectedMarkerIconSizeHigh, selectedMarkerTransformScaleExpr],
+		];
+		const ownedVenueHomeIconSizeExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			MAP_MIN_ZOOM,
+			0.3,
+			MAP_DEFAULT_ZOOM,
+			0.5,
+			10,
+			0.72,
+			14,
+			0.95,
+		];
+		// Track the contact result dots' zoom anchors. Star image is 54px natural; these
+		// give ~18px at min zoom and ~20px at the default zoom (MAP_DEFAULT_ZOOM=5),
+		// growing to ~36px when zoomed in — a clear marker that reads bigger than a dot
+		// without the oversized original.
+		const eventStarIconSizeExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			0.33,
+			RESULT_DOT_ZOOM_MIN,
+			0.33,
+			RESULT_DOT_ZOOM_MAX,
+			0.66,
+			24,
+			0.66,
 		];
 
 		// States: hover fill + hit fill (transparent) + divider lines + interactive borders
@@ -8238,11 +7148,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			MAP_MIN_ZOOM,
 			0,
 			MAP_MIN_ZOOM + 1.25,
-			0.6,
+			0.5,
 			5,
-			0.75,
+			0.65,
 			STATE_DIVIDER_LINES_MAX_ZOOM,
-			0.85,
+			0.74,
 		];
 		const stateInteractiveBorderWidthExpr = buildStateInteractiveBorderWidthExpr();
 		const stateInteractiveBorderOpacityExpr = [
@@ -8317,6 +7227,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			type: 'symbol',
 			source: MAPBOX_SOURCE_IDS.stateLabels,
 			minzoom: MAP_MIN_ZOOM,
+			// Per-state zoom gate: small states (DC, territories) only label once
+			// zoomed in; big states label from the wide view. `minZoom` is baked
+			// into each feature by the preprocess script (area-based).
+			filter: ['>=', ['zoom'], ['get', 'minZoom']],
 			layout: {
 				// Abbreviations when zoomed out, full names when zoomed in.
 				'text-field': ['step', ['zoom'], ['get', 'key'], 8.5, ['get', 'name']],
@@ -8324,7 +7238,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'text-font': ['Inter Medium', 'Arial Unicode MS Regular'],
 				'text-allow-overlap': false,
 				'text-ignore-placement': false,
-				'text-padding': 2,
+				// Smaller padding lets more initials survive collision when zoomed out.
+				'text-padding': 1,
+				// Rank 1 = largest state. Lower sort key is placed first and wins
+				// collisions, so big states stay legible far out and crowded small
+				// states (NE corner) fill in as you zoom.
+				'symbol-sort-key': ['get', 'rank'],
 			},
 			paint: {
 				'text-color': STATE_LABEL_COLOR,
@@ -8340,14 +7259,188 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		// Search-results outlines (blue + black) intentionally removed.
 
+		// Curated-search blob body — unioned regional circle-lobes, behind all dot/pin layers.
+		ensureLayer(
+			{
+				id: MAPBOX_LAYER_IDS.curatedBlobFill,
+				type: 'fill',
+				source: MAPBOX_SOURCE_IDS.curatedBlob,
+				paint: {
+					'fill-color': '#EFE8D8',
+					'fill-opacity': [
+						'interpolate',
+						['linear'],
+						['zoom'],
+						3.4,
+						0.22,
+						5,
+						0.44,
+						10,
+						0.38,
+					],
+					'fill-antialias': true,
+				},
+			},
+			MAPBOX_LAYER_IDS.statesLabels
+		);
+
+		// Curated-search blob outline — plain white, behind all dot/pin layers.
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.curatedBlobCore,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.curatedBlob,
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
+			paint: {
+				'line-color': '#FFFFFF',
+				// The same outline geometry now morphs from natural blob → circle
+				// across the transition zoom range, so opacity stays constant: at
+				// t=1 the blob *is* the circle, and at any intermediate t it's a
+				// continuously-deforming shape — fading it out would defeat the
+				// "shape transforms" effect the user wants to see.
+				'line-opacity': 0.86,
+				// Width tapers down well before the transition window so the
+				// outline already reads as a delicate thin ring by the time the
+				// shape morph starts — and stays that way through the rest of
+				// the zoom-out. Mapbox clamps outside the stops, so above zoom
+				// 5 the line is at full 5px (normal cluster view) and below
+				// 3.4 it holds at 0.75px.
+				'line-width': ['interpolate', ['linear'], ['zoom'], 3.4, 0.75, 5, 5],
+				'line-blur': 0,
+			},
+		});
+
+		// Locked searched-state border. This is Mapbox-owned, so contact marker
+		// layers render above it when they overlap the selected state's edge.
+		ensureLayer(
+			{
+				id: MAPBOX_LAYER_IDS.lockedOutline,
+				type: 'line',
+				source: MAPBOX_SOURCE_IDS.lockedOutline,
+				layout: { 'line-join': 'round', 'line-cap': 'round' },
+				paint: {
+					'line-color': '#FFFFFF',
+					'line-opacity': 0.98,
+					'line-width': buildLockedStateOutlineWidthExpr(),
+					'line-blur': 0,
+				},
+			},
+			MAPBOX_LAYER_IDS.markerConstellationGlow
+		);
+
+		// Frozen per-search constellation linework — understated background geometry
+		// that sits behind the marker dots and never participates in hit testing.
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markerConstellationGlow,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.markerConstellation,
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
+			paint: {
+				'line-color': [
+					'coalesce',
+					['get', 'lineGlowColor'],
+					MARKER_CONSTELLATION_HALO_COLOR,
+				],
+				'line-opacity': 0,
+				'line-width': markerConstellationGlowLineWidthExpr,
+				'line-blur': 1.8,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markerConstellationCore,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.markerConstellation,
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
+			paint: {
+				'line-color': ['coalesce', ['get', 'lineColor'], MARKER_CONSTELLATION_LINE_COLOR],
+				'line-opacity': 0,
+				'line-width': markerConstellationCoreLineWidthExpr,
+				'line-blur': 0,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markerConstellationSelectedGlow,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.markerConstellationSelected,
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
+			paint: {
+				'line-color': MARKER_CONSTELLATION_SELECTED_HALO_COLOR,
+				'line-opacity': getSelectedMarkerConstellationZoomFadedOpacity(
+					MARKER_CONSTELLATION_SELECTED_GLOW_OPACITY
+				),
+				'line-width': ['interpolate', ['linear'], ['zoom'], 3, 6, 7, 8.4, 13, 11.2],
+				'line-blur': 1.6,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markerConstellationSelectedCore,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.markerConstellationSelected,
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
+			paint: {
+				'line-color': MARKER_CONSTELLATION_SELECTED_LINE_COLOR,
+				'line-opacity': getSelectedMarkerConstellationZoomFadedOpacity(
+					MARKER_CONSTELLATION_SELECTED_CORE_OPACITY
+				),
+				'line-width': ['interpolate', ['linear'], ['zoom'], 3, 3.4, 7, 4.8, 13, 6.2],
+				'line-blur': 0,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markerConstellationNodeGlow,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.markerConstellationNodes,
+			paint: {
+				'circle-radius': constellationNodeGlowRadiusExpr,
+				'circle-color': MARKER_CONSTELLATION_HALO_COLOR,
+				'circle-opacity': getMarkerConstellationNodeZoomFadedOpacity(
+					MARKER_CONSTELLATION_NODE_GLOW_OPACITY
+				),
+				'circle-blur': 0.72,
+				'circle-stroke-width': 0,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markerConstellationNodeDots,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.markerConstellationNodes,
+			paint: {
+				'circle-radius': constellationNodeRadiusExpr,
+				'circle-color': ['get', 'fillColor'],
+				'circle-opacity': withFeatureFillOpacity(constellationNodeOpacityExpr),
+				'circle-stroke-color': [
+					'coalesce',
+					['get', 'strokeColor'],
+					MARKER_CONSTELLATION_HALO_COLOR,
+				],
+				'circle-stroke-opacity': withFeatureStrokeOpacity(constellationNodeOpacityExpr),
+				'circle-stroke-width': constellationNodeStrokeWidthExpr,
+			},
+		});
+
 		// All-contacts overlay (gray dots) — lowest marker priority
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.markersAllHit,
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersAllOverlay,
 			paint: {
-				'circle-radius': allOverlayRadiusExpr,
+				'circle-radius': allOverlayHitRadiusExpr,
 				'circle-opacity': 0,
+				'circle-stroke-width': 0,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markersAllGlow,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.markersAllOverlay,
+			filter: ['!=', ['get', 'isUncategorized'], true],
+			paint: {
+				'circle-radius': allOverlayGlowRadiusExpr,
+				'circle-color': RESULT_DOT_GLOW_COLOR,
+				'circle-opacity': getSelectedStateOrbZoomFadedOpacity(
+					ALL_CONTACTS_DOT_GLOW_OPACITY,
+					getNormalMarkerFadeOpacityExpr()
+				),
+				'circle-blur': RESULT_DOT_GLOW_BLUR,
 				'circle-stroke-width': 0,
 			},
 		});
@@ -8355,17 +7448,57 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			id: MAPBOX_LAYER_IDS.markersAllDots,
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersAllOverlay,
+			filter: ['!=', ['get', 'isUncategorized'], true],
 			paint: {
 				'circle-radius': allOverlayRadiusExpr,
-				'circle-color': ['get', 'fillColor'],
-				'circle-opacity': 1,
-				'circle-stroke-color': [
-					'case',
-					['boolean', ['feature-state', 'selected'], false],
-					RESULT_DOT_STROKE_COLOR_SELECTED,
-					RESULT_DOT_STROKE_COLOR_DEFAULT,
-				],
-				'circle-stroke-width': allOverlayStrokeExpr,
+				'circle-color': getMarkerHoverFillColorExpr(),
+				'circle-opacity': getSelectedStateOrbZoomFadedOpacity(
+					1,
+					getNormalMarkerFadeOpacityExpr()
+				),
+				'circle-stroke-color': RESULT_DOT_TRANSPARENT_STROKE_COLOR,
+				'circle-stroke-width': 0,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markersAllFallbackIcons,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.markersAllOverlay,
+			filter: ['==', ['get', 'isUncategorized'], true],
+			layout: {
+				'icon-image': ['get', 'fallbackIcon'],
+				'icon-size': allOverlayStarIconSizeExpr,
+				'icon-anchor': 'top-left',
+				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
+					1,
+					getNormalMarkerFadeOpacityExpr()
+				),
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markersAllFallbackIconsHover,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.markersAllOverlay,
+			filter: ['==', ['get', 'isUncategorized'], true],
+			layout: {
+				'icon-image': ['coalesce', ['get', 'fallbackIconHover'], ['get', 'fallbackIcon']],
+				'icon-size': allOverlayStarIconSizeExpr,
+				'icon-anchor': 'top-left',
+				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': getSelectedStateOrbZoomFadedOpacity(1, [
+					'*',
+					getNormalMarkerFadeOpacityExpr(),
+					getMarkerHoverOpacityExpr(),
+				]),
 			},
 		});
 
@@ -8376,20 +7509,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersPromotionPin,
 			paint: {
-				'circle-radius': pinRadiusExpr,
+				'circle-radius': pinHitRadiusExpr,
 				'circle-opacity': 0,
-				'circle-stroke-width': [
-					'case',
-					['boolean', ['feature-state', 'selected'], false],
-					2.5,
-					0,
-				],
-				'circle-stroke-color': [
-					'case',
-					['boolean', ['feature-state', 'selected'], false],
-					RESULT_DOT_STROKE_COLOR_SELECTED,
-					'transparent',
-				],
+				'circle-stroke-width': 0,
+				'circle-stroke-color': 'transparent',
 			},
 		});
 		ensureLayer({
@@ -8404,6 +7527,32 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'icon-allow-overlap': true,
 				'icon-ignore-placement': true,
 			},
+			paint: {
+				'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
+					1,
+					getNormalMarkerFadeOpacityExpr()
+				),
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.promotionPinIconsHover,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.markersPromotionPin,
+			layout: {
+				'icon-image': ['coalesce', ['get', 'iconHover'], ['get', 'iconDefault']],
+				'icon-size': pinIconSizeExpr,
+				'icon-anchor': 'top-left',
+				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': getSelectedStateOrbZoomFadedOpacity(1, [
+					'*',
+					getNormalMarkerFadeOpacityExpr(),
+					getMarkerHoverOpacityExpr(),
+				]),
+			},
 		});
 
 		// Booking extra pins — behind primary dots
@@ -8413,20 +7562,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersBookingPin,
 			paint: {
-				'circle-radius': pinRadiusExpr,
+				'circle-radius': pinHitRadiusExpr,
 				'circle-opacity': 0,
-				'circle-stroke-width': [
-					'case',
-					['boolean', ['feature-state', 'selected'], false],
-					2.5,
-					0,
-				],
-				'circle-stroke-color': [
-					'case',
-					['boolean', ['feature-state', 'selected'], false],
-					RESULT_DOT_STROKE_COLOR_SELECTED,
-					'transparent',
-				],
+				'circle-stroke-width': 0,
+				'circle-stroke-color': 'transparent',
 			},
 		});
 		ensureLayer({
@@ -8440,6 +7579,32 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
 				'icon-allow-overlap': true,
 				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
+					1,
+					getNormalMarkerFadeOpacityExpr()
+				),
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.bookingPinIconsMarkerHover,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.markersBookingPin,
+			layout: {
+				'icon-image': ['coalesce', ['get', 'iconHover'], ['get', 'iconDefault']],
+				'icon-size': pinIconSizeExpr,
+				'icon-anchor': 'top-left',
+				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': getSelectedStateOrbZoomFadedOpacity(1, [
+					'*',
+					getNormalMarkerFadeOpacityExpr(),
+					getMarkerHoverOpacityExpr(),
+				]),
 			},
 		});
 
@@ -8456,6 +7621,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'icon-allow-overlap': true,
 				'icon-ignore-placement': true,
 			},
+			paint: {
+				'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
+					1,
+					getNormalMarkerFadeOpacityExpr()
+				),
+			},
 		});
 
 		// Promotion overlay dots (inside locked state) — below primary dots
@@ -8464,8 +7635,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersPromotionDot,
 			paint: {
-				'circle-radius': resultDotRadiusExpr,
+				'circle-radius': resultDotHitRadiusExpr,
 				'circle-opacity': 0,
+				'circle-stroke-width': 0,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.promotionDotGlow,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.markersPromotionDot,
+			paint: {
+				'circle-radius': resultDotGlowRadiusExpr,
+				'circle-color': RESULT_DOT_GLOW_COLOR,
+				'circle-opacity': getSelectedStateOrbZoomFadedOpacity(
+					RESULT_DOT_GLOW_OPACITY,
+					getNormalMarkerFadeOpacityExpr()
+				),
+				'circle-blur': RESULT_DOT_GLOW_BLUR,
 				'circle-stroke-width': 0,
 			},
 		});
@@ -8475,15 +7661,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			source: MAPBOX_SOURCE_IDS.markersPromotionDot,
 			paint: {
 				'circle-radius': resultDotRadiusExpr,
-				'circle-color': ['get', 'fillColor'],
-				'circle-opacity': 1,
-				'circle-stroke-color': [
-					'case',
-					['boolean', ['feature-state', 'selected'], false],
-					RESULT_DOT_STROKE_COLOR_SELECTED,
-					RESULT_DOT_STROKE_COLOR_DEFAULT,
-				],
-				'circle-stroke-width': resultDotStrokeExpr,
+				'circle-color': getMarkerHoverFillColorExpr(),
+				'circle-opacity': getSelectedStateOrbZoomFadedOpacity(
+					1,
+					getNormalMarkerFadeOpacityExpr()
+				),
+				'circle-stroke-color': RESULT_DOT_TRANSPARENT_STROKE_COLOR,
+				'circle-stroke-width': 0,
 			},
 		});
 
@@ -8493,8 +7677,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersBase,
 			paint: {
-				'circle-radius': resultDotRadiusExpr,
+				'circle-radius': resultDotHitRadiusExpr,
 				'circle-opacity': 0,
+				'circle-stroke-width': 0,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.baseGlow,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.markersBase,
+			paint: {
+				'circle-radius': resultDotGlowRadiusExpr,
+				'circle-color': RESULT_DOT_GLOW_COLOR,
+				'circle-opacity': getCategorizedDotGlowZoomFadedOpacity(
+					getNormalMarkerFadeOpacityExpr()
+				),
+				'circle-blur': RESULT_DOT_GLOW_BLUR,
 				'circle-stroke-width': 0,
 			},
 		});
@@ -8504,15 +7702,319 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			source: MAPBOX_SOURCE_IDS.markersBase,
 			paint: {
 				'circle-radius': resultDotRadiusExpr,
-				'circle-color': ['get', 'fillColor'],
-				'circle-opacity': 1,
+				'circle-color': getMarkerHoverFillColorExpr(),
+				'circle-opacity': withFeatureFillOpacity(
+					getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
+				),
 				'circle-stroke-color': [
-					'case',
-					['boolean', ['feature-state', 'selected'], false],
-					RESULT_DOT_STROKE_COLOR_SELECTED,
-					RESULT_DOT_STROKE_COLOR_DEFAULT,
+					'coalesce',
+					['get', 'strokeColor'],
+					RESULT_DOT_TRANSPARENT_STROKE_COLOR,
 				],
-				'circle-stroke-width': resultDotStrokeExpr,
+				'circle-stroke-width': ['coalesce', ['get', 'strokeWidth'], 0],
+				'circle-stroke-opacity': withFeatureStrokeOpacity(
+					getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
+				),
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.baseFallbackIcons,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.markersBase,
+			filter: ['==', ['get', 'isUncategorized'], true],
+			layout: {
+				'icon-image': ['get', 'fallbackIcon'],
+				'icon-size': pinIconSizeExpr,
+				'icon-anchor': 'top-left',
+				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
+					1,
+					getNormalMarkerFadeOpacityExpr()
+				),
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.baseFallbackIconsHover,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.markersBase,
+			filter: ['==', ['get', 'isUncategorized'], true],
+			layout: {
+				'icon-image': ['coalesce', ['get', 'fallbackIconHover'], ['get', 'fallbackIcon']],
+				'icon-size': pinIconSizeExpr,
+				'icon-anchor': 'top-left',
+				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': getSelectedStateOrbZoomFadedOpacity(1, [
+					'*',
+					getNormalMarkerFadeOpacityExpr(),
+					getMarkerHoverOpacityExpr(),
+				]),
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.ownedVenueGlowFill,
+			type: 'fill',
+			source: MAPBOX_SOURCE_IDS.ownedVenueGlow,
+			layout: { 'fill-sort-key': ['get', 'sort'] },
+			paint: {
+				'fill-color': ['coalesce', ['get', 'color'], '#A8E6FF'],
+				'fill-opacity': ['coalesce', ['get', 'opacity'], 0],
+				'fill-antialias': true,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.ownedVenueRingLines,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.ownedVenueRings,
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
+			paint: {
+				'line-color': '#FFFFFF',
+				'line-opacity': ['coalesce', ['get', 'opacity'], 0],
+				'line-width': [
+					'interpolate',
+					['linear'],
+					['zoom'],
+					MAP_MIN_ZOOM,
+					['*', ['coalesce', ['get', 'width'], 1], 0.72],
+					MAP_DEFAULT_ZOOM,
+					['coalesce', ['get', 'width'], 1],
+					10,
+					['*', ['coalesce', ['get', 'width'], 1], 1.1],
+				],
+				'line-blur': 0.18,
+			},
+		});
+		ensureLayer(
+			{
+				id: MAPBOX_LAYER_IDS.ownedVenuePulseLine,
+				type: 'line',
+				source: MAPBOX_SOURCE_IDS.ownedVenuePulse,
+				layout: { 'line-join': 'round', 'line-cap': 'round' },
+				paint: {
+					'line-color': ['coalesce', ['get', 'color'], '#6BD9FF'],
+					'line-opacity': ['coalesce', ['get', 'opacity'], 0],
+					'line-width': [
+						'interpolate',
+						['linear'],
+						['zoom'],
+						MAP_MIN_ZOOM,
+						['*', ['coalesce', ['get', 'width'], 1], 0.72],
+						MAP_DEFAULT_ZOOM,
+						['coalesce', ['get', 'width'], 1],
+						10,
+						['*', ['coalesce', ['get', 'width'], 1], 1.12],
+					],
+					'line-blur': 1.05,
+				},
+			},
+			MAPBOX_LAYER_IDS.ownedVenueRingLines
+		);
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.ownedVenueHomeGlow,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.ownedVenueIcon,
+			paint: {
+				'circle-color': '#6BD9FF',
+				'circle-radius': [
+					'interpolate',
+					['linear'],
+					['zoom'],
+					MAP_MIN_ZOOM,
+					18,
+					MAP_DEFAULT_ZOOM,
+					34,
+					10,
+					52,
+					14,
+					68,
+				],
+				'circle-opacity': [
+					'interpolate',
+					['linear'],
+					['zoom'],
+					MAP_MIN_ZOOM,
+					0.12,
+					MAP_DEFAULT_ZOOM,
+					0.22,
+					10,
+					0.28,
+					14,
+					0.24,
+				],
+				'circle-blur': 0.92,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.ownedVenueHomeIcon,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.ownedVenueIcon,
+			layout: {
+				'icon-image': OWNED_VENUE_HOME_ICON_IMAGE_NAME,
+				'icon-size': ownedVenueHomeIconSizeExpr,
+				'icon-anchor': 'center',
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': ['interpolate', ['linear'], ['zoom'], MAP_MIN_ZOOM, 0.82, 4, 1],
+			},
+		});
+		// Event opportunity markers — same radar layer stack as the owned venue, but
+		// fed by the events* sources and centered on the red star icon.
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.eventsGlowFill,
+			type: 'fill',
+			source: MAPBOX_SOURCE_IDS.eventsGlow,
+			layout: { 'fill-sort-key': ['get', 'sort'] },
+			paint: {
+				'fill-color': ['coalesce', ['get', 'color'], '#A8E6FF'],
+				'fill-opacity': ['coalesce', ['get', 'opacity'], 0],
+				'fill-antialias': true,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.eventsRingLines,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.eventsRings,
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
+			paint: {
+				'line-color': '#FFFFFF',
+				'line-opacity': ['coalesce', ['get', 'opacity'], 0],
+				'line-width': [
+					'interpolate',
+					['linear'],
+					['zoom'],
+					MAP_MIN_ZOOM,
+					['*', ['coalesce', ['get', 'width'], 1], 0.72],
+					MAP_DEFAULT_ZOOM,
+					['coalesce', ['get', 'width'], 1],
+					10,
+					['*', ['coalesce', ['get', 'width'], 1], 1.1],
+				],
+				'line-blur': 0.18,
+			},
+		});
+		ensureLayer(
+			{
+				id: MAPBOX_LAYER_IDS.eventsPulseLine,
+				type: 'line',
+				source: MAPBOX_SOURCE_IDS.eventsPulse,
+				layout: { 'line-join': 'round', 'line-cap': 'round' },
+				paint: {
+					'line-color': ['coalesce', ['get', 'color'], '#6BD9FF'],
+					'line-opacity': ['coalesce', ['get', 'opacity'], 0],
+					'line-width': [
+						'interpolate',
+						['linear'],
+						['zoom'],
+						MAP_MIN_ZOOM,
+						['*', ['coalesce', ['get', 'width'], 1], 0.72],
+						MAP_DEFAULT_ZOOM,
+						['coalesce', ['get', 'width'], 1],
+						10,
+						['*', ['coalesce', ['get', 'width'], 1], 1.12],
+					],
+					'line-blur': 1.05,
+				},
+			},
+			MAPBOX_LAYER_IDS.eventsRingLines
+		);
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.eventsStarGlow,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.eventsIcon,
+			paint: {
+				'circle-color': '#6BD9FF',
+				// Soft halo a bit larger than the star, on the dots' anchors.
+				'circle-radius': [
+					'interpolate',
+					['linear'],
+					['zoom'],
+					0,
+					13,
+					RESULT_DOT_ZOOM_MIN,
+					13,
+					RESULT_DOT_ZOOM_MAX,
+					30,
+					24,
+					30,
+				],
+				'circle-opacity': [
+					'interpolate',
+					['linear'],
+					['zoom'],
+					MAP_MIN_ZOOM,
+					0.12,
+					MAP_DEFAULT_ZOOM,
+					0.22,
+					10,
+					0.28,
+					14,
+					0.24,
+				],
+				'circle-blur': 0.92,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.eventsStarIcon,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.eventsIcon,
+			layout: {
+				'icon-image': EVENT_STAR_ICON_IMAGE_NAME,
+				'icon-size': eventStarIconSizeExpr,
+				'icon-anchor': 'center',
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': ['interpolate', ['linear'], ['zoom'], MAP_MIN_ZOOM, 0.82, 4, 1],
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.selectedMarkerIcons,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.markersSelected,
+			minzoom: CURATED_DOT_FADE_END_ZOOM,
+			layout: {
+				'icon-image': ['get', 'selectedIcon'],
+				'icon-size': selectedMarkerIconSizeExpr,
+				'icon-anchor': 'top-left',
+				'icon-offset': [
+					-SELECTED_CONTACT_MARKER_CENTER_X,
+					-SELECTED_CONTACT_MARKER_CENTER_Y,
+				],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': getSelectedMarkerIconOpacityExpr(),
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.selectedMarkerIconsHover,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.markersSelected,
+			minzoom: CURATED_DOT_FADE_END_ZOOM,
+			layout: {
+				'icon-image': ['coalesce', ['get', 'selectedIconHover'], ['get', 'selectedIcon']],
+				'icon-size': selectedMarkerIconSizeExpr,
+				'icon-anchor': 'top-left',
+				'icon-offset': [
+					-SELECTED_CONTACT_MARKER_CENTER_X,
+					-SELECTED_CONTACT_MARKER_CENTER_Y,
+				],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': getSelectedMarkerHoverIconOpacityExpr(),
 			},
 		});
 
@@ -8616,12 +8118,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		mapboxgl.accessToken = accessToken;
 
 		const initialPresentation = presentationRef.current;
+		const initialEntryCamera =
+			initialPresentation === 'interactive' ? interactiveEntryCameraRef.current : null;
+		if (initialPresentation === 'interactive') {
+			interactiveEntryCameraPendingRef.current = true;
+			interactiveEntryCameraAppliedKeyRef.current =
+				interactiveEntryCameraKey(initialEntryCamera);
+		}
 		const initialCenter: [number, number] =
 			initialPresentation === 'background'
 				? DASHBOARD_DECORATIVE_CENTER
-				: [defaultCenter.lng, defaultCenter.lat];
+				: initialEntryCamera
+					? [initialEntryCamera.center.lng, initialEntryCamera.center.lat]
+					: [defaultCenter.lng, defaultCenter.lat];
 		const initialZoom =
-			initialPresentation === 'background' ? DASHBOARD_DECORATIVE_ZOOM : MAP_DEFAULT_ZOOM;
+			initialPresentation === 'background'
+				? DASHBOARD_DECORATIVE_ZOOM
+				: (initialEntryCamera?.zoom ?? MAP_DEFAULT_ZOOM);
 		const initialPitch =
 			initialPresentation === 'background' ? DASHBOARD_DECORATIVE_PITCH : 0;
 
@@ -8634,11 +8147,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			bearing: 0,
 			minZoom: MAP_MIN_ZOOM,
 			attributionControl: true,
+			dragRotate: false,
+			pitchWithRotate: false,
+			touchPitch: false,
+			// Retain recently-displayed low-zoom basemap tiles in-memory across a deep
+			// zoom-in so zooming back out renders the center area instantly (no re-parse,
+			// no ocean-blue flash). `minTileCacheSize` is the floor that does this work;
+			// `maxTileCacheSize` is only a sane ceiling. (A bare `maxTileCacheSize` was a
+			// no-op: the cache is dynamically sized ~viewport*5 (~60) and max only clamps
+			// *down*. The floor is the lever.) Per source; ~128 ≈ 2× the dynamic default.
+			minTileCacheSize: 128,
+			maxTileCacheSize: 1024,
+			refreshExpiredTiles: false,
 			...(contactLightsDebugEnabled ? { showTileBoundaries: true } : {}),
 		});
 
 		mapRef.current = mapInstance;
 		setMap(mapInstance);
+		// Deterministic camera handle for scripts/measure-dashboard-memory.mjs and
+		// scripts/measure-map-fps.mjs (drives fixed camera sequences); also handy
+		// for manual debugging.
+		(window as unknown as { __murmurMapDebug?: unknown }).__murmurMapDebug = mapInstance;
 		try {
 			initialZoomConstraintsRef.current = {
 				minZoom: mapInstance.getMinZoom(),
@@ -8648,17 +8177,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Non-fatal.
 		}
 
+		// Soften scroll/pinch zoom for a smoother, more premium feel. Persists
+		// across scrollZoom enable/disable cycles since rates live on the handler.
+		try {
+			mapInstance.scrollZoom.setWheelZoomRate(MAP_WHEEL_ZOOM_RATE);
+			mapInstance.scrollZoom.setZoomRate(MAP_PINCH_ZOOM_RATE);
+		} catch {
+			// Non-fatal — older Mapbox builds may not expose these setters.
+		}
+
 		const onStyleLoad = () => {
 			applyFreeTrialMapVisualTuning(mapInstance);
 			const initialVisualNightT = computeMoodVisualNightT(
 				nightTRef.current,
 				weatherMoodConfigRef.current
 			);
-			applyMurmurGlobeLighting(mapInstance);
+			applyMurmurGlobeLighting(mapInstance, unsubscribeBurnTRef.current);
 			applyMapboxFogForMoodAndNight(
 				mapInstance,
 				weatherMoodConfigRef.current,
-				initialVisualNightT
+				initialVisualNightT,
+				unsubscribeBurnTRef.current
 			);
 			// Add Murmur sources/layers (including clouds + world-land fill) as early as
 			// possible so they can begin loading before the first reveal.
@@ -8671,11 +8210,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				nightTRef.current,
 				weatherMoodConfigRef.current
 			);
-			applyMurmurGlobeLighting(mapInstance);
+			applyMurmurGlobeLighting(mapInstance, unsubscribeBurnTRef.current);
 			applyMapboxFogForMoodAndNight(
 				mapInstance,
 				weatherMoodConfigRef.current,
-				initialVisualNightT
+				initialVisualNightT,
+				unsubscribeBurnTRef.current
 			);
 			ensureMapboxSourcesAndLayers(mapInstance);
 
@@ -8782,7 +8322,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// `rotate` fires continuously during interaction; the call is cheap (no
 		// layer reshuffling) because setLights only updates the existing light defs.
 		const onRotate = () => {
-			applyMurmurGlobeLighting(mapInstance);
+			applyMurmurGlobeLighting(mapInstance, unsubscribeBurnTRef.current);
 		};
 
 		mapInstance.on('load', onLoad);
@@ -8900,7 +8440,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				} catch {
 					revealLoaded = null;
 				}
-				// eslint-disable-next-line no-console
+
 				console.debug('[contact-lights]', tag, {
 					zoom: typeof zoom === 'number' ? Number(zoom.toFixed(2)) : zoom,
 					nightT: Number(night.toFixed(2)),
@@ -8944,7 +8484,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				sourceId === MAPBOX_SOURCE_IDS.nightLightsReveal ||
 				isContactLightsUrl(url)
 			) {
-				// eslint-disable-next-line no-console
 				console.warn('[contact-lights] tile error', {
 					sourceId,
 					url,
@@ -9020,6 +8559,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const pendingMinZoomRestoreRef = useRef(false);
 	const hasAttachedMinZoomRestoreRef = useRef(false);
+
+	// Keep the interactive zoom floor in sync with the device class. Skip while the
+	// decorative lock or a temporarily relaxed floor is active — those paths re-apply
+	// the floor from the ref once the camera settles.
+	useEffect(() => {
+		interactiveMinZoomRef.current = isMobile ? MOBILE_MAP_MIN_ZOOM : MAP_MIN_ZOOM;
+		if (!map) return;
+		if (presentationRef.current === 'background') return;
+		if (pendingMinZoomRestoreRef.current) return;
+		try {
+			map.setMinZoom(interactiveMinZoomRef.current);
+		} catch {
+			// Ignore (map may be tearing down).
+		}
+	}, [map, isMobile]);
+
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
 
@@ -9044,13 +8599,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				map.dragPan.enable();
 			} catch {}
 			try {
-				map.dragRotate.enable();
-			} catch {}
-			try {
 				map.keyboard.enable();
 			} catch {}
 			try {
 				map.touchZoomRotate.enable();
+				map.touchZoomRotate.disableRotation();
 			} catch {}
 		};
 
@@ -9084,8 +8637,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			// Tune these to match the homepage "globe peeking from the top" framing.
 			// Key trick: use `offset` (screen-space pan) rather than changing geo center a lot.
-			const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-
 			const lockDecorativeZoom = () => {
 				try {
 					map.setMinZoom(DASHBOARD_DECORATIVE_ZOOM);
@@ -9101,6 +8652,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const secondsPerRevolution = 3000;
 				const distancePerSecond = 360 / secondsPerRevolution;
 				const animationDurationMs = 1000;
+				// Cap per-tick elapsed time: background tabs suspend the ease, and an
+				// uncapped dt on tab return would visibly snap the globe forward.
+				const maxTickDtMs = 2000;
 
 				const normalizeLng = (lng: number) => ((((lng + 180) % 360) + 360) % 360) - 180;
 
@@ -9108,10 +8662,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const maxDriftDeg = 35; // keep camera within a US-visible band
 				let direction: 1 | -1 = 1;
 				let currentLng = normalizeLng(map.getCenter()?.lng ?? baseLng);
+				// Seed one full step back so the kick-off tick advances a full increment.
+				let lastTickMs = performance.now() - animationDurationMs;
 
 				const spinGlobe = () => {
 					try {
-						currentLng = normalizeLng(currentLng + direction * distancePerSecond);
+						// Advance by wall-clock elapsed time, not per event: map.resize()
+						// (e.g. while the window is being drag-resized) fires extra moveend
+						// events, and a fixed per-tick step would speed up the spin.
+						const now = performance.now();
+						const dtMs = Math.min(now - lastTickMs, maxTickDtMs);
+						lastTickMs = now;
+						currentLng = normalizeLng(
+							currentLng + direction * distancePerSecond * (dtMs / 1000)
+						);
 						const drift = normalizeLng(currentLng - baseLng);
 						if (drift > maxDriftDeg) {
 							currentLng = normalizeLng(baseLng + maxDriftDeg);
@@ -9120,6 +8684,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							currentLng = normalizeLng(baseLng - maxDriftDeg);
 							direction = 1;
 						}
+
+						// Publish the new target longitude so the strategy-card decorative
+						// globe can ease alongside us in lock-step.
+						setDashboardGlobeSpinLng(currentLng);
 
 						map.easeTo({
 							center: [currentLng, DASHBOARD_DECORATIVE_CENTER[1]],
@@ -9212,7 +8780,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						bearing: 0,
 						offset: DASHBOARD_DECORATIVE_OFFSET_PX,
 						duration: dur,
-						easing: easeOutCubic,
+						easing: mapboxEaseOutCubic,
 					});
 				} catch {
 					// Ignore.
@@ -9260,14 +8828,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		try {
 			map.stop();
 		} catch {}
-		// Restore interactive zoom constraints. If we're coming from the decorative globe (zoom < MAP_MIN_ZOOM),
-		// temporarily allow that starting zoom so the camera move begins exactly from the dashboard view.
+		// Restore interactive zoom constraints. If we're coming from the decorative globe (zoom < the
+		// interactive floor), temporarily allow that starting zoom so the camera move begins exactly
+		// from the dashboard view.
 		try {
 			const currentZoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
-			const safeMinZoom = Math.min(MAP_MIN_ZOOM, currentZoom);
+			const interactiveMinZoom = interactiveMinZoomRef.current;
+			const safeMinZoom = Math.min(interactiveMinZoom, currentZoom);
 			map.setMinZoom(safeMinZoom);
 			map.setMaxZoom(DEFAULT_MAX_ZOOM_FALLBACK);
-			if (safeMinZoom < MAP_MIN_ZOOM) {
+			if (safeMinZoom < interactiveMinZoom) {
 				pendingMinZoomRestoreRef.current = true;
 			}
 		} catch {
@@ -9292,31 +8862,120 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			} catch {}
 
 			// Background presentation uses a screen-space offset to create the "globe peeking"
-			// framing on the dashboard. If the user transitions into interactive search before
-			// an auto-fit camera move runs (e.g. hydration races / empty results), that offset
-			// can visually persist and leave the globe too low in the viewport.
+			// framing on the dashboard. With a host-provided entry camera (e.g. the venue
+			// portal centering on the venue home icon), snap straight there so the reveal
+			// is already framed correctly — no zoom-in sweep. Otherwise start gliding
+			// toward a neutral interactive camera, then let the search/state auto-fit
+			// interrupt and continue from the current camera position once data is ready.
+			// This avoids the old instant reset.
+			const entryCamera = interactiveEntryCameraRef.current;
+			interactiveEntryCameraPendingRef.current = true;
+			interactiveEntryCameraAppliedKeyRef.current =
+				interactiveEntryCameraKey(entryCamera);
 			try {
-				const container = map.getContainer?.() as HTMLElement | undefined;
-				const w = container?.clientWidth ?? 0;
-				const h = container?.clientHeight ?? 0;
 				let center: [number, number] = DASHBOARD_DECORATIVE_CENTER;
-				if (w > 0 && h > 0) {
-					const target = map.unproject([
-						w / 2 + DASHBOARD_DECORATIVE_OFFSET_PX[0],
-						h / 2 + DASHBOARD_DECORATIVE_OFFSET_PX[1],
-					]);
-					center = [target.lng, target.lat];
+				let zoom = MAP_DEFAULT_ZOOM;
+				if (entryCamera) {
+					center = [entryCamera.center.lng, entryCamera.center.lat];
+					zoom = entryCamera.zoom;
+				} else {
+					const container = map.getContainer?.() as HTMLElement | undefined;
+					const w = container?.clientWidth ?? 0;
+					const h = container?.clientHeight ?? 0;
+					if (w > 0 && h > 0) {
+						const target = map.unproject([
+							w / 2 + DASHBOARD_DECORATIVE_OFFSET_PX[0],
+							h / 2 + DASHBOARD_DECORATIVE_OFFSET_PX[1],
+						]);
+						center = [target.lng, target.lat];
+					}
 				}
 				map.easeTo({
 					center,
-					zoom: MAP_DEFAULT_ZOOM,
+					zoom,
 					pitch: 0,
 					bearing: 0,
-					duration: 0,
+					offset: [0, 0],
+					duration: entryCamera ? 0 : DASHBOARD_TO_INTERACTIVE_HANDOFF_GLIDE_MS,
+					easing: mapboxEaseOutCubic,
 				});
 			} catch {}
 		}
 	}, [map, isMapLoaded, isBackgroundPresentation, shouldAutoSpin, presentation]);
+
+	// The interactive entry camera can resolve — or be corrected — after the reveal
+	// has already happened (e.g. the venue save's refetch is still in flight while
+	// the portal flips views, so the flip render briefly carries stale coordinates).
+	// While the user hasn't moved the camera since entry, follow the latest value —
+	// same snap semantics as the entry itself.
+	const interactiveEntryCameraLat = interactiveEntryCamera?.center.lat;
+	const interactiveEntryCameraLng = interactiveEntryCamera?.center.lng;
+	const interactiveEntryCameraZoom = interactiveEntryCamera?.zoom;
+	useEffect(() => {
+		if (!map || !isMapLoaded || isBackgroundPresentation) return;
+		if (!interactiveEntryCameraPendingRef.current) return;
+		if (
+			interactiveEntryCameraLat == null ||
+			interactiveEntryCameraLng == null ||
+			interactiveEntryCameraZoom == null
+		) {
+			return;
+		}
+		const key = `${interactiveEntryCameraLat},${interactiveEntryCameraLng},${interactiveEntryCameraZoom}`;
+		if (key === interactiveEntryCameraAppliedKeyRef.current) return;
+		interactiveEntryCameraAppliedKeyRef.current = key;
+		try {
+			map.easeTo({
+				center: [interactiveEntryCameraLng, interactiveEntryCameraLat],
+				zoom: interactiveEntryCameraZoom,
+				pitch: 0,
+				bearing: 0,
+				offset: [0, 0],
+				duration: 0,
+			});
+		} catch {
+			// Ignore (map may be tearing down).
+		}
+	}, [
+		map,
+		isMapLoaded,
+		isBackgroundPresentation,
+		interactiveEntryCameraLat,
+		interactiveEntryCameraLng,
+		interactiveEntryCameraZoom,
+	]);
+
+	// Once the user moves the camera themselves, stop following the entry camera —
+	// never yank the map out from under them. User-driven moves carry
+	// `originalEvent`; programmatic eases do not. Two mapbox-gl quirks: window
+	// resize/orientation/fullscreen changes are forwarded through Map#resize with
+	// `originalEvent` set (not user camera intent — ignore those), and box zoom
+	// fires `movestart` without `originalEvent` (caught via `boxzoomstart`).
+	useEffect(() => {
+		if (!map || !isMapLoaded || isBackgroundPresentation) return;
+		const onUserMoveStart = (event: { originalEvent?: { type?: string } }) => {
+			const originalEvent = event?.originalEvent;
+			if (!originalEvent) return;
+			if (
+				originalEvent.type === 'resize' ||
+				originalEvent.type === 'orientationchange' ||
+				originalEvent.type === 'fullscreenchange' ||
+				originalEvent.type === 'webkitfullscreenchange'
+			) {
+				return;
+			}
+			interactiveEntryCameraPendingRef.current = false;
+		};
+		const onBoxZoomStart = () => {
+			interactiveEntryCameraPendingRef.current = false;
+		};
+		map.on('movestart', onUserMoveStart);
+		map.on('boxzoomstart', onBoxZoomStart);
+		return () => {
+			map.off('movestart', onUserMoveStart);
+			map.off('boxzoomstart', onBoxZoomStart);
+		};
+	}, [map, isMapLoaded, isBackgroundPresentation]);
 
 	// When used as a decorative background, clear any interactive UI state so we don't
 	// "carry" selected/hovered marker panels across view transitions.
@@ -9364,6 +9023,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const ro = new ResizeObserver(() => scheduleResize());
 		ro.observe(container);
 
+		// Mobile browsers change the layout viewport when the URL bar / keyboard
+		// shows or hides; mapbox-gl only listens to window resize, and the container
+		// observer can miss these transitions — track the visual viewport directly so
+		// the canvas never ends up shorter than its container (black band).
+		window.addEventListener('resize', scheduleResize, { passive: true });
+		window.visualViewport?.addEventListener('resize', scheduleResize);
+		window.addEventListener('orientationchange', scheduleResize);
+		window.addEventListener(
+			'murmur:campaign-zoom-changed',
+			scheduleResize as EventListener
+		);
+		document.addEventListener('fullscreenchange', scheduleResize);
+		document.addEventListener('webkitfullscreenchange', scheduleResize as EventListener);
+
 		// Burst of retries to catch portal/fixed layout settling.
 		const timers: ReturnType<typeof setTimeout>[] = [];
 		for (const ms of [0, 50, 150, 300, 600]) {
@@ -9372,6 +9045,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		return () => {
 			ro.disconnect();
+			window.removeEventListener('resize', scheduleResize);
+			window.visualViewport?.removeEventListener('resize', scheduleResize);
+			window.removeEventListener('orientationchange', scheduleResize);
+			window.removeEventListener(
+				'murmur:campaign-zoom-changed',
+				scheduleResize as EventListener
+			);
+			document.removeEventListener('fullscreenchange', scheduleResize);
+			document.removeEventListener(
+				'webkitfullscreenchange',
+				scheduleResize as EventListener
+			);
 			for (const t of timers) clearTimeout(t);
 			if (resizeDebounce) clearTimeout(resizeDebounce);
 		};
@@ -9447,6 +9132,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return false;
 	}, []);
 
+	const isAllContactsOverlayContactOnLand = useCallback(
+		(contact: ContactWithName, coords: LatLngLiteral): boolean => {
+			// Don't block first paint on the state-prepared polygon payload. Contacts with
+			// valid coordinates are overwhelmingly land-based; once polygons are ready we
+			// cache the exact check per contact id.
+			if (!isStateLayerReady) return true;
+			const cached = allContactsOverlayLandMaskByIdRef.current.get(contact.id);
+			if (cached != null) return cached;
+			const isOnLand = isCoordsInAnyUsState(coords);
+			allContactsOverlayLandMaskByIdRef.current.set(contact.id, isOnLand);
+			return isOnLand;
+		},
+		[isCoordsInAnyUsState, isStateLayerReady]
+	);
+
 	const resultStateKeysSignature = useMemo(
 		() => resultStateKeys.join('|'),
 		[resultStateKeys]
@@ -9463,19 +9163,263 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[coordsByContactId]
 	);
 
-	const handleMapMouseUp = useCallback(
-		(e: mapboxgl.MapMouseEvent) => {
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+
+		// Curated blob UI is reserved for active search mode.
+		// Campaign pages can still color markers via `contact.curatedCategory`, but should not
+		// render the search-only blob geometry.
+		const searchKey = (searchQuery ?? '').trim();
+		if (!searchKey) {
+			clearCuratedBlobOutline();
+			return;
+		}
+
+		if (isLoading || !searchEngaged) {
+			clearCuratedBlobOutline();
+			return;
+		}
+
+		const curatedDots = contactsWithCoords
+			.map((contact) => ({
+				id: contact.id,
+				isCurated: Boolean(contact.curatedCategory),
+				coords: getContactCoords(contact),
+			}))
+			.filter(
+				(
+					dot
+				): dot is {
+					id: number;
+					isCurated: true;
+					coords: LatLngLiteral;
+				} => dot.isCurated && dot.coords != null
+			)
+			.sort((a, b) => a.id - b.id);
+
+		if (curatedDots.length === 0) {
+			clearCuratedBlobOutline();
+			return;
+		}
+
+		const signature = curatedDots
+			.map((dot) => `${dot.id}:${dot.coords.lng.toFixed(5)}:${dot.coords.lat.toFixed(5)}`)
+			.join('|');
+		const radiusOverlaySig = radiusOverlayRef.current
+			? `r:${radiusOverlayRef.current.center.lat.toFixed(5)}:${radiusOverlayRef.current.center.lng.toFixed(5)}:${radiusOverlayRef.current.radiusMiles}`
+			: 'r:none';
+		const nextSignature = `v12:${CURATED_BLOB_MIN_REGION_POINTS}:${CURATED_BLOB_MAX_REGIONS}:${CURATED_BLOB_MAX_REGION_SPAN_KM}:${CURATED_BLOB_SHAPE_STEPS}:${CURATED_BLOB_OUTLINE_SMOOTHING_PASSES}:${CURATED_BLOB_LOBE_MIN_COUNT}:${CURATED_BLOB_LOBE_MAX_COUNT}:${CURATED_BLOB_LOBE_PADDING_KM}:${CURATED_BLOB_LOBE_MIN_RADIUS_KM}:${CURATED_BLOB_LOBE_MAX_RADIUS_KM}:${CURATED_BLOB_LOBE_OVERLAP_RADIUS_RATIO}:${CURATED_BLOB_LOBE_RADIUS_JITTER}:${CURATED_BLOB_SINGLETON_LOBE_RADIUS_KM}:${CURATED_BLOB_SINGLETON_LOBE_OFFSET_KM}:${CURATED_ORB_SMALL_SHAPE_MIN_RADIUS_KM}:${CURATED_ORB_SMALL_SHAPE_THRESHOLD_KM}:${CURATED_BLOB_ORGANIC_WOBBLE}:${radiusOverlaySig}:${signature}`;
+		if (nextSignature === curatedBlobSignatureRef.current) return;
+
+		let cancelled = false;
+
+		const updateCuratedBlob = async () => {
+			const radiusOv = radiusOverlayRef.current;
+			const protectedMarkerIds = new Set<number>();
+			let lobeMultiPolygons: ClippingMultiPolygon[];
+
+			if (radiusOv) {
+				// Radius mode: one circular blob at the radius center, sized to the
+				// committed search radius. Reuses the same blob/orb visuals as a single circle.
+				const circle = buildMercatorCircleMultiPolygon(
+					radiusOv.center,
+					radiusOv.radiusMiles * 1.609344,
+					CURATED_BLOB_SHAPE_STEPS,
+					0,
+					0
+				);
+				if (!circle) {
+					if (!cancelled) clearCuratedBlobOutline();
+					return;
+				}
+				lobeMultiPolygons = [circle];
+				for (const dot of curatedDots) protectedMarkerIds.add(dot.id);
+			} else {
+				const mercatorPoints = curatedDots
+					.map((dot) => projectCuratedBlobPoint(dot.id, dot.coords))
+					.filter((point): point is CuratedBlobMercatorPoint => point != null);
+
+				if (mercatorPoints.length === 0) {
+					if (!cancelled) clearCuratedBlobOutline();
+					return;
+				}
+
+				const clusters = pickAdaptiveCuratedBlobClusters(mercatorPoints);
+				for (const cluster of clusters) {
+					for (const point of cluster.points) {
+						protectedMarkerIds.add(point.id);
+					}
+				}
+				lobeMultiPolygons = clusters.flatMap((cluster, index) =>
+					buildCuratedBlobClusterLobeMultiPolygons(cluster, index)
+				);
+			}
+
+			if (lobeMultiPolygons.length === 0) {
+				if (!cancelled) clearCuratedBlobOutline();
+				return;
+			}
+
+			let unionedMercatorMultiPolygon: ClippingMultiPolygon | null =
+				lobeMultiPolygons.length === 1 ? lobeMultiPolygons[0] : null;
+			if (!unionedMercatorMultiPolygon) {
+				const wasmGeo = await ensureWasmGeoModuleLoaded();
+				if (typeof wasmGeo?.union_multi_polygons === 'function') {
+					try {
+						const out = wasmGeo.union_multi_polygons(lobeMultiPolygons);
+						if (Array.isArray(out) && out.length) unionedMercatorMultiPolygon = out;
+					} catch (err) {
+						logWasmGeoRuntimeError(err);
+					}
+				}
+			}
+
+			if (!unionedMercatorMultiPolygon) {
+				try {
+					const { unionClippingMultiPolygons } = await import('@/utils/polygonClipping');
+					unionedMercatorMultiPolygon = unionClippingMultiPolygons(...lobeMultiPolygons);
+				} catch (err) {
+					console.error('Failed to union curated blob lobes', err);
+				}
+			}
+
+			const naturalMercatorMultiPolygon = smoothCuratedBlobMultiPolygon(
+				unionedMercatorMultiPolygon?.length
+					? unionedMercatorMultiPolygon
+					: lobeMultiPolygons.flat(),
+				CURATED_BLOB_OUTLINE_SMOOTHING_PASSES
+			);
+			const morphSources = createCuratedBlobMorphSourcesFromMercatorMultiPolygon(
+				naturalMercatorMultiPolygon
+			);
+
+			if (morphSources.length === 0) {
+				if (!cancelled) clearCuratedBlobOutline();
+				return;
+			}
+
+			if (cancelled) return;
+			const source = map.getSource(MAPBOX_SOURCE_IDS.curatedBlob) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			if (!source) return;
+
+			curatedBlobOrbTargetsRef.current = morphSources.map((shapeSource) => ({
+				center: shapeSource.center,
+				radiusKm: shapeSource.radiusKm,
+			}));
+			updateCuratedBlobProtectedMarkerIds(protectedMarkerIds);
+			naturalBlobMorphSourceRef.current = morphSources;
+			lastBlobMorphTAppliedRef.current = Number.NaN;
+			curatedBlobSignatureRef.current = nextSignature;
+
+			// Apply the current morph state (which depends on current zoom).
+			// At t=0 this writes the natural geometry; otherwise it writes the
+			// vertex-lerped morph toward the circle.
+			applyBlobMorphRef.current?.();
+			applyCuratedOrbStateRef.current?.();
+		};
+
+		void updateCuratedBlob();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		map,
+		isMapLoaded,
+		searchQuery,
+		isLoading,
+		searchEngaged,
+		contactsWithCoords,
+		radiusOverlay,
+		getContactCoords,
+		clearCuratedBlobOutline,
+		updateCuratedBlobProtectedMarkerIds,
+	]);
+
+	// Radius-search center pin. Appears alongside the single-circle blob (i.e. only
+	// once a radius search has results), reusing the shared profile-area location
+	// marker SVG — a touch smaller, scaled with zoom. Draggable: dropping it
+	// recenters the radius and re-runs the search.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const showPin = !!radiusOverlay && searchEngaged && contactsWithCoords.length > 0;
+		if (!showPin) {
+			if (radiusMarkerZoomHandlerRef.current) {
+				map.off('zoom', radiusMarkerZoomHandlerRef.current);
+				radiusMarkerZoomHandlerRef.current = null;
+			}
+			radiusMarkerRef.current?.remove();
+			radiusMarkerRef.current = null;
+			return;
+		}
+		const { center } = radiusOverlay;
+		if (!radiusMarkerRef.current) {
+			const el = document.createElement('div');
+			el.dataset.radiusCenterMarker = 'true';
+			el.style.cursor = 'grab';
+			el.style.width = '22px';
+			el.style.height = '27px';
+			const inner = document.createElement('div');
+			inner.style.width = '100%';
+			inner.style.height = '100%';
+			inner.style.transformOrigin = 'bottom center';
+			inner.innerHTML = profileAreaMarkerSvg;
+			el.appendChild(inner);
+
+			const applyRadiusPinZoomScale = () => {
+				const scale = clamp(0.55 + (map.getZoom() - 5) * 0.075, 0.6, 1.15);
+				inner.style.transform = `scale(${scale})`;
+			};
+			applyRadiusPinZoomScale();
+			map.on('zoom', applyRadiusPinZoomScale);
+			radiusMarkerZoomHandlerRef.current = applyRadiusPinZoomScale;
+
+			const marker = new mapboxgl.Marker({
+				element: el,
+				anchor: 'bottom',
+				draggable: true,
+			})
+				.setLngLat([center.lng, center.lat])
+				.addTo(map);
+			marker.on('dragstart', () => {
+				isDraggingRadiusRef.current = true;
+				radiusDragSuppressEmptyMapUntilRef.current = Number.POSITIVE_INFINITY;
+				clearEmptyMapPrompt();
+				el.style.cursor = 'grabbing';
+			});
+			marker.on('dragend', () => {
+				isDraggingRadiusRef.current = false;
+				radiusDragSuppressEmptyMapUntilRef.current = Date.now() + 300;
+				el.style.cursor = 'grab';
+				const ll = marker.getLngLat();
+				onRadiusCenterChangeRef.current?.({ lat: ll.lat, lng: ll.lng });
+			});
+			radiusMarkerRef.current = marker;
+		} else if (!isDraggingRadiusRef.current) {
+			radiusMarkerRef.current.setLngLat([center.lng, center.lat]);
+		}
+	}, [
+		map,
+		isMapLoaded,
+		radiusOverlay,
+		searchEngaged,
+		contactsWithCoords,
+		clearEmptyMapPrompt,
+	]);
+
+	const completeAreaSelection = useCallback(
+		(end: { lat: number; lng: number }, endClient: { x: number; y: number } | null) => {
 			if (!isAreaSelecting) return;
 			const start = selectionStartLatLngRef.current;
 			if (!start) {
 				clearSelectionRect();
 				return;
 			}
-			const end = { lat: e.lngLat.lat, lng: e.lngLat.lng };
 
 			// Ignore tiny "click" selections (treat as cancel).
 			const startClient = selectionStartClientRef.current;
-			const endClient = getClientPointFromDomEvent(e.originalEvent);
 			const dx = startClient && endClient ? Math.abs(endClient.x - startClient.x) : 0;
 			const dy = startClient && endClient ? Math.abs(endClient.y - startClient.y) : 0;
 			const movedEnough = dx >= 6 || dy >= 6;
@@ -9592,6 +9536,30 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		]
 	);
 
+	const handleMapMouseUp = useCallback(
+		(e: mapboxgl.MapMouseEvent) => {
+			completeAreaSelection(
+				{ lat: e.lngLat.lat, lng: e.lngLat.lng },
+				getClientPointFromDomEvent(e.originalEvent)
+			);
+		},
+		[completeAreaSelection]
+	);
+
+	const handleMapTouchEnd = useCallback(
+		(e: mapboxgl.MapTouchEvent) => {
+			if (!isAreaSelecting) return;
+			// `touches` is empty on touchend — the lifted finger lives in `changedTouches`.
+			const changed = e.originalEvent.changedTouches;
+			const endClient =
+				changed && changed.length > 0
+					? { x: changed[0].clientX, y: changed[0].clientY }
+					: getClientPointFromDomEvent(e.originalEvent);
+			completeAreaSelection({ lat: e.lngLat.lat, lng: e.lngLat.lng }, endClient);
+		},
+		[isAreaSelecting, completeAreaSelection]
+	);
+
 	// Dashboard UX: "All" button selects all markers currently visible in the viewport that
 	// match the active search category (including overlay pins when visible).
 	useEffect(() => {
@@ -9619,8 +9587,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const selectedIds = new Set<number>();
 
-		// Base results: only select dots currently rendered in the viewport.
-		for (const contact of visibleContacts) selectedIds.add(contact.id);
+		// Base results: only select dots currently rendered in the viewport. Curated
+		// searches may keep the full small result set in the marker source for zoom stability.
+		for (const contact of visibleContacts) {
+			const coords = getContactCoords(contact);
+			if (!coords) continue;
+			if (
+				coords.lat < bounds.south ||
+				coords.lat > bounds.north ||
+				coords.lng < bounds.west ||
+				coords.lng > bounds.east
+			) {
+				continue;
+			}
+			selectedIds.add(contact.id);
+		}
 
 		const normalizedSearchWhat = searchWhat ? normalizeWhatKey(searchWhat) : null;
 		const extraContactsById = new Map<number, ContactWithName>();
@@ -9686,6 +9667,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map,
 		onAreaSelect,
 		visibleContacts,
+		getContactCoords,
 		searchWhat,
 		isBookingSearch,
 		bookingExtraVisibleContacts,
@@ -9729,20 +9711,45 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Use the same scale so our world-pixel distances match on-screen pixels.
 			const worldSize = 512 * Math.pow(2, zoomRaw);
 
+			// Pad the bbox so off-screen-but-near markers stay in the source. Without
+			// this, fast zoom/pan changes cull edge markers from the source data, and
+			// the resulting `setData()` causes the dot layer to briefly clear before
+			// re-rendering — which reads as the "disappear and reload" flicker.
+			const latSpan = north - south;
+			const lngSpan = east - west;
+			const padLat = latSpan * VIEWPORT_BBOX_PAD_FACTOR;
+			const padLng = lngSpan * VIEWPORT_BBOX_PAD_FACTOR;
+			const paddedSouth = clamp(south - padLat, -90, 90);
+			const paddedNorth = clamp(north + padLat, -90, 90);
+			const paddedWest = clamp(west - padLng, -180, 180);
+			const paddedEast = clamp(east + padLng, -180, 180);
+
 			// Keep the seed quantized so marker sampling stays stable while panning/zooming.
+			// Use the padded bounds so the seed only changes when the user moves outside the
+			// padded buffer — matching the visibility filter below for end-to-end stability.
 			const zoomKey = Math.round(zoomRaw);
 			const quant = getBackgroundDotsQuantizationDeg(zoomKey);
-			const qSouth = Math.round(south / quant);
-			const qWest = Math.round(west / quant);
-			const qNorth = Math.round(north / quant);
-			const qEast = Math.round(east / quant);
+			const qSouth = Math.round(paddedSouth / quant);
+			const qWest = Math.round(paddedWest / quant);
+			const qNorth = Math.round(paddedNorth / quant);
+			const qEast = Math.round(paddedEast / quant);
 			const seed = `${zoomKey}|${qSouth}|${qWest}|${qNorth}|${qEast}`;
 
+			// Identity salt for per-contact hashing — invariant under zoom/pan so the
+			// non-priority dot fill doesn't reshuffle across zoom thresholds. Resets on a
+			// new result set / locked-state change, which also clears the carry-over set
+			// (see below) so a new search doesn't inherit the prior set's visible dots.
+			const sampleSalt = `${(searchQuery ?? '').trim()}|${lockedStateKey ?? ''}|${baseContactIdSet.size}`;
+			if (sampleSalt !== dotSampleSaltRef.current) {
+				dotSampleSaltRef.current = sampleSalt;
+				visibleContactIdSetRef.current = new Set();
+			}
+
 			const viewportBbox: BoundingBox = {
-				minLat: south,
-				maxLat: north,
-				minLng: west,
-				maxLng: east,
+				minLat: paddedSouth,
+				maxLat: paddedNorth,
+				minLng: paddedWest,
+				maxLng: paddedEast,
 			};
 
 			// Promotion overlay pins: state-wide "Radio Stations <State>" / "College Radio <State>"
@@ -9779,6 +9786,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				nextPromotionOverlayVisible.length > 0
 					? new Set<number>(nextPromotionOverlayVisible.map((c) => c.id))
 					: null;
+
+			const curatedContactsWithCoords = contactsWithCoords.filter(
+				(contact) => Boolean(contact.curatedCategory) && getContactCoords(contact) != null
+			);
+			const shouldUseStableCuratedMarkers =
+				!isBookingSearch &&
+				!isPromotionSearch &&
+				curatedContactsWithCoords.length > 0 &&
+				curatedContactsWithCoords.length === contactsWithCoords.length &&
+				curatedContactsWithCoords.length <= CURATED_STABLE_MARKER_MAX_DOTS;
+			if (shouldUseStableCuratedMarkers) {
+				const nextVisibleContacts = curatedContactsWithCoords
+					.slice()
+					.sort((a, b) => a.id - b.id);
+				const nextKey = nextVisibleContacts.map((c) => c.id).join(',');
+				if (nextKey !== lastVisibleContactsKeyRef.current) {
+					lastVisibleContactsKeyRef.current = nextKey;
+					setVisibleContacts(nextVisibleContacts);
+				}
+				return;
+			}
 
 			// Determine which contacts are currently in the viewport.
 			const inBounds: ContactWithName[] = [];
@@ -10033,7 +10061,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					isPriority: priorityIdSet.has(contact.id),
 					isInLockedState,
 					isNearLockedBorder: !!lockedEdgeIdSet && lockedEdgeIdSet.has(contact.id),
-					key: hashStringToUint32(`${seed}|${contact.id}`),
+					key: hashStringToUint32(`${sampleSalt}|${contact.id}`),
 				});
 			}
 
@@ -10212,7 +10240,54 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 			}
 
-			const nextVisibleContacts: ContactWithName[] = picked;
+			// Monotonic stability across zoom: never drop a base dot that was already
+			// visible and is still within the padded viewport. The non-overlap picker
+			// culls priority dots that collide at lower zoom (minSeparationPx grows as
+			// you zoom out), which reads as dots "going away." Re-add those survivors so
+			// the visible set only grows while panning/zooming within the same result
+			// set. Stale dots fall out naturally: a new search clears
+			// `visibleContactIdSetRef` (salt reset above) and contacts that leave the
+			// padded bbox aren't in `inBounds`.
+			const pickedIdSet = new Set<number>(picked.map((c) => c.id));
+			const carryOver: ContactWithName[] = [];
+			for (const contact of inBounds) {
+				if (pickedIdSet.has(contact.id)) continue;
+				if (visibleContactIdSetRef.current.has(contact.id)) carryOver.push(contact);
+			}
+
+			let nextVisibleContacts: ContactWithName[];
+			if (carryOver.length === 0) {
+				nextVisibleContacts = picked;
+			} else if (picked.length + carryOver.length <= maxPrimaryDots) {
+				nextVisibleContacts = [...picked, ...carryOver];
+			} else {
+				// Over budget: keep selected/hovered first, then picked, then as many
+				// carry-overs (stable by id) as fit, so the cap never evicts a selected dot.
+				const keep: ContactWithName[] = [];
+				const keepIds = new Set<number>();
+				const pushKeep = (contact: ContactWithName) => {
+					if (keepIds.has(contact.id)) return;
+					keepIds.add(contact.id);
+					keep.push(contact);
+				};
+				for (const contact of picked) {
+					if (
+						selectedSet.has(contact.id) ||
+						(hoveredId != null && contact.id === hoveredId)
+					)
+						pushKeep(contact);
+				}
+				for (const contact of picked) {
+					if (keep.length >= maxPrimaryDots) break;
+					pushKeep(contact);
+				}
+				const sortedCarry = carryOver.slice().sort((a, b) => a.id - b.id);
+				for (const contact of sortedCarry) {
+					if (keep.length >= maxPrimaryDots) break;
+					pushKeep(contact);
+				}
+				nextVisibleContacts = keep;
+			}
 
 			// Stabilize ordering to reduce churn in marker source updates.
 			nextVisibleContacts.sort((a, b) => a.id - b.id);
@@ -10315,7 +10390,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							contact,
 							x: projected.x,
 							y: projected.y,
-							key: hashStringToUint32(`${seed}|bookingExtra|${contact.id}`),
+							key: hashStringToUint32(`${sampleSalt}|bookingExtra|${contact.id}`),
 							isSelected: selectedSet.has(contact.id),
 							isPriority: priorityExtraIdSet.has(contact.id),
 						});
@@ -10394,11 +10469,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				setBookingExtraVisibleContacts(nextBookingExtraVisible);
 			}
 
-			// High-zoom gray-dot overlay: show *all* contacts in the viewport (excluding contacts
-			// already rendered as primary dots or overlay pins).
+			// All-contact overlay:
+			// - active-search mode: close-zoom gray/context dots
+			// - disengaged ambient mode: regional contact atlas, sampled to ~500 visible dots
+			const isAmbientAllContactsOverlay =
+				isAmbientContactsEnabled && zoomRaw >= AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM;
+			const isSearchAllContactsOverlay =
+				isAnySearch && zoomRaw >= ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM;
 			const shouldShowAllContactsOverlay =
-				isAnySearch &&
-				zoomRaw >= ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM &&
+				(isAmbientAllContactsOverlay || isSearchAllContactsOverlay) &&
 				allContactsOverlayContactsWithCoords.length > 0;
 			let nextAllContactsOverlayVisible: ContactWithName[] = [];
 			if (shouldShowAllContactsOverlay) {
@@ -10406,22 +10485,194 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				for (const c of nextBookingExtraVisible) excludeIdSet.add(c.id);
 				for (const c of nextPromotionOverlayVisible) excludeIdSet.add(c.id);
 
-				const inBounds: ContactWithName[] = [];
+				const visibleViewportBbox: BoundingBox = {
+					minLat: south,
+					maxLat: north,
+					minLng: west,
+					maxLng: east,
+				};
+
+				const isAmbientContactAllowed = (contact: ContactWithName): boolean => {
+					if (!isAmbientAllContactsOverlay) return true;
+					const categoryIndex = getAmbientContactCategoryIndexFromTitle(contact.title);
+					if (categoryIndex < 0) return ambientUncategorizedActive;
+					return ambientActiveCategories?.[categoryIndex] !== false;
+				};
+
+				const visibleInBounds: ContactWithName[] = [];
+				const bufferInBounds: ContactWithName[] = [];
 				for (const contact of allContactsOverlayContactsWithCoords) {
 					if (excludeIdSet.has(contact.id)) continue;
+					if (!isAmbientContactAllowed(contact)) continue;
 					const coords = getAllContactsOverlayContactCoords(contact);
 					if (!coords) continue;
 					if (!isLatLngInBbox(coords.lat, coords.lng, viewportBbox)) continue;
-					// Never render gray dots in water (e.g. oceans). Treat "land" as inside any US state polygon.
-					if (!isCoordsInAnyUsState(coords)) continue;
-					inBounds.push(contact);
+					// Never render gray dots in water once state polygons are ready. Cached per id.
+					if (!isAllContactsOverlayContactOnLand(contact, coords)) continue;
+					if (isLatLngInBbox(coords.lat, coords.lng, visibleViewportBbox)) {
+						visibleInBounds.push(contact);
+					} else {
+						bufferInBounds.push(contact);
+					}
 				}
 
-				inBounds.sort((a, b) => a.id - b.id);
-				nextAllContactsOverlayVisible = inBounds;
+				if (isAmbientAllContactsOverlay) {
+					const ambientT = smoothstep(
+						0,
+						1,
+						clamp(
+							(zoomRaw - AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM) /
+								(AMBIENT_CONTACTS_OVERLAY_MARKERS_FULL_ZOOM -
+									AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM),
+							0,
+							1
+						)
+					);
+					const visibleTarget = Math.max(
+						AMBIENT_CONTACTS_OVERLAY_MIN_DOTS,
+						Math.round(AMBIENT_CONTACTS_OVERLAY_TARGET_DOTS * ambientT)
+					);
+					const bufferTarget = Math.min(
+						AMBIENT_CONTACTS_OVERLAY_BUFFER_DOTS,
+						Math.round(visibleTarget * 0.85)
+					);
+					const ambientMinSeparationPx = Math.max(
+						7,
+						2 * (markerScale * 0.78) + dotStrokeWeight + 1
+					);
+					const ambientMinSeparationSq = ambientMinSeparationPx * ambientMinSeparationPx;
+
+					const pickAmbientContacts = (
+						candidatesSource: ContactWithName[],
+						bbox: BoundingBox,
+						slots: number,
+						seedSuffix: string
+					): ContactWithName[] => {
+						if (slots <= 0 || candidatesSource.length === 0) return [];
+						const priorityIdSet = new Set<number>(selectedSet);
+						if (hoveredId != null) priorityIdSet.add(hoveredId);
+						for (const id of allContactsOverlayVisibleIdSetRef.current) {
+							priorityIdSet.add(id);
+						}
+
+						const priorityCandidates = candidatesSource.filter((contact) =>
+							priorityIdSet.has(contact.id)
+						);
+						const otherCandidates = candidatesSource.filter(
+							(contact) => !priorityIdSet.has(contact.id)
+						);
+						const poolSlots = slots * 4;
+						let pool: ContactWithName[];
+						if (candidatesSource.length <= poolSlots) {
+							pool = candidatesSource;
+						} else {
+							const remainingSlots = Math.max(0, poolSlots - priorityCandidates.length);
+							const sampledOther = stableViewportSampleContacts(
+								otherCandidates,
+								getAllContactsOverlayContactCoords,
+								bbox,
+								remainingSlots,
+								`${seed}|ambient:${seedSuffix}:pool`
+							);
+							pool = [...priorityCandidates, ...sampledOther];
+						}
+
+						type AmbientCandidate = {
+							contact: ContactWithName;
+							x: number;
+							y: number;
+							isPriority: boolean;
+							key: number;
+						};
+						const candidateContacts: ContactWithName[] = [];
+						const candidateCoords: LatLngLiteral[] = [];
+						for (const contact of pool) {
+							const coords = getAllContactsOverlayContactCoords(contact);
+							if (!coords) continue;
+							candidateContacts.push(contact);
+							candidateCoords.push(coords);
+						}
+						const projectedCandidates = batchLatLngToWorldPixels(
+							candidateCoords,
+							worldSize
+						);
+						const candidates: AmbientCandidate[] = [];
+						for (let i = 0; i < candidateContacts.length; i++) {
+							const contact = candidateContacts[i];
+							const projected = projectedCandidates[i];
+							if (!projected) continue;
+							candidates.push({
+								contact,
+								x: projected.x,
+								y: projected.y,
+								isPriority: priorityIdSet.has(contact.id),
+								key: hashStringToUint32(
+									`${sampleSalt}|ambient:${seedSuffix}|${contact.id}`
+								),
+							});
+						}
+						candidates.sort((a, b) => {
+							if (a.isPriority !== b.isPriority) return a.isPriority ? -1 : 1;
+							return a.key - b.key;
+						});
+
+						const picked: ContactWithName[] = [];
+						const grid = new Map<string, Array<{ x: number; y: number }>>();
+						const cellSize = Math.max(6, ambientMinSeparationPx);
+						const hasNeighborWithin = (x: number, y: number): boolean => {
+							const cx = Math.floor(x / cellSize);
+							const cy = Math.floor(y / cellSize);
+							for (let dx = -1; dx <= 1; dx++) {
+								for (let dy = -1; dy <= 1; dy++) {
+									const arr = grid.get(`${cx + dx},${cy + dy}`);
+									if (!arr) continue;
+									for (const p of arr) {
+										const ddx = x - p.x;
+										const ddy = y - p.y;
+										if (ddx * ddx + ddy * ddy < ambientMinSeparationSq) return true;
+									}
+								}
+							}
+							return false;
+						};
+
+						for (const candidate of candidates) {
+							if (picked.length >= slots) break;
+							if (hasNeighborWithin(candidate.x, candidate.y)) continue;
+							picked.push(candidate.contact);
+							const cx = Math.floor(candidate.x / cellSize);
+							const cy = Math.floor(candidate.y / cellSize);
+							const k = `${cx},${cy}`;
+							const arr = grid.get(k);
+							if (arr) arr.push({ x: candidate.x, y: candidate.y });
+							else grid.set(k, [{ x: candidate.x, y: candidate.y }]);
+						}
+						return picked;
+					};
+
+					const pickedVisible = pickAmbientContacts(
+						visibleInBounds,
+						visibleViewportBbox,
+						visibleTarget,
+						'visible'
+					);
+					const pickedVisibleIds = new Set(pickedVisible.map((contact) => contact.id));
+					const pickedBuffer = pickAmbientContacts(
+						bufferInBounds.filter((contact) => !pickedVisibleIds.has(contact.id)),
+						viewportBbox,
+						bufferTarget,
+						'buffer'
+					);
+
+					nextAllContactsOverlayVisible = [...pickedVisible, ...pickedBuffer];
+				} else {
+					nextAllContactsOverlayVisible = visibleInBounds;
+				}
+
+				nextAllContactsOverlayVisible.sort((a, b) => a.id - b.id);
 			}
 
-			const nextAllKey = nextAllContactsOverlayVisible.map((c) => c.id).join(',');
+			const nextAllKey = `${isAmbientAllContactsOverlay ? 'ambient' : 'all'}|${nextAllContactsOverlayVisible.map((c) => c.id).join(',')}`;
 			if (nextAllKey !== lastAllContactsOverlayVisibleContactsKeyRef.current) {
 				lastAllContactsOverlayVisibleContactsKeyRef.current = nextAllKey;
 				setAllContactsOverlayVisibleContacts(nextAllContactsOverlayVisible);
@@ -10434,6 +10685,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			getContactCoords,
 			baseContactIdSet,
 			selectedContacts,
+			searchQuery,
 			lockedStateKey,
 			isCoordsInLockedState,
 			isBookingSearch,
@@ -10443,9 +10695,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			promotionOverlayContactsWithCoords,
 			getPromotionOverlayContactCoords,
 			isAnySearch,
+			isAmbientContactsEnabled,
+			ambientActiveCategories,
+			ambientUncategorizedActive,
 			allContactsOverlayContactsWithCoords,
 			getAllContactsOverlayContactCoords,
-			isCoordsInAnyUsState,
+			isAllContactsOverlayContactOnLand,
 		]
 	);
 
@@ -10460,6 +10715,41 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isStateLayerReady,
 		isLoading,
 		recomputeViewportDots,
+	]);
+
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		if (isBackgroundPresentation) return;
+		const requestedZoomValue = requestedZoom?.zoom;
+		if (typeof requestedZoomValue !== 'number' || !Number.isFinite(requestedZoomValue))
+			return;
+
+		try {
+			const minZoom = map.getMinZoom();
+			const maxZoom = map.getMaxZoom();
+			const targetZoom = clamp(requestedZoomValue, minZoom, maxZoom);
+			const currentZoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
+			if (Math.abs(currentZoom - targetZoom) < 0.03) return;
+			if (requestedZoom?.isDragging) {
+				map.jumpTo({ zoom: targetZoom });
+				return;
+			}
+			map.easeTo({
+				zoom: targetZoom,
+				duration: 180,
+				essential: true,
+			});
+		} catch {
+			// Non-fatal; the slider will sync again on the next map idle event.
+		}
+	}, [
+		map,
+		isMapLoaded,
+		isBackgroundPresentation,
+		requestedZoom?.isDragging,
+		requestedZoom?.nonce,
+		requestedZoom?.zoom,
 	]);
 
 	useEffect(() => {
@@ -10529,30 +10819,265 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		updateAllContactsOverlayFetchBbox,
 	]);
 
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		if (isBackgroundPresentation) return;
+
+		const onZoom = () => {
+			onViewportZoomRef.current?.(map.getZoom() ?? MAP_DEFAULT_ZOOM);
+		};
+
+		onZoom();
+		map.on('zoom', onZoom);
+		return () => {
+			map.off('zoom', onZoom);
+		};
+	}, [map, isMapLoaded, isBackgroundPresentation]);
+
+	// Street-level 3D: couple camera pitch to the settled zoom. Reconciles on
+	// 'moveend' only — never per zoom frame — because setPitch/jumpTo fire a
+	// synchronous moveend (storming the heavy viewport-idle pipeline) and stop()
+	// any in-flight easeTo/fitBounds. Two subtleties make the reconcile deferred
+	// by one frame with an isEasing/isMoving re-check:
+	// - moveends fired by *interrupting* an ease (every input/render frame of an
+	//   active gesture calls map stop()) report isEasing() === false, so a
+	//   synchronous reconcile would re-arm at frame rate for the whole gesture;
+	// - starting an ease synchronously from inside another ease's stop() leaves
+	//   two render-frame chains running concurrently.
+	// After the one-frame deferral only a genuinely settled camera starts the
+	// pitch ease. The ramp is continuous, so leaving street zoom naturally
+	// returns pitch to 0; the epsilon dead-band makes the pitch ease's own
+	// moveend a terminating no-op.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		if (isBackgroundPresentation) return;
+		if (!streetViewEnabled) return;
+
+		let frameId: number | null = null;
+		const reconcilePitch = () => {
+			if (frameId !== null) return;
+			frameId = requestAnimationFrame(() => {
+				frameId = null;
+				try {
+					if (map.isEasing() || map.isMoving()) return;
+					const target = computeStreetViewPitch(map.getZoom() ?? MAP_DEFAULT_ZOOM);
+					const current = map.getPitch() ?? 0;
+					if (Math.abs(current - target) < STREET_VIEW_PITCH_EPSILON_DEG) return;
+					map.easeTo({
+						pitch: target,
+						duration: STREET_VIEW_PITCH_EASE_MS,
+						easing: mapboxEaseOutCubic,
+						essential: true,
+					});
+				} catch {
+					// Non-fatal.
+				}
+			});
+		};
+
+		map.on('moveend', reconcilePitch);
+		// Align immediately on enable / re-entry to the search surface.
+		reconcilePitch();
+		return () => {
+			map.off('moveend', reconcilePitch);
+			if (frameId !== null) {
+				cancelAnimationFrame(frameId);
+				frameId = null;
+			}
+		};
+	}, [map, isMapLoaded, isBackgroundPresentation, streetViewEnabled]);
+
+	// Street-level 3D: continuous pitch ramp during user zoom gestures, so the
+	// camera tilts WHILE zooming instead of after the gesture settles. Writes
+	// map.transform.pitch directly (the exact write jumpTo performs internally:
+	// the setter clamps to [minPitch, maxPitch] and recalcs matrices) because
+	// every public camera mutator funnels through stop(), which resets all
+	// gesture handlers — freezing wheel smoothing and killing a live pinch. The
+	// gesture pipeline applies deltas only (tr.pitch += pitchDelta) and no zoom
+	// handler emits pitchDelta (touchPitch/pitchWithRotate are off on this map),
+	// so these writes are never overwritten. e.originalEvent separates user
+	// input (wheel/pinch frames; dblclick/inertia eases, which never touch
+	// pitch) from programmatic flights/handoffs, which stay owned by the
+	// moveend reconcile above — that effect remains the settle pass and the
+	// fallback if mapbox internals ever change shape.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		if (isBackgroundPresentation) return;
+		if (!streetViewEnabled) return;
+
+		const onZoomFrame = (e: { originalEvent?: Event }) => {
+			try {
+				if (!e.originalEvent) return; // programmatic camera move — skip
+				const tr = map.transform;
+				if (!tr || typeof tr.pitch !== 'number') return; // private-API fence
+				const target = computeStreetViewPitch(map.getZoom() ?? MAP_DEFAULT_ZOOM);
+				if (Math.abs(tr.pitch - target) < STREET_VIEW_PITCH_FRAME_EPSILON_DEG) return;
+				tr.pitch = target;
+				map.triggerRepaint(); // no-op mid-render; safety net otherwise
+			} catch {
+				// Fence: on any mapbox internals change, fall back to the
+				// moveend reconcile (today's behavior).
+			}
+		};
+
+		map.on('zoom', onZoomFrame);
+		return () => {
+			map.off('zoom', onZoomFrame);
+		};
+	}, [map, isMapLoaded, isBackgroundPresentation, streetViewEnabled]);
+
+	// Show the 3D buildings only on surfaces that opted into street view.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		try {
+			if (!map.getLayer(MAPBOX_LAYER_IDS.streetViewBuildings)) return;
+			map.setLayoutProperty(
+				MAPBOX_LAYER_IDS.streetViewBuildings,
+				'visibility',
+				streetViewEnabled && !isBackgroundPresentation ? 'visible' : 'none'
+			);
+		} catch {
+			// Non-fatal.
+		}
+	}, [map, isMapLoaded, isBackgroundPresentation, streetViewEnabled]);
+
+	// If street view is disabled while pitched (e.g. the host toggles the prop while
+	// staying interactive), ease back to the flat top-down camera. The background
+	// handoff is excluded: it owns pitch explicitly (0 / DASHBOARD_DECORATIVE_PITCH).
+	// Same one-frame deferral + settled-camera re-check as the street-view pitch
+	// reconciler above: in particular this must never stop() an in-flight
+	// background → interactive handoff glide (which already lands at pitch 0).
+	// Reconciling on moveend covers a prop flip that lands mid-animation.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		if (streetViewEnabled) return;
+		if (isBackgroundPresentation) return;
+
+		let frameId: number | null = null;
+		const flattenPitch = () => {
+			if (frameId !== null) return;
+			frameId = requestAnimationFrame(() => {
+				frameId = null;
+				try {
+					if (map.isEasing() || map.isMoving()) return;
+					if ((map.getPitch() ?? 0) <= STREET_VIEW_PITCH_EPSILON_DEG) return;
+					map.easeTo({
+						pitch: 0,
+						duration: STREET_VIEW_PITCH_EASE_MS,
+						easing: mapboxEaseOutCubic,
+						essential: true,
+					});
+				} catch {
+					// Non-fatal.
+				}
+			});
+		};
+
+		map.on('moveend', flattenPitch);
+		flattenPitch();
+		return () => {
+			map.off('moveend', flattenPitch);
+			if (frameId !== null) {
+				cancelAnimationFrame(frameId);
+				frameId = null;
+			}
+		};
+	}, [map, isMapLoaded, isBackgroundPresentation, streetViewEnabled]);
+
+	// Prewarm the coarse low-zoom basemap for the wide region the user would reveal
+	// on zoom-out, so even the FIRST zoom-out renders already-cached cartography
+	// instead of streaming streets-v12 across the periphery. Uses Mapbox's public,
+	// event-free `jumpTo(preloadOnly)`: it clones the transform (no camera move, no
+	// events) and warms the browser tile cache for that camera. Fires on a debounced
+	// settle so it stays off the interaction hot path.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		if (isBackgroundPresentation) return;
+
+		const prewarm = () => {
+			try {
+				if (typeof map.jumpTo !== 'function') return;
+				// `jumpTo` calls `map.stop()`, which would abort an in-progress camera
+				// animation. Never prewarm while the camera is moving — defer until it
+				// settles so we can't interrupt a fresh gesture started mid-debounce.
+				if (typeof map.isMoving === 'function' && map.isMoving()) {
+					schedule();
+					return;
+				}
+				const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
+				if (zoom < OVERVIEW_PREWARM_MIN_ZOOM) return;
+				if (typeof document !== 'undefined' && document.hidden) return;
+				const c = map.getCenter();
+				if (!c) return;
+				const q = OVERVIEW_PREWARM_CENTER_QUANT_DEG;
+				const key = `${Math.round(c.lng / q) * q}:${Math.round(c.lat / q) * q}`;
+				if (lastPrewarmKeyRef.current === key) return;
+				lastPrewarmKeyRef.current = key;
+				for (const z of OVERVIEW_PREWARM_ZOOMS) {
+					map.jumpTo({ center: [c.lng, c.lat], zoom: z, preloadOnly: true } as any);
+				}
+			} catch {
+				// Non-fatal — prewarm is a pure optimization, never break the map.
+			}
+		};
+
+		const schedule = () => {
+			if (prewarmTimerRef.current != null) {
+				window.clearTimeout(prewarmTimerRef.current);
+			}
+			prewarmTimerRef.current = window.setTimeout(prewarm, OVERVIEW_PREWARM_DEBOUNCE_MS);
+		};
+
+		map.on('moveend', schedule);
+		// Seed once on first settle (covers deep-link-then-zoom-out with no pan).
+		schedule();
+
+		return () => {
+			map.off('moveend', schedule);
+			if (prewarmTimerRef.current != null) {
+				window.clearTimeout(prewarmTimerRef.current);
+				prewarmTimerRef.current = null;
+			}
+		};
+	}, [map, isMapLoaded, isBackgroundPresentation]);
+
 	// Notify the parent as soon as the user starts interacting with the viewport.
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
 		if (isBackgroundPresentation) return;
 		const onMoveStart = () => {
+			clearEmptyMapPrompt();
 			onViewportInteractionRef.current?.();
 		};
 		map.on('movestart', onMoveStart);
 		return () => {
 			map.off('movestart', onMoveStart);
 		};
-	}, [map, isMapLoaded, isBackgroundPresentation]);
+	}, [map, isMapLoaded, isBackgroundPresentation, clearEmptyMapPrompt]);
 
-	// Rectangle selection handlers (Mapbox mouse events).
+	// Rectangle selection handlers (Mapbox mouse + touch events).
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
 		if (isBackgroundPresentation) return;
 		map.on('mousedown', handleMapMouseDown);
 		map.on('mousemove', handleMapMouseMove);
 		map.on('mouseup', handleMapMouseUp);
+		map.on('touchstart', handleMapTouchStart);
+		map.on('touchmove', handleMapTouchMove);
+		map.on('touchend', handleMapTouchEnd);
 		return () => {
 			map.off('mousedown', handleMapMouseDown);
 			map.off('mousemove', handleMapMouseMove);
 			map.off('mouseup', handleMapMouseUp);
+			map.off('touchstart', handleMapTouchStart);
+			map.off('touchmove', handleMapTouchMove);
+			map.off('touchend', handleMapTouchEnd);
 		};
 	}, [
 		map,
@@ -10561,6 +11086,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		handleMapMouseDown,
 		handleMapMouseMove,
 		handleMapMouseUp,
+		handleMapTouchStart,
+		handleMapTouchMove,
+		handleMapTouchEnd,
 	]);
 
 	// Toggle map interaction mode for rectangle selection.
@@ -10571,10 +11099,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		try {
 			if (selecting) {
 				map.dragPan.disable();
-				map.dragRotate.disable();
 			} else {
 				map.dragPan.enable();
-				map.dragRotate.enable();
 			}
 		} catch {
 			// Ignore (handlers may not be ready yet).
@@ -10588,7 +11114,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		// Hide state outlines when using rectangle selection (selectedAreaBounds is set)
 		// Clear outlines while loading or if no result states
-		if (isLoading || !resultStateKeysSignature || selectedAreaBounds) {
+		if (!searchEngaged || isLoading || !resultStateKeysSignature || selectedAreaBounds) {
 			clearResultsOutline();
 			return;
 		}
@@ -10664,6 +11190,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map,
 		isMapLoaded,
 		isStateLayerReady,
+		searchEngaged,
 		isLoading,
 		resultStateKeys,
 		resultStateKeysSignature,
@@ -10671,8 +11198,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		selectedAreaBounds,
 	]);
 
-	// Draw a black outline around the searched/locked state (even when state interactions are off).
-	// When state interactions are enabled, our interactive borders layer renders the selected state border.
+	// Track the searched/locked state polygon for marker styling and the clipped state overlay.
 	useEffect(() => {
 		if (!map || !isMapLoaded || !isStateLayerReady) return;
 
@@ -10682,6 +11208,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lockedStateSelectionMultiPolygonRef.current = null;
 			lockedStateSelectionBboxRef.current = null;
 			lockedStateSelectionKeyRef.current = null;
+			selectedStateMorphSourceRef.current = null;
+			selectedStateDisplayMultiPolygonRef.current = null;
+			selectedStateLastMorphTAppliedRef.current = Number.NaN;
+			selectedStateOutlineSourceKeyRef.current = '';
+			applySelectedStateGradientStateRef.current?.();
 			recomputeViewportDots(map);
 			return;
 		}
@@ -10691,28 +11222,42 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lockedStateSelectionMultiPolygonRef.current = null;
 			lockedStateSelectionBboxRef.current = null;
 			lockedStateSelectionKeyRef.current = null;
+			selectedStateMorphSourceRef.current = null;
+			selectedStateDisplayMultiPolygonRef.current = null;
+			selectedStateLastMorphTAppliedRef.current = Number.NaN;
+			selectedStateOutlineSourceKeyRef.current = '';
+			applySelectedStateGradientStateRef.current?.();
 			recomputeViewportDots(map);
 			return;
 		}
 
 		const found = usStatesByKeyRef.current.get(lockedStateKey)?.multiPolygon ?? null;
+		if (!found) {
+			clearSearchedStateOutline();
+			lockedStateSelectionMultiPolygonRef.current = null;
+			lockedStateSelectionBboxRef.current = null;
+			lockedStateSelectionKeyRef.current = null;
+			selectedStateMorphSourceRef.current = null;
+			selectedStateDisplayMultiPolygonRef.current = null;
+			selectedStateLastMorphTAppliedRef.current = Number.NaN;
+			selectedStateOutlineSourceKeyRef.current = '';
+			applySelectedStateGradientStateRef.current?.();
+			recomputeViewportDots(map);
+			return;
+		}
 
 		// Store polygon selection for marker "inside/outside" styling (even if we don't draw the outline).
 		lockedStateSelectionMultiPolygonRef.current = found;
 		lockedStateSelectionBboxRef.current = found ? bboxFromMultiPolygon(found) : null;
 		lockedStateSelectionKeyRef.current = lockedStateKey;
+		selectedStateMorphSourceRef.current = createSelectedStateMorphSource(found);
+		selectedStateDisplayMultiPolygonRef.current = null;
+		selectedStateLastMorphTAppliedRef.current = Number.NaN;
+		selectedStateOutlineSourceKeyRef.current = '';
 		// The locked-state polygon is stored in refs (no rerender) — force a marker recompute
 		// so low-zoom bias toward the locked state applies immediately.
 		recomputeViewportDots(map);
-
-		clearSearchedStateOutline();
-		if (stateInteractionsEnabled || !found) return;
-
-		const outlineFc = createOutlineGeoJsonFromMultiPolygon(found);
-		const source = map.getSource(MAPBOX_SOURCE_IDS.lockedOutline) as
-			| mapboxgl.GeoJSONSource
-			| undefined;
-		source?.setData(outlineFc as any);
+		applySelectedStateGradientStateRef.current?.();
 	}, [
 		map,
 		isMapLoaded,
@@ -10739,8 +11284,45 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// In search mode, use the query string as the stable "search session" key. This avoids
 	// treating resorted/streaming results as a brand new search (which causes map bouncing).
 	const lastSearchQueryKeyRef = useRef<string | null>(null);
+	const lastAutoFitRequestNonceRef = useRef<number>(autoFitRequestNonce ?? 0);
+	// Tracks the last consumed `instantAutoFitNonce` so each distinct value snaps exactly one fit.
+	const lastInstantAutoFitNonceRef = useRef<number>(0);
 	// Debounce auto-fit camera moves so rapid result updates don't cause zoom oscillation.
 	const autoFitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+	// Keep the latest autoFitPadding without churning the fit callbacks' identity (the
+	// host passes an inline object literal).
+	const autoFitPaddingRef = useRef(autoFitPadding);
+	autoFitPaddingRef.current = autoFitPadding;
+
+	// Resolve the padding for a fitBounds call: the host's chrome-aware autoFitPadding
+	// when provided, scaled down so the bounds always have ≥80px of canvas to land in
+	// (Mapbox bails out of fits whose padding exceeds the canvas), else the fallback.
+	const resolveAutoFitPadding = useCallback(
+		(
+			mapInstance: mapboxgl.Map,
+			fallback: { top: number; right: number; bottom: number; left: number }
+		) => {
+			const requested = autoFitPaddingRef.current;
+			if (!requested) return fallback;
+			const container = mapInstance.getContainer();
+			let { top, right, bottom, left } = requested;
+			const maxVertical = Math.max(0, container.clientHeight - 80);
+			const maxHorizontal = Math.max(0, container.clientWidth - 80);
+			if (top + bottom > maxVertical && top + bottom > 0) {
+				const scale = maxVertical / (top + bottom);
+				top *= scale;
+				bottom *= scale;
+			}
+			if (left + right > maxHorizontal && left + right > 0) {
+				const scale = maxHorizontal / (left + right);
+				left *= scale;
+				right *= scale;
+			}
+			return { top, right, bottom, left };
+		},
+		[]
+	);
 
 	// Helper to fit map bounds with padding
 	const fitMapToBounds = useCallback(
@@ -10766,14 +11348,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			const dur = opts?.durationMs ?? 650;
 			mapInstance.fitBounds(bounds, {
-				padding: { top: 50, right: 50, bottom: 50, left: 50 },
+				padding: resolveAutoFitPadding(mapInstance, {
+					top: 50,
+					right: 50,
+					bottom: 50,
+					left: 50,
+				}),
 				maxZoom: AUTO_FIT_CONTACTS_MAX_ZOOM,
+				pitch: 0,
+				bearing: 0,
+				offset: [0, 0],
 				duration: dur,
 				// Smooth ease-out for cinematic transitions (default Mapbox ease is too stiff at long durations).
-				...(dur > 1000 ? { easing: (t: number) => 1 - Math.pow(1 - t, 3) } : {}),
+				...(dur > 1000 ? { easing: mapboxEaseOutCubic } : {}),
 			});
 		},
-		[getContactCoords]
+		[getContactCoords, resolveAutoFitPadding]
 	);
 
 	// Helper to fit map to a state's bounds
@@ -10796,17 +11386,25 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					[bbox.maxLng, bbox.maxLat],
 				],
 				{
-					padding: { top: 100, right: 100, bottom: 100, left: 100 },
+					padding: resolveAutoFitPadding(mapInstance, {
+						top: 100,
+						right: 100,
+						bottom: 100,
+						left: 100,
+					}),
 					maxZoom: AUTO_FIT_STATE_MAX_ZOOM,
+					pitch: 0,
+					bearing: 0,
+					offset: [0, 0],
 					duration: dur,
 					// Smooth ease-out for cinematic transitions.
-					...(dur > 1000 ? { easing: (t: number) => 1 - Math.pow(1 - t, 3) } : {}),
+					...(dur > 1000 ? { easing: mapboxEaseOutCubic } : {}),
 				}
 			);
 
 			return true;
 		},
-		[]
+		[resolveAutoFitPadding]
 	);
 
 	// Fit bounds when contacts with coordinates change (or when the locked state changes).
@@ -10825,6 +11423,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const searchQueryKey = (searchQuery ?? '').trim();
 		const isSearchMode = searchQueryKey.length > 0;
+		const autoFitRequestNonceValue = autoFitRequestNonce ?? 0;
+		const isAutoFitRequested =
+			autoFitRequestNonceValue !== lastAutoFitRequestNonceRef.current;
 
 		// Check if this is a new set of search results.
 		// In search mode, rely on the query string (stable). Outside of search mode,
@@ -10857,7 +11458,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// Even if we've already fit to contacts, we still want to zoom to the locked state
 		// once the state layer finishes loading (prevents "random" fallback viewports).
 		const shouldFitLockedState =
-			lockedStateKeyIsUsState && isStateLayerReady && !hasFitLockedStateForKey;
+			lockedStateKeyIsUsState &&
+			isStateLayerReady &&
+			(!hasFitLockedStateForKey || isAutoFitRequested);
 
 		// Fit bounds if:
 		// 1. We haven't fit bounds yet (initial load after geocoding)
@@ -10871,11 +11474,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				!hasFitBoundsRef.current ||
 				isNewSearch ||
 				isNewStateSearch ||
+				isAutoFitRequested ||
 				(!lockedStateKeyIsUsState && coordsJustBecameAvailable)
 			: // Outside search mode (campaign contacts view), keep the existing "results changed" behavior.
 				!hasFitBoundsRef.current ||
 				isNewSearch ||
 				isNewStateSearch ||
+				isAutoFitRequested ||
 				contactsWithCoords.length > lastContactsCountRef.current ||
 				Math.abs(contactsWithCoords.length - lastContactsCountRef.current) > 5;
 
@@ -10891,6 +11496,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lockedStateKeyIsUsState && !!lockedStateKey && isStateLayerReady;
 		const canFitToBoundsNow = contactsWithCoords.length > 0;
 		if (!canFitToStateNow && !canFitToBoundsNow) return;
+		// During a fresh dashboard search, React Query may briefly expose the previous result set
+		// while the new request is loading. If we do not have a state target ready yet, wait for
+		// fresh contacts instead of flying toward stale coordinates.
+		const shouldWaitForFreshContactFit =
+			Boolean(isLoading) &&
+			isSearchMode &&
+			!canFitToStateNow &&
+			(isNewSearch || !hasFitBoundsRef.current);
+		if (shouldWaitForFreshContactFit) return;
 
 		// Debounce camera moves so rapid updates don't cause zoom in/out oscillation.
 		if (autoFitTimeoutRef.current) {
@@ -10904,8 +11518,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			pendingSearch.key === searchQueryKey &&
 			Date.now() - pendingSearch.at < 10_000;
 
+		const instantFitRequested =
+			(instantAutoFitNonce ?? 0) > 0 &&
+			(instantAutoFitNonce ?? 0) !== lastInstantAutoFitNonceRef.current;
 		const autoFitDebounceMs =
-			cinematicAutoFitRef.current || isSearchQueryCinematic ? 0 : 180;
+			instantFitRequested || cinematicAutoFitRef.current || isSearchQueryCinematic
+				? 0
+				: 180;
 		autoFitTimeoutRef.current = setTimeout(() => {
 			// If a cinematic fly-in is already underway, don't restart the camera animation.
 			if (cinematicInFlightRef.current) return;
@@ -10923,8 +11542,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				!!pendingSearchNow &&
 				pendingSearchNow.key === searchQueryKey &&
 				Date.now() - pendingSearchNow.at < 10_000;
-			const durationMs =
-				cinematicNow || isUserStateClickCinematic || isSearchQueryCinematicNow
+			const durationMs = instantFitRequested
+				? 0
+				: cinematicNow || isUserStateClickCinematic || isSearchQueryCinematicNow
 					? DASHBOARD_TO_INTERACTIVE_TRANSITION_MS
 					: 650;
 
@@ -10958,6 +11578,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			// Only mark as "fit" if we actually moved the camera.
 			if (didFit) {
+				lastAutoFitRequestNonceRef.current = autoFitRequestNonceValue;
+				if (instantFitRequested) {
+					// Mark this nonce consumed; clear pending cinematic intents so the next *real*
+					// search/state-click animates normally instead of inheriting this snap.
+					lastInstantAutoFitNonceRef.current = instantAutoFitNonce ?? 0;
+					pendingSearchQueryCinematicRef.current = null;
+					pendingStateClickCinematicRef.current = null;
+				}
 				// Clear the user-click flag once we successfully kicked off the cinematic state zoom.
 				if (isUserStateClickCinematic) {
 					pendingStateClickCinematicRef.current = null;
@@ -10969,8 +11597,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				hasFitBoundsRef.current = true;
 				lastContactsCountRef.current = contactsWithCoords.length;
 
-				// If we temporarily allowed zoom < MAP_MIN_ZOOM to start the animation from the
-				// decorative globe, restore the normal constraint once the camera settles.
+				// If we temporarily allowed zoom below the interactive floor to start the animation
+				// from the decorative globe, restore the normal constraint once the camera settles.
 				if (pendingMinZoomRestoreRef.current && !hasAttachedMinZoomRestoreRef.current) {
 					hasAttachedMinZoomRestoreRef.current = true;
 					try {
@@ -10978,7 +11606,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							hasAttachedMinZoomRestoreRef.current = false;
 							pendingMinZoomRestoreRef.current = false;
 							try {
-								map.setMinZoom(MAP_MIN_ZOOM);
+								map.setMinZoom(interactiveMinZoomRef.current);
 							} catch {}
 						});
 					} catch {
@@ -11024,8 +11652,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		fitMapToState,
 		lockedStateKey,
 		isStateLayerReady,
+		isLoading,
 		skipAutoFit,
 		searchQuery,
+		autoFitRequestNonce,
+		instantAutoFitNonce,
 	]);
 
 	// If auto-fit is disabled, ensure we don't have a queued fit from a prior render.
@@ -11037,36 +11668,61 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 	}, [skipAutoFit]);
 
-	// Reset bounds tracking when contacts prop is empty (preparing for new search)
+	// Reset bounds tracking when contacts prop is empty (preparing for new search).
+	// Do NOT re-arm while auto-fit is disabled: an empty-contacts frame under skipAutoFit is
+	// always transient (the route-handoff FALLBACK flash between campaign/dashboard, or
+	// background/decorative mode). Re-arming there forces a spurious re-fit when the real
+	// interactive config rehydrates with the same search, overriding the user's camera.
 	useEffect(() => {
+		if (skipAutoFit) return;
 		if (contacts.length === 0) {
 			hasFitBoundsRef.current = false;
 			lastContactsCountRef.current = 0;
 			lastFirstContactIdRef.current = null;
 			lastLockedStateKeyRef.current = null;
 		}
-	}, [contacts]);
+	}, [contacts, skipAutoFit]);
 
-	const handleMarkerClick = (contact: ContactWithName) => {
-		onMarkerClick?.(contact);
-		// Toggle selection when clicking on a marker.
-		// - Always allow selection toggling for primary result set.
-		// - In Booking mode, also allow toggling on the zoom-in "extra" pins (even though they
-		//   come from the map-overlay endpoint rather than the primary results list).
+	// Selection toggling is allowed for:
+	// - the primary result set;
+	// - in Booking mode, the zoom-in "extra" pins (even though they come from the
+	//   map-overlay endpoint rather than the primary results list);
+	// - at extremely high zoom, the "all contacts" gray-dot overlay.
+	// Shared by marker clicks and the street-view card's selection button.
+	const isSelectionToggleEligible = (contact: ContactWithName): boolean => {
 		const isPrimaryResult = baseContactIdSet.has(contact.id);
 		const isBookingExtraResult =
 			isBookingSearch && bookingExtraVisibleContacts.some((c) => c.id === contact.id);
-		// - At extremely high zoom, also allow toggling for the "all contacts" gray-dot overlay.
 		const isAllContactsOverlayResult = allContactsOverlayVisibleIdSetRef.current.has(
 			contact.id
 		);
-		if (isPrimaryResult || isBookingExtraResult || isAllContactsOverlayResult) {
+		return isPrimaryResult || isBookingExtraResult || isAllContactsOverlayResult;
+	};
+
+	const handleMarkerClick = (contact: ContactWithName) => {
+		onMarkerClick?.(contact);
+		if (isSelectionToggleEligible(contact)) {
 			onToggleSelection?.(contact.id);
 		}
 	};
 
+	// Street-view card "Add to Selection" must follow the marker-click contract:
+	// onMarkerClick first, so the consumer can pin overlay-only contacts (ambient
+	// dots, non-matching booking/promotion pins) into its results panel — a bare
+	// onToggleSelection(id) leaves the dashboard with an id it can't resolve to a
+	// row. Stable identity so the memoized persistent cards don't re-render.
+	// (The cards only render this button for selection-eligible contacts.)
+	const handleStreetCardToggleSelection = useCallback(
+		(contact: ContactWithName) => {
+			onMarkerClick?.(contact);
+			onToggleSelection?.(contact.id);
+		},
+		[onMarkerClick, onToggleSelection]
+	);
+
 	const handleMarkerMouseOver = useCallback(
 		(contact: ContactWithName, domEvent?: MouseEvent | TouchEvent) => {
+			clearEmptyMapPrompt();
 			// Don't trigger hover interactions until sufficiently zoomed in
 			if (zoomLevel < HOVER_INTERACTION_MIN_ZOOM) return;
 
@@ -11092,7 +11748,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			onMarkerHover?.(contact, meta);
 		},
-		[onMarkerHover, zoomLevel]
+		[clearEmptyMapPrompt, onMarkerHover, zoomLevel]
 	);
 
 	const handleMarkerMouseOut = useCallback(
@@ -11201,11 +11857,189 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return getResultDotScaleForZoom(zoomLevel);
 	}, [zoomLevel]);
 
+	// Curated cluster orbs: project each current morphed blob to screen space,
+	// then fit one SVG gradient to each projected blob bounds.
+	const applyCuratedOrbState = useCallback(() => {
+		const m = mapRef.current;
+		const orb = curatedOrbRef.current;
+		if (!m || !orb) return;
+		const zoom = m.getZoom() ?? MAP_DEFAULT_ZOOM;
+		const bloomT = computeCuratedOrbT(zoom);
+		const colorOpacity = CURATED_ORB_COLOR_BLEND_OPACITY * (1 - bloomT);
+		const bloomOpacity = CURATED_ORB_BLOOM_OPACITY * bloomT;
+		const shapeMultiPolygons = curatedBlobLngLatShapeMultiPolygonsRef.current;
+		const targets = curatedBlobOrbTargetsRef.current;
+		let hasVisibleSlot = false;
+
+		for (let i = 0; i < CURATED_ORB_SLOT_COUNT; i++) {
+			const ellipse = curatedOrbEllipseRefs.current[i];
+			const bloomEllipse = curatedOrbBloomEllipseRefs.current[i];
+			const gradient = curatedOrbGradientRefs.current[i];
+			const bloomGradient = curatedOrbBloomGradientRefs.current[i];
+			const clipPath = curatedOrbClipPathRefs.current[i];
+			const hideSlot = () => {
+				clipPath?.setAttribute('d', '');
+				ellipse?.setAttribute('opacity', '0');
+				bloomEllipse?.setAttribute('opacity', '0');
+			};
+			if (!ellipse || !bloomEllipse || !gradient || !bloomGradient || !clipPath) {
+				continue;
+			}
+
+			const shapeMultiPolygon = shapeMultiPolygons[i];
+			if (!shapeMultiPolygon?.length) {
+				hideSlot();
+				continue;
+			}
+
+			const target = targets[i];
+			const frontHemisphereOpacity = computeGlobeFrontHemisphereOpacity(
+				m,
+				target?.center ?? null,
+				target?.radiusKm ?? null,
+				zoom
+			);
+			if (frontHemisphereOpacity <= 0.006) {
+				hideSlot();
+				continue;
+			}
+
+			const projectedClip = buildScreenPathFromLngLatMultiPolygon(m, shapeMultiPolygon);
+			if (!projectedClip) {
+				hideSlot();
+				continue;
+			}
+
+			const width = projectedClip.maxX - projectedClip.minX;
+			const height = projectedClip.maxY - projectedClip.minY;
+			if (
+				!Number.isFinite(width) ||
+				!Number.isFinite(height) ||
+				width <= 0 ||
+				height <= 0
+			) {
+				hideSlot();
+				continue;
+			}
+
+			const halfWidth = width / 2;
+			const halfHeight = height / 2;
+			const centerX = projectedClip.minX + halfWidth;
+			const centerY = projectedClip.minY + halfHeight;
+			ellipse.setAttribute('cx', centerX.toFixed(2));
+			ellipse.setAttribute('cy', centerY.toFixed(2));
+			bloomEllipse.setAttribute('cx', centerX.toFixed(2));
+			bloomEllipse.setAttribute('cy', centerY.toFixed(2));
+			ellipse.setAttribute('rx', (halfWidth * CURATED_ORB_ELLIPSE_RX_RATIO).toFixed(2));
+			ellipse.setAttribute('ry', (halfHeight * CURATED_ORB_ELLIPSE_RY_RATIO).toFixed(2));
+			const bloomRadius = Math.max(halfWidth, halfHeight);
+			bloomEllipse.setAttribute('rx', bloomRadius.toFixed(2));
+			bloomEllipse.setAttribute('ry', bloomRadius.toFixed(2));
+			gradient.setAttribute(
+				'gradientTransform',
+				`translate(${centerX.toFixed(2)} ${centerY.toFixed(2)}) rotate(${CURATED_ORB_GRADIENT_ROTATION_DEG}) scale(${(
+					halfWidth * CURATED_ORB_GRADIENT_SCALE_X_RATIO
+				).toFixed(2)} ${(halfHeight * CURATED_ORB_GRADIENT_SCALE_Y_RATIO).toFixed(2)})`
+			);
+			bloomGradient.setAttribute(
+				'gradientTransform',
+				`translate(${centerX.toFixed(2)} ${centerY.toFixed(2)}) scale(${bloomRadius.toFixed(2)})`
+			);
+			clipPath.setAttribute('d', projectedClip.d);
+			ellipse.setAttribute('opacity', (colorOpacity * frontHemisphereOpacity).toFixed(3));
+			bloomEllipse.setAttribute(
+				'opacity',
+				(bloomOpacity * frontHemisphereOpacity).toFixed(3)
+			);
+			hasVisibleSlot = true;
+		}
+
+		orb.style.opacity = hasVisibleSlot ? '1' : '0';
+	}, []);
+	applyCuratedOrbStateRef.current = applyCuratedOrbState;
+
+	// Vertex-by-vertex morph of the curated blob outline toward a circle of
+	// `radiusMerc` around `centerMerc`. Each vertex moves along its own ray
+	// from the centroid, so a non-circular blob smoothly widens out into the
+	// target circle as `t` grows from 0 → 1. Even when the morph geometry
+	// itself is unchanged, the SVG clip must still be reprojected on every
+	// render frame so it stays locked to Mapbox's fast camera transforms.
+	const applyBlobMorph = useCallback(() => {
+		const m = mapRef.current;
+		if (!m) return;
+		const morphSources = naturalBlobMorphSourceRef.current;
+		const source = m.getSource(MAPBOX_SOURCE_IDS.curatedBlob) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		if (!source) return;
+		if (!morphSources?.length) {
+			lastBlobMorphTAppliedRef.current = Number.NaN;
+			curatedBlobLngLatMultiPolygonRef.current = null;
+			curatedBlobLngLatShapeMultiPolygonsRef.current = [];
+			return;
+		}
+		const zoom = m.getZoom() ?? MAP_DEFAULT_ZOOM;
+		const t = computeCuratedOrbT(zoom);
+		if (Math.abs(t - lastBlobMorphTAppliedRef.current) < 0.001) {
+			applyCuratedOrbStateRef.current?.();
+			return;
+		}
+		lastBlobMorphTAppliedRef.current = t;
+
+		const morphedShapes = morphSources.map(
+			({ mercatorMultiPolygon, centerMerc, radiusMerc }) =>
+				t <= 0
+					? mercatorMultiPolygon
+					: mercatorMultiPolygon.map((polygon) =>
+							polygon.map((ring) =>
+								ring.map((point): [number, number] => {
+									const dx = point[0] - centerMerc.x;
+									const dy = point[1] - centerMerc.y;
+									if (dx === 0 && dy === 0) return [point[0], point[1]];
+									const angle = Math.atan2(dy, dx);
+									const tx = centerMerc.x + Math.cos(angle) * radiusMerc;
+									const ty = centerMerc.y + Math.sin(angle) * radiusMerc;
+									return [point[0] + (tx - point[0]) * t, point[1] + (ty - point[1]) * t];
+								})
+							)
+						)
+		);
+		const lngLatShapes = morphedShapes.map(mercatorMultiPolygonToLngLat);
+		const lngLat = lngLatShapes.flat();
+		curatedBlobLngLatShapeMultiPolygonsRef.current = lngLatShapes;
+		curatedBlobLngLatMultiPolygonRef.current = lngLat;
+		const fc = createOutlineGeoJsonFromMultiPolygon(lngLat);
+		source.setData(fc as GeoJSON.FeatureCollection);
+		applyCuratedOrbStateRef.current?.();
+	}, []);
+	applyBlobMorphRef.current = applyBlobMorph;
+
 	// Softbox lighting overlay opacity is owned entirely by `applyLightingOverlayOpacity`
 	// below, which fires on every `zoom` event and on mood changes. We deliberately do
 	// NOT render an `opacity` value into the JSX style: any React re-render during a
 	// zoom gesture would otherwise overwrite the smooth imperative update with the stale
 	// `zoomLevel`-derived value (zoomLevel only updates on `moveend`).
+
+	const setRasterOpacityIfChanged = useCallback(
+		(m: mapboxgl.Map, layerId: string, value: number) => {
+			const prev = lightingRasterOpacityAppliedRef.current[layerId];
+			if (prev != null && Math.abs(prev - value) < 0.0005) return;
+			if (!m.getLayer(layerId)) return;
+			m.setPaintProperty(layerId, 'raster-opacity', value);
+			// While effectively invisible, hide the layer outright: mapbox keeps
+			// loading + compositing raster tiles for opacity-0 layers (the 7
+			// night-lights layers cost dashboard zoom/wheel tile churn all day).
+			// The load-fade machinery (nightLightsLoadT / isSourceLoaded polls)
+			// handles the gradual reveal when night flips them visible again.
+			const visibility = value < 0.0005 ? 'none' : 'visible';
+			if (lightingLayerVisibilityAppliedRef.current[layerId] !== visibility) {
+				m.setLayoutProperty(layerId, 'visibility', visibility);
+				lightingLayerVisibilityAppliedRef.current[layerId] = visibility;
+			}
+			lightingRasterOpacityAppliedRef.current[layerId] = value;
+		},
+		[]
+	);
 
 	const applyLightingOverlayOpacity = useCallback(() => {
 		if (!mapRef.current) return;
@@ -11238,8 +12072,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const trueNightEase = rawNight * rawNight * (3 - 2 * rawNight);
 		// Let night take over the lighting direction: the warm daytime key fades
 		// out while the moonlit upper-right key and lower-left shadow fade in.
-		const keyNightMul =
-			1 - trueNightEase * (1 - clamp(NIGHT_WARM_KEY_MIN_MUL, 0, 1));
+		const keyNightMul = 1 - trueNightEase * (1 - clamp(NIGHT_WARM_KEY_MIN_MUL, 0, 1));
 		const shadowNightMul =
 			1 - trueNightEase * (1 - clamp(NIGHT_SHADOW_OVERLAY_MUL_MIN, 0, 1));
 
@@ -11254,7 +12087,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			1
 		);
 		const shadowOpacity = clamp(
-			base * cfg.shadowOpacityMultiplier * shadowNightMul * (1 - sunWashSuppression * 0.9),
+			base *
+				cfg.shadowOpacityMultiplier *
+				shadowNightMul *
+				(1 - sunWashSuppression * 0.9),
 			0,
 			1
 		);
@@ -11306,24 +12142,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		);
 		try {
 			const m = mapRef.current;
-			if (m?.getLayer(MAPBOX_LAYER_IDS.dayFarSideShade)) {
-				m.setPaintProperty(
+			if (m) {
+				setRasterOpacityIfChanged(
+					m,
 					MAPBOX_LAYER_IDS.dayFarSideShade,
-					'raster-opacity',
 					dayShadeOpacity
 				);
-			}
-			if (m?.getLayer(MAPBOX_LAYER_IDS.sunTransition)) {
-				m.setPaintProperty(
+				setRasterOpacityIfChanged(
+					m,
 					MAPBOX_LAYER_IDS.sunTransition,
-					'raster-opacity',
 					sunTransitionOpacity
 				);
-			}
-			if (m?.getLayer(MAPBOX_LAYER_IDS.sunTransitionCloudCatchlight)) {
-				m.setPaintProperty(
+				setRasterOpacityIfChanged(
+					m,
 					MAPBOX_LAYER_IDS.sunTransitionCloudCatchlight,
-					'raster-opacity',
 					sunTransitionCatchlightOpacity
 				);
 			}
@@ -11356,8 +12188,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// Make lights appear earlier in dusk/dawn (and feel more "present" at night)
 		// without showing them during full daylight.
 		const nightForLights = Math.pow(night, 0.65);
+		// Unsubscribe burn: surface the dots as embers even in full daylight,
+		// scaling with the burn factor (their ember tint is owned by the burn
+		// tween via `applyUnsubscribeBurnEmberTint`). Same fast-start power
+		// curve as `nightForLights` so embers read clearly from the first step.
+		const unsubscribeBurn = unsubscribeBurnEase(unsubscribeBurnTRef.current);
+		const burnForLights = Math.pow(unsubscribeBurn, 0.65);
 		const lightsBase =
-			nightForLights *
+			Math.max(nightForLights, burnForLights) *
 			(NIGHT_US_LIGHTS_OPACITY + zoomOutLift) *
 			computeNightLightsFade(zoom) *
 			loadT;
@@ -11420,54 +12258,38 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		);
 		try {
 			const m = mapRef.current;
-			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLightsSpaceGlow)) {
-				(m as any).setPaintProperty(
+			if (m) {
+				setRasterOpacityIfChanged(
+					m,
 					MAPBOX_LAYER_IDS.nightLightsSpaceGlow,
-					'raster-opacity',
 					finalSpaceGlowOpacity
 				);
-			}
-			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLightsSpaceGlow2)) {
-				(m as any).setPaintProperty(
+				setRasterOpacityIfChanged(
+					m,
 					MAPBOX_LAYER_IDS.nightLightsSpaceGlow2,
-					'raster-opacity',
 					finalSpaceGlowOpacity2
 				);
-			}
-			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLightsRevealGlow)) {
-				(m as any).setPaintProperty(
+				setRasterOpacityIfChanged(
+					m,
 					MAPBOX_LAYER_IDS.nightLightsRevealGlow,
-					'raster-opacity',
 					revealGlowOpacity
 				);
-			}
-			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLightsReveal)) {
-				(m as any).setPaintProperty(
+				setRasterOpacityIfChanged(
+					m,
 					MAPBOX_LAYER_IDS.nightLightsReveal,
-					'raster-opacity',
 					revealCrispOpacity
 				);
-			}
-			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLightsGlow)) {
-				(m as any).setPaintProperty(
+				setRasterOpacityIfChanged(
+					m,
 					MAPBOX_LAYER_IDS.nightLightsGlow,
-					'raster-opacity',
 					finalGlowOpacity
 				);
-			}
-			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLightsCloseGlow)) {
-				(m as any).setPaintProperty(
+				setRasterOpacityIfChanged(
+					m,
 					MAPBOX_LAYER_IDS.nightLightsCloseGlow,
-					'raster-opacity',
 					finalCloseGlowOpacity
 				);
-			}
-			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLights)) {
-				(m as any).setPaintProperty(
-					MAPBOX_LAYER_IDS.nightLights,
-					'raster-opacity',
-					finalCrispOpacity
-				);
+				setRasterOpacityIfChanged(m, MAPBOX_LAYER_IDS.nightLights, finalCrispOpacity);
 			}
 		} catch {
 			// Non-fatal.
@@ -11505,7 +12327,25 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		);
 		if (lightingOverlayNightDarkWashRef.current)
 			lightingOverlayNightDarkWashRef.current.style.opacity = String(nightDarkOpacity);
-	}, []);
+
+		// Unsubscribe burn washes — uniform multiply char plus a late-stage
+		// screen-blend ember under-glow (only emerges past mid-burn). Both are
+		// 0 outside the unsubscribe flow.
+		const burnWashOpacity = clamp(
+			unsubscribeBurn * UNSUBSCRIBE_BURN_WASH_MAX_OPACITY,
+			0,
+			1
+		);
+		const burnGlowOpacity = clamp(
+			smoothstep(0.45, 1, unsubscribeBurn) * UNSUBSCRIBE_BURN_GLOW_MAX_OPACITY,
+			0,
+			1
+		);
+		if (lightingOverlayBurnWashRef.current)
+			lightingOverlayBurnWashRef.current.style.opacity = String(burnWashOpacity);
+		if (lightingOverlayBurnGlowRef.current)
+			lightingOverlayBurnGlowRef.current.style.opacity = String(burnGlowOpacity);
+	}, [setRasterOpacityIfChanged]);
 
 	const repaintSunTransitionCanvas = useCallback((nowMs: number, force = false) => {
 		const sunCanvas = sunTransitionCanvasRef.current;
@@ -11525,11 +12365,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			sunTransitionPaintKeyRef.current = paintKey;
 			try {
 				const m = mapRef.current;
-				(
-					m?.getSource(MAPBOX_SOURCE_IDS.sunTransition) as
-						| { play?: () => void }
-						| undefined
-				)?.play?.();
+				const sunSrc = m?.getSource(MAPBOX_SOURCE_IDS.sunTransition) as
+					| { play?: () => void; pause?: () => void }
+					| undefined;
+				sunSrc?.play?.();
+				// Safari: upload once, then stop forcing per-frame texture uploads.
+				if (SAFARI_CANVAS_PERF_MODE) sunSrc?.pause?.();
 				m?.triggerRepaint();
 			} catch {
 				// Non-fatal.
@@ -11543,16 +12384,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const refreshSource = () => {
 			try {
 				const source = map?.getSource(MAPBOX_SOURCE_IDS.dayFarSideShade) as
-					| { play?: () => void }
+					| { play?: () => void; pause?: () => void }
 					| undefined;
 				source?.play?.();
+				// Safari: upload once, then stop forcing per-frame texture uploads.
+				if (SAFARI_CANVAS_PERF_MODE) source?.pause?.();
 				map?.triggerRepaint();
 			} catch {
 				// Non-fatal.
 			}
 		};
 
-		const repaint = (nowMs: number) => {
+		const repaint = (nowMs: number, forceRefresh = false) => {
 			const shadeCanvas = dayFarSideShadeCanvasRef.current;
 			if (!shadeCanvas) return false;
 
@@ -11568,17 +12411,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				shadeCanvas.width !== DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX ||
 				shadeCanvas.height !== DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX;
 
-			if (needsPaint) {
-				if (!paintDayFarSideShadeCanvas(shadeCanvas, nextCenterLng)) return false;
-				dayFarSideShadeCenterLngRef.current = nextCenterLng;
+			if (needsPaint && !paintDayFarSideShadeCanvas(shadeCanvas, nextCenterLng)) {
+				return false;
 			}
+			if (needsPaint) dayFarSideShadeCenterLngRef.current = nextCenterLng;
 
-			refreshSource();
-			if (map && isMapLoaded) applyLightingOverlayOpacity();
+			// Re-upload + reapply lighting only when the canvas actually changed
+			// (or on the forced setup call after a (re)mount/style reload): the
+			// unconditional 4s refresh re-uploaded the texture and restarted paint
+			// transitions for nothing, keeping the map's render loop warm at idle.
+			if (needsPaint || forceRefresh) {
+				refreshSource();
+				if (map && isMapLoaded) applyLightingOverlayOpacity();
+			}
 			return true;
 		};
 
-		repaint(Date.now());
+		repaint(Date.now(), true);
 		if (!map || !isMapLoaded || typeof window === 'undefined') return;
 
 		let timeoutId: number | null = null;
@@ -11639,6 +12488,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			map.off('zoom', applyLightingOverlayOpacity);
 		};
 	}, [map, isMapLoaded, applyLightingOverlayOpacity]);
+
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+
+		applyBlobMorph();
+		// `move` fires on every camera-change frame, which keeps the DOM SVG clip
+		// in the same cadence as Mapbox's camera transform during quick pinch/
+		// scroll zooms — without also running on every non-camera repaint (e.g.
+		// the clouds-drift ticks) the way `render` did. All non-camera triggers
+		// invoke applyBlobMorph directly.
+		map.on('move', applyBlobMorph);
+		map.on('moveend', applyBlobMorph);
+		map.on('resize', applyBlobMorph);
+		return () => {
+			map.off('move', applyBlobMorph);
+			map.off('moveend', applyBlobMorph);
+			map.off('resize', applyBlobMorph);
+		};
+	}, [map, isMapLoaded, applyBlobMorph]);
 
 	// Fade in night lights once their tiles are ready to avoid the initial "patchy" look.
 	useEffect(() => {
@@ -11873,10 +12742,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!map) return;
 		if (!isMapLoaded) return;
 		const visualNightT = computeMoodVisualNightT(nightT, weatherMoodConfigRef.current);
-		applyMurmurGlobeLighting(map);
-		applyNightLandPalette(map, visualNightT);
+		applyMurmurGlobeLighting(map, unsubscribeBurnTRef.current);
+		applyNightLandPalette(map, visualNightT, unsubscribeBurnTRef.current);
 		applyStateOverlayNightColors(map, visualNightT);
-		applyMapboxFogForMoodAndNight(map, weatherMoodConfigRef.current, visualNightT);
+		applyMapboxFogForMoodAndNight(
+			map,
+			weatherMoodConfigRef.current,
+			visualNightT,
+			unsubscribeBurnTRef.current
+		);
 	}, [nightT, weatherMood, map, isMapLoaded]);
 
 	// During sunrise/sunset, `useGlobeNightLighting` intentionally avoids React
@@ -11913,10 +12787,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				runtimeNightT,
 				weatherMoodConfigRef.current
 			);
-			applyMurmurGlobeLighting(map);
-			applyNightLandPalette(map, visualNightT);
+			applyMurmurGlobeLighting(map, unsubscribeBurnTRef.current);
+			applyNightLandPalette(map, visualNightT, unsubscribeBurnTRef.current);
 			applyStateOverlayNightColors(map, visualNightT);
-			applyMapboxFogForMoodAndNight(map, weatherMoodConfigRef.current, visualNightT);
+			applyMapboxFogForMoodAndNight(
+				map,
+				weatherMoodConfigRef.current,
+				visualNightT,
+				unsubscribeBurnTRef.current
+			);
 			applyStateOverlayOpacity(
 				stateOverlayOpacityRef.current,
 				stateOverlayModeRef.current
@@ -11955,6 +12834,279 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		applyStateOverlayOpacity,
 	]);
 
+	// Unsubscribe burn ("globe on fire"): tween the visual burn factor toward
+	// the flow's published target and repaint the burn-aware appliers each
+	// frame. Burn composes *inside* the night/mood pipeline, so the periodic
+	// reapplications elsewhere repaint (rather than wipe) the current level.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+
+		let rafId: number | null = null;
+
+		const applyBurnFrame = () => {
+			const burn = unsubscribeBurnTRef.current;
+			const visualNightT = computeMoodVisualNightT(
+				nightTRef.current,
+				weatherMoodConfigRef.current
+			);
+			applyMurmurGlobeLighting(map, burn);
+			applyNightLandPalette(map, visualNightT, burn);
+			applyMapboxFogForMoodAndNight(
+				map,
+				weatherMoodConfigRef.current,
+				visualNightT,
+				burn
+			);
+			applyUnsubscribeBurnEmberTint(map, burn);
+			applyLightingOverlayOpacity();
+			try {
+				map.triggerRepaint();
+			} catch {
+				// Non-fatal.
+			}
+		};
+
+		// Tuning/screenshot escape hatch: `?devBurnT=0.5` pins the burn factor.
+		const devBurnRaw =
+			typeof window === 'undefined'
+				? null
+				: new URLSearchParams(window.location.search).get('devBurnT');
+		const devBurnT = devBurnRaw == null ? null : Number(devBurnRaw);
+		if (devBurnT != null && Number.isFinite(devBurnT)) {
+			unsubscribeBurnTRef.current = clamp(devBurnT, 0, 1);
+			applyBurnFrame();
+			return;
+		}
+
+		const seekTo = (target: number) => {
+			if (rafId != null) cancelAnimationFrame(rafId);
+			rafId = null;
+			const from = unsubscribeBurnTRef.current;
+			if (Math.abs(target - from) < 0.001) {
+				unsubscribeBurnTRef.current = target;
+				applyBurnFrame();
+				return;
+			}
+			const startMs = performance.now();
+			const tick = () => {
+				const t = clamp(
+					(performance.now() - startMs) / UNSUBSCRIBE_BURN_TRANSITION_MS,
+					0,
+					1
+				);
+				const eased = t * t * (3 - 2 * t);
+				unsubscribeBurnTRef.current = lerp(from, target, eased);
+				applyBurnFrame();
+				if (t < 1) {
+					rafId = requestAnimationFrame(tick);
+					return;
+				}
+				rafId = null;
+			};
+			tick();
+		};
+
+		// Catch up if the flow advanced before the map was ready (or after a
+		// style reload re-asserted the unburned look).
+		if (getUnsubscribeBurnTarget() !== unsubscribeBurnTRef.current) {
+			seekTo(getUnsubscribeBurnTarget());
+		}
+		const unsubscribe = subscribeUnsubscribeBurn(seekTo);
+		return () => {
+			unsubscribe();
+			if (rafId != null) cancelAnimationFrame(rafId);
+		};
+	}, [map, isMapLoaded, applyLightingOverlayOpacity]);
+
+	const getSelectedStateDisplayMultiPolygon = useCallback(
+		(mapInstance: mapboxgl.Map): ClippingMultiPolygon | null => {
+			const selection = lockedStateSelectionMultiPolygonRef.current;
+			if (!selection?.length) return null;
+
+			const zoom = mapInstance.getZoom() ?? MAP_DEFAULT_ZOOM;
+			const t = computeCuratedOrbT(zoom);
+			const morphSource = selectedStateMorphSourceRef.current;
+			const shouldUseCircleMorph = Boolean(morphSource && t > 0.001);
+
+			let displayMultiPolygon: ClippingMultiPolygon | null = null;
+			if (!shouldUseCircleMorph) {
+				displayMultiPolygon = selection;
+			} else if (
+				Number.isFinite(selectedStateLastMorphTAppliedRef.current) &&
+				Math.abs(t - selectedStateLastMorphTAppliedRef.current) < 0.001 &&
+				selectedStateDisplayMultiPolygonRef.current
+			) {
+				displayMultiPolygon = selectedStateDisplayMultiPolygonRef.current;
+			} else if (morphSource) {
+				displayMultiPolygon = morphCuratedBlobSourceToLngLat(morphSource, t);
+				selectedStateDisplayMultiPolygonRef.current = displayMultiPolygon;
+				selectedStateLastMorphTAppliedRef.current = t;
+			}
+
+			if (!displayMultiPolygon?.length) return null;
+
+			const source = mapInstance.getSource(MAPBOX_SOURCE_IDS.lockedOutline) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			const outlineKey = `${selectedStateKeyRef.current ?? ''}:${
+				shouldUseCircleMorph ? t.toFixed(3) : 'state'
+			}`;
+			if (source && selectedStateOutlineSourceKeyRef.current !== outlineKey) {
+				selectedStateOutlineSourceKeyRef.current = outlineKey;
+				source.setData(createOutlineGeoJsonFromMultiPolygon(displayMultiPolygon) as any);
+			}
+
+			return displayMultiPolygon;
+		},
+		[]
+	);
+
+	const applySelectedStateGradientState = useCallback(() => {
+		const m = mapRef.current;
+		const overlay = selectedStateGradientSvgRef.current;
+		if (!overlay) return;
+
+		const ellipse = selectedStateGradientEllipseRef.current;
+		const bloomEllipse = selectedStateGradientBloomEllipseRef.current;
+		const gradient = selectedStateGradientRef.current;
+		const bloomGradient = selectedStateGradientBloomRef.current;
+		const clipPath = selectedStateGradientClipPathRef.current;
+
+		const hide = () => {
+			overlay.style.opacity = '0';
+			clipPath?.setAttribute('d', '');
+			ellipse?.setAttribute('opacity', '0');
+			bloomEllipse?.setAttribute('opacity', '0');
+		};
+
+		if (!m || !ellipse || !bloomEllipse || !gradient || !bloomGradient || !clipPath) {
+			hide();
+			return;
+		}
+
+		if (presentationRef.current === 'background' || isLoadingRef.current) {
+			hide();
+			return;
+		}
+
+		const selectedKey = selectedStateKeyRef.current;
+		const lockedKey = lockedStateSelectionKeyRef.current;
+		const selection = lockedStateSelectionMultiPolygonRef.current;
+		if (!selectedKey || selectedKey !== lockedKey || !selection?.length) {
+			hide();
+			return;
+		}
+
+		const displayMultiPolygon = getSelectedStateDisplayMultiPolygon(m);
+		if (!displayMultiPolygon?.length) {
+			hide();
+			return;
+		}
+
+		const projectedClip = buildScreenPathFromLngLatMultiPolygon(m, displayMultiPolygon);
+		if (!projectedClip) {
+			hide();
+			return;
+		}
+
+		const width = projectedClip.maxX - projectedClip.minX;
+		const height = projectedClip.maxY - projectedClip.minY;
+		if (
+			!Number.isFinite(width) ||
+			!Number.isFinite(height) ||
+			width <= 0 ||
+			height <= 0
+		) {
+			hide();
+			return;
+		}
+
+		const zoom = m.getZoom() ?? MAP_DEFAULT_ZOOM;
+		const morphSource = selectedStateMorphSourceRef.current;
+		const bbox = lockedStateSelectionBboxRef.current;
+		const stateCenter =
+			morphSource?.center ??
+			(bbox
+				? {
+						lat: (bbox.minLat + bbox.maxLat) / 2,
+						lng: (bbox.minLng + bbox.maxLng) / 2,
+					}
+				: null);
+		const frontHemisphereOpacity = computeGlobeFrontHemisphereOpacity(
+			m,
+			stateCenter,
+			morphSource?.radiusKm ?? null,
+			zoom
+		);
+		if (frontHemisphereOpacity <= 0.006) {
+			hide();
+			return;
+		}
+		const bloomT = computeCuratedOrbT(zoom);
+		const colorOpacity =
+			SELECTED_STATE_GRADIENT_COLOR_OPACITY * (1 - bloomT) * frontHemisphereOpacity;
+		const bloomOpacity =
+			SELECTED_STATE_GRADIENT_BLOOM_OPACITY * bloomT * frontHemisphereOpacity;
+
+		const halfWidth = width / 2;
+		const halfHeight = height / 2;
+		const centerX = projectedClip.minX + halfWidth;
+		const centerY = projectedClip.minY + halfHeight;
+		const bloomRadius = Math.max(halfWidth, halfHeight);
+
+		ellipse.setAttribute('cx', centerX.toFixed(2));
+		ellipse.setAttribute('cy', centerY.toFixed(2));
+		bloomEllipse.setAttribute('cx', centerX.toFixed(2));
+		bloomEllipse.setAttribute('cy', centerY.toFixed(2));
+		ellipse.setAttribute('rx', (halfWidth * CURATED_ORB_ELLIPSE_RX_RATIO).toFixed(2));
+		ellipse.setAttribute('ry', (halfHeight * CURATED_ORB_ELLIPSE_RY_RATIO).toFixed(2));
+		bloomEllipse.setAttribute('rx', bloomRadius.toFixed(2));
+		bloomEllipse.setAttribute('ry', bloomRadius.toFixed(2));
+		gradient.setAttribute(
+			'gradientTransform',
+			`translate(${centerX.toFixed(2)} ${centerY.toFixed(2)}) rotate(${CURATED_ORB_GRADIENT_ROTATION_DEG}) scale(${(
+				halfWidth * CURATED_ORB_GRADIENT_SCALE_X_RATIO
+			).toFixed(2)} ${(halfHeight * CURATED_ORB_GRADIENT_SCALE_Y_RATIO).toFixed(2)})`
+		);
+		bloomGradient.setAttribute(
+			'gradientTransform',
+			`translate(${centerX.toFixed(2)} ${centerY.toFixed(2)}) scale(${bloomRadius.toFixed(2)})`
+		);
+		clipPath.setAttribute('d', projectedClip.d);
+		ellipse.setAttribute('opacity', colorOpacity.toFixed(3));
+		bloomEllipse.setAttribute('opacity', bloomOpacity.toFixed(3));
+		overlay.style.opacity = '1';
+	}, [getSelectedStateDisplayMultiPolygon]);
+	applySelectedStateGradientStateRef.current = applySelectedStateGradientState;
+
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+
+		applySelectedStateGradientState();
+		// Camera events only (not `render`): the gradient's inputs are all
+		// camera-derived; non-camera triggers call the function directly.
+		map.on('move', applySelectedStateGradientState);
+		map.on('moveend', applySelectedStateGradientState);
+		map.on('resize', applySelectedStateGradientState);
+		return () => {
+			map.off('move', applySelectedStateGradientState);
+			map.off('moveend', applySelectedStateGradientState);
+			map.off('resize', applySelectedStateGradientState);
+		};
+	}, [map, isMapLoaded, applySelectedStateGradientState]);
+
+	useEffect(() => {
+		applySelectedStateGradientState();
+	}, [
+		applySelectedStateGradientState,
+		presentation,
+		isLoading,
+		lockedStateKey,
+		isStateLayerReady,
+	]);
+
 	// Re-apply the night palette when zoom changes so the "zoomed in" view can be
 	// slightly brighter without changing the low-zoom globe read.
 	useEffect(() => {
@@ -11963,7 +13115,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const onZoomEnd = () =>
 			applyNightLandPalette(
 				map,
-				computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current)
+				computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current),
+				unsubscribeBurnTRef.current
 			);
 		map.on('zoomend', onZoomEnd);
 		return () => {
@@ -12026,9 +13179,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const visualNightT = computeMoodVisualNightT(nightTRef.current, cfg);
 			// Atmosphere fog tint — combined with night-aware modulation so the
 			// star glow / space haze / muted limb-mist react in a single pass.
-			applyMapboxFogForMoodAndNight(m, cfg, visualNightT);
-			applyMurmurGlobeLighting(m);
-			applyNightLandPalette(m, visualNightT);
+			applyMapboxFogForMoodAndNight(m, cfg, visualNightT, unsubscribeBurnTRef.current);
+			applyMurmurGlobeLighting(m, unsubscribeBurnTRef.current);
+			applyNightLandPalette(m, visualNightT, unsubscribeBurnTRef.current);
 			applyStateOverlayNightColors(m, visualNightT);
 			applyStateOverlayOpacity(
 				stateOverlayOpacityRef.current,
@@ -12077,11 +13230,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					0,
 					1
 				);
-				const discreteT = clamp(
-					(now - transition.startMs) / transition.discreteMs,
-					0,
-					1
-				);
+				const discreteT = clamp((now - transition.startMs) / transition.discreteMs, 0, 1);
 				const cfg = blendRuntimeMoodConfig(
 					transition.from,
 					transition.to,
@@ -12090,8 +13239,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				);
 
 				if (
-					now - moodTransitionLastPaintMsRef.current >=
-						MOOD_TRANSITION_PAINT_FRAME_MS ||
+					now - moodTransitionLastPaintMsRef.current >= MOOD_TRANSITION_PAINT_FRAME_MS ||
 					continuousT >= 1
 				) {
 					moodTransitionLastPaintMsRef.current = now;
@@ -12124,13 +13272,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 		startWeatherMoodTransition(weatherMood);
-	}, [
-		map,
-		isMapLoaded,
-		weatherMood,
-		applyWeatherMoodConfig,
-		startWeatherMoodTransition,
-	]);
+	}, [map, isMapLoaded, weatherMood, applyWeatherMoodConfig, startWeatherMoodTransition]);
 
 	useEffect(() => {
 		return () => {
@@ -12175,19 +13317,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[]
 	);
 
-	const defaultDotFillColor = useMemo(() => {
-		return getResultDotColorForWhat(searchWhat);
-	}, [searchWhat]);
-
-	const outsideDefaultDotFillColor = useMemo(
-		() => washOutHexColor(defaultDotFillColor, OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE),
-		[defaultDotFillColor]
-	);
-
 	// Build fast id->contact lookups for Mapbox interactions/tooltips.
 	const visibleContactsById = useMemo(
 		() => new Map<number, ContactWithName>(visibleContacts.map((c) => [c.id, c])),
 		[visibleContacts]
+	);
+	const contactsWithCoordsById = useMemo(
+		() => new Map<number, ContactWithName>(contactsWithCoords.map((c) => [c.id, c])),
+		[contactsWithCoords]
 	);
 	const bookingExtraContactsById = useMemo(
 		() =>
@@ -12213,15 +13350,48 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
 
+		// Coalesce mousemove hover detection to one run per animation frame, against the
+		// latest event. Mapbox fires mousemove 60–120×/sec; running the 6-layer
+		// queryRenderedFeatures + setHoveredMarkerId on every event janks rapid sweeps.
+		let mouseMoveRafId: number | null = null;
+		let latestMouseMoveEvent: mapboxgl.MapMouseEvent | null = null;
+
 		const markerHitLayers = [
+			MAPBOX_LAYER_IDS.selectedMarkerIcons,
 			MAPBOX_LAYER_IDS.baseHit,
 			MAPBOX_LAYER_IDS.promotionDotHit,
 			MAPBOX_LAYER_IDS.bookingPinHit,
 			MAPBOX_LAYER_IDS.promotionPinHit,
 			MAPBOX_LAYER_IDS.markersAllHit,
 		];
+		const searchAreaHitLayers = [
+			MAPBOX_LAYER_IDS.curatedBlobFill,
+			MAPBOX_LAYER_IDS.curatedBlobCore,
+		];
+		const markerHitLayerSet = new Set<string>(markerHitLayers);
+		const searchAreaHitLayerSet = new Set<string>(searchAreaHitLayers);
+		const isSearchAreaHit = (e: mapboxgl.MapMouseEvent): boolean => {
+			const searchAreaFeatures = map.queryRenderedFeatures(e.point, {
+				layers: searchAreaHitLayers,
+			});
+			if (searchAreaFeatures.length > 0) return true;
+
+			const blobMultiPolygon = curatedBlobLngLatMultiPolygonRef.current;
+			if (!blobMultiPolygon?.length) return false;
+			return pointInMultiPolygon([e.lngLat.lng, e.lngLat.lat], blobMultiPolygon);
+		};
 
 		const getContactForHit = (layerId: string, id: number): ContactWithName | null => {
+			if (layerId === MAPBOX_LAYER_IDS.selectedMarkerIcons) {
+				return (
+					contactsWithCoordsById.get(id) ??
+					bookingExtraContactsById.get(id) ??
+					promotionOverlayContactsById.get(id) ??
+					allOverlayContactsById.get(id) ??
+					visibleContactsById.get(id) ??
+					null
+				);
+			}
 			if (layerId === MAPBOX_LAYER_IDS.baseHit)
 				return visibleContactsById.get(id) ?? null;
 			if (layerId === MAPBOX_LAYER_IDS.bookingPinHit)
@@ -12237,10 +13407,69 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return null;
 		};
 
+		const getSourceForHitLayer = (layerId: string): string | null => {
+			if (layerId === MAPBOX_LAYER_IDS.selectedMarkerIcons)
+				return MAPBOX_SOURCE_IDS.markersSelected;
+			if (layerId === MAPBOX_LAYER_IDS.baseHit) return MAPBOX_SOURCE_IDS.markersBase;
+			if (layerId === MAPBOX_LAYER_IDS.bookingPinHit)
+				return MAPBOX_SOURCE_IDS.markersBookingPin;
+			if (layerId === MAPBOX_LAYER_IDS.promotionDotHit)
+				return MAPBOX_SOURCE_IDS.markersPromotionDot;
+			if (layerId === MAPBOX_LAYER_IDS.promotionPinHit)
+				return MAPBOX_SOURCE_IDS.markersPromotionPin;
+			if (layerId === MAPBOX_LAYER_IDS.markersAllHit)
+				return MAPBOX_SOURCE_IDS.markersAllOverlay;
+			return null;
+		};
+
+		// Event-star hit test. Event features carry a STRING feature id (`event-<id>-icon`),
+		// so the eventId lives in `properties.eventId`, not the feature id. Returns the
+		// numeric event id under the pointer (and present in the current set), else null.
+		const getEventHit = (e: mapboxgl.MapMouseEvent): number | null => {
+			if (suppressEventPopups) return null;
+			if (eventCentersById.size === 0) return null;
+			const raw = map.queryRenderedFeatures(e.point, {
+				layers: [MAPBOX_LAYER_IDS.eventsStarIcon],
+			})[0]?.properties?.eventId;
+			const id =
+				typeof raw === 'number'
+					? raw
+					: typeof raw === 'string'
+						? Number.parseInt(raw, 10)
+						: NaN;
+			return Number.isFinite(id) && eventCentersById.has(id) ? id : null;
+		};
+
 		const setCursor = (cursor: string) => {
 			// Avoid fighting the rectangle-selection cursor.
 			if (areaSelectionEnabled || isAreaSelecting) return;
 			map.getCanvas().style.cursor = cursor;
+		};
+
+		const clearMarkerVisualHover = () => {
+			const prev = hoveredMarkerVisualRef.current;
+			if (!prev) return;
+			try {
+				map.setFeatureState(
+					{ source: prev.sourceId, id: prev.id },
+					{ markerHover: false }
+				);
+			} catch {
+				// Ignore.
+			}
+			hoveredMarkerVisualRef.current = null;
+		};
+
+		const setMarkerVisualHover = (sourceId: string, id: number) => {
+			const prev = hoveredMarkerVisualRef.current;
+			if (prev?.sourceId === sourceId && prev.id === id) return;
+			clearMarkerVisualHover();
+			try {
+				map.setFeatureState({ source: sourceId, id }, { markerHover: true });
+				hoveredMarkerVisualRef.current = { sourceId, id };
+			} catch {
+				// Ignore.
+			}
 		};
 
 		const clearStateHover = () => {
@@ -12257,82 +13486,173 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			hoveredStateIdRef.current = null;
 		};
 
-		const onMouseMove = (e: mapboxgl.MapMouseEvent) => {
-			if (areaSelectionEnabled || isAreaSelecting) return;
+		const processMouseMove = (e: mapboxgl.MapMouseEvent) => {
+			if (areaSelectionEnabled || isAreaSelecting) {
+				clearEmptyMapPrompt();
+				clearEventHoverImmediate();
+				return;
+			}
 
-			// Marker hover interactions only at sufficiently high zoom.
 			const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
-			if (zoom < HOVER_INTERACTION_MIN_ZOOM) {
-				const prevHovered = hoveredMarkerIdRef.current;
-				if (hoverSourceRef.current === 'map' && prevHovered != null) {
-					handleMarkerMouseOut(prevHovered);
-				}
-				setCursor('');
-			} else {
-				const features = map.queryRenderedFeatures(e.point, { layers: markerHitLayers });
-				const top = features[0];
-				const layerId = top?.layer?.id;
-				const rawId = top?.id;
-				const id =
-					typeof rawId === 'number'
-						? rawId
-						: typeof rawId === 'string'
-							? Number.parseInt(rawId, 10)
-							: NaN;
 
-				if (layerId && Number.isFinite(id)) {
-					const contact = getContactForHit(layerId, id);
-					if (contact) {
-						setCursor('pointer');
-						if (hoverSourceRef.current !== 'map' || hoveredMarkerIdRef.current !== id) {
-							handleMarkerMouseOver(
-								contact,
-								e.originalEvent as unknown as MouseEvent | TouchEvent
-							);
-						}
-					} else {
-						const prevHovered = hoveredMarkerIdRef.current;
-						if (hoverSourceRef.current === 'map' && prevHovered != null) {
-							handleMarkerMouseOut(prevHovered);
-						}
-						setCursor('');
-					}
-				} else {
-					const prevHovered = hoveredMarkerIdRef.current;
-					if (hoverSourceRef.current === 'map' && prevHovered != null) {
-						handleMarkerMouseOut(prevHovered);
-					}
-					setCursor('');
+			// ONE combined queryRenderedFeatures for every hover target (markers,
+			// event stars, curated blob, states). Each call walks the per-tile
+			// feature index on the main thread, and four separate walks per pointer
+			// frame were the dominant hover cost (worst in Safari, which is already
+			// main-thread-bound). Results are top-to-bottom, so "first feature per
+			// layer group" preserves the old per-layer query semantics; guards that
+			// used to decide whether to QUERY now decide whether to USE a partition.
+			const wantEventHit = !suppressEventPopups && eventCentersById.size > 0;
+			const wantStateHit =
+				stateInteractionsEnabled &&
+				isStateLayerReady &&
+				zoom <= STATE_HOVER_HIGHLIGHT_MAX_ZOOM + 0.001;
+			const hoverHitCandidateLayers = [
+				...markerHitLayers,
+				...(wantEventHit ? [MAPBOX_LAYER_IDS.eventsStarIcon] : []),
+				...searchAreaHitLayers,
+				...(wantStateHit ? [MAPBOX_LAYER_IDS.statesFillHit] : []),
+			];
+			let hoverFeatures: mapboxgl.GeoJSONFeature[] = [];
+			try {
+				hoverFeatures = map.queryRenderedFeatures(e.point, {
+					layers: hoverHitCandidateLayers.filter((id) => Boolean(map.getLayer(id))),
+				});
+			} catch {
+				// Ignore (style mid-reload); treated as empty-map hover below.
+			}
+			let topMarker: (typeof hoverFeatures)[number] | undefined;
+			let topEventFeature: (typeof hoverFeatures)[number] | undefined;
+			let blobLayerHit = false;
+			let topStateFeature: (typeof hoverFeatures)[number] | undefined;
+			for (const feature of hoverFeatures) {
+				const featureLayerId = feature.layer?.id;
+				if (!featureLayerId) continue;
+				if (!topMarker && markerHitLayerSet.has(featureLayerId)) {
+					topMarker = feature;
+				} else if (
+					!topEventFeature &&
+					featureLayerId === MAPBOX_LAYER_IDS.eventsStarIcon
+				) {
+					topEventFeature = feature;
+				} else if (!blobLayerHit && searchAreaHitLayerSet.has(featureLayerId)) {
+					blobLayerHit = true;
+				} else if (
+					!topStateFeature &&
+					featureLayerId === MAPBOX_LAYER_IDS.statesFillHit
+				) {
+					topStateFeature = feature;
 				}
+			}
+
+			const markerLayerId = topMarker?.layer?.id;
+			const rawMarkerId = topMarker?.id;
+			const markerId =
+				typeof rawMarkerId === 'number'
+					? rawMarkerId
+					: typeof rawMarkerId === 'string'
+						? Number.parseInt(rawMarkerId, 10)
+						: NaN;
+
+			if (markerLayerId && Number.isFinite(markerId)) {
+				const contact = getContactForHit(markerLayerId, markerId);
+				const sourceId = getSourceForHitLayer(markerLayerId);
+				if (contact && sourceId) {
+					clearEmptyMapPrompt();
+					clearEventHoverImmediate();
+					setCursor('pointer');
+					setMarkerVisualHover(sourceId, markerId);
+					clearStateHover();
+					if (
+						zoom >= HOVER_INTERACTION_MIN_ZOOM &&
+						(hoverSourceRef.current !== 'map' || hoveredMarkerIdRef.current !== markerId)
+					) {
+						handleMarkerMouseOver(
+							contact,
+							e.originalEvent as unknown as MouseEvent | TouchEvent
+						);
+					}
+					return;
+				}
+			}
+
+			clearMarkerVisualHover();
+			const prevHovered = hoveredMarkerIdRef.current;
+			if (hoverSourceRef.current === 'map' && prevHovered != null) {
+				handleMarkerMouseOut(prevHovered);
+			}
+			setCursor('');
+
+			// Event-star hover (independent of the contact/state hover machinery). Contacts
+			// win ties because their branch returns above. Stop before the state-hover and
+			// empty-map-prompt logic so a star hover doesn't also highlight the state under it.
+			// (Same id extraction as getEventHit, on the partitioned feature.)
+			const rawEventId = topEventFeature?.properties?.eventId;
+			const parsedEventId =
+				typeof rawEventId === 'number'
+					? rawEventId
+					: typeof rawEventId === 'string'
+						? Number.parseInt(rawEventId, 10)
+						: NaN;
+			const eventHitId =
+				Number.isFinite(parsedEventId) && eventCentersById.has(parsedEventId)
+					? parsedEventId
+					: null;
+			if (eventHitId != null) {
+				clearStateHover();
+				clearEmptyMapPrompt();
+				setCursor('pointer');
+				setEventHover(eventHitId);
+				return;
+			}
+			// Pointer left the star to empty map: don't close instantly — give the cursor a grace
+			// window to reach the (interactive) popup box, whose onMouseEnter cancels this close.
+			scheduleEventHoverClose();
+
+			// Same semantics as isSearchAreaHit, using the partitioned layer hit
+			// plus the CPU multipolygon fallback.
+			const searchAreaHit =
+				blobLayerHit ||
+				(() => {
+					const blobMultiPolygon = curatedBlobLngLatMultiPolygonRef.current;
+					if (!blobMultiPolygon?.length) return false;
+					return pointInMultiPolygon([e.lngLat.lng, e.lngLat.lat], blobMultiPolygon);
+				})();
+			if (searchAreaHit) {
+				clearEmptyMapPrompt();
+				clearStateHover();
+				return;
 			}
 
 			// Optional state hover highlight (only when state interactions are enabled).
 			if (!stateInteractionsEnabled || !isStateLayerReady) {
 				clearStateHover();
+				scheduleEmptyMapPrompt(e.point);
 				return;
 			}
 			if (zoom > STATE_HOVER_HIGHLIGHT_MAX_ZOOM + 0.001) {
 				clearStateHover();
+				scheduleEmptyMapPrompt(e.point);
 				return;
 			}
 
 			// If a marker is hovered, don't also hover-highlight the state underneath.
 			if (hoverSourceRef.current === 'map' && hoveredMarkerIdRef.current != null) {
 				clearStateHover();
+				clearEmptyMapPrompt();
 				return;
 			}
 			// While zooming-to-state after a state click (or while results are loading), don't show
 			// hover overlays on other states as the camera sweeps.
 			if (stateClickZoomInFlightRef.current || isLoadingRef.current) {
 				clearStateHover();
+				clearEmptyMapPrompt();
 				return;
 			}
 
-			const stateFeatures = map.queryRenderedFeatures(e.point, {
-				layers: [MAPBOX_LAYER_IDS.statesFillHit],
-			});
-			const topState = stateFeatures[0];
-			const nextStateId = topState?.id ?? null;
+			// The guards above mirror wantStateHit exactly, so reaching this point
+			// means the states layer was part of the combined query.
+			const nextStateId = topStateFeature?.id ?? null;
 			const prev = hoveredStateIdRef.current;
 			if (prev != null && prev !== nextStateId) {
 				try {
@@ -12356,8 +13676,28 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 			hoveredStateIdRef.current = nextStateId;
 			if (nextStateId != null) {
+				clearEmptyMapPrompt();
 				setCursor('pointer');
+			} else {
+				scheduleEmptyMapPrompt(e.point);
 			}
+		};
+
+		// Run hover detection at most once per frame, using the latest pointer position.
+		const onMouseMove = (e: mapboxgl.MapMouseEvent) => {
+			latestMouseMoveEvent = e;
+			if (mouseMoveRafId != null) return;
+			mouseMoveRafId = window.requestAnimationFrame(() => {
+				mouseMoveRafId = null;
+				const ev = latestMouseMoveEvent;
+				latestMouseMoveEvent = null;
+				if (ev) processMouseMove(ev);
+			});
+		};
+
+		const onMouseDown = (e: mapboxgl.MapMouseEvent) => {
+			emptyMapPointerDownClientRef.current = getClientPointFromDomEvent(e.originalEvent);
+			clearEmptyMapPrompt();
 		};
 
 		const onClick = (e: mapboxgl.MapMouseEvent) => {
@@ -12383,6 +13723,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					handleMarkerClick(contact);
 					return;
 				}
+			}
+
+			// Click on an event star pins its popup open (toggle). Returning here also stops
+			// the generic empty-map handling below from firing for star clicks.
+			const eventClickId = getEventHit(e);
+			if (eventClickId != null) {
+				setPinnedEventId((prev) => (prev === eventClickId ? null : eventClickId));
+				setEventHover(eventClickId);
+				return;
+			}
+
+			// Clicks inside curated blobs are intentional search-result interactions, not
+			// empty-map clicks that should disengage the current search.
+			if (isSearchAreaHit(e)) {
+				clearEmptyMapPrompt();
+				clearStateHover();
+				return;
 			}
 
 			// State click (when enabled and zoomed out).
@@ -12438,21 +13795,87 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 			}
 
-			// Click on empty map clears any selected marker panel.
+			const downClient = emptyMapPointerDownClientRef.current;
+			emptyMapPointerDownClientRef.current = null;
+			const upClient = getClientPointFromDomEvent(e.originalEvent);
+			const movedAfterPointerDown = Boolean(
+				downClient &&
+				upClient &&
+				(Math.abs(downClient.x - upClient.x) >= 6 ||
+					Math.abs(downClient.y - upClient.y) >= 6)
+			);
+
+			// Click on empty map clears any selected marker panel and dismisses a pinned
+			// event popup.
 			setSelectedMarker(null);
+			setPinnedEventId(null);
+
+			if (
+				!movedAfterPointerDown &&
+				emptyMapPromptEnabled &&
+				onEmptyMapClick &&
+				!shouldSuppressEmptyMapPrompt()
+			) {
+				clearEmptyMapPrompt();
+				onEmptyMapClick();
+			}
 		};
 
+		map.on('mousedown', onMouseDown);
 		map.on('mousemove', onMouseMove);
 		map.on('click', onClick);
+		const canvas = map.getCanvas();
+		const isInsideHoverTooltip = (event: MouseEvent): boolean => {
+			// Covers the slim SVG tooltip, the ambient street-view hover card, and the
+			// persistent street-view card layer — whichever overlay is mounted keeps
+			// hover alive across canvas → DOM moves.
+			for (const tooltipEl of [
+				hoverTooltipOverlayRef.current,
+				streetCardOverlayRef.current,
+				streetCardsContainerRef.current,
+			]) {
+				if (!tooltipEl) continue;
+
+				const relatedTarget = event.relatedTarget;
+				if (relatedTarget instanceof Node && tooltipEl.contains(relatedTarget)) {
+					return true;
+				}
+
+				const pointTarget = tooltipEl.ownerDocument.elementFromPoint(
+					event.clientX,
+					event.clientY
+				);
+				if (pointTarget && tooltipEl.contains(pointTarget)) return true;
+			}
+			return false;
+		};
+		const onCanvasMouseLeave = (event: MouseEvent) => {
+			if (isInsideHoverTooltip(event)) return;
+			clearEmptyMapPrompt();
+			clearMarkerVisualHover();
+			// Schedule (don't force) the popup close: if the cursor is leaving the canvas to
+			// enter the popup box, the box's onMouseEnter cancels this before it fires.
+			scheduleEventHoverClose();
+			const prevHovered = hoveredMarkerIdRef.current;
+			if (hoverSourceRef.current === 'map' && prevHovered != null) {
+				handleMarkerMouseOut(prevHovered);
+			}
+			setCursor('');
+		};
+		canvas.addEventListener('mouseleave', onCanvasMouseLeave);
 
 		return () => {
+			map.off('mousedown', onMouseDown);
 			map.off('mousemove', onMouseMove);
+			if (mouseMoveRafId != null) window.cancelAnimationFrame(mouseMoveRafId);
 			map.off('click', onClick);
+			canvas.removeEventListener('mouseleave', onCanvasMouseLeave);
 			try {
 				map.getCanvas().style.cursor = '';
 			} catch {
 				// Ignore.
 			}
+			clearMarkerVisualHover();
 			clearStateHover();
 		};
 	}, [
@@ -12463,12 +13886,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		stateInteractionsEnabled,
 		isStateLayerReady,
 		visibleContactsById,
+		contactsWithCoordsById,
 		bookingExtraContactsById,
 		promotionOverlayContactsById,
 		allOverlayContactsById,
+		clearEmptyMapPrompt,
+		scheduleEmptyMapPrompt,
+		shouldSuppressEmptyMapPrompt,
+		emptyMapPromptEnabled,
+		onEmptyMapClick,
 		handleMarkerMouseOver,
 		handleMarkerMouseOut,
 		handleMarkerClick,
+		eventCentersById,
+		suppressEventPopups,
+		setEventHover,
+		clearEventHoverImmediate,
+		scheduleEventHoverClose,
 	]);
 
 	// ---- Mapbox marker sources (rendered via layers) ----
@@ -12506,7 +13940,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	);
 
 	const ensureMapImageFromUrl = useCallback(
-		(imageName: string, url: string): Promise<void> => {
+		(
+			imageName: string,
+			url: string,
+			dimensions: { width: number; height: number } = {
+				width: MAP_MARKER_PIN_VIEWBOX_WIDTH,
+				height: MAP_MARKER_PIN_VIEWBOX_HEIGHT,
+			}
+		): Promise<void> => {
 			const mapInstance = mapRef.current;
 			if (!mapInstance || !isMapLoaded) return Promise.resolve();
 			if (mapInstance.hasImage(imageName)) return Promise.resolve();
@@ -12522,8 +13963,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						try {
 							// Render at 2× for retina crispness.
 							const scale = 2;
-							const w = MAP_MARKER_PIN_VIEWBOX_WIDTH * scale;
-							const h = MAP_MARKER_PIN_VIEWBOX_HEIGHT * scale;
+							const w = dimensions.width * scale;
+							const h = dimensions.height * scale;
 							const imgData = await rasterizeSvgDataUri(url, w, h);
 							const latestMap = mapRef.current;
 							if (!latestMap || latestMap !== mapInstance) return;
@@ -12571,6 +14012,138 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[]
 	);
 
+	const uncategorizedContactMarkerUrl = useMemo(
+		() => generateUncategorizedContactMarkerIconUrl(),
+		[]
+	);
+	const uncategorizedContactMarkerHoverUrl = useMemo(
+		() =>
+			generateUncategorizedContactMarkerIconUrl(
+				darkenHexColor('#5BB6DD', MARKER_HOVER_DARKEN_AMOUNT)
+			),
+		[]
+	);
+	const uncategorizedContactMarkerImageName = useMemo(
+		() => imageNameFromUrl(uncategorizedContactMarkerUrl),
+		[imageNameFromUrl, uncategorizedContactMarkerUrl]
+	);
+	const uncategorizedContactMarkerHoverImageName = useMemo(
+		() => imageNameFromUrl(uncategorizedContactMarkerHoverUrl),
+		[imageNameFromUrl, uncategorizedContactMarkerHoverUrl]
+	);
+	const selectedCategorizedContactMarkerUrl = useMemo(
+		() => generateSelectedCategorizedContactMarkerIconUrl(),
+		[]
+	);
+	const selectedCategorizedContactMarkerHoverUrl = useMemo(
+		() =>
+			generateSelectedCategorizedContactMarkerIconUrl(
+				darkenHexColor('#739EE8', MARKER_HOVER_DARKEN_AMOUNT)
+			),
+		[]
+	);
+	const selectedUncategorizedContactMarkerUrl = useMemo(
+		() => generateSelectedUncategorizedContactMarkerIconUrl(),
+		[]
+	);
+	const selectedUncategorizedContactMarkerHoverUrl = useMemo(
+		() =>
+			generateSelectedUncategorizedContactMarkerIconUrl(
+				darkenHexColor('#50A5C9', MARKER_HOVER_DARKEN_AMOUNT)
+			),
+		[]
+	);
+	const selectedCategorizedContactMarkerImageName = useMemo(
+		() => imageNameFromUrl(selectedCategorizedContactMarkerUrl),
+		[imageNameFromUrl, selectedCategorizedContactMarkerUrl]
+	);
+	const selectedCategorizedContactMarkerHoverImageName = useMemo(
+		() => imageNameFromUrl(selectedCategorizedContactMarkerHoverUrl),
+		[imageNameFromUrl, selectedCategorizedContactMarkerHoverUrl]
+	);
+	const selectedUncategorizedContactMarkerImageName = useMemo(
+		() => imageNameFromUrl(selectedUncategorizedContactMarkerUrl),
+		[imageNameFromUrl, selectedUncategorizedContactMarkerUrl]
+	);
+	const selectedUncategorizedContactMarkerHoverImageName = useMemo(
+		() => imageNameFromUrl(selectedUncategorizedContactMarkerHoverUrl),
+		[imageNameFromUrl, selectedUncategorizedContactMarkerHoverUrl]
+	);
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		void ensureMapImageFromUrl(
+			uncategorizedContactMarkerImageName,
+			uncategorizedContactMarkerUrl
+		);
+		void ensureMapImageFromUrl(
+			uncategorizedContactMarkerHoverImageName,
+			uncategorizedContactMarkerHoverUrl
+		);
+	}, [
+		map,
+		isMapLoaded,
+		ensureMapImageFromUrl,
+		uncategorizedContactMarkerImageName,
+		uncategorizedContactMarkerUrl,
+		uncategorizedContactMarkerHoverImageName,
+		uncategorizedContactMarkerHoverUrl,
+	]);
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const selectedMarkerDimensions = {
+			width: SELECTED_CONTACT_MARKER_VIEWBOX_WIDTH,
+			height: SELECTED_CONTACT_MARKER_VIEWBOX_HEIGHT,
+		};
+		void ensureMapImageFromUrl(
+			selectedCategorizedContactMarkerImageName,
+			selectedCategorizedContactMarkerUrl,
+			selectedMarkerDimensions
+		);
+		void ensureMapImageFromUrl(
+			selectedCategorizedContactMarkerHoverImageName,
+			selectedCategorizedContactMarkerHoverUrl,
+			selectedMarkerDimensions
+		);
+		void ensureMapImageFromUrl(
+			selectedUncategorizedContactMarkerImageName,
+			selectedUncategorizedContactMarkerUrl,
+			selectedMarkerDimensions
+		);
+		void ensureMapImageFromUrl(
+			selectedUncategorizedContactMarkerHoverImageName,
+			selectedUncategorizedContactMarkerHoverUrl,
+			selectedMarkerDimensions
+		);
+	}, [
+		map,
+		isMapLoaded,
+		ensureMapImageFromUrl,
+		selectedCategorizedContactMarkerImageName,
+		selectedCategorizedContactMarkerUrl,
+		selectedCategorizedContactMarkerHoverImageName,
+		selectedCategorizedContactMarkerHoverUrl,
+		selectedUncategorizedContactMarkerImageName,
+		selectedUncategorizedContactMarkerUrl,
+		selectedUncategorizedContactMarkerHoverImageName,
+		selectedUncategorizedContactMarkerHoverUrl,
+	]);
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		void ensureMapImageFromUrl(
+			OWNED_VENUE_HOME_ICON_IMAGE_NAME,
+			OWNED_VENUE_HOME_ICON_URL,
+			OWNED_VENUE_HOME_ICON_IMAGE_DIMENSIONS
+		);
+		void ensureMapImageFromUrl(
+			EVENT_STAR_ICON_IMAGE_NAME,
+			EVENT_STAR_ICON_URL,
+			EVENT_STAR_ICON_IMAGE_DIMENSIONS
+		);
+	}, [map, isMapLoaded, ensureMapImageFromUrl]);
+
 	const promotionPinIdsRef = useRef<Set<number>>(new Set());
 	const promotionDotIdsRef = useRef<Set<number>>(new Set());
 	const baseDotsLastDataKeyRef = useRef<string>('');
@@ -12590,6 +14163,57 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const baseDotsWavePendingSearchKeyRef = useRef<string | null>(null);
 	// Tracks the last query key that actually played the base-dot wave animation.
 	const baseDotsWaveLastSearchKeyRef = useRef<string>('');
+	const hoveredMarkerVisualRef = useRef<{ sourceId: string; id: number } | null>(null);
+	const markerConstellationEdgesRef = useRef<MarkerConstellationEdge[]>([]);
+	const markerConstellationUsesCategoryColorsRef = useRef<boolean>(false);
+	const markerConstellationNodesRef = useRef<MarkerConstellationNode[]>([]);
+	const markerConstellationContactsByIdRef = useRef<Map<number, ContactWithName>>(
+		new Map()
+	);
+	const selectedMarkerFadeRafRef = useRef<number | null>(null);
+	const selectedMarkerFadeByIdRef = useRef<Map<number, number>>(new Map());
+	const selectedMarkerScaleByIdRef = useRef<Map<number, number>>(new Map());
+	const selectedMarkerFeatureByIdRef = useRef<Map<number, any>>(new Map());
+	// Signature of the last-built selected-marker feature set (selected ids + coords +
+	// styling, NOT zoom). Lets the selected-marker effect no-op pure-zoom re-runs so
+	// selected halos don't re-animate/flicker when zooming.
+	const selectedMarkerBuildSignatureRef = useRef<string>('');
+	// Ref mirrors of the overlay arrays so the selected-marker effect can read them
+	// without listing them as deps (they get fresh references on every zoom, which
+	// would otherwise re-trigger the fade animation on each zoom).
+	const bookingExtraVisibleContactsRef = useRef<ContactWithName[]>([]);
+	const promotionOverlayVisibleContactsRef = useRef<ContactWithName[]>([]);
+	const allContactsOverlayVisibleContactsRef = useRef<ContactWithName[]>([]);
+	useEffect(() => {
+		bookingExtraVisibleContactsRef.current = bookingExtraVisibleContacts;
+		promotionOverlayVisibleContactsRef.current = promotionOverlayVisibleContacts;
+		allContactsOverlayVisibleContactsRef.current = allContactsOverlayVisibleContacts;
+	}, [
+		bookingExtraVisibleContacts,
+		promotionOverlayVisibleContacts,
+		allContactsOverlayVisibleContacts,
+	]);
+	const selectedConstellationLineFadeRafRef = useRef<number | null>(null);
+	const selectedConstellationLineOpacityRef = useRef<number>(1);
+	const selectedConstellationHadPathRef = useRef<boolean>(false);
+	const selectedConstellationEdgesRef = useRef<MarkerConstellationEdgeSeed[]>([]);
+	const selectedConstellationGraphKeyRef = useRef<string>('');
+	const markerConstellationNodeIdsRef = useRef<Set<number>>(new Set());
+	const markerConstellationLastSearchKeyRef = useRef<string>((searchQuery ?? '').trim());
+	const markerConstellationComposedSearchKeyRef = useRef<string>('');
+	const markerConstellationRevealCancelRef = useRef<(() => void) | null>(null);
+	const markerConstellationRevealDoneRef = useRef<boolean>(true);
+	const markerConstellationLastDataKeyRef = useRef<string>('');
+	const markerConstellationIsStatusModeRef = useRef<boolean>(false);
+	// Tracks a pending moveend listener registered when compose is deferred for a
+	// camera animation (e.g., autoFit fitBounds after a search from far-out zoom).
+	// Stored on a ref so we can keep it idempotent and avoid stacking listeners.
+	const markerConstellationDeferredMoveEndRef = useRef<(() => void) | null>(null);
+	const [markerConstellationIdleNonce, setMarkerConstellationIdleNonce] = useState(0);
+	// Bumped whenever the constellation node set changes (compose, clear, reset),
+	// so the feature-state sync effect re-applies `inConstellation` on the dots.
+	const [markerConstellationCompositionNonce, setMarkerConstellationCompositionNonce] =
+		useState(0);
 	const stopBaseDotsWaveAndRestoreSteadyRendering = useCallback(() => {
 		if (!map || !isMapLoaded) return;
 
@@ -12600,6 +14224,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 
 		try {
+			if (map.getLayer(MAPBOX_LAYER_IDS.baseGlow)) {
+				const transition = { duration: 0, delay: 0 } as any;
+				(map as any).setPaintProperty(
+					MAPBOX_LAYER_IDS.baseGlow,
+					'circle-opacity-transition',
+					transition
+				);
+				(map as any).setPaintProperty(
+					MAPBOX_LAYER_IDS.baseGlow,
+					'circle-opacity',
+					getCategorizedDotGlowZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
+				);
+			}
 			if (map.getLayer(MAPBOX_LAYER_IDS.baseDots)) {
 				const transition = { duration: 0, delay: 0 } as any;
 				(map as any).setPaintProperty(
@@ -12612,11 +14249,32 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					'circle-stroke-opacity-transition',
 					transition
 				);
-				(map as any).setPaintProperty(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity', 1);
+				(map as any).setPaintProperty(
+					MAPBOX_LAYER_IDS.baseDots,
+					'circle-opacity',
+					withFeatureFillOpacity(
+						getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
+					)
+				);
 				(map as any).setPaintProperty(
 					MAPBOX_LAYER_IDS.baseDots,
 					'circle-stroke-opacity',
-					1
+					withFeatureStrokeOpacity(
+						getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
+					)
+				);
+			}
+			if (map.getLayer(MAPBOX_LAYER_IDS.baseFallbackIcons)) {
+				const transition = { duration: 0, delay: 0 } as any;
+				(map as any).setPaintProperty(
+					MAPBOX_LAYER_IDS.baseFallbackIcons,
+					'icon-opacity-transition',
+					transition
+				);
+				(map as any).setPaintProperty(
+					MAPBOX_LAYER_IDS.baseFallbackIcons,
+					'icon-opacity',
+					getSelectedStateOrbZoomFadedOpacity(1, getNormalMarkerFadeOpacityExpr())
 				);
 			}
 		} catch {
@@ -12625,12 +14283,41 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		try {
 			if (map.getLayer(MAPBOX_LAYER_IDS.baseHit)) {
-				map.setFilter(MAPBOX_LAYER_IDS.baseHit, null as any);
+				// Restore the visibility filter (not `null`) so hit detection
+				// stays scoped to the currently-sampled visibleContacts after
+				// the wave completes. Otherwise off-screen-sampled-out features
+				// would be hit-testable just because they're in the source.
+				const visibleIds = Array.from(visibleContactIdSetRef.current);
+				const visibilityFilter: any =
+					visibleIds.length === 0
+						? ['==', ['id'], -1]
+						: ['match', ['id'], visibleIds, true, false];
+				map.setFilter(MAPBOX_LAYER_IDS.baseHit, visibilityFilter);
 			}
 		} catch {
 			// Ignore style timing races.
 		}
 	}, [map, isMapLoaded]);
+
+	// Status mode renders every contact as a campaign-status dot, so the soft glow
+	// halos beneath them read as fuzzy "residue" around the crisp status circles.
+	// Hide those glow layers while in status mode; restore them for category mode.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const hideStatusGlow = campaignMarkerMode === 'status';
+		const glowLayerIds = [
+			MAPBOX_LAYER_IDS.baseGlow,
+			MAPBOX_LAYER_IDS.markerConstellationNodeGlow,
+		];
+		for (const layerId of glowLayerIds) {
+			if (!map.getLayer(layerId)) continue;
+			try {
+				map.setLayoutProperty(layerId, 'visibility', hideStatusGlow ? 'none' : 'visible');
+			} catch {
+				// Ignore style timing races.
+			}
+		}
+	}, [map, isMapLoaded, campaignMarkerMode]);
 
 	// If the user starts panning/zooming while the post-search reveal wave is running,
 	// switch back to steady rendering so newly sampled viewport dots don't appear to vanish.
@@ -12645,6 +14332,467 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			map.off('movestart', onMoveStart);
 		};
 	}, [map, isMapLoaded, stopBaseDotsWaveAndRestoreSteadyRendering]);
+
+	const stopMarkerConstellationReveal = useCallback(() => {
+		const cancel = markerConstellationRevealCancelRef.current;
+		if (cancel) {
+			cancel();
+			markerConstellationRevealCancelRef.current = null;
+		}
+	}, []);
+
+	const setMarkerConstellationLineOpacity = useCallback(
+		(coreOpacity: any, glowOpacity: any, transitionMs = 0) => {
+			if (!map || !isMapLoaded) return;
+			const transition = { duration: transitionMs, delay: 0 } as any;
+			try {
+				if (map.getLayer(MAPBOX_LAYER_IDS.markerConstellationCore)) {
+					(map as any).setPaintProperty(
+						MAPBOX_LAYER_IDS.markerConstellationCore,
+						'line-opacity-transition',
+						transition
+					);
+					(map as any).setPaintProperty(
+						MAPBOX_LAYER_IDS.markerConstellationCore,
+						'line-opacity',
+						getMarkerConstellationZoomFadedOpacity(coreOpacity)
+					);
+				}
+				if (map.getLayer(MAPBOX_LAYER_IDS.markerConstellationGlow)) {
+					(map as any).setPaintProperty(
+						MAPBOX_LAYER_IDS.markerConstellationGlow,
+						'line-opacity-transition',
+						transition
+					);
+					(map as any).setPaintProperty(
+						MAPBOX_LAYER_IDS.markerConstellationGlow,
+						'line-opacity',
+						getMarkerConstellationZoomFadedOpacity(glowOpacity)
+					);
+				}
+			} catch {
+				// Ignore style timing races.
+			}
+		},
+		[map, isMapLoaded]
+	);
+
+	const clearMarkerConstellation = useCallback(
+		(includeSelected = true) => {
+			stopMarkerConstellationReveal();
+			markerConstellationEdgesRef.current = [];
+			markerConstellationUsesCategoryColorsRef.current = false;
+			markerConstellationNodesRef.current = [];
+			markerConstellationContactsByIdRef.current = new Map();
+			markerConstellationNodeIdsRef.current = new Set();
+			markerConstellationComposedSearchKeyRef.current = '';
+			markerConstellationRevealDoneRef.current = true;
+			markerConstellationLastDataKeyRef.current = '';
+			markerConstellationIsStatusModeRef.current = false;
+			setMarkerConstellationCompositionNonce((value) => value + 1);
+			setMarkerConstellationLineOpacity(0, 0, 0);
+			if (!map || !isMapLoaded) return;
+			const lineSource = map.getSource(MAPBOX_SOURCE_IDS.markerConstellation) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			const selectedLineSource = map.getSource(
+				MAPBOX_SOURCE_IDS.markerConstellationSelected
+			) as mapboxgl.GeoJSONSource | undefined;
+			const nodeSource = map.getSource(MAPBOX_SOURCE_IDS.markerConstellationNodes) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			try {
+				const empty = { type: 'FeatureCollection', features: [] } as any;
+				lineSource?.setData(empty);
+				if (includeSelected) selectedLineSource?.setData(empty);
+				nodeSource?.setData(empty);
+			} catch {
+				// Ignore style timing races.
+			}
+		},
+		[map, isMapLoaded, stopMarkerConstellationReveal, setMarkerConstellationLineOpacity]
+	);
+
+	const writeMarkerConstellationSourceData = useCallback(
+		(contactsForVisibility?: ContactWithName[]): void => {
+			if (!map || !isMapLoaded) return;
+			const source = map.getSource(MAPBOX_SOURCE_IDS.markerConstellation) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			const selectedLineSource = map.getSource(
+				MAPBOX_SOURCE_IDS.markerConstellationSelected
+			) as mapboxgl.GeoJSONSource | undefined;
+			const nodeSource = map.getSource(MAPBOX_SOURCE_IDS.markerConstellationNodes) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			if (!source && !selectedLineSource && !nodeSource) return;
+
+			const contactsById =
+				contactsForVisibility != null
+					? new Map<number, ContactWithName>(
+							contactsForVisibility.map((contact) => [contact.id, contact])
+						)
+					: markerConstellationContactsByIdRef.current;
+			const selectedSet = new Set<number>(selectedContacts);
+
+			const features: any[] = [];
+			const dataKeyParts: string[] = [];
+			for (const edge of markerConstellationEdgesRef.current) {
+				if (selectedSet.has(edge.fromId) || selectedSet.has(edge.toId)) continue;
+				const fromContact = contactsById.get(edge.fromId);
+				const toContact = contactsById.get(edge.toId);
+				if (!fromContact || !toContact) continue;
+
+				const fromCoords = getContactCoords(fromContact);
+				const toCoords = getContactCoords(toContact);
+				if (!fromCoords || !toCoords) continue;
+
+				let lineColor: string | null = null;
+				let lineGlowColor: string | null = null;
+				let useSelectedLineWidth = false;
+				const campaignStatusLineStyle = getCampaignStatusLineStyleForContacts(
+					fromContact.id,
+					toContact.id
+				);
+				if (campaignStatusLineStyle) {
+					lineColor = campaignStatusLineStyle.lineColor;
+					lineGlowColor = campaignStatusLineStyle.lineColor;
+					useSelectedLineWidth = true;
+				}
+				if (
+					!campaignStatusLineStyle &&
+					markerConstellationUsesCategoryColorsRef.current
+				) {
+					const fromCategory = fromContact.curatedCategory ?? null;
+					const toCategory = toContact.curatedCategory ?? null;
+					const fromCategoryKey = fromCategory
+						? normalizeWhatKey(fromCategory)
+						: '__general__';
+					const toCategoryKey = toCategory ? normalizeWhatKey(toCategory) : '__general__';
+					if (fromCategoryKey === toCategoryKey) {
+						lineColor = fromCategory
+							? getResultDotColorForWhat(fromCategory)
+							: GENERAL_CONTACT_CONSTELLATION_LINE_COLOR;
+						lineGlowColor = fromCategory ? lineColor : MARKER_CONSTELLATION_HALO_COLOR;
+					}
+				}
+
+				const rank = useSelectedLineWidth ? 0 : edge.rank;
+				const opacityScale = useSelectedLineWidth ? 1 : edge.opacityScale;
+				const edgeId = markerConstellationPairKey(edge.fromId, edge.toId);
+				const featureId = `${edge.level}:${edgeId}`;
+				dataKeyParts.push(
+					`e:${featureId}:${lineColor ?? ''}:${useSelectedLineWidth ? 'selected' : 'normal'}:${rank.toFixed(3)}:${opacityScale.toFixed(2)}`
+				);
+				features.push({
+					type: 'Feature',
+					id: featureId,
+					properties: {
+						level: edge.level,
+						rank,
+						opacityScale,
+						...(lineColor
+							? {
+									lineColor,
+									lineGlowColor: lineGlowColor ?? lineColor,
+									useSelectedLineWidth,
+								}
+							: {}),
+					},
+					geometry: {
+						type: 'LineString',
+						coordinates: [
+							[fromCoords.lng, fromCoords.lat],
+							[toCoords.lng, toCoords.lat],
+						],
+					},
+				});
+			}
+
+			const nodeFeatures: any[] = [];
+			const hasLockedStateSelection = Boolean(
+				lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
+			);
+			for (const node of markerConstellationNodesRef.current) {
+				if (selectedSet.has(node.id)) continue;
+				const contact = contactsById.get(node.id);
+				if (!contact) continue;
+				const coords = getContactCoords(contact);
+				if (!coords) continue;
+				const isOutsideLockedState = hasLockedStateSelection
+					? !isCoordsInLockedState(coords)
+					: false;
+				const whatForContact = contact.curatedCategory ?? searchWhat ?? null;
+				const statusMarkerStyle = getCampaignStatusMarkerStyleForContact(contact.id);
+				const baseFillColor =
+					statusMarkerStyle?.fillColor ?? getResultDotColorForWhat(whatForContact);
+				const fillColor = isOutsideLockedState
+					? washOutHexColor(baseFillColor, OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE)
+					: baseFillColor;
+				const strokeColor =
+					statusMarkerStyle?.strokeColor ?? MARKER_CONSTELLATION_HALO_COLOR;
+				const strokeWidth = statusMarkerStyle?.strokeWidth;
+				const strokeOpacity = statusMarkerStyle?.strokeOpacity;
+				const radiusScale = statusMarkerStyle?.radiusScale;
+				const fillOpacity = statusMarkerStyle?.fillOpacity;
+				const featureId = `${node.level}:${node.id}`;
+				dataKeyParts.push(
+					`n:${featureId}:${fillColor}:${strokeColor}:${strokeWidth ?? ''}:${
+						strokeOpacity ?? ''
+					}:${radiusScale ?? ''}:${node.rank.toFixed(3)}:${node.opacityScale.toFixed(2)}`
+				);
+				nodeFeatures.push({
+					type: 'Feature',
+					id: featureId,
+					properties: {
+						fillColor,
+						strokeColor,
+						...(strokeWidth != null ? { strokeWidth } : {}),
+						...(strokeOpacity != null ? { strokeOpacity } : {}),
+						...(radiusScale != null ? { radiusScale } : {}),
+						...(fillOpacity != null ? { fillOpacity } : {}),
+						level: node.level,
+						rank: node.rank,
+						opacityScale: node.opacityScale,
+					},
+					geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+				});
+			}
+
+			const selectedPointById = new Map<number, LatLngLiteral>();
+			const addSelectedPoint = (
+				contact: ContactWithName,
+				coords: LatLngLiteral | null
+			) => {
+				if (!selectedSet.has(contact.id)) return;
+				if (!coords) return;
+				if (selectedPointById.has(contact.id)) return;
+				selectedPointById.set(contact.id, coords);
+			};
+			if (selectedSet.size >= 2) {
+				for (const contact of contactsById.values()) {
+					addSelectedPoint(contact, getContactCoords(contact));
+				}
+				for (const contact of contactsWithCoords) {
+					addSelectedPoint(contact, getContactCoords(contact));
+				}
+				for (const contact of bookingExtraVisibleContacts) {
+					addSelectedPoint(contact, getBookingExtraContactCoords(contact));
+				}
+				for (const contact of promotionOverlayVisibleContacts) {
+					addSelectedPoint(contact, getPromotionOverlayContactCoords(contact));
+				}
+				for (const contact of allContactsOverlayVisibleContacts) {
+					addSelectedPoint(contact, getAllContactsOverlayContactCoords(contact));
+				}
+			}
+
+			const selectedLineFeatures: any[] = [];
+			const selectedPointSeeds: Array<{ id: number; coords: LatLngLiteral }> = [];
+			const seenSelectedIds = new Set<number>();
+			for (const id of selectedContacts) {
+				if (seenSelectedIds.has(id)) continue;
+				seenSelectedIds.add(id);
+				const selectedCoords = selectedPointById.get(id);
+				if (!selectedCoords) continue;
+				selectedPointSeeds.push({ id, coords: selectedCoords });
+			}
+			selectedPointSeeds.sort((a, b) => a.id - b.id);
+
+			if (selectedPointSeeds.length < 2) {
+				selectedConstellationEdgesRef.current = [];
+				selectedConstellationGraphKeyRef.current = '';
+			} else {
+				const selectedGraphKey = selectedPointSeeds
+					.map((point) =>
+						[point.id, point.coords.lng.toFixed(5), point.coords.lat.toFixed(5)].join(':')
+					)
+					.join(',');
+
+				if (selectedConstellationGraphKeyRef.current !== selectedGraphKey) {
+					let selectedComposeZoom = MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM;
+					try {
+						selectedComposeZoom = Math.max(
+							MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM,
+							map.getZoom() ?? MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM
+						);
+					} catch {
+						selectedComposeZoom = MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM;
+					}
+					if (!Number.isFinite(selectedComposeZoom)) {
+						selectedComposeZoom = MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM;
+					}
+
+					const selectedWorldSize = 512 * Math.pow(2, selectedComposeZoom);
+					const selectedGraphPoints: MarkerConstellationPoint[] = [];
+					for (const point of selectedPointSeeds) {
+						const projected = latLngToWorldPixel(point.coords, selectedWorldSize);
+						if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y)) {
+							continue;
+						}
+						selectedGraphPoints.push({
+							id: point.id,
+							coords: point.coords,
+							x: projected.x,
+							y: projected.y,
+							groupKey: 'selected',
+						});
+					}
+
+					const selectedGraphSeed = hashStringToUint32(selectedGraphKey).toString(36);
+					selectedConstellationEdgesRef.current = buildSelectedMarkerConstellationEdges(
+						selectedGraphPoints,
+						`selected|${selectedGraphPoints.length}|${selectedGraphSeed}`
+					);
+					selectedConstellationGraphKeyRef.current = selectedGraphKey;
+				}
+
+				for (const edge of selectedConstellationEdgesRef.current) {
+					const fromCoords = selectedPointById.get(edge.fromId);
+					const toCoords = selectedPointById.get(edge.toId);
+					if (!fromCoords || !toCoords) continue;
+
+					const edgeIndex = selectedLineFeatures.length;
+					const edgeId = markerConstellationPairKey(edge.fromId, edge.toId);
+					const featureId = `selected:${edgeIndex}:${edgeId}`;
+					dataKeyParts.push(`s:${featureId}`);
+					selectedLineFeatures.push({
+						type: 'Feature',
+						id: featureId,
+						properties: {
+							selectedLineOpacity: selectedConstellationLineOpacityRef.current,
+							fromId: edge.fromId,
+							toId: edge.toId,
+						},
+						geometry: {
+							type: 'LineString',
+							coordinates: [
+								[fromCoords.lng, fromCoords.lat],
+								[toCoords.lng, toCoords.lat],
+							],
+						},
+					});
+				}
+			}
+
+			const dataKey = dataKeyParts.join(',');
+			markerConstellationLastDataKeyRef.current = dataKey;
+
+			try {
+				source?.setData({ type: 'FeatureCollection', features } as any);
+				selectedLineSource?.setData({
+					type: 'FeatureCollection',
+					features: selectedLineFeatures,
+				} as any);
+				nodeSource?.setData({ type: 'FeatureCollection', features: nodeFeatures } as any);
+			} catch {
+				// Ignore style timing races.
+			}
+		},
+		[
+			map,
+			isMapLoaded,
+			selectedContacts,
+			contactsWithCoords,
+			bookingExtraVisibleContacts,
+			promotionOverlayVisibleContacts,
+			allContactsOverlayVisibleContacts,
+			getCampaignStatusLineStyleForContacts,
+			getCampaignStatusMarkerStyleForContact,
+			getContactCoords,
+			getBookingExtraContactCoords,
+			getPromotionOverlayContactCoords,
+			getAllContactsOverlayContactCoords,
+			lockedStateKey,
+			isCoordsInLockedState,
+			searchWhat,
+		]
+	);
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+
+		if (selectedConstellationLineFadeRafRef.current != null) {
+			cancelAnimationFrame(selectedConstellationLineFadeRafRef.current);
+			selectedConstellationLineFadeRafRef.current = null;
+		}
+
+		const hasSelectedPath = selectedContacts.length >= 2;
+		const hadSelectedPath = selectedConstellationHadPathRef.current;
+		selectedConstellationHadPathRef.current = hasSelectedPath;
+
+		if (!hasSelectedPath) {
+			selectedConstellationLineOpacityRef.current = 0;
+			writeMarkerConstellationSourceData();
+			return;
+		}
+
+		if (hadSelectedPath) {
+			selectedConstellationLineOpacityRef.current = 1;
+			writeMarkerConstellationSourceData();
+			return;
+		}
+
+		let cancelled = false;
+		const start = performance.now();
+		const durationMs = 220;
+
+		const tick = (now: number) => {
+			if (cancelled) return;
+			const rawT = clamp((now - start) / durationMs, 0, 1);
+			const easedT = 1 - Math.pow(1 - rawT, 3);
+			selectedConstellationLineOpacityRef.current = easedT;
+			writeMarkerConstellationSourceData();
+
+			if (rawT < 1) {
+				selectedConstellationLineFadeRafRef.current = requestAnimationFrame(tick);
+			} else {
+				selectedConstellationLineFadeRafRef.current = null;
+			}
+		};
+
+		selectedConstellationLineOpacityRef.current = 0;
+		writeMarkerConstellationSourceData();
+		selectedConstellationLineFadeRafRef.current = requestAnimationFrame(tick);
+
+		return () => {
+			cancelled = true;
+			if (selectedConstellationLineFadeRafRef.current != null) {
+				cancelAnimationFrame(selectedConstellationLineFadeRafRef.current);
+				selectedConstellationLineFadeRafRef.current = null;
+			}
+		};
+	}, [map, isMapLoaded, selectedContacts, writeMarkerConstellationSourceData]);
+
+	const startMarkerConstellationReveal = useCallback(() => {
+		stopMarkerConstellationReveal();
+
+		if (!map || !isMapLoaded) return;
+		if (markerConstellationEdgesRef.current.length === 0) {
+			markerConstellationRevealDoneRef.current = true;
+			setMarkerConstellationLineOpacity(0, 0, 0);
+			return;
+		}
+
+		markerConstellationRevealDoneRef.current = true;
+		const coreOpacity = markerConstellationIsStatusModeRef.current
+			? CAMPAIGN_STATUS_CONSTELLATION_CORE_OPACITY
+			: MARKER_CONSTELLATION_CORE_OPACITY;
+		const glowOpacity = markerConstellationIsStatusModeRef.current
+			? CAMPAIGN_STATUS_CONSTELLATION_GLOW_OPACITY
+			: MARKER_CONSTELLATION_GLOW_OPACITY;
+		setMarkerConstellationLineOpacity(
+			coreOpacity,
+			glowOpacity,
+			MARKER_CONSTELLATION_REVEAL_FADE_MS
+		);
+		return;
+	}, [
+		map,
+		isMapLoaded,
+		stopMarkerConstellationReveal,
+		setMarkerConstellationLineOpacity,
+	]);
 
 	// Base result dots
 	useEffect(() => {
@@ -12688,27 +14836,92 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 
+		if (!searchEngaged) {
+			if (baseDotsWaveCancelRef.current) {
+				baseDotsWaveCancelRef.current();
+				baseDotsWaveCancelRef.current = null;
+			}
+			baseDotsWaveMetaRef.current = null;
+			baseDotsLastDataKeyRef.current = '';
+			source.setData({ type: 'FeatureCollection', features: [] } as any);
+			return;
+		}
+
 		const hasLockedStateSelection = Boolean(
 			lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
 		);
+		const fadeWithSelectedStateOrb = Boolean(
+			hasLockedStateSelection && selectedStateMorphSourceRef.current
+		);
 
-		type DotSeed = { id: number; lng: number; lat: number; fillColor: string };
+		type DotSeed = {
+			id: number;
+			lng: number;
+			lat: number;
+			fillColor: string;
+			hoverFillColor: string;
+			fillOpacity: number;
+			strokeColor: string;
+			strokeWidth: number;
+			strokeOpacity: number;
+			radiusScale: number;
+			isCurated: boolean;
+			isUncategorized: boolean;
+			isVenue: boolean;
+			fadeWithSelectedStateOrb: boolean;
+		};
 		const dots: DotSeed[] = [];
 		let minLng = Number.POSITIVE_INFINITY;
 		let maxLng = Number.NEGATIVE_INFINITY;
 		let minLat = Number.POSITIVE_INFINITY;
 		let maxLat = Number.NEGATIVE_INFINITY;
 
-		for (const contact of visibleContacts) {
+		// Iterate the FULL contacts list (not the viewport-sampled `visibleContacts`)
+		// so the GeoJSON source stays stable across pans/zooms. `setData` only fires
+		// when the underlying contacts (or their fillColor inputs) actually change,
+		// not on every moveend. The sampled viewport subset is enforced by `setFilter`
+		// on the layers (see the visibility-filter useEffect below) — that's cheap
+		// and doesn't trigger a layer rebuild, so fast zoom no longer causes the dot
+		// layer to briefly clear and re-render ("disappear and reload").
+		for (const contact of contactsWithCoords) {
 			const coords = getContactCoords(contact);
 			if (!coords) continue;
 			const isOutsideLockedState = hasLockedStateSelection
 				? !isCoordsInLockedState(coords)
 				: false;
+			const whatForContact = contact.curatedCategory ?? searchWhat ?? null;
+			const statusMarkerStyle = getCampaignStatusMarkerStyleForContact(contact.id);
+			const isUncategorized = statusMarkerStyle
+				? false
+				: !isCleanMapMarkerCategory(whatForContact);
+			const isVenue = contact.venueId != null;
+			const baseFillColor =
+				statusMarkerStyle?.fillColor ?? getResultDotColorForWhat(whatForContact);
 			const fillColor = isOutsideLockedState
-				? outsideDefaultDotFillColor
-				: defaultDotFillColor;
-			dots.push({ id: contact.id, lng: coords.lng, lat: coords.lat, fillColor });
+				? washOutHexColor(baseFillColor, OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE)
+				: baseFillColor;
+			dots.push({
+				id: contact.id,
+				lng: coords.lng,
+				lat: coords.lat,
+				fillColor,
+				// Status markers keep their fill on hover (darkening a near-white
+				// "contacts" dot makes it vanish into the light map); they grow
+				// instead. Non-status (search/category) dots keep the darken cue.
+				hoverFillColor: statusMarkerStyle ? fillColor : darkenHexColor(fillColor),
+				strokeColor:
+					statusMarkerStyle?.strokeColor ?? RESULT_DOT_TRANSPARENT_STROKE_COLOR,
+				strokeWidth: statusMarkerStyle?.strokeWidth ?? 0,
+				strokeOpacity: statusMarkerStyle?.strokeOpacity ?? 0,
+				fillOpacity: statusMarkerStyle?.fillOpacity ?? 1,
+				radiusScale: isVenue
+					? VENUE_DOT_RADIUS_SCALE
+					: (statusMarkerStyle?.radiusScale ?? 1),
+				isCurated: statusMarkerStyle ? false : Boolean(contact.curatedCategory),
+				isUncategorized,
+				isVenue,
+				fadeWithSelectedStateOrb,
+			});
 			minLng = Math.min(minLng, coords.lng);
 			maxLng = Math.max(maxLng, coords.lng);
 			minLat = Math.min(minLat, coords.lat);
@@ -12739,12 +14952,35 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		let dataKey = '';
 		for (let i = 0; i < dots.length; i++) {
 			const d = dots[i];
-			dataKey += (i > 0 ? ',' : '') + d.id + ':' + d.fillColor;
+			dataKey +=
+				(i > 0 ? ',' : '') +
+				d.id +
+				':' +
+				d.fillColor +
+				':' +
+				d.strokeColor +
+				':' +
+				d.strokeWidth +
+				':' +
+				d.strokeOpacity +
+				':' +
+				d.radiusScale +
+				':' +
+				(d.isUncategorized ? 'u' : 'c') +
+				':' +
+				(d.isVenue ? 'v' : 'n') +
+				':' +
+				(d.fadeWithSelectedStateOrb ? 'f' : 'n');
 		}
 		if (dataKey === baseDotsLastDataKeyRef.current) {
 			return;
 		}
 		baseDotsLastDataKeyRef.current = dataKey;
+		const isStableCuratedMarkerSet =
+			dots.length > 0 &&
+			dots.length <= CURATED_STABLE_MARKER_MAX_DOTS &&
+			visibleContacts.length === dots.length &&
+			visibleContacts.every((contact) => Boolean(contact.curatedCategory));
 
 		// Interrupt the reveal wave before swapping source data; otherwise the in-flight
 		// opacity expression can keep newly sampled dots hidden until old delays elapse.
@@ -12771,7 +15007,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				id: dot.id,
 				properties: {
 					fillColor: dot.fillColor,
+					hoverFillColor: dot.hoverFillColor,
+					fillOpacity: dot.fillOpacity,
+					strokeColor: dot.strokeColor,
+					strokeWidth: dot.strokeWidth,
+					strokeOpacity: dot.strokeOpacity,
+					radiusScale: dot.radiusScale,
 					[DOT_WAVE_DELAY_PROP]: delayMs,
+					isCurated: dot.isCurated,
+					isUncategorized: dot.isUncategorized,
+					isVenue: dot.isVenue,
+					fadeWithSelectedStateOrb: dot.fadeWithSelectedStateOrb,
+					fallbackIcon: dot.isUncategorized ? uncategorizedContactMarkerImageName : '',
+					fallbackIconHover: dot.isUncategorized
+						? uncategorizedContactMarkerHoverImageName
+						: '',
 				},
 				geometry: { type: 'Point', coordinates: [dot.lng, dot.lat] },
 			};
@@ -12791,7 +15041,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		} catch {
 			prefersReducedMotion = false;
 		}
-		prefersReducedMotion = prefersReducedMotion || disableDotWaveReveal;
+		prefersReducedMotion =
+			prefersReducedMotion || disableDotWaveReveal || isStableCuratedMarkerSet;
 		// During long camera eases (e.g. cinematic fitBounds after a top-search),
 		// avoid priming the "hide then reveal" wave frame. Otherwise dots can
 		// disappear mid-flight and then reappear as the wave runs.
@@ -12820,15 +15071,29 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				1,
 			] as any;
 			try {
+				if (map.getLayer(MAPBOX_LAYER_IDS.baseGlow)) {
+					(map as any).setPaintProperty(
+						MAPBOX_LAYER_IDS.baseGlow,
+						'circle-opacity',
+						withCategorizedDotOpacity(withResultDotGlowOpacity(expr0))
+					);
+				}
 				if (map.getLayer(MAPBOX_LAYER_IDS.baseDots)) {
 					(map as any).setPaintProperty(
 						MAPBOX_LAYER_IDS.baseDots,
 						'circle-opacity',
-						expr0
+						withFeatureFillOpacity(withCategorizedDotOpacity(expr0))
 					);
 					(map as any).setPaintProperty(
 						MAPBOX_LAYER_IDS.baseDots,
 						'circle-stroke-opacity',
+						withFeatureStrokeOpacity(expr0)
+					);
+				}
+				if (map.getLayer(MAPBOX_LAYER_IDS.baseFallbackIcons)) {
+					(map as any).setPaintProperty(
+						MAPBOX_LAYER_IDS.baseFallbackIcons,
+						'icon-opacity',
 						expr0
 					);
 				}
@@ -12856,17 +15121,420 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map,
 		isMapLoaded,
 		isLoading,
+		searchEngaged,
 		contacts.length,
 		visibleContacts,
 		getContactCoords,
-		defaultDotFillColor,
-		outsideDefaultDotFillColor,
+		searchWhat,
 		lockedStateKey,
 		isStateLayerReady,
 		isCoordsInLockedState,
 		searchQuery,
 		isBackgroundPresentation,
+		disableDotWaveReveal,
+		getCampaignStatusMarkerStyleForContact,
 		stopBaseDotsWaveAndRestoreSteadyRendering,
+		uncategorizedContactMarkerImageName,
+		uncategorizedContactMarkerHoverImageName,
+	]);
+
+	// Selected marker artwork. This source is separate from the normal dot/pin sources so
+	// selected contacts can swap to the bespoke halo markers without rebuilding every marker.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const source = map.getSource(MAPBOX_SOURCE_IDS.markersSelected) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		if (!source) return;
+
+		if (isLoading) {
+			// Preserve existing selected markers while parent data is refetching.
+			return;
+		}
+
+		if (!searchEngaged && !isAmbientContactsEnabled) {
+			if (selectedMarkerFadeRafRef.current != null) {
+				cancelAnimationFrame(selectedMarkerFadeRafRef.current);
+				selectedMarkerFadeRafRef.current = null;
+			}
+			selectedMarkerFadeByIdRef.current.clear();
+			selectedMarkerScaleByIdRef.current.clear();
+			selectedMarkerFeatureByIdRef.current = new Map();
+			selectedMarkerBuildSignatureRef.current = '';
+			source.setData({ type: 'FeatureCollection', features: [] } as any);
+			return;
+		}
+
+		let cancelled = false;
+
+		const run = async () => {
+			const selectedSet = new Set<number>(selectedContacts);
+			const seenIds = new Set<number>();
+			const nextSelectedFeaturesById = new Map<number, any>();
+			const fadeWithSelectedStateOrb = Boolean(
+				lockedStateKey &&
+				lockedStateSelectionKeyRef.current === lockedStateKey &&
+				selectedStateMorphSourceRef.current
+			);
+
+			const addSelectedMarker = (
+				contact: ContactWithName,
+				coords: LatLngLiteral | null,
+				whatForMarker?: string | null
+			) => {
+				if (!selectedSet.has(contact.id)) return;
+				if (seenIds.has(contact.id)) return;
+				if (!coords) return;
+
+				const isUncategorized = !isCleanMapMarkerCategory(whatForMarker);
+				seenIds.add(contact.id);
+				nextSelectedFeaturesById.set(contact.id, {
+					type: 'Feature',
+					id: contact.id,
+					properties: {
+						selectedIcon: isUncategorized
+							? selectedUncategorizedContactMarkerImageName
+							: selectedCategorizedContactMarkerImageName,
+						selectedIconHover: isUncategorized
+							? selectedUncategorizedContactMarkerHoverImageName
+							: selectedCategorizedContactMarkerHoverImageName,
+						isUncategorized,
+						fadeWithSelectedStateOrb,
+					},
+					geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+				});
+			};
+
+			for (const contact of contactsWithCoords) {
+				addSelectedMarker(
+					contact,
+					getContactCoords(contact),
+					contact.curatedCategory ?? searchWhat ?? null
+				);
+			}
+
+			// Read overlay arrays from refs (not the effect deps) so zoom-driven overlay
+			// resamples don't re-trigger this effect and restart the fade animation.
+			for (const contact of bookingExtraVisibleContactsRef.current) {
+				addSelectedMarker(
+					contact,
+					getBookingExtraContactCoords(contact),
+					getBookingTitlePrefixFromContactTitle(contact.title) ?? null
+				);
+			}
+
+			for (const contact of promotionOverlayVisibleContactsRef.current) {
+				addSelectedMarker(
+					contact,
+					getPromotionOverlayContactCoords(contact),
+					getPromotionOverlayWhatFromContactTitle(contact.title) ?? null
+				);
+			}
+
+			for (const contact of allContactsOverlayVisibleContactsRef.current) {
+				addSelectedMarker(
+					contact,
+					getAllContactsOverlayContactCoords(contact),
+					getAmbientContactWhatFromTitle(contact.title)
+				);
+			}
+
+			// Fallback for selected contacts that aren't in the current map dataset/overlays
+			// (e.g. curated selections kept visible after disengaging to the ambient atlas).
+			// Deduped by seenIds, so contacts already added above keep their dot-aligned coords.
+			for (const contact of selectedContactObjects) {
+				addSelectedMarker(
+					contact,
+					getLatLngFromContact(contact),
+					contact.curatedCategory ??
+						searchWhat ??
+						getAmbientContactWhatFromTitle(contact.title) ??
+						null
+				);
+			}
+
+			// Pure-zoom re-runs (overlay arrays changed reference but the selected
+			// subset, its coords, and styling are identical) are no-ops. Skip the
+			// rebuild + re-animation so selected halos stay stable while zooming.
+			const signatureParts: string[] = [];
+			for (const id of Array.from(nextSelectedFeaturesById.keys()).sort(
+				(a, b) => a - b
+			)) {
+				const feature = nextSelectedFeaturesById.get(id);
+				const [lng, lat] = feature.geometry.coordinates;
+				signatureParts.push(
+					`${id}:${feature.properties.isUncategorized ? 'u' : 'c'}:${
+						feature.properties.fadeWithSelectedStateOrb ? '1' : '0'
+					}:${lng.toFixed(5)}:${lat.toFixed(5)}`
+				);
+			}
+			const nextSignature = signatureParts.join(',');
+			if (
+				nextSignature === selectedMarkerBuildSignatureRef.current &&
+				selectedMarkerFadeRafRef.current == null
+			) {
+				return;
+			}
+			selectedMarkerBuildSignatureRef.current = nextSignature;
+
+			const selectedMarkerDimensions = {
+				width: SELECTED_CONTACT_MARKER_VIEWBOX_WIDTH,
+				height: SELECTED_CONTACT_MARKER_VIEWBOX_HEIGHT,
+			};
+			void Promise.all([
+				ensureMapImageFromUrl(
+					selectedCategorizedContactMarkerImageName,
+					selectedCategorizedContactMarkerUrl,
+					selectedMarkerDimensions
+				),
+				ensureMapImageFromUrl(
+					selectedCategorizedContactMarkerHoverImageName,
+					selectedCategorizedContactMarkerHoverUrl,
+					selectedMarkerDimensions
+				),
+				ensureMapImageFromUrl(
+					selectedUncategorizedContactMarkerImageName,
+					selectedUncategorizedContactMarkerUrl,
+					selectedMarkerDimensions
+				),
+				ensureMapImageFromUrl(
+					selectedUncategorizedContactMarkerHoverImageName,
+					selectedUncategorizedContactMarkerHoverUrl,
+					selectedMarkerDimensions
+				),
+			]);
+			if (cancelled) return;
+
+			if (selectedMarkerFadeRafRef.current != null) {
+				cancelAnimationFrame(selectedMarkerFadeRafRef.current);
+				selectedMarkerFadeRafRef.current = null;
+			}
+
+			const featureById = new Map<number, any>(selectedMarkerFeatureByIdRef.current);
+			for (const [id, feature] of nextSelectedFeaturesById) {
+				featureById.set(id, feature);
+			}
+
+			const fadeById = selectedMarkerFadeByIdRef.current;
+			const scaleById = selectedMarkerScaleByIdRef.current;
+			const targets = new Map<number, number>();
+			for (const id of featureById.keys()) {
+				targets.set(id, nextSelectedFeaturesById.has(id) ? 1 : 0);
+			}
+
+			if (targets.size === 0) {
+				fadeById.clear();
+				scaleById.clear();
+				selectedMarkerFeatureByIdRef.current = new Map();
+				selectedMarkerBuildSignatureRef.current = '';
+				source.setData({ type: 'FeatureCollection', features: [] } as any);
+				return;
+			}
+
+			const startFadeById = new Map<number, number>();
+			const startScaleById = new Map<number, number>();
+			for (const id of targets.keys()) {
+				const isSelecting = nextSelectedFeaturesById.has(id);
+				startFadeById.set(
+					id,
+					fadeById.get(id) ?? (isSelecting ? SELECTED_MARKER_ENTRY_OPACITY : 1)
+				);
+				startScaleById.set(
+					id,
+					scaleById.get(id) ?? (isSelecting ? SELECTED_MARKER_INITIAL_TRANSFORM_SCALE : 1)
+				);
+			}
+
+			const setNormalMarkerAnimationState = (id: number, t: number) => {
+				for (const sourceId of [
+					MAPBOX_SOURCE_IDS.markersBase,
+					MAPBOX_SOURCE_IDS.markersBookingPin,
+					MAPBOX_SOURCE_IDS.markersPromotionDot,
+					MAPBOX_SOURCE_IDS.markersPromotionPin,
+					MAPBOX_SOURCE_IDS.markersAllOverlay,
+				]) {
+					try {
+						map.setFeatureState({ source: sourceId, id }, { selectedMarkerT: t });
+					} catch {
+						// Feature may not be present in this source.
+					}
+				}
+			};
+
+			const writeFrame = (progress: number) => {
+				const eased = 1 - Math.pow(1 - progress, 3);
+				const features: any[] = [];
+
+				for (const [id, target] of targets) {
+					const feature = featureById.get(id);
+					if (!feature) continue;
+					const start = startFadeById.get(id) ?? target;
+					const opacity = start + (target - start) * eased;
+					const startScale = startScaleById.get(id) ?? 1;
+					const targetScale = target > 0 ? 1 : SELECTED_MARKER_INITIAL_TRANSFORM_SCALE;
+					const scale = startScale + (targetScale - startScale) * eased;
+
+					if (progress >= 1 && target <= 0) {
+						fadeById.delete(id);
+						scaleById.delete(id);
+						featureById.delete(id);
+						setNormalMarkerAnimationState(id, 0);
+						continue;
+					}
+
+					fadeById.set(id, opacity);
+					scaleById.set(id, scale);
+					setNormalMarkerAnimationState(id, opacity);
+					features.push({
+						...feature,
+						properties: {
+							...(feature.properties ?? {}),
+							selectedMarkerOpacity: opacity,
+							selectedMarkerScale: scale,
+						},
+					});
+				}
+
+				selectedMarkerFeatureByIdRef.current = featureById;
+				source.setData({ type: 'FeatureCollection', features } as any);
+			};
+
+			const startMs = performance.now();
+			writeFrame(0);
+
+			const tick = () => {
+				const progress = Math.min(
+					1,
+					(performance.now() - startMs) / SELECTED_MARKER_FADE_MS
+				);
+				writeFrame(progress);
+
+				if (progress < 1) {
+					selectedMarkerFadeRafRef.current = requestAnimationFrame(tick);
+					return;
+				}
+
+				selectedMarkerFadeRafRef.current = null;
+			};
+
+			selectedMarkerFadeRafRef.current = requestAnimationFrame(tick);
+		};
+
+		void run();
+
+		return () => {
+			cancelled = true;
+			if (selectedMarkerFadeRafRef.current != null) {
+				cancelAnimationFrame(selectedMarkerFadeRafRef.current);
+				selectedMarkerFadeRafRef.current = null;
+			}
+		};
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		searchEngaged,
+		isAmbientContactsEnabled,
+		selectedContacts,
+		selectedContactObjects,
+		contactsWithCoords,
+		getContactCoords,
+		searchWhat,
+		getBookingExtraContactCoords,
+		getPromotionOverlayContactCoords,
+		getAllContactsOverlayContactCoords,
+		lockedStateKey,
+		isStateLayerReady,
+		ensureMapImageFromUrl,
+		selectedCategorizedContactMarkerImageName,
+		selectedCategorizedContactMarkerUrl,
+		selectedCategorizedContactMarkerHoverImageName,
+		selectedCategorizedContactMarkerHoverUrl,
+		selectedUncategorizedContactMarkerImageName,
+		selectedUncategorizedContactMarkerUrl,
+		selectedUncategorizedContactMarkerHoverImageName,
+		selectedUncategorizedContactMarkerHoverUrl,
+	]);
+
+	// Drive base-marker visibility via `setFilter` (cheap, no layer rebuild)
+	// instead of changing source data on every viewport change. The source
+	// above contains the full `contactsWithCoords`; this filter narrows what
+	// renders to the viewport-sampled subset (`visibleContacts`). Together
+	// these eliminate the `setData`-induced layer clear that fast zoom used
+	// to trigger ("disappear and reload").
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const visibleIds = visibleContacts.map((c) => c.id);
+		const visibilityFilter: any =
+			visibleIds.length === 0
+				? ['==', ['id'], -1]
+				: ['match', ['id'], visibleIds, true, false];
+
+		const safeSet = (layerId: string, filter: any) => {
+			try {
+				if (!map.getLayer(layerId)) return;
+				map.setFilter(layerId, filter);
+			} catch {
+				// Ignore style timing races.
+			}
+		};
+
+		// While a wave reveal is active, leave baseHit's filter alone — the
+		// wave manager owns it and will restore the visibility filter when
+		// the wave completes (see stopBaseDotsWaveAndRestoreSteadyRendering).
+		if (!baseDotsWaveCancelRef.current) {
+			safeSet(MAPBOX_LAYER_IDS.baseHit, visibilityFilter);
+		}
+		safeSet(MAPBOX_LAYER_IDS.baseGlow, visibilityFilter);
+		safeSet(MAPBOX_LAYER_IDS.baseDots, visibilityFilter);
+		// baseFallbackIcons already filters by isUncategorized; AND with visibility.
+		safeSet(MAPBOX_LAYER_IDS.baseFallbackIcons, [
+			'all',
+			['==', ['get', 'isUncategorized'], true],
+			visibilityFilter,
+		]);
+		safeSet(MAPBOX_LAYER_IDS.baseFallbackIconsHover, [
+			'all',
+			['==', ['get', 'isUncategorized'], true],
+			visibilityFilter,
+		]);
+	}, [map, isMapLoaded, visibleContacts]);
+
+	// Sync `inConstellation` feature-state on the base markers source so the
+	// zoom-fade paint expressions can dim non-constellation dots at low zoom.
+	// Default (unset) reads as visible; only contacts NOT in the frozen
+	// constellation node set are explicitly marked false.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+
+		try {
+			map.removeFeatureState({ source: MAPBOX_SOURCE_IDS.markersBase });
+		} catch {
+			// Ignore style timing races.
+		}
+
+		const nodeIds = markerConstellationNodeIdsRef.current;
+		const blobProtectedIds = curatedBlobProtectedMarkerIdsRef.current;
+		if (nodeIds.size === 0 && blobProtectedIds.size === 0) return;
+
+		for (const contact of visibleContacts) {
+			if (nodeIds.has(contact.id)) continue;
+			if (blobProtectedIds.has(contact.id)) continue;
+			try {
+				map.setFeatureState(
+					{ source: MAPBOX_SOURCE_IDS.markersBase, id: contact.id },
+					{ inConstellation: false }
+				);
+			} catch {
+				// Ignore style timing races.
+			}
+		}
+	}, [
+		map,
+		isMapLoaded,
+		visibleContacts,
+		markerConstellationCompositionNonce,
+		curatedBlobProtectedMarkerIdsNonce,
 	]);
 
 	// Wave reveal for base dots on each completed search (left → right).
@@ -12910,14 +15578,42 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Reset base dots to normal rendering (no animated expression).
 			// IMPORTANT: set transitions *before* opacity changes.
 			const transition = { duration: transitionMs, delay: 0 } as any;
+			safeSetPaint(MAPBOX_LAYER_IDS.baseGlow, 'circle-opacity-transition', transition);
+			safeSetPaint(
+				MAPBOX_LAYER_IDS.baseGlow,
+				'circle-opacity',
+				getCategorizedDotGlowZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
+			);
 			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity-transition', transition);
 			safeSetPaint(
 				MAPBOX_LAYER_IDS.baseDots,
 				'circle-stroke-opacity-transition',
 				transition
 			);
-			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity', 1);
-			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity', 1);
+			safeSetPaint(
+				MAPBOX_LAYER_IDS.baseDots,
+				'circle-opacity',
+				withFeatureFillOpacity(
+					getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
+				)
+			);
+			safeSetPaint(
+				MAPBOX_LAYER_IDS.baseDots,
+				'circle-stroke-opacity',
+				withFeatureStrokeOpacity(
+					getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
+				)
+			);
+			safeSetPaint(
+				MAPBOX_LAYER_IDS.baseFallbackIcons,
+				'icon-opacity-transition',
+				transition
+			);
+			safeSetPaint(
+				MAPBOX_LAYER_IDS.baseFallbackIcons,
+				'icon-opacity',
+				getSelectedStateOrbZoomFadedOpacity(1, getNormalMarkerFadeOpacityExpr())
+			);
 			safeClearFilter(MAPBOX_LAYER_IDS.baseHit);
 		};
 
@@ -13018,7 +15714,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			duration: DOT_WAVE_SMOOTH_TRANSITION_MS,
 			delay: 0,
 		} as any);
+		safeSetPaint(MAPBOX_LAYER_IDS.baseGlow, 'circle-opacity-transition', {
+			duration: DOT_WAVE_SMOOTH_TRANSITION_MS,
+			delay: 0,
+		} as any);
 		safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity-transition', {
+			duration: DOT_WAVE_SMOOTH_TRANSITION_MS,
+			delay: 0,
+		} as any);
+		safeSetPaint(MAPBOX_LAYER_IDS.baseFallbackIcons, 'icon-opacity-transition', {
 			duration: DOT_WAVE_SMOOTH_TRANSITION_MS,
 			delay: 0,
 		} as any);
@@ -13062,8 +15766,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			if (t - lastPaintUpdateAt >= DOT_WAVE_FRAME_MS) {
 				const expr = buildOpacityExpr(t);
-				safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity', expr);
-				safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity', expr);
+				safeSetPaint(
+					MAPBOX_LAYER_IDS.baseGlow,
+					'circle-opacity',
+					withCategorizedDotOpacity(withResultDotGlowOpacity(expr))
+				);
+				safeSetPaint(
+					MAPBOX_LAYER_IDS.baseDots,
+					'circle-opacity',
+					withFeatureFillOpacity(withCategorizedDotOpacity(expr))
+				);
+				safeSetPaint(
+					MAPBOX_LAYER_IDS.baseDots,
+					'circle-stroke-opacity',
+					withFeatureStrokeOpacity(expr)
+				);
+				safeSetPaint(MAPBOX_LAYER_IDS.baseFallbackIcons, 'icon-opacity', expr);
 				lastPaintUpdateAt = t;
 			}
 
@@ -13091,8 +15809,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		// Prime frame 0 (all hidden) before the first rAF callback.
 		const expr0 = buildOpacityExpr(0);
-		safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity', expr0);
-		safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity', expr0);
+		safeSetPaint(
+			MAPBOX_LAYER_IDS.baseGlow,
+			'circle-opacity',
+			withCategorizedDotOpacity(withResultDotGlowOpacity(expr0))
+		);
+		safeSetPaint(
+			MAPBOX_LAYER_IDS.baseDots,
+			'circle-opacity',
+			withFeatureFillOpacity(withCategorizedDotOpacity(expr0))
+		);
+		safeSetPaint(
+			MAPBOX_LAYER_IDS.baseDots,
+			'circle-stroke-opacity',
+			withFeatureStrokeOpacity(expr0)
+		);
+		safeSetPaint(MAPBOX_LAYER_IDS.baseFallbackIcons, 'icon-opacity', expr0);
 
 		rafId = requestAnimationFrame(tick);
 
@@ -13100,7 +15832,366 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			cancel();
 			if (baseDotsWaveCancelRef.current === cancel) baseDotsWaveCancelRef.current = null;
 		};
-	}, [map, isMapLoaded, isLoading, isBackgroundPresentation, searchQuery]);
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		isBackgroundPresentation,
+		searchQuery,
+		disableDotWaveReveal,
+	]);
+
+	// Keep the frozen constellation's rendered line source synced after style/coordinate changes.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		if (!markerConstellationComposedSearchKeyRef.current) return;
+		writeMarkerConstellationSourceData();
+		if (markerConstellationRevealDoneRef.current) {
+			const coreOpacity = markerConstellationIsStatusModeRef.current
+				? CAMPAIGN_STATUS_CONSTELLATION_CORE_OPACITY
+				: MARKER_CONSTELLATION_CORE_OPACITY;
+			const glowOpacity = markerConstellationIsStatusModeRef.current
+				? CAMPAIGN_STATUS_CONSTELLATION_GLOW_OPACITY
+				: MARKER_CONSTELLATION_GLOW_OPACITY;
+			setMarkerConstellationLineOpacity(
+				markerConstellationEdgesRef.current.length > 0 ? coreOpacity : 0,
+				markerConstellationEdgesRef.current.length > 0 ? glowOpacity : 0,
+				0
+			);
+		}
+	}, [
+		map,
+		isMapLoaded,
+		writeMarkerConstellationSourceData,
+		setMarkerConstellationLineOpacity,
+	]);
+
+	// Compose marker constellations once per result set from the camera-independent
+	// pool of result contacts so lines can fade in over the autoFit fly-in.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+
+		const searchKey = (searchQuery ?? '').trim();
+		const isSearchMode = searchKey.length > 0;
+		const isCategoryConstellationMode = categoryConstellationsEnabled && !isSearchMode;
+		const isStatusConstellationMode =
+			isCategoryConstellationMode && campaignMarkerMode === 'status';
+		const shouldComposeConstellation = isSearchMode || isCategoryConstellationMode;
+		const constellationKey = isSearchMode
+			? searchKey
+			: isCategoryConstellationMode
+				? isStatusConstellationMode
+					? '__status-constellations__'
+					: '__category-constellations__'
+				: '';
+		const loading = Boolean(isLoading);
+
+		if (!shouldComposeConstellation || isBackgroundPresentation || !searchEngaged) {
+			markerConstellationLastSearchKeyRef.current = constellationKey;
+			clearMarkerConstellation(!isAmbientContactsEnabled);
+			return;
+		}
+
+		if (constellationKey !== markerConstellationLastSearchKeyRef.current) {
+			markerConstellationLastSearchKeyRef.current = constellationKey;
+			clearMarkerConstellation();
+		}
+
+		if (loading) {
+			const composedKey = markerConstellationComposedSearchKeyRef.current;
+			const hasComposedForCurrentSearch =
+				composedKey === constellationKey ||
+				composedKey.startsWith(`${constellationKey}|results:`);
+			if (!hasComposedForCurrentSearch) {
+				stopMarkerConstellationReveal();
+				markerConstellationEdgesRef.current = [];
+				markerConstellationUsesCategoryColorsRef.current = false;
+				markerConstellationNodesRef.current = [];
+				markerConstellationContactsByIdRef.current = new Map();
+				markerConstellationNodeIdsRef.current = new Set();
+				markerConstellationComposedSearchKeyRef.current = '';
+				markerConstellationLastDataKeyRef.current = '';
+				markerConstellationIsStatusModeRef.current = false;
+				setMarkerConstellationCompositionNonce((value) => value + 1);
+				setMarkerConstellationLineOpacity(0, 0, 0);
+			}
+			return;
+		}
+
+		if (contactsWithCoords.length < 2) return;
+
+		const resultSignature = contactsWithCoords
+			.map((contact) => {
+				const coords = getContactCoords(contact);
+				if (!coords) return null;
+				const groupSignature = isStatusConstellationMode
+					? getCampaignStatusForContact(contact.id)
+					: (contact.curatedCategory ?? '');
+				return `${contact.id}:${groupSignature}:${coords.lng.toFixed(
+					5
+				)}:${coords.lat.toFixed(5)}`;
+			})
+			.filter((part): part is string => part != null)
+			.sort()
+			.join(',');
+		if (!resultSignature) return;
+
+		const resultKey = `${constellationKey}|results:${resultSignature}`;
+		const formationVersion = isStatusConstellationMode
+			? 'status-v1'
+			: isCategoryConstellationMode
+				? 'category-v2'
+				: 'beauty-v2';
+		if (
+			markerConstellationComposedSearchKeyRef.current.startsWith(
+				`${resultKey}|${formationVersion}:`
+			)
+		) {
+			return;
+		}
+
+		// Constellation topology projects to a stable Mercator pixel grid
+		// (MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM), so the graph itself doesn't
+		// depend on the camera. Source from contactsWithCoords (camera-independent)
+		// and compose immediately so the lines fade in over the autoFit fly-in
+		// instead of popping in once it lands. The retry-on-moveend path below is
+		// kept as a safety net for the rare zero-edges fallback.
+		const ensureDeferredMoveEndListener = () => {
+			if (markerConstellationDeferredMoveEndRef.current) return;
+			const onMoveEnd = () => {
+				if (markerConstellationDeferredMoveEndRef.current === onMoveEnd) {
+					markerConstellationDeferredMoveEndRef.current = null;
+				}
+				setMarkerConstellationIdleNonce((value) => value + 1);
+			};
+			markerConstellationDeferredMoveEndRef.current = onMoveEnd;
+			map.once('moveend', onMoveEnd);
+		};
+
+		let cancelled = false;
+		// rAF-defer one frame so the dot first-paint isn't blocked by the
+		// O(N²) edge builder that runs below.
+		const rafId = requestAnimationFrame(() => {
+			if (cancelled) return;
+
+			const curatedBlobGroupKeyByContactId = new Map<number, string>();
+			if (!isCategoryConstellationMode) {
+				const curatedBlobPoints = contactsWithCoords
+					.map((contact) => {
+						if (!contact.curatedCategory) return null;
+						const coords = getContactCoords(contact);
+						if (!coords) return null;
+						return projectCuratedBlobPoint(contact.id, coords);
+					})
+					.filter((point): point is CuratedBlobMercatorPoint => point != null);
+
+				if (curatedBlobPoints.length >= 2) {
+					const clusters = pickAdaptiveCuratedBlobClusters(curatedBlobPoints);
+					clusters.forEach((cluster, index) => {
+						for (const point of cluster.points) {
+							curatedBlobGroupKeyByContactId.set(point.id, `blob:${index}`);
+						}
+					});
+				}
+			}
+
+			// When a state is locked, prefer in-state contacts so the 180-point cap
+			// doesn't get dominated by out-of-state contacts at low zoom — this
+			// mirrors the in/out balance that visibleContacts uses.
+			let contactsForConstellation: ContactWithName[];
+			if (lockedStateKey) {
+				const insideState: ContactWithName[] = [];
+				for (const contact of contactsWithCoords) {
+					const contactStateKey = normalizeStateKey(contact.state ?? null);
+					if (contactStateKey === lockedStateKey) {
+						insideState.push(contact);
+					} else if (!contactStateKey) {
+						const coords = getContactCoords(contact);
+						if (coords && isCoordsInLockedState(coords)) insideState.push(contact);
+					}
+				}
+				contactsForConstellation =
+					insideState.length >= 2 ? insideState : contactsWithCoords.slice();
+			} else {
+				contactsForConstellation = contactsWithCoords.slice();
+			}
+
+			if (contactsForConstellation.length > MARKER_CONSTELLATION_MAX_POINTS) {
+				contactsForConstellation = contactsForConstellation
+					.map((contact) => ({
+						contact,
+						score: hashStringToUint32(`${constellationKey}|constellation|${contact.id}`),
+					}))
+					.sort((a, b) => a.score - b.score)
+					.slice(0, MARKER_CONSTELLATION_MAX_POINTS)
+					.map(({ contact }) => contact);
+			}
+			contactsForConstellation.sort((a, b) => a.id - b.id);
+
+			let currentZoom = MAP_DEFAULT_ZOOM;
+			try {
+				currentZoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
+			} catch {
+				currentZoom = MAP_DEFAULT_ZOOM;
+			}
+			if (!Number.isFinite(currentZoom)) currentZoom = MAP_DEFAULT_ZOOM;
+			// Constellation topology is frozen once per result set. If a search starts
+			// from the low-zoom globe, current screen pixels collapse nearby contacts
+			// enough that the edge builder can cache an empty formation. Compose in a
+			// stable Mercator pixel space with a normal-map zoom floor instead.
+			const constellationComposeZoom = Math.max(
+				MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM,
+				currentZoom
+			);
+			const constellationWorldSize = 512 * Math.pow(2, constellationComposeZoom);
+
+			let points: MarkerConstellationPoint[] = [];
+			const contactsByPointId = new Map<number, ContactWithName>();
+			for (const contact of contactsForConstellation) {
+				const coords = getContactCoords(contact);
+				if (!coords) continue;
+				let groupKey: string;
+				if (isCategoryConstellationMode) {
+					if (isStatusConstellationMode) {
+						groupKey = `status:${getCampaignStatusForContact(contact.id)}`;
+					} else {
+						const categoryKey = contact.curatedCategory
+							? normalizeWhatKey(contact.curatedCategory)
+							: '';
+						groupKey = categoryKey ? `category:${categoryKey}` : 'general';
+					}
+				} else {
+					const curatedGroupKey = curatedBlobGroupKeyByContactId.get(contact.id);
+					if (curatedBlobGroupKeyByContactId.size > 0 && !curatedGroupKey) continue;
+					groupKey = curatedGroupKey ?? 'fallback:pending';
+				}
+
+				const projected = latLngToWorldPixel(coords, constellationWorldSize);
+				if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y)) continue;
+
+				points.push({
+					id: contact.id,
+					coords,
+					x: projected.x,
+					y: projected.y,
+					groupKey,
+				});
+				contactsByPointId.set(contact.id, contact);
+			}
+
+			if (
+				!isCategoryConstellationMode &&
+				curatedBlobGroupKeyByContactId.size === 0 &&
+				points.length >= 2
+			) {
+				const fallbackGroupKeyById = buildFallbackMarkerConstellationGroupKeys(points);
+				points = points.map((point) => ({
+					...point,
+					groupKey: fallbackGroupKeyById.get(point.id) ?? `fallback:${point.id}`,
+				}));
+			}
+
+			const pointsSignature = points
+				.map(
+					(point) =>
+						`${point.id}:${point.groupKey}:${point.coords.lng.toFixed(
+							5
+						)}:${point.coords.lat.toFixed(5)}`
+				)
+				.join(',');
+			const compositionKey = `${resultKey}|${formationVersion}:${pointsSignature}`;
+			if (markerConstellationComposedSearchKeyRef.current === compositionKey) return;
+
+			if (points.length < 2) {
+				// No projectable points. Don't cache — leave composedKey unset so a
+				// later contactsWithCoords update can retry.
+				stopMarkerConstellationReveal();
+				markerConstellationEdgesRef.current = [];
+				markerConstellationUsesCategoryColorsRef.current = false;
+				markerConstellationNodesRef.current = [];
+				markerConstellationContactsByIdRef.current = new Map();
+				markerConstellationNodeIdsRef.current = new Set();
+				markerConstellationComposedSearchKeyRef.current = '';
+				markerConstellationRevealDoneRef.current = true;
+				markerConstellationLastDataKeyRef.current = '';
+				markerConstellationIsStatusModeRef.current = false;
+				setMarkerConstellationCompositionNonce((value) => value + 1);
+				setMarkerConstellationLineOpacity(0, 0, 0);
+				writeMarkerConstellationSourceData();
+				ensureDeferredMoveEndListener();
+				return;
+			}
+
+			const seed = `${constellationKey}|${formationVersion}|${points
+				.map((point) => point.id)
+				.join(',')}`;
+			const formation = isCategoryConstellationMode
+				? buildCategoryMarkerConstellationFormation(points, seed)
+				: buildBeautyMarkerConstellationFormation(points, seed, constellationComposeZoom);
+
+			if (formation.edges.length === 0 && formation.nodes.length === 0) {
+				// No drawable formation. Leave composedKey unset so the next idle update
+				// can retry after a pan/zoom or a denser coordinate update.
+				stopMarkerConstellationReveal();
+				markerConstellationEdgesRef.current = [];
+				markerConstellationUsesCategoryColorsRef.current = false;
+				markerConstellationNodesRef.current = [];
+				markerConstellationContactsByIdRef.current = contactsByPointId;
+				markerConstellationNodeIdsRef.current = new Set();
+				markerConstellationComposedSearchKeyRef.current = '';
+				markerConstellationRevealDoneRef.current = true;
+				markerConstellationLastDataKeyRef.current = '';
+				markerConstellationIsStatusModeRef.current = false;
+				setMarkerConstellationCompositionNonce((value) => value + 1);
+				setMarkerConstellationLineOpacity(0, 0, 0);
+				writeMarkerConstellationSourceData();
+				ensureDeferredMoveEndListener();
+				return;
+			}
+
+			stopMarkerConstellationReveal();
+			markerConstellationEdgesRef.current = formation.edges;
+			markerConstellationUsesCategoryColorsRef.current =
+				isCategoryConstellationMode && !isStatusConstellationMode;
+			markerConstellationNodesRef.current = formation.nodes;
+			markerConstellationContactsByIdRef.current = contactsByPointId;
+			markerConstellationNodeIdsRef.current = formation.lowZoomNodeIds;
+			markerConstellationComposedSearchKeyRef.current = compositionKey;
+			markerConstellationRevealDoneRef.current = false;
+			markerConstellationLastDataKeyRef.current = '';
+			markerConstellationIsStatusModeRef.current = isStatusConstellationMode;
+			setMarkerConstellationCompositionNonce((value) => value + 1);
+			setMarkerConstellationLineOpacity(0, 0, 0);
+			writeMarkerConstellationSourceData();
+			startMarkerConstellationReveal();
+		});
+
+		return () => {
+			cancelled = true;
+			cancelAnimationFrame(rafId);
+		};
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		isBackgroundPresentation,
+		searchEngaged,
+		isAmbientContactsEnabled,
+		campaignMarkerMode,
+		categoryConstellationsEnabled,
+		searchQuery,
+		contactsWithCoords,
+		getCampaignStatusForContact,
+		getContactCoords,
+		lockedStateKey,
+		isCoordsInLockedState,
+		markerConstellationIdleNonce,
+		clearMarkerConstellation,
+		stopMarkerConstellationReveal,
+		setMarkerConstellationLineOpacity,
+		writeMarkerConstellationSourceData,
+		startMarkerConstellationReveal,
+	]);
 
 	// All-contacts overlay (gray dots)
 	useEffect(() => {
@@ -13115,14 +16206,41 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 
+		if (!searchEngaged && !isAmbientContactsEnabled) {
+			source.setData({ type: 'FeatureCollection', features: [] } as any);
+			return;
+		}
+
+		const fadeWithSelectedStateOrb = Boolean(
+			lockedStateKey &&
+			lockedStateSelectionKeyRef.current === lockedStateKey &&
+			selectedStateMorphSourceRef.current
+		);
 		const features: any[] = [];
 		for (const contact of allContactsOverlayVisibleContacts) {
 			const coords = getAllContactsOverlayContactCoords(contact);
 			if (!coords) continue;
+			const whatForMarker = getAmbientContactWhatFromTitle(contact.title);
+			const isUncategorized = !isCleanMapMarkerCategory(whatForMarker);
+			const fillColor = isAmbientContactsEnabled
+				? whatForMarker
+					? getResultDotColorForWhat(whatForMarker)
+					: AMBIENT_CONTACTS_UNCATEGORIZED_FILL_COLOR
+				: ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR;
 			features.push({
 				type: 'Feature',
 				id: contact.id,
-				properties: { fillColor: ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR },
+				properties: {
+					fillColor,
+					hoverFillColor: darkenHexColor(fillColor),
+					fadeWithSelectedStateOrb,
+					isUncategorized,
+					category: whatForMarker ?? '',
+					fallbackIcon: isUncategorized ? uncategorizedContactMarkerImageName : '',
+					fallbackIconHover: isUncategorized
+						? uncategorizedContactMarkerHoverImageName
+						: '',
+				},
 				geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
 			});
 		}
@@ -13132,8 +16250,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map,
 		isMapLoaded,
 		isLoading,
+		searchEngaged,
+		isAmbientContactsEnabled,
 		allContactsOverlayVisibleContacts,
 		getAllContactsOverlayContactCoords,
+		lockedStateKey,
+		isStateLayerReady,
+		uncategorizedContactMarkerImageName,
+		uncategorizedContactMarkerHoverImageName,
 	]);
 
 	// Promotion overlay: split into in-state dots vs out-of-state pins
@@ -13152,11 +16276,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 
+		if (!searchEngaged) {
+			const empty = { type: 'FeatureCollection', features: [] } as any;
+			dotSource.setData(empty);
+			pinSource.setData(empty);
+			promotionDotIdsRef.current = new Set();
+			promotionPinIdsRef.current = new Set();
+			return;
+		}
+
 		let cancelled = false;
 
 		const run = async () => {
 			const hasLockedStateSelection = Boolean(
 				lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
+			);
+			const fadeWithSelectedStateOrb = Boolean(
+				hasLockedStateSelection && selectedStateMorphSourceRef.current
 			);
 
 			const dotFeatures: any[] = [];
@@ -13188,7 +16324,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					dotFeatures.push({
 						type: 'Feature',
 						id: contact.id,
-						properties: { fillColor: dotFillColor },
+						properties: {
+							fillColor: dotFillColor,
+							hoverFillColor: darkenHexColor(dotFillColor),
+							fadeWithSelectedStateOrb,
+						},
 						geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
 					});
 					continue;
@@ -13200,20 +16340,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					RESULT_DOT_STROKE_COLOR_DEFAULT,
 					whatForMarker
 				);
-				const selectedUrl = getMarkerPinUrl(
-					pinFillColor,
-					RESULT_DOT_STROKE_COLOR_SELECTED,
+				const hoverUrl = getMarkerPinUrl(
+					darkenHexColor(pinFillColor),
+					RESULT_DOT_STROKE_COLOR_DEFAULT,
 					whatForMarker
 				);
 				const iconDefault = imageNameFromUrl(defaultUrl);
-				const iconSelected = imageNameFromUrl(selectedUrl);
+				const iconHover = imageNameFromUrl(hoverUrl);
 				imagesToEnsure.set(iconDefault, defaultUrl);
-				imagesToEnsure.set(iconSelected, selectedUrl);
+				imagesToEnsure.set(iconHover, hoverUrl);
 
 				pinFeatures.push({
 					type: 'Feature',
 					id: contact.id,
-					properties: { iconDefault, iconSelected },
+					properties: { iconDefault, iconHover, fadeWithSelectedStateOrb },
 					geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
 				});
 			}
@@ -13241,6 +16381,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map,
 		isMapLoaded,
 		isLoading,
+		searchEngaged,
 		promotionOverlayVisibleContacts,
 		lockedStateKey,
 		isStateLayerReady,
@@ -13264,11 +16405,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 
+		if (!searchEngaged) {
+			source.setData({ type: 'FeatureCollection', features: [] } as any);
+			return;
+		}
+
 		let cancelled = false;
 
 		const run = async () => {
 			const hasLockedStateSelection = Boolean(
 				lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
+			);
+			const fadeWithSelectedStateOrb = Boolean(
+				hasLockedStateSelection && selectedStateMorphSourceRef.current
 			);
 
 			const features: any[] = [];
@@ -13297,24 +16446,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					RESULT_DOT_STROKE_COLOR_DEFAULT
 				);
 				const hoverUrl = getMarkerPinUrl(
-					pinFillColor,
+					darkenHexColor(pinFillColor),
 					BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR,
 					whatForMarker,
 					BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR
 				);
-				const selectedUrl = getMarkerPinUrl(
-					pinFillColor,
-					RESULT_DOT_STROKE_COLOR_SELECTED,
-					whatForMarker,
-					RESULT_DOT_STROKE_COLOR_SELECTED
-				);
 
 				const iconDefault = imageNameFromUrl(defaultUrl);
 				const iconHover = imageNameFromUrl(hoverUrl);
-				const iconSelected = imageNameFromUrl(selectedUrl);
 				imagesToEnsure.set(iconDefault, defaultUrl);
 				imagesToEnsure.set(iconHover, hoverUrl);
-				imagesToEnsure.set(iconSelected, selectedUrl);
 
 				features.push({
 					type: 'Feature',
@@ -13322,8 +16463,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					properties: {
 						iconDefault,
 						iconHover,
-						iconSelected,
 						category: whatForMarker ?? '',
+						fadeWithSelectedStateOrb,
 					},
 					geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
 				});
@@ -13348,6 +16489,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map,
 		isMapLoaded,
 		isLoading,
+		searchEngaged,
 		bookingExtraVisibleContacts,
 		lockedStateKey,
 		isStateLayerReady,
@@ -13404,17 +16546,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const layer = MAPBOX_LAYER_IDS.bookingPinIconsHover;
 		if (!map.getLayer(layer)) return;
 		const cat = hoveredBookingExtraCategory;
+		const categoryFilter: any = ['==', ['get', 'category'], cat ?? ''];
 		// Match features whose `category` property equals the hovered category.
 		// When no category is hovered, match nothing (empty string never stored as a real category).
-		map.setFilter(layer, ['==', ['get', 'category'], cat ?? '']);
+		map.setFilter(layer, categoryFilter);
 	}, [map, isMapLoaded, hoveredBookingExtraCategory]);
 
-	// Larger leave buffer zone - how much extra padding below the tooltip for hysteresis
-	const hoverLeaveBufferPx = useMemo(() => {
-		// The buffer should be roughly the size the hit area used to be (2x marker)
-		// This prevents flicker when moving off the marker
-		return markerScale * 2;
-	}, [markerScale]);
+	// Give the DOM tooltip a real hover target around the SVG so moving from the
+	// marker into the bubble does not cross a tiny Mapbox/DOM dead zone.
+	const hoverTooltipHitSlopPx = useMemo(
+		() => Math.max(14, markerScale * 2),
+		[markerScale]
+	);
 
 	const selectedContactIdSet = useMemo(
 		() => new Set<number>(selectedContacts),
@@ -13444,6 +16587,187 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			map.off('move', update);
 		};
 	}, [map, isMapLoaded, isLoading, selectedMarkerCoords?.lat, selectedMarkerCoords?.lng]);
+
+	// Event opportunity popup anchoring with edge-aware placement. The EVENT_POPUP_W×_H box flips
+	// above/below/left/right of the star depending on available room in the map container,
+	// then clamps so it always stays fully on screen. Re-runs on every map move (pan/zoom).
+	useLayoutEffect(() => {
+		if (!map || !isMapLoaded || isLoading) return;
+		const el = eventPopupOverlayRef.current;
+		const container = mapContainerRef.current;
+		if (!el || !container || !activeEvent) return;
+
+		const place = () => {
+			const rect = container.getBoundingClientRect();
+			const cw = rect.width;
+			const ch = rect.height;
+			// Right boundary excludes any host UI obstructing the right edge (e.g. the
+			// search-results panel), plus a gap, so the popup is placed to the right of a
+			// marker only when it fully clears that region — otherwise it flips left.
+			const usableRight = Math.max(EVENT_POPUP_W, cw - rightSafeAreaPx - EVENT_POPUP_GAP);
+			// map.project() returns container-relative pixels, matching getBoundingClientRect.
+			const p = map.project([activeEvent.lng, activeEvent.lat]);
+			const offset = EVENT_POPUP_STAR_HALF + EVENT_POPUP_GAP;
+
+			// Room on each side of the star, beyond the star half-extent + gap.
+			const roomAbove = p.y - offset;
+			const roomBelow = ch - p.y - offset;
+			const roomLeft = p.x - offset;
+			const roomRight = usableRight - p.x - offset;
+
+			// Candidate placements (top-left corner of the popup) for each side. Above/below
+			// center horizontally on the marker; left/right center vertically.
+			const above = { x: p.x - EVENT_POPUP_W / 2, y: p.y - offset - EVENT_POPUP_H };
+			const below = { x: p.x - EVENT_POPUP_W / 2, y: p.y + offset };
+			const toRight = { x: p.x + offset, y: p.y - EVENT_POPUP_H / 2 };
+			const toLeft = { x: p.x - offset - EVENT_POPUP_W, y: p.y - EVENT_POPUP_H / 2 };
+
+			const fitsAbove = roomAbove >= EVENT_POPUP_H;
+			const fitsBelow = roomBelow >= EVENT_POPUP_H;
+			// Horizontal side that clears the right-side panel: right preferred, else left.
+			const horizontal =
+				roomRight >= EVENT_POPUP_W ? toRight : roomLeft >= EVENT_POPUP_W ? toLeft : null;
+
+			// Vertical position drives above/below; the middle band uses the sides. A marker
+			// low in the view opens upward, one near the top opens downward, and the middle
+			// third opens to the side (right when it clears the panel, otherwise left).
+			const lowInView = p.y > ch * (2 / 3);
+			const highInView = p.y < ch * (1 / 3);
+
+			let placement: { x: number; y: number };
+			if (lowInView && fitsAbove) {
+				placement = above;
+			} else if (highInView && fitsBelow) {
+				placement = below;
+			} else if (horizontal) {
+				placement = horizontal;
+			} else if (fitsAbove) {
+				placement = above;
+			} else if (fitsBelow) {
+				placement = below;
+			} else {
+				// Nothing fits cleanly (small container): pick the side with the most room and
+				// let the clamp below keep the box on screen.
+				const maxVertical = Math.max(roomAbove, roomBelow);
+				const maxHorizontal = Math.max(roomLeft, roomRight);
+				if (maxHorizontal >= maxVertical) {
+					placement = roomRight >= roomLeft ? toRight : toLeft;
+				} else {
+					placement = roomAbove >= roomBelow ? above : below;
+				}
+			}
+
+			let x = placement.x;
+			let y = placement.y;
+
+			// Clamp so the EVENT_POPUP_W×_H box stays within the usable area (and on the top/left).
+			x = Math.max(0, Math.min(x, usableRight - EVENT_POPUP_W));
+			y = Math.max(0, Math.min(y, ch - EVENT_POPUP_H));
+			el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+		};
+
+		place();
+		map.on('move', place);
+		return () => {
+			map.off('move', place);
+		};
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		activeEvent?.id,
+		activeEvent?.lat,
+		activeEvent?.lng,
+		rightSafeAreaPx,
+	]);
+
+	// Multi-select action card anchoring. Resolves each selected contact's
+	// coordinates (across the base + overlay coord maps); the card is anchored to
+	// the TOP-most selected dot on screen, scales down with the map and fades out
+	// as the user zooms further out, and re-anchors on every map move — same
+	// projection pattern as the selected-marker "Research" panel above.
+	const selectionActionsOverlayRef = useRef<HTMLDivElement | null>(null);
+	// Zoom level captured when the card first appears; scale/fade are measured
+	// relative to it. Cleared (below) when the selection clears so the next
+	// selection re-captures its own baseline.
+	const selectionBaseZoomRef = useRef<number | null>(null);
+	const selectedAnchorPoints = useMemo(() => {
+		if (selectedContacts.length < 2) return null;
+		const points: LatLngLiteral[] = [];
+		for (const id of selectedContacts) {
+			const coords =
+				coordsByContactId.get(id) ??
+				bookingExtraCoordsByContactId.get(id) ??
+				promotionOverlayCoordsByContactId.get(id) ??
+				allContactsOverlayCoordsByContactId.get(id);
+			if (coords) points.push(coords);
+		}
+		return points.length >= 2 ? points : null;
+	}, [
+		selectedContacts,
+		coordsByContactId,
+		bookingExtraCoordsByContactId,
+		promotionOverlayCoordsByContactId,
+		allContactsOverlayCoordsByContactId,
+	]);
+	useEffect(() => {
+		if (!selectedAnchorPoints) selectionBaseZoomRef.current = null;
+	}, [selectedAnchorPoints]);
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		if (isLoading) return;
+		const el = selectionActionsOverlayRef.current;
+		if (!el || !selectedAnchorPoints) return;
+
+		const update = () => {
+			// Anchor above the TOP-most selected dot on screen (smallest projected y)
+			// so the card sits in the emptier space above the selection rather than
+			// over the cluster, where more dots may still be picked.
+			let top: { x: number; y: number } | null = null;
+			for (const pt of selectedAnchorPoints) {
+				const projected = map.project([pt.lng, pt.lat]);
+				if (!top || projected.y < top.y) {
+					top = { x: projected.x, y: projected.y };
+				}
+			}
+			if (!top) return;
+
+			// Scale with the map (2x per zoom level), capped at 1x when zooming in,
+			// and fade out as the user zooms further out than where the card appeared.
+			if (selectionBaseZoomRef.current == null) {
+				selectionBaseZoomRef.current = map.getZoom();
+			}
+			const zoomDelta = map.getZoom() - selectionBaseZoomRef.current;
+			const scale = Math.min(1, 2 ** zoomDelta);
+			const FADE_START = -0.4;
+			const FADE_END = -2.2;
+			const opacity = Math.max(
+				0,
+				Math.min(1, (zoomDelta - FADE_END) / (FADE_START - FADE_END))
+			);
+
+			// offsetWidth/Height are the UNSCALED box; using them (not
+			// getBoundingClientRect, which includes the scale) keeps the centering
+			// stable as the scale changes. Pivot the scale at the bottom-center so the
+			// card shrinks toward the dot it is anchored above.
+			const w = el.offsetWidth;
+			const h = el.offsetHeight;
+			const x = top.x - w / 2;
+			const y = top.y - h - 40;
+			el.style.transformOrigin = 'bottom center';
+			el.style.transform = `translate(${Math.round(x)}px, ${Math.round(
+				y
+			)}px) scale(${scale})`;
+			el.style.opacity = String(opacity);
+			el.style.pointerEvents = opacity < 0.1 ? 'none' : 'auto';
+		};
+
+		update();
+		map.on('move', update);
+		return () => {
+			map.off('move', update);
+		};
+	}, [map, isMapLoaded, isLoading, selectedAnchorPoints]);
 
 	// Hover tooltip anchoring (single overlay).
 	const hoverTooltipContactId = hoveredMarkerId ?? fadingTooltipId;
@@ -13489,6 +16813,148 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		getAllContactsOverlayContactCoords,
 	]);
 
+	// Street-view research cards, engaged only at street zoom on surfaces that
+	// opted in. Base/booking/promotion markers get PERSISTENT cards (see
+	// streetCardEntries below); this hover-gated single-card path now serves
+	// only the ambient 'all'-contacts gray dots, which stay hover-only.
+	const isStreetCardMode = streetViewEnabled && zoomLevel >= STREET_VIEW_MIN_ZOOM;
+	const streetCardContact =
+		isStreetCardMode && hoverTooltipEntry?.kind === 'all'
+			? hoverTooltipEntry.contact
+			: null;
+	// Slim overlay payloads (booking/promotion/all — see api/contacts/map-overlay) omit
+	// metadata/address; backfill via the per-contact research endpoint (30-min cache).
+	const streetCardNeedsBackfill =
+		streetCardContact != null &&
+		(!streetCardContact.metadata || !streetCardContact.address);
+	const { data: streetCardResearch, isLoading: isStreetCardResearchLoading } =
+		useGetContactResearch(
+			streetCardNeedsBackfill && streetCardContact ? streetCardContact.id : null
+		);
+
+	const streetCardData = useMemo(() => {
+		if (!isStreetCardMode || !hoverTooltipEntry || hoverTooltipEntry.kind !== 'all')
+			return null;
+		const contact = hoverTooltipEntry.contact;
+		const kind = hoverTooltipEntry.kind;
+		const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+		const name = fullName || contact.name || contact.company || 'Unknown';
+		const company = fullName || contact.name ? contact.company || '' : '';
+		// Same per-kind category resolution as the slim tooltip (see hoverTooltipData).
+		const whatForMarker =
+			kind === 'base'
+				? (contact.curatedCategory ?? searchWhat ?? null)
+				: kind === 'booking'
+					? (getBookingTitlePrefixFromContactTitle(contact.title) ?? null)
+					: kind === 'promotion'
+						? (getPromotionOverlayWhatFromContactTitle(contact.title) ?? null)
+						: (getAmbientContactWhatFromTitle(contact.title) ?? null);
+		const accentColor = getResultDotColorForWhat(whatForMarker);
+		const cityStateFallback = [
+			contact.city,
+			getStateAbbreviation(contact.state || '') || contact.state,
+		]
+			.filter(Boolean)
+			.join(', ');
+		const address = contact.address || streetCardResearch?.address || cityStateFallback;
+		const metadata = contact.metadata || streetCardResearch?.metadata || null;
+		const sections = parseMetadataSections(metadata);
+		const blurb = sections['1'] ?? (metadata?.trim() || '');
+		return {
+			name,
+			company,
+			accentColor,
+			address,
+			blurb,
+			isSelected: selectedContactIdSet.has(contact.id),
+			isSelectionEligible: isSelectionToggleEligible(contact),
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [
+		isStreetCardMode,
+		hoverTooltipEntry,
+		searchWhat,
+		streetCardResearch,
+		selectedContactIdSet,
+		baseContactIdSet,
+		isBookingSearch,
+		bookingExtraVisibleContacts,
+	]);
+
+	// Persistent street-view research cards: one per visible search-result dot and
+	// booking/promotion pin (ambient 'all' dots excluded — they keep the hover-only
+	// card above). Capped to the markers nearest the viewport center so dense
+	// blocks can't wall the screen, then id-sorted so render order (and therefore
+	// paint stacking among equal z-indexes) stays stable while panning.
+	const streetCardEntries = useMemo(() => {
+		if (!isStreetCardMode || isBackgroundPresentation) return [];
+		type StreetCardEntry = {
+			contact: ContactWithName;
+			coords: LatLngLiteral;
+			isSelected: boolean;
+			isSelectionEligible: boolean;
+		};
+		const seenIds = new Set<number>();
+		const candidates: StreetCardEntry[] = [];
+		const collect = (
+			contacts: ContactWithName[],
+			getCoords: (contact: ContactWithName) => LatLngLiteral | null
+		) => {
+			for (const contact of contacts) {
+				if (seenIds.has(contact.id)) continue;
+				const coords = getCoords(contact);
+				if (!coords) continue;
+				seenIds.add(contact.id);
+				candidates.push({
+					contact,
+					coords,
+					isSelected: selectedContactIdSet.has(contact.id),
+					isSelectionEligible: isSelectionToggleEligible(contact),
+				});
+			}
+		};
+		collect(visibleContacts, getContactCoords);
+		collect(bookingExtraVisibleContacts, getBookingExtraContactCoords);
+		collect(promotionOverlayVisibleContacts, getPromotionOverlayContactCoords);
+
+		let kept = candidates;
+		if (candidates.length > STREET_VIEW_MAX_PERSISTENT_CARDS) {
+			// Membership (not render order) is distance-ranked. Recomputed only when a
+			// visible list's identity changes — a pure pan inside the padded bbox keeps
+			// the same set, which is the stability we want.
+			const center = map?.getCenter();
+			if (center) {
+				kept = candidates
+					.slice()
+					.sort((a, b) => {
+						const da =
+							(a.coords.lat - center.lat) ** 2 + (a.coords.lng - center.lng) ** 2;
+						const db =
+							(b.coords.lat - center.lat) ** 2 + (b.coords.lng - center.lng) ** 2;
+						return da - db;
+					})
+					.slice(0, STREET_VIEW_MAX_PERSISTENT_CARDS);
+			} else {
+				kept = candidates.slice(0, STREET_VIEW_MAX_PERSISTENT_CARDS);
+			}
+		}
+
+		return kept.slice().sort((a, b) => a.contact.id - b.contact.id);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [
+		isStreetCardMode,
+		isBackgroundPresentation,
+		visibleContacts,
+		bookingExtraVisibleContacts,
+		promotionOverlayVisibleContacts,
+		getContactCoords,
+		getBookingExtraContactCoords,
+		getPromotionOverlayContactCoords,
+		selectedContactIdSet,
+		baseContactIdSet,
+		isBookingSearch,
+	]);
+
 	const hoverTooltipData = useMemo(() => {
 		if (!hoverTooltipEntry) return null;
 		const contact = hoverTooltipEntry.contact;
@@ -13498,9 +16964,43 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
 		const nameForTooltip = fullName || contact.name || '';
 		const companyForTooltip = contact.company || '';
-		const titleForTooltip = (contact.title || contact.headline || '').trim();
+		const titleForTooltip = (
+			contact.curatedDisplayLabel ||
+			contact.title ||
+			contact.headline ||
+			''
+		).trim();
 
 		if (kind === 'all') {
+			const whatForMarker = getAmbientContactWhatFromTitle(contact.title);
+			if (whatForMarker) {
+				const dotFillColor = getResultDotColorForWhat(whatForMarker);
+				const normalizedWhat = normalizeWhatKey(whatForMarker);
+				const tooltipFillColor = isSelected
+					? TOOLTIP_FILL_COLOR_SELECTED
+					: (WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? dotFillColor);
+				const width = calculateTooltipWidth(
+					nameForTooltip,
+					companyForTooltip,
+					titleForTooltip,
+					whatForMarker
+				);
+				const height = calculateTooltipHeight(nameForTooltip, companyForTooltip);
+				const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
+				return {
+					svg: generateMapTooltipSvg(
+						nameForTooltip,
+						companyForTooltip,
+						titleForTooltip,
+						tooltipFillColor,
+						whatForMarker
+					),
+					width,
+					height,
+					anchorY,
+				};
+			}
+
 			const tooltipFillColor = isSelected
 				? TOOLTIP_FILL_COLOR_SELECTED
 				: ALL_CONTACTS_OVERLAY_TOOLTIP_FILL_COLOR;
@@ -13512,7 +17012,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const height = calculateTooltipHeight(nameForTooltip, companyForTooltip);
 			const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
 			return {
-				url: generateMapTooltipIconUrl(
+				svg: generateMapTooltipSvg(
 					nameForTooltip,
 					companyForTooltip,
 					titleForTooltip,
@@ -13526,15 +17026,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const whatForMarker =
 			kind === 'base'
-				? (searchWhat ?? null)
+				? (contact.curatedCategory ?? searchWhat ?? null)
 				: kind === 'booking'
 					? (getBookingTitlePrefixFromContactTitle(contact.title) ?? null)
 					: (getPromotionOverlayWhatFromContactTitle(contact.title) ?? null);
 
 		// Even if the marker dot is "washed out" outside the locked/selected state, keep the hover tooltip
 		// using the base category color so it consistently communicates the search intent.
-		const dotFillColor =
-			kind === 'base' ? defaultDotFillColor : getResultDotColorForWhat(whatForMarker);
+		const dotFillColor = getResultDotColorForWhat(whatForMarker);
 
 		const normalizedWhat = whatForMarker ? normalizeWhatKey(whatForMarker) : null;
 		const baseTooltipFillColor = normalizedWhat
@@ -13555,7 +17054,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
 
 		return {
-			url: generateMapTooltipIconUrl(
+			svg: generateMapTooltipSvg(
 				nameForTooltip,
 				companyForTooltip,
 				titleForTooltip,
@@ -13566,10 +17065,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			height,
 			anchorY,
 		};
-	}, [hoverTooltipEntry, selectedContactIdSet, searchWhat, defaultDotFillColor]);
+	}, [hoverTooltipEntry, selectedContactIdSet, searchWhat]);
 
-	const hoverTooltipOverlayRef = useRef<HTMLDivElement | null>(null);
-	useEffect(() => {
+	useLayoutEffect(() => {
 		if (!map || !isMapLoaded) return;
 		if (isLoading) return;
 		const el = hoverTooltipOverlayRef.current;
@@ -13577,9 +17075,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const update = () => {
 			const p = map.project([hoverTooltipCoords.lng, hoverTooltipCoords.lat]);
-			el.style.transform = `translate(${Math.round(p.x - MAP_TOOLTIP_ANCHOR_X)}px, ${Math.round(
-				p.y - hoverTooltipData.anchorY
-			)}px)`;
+			el.style.transform = `translate(${Math.round(
+				p.x - MAP_TOOLTIP_ANCHOR_X - hoverTooltipHitSlopPx
+			)}px, ${Math.round(p.y - hoverTooltipData.anchorY - hoverTooltipHitSlopPx)}px)`;
 		};
 
 		update();
@@ -13591,11 +17089,78 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map,
 		isMapLoaded,
 		isLoading,
+		// The street-card mode flip unmounts/remounts this overlay (same hover
+		// target, same coords), so it must re-run the effect: cleanup detaches the
+		// 'move' listener bound to the old element and the remounted tooltip is
+		// positioned before paint.
+		isStreetCardMode,
 		hoverTooltipContactId,
 		hoverTooltipCoords?.lat,
 		hoverTooltipCoords?.lng,
 		hoverTooltipData?.anchorY,
+		hoverTooltipHitSlopPx,
 	]);
+
+	// Street-view research card positioning: the outer overlay anchors at the marker's
+	// projected point only; an inner div self-centers above it (translate(-50%, -100%)),
+	// so async research data changing the card's height never needs a re-measure.
+	// map.project runs through the full camera matrix, so the pitched street camera
+	// is handled for free.
+	useLayoutEffect(() => {
+		if (!map || !isMapLoaded) return;
+		if (isLoading) return;
+		const el = streetCardOverlayRef.current;
+		if (!el || !isStreetCardMode || !hoverTooltipCoords) return;
+
+		const update = () => {
+			const p = map.project([hoverTooltipCoords.lng, hoverTooltipCoords.lat]);
+			el.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px)`;
+		};
+
+		update();
+		map.on('move', update);
+		return () => {
+			map.off('move', update);
+		};
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		isStreetCardMode,
+		hoverTooltipContactId,
+		hoverTooltipCoords?.lat,
+		hoverTooltipCoords?.lng,
+	]);
+
+	// Persistent street-view cards positioning: ONE shared listener re-projects every
+	// mounted card (same outer-anchor/inner-self-center scheme as the hover card
+	// above). 'moveend' is included because the continuous pitch coupler writes the
+	// transform without firing 'move' — the gesture's own frames cover the ramp, but
+	// the final frame's pitch lands after the last 'move', so the settle pass here
+	// squares the cards with the settled camera. Both handlers MUST stay read-only
+	// (project only — see the synchronous-moveend hazard on the pitch reconciler).
+	useLayoutEffect(() => {
+		if (!map || !isMapLoaded) return;
+		if (isLoading) return;
+		if (!isStreetCardMode || streetCardEntries.length === 0) return;
+
+		const update = () => {
+			for (const entry of streetCardEntries) {
+				const el = streetCardElsByContactIdRef.current.get(entry.contact.id);
+				if (!el) continue;
+				const p = map.project([entry.coords.lng, entry.coords.lat]);
+				el.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px)`;
+			}
+		};
+
+		update();
+		map.on('move', update);
+		map.on('moveend', update);
+		return () => {
+			map.off('move', update);
+			map.off('moveend', update);
+		};
+	}, [map, isMapLoaded, isLoading, isStreetCardMode, streetCardEntries]);
 
 	return (
 		<div
@@ -13613,21 +17178,196 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				overflow: 'hidden',
 			}}
 		>
-			{!isBackgroundPresentation && (
-				<style>{`
-					.murmur-search-results-map--interactive .mapboxgl-ctrl-bottom-left {
-						left: 8px !important;
-						bottom: 6px !important;
-					}
-					.murmur-search-results-map--interactive .mapboxgl-ctrl-bottom-left .mapboxgl-ctrl-logo {
-						display: block !important;
-						transform: scale(0.6);
-						transform-origin: 0 100%;
-						opacity: 0.8;
-					}
-				`}</style>
-			)}
+			{/* Three-class selectors so the logo out-specifies the
+			    `.dashboard-globe-bg .mapboxgl-ctrl-logo { display: none }` hide rule in
+			    every presentation, including the background globe. */}
+			<style>{`
+				.murmur-search-results-map .mapboxgl-ctrl-bottom-left {
+					left: 8px !important;
+					bottom: 6px !important;
+				}
+				.murmur-search-results-map .mapboxgl-ctrl-bottom-left .mapboxgl-ctrl-logo {
+					display: block !important;
+					transform: scale(0.6);
+					transform-origin: 0 100%;
+					opacity: 0.8;
+				}
+			`}</style>
 			<div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
+			{/*
+			  Selected state wash. This reuses the curated blob gradient language,
+			  but clips it to the searched state's projected polygon. The white
+			  border is a Mapbox layer so markers always render above it.
+			*/}
+			<svg
+				ref={selectedStateGradientSvgRef}
+				aria-hidden
+				width="100%"
+				height="100%"
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					opacity: 0,
+					willChange: 'opacity',
+					zIndex: 2,
+					overflow: 'visible',
+				}}
+			>
+				<defs>
+					<radialGradient
+						ref={selectedStateGradientRef}
+						id={selectedStateGradientIds.gradient}
+						cx="0"
+						cy="0"
+						r="1"
+						gradientUnits="userSpaceOnUse"
+					>
+						<stop offset="0.716346" stopColor="#EFE8D8" stopOpacity="0" />
+						<stop offset="0.783654" stopColor="#FFF8E5" stopOpacity="0.55" />
+						<stop offset="0.841346" stopColor="#CAD7FF" />
+						<stop offset="0.884615" stopColor="#CBFFE7" />
+						<stop offset="1" stopColor="#F0EBDE" stopOpacity="0.2" />
+					</radialGradient>
+					<radialGradient
+						ref={selectedStateGradientBloomRef}
+						id={selectedStateGradientIds.bloomGradient}
+						cx="0"
+						cy="0"
+						r="1"
+						gradientUnits="userSpaceOnUse"
+					>
+						<stop offset="0" stopColor="#FFFFFF" stopOpacity="0.95" />
+						<stop offset="0.14" stopColor="#FFFFFF" stopOpacity="0.7" />
+						<stop offset="0.36" stopColor="#FFFFFF" stopOpacity="0.4" />
+						<stop offset="0.6" stopColor="#FFFFFF" stopOpacity="0.18" />
+						<stop offset="0.8" stopColor="#FFFFFF" stopOpacity="0.06" />
+						<stop offset="0.92" stopColor="#FFFFFF" stopOpacity="0" />
+					</radialGradient>
+					<clipPath id={selectedStateGradientIds.clipPath} clipPathUnits="userSpaceOnUse">
+						<path ref={selectedStateGradientClipPathRef} d="" clipRule="evenodd" />
+					</clipPath>
+				</defs>
+				<ellipse
+					ref={selectedStateGradientBloomEllipseRef}
+					cx="0"
+					cy="0"
+					rx="0"
+					ry="0"
+					opacity="0"
+					fill={`url(#${selectedStateGradientIds.bloomGradient})`}
+					clipPath={`url(#${selectedStateGradientIds.clipPath})`}
+				/>
+				<ellipse
+					ref={selectedStateGradientEllipseRef}
+					cx="0"
+					cy="0"
+					rx="0"
+					ry="0"
+					opacity="0"
+					fill={`url(#${selectedStateGradientIds.gradient})`}
+					clipPath={`url(#${selectedStateGradientIds.clipPath})`}
+					style={{ mixBlendMode: 'color' }}
+				/>
+			</svg>
+			{/*
+			  Curated cluster zoom-out orbs. Each SVG ellipse paints its own
+			  radial gradient, while the clip paths are rebuilt from the same
+			  morphed Mapbox blob geometry that draws the white outlines.
+			*/}
+			<svg
+				ref={curatedOrbRef}
+				aria-hidden
+				width="100%"
+				height="100%"
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					opacity: 0,
+					willChange: 'opacity',
+					zIndex: 2,
+					overflow: 'visible',
+				}}
+			>
+				<defs>
+					{curatedOrbSlotIds.map((ids, index) => (
+						<Fragment key={ids.gradient}>
+							<radialGradient
+								ref={(node) => {
+									curatedOrbGradientRefs.current[index] = node;
+								}}
+								id={ids.gradient}
+								cx="0"
+								cy="0"
+								r="1"
+								gradientUnits="userSpaceOnUse"
+							>
+								<stop offset="0.716346" stopColor="#EFE8D8" stopOpacity="0" />
+								<stop offset="0.783654" stopColor="#FFF8E5" stopOpacity="0.55" />
+								<stop offset="0.841346" stopColor="#CAD7FF" />
+								<stop offset="0.884615" stopColor="#CBFFE7" />
+								<stop offset="1" stopColor="#F0EBDE" stopOpacity="0.2" />
+							</radialGradient>
+							<radialGradient
+								ref={(node) => {
+									curatedOrbBloomGradientRefs.current[index] = node;
+								}}
+								id={ids.bloomGradient}
+								cx="0"
+								cy="0"
+								r="1"
+								gradientUnits="userSpaceOnUse"
+							>
+								<stop offset="0" stopColor="#FFFFFF" stopOpacity="0.95" />
+								<stop offset="0.14" stopColor="#FFFFFF" stopOpacity="0.7" />
+								<stop offset="0.36" stopColor="#FFFFFF" stopOpacity="0.4" />
+								<stop offset="0.6" stopColor="#FFFFFF" stopOpacity="0.18" />
+								<stop offset="0.8" stopColor="#FFFFFF" stopOpacity="0.06" />
+								<stop offset="0.92" stopColor="#FFFFFF" stopOpacity="0" />
+							</radialGradient>
+							<clipPath id={ids.clipPath} clipPathUnits="userSpaceOnUse">
+								<path
+									ref={(node) => {
+										curatedOrbClipPathRefs.current[index] = node;
+									}}
+									d=""
+									clipRule="evenodd"
+								/>
+							</clipPath>
+						</Fragment>
+					))}
+				</defs>
+				{curatedOrbSlotIds.map((ids, index) => (
+					<Fragment key={ids.clipPath}>
+						<ellipse
+							ref={(node) => {
+								curatedOrbBloomEllipseRefs.current[index] = node;
+							}}
+							cx="0"
+							cy="0"
+							rx="0"
+							ry="0"
+							opacity="0"
+							fill={`url(#${ids.bloomGradient})`}
+							clipPath={`url(#${ids.clipPath})`}
+						/>
+						<ellipse
+							ref={(node) => {
+								curatedOrbEllipseRefs.current[index] = node;
+							}}
+							cx="0"
+							cy="0"
+							rx="0"
+							ry="0"
+							opacity="0"
+							fill={`url(#${ids.gradient})`}
+							clipPath={`url(#${ids.clipPath})`}
+							style={{ mixBlendMode: 'color' }}
+						/>
+					</Fragment>
+				))}
+			</svg>
 			{/*
 			  Softbox lighting overlay. Two stacked viewport-anchored radial gradients
 			  paint the "lit sphere" feel directly on top of the map. Because these
@@ -13834,6 +17574,40 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					zIndex: 1,
 				}}
 			/>
+			{/*
+			  Unsubscribe burn washes. The flow's "globe on fire" effect: a uniform
+			  multiply char that reddens/darkens what the basemap paint can't reach
+			  (clouds, lighting overlays), plus a late-stage screen-blend ember
+			  under-glow. Opacities owned by applyLightingOverlayOpacity; both stay
+			  0 outside the unsubscribe flow, so initial opacity is set explicitly
+			  to avoid a dark-red first paint before the first apply runs.
+			*/}
+			<div
+				ref={lightingOverlayBurnWashRef}
+				aria-hidden
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					background: UNSUBSCRIBE_BURN_WASH_COLOR,
+					mixBlendMode: 'multiply',
+					zIndex: 1,
+					opacity: 0,
+				}}
+			/>
+			<div
+				ref={lightingOverlayBurnGlowRef}
+				aria-hidden
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					background: UNSUBSCRIBE_BURN_GLOW_BG,
+					mixBlendMode: 'screen',
+					zIndex: 1,
+					opacity: 0,
+				}}
+			/>
 			{mapLoadError && (
 				<div
 					className={`absolute inset-0 flex items-center justify-center ${
@@ -13857,49 +17631,254 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				</div>
 			)}
 
-			{/* Hover SVG tooltip (single overlay; positioned via map.project) */}
-			{!isLoading && hoverTooltipEntry && hoverTooltipCoords && hoverTooltipData && (
+			{/* Empty-map hover prompt: pointer-events none so dragging/panning remains Mapbox-owned. */}
+			{emptyMapPromptEnabled && emptyMapPromptPoint && emptyMapPromptText && (
 				<div
-					ref={hoverTooltipOverlayRef}
+					aria-hidden="true"
 					style={{
 						position: 'absolute',
 						left: 0,
 						top: 0,
-						width: `${hoverTooltipData.width}px`,
-						height: `${hoverTooltipData.height + hoverLeaveBufferPx}px`,
-						pointerEvents:
-							hoverTooltipContactId != null && hoveredMarkerId === hoverTooltipContactId
-								? 'auto'
-								: 'none',
-						display: 'flex',
-						flexDirection: 'column',
-						zIndex: HOVER_TOOLTIP_Z_INDEX,
+						transform: `translate(${emptyMapPromptPoint.x}px, ${emptyMapPromptPoint.y}px)`,
+						pointerEvents: 'none',
+						zIndex: HOVER_TOOLTIP_Z_INDEX + 8,
 					}}
-					onMouseEnter={() => handleMarkerMouseOver(hoverTooltipEntry.contact)}
-					onMouseLeave={() => handleMarkerMouseOut(hoverTooltipEntry.contact.id)}
-					onClick={() => handleMarkerClick(hoverTooltipEntry.contact)}
 				>
 					<div
 						style={{
-							width: '100%',
-							height: `${hoverTooltipData.height}px`,
-							opacity:
-								hoverTooltipContactId != null && hoveredMarkerId === hoverTooltipContactId
-									? 1
-									: 0,
-							transition: 'opacity 150ms ease-in-out',
-							flexShrink: 0,
+							position: 'relative',
+							transform: 'translate(-50%, calc(-100% - 14px))',
+							backgroundColor: '#000000',
+							color: '#FFFFFF',
+							borderRadius: '8px',
+							padding: '5px 9px',
+							fontFamily: 'Inter, sans-serif',
+							fontSize: '12px',
+							fontWeight: 600,
+							lineHeight: 1.15,
+							letterSpacing: '0.01em',
+							whiteSpace: 'nowrap',
 						}}
 					>
-						<img
-							src={hoverTooltipData.url}
-							alt=""
-							draggable={false}
-							style={{ width: '100%', height: '100%', display: 'block' }}
-						/>
+						{emptyMapPromptText}
 					</div>
 				</div>
 			)}
+
+			{/* Hover SVG tooltip (single overlay; positioned via map.project). At street
+			    zoom the rich research card below replaces it. */}
+			{!isLoading &&
+				!isStreetCardMode &&
+				hoverTooltipEntry &&
+				hoverTooltipCoords &&
+				hoverTooltipData && (
+					<div
+						ref={hoverTooltipOverlayRef}
+						style={{
+							position: 'absolute',
+							left: 0,
+							top: 0,
+							width: `${hoverTooltipData.width + hoverTooltipHitSlopPx * 2}px`,
+							height: `${hoverTooltipData.height + hoverTooltipHitSlopPx * 2}px`,
+							pointerEvents:
+								hoverTooltipContactId != null && hoveredMarkerId === hoverTooltipContactId
+									? 'auto'
+									: 'none',
+							padding: `${hoverTooltipHitSlopPx}px`,
+							boxSizing: 'border-box',
+							zIndex: HOVER_TOOLTIP_Z_INDEX,
+						}}
+						onMouseEnter={() => handleMarkerMouseOver(hoverTooltipEntry.contact)}
+						onMouseLeave={() => handleMarkerMouseOut(hoverTooltipEntry.contact.id)}
+						onClick={() => handleMarkerClick(hoverTooltipEntry.contact)}
+					>
+						<div
+							style={{
+								width: '100%',
+								height: `${hoverTooltipData.height}px`,
+								opacity:
+									hoverTooltipContactId != null &&
+									hoveredMarkerId === hoverTooltipContactId
+										? 1
+										: 0,
+								transition: 'opacity 150ms ease-in-out',
+								flexShrink: 0,
+							}}
+						>
+							<div
+								dangerouslySetInnerHTML={{ __html: hoverTooltipData.svg }}
+								style={{
+									width: '100%',
+									height: '100%',
+									display: 'block',
+									lineHeight: 0,
+								}}
+							/>
+						</div>
+					</div>
+				)}
+
+			{/* Persistent street-view research cards (search-result dots + booking/
+			    promotion pins). Positions are set imperatively by the shared 'move'
+			    listener; hover raises a card within this container. */}
+			{!isLoading && isStreetCardMode && streetCardEntries.length > 0 && (
+				<div
+					ref={streetCardsContainerRef}
+					style={{
+						position: 'absolute',
+						left: 0,
+						top: 0,
+						zIndex: HOVER_TOOLTIP_Z_INDEX,
+						pointerEvents: 'none',
+					}}
+				>
+					{streetCardEntries.map((entry) => (
+						<StreetViewContactCard
+							key={entry.contact.id}
+							contact={entry.contact}
+							coords={entry.coords}
+							isSelected={entry.isSelected}
+							isSelectionEligible={entry.isSelectionEligible}
+							isHovered={hoveredMarkerId === entry.contact.id}
+							onHoverStart={handleMarkerMouseOver}
+							onHoverEnd={handleMarkerMouseOut}
+							onToggleSelection={handleStreetCardToggleSelection}
+							registerEl={registerStreetCardEl}
+						/>
+					))}
+				</div>
+			)}
+
+			{/* Street-view research card for ambient 'all'-contacts dots only (those
+			    stay hover-gated; everything else has a persistent card above). */}
+			{!isLoading &&
+				isStreetCardMode &&
+				hoverTooltipEntry &&
+				hoverTooltipCoords &&
+				streetCardData && (
+					<div
+						ref={streetCardOverlayRef}
+						style={{
+							position: 'absolute',
+							left: 0,
+							top: 0,
+							// Above the persistent cards (hover intent), below the
+							// selected-marker panel (+10).
+							zIndex: HOVER_TOOLTIP_Z_INDEX + 5,
+							pointerEvents: 'none',
+						}}
+					>
+						{/* Self-centers above the marker point; the transparent bottom padding
+					    bridges the marker→card gap so hover never crosses a dead zone. */}
+						<div
+							style={{
+								transform: 'translate(-50%, -100%)',
+								paddingBottom: '18px',
+								pointerEvents:
+									hoverTooltipContactId != null &&
+									hoveredMarkerId === hoverTooltipContactId
+										? 'auto'
+										: 'none',
+								opacity:
+									hoverTooltipContactId != null &&
+									hoveredMarkerId === hoverTooltipContactId
+										? 1
+										: 0,
+								transition: 'opacity 150ms ease-in-out',
+							}}
+							onMouseEnter={() => handleMarkerMouseOver(hoverTooltipEntry.contact)}
+							onMouseLeave={() => handleMarkerMouseOut(hoverTooltipEntry.contact.id)}
+						>
+							<div
+								className="relative w-[280px] rounded-[10px] bg-white overflow-hidden font-inter"
+								style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }}
+							>
+								{/* Name / company / coordinates */}
+								<div className="px-3 pt-3 pb-2">
+									<div className="font-bold text-[14px] leading-tight text-black truncate">
+										{streetCardData.name}
+									</div>
+									{streetCardData.company && (
+										<div className="text-[12px] leading-tight text-black/70 truncate mt-[2px]">
+											{streetCardData.company}
+										</div>
+									)}
+									<div className="text-[10px] leading-none text-black/50 mt-[6px] tabular-nums">
+										{hoverTooltipCoords.lat.toFixed(4)}{' '}
+										{hoverTooltipCoords.lng.toFixed(4)}
+									</div>
+								</div>
+								{/* Category-colored accent divider */}
+								<div
+									className="w-full"
+									style={{ height: '3px', backgroundColor: streetCardData.accentColor }}
+								/>
+								{/* Address + research blurb */}
+								<div className="px-3 py-2">
+									{streetCardData.address && (
+										<div className="text-[12px] font-semibold text-black leading-snug">
+											{streetCardData.address}
+										</div>
+									)}
+									{streetCardData.blurb ? (
+										<div
+											className="text-[11px] text-black/70 leading-snug mt-1"
+											style={{
+												display: '-webkit-box',
+												WebkitLineClamp: 3,
+												WebkitBoxOrient: 'vertical',
+												overflow: 'hidden',
+											}}
+										>
+											{streetCardData.blurb}
+										</div>
+									) : isStreetCardResearchLoading ? (
+										<div className="text-[11px] italic text-black/40 mt-1">
+											Researching…
+										</div>
+									) : null}
+								</div>
+								{/* Selection toggle (hidden for contacts the marker click also ignores) */}
+								{streetCardData.isSelectionEligible && (
+									<button
+										type="button"
+										className="w-full h-[34px] text-[12px] font-bold text-black transition-colors"
+										style={{
+											backgroundColor: streetCardData.isSelected ? '#9BC6DF' : '#C9EAFF',
+											borderTop: '1px solid rgba(0,0,0,0.15)',
+										}}
+										onClick={(e) => {
+											e.stopPropagation();
+											handleStreetCardToggleSelection(hoverTooltipEntry.contact);
+										}}
+									>
+										{streetCardData.isSelected
+											? 'Remove from Selection'
+											: 'Add to Selection'}
+									</button>
+								)}
+							</div>
+							{/* Pointer triangle (sits in the bottom hover-bridge padding) */}
+							<div
+								className="absolute left-1/2 -translate-x-1/2"
+								style={{
+									bottom: '8px',
+									width: 0,
+									height: 0,
+									borderLeft: '8px solid transparent',
+									borderRight: '8px solid transparent',
+									borderTop: `10px solid ${
+										streetCardData.isSelectionEligible
+											? streetCardData.isSelected
+												? '#9BC6DF'
+												: '#C9EAFF'
+											: '#FFFFFF'
+									}`,
+								}}
+							/>
+						</div>
+					</div>
+				)}
 
 			{/* Only show selected marker overlay when not loading */}
 			{!isLoading && selectedMarker && selectedMarkerCoords && (
@@ -13985,11 +17964,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 											{(() => {
 												const stateAbbr =
 													getStateAbbreviation(selectedMarker.state || '') || '';
-												if (stateAbbr && stateBadgeColorMap[stateAbbr]) {
+												if (stateAbbr) {
 													return (
 														<span
 															className="inline-flex items-center justify-center h-[14px] px-[5px] rounded-[3px] border border-black text-[10px] font-bold leading-none flex-shrink-0"
-															style={{ backgroundColor: stateBadgeColorMap[stateAbbr] }}
+															style={{
+																backgroundColor:
+																	stateBadgeColorMap[stateAbbr] || '#E0E0E0',
+															}}
 														>
 															{stateAbbr}
 														</span>
@@ -14003,7 +17985,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 												</span>
 											)}
 										</div>
-										{(selectedMarker.title ||
+										{(selectedMarker.curatedDisplayLabel ||
+											selectedMarker.title ||
 											selectedMarker.headline ||
 											isMusicVenuesSearch ||
 											isRestaurantsSearch ||
@@ -14011,7 +17994,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 											isWeddingPlannersSearch) &&
 											(() => {
 												const titleText =
-													selectedMarker.title || selectedMarker.headline || '';
+													selectedMarker.curatedDisplayLabel ||
+													selectedMarker.title ||
+													selectedMarker.headline ||
+													'';
 												const isRestaurant =
 													isRestaurantsSearch || isRestaurantTitle(titleText);
 												const isCoffeeShop =
@@ -14246,8 +18232,179 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					</div>
 				</div>
 			)}
+
+			{/* Event opportunity popup (phase 1: shapes + lat/lng only). Outer red box,
+			    inner white box inset 5px from the top, and a bottom red strip with the
+			    event coordinates. Positioned by the edge-aware placement effect above. */}
+			{!isLoading && activeEvent && (
+				<div
+					ref={eventPopupOverlayRef}
+					style={{
+						position: 'absolute',
+						left: 0,
+						top: 0,
+						width: `${EVENT_POPUP_W}px`,
+						height: `${EVENT_POPUP_H}px`,
+						// Interactive only while this event is the hovered one, so the cursor can travel
+						// into / dwell on the card (entering cancels the pending hover-close; leaving
+						// reschedules it). A purely pinned card reverts to 'none' so it never becomes a
+						// dead zone over the map (pan/zoom/select/marker clicks pass through), mirroring
+						// the contact tooltip's hover-gated pointer capture.
+						pointerEvents: hoveredEventId === activeEvent.id ? 'auto' : 'none',
+						zIndex: HOVER_TOOLTIP_Z_INDEX + 12,
+					}}
+					onMouseEnter={() => {
+						isPointerOverEventPopupRef.current = true;
+						setEventHover(activeEvent.id);
+					}}
+					onMouseLeave={() => {
+						isPointerOverEventPopupRef.current = false;
+						scheduleEventHoverClose();
+					}}
+				>
+					{/* Outer red box — authored at its natural design size and uniformly
+					    scaled down to the footprint above. transform-origin top-left so the
+					    scaled box aligns with the overlay's translate() placement. */}
+					<div
+						style={{
+							position: 'relative',
+							width: `${EVENT_POPUP_DESIGN_W}px`,
+							height: `${EVENT_POPUP_DESIGN_H}px`,
+							transform: `scale(${EVENT_POPUP_SCALE})`,
+							transformOrigin: 'top left',
+							background: '#E06D6D',
+							border: '3px solid #A43B3B',
+							borderRadius: '16px',
+							boxSizing: 'border-box',
+						}}
+					>
+						{/* Inner white box: 347×427, 5px from top, horizontally centered. Hosts the
+						    event card content supplied by the host via renderEventPopupContent. */}
+						<div
+							style={{
+								position: 'absolute',
+								top: '5px',
+								left: 0,
+								right: 0,
+								marginLeft: 'auto',
+								marginRight: 'auto',
+								width: '347px',
+								height: '427px',
+								background: '#FFF',
+								border: '2px solid #000',
+								borderRadius: '12px',
+								boxSizing: 'border-box',
+								overflow: 'hidden',
+							}}
+						>
+							{renderEventPopupContent?.(activeEvent.id)}
+						</div>
+						{/* Bottom red strip: the event's lat/lng (the only text in phase 1). */}
+						<div
+							style={{
+								position: 'absolute',
+								left: 0,
+								right: 0,
+								top: '432px',
+								bottom: 0,
+								paddingLeft: '14px',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'flex-start',
+								color: '#000',
+								fontSize: '12px',
+								lineHeight: 1,
+								fontVariantNumeric: 'tabular-nums',
+							}}
+						>
+							{`${activeEvent.lat.toFixed(4)}  ${activeEvent.lng.toFixed(4)}`}
+						</div>
+					</div>
+				</div>
+			)}
+
+			{/* Multi-select action card — anchored to the selection centroid.
+			    Only rendered on hosts that wire `onAddSelectionToFolder` (the
+			    dashboard search map), and only for 2+ selected contacts. */}
+			{!isLoading &&
+				selectedContacts.length >= 2 &&
+				onAddSelectionToFolder &&
+				selectedAnchorPoints && (
+					<div
+						ref={selectionActionsOverlayRef}
+						style={{
+							position: 'absolute',
+							left: 0,
+							top: 0,
+							opacity: 0,
+							pointerEvents: 'none',
+							zIndex: HOVER_TOOLTIP_Z_INDEX + 11,
+						}}
+						onMouseDown={(e) => e.stopPropagation()}
+						onPointerDown={(e) => e.stopPropagation()}
+					>
+						<div
+							style={{
+								display: 'flex',
+								flexDirection: 'column',
+								gap: '4px',
+								padding: '5px',
+								backgroundColor: '#FFFFFF',
+								borderRadius: '9px',
+								boxSizing: 'border-box',
+							}}
+						>
+							<button
+								type="button"
+								onClick={() => onAddSelectionToFolder?.()}
+								className="font-inter"
+								style={{
+									width: '100%',
+									padding: '5px 10px',
+									backgroundColor: '#EFEFEF',
+									border: 'none',
+									borderRadius: '6px',
+									fontSize: '12px',
+									fontWeight: 500,
+									color: '#000000',
+									textAlign: 'left',
+									whiteSpace: 'nowrap',
+									cursor: 'pointer',
+								}}
+							>
+								Add Contacts to Folder
+							</button>
+							<button
+								type="button"
+								onClick={() => onWriteSelectionMessage?.()}
+								className="font-inter"
+								style={{
+									width: '100%',
+									padding: '5px 10px',
+									backgroundColor: '#EFEFEF',
+									border: 'none',
+									borderRadius: '6px',
+									fontSize: '12px',
+									fontWeight: 500,
+									color: '#000000',
+									textAlign: 'left',
+									whiteSpace: 'nowrap',
+									cursor: 'pointer',
+								}}
+							>
+								Write Message
+							</button>
+						</div>
+					</div>
+				)}
 		</div>
 	);
 };
 
-export default SearchResultsMap;
+// Memoized so the heavy Mapbox component does not re-render when the parent
+// (Dashboard) re-renders for unrelated state changes (e.g. the bottom search
+// bar opening/closing dropdowns). Requires that all callback props from the
+// parent are stable (wrapped in useCallback) to take effect.
+const MemoizedSearchResultsMap = memo(SearchResultsMap);
+MemoizedSearchResultsMap.displayName = 'SearchResultsMap';
+export default MemoizedSearchResultsMap;

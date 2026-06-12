@@ -2021,62 +2021,7 @@ const SvgComponent = ({ mobileCopyScale = 1, ...props }: Props) => (
         </text>
       </g>
 
-      {/* Learn about the Map button (inside SVG on mobile) */}
-      <a href="/map" aria-label="Learn about the Map">
-        <g style={{ cursor: "pointer" }}>
-          <rect
-            /* Left-align to the blocks above */
-            x={616.5}
-            y={638}
-            width={420}
-            height={64}
-            rx={8}
-            ry={8}
-            fill="#F1F1F1"
-            stroke="#5DAB68"
-            strokeWidth={2}
-          />
-          <text
-            x={616.5 + 420 / 2}
-            y={670}
-            textAnchor="middle"
-            dominantBaseline="central"
-            fontFamily="Inter, sans-serif"
-            fontSize={28}
-            fill="#5DAB68"
-          >
-            {"Learn about the Map"}
-          </text>
-        </g>
-      </a>
     </g>
-    {/* Learn about the Map button - MOVED TO HTML OVERLAY IN PAGE.TSX */}
-    {/* <Link href="/map">
-      <g style={{ cursor: "pointer" }}>
-        <rect
-          x={38}
-          y={638}
-          width={302}
-          height={51}
-          rx={6}
-          ry={6}
-          fill="#F1F1F1"
-          stroke="#5DAB68"
-          strokeWidth={2}
-        />
-        <text
-          x={38 + 302 / 2}
-          y={638 + 51 / 2}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fontFamily="Inter, sans-serif"
-          fontSize={24}
-          fill="#5DAB68"
-        >
-          Learn about the Map
-        </text>
-      </g>
-    </Link> */}
   </svg>
 )
 export default SvgComponent

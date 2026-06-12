@@ -15,7 +15,14 @@
 
 # next.js
 /.next/
+/.next-*/
 /out/
+
+# memory measurement runs (scripts/measure-dashboard-memory.mjs)
+/.memory-baselines/
+
+# map fps measurement runs (scripts/measure-map-fps.mjs)
+/.perf-baselines/
 
 # production
 /build
@@ -51,3 +58,6 @@ public/exports/*
 
 # rust wasm build artifacts
 /rust-scorer/target/
+
+# generated email previews
+scripts/.preview/

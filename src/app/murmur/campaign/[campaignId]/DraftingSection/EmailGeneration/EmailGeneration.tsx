@@ -239,6 +239,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 
 	// Custom send handler without dialog dependencies
 	// If `draftIds` is provided, only those drafts are sent (used by draft-review "Send" buttons).
+	// NOTE: this component is currently unmounted; if revived, this loop must drive
+	// SendingSessionContext like useDraftReviewHandlers.handleSendDrafts does.
 	const handleSend = async (draftIds?: Iterable<number>) => {
 		const explicitIds = draftIds ? new Set(Array.from(draftIds)) : null;
 
@@ -249,12 +251,12 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 				: [];
 
 		if (selectedDrafts.length === 0) {
-			toast.error('Select emails to send.');
+			toast.error('Select messages to send.');
 			return;
 		}
 
 		if (!campaign?.identity?.email || !campaign?.identity?.name) {
-			toast.error('Please create an Identity before sending emails.');
+			toast.error('Please create an Identity before sending messages.');
 			return;
 		}
 
@@ -262,7 +264,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 			!subscriptionTier &&
 			user?.stripeSubscriptionStatus !== StripeSubscriptionStatus.TRIALING
 		) {
-			toast.error('Please upgrade to a paid plan to send emails.');
+			toast.error('Please upgrade to a paid plan to send messages.');
 			return;
 		}
 
@@ -304,6 +306,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 							? user?.customDomain
 							: user?.murmurEmail,
 					replyToEmail: user?.replyToEmail ?? user?.murmurEmail ?? undefined,
+					template: 'newMessage',
+					campaignId: campaign.id,
 				});
 
 				if (res.success) {
@@ -348,15 +352,15 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 
 		// Show status message
 		if (successfulSends === emailsToSend) {
-			toast.success(`All ${successfulSends} emails sent successfully!`);
+			toast.success(`All ${successfulSends} messages sent successfully!`);
 		} else if (successfulSends > 0) {
 			if (emailsWeCanSend < emailsToSend) {
-				toast.warning(`Sent ${successfulSends} emails before running out of credits.`);
+				toast.warning(`Sent ${successfulSends} messages before running out of credits.`);
 			} else {
-				toast.warning(`${successfulSends} of ${emailsToSend} emails sent successfully.`);
+				toast.warning(`${successfulSends} of ${emailsToSend} messages sent successfully.`);
 			}
 		} else {
-			toast.error('Failed to send emails. Please try again.');
+			toast.error('Failed to send messages. Please try again.');
 		}
 	};
 

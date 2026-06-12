@@ -24,7 +24,7 @@ export const generateMurmurReplyToEmail = (
 ): string => {
 	const first = sanitizeNameForEmail(firstName);
 	const last = sanitizeNameForEmail(lastName);
-	const base = (first + last) || 'user';
+	const base = first + last || 'user';
 	return `${base}${String(userId)}@murmurmailbox.com`;
 };
 

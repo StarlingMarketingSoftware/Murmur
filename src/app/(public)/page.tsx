@@ -3,6 +3,7 @@ import { StripeSubscriptionStatus } from '@/types';
 import { getUser } from '@/app/api/_utils/user';
 import { urls } from '@/constants/urls';
 import { UserRole } from '@prisma/client';
+import { AccountType } from '@/constants/prismaEnums';
 import HomePageClient from './HomePageClient';
 
 export const dynamic = 'force-dynamic';
@@ -21,6 +22,10 @@ export default async function HomePage({
 	// Allow subscribed users to view the landing page only when explicitly requested.
 	if (activeLandingFlag !== '1') {
 		const user = await getUser();
+
+		if (user?.accountType === AccountType.venue) {
+			redirect(urls.venuePortal.index);
+		}
 
 		const hasActiveSubscription =
 			user?.stripeSubscriptionStatus === StripeSubscriptionStatus.ACTIVE ||

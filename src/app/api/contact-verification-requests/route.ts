@@ -12,6 +12,7 @@ import {
 	verifyEmailsWithZeroBounce,
 	ZeroBounceFileResponse,
 } from '@/app/api/_utils';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import { z } from 'zod';
 
 const postContactVerificationRequestSchema = z.object({
@@ -54,8 +55,11 @@ const generateWhereClause = (
 	return whereClause;
 };
 
-export async function GET() {
+export async function GET(req: Request) {
 	try {
+		const limited = await withRateLimit(req, 'read-cheap', 'contact-verification');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
@@ -75,6 +79,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
 	try {
+		const limited = await withRateLimit(req, 'paid-external', 'contact-verification');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
@@ -132,6 +139,9 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
 	try {
+		const limited = await withRateLimit(req, 'mutation', 'contact-verification');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();

@@ -21,6 +21,7 @@ model User {
   stripeSubscriptionStatus String?
   id                       Int               @id @default(autoincrement())
   role                     UserRole          @default(user)
+  accountType              AccountType       @default(standard)
   aiDraftCredits           Int               @default(5)
   aiTestCredits            Int               @default(2)
   murmurEmail              String?           @unique
@@ -38,6 +39,9 @@ model User {
   signatures               Signature[]
   userContactLists         UserContactList[]
   inboundEmails            InboundEmail[]
+  mediaAssets              MediaAsset[]
+  venue                    Venue?
+  events                   Event[]
 }
 
 model ContactList {
@@ -69,6 +73,7 @@ model UserContactList {
 }
 
 model Contact {
+  venueId                  Int?                    @unique
   email                    String
   company                  String?
   country                  String?
@@ -117,6 +122,8 @@ model Contact {
   @@unique([email, contactListId])
   @@index([contactListId])
   @@index([userId])
+  @@index([latitude, longitude])
+  @@index([longitude, latitude])
 }
 
 model Email {
@@ -142,34 +149,34 @@ model Email {
 model Campaign {
   name                  String
   userId                String
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
-  id                    Int               @id @default(autoincrement())
-  fullAiPrompt          String?           @map("message")
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  id                    Int                    @id @default(autoincrement())
+  fullAiPrompt          String?                @map("message")
   subject               String?
   testMessage           String?
   testSubject           String?
   senderEmail           String?
   senderName            String?
-  status                Status            @default(active)
+  status                Status                 @default(active)
   signatureId           Int?
-  font                  String            @default("Arial")
+  font                  String                 @default("Arial")
   identityId            Int?
-  draftingMode          DraftingMode      @default(hybrid)
-  draftingTone          DraftingTone      @default(normal)
+  draftingMode          DraftingMode           @default(hybrid)
+  draftingTone          DraftingTone           @default(normal)
   handwrittenPrompt     String?
   hybridPrompt          String?
-  isAiSubject           Boolean           @default(true)
-  paragraphs            Int?              @default(0)
-  hybridBlockPrompts    Json?             @default("[{\"id\": \"full_automated\", \"type\": \"full_automated\", \"value\": \"\"}]")
-  hybridAvailableBlocks HybridBlock[]     @default([full_automated, introduction, research, action, text])
-  identity              Identity?         @relation(fields: [identityId], references: [id])
-  signature             Signature?        @relation(fields: [signatureId], references: [id])
-  user                  User              @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  isAiSubject           Boolean                @default(true)
+  paragraphs            Int?                   @default(0)
+  hybridBlockPrompts    Json?                  @default("[{\"id\": \"full_automated\", \"type\": \"full_automated\", \"value\": \"\"}]")
+  hybridAvailableBlocks HybridBlock[]          @default([full_automated, introduction, research, action, text])
+  identity              Identity?              @relation(fields: [identityId], references: [id])
+  signature             Signature?             @relation(fields: [signatureId], references: [id])
+  user                  User                   @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
   emails                Email[]
-  contacts              Contact[]         @relation("CampaignToContact")
-  contactLists          ContactList[]     @relation("CampaignToContactList")
-  userContactLists      UserContactList[] @relation("CampaignToUserContactList")
+  contacts              Contact[]              @relation("CampaignToContact")
+  contactLists          ContactList[]          @relation("CampaignToContactList")
+  userContactLists      UserContactList[]      @relation("CampaignToUserContactList")
   contactEvents         CampaignContactEvent[]
   inboundEmails         InboundEmail[]
 
@@ -209,6 +216,57 @@ model Identity {
   @@index([userId])
 }
 
+model Venue {
+  id           Int      @id @default(autoincrement())
+  userId       String   @unique
+  venueName    String
+  address      String?
+  city         String?
+  state        String?
+  latitude     Float?
+  longitude    Float?
+  businessType String?
+  hours        Json?
+  capacityMin  Int?
+  capacityMax  Int?
+  genres       String[]
+  payRange     String?
+  payMin       Int?
+  payMax       Int?
+  sound        String?
+  description  String?
+  website      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+}
+
+model Event {
+  id        Int       @id @default(autoincrement())
+  userId    String // clerkId of the venue account that created the event
+  name      String
+  address   String?
+  placeId   String?
+  latitude  Float?
+  longitude Float?
+  size      String? // free text: "Solo" | "Duo" | "Full Band" | "Other" | anything
+  genres    String[]
+  whenLabel String? // faithful display label, e.g. "June 15th 2026"
+  startTime String? // raw "HH:MM" as entered
+  endTime   String? // raw "HH:MM" as entered
+  startsAt  DateTime? // derived UTC instant (picked date + startTime, browser-local)
+  endsAt    DateTime? // derived UTC instant (picked date + endTime, browser-local)
+  pay       String? // free text, e.g. "$150-500"
+  details   String?
+  isActive  Boolean   @default(true) // soft-delete flag: venue "deletes" hide the event, the row stays
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User      @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([startsAt])
+}
+
 model Signature {
   id        Int        @id @default(autoincrement())
   content   String     @default("")
@@ -220,6 +278,29 @@ model Signature {
   user      User       @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model MediaAsset {
+  id          Int         @id @default(autoincrement())
+  userId      String
+  kind        MediaKind
+  context     String
+  key         String
+  posterKey   String?
+  filename    String
+  contentType String
+  sizeBytes   Int?
+  durationSec Float?
+  status      MediaStatus @default(uploading)
+  position    Int         @default(0)
+  sourceType  MediaSource @default(upload)
+  embedUrl    String?
+  shareId     String      @unique @default(cuid())
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  user        User        @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+
+  @@index([userId, context])
 }
 
 model EmailVerificationCode {
@@ -265,7 +346,7 @@ model Lead {
 }
 
 model InboundEmail {
-  id                Int                 @id @default(autoincrement())
+  id                Int       @id @default(autoincrement())
   sender            String
   senderName        String?
   recipient         String
@@ -280,7 +361,7 @@ model InboundEmail {
   contentType       String?
   messageHeaders    Json?
   received          String?
-  messageId         String              @unique
+  messageId         String    @unique
   bodyPlain         String?
   bodyHtml          String?
   strippedText      String?
@@ -294,16 +375,16 @@ model InboundEmail {
   timestamp         Int?
   signature         String?
   userId            String?
-  user              User?               @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  user              User?     @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
   contactId         Int?
-  contact           Contact?            @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  contact           Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
   originalEmailId   Int?
-  originalEmail     Email?              @relation("EmailReplies", fields: [originalEmailId], references: [id], onDelete: SetNull)
+  originalEmail     Email?    @relation("EmailReplies", fields: [originalEmailId], references: [id], onDelete: SetNull)
   campaignId        Int?
-  campaign          Campaign?           @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  receivedAt        DateTime            @default(now())
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  campaign          Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  receivedAt        DateTime  @default(now())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@index([userId])
   @@index([recipient])
@@ -361,6 +442,11 @@ enum UserRole {
   admin
 }
 
+enum AccountType {
+  standard
+  venue
+}
+
 enum Status {
   active
   deleted
@@ -379,4 +465,281 @@ enum DraftingTone {
   formal
   concise
   casual
+}
+
+enum MediaKind {
+  video
+  audio
+  image
+}
+
+enum MediaStatus {
+  uploading
+  ready
+  failed
+}
+
+enum MediaSource {
+  upload
+  youtube
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Internal messaging (venue ↔ standard-user direct messages).
+// STRICTLY ADDITIVE: new models + enum only. Links to existing tables
+// (standardUserId, venueId, emailId, campaignId) are plain SCALAR columns with NO
+// @relation to existing models — resolved by explicit lookups in code — so no
+// existing model is modified and the migration references no existing table. The
+// only relation is Conversation ↔ Message (both new).
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum MessageSender {
+  standard
+  venue
+}
+
+model Conversation {
+  id                 Int       @id @default(autoincrement())
+  standardUserId     String // clerkId of the standard (artist) user
+  venueId            Int // Venue.id (== Contact.venueId)
+  standardLastReadAt DateTime?
+  venueLastReadAt    DateTime?
+  lastMessageAt      DateTime  @default(now())
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  messages Message[]
+
+  @@unique([standardUserId, venueId])
+  @@index([standardUserId, lastMessageAt])
+  @@index([venueId, lastMessageAt])
+}
+
+model Message {
+  id             Int           @id @default(autoincrement())
+  conversationId Int
+  sender         MessageSender
+  senderClerkId  String
+  body           String
+  isHtml         Boolean       @default(false)
+  emailId        Int? // provenance of the diverted first message (scalar, no FK)
+  applicationId  Int? // provenance of an application-seeded message (scalar, no FK)
+  campaignId     Int? // provenance of the originating campaign (scalar, no FK)
+  // Thread partition within the conversation: messages exchanged in the context of
+  // a specific EventApplication carry its id; null = the general/cold-outreach
+  // thread (scalar, no FK). Seeded summaries carry both this and applicationId.
+  threadApplicationId Int?
+  // Booking-request delivery: set on the Message that carries a BookingRequest so
+  // it rides the thread like any reply (scalar, no FK; additive column).
+  bookingRequestId Int?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([emailId])
+  @@unique([applicationId])
+  @@index([conversationId, id])
+  @@index([conversationId, threadApplicationId, id])
+}
+
+// Per-side read watermarks for one application thread (the per-pair Conversation
+// watermarks keep governing the general thread). STRICTLY ADDITIVE: new model with
+// a scalar applicationId (no FK), mirroring the EventApplication precedent.
+model ApplicationReadState {
+  id                 Int       @id @default(autoincrement())
+  applicationId      Int       @unique // EventApplication.id (scalar, no FK)
+  venueLastReadAt    DateTime?
+  standardLastReadAt DateTime? // the applicant's watermark for this thread
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+enum BookingRequestStatus {
+  pending
+  confirmed
+  canceled
+}
+
+// A venue's "Request to book {artist}" handshake inside one conversation thread.
+// STRICTLY ADDITIVE: new model with scalar ids only (no FK relations), mirroring
+// the EventApplication / ApplicationReadState precedent. Participant ids are
+// denormalized at creation so cancel/confirm authorize without joins. The request
+// is delivered as an in-thread Message (Message.bookingRequestId) so previews,
+// unread counts, and the venue inbound projection work unchanged.
+model BookingRequest {
+  id                  Int                  @id @default(autoincrement())
+  conversationId      Int // Conversation.id (scalar, no FK)
+  threadApplicationId Int? // EventApplication.id; null = the general/cold-outreach thread (scalar, no FK)
+  eventId             Int? // Event.id, denormalized from the application at request time (scalar, no FK)
+  venueUserId         String // venue owner clerkId (== Venue.userId at request time)
+  standardUserId      String // artist clerkId (== Conversation.standardUserId)
+  venueId             Int // Venue.id (== Conversation.venueId)
+  status              BookingRequestStatus @default(pending)
+  // 'YYYY-MM-DD' local-date key, matching CalendarEntry.date; null until the artist
+  // confirms (the server never derives a calendar day from the event's UTC instant).
+  date                String?
+  requestedAt         DateTime             @default(now())
+  confirmedAt         DateTime?
+  canceledAt          DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([conversationId, threadApplicationId, status])
+  @@index([eventId, status])
+  @@index([standardUserId, status])
+  @@index([venueUserId, status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Event applications (standard-user → venue Event).
+// STRICTLY ADDITIVE: new models + enum only. Links to existing tables (eventId,
+// standardUserId, venueUserId, sourceMediaAssetId) are plain SCALAR columns with NO
+// @relation to Event / User / MediaAsset — resolved by explicit lookups in code —
+// so no existing model is modified and the migration references no existing table.
+// The only relation is EventApplication ↔ ApplicationVideo (both new), mirroring
+// the Conversation ↔ Message precedent. Submitted videos are FROZEN: each upload is
+// copied to an application-scoped R2 key at apply time, so a venue's record survives
+// the artist later deleting the source video from their profile pool.
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum ApplicationStatus {
+  submitted
+  withdrawn
+}
+
+model EventApplication {
+  id             Int    @id @default(autoincrement())
+  eventId        Int // Event.id (the opportunity). Scalar, no FK.
+  standardUserId String // clerkId of the applying standard user. Scalar, no FK.
+  venueUserId    String // == Event.userId (venue owner clerkId), denormalized at apply time.
+
+  // Point-in-time snapshot of the modal answers (seeded from Identity but freely
+  // edited in the modal — so we snapshot the submitted values, not a FK).
+  genre          String?
+  area           String?
+  performingName String?
+  bio            String?
+
+  status    ApplicationStatus @default(submitted)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  videos ApplicationVideo[]
+
+  @@unique([eventId, standardUserId])
+  @@index([eventId, createdAt])
+  @@index([standardUserId, createdAt])
+  @@index([venueUserId, createdAt])
+}
+
+model ApplicationVideo {
+  id                 Int  @id @default(autoincrement())
+  applicationId      Int
+  sourceMediaAssetId Int? // provenance: profile MediaAsset it was copied from (scalar, no FK).
+
+  // Immutable snapshot copied at apply time — independent of the artist's profile pool.
+  kind        MediaKind
+  sourceType  MediaSource
+  key         String? // application-scoped R2 key (copied object). Null for youtube.
+  posterKey   String? // application-scoped R2 key for the poster. Null for youtube.
+  embedUrl    String? // youtube watch URL (sourceType = youtube; no R2 copy).
+  filename    String?
+  contentType String?
+  durationSec Float?
+  position    Int         @default(0)
+  createdAt   DateTime    @default(now())
+
+  application EventApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+}
+
+// Recipients who unsubscribed from a specific artist's cold outreach emails.
+// STRICTLY ADDITIVE: scalar userId (clerkId), no FK relation (matches messaging models).
+model EmailSuppression {
+  id        Int      @id @default(autoincrement())
+  email     String // recipient address, stored lowercased
+  userId    String // artist's clerkId whose sends are suppressed
+  reason    String   @default("unsubscribe") // 'page' | 'one_click'
+  createdAt DateTime @default(now())
+
+  @@unique([email, userId])
+  @@index([email])
+}
+
+model ContactNote {
+  id        Int      @id @default(autoincrement())
+  userId    String // owner's clerkId; intentionally no FK
+  contactId Int // Contact.id; intentionally no FK
+  content   String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, contactId])
+  @@index([contactId])
+}
+
+model CalendarEntry {
+  id              Int      @id @default(autoincrement())
+  userId          String
+  date            String
+  personName      String   @default("")
+  company         String   @default("")
+  startTime       String   @default("")
+  endTime         String   @default("")
+  notes           String   @default("")
+  address         String   @default("")
+  placeId         String?
+  latitude        Float?
+  longitude       Float?
+  drivingDuration String?
+  campaignId      Int? // Campaign.id provenance from the inbox booking flow; intentionally no FK
+  contactId       Int? // Contact.id provenance; intentionally no FK
+  bookingRequestId Int? // BookingRequest.id provenance for confirmed bookings; intentionally no FK
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, date])
+}
+
+// A venue user's personal 1–5 star rating of one submitted application video.
+// STRICTLY ADDITIVE: scalar ids, no FK relations (ContactNote pattern).
+// applicationId + standardUserId are denormalized at write time for per-
+// application averages and future artist-level views. rating 0 = cleared
+// (rows are never hard-deleted).
+model ApplicationVideoRating {
+  id             Int      @id @default(autoincrement())
+  userId         String // venue owner's clerkId; intentionally no FK
+  videoId        Int // ApplicationVideo.id; intentionally no FK
+  applicationId  Int // EventApplication.id, denormalized
+  standardUserId String // applying artist's clerkId, denormalized
+  rating         Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, videoId])
+  @@index([userId, applicationId])
+  @@index([userId, standardUserId])
+}
+
+// Cached intelligent match score: how relevant one submitted application is to
+// its event + venue context. STRICTLY ADDITIVE: scalar ids, no FK relations
+// (ApplicationVideoRating pattern). One row per application — re-apply upserts
+// the EventApplication snapshot, which changes inputHash and lazily recomputes
+// on the next venue read. Fallback (non-LLM) scores are never persisted.
+model ApplicationMatchScore {
+  id            Int      @id @default(autoincrement())
+  applicationId Int      @unique // EventApplication.id; intentionally no FK
+  eventId       Int // Event.id, denormalized for per-event reads/invalidation
+  venueUserId   String // venue owner clerkId, denormalized (EventApplication parity)
+  score         Int // final displayed percent, 0-100
+  breakdown     Json // { version, method, components, weights, caps, inferredGenre, rationale }
+  inputHash     String // sha256 over canonical scoring inputs + SCORER_VERSION
+  scorerVersion Int // mirrors the version baked into inputHash (analytics/cleanup)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([eventId])
 }

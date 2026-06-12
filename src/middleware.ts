@@ -10,7 +10,13 @@ const isProtectedRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
-	if (isProtectedRoute(req)) {
+	// Mailgun POSTs inbound email to /api/inbound without a Clerk session; that POST
+	// authenticates via its own Mailgun signature (verified in the route). The GET on
+	// the same path (user inbox) stays protected.
+	const isPublicInboundWebhook =
+		req.method === 'POST' && req.nextUrl.pathname === '/api/inbound';
+
+	if (isProtectedRoute(req) && !isPublicInboundWebhook) {
 		await auth.protect();
 	}
 });

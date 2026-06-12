@@ -367,3 +367,5 @@ export const getTooltipCategoryIconSpec = (searchWhat?: string | null): TooltipC
 	return WHAT_TO_TOOLTIP_CATEGORY_ICON[key] ?? null;
 };
 
+export const isCleanMapMarkerCategory = (searchWhat?: string | null): boolean =>
+	Boolean(getTooltipCategoryIconSpec(searchWhat));

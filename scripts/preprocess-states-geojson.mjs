@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import polylabel from 'polylabel';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -125,19 +126,35 @@ const STATE_NAME_TO_ABBR = {
 	'DISTRICT OF COLUMBIA': 'DC',
 };
 
+// Hand-tuned label points for a few small / oddly-shaped states where the pole
+// of inaccessibility reads as off-center (e.g. it lands in the north of a
+// vertical state). polylabel handles every other state automatically.
 const STATE_LABEL_OVERRIDES = {
-	TX: [-99.5, 31.5],
-	OK: [-97.5, 35.5],
-	MN: [-94.3, 46.0],
-	NV: [-117.0, 39.0],
-	CA: [-119.3, 36.5],
-	ID: [-114.5, 44.4],
-	FL: [-81.7, 28.6],
-	MI: [-85.4, 43.5],
-	LA: [-92.5, 31.0],
-	MD: [-76.8, 39.05],
-	HI: [-157.5, 20.5],
-	AK: [-153.0, 64.0],
+	NJ: [-74.45, 40.15],
+	MA: [-72.0, 42.3],
+	DE: [-75.5, 39.0],
+	RI: [-71.62, 41.7],
+	CT: [-72.75, 41.64],
+	PA: [-77.6, 40.88],
+	TX: [-99.35, 31.48],
+};
+
+// Zoom-gating for labels: big states label from the wide view, tiny ones (DC,
+// territories) only once zoomed in so they don't clutter / sit on top of
+// neighbors. Interpolated on log(area) between these area (deg²) / zoom anchors.
+const LABEL_MIN_ZOOM_FLOOR = 2.25; // mirrors MAP_MIN_ZOOM in the map constants
+const LABEL_MIN_ZOOM_CEIL = 8;
+const LABEL_AREA_SMALL = 0.015;
+const LABEL_AREA_LARGE = 3.0;
+
+const labelMinZoomForArea = (area) => {
+	if (!(area > 0)) return LABEL_MIN_ZOOM_CEIL;
+	const a = Math.max(LABEL_AREA_SMALL, Math.min(LABEL_AREA_LARGE, area));
+	const t =
+		(Math.log(a) - Math.log(LABEL_AREA_LARGE)) /
+		(Math.log(LABEL_AREA_SMALL) - Math.log(LABEL_AREA_LARGE));
+	const z = LABEL_MIN_ZOOM_FLOOR + t * (LABEL_MIN_ZOOM_CEIL - LABEL_MIN_ZOOM_FLOOR);
+	return Math.round(z * 100) / 100;
 };
 
 const closeRing = (ring) => {
@@ -157,6 +174,65 @@ const absRingArea = (ring) => {
 		area2 += x1 * y2 - x2 * y1;
 	}
 	return Math.abs(area2 / 2);
+};
+
+// Reorder a clipping polygon's rings into polylabel's expected shape:
+// [outerRing, ...holes], where the outer ring is the largest by area.
+const polygonForPolylabel = (clippingPolygon) => {
+	const rings = (clippingPolygon ?? []).filter((ring) => ring?.length >= 4);
+	if (!rings.length) return null;
+	let outerIdx = 0;
+	let outerArea = -Infinity;
+	rings.forEach((ring, i) => {
+		const a = absRingArea(ring);
+		if (a > outerArea) {
+			outerArea = a;
+			outerIdx = i;
+		}
+	});
+	return [rings[outerIdx], ...rings.filter((_, i) => i !== outerIdx)];
+};
+
+// Total land area of a state's largest-ring-per-polygon — used to rank states so
+// bigger ones win label collisions when zoomed out.
+const stateLabelArea = (multiPolygon) => {
+	let total = 0;
+	for (const polygon of multiPolygon ?? []) {
+		const candidate = polygonForPolylabel(polygon);
+		if (candidate) total += absRingArea(candidate[0]);
+	}
+	return total;
+};
+
+// Pole of inaccessibility (polylabel) of a state's LARGEST polygon, so the label
+// sits well inside the main landmass instead of a bbox center that can fall in
+// the ocean or a neighbor for concave / multi-part states. Falls back to the
+// bbox center if polylabel can't produce a finite point.
+const labelPointFromMultiPolygon = (multiPolygon, bbox) => {
+	const fallback = bbox
+		? [(bbox.minLng + bbox.maxLng) / 2, (bbox.minLat + bbox.maxLat) / 2]
+		: null;
+	try {
+		let best = null;
+		let bestArea = -Infinity;
+		for (const polygon of multiPolygon ?? []) {
+			const candidate = polygonForPolylabel(polygon);
+			if (!candidate) continue;
+			const area = absRingArea(candidate[0]);
+			if (area > bestArea) {
+				bestArea = area;
+				best = candidate;
+			}
+		}
+		if (!best) return fallback;
+		// Precision in degrees (~1 km); the library default of 1.0 is far too
+		// coarse for lat/lng-scale polygons and lands near the bbox center.
+		const [lng, lat] = polylabel(best, 0.01);
+		if (Number.isFinite(lng) && Number.isFinite(lat)) return [lng, lat];
+		return fallback;
+	} catch {
+		return fallback;
+	}
 };
 
 const createOutlineGeoJsonFromMultiPolygon = (multiPolygon) => {
@@ -369,17 +445,36 @@ const run = async () => {
 		statesMeta[key] = { key: entry.key, name: entry.name, bbox: entry.bbox };
 	}
 
+	// Area per state (deg²), reused for collision ranking and zoom-gating.
+	const areaByKey = new Map();
+	for (const [key, entry] of statesByKey) {
+		areaByKey.set(key, stateLabelArea(entry.multiPolygon));
+	}
+
+	// Rank states by area (1 = largest) so the symbol layer can prioritize bigger
+	// states in label collisions via `symbol-sort-key`.
+	const rankByKey = new Map();
+	[...areaByKey.entries()]
+		.sort((a, b) => b[1] - a[1])
+		.forEach(([key], i) => rankByKey.set(key, i + 1));
+
 	const labelFeatures = [];
 	for (const [key, entry] of statesByKey) {
 		const bbox = entry.bbox;
 		if (!bbox) continue;
 		const override = STATE_LABEL_OVERRIDES[key];
-		const lng = override ? override[0] : (bbox.minLng + bbox.maxLng) / 2;
-		const lat = override ? override[1] : (bbox.minLat + bbox.maxLat) / 2;
+		const [lng, lat] = override
+			? override
+			: labelPointFromMultiPolygon(entry.multiPolygon, bbox);
 
 		labelFeatures.push({
 			type: 'Feature',
-			properties: { key, name: entry.name },
+			properties: {
+				key,
+				name: entry.name,
+				rank: rankByKey.get(key) ?? 999,
+				minZoom: labelMinZoomForArea(areaByKey.get(key) ?? 0),
+			},
 			geometry: { type: 'Point', coordinates: [lng, lat] },
 		});
 	}

@@ -5,6 +5,7 @@ import { ContactFilterData, PostContactData } from '@/app/api/contacts/route';
 import { appendQueryParamsToUrl } from '@/utils';
 import { PostBatchContactData } from '@/app/api/contacts/batch/route';
 import { PatchContactData } from '@/app/api/contacts/[id]/route';
+import { GetContactResearchData } from '@/app/api/contacts/[id]/research/route';
 import { PostBulkUpdateContactData } from '@/app/api/contacts/bulk-update/route';
 import { _fetch } from '@/utils';
 import { urls } from '@/constants/urls';
@@ -16,6 +17,40 @@ const QUERY_KEYS = {
 	detail: (id: string | number) => [...QUERY_KEYS.all, 'detail', id.toString()] as const,
 } as const;
 
+const CONTACT_SEARCH_TIMEOUT_MS = 65000;
+const TIMEOUT_ERROR_RE = /\b(timeout|timed\s*out)\b/i;
+
+const readResponseErrorMessage = async (
+	response: Response,
+	fallback: string,
+	timeoutMs?: number
+): Promise<string> => {
+	let errorMessage = fallback;
+	try {
+		const rawError = await response.text();
+		if (rawError) {
+			try {
+				const errorData = JSON.parse(rawError);
+				errorMessage = errorData.error || errorData.message || rawError;
+			} catch {
+				errorMessage = rawError;
+			}
+		} else {
+			errorMessage = `HTTP ${response.status} error`;
+		}
+	} catch {
+		errorMessage = `HTTP ${response.status} error`;
+	}
+
+	if (response.status === 504 || TIMEOUT_ERROR_RE.test(errorMessage)) {
+		return timeoutMs
+			? `Request timeout after ${timeoutMs}ms`
+			: 'Request timeout';
+	}
+
+	return errorMessage;
+};
+
 export interface ContactQueryOptions extends CustomQueryOptions {
 	filters?: ContactFilterData;
 }
@@ -25,39 +60,47 @@ interface EditContactData {
 	data: PatchContactData;
 }
 
+// Exported so callers (e.g. dashboard hover prefetch) can warm the exact same
+// React Query cache entry that useGetContacts reads — same key, same fetcher.
+export const getContactsListQueryKey = (filters?: ContactFilterData) =>
+	[...QUERY_KEYS.list(), filters] as const;
+
+export const fetchContactsList = async (
+	filters: ContactFilterData | undefined,
+	signal?: AbortSignal
+): Promise<ContactWithName[]> => {
+	const url = appendQueryParamsToUrl(urls.api.contacts.index, filters);
+	// The route's maxDuration is 60s. Give the server enough room to
+	// finish or return its own 504 instead of aborting a slow success.
+	const response = await _fetch(url, undefined, undefined, {
+		signal,
+		timeout: CONTACT_SEARCH_TIMEOUT_MS,
+	});
+
+	if (!response.ok) {
+		const errorMessage = await readResponseErrorMessage(
+			response,
+			'Failed to fetch contacts',
+			CONTACT_SEARCH_TIMEOUT_MS
+		);
+		throw new Error(errorMessage);
+	}
+
+	return response.json() as Promise<ContactWithName[]>;
+};
+
 export const useGetContacts = (options: ContactQueryOptions) => {
 	return useQuery<ContactWithName[]>({
-		queryKey: [...QUERY_KEYS.list(), options.filters],
-		queryFn: async ({ signal }) => {
-			const url = appendQueryParamsToUrl(urls.api.contacts.index, options.filters);
-			const response = await _fetch(url, undefined, undefined, {
-				signal,
-				timeout: 25000,
-			});
-
-			if (!response.ok) {
-				let errorMessage = 'Failed to fetch contacts';
-				try {
-					const errorData = await response.json();
-					errorMessage = errorData.error || errorMessage;
-				} catch {
-					// If response is not JSON (e.g., plain text "Internal Server Error")
-					// try to get the text content
-					try {
-						const textError = await response.text();
-						errorMessage = textError || `HTTP ${response.status} error`;
-					} catch {
-						errorMessage = `HTTP ${response.status} error`;
-					}
-				}
-				throw new Error(errorMessage);
-			}
-
-			return response.json() as Promise<ContactWithName[]>;
-		},
+		queryKey: getContactsListQueryKey(options.filters),
+		queryFn: ({ signal }) => fetchContactsList(options.filters, signal),
 		enabled: options.enabled === undefined ? true : options.enabled,
 		// Keep previous results visible while a new search fetches (prevents UI + map flicker).
 		placeholderData: keepPreviousData,
+		refetchOnMount: false,
+		refetchOnReconnect: false,
+		refetchOnWindowFocus: false,
+		retry: false,
+		staleTime: 1000 * 60 * 60,
 		gcTime: 1000 * 60 * 10, // Keep in cache for 10 minutes
 	});
 };
@@ -398,7 +441,7 @@ export const useGetLocations = (query: string, mode?: 'state' | 'state-first') =
 	});
 };
 
-export type ContactsMapOverlayMode = 'booking' | 'promotion' | 'all';
+export type ContactsMapOverlayMode = 'booking' | 'promotion' | 'all' | 'ambient';
 
 export interface ContactsMapOverlayFilters
 	extends Record<string, string[] | number[] | string | number | boolean | undefined> {
@@ -408,6 +451,9 @@ export interface ContactsMapOverlayFilters
 	north: number;
 	east: number;
 	limit?: number;
+	zoom?: number;
+	seed?: string;
+	phase?: 'visible' | 'buffer';
 }
 
 export const useGetContactsMapOverlay = (options: {
@@ -419,25 +465,31 @@ export const useGetContactsMapOverlay = (options: {
 		queryFn: async ({ signal }) => {
 			if (!options.filters) return [];
 			const url = appendQueryParamsToUrl(urls.api.contacts.mapOverlay.index, options.filters);
-			const response = await _fetch(url, undefined, undefined, {
-				signal,
-				timeout: 15000,
-			});
+			let response: Response;
+			try {
+				response = await _fetch(url, undefined, undefined, {
+					signal,
+					timeout: 20000,
+				});
+			} catch (error) {
+				if (error instanceof Error && error.name === 'AbortError') {
+					throw error;
+				}
+				console.warn('[contacts-map-overlay] Background overlay fetch failed', error);
+				return [];
+			}
 
 			if (!response.ok) {
-				let errorMessage = 'Failed to fetch map overlay contacts';
-				try {
-					const errorData = await response.json();
-					errorMessage = errorData.error || errorMessage;
-				} catch {
-					try {
-						const textError = await response.text();
-						errorMessage = textError || `HTTP ${response.status} error`;
-					} catch {
-						errorMessage = `HTTP ${response.status} error`;
-					}
-				}
-				throw new Error(errorMessage);
+				const errorMessage = await readResponseErrorMessage(
+					response,
+					'Failed to fetch map overlay contacts',
+					20000
+				);
+				console.warn('[contacts-map-overlay] Background overlay response failed', {
+					status: response.status,
+					errorMessage,
+				});
+				return [];
 			}
 
 			return response.json() as Promise<ContactWithName[]>;
@@ -446,8 +498,209 @@ export const useGetContactsMapOverlay = (options: {
 		// Prevent marker flicker when the bbox/zoom changes by keeping the previous
 		// overlay results visible while the next window refetches.
 		placeholderData: keepPreviousData,
+		refetchOnMount: false,
+		refetchOnReconnect: false,
+		refetchOnWindowFocus: false,
+		retry: false,
 		staleTime: 1000 * 60 * 5, // 5 minutes
 		gcTime: 1000 * 60 * 30, // Keep in cache for 30 minutes
+	});
+};
+
+// Backfills the research-detail fields for a single contact when a hovered map-overlay
+// row arrived without them (slim payload — see api/contacts/map-overlay).
+export const useGetContactResearch = (contactId: number | null) => {
+	return useQuery<GetContactResearchData>({
+		queryKey: [...QUERY_KEYS.detail(contactId ?? 'none'), 'research'],
+		queryFn: async ({ signal }) => {
+			const response = await _fetch(
+				urls.api.contacts.research(contactId!),
+				undefined,
+				undefined,
+				{ signal }
+			);
+			if (!response.ok) {
+				const errorMessage = await readResponseErrorMessage(
+					response,
+					'Failed to fetch contact research'
+				);
+				throw new Error(errorMessage);
+			}
+			return response.json() as Promise<GetContactResearchData>;
+		},
+		enabled: contactId != null,
+		refetchOnMount: false,
+		refetchOnReconnect: false,
+		refetchOnWindowFocus: false,
+		retry: false,
+		staleTime: 1000 * 60 * 30, // research metadata rarely changes
+		gcTime: 1000 * 60 * 30,
+	});
+};
+
+export interface CuratedSearchResult {
+	categoryBreakdown: Record<string, number>;
+	center: { lat: number; lon: number } | null;
+	radiusKm: number | null;
+	city: string | null;
+	region: string | null;
+	contacts: ContactWithName[];
+}
+
+export interface CuratedSearchVariables {
+	lat?: number | null;
+	lon?: number | null;
+	radiusKm?: number | null;
+	category?: string | null;
+	state?: string | null;
+	limit?: number;
+	// Caller-supplied signal: lets the dashboard cancel an in-flight curated
+	// search when the user fires another one. Without this, rapid-fire searches
+	// stack on the server and contend on ES, making everything slow.
+	signal?: AbortSignal;
+}
+
+// Exported so non-mutation callers (e.g. the campaign page's Search-tab speculative
+// prefetch) can run the exact same fetch the mutation below runs.
+export const fetchCuratedSearch = async (
+	vars: CuratedSearchVariables = {}
+): Promise<CuratedSearchResult> => {
+	const params: Record<string, string> = {};
+	if (typeof vars.lat === 'number' && Number.isFinite(vars.lat)) {
+		params.lat = String(vars.lat);
+	}
+	if (typeof vars.lon === 'number' && Number.isFinite(vars.lon)) {
+		params.lon = String(vars.lon);
+	}
+	if (typeof vars.radiusKm === 'number' && Number.isFinite(vars.radiusKm)) {
+		params.radiusKm = String(vars.radiusKm);
+	}
+	if (vars.category) params.category = vars.category;
+	if (vars.state) params.state = vars.state;
+	if (typeof vars.limit === 'number') params.limit = String(vars.limit);
+	const url = appendQueryParamsToUrl(
+		urls.api.contacts.curatedSearch.index,
+		params
+	);
+	// The route's maxDuration is 60s; let the server own the deadline.
+	const response = await _fetch(url, undefined, undefined, {
+		timeout: CONTACT_SEARCH_TIMEOUT_MS,
+		signal: vars.signal,
+	});
+	if (!response.ok) {
+		const errorMessage = await readResponseErrorMessage(
+			response,
+			'Failed to fetch curated picks',
+			CONTACT_SEARCH_TIMEOUT_MS
+		);
+		throw new Error(errorMessage);
+	}
+	return response.json() as Promise<CuratedSearchResult>;
+};
+
+export const useCuratedContactsSearch = (options: CustomMutationOptions = {}) => {
+	const { suppressToasts = true, onSuccess: onSuccessCallback } = options;
+
+	return useMutation({
+		mutationFn: fetchCuratedSearch,
+		onSuccess: (data) => {
+			onSuccessCallback?.();
+			if (!suppressToasts) {
+				toast.success(`Showing ${data.contacts.length} curated picks`);
+			}
+		},
+		onError: (error) => {
+			if (!suppressToasts) {
+				toast.error(error.message || 'Failed to fetch curated picks');
+			}
+		},
+	});
+};
+
+export interface FreeTextSearchResult {
+	query: string;
+	parsed: {
+		categories: string[];
+		city: string | null;
+		state: string | null;
+		country: string | null;
+		restOfQuery: string;
+	};
+	center: { lat: number; lon: number } | null;
+	radiusKm: number | null;
+	retrieverBreakdown: Record<string, number>;
+	cleanlinessBreakdown: Record<string, number>;
+	contacts: ContactWithName[];
+}
+
+export interface FreeTextSearchVariables {
+	q: string;
+	lat?: number | null;
+	lon?: number | null;
+	radiusKm?: number | null;
+	/** Radius-search mode: makes lat/lon/radiusKm a hard geographic filter server-side. */
+	strictRadius?: boolean;
+	/** Keyword-search mode: direct field matching instead of semantic/category search. */
+	keywordMode?: boolean;
+	/** Profile mode: raw genre, server tokenizes it into a soft ranking multiplier. */
+	profileGenre?: string | null;
+	/** Profile mode: genre + bio keywords appended to the embedding text only. */
+	profileEmbedText?: string | null;
+	/** Profile mode: raw area string, server geocodes it as a soft location anchor. */
+	profileArea?: string | null;
+	limit?: number;
+	// Caller-supplied signal: see CuratedSearchVariables.signal.
+	signal?: AbortSignal;
+}
+
+export const useFreeTextContactsSearch = (options: CustomMutationOptions = {}) => {
+	const { suppressToasts = true, onSuccess: onSuccessCallback } = options;
+
+	return useMutation({
+		mutationFn: async (vars: FreeTextSearchVariables): Promise<FreeTextSearchResult> => {
+			const params: Record<string, string> = { q: vars.q };
+			if (typeof vars.lat === 'number' && Number.isFinite(vars.lat)) {
+				params.lat = String(vars.lat);
+			}
+			if (typeof vars.lon === 'number' && Number.isFinite(vars.lon)) {
+				params.lon = String(vars.lon);
+			}
+			if (typeof vars.radiusKm === 'number' && Number.isFinite(vars.radiusKm)) {
+				params.radiusKm = String(vars.radiusKm);
+			}
+			if (vars.strictRadius) params.strictRadius = '1';
+			if (vars.keywordMode) params.keywordMode = '1';
+			if (vars.profileGenre) params.profileGenre = vars.profileGenre.slice(0, 120);
+			if (vars.profileEmbedText)
+				params.profileEmbedText = vars.profileEmbedText.slice(0, 200);
+			if (vars.profileArea) params.profileArea = vars.profileArea.slice(0, 120);
+			if (typeof vars.limit === 'number') params.limit = String(vars.limit);
+			const url = appendQueryParamsToUrl(urls.api.contacts.search.index, params);
+			const response = await _fetch(url, undefined, undefined, {
+				timeout: CONTACT_SEARCH_TIMEOUT_MS,
+				signal: vars.signal,
+			});
+			if (!response.ok) {
+				const errorMessage = await readResponseErrorMessage(
+					response,
+					'Failed to run search',
+					CONTACT_SEARCH_TIMEOUT_MS
+				);
+				throw new Error(errorMessage);
+			}
+			return response.json() as Promise<FreeTextSearchResult>;
+		},
+		onSuccess: (data) => {
+			onSuccessCallback?.();
+			if (!suppressToasts) {
+				toast.success(`Found ${data.contacts.length} matches`);
+			}
+		},
+		onError: (error) => {
+			if (!suppressToasts) {
+				toast.error(error.message || 'Failed to run search');
+			}
+		},
 	});
 };
 

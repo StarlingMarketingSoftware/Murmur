@@ -5,14 +5,15 @@ import {
 	handleApiError,
 } from '@/app/api/_utils';
 import { fetchGemini } from '@/app/api/_utils';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
 const postGeminiSchema = z.object({
-	model: z.string().min(1).default('gemini-2.5-pro-preview-05-06'),
-	prompt: z.string().min(1),
-	content: z.string().min(1),
+	model: z.string().min(1).max(200).default('gemini-2.5-pro-preview-05-06'),
+	prompt: z.string().min(1).max(100000),
+	content: z.string().min(1).max(100000),
 });
 
 export type PostGeminiData = z.infer<typeof postGeminiSchema>;
@@ -27,6 +28,9 @@ export const maxDuration = 120; // Increased for thinking models
 
 export async function POST(request: NextRequest) {
 	try {
+		const limited = await withRateLimit(request, 'ai-expensive', 'gemini');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();

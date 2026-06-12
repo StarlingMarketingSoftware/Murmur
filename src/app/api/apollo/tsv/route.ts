@@ -8,6 +8,7 @@ import path from 'path';
 import { put } from '@vercel/blob';
 import { apiBadRequest, apiResponse, apiUnauthorized } from '@/app/api/_utils';
 import { enrichApolloContacts, transformApolloContact } from '@/app/api/_utils';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 
 import { ApolloPerson } from '@/types/apollo';
 import { UserRole } from '@prisma/client';
@@ -21,7 +22,7 @@ const postApolloContactsTSVSchema = z.object({
 	organization_locations: z.array(z.string()).optional(),
 	contact_email_status: z.array(z.string()).optional(),
 	organization_num_employees_ranges: z.array(z.array(z.number())).optional(),
-	per_page: z.number().default(100),
+	per_page: z.number().int().min(1).max(100).default(100),
 	q_keywords: z.string().optional(),
 });
 export type PostApolloContactsTSVData = z.infer<typeof postApolloContactsTSVSchema>;
@@ -30,6 +31,9 @@ export type PostApolloContactsTSVData = z.infer<typeof postApolloContactsTSVSche
 type TransformedContact = ReturnType<typeof transformApolloContact>;
 
 export async function POST(req: NextRequest): Promise<Response> {
+	const limited = await withRateLimit(req, 'paid-external', 'apollo-tsv');
+	if (limited) return limited;
+
 	const apolloApiKey = process.env.APOLLO_API_KEY;
 	if (!apolloApiKey) {
 		console.error('Apollo API key not found');

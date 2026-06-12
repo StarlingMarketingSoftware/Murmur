@@ -1,42 +1,161 @@
 'use client';
 
-import { FC, MouseEvent, useMemo, useRef, useState, useEffect, useCallback, useLayoutEffect } from 'react';
+import {
+	FC,
+	MouseEvent,
+	useMemo,
+	useRef,
+	useState,
+	useEffect,
+	useCallback,
+	useLayoutEffect,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { ContactWithName } from '@/types/contact';
-import { CampaignWithRelations } from '@/types';
-import { cn } from '@/utils';
+import type {
+	CampaignWithRelations,
+	EmailWithRelations,
+	InboundEmailWithRelations,
+} from '@/types';
+import { cn, convertHtmlToPlainText } from '@/utils';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation, splitTrailingNumericSuffix } from '@/utils/string';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 import OpenIcon from '@/components/atoms/svg/OpenIcon';
-import {
-	getCampaignLoadingWaveElapsedSeconds,
-	getSyncedWaveDelay,
-} from '@/utils/campaignLoadingWave';
+import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
+import { CalendarPlusIcon } from '@/components/atoms/_svg/CalendarPlusIcon';
 import {
 	canadianProvinceAbbreviations,
 	canadianProvinceNames,
 	stateBadgeColorMap,
 } from '@/constants/ui';
-import { useGetUsedContactCampaigns, useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
+import { useGetUsedContactCampaigns } from '@/hooks/queryHooks/useContacts';
 import { useGetCampaignContactEvents } from '@/hooks/queryHooks/useCampaigns';
-import { ContactsHeaderChrome } from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraftingTable/DraftingTable';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
+import {
+	ContactsHeaderChrome,
+	type ContactsHeaderChromeCampaignStop,
+} from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraftingTable/DraftingTable';
+import {
+	isRestaurantTitle,
+	isCoffeeShopTitle,
+	isMusicVenueTitle,
+	isMusicFestivalTitle,
+	isWeddingPlannerTitle,
+	isWeddingVenueTitle,
+	isWineBeerSpiritsTitle,
+	getWineBeerSpiritsLabel,
+} from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
+import {
+	DashboardResponsesFilterBar,
+	RESPONSE_WIDGET_BACKGROUND_BY_TAB,
+	type DashboardResponsesTab,
+} from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesFilterBar';
+import {
+	buildInboxConversations,
+	getConversationThreadApplicationId,
+	getInboxMessageTimeMs,
+	getInboxMessageSnippet,
+	inboxConversationContainsEmailId,
+	inboxConversationContainsInboundEmailId,
+	inboxConversationContainsSentEmailId,
+	normalizeApplicationForInboxConversation,
+	normalizeSentEmailForInboxConversation,
+	type InboxConversation,
+	type InboxConversationMessage,
+} from '@/utils/inboxConversations';
+import {
+	useGetMyEventApplications,
+	type MyEventApplication,
+} from '@/hooks/queryHooks/useEventApplications';
+import { deriveEventChatStatus, formatEventChatTimestamp } from '@/utils/eventChatStatus';
+import {
+	EventChatCard,
+	EVENT_CHAT_COMPACT_ROW_HEIGHT_PX,
+	EVENT_CHAT_ROW_HEIGHT_PX,
+} from '@/components/molecules/EventChatCard/EventChatCard';
 
 const isSameLocalDay = (a: Date, b: Date) =>
 	a.getFullYear() === b.getFullYear() &&
 	a.getMonth() === b.getMonth() &&
 	a.getDate() === b.getDate();
 
+const CONTACT_ROW_INSET_PX = 6.104;
+const CONTACT_ROW_HEIGHT_PX = 49.657;
+const CONTACT_ROW_RADIUS_PX = 8.269;
+const SUPPLEMENTAL_DRAFT_ROW_HEIGHT_PX = 108;
+const SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX = 7.798;
+const SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX = 92;
+const WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR = '#F5C0BD';
+const WRITE_TAB_SUPPLEMENTAL_BADGE_FILL_COLOR = '#EE9798';
+const WRITE_TAB_SUPPLEMENTAL_ROW_FILL_COLOR = '#EB8586';
+const SHOWING_DRAFT_ROW_FILL_COLOR = '#F8C262';
+const SHOWING_DRAFT_TOP_BAR_COLOR = '#FFE3AA';
+const SELECTED_DRAFT_ROW_FILL_COLOR = '#FDDEA5';
+const SELECTED_DRAFT_TOP_BAR_COLOR = '#F9D387';
+const INBOX_LAST_SENT_FILL_COLOR = '#7ED29E';
+
 const formatBatchCount = (count: number) => `+${count < 10 ? `0${count}` : count}`;
+
+const isInboxOpportunityEmail = (email: InboundEmailWithRelations) => {
+	// Venue↔artist internal DMs are ongoing conversations, not keyword-triaged
+	// cold-email replies — never classify them as Opportunities. They must always
+	// stay in Responses; otherwise a venue reply like "following up here" routes the
+	// whole thread into the Opportunities sub-tab and it vanishes from the Responses
+	// list the inbox defaults to. Projected venue rows carry venueConversationId;
+	// real inbound email replies don't.
+	if (email.venueConversationId != null) return false;
+
+	const text = `${email.subject || ''} ${email.strippedText || ''} ${email.bodyPlain || ''} ${
+		email.bodyHtml ? convertHtmlToPlainText(email.bodyHtml) : ''
+	}`.toLowerCase();
+
+	return (
+		/\b(pass|passed|declin(?:e|ed|ing)|not interested|not a fit|unavailable|can't|cannot|no longer)\b/.test(
+			text
+		) ||
+		/\b(?:already|fully) booked\b/.test(text) ||
+		/\b(booked|confirmed|confirming|reserved)\b/.test(text) ||
+		/\b(?:sounds good|let'?s do it|works for us|we'd love|we would love)\b/.test(text) ||
+		/\b(in progress|interested|available|tentative|pencil(?:ed)? in|hold(?:ing)? the date|checking|looking into|following up|follow up|send more|details|what dates|which date)\b/.test(
+			text
+		)
+	);
+};
+
+const ShowingDraftViewIcon: FC<{ className?: string; centerFill?: string }> = ({
+	className,
+	centerFill = SHOWING_DRAFT_TOP_BAR_COLOR,
+}) => (
+	<svg
+		viewBox="0 20 16 9"
+		fill="none"
+		xmlns="http://www.w3.org/2000/svg"
+		className={className}
+		aria-hidden="true"
+		focusable="false"
+	>
+		<path
+			d="M7.652 20.84c2.076 0 4.027.687 5.458 1.527.716.42 1.297.876 1.696 1.298.2.21.35.41.45.589.102.18.145.33.145.443 0 .232-.18.556-.586.928-.397.363-.976.742-1.692 1.086-1.431.688-3.386 1.224-5.47 1.224-2.077 0-3.96-.662-5.323-1.45-.681-.395-1.229-.819-1.602-1.203a2.906 2.906 0 01-.42-.527c-.095-.16-.131-.283-.131-.367 0-.085.036-.208.13-.368.093-.157.234-.336.42-.528.374-.384.922-.807 1.603-1.201 1.363-.789 3.246-1.45 5.322-1.45z"
+			fill="#000000"
+			stroke="#7D7D7D"
+			strokeWidth={0.352663}
+		/>
+		<path
+			d="M7.787 20.84c1.595 0 2.94 1.558 2.94 3.548s-1.345 3.547-2.94 3.547-2.938-1.558-2.938-3.547c0-1.99 1.343-3.547 2.938-3.547z"
+			fill={centerFill}
+			stroke="#7D7D7D"
+			strokeWidth={0.352663}
+		/>
+	</svg>
+);
 
 const formatBatchTimestamp = (date: Date) => {
 	const now = new Date();
@@ -53,15 +172,21 @@ const formatBatchTimestamp = (date: Date) => {
 	return `${month}/${day}`;
 };
 
+export type ContactsExpandedTopNavStop = ContactsHeaderChromeCampaignStop;
+export type ContactsExpandedListFocusMode = 'contacts' | 'drafts' | 'inbox';
+
 const FadeOverflowText: FC<{
 	text: string;
 	className?: string;
 	fadePx?: number;
 	measureKey?: unknown;
-}> = ({ text, className, fadePx = 16, measureKey }) => {
+	splitNumericSuffix?: boolean;
+}> = ({ text, className, fadePx = 16, measureKey, splitNumericSuffix = true }) => {
 	const spanRef = useRef<HTMLSpanElement | null>(null);
 	const [isOverflowing, setIsOverflowing] = useState(false);
-	const { base, suffixNumber } = splitTrailingNumericSuffix(text);
+	const { base, suffixNumber } = splitNumericSuffix
+		? splitTrailingNumericSuffix(text)
+		: { base: text, suffixNumber: null };
 
 	const measure = useCallback(() => {
 		const el = spanRef.current;
@@ -117,8 +242,284 @@ const FadeOverflowText: FC<{
 	);
 };
 
+const getContactFullName = (contact?: ContactWithName | null) =>
+	contact?.name || `${contact?.firstName || ''} ${contact?.lastName || ''}`.trim();
+
+const getContactDisplayName = (contact?: ContactWithName | null, fallback = 'Contact') =>
+	getContactFullName(contact) || contact?.company || contact?.email || fallback;
+
+const hasSeparateContactName = (contact?: ContactWithName | null) =>
+	Boolean(
+		(contact?.name && contact.name.trim()) ||
+		(contact?.firstName && contact.firstName.trim()) ||
+		(contact?.lastName && contact.lastName.trim())
+	);
+
+const getContactCompanyLabel = (contact?: ContactWithName | null) =>
+	hasSeparateContactName(contact) ? contact?.company || '' : '';
+
+const getContactTitle = (contact?: ContactWithName | null) =>
+	contact?.title || contact?.headline || '';
+
+const getTitleBadgeBgColor = (title: string) =>
+	isRestaurantTitle(title)
+		? '#C3FBD1'
+		: isCoffeeShopTitle(title)
+			? '#D6F1BD'
+			: isMusicVenueTitle(title)
+				? '#B7E5FF'
+				: isMusicFestivalTitle(title)
+					? '#C1D6FF'
+					: isWeddingPlannerTitle(title) || isWeddingVenueTitle(title)
+						? '#FFF2BC'
+						: isWineBeerSpiritsTitle(title)
+							? '#BFC4FF'
+							: '#E8EFFF';
+
+const getTitleBadgeLabel = (title: string) =>
+	isRestaurantTitle(title)
+		? 'Restaurant'
+		: isCoffeeShopTitle(title)
+			? 'Coffee Shop'
+			: isMusicVenueTitle(title)
+				? 'Music Venue'
+				: isMusicFestivalTitle(title)
+					? 'Music Festival'
+					: isWeddingPlannerTitle(title)
+						? 'Wedding Planner'
+						: isWeddingVenueTitle(title)
+							? 'Wedding Venue'
+							: isWineBeerSpiritsTitle(title)
+								? (getWineBeerSpiritsLabel(title) ?? title)
+								: title;
+
+export const TitleBadge: FC<{
+	title: string;
+	className?: string;
+	textClassName?: string;
+	fillColor?: string;
+	strokeColor?: string;
+	textColor?: string;
+	showStroke?: boolean;
+	restaurantIconSize?: number;
+	coffeeIconSize?: number;
+	defaultIconSize?: number;
+}> = ({
+	title,
+	className,
+	textClassName,
+	fillColor,
+	strokeColor,
+	textColor,
+	showStroke = true,
+	restaurantIconSize = 14,
+	coffeeIconSize = 6,
+	defaultIconSize = 14,
+}) => (
+	<div
+		className={cn('border overflow-hidden flex items-center gap-0.5', className)}
+		style={{
+			backgroundColor: fillColor ?? getTitleBadgeBgColor(title),
+			borderColor: showStroke ? (strokeColor ?? '#000000') : 'transparent',
+			borderWidth: showStroke ? undefined : 0,
+			color: textColor ?? '#000000',
+		}}
+	>
+		{isRestaurantTitle(title) && (
+			<RestaurantsIcon
+				size={restaurantIconSize}
+				innerFill={fillColor}
+				outlineFill={strokeColor}
+			/>
+		)}
+		{isCoffeeShopTitle(title) && (
+			<CoffeeShopsIcon
+				size={coffeeIconSize}
+				innerFill={fillColor}
+				outlineFill={strokeColor}
+			/>
+		)}
+		{isMusicVenueTitle(title) && (
+			<MusicVenuesIcon
+				size={defaultIconSize}
+				className="flex-shrink-0"
+				innerFill={fillColor}
+				outlineFill={strokeColor}
+			/>
+		)}
+		{isMusicFestivalTitle(title) && (
+			<FestivalsIcon
+				size={defaultIconSize}
+				className="flex-shrink-0"
+				innerFill={fillColor}
+				outlineFill={strokeColor}
+			/>
+		)}
+		{(isWeddingPlannerTitle(title) || isWeddingVenueTitle(title)) && (
+			<WeddingPlannersIcon
+				size={defaultIconSize}
+				innerFill={fillColor}
+				outlineFill={strokeColor}
+			/>
+		)}
+		{isWineBeerSpiritsTitle(title) && (
+			<WineBeerSpiritsIcon
+				size={defaultIconSize}
+				className="flex-shrink-0"
+				innerFill={fillColor}
+				outlineFill={strokeColor}
+			/>
+		)}
+		<ScrollableText
+			text={getTitleBadgeLabel(title)}
+			className={cn('leading-none', textClassName)}
+		/>
+	</div>
+);
+
+// Labels a per-application (event) thread row with its opportunity name —
+// calendar icon + amber fill so the row reads as an event, not a venue email.
+export const EventThreadBadge: FC<{
+	name: string;
+	className?: string;
+	textClassName?: string;
+	strokeColor?: string;
+	textColor?: string;
+	showStroke?: boolean;
+}> = ({ name, className, textClassName, strokeColor, textColor, showStroke = true }) => (
+	<div
+		className={cn('border overflow-hidden flex items-center gap-0.5', className)}
+		style={{
+			backgroundColor: '#FFE2C8',
+			borderColor: showStroke ? (strokeColor ?? '#000000') : 'transparent',
+			borderWidth: showStroke ? undefined : 0,
+			color: textColor ?? '#000000',
+		}}
+	>
+		<CalendarPlusIcon className="h-[12px] w-[12px] shrink-0" />
+		<ScrollableText text={name} className={cn('leading-none', textClassName)} />
+	</div>
+);
+
+export const StateLocationRow: FC<{
+	contact?: ContactWithName | null;
+	className?: string;
+	badgeClassName?: string;
+	badgeTextClassName?: string;
+	cityClassName?: string;
+	badgeFillColor?: string;
+	strokeColor?: string;
+	textColor?: string;
+	showBadgeStroke?: boolean;
+}> = ({
+	contact,
+	className,
+	badgeClassName,
+	badgeTextClassName,
+	cityClassName,
+	badgeFillColor,
+	strokeColor,
+	textColor,
+	showBadgeStroke = true,
+}) => {
+	const fullStateName = (contact?.state as string) || '';
+	const stateAbbr = getStateAbbreviation(fullStateName) || '';
+	const normalizedState = fullStateName.trim();
+	const lowercaseCanadianProvinceNames = canadianProvinceNames.map((s) =>
+		s.toLowerCase()
+	);
+	const isCanadianProvince =
+		lowercaseCanadianProvinceNames.includes(normalizedState.toLowerCase()) ||
+		canadianProvinceAbbreviations.includes(normalizedState.toUpperCase()) ||
+		canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
+	const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+	const badgeBorderColor = showBadgeStroke ? (strokeColor ?? '#000000') : 'transparent';
+	const badgeBorderWidth = showBadgeStroke ? undefined : 0;
+
+	return (
+		<div
+			className={cn('flex items-center justify-start gap-1', className)}
+			style={{ color: textColor ?? '#000000' }}
+		>
+			{stateAbbr ? (
+				isCanadianProvince ? (
+					<div
+						className={cn(
+							'inline-flex items-center justify-center border overflow-hidden',
+							badgeClassName
+						)}
+						style={{ borderColor: badgeBorderColor, borderWidth: badgeBorderWidth }}
+						title="Canadian province"
+					>
+						<CanadianFlag width="100%" height="100%" className="w-full h-full" />
+					</div>
+				) : isUSAbbr ? (
+					<span
+						className={cn(
+							'inline-flex items-center justify-center border leading-none font-bold',
+							badgeClassName,
+							badgeTextClassName
+						)}
+						style={{
+							backgroundColor:
+								badgeFillColor ?? stateBadgeColorMap[stateAbbr] ?? 'transparent',
+							borderColor: badgeBorderColor,
+							borderWidth: badgeBorderWidth,
+							color: textColor ?? '#000000',
+						}}
+					>
+						{stateAbbr}
+					</span>
+				) : (
+					<span
+						className={cn(
+							'inline-flex items-center justify-center border',
+							badgeClassName
+						)}
+						style={{ borderColor: badgeBorderColor, borderWidth: badgeBorderWidth }}
+					/>
+				)
+			) : null}
+			{contact?.city ? (
+				<ScrollableText
+					text={contact.city}
+					className={cn('leading-none', cityClassName)}
+				/>
+			) : null}
+		</div>
+	);
+};
+
+const resolveInboundContact = (
+	email: InboundEmailWithRelations,
+	contactByEmail?: Record<string, ContactWithName>,
+	contactsById?: Map<number, ContactWithName>
+) => {
+	const senderKey = email.sender?.toLowerCase().trim();
+	if (senderKey && contactByEmail?.[senderKey]) return contactByEmail[senderKey];
+	if (email.contactId && contactsById?.has(email.contactId)) {
+		return contactsById.get(email.contactId) ?? null;
+	}
+	return (email.contact as ContactWithName | null) ?? null;
+};
+
+const getInboxConversationSelectionEmail = (conversation: InboxConversation) =>
+	conversation.latestInboundMessage ?? conversation.latestMessage;
+
 export interface ContactsExpandedListProps {
 	contacts: ContactWithName[];
+	/** Optional full campaign contact set used to resolve draft/inbox rows. */
+	allContacts?: ContactWithName[];
+	/** Optional campaign drafts to show below draftable contacts. */
+	drafts?: EmailWithRelations[];
+	/** Optional campaign sent emails shown by the inbox-panel Sent filter. */
+	sentEmails?: EmailWithRelations[];
+	/** Optional campaign inbox replies to show below drafts. */
+	inboxEmails?: InboundEmailWithRelations[];
+	/** Locally sent follow-ups keyed by any message ID in the inbox conversation. */
+	optimisticInboxReplyByEmailId?: Record<number, number>;
+	/** Optional sender email -> campaign contact map for inbox canonical display. */
+	contactByEmail?: Record<string, ContactWithName>;
 	onHeaderClick?: () => void;
 	onDraftSelected?: (contactIds: number[]) => void;
 	isDraftDisabled?: boolean;
@@ -129,6 +530,30 @@ export interface ContactsExpandedListProps {
 	isLoading?: boolean;
 	onContactClick?: (contact: ContactWithName | null) => void;
 	onContactHover?: (contact: ContactWithName | null) => void;
+	/**
+	 * Row-geometry hover for the left-docked abridged research card.
+	 * Fires (contact|null, rowEl) on row mouseenter and (null, null) on row mouseleave.
+	 */
+	onContactRowHover?: (
+		contact: ContactWithName | null,
+		rowElement: HTMLElement | null
+	) => void;
+	/**
+	 * Row-geometry hover for event-chat rows — replaces onContactRowHover for
+	 * rows tied to an event application so the docked card shows the
+	 * opportunity panel instead of contact research.
+	 */
+	onEventChatRowHover?: (
+		application: MyEventApplication | null,
+		rowElement: HTMLElement | null
+	) => void;
+	onDraftClick?: (draft: EmailWithRelations) => void;
+	onDraftHover?: (draft: EmailWithRelations | null) => void;
+	selectedInboxEmailId?: number | null;
+	onInboxEmailClick?: (email: InboxConversationMessage) => void;
+	selectedDraftId?: number | null;
+	selectedDraftIds?: Set<number>;
+	onDraftSelectionChange?: (updater: (prev: Set<number>) => Set<number>) => void;
 	/**
 	 * Optional controlled selection props. When provided, this component will
 	 * mirror and update the passed-in selection instead of managing its own.
@@ -150,9 +575,15 @@ export interface ContactsExpandedListProps {
 	 */
 	enableUsedContactTooltip?: boolean;
 	showSearchBar?: boolean;
-	
+
 	onSearchFromMiniBar?: (params: { why: string; what: string; where: string }) => void;
 	whiteSectionHeight?: number;
+	activeTopNavStop?: ContactsExpandedTopNavStop;
+	onOpenAll?: () => void;
+	onOpenSearch?: () => void;
+	onOpenWriting?: () => void;
+	onOpenSend?: () => void;
+	onOpenInbox?: () => void;
 	onOpenContacts?: () => void;
 	/**
 	 * When true, renders only the header chrome (no rows) for ultra-compact bottom panel layouts.
@@ -165,13 +596,29 @@ export interface ContactsExpandedListProps {
 	 * - rows still fire `onContactHover` so the All tab can update the Research panel
 	 */
 	interactionMode?: 'default' | 'allTab';
+	focusMode?: ContactsExpandedListFocusMode;
 }
 
 export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	contacts,
+	allContacts,
+	drafts,
+	sentEmails,
+	inboxEmails,
+	optimisticInboxReplyByEmailId,
+	contactByEmail,
 	onHeaderClick,
 	onContactClick,
 	onContactHover,
+	onContactRowHover,
+	onEventChatRowHover,
+	onDraftClick,
+	onDraftHover,
+	selectedInboxEmailId,
+	onInboxEmailClick,
+	selectedDraftId,
+	selectedDraftIds,
+	onDraftSelectionChange,
 	selectedContactIds,
 	activelyDraftingContactIds,
 	onContactSelectionChange,
@@ -182,32 +629,39 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	campaign,
 	enableUsedContactTooltip = false,
 	whiteSectionHeight: customWhiteSectionHeight,
+	activeTopNavStop,
+	onOpenAll,
+	onOpenSearch,
+	onOpenWriting,
+	onOpenSend,
+	onOpenInbox,
 	onOpenContacts,
 	collapsed = false,
 	interactionMode = 'default',
+	focusMode = 'contacts',
 }) => {
 	const router = useRouter();
 	const [internalSelectedContactIds, setInternalSelectedContactIds] = useState<
 		Set<number>
 	>(new Set());
 	const lastClickedRef = useRef<number | null>(null);
-	
+	const lastClickedDraftRef = useRef<number | null>(null);
+	const supplementalDraftRowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+	const lastAutoScrolledDraftIdRef = useRef<number | null>(null);
+
 	// Track whether the container is being hovered (for bottom view outline)
 	const [isContainerHovered, setIsContainerHovered] = useState(false);
-	
+
 	// Track hovered contact index for keyboard navigation
 	const [hoveredContactIndex, setHoveredContactIndex] = useState<number | null>(null);
 
-	// Used contacts indicator data (IDs for current user)
-	const { data: usedContactIds } = useGetUsedContactIds();
-	const usedContactIdsSet = useMemo(
-		() => new Set(usedContactIds || []),
-		[usedContactIds]
-	);
-
 	const [hoveredUsedContactId, setHoveredUsedContactId] = useState<number | null>(null);
-	const { data: hoveredUsedContactCampaigns } = useGetUsedContactCampaigns(hoveredUsedContactId);
-	const [activeUsedContactCampaignIndex, setActiveUsedContactCampaignIndex] = useState<number | null>(null);
+	const [inboxPanelTab, setInboxPanelTab] = useState<DashboardResponsesTab>('responses');
+	const { data: hoveredUsedContactCampaigns } =
+		useGetUsedContactCampaigns(hoveredUsedContactId);
+	const [activeUsedContactCampaignIndex, setActiveUsedContactCampaignIndex] = useState<
+		number | null
+	>(null);
 	// Memoize resolved campaigns so it can be used in both tooltip and indicator
 	const resolvedUsedContactCampaigns = useMemo(() => {
 		const all = hoveredUsedContactCampaigns ?? [];
@@ -269,42 +723,6 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		[getBodyScaleContext]
 	);
 
-	const openUsedContactTooltip = useCallback(
-		(contactId: number) => {
-			clearUsedContactTooltipCloseTimeout();
-			const el = usedContactRowElsRef.current.get(contactId);
-			if (el) {
-				const rect = el.getBoundingClientRect();
-				setUsedContactTooltipPos(computeUsedContactTooltipPos(rect));
-			}
-			// Start with first campaign active, but don't reset if we're already on this contact
-			// (e.g., user selected a row in the tooltip and moves back to the pill to click).
-			setActiveUsedContactCampaignIndex((prev) =>
-				hoveredUsedContactId === contactId ? (prev ?? 0) : 0
-			);
-			setHoveredUsedContactId(contactId);
-		},
-		[clearUsedContactTooltipCloseTimeout, computeUsedContactTooltipPos, hoveredUsedContactId]
-	);
-
-	const goToUsedContactCampaign = useCallback(
-		(contactId: number) => {
-			// Only navigate when this contact's hover state is active (campaign list is scoped to hovered contact).
-			if (hoveredUsedContactId !== contactId) return;
-			if (!resolvedUsedContactCampaigns.length) return;
-
-			const idx = Math.min(
-				resolvedUsedContactCampaigns.length - 1,
-				Math.max(0, activeUsedContactCampaignIndex ?? 0)
-			);
-			const selected = resolvedUsedContactCampaigns[idx];
-			if (!selected?.id) return;
-
-			router.push(`/murmur/campaign/${selected.id}`);
-		},
-		[activeUsedContactCampaignIndex, hoveredUsedContactId, resolvedUsedContactCampaigns, router]
-	);
-
 	const scheduleCloseUsedContactTooltip = useCallback(
 		(contactId: number) => {
 			clearUsedContactTooltipCloseTimeout();
@@ -349,85 +767,111 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 
 	const isControlled = Boolean(selectedContactIds);
 	const currentSelectedIds = selectedContactIds ?? internalSelectedContactIds;
+	const isDraftsFocusMode = focusMode === 'drafts';
+	const isInboxFocusMode = focusMode === 'inbox';
 
-	const updateSelection = useCallback((updater: (prev: Set<number>) => Set<number>) => {
-		const apply = (prev: Set<number>) => {
-			const next = updater(new Set(prev));
-			// Never keep actively drafting contacts selected.
-			if (activelyDraftingContactIds && activelyDraftingContactIds.size > 0) {
-				for (const id of activelyDraftingContactIds) {
-					next.delete(id);
+	useEffect(() => {
+		if (isInboxFocusMode) setInboxPanelTab('responses');
+	}, [isInboxFocusMode]);
+
+	const updateSelection = useCallback(
+		(updater: (prev: Set<number>) => Set<number>) => {
+			const apply = (prev: Set<number>) => {
+				const next = updater(new Set(prev));
+				// Never keep actively drafting contacts selected.
+				if (activelyDraftingContactIds && activelyDraftingContactIds.size > 0) {
+					for (const id of activelyDraftingContactIds) {
+						next.delete(id);
+					}
 				}
-			}
-			return next;
-		};
+				return next;
+			};
 
-		if (isControlled && onContactSelectionChange) {
-			onContactSelectionChange(apply);
-		} else {
-			setInternalSelectedContactIds((prev) => apply(prev));
-		}
-	}, [activelyDraftingContactIds, isControlled, onContactSelectionChange]);
+			if (isControlled && onContactSelectionChange) {
+				onContactSelectionChange(apply);
+			} else {
+				setInternalSelectedContactIds((prev) => apply(prev));
+			}
+		},
+		[activelyDraftingContactIds, isControlled, onContactSelectionChange]
+	);
 
 	// Keyboard navigation: up/down arrows move hover between rows, Enter selects hovered contact
-	const handleKeyboardNavigation = useCallback((e: KeyboardEvent) => {
-		// Only handle up/down arrows and Enter
-		if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'Enter') return;
-		
-		// Only work if we have a hovered contact
-		if (hoveredContactIndex === null) return;
-		
-		// Check if a text input element is focused (don't intercept typing)
-		const activeElement = document.activeElement;
-		if (activeElement) {
-			const tagName = activeElement.tagName.toLowerCase();
-			if (
-				tagName === 'input' ||
-				tagName === 'textarea' ||
-				(activeElement as HTMLElement).isContentEditable
-			) {
-				return;
-			}
-		}
-		
-		e.preventDefault();
-		e.stopImmediatePropagation(); // Prevent campaign page tab navigation
-		
-		// Handle Enter key - select/deselect the hovered contact
-		if (e.key === 'Enter') {
-			const contact = contacts[hoveredContactIndex];
-			if (contact) {
-				// Don't allow selecting contacts that are actively drafting.
-				if (!activelyDraftingContactIds?.has(contact.id)) {
-					updateSelection((prev) => {
-						const next = new Set(prev);
-						if (next.has(contact.id)) {
-							next.delete(contact.id);
-						} else {
-							next.add(contact.id);
-						}
-						return next;
-					});
+	const handleKeyboardNavigation = useCallback(
+		(e: KeyboardEvent) => {
+			// Only handle up/down arrows and Enter
+			if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'Enter') return;
+
+			// Only work if we have a hovered contact
+			if (hoveredContactIndex === null) return;
+
+			// Check if a text input element is focused (don't intercept typing)
+			const activeElement = document.activeElement;
+			if (activeElement) {
+				const tagName = activeElement.tagName.toLowerCase();
+				if (
+					tagName === 'input' ||
+					tagName === 'textarea' ||
+					(activeElement as HTMLElement).isContentEditable
+				) {
+					return;
 				}
 			}
-			return;
-		}
-		
-		let newIndex: number;
-		if (e.key === 'ArrowUp') {
-			newIndex = hoveredContactIndex > 0 ? hoveredContactIndex - 1 : contacts.length - 1;
-		} else {
-			newIndex = hoveredContactIndex < contacts.length - 1 ? hoveredContactIndex + 1 : 0;
-		}
-		
-		setHoveredContactIndex(newIndex);
-		onContactHover?.(contacts[newIndex]);
-	}, [hoveredContactIndex, contacts, onContactHover, updateSelection, activelyDraftingContactIds]);
+
+			e.preventDefault();
+			e.stopImmediatePropagation(); // Prevent campaign page tab navigation
+
+			// Handle Enter key - select/deselect the hovered contact
+			if (e.key === 'Enter') {
+				const contact = contacts[hoveredContactIndex];
+				if (contact) {
+					if (isDraftsFocusMode) {
+						onContactClick?.(contact);
+						return;
+					}
+					// Don't allow selecting contacts that are actively drafting.
+					if (!activelyDraftingContactIds?.has(contact.id)) {
+						updateSelection((prev) => {
+							const next = new Set(prev);
+							if (next.has(contact.id)) {
+								next.delete(contact.id);
+							} else {
+								next.add(contact.id);
+							}
+							return next;
+						});
+					}
+				}
+				return;
+			}
+
+			let newIndex: number;
+			if (e.key === 'ArrowUp') {
+				newIndex =
+					hoveredContactIndex > 0 ? hoveredContactIndex - 1 : contacts.length - 1;
+			} else {
+				newIndex =
+					hoveredContactIndex < contacts.length - 1 ? hoveredContactIndex + 1 : 0;
+			}
+
+			setHoveredContactIndex(newIndex);
+			onContactHover?.(contacts[newIndex]);
+		},
+		[
+			hoveredContactIndex,
+			contacts,
+			onContactHover,
+			onContactClick,
+			isDraftsFocusMode,
+			updateSelection,
+			activelyDraftingContactIds,
+		]
+	);
 
 	useEffect(() => {
 		// Only add listener if we have a hovered contact
 		if (hoveredContactIndex === null) return;
-		
+
 		// Use capture phase to run before campaign page handler
 		document.addEventListener('keydown', handleKeyboardNavigation, true);
 		return () => {
@@ -504,27 +948,326 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const loadingWaveDurationSeconds = 4.5;
 	// Match MapResultsPanelSkeleton step delay exactly for consistent "fluid" feel
 	const loadingWaveStepSeconds = 0.1;
-	// If the page-level CampaignPageSkeleton was shown, sync our wave phase to it so
-	// the animation does not restart when the real component mounts.
-	const syncedWaveElapsedSeconds = useMemo(() => getCampaignLoadingWaveElapsedSeconds(), []);
-
-	// Allow callers to override dimensions; default to the original sidebar size
-	const resolvedWidth = width ?? 376;
-	const resolvedHeight = height ?? 424;
-	// Inner content width (search bar, rows) - leaves ~10px padding on sides
-	const innerWidth = typeof resolvedWidth === 'number' ? resolvedWidth - 10 : 370;
 
 	const isAllTab = height === 263;
 	const isAllTabNavigation = interactionMode === 'allTab';
-	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
+	// Compact (narrow-desktop) header is the full 28px header scaled by 0.875.
+	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 24.5 : 28);
 	const isBottomView = customWhiteSectionHeight === 15 || customWhiteSectionHeight === 16;
-	// Compressed bottom panel spec: 40px total = 12px white + 28px color.
-	const effectiveWhiteSectionHeight = collapsed && isBottomView ? 12 : whiteSectionHeight;
 	const shouldRenderCollapsedTopBox = collapsed && isBottomView;
-	const collapsedTopBoxHeightPx = 22;
-	const collapsedTopBoxWidthPx = 224;
-	const collapsedTopBoxRadiusPx = 4.7;
-	const shouldShowScrollbar = !isBottomView && contacts.length >= 14;
+	// Compressed bottom panel spec: 45px total = 13px label strip + 26px inner bar.
+	const collapsedOuterWidthPx = 197;
+	const collapsedOuterHeightPx = 45;
+	const collapsedLabelHeightPx = 13;
+	// Allow callers to override dimensions; default to the original sidebar size.
+	const resolvedWidth = shouldRenderCollapsedTopBox ? collapsedOuterWidthPx : (width ?? 376);
+	const resolvedHeight = shouldRenderCollapsedTopBox ? collapsedOuterHeightPx : (height ?? 424);
+	// The main 377px panel resolves to the spec row width: 370.896px.
+	const contactRowWidth =
+		typeof resolvedWidth === 'number'
+			? `${Math.max(0, resolvedWidth - CONTACT_ROW_INSET_PX)}px`
+			: `calc(${resolvedWidth} - ${CONTACT_ROW_INSET_PX}px)`;
+	const contactRowStyle = !isBottomView
+		? {
+				width: contactRowWidth,
+				height: `${CONTACT_ROW_HEIGHT_PX}px`,
+				borderRadius: `${CONTACT_ROW_RADIUS_PX}px`,
+				boxSizing: 'border-box' as const,
+			}
+		: undefined;
+	const effectiveWhiteSectionHeight = shouldRenderCollapsedTopBox ? collapsedLabelHeightPx : whiteSectionHeight;
+	const collapsedTopColor = '#FFB9B9';
+	const panelFillColor = isInboxFocusMode
+		? RESPONSE_WIDGET_BACKGROUND_BY_TAB[inboxPanelTab]
+		: '#EB8586';
+	const headerStripColor =
+		isInboxFocusMode
+			? panelFillColor
+			: shouldRenderCollapsedTopBox
+				? collapsedTopColor
+			: effectiveWhiteSectionHeight === 28 || isAllTab
+				? '#FFB9B9'
+				: 'rgba(255, 255, 255, 0.31)';
+	const panelBackground =
+		`linear-gradient(to bottom, ${headerStripColor} ` +
+		`${effectiveWhiteSectionHeight}px, ${panelFillColor} ${effectiveWhiteSectionHeight}px)`;
+	const resolvedActiveTopNavStop: ContactsExpandedTopNavStop =
+		activeTopNavStop ??
+		(isInboxFocusMode
+			? 'inbox'
+			: isDraftsFocusMode
+				? 'send'
+				: enableUsedContactTooltip
+					? 'write'
+					: 'all');
+	const shouldRedOutContactRows = !isBottomView && isDraftsFocusMode;
+	const shouldRedOutDraftRows =
+		!isBottomView && !isDraftsFocusMode && resolvedActiveTopNavStop === 'write';
+	const shouldRedOutInboxRows =
+		!isBottomView &&
+		(isDraftsFocusMode || (!isDraftsFocusMode && resolvedActiveTopNavStop === 'write'));
+	const draftSupplementalTextClassName = shouldRedOutDraftRows
+		? 'text-[#F5C0BD]'
+		: 'text-black';
+	const draftSupplementalBorderColor = shouldRedOutDraftRows
+		? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
+		: '#000000';
+	const draftSupplementalRowFillColor = shouldRedOutDraftRows
+		? WRITE_TAB_SUPPLEMENTAL_ROW_FILL_COLOR
+		: undefined;
+	const draftSupplementalBadgeFillColor = shouldRedOutDraftRows
+		? WRITE_TAB_SUPPLEMENTAL_BADGE_FILL_COLOR
+		: undefined;
+	const draftSupplementalTextColor = shouldRedOutDraftRows
+		? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
+		: undefined;
+	const inboxSupplementalTextClassName = shouldRedOutInboxRows
+		? 'text-[#F5C0BD]'
+		: 'text-black';
+	const inboxSupplementalBorderColor = shouldRedOutInboxRows
+		? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
+		: '#000000';
+	const inboxSupplementalRowFillColor = shouldRedOutInboxRows
+		? WRITE_TAB_SUPPLEMENTAL_ROW_FILL_COLOR
+		: undefined;
+	const inboxSupplementalBadgeFillColor = shouldRedOutInboxRows
+		? WRITE_TAB_SUPPLEMENTAL_BADGE_FILL_COLOR
+		: undefined;
+	const inboxSupplementalTextColor = shouldRedOutInboxRows
+		? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
+		: undefined;
+	const collapsedTopBoxHeightPx = 26;
+	const collapsedTopBoxWidthPx = 191;
+	const collapsedTopBoxRadiusPx = 3.33;
+	const allCampaignContacts = allContacts ?? contacts;
+	const contactsById = useMemo(() => {
+		const map = new Map<number, ContactWithName>();
+		for (const contact of allCampaignContacts) {
+			map.set(contact.id, contact);
+		}
+		return map;
+	}, [allCampaignContacts]);
+	const contactsByEmail = useMemo(() => {
+		const map = new Map<string, ContactWithName>();
+		for (const contact of allCampaignContacts) {
+			const key = contact.email?.toLowerCase().trim();
+			if (key && !map.has(key)) map.set(key, contact);
+		}
+		if (contactByEmail) {
+			for (const [email, contact] of Object.entries(contactByEmail)) {
+				const key = email.toLowerCase().trim();
+				if (key && !map.has(key)) map.set(key, contact);
+			}
+		}
+		return map;
+	}, [allCampaignContacts, contactByEmail]);
+	const supplementalDraftRows = useMemo(() => drafts ?? [], [drafts]);
+	const supplementalSentRows = useMemo(() => sentEmails ?? [], [sentEmails]);
+	const supplementalSentThreadMessages = useMemo(
+		() => supplementalSentRows.map(normalizeSentEmailForInboxConversation),
+		[supplementalSentRows]
+	);
+	const selectableDraftIds = useMemo(
+		() => new Set(supplementalDraftRows.map((draft) => draft.id)),
+		[supplementalDraftRows]
+	);
+	const draftSelectionCount = selectedDraftIds?.size
+		? selectedDraftIds.size
+		: selectedDraftId == null
+			? 0
+			: 1;
+	useEffect(() => {
+		if (!isDraftsFocusMode) {
+			lastClickedDraftRef.current = null;
+			return;
+		}
+
+		if (selectedDraftId != null) {
+			lastClickedDraftRef.current = selectedDraftId;
+		}
+	}, [isDraftsFocusMode, selectedDraftId]);
+	const areAllDraftsSelected = Boolean(
+		selectedDraftIds &&
+		selectableDraftIds.size > 0 &&
+		selectedDraftIds.size === selectableDraftIds.size &&
+		Array.from(selectableDraftIds).every((id) => selectedDraftIds.has(id))
+	);
+	const handleDraftSelectAllToggle = useCallback(() => {
+		if (!onDraftSelectionChange) return;
+		onDraftSelectionChange(() => {
+			if (areAllDraftsSelected) return new Set<number>();
+			return new Set(selectableDraftIds);
+		});
+	}, [areAllDraftsSelected, onDraftSelectionChange, selectableDraftIds]);
+	useEffect(() => {
+		if (selectedDraftId == null) {
+			lastAutoScrolledDraftIdRef.current = null;
+			return;
+		}
+		if (lastAutoScrolledDraftIdRef.current === selectedDraftId) return;
+
+		const rowEl = supplementalDraftRowRefs.current.get(selectedDraftId);
+		if (!rowEl) return;
+
+		rowEl.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+		lastAutoScrolledDraftIdRef.current = selectedDraftId;
+	}, [selectedDraftId, supplementalDraftRows.length]);
+	const supplementalInboxRows = useMemo(() => {
+		const rows = inboxEmails ?? [];
+		const shouldScopeToCampaignContacts = Boolean(allContacts || contactByEmail);
+		if (!shouldScopeToCampaignContacts) return rows;
+		return rows.filter((email) => {
+			const sender = email.sender?.toLowerCase().trim();
+			return Boolean(sender && contactsByEmail.has(sender));
+		});
+	}, [allContacts, contactByEmail, contactsByEmail, inboxEmails]);
+	// The artist's submitted applications thread in as per-event "sent" items,
+	// scoped by the same campaign-contacts rule as the inbound rows above.
+	const { data: myApplications } = useGetMyEventApplications();
+	// Event-chat rows resolve their application (status, event metadata) by the
+	// conversation's thread-application id. Withdrawn applications stay in the
+	// map so their chats can render the closed state.
+	const applicationById = useMemo(
+		() =>
+			new Map((myApplications ?? []).map((application) => [application.id, application])),
+		[myApplications]
+	);
+	const supplementalApplicationRows = useMemo(() => {
+		const rows = (myApplications ?? [])
+			.filter((application) => application.status === 'submitted')
+			.map(normalizeApplicationForInboxConversation)
+			.filter((row): row is InboxConversationMessage => row != null);
+		const shouldScopeToCampaignContacts = Boolean(allContacts || contactByEmail);
+		if (!shouldScopeToCampaignContacts) return rows;
+		return rows.filter((row) => {
+			const sender = row.sender?.toLowerCase().trim();
+			return Boolean(sender && contactsByEmail.has(sender));
+		});
+	}, [allContacts, contactByEmail, contactsByEmail, myApplications]);
+	const supplementalInboxThreadConversations = useMemo(
+		() =>
+			buildInboxConversations([
+				...(supplementalInboxRows as InboxConversationMessage[]),
+				...supplementalSentThreadMessages,
+				...supplementalApplicationRows,
+			]),
+		[supplementalInboxRows, supplementalSentThreadMessages, supplementalApplicationRows]
+	);
+	const supplementalSentConversations = useMemo(
+		() =>
+			supplementalInboxThreadConversations.filter(
+				(conversation) =>
+					conversation.sentMessages.length > 0 && Boolean(conversation.latestMessage.isSent)
+			),
+		[supplementalInboxThreadConversations]
+	);
+	const supplementalInboxConversations = useMemo(
+		() =>
+			supplementalInboxThreadConversations
+				.filter((conversation) => conversation.inboundMessages.length > 0)
+				.sort(
+					(a, b) =>
+						getInboxMessageTimeMs(getInboxConversationSelectionEmail(b)) -
+						getInboxMessageTimeMs(getInboxConversationSelectionEmail(a))
+				),
+		[supplementalInboxThreadConversations]
+	);
+	const supplementalOpportunityInboxConversations = useMemo(
+		() =>
+			supplementalInboxConversations.filter(
+				(conversation) =>
+					conversation.inboundMessages.some(isInboxOpportunityEmail) ||
+					// Application chats (the venue's replies to an event the artist applied
+					// to) belong under Opportunities — AND stay in Responses below, since
+					// they're real replies too.
+					conversation.inboundMessages.some(
+						(message) => message.venueThreadApplicationId != null
+					)
+			),
+		[supplementalInboxConversations]
+	);
+	// Responses sub-tab should NOT also contain opportunity-KEYWORD conversations.
+	// Keyword-classified conversations route to exactly one of {Responses,
+	// Opportunities}; application chats are the exception and appear in both
+	// (isInboxOpportunityEmail exempts venue rows, so they never match here).
+	const supplementalInboxConversationsResponsesOnly = useMemo(
+		() =>
+			supplementalInboxConversations.filter(
+				(conversation) => !conversation.inboundMessages.some(isInboxOpportunityEmail)
+			),
+		[supplementalInboxConversations]
+	);
+	// Past/live partition for the inbox panel: closed/canceled event chats sit
+	// above the fold and reveal only by scrolling up (the venue portal's ledger
+	// pattern). Recomputed per render (not memoized) so every row shares one
+	// Date.now() frame.
+	const nowMs = Date.now();
+	const isConversationAboveFold = (conversation: InboxConversation) => {
+		const threadApplicationId = getConversationThreadApplicationId(conversation);
+		if (threadApplicationId == null) return false;
+		const application = applicationById.get(threadApplicationId);
+		if (!application) return false;
+		return deriveEventChatStatus(application, nowMs).isAboveFold;
+	};
+	const activeInboxPanelConversations =
+		inboxPanelTab === 'sent'
+			? supplementalSentConversations
+			: inboxPanelTab === 'opportunities'
+				? supplementalOpportunityInboxConversations
+				: supplementalInboxConversationsResponsesOnly;
+	const pastInboxPanelConversations: InboxConversation[] = [];
+	const liveInboxPanelConversations: InboxConversation[] = [];
+	for (const conversation of activeInboxPanelConversations) {
+		(isConversationAboveFold(conversation)
+			? pastInboxPanelConversations
+			: liveInboxPanelConversations
+		).push(conversation);
+	}
+	const pastInboxIdsKey = pastInboxPanelConversations
+		.map((conversation) => conversation.key)
+		.join(',');
+	const visibleInboxPanelRowCount =
+		inboxPanelTab === 'sent'
+			? supplementalSentConversations.length
+			: inboxPanelTab === 'opportunities'
+				? supplementalOpportunityInboxConversations.length
+				: supplementalInboxConversationsResponsesOnly.length;
+	const totalRenderedRows = isInboxFocusMode
+		? visibleInboxPanelRowCount
+		: contacts.length + supplementalDraftRows.length + supplementalInboxConversations.length;
+	const shouldShowScrollbar =
+		!isBottomView &&
+		(isInboxFocusMode ? visibleInboxPanelRowCount >= 6 : totalRenderedRows >= 14);
+
+	// Pin the inbox panel's initial scroll to the live section so it renders like
+	// a live-only list; past (closed/canceled) event chats reveal by scrolling up.
+	// Re-pins when the panel (re)mounts, the sub-tab changes, or a NEW past key
+	// appears mid-session — not on removals. Layout effect so the first paint is
+	// already pinned.
+	const inboxListScrollerRef = useRef<HTMLDivElement | null>(null);
+	const inboxLiveSectionRef = useRef<HTMLDivElement | null>(null);
+	const seenPastInboxIdsRef = useRef<Set<string> | null>(null);
+	const seenPastInboxTabRef = useRef<DashboardResponsesTab | null>(null);
+	useLayoutEffect(() => {
+		if (!isInboxFocusMode) {
+			seenPastInboxIdsRef.current = null;
+			seenPastInboxTabRef.current = null;
+			return;
+		}
+		const scroller = inboxListScrollerRef.current;
+		const liveSection = inboxLiveSectionRef.current;
+		if (!scroller || !liveSection) return;
+		if (seenPastInboxTabRef.current !== inboxPanelTab) {
+			seenPastInboxTabRef.current = inboxPanelTab;
+			seenPastInboxIdsRef.current = null;
+		}
+		const previous = seenPastInboxIdsRef.current;
+		const nextIds = pastInboxIdsKey === '' ? [] : pastInboxIdsKey.split(',');
+		seenPastInboxIdsRef.current = new Set(nextIds);
+		if (previous && nextIds.every((id) => previous.has(id))) return;
+		// offsetTop is scroller-relative, so it equals the past band's height.
+		scroller.scrollTop = liveSection.offsetTop;
+	}, [isInboxFocusMode, inboxPanelTab, pastInboxIdsKey]);
 
 	const { data: campaignContactEvents } = useGetCampaignContactEvents(campaign?.id, {
 		enabled: isBottomView && Boolean(campaign?.id),
@@ -536,8 +1279,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		if (!isBottomView) return [] as Array<{ addedCount: number; createdAt: Date }>;
 
 		const totalNow = contacts.length;
-		const createdAtRaw = (campaign as unknown as { createdAt?: string | Date } | undefined)
-			?.createdAt;
+		const createdAtRaw = (
+			campaign as unknown as { createdAt?: string | Date } | undefined
+		)?.createdAt;
 		const campaignCreatedAt = createdAtRaw ? new Date(createdAtRaw) : null;
 		const hasValidCampaignCreatedAt =
 			Boolean(campaignCreatedAt) && !Number.isNaN(campaignCreatedAt?.getTime());
@@ -565,43 +1309,690 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			const sumAdded = parsedEvents.reduce((sum, e) => sum + e.addedCount, 0);
 			const inferredInitial = Math.max(0, totalNow - sumAdded);
 			if (inferredInitial > 0) {
-				return [...parsedEvents, { addedCount: inferredInitial, createdAt: campaignCreatedAt as Date }];
+				return [
+					...parsedEvents,
+					{ addedCount: inferredInitial, createdAt: campaignCreatedAt as Date },
+				];
 			}
 		}
 
 		return parsedEvents;
 	}, [campaign, campaignContactEvents, contacts.length, isBottomView]);
 
-	const bottomViewBatchesToShow = useMemo(() => bottomViewContactBatches.slice(0, 3), [bottomViewContactBatches]);
+	const bottomViewBatchesToShow = useMemo(
+		() => bottomViewContactBatches.slice(0, 3),
+		[bottomViewContactBatches]
+	);
 	const bottomViewPlaceholderCount = Math.max(0, 3 - bottomViewBatchesToShow.length);
+
+	const renderSupplementalDraftRow = (draft: EmailWithRelations, draftIndex: number) => {
+		const contact =
+			contactsById.get(draft.contactId) ??
+			((draft.contact as ContactWithName | null) || null);
+		const rawContactName = getContactFullName(contact);
+		const rawCompanyLabel = contact?.company || '';
+		const contactName = rawContactName.includes('@') ? '' : rawContactName;
+		const companyLabel = rawCompanyLabel.includes('@')
+			? !contactName
+				? 'Unknown Contact'
+				: ''
+			: rawCompanyLabel || (!contactName ? 'Unknown Contact' : '');
+		const contactTitle = getContactTitle(contact);
+		const messagePreview = draft.message
+			? convertHtmlToPlainText(draft.message)
+			: 'No content';
+		const isSelectedDraft = selectedDraftId === draft.id;
+		const isBatchSelectedDraft = selectedDraftIds?.has(draft.id) ?? false;
+		const isShowingDraft = isSelectedDraft;
+		const isInactiveSelectedDraft = isBatchSelectedDraft && !isShowingDraft;
+		const topBarLeftColor = shouldRedOutDraftRows
+			? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
+			: isInactiveSelectedDraft
+				? SELECTED_DRAFT_TOP_BAR_COLOR
+				: SHOWING_DRAFT_TOP_BAR_COLOR;
+		const topBarRightColor = shouldRedOutDraftRows
+			? WRITE_TAB_SUPPLEMENTAL_ROW_FILL_COLOR
+			: isShowingDraft
+				? SHOWING_DRAFT_TOP_BAR_COLOR
+				: '#F9FAFB';
+		const topBarLeftWidthPx = isInactiveSelectedDraft ? 177 : 115;
+
+		return (
+			<div
+				key={`contacts-draft-${draft.id}-${draftIndex}`}
+				ref={(el) => {
+					if (el) {
+						supplementalDraftRowRefs.current.set(draft.id, el);
+					} else {
+						supplementalDraftRowRefs.current.delete(draft.id);
+					}
+				}}
+				className={cn(
+					'relative select-none overflow-hidden',
+					isAllTabNavigation ? 'cursor-default' : 'cursor-pointer'
+				)}
+				style={{
+					width: contactRowWidth,
+					height: `${SUPPLEMENTAL_DRAFT_ROW_HEIGHT_PX}px`,
+					borderRadius: `${SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX}px`,
+					borderTop: `1.955px solid ${draftSupplementalBorderColor}`,
+					borderRight: `1.949px solid ${draftSupplementalBorderColor}`,
+					borderBottom: `1.949px solid ${draftSupplementalBorderColor}`,
+					borderLeft: `1.949px solid ${draftSupplementalBorderColor}`,
+					backgroundColor:
+						draftSupplementalRowFillColor ??
+						(isShowingDraft
+							? SHOWING_DRAFT_ROW_FILL_COLOR
+							: isInactiveSelectedDraft
+								? SELECTED_DRAFT_ROW_FILL_COLOR
+								: '#FFFFFF'),
+					boxSizing: 'border-box',
+				}}
+				onMouseEnter={(e) => {
+					if (!isAllTabNavigation) setHoveredContactIndex(null);
+					onDraftHover?.(draft);
+					onContactHover?.(contact);
+					onContactRowHover?.(contact, e.currentTarget);
+				}}
+				onMouseLeave={() => onContactRowHover?.(null, null)}
+				onMouseDown={(e) => {
+					if (e.shiftKey) e.preventDefault();
+				}}
+				onClick={(e) => {
+					if (isAllTabNavigation) return;
+					e.stopPropagation();
+					if (e.shiftKey && onDraftSelectionChange) {
+						e.preventDefault();
+						window.getSelection()?.removeAllRanges();
+
+						const currentIndex = supplementalDraftRows.findIndex(
+							(row) => row.id === draft.id
+						);
+						const anchorDraftId =
+							lastClickedDraftRef.current ?? selectedDraftId ?? draft.id;
+						const anchorIndex = supplementalDraftRows.findIndex(
+							(row) => row.id === anchorDraftId
+						);
+
+						if (currentIndex !== -1 && anchorIndex !== -1) {
+							const start = Math.min(currentIndex, anchorIndex);
+							const end = Math.max(currentIndex, anchorIndex);
+
+							onDraftSelectionChange(() => {
+								const next = new Set<number>();
+								for (let i = start; i <= end; i++) {
+									next.add(supplementalDraftRows[i].id);
+								}
+								return next;
+							});
+						}
+						return;
+					}
+
+					lastClickedDraftRef.current = draft.id;
+					onDraftClick?.(draft);
+					if (contact) onContactClick?.(contact);
+				}}
+			>
+				<div className="absolute left-0 top-0 h-[13px] w-full pointer-events-none flex">
+					<div
+						className="h-full shrink-0"
+						style={{
+							width: `${topBarLeftWidthPx}px`,
+							backgroundColor: topBarLeftColor,
+						}}
+					/>
+					<div className="h-full flex-1" style={{ backgroundColor: topBarRightColor }} />
+				</div>
+
+				<div className="absolute left-3 top-[17px] right-1/2 pr-1 pointer-events-none">
+					<FadeOverflowText
+						text={companyLabel}
+						className={cn(
+							'font-inter text-[14.661px] font-medium leading-[19.547px]',
+							draftSupplementalTextClassName
+						)}
+						splitNumericSuffix={false}
+					/>
+					<FadeOverflowText
+						text={contactName}
+						className={cn(
+							'font-inter text-[14.661px] font-normal leading-[19.547px]',
+							draftSupplementalTextClassName
+						)}
+						splitNumericSuffix={false}
+					/>
+				</div>
+
+				<div className="absolute top-[16px] left-1/2 right-2 pl-1 pointer-events-none">
+					{isShowingDraft ? (
+						<div
+							className="w-full h-[17px] rounded-[6px] pl-2 pr-2 border overflow-hidden flex items-center justify-start gap-2"
+							style={{
+								backgroundColor: SHOWING_DRAFT_TOP_BAR_COLOR,
+								borderColor: draftSupplementalBorderColor,
+							}}
+						>
+							<ShowingDraftViewIcon className="w-[20px] h-[11px] shrink-0" />
+							<span className="font-inter text-[10px] font-medium leading-none text-black">
+								Showing
+							</span>
+						</div>
+					) : contactTitle ? (
+						<TitleBadge
+							title={contactTitle}
+							className="w-full h-[17px] rounded-[6px] px-2 gap-1"
+							textClassName={cn(
+								'text-[10px] leading-none',
+								draftSupplementalTextClassName
+							)}
+							fillColor={draftSupplementalBadgeFillColor}
+							strokeColor={draftSupplementalBorderColor}
+							textColor={draftSupplementalTextColor}
+							showStroke={!shouldRedOutDraftRows}
+							restaurantIconSize={12}
+							coffeeIconSize={7}
+							defaultIconSize={12}
+						/>
+					) : null}
+				</div>
+
+				<div className="absolute top-[37px] left-1/2 right-2 pl-1 pointer-events-none">
+					<StateLocationRow
+						contact={contact}
+						className="h-[16px] w-full gap-1"
+						badgeClassName="box-border w-[29px] h-[16px] rounded-[4px] shrink-0"
+						badgeTextClassName="font-inter text-[10px] leading-none font-bold"
+						cityClassName={cn('text-[10px] leading-none', draftSupplementalTextClassName)}
+						badgeFillColor={draftSupplementalBadgeFillColor}
+						strokeColor={draftSupplementalBorderColor}
+						textColor={draftSupplementalTextColor}
+						showBadgeStroke={!shouldRedOutDraftRows}
+					/>
+				</div>
+
+				<div className="absolute left-3 right-[12px] top-[57px] pointer-events-none">
+					<FadeOverflowText
+						text={draft.subject || 'No subject'}
+						className={cn(
+							'font-inter text-[13.215px] font-semibold leading-[21.144px]',
+							draftSupplementalTextClassName
+						)}
+						splitNumericSuffix={false}
+					/>
+					<FadeOverflowText
+						text={messagePreview}
+						className={cn(
+							'font-inter text-[13.215px] font-normal leading-[21.144px]',
+							draftSupplementalTextClassName
+						)}
+						splitNumericSuffix={false}
+					/>
+				</div>
+			</div>
+		);
+	};
+
+	const renderSupplementalInboxRow = (conversation: InboxConversation, inboxIndex: number) => {
+		const selectionEmail = getInboxConversationSelectionEmail(conversation);
+		const email = selectionEmail;
+		const previewEmail = conversation.latestMessage;
+		const contact = resolveInboundContact(email, contactByEmail, contactsById);
+		const contactName = getContactDisplayName(
+			contact,
+			email.senderName || email.sender || 'Unknown sender'
+		);
+		const companyLabel = getContactCompanyLabel(contact);
+		const contactTitle = getContactTitle(contact);
+		// Event-thread rows are labeled with their opportunity (the row's subject is
+		// the event name) instead of the generic venue-type chip.
+		const threadEventName =
+			email.venueThreadApplicationId != null ? email.subject || '' : '';
+		const bodyPreview = `${previewEmail.isSent ? 'You: ' : ''}${
+			getInboxMessageSnippet(previewEmail) || 'No content'
+		}`;
+		// Event-chat rows render the rich status card instead of the generic
+		// company/badge layout once their application data resolves (red-out
+		// silhouettes keep the generic layout).
+		const threadApplicationId = getConversationThreadApplicationId(conversation);
+		const eventApplication =
+			threadApplicationId != null ? applicationById.get(threadApplicationId) : undefined;
+		const eventChatState =
+			eventApplication && !shouldRedOutInboxRows
+				? deriveEventChatStatus(eventApplication, nowMs)
+				: null;
+		const isEventChatCompact =
+			eventChatState?.status === 'closed' || eventChatState?.status === 'canceled';
+		const rowHeightPx = eventChatState
+			? isEventChatCompact
+				? EVENT_CHAT_COMPACT_ROW_HEIGHT_PX
+				: EVENT_CHAT_ROW_HEIGHT_PX
+			: SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX;
+		const latestMessageMs = getInboxMessageTimeMs(previewEmail);
+		const eventChatTimestampLabel = latestMessageMs
+			? formatEventChatTimestamp(new Date(latestMessageMs), nowMs)
+			: '';
+		const optimisticLastSentAt = conversation.messages.reduce((latest, message) => {
+			const sentAt = optimisticInboxReplyByEmailId?.[message.id];
+			return typeof sentAt === 'number' && sentAt > latest ? sentAt : latest;
+		}, 0);
+		const latestInboundAt = conversation.latestInboundMessage
+			? getInboxMessageTimeMs(conversation.latestInboundMessage)
+			: 0;
+		const isLastInboxMessageSent =
+			conversation.latestMessage.isSent || optimisticLastSentAt > latestInboundAt;
+		const selectedInboxRowFillColor = isLastInboxMessageSent
+			? INBOX_LAST_SENT_FILL_COLOR
+			: '#E5F1FF';
+		const isSelectedInboxConversation =
+			selectedInboxEmailId != null &&
+			(inboxConversationContainsInboundEmailId(conversation, selectedInboxEmailId) ||
+				inboxConversationContainsEmailId(conversation, selectedInboxEmailId));
+
+		return (
+			<div
+				key={`contacts-inbox-${conversation.key}-${inboxIndex}`}
+				className={cn(
+					'relative select-none overflow-hidden',
+					isAllTabNavigation ? 'cursor-default' : 'cursor-pointer'
+				)}
+				style={{
+					width: contactRowWidth,
+					height: `${rowHeightPx}px`,
+					borderRadius: `${SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX}px`,
+					borderTop: `1.955px solid ${inboxSupplementalBorderColor}`,
+					borderRight: `1.949px solid ${inboxSupplementalBorderColor}`,
+					borderBottom: `1.949px solid ${inboxSupplementalBorderColor}`,
+					borderLeft: `1.949px solid ${inboxSupplementalBorderColor}`,
+					background: isSelectedInboxConversation
+						? selectedInboxRowFillColor
+						: (inboxSupplementalRowFillColor ?? '#F9FAFB'),
+					boxSizing: 'border-box',
+				}}
+				role={!isAllTabNavigation ? 'button' : undefined}
+				aria-pressed={!isAllTabNavigation ? isSelectedInboxConversation : undefined}
+				tabIndex={!isAllTabNavigation ? 0 : undefined}
+				onMouseEnter={(e) => {
+					if (!isAllTabNavigation) setHoveredContactIndex(null);
+					if (isDraftsFocusMode) onDraftHover?.(null);
+					onContactHover?.(contact);
+					if (eventApplication && eventChatState) {
+						onEventChatRowHover?.(eventApplication, e.currentTarget);
+					} else {
+						onContactRowHover?.(contact, e.currentTarget);
+					}
+				}}
+				onMouseLeave={() => {
+					if (eventApplication && eventChatState) {
+						onEventChatRowHover?.(null, null);
+					} else {
+						onContactRowHover?.(null, null);
+					}
+				}}
+				onClick={(e) => {
+					if (isAllTabNavigation) return;
+					e.stopPropagation();
+					if (onInboxEmailClick) {
+						onInboxEmailClick(selectionEmail);
+						return;
+					}
+					if (contact) onContactClick?.(contact);
+				}}
+				onKeyDown={(e) => {
+					if (isAllTabNavigation || !onInboxEmailClick) return;
+					if (e.key === 'Enter' || e.key === ' ') {
+						e.preventDefault();
+						onInboxEmailClick(selectionEmail);
+					}
+				}}
+			>
+				{eventApplication && eventChatState ? (
+					<div className="pointer-events-none h-full w-full">
+						<EventChatCard
+							application={eventApplication}
+							state={eventChatState}
+							nowMs={nowMs}
+							campaignName={campaign?.name?.trim() || null}
+							timestampLabel={eventChatTimestampLabel}
+							previewText={bodyPreview}
+						/>
+					</div>
+				) : (
+					<>
+				{/* Layout mirrors supplemental draft rows, but without the top strip. */}
+				<div className="absolute left-3 top-[10px] right-1/2 pr-1 pointer-events-none">
+					<FadeOverflowText
+						text={companyLabel}
+						className={cn(
+							'font-inter text-[14.661px] font-medium leading-[19.547px]',
+							inboxSupplementalTextClassName
+						)}
+						splitNumericSuffix={false}
+					/>
+					<FadeOverflowText
+						text={contactName}
+						className={cn(
+							'font-inter text-[14.661px] font-normal leading-[19.547px]',
+							inboxSupplementalTextClassName
+						)}
+						splitNumericSuffix={false}
+					/>
+				</div>
+
+				<div className="absolute top-[9px] left-1/2 right-2 pl-1 pointer-events-none">
+					{threadEventName ? (
+						<EventThreadBadge
+							name={threadEventName}
+							className="w-full h-[17px] rounded-[6px] px-2 gap-1"
+							textClassName={cn(
+								'text-[10px] leading-none',
+								inboxSupplementalTextClassName
+							)}
+							strokeColor={inboxSupplementalBorderColor}
+							textColor={inboxSupplementalTextColor}
+							showStroke={!shouldRedOutInboxRows}
+						/>
+					) : contactTitle ? (
+						<TitleBadge
+							title={contactTitle}
+							className="w-full h-[17px] rounded-[6px] px-2 gap-1"
+							textClassName={cn(
+								'text-[10px] leading-none',
+								inboxSupplementalTextClassName
+							)}
+							fillColor={inboxSupplementalBadgeFillColor}
+							strokeColor={inboxSupplementalBorderColor}
+							textColor={inboxSupplementalTextColor}
+							showStroke={!shouldRedOutInboxRows}
+							restaurantIconSize={12}
+							coffeeIconSize={7}
+							defaultIconSize={12}
+						/>
+					) : null}
+				</div>
+
+				<div
+					className={cn(
+						'absolute left-1/2 right-2 pl-1 pointer-events-none',
+						threadEventName || contactTitle ? 'top-[30px]' : 'top-[9px]'
+					)}
+				>
+					<StateLocationRow
+						contact={contact}
+						className="h-[16px] w-full gap-1"
+						badgeClassName="box-border w-[29px] h-[16px] rounded-[4px] shrink-0"
+						badgeTextClassName="font-inter text-[10px] leading-none font-bold"
+						cityClassName={cn('text-[10px] leading-none', inboxSupplementalTextClassName)}
+						badgeFillColor={inboxSupplementalBadgeFillColor}
+						strokeColor={inboxSupplementalBorderColor}
+						textColor={inboxSupplementalTextColor}
+						showBadgeStroke={!shouldRedOutInboxRows}
+					/>
+				</div>
+
+				<div className="absolute left-3 right-[12px] top-[48px] pointer-events-none">
+					<FadeOverflowText
+						text={previewEmail.subject || 'No subject'}
+						className={cn(
+							'font-inter text-[13.215px] font-semibold leading-[17px]',
+							inboxSupplementalTextClassName
+						)}
+						splitNumericSuffix={false}
+					/>
+					<FadeOverflowText
+						text={bodyPreview}
+						className={cn(
+							'font-inter text-[13.215px] font-normal leading-[17px]',
+							inboxSupplementalTextClassName
+						)}
+						splitNumericSuffix={false}
+					/>
+				</div>
+					</>
+				)}
+			</div>
+		);
+	};
+
+	const renderSupplementalSentRow = (conversation: InboxConversation, sentIndex: number) => {
+		const email = conversation.latestMessage;
+		const contact = resolveInboundContact(email, contactByEmail, contactsById);
+		const contactName = getContactDisplayName(contact, contact?.email || 'Unknown recipient');
+		const companyLabel = getContactCompanyLabel(contact);
+		const contactTitle = getContactTitle(contact);
+		const threadEventName =
+			email.venueThreadApplicationId != null ? email.subject || '' : '';
+		const messagePreview = `You: ${getInboxMessageSnippet(email) || 'No content'}`;
+		const isSelectedSentConversation =
+			selectedInboxEmailId != null &&
+			inboxConversationContainsSentEmailId(conversation, selectedInboxEmailId);
+		// Same event-chat card swap as the inbound rows.
+		const threadApplicationId = getConversationThreadApplicationId(conversation);
+		const eventApplication =
+			threadApplicationId != null ? applicationById.get(threadApplicationId) : undefined;
+		const eventChatState =
+			eventApplication && !shouldRedOutInboxRows
+				? deriveEventChatStatus(eventApplication, nowMs)
+				: null;
+		const isEventChatCompact =
+			eventChatState?.status === 'closed' || eventChatState?.status === 'canceled';
+		const rowHeightPx = eventChatState
+			? isEventChatCompact
+				? EVENT_CHAT_COMPACT_ROW_HEIGHT_PX
+				: EVENT_CHAT_ROW_HEIGHT_PX
+			: SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX;
+		const latestMessageMs = getInboxMessageTimeMs(email);
+		const eventChatTimestampLabel = latestMessageMs
+			? formatEventChatTimestamp(new Date(latestMessageMs), nowMs)
+			: '';
+
+		return (
+			<div
+				key={`contacts-inbox-sent-${conversation.key}-${sentIndex}`}
+				className={cn(
+					'relative select-none overflow-hidden',
+					isAllTabNavigation ? 'cursor-default' : 'cursor-pointer'
+				)}
+				style={{
+					width: contactRowWidth,
+					height: `${rowHeightPx}px`,
+					borderRadius: `${SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX}px`,
+					borderTop: `1.955px solid ${inboxSupplementalBorderColor}`,
+					borderRight: `1.949px solid ${inboxSupplementalBorderColor}`,
+					borderBottom: `1.949px solid ${inboxSupplementalBorderColor}`,
+					borderLeft: `1.949px solid ${inboxSupplementalBorderColor}`,
+					background: isSelectedSentConversation
+						? '#E5F1FF'
+						: (inboxSupplementalRowFillColor ?? '#F9FAFB'),
+					boxSizing: 'border-box',
+				}}
+				role={!isAllTabNavigation ? 'button' : undefined}
+				aria-pressed={!isAllTabNavigation ? isSelectedSentConversation : undefined}
+				tabIndex={!isAllTabNavigation ? 0 : undefined}
+				onMouseEnter={(e) => {
+					if (!isAllTabNavigation) setHoveredContactIndex(null);
+					if (isDraftsFocusMode) onDraftHover?.(null);
+					onContactHover?.(contact);
+					if (eventApplication && eventChatState) {
+						onEventChatRowHover?.(eventApplication, e.currentTarget);
+					} else {
+						onContactRowHover?.(contact, e.currentTarget);
+					}
+				}}
+				onMouseLeave={() => {
+					if (eventApplication && eventChatState) {
+						onEventChatRowHover?.(null, null);
+					} else {
+						onContactRowHover?.(null, null);
+					}
+				}}
+				onClick={(e) => {
+					if (isAllTabNavigation) return;
+					e.stopPropagation();
+					if (onInboxEmailClick) {
+						onInboxEmailClick(email);
+						return;
+					}
+					if (contact) onContactClick?.(contact);
+				}}
+				onKeyDown={(e) => {
+					if (isAllTabNavigation) return;
+					if (e.key === 'Enter' || e.key === ' ') {
+						e.preventDefault();
+						if (onInboxEmailClick) {
+							onInboxEmailClick(email);
+							return;
+						}
+						if (contact) onContactClick?.(contact);
+					}
+				}}
+			>
+				{eventApplication && eventChatState ? (
+					<div className="pointer-events-none h-full w-full">
+						<EventChatCard
+							application={eventApplication}
+							state={eventChatState}
+							nowMs={nowMs}
+							campaignName={campaign?.name?.trim() || null}
+							timestampLabel={eventChatTimestampLabel}
+							previewText={messagePreview}
+						/>
+					</div>
+				) : (
+					<>
+				<div className="absolute left-3 top-[10px] right-1/2 pr-1 pointer-events-none">
+					<FadeOverflowText
+						text={companyLabel}
+						className={cn(
+							'font-inter text-[14.661px] font-medium leading-[19.547px]',
+							inboxSupplementalTextClassName
+						)}
+						splitNumericSuffix={false}
+					/>
+					<FadeOverflowText
+						text={contactName}
+						className={cn(
+							'font-inter text-[14.661px] font-normal leading-[19.547px]',
+							inboxSupplementalTextClassName
+						)}
+						splitNumericSuffix={false}
+					/>
+				</div>
+
+				<div className="absolute top-[9px] left-1/2 right-2 pl-1 pointer-events-none">
+					{threadEventName ? (
+						<EventThreadBadge
+							name={threadEventName}
+							className="w-full h-[17px] rounded-[6px] px-2 gap-1"
+							textClassName={cn(
+								'text-[10px] leading-none',
+								inboxSupplementalTextClassName
+							)}
+							strokeColor={inboxSupplementalBorderColor}
+							textColor={inboxSupplementalTextColor}
+							showStroke={!shouldRedOutInboxRows}
+						/>
+					) : contactTitle ? (
+						<TitleBadge
+							title={contactTitle}
+							className="w-full h-[17px] rounded-[6px] px-2 gap-1"
+							textClassName={cn(
+								'text-[10px] leading-none',
+								inboxSupplementalTextClassName
+							)}
+							fillColor={inboxSupplementalBadgeFillColor}
+							strokeColor={inboxSupplementalBorderColor}
+							textColor={inboxSupplementalTextColor}
+							showStroke={!shouldRedOutInboxRows}
+							restaurantIconSize={12}
+							coffeeIconSize={7}
+							defaultIconSize={12}
+						/>
+					) : null}
+				</div>
+
+				<div
+					className={cn(
+						'absolute left-1/2 right-2 pl-1 pointer-events-none',
+						threadEventName || contactTitle ? 'top-[30px]' : 'top-[9px]'
+					)}
+				>
+					<StateLocationRow
+						contact={contact}
+						className="h-[16px] w-full gap-1"
+						badgeClassName="box-border w-[29px] h-[16px] rounded-[4px] shrink-0"
+						badgeTextClassName="font-inter text-[10px] leading-none font-bold"
+						cityClassName={cn('text-[10px] leading-none', inboxSupplementalTextClassName)}
+						badgeFillColor={inboxSupplementalBadgeFillColor}
+						strokeColor={inboxSupplementalBorderColor}
+						textColor={inboxSupplementalTextColor}
+						showBadgeStroke={!shouldRedOutInboxRows}
+					/>
+				</div>
+
+				<div className="absolute left-3 right-[12px] top-[48px] pointer-events-none">
+					<FadeOverflowText
+						text={email.subject || 'No subject'}
+						className={cn(
+							'font-inter text-[13.215px] font-semibold leading-[17px]',
+							inboxSupplementalTextClassName
+						)}
+						splitNumericSuffix={false}
+					/>
+					<FadeOverflowText
+						text={messagePreview}
+						className={cn(
+							'font-inter text-[13.215px] font-normal leading-[17px]',
+							inboxSupplementalTextClassName
+						)}
+						splitNumericSuffix={false}
+					/>
+				</div>
+					</>
+				)}
+			</div>
+		);
+	};
 
 	return (
 		<div
 			className={cn(
-				'relative max-[480px]:w-[96.27vw] rounded-md flex flex-col overflow-visible',
-				// In the compressed bottom-panel view we need exact internal pixel heights (16px white + 24px color).
+				'relative max-[480px]:w-[96.27vw] rounded-[8px] flex flex-col overflow-visible',
+				// In the compressed bottom-panel view we need exact internal pixel heights.
 				// Use a stroke via box-shadow so it doesn't consume layout height.
 				shouldRenderCollapsedTopBox
 					? 'border-0'
 					: isBottomView
 						? 'border-2 border-black'
-					: isAllTab
-					? 'border-[3px] border-black'
-					: 'border border-black'
+						: isAllTab
+							? 'border-[3px] border-black'
+							: 'border border-black'
 			)}
 			style={{
+				boxSizing: 'border-box',
 				width: typeof resolvedWidth === 'number' ? `${resolvedWidth}px` : resolvedWidth,
 				height:
 					typeof resolvedHeight === 'number' ? `${resolvedHeight}px` : resolvedHeight,
-				background: `linear-gradient(to bottom, #ffffff ${effectiveWhiteSectionHeight}px, #EB8586 ${effectiveWhiteSectionHeight}px)`,
-				boxShadow: shouldRenderCollapsedTopBox
-					? 'inset 0 0 0 2px #000000'
-					: undefined,
+				background: panelBackground,
+				borderRadius: shouldRenderCollapsedTopBox ? '3.33px' : undefined,
+				boxShadow: shouldRenderCollapsedTopBox ? 'inset 0 0 0 2px #000000' : undefined,
 				...(isBottomView ? { cursor: 'pointer' } : {}),
 			}}
-			data-hover-description="Contacts: This box displays all of the contacts in your campaign. Select contacts to generate drafts."
+			data-hover-description={
+				isInboxFocusMode
+					? 'Inbox: This box displays replies from contacts in your campaign.'
+					: isDraftsFocusMode
+						? 'Drafts: This box displays generated drafts and de-emphasizes non-draft campaign activity.'
+						: 'Contacts: This box displays all of the contacts in your campaign. Select contacts to generate drafts.'
+			}
 			role="region"
-			aria-label="Expanded contacts preview"
+			aria-label={
+				isInboxFocusMode
+					? 'Expanded inbox preview'
+					: isDraftsFocusMode
+						? 'Expanded drafts preview'
+						: 'Expanded contacts preview'
+			}
 			onMouseEnter={() => isBottomView && setIsContainerHovered(true)}
 			onMouseLeave={() => isBottomView && setIsContainerHovered(false)}
 			onClick={() => isBottomView && onOpenContacts?.()}
@@ -628,7 +2019,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				}
 
 				.murmur-actively-drafting {
-					background-color: #FFA5A5;
+					background-color: #ffa5a5;
 				}
 
 				.murmur-actively-drafting::after {
@@ -640,6 +2031,26 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					pointer-events: none;
 					will-change: opacity;
 					animation: murmur-actively-drafting-pulse 3.6s ease-in-out infinite;
+				}
+
+				.murmur-contacts-drafts-redout,
+				.murmur-contacts-drafts-redout * {
+					color: ${WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR} !important;
+					border-color: ${WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR} !important;
+				}
+
+				.murmur-contacts-drafts-redout [style*='background-color'] {
+					background-color: ${WRITE_TAB_SUPPLEMENTAL_BADGE_FILL_COLOR} !important;
+				}
+
+				.murmur-contacts-drafts-redout [class*='border'] {
+					border-color: transparent !important;
+				}
+
+				.murmur-contacts-drafts-redout svg,
+				.murmur-contacts-drafts-redout svg * {
+					fill: ${WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR} !important;
+					stroke: ${WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR} !important;
 				}
 
 				@media (prefers-reduced-motion: reduce) {
@@ -664,18 +2075,33 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					}}
 				/>
 			)}
-			<ContactsHeaderChrome
-				isAllTab={isAllTab}
-				whiteSectionHeight={
-					shouldRenderCollapsedTopBox ? effectiveWhiteSectionHeight : customWhiteSectionHeight
-				}
-				// Match the main Contacts tab header chrome animation, but keep the ultra-compact
-				// bottom view static so it doesn't interfere with the "Open" affordance.
-				// Also, when this list is rendered on the Write tab (tooltip-enabled), treat "Write"
-				// as the active tab so hovering "Write" shows the white-placeholder state.
-				activeTab={enableUsedContactTooltip ? 'write' : 'contacts'}
-				interactive={!isBottomView && !isAllTabNavigation}
-			/>
+			{!shouldRenderCollapsedTopBox && (
+				<ContactsHeaderChrome
+					variant={isBottomView ? 'legacy' : 'campaignStops'}
+					isAllTab={isAllTab}
+					offsetY={effectiveWhiteSectionHeight === 28 ? 2 : isAllTab ? 1.75 : 0}
+					whiteSectionHeight={effectiveWhiteSectionHeight}
+					activeCampaignStop={resolvedActiveTopNavStop}
+					onAllClick={onOpenAll}
+					onSearchClick={onOpenSearch}
+					onWriteClick={onOpenWriting}
+					onSendClick={onOpenSend}
+					onInboxClick={onOpenInbox}
+					// When this list is rendered on the Write tab (tooltip-enabled), treat "Write"
+					// as the active tab so hovering "Write" shows the white-placeholder state.
+					activeTab={
+						isDraftsFocusMode ? 'drafts' : enableUsedContactTooltip ? 'write' : 'contacts'
+					}
+					interactive={!isBottomView && !isAllTabNavigation}
+				/>
+			)}
+			{shouldRenderCollapsedTopBox && (
+				<div className="absolute left-[8px] top-[1px] z-20 flex h-[13px] items-center pointer-events-none">
+					<span className="font-inter text-[12px] font-semibold leading-none text-black">
+						Contacts
+					</span>
+				</div>
+			)}
 			<div
 				className={cn(
 					'flex items-center gap-2 px-3 shrink-0',
@@ -694,13 +2120,14 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				}}
 			></div>
 
-			{(isAllTab || isBottomView) && (
+			{isAllTab && (
 				<div
 					className={cn(
-						'absolute z-20 flex items-center gap-[12px]',
+						'absolute z-20 flex items-center',
 						isAllTabNavigation ? 'pointer-events-none cursor-default' : 'cursor-pointer'
 					)}
-					style={{ top: isBottomView ? 1 : -1, right: isBottomView ? 4 : 4 }}
+					// Seated in the right end of the campaign-stops chrome bar (top 3.05px, 21.9px tall).
+					style={{ top: 7.5, right: 9 }}
 					onClick={onOpenContacts}
 					role={onOpenContacts ? 'button' : undefined}
 					tabIndex={onOpenContacts ? 0 : undefined}
@@ -712,21 +2139,43 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						}
 					}}
 				>
-					<span className={cn(
-						"font-medium leading-none text-[#B3B3B3] font-inter",
-						isBottomView ? "text-[8px]" : "text-[10px]"
-					)}>
-						Open
-					</span>
-					<div className="flex items-center" style={{ marginTop: isBottomView ? 0 : '1px' }}>
-						<OpenIcon width={isBottomView ? 10 : undefined} height={isBottomView ? 10 : undefined} />
-					</div>
+					<OpenIcon />
 				</div>
 			)}
 
-			{/* Collapsed bottom panels: show only the top "batch" box (22px) centered in the 24px color region */}
+			{!collapsed && !isBottomView && isInboxFocusMode && (
+				<div
+					className="absolute z-20 flex items-center gap-[6px]"
+					style={{ top: '45px', left: '6px' }}
+				>
+					<DashboardResponsesFilterBar
+						activeTab={inboxPanelTab}
+						onTabChange={setInboxPanelTab}
+						width={339}
+						height={22}
+						ariaLabel="Inbox contacts filters"
+					/>
+					<button
+						type="button"
+						aria-label="Search inbox contacts"
+						className="flex items-center justify-center bg-white p-0"
+						style={{
+							width: '22px',
+							height: '22px',
+							borderRadius: '6px',
+							border: 'none',
+							cursor: 'default',
+						}}
+						onClick={(e) => e.stopPropagation()}
+					>
+						<SearchIconDesktop width={16} height={16} stroke="black" strokeWidth={2} />
+					</button>
+				</div>
+			)}
+
+			{/* Collapsed bottom panels: label strip + bottom-aligned summary bar. */}
 			{shouldRenderCollapsedTopBox && (
-				<div className="flex-1 flex items-center justify-center px-[2px]">
+				<div className="flex-1 flex items-end justify-center px-[2px]" style={{ paddingBottom: 3 }}>
 					{bottomViewBatchesToShow[0] ? (
 						<div
 							key="contacts-collapsed-batch"
@@ -762,7 +2211,29 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				</div>
 			)}
 
-			{!collapsed && !isBottomView && (
+			{!collapsed && !isBottomView && isDraftsFocusMode && (
+				<div className="px-3 mt-2 mb-0 flex items-center justify-center relative z-10 text-[13px] font-inter font-medium text-black/70">
+					<span>{draftSelectionCount} Selected</span>
+					{onDraftSelectionChange ? (
+						<button
+							type="button"
+							className="absolute right-3 bg-transparent border-none p-0 hover:text-black text-[13px] font-inter font-medium text-black/70 cursor-pointer"
+							onClick={(e) => {
+								e.stopPropagation();
+								handleDraftSelectAllToggle();
+							}}
+						>
+							{areAllDraftsSelected ? 'Deselect All' : 'Select All'}
+						</button>
+					) : (
+						<span className="absolute right-3 bg-transparent border-none p-0 text-[13px] font-inter font-medium text-black/70 cursor-default">
+							Select All
+						</span>
+					)}
+				</div>
+			)}
+
+			{!collapsed && !isBottomView && !isDraftsFocusMode && !isInboxFocusMode && (
 				<div className="px-3 mt-2 mb-0 flex items-center justify-center relative z-10 text-[13px] font-inter font-medium text-black/70">
 					<span>{isAllTabNavigation ? 0 : selectedCount} Selected</span>
 					{isAllTabNavigation ? (
@@ -788,11 +2259,17 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				<div
 					className={cn(
 						'relative flex-1 flex flex-col min-h-0',
-						isBottomView ? 'px-[2px] pt-0 pb-0' : 'pb-2 pt-2'
+						isBottomView
+							? 'px-[2px] pt-0 pb-0'
+							: isInboxFocusMode
+								? 'pb-2 pt-[61px]'
+								: 'pb-2 pt-2'
 					)}
 					onMouseLeave={() => {
 						setHoveredContactIndex(null);
+						onDraftHover?.(null);
 						onContactHover?.(null);
+						onContactRowHover?.(null, null);
 					}}
 				>
 					{enableUsedContactTooltip &&
@@ -816,7 +2293,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 										'fixed z-[9999] w-[322px] rounded-[8px] bg-[#DAE6FE] text-black border-2 border-black shadow-none',
 										!isMultiCampaign && 'h-[60px]'
 									)}
-									style={{ left: usedContactTooltipPos.left, top: usedContactTooltipPos.top }}
+									style={{
+										left: usedContactTooltipPos.left,
+										top: usedContactTooltipPos.top,
+									}}
 									onMouseEnter={() => {
 										clearUsedContactTooltipCloseTimeout();
 									}}
@@ -905,7 +2385,68 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						offsetRight={isBottomView ? -7 : -6}
 						contentClassName="overflow-x-hidden"
 						alwaysShow={false}
+						scrollContainerRef={
+							isInboxFocusMode && !isBottomView ? inboxListScrollerRef : undefined
+						}
 					>
+						{isInboxFocusMode && !isBottomView ? (
+							<>
+								{/* Past band: closed/canceled event chats above the fold. */}
+								{pastInboxPanelConversations.length > 0 && (
+									<div className="flex shrink-0 flex-col items-center space-y-2 pb-2 opacity-70">
+										{inboxPanelTab === 'sent'
+											? pastInboxPanelConversations.map(renderSupplementalSentRow)
+											: pastInboxPanelConversations.map(renderSupplementalInboxRow)}
+									</div>
+								)}
+								{/* min-h-full pins max-scrollTop to the past band's height so the
+								    pinned view renders exactly like a live-only list; shrink-0 is
+								    load-bearing (min-h-full replaces flex sizing). */}
+								<div
+									ref={inboxLiveSectionRef}
+									className="flex min-h-full shrink-0 flex-col items-center space-y-2 pb-2"
+									style={{
+										paddingTop:
+											customWhiteSectionHeight !== undefined ? '2px' : undefined,
+									}}
+								>
+									{inboxPanelTab === 'sent'
+										? liveInboxPanelConversations.map(renderSupplementalSentRow)
+										: liveInboxPanelConversations.map(renderSupplementalInboxRow)}
+									{Array.from({
+										length: Math.max(0, minRows - visibleInboxPanelRowCount),
+									}).map((_, idx) => (
+										<div
+											key={`inbox-placeholder-${idx}`}
+											className={cn(
+												'select-none overflow-hidden max-[480px]:w-[96.27vw]',
+												shouldShowLoadingWave &&
+													'contacts-expanded-list-loading-wave-row contacts-expanded-list-loading-wave-row--inbox'
+											)}
+											style={{
+												width: contactRowWidth,
+												height: `${SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX}px`,
+												borderRadius: `${SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX}px`,
+												borderTop: `1.955px solid ${inboxSupplementalBorderColor}`,
+												borderRight: `1.949px solid ${inboxSupplementalBorderColor}`,
+												borderBottom: `1.949px solid ${inboxSupplementalBorderColor}`,
+												borderLeft: `1.949px solid ${inboxSupplementalBorderColor}`,
+												backgroundColor: panelFillColor,
+												boxSizing: 'border-box',
+												...(shouldShowLoadingWave
+													? {
+															animationDelay: `${-(
+																loadingWaveDurationSeconds -
+																idx * loadingWaveStepSeconds
+															)}s`,
+														}
+													: {}),
+											}}
+										/>
+									))}
+								</div>
+							</>
+						) : (
 						<div
 							className={cn(
 								'flex flex-col items-center',
@@ -915,913 +2456,879 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 								paddingTop: customWhiteSectionHeight !== undefined ? '2px' : undefined,
 							}}
 						>
-					{isBottomView ? (
-						<>
-							{bottomViewBatchesToShow.map((batch, idx) => {
-								const countLabel = formatBatchCount(batch.addedCount);
-								const rightLabel = formatBatchTimestamp(batch.createdAt);
-								return (
-									<div
-										key={`${batch.createdAt.getTime()}-${batch.addedCount}-${idx}`}
-										className={cn(
-											'select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between',
-											'w-[224px] h-[30px] rounded-[4.7px] bg-[#F5DADA]'
-										)}
-									>
-										<span className="pl-[18px] font-inter font-medium text-[15px] text-black leading-none">
-											{countLabel}
-										</span>
-										<span className="pr-[18px] font-inter font-medium text-[15px] text-black leading-none">
-											{rightLabel}
-										</span>
-									</div>
-								);
-							})}
-							{Array.from({ length: bottomViewPlaceholderCount }).map((_, idx) => (
-								<div
-									key={`contacts-batch-placeholder-${idx}`}
-									className={cn(
-										'select-none overflow-hidden border-2 border-[#000000]',
-										'w-[224px] h-[30px] rounded-[4.7px] bg-[#EB8586]'
-									)}
-								/>
-							))}
-						</>
-					) : (
-					contacts.map((contact, contactIndex) => {
-						const fullName =
-							contact.name ||
-							`${contact.firstName || ''} ${contact.lastName || ''}`.trim();
-						const isActivelyDrafting = Boolean(activelyDraftingContactIds?.has(contact.id));
-						const isSelected = !isActivelyDrafting && currentSelectedIds.has(contact.id);
-						const isUsed = usedContactIdsSet.has(contact.id);
-						const isUsedContactHoverCardVisible =
-							enableUsedContactTooltip &&
-							hoveredUsedContactId === contact.id &&
-							Boolean(usedContactTooltipPos) &&
-							Boolean(hoveredUsedContactCampaigns?.length);
-						const contactTitle = contact.title || contact.headline || '';
-						// Left padding: 12px base + 16px dot + 8px gap = 36px when used, else 12px
-						const leftPadding = isUsed ? 'pl-[36px]' : 'pl-3';
-						// Keyboard focus shows hover UI independently of mouse hover
-						const isKeyboardFocused = hoveredContactIndex === contactIndex;
-						// Final background: actively drafting > selected > keyboard focus > white (mouse hover handled by CSS)
-						const contactBgColor = isActivelyDrafting
-							? 'murmur-actively-drafting'
-							: isAllTabNavigation
-								? 'bg-white'
-								: isSelected
-									? 'bg-[#F5DADA]'
-									: isKeyboardFocused
-										? 'bg-[#FAE6E6]'
-										: 'bg-white hover:bg-[#FAE6E6]';
-						// Align the used-contact indicator with the top (Company) line in the standard (non-bottom) view.
-						// When the hover tooltip is visible, we center the tall pill so it stays inside the row.
-						const indicatorTop = isBottomView
-							? '50%'
-							: isUsedContactHoverCardVisible
-								? '50%'
-								: '16px';
-
-						return (
-							<div
-								key={contact.id}
-								ref={(el) => {
-									if (el) {
-										usedContactRowElsRef.current.set(contact.id, el);
-									} else {
-										usedContactRowElsRef.current.delete(contact.id);
-									}
-								}}
-						className={cn(
-							'overflow-hidden border-2 border-[#000000] select-none relative grid grid-cols-2 grid-rows-2',
-							isAllTabNavigation ? 'cursor-default' : 'cursor-pointer',
-							isBottomView
-								? 'w-[224px] h-[30px] rounded-[4.7px]'
-								: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px] rounded-[8px]',
-							contactBgColor,
-						)}
-								style={!isBottomView ? { width: `${innerWidth}px` } : undefined}
-								onMouseDown={(e) => {
-									if (e.shiftKey) e.preventDefault();
-								}}
-								onMouseEnter={() => {
-									if (!isAllTabNavigation) setHoveredContactIndex(contactIndex);
-									onContactHover?.(contact);
-								}}
-								onClick={(e) => {
-									if (isAllTabNavigation) return;
-									// Don't allow selecting contacts that are actively drafting.
-									if (!isActivelyDrafting) {
-										handleContactClick(contact, e);
-									}
-									onContactClick?.(contact);
-								}}
-							>
-									{/* Used contact indicator - absolutely positioned, vertically centered */}
-									{isUsed && (enableUsedContactTooltip ? (() => {
-										const isMultiCampaignIndicator =
-											isUsedContactHoverCardVisible && resolvedUsedContactCampaigns.length > 1;
-										const isSingleCampaignIndicator =
-											isUsedContactHoverCardVisible && resolvedUsedContactCampaigns.length === 1;
-										// For multi-campaign: #A0C0FF with sliding dot
-										// For single-campaign: #B0EAA4 (green, no dot)
-										// For default (not hovered): #DAE6FE
-										const pillBg = isMultiCampaignIndicator
-											? '#A0C0FF'
-											: isSingleCampaignIndicator
-												? '#B0EAA4'
-												: '#DAE6FE';
-
-										const DEFAULT_SIZE = isBottomView ? 12 : 16;
-										const PILL_WIDTH = isBottomView ? 10 : 14;
-										const PILL_HEIGHT = isBottomView ? 24 : 37;
-
-										// Handle mouse move on the pill to drive campaign selection
-										const handlePillMouseMove = isMultiCampaignIndicator
-											? (e: MouseEvent<HTMLSpanElement>) => {
-													// We render a thin stroke via box-shadow (doesn't affect box-model), so the
-													// interactive area is the full pill rect.
-													const PILL_BORDER = 0;
-													const rect = e.currentTarget.getBoundingClientRect();
-													const actualHeight = rect.height;
-													const offsetY = e.clientY - rect.top;
-													const innerHeight = Math.max(1, actualHeight - PILL_BORDER * 2);
-													const innerOffsetY = offsetY - PILL_BORDER;
-													const campaignCount = resolvedUsedContactCampaigns.length;
-													if (campaignCount <= 1) return;
-													// Map cursor Y position to campaign index (0 at top, max at bottom)
-													const ratio = Math.max(0, Math.min(1, innerOffsetY / innerHeight));
-													const idx = Math.round(ratio * (campaignCount - 1));
-													const clampedIdx = Math.max(0, Math.min(campaignCount - 1, idx));
-													setActiveUsedContactCampaignIndex((prev) =>
-														prev === clampedIdx ? prev : clampedIdx
-													);
-												}
-											: undefined;
-
+							{isBottomView ? (
+								<>
+									{bottomViewBatchesToShow.map((batch, idx) => {
+										const countLabel = formatBatchCount(batch.addedCount);
+										const rightLabel = formatBatchTimestamp(batch.createdAt);
 										return (
-											<span
-												className="z-10 cursor-pointer transition-all duration-150 ease-out"
-												style={{
-													position: 'absolute',
-													left: isBottomView ? '8px' : '12px',
-													top: indicatorTop,
-													transform: 'translateY(-50%)',
-													boxSizing: 'border-box',
-													// Default state: circle. Hover state (single/multi): pill.
-													width: isUsedContactHoverCardVisible ? `${PILL_WIDTH}px` : `${DEFAULT_SIZE}px`,
-													height: isUsedContactHoverCardVisible ? `${PILL_HEIGHT}px` : `${DEFAULT_SIZE}px`,
-													borderRadius: isUsedContactHoverCardVisible ? '9999px' : '50%',
-													// Thin stroke: use box-shadow so sizes stay exact (per design spec).
-													border: isUsedContactHoverCardVisible ? 'none' : '1px solid #000000',
-													boxShadow: isUsedContactHoverCardVisible
-														? '0 0 0 1px #000000'
-														: undefined,
-													backgroundColor: pillBg,
-													overflow: 'hidden',
-												}}
-												onMouseEnter={() => openUsedContactTooltip(contact.id)}
-												onMouseLeave={() => scheduleCloseUsedContactTooltip(contact.id)}
-												onMouseMove={handlePillMouseMove}
-												onClick={(e) => {
-													// Only hijack click when the hover card is visible (prevents breaking normal
-													// contact selection clicks on the indicator in its default state).
-													if (!isUsedContactHoverCardVisible) return;
-													e.stopPropagation();
-													goToUsedContactCampaign(contact.id);
-												}}
-												aria-label="Used in a previous campaign"
-											>
-												{/* Sliding dot for multi-campaign */}
-												{isMultiCampaignIndicator && (
-													<span
-														className="rounded-full bg-[#DAE6FE] pointer-events-none transition-all duration-150 ease-out"
-														style={(() => {
-															const maxTop = Math.max(0, PILL_HEIGHT - PILL_WIDTH);
-															const campaignCount = resolvedUsedContactCampaigns.length;
-															const clampedIdx =
-																typeof activeUsedContactCampaignIndex === 'number' && campaignCount > 0
-																	? Math.min(
-																			campaignCount - 1,
-																			Math.max(0, activeUsedContactCampaignIndex)
-																		)
-																	: 0;
-															// Position dot based on active index
-															const top =
-																campaignCount > 1
-																	? (maxTop * clampedIdx) / (campaignCount - 1)
-																	: maxTop / 2;
-															return {
-																position: 'absolute' as const,
-																left: '0px',
-																top: `${top}px`,
-																width: `${PILL_WIDTH}px`,
-																height: `${PILL_WIDTH}px`,
-																// Thin stroke without changing geometry.
-																boxShadow: '0 0 0 1px #000000',
-															};
-														})()}
-													/>
+											<div
+												key={`${batch.createdAt.getTime()}-${batch.addedCount}-${idx}`}
+												className={cn(
+													'select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between',
+													'w-[224px] h-[30px] rounded-[4.7px] bg-[#F5DADA]'
 												)}
-											</span>
+											>
+												<span className="pl-[18px] font-inter font-medium text-[15px] text-black leading-none">
+													{countLabel}
+												</span>
+												<span className="pr-[18px] font-inter font-medium text-[15px] text-black leading-none">
+													{rightLabel}
+												</span>
+											</div>
 										);
-									})() : (
-										<span
+									})}
+									{Array.from({ length: bottomViewPlaceholderCount }).map((_, idx) => (
+										<div
+											key={`contacts-batch-placeholder-${idx}`}
 											className={cn(
-												"absolute -translate-y-1/2",
-												isBottomView ? "left-2" : "left-3"
+												'select-none overflow-hidden border-2 border-[#000000]',
+												'w-[224px] h-[30px] rounded-[4.7px] bg-[#EB8586]'
 											)}
-											aria-label="Used in a previous campaign"
-											style={{
-												top: indicatorTop,
-												width: isBottomView ? '12px' : '16px',
-												height: isBottomView ? '12px' : '16px',
-												borderRadius: '50%',
-												border: '1px solid #000000',
-												backgroundColor: '#DAE6FE',
-											}}
 										/>
 									))}
-									{/* Bottom view - compact 2-row layout */}
-									{isBottomView ? (
-										<>
-											{fullName ? (
-												<>
-													{/* Top Left - Name */}
-													<div className={cn(isUsed ? 'pl-[22px]' : 'pl-2', 'pr-1 flex items-center h-[12px] overflow-hidden')}>
-														<div className="font-bold text-[9px] w-full truncate leading-none">
-															{fullName}
-														</div>
-													</div>
-													{/* Top Right - Title */}
-													<div className="pr-1.5 pl-0.5 flex items-center justify-start h-[12px]">
-														{contactTitle ? (
-															<div
-																className="h-[10px] rounded-[3px] px-1 flex items-center gap-0.5 max-w-full border border-black overflow-hidden"
-																style={{
-																	backgroundColor: isRestaurantTitle(contactTitle)
-																		? '#C3FBD1'
-																		: isCoffeeShopTitle(contactTitle)
-																			? '#D6F1BD'
-																			: isMusicVenueTitle(contactTitle)
-																				? '#B7E5FF'
-																				: isMusicFestivalTitle(contactTitle)
-																					? '#C1D6FF'
-																					: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
-																						? '#FFF2BC'
-																						: '#E8EFFF',
-																}}
-															>
-																{isRestaurantTitle(contactTitle) && (
-																	<RestaurantsIcon size={7} />
-																)}
-																{isCoffeeShopTitle(contactTitle) && (
-																	<CoffeeShopsIcon size={4} />
-																)}
-																{isMusicVenueTitle(contactTitle) && (
-																	<MusicVenuesIcon size={7} className="flex-shrink-0" />
-																)}
-																{isMusicFestivalTitle(contactTitle) && (
-																	<FestivalsIcon size={7} className="flex-shrink-0" />
-																)}
-																{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
-																	<WeddingPlannersIcon size={7} />
-																)}
-																<span className="text-[7px] text-black leading-none truncate">
-																	{isRestaurantTitle(contactTitle)
-																		? 'Restaurant'
-																		: isCoffeeShopTitle(contactTitle)
-																			? 'Coffee Shop'
-																			: isMusicVenueTitle(contactTitle)
-																				? 'Music Venue'
-																				: isMusicFestivalTitle(contactTitle)
-																					? 'Music Festival'
-																					: isWeddingPlannerTitle(contactTitle)
-																						? 'Wedding Planner'
-																						: isWeddingVenueTitle(contactTitle)
-																							? 'Wedding Venue'
-																							: contactTitle}
-																</span>
-															</div>
-														) : null}
-													</div>
-								{/* Bottom Left - Company */}
-								<div className={cn(isUsed ? 'pl-[22px]' : 'pl-2', 'pr-1 flex items-center h-[12px] overflow-hidden')}>
-									{contact.company && (
-										<div
-											className="text-[8px] text-black w-full overflow-hidden whitespace-nowrap leading-none"
-											style={{
-												maskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
-												WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
-											}}
-										>
-											{contact.company}
-										</div>
-									)}
-								</div>
-													{/* Bottom Right - Location */}
-													<div className="pr-1.5 pl-0.5 flex items-center justify-start h-[12px]">
-														{(contact.city || contact.state) && (
-															<div className="flex items-center gap-0.5">
-																{(() => {
-																	const fullStateName = (contact.state as string) || '';
-																	const stateAbbr = getStateAbbreviation(fullStateName) || '';
-																	const normalizedState = fullStateName.trim();
-																	const lowercaseCanadianProvinceNames =
-																		canadianProvinceNames.map((s) => s.toLowerCase());
-																	const isCanadianProvince =
-																		lowercaseCanadianProvinceNames.includes(
-																			normalizedState.toLowerCase()
-																		) ||
-																		canadianProvinceAbbreviations.includes(
-																			normalizedState.toUpperCase()
-																		) ||
-																		canadianProvinceAbbreviations.includes(
-																			stateAbbr.toUpperCase()
-																		);
-																	const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
-
-																	if (!stateAbbr) return null;
-																	return isCanadianProvince ? (
-																		<div
-																			className="inline-flex items-center justify-center w-[20px] h-[10px] rounded-[2px] border overflow-hidden"
-																			style={{ borderColor: '#000000' }}
-																			title="Canadian province"
-																		>
-																			<CanadianFlag
-																				width="100%"
-																				height="100%"
-																				className="w-full h-full"
-																			/>
-																		</div>
-																	) : isUSAbbr ? (
-																		<span
-																			className="inline-flex items-center justify-center w-[20px] h-[10px] rounded-[2px] border text-[7px] leading-none font-bold"
-																			style={{
-																				backgroundColor:
-																					stateBadgeColorMap[stateAbbr] || 'transparent',
-																				borderColor: '#000000',
-																			}}
-																		>
-																			{stateAbbr}
-																		</span>
-																	) : null;
-																})()}
-																{contact.city && (
-																	<span className="text-[7px] text-black leading-none truncate max-w-[50px]">
-																		{contact.city}
-																	</span>
-																)}
-															</div>
-														)}
-													</div>
-												</>
-											) : (
-												<>
-								{/* Left - Company only, centered vertically across both rows */}
-								<div className={cn(isUsed ? 'pl-[22px]' : 'pl-2', 'pr-1 row-span-2 flex items-center overflow-hidden')}>
-									<div
-										className="font-bold text-[9px] w-full overflow-hidden whitespace-nowrap leading-none"
-										style={{
-											maskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
-											WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
-										}}
-									>
-										{contact.company || 'Contact'}
-									</div>
-								</div>
-													{/* Right column spans both rows for title + location stacked */}
-													<div className="pr-1.5 pl-0.5 row-span-2 flex flex-col justify-center gap-0.5 overflow-hidden">
-														{contactTitle && (
-															<div
-																className="h-[10px] rounded-[3px] px-1 flex items-center gap-0.5 max-w-full border border-black overflow-hidden"
-																style={{
-																	backgroundColor: isRestaurantTitle(contactTitle)
-																		? '#C3FBD1'
-																		: isCoffeeShopTitle(contactTitle)
-																			? '#D6F1BD'
-																			: isMusicVenueTitle(contactTitle)
-																				? '#B7E5FF'
-																				: isMusicFestivalTitle(contactTitle)
-																					? '#C1D6FF'
-																					: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
-																						? '#FFF2BC'
-																						: isWineBeerSpiritsTitle(contactTitle)
-																							? '#BFC4FF'
-																							: '#E8EFFF',
-																}}
-															>
-																{isRestaurantTitle(contactTitle) && (
-																	<RestaurantsIcon size={7} />
-																)}
-																{isCoffeeShopTitle(contactTitle) && (
-																	<CoffeeShopsIcon size={4} />
-																)}
-																{isMusicVenueTitle(contactTitle) && (
-																	<MusicVenuesIcon size={7} className="flex-shrink-0" />
-																)}
-																{isMusicFestivalTitle(contactTitle) && (
-																	<FestivalsIcon size={7} className="flex-shrink-0" />
-																)}
-																{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
-																	<WeddingPlannersIcon size={7} />
-																)}
-																{isWineBeerSpiritsTitle(contactTitle) && (
-																	<WineBeerSpiritsIcon size={7} className="flex-shrink-0" />
-																)}
-																<span className="text-[7px] text-black leading-none truncate">
-																	{isRestaurantTitle(contactTitle)
-																		? 'Restaurant'
-																		: isCoffeeShopTitle(contactTitle)
-																			? 'Coffee Shop'
-																			: isMusicVenueTitle(contactTitle)
-																				? 'Music Venue'
-																				: isMusicFestivalTitle(contactTitle)
-																					? 'Music Festival'
-																					: isWeddingPlannerTitle(contactTitle)
-																						? 'Wedding Planner'
-																						: isWeddingVenueTitle(contactTitle)
-																							? 'Wedding Venue'
-																							: isWineBeerSpiritsTitle(contactTitle)
-																								? getWineBeerSpiritsLabel(contactTitle)
-																								: contactTitle}
-																</span>
-															</div>
-														)}
-														{(contact.city || contact.state) && (
-															<div className="flex items-center gap-0.5">
-																{(() => {
-																	const fullStateName = (contact.state as string) || '';
-																	const stateAbbr = getStateAbbreviation(fullStateName) || '';
-																	const normalizedState = fullStateName.trim();
-																	const lowercaseCanadianProvinceNames =
-																		canadianProvinceNames.map((s) => s.toLowerCase());
-																	const isCanadianProvince =
-																		lowercaseCanadianProvinceNames.includes(
-																			normalizedState.toLowerCase()
-																		) ||
-																		canadianProvinceAbbreviations.includes(
-																			normalizedState.toUpperCase()
-																		) ||
-																		canadianProvinceAbbreviations.includes(
-																			stateAbbr.toUpperCase()
-																		);
-																	const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
-
-																	if (!stateAbbr) return null;
-																	return isCanadianProvince ? (
-																		<div
-																			className="inline-flex items-center justify-center w-[20px] h-[10px] rounded-[2px] border overflow-hidden"
-																			style={{ borderColor: '#000000' }}
-																			title="Canadian province"
-																		>
-																			<CanadianFlag
-																				width="100%"
-																				height="100%"
-																				className="w-full h-full"
-																			/>
-																		</div>
-																	) : isUSAbbr ? (
-																		<span
-																			className="inline-flex items-center justify-center w-[20px] h-[10px] rounded-[2px] border text-[7px] leading-none font-bold"
-																			style={{
-																				backgroundColor:
-																					stateBadgeColorMap[stateAbbr] || 'transparent',
-																				borderColor: '#000000',
-																			}}
-																		>
-																			{stateAbbr}
-																		</span>
-																	) : null;
-																})()}
-																{contact.city && (
-																	<span className="text-[7px] text-black leading-none truncate max-w-[50px]">
-																		{contact.city}
-																	</span>
-																)}
-															</div>
-														)}
-													</div>
-												</>
-											)}
-										</>
-									) : fullName ? (
-										<>
-											{/* Top Left - Company (fixed top slot) */}
+								</>
+							) : (
+								<>
+									{isDraftsFocusMode &&
+										supplementalDraftRows.map(renderSupplementalDraftRow)}
+									{contacts.map((contact, contactIndex) => {
+										const fullName =
+											contact.name ||
+											`${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+										const isActivelyDrafting = Boolean(
+											activelyDraftingContactIds?.has(contact.id)
+										);
+										const isSelected =
+											!isActivelyDrafting && currentSelectedIds.has(contact.id);
+										const contactTitle = contact.title || contact.headline || '';
+										// Pull the contact identity block slightly toward the row center.
+										const leftPadding = 'pl-3';
+										// Keyboard focus shows hover UI independently of mouse hover
+										const isKeyboardFocused = hoveredContactIndex === contactIndex;
+										const shouldShowSelectedState = !isAllTabNavigation && isSelected;
+										// Final background: actively drafting > selected > keyboard focus > white (mouse hover handled by CSS)
+										const contactBgColor = isActivelyDrafting
+											? 'murmur-actively-drafting'
+											: shouldRedOutContactRows
+												? 'bg-[#EB8586]'
+												: isAllTabNavigation
+													? 'bg-[#FFF]'
+													: shouldShowSelectedState
+														? 'bg-[#FD8E89]'
+														: isKeyboardFocused
+															? 'bg-[#FAE6E6]'
+															: 'bg-[#FFF] hover:bg-[#FAE6E6]';
+										const contactBorderColor = shouldShowSelectedState
+											? 'border-white'
+											: shouldRedOutContactRows
+												? 'border-[#F5C0BD]'
+												: 'border-[#000000]';
+										return (
 											<div
+												key={contact.id}
+												ref={(el) => {
+													if (el) {
+														usedContactRowElsRef.current.set(contact.id, el);
+													} else {
+														usedContactRowElsRef.current.delete(contact.id);
+													}
+												}}
 												className={cn(
-													leftPadding,
-													'col-start-1 row-start-1 pr-1 flex items-end pb-[2px] overflow-hidden'
+													'overflow-hidden border-2 select-none relative grid grid-cols-2 grid-rows-2',
+													isAllTabNavigation ? 'cursor-default' : 'cursor-pointer',
+													isBottomView
+														? 'w-[224px] h-[30px] rounded-[4.7px]'
+														: 'max-[480px]:w-[96.27vw]',
+													shouldRedOutContactRows && 'murmur-contacts-drafts-redout',
+													contactBorderColor,
+													contactBgColor
 												)}
+												style={contactRowStyle}
+												onMouseDown={(e) => {
+													if (e.shiftKey) e.preventDefault();
+												}}
+												onMouseEnter={(e) => {
+													if (!isAllTabNavigation) setHoveredContactIndex(contactIndex);
+													if (isDraftsFocusMode) onDraftHover?.(null);
+													onContactHover?.(contact);
+													onContactRowHover?.(contact, e.currentTarget);
+												}}
+												onMouseLeave={() => onContactRowHover?.(null, null)}
+												onClick={(e) => {
+													if (isAllTabNavigation) return;
+													if (isDraftsFocusMode) {
+														e.stopPropagation();
+														onContactClick?.(contact);
+														return;
+													}
+													// Don't allow selecting contacts that are actively drafting.
+													if (!isActivelyDrafting) {
+														handleContactClick(contact, e);
+													}
+													onContactClick?.(contact);
+												}}
 											>
-												<div
-													className="font-bold text-[12px] font-inter text-black w-full overflow-hidden whitespace-nowrap leading-[1.1]"
-													style={{
-														maskImage:
-															'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
-														WebkitMaskImage:
-															'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
-													}}
-												>
-													{contact.company || ''}
-												</div>
-											</div>
-
-											{/* Top Right - Title (aligned to top slot) */}
-											<div className="col-start-2 row-start-1 pr-2 pl-1 flex items-end pb-[2px] overflow-hidden">
-												{contactTitle ? (
-													<div
-														className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
-														style={{
-															backgroundColor: isRestaurantTitle(contactTitle)
-																? '#C3FBD1'
-																: isCoffeeShopTitle(contactTitle)
-																	? '#D6F1BD'
-																	: isMusicVenueTitle(contactTitle)
-																		? '#B7E5FF'
-																		: isMusicFestivalTitle(contactTitle)
-																			? '#C1D6FF'
-																			: (isWeddingPlannerTitle(contactTitle) ||
-																					  isWeddingVenueTitle(contactTitle))
-																				? '#FFF2BC'
-																				: '#E8EFFF',
-														}}
-													>
-														{isRestaurantTitle(contactTitle) && <RestaurantsIcon size={12} />}
-														{isCoffeeShopTitle(contactTitle) && <CoffeeShopsIcon size={7} />}
-														{isMusicVenueTitle(contactTitle) && (
-															<MusicVenuesIcon size={12} className="flex-shrink-0" />
-														)}
-														{isMusicFestivalTitle(contactTitle) && (
-															<FestivalsIcon size={12} className="flex-shrink-0" />
-														)}
-														{(isWeddingPlannerTitle(contactTitle) ||
-															isWeddingVenueTitle(contactTitle)) && (
-															<WeddingPlannersIcon size={12} />
-														)}
-														<ScrollableText
-															text={
-																isRestaurantTitle(contactTitle)
-																	? 'Restaurant'
-																	: isCoffeeShopTitle(contactTitle)
-																		? 'Coffee Shop'
-																		: isMusicVenueTitle(contactTitle)
-																			? 'Music Venue'
-																			: isMusicFestivalTitle(contactTitle)
-																				? 'Music Festival'
-																				: isWeddingPlannerTitle(contactTitle)
-																					? 'Wedding Planner'
-																					: isWeddingVenueTitle(contactTitle)
-																						? 'Wedding Venue'
-																						: contactTitle
-															}
-															className="text-[10px] text-black leading-none"
-															scrollPixelsPerSecond={60}
-														/>
-													</div>
-												) : (
-													<div className="w-full" />
-												)}
-											</div>
-
-											{/* Bottom Left - Name (fixed bottom slot) */}
-											<div
-												className={cn(
-													leftPadding,
-													'col-start-1 row-start-2 pr-1 flex items-start pt-[2px] overflow-hidden'
-												)}
-											>
-												<div className="text-[12px] font-inter text-black w-full truncate leading-[1.1]">
-													{fullName}
-												</div>
-											</div>
-											
-											{/* Bottom Right - Location (aligned to bottom slot) */}
-											<div className="col-start-2 row-start-2 pr-2 pl-1 flex items-start pt-[2px] overflow-hidden">
-												{contact.city || contact.state ? (
-													<div className="flex items-center gap-1 w-full">
-														{(() => {
-															const fullStateName = (contact.state as string) || '';
-															const stateAbbr = getStateAbbreviation(fullStateName) || '';
-															const normalizedState = fullStateName.trim();
-															const lowercaseCanadianProvinceNames =
-																canadianProvinceNames.map((s) => s.toLowerCase());
-															const isCanadianProvince =
-																lowercaseCanadianProvinceNames.includes(
-																	normalizedState.toLowerCase()
-																) ||
-																canadianProvinceAbbreviations.includes(
-																	normalizedState.toUpperCase()
-																) ||
-																canadianProvinceAbbreviations.includes(
-																	stateAbbr.toUpperCase()
-																);
-															const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
-
-															if (!stateAbbr) return null;
-															return isCanadianProvince ? (
+												{/* Bottom view - compact 2-row layout */}
+												{isBottomView ? (
+													<>
+														{fullName ? (
+															<>
+																{/* Top Left - Name */}
 																<div
-																	className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border overflow-hidden"
-																	style={{ borderColor: '#000000' }}
-																	title="Canadian province"
+																	className={cn(
+																		'pl-2',
+																		'pr-1 flex items-center h-[12px] overflow-hidden'
+																	)}
 																>
-																	<CanadianFlag
-																		width="100%"
-																		height="100%"
-																		className="w-full h-full"
-																	/>
+																	<div className="font-bold text-[9px] w-full truncate leading-none">
+																		{fullName}
+																	</div>
 																</div>
-															) : isUSAbbr ? (
-																<span
-																	className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
+																{/* Top Right - Title */}
+																<div className="pr-1.5 pl-0.5 flex items-center justify-start h-[12px]">
+																	{contactTitle ? (
+																		<div
+																			className="h-[10px] rounded-[3px] px-1 flex items-center gap-0.5 max-w-full border border-black overflow-hidden"
+																			style={{
+																				backgroundColor: isRestaurantTitle(contactTitle)
+																					? '#C3FBD1'
+																					: isCoffeeShopTitle(contactTitle)
+																						? '#D6F1BD'
+																						: isMusicVenueTitle(contactTitle)
+																							? '#B7E5FF'
+																							: isMusicFestivalTitle(contactTitle)
+																								? '#C1D6FF'
+																								: isWeddingPlannerTitle(contactTitle) ||
+																									  isWeddingVenueTitle(contactTitle)
+																									? '#FFF2BC'
+																									: '#E8EFFF',
+																			}}
+																		>
+																			{isRestaurantTitle(contactTitle) && (
+																				<RestaurantsIcon size={7} />
+																			)}
+																			{isCoffeeShopTitle(contactTitle) && (
+																				<CoffeeShopsIcon size={4} />
+																			)}
+																			{isMusicVenueTitle(contactTitle) && (
+																				<MusicVenuesIcon
+																					size={7}
+																					className="flex-shrink-0"
+																				/>
+																			)}
+																			{isMusicFestivalTitle(contactTitle) && (
+																				<FestivalsIcon
+																					size={7}
+																					className="flex-shrink-0"
+																				/>
+																			)}
+																			{(isWeddingPlannerTitle(contactTitle) ||
+																				isWeddingVenueTitle(contactTitle)) && (
+																				<WeddingPlannersIcon size={7} />
+																			)}
+																			<span className="text-[7px] text-black leading-none truncate">
+																				{isRestaurantTitle(contactTitle)
+																					? 'Restaurant'
+																					: isCoffeeShopTitle(contactTitle)
+																						? 'Coffee Shop'
+																						: isMusicVenueTitle(contactTitle)
+																							? 'Music Venue'
+																							: isMusicFestivalTitle(contactTitle)
+																								? 'Music Festival'
+																								: isWeddingPlannerTitle(contactTitle)
+																									? 'Wedding Planner'
+																									: isWeddingVenueTitle(contactTitle)
+																										? 'Wedding Venue'
+																										: contactTitle}
+																			</span>
+																		</div>
+																	) : null}
+																</div>
+																{/* Bottom Left - Company */}
+																<div
+																	className={cn(
+																		'pl-2',
+																		'pr-1 flex items-center h-[12px] overflow-hidden'
+																	)}
+																>
+																	{contact.company && (
+																		<div
+																			className="text-[8px] text-black w-full overflow-hidden whitespace-nowrap leading-none"
+																			style={{
+																				maskImage:
+																					'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+																				WebkitMaskImage:
+																					'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+																			}}
+																		>
+																			{contact.company}
+																		</div>
+																	)}
+																</div>
+																{/* Bottom Right - Location */}
+																<div className="pr-1.5 pl-0.5 flex items-center justify-start h-[12px]">
+																	{(contact.city || contact.state) && (
+																		<div className="flex items-center gap-0.5">
+																			{(() => {
+																				const fullStateName =
+																					(contact.state as string) || '';
+																				const stateAbbr =
+																					getStateAbbreviation(fullStateName) || '';
+																				const normalizedState = fullStateName.trim();
+																				const lowercaseCanadianProvinceNames =
+																					canadianProvinceNames.map((s) =>
+																						s.toLowerCase()
+																					);
+																				const isCanadianProvince =
+																					lowercaseCanadianProvinceNames.includes(
+																						normalizedState.toLowerCase()
+																					) ||
+																					canadianProvinceAbbreviations.includes(
+																						normalizedState.toUpperCase()
+																					) ||
+																					canadianProvinceAbbreviations.includes(
+																						stateAbbr.toUpperCase()
+																					);
+																				const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+
+																				if (!stateAbbr) return null;
+																				return isCanadianProvince ? (
+																					<div
+																						className="inline-flex items-center justify-center w-[20px] h-[10px] rounded-[2px] border overflow-hidden"
+																						style={{ borderColor: '#000000' }}
+																						title="Canadian province"
+																					>
+																						<CanadianFlag
+																							width="100%"
+																							height="100%"
+																							className="w-full h-full"
+																						/>
+																					</div>
+																				) : isUSAbbr ? (
+																					<span
+																						className="inline-flex items-center justify-center w-[20px] h-[10px] rounded-[2px] border text-[7px] leading-none font-bold"
+																						style={{
+																							backgroundColor:
+																								stateBadgeColorMap[stateAbbr] ||
+																								'transparent',
+																							borderColor: '#000000',
+																						}}
+																					>
+																						{stateAbbr}
+																					</span>
+																				) : null;
+																			})()}
+																			{contact.city && (
+																				<span className="text-[7px] text-black leading-none truncate max-w-[50px]">
+																					{contact.city}
+																				</span>
+																			)}
+																		</div>
+																	)}
+																</div>
+															</>
+														) : (
+															<>
+																{/* Left - Company only, centered vertically across both rows */}
+																<div
+																	className={cn(
+																		'pl-2',
+																		'pr-1 row-span-2 flex items-center overflow-hidden'
+																	)}
+																>
+																	<div
+																		className="font-bold text-[9px] w-full overflow-hidden whitespace-nowrap leading-none"
+																		style={{
+																			maskImage:
+																				'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+																			WebkitMaskImage:
+																				'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+																		}}
+																	>
+																		{contact.company || 'Contact'}
+																	</div>
+																</div>
+																{/* Right column spans both rows for title + location stacked */}
+																<div className="pr-1.5 pl-0.5 row-span-2 flex flex-col justify-center gap-0.5 overflow-hidden">
+																	{contactTitle && (
+																		<div
+																			className="h-[10px] rounded-[3px] px-1 flex items-center gap-0.5 max-w-full border border-black overflow-hidden"
+																			style={{
+																				backgroundColor: isRestaurantTitle(contactTitle)
+																					? '#C3FBD1'
+																					: isCoffeeShopTitle(contactTitle)
+																						? '#D6F1BD'
+																						: isMusicVenueTitle(contactTitle)
+																							? '#B7E5FF'
+																							: isMusicFestivalTitle(contactTitle)
+																								? '#C1D6FF'
+																								: isWeddingPlannerTitle(contactTitle) ||
+																									  isWeddingVenueTitle(contactTitle)
+																									? '#FFF2BC'
+																									: isWineBeerSpiritsTitle(contactTitle)
+																										? '#BFC4FF'
+																										: '#E8EFFF',
+																			}}
+																		>
+																			{isRestaurantTitle(contactTitle) && (
+																				<RestaurantsIcon size={7} />
+																			)}
+																			{isCoffeeShopTitle(contactTitle) && (
+																				<CoffeeShopsIcon size={4} />
+																			)}
+																			{isMusicVenueTitle(contactTitle) && (
+																				<MusicVenuesIcon
+																					size={7}
+																					className="flex-shrink-0"
+																				/>
+																			)}
+																			{isMusicFestivalTitle(contactTitle) && (
+																				<FestivalsIcon
+																					size={7}
+																					className="flex-shrink-0"
+																				/>
+																			)}
+																			{(isWeddingPlannerTitle(contactTitle) ||
+																				isWeddingVenueTitle(contactTitle)) && (
+																				<WeddingPlannersIcon size={7} />
+																			)}
+																			{isWineBeerSpiritsTitle(contactTitle) && (
+																				<WineBeerSpiritsIcon
+																					size={7}
+																					className="flex-shrink-0"
+																				/>
+																			)}
+																			<span className="text-[7px] text-black leading-none truncate">
+																				{isRestaurantTitle(contactTitle)
+																					? 'Restaurant'
+																					: isCoffeeShopTitle(contactTitle)
+																						? 'Coffee Shop'
+																						: isMusicVenueTitle(contactTitle)
+																							? 'Music Venue'
+																							: isMusicFestivalTitle(contactTitle)
+																								? 'Music Festival'
+																								: isWeddingPlannerTitle(contactTitle)
+																									? 'Wedding Planner'
+																									: isWeddingVenueTitle(contactTitle)
+																										? 'Wedding Venue'
+																										: isWineBeerSpiritsTitle(contactTitle)
+																											? getWineBeerSpiritsLabel(
+																													contactTitle
+																												)
+																											: contactTitle}
+																			</span>
+																		</div>
+																	)}
+																	{(contact.city || contact.state) && (
+																		<div className="flex items-center gap-0.5">
+																			{(() => {
+																				const fullStateName =
+																					(contact.state as string) || '';
+																				const stateAbbr =
+																					getStateAbbreviation(fullStateName) || '';
+																				const normalizedState = fullStateName.trim();
+																				const lowercaseCanadianProvinceNames =
+																					canadianProvinceNames.map((s) =>
+																						s.toLowerCase()
+																					);
+																				const isCanadianProvince =
+																					lowercaseCanadianProvinceNames.includes(
+																						normalizedState.toLowerCase()
+																					) ||
+																					canadianProvinceAbbreviations.includes(
+																						normalizedState.toUpperCase()
+																					) ||
+																					canadianProvinceAbbreviations.includes(
+																						stateAbbr.toUpperCase()
+																					);
+																				const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+
+																				if (!stateAbbr) return null;
+																				return isCanadianProvince ? (
+																					<div
+																						className="inline-flex items-center justify-center w-[20px] h-[10px] rounded-[2px] border overflow-hidden"
+																						style={{ borderColor: '#000000' }}
+																						title="Canadian province"
+																					>
+																						<CanadianFlag
+																							width="100%"
+																							height="100%"
+																							className="w-full h-full"
+																						/>
+																					</div>
+																				) : isUSAbbr ? (
+																					<span
+																						className="inline-flex items-center justify-center w-[20px] h-[10px] rounded-[2px] border text-[7px] leading-none font-bold"
+																						style={{
+																							backgroundColor:
+																								stateBadgeColorMap[stateAbbr] ||
+																								'transparent',
+																							borderColor: '#000000',
+																						}}
+																					>
+																						{stateAbbr}
+																					</span>
+																				) : null;
+																			})()}
+																			{contact.city && (
+																				<span className="text-[7px] text-black leading-none truncate max-w-[50px]">
+																					{contact.city}
+																				</span>
+																			)}
+																		</div>
+																	)}
+																</div>
+															</>
+														)}
+													</>
+												) : fullName ? (
+													<>
+														{/* Left - Name and company centered as a tighter stack */}
+														<div
+															className={cn(
+																leftPadding,
+																'col-start-1 row-start-1 row-span-2 pr-1 flex flex-col justify-center gap-[1px] overflow-hidden'
+															)}
+														>
+															<div className="font-inter text-[14.661px] font-normal leading-[17px] text-black text-left w-full truncate">
+																{fullName}
+															</div>
+															{contact.company ? (
+																<div
+																	className="font-inter text-[14.661px] font-medium leading-[17px] text-black text-left w-full overflow-hidden whitespace-nowrap"
 																	style={{
-																		backgroundColor:
-																			stateBadgeColorMap[stateAbbr] || 'transparent',
-																		borderColor: '#000000',
+																		maskImage:
+																			'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+																		WebkitMaskImage:
+																			'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
 																	}}
 																>
-																	{stateAbbr}
-																</span>
-															) : (
-																<span
-																	className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border"
-																	style={{ borderColor: '#000000' }}
-																/>
-															);
-														})()}
-
-														{contact.city ? (
-															<ScrollableText
-																text={contact.city}
-																className="text-[10px] text-black leading-none"
-															/>
-														) : (
-															<div className="w-full" />
-														)}
-													</div>
-												) : (
-													<div className="w-full" />
-												)}
-											</div>
-										</>
-									) : (
-										<>
-											{/* Top Left - Company (fixed top slot) */}
-											<div
-												className={cn(
-													leftPadding,
-													'col-start-1 row-start-1 pr-1 flex items-end pb-[2px] overflow-hidden'
-												)}
-											>
-												<div
-													className="font-bold text-[12px] font-inter text-black w-full overflow-hidden whitespace-nowrap leading-[1.1]"
-													style={{
-														maskImage:
-															'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
-														WebkitMaskImage:
-															'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
-													}}
-												>
-													{contact.company || 'Contact'}
-												</div>
-											</div>
-											{/* Bottom Left - (empty fixed bottom slot) */}
-											<div className="col-start-1 row-start-2" />
-
-											{contactTitle ? (
-												<>
-													{/* Top Right - Title */}
-													<div className="col-start-2 row-start-1 pr-2 pl-1 flex items-end pb-[2px] overflow-hidden">
-														<div
-															className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
-															style={{
-																backgroundColor: isRestaurantTitle(contactTitle)
-																	? '#C3FBD1'
-																	: isCoffeeShopTitle(contactTitle)
-																		? '#D6F1BD'
-																		: isMusicVenueTitle(contactTitle)
-																			? '#B7E5FF'
-																			: isMusicFestivalTitle(contactTitle)
-																				? '#C1D6FF'
-																				: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
-																					? '#FFF2BC'
-																					: '#E8EFFF',
-															}}
-														>
-															{isRestaurantTitle(contactTitle) && (
-																<RestaurantsIcon size={12} />
-															)}
-															{isCoffeeShopTitle(contactTitle) && (
-																<CoffeeShopsIcon size={7} />
-															)}
-															{isMusicVenueTitle(contactTitle) && (
-																<MusicVenuesIcon size={12} className="flex-shrink-0" />
-															)}
-															{isMusicFestivalTitle(contactTitle) && (
-																<FestivalsIcon size={12} className="flex-shrink-0" />
-															)}
-															{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
-																<WeddingPlannersIcon size={12} />
-															)}
-															<ScrollableText
-																text={
-																	isRestaurantTitle(contactTitle)
-																		? 'Restaurant'
-																		: isCoffeeShopTitle(contactTitle)
-																			? 'Coffee Shop'
-																			: isMusicVenueTitle(contactTitle)
-																				? 'Music Venue'
-																				: isMusicFestivalTitle(contactTitle)
-																					? 'Music Festival'
-																					: isWeddingPlannerTitle(contactTitle)
-																						? 'Wedding Planner'
-																						: isWeddingVenueTitle(contactTitle)
-																							? 'Wedding Venue'
-																							: contactTitle
-																}
-																className="text-[10px] text-black leading-none"
-															/>
+																	{contact.company}
+																</div>
+															) : null}
 														</div>
-													</div>
 
-													{/* Bottom Right - Location */}
-													<div className="col-start-2 row-start-2 pr-2 pl-1 flex items-start pt-[2px] overflow-hidden">
-														{contact.city || contact.state ? (
-															<div className="flex items-center gap-1 w-full">
-																{(() => {
-																	const fullStateName = (contact.state as string) || '';
-																	const stateAbbr =
-																		getStateAbbreviation(fullStateName) || '';
-																	const normalizedState = fullStateName.trim();
-																	const lowercaseCanadianProvinceNames =
-																		canadianProvinceNames.map((s) => s.toLowerCase());
-																	const isCanadianProvince =
-																		lowercaseCanadianProvinceNames.includes(
-																			normalizedState.toLowerCase()
-																		) ||
-																		canadianProvinceAbbreviations.includes(
-																			normalizedState.toUpperCase()
-																		) ||
-																		canadianProvinceAbbreviations.includes(
-																			stateAbbr.toUpperCase()
-																		);
-																	const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
-
-																	if (!stateAbbr) return null;
-																	return isCanadianProvince ? (
-																		<div
-																			className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border overflow-hidden"
-																			style={{ borderColor: '#000000' }}
-																			title="Canadian province"
-																		>
-																			<CanadianFlag
-																				width="100%"
-																				height="100%"
-																				className="w-full h-full"
-																			/>
-																		</div>
-																	) : isUSAbbr ? (
-																		<span
-																			className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
-																			style={{
-																				backgroundColor:
-																					stateBadgeColorMap[stateAbbr] || 'transparent',
-																				borderColor: '#000000',
-																			}}
-																		>
-																			{stateAbbr}
-																		</span>
-																	) : (
-																		<span
-																			className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border"
-																			style={{ borderColor: '#000000' }}
+														{/* Top Right - Title (aligned to top slot) */}
+														<div className="col-start-2 row-start-1 pr-2 pl-1 flex items-end pb-[2px] overflow-hidden">
+															{contactTitle ? (
+																<div
+																	className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																	style={{
+																		backgroundColor: isRestaurantTitle(contactTitle)
+																			? '#C3FBD1'
+																			: isCoffeeShopTitle(contactTitle)
+																				? '#D6F1BD'
+																				: isMusicVenueTitle(contactTitle)
+																					? '#B7E5FF'
+																					: isMusicFestivalTitle(contactTitle)
+																						? '#C1D6FF'
+																						: isWeddingPlannerTitle(contactTitle) ||
+																							  isWeddingVenueTitle(contactTitle)
+																							? '#FFF2BC'
+																							: '#E8EFFF',
+																	}}
+																>
+																	{isRestaurantTitle(contactTitle) && (
+																		<RestaurantsIcon size={12} />
+																	)}
+																	{isCoffeeShopTitle(contactTitle) && (
+																		<CoffeeShopsIcon size={7} />
+																	)}
+																	{isMusicVenueTitle(contactTitle) && (
+																		<MusicVenuesIcon
+																			size={12}
+																			className="flex-shrink-0"
 																		/>
-																	);
-																})()}
-																{contact.city ? (
+																	)}
+																	{isMusicFestivalTitle(contactTitle) && (
+																		<FestivalsIcon size={12} className="flex-shrink-0" />
+																	)}
+																	{(isWeddingPlannerTitle(contactTitle) ||
+																		isWeddingVenueTitle(contactTitle)) && (
+																		<WeddingPlannersIcon size={12} />
+																	)}
 																	<ScrollableText
-																		text={contact.city}
-																		className="text-xs text-black w-full"
+																		text={
+																			isRestaurantTitle(contactTitle)
+																				? 'Restaurant'
+																				: isCoffeeShopTitle(contactTitle)
+																					? 'Coffee Shop'
+																					: isMusicVenueTitle(contactTitle)
+																						? 'Music Venue'
+																						: isMusicFestivalTitle(contactTitle)
+																							? 'Music Festival'
+																							: isWeddingPlannerTitle(contactTitle)
+																								? 'Wedding Planner'
+																								: isWeddingVenueTitle(contactTitle)
+																									? 'Wedding Venue'
+																									: contactTitle
+																		}
+																		className="text-[10px] text-black leading-none"
+																		scrollPixelsPerSecond={60}
 																	/>
+																</div>
+															) : (
+																<div className="w-full" />
+															)}
+														</div>
+
+														{/* Bottom Right - Location (aligned to bottom slot) */}
+														<div className="col-start-2 row-start-2 pr-2 pl-1 flex items-start pt-[2px] overflow-hidden">
+															{contact.city || contact.state ? (
+																<div className="flex items-center gap-1 w-full">
+																	{(() => {
+																		const fullStateName = (contact.state as string) || '';
+																		const stateAbbr =
+																			getStateAbbreviation(fullStateName) || '';
+																		const normalizedState = fullStateName.trim();
+																		const lowercaseCanadianProvinceNames =
+																			canadianProvinceNames.map((s) => s.toLowerCase());
+																		const isCanadianProvince =
+																			lowercaseCanadianProvinceNames.includes(
+																				normalizedState.toLowerCase()
+																			) ||
+																			canadianProvinceAbbreviations.includes(
+																				normalizedState.toUpperCase()
+																			) ||
+																			canadianProvinceAbbreviations.includes(
+																				stateAbbr.toUpperCase()
+																			);
+																		const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+
+																		if (!stateAbbr) return null;
+																		return isCanadianProvince ? (
+																			<div
+																				className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border overflow-hidden"
+																				style={{ borderColor: '#000000' }}
+																				title="Canadian province"
+																			>
+																				<CanadianFlag
+																					width="100%"
+																					height="100%"
+																					className="w-full h-full"
+																				/>
+																			</div>
+																		) : isUSAbbr ? (
+																			<span
+																				className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
+																				style={{
+																					backgroundColor:
+																						stateBadgeColorMap[stateAbbr] ||
+																						'transparent',
+																					borderColor: '#000000',
+																				}}
+																			>
+																				{stateAbbr}
+																			</span>
+																		) : (
+																			<span
+																				className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border"
+																				style={{ borderColor: '#000000' }}
+																			/>
+																		);
+																	})()}
+
+																	{contact.city ? (
+																		<ScrollableText
+																			text={contact.city}
+																			className="text-[10px] text-black leading-none"
+																		/>
+																	) : (
+																		<div className="w-full" />
+																	)}
+																</div>
+															) : (
+																<div className="w-full" />
+															)}
+														</div>
+													</>
+												) : (
+													<>
+														{/* Top Left - Company only */}
+														<div
+															className={cn(
+																leftPadding,
+																'col-start-1 row-start-1 pr-1 flex items-end pb-[2px] overflow-hidden'
+															)}
+														>
+															<div
+																className="font-inter text-[14.661px] font-medium leading-[17px] text-black text-left w-full overflow-hidden whitespace-nowrap"
+																style={{
+																	maskImage:
+																		'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+																	WebkitMaskImage:
+																		'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+																}}
+															>
+																{contact.company || 'Contact'}
+															</div>
+														</div>
+														<div className="col-start-1 row-start-2" />
+
+														{contactTitle ? (
+															<>
+																{/* Top Right - Title */}
+																<div className="col-start-2 row-start-1 pr-2 pl-1 flex items-end pb-[2px] overflow-hidden">
+																	<div
+																		className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																		style={{
+																			backgroundColor: isRestaurantTitle(contactTitle)
+																				? '#C3FBD1'
+																				: isCoffeeShopTitle(contactTitle)
+																					? '#D6F1BD'
+																					: isMusicVenueTitle(contactTitle)
+																						? '#B7E5FF'
+																						: isMusicFestivalTitle(contactTitle)
+																							? '#C1D6FF'
+																							: isWeddingPlannerTitle(contactTitle) ||
+																								  isWeddingVenueTitle(contactTitle)
+																								? '#FFF2BC'
+																								: '#E8EFFF',
+																		}}
+																	>
+																		{isRestaurantTitle(contactTitle) && (
+																			<RestaurantsIcon size={12} />
+																		)}
+																		{isCoffeeShopTitle(contactTitle) && (
+																			<CoffeeShopsIcon size={7} />
+																		)}
+																		{isMusicVenueTitle(contactTitle) && (
+																			<MusicVenuesIcon
+																				size={12}
+																				className="flex-shrink-0"
+																			/>
+																		)}
+																		{isMusicFestivalTitle(contactTitle) && (
+																			<FestivalsIcon
+																				size={12}
+																				className="flex-shrink-0"
+																			/>
+																		)}
+																		{(isWeddingPlannerTitle(contactTitle) ||
+																			isWeddingVenueTitle(contactTitle)) && (
+																			<WeddingPlannersIcon size={12} />
+																		)}
+																		<ScrollableText
+																			text={
+																				isRestaurantTitle(contactTitle)
+																					? 'Restaurant'
+																					: isCoffeeShopTitle(contactTitle)
+																						? 'Coffee Shop'
+																						: isMusicVenueTitle(contactTitle)
+																							? 'Music Venue'
+																							: isMusicFestivalTitle(contactTitle)
+																								? 'Music Festival'
+																								: isWeddingPlannerTitle(contactTitle)
+																									? 'Wedding Planner'
+																									: isWeddingVenueTitle(contactTitle)
+																										? 'Wedding Venue'
+																										: contactTitle
+																			}
+																			className="text-[10px] text-black leading-none"
+																		/>
+																	</div>
+																</div>
+
+																{/* Bottom Right - Location */}
+																<div className="col-start-2 row-start-2 pr-2 pl-1 flex items-start pt-[2px] overflow-hidden">
+																	{contact.city || contact.state ? (
+																		<div className="flex items-center gap-1 w-full">
+																			{(() => {
+																				const fullStateName =
+																					(contact.state as string) || '';
+																				const stateAbbr =
+																					getStateAbbreviation(fullStateName) || '';
+																				const normalizedState = fullStateName.trim();
+																				const lowercaseCanadianProvinceNames =
+																					canadianProvinceNames.map((s) =>
+																						s.toLowerCase()
+																					);
+																				const isCanadianProvince =
+																					lowercaseCanadianProvinceNames.includes(
+																						normalizedState.toLowerCase()
+																					) ||
+																					canadianProvinceAbbreviations.includes(
+																						normalizedState.toUpperCase()
+																					) ||
+																					canadianProvinceAbbreviations.includes(
+																						stateAbbr.toUpperCase()
+																					);
+																				const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+
+																				if (!stateAbbr) return null;
+																				return isCanadianProvince ? (
+																					<div
+																						className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border overflow-hidden"
+																						style={{ borderColor: '#000000' }}
+																						title="Canadian province"
+																					>
+																						<CanadianFlag
+																							width="100%"
+																							height="100%"
+																							className="w-full h-full"
+																						/>
+																					</div>
+																				) : isUSAbbr ? (
+																					<span
+																						className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
+																						style={{
+																							backgroundColor:
+																								stateBadgeColorMap[stateAbbr] ||
+																								'transparent',
+																							borderColor: '#000000',
+																						}}
+																					>
+																						{stateAbbr}
+																					</span>
+																				) : (
+																					<span
+																						className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border"
+																						style={{ borderColor: '#000000' }}
+																					/>
+																				);
+																			})()}
+																			{contact.city ? (
+																				<ScrollableText
+																					text={contact.city}
+																					className="text-xs text-black w-full"
+																				/>
+																			) : (
+																				<div className="w-full"></div>
+																			)}
+																		</div>
+																	) : (
+																		<div className="w-full"></div>
+																	)}
+																</div>
+															</>
+														) : (
+															<div className="col-start-2 row-span-2 pr-2 pl-1 flex items-center h-full">
+																{contact.city || contact.state ? (
+																	<div className="flex items-center gap-1 w-full">
+																		{(() => {
+																			const fullStateName =
+																				(contact.state as string) || '';
+																			const stateAbbr =
+																				getStateAbbreviation(fullStateName) || '';
+																			const normalizedState = fullStateName.trim();
+																			const isCanadianProvince =
+																				canadianProvinceNames.includes(
+																					normalizedState.toLowerCase()
+																				) ||
+																				canadianProvinceAbbreviations.includes(
+																					normalizedState.toUpperCase()
+																				) ||
+																				canadianProvinceAbbreviations.includes(
+																					stateAbbr.toUpperCase()
+																				);
+																			const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+
+																			if (!stateAbbr) return null;
+																			return isCanadianProvince ? (
+																				<div
+																					className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border overflow-hidden"
+																					style={{ borderColor: '#000000' }}
+																					title="Canadian province"
+																				>
+																					<CanadianFlag
+																						width="100%"
+																						height="100%"
+																						className="w-full h-full"
+																					/>
+																				</div>
+																			) : isUSAbbr ? (
+																				<span
+																					className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
+																					style={{
+																						backgroundColor:
+																							stateBadgeColorMap[stateAbbr] ||
+																							'transparent',
+																						borderColor: '#000000',
+																					}}
+																				>
+																					{stateAbbr}
+																				</span>
+																			) : (
+																				<span
+																					className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border"
+																					style={{ borderColor: '#000000' }}
+																				/>
+																			);
+																		})()}
+																		{contact.city ? (
+																			<ScrollableText
+																				text={contact.city}
+																				className="text-xs text-black w-full"
+																			/>
+																		) : (
+																			<div className="w-full"></div>
+																		)}
+																	</div>
 																) : (
 																	<div className="w-full"></div>
 																)}
 															</div>
-														) : (
-															<div className="w-full"></div>
 														)}
-													</div>
-												</>
-											) : (
-												<div className="col-start-2 row-span-2 pr-2 pl-1 flex items-center h-full">
-													{contact.city || contact.state ? (
-														<div className="flex items-center gap-1 w-full">
-															{(() => {
-																const fullStateName = (contact.state as string) || '';
-																const stateAbbr =
-																	getStateAbbreviation(fullStateName) || '';
-																const normalizedState = fullStateName.trim();
-																const isCanadianProvince =
-																	canadianProvinceNames.includes(
-																		normalizedState.toLowerCase()
-																	) ||
-																	canadianProvinceAbbreviations.includes(
-																		normalizedState.toUpperCase()
-																	) ||
-																	canadianProvinceAbbreviations.includes(
-																		stateAbbr.toUpperCase()
-																	);
-																const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+													</>
+												)}
+											</div>
+										);
+									})}
+									{!isDraftsFocusMode &&
+										supplementalDraftRows.map(renderSupplementalDraftRow)}
+									{supplementalInboxConversations.map(renderSupplementalInboxRow)}
+								</>
+							)}
+							{Array.from({
+								length: Math.max(0, (!isBottomView ? minRows : 0) - totalRenderedRows),
+							}).map((_, idx) => {
+								const inboxPlaceholderStyle = isInboxFocusMode
+									? {
+											width: contactRowWidth,
+											height: `${SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX}px`,
+											borderRadius: `${SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX}px`,
+											borderTop: `1.955px solid ${inboxSupplementalBorderColor}`,
+											borderRight: `1.949px solid ${inboxSupplementalBorderColor}`,
+											borderBottom: `1.949px solid ${inboxSupplementalBorderColor}`,
+											borderLeft: `1.949px solid ${inboxSupplementalBorderColor}`,
+											backgroundColor: panelFillColor,
+											boxSizing: 'border-box' as const,
+										}
+									: undefined;
 
-																if (!stateAbbr) return null;
-																return isCanadianProvince ? (
-																	<div
-																		className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border overflow-hidden"
-																		style={{ borderColor: '#000000' }}
-																		title="Canadian province"
-																	>
-																		<CanadianFlag
-																			width="100%"
-																			height="100%"
-																			className="w-full h-full"
-																		/>
-																	</div>
-																) : isUSAbbr ? (
-																	<span
-																		className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
-																		style={{
-																			backgroundColor:
-																				stateBadgeColorMap[stateAbbr] || 'transparent',
-																			borderColor: '#000000',
-																		}}
-																	>
-																		{stateAbbr}
-																	</span>
-																) : (
-																	<span
-																		className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border"
-																		style={{ borderColor: '#000000' }}
-																	/>
-																);
-															})()}
-															{contact.city ? (
-																<ScrollableText
-																	text={contact.city}
-																	className="text-xs text-black w-full"
-																/>
-															) : (
-																<div className="w-full"></div>
-															)}
-														</div>
-													) : (
-														<div className="w-full"></div>
-													)}
-												</div>
-											)}
-										</>
-									)}
-								</div>
-							);
-						})
-					)}
-					{Array.from({ length: Math.max(0, (!isBottomView ? minRows : 0) - contacts.length) }).map(
-						(_, idx) => (
-							<div
-								key={`placeholder-${idx}`}
-								className={cn(
-									'select-none overflow-hidden border-2 border-[#000000]',
-									isBottomView
-										? 'w-[224px] h-[30px] rounded-[4.7px]'
-										: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px] rounded-[8px]'
-									,
-									shouldShowLoadingWave
-										? 'contacts-expanded-list-loading-wave-row'
-										: 'bg-[#EB8586]'
-								)}
-								style={{
-									...(!isBottomView ? { width: `${innerWidth}px` } : {}),
-									...(shouldShowLoadingWave
-										? {
-												animationDelay:
-													syncedWaveElapsedSeconds !== null
-														? getSyncedWaveDelay({
-																elapsedSeconds: syncedWaveElapsedSeconds,
-																durationSeconds: loadingWaveDurationSeconds,
-																index: idx,
-																stepSeconds: loadingWaveStepSeconds,
-														  })
-														: `${-(
-																loadingWaveDurationSeconds -
-																idx * loadingWaveStepSeconds
-														  )}s`,
-											}
-										: {}),
-								}}
-							/>
-						)
-					)}
+								return (
+									<div
+										key={`placeholder-${idx}`}
+										className={cn(
+											'select-none overflow-hidden border-2 border-[#000000]',
+											isBottomView
+												? 'w-[224px] h-[30px] rounded-[4.7px]'
+												: 'max-[480px]:w-[96.27vw]',
+											shouldShowLoadingWave
+												? cn(
+														'contacts-expanded-list-loading-wave-row',
+														isInboxFocusMode &&
+															'contacts-expanded-list-loading-wave-row--inbox'
+												  )
+												: !isInboxFocusMode && 'bg-[#EB8586]'
+										)}
+										style={{
+											...(inboxPlaceholderStyle ?? contactRowStyle ?? {}),
+											...(shouldShowLoadingWave
+												? {
+														animationDelay: `${-(
+															loadingWaveDurationSeconds -
+															idx * loadingWaveStepSeconds
+														)}s`,
+												  }
+												: {}),
+										}}
+									/>
+								);
+							})}
 						</div>
+						)}
 					</CustomScrollbar>
 				</div>
 			)}

@@ -1210,7 +1210,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						`}</style>
 						<div
 							data-mini-settings-manual-body
-							className="h-full w-full px-[10px] py-[8px] font-inter text-[12px] leading-[16px] text-black overflow-y-auto"
+							className="murmur-selectable h-full w-full px-[10px] py-[8px] font-inter text-[12px] leading-[16px] text-black overflow-y-auto"
 							data-mini-email-scroll="true"
 							dangerouslySetInnerHTML={{
 								__html: html?.trim()

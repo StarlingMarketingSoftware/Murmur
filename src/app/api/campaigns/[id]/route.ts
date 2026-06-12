@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import {
 	apiBadRequest,
 	apiNoContent,
@@ -9,6 +10,8 @@ import {
 	apiUnauthorizedResource,
 	handleApiError,
 	connectOrDisconnectId,
+	allContactsGlobalOrOwned,
+	allUserContactListsOwned,
 } from '@/app/api/_utils';
 import { DraftingTone, HybridBlock, Prisma, Status } from '@prisma/client';
 import { ApiRouteParams } from '@/types';
@@ -85,13 +88,13 @@ const patchCampaignSchema = z.object({
 	contactOperation: z
 		.object({
 			action: z.enum(['connect', 'disconnect']),
-			contactIds: z.array(z.number()),
+			contactIds: z.array(z.number()).max(100000),
 		})
 		.optional(),
 	userContactListOperation: z
 		.object({
 			action: z.enum(['connect', 'disconnect']),
-			userContactListIds: z.array(z.number()),
+			userContactListIds: z.array(z.number()).max(1000),
 		})
 		.optional(),
 });
@@ -99,6 +102,9 @@ export type PatchCampaignData = z.infer<typeof patchCampaignSchema>;
 
 export async function GET(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
+		const limited = await withRateLimit(req, 'read-cheap', 'campaigns-id');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
@@ -126,6 +132,9 @@ export async function GET(req: NextRequest, { params }: { params: ApiRouteParams
 
 export async function PATCH(req: Request, { params }: { params: ApiRouteParams }) {
 	try {
+		const limited = await withRateLimit(req, 'mutation', 'campaigns-id');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
@@ -157,6 +166,25 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 		const preUpdateContactCount = shouldLogContactsAdded
 			? await getCampaignContactsCount(campaignId)
 			: null;
+
+		// Connected resources must be global or the caller's own — otherwise any
+		// user could attach (and later read) other users' private contacts/lists.
+		// Disconnects need no check: the campaign itself is userId-scoped below.
+		if (
+			contactOperation?.action === 'connect' &&
+			!(await allContactsGlobalOrOwned(contactOperation.contactIds, userId))
+		) {
+			return apiBadRequest('One or more contacts are invalid');
+		}
+		if (
+			userContactListOperation?.action === 'connect' &&
+			!(await allUserContactListsOwned(
+				userContactListOperation.userContactListIds,
+				userId
+			))
+		) {
+			return apiBadRequest('One or more contact lists are invalid');
+		}
 
 		// Verify that the identity belongs to the current user
 		if (identityId) {
@@ -236,6 +264,9 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 
 export async function DELETE(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
+		const limited = await withRateLimit(req, 'mutation', 'campaigns-id');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();

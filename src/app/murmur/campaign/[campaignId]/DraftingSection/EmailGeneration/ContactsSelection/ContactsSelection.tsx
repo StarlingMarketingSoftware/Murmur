@@ -26,7 +26,6 @@ import {
 	useGetUsedContactIds,
 	useGetLocations,
 } from '@/hooks/queryHooks/useContacts';
-import { CampaignWithRelations } from '@/types';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
@@ -48,28 +47,11 @@ const DEFAULT_STATE_SUGGESTIONS = [
 	{ label: 'Pennsylvania', description: 'contact venues, restaurants and more' },
 	{ label: 'California', description: 'contact venues, restaurants and more' },
 ];
+const PENDING_SEARCH_STORAGE_KEY = 'murmur_pending_search';
 
-// Parse campaign name to extract search components
-// Campaign names are typically formatted as "{what} in {where}" or just "{what}"
-export const parseSearchFromCampaign = (campaign?: CampaignWithRelations) => {
-	// Try to get the name from userContactLists first (more accurate), then fall back to campaign name
-	const searchName = campaign?.userContactLists?.[0]?.name || campaign?.name || '';
-
-	// Default values - using "Why", "What", "Where" to match dashboard
-	const why = 'Booking'; // Default assumption
-	let what = '';
-	let where = '';
-
-	// Check if name contains location indicator " in "
-	const inMatch = searchName.match(/^(.+?)\s+in\s+(.+)$/i);
-	if (inMatch) {
-		what = inMatch[1].trim();
-		where = inMatch[2].trim();
-	} else {
-		what = searchName;
-	}
-
-	return { why, what, where };
+// Campaign mini search starts blank so the campaign name is never used as a query.
+export const parseSearchFromCampaign = () => {
+	return { why: 'Booking', what: '', where: '' };
 };
 
 const FadeOverflowText: FC<{
@@ -968,7 +950,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 	const [isDrafting, setIsDrafting] = useState(false);
 	const router = useRouter();
 	const isMobile = useIsMobile();
-	const searchInfo = useMemo(() => parseSearchFromCampaign(campaign), [campaign]);
+	const searchInfo = useMemo(() => parseSearchFromCampaign(), []);
 	
 	// Track hovered contact index for keyboard navigation
 	const [hoveredContactIndex, setHoveredContactIndex] = useState<number | null>(null);
@@ -1082,32 +1064,53 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		}
 
 		// Fallback: preserve original behavior of kicking off a dashboard search
-		let searchQuery = '';
-		if (whyValue) {
-			searchQuery += whyValue + ' ';
-		}
-		if (whatValue) {
-			searchQuery += whatValue;
-		}
-		if (whereValue) {
-			searchQuery += ' in ' + whereValue;
-		}
-		searchQuery = searchQuery.trim();
+		const trimmedWhy = (whyValue ?? '').trim();
+		const trimmedWhat = (whatValue ?? '').trim();
+		const trimmedWhere = (whereValue ?? '').trim();
 
-		if (searchQuery) {
-			// Store the search query in sessionStorage for the dashboard to pick up
+		const dashboardUrl = campaign?.id
+			? `${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`
+			: urls.murmur.dashboard.index;
+
+		if (!trimmedWhat && !trimmedWhere) {
 			try {
-				sessionStorage.setItem('murmur_pending_search', searchQuery);
+				sessionStorage.removeItem(PENDING_SEARCH_STORAGE_KEY);
 			} catch {
 				// Ignore sessionStorage errors (e.g., disabled storage)
 			}
-
-			// Navigate to the campaign-scoped dashboard search/map view when possible
-			const dashboardUrl = campaign?.id
-				? `${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`
-				: urls.murmur.dashboard.index;
-			router.push(dashboardUrl);
+			router.push(
+				`${dashboardUrl}${dashboardUrl.includes('?') ? '&' : '?'}pick=1&allContacts=1`
+			);
+			return;
 		}
+
+		let searchQuery = '';
+		if (trimmedWhy) {
+			searchQuery += trimmedWhy + ' ';
+		}
+		if (trimmedWhat) {
+			searchQuery += trimmedWhat;
+		}
+		if (trimmedWhere) {
+			searchQuery += ' in ' + trimmedWhere;
+		}
+		searchQuery = searchQuery.trim();
+
+		// Store the search query in sessionStorage for the dashboard to pick up.
+		try {
+			sessionStorage.setItem(
+				PENDING_SEARCH_STORAGE_KEY,
+				JSON.stringify({
+					v: 1,
+					query: searchQuery,
+					fromCampaignId: campaign?.id != null ? String(campaign.id) : null,
+				})
+			);
+		} catch {
+			// Ignore sessionStorage errors (e.g., disabled storage)
+		}
+
+		router.push(dashboardUrl);
 	};
 
 	const { data: usedContactIds } = useGetUsedContactIds();
@@ -1554,112 +1557,12 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								onContactClick?.(contact);
 							}}
 						>
-							{/* Used contact indicator - absolutely positioned, vertically centered */}
-							{isUsedContact && (() => {
-								const isMultiCampaignIndicator = isUsedContactHoverCardVisible && resolvedUsedContactCampaigns.length > 1;
-								const isSingleCampaignIndicator = isUsedContactHoverCardVisible && resolvedUsedContactCampaigns.length === 1;
-								// For multi-campaign: #A0C0FF with sliding dot
-								// For single-campaign: #B0EAA4 (green, no dot)
-								// For default (not hovered): #DAE6FE
-								const pillBg = isMultiCampaignIndicator
-									? '#A0C0FF'
-									: isSingleCampaignIndicator
-										? '#B0EAA4'
-										: '#DAE6FE';
-								// Handle mouse move on the pill to drive campaign selection
-								const handlePillMouseMove = isMultiCampaignIndicator
-									? (e: React.MouseEvent<HTMLSpanElement>) => {
-										// We render a thin stroke via box-shadow (doesn't affect box-model), so the
-										// interactive area is the full pill rect.
-										const PILL_BORDER = 0;
-										const rect = e.currentTarget.getBoundingClientRect();
-										const actualHeight = rect.height;
-										const offsetY = e.clientY - rect.top;
-										const innerHeight = Math.max(1, actualHeight - PILL_BORDER * 2);
-										const innerOffsetY = offsetY - PILL_BORDER;
-										const campaignCount = resolvedUsedContactCampaigns.length;
-										if (campaignCount <= 1) return;
-										// Map cursor Y position to campaign index (0 at top, max at bottom)
-										const ratio = Math.max(0, Math.min(1, innerOffsetY / innerHeight));
-										const idx = Math.round(ratio * (campaignCount - 1));
-										const clampedIdx = Math.max(0, Math.min(campaignCount - 1, idx));
-										setActiveUsedContactCampaignIndex((prev) =>
-											prev === clampedIdx ? prev : clampedIdx
-										);
-									}
-									: undefined;
-
-								return (
-									<span
-										className="z-10 cursor-pointer transition-all duration-150 ease-out"
-										style={{
-											position: 'absolute',
-											left: '12px',
-											// Align circle with Company (top row). Keep the taller pill centered to avoid clipping.
-											top: isUsedContactHoverCardVisible ? '50%' : '14px',
-											transform: 'translateY(-50%)',
-											boxSizing: 'border-box',
-											// Default state: 16×16 circle. Hover state (single/multi): 14×37 pill.
-											width: isUsedContactHoverCardVisible ? '14px' : '16px',
-											height: isUsedContactHoverCardVisible ? '37px' : '16px',
-											borderRadius: isUsedContactHoverCardVisible ? '9999px' : '50%',
-											// Thin stroke: use box-shadow so sizes stay exact (per design spec).
-											border: isUsedContactHoverCardVisible ? 'none' : '1px solid #000000',
-											boxShadow: isUsedContactHoverCardVisible
-												? '0 0 0 1px #000000'
-												: undefined,
-											backgroundColor: pillBg,
-											overflow: 'hidden',
-										}}
-										onMouseEnter={() => openUsedContactTooltip(contact.id)}
-										onMouseLeave={() => scheduleCloseUsedContactTooltip(contact.id)}
-										onMouseMove={handlePillMouseMove}
-									onClick={(e) => {
-										// Only hijack click when the hover card is visible (prevents breaking normal
-										// contact selection clicks on the indicator in its default state).
-										if (!isUsedContactHoverCardVisible) return;
-										e.stopPropagation();
-										goToUsedContactCampaign(contact.id);
-									}}
-									>
-										{/* Sliding dot for multi-campaign */}
-										{isMultiCampaignIndicator && (
-											<span
-												className="rounded-full bg-[#DAE6FE] pointer-events-none transition-all duration-150 ease-out"
-												style={(() => {
-													// Spec: 14×37 pill, 14×14 circle, thin stroke.
-													const PILL_HEIGHT = 37;
-													const DOT_SIZE = 14;
-													const maxTop = Math.max(0, PILL_HEIGHT - DOT_SIZE);
-													const campaignCount = resolvedUsedContactCampaigns.length;
-													const clampedIdx =
-														typeof activeUsedContactCampaignIndex === 'number' && campaignCount > 0
-															? Math.min(campaignCount - 1, Math.max(0, activeUsedContactCampaignIndex))
-															: 0;
-													// Position dot based on active index
-													const top = campaignCount > 1 ? (maxTop * clampedIdx) / (campaignCount - 1) : maxTop / 2;
-													return {
-														position: 'absolute' as const,
-														left: '0px',
-														top: `${top}px`,
-														width: `${DOT_SIZE}px`,
-														height: `${DOT_SIZE}px`,
-														// Thin stroke without changing geometry.
-														boxShadow: '0 0 0 1px #000000',
-													};
-												})()}
-											/>
-										)}
-									</span>
-								);
-							})()}
 							{(() => {
 								const fullName =
 									contact.name ||
 									`${contact.firstName || ''} ${contact.lastName || ''}`.trim();
 								const contactTitle = contact.title || contact.headline || '';
-								// Left padding: 12px base + 16px dot + 8px gap = 36px when used, else 12px
-								const leftPadding = isUsedContact ? 'pl-[36px]' : 'pl-3';
+								const leftPadding = 'pl-3';
 								const hasLocation = Boolean(contact.city || contact.state);
 								const shouldSpanLocation = !contactTitle && hasLocation;
 								// Company is always top slot, Name always bottom slot (fixed positions).
