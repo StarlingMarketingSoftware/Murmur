@@ -99,7 +99,7 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 		// needs none of these — so only gate when there are actual emails to send.
 		if (emailDrafts.length > 0) {
 			if (!campaign?.identity?.email || !campaign?.identity?.name) {
-				toast.error('Please create an Identity before sending emails.');
+				toast.error('Please create an Identity before sending messages.');
 				return;
 			}
 
@@ -107,7 +107,7 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 				!subscriptionTier &&
 				user?.stripeSubscriptionStatus !== StripeSubscriptionStatus.TRIALING
 			) {
-				toast.error('Please upgrade to a paid plan to send emails.');
+				toast.error('Please upgrade to a paid plan to send messages.');
 				return;
 			}
 		}
@@ -237,7 +237,7 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 				toast.warning(
 					`Sent ${totalProcessed} before running out of credits. Please upgrade your subscription to send the remaining ${
 						emailDrafts.length - emailsWeCanSend
-					} email${emailDrafts.length - emailsWeCanSend === 1 ? '' : 's'}.`
+					} message${emailDrafts.length - emailsWeCanSend === 1 ? '' : 's'}.`
 				);
 				setSendingProgress(-1);
 			} else {

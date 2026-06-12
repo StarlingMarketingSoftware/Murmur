@@ -232,7 +232,7 @@ export const useDraftReviewHandlers = ({
 						) || [];
 
 					if (hybridBlocks.length === 0) {
-						toast.error('Please set up your email template first');
+						toast.error('Please set up your message template first');
 						return null;
 					}
 
@@ -420,7 +420,7 @@ export const useDraftReviewHandlers = ({
 				: [];
 
 		if (selectedDrafts.length === 0) {
-			toast.error('Select emails to send.');
+			toast.error('Select messages to send.');
 			return 0;
 		}
 
@@ -438,7 +438,7 @@ export const useDraftReviewHandlers = ({
 		// Identity + plan are required only to send EMAILS, not internal messages.
 		if (emailDrafts.length > 0) {
 			if (!campaign?.identity?.email || !campaign?.identity?.name) {
-				toast.error('Please create an Identity before sending emails.');
+				toast.error('Please create an Identity before sending messages.');
 				return 0;
 			}
 
@@ -446,7 +446,7 @@ export const useDraftReviewHandlers = ({
 				!subscriptionTier &&
 				user?.stripeSubscriptionStatus !== StripeSubscriptionStatus.TRIALING
 			) {
-				toast.error('Please upgrade to a paid plan to send emails.');
+				toast.error('Please upgrade to a paid plan to send messages.');
 				return 0;
 			}
 		}
@@ -576,7 +576,7 @@ export const useDraftReviewHandlers = ({
 				toast.warning(`${totalProcessed} of ${emailsToSend} sent successfully.`);
 			}
 		} else {
-			toast.error('Failed to send emails. Please try again.');
+			toast.error('Failed to send messages. Please try again.');
 		}
 
 		return totalProcessed;

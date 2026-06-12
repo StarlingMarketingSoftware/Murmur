@@ -456,7 +456,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 
 		console.log('Campaign identity:', campaign?.identity);
 		if (!campaign?.identity?.email || !campaign?.identity?.name) {
-			toast.error('Please create an Identity before sending emails.');
+			toast.error('Please create an Identity before sending messages.');
 			return;
 		}
 
@@ -464,7 +464,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 			!subscriptionTier &&
 			user?.stripeSubscriptionStatus !== StripeSubscriptionStatus.TRIALING
 		) {
-			toast.error('Please upgrade to a paid plan to send emails.');
+			toast.error('Please upgrade to a paid plan to send messages.');
 			return;
 		}
 
@@ -572,17 +572,17 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 			// Clear selection and notify
 			setSelectedDraftIds(new Set());
 			if (successfulSends === selectedDrafts.length) {
-				toast.success(`All ${successfulSends} emails sent successfully!`);
+				toast.success(`All ${successfulSends} messages sent successfully!`);
 			} else if (successfulSends > 0) {
 				if (emailsWeCanSend < selectedDrafts.length) {
-					toast.warning(`Sent ${successfulSends} emails before running out of credits.`);
+					toast.warning(`Sent ${successfulSends} messages before running out of credits.`);
 				} else {
 					toast.warning(
-						`${successfulSends} of ${selectedDrafts.length} emails sent successfully.`
+						`${successfulSends} of ${selectedDrafts.length} messages sent successfully.`
 					);
 				}
 			} else {
-				toast.error('Failed to send emails. Please try again.');
+				toast.error('Failed to send messages. Please try again.');
 			}
 		} finally {
 			sendingActions.finishSession();

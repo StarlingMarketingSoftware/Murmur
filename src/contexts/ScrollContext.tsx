@@ -58,10 +58,14 @@ export function ScrollProvider({ children }: ScrollProviderProps) {
 		// Disable Lenis smooth scrolling on:
 		// - all mobile devices (native scrolling only)
 		// - campaign pages (all devices)
+		// - the venue portal (fixed full-screen map app with no Lenis consumers;
+		//   the gsap ticker rAF + wheel hooks are pure overhead over the map)
 		const isCampaignPage =
 			typeof pathname === 'string' && pathname.startsWith('/murmur/campaign');
-		
-		if (isCampaignPage || isMobile === true) {
+		const isVenuePortalPage =
+			typeof pathname === 'string' && pathname.startsWith('/venue-portal');
+
+		if (isCampaignPage || isVenuePortalPage || isMobile === true) {
 			// Ensure any existing Lenis instance is destroyed and classes updated
 			try {
 				if (lenisRef.current) {

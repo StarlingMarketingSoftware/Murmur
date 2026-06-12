@@ -363,8 +363,11 @@ const ProfileSummaryBox = ({
 			onClick={onOpen ? handleOpen : undefined}
 			onKeyDown={onOpen ? handleKeyDown : undefined}
 		>
-			<div className="relative h-[26px] shrink-0 border-b border-black bg-white">
-				<div className="absolute inset-0 overflow-hidden">
+			<div className="relative h-[26px] shrink-0 rounded-t-[6px] border-b border-black bg-white">
+				{/* Safari doesn't clip positioned children to the parent's rounded overflow,
+				    so round this layer itself; isolate gives WebKit the stacking context it
+				    needs to clip the fill bar */}
+				<div className="absolute inset-0 isolate overflow-hidden rounded-t-[6px]">
 					<div
 						aria-hidden="true"
 						className="absolute inset-y-0 left-0 transition-[width,background-color] duration-200 ease-out"
@@ -382,16 +385,10 @@ const ProfileSummaryBox = ({
 							/>
 						)}
 				</div>
-				<div
-					aria-hidden="true"
-					className="absolute left-[9px] top-1/2 z-20 w-[22px] h-[22px] -translate-y-1/2 rounded-full bg-[#7BDB7F] flex items-center justify-center font-inter font-normal text-[14px] leading-none text-white"
-				>
-					{summary.nameInitial}
-				</div>
 				<div className="relative z-10 h-full flex items-center pr-[8px]">
 					<span
 						className={cn(
-							'ml-[23px] max-w-[calc(100%_-_68px)] min-h-[17px] rounded-[3px] bg-[#D6FFED] pl-[14px] pr-[6px] py-[1px]',
+							'ml-[34px] max-w-[calc(100%_-_79px)] min-h-[17px] rounded-[3px] bg-[#D6FFED] pl-[6px] pr-[6px] py-[1px]',
 							'inline-flex items-center font-inter font-normal text-[13px] leading-[16px] text-black truncate',
 							!summary.hasName && 'opacity-50'
 						)}
@@ -404,8 +401,17 @@ const ProfileSummaryBox = ({
 						</span>
 					)}
 				</div>
+				{/* After the name row in DOM and untransformed (top-[2px] instead of
+				    top-1/2 -translate-y-1/2): Safari composites the transformed badge
+				    into its own layer and paints it beneath the z-10 row */}
+				<div
+					aria-hidden="true"
+					className="absolute left-[9px] top-[2px] z-20 w-[22px] h-[22px] rounded-full bg-[#7BDB7F] flex items-center justify-center font-inter font-normal text-[14px] leading-none text-white"
+				>
+					{summary.nameInitial}
+				</div>
 			</div>
-			<div className="relative flex-1 min-h-0 px-2 pt-[10px] pb-2 overflow-y-auto overflow-x-hidden hide-native-scrollbar bg-white">
+			<div className="relative flex-1 min-h-0 rounded-b-[6px] px-2 pt-[10px] pb-2 overflow-y-auto overflow-x-hidden hide-native-scrollbar bg-white">
 				<div className="relative z-10 flex flex-wrap gap-x-[6px] gap-y-[8px] content-start">
 					{summary.items.map((item) => (
 						<span

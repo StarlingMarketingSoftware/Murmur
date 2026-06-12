@@ -2538,27 +2538,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		);
 	}
 
-	if (error) {
-		return (
-			<div className={`w-full flex justify-center ${outerPaddingClass}`}>
-				<div
-					data-campaign-main-box="inbox"
-					className="flex items-center justify-center"
-					style={{
-						width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
-						maxWidth: isMobile ? undefined : `${boxWidth}px`,
-						height: isMobile ? 'calc(100dvh - 160px)' : `${desktopBoxHeight}px`,
-						border: '3px solid #000000',
-						borderRadius: '8px',
-					}}
-				>
-					<div className="text-red-500">Failed to load emails</div>
-				</div>
-			</div>
-		);
-	}
-
-	if (visibleEmails.length === 0) {
+	// A fetch error renders the same styled empty-inbox frame (with softer copy)
+	// rather than a bare error box — this view sits directly over the map.
+	if (error || visibleEmails.length === 0) {
 		return (
 			<div className={`w-full flex justify-center ${outerPaddingClass}`}>
 				<div
@@ -2898,7 +2880,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 										textAlign: 'center',
 									}}
 								>
-									Check Back Later
+									{error ? "Couldn't load emails — check back soon" : 'Check Back Later'}
 								</span>
 							)}
 							{idx >= 1 && idx <= 4 && (

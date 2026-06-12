@@ -26,6 +26,14 @@ import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptio
 // EmailGeneration kept available but not used in current view
 // import { EmailGeneration } from './EmailGeneration/EmailGeneration';
 import { cn } from '@/utils';
+import { markAfterPaint } from '@/utils/perfMarks';
+import {
+	CAMPAIGN_SNUG_MAX_HEIGHT_FIT_ZOOM,
+	CAMPAIGN_SNUG_MIN_EFFECTIVE_WIDTH_PX,
+	CAMPAIGN_SNUG_SAFE_BOTTOM_MARGIN_PX,
+	CAMPAIGN_WORKSPACE_CONTENT_SCALE,
+	getMurmurChromeZoomForWindow,
+} from '@/utils/murmurChromeZoom';
 import {
 	extractMurmurDraftSettingsSnapshot,
 	injectMurmurDraftSettingsSnapshot,
@@ -311,6 +319,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		overviewRightRailSearchContactsLoading,
 		onClearOverviewRightRailSearch,
 	} = props;
+
+	// Search→campaign-tab timing: first paint of the campaign tool view after a tab click
+	// on the dashboard map (the click mark is set in handleCampaignTabPointerDown there).
+	useEffect(() => {
+		markAfterPaint('murmur:camp:view-paint', 'murmur:camp:click');
+	}, []);
 
 	const inboxMockOverrideActive = inboxMockState != null;
 	const inboxMockData = useMemo(
@@ -730,6 +744,121 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			window.removeEventListener(CAMPAIGN_ZOOM_EVENT, checkBreakpoints as EventListener);
 		};
 	}, []);
+
+	// --- Envelope expansion for large monitors ---
+	// The campaign zoom is capped at the shared chrome zoom target
+	// (src/utils/murmurChromeZoom.ts) so the fixed top chrome matches the dashboard
+	// map view exactly. When the viewport is taller than the natural snug fit at
+	// that target, the panels keep their tuned proportions and the slack lowers the
+	// workspace cluster toward the middle of the band (half as marginTop, half as a
+	// wider gap above the bottom panels, which stay pinned at the viewport bottom).
+	const [extraEnvelopeHeightPx, setExtraEnvelopeHeightPx] = useState(0);
+	// The E value the committed DOM currently reflects — compute() measures the DOM,
+	// so its correction must be applied relative to this, not to in-flight state.
+	const appliedEnvelopeExtraRef = useRef(0);
+	useLayoutEffect(() => {
+		if (appliedEnvelopeExtraRef.current === extraEnvelopeHeightPx) return;
+		appliedEnvelopeExtraRef.current = extraEnvelopeHeightPx;
+		// The anchors just moved; ask the page to re-fit the zoom against them (the
+		// resize settle passes may already be over, e.g. when inbox content loads
+		// late). The page's zoom pass dispatches murmur:campaign-zoom-changed, which
+		// re-runs compute() — the loop stops at the ±4px hysteresis.
+		try {
+			window.dispatchEvent(new CustomEvent('murmur:campaign-envelope-changed'));
+		} catch {
+			// ignore
+		}
+	}, [extraEnvelopeHeightPx]);
+	const isWideEnvelopeActive =
+		!isMobile &&
+		!hideHeaderBox &&
+		!isNarrowDesktop &&
+		!isNarrowestDesktop &&
+		['testing', 'drafting', 'sent', 'inbox', 'overview'].includes(view);
+	useLayoutEffect(() => {
+		if (typeof window === 'undefined') return;
+		if (!isWideEnvelopeActive) {
+			setExtraEnvelopeHeightPx(0);
+			return;
+		}
+		let raf: number | null = null;
+		const compute = () => {
+			// Measure the same bottom anchors the page's snug-fit zoom pass measures,
+			// from the active view layer only (a crossfading previous layer would
+			// otherwise pollute the measurement).
+			const layer =
+				(document.querySelector(
+					'[data-campaign-view-layer="active"]'
+				) as HTMLElement | null) ?? document.body;
+			const anchors = Array.from(
+				layer.querySelectorAll<HTMLElement>('[data-campaign-bottom-anchor]')
+			);
+			if (anchors.length === 0) return;
+			// Geometric root-scale read — correct in CSS-zoom mode, Safari transform
+			// mode, and during cold load before the compact class lands (ratio 1).
+			// Never parse the zoom var here: it can read its 0.85 fallback before the
+			// first zoom apply.
+			const body = document.body;
+			const rootScale =
+				body.offsetWidth > 0
+					? body.getBoundingClientRect().width / body.offsetWidth
+					: 1;
+			const maxBottomPx =
+				anchors.reduce((acc, el) => Math.max(acc, el.getBoundingClientRect().bottom), 0) /
+				(rootScale || 1);
+			if (maxBottomPx <= 0) return;
+			const targetZoom = Math.min(
+				getMurmurChromeZoomForWindow(),
+				window.innerWidth / CAMPAIGN_SNUG_MIN_EFFECTIVE_WIDTH_PX,
+				CAMPAIGN_SNUG_MAX_HEIGHT_FIT_ZOOM
+			);
+			if (!Number.isFinite(targetZoom) || targetZoom <= 0) return;
+			const availableH = Math.max(
+				0,
+				window.innerHeight - CAMPAIGN_SNUG_SAFE_BOTTOM_MARGIN_PX
+			);
+			// How much deeper the anchor bottom must sit (root-unscaled px) for the
+			// snug fit to land exactly at the shared target, converted to layout px
+			// inside the 0.94-scaled workspace. Measurement-based, so it converges
+			// even if a view's anchors don't move exactly 0.94px per envelope px.
+			const deficitLayoutPx =
+				(availableH / targetZoom - maxBottomPx) / CAMPAIGN_WORKSPACE_CONTENT_SCALE;
+			const appliedE = appliedEnvelopeExtraRef.current;
+			// Floor-quantize so the snug fit always lands at (never past) the target —
+			// the bottom anchors never clip, so the page's clip observer never churns.
+			// The ±4px hysteresis stops the correction loop once converged.
+			const next = Math.max(0, Math.floor((appliedE + deficitLayoutPx) / 4) * 4);
+			if (Math.abs(next - appliedE) < 4) return;
+			setExtraEnvelopeHeightPx(next);
+		};
+		const schedule = () => {
+			if (raf != null) return;
+			raf = window.requestAnimationFrame(() => {
+				raf = null;
+				compute();
+			});
+		};
+		compute();
+		window.addEventListener('resize', schedule, { passive: true });
+		window.addEventListener(
+			'murmur:campaign-zoom-changed',
+			schedule as EventListener
+		);
+		return () => {
+			if (raf != null) window.cancelAnimationFrame(raf);
+			window.removeEventListener('resize', schedule);
+			window.removeEventListener(
+				'murmur:campaign-zoom-changed',
+				schedule as EventListener
+			);
+		};
+	}, [isWideEnvelopeActive, isCampaignWorkspaceExpanded, view]);
+	// Slack distribution: the panels keep their tuned proportions; half the slack
+	// lowers the whole workspace cluster (marginTop on the content wrapper) so it
+	// sits centered in the band rather than hugging the top, and the rest widens
+	// the gap above the bottom panels, which stay pinned to the viewport bottom.
+	const workspaceDropPx = Math.floor(extraEnvelopeHeightPx / 2);
+	const extraBottomGapPx = extraEnvelopeHeightPx - workspaceDropPx;
 
 	const bottomPanelBoxWidthPx = 197;
 	const bottomPanelBoxHeightPx = 45;
@@ -1346,7 +1475,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		? 703
 		: inboxMainPanelHeightPx;
 	const inboxWideTopMarginPx = 24;
-	const inboxWideBottomPanelMarginTopPx = 114;
+	const inboxWideBottomPanelMarginTopPx = 114 + extraBottomGapPx;
 	const sharedWideTabZoomEnvelopeBottomPx =
 		inboxWideTopMarginPx +
 		activeInboxMainPanelHeightPx +
@@ -2846,7 +2975,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const handleDraftSelectedContacts = useCallback(async () => {
 		const selectedIds = Array.from(contactsTabSelectedIds.values());
 		if (selectedIds.length === 0) {
-			toast.error('Select at least one contact to draft emails.');
+			toast.error('Select at least one contact to draft messages.');
 			return;
 		}
 		await handleGenerateDrafts(selectedIds);
@@ -3948,11 +4077,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					{/* Main content wrapper to anchor the persistent Header Box */}
 					<div
 						className="relative w-full flex flex-col items-center"
-						style={
-							shouldRenderSharedBottomPanels || shouldRenderWriteBottomDraftBar
+						style={{
+							...(shouldRenderSharedBottomPanels || shouldRenderWriteBottomDraftBar
 								? { minHeight: `${sharedWideTabZoomEnvelopeBottomPx}px` }
-								: undefined
-						}
+								: undefined),
+							// Envelope-expansion slack: lower the whole workspace cluster so it
+							// sits centered in the band on tall monitors (margin, NOT transform —
+							// a transform would become the containing block for fixed children).
+							...(workspaceDropPx > 0
+								? { marginTop: `${workspaceDropPx}px` }
+								: undefined),
+						}}
 					>
 						{shouldReserveSharedWideTabZoomEnvelope && (
 							<div
@@ -5844,7 +5979,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													draftCount={contactsTabSelectedIds.size}
 													onDraftClick={async () => {
 														if (contactsTabSelectedIds.size === 0) {
-															toast.error('Select at least one contact to draft emails.');
+															toast.error('Select at least one contact to draft messages.');
 															return;
 														}
 														await handleGenerateDrafts(
@@ -5904,7 +6039,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															onClick={async () => {
 																if (contactsTabSelectedIds.size === 0) {
 																	toast.error(
-																		'Select at least one contact to draft emails.'
+																		'Select at least one contact to draft messages.'
 																	);
 																	return;
 																}
@@ -6029,7 +6164,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											draftCount={contactsTabSelectedIds.size}
 											onDraftClick={async () => {
 												if (contactsTabSelectedIds.size === 0) {
-													toast.error('Select at least one contact to draft emails.');
+													toast.error('Select at least one contact to draft messages.');
 													return;
 												}
 												await handleGenerateDrafts(
@@ -6086,7 +6221,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																onClick={async () => {
 																	if (contactsTabSelectedIds.size === 0) {
 																		toast.error(
-																			'Select at least one contact to draft emails.'
+																			'Select at least one contact to draft messages.'
 																		);
 																		return;
 																	}

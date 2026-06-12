@@ -36,12 +36,17 @@ import {
 import { MobileFolderCards } from '@/components/molecules/MobileFolderCards/MobileFolderCards';
 import { MobileDashboardSearch } from '@/app/murmur/dashboard/MobileDashboardSearch';
 import { useDashboard } from './useDashboard';
+import { useLenis } from '@/contexts/ScrollContext';
 import { urls } from '@/constants/urls';
 import {
 	getMsUntilNextSearchGradientBucket,
 	getSearchGradientForDate,
 } from '@/constants/searchGradients';
 import { isProblematicBrowser } from '@/utils/browserDetection';
+import {
+	getMurmurChromeZoomForWindow,
+	MURMUR_CHROME_ZOOM_DEFAULT,
+} from '@/utils/murmurChromeZoom';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
 import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
@@ -156,6 +161,7 @@ import {
 	normalizeUsStateName,
 } from '@/utils/usStates';
 import { getApproximateLocation } from '@/utils/approximateLocation';
+import { markPerf } from '@/utils/perfMarks';
 import { useGetIdentities } from '@/hooks/queryHooks/useIdentities';
 import {
 	deriveProfileSearchSignals,
@@ -189,8 +195,16 @@ import {
 	getCampaignDetailQueryKey,
 	fetchCampaignDetail,
 } from '@/hooks/queryHooks/useCampaigns';
-import { useGetEmails } from '@/hooks/queryHooks/useEmails';
-import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
+import {
+	useGetEmails,
+	getEmailsListQueryKey,
+	fetchEmailsList,
+} from '@/hooks/queryHooks/useEmails';
+import {
+	useGetInboundEmails,
+	getInboundEmailsListQueryKey,
+	fetchInboundEmailsList,
+} from '@/hooks/queryHooks/useInboundEmails';
 import { useGetMapEvents } from '@/hooks/queryHooks/useGetMapEvents';
 import { useGetMyEventApplications } from '@/hooks/queryHooks/useEventApplications';
 import type { MapEventData } from '@/app/api/events/route';
@@ -1520,10 +1534,10 @@ const buildInitialDashboardSearchSuggestions = (
 			});
 };
 
-// Resolution-aware zoom for the fullscreen map view. Mirrors the campaign page's tuned
-// `SIXTEEN_BY_TEN_ZOOM_MAP` / `SIXTEEN_BY_NINE_ZOOM_MAP` tables so the dashboard map-view
-// chrome lands at the same physical size as the campaign chrome on every monitor.
-const DASHBOARD_MAP_ZOOM_DEFAULT = 0.85;
+// Resolution-aware zoom for the fullscreen map view. Delegates to the shared chrome
+// zoom module (src/utils/murmurChromeZoom.ts) so the dashboard map-view chrome lands
+// at exactly the same physical size as the campaign page chrome on every monitor.
+const DASHBOARD_MAP_ZOOM_DEFAULT = MURMUR_CHROME_ZOOM_DEFAULT;
 // Baseline zoom for the non-map dashboard (initial/hero + results views). The fullscreen
 // map view keeps its own resolution-aware zoom anchored to DASHBOARD_MAP_ZOOM_DEFAULT.
 // At/above the 1512×945 anchor the zoom grows with the monitor (so the layout doesn't
@@ -1554,170 +1568,6 @@ const computeDashboardInitialZoomForViewport = (w: number, h: number): number =>
 		DASHBOARD_INITIAL_ZOOM_MIN,
 		DASHBOARD_INITIAL_ZOOM_MAX,
 	);
-};
-const DASHBOARD_MAP_ZOOM_MATCH_TOLERANCE_PX = 50;
-const DASHBOARD_MAP_ZOOM_MIN = 0.5;
-const DASHBOARD_MAP_ZOOM_MAX = 1.6;
-const DASHBOARD_MAP_SIXTEEN_BY_TEN_ZOOM_MAP: Array<{
-	w: number;
-	h: number;
-	zoom: number;
-}> = [
-	{ w: 1152, h: 720, zoom: 0.52 },
-	{ w: 1280, h: 800, zoom: 0.6 },
-	{ w: 1440, h: 900, zoom: 0.7 },
-	{ w: 1504, h: 940, zoom: 0.84 },
-	{ w: 1664, h: 1040, zoom: 0.77 },
-	{ w: 1920, h: 1200, zoom: 0.95 },
-	{ w: 2048, h: 1280, zoom: 0.95 },
-	{ w: 2304, h: 1440, zoom: 1.1 },
-	{ w: 2592, h: 1620, zoom: 1.2 },
-	{ w: 2880, h: 1800, zoom: 1.2 },
-	{ w: 2976, h: 1860, zoom: 1.45 },
-	{ w: 4608, h: 2880, zoom: 1.6 },
-];
-const DASHBOARD_MAP_SIXTEEN_BY_TEN_FALLBACK_ZOOM = 0.8;
-type DashboardMapZoomPoint = { w: number; h: number; zoom: number; metric: number };
-const DASHBOARD_MAP_SIXTEEN_BY_TEN_ZOOM_POINTS: DashboardMapZoomPoint[] =
-	DASHBOARD_MAP_SIXTEEN_BY_TEN_ZOOM_MAP.map((entry) => ({
-		...entry,
-		metric: Math.hypot(entry.w, entry.h),
-	})).sort((a, b) => a.metric - b.metric);
-const DASHBOARD_MAP_SIXTEEN_BY_NINE_ZOOM_MAP: Array<{
-	w: number;
-	h: number;
-	zoom: number;
-}> = [
-	{ w: 1280, h: 720, zoom: 0.52 },
-	{ w: 1344, h: 756, zoom: 0.55 },
-	{ w: 1600, h: 900, zoom: 0.68 },
-	{ w: 1920, h: 1080, zoom: 0.83 },
-];
-const DASHBOARD_MAP_SIXTEEN_BY_NINE_FALLBACK_ZOOM = 0.85;
-const DASHBOARD_MAP_SIXTEEN_BY_NINE_ZOOM_POINTS: DashboardMapZoomPoint[] =
-	DASHBOARD_MAP_SIXTEEN_BY_NINE_ZOOM_MAP.map((entry) => ({
-		...entry,
-		metric: Math.hypot(entry.w, entry.h),
-	})).sort((a, b) => a.metric - b.metric);
-
-const clampDashboardMapZoom = (
-	z: number,
-	min = DASHBOARD_MAP_ZOOM_MIN,
-	max = DASHBOARD_MAP_ZOOM_MAX
-) => Math.min(max, Math.max(min, z));
-
-const computeDashboardMapZoomForViewport = (
-	viewportW: number,
-	viewportH: number
-): number => {
-	if (!Number.isFinite(viewportW) || !Number.isFinite(viewportH)) {
-		return DASHBOARD_MAP_ZOOM_DEFAULT;
-	}
-	if (viewportW <= 0 || viewportH <= 0) return DASHBOARD_MAP_ZOOM_DEFAULT;
-
-	const ratio = viewportW / viewportH;
-	const IDEAL_16X10 = 16 / 10;
-	const IDEAL_16X9 = 16 / 9;
-	const viewportDelta16x10 = Math.abs(ratio - IDEAL_16X10);
-	const viewportDelta16x9 = Math.abs(ratio - IDEAL_16X9);
-	const screenW =
-		(typeof window !== 'undefined' &&
-			(window.screen?.availWidth ?? window.screen?.width)) ||
-		viewportW;
-	const screenH =
-		(typeof window !== 'undefined' &&
-			(window.screen?.availHeight ?? window.screen?.height)) ||
-		viewportH;
-	const screenRatio = screenW > 0 && screenH > 0 ? screenW / screenH : ratio;
-	const screenDelta16x10 = Math.abs(screenRatio - IDEAL_16X10);
-	const screenDelta16x9 = Math.abs(screenRatio - IDEAL_16X9);
-	const isSixteenByTenish = viewportDelta16x10 <= 0.14 || screenDelta16x10 <= 0.14;
-	const isSixteenByNineish = viewportDelta16x9 <= 0.08 || screenDelta16x9 <= 0.08;
-
-	let targetZoom = DASHBOARD_MAP_ZOOM_DEFAULT;
-
-	const pickFromTable = (
-		table: Array<{ w: number; h: number; zoom: number }>,
-		points: DashboardMapZoomPoint[],
-		fallback: number
-	) => {
-		const matchScreenW = screenW || viewportW;
-		const matchScreenH = screenH || viewportH;
-
-		const findNearMatch = (w: number, h: number) =>
-			table.find(
-				(entry) =>
-					Math.abs(w - entry.w) <= DASHBOARD_MAP_ZOOM_MATCH_TOLERANCE_PX &&
-					Math.abs(h - entry.h) <= DASHBOARD_MAP_ZOOM_MATCH_TOLERANCE_PX
-			);
-
-		const interpolateZoom = (w: number, h: number) => {
-			const metric = Math.hypot(w, h);
-			if (!Number.isFinite(metric) || metric <= 0 || points.length === 0) {
-				return fallback;
-			}
-			const first = points[0];
-			const last = points[points.length - 1];
-			if (metric <= first.metric) return first.zoom;
-			if (metric >= last.metric) return last.zoom;
-			for (let i = 0; i < points.length - 1; i++) {
-				const a = points[i];
-				const b = points[i + 1];
-				if (metric < a.metric || metric > b.metric) continue;
-				const denom = b.metric - a.metric;
-				const t = denom > 0 ? (metric - a.metric) / denom : 0;
-				return a.zoom + (b.zoom - a.zoom) * t;
-			}
-			return fallback;
-		};
-
-		const distanceToMap = (w: number, h: number) => {
-			let best = Number.POSITIVE_INFINITY;
-			for (const entry of points) {
-				best = Math.min(best, Math.hypot(w - entry.w, h - entry.h));
-			}
-			return best;
-		};
-
-		const screenNearMatch = findNearMatch(matchScreenW, matchScreenH);
-		if (screenNearMatch) return screenNearMatch.zoom;
-		const viewportNearMatch = findNearMatch(viewportW, viewportH);
-		if (viewportNearMatch) return viewportNearMatch.zoom;
-		const screenDistance = distanceToMap(matchScreenW, matchScreenH);
-		const viewportDistance = distanceToMap(viewportW, viewportH);
-		const useViewportDims = viewportDistance + 0.5 < screenDistance;
-		const w = useViewportDims ? viewportW : matchScreenW;
-		const h = useViewportDims ? viewportH : matchScreenH;
-		return interpolateZoom(w, h);
-	};
-
-	if (isSixteenByTenish) {
-		targetZoom = pickFromTable(
-			DASHBOARD_MAP_SIXTEEN_BY_TEN_ZOOM_MAP,
-			DASHBOARD_MAP_SIXTEEN_BY_TEN_ZOOM_POINTS,
-			DASHBOARD_MAP_SIXTEEN_BY_TEN_FALLBACK_ZOOM
-		);
-	} else if (isSixteenByNineish) {
-		targetZoom = pickFromTable(
-			DASHBOARD_MAP_SIXTEEN_BY_NINE_ZOOM_MAP,
-			DASHBOARD_MAP_SIXTEEN_BY_NINE_ZOOM_POINTS,
-			DASHBOARD_MAP_SIXTEEN_BY_NINE_FALLBACK_ZOOM
-		);
-	}
-
-	// Dock / windowed overrides, mirrored from the campaign page so behaviour matches when
-	// the macOS Dock is visible or the browser window is not maximized.
-	if (viewportW >= 1400 && viewportH <= 780) {
-		targetZoom = clampDashboardMapZoom(targetZoom, 0.7);
-	}
-	if (viewportW >= 1900 && viewportW <= 2050 && viewportH >= 1180 && viewportH <= 1245) {
-		targetZoom = clampDashboardMapZoom(targetZoom, undefined, 0.93);
-	}
-	if (viewportW >= 2100 && viewportW <= 2200 && viewportH >= 1320 && viewportH <= 1380) {
-		targetZoom = clampDashboardMapZoom(targetZoom, 1.2);
-	}
-
-	return clampDashboardMapZoom(targetZoom);
 };
 
 const MAP_SELECT_GRAB_LEFT_PX = 26;
@@ -3548,8 +3398,7 @@ const DashboardContent = () => {
 			setViewportHeight(window.innerHeight);
 			// Same zoom the map-view layout effect applies, so chrome state and zoom
 			// always change together from the same inputs.
-			const layoutWidth =
-				width / computeDashboardMapZoomForViewport(width, window.innerHeight);
+			const layoutWidth = width / getMurmurChromeZoomForWindow();
 			setMapChromeState(
 				layoutWidth < MAP_CHROME_COMPRESSED_MAX_LAYOUT_WIDTH_PX
 					? 'compressed'
@@ -4449,6 +4298,26 @@ const DashboardContent = () => {
 		return { contactListIds: lists.map((list) => list.id) };
 	}, [fromCampaign, activeCampaign]);
 
+	// The emails/inbound-emails queries key on the NUMERIC campaign id (every campaign-page
+	// caller passes `campaign.id` / `Number(params.campaignId)`); a string id would warm a
+	// key nobody reads. null when we can't resolve a numeric id.
+	const prefetchEmailsCampaignId = useMemo(() => {
+		const campaignForPrefetch = fromCampaign ?? activeCampaign;
+		if (campaignForPrefetch?.id != null) return campaignForPrefetch.id;
+		const parsed = Number(mapCampaignId);
+		return mapCampaignId && Number.isFinite(parsed) ? parsed : null;
+	}, [fromCampaign, activeCampaign, mapCampaignId]);
+
+	// True once contacts were added during this dashboard visit WITHOUT navigating
+	// (folder add / write-selection commit). The campaign-tab pushes below append
+	// `added=1` so the campaign page still refetches contacts in that case; pure
+	// tab switches stay refetch-free. Read at click time via the ref.
+	const hasAddedContactsThisVisitRef = useRef(false);
+	const campaignReturnAddedSuffix = useCallback(
+		() => (hasAddedContactsThisVisitRef.current ? '&added=1' : ''),
+		[]
+	);
+
 	const prefetchedCampaignRoutes = useRef<Set<string>>(new Set());
 
 	// Tier 1: warm the campaign route's JS chunks. The ?tab= query doesn't change the
@@ -4483,7 +4352,24 @@ const DashboardContent = () => {
 				staleTime: 1000 * 60 * 60, // match useGetContacts so the page won't refetch
 			});
 		}
-	}, [queryClient, mapCampaignId, prefetchContactsFilter]);
+		// Tier 3 (heavy): the campaign's emails + inbound emails — these gate the
+		// Drafts/Sent/Inbox lists and the header counts on every campaign tab.
+		// 5-min staleTime matches the global default useGetEmails inherits, so the
+		// page reads the prefetched entry without refetching on mount.
+		if (prefetchEmailsCampaignId != null) {
+			const emailFilters = { campaignId: prefetchEmailsCampaignId };
+			queryClient.prefetchQuery({
+				queryKey: getEmailsListQueryKey(emailFilters),
+				queryFn: () => fetchEmailsList(emailFilters),
+				staleTime: 1000 * 60 * 5,
+			});
+			queryClient.prefetchQuery({
+				queryKey: getInboundEmailsListQueryKey(emailFilters),
+				queryFn: () => fetchInboundEmailsList(emailFilters),
+				staleTime: 1000 * 60 * 5,
+			});
+		}
+	}, [queryClient, mapCampaignId, prefetchContactsFilter, prefetchEmailsCampaignId]);
 
 	// Fire Tier 1 immediately on hover/focus; gate Tier 2/3 behind ~120ms of sustained
 	// hover (or pointerdown) so an incidental pass-over doesn't trigger the large fetch.
@@ -4509,6 +4395,7 @@ const DashboardContent = () => {
 
 	const handleCampaignTabPointerDown = useCallback(() => {
 		// Strong intent (about to click): skip the debounce and warm everything now.
+		markPerf('murmur:camp:click');
 		if (campaignPrefetchTimerRef.current) {
 			window.clearTimeout(campaignPrefetchTimerRef.current);
 			campaignPrefetchTimerRef.current = null;
@@ -4522,6 +4409,33 @@ const DashboardContent = () => {
 	useEffect(() => {
 		if (isMapView && mapCampaignId) prefetchCampaignRoute();
 	}, [isMapView, mapCampaignId, prefetchCampaignRoute]);
+
+	// Also warm the campaign page's heavy DraftingSection async chunk on idle.
+	// router.prefetch above only loads the route's own chunks — the nextDynamic
+	// import inside the campaign page starts downloading only when it renders,
+	// which is exactly the first-switch wait this removes. Webpack resolves this
+	// aliased path to the same module as the campaign page's relative import, so
+	// loading it here registers the chunk for the nextDynamic loader.
+	const hasWarmedDraftingSectionChunkRef = useRef(false);
+	useEffect(() => {
+		if (!isMapView || !mapCampaignId) return;
+		if (hasWarmedDraftingSectionChunkRef.current) return;
+		hasWarmedDraftingSectionChunkRef.current = true;
+		const warm = () =>
+			void import(
+				'@/app/murmur/campaign/[campaignId]/DraftingSection/DraftingSection'
+			).catch(() => undefined);
+		const idle = window as unknown as {
+			requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number;
+			cancelIdleCallback?: (handle: number) => void;
+		};
+		if (typeof idle.requestIdleCallback === 'function') {
+			const handle = idle.requestIdleCallback(warm, { timeout: 2000 });
+			return () => idle.cancelIdleCallback?.(handle);
+		}
+		const timer = window.setTimeout(warm, 500);
+		return () => window.clearTimeout(timer);
+	}, [isMapView, mapCampaignId]);
 
 	useEffect(() => {
 		return () => {
@@ -4768,9 +4682,7 @@ const DashboardContent = () => {
 
 		const applyMapViewZoom = () => {
 			if (typeof window === 'undefined') return;
-			const w = window.innerWidth;
-			const h = window.innerHeight;
-			const zoom = computeDashboardMapZoomForViewport(w, h);
+			const zoom = getMurmurChromeZoomForWindow();
 			// Always set the var inline: the non-map baseline (DASHBOARD_INITIAL_ZOOM) differs
 			// from the map default, so an unset var no longer means "the right zoom applies".
 			document.documentElement.style.setProperty(DASHBOARD_ZOOM_VAR, zoom.toFixed(3));
@@ -4984,6 +4896,7 @@ const DashboardContent = () => {
 			}
 
 			hasHydratedFromCampaignUrlRef.current = true;
+			markPerf('murmur:pick:rehydrate-start');
 			const hasCapturedCoords = curatedLatParam != null && curatedLonParam != null;
 			void (async () => {
 				let lat = curatedLatParam;
@@ -4997,6 +4910,7 @@ const DashboardContent = () => {
 						// Non-fatal: backend can infer from request headers.
 					}
 				}
+				markPerf('murmur:pick:loc-resolved');
 				await rehydrateCuratedSession({
 					lat,
 					lon,
@@ -5437,7 +5351,11 @@ const DashboardContent = () => {
 			);
 
 			// Return to the campaign page we came from
-			router.push(`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search`);
+			// `added=1`: contacts actually changed — the campaign page uses it to refetch
+			// contacts/lists on arrival (pure tab-switch arrivals skip that work).
+			router.push(
+				`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&added=1`
+			);
 		} catch (error) {
 			console.error('Error adding contacts to campaign:', error);
 			toast.error('Failed to add contacts to campaign');
@@ -5516,7 +5434,9 @@ const DashboardContent = () => {
 				`${addedCount} contact${addedCount === 1 ? '' : 's'} added to ${activeCampaign.name}`
 			);
 
-			router.push(`${urls.murmur.campaign.detail(activeCampaignId)}?origin=search`);
+			router.push(
+				`${urls.murmur.campaign.detail(activeCampaignId)}?origin=search&added=1`
+			);
 		} catch (error) {
 			console.error('Error adding contacts to active campaign:', error);
 			toast.error('Failed to add contacts to campaign');
@@ -5581,6 +5501,7 @@ const DashboardContent = () => {
 
 			const addedCount = selectedContacts.length;
 			setSelectedContacts([]);
+			hasAddedContactsThisVisitRef.current = true;
 
 			await Promise.all([
 				queryClient.invalidateQueries({ queryKey: ['campaigns'] }),
@@ -5658,6 +5579,8 @@ const DashboardContent = () => {
 					},
 				},
 			});
+
+			hasAddedContactsThisVisitRef.current = true;
 
 			// Refresh so the inline drafting panel (and the campaign header counts) see the new
 			// members. Target the exact contacts query the panel reads so we await the right refetch.
@@ -8801,19 +8724,26 @@ const DashboardContent = () => {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isUnsubscribeFlowOpen, isMapView, hasSearched]);
 
+	// While the map view is the sole interaction surface, halt Lenis' per-frame
+	// scroll processing + wheel hooks (it stays alive for the hero/results
+	// scroll on exit). stop() is idempotent and instance-safe.
+	const lenis = useLenis();
 	useEffect(() => {
 		if (typeof document === 'undefined') return;
 
 		if (isMapView) {
 			document.body.classList.add('murmur-map-view');
+			lenis?.stop();
 		} else {
 			document.body.classList.remove('murmur-map-view');
+			lenis?.start();
 		}
 
 		return () => {
 			document.body.classList.remove('murmur-map-view');
+			lenis?.start();
 		};
-	}, [isMapView]);
+	}, [isMapView, lenis]);
 
 	// Shared Mapbox layer (background globe + interactive results) — one map instance.
 	// One-shot signal set only by the campaign "Search" tab. Captured once at mount (the URL is
@@ -9463,7 +9393,7 @@ const DashboardContent = () => {
 						newMessageCount={mobileSearchNewMessageCount}
 						onOpenCampaignSummary={(section) =>
 							router.push(
-								`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&summarySection=${section}`
+								`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&summarySection=${section}${campaignReturnAddedSuffix()}`
 							)
 						}
 						queryPillLabel={
@@ -10497,7 +10427,11 @@ const DashboardContent = () => {
 						className={`relative min-h-screen dashboard-main-offset w-full max-w-full transition-opacity duration-500 ${bottomPadding} ${
 							hasSearched ? 'search-active' : ''
 						} ${
-							isMapView || isUnsubscribeFlowOpen
+							// Add-to-campaign (pick-flow) arrivals go straight to the map: keep the
+							// landing hero invisible for the frames before isMapView flips so the
+							// campaign→Search transition doesn't flash it. Exiting pick mode (Home)
+							// strips the URL param, which un-hides this again.
+							isMapView || isUnsubscribeFlowOpen || isAddToCampaignMode
 								? 'opacity-0 pointer-events-none'
 								: 'opacity-100'
 						}`}
@@ -12827,7 +12761,7 @@ const DashboardContent = () => {
 													onClick={() => {
 														if (!mapCampaignId) return;
 														router.push(
-															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=write`
+															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=write${campaignReturnAddedSuffix()}`
 														);
 													}}
 												>
@@ -12853,7 +12787,7 @@ const DashboardContent = () => {
 													onClick={() => {
 														if (!mapCampaignId) return;
 														router.push(
-															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=all`
+															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=all${campaignReturnAddedSuffix()}`
 														);
 													}}
 												>
@@ -12898,7 +12832,7 @@ const DashboardContent = () => {
 													onClick={() => {
 														if (!mapCampaignId) return;
 														router.push(
-															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=inbox`
+															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=inbox${campaignReturnAddedSuffix()}`
 														);
 													}}
 												>
@@ -12923,7 +12857,7 @@ const DashboardContent = () => {
 													onClick={() => {
 														if (!mapCampaignId) return;
 														router.push(
-															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts`
+															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts${campaignReturnAddedSuffix()}`
 														);
 													}}
 												>
@@ -13416,19 +13350,19 @@ const DashboardContent = () => {
 																		onContactsClick={() => {
 																			if (!mapCampaignId) return;
 																			router.push(
-																				`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=write`
+																				`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=write${campaignReturnAddedSuffix()}`
 																			);
 																		}}
 																		onDraftsClick={() => {
 																			if (!mapCampaignId) return;
 																			router.push(
-																				`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts`
+																				`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts${campaignReturnAddedSuffix()}`
 																			);
 																		}}
 																		onSentClick={() => {
 																			if (!mapCampaignId) return;
 																			router.push(
-																				`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=sent`
+																				`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=sent${campaignReturnAddedSuffix()}`
 																			);
 																		}}
 																		width={433}
@@ -14403,8 +14337,11 @@ const DashboardContent = () => {
 							</>
 						)}
 
-						{/* Panel content for search tab - driven by the action bar icon selection */}
-						{!hasSearched && activeTab === 'search' && (
+						{/* Panel content for search tab - driven by the action bar icon selection.
+						    Skipped in add-to-campaign (pick-flow) mode: the rehydration effect flips
+						    hasSearched within a couple frames, so this subtree would mount, flash over
+						    the interactive map, and unmount — pure waste on a tab transition. */}
+						{!hasSearched && !isAddToCampaignMode && activeTab === 'search' && (
 							<div
 								ref={tabbedLandingBoxRef}
 								className="campaigns-table-wrapper dashboard-recent-campaigns w-full max-w-[960px] mx-auto px-4"

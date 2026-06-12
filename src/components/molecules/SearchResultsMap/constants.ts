@@ -516,6 +516,12 @@ export const CLOUDS_DRIFT_UPDATE_MS = 16;
 // Safari/WebKit: canvas→GPU-texture uploads are far slower than Chrome's, so halve
 // the animated-canvas cadence there (drift is ~0.35 px/s — sub-pixel per tick either way).
 export const SAFARI_CLOUDS_DRIFT_UPDATE_MS = 33;
+// Safari/WebKit: while the camera has been still for a couple of seconds, drop the
+// drift cadence further — each tick forces a whole-map repaint via triggerRepaint(),
+// and at rest the only change is sub-pixel cloud drift. Camera motion restores the
+// normal cadence on the next tick.
+export const SAFARI_CLOUDS_IDLE_DRIFT_UPDATE_MS = 100;
+export const SAFARI_CLOUDS_IDLE_AFTER_MS = 2000;
 export const CLOUDS_DRIFT_LOOP_MS = 180_000;
 export const CLOUDS_DRIFT_BASE_ZOOM = 4.0;
 export const CLOUDS_DRIFT_AMPLITUDE_X_PX = 12;

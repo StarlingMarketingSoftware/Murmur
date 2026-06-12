@@ -8,8 +8,8 @@ import { toast } from 'sonner';
 export const useSendMailgunMessage = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,
-		successMessage = 'Email sent successfully',
-		errorMessage = 'Failed to send email',
+		successMessage = 'Message sent successfully',
+		errorMessage = 'Failed to send message',
 		onSuccess: onSuccessCallback,
 	} = options;
 

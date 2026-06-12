@@ -78,6 +78,14 @@ export function PersistentDashboardMap() {
 	const frameInsetPx = isInteractiveRevealMap ? mapConfig?.mapViewFrameInsetPx ?? 0 : 0;
 	const frameRadiusPx = isInteractiveRevealMap ? mapConfig?.mapViewFrameRadiusPx ?? 0 : 0;
 	const frameBorderPx = isInteractiveRevealMap ? mapConfig?.mapViewFrameBorderPx ?? 0 : 0;
+	// While the clip/frame are at their no-op idle values (every host today),
+	// skip the clip-path + will-change wrappers entirely: they pin extra
+	// composited layers around the WebGL canvas that WebKit re-evaluates every
+	// map frame. A first non-idle clip applies discretely (clip-path cannot
+	// interpolate from none) — acceptable, since no host currently animates
+	// from the idle value.
+	const isIdleClip = mapViewClip === IDLE_CLIP_PATH;
+	const hasVisibleFrame = frameBorderPx > 0 || frameInsetPx > 0 || frameRadiusPx > 0;
 
 	return (
 		<>
@@ -109,11 +117,15 @@ export function PersistentDashboardMap() {
 						style={{
 							width: '100%',
 							height: '100%',
-							WebkitClipPath: mapViewClip,
-							clipPath: mapViewClip,
-							transition: `-webkit-clip-path ${mapViewFrameTransition}, clip-path ${mapViewFrameTransition}`,
-							willChange: 'clip-path',
 							overflow: 'hidden',
+							...(isIdleClip
+								? {}
+								: {
+										WebkitClipPath: mapViewClip,
+										clipPath: mapViewClip,
+										transition: `-webkit-clip-path ${mapViewFrameTransition}, clip-path ${mapViewFrameTransition}`,
+										willChange: 'clip-path',
+									}),
 						}}
 					>
 						{/* onMapLoadedChange stays after the spread so a host-config mapProps
@@ -124,24 +136,26 @@ export function PersistentDashboardMap() {
 						/>
 					</div>
 
-					<div
-						aria-hidden="true"
-						style={{
-							position: 'absolute',
-							top: frameInsetPx,
-							left: frameInsetPx,
-							right: frameInsetPx,
-							bottom: frameInsetPx,
-							borderRadius: frameRadiusPx,
-							borderStyle: 'solid',
-							borderColor: '#143883',
-							borderWidth: frameBorderPx,
-							boxSizing: 'border-box',
-							pointerEvents: 'none',
-							transition: `top ${mapViewFrameTransition}, left ${mapViewFrameTransition}, right ${mapViewFrameTransition}, bottom ${mapViewFrameTransition}, border-radius ${mapViewFrameTransition}, border-width ${mapViewFrameTransition}`,
-							willChange: 'top, left, right, bottom, border-radius, border-width',
-						}}
-					/>
+					{hasVisibleFrame && (
+						<div
+							aria-hidden="true"
+							style={{
+								position: 'absolute',
+								top: frameInsetPx,
+								left: frameInsetPx,
+								right: frameInsetPx,
+								bottom: frameInsetPx,
+								borderRadius: frameRadiusPx,
+								borderStyle: 'solid',
+								borderColor: '#143883',
+								borderWidth: frameBorderPx,
+								boxSizing: 'border-box',
+								pointerEvents: 'none',
+								transition: `top ${mapViewFrameTransition}, left ${mapViewFrameTransition}, right ${mapViewFrameTransition}, bottom ${mapViewFrameTransition}, border-radius ${mapViewFrameTransition}, border-width ${mapViewFrameTransition}`,
+								willChange: 'top, left, right, bottom, border-radius, border-width',
+							}}
+						/>
+					)}
 				</div>
 			</div>
 			<style jsx global>{`

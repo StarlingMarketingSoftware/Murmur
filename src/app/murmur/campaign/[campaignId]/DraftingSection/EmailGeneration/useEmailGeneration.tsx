@@ -100,7 +100,7 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 
 	const handleDraftButtonClick = async () => {
 		if (selectedContactIds.size === 0) {
-			toast.error('Select at least one contact to draft emails.');
+			toast.error('Select at least one contact to draft messages.');
 			return;
 		}
 		await executeDraftNow();

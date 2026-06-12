@@ -12,6 +12,16 @@ import type {
 import { useRouter, useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import { cn } from '@/utils';
+import { getApproximateLocation } from '@/utils/approximateLocation';
+import { markPerf } from '@/utils/perfMarks';
+import { prefetchCuratedForYouFromCampaign } from '@/app/murmur/dashboard/searchResultCache';
+import {
+	CAMPAIGN_SNUG_MAX_HEIGHT_FIT_ZOOM,
+	CAMPAIGN_SNUG_MIN_EFFECTIVE_WIDTH_PX,
+	CAMPAIGN_SNUG_SAFE_BOTTOM_MARGIN_PX,
+	CAMPAIGN_WORKSPACE_CONTENT_SCALE,
+	computeMurmurChromeZoomForViewport,
+} from '@/utils/murmurChromeZoom';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useMe } from '@/hooks/useMe';
 import {
@@ -729,7 +739,7 @@ const CAMPAIGN_MAP_SHIFT_X_VAR = '--murmur-campaign-map-shift-x';
 const CAMPAIGN_TOP_NAV_SHIFT_X_VAR = '--murmur-campaign-top-nav-shift-x';
 const CAMPAIGN_MAP_BACKDROP_START_VAR = '--murmur-campaign-map-backdrop-start';
 const CAMPAIGN_MAP_BACKDROP_END_VAR = '--murmur-campaign-map-backdrop-end';
-const CAMPAIGN_MAP_CONTENT_SCALE = 0.94;
+const CAMPAIGN_MAP_CONTENT_SCALE = CAMPAIGN_WORKSPACE_CONTENT_SCALE;
 const CAMPAIGN_MAP_FALLBACK_SHIFT_X_PX = 160;
 const CAMPAIGN_MAP_MIN_SHIFT_X_PX = 88;
 const CAMPAIGN_MAP_MAX_SHIFT_X_PX = 900;
@@ -877,54 +887,6 @@ const getCampaignMapZoomControlValueForZoom = (zoom: number) => {
 
 	return CAMPAIGN_MAP_ZOOM_CONTROL_MAX_INDEX;
 };
-
-const SIXTEEN_BY_TEN_ZOOM_MATCH_TOLERANCE_PX = 50;
-
-// 16:10 resolution-specific zoom levels: [width, height] → zoom
-const SIXTEEN_BY_TEN_ZOOM_MAP: Array<{ w: number; h: number; zoom: number }> = [
-	{ w: 1152, h: 720, zoom: 0.52 },
-	{ w: 1280, h: 800, zoom: 0.6 },
-	{ w: 1440, h: 900, zoom: 0.7 },
-	{ w: 1504, h: 940, zoom: 0.84 }, // 14" MacBook Pro (slightly more zoomed-in)
-	{ w: 1664, h: 1040, zoom: 0.77 },
-	{ w: 1920, h: 1200, zoom: 0.95 },
-	{ w: 2048, h: 1280, zoom: 0.95 },
-	{ w: 2304, h: 1440, zoom: 1.1 },
-	{ w: 2592, h: 1620, zoom: 1.2 },
-	{ w: 2880, h: 1800, zoom: 1.2 },
-	{ w: 2976, h: 1860, zoom: 1.45 },
-	{ w: 4608, h: 2880, zoom: 1.6 },
-];
-
-// Fallback zoom for 16:10-ish resolutions that don't match any tuned point
-const SIXTEEN_BY_TEN_FALLBACK_ZOOM = 0.8;
-
-type SixteenByTenZoomPoint = { w: number; h: number; zoom: number; metric: number };
-
-// Precompute a size metric (diagonal length) so we can smoothly interpolate between tuned points.
-const SIXTEEN_BY_TEN_ZOOM_POINTS: SixteenByTenZoomPoint[] = SIXTEEN_BY_TEN_ZOOM_MAP.map(
-	(entry) => ({ ...entry, metric: Math.hypot(entry.w, entry.h) })
-).sort((a, b) => a.metric - b.metric);
-
-// 16:9 resolution-specific zoom levels: [width, height] → zoom
-const SIXTEEN_BY_NINE_ZOOM_MAP: Array<{ w: number; h: number; zoom: number }> = [
-	{ w: 1280, h: 720, zoom: 0.52 },
-	{ w: 1344, h: 756, zoom: 0.55 },
-	{ w: 1600, h: 900, zoom: 0.68 },
-	{ w: 1920, h: 1080, zoom: 0.83 },
-];
-
-// Fallback zoom for 16:9 resolutions that don't match any tuned point
-const SIXTEEN_BY_NINE_FALLBACK_ZOOM = 0.85;
-
-type SixteenByNineZoomPoint = { w: number; h: number; zoom: number; metric: number };
-
-// Precompute a size metric (diagonal length) so we can smoothly interpolate between tuned points.
-const SIXTEEN_BY_NINE_ZOOM_POINTS: SixteenByNineZoomPoint[] =
-	SIXTEEN_BY_NINE_ZOOM_MAP.map((entry) => ({
-		...entry,
-		metric: Math.hypot(entry.w, entry.h),
-	})).sort((a, b) => a.metric - b.metric);
 
 // Dynamically import heavy components to reduce initial bundle size and prevent Vercel timeout
 const DraftingSection = nextDynamic(() =>
@@ -1383,207 +1345,19 @@ const Murmur = () => {
 		if (viewportH <= 0 || viewportW <= 0) return;
 		html.style.setProperty(CAMPAIGN_VIEWPORT_H_VAR, `${viewportH}px`);
 
-		const ratio = viewportW / viewportH;
-		const IDEAL_16X10 = 16 / 10; // 1.6
-		const IDEAL_16X9 = 16 / 9; // ~1.777
-		const viewportDelta16x10 = Math.abs(ratio - IDEAL_16X10);
-		const viewportDelta16x9 = Math.abs(ratio - IDEAL_16X9);
-		const screenW = window.screen?.availWidth ?? window.screen?.width ?? viewportW;
-		const screenH = window.screen?.availHeight ?? window.screen?.height ?? viewportH;
-		const screenRatio = screenW > 0 && screenH > 0 ? screenW / screenH : ratio;
-		const screenDelta16x10 = Math.abs(screenRatio - IDEAL_16X10);
-		const screenDelta16x9 = Math.abs(screenRatio - IDEAL_16X9);
-		const isSixteenByTenish = viewportDelta16x10 <= 0.14 || screenDelta16x10 <= 0.14;
-		const isSixteenByNineish = viewportDelta16x9 <= 0.08 || screenDelta16x9 <= 0.08;
-
-		let targetZoom = DEFAULT_CAMPAIGN_ZOOM;
-
-		if (isSixteenByTenish) {
-			// Check both screen dimensions AND viewport dimensions.
-			// Screen dims work for real monitors; viewport dims work for dev tools simulation.
-			const screenW = window.screen?.width;
-			const screenH = window.screen?.height;
-			const matchScreenW = screenW ?? viewportW;
-			const matchScreenH = screenH ?? viewportH;
-
-			const findNearMatch = (w: number, h: number) =>
-				SIXTEEN_BY_TEN_ZOOM_MAP.find(
-					(entry) =>
-						Math.abs(w - entry.w) <= SIXTEEN_BY_TEN_ZOOM_MATCH_TOLERANCE_PX &&
-						Math.abs(h - entry.h) <= SIXTEEN_BY_TEN_ZOOM_MATCH_TOLERANCE_PX
-				);
-
-			const interpolateZoom = (w: number, h: number) => {
-				const metric = Math.hypot(w, h);
-				if (
-					!Number.isFinite(metric) ||
-					metric <= 0 ||
-					SIXTEEN_BY_TEN_ZOOM_POINTS.length === 0
-				) {
-					return SIXTEEN_BY_TEN_FALLBACK_ZOOM;
-				}
-
-				const first = SIXTEEN_BY_TEN_ZOOM_POINTS[0];
-				const last = SIXTEEN_BY_TEN_ZOOM_POINTS[SIXTEEN_BY_TEN_ZOOM_POINTS.length - 1];
-				if (metric <= first.metric) return first.zoom;
-				if (metric >= last.metric) return last.zoom;
-
-				for (let i = 0; i < SIXTEEN_BY_TEN_ZOOM_POINTS.length - 1; i++) {
-					const a = SIXTEEN_BY_TEN_ZOOM_POINTS[i];
-					const b = SIXTEEN_BY_TEN_ZOOM_POINTS[i + 1];
-					if (metric < a.metric || metric > b.metric) continue;
-
-					const denom = b.metric - a.metric;
-					const t = denom > 0 ? (metric - a.metric) / denom : 0;
-					return a.zoom + (b.zoom - a.zoom) * t;
-				}
-
-				return SIXTEEN_BY_TEN_FALLBACK_ZOOM;
-			};
-
-			const distanceToMap = (w: number, h: number) => {
-				let best = Number.POSITIVE_INFINITY;
-				for (const entry of SIXTEEN_BY_TEN_ZOOM_POINTS) {
-					best = Math.min(best, Math.hypot(w - entry.w, h - entry.h));
-				}
-				return best;
-			};
-
-			// Prefer a tuned near-match when possible (screen first, then viewport).
-			const screenNearMatch = findNearMatch(matchScreenW, matchScreenH);
-			if (screenNearMatch) {
-				targetZoom = screenNearMatch.zoom;
-			} else {
-				const viewportNearMatch = findNearMatch(viewportW, viewportH);
-				if (viewportNearMatch) {
-					targetZoom = viewportNearMatch.zoom;
-				} else {
-					// Otherwise interpolate smoothly between the two nearest tuned points.
-					// Choose whichever dimensions are "closer" to our tuned resolution set.
-					const screenDistance = distanceToMap(matchScreenW, matchScreenH);
-					const viewportDistance = distanceToMap(viewportW, viewportH);
-					const useViewportDims = viewportDistance + 0.5 < screenDistance; // bias ties toward screen dims
-					const w = useViewportDims ? viewportW : matchScreenW;
-					const h = useViewportDims ? viewportH : matchScreenH;
-					targetZoom = interpolateZoom(w, h);
-				}
-			}
-		} else if (isSixteenByNineish) {
-			// 16:9 monitor handling
-			const screenW = window.screen?.width;
-			const screenH = window.screen?.height;
-			const matchScreenW = screenW ?? viewportW;
-			const matchScreenH = screenH ?? viewportH;
-
-			const findNearMatch = (w: number, h: number) =>
-				SIXTEEN_BY_NINE_ZOOM_MAP.find(
-					(entry) =>
-						Math.abs(w - entry.w) <= SIXTEEN_BY_TEN_ZOOM_MATCH_TOLERANCE_PX &&
-						Math.abs(h - entry.h) <= SIXTEEN_BY_TEN_ZOOM_MATCH_TOLERANCE_PX
-				);
-
-			const interpolateZoom = (w: number, h: number) => {
-				const metric = Math.hypot(w, h);
-				if (
-					!Number.isFinite(metric) ||
-					metric <= 0 ||
-					SIXTEEN_BY_NINE_ZOOM_POINTS.length === 0
-				) {
-					return SIXTEEN_BY_NINE_FALLBACK_ZOOM;
-				}
-
-				const first = SIXTEEN_BY_NINE_ZOOM_POINTS[0];
-				const last = SIXTEEN_BY_NINE_ZOOM_POINTS[SIXTEEN_BY_NINE_ZOOM_POINTS.length - 1];
-				if (metric <= first.metric) return first.zoom;
-				if (metric >= last.metric) return last.zoom;
-
-				for (let i = 0; i < SIXTEEN_BY_NINE_ZOOM_POINTS.length - 1; i++) {
-					const a = SIXTEEN_BY_NINE_ZOOM_POINTS[i];
-					const b = SIXTEEN_BY_NINE_ZOOM_POINTS[i + 1];
-					if (metric < a.metric || metric > b.metric) continue;
-
-					const denom = b.metric - a.metric;
-					const t = denom > 0 ? (metric - a.metric) / denom : 0;
-					return a.zoom + (b.zoom - a.zoom) * t;
-				}
-
-				return SIXTEEN_BY_NINE_FALLBACK_ZOOM;
-			};
-
-			const distanceToMap = (w: number, h: number) => {
-				let best = Number.POSITIVE_INFINITY;
-				for (const entry of SIXTEEN_BY_NINE_ZOOM_POINTS) {
-					best = Math.min(best, Math.hypot(w - entry.w, h - entry.h));
-				}
-				return best;
-			};
-
-			// Prefer a tuned near-match when possible (screen first, then viewport).
-			const screenNearMatch = findNearMatch(matchScreenW, matchScreenH);
-			if (screenNearMatch) {
-				targetZoom = screenNearMatch.zoom;
-			} else {
-				const viewportNearMatch = findNearMatch(viewportW, viewportH);
-				if (viewportNearMatch) {
-					targetZoom = viewportNearMatch.zoom;
-				} else {
-					// Otherwise interpolate smoothly between the two nearest tuned points.
-					const screenDistance = distanceToMap(matchScreenW, matchScreenH);
-					const viewportDistance = distanceToMap(viewportW, viewportH);
-					const useViewportDims = viewportDistance + 0.5 < screenDistance;
-					const w = useViewportDims ? viewportW : matchScreenW;
-					const h = useViewportDims ? viewportH : matchScreenH;
-					targetZoom = interpolateZoom(w, h);
-				}
-			}
-		}
-
-		// --- Dock / windowed zoom overrides ---
-		// Keep these rules narrow + ordered so they’re easy to reason about and don’t accidentally
-		// affect unrelated resolutions. These apply after the general resolution map.
+		// Shared chrome zoom target — single source of truth with the dashboard map
+		// view (src/utils/murmurChromeZoom.ts): resolution tables, dock/windowed
+		// overrides, guardrails. The snug-fit pass below may shrink the zoom so the
+		// bottom panels stay visible, but never grows past this target, so the fixed
+		// top-tab chrome renders at exactly the dashboard map view's size.
+		let targetZoom = computeMurmurChromeZoomForViewport(
+			viewportW,
+			viewportH,
+			window.screen
+		);
+		const chromeZoomTarget = targetZoom;
 		const clampZoom = (z: number, min = -Infinity, max = Infinity) =>
 			Math.min(max, Math.max(min, z));
-		const appliedDockRules: string[] = [];
-		type DockZoomRule = { id: string; when: boolean; min?: number; max?: number };
-		const dockZoomRules: DockZoomRule[] = [
-			{
-				// Wide-but-short windows (often due to macOS Dock / non-maximized browser windows)
-				// can feel too zoomed out; prefer allowing scroll instead of shrinking indefinitely.
-				id: 'short-viewport-min',
-				when: viewportW >= 1400 && viewportH <= 780,
-				min: 0.7,
-			},
-			{
-				// ~1952x1220 with Dock: 1920x1200 tuned zoom feels a hair too large.
-				id: 'dock-1952x1220-max',
-				when:
-					viewportW >= 1900 &&
-					viewportW <= 2050 &&
-					viewportH >= 1180 &&
-					viewportH <= 1245,
-				max: 0.93,
-			},
-			{
-				// ~2144x1340 with Dock: custom preference bump.
-				id: 'dock-2144x1340-min',
-				when:
-					viewportW >= 2100 &&
-					viewportW <= 2200 &&
-					viewportH >= 1320 &&
-					viewportH <= 1380,
-				min: 1.2,
-			},
-		];
-		for (const rule of dockZoomRules) {
-			if (!rule.when) continue;
-			const next = clampZoom(targetZoom, rule.min, rule.max);
-			if (Math.abs(next - targetZoom) > 1e-6) {
-				targetZoom = next;
-				appliedDockRules.push(rule.id);
-			}
-		}
-		// Guardrails: keep zoom within sane bounds (prevents accidental extreme values).
-		targetZoom = clampZoom(targetZoom, 0.5, 1.6);
 
 		// Normal + narrow: keep compact mode (snug, no page scroll).
 		html.classList.remove(CAMPAIGN_SCROLLABLE_CLASS);
@@ -1609,9 +1383,9 @@ const Murmur = () => {
 			);
 			if (anchors.length > 0) {
 				// Keep the campaign bottom panels' measured bottom exactly 22px above the viewport.
-				const SAFE_BOTTOM_MARGIN_PX = 22;
+				const SAFE_BOTTOM_MARGIN_PX = CAMPAIGN_SNUG_SAFE_BOTTOM_MARGIN_PX;
 				const ABSOLUTE_MIN_DOCK_CLAMP_ZOOM = 0.5;
-				const ABSOLUTE_MAX_HEIGHT_FIT_ZOOM = 1.2;
+				const ABSOLUTE_MAX_HEIGHT_FIT_ZOOM = CAMPAIGN_SNUG_MAX_HEIGHT_FIT_ZOOM;
 				const availableH = Math.max(0, viewportH - SAFE_BOTTOM_MARGIN_PX);
 
 				const isTransformScaleMode = (() => {
@@ -1675,14 +1449,20 @@ const Murmur = () => {
 						// 1. Never shrink below ABSOLUTE_MIN_DOCK_CLAMP_ZOOM (0.5)
 						// 2. Never grow above ABSOLUTE_MAX_HEIGHT_FIT_ZOOM (1.2)
 						// 3. Ensure we don't break the layout width (keep effective width >= 952px)
+						// 4. Never grow above the shared chrome zoom target — the workspace
+						//    layout expands its vertical envelope instead (DraftingSection's
+						//    extraEnvelopeHeightPx), so the snug fit lands AT the target and
+						//    the chrome matches the dashboard map view exactly.
 
-						const minEffectiveWidth = 952;
+						const minEffectiveWidth = CAMPAIGN_SNUG_MIN_EFFECTIVE_WIDTH_PX;
 						const maxZoomForWidth = viewportW / minEffectiveWidth;
 
-						const finalMaxZoom = Math.min(ABSOLUTE_MAX_HEIGHT_FIT_ZOOM, maxZoomForWidth);
+						const finalMaxZoom = Math.min(
+							ABSOLUTE_MAX_HEIGHT_FIT_ZOOM,
+							maxZoomForWidth,
+							chromeZoomTarget
+						);
 
-						// We strictly use the calculated zoomToFitHeight (clamped)
-						// because the user wants it "SNUG" (filled).
 						targetZoom = Math.min(
 							Math.max(zoomToFitHeight, ABSOLUTE_MIN_DOCK_CLAMP_ZOOM),
 							finalMaxZoom
@@ -1828,7 +1608,7 @@ const Murmur = () => {
 				viewportW,
 				viewportH,
 				targetZoom,
-				appliedDockRules,
+				chromeZoomTarget,
 				forceTransform: shouldForceTransform,
 				htmlZoom: (() => {
 					try {
@@ -1972,6 +1752,18 @@ const Murmur = () => {
 			// Safari fullscreen / rapid vertical resize settles over multiple frames.
 			scheduleZoomSettlePasses();
 		};
+		// DraftingSection grows its vertical envelope (extraEnvelopeHeightPx) so the
+		// snug fit lands at the shared chrome zoom target. That can commit AFTER the
+		// resize settle passes (e.g. inbox content loads late), so it announces the
+		// change and we re-fit against the moved anchors.
+		const onEnvelopeChanged = () => {
+			refreshBottomAnchors();
+			scheduleZoomUpdate();
+		};
+		window.addEventListener(
+			'murmur:campaign-envelope-changed',
+			onEnvelopeChanged as EventListener
+		);
 		// Defensive: clear any stale campaign zoom (e.g. Safari BFCache restores).
 		try {
 			document.documentElement.style.removeProperty(CAMPAIGN_ZOOM_VAR);
@@ -2043,6 +1835,10 @@ const Murmur = () => {
 		return () => {
 			cancelled = true;
 			refreshCampaignZoomAnchorObserversRef.current = null;
+			window.removeEventListener(
+				'murmur:campaign-envelope-changed',
+				onEnvelopeChanged as EventListener
+			);
 			document.documentElement.classList.remove(CAMPAIGN_COMPACT_CLASS);
 			document.documentElement.classList.remove(CAMPAIGN_SCROLLABLE_CLASS);
 			document.documentElement.classList.remove(CAMPAIGN_FORCE_TRANSFORM_CLASS);
@@ -2070,6 +1866,9 @@ const Murmur = () => {
 	const searchParams = useSearchParams();
 	const originParam = searchParams.get('origin');
 	const cameFromSearch = originParam === 'search';
+	// Set only by the dashboard's add-to-campaign pushes — pure tab-switch arrivals
+	// (origin=search without it) skip the contacts refetch below.
+	const searchAddedContacts = searchParams.get('added') === '1';
 	const tabParam = searchParams.get('tab');
 	const inboxDebugEnabled = searchParams.get('inboxDebug') === '1';
 	const [inboxMockState, setInboxMockState] = useState<
@@ -2108,9 +1907,58 @@ const Murmur = () => {
 
 	const topSearchHighlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+	// Hoisted above the Search-tab handlers: the curated prefetch below keys its
+	// localStorage cache by user id.
+	const { user, isPendingUser, isLoaded } = useMe();
+
+	// Speculative "For You" prefetch for the Search tab: starts the curated fetch the
+	// dashboard pick-flow is about to run (and warms the IP-location cache it awaits)
+	// so the route swap overlaps the search instead of serializing after it. Fired on
+	// hover intent and again as a guaranteed floor inside the click handler — repeat
+	// calls dedupe via the module-scope slot/cache.
+	const prefetchDashboardCuratedForYou = useCallback(() => {
+		void prefetchCuratedForYouFromCampaign(user?.id);
+	}, [user?.id]);
+
+	// Hover tier for the Search tab (template: the dashboard's campaign-tab prefetch):
+	// ~120ms of sustained hover means real intent — an incidental pass-over shouldn't
+	// cost a curated search. Pointerdown (about to click) fires immediately.
+	const searchTabPrefetchTimerRef = useRef<number | null>(null);
+	const handleSearchTabPointerEnter = useCallback(() => {
+		if (searchTabPrefetchTimerRef.current) {
+			window.clearTimeout(searchTabPrefetchTimerRef.current);
+		}
+		searchTabPrefetchTimerRef.current = window.setTimeout(() => {
+			searchTabPrefetchTimerRef.current = null;
+			prefetchDashboardCuratedForYou();
+		}, 120);
+	}, [prefetchDashboardCuratedForYou]);
+	const handleSearchTabPointerLeave = useCallback(() => {
+		if (searchTabPrefetchTimerRef.current) {
+			window.clearTimeout(searchTabPrefetchTimerRef.current);
+			searchTabPrefetchTimerRef.current = null;
+		}
+	}, []);
+	const handleSearchTabPointerDown = useCallback(() => {
+		if (searchTabPrefetchTimerRef.current) {
+			window.clearTimeout(searchTabPrefetchTimerRef.current);
+			searchTabPrefetchTimerRef.current = null;
+		}
+		prefetchDashboardCuratedForYou();
+	}, [prefetchDashboardCuratedForYou]);
+	useEffect(() => {
+		return () => {
+			if (searchTabPrefetchTimerRef.current) {
+				window.clearTimeout(searchTabPrefetchTimerRef.current);
+			}
+		};
+	}, []);
+
 	// Moved here to be accessible by the keydown listener
 	const handleOpenDashboardSearchForCampaign = useCallback(() => {
 		if (!campaign) return;
+
+		prefetchDashboardCuratedForYou();
 
 		try {
 			sessionStorage.removeItem('murmur_pending_search');
@@ -2127,12 +1975,13 @@ const Murmur = () => {
 		// search framing (no background-globe flash, no pan-down) only for this tab transition.
 		// Mobile omits allContacts=1 so the entry stays engaged on the fresh "For You"
 		// curated picks (the pill + pins) instead of disengaging to ambient all-contacts.
+		markPerf('murmur:pick:click');
 		router.push(
 			`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}&pick=1${
 				isMobile === true ? '' : '&allContacts=1'
 			}&instant=1`
 		);
-	}, [campaign, isMobile, router]);
+	}, [campaign, isMobile, prefetchDashboardCuratedForYou, router]);
 
 	// Legacy ?tab=search deep link (the in-campaign mobile search view is gone — search
 	// lives on the dashboard pick flow). Capture the param once on mount: the tab URL
@@ -2169,6 +2018,25 @@ const Murmur = () => {
 		router.prefetch(urls.murmur.dashboard.index);
 	}, [router]);
 
+	// Warm the coarse IP geolocation on idle (cached 24h, in-flight deduped). The dashboard's
+	// pick-flow rehydration awaits it before the curated search — cold, that's an external IP
+	// round-trip (up to two 4s-timeout providers) sitting serially inside the Search tab
+	// transition. Mirrors the dashboard's own idle warm.
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		const warm = () => void getApproximateLocation().catch(() => undefined);
+		const idle = window as unknown as {
+			requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number;
+			cancelIdleCallback?: (handle: number) => void;
+		};
+		if (typeof idle.requestIdleCallback === 'function') {
+			const handle = idle.requestIdleCallback(warm, { timeout: 2000 });
+			return () => idle.cancelIdleCallback?.(handle);
+		}
+		const timer = window.setTimeout(warm, 500);
+		return () => window.clearTimeout(timer);
+	}, []);
+
 	// Campaign Search should always stay pinned to the campaign the user is viewing.
 	const handleGoToDashboardSearch = handleOpenDashboardSearchForCampaign;
 	// Overview (All tab) local search state: when set, the right-rail swaps to the dashboard-style
@@ -2202,6 +2070,9 @@ const Murmur = () => {
 					handleOpenDashboardSearchForCampaign();
 				} else {
 					setTopSearchHighlighted(true);
+					// First Space press arms the Search shortcut — strong intent that the
+					// second press will navigate, so start the curated prefetch now.
+					prefetchDashboardCuratedForYou();
 
 					if (topSearchHighlightTimeoutRef.current) {
 						clearTimeout(topSearchHighlightTimeoutRef.current);
@@ -2218,7 +2089,7 @@ const Murmur = () => {
 		return () => {
 			window.removeEventListener('keydown', handleKeyDown);
 		};
-	}, [handleOpenDashboardSearchForCampaign]);
+	}, [handleOpenDashboardSearchForCampaign, prefetchDashboardCuratedForYou]);
 
 	// Cleanup timer on unmount
 	useEffect(() => {
@@ -2229,7 +2100,6 @@ const Murmur = () => {
 		};
 	}, []);
 
-	const { user, isPendingUser, isLoaded } = useMe();
 	const { data: identities, isPending: isPendingIdentities } = useGetIdentities({});
 	const { mutateAsync: editCampaign } = useEditCampaign({ suppressToasts: true });
 	const { mutateAsync: createIdentity } = useCreateIdentity({ suppressToasts: true });
@@ -2237,9 +2107,14 @@ const Murmur = () => {
 	const queryClient = useQueryClient();
 	const hasRefetchedContactsRef = useRef(false);
 
-	// Refetch contacts when returning from map search (origin=search) to ensure newly added contacts are shown
+	// Refetch contacts when returning from map search with newly added contacts (added=1,
+	// set by the dashboard's add-to-campaign pushes). Gated so plain origin=search tab
+	// switches don't blow away the contacts/lists cache the dashboard just prefetched.
+	// Kept (rather than relying on the dashboard's own awaited invalidations) as the
+	// safety net for inactive queries: useGetContacts has refetchOnMount:false, so an
+	// invalidated-but-unmounted query would otherwise stay stale when it mounts here.
 	useEffect(() => {
-		if (cameFromSearch && campaign && !hasRefetchedContactsRef.current) {
+		if (cameFromSearch && searchAddedContacts && campaign && !hasRefetchedContactsRef.current) {
 			hasRefetchedContactsRef.current = true;
 			// Invalidate all contacts and userContactLists queries to force fresh data
 			// This marks queries as stale so they refetch when accessed
@@ -2249,7 +2124,7 @@ const Murmur = () => {
 			queryClient.refetchQueries({ queryKey: ['contacts'], type: 'active' });
 			queryClient.refetchQueries({ queryKey: ['userContactLists'], type: 'active' });
 		}
-	}, [cameFromSearch, campaign, queryClient]);
+	}, [cameFromSearch, searchAddedContacts, campaign, queryClient]);
 
 	// If we landed here without an identity:
 	// - Normal flow: force the IdentityDialog (existing behavior)
@@ -2722,6 +2597,34 @@ const Murmur = () => {
 			return el.scrollTop > 0;
 		};
 
+		// Cache the split-overlay band rect: this capture handler runs for EVERY
+		// wheel event (including continuous trackpad map-zoom streams), and a
+		// querySelector + getBoundingClientRect per event forces style/layout on
+		// the wheel path. Invalidated on resize/zoom-change/overlay resize below.
+		let cachedOverlay: Element | null = null;
+		let cachedBand: { left: number; right: number } | null = null;
+		let overlayResizeObserver: ResizeObserver | null = null;
+		const invalidateBandRect = () => {
+			cachedBand = null;
+		};
+		const getBandRect = (): { left: number; right: number } | null => {
+			if (!cachedOverlay || !cachedOverlay.isConnected) {
+				cachedOverlay = document.querySelector('.campaign-map-split-overlay');
+				cachedBand = null;
+				overlayResizeObserver?.disconnect();
+				if (cachedOverlay && typeof ResizeObserver !== 'undefined') {
+					overlayResizeObserver = new ResizeObserver(invalidateBandRect);
+					overlayResizeObserver.observe(cachedOverlay);
+				}
+			}
+			if (!cachedOverlay) return null;
+			if (!cachedBand) {
+				const rect = cachedOverlay.getBoundingClientRect();
+				cachedBand = { left: rect.left, right: rect.right };
+			}
+			return cachedBand;
+		};
+
 		const onWheelCapture = (e: WheelEvent) => {
 			try {
 				const html = document.documentElement;
@@ -2748,9 +2651,8 @@ const Murmur = () => {
 				// Compact ("nuclear") desktop mode: keep the opacity band steady (no page nudge /
 				// overscroll snap-back), but leave the clear map area free for Mapbox wheel-zoom.
 				if (html.classList.contains(CAMPAIGN_COMPACT_CLASS)) {
-					const overlay = document.querySelector('.campaign-map-split-overlay');
-					if (!overlay) return;
-					const bandRect = overlay.getBoundingClientRect();
+					const bandRect = getBandRect();
+					if (!bandRect) return;
 					// Outside the band's horizontal span is the clear map region — let the map zoom.
 					if (e.clientX < bandRect.left || e.clientX > bandRect.right) return;
 
@@ -2767,8 +2669,19 @@ const Murmur = () => {
 		};
 
 		window.addEventListener('wheel', onWheelCapture, { passive: false, capture: true });
+		window.addEventListener('resize', invalidateBandRect, { passive: true });
+		window.addEventListener(
+			CAMPAIGN_ZOOM_EVENT,
+			invalidateBandRect as EventListener
+		);
 		return () => {
 			window.removeEventListener('wheel', onWheelCapture, true);
+			window.removeEventListener('resize', invalidateBandRect);
+			window.removeEventListener(
+				CAMPAIGN_ZOOM_EVENT,
+				invalidateBandRect as EventListener
+			);
+			overlayResizeObserver?.disconnect();
 		};
 	}, [activeView]);
 
@@ -4010,6 +3923,10 @@ const Murmur = () => {
 														type="button"
 														className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
 														style={inactiveTabStyle(false)}
+														onPointerEnter={handleSearchTabPointerEnter}
+														onFocus={handleSearchTabPointerEnter}
+														onPointerLeave={handleSearchTabPointerLeave}
+														onPointerDown={handleSearchTabPointerDown}
 														onClick={handleGoToDashboardSearch}
 													>
 														Search

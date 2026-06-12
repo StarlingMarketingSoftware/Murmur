@@ -560,43 +560,49 @@ export interface CuratedSearchVariables {
 	signal?: AbortSignal;
 }
 
+// Exported so non-mutation callers (e.g. the campaign page's Search-tab speculative
+// prefetch) can run the exact same fetch the mutation below runs.
+export const fetchCuratedSearch = async (
+	vars: CuratedSearchVariables = {}
+): Promise<CuratedSearchResult> => {
+	const params: Record<string, string> = {};
+	if (typeof vars.lat === 'number' && Number.isFinite(vars.lat)) {
+		params.lat = String(vars.lat);
+	}
+	if (typeof vars.lon === 'number' && Number.isFinite(vars.lon)) {
+		params.lon = String(vars.lon);
+	}
+	if (typeof vars.radiusKm === 'number' && Number.isFinite(vars.radiusKm)) {
+		params.radiusKm = String(vars.radiusKm);
+	}
+	if (vars.category) params.category = vars.category;
+	if (vars.state) params.state = vars.state;
+	if (typeof vars.limit === 'number') params.limit = String(vars.limit);
+	const url = appendQueryParamsToUrl(
+		urls.api.contacts.curatedSearch.index,
+		params
+	);
+	// The route's maxDuration is 60s; let the server own the deadline.
+	const response = await _fetch(url, undefined, undefined, {
+		timeout: CONTACT_SEARCH_TIMEOUT_MS,
+		signal: vars.signal,
+	});
+	if (!response.ok) {
+		const errorMessage = await readResponseErrorMessage(
+			response,
+			'Failed to fetch curated picks',
+			CONTACT_SEARCH_TIMEOUT_MS
+		);
+		throw new Error(errorMessage);
+	}
+	return response.json() as Promise<CuratedSearchResult>;
+};
+
 export const useCuratedContactsSearch = (options: CustomMutationOptions = {}) => {
 	const { suppressToasts = true, onSuccess: onSuccessCallback } = options;
 
 	return useMutation({
-		mutationFn: async (vars: CuratedSearchVariables = {}): Promise<CuratedSearchResult> => {
-			const params: Record<string, string> = {};
-			if (typeof vars.lat === 'number' && Number.isFinite(vars.lat)) {
-				params.lat = String(vars.lat);
-			}
-			if (typeof vars.lon === 'number' && Number.isFinite(vars.lon)) {
-				params.lon = String(vars.lon);
-			}
-			if (typeof vars.radiusKm === 'number' && Number.isFinite(vars.radiusKm)) {
-				params.radiusKm = String(vars.radiusKm);
-			}
-			if (vars.category) params.category = vars.category;
-			if (vars.state) params.state = vars.state;
-			if (typeof vars.limit === 'number') params.limit = String(vars.limit);
-			const url = appendQueryParamsToUrl(
-				urls.api.contacts.curatedSearch.index,
-				params
-			);
-			// The route's maxDuration is 60s; let the server own the deadline.
-			const response = await _fetch(url, undefined, undefined, {
-				timeout: CONTACT_SEARCH_TIMEOUT_MS,
-				signal: vars.signal,
-			});
-			if (!response.ok) {
-				const errorMessage = await readResponseErrorMessage(
-					response,
-					'Failed to fetch curated picks',
-					CONTACT_SEARCH_TIMEOUT_MS
-				);
-				throw new Error(errorMessage);
-			}
-			return response.json() as Promise<CuratedSearchResult>;
-		},
+		mutationFn: fetchCuratedSearch,
 		onSuccess: (data) => {
 			onSuccessCallback?.();
 			if (!suppressToasts) {

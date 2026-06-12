@@ -942,6 +942,19 @@ body {
 				transition-delay: 40ms;
 			}
 
+			/* These layers are opacity:0 at rest, yet their infinite animations keep
+			   ticking style invalidations over the live WebGL globe forever. Pause
+			   the timelines until hover; resuming mid-phase on hover reads better
+			   than a restart anyway. */
+			.search-spotlight-zone:not(:hover):not(:focus-visible)::after {
+				animation-play-state: paused;
+			}
+
+			.search-pond-zone:not(:hover):not(:focus-visible) .search-refraction-streaks,
+			.search-pond-zone:not(:hover):not(:focus-visible) .search-refraction-caustics {
+				animation-play-state: paused;
+			}
+
 			.search-spotlight-zone > .search-spotlight-content {
 				position: relative;
 				z-index: 2;
@@ -1052,6 +1065,23 @@ body {
 	text-rendering: optimizeLegibility;
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
+}
+
+/* Safari: blur(10px) here is a persistent backdrop root re-evaluated on every
+   map frame (the WebKit perf cliff named at the .search-query-display rule).
+   The resting hero container and the focused input are opaque, so dropping the
+   blur is a visual no-op everywhere except the map-view mini searchbar, whose
+   sheen gets a compensating bump below. */
+html.is-safari .search-wave-input {
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+}
+
+html.is-safari
+	body.murmur-map-view
+	.results-search-input-group
+	.search-wave-container::before {
+	background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.62));
 }
 
 .search-wave-input:hover {
@@ -2668,6 +2698,35 @@ html.is-safari .search-active .search-query-display {
 		rgba(255, 255, 255, 0.97) 50%,
 		rgba(255, 255, 255, 0.94) 100%
 	);
+}
+
+/* Safari: same perf cliff for every Tailwind backdrop-blur utility over the
+   map sections (campaign status badges, dialog/drawer overlays, venue popups —
+   each is a backdrop root WebKit re-evaluates per map frame). html.is-safari
+   only exists under /murmur and /venue-portal, so landing pages keep their
+   blurs. Most affected fills are opaque (exact parity); the translucent ones
+   get compensating fills right below. NOTE: keep these rules unlayered — they
+   must out-cascade Tailwind's utilities layer without !important. */
+html.is-safari [class*='backdrop-blur'] {
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+}
+
+/* Compensating fills for the genuinely translucent kill-switch sites. */
+html.is-safari [data-slot='dialog-overlay'][data-overlay-variant='gradient'] {
+	background: linear-gradient(
+		to bottom,
+		var(--background),
+		color-mix(in srgb, var(--background) 38%, transparent)
+	);
+}
+
+html.is-safari [data-slot='drawer-overlay'] {
+	background-color: color-mix(in srgb, var(--background) 62%, transparent);
+}
+
+html.is-safari [data-venue-tool-ui][aria-label='Select event timeframe'] {
+	background-color: rgba(229, 96, 98, 0.96);
 }
 
 /* Results page persistent search bar */

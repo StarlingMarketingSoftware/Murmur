@@ -13,6 +13,7 @@ import React, {
 	type FC,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { getMurmurRootScale } from '@/utils/rootScale';
  
 type BookingForTab = 'Anytime' | 'Season' | 'Calendar';
 type BookingForSeason = 'Spring' | 'Summer' | 'Fall' | 'Winter';
@@ -127,20 +128,11 @@ export const useBookingForDropdownController = ({
 		const button = bookingForButtonRef.current;
 		if (!container || !button) return;
  
-		// Get the page zoom factor. Murmur uses `zoom: 0.9` (or similar) on <html>.
-		// getBoundingClientRect() returns zoomed coordinates, but position: fixed uses unzoomed.
-		// We need to divide by zoom to convert.
-		const getZoomFactor = (): number => {
-			const html = document.documentElement;
-			const computed = window.getComputedStyle(html);
-			const zoom = computed.zoom;
-			if (zoom && zoom !== 'normal') {
-				const zoomValue = parseFloat(zoom);
-				if (Number.isFinite(zoomValue) && zoomValue > 0) return zoomValue;
-			}
-			return 1;
-		};
-		const zoom = getZoomFactor();
+		// Get the page scale factor. Murmur scales compact pages with `zoom` on <html>
+		// (Chrome) or `transform: scale()` on <body> (Safari force-transform mode).
+		// getBoundingClientRect() returns scaled coordinates, but position: fixed values
+		// resolve in unscaled units in both modes, so divide by the applied scale.
+		const zoom = getMurmurRootScale();
  
 		const containerRect = container.getBoundingClientRect();
 		const buttonRect = button.getBoundingClientRect();

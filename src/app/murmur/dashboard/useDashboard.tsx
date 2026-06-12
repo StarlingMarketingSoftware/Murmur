@@ -42,6 +42,28 @@ import {
 } from '@/constants/ui';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { generateCampaignName } from '@/utils/campaignNames';
+import { markAfterPaint, markPerf } from '@/utils/perfMarks';
+// The search-result localStorage cache, its arg types/normalizers, and the speculative
+// curated-fetch slot live in searchResultCache.ts so the campaign page's Search-tab
+// prefetch can share them without dragging in this hook.
+import {
+	CURATED_CACHE_KEY_PREFIX,
+	FREETEXT_CACHE_KEY_PREFIX,
+	curatedArgsEqual,
+	findSearchCacheEntry,
+	freeTextArgsEqual,
+	normalizeCuratedArgs,
+	normalizeFreeTextArgs,
+	isSpeculativeCuratedFetchFresh,
+	readSearchCache,
+	searchCacheKey,
+	speculativeCuratedSlot,
+	toCuratedArgs,
+	writeSearchCacheEntry,
+	type CuratedOverrides,
+	type CuratedSearchArgs,
+	type FreeTextSearchArgs,
+} from './searchResultCache';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
@@ -52,203 +74,6 @@ type FormData = z.infer<typeof formSchema>;
 
 const getRandomSearchResultLimit = (): number =>
 	Math.floor(Math.random() * 21) + 30;
-
-// Args a given search ran with. Doubles as the cache match key (after normalization).
-type CuratedSearchArgs = {
-	lat: number | null;
-	lon: number | null;
-	radiusKm: number | null;
-	category: string | null;
-	state: string | null;
-};
-
-// Args we ran a free-text "Search Anything" search with. The decorated result is cached so
-// a repeat restores the same hybrid-retriever result set (and its `curatedCategory`
-// decoration) instead of falling back to the regular /api/contacts vector search — which
-// returns differently-scored data and breaks the map's stable curated marker rendering.
-type FreeTextSearchArgs = {
-	q: string;
-	lat: number | null;
-	lon: number | null;
-	radiusKm: number | null;
-	// Radius-search mode. Part of the cache identity so a strict (hard-filtered)
-	// search isn't served a soft-locality result cached at the same radius.
-	strictRadius: boolean;
-	// Keyword mode swaps the server into direct field matching instead of semantic search.
-	keywordMode: boolean;
-	// Profile mode: a normalized signature of the identity signals (genre|embedText|
-	// area). Part of the cache identity so profile-tailored results don't collide
-	// with non-profile results, and an identity edit (new signature) busts stale
-	// entries. Empty string when Profile is off.
-	profileSig: string;
-};
-
-// Client-side multi-entry result cache (localStorage). Repeating a recent dashboard search
-// should paint instantly instead of re-running the multi-second curated/free-text pipelines.
-// localStorage (not sessionStorage) so it survives tab close and is shared across tabs within
-// the window. Curated stays non-deterministic on the server — the SWR path in
-// triggerCuratedSearch paints the cache, then swaps in a fresh shuffle.
-const SEARCH_CACHE_VERSION = 3 as const;
-// Three hours: covers same-session repeats and "I came back after lunch", short enough that a
-// stale contact set is bounded. Curated additionally self-heals via background revalidate.
-const SEARCH_CACHE_MAX_AGE_MS = 3 * 60 * 60 * 1000;
-// Per path. ~50 contacts/entry × ~1.5 KB ≈ <1 MB/path, comfortably under the localStorage budget.
-const SEARCH_CACHE_MAX_ENTRIES = 12;
-const CURATED_CACHE_KEY_PREFIX = 'murmur_search_cache_curated_v3';
-const FREETEXT_CACHE_KEY_PREFIX = 'murmur_search_cache_freetext_v3';
-
-// One cached result set: the args that produced it, the display query, and the exact contacts
-// that were rendered (so a replay is byte-identical).
-type SearchCacheEntry<TArgs> = {
-	ts: number;
-	args: TArgs;
-	query: string;
-	contacts: ContactWithName[];
-};
-
-type SearchCacheEnvelope<TArgs> = {
-	v: typeof SEARCH_CACHE_VERSION;
-	entries: SearchCacheEntry<TArgs>[];
-};
-
-// Namespace by user so a different signed-in user on the same browser can't read prior
-// results. Expired entries are dropped on read, so no explicit sign-out clear is required.
-const searchCacheKey = (
-	prefix: string,
-	userId: string | number | null | undefined
-): string => `${prefix}:${userId ?? 'anon'}`;
-
-// JSON.stringify(new Date()) is an ISO string, JSON.parse leaves it as a string.
-// Contact has Date-typed fields that downstream consumers may treat as Dates, so
-// we revive them on read. Missing/null pass through unchanged.
-const reviveContactDates = (raw: unknown): ContactWithName => {
-	const c = raw as Record<string, unknown>;
-	const reviveOne = (v: unknown): unknown =>
-		typeof v === 'string' ? new Date(v) : v;
-	return {
-		...c,
-		createdAt: reviveOne(c.createdAt),
-		updatedAt: reviveOne(c.updatedAt),
-		lastResearchedDate: c.lastResearchedDate != null ? reviveOne(c.lastResearchedDate) : null,
-		emailValidatedAt: c.emailValidatedAt != null ? reviveOne(c.emailValidatedAt) : null,
-	} as ContactWithName;
-};
-
-const readSearchCache = <TArgs,>(storageKey: string): SearchCacheEntry<TArgs>[] => {
-	if (typeof window === 'undefined') return [];
-	try {
-		const raw = window.localStorage.getItem(storageKey);
-		if (!raw) return [];
-		const parsed = JSON.parse(raw) as SearchCacheEnvelope<TArgs>;
-		if (parsed?.v !== SEARCH_CACHE_VERSION || !Array.isArray(parsed.entries)) return [];
-		const now = Date.now();
-		return parsed.entries
-			.filter(
-				(e): e is SearchCacheEntry<TArgs> =>
-					!!e &&
-					typeof e.ts === 'number' &&
-					now - e.ts <= SEARCH_CACHE_MAX_AGE_MS &&
-					Array.isArray(e.contacts)
-			)
-			.map((e) => ({
-				ts: e.ts,
-				args: e.args,
-				query: typeof e.query === 'string' ? e.query : '',
-				contacts: e.contacts.map(reviveContactDates),
-			}));
-	} catch {
-		return [];
-	}
-};
-
-const findSearchCacheEntry = <TArgs,>(
-	entries: SearchCacheEntry<TArgs>[],
-	argsEqual: (a: TArgs, b: TArgs) => boolean,
-	args: TArgs
-): SearchCacheEntry<TArgs> | null => entries.find((e) => argsEqual(e.args, args)) ?? null;
-
-const writeSearchCacheEntry = <TArgs,>(
-	storageKey: string,
-	entry: SearchCacheEntry<TArgs>,
-	argsEqual: (a: TArgs, b: TArgs) => boolean
-): void => {
-	if (typeof window === 'undefined') return;
-	// Dedupe by args, move to front (MRU), cap length.
-	const others = readSearchCache<TArgs>(storageKey).filter(
-		(e) => !argsEqual(e.args, entry.args)
-	);
-	let entries = [entry, ...others].slice(0, SEARCH_CACHE_MAX_ENTRIES);
-	// On quota exhaustion, drop the oldest entry and retry so the cache degrades to
-	// "fewer entries" instead of failing to persist at all.
-	while (entries.length > 0) {
-		try {
-			window.localStorage.setItem(
-				storageKey,
-				JSON.stringify({ v: SEARCH_CACHE_VERSION, entries })
-			);
-			return;
-		} catch {
-			entries = entries.slice(0, -1);
-		}
-	}
-};
-
-const roundTo = (value: number, decimals: number): number => {
-	const factor = 10 ** decimals;
-	return Math.round(value * factor) / factor;
-};
-
-// Normalize so trivially-different inputs hit the same entry. Curated is a neighborhood
-// sample → coarse 2dp (~1.1 km) buckets; free-text is more location-specific → 3dp.
-const normalizeCuratedArgs = (args: CuratedSearchArgs): CuratedSearchArgs => ({
-	lat: args.lat == null ? null : roundTo(args.lat, 2),
-	lon: args.lon == null ? null : roundTo(args.lon, 2),
-	radiusKm: args.radiusKm == null ? null : Math.round(args.radiusKm),
-	category: args.category?.trim().toLowerCase() ?? null,
-	state: args.state?.trim().toLowerCase() ?? null,
-});
-
-const normalizeFreeTextArgs = (args: FreeTextSearchArgs): FreeTextSearchArgs => ({
-	q: args.q.trim().toLowerCase().replace(/\s+/g, ' '),
-	lat: args.lat == null ? null : roundTo(args.lat, 3),
-	lon: args.lon == null ? null : roundTo(args.lon, 3),
-	radiusKm: args.radiusKm == null ? null : Math.round(args.radiusKm),
-	strictRadius: args.strictRadius,
-	keywordMode: args.keywordMode,
-	profileSig: args.profileSig,
-});
-
-const curatedArgsEqual = (a: CuratedSearchArgs, b: CuratedSearchArgs): boolean =>
-	a.lat === b.lat &&
-	a.lon === b.lon &&
-	a.radiusKm === b.radiusKm &&
-	a.category === b.category &&
-	a.state === b.state;
-
-const freeTextArgsEqual = (a: FreeTextSearchArgs, b: FreeTextSearchArgs): boolean =>
-	a.q === b.q &&
-	a.lat === b.lat &&
-	a.lon === b.lon &&
-	a.radiusKm === b.radiusKm &&
-	a.strictRadius === b.strictRadius &&
-	Boolean(a.keywordMode) === Boolean(b.keywordMode) &&
-	a.profileSig === b.profileSig;
-
-type CuratedOverrides = {
-	lat?: number | null;
-	lon?: number | null;
-	radiusKm?: number | null;
-	category?: string | null;
-	state?: string | null;
-};
-
-const toCuratedArgs = (overrides?: CuratedOverrides): CuratedSearchArgs => ({
-	lat: overrides?.lat ?? null,
-	lon: overrides?.lon ?? null,
-	radiusKm: overrides?.radiusKm ?? null,
-	category: overrides?.category ?? null,
-	state: overrides?.state ?? null,
-});
 
 const isTimeoutError = (error: unknown): boolean =>
 	error instanceof Error && /\b(timeout|timed\s*out)\b/i.test(error.message);
@@ -443,15 +268,18 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		[user?.id]
 	);
 
-	// Speculative "For You" prefetch: a curated fetch kicked off on hover/focus intent, before
-	// the click. The click (and a cache-hit's background revalidate) adopts this in-flight
-	// promise instead of firing a second request. Keyed by the exact (unrounded) args so the
-	// click's args match byte-for-byte.
-	const speculativeCuratedRef = useRef<{
-		args: CuratedSearchArgs;
-		promise: Promise<CuratedSearchResult>;
-		controller: AbortController;
-	} | null>(null);
+	// Speculative "For You" prefetch slot: a curated fetch kicked off on hover/focus
+	// intent, before the click. The click (and a cache-hit's background revalidate)
+	// adopts this in-flight promise instead of firing a second request. Module-scope
+	// (speculativeCuratedSlot) so a fetch fired on the CAMPAIGN page's Search tab
+	// survives the route swap and is adopted here after this hook remounts.
+	// True while an adopted campaign-origin fetch is in flight: those don't run through
+	// the curated mutation, so isPendingCuratedSearch stays false for them — without
+	// this, the clear-pending effect below would wipe isSearchPending mid-fetch and the
+	// UI would flash "No Results Found" (and prematurely disengage allContacts mode).
+	const [isAdoptedCuratedFetchPending, setIsAdoptedCuratedFetchPending] = useState(false);
+	// Generation guard for clearing: only the call that last set the flag may clear it.
+	const adoptedCuratedGenerationRef = useRef(0);
 
 	const cancelInFlightSearches = useCallback(() => {
 		curatedAbortRef.current?.abort();
@@ -471,7 +299,10 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		? // While revalidating a cache hit, the cached picks are already on screen — the
 		  // background curated fetch must NOT surface as a blocking load (that would defeat the
 		  // instant paint). All other curated/free-text pending states still count as loading.
-		  (isPendingCuratedSearch || isPendingFreeTextSearch || pendingFreeTextQuery !== null) &&
+		  (isPendingCuratedSearch ||
+				isAdoptedCuratedFetchPending ||
+				isPendingFreeTextSearch ||
+				pendingFreeTextQuery !== null) &&
 			!isRevalidatingCurated
 		: isLoadingRawContacts;
 	const isRefetchingContacts = isCuratedSearchActive ? false : isRefetchingRawContacts;
@@ -701,20 +532,34 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	);
 
 	// Adopt a matching in-flight speculative prefetch if present, else start a fresh fetch.
-	// Returns the controller actually doing the work so the caller can wire abort/cleanup.
+	// Returns the controller actually doing the work so the caller can wire abort/cleanup,
+	// plus whether the promise came from outside the curated mutation (campaign-origin) —
+	// the caller must surface pending state for those itself.
 	const resolveCuratedResult = useCallback(
 		(
 			overrides: CuratedOverrides | undefined
-		): { promise: Promise<CuratedSearchResult>; controller: AbortController } => {
+		): {
+			promise: Promise<CuratedSearchResult>;
+			controller: AbortController;
+			isExternal: boolean;
+		} => {
 			const rawArgs = toCuratedArgs(overrides);
-			const spec = speculativeCuratedRef.current;
+			const spec = speculativeCuratedSlot.current;
 			if (spec && curatedArgsEqual(spec.args, rawArgs)) {
-				speculativeCuratedRef.current = null;
-				return { promise: spec.promise, controller: spec.controller };
+				speculativeCuratedSlot.current = null;
+				if (isSpeculativeCuratedFetchFresh(spec)) {
+					return {
+						promise: spec.promise,
+						controller: spec.controller,
+						isExternal: spec.origin === 'campaign',
+					};
+				}
+				// Too old to trust (module-scope slot outlives mounts) — drop it.
+				spec.controller.abort();
 			}
 			const controller = new AbortController();
 			const promise = runCuratedSearch(buildCuratedVars(overrides, controller.signal));
-			return { promise, controller };
+			return { promise, controller, isExternal: false };
 		},
 		[buildCuratedVars, runCuratedSearch]
 	);
@@ -725,16 +570,28 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	const prefetchCuratedSearch = useCallback(
 		(overrides?: CuratedOverrides) => {
 			const args = toCuratedArgs(overrides);
-			const existing = speculativeCuratedRef.current;
-			if (existing && curatedArgsEqual(existing.args, args)) return;
-			// Replace a stale speculative request (different args) — abort the old one.
+			const existing = speculativeCuratedSlot.current;
+			if (
+				existing &&
+				curatedArgsEqual(existing.args, args) &&
+				isSpeculativeCuratedFetchFresh(existing)
+			) {
+				return;
+			}
+			// Replace a stale/expired speculative request — abort the old one.
 			existing?.controller.abort();
 			const controller = new AbortController();
 			const promise = runCuratedSearch(buildCuratedVars(overrides, controller.signal));
 			// Keep an unconsumed rejection from becoming an unhandled promise rejection;
 			// the real consumer re-awaits and surfaces errors itself.
 			promise.catch(() => undefined);
-			speculativeCuratedRef.current = { args, promise, controller };
+			speculativeCuratedSlot.current = {
+				args,
+				promise,
+				controller,
+				origin: 'dashboard',
+				startedAt: Date.now(),
+			};
 		},
 		[buildCuratedVars, runCuratedSearch]
 	);
@@ -771,6 +628,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				setActiveSearchQuery(cached.query);
 				setIsSearchPending(false);
 				setIsRevalidatingCurated(true);
+				markAfterPaint('murmur:pick:results-paint', 'murmur:pick:click');
 
 				const { promise, controller } = resolveCuratedResult(overrides);
 				curatedAbortRef.current = controller;
@@ -834,14 +692,21 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			setLastFreeTextArgs(null);
 			setLastCuratedArgs(capturedArgs);
 
-			const { promise, controller } = resolveCuratedResult(overrides);
+			const { promise, controller, isExternal } = resolveCuratedResult(overrides);
 			curatedAbortRef.current = controller;
+			if (isExternal) {
+				// Campaign-origin adopted fetch: not a mutation, so isPendingCuratedSearch
+				// won't cover it — surface our own pending state for isLoadingContacts.
+				adoptedCuratedGenerationRef.current = myGeneration;
+				setIsAdoptedCuratedFetchPending(true);
+			}
 			try {
 				const result = await promise;
 				// A newer search has started since we kicked off — drop this result on
 				// the floor so we don't overwrite whatever the newer call rendered.
 				if (myGeneration !== searchGenerationRef.current) return result;
 				setCuratedContacts(result.contacts);
+				markAfterPaint('murmur:pick:results-paint', 'murmur:pick:click');
 				const where = result.city ?? result.region ?? overrides?.state ?? 'your area';
 				const query = `Curated picks near ${where}`;
 				setActiveSearchQuery(query);
@@ -881,6 +746,11 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			} finally {
 				if (curatedAbortRef.current === controller) {
 					curatedAbortRef.current = null;
+				}
+				// Only the call that last set the adopted flag may clear it (a newer
+				// adopted call may have re-armed it for its own fetch).
+				if (adoptedCuratedGenerationRef.current === myGeneration) {
+					setIsAdoptedCuratedFetchPending(false);
 				}
 				if (myGeneration === searchGenerationRef.current) {
 					setIsSearchPending(false);
@@ -1107,6 +977,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				normalizeCuratedArgs(args)
 			);
 			if (cached) {
+				markPerf('murmur:pick:cache-hit');
 				setMapBboxFilter(null);
 				setPendingFreeTextQuery(null);
 				setIsCuratedSearchActive(true);
@@ -1117,8 +988,10 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				setCuratedContacts(cached.contacts);
 				setActiveSearchQuery(cached.query);
 				setIsSearchPending(false);
+				markAfterPaint('murmur:pick:results-paint', 'murmur:pick:click');
 				return;
 			}
+			markPerf('murmur:pick:cache-miss');
 			await triggerCuratedSearch(args);
 		},
 		[curatedCacheKey, triggerCuratedSearch]
@@ -1280,7 +1153,9 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			});
 
 			if (campaign) {
-				startTransition(`${urls.murmur.campaign.detail(campaign.id)}?silent=1&origin=search`);
+				startTransition(
+					`${urls.murmur.campaign.detail(campaign.id)}?silent=1&origin=search&added=1`
+				);
 			}
 		} else if (currentTab === 'list') {
 			if (selectedContactListRows.length === 0) {

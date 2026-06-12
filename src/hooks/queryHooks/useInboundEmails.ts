@@ -29,20 +29,29 @@ interface AssignInboundEmailToCampaignData {
 	data?: PatchInboundEmailData;
 }
 
+// Exported so callers (e.g. dashboard hover prefetch) can warm the exact same
+// React Query cache entry that useGetInboundEmails reads — same key, same fetcher.
+export const getInboundEmailsListQueryKey = (filters?: InboundEmailFilterData) =>
+	[...INBOUND_EMAIL_QUERY_KEYS.list(), filters] as const;
+
+export const fetchInboundEmailsList = async (
+	filters?: InboundEmailFilterData
+): Promise<InboundEmailWithRelations[]> => {
+	const url = appendQueryParamsToUrl(urls.api.inboundEmails.index, filters);
+	const response = await _fetch(url);
+
+	if (!response.ok) {
+		const errorData = await response.json();
+		throw new Error(errorData.error || 'Failed to fetch inbound emails');
+	}
+
+	return response.json() as Promise<InboundEmailWithRelations[]>;
+};
+
 export const useGetInboundEmails = (options: InboundEmailQueryOptions = {}) => {
 	return useQuery({
-		queryKey: [...INBOUND_EMAIL_QUERY_KEYS.list(), options.filters],
-		queryFn: async () => {
-			const url = appendQueryParamsToUrl(urls.api.inboundEmails.index, options.filters);
-			const response = await _fetch(url);
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to fetch inbound emails');
-			}
-
-			return response.json() as Promise<InboundEmailWithRelations[]>;
-		},
+		queryKey: getInboundEmailsListQueryKey(options.filters),
+		queryFn: () => fetchInboundEmailsList(options.filters),
 		enabled: options.enabled,
 		refetchInterval: REALTIME_ENABLED ? false : INBOUND_REFETCH_INTERVAL_MS,
 	});
@@ -51,8 +60,8 @@ export const useGetInboundEmails = (options: InboundEmailQueryOptions = {}) => {
 export const useAssignInboundEmailToCampaign = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,
-		successMessage = 'Email assigned to campaign',
-		errorMessage = 'Failed to assign email to campaign',
+		successMessage = 'Message assigned to campaign',
+		errorMessage = 'Failed to assign message to campaign',
 		onSuccess: onSuccessCallback,
 	} = options;
 	const queryClient = useQueryClient();

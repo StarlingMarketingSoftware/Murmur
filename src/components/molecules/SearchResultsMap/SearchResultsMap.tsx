@@ -313,6 +313,8 @@ import {
 	RESULT_DOT_ZOOM_MAX,
 	RESULT_DOT_ZOOM_MIN,
 	SAFARI_CLOUDS_DRIFT_UPDATE_MS,
+	SAFARI_CLOUDS_IDLE_AFTER_MS,
+	SAFARI_CLOUDS_IDLE_DRIFT_UPDATE_MS,
 	SELECTED_STATE_GRADIENT_BLOOM_OPACITY,
 	SELECTED_STATE_GRADIENT_COLOR_OPACITY,
 	SNOWFLAKE_STAMPS_COUNT,
@@ -674,6 +676,10 @@ const OWNED_VENUE_HOME_ICON_URL = `data:image/svg+xml;charset=UTF-8,${encodeURIC
 const OWNED_VENUE_HOME_ICON_IMAGE_DIMENSIONS = { width: 72, height: 63 } as const;
 const OWNED_VENUE_RING_STEPS = 160;
 const OWNED_VENUE_RADAR_MS = 3400;
+// Radar sweeps animate via 3 GeoJSON setData calls per frame (reparse +
+// re-tessellation + forced repaint); 30fps over a 3.4s period is ~113 steps —
+// visually identical to 60fps at half the cost.
+const RADAR_FRAME_MS = 33;
 const OWNED_VENUE_RADAR_OUTER_TRAVEL_KM = 10;
 const OWNED_VENUE_RADAR_IDLE_COLOR = 'rgb(255, 255, 255)';
 const OWNED_VENUE_GLOW_IDLE_COLOR = 'rgb(169, 231, 255)';
@@ -1502,6 +1508,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	]);
 	const cloudsDriftRafRef = useRef<number | null>(null);
 	const cloudsDriftLastFrameMsRef = useRef<number>(0);
+	// Last camera-motion timestamp; drives the Safari idle drift cadence.
+	const cloudsDriftLastCameraMoveMsRef = useRef<number>(0);
+	// Last raster-opacity applied per layer by applyLightingOverlayOpacity (it
+	// runs on every zoom frame; skipping unchanged values avoids restarting
+	// mapbox paint transitions, which keep the render loop warm — a WebKit-felt
+	// cost). Cleared in ensureMapboxSourcesAndLayers so style reloads re-assert.
+	const lightingRasterOpacityAppliedRef = useRef<Record<string, number>>({});
+	const lightingLayerVisibilityAppliedRef = useRef<Record<string, string>>({});
 	const cloudsDriftOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 	const cloudsDriftOffsetSecondaryRef = useRef<{ x: number; y: number }>({
 		x: 0,
@@ -2143,7 +2157,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Pinned (click) wins over hovered. Deriving the event object via `.get()` makes the
 	// "events emptied / id no longer present" cases collapse to null automatically, so the
 	// popup overlay simply unmounts.
-	const activeEventId = suppressEventPopups ? null : pinnedEventId ?? hoveredEventId;
+	const activeEventId = suppressEventPopups ? null : (pinnedEventId ?? hoveredEventId);
 	const activeEvent =
 		activeEventId != null ? (eventCentersById.get(activeEventId) ?? null) : null;
 	// Drop hovered/pinned ids whose event has disappeared (e.g. events list changed).
@@ -2306,8 +2320,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		let cancelled = false;
 
+		let lastFrameMs = 0;
 		const animateRadar = (nowMs: number) => {
 			if (cancelled) return;
+			if (nowMs - lastFrameMs < RADAR_FRAME_MS) {
+				ownedVenuePulseRafRef.current = window.requestAnimationFrame(animateRadar);
+				return;
+			}
+			lastFrameMs = nowMs;
 
 			const phase = (nowMs % OWNED_VENUE_RADAR_MS) / OWNED_VENUE_RADAR_MS;
 			glowSource.setData({
@@ -2445,8 +2465,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		let cancelled = false;
 
+		let lastFrameMs = 0;
 		const animateRadar = (nowMs: number) => {
 			if (cancelled) return;
+			if (nowMs - lastFrameMs < RADAR_FRAME_MS) {
+				eventsPulseRafRef.current = window.requestAnimationFrame(animateRadar);
+				return;
+			}
+			lastFrameMs = nowMs;
 
 			const phase = (nowMs % OWNED_VENUE_RADAR_MS) / OWNED_VENUE_RADAR_MS;
 			glowSource.setData({
@@ -6105,8 +6131,48 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const tick = (now: number, img: HTMLImageElement, pattern: CanvasPattern | null) => {
 			if (canceled) return;
 
+			// Safari: every drift tick forces a whole-map repaint (triggerRepaint
+			// below). Skip ticks entirely while the weather visuals are invisible
+			// (deep zoom in moods with no deep-zoom cloud veil; lightning and snow
+			// are also hidden at CLOUDS_OVERLAY_FADE_OUT_END_ZOOM), and at rest
+			// drop the cadence — sub-pixel drift at 10fps reads the same.
+			let effectiveDriftMs = driftUpdateMs;
+			if (SAFARI_CANVAS_PERF_MODE) {
+				const cfg = weatherMoodConfigRef.current;
+				let zoom: number | null = null;
+				try {
+					zoom = map.getZoom();
+				} catch {
+					zoom = null;
+				}
+				if (
+					zoom != null &&
+					zoom >= CLOUDS_OVERLAY_FADE_OUT_END_ZOOM &&
+					cfg.cloudDeepZoomOpacity <= 0.001 &&
+					lightningEventsRef.current.length === 0 &&
+					!lightningUploadWasActiveRef.current &&
+					!snowUploadWasActiveRef.current
+				) {
+					// Keep dt sane for the eventual resume, keep the rAF chain
+					// alive, do no draw/upload/repaint work: the map truly idles.
+					cloudsDriftLastFrameMsRef.current = now;
+					cloudsDriftRafRef.current = requestAnimationFrame((t) => tick(t, img, pattern));
+					return;
+				}
+				try {
+					if (
+						!map.isMoving() &&
+						now - cloudsDriftLastCameraMoveMsRef.current > SAFARI_CLOUDS_IDLE_AFTER_MS
+					) {
+						effectiveDriftMs = SAFARI_CLOUDS_IDLE_DRIFT_UPDATE_MS;
+					}
+				} catch {
+					// Keep the normal cadence.
+				}
+			}
+
 			const last = cloudsDriftLastFrameMsRef.current;
-			if (!last || now - last >= driftUpdateMs) {
+			if (!last || now - last >= effectiveDriftMs) {
 				const dtS = last ? (now - last) / 1000 : 0;
 				cloudsDriftLastFrameMsRef.current = now;
 				const dtReal = clamp(dtS, 0, 0.25);
@@ -6244,8 +6310,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// If the texture fails to load, just leave clouds static.
 			});
 
+		// Stamp camera motion so the Safari idle drift cadence can re-engage the
+		// normal cadence the moment the user (or an ease) moves the camera.
+		const stampCameraMove = () => {
+			cloudsDriftLastCameraMoveMsRef.current = performance.now();
+		};
+		stampCameraMove();
+		map.on('move', stampCameraMove);
+
 		return () => {
 			canceled = true;
+			map.off('move', stampCameraMove);
 			lightningWasEnabledRef.current = false;
 			lightningEventsRef.current = [];
 			lightningNextFlashAtMsRef.current = 0;
@@ -6313,6 +6388,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!sunTransitionCanvasRef.current && typeof document !== 'undefined') {
 			sunTransitionCanvasRef.current = createSunTransitionCanvas();
 		}
+
+		// Style (re)loads reset paint/layout values; drop the lighting memos so
+		// the next applyLightingOverlayOpacity re-asserts every layer.
+		lightingRasterOpacityAppliedRef.current = {};
+		lightingLayerVisibilityAppliedRef.current = {};
 
 		// World-land fill (cream continents under the ocean-blue background). Idempotent;
 		// safe if style.load already added it earlier.
@@ -8087,8 +8167,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// Deterministic camera handle for scripts/measure-dashboard-memory.mjs and
 		// scripts/measure-map-fps.mjs (drives fixed camera sequences); also handy
 		// for manual debugging.
-		(window as unknown as { __murmurMapDebug?: unknown }).__murmurMapDebug =
-			mapInstance;
+		(window as unknown as { __murmurMapDebug?: unknown }).__murmurMapDebug = mapInstance;
 		try {
 			initialZoomConstraintsRef.current = {
 				minZoom: mapInstance.getMinZoom(),
@@ -9331,10 +9410,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	]);
 
 	const completeAreaSelection = useCallback(
-		(
-			end: { lat: number; lng: number },
-			endClient: { x: number; y: number } | null
-		) => {
+		(end: { lat: number; lng: number }, endClient: { x: number; y: number } | null) => {
 			if (!isAreaSelecting) return;
 			const start = selectionStartLatLngRef.current;
 			if (!start) {
@@ -11944,6 +12020,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// zoom gesture would otherwise overwrite the smooth imperative update with the stale
 	// `zoomLevel`-derived value (zoomLevel only updates on `moveend`).
 
+	const setRasterOpacityIfChanged = useCallback(
+		(m: mapboxgl.Map, layerId: string, value: number) => {
+			const prev = lightingRasterOpacityAppliedRef.current[layerId];
+			if (prev != null && Math.abs(prev - value) < 0.0005) return;
+			if (!m.getLayer(layerId)) return;
+			m.setPaintProperty(layerId, 'raster-opacity', value);
+			// While effectively invisible, hide the layer outright: mapbox keeps
+			// loading + compositing raster tiles for opacity-0 layers (the 7
+			// night-lights layers cost dashboard zoom/wheel tile churn all day).
+			// The load-fade machinery (nightLightsLoadT / isSourceLoaded polls)
+			// handles the gradual reveal when night flips them visible again.
+			const visibility = value < 0.0005 ? 'none' : 'visible';
+			if (lightingLayerVisibilityAppliedRef.current[layerId] !== visibility) {
+				m.setLayoutProperty(layerId, 'visibility', visibility);
+				lightingLayerVisibilityAppliedRef.current[layerId] = visibility;
+			}
+			lightingRasterOpacityAppliedRef.current[layerId] = value;
+		},
+		[]
+	);
+
 	const applyLightingOverlayOpacity = useCallback(() => {
 		if (!mapRef.current) return;
 		const zoom = mapRef.current.getZoom() ?? MAP_DEFAULT_ZOOM;
@@ -12045,24 +12142,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		);
 		try {
 			const m = mapRef.current;
-			if (m?.getLayer(MAPBOX_LAYER_IDS.dayFarSideShade)) {
-				m.setPaintProperty(
+			if (m) {
+				setRasterOpacityIfChanged(
+					m,
 					MAPBOX_LAYER_IDS.dayFarSideShade,
-					'raster-opacity',
 					dayShadeOpacity
 				);
-			}
-			if (m?.getLayer(MAPBOX_LAYER_IDS.sunTransition)) {
-				m.setPaintProperty(
+				setRasterOpacityIfChanged(
+					m,
 					MAPBOX_LAYER_IDS.sunTransition,
-					'raster-opacity',
 					sunTransitionOpacity
 				);
-			}
-			if (m?.getLayer(MAPBOX_LAYER_IDS.sunTransitionCloudCatchlight)) {
-				m.setPaintProperty(
+				setRasterOpacityIfChanged(
+					m,
 					MAPBOX_LAYER_IDS.sunTransitionCloudCatchlight,
-					'raster-opacity',
 					sunTransitionCatchlightOpacity
 				);
 			}
@@ -12165,54 +12258,38 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		);
 		try {
 			const m = mapRef.current;
-			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLightsSpaceGlow)) {
-				(m as any).setPaintProperty(
+			if (m) {
+				setRasterOpacityIfChanged(
+					m,
 					MAPBOX_LAYER_IDS.nightLightsSpaceGlow,
-					'raster-opacity',
 					finalSpaceGlowOpacity
 				);
-			}
-			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLightsSpaceGlow2)) {
-				(m as any).setPaintProperty(
+				setRasterOpacityIfChanged(
+					m,
 					MAPBOX_LAYER_IDS.nightLightsSpaceGlow2,
-					'raster-opacity',
 					finalSpaceGlowOpacity2
 				);
-			}
-			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLightsRevealGlow)) {
-				(m as any).setPaintProperty(
+				setRasterOpacityIfChanged(
+					m,
 					MAPBOX_LAYER_IDS.nightLightsRevealGlow,
-					'raster-opacity',
 					revealGlowOpacity
 				);
-			}
-			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLightsReveal)) {
-				(m as any).setPaintProperty(
+				setRasterOpacityIfChanged(
+					m,
 					MAPBOX_LAYER_IDS.nightLightsReveal,
-					'raster-opacity',
 					revealCrispOpacity
 				);
-			}
-			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLightsGlow)) {
-				(m as any).setPaintProperty(
+				setRasterOpacityIfChanged(
+					m,
 					MAPBOX_LAYER_IDS.nightLightsGlow,
-					'raster-opacity',
 					finalGlowOpacity
 				);
-			}
-			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLightsCloseGlow)) {
-				(m as any).setPaintProperty(
+				setRasterOpacityIfChanged(
+					m,
 					MAPBOX_LAYER_IDS.nightLightsCloseGlow,
-					'raster-opacity',
 					finalCloseGlowOpacity
 				);
-			}
-			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLights)) {
-				(m as any).setPaintProperty(
-					MAPBOX_LAYER_IDS.nightLights,
-					'raster-opacity',
-					finalCrispOpacity
-				);
+				setRasterOpacityIfChanged(m, MAPBOX_LAYER_IDS.nightLights, finalCrispOpacity);
 			}
 		} catch {
 			// Non-fatal.
@@ -12268,7 +12345,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lightingOverlayBurnWashRef.current.style.opacity = String(burnWashOpacity);
 		if (lightingOverlayBurnGlowRef.current)
 			lightingOverlayBurnGlowRef.current.style.opacity = String(burnGlowOpacity);
-	}, []);
+	}, [setRasterOpacityIfChanged]);
 
 	const repaintSunTransitionCanvas = useCallback((nowMs: number, force = false) => {
 		const sunCanvas = sunTransitionCanvasRef.current;
@@ -12318,7 +12395,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 		};
 
-		const repaint = (nowMs: number) => {
+		const repaint = (nowMs: number, forceRefresh = false) => {
 			const shadeCanvas = dayFarSideShadeCanvasRef.current;
 			if (!shadeCanvas) return false;
 
@@ -12334,17 +12411,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				shadeCanvas.width !== DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX ||
 				shadeCanvas.height !== DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX;
 
-			if (needsPaint) {
-				if (!paintDayFarSideShadeCanvas(shadeCanvas, nextCenterLng)) return false;
-				dayFarSideShadeCenterLngRef.current = nextCenterLng;
+			if (needsPaint && !paintDayFarSideShadeCanvas(shadeCanvas, nextCenterLng)) {
+				return false;
 			}
+			if (needsPaint) dayFarSideShadeCenterLngRef.current = nextCenterLng;
 
-			refreshSource();
-			if (map && isMapLoaded) applyLightingOverlayOpacity();
+			// Re-upload + reapply lighting only when the canvas actually changed
+			// (or on the forced setup call after a (re)mount/style reload): the
+			// unconditional 4s refresh re-uploaded the texture and restarted paint
+			// transitions for nothing, keeping the map's render loop warm at idle.
+			if (needsPaint || forceRefresh) {
+				refreshSource();
+				if (map && isMapLoaded) applyLightingOverlayOpacity();
+			}
 			return true;
 		};
 
-		repaint(Date.now());
+		repaint(Date.now(), true);
 		if (!map || !isMapLoaded || typeof window === 'undefined') return;
 
 		let timeoutId: number | null = null;
@@ -12411,12 +12494,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!isMapLoaded) return;
 
 		applyBlobMorph();
-		// `render` keeps the DOM SVG clip in the same frame cadence as Mapbox's
-		// camera transform, which prevents the gradient from trailing during
-		// quick pinch/scroll zooms.
-		map.on('render', applyBlobMorph);
+		// `move` fires on every camera-change frame, which keeps the DOM SVG clip
+		// in the same cadence as Mapbox's camera transform during quick pinch/
+		// scroll zooms — without also running on every non-camera repaint (e.g.
+		// the clouds-drift ticks) the way `render` did. All non-camera triggers
+		// invoke applyBlobMorph directly.
+		map.on('move', applyBlobMorph);
+		map.on('moveend', applyBlobMorph);
+		map.on('resize', applyBlobMorph);
 		return () => {
-			map.off('render', applyBlobMorph);
+			map.off('move', applyBlobMorph);
+			map.off('moveend', applyBlobMorph);
+			map.off('resize', applyBlobMorph);
 		};
 	}, [map, isMapLoaded, applyBlobMorph]);
 
@@ -12996,9 +13085,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!isMapLoaded) return;
 
 		applySelectedStateGradientState();
-		map.on('render', applySelectedStateGradientState);
+		// Camera events only (not `render`): the gradient's inputs are all
+		// camera-derived; non-camera triggers call the function directly.
+		map.on('move', applySelectedStateGradientState);
+		map.on('moveend', applySelectedStateGradientState);
+		map.on('resize', applySelectedStateGradientState);
 		return () => {
-			map.off('render', applySelectedStateGradientState);
+			map.off('move', applySelectedStateGradientState);
+			map.off('moveend', applySelectedStateGradientState);
+			map.off('resize', applySelectedStateGradientState);
 		};
 	}, [map, isMapLoaded, applySelectedStateGradientState]);
 
@@ -13273,6 +13368,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			MAPBOX_LAYER_IDS.curatedBlobFill,
 			MAPBOX_LAYER_IDS.curatedBlobCore,
 		];
+		const markerHitLayerSet = new Set<string>(markerHitLayers);
+		const searchAreaHitLayerSet = new Set<string>(searchAreaHitLayers);
 		const isSearchAreaHit = (e: mapboxgl.MapMouseEvent): boolean => {
 			const searchAreaFeatures = map.queryRenderedFeatures(e.point, {
 				layers: searchAreaHitLayers,
@@ -13398,10 +13495,56 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
 
-			const markerFeatures = map.queryRenderedFeatures(e.point, {
-				layers: markerHitLayers,
-			});
-			const topMarker = markerFeatures[0];
+			// ONE combined queryRenderedFeatures for every hover target (markers,
+			// event stars, curated blob, states). Each call walks the per-tile
+			// feature index on the main thread, and four separate walks per pointer
+			// frame were the dominant hover cost (worst in Safari, which is already
+			// main-thread-bound). Results are top-to-bottom, so "first feature per
+			// layer group" preserves the old per-layer query semantics; guards that
+			// used to decide whether to QUERY now decide whether to USE a partition.
+			const wantEventHit = !suppressEventPopups && eventCentersById.size > 0;
+			const wantStateHit =
+				stateInteractionsEnabled &&
+				isStateLayerReady &&
+				zoom <= STATE_HOVER_HIGHLIGHT_MAX_ZOOM + 0.001;
+			const hoverHitCandidateLayers = [
+				...markerHitLayers,
+				...(wantEventHit ? [MAPBOX_LAYER_IDS.eventsStarIcon] : []),
+				...searchAreaHitLayers,
+				...(wantStateHit ? [MAPBOX_LAYER_IDS.statesFillHit] : []),
+			];
+			let hoverFeatures: mapboxgl.GeoJSONFeature[] = [];
+			try {
+				hoverFeatures = map.queryRenderedFeatures(e.point, {
+					layers: hoverHitCandidateLayers.filter((id) => Boolean(map.getLayer(id))),
+				});
+			} catch {
+				// Ignore (style mid-reload); treated as empty-map hover below.
+			}
+			let topMarker: (typeof hoverFeatures)[number] | undefined;
+			let topEventFeature: (typeof hoverFeatures)[number] | undefined;
+			let blobLayerHit = false;
+			let topStateFeature: (typeof hoverFeatures)[number] | undefined;
+			for (const feature of hoverFeatures) {
+				const featureLayerId = feature.layer?.id;
+				if (!featureLayerId) continue;
+				if (!topMarker && markerHitLayerSet.has(featureLayerId)) {
+					topMarker = feature;
+				} else if (
+					!topEventFeature &&
+					featureLayerId === MAPBOX_LAYER_IDS.eventsStarIcon
+				) {
+					topEventFeature = feature;
+				} else if (!blobLayerHit && searchAreaHitLayerSet.has(featureLayerId)) {
+					blobLayerHit = true;
+				} else if (
+					!topStateFeature &&
+					featureLayerId === MAPBOX_LAYER_IDS.statesFillHit
+				) {
+					topStateFeature = feature;
+				}
+			}
+
 			const markerLayerId = topMarker?.layer?.id;
 			const rawMarkerId = topMarker?.id;
 			const markerId =
@@ -13443,7 +13586,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Event-star hover (independent of the contact/state hover machinery). Contacts
 			// win ties because their branch returns above. Stop before the state-hover and
 			// empty-map-prompt logic so a star hover doesn't also highlight the state under it.
-			const eventHitId = getEventHit(e);
+			// (Same id extraction as getEventHit, on the partitioned feature.)
+			const rawEventId = topEventFeature?.properties?.eventId;
+			const parsedEventId =
+				typeof rawEventId === 'number'
+					? rawEventId
+					: typeof rawEventId === 'string'
+						? Number.parseInt(rawEventId, 10)
+						: NaN;
+			const eventHitId =
+				Number.isFinite(parsedEventId) && eventCentersById.has(parsedEventId)
+					? parsedEventId
+					: null;
 			if (eventHitId != null) {
 				clearStateHover();
 				clearEmptyMapPrompt();
@@ -13455,7 +13609,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// window to reach the (interactive) popup box, whose onMouseEnter cancels this close.
 			scheduleEventHoverClose();
 
-			if (isSearchAreaHit(e)) {
+			// Same semantics as isSearchAreaHit, using the partitioned layer hit
+			// plus the CPU multipolygon fallback.
+			const searchAreaHit =
+				blobLayerHit ||
+				(() => {
+					const blobMultiPolygon = curatedBlobLngLatMultiPolygonRef.current;
+					if (!blobMultiPolygon?.length) return false;
+					return pointInMultiPolygon([e.lngLat.lng, e.lngLat.lat], blobMultiPolygon);
+				})();
+			if (searchAreaHit) {
 				clearEmptyMapPrompt();
 				clearStateHover();
 				return;
@@ -13487,11 +13650,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				return;
 			}
 
-			const stateFeatures = map.queryRenderedFeatures(e.point, {
-				layers: [MAPBOX_LAYER_IDS.statesFillHit],
-			});
-			const topState = stateFeatures[0];
-			const nextStateId = topState?.id ?? null;
+			// The guards above mirror wantStateHit exactly, so reaching this point
+			// means the states layer was part of the combined query.
+			const nextStateId = topStateFeature?.id ?? null;
 			const prev = hoveredStateIdRef.current;
 			if (prev != null && prev !== nextStateId) {
 				try {
@@ -17506,51 +17667,56 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			{/* Hover SVG tooltip (single overlay; positioned via map.project). At street
 			    zoom the rich research card below replaces it. */}
-			{!isLoading && !isStreetCardMode && hoverTooltipEntry && hoverTooltipCoords && hoverTooltipData && (
-				<div
-					ref={hoverTooltipOverlayRef}
-					style={{
-						position: 'absolute',
-						left: 0,
-						top: 0,
-						width: `${hoverTooltipData.width + hoverTooltipHitSlopPx * 2}px`,
-						height: `${hoverTooltipData.height + hoverTooltipHitSlopPx * 2}px`,
-						pointerEvents:
-							hoverTooltipContactId != null && hoveredMarkerId === hoverTooltipContactId
-								? 'auto'
-								: 'none',
-						padding: `${hoverTooltipHitSlopPx}px`,
-						boxSizing: 'border-box',
-						zIndex: HOVER_TOOLTIP_Z_INDEX,
-					}}
-					onMouseEnter={() => handleMarkerMouseOver(hoverTooltipEntry.contact)}
-					onMouseLeave={() => handleMarkerMouseOut(hoverTooltipEntry.contact.id)}
-					onClick={() => handleMarkerClick(hoverTooltipEntry.contact)}
-				>
+			{!isLoading &&
+				!isStreetCardMode &&
+				hoverTooltipEntry &&
+				hoverTooltipCoords &&
+				hoverTooltipData && (
 					<div
+						ref={hoverTooltipOverlayRef}
 						style={{
-							width: '100%',
-							height: `${hoverTooltipData.height}px`,
-							opacity:
+							position: 'absolute',
+							left: 0,
+							top: 0,
+							width: `${hoverTooltipData.width + hoverTooltipHitSlopPx * 2}px`,
+							height: `${hoverTooltipData.height + hoverTooltipHitSlopPx * 2}px`,
+							pointerEvents:
 								hoverTooltipContactId != null && hoveredMarkerId === hoverTooltipContactId
-									? 1
-									: 0,
-							transition: 'opacity 150ms ease-in-out',
-							flexShrink: 0,
+									? 'auto'
+									: 'none',
+							padding: `${hoverTooltipHitSlopPx}px`,
+							boxSizing: 'border-box',
+							zIndex: HOVER_TOOLTIP_Z_INDEX,
 						}}
+						onMouseEnter={() => handleMarkerMouseOver(hoverTooltipEntry.contact)}
+						onMouseLeave={() => handleMarkerMouseOut(hoverTooltipEntry.contact.id)}
+						onClick={() => handleMarkerClick(hoverTooltipEntry.contact)}
 					>
 						<div
-							dangerouslySetInnerHTML={{ __html: hoverTooltipData.svg }}
 							style={{
 								width: '100%',
-								height: '100%',
-								display: 'block',
-								lineHeight: 0,
+								height: `${hoverTooltipData.height}px`,
+								opacity:
+									hoverTooltipContactId != null &&
+									hoveredMarkerId === hoverTooltipContactId
+										? 1
+										: 0,
+								transition: 'opacity 150ms ease-in-out',
+								flexShrink: 0,
 							}}
-						/>
+						>
+							<div
+								dangerouslySetInnerHTML={{ __html: hoverTooltipData.svg }}
+								style={{
+									width: '100%',
+									height: '100%',
+									display: 'block',
+									lineHeight: 0,
+								}}
+							/>
+						</div>
 					</div>
-				</div>
-			)}
+				)}
 
 			{/* Persistent street-view research cards (search-result dots + booking/
 			    promotion pins). Positions are set imperatively by the shared 'move'
@@ -17585,123 +17751,134 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			{/* Street-view research card for ambient 'all'-contacts dots only (those
 			    stay hover-gated; everything else has a persistent card above). */}
-			{!isLoading && isStreetCardMode && hoverTooltipEntry && hoverTooltipCoords && streetCardData && (
-				<div
-					ref={streetCardOverlayRef}
-					style={{
-						position: 'absolute',
-						left: 0,
-						top: 0,
-						// Above the persistent cards (hover intent), below the
-						// selected-marker panel (+10).
-						zIndex: HOVER_TOOLTIP_Z_INDEX + 5,
-						pointerEvents: 'none',
-					}}
-				>
-					{/* Self-centers above the marker point; the transparent bottom padding
-					    bridges the marker→card gap so hover never crosses a dead zone. */}
+			{!isLoading &&
+				isStreetCardMode &&
+				hoverTooltipEntry &&
+				hoverTooltipCoords &&
+				streetCardData && (
 					<div
+						ref={streetCardOverlayRef}
 						style={{
-							transform: 'translate(-50%, -100%)',
-							paddingBottom: '18px',
-							pointerEvents:
-								hoverTooltipContactId != null && hoveredMarkerId === hoverTooltipContactId
-									? 'auto'
-									: 'none',
-							opacity:
-								hoverTooltipContactId != null && hoveredMarkerId === hoverTooltipContactId
-									? 1
-									: 0,
-							transition: 'opacity 150ms ease-in-out',
+							position: 'absolute',
+							left: 0,
+							top: 0,
+							// Above the persistent cards (hover intent), below the
+							// selected-marker panel (+10).
+							zIndex: HOVER_TOOLTIP_Z_INDEX + 5,
+							pointerEvents: 'none',
 						}}
-						onMouseEnter={() => handleMarkerMouseOver(hoverTooltipEntry.contact)}
-						onMouseLeave={() => handleMarkerMouseOut(hoverTooltipEntry.contact.id)}
 					>
+						{/* Self-centers above the marker point; the transparent bottom padding
+					    bridges the marker→card gap so hover never crosses a dead zone. */}
 						<div
-							className="relative w-[280px] rounded-[10px] bg-white overflow-hidden font-inter"
-							style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }}
+							style={{
+								transform: 'translate(-50%, -100%)',
+								paddingBottom: '18px',
+								pointerEvents:
+									hoverTooltipContactId != null &&
+									hoveredMarkerId === hoverTooltipContactId
+										? 'auto'
+										: 'none',
+								opacity:
+									hoverTooltipContactId != null &&
+									hoveredMarkerId === hoverTooltipContactId
+										? 1
+										: 0,
+								transition: 'opacity 150ms ease-in-out',
+							}}
+							onMouseEnter={() => handleMarkerMouseOver(hoverTooltipEntry.contact)}
+							onMouseLeave={() => handleMarkerMouseOut(hoverTooltipEntry.contact.id)}
 						>
-							{/* Name / company / coordinates */}
-							<div className="px-3 pt-3 pb-2">
-								<div className="font-bold text-[14px] leading-tight text-black truncate">
-									{streetCardData.name}
-								</div>
-								{streetCardData.company && (
-									<div className="text-[12px] leading-tight text-black/70 truncate mt-[2px]">
-										{streetCardData.company}
-									</div>
-								)}
-								<div className="text-[10px] leading-none text-black/50 mt-[6px] tabular-nums">
-									{hoverTooltipCoords.lat.toFixed(4)} {hoverTooltipCoords.lng.toFixed(4)}
-								</div>
-							</div>
-							{/* Category-colored accent divider */}
 							<div
-								className="w-full"
-								style={{ height: '3px', backgroundColor: streetCardData.accentColor }}
-							/>
-							{/* Address + research blurb */}
-							<div className="px-3 py-2">
-								{streetCardData.address && (
-									<div className="text-[12px] font-semibold text-black leading-snug">
-										{streetCardData.address}
+								className="relative w-[280px] rounded-[10px] bg-white overflow-hidden font-inter"
+								style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }}
+							>
+								{/* Name / company / coordinates */}
+								<div className="px-3 pt-3 pb-2">
+									<div className="font-bold text-[14px] leading-tight text-black truncate">
+										{streetCardData.name}
 									</div>
-								)}
-								{streetCardData.blurb ? (
-									<div
-										className="text-[11px] text-black/70 leading-snug mt-1"
+									{streetCardData.company && (
+										<div className="text-[12px] leading-tight text-black/70 truncate mt-[2px]">
+											{streetCardData.company}
+										</div>
+									)}
+									<div className="text-[10px] leading-none text-black/50 mt-[6px] tabular-nums">
+										{hoverTooltipCoords.lat.toFixed(4)}{' '}
+										{hoverTooltipCoords.lng.toFixed(4)}
+									</div>
+								</div>
+								{/* Category-colored accent divider */}
+								<div
+									className="w-full"
+									style={{ height: '3px', backgroundColor: streetCardData.accentColor }}
+								/>
+								{/* Address + research blurb */}
+								<div className="px-3 py-2">
+									{streetCardData.address && (
+										<div className="text-[12px] font-semibold text-black leading-snug">
+											{streetCardData.address}
+										</div>
+									)}
+									{streetCardData.blurb ? (
+										<div
+											className="text-[11px] text-black/70 leading-snug mt-1"
+											style={{
+												display: '-webkit-box',
+												WebkitLineClamp: 3,
+												WebkitBoxOrient: 'vertical',
+												overflow: 'hidden',
+											}}
+										>
+											{streetCardData.blurb}
+										</div>
+									) : isStreetCardResearchLoading ? (
+										<div className="text-[11px] italic text-black/40 mt-1">
+											Researching…
+										</div>
+									) : null}
+								</div>
+								{/* Selection toggle (hidden for contacts the marker click also ignores) */}
+								{streetCardData.isSelectionEligible && (
+									<button
+										type="button"
+										className="w-full h-[34px] text-[12px] font-bold text-black transition-colors"
 										style={{
-											display: '-webkit-box',
-											WebkitLineClamp: 3,
-											WebkitBoxOrient: 'vertical',
-											overflow: 'hidden',
+											backgroundColor: streetCardData.isSelected ? '#9BC6DF' : '#C9EAFF',
+											borderTop: '1px solid rgba(0,0,0,0.15)',
+										}}
+										onClick={(e) => {
+											e.stopPropagation();
+											handleStreetCardToggleSelection(hoverTooltipEntry.contact);
 										}}
 									>
-										{streetCardData.blurb}
-									</div>
-								) : isStreetCardResearchLoading ? (
-									<div className="text-[11px] italic text-black/40 mt-1">Researching…</div>
-								) : null}
+										{streetCardData.isSelected
+											? 'Remove from Selection'
+											: 'Add to Selection'}
+									</button>
+								)}
 							</div>
-							{/* Selection toggle (hidden for contacts the marker click also ignores) */}
-							{streetCardData.isSelectionEligible && (
-								<button
-									type="button"
-									className="w-full h-[34px] text-[12px] font-bold text-black transition-colors"
-									style={{
-										backgroundColor: streetCardData.isSelected ? '#9BC6DF' : '#C9EAFF',
-										borderTop: '1px solid rgba(0,0,0,0.15)',
-									}}
-									onClick={(e) => {
-										e.stopPropagation();
-										handleStreetCardToggleSelection(hoverTooltipEntry.contact);
-									}}
-								>
-									{streetCardData.isSelected ? 'Remove from Selection' : 'Add to Selection'}
-								</button>
-							)}
+							{/* Pointer triangle (sits in the bottom hover-bridge padding) */}
+							<div
+								className="absolute left-1/2 -translate-x-1/2"
+								style={{
+									bottom: '8px',
+									width: 0,
+									height: 0,
+									borderLeft: '8px solid transparent',
+									borderRight: '8px solid transparent',
+									borderTop: `10px solid ${
+										streetCardData.isSelectionEligible
+											? streetCardData.isSelected
+												? '#9BC6DF'
+												: '#C9EAFF'
+											: '#FFFFFF'
+									}`,
+								}}
+							/>
 						</div>
-						{/* Pointer triangle (sits in the bottom hover-bridge padding) */}
-						<div
-							className="absolute left-1/2 -translate-x-1/2"
-							style={{
-								bottom: '8px',
-								width: 0,
-								height: 0,
-								borderLeft: '8px solid transparent',
-								borderRight: '8px solid transparent',
-								borderTop: `10px solid ${
-									streetCardData.isSelectionEligible
-										? streetCardData.isSelected
-											? '#9BC6DF'
-											: '#C9EAFF'
-										: '#FFFFFF'
-								}`,
-							}}
-						/>
 					</div>
-				</div>
-			)}
+				)}
 
 			{/* Only show selected marker overlay when not loading */}
 			{!isLoading && selectedMarker && selectedMarkerCoords && (

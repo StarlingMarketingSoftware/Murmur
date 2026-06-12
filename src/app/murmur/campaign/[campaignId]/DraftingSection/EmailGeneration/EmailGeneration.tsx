@@ -251,12 +251,12 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 				: [];
 
 		if (selectedDrafts.length === 0) {
-			toast.error('Select emails to send.');
+			toast.error('Select messages to send.');
 			return;
 		}
 
 		if (!campaign?.identity?.email || !campaign?.identity?.name) {
-			toast.error('Please create an Identity before sending emails.');
+			toast.error('Please create an Identity before sending messages.');
 			return;
 		}
 
@@ -264,7 +264,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 			!subscriptionTier &&
 			user?.stripeSubscriptionStatus !== StripeSubscriptionStatus.TRIALING
 		) {
-			toast.error('Please upgrade to a paid plan to send emails.');
+			toast.error('Please upgrade to a paid plan to send messages.');
 			return;
 		}
 
@@ -352,15 +352,15 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 
 		// Show status message
 		if (successfulSends === emailsToSend) {
-			toast.success(`All ${successfulSends} emails sent successfully!`);
+			toast.success(`All ${successfulSends} messages sent successfully!`);
 		} else if (successfulSends > 0) {
 			if (emailsWeCanSend < emailsToSend) {
-				toast.warning(`Sent ${successfulSends} emails before running out of credits.`);
+				toast.warning(`Sent ${successfulSends} messages before running out of credits.`);
 			} else {
-				toast.warning(`${successfulSends} of ${emailsToSend} emails sent successfully.`);
+				toast.warning(`${successfulSends} of ${emailsToSend} messages sent successfully.`);
 			}
 		} else {
-			toast.error('Failed to send emails. Please try again.');
+			toast.error('Failed to send messages. Please try again.');
 		}
 	};
 
