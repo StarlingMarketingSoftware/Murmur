@@ -10,15 +10,9 @@
 	margin-right: calc((100% - (100% / var(--pricing-zoom))) / 2);
 }
 
-/* Pricing navbar: fixed-position safe zoom (no right drift) */
-.pricing-navbar-zoom-80 {
-	--pricing-zoom: 0.8;
-	left: 50%;
-	right: auto;
-	width: calc(100% / var(--pricing-zoom));
-	transform: translateX(-50%) scale(var(--pricing-zoom));
-	transform-origin: top center;
-}
+/* .pricing-navbar-zoom-80 lives in landing-animations.css: the Navbar applies
+   it the instant the pathname flips to /pricing, before this route-level
+   stylesheet has loaded, so it must come from the (public) layout's CSS. */
 
 /* Compensate viewport-sized Tailwind utilities under zoom */
 .pricing-zoom-80 .w-screen {
@@ -35,6 +29,27 @@
 }
 .pricing-zoom-80 .min-h-dvh {
 	min-height: calc(100dvh / var(--pricing-zoom));
+}
+
+/* Below lg (1024px) the pricing cards stack in one column and overflow the
+   viewport, so pricing routes must scroll natively. This neutralizes
+   advanced-scroll.css's `body { overscroll-behavior: none }`, which makes
+   <body> a scroll boundary that blocks native touch scrolling from reaching
+   the root scroller (Lenis is destroyed on mobile/tablet devices, so native
+   gestures are all there is). `overscroll-behavior-y: auto` is the
+   load-bearing property. */
+@media (width < 1024px) {
+	html:has(.pricing-zoom-80),
+	html:has(.pricing-zoom-80) body {
+		overflow-y: auto !important;
+		overflow-x: hidden !important;
+		height: auto !important;
+		min-height: 100% !important;
+		position: static !important;
+		touch-action: pan-y !important;
+		-webkit-overflow-scrolling: touch !important;
+		overscroll-behavior-y: auto !important;
+	}
 }
 
 /* Fallback if `zoom` isn't supported */

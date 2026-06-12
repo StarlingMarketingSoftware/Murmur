@@ -29,7 +29,7 @@ export function GlobalScrollbar() {
 		(pathname === '/pricing' || pathname.startsWith('/pricing/'));
 	const hideOnMobileByRoute =
 		typeof pathname === 'string' &&
-		new Set(['/']).has(pathname);
+		new Set(['/', '/venue']).has(pathname);
 
 	const updateScrollbar = useCallback(() => {
 		const { scrollTop, scrollHeight, clientHeight } = document.documentElement;

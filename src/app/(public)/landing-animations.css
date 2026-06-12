@@ -64,6 +64,62 @@ body {
 		overflow: auto !important;
 		overflow-y: auto !important;
 	}
+
+	/* Landing + pricing pages: footer sits in flow at the document bottom
+	   instead of floating over content. Desktop and other (public) pages keep
+	   it fixed. */
+	html:has(.landing-page) .landing-footer,
+	html:has(.pricing-landing) .landing-footer {
+		position: static;
+	}
+
+	/* While the embedded checkout is open (html class set by
+	   StripeEmbeddedCheckoutModal), lock the page behind it. Specificity
+	   (0,2,1) beats the html:has(.landing-page) rules above (0,1,1);
+	   source order beats the lenis-stopped tie. overflow:hidden preserves
+	   the root scrollTop, so the page doesn't jump on close. */
+	html.murmur-checkout-open:has(.landing-page),
+	html.murmur-checkout-open:has(.landing-page) body {
+		overflow: hidden !important;
+		overscroll-behavior: none !important;
+	}
+}
+
+/* Canvas behind the landing page: rubber-band overscroll (iOS + macOS) reveals
+   the html background, which was white. Mirror the page gradient so the bounce
+   shows gradient, and keep the area above the page white. */
+html:has(.landing-page) {
+	background:
+		/* white block painted above the document so top overscroll stays white */
+		linear-gradient(#fff, #fff) no-repeat 0 -100000px / 100% 100000px,
+		linear-gradient(180deg, #fff 0%, #fff 50%, #d5f1ff 100%) no-repeat 0 0 / 100% 100%;
+	/* bottom overscroll (beyond the document) shows the gradient's end color */
+	background-color: #d5f1ff;
+}
+
+/* Venue landing ends pink, not blue: repaint the overscroll canvas to match.
+   Same specificity as the rule above — source order wins. The shorthand
+   resets background-color, so both declarations are restated. */
+html:has(.landing-page--venue) {
+	background:
+		linear-gradient(#fff, #fff) no-repeat 0 -100000px / 100% 100000px,
+		linear-gradient(180deg, #fff 0%, #fff 50%, #fce2f6 100%) no-repeat 0 0 / 100% 100%;
+	background-color: #fce2f6;
+}
+
+/* Pricing landing: same canvas treatment as the home page, so the mobile
+   static footer strip and rubber-band overscroll show the gradient. */
+html:has(.pricing-landing) {
+	background:
+		linear-gradient(#fff, #fff) no-repeat 0 -100000px / 100% 100000px,
+		linear-gradient(180deg, #fff 0%, #fff 50%, #d5f1ff 100%) no-repeat 0 0 / 100% 100%;
+	background-color: #d5f1ff;
+}
+
+/* Let the canvas gradient show behind the (mobile-static) footer strip. */
+html:has(.landing-page) body,
+html:has(.pricing-landing) body {
+	background: transparent;
 }
 
 /* Landing page: prevent embedded demo panels from trapping page scroll.
@@ -93,6 +149,20 @@ body {
 	right: auto;
 	width: calc(100% / var(--landing-zoom));
 	transform: translateX(-50%) scale(var(--landing-zoom));
+	transform-origin: top center;
+}
+
+/* Pricing navbar: fixed-position safe zoom (no right drift).
+   Defined here (not in pricing-zoom.css) because the Navbar applies this class
+   the moment the pathname flips to /pricing — before the pricing route's CSS
+   chunk has loaded. If the class is unstyled at that moment, the fixed navbar
+   shrink-wraps and the links collapse into a pile until the chunk arrives. */
+.pricing-navbar-zoom-80 {
+	--pricing-zoom: 0.8;
+	left: 50%;
+	right: auto;
+	width: calc(100% / var(--pricing-zoom));
+	transform: translateX(-50%) scale(var(--pricing-zoom));
 	transform-origin: top center;
 }
 

@@ -2,9 +2,11 @@
 
 import { SignIn, SignUp, useAuth } from '@clerk/nextjs';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { urls } from '@/constants/urls';
 import { useFreeTrialCheckout } from '@/hooks/useFreeTrialCheckout';
+import { useKeyboardViewportFit } from '@/hooks/useKeyboardViewportFit';
 import { StripeEmbeddedCheckoutModal } from '@/components/organisms/StripeEmbeddedCheckoutModal';
 import {
 	FREE_TRIAL_CLERK_APPEARANCE,
@@ -18,14 +20,14 @@ const TRIAL_RETURN_URL = urls.home.startFreeTrial;
 
 interface StartFreeTrialModalProps {
 	open: boolean;
+	onClose?: () => void;
 }
 
 /**
- * Non-dismissable free-trial popup for the landing page: Clerk sign-up/sign-in
- * while signed out, then the embedded Stripe checkout. There is deliberately no
- * way to close it — only a page refresh escapes.
+ * Free-trial popup for the landing page: Clerk sign-up/sign-in while signed
+ * out, then the embedded Stripe checkout. Clicking the backdrop dismisses it.
  */
-export function StartFreeTrialModal({ open }: StartFreeTrialModalProps) {
+export function StartFreeTrialModal({ open, onClose }: StartFreeTrialModalProps) {
 	const { isLoaded, isSignedIn } = useAuth();
 	const searchParams = useSearchParams();
 	const [latchedOpen, setLatchedOpen] = useState(false);
@@ -87,7 +89,26 @@ export function StartFreeTrialModal({ open }: StartFreeTrialModalProps) {
 		sessionStorage.removeItem('redirectAfterSignIn');
 	}, [isOpen, isLoaded, isSignedIn]);
 
-	if (!isOpen) return null;
+	// Lock the page behind while the Clerk step is up; StripeEmbeddedCheckoutModal
+	// owns the same lock for the checkout step (it adds/removes this class itself,
+	// and the gate mirrors the render branch so ownership never overlaps).
+	const clerkStepOpen = isOpen && !(isLoaded && isSignedIn);
+	useEffect(() => {
+		if (!clerkStepOpen) return;
+		document.documentElement.classList.add('murmur-checkout-open');
+		return () => document.documentElement.classList.remove('murmur-checkout-open');
+	}, [clerkStepOpen]);
+
+	// Keep the card (and the focused field) above the iOS keyboard.
+	const overlayRef = useRef<HTMLDivElement>(null);
+	useKeyboardViewportFit(overlayRef, clerkStepOpen);
+
+	const handleClose = () => {
+		setLatchedOpen(false);
+		onClose?.();
+	};
+
+	if (!isOpen || typeof window === 'undefined') return null;
 
 	if (isLoaded && isSignedIn) {
 		return (
@@ -97,13 +118,27 @@ export function StartFreeTrialModal({ open }: StartFreeTrialModalProps) {
 				loadingText={checkoutLoadingText}
 				error={checkoutError}
 				clientSecret={clientSecret}
+				onClose={handleClose}
 			/>
 		);
 	}
 
-	return (
-		<div className="fixed inset-0 z-[60] flex flex-col overflow-y-auto bg-black/20 p-2 sm:p-4">
-			<div className="m-auto">
+	// Portal to <body>: globals.css sets `main { isolation: isolate }`, so a fixed
+	// overlay rendered inside a page's <main> is trapped below the z-50 navbar
+	// (Clerk avatar / hamburger) no matter its z-index.
+	return createPortal(
+		<div
+			ref={overlayRef}
+			data-lenis-prevent
+			className="free-trial-clerk-modal fixed inset-0 z-[60] flex flex-col overflow-hidden bg-black/20 p-2 sm:p-4"
+			onMouseDown={(event) => {
+				if (event.target === event.currentTarget) handleClose();
+			}}
+		>
+			{/* flex + min-h-0 + max-h-full clamp the Clerk card chain (rootBox →
+			    cardBox) to the viewport; the form scrolls inside .cl-card instead
+			    of the whole card scrolling past the screen edges. */}
+			<div className="m-auto flex min-h-0 max-h-full">
 				{isLoaded &&
 					(showSignIn ? (
 						<SignIn
@@ -130,6 +165,7 @@ export function StartFreeTrialModal({ open }: StartFreeTrialModalProps) {
 					))}
 			</div>
 			<FreeTrialClerkGlobalStyles />
-		</div>
+		</div>,
+		document.body
 	);
 }
