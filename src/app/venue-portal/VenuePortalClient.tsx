@@ -3321,7 +3321,7 @@ function VenueProfileMapCard({ onEdit }: { onEdit: () => void }) {
 // the 83px card — within the map-view wrapper's cluster scale.
 const VENUE_CALENDAR_SCALE = 656 / DASHBOARD_CALENDAR_NATIVE_WIDTH_PX;
 
-function VenueCalendarMapPanel() {
+function VenueCalendarMapPanel({ boost }: { boost: number }) {
 	const now = new Date();
 	return (
 		<div
@@ -3331,11 +3331,12 @@ function VenueCalendarMapPanel() {
 			{/* mockState only anchors the month window (today-highlight stays real);
 			    persistEvents makes it live so confirmed artist bookings land here.
 			    popupScale: the event editor portals to body (fixed), so it must be
-			    handed the cluster × calendar scale to render at this view's size. */}
+			    handed the cluster × calendar scale (× the large-monitor boost the
+			    cluster wrapper renders at) to render at this view's size. */}
 			<DashboardCalendarPanel
 				mockState={{ year: now.getFullYear(), monthIndex: now.getMonth() }}
 				persistEvents
-				popupScale={VENUE_MAP_LEFT_CLUSTER_SCALE * VENUE_CALENDAR_SCALE}
+				popupScale={VENUE_MAP_LEFT_CLUSTER_SCALE * VENUE_CALENDAR_SCALE * boost}
 			/>
 		</div>
 	);
@@ -4233,9 +4234,11 @@ export default function VenuePortalClient() {
 			{isMobile === false && view === 'map' && layout.showLeftCluster && (
 				<div
 					data-venue-tool-ui="true"
-					className="fixed left-[24px] top-[56px] z-[100] origin-top-left"
+					className="fixed z-[100] origin-top-left"
 					style={{
-						transform: `scale(${VENUE_MAP_LEFT_CLUSTER_SCALE})`,
+						left: layout.cluster.left,
+						top: layout.cluster.top,
+						transform: `scale(${layout.cluster.scale})`,
 					}}
 				>
 					<VenueProfileMapCard
@@ -4246,7 +4249,7 @@ export default function VenuePortalClient() {
 							setView('edit');
 						}}
 					/>
-					<VenueCalendarMapPanel />
+					<VenueCalendarMapPanel boost={layout.boost} />
 					<VenueOpportunitiesMapPanel
 						opportunities={opportunities}
 						applicantCountByEventId={applicantCountByEventId}
@@ -4270,10 +4273,15 @@ export default function VenuePortalClient() {
 						applicantCountByEventId={applicantCountByEventId}
 						onOpenThread={openChatThread}
 						onOpenEvent={openOpportunityDetail}
+						boost={layout.boost}
 					/>
 				)}
 			{isMobile === false && view === 'map' && selectedVenueTool === 'add' && (
-				<VenueCreateEventMapPanel event={editingVenueEvent} frame={layout.createPanel} />
+				<VenueCreateEventMapPanel
+					event={editingVenueEvent}
+					frame={layout.createPanel}
+					boost={layout.boost}
+				/>
 			)}
 			{isMobile === false && view === 'map' && isMailToolSelected && (
 				<VenueChatMapPanel
@@ -4313,6 +4321,7 @@ export default function VenuePortalClient() {
 							openChatThread(dockedThread.conversationId, dockedThread.thread)
 						}
 						scale={layout.dockedChatScale}
+						boost={layout.boost}
 					/>
 				)}
 			{isMobile === false && view === 'map' && selectedVenueTool === 'profile' && (
@@ -4342,7 +4351,8 @@ export default function VenuePortalClient() {
 						selectedTool={selectedVenueTool}
 						onToolSelect={selectVenueTool}
 						unreadCount={venueUnread}
-						clusterScale={VENUE_MAP_LEFT_CLUSTER_SCALE}
+						clusterScale={VENUE_MAP_LEFT_CLUSTER_SCALE * layout.boost}
+						boost={layout.boost}
 						dockMinX={layout.pillsDockMinX}
 					/>
 				)}

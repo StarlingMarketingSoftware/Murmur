@@ -103,6 +103,8 @@ export interface DraftedEmailsProps {
 	hideDraftReviewActionRow?: boolean;
 	/** Optional: use the shorter dashboard search review card proportions. */
 	compactDraftReview?: boolean;
+	/** Optional: shrink only the Send / Regenerate / Delete action row (not the review card). */
+	compactReviewActionRow?: boolean;
 	/** Optional: keeps draft review open by hiding/ignoring controls that return to the drafts list */
 	lockDraftReviewOpen?: boolean;
 	/**

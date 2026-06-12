@@ -309,6 +309,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		goToSent,
 		goToSummary,
 		inboxSentTabRequest,
+		inboxPanelTabRequest,
 		onInboxSentTabChange,
 		goToPreviousTab,
 		goToNextTab,
@@ -1566,6 +1567,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	}, [view]);
 	const shouldRenderWriteBottomDraftBar =
 		contentView === 'testing' && !isMobile && !hideHeaderBox && !isNarrowestDesktop;
+	const shouldRenderDraftsBottomSendBar =
+		contentView === 'drafting' && !isMobile && !hideHeaderBox && !isNarrowestDesktop;
 	const shouldRenderSharedBottomPanels =
 		sharedBottomPanelKinds.length > 0 &&
 		!isMobile &&
@@ -3544,67 +3547,73 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		return null;
 	};
 
+	// Shared square-button helpers for the Write/Drafts bottom bars.
+	const boxStyle: CSSProperties = {
+		width: 39.154,
+		height: 39.154,
+		borderRadius: 7.458,
+		border: '0.725px solid #000',
+		boxSizing: 'border-box',
+		display: 'flex',
+		alignItems: 'center',
+		justifyContent: 'center',
+		fontFamily: 'Inter, sans-serif',
+		fontSize: 12.326,
+		fontStyle: 'normal',
+		fontWeight: 500,
+		lineHeight: '10.151px',
+		color: '#000',
+	};
+	const blankBox = (key: string, opacity: number) => (
+		<div
+			key={key}
+			aria-hidden="true"
+			style={{
+				...boxStyle,
+				opacity,
+				background: '#F3EEE1',
+			}}
+		/>
+	);
+	const counterBox = ({
+		label,
+		count,
+		background,
+		opacity,
+		onClick,
+	}: {
+		label: string;
+		count: number;
+		background: string;
+		opacity?: number;
+		onClick?: () => void;
+	}) => (
+		<button
+			type="button"
+			aria-label={`${count} ${label}`}
+			disabled={!onClick}
+			className={cn(
+				'border-0 p-0 transition-opacity duration-150',
+				onClick && 'hover:opacity-85'
+			)}
+			style={{
+				...boxStyle,
+				background,
+				opacity,
+				cursor: onClick ? 'pointer' : 'default',
+			}}
+			onClick={onClick}
+		>
+			{count}
+		</button>
+	);
+
 	const renderWriteBottomDraftBar = () => {
 		const selectedCount = contactsTabSelectedIds.size;
 		const isDraftDisabled = selectedCount === 0;
 		const draftLabel = isDraftQueueActive
 			? 'Add Emails to Queue'
 			: `Draft ${selectedCount} ${selectedCount === 1 ? 'contact' : 'contacts'}`;
-		const boxStyle: CSSProperties = {
-			width: 39.154,
-			height: 39.154,
-			borderRadius: 7.458,
-			border: '0.725px solid #000',
-			boxSizing: 'border-box',
-			display: 'flex',
-			alignItems: 'center',
-			justifyContent: 'center',
-			fontFamily: 'Inter, sans-serif',
-			fontSize: 12.326,
-			fontStyle: 'normal',
-			fontWeight: 500,
-			lineHeight: '10.151px',
-			color: '#000',
-		};
-		const blankBox = (key: string, opacity: number) => (
-			<div
-				key={key}
-				aria-hidden="true"
-				style={{
-					...boxStyle,
-					opacity,
-					background: '#F3EEE1',
-				}}
-			/>
-		);
-		const counterBox = ({
-			label,
-			count,
-			background,
-			opacity,
-			onClick,
-		}: {
-			label: string;
-			count: number;
-			background: string;
-			opacity?: number;
-			onClick?: () => void;
-		}) => (
-			<button
-				type="button"
-				aria-label={`${count} ${label}`}
-				className="border-0 p-0 transition-opacity duration-150 hover:opacity-85"
-				style={{
-					...boxStyle,
-					background,
-					opacity,
-					cursor: onClick ? 'pointer' : 'default',
-				}}
-				onClick={onClick}
-			>
-				{count}
-			</button>
-		);
 
 		return (
 			<div
@@ -3674,22 +3683,127 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					label: 'drafts',
 					count: draftCount,
 					background: '#FFE3AA',
-					onClick: goToDrafting,
+					onClick: draftCount > 0 ? goToDrafting : undefined,
 				})}
 				{counterBox({
 					label: 'sent',
 					count: sentCount,
 					background: '#5AB478',
 					opacity: 0.2,
-					onClick: goToSent,
+					onClick: sentCount > 0 ? goToSent : undefined,
 				})}
 				{counterBox({
 					label: 'inbox',
 					count: inboxCount,
 					background: '#6EBED5',
 					opacity: 0.1,
+					// openInboxTab (not bare goToInbox) supersedes any pending Sent-tab
+					// request so the inbox doesn't mount on the Sent view.
+					onClick: inboxCount > 0 ? openInboxTab : undefined,
+				})}
+			</div>
+		);
+	};
+
+	const renderDraftsBottomSendBar = () => {
+		const selectedCount = draftsTabSelectedIds.size;
+		const isSendDisabled = selectedCount === 0 || isSendingDisabled;
+		const allDraftIds = draftEmailsForView.map((draft) => draft.id);
+		const areAllDraftsSelected =
+			allDraftIds.length > 0 &&
+			selectedCount === allDraftIds.length &&
+			allDraftIds.every((id) => draftsTabSelectedIds.has(id));
+
+		return (
+			<div
+				data-draft-button-container
+				className="flex items-center"
+				style={{ gap: 3, height: writeDraftBottomBarHeightPx }}
+			>
+				{blankBox('left-1', 0.1)}
+				<button
+					type="button"
+					aria-label="Open search"
+					className="border-0 p-0 transition-opacity duration-150 hover:opacity-85"
+					style={{
+						...boxStyle,
+						background: '#FFFFFF',
+						opacity: 0.2,
+						cursor: onGoToSearch ? 'pointer' : 'default',
+					}}
+					onClick={onGoToSearch}
+				>
+					<SearchIconDesktop width={17} height={18} stroke="#8B8B8B" strokeWidth={2.3} />
+				</button>
+				{counterBox({
+					label: 'contacts',
+					count: contactsCount,
+					background: '#EB8586',
+					onClick: goToWriting,
+				})}
+				<div
+					className="flex overflow-hidden"
+					style={{
+						width: 472,
+						height: writeDraftBottomBarHeightPx,
+						borderRadius: 5,
+						border: '2px solid #000',
+						boxSizing: 'border-box',
+						background: '#FFFAD1',
+					}}
+				>
+					<button
+						type="button"
+						disabled={isSendDisabled}
+						className="flex flex-1 items-center justify-center border-0 bg-transparent p-0 font-inter text-[17px] font-normal leading-none text-black"
+						style={{
+							cursor: isSendDisabled ? 'not-allowed' : 'pointer',
+							opacity: isSendDisabled ? 0.55 : 1,
+						}}
+						onClick={async () => {
+							if (isSendDisabled) return;
+							await handleSendDrafts();
+						}}
+					>
+						{`Send ${selectedCount} ${selectedCount === 1 ? 'Message' : 'Messages'}`}
+					</button>
+					<button
+						type="button"
+						aria-pressed={areAllDraftsSelected}
+						aria-label={areAllDraftsSelected ? 'Clear selected drafts' : 'Select all drafts'}
+						disabled={draftEmailsForView.length === 0}
+						className="flex items-center justify-center border-0 border-l-[2px] border-black p-0 font-inter text-[17px] font-normal leading-none text-black transition-colors duration-150 hover:bg-[#F5D894] disabled:cursor-not-allowed disabled:opacity-60"
+						style={{
+							width: 58,
+							background: '#FFE3AA',
+							cursor: draftEmailsForView.length === 0 ? 'not-allowed' : 'pointer',
+						}}
+						onClick={(event) => {
+							event.stopPropagation();
+							if (areAllDraftsSelected) {
+								setDraftsTabSelectedIds(new Set());
+							} else {
+								setDraftsTabSelectedIds(new Set(allDraftIds));
+							}
+						}}
+					>
+						All
+					</button>
+				</div>
+				{counterBox({
+					label: 'sent',
+					count: sentCount,
+					background: '#5AB478',
+					onClick: goToSent,
+				})}
+				{counterBox({
+					label: 'inbox',
+					count: inboxCount,
+					background: '#6EBED5',
+					opacity: 0.2,
 					onClick: goToInbox,
 				})}
+				{blankBox('right-1', 0.1)}
 			</div>
 		);
 	};
@@ -4224,6 +4338,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											isLoading={isContactsLoading}
 											campaign={campaign}
 											focusMode="inbox"
+											inboxPanelTabRequest={inboxPanelTabRequest}
 											selectedInboxEmailId={selectedInboxEmailId}
 											onInboxEmailClick={handleInboxEmailClick}
 											onContactHover={handleResearchContactHover}
@@ -6657,13 +6772,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														hideSendButton
 														lockDraftReviewOpen
 														isNarrowDesktop
+														compactReviewActionRow={shouldRenderDraftsBottomSendBar}
 														goToPreviousTab={goToPreviousTab}
 														goToNextTab={goToNextTab}
 													/>
 												</div>
 											</div>
 											{/* Send Button with arrows - centered relative to full container width */}
-											{draftEmailsForView.length > 0 && !selectedDraft && (
+											{!shouldRenderDraftsBottomSendBar &&
+												draftEmailsForView.length > 0 &&
+												!selectedDraft && (
 												<div className="flex items-center justify-center gap-[29px] mt-4 w-full">
 													{/* Left arrow */}
 													<button
@@ -6795,6 +6913,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												lockDraftReviewOpen
 												isNarrowestDesktop={isNarrowestDesktop}
 												isNarrowDesktop={isNarrowDesktop}
+												compactReviewActionRow={shouldRenderDraftsBottomSendBar}
 												goToPreviousTab={goToPreviousTab}
 												goToNextTab={goToNextTab}
 											/>
@@ -8530,6 +8649,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												isLoading={isContactsLoading}
 												campaign={campaign}
 												focusMode="inbox"
+												inboxPanelTabRequest={inboxPanelTabRequest}
 												selectedInboxEmailId={selectedInboxEmailId}
 												onInboxEmailClick={handleInboxEmailClick}
 												onContactHover={handleResearchContactHover}
@@ -8576,6 +8696,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													isLoading={isContactsLoading}
 													campaign={campaign}
 													focusMode="inbox"
+													inboxPanelTabRequest={inboxPanelTabRequest}
 													selectedInboxEmailId={selectedInboxEmailId}
 													onInboxEmailClick={handleInboxEmailClick}
 													onContactHover={handleResearchContactHover}
@@ -8685,6 +8806,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								}}
 							>
 								{renderWriteBottomDraftBar()}
+							</div>
+						)}
+
+						{shouldRenderDraftsBottomSendBar && (
+							<div
+								className="absolute left-0 right-0 z-30 flex justify-center"
+								style={{
+									top: `${writeDraftBottomBarSlotTopPx}px`,
+									transform: isCampaignWorkspaceCompact
+										? 'translateX(-180px)'
+										: undefined,
+								}}
+							>
+								{renderDraftsBottomSendBar()}
 							</div>
 						)}
 

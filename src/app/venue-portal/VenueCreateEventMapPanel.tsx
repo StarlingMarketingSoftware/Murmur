@@ -285,10 +285,14 @@ export const buildVenueEventPayload = (eventForm: VenueCreateEventFormState) => 
 export function VenueCreateEventMapPanel({
 	event,
 	frame,
+	boost,
 }: {
 	event?: VenueEvent | null;
 	// Viewport anchor + scale from useVenuePortalLayout's responsive cascade.
 	frame: VenuePortalFrame;
+	// Large-monitor growth (already inside frame.scale); the body-portaled when
+	// popup renders outside the frame's transform, so it scales by this itself.
+	boost: number;
 }) {
 	const { data: venueProfile } = useGetVenue();
 	const [eventForm, setEventForm] = useState<VenueCreateEventFormState>(() =>
@@ -411,32 +415,29 @@ export function VenueCreateEventMapPanel({
 
 		const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1440;
 		const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 900;
+		// Rendered footprint/gap under the large-monitor boost (the cell rect is
+		// already in rendered px); the viewport-edge margin stays real px.
+		const popupWidth = VENUE_CREATE_EVENT_WHEN_POPUP_WIDTH_PX * boost;
+		const popupHeight = VENUE_CREATE_EVENT_WHEN_POPUP_HEIGHT_PX * boost;
+		const popupGap = VENUE_CREATE_EVENT_WHEN_POPUP_GAP_PX * boost;
 		const maxLeft = Math.max(
 			VENUE_CREATE_EVENT_WHEN_POPUP_MARGIN_PX,
-			viewportWidth -
-				VENUE_CREATE_EVENT_WHEN_POPUP_WIDTH_PX -
-				VENUE_CREATE_EVENT_WHEN_POPUP_MARGIN_PX
+			viewportWidth - popupWidth - VENUE_CREATE_EVENT_WHEN_POPUP_MARGIN_PX
 		);
 		const maxTop = Math.max(
 			VENUE_CREATE_EVENT_WHEN_POPUP_MARGIN_PX,
-			viewportHeight -
-				VENUE_CREATE_EVENT_WHEN_POPUP_HEIGHT_PX -
-				VENUE_CREATE_EVENT_WHEN_POPUP_MARGIN_PX
+			viewportHeight - popupHeight - VENUE_CREATE_EVENT_WHEN_POPUP_MARGIN_PX
 		);
 
 		if (event) {
 			const cellRect = event.currentTarget.getBoundingClientRect();
-			const roomRight =
-				viewportWidth - cellRect.right - VENUE_CREATE_EVENT_WHEN_POPUP_GAP_PX;
-			const roomLeft = cellRect.left - VENUE_CREATE_EVENT_WHEN_POPUP_GAP_PX;
+			const roomRight = viewportWidth - cellRect.right - popupGap;
+			const roomLeft = cellRect.left - popupGap;
 			const rawLeft =
-				roomRight >=
-					VENUE_CREATE_EVENT_WHEN_POPUP_WIDTH_PX +
-						VENUE_CREATE_EVENT_WHEN_POPUP_MARGIN_PX || roomRight >= roomLeft
-					? cellRect.right + VENUE_CREATE_EVENT_WHEN_POPUP_GAP_PX
-					: cellRect.left -
-						VENUE_CREATE_EVENT_WHEN_POPUP_WIDTH_PX -
-						VENUE_CREATE_EVENT_WHEN_POPUP_GAP_PX;
+				roomRight >= popupWidth + VENUE_CREATE_EVENT_WHEN_POPUP_MARGIN_PX ||
+				roomRight >= roomLeft
+					? cellRect.right + popupGap
+					: cellRect.left - popupWidth - popupGap;
 
 			setActiveWhenPopup({
 				left: clampVenueCreateEventValue(
@@ -445,9 +446,7 @@ export function VenueCreateEventMapPanel({
 					maxLeft
 				),
 				top: clampVenueCreateEventValue(
-					cellRect.top +
-						cellRect.height / 2 -
-						VENUE_CREATE_EVENT_WHEN_POPUP_HEIGHT_PX / 2,
+					cellRect.top + cellRect.height / 2 - popupHeight / 2,
 					VENUE_CREATE_EVENT_WHEN_POPUP_MARGIN_PX,
 					maxTop
 				),
@@ -455,12 +454,12 @@ export function VenueCreateEventMapPanel({
 		} else {
 			setActiveWhenPopup({
 				left: clampVenueCreateEventValue(
-					viewportWidth / 2 - VENUE_CREATE_EVENT_WHEN_POPUP_WIDTH_PX / 2,
+					viewportWidth / 2 - popupWidth / 2,
 					VENUE_CREATE_EVENT_WHEN_POPUP_MARGIN_PX,
 					maxLeft
 				),
 				top: clampVenueCreateEventValue(
-					viewportHeight / 2 - VENUE_CREATE_EVENT_WHEN_POPUP_HEIGHT_PX / 2,
+					viewportHeight / 2 - popupHeight / 2,
 					VENUE_CREATE_EVENT_WHEN_POPUP_MARGIN_PX,
 					maxTop
 				),
@@ -1677,8 +1676,12 @@ export function VenueCreateEventMapPanel({
 						role="dialog"
 						aria-label="Select event timeframe"
 						data-venue-tool-ui="true"
-						className="fixed z-[2147483601] h-[96px] w-[244px] rounded-[9px] border border-white/90 bg-[rgba(229,96,98,0.88)] p-[9px] font-inter shadow-[0_18px_45px_rgba(0,0,0,0.22)] backdrop-blur-[22px]"
-						style={{ left: `${activeWhenPopup.left}px`, top: `${activeWhenPopup.top}px` }}
+						className="fixed z-[2147483601] h-[96px] w-[244px] origin-top-left rounded-[9px] border border-white/90 bg-[rgba(229,96,98,0.88)] p-[9px] font-inter shadow-[0_18px_45px_rgba(0,0,0,0.22)] backdrop-blur-[22px]"
+						style={{
+							left: `${activeWhenPopup.left}px`,
+							top: `${activeWhenPopup.top}px`,
+							transform: `scale(${boost})`,
+						}}
 					>
 						<div className="flex h-[27px] items-center rounded-[6px] bg-[#FFEFF0] px-[10px] text-[16px] font-bold leading-none text-black">
 							<span className="min-w-0 truncate">{eventForm.when}</span>

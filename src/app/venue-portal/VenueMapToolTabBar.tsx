@@ -11,9 +11,11 @@ import {
 import type { VenuePortalFrame } from './useVenuePortalLayout';
 
 // Tab-bar geometry from the Figma mock (native px, rendered at the frame's
-// scale like the panels below it). The bar keeps one position and widens to the
-// 781px panels' outer width for every tab except Create; the segment row stays
-// anchored in the leftmost 461px so the tabs never move.
+// scale like the panels below it). The bar keeps one position per viewport (a
+// left anchor that drifts to horizontal center beyond the 1080p baseline — see
+// useVenuePortalLayout) and widens to the 781px panels' outer width for every
+// tab except Create; the segment row stays anchored in the leftmost 461px so
+// the tabs never move.
 const BAR_W = VENUE_MAP_TAB_BAR_NATIVE_W_PX;
 const BAR_CHAT_W = VENUE_MAP_PANEL_NATIVE_W_PX;
 const BAR_BORDER_W = 1.212;

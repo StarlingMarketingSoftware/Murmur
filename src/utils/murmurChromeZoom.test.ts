@@ -4,6 +4,7 @@ import {
 	CAMPAIGN_SNUG_MAX_HEIGHT_FIT_ZOOM,
 	computeMapSelectGrabViewScale,
 	computeMurmurChromeZoomForViewport,
+	computeSideRailCenterDeadbandPx,
 	computeSideRailCenterShiftPx,
 	MURMUR_CHROME_ZOOM_DEFAULT,
 	MURMUR_CHROME_ZOOM_MAX,
@@ -223,18 +224,42 @@ test('side-rail centering shift grows with monitor size', () => {
 	assert.equal(computeSideRailCenterShiftPx(1250, 0.95, RAIL_TOTAL_HEIGHT_PX), 61);
 	// 2560×1440 (zoom 1.02, rail scale ~0.9353).
 	assert.equal(computeSideRailCenterShiftPx(1440, 1.02, RAIL_TOTAL_HEIGHT_PX), 96);
+	// 2560×1600 (zoom 1.2): mid-taper — dead band down to ~66.5px.
+	assert.equal(computeSideRailCenterShiftPx(1600, 1.2, RAIL_TOTAL_HEIGHT_PX), 109);
+	// 3232×2020 (BetterDisplay 16:10 virtual screen): past the taper end, the
+	// dead band is fully gone and the rail centers true.
+	const tallSixteenTenZoom = computeMurmurChromeZoomForViewport(3232, 2020, {
+		width: 3232,
+		height: 2020,
+		availWidth: 3232,
+		availHeight: 2020,
+	});
+	assert.equal(
+		computeSideRailCenterShiftPx(2020, tallSixteenTenZoom, RAIL_TOTAL_HEIGHT_PX),
+		267
+	);
 	// 3840×2160 (zoom 1.53, rail scale capped at 0.95).
-	assert.equal(computeSideRailCenterShiftPx(2160, 1.53, RAIL_TOTAL_HEIGHT_PX), 227);
+	assert.equal(computeSideRailCenterShiftPx(2160, 1.53, RAIL_TOTAL_HEIGHT_PX), 312);
 });
 
-test('side-rail centering shift puts the rail midpoint at H/2 − 85 (cross-page parity)', () => {
+test('side-rail dead band tapers to 0 on very tall viewports', () => {
+	assert.equal(computeSideRailCenterDeadbandPx(1080), 85);
+	assert.equal(computeSideRailCenterDeadbandPx(1500), 85);
+	assert.equal(computeSideRailCenterDeadbandPx(1730), 42.5);
+	assert.equal(computeSideRailCenterDeadbandPx(1960), 0);
+	assert.equal(computeSideRailCenterDeadbandPx(2160), 0);
+});
+
+test('side-rail centering shift puts the rail midpoint at H/2 − deadband(H) (cross-page parity)', () => {
 	// Whenever the shift is > 0, visibleTop(102) + shift + railVisualH/2 must equal
-	// viewportH/2 − deadband(85) regardless of zoom — this is what keeps the campaign
-	// and dashboard rails vertically even on big monitors even if their zooms differ.
+	// viewportH/2 − deadband(viewportH) regardless of zoom — this is what keeps the
+	// campaign and dashboard rails vertically even on big monitors even if their
+	// zooms differ.
 	for (const [viewportH, zoom] of [
 		[1440, 1.02],
 		[1440, 0.95],
 		[2160, 1.53],
+		[2020, 1.4735],
 		[1890, 1.34],
 	] as const) {
 		const shift = computeSideRailCenterShiftPx(viewportH, zoom, RAIL_TOTAL_HEIGHT_PX);
@@ -244,7 +269,7 @@ test('side-rail centering shift puts the rail midpoint at H/2 − 85 (cross-page
 			computeMapSelectGrabViewScale(viewportH, RAIL_TOTAL_HEIGHT_PX) *
 			zoom;
 		const midpoint = 102 + shift + railVisualH / 2;
-		const target = viewportH / 2 - 85;
+		const target = viewportH / 2 - computeSideRailCenterDeadbandPx(viewportH);
 		assert.ok(
 			Math.abs(midpoint - target) <= 0.5,
 			`midpoint ${midpoint} should be within rounding of ${target} (${viewportH}/${zoom})`

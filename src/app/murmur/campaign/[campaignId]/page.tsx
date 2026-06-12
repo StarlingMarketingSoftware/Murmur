@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 import { useCampaignDetail } from './useCampaignDetail';
 import type {
 	DraftingSectionView,
+	InboxPanelTabRequest,
 	InboxSentTab,
 	InboxSentTabRequest,
 } from './DraftingSection/useDraftingSection';
@@ -127,6 +128,13 @@ type CampaignOverviewBottomBoxesProps = {
 	draftCount: number;
 	inboxCount: number;
 	sentCount: number;
+	// Navigation handlers; undefined renders that box as a disabled, display-only pill.
+	onOpenSearch?: () => void;
+	onOpenContacts?: () => void;
+	onOpenDrafts?: () => void;
+	onOpenInbox?: () => void;
+	onOpenSent?: () => void;
+	onOpenOpportunities?: () => void;
 };
 
 // The overview bottom cluster (status toggle + strip + ask box + count boxes) is
@@ -610,6 +618,12 @@ const CampaignOverviewBottomBoxes = ({
 	draftCount,
 	inboxCount,
 	sentCount,
+	onOpenSearch,
+	onOpenContacts,
+	onOpenDrafts,
+	onOpenInbox,
+	onOpenSent,
+	onOpenOpportunities,
 }: CampaignOverviewBottomBoxesProps) => {
 	const boxStyle: CSSProperties = {
 		width: 39.154,
@@ -632,6 +646,7 @@ const CampaignOverviewBottomBoxes = ({
 	const inactiveBox = (key: string, opacity: number) => (
 		<div
 			key={key}
+			aria-hidden="true"
 			style={{
 				...boxStyle,
 				opacity,
@@ -639,34 +654,99 @@ const CampaignOverviewBottomBoxes = ({
 			}}
 		/>
 	);
+	const navBoxClassName = (onClick?: () => void) =>
+		cn(
+			'pointer-events-auto border-0 p-0 transition-opacity duration-150',
+			onClick && 'hover:opacity-85'
+		);
+	const countBox = ({
+		label,
+		count,
+		background,
+		onClick,
+	}: {
+		label: string;
+		count: number;
+		background: string;
+		onClick?: () => void;
+	}) => (
+		<button
+			type="button"
+			aria-label={`${count} ${label}`}
+			disabled={!onClick}
+			className={navBoxClassName(onClick)}
+			style={{
+				...boxStyle,
+				...countStyle,
+				background,
+				cursor: onClick ? 'pointer' : 'default',
+			}}
+			onClick={onClick}
+		>
+			{count}
+		</button>
+	);
 
 	return (
 		<div
-			aria-hidden="true"
 			className="pointer-events-none fixed left-0 right-0 flex justify-center"
 			style={{ bottom: CAMPAIGN_OVERVIEW_BOTTOM_BOXES_BOTTOM_PX, zIndex: 125 }}
 		>
 			<div className="flex" style={{ gap: 3 }}>
 				{inactiveBox('left-1', 0.1)}
 				{inactiveBox('left-2', 0.2)}
-				<div style={{ ...boxStyle, background: '#FFFFFF' }}>
+				<button
+					type="button"
+					aria-label="Open search"
+					disabled={!onOpenSearch}
+					className={navBoxClassName(onOpenSearch)}
+					style={{
+						...boxStyle,
+						background: '#FFFFFF',
+						cursor: onOpenSearch ? 'pointer' : 'default',
+					}}
+					onClick={onOpenSearch}
+				>
 					<SearchIconDesktop width={17} height={18} stroke="#8B8B8B" strokeWidth={2.3} />
-				</div>
-				<div style={{ ...boxStyle, ...countStyle, background: '#EB8586' }}>
-					{contactsCount}
-				</div>
-				<div style={{ ...boxStyle, ...countStyle, background: '#FFE3AA' }}>
-					{draftCount}
-				</div>
-				<div style={{ ...boxStyle, ...countStyle, background: '#6EBED5' }}>
-					{inboxCount}
-				</div>
-				<div style={{ ...boxStyle, ...countStyle, background: '#5AB478' }}>
-					{sentCount}
-				</div>
-				<div style={{ ...boxStyle, background: '#EFD7D3' }}>
+				</button>
+				{countBox({
+					label: 'contacts',
+					count: contactsCount,
+					background: '#EB8586',
+					onClick: onOpenContacts,
+				})}
+				{countBox({
+					label: 'drafts',
+					count: draftCount,
+					background: '#FFE3AA',
+					onClick: onOpenDrafts,
+				})}
+				{countBox({
+					label: 'inbox',
+					count: inboxCount,
+					background: '#6EBED5',
+					onClick: onOpenInbox,
+				})}
+				{countBox({
+					label: 'sent',
+					count: sentCount,
+					background: '#5AB478',
+					onClick: onOpenSent,
+				})}
+				<button
+					type="button"
+					aria-label="Open inbox opportunities"
+					disabled={!onOpenOpportunities}
+					className={navBoxClassName(onOpenOpportunities)}
+					style={{
+						...boxStyle,
+						background: '#EFD7D3',
+						cursor: onOpenOpportunities ? 'pointer' : 'default',
+					}}
+					onClick={onOpenOpportunities}
+				>
 					<DashboardActionBarStarIcon width={15} height={15} style={{ color: '#E32222' }} />
-				</div>
+				</button>
 				{inactiveBox('right-1', 0.2)}
 				{inactiveBox('right-2', 0.1)}
 			</div>
@@ -2240,6 +2320,18 @@ const Murmur = () => {
 			requestId: (prev?.requestId ?? 0) + 1,
 		}));
 	}, []);
+	// One-shot Responses/Opportunities filter seed for the inbox left panel (the
+	// overview star pill). Cleared whenever navigation lands anywhere but the inbox
+	// so a consumed request can't re-apply on a later plain Inbox visit (the list
+	// remounts per entry/breakpoint tier with a fresh handled-ref).
+	const [inboxPanelTabRequest, setInboxPanelTabRequest] =
+		useState<InboxPanelTabRequest | null>(null);
+	const requestInboxPanelTab = useCallback((tab: InboxPanelTabRequest['tab']) => {
+		setInboxPanelTabRequest((prev) => ({
+			tab,
+			requestId: (prev?.requestId ?? 0) + 1,
+		}));
+	}, []);
 	// Track if we navigated from inbox to sent via down arrow (so up arrow can return to inbox)
 	const [cameToSentFromInbox, setCameToSentFromInbox] = useState(false);
 	// Track the latest requested view so rapid tab flips don't get dropped due to stale closures.
@@ -2876,6 +2968,11 @@ const Murmur = () => {
 					});
 				}
 			}
+			// A pending Opportunities-filter seed only makes sense while landing on the
+			// inbox — clear it for any other destination (covers every leave-inbox path).
+			if (newView !== 'inbox') {
+				setInboxPanelTabRequest(null);
+			}
 			// Dedupe against the *latest requested* view (not just the last committed render) so
 			// rapid flips like A -> B -> A still enqueue the final A update and don't get dropped.
 			if (newView === requestedViewRef.current) return;
@@ -2990,6 +3087,15 @@ const Murmur = () => {
 		setActiveView(requestedView);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [tabParam, inboxEmailIdParam]);
+
+	// Overview star pill: land on the Inbox tab with the Opportunities filter
+	// selected. The explicit 'inbox' sent-tab request beats a stale 'sent' request
+	// left by a prior Sent navigation (the view dedupe can skip re-requesting).
+	const handleOpenInboxOpportunities = useCallback(() => {
+		requestInboxSentTab('inbox');
+		requestInboxPanelTab('opportunities');
+		setActiveView('inbox');
+	}, [requestInboxSentTab, requestInboxPanelTab, setActiveView]);
 
 	// Launch a campaign search from the Write/Drafts/Inbox tabs: jump to the All
 	// tab, drop that tab's preset status filter (so results aren't scoped to e.g.
@@ -3615,6 +3721,29 @@ const Murmur = () => {
 									draftCount={headerDraftCount}
 									inboxCount={overviewInboxCount}
 									sentCount={headerSentCount}
+									onOpenSearch={handleOpenDashboardSearchForCampaign}
+									onOpenContacts={
+										headerContactsCount > 0 ? () => setActiveView('testing') : undefined
+									}
+									onOpenDrafts={
+										headerDraftCount > 0 ? () => setActiveView('drafting') : undefined
+									}
+									onOpenInbox={
+										overviewInboxCount > 0
+											? () => {
+													// Explicit 'inbox' request beats a stale 'sent' one when the
+													// view dedupe skips re-requesting (sent pill → inbox pill).
+													requestInboxSentTab('inbox');
+													setActiveView('inbox');
+												}
+											: undefined
+									}
+									onOpenSent={
+										headerSentCount > 0 ? () => setActiveView('sent') : undefined
+									}
+									onOpenOpportunities={
+										overviewInboxCount > 0 ? handleOpenInboxOpportunities : undefined
+									}
 								/>
 							</div>
 						)}
@@ -4663,6 +4792,7 @@ const Murmur = () => {
 											onDraftOperationsProgress={setDraftOperationsProgress}
 												autoOpenProfileTabWhenIncomplete={cameFromSearch}
 												inboxSentTabRequest={inboxSentTabRequest}
+												inboxPanelTabRequest={inboxPanelTabRequest}
 												onInboxSentTabChange={setInboxSentTab}
 												goToOverview={() => setActiveView('overview')}
 												goToDrafting={() => setActiveView('drafting')}

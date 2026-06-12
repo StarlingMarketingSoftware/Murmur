@@ -66,13 +66,17 @@ export function VenueMapActionPills({
 	onToolSelect,
 	unreadCount,
 	clusterScale,
+	boost,
 	dockMinX,
 }: {
 	anchorStore: VenueIconAnchorStore;
 	selectedTool: 'add' | 'profile' | 'mail' | 'events' | null;
 	onToolSelect: (tool: 'add' | 'profile' | 'mail' | 'events') => void;
 	unreadCount: number;
+	// Already includes the large-monitor boost (the stack's rendered footprint
+	// follows it); boost additionally scales the native-px gaps/margins below.
 	clusterScale: number;
+	boost: number;
 	dockMinX: number;
 }) {
 	const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -88,22 +92,24 @@ export function VenueMapActionPills({
 			const anchor = anchorStore.get();
 			const vw = window.innerWidth;
 			const vh = window.innerHeight;
-			// Rendered footprint after the chrome scale.
+			// Rendered footprint after the chrome scale; gaps/margins boost-scale
+			// alongside it (anchor x/y are raw viewport px — the map is unzoomed).
 			const stackW = PILL_W * clusterScale;
 			const stackH = STACK_H * clusterScale;
+			const margin = VIEWPORT_MARGIN * boost;
 			const minX = dockMinX;
-			const maxX = vw - stackW - VIEWPORT_MARGIN;
+			const maxX = vw - stackW - margin;
 			const isAnchored =
 				anchor != null && anchor.isOnScreen && anchor.zoom >= ANCHOR_MIN_ZOOM;
 
 			let x: number;
 			let y: number;
 			if (isAnchored) {
-				x = clamp(anchor.x - ICON_GAP - stackW, minX, maxX);
-				y = clamp(anchor.y - stackH / 2, VIEWPORT_MARGIN, vh - stackH - VIEWPORT_MARGIN);
+				x = clamp(anchor.x - ICON_GAP * boost - stackW, minX, maxX);
+				y = clamp(anchor.y - stackH / 2, margin, vh - stackH - margin);
 			} else {
 				x = minX;
-				y = DOCKED_TOP;
+				y = DOCKED_TOP * boost;
 			}
 
 			// Rigid tracking while anchored (a persistent transition would retarget every
@@ -129,7 +135,7 @@ export function VenueMapActionPills({
 			window.removeEventListener('resize', place);
 			if (transitionTimeout != null) window.clearTimeout(transitionTimeout);
 		};
-	}, [anchorStore, clusterScale, dockMinX]);
+	}, [anchorStore, clusterScale, boost, dockMinX]);
 
 	const pillClassName =
 		'pointer-events-auto flex h-[52.657px] w-[196px] cursor-pointer items-center gap-[14px] rounded-[23.022px] bg-white pl-[20px] opacity-[0.81]';

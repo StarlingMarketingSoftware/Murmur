@@ -47,6 +47,7 @@ export function VenueNotificationsMapPanel({
 	applicantCountByEventId,
 	onOpenThread,
 	onOpenEvent,
+	boost,
 }: {
 	conversations: ConversationListItem[] | undefined;
 	applications: VenueApplicationRow[] | undefined;
@@ -55,6 +56,9 @@ export function VenueNotificationsMapPanel({
 	applicantCountByEventId: Map<number, number>;
 	onOpenThread: (conversationId: number, thread: ConversationThreadFilter) => void;
 	onOpenEvent: (eventId: number) => void;
+	// Large-monitor growth from useVenuePortalLayout — the panel keeps its own
+	// fixed-corner anchor (right 24 / top 56 / scale 0.7), all boost-scaled.
+	boost: number;
 }) {
 	const [collapsed, setCollapsed] = useState(false);
 
@@ -116,13 +120,15 @@ export function VenueNotificationsMapPanel({
 			<div
 				data-venue-tool-ui="true"
 				aria-hidden={collapsed}
-				className={`fixed right-[24px] top-[56px] z-[100] origin-top-right transition-transform duration-300 ${
+				className={`fixed z-[100] origin-top-right transition-transform duration-300 ${
 					collapsed ? 'pointer-events-none' : ''
 				}`}
 				style={{
+					right: 24 * boost,
+					top: 56 * boost,
 					transform: collapsed
-						? `scale(${VENUE_MAP_LEFT_CLUSTER_SCALE}) translateX(calc(100% + 60px))`
-						: `scale(${VENUE_MAP_LEFT_CLUSTER_SCALE})`,
+						? `scale(${VENUE_MAP_LEFT_CLUSTER_SCALE * boost}) translateX(calc(100% + 60px))`
+						: `scale(${VENUE_MAP_LEFT_CLUSTER_SCALE * boost})`,
 				}}
 			>
 				<div className="flex h-[682px] w-[431px] flex-col rounded-[12px] bg-[linear-gradient(180deg,rgba(255,255,255,0.63)_0%,rgba(255,255,255,0.00)_100%)] px-[18px] pb-[18px] pt-[12px]">
@@ -254,7 +260,8 @@ export function VenueNotificationsMapPanel({
 					data-venue-tool-ui="true"
 					aria-label="Show notifications"
 					onClick={() => setCollapsed(false)}
-					className="fixed right-0 top-[56px] z-[100] flex h-[44px] w-[26px] items-center justify-center rounded-l-[10px] border-[2px] border-r-0 border-black bg-white text-black"
+					className="fixed right-0 z-[100] flex h-[44px] w-[26px] origin-top-right items-center justify-center rounded-l-[10px] border-[2px] border-r-0 border-black bg-white text-black"
+					style={{ top: 56 * boost, transform: `scale(${boost})` }}
 				>
 					<ChevronLeft className="h-[16px] w-[16px]" strokeWidth={2.5} />
 				</button>

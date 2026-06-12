@@ -254,8 +254,9 @@ export const getMurmurChromeZoomForWindow = (): number => {
 // a shared downward shift that re-centers the rail. The shift is rail-driven on
 // BOTH pages (the rail is the one element they share, with identical constants),
 // which gives cross-page parity: whenever the shift is > 0 the rail's visual
-// midpoint lands at exactly `viewportH/2 − deadband` regardless of rail size or
-// zoom, so the campaign and dashboard rails stay even even if their zooms differ.
+// midpoint lands at exactly `viewportH/2 − deadband(viewportH)` regardless of
+// rail size or zoom, so the campaign and dashboard rails stay even even if their
+// zooms differ.
 export const DASHBOARD_SIDE_SHIFT_VAR = '--murmur-dashboard-side-shift';
 export const CAMPAIGN_SIDE_SHIFT_VAR = '--murmur-campaign-side-shift';
 
@@ -265,10 +266,26 @@ const SIDE_RAIL_VISUAL_TOP_PX = 106;
 const SIDE_RAIL_VISUAL_TOP_NUDGE_UP_PX = 4;
 // Dead band that keeps the 1080p reference layout pixel-identical: a maximized
 // fullscreen 1920×1080 window (zoom 0.92, rail scale 0.84) has a centering delta
-// of 84.05px, so anything ≤ 85 floors to 0 there and on smaller monitors. The
-// trade-off is that centered chrome sits a constant 85 visual px above true
-// center on big monitors — deliberate optical centering, not a bug.
+// of 84.05px, so anything ≤ 85 floors to 0 there and on smaller monitors. Below
+// the taper window the centered chrome deliberately sits a constant 85 visual px
+// above true center, but on very tall monitors that read as "too high", so the
+// dead band tapers linearly to 0 across the 1500→1960 viewport-height window —
+// beyond it the rail midpoint lands at exactly viewportH/2.
 export const MURMUR_SIDE_RAIL_CENTER_DEADBAND_PX = 85;
+const SIDE_RAIL_DEADBAND_TAPER_START_VIEWPORT_H_PX = 1500;
+const SIDE_RAIL_DEADBAND_TAPER_END_VIEWPORT_H_PX = 1960;
+
+export const computeSideRailCenterDeadbandPx = (viewportH: number): number => {
+	if (!Number.isFinite(viewportH)) return MURMUR_SIDE_RAIL_CENTER_DEADBAND_PX;
+	const taperProgress = clampZoom(
+		(viewportH - SIDE_RAIL_DEADBAND_TAPER_START_VIEWPORT_H_PX) /
+			(SIDE_RAIL_DEADBAND_TAPER_END_VIEWPORT_H_PX -
+				SIDE_RAIL_DEADBAND_TAPER_START_VIEWPORT_H_PX),
+		0,
+		1
+	);
+	return MURMUR_SIDE_RAIL_CENTER_DEADBAND_PX * (1 - taperProgress);
+};
 
 // View-scale curve for the left MapSelectGrab rail — previously duplicated
 // verbatim in the dashboard and campaign page memos. `railTotalHeightPx` is the
@@ -327,6 +344,6 @@ export const computeSideRailCenterShiftPx = (
 		(SIDE_RAIL_VISUAL_TOP_PX - SIDE_RAIL_VISUAL_TOP_NUDGE_UP_PX);
 	return Math.max(
 		0,
-		Math.round(centeringDeltaPx - MURMUR_SIDE_RAIL_CENTER_DEADBAND_PX)
+		Math.round(centeringDeltaPx - computeSideRailCenterDeadbandPx(viewportH))
 	);
 };

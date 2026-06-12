@@ -152,13 +152,17 @@ export function VenueDockedChatPanel({
 	thread,
 	onExpand,
 	scale,
+	boost,
 }: {
 	conversationId: number;
 	thread: ConversationThreadFilter;
 	onExpand: () => void;
 	// From useVenuePortalLayout's dockedChatScale: the corner clusters' 0.7, or
-	// smaller when the viewport can't fit that beside the tool panels.
+	// smaller when the viewport can't fit that beside the tool panels (both
+	// already include the large-monitor boost, which also scales the corner
+	// margins below).
 	scale: number;
+	boost: number;
 }) {
 	// Header identity comes from the inbox lists (cache-shared with the portal
 	// root's 30s polls — no new request). Application threads resolve from the
@@ -186,8 +190,12 @@ export function VenueDockedChatPanel({
 	return (
 		<div
 			data-venue-tool-ui="true"
-			className="fixed bottom-[24px] right-[12px] z-[100] origin-bottom-right"
-			style={{ transform: `scale(${scale})` }}
+			className="fixed z-[100] origin-bottom-right"
+			style={{
+				bottom: 24 * boost,
+				right: 12 * boost,
+				transform: `scale(${scale})`,
+			}}
 		>
 			{/* Tool-panel chrome at the Figma-native 515×658, scaled by the corner
 			    clusters' 0.7 like everything else on the map — or smaller when the
