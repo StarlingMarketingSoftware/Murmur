@@ -11,6 +11,7 @@ import type { VenueEventApplicant } from '@/hooks/queryHooks/useVenueApplication
 import {
 	GenrePill,
 	getApplicantRating,
+	MatchPercentPill,
 	MEDIA_THUMB_GRADIENT,
 	mediaThumbSrc,
 	ratingColor,
@@ -53,7 +54,8 @@ function EmptyFieldValue() {
 }
 
 // Mobile restack of the desktop ApplicantDetailCard: light header row (avatar,
-// name, derived stars), stacked answer fields, then a horizontal media strip.
+// name, derived stars, match pill), stacked answer fields, then a horizontal
+// media strip.
 // Ratings are read-only here; rating happens in the media view's open player.
 export function MobileApplicantProfileCard({
 	applicant,
@@ -81,6 +83,9 @@ export function MobileApplicantProfileCard({
 					{applicant.applicantName}
 				</span>
 				{rating > 0 && <ApplicantRatingStars rating={rating} />}
+				{applicant.matchPercent != null && (
+					<MatchPercentPill percent={applicant.matchPercent} />
+				)}
 			</div>
 			<div className="flex flex-col gap-[10px] p-[12px]">
 				<div className="flex flex-col items-start">

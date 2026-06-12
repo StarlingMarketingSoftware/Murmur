@@ -663,6 +663,19 @@ body {
 			animation: gradient-breathe 16s ease-in-out infinite;
 		}
 
+		/* The booking-confirm footer: the search bar's breathe, recolored green. */
+		.booking-confirm-gradient-button {
+			background: linear-gradient(
+				90deg,
+				#B7FFC5 1.69%,
+				#4DC864 34.7%,
+				#38E497 65.83%,
+				#A4F5B3 98.97%
+			);
+			background-size: 250% 100%;
+			animation: gradient-breathe 16s ease-in-out infinite;
+		}
+
 		/* Hero searchbar: cursor-follow spotlight overlay (opt-in via extra class) */
 		@media (hover: hover) and (pointer: fine) {
 			.search-spotlight-zone {

@@ -16,6 +16,7 @@ import {
 import {
 	GenrePill,
 	getApplicantRating,
+	MatchPercentPill,
 	MEDIA_THUMB_GRADIENT,
 	mediaThumbSrc,
 	ratingColor,
@@ -50,8 +51,9 @@ function SectionNotice({ children }: { children: string }) {
 	);
 }
 
-// One finder-style applicant row: name | derived stars | genre | thumbnails.
-// Stars are plain icons (ApplicantRatingStars) — never buttons inside this button.
+// One finder-style applicant row: name | derived stars | match pill | genre |
+// thumbnails. Stars are plain icons (ApplicantRatingStars) — never buttons
+// inside this button.
 function MobileApplicantRow({
 	applicant,
 	rating,
@@ -77,13 +79,16 @@ function MobileApplicantRow({
 			}`}
 		>
 			<span
-				className={`min-w-0 flex-1 truncate text-[16px] leading-none text-black ${
+				className={`min-w-[48px] flex-1 truncate text-[16px] leading-none text-black ${
 					expanded ? 'font-bold' : 'font-semibold'
 				}`}
 			>
 				{applicant.applicantName}
 			</span>
 			{rating > 0 && <ApplicantRatingStars rating={rating} />}
+			{applicant.matchPercent != null && (
+				<MatchPercentPill percent={applicant.matchPercent} />
+			)}
 			{applicant.genre && <GenrePill genre={applicant.genre} />}
 			<span className="flex shrink-0 items-center gap-[4px]">
 				{visibleVideos.map((video) => {

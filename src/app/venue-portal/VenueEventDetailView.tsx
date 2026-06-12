@@ -126,9 +126,31 @@ function EventDatePill({
 export function GenrePill({ genre }: { genre: string }) {
 	const GenreIcon = getProfileGenreIcon(genre);
 	return (
-		<span className="flex h-[21.374px] w-fit max-w-full shrink-0 items-center gap-[3px] overflow-hidden rounded-[7.491px] bg-[#F4F4F4] px-[6px] font-inter text-[14px] font-medium leading-[21.374px] text-black">
+		<span className="flex h-[21.374px] w-fit min-w-[56px] max-w-full items-center gap-[3px] overflow-hidden rounded-[7.491px] bg-[#F4F4F4] px-[6px] font-inter text-[14px] font-medium leading-[21.374px] text-black">
 			{GenreIcon && <GenreIcon aria-hidden="true" className="shrink-0" />}
 			<span className="min-w-0 truncate">{genre}</span>
+		</span>
+	);
+}
+
+// Match-band pastel fills, dark text. Banded rather than a single green so a
+// heavy genre-mismatch penalty reads at a glance; thresholds align with the
+// scorer's genre caps (a hard clash caps the score at 35 → red band).
+const matchPercentFill = (percent: number) =>
+	percent >= 70 ? '#D6F5D6' : percent >= 40 ? '#FBF0C4' : '#FFDADA';
+
+// Event-fit score pill (the generated applicant→event match percent). Same
+// metrics as GenrePill so they sit flush as siblings in the 27px rows;
+// callers gate on matchPercent != null, matching the `rating > 0 &&` idiom.
+export function MatchPercentPill({ percent }: { percent: number }) {
+	const value = Math.round(Math.min(100, Math.max(0, percent)));
+	return (
+		<span
+			title={`${value}% match for this event`}
+			className="flex h-[21.374px] shrink-0 items-center rounded-[7.491px] px-[6px] font-inter text-[14px] font-medium leading-[21.374px] text-black"
+			style={{ backgroundColor: matchPercentFill(value) }}
+		>
+			{value}%
 		</span>
 	);
 }
@@ -295,6 +317,9 @@ function ApplicantDetailCard({ applicant }: { applicant: VenueEventApplicant }) 
 			<div className="flex h-[36px] shrink-0 items-center gap-[10px] bg-[#1E4620] px-[14px] text-[18px] font-bold leading-none text-white">
 				<span className="min-w-0 truncate">{applicant.applicantName}</span>
 				{rating > 0 && <ApplicantAverageRating rating={rating} light />}
+				{applicant.matchPercent != null && (
+					<MatchPercentPill percent={applicant.matchPercent} />
+				)}
 			</div>
 			<div className="flex gap-[14px] p-[14px]">
 				<div className="flex w-[230px] shrink-0 flex-col items-start">
@@ -364,8 +389,8 @@ function ApplicantDetailCard({ applicant }: { applicant: VenueEventApplicant }) 
 	);
 }
 
-// One finder-style applicant row: name | genre pill | media thumbnails. Clicking
-// toggles the snapshot card above the list.
+// One finder-style applicant row: name | rating | match pill | genre pill |
+// media thumbnails. Clicking toggles the snapshot card above the list.
 function ApplicantRow({
 	applicant,
 	striped,
@@ -395,6 +420,9 @@ function ApplicantRow({
 				{applicant.applicantName}
 			</span>
 			{rating > 0 && <ApplicantAverageRating rating={rating} />}
+			{applicant.matchPercent != null && (
+				<MatchPercentPill percent={applicant.matchPercent} />
+			)}
 			{applicant.genre && <GenrePill genre={applicant.genre} />}
 			<span className="flex shrink-0 gap-[4px]">
 				{applicant.videos.map((video) => {

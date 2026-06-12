@@ -18,7 +18,12 @@ import {
 	useGetVenueEventApplicants,
 	type VenueEventApplicant,
 } from '@/hooks/queryHooks/useVenueApplications';
-import { GenrePill, MEDIA_THUMB_GRADIENT, mediaThumbSrc } from './VenueEventDetailView';
+import {
+	GenrePill,
+	MatchPercentPill,
+	MEDIA_THUMB_GRADIENT,
+	mediaThumbSrc,
+} from './VenueEventDetailView';
 import { VENUE_MAP_LEFT_CLUSTER_SCALE, VENUE_MAP_OVERLAY_SCALE } from './constants';
 
 // Never overlap the centered tool panels: below ~1510px viewport width the
@@ -99,8 +104,14 @@ function DockedApplicationCard({ applicant }: { applicant: VenueEventApplicant }
 				<span className="text-[13px] font-semibold leading-none text-black">
 					Application
 				</span>
-				{(applicant.genre || applicant.performingName || applicant.area) && (
+				{(applicant.matchPercent != null ||
+					applicant.genre ||
+					applicant.performingName ||
+					applicant.area) && (
 					<div className="flex flex-wrap items-center gap-[6px]">
+						{applicant.matchPercent != null && (
+							<MatchPercentPill percent={applicant.matchPercent} />
+						)}
 						{applicant.genre && <GenrePill genre={applicant.genre} />}
 						{applicant.performingName && (
 							<SnapshotChip

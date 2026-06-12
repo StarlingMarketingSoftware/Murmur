@@ -80,6 +80,13 @@ export const useCreateBookingRequest = (
 					eventName: null,
 					eventStartsAt: null,
 					eventWhenLabel: null,
+					eventStartTimeLabel: null,
+					eventEndTimeLabel: null,
+					eventAddress: null,
+					eventLatitude: null,
+					eventLongitude: null,
+					venueName: null,
+					bookingNotes: null,
 				};
 				const optimisticMessage: SerializedMessage = {
 					id: -Date.now(),

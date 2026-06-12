@@ -169,12 +169,18 @@ export const getSameDayTimeRangeError = (
 	return endMinutes <= startMinutes ? 'Time range must stay within one day' : null;
 };
 
-export const formatDurationLabel = (startTime: string, endTime: string): string => {
+export const formatDurationLabel = (
+	startTime: string,
+	endTime: string,
+	options?: { wrapMidnight?: boolean }
+): string => {
 	const startMinutes = parseClockMinutes(startTime);
 	const endMinutes = parseClockMinutes(endTime);
 	if (startMinutes == null || endMinutes == null) return 'Duration';
 
-	const durationMinutes = endMinutes - startMinutes;
+	let durationMinutes = endMinutes - startMinutes;
+	// Venue-set event times may legitimately cross midnight (9 pm - 1 am).
+	if (durationMinutes <= 0 && options?.wrapMidnight) durationMinutes += 24 * 60;
 	if (durationMinutes <= 0) return 'Pick Valid Time';
 
 	const hours = Math.floor(durationMinutes / 60);

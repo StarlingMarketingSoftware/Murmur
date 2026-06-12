@@ -13,15 +13,115 @@ type BookingEventContext = {
 	name: string | null;
 	startsAt: Date | null;
 	whenLabel: string | null;
+	startTime: string | null;
+	endTime: string | null;
+	address: string | null;
+	latitude: number | null;
+	longitude: number | null;
+	size: string | null;
+	genres: string[];
+	pay: string | null;
+	details: string | null;
+};
+
+type BookingVenueContext = {
+	venueName: string;
+	address: string | null;
+	city: string | null;
+	state: string | null;
+	businessType: string | null;
+	capacityMin: number | null;
+	capacityMax: number | null;
+	genres: string[];
+	payRange: string | null;
+	payMin: number | null;
+	payMax: number | null;
+	sound: string | null;
+	description: string | null;
+	website: string | null;
 };
 
 /** Plain-text body for the delivering Message — shows in list previews on both sides. */
 export const buildBookingRequestBody = (eventName: string | null): string =>
 	eventName ? `Booking request — ${eventName}` : 'Booking request';
 
+/**
+ * Event times are stored as 24h 'HH:MM' (the venue form's option values); the
+ * artist calendar renders friendly labels ('9 pm', '9:30 pm'). Pure — exported
+ * for tests. Null on blank/unparseable so callers can fall back.
+ */
+export const formatEventTimeLabel = (raw: string | null): string | null => {
+	const match = raw?.trim().match(/^(\d{1,2}):(\d{2})$/);
+	if (!match) return null;
+	const hours = Number(match[1]);
+	const minutes = Number(match[2]);
+	if (hours > 23 || minutes > 59) return null;
+	const hour12 = hours % 12 || 12;
+	const meridiem = hours < 12 ? 'am' : 'pm';
+	return `${hour12}${minutes ? `:${match[2]}` : ''} ${meridiem}`;
+};
+
+const truncateNote = (value: string, max: number): string =>
+	value.length > max ? `${value.slice(0, max - 1).trimEnd()}…` : value;
+
+/**
+ * Single-line ' • '-separated summary of everything the artist should know about
+ * the gig — the event's details plus the venue's profile — destined for the
+ * artist's CalendarEntry.notes (a single-line field everywhere it renders).
+ * Pure — exported for tests. Empty string when nothing is known.
+ */
+export const composeArtistEntryNotes = (
+	event: BookingEventContext | null,
+	venue: BookingVenueContext | null
+): string => {
+	const startLabel = formatEventTimeLabel(event?.startTime ?? null);
+	const endLabel = formatEventTimeLabel(event?.endTime ?? null);
+	const venuePay =
+		venue?.payRange?.trim() ||
+		(venue?.payMin != null && venue?.payMax != null
+			? `$${venue.payMin}-$${venue.payMax}`
+			: venue?.payMin != null
+				? `from $${venue.payMin}`
+				: venue?.payMax != null
+					? `up to $${venue.payMax}`
+					: '');
+	const pay = event?.pay?.trim() || venuePay;
+	const capacity =
+		venue?.capacityMin != null && venue?.capacityMax != null
+			? `Capacity ${venue.capacityMin}-${venue.capacityMax}`
+			: venue?.capacityMax != null
+				? `Capacity up to ${venue.capacityMax}`
+				: venue?.capacityMin != null
+					? `Capacity ${venue.capacityMin}+`
+					: '';
+	const venueLocation = [venue?.address, venue?.city, venue?.state]
+		.map((part) => part?.trim())
+		.filter(Boolean)
+		.join(', ');
+	// The event's own genres (editable per event) beat the venue's profile list.
+	const genres = event?.genres?.length ? event.genres : (venue?.genres ?? []);
+	const parts = [
+		event?.name?.trim() ? `Event: ${event.name.trim()}` : '',
+		startLabel && endLabel ? `${startLabel} - ${endLabel}` : '',
+		event?.size?.trim() ?? '',
+		pay ? `Pay: ${pay}` : '',
+		event?.details?.trim() ? truncateNote(event.details.trim(), 140) : '',
+		venue?.venueName?.trim() ? `Venue: ${venue.venueName.trim()}` : '',
+		venue?.businessType?.trim() ?? '',
+		venueLocation,
+		capacity,
+		genres.length ? genres.join(', ') : '',
+		venue?.sound?.trim() ? `Sound: ${venue.sound.trim()}` : '',
+		venue?.website?.trim() ?? '',
+		venue?.description?.trim() ? truncateNote(venue.description.trim(), 200) : '',
+	];
+	return parts.filter(Boolean).join(' • ');
+};
+
 export const serializeBookingRequest = (
 	request: BookingRequest,
-	event: BookingEventContext | null = null
+	event: BookingEventContext | null = null,
+	venue: BookingVenueContext | null = null
 ): SerializedBookingRequest => ({
 	id: request.id,
 	conversationId: request.conversationId,
@@ -35,6 +135,13 @@ export const serializeBookingRequest = (
 	eventName: event?.name ?? null,
 	eventStartsAt: event?.startsAt?.toISOString() ?? null,
 	eventWhenLabel: event?.whenLabel ?? null,
+	eventStartTimeLabel: formatEventTimeLabel(event?.startTime ?? null),
+	eventEndTimeLabel: formatEventTimeLabel(event?.endTime ?? null),
+	eventAddress: event?.address ?? null,
+	eventLatitude: event?.latitude ?? null,
+	eventLongitude: event?.longitude ?? null,
+	venueName: venue?.venueName ?? null,
+	bookingNotes: composeArtistEntryNotes(event, venue) || null,
 });
 
 /**
@@ -48,17 +155,58 @@ export const serializeBookingRequestRows = async (
 	const eventIds = [
 		...new Set(rows.map((r) => r.eventId).filter((id): id is number => id != null)),
 	];
-	const events = eventIds.length
-		? await prisma.event.findMany({
-				where: { id: { in: eventIds } },
-				select: { id: true, name: true, startsAt: true, whenLabel: true },
-			})
-		: [];
+	const venueIds = [...new Set(rows.map((r) => r.venueId))];
+	const [events, venues] = await Promise.all([
+		eventIds.length
+			? prisma.event.findMany({
+					where: { id: { in: eventIds } },
+					select: {
+						id: true,
+						name: true,
+						startsAt: true,
+						whenLabel: true,
+						startTime: true,
+						endTime: true,
+						address: true,
+						latitude: true,
+						longitude: true,
+						size: true,
+						genres: true,
+						pay: true,
+						details: true,
+					},
+				})
+			: Promise.resolve([]),
+		venueIds.length
+			? prisma.venue.findMany({
+					where: { id: { in: venueIds } },
+					select: {
+						id: true,
+						venueName: true,
+						address: true,
+						city: true,
+						state: true,
+						businessType: true,
+						capacityMin: true,
+						capacityMax: true,
+						genres: true,
+						payRange: true,
+						payMin: true,
+						payMax: true,
+						sound: true,
+						description: true,
+						website: true,
+					},
+				})
+			: Promise.resolve([]),
+	]);
 	const eventById = new Map(events.map((e) => [e.id, e]));
+	const venueById = new Map(venues.map((v) => [v.id, v]));
 	return rows.map((row) =>
 		serializeBookingRequest(
 			row,
-			row.eventId != null ? (eventById.get(row.eventId) ?? null) : null
+			row.eventId != null ? (eventById.get(row.eventId) ?? null) : null,
+			venueById.get(row.venueId) ?? null
 		)
 	);
 };
@@ -416,8 +564,11 @@ export const confirmBookingRequest = async (
 	const artistContent = {
 		personName: input.personName ?? '',
 		company: input.company ?? '',
-		startTime: input.startTime ?? '',
-		endTime: input.endTime ?? '',
+		// An event-backed booking's times are the venue's to set — fall back to
+		// them when the client sent blanks (stale clients, partial payloads).
+		startTime:
+			input.startTime?.trim() || formatEventTimeLabel(event?.startTime ?? null) || '',
+		endTime: input.endTime?.trim() || formatEventTimeLabel(event?.endTime ?? null) || '',
 		notes: input.notes ?? '',
 		address: input.address ?? '',
 		placeId: input.placeId ?? null,

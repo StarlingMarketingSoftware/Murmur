@@ -26,6 +26,16 @@ export interface SerializedBookingRequest {
 	eventName: string | null;
 	eventStartsAt: string | null; // ISO instant (venue-local picked date + time)
 	eventWhenLabel: string | null; // faithful display label, e.g. "June 15th 2026"
+	// Prefill context for the artist's locked confirm popup: the event's times
+	// (pre-formatted as calendar labels, e.g. "9 pm"), its location, the venue's
+	// name, and a server-composed event+venue summary for the entry's notes.
+	eventStartTimeLabel: string | null;
+	eventEndTimeLabel: string | null;
+	eventAddress: string | null;
+	eventLatitude: number | null;
+	eventLongitude: number | null;
+	venueName: string | null;
+	bookingNotes: string | null;
 }
 
 export interface SerializedMessage {

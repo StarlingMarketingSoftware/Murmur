@@ -154,6 +154,13 @@ test('serializeMessage attaches live booking-request state from the lookup map',
 		eventName: 'Jazz Night',
 		eventStartsAt: '2026-06-15T23:00:00.000Z',
 		eventWhenLabel: 'June 15th 2026',
+		eventStartTimeLabel: '7 pm',
+		eventEndTimeLabel: '10 pm',
+		eventAddress: null,
+		eventLatitude: null,
+		eventLongitude: null,
+		venueName: 'The Note',
+		bookingNotes: null,
 	};
 	const out = serializeMessage(row, new Map([[41, liveState]]));
 	assert.equal(out.bookingRequestId, 41);

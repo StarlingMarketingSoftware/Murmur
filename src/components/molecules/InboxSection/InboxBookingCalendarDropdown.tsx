@@ -59,6 +59,11 @@ export type BookingPrefillFields = {
 	address: string;
 	latitude: number | null;
 	longitude: number | null;
+	// Event-backed requests carry the event's times and a composed event+venue
+	// summary; null falls back to the calendar defaults / empty notes.
+	startTime: string | null;
+	endTime: string | null;
+	notes: string | null;
 	contactId: number | null;
 };
 
@@ -73,12 +78,18 @@ type InboxBookingCalendarDropdownProps = {
 	/** Excluded from click-outside — the banner toggles the dropdown itself. */
 	bannerRef: RefObject<HTMLDivElement | null>;
 	/**
-	 * Booking-request confirm mode: everything works as usual (the artist places/
-	 * edits their provisional entry), plus a footer "Confirm booking" bar that
-	 * sends the placed entry through the booking-confirm endpoint (which also
-	 * writes the venue's calendar) instead of leaving a bare calendar entry.
+	 * Booking-request confirm mode: a footer "Confirm booking" bar sends the
+	 * placed entry through the booking-confirm endpoint (which also writes the
+	 * venue's calendar) instead of leaving a bare calendar entry. With
+	 * `lockedDateIso` set (event-backed request), the booking is pinned to the
+	 * venue's date: no moves, no title/time edits, no delete — just confirm.
+	 * Null keeps the original pick-a-date editable flow.
 	 */
-	confirmMode?: { bookingRequestId: number; onConfirmed: () => void };
+	confirmMode?: {
+		bookingRequestId: number;
+		lockedDateIso: string | null;
+		onConfirmed: () => void;
+	};
 	onClose: () => void;
 };
 
@@ -363,6 +374,39 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 	const isConversationEntry = (entry: GetCalendarEntryData): boolean =>
 		entry.campaignId === campaignId && entry.contactId === prefill.contactId;
 
+	// Event-backed confirm: the booking is pinned to the VENUE'S date. The confirm
+	// target is the entry sitting on that exact date — never the first conversation
+	// match across all dates (a leftover from the plain booked flow on another day
+	// would otherwise drive the footer and get confirmed on the wrong date).
+	const lockedDateIso = confirmMode?.lockedDateIso ?? null;
+	const lockedOccupant = lockedDateIso
+		? (entriesByDate.get(lockedDateIso) ?? null)
+		: null;
+	// An entry confirmed by a DIFFERENT booking request also fails the lock — the
+	// server would reject the confirm (date_unavailable), so surface that up front.
+	const lockedOwnEntry =
+		lockedOccupant &&
+		isConversationEntry(lockedOccupant) &&
+		(lockedOccupant.bookingRequestId == null ||
+			lockedOccupant.bookingRequestId === confirmMode?.bookingRequestId)
+			? lockedOccupant
+			: null;
+	const confirmTargetEntry = lockedDateIso != null ? lockedOwnEntry : conversationEntry;
+	const confirmTargetEntryRef = useRef(confirmTargetEntry);
+	confirmTargetEntryRef.current = confirmTargetEntry;
+	// The event's times are facts only when the venue actually set them; a dated
+	// event with no times keeps the time selectors editable even in locked mode.
+	const lockedTimesKnown = prefill.startTime != null && prefill.endTime != null;
+	// Whether an entry IS the locked booking being confirmed. An entry that a
+	// different request confirmed renders as a normal editable entry instead —
+	// presenting this event's content over it would mislead, and the artist needs
+	// the Delete affordance to clear the conflict the footer calls unavailable.
+	const isLockedBookingEntry = (entry: GetCalendarEntryData): boolean =>
+		lockedDateIso != null &&
+		entry.date === lockedDateIso &&
+		(entry.bookingRequestId == null ||
+			entry.bookingRequestId === confirmMode?.bookingRequestId);
+
 	// The popup edits the entry sitting on ITS date — not just the first
 	// conversation match — so stray duplicates remain editable and deletable.
 	const activeEntry = activePopup
@@ -373,6 +417,8 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 		: null;
 	const activeEntryRef = useRef(activeEntry);
 	activeEntryRef.current = activeEntry;
+	const popupEntryLocked = activeEntry != null && isLockedBookingEntry(activeEntry);
+	const popupTimesLocked = popupEntryLocked && lockedTimesKnown;
 
 	// Where this conversation's booking currently lives, tracked synchronously so
 	// rapid move clicks delete the right date before the cache round-trip lands.
@@ -404,9 +450,9 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 		date: dateIso,
 		personName: prefill.personName,
 		company: prefill.company,
-		startTime: DEFAULT_START_TIME,
-		endTime: DEFAULT_END_TIME,
-		notes: '',
+		startTime: prefill.startTime ?? DEFAULT_START_TIME,
+		endTime: prefill.endTime ?? DEFAULT_END_TIME,
+		notes: prefill.notes ?? '',
 		address: prefill.address,
 		placeId: null,
 		latitude: prefill.latitude,
@@ -427,13 +473,28 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 			setDraft(null);
 			return;
 		}
+		// Locked confirm: the venue's event content is authoritative — seed the
+		// locked fields from the prefill, never from the cache entry (the chip
+		// click's refresh PATCH may still be in flight; the entry keeps its id and
+		// date when it lands, so this effect would not re-run, and a stale draft
+		// would be displayed as venue facts and autosaved back over the refresh).
+		const locked = isLockedBookingEntry(entry);
 		setDraft({
-			personName: entry.personName,
-			company: entry.company,
-			startTime: entry.startTime || DEFAULT_START_TIME,
-			endTime: entry.endTime || DEFAULT_END_TIME,
-			notes: entry.notes,
+			personName: locked ? prefill.personName : entry.personName,
+			company: locked ? prefill.company : entry.company,
+			startTime:
+				locked && prefill.startTime != null
+					? prefill.startTime
+					: entry.startTime || DEFAULT_START_TIME,
+			endTime:
+				locked && prefill.endTime != null
+					? prefill.endTime
+					: entry.endTime || DEFAULT_END_TIME,
+			notes: locked ? entry.notes || (prefill.notes ?? '') : entry.notes,
 		});
+		// lockedDateIso and prefill are fixed for the dropdown's lifetime (a new
+		// confirm flow remounts it), so the entry identity is the only real dep.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [activeEntryId, activeEntryDate]);
 
 	// Debounced autosave for the popup's text fields.
@@ -469,15 +530,38 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 	// have landed in the cache yet.
 	const confirmBooking = useConfirmBookingRequest();
 	const handleConfirmBooking = () => {
-		const entry = conversationEntryRef.current;
+		const entry = confirmTargetEntryRef.current;
 		if (!entry || !confirmMode || confirmBooking.isPending) return;
 		const pendingDraft =
 			activeEntryRef.current?.date === entry.date ? pendingAutosaveRef.current : null;
 		flushAutosave();
+		// Locked confirm: the venue-owned fields come from the authoritative
+		// prefill — never from a cache entry or draft snapshot that a still-in-
+		// flight refresh PATCH could have left stale. (The locked target passed
+		// the bookingRequestId guard by construction.)
+		const lockedContent =
+			confirmMode.lockedDateIso != null
+				? {
+						personName: prefill.personName,
+						company: prefill.company,
+						// WYSIWYG notes: what the popup displays — the live draft when it
+						// is open on the target, else the entry's notes or the composed
+						// fallback the seed would show. Without this, an empty cache entry
+						// (refresh PATCH still in flight) confirms with blank notes while
+						// the popup showed the composed summary.
+						notes:
+							(activeEntryRef.current?.date === entry.date
+								? draft?.notes
+								: undefined) ?? (entry.notes || (prefill.notes ?? '')),
+						...(lockedTimesKnown
+							? { startTime: prefill.startTime ?? '', endTime: prefill.endTime ?? '' }
+							: {}),
+					}
+				: {};
 		confirmBooking.mutate(
 			{
 				requestId: confirmMode.bookingRequestId,
-				data: { ...entryToUpsertInput(entry), ...(pendingDraft ?? {}) },
+				data: { ...entryToUpsertInput(entry), ...(pendingDraft ?? {}), ...lockedContent },
 			},
 			{ onSuccess: confirmMode.onConfirmed }
 		);
@@ -544,12 +628,41 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 	activeTimeDropdownFieldRef.current = activeTimeDropdownField;
 	const activePopupRef = useRef(activePopup);
 	activePopupRef.current = activePopup;
+	const popupCardRef = useRef<HTMLDivElement | null>(null);
+	const confirmFooterRef = useRef<HTMLButtonElement | null>(null);
+	const lockedDateIsoRef = useRef(lockedDateIso);
+	lockedDateIsoRef.current = lockedDateIso;
 	// Cumulative wheel delta while the popup is open; reset on every popup open.
 	const popupWheelAccumRef = useRef(0);
 	useEffect(() => {
 		const handleMouseDown = (event: MouseEvent) => {
 			const target = event.target as Node;
-			if (panelRef.current?.contains(target)) return;
+			if (panelRef.current?.contains(target)) {
+				// Inside the panel, clicking off the open popup card dismisses it.
+				// Interactive day cells keep their own toggle/move semantics
+				// (handleDayCellClick) — but in locked mode every cell except the
+				// locked date is inert, so those count as "off". The confirm footer
+				// must NOT pre-flush here — its click handler merges the pending
+				// draft into the confirm payload itself.
+				const cellEl =
+					target instanceof Element ? target.closest('[data-booking-date]') : null;
+				const cellOwnsClick =
+					cellEl != null &&
+					(lockedDateIsoRef.current == null ||
+						cellEl.getAttribute('data-booking-date') === lockedDateIsoRef.current);
+				if (
+					activePopupRef.current &&
+					!popupCardRef.current?.contains(target) &&
+					!confirmFooterRef.current?.contains(target) &&
+					!cellOwnsClick
+				) {
+					// Flush BEFORE the close — activeEntryRef nulls next render.
+					flushAutosaveRef.current();
+					setActivePopup(null);
+					setActiveTimeDropdownField(null);
+				}
+				return;
+			}
 			if (bannerRef.current?.contains(target)) return;
 			onCloseRef.current();
 		};
@@ -739,11 +852,17 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 		const panelHeight = panelRect.height / scale;
 
 		// Apple-style placement, like the dashboard: prefer right of the cell,
-		// flip left when there isn't room (the popup may overhang the panel edge).
-		const left =
+		// flip left when there isn't room (the popup may overhang the panel edge),
+		// then clamp so the card never leaves the viewport. Rects and innerWidth
+		// share viewport px under every zoom/transform mode; `scale` converts
+		// panel-local ↔ viewport.
+		const preferredLeft =
 			cellRight + POPUP_CELL_GAP_PX + POPUP_WIDTH_PX <= dropdownWidth + 60
 				? cellRight + POPUP_CELL_GAP_PX
 				: cellLeft - POPUP_WIDTH_PX - POPUP_CELL_GAP_PX;
+		const minLeft = (8 - panelRect.left) / scale;
+		const maxLeft = (window.innerWidth - 8 - panelRect.left) / scale - POPUP_WIDTH_PX;
+		const left = clamp(preferredLeft, minLeft, Math.max(maxLeft, minLeft));
 		const top = clamp(cellTop, 8, Math.max(panelHeight - POPUP_HEIGHT_PX - 8, 8));
 
 		setActiveTimeDropdownField(null);
@@ -761,6 +880,9 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 		// Commit any pending popup edits up front — every branch below closes,
 		// switches, or moves the popup, after which the debounced autosave no-ops.
 		flushAutosave();
+		// Locked confirm: the venue picked the date — only its cell stays
+		// interactive (popup toggle / re-place); every other day is inert.
+		if (lockedDateIso && iso !== lockedDateIso) return;
 		if (occupant && !isConversationEntry(occupant)) return; // one booking per day
 		if (occupant) {
 			if (activePopup?.dateIso === iso) {
@@ -771,7 +893,9 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 			}
 			return;
 		}
-		const sourceEntry = conversationEntryRef.current;
+		// Locked mode never moves a stray conversation match onto the venue's date —
+		// it places fresh authoritative event content instead (the else branch).
+		const sourceEntry = lockedDateIso ? null : conversationEntryRef.current;
 		const oldDate = lastOwnDateRef.current ?? sourceEntry?.date ?? null;
 		if (sourceEntry) {
 			// Move: keep all edited fields, change only the date; upsert first so a
@@ -826,14 +950,23 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 		endTime: editor.endTime,
 	});
 
+	// Authoritative locked times are the venue's facts, not user input — never
+	// flag them (an event can legitimately cross midnight, which the same-day
+	// check rejects). Editable times keep the normal validation.
 	const activeTimeRangeError =
-		draft != null ? getSameDayTimeRangeError(draft.startTime, draft.endTime) : null;
-	const visibleTimeRangeError = activeTimeRangeError ?? timeRangeError;
+		draft != null && !popupTimesLocked
+			? getSameDayTimeRangeError(draft.startTime, draft.endTime)
+			: null;
+	const visibleTimeRangeError = popupTimesLocked
+		? null
+		: (activeTimeRangeError ?? timeRangeError);
 	const hasTimeRangeError = visibleTimeRangeError != null;
 	const durationLabel = draft
 		? hasTimeRangeError
 			? 'Pick Valid Time'
-			: formatDurationLabel(draft.startTime, draft.endTime)
+			: formatDurationLabel(draft.startTime, draft.endTime, {
+					wrapMidnight: popupTimesLocked,
+				})
 		: 'Duration';
 
 	const selectTimeOption = (field: TimeDropdownField, option: TimeOption) => {
@@ -1060,11 +1193,17 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 		if (!activePopup || !entry || !draft) {
 			return null;
 		}
+		// Locked confirm: the venue set the what/when — title, business, and times
+		// render read-only and the entry can't be deleted, only confirmed. Notes
+		// and the location box stay editable (the artist's own annotations). An
+		// entry another request confirmed renders fully editable instead.
+		const isLocked = popupEntryLocked;
 
 		return (
 			<div
+				ref={popupCardRef}
 				role="dialog"
-				aria-label="Calendar event editor"
+				aria-label={isLocked ? 'Booking details' : 'Calendar event editor'}
 				style={{
 					position: 'absolute',
 					left: `${activePopup.left}px`,
@@ -1097,6 +1236,7 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 						aria-label="Person or thing"
 						placeholder="New Event"
 						value={draft.personName}
+						readOnly={isLocked}
 						onChange={(event) =>
 							scheduleAutosave({ ...draft, personName: event.target.value })
 						}
@@ -1115,6 +1255,7 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 						aria-label="Company"
 						placeholder="Add Business"
 						value={draft.company}
+						readOnly={isLocked}
 						onChange={(event) =>
 							scheduleAutosave({ ...draft, company: event.target.value })
 						}
@@ -1195,19 +1336,38 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 							boxSizing: 'border-box',
 						}}
 					>
-						{renderTimeSelector('startTime', 'Start time')}
-						<span
-							style={{
-								...popupTextStyle,
-								color: hasTimeRangeError ? '#FFFFFF' : '#000000',
-								fontSize: '16px',
-								fontWeight: 500,
-								lineHeight: '16px',
-							}}
-						>
-							-
-						</span>
-						{renderTimeSelector('endTime', 'End time')}
+						{popupTimesLocked ? (
+							<span
+								aria-label="Event time"
+								style={{
+									...popupTextStyle,
+									color: '#000000',
+									fontSize: '16px',
+									fontWeight: 500,
+									lineHeight: '16px',
+									padding: '0 3px',
+									whiteSpace: 'nowrap',
+								}}
+							>
+								{draft.startTime} - {draft.endTime}
+							</span>
+						) : (
+							<>
+								{renderTimeSelector('startTime', 'Start time')}
+								<span
+									style={{
+										...popupTextStyle,
+										color: hasTimeRangeError ? '#FFFFFF' : '#000000',
+										fontSize: '16px',
+										fontWeight: 500,
+										lineHeight: '16px',
+									}}
+								>
+									-
+								</span>
+								{renderTimeSelector('endTime', 'End time')}
+							</>
+						)}
 					</div>
 					<div
 						aria-live="polite"
@@ -1282,29 +1442,31 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 					}}
 				/>
 
-				<button
-					type="button"
-					onClick={handleDeleteBooking}
-					aria-label="Delete booking"
-					style={{
-						position: 'absolute',
-						right: '9.5px',
-						bottom: '10px',
-						height: '22px',
-						padding: '0 14px',
-						borderRadius: '11px',
-						border: '1.076px solid #FFFFFF',
-						background: 'rgba(255, 255, 255, 0.16)',
-						color: '#FFFFFF',
-						fontFamily: FONT_FAMILY,
-						fontSize: '12px',
-						fontWeight: 600,
-						lineHeight: '20px',
-						cursor: 'pointer',
-					}}
-				>
-					Delete
-				</button>
+				{!isLocked && (
+					<button
+						type="button"
+						onClick={handleDeleteBooking}
+						aria-label="Delete booking"
+						style={{
+							position: 'absolute',
+							right: '9.5px',
+							bottom: '10px',
+							height: '22px',
+							padding: '0 14px',
+							borderRadius: '11px',
+							border: '1.076px solid #FFFFFF',
+							background: 'rgba(255, 255, 255, 0.16)',
+							color: '#FFFFFF',
+							fontFamily: FONT_FAMILY,
+							fontSize: '12px',
+							fontWeight: 600,
+							lineHeight: '20px',
+							cursor: 'pointer',
+						}}
+					>
+						Delete
+					</button>
+				)}
 			</div>
 		);
 	};
@@ -1326,6 +1488,9 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 		const occupant = entriesByDate.get(iso);
 		const isOwn = occupant != null && isConversationEntry(occupant);
 		const isOtherBooking = occupant != null && !isOwn;
+		// Locked confirm: every cell off the venue's date is inert — match the
+		// affordances (cursor, aria) to what handleDayCellClick actually does.
+		const isInert = isOtherBooking || (lockedDateIso != null && iso !== lockedDateIso);
 		const isPopupCell = isOwn && activePopup?.dateIso === iso;
 		const showBookingCard = occupant != null;
 		const isHighlighted = isToday && !showBookingCard;
@@ -1356,7 +1521,7 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 				type="button"
 				data-booking-date={iso}
 				aria-label={`${isOwn ? 'Edit booking for' : 'Book'} ${formatCalendarDate(date)}`}
-				aria-disabled={isOtherBooking}
+				aria-disabled={isInert}
 				onClick={(event) => handleDayCellClick(event, date)}
 				style={{
 					width: '100%',
@@ -1368,7 +1533,7 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 					boxSizing: 'border-box',
 					position: 'relative',
 					padding: 0,
-					cursor: isOtherBooking ? 'default' : 'pointer',
+					cursor: isInert ? 'default' : 'pointer',
 					font: 'inherit',
 					appearance: 'none',
 					WebkitAppearance: 'none',
@@ -1616,27 +1781,33 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 			</div>
 			{confirmMode && (
 				<button
+					ref={confirmFooterRef}
 					type="button"
 					onClick={handleConfirmBooking}
-					disabled={!conversationEntry || confirmBooking.isPending}
+					disabled={!confirmTargetEntry || confirmBooking.isPending}
+					className="booking-confirm-gradient-button"
 					style={{
 						width: '100%',
 						height: '30px',
 						marginTop: '10px',
 						borderRadius: '8px',
 						border: '2px solid #000000',
-						background: '#B7FFC5',
 						fontFamily: 'Inter, sans-serif',
 						fontSize: '13px',
 						fontWeight: 700,
 						color: '#000000',
-						cursor: !conversationEntry || confirmBooking.isPending ? 'default' : 'pointer',
-						opacity: !conversationEntry || confirmBooking.isPending ? 0.5 : 1,
+						cursor:
+							!confirmTargetEntry || confirmBooking.isPending ? 'default' : 'pointer',
+						opacity: !confirmTargetEntry || confirmBooking.isPending ? 0.5 : 1,
 					}}
 				>
-					{conversationEntry
-						? `Confirm booking — ${formatCalendarDate(parseIsoKey(conversationEntry.date))}`
-						: 'Pick a date to confirm'}
+					{lockedDateIso
+						? lockedOccupant && !lockedOwnEntry
+							? `${formatCalendarDate(parseIsoKey(lockedDateIso))} is unavailable`
+							: `Confirm booking — ${formatCalendarDate(parseIsoKey(lockedDateIso))}`
+						: confirmTargetEntry
+							? `Confirm booking — ${formatCalendarDate(parseIsoKey(confirmTargetEntry.date))}`
+							: 'Pick a date to confirm'}
 				</button>
 			)}
 			{renderEventPopup()}

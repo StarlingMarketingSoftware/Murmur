@@ -44,6 +44,9 @@ export type GetCalendarEntryData = {
 	drivingDuration: string | null;
 	campaignId: number | null;
 	contactId: number | null;
+	// Which booking request confirmed this entry (null = not booking-claimed) —
+	// lets the inbox confirm flow leave another request's entry alone.
+	bookingRequestId: number | null;
 	updatedAt: string;
 };
 export type GetCalendarEntriesData = { entries: GetCalendarEntryData[] };
@@ -64,6 +67,7 @@ const serializeCalendarEntry = (entry: CalendarEntry): GetCalendarEntryData => (
 	drivingDuration: entry.drivingDuration,
 	campaignId: entry.campaignId,
 	contactId: entry.contactId,
+	bookingRequestId: entry.bookingRequestId,
 	updatedAt: entry.updatedAt.toISOString(),
 });
 

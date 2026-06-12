@@ -925,6 +925,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		// Date the confirm-chip click provisionally placed (so closing without
 		// confirming can take it back); null when nothing was auto-placed.
 		provisionalDateIso: string | null;
+		// Event-backed confirm: the venue picked this date, so the dropdown locks
+		// the booking to it (no moves/edits — the artist just confirms).
+		lockedDateIso: string | null;
 	} | null>(null);
 	const bookingRequestBannerRef = useRef<HTMLDivElement | null>(null);
 
@@ -1358,31 +1361,57 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		});
 	}, [selectedConversationKey]);
 
+	// A pending event-backed request carries the gig's own location — prefer it as
+	// a coherent triple (address + pin together) over the contact's; a missing pin
+	// with an address present still geocodes in the dropdown.
+	const bookingEventLocation =
+		selectedPendingBookingRequest &&
+		(selectedPendingBookingRequest.eventAddress ||
+			(selectedPendingBookingRequest.eventLatitude != null &&
+				selectedPendingBookingRequest.eventLongitude != null))
+			? {
+					address: selectedPendingBookingRequest.eventAddress ?? '',
+					latitude: selectedPendingBookingRequest.eventLatitude,
+					longitude: selectedPendingBookingRequest.eventLongitude,
+				}
+			: null;
 	const bookingPrefillFields: BookingPrefillFields = {
-		personName: selectedConversationLatestInbound
-			? getCanonicalContactName(selectedConversationLatestInbound, contactByEmail)
-			: '',
-		company: selectedConversationLatestInbound
-			? getContactCompanyLabel(selectedConversationLatestInbound, contactByEmail) || ''
-			: '',
-		address: [
-			selectedConversationContact?.address,
-			selectedConversationContact?.city,
-			selectedConversationContact?.state,
-		]
-			.filter(
-				(part): part is string => typeof part === 'string' && part.trim().length > 0
-			)
-			.map((part) => part.trim())
-			.join(', '),
-		latitude:
-			typeof selectedConversationContact?.latitude === 'number'
+		personName:
+			(selectedConversationLatestInbound
+				? getCanonicalContactName(selectedConversationLatestInbound, contactByEmail)
+				: '') ||
+			selectedPendingBookingRequest?.eventName ||
+			'',
+		company:
+			selectedPendingBookingRequest?.venueName ||
+			(selectedConversationLatestInbound
+				? getContactCompanyLabel(selectedConversationLatestInbound, contactByEmail) || ''
+				: ''),
+		address: bookingEventLocation
+			? bookingEventLocation.address
+			: [
+					selectedConversationContact?.address,
+					selectedConversationContact?.city,
+					selectedConversationContact?.state,
+				]
+					.filter(
+						(part): part is string => typeof part === 'string' && part.trim().length > 0
+					)
+					.map((part) => part.trim())
+					.join(', '),
+		latitude: bookingEventLocation
+			? bookingEventLocation.latitude
+			: typeof selectedConversationContact?.latitude === 'number'
 				? selectedConversationContact.latitude
 				: null,
-		longitude:
-			typeof selectedConversationContact?.longitude === 'number'
+		longitude: bookingEventLocation
+			? bookingEventLocation.longitude
+			: typeof selectedConversationContact?.longitude === 'number'
 				? selectedConversationContact.longitude
 				: null,
+		startTime: selectedPendingBookingRequest?.eventStartTimeLabel ?? null,
+		endTime: selectedPendingBookingRequest?.eventEndTimeLabel ?? null,
+		notes: selectedPendingBookingRequest?.bookingNotes ?? null,
 		// When the contact can't be resolved the booking still saves, but the
 		// banner can't re-derive its "booked" state afterwards (rare; accepted).
 		contactId: selectedConversationContactId,
@@ -1392,9 +1421,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		date: dateIso,
 		personName: bookingPrefillFields.personName,
 		company: bookingPrefillFields.company,
-		startTime: DEFAULT_START_TIME,
-		endTime: DEFAULT_END_TIME,
-		notes: '',
+		startTime: bookingPrefillFields.startTime ?? DEFAULT_START_TIME,
+		endTime: bookingPrefillFields.endTime ?? DEFAULT_END_TIME,
+		notes: bookingPrefillFields.notes ?? '',
 		address: bookingPrefillFields.address,
 		placeId: null,
 		latitude: bookingPrefillFields.latitude,
@@ -1445,6 +1474,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 			mode: 'plain',
 			bookingRequestId: null,
 			provisionalDateIso: null,
+			lockedDateIso: null,
 		});
 	};
 
@@ -1463,6 +1493,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 			mode: 'plain',
 			bookingRequestId: null,
 			provisionalDateIso: null,
+			lockedDateIso: null,
 		});
 	};
 
@@ -1504,6 +1535,50 @@ export const InboxSection: FC<InboxSectionProps> = ({
 			occupant.campaignId === campaignId &&
 			occupant.contactId === selectedConversationContactId
 		) {
+			// Adopted entry: refresh the venue-owned fields (an earlier session may
+			// have left stale default times / empty notes) — but never an entry that
+			// another booking request confirmed, never the artist's own annotations
+			// (notes/location), and never as a no-op write (an unconditional PATCH
+			// here can revive a row whose take-back DELETE is still in flight).
+			if (
+				occupant.bookingRequestId == null ||
+				occupant.bookingRequestId === selectedPendingBookingRequest.id
+			) {
+				const authoritative = buildPrefilledBookingInput(occupant.date);
+				const refreshInput = {
+					...authoritative,
+					// Times are artist-owned when the event set none — preserve them.
+					...(bookingPrefillFields.startTime == null ||
+					bookingPrefillFields.endTime == null
+						? {
+								startTime: occupant.startTime || authoritative.startTime,
+								endTime: occupant.endTime || authoritative.endTime,
+							}
+						: {}),
+					notes: occupant.notes.trim() ? occupant.notes : authoritative.notes,
+					...(occupant.address.trim() || occupant.latitude != null
+						? {
+								address: occupant.address,
+								placeId: occupant.placeId,
+								latitude: occupant.latitude,
+								longitude: occupant.longitude,
+								drivingDuration: occupant.drivingDuration,
+							}
+						: {}),
+				};
+				const needsRefresh =
+					refreshInput.personName !== occupant.personName ||
+					refreshInput.company !== occupant.company ||
+					refreshInput.startTime !== occupant.startTime ||
+					refreshInput.endTime !== occupant.endTime ||
+					refreshInput.notes !== occupant.notes ||
+					refreshInput.address !== occupant.address ||
+					refreshInput.latitude !== occupant.latitude ||
+					refreshInput.longitude !== occupant.longitude;
+				if (needsRefresh) {
+					upsertCalendarEntry.mutate(refreshInput);
+				}
+			}
 			placed = true;
 		}
 		setBookingDropdown({
@@ -1513,6 +1588,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 			mode: 'confirm',
 			bookingRequestId: selectedPendingBookingRequest.id,
 			provisionalDateIso,
+			lockedDateIso: requestedIso,
 		});
 	};
 
@@ -3046,6 +3122,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						bookingDropdown.mode === 'confirm' && bookingDropdown.bookingRequestId != null
 							? {
 									bookingRequestId: bookingDropdown.bookingRequestId,
+									lockedDateIso: bookingDropdown.lockedDateIso,
 									onConfirmed: () => closeBookingDropdown({ confirmed: true }),
 								}
 							: undefined

@@ -723,3 +723,23 @@ model ApplicationVideoRating {
   @@index([userId, applicationId])
   @@index([userId, standardUserId])
 }
+
+// Cached intelligent match score: how relevant one submitted application is to
+// its event + venue context. STRICTLY ADDITIVE: scalar ids, no FK relations
+// (ApplicationVideoRating pattern). One row per application — re-apply upserts
+// the EventApplication snapshot, which changes inputHash and lazily recomputes
+// on the next venue read. Fallback (non-LLM) scores are never persisted.
+model ApplicationMatchScore {
+  id            Int      @id @default(autoincrement())
+  applicationId Int      @unique // EventApplication.id; intentionally no FK
+  eventId       Int // Event.id, denormalized for per-event reads/invalidation
+  venueUserId   String // venue owner clerkId, denormalized (EventApplication parity)
+  score         Int // final displayed percent, 0-100
+  breakdown     Json // { version, method, components, weights, caps, inferredGenre, rationale }
+  inputHash     String // sha256 over canonical scoring inputs + SCORER_VERSION
+  scorerVersion Int // mirrors the version baked into inputHash (analytics/cleanup)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([eventId])
+}
