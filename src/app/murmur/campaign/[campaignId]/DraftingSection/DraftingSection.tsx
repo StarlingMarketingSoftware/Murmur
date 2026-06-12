@@ -2193,6 +2193,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		renderGlobalOverlays &&
 		isSendingUiVisible;
 
+	// A truly empty campaign inbox (no replies AND nothing sent) bounces to Write so
+	// the user can get messages out first. Mid-send the counts are transiently 0 —
+	// don't bounce out with a wrong toast.
+	const handleCampaignInboxEmpty = useCallback(() => {
+		if (sendingSession.status !== 'idle') return;
+		toast('Send out messages first — replies will show up here.', {
+			id: 'campaign-empty-tab-redirect',
+		});
+		goToWriting?.();
+	}, [sendingSession.status, goToWriting]);
+
 	// Drafts review stays open whenever at least one (batch-scoped) draft exists.
 	useEffect(() => {
 		if (contentView !== 'drafting') return;
@@ -8451,7 +8462,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											inboxSentTabRequest={effectiveInboxSentTabRequest}
 											onInboxSentTabChange={onInboxSentTabChange}
 											onCampaignInboxEmpty={
-												inboxMockOverrideActive ? undefined : goToOverview
+												inboxMockOverrideActive || !renderGlobalOverlays
+													? undefined
+													: handleCampaignInboxEmpty
 											}
 											selectedEmailId={selectedInboxEmailId}
 											onSelectedEmailIdChange={setSelectedInboxEmailId}
@@ -8547,7 +8560,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													inboxSentTabRequest={effectiveInboxSentTabRequest}
 													onInboxSentTabChange={onInboxSentTabChange}
 													onCampaignInboxEmpty={
-														inboxMockOverrideActive ? undefined : goToOverview
+														inboxMockOverrideActive || !renderGlobalOverlays
+															? undefined
+															: handleCampaignInboxEmpty
 													}
 													selectedEmailId={selectedInboxEmailId}
 													onSelectedEmailIdChange={setSelectedInboxEmailId}
@@ -8594,7 +8609,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												inboxSentTabRequest={effectiveInboxSentTabRequest}
 												onInboxSentTabChange={onInboxSentTabChange}
 												onCampaignInboxEmpty={
-													inboxMockOverrideActive ? undefined : goToOverview
+													inboxMockOverrideActive || !renderGlobalOverlays
+														? undefined
+														: handleCampaignInboxEmpty
 												}
 												selectedEmailId={selectedInboxEmailId}
 												onSelectedEmailIdChange={setSelectedInboxEmailId}

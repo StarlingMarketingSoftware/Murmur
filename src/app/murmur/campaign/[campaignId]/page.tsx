@@ -56,6 +56,7 @@ import { CampaignsTable } from '@/components/organisms/_tables/CampaignsTable/Ca
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import { useEditCampaign, useGetCampaignContacts } from '@/hooks/queryHooks/useCampaigns';
 import { EMAIL_QUERY_KEYS, useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { toast } from 'sonner';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useCreateIdentity, useGetIdentities } from '@/hooks/queryHooks/useIdentities';
 import { EmailStatus } from '@/constants/prismaEnums';
@@ -2921,6 +2922,9 @@ const Murmur = () => {
 				]);
 				if (cachedEmails && !cachedEmails.some((e) => e.status === EmailStatus.draft)) {
 					newView = 'testing';
+					toast('No drafts yet — write your messages first.', {
+						id: 'campaign-empty-tab-redirect',
+					});
 				}
 			}
 			// Dedupe against the *latest requested* view (not just the last committed render) so
@@ -2936,6 +2940,31 @@ const Murmur = () => {
 			if (maxWaitTimeoutRef.current) {
 				clearTimeout(maxWaitTimeoutRef.current);
 				maxWaitTimeoutRef.current = null;
+			}
+
+			// While a crossfade is staged but the destination hasn't been revealed yet (the
+			// previous view still covers it at full opacity), retarget the hidden destination
+			// instead of staging a second crossfade from a half-painted view (the empty-tab
+			// redirects land here when their data resolves mid-transition).
+			if (isTransitioning && previousView && !isFadingOutPreviousView) {
+				if (newView === previousView) {
+					// Round trip back to the still-visible origin — cancel outright; nothing moves.
+					setPreviousView(null);
+					setIsTransitioning(false);
+					setActiveViewInternal(newView);
+					return;
+				}
+				setActiveViewInternal(newView);
+				maxWaitTimeoutRef.current = setTimeout(() => {
+					if (isMobile === true) {
+						setPreviousView(null);
+						setIsTransitioning(false);
+						setIsFadingOutPreviousView(false);
+						return;
+					}
+					setIsFadingOutPreviousView(true);
+				}, MAX_TRANSITION_WAIT_MS);
+				return;
 			}
 
 			// If the user clicks back to the currently committed view while a different view was pending,
@@ -2977,6 +3006,9 @@ const Murmur = () => {
 			sendingSession.status,
 			queryClient,
 			routeCampaignId,
+			isTransitioning,
+			previousView,
+			isFadingOutPreviousView,
 		]
 	);
 
@@ -3158,13 +3190,21 @@ const Murmur = () => {
 		if (headerEmails === undefined) return;
 		if (headerDraftCount > 0) return;
 		if (draftOperationsProgress.visible) return;
-		if (sendingSession.status === 'sending') return;
+		if (sendingSession.status !== 'idle') return;
+		// After a send drains the drafts the bounce itself is expected — only toast
+		// when nothing has been written yet.
+		if (headerSentCount === 0) {
+			toast('No drafts yet — write your messages first.', {
+				id: 'campaign-empty-tab-redirect',
+			});
+		}
 		setActiveView('testing');
 	}, [
 		isMobile,
 		activeView,
 		headerEmails,
 		headerDraftCount,
+		headerSentCount,
 		draftOperationsProgress.visible,
 		sendingSession.status,
 		setActiveView,
