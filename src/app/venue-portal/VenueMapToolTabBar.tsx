@@ -4,14 +4,18 @@ import { VenuePortalAddIcon } from '@/components/atoms/_svg/VenuePortalAddIcon';
 import { VenuePortalChatIcon } from '@/components/atoms/_svg/VenuePortalChatIcon';
 import { VenuePortalEventsIcon } from '@/components/atoms/_svg/VenuePortalEventsIcon';
 import { VenuePortalProfileIcon } from '@/components/atoms/_svg/VenuePortalProfileIcon';
-import { VENUE_MAP_OVERLAY_SCALE } from './constants';
+import {
+	VENUE_MAP_PANEL_NATIVE_W_PX,
+	VENUE_MAP_TAB_BAR_NATIVE_W_PX,
+} from './constants';
+import type { VenuePortalFrame } from './useVenuePortalLayout';
 
-// Tab-bar geometry from the Figma mock (native px, rendered at the shared overlay
+// Tab-bar geometry from the Figma mock (native px, rendered at the frame's
 // scale like the panels below it). The bar keeps one position and widens to the
 // 781px panels' outer width for every tab except Create; the segment row stays
 // anchored in the leftmost 461px so the tabs never move.
-const BAR_W = 461;
-const BAR_CHAT_W = 781;
+const BAR_W = VENUE_MAP_TAB_BAR_NATIVE_W_PX;
+const BAR_CHAT_W = VENUE_MAP_PANEL_NATIVE_W_PX;
 const BAR_BORDER_W = 1.212;
 const SEGMENT_ROW_W = BAR_W - BAR_BORDER_W * 2;
 
@@ -25,17 +29,24 @@ const SEGMENT_ACTIVE_BG: Record<VenueMapTool, string> = {
 };
 
 // Horizontal Create/Chat/Events/Profile bar shown above the open tool panel; it
-// replaces the floating pill stack whenever a tool is selected. Sits just above
-// the panels' shared top-[122px] edge (85 + 36 × 0.8 ≈ 114 leaves an ~8px gap),
-// its bottom roughly flush with the header card's bottom like the Figma mock.
+// replaces the floating pill stack whenever a tool is selected. The frame comes
+// from useVenuePortalLayout: just above the panels' top edge at the wider tiers,
+// pinned to the viewport's top-left corner at the compact tier — where it also
+// renders with no tool selected (the pill stack doesn't exist there), so
+// selectedTool is nullable. At compact the bar never takes the 781 panel-match
+// width (it wouldn't fit, and it's standalone chrome there).
 export function VenueMapToolTabBar({
 	selectedTool,
 	onToolSelect,
 	unreadCount,
+	frame,
+	compact,
 }: {
-	selectedTool: VenueMapTool;
+	selectedTool: VenueMapTool | null;
 	onToolSelect: (tool: VenueMapTool) => void;
 	unreadCount: number;
+	frame: VenuePortalFrame;
+	compact: boolean;
 }) {
 	const segmentClassName =
 		'flex h-[34px] w-[105px] cursor-pointer items-center justify-center gap-[8px]';
@@ -45,10 +56,14 @@ export function VenueMapToolTabBar({
 	return (
 		<div
 			data-venue-tool-ui="true"
-			className="fixed left-[500px] top-[85px] z-[99] h-[36px] origin-top-left overflow-hidden rounded-[7.272px] border-[1.212px] border-black bg-white"
+			className="fixed z-[99] h-[36px] origin-top-left overflow-hidden rounded-[7.272px] border-[1.212px] border-black bg-white"
 			style={{
-				width: selectedTool === 'add' ? BAR_W : BAR_CHAT_W,
-				transform: `scale(${VENUE_MAP_OVERLAY_SCALE})`,
+				left: frame.left,
+				top: frame.top,
+				width: compact || selectedTool === 'add' || selectedTool === null
+					? BAR_W
+					: BAR_CHAT_W,
+				transform: `scale(${frame.scale})`,
 			}}
 		>
 			<div

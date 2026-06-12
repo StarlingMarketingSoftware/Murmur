@@ -11,7 +11,6 @@ import type { ConversationListItem } from '@/types';
 import { OutlinedInitialAvatar } from '@/components/atoms/OutlinedInitialAvatar/OutlinedInitialAvatar';
 import { ProfileAreaMarkerIcon } from '@/components/atoms/_svg/ProfileAreaMarkerIcon';
 import { getProfileGenreIcon } from '@/components/molecules/HybridPromptInput/profileFieldIcons';
-import { VENUE_MAP_OVERLAY_SCALE } from './constants';
 import {
 	EVENT_PILL_COLORS,
 	isReplyRowEventLive,
@@ -19,6 +18,7 @@ import {
 	useVenueChatInbox,
 	type ReplyGroup,
 } from './useVenueChatInbox';
+import type { VenuePortalFrame } from './useVenuePortalLayout';
 
 function SectionNotice({ children }: { children: ReactNode }) {
 	return (
@@ -217,6 +217,7 @@ function ThreadListCard({
 export function VenueChatMapPanel({
 	initialThread,
 	onThreadOpened,
+	frame,
 }: {
 	// Deep link from the notifications panel: open straight onto this thread. Read
 	// once at mount — the parent remounts the panel (via key) per deep link.
@@ -224,7 +225,9 @@ export function VenueChatMapPanel({
 	// Reports user-initiated thread opens so the parent can dock them as the
 	// last-active thread. Not fired for initialThread — the parent set that itself.
 	onThreadOpened?: (conversationId: number, thread: ConversationThreadFilter) => void;
-} = {}) {
+	// Viewport anchor + scale from useVenuePortalLayout's responsive cascade.
+	frame: VenuePortalFrame;
+}) {
 	const [activeSection, setActiveSection] = useState<'replies' | 'inbound'>(
 		initialThread?.thread === 'general' ? 'inbound' : 'replies'
 	);
@@ -362,12 +365,16 @@ export function VenueChatMapPanel({
 		}`;
 
 	return (
-		// Left-aligned with the tool tab bar above it; shares the panels' top-[122px]
-		// edge so the create/chat/events/profile boxes all open flush with each other.
+		// Left-aligned with the tool tab bar above it; shares the panels' frame so
+		// the create/chat/events/profile boxes all open flush with each other.
 		<div
 			data-venue-tool-ui="true"
-			className="fixed left-[500px] top-[122px] z-[99] h-[829px] w-[781px] origin-top-left rounded-[10px] border-[2px] border-black/40 bg-white/15"
-			style={{ transform: `scale(${VENUE_MAP_OVERLAY_SCALE})` }}
+			className="fixed z-[99] h-[829px] w-[781px] origin-top-left rounded-[10px] border-[2px] border-black/40 bg-white/15"
+			style={{
+				left: frame.left,
+				top: frame.top,
+				transform: `scale(${frame.scale})`,
+			}}
 		>
 			<div className="absolute left-[12px] top-[4px] font-inter text-[12.358px] font-medium leading-[16.477px] text-black">
 				Chat

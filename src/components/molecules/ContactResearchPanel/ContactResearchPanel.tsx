@@ -817,7 +817,7 @@ const ResearchMetadataNotesArea: FC<{
 					>
 						<div
 							ref={textRef}
-							className="whitespace-pre-wrap break-words"
+							className="murmur-selectable whitespace-pre-wrap break-words"
 							style={{
 								color: '#000',
 								fontFamily: 'Inter',

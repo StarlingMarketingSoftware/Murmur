@@ -1,6 +1,14 @@
 'use client';
 
-import { FC, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+	FC,
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
@@ -49,7 +57,15 @@ import {
 	type InboxConversation,
 	type InboxConversationMessage,
 } from '@/utils/inboxConversations';
-import { useGetMyEventApplications } from '@/hooks/queryHooks/useEventApplications';
+import {
+	useGetMyEventApplications,
+	type MyEventApplication,
+} from '@/hooks/queryHooks/useEventApplications';
+import {
+	deriveEventChatStatus,
+	formatEventDateLabel,
+} from '@/utils/eventChatStatus';
+import { EventChatStatusPill } from '@/components/molecules/EventChatCard/EventChatCard';
 import {
 	InboxRichReplyEditor,
 	isRichTextMessageEmpty,
@@ -160,6 +176,13 @@ interface InboxSectionProps {
 	 * Used to temporarily display the research panel for the hovered contact.
 	 */
 	onContactHover?: (contact: ContactWithName | null) => void;
+
+	/**
+	 * Optional callback when hovering an event-chat row (a conversation tied to
+	 * an event application). Replaces the research panel with the opportunity
+	 * panel for these rows.
+	 */
+	onEventChatHover?: (application: MyEventApplication | null) => void;
 
 	/**
 	 * When true, renders the inbox in a narrower layout (516px wide).
@@ -791,6 +814,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	onGoToSearch,
 	onContactSelect,
 	onContactHover,
+	onEventChatHover,
 	isNarrow = false,
 	sampleData,
 	desktopWidth,
@@ -949,6 +973,24 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	const { data: myApplications } = useGetMyEventApplications({
 		enabled: !isUsingSampleData,
 	});
+	// Event-chat rows resolve their application (live status, event metadata) by
+	// thread-application id. One Date.now() frame per render keeps every row's
+	// derived status consistent (venue-panel convention).
+	const nowMs = Date.now();
+	const applicationById = useMemo(
+		() =>
+			new Map((myApplications ?? []).map((application) => [application.id, application])),
+		[myApplications]
+	);
+	const getRowEventChat = (email: {
+		venueThreadApplicationId?: number | null;
+	}): { application: MyEventApplication; state: ReturnType<typeof deriveEventChatStatus> } | null => {
+		const threadApplicationId = email.venueThreadApplicationId;
+		if (threadApplicationId == null) return null;
+		const application = applicationById.get(threadApplicationId);
+		if (!application) return null;
+		return { application, state: deriveEventChatStatus(application, nowMs) };
+	};
 	const inboundEmails = isUsingSampleData
 		? (sampleData?.inboundEmails ?? [])
 		: inboundEmailsFromApi;
@@ -1239,6 +1281,10 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	// Mailgun fallback would email the venue contact's placeholder address.
 	const selectedIsApplicationRow =
 		selectedEmail != null && isApplicationSentRow(selectedEmail);
+	// Canceled events (venue deleted them) are read-only: the composer hides and
+	// handleSendReply hard-blocks. Closed chats stay messageable.
+	const selectedEventChat = selectedEmail ? getRowEventChat(selectedEmail) : null;
+	const selectedThreadCanMessage = selectedEventChat?.state.canMessage ?? true;
 	// Viewing a venue conversation marks its thread read (application threads have
 	// their own watermark; the general thread uses the conversation's) so the
 	// opportunities "venue responded" dot and unread counts clear. Delayed a beat:
@@ -1657,6 +1703,45 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					email,
 					selectionEmail: email,
 				}));
+	// Past/live partition: closed/canceled event chats sit above the fold of the
+	// main list and reveal only by scrolling up (venue portal's ledger pattern).
+	const pastEmailRows: typeof visibleEmailRows = [];
+	const liveEmailRows: typeof visibleEmailRows = [];
+	for (const row of visibleEmailRows) {
+		(getRowEventChat(row.email)?.state.isAboveFold ? pastEmailRows : liveEmailRows).push(
+			row
+		);
+	}
+	const pastEmailRowsKey = pastEmailRows.map((row) => row.key).join(',');
+	// Pin the list's initial scroll to the live section (past band hides above).
+	// Re-pins when the list view (re)mounts, the tab flips, or a NEW past key
+	// appears mid-session — not on removals. Layout effect so the first paint is
+	// already pinned.
+	const mainListScrollerRef = useRef<HTMLDivElement | null>(null);
+	const mainListLiveSectionRef = useRef<HTMLDivElement | null>(null);
+	const seenPastMainRowKeysRef = useRef<Set<string> | null>(null);
+	const seenPastMainTabRef = useRef<'inbox' | 'sent' | null>(null);
+	const isEmailListViewVisible = !selectedEmail && !detailOnly;
+	useLayoutEffect(() => {
+		if (!isEmailListViewVisible) {
+			seenPastMainRowKeysRef.current = null;
+			seenPastMainTabRef.current = null;
+			return;
+		}
+		const scroller = mainListScrollerRef.current;
+		const liveSection = mainListLiveSectionRef.current;
+		if (!scroller || !liveSection) return;
+		if (seenPastMainTabRef.current !== activeTab) {
+			seenPastMainTabRef.current = activeTab;
+			seenPastMainRowKeysRef.current = null;
+		}
+		const previous = seenPastMainRowKeysRef.current;
+		const nextKeys = pastEmailRowsKey === '' ? [] : pastEmailRowsKey.split(',');
+		seenPastMainRowKeysRef.current = new Set(nextKeys);
+		if (previous && nextKeys.every((key) => previous.has(key))) return;
+		// offsetTop is scroller-relative, so it equals the past band's height.
+		scroller.scrollTop = liveSection.offsetTop;
+	}, [isEmailListViewVisible, activeTab, pastEmailRowsKey]);
 	const shouldUseDetailChrome = Boolean(selectedEmail) || detailOnly;
 	const selectedSenderKey = selectedEmail?.sender?.toLowerCase().trim();
 	const selectedConversationLatestMessageIsSent = Boolean(
@@ -1759,6 +1844,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		if (!selectedEmail || isRichTextMessageEmpty(messageToSend)) return;
 		// Application rows have no reply channel (see selectedIsApplicationRow).
 		if (isApplicationSentRow(selectedEmail)) return;
+		// Canceled event threads are read-only (see selectedThreadCanMessage).
+		if (!selectedThreadCanMessage) return;
 
 		const replyKey = selectedConversationReplyKey ?? selectedEmail.id.toString();
 		const senderKey = selectedEmail.sender?.toLowerCase().trim();
@@ -3139,6 +3226,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 				trackColor="transparent"
 				offsetRight={scrollbarOffsetRight}
 				alignTrackToScrollContainer={scrollbarAlignTrackToScrollContainer}
+				scrollContainerRef={mainListScrollerRef}
 				disableOverflowClass
 				style={{
 					width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
@@ -3906,6 +3994,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 													style={{ flexShrink: 0 }}
 												>
 													<div
+														className="murmur-selectable"
 														style={{
 															maxWidth: '62%',
 															backgroundColor: INBOX_MESSENGER_OUTBOUND_BACKGROUND,
@@ -3967,6 +4056,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 													</span>
 												</div>
 												<div
+													className="murmur-selectable"
 													style={{
 														marginTop: '8px',
 														paddingLeft: '37px',
@@ -3982,7 +4072,30 @@ export const InboxSection: FC<InboxSectionProps> = ({
 								</CustomScrollbar>
 							</div>
 
-							{selectedEmail && !selectedIsApplicationRow && (
+							{selectedEmail && !selectedIsApplicationRow && !selectedThreadCanMessage && (
+								<div
+									style={{
+										position: 'absolute',
+										top: `${campaignInboxDetailComposerTop}px`,
+										left: '50%',
+										transform: 'translateX(-50%)',
+										width: `${campaignInboxDetailInnerWidth}px`,
+										boxSizing: 'border-box',
+										zIndex: 2,
+										textAlign: 'center',
+										fontFamily: 'Inter, sans-serif',
+										fontSize: '13px',
+										color: '#000000',
+										padding: '10px 12px',
+										borderRadius: '6.877px',
+										border: '1.719px solid #000000',
+										backgroundColor: '#D9D9D9',
+									}}
+								>
+									This event was canceled by the venue — messaging is closed.
+								</div>
+							)}
+							{selectedEmail && !selectedIsApplicationRow && selectedThreadCanMessage && (
 								<InboxRichReplyEditor
 									value={replyMessage}
 									onChange={setReplyMessage}
@@ -4352,10 +4465,10 @@ export const InboxSection: FC<InboxSectionProps> = ({
 															dangerouslySetInnerHTML={{
 																__html: stripQuotedReplyHtml(message.bodyHtml),
 															}}
-															className="prose prose-sm max-w-none"
+															className="murmur-selectable prose prose-sm max-w-none"
 														/>
 													) : (
-														<div className="whitespace-pre-wrap">
+														<div className="murmur-selectable whitespace-pre-wrap">
 															{stripQuotedReply(
 																message.strippedText || message.bodyPlain || ''
 															) || 'No content'}
@@ -4379,6 +4492,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 													style={{ flexShrink: 0 }}
 												>
 													<div
+														className="murmur-selectable"
 														style={{
 															maxWidth: isMobile ? '78%' : '62%',
 															backgroundColor: INBOX_MESSENGER_OUTBOUND_BACKGROUND,
@@ -4429,7 +4543,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 													<span className="text-xs text-gray-500">You</span>
 												</div>
 												<div
-													className="text-sm"
+													className="murmur-selectable text-sm"
 													dangerouslySetInnerHTML={{ __html: reply.message }}
 												/>
 											</div>
@@ -4438,7 +4552,34 @@ export const InboxSection: FC<InboxSectionProps> = ({
 								</CustomScrollbar>
 
 								{/* Reply Box - fixed at bottom */}
-								{selectedEmail && !selectedIsApplicationRow && (
+								{selectedEmail && !selectedIsApplicationRow && !selectedThreadCanMessage && (
+									<div
+										className="w-full flex justify-center"
+										style={{
+											marginTop: isMobile ? '14px' : '18px',
+											paddingBottom: isMobile ? '6px' : '10px',
+											flexShrink: 0,
+										}}
+									>
+										<div
+											className="flex items-center justify-center text-center"
+											style={{
+												width: isMobile ? mobileEmailBodyWidth : `${emailBodyWidth}px`,
+												border: '3px solid #000000',
+												borderRadius: '8px',
+												backgroundColor: '#D9D9D9',
+												fontFamily: 'Inter, sans-serif',
+												fontSize: '13px',
+												color: '#000000',
+												padding: '12px',
+												boxSizing: 'border-box',
+											}}
+										>
+											This event was canceled by the venue — messaging is closed.
+										</div>
+									</div>
+								)}
+								{selectedEmail && !selectedIsApplicationRow && selectedThreadCanMessage && (
 									<div
 										className="w-full flex justify-center"
 										style={{
@@ -4485,8 +4626,12 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					</div>
 				) : (
 					/* Email List View */
-					<>
-						{visibleEmailRows.map(({ key, email, selectionEmail }) => (
+					(() => {
+						const renderEmailListRow = ({
+							key,
+							email,
+							selectionEmail,
+						}: (typeof visibleEmailRows)[number]) => (
 							<div
 								key={key}
 								className={`bg-white ${emailRowHoverClassName} cursor-pointer px-4 flex items-center mb-2 w-full max-[480px]:px-2`}
@@ -4502,12 +4647,18 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									setReplyMessage('');
 								}}
 								onMouseEnter={() => {
+									const eventChat = getRowEventChat(email);
+									if (eventChat && onEventChatHover) {
+										onEventChatHover(eventChat.application);
+										return;
+									}
 									if (onContactHover) {
 										const contact = resolveContactForEmail(email, contactByEmail);
 										onContactHover(contact as ContactWithName | null);
 									}
 								}}
 								onMouseLeave={() => {
+									onEventChatHover?.(null);
 									if (onContactHover) {
 										onContactHover(null);
 									}
@@ -4608,6 +4759,33 @@ export const InboxSection: FC<InboxSectionProps> = ({
 															email.subject && (
 																<InboxEventPill name={email.subject} compact />
 															)}
+														{(() => {
+															const eventChat = getRowEventChat(email);
+															if (!eventChat) return null;
+															return (
+																<>
+																	<EventChatStatusPill
+																		status={eventChat.state.status}
+																		height={16}
+																		fontSize={9.5}
+																	/>
+																	{eventChat.application.event && (
+																		<span
+																			className="inline-flex items-center rounded-[4px] px-1.5 text-[10px] font-medium leading-none flex-shrink-0"
+																			style={{
+																				height: '16px',
+																				backgroundColor: '#B6E8F1',
+																			}}
+																		>
+																			{formatEventDateLabel(
+																				eventChat.application.event,
+																				nowMs
+																			)}
+																		</span>
+																	)}
+																</>
+															);
+														})()}
 														{headline && (
 															<div
 																className="h-[16px] max-w-[140px] rounded-[4px] px-1.5 flex items-center gap-0.5 border border-black overflow-hidden flex-shrink-0"
@@ -4695,6 +4873,33 @@ export const InboxSection: FC<InboxSectionProps> = ({
 													<>
 														{email.venueThreadApplicationId != null &&
 															email.subject && <InboxEventPill name={email.subject} />}
+														{(() => {
+															const eventChat = getRowEventChat(email);
+															if (!eventChat) return null;
+															return (
+																<>
+																	<EventChatStatusPill
+																		status={eventChat.state.status}
+																		height={20}
+																		fontSize={11}
+																	/>
+																	{eventChat.application.event && (
+																		<span
+																			className="inline-flex items-center rounded-[4px] px-2 text-[12px] font-medium leading-none flex-shrink-0"
+																			style={{
+																				height: '20px',
+																				backgroundColor: '#B6E8F1',
+																			}}
+																		>
+																			{formatEventDateLabel(
+																				eventChat.application.event,
+																				nowMs
+																			)}
+																		</span>
+																	)}
+																</>
+															);
+														})()}
 														{headline && (
 															<div
 																className="h-[21px] max-w-[160px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden flex-shrink-0"
@@ -4783,24 +4988,43 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									)}
 								</div>
 							</div>
-						))}
-						{Array.from({
-							length: Math.max(0, (isMobile ? 4 : 6) - visibleEmailRows.length),
-						}).map((_, idx) => (
-							<div
-								key={`inbox-placeholder-${idx}`}
-								className="select-none mb-2 w-full"
-								style={{
-									width: isMobile ? mobileEmailRowWidth : `${emailRowWidth}px`,
-									height: isMobile ? '100px' : '78px',
-									minHeight: isMobile ? '100px' : '78px',
-									border: '3px solid #000000',
-									borderRadius: '8px',
-									backgroundColor: activeTab === 'inbox' ? '#6fa4e1' : '#5AB477',
-								}}
-							/>
-						))}
-					</>
+						);
+						return (
+							<>
+								{/* Past band: closed/canceled event chats above the fold. */}
+								{pastEmailRows.length > 0 && (
+									<div className="flex w-full shrink-0 flex-col items-center opacity-70">
+										{pastEmailRows.map(renderEmailListRow)}
+									</div>
+								)}
+								{/* min-h-full pins max-scrollTop to the past band's height so the
+								    pinned view renders like a live-only list; shrink-0 is
+								    load-bearing (min-h-full replaces flex sizing). */}
+								<div
+									ref={mainListLiveSectionRef}
+									className="flex min-h-full w-full shrink-0 flex-col items-center"
+								>
+									{liveEmailRows.map(renderEmailListRow)}
+									{Array.from({
+										length: Math.max(0, (isMobile ? 4 : 6) - visibleEmailRows.length),
+									}).map((_, idx) => (
+										<div
+											key={`inbox-placeholder-${idx}`}
+											className="select-none mb-2 w-full"
+											style={{
+												width: isMobile ? mobileEmailRowWidth : `${emailRowWidth}px`,
+												height: isMobile ? '100px' : '78px',
+												minHeight: isMobile ? '100px' : '78px',
+												border: '3px solid #000000',
+												borderRadius: '8px',
+												backgroundColor: activeTab === 'inbox' ? '#6fa4e1' : '#5AB477',
+											}}
+										/>
+									))}
+								</div>
+							</>
+						);
+					})()
 				)}
 			</CustomScrollbar>
 		</div>

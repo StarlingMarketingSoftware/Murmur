@@ -513,6 +513,9 @@ export const SUN_TRANSITION_SUNSET_END_OFFSET_DEG = 54;
 // Target frame cadence for the clouds canvas animation. Keeping this near ~60fps
 // helps the drift feel smooth without forcing Mapbox to repaint at very high rates.
 export const CLOUDS_DRIFT_UPDATE_MS = 16;
+// Safari/WebKit: canvas→GPU-texture uploads are far slower than Chrome's, so halve
+// the animated-canvas cadence there (drift is ~0.35 px/s — sub-pixel per tick either way).
+export const SAFARI_CLOUDS_DRIFT_UPDATE_MS = 33;
 export const CLOUDS_DRIFT_LOOP_MS = 180_000;
 export const CLOUDS_DRIFT_BASE_ZOOM = 4.0;
 export const CLOUDS_DRIFT_AMPLITUDE_X_PX = 12;

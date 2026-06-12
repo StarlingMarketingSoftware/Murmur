@@ -135,7 +135,9 @@ export function MobileApplicantProfileCard({
 								className="mt-[1px] block h-[17px] w-[8px] shrink-0"
 								dangerouslySetInnerHTML={{ __html: profileBioIconSvg }}
 							/>
-							<span className="min-w-0 whitespace-pre-wrap">{applicant.bio}</span>
+							<span className="murmur-selectable min-w-0 whitespace-pre-wrap">
+							{applicant.bio}
+						</span>
 						</div>
 					) : (
 						<EmptyFieldValue />

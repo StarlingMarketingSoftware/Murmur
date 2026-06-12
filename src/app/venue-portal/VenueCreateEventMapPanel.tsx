@@ -19,9 +19,9 @@ import { ProfileAreaMapBox } from '@/components/molecules/HybridPromptInput/Prof
 import {
 	DASHBOARD_CALENDAR_NATIVE_WIDTH_PX,
 	PROFILE_GENRE_OPTIONS,
-	VENUE_MAP_OVERLAY_SCALE,
 	VENUE_TIME_OPTIONS,
 } from './constants';
+import type { VenuePortalFrame } from './useVenuePortalLayout';
 import {
 	formatVenueLocationFeature,
 	VENUE_LOCATION_GEOCODE_TYPES,
@@ -282,7 +282,14 @@ export const buildVenueEventPayload = (eventForm: VenueCreateEventFormState) => 
 	};
 };
 
-export function VenueCreateEventMapPanel({ event }: { event?: VenueEvent | null }) {
+export function VenueCreateEventMapPanel({
+	event,
+	frame,
+}: {
+	event?: VenueEvent | null;
+	// Viewport anchor + scale from useVenuePortalLayout's responsive cascade.
+	frame: VenuePortalFrame;
+}) {
 	const { data: venueProfile } = useGetVenue();
 	const [eventForm, setEventForm] = useState<VenueCreateEventFormState>(() =>
 		event
@@ -658,15 +665,20 @@ export function VenueCreateEventMapPanel({ event }: { event?: VenueEvent | null 
 			: 'Publish';
 
 	return (
-		// Snug to the right of the calendar cluster. The cluster (left-24, scale 0.7) puts the
-		// 656px calendar's right edge at ~483px, so left-[500px] leaves a ~17px gap; top-[122px]
-		// sits level with the calendar top (56 + 98×0.7 ≈ 125px), tucked under the tool tab bar.
+		// Anchored by useVenuePortalLayout: snug to the right of the calendar cluster at
+		// the wide tiers (the cluster's right edge is ~483px, so left 500 leaves a ~17px
+		// gap and top 122 sits level with the calendar top, tucked under the tool tab
+		// bar), re-anchored to the viewport's left edge once the cluster hides.
 		<form
 			ref={createEventFormRef}
 			onSubmit={handlePublishEvent}
 			data-venue-tool-ui="true"
-			className="fixed left-[500px] top-[122px] z-[99] h-[727px] w-[456px] origin-top-left rounded-[12px] border-[2px] border-black bg-white"
-			style={{ transform: `scale(${VENUE_MAP_OVERLAY_SCALE})` }}
+			className="fixed z-[99] h-[727px] w-[456px] origin-top-left rounded-[12px] border-[2px] border-black bg-white"
+			style={{
+				left: frame.left,
+				top: frame.top,
+				transform: `scale(${frame.scale})`,
+			}}
 		>
 			<div className="absolute left-[12px] top-[4px] font-inter text-[12.358px] font-medium leading-[16.477px] text-black">
 				{isEditingEvent ? 'Edit Event' : 'New Event'}
@@ -1657,10 +1669,14 @@ export function VenueCreateEventMapPanel({ event }: { event?: VenueEvent | null 
 				eventForm.when &&
 				typeof window !== 'undefined' &&
 				createPortal(
+					// data-venue-tool-ui: the portal escapes the panel's tagged subtree, so
+					// without its own tag a click on the part of the popup poking out past
+					// the panel's buffered rect would dismiss the whole Create tool.
 					<div
 						ref={whenPopupRef}
 						role="dialog"
 						aria-label="Select event timeframe"
+						data-venue-tool-ui="true"
 						className="fixed z-[2147483601] h-[96px] w-[244px] rounded-[9px] border border-white/90 bg-[rgba(229,96,98,0.88)] p-[9px] font-inter shadow-[0_18px_45px_rgba(0,0,0,0.22)] backdrop-blur-[22px]"
 						style={{ left: `${activeWhenPopup.left}px`, top: `${activeWhenPopup.top}px` }}
 					>

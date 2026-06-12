@@ -48,11 +48,10 @@ const STACK_H = PILL_H * 4 + PILL_GAP * 3;
 // Horizontal gap from the home icon's center to the stack's right edge.
 const ICON_GAP = 64;
 const VIEWPORT_MARGIN = 16;
-// Docked resting spot when the home icon is off-screen: just right of the
-// profile-card + calendar cluster (fixed left-[24px], native width 656, scaled).
+// Vertical docked resting spot when the home icon is off-screen; the docked x
+// is the dockMinX prop (just right of the left cluster while it's visible, the
+// viewport's left margin once the responsive cascade hides it).
 const DOCKED_TOP = 120;
-const LEFT_CLUSTER_X = 24;
-const LEFT_CLUSTER_NATIVE_W = 656;
 // Below this zoom the view is continent/globe scale and the home icon no longer has
 // a meaningful neighborhood — dock instead of chasing the icon across the viewport.
 // (Map min zoom is 2.25; the venue entry camera lands at 6.2.)
@@ -67,12 +66,14 @@ export function VenueMapActionPills({
 	onToolSelect,
 	unreadCount,
 	clusterScale,
+	dockMinX,
 }: {
 	anchorStore: VenueIconAnchorStore;
 	selectedTool: 'add' | 'profile' | 'mail' | 'events' | null;
 	onToolSelect: (tool: 'add' | 'profile' | 'mail' | 'events') => void;
 	unreadCount: number;
 	clusterScale: number;
+	dockMinX: number;
 }) {
 	const wrapperRef = useRef<HTMLDivElement | null>(null);
 
@@ -90,8 +91,7 @@ export function VenueMapActionPills({
 			// Rendered footprint after the chrome scale.
 			const stackW = PILL_W * clusterScale;
 			const stackH = STACK_H * clusterScale;
-			const minX =
-				LEFT_CLUSTER_X + LEFT_CLUSTER_NATIVE_W * clusterScale + VIEWPORT_MARGIN;
+			const minX = dockMinX;
 			const maxX = vw - stackW - VIEWPORT_MARGIN;
 			const isAnchored =
 				anchor != null && anchor.isOnScreen && anchor.zoom >= ANCHOR_MIN_ZOOM;
@@ -129,7 +129,7 @@ export function VenueMapActionPills({
 			window.removeEventListener('resize', place);
 			if (transitionTimeout != null) window.clearTimeout(transitionTimeout);
 		};
-	}, [anchorStore, clusterScale]);
+	}, [anchorStore, clusterScale, dockMinX]);
 
 	const pillClassName =
 		'pointer-events-auto flex h-[52.657px] w-[196px] cursor-pointer items-center gap-[14px] rounded-[23.022px] bg-white pl-[20px] opacity-[0.81]';

@@ -217,6 +217,17 @@ export const buildInboxConversations = (
 		.sort((a, b) => b.sortAtMs - a.sortAtMs || b.latestMessage.id - a.latestMessage.id);
 };
 
+/** The event-application id a conversation is threaded under, or null for
+ * non-event (cold-outreach/general) conversations. */
+export const getConversationThreadApplicationId = (
+	conversation: InboxConversation
+): number | null => {
+	for (const message of conversation.messages) {
+		if (message.venueThreadApplicationId != null) return message.venueThreadApplicationId;
+	}
+	return null;
+};
+
 export const inboxConversationContainsEmailId = (
 	conversation: InboxConversation,
 	emailId: number | null | undefined

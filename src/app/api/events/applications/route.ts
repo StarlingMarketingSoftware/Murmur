@@ -17,6 +17,12 @@ export type MyApplicationEvent = {
 	startsAt: string | null;
 	pay: string | null;
 	details: string | null;
+	latitude: number | null;
+	longitude: number | null;
+	// Soft-delete state — false means the venue canceled (deleted) the event.
+	isActive: boolean;
+	// Approximates cancellation time: the row gets no writes after soft-delete.
+	updatedAt: string; // ISO
 	venueName: string | null;
 	venueCity: string | null;
 	venueState: string | null;
@@ -70,6 +76,9 @@ export type MyEventApplication = {
 	// Active booking-request handshake for this application (drives the Booked
 	// label on the artist's opportunity row; canceled requests don't surface).
 	booking: MyApplicationBooking | null;
+	// True when another artist holds the event's confirmed booking — the
+	// opportunity is closed to this user even though their application is open.
+	bookedByOther: boolean;
 };
 
 export type MyEventApplicationsResponse = { applications: MyEventApplication[] };
@@ -112,6 +121,10 @@ export async function GET() {
 						startsAt: true,
 						pay: true,
 						details: true,
+						latitude: true,
+						longitude: true,
+						isActive: true,
+						updatedAt: true,
 					user: {
 							select: {
 								venue: {
@@ -171,6 +184,15 @@ export async function GET() {
 					select: { id: true, threadApplicationId: true, status: true, date: true },
 				})
 			: Promise.resolve([]);
+		// Who holds each event's confirmed booking (at most one per event, lock-
+		// enforced). Keyed by standardUserId, not threadApplicationId — confirmed
+		// bookings can live on the general thread.
+		const confirmedBookingsPromise = eventIds.length
+			? prisma.bookingRequest.findMany({
+					where: { eventId: { in: eventIds }, status: 'confirmed' },
+					select: { eventId: true, standardUserId: true },
+				})
+			: Promise.resolve([]);
 
 		const [venueThreadMessages, readStates, provenanceDiverts] = conversationIds.length
 			? await Promise.all([
@@ -202,7 +224,16 @@ export async function GET() {
 					}),
 				])
 			: [[], [], []];
-		const bookingRows = await bookingRowsPromise;
+		const [bookingRows, confirmedBookings] = await Promise.all([
+			bookingRowsPromise,
+			confirmedBookingsPromise,
+		]);
+		const confirmedOwnerByEventId = new Map<number, string>();
+		for (const booking of confirmedBookings) {
+			if (booking.eventId != null && !confirmedOwnerByEventId.has(booking.eventId)) {
+				confirmedOwnerByEventId.set(booking.eventId, booking.standardUserId);
+			}
+		}
 		const bookingByApp = new Map<number, (typeof bookingRows)[number]>();
 		for (const booking of bookingRows) {
 			if (
@@ -262,6 +293,10 @@ export async function GET() {
 								startsAt: event.startsAt?.toISOString() ?? null,
 								pay: event.pay,
 								details: event.details,
+								latitude: event.latitude,
+								longitude: event.longitude,
+								isActive: event.isActive,
+								updatedAt: event.updatedAt.toISOString(),
 								venueName: event.user.venue?.venueName ?? null,
 								venueCity: event.user.venue?.city ?? null,
 								venueState: event.user.venue?.state ?? null,
@@ -289,6 +324,10 @@ export async function GET() {
 									date: booking.date,
 								}
 							: null;
+					})(),
+					bookedByOther: (() => {
+						const owner = confirmedOwnerByEventId.get(application.eventId);
+						return owner != null && owner !== userId;
 					})(),
 				};
 			}),

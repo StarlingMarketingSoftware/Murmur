@@ -21,6 +21,9 @@
 # memory measurement runs (scripts/measure-dashboard-memory.mjs)
 /.memory-baselines/
 
+# map fps measurement runs (scripts/measure-map-fps.mjs)
+/.perf-baselines/
+
 # production
 /build
 

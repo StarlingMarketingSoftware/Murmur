@@ -87,7 +87,15 @@ import {
 	type InboxConversation,
 	type InboxConversationMessage,
 } from '@/utils/inboxConversations';
-import { useGetMyEventApplications } from '@/hooks/queryHooks/useEventApplications';
+import {
+	useGetMyEventApplications,
+	type MyEventApplication,
+} from '@/hooks/queryHooks/useEventApplications';
+import {
+	OpportunityHoverPanel,
+	OPPORTUNITY_HOVER_PANEL_HEIGHT_PX,
+	OPPORTUNITY_HOVER_PANEL_WIDTH_PX,
+} from '@/components/molecules/OpportunityHoverPanel/OpportunityHoverPanel';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
 import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
@@ -271,6 +279,10 @@ const ROW_HOVER_RESEARCH_DOCKED_LEFT_PX = -(
 	ROW_HOVER_RESEARCH_CARD_WIDTH_PX + ROW_HOVER_RESEARCH_GAP_PX
 );
 const ROW_HOVER_RESEARCH_CLEAR_DELAY_MS = 220;
+// Event-chat rows dock the opportunity panel in the same slot (larger card).
+const ROW_HOVER_OPPORTUNITY_DOCKED_LEFT_PX = -(
+	OPPORTUNITY_HOVER_PANEL_WIDTH_PX + ROW_HOVER_RESEARCH_GAP_PX
+);
 
 export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const {
@@ -2449,6 +2461,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		useState<ContactWithName | null>(null);
 	const [hoveredContactForResearch, setHoveredContactForResearch] =
 		useState<ContactWithName | null>(null);
+	// Hovering an event-chat row in the main inbox list swaps the adjacent
+	// research panel for the opportunity panel.
+	const [hoveredOpportunityForResearch, setHoveredOpportunityForResearch] =
+		useState<MyEventApplication | null>(null);
 	const [hasUserSelectedResearchContact, setHasUserSelectedResearchContact] =
 		useState(false);
 	// Row-aligned abridged research card left of the pinned list (Write/Drafts/Inbox).
@@ -2460,6 +2476,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		ROW_HOVER_RESEARCH_DOCKED_LEFT_PX
 	);
 	const rowHoverResearchClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	// Event-chat rows hover the opportunity panel instead of contact research.
+	// Shares the docked slot, position state and clear timer — one card at a time.
+	const [rowHoverOpportunity, setRowHoverOpportunity] =
+		useState<MyEventApplication | null>(null);
 	const [showTestPreview, setShowTestPreview] = useState(false);
 	const handleTestPreviewToggle = useCallback(
 		(open: boolean) => {
@@ -2886,6 +2906,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		rowHoverResearchClearTimeoutRef.current = setTimeout(() => {
 			rowHoverResearchClearTimeoutRef.current = null;
 			setRowHoverResearchContact(null);
+			setRowHoverOpportunity(null);
 		}, ROW_HOVER_RESEARCH_CLEAR_DELAY_MS);
 	}, [cancelRowHoverResearchClear]);
 
@@ -2929,7 +2950,49 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				}
 			}
 			setRowHoverResearchLeftPx(leftPx);
+			setRowHoverOpportunity(null);
 			setRowHoverResearchContact(contact);
+		},
+		[cancelRowHoverResearchClear, scheduleRowHoverResearchClear]
+	);
+
+	// Event-chat row variant of the handler above: same anchor/scale/dock math,
+	// sized for the opportunity panel, and swaps which card is shown.
+	const handleEventChatRowHover = useCallback(
+		(application: MyEventApplication | null, rowElement: HTMLElement | null) => {
+			if (!application || !rowElement) {
+				scheduleRowHoverResearchClear();
+				return;
+			}
+			const anchor = rowElement.closest<HTMLElement>('[data-row-hover-research-anchor]');
+			if (!anchor) return;
+			cancelRowHoverResearchClear();
+			const anchorRect = anchor.getBoundingClientRect();
+			const rowRect = rowElement.getBoundingClientRect();
+			const scale = anchor.offsetHeight > 0 ? anchorRect.height / anchor.offsetHeight : 1;
+			const rawTopPx = (rowRect.top - anchorRect.top) / (scale || 1);
+			const maxTopPx = Math.max(
+				0,
+				anchor.offsetHeight - OPPORTUNITY_HOVER_PANEL_HEIGHT_PX
+			);
+			setRowHoverResearchTopPx(Math.min(Math.max(rawTopPx, 0), maxTopPx));
+			let leftPx = ROW_HOVER_OPPORTUNITY_DOCKED_LEFT_PX;
+			const splitOverlay = document.querySelector('.campaign-map-split-overlay');
+			if (splitOverlay) {
+				const overlayLeftPx = splitOverlay.getBoundingClientRect().left;
+				const cardFootprintRealPx =
+					(OPPORTUNITY_HOVER_PANEL_WIDTH_PX + ROW_HOVER_RESEARCH_GAP_PX) * (scale || 1);
+				if (overlayLeftPx > cardFootprintRealPx) {
+					leftPx = Math.min(
+						leftPx,
+						(overlayLeftPx - anchorRect.left) / (scale || 1) +
+							ROW_HOVER_OPPORTUNITY_DOCKED_LEFT_PX
+					);
+				}
+			}
+			setRowHoverResearchLeftPx(leftPx);
+			setRowHoverResearchContact(null);
+			setRowHoverOpportunity(application);
 		},
 		[cancelRowHoverResearchClear, scheduleRowHoverResearchClear]
 	);
@@ -2941,6 +3004,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		// Never carry a card across tab switches; also cleans the timer on unmount.
 		cancelRowHoverResearchClear();
 		setRowHoverResearchContact(null);
+		setRowHoverOpportunity(null);
 		return cancelRowHoverResearchClear;
 	}, [view, cancelRowHoverResearchClear]);
 
@@ -2952,6 +3016,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		const clearCard = () => {
 			cancelRowHoverResearchClear();
 			setRowHoverResearchContact(null);
+			setRowHoverOpportunity(null);
 		};
 		window.addEventListener('resize', clearCard);
 		window.addEventListener('murmur:campaign-zoom-changed', clearCard);
@@ -3221,7 +3286,18 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// split map strip is visible). Rendered inside the
 	// [data-row-hover-research-anchor] wrapper.
 	const renderRowHoverResearchCard = () =>
-		isRowHoverResearchEnabled && rowHoverResearchContact ? (
+		isRowHoverResearchEnabled && rowHoverOpportunity ? (
+			<div
+				className="absolute pointer-events-none"
+				style={{
+					zIndex: 40,
+					top: `${rowHoverResearchTopPx}px`,
+					left: `${rowHoverResearchLeftPx}px`,
+				}}
+			>
+				<OpportunityHoverPanel application={rowHoverOpportunity} nowMs={Date.now()} />
+			</div>
+		) : isRowHoverResearchEnabled && rowHoverResearchContact ? (
 			<div
 				className="absolute pointer-events-none"
 				style={{
@@ -3977,6 +4053,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onContactRowHover={
 												isRowHoverResearchEnabled ? handleContactRowHoverResearch : undefined
 											}
+											onEventChatRowHover={
+												isRowHoverResearchEnabled ? handleEventChatRowHover : undefined
+											}
 											width={mainContactsPanelWidthPx}
 											height={mainContactsPanelHeightPx}
 										/>
@@ -4093,6 +4172,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															? handleContactRowHoverResearch
 															: undefined
 													}
+													onEventChatRowHover={
+														isRowHoverResearchEnabled ? handleEventChatRowHover : undefined
+													}
 													width={376}
 													height={587}
 													minRows={8}
@@ -4163,6 +4245,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															isRowHoverResearchEnabled
 																? handleContactRowHoverResearch
 																: undefined
+														}
+														onEventChatRowHover={
+															isRowHoverResearchEnabled ? handleEventChatRowHover : undefined
 														}
 														onDraftSelected={async (ids) => {
 															await handleGenerateDrafts(ids);
@@ -8237,6 +8322,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onContactHover={(contact) => {
 												setHoveredContactForResearch(contact);
 											}}
+											onEventChatHover={setHoveredOpportunityForResearch}
 											isNarrow={true}
 										/>
 										{/* Research panel below inbox - matches InboxSection's container structure (w-full mx-auto px-4 maxWidth 516px) - hidden on mobile */}
@@ -8249,6 +8335,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														fallbackDraft={draftPreviewFallbackDraft}
 														width={516}
 														height={400}
+													/>
+												) : hoveredOpportunityForResearch ? (
+													<OpportunityHoverPanel
+														application={hoveredOpportunityForResearch}
+														nowMs={Date.now()}
 													/>
 												) : (
 													<ContactResearchPanel

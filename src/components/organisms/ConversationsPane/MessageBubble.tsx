@@ -65,11 +65,11 @@ export function MessageBubble({
 			>
 				{message.isHtml ? (
 					<div
-						className="[&_a]:underline [&_p]:mb-[6px] last:[&_p]:mb-0"
+						className="murmur-selectable [&_a]:underline [&_p]:mb-[6px] last:[&_p]:mb-0"
 						dangerouslySetInnerHTML={{ __html: sanitizeMessageHtml(message.body) }}
 					/>
 				) : (
-					<span className="whitespace-pre-wrap">{message.body}</span>
+					<span className="murmur-selectable whitespace-pre-wrap">{message.body}</span>
 				)}
 			</div>
 		</div>

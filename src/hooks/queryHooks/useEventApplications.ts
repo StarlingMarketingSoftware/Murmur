@@ -11,6 +11,7 @@ import type { MyEventApplicationsResponse } from '@/app/api/events/applications/
 
 export type {
 	MyEventApplication,
+	MyApplicationEvent,
 	MyApplicationVenueResponse,
 } from '@/app/api/events/applications/route';
 

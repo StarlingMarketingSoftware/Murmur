@@ -37,10 +37,12 @@
     "**/*.ts",
     "**/*.tsx",
     ".next-baseline/types/**/*.ts",
+    ".next-verify-dev/types/**/*.ts",
+    ".next-verify-eventchat/types/**/*.ts",
     ".next-verify/types/**/*.ts",
     ".next/types/**/*.ts",
     "next-env.d.ts",
-    ".next-verify-dev/types/**/*.ts"
+    ".next-safari-fix/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

@@ -105,13 +105,13 @@ export const MobileDraftReviewView: FC<MobileDraftReviewViewProps> = ({
 			>
 				{hasLinks ? (
 					<div
-						className="font-inter text-[14px] leading-[1.45] text-black [&_p]:m-0"
+						className="murmur-selectable font-inter text-[14px] leading-[1.45] text-black [&_p]:m-0"
 						dangerouslySetInnerHTML={{
 							__html: sanitizeMessageHtml(stripMurmurDraftSettingsSnapshot(message)),
 						}}
 					/>
 				) : (
-					<p className="font-inter text-[14px] leading-[1.45] text-black whitespace-pre-wrap">
+					<p className="murmur-selectable font-inter text-[14px] leading-[1.45] text-black whitespace-pre-wrap">
 						{convertHtmlToPlainText(message)}
 					</p>
 				)}

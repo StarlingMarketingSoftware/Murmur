@@ -31,6 +31,7 @@ import type { InboundEmailWithRelations } from '@/types';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { cn } from '@/utils/ui';
+import { deriveEventChatStatus } from '@/utils/eventChatStatus';
 import {
 	getWineBeerSpiritsLabel,
 	isCoffeeShopTitle,
@@ -42,7 +43,7 @@ import {
 	isWineBeerSpiritsTitle,
 } from '@/utils/restaurantTitle';
 
-export type OpportunityStatus = 'booked' | 'closed' | 'in-progress';
+export type OpportunityStatus = 'booked' | 'closed' | 'in-progress' | 'canceled';
 
 type OpportunityRow = {
 	// `id` is only unique within a source (an email id can equal an application id),
@@ -152,6 +153,13 @@ const STATUS_META: Record<
 		label: 'In Progress',
 		tabFill: '#FFF18A',
 		accent: '#FFD08A',
+	},
+	// The venue deleted the event. No dedicated tab — these surface in the
+	// unfiltered view (compact, like closed) and under the Closed tab filter.
+	canceled: {
+		label: 'Canceled',
+		tabFill: '#D9D9D9',
+		accent: '#B9B9B9',
 	},
 };
 
@@ -544,9 +552,14 @@ const buildMockOpportunityRow = (row: OpportunitiesMockRow, index: number): Oppo
 	};
 };
 
-// An opportunity the user actively applied to. Submissions surface as In Progress
-// until the venue's booking request is confirmed, which flips the row to Booked.
-const buildApplicationOpportunityRow = (application: MyEventApplication): OpportunityRow => {
+// An opportunity the user actively applied to. Status comes from the shared
+// event-chat derivation: booked (my confirmed booking), closed (someone else
+// booked / date elapsed / withdrawn), canceled (venue deleted the event), else
+// in-progress.
+const buildApplicationOpportunityRow = (
+	application: MyEventApplication,
+	nowMs: number
+): OpportunityRow => {
 	const event = application.event;
 	const city = event?.venueCity?.trim() || '';
 	const stateAbbr = event?.venueState
@@ -568,12 +581,7 @@ const buildApplicationOpportunityRow = (application: MyEventApplication): Opport
 	return {
 		source: 'application',
 		id: application.id,
-		status:
-			application.booking?.status === 'confirmed'
-				? 'booked'
-				: application.status === 'submitted'
-					? 'in-progress'
-					: 'closed',
+		status: deriveEventChatStatus(application, nowMs).status,
 		contactLabel: event?.venueName?.trim() || 'Venue',
 		exchangeCount: response?.responseCount ?? 0,
 		folder: '',
@@ -680,7 +688,10 @@ export const DashboardOpportunitiesContent: FC<{
 
 			// The user's own submitted applications (newest-first from the API) lead the
 			// list so they're visible at the top of the In Progress tab.
-			const applicationRows = (myApplications ?? []).map(buildApplicationOpportunityRow);
+			const nowMs = Date.now();
+			const applicationRows = (myApplications ?? []).map((application) =>
+				buildApplicationOpportunityRow(application, nowMs)
+			);
 			rows = [...applicationRows, ...rows];
 		}
 
@@ -690,7 +701,9 @@ export const DashboardOpportunitiesContent: FC<{
 	const opportunities = useMemo(() => {
 		const q = searchQuery.trim().toLowerCase();
 		return allOpportunities.filter((row) => {
-			if (activeStatus && row.status !== activeStatus) return false;
+			// No dedicated Canceled tab — those rows file under the Closed filter.
+			const effectiveStatus = row.status === 'canceled' ? 'closed' : row.status;
+			if (activeStatus && effectiveStatus !== activeStatus) return false;
 			if (!q) return true;
 
 			return [
@@ -896,7 +909,9 @@ export const DashboardOpportunitiesContent: FC<{
 						opportunities.map((opportunity) => {
 							const statusMeta = STATUS_META[opportunity.status];
 							const categoryMeta = getOpportunityCategoryMeta(opportunity.categoryTitle);
-							const isCompactClosedRow = isUnfilteredView && opportunity.status === 'closed';
+							const isCompactClosedRow =
+								isUnfilteredView &&
+								(opportunity.status === 'closed' || opportunity.status === 'canceled');
 							const isExpiredOpportunity = isOpportunityDatePassed(
 								opportunity.opportunityDate
 							);

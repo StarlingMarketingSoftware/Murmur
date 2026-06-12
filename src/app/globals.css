@@ -2656,6 +2656,20 @@ body {
 	opacity: 0;
 }
 
+/* Safari: backdrop-filter over the WebGL globe forces WebKit to re-blur the
+   backdrop on every map frame — a major perf cliff. The band is already 88-98%
+   opaque white, so a slightly more opaque fill reads the same without the blur. */
+html.is-safari .search-active .search-query-display {
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+	background: linear-gradient(
+		to bottom,
+		rgba(255, 255, 255, 0.99) 0%,
+		rgba(255, 255, 255, 0.97) 50%,
+		rgba(255, 255, 255, 0.94) 100%
+	);
+}
+
 /* Results page persistent search bar */
 .results-search-bar-wrapper {
 	position: sticky;
@@ -4508,6 +4522,13 @@ body.murmur-mobile .results-align {
 	z-index: 1;
 }
 
+/* Safari: blur(1px) is imperceptible but each instance is a backdrop root WebKit
+   re-evaluates per map frame; results lists render many of these over the globe. */
+html.is-safari .email-obfuscated-local::before {
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+}
+
 /* Subtle hover state for the entire row (not the blurred email itself) */
 tr:hover .email-obfuscated-local {
 	filter: blur(2px);
@@ -4533,6 +4554,31 @@ body.murmur-page.murmur-campaign {
 html:has(body.murmur-page.murmur-map-view),
 body.murmur-page.murmur-map-view {
 	background: #afd6ef;
+}
+
+/* Safari/WebKit: a drag starting on a select-none element (or the map) can
+   still begin a document-wide selection and sweep the whole page. Make the
+   app chrome non-selectable at the page scope; re-enable selection on every
+   read/edit surface below. No !important anywhere: inline user-select (e.g.
+   fill-in chips' `user-select: all`) and Tailwind select-text/select-none
+   utilities must keep working on top of these. */
+body.murmur-page {
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+body.murmur-page input,
+body.murmur-page textarea,
+body.murmur-page select,
+body.murmur-page [contenteditable],
+body.murmur-page [contenteditable] *,
+body.murmur-page [role='textbox'],
+body.murmur-page .ProseMirror,
+body.murmur-page .ProseMirror *,
+body.murmur-page .murmur-selectable,
+body.murmur-page .murmur-selectable * {
+	-webkit-user-select: text;
+	user-select: text;
 }
 
 /* Map view: lift the settings/avatar icons into the free band above the
@@ -5077,6 +5123,8 @@ html.murmur-compact.murmur-campaign-compact {
    to avoid any chance of double-scaling. */
 html.murmur-compact.murmur-campaign-compact.murmur-campaign-force-transform {
 	zoom: 1 !important;
+	/* Resolvable base for body's percentage height compensation below. */
+	height: 100%;
 }
 
 html.murmur-compact.murmur-campaign-compact.murmur-campaign-force-transform body {
@@ -5084,6 +5132,22 @@ html.murmur-compact.murmur-campaign-compact.murmur-campaign-force-transform body
 	/* Using `top left` prevents the whole page from drifting right after scale. */
 	transform-origin: top left;
 	width: calc(100% / var(--murmur-campaign-zoom, 0.85));
+	/* Height must be compensated like width: the transformed body is the
+	   containing block for every fixed descendant (incl. the persistent map),
+	   so without this the page's visual height is zoom × viewport and the
+	   bottom strip paints the root background (white). min-height too, or
+	   Tailwind's min-h-screen on body wins whenever zoom > 1. */
+	height: calc(100% / var(--murmur-campaign-zoom, 0.85));
+	min-height: calc(100% / var(--murmur-campaign-zoom, 0.85));
+}
+
+/* Residual gaps behind the transformed body (sub-pixel rounding, first paint)
+   should read as map water, not white. Out-specifies the transparent override
+   injected by PersistentDashboardMap. */
+html.murmur-compact.murmur-campaign-compact.murmur-campaign-force-transform:has(
+		.dashboard-globe-bg
+	) {
+	background-color: #afd6ef !important;
 }
 
 html.murmur-compact.murmur-campaign-compact body {
@@ -5131,10 +5195,17 @@ html.murmur-compact.murmur-dashboard-map-compact {
 }
 
 @supports not (zoom: 1) {
+	html.murmur-compact.murmur-campaign-compact {
+		height: 100%;
+	}
+
 	html.murmur-compact.murmur-campaign-compact body {
 		transform: scale(var(--murmur-campaign-zoom, 0.85));
 		transform-origin: top center;
 		width: calc(100% / var(--murmur-campaign-zoom, 0.85));
+		/* Same height compensation as the Safari force-transform path above. */
+		height: calc(100% / var(--murmur-campaign-zoom, 0.85));
+		min-height: calc(100% / var(--murmur-campaign-zoom, 0.85));
 	}
 
 	html.murmur-compact.murmur-dashboard-compact body,

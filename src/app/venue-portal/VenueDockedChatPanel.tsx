@@ -1,6 +1,5 @@
 'use client';
 
-import { useLayoutEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { OutlinedInitialAvatar } from '@/components/atoms/OutlinedInitialAvatar/OutlinedInitialAvatar';
 import { ProfileAreaMarkerIcon } from '@/components/atoms/_svg/ProfileAreaMarkerIcon';
@@ -24,39 +23,6 @@ import {
 	MEDIA_THUMB_GRADIENT,
 	mediaThumbSrc,
 } from './VenueEventDetailView';
-import { VENUE_MAP_LEFT_CLUSTER_SCALE, VENUE_MAP_OVERLAY_SCALE } from './constants';
-
-// Never overlap the centered tool panels: below ~1510px viewport width the
-// preferred 0.7 scale would cross the widest tool panel's rendered right edge
-// (left 500 + 781 native × the 0.8 overlay scale), so the docked chat shrinks
-// to exactly fill the strip between that edge and its right margin instead.
-const TOOL_PANELS_RIGHT_EDGE_PX = 500 + 781 * VENUE_MAP_OVERLAY_SCALE;
-const DOCKED_NATIVE_WIDTH_PX = 515; // keep in sync with the w-[515px] chrome below
-const DOCKED_RIGHT_MARGIN_PX = 12;
-const DOCKED_TOOL_CLEARANCE_PX = 12;
-
-function useDockedChatScale() {
-	const [scale, setScale] = useState(VENUE_MAP_LEFT_CLUSTER_SCALE);
-	useLayoutEffect(() => {
-		const update = () => {
-			const available =
-				window.innerWidth -
-				TOOL_PANELS_RIGHT_EDGE_PX -
-				DOCKED_TOOL_CLEARANCE_PX -
-				DOCKED_RIGHT_MARGIN_PX;
-			setScale(
-				Math.min(
-					VENUE_MAP_LEFT_CLUSTER_SCALE,
-					Math.max(0, available / DOCKED_NATIVE_WIDTH_PX)
-				)
-			);
-		};
-		update();
-		window.addEventListener('resize', update);
-		return () => window.removeEventListener('resize', update);
-	}, []);
-	return scale;
-}
 
 // Application-time snapshot chip, same look as the Events detail card's fields.
 function SnapshotChip({ icon, label }: { icon: ReactNode; label: string }) {
@@ -144,7 +110,9 @@ function DockedApplicationCard({ applicant }: { applicant: VenueEventApplicant }
 							className="mt-[1px] block h-[17px] w-[8px] shrink-0"
 							dangerouslySetInnerHTML={{ __html: profileBioIconSvg }}
 						/>
-						<span className="min-w-0 whitespace-pre-wrap">{applicant.bio}</span>
+						<span className="murmur-selectable min-w-0 whitespace-pre-wrap">
+						{applicant.bio}
+					</span>
 					</div>
 				)}
 				{applicant.videos.length > 0 && (
@@ -172,20 +140,25 @@ function DockedApplicationCard({ applicant }: { applicant: VenueEventApplicant }
 }
 
 // Persistent docked chat for the map view: pins the last-active thread to the
-// bottom-right corner (same fixed-corner + 0.7-scale convention; the parent
-// hides the notifications cluster while this is up) so the conversation stays
-// in view while the user moves between tools. The parent hides it only while
-// the Chat tool shows the thread itself.
+// bottom-right corner (same fixed-corner convention; the parent hides the
+// notifications cluster while this is up) so the conversation stays in view
+// while the user moves between tools. The parent hides it while the Chat tool
+// shows the thread itself, and unmounts it when useVenuePortalLayout says it
+// can't render legibly (narrow/compact viewports).
 // Being mounted marks the thread read as messages arrive — accepted, since the
-// thread is visibly on screen the whole time.
+// parent only mounts it while it's visibly on screen.
 export function VenueDockedChatPanel({
 	conversationId,
 	thread,
 	onExpand,
+	scale,
 }: {
 	conversationId: number;
 	thread: ConversationThreadFilter;
 	onExpand: () => void;
+	// From useVenuePortalLayout's dockedChatScale: the corner clusters' 0.7, or
+	// smaller when the viewport can't fit that beside the tool panels.
+	scale: number;
 }) {
 	// Header identity comes from the inbox lists (cache-shared with the portal
 	// root's 30s polls — no new request). Application threads resolve from the
@@ -210,7 +183,6 @@ export function VenueDockedChatPanel({
 		typeof thread === 'number'
 			? ((eventApplicants ?? []).find((row) => row.id === thread) ?? null)
 			: null;
-	const scale = useDockedChatScale();
 	return (
 		<div
 			data-venue-tool-ui="true"
@@ -219,7 +191,7 @@ export function VenueDockedChatPanel({
 		>
 			{/* Tool-panel chrome at the Figma-native 515×658, scaled by the corner
 			    clusters' 0.7 like everything else on the map — or smaller when the
-			    viewport can't fit that beside the tool panels (see useDockedChatScale). */}
+			    viewport can't fit that beside the tool panels (see the scale prop). */}
 			<div
 				className="relative h-[658px] w-[515px] overflow-hidden rounded-[14px] border-[2px] border-black"
 				style={{

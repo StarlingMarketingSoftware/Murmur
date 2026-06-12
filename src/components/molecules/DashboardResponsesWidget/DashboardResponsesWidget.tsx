@@ -23,6 +23,10 @@ import type { InboundEmailWithRelations } from '@/types';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
+import { MapStackStarIcon } from '@/components/atoms/_svg/MapStackStarIcon';
+import { useGetMyEventApplications } from '@/hooks/queryHooks/useEventApplications';
+import { deriveEventChatStatus } from '@/utils/eventChatStatus';
+import { EventChatStatusPill } from '@/components/molecules/EventChatCard/EventChatCard';
 import { cn } from '@/utils/ui';
 import { EmailStatus } from '@/constants/prismaEnums';
 import { urls } from '@/constants/urls';
@@ -336,6 +340,17 @@ export const DashboardResponsesWidget: FC<{
 		enabled: enabled && !mockOverrideActive && activeTab === 'sent',
 		filters: { status: EmailStatus.sent },
 	});
+	// Venue event chats project into the responses list with a thread-application
+	// id; resolving the application drives the opportunity marker + status pill.
+	const { data: myApplications } = useGetMyEventApplications({
+		enabled: enabled && !mockOverrideActive,
+	});
+	const nowMs = Date.now();
+	const applicationById = useMemo(
+		() =>
+			new Map((myApplications ?? []).map((application) => [application.id, application])),
+		[myApplications]
+	);
 	const { mutateAsync: assignInboundEmailToCampaign } = useAssignInboundEmailToCampaign({
 		suppressToasts: true,
 	});
@@ -812,6 +827,15 @@ export const DashboardResponsesWidget: FC<{
 							const exchangeKey = getResponseThreadKey(email);
 							const exchangeCount = Math.max(1, exchangeCounts[exchangeKey] || 1);
 							const campaignLabel = getCampaignLabel(email);
+							// Event-chat rows (venue threads tied to an application) carry an
+							// opportunity marker + live status pill.
+							const eventApplication =
+								email.venueThreadApplicationId != null
+									? applicationById.get(email.venueThreadApplicationId)
+									: undefined;
+							const eventChatState = eventApplication
+								? deriveEventChatStatus(eventApplication, nowMs)
+								: null;
 							const subject = email.subject?.trim() || '(No Subject)';
 							const snippet = getEmailSnippet(email);
 							const timeLabel = formatInboxTimestamp(email.receivedAt);
@@ -893,6 +917,12 @@ export const DashboardResponsesWidget: FC<{
 												lineHeight: '17.186px',
 											}}
 										>
+											{eventChatState && (
+												<MapStackStarIcon
+													size={12}
+													className="flex-shrink-0 self-center"
+												/>
+											)}
 											<FadeOverflowText
 												text={senderLabel}
 												title={senderLabel}
@@ -912,41 +942,57 @@ export const DashboardResponsesWidget: FC<{
 											</span>
 										</div>
 
-										<span
-											title={campaignLabel}
+										<div
 											style={{
-												width: '80px',
-												height: '15px',
-												borderRadius: '3px',
-												background: chipScheme.card,
 												display: 'flex',
 												alignItems: 'center',
-												overflow: 'hidden',
-												boxSizing: 'border-box',
-												padding: '0 4px',
+												gap: '5px',
 												flex: '0 0 auto',
 											}}
 										>
-											<DashboardActionBarFolderIcon
-												width={20}
-												height={12}
-												style={{ color: chipScheme.folder, flex: '0 0 auto' }}
-											/>
-											<FadeOverflowText
-												text={campaignLabel}
+											<span
+												title={campaignLabel}
 												style={{
-													minWidth: 0,
-													flex: 1,
-													marginLeft: '6px',
-													color: '#000000',
-													fontFamily: 'Inter, sans-serif',
-													fontSize: '13.854px',
-													fontStyle: 'normal',
-													fontWeight: 500,
-													lineHeight: '17.186px',
+													width: '80px',
+													height: '15px',
+													borderRadius: '3px',
+													background: chipScheme.card,
+													display: 'flex',
+													alignItems: 'center',
+													overflow: 'hidden',
+													boxSizing: 'border-box',
+													padding: '0 4px',
+													flex: '0 0 auto',
 												}}
-											/>
-										</span>
+											>
+												<DashboardActionBarFolderIcon
+													width={20}
+													height={12}
+													style={{ color: chipScheme.folder, flex: '0 0 auto' }}
+												/>
+												<FadeOverflowText
+													text={campaignLabel}
+													style={{
+														minWidth: 0,
+														flex: 1,
+														marginLeft: '6px',
+														color: '#000000',
+														fontFamily: 'Inter, sans-serif',
+														fontSize: '13.854px',
+														fontStyle: 'normal',
+														fontWeight: 500,
+														lineHeight: '17.186px',
+													}}
+												/>
+											</span>
+											{eventChatState && (
+												<EventChatStatusPill
+													status={eventChatState.status}
+													height={15}
+													fontSize={9.5}
+												/>
+											)}
+										</div>
 									</div>
 
 									{/* Subject + preview */}

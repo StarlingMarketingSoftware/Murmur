@@ -394,7 +394,7 @@ export const MobileConversationView: FC<MobileConversationViewProps> = ({
 							style={{ flexShrink: 0 }}
 						>
 							<div
-								className="[&_p]:m-0"
+								className="murmur-selectable [&_p]:m-0"
 								style={{
 									maxWidth: '78%',
 									backgroundColor: MESSENGER_OUTBOUND_BACKGROUND,
@@ -424,7 +424,7 @@ export const MobileConversationView: FC<MobileConversationViewProps> = ({
 							</div>
 							<div className="px-4 pb-[14px]">
 								<div
-									className="font-inter text-[14px] leading-[1.4] text-black mt-[8px] pl-[35px] [&_p]:m-0"
+									className="murmur-selectable font-inter text-[14px] leading-[1.4] text-black mt-[8px] pl-[35px] [&_p]:m-0"
 									dangerouslySetInnerHTML={{
 										__html: sanitizeMessageHtml(reply.message),
 									}}

@@ -74,6 +74,7 @@ import {
 	type VenueEventApplicant,
 } from '@/hooks/queryHooks/useVenueApplications';
 import { _fetch } from '@/utils';
+import { isSafariBrowser } from '@/utils/browserDetection';
 import type { MediaAssetDto } from '@/app/api/media/route';
 import type { PatchVenueData, WeeklyHours } from '@/app/api/venue/schema';
 import {
@@ -81,9 +82,9 @@ import {
 	PROFILE_GENRE_OPTIONS,
 	VENUE_MAP_ENTRY_ZOOM,
 	VENUE_MAP_LEFT_CLUSTER_SCALE,
-	VENUE_MAP_OVERLAY_SCALE,
 	VENUE_TIME_OPTIONS,
 } from './constants';
+import { useVenuePortalLayout, type VenuePortalFrame } from './useVenuePortalLayout';
 import { MobileVenuePortal } from './mobile/MobileVenuePortal';
 import { VenueChatMapPanel } from './VenueChatMapPanel';
 import { VenueCreateEventMapPanel } from './VenueCreateEventMapPanel';
@@ -3664,6 +3665,7 @@ function VenueEventsMapPanel({
 	onAddOpportunity,
 	onEditOpportunity,
 	onViewApplicant,
+	frame,
 }: {
 	opportunities: VenueEvent[];
 	applicantCountByEventId: Map<number, number>;
@@ -3672,6 +3674,8 @@ function VenueEventsMapPanel({
 	onAddOpportunity: () => void;
 	onEditOpportunity: (eventId: number) => void;
 	onViewApplicant?: (applicant: VenueEventApplicant) => void;
+	// Viewport anchor + scale from useVenuePortalLayout's responsive cascade.
+	frame: VenuePortalFrame;
 }) {
 	// The inner list box is overflow-hidden, so the hover-delete X can't sit next to
 	// a row there. Instead the hovered row's measured offsetTop (relative to the
@@ -3742,8 +3746,12 @@ function VenueEventsMapPanel({
 	return (
 		<div
 			data-venue-tool-ui="true"
-			className="fixed left-[500px] top-[122px] z-[99] h-[829px] w-[781px] origin-top-left rounded-[12px] border-[2px] border-black/40 bg-white/40"
-			style={{ transform: `scale(${VENUE_MAP_OVERLAY_SCALE})` }}
+			className="fixed z-[99] h-[829px] w-[781px] origin-top-left rounded-[12px] border-[2px] border-black/40 bg-white/40"
+			style={{
+				left: frame.left,
+				top: frame.top,
+				transform: `scale(${frame.scale})`,
+			}}
 			onMouseLeave={() => setHovered(null)}
 		>
 			<div className="absolute left-[12px] top-[4px] font-inter text-[12.358px] font-medium leading-[16.477px] text-black">
@@ -3875,12 +3883,16 @@ function VenueEventsMapPanel({
 // Floating profile panel for the toolbar's Profile tab. Same footprint as the
 // chat panel (829×781 outer, 797×765 inner) so the boxes read as siblings; the
 // body renders the form's panel variant at its native 765px width.
-function VenueProfileMapPanel() {
+function VenueProfileMapPanel({ frame }: { frame: VenuePortalFrame }) {
 	return (
 		<div
 			data-venue-tool-ui="true"
-			className="fixed left-[500px] top-[122px] z-[99] h-[829px] w-[781px] origin-top-left rounded-[8px] border border-black bg-[linear-gradient(180deg,#ABF_0%,#EAF5FD_27.95%)]"
-			style={{ transform: `scale(${VENUE_MAP_OVERLAY_SCALE})` }}
+			className="fixed z-[99] h-[829px] w-[781px] origin-top-left rounded-[8px] border border-black bg-[linear-gradient(180deg,#ABF_0%,#EAF5FD_27.95%)]"
+			style={{
+				left: frame.left,
+				top: frame.top,
+				transform: `scale(${frame.scale})`,
+			}}
 		>
 			<div className="absolute left-[12px] top-[4px] font-inter text-[12.358px] font-medium leading-[16.477px] text-black">
 				Profile
@@ -3941,9 +3953,27 @@ export default function VenuePortalClient() {
 			setView('map');
 		}
 	}, []);
+	// The venue portal lives outside MurmurLayoutClient, so mirror its two
+	// document-level hooks here: `murmur-page` scopes the app-chrome user-select
+	// scheme (Safari can otherwise sweep-select the whole page), and `is-safari`
+	// gates Safari-only CSS. Deliberately NOT `murmur-compact` — that applies a
+	// root zoom the venue portal is designed without.
+	useEffect(() => {
+		document.body.classList.add('murmur-page');
+		if (isSafariBrowser()) {
+			document.documentElement.classList.add('is-safari');
+		}
+		return () => {
+			document.body.classList.remove('murmur-page');
+			document.documentElement.classList.remove('is-safari');
+		};
+	}, []);
 	const [selectedVenueTool, setSelectedVenueTool] = useState<
 		'add' | 'profile' | 'mail' | 'events' | null
 	>(null);
+	// Responsive cascade for the map view's fixed chrome: which regions render
+	// and where the center column anchors/scales at the current viewport size.
+	const layout = useVenuePortalLayout();
 	const [editingVenueEventId, setEditingVenueEventId] = useState<number | null>(null);
 	// Detail-view selection for the Events tool panel, lifted here so the inline
 	// Events box can open the panel directly onto an event's detail view.
@@ -4063,6 +4093,27 @@ export default function VenuePortalClient() {
 		};
 	}, [view, selectedVenueTool]);
 
+	// Entering the compact tier (including loading in it) auto-opens Chat — the
+	// pill stack is gone there, and the tab bar alone over the map reads as an
+	// empty state. Edge-triggered on the tier crossing so dismissing the panel
+	// while staying compact doesn't fight the user by re-opening it; leaving the
+	// map view re-arms it. Mirrors selectVenueTool's mail branch (deep link
+	// cleared) without depending on that per-render closure.
+	const isCompactTier = layout.tier === 'compact';
+	const wasCompactTierRef = useRef<boolean | null>(null);
+	useEffect(() => {
+		if (isMobile !== false || view !== 'map') {
+			wasCompactTierRef.current = null;
+			return;
+		}
+		const wasCompact = wasCompactTierRef.current;
+		wasCompactTierRef.current = isCompactTier;
+		if (isCompactTier && wasCompact !== true && selectedVenueTool === null) {
+			setChatDeepLink(null);
+			setSelectedVenueTool('mail');
+		}
+	}, [isCompactTier, isMobile, view, selectedVenueTool]);
+
 	// The map reports the home icon's projected position at 60fps during pans; route
 	// it through a mutable store so the pill stack can follow without re-rendering
 	// the whole portal tree per frame.
@@ -4179,7 +4230,7 @@ export default function VenuePortalClient() {
 				/>
 			)}
 			{/* Keep the profile-card + calendar cluster compact and slightly lower on the map. */}
-			{isMobile === false && view === 'map' && (
+			{isMobile === false && view === 'map' && layout.showLeftCluster && (
 				<div
 					data-venue-tool-ui="true"
 					className="fixed left-[24px] top-[56px] z-[100] origin-top-left"
@@ -4206,8 +4257,11 @@ export default function VenuePortalClient() {
 			)}
 			{/* Hidden while the docked chat is up: its newest-message card duplicates
 			    the thread already pinned to the corner, and the two would crowd the
-			    same right edge. */}
-			{isMobile === false && view === 'map' && (isMailToolSelected || !dockedThread) && (
+			    same right edge. The cascade sheds it first as the window narrows. */}
+			{isMobile === false &&
+				view === 'map' &&
+				layout.showNotifications &&
+				(isMailToolSelected || !dockedThread) && (
 				<VenueNotificationsMapPanel
 					conversations={venueConversations}
 					applications={venueApplications}
@@ -4219,13 +4273,17 @@ export default function VenuePortalClient() {
 				/>
 			)}
 			{isMobile === false && view === 'map' && selectedVenueTool === 'add' && (
-				<VenueCreateEventMapPanel event={editingVenueEvent} />
+				<VenueCreateEventMapPanel
+					event={editingVenueEvent}
+					frame={layout.createPanel}
+				/>
 			)}
 			{isMobile === false && view === 'map' && isMailToolSelected && (
 				<VenueChatMapPanel
 					key={chatDeepLink?.nonce ?? 'list'}
 					initialThread={chatDeepLink}
 					onThreadOpened={handleThreadActivated}
+					frame={layout.panel}
 				/>
 			)}
 			{isMobile === false && view === 'map' && selectedVenueTool === 'events' && (
@@ -4237,12 +4295,19 @@ export default function VenuePortalClient() {
 					onAddOpportunity={openCreateOpportunity}
 					onEditOpportunity={openEditOpportunity}
 					onViewApplicant={handleViewApplicant}
+					frame={layout.panel}
 				/>
 			)}
 			{/* The docked last-active thread; keyed so a thread switch resets the
 			    ConversationThread draft (a half-typed reply must not carry across
-			    counterparts). */}
-			{isMobile === false && view === 'map' && !isMailToolSelected && dockedThread && (
+			    counterparts). Unmounted (state kept) when the layout can't fit it
+			    legibly — a mounted thread marks itself read, so it must never sit
+			    invisible at a near-zero scale. */}
+			{isMobile === false &&
+				view === 'map' &&
+				!isMailToolSelected &&
+				layout.dockedChatVisible &&
+				dockedThread && (
 				<VenueDockedChatPanel
 					key={`${dockedThread.conversationId}:${dockedThread.thread}`}
 					conversationId={dockedThread.conversationId}
@@ -4250,27 +4315,38 @@ export default function VenuePortalClient() {
 					onExpand={() =>
 						openChatThread(dockedThread.conversationId, dockedThread.thread)
 					}
+					scale={layout.dockedChatScale}
 				/>
 			)}
 			{isMobile === false && view === 'map' && selectedVenueTool === 'profile' && (
-				<VenueProfileMapPanel />
+				<VenueProfileMapPanel frame={layout.panel} />
 			)}
 			{/* The pill stack and the tool tab bar swap: pills while nothing is open,
-			    the horizontal bar (above the open panel) while a tool is selected. */}
-			{isMobile === false && view === 'map' && selectedVenueTool !== null && (
+			    the horizontal bar (above the open panel) while a tool is selected. At
+			    the compact tier the bar is the only navigation and renders always —
+			    the map-anchored pills have no room there. */}
+			{isMobile === false &&
+				view === 'map' &&
+				(selectedVenueTool !== null || layout.tier === 'compact') && (
 				<VenueMapToolTabBar
 					selectedTool={selectedVenueTool}
 					onToolSelect={selectVenueTool}
 					unreadCount={venueUnread}
+					frame={layout.bar}
+					compact={layout.tier === 'compact'}
 				/>
 			)}
-			{isMobile === false && view === 'map' && selectedVenueTool === null && (
+			{isMobile === false &&
+				view === 'map' &&
+				selectedVenueTool === null &&
+				layout.tier !== 'compact' && (
 				<VenueMapActionPills
 					anchorStore={anchorStore}
 					selectedTool={selectedVenueTool}
 					onToolSelect={selectVenueTool}
 					unreadCount={venueUnread}
 					clusterScale={VENUE_MAP_LEFT_CLUSTER_SCALE}
+					dockMinX={layout.pillsDockMinX}
 				/>
 			)}
 		</PersistentMapProvider>

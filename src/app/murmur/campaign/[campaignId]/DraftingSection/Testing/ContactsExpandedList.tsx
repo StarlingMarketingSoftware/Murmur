@@ -60,6 +60,7 @@ import {
 } from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesFilterBar';
 import {
 	buildInboxConversations,
+	getConversationThreadApplicationId,
 	getInboxMessageTimeMs,
 	getInboxMessageSnippet,
 	inboxConversationContainsEmailId,
@@ -70,7 +71,16 @@ import {
 	type InboxConversation,
 	type InboxConversationMessage,
 } from '@/utils/inboxConversations';
-import { useGetMyEventApplications } from '@/hooks/queryHooks/useEventApplications';
+import {
+	useGetMyEventApplications,
+	type MyEventApplication,
+} from '@/hooks/queryHooks/useEventApplications';
+import { deriveEventChatStatus, formatEventChatTimestamp } from '@/utils/eventChatStatus';
+import {
+	EventChatCard,
+	EVENT_CHAT_COMPACT_ROW_HEIGHT_PX,
+	EVENT_CHAT_ROW_HEIGHT_PX,
+} from '@/components/molecules/EventChatCard/EventChatCard';
 
 const isSameLocalDay = (a: Date, b: Date) =>
 	a.getFullYear() === b.getFullYear() &&
@@ -528,6 +538,15 @@ export interface ContactsExpandedListProps {
 		contact: ContactWithName | null,
 		rowElement: HTMLElement | null
 	) => void;
+	/**
+	 * Row-geometry hover for event-chat rows — replaces onContactRowHover for
+	 * rows tied to an event application so the docked card shows the
+	 * opportunity panel instead of contact research.
+	 */
+	onEventChatRowHover?: (
+		application: MyEventApplication | null,
+		rowElement: HTMLElement | null
+	) => void;
 	onDraftClick?: (draft: EmailWithRelations) => void;
 	onDraftHover?: (draft: EmailWithRelations | null) => void;
 	selectedInboxEmailId?: number | null;
@@ -592,6 +611,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	onContactClick,
 	onContactHover,
 	onContactRowHover,
+	onEventChatRowHover,
 	onDraftClick,
 	onDraftHover,
 	selectedInboxEmailId,
@@ -1104,6 +1124,14 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	// The artist's submitted applications thread in as per-event "sent" items,
 	// scoped by the same campaign-contacts rule as the inbound rows above.
 	const { data: myApplications } = useGetMyEventApplications();
+	// Event-chat rows resolve their application (status, event metadata) by the
+	// conversation's thread-application id. Withdrawn applications stay in the
+	// map so their chats can render the closed state.
+	const applicationById = useMemo(
+		() =>
+			new Map((myApplications ?? []).map((application) => [application.id, application])),
+		[myApplications]
+	);
 	const supplementalApplicationRows = useMemo(() => {
 		const rows = (myApplications ?? [])
 			.filter((application) => application.status === 'submitted')
@@ -1169,6 +1197,35 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			),
 		[supplementalInboxConversations]
 	);
+	// Past/live partition for the inbox panel: closed/canceled event chats sit
+	// above the fold and reveal only by scrolling up (the venue portal's ledger
+	// pattern). Recomputed per render (not memoized) so every row shares one
+	// Date.now() frame.
+	const nowMs = Date.now();
+	const isConversationAboveFold = (conversation: InboxConversation) => {
+		const threadApplicationId = getConversationThreadApplicationId(conversation);
+		if (threadApplicationId == null) return false;
+		const application = applicationById.get(threadApplicationId);
+		if (!application) return false;
+		return deriveEventChatStatus(application, nowMs).isAboveFold;
+	};
+	const activeInboxPanelConversations =
+		inboxPanelTab === 'sent'
+			? supplementalSentConversations
+			: inboxPanelTab === 'opportunities'
+				? supplementalOpportunityInboxConversations
+				: supplementalInboxConversationsResponsesOnly;
+	const pastInboxPanelConversations: InboxConversation[] = [];
+	const liveInboxPanelConversations: InboxConversation[] = [];
+	for (const conversation of activeInboxPanelConversations) {
+		(isConversationAboveFold(conversation)
+			? pastInboxPanelConversations
+			: liveInboxPanelConversations
+		).push(conversation);
+	}
+	const pastInboxIdsKey = pastInboxPanelConversations
+		.map((conversation) => conversation.key)
+		.join(',');
 	const visibleInboxPanelRowCount =
 		inboxPanelTab === 'sent'
 			? supplementalSentConversations.length
@@ -1181,6 +1238,36 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const shouldShowScrollbar =
 		!isBottomView &&
 		(isInboxFocusMode ? visibleInboxPanelRowCount >= 6 : totalRenderedRows >= 14);
+
+	// Pin the inbox panel's initial scroll to the live section so it renders like
+	// a live-only list; past (closed/canceled) event chats reveal by scrolling up.
+	// Re-pins when the panel (re)mounts, the sub-tab changes, or a NEW past key
+	// appears mid-session — not on removals. Layout effect so the first paint is
+	// already pinned.
+	const inboxListScrollerRef = useRef<HTMLDivElement | null>(null);
+	const inboxLiveSectionRef = useRef<HTMLDivElement | null>(null);
+	const seenPastInboxIdsRef = useRef<Set<string> | null>(null);
+	const seenPastInboxTabRef = useRef<DashboardResponsesTab | null>(null);
+	useLayoutEffect(() => {
+		if (!isInboxFocusMode) {
+			seenPastInboxIdsRef.current = null;
+			seenPastInboxTabRef.current = null;
+			return;
+		}
+		const scroller = inboxListScrollerRef.current;
+		const liveSection = inboxLiveSectionRef.current;
+		if (!scroller || !liveSection) return;
+		if (seenPastInboxTabRef.current !== inboxPanelTab) {
+			seenPastInboxTabRef.current = inboxPanelTab;
+			seenPastInboxIdsRef.current = null;
+		}
+		const previous = seenPastInboxIdsRef.current;
+		const nextIds = pastInboxIdsKey === '' ? [] : pastInboxIdsKey.split(',');
+		seenPastInboxIdsRef.current = new Set(nextIds);
+		if (previous && nextIds.every((id) => previous.has(id))) return;
+		// offsetTop is scroller-relative, so it equals the past band's height.
+		scroller.scrollTop = liveSection.offsetTop;
+	}, [isInboxFocusMode, inboxPanelTab, pastInboxIdsKey]);
 
 	const { data: campaignContactEvents } = useGetCampaignContactEvents(campaign?.id, {
 		enabled: isBottomView && Boolean(campaign?.id),
@@ -1464,6 +1551,27 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		const bodyPreview = `${previewEmail.isSent ? 'You: ' : ''}${
 			getInboxMessageSnippet(previewEmail) || 'No content'
 		}`;
+		// Event-chat rows render the rich status card instead of the generic
+		// company/badge layout once their application data resolves (red-out
+		// silhouettes keep the generic layout).
+		const threadApplicationId = getConversationThreadApplicationId(conversation);
+		const eventApplication =
+			threadApplicationId != null ? applicationById.get(threadApplicationId) : undefined;
+		const eventChatState =
+			eventApplication && !shouldRedOutInboxRows
+				? deriveEventChatStatus(eventApplication, nowMs)
+				: null;
+		const isEventChatCompact =
+			eventChatState?.status === 'closed' || eventChatState?.status === 'canceled';
+		const rowHeightPx = eventChatState
+			? isEventChatCompact
+				? EVENT_CHAT_COMPACT_ROW_HEIGHT_PX
+				: EVENT_CHAT_ROW_HEIGHT_PX
+			: SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX;
+		const latestMessageMs = getInboxMessageTimeMs(previewEmail);
+		const eventChatTimestampLabel = latestMessageMs
+			? formatEventChatTimestamp(new Date(latestMessageMs), nowMs)
+			: '';
 		const optimisticLastSentAt = conversation.messages.reduce((latest, message) => {
 			const sentAt = optimisticInboxReplyByEmailId?.[message.id];
 			return typeof sentAt === 'number' && sentAt > latest ? sentAt : latest;
@@ -1490,7 +1598,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				)}
 				style={{
 					width: contactRowWidth,
-					height: `${SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX}px`,
+					height: `${rowHeightPx}px`,
 					borderRadius: `${SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX}px`,
 					borderTop: `1.955px solid ${inboxSupplementalBorderColor}`,
 					borderRight: `1.949px solid ${inboxSupplementalBorderColor}`,
@@ -1508,9 +1616,19 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					if (!isAllTabNavigation) setHoveredContactIndex(null);
 					if (isDraftsFocusMode) onDraftHover?.(null);
 					onContactHover?.(contact);
-					onContactRowHover?.(contact, e.currentTarget);
+					if (eventApplication && eventChatState) {
+						onEventChatRowHover?.(eventApplication, e.currentTarget);
+					} else {
+						onContactRowHover?.(contact, e.currentTarget);
+					}
 				}}
-				onMouseLeave={() => onContactRowHover?.(null, null)}
+				onMouseLeave={() => {
+					if (eventApplication && eventChatState) {
+						onEventChatRowHover?.(null, null);
+					} else {
+						onContactRowHover?.(null, null);
+					}
+				}}
 				onClick={(e) => {
 					if (isAllTabNavigation) return;
 					e.stopPropagation();
@@ -1528,6 +1646,19 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					}
 				}}
 			>
+				{eventApplication && eventChatState ? (
+					<div className="pointer-events-none h-full w-full">
+						<EventChatCard
+							application={eventApplication}
+							state={eventChatState}
+							nowMs={nowMs}
+							campaignName={campaign?.name?.trim() || null}
+							timestampLabel={eventChatTimestampLabel}
+							previewText={bodyPreview}
+						/>
+					</div>
+				) : (
+					<>
 				{/* Layout mirrors supplemental draft rows, but without the top strip. */}
 				<div className="absolute left-3 top-[10px] right-1/2 pr-1 pointer-events-none">
 					<FadeOverflowText
@@ -1617,6 +1748,8 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						splitNumericSuffix={false}
 					/>
 				</div>
+					</>
+				)}
 			</div>
 		);
 	};
@@ -1633,6 +1766,25 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		const isSelectedSentConversation =
 			selectedInboxEmailId != null &&
 			inboxConversationContainsSentEmailId(conversation, selectedInboxEmailId);
+		// Same event-chat card swap as the inbound rows.
+		const threadApplicationId = getConversationThreadApplicationId(conversation);
+		const eventApplication =
+			threadApplicationId != null ? applicationById.get(threadApplicationId) : undefined;
+		const eventChatState =
+			eventApplication && !shouldRedOutInboxRows
+				? deriveEventChatStatus(eventApplication, nowMs)
+				: null;
+		const isEventChatCompact =
+			eventChatState?.status === 'closed' || eventChatState?.status === 'canceled';
+		const rowHeightPx = eventChatState
+			? isEventChatCompact
+				? EVENT_CHAT_COMPACT_ROW_HEIGHT_PX
+				: EVENT_CHAT_ROW_HEIGHT_PX
+			: SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX;
+		const latestMessageMs = getInboxMessageTimeMs(email);
+		const eventChatTimestampLabel = latestMessageMs
+			? formatEventChatTimestamp(new Date(latestMessageMs), nowMs)
+			: '';
 
 		return (
 			<div
@@ -1643,7 +1795,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				)}
 				style={{
 					width: contactRowWidth,
-					height: `${SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX}px`,
+					height: `${rowHeightPx}px`,
 					borderRadius: `${SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX}px`,
 					borderTop: `1.955px solid ${inboxSupplementalBorderColor}`,
 					borderRight: `1.949px solid ${inboxSupplementalBorderColor}`,
@@ -1661,9 +1813,19 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					if (!isAllTabNavigation) setHoveredContactIndex(null);
 					if (isDraftsFocusMode) onDraftHover?.(null);
 					onContactHover?.(contact);
-					onContactRowHover?.(contact, e.currentTarget);
+					if (eventApplication && eventChatState) {
+						onEventChatRowHover?.(eventApplication, e.currentTarget);
+					} else {
+						onContactRowHover?.(contact, e.currentTarget);
+					}
 				}}
-				onMouseLeave={() => onContactRowHover?.(null, null)}
+				onMouseLeave={() => {
+					if (eventApplication && eventChatState) {
+						onEventChatRowHover?.(null, null);
+					} else {
+						onContactRowHover?.(null, null);
+					}
+				}}
 				onClick={(e) => {
 					if (isAllTabNavigation) return;
 					e.stopPropagation();
@@ -1685,6 +1847,19 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					}
 				}}
 			>
+				{eventApplication && eventChatState ? (
+					<div className="pointer-events-none h-full w-full">
+						<EventChatCard
+							application={eventApplication}
+							state={eventChatState}
+							nowMs={nowMs}
+							campaignName={campaign?.name?.trim() || null}
+							timestampLabel={eventChatTimestampLabel}
+							previewText={messagePreview}
+						/>
+					</div>
+				) : (
+					<>
 				<div className="absolute left-3 top-[10px] right-1/2 pr-1 pointer-events-none">
 					<FadeOverflowText
 						text={companyLabel}
@@ -1773,6 +1948,8 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						splitNumericSuffix={false}
 					/>
 				</div>
+					</>
+				)}
 			</div>
 		);
 	};
@@ -2208,7 +2385,68 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						offsetRight={isBottomView ? -7 : -6}
 						contentClassName="overflow-x-hidden"
 						alwaysShow={false}
+						scrollContainerRef={
+							isInboxFocusMode && !isBottomView ? inboxListScrollerRef : undefined
+						}
 					>
+						{isInboxFocusMode && !isBottomView ? (
+							<>
+								{/* Past band: closed/canceled event chats above the fold. */}
+								{pastInboxPanelConversations.length > 0 && (
+									<div className="flex shrink-0 flex-col items-center space-y-2 pb-2 opacity-70">
+										{inboxPanelTab === 'sent'
+											? pastInboxPanelConversations.map(renderSupplementalSentRow)
+											: pastInboxPanelConversations.map(renderSupplementalInboxRow)}
+									</div>
+								)}
+								{/* min-h-full pins max-scrollTop to the past band's height so the
+								    pinned view renders exactly like a live-only list; shrink-0 is
+								    load-bearing (min-h-full replaces flex sizing). */}
+								<div
+									ref={inboxLiveSectionRef}
+									className="flex min-h-full shrink-0 flex-col items-center space-y-2 pb-2"
+									style={{
+										paddingTop:
+											customWhiteSectionHeight !== undefined ? '2px' : undefined,
+									}}
+								>
+									{inboxPanelTab === 'sent'
+										? liveInboxPanelConversations.map(renderSupplementalSentRow)
+										: liveInboxPanelConversations.map(renderSupplementalInboxRow)}
+									{Array.from({
+										length: Math.max(0, minRows - visibleInboxPanelRowCount),
+									}).map((_, idx) => (
+										<div
+											key={`inbox-placeholder-${idx}`}
+											className={cn(
+												'select-none overflow-hidden max-[480px]:w-[96.27vw]',
+												shouldShowLoadingWave &&
+													'contacts-expanded-list-loading-wave-row contacts-expanded-list-loading-wave-row--inbox'
+											)}
+											style={{
+												width: contactRowWidth,
+												height: `${SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX}px`,
+												borderRadius: `${SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX}px`,
+												borderTop: `1.955px solid ${inboxSupplementalBorderColor}`,
+												borderRight: `1.949px solid ${inboxSupplementalBorderColor}`,
+												borderBottom: `1.949px solid ${inboxSupplementalBorderColor}`,
+												borderLeft: `1.949px solid ${inboxSupplementalBorderColor}`,
+												backgroundColor: panelFillColor,
+												boxSizing: 'border-box',
+												...(shouldShowLoadingWave
+													? {
+															animationDelay: `${-(
+																loadingWaveDurationSeconds -
+																idx * loadingWaveStepSeconds
+															)}s`,
+														}
+													: {}),
+											}}
+										/>
+									))}
+								</div>
+							</>
+						) : (
 						<div
 							className={cn(
 								'flex flex-col items-center',
@@ -2249,14 +2487,6 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 											)}
 										/>
 									))}
-								</>
-							) : isInboxFocusMode ? (
-								<>
-									{inboxPanelTab === 'sent'
-										? supplementalSentConversations.map(renderSupplementalSentRow)
-										: inboxPanelTab === 'opportunities'
-											? supplementalOpportunityInboxConversations.map(renderSupplementalInboxRow)
-											: supplementalInboxConversationsResponsesOnly.map(renderSupplementalInboxRow)}
 								</>
 							) : (
 								<>
@@ -3098,6 +3328,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 								);
 							})}
 						</div>
+						)}
 					</CustomScrollbar>
 				</div>
 			)}

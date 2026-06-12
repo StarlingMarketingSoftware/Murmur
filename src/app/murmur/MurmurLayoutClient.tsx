@@ -12,6 +12,7 @@ import { SettingsModal } from '@/components/organisms/SettingsModal/SettingsModa
 import { PersistentDashboardMap } from '@/components/molecules/PersistentDashboardMap';
 import { PersistentMapProvider } from '@/contexts/PersistentMapContext';
 import { SendingSessionProvider } from '@/contexts/SendingSessionContext';
+import { isSafariBrowser } from '@/utils/browserDetection';
 
 export default function MurmurLayoutClient({ children }: { children: React.ReactNode }) {
 	const { isSignedIn } = useAuth();
@@ -44,12 +45,18 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 	useEffect(() => {
 		document.body.classList.add('murmur-page');
 		document.documentElement.classList.add('murmur-compact');
+		// Safari-only CSS hooks (e.g. swapping backdrop-filter over the WebGL map
+		// for opaque fills — a WebKit compositing perf cliff).
+		if (isSafariBrowser()) {
+			document.documentElement.classList.add('is-safari');
+		}
 
 		// Removed slide-up animation on nav to avoid bounce-in effect
 
 		return () => {
 			document.body.classList.remove('murmur-page');
 			document.documentElement.classList.remove('murmur-compact');
+			document.documentElement.classList.remove('is-safari');
 		};
 	}, []);
 

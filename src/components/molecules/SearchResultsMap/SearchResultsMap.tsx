@@ -62,6 +62,7 @@ import {
 	isWineBeerSpiritsTitle,
 	getWineBeerSpiritsLabel,
 } from '@/utils/restaurantTitle';
+import { isSafariBrowser } from '@/utils/browserDetection';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { WeatherMood } from '@/lib/weather/regions';
@@ -311,6 +312,7 @@ import {
 	RESULT_DOT_TRANSPARENT_STROKE_COLOR,
 	RESULT_DOT_ZOOM_MAX,
 	RESULT_DOT_ZOOM_MIN,
+	SAFARI_CLOUDS_DRIFT_UPDATE_MS,
 	SELECTED_STATE_GRADIENT_BLOOM_OPACITY,
 	SELECTED_STATE_GRADIENT_COLOR_OPACITY,
 	SNOWFLAKE_STAMPS_COUNT,
@@ -547,6 +549,27 @@ export {
 	DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING,
 	DASHBOARD_TO_INTERACTIVE_TRANSITION_MS,
 } from './constants';
+
+// Safari/WebKit: canvas→GPU-texture uploads are far slower than Chrome's, and any
+// *playing* Mapbox canvas source forces the map to re-render (and re-upload every
+// playing canvas) every frame, forever — the map never idles. In Safari we keep the
+// animated canvas sources paused between content updates instead. Module-level:
+// the UA never changes within a session (false during SSR; the map only runs client-side).
+const SAFARI_CANVAS_PERF_MODE = isSafariBrowser();
+
+// Upload the current canvas content to the source's GPU texture once, leaving the
+// source paused afterwards (CanvasSource.pause() runs prepare() — a synchronous
+// texture.update — before clearing its playing flag).
+const uploadCanvasSourceOnce = (
+	src: { play?: () => void; pause?: () => void } | null | undefined
+) => {
+	try {
+		src?.play?.();
+		src?.pause?.();
+	} catch {
+		// Non-fatal.
+	}
+};
 
 const EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_X_PX = 112;
 const EMPTY_MAP_CLICK_PROMPT_EDGE_PADDING_TOP_PX = 48;
@@ -1499,6 +1522,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const lightningRestrikeCellRef = useRef<StormLightningCell | null>(null);
 	const lightningEventIdRef = useRef<number>(1);
 	const lightningWasEnabledRef = useRef<boolean>(false);
+	// Safari perf mode: whether the lightning/snow canvases uploaded last tick, so the
+	// final cleared canvas still reaches the GPU one tick after a flash/mood ends.
+	const lightningUploadWasActiveRef = useRef<boolean>(false);
+	const snowUploadWasActiveRef = useRef<boolean>(false);
 	const snowCanvasRef = useRef<HTMLCanvasElement | null>(null);
 	const snowCanvasCtxRef = useRef<CanvasRenderingContext2D | null>(null);
 	const snowStampImagesRef = useRef<HTMLImageElement[] | null>(null);
@@ -3612,39 +3639,46 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!isCanvasSource) return;
 
 		// Ensure Mapbox is actively sampling the canvas each frame.
+		// Safari: the tick below re-uploads after each draw instead; keep the source
+		// paused between ticks so the map can idle (see SAFARI_CANVAS_PERF_MODE).
 		try {
 			cloudsSource.play?.();
+			if (SAFARI_CANVAS_PERF_MODE) cloudsSource.pause?.();
 		} catch {
 			// Ignore.
 		}
 
 		// Mirror the same play() guarantee for the dedicated lightning canvas source.
-		try {
-			const lightningSource: { play?: () => void } | null = (() => {
-				try {
-					return map.getSource(MAPBOX_SOURCE_IDS.lightning) as {
-						play?: () => void;
-					} | null;
-				} catch {
-					return null;
-				}
-			})();
-			lightningSource?.play?.();
-		} catch {
-			// Ignore.
-		}
+		// Safari: skipped — the tick uploads the lightning/snow canvases only while
+		// their weather visuals are actually active.
+		if (!SAFARI_CANVAS_PERF_MODE) {
+			try {
+				const lightningSource: { play?: () => void } | null = (() => {
+					try {
+						return map.getSource(MAPBOX_SOURCE_IDS.lightning) as {
+							play?: () => void;
+						} | null;
+					} catch {
+						return null;
+					}
+				})();
+				lightningSource?.play?.();
+			} catch {
+				// Ignore.
+			}
 
-		try {
-			const snowSource: { play?: () => void } | null = (() => {
-				try {
-					return map.getSource(MAPBOX_SOURCE_IDS.snow) as { play?: () => void } | null;
-				} catch {
-					return null;
-				}
-			})();
-			snowSource?.play?.();
-		} catch {
-			// Ignore.
+			try {
+				const snowSource: { play?: () => void } | null = (() => {
+					try {
+						return map.getSource(MAPBOX_SOURCE_IDS.snow) as { play?: () => void } | null;
+					} catch {
+						return null;
+					}
+				})();
+				snowSource?.play?.();
+			} catch {
+				// Ignore.
+			}
 		}
 
 		const loadTexture = (): Promise<HTMLImageElement> => {
@@ -6065,11 +6099,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 		};
 
+		const driftUpdateMs = SAFARI_CANVAS_PERF_MODE
+			? SAFARI_CLOUDS_DRIFT_UPDATE_MS
+			: CLOUDS_DRIFT_UPDATE_MS;
 		const tick = (now: number, img: HTMLImageElement, pattern: CanvasPattern | null) => {
 			if (canceled) return;
 
 			const last = cloudsDriftLastFrameMsRef.current;
-			if (!last || now - last >= CLOUDS_DRIFT_UPDATE_MS) {
+			if (!last || now - last >= driftUpdateMs) {
 				const dtS = last ? (now - last) / 1000 : 0;
 				cloudsDriftLastFrameMsRef.current = now;
 				const dtReal = clamp(dtS, 0, 0.25);
@@ -6089,6 +6126,45 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					drawSnow(cloudsDriftSimTimeMsRef.current);
 				} catch {
 					// Ignore.
+				}
+				if (SAFARI_CANVAS_PERF_MODE) {
+					// Upload this tick's content, then leave the sources paused so the map
+					// idles between ticks instead of re-uploading every canvas every frame.
+					uploadCanvasSourceOnce(cloudsSource);
+
+					// Lightning/snow upload only while visually active, plus one trailing
+					// tick so the final cleared canvas reaches the GPU (drawLightning and
+					// drawSnow clearRect every tick).
+					const cfg = weatherMoodConfigRef.current;
+					const lightningActive = lightningEventsRef.current.length > 0;
+					if (lightningActive || lightningUploadWasActiveRef.current) {
+						try {
+							uploadCanvasSourceOnce(
+								map.getSource(MAPBOX_SOURCE_IDS.lightning) as {
+									play?: () => void;
+									pause?: () => void;
+								} | null
+							);
+						} catch {
+							// Ignore.
+						}
+					}
+					lightningUploadWasActiveRef.current = lightningActive;
+
+					const snowActive = cfg.snowOpacity > 0.001 && cfg.snowDensity > 0.001;
+					if (snowActive || snowUploadWasActiveRef.current) {
+						try {
+							uploadCanvasSourceOnce(
+								map.getSource(MAPBOX_SOURCE_IDS.snow) as {
+									play?: () => void;
+									pause?: () => void;
+								} | null
+							);
+						} catch {
+							// Ignore.
+						}
+					}
+					snowUploadWasActiveRef.current = snowActive;
 				}
 				// In some Mapbox GL configurations `animate: true` is not enough to force
 				// continuous sampling; request repaint after every animated canvas is current.
@@ -6271,7 +6347,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				} as any);
 				// Start sampling immediately (the drift loop will draw once the texture loads).
 				try {
-					(mapInstance.getSource(MAPBOX_SOURCE_IDS.clouds) as any)?.play?.();
+					const cloudsSrc = mapInstance.getSource(MAPBOX_SOURCE_IDS.clouds) as any;
+					cloudsSrc?.play?.();
+					if (SAFARI_CANVAS_PERF_MODE) cloudsSrc?.pause?.();
 				} catch {
 					// Ignore.
 				}
@@ -6296,11 +6374,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						animate: true,
 						coordinates: LIGHTNING_CANVAS_COORDINATES,
 					} as unknown as mapboxgl.AnySourceData);
-					(
-						mapInstance.getSource(MAPBOX_SOURCE_IDS.lightning) as
-							| { play?: () => void }
-							| undefined
-					)?.play?.();
+					const lightningSrc = mapInstance.getSource(MAPBOX_SOURCE_IDS.lightning) as
+						| { play?: () => void; pause?: () => void }
+						| undefined;
+					lightningSrc?.play?.();
+					if (SAFARI_CANVAS_PERF_MODE) lightningSrc?.pause?.();
 				} catch {
 					// Non-fatal; storm mood simply renders without the dedicated lightning layer.
 				}
@@ -6317,11 +6395,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						animate: true,
 						coordinates: CLOUDS_CANVAS_COORDINATES,
 					} as unknown as mapboxgl.AnySourceData);
-					(
-						mapInstance.getSource(MAPBOX_SOURCE_IDS.snow) as
-							| { play?: () => void }
-							| undefined
-					)?.play?.();
+					const snowSrc = mapInstance.getSource(MAPBOX_SOURCE_IDS.snow) as
+						| { play?: () => void; pause?: () => void }
+						| undefined;
+					snowSrc?.play?.();
+					if (SAFARI_CANVAS_PERF_MODE) snowSrc?.pause?.();
 				} catch {
 					// Non-fatal; snowy mood simply renders without the particle layer.
 				}
@@ -6343,11 +6421,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						animate: true,
 						coordinates: CLOUDS_CANVAS_COORDINATES,
 					} as unknown as mapboxgl.AnySourceData);
-					(
-						mapInstance.getSource(MAPBOX_SOURCE_IDS.dayFarSideShade) as
-							| { play?: () => void }
-							| undefined
-					)?.play?.();
+					const shadeSrc = mapInstance.getSource(MAPBOX_SOURCE_IDS.dayFarSideShade) as
+						| { play?: () => void; pause?: () => void }
+						| undefined;
+					shadeSrc?.play?.();
+					if (SAFARI_CANVAS_PERF_MODE) shadeSrc?.pause?.();
 				} catch {
 					// Non-fatal; the background globe simply renders without the extra shade.
 				}
@@ -6364,11 +6442,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						animate: true,
 						coordinates: CLOUDS_CANVAS_COORDINATES,
 					} as unknown as mapboxgl.AnySourceData);
-					(
-						mapInstance.getSource(MAPBOX_SOURCE_IDS.sunTransition) as
-							| { play?: () => void }
-							| undefined
-					)?.play?.();
+					const sunSrc = mapInstance.getSource(MAPBOX_SOURCE_IDS.sunTransition) as
+						| { play?: () => void; pause?: () => void }
+						| undefined;
+					sunSrc?.play?.();
+					if (SAFARI_CANVAS_PERF_MODE) sunSrc?.pause?.();
 				} catch {
 					// Non-fatal; sunrise still falls back to the normal day/night fade.
 				}
@@ -8006,6 +8084,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		mapRef.current = mapInstance;
 		setMap(mapInstance);
+		// Deterministic camera handle for scripts/measure-dashboard-memory.mjs and
+		// scripts/measure-map-fps.mjs (drives fixed camera sequences); also handy
+		// for manual debugging.
+		(window as unknown as { __murmurMapDebug?: unknown }).__murmurMapDebug =
+			mapInstance;
 		try {
 			initialZoomConstraintsRef.current = {
 				minZoom: mapInstance.getMinZoom(),
@@ -12188,11 +12271,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			sunTransitionPaintKeyRef.current = paintKey;
 			try {
 				const m = mapRef.current;
-				(
-					m?.getSource(MAPBOX_SOURCE_IDS.sunTransition) as
-						| { play?: () => void }
-						| undefined
-				)?.play?.();
+				const sunSrc = m?.getSource(MAPBOX_SOURCE_IDS.sunTransition) as
+					| { play?: () => void; pause?: () => void }
+					| undefined;
+				sunSrc?.play?.();
+				// Safari: upload once, then stop forcing per-frame texture uploads.
+				if (SAFARI_CANVAS_PERF_MODE) sunSrc?.pause?.();
 				m?.triggerRepaint();
 			} catch {
 				// Non-fatal.
@@ -12206,9 +12290,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const refreshSource = () => {
 			try {
 				const source = map?.getSource(MAPBOX_SOURCE_IDS.dayFarSideShade) as
-					| { play?: () => void }
+					| { play?: () => void; pause?: () => void }
 					| undefined;
 				source?.play?.();
+				// Safari: upload once, then stop forcing per-frame texture uploads.
+				if (SAFARI_CANVAS_PERF_MODE) source?.pause?.();
 				map?.triggerRepaint();
 			} catch {
 				// Non-fatal.
