@@ -2461,10 +2461,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		useState<ContactWithName | null>(null);
 	const [hoveredContactForResearch, setHoveredContactForResearch] =
 		useState<ContactWithName | null>(null);
-	// Hovering an event-chat row in the main inbox list swaps the adjacent
-	// research panel for the opportunity panel.
-	const [hoveredOpportunityForResearch, setHoveredOpportunityForResearch] =
-		useState<MyEventApplication | null>(null);
 	const [hasUserSelectedResearchContact, setHasUserSelectedResearchContact] =
 		useState(false);
 	// Row-aligned abridged research card left of the pinned list (Write/Drafts/Inbox).
@@ -6071,6 +6067,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													{/* Left arrow */}
 													<button
 														type="button"
+														data-campaign-interactive-surface
 														onClick={goToPreviousTab}
 														className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
 														aria-label="Previous tab"
@@ -6187,6 +6184,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													{/* Right arrow */}
 													<button
 														type="button"
+														data-campaign-interactive-surface
 														onClick={goToNextTab}
 														className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
 														aria-label="Next tab"
@@ -6198,7 +6196,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										)}
 										{/* Contacts table below writing box at narrowest breakpoint */}
 										{isNarrowestDesktop && (
-											<div className="mt-[20px] w-full flex justify-center">
+											<div
+												data-campaign-interactive-surface
+												className="mt-[20px] w-full flex justify-center"
+											>
 												{isSendingUiVisible ? (
 													<SendingExpandedList width={489} height={349} />
 												) : (
@@ -6232,7 +6233,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										)}
 										{/* Research panel below contacts at narrowest breakpoint */}
 										{isNarrowestDesktop && (
-											<div className="mt-[20px] w-full flex justify-center">
+											<div
+												data-campaign-interactive-surface
+												className="mt-[20px] w-full flex justify-center"
+											>
 												{isBatchDraftingInProgress ? (
 													<DraftPreviewExpandedList
 														contacts={contacts || []}
@@ -8297,9 +8301,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{view === 'inbox' && (
 							<div className="mt-6 flex flex-col items-center">
 								{isNarrowestDesktop ? (
-									// Narrowest layout (< 952px): Single column with Inbox on top, Research below
+									// Narrowest layout (< 952px): the compact-workspace detail panel on top
+									// (501x703 — these exact dims gate InboxSection's campaign compact detail
+									// design), with the inbox list that sits to its left at wider widths
+									// stacked below it.
 									<div className="flex flex-col items-center w-full">
-										{/* Inbox section */}
 										<InboxSection
 											allowedSenderEmails={campaignContactEmails}
 											contactByEmail={campaignContactsByEmail}
@@ -8312,7 +8318,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onCampaignInboxEmpty={
 												inboxMockOverrideActive ? undefined : goToOverview
 											}
+											selectedEmailId={selectedInboxEmailId}
+											onSelectedEmailIdChange={setSelectedInboxEmailId}
 											onThreadReplySent={handleInboxThreadReplySent}
+											autoSelectFirstEmail
+											detailOnly
+											hideSelectedEmailBackButton
+											desktopWidth={501}
+											desktopHeight={703}
 											sampleData={inboxSectionSampleData}
 											onContactSelect={(contact) => {
 												if (contact) {
@@ -8322,49 +8335,38 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onContactHover={(contact) => {
 												setHoveredContactForResearch(contact);
 											}}
-											onEventChatHover={setHoveredOpportunityForResearch}
 											isNarrow={true}
 										/>
-										{/* Research panel below inbox - matches InboxSection's container structure (w-full mx-auto px-4 maxWidth 516px) - hidden on mobile */}
-										{!isMobile && (
-											<div className="mt-[20px] w-full flex justify-center px-4">
-												{isBatchDraftingInProgress ? (
-													<DraftPreviewExpandedList
-														contacts={contacts || []}
-														livePreview={liveDraftPreview}
-														fallbackDraft={draftPreviewFallbackDraft}
-														width={516}
-														height={400}
-													/>
-												) : hoveredOpportunityForResearch ? (
-													<OpportunityHoverPanel
-														application={hoveredOpportunityForResearch}
-														nowMs={Date.now()}
-													/>
-												) : (
-													<ContactResearchPanel
-														contact={displayedContactForResearch}
-														hideAllText={false}
-														hideSummaryIfBullets={true}
-														height={400}
-														width={516}
-														boxWidth={488}
-														compactHeader
-														style={{ display: 'block' }}
-													/>
-												)}
-											</div>
-										)}
+										{/* Inbox mode of ContactsExpandedList drives the selected email in the detail panel above. */}
+										<div className="mt-[20px]" data-campaign-interactive-surface>
+											<ContactsExpandedList
+												contacts={contactsForContactsExpandedList}
+												{...contactsListSupplementalProps}
+												{...contactsListTopNavProps}
+												isLoading={isContactsLoading}
+												campaign={campaign}
+												focusMode="inbox"
+												selectedInboxEmailId={selectedInboxEmailId}
+												onInboxEmailClick={handleInboxEmailClick}
+												onContactHover={handleResearchContactHover}
+												width={501}
+												height={582}
+												minRows={6}
+											/>
+										</div>
 									</div>
 								) : isInboxTabStacked || isNarrowDesktop ? (
-									// Stacked layout (952px - 1317px): keep the left inbox column aligned with other tabs.
+									// Stacked layout (952px - 1317px): left inbox column + the compact-workspace
+									// detail panel (501x703 gates InboxSection's campaign compact detail design).
+									// 912 = 375 left column + 36 gap + 501 detail.
 									<div
 										className="flex flex-col items-center mx-auto"
-										style={{ width: '927px' }}
+										style={{ width: '912px' }}
 									>
 										<div className="flex flex-row items-start gap-[36px] w-full">
 											{/* Left column: Campaign Header + Inbox list */}
 											<div
+												data-campaign-interactive-surface
 												className="flex flex-col flex-shrink-0"
 												style={{ gap: '16px', width: '375px' }}
 											>
@@ -8418,6 +8420,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													autoSelectFirstEmail
 													detailOnly
 													hideSelectedEmailBackButton
+													desktopWidth={501}
+													desktopHeight={703}
 													sampleData={inboxSectionSampleData}
 													onContactSelect={(contact) => {
 														if (contact) {

@@ -45,11 +45,13 @@ import nextDynamic from 'next/dynamic';
 import { CampaignsTable } from '@/components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import { useEditCampaign, useGetCampaignContacts } from '@/hooks/queryHooks/useCampaigns';
-import { useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { EMAIL_QUERY_KEYS, useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useCreateIdentity, useGetIdentities } from '@/hooks/queryHooks/useIdentities';
 import { EmailStatus } from '@/constants/prismaEnums';
 import { useQueryClient } from '@tanstack/react-query';
+import type { EmailWithRelations } from '@/types';
+import { useSendingSessionState } from '@/contexts/SendingSessionContext';
 import { HoverDescriptionProvider } from '@/contexts/HoverDescriptionContext';
 import { CampaignTopSearchHighlightProvider } from '@/contexts/CampaignTopSearchHighlightContext';
 import { CampaignDeviceProvider } from '@/contexts/CampaignDeviceContext';
@@ -749,6 +751,15 @@ const CAMPAIGN_CENTERED_STAGE_COMPACT_MAX_LAYOUT_W_PX = 1317;
 // The standard right-anchored cluster (Sent / expanded workspace) spans ±657·0.94 from
 // center; with the 88px min shift clamp it clips the right edge below ~1418 layout px.
 const CAMPAIGN_CENTERED_STAGE_STANDARD_MAX_LAYOUT_W_PX = 1418;
+// On the compact (non-expanded) Write/Drafts/Inbox stage the bottom map cluster
+// (status strip + ask box, ×CAMPAIGN_OVERVIEW_CLUSTER_SCALE, centered over the clear
+// left strip) keeps a fixed size while the 985px band's left edge marches toward it
+// as the window narrows. Below this layout width the band would overlap the cluster,
+// so it hides early (the left "Showing" tool column stays — the band never reaches it).
+const CAMPAIGN_COMPACT_PRESET_CLUSTER_MIN_LAYOUT_W_PX =
+	CAMPAIGN_COMPACT_WORKSPACE_BACKDROP_WIDTH_PX +
+	CAMPAIGN_OVERVIEW_STATUS_STRIP_WIDTH_PX * CAMPAIGN_OVERVIEW_CLUSTER_SCALE +
+	16;
 const CAMPAIGN_TOP_NAV_UI_SCALE = 0.85;
 const CAMPAIGN_TOP_NAV_SEARCH_BAR_OUTER_WIDTH_PX = 440;
 const CAMPAIGN_TOP_NAV_SEARCH_BAR_INPUT_HEIGHT_PX = 49;
@@ -1607,47 +1618,48 @@ const Murmur = () => {
 					}
 				})();
 
-				const getOffsetTopToDocument = (el: HTMLElement): number => {
-					let top = 0;
-					let node: HTMLElement | null = el;
-					// `offsetTop` is layout-based (unaffected by transforms), so this works well
-					// when we are using transform scaling.
-					while (node) {
-						top += node.offsetTop || 0;
-						node = node.offsetParent as HTMLElement | null;
-					}
-					return top;
-				};
+				// Both scaling modes measure the anchors' visual rects and divide out the
+				// root-level scale. Rects (unlike offsetTop chains) include the inner
+				// campaign-content scale (CAMPAIGN_MAP_CONTENT_SCALE) — an offset-based
+				// measurement overestimates the content bottom by that factor, which made
+				// the Safari snug fit pick a too-small zoom and float the bottom panels
+				// ~55px above the viewport bottom.
+				const maxBottomPx = anchors.reduce((acc, el) => {
+					const rect = el.getBoundingClientRect();
+					return Math.max(acc, rect.bottom);
+				}, 0);
 
-				let unscaledBottomPx = 0;
+				const computed = window.getComputedStyle(html);
+				const varZoomStr = computed.getPropertyValue(CAMPAIGN_ZOOM_VAR);
+				const parsedVarZoom = varZoomStr ? parseFloat(varZoomStr) : NaN;
+				let appliedScale =
+					Number.isFinite(parsedVarZoom) && parsedVarZoom > 0
+						? parsedVarZoom
+						: DEFAULT_CAMPAIGN_ZOOM;
 				if (isTransformScaleMode) {
-					// Transform scaling does not affect layout metrics — use offset* to avoid any
-					// Safari/WebKit quirks with getBoundingClientRect under a transformed <body>.
-					unscaledBottomPx = anchors.reduce((acc, el) => {
-						const top = getOffsetTopToDocument(el);
-						return Math.max(acc, top + el.offsetHeight);
-					}, 0);
+					// The scale lives on body's transform matrix (`matrix(s, 0, 0, s, tx, ty)`).
+					try {
+						const bodyTransform = window.getComputedStyle(document.body).transform;
+						const matrixMatch =
+							bodyTransform && bodyTransform !== 'none'
+								? bodyTransform.match(/matrix\(\s*([^,]+),/)
+								: null;
+						const parsedScale = matrixMatch ? parseFloat(matrixMatch[1]) : NaN;
+						if (Number.isFinite(parsedScale) && parsedScale > 0) {
+							appliedScale = parsedScale;
+						}
+					} catch {
+						// keep the zoom-var fallback
+					}
 				} else {
-					// Zoom scaling affects layout — use bounding rect and unscale.
-					const maxBottomPx = anchors.reduce((acc, el) => {
-						const rect = el.getBoundingClientRect();
-						return Math.max(acc, rect.bottom);
-					}, 0);
-
-					const computed = window.getComputedStyle(html);
 					const zoomStr = computed.zoom;
 					const parsedZoom = zoomStr ? parseFloat(zoomStr) : NaN;
-					const varZoomStr = computed.getPropertyValue(CAMPAIGN_ZOOM_VAR);
-					const parsedVarZoom = varZoomStr ? parseFloat(varZoomStr) : NaN;
-					const appliedScale =
-						Number.isFinite(parsedZoom) && parsedZoom > 0 && parsedZoom !== 1
-							? parsedZoom
-							: Number.isFinite(parsedVarZoom) && parsedVarZoom > 0
-								? parsedVarZoom
-								: DEFAULT_CAMPAIGN_ZOOM;
-
-					unscaledBottomPx = appliedScale > 0 ? maxBottomPx / appliedScale : maxBottomPx;
+					if (Number.isFinite(parsedZoom) && parsedZoom > 0 && parsedZoom !== 1) {
+						appliedScale = parsedZoom;
+					}
 				}
+
+				const unscaledBottomPx = appliedScale > 0 ? maxBottomPx / appliedScale : maxBottomPx;
 
 				if (unscaledBottomPx > 0) {
 					// Calculate exact zoom to make the content bottom align with the viewport bottom
@@ -2392,6 +2404,7 @@ const Murmur = () => {
 		visible: boolean;
 		operations: Array<{ current: number; total: number }>;
 	}>({ visible: false, operations: [] });
+	const sendingSession = useSendingSessionState();
 	const getInitialInboxSentTab = (): InboxSentTab => getInboxSentTabFromUrlTab(tabParam);
 	const [inboxSentTab, setInboxSentTab] = useState<InboxSentTab>(
 		getInitialInboxSentTab()
@@ -2936,6 +2949,24 @@ const Murmur = () => {
 			) {
 				newView = 'summary';
 			}
+			// An empty Drafts tab is just the blank placeholder page — route to Write instead.
+			// Read the email cache at call time (not a captured render value) so flows that
+			// create a draft and then navigate here see the fresh count. Skip while a drafting
+			// run or sending session is live: drafts are in flight, not absent.
+			if (
+				newView === 'drafting' &&
+				isMobile === false &&
+				!draftOperationsProgress.visible &&
+				sendingSession.status !== 'sending'
+			) {
+				const cachedEmails = queryClient.getQueryData<EmailWithRelations[]>([
+					...EMAIL_QUERY_KEYS.list(),
+					{ campaignId: routeCampaignId },
+				]);
+				if (cachedEmails && !cachedEmails.some((e) => e.status === EmailStatus.draft)) {
+					newView = 'testing';
+				}
+			}
 			// Dedupe against the *latest requested* view (not just the last committed render) so
 			// rapid flips like A -> B -> A still enqueue the final A update and don't get dropped.
 			if (newView === requestedViewRef.current) return;
@@ -2981,7 +3012,16 @@ const Murmur = () => {
 				setIsFadingOutPreviousView(true);
 			}, MAX_TRANSITION_WAIT_MS);
 		},
-		[activeView, isMobile, MOBILE_ALLOWED_VIEWS, requestInboxSentTab]
+		[
+			activeView,
+			isMobile,
+			MOBILE_ALLOWED_VIEWS,
+			requestInboxSentTab,
+			draftOperationsProgress.visible,
+			sendingSession.status,
+			queryClient,
+			routeCampaignId,
+		]
 	);
 
 	// Query-only navigations to this campaign (e.g. an opportunities-row deep link
@@ -3077,6 +3117,8 @@ const Murmur = () => {
 	const [isCampaignChromeCentered, setIsCampaignChromeCentered] = useState(false);
 	const [isCampaignStandardStageNarrow, setIsCampaignStandardStageNarrow] =
 		useState(false);
+	const [isCompactPresetClusterBandClipped, setIsCompactPresetClusterBandClipped] =
+		useState(false);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		const checkBreakpoints = () => {
@@ -3101,6 +3143,9 @@ const Murmur = () => {
 			);
 			setIsCampaignStandardStageNarrow(
 				effectiveWidth < CAMPAIGN_CENTERED_STAGE_STANDARD_MAX_LAYOUT_W_PX
+			);
+			setIsCompactPresetClusterBandClipped(
+				effectiveWidth < CAMPAIGN_COMPACT_PRESET_CLUSTER_MIN_LAYOUT_W_PX
 			);
 		};
 		checkBreakpoints();
@@ -3146,6 +3191,28 @@ const Murmur = () => {
 	const headerToListNames =
 		campaign?.userContactLists?.map((list) => list.name).join(', ') || '';
 	const headerFromName = campaign?.identity?.name || '';
+
+	// A Drafts tab with nothing drafted is just the blank placeholder page — redirect to
+	// Write. Covers the URL-initialized state (?tab=drafts deep link, which bypasses
+	// setActiveView) and the list emptying out while the tab is open (last draft deleted).
+	// Skip while a drafting run or sending session is live: drafts are in flight, not absent.
+	useEffect(() => {
+		if (isMobile !== false) return;
+		if (activeView !== 'drafting') return;
+		if (headerEmails === undefined) return;
+		if (headerDraftCount > 0) return;
+		if (draftOperationsProgress.visible) return;
+		if (sendingSession.status === 'sending') return;
+		setActiveView('testing');
+	}, [
+		isMobile,
+		activeView,
+		headerEmails,
+		headerDraftCount,
+		draftOperationsProgress.visible,
+		sendingSession.status,
+		setActiveView,
+	]);
 	const campaignOverviewContactStatusById = useMemo(() => {
 		const statusById = new Map<number, CampaignOverviewStatusKey>();
 		for (const contact of campaignMapContacts || []) {
@@ -3466,6 +3533,13 @@ const Murmur = () => {
 		!shouldHideContent &&
 		!isNarrowestDesktop &&
 		!isCampaignMapStageCentered;
+	// The compact (non-expanded) stage keeps the bottom cluster at a fixed scale, so
+	// the band's left edge reaches it before the centered-stage cutoff — drop just the
+	// bottom cluster once the clear strip can no longer fit it. The expanded workspace
+	// rescales the cluster to the strip instead, so it's exempt.
+	const isPresetBottomClusterVisible =
+		isPresetMapControlsView &&
+		(isCampaignWorkspaceExpanded || !isCompactPresetClusterBandClipped);
 	const presetMapControlsLeftCss = `calc(var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333vw) / 2)`;
 	const presetMapControlsScale =
 		isPresetMapControlsView && isCampaignWorkspaceExpanded && viewportWidth > 0
@@ -3574,29 +3648,31 @@ const Murmur = () => {
 						    that lights up to full opacity on hover, like the left strip. */}
 						{isPresetMapControlsView && (
 							<>
-								<div
-									className="pointer-events-none fixed inset-0"
-									style={{
-										transform: `scale(${presetMapControlsScale})`,
-										transformOrigin: `${presetMapControlsLeftCss} bottom`,
-										zIndex: 126,
-									}}
-								>
-									<CampaignOverviewStatusStrip
-										selectedStatuses={effectiveActiveStatusSetForActiveView}
-										locked
-										leftOverride={presetMapControlsLeftCss}
-										bottomOverride={presetMapStatusStripBottomPx}
-										onToggleStatus={() => undefined}
-									/>
-									<CampaignOverviewAskAnythingBox
-										onSubmit={handlePresetAskAnythingSubmit}
-										value={overviewSearchQuery ?? ''}
-										leftOverride={presetMapControlsLeftCss}
-										bottomOverride={presetMapAskBoxBottomPx}
-										dimUntilHover
-									/>
-								</div>
+								{isPresetBottomClusterVisible && (
+									<div
+										className="pointer-events-none fixed inset-0"
+										style={{
+											transform: `scale(${presetMapControlsScale})`,
+											transformOrigin: `${presetMapControlsLeftCss} bottom`,
+											zIndex: 126,
+										}}
+									>
+										<CampaignOverviewStatusStrip
+											selectedStatuses={effectiveActiveStatusSetForActiveView}
+											locked
+											leftOverride={presetMapControlsLeftCss}
+											bottomOverride={presetMapStatusStripBottomPx}
+											onToggleStatus={() => undefined}
+										/>
+										<CampaignOverviewAskAnythingBox
+											onSubmit={handlePresetAskAnythingSubmit}
+											value={overviewSearchQuery ?? ''}
+											leftOverride={presetMapControlsLeftCss}
+											bottomOverride={presetMapAskBoxBottomPx}
+											dimUntilHover
+										/>
+									</div>
+								)}
 								{/* The overview "Showing" strip, mirrored onto the Write/Drafts/Inbox
 								    tabs: dimmed to 0.4 by default, fading to full opacity + becoming
 								    interactive while hovered (like the search page). Wired to the same
@@ -4544,7 +4620,7 @@ const Murmur = () => {
 								{/* Campaign Header Box - shown at narrowest breakpoint (< 952px).
 								    Excluded on the All tab, where the whole contacts column hides instead. */}
 								{!isMobile && isNarrowestDesktop && activeView !== 'overview' && campaign && (
-									<div className="flex justify-center mb-4">
+									<div className="campaign-narrowest-header-box flex justify-center mb-4">
 										<CampaignHeaderBox
 											campaignId={campaign.id}
 											campaignName={campaign.name || 'Untitled Campaign'}
@@ -4728,10 +4804,33 @@ const Murmur = () => {
 										right: 0;
 									}
 
+									/* ≤776px scrollable mode: the fixed top-nav chrome sits over the top of
+									   the stacked layout and covers the in-flow header box — hide it there. */
+									html.murmur-campaign-scrollable .campaign-narrowest-header-box {
+										display: none;
+									}
+
+									/* ≤776px scrollable mode: the fixed top-right settings gear + Clerk
+									   avatar cluster (from MurmurLayoutClient) collides with the top-nav
+									   backdrop — hide it. Desktop only; mobile keeps its avatar. */
+									html.murmur-campaign-scrollable body:not(.murmur-mobile) .clerk-user-button {
+										display: none;
+									}
+
 									html.murmur-campaign-scrollable .campaign-persistent-map-page [data-slot='campaign-top-box-wrapper'],
 									html.murmur-campaign-scrollable .campaign-persistent-map-page [data-slot='campaign-header'],
 									html.murmur-campaign-scrollable .campaign-persistent-map-page [data-slot='campaign-content'] {
 										transform: translateX(0) scale(${CAMPAIGN_MAP_CONTENT_SCALE});
+									}
+
+									/* ≤776px scrollable mode: the fixed top-nav chrome stays pinned (bottom
+									   edge ≈ 82px) while the stacked content starts at ~67px and slides
+									   underneath it. Pad the content container so its first box clears the
+									   chrome by the same ~27px gap the standard desktop layout uses.
+									   (Padding also stops the inner mt-6 from collapsing through, and is
+									   scaled by the 0.94 content scale above.) */
+									html.murmur-campaign-scrollable .campaign-persistent-map-page [data-slot='campaign-content'] {
+										padding-top: 40px;
 									}
 
 									.campaign-persistent-map-page [data-slot='campaign-top-box-wrapper'],

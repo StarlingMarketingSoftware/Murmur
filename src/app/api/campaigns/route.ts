@@ -19,6 +19,7 @@ import {
 	summarizeCampaignDataTypes,
 	type CampaignDataTypeContactSource,
 } from '@/utils/campaignDataTypes';
+import { resolveUniqueCampaignName } from '@/utils/campaignNames';
 
 const ACTIVE_CAMPAIGN_CAP = 5;
 const CAMPAIGN_CAP_REACHED_ERROR = 'CAMPAIGN_CAP_REACHED';
@@ -64,62 +65,11 @@ const safeInsertCampaignContactEvent = async (args: {
 	}
 };
 
-function escapeRegExp(input: string) {
-	return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function normalizeCampaignName(input: string) {
-	return input.trim().replace(/\s+/g, ' ');
-}
-
-async function getUniqueCampaignName({
-	userId,
-	desiredName,
-}: {
-	userId: string;
-	desiredName: string;
-}) {
-	const baseName = normalizeCampaignName(desiredName);
-	if (!baseName) return desiredName;
-
-	// Only consider non-deleted campaigns so users can reuse names after deleting.
-	const existingNames = await prisma.campaign.findMany({
-		where: {
-			userId,
-			status: { not: Status.deleted },
-			name: { startsWith: baseName, mode: 'insensitive' },
-		},
-		select: { name: true },
-	});
-
-	const basePattern = new RegExp(`^${escapeRegExp(baseName)}(?:\\s+(\\d+))?$`, 'i');
-
-	let baseExists = false;
-	const usedSuffixes = new Set<number>();
-
-	for (const row of existingNames) {
-		const existing = normalizeCampaignName(row.name);
-		const match = basePattern.exec(existing);
-		if (!match) continue;
-
-		const suffix = match[1];
-		if (!suffix) {
-			baseExists = true;
-			continue;
-		}
-
-		const n = Number(suffix);
-		if (Number.isInteger(n) && n > 0) {
-			usedSuffixes.add(n);
-		}
-	}
-
-	if (!baseExists) return baseName;
-
-	let next = 1;
-	while (usedSuffixes.has(next)) next += 1;
-	return `${baseName} ${next}`;
-}
+// Namespace for pg_advisory_xact_lock(int4, int4); hashtext maps the Clerk
+// user id onto int4. Serializes name resolution + create per user so two
+// concurrent creates cannot both claim the same name (there is no unique
+// constraint on (userId, name)). Auto-releases at commit/rollback.
+const CAMPAIGN_NAME_LOCK_NAMESPACE = 20260612;
 
 const postCampaignSchema = z.object({
 	name: z.string().min(1),
@@ -184,27 +134,43 @@ export async function POST(req: NextRequest) {
 			});
 		}
 
-		const uniqueName = await getUniqueCampaignName({ userId, desiredName: name });
+		const campaign = await prisma.$transaction(async (tx) => {
+			await tx.$executeRaw`SELECT pg_advisory_xact_lock(${CAMPAIGN_NAME_LOCK_NAMESPACE}::int, hashtext(${userId}))`;
 
-		const campaign = await prisma.campaign.create({
-			data: {
-				...validatedData.data,
-				name: uniqueName,
-				userId,
-				contacts: {
-					connect: contacts?.map((id) => ({ id })),
+			// Only non-deleted campaigns block a name so users can reuse names
+			// after deleting; archived campaigns still block (they can return).
+			const existing = await tx.campaign.findMany({
+				where: { userId, status: { not: Status.deleted } },
+				select: { name: true },
+			});
+			const uniqueName = resolveUniqueCampaignName(
+				name,
+				existing.map((c) => c.name)
+			);
+
+			return tx.campaign.create({
+				data: {
+					...validatedData.data,
+					name: uniqueName,
+					userId,
+					contacts: {
+						connect: contacts?.map((id) => ({ id })),
+					},
+					contactLists: {
+						connect: contactLists?.map((id) => ({ id })),
+					},
+					userContactLists: {
+						connect: userContactLists?.map((id) => ({ id })),
+					},
 				},
-				contactLists: {
-					connect: contactLists?.map((id) => ({ id })),
+				include: {
+					contacts: true,
 				},
-				userContactLists: {
-					connect: userContactLists?.map((id) => ({ id })),
-				},
-			},
-			include: {
-				contacts: true,
-			},
-		});
+			});
+		},
+		// The create may connect large contact sets (schema allows up to 100k
+		// ids), which can outlive the default 5s interactive-tx timeout.
+		{ timeout: 30_000 });
 
 		// Log initial contacts as a "batch" event for the bottom-view history.
 		// Best-effort: do not fail campaign creation if the event table isn't ready.
