@@ -4,6 +4,7 @@ import React, { type FC, useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { Form } from '@/components/ui/form';
+import { urls } from '@/constants/urls';
 import { DEFAULT_FONT } from '@/constants/ui';
 import { DraftingTone } from '@/constants/prismaEnums';
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
@@ -129,7 +130,7 @@ export const LandingDraftingDemo: FC<LandingDraftingDemoProps> = ({ isMobileLayo
 
 	const handleUpscalePrompt = useCallback(async () => {
 		setIsUpscalingPrompt(true);
-		router.push('/free-trial');
+		router.push(urls.home.startFreeTrial);
 	}, [router]);
 
 	const handleUndoUpscalePrompt = useCallback(() => {
@@ -200,7 +201,7 @@ export const LandingDraftingDemo: FC<LandingDraftingDemoProps> = ({ isMobileLayo
 							hideMobileStickyTestFooter
 							testMessage="Demo only"
 							handleGenerateTestDrafts={() => {
-								router.push('/free-trial');
+								router.push(urls.home.startFreeTrial);
 							}}
 							isGenerationDisabled={() => false}
 							isPendingGeneration={false}

@@ -56,6 +56,8 @@ const stateAbbreviations: Record<string, string> = {
 	'west virginia': 'WV',
 	wisconsin: 'WI',
 	wyoming: 'WY',
+	yukon: 'YT',
+	'yukon territory': 'YT',
 };
 
 // Canonical list of 50 US states (no cities or territories)

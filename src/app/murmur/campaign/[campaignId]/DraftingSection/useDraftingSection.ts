@@ -45,15 +45,19 @@ import { ContactWithName } from '@/types/contact';
 
 export type DraftingSectionView =
 	| 'search'
-	| 'contacts'
+	| 'summary'
+	| 'overview'
 	| 'testing'
 	| 'drafting'
 	| 'sent'
-	| 'inbox'
-	| 'all';
+	| 'inbox';
 
 export type InboxSentTab = 'inbox' | 'sent';
-export type InboxSentTabRequest = { tab: InboxSentTab; requestId: number };
+export type InboxSentTabRequest = {
+	tab: InboxSentTab;
+	requestId: number;
+	preserveSelection?: boolean;
+};
 
 export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
@@ -69,8 +73,11 @@ export interface DraftingSectionProps {
 	 * This should only be enabled on the "active" DraftingSection instance during tab crossfades.
 	 */
 	renderGlobalOverlays?: boolean;
+	/**
+	 * Optional callback to switch the campaign page into the campaign overview / All tab.
+	 */
+	goToOverview?: () => void;
 	goToDrafting?: () => void;
-	goToAll?: () => void;
 	/**
 	 * Optional callback to switch the campaign page into the Writing tab.
 	 */
@@ -80,9 +87,9 @@ export interface DraftingSectionProps {
 	 */
 	onGoToSearch?: () => void;
 	/**
-	 * Optional callback to switch the campaign page into the Contacts tab.
+	 * Optional callback to switch the campaign page into the mobile Summary view.
 	 */
-	goToContacts?: () => void;
+	goToSummary?: () => void;
 	/**
 	 * Optional callback to switch the campaign page into the Inbox tab.
 	 */
@@ -121,15 +128,11 @@ export interface DraftingSectionProps {
 		operations: Array<{ current: number; total: number }>;
 	}) => void;
 	/**
-	 * When true, this DraftingSection is fading out as part of a tab transition.
-	 * Used to hide elements that should remain stable (like research panel) in the exiting view.
+	 * Debug-only: when provided, the Inbox tab is rendered against mocked
+	 * inbound/sent emails instead of the live API responses. Enabled by the
+	 * `?inboxDebug=1` URL flag on the campaign page.
 	 */
-	isTransitioningOut?: boolean;
-	/**
-	 * When true, this DraftingSection is fading in as part of a tab transition
-	 * where the research panel should appear stable (not fade).
-	 */
-	isTransitioningIn?: boolean;
+	inboxMockState?: import('../CampaignInboxDebugPanel').CampaignInboxMockState;
 }
 
 type GeneratedEmail = {
@@ -382,6 +385,16 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const [isTest, setIsTest] = useState<boolean>(false);
 	// Drafting queue: allow multiple drafting operations to be queued while one runs.
 	const [draftOperations, setDraftOperations] = useState<DraftingOperation[]>([]);
+	// Transient "review the batch I just drafted on the Write tab" state. Holds the contact IDs
+	// of batch(es) drafted from the Write tab so those exact drafts surface inline on the Write
+	// tab. In-memory only (a page refresh clears it) and cleared once the batch is fully
+	// sent/deleted — so the Write tab never "prioritizes" pre-existing drafts on reload.
+	const [writeReviewBatchContactIds, setWriteReviewBatchContactIds] = useState<Set<number>>(
+		() => new Set()
+	);
+	const clearWriteReviewBatch = useCallback(() => {
+		setWriteReviewBatchContactIds((prev) => (prev.size === 0 ? prev : new Set()));
+	}, []);
 	const draftOperationsRef = useRef<DraftingOperation[]>([]);
 	const updateDraftOperations = useCallback(
 		(updater: (prev: DraftingOperation[]) => DraftingOperation[]) => {
@@ -1030,7 +1043,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		const generatedEmails: GeneratedEmail[] = [];
 
 		if (!operation.targets || operation.targets.length === 0) {
-			toast.error('No contacts available to generate emails.');
+			toast.error('No contacts available to generate messages.');
 			return generatedEmails;
 		}
 
@@ -1964,7 +1977,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 	const generateHandWrittenDraftTest = async () => {
 		setIsTest(true);
 		if (!contacts || contacts.length === 0) {
-			toast.error('No contacts available to send test email.');
+			toast.error('No contacts available to send test message.');
 			return;
 		}
 		const identityProfile = campaign.identity as IdentityProfileFields | null | undefined;
@@ -2053,12 +2066,12 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		while (!isSuccess) {
 			try {
 				if (attempts > 1) {
-					toast.error('Failed to generate test email.');
+					toast.error('Failed to generate test message.');
 					break;
 				}
 
 				if (!contacts || contacts.length === 0) {
-					toast.error('No contacts available to send test email.');
+					toast.error('No contacts available to send test message.');
 					break;
 				}
 
@@ -2175,7 +2188,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 					queryClient.invalidateQueries({
 						queryKey: ['emails', { campaignId: campaign.id }],
 					});
-					toast.success('Test email generated successfully!');
+					toast.success('Test message generated successfully!');
 					isSuccess = true;
 				} else {
 					attempts++;
@@ -2456,7 +2469,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 
 		try {
 			if (!targets.length) {
-				toast.error('No contacts available to generate emails.');
+				toast.error('No contacts available to generate messages.');
 				return { blockedByCredits: false };
 			}
 
@@ -2544,17 +2557,17 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 
 			if (!isGenerationCancelledRef.current && !stoppedDueToCredits) {
 				if (successfulEmails === targets.length) {
-					toast.success('All emails generated successfully!');
+					toast.success('All messages generated successfully!');
 				} else if (successfulEmails > 0) {
 					toast.success(
-						`Email generation completed! ${successfulEmails}/${targets.length} emails generated successfully.`
+						`Message generation completed! ${successfulEmails}/${targets.length} messages generated successfully.`
 					);
 				} else {
-					toast.error('Email generation failed. Please try again.');
+					toast.error('Message generation failed. Please try again.');
 				}
 			} else if (stoppedDueToCredits && successfulEmails > 0) {
 				toast.warning(
-					`Generated ${successfulEmails} emails before running out of credits. Please upgrade your plan to continue.`
+					`Generated ${successfulEmails} messages before running out of credits. Please upgrade your plan to continue.`
 				);
 			}
 		} catch (error) {
@@ -2562,7 +2575,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 				console.log('Email generation was cancelled by user');
 			} else {
 				console.error('Unexpected error during batch processing:', error);
-				toast.error('An error occurred during email generation.');
+				toast.error('An error occurred during message generation.');
 			}
 		} finally {
 			abortControllerRef.current = null;
@@ -2650,7 +2663,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 
 		try {
 			if (!streamingTargets.length) {
-				toast.error('No contacts available to generate emails.');
+				toast.error('No contacts available to generate messages.');
 				return { blockedByCredits: false };
 			}
 
@@ -2882,17 +2895,17 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 
 			if (!isGenerationCancelledRef.current && !stoppedDueToCredits) {
 				if (successfulEmails === streamingTargets.length) {
-					toast.success('All emails generated successfully!');
+					toast.success('All messages generated successfully!');
 				} else if (successfulEmails > 0) {
 					toast.success(
-						`Email generation completed! ${successfulEmails}/${streamingTargets.length} emails generated successfully.`
+						`Message generation completed! ${successfulEmails}/${streamingTargets.length} messages generated successfully.`
 					);
 				} else {
-					toast.error('Email generation failed. Please try again.');
+					toast.error('Message generation failed. Please try again.');
 				}
 			} else if (stoppedDueToCredits && successfulEmails > 0) {
 				toast.warning(
-					`Generated ${successfulEmails} emails before running out of credits. Please upgrade your plan to continue.`
+					`Generated ${successfulEmails} messages before running out of credits. Please upgrade your plan to continue.`
 				);
 			}
 		} catch (error) {
@@ -2903,7 +2916,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 				console.log('Email generation was cancelled by user');
 			} else {
 				console.error('Unexpected error during server-stream batch processing:', error);
-				toast.error('An error occurred during email generation.');
+				toast.error('An error occurred during message generation.');
 			}
 		} finally {
 			abortControllerRef.current = null;
@@ -3082,7 +3095,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 				(block) => block.type !== 'full_automated' && !block.isCollapsed
 			);
 			if (!hybridBlocks || hybridBlocks.length === 0) {
-				toast.error('Please set up your email template on the Testing tab first.');
+				toast.error('Please set up your message template on the Testing tab first.');
 				return;
 			}
 		}
@@ -3109,21 +3122,30 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		}
 
 		if (!contacts || contacts.length === 0) {
-			toast.error('No contacts available to generate emails.');
+			toast.error('No contacts available to generate messages.');
 			return;
 		}
 
 		const ids =
 			contactIds && contactIds.length > 0 ? Array.from(new Set(contactIds)) : [];
 		if (!ids.length) {
-			toast.error('Select at least one contact to draft emails.');
+			toast.error('Select at least one contact to draft messages.');
 			return;
 		}
 
 		const targets = contacts.filter((c: ContactWithName) => ids.includes(c.id));
 		if (!targets.length) {
-			toast.error('No contacts available to generate emails.');
+			toast.error('No contacts available to generate messages.');
 			return;
+		}
+
+		// Drafting from the Write tab arms a transient, inline review of just this batch.
+		if ((props.view ?? 'testing') === 'testing') {
+			setWriteReviewBatchContactIds((prev) => {
+				const next = new Set(prev);
+				for (const id of ids) next.add(id);
+				return next;
+			});
 		}
 
 		const operation: DraftingOperation = {
@@ -3321,6 +3343,8 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		isContactsLoading,
 		draftingMode,
 		draftOperations,
+		writeReviewBatchContactIds,
+		clearWriteReviewBatch,
 		form,
 		generationProgress,
 		generationTotal,

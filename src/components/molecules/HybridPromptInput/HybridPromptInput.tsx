@@ -7,7 +7,13 @@ import {
 } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
 import { useFormContext } from 'react-hook-form';
-import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import {
+	DndContext,
+	closestCenter,
+	PointerSensor,
+	useSensor,
+	useSensors,
+} from '@dnd-kit/core';
 import { Droppable } from '../DragAndDrop/Droppable';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
@@ -22,7 +28,6 @@ import { X } from 'lucide-react';
 import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/DraftingSection/useDraftingSection';
 import { HybridBlock, Identity } from '@prisma/client';
 import { HybridPromptInputProps, useHybridPromptInput } from './useHybridPromptInput';
-import { WriteTabChromeHeader } from './WriteTabChromeHeader';
 import {
 	BookingForDropdownControl,
 	useBookingForDropdownController,
@@ -34,6 +39,7 @@ import React, {
 	useState,
 	FC,
 	Fragment,
+	ReactNode,
 	useRef,
 	useEffect,
 	useMemo,
@@ -44,6 +50,12 @@ import { createPortal } from 'react-dom';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { TestPreviewPanel } from '../TestPreviewPanel/TestPreviewPanel';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
+import { ProfileAreaMarkerIcon } from '@/components/atoms/_svg/ProfileAreaMarkerIcon';
+import {
+	getProfileGenreIcon,
+	profileBioIconSvg,
+	profilePerformingNameIconSvg,
+} from '@/components/molecules/HybridPromptInput/profileFieldIcons';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
 import UndoIcon from '@/components/atoms/_svg/UndoIcon';
@@ -132,6 +144,294 @@ const HPI_GREEN_BG_GRADIENT =
 
 const HPI_GREEN_BG_GRADIENT_HOVER =
 	'linear-gradient(to bottom, #A6E2A8 0%, #A6E2A8 25%, #7BDB7E 100%)';
+
+type ProfileSummaryFields = {
+	name: string;
+	genre: string;
+	area: string;
+	band: string;
+	bio: string;
+	links: string;
+};
+
+type ProfileSummaryItem = {
+	key: string;
+	text: string;
+	bgClass: string;
+	icon?: ReactNode;
+};
+
+type ProfileSummaryModel = {
+	nameText: string;
+	nameInitial: string;
+	hasName: boolean;
+	items: ProfileSummaryItem[];
+	completionPercent: number;
+	fillWidthPx: number;
+	fillColor: string;
+	darkOverlayOpacity: number;
+	isComplete: boolean;
+};
+
+const PROFILE_SUMMARY_TOP_BAR_WIDTH_PX = 455.57;
+const PROFILE_SUMMARY_FILL_WIDTH_PX_BY_SEQUENTIAL_COUNT = [
+	0,
+	18,
+	187,
+	(187 + 345) / 2,
+	345,
+	(345 + PROFILE_SUMMARY_TOP_BAR_WIDTH_PX) / 2,
+	PROFILE_SUMMARY_TOP_BAR_WIDTH_PX,
+] as const;
+const PROFILE_SUMMARY_MAX_DARK_OVERLAY_OPACITY = 0.2;
+
+const getProfileBioIsComplete = (bio: string) => {
+	const trimmed = bio.trim();
+	if (!trimmed) return false;
+	const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
+	return wordCount >= 7 && /[.!?…]/.test(trimmed);
+};
+
+const buildProfileSummaryModel = (
+	profileFields: Partial<ProfileSummaryFields> | null | undefined
+): ProfileSummaryModel => {
+	const truncate = (value: string, max: number) => {
+		const v = value.trim();
+		if (v.length <= max) return v;
+		return v.slice(0, Math.max(0, max - 1)).trimEnd() + '…';
+	};
+
+	const name = (profileFields?.name ?? '').trim();
+	const genre = (profileFields?.genre ?? '').trim();
+	const area = (profileFields?.area ?? '').trim();
+	const band = (profileFields?.band ?? '').trim();
+	const bio = (profileFields?.bio ?? '').trim();
+	const links = (profileFields?.links ?? '')
+		.split(/\r?\n|,/g)
+		.map((s) => s.trim())
+		.filter(Boolean);
+
+	// Each pill reuses the exact SVG shown for that field in the Profile entry box
+	// (ProfileSidePanelBox): the genre-specific icon, the area pin, the performing-name
+	// disc, and the bio figure. The genre icon is undefined for "Other"/unknown genres.
+	const GenreIcon = getProfileGenreIcon(genre);
+
+	const items: ProfileSummaryItem[] = [];
+	if (genre) {
+		items.push({
+			key: 'profile-genre',
+			text: truncate(genre, 24),
+			bgClass: 'bg-[#EBEBEB]',
+			icon: GenreIcon ? (
+				<GenreIcon aria-hidden="true" className="h-[15px] w-[15px] shrink-0" />
+			) : undefined,
+		});
+	}
+	if (area) {
+		items.push({
+			key: 'profile-area',
+			text: truncate(area, 32),
+			bgClass: 'bg-[#EBEBEB]',
+			icon: (
+				<ProfileAreaMarkerIcon
+					aria-hidden="true"
+					className="h-[15px] w-[12px] shrink-0"
+				/>
+			),
+		});
+	}
+	if (band) {
+		items.push({
+			key: 'profile-band',
+			text: truncate(band, 32),
+			bgClass: 'bg-[#EBEBEB]',
+			icon: (
+				<span
+					aria-hidden="true"
+					className="block h-[15px] w-[15px] shrink-0"
+					dangerouslySetInnerHTML={{ __html: profilePerformingNameIconSvg }}
+				/>
+			),
+		});
+	}
+	if (bio) {
+		items.push({
+			key: 'profile-bio',
+			text: 'Bio',
+			bgClass: 'bg-[#EBEBEB]',
+			icon: (
+				<span
+					aria-hidden="true"
+					className="block h-[15px] w-[7px] shrink-0"
+					dangerouslySetInnerHTML={{ __html: profileBioIconSvg }}
+				/>
+			),
+		});
+	}
+	if (links.length > 0) {
+		items.push({
+			key: 'profile-links',
+			text: links.length === 1 ? 'Link' : `${links.length} Links`,
+			bgClass: 'bg-[#EBEBEB]',
+		});
+	}
+
+	const completedProfileSteps = [
+		Boolean(name),
+		Boolean(genre),
+		Boolean(area),
+		Boolean(band),
+		getProfileBioIsComplete(bio),
+		links.length > 0,
+	];
+	let sequentialCompletedCount = 0;
+	for (const isStepComplete of completedProfileSteps) {
+		if (!isStepComplete) break;
+		sequentialCompletedCount += 1;
+	}
+	const fillWidthPx =
+		PROFILE_SUMMARY_FILL_WIDTH_PX_BY_SEQUENTIAL_COUNT[sequentialCompletedCount] ?? 0;
+	const isComplete = sequentialCompletedCount === completedProfileSteps.length;
+	const completionPercent = Math.round(
+		(fillWidthPx / PROFILE_SUMMARY_TOP_BAR_WIDTH_PX) * 100
+	);
+
+	return {
+		nameText: name || 'Name',
+		nameInitial: name.charAt(0).toUpperCase() || '?',
+		hasName: Boolean(name),
+		items,
+		completionPercent,
+		fillWidthPx,
+		fillColor: isComplete ? '#7BDB7F' : '#95CFFF',
+		darkOverlayOpacity:
+			PROFILE_SUMMARY_MAX_DARK_OVERLAY_OPACITY * (1 - completionPercent / 100),
+		isComplete,
+	};
+};
+
+const ProfileCompletionDarkOverlay = ({
+	opacity,
+	className,
+	zIndex,
+}: {
+	opacity: number;
+	className?: string;
+	zIndex?: number;
+}) => (
+	<div
+		aria-hidden="true"
+		className={cn(
+			'pointer-events-none absolute inset-0 z-10 bg-black transition-opacity duration-200 ease-out',
+			className
+		)}
+		style={{ opacity, zIndex }}
+	/>
+);
+
+const ProfileSummaryBox = ({
+	summary,
+	onOpen,
+}: {
+	summary: ProfileSummaryModel;
+	onOpen?: () => void;
+}) => {
+	const handleOpen = (event: React.MouseEvent<HTMLDivElement>) => {
+		event.stopPropagation();
+		onOpen?.();
+	};
+
+	const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+		if (!onOpen) return;
+		if (event.key !== 'Enter' && event.key !== ' ') return;
+		event.preventDefault();
+		event.stopPropagation();
+		onOpen();
+	};
+
+	return (
+		<div
+			className={cn(
+				'relative z-50 w-[455.57px] max-w-full h-[104px] self-center bg-white rounded-[8px] border-2 border-black overflow-hidden flex flex-col',
+				onOpen ? 'cursor-pointer' : 'cursor-default'
+			)}
+			role={onOpen ? 'button' : undefined}
+			tabIndex={onOpen ? 0 : undefined}
+			aria-label={
+				onOpen ? `Open Profile (${summary.completionPercent}% complete)` : undefined
+			}
+			onClick={onOpen ? handleOpen : undefined}
+			onKeyDown={onOpen ? handleKeyDown : undefined}
+		>
+			<div className="relative h-[26px] shrink-0 rounded-t-[6px] border-b border-black bg-white">
+				{/* Safari doesn't clip positioned children to the parent's rounded overflow,
+				    so round this layer itself; isolate gives WebKit the stacking context it
+				    needs to clip the fill bar */}
+				<div className="absolute inset-0 isolate overflow-hidden rounded-t-[6px]">
+					<div
+						aria-hidden="true"
+						className="absolute inset-y-0 left-0 transition-[width,background-color] duration-200 ease-out"
+						style={{
+							width: `min(${summary.fillWidthPx}px, 100%)`,
+							backgroundColor: summary.fillColor,
+						}}
+					/>
+					{summary.fillWidthPx > 0 &&
+						summary.fillWidthPx < PROFILE_SUMMARY_TOP_BAR_WIDTH_PX && (
+							<div
+								aria-hidden="true"
+								className="absolute top-0 bottom-0 w-px bg-black transition-[left] duration-200 ease-out"
+								style={{ left: `min(${summary.fillWidthPx}px, 100%)` }}
+							/>
+						)}
+				</div>
+				<div className="relative z-10 h-full flex items-center pr-[8px]">
+					<span
+						className={cn(
+							'ml-[34px] max-w-[calc(100%_-_79px)] min-h-[17px] rounded-[3px] bg-[#D6FFED] pl-[6px] pr-[6px] py-[1px]',
+							'inline-flex items-center font-inter font-normal text-[13px] leading-[16px] text-black truncate',
+							!summary.hasName && 'opacity-50'
+						)}
+					>
+						{summary.nameText}
+					</span>
+					{summary.isComplete && (
+						<span className="ml-auto font-inter font-semibold text-[13px] leading-none text-black">
+							100
+						</span>
+					)}
+				</div>
+				{/* After the name row in DOM and untransformed (top-[2px] instead of
+				    top-1/2 -translate-y-1/2): Safari composites the transformed badge
+				    into its own layer and paints it beneath the z-10 row */}
+				<div
+					aria-hidden="true"
+					className="absolute left-[9px] top-[2px] z-20 w-[22px] h-[22px] rounded-full bg-[#7BDB7F] flex items-center justify-center font-inter font-normal text-[14px] leading-none text-white"
+				>
+					{summary.nameInitial}
+				</div>
+			</div>
+			<div className="relative flex-1 min-h-0 rounded-b-[6px] px-2 pt-[10px] pb-2 overflow-y-auto overflow-x-hidden hide-native-scrollbar bg-white">
+				<div className="relative z-10 flex flex-wrap gap-x-[6px] gap-y-[8px] content-start">
+					{summary.items.map((item) => (
+						<span
+							key={item.key}
+							className={cn(
+								'inline-flex h-[20.071px] items-center gap-[4px] rounded-[7.034px] px-[10px]',
+								'font-inter font-normal text-[13px] leading-[16px] max-[480px]:text-[11px] max-[480px]:leading-[14px]',
+								'text-black max-w-full whitespace-nowrap',
+								item.bgClass
+							)}
+						>
+							{item.icon}
+							<span>{item.text}</span>
+						</span>
+					))}
+				</div>
+			</div>
+		</div>
+	);
+};
 
 interface SortableAIBlockProps {
 	block: {
@@ -225,7 +525,8 @@ const SortableAIBlock = ({
 	const [isAdvancedEnabled, setIsAdvancedEnabled] = useState(false);
 	// Full Auto: custom instructions expander (stored in hybridBlockPrompts[fieldIndex].value)
 	const [isCustomInstructionsOpen, setIsCustomInstructionsOpen] = useState(
-		() => Boolean(defaultOpenCustomInstructions) && block.value === HybridBlock.full_automated
+		() =>
+			Boolean(defaultOpenCustomInstructions) && block.value === HybridBlock.full_automated
 	);
 	// Used by effects below (declared early to avoid TDZ issues)
 	const isFullAutomatedBlock = block.value === HybridBlock.full_automated;
@@ -343,7 +644,7 @@ const SortableAIBlock = ({
 		block.value === HybridBlock.research ||
 		block.value === HybridBlock.action ||
 		block.value === HybridBlock.text;
- 
+
 	// Detect if the Manual tab is selected (all blocks are Text)
 	const isManualModeSelected =
 		(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
@@ -361,105 +662,10 @@ const SortableAIBlock = ({
 	const isMobileHook = useIsMobile();
 	const isMobile = forceDesktop ? false : isMobileHook;
 
-	type ProfileFields = {
-		name: string;
-		genre: string;
-		area: string;
-		band: string;
-		bio: string;
-		links: string;
-	};
-
-	type ProfileChipItem = {
-		key: string;
-		text: string;
-		bgClass: string;
-		isEmpty: boolean;
-	};
-
-	const profileChipItems = useMemo<ProfileChipItem[]>(() => {
-		if (!isFullAutomatedBlock) return [];
-		const pf: ProfileFields = {
-			name: profileFields?.name ?? '',
-			genre: profileFields?.genre ?? '',
-			area: profileFields?.area ?? '',
-			band: profileFields?.band ?? '',
-			bio: profileFields?.bio ?? '',
-			links: profileFields?.links ?? '',
-		};
-
-		const truncate = (value: string, max: number) => {
-			const v = value.trim();
-			if (v.length <= max) return v;
-			return v.slice(0, Math.max(0, max - 1)).trimEnd() + '…';
-		};
-
-		const chips: ProfileChipItem[] = [];
-
-		const name = pf.name.trim();
-		const genre = pf.genre.trim();
-		const area = pf.area.trim();
-		const band = pf.band.trim();
-		const bio = pf.bio.trim();
-		const linksRaw = pf.links.trim();
-
-		chips.push({
-			key: 'profile-name',
-			text: name ? `Nme. ${truncate(name, 28)}` : 'Nme.',
-			bgClass: 'bg-[#CAE7FF]',
-			isEmpty: !name,
-		});
-		chips.push({
-			key: 'profile-genre',
-			text: genre ? `Gnre. ${truncate(genre, 22)}` : 'Gnre.',
-			bgClass: 'bg-[#BFE2FF]',
-			isEmpty: !genre,
-		});
-		chips.push({
-			key: 'profile-area',
-			text: area ? `Area. ${truncate(area, 30)}` : 'Area.',
-			bgClass: 'bg-[#CAFDFF]',
-			isEmpty: !area,
-		});
-		chips.push({
-			key: 'profile-band',
-			text: band ? `Artst Nme. ${truncate(band, 30)}` : 'Artst Nme.',
-			bgClass: 'bg-[#C6FFFC]',
-			isEmpty: !band,
-		});
-		chips.push({
-			key: 'profile-bio',
-			text: bio ? `Bio. “${truncate(bio, 48)}”` : 'Bio.',
-			bgClass: 'bg-[#C8FFE1]',
-			isEmpty: !bio,
-		});
-
-		const links = linksRaw
-			.split(/\r?\n|,/g)
-			.map((s) => s.trim())
-			.filter(Boolean);
-
-		if (links.length === 0) {
-			chips.push({
-				key: 'profile-link-0',
-				text: 'Link.',
-				bgClass: 'bg-[#C5F7C9]',
-				isEmpty: true,
-			});
-		} else {
-			for (let i = 0; i < links.length; i++) {
-				const link = links[i];
-				chips.push({
-					key: `profile-link-${i}`,
-					text: `Link. ${truncate(link, 42)}`,
-					bgClass: 'bg-[#C5F7C9]',
-					isEmpty: false,
-				});
-			}
-		}
-
-		return chips;
-	}, [isFullAutomatedBlock, profileFields]);
+	const profileSummary = useMemo(
+		() => (isFullAutomatedBlock ? buildProfileSummaryModel(profileFields) : null),
+		[isFullAutomatedBlock, profileFields]
+	);
 
 	// Full Auto: prompt score meter helpers (display only)
 	const clampedPromptScore = useMemo(() => {
@@ -510,14 +716,14 @@ const SortableAIBlock = ({
 				isFullAutomatedBlock
 					? 'full'
 					: isIntroductionBlock
-					? 'introduction'
-					: isResearchBlock
-					? 'research'
-					: isActionBlock
-					? 'action'
-					: isTextBlock
-					? 'text'
-					: 'other'
+						? 'introduction'
+						: isResearchBlock
+							? 'research'
+							: isActionBlock
+								? 'action'
+								: isTextBlock
+									? 'text'
+									: 'other'
 			}
 			className={cn(
 				'relative rounded-md',
@@ -526,37 +732,61 @@ const SortableAIBlock = ({
 				isResearchBlock && 'border-2 border-[#1010E7] bg-background',
 				isActionBlock && 'border-2 border-[#0E0E7F] bg-background',
 				isTextBlock && 'border-[3px] border-[#187124] bg-background',
-			!isIntroductionBlock &&
-				!isResearchBlock &&
-				!isActionBlock &&
-				!isTextBlock &&
-				!isFullAutomatedBlock &&
-				'border-2 border-gray-300 bg-background',
-			isFullAutomatedBlock && 'border border-[#51A2E4] bg-[#51A2E4]',
-			isTextBlock
-				? showTestPreview
-					? cn('w-[426px] min-h-[44px]', !forceDesktop && 'max-[480px]:w-[89.33vw]')
-					: isManualModeSelected
-					? cn(!forceDesktop ? 'w-[89.33vw]' : 'w-[475px]', 'max-w-[475px] min-h-[188px]')
-					: cn(!forceDesktop ? 'w-[89.33vw]' : 'w-[475px]', 'max-w-[475px] min-h-[80px]')
-					: isCompactBlock
-					? showTestPreview
-						? cn('w-[426px]', !forceDesktop && 'max-[480px]:w-[89.33vw]', isAdvancedEnabled ? 'h-[78px]' : cn('h-[31px]', !forceDesktop && 'max-[480px]:h-[24px]'))
-						: cn(!forceDesktop ? 'w-[89.33vw]' : 'w-[475px]', 'max-w-[475px]', isAdvancedEnabled ? 'h-[78px]' : cn('h-[31px]', !forceDesktop && 'max-[480px]:h-[24px]'))
-					: isFullAutomatedBlock
-					? showTestPreview
-						? cn('w-[426px]', !forceDesktop && 'max-[480px]:w-[89.33vw]', isCustomInstructionsOpen ? 'h-auto min-h-[233px]' : 'h-[233px]')
-						: cn(!forceDesktop ? 'w-[89.33vw]' : 'w-[468px]', 'max-w-[468px]', isCustomInstructionsOpen ? 'h-auto min-h-[233px]' : 'h-[233px]')
-					: showTestPreview
-					? cn('w-[426px]', !forceDesktop && 'max-[480px]:w-[89.33vw]')
-					: cn(!forceDesktop ? 'w-[89.33vw]' : 'w-[475px]', 'max-w-[475px]'),
 				!isIntroductionBlock &&
 					!isResearchBlock &&
 					!isActionBlock &&
 					!isTextBlock &&
-					(shouldShowRedStyling
-						? 'border-[#A20000]'
-						: 'border-secondary'),
+					!isFullAutomatedBlock &&
+					'border-2 border-gray-300 bg-background',
+				isFullAutomatedBlock && 'border border-[#51A2E4] bg-[#51A2E4]',
+				isTextBlock
+					? showTestPreview
+						? cn('w-[426px] min-h-[44px]', !forceDesktop && 'max-[480px]:w-[89.33vw]')
+						: isManualModeSelected
+							? cn(
+									!forceDesktop ? 'w-[89.33vw]' : 'w-[475px]',
+									'max-w-[475px] min-h-[188px]'
+								)
+							: cn(
+									!forceDesktop ? 'w-[89.33vw]' : 'w-[475px]',
+									'max-w-[475px] min-h-[80px]'
+								)
+					: isCompactBlock
+						? showTestPreview
+							? cn(
+									'w-[426px]',
+									!forceDesktop && 'max-[480px]:w-[89.33vw]',
+									isAdvancedEnabled
+										? 'h-[78px]'
+										: cn('h-[31px]', !forceDesktop && 'max-[480px]:h-[24px]')
+								)
+							: cn(
+									!forceDesktop ? 'w-[89.33vw]' : 'w-[475px]',
+									'max-w-[475px]',
+									isAdvancedEnabled
+										? 'h-[78px]'
+										: cn('h-[31px]', !forceDesktop && 'max-[480px]:h-[24px]')
+								)
+						: isFullAutomatedBlock
+							? showTestPreview
+								? cn(
+										'w-[426px]',
+										!forceDesktop && 'max-[480px]:w-[89.33vw]',
+										isCustomInstructionsOpen ? 'h-auto min-h-[233px]' : 'h-[233px]'
+									)
+								: cn(
+										!forceDesktop ? 'w-[89.33vw]' : 'w-[468px]',
+										'max-w-[468px]',
+										isCustomInstructionsOpen ? 'h-auto min-h-[233px]' : 'h-[233px]'
+									)
+							: showTestPreview
+								? cn('w-[426px]', !forceDesktop && 'max-[480px]:w-[89.33vw]')
+								: cn(!forceDesktop ? 'w-[89.33vw]' : 'w-[475px]', 'max-w-[475px]'),
+				!isIntroductionBlock &&
+					!isResearchBlock &&
+					!isActionBlock &&
+					!isTextBlock &&
+					(shouldShowRedStyling ? 'border-[#A20000]' : 'border-secondary'),
 				isDragging ? 'opacity-50 z-50 transform-gpu' : ''
 			)}
 		>
@@ -582,19 +812,23 @@ const SortableAIBlock = ({
 								? 'h-[44px] w-[80px]'
 								: 'h-[80px] w-[90px]'
 							: isCompactBlock
-							? showTestPreview
-								? `${
-										isAdvancedEnabled ? 'h-[78px]' : cn('h-[31px]', !forceDesktop && 'max-[480px]:h-[24px]')
-								  } w-[80px]`
-								: `${
-										isAdvancedEnabled ? 'h-[78px]' : cn('h-[31px]', !forceDesktop && 'max-[480px]:h-[24px]')
-								  } w-[90px]`
-							: 'h-12',
+								? showTestPreview
+									? `${
+											isAdvancedEnabled
+												? 'h-[78px]'
+												: cn('h-[31px]', !forceDesktop && 'max-[480px]:h-[24px]')
+										} w-[80px]`
+									: `${
+											isAdvancedEnabled
+												? 'h-[78px]'
+												: cn('h-[31px]', !forceDesktop && 'max-[480px]:h-[24px]')
+										} w-[90px]`
+								: 'h-12',
 						isFullAutomatedBlock
 							? 'w-[172px]'
 							: !isCompactBlock && !isFullAutomatedBlock
-							? 'w-full'
-							: ''
+								? 'w-full'
+								: ''
 					)}
 				/>
 				{/* Block content container */}
@@ -605,13 +839,13 @@ const SortableAIBlock = ({
 							? isAdvancedEnabled
 								? 'p-0 h-full'
 								: isTextBlock && isManualModeSelected
-								? 'p-0 h-full'
-								: 'p-2 h-full max-[480px]:py-[2px]'
+									? 'p-0 h-full'
+									: 'p-2 h-full max-[480px]:py-[2px]'
 							: isFullAutomatedBlock
-							? 'p-0'
-							: isTextBlock
-							? 'px-4 pt-2 pb-4'
-							: 'p-4'
+								? 'p-0'
+								: isTextBlock
+									? 'px-4 pt-2 pb-4'
+									: 'p-4'
 					)}
 				>
 					<div className={cn('flex-grow min-w-0', isCompactBlock && 'flex items-center')}>
@@ -625,13 +859,13 @@ const SortableAIBlock = ({
 									? isTextBlock
 										? 'right-1 top-0'
 										: isAdvancedEnabled
-										? 'right-1 top-[12.5px] -translate-y-1/2'
-										: 'right-1 top-1/2 -translate-y-1/2'
+											? 'right-1 top-[12.5px] -translate-y-1/2'
+											: 'right-1 top-1/2 -translate-y-1/2'
 									: isFullAutomatedBlock
-									? 'right-1 top-0'
-									: isTextBlock
-									? 'right-3 top-2'
-									: 'right-3 top-3'
+										? 'right-1 top-0'
+										: isTextBlock
+											? 'right-3 top-2'
+											: 'right-3 top-3'
 							)}
 						>
 							{!isTextBlock && !isFullAutomatedBlock && !isCompactBlock && (
@@ -671,19 +905,23 @@ const SortableAIBlock = ({
 									isAdvancedEnabled
 										? 'flex flex-col'
 										: isTextBlock
-										? isManualModeSelected
-											? 'flex flex-col'
-											: 'flex items-start'
-										: 'flex items-center'
+											? isManualModeSelected
+												? 'flex flex-col'
+												: 'flex items-start'
+											: 'flex items-center'
 								)}
 							>
 								{isTextBlock ? (
 									<>
 										{/* Top section with Text label */}
-										<div className={cn(
-											'flex items-center',
-											isManualModeSelected ? 'h-[29px] pl-2 w-full bg-[#A6E0B4]' : 'w-[90px]'
-										)}>
+										<div
+											className={cn(
+												'flex items-center',
+												isManualModeSelected
+													? 'h-[29px] pl-2 w-full bg-[#A6E0B4]'
+													: 'w-[90px]'
+											)}
+										>
 											<span
 												className={cn(
 													'font-inter font-medium text-[17px] leading-[14px]',
@@ -712,9 +950,13 @@ const SortableAIBlock = ({
 														'flex-1 outline-none focus:outline-none text-sm border-0 ring-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 p-0 resize-none overflow-hidden bg-transparent min-h-0 appearance-none rounded-none',
 														(isIntroductionBlock || isResearchBlock || isActionBlock) &&
 															'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
-														isManualModeSelected ? 'pl-2 pt-2 pr-4 pb-[35px]' : 'pl-0 pr-12',
+														isManualModeSelected
+															? 'pl-2 pt-2 pr-4 pb-[35px]'
+															: 'pl-0 pr-12',
 														// Make placeholder text much smaller on mobile portrait when in Manual mode
-														isManualModeSelected && !forceDesktop && 'max-[480px]:placeholder:text-[10px]'
+														isManualModeSelected &&
+															!forceDesktop &&
+															'max-[480px]:placeholder:text-[10px]'
 													)}
 													rows={isMobile ? 2 : 1}
 													{...fieldProps}
@@ -766,20 +1008,25 @@ const SortableAIBlock = ({
 															{isIntroductionBlock
 																? 'Intro'
 																: isResearchBlock
-																? 'Resarch'
-																: isActionBlock
-																? 'CTA'
-																: (block as { label: string }).label}
+																	? 'Resarch'
+																	: isActionBlock
+																		? 'CTA'
+																		: (block as { label: string }).label}
 														</span>
 													</div>
 													<div className="flex-1 min-w-0 flex items-center pl-0 pr-12 overflow-hidden">
-														<span className={cn('text-sm font-inter italic text-[#5d5d5d] truncate', !forceDesktop && 'max-[480px]:text-[10px]')}>
+														<span
+															className={cn(
+																'text-sm font-inter italic text-[#5d5d5d] truncate',
+																!forceDesktop && 'max-[480px]:text-[10px]'
+															)}
+														>
 															{isResearchBlock
 																? isMobile
 																	? 'Automatic Research'
 																	: showTestPreview
-																	? 'Automated Research'
-																	: block.placeholder
+																		? 'Automated Research'
+																		: block.placeholder
 																: block.placeholder}
 														</span>
 													</div>
@@ -803,10 +1050,10 @@ const SortableAIBlock = ({
 														borderColor: isIntroductionBlock
 															? '#6673FF'
 															: isResearchBlock
-															? '#1010E7'
-															: isActionBlock
-															? '#0E0E7F'
-															: '#000000',
+																? '#1010E7'
+																: isActionBlock
+																	? '#0E0E7F'
+																	: '#000000',
 													}}
 												/>
 												{/* Input section below */}
@@ -865,10 +1112,10 @@ const SortableAIBlock = ({
 														{isIntroductionBlock
 															? 'Intro'
 															: isResearchBlock
-															? 'Resarch'
-															: isActionBlock
-															? 'CTA'
-															: (block as { label: string }).label}
+																? 'Resarch'
+																: isActionBlock
+																	? 'CTA'
+																	: (block as { label: string }).label}
 													</span>
 												</div>
 												{(() => {
@@ -885,8 +1132,8 @@ const SortableAIBlock = ({
 																		? isMobile
 																			? 'Automatic Research'
 																			: showTestPreview
-																			? 'Automated Research'
-																			: block.placeholder
+																				? 'Automated Research'
+																				: block.placeholder
 																		: block.placeholder
 																}
 																onClick={(e) => e.stopPropagation()}
@@ -897,14 +1144,21 @@ const SortableAIBlock = ({
 																	!isAdvancedEnabled
 																}
 																className={cn(
-																	cn('flex-1 outline-none text-sm truncate min-w-0', !forceDesktop && 'max-[480px]:text-[10px]'),
+																	cn(
+																		'flex-1 outline-none text-sm truncate min-w-0',
+																		!forceDesktop && 'max-[480px]:text-[10px]'
+																	),
 																	isIntroductionBlock || isResearchBlock || isActionBlock
 																		? '!bg-[#DADAFC]'
 																		: 'bg-white placeholder:text-gray-400',
 																	(isIntroductionBlock ||
 																		isResearchBlock ||
 																		isActionBlock) &&
-																		cn('font-inter placeholder:italic placeholder:text-[#5d5d5d]', !forceDesktop && 'max-[480px]:placeholder:text-[10px]'),
+																		cn(
+																			'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
+																			!forceDesktop &&
+																				'max-[480px]:placeholder:text-[10px]'
+																		),
 																	'pl-0',
 																	isIntroductionBlock || isResearchBlock || isActionBlock
 																		? 'pr-24'
@@ -987,9 +1241,7 @@ const SortableAIBlock = ({
 											<div
 												className={cn(
 													'h-[27px] flex items-stretch transition-colors duration-75 ease-out',
-													selectedPowerMode === 'high'
-														? 'bg-[#95CFFF]'
-														: 'bg-[#58A6E5]'
+													selectedPowerMode === 'high' ? 'bg-[#95CFFF]' : 'bg-[#58A6E5]'
 												)}
 											>
 												{/* Full Auto label section */}
@@ -1011,20 +1263,14 @@ const SortableAIBlock = ({
 													onClick={() => setSelectedPowerMode('normal')}
 													className={cn(
 														'h-full flex items-center justify-center cursor-pointer border-0 p-0 m-0 flex-shrink-0 outline-none focus:outline-none whitespace-nowrap transition-[background-color,width] duration-75 ease-out',
-														selectedPowerMode === 'high'
-															? 'w-[108px]'
-															: 'w-[132px]',
+														selectedPowerMode === 'high' ? 'w-[108px]' : 'w-[132px]',
 														selectedPowerMode === 'normal'
 															? 'bg-[#88C5F7]'
 															: 'bg-transparent'
 													)}
 												>
-													<span
-														className="font-inter font-normal italic text-[14px] max-[480px]:text-[12px] text-[#000000]"
-													>
-														{selectedPowerMode === 'high'
-															? 'Standard'
-															: 'Standard Power'}
+													<span className="font-inter font-normal italic text-[14px] max-[480px]:text-[12px] text-[#000000]">
+														{selectedPowerMode === 'high' ? 'Standard' : 'Standard Power'}
 													</span>
 												</button>
 												{/* Divider */}
@@ -1035,9 +1281,7 @@ const SortableAIBlock = ({
 													onClick={() => setSelectedPowerMode('high')}
 													className={cn(
 														'h-full flex items-center justify-center cursor-pointer border-0 p-0 m-0 flex-shrink-0 outline-none focus:outline-none whitespace-nowrap transition-[background-color,width] duration-75 ease-out',
-														selectedPowerMode === 'high'
-															? 'w-[100px]'
-															: 'w-[46px]',
+														selectedPowerMode === 'high' ? 'w-[100px]' : 'w-[46px]',
 														selectedPowerMode === 'high'
 															? 'bg-[#58A6E5]'
 															: 'bg-transparent'
@@ -1103,48 +1347,17 @@ const SortableAIBlock = ({
 									<div className="min-h-[60px] w-full px-1 pb-1">
 										<div
 											className={cn(
-												'w-full rounded-b-[6px] p-2 flex justify-center transition-colors duration-75 ease-out',
-												selectedPowerMode === 'high'
-													? 'bg-[#58A6E5]'
-													: 'bg-[#88C5F7]'
+												'relative w-full rounded-b-[6px] p-2 flex justify-center transition-colors duration-75 ease-out overflow-hidden',
+												selectedPowerMode === 'high' ? 'bg-[#58A6E5]' : 'bg-[#88C5F7]'
 											)}
 										>
-											<div className="w-[448px] max-w-full flex flex-col items-start">
-												<div
-													className="w-full h-[104px] bg-white rounded-[8px] border border-black px-2 pt-1 pb-2 overflow-y-auto overflow-x-hidden hide-native-scrollbar cursor-pointer"
-													role="button"
-													tabIndex={0}
-													aria-label="Open Profile"
-													onClick={(e) => {
-														e.stopPropagation();
-														onGoToProfileTab?.();
-													}}
-													onKeyDown={(e) => {
-														if (e.key === 'Enter' || e.key === ' ') {
-															e.preventDefault();
-															e.stopPropagation();
-															onGoToProfileTab?.();
-														}
-													}}
-												>
-													<div className="font-inter font-normal text-[13px] leading-[16px] text-black mb-[7px]">
-														Profile
-													</div>
-													<div className="flex flex-wrap gap-x-[6px] gap-y-[10px] content-start">
-														{profileChipItems.map((chip) => (
-															<span
-																key={chip.key}
-																className={cn(
-																	'inline-flex items-center rounded-[5px] px-[5px] py-[0.5px] font-inter font-normal text-[10px] leading-[12px] max-[480px]:text-[8px] max-[480px]:leading-[10px] text-black max-w-full whitespace-nowrap',
-																	chip.bgClass,
-																	chip.isEmpty && 'opacity-50'
-																)}
-															>
-																{chip.text}
-															</span>
-														))}
-													</div>
-												</div>
+											<div className="w-[455.57px] max-[480px]:w-full flex flex-col items-start">
+												{profileSummary && (
+													<ProfileSummaryBox
+														summary={profileSummary}
+														onOpen={onGoToProfileTab}
+													/>
+												)}
 
 												{/* Booking For box (203 x 28px) + dropdown - rendered before Custom Instructions when closed */}
 												{!isCustomInstructionsOpen && (
@@ -1155,7 +1368,10 @@ const SortableAIBlock = ({
 												)}
 
 												{false && !isCustomInstructionsOpen && (
-													<div ref={bookingForContainerRef} className="relative mt-[10px] w-full">
+													<div
+														ref={bookingForContainerRef}
+														className="relative mt-[10px] w-full"
+													>
 														<button
 															ref={bookingForButtonRef}
 															type="button"
@@ -1179,13 +1395,17 @@ const SortableAIBlock = ({
 																	setBookingForTab('Calendar');
 																} else if (bookingForTab === 'Season') {
 																	if (isSeasonSelection) {
-																		setBookingForSeason(bookingForValue as BookingForSeason);
+																		setBookingForSeason(
+																			bookingForValue as BookingForSeason
+																		);
 																	}
 																	setBookingForTab('Season');
 																} else if (bookingForCalendarStartDate != null) {
 																	setBookingForTab('Calendar');
 																} else if (isSeasonSelection) {
-																	setBookingForSeason(bookingForValue as BookingForSeason);
+																	setBookingForSeason(
+																		bookingForValue as BookingForSeason
+																	);
 																	setBookingForTab('Season');
 																} else {
 																	setBookingForTab('Anytime');
@@ -1221,531 +1441,708 @@ const SortableAIBlock = ({
 														</button>
 
 														{isBookingForOpen &&
-														(bookingForDropdownPosition || bookingForTab !== 'Calendar') &&
-														(() => {
-															// Anytime/Season use static (absolute) positioning - they fit in the container.
-															// Calendar uses portal with fixed positioning so it's not clipped by overflow.
-															const useStatic = bookingForTab !== 'Calendar';
-															
-															// For Calendar in landing page mode, calculate position to align tabs with button
-															// Note: In landing mode the entire HybridPromptInput panel is scaled down (see `LandingDraftingDemo`).
-															// The Calendar dropdown is portaled to `document.body`, so we must:
-															// - Scale the Calendar dropdown by the same factor, and
-															// - Compute its fixed position in *screen* pixels so the tab strip doesn't "jump".
-															const landingScale = (() => {
-																// If the panel isn't scaled, this should be ~1.
-																const anchor = bookingForButtonRef.current;
-																if (!anchor) return 1;
-																const unscaledWidth = anchor!.offsetWidth;
-																if (!unscaledWidth) return 1;
-																const scaledWidth = anchor!.getBoundingClientRect().width;
-																const scale = scaledWidth / unscaledWidth;
-																return Number.isFinite(scale) && scale > 0 ? scale : 1;
-															})();
-															// For landing page, position Calendar so centered tabs align with Anytime/Season tabs.
-															// With transformOrigin: 'top left', the left edge stays in place during scaling.
-															const getCalendarLandingPosition = () => {
-																if (!useStaticDropdownPosition || bookingForTab !== 'Calendar') {
-																	return null;
-																}
-																const containerRect = bookingForContainerRef.current?.getBoundingClientRect();
-																if (!containerRect) return null;
-																
-																// Anytime/Season tabs are centered in 317px at 16.5px from dropdown left
-																// Calendar tabs are centered in 829px at 272.5px from dropdown left
-																// To align: Calendar left = container left - (272.5 - 16.5) = container left - 256
-																// Fine-tuned to 250px for better visual alignment
-																const tabsAlignShift = 250 * landingScale;
-																
-																return {
-																	top: containerRect.bottom + 6 * landingScale,
-																	left: containerRect.left - tabsAlignShift,
-																};
-															};
-															const calendarPos = getCalendarLandingPosition();
-															
-															const dropdownContent = (
-																<div
-																	ref={bookingForDropdownRef}
-																	style={
-																		useStatic
-																			? {
-																					position: 'absolute',
-																					top: '100%',
-																					left: 0,
-																					marginTop: 6,
-																					width: bookingForDropdownSize.width,
-																					height: bookingForDropdownSize.height,
-																			  }
-																			: {
-																					position: 'fixed',
-																					top: calendarPos?.top ?? bookingForDropdownPosition?.top ?? 0,
-																					left: calendarPos?.left ?? bookingForDropdownPosition?.left ?? 0,
-																					width: bookingForDropdownSize.width,
-																					height: bookingForDropdownSize.height,
-																					// Scale down Calendar in landing page mode to match the scaled container
-																					...(useStaticDropdownPosition && bookingForTab === 'Calendar' ? {
-																						transform: `scale(${landingScale})`,
-																						transformOrigin: 'top left',
-																					} : {}),
-																			  }
-																	}
-																	className={cn(
-																		'z-[9999] rounded-[6px]',
-																		bookingForTab === 'Season'
-																			? BOOKING_FOR_SEASON_STYLES[bookingForPreviewSeason].bgClass
-																			: 'bg-[#F5F5F5]',
-																		'border-2 border-black',
-																		'flex flex-col overflow-hidden'
-																	)}
-																	onMouseEnter={clearBookingForCloseTimeout}
-																	onMouseLeave={() => {
-																		setHoveredBookingForTab(null);
-																		setHoveredBookingForSeason(null);
-																		scheduleBookingForCloseTimeout();
-																	}}
-																	role="dialog"
-																	aria-label="Booking For"
-																>
-																<div className="relative h-[46px]">
-																	{bookingForTab === 'Season' && (
-																		<div
-																			aria-hidden="true"
-																			className="pointer-events-none absolute inset-0 flex items-center justify-center"
-																		>
-																			<div className="w-[284px] h-[32px] bg-[#E2E2E2] opacity-30 rounded-[6px]" />
-																		</div>
-																	)}
+															(bookingForDropdownPosition ||
+																bookingForTab !== 'Calendar') &&
+															(() => {
+																// Anytime/Season use static (absolute) positioning - they fit in the container.
+																// Calendar uses portal with fixed positioning so it's not clipped by overflow.
+																const useStatic = bookingForTab !== 'Calendar';
 
+																// For Calendar in landing page mode, calculate position to align tabs with button
+																// Note: In landing mode the entire HybridPromptInput panel is scaled down (see `LandingDraftingDemo`).
+																// The Calendar dropdown is portaled to `document.body`, so we must:
+																// - Scale the Calendar dropdown by the same factor, and
+																// - Compute its fixed position in *screen* pixels so the tab strip doesn't "jump".
+																const landingScale = (() => {
+																	// If the panel isn't scaled, this should be ~1.
+																	const anchor = bookingForButtonRef.current;
+																	if (!anchor) return 1;
+																	const unscaledWidth = anchor!.offsetWidth;
+																	if (!unscaledWidth) return 1;
+																	const scaledWidth =
+																		anchor!.getBoundingClientRect().width;
+																	const scale = scaledWidth / unscaledWidth;
+																	return Number.isFinite(scale) && scale > 0 ? scale : 1;
+																})();
+																// For landing page, position Calendar so centered tabs align with Anytime/Season tabs.
+																// With transformOrigin: 'top left', the left edge stays in place during scaling.
+																const getCalendarLandingPosition = () => {
+																	if (
+																		!useStaticDropdownPosition ||
+																		bookingForTab !== 'Calendar'
+																	) {
+																		return null;
+																	}
+																	const containerRect =
+																		bookingForContainerRef.current?.getBoundingClientRect();
+																	if (!containerRect) return null;
+
+																	// Anytime/Season tabs are centered in 317px at 16.5px from dropdown left
+																	// Calendar tabs are centered in 829px at 272.5px from dropdown left
+																	// To align: Calendar left = container left - (272.5 - 16.5) = container left - 256
+																	// Fine-tuned to 250px for better visual alignment
+																	const tabsAlignShift = 250 * landingScale;
+
+																	return {
+																		top: containerRect.bottom + 6 * landingScale,
+																		left: containerRect.left - tabsAlignShift,
+																	};
+																};
+																const calendarPos = getCalendarLandingPosition();
+
+																const dropdownContent = (
 																	<div
+																		ref={bookingForDropdownRef}
+																		style={
+																			useStatic
+																				? {
+																						position: 'absolute',
+																						top: '100%',
+																						left: 0,
+																						marginTop: 6,
+																						width: bookingForDropdownSize.width,
+																						height: bookingForDropdownSize.height,
+																					}
+																				: {
+																						position: 'fixed',
+																						top:
+																							calendarPos?.top ??
+																							bookingForDropdownPosition?.top ??
+																							0,
+																						left:
+																							calendarPos?.left ??
+																							bookingForDropdownPosition?.left ??
+																							0,
+																						width: bookingForDropdownSize.width,
+																						height: bookingForDropdownSize.height,
+																						// Scale down Calendar in landing page mode to match the scaled container
+																						...(useStaticDropdownPosition &&
+																						bookingForTab === 'Calendar'
+																							? {
+																									transform: `scale(${landingScale})`,
+																									transformOrigin: 'top left',
+																								}
+																							: {}),
+																					}
+																		}
 																		className={cn(
-																			'relative z-[1] h-full flex items-center',
-																			// On landing page (useStaticDropdownPosition), always center tabs
-																			// On campaign page, use paddingLeft to align tabs
-																			!useStaticDropdownPosition && bookingForTabStripLeft != null ? 'justify-start' : 'justify-center'
+																			'z-[9999] rounded-[6px]',
+																			bookingForTab === 'Season'
+																				? BOOKING_FOR_SEASON_STYLES[
+																						bookingForPreviewSeason
+																					].bgClass
+																				: 'bg-[#F5F5F5]',
+																			'border-2 border-black',
+																			'flex flex-col overflow-hidden'
 																		)}
-																		style={!useStaticDropdownPosition && bookingForTabStripLeft != null ? { paddingLeft: bookingForTabStripLeft ?? 0 } : undefined}
+																		onMouseEnter={clearBookingForCloseTimeout}
+																		onMouseLeave={() => {
+																			setHoveredBookingForTab(null);
+																			setHoveredBookingForSeason(null);
+																			scheduleBookingForCloseTimeout();
+																		}}
+																		role="dialog"
+																		aria-label="Booking For"
 																	>
-																		<div
-																			className="w-[284px] grid grid-cols-3 items-center gap-[8px]"
-																			onMouseLeave={() => setHoveredBookingForTab(null)}
-																		>
-																			{(['Anytime', 'Season', 'Calendar'] as const).map(
-																				(opt) => {
-																					const isSelected = bookingForTab === opt;
-																					const isDimmed =
-																						hoveredBookingForTab !== null &&
-																						hoveredBookingForTab !== opt;
-																					const isHovered = hoveredBookingForTab === opt;
+																		<div className="relative h-[46px]">
+																			{bookingForTab === 'Season' && (
+																				<div
+																					aria-hidden="true"
+																					className="pointer-events-none absolute inset-0 flex items-center justify-center"
+																				>
+																					<div className="w-[284px] h-[32px] bg-[#E2E2E2] opacity-30 rounded-[6px]" />
+																				</div>
+																			)}
+
+																			<div
+																				className={cn(
+																					'relative z-[1] h-full flex items-center',
+																					// On landing page (useStaticDropdownPosition), always center tabs
+																					// On campaign page, use paddingLeft to align tabs
+																					!useStaticDropdownPosition &&
+																						bookingForTabStripLeft != null
+																						? 'justify-start'
+																						: 'justify-center'
+																				)}
+																				style={
+																					!useStaticDropdownPosition &&
+																					bookingForTabStripLeft != null
+																						? { paddingLeft: bookingForTabStripLeft ?? 0 }
+																						: undefined
+																				}
+																			>
+																				<div
+																					className="w-[284px] grid grid-cols-3 items-center gap-[8px]"
+																					onMouseLeave={() =>
+																						setHoveredBookingForTab(null)
+																					}
+																				>
+																					{(
+																						['Anytime', 'Season', 'Calendar'] as const
+																					).map((opt) => {
+																						const isSelected = bookingForTab === opt;
+																						const isDimmed =
+																							hoveredBookingForTab !== null &&
+																							hoveredBookingForTab !== opt;
+																						const isHovered =
+																							hoveredBookingForTab === opt;
+																						return (
+																							<button
+																								key={opt}
+																								type="button"
+																								onMouseEnter={() =>
+																									setHoveredBookingForTab(opt)
+																								}
+																								onClick={() => {
+																									if (opt === 'Season') {
+																										setBookingForTab('Season');
+																										return;
+																									}
+
+																									if (opt === 'Anytime') {
+																										setBookingForValue('Anytime');
+																										setBookingForCalendarStartDate(null);
+																										setBookingForCalendarEndDate(null);
+																										setBookingForTab('Anytime');
+																										return;
+																									}
+
+																									// Calendar
+																									setBookingForTab('Calendar');
+																								}}
+																								className={cn(
+																									'h-[28px] w-[81px] rounded-[6px] font-inter text-[14px] leading-[14px] text-black',
+																									'flex items-center justify-center text-center justify-self-center',
+																									isSelected
+																										? 'font-semibold'
+																										: 'font-normal'
+																								)}
+																								style={{
+																									backgroundColor: isDimmed
+																										? '#FFFFFF'
+																										: isSelected
+																											? opt === 'Season'
+																												? '#F5F5F5'
+																												: '#C2C2C2'
+																											: isHovered
+																												? 'rgba(0,0,0,0.05)'
+																												: 'transparent',
+																									boxShadow:
+																										hoveredBookingForTab !== null
+																											? 'inset 0 0 0 1px #000000'
+																											: 'inset 0 0 0 1px rgba(0,0,0,0)',
+																									transition: `background-color ${BOOKING_FOR_TAB_CHROME_TRANSITION}, box-shadow ${BOOKING_FOR_TAB_CHROME_TRANSITION}`,
+																								}}
+																								role="button"
+																								aria-pressed={isSelected}
+																							>
+																								<span
+																									style={{
+																										opacity: isDimmed ? 0 : 1,
+																										transition: `opacity ${BOOKING_FOR_TAB_CHROME_TRANSITION}`,
+																									}}
+																								>
+																									{opt}
+																								</span>
+																							</button>
+																						);
+																					})}
+																				</div>
+																			</div>
+																		</div>
+
+																		{bookingForTab === 'Season' && (
+																			<div className="flex-1 flex flex-col items-center justify-center gap-[10px] pb-[10px]">
+																				{(
+																					['Spring', 'Summer', 'Fall', 'Winter'] as const
+																				).map((season) => {
+																					const isSelectedSeason =
+																						bookingForSeasonFromValue === season;
+																					const isHoveredSeason =
+																						hoveredBookingForSeason === season;
+																					const isActiveSeason =
+																						isSelectedSeason || isHoveredSeason;
 																					return (
 																						<button
-																							key={opt}
+																							key={season}
 																							type="button"
-																							onMouseEnter={() => setHoveredBookingForTab(opt)}
 																							onClick={() => {
-																								if (opt === 'Season') {
-																									setBookingForTab('Season');
-																									return;
-																								}
-
-																								if (opt === 'Anytime') {
-																									setBookingForValue('Anytime');
-																									setBookingForCalendarStartDate(null);
-																									setBookingForCalendarEndDate(null);
-																									setBookingForTab('Anytime');
-																									return;
-																								}
-
-																								// Calendar
-																								setBookingForTab('Calendar');
+																								setBookingForSeason(season);
+																								setBookingForValue(season);
+																								setBookingForCalendarStartDate(null);
+																								setBookingForCalendarEndDate(null);
 																							}}
+																							onMouseEnter={() =>
+																								setHoveredBookingForSeason(season)
+																							}
+																							onMouseLeave={() =>
+																								setHoveredBookingForSeason(null)
+																							}
 																							className={cn(
-																								'h-[28px] w-[81px] rounded-[6px] font-inter text-[14px] leading-[14px] text-black',
-																								'flex items-center justify-center text-center justify-self-center',
-																								isSelected ? 'font-semibold' : 'font-normal'
+																								'font-inter text-[14px] leading-[16px]',
+																								isActiveSeason
+																									? 'font-semibold text-white'
+																									: 'font-normal text-black opacity-90 hover:opacity-100'
 																							)}
-																							style={{
-																								backgroundColor: isDimmed
-																									? '#FFFFFF'
-																									: isSelected
-																										? opt === 'Season'
-																											? '#F5F5F5'
-																											: '#C2C2C2'
-																										: isHovered
-																											? 'rgba(0,0,0,0.05)'
-																											: 'transparent',
-																								boxShadow:
-																									hoveredBookingForTab !== null
-																										? 'inset 0 0 0 1px #000000'
-																										: 'inset 0 0 0 1px rgba(0,0,0,0)',
-																								transition: `background-color ${BOOKING_FOR_TAB_CHROME_TRANSITION}, box-shadow ${BOOKING_FOR_TAB_CHROME_TRANSITION}`,
-																							}}
-																							role="button"
-																							aria-pressed={isSelected}
 																						>
-																							<span
-																								style={{
-																									opacity: isDimmed ? 0 : 1,
-																									transition: `opacity ${BOOKING_FOR_TAB_CHROME_TRANSITION}`,
-																								}}
-																							>
-																								{opt}
-																							</span>
+																							{season}
 																						</button>
 																					);
-																				}
-																			)}
-																		</div>
-																	</div>
-																</div>
+																				})}
+																			</div>
+																		)}
 
-																{bookingForTab === 'Season' && (
-																	<div className="flex-1 flex flex-col items-center justify-center gap-[10px] pb-[10px]">
-																		{(['Spring', 'Summer', 'Fall', 'Winter'] as const).map(
-																			(season) => {
-																				const isSelectedSeason = bookingForSeasonFromValue === season;
-																				const isHoveredSeason = hoveredBookingForSeason === season;
-																				const isActiveSeason = isSelectedSeason || isHoveredSeason;
-																				return (
-																					<button
-																						key={season}
-																						type="button"
-																						onClick={() => {
-																							setBookingForSeason(season);
-																							setBookingForValue(season);
-																							setBookingForCalendarStartDate(null);
-																							setBookingForCalendarEndDate(null);
-																						}}
-																						onMouseEnter={() => setHoveredBookingForSeason(season)}
-																						onMouseLeave={() => setHoveredBookingForSeason(null)}
-																						className={cn(
-																							'font-inter text-[14px] leading-[16px]',
-																							isActiveSeason
-																								? 'font-semibold text-white'
-																								: 'font-normal text-black opacity-90 hover:opacity-100'
-																						)}
+																		{bookingForTab === 'Calendar' && (
+																			<div
+																				className="flex-1 w-full p-[14px]"
+																				data-hover-description="Pick a date range that you want to book within. This will be included in the drafting"
+																			>
+																				<div className="w-full h-full flex flex-col gap-[16px]">
+																					{/* Top row */}
+																					<div
+																						className="w-full flex items-center justify-center gap-[24px]"
+																						data-hover-description-suppress="true"
 																					>
-																						{season}
-																					</button>
-																				);
-																			}
+																						{(() => {
+																							const now = new Date();
+																							const minBaseMonth = new Date(
+																								now.getFullYear(),
+																								now.getMonth(),
+																								1
+																							);
+																							const isPrevDisabled =
+																								bookingForCalendarBaseMonth.getTime() <=
+																								minBaseMonth.getTime();
+
+																							const currentMonth =
+																								new Intl.DateTimeFormat(undefined, {
+																									month: 'long',
+																								}).format(bookingForCalendarBaseMonth);
+																							const nextMonthDate = new Date(
+																								bookingForCalendarBaseMonth.getFullYear(),
+																								bookingForCalendarBaseMonth.getMonth() +
+																									1,
+																								1
+																							);
+																							const nextMonth = new Intl.DateTimeFormat(
+																								undefined,
+																								{
+																									month: 'long',
+																								}
+																							).format(nextMonthDate);
+
+																							return (
+																								<div className="w-full flex items-center justify-center gap-[12px]">
+																									<button
+																										type="button"
+																										disabled={isPrevDisabled}
+																										data-hover-description-suppress="true"
+																										onClick={() => {
+																											setBookingForCalendarBaseMonth(
+																												(prev) => {
+																													const next = new Date(
+																														prev.getFullYear(),
+																														prev.getMonth() - 1,
+																														1
+																													);
+																													return next.getTime() <
+																														minBaseMonth.getTime()
+																														? prev
+																														: next;
+																												}
+																											);
+																										}}
+																										className="shrink-0 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity disabled:cursor-not-allowed disabled:hover:opacity-100"
+																										aria-label="Previous month"
+																									>
+																										<LeftArrow
+																											width={8}
+																											height={16}
+																											color={
+																												isPrevDisabled
+																													? '#A0A0A0'
+																													: '#000000'
+																											}
+																											opacity={isPrevDisabled ? 0.6 : 1}
+																										/>
+																									</button>
+
+																									<div className="flex items-center justify-center gap-[24px]">
+																										<div
+																											className="w-[364px] h-[42px] rounded-[8px] bg-[#D2EFFF] flex items-center px-[18px]"
+																											data-hover-description-suppress="true"
+																										>
+																											<span className="font-inter font-semibold text-[16px] leading-[16px] text-black">
+																												{currentMonth}
+																											</span>
+																										</div>
+																										<div
+																											className="w-[364px] h-[42px] rounded-[8px] bg-[#D2EFFF] flex items-center px-[18px]"
+																											data-hover-description-suppress="true"
+																										>
+																											<span className="font-inter font-semibold text-[16px] leading-[16px] text-black">
+																												{nextMonth}
+																											</span>
+																										</div>
+																									</div>
+
+																									<button
+																										type="button"
+																										data-hover-description-suppress="true"
+																										onClick={() => {
+																											setBookingForCalendarBaseMonth(
+																												(prev) => {
+																													return new Date(
+																														prev.getFullYear(),
+																														prev.getMonth() + 1,
+																														1
+																													);
+																												}
+																											);
+																										}}
+																										className="shrink-0 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
+																										aria-label="Next month"
+																									>
+																										<RightArrow
+																											width={8}
+																											height={16}
+																											color="#000000"
+																											opacity={1}
+																										/>
+																									</button>
+																								</div>
+																							);
+																						})()}
+																					</div>
+
+																					{/* Bottom row */}
+																					<div
+																						className="w-full flex items-center justify-center gap-[24px]"
+																						data-hover-description-suppress="true"
+																					>
+																						{(() => {
+																							const now = new Date();
+																							const today = new Date(
+																								now.getFullYear(),
+																								now.getMonth(),
+																								now.getDate()
+																							);
+
+																							const weekDays = [
+																								'S',
+																								'M',
+																								'T',
+																								'W',
+																								'T',
+																								'F',
+																								'S',
+																							] as const;
+
+																							const formatMonthDay = (date: Date) => {
+																								return new Intl.DateTimeFormat('en-US', {
+																									month: 'short',
+																									day: 'numeric',
+																								}).format(date);
+																							};
+
+																							const handleSelectCalendarDate = (
+																								date: Date
+																							) => {
+																								// Prevent selecting past dates
+																								if (date.getTime() < today.getTime())
+																									return;
+
+																								// First click (or restarting selection)
+																								if (
+																									bookingForCalendarStartDate == null ||
+																									bookingForCalendarEndDate != null
+																								) {
+																									setBookingForCalendarStartDate(date);
+																									setBookingForCalendarEndDate(null);
+																									setBookingForValue(
+																										formatMonthDay(date)
+																									);
+																									return;
+																								}
+
+																								// Second click completes the range
+																								const start = bookingForCalendarStartDate;
+																								if (date.getTime() < start.getTime()) {
+																									setBookingForCalendarStartDate(date);
+																									setBookingForCalendarEndDate(start);
+																									setBookingForValue(
+																										`${formatMonthDay(date)} - ${formatMonthDay(start)}`
+																									);
+																									return;
+																								}
+
+																								setBookingForCalendarEndDate(date);
+																								if (date.getTime() === start.getTime()) {
+																									setBookingForValue(
+																										formatMonthDay(start)
+																									);
+																								} else {
+																									setBookingForValue(
+																										`${formatMonthDay(start)} - ${formatMonthDay(date)}`
+																									);
+																								}
+																							};
+
+																							const renderMonthGrid = (
+																								monthDate: Date
+																							) => {
+																								const year = monthDate.getFullYear();
+																								const month = monthDate.getMonth();
+																								const firstDayOfWeek = new Date(
+																									year,
+																									month,
+																									1
+																								).getDay(); // 0=Sun
+																								const daysInMonth = new Date(
+																									year,
+																									month + 1,
+																									0
+																								).getDate();
+
+																								const cells = Array.from(
+																									{ length: 42 },
+																									(_, idx) => {
+																										const dayNumber =
+																											idx - firstDayOfWeek + 1;
+																										if (
+																											dayNumber < 1 ||
+																											dayNumber > daysInMonth
+																										)
+																											return null;
+																										return new Date(
+																											year,
+																											month,
+																											dayNumber
+																										);
+																									}
+																								);
+
+																								return (
+																									<div
+																										className="w-[364px] h-[312px] rounded-[8px] bg-[#D2EFFF] p-[18px] flex flex-col"
+																										data-hover-description-suppress="true"
+																									>
+																										<div className="grid grid-cols-7 text-center">
+																											{weekDays.map((d) => (
+																												<div
+																													key={d}
+																													className="font-inter font-medium text-[12px] leading-[12px] text-black/35"
+																												>
+																													{d}
+																												</div>
+																											))}
+																										</div>
+
+																										<div className="mt-[18px] grid grid-cols-7 grid-rows-6 flex-1">
+																											{cells.map((cellDate, idx) => {
+																												if (!cellDate) {
+																													return (
+																														<div
+																															key={idx}
+																															aria-hidden="true"
+																														/>
+																													);
+																												}
+
+																												const cellDayStart = new Date(
+																													cellDate.getFullYear(),
+																													cellDate.getMonth(),
+																													cellDate.getDate()
+																												);
+																												const isPast =
+																													cellDayStart.getTime() <
+																													today.getTime();
+
+																												const hasRange =
+																													bookingForCalendarStartDate !=
+																														null &&
+																													bookingForCalendarEndDate !=
+																														null &&
+																													bookingForCalendarStartDate.getTime() !==
+																														bookingForCalendarEndDate.getTime();
+																												const rangeStart =
+																													bookingForCalendarStartDate;
+																												const rangeEnd =
+																													bookingForCalendarEndDate;
+
+																												const isStartSelected =
+																													rangeStart != null &&
+																													cellDayStart.getTime() ===
+																														rangeStart.getTime();
+																												const isEndSelected =
+																													rangeEnd != null &&
+																													cellDayStart.getTime() ===
+																														rangeEnd.getTime();
+
+																												const isInRange =
+																													hasRange &&
+																													rangeStart != null &&
+																													rangeEnd != null &&
+																													cellDayStart.getTime() >
+																														rangeStart.getTime() &&
+																													cellDayStart.getTime() <
+																														rangeEnd.getTime();
+
+																												const isInRangeInclusive =
+																													hasRange &&
+																													rangeStart != null &&
+																													rangeEnd != null &&
+																													cellDayStart.getTime() >=
+																														rangeStart.getTime() &&
+																													cellDayStart.getTime() <=
+																														rangeEnd.getTime();
+
+																												const prevDay = new Date(
+																													cellDayStart.getFullYear(),
+																													cellDayStart.getMonth(),
+																													cellDayStart.getDate() - 1
+																												);
+																												const nextDay = new Date(
+																													cellDayStart.getFullYear(),
+																													cellDayStart.getMonth(),
+																													cellDayStart.getDate() + 1
+																												);
+																												const prevInRange =
+																													isInRangeInclusive &&
+																													rangeStart != null &&
+																													rangeEnd != null &&
+																													prevDay.getTime() >=
+																														rangeStart.getTime() &&
+																													prevDay.getTime() <=
+																														rangeEnd.getTime();
+																												const nextInRange =
+																													isInRangeInclusive &&
+																													rangeStart != null &&
+																													rangeEnd != null &&
+																													nextDay.getTime() >=
+																														rangeStart.getTime() &&
+																													nextDay.getTime() <=
+																														rangeEnd.getTime();
+
+																												const isRowStart = idx % 7 === 0;
+																												const isRowEnd = idx % 7 === 6;
+																												const isRangeLeftCap =
+																													isInRangeInclusive &&
+																													(isRowStart || !prevInRange);
+																												const isRangeRightCap =
+																													isInRangeInclusive &&
+																													(isRowEnd || !nextInRange);
+
+																												return (
+																													<button
+																														key={idx}
+																														className={cn(
+																															'relative w-full h-full flex items-center justify-center group',
+																															'bg-transparent border-0 p-0',
+																															isPast
+																																? 'cursor-not-allowed'
+																																: 'cursor-pointer'
+																														)}
+																														type="button"
+																														disabled={isPast}
+																														data-hover-description-suppress="true"
+																														onClick={() =>
+																															handleSelectCalendarDate(
+																																cellDayStart
+																															)
+																														}
+																														aria-label={new Intl.DateTimeFormat(
+																															'en-US',
+																															{
+																																month: 'long',
+																																day: 'numeric',
+																																year: 'numeric',
+																															}
+																														).format(cellDayStart)}
+																													>
+																														{/* Range pill background */}
+																														{isInRangeInclusive && (
+																															<div
+																																aria-hidden="true"
+																																className={cn(
+																																	'absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[34px] bg-white/55',
+																																	isRangeLeftCap &&
+																																		'rounded-l-full',
+																																	isRangeRightCap &&
+																																		'rounded-r-full'
+																																)}
+																															/>
+																														)}
+
+																														{/* Day circle / number */}
+																														<div
+																															className={cn(
+																																'relative z-[1] w-[34px] h-[34px] rounded-full flex items-center justify-center',
+																																'border border-transparent transition-colors',
+																																'font-inter text-[16px] leading-[16px]',
+																																!isPast &&
+																																	!isStartSelected &&
+																																	!isEndSelected &&
+																																	'group-hover:border-black',
+																																(isStartSelected ||
+																																	isEndSelected) &&
+																																	'bg-black text-white',
+																																isEndSelected &&
+																																	hasRange &&
+																																	'ring-2 ring-white ring-offset-2 ring-offset-black',
+																																!isStartSelected &&
+																																	!isEndSelected &&
+																																	(isInRange
+																																		? 'text-black'
+																																		: isPast
+																																			? 'text-black/25'
+																																			: 'text-black')
+																															)}
+																														>
+																															{cellDate.getDate()}
+																														</div>
+																													</button>
+																												);
+																											})}
+																										</div>
+																									</div>
+																								);
+																							};
+
+																							const nextMonthBase = new Date(
+																								bookingForCalendarBaseMonth.getFullYear(),
+																								bookingForCalendarBaseMonth.getMonth() +
+																									1,
+																								1
+																							);
+
+																							return (
+																								<>
+																									{renderMonthGrid(
+																										bookingForCalendarBaseMonth
+																									)}
+																									{renderMonthGrid(nextMonthBase)}
+																								</>
+																							);
+																						})()}
+																					</div>
+																				</div>
+																			</div>
 																		)}
 																	</div>
-																)}
-
-																{bookingForTab === 'Calendar' && (
-																	<div className="flex-1 w-full p-[14px]" data-hover-description="Pick a date range that you want to book within. This will be included in the drafting">
-																		<div className="w-full h-full flex flex-col gap-[16px]">
-																			{/* Top row */}
-																			<div className="w-full flex items-center justify-center gap-[24px]" data-hover-description-suppress="true">
-																				{(() => {
-																					const now = new Date();
-																					const minBaseMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-																					const isPrevDisabled =
-																						bookingForCalendarBaseMonth.getTime() <= minBaseMonth.getTime();
-
-																					const currentMonth = new Intl.DateTimeFormat(undefined, {
-																						month: 'long',
-																					}).format(bookingForCalendarBaseMonth);
-																					const nextMonthDate = new Date(
-																						bookingForCalendarBaseMonth.getFullYear(),
-																						bookingForCalendarBaseMonth.getMonth() + 1,
-																						1
-																					);
-																					const nextMonth = new Intl.DateTimeFormat(undefined, {
-																						month: 'long',
-																					}).format(nextMonthDate);
-
-																					return (
-																						<div className="w-full flex items-center justify-center gap-[12px]">
-																							<button
-																								type="button"
-																								disabled={isPrevDisabled}
-																								data-hover-description-suppress="true"
-																								onClick={() => {
-																									setBookingForCalendarBaseMonth((prev) => {
-																										const next = new Date(prev.getFullYear(), prev.getMonth() - 1, 1);
-																										return next.getTime() < minBaseMonth.getTime() ? prev : next;
-																									});
-																								}}
-																								className="shrink-0 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity disabled:cursor-not-allowed disabled:hover:opacity-100"
-																								aria-label="Previous month"
-																							>
-																								<LeftArrow
-																									width={8}
-																									height={16}
-																									color={isPrevDisabled ? '#A0A0A0' : '#000000'}
-																									opacity={isPrevDisabled ? 0.6 : 1}
-																								/>
-																							</button>
-
-																							<div className="flex items-center justify-center gap-[24px]">
-																								<div className="w-[364px] h-[42px] rounded-[8px] bg-[#E2E2E2] flex items-center px-[18px]" data-hover-description-suppress="true">
-																									<span className="font-inter font-semibold text-[16px] leading-[16px] text-black">
-																										{currentMonth}
-																									</span>
-																								</div>
-																								<div className="w-[364px] h-[42px] rounded-[8px] bg-[#E2E2E2] flex items-center px-[18px]" data-hover-description-suppress="true">
-																									<span className="font-inter font-semibold text-[16px] leading-[16px] text-black">
-																										{nextMonth}
-																									</span>
-																								</div>
-																							</div>
-
-																							<button
-																								type="button"
-																								data-hover-description-suppress="true"
-																								onClick={() => {
-																									setBookingForCalendarBaseMonth((prev) => {
-																										return new Date(prev.getFullYear(), prev.getMonth() + 1, 1);
-																									});
-																								}}
-																								className="shrink-0 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
-																								aria-label="Next month"
-																							>
-																								<RightArrow width={8} height={16} color="#000000" opacity={1} />
-																							</button>
-																						</div>
-																					);
-																				})()}
-																			</div>
-
-																			{/* Bottom row */}
-																			<div className="w-full flex items-center justify-center gap-[24px]" data-hover-description-suppress="true">
-																				{(() => {
-																					const now = new Date();
-																					const today = new Date(
-																						now.getFullYear(),
-																						now.getMonth(),
-																						now.getDate()
-																					);
-
-																					const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
-
-																					const formatMonthDay = (date: Date) => {
-																						return new Intl.DateTimeFormat('en-US', {
-																							month: 'short',
-																							day: 'numeric',
-																						}).format(date);
-																					};
-
-																					const handleSelectCalendarDate = (date: Date) => {
-																						// Prevent selecting past dates
-																						if (date.getTime() < today.getTime()) return;
-
-																						// First click (or restarting selection)
-																						if (
-																							bookingForCalendarStartDate == null ||
-																							bookingForCalendarEndDate != null
-																						) {
-																							setBookingForCalendarStartDate(date);
-																							setBookingForCalendarEndDate(null);
-																							setBookingForValue(formatMonthDay(date));
-																							return;
-																						}
-
-																						// Second click completes the range
-																						const start = bookingForCalendarStartDate;
-																						if (date.getTime() < start.getTime()) {
-																							setBookingForCalendarStartDate(date);
-																							setBookingForCalendarEndDate(start);
-																							setBookingForValue(`${formatMonthDay(date)} - ${formatMonthDay(start)}`);
-																							return;
-																						}
-
-																						setBookingForCalendarEndDate(date);
-																						if (date.getTime() === start.getTime()) {
-																							setBookingForValue(formatMonthDay(start));
-																						} else {
-																							setBookingForValue(`${formatMonthDay(start)} - ${formatMonthDay(date)}`);
-																						}
-																					};
-
-																					const renderMonthGrid = (monthDate: Date) => {
-																						const year = monthDate.getFullYear();
-																						const month = monthDate.getMonth();
-																						const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0=Sun
-																						const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-																						const cells = Array.from({ length: 42 }, (_, idx) => {
-																							const dayNumber = idx - firstDayOfWeek + 1;
-																							if (dayNumber < 1 || dayNumber > daysInMonth) return null;
-																							return new Date(year, month, dayNumber);
-																						});
-
-																						return (
-																							<div className="w-[364px] h-[312px] rounded-[8px] bg-[#E2E2E2] p-[18px] flex flex-col" data-hover-description-suppress="true">
-																								<div className="grid grid-cols-7 text-center">
-																									{weekDays.map((d) => (
-																										<div
-																											key={d}
-																											className="font-inter font-medium text-[12px] leading-[12px] text-black/35"
-																										>
-																											{d}
-																										</div>
-																									))}
-																								</div>
-
-																								<div className="mt-[18px] grid grid-cols-7 grid-rows-6 flex-1">
-																									{cells.map((cellDate, idx) => {
-																										if (!cellDate) {
-																											return <div key={idx} aria-hidden="true" />;
-																										}
-
-																										const cellDayStart = new Date(
-																											cellDate.getFullYear(),
-																											cellDate.getMonth(),
-																											cellDate.getDate()
-																										);
-																										const isPast = cellDayStart.getTime() < today.getTime();
-
-																										const hasRange =
-																											bookingForCalendarStartDate != null &&
-																											bookingForCalendarEndDate != null &&
-																											bookingForCalendarStartDate.getTime() !==
-																												bookingForCalendarEndDate.getTime();
-																										const rangeStart = bookingForCalendarStartDate;
-																										const rangeEnd = bookingForCalendarEndDate;
-
-																										const isStartSelected =
-																											rangeStart != null &&
-																											cellDayStart.getTime() === rangeStart.getTime();
-																										const isEndSelected =
-																											rangeEnd != null &&
-																											cellDayStart.getTime() === rangeEnd.getTime();
-
-																										const isInRange =
-																											hasRange &&
-																											rangeStart != null &&
-																											rangeEnd != null &&
-																											cellDayStart.getTime() > rangeStart.getTime() &&
-																											cellDayStart.getTime() < rangeEnd.getTime();
-
-																										const isInRangeInclusive =
-																											hasRange &&
-																											rangeStart != null &&
-																											rangeEnd != null &&
-																											cellDayStart.getTime() >= rangeStart.getTime() &&
-																											cellDayStart.getTime() <= rangeEnd.getTime();
-
-																										const prevDay = new Date(
-																											cellDayStart.getFullYear(),
-																											cellDayStart.getMonth(),
-																											cellDayStart.getDate() - 1
-																										);
-																										const nextDay = new Date(
-																											cellDayStart.getFullYear(),
-																											cellDayStart.getMonth(),
-																											cellDayStart.getDate() + 1
-																										);
-																										const prevInRange =
-																											isInRangeInclusive &&
-																											rangeStart != null &&
-																											rangeEnd != null &&
-																											prevDay.getTime() >= rangeStart.getTime() &&
-																											prevDay.getTime() <= rangeEnd.getTime();
-																										const nextInRange =
-																											isInRangeInclusive &&
-																											rangeStart != null &&
-																											rangeEnd != null &&
-																											nextDay.getTime() >= rangeStart.getTime() &&
-																											nextDay.getTime() <= rangeEnd.getTime();
-
-																										const isRowStart = idx % 7 === 0;
-																										const isRowEnd = idx % 7 === 6;
-																										const isRangeLeftCap =
-																											isInRangeInclusive && (isRowStart || !prevInRange);
-																										const isRangeRightCap =
-																											isInRangeInclusive && (isRowEnd || !nextInRange);
-
-																										return (
-																											<button
-																												key={idx}
-																												className={cn(
-																													'relative w-full h-full flex items-center justify-center group',
-																													'bg-transparent border-0 p-0',
-																													isPast ? 'cursor-not-allowed' : 'cursor-pointer'
-																												)}
-																												type="button"
-																												disabled={isPast}
-																												data-hover-description-suppress="true"
-																												onClick={() => handleSelectCalendarDate(cellDayStart)}
-																												aria-label={new Intl.DateTimeFormat('en-US', {
-																													month: 'long',
-																													day: 'numeric',
-																													year: 'numeric',
-																												}).format(cellDayStart)}
-																											>
-																												{/* Range pill background */}
-																												{isInRangeInclusive && (
-																													<div
-																														aria-hidden="true"
-																														className={cn(
-																															'absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[34px] bg-white/55',
-																															isRangeLeftCap && 'rounded-l-full',
-																															isRangeRightCap && 'rounded-r-full'
-																														)}
-																													/>
-																												)}
-
-																												{/* Day circle / number */}
-																												<div
-																													className={cn(
-																														'relative z-[1] w-[34px] h-[34px] rounded-full flex items-center justify-center',
-																														'border border-transparent transition-colors',
-																														'font-inter text-[16px] leading-[16px]',
-																														!isPast &&
-																															!isStartSelected &&
-																															!isEndSelected &&
-																															'group-hover:border-black',
-																														(isStartSelected || isEndSelected) &&
-																															'bg-black text-white',
-																														isEndSelected &&
-																															hasRange &&
-																															'ring-2 ring-white ring-offset-2 ring-offset-black',
-																														!isStartSelected &&
-																															!isEndSelected &&
-																															(isInRange ? 'text-black' : isPast ? 'text-black/25' : 'text-black')
-																													)}
-																												>
-																													{cellDate.getDate()}
-																												</div>
-																											</button>
-																										);
-																									})}
-																								</div>
-																							</div>
-																						);
-																					};
-
-																					const nextMonthBase = new Date(
-																						bookingForCalendarBaseMonth.getFullYear(),
-																						bookingForCalendarBaseMonth.getMonth() + 1,
-																						1
-																					);
-
-																					return (
-																						<>
-																							{renderMonthGrid(bookingForCalendarBaseMonth)}
-																							{renderMonthGrid(nextMonthBase)}
-																						</>
-																					);
-																				})()}
-																			</div>
-																		</div>
-																	</div>
-																)}
-															</div>
-														);
-														return useStatic
-															? dropdownContent
-															: typeof document !== 'undefined'
-																// Portal to <html> instead of <body> because Murmur uses
-																// body { transform: scale() } on Firefox, which would offset
-																// position: fixed children.
-																? createPortal(dropdownContent, document.documentElement)
-																: null;
-													})()}
+																);
+																return useStatic
+																	? dropdownContent
+																	: typeof document !== 'undefined'
+																		? // Portal to <html> instead of <body> because Murmur uses
+																			// body { transform: scale() } on Firefox, which would offset
+																			// position: fixed children.
+																			createPortal(
+																				dropdownContent,
+																				document.documentElement
+																			)
+																		: null;
+															})()}
 													</div>
 												)}
 
@@ -1829,13 +2226,19 @@ const SortableAIBlock = ({
 																			// Avoid interfering with IME composition confirmation.
 																			// (Some browsers also expose this as `e.nativeEvent.isComposing`.)
 																			// @ts-expect-error - React KeyboardEvent doesn't always expose isComposing in types
-																			if (e.isComposing || (e.nativeEvent as any)?.isComposing) return;
+																			if (
+																				e.isComposing ||
+																				(e.nativeEvent as any)?.isComposing
+																			)
+																				return;
 
 																			e.preventDefault();
 																			e.stopPropagation();
 
 																			const currentValue =
-																				form.getValues(`hybridBlockPrompts.${fieldIndex}.value`) || '';
+																				form.getValues(
+																					`hybridBlockPrompts.${fieldIndex}.value`
+																				) || '';
 																			await onGetSuggestions?.(currentValue);
 																		}}
 																		onFocus={(e) => {
@@ -1894,7 +2297,9 @@ const SortableAIBlock = ({
 																			if (isUpscalingPrompt) return;
 																			void onUpscalePrompt();
 																		}}
-																		disabled={!onUpscalePrompt || Boolean(isUpscalingPrompt)}
+																		disabled={
+																			!onUpscalePrompt || Boolean(isUpscalingPrompt)
+																		}
 																		className={cn(
 																			'w-[73px] h-[20px] box-border rounded-[8px] border-2 border-transparent bg-transparent flex items-center justify-between gap-[4px] px-[4px] py-0',
 																			isUpscalingPrompt
@@ -1924,7 +2329,10 @@ const SortableAIBlock = ({
 												)}
 
 												{false && isCustomInstructionsOpen && (
-													<div ref={bookingForContainerRef} className="relative mt-[10px] w-full">
+													<div
+														ref={bookingForContainerRef}
+														className="relative mt-[10px] w-full"
+													>
 														<button
 															ref={bookingForButtonRef}
 															type="button"
@@ -1946,13 +2354,17 @@ const SortableAIBlock = ({
 																	setBookingForTab('Calendar');
 																} else if (bookingForTab === 'Season') {
 																	if (isSeasonSelection) {
-																		setBookingForSeason(bookingForValue as BookingForSeason);
+																		setBookingForSeason(
+																			bookingForValue as BookingForSeason
+																		);
 																	}
 																	setBookingForTab('Season');
 																} else if (bookingForCalendarStartDate != null) {
 																	setBookingForTab('Calendar');
 																} else if (isSeasonSelection) {
-																	setBookingForSeason(bookingForValue as BookingForSeason);
+																	setBookingForSeason(
+																		bookingForValue as BookingForSeason
+																	);
 																	setBookingForTab('Season');
 																} else {
 																	setBookingForTab('Anytime');
@@ -1988,12 +2400,13 @@ const SortableAIBlock = ({
 														</button>
 
 														{isBookingForOpen &&
-															(bookingForDropdownPosition || bookingForTab !== 'Calendar') &&
+															(bookingForDropdownPosition ||
+																bookingForTab !== 'Calendar') &&
 															(() => {
 																// Anytime/Season use static (absolute) positioning - they fit in the container.
 																// Calendar uses portal with fixed positioning so it's not clipped by overflow.
 																const useStatic2 = bookingForTab !== 'Calendar';
-																
+
 																// For Calendar in landing page mode, calculate position to align tabs with button
 																// See comment in the other Booking For render path for why this needs
 																// special handling when the panel is scaled on the landing page.
@@ -2002,32 +2415,37 @@ const SortableAIBlock = ({
 																	if (!anchor) return 1;
 																	const unscaledWidth = anchor!.offsetWidth;
 																	if (!unscaledWidth) return 1;
-																	const scaledWidth = anchor!.getBoundingClientRect().width;
+																	const scaledWidth =
+																		anchor!.getBoundingClientRect().width;
 																	const scale = scaledWidth / unscaledWidth;
 																	return Number.isFinite(scale) && scale > 0 ? scale : 1;
 																})();
 																// For landing page, position Calendar so centered tabs align with Anytime/Season tabs.
 																// With transformOrigin: 'top left', the left edge stays in place during scaling.
 																const getCalendarLandingPosition2 = () => {
-																	if (!useStaticDropdownPosition || bookingForTab !== 'Calendar') {
+																	if (
+																		!useStaticDropdownPosition ||
+																		bookingForTab !== 'Calendar'
+																	) {
 																		return null;
 																	}
-																	const containerRect = bookingForContainerRef.current?.getBoundingClientRect();
+																	const containerRect =
+																		bookingForContainerRef.current?.getBoundingClientRect();
 																	if (!containerRect) return null;
-																	
+
 																	// Anytime/Season tabs are centered in 317px at 16.5px from dropdown left
 																	// Calendar tabs are centered in 829px at 272.5px from dropdown left
 																	// To align: Calendar left = container left - (272.5 - 16.5) = container left - 256
 																	// Fine-tuned to 250px for better visual alignment
 																	const tabsAlignShift = 250 * landingScale2;
-																	
+
 																	return {
 																		top: containerRect.bottom + 6 * landingScale2,
 																		left: containerRect.left - tabsAlignShift,
 																	};
 																};
 																const calendarPos2 = getCalendarLandingPosition2();
-																
+
 																const dropdownContent2 = (
 																	<div
 																		ref={bookingForDropdownRef}
@@ -2040,24 +2458,35 @@ const SortableAIBlock = ({
 																						marginTop: 6,
 																						width: bookingForDropdownSize.width,
 																						height: bookingForDropdownSize.height,
-																				  }
+																					}
 																				: {
 																						position: 'fixed',
-																						top: calendarPos2?.top ?? bookingForDropdownPosition?.top ?? 0,
-																						left: calendarPos2?.left ?? bookingForDropdownPosition?.left ?? 0,
+																						top:
+																							calendarPos2?.top ??
+																							bookingForDropdownPosition?.top ??
+																							0,
+																						left:
+																							calendarPos2?.left ??
+																							bookingForDropdownPosition?.left ??
+																							0,
 																						width: bookingForDropdownSize.width,
 																						height: bookingForDropdownSize.height,
 																						// Scale down Calendar in landing page mode to match the scaled container
-																						...(useStaticDropdownPosition && bookingForTab === 'Calendar' ? {
-																							transform: `scale(${landingScale2})`,
-																							transformOrigin: 'top left',
-																						} : {}),
-																				  }
+																						...(useStaticDropdownPosition &&
+																						bookingForTab === 'Calendar'
+																							? {
+																									transform: `scale(${landingScale2})`,
+																									transformOrigin: 'top left',
+																								}
+																							: {}),
+																					}
 																		}
 																		className={cn(
 																			'z-[9999] rounded-[6px]',
 																			bookingForTab === 'Season'
-																				? BOOKING_FOR_SEASON_STYLES[bookingForPreviewSeason].bgClass
+																				? BOOKING_FOR_SEASON_STYLES[
+																						bookingForPreviewSeason
+																					].bgClass
 																				: 'bg-[#F5F5F5]',
 																			'border-2 border-black',
 																			'flex flex-col overflow-hidden'
@@ -2071,41 +2500,55 @@ const SortableAIBlock = ({
 																		role="dialog"
 																		aria-label="Booking For"
 																	>
-																	<div className="relative h-[46px]">
-																		{bookingForTab === 'Season' && (
-																			<div
-																				aria-hidden="true"
-																				className="pointer-events-none absolute inset-0 flex items-center justify-center"
-																			>
-																				<div className="w-[284px] h-[32px] bg-[#E2E2E2] opacity-30 rounded-[6px]" />
-																			</div>
-																		)}
-
-																		<div
-																			className={cn(
-																				'relative z-[1] h-full flex items-center',
-																				// On landing page (useStaticDropdownPosition), always center tabs
-																				// On campaign page, use paddingLeft to align tabs
-																				!useStaticDropdownPosition && bookingForTabStripLeft != null ? 'justify-start' : 'justify-center'
+																		<div className="relative h-[46px]">
+																			{bookingForTab === 'Season' && (
+																				<div
+																					aria-hidden="true"
+																					className="pointer-events-none absolute inset-0 flex items-center justify-center"
+																				>
+																					<div className="w-[284px] h-[32px] bg-[#E2E2E2] opacity-30 rounded-[6px]" />
+																				</div>
 																			)}
-																		style={!useStaticDropdownPosition && bookingForTabStripLeft != null ? { paddingLeft: bookingForTabStripLeft ?? 0 } : undefined}
-																		>
+
 																			<div
-																				className="w-[284px] grid grid-cols-3 items-center gap-[8px]"
-																				onMouseLeave={() => setHoveredBookingForTab(null)}
+																				className={cn(
+																					'relative z-[1] h-full flex items-center',
+																					// On landing page (useStaticDropdownPosition), always center tabs
+																					// On campaign page, use paddingLeft to align tabs
+																					!useStaticDropdownPosition &&
+																						bookingForTabStripLeft != null
+																						? 'justify-start'
+																						: 'justify-center'
+																				)}
+																				style={
+																					!useStaticDropdownPosition &&
+																					bookingForTabStripLeft != null
+																						? { paddingLeft: bookingForTabStripLeft ?? 0 }
+																						: undefined
+																				}
 																			>
-																				{(['Anytime', 'Season', 'Calendar'] as const).map(
-																					(opt) => {
+																				<div
+																					className="w-[284px] grid grid-cols-3 items-center gap-[8px]"
+																					onMouseLeave={() =>
+																						setHoveredBookingForTab(null)
+																					}
+																				>
+																					{(
+																						['Anytime', 'Season', 'Calendar'] as const
+																					).map((opt) => {
 																						const isSelected = bookingForTab === opt;
 																						const isDimmed =
 																							hoveredBookingForTab !== null &&
 																							hoveredBookingForTab !== opt;
-																						const isHovered = hoveredBookingForTab === opt;
+																						const isHovered =
+																							hoveredBookingForTab === opt;
 																						return (
 																							<button
 																								key={opt}
 																								type="button"
-																								onMouseEnter={() => setHoveredBookingForTab(opt)}
+																								onMouseEnter={() =>
+																									setHoveredBookingForTab(opt)
+																								}
 																								onClick={() => {
 																									if (opt === 'Season') {
 																										setBookingForTab('Season');
@@ -2125,7 +2568,9 @@ const SortableAIBlock = ({
 																								className={cn(
 																									'h-[28px] w-[81px] rounded-[6px] font-inter text-[14px] leading-[14px] text-black',
 																									'flex items-center justify-center text-center justify-self-center',
-																									isSelected ? 'font-semibold' : 'font-normal'
+																									isSelected
+																										? 'font-semibold'
+																										: 'font-normal'
 																								)}
 																								style={{
 																									backgroundColor: isDimmed
@@ -2156,19 +2601,22 @@ const SortableAIBlock = ({
 																								</span>
 																							</button>
 																						);
-																					}
-																				)}
+																					})}
+																				</div>
 																			</div>
 																		</div>
-																	</div>
 
-																	{bookingForTab === 'Season' && (
-																		<div className="flex-1 flex flex-col items-center justify-center gap-[10px] pb-[10px]">
-																			{(['Spring', 'Summer', 'Fall', 'Winter'] as const).map(
-																				(season) => {
-																					const isSelectedSeason = bookingForSeasonFromValue === season;
-																					const isHoveredSeason = hoveredBookingForSeason === season;
-																					const isActiveSeason = isSelectedSeason || isHoveredSeason;
+																		{bookingForTab === 'Season' && (
+																			<div className="flex-1 flex flex-col items-center justify-center gap-[10px] pb-[10px]">
+																				{(
+																					['Spring', 'Summer', 'Fall', 'Winter'] as const
+																				).map((season) => {
+																					const isSelectedSeason =
+																						bookingForSeasonFromValue === season;
+																					const isHoveredSeason =
+																						hoveredBookingForSeason === season;
+																					const isActiveSeason =
+																						isSelectedSeason || isHoveredSeason;
 																					return (
 																						<button
 																							key={season}
@@ -2179,8 +2627,12 @@ const SortableAIBlock = ({
 																								setBookingForCalendarStartDate(null);
 																								setBookingForCalendarEndDate(null);
 																							}}
-																							onMouseEnter={() => setHoveredBookingForSeason(season)}
-																							onMouseLeave={() => setHoveredBookingForSeason(null)}
+																							onMouseEnter={() =>
+																								setHoveredBookingForSeason(season)
+																							}
+																							onMouseLeave={() =>
+																								setHoveredBookingForSeason(null)
+																							}
 																							className={cn(
 																								'font-inter text-[14px] leading-[16px]',
 																								isActiveSeason
@@ -2191,317 +2643,454 @@ const SortableAIBlock = ({
 																							{season}
 																						</button>
 																					);
-																				}
-																			)}
-																		</div>
-																	)}
+																				})}
+																			</div>
+																		)}
 
-																	{bookingForTab === 'Calendar' && (
-																		<div className="flex-1 w-full p-[14px]" data-hover-description="Pick a date range that you want to book within. This will be included in the drafting">
-																			<div className="w-full h-full flex flex-col gap-[16px]">
-																				<div className="w-full flex items-center justify-center gap-[24px]" data-hover-description-suppress="true">
-																					{(() => {
-																						const now = new Date();
-																						const minBaseMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-																						const isPrevDisabled =
-																							bookingForCalendarBaseMonth.getTime() <= minBaseMonth.getTime();
+																		{bookingForTab === 'Calendar' && (
+																			<div
+																				className="flex-1 w-full p-[14px]"
+																				data-hover-description="Pick a date range that you want to book within. This will be included in the drafting"
+																			>
+																				<div className="w-full h-full flex flex-col gap-[16px]">
+																					<div
+																						className="w-full flex items-center justify-center gap-[24px]"
+																						data-hover-description-suppress="true"
+																					>
+																						{(() => {
+																							const now = new Date();
+																							const minBaseMonth = new Date(
+																								now.getFullYear(),
+																								now.getMonth(),
+																								1
+																							);
+																							const isPrevDisabled =
+																								bookingForCalendarBaseMonth.getTime() <=
+																								minBaseMonth.getTime();
 
-																						const currentMonth = new Intl.DateTimeFormat(undefined, {
-																							month: 'long',
-																						}).format(bookingForCalendarBaseMonth);
-																						const nextMonthDate = new Date(
-																							bookingForCalendarBaseMonth.getFullYear(),
-																							bookingForCalendarBaseMonth.getMonth() + 1,
-																							1
-																						);
-																						const nextMonth = new Intl.DateTimeFormat(undefined, {
-																							month: 'long',
-																						}).format(nextMonthDate);
-
-																						return (
-																							<div className="w-full flex items-center justify-center gap-[12px]">
-																								<button
-																									type="button"
-																									disabled={isPrevDisabled}
-																									data-hover-description-suppress="true"
-																									onClick={() => {
-																										setBookingForCalendarBaseMonth((prev) => {
-																											const next = new Date(prev.getFullYear(), prev.getMonth() - 1, 1);
-																											return next.getTime() < minBaseMonth.getTime() ? prev : next;
-																										});
-																									}}
-																									className="shrink-0 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity disabled:cursor-not-allowed disabled:hover:opacity-100"
-																									aria-label="Previous month"
-																								>
-																									<LeftArrow
-																										width={8}
-																										height={16}
-																										color={isPrevDisabled ? '#A0A0A0' : '#000000'}
-																										opacity={isPrevDisabled ? 0.6 : 1}
-																									/>
-																								</button>
-
-																								<div className="flex items-center justify-center gap-[24px]">
-																									<div className="w-[364px] h-[42px] rounded-[8px] bg-[#E2E2E2] flex items-center px-[18px]" data-hover-description-suppress="true">
-																										<span className="font-inter font-semibold text-[16px] leading-[16px] text-black">
-																											{currentMonth}
-																										</span>
-																									</div>
-																									<div className="w-[364px] h-[42px] rounded-[8px] bg-[#E2E2E2] flex items-center px-[18px]" data-hover-description-suppress="true">
-																										<span className="font-inter font-semibold text-[16px] leading-[16px] text-black">
-																											{nextMonth}
-																										</span>
-																									</div>
-																								</div>
-
-																								<button
-																									type="button"
-																									data-hover-description-suppress="true"
-																									onClick={() => {
-																										setBookingForCalendarBaseMonth((prev) => {
-																											return new Date(prev.getFullYear(), prev.getMonth() + 1, 1);
-																										});
-																									}}
-																									className="shrink-0 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
-																									aria-label="Next month"
-																								>
-																									<RightArrow width={8} height={16} color="#000000" opacity={1} />
-																								</button>
-																							</div>
-																						);
-																					})()}
-																				</div>
-
-																				<div className="w-full flex items-center justify-center gap-[24px]" data-hover-description-suppress="true">
-																					{(() => {
-																						const now = new Date();
-																						const today = new Date(
-																							now.getFullYear(),
-																							now.getMonth(),
-																							now.getDate()
-																						);
-
-																						const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
-
-																						const formatMonthDay = (date: Date) => {
-																							return new Intl.DateTimeFormat('en-US', {
-																								month: 'short',
-																								day: 'numeric',
-																							}).format(date);
-																						};
-
-																						const handleSelectCalendarDate = (date: Date) => {
-																							if (date.getTime() < today.getTime()) return;
-
-																							if (
-																								bookingForCalendarStartDate == null ||
-																								bookingForCalendarEndDate != null
-																							) {
-																								setBookingForCalendarStartDate(date);
-																								setBookingForCalendarEndDate(null);
-																								setBookingForValue(formatMonthDay(date));
-																								return;
-																							}
-
-																							const start = bookingForCalendarStartDate;
-																							if (date.getTime() < start.getTime()) {
-																								setBookingForCalendarStartDate(date);
-																								setBookingForCalendarEndDate(start);
-																								setBookingForValue(`${formatMonthDay(date)} - ${formatMonthDay(start)}`);
-																								return;
-																							}
-
-																							setBookingForCalendarEndDate(date);
-																							if (date.getTime() === start.getTime()) {
-																								setBookingForValue(formatMonthDay(start));
-																							} else {
-																								setBookingForValue(`${formatMonthDay(start)} - ${formatMonthDay(date)}`);
-																							}
-																						};
-
-																						const renderMonthGrid = (monthDate: Date) => {
-																							const year = monthDate.getFullYear();
-																							const month = monthDate.getMonth();
-																							const firstDayOfWeek = new Date(year, month, 1).getDay();
-																							const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-																							const cells = Array.from({ length: 42 }, (_, idx) => {
-																								const dayNumber = idx - firstDayOfWeek + 1;
-																								if (dayNumber < 1 || dayNumber > daysInMonth) return null;
-																								return new Date(year, month, dayNumber);
-																							});
+																							const currentMonth =
+																								new Intl.DateTimeFormat(undefined, {
+																									month: 'long',
+																								}).format(bookingForCalendarBaseMonth);
+																							const nextMonthDate = new Date(
+																								bookingForCalendarBaseMonth.getFullYear(),
+																								bookingForCalendarBaseMonth.getMonth() +
+																									1,
+																								1
+																							);
+																							const nextMonth = new Intl.DateTimeFormat(
+																								undefined,
+																								{
+																									month: 'long',
+																								}
+																							).format(nextMonthDate);
 
 																							return (
-																								<div className="w-[364px] h-[312px] rounded-[8px] bg-[#E2E2E2] p-[18px] flex flex-col" data-hover-description-suppress="true">
-																									<div className="grid grid-cols-7 text-center">
-																										{weekDays.map((d) => (
-																											<div
-																												key={d}
-																												className="font-inter font-medium text-[12px] leading-[12px] text-black/35"
-																											>
-																												{d}
-																											</div>
-																										))}
-																									</div>
-
-																									<div className="mt-[18px] grid grid-cols-7 grid-rows-6 flex-1">
-																										{cells.map((cellDate, idx) => {
-																											if (!cellDate) {
-																												return <div key={idx} aria-hidden="true" />;
+																								<div className="w-full flex items-center justify-center gap-[12px]">
+																									<button
+																										type="button"
+																										disabled={isPrevDisabled}
+																										data-hover-description-suppress="true"
+																										onClick={() => {
+																											setBookingForCalendarBaseMonth(
+																												(prev) => {
+																													const next = new Date(
+																														prev.getFullYear(),
+																														prev.getMonth() - 1,
+																														1
+																													);
+																													return next.getTime() <
+																														minBaseMonth.getTime()
+																														? prev
+																														: next;
+																												}
+																											);
+																										}}
+																										className="shrink-0 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity disabled:cursor-not-allowed disabled:hover:opacity-100"
+																										aria-label="Previous month"
+																									>
+																										<LeftArrow
+																											width={8}
+																											height={16}
+																											color={
+																												isPrevDisabled
+																													? '#A0A0A0'
+																													: '#000000'
 																											}
+																											opacity={isPrevDisabled ? 0.6 : 1}
+																										/>
+																									</button>
 
-																											const cellDayStart = new Date(
-																												cellDate.getFullYear(),
-																												cellDate.getMonth(),
-																												cellDate.getDate()
-																											);
-																											const isPast = cellDayStart.getTime() < today.getTime();
-
-																											const hasRange =
-																												bookingForCalendarStartDate != null &&
-																												bookingForCalendarEndDate != null &&
-																												bookingForCalendarStartDate.getTime() !==
-																													bookingForCalendarEndDate.getTime();
-																											const rangeStart = bookingForCalendarStartDate;
-																											const rangeEnd = bookingForCalendarEndDate;
-
-																											const isStartSelected =
-																												rangeStart != null &&
-																												cellDayStart.getTime() === rangeStart.getTime();
-																											const isEndSelected =
-																												rangeEnd != null &&
-																												cellDayStart.getTime() === rangeEnd.getTime();
-
-																											const isInRange =
-																												hasRange &&
-																												rangeStart != null &&
-																												rangeEnd != null &&
-																												cellDayStart.getTime() > rangeStart.getTime() &&
-																												cellDayStart.getTime() < rangeEnd.getTime();
-
-																											const isInRangeInclusive =
-																												hasRange &&
-																												rangeStart != null &&
-																												rangeEnd != null &&
-																												cellDayStart.getTime() >= rangeStart.getTime() &&
-																												cellDayStart.getTime() <= rangeEnd.getTime();
-
-																											const prevDay = new Date(
-																												cellDayStart.getFullYear(),
-																												cellDayStart.getMonth(),
-																												cellDayStart.getDate() - 1
-																											);
-																											const nextDay = new Date(
-																												cellDayStart.getFullYear(),
-																												cellDayStart.getMonth(),
-																												cellDayStart.getDate() + 1
-																											);
-																											const prevInRange =
-																												isInRangeInclusive &&
-																												rangeStart != null &&
-																												rangeEnd != null &&
-																												prevDay.getTime() >= rangeStart.getTime() &&
-																												prevDay.getTime() <= rangeEnd.getTime();
-																											const nextInRange =
-																												isInRangeInclusive &&
-																												rangeStart != null &&
-																												rangeEnd != null &&
-																												nextDay.getTime() >= rangeStart.getTime() &&
-																												nextDay.getTime() <= rangeEnd.getTime();
-
-																											const isRowStart = idx % 7 === 0;
-																											const isRowEnd = idx % 7 === 6;
-																											const isRangeLeftCap =
-																												isInRangeInclusive && (isRowStart || !prevInRange);
-																											const isRangeRightCap =
-																												isInRangeInclusive && (isRowEnd || !nextInRange);
-
-																											return (
-																												<button
-																													key={idx}
-																													className={cn(
-																														'relative w-full h-full flex items-center justify-center group',
-																														'bg-transparent border-0 p-0',
-																														isPast ? 'cursor-not-allowed' : 'cursor-pointer'
-																													)}
-																													type="button"
-																													disabled={isPast}
-																													data-hover-description-suppress="true"
-																													onClick={() => handleSelectCalendarDate(cellDayStart)}
-																													aria-label={new Intl.DateTimeFormat('en-US', {
-																														month: 'long',
-																														day: 'numeric',
-																														year: 'numeric',
-																													}).format(cellDayStart)}
-																												>
-																													{isInRangeInclusive && (
-																														<div
-																															aria-hidden="true"
-																															className={cn(
-																																'absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[34px] bg-white/55',
-																																isRangeLeftCap && 'rounded-l-full',
-																																isRangeRightCap && 'rounded-r-full'
-																															)}
-																														/>
-																													)}
-
-																													<div
-																														className={cn(
-																															'relative z-[1] w-[34px] h-[34px] rounded-full flex items-center justify-center',
-																															'border border-transparent transition-colors',
-																															'font-inter text-[16px] leading-[16px]',
-																															!isPast &&
-																																!isStartSelected &&
-																																!isEndSelected &&
-																																'group-hover:border-black',
-																															(isStartSelected || isEndSelected) &&
-																																'bg-black text-white',
-																															isEndSelected &&
-																																hasRange &&
-																																'ring-2 ring-white ring-offset-2 ring-offset-black',
-																															!isStartSelected &&
-																																!isEndSelected &&
-																																(isInRange ? 'text-black' : isPast ? 'text-black/25' : 'text-black')
-																														)}
-																													>
-																														{cellDate.getDate()}
-																													</div>
-																												</button>
-																											);
-																										})}
+																									<div className="flex items-center justify-center gap-[24px]">
+																										<div
+																											className="w-[364px] h-[42px] rounded-[8px] bg-[#D2EFFF] flex items-center px-[18px]"
+																											data-hover-description-suppress="true"
+																										>
+																											<span className="font-inter font-semibold text-[16px] leading-[16px] text-black">
+																												{currentMonth}
+																											</span>
+																										</div>
+																										<div
+																											className="w-[364px] h-[42px] rounded-[8px] bg-[#D2EFFF] flex items-center px-[18px]"
+																											data-hover-description-suppress="true"
+																										>
+																											<span className="font-inter font-semibold text-[16px] leading-[16px] text-black">
+																												{nextMonth}
+																											</span>
+																										</div>
 																									</div>
+
+																									<button
+																										type="button"
+																										data-hover-description-suppress="true"
+																										onClick={() => {
+																											setBookingForCalendarBaseMonth(
+																												(prev) => {
+																													return new Date(
+																														prev.getFullYear(),
+																														prev.getMonth() + 1,
+																														1
+																													);
+																												}
+																											);
+																										}}
+																										className="shrink-0 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
+																										aria-label="Next month"
+																									>
+																										<RightArrow
+																											width={8}
+																											height={16}
+																											color="#000000"
+																											opacity={1}
+																										/>
+																									</button>
 																								</div>
 																							);
-																						};
+																						})()}
+																					</div>
 
-																						const nextMonthBase = new Date(
-																							bookingForCalendarBaseMonth.getFullYear(),
-																							bookingForCalendarBaseMonth.getMonth() + 1,
-																							1
-																						);
+																					<div
+																						className="w-full flex items-center justify-center gap-[24px]"
+																						data-hover-description-suppress="true"
+																					>
+																						{(() => {
+																							const now = new Date();
+																							const today = new Date(
+																								now.getFullYear(),
+																								now.getMonth(),
+																								now.getDate()
+																							);
 
-																						return (
-																							<>
-																								{renderMonthGrid(bookingForCalendarBaseMonth)}
-																								{renderMonthGrid(nextMonthBase)}
-																							</>
-																						);
-																					})()}
+																							const weekDays = [
+																								'S',
+																								'M',
+																								'T',
+																								'W',
+																								'T',
+																								'F',
+																								'S',
+																							] as const;
+
+																							const formatMonthDay = (date: Date) => {
+																								return new Intl.DateTimeFormat('en-US', {
+																									month: 'short',
+																									day: 'numeric',
+																								}).format(date);
+																							};
+
+																							const handleSelectCalendarDate = (
+																								date: Date
+																							) => {
+																								if (date.getTime() < today.getTime())
+																									return;
+
+																								if (
+																									bookingForCalendarStartDate == null ||
+																									bookingForCalendarEndDate != null
+																								) {
+																									setBookingForCalendarStartDate(date);
+																									setBookingForCalendarEndDate(null);
+																									setBookingForValue(
+																										formatMonthDay(date)
+																									);
+																									return;
+																								}
+
+																								const start = bookingForCalendarStartDate;
+																								if (date.getTime() < start.getTime()) {
+																									setBookingForCalendarStartDate(date);
+																									setBookingForCalendarEndDate(start);
+																									setBookingForValue(
+																										`${formatMonthDay(date)} - ${formatMonthDay(start)}`
+																									);
+																									return;
+																								}
+
+																								setBookingForCalendarEndDate(date);
+																								if (date.getTime() === start.getTime()) {
+																									setBookingForValue(
+																										formatMonthDay(start)
+																									);
+																								} else {
+																									setBookingForValue(
+																										`${formatMonthDay(start)} - ${formatMonthDay(date)}`
+																									);
+																								}
+																							};
+
+																							const renderMonthGrid = (
+																								monthDate: Date
+																							) => {
+																								const year = monthDate.getFullYear();
+																								const month = monthDate.getMonth();
+																								const firstDayOfWeek = new Date(
+																									year,
+																									month,
+																									1
+																								).getDay();
+																								const daysInMonth = new Date(
+																									year,
+																									month + 1,
+																									0
+																								).getDate();
+
+																								const cells = Array.from(
+																									{ length: 42 },
+																									(_, idx) => {
+																										const dayNumber =
+																											idx - firstDayOfWeek + 1;
+																										if (
+																											dayNumber < 1 ||
+																											dayNumber > daysInMonth
+																										)
+																											return null;
+																										return new Date(
+																											year,
+																											month,
+																											dayNumber
+																										);
+																									}
+																								);
+
+																								return (
+																									<div
+																										className="w-[364px] h-[312px] rounded-[8px] bg-[#D2EFFF] p-[18px] flex flex-col"
+																										data-hover-description-suppress="true"
+																									>
+																										<div className="grid grid-cols-7 text-center">
+																											{weekDays.map((d) => (
+																												<div
+																													key={d}
+																													className="font-inter font-medium text-[12px] leading-[12px] text-black/35"
+																												>
+																													{d}
+																												</div>
+																											))}
+																										</div>
+
+																										<div className="mt-[18px] grid grid-cols-7 grid-rows-6 flex-1">
+																											{cells.map((cellDate, idx) => {
+																												if (!cellDate) {
+																													return (
+																														<div
+																															key={idx}
+																															aria-hidden="true"
+																														/>
+																													);
+																												}
+
+																												const cellDayStart = new Date(
+																													cellDate.getFullYear(),
+																													cellDate.getMonth(),
+																													cellDate.getDate()
+																												);
+																												const isPast =
+																													cellDayStart.getTime() <
+																													today.getTime();
+
+																												const hasRange =
+																													bookingForCalendarStartDate !=
+																														null &&
+																													bookingForCalendarEndDate !=
+																														null &&
+																													bookingForCalendarStartDate.getTime() !==
+																														bookingForCalendarEndDate.getTime();
+																												const rangeStart =
+																													bookingForCalendarStartDate;
+																												const rangeEnd =
+																													bookingForCalendarEndDate;
+
+																												const isStartSelected =
+																													rangeStart != null &&
+																													cellDayStart.getTime() ===
+																														rangeStart.getTime();
+																												const isEndSelected =
+																													rangeEnd != null &&
+																													cellDayStart.getTime() ===
+																														rangeEnd.getTime();
+
+																												const isInRange =
+																													hasRange &&
+																													rangeStart != null &&
+																													rangeEnd != null &&
+																													cellDayStart.getTime() >
+																														rangeStart.getTime() &&
+																													cellDayStart.getTime() <
+																														rangeEnd.getTime();
+
+																												const isInRangeInclusive =
+																													hasRange &&
+																													rangeStart != null &&
+																													rangeEnd != null &&
+																													cellDayStart.getTime() >=
+																														rangeStart.getTime() &&
+																													cellDayStart.getTime() <=
+																														rangeEnd.getTime();
+
+																												const prevDay = new Date(
+																													cellDayStart.getFullYear(),
+																													cellDayStart.getMonth(),
+																													cellDayStart.getDate() - 1
+																												);
+																												const nextDay = new Date(
+																													cellDayStart.getFullYear(),
+																													cellDayStart.getMonth(),
+																													cellDayStart.getDate() + 1
+																												);
+																												const prevInRange =
+																													isInRangeInclusive &&
+																													rangeStart != null &&
+																													rangeEnd != null &&
+																													prevDay.getTime() >=
+																														rangeStart.getTime() &&
+																													prevDay.getTime() <=
+																														rangeEnd.getTime();
+																												const nextInRange =
+																													isInRangeInclusive &&
+																													rangeStart != null &&
+																													rangeEnd != null &&
+																													nextDay.getTime() >=
+																														rangeStart.getTime() &&
+																													nextDay.getTime() <=
+																														rangeEnd.getTime();
+
+																												const isRowStart = idx % 7 === 0;
+																												const isRowEnd = idx % 7 === 6;
+																												const isRangeLeftCap =
+																													isInRangeInclusive &&
+																													(isRowStart || !prevInRange);
+																												const isRangeRightCap =
+																													isInRangeInclusive &&
+																													(isRowEnd || !nextInRange);
+
+																												return (
+																													<button
+																														key={idx}
+																														className={cn(
+																															'relative w-full h-full flex items-center justify-center group',
+																															'bg-transparent border-0 p-0',
+																															isPast
+																																? 'cursor-not-allowed'
+																																: 'cursor-pointer'
+																														)}
+																														type="button"
+																														disabled={isPast}
+																														data-hover-description-suppress="true"
+																														onClick={() =>
+																															handleSelectCalendarDate(
+																																cellDayStart
+																															)
+																														}
+																														aria-label={new Intl.DateTimeFormat(
+																															'en-US',
+																															{
+																																month: 'long',
+																																day: 'numeric',
+																																year: 'numeric',
+																															}
+																														).format(cellDayStart)}
+																													>
+																														{isInRangeInclusive && (
+																															<div
+																																aria-hidden="true"
+																																className={cn(
+																																	'absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[34px] bg-white/55',
+																																	isRangeLeftCap &&
+																																		'rounded-l-full',
+																																	isRangeRightCap &&
+																																		'rounded-r-full'
+																																)}
+																															/>
+																														)}
+
+																														<div
+																															className={cn(
+																																'relative z-[1] w-[34px] h-[34px] rounded-full flex items-center justify-center',
+																																'border border-transparent transition-colors',
+																																'font-inter text-[16px] leading-[16px]',
+																																!isPast &&
+																																	!isStartSelected &&
+																																	!isEndSelected &&
+																																	'group-hover:border-black',
+																																(isStartSelected ||
+																																	isEndSelected) &&
+																																	'bg-black text-white',
+																																isEndSelected &&
+																																	hasRange &&
+																																	'ring-2 ring-white ring-offset-2 ring-offset-black',
+																																!isStartSelected &&
+																																	!isEndSelected &&
+																																	(isInRange
+																																		? 'text-black'
+																																		: isPast
+																																			? 'text-black/25'
+																																			: 'text-black')
+																															)}
+																														>
+																															{cellDate.getDate()}
+																														</div>
+																													</button>
+																												);
+																											})}
+																										</div>
+																									</div>
+																								);
+																							};
+
+																							const nextMonthBase = new Date(
+																								bookingForCalendarBaseMonth.getFullYear(),
+																								bookingForCalendarBaseMonth.getMonth() +
+																									1,
+																								1
+																							);
+
+																							return (
+																								<>
+																									{renderMonthGrid(
+																										bookingForCalendarBaseMonth
+																									)}
+																									{renderMonthGrid(nextMonthBase)}
+																								</>
+																							);
+																						})()}
+																					</div>
 																				</div>
 																			</div>
-																		</div>
-																	)}
-																</div>
-															);
-															return useStatic2
-																? dropdownContent2
-																: typeof document !== 'undefined'
-																	// Portal to <html> instead of <body> because Murmur uses
-																	// body { transform: scale() } on Firefox, which would offset
-																	// position: fixed children.
-																	? createPortal(dropdownContent2, document.documentElement)
-																	: null;
-														})()}
+																		)}
+																	</div>
+																);
+																return useStatic2
+																	? dropdownContent2
+																	: typeof document !== 'undefined'
+																		? // Portal to <html> instead of <body> because Murmur uses
+																			// body { transform: scale() } on Firefox, which would offset
+																			// position: fixed children.
+																			createPortal(
+																				dropdownContent2,
+																				document.documentElement
+																			)
+																		: null;
+															})()}
 													</div>
 												)}
 											</div>
@@ -2574,7 +3163,8 @@ const SortableAIBlock = ({
 					<button
 						type="button"
 						onClick={() => {
-							const currentValue = form.getValues(`hybridBlockPrompts.${fieldIndex}.value`) || '';
+							const currentValue =
+								form.getValues(`hybridBlockPrompts.${fieldIndex}.value`) || '';
 							onGetSuggestions?.(currentValue);
 						}}
 						className="w-[115px] h-[20px] ml-[15px] bg-[#D7F0FF] border-2 border-black rounded-[5px] text-[11px] font-inter font-semibold cursor-pointer"
@@ -2642,6 +3232,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		dataCampaignMainBox,
 		onGoToContacts,
 		onGoToInbox,
+		onProfilePanelOpen,
+		autoOpenProfileTabWhenIncomplete,
 		forceDesktop,
 	} = props;
 
@@ -2684,7 +3276,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		defaultTriggerBgClass: 'bg-[#DADAFC]',
 		shouldDirty: true,
 	});
-	const { closeBookingForDropdown: closeHybridBookingForDropdown } = hybridBookingForDropdown;
+	const { closeBookingForDropdown: closeHybridBookingForDropdown } =
+		hybridBookingForDropdown;
 
 	const subjectManualTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 	const signatureManualTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -2699,7 +3292,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const buildAutoSubjectHoverTimeline = useCallback(() => {
 		const pillEl = autoSubjectPillRef.current;
 		const autoWordEl = autoSubjectAutoWordRef.current;
-		
+
 		const controlsEl = autoSubjectControlsRef.current;
 		if (!pillEl || !autoWordEl) return;
 
@@ -2913,7 +3506,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	}, [isAutoSignature]);
 
 	// Track if Custom Instructions is open (for adjusting Generate Test button position)
-	const [isLocalCustomInstructionsOpen, setIsLocalCustomInstructionsOpen] = useState(false);
+	const [isLocalCustomInstructionsOpen, setIsLocalCustomInstructionsOpen] =
+		useState(false);
 
 	// Hybrid mode: sliding "+ Text" ghost between gaps (see develop branch reference)
 	const [ghostTop, setGhostTop] = useState<number | null>(null);
@@ -3003,10 +3597,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			modeOverride === 'none'
 				? 'none'
 				: isFullSelected
-				? 'full'
-				: isManualSelected
-				? 'manual'
-				: 'hybrid',
+					? 'full'
+					: isManualSelected
+						? 'manual'
+						: 'hybrid',
 		[modeOverride, isFullSelected, isManualSelected]
 	);
 	const isHybridModeSelected = selectedModeKey === 'hybrid';
@@ -3020,15 +3614,21 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	const [hybridStructureSelection, setHybridStructureSelection] =
 		useState<HybridStructureSelection>({ kind: 'none' });
-	const [expandedHybridTextBlockId, setExpandedHybridTextBlockId] = useState<string | null>(null);
-	const [expandedHybridCoreBlockId, setExpandedHybridCoreBlockId] = useState<string | null>(null);
+	const [expandedHybridTextBlockId, setExpandedHybridTextBlockId] = useState<
+		string | null
+	>(null);
+	const [expandedHybridCoreBlockId, setExpandedHybridCoreBlockId] = useState<
+		string | null
+	>(null);
 	const isHybridStructureExpanded =
 		expandedHybridTextBlockId !== null || expandedHybridCoreBlockId !== null;
 
 	// Reset hybrid-only UI when switching modes
 	useEffect(() => {
 		if (selectedModeKey !== 'hybrid') {
-			setHybridStructureSelection({ kind: 'none' });
+			setHybridStructureSelection((prev) =>
+				prev.kind === 'none' ? prev : { kind: 'none' }
+			);
 			setExpandedHybridTextBlockId(null);
 			setExpandedHybridCoreBlockId(null);
 			closeHybridBookingForDropdown();
@@ -3139,7 +3739,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							value: '',
 						},
 						{ id: 'action', type: HybridBlock.action, value: '' },
-				  ]
+					]
 		);
 		form.setValue('isAiSubject', true);
 	};
@@ -3185,21 +3785,23 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const headerSectionRef = useRef<HTMLDivElement>(null);
 	const modeDividerRef = useRef<HTMLDivElement>(null);
 	const [overlayTopPx, setOverlayTopPx] = useState<number | null>(null);
-	
+
 	// Custom font dropdown state (to avoid Radix positioning issues with zoom)
 	const [isFontDropdownOpen, setIsFontDropdownOpen] = useState(false);
 	const fontDropdownRef = useRef<HTMLDivElement>(null);
-	
+
 	// Custom font size dropdown state
 	const [isFontSizeDropdownOpen, setIsFontSizeDropdownOpen] = useState(false);
 	const fontSizeDropdownRef = useRef<HTMLDivElement>(null);
 	const FONT_SIZE_OPTIONS = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 36] as const;
 	const DEFAULT_FONT_SIZE = 12;
-	
+
 	// Manual mode color picker dropdown state
 	const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
 	const colorPickerRef = useRef<HTMLDivElement>(null);
-	const [manualSelectedTextColor, setManualSelectedTextColor] = useState<string | null>(null);
+	const [manualSelectedTextColor, setManualSelectedTextColor] = useState<string | null>(
+		null
+	);
 	const [manualSelectedBgColor, setManualSelectedBgColor] = useState<string | null>(null);
 
 	// Fill-ins dropdown state
@@ -3213,7 +3815,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const [linkText, setLinkText] = useState('');
 	const [linkUrl, setLinkUrl] = useState('');
 	const [savedRange, setSavedRange] = useState<Range | null>(null);
-	const [linkPopoverPosition, setLinkPopoverPosition] = useState<{ top: number; left: number } | null>(null);
+	const [linkPopoverPosition, setLinkPopoverPosition] = useState<{
+		top: number;
+		left: number;
+	} | null>(null);
 
 	// Manual mode body editor ref (contentEditable)
 	const manualSubjectRef = useRef<HTMLTextAreaElement | null>(null);
@@ -3261,18 +3866,22 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	// Listen for selection changes to update formatting state
 	useEffect(() => {
 		if (selectedModeKey !== 'manual') return;
-		
+
 		const handleSelectionChange = () => {
 			updateActiveFormatting();
 		};
-		
+
 		document.addEventListener('selectionchange', handleSelectionChange);
 		return () => document.removeEventListener('selectionchange', handleSelectionChange);
 	}, [selectedModeKey, updateActiveFormatting]);
 
 	// Initialize the contentEditable with form value (only once when entering manual mode)
 	useEffect(() => {
-		if (selectedModeKey === 'manual' && manualBodyEditorRef.current && !manualBodyInitializedRef.current) {
+		if (
+			selectedModeKey === 'manual' &&
+			manualBodyEditorRef.current &&
+			!manualBodyInitializedRef.current
+		) {
 			const currentValue = form.getValues('hybridBlockPrompts.0.value') || '';
 			manualBodyEditorRef.current.innerHTML = currentValue;
 			manualBodyInitializedRef.current = true;
@@ -3287,23 +3896,23 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	// Apply formatting to the manual mode body editor
 	const applyManualFormatting = useCallback(
 		(command: 'bold' | 'italic' | 'underline' | 'insertUnorderedList') => {
-		const editor = manualBodyEditorRef.current;
-		if (!editor) return;
-		
-		// Focus the editor to ensure selection is active
-		editor.focus();
-		
-		// Apply the formatting command
-		document.execCommand(command, false);
-		
-		// Update active formatting state
-		updateActiveFormatting();
-		
-		// Sync back to form after applying formatting
-		const html = editor.innerHTML || '';
-		form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
-		syncManualBodyHasMeaningfulText();
-	},
+			const editor = manualBodyEditorRef.current;
+			if (!editor) return;
+
+			// Focus the editor to ensure selection is active
+			editor.focus();
+
+			// Apply the formatting command
+			document.execCommand(command, false);
+
+			// Update active formatting state
+			updateActiveFormatting();
+
+			// Sync back to form after applying formatting
+			const html = editor.innerHTML || '';
+			form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
+			syncManualBodyHasMeaningfulText();
+		},
 		[form, updateActiveFormatting, syncManualBodyHasMeaningfulText]
 	);
 
@@ -3358,7 +3967,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			let range: Range;
 
 			// If no selection or not in editor, insert at end
-			if (!selection || selection.rangeCount === 0 || !editor.contains(selection.anchorNode)) {
+			if (
+				!selection ||
+				selection.rangeCount === 0 ||
+				!editor.contains(selection.anchorNode)
+			) {
 				range = document.createRange();
 				range.selectNodeContents(editor);
 				range.collapse(false); // Collapse to end
@@ -3392,7 +4005,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		let sanitized = html.replace(/\{\{email\}\}/gi, '');
 		sanitized = sanitized.replace(/\{\{phone\}\}/gi, '');
 		// Also remove any styled fill-in spans with banned types
-		sanitized = sanitized.replace(/<span[^>]*data-fill-in="(email|phone)"[^>]*>[^<]*<\/span>/gi, '');
+		sanitized = sanitized.replace(
+			/<span[^>]*data-fill-in="(email|phone)"[^>]*>[^<]*<\/span>/gi,
+			''
+		);
 		return sanitized;
 	}, []);
 
@@ -3408,7 +4024,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		let range: Range;
 
 		// If no selection or selection not in editor, create one at the end
-		if (!selection || selection.rangeCount === 0 || !editor.contains(selection.anchorNode)) {
+		if (
+			!selection ||
+			selection.rangeCount === 0 ||
+			!editor.contains(selection.anchorNode)
+		) {
 			range = document.createRange();
 			range.selectNodeContents(editor);
 			range.collapse(false); // Collapse to end
@@ -3432,11 +4052,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		// Calculate position for the popover (at cursor position)
 		const rect = range.getBoundingClientRect();
 		const editorRect = editor.getBoundingClientRect();
-		
+
 		// Position popover below the selection (with fallback if rect is zero)
 		const popoverTop = rect.height > 0 ? rect.bottom - editorRect.top + 8 : 40;
-		const popoverLeft = rect.width > 0 || rect.left > 0 ? Math.max(0, rect.left - editorRect.left) : 0;
-		
+		const popoverLeft =
+			rect.width > 0 || rect.left > 0 ? Math.max(0, rect.left - editorRect.left) : 0;
+
 		setLinkPopoverPosition({
 			top: popoverTop,
 			left: Math.min(popoverLeft, 150),
@@ -3456,9 +4077,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		if (!editor || !linkUrl.trim()) return;
 
 		// Normalize the URL
-		const normalizedUrl = linkUrl.startsWith('http://') || linkUrl.startsWith('https://') 
-			? linkUrl 
-			: `https://${linkUrl}`;
+		const normalizedUrl =
+			linkUrl.startsWith('http://') || linkUrl.startsWith('https://')
+				? linkUrl
+				: `https://${linkUrl}`;
 
 		// Determine the text to display (use URL if no text provided)
 		const displayText = linkText.trim() || normalizedUrl;
@@ -3478,12 +4100,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		if (selection && selection.rangeCount > 0) {
 			const range = selection.getRangeAt(0);
 			const selectedContent = selection.toString();
-			
+
 			// Delete current selection content if any
 			if (selectedContent) {
 				range.deleteContents();
 			}
-			
+
 			// Create and insert the link element
 			const linkElement = document.createElement('a');
 			linkElement.href = normalizedUrl;
@@ -3493,7 +4115,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			linkElement.style.color = '#0066cc';
 			linkElement.style.textDecoration = 'underline';
 			range.insertNode(linkElement);
-			
+
 			// Move cursor after the link
 			range.setStartAfter(linkElement);
 			range.setEndAfter(linkElement);
@@ -3527,7 +4149,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	// Close link popover when clicking outside
 	useEffect(() => {
 		if (!isLinkPopoverOpen) return;
-		
+
 		const handleClickOutside = (e: MouseEvent) => {
 			if (linkPopoverRef.current && !linkPopoverRef.current.contains(e.target as Node)) {
 				setIsLinkPopoverOpen(false);
@@ -3537,7 +4159,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 				setLinkPopoverPosition(null);
 			}
 		};
-		
+
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if (e.key === 'Escape') {
 				setIsLinkPopoverOpen(false);
@@ -3547,7 +4169,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 				setLinkPopoverPosition(null);
 			}
 		};
-		
+
 		document.addEventListener('mousedown', handleClickOutside);
 		document.addEventListener('keydown', handleKeyDown);
 		return () => {
@@ -3566,24 +4188,30 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			setLinkPopoverPosition(null);
 		}
 	}, [selectedModeKey]);
-	
+
 	// Close font dropdown when clicking outside
 	useEffect(() => {
 		if (!isFontDropdownOpen) return;
 		const handleClickOutside = (e: MouseEvent) => {
-			if (fontDropdownRef.current && !fontDropdownRef.current.contains(e.target as Node)) {
+			if (
+				fontDropdownRef.current &&
+				!fontDropdownRef.current.contains(e.target as Node)
+			) {
 				setIsFontDropdownOpen(false);
 			}
 		};
 		document.addEventListener('mousedown', handleClickOutside);
 		return () => document.removeEventListener('mousedown', handleClickOutside);
 	}, [isFontDropdownOpen]);
-	
+
 	// Close font size dropdown when clicking outside
 	useEffect(() => {
 		if (!isFontSizeDropdownOpen) return;
 		const handleClickOutside = (e: MouseEvent) => {
-			if (fontSizeDropdownRef.current && !fontSizeDropdownRef.current.contains(e.target as Node)) {
+			if (
+				fontSizeDropdownRef.current &&
+				!fontSizeDropdownRef.current.contains(e.target as Node)
+			) {
 				setIsFontSizeDropdownOpen(false);
 			}
 		};
@@ -3595,21 +4223,21 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	useEffect(() => {
 		if (selectedModeKey !== 'manual') setIsColorPickerOpen(false);
 	}, [selectedModeKey]);
-	
+
 	// Close color picker when clicking outside / pressing Escape
 	useEffect(() => {
 		if (!isColorPickerOpen) return;
-		
+
 		const handleClickOutside = (e: MouseEvent) => {
 			if (colorPickerRef.current && !colorPickerRef.current.contains(e.target as Node)) {
 				setIsColorPickerOpen(false);
 			}
 		};
-		
+
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if (e.key === 'Escape') setIsColorPickerOpen(false);
 		};
-		
+
 		document.addEventListener('mousedown', handleClickOutside);
 		document.addEventListener('keydown', handleKeyDown);
 		return () => {
@@ -3621,17 +4249,20 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	// Close fill-ins dropdown when clicking outside / pressing Escape
 	useEffect(() => {
 		if (!isFillInsDropdownOpen) return;
-		
+
 		const handleClickOutside = (e: MouseEvent) => {
-			if (fillInsDropdownRef.current && !fillInsDropdownRef.current.contains(e.target as Node)) {
+			if (
+				fillInsDropdownRef.current &&
+				!fillInsDropdownRef.current.contains(e.target as Node)
+			) {
 				setIsFillInsDropdownOpen(false);
 			}
 		};
-		
+
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if (e.key === 'Escape') setIsFillInsDropdownOpen(false);
 		};
-		
+
 		document.addEventListener('mousedown', handleClickOutside);
 		document.addEventListener('keydown', handleKeyDown);
 		return () => {
@@ -3642,13 +4273,17 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	// Track which tab is active: 'main' (the normal Writing view) or 'profile'
 	const [activeTab, setActiveTab] = useState<'main' | 'profile'>(() => {
-		if (!props.autoOpenProfileTabWhenIncomplete) return 'main';
-		const id = identity as {
-			name?: string | null;
-			genre?: string | null;
-			area?: string | null;
-			bio?: string | null;
-		} | null | undefined;
+		if (onProfilePanelOpen) return 'main';
+		if (!autoOpenProfileTabWhenIncomplete) return 'main';
+		const id = identity as
+			| {
+					name?: string | null;
+					genre?: string | null;
+					area?: string | null;
+					bio?: string | null;
+			  }
+			| null
+			| undefined;
 		const isIncomplete =
 			!(id?.name ?? '').trim() ||
 			!(id?.genre ?? '').trim() ||
@@ -3656,6 +4291,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			!(id?.bio ?? '').trim();
 		return isIncomplete ? 'profile' : 'main';
 	});
+	const handleOpenProfile = useCallback(() => {
+		if (onProfilePanelOpen) {
+			onProfilePanelOpen();
+			return;
+		}
+
+		setActiveTab('profile');
+	}, [onProfilePanelOpen]);
 
 	// Auto tab: background gradient wave on "Generate Test" hover (desktop)
 	const [isAutoGenerateTestHovered, setIsAutoGenerateTestHovered] = useState(false);
@@ -3692,20 +4335,42 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		bandName?: string | null;
 		bio?: string | null;
 	};
+	type ProfileFieldsSnapshot = {
+		name: string;
+		genre: string;
+		area: string;
+		band: string;
+		bio: string;
+		links: string;
+	};
 	const identityProfile = identity as IdentityProfileFields | null | undefined;
+	const getProfileFieldsFromIdentity = (
+		profile: IdentityProfileFields | null | undefined
+	): ProfileFieldsSnapshot => ({
+		name: profile?.name || '',
+		genre: profile?.genre || '',
+		area: profile?.area || '',
+		band: profile?.bandName || '',
+		bio: profile?.bio || '',
+		links: profile?.website || '',
+	});
+	const areProfileFieldsEqual = (a: ProfileFieldsSnapshot, b: ProfileFieldsSnapshot) =>
+		a.name === b.name &&
+		a.genre === b.genre &&
+		a.area === b.area &&
+		a.band === b.band &&
+		a.bio === b.bio &&
+		a.links === b.links;
 
 	// Profile field values - initialized from identity
-	const [profileFields, setProfileFields] = useState({
-		name: identityProfile?.name || '',
-		genre: identityProfile?.genre || '',
-		area: identityProfile?.area || '',
-		band: identityProfile?.bandName || '',
-		bio: identityProfile?.bio || '',
-		links: identityProfile?.website || '',
-	});
+	const [profileFields, setProfileFields] = useState<ProfileFieldsSnapshot>(() =>
+		getProfileFieldsFromIdentity(identityProfile)
+	);
 
-	type ProfileFieldsSnapshot = Record<ProfileField, string>;
-	type ProfileUndoSnapshot = { fields: ProfileFieldsSnapshot; hasLeftProfileTab: boolean };
+	type ProfileUndoSnapshot = {
+		fields: ProfileFieldsSnapshot;
+		hasLeftProfileTab: boolean;
+	};
 
 	// Profile undo should be "commit-based" (blur/enter/toggle/clear-all), not per-keystroke.
 	const profileUndoStackRef = useRef<ProfileUndoSnapshot[]>([]);
@@ -3727,100 +4392,25 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	// Sync profileFields when identity changes
 	useEffect(() => {
-		if (identityProfile) {
-			const nextProfileFields = {
-				name: identityProfile.name || '',
-				genre: identityProfile.genre || '',
-				area: identityProfile.area || '',
-				band: identityProfile.bandName || '',
-				bio: identityProfile.bio || '',
-				links: identityProfile.website || '',
-			};
-			setProfileFields(nextProfileFields);
-			profileCommittedFieldsRef.current = nextProfileFields;
-		}
-	}, [identityProfile]);
+		if (!identityProfile) return;
+		const nextProfileFields = getProfileFieldsFromIdentity(identityProfile);
+		setProfileFields((prev) =>
+			areProfileFieldsEqual(prev, nextProfileFields) ? prev : nextProfileFields
+		);
+		profileCommittedFieldsRef.current = nextProfileFields;
+	}, [
+		identityProfile?.area,
+		identityProfile?.bandName,
+		identityProfile?.bio,
+		identityProfile?.genre,
+		identityProfile?.name,
+		identityProfile?.website,
+	]);
 
-	// Hybrid: profile chips (match Full Auto Profile section formatting)
-	type HybridProfileChipItem = {
-		key: string;
-		text: string;
-		bgClass: string;
-		isEmpty: boolean;
-	};
-	const hybridProfileChipItems = useMemo<HybridProfileChipItem[]>(() => {
-		const truncate = (value: string, max: number) => {
-			const v = (value || '').trim();
-			if (v.length <= max) return v;
-			return v.slice(0, Math.max(0, max - 1)).trimEnd() + '…';
-		};
-
-		const chips: HybridProfileChipItem[] = [];
-
-		const name = (profileFields?.name ?? '').trim();
-		const genre = (profileFields?.genre ?? '').trim();
-		const area = (profileFields?.area ?? '').trim();
-		const band = (profileFields?.band ?? '').trim();
-		const bio = (profileFields?.bio ?? '').trim();
-		const linksRaw = (profileFields?.links ?? '').trim();
-
-		chips.push({
-			key: 'profile-name',
-			text: name ? `Nme. ${truncate(name, 28)}` : 'Nme.',
-			bgClass: 'bg-[#CAE7FF]',
-			isEmpty: !name,
-		});
-		chips.push({
-			key: 'profile-genre',
-			text: genre ? `Gnre. ${truncate(genre, 22)}` : 'Gnre.',
-			bgClass: 'bg-[#BFE2FF]',
-			isEmpty: !genre,
-		});
-		chips.push({
-			key: 'profile-area',
-			text: area ? `Area. ${truncate(area, 30)}` : 'Area.',
-			bgClass: 'bg-[#CAFDFF]',
-			isEmpty: !area,
-		});
-		chips.push({
-			key: 'profile-band',
-			text: band ? `Artst Nme. ${truncate(band, 30)}` : 'Artst Nme.',
-			bgClass: 'bg-[#C6FFFC]',
-			isEmpty: !band,
-		});
-		chips.push({
-			key: 'profile-bio',
-			text: bio ? `Bio. “${truncate(bio, 48)}”` : 'Bio.',
-			bgClass: 'bg-[#C8FFE1]',
-			isEmpty: !bio,
-		});
-
-		const links = linksRaw
-			.split(/\r?\n|,/g)
-			.map((s) => s.trim())
-			.filter(Boolean);
-
-		if (links.length === 0) {
-			chips.push({
-				key: 'profile-link-0',
-				text: 'Link.',
-				bgClass: 'bg-[#C5F7C9]',
-				isEmpty: true,
-			});
-		} else {
-			for (let i = 0; i < links.length; i++) {
-				const link = links[i];
-				chips.push({
-					key: `profile-link-${i}`,
-					text: `Link. ${truncate(link, 42)}`,
-					bgClass: 'bg-[#C5F7C9]',
-					isEmpty: false,
-				});
-			}
-		}
-
-		return chips;
-	}, [profileFields]);
+	const hybridProfileSummary = useMemo(
+		() => buildProfileSummaryModel(profileFields),
+		[profileFields]
+	);
 
 	// Profile score bar (weighted by UI order; more rules will follow)
 	const PROFILE_PROGRESS_SEQUENCE = [
@@ -3940,7 +4530,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		// Weighting is ordered: always prompt for the first missing field in UI order.
 		if (nextProfileFieldToFill) {
 			// Custom copy for the Area step once Name + Genre are complete.
-			if (nextProfileFieldToFill.key === 'area' && sequentialFilledProfileFieldCount >= 2) {
+			if (
+				nextProfileFieldToFill.key === 'area' &&
+				sequentialFilledProfileFieldCount >= 2
+			) {
 				return 'Where are you Based?';
 			}
 			// Bio guidance: keep prompting until it's 7+ words AND a full sentence.
@@ -3952,7 +4545,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 		// All fields filled.
 		return 'Excellent';
-	}, [filledProfileFieldCount, nextProfileFieldToFill, sequentialFilledProfileFieldCount]);
+	}, [
+		filledProfileFieldCount,
+		nextProfileFieldToFill,
+		sequentialFilledProfileFieldCount,
+	]);
 
 	const profileSuggestionDisplayLabel =
 		profileSuggestionScore === 0
@@ -3976,12 +4573,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	// If requested by the parent, automatically route the user into the Profile tab
 	// when key profile fields are still missing.
 	useEffect(() => {
-		if (!props.autoOpenProfileTabWhenIncomplete) return;
+		if (!autoOpenProfileTabWhenIncomplete) return;
 		if (!isKeyProfileIncomplete) return;
 		if (didAutoOpenProfileTabRef.current) return;
-		setActiveTab('profile');
+		handleOpenProfile();
 		didAutoOpenProfileTabRef.current = true;
-	}, [props.autoOpenProfileTabWhenIncomplete, isKeyProfileIncomplete]);
+	}, [autoOpenProfileTabWhenIncomplete, isKeyProfileIncomplete, handleOpenProfile]);
 
 	type ProfileField = 'name' | 'genre' | 'area' | 'band' | 'bio' | 'links';
 
@@ -4086,7 +4683,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		};
 	}, [activeTab, expandedProfileBox]);
 
-	const PROFILE_FIELD_ORDER: ProfileField[] = ['name', 'genre', 'area', 'band', 'bio', 'links'];
+	const PROFILE_FIELD_ORDER: ProfileField[] = [
+		'name',
+		'genre',
+		'area',
+		'band',
+		'bio',
+		'links',
+	];
 
 	const handleProfileFieldEnter = (field: ProfileField) => {
 		// Don't allow Enter to advance if Name is empty (Identity.name is required)
@@ -4234,12 +4838,17 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const [isInitialRender, setIsInitialRender] = useState(true);
 
 	// Chrome-style mode hover preview (active turns white, hovered mode appears)
-	const [hoveredModeKey, setHoveredModeKey] = useState<'full' | 'hybrid' | 'manual' | null>(null);
+	const [hoveredModeKey, setHoveredModeKey] = useState<
+		'full' | 'hybrid' | 'manual' | null
+	>(null);
 	const isModePreviewingOther =
-		hoveredModeKey !== null && selectedModeKey !== 'none' && hoveredModeKey !== selectedModeKey;
+		hoveredModeKey !== null &&
+		selectedModeKey !== 'none' &&
+		hoveredModeKey !== selectedModeKey;
 
 	const wasModePreviewingRef = useRef(false);
-	const isSwitchingBetweenModePreviews = wasModePreviewingRef.current && isModePreviewingOther;
+	const isSwitchingBetweenModePreviews =
+		wasModePreviewingRef.current && isModePreviewingOther;
 	useEffect(() => {
 		wasModePreviewingRef.current = isModePreviewingOther;
 	}, [isModePreviewingOther]);
@@ -4256,17 +4865,20 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		opacity: 0,
 	}));
 
-	const getModeHighlightBackgroundColor = useCallback((mode: 'full' | 'hybrid' | 'manual') => {
-		switch (mode) {
-			case 'hybrid':
-				return 'rgba(74, 74, 217, 0.31)'; // #4A4AD9 at 31% opacity
-			case 'manual':
-				return 'rgba(109, 171, 104, 0.47)'; // #6DAB68 at 47% opacity
-			case 'full':
-			default:
-				return '#DAE6FE';
-		}
-	}, []);
+	const getModeHighlightBackgroundColor = useCallback(
+		(mode: 'full' | 'hybrid' | 'manual') => {
+			switch (mode) {
+				case 'hybrid':
+					return 'rgba(74, 74, 217, 0.31)'; // #4A4AD9 at 31% opacity
+				case 'manual':
+					return 'rgba(109, 171, 104, 0.47)'; // #6DAB68 at 47% opacity
+				case 'full':
+				default:
+					return '#DAE6FE';
+			}
+		},
+		[]
+	);
 
 	useLayoutEffect(() => {
 		if (!isModePreviewingOther || !hoveredModeKey) {
@@ -4475,7 +5087,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	}, [activeTab, selectedModeKey]);
 
 	const manualSubjectHasMeaningfulText = Boolean((subjectValue ?? '').trim());
-	const canDraftInManualMode = manualSubjectHasMeaningfulText && manualBodyHasMeaningfulText;
+	const canDraftInManualMode =
+		manualSubjectHasMeaningfulText && manualBodyHasMeaningfulText;
 
 	const hasSelectedContactsForDrafting = draftCount > 0 || Boolean(isAllContactsSelected);
 	const shouldShowDraftCta =
@@ -4521,9 +5134,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								compactLeftOnly
 									? 'flex-col'
 									: cn(
-											cn(!forceDesktop ? 'w-[96.27vw]' : 'w-[499px]', 'max-w-[499px] transition flex mx-auto flex-col border-[3px] border-transparent rounded-[8px]'),
+											cn(
+												!forceDesktop ? 'w-[96.27vw]' : 'w-[499px]',
+												'max-w-[499px] transition flex mx-auto flex-col border-[3px] border-transparent rounded-[8px]'
+											),
 											containerHeightPx ? null : 'h-[703px]'
-									  ),
+										),
 								'relative overflow-visible isolate'
 							)}
 							style={
@@ -4532,7 +5148,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											backgroundColor: '#A6E2A8',
 											backgroundImage: HPI_GREEN_BG_GRADIENT,
 											...(containerHeightPx ? { height: `${containerHeightPx}px` } : {}),
-									  }
+										}
 									: undefined
 							}
 							data-campaign-main-box={
@@ -4549,19 +5165,18 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							onMouseEnter={() => onHoverChange?.(true)}
 							onMouseLeave={() => onHoverChange?.(false)}
 						>
-							{/* Write tab chrome header (pill + dots) */}
-							{!isMobile && !compactLeftOnly && (
-								<WriteTabChromeHeader
-									onContactsClick={onGoToContacts}
-									onDraftsClick={onGoToDrafting}
-									onInboxClick={onGoToInbox}
-								/>
-							)}
 							{/* Border overlay to ensure crisp, unbroken stroke at rounded corners */}
 							{!compactLeftOnly && (
 								<div
 									aria-hidden="true"
 									className="pointer-events-none absolute -inset-[3px] z-[60] rounded-[8px] border-[3px] border-black"
+								/>
+							)}
+							{activeTab === 'main' && selectedModeKey === 'full' && (
+								<ProfileCompletionDarkOverlay
+									opacity={hybridProfileSummary.darkOverlayOpacity}
+									className="rounded-[5px]"
+									zIndex={30}
 								/>
 							)}
 							{/* Auto: hover wave background shift (desktop only) */}
@@ -4588,27 +5203,30 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									/>
 								)}
 							{/* Mobile-only background overlay starting under Mode divider (match desktop fill) */}
-							{isMobile && activeTab === 'main' && !showTestPreview && overlayTopPx !== null && (
-								<div
-									style={{
-										position: 'absolute',
-										left: 0,
-										right: 0,
-										top: overlayTopPx,
-										bottom: 0,
-										backgroundColor: '#A6E2A8',
-										backgroundImage: HPI_GREEN_BG_GRADIENT,
-										pointerEvents: 'none',
-										zIndex: -1,
-										// Square off the top corners so the fill meets the border flush on mobile
-										borderTopLeftRadius: 0,
-										borderTopRightRadius: 0,
-										// Preserve the container's rounded bottoms
-										borderBottomLeftRadius: 'inherit',
-										borderBottomRightRadius: 'inherit',
-									}}
-								/>
-							)}
+							{isMobile &&
+								activeTab === 'main' &&
+								!showTestPreview &&
+								overlayTopPx !== null && (
+									<div
+										style={{
+											position: 'absolute',
+											left: 0,
+											right: 0,
+											top: overlayTopPx,
+											bottom: 0,
+											backgroundColor: '#A6E2A8',
+											backgroundImage: HPI_GREEN_BG_GRADIENT,
+											pointerEvents: 'none',
+											zIndex: -1,
+											// Square off the top corners so the fill meets the border flush on mobile
+											borderTopLeftRadius: 0,
+											borderTopRightRadius: 0,
+											// Preserve the container's rounded bottoms
+											borderBottomLeftRadius: 'inherit',
+											borderBottomRightRadius: 'inherit',
+										}}
+									/>
+								)}
 							{/* Left side - Content area (main drafting box) */}
 							<DraggableBox
 								id="test-left-panel"
@@ -4632,122 +5250,152 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									<div ref={headerSectionRef} className={cn('pt-0 pb-0')}>
 										<div className={cn(!compactLeftOnly ? 'bg-white' : '', 'relative')}>
 											<div className="relative h-[31px]">
-											<div
-												className={cn(
-													'h-[31px] flex items-center relative z-20',
-													cn(!forceDesktop ? 'w-[93.7vw]' : 'w-[475px]', 'max-w-[475px] mx-auto px-[8px]', !forceDesktop && 'max-[480px]:px-[6px]')
-												)}
-												data-left-drag-handle
-												data-root-drag-handle
-											>
 												<div
-													ref={modeContainerRef}
-													onMouseLeave={() => setHoveredModeKey(null)}
 													className={cn(
-														'relative flex items-center justify-center flex-1',
-														forceDesktop ? 'gap-[70px]' : 'gap-[78px]',
-														!forceDesktop &&
-															'max-[480px]:gap-0 max-[480px]:justify-between max-[480px]:w-full max-[480px]:px-[24px]'
+														'h-[31px] flex items-center relative z-20',
+														cn(
+															!forceDesktop ? 'w-[93.7vw]' : 'w-[475px]',
+															'max-w-[475px] mx-auto px-[8px]',
+															!forceDesktop && 'max-[480px]:px-[6px]'
+														)
 													)}
-													data-hover-description-suppress="true"
+													data-left-drag-handle
+													data-root-drag-handle
 												>
-													{/* Hover preview pill (appears under hovered mode; selected pill turns white) */}
-													{selectedModeKey !== 'none' && (
-														<div
-															aria-hidden="true"
-															className="absolute top-1/2 -translate-y-1/2 z-10 rounded-[8px] pointer-events-none"
+													<div
+														ref={modeContainerRef}
+														onMouseLeave={() => setHoveredModeKey(null)}
+														className={cn(
+															'relative flex items-center justify-center flex-1',
+															forceDesktop ? 'gap-[70px]' : 'gap-[78px]',
+															!forceDesktop &&
+																'max-[480px]:gap-0 max-[480px]:justify-between max-[480px]:w-full max-[480px]:px-[24px]'
+														)}
+														data-hover-description-suppress="true"
+													>
+														{/* Hover preview pill (appears under hovered mode; selected pill turns white) */}
+														{selectedModeKey !== 'none' && (
+															<div
+																aria-hidden="true"
+																className="absolute top-1/2 -translate-y-1/2 z-10 rounded-[8px] pointer-events-none"
+																style={{
+																	left: hoverPreviewHighlightStyle.left,
+																	width: MODE_HIGHLIGHT_WIDTH,
+																	opacity: hoverPreviewHighlightStyle.opacity,
+																	transition: `opacity ${modePreviewOpacityTransition}`,
+																}}
+															>
+																<div
+																	style={{
+																		width: MODE_HIGHLIGHT_WIDTH,
+																		height: 19,
+																		backgroundColor:
+																			hoveredModeKey && isModePreviewingOther
+																				? getModeHighlightBackgroundColor(hoveredModeKey)
+																				: 'transparent',
+																		border: '1.3px solid #000000',
+																		borderRadius: '8px',
+																		transition: `background-color ${modePreviewOpacityTransition}`,
+																	}}
+																/>
+															</div>
+														)}
+														<DndContext
+															onDragEnd={handleHighlightDragEnd}
+															modifiers={[restrictToHorizontalAxisAndBounds]}
+															sensors={modeHighlightSensors}
+														>
+															{selectedModeKey !== 'none' && (
+																<DraggableHighlight
+																	style={highlightStyle}
+																	isInitialRender={isInitialRender}
+																	mode={selectedModeKey as 'full' | 'hybrid' | 'manual'}
+																	disabled={isHybridModeSelected}
+																	backgroundColorOverride={
+																		isModePreviewingOther ? '#FFFFFF' : undefined
+																	}
+																	onSelectMode={() => {
+																		// Clicking the pill should behave like selecting that mode tab.
+																		// Avoid re-running switch logic (which can overwrite in-progress edits).
+																		if (activeTab !== 'main') {
+																			setActiveTab('main');
+																			setHasLeftProfileTab(true);
+																		}
+																	}}
+																/>
+															)}
+														</DndContext>
+														<Button
+															ref={fullModeButtonRef}
+															variant="ghost"
+															type="button"
+															onMouseEnter={() => setHoveredModeKey('full')}
 															style={{
-																left: hoverPreviewHighlightStyle.left,
-																width: MODE_HIGHLIGHT_WIDTH,
-																opacity: hoverPreviewHighlightStyle.opacity,
-																transition: `opacity ${modePreviewOpacityTransition}`,
+																transition: `opacity ${modePreviewAnimatedTransition}`,
+															}}
+															className={cn(
+																'!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black transition-opacity',
+																!forceDesktop && 'max-[480px]:text-[14px]',
+																isModePreviewingOther &&
+																	selectedModeKey === 'full' &&
+																	'opacity-0'
+															)}
+															onClick={() => {
+																setActiveTab('main');
+																setHasLeftProfileTab(true);
+																switchToFull();
 															}}
 														>
-															<div
-																style={{
-																	width: MODE_HIGHLIGHT_WIDTH,
-																	height: 19,
-																	backgroundColor:
-																		hoveredModeKey && isModePreviewingOther
-																			? getModeHighlightBackgroundColor(hoveredModeKey)
-																			: 'transparent',
-																	border: '1.3px solid #000000',
-																	borderRadius: '8px',
-																	transition: `background-color ${modePreviewOpacityTransition}`,
-																}}
-															/>
-														</div>
-													)}
-													<DndContext
-														onDragEnd={handleHighlightDragEnd}
-														modifiers={[restrictToHorizontalAxisAndBounds]}
-														sensors={modeHighlightSensors}
-													>
-														{selectedModeKey !== 'none' && (
-															<DraggableHighlight
-																style={highlightStyle}
-																isInitialRender={isInitialRender}
-																mode={selectedModeKey as 'full' | 'hybrid' | 'manual'}
-																disabled={isHybridModeSelected}
-																backgroundColorOverride={isModePreviewingOther ? '#FFFFFF' : undefined}
-																onSelectMode={() => {
-																	// Clicking the pill should behave like selecting that mode tab.
-																	// Avoid re-running switch logic (which can overwrite in-progress edits).
-																	if (activeTab !== 'main') {
-																		setActiveTab('main');
-																		setHasLeftProfileTab(true);
-																	}
-																}}
-															/>
-														)}
-													</DndContext>
-													<Button
-														ref={fullModeButtonRef}
-														variant="ghost"
-														type="button"
-														onMouseEnter={() => setHoveredModeKey('full')}
-														style={{ transition: `opacity ${modePreviewAnimatedTransition}` }}
-														className={cn(
-															'!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black transition-opacity',
-															!forceDesktop && 'max-[480px]:text-[14px]',
-															isModePreviewingOther && selectedModeKey === 'full' && 'opacity-0'
-														)}
-														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToFull(); }}
-													>
-														Auto
-													</Button>
-													<Button
-														ref={manualModeButtonRef}
-														variant="ghost"
-														type="button"
-														onMouseEnter={() => setHoveredModeKey('manual')}
-														style={{ transition: `opacity ${modePreviewAnimatedTransition}` }}
-														className={cn(
-															'!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black transition-opacity',
-															!forceDesktop && 'max-[480px]:text-[14px]',
-															isModePreviewingOther && selectedModeKey === 'manual' && 'opacity-0'
-														)}
-														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToManual(); }}
-													>
-														Manual
-													</Button>
-													<Button
-														ref={hybridModeButtonRef}
-														variant="ghost"
-														type="button"
-														onMouseEnter={() => setHoveredModeKey('hybrid')}
-														style={{ transition: `opacity ${modePreviewAnimatedTransition}` }}
-														className={cn(
-															'!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black transition-opacity',
-															!forceDesktop && 'max-[480px]:text-[14px]',
-															isModePreviewingOther && selectedModeKey === 'hybrid' && 'opacity-0'
-														)}
-														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToHybrid(); }}
-													>
-														Hybrid
-													</Button>
+															Auto
+														</Button>
+														<Button
+															ref={manualModeButtonRef}
+															variant="ghost"
+															type="button"
+															onMouseEnter={() => setHoveredModeKey('manual')}
+															style={{
+																transition: `opacity ${modePreviewAnimatedTransition}`,
+															}}
+															className={cn(
+																'!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black transition-opacity',
+																!forceDesktop && 'max-[480px]:text-[14px]',
+																isModePreviewingOther &&
+																	selectedModeKey === 'manual' &&
+																	'opacity-0'
+															)}
+															onClick={() => {
+																setActiveTab('main');
+																setHasLeftProfileTab(true);
+																switchToManual();
+															}}
+														>
+															Manual
+														</Button>
+														<Button
+															ref={hybridModeButtonRef}
+															variant="ghost"
+															type="button"
+															onMouseEnter={() => setHoveredModeKey('hybrid')}
+															style={{
+																transition: `opacity ${modePreviewAnimatedTransition}`,
+															}}
+															className={cn(
+																'!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black transition-opacity',
+																!forceDesktop && 'max-[480px]:text-[14px]',
+																isModePreviewingOther &&
+																	selectedModeKey === 'hybrid' &&
+																	'opacity-0'
+															)}
+															onClick={() => {
+																setActiveTab('main');
+																setHasLeftProfileTab(true);
+																switchToHybrid();
+															}}
+														>
+															Hybrid
+														</Button>
+													</div>
 												</div>
-											</div>
 											</div>
 											{compactLeftOnly ? null : (
 												<>
@@ -4775,8 +5423,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														<FormItem
 															className={cn(
 																showTestPreview
-																	? cn('w-[426px]', !forceDesktop && 'max-[480px]:w-[89.33vw]')
-																	: cn(!forceDesktop ? 'w-[89.33vw]' : 'w-[468px]', 'max-w-[468px]'),
+																	? cn(
+																			'w-[426px]',
+																			!forceDesktop && 'max-[480px]:w-[89.33vw]'
+																		)
+																	: cn(
+																			!forceDesktop ? 'w-[89.33vw]' : 'w-[468px]',
+																			'max-w-[468px]'
+																		),
 																// Remove default margin to control spacing to content below
 																'mb-0'
 															)}
@@ -4839,7 +5493,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																					className={cn(
 																						'flex items-center h-[25px] w-[292px] rounded-[5px] bg-[#74D177] overflow-hidden subject-bar pl-[7px] pr-[10px]',
 																						'gap-[14px]',
-																						!forceDesktop && 'max-[480px]:h-[24px] max-[480px]:w-auto max-[480px]:flex-1 max-[480px]:min-w-0'
+																						!forceDesktop &&
+																							'max-[480px]:h-[24px] max-[480px]:w-auto max-[480px]:flex-1 max-[480px]:min-w-0'
 																					)}
 																				>
 																					{/* 33x17 toggle pill (r=8, bg #79DF7C) */}
@@ -4848,7 +5503,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																						data-hover-description="click to disable automatic drafting for this and write your own"
 																						onClick={() => {
 																							if (!isHandwrittenMode) {
-																								const newValue = !form.watch('isAiSubject');
+																								const newValue =
+																									!form.watch('isAiSubject');
 																								form.setValue('isAiSubject', newValue);
 																								if (newValue) {
 																									form.setValue('subject', '');
@@ -4859,9 +5515,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																						className={cn(
 																							'flex items-center justify-center h-[17px] w-[33px] rounded-[8px] bg-[#79DF7C] border-2 border-black',
 																							'text-[11px] leading-none font-inter font-normal text-black subject-toggle',
-																							isHandwrittenMode && 'opacity-50 cursor-not-allowed'
+																							isHandwrittenMode &&
+																								'opacity-50 cursor-not-allowed'
 																						)}
-																						aria-pressed={Boolean(form.watch('isAiSubject'))}
+																						aria-pressed={Boolean(
+																							form.watch('isAiSubject')
+																						)}
 																					>
 																						on
 																					</button>
@@ -4878,7 +5537,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																					</div>
 																				</div>
 																			</div>
-																	</div>
+																		</div>
 																	</div>
 																) : (
 																	// Auto OFF: expand downward (matches the signature manual box pattern)
@@ -4886,7 +5545,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		className="w-full h-[97px] rounded-[8px] border-2 border-black overflow-hidden flex flex-col"
 																		onMouseLeave={() => {
 																			// If user hasn't actually typed a manual subject, revert back to auto when leaving.
-																			const value = (form.getValues('subject') ?? '').trim();
+																			const value = (
+																				form.getValues('subject') ?? ''
+																			).trim();
 																			if (!value) {
 																				form.setValue('subject', '');
 																				form.setValue('isAiSubject', true);
@@ -4917,7 +5578,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																				className={cn(
 																					'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0 subject-toggle',
 																					'w-[80px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8]',
-																					isHandwrittenMode && 'opacity-50 cursor-not-allowed'
+																					isHandwrittenMode &&
+																						'opacity-50 cursor-not-allowed'
 																				)}
 																			>
 																				<span className="absolute left-0 h-full border-l-2 border-black"></span>
@@ -4949,13 +5611,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																					// Prevent Enter from creating new lines (email subjects don't support newlines)
 																					if (e.key === 'Enter') e.preventDefault();
 																				}}
-																				onFocus={(e) => trackFocusedField?.('subject', e.target)}
+																				onFocus={(e) =>
+																					trackFocusedField?.('subject', e.target)
+																				}
 																				onBlur={() => {
 																					setHasSubjectBeenTouched(true);
 																					field.onBlur();
 																				}}
 																				onChange={(e) => {
-																					if (e.target.value) setHasSubjectBeenTouched(true);
+																					if (e.target.value)
+																						setHasSubjectBeenTouched(true);
 																					field.onChange(e);
 																				}}
 																			/>
@@ -4970,698 +5635,730 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											</div>
 										)}
 									</div>
-								<div
-									className={cn(
-										'flex-1 min-h-0 flex flex-col hide-native-scrollbar relative overflow-x-hidden',
-										activeTab === 'profile' ? 'overflow-y-hidden' : 'overflow-y-auto',
-										shouldEnableHybridPlusGutter && 'w-[calc(100%_+_90px)] -mr-[90px]'
-									)}
-									data-hpi-content
-								>
-									{/* Profile Tab Content */}
-									{activeTab === 'profile' && (
-										<div className="w-full flex flex-col flex-1">
-											{/* Empty header row + divider (matches mock): 32px below the main header */}
-											<div className="w-full h-[32px] bg-[#E7F3E8] border-b-[3px] border-black shrink-0 flex items-center justify-center">
-												<div className="w-[468px] max-w-full flex items-center gap-[24px] px-4">
-													{/* Progress track */}
-													<div className="relative w-[223px] h-[12px] bg-white border-2 border-black rounded-[8px] overflow-hidden">
-														<div
-															className="absolute left-0 top-0 bottom-0 bg-[#36B24A] rounded-full transition-[width] duration-200"
-															style={{ width: `${profileSuggestionFillPercent}%` }}
-														/>
-													</div>
-													{/* Score label */}
-													<span className="font-inter font-medium text-[17px] leading-none text-black whitespace-nowrap">
-														{profileSuggestionDisplayLabel}
-													</span>
-												</div>
-											</div>
-											{/* Body container (380px tall) - positioned 64px below the score line */}
-											<div
-												className="flex-1 relative flex flex-col cursor-pointer"
-												onClick={() => {
-													setActiveTab('main');
-													setHasLeftProfileTab(true);
-												}}
-											>
-												{/* Green chrome background fades in (blue main box does not). */}
-												<div
-													ref={profileChromeRef}
-													aria-hidden="true"
-													className="absolute inset-0 z-0 bg-[#305B31] pointer-events-none opacity-0"
-												/>
-												<div className="relative z-10 flex flex-col flex-1 mt-[18px]">
-													{/* Profile tab: align the decorative top pill with Auto/Hybrid Subject */}
-													<div
-														aria-hidden="true"
-														className="absolute inset-x-0 top-0 pointer-events-none"
-													>
-														{/* Match Subject pill top offset: 38px below mode divider, minus 32px rating row */}
-														<div className="w-[465px] max-[480px]:w-full mx-auto pt-[6px]">
-															<div className="w-[110px] h-[25px] max-[480px]:h-[24px] rounded-[10px] border-2 border-black" />
+									<div
+										className={cn(
+											'flex-1 min-h-0 flex flex-col hide-native-scrollbar relative overflow-x-hidden',
+											activeTab === 'profile' ? 'overflow-y-hidden' : 'overflow-y-auto',
+											shouldEnableHybridPlusGutter && 'w-[calc(100%_+_90px)] -mr-[90px]'
+										)}
+										data-hpi-content
+									>
+										{/* Profile Tab Content */}
+										{activeTab === 'profile' && (
+											<div className="w-full flex flex-col flex-1">
+												{/* Empty header row + divider (matches mock): 32px below the main header */}
+												<div className="w-full h-[32px] bg-[#E7F3E8] border-b-[3px] border-black shrink-0 flex items-center justify-center">
+													<div className="w-[468px] max-w-full flex items-center gap-[24px] px-4">
+														{/* Progress track */}
+														<div className="relative w-[223px] h-[12px] bg-white border-2 border-black rounded-[8px] overflow-hidden">
+															<div
+																className="absolute left-0 top-0 bottom-0 bg-[#36B24A] rounded-full transition-[width] duration-200"
+																style={{ width: `${profileSuggestionFillPercent}%` }}
+															/>
 														</div>
+														{/* Score label */}
+														<span className="font-inter font-medium text-[17px] leading-none text-black whitespace-nowrap">
+															{profileSuggestionDisplayLabel}
+														</span>
 													</div>
-													{/* Match Full Auto Body box start: Subject height (38+25) + main content offset (20-8), minus 32px rating row */}
-													<div className="w-full mt-[43px] max-[480px]:mt-[39px]">
+												</div>
+												{/* Body container (380px tall) - positioned 64px below the score line */}
+												<div
+													className="flex-1 relative flex flex-col cursor-pointer"
+													onClick={() => {
+														setActiveTab('main');
+														setHasLeftProfileTab(true);
+													}}
+												>
+													{/* Green chrome background fades in (blue main box does not). */}
 													<div
-														className={cn(
-															'relative z-10 w-[465px] max-w-full mx-auto bg-[#4597DA] border-[3px] border-black rounded-[8px] overflow-hidden flex flex-col',
-															props.clipProfileTabOverflow
-																? expandedProfileBox
-																	? 'h-[425px]'
-																	: 'h-[391px]'
-																: expandedProfileBox
-																? 'min-h-[425px]'
-																: 'min-h-[391px]'
-														)}
-														onClick={(e) => e.stopPropagation()}
-													>
-														{/* Header band (30px fill + 3px divider) */}
-														<div className="shrink-0 h-[33px] bg-[#95CFFF] border-b-[3px] border-black flex items-center">
-															<span className="pl-4 font-inter font-semibold text-[15px] leading-none text-black">
-																Introduce yourself
-															</span>
-															{/* Right controls: "Clear all" + Undo (44px) + Close (44px) */}
-															<div className="ml-auto flex items-stretch h-full">
-																<button
-																	type="button"
-																	onClick={handleClearAllProfileFields}
-																	className="w-[89px] shrink-0 h-full bg-[#58A6E5] border-l-[3px] border-black flex items-center justify-center font-inter font-semibold text-[13px] leading-none text-black cursor-pointer p-0 border-0 focus:outline-none focus-visible:outline-none"
+														ref={profileChromeRef}
+														aria-hidden="true"
+														className="absolute inset-0 z-0 bg-[#305B31] pointer-events-none opacity-0"
+													/>
+													<div className="relative z-10 flex flex-col flex-1 mt-[18px]">
+														{/* Profile tab: align the decorative top pill with Auto/Hybrid Subject */}
+														<div
+															aria-hidden="true"
+															className="absolute inset-x-0 top-0 pointer-events-none"
+														>
+															{/* Match Subject pill top offset: 38px below mode divider, minus 32px rating row */}
+															<div className="w-[465px] max-[480px]:w-full mx-auto pt-[6px]">
+																<div className="w-[110px] h-[25px] max-[480px]:h-[24px] rounded-[10px] border-2 border-black" />
+															</div>
+														</div>
+														{/* Match Full Auto Body box start: Subject height (38+25) + main content offset (20-8), minus 32px rating row */}
+														<div className="w-full mt-[43px] max-[480px]:mt-[39px]">
+															<div
+																className={cn(
+																	'relative z-10 w-[465px] max-w-full mx-auto bg-[#4597DA] border-[3px] border-black rounded-[8px] overflow-hidden flex flex-col',
+																	props.clipProfileTabOverflow
+																		? expandedProfileBox
+																			? 'h-[425px]'
+																			: 'h-[391px]'
+																		: expandedProfileBox
+																			? 'min-h-[425px]'
+																			: 'min-h-[391px]'
+																)}
+																onClick={(e) => e.stopPropagation()}
+															>
+																{/* Header band (30px fill + 3px divider) */}
+																<div className="shrink-0 h-[33px] bg-[#95CFFF] border-b-[3px] border-black flex items-center">
+																	<span className="pl-4 font-inter font-semibold text-[15px] leading-none text-black">
+																		Introduce yourself
+																	</span>
+																	{/* Right controls: "Clear all" + Undo (44px) + Close (44px) */}
+																	<div className="ml-auto flex items-stretch h-full">
+																		<button
+																			type="button"
+																			onClick={handleClearAllProfileFields}
+																			className="w-[89px] shrink-0 h-full bg-[#58A6E5] border-l-[3px] border-black flex items-center justify-center font-inter font-semibold text-[13px] leading-none text-black cursor-pointer p-0 border-0 focus:outline-none focus-visible:outline-none"
+																		>
+																			Clear all
+																		</button>
+																		<button
+																			type="button"
+																			onClick={(e) => {
+																				e.stopPropagation();
+																				handleUndoProfileFields();
+																			}}
+																			disabled={!canUndoProfile}
+																			className={cn(
+																				'w-[44px] shrink-0 h-full border-l-[3px] border-black flex items-center justify-center p-0 bg-transparent text-black disabled:text-black disabled:opacity-100',
+																				canUndoProfile
+																					? 'cursor-pointer hover:brightness-[0.98] active:brightness-[0.95]'
+																					: 'cursor-not-allowed'
+																			)}
+																			aria-label="Undo last profile change"
+																		>
+																			<UndoIcon width="20" height="20" />
+																		</button>
+																	</div>
+																</div>
+
+																{/* Profile fields live inside the 380px Body container */}
+																<div
+																	className={cn(
+																		'flex-1 flex flex-col justify-center',
+																		props.clipProfileTabOverflow &&
+																			'min-h-0 overflow-y-auto hide-native-scrollbar'
+																	)}
 																>
-																	Clear all
-																</button>
+																	<div className="px-3 py-[16px] flex flex-col gap-[12px]">
+																		<div
+																			ref={
+																				expandedProfileBox === 'name'
+																					? expandedProfileBoxRef
+																					: undefined
+																			}
+																			className={cn(
+																				'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																				expandedProfileBox === 'name'
+																					? 'h-[64px]'
+																					: 'h-[32px]'
+																			)}
+																			onClick={() => handleProfileBoxToggle('name')}
+																		>
+																			<div
+																				className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																				style={{
+																					backgroundColor: getProfileHeaderBg('name'),
+																				}}
+																			>
+																				{expandedProfileBox !== 'name' &&
+																				profileFields.name.trim() ? (
+																					<div className="flex items-stretch w-full h-full">
+																						<div className="w-[20px] shrink-0" />
+																						<div className="w-[3px] bg-black" />
+																						<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
+																							<span className="truncate">
+																								{profileFields.name.trim()}
+																							</span>
+																						</div>
+																						<div className="w-[3px] bg-black" />
+																						<div className="min-w-[20px] flex-1" />
+																					</div>
+																				) : (
+																					<div className="w-full px-3 truncate">
+																						{getProfileHeaderText(
+																							'name',
+																							'Name',
+																							'Enter your Name'
+																						)}
+																					</div>
+																				)}
+																			</div>
+																			{expandedProfileBox === 'name' && (
+																				<input
+																					type="text"
+																					className="h-[32px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																					value={profileFields.name}
+																					onChange={(e) =>
+																						setProfileFields({
+																							...profileFields,
+																							name: e.target.value,
+																						})
+																					}
+																					onBlur={() => handleProfileFieldBlur('name')}
+																					onKeyDown={(e) => {
+																						if (e.key === 'Enter') {
+																							e.preventDefault();
+																							handleProfileFieldEnter('name');
+																						}
+																					}}
+																					onClick={(e) => e.stopPropagation()}
+																					placeholder=""
+																					autoFocus
+																				/>
+																			)}
+																		</div>
+
+																		<div
+																			ref={
+																				expandedProfileBox === 'genre'
+																					? expandedProfileBoxRef
+																					: undefined
+																			}
+																			className={cn(
+																				'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																				expandedProfileBox === 'genre'
+																					? 'h-[64px]'
+																					: 'h-[32px]'
+																			)}
+																			onClick={() => handleProfileBoxToggle('genre')}
+																		>
+																			<div
+																				className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																				style={{
+																					backgroundColor: getProfileHeaderBg('genre'),
+																				}}
+																			>
+																				{expandedProfileBox !== 'genre' &&
+																				profileFields.genre.trim() ? (
+																					<div className="flex items-stretch w-full h-full">
+																						<div className="w-[20px] shrink-0" />
+																						<div className="w-[3px] bg-black" />
+																						<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
+																							<span className="truncate">
+																								{profileFields.genre.trim()}
+																							</span>
+																						</div>
+																						<div className="w-[3px] bg-black" />
+																						<div className="min-w-[20px] flex-1" />
+																					</div>
+																				) : (
+																					<div className="w-full px-3 truncate">
+																						{getProfileHeaderText(
+																							'genre',
+																							'Genre',
+																							'Enter your Genre'
+																						)}
+																					</div>
+																				)}
+																			</div>
+																			{expandedProfileBox === 'genre' && (
+																				<input
+																					type="text"
+																					className="h-[32px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																					value={profileFields.genre}
+																					onChange={(e) =>
+																						setProfileFields({
+																							...profileFields,
+																							genre: e.target.value,
+																						})
+																					}
+																					onBlur={() => handleProfileFieldBlur('genre')}
+																					onKeyDown={(e) => {
+																						if (e.key === 'Enter') {
+																							e.preventDefault();
+																							handleProfileFieldEnter('genre');
+																						}
+																					}}
+																					onClick={(e) => e.stopPropagation()}
+																					placeholder=""
+																					autoFocus
+																				/>
+																			)}
+																		</div>
+
+																		<div
+																			ref={
+																				expandedProfileBox === 'area'
+																					? expandedProfileBoxRef
+																					: undefined
+																			}
+																			className={cn(
+																				'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																				expandedProfileBox === 'area'
+																					? 'h-[64px]'
+																					: 'h-[32px]'
+																			)}
+																			onClick={() => handleProfileBoxToggle('area')}
+																		>
+																			<div
+																				className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																				style={{
+																					backgroundColor: getProfileHeaderBg('area'),
+																				}}
+																			>
+																				{expandedProfileBox !== 'area' &&
+																				profileFields.area.trim() ? (
+																					<div className="flex items-stretch w-full h-full">
+																						<div className="w-[20px] shrink-0" />
+																						<div className="w-[3px] bg-black" />
+																						<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
+																							<span className="truncate">
+																								{profileFields.area.trim()}
+																							</span>
+																						</div>
+																						<div className="w-[3px] bg-black" />
+																						<div className="min-w-[20px] flex-1" />
+																					</div>
+																				) : (
+																					<div className="w-full px-3 truncate">
+																						{getProfileHeaderText(
+																							'area',
+																							'Area',
+																							'Enter your Area'
+																						)}
+																					</div>
+																				)}
+																			</div>
+																			{expandedProfileBox === 'area' && (
+																				<input
+																					type="text"
+																					className="h-[32px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																					value={profileFields.area}
+																					onChange={(e) =>
+																						setProfileFields({
+																							...profileFields,
+																							area: e.target.value,
+																						})
+																					}
+																					onBlur={() => handleProfileFieldBlur('area')}
+																					onKeyDown={(e) => {
+																						if (e.key === 'Enter') {
+																							e.preventDefault();
+																							handleProfileFieldEnter('area');
+																						}
+																					}}
+																					onClick={(e) => e.stopPropagation()}
+																					placeholder=""
+																					autoFocus
+																				/>
+																			)}
+																		</div>
+
+																		<div
+																			ref={
+																				expandedProfileBox === 'band'
+																					? expandedProfileBoxRef
+																					: undefined
+																			}
+																			className={cn(
+																				'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																				expandedProfileBox === 'band'
+																					? 'h-[64px]'
+																					: 'h-[32px]'
+																			)}
+																			onClick={() => handleProfileBoxToggle('band')}
+																		>
+																			<div
+																				className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																				style={{
+																					backgroundColor: getProfileHeaderBg('band'),
+																				}}
+																			>
+																				{expandedProfileBox !== 'band' &&
+																				profileFields.band.trim() ? (
+																					<div className="flex items-stretch w-full h-full">
+																						<div className="w-[20px] shrink-0" />
+																						<div className="w-[3px] bg-black" />
+																						<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
+																							<span className="truncate">
+																								{profileFields.band.trim()}
+																							</span>
+																						</div>
+																						<div className="w-[3px] bg-black" />
+																						<div className="min-w-[20px] flex-1" />
+																					</div>
+																				) : (
+																					<div className="w-full px-3 truncate">
+																						{getProfileHeaderText(
+																							'band',
+																							'Band/Artist Name',
+																							'Enter your Band/Artist Name'
+																						)}
+																					</div>
+																				)}
+																			</div>
+																			{expandedProfileBox === 'band' && (
+																				<input
+																					type="text"
+																					className="h-[32px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																					value={profileFields.band}
+																					onChange={(e) =>
+																						setProfileFields({
+																							...profileFields,
+																							band: e.target.value,
+																						})
+																					}
+																					onBlur={() => handleProfileFieldBlur('band')}
+																					onKeyDown={(e) => {
+																						if (e.key === 'Enter') {
+																							e.preventDefault();
+																							handleProfileFieldEnter('band');
+																						}
+																					}}
+																					onClick={(e) => e.stopPropagation()}
+																					placeholder=""
+																					autoFocus
+																				/>
+																			)}
+																		</div>
+
+																		<div
+																			ref={
+																				expandedProfileBox === 'bio'
+																					? expandedProfileBoxRef
+																					: undefined
+																			}
+																			className={cn(
+																				'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																				expandedProfileBox === 'bio'
+																					? 'min-h-[64px]'
+																					: 'h-[32px]'
+																			)}
+																			onClick={() => handleProfileBoxToggle('bio')}
+																		>
+																			<div
+																				className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																				style={{
+																					backgroundColor: getProfileHeaderBg('bio'),
+																				}}
+																			>
+																				{expandedProfileBox !== 'bio' &&
+																				profileFields.bio.trim() ? (
+																					<div className="flex items-stretch w-full h-full">
+																						<div className="w-[20px] shrink-0" />
+																						<div className="w-[3px] bg-black" />
+																						<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
+																							<span className="truncate">
+																								{profileFields.bio.trim()}
+																							</span>
+																						</div>
+																						<div className="w-[3px] bg-black" />
+																						<div className="min-w-[20px] flex-1" />
+																					</div>
+																				) : (
+																					<div className="w-full px-3 truncate">
+																						{getProfileHeaderText(
+																							'bio',
+																							'Bio',
+																							'Enter your Bio'
+																						)}
+																					</div>
+																				)}
+																			</div>
+																			{expandedProfileBox === 'bio' && (
+																				<textarea
+																					ref={bioTextareaRef}
+																					className="min-h-[32px] bg-white px-3 py-[6px] font-inter text-[14px] leading-[20px] outline-none border-0 resize-none overflow-hidden"
+																					value={profileFields.bio}
+																					onChange={(e) =>
+																						setProfileFields({
+																							...profileFields,
+																							bio: e.target.value,
+																						})
+																					}
+																					onInput={(
+																						e: React.FormEvent<HTMLTextAreaElement>
+																					) => {
+																						const target = e.currentTarget;
+																						target.style.height = 'auto';
+																						target.style.height = `${target.scrollHeight}px`;
+																					}}
+																					onBlur={() => handleProfileFieldBlur('bio')}
+																					onKeyDown={(e) => {
+																						if (e.key === 'Enter') {
+																							e.preventDefault();
+																							handleProfileFieldEnter('bio');
+																						}
+																					}}
+																					onClick={(e) => e.stopPropagation()}
+																					placeholder=""
+																					autoFocus
+																					rows={1}
+																				/>
+																			)}
+																		</div>
+
+																		<div
+																			ref={
+																				expandedProfileBox === 'links'
+																					? expandedProfileBoxRef
+																					: undefined
+																			}
+																			className={cn(
+																				'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																				expandedProfileBox === 'links'
+																					? 'h-[64px]'
+																					: 'h-[32px]'
+																			)}
+																			onClick={() => handleProfileBoxToggle('links')}
+																		>
+																			<div
+																				className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																				style={{
+																					backgroundColor: getProfileHeaderBg('links'),
+																				}}
+																			>
+																				{expandedProfileBox !== 'links' &&
+																				profileFields.links.trim() ? (
+																					<div className="flex items-stretch w-full h-full">
+																						<div className="w-[20px] shrink-0" />
+																						<div className="w-[3px] bg-black" />
+																						<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
+																							<span className="truncate">
+																								{profileFields.links.trim()}
+																							</span>
+																						</div>
+																						<div className="w-[3px] bg-black" />
+																						<div className="min-w-[20px] flex-1" />
+																					</div>
+																				) : (
+																					<div className="w-full px-3 truncate">
+																						{getProfileHeaderText(
+																							'links',
+																							'Links',
+																							'Enter your Links'
+																						)}
+																					</div>
+																				)}
+																			</div>
+																			{expandedProfileBox === 'links' && (
+																				<input
+																					type="text"
+																					className="h-[32px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																					value={profileFields.links}
+																					onChange={(e) =>
+																						setProfileFields({
+																							...profileFields,
+																							links: e.target.value,
+																						})
+																					}
+																					onBlur={() => handleProfileFieldBlur('links')}
+																					onKeyDown={(e) => {
+																						if (e.key === 'Enter') {
+																							e.preventDefault();
+																							handleProfileFieldEnter('links');
+																						}
+																					}}
+																					onClick={(e) => e.stopPropagation()}
+																					placeholder=""
+																					autoFocus
+																				/>
+																			)}
+																		</div>
+																	</div>
+																</div>
+
+																{/* Bottom-right Continue CTA (matches mock) */}
 																<button
 																	type="button"
 																	onClick={(e) => {
 																		e.stopPropagation();
-																		handleUndoProfileFields();
+																		setActiveTab('main');
+																		setHasLeftProfileTab(true);
 																	}}
-																	disabled={!canUndoProfile}
-																	className={cn(
-																		'w-[44px] shrink-0 h-full border-l-[3px] border-black flex items-center justify-center p-0 bg-transparent text-black disabled:text-black disabled:opacity-100',
-																		canUndoProfile
-																			? 'cursor-pointer hover:brightness-[0.98] active:brightness-[0.95]'
-																			: 'cursor-not-allowed'
-																	)}
-																	aria-label="Undo last profile change"
+																	className="shrink-0 h-[30px] pr-[18px] flex items-center justify-end gap-[8px] bg-transparent border-0 p-0 m-0 cursor-pointer focus:outline-none focus-visible:outline-none"
+																	aria-label="Continue"
 																>
-																	<UndoIcon width="20" height="20" />
+																	<span className="font-inter font-normal text-[16px] leading-none text-black">
+																		Continue
+																	</span>
+																	<RightArrow
+																		width={7}
+																		height={14}
+																		color="#000000"
+																		opacity={1}
+																		strokeWidth={4}
+																	/>
 																</button>
+
+																{/* Bottom band (3px divider + 10px fill) */}
+																<div className="shrink-0 h-[13px] bg-[#58A6E5] border-t-[3px] border-black" />
 															</div>
 														</div>
 
-														{/* Profile fields live inside the 380px Body container */}
-														<div
-															className={cn(
-																'flex-1 flex flex-col justify-center',
-																props.clipProfileTabOverflow &&
-																	'min-h-0 overflow-y-auto hide-native-scrollbar'
-															)}
-														>
-															<div className="px-3 py-[16px] flex flex-col gap-[12px]">
+														{/* New containers below Body box */}
+														<div className="relative w-full flex flex-col items-center mt-[9px] flex-1">
+															{/* 465px container positioned behind the Introduce yourself box */}
+															<div className="relative z-0 w-[465px] h-[93px] max-w-full rounded-[8px] border-[3px] border-black -mt-[20px]">
+																{/* Decorative inner boxes (448px wide, left aligned) */}
 																<div
-																	ref={
-																		expandedProfileBox === 'name'
-																			? expandedProfileBoxRef
-																			: undefined
-																	}
-																	className={cn(
-																		'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
-																		expandedProfileBox === 'name' ? 'h-[64px]' : 'h-[32px]'
-																	)}
-																	onClick={() => handleProfileBoxToggle('name')}
-																>
-																	<div
-																		className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
-																		style={{ backgroundColor: getProfileHeaderBg('name') }}
-																	>
-																		{expandedProfileBox !== 'name' &&
-																		profileFields.name.trim() ? (
-																			<div className="flex items-stretch w-full h-full">
-																				<div className="w-[20px] shrink-0" />
-																				<div className="w-[3px] bg-black" />
-																				<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
-																					<span className="truncate">
-																						{profileFields.name.trim()}
-																					</span>
-																				</div>
-																				<div className="w-[3px] bg-black" />
-																				<div className="min-w-[20px] flex-1" />
-																			</div>
-																		) : (
-																			<div className="w-full px-3 truncate">
-																				{getProfileHeaderText(
-																					'name',
-																					'Name',
-																					'Enter your Name'
-																				)}
-																			</div>
-																		)}
-																	</div>
-																	{expandedProfileBox === 'name' && (
-																		<input
-																			type="text"
-																			className="h-[32px] bg-white px-3 font-inter text-[14px] outline-none border-0"
-																			value={profileFields.name}
-																			onChange={(e) =>
-																				setProfileFields({
-																					...profileFields,
-																					name: e.target.value,
-																				})
-																			}
-																			onBlur={() => handleProfileFieldBlur('name')}
-																			onKeyDown={(e) => {
-																				if (e.key === 'Enter') {
-																					e.preventDefault();
-																					handleProfileFieldEnter('name');
-																				}
-																			}}
-																			onClick={(e) => e.stopPropagation()}
-																			placeholder=""
-																			autoFocus
-																		/>
-																	)}
-																</div>
-
+																	aria-hidden="true"
+																	className="pointer-events-none absolute left-[8px] top-[15px] w-[448px] h-[28px] rounded-[8px] border-2 border-black z-0"
+																/>
 																<div
-																	ref={
-																		expandedProfileBox === 'genre'
-																			? expandedProfileBoxRef
-																			: undefined
-																	}
-																	className={cn(
-																		'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
-																		expandedProfileBox === 'genre' ? 'h-[64px]' : 'h-[32px]'
-																	)}
-																	onClick={() => handleProfileBoxToggle('genre')}
-																>
-																	<div
-																		className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
-																		style={{ backgroundColor: getProfileHeaderBg('genre') }}
-																	>
-																		{expandedProfileBox !== 'genre' &&
-																		profileFields.genre.trim() ? (
-																			<div className="flex items-stretch w-full h-full">
-																				<div className="w-[20px] shrink-0" />
-																				<div className="w-[3px] bg-black" />
-																				<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
-																					<span className="truncate">
-																						{profileFields.genre.trim()}
-																					</span>
-																				</div>
-																				<div className="w-[3px] bg-black" />
-																				<div className="min-w-[20px] flex-1" />
-																			</div>
-																		) : (
-																			<div className="w-full px-3 truncate">
-																				{getProfileHeaderText(
-																					'genre',
-																					'Genre',
-																					'Enter your Genre'
-																				)}
-																			</div>
-																		)}
-																	</div>
-																	{expandedProfileBox === 'genre' && (
-																		<input
-																			type="text"
-																			className="h-[32px] bg-white px-3 font-inter text-[14px] outline-none border-0"
-																			value={profileFields.genre}
-																			onChange={(e) =>
-																				setProfileFields({
-																					...profileFields,
-																					genre: e.target.value,
-																				})
-																			}
-																			onBlur={() => handleProfileFieldBlur('genre')}
-																			onKeyDown={(e) => {
-																				if (e.key === 'Enter') {
-																					e.preventDefault();
-																					handleProfileFieldEnter('genre');
-																				}
-																			}}
-																			onClick={(e) => e.stopPropagation()}
-																			placeholder=""
-																			autoFocus
-																		/>
-																	)}
-																</div>
-
-																<div
-																	ref={
-																		expandedProfileBox === 'area'
-																			? expandedProfileBoxRef
-																			: undefined
-																	}
-																	className={cn(
-																		'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
-																		expandedProfileBox === 'area' ? 'h-[64px]' : 'h-[32px]'
-																	)}
-																	onClick={() => handleProfileBoxToggle('area')}
-																>
-																	<div
-																		className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
-																		style={{ backgroundColor: getProfileHeaderBg('area') }}
-																	>
-																		{expandedProfileBox !== 'area' &&
-																		profileFields.area.trim() ? (
-																			<div className="flex items-stretch w-full h-full">
-																				<div className="w-[20px] shrink-0" />
-																				<div className="w-[3px] bg-black" />
-																				<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
-																					<span className="truncate">
-																						{profileFields.area.trim()}
-																					</span>
-																				</div>
-																				<div className="w-[3px] bg-black" />
-																				<div className="min-w-[20px] flex-1" />
-																			</div>
-																		) : (
-																			<div className="w-full px-3 truncate">
-																				{getProfileHeaderText(
-																					'area',
-																					'Area',
-																					'Enter your Area'
-																				)}
-																			</div>
-																		)}
-																	</div>
-																	{expandedProfileBox === 'area' && (
-																		<input
-																			type="text"
-																			className="h-[32px] bg-white px-3 font-inter text-[14px] outline-none border-0"
-																			value={profileFields.area}
-																			onChange={(e) =>
-																				setProfileFields({
-																					...profileFields,
-																					area: e.target.value,
-																				})
-																			}
-																			onBlur={() => handleProfileFieldBlur('area')}
-																			onKeyDown={(e) => {
-																				if (e.key === 'Enter') {
-																					e.preventDefault();
-																					handleProfileFieldEnter('area');
-																				}
-																			}}
-																			onClick={(e) => e.stopPropagation()}
-																			placeholder=""
-																			autoFocus
-																		/>
-																	)}
-																</div>
-
-																<div
-																	ref={
-																		expandedProfileBox === 'band'
-																			? expandedProfileBoxRef
-																			: undefined
-																	}
-																	className={cn(
-																		'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
-																		expandedProfileBox === 'band' ? 'h-[64px]' : 'h-[32px]'
-																	)}
-																	onClick={() => handleProfileBoxToggle('band')}
-																>
-																	<div
-																		className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
-																		style={{ backgroundColor: getProfileHeaderBg('band') }}
-																	>
-																		{expandedProfileBox !== 'band' &&
-																		profileFields.band.trim() ? (
-																			<div className="flex items-stretch w-full h-full">
-																				<div className="w-[20px] shrink-0" />
-																				<div className="w-[3px] bg-black" />
-																				<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
-																					<span className="truncate">
-																						{profileFields.band.trim()}
-																					</span>
-																				</div>
-																				<div className="w-[3px] bg-black" />
-																				<div className="min-w-[20px] flex-1" />
-																			</div>
-																		) : (
-																			<div className="w-full px-3 truncate">
-																				{getProfileHeaderText(
-																					'band',
-																					'Band/Artist Name',
-																					'Enter your Band/Artist Name'
-																				)}
-																			</div>
-																		)}
-																	</div>
-																	{expandedProfileBox === 'band' && (
-																		<input
-																			type="text"
-																			className="h-[32px] bg-white px-3 font-inter text-[14px] outline-none border-0"
-																			value={profileFields.band}
-																			onChange={(e) =>
-																				setProfileFields({
-																					...profileFields,
-																					band: e.target.value,
-																				})
-																			}
-																			onBlur={() => handleProfileFieldBlur('band')}
-																			onKeyDown={(e) => {
-																				if (e.key === 'Enter') {
-																					e.preventDefault();
-																					handleProfileFieldEnter('band');
-																				}
-																			}}
-																			onClick={(e) => e.stopPropagation()}
-																			placeholder=""
-																			autoFocus
-																		/>
-																	)}
-																</div>
-
-																<div
-																	ref={
-																		expandedProfileBox === 'bio'
-																			? expandedProfileBoxRef
-																			: undefined
-																	}
-																	className={cn(
-																		'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
-																		expandedProfileBox === 'bio'
-																			? 'min-h-[64px]'
-																			: 'h-[32px]'
-																	)}
-																	onClick={() => handleProfileBoxToggle('bio')}
-																>
-																	<div
-																		className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
-																		style={{ backgroundColor: getProfileHeaderBg('bio') }}
-																	>
-																		{expandedProfileBox !== 'bio' &&
-																		profileFields.bio.trim() ? (
-																			<div className="flex items-stretch w-full h-full">
-																				<div className="w-[20px] shrink-0" />
-																				<div className="w-[3px] bg-black" />
-																				<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
-																					<span className="truncate">
-																						{profileFields.bio.trim()}
-																					</span>
-																				</div>
-																				<div className="w-[3px] bg-black" />
-																				<div className="min-w-[20px] flex-1" />
-																			</div>
-																		) : (
-																			<div className="w-full px-3 truncate">
-																				{getProfileHeaderText('bio', 'Bio', 'Enter your Bio')}
-																			</div>
-																		)}
-																	</div>
-																	{expandedProfileBox === 'bio' && (
-																		<textarea
-																			ref={bioTextareaRef}
-																			className="min-h-[32px] bg-white px-3 py-[6px] font-inter text-[14px] leading-[20px] outline-none border-0 resize-none overflow-hidden"
-																			value={profileFields.bio}
-																			onChange={(e) =>
-																				setProfileFields({
-																					...profileFields,
-																					bio: e.target.value,
-																				})
-																			}
-																			onInput={(
-																				e: React.FormEvent<HTMLTextAreaElement>
-																			) => {
-																				const target = e.currentTarget;
-																				target.style.height = 'auto';
-																				target.style.height = `${target.scrollHeight}px`;
-																			}}
-																			onBlur={() => handleProfileFieldBlur('bio')}
-																			onKeyDown={(e) => {
-																				if (e.key === 'Enter') {
-																					e.preventDefault();
-																					handleProfileFieldEnter('bio');
-																				}
-																			}}
-																			onClick={(e) => e.stopPropagation()}
-																			placeholder=""
-																			autoFocus
-																			rows={1}
-																		/>
-																	)}
-																</div>
-
-																<div
-																	ref={
-																		expandedProfileBox === 'links'
-																			? expandedProfileBoxRef
-																			: undefined
-																	}
-																	className={cn(
-																		'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
-																		expandedProfileBox === 'links' ? 'h-[64px]' : 'h-[32px]'
-																	)}
-																	onClick={() => handleProfileBoxToggle('links')}
-																>
-																	<div
-																		className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
-																		style={{ backgroundColor: getProfileHeaderBg('links') }}
-																	>
-																		{expandedProfileBox !== 'links' &&
-																		profileFields.links.trim() ? (
-																			<div className="flex items-stretch w-full h-full">
-																				<div className="w-[20px] shrink-0" />
-																				<div className="w-[3px] bg-black" />
-																				<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
-																					<span className="truncate">
-																						{profileFields.links.trim()}
-																					</span>
-																				</div>
-																				<div className="w-[3px] bg-black" />
-																				<div className="min-w-[20px] flex-1" />
-																			</div>
-																		) : (
-																			<div className="w-full px-3 truncate">
-																				{getProfileHeaderText(
-																					'links',
-																					'Links',
-																					'Enter your Links'
-																				)}
-																			</div>
-																		)}
-																	</div>
-																	{expandedProfileBox === 'links' && (
-																		<input
-																			type="text"
-																			className="h-[32px] bg-white px-3 font-inter text-[14px] outline-none border-0"
-																			value={profileFields.links}
-																			onChange={(e) =>
-																				setProfileFields({
-																					...profileFields,
-																					links: e.target.value,
-																				})
-																			}
-																			onBlur={() => handleProfileFieldBlur('links')}
-																			onKeyDown={(e) => {
-																				if (e.key === 'Enter') {
-																					e.preventDefault();
-																					handleProfileFieldEnter('links');
-																				}
-																			}}
-																			onClick={(e) => e.stopPropagation()}
-																			placeholder=""
-																			autoFocus
-																		/>
-																	)}
-																</div>
+																	aria-hidden="true"
+																	className="pointer-events-none absolute left-[8px] top-[56px] w-[448px] h-[22px] rounded-[8px] border-2 border-black z-0"
+																/>
 															</div>
-														</div>
 
-														{/* Bottom-right Continue CTA (matches mock) */}
-														<button
-															type="button"
-															onClick={(e) => {
-																e.stopPropagation();
-																setActiveTab('main');
-																setHasLeftProfileTab(true);
-															}}
-															className="shrink-0 h-[30px] pr-[18px] flex items-center justify-end gap-[8px] bg-transparent border-0 p-0 m-0 cursor-pointer focus:outline-none focus-visible:outline-none"
-															aria-label="Continue"
-														>
-															<span className="font-inter font-normal text-[16px] leading-none text-black">
-																Continue
-															</span>
-															<RightArrow
-																width={7}
-																height={14}
-																color="#000000"
-																opacity={1}
-																strokeWidth={4}
-															/>
-														</button>
-
-														{/* Bottom band (3px divider + 10px fill) */}
-														<div className="shrink-0 h-[13px] bg-[#58A6E5] border-t-[3px] border-black" />
-													</div>
-												</div>
-
-												{/* New containers below Body box */}
-												<div className="relative w-full flex flex-col items-center mt-[9px] flex-1">
-													{/* 465px container positioned behind the Introduce yourself box */}
-													<div className="relative z-0 w-[465px] h-[93px] max-w-full rounded-[8px] border-[3px] border-black -mt-[20px]">
-														{/* Decorative inner boxes (448px wide, left aligned) */}
-														<div
-															aria-hidden="true"
-															className="pointer-events-none absolute left-[8px] top-[15px] w-[448px] h-[28px] rounded-[8px] border-2 border-black z-0"
-														/>
-														<div
-															aria-hidden="true"
-															className="pointer-events-none absolute left-[8px] top-[56px] w-[448px] h-[22px] rounded-[8px] border-2 border-black z-0"
-														/>
-													</div>
-
-													{/* 110 x 30 box, 58px from bottom, aligned with left of 465px box */}
-													{!props.hideProfileBottomMiniBox && (
-														<div className="absolute bottom-[63px] left-1/2 -translate-x-1/2 w-[465px] max-w-full">
-															<div
-																aria-hidden="true"
-																className="w-[110px] h-[25px] rounded-[10px] border-2 border-black ml-[8px]"
-															/>
-														</div>
-													)}
-
-													{/* Profile: bottom Generate Test button */}
-													{!hideGenerateTestButton && !showTestPreview && !compactLeftOnly && (
-														<div
-															className={cn(
-																'mt-auto pb-[18px] w-[468px] flex items-center justify-center',
-																!forceDesktop && 'max-w-[89.33vw]'
+															{/* 110 x 30 box, 58px from bottom, aligned with left of 465px box */}
+															{!props.hideProfileBottomMiniBox && (
+																<div className="absolute bottom-[63px] left-1/2 -translate-x-1/2 w-[465px] max-w-full">
+																	<div
+																		aria-hidden="true"
+																		className="w-[110px] h-[25px] rounded-[10px] border-2 border-black ml-[8px]"
+																	/>
+																</div>
 															)}
-															onClick={(e) => e.stopPropagation()}
-														>
-															<Button
-																type="button"
-																data-hover-description="This will show you a test draft, given all of what you provided"
-																onClick={(e) => {
-																	e.stopPropagation();
-																	if (isMobile) {
-																		setShowTestPreview?.(true);
-																	} else {
-																		onTestPreviewToggle?.(true);
-																	}
-																	handleGenerateTestDrafts?.();
-																	setHasAttemptedTest(true);
-																}}
-																disabled={isGenerateTestButtonDisabled}
-																className={cn(
-																	'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[12px] cursor-pointer flex items-center justify-center p-0 border-2 border-transparent',
-																	isGeneratingTest
-																		? 'transition-colors bg-[#A2E9A4] hover:bg-[#A2E9A4] active:bg-[#A2E9A4] cursor-default'
-																		: 'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
-																	isGenerateTestButtonDisabled
-																		? isGeneratingTest
-																			? '!opacity-100'
-																			: 'opacity-50 cursor-not-allowed'
-																		: 'opacity-100'
+
+															{/* Profile: bottom Generate Test button */}
+															{!hideGenerateTestButton &&
+																!showTestPreview &&
+																!compactLeftOnly && (
+																	<div
+																		className={cn(
+																			'mt-auto pb-[18px] w-[468px] flex items-center justify-center',
+																			!forceDesktop && 'max-w-[89.33vw]'
+																		)}
+																		onClick={(e) => e.stopPropagation()}
+																	>
+																		<Button
+																			type="button"
+																			data-hover-description="This will show you a test draft, given all of what you provided"
+																			onClick={(e) => {
+																				e.stopPropagation();
+																				if (isMobile) {
+																					setShowTestPreview?.(true);
+																				} else {
+																					onTestPreviewToggle?.(true);
+																				}
+																				handleGenerateTestDrafts?.();
+																				setHasAttemptedTest(true);
+																			}}
+																			disabled={isGenerateTestButtonDisabled}
+																			className={cn(
+																				'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[12px] cursor-pointer flex items-center justify-center p-0 border-2 border-transparent',
+																				isGeneratingTest
+																					? 'transition-colors bg-[#A2E9A4] hover:bg-[#A2E9A4] active:bg-[#A2E9A4] cursor-default'
+																					: 'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
+																				isGenerateTestButtonDisabled
+																					? isGeneratingTest
+																						? '!opacity-100'
+																						: 'opacity-50 cursor-not-allowed'
+																					: 'opacity-100'
+																			)}
+																		>
+																			{isGeneratingTest ? null : 'Generate Test'}
+																		</Button>
+																	</div>
 																)}
-															>
-																{isGeneratingTest ? null : 'Generate Test'}
-															</Button>
 														</div>
-													)}
-												</div>
+													</div>
 												</div>
 											</div>
-										</div>
-									)}
-									{/* Main Content area */}
-									{activeTab === 'main' && (
-									<div
-										className={cn(
-											'pt-[20px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1',
-											shouldEnableHybridPlusGutter && 'w-[calc(100%_-_90px)]'
 										)}
-									>
-										{selectedModeKey === 'manual' && (
+										{/* Main Content area */}
+										{activeTab === 'main' && (
 											<div
 												className={cn(
-													'w-[468px] h-[623px] bg-white border-[3px] border-[#0B5C0D] rounded-[8px] flex flex-col',
-													!forceDesktop && 'max-[480px]:w-[89.33vw]'
+													'pt-[20px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1',
+													shouldEnableHybridPlusGutter && 'w-[calc(100%_-_90px)]'
 												)}
-												style={{
-													overflow: 'visible',
-													...(props.manualEntryHeightPx != null
-														? { height: props.manualEntryHeightPx }
-														: {}),
-												}}
-												data-hpi-manual-entry
 											>
-												{/* Header wrapper clips the top corners cleanly while preserving overflow-visible for popovers */}
-												<div className="bg-white overflow-hidden rounded-t-[5px]">
-													{/* Subject (inside the unified manual box) */}
-													<div className="min-h-[39px] flex items-start px-3 py-2 bg-white cursor-text">
-														<FormField
-															control={form.control}
-															name="subject"
-															rules={{ required: form.watch('isAiSubject') }}
-															render={({ field }) => (
-																<FormItem className="flex-1 mb-0">
-																	<FormControl>
-																		<Textarea
-																			{...field}
-																			ref={(el) => {
-																				field.ref(el);
-																				manualSubjectRef.current = el;
-																			}}
-																			className={cn(
-																				// Auto-expanding textarea for subject (up to 4 lines)
-																				'w-full border-0 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 !bg-transparent p-0 min-h-[20px] leading-[20px] resize-none overflow-hidden',
-																				// Subject spec: Inter semi-bold, 16px (placeholder + typed text).
-																				'font-inter font-semibold text-[16px] md:text-[16px] placeholder:font-semibold placeholder:text-[16px] placeholder:opacity-100',
-																				shouldShowSubjectRedStyling
-																					? '!text-[#A20000] placeholder:text-[#A20000] focus:placeholder:text-[#A20000]'
-																					: '!text-black placeholder:text-black focus:placeholder:text-gray-400'
-																			)}
-																			style={{ maxHeight: '80px' }} // 4 lines max (20px * 4)
-																			placeholder="Subject"
-																			rows={1}
-																			onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
-																				const target = e.currentTarget;
-																				target.style.height = 'auto';
-																				// Limit to 4 lines (80px)
-																				target.style.height = Math.min(target.scrollHeight, 80) + 'px';
-																			}}
-																			onKeyDown={(e) => {
-																				// Prevent Enter from creating new lines (email subjects don't support newlines)
-																				if (e.key === 'Enter') {
-																					e.preventDefault();
-																				}
-																			}}
-																			onFocus={(e) =>
-																				trackFocusedField?.(
-																					'subject',
-																					e.target as HTMLTextAreaElement
-																				)
-																			}
-																			onBlur={() => {
-																				setHasSubjectBeenTouched(true);
-																				field.onBlur();
-																			}}
-																			onChange={(e) => {
-																				if (e.target.value) setHasSubjectBeenTouched(true);
-																				field.onChange(e);
-																			}}
-																		/>
-																	</FormControl>
-																</FormItem>
-															)}
-														/>
-													</div>
-													{/* Subject divider line (full width) */}
-													<div className="px-0 bg-white">
-														<div className="w-full h-[2px] bg-[#AFAFAF]" />
-													</div>
-												</div>
+												{selectedModeKey === 'manual' && (
+													<div
+														className={cn(
+															'w-[468px] h-[623px] bg-white border-[3px] border-[#0B5C0D] rounded-[8px] flex flex-col',
+															!forceDesktop && 'max-[480px]:w-[89.33vw]'
+														)}
+														style={{
+															overflow: 'visible',
+															...(props.manualEntryHeightPx != null
+																? { height: props.manualEntryHeightPx }
+																: {}),
+														}}
+														data-hpi-manual-entry
+													>
+														{/* Header wrapper clips the top corners cleanly while preserving overflow-visible for popovers */}
+														<div className="bg-white overflow-hidden rounded-t-[5px]">
+															{/* Subject (inside the unified manual box) */}
+															<div className="min-h-[39px] flex items-start px-3 py-2 bg-white cursor-text">
+																<FormField
+																	control={form.control}
+																	name="subject"
+																	rules={{ required: form.watch('isAiSubject') }}
+																	render={({ field }) => (
+																		<FormItem className="flex-1 mb-0">
+																			<FormControl>
+																				<Textarea
+																					{...field}
+																					ref={(el) => {
+																						field.ref(el);
+																						manualSubjectRef.current = el;
+																					}}
+																					className={cn(
+																						// Auto-expanding textarea for subject (up to 4 lines)
+																						'w-full border-0 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 !bg-transparent p-0 min-h-[20px] leading-[20px] resize-none overflow-hidden',
+																						// Subject spec: Inter semi-bold, 16px (placeholder + typed text).
+																						'font-inter font-semibold text-[16px] md:text-[16px] placeholder:font-semibold placeholder:text-[16px] placeholder:opacity-100',
+																						shouldShowSubjectRedStyling
+																							? '!text-[#A20000] placeholder:text-[#A20000] focus:placeholder:text-[#A20000]'
+																							: '!text-black placeholder:text-black focus:placeholder:text-gray-400'
+																					)}
+																					style={{ maxHeight: '80px' }} // 4 lines max (20px * 4)
+																					placeholder="Subject"
+																					rows={1}
+																					onInput={(
+																						e: React.FormEvent<HTMLTextAreaElement>
+																					) => {
+																						const target = e.currentTarget;
+																						target.style.height = 'auto';
+																						// Limit to 4 lines (80px)
+																						target.style.height =
+																							Math.min(target.scrollHeight, 80) + 'px';
+																					}}
+																					onKeyDown={(e) => {
+																						// Prevent Enter from creating new lines (email subjects don't support newlines)
+																						if (e.key === 'Enter') {
+																							e.preventDefault();
+																						}
+																					}}
+																					onFocus={(e) =>
+																						trackFocusedField?.(
+																							'subject',
+																							e.target as HTMLTextAreaElement
+																						)
+																					}
+																					onBlur={() => {
+																						setHasSubjectBeenTouched(true);
+																						field.onBlur();
+																					}}
+																					onChange={(e) => {
+																						if (e.target.value)
+																							setHasSubjectBeenTouched(true);
+																						field.onChange(e);
+																					}}
+																				/>
+																			</FormControl>
+																		</FormItem>
+																	)}
+																/>
+															</div>
+															{/* Subject divider line (full width) */}
+															<div className="px-0 bg-white">
+																<div className="w-full h-[2px] bg-[#AFAFAF]" />
+															</div>
+														</div>
 
-												{/* Body (single editor for Manual - no separate signature) */}
-												<div className="flex-1 min-h-0 bg-white px-3 py-2 relative">
-													{/* Tailwind preflight strips list markers; re-enable bullets/numbering inside the manual editor */}
-													<style>{`
+														{/* Body (single editor for Manual - no separate signature) */}
+														<div className="flex-1 min-h-0 bg-white px-3 py-2 relative">
+															{/* Tailwind preflight strips list markers; re-enable bullets/numbering inside the manual editor */}
+															<style>{`
 														[data-hpi-manual-body-editor] ul {
 															list-style: disc;
 															padding-left: 1.25rem;
@@ -5684,193 +6381,216 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															color: #0052a3;
 														}
 													`}</style>
-													<div
-														ref={manualBodyEditorRef}
-														contentEditable
-														suppressContentEditableWarning
-														data-hpi-manual-body-editor
-														className={cn(
-															'absolute inset-0 resize-none border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
-															'bg-white px-3 py-2 font-inter text-black',
-															'overflow-y-auto'
-														)}
-														style={{
-															fontFamily: form.watch('font') || 'Arial',
-															fontSize: `${form.watch('fontSize') || DEFAULT_FONT_SIZE}px`,
-															lineHeight: '1.4',
-														}}
-														onFocus={(e) =>
-															trackFocusedField?.('hybridBlockPrompts.0.value', e.target as unknown as HTMLTextAreaElement)
-														}
-														onBlur={() => {
-															// Sync contentEditable HTML back to form (with banned fill-ins removed)
-															const rawHtml = manualBodyEditorRef.current?.innerHTML || '';
-															const html = sanitizeBannedFillIns(rawHtml);
-															// Update the editor if content was sanitized
-															if (html !== rawHtml && manualBodyEditorRef.current) {
-																manualBodyEditorRef.current.innerHTML = html;
-															}
-															form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
-															syncManualBodyHasMeaningfulText();
-														}}
-														onInput={() => {
-															// Sync contentEditable HTML to form on every input (with banned fill-ins removed)
-															const rawHtml = manualBodyEditorRef.current?.innerHTML || '';
-															const html = sanitizeBannedFillIns(rawHtml);
-															// Update the editor if content was sanitized
-															if (html !== rawHtml && manualBodyEditorRef.current) {
-															manualBodyEditorRef.current.innerHTML = html;
-															// Try to restore cursor (simplified - goes to end if complex)
-															try {
-																const selection = window.getSelection();
-																const range = document.createRange();
-																range.selectNodeContents(manualBodyEditorRef.current);
-																range.collapse(false);
-																selection?.removeAllRanges();
-																selection?.addRange(range);
-															} catch {}
-															}
-															form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
-															syncManualBodyHasMeaningfulText();
-														}}
-														onClick={(e) => {
-															// Allow clicking links with Ctrl/Cmd key
-															const target = e.target as HTMLElement;
-															if (target.tagName === 'A' && (e.ctrlKey || e.metaKey)) {
-																e.preventDefault();
-																const href = target.getAttribute('href');
-																if (href) {
-																	window.open(href, '_blank', 'noopener,noreferrer');
+															<div
+																ref={manualBodyEditorRef}
+																contentEditable
+																suppressContentEditableWarning
+																data-hpi-manual-body-editor
+																className={cn(
+																	'absolute inset-0 resize-none border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+																	'bg-white px-3 py-2 font-inter text-black',
+																	'overflow-y-auto'
+																)}
+																style={{
+																	fontFamily: form.watch('font') || 'Arial',
+																	fontSize: `${form.watch('fontSize') || DEFAULT_FONT_SIZE}px`,
+																	lineHeight: '1.4',
+																}}
+																onFocus={(e) =>
+																	trackFocusedField?.(
+																		'hybridBlockPrompts.0.value',
+																		e.target as unknown as HTMLTextAreaElement
+																	)
 																}
-															}
-														}}
-													/>
-													
-													{/* Link popover */}
-													{isLinkPopoverOpen && linkPopoverPosition && (
-														<div
-															ref={linkPopoverRef}
-															className="absolute z-[9999] bg-[#E0E0E0] rounded-[8px] p-3 w-[280px]"
-															style={{
-																top: linkPopoverPosition.top,
-																left: Math.min(linkPopoverPosition.left, 150),
-															}}
-														>
-															<div className="flex items-center gap-2">
-																{/* Input fields column */}
-																<div className="flex-1 flex flex-col gap-2">
-																	{/* Text input */}
-																	<input
-																		type="text"
-																		value={linkText}
-																		onChange={(e) => setLinkText(e.target.value)}
-																		placeholder="Text"
-																		className="w-full px-2 py-1.5 text-sm bg-white border border-gray-300 rounded focus:outline-none focus:border-gray-400 font-inter"
-																	/>
-																	
-																	{/* URL input */}
-																	<input
-																		type="text"
-																		value={linkUrl}
-																		onChange={(e) => setLinkUrl(e.target.value)}
-																		placeholder="Type or paste a link"
-																		className="w-full px-2 py-1.5 text-sm bg-white border border-gray-300 rounded focus:outline-none focus:border-gray-400 font-inter"
-																		onKeyDown={(e) => {
-																			if (e.key === 'Enter') {
-																				e.preventDefault();
-																				applyLink();
-																			}
-																		}}
-																	/>
-																</div>
-																
-																{/* Apply button - vertically centered on the right */}
-																<button
-																	type="button"
-																	onClick={applyLink}
-																	disabled={!linkUrl.trim()}
-																	className={cn(
-																		"px-3 py-1.5 text-sm font-inter font-medium rounded transition-colors self-center",
-																		linkUrl.trim()
-																			? "text-gray-700 hover:bg-gray-100 cursor-pointer"
-																			: "text-gray-400 cursor-not-allowed"
-																	)}
-																>
-																	Apply
-																</button>
-															</div>
-														</div>
-													)}
-												</div>
+																onBlur={() => {
+																	// Sync contentEditable HTML back to form (with banned fill-ins removed)
+																	const rawHtml =
+																		manualBodyEditorRef.current?.innerHTML || '';
+																	const html = sanitizeBannedFillIns(rawHtml);
+																	// Update the editor if content was sanitized
+																	if (html !== rawHtml && manualBodyEditorRef.current) {
+																		manualBodyEditorRef.current.innerHTML = html;
+																	}
+																	form.setValue('hybridBlockPrompts.0.value', html, {
+																		shouldDirty: true,
+																	});
+																	syncManualBodyHasMeaningfulText();
+																}}
+																onInput={() => {
+																	// Sync contentEditable HTML to form on every input (with banned fill-ins removed)
+																	const rawHtml =
+																		manualBodyEditorRef.current?.innerHTML || '';
+																	const html = sanitizeBannedFillIns(rawHtml);
+																	// Update the editor if content was sanitized
+																	if (html !== rawHtml && manualBodyEditorRef.current) {
+																		manualBodyEditorRef.current.innerHTML = html;
+																		// Try to restore cursor (simplified - goes to end if complex)
+																		try {
+																			const selection = window.getSelection();
+																			const range = document.createRange();
+																			range.selectNodeContents(
+																				manualBodyEditorRef.current
+																			);
+																			range.collapse(false);
+																			selection?.removeAllRanges();
+																			selection?.addRange(range);
+																		} catch {}
+																	}
+																	form.setValue('hybridBlockPrompts.0.value', html, {
+																		shouldDirty: true,
+																	});
+																	syncManualBodyHasMeaningfulText();
+																}}
+																onClick={(e) => {
+																	// Allow clicking links with Ctrl/Cmd key
+																	const target = e.target as HTMLElement;
+																	if (
+																		target.tagName === 'A' &&
+																		(e.ctrlKey || e.metaKey)
+																	) {
+																		e.preventDefault();
+																		const href = target.getAttribute('href');
+																		if (href) {
+																			window.open(href, '_blank', 'noopener,noreferrer');
+																		}
+																	}
+																}}
+															/>
 
-												{/* Bottom action box */}
-												<div className="flex justify-center mb-[18px] flex-shrink-0 overflow-visible">
-											<div
-												className="w-[430px] h-[32px] rounded-[16px] bg-[#DDE6F5] relative flex items-center overflow-visible"
-												style={{ backgroundColor: '#DDE6F5' }}
-											>
-												{/* Left section (Font) - custom dropdown to avoid Radix zoom issues */}
-												<div 
-													ref={fontDropdownRef}
-													className="w-[109px] h-full flex items-center pl-[8px] pr-0 relative"
-												>
-													{/* Custom font trigger button */}
-													<button
-														type="button"
-														onClick={() => setIsFontDropdownOpen(!isFontDropdownOpen)}
-														className={cn(
-															'h-[24px] flex items-center',
-															'bg-transparent border-0 shadow-none rounded-[4px]',
-															'pl-[8px] pr-[6px] relative cursor-pointer',
-															'font-inter font-normal text-[14px] leading-none text-black',
-															'transition-[background-color,transform] duration-[80ms] ease-out',
-															'hover:bg-[#c9d4e8] hover:scale-[1.01] active:scale-100 focus:outline-none',
-															isFontDropdownOpen && 'bg-[#c9d4e8]'
-														)}
-														style={{
-															fontFamily: form.watch('font') || DEFAULT_FONT,
-														}}
-														aria-label="Font"
-														aria-expanded={isFontDropdownOpen}
-													>
-	<div
-		className="flex items-center min-w-0 overflow-hidden pr-[2px] whitespace-nowrap"
-		style={{
-			maskImage: 'linear-gradient(to right, black 70%, transparent 95%)',
-			WebkitMaskImage: 'linear-gradient(to right, black 70%, transparent 95%)',
-		}}
-	>
-		<span>
-			{(() => {
-				const currentFont = form.watch('font') || DEFAULT_FONT;
-				if (currentFont === 'Arial') return 'Sans Serif';
-				if (currentFont === 'serif') return 'Serif';
-				if (currentFont === 'Courier New') return 'Fixed Width';
-				if (currentFont === 'Arial Black') return 'Wide';
-				if (currentFont === 'Arial Narrow') return 'Narrow';
-				return currentFont;
-			})()}
-		</span>
-	</div>
-														<FontDropdownArrow className="!block pointer-events-none ml-[6px] !w-[8px] !h-[5px]" />
-													</button>
-													
-													{/* Custom dropdown menu */}
-													{isFontDropdownOpen && (
-														<div
-															id="font-dropdown-scroll-wrapper"
-															className={cn(
-																'absolute w-[119px] overflow-visible',
-																'rounded-[8px] bg-[#E0E0E0]',
-																'z-[9999]'
+															{/* Link popover */}
+															{isLinkPopoverOpen && linkPopoverPosition && (
+																<div
+																	ref={linkPopoverRef}
+																	className="absolute z-[9999] bg-[#E0E0E0] rounded-[8px] p-3 w-[280px]"
+																	style={{
+																		top: linkPopoverPosition.top,
+																		left: Math.min(linkPopoverPosition.left, 150),
+																	}}
+																>
+																	<div className="flex items-center gap-2">
+																		{/* Input fields column */}
+																		<div className="flex-1 flex flex-col gap-2">
+																			{/* Text input */}
+																			<input
+																				type="text"
+																				value={linkText}
+																				onChange={(e) => setLinkText(e.target.value)}
+																				placeholder="Text"
+																				className="w-full px-2 py-1.5 text-sm bg-white border border-gray-300 rounded focus:outline-none focus:border-gray-400 font-inter"
+																			/>
+
+																			{/* URL input */}
+																			<input
+																				type="text"
+																				value={linkUrl}
+																				onChange={(e) => setLinkUrl(e.target.value)}
+																				placeholder="Type or paste a link"
+																				className="w-full px-2 py-1.5 text-sm bg-white border border-gray-300 rounded focus:outline-none focus:border-gray-400 font-inter"
+																				onKeyDown={(e) => {
+																					if (e.key === 'Enter') {
+																						e.preventDefault();
+																						applyLink();
+																					}
+																				}}
+																			/>
+																		</div>
+
+																		{/* Apply button - vertically centered on the right */}
+																		<button
+																			type="button"
+																			onClick={applyLink}
+																			disabled={!linkUrl.trim()}
+																			className={cn(
+																				'px-3 py-1.5 text-sm font-inter font-medium rounded transition-colors self-center',
+																				linkUrl.trim()
+																					? 'text-gray-700 hover:bg-gray-100 cursor-pointer'
+																					: 'text-gray-400 cursor-not-allowed'
+																			)}
+																		>
+																			Apply
+																		</button>
+																	</div>
+																</div>
 															)}
-															style={{
-																left: '0px',
-																bottom: 'calc(100% + 8px)',
-																height: '161px',
-															}}
-														>
-															<style>{`
+														</div>
+
+														{/* Bottom action box */}
+														<div className="flex justify-center mb-[18px] flex-shrink-0 overflow-visible">
+															<div
+																className="w-[430px] h-[32px] rounded-[16px] bg-[#DDE6F5] relative flex items-center overflow-visible"
+																style={{ backgroundColor: '#DDE6F5' }}
+															>
+																{/* Left section (Font) - custom dropdown to avoid Radix zoom issues */}
+																<div
+																	ref={fontDropdownRef}
+																	className="w-[109px] h-full flex items-center pl-[8px] pr-0 relative"
+																>
+																	{/* Custom font trigger button */}
+																	<button
+																		type="button"
+																		onClick={() =>
+																			setIsFontDropdownOpen(!isFontDropdownOpen)
+																		}
+																		className={cn(
+																			'h-[24px] flex items-center',
+																			'bg-transparent border-0 shadow-none rounded-[4px]',
+																			'pl-[8px] pr-[6px] relative cursor-pointer',
+																			'font-inter font-normal text-[14px] leading-none text-black',
+																			'transition-[background-color,transform] duration-[80ms] ease-out',
+																			'hover:bg-[#c9d4e8] hover:scale-[1.01] active:scale-100 focus:outline-none',
+																			isFontDropdownOpen && 'bg-[#c9d4e8]'
+																		)}
+																		style={{
+																			fontFamily: form.watch('font') || DEFAULT_FONT,
+																		}}
+																		aria-label="Font"
+																		aria-expanded={isFontDropdownOpen}
+																	>
+																		<div
+																			className="flex items-center min-w-0 overflow-hidden pr-[2px] whitespace-nowrap"
+																			style={{
+																				maskImage:
+																					'linear-gradient(to right, black 70%, transparent 95%)',
+																				WebkitMaskImage:
+																					'linear-gradient(to right, black 70%, transparent 95%)',
+																			}}
+																		>
+																			<span>
+																				{(() => {
+																					const currentFont =
+																						form.watch('font') || DEFAULT_FONT;
+																					if (currentFont === 'Arial')
+																						return 'Sans Serif';
+																					if (currentFont === 'serif') return 'Serif';
+																					if (currentFont === 'Courier New')
+																						return 'Fixed Width';
+																					if (currentFont === 'Arial Black')
+																						return 'Wide';
+																					if (currentFont === 'Arial Narrow')
+																						return 'Narrow';
+																					return currentFont;
+																				})()}
+																			</span>
+																		</div>
+																		<FontDropdownArrow className="!block pointer-events-none ml-[6px] !w-[8px] !h-[5px]" />
+																	</button>
+
+																	{/* Custom dropdown menu */}
+																	{isFontDropdownOpen && (
+																		<div
+																			id="font-dropdown-scroll-wrapper"
+																			className={cn(
+																				'absolute w-[119px] overflow-visible',
+																				'rounded-[8px] bg-[#E0E0E0]',
+																				'z-[9999]'
+																			)}
+																			style={{
+																				left: '0px',
+																				bottom: 'calc(100% + 8px)',
+																				height: '161px',
+																			}}
+																		>
+																			<style>{`
 																#font-dropdown-scroll-wrapper *::-webkit-scrollbar {
 																	display: none !important;
 																	width: 0 !important;
@@ -5882,98 +6602,105 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	scrollbar-width: none !important;
 																}
 															`}</style>
-															<CustomScrollbar
-																className="w-full h-full"
-																thumbColor="#000000"
-																thumbWidth={2}
-																offsetRight={-6}
-															>
-																{FONT_OPTIONS.map((font) => {
-																	const label =
-																		font === 'Arial'
-																			? 'Sans Serif'
-																			: font === 'serif'
-																			? 'Serif'
-																			: font === 'Courier New'
-																			? 'Fixed Width'
-																			: font === 'Arial Black'
-																			? 'Wide'
-																			: font === 'Arial Narrow'
-																			? 'Narrow'
-																			: font;
-																	const isSelected = (form.watch('font') || DEFAULT_FONT) === font;
-																	return (
-																		<button
-																			key={font}
-																			type="button"
-																			onClick={() => {
-																				form.setValue('font', font as DraftingFormValues['font'], {
-																					shouldDirty: true,
-																				});
-																				setIsFontDropdownOpen(false);
-																			}}
+																			<CustomScrollbar
+																				className="w-full h-full"
+																				thumbColor="#000000"
+																				thumbWidth={2}
+																				offsetRight={-6}
+																			>
+																				{FONT_OPTIONS.map((font) => {
+																					const label =
+																						font === 'Arial'
+																							? 'Sans Serif'
+																							: font === 'serif'
+																								? 'Serif'
+																								: font === 'Courier New'
+																									? 'Fixed Width'
+																									: font === 'Arial Black'
+																										? 'Wide'
+																										: font === 'Arial Narrow'
+																											? 'Narrow'
+																											: font;
+																					const isSelected =
+																						(form.watch('font') || DEFAULT_FONT) === font;
+																					return (
+																						<button
+																							key={font}
+																							type="button"
+																							onClick={() => {
+																								form.setValue(
+																									'font',
+																									font as DraftingFormValues['font'],
+																									{
+																										shouldDirty: true,
+																									}
+																								);
+																								setIsFontDropdownOpen(false);
+																							}}
+																							className={cn(
+																								'w-full px-2 py-1.5 text-left text-[12px] leading-none',
+																								'hover:bg-gray-300 cursor-pointer',
+																								isSelected && 'bg-gray-300/60'
+																							)}
+																							style={{ fontFamily: font }}
+																						>
+																							<span>{label}</span>
+																						</button>
+																					);
+																				})}
+																			</CustomScrollbar>
+																		</div>
+																	)}
+																</div>
+
+																{/* Divider (109px from left, 23px tall) */}
+																<div
+																	aria-hidden="true"
+																	className="absolute left-[109px] top-1/2 -translate-y-1/2 w-px h-[23px] bg-black"
+																/>
+
+																{/* Font size dropdown */}
+																<div
+																	ref={fontSizeDropdownRef}
+																	className="absolute left-[111px] top-0 bottom-0 w-[40px] flex items-center justify-center"
+																>
+																	<button
+																		type="button"
+																		onClick={() =>
+																			setIsFontSizeDropdownOpen(!isFontSizeDropdownOpen)
+																		}
+																		className={cn(
+																			'h-[24px] flex items-center justify-center gap-[5px]',
+																			'bg-transparent border-0 shadow-none rounded-[4px]',
+																			'px-[6px] cursor-pointer',
+																			'transition-[background-color,transform] duration-[80ms] ease-out',
+																			'hover:bg-[#c9d4e8] hover:scale-[1.01] active:scale-100 focus:outline-none',
+																			isFontSizeDropdownOpen && 'bg-[#c9d4e8]'
+																		)}
+																		aria-label="Font Size"
+																		aria-expanded={isFontSizeDropdownOpen}
+																	>
+																		<FontSizeIcon width={12} height={12} />
+																		<FontDropdownArrow className="!block pointer-events-none !w-[8px] !h-[5px] relative top-[1px]" />
+																	</button>
+
+																	{/* Font size dropdown menu */}
+																	{isFontSizeDropdownOpen && (
+																		<div
+																			id="font-size-dropdown-scroll-wrapper"
 																			className={cn(
-																				'w-full px-2 py-1.5 text-left text-[12px] leading-none',
-																				'hover:bg-gray-300 cursor-pointer',
-																				isSelected && 'bg-gray-300/60'
+																				'absolute w-[50px] overflow-visible',
+																				'rounded-[8px] bg-[#E0E0E0]',
+																				'z-[9999]'
 																			)}
-																			style={{ fontFamily: font }}
+																			style={{
+																				left: '50%',
+																				transform: 'translateX(-50%)',
+																				bottom: 'calc(100% + 8px)',
+																				height: '161px',
+																			}}
 																		>
-																			<span>{label}</span>
-																		</button>
-																	);
-																})}
-															</CustomScrollbar>
-														</div>
-													)}
-												</div>
-
-												{/* Divider (109px from left, 23px tall) */}
-												<div
-													aria-hidden="true"
-													className="absolute left-[109px] top-1/2 -translate-y-1/2 w-px h-[23px] bg-black"
-												/>
-
-												{/* Font size dropdown */}
-												<div 
-													ref={fontSizeDropdownRef}
-													className="absolute left-[111px] top-0 bottom-0 w-[40px] flex items-center justify-center"
-												>
-													<button
-														type="button"
-														onClick={() => setIsFontSizeDropdownOpen(!isFontSizeDropdownOpen)}
-														className={cn(
-															'h-[24px] flex items-center justify-center gap-[5px]',
-															'bg-transparent border-0 shadow-none rounded-[4px]',
-															'px-[6px] cursor-pointer',
-															'transition-[background-color,transform] duration-[80ms] ease-out',
-															'hover:bg-[#c9d4e8] hover:scale-[1.01] active:scale-100 focus:outline-none',
-															isFontSizeDropdownOpen && 'bg-[#c9d4e8]'
-														)}
-														aria-label="Font Size"
-														aria-expanded={isFontSizeDropdownOpen}
-													>
-														<FontSizeIcon width={12} height={12} />
-														<FontDropdownArrow className="!block pointer-events-none !w-[8px] !h-[5px] relative top-[1px]" />
-													</button>
-													
-													{/* Font size dropdown menu */}
-													{isFontSizeDropdownOpen && (
-														<div
-															id="font-size-dropdown-scroll-wrapper"
-															className={cn(
-																'absolute w-[50px] overflow-visible',
-																'rounded-[8px] bg-[#E0E0E0]',
-																'z-[9999]'
-															)}
-															style={{
-																left: '50%',
-																transform: 'translateX(-50%)',
-																bottom: 'calc(100% + 8px)',
-																height: '161px',
-															}}
-														>
-															<style>{`
+																			<style>{`
 																#font-size-dropdown-scroll-wrapper *::-webkit-scrollbar {
 																	display: none !important;
 																	width: 0 !important;
@@ -5985,783 +6712,812 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	scrollbar-width: none !important;
 																}
 															`}</style>
-															<CustomScrollbar
-																className="w-full h-full"
-																thumbColor="#000000"
-																thumbWidth={2}
-																offsetRight={-6}
-															>
-																{FONT_SIZE_OPTIONS.map((size) => {
-																	const currentSize = form.watch('fontSize') || DEFAULT_FONT_SIZE;
-																	const isSelected = currentSize === size;
-																	return (
-																		<button
-																			key={size}
-																			type="button"
-																			onClick={() => {
-																				form.setValue('fontSize', size, {
-																					shouldDirty: true,
-																				});
-																				setIsFontSizeDropdownOpen(false);
-																			}}
-																			className={cn(
-																				'w-full px-2 py-1.5 text-center text-[12px] leading-none',
-																				'hover:bg-gray-300 cursor-pointer',
-																				isSelected && 'bg-gray-300/60 font-semibold'
-																			)}
-																		>
-																			<span>{size}</span>
-																		</button>
-																	);
-																})}
-															</CustomScrollbar>
-														</div>
-													)}
-												</div>
-
-												{/* Second divider */}
-												<div
-													aria-hidden="true"
-													className="absolute left-[151px] top-1/2 -translate-y-1/2 w-px h-[23px] bg-black"
-												/>
-
-												{/* Bold icon */}
-												<button
-													type="button"
-													onMouseDown={(e) => e.preventDefault()}
-													onClick={() => applyManualFormatting('bold')}
-													className={cn(
-														"absolute left-[159px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer rounded-[4px]",
-														"transition-[background-color,transform] duration-[80ms] ease-out",
-														activeFormatting.bold
-															? "bg-[#B8C8E0]"
-															: "hover:bg-[#C5D3E8] hover:scale-[1.08] active:scale-100"
-													)}
-													aria-label="Bold"
-												>
-													<BoldIcon width={8} height={11} />
-												</button>
-
-												{/* Italic icon */}
-												<button
-													type="button"
-													onMouseDown={(e) => e.preventDefault()}
-													onClick={() => applyManualFormatting('italic')}
-													className={cn(
-														"absolute left-[183px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer rounded-[4px]",
-														"transition-[background-color,transform] duration-[80ms] ease-out",
-														activeFormatting.italic
-															? "bg-[#B8C8E0]"
-															: "hover:bg-[#C5D3E8] hover:scale-[1.08] active:scale-100"
-													)}
-													aria-label="Italic"
-												>
-													<ItalicIcon width={4} height={11} />
-												</button>
-
-												{/* Underline icon - top aligned with B/I, underline extends below */}
-												<button
-													type="button"
-													onMouseDown={(e) => e.preventDefault()}
-													onClick={() => applyManualFormatting('underline')}
-													className={cn(
-														"absolute left-[207px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer rounded-[4px]",
-														"transition-[background-color,transform] duration-[80ms] ease-out",
-														activeFormatting.underline
-															? "bg-[#B8C8E0]"
-															: "hover:bg-[#C5D3E8] hover:scale-[1.08] active:scale-100"
-													)}
-													aria-label="Underline"
-												>
-													<UnderlineIcon width={11} height={14} />
-												</button>
-
-												{/* Bullet list icon */}
-												<button
-													type="button"
-													onMouseDown={(e) => e.preventDefault()}
-													onClick={() => applyManualFormatting('insertUnorderedList')}
-													className={cn(
-														"absolute left-[236px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer rounded-[4px]",
-														"transition-[background-color,transform] duration-[80ms] ease-out",
-														activeFormatting.bulletList
-															? "bg-[#B8C8E0]"
-															: "hover:bg-[#C5D3E8] hover:scale-[1.08] active:scale-100"
-													)}
-													aria-label="Bullet list"
-												>
-													<BulletListIcon width={15} height={11} />
-												</button>
-
-												{/* Text + background color picker */}
-												<div
-													ref={colorPickerRef}
-													className="absolute left-[260px] top-[4px] w-[32px] h-[24px] flex items-center justify-center"
-												>
-													<button
-														type="button"
-														onMouseDown={(e) => e.preventDefault()}
-														onClick={() => {
-															// avoid overlapping dropdowns
-															setIsFontDropdownOpen(false);
-															setIsFontSizeDropdownOpen(false);
-															setIsColorPickerOpen((v) => !v);
-														}}
-														className={cn(
-															"w-[24px] h-[24px] flex items-center justify-center cursor-pointer rounded-[4px]",
-															"transition-[background-color,transform] duration-[80ms] ease-out",
-															isColorPickerOpen ? "bg-[#B8C8E0]" : "hover:bg-[#C5D3E8] hover:scale-[1.08] active:scale-100"
-														)}
-														aria-label="Text & background color"
-														aria-expanded={isColorPickerOpen}
-													>
-														<TextColorIcon width={11} height={14} />
-													</button>
-
-													{isColorPickerOpen && (
-														<div className="absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 z-[9999]">
-															<div className="flex gap-6 rounded-[8px] bg-[#E0E0E0] p-3">
-																<div className="min-w-[150px]">
-																	<div className="mb-2 text-[12px] font-inter font-medium text-black/80">
-																		Background color
-																	</div>
-																	<div className="grid grid-cols-8 gap-[4px]">
-																		{MANUAL_EDITOR_COLOR_SWATCHES.map((color) => (
-																			(() => {
-																				const isSelected =
-																					(manualSelectedBgColor ?? '').toLowerCase() ===
-																					color.toLowerCase();
-																				return (
-																			<button
-																				key={`hpi-bg-${color}`}
-																				type="button"
-																				onMouseDown={(e) => e.preventDefault()}
-																				onClick={() => applyManualColor('hiliteColor', color)}
-																				className={cn(
-																					"w-[14px] h-[14px] rounded-[2px] border border-black/10 hover:outline hover:outline-2 hover:outline-black/20",
-																					isSelected &&
-																						"ring-2 ring-black ring-offset-1 ring-offset-white border-transparent"
-																				)}
-																				style={{ backgroundColor: color }}
-																				aria-label={`Background ${color}`}
-																				aria-pressed={isSelected}
-																			/>
-																				);
-																			})()
-																		))}
-																	</div>
+																			<CustomScrollbar
+																				className="w-full h-full"
+																				thumbColor="#000000"
+																				thumbWidth={2}
+																				offsetRight={-6}
+																			>
+																				{FONT_SIZE_OPTIONS.map((size) => {
+																					const currentSize =
+																						form.watch('fontSize') || DEFAULT_FONT_SIZE;
+																					const isSelected = currentSize === size;
+																					return (
+																						<button
+																							key={size}
+																							type="button"
+																							onClick={() => {
+																								form.setValue('fontSize', size, {
+																									shouldDirty: true,
+																								});
+																								setIsFontSizeDropdownOpen(false);
+																							}}
+																							className={cn(
+																								'w-full px-2 py-1.5 text-center text-[12px] leading-none',
+																								'hover:bg-gray-300 cursor-pointer',
+																								isSelected &&
+																									'bg-gray-300/60 font-semibold'
+																							)}
+																						>
+																							<span>{size}</span>
+																						</button>
+																					);
+																				})}
+																			</CustomScrollbar>
+																		</div>
+																	)}
 																</div>
 
-																<div className="min-w-[150px]">
-																	<div className="mb-2 text-[12px] font-inter font-medium text-black/80">
-																		Text color
-																	</div>
-																	<div className="grid grid-cols-8 gap-[4px]">
-																		{MANUAL_EDITOR_COLOR_SWATCHES.map((color) => (
-																			(() => {
-																				const isSelected =
-																					(manualSelectedTextColor ?? '').toLowerCase() ===
-																					color.toLowerCase();
-																				return (
-																			<button
-																				key={`hpi-text-${color}`}
-																				type="button"
-																				onMouseDown={(e) => e.preventDefault()}
-																				onClick={() => applyManualColor('foreColor', color)}
-																				className={cn(
-																					"w-[14px] h-[14px] rounded-[2px] border border-black/10 hover:outline hover:outline-2 hover:outline-black/20",
-																					isSelected &&
-																						"ring-2 ring-black ring-offset-1 ring-offset-white border-transparent"
-																				)}
-																				style={{ backgroundColor: color }}
-																				aria-label={`Text ${color}`}
-																				aria-pressed={isSelected}
-																			/>
-																				);
-																			})()
-																		))}
-																	</div>
-																</div>
-															</div>
-														</div>
-													)}
-												</div>
+																{/* Second divider */}
+																<div
+																	aria-hidden="true"
+																	className="absolute left-[151px] top-1/2 -translate-y-1/2 w-px h-[23px] bg-black"
+																/>
 
-												{/* Link icon button */}
-												<button
-													type="button"
-													onMouseDown={(e) => e.preventDefault()}
-													onClick={openLinkPopover}
-													className={cn(
-														"absolute left-[295px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer rounded-[4px]",
-														"transition-[background-color,transform] duration-[80ms] ease-out",
-														isLinkPopoverOpen
-															? "bg-[#B8C8E0]"
-															: "hover:bg-[#C5D3E8] hover:scale-[1.08] active:scale-100"
-													)}
-													aria-label="Insert link"
-												>
-													<svg
-														width={18}
-														height={18}
-														viewBox="0 0 23 23"
-														fill="none"
-														xmlns="http://www.w3.org/2000/svg"
-													>
-														<path
-															d="M3.0751 14.325C2.3251 13.575 1.8001 12.45 1.8001 11.25C1.8001 10.05 2.2501 8.99996 3.0751 8.17496C3.9001 7.34996 4.9501 6.89996 6.1501 6.89996H9.0001C9.3001 6.89996 9.5251 7.12497 9.5251 7.42497C9.5251 7.72497 9.30011 7.94996 9.00011 7.94996L6.1501 7.94997C5.2501 7.94997 4.5001 8.24996 3.8251 8.92496C3.1501 9.59996 2.8501 10.35 2.8501 11.25C2.8501 13.05 4.3501 14.55 6.0751 14.475H8.9251C9.2251 14.475 9.4501 14.7 9.4501 15C9.4501 15.3 9.22511 15.525 8.92511 15.525L6.0751 15.525C4.9501 15.6 3.9001 15.15 3.0751 14.325Z"
-															fill="#231815"
-														/>
-														<path
-															d="M13.3503 15.45C13.2753 15.375 13.1253 15.225 13.1253 15.075C13.1253 14.775 13.3503 14.55 13.6503 14.55L16.5003 14.55C18.3003 14.55 19.7253 13.125 19.7253 11.325C19.7253 9.52499 18.3003 8.09999 16.5003 8.09999L13.6503 8.09999C13.3503 8.09999 13.1253 7.87499 13.1253 7.57499C13.1253 7.27499 13.3503 7.04999 13.6503 7.04999L16.5003 7.04999C18.9003 7.04999 20.7753 8.92499 20.7753 11.325C20.7753 13.725 18.9003 15.6 16.5003 15.6H13.6503C13.5003 15.6 13.4253 15.525 13.3503 15.45Z"
-															fill="#231815"
-														/>
-														<path
-															d="M5.70029 11.7C5.62529 11.625 5.47529 11.475 5.47529 11.325C5.47529 11.025 5.70029 10.8 6.00029 10.8L16.3503 10.8C16.6503 10.8 16.8753 11.025 16.8753 11.325C16.8753 11.625 16.6503 11.85 16.3503 11.85L6.00029 11.85C6.00029 11.85 5.85029 11.85 5.70029 11.7Z"
-															fill="#231815"
-														/>
-													</svg>
-												</button>
-
-												{/* Third divider (102px from right edge) */}
-												<div
-													aria-hidden="true"
-													className="absolute right-[102px] top-1/2 -translate-y-1/2 w-px h-[23px] bg-black"
-												/>
-
-												{/* Fill-ins section */}
-												<div
-													ref={fillInsDropdownRef}
-													className="absolute right-[24px] top-0 h-full flex items-center"
-												>
-													<button
-														type="button"
-														onMouseDown={(e) => e.preventDefault()}
-														onClick={() => {
-															// Close other dropdowns
-															setIsFontDropdownOpen(false);
-															setIsFontSizeDropdownOpen(false);
-															setIsColorPickerOpen(false);
-															setIsFillInsDropdownOpen(!isFillInsDropdownOpen);
-														}}
-														className={cn(
-															"h-[24px] flex items-center cursor-pointer bg-transparent border-0 px-[8px] rounded-[4px]",
-															"transition-[background-color,transform] duration-[80ms] ease-out",
-															"hover:bg-[#c9d4e8] hover:scale-[1.01] active:scale-100",
-															isFillInsDropdownOpen && "bg-[#c9d4e8]"
-														)}
-														aria-label="Fill-ins"
-														aria-expanded={isFillInsDropdownOpen}
-													>
-														<span className="font-inter font-medium text-[14px] leading-none text-black">
-															Fill-ins
-														</span>
-														<FontDropdownArrow className="!block pointer-events-none ml-[6px] !w-[8px] !h-[5px] relative top-[3px]" />
-													</button>
-
-													{/* Fill-ins dropdown menu */}
-													{isFillInsDropdownOpen && (
-														<div
-															className={cn(
-																'absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 z-[9999]',
-																'rounded-[8px] bg-[#E0E0E0] py-1 min-w-[100px] shadow-md'
-															)}
-														>
-															{FILL_IN_OPTIONS.map((option) => (
+																{/* Bold icon */}
 																<button
-																	key={option}
 																	type="button"
 																	onMouseDown={(e) => e.preventDefault()}
-																	onClick={() => insertFillIn(option)}
+																	onClick={() => applyManualFormatting('bold')}
 																	className={cn(
-																		'w-full px-3 py-2 text-left text-[13px] font-inter',
-																		'hover:bg-gray-300 cursor-pointer',
-																		'text-black'
+																		'absolute left-[159px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer rounded-[4px]',
+																		'transition-[background-color,transform] duration-[80ms] ease-out',
+																		activeFormatting.bold
+																			? 'bg-[#B8C8E0]'
+																			: 'hover:bg-[#C5D3E8] hover:scale-[1.08] active:scale-100'
 																	)}
+																	aria-label="Bold"
 																>
-																	{option}
+																	<BoldIcon width={8} height={11} />
 																</button>
-															))}
-														</div>
-													)}
-												</div>
-											</div>
-												</div>
 
-											</div>
-										)}
+																{/* Italic icon */}
+																<button
+																	type="button"
+																	onMouseDown={(e) => e.preventDefault()}
+																	onClick={() => applyManualFormatting('italic')}
+																	className={cn(
+																		'absolute left-[183px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer rounded-[4px]',
+																		'transition-[background-color,transform] duration-[80ms] ease-out',
+																		activeFormatting.italic
+																			? 'bg-[#B8C8E0]'
+																			: 'hover:bg-[#C5D3E8] hover:scale-[1.08] active:scale-100'
+																	)}
+																	aria-label="Italic"
+																>
+																	<ItalicIcon width={4} height={11} />
+																</button>
 
-										{selectedModeKey === 'hybrid' && (
-											<div className="w-full flex flex-col items-center -mt-2 max-[480px]:mt-0">
-												{/* Main content: 468 x 364 box (r=8) */}
-												<div
-													className={cn(
-														showTestPreview
-															? cn('w-[426px]', !forceDesktop && 'max-[480px]:w-[89.33vw]')
-															: cn(!forceDesktop ? 'w-[89.33vw]' : 'w-[468px]', 'max-w-[468px]'),
-														'min-h-[364px] rounded-[8px] border-[3px] border-black bg-[#8989E1] flex flex-col overflow-visible'
-													)}
-													data-hpi-hybrid-main-box
-												>
-													{/* Header: Body + power mode toggles */}
-													<div
-														className={cn(
-															'h-[27px] flex items-stretch rounded-t-[8px] overflow-hidden',
-															'bg-[#DADAFC]'
-														)}
-														data-hpi-hybrid-body-header
-													>
-														<div className="flex-1 flex items-center pl-[16px]">
-															<Typography
-																variant="h4"
-																className="font-inter font-semibold text-[17px] text-black"
-															>
-																Body
-															</Typography>
-														</div>
-														{selectedPowerMode === 'normal' && (
-															<div className="w-[1px] flex-shrink-0 bg-black" />
-														)}
-														<button
-															type="button"
-															onClick={() => setSelectedPowerMode('normal')}
-															className={cn(
-																'h-full flex items-center justify-center cursor-pointer border-0 p-0 m-0 flex-shrink-0 outline-none focus:outline-none whitespace-nowrap transition-[background-color,width] duration-75 ease-out',
-																selectedPowerMode === 'high' ? 'w-[108px]' : 'w-[132px]',
-																selectedPowerMode === 'normal' ? 'bg-[#BCBCF2]' : 'bg-transparent'
-															)}
-															aria-pressed={selectedPowerMode === 'normal'}
-														>
-															<span className="font-inter font-normal italic text-[14px] text-black">
-																{selectedPowerMode === 'high' ? 'Standard' : 'Standard Power'}
-															</span>
-														</button>
-														<div className="w-[1px] flex-shrink-0 bg-black" />
-														<button
-															type="button"
-															onClick={() => setSelectedPowerMode('high')}
-															className={cn(
-																'h-full flex items-center justify-center cursor-pointer border-0 p-0 m-0 flex-shrink-0 outline-none focus:outline-none whitespace-nowrap transition-[background-color,width] duration-75 ease-out',
-																selectedPowerMode === 'high' ? 'w-[100px]' : 'w-[46px]',
-																selectedPowerMode === 'high' ? 'bg-[#8989E1]' : 'bg-transparent'
-															)}
-															aria-pressed={selectedPowerMode === 'high'}
-														>
-															<span
-																className={cn(
-																	'font-inter font-normal italic text-[14px] transition-colors duration-75 ease-out',
-																	selectedPowerMode === 'high' ? 'text-white' : 'text-black'
-																)}
-															>
-																{selectedPowerMode === 'high' ? 'High Power' : 'High'}
-															</span>
-														</button>
-														{selectedPowerMode === 'high' && (
-															<div className="w-[1px] flex-shrink-0 bg-black" />
-														)}
-														<div className="w-[31px] flex-shrink-0" />
-													</div>
+																{/* Underline icon - top aligned with B/I, underline extends below */}
+																<button
+																	type="button"
+																	onMouseDown={(e) => e.preventDefault()}
+																	onClick={() => applyManualFormatting('underline')}
+																	className={cn(
+																		'absolute left-[207px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer rounded-[4px]',
+																		'transition-[background-color,transform] duration-[80ms] ease-out',
+																		activeFormatting.underline
+																			? 'bg-[#B8C8E0]'
+																			: 'hover:bg-[#C5D3E8] hover:scale-[1.08] active:scale-100'
+																	)}
+																	aria-label="Underline"
+																>
+																	<UnderlineIcon width={11} height={14} />
+																</button>
 
-													{/* Top content: Profile + Booking For */}
-													<div className="w-full px-[10px] pt-[14px] pb-[12px]">
-														<div className="w-[448px] max-w-full mx-auto flex flex-col items-start">
-															<div
-																className="w-full h-[104px] bg-white rounded-[8px] border-2 border-black px-2 pt-1 pb-2 overflow-y-auto overflow-x-hidden hide-native-scrollbar cursor-pointer"
-																role="button"
-																tabIndex={0}
-																aria-label="Open Profile"
-																onClick={(e) => {
-																	e.stopPropagation();
-																	setActiveTab('profile');
-																}}
-																onKeyDown={(e) => {
-																	if (e.key === 'Enter' || e.key === ' ') {
-																		e.preventDefault();
-																		e.stopPropagation();
-																		setActiveTab('profile');
+																{/* Bullet list icon */}
+																<button
+																	type="button"
+																	onMouseDown={(e) => e.preventDefault()}
+																	onClick={() =>
+																		applyManualFormatting('insertUnorderedList')
 																	}
-																}}
-															>
-																<div className="font-inter font-normal text-[13px] leading-[16px] text-black mb-[7px]">
-																	Profile
+																	className={cn(
+																		'absolute left-[236px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer rounded-[4px]',
+																		'transition-[background-color,transform] duration-[80ms] ease-out',
+																		activeFormatting.bulletList
+																			? 'bg-[#B8C8E0]'
+																			: 'hover:bg-[#C5D3E8] hover:scale-[1.08] active:scale-100'
+																	)}
+																	aria-label="Bullet list"
+																>
+																	<BulletListIcon width={15} height={11} />
+																</button>
+
+																{/* Text + background color picker */}
+																<div
+																	ref={colorPickerRef}
+																	className="absolute left-[260px] top-[4px] w-[32px] h-[24px] flex items-center justify-center"
+																>
+																	<button
+																		type="button"
+																		onMouseDown={(e) => e.preventDefault()}
+																		onClick={() => {
+																			// avoid overlapping dropdowns
+																			setIsFontDropdownOpen(false);
+																			setIsFontSizeDropdownOpen(false);
+																			setIsColorPickerOpen((v) => !v);
+																		}}
+																		className={cn(
+																			'w-[24px] h-[24px] flex items-center justify-center cursor-pointer rounded-[4px]',
+																			'transition-[background-color,transform] duration-[80ms] ease-out',
+																			isColorPickerOpen
+																				? 'bg-[#B8C8E0]'
+																				: 'hover:bg-[#C5D3E8] hover:scale-[1.08] active:scale-100'
+																		)}
+																		aria-label="Text & background color"
+																		aria-expanded={isColorPickerOpen}
+																	>
+																		<TextColorIcon width={11} height={14} />
+																	</button>
+
+																	{isColorPickerOpen && (
+																		<div className="absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 z-[9999]">
+																			<div className="flex gap-6 rounded-[8px] bg-[#E0E0E0] p-3">
+																				<div className="min-w-[150px]">
+																					<div className="mb-2 text-[12px] font-inter font-medium text-black/80">
+																						Background color
+																					</div>
+																					<div className="grid grid-cols-8 gap-[4px]">
+																						{MANUAL_EDITOR_COLOR_SWATCHES.map((color) =>
+																							(() => {
+																								const isSelected =
+																									(
+																										manualSelectedBgColor ?? ''
+																									).toLowerCase() === color.toLowerCase();
+																								return (
+																									<button
+																										key={`hpi-bg-${color}`}
+																										type="button"
+																										onMouseDown={(e) =>
+																											e.preventDefault()
+																										}
+																										onClick={() =>
+																											applyManualColor(
+																												'hiliteColor',
+																												color
+																											)
+																										}
+																										className={cn(
+																											'w-[14px] h-[14px] rounded-[2px] border border-black/10 hover:outline hover:outline-2 hover:outline-black/20',
+																											isSelected &&
+																												'ring-2 ring-black ring-offset-1 ring-offset-white border-transparent'
+																										)}
+																										style={{ backgroundColor: color }}
+																										aria-label={`Background ${color}`}
+																										aria-pressed={isSelected}
+																									/>
+																								);
+																							})()
+																						)}
+																					</div>
+																				</div>
+
+																				<div className="min-w-[150px]">
+																					<div className="mb-2 text-[12px] font-inter font-medium text-black/80">
+																						Text color
+																					</div>
+																					<div className="grid grid-cols-8 gap-[4px]">
+																						{MANUAL_EDITOR_COLOR_SWATCHES.map((color) =>
+																							(() => {
+																								const isSelected =
+																									(
+																										manualSelectedTextColor ?? ''
+																									).toLowerCase() === color.toLowerCase();
+																								return (
+																									<button
+																										key={`hpi-text-${color}`}
+																										type="button"
+																										onMouseDown={(e) =>
+																											e.preventDefault()
+																										}
+																										onClick={() =>
+																											applyManualColor('foreColor', color)
+																										}
+																										className={cn(
+																											'w-[14px] h-[14px] rounded-[2px] border border-black/10 hover:outline hover:outline-2 hover:outline-black/20',
+																											isSelected &&
+																												'ring-2 ring-black ring-offset-1 ring-offset-white border-transparent'
+																										)}
+																										style={{ backgroundColor: color }}
+																										aria-label={`Text ${color}`}
+																										aria-pressed={isSelected}
+																									/>
+																								);
+																							})()
+																						)}
+																					</div>
+																				</div>
+																			</div>
+																		</div>
+																	)}
 																</div>
-																<div className="flex flex-wrap gap-x-[6px] gap-y-[10px] content-start">
-																	{hybridProfileChipItems.map((chip) => (
-																		<span
-																			key={chip.key}
+
+																{/* Link icon button */}
+																<button
+																	type="button"
+																	onMouseDown={(e) => e.preventDefault()}
+																	onClick={openLinkPopover}
+																	className={cn(
+																		'absolute left-[295px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer rounded-[4px]',
+																		'transition-[background-color,transform] duration-[80ms] ease-out',
+																		isLinkPopoverOpen
+																			? 'bg-[#B8C8E0]'
+																			: 'hover:bg-[#C5D3E8] hover:scale-[1.08] active:scale-100'
+																	)}
+																	aria-label="Insert link"
+																>
+																	<svg
+																		width={18}
+																		height={18}
+																		viewBox="0 0 23 23"
+																		fill="none"
+																		xmlns="http://www.w3.org/2000/svg"
+																	>
+																		<path
+																			d="M3.0751 14.325C2.3251 13.575 1.8001 12.45 1.8001 11.25C1.8001 10.05 2.2501 8.99996 3.0751 8.17496C3.9001 7.34996 4.9501 6.89996 6.1501 6.89996H9.0001C9.3001 6.89996 9.5251 7.12497 9.5251 7.42497C9.5251 7.72497 9.30011 7.94996 9.00011 7.94996L6.1501 7.94997C5.2501 7.94997 4.5001 8.24996 3.8251 8.92496C3.1501 9.59996 2.8501 10.35 2.8501 11.25C2.8501 13.05 4.3501 14.55 6.0751 14.475H8.9251C9.2251 14.475 9.4501 14.7 9.4501 15C9.4501 15.3 9.22511 15.525 8.92511 15.525L6.0751 15.525C4.9501 15.6 3.9001 15.15 3.0751 14.325Z"
+																			fill="#231815"
+																		/>
+																		<path
+																			d="M13.3503 15.45C13.2753 15.375 13.1253 15.225 13.1253 15.075C13.1253 14.775 13.3503 14.55 13.6503 14.55L16.5003 14.55C18.3003 14.55 19.7253 13.125 19.7253 11.325C19.7253 9.52499 18.3003 8.09999 16.5003 8.09999L13.6503 8.09999C13.3503 8.09999 13.1253 7.87499 13.1253 7.57499C13.1253 7.27499 13.3503 7.04999 13.6503 7.04999L16.5003 7.04999C18.9003 7.04999 20.7753 8.92499 20.7753 11.325C20.7753 13.725 18.9003 15.6 16.5003 15.6H13.6503C13.5003 15.6 13.4253 15.525 13.3503 15.45Z"
+																			fill="#231815"
+																		/>
+																		<path
+																			d="M5.70029 11.7C5.62529 11.625 5.47529 11.475 5.47529 11.325C5.47529 11.025 5.70029 10.8 6.00029 10.8L16.3503 10.8C16.6503 10.8 16.8753 11.025 16.8753 11.325C16.8753 11.625 16.6503 11.85 16.3503 11.85L6.00029 11.85C6.00029 11.85 5.85029 11.85 5.70029 11.7Z"
+																			fill="#231815"
+																		/>
+																	</svg>
+																</button>
+
+																{/* Third divider (102px from right edge) */}
+																<div
+																	aria-hidden="true"
+																	className="absolute right-[102px] top-1/2 -translate-y-1/2 w-px h-[23px] bg-black"
+																/>
+
+																{/* Fill-ins section */}
+																<div
+																	ref={fillInsDropdownRef}
+																	className="absolute right-[24px] top-0 h-full flex items-center"
+																>
+																	<button
+																		type="button"
+																		onMouseDown={(e) => e.preventDefault()}
+																		onClick={() => {
+																			// Close other dropdowns
+																			setIsFontDropdownOpen(false);
+																			setIsFontSizeDropdownOpen(false);
+																			setIsColorPickerOpen(false);
+																			setIsFillInsDropdownOpen(!isFillInsDropdownOpen);
+																		}}
+																		className={cn(
+																			'h-[24px] flex items-center cursor-pointer bg-transparent border-0 px-[8px] rounded-[4px]',
+																			'transition-[background-color,transform] duration-[80ms] ease-out',
+																			'hover:bg-[#c9d4e8] hover:scale-[1.01] active:scale-100',
+																			isFillInsDropdownOpen && 'bg-[#c9d4e8]'
+																		)}
+																		aria-label="Fill-ins"
+																		aria-expanded={isFillInsDropdownOpen}
+																	>
+																		<span className="font-inter font-medium text-[14px] leading-none text-black">
+																			Fill-ins
+																		</span>
+																		<FontDropdownArrow className="!block pointer-events-none ml-[6px] !w-[8px] !h-[5px] relative top-[3px]" />
+																	</button>
+
+																	{/* Fill-ins dropdown menu */}
+																	{isFillInsDropdownOpen && (
+																		<div
 																			className={cn(
-																				'inline-flex items-center rounded-[5px] px-[5px] py-[0.5px] font-inter font-normal text-[10px] leading-[12px] text-black max-w-full whitespace-nowrap',
-																				chip.bgClass,
-																				chip.isEmpty && 'opacity-50'
+																				'absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 z-[9999]',
+																				'rounded-[8px] bg-[#E0E0E0] py-1 min-w-[100px] shadow-md'
 																			)}
 																		>
-																			{chip.text}
-																		</span>
-																	))}
+																			{FILL_IN_OPTIONS.map((option) => (
+																				<button
+																					key={option}
+																					type="button"
+																					onMouseDown={(e) => e.preventDefault()}
+																					onClick={() => insertFillIn(option)}
+																					className={cn(
+																						'w-full px-3 py-2 text-left text-[13px] font-inter',
+																						'hover:bg-gray-300 cursor-pointer',
+																						'text-black'
+																					)}
+																				>
+																					{option}
+																				</button>
+																			))}
+																		</div>
+																	)}
+																</div>
+															</div>
+														</div>
+													</div>
+												)}
+
+												{selectedModeKey === 'hybrid' && (
+													<div className="w-full flex flex-col items-center -mt-2 max-[480px]:mt-0">
+														{/* Main content: 468 x 364 box (r=8) */}
+														<div
+															className={cn(
+																showTestPreview
+																	? cn(
+																			'w-[426px]',
+																			!forceDesktop && 'max-[480px]:w-[89.33vw]'
+																		)
+																	: cn(
+																			!forceDesktop ? 'w-[89.33vw]' : 'w-[468px]',
+																			'max-w-[468px]'
+																		),
+																'relative min-h-[364px] rounded-[8px] border-[3px] border-black bg-[#8989E1] flex flex-col overflow-visible'
+															)}
+															data-hpi-hybrid-main-box
+														>
+															<ProfileCompletionDarkOverlay
+																opacity={hybridProfileSummary.darkOverlayOpacity}
+																className="rounded-[5px]"
+															/>
+															{/* Header: Body + power mode toggles */}
+															<div
+																className="h-[27px] flex items-stretch rounded-t-[8px] overflow-hidden bg-[#DADAFC]"
+																data-hpi-hybrid-body-header
+															>
+																<div className="flex-1 flex items-center pl-[16px]">
+																	<Typography
+																		variant="h4"
+																		className="font-inter font-semibold text-[17px] text-black"
+																	>
+																		Body
+																	</Typography>
+																</div>
+																{selectedPowerMode === 'normal' && (
+																	<div className="w-[1px] flex-shrink-0 bg-black" />
+																)}
+																<button
+																	type="button"
+																	onClick={() => setSelectedPowerMode('normal')}
+																	className={cn(
+																		'h-full flex items-center justify-center cursor-pointer border-0 p-0 m-0 flex-shrink-0 outline-none focus:outline-none whitespace-nowrap transition-[background-color,width] duration-75 ease-out',
+																		selectedPowerMode === 'high'
+																			? 'w-[108px]'
+																			: 'w-[132px]',
+																		selectedPowerMode === 'normal'
+																			? 'bg-[#BCBCF2]'
+																			: 'bg-transparent'
+																	)}
+																	aria-pressed={selectedPowerMode === 'normal'}
+																>
+																	<span className="font-inter font-normal italic text-[14px] text-black">
+																		{selectedPowerMode === 'high'
+																			? 'Standard'
+																			: 'Standard Power'}
+																	</span>
+																</button>
+																<div className="w-[1px] flex-shrink-0 bg-black" />
+																<button
+																	type="button"
+																	onClick={() => setSelectedPowerMode('high')}
+																	className={cn(
+																		'h-full flex items-center justify-center cursor-pointer border-0 p-0 m-0 flex-shrink-0 outline-none focus:outline-none whitespace-nowrap transition-[background-color,width] duration-75 ease-out',
+																		selectedPowerMode === 'high'
+																			? 'w-[100px]'
+																			: 'w-[46px]',
+																		selectedPowerMode === 'high'
+																			? 'bg-[#8989E1]'
+																			: 'bg-transparent'
+																	)}
+																	aria-pressed={selectedPowerMode === 'high'}
+																>
+																	<span
+																		className={cn(
+																			'font-inter font-normal italic text-[14px] transition-colors duration-75 ease-out',
+																			selectedPowerMode === 'high'
+																				? 'text-white'
+																				: 'text-black'
+																		)}
+																	>
+																		{selectedPowerMode === 'high' ? 'High Power' : 'High'}
+																	</span>
+																</button>
+																{selectedPowerMode === 'high' && (
+																	<div className="w-[1px] flex-shrink-0 bg-black" />
+																)}
+																<div className="w-[31px] flex-shrink-0" />
+															</div>
+
+															{/* Top content: Profile + Booking For */}
+															{/* Same 455.57px width as the Auto tab, centered within the body box (no horizontal
+												   padding) so it fills the width like Auto instead of overflowing / shifting right.
+												   The Intro/Research/CTA blocks below keep their own narrower inset layout. */}
+															<div className="w-full pt-[14px] pb-[12px]">
+																<div className="w-[455.57px] max-w-full mx-auto flex flex-col items-start">
+																	<ProfileSummaryBox
+																		summary={hybridProfileSummary}
+																		onOpen={handleOpenProfile}
+																	/>
+
+																	{/* Booking For */}
+																	<BookingForDropdownControl
+																		controller={hybridBookingForDropdown}
+																		useStaticDropdownPosition={useStaticDropdownPosition}
+																	/>
 																</div>
 															</div>
 
-															{/* Booking For */}
-															<BookingForDropdownControl
-																controller={hybridBookingForDropdown}
-																useStaticDropdownPosition={useStaticDropdownPosition}
-															/>
-														</div>
-													</div>
-
-													{/* Intro/Research/CTA area (153px tall; expands with content) */}
-													{/* Divider lines:
+															{/* Intro/Research/CTA area (153px tall; expands with content) */}
+															{/* Divider lines:
 													   - Bottom divider is 37px from the box bottom
 													   - Next divider is 153px above that (i.e., top of this region) */}
-													<div className="w-full bg-[#7D7DE7] min-h-[153px] border-t-[3px] border-[#0E0E7F]">
-														{/* Match the original Hybrid proportions: 448px inner box with 10px left inset */}
-														<div className="w-[448px] max-w-full mx-auto pl-[10px] pr-[5px] py-[14px]">
-															{(() => {
-																const introField = fields.find((f) => f.type === HybridBlock.introduction);
-																const researchField = fields.find((f) => f.type === HybridBlock.research);
-																const actionField = fields.find((f) => f.type === HybridBlock.action);
+															<div className="w-full bg-[#7D7DE7] min-h-[153px] border-t-[3px] border-[#0E0E7F]">
+																{/* Match the original Hybrid proportions: 448px inner box with 10px left inset */}
+																<div className="w-[448px] max-w-full mx-auto pl-[10px] pr-[5px] py-[14px]">
+																	{(() => {
+																		const introField = fields.find(
+																			(f) => f.type === HybridBlock.introduction
+																		);
+																		const researchField = fields.find(
+																			(f) => f.type === HybridBlock.research
+																		);
+																		const actionField = fields.find(
+																			(f) => f.type === HybridBlock.action
+																		);
 
-																const introId = introField?.id;
-																const researchId = researchField?.id;
-																const actionId = actionField?.id;
+																		const introId = introField?.id;
+																		const researchId = researchField?.id;
+																		const actionId = actionField?.id;
 
-																const openOrCreateTextAfter = (coreType: HybridBlock) => {
-																	setExpandedHybridCoreBlockId(null);
-																	const coreIndex = fields.findIndex((f) => f.type === coreType);
-																	if (coreIndex === -1) return;
-																	const next = fields[coreIndex + 1];
-																	if (next?.type === HybridBlock.text) {
-																		setHybridStructureSelection({ kind: 'block', blockId: next.id });
-																		setExpandedHybridTextBlockId(next.id);
-																		return;
-																	}
-																	const newId = handleAddTextBlockAt(coreIndex);
-																	setHybridStructureSelection({ kind: 'block', blockId: newId });
-																	setExpandedHybridTextBlockId(newId);
-																};
+																		const openOrCreateTextAfter = (
+																			coreType: HybridBlock
+																		) => {
+																			setExpandedHybridCoreBlockId(null);
+																			const coreIndex = fields.findIndex(
+																				(f) => f.type === coreType
+																			);
+																			if (coreIndex === -1) return;
+																			const next = fields[coreIndex + 1];
+																			if (next?.type === HybridBlock.text) {
+																				setHybridStructureSelection({
+																					kind: 'block',
+																					blockId: next.id,
+																				});
+																				setExpandedHybridTextBlockId(next.id);
+																				return;
+																			}
+																			const newId = handleAddTextBlockAt(coreIndex);
+																			setHybridStructureSelection({
+																				kind: 'block',
+																				blockId: newId,
+																			});
+																			setExpandedHybridTextBlockId(newId);
+																		};
 
-																const getImmediateTextAfter = (coreType: HybridBlock) => {
-																	const coreIndex = fields.findIndex((f) => f.type === coreType);
-																	if (coreIndex === -1) return null;
-																	const next = fields[coreIndex + 1];
-																	return next?.type === HybridBlock.text ? next : null;
-																};
+																		const getImmediateTextAfter = (
+																			coreType: HybridBlock
+																		) => {
+																			const coreIndex = fields.findIndex(
+																				(f) => f.type === coreType
+																			);
+																			if (coreIndex === -1) return null;
+																			const next = fields[coreIndex + 1];
+																			return next?.type === HybridBlock.text
+																				? next
+																				: null;
+																		};
 
-																const introText = getImmediateTextAfter(HybridBlock.introduction);
-																const researchText = getImmediateTextAfter(HybridBlock.research);
-																const actionText = getImmediateTextAfter(HybridBlock.action);
+																		const introText = getImmediateTextAfter(
+																			HybridBlock.introduction
+																		);
+																		const researchText = getImmediateTextAfter(
+																			HybridBlock.research
+																		);
+																		const actionText = getImmediateTextAfter(
+																			HybridBlock.action
+																		);
 
-																const shouldHideAddTextButtons = isHybridStructureExpanded;
+																		const shouldHideAddTextButtons =
+																			isHybridStructureExpanded;
 
-																const AddTextGap = ({
-																	height,
-																	onClick,
-																	ghostOffsetY = 0,
-																}: {
-																	height: number;
-																	onClick: () => void;
-																	ghostOffsetY?: number;
-																}) => {
-																	const gapRef = useRef<HTMLDivElement | null>(null);
+																		const AddTextGap = ({
+																			height,
+																			onClick,
+																			ghostOffsetY = 0,
+																		}: {
+																			height: number;
+																			onClick: () => void;
+																			ghostOffsetY?: number;
+																		}) => {
+																			const gapRef = useRef<HTMLDivElement | null>(null);
 
-																	return (
-																		<div
-																			ref={gapRef}
-																			className="group relative w-full overflow-visible"
-																			style={{ height }}
-																		>
-																			{/* Hover target starts at pill edge (150px) so it won't interfere with pills.
+																			return (
+																				<div
+																					ref={gapRef}
+																					className="group relative w-full overflow-visible"
+																					style={{ height }}
+																				>
+																					{/* Hover target starts at pill edge (150px) so it won't interfere with pills.
 																			   This prevents the "+ Text" ghost from appearing when simply moving through vertical spacing. */}
-																			<div
-																				aria-hidden="true"
-																				className="absolute left-[150px] top-0 w-[140px] h-[36px] z-0"
-																				onMouseEnter={() => {
-																					if (shouldHideAddTextButtons) return;
-																					if (!gapRef.current) return;
-																					handleGapEnter(gapRef.current, ghostOffsetY);
-																				}}
-																				onMouseLeave={() => setIsGhostVisible(false)}
-																			>
-																				<button
-																					type="button"
-																					disabled={shouldHideAddTextButtons}
-																					onClick={() => {
-																						if (shouldHideAddTextButtons) return;
-																						setIsGhostVisible(false);
-																						onClick();
-																					}}
-																					className={cn(
-																						// Place the button 17px to the right of the 150px pill:
-																						// pillWidth (150) + gap (17) = 167px
-																						'absolute left-[17px] top-1/2 -translate-y-1/2 z-10',
-																						'w-[57px] h-[22px] rounded-[4px] border border-[#0B741A] bg-[#9EDDB6]',
-																						'flex items-center justify-center gap-[5px] box-border',
-																						'opacity-0 pointer-events-auto cursor-pointer', // Always invisible; ghost is the visible affordance
-																						shouldHideAddTextButtons && 'pointer-events-none',
-																						'font-inter font-medium text-[12px] leading-none text-black'
-																					)}
-																					style={
-																						ghostOffsetY
-																							? { top: `calc(50% + ${ghostOffsetY}px)` }
-																							: undefined
-																					}
-																					aria-label="Add Text"
-																				>
-																					<span className="text-[12px] leading-[12px]">+</span>
-																					<span className="text-[12px] leading-[12px]">Text</span>
-																				</button>
-																			</div>
-																		</div>
-																	);
-																};
-
-																const CoreBlockButton = ({
-																	id,
-																	label,
-																	bgColor,
-																	borderColor,
-																	advancedOffBadgeColor,
-																	placeholder,
-																}: {
-																	id: string;
-																	label: string;
-																	bgColor: string;
-																	borderColor: string;
-																	advancedOffBadgeColor: string;
-																	placeholder: string;
-																}) => {
-																	const idx = fields.findIndex((f) => f.id === id);
-																	const isDraftExcluded =
-																		idx >= 0 ? Boolean(fields[idx]?.isCollapsed) : false;
-																	const isOpen =
-																		expandedHybridCoreBlockId === id && !isDraftExcluded;
-																	const initialValue =
-																		idx >= 0
-																			? ((form.getValues(`hybridBlockPrompts.${idx}.value`) as string) || '')
-																			: '';
-																	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-																	const commitCoreValue = () => {
-																		if (idx < 0) return;
-																		const nextValue = textareaRef.current?.value;
-																		if (nextValue === undefined) return;
-																		form.setValue(`hybridBlockPrompts.${idx}.value`, nextValue, {
-																			shouldDirty: true,
-																		});
-																	};
-																	const collapseCoreBlock = () => {
-																		// The textarea is intentionally uncontrolled (defaultValue + onBlur).
-																		// Collapsing on pointer down can unmount before blur fires, so commit first.
-																		commitCoreValue();
-																		setExpandedHybridCoreBlockId(null);
-																	};
-
-																	if (!isOpen) {
-																		return (
-																			<div className="relative w-[150px] max-w-full h-[28px] overflow-visible">
-																				<button
-																					type="button"
-																					onMouseEnter={() => setIsGhostVisible(false)}
-																					onClick={() => {
-																						setIsGhostVisible(false);
-																						setExpandedHybridTextBlockId(null);
-																						// If this block is excluded from drafting, clicking anywhere re-enables it.
-																						if (isDraftExcluded) {
-																							setExpandedHybridCoreBlockId(null);
-																							handleToggleCollapse(id);
-																							return;
-																						}
-																						setHybridStructureSelection({
-																							kind: 'block',
-																							blockId: id,
-																						});
-																						setExpandedHybridCoreBlockId(id);
-																					}}
-																					className={cn(
-																						'peer group relative h-[28px] w-full cursor-pointer select-none',
-																						'rounded-[8px] border-[3px]',
-																						'flex items-center justify-start pl-3 pr-[36px]',
-																						'font-inter font-medium text-[14px] leading-none text-black'
-																					)}
-																					style={{
-																						backgroundColor: isDraftExcluded ? 'transparent' : bgColor,
-																						borderColor: isDraftExcluded ? '#000000' : borderColor,
-																					}}
-																				>
-																					<span className="whitespace-nowrap">{label}</span>
-																					<span
+																					<div
 																						aria-hidden="true"
-																						className={cn(
-																							'absolute right-[8px] top-1/2 -translate-y-1/2',
-																							// Match other Hybrid pills: only show the badge on hover/focus.
-																							'opacity-0 pointer-events-none',
-																							'group-hover:opacity-100 group-hover:pointer-events-auto',
-																							'group-focus-visible:opacity-100 group-focus-visible:pointer-events-auto',
-																							'transition-opacity'
-																						)}
-																						onMouseDown={(e) => {
-																							// Prevent focus + click from triggering open/close on the parent button.
-																							e.preventDefault();
-																							e.stopPropagation();
+																						className="absolute left-[150px] top-0 w-[140px] h-[36px] z-0"
+																						onMouseEnter={() => {
+																							if (shouldHideAddTextButtons) return;
+																							if (!gapRef.current) return;
+																							handleGapEnter(
+																								gapRef.current,
+																								ghostOffsetY
+																							);
 																						}}
-																						onClick={(e) => {
-																							e.preventDefault();
-																							e.stopPropagation();
-																							setIsGhostVisible(false);
-																							setExpandedHybridTextBlockId(null);
-																							setExpandedHybridCoreBlockId(null);
-																							handleToggleCollapse(id);
-																						}}
+																						onMouseLeave={() => setIsGhostVisible(false)}
 																					>
-																						<span
-																							className="flex h-[18px] w-[18px] items-center justify-center rounded-[5px]"
+																						<button
+																							type="button"
+																							disabled={shouldHideAddTextButtons}
+																							onClick={() => {
+																								if (shouldHideAddTextButtons) return;
+																								setIsGhostVisible(false);
+																								onClick();
+																							}}
+																							className={cn(
+																								// Place the button 17px to the right of the 150px pill:
+																								// pillWidth (150) + gap (17) = 167px
+																								'absolute left-[17px] top-1/2 -translate-y-1/2 z-10',
+																								'w-[57px] h-[22px] rounded-[4px] border border-[#0B741A] bg-[#9EDDB6]',
+																								'flex items-center justify-center gap-[5px] box-border',
+																								'opacity-0 pointer-events-auto cursor-pointer', // Always invisible; ghost is the visible affordance
+																								shouldHideAddTextButtons &&
+																									'pointer-events-none',
+																								'font-inter font-medium text-[12px] leading-none text-black'
+																							)}
+																							style={
+																								ghostOffsetY
+																									? {
+																											top: `calc(50% + ${ghostOffsetY}px)`,
+																										}
+																									: undefined
+																							}
+																							aria-label="Add Text"
+																						>
+																							<span className="text-[12px] leading-[12px]">
+																								+
+																							</span>
+																							<span className="text-[12px] leading-[12px]">
+																								Text
+																							</span>
+																						</button>
+																					</div>
+																				</div>
+																			);
+																		};
+
+																		const CoreBlockButton = ({
+																			id,
+																			label,
+																			bgColor,
+																			borderColor,
+																			advancedOffBadgeColor,
+																			placeholder,
+																		}: {
+																			id: string;
+																			label: string;
+																			bgColor: string;
+																			borderColor: string;
+																			advancedOffBadgeColor: string;
+																			placeholder: string;
+																		}) => {
+																			const idx = fields.findIndex((f) => f.id === id);
+																			const isDraftExcluded =
+																				idx >= 0
+																					? Boolean(fields[idx]?.isCollapsed)
+																					: false;
+																			const isOpen =
+																				expandedHybridCoreBlockId === id &&
+																				!isDraftExcluded;
+																			const initialValue =
+																				idx >= 0
+																					? (form.getValues(
+																							`hybridBlockPrompts.${idx}.value`
+																						) as string) || ''
+																					: '';
+																			const textareaRef =
+																				useRef<HTMLTextAreaElement | null>(null);
+																			const commitCoreValue = () => {
+																				if (idx < 0) return;
+																				const nextValue = textareaRef.current?.value;
+																				if (nextValue === undefined) return;
+																				form.setValue(
+																					`hybridBlockPrompts.${idx}.value`,
+																					nextValue,
+																					{
+																						shouldDirty: true,
+																					}
+																				);
+																			};
+																			const collapseCoreBlock = () => {
+																				// The textarea is intentionally uncontrolled (defaultValue + onBlur).
+																				// Collapsing on pointer down can unmount before blur fires, so commit first.
+																				commitCoreValue();
+																				setExpandedHybridCoreBlockId(null);
+																			};
+
+																			if (!isOpen) {
+																				return (
+																					<div className="relative w-[150px] max-w-full h-[28px] overflow-visible">
+																						<button
+																							type="button"
+																							onMouseEnter={() =>
+																								setIsGhostVisible(false)
+																							}
+																							onClick={() => {
+																								setIsGhostVisible(false);
+																								setExpandedHybridTextBlockId(null);
+																								// If this block is excluded from drafting, clicking anywhere re-enables it.
+																								if (isDraftExcluded) {
+																									setExpandedHybridCoreBlockId(null);
+																									handleToggleCollapse(id);
+																									return;
+																								}
+																								setHybridStructureSelection({
+																									kind: 'block',
+																									blockId: id,
+																								});
+																								setExpandedHybridCoreBlockId(id);
+																							}}
+																							className={cn(
+																								'peer group relative h-[28px] w-full cursor-pointer select-none',
+																								'rounded-[8px] border-[3px]',
+																								'flex items-center justify-start pl-3 pr-[36px]',
+																								'font-inter font-medium text-[14px] leading-none text-black'
+																							)}
 																							style={{
-																								// Disabled state: make the 18x18 badge much lower opacity,
-																								// while keeping the plus icon crisp/black.
 																								backgroundColor: isDraftExcluded
-																									? 'rgba(202, 202, 255, 0.25)'
-																									: advancedOffBadgeColor,
+																									? 'transparent'
+																									: bgColor,
+																								borderColor: isDraftExcluded
+																									? '#000000'
+																									: borderColor,
 																							}}
 																						>
-																							{isDraftExcluded ? (
-																								<span className="relative block w-[10px] h-[10px]">
-																									<span className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-black" />
-																									<span className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[2px] bg-black" />
+																							<span className="whitespace-nowrap">
+																								{label}
+																							</span>
+																							<span
+																								aria-hidden="true"
+																								className={cn(
+																									'absolute right-[8px] top-1/2 -translate-y-1/2',
+																									// Match other Hybrid pills: only show the badge on hover/focus.
+																									'opacity-0 pointer-events-none',
+																									'group-hover:opacity-100 group-hover:pointer-events-auto',
+																									'group-focus-visible:opacity-100 group-focus-visible:pointer-events-auto',
+																									'transition-opacity'
+																								)}
+																								onMouseDown={(e) => {
+																									// Prevent focus + click from triggering open/close on the parent button.
+																									e.preventDefault();
+																									e.stopPropagation();
+																								}}
+																								onClick={(e) => {
+																									e.preventDefault();
+																									e.stopPropagation();
+																									setIsGhostVisible(false);
+																									setExpandedHybridTextBlockId(null);
+																									setExpandedHybridCoreBlockId(null);
+																									handleToggleCollapse(id);
+																								}}
+																							>
+																								<span
+																									className="flex h-[18px] w-[18px] items-center justify-center rounded-[5px]"
+																									style={{
+																										// Disabled state: make the 18x18 badge much lower opacity,
+																										// while keeping the plus icon crisp/black.
+																										backgroundColor: isDraftExcluded
+																											? 'rgba(202, 202, 255, 0.25)'
+																											: advancedOffBadgeColor,
+																									}}
+																								>
+																									{isDraftExcluded ? (
+																										<span className="relative block w-[10px] h-[10px]">
+																											<span className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-black" />
+																											<span className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[2px] bg-black" />
+																										</span>
+																									) : (
+																										<span className="block w-[10px] h-[2px] bg-black rounded-[1px]" />
+																									)}
 																								</span>
-																							) : (
-																								<span className="block w-[10px] h-[2px] bg-black rounded-[1px]" />
-																							)}
-																						</span>
-																					</span>
-																				</button>
-																				{!isDraftExcluded && (
-																					<span
-																						aria-hidden="true"
-																						className={cn(
-																							'pointer-events-none absolute left-full top-1/2 -translate-y-1/2',
-																							'ml-[28px]',
-																							'opacity-0 peer-hover:opacity-100',
-																							'transition-opacity',
-																							'font-inter font-medium text-[14px] leading-none text-black whitespace-nowrap'
+																							</span>
+																						</button>
+																						{!isDraftExcluded && (
+																							<span
+																								aria-hidden="true"
+																								className={cn(
+																									'pointer-events-none absolute left-full top-1/2 -translate-y-1/2',
+																									'ml-[28px]',
+																									'opacity-0 peer-hover:opacity-100',
+																									'transition-opacity',
+																									'font-inter font-medium text-[14px] leading-none text-black whitespace-nowrap'
+																								)}
+																							>
+																								Advanced off
+																							</span>
 																						)}
-																					>
-																						Advanced off
-																					</span>
-																				)}
-																			</div>
-																		);
-																	}
+																					</div>
+																				);
+																			}
 
-																	return (
-																		<div
-																			className="w-[429px] max-w-full rounded-[8px] border-[3px] overflow-hidden"
-																			style={{ backgroundColor: bgColor, borderColor }}
-																		>
-																			<button
-																				type="button"
-																				onMouseDown={(e) => {
-																					e.stopPropagation();
-																					collapseCoreBlock();
-																				}}
-																				onClick={(e) => {
-																					// Keep keyboard activation working (Enter/Space triggers click, not mousedown).
-																					e.stopPropagation();
-																					collapseCoreBlock();
-																				}}
-																				className="w-full h-[28px] flex items-center justify-between px-3 cursor-pointer select-none"
-																				aria-label={`Collapse ${label}`}
-																			>
-																				<span className="font-inter font-medium text-[14px] leading-none text-black">
-																					{label}
-																				</span>
-																				<span
-																					aria-hidden="true"
-																					className="block w-[12px] h-[2px] bg-black rounded-[1px]"
-																				/>
-																			</button>
-																			<div className="h-[2px] bg-black" />
-																			<div className="bg-white">
-																				<Textarea
-																					ref={textareaRef}
-																					placeholder={placeholder}
-																					className={cn(
-																						'h-[72px] w-full border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
-																						'bg-white px-3 py-2 resize-none overflow-y-auto',
-																						'font-inter text-[12px] leading-[14px] text-black'
-																					)}
-																					onMouseDown={(e) => e.stopPropagation()}
-																					autoFocus
-																					defaultValue={initialValue}
-																					onBlur={(e) => {
-																						if (idx < 0) return;
-																						form.setValue(
-																							`hybridBlockPrompts.${idx}.value`,
-																							e.target.value,
-																							{ shouldDirty: true }
-																						);
+																			return (
+																				<div
+																					className="w-[429px] max-w-full rounded-[8px] border-[3px] overflow-hidden"
+																					style={{
+																						backgroundColor: bgColor,
+																						borderColor,
 																					}}
-																				/>
-																			</div>
-																		</div>
-																	);
-																};
-
-																const TextBlock = ({ id }: { id: string }) => {
-																	const isOpen = expandedHybridTextBlockId === id;
-																	const idx = fields.findIndex((f) => f.id === id);
-																	const initialValue =
-																		idx >= 0
-																			? ((form.getValues(`hybridBlockPrompts.${idx}.value`) as string) || '')
-																			: '';
-
-																	if (!isOpen) {
-																		return (
-																			<div
-																				role="button"
-																				tabIndex={0}
-																				onClick={() => {
-																					setIsGhostVisible(false);
-																					setExpandedHybridCoreBlockId(null);
-																					setHybridStructureSelection({ kind: 'block', blockId: id });
-																					setExpandedHybridTextBlockId(id);
-																				}}
-																				onKeyDown={(e) => {
-																					if (e.key === 'Enter' || e.key === ' ') {
-																						e.preventDefault();
-																						setIsGhostVisible(false);
-																						setExpandedHybridCoreBlockId(null);
-																						setHybridStructureSelection({
-																							kind: 'block',
-																							blockId: id,
-																						});
-																						setExpandedHybridTextBlockId(id);
-																					}
-																				}}
-																				className={cn(
-																					'relative h-[28px] cursor-pointer select-none',
-																					'w-[150px] hover:w-[429px] transition-none',
-																					'rounded-[8px] border-[3px] border-[#0B741A] bg-[#A6E2A8]',
-																					'flex items-center justify-start px-3',
-																					'font-inter font-medium text-[14px] leading-none text-black',
-																					'group/hybrid-structure-text-pill'
-																				)}
-																			>
-																				<span className="pr-[56px]">Text</span>
-																				<div className="hidden group-hover/hybrid-structure-text-pill:flex items-center gap-[8px] absolute right-[8px] top-1/2 -translate-y-1/2">
+																				>
 																					<button
 																						type="button"
-																						onClick={(e) => {
+																						onMouseDown={(e) => {
 																							e.stopPropagation();
-																							handleRemoveBlock(id);
+																							collapseCoreBlock();
 																						}}
-																						className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0 text-black"
-																						aria-label="Delete Text block"
-																					>
-																						<CloseIcon width={7} height={7} />
-																					</button>
-																					<button
-																						type="button"
 																						onClick={(e) => {
+																							// Keep keyboard activation working (Enter/Space triggers click, not mousedown).
 																							e.stopPropagation();
+																							collapseCoreBlock();
+																						}}
+																						className="w-full h-[28px] flex items-center justify-between px-3 cursor-pointer select-none"
+																						aria-label={`Collapse ${label}`}
+																					>
+																						<span className="font-inter font-medium text-[14px] leading-none text-black">
+																							{label}
+																						</span>
+																						<span
+																							aria-hidden="true"
+																							className="block w-[12px] h-[2px] bg-black rounded-[1px]"
+																						/>
+																					</button>
+																					<div className="h-[2px] bg-black" />
+																					<div className="bg-white">
+																						<Textarea
+																							ref={textareaRef}
+																							placeholder={placeholder}
+																							className={cn(
+																								'h-[72px] w-full border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
+																								'bg-white px-3 py-2 resize-none overflow-y-auto',
+																								'font-inter text-[12px] leading-[14px] text-black'
+																							)}
+																							onMouseDown={(e) => e.stopPropagation()}
+																							autoFocus
+																							defaultValue={initialValue}
+																							onBlur={(e) => {
+																								if (idx < 0) return;
+																								form.setValue(
+																									`hybridBlockPrompts.${idx}.value`,
+																									e.target.value,
+																									{ shouldDirty: true }
+																								);
+																							}}
+																						/>
+																					</div>
+																				</div>
+																			);
+																		};
+
+																		const TextBlock = ({ id }: { id: string }) => {
+																			const isOpen = expandedHybridTextBlockId === id;
+																			const idx = fields.findIndex((f) => f.id === id);
+																			const initialValue =
+																				idx >= 0
+																					? (form.getValues(
+																							`hybridBlockPrompts.${idx}.value`
+																						) as string) || ''
+																					: '';
+
+																			if (!isOpen) {
+																				return (
+																					<div
+																						role="button"
+																						tabIndex={0}
+																						onClick={() => {
+																							setIsGhostVisible(false);
 																							setExpandedHybridCoreBlockId(null);
 																							setHybridStructureSelection({
 																								kind: 'block',
@@ -6769,863 +7525,981 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																							});
 																							setExpandedHybridTextBlockId(id);
 																						}}
-																						className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0"
-																						aria-label="Expand Text block"
+																						onKeyDown={(e) => {
+																							if (e.key === 'Enter' || e.key === ' ') {
+																								e.preventDefault();
+																								setIsGhostVisible(false);
+																								setExpandedHybridCoreBlockId(null);
+																								setHybridStructureSelection({
+																									kind: 'block',
+																									blockId: id,
+																								});
+																								setExpandedHybridTextBlockId(id);
+																							}
+																						}}
+																						className={cn(
+																							'relative h-[28px] cursor-pointer select-none',
+																							'w-[150px] hover:w-[429px] transition-none',
+																							'rounded-[8px] border-[3px] border-[#0B741A] bg-[#A6E2A8]',
+																							'flex items-center justify-start px-3',
+																							'font-inter font-medium text-[14px] leading-none text-black',
+																							'group/hybrid-structure-text-pill'
+																						)}
 																					>
-																						<svg
-																							width="7"
-																							height="5"
-																							viewBox="0 0 7 5"
-																							fill="none"
-																							xmlns="http://www.w3.org/2000/svg"
-																						>
-																							<path
-																								d="M0.796875 0.796875L3.12021 3.34412L5.44355 0.796875"
-																								stroke="black"
-																								strokeWidth="1.59374"
-																								strokeLinecap="round"
-																								strokeLinejoin="round"
-																							/>
-																						</svg>
-																					</button>
+																						<span className="pr-[56px]">Text</span>
+																						<div className="hidden group-hover/hybrid-structure-text-pill:flex items-center gap-[8px] absolute right-[8px] top-1/2 -translate-y-1/2">
+																							<button
+																								type="button"
+																								onClick={(e) => {
+																									e.stopPropagation();
+																									handleRemoveBlock(id);
+																								}}
+																								className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0 text-black"
+																								aria-label="Delete Text block"
+																							>
+																								<CloseIcon width={7} height={7} />
+																							</button>
+																							<button
+																								type="button"
+																								onClick={(e) => {
+																									e.stopPropagation();
+																									setExpandedHybridCoreBlockId(null);
+																									setHybridStructureSelection({
+																										kind: 'block',
+																										blockId: id,
+																									});
+																									setExpandedHybridTextBlockId(id);
+																								}}
+																								className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0"
+																								aria-label="Expand Text block"
+																							>
+																								<svg
+																									width="7"
+																									height="5"
+																									viewBox="0 0 7 5"
+																									fill="none"
+																									xmlns="http://www.w3.org/2000/svg"
+																								>
+																									<path
+																										d="M0.796875 0.796875L3.12021 3.34412L5.44355 0.796875"
+																										stroke="black"
+																										strokeWidth="1.59374"
+																										strokeLinecap="round"
+																										strokeLinejoin="round"
+																									/>
+																								</svg>
+																							</button>
+																						</div>
+																					</div>
+																				);
+																			}
+
+																			return (
+																				<div className="w-[429px] max-w-full rounded-[8px] border-[3px] border-[#0B741A] overflow-hidden bg-[#A6E2A8]">
+																					<div className="h-[28px] flex items-center justify-between px-3">
+																						<span className="font-inter font-medium text-[14px] text-black">
+																							Text
+																						</span>
+																						<div className="flex items-center gap-[8px]">
+																							<button
+																								type="button"
+																								onMouseDown={(e) => {
+																									e.stopPropagation();
+																									setExpandedHybridTextBlockId(null);
+																									handleRemoveBlock(id);
+																								}}
+																								className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0 text-black"
+																								aria-label="Delete Text block"
+																							>
+																								<CloseIcon width={7} height={7} />
+																							</button>
+																							<button
+																								type="button"
+																								onMouseDown={(e) => {
+																									e.stopPropagation();
+																									setExpandedHybridTextBlockId(null);
+																								}}
+																								className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0"
+																								aria-label="Collapse Text block"
+																							>
+																								<span
+																									aria-hidden="true"
+																									className="block w-[12px] h-[2px] bg-black rounded-[1px]"
+																								/>
+																							</button>
+																						</div>
+																					</div>
+																					<div className="h-[2px] bg-black" />
+																					<div className="bg-white">
+																						<Textarea
+																							placeholder="Type anything you want to include"
+																							className={cn(
+																								'h-[72px] w-full border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
+																								'bg-white px-3 py-2 resize-none overflow-y-auto',
+																								'font-inter text-[12px] leading-[14px] text-black'
+																							)}
+																							onMouseDown={(e) => e.stopPropagation()}
+																							autoFocus
+																							defaultValue={initialValue}
+																							onBlur={(e) => {
+																								if (idx < 0) return;
+																								form.setValue(
+																									`hybridBlockPrompts.${idx}.value`,
+																									e.target.value,
+																									{ shouldDirty: true }
+																								);
+																							}}
+																						/>
+																					</div>
 																				</div>
+																			);
+																		};
+
+																		return (
+																			<div
+																				ref={hybridContainerRef}
+																				className="w-full flex flex-col items-start relative"
+																				onMouseLeave={handleContainerLeave}
+																			>
+																				{/* Sliding Ghost Button */}
+																				<div
+																					aria-hidden="true"
+																					className={cn(
+																						'absolute left-[167px] z-20 pointer-events-none',
+																						'w-[57px] h-[22px] rounded-[4px] border border-[#0B741A] bg-[#9EDDB6]',
+																						'flex items-center justify-center gap-[5px] box-border',
+																						'font-inter font-medium text-[12px] leading-none text-black',
+																						'transition-all duration-200 ease-out', // Smooth sliding
+																						!shouldHideAddTextButtons && isGhostVisible
+																							? 'opacity-100 scale-100'
+																							: 'opacity-0 scale-95'
+																					)}
+																					style={{
+																						top: ghostTop ?? 0,
+																					}}
+																				>
+																					<span className="text-[12px] leading-[12px]">
+																						+
+																					</span>
+																					<span className="text-[12px] leading-[12px]">
+																						Text
+																					</span>
+																				</div>
+
+																				{/* Intro */}
+																				{introId ? (
+																					<CoreBlockButton
+																						id={introId}
+																						label="Intro"
+																						bgColor="#DADAFC"
+																						borderColor="#6673FF"
+																						advancedOffBadgeColor="#CACAFF"
+																						placeholder="Automated Intro"
+																					/>
+																				) : null}
+
+																				{/* Intro -> Research slot */}
+																				{introText ? (
+																					<>
+																						<div className="h-[12px]" />
+																						<TextBlock id={introText.id} />
+																						<div className="h-[12px]" />
+																					</>
+																				) : (
+																					<AddTextGap
+																						height={12}
+																						onClick={() =>
+																							openOrCreateTextAfter(
+																								HybridBlock.introduction
+																							)
+																						}
+																					/>
+																				)}
+
+																				{/* Research */}
+																				{researchId ? (
+																					<CoreBlockButton
+																						id={researchId}
+																						label="Research"
+																						bgColor="#C7C7FF"
+																						borderColor="#1010E7"
+																						advancedOffBadgeColor="#B6B6F6"
+																						placeholder="Automated Research on who you’re sending to"
+																					/>
+																				) : null}
+
+																				{/* Research -> Call to Action slot */}
+																				{researchText ? (
+																					<>
+																						<div className="h-[12px]" />
+																						<TextBlock id={researchText.id} />
+																						<div className="h-[12px]" />
+																					</>
+																				) : (
+																					<AddTextGap
+																						height={12}
+																						onClick={() =>
+																							openOrCreateTextAfter(HybridBlock.research)
+																						}
+																					/>
+																				)}
+
+																				{/* Call to Action */}
+																				{actionId ? (
+																					<CoreBlockButton
+																						id={actionId}
+																						label="Call to Action"
+																						bgColor="#A0A0D5"
+																						borderColor="#0E0E7F"
+																						advancedOffBadgeColor="#9797D6"
+																						placeholder="Automated Call to Action"
+																					/>
+																				) : null}
+
+																				{/* CTA -> Signature slot */}
+																				{actionText ? (
+																					<>
+																						<div className="h-[15px]" />
+																						<TextBlock id={actionText.id} />
+																						<div className="h-[15px]" />
+																					</>
+																				) : (
+																					<AddTextGap
+																						height={15}
+																						ghostOffsetY={-4}
+																						onClick={() =>
+																							openOrCreateTextAfter(HybridBlock.action)
+																						}
+																					/>
+																				)}
 																			</div>
 																		);
-																	}
+																	})()}
+																</div>
+															</div>
 
-																	return (
-																		<div className="w-[429px] max-w-full rounded-[8px] border-[3px] border-[#0B741A] overflow-hidden bg-[#A6E2A8]">
-																			<div className="h-[28px] flex items-center justify-between px-3">
-																				<span className="font-inter font-medium text-[14px] text-black">
-																					Text
-																				</span>
-																				<div className="flex items-center gap-[8px]">
-																					<button
-																						type="button"
-																						onMouseDown={(e) => {
-																							e.stopPropagation();
-																							setExpandedHybridTextBlockId(null);
-																							handleRemoveBlock(id);
-																						}}
-																						className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0 text-black"
-																						aria-label="Delete Text block"
+															{/* Bottom buffer strip (keeps the panel from needing to scroll when blocks expand) */}
+															<div
+																className={cn(
+																	'w-full bg-[#8989E1] border-t-[3px] border-[#0E0E7F] rounded-b-[8px]',
+																	'h-[37px]'
+																)}
+															/>
+														</div>
+
+														{/* Signature (Auto-tab UI; outside the Body box) */}
+														{!showTestPreview && (
+															<div
+																className={cn(
+																	!forceDesktop ? 'w-[89.33vw]' : 'w-[468px]',
+																	'max-w-[468px] mx-auto',
+																	'mt-[16px]',
+																	'h-[97px] flex flex-col'
+																)}
+																data-hpi-hybrid-signature-auto
+															>
+																{isAutoSignature ? (
+																	<div className="flex items-center">
+																		<div
+																			onClick={() => setIsAutoSignature(false)}
+																			onMouseLeave={handleSignatureHoverLeave}
+																			className="relative w-[465px] max-[480px]:w-full transition-none flex items-center"
+																		>
+																			<div
+																				ref={autoSignaturePillRef}
+																				onMouseEnter={handleSignatureHoverEnter}
+																				className={cn(
+																					'flex items-center justify-center h-[25px] rounded-[10px] border-2 border-black overflow-hidden w-[122px]',
+																					!forceDesktop && 'max-[480px]:h-[24px]'
+																				)}
+																				style={{ backgroundColor: '#E0E0E0' }}
+																			>
+																				<div className="flex items-center justify-center">
+																					<span
+																						ref={autoSignatureAutoWordRef}
+																						aria-hidden="true"
+																						className={cn(
+																							'inline-block overflow-hidden whitespace-nowrap text-black',
+																							'font-inter font-medium text-[18px] max-[480px]:text-[12px]',
+																							'w-0 opacity-0'
+																						)}
 																					>
-																						<CloseIcon width={7} height={7} />
-																					</button>
-																					<button
-																						type="button"
-																						onMouseDown={(e) => {
-																							e.stopPropagation();
-																							setExpandedHybridTextBlockId(null);
-																						}}
-																						className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0"
-																						aria-label="Collapse Text block"
-																					>
-																						<span
-																							aria-hidden="true"
-																							className="block w-[12px] h-[2px] bg-black rounded-[1px]"
-																						/>
-																					</button>
+																						Auto
+																					</span>
+																					<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black">
+																						Signature
+																					</span>
 																				</div>
 																			</div>
-																			<div className="h-[2px] bg-black" />
-																			<div className="bg-white">
-																				<Textarea
-																					placeholder="Type anything you want to include"
+																			<div
+																				ref={autoSignatureControlsRef}
+																				className="flex items-center h-[25px] ml-[13px] max-[480px]:ml-[12px] opacity-0 pointer-events-none"
+																			>
+																				<div
 																					className={cn(
-																						'h-[72px] w-full border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
-																						'bg-white px-3 py-2 resize-none overflow-y-auto',
-																						'font-inter text-[12px] leading-[14px] text-black'
+																						'flex items-center h-[25px] w-[292px] rounded-[5px] bg-[#74D177] overflow-hidden pl-[7px] pr-[10px]',
+																						'gap-[14px]',
+																						!forceDesktop &&
+																							'max-[480px]:h-[24px] max-[480px]:w-auto max-[480px]:flex-1 max-[480px]:min-w-0'
 																					)}
-																					onMouseDown={(e) => e.stopPropagation()}
-																					autoFocus
-																					defaultValue={initialValue}
-																					onBlur={(e) => {
-																						if (idx < 0) return;
-																						form.setValue(
-																							`hybridBlockPrompts.${idx}.value`,
-																							e.target.value,
-																							{ shouldDirty: true }
-																						);
-																					}}
-																				/>
+																				>
+																					<button
+																						type="button"
+																						data-hover-description="click to disable automatic drafting for this and write your own"
+																						onClick={() => setIsAutoSignature(false)}
+																						className="flex items-center justify-center h-[17px] w-[33px] rounded-[8px] bg-[#79DF7C] border-2 border-black text-[11px] leading-none font-inter font-normal text-black"
+																						aria-label="Auto Signature on"
+																					>
+																						on
+																					</button>
+																					<div className="flex-1 min-w-0 h-full flex items-center">
+																						<span
+																							className={cn(
+																								'text-black text-[13px] leading-none truncate relative -top-[1px]',
+																								!forceDesktop && 'max-[480px]:text-[10px]'
+																							)}
+																						>
+																							Write manual signature here
+																						</span>
+																					</div>
+																				</div>
 																			</div>
+																		</div>
+																	</div>
+																) : (
+																	<div
+																		className="w-full h-[97px] rounded-[8px] border-2 border-black overflow-hidden flex flex-col"
+																		onMouseLeave={() => {
+																			if (!manualSignatureValue.trim()) {
+																				setManualSignatureValue('');
+																				setIsAutoSignature(true);
+																			}
+																		}}
+																	>
+																		<div className="flex items-center h-[31px] shrink-0 bg-[#8DDF90]">
+																			<div className="pl-2 flex items-center h-full shrink-0 w-[120px] bg-[#8DDF90]">
+																				<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
+																					Signature
+																				</span>
+																			</div>
+																			<button
+																				type="button"
+																				data-hover-description="Turn back on automated drafting for here"
+																				onClick={() => {
+																					setIsAutoSignature(true);
+																					setManualSignatureValue('');
+																				}}
+																				className="relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0 w-[80px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8]"
+																			>
+																				<span className="absolute left-0 h-full border-l-2 border-black" />
+																				<span>Auto off</span>
+																				<span className="absolute right-0 h-full border-r-2 border-black" />
+																			</button>
+																			<div className="flex-grow h-full bg-[#8DDF90]" />
+																		</div>
+																		<div className="w-full h-[2px] bg-black shrink-0" />
+																		<div className="flex-1 bg-white">
+																			<Textarea
+																				value={manualSignatureValue}
+																				onChange={(e) =>
+																					setManualSignatureValue(e.target.value)
+																				}
+																				ref={signatureManualTextareaRef}
+																				className="w-full h-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none !text-black placeholder:!text-[#9E9E9E] font-inter text-[14px]"
+																				placeholder="Write manual signature here"
+																			/>
+																		</div>
+																	</div>
+																)}
+															</div>
+														)}
+
+														{/* Hybrid: Generate Test button — 26px below Signature (desktop) */}
+														{!hideGenerateTestButton &&
+															!showTestPreview &&
+															!compactLeftOnly && (
+																<div
+																	className={cn(
+																		'mt-[26px]',
+																		'w-[468px] flex items-center justify-center',
+																		!forceDesktop && 'max-w-[89.33vw] max-[480px]:hidden'
+																	)}
+																>
+																	<Button
+																		type="button"
+																		data-hover-description="This will show you a test draft, given all of what you provided"
+																		onClick={() => {
+																			if (isMobile) {
+																				setShowTestPreview?.(true);
+																			} else {
+																				onTestPreviewToggle?.(true);
+																			}
+																			handleGenerateTestDrafts?.();
+																			setHasAttemptedTest(true);
+																		}}
+																		disabled={isGenerateTestButtonDisabled}
+																		className={cn(
+																			'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[12px] cursor-pointer flex items-center justify-center p-0 border-2 border-transparent',
+																			isGeneratingTest
+																				? 'transition-colors bg-[#A2E9A4] hover:bg-[#A2E9A4] active:bg-[#A2E9A4] cursor-default'
+																				: 'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
+																			isGenerateTestButtonDisabled
+																				? isGeneratingTest
+																					? '!opacity-100'
+																					: 'opacity-50 cursor-not-allowed'
+																				: 'opacity-100'
+																		)}
+																	>
+																		{isGeneratingTest ? null : 'Generate Test'}
+																	</Button>
+																</div>
+															)}
+													</div>
+												)}
+
+												{selectedModeKey !== 'manual' && selectedModeKey !== 'hybrid' && (
+													<>
+														{fields.length === 0 && (
+															<span className="text-gray-300 font-primary text-[12px]">
+																Add blocks here to build your prompt...
+															</span>
+														)}
+														<SortableContext
+															items={fields.map((f) => f.id)}
+															strategy={verticalListSortingStrategy}
+														>
+															{(() => {
+																const orderedHybridTypes = [
+																	HybridBlock.introduction,
+																	HybridBlock.research,
+																	HybridBlock.action,
+																];
+																const presentHybridTypes = new Set(
+																	fields
+																		.filter(
+																			(f) =>
+																				f.type === HybridBlock.introduction ||
+																				f.type === HybridBlock.research ||
+																				f.type === HybridBlock.action
+																		)
+																		.map((f) => f.type)
+																);
+
+																// Placeholders are only relevant in Hybrid mode; this list is rendered only in non-hybrid modes.
+																const shouldShowPlaceholders = false;
+																const missingHybridTypes = shouldShowPlaceholders
+																	? orderedHybridTypes.filter(
+																			(t) => !presentHybridTypes.has(t)
+																		)
+																	: [];
+
+																const inserted = new Set<string>();
+																const augmented: Array<
+																	| {
+																			kind: 'field';
+																			field: (typeof fields)[number];
+																			index: number;
+																	  }
+																	| {
+																			kind: 'placeholder';
+																			blockType: HybridBlock;
+																			key: string;
+																	  }
+																> = [];
+
+																for (let index = 0; index < fields.length; index++) {
+																	const field = fields[index];
+																	if (
+																		field.type === HybridBlock.introduction ||
+																		field.type === HybridBlock.research ||
+																		field.type === HybridBlock.action
+																	) {
+																		const currentIdx = orderedHybridTypes.indexOf(
+																			field.type
+																		);
+																		for (let i = 0; i < currentIdx; i++) {
+																			const t = orderedHybridTypes[i];
+																			if (
+																				missingHybridTypes.includes(t) &&
+																				!inserted.has(`ph-${t}`)
+																			) {
+																				augmented.push({
+																					kind: 'placeholder',
+																					blockType: t,
+																					key: `ph-${t}-${index}`,
+																				});
+																				inserted.add(`ph-${t}`);
+																			}
+																		}
+																	}
+																	augmented.push({ kind: 'field', field, index });
+																}
+
+																for (const t of orderedHybridTypes) {
+																	if (
+																		missingHybridTypes.includes(t) &&
+																		!inserted.has(`ph-${t}`)
+																	) {
+																		augmented.push({
+																			kind: 'placeholder',
+																			blockType: t,
+																			key: `ph-${t}-end`,
+																		});
+																		inserted.add(`ph-${t}`);
+																	}
+																}
+
+																const renderHybridPlaceholder = (type: HybridBlock) => {
+																	const label =
+																		type === HybridBlock.introduction
+																			? 'Intro'
+																			: type === HybridBlock.research
+																				? 'Research'
+																				: 'CTA';
+																	const borderColor =
+																		type === HybridBlock.introduction
+																			? '#6673FF'
+																			: type === HybridBlock.research
+																				? '#1010E7'
+																				: '#0E0E7F';
+																	return (
+																		<div
+																			className={cn(
+																				'flex justify-end',
+																				showTestPreview
+																					? 'w-[426px] max-[480px]:w-[89.8vw]'
+																					: 'w-[93.7vw] max-w-[475px]'
+																			)}
+																		>
+																			<Button
+																				type="button"
+																				onClick={() => handleAddBlock(getBlock(type))}
+																				font="secondary"
+																				className="w-[76px] h-[30px] bg-background hover:bg-primary/20 active:bg-primary/20 border-2 rounded-[8px] !font-normal text-[10px] text-gray-600 inline-flex items-center justify-start gap-[4px] pl-[4px]"
+																				style={{ borderColor }}
+																				title={`Add ${label}`}
+																			>
+																				<TinyPlusIcon
+																					width="8px"
+																					height="8px"
+																					className="!w-[8px] !h-[8px]"
+																				/>
+																				<span className="font-inter font-medium text-[10px] text-[#0A0A0A]">
+																					{label}
+																				</span>
+																			</Button>
 																		</div>
 																	);
 																};
 
-																return (
-																	<div
-																		ref={hybridContainerRef}
-																		className="w-full flex flex-col items-start relative"
-																		onMouseLeave={handleContainerLeave}
-																	>
-																		{/* Sliding Ghost Button */}
-																		<div
-																			aria-hidden="true"
-																			className={cn(
-																				'absolute left-[167px] z-20 pointer-events-none',
-																				'w-[57px] h-[22px] rounded-[4px] border border-[#0B741A] bg-[#9EDDB6]',
-																				'flex items-center justify-center gap-[5px] box-border',
-																				'font-inter font-medium text-[12px] leading-none text-black',
-																				'transition-all duration-200 ease-out', // Smooth sliding
-																				!shouldHideAddTextButtons && isGhostVisible
-																					? 'opacity-100 scale-100'
-																					: 'opacity-0 scale-95'
-																			)}
-																			style={{
-																				top: ghostTop ?? 0,
-																			}}
+																return augmented.map((item) => {
+																	if (item.kind === 'placeholder') {
+																		return (
+																			<Fragment key={item.key}>
+																				{renderHybridPlaceholder(item.blockType)}
+																			</Fragment>
+																		);
+																	}
+
+																	const field = item.field;
+																	const index = item.index;
+																	const isHybridBlock =
+																		field.type === HybridBlock.introduction ||
+																		field.type === HybridBlock.research ||
+																		field.type === HybridBlock.action;
+																	const isFullAutomatedField =
+																		field.type === HybridBlock.full_automated;
+																	const hasImmediateTextBlock =
+																		fields[index + 1]?.type === HybridBlock.text;
+
+																	return (
+																		<Fragment
+																			key={
+																				isFullAutomatedField ? 'full_automated' : field.id
+																			}
 																		>
-																			<span className="text-[12px] leading-[12px]">+</span>
-																			<span className="text-[12px] leading-[12px]">Text</span>
-																		</div>
-
-																		{/* Intro */}
-																		{introId ? (
-																			<CoreBlockButton
-																				id={introId}
-																				label="Intro"
-																				bgColor="#DADAFC"
-																				borderColor="#6673FF"
-																				advancedOffBadgeColor="#CACAFF"
-																				placeholder="Automated Intro"
-																			/>
-																		) : null}
-
-																		{/* Intro -> Research slot */}
-																		{introText ? (
-																			<>
-																				<div className="h-[12px]" />
-																				<TextBlock id={introText.id} />
-																				<div className="h-[12px]" />
-																			</>
-																		) : (
-																			<AddTextGap
-																				height={12}
-																				onClick={() =>
-																					openOrCreateTextAfter(HybridBlock.introduction)
-																				}
-																			/>
-																		)}
-
-																		{/* Research */}
-																		{researchId ? (
-																			<CoreBlockButton
-																				id={researchId}
-																				label="Research"
-																				bgColor="#C7C7FF"
-																				borderColor="#1010E7"
-																				advancedOffBadgeColor="#B6B6F6"
-																				placeholder="Automated Research on who you’re sending to"
-																			/>
-																		) : null}
-
-																		{/* Research -> Call to Action slot */}
-																		{researchText ? (
-																			<>
-																				<div className="h-[12px]" />
-																				<TextBlock id={researchText.id} />
-																				<div className="h-[12px]" />
-																			</>
-																		) : (
-																			<AddTextGap
-																				height={12}
-																				onClick={() => openOrCreateTextAfter(HybridBlock.research)}
-																			/>
-																		)}
-
-																		{/* Call to Action */}
-																		{actionId ? (
-																			<CoreBlockButton
-																				id={actionId}
-																				label="Call to Action"
-																				bgColor="#A0A0D5"
-																				borderColor="#0E0E7F"
-																				advancedOffBadgeColor="#9797D6"
-																				placeholder="Automated Call to Action"
-																			/>
-																		) : null}
-
-																		{/* CTA -> Signature slot */}
-																		{actionText ? (
-																			<>
-																				<div className="h-[15px]" />
-																				<TextBlock id={actionText.id} />
-																				<div className="h-[15px]" />
-																			</>
-																		) : (
-																			<AddTextGap
-																				height={15}
-																				ghostOffsetY={-4}
-																				onClick={() => openOrCreateTextAfter(HybridBlock.action)}
-																			/>
-																		)}
-																	</div>
-																);
-															})()}
-														</div>
-													</div>
-
-													{/* Bottom buffer strip (keeps the panel from needing to scroll when blocks expand) */}
-													<div
-														className={cn(
-															'w-full bg-[#8989E1] border-t-[3px] border-[#0E0E7F] rounded-b-[8px]',
-															'h-[37px]'
-														)}
-													/>
-												</div>
-
-												{/* Signature (Auto-tab UI; outside the Body box) */}
-												{!showTestPreview && (
-												<div
-													className={cn(
-														!forceDesktop ? 'w-[89.33vw]' : 'w-[468px]',
-														'max-w-[468px] mx-auto',
-														'mt-[16px]',
-														'h-[97px] flex flex-col'
-													)}
-													data-hpi-hybrid-signature-auto
-												>
-													{isAutoSignature ? (
-														<div className="flex items-center">
-															<div
-																onClick={() => setIsAutoSignature(false)}
-																onMouseLeave={handleSignatureHoverLeave}
-																className="relative w-[465px] max-[480px]:w-full transition-none flex items-center"
-															>
-																<div
-																	ref={autoSignaturePillRef}
-																	onMouseEnter={handleSignatureHoverEnter}
-																	className={cn(
-																		'flex items-center justify-center h-[25px] rounded-[10px] border-2 border-black overflow-hidden w-[122px]',
-																		!forceDesktop && 'max-[480px]:h-[24px]'
-																	)}
-																	style={{ backgroundColor: '#E0E0E0' }}
-																>
-																	<div className="flex items-center justify-center">
-																		<span
-																			ref={autoSignatureAutoWordRef}
-																			aria-hidden="true"
-																			className={cn(
-																				'inline-block overflow-hidden whitespace-nowrap text-black',
-																				'font-inter font-medium text-[18px] max-[480px]:text-[12px]',
-																				'w-0 opacity-0'
-																			)}
-																		>
-																			Auto
-																		</span>
-																		<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black">
-																			Signature
-																		</span>
-																	</div>
-																</div>
-																<div
-																	ref={autoSignatureControlsRef}
-																	className="flex items-center h-[25px] ml-[13px] max-[480px]:ml-[12px] opacity-0 pointer-events-none"
-																>
-																	<div
-																		className={cn(
-																			'flex items-center h-[25px] w-[292px] rounded-[5px] bg-[#74D177] overflow-hidden pl-[7px] pr-[10px]',
-																			'gap-[14px]',
-																			!forceDesktop &&
-																				'max-[480px]:h-[24px] max-[480px]:w-auto max-[480px]:flex-1 max-[480px]:min-w-0'
-																		)}
-																	>
-																		<button
-																			type="button"
-																			data-hover-description="click to disable automatic drafting for this and write your own"
-																			onClick={() => setIsAutoSignature(false)}
-																			className="flex items-center justify-center h-[17px] w-[33px] rounded-[8px] bg-[#79DF7C] border-2 border-black text-[11px] leading-none font-inter font-normal text-black"
-																			aria-label="Auto Signature on"
-																		>
-																			on
-																		</button>
-																		<div className="flex-1 min-w-0 h-full flex items-center">
-																			<span
+																			<div
 																				className={cn(
-																					'text-black text-[13px] leading-none truncate relative -top-[1px]',
-																					!forceDesktop && 'max-[480px]:text-[10px]'
+																					index === 0 && '-mt-2 max-[480px]:mt-0'
 																				)}
 																			>
-																				Write manual signature here
-																			</span>
+																				<SortableAIBlock
+																					id={field.id}
+																					fieldIndex={index}
+																					block={getBlock(field.type)}
+																					onRemove={handleRemoveBlock}
+																					onCollapse={handleToggleCollapse}
+																					onExpand={handleToggleCollapse}
+																					isCollapsed={field.isCollapsed}
+																					trackFocusedField={trackFocusedField}
+																					showTestPreview={showTestPreview}
+																					testMessage={testMessage}
+																					onGetSuggestions={onGetSuggestions}
+																					promptQualityScore={promptQualityScore}
+																					promptQualityLabel={promptQualityLabel}
+																					onUpscalePrompt={onUpscalePrompt}
+																					isUpscalingPrompt={isUpscalingPrompt}
+																					hasPreviousPrompt={hasPreviousPrompt}
+																					onUndoUpscalePrompt={onUndoUpscalePrompt}
+																					defaultOpenCustomInstructions={
+																						field.type === HybridBlock.full_automated
+																							? props.defaultOpenFullAutoCustomInstructions
+																							: undefined
+																					}
+																					onCustomInstructionsOpenChange={
+																						field.type === HybridBlock.full_automated
+																							? handleCustomInstructionsOpenChange
+																							: undefined
+																					}
+																					profileFields={profileFields}
+																					onGoToProfileTab={handleOpenProfile}
+																					isDragDisabled={isHybridModeSelected}
+																					useStaticDropdownPosition={
+																						useStaticDropdownPosition
+																					}
+																					forceDesktop={forceDesktop}
+																				/>
+																			</div>
+																			{/* Plus button under hybrid blocks */}
+																			{isHybridBlock && !hasImmediateTextBlock && (
+																				<div
+																					className={cn(
+																						'flex relative z-[70]',
+																						showTestPreview
+																							? 'justify-start w-full'
+																							: cn(
+																									'justify-end -mr-[85px] max-w-[475px]',
+																									!forceDesktop
+																										? 'w-[93.7vw] max-[480px]:-mr-[2vw]'
+																										: 'w-full'
+																								)
+																					)}
+																					style={{ transform: 'translateY(-12px)' }}
+																				>
+																					<Button
+																						type="button"
+																						onClick={() => handleAddTextBlockAt(index)}
+																						className={cn(
+																							cn(
+																								'w-[52px] h-[20px] bg-background hover:bg-stone-100 active:bg-stone-200 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600',
+																								!forceDesktop &&
+																									'max-[480px]:translate-x-[6px]'
+																							),
+																							showTestPreview &&
+																								'absolute left-0 -translate-x-[calc(100%+5px)]'
+																						)}
+																						title="Text block"
+																					>
+																						<TinyPlusIcon
+																							width="5px"
+																							height="5px"
+																							className="!w-[8px] !h-[8px]"
+																						/>
+																						<span className="font-secondary">Text</span>
+																					</Button>
+																				</div>
+																			)}
+																		</Fragment>
+																	);
+																});
+															})()}
+														</SortableContext>
+														{/* Auto mode: Signature indicator sits directly under the Full Auto Body block */}
+														{selectedModeKey === 'full' && (
+															<div
+																className={cn(
+																	showTestPreview
+																		? cn(
+																				'w-[426px]',
+																				!forceDesktop && 'max-[480px]:w-[89.33vw]'
+																			)
+																		: cn(
+																				!forceDesktop ? 'w-[89.33vw]' : 'w-[468px]',
+																				'max-w-[468px]',
+																				'mx-auto'
+																			),
+																	'h-[97px] flex flex-col'
+																)}
+																data-hpi-signature-auto
+															>
+																{isAutoSignature ? (
+																	<div className="flex items-center">
+																		<div
+																			onClick={() => {
+																				// Click anywhere on the hover UI -> switch to manual.
+																				// If the user doesn't type anything and moves away, we snap back to auto (handled in manual view).
+																				setIsAutoSignature(false);
+																			}}
+																			onMouseLeave={handleSignatureHoverLeave}
+																			className={cn(
+																				// Keep-open hover zone includes the gap + green box (but only the pill triggers expansion).
+																				'relative w-[465px] max-[480px]:w-full transition-none flex items-center'
+																			)}
+																		>
+																			{/* Auto Signature pill - animates on hover */}
+																			<div
+																				ref={autoSignaturePillRef}
+																				onMouseEnter={handleSignatureHoverEnter}
+																				className={cn(
+																					cn(
+																						'flex items-center justify-center h-[25px] rounded-[10px] border-2 border-black overflow-hidden w-[122px]',
+																						!forceDesktop && 'max-[480px]:h-[24px]'
+																					)
+																				)}
+																				style={{ backgroundColor: '#E0E0E0' }}
+																			>
+																				<div className="flex items-center justify-center">
+																					<span
+																						ref={autoSignatureAutoWordRef}
+																						aria-hidden="true"
+																						className={cn(
+																							'inline-block overflow-hidden whitespace-nowrap text-black',
+																							'font-inter font-medium text-[18px] max-[480px]:text-[12px]',
+																							'w-0 opacity-0'
+																						)}
+																					>
+																						Auto
+																					</span>
+																					<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black">
+																						Signature
+																					</span>
+																				</div>
+																			</div>
+
+																			{/* Expanded controls - fades in with "Auto" */}
+																			<div
+																				ref={autoSignatureControlsRef}
+																				className="flex items-center h-[25px] ml-[13px] max-[480px]:ml-[12px] opacity-0 pointer-events-none"
+																			>
+																				{/* 292x25 manual signature bar (bg #74D177, r=5) */}
+																				<div
+																					className={cn(
+																						'flex items-center h-[25px] w-[292px] rounded-[5px] bg-[#74D177] overflow-hidden pl-[7px] pr-[10px]',
+																						'gap-[14px]',
+																						!forceDesktop &&
+																							'max-[480px]:h-[24px] max-[480px]:w-auto max-[480px]:flex-1 max-[480px]:min-w-0'
+																					)}
+																				>
+																					{/* 33x17 toggle pill (r=8, bg #79DF7C) */}
+																					<button
+																						type="button"
+																						data-hover-description="click to disable automatic drafting for this and write your own"
+																						onClick={() => setIsAutoSignature(false)}
+																						className={cn(
+																							'flex items-center justify-center h-[17px] w-[33px] rounded-[8px] bg-[#79DF7C] border-2 border-black',
+																							'text-[11px] leading-none font-inter font-normal text-black subject-toggle'
+																						)}
+																						aria-label="Auto Signature on"
+																					>
+																						on
+																					</button>
+
+																					<div className="flex-1 min-w-0 h-full flex items-center">
+																						<span
+																							className={cn(
+																								'text-black text-[13px] leading-none truncate relative -top-[1px]',
+																								!forceDesktop && 'max-[480px]:text-[10px]'
+																							)}
+																						>
+																							Write manual signature here
+																						</span>
+																					</div>
+																				</div>
+																			</div>
 																		</div>
 																	</div>
-																</div>
-															</div>
-														</div>
-													) : (
-														<div
-															className="w-full h-[97px] rounded-[8px] border-2 border-black overflow-hidden flex flex-col"
-															onMouseLeave={() => {
-																if (!manualSignatureValue.trim()) {
-																	setManualSignatureValue('');
-																	setIsAutoSignature(true);
-																}
-															}}
-														>
-															<div className="flex items-center h-[31px] shrink-0 bg-[#8DDF90]">
-																<div className="pl-2 flex items-center h-full shrink-0 w-[120px] bg-[#8DDF90]">
-																	<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
-																		Signature
-																	</span>
-																</div>
-																<button
-																	type="button"
-																	data-hover-description="Turn back on automated drafting for here"
-																	onClick={() => {
-																		setIsAutoSignature(true);
-																		setManualSignatureValue('');
-																	}}
-																	className="relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0 w-[80px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8]"
-																>
-																	<span className="absolute left-0 h-full border-l-2 border-black" />
-																	<span>Auto off</span>
-																	<span className="absolute right-0 h-full border-r-2 border-black" />
-																</button>
-																<div className="flex-grow h-full bg-[#8DDF90]" />
-															</div>
-															<div className="w-full h-[2px] bg-black shrink-0" />
-															<div className="flex-1 bg-white">
-																<Textarea
-																	value={manualSignatureValue}
-																	onChange={(e) => setManualSignatureValue(e.target.value)}
-																	ref={signatureManualTextareaRef}
-																	className="w-full h-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none !text-black placeholder:!text-[#9E9E9E] font-inter text-[14px]"
-																	placeholder="Write manual signature here"
-																/>
-															</div>
-														</div>
-													)}
-												</div>
-												)}
-
-												{/* Hybrid: Generate Test button — 26px below Signature (desktop) */}
-												{!hideGenerateTestButton && !showTestPreview && !compactLeftOnly && (
-													<div
-														className={cn(
-															'mt-[26px]',
-															'w-[468px] flex items-center justify-center',
-															!forceDesktop && 'max-w-[89.33vw] max-[480px]:hidden'
-														)}
-													>
-														<Button
-															type="button"
-															data-hover-description="This will show you a test draft, given all of what you provided"
-															onClick={() => {
-																if (isMobile) {
-																	setShowTestPreview?.(true);
-																} else {
-																	onTestPreviewToggle?.(true);
-																}
-																handleGenerateTestDrafts?.();
-																setHasAttemptedTest(true);
-															}}
-															disabled={isGenerateTestButtonDisabled}
-															className={cn(
-																'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[12px] cursor-pointer flex items-center justify-center p-0 border-2 border-transparent',
-																isGeneratingTest
-																	? 'transition-colors bg-[#A2E9A4] hover:bg-[#A2E9A4] active:bg-[#A2E9A4] cursor-default'
-																	: 'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
-																isGenerateTestButtonDisabled
-																	? isGeneratingTest
-																		? '!opacity-100'
-																		: 'opacity-50 cursor-not-allowed'
-																	: 'opacity-100'
-															)}
-														>
-															{isGeneratingTest ? null : 'Generate Test'}
-														</Button>
-													</div>
-												)}
-											</div>
-										)}
-
-										{selectedModeKey !== 'manual' && selectedModeKey !== 'hybrid' && (
-											<>
-										{fields.length === 0 && (
-											<span className="text-gray-300 font-primary text-[12px]">
-												Add blocks here to build your prompt...
-											</span>
-										)}
-										<SortableContext
-											items={fields.map((f) => f.id)}
-											strategy={verticalListSortingStrategy}
-										>
-												{(() => {
-													const orderedHybridTypes = [
-														HybridBlock.introduction,
-														HybridBlock.research,
-														HybridBlock.action,
-													];
-													const presentHybridTypes = new Set(
-														fields
-															.filter(
-																(f) =>
-																	f.type === HybridBlock.introduction ||
-																	f.type === HybridBlock.research ||
-																	f.type === HybridBlock.action
-															)
-															.map((f) => f.type)
-													);
-
-													// Placeholders are only relevant in Hybrid mode; this list is rendered only in non-hybrid modes.
-													const shouldShowPlaceholders = false;
-													const missingHybridTypes = shouldShowPlaceholders
-														? orderedHybridTypes.filter((t) => !presentHybridTypes.has(t))
-														: [];
-
-													const inserted = new Set<string>();
-													const augmented: Array<
-														| {
-																kind: 'field';
-																field: (typeof fields)[number];
-																index: number;
-														  }
-														| { kind: 'placeholder'; blockType: HybridBlock; key: string }
-													> = [];
-
-													for (let index = 0; index < fields.length; index++) {
-														const field = fields[index];
-														if (
-															field.type === HybridBlock.introduction ||
-															field.type === HybridBlock.research ||
-															field.type === HybridBlock.action
-														) {
-															const currentIdx = orderedHybridTypes.indexOf(field.type);
-															for (let i = 0; i < currentIdx; i++) {
-																const t = orderedHybridTypes[i];
-																if (
-																	missingHybridTypes.includes(t) &&
-																	!inserted.has(`ph-${t}`)
-																) {
-																	augmented.push({
-																		kind: 'placeholder',
-																		blockType: t,
-																		key: `ph-${t}-${index}`,
-																	});
-																	inserted.add(`ph-${t}`);
-																}
-															}
-														}
-														augmented.push({ kind: 'field', field, index });
-													}
-
-													for (const t of orderedHybridTypes) {
-														if (
-															missingHybridTypes.includes(t) &&
-															!inserted.has(`ph-${t}`)
-														) {
-															augmented.push({
-																kind: 'placeholder',
-																blockType: t,
-																key: `ph-${t}-end`,
-															});
-															inserted.add(`ph-${t}`);
-														}
-													}
-
-													const renderHybridPlaceholder = (type: HybridBlock) => {
-														const label =
-															type === HybridBlock.introduction
-																? 'Intro'
-																: type === HybridBlock.research
-																? 'Research'
-																: 'CTA';
-														const borderColor =
-															type === HybridBlock.introduction
-																? '#6673FF'
-																: type === HybridBlock.research
-																? '#1010E7'
-																: '#0E0E7F';
-														return (
-															<div
-																className={cn(
-																	'flex justify-end',
-																	showTestPreview
-																		? 'w-[426px] max-[480px]:w-[89.8vw]'
-																		: 'w-[93.7vw] max-w-[475px]'
-																)}
-															>
-																<Button
-																	type="button"
-																	onClick={() => handleAddBlock(getBlock(type))}
-																	font="secondary"
-																	className="w-[76px] h-[30px] bg-background hover:bg-primary/20 active:bg-primary/20 border-2 rounded-[8px] !font-normal text-[10px] text-gray-600 inline-flex items-center justify-start gap-[4px] pl-[4px]"
-																	style={{ borderColor }}
-																	title={`Add ${label}`}
-																>
-																	<TinyPlusIcon
-																		width="8px"
-																		height="8px"
-																		className="!w-[8px] !h-[8px]"
-																	/>
-																	<span className="font-inter font-medium text-[10px] text-[#0A0A0A]">
-																		{label}
-																	</span>
-																</Button>
-															</div>
-														);
-													};
-
-													return augmented.map((item) => {
-														if (item.kind === 'placeholder') {
-															return (
-																<Fragment key={item.key}>
-																	{renderHybridPlaceholder(item.blockType)}
-																</Fragment>
-															);
-														}
-
-														const field = item.field;
-														const index = item.index;
-														const isHybridBlock =
-															field.type === HybridBlock.introduction ||
-															field.type === HybridBlock.research ||
-															field.type === HybridBlock.action;
-														const isFullAutomatedField =
-															field.type === HybridBlock.full_automated;
-														const hasImmediateTextBlock =
-															fields[index + 1]?.type === HybridBlock.text;
-
-														return (
-															<Fragment key={isFullAutomatedField ? 'full_automated' : field.id}>
-																<div
-																	className={cn(index === 0 && '-mt-2 max-[480px]:mt-0')}
-																>
-																	<SortableAIBlock
-																		id={field.id}
-																		fieldIndex={index}
-																		block={getBlock(field.type)}
-																		onRemove={handleRemoveBlock}
-																		onCollapse={handleToggleCollapse}
-																		onExpand={handleToggleCollapse}
-																		isCollapsed={field.isCollapsed}
-																		trackFocusedField={trackFocusedField}
-																		showTestPreview={showTestPreview}
-																		testMessage={testMessage}
-																		onGetSuggestions={onGetSuggestions}
-																		promptQualityScore={promptQualityScore}
-																		promptQualityLabel={promptQualityLabel}
-																		onUpscalePrompt={onUpscalePrompt}
-																		isUpscalingPrompt={isUpscalingPrompt}
-																		hasPreviousPrompt={hasPreviousPrompt}
-																		onUndoUpscalePrompt={onUndoUpscalePrompt}
-																		defaultOpenCustomInstructions={
-																			field.type === HybridBlock.full_automated
-																				? props.defaultOpenFullAutoCustomInstructions
-																				: undefined
-																		}
-																		onCustomInstructionsOpenChange={
-																			field.type === HybridBlock.full_automated
-																				? handleCustomInstructionsOpenChange
-																				: undefined
-																		}
-																		profileFields={profileFields}
-																		onGoToProfileTab={() => setActiveTab('profile')}
-																		isDragDisabled={isHybridModeSelected}
-																		useStaticDropdownPosition={useStaticDropdownPosition}
-																		forceDesktop={forceDesktop}
-																	/>
-																</div>
-																{/* Plus button under hybrid blocks */}
-																{isHybridBlock && !hasImmediateTextBlock && (
+																) : (
+																	/* Manual signature mode: 467x97px box with header and text area */
 																	<div
 																		className={cn(
-																			'flex relative z-[70]',
-																			showTestPreview
-																				? 'justify-start w-full'
-																				: cn('justify-end -mr-[85px] max-w-[475px]', !forceDesktop ? 'w-[93.7vw] max-[480px]:-mr-[2vw]' : 'w-full')
+																			'w-full h-[97px] rounded-[8px] border-2 border-black overflow-hidden flex flex-col'
 																		)}
-																		style={{ transform: 'translateY(-12px)' }}
+																		onMouseLeave={() => {
+																			// If user hasn't actually typed a manual signature, revert back to auto when leaving.
+																			if (!manualSignatureValue.trim()) {
+																				setManualSignatureValue('');
+																				setIsAutoSignature(true);
+																			}
+																		}}
 																	>
-																		<Button
-																			type="button"
-																			onClick={() => handleAddTextBlockAt(index)}
-																			className={cn(
-																				cn('w-[52px] h-[20px] bg-background hover:bg-stone-100 active:bg-stone-200 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600', !forceDesktop && 'max-[480px]:translate-x-[6px]'),
-																				showTestPreview &&
-																					'absolute left-0 -translate-x-[calc(100%+5px)]'
-																			)}
-																			title="Text block"
-																		>
-																			<TinyPlusIcon
-																				width="5px"
-																				height="5px"
-																				className="!w-[8px] !h-[8px]"
+																		{/* Header row */}
+																		<div className="flex items-center h-[31px] shrink-0 bg-[#8DDF90]">
+																			<div
+																				className={cn(
+																					'pl-2 flex items-center h-full shrink-0 w-[120px]',
+																					'bg-[#8DDF90]'
+																				)}
+																			>
+																				<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
+																					Signature
+																				</span>
+																			</div>
+
+																			<button
+																				type="button"
+																				data-hover-description="Turn back on automated drafting for here"
+																				onClick={() => {
+																					setIsAutoSignature(true);
+																					setManualSignatureValue('');
+																				}}
+																				className={cn(
+																					'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0',
+																					'w-[80px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8]'
+																				)}
+																			>
+																				<span className="absolute left-0 h-full border-l-2 border-black"></span>
+																				<span>Auto off</span>
+																				<span className="absolute right-0 h-full border-r-2 border-black"></span>
+																			</button>
+
+																			<div className="flex-grow h-full bg-[#8DDF90]" />
+																		</div>
+																		{/* Divider line */}
+																		<div className="w-full h-[2px] bg-black shrink-0" />
+																		{/* Text entry area */}
+																		<div className="flex-1 bg-white">
+																			<Textarea
+																				value={manualSignatureValue}
+																				onChange={(e) =>
+																					setManualSignatureValue(e.target.value)
+																				}
+																				ref={signatureManualTextareaRef}
+																				className={cn(
+																					'w-full h-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none',
+																					'!text-black placeholder:!text-[#9E9E9E] font-inter text-[14px]'
+																				)}
+																				placeholder="Write manual signature here"
 																			/>
-																			<span className="font-secondary">Text</span>
-																		</Button>
+																		</div>
 																	</div>
 																)}
-															</Fragment>
-														);
-													});
-												})()}
-											</SortableContext>
-										{/* Auto mode: Signature indicator sits directly under the Full Auto Body block */}
-										{selectedModeKey === 'full' && (
-											<div
-												className={cn(
-													showTestPreview
-														? cn('w-[426px]', !forceDesktop && 'max-[480px]:w-[89.33vw]')
-														: cn(
-																!forceDesktop ? 'w-[89.33vw]' : 'w-[468px]',
-																'max-w-[468px]',
-																'mx-auto'
-														  ),
-													'h-[97px] flex flex-col'
-												)}
-												data-hpi-signature-auto
-											>
-												{isAutoSignature ? (
-													<div className="flex items-center">
-														<div
-															onClick={() => {
-																// Click anywhere on the hover UI -> switch to manual.
-																// If the user doesn't type anything and moves away, we snap back to auto (handled in manual view).
-																setIsAutoSignature(false);
-															}}
-															onMouseLeave={handleSignatureHoverLeave}
-															className={cn(
-																// Keep-open hover zone includes the gap + green box (but only the pill triggers expansion).
-																'relative w-[465px] max-[480px]:w-full transition-none flex items-center'
-															)}
-														>
-															{/* Auto Signature pill - animates on hover */}
-															<div
-																ref={autoSignaturePillRef}
-																onMouseEnter={handleSignatureHoverEnter}
-																className={cn(
-																	cn(
-																		'flex items-center justify-center h-[25px] rounded-[10px] border-2 border-black overflow-hidden w-[122px]',
-																		!forceDesktop && 'max-[480px]:h-[24px]'
-																	)
-																)}
-																style={{ backgroundColor: '#E0E0E0' }}
-															>
-																<div className="flex items-center justify-center">
-																	<span
-																		ref={autoSignatureAutoWordRef}
-																		aria-hidden="true"
-																		className={cn(
-																			'inline-block overflow-hidden whitespace-nowrap text-black',
-																			'font-inter font-medium text-[18px] max-[480px]:text-[12px]',
-																			'w-0 opacity-0'
-																		)}
-																	>
-																		Auto
-																	</span>
-																	<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black">
-																		Signature
-																	</span>
-																</div>
 															</div>
-
-															{/* Expanded controls - fades in with "Auto" */}
-															<div
-																ref={autoSignatureControlsRef}
-																className="flex items-center h-[25px] ml-[13px] max-[480px]:ml-[12px] opacity-0 pointer-events-none"
-															>
-																{/* 292x25 manual signature bar (bg #74D177, r=5) */}
+														)}
+														{/* Full Auto: Generate Test button sits in the empty green space (desktop) */}
+														{!hideGenerateTestButton &&
+															selectedModeKey === 'full' &&
+															!showTestPreview &&
+															!compactLeftOnly && (
 																<div
 																	className={cn(
-																		'flex items-center h-[25px] w-[292px] rounded-[5px] bg-[#74D177] overflow-hidden pl-[7px] pr-[10px]',
-																		'gap-[14px]',
-																		!forceDesktop && 'max-[480px]:h-[24px] max-[480px]:w-auto max-[480px]:flex-1 max-[480px]:min-w-0'
+																		cn(
+																			'absolute left-0 right-0 w-full flex items-center justify-center',
+																			!forceDesktop && 'max-[480px]:hidden'
+																		),
+																		// This button is absolutely positioned; when Custom Instructions and/or Signature expand,
+																		// the content can slide into this area. Prefer dropping the button lower (smaller `bottom`)
+																		// to avoid overlap with the Signature box.
+																		!isAutoSignature
+																			? isLocalCustomInstructionsOpen
+																				? 'bottom-[58px]'
+																				: 'bottom-[128px]'
+																			: isManualSubject
+																				? isLocalCustomInstructionsOpen
+																					? 'bottom-[82px]'
+																					: 'bottom-[152px]'
+																				: isLocalCustomInstructionsOpen
+																					? 'bottom-[124px]'
+																					: 'bottom-[194px]'
 																	)}
 																>
-																	{/* 33x17 toggle pill (r=8, bg #79DF7C) */}
-																	<button
+																	<Button
 																		type="button"
-																		data-hover-description="click to disable automatic drafting for this and write your own"
-																		onClick={() => setIsAutoSignature(false)}
+																		data-hover-description="This will show you a test draft, given all of what you provided"
+																		onClick={() => {
+																			if (isMobile) {
+																				setShowTestPreview?.(true);
+																			} else {
+																				onTestPreviewToggle?.(true);
+																			}
+																			handleGenerateTestDrafts?.();
+																			setHasAttemptedTest(true);
+																		}}
+																		disabled={isGenerateTestButtonDisabled}
+																		onMouseEnter={() => {
+																			if (!isGenerateTestButtonDisabled)
+																				setIsAutoGenerateTestHovered(true);
+																		}}
+																		onMouseLeave={() =>
+																			setIsAutoGenerateTestHovered(false)
+																		}
+																		onFocus={() => {
+																			if (!isGenerateTestButtonDisabled)
+																				setIsAutoGenerateTestHovered(true);
+																		}}
+																		onBlur={() => setIsAutoGenerateTestHovered(false)}
 																		className={cn(
-																			'flex items-center justify-center h-[17px] w-[33px] rounded-[8px] bg-[#79DF7C] border-2 border-black',
-																			'text-[11px] leading-none font-inter font-normal text-black subject-toggle'
+																			'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[12px] cursor-pointer flex items-center justify-center p-0 border-2 border-transparent',
+																			isGeneratingTest
+																				? 'transition-colors bg-[#A2E9A4] hover:bg-[#A2E9A4] active:bg-[#A2E9A4] cursor-default'
+																				: 'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
+																			isGenerateTestButtonDisabled
+																				? isGeneratingTest
+																					? '!opacity-100'
+																					: 'opacity-50 cursor-not-allowed'
+																				: 'opacity-100'
 																		)}
-																		aria-label="Auto Signature on"
 																	>
-																		on
-																	</button>
-
-																	<div className="flex-1 min-w-0 h-full flex items-center">
-																		<span
-																			className={cn(
-																				'text-black text-[13px] leading-none truncate relative -top-[1px]',
-																				!forceDesktop && 'max-[480px]:text-[10px]'
-																			)}
-																		>
-																			Write manual signature here
-																		</span>
-																	</div>
+																		{isGeneratingTest ? null : 'Generate Test'}
+																	</Button>
 																</div>
-															</div>
-													</div>
-													</div>
-												) : (
-													/* Manual signature mode: 467x97px box with header and text area */
-													<div
-														className={cn(
-															'w-full h-[97px] rounded-[8px] border-2 border-black overflow-hidden flex flex-col'
-														)}
-														onMouseLeave={() => {
-															// If user hasn't actually typed a manual signature, revert back to auto when leaving.
-															if (!manualSignatureValue.trim()) {
-																setManualSignatureValue('');
-																setIsAutoSignature(true);
-															}
-														}}
-													>
-														{/* Header row */}
-														<div className="flex items-center h-[31px] shrink-0 bg-[#8DDF90]">
-															<div
-																className={cn(
-																	'pl-2 flex items-center h-full shrink-0 w-[120px]',
-																	'bg-[#8DDF90]'
-																)}
-															>
-																<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
-																	Signature
-																</span>
-															</div>
-
-															<button
-																type="button"
-																data-hover-description="Turn back on automated drafting for here"
-																onClick={() => {
-																	setIsAutoSignature(true);
-																	setManualSignatureValue('');
-																}}
-																className={cn(
-																	'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0',
-																	'w-[80px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8]'
-																)}
-															>
-																<span className="absolute left-0 h-full border-l-2 border-black"></span>
-																<span>Auto off</span>
-																<span className="absolute right-0 h-full border-r-2 border-black"></span>
-															</button>
-
-															<div className="flex-grow h-full bg-[#8DDF90]" />
-														</div>
-														{/* Divider line */}
-														<div className="w-full h-[2px] bg-black shrink-0" />
-														{/* Text entry area */}
-														<div className="flex-1 bg-white">
-															<Textarea
-																value={manualSignatureValue}
-																onChange={(e) => setManualSignatureValue(e.target.value)}
-																ref={signatureManualTextareaRef}
-																className={cn(
-																	'w-full h-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none',
-																	'!text-black placeholder:!text-[#9E9E9E] font-inter text-[14px]'
-																)}
-																placeholder="Write manual signature here"
-															/>
-														</div>
-													</div>
+															)}
+													</>
 												)}
 											</div>
 										)}
-										{/* Full Auto: Generate Test button sits in the empty green space (desktop) */}
-										{!hideGenerateTestButton && selectedModeKey === 'full' && !showTestPreview && !compactLeftOnly && (
-											<div className={cn(
-												cn('absolute left-0 right-0 w-full flex items-center justify-center', !forceDesktop && 'max-[480px]:hidden'),
-												// This button is absolutely positioned; when Custom Instructions and/or Signature expand,
-												// the content can slide into this area. Prefer dropping the button lower (smaller `bottom`)
-												// to avoid overlap with the Signature box.
-												!isAutoSignature
-													? (isLocalCustomInstructionsOpen ? 'bottom-[58px]' : 'bottom-[128px]')
-													: isManualSubject
-														? (isLocalCustomInstructionsOpen ? 'bottom-[82px]' : 'bottom-[152px]')
-														: (isLocalCustomInstructionsOpen ? 'bottom-[124px]' : 'bottom-[194px]')
-											)}>
-												<Button
-													type="button"
-													data-hover-description="This will show you a test draft, given all of what you provided"
-													onClick={() => {
-														if (isMobile) {
-															setShowTestPreview?.(true);
-														} else {
-															onTestPreviewToggle?.(true);
-														}
-														handleGenerateTestDrafts?.();
-														setHasAttemptedTest(true);
-													}}
-													disabled={isGenerateTestButtonDisabled}
-													onMouseEnter={() => {
-														if (!isGenerateTestButtonDisabled) setIsAutoGenerateTestHovered(true);
-													}}
-													onMouseLeave={() => setIsAutoGenerateTestHovered(false)}
-													onFocus={() => {
-														if (!isGenerateTestButtonDisabled) setIsAutoGenerateTestHovered(true);
-													}}
-													onBlur={() => setIsAutoGenerateTestHovered(false)}
-													className={cn(
-														'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[12px] cursor-pointer flex items-center justify-center p-0 border-2 border-transparent',
-														isGeneratingTest
-															? 'transition-colors bg-[#A2E9A4] hover:bg-[#A2E9A4] active:bg-[#A2E9A4] cursor-default'
-															: 'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
-														isGenerateTestButtonDisabled
-															? isGeneratingTest
-																? '!opacity-100'
-																: 'opacity-50 cursor-not-allowed'
-															: 'opacity-100'
-													)}
-												>
-													{isGeneratingTest ? null : 'Generate Test'}
-												</Button>
-											</div>
-										)}
-											</>
-										)}
-										</div>
-									)}
 									</div>
 
 									{/* In Test Preview, keep Signature inside the left panel so it doesn't float */}
-									{showTestPreview && activeTab !== 'profile' && selectedModeKey !== 'full' && (
-										<div className={cn('px-3 pb-0 pt-0 flex justify-center mt-auto')}>
-											<FormField
-												control={form.control}
-												name="signature"
-												render={({ field }) => (
-													<FormItem className="mb-[9px]">
-														<div
-															className={cn(
-																`min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2`,
-																showTestPreview
-																	? cn('w-[426px]', !forceDesktop && 'max-[480px]:w-[89.33vw]')
-																	: cn(!forceDesktop ? 'w-[89.33vw]' : 'w-full', 'max-w-[475px]')
-															)}
-														>
-															<FormLabel className="text-base font-semibold font-secondary">
-																Signature
-															</FormLabel>
-															<FormControl>
-																<Textarea
-																	placeholder="Enter your signature..."
-																	className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white max-[480px]:text-[10px] signature-textarea"
-																	style={{
-																		fontFamily: form.watch('font') || 'Arial',
-																	}}
-																	onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
-																		const target = e.currentTarget;
-																		target.style.height = 'auto';
-																		target.style.height = target.scrollHeight + 'px';
-																	}}
-																	{...field}
-																/>
-															</FormControl>
-														</div>
-														<FormMessage />
-													</FormItem>
-												)}
-											/>
-										</div>
-									)}
+									{showTestPreview &&
+										activeTab !== 'profile' &&
+										selectedModeKey !== 'full' && (
+											<div className={cn('px-3 pb-0 pt-0 flex justify-center mt-auto')}>
+												<FormField
+													control={form.control}
+													name="signature"
+													render={({ field }) => (
+														<FormItem className="mb-[9px]">
+															<div
+																className={cn(
+																	`min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2`,
+																	showTestPreview
+																		? cn(
+																				'w-[426px]',
+																				!forceDesktop && 'max-[480px]:w-[89.33vw]'
+																			)
+																		: cn(
+																				!forceDesktop ? 'w-[89.33vw]' : 'w-full',
+																				'max-w-[475px]'
+																			)
+																)}
+															>
+																<FormLabel className="text-base font-semibold font-secondary">
+																	Signature
+																</FormLabel>
+																<FormControl>
+																	<Textarea
+																		placeholder="Enter your signature..."
+																		className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white max-[480px]:text-[10px] signature-textarea"
+																		style={{
+																			fontFamily: form.watch('font') || 'Arial',
+																		}}
+																		onInput={(
+																			e: React.FormEvent<HTMLTextAreaElement>
+																		) => {
+																			const target = e.currentTarget;
+																			target.style.height = 'auto';
+																			target.style.height = target.scrollHeight + 'px';
+																		}}
+																		{...field}
+																	/>
+																</FormControl>
+															</div>
+															<FormMessage />
+														</FormItem>
+													)}
+												/>
+											</div>
+										)}
 								</div>
 							</DraggableBox>
 
@@ -7637,42 +8511,47 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									selectedModeKey !== 'full' &&
 									selectedModeKey !== 'hybrid' &&
 									selectedModeKey !== 'manual' && (
-									<FormField
-										control={form.control}
-										name="signature"
-										render={({ field }) => (
-											<FormItem className={cn(!compactLeftOnly ? 'mb-[23px]' : 'mb-[9px]')}>
-												<div
-													className={cn(
-														'min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2',
-														cn(!forceDesktop ? 'w-[89.33vw]' : 'w-full', 'max-w-[475px]')
-													)}
-													data-hpi-signature-card
+										<FormField
+											control={form.control}
+											name="signature"
+											render={({ field }) => (
+												<FormItem
+													className={cn(!compactLeftOnly ? 'mb-[23px]' : 'mb-[9px]')}
 												>
-													<FormLabel className="text-base font-semibold font-secondary">
-														Signature
-													</FormLabel>
-													<FormControl>
-														<Textarea
-															placeholder="Enter your signature..."
-															className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white max-[480px]:text-[10px] signature-textarea"
-															style={{
-																fontFamily: form.watch('font') || 'Arial',
-															}}
-															onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
-																const target = e.currentTarget;
-																target.style.height = 'auto';
-																target.style.height = target.scrollHeight + 'px';
-															}}
-															{...field}
-														/>
-													</FormControl>
-												</div>
-												<FormMessage />
-											</FormItem>
-										)}
-									/>
-								)}
+													<div
+														className={cn(
+															'min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2',
+															cn(
+																!forceDesktop ? 'w-[89.33vw]' : 'w-full',
+																'max-w-[475px]'
+															)
+														)}
+														data-hpi-signature-card
+													>
+														<FormLabel className="text-base font-semibold font-secondary">
+															Signature
+														</FormLabel>
+														<FormControl>
+															<Textarea
+																placeholder="Enter your signature..."
+																className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white max-[480px]:text-[10px] signature-textarea"
+																style={{
+																	fontFamily: form.watch('font') || 'Arial',
+																}}
+																onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
+																	const target = e.currentTarget;
+																	target.style.height = 'auto';
+																	target.style.height = target.scrollHeight + 'px';
+																}}
+																{...field}
+															/>
+														</FormControl>
+													</div>
+													<FormMessage />
+												</FormItem>
+											)}
+										/>
+									)}
 
 								{/* Test button and notices (hidden in compact mode, profile tab, and Manual mode) */}
 								{compactLeftOnly ||
@@ -7718,7 +8597,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														disabled={isGenerateTestButtonDisabled}
 														className={cn(
 															'h-[28px] bg-white border-[3px] border-[#349A37] text-black font-inter font-normal text-[17px] leading-none rounded-[12px] cursor-pointer flex items-center justify-center transition-all hover:bg-[#EAF9EB] hover:border-black active:bg-primary/20 p-0',
-															cn(!forceDesktop ? 'w-[93.7vw]' : 'w-full', 'max-w-[475px]'),
+															cn(
+																!forceDesktop ? 'w-[93.7vw]' : 'w-full',
+																'max-w-[475px]'
+															),
 															isGeneratingTest
 																? 'bg-[#A2E9A4] hover:bg-[#A2E9A4] active:bg-[#A2E9A4] cursor-default'
 																: null,
@@ -7780,13 +8662,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							{compactLeftOnly
 								? null
 								: isMobile &&
-								  showTestPreview && (
+									showTestPreview && (
 										<div
 											className="fixed inset-0 z-50 flex items-center justify-center bg-black/20"
 											onClick={() => setShowTestPreview?.(false)}
 										>
 											<div
-												className={cn('w-[461px]', !forceDesktop && 'max-[480px]:w-[96.27vw]')}
+												className={cn(
+													'w-[461px]',
+													!forceDesktop && 'max-[480px]:w-[96.27vw]'
+												)}
 												data-test-preview-wrapper
 												onClick={(e) => e.stopPropagation()}
 											>
@@ -7846,7 +8731,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												)}
 											</div>
 										</div>
-								  )}
+									)}
 						</div>
 						{!compactLeftOnly && !hideDraftButton && (
 							<div
@@ -7907,8 +8792,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													'Add Emails to Queue'
 												) : (
 													<>
-														Draft <span className="font-bold mx-1">All</span> {totalContactCount}{' '}
-														Contacts
+														Draft <span className="font-bold mx-1">All</span>{' '}
+														{totalContactCount} Contacts
 													</>
 												)}
 											</span>

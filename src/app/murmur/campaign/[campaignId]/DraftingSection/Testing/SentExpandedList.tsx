@@ -15,7 +15,6 @@ import {
 	canadianProvinceNames,
 	stateBadgeColorMap,
 } from '@/constants/ui';
-import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
@@ -206,12 +205,6 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 	// Track whether the container is being hovered (for bottom view outline)
 	const [isContainerHovered, setIsContainerHovered] = useState(false);
 
-	const { data: usedContactIds } = useGetUsedContactIds();
-	const usedContactIdsSet = useMemo(
-		() => new Set(usedContactIds || []),
-		[usedContactIds]
-	);
-
 	const handleSentClick = (emailId: number, e: MouseEvent) => {
 		if (e.shiftKey && lastClickedRef.current !== null) {
 			// Prevent text selection on shift-click
@@ -259,14 +252,19 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 	const isAllTabNavigation = interactionMode === 'allTab';
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
 	const isBottomView = customWhiteSectionHeight === 15 || customWhiteSectionHeight === 16;
-	// Compressed bottom panel spec: 40px total = 12px white + 28px color.
-	const effectiveWhiteSectionHeight = collapsed && isBottomView ? 12 : whiteSectionHeight;
+	// Compressed bottom panel spec: 45px total = 13px label strip + 26px inner bar.
+	const collapsedOuterWidthPx = 197;
+	const collapsedOuterHeightPx = 45;
+	const collapsedLabelHeightPx = 13;
+	const effectiveWhiteSectionHeight = collapsed && isBottomView ? collapsedLabelHeightPx : whiteSectionHeight;
 	const shouldRenderCollapsedTopBox = collapsed && isBottomView;
-	const collapsedTopBoxHeightPx = 22;
-	const collapsedTopBoxWidthPx = 224;
-	const collapsedTopBoxRadiusPx = 4.7;
+	const collapsedTopBoxHeightPx = 26;
+	const collapsedTopBoxWidthPx = 191;
+	const collapsedTopBoxRadiusPx = 3.33;
 	const isFullyEmpty = sent.length === 0;
 	const placeholderBgColor = isFullyEmpty ? '#3DAC61' : '#5AB477';
+	const collapsedTopColor = '#C7ECC3';
+	const collapsedFillColor = '#5AB477';
 
 	// Bottom view: show "batch" boxes instead of individual sent emails.
 	const bottomViewSentBatches = useMemo(() => {
@@ -312,7 +310,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 		<div
 			className={cn(
 				'relative max-[480px]:w-[96.27vw] rounded-md flex flex-col overflow-visible',
-				// In the compressed bottom-panel view we need exact internal pixel heights (16px white + 24px color).
+				// In the compressed bottom-panel view we need exact internal pixel heights.
 				// Use a stroke via box-shadow so it doesn't consume layout height.
 				shouldRenderCollapsedTopBox
 					? 'border-0'
@@ -323,9 +321,12 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 					: 'border-2 border-black/30'
 			)}
 			style={{
-				width: `${width}px`,
-				height: `${height}px`,
-				background: `linear-gradient(to bottom, #ffffff ${effectiveWhiteSectionHeight}px, #5AB477 ${effectiveWhiteSectionHeight}px)`,
+				width: `${shouldRenderCollapsedTopBox ? collapsedOuterWidthPx : width}px`,
+				height: `${shouldRenderCollapsedTopBox ? collapsedOuterHeightPx : height}px`,
+				background: shouldRenderCollapsedTopBox
+					? `linear-gradient(to bottom, ${collapsedTopColor} ${effectiveWhiteSectionHeight}px, ${collapsedFillColor} ${effectiveWhiteSectionHeight}px)`
+					: `linear-gradient(to bottom, #ffffff ${effectiveWhiteSectionHeight}px, ${collapsedFillColor} ${effectiveWhiteSectionHeight}px)`,
+				borderRadius: shouldRenderCollapsedTopBox ? '3.33px' : undefined,
 				boxShadow: shouldRenderCollapsedTopBox
 					? 'inset 0 0 0 2px #000000'
 					: undefined,
@@ -355,10 +356,19 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 				/>
 			)}
 			{/* Header row (no explicit divider; let the background change from white to green like the main table) */}
-			<SentHeaderChrome
-				isAllTab={isAllTab}
-				whiteSectionHeight={shouldRenderCollapsedTopBox ? effectiveWhiteSectionHeight : customWhiteSectionHeight}
-			/>
+			{!shouldRenderCollapsedTopBox && (
+				<SentHeaderChrome
+					isAllTab={isAllTab}
+					whiteSectionHeight={customWhiteSectionHeight}
+				/>
+			)}
+			{shouldRenderCollapsedTopBox && (
+				<div className="absolute left-[8px] top-[1px] z-20 flex h-[13px] items-center pointer-events-none">
+					<span className="font-inter text-[12px] font-semibold leading-none text-black">
+						Sent
+					</span>
+				</div>
+			)}
 			<div
 				className={cn(
 					'flex items-center gap-2 px-3 shrink-0',
@@ -377,7 +387,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 				}}
 			></div>
 
-			{(isAllTab || isBottomView) && (
+			{isAllTab && (
 				<div
 					className={cn(
 						'absolute z-20 flex items-center gap-[12px]',
@@ -407,28 +417,38 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 				</div>
 			)}
 
-			{/* Collapsed bottom panels: show only the top "batch" box (22px) centered in the 24px color region */}
+			{/* Collapsed bottom panels: label strip + bottom-aligned summary bar. */}
 			{shouldRenderCollapsedTopBox && (
-				<div className="flex-1 flex items-center justify-center px-[2px]">
+				<div className="flex-1 flex items-end justify-center px-[2px]" style={{ paddingBottom: 3 }}>
 					{bottomViewSentBatches[0] ? (
 						<div
 							key="sent-collapsed-batch"
 							className={cn(
-								'select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between'
+								'select-none overflow-hidden border-2 border-[#000000] flex'
 							)}
 							style={{
 								width: `${collapsedTopBoxWidthPx}px`,
 								height: `${collapsedTopBoxHeightPx}px`,
 								borderRadius: `${collapsedTopBoxRadiusPx}px`,
-								backgroundColor: '#C3E7BF',
+								backgroundColor: collapsedTopColor,
 							}}
 						>
-							<span className="pl-[18px] font-inter font-medium text-[15px] text-black leading-none">
-								{formatBatchCount(bottomViewSentBatches[0].count)}
-							</span>
-							<span className="pr-[18px] font-inter font-medium text-[15px] text-black leading-none">
-								{formatBatchTimestamp(bottomViewSentBatches[0].endAt)}
-							</span>
+							<div
+								className="flex-1 flex items-center justify-center"
+								style={{ backgroundColor: collapsedFillColor }}
+							>
+								<span className="font-inter font-medium text-[15px] text-black leading-none">
+									{formatBatchCount(bottomViewSentBatches[0].count)}
+								</span>
+							</div>
+							<div
+								aria-hidden
+								style={{
+									width: '96px',
+									backgroundColor: collapsedTopColor,
+									borderLeft: '2px solid #000000',
+								}}
+							/>
 						</div>
 					) : (
 						<div
@@ -568,24 +588,6 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 										handleSentClick(email.id as number, e);
 									}}
 								>
-									{/* Used-contact indicator - vertically centered */}
-									{usedContactIdsSet.has(email.contactId) && (
-										<span
-											className={cn(
-												"absolute left-[8px]",
-												isBottomView ? "left-[6px]" : "left-[8px]"
-											)}
-											style={{
-												top: '50%',
-												transform: 'translateY(-50%)',
-												width: isBottomView ? '12px' : isAllTab ? '13px' : '16px',
-												height: isBottomView ? '12px' : isAllTab ? '13px' : '16px',
-												borderRadius: '50%',
-												border: '1px solid #000000',
-												backgroundColor: '#DAE6FE',
-											}}
-										/>
-									)}
 
 									{/* Fixed top-right info (Title + Location) */}
 									<div

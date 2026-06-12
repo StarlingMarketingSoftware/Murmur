@@ -62,6 +62,8 @@ interface DataTableProps<TData, TValue> {
 	hidePagination?: boolean;
 	headerAction?: ReactNode;
 	headerInlineAction?: ReactNode;
+	topContent?: ReactNode;
+	footerContent?: ReactNode;
 }
 
 interface TableSortingButtonProps<TData> {
@@ -141,6 +143,8 @@ export function CustomTable<TData, TValue>({
 	hidePagination = false,
 	headerAction,
 	headerInlineAction,
+	topContent,
+	footerContent,
 	useAutoLayout = false,
 	allowColumnOverflow = false,
 	containerClassName,
@@ -284,6 +288,21 @@ export function CustomTable<TData, TValue>({
 
 	const showLoadingSkeleton = isLoading && (!data || data.length === 0);
 	const resolvedLoadingRowCount = Math.max(1, Math.min(loadingRowCount, 20));
+	const shouldIgnoreRowClick = (event: React.MouseEvent<HTMLTableRowElement>) => {
+		if (event.defaultPrevented) return true;
+
+		const target = event.target;
+		const targetElement =
+			target instanceof Element
+				? target
+				: target instanceof Node
+					? target.parentElement
+					: null;
+
+		return targetElement?.closest('[data-custom-table-ignore-row-click="true"]') !== null;
+	};
+	const shouldSpanAllCells = (rowData: TData) =>
+		Boolean((rowData as Record<string, unknown>)?.__customTableColSpanAll);
 	const visibleLeafColumns = table.getVisibleLeafColumns();
 	const skeletonWidthClassByIndex = (index: number): string => {
 		const widths = ['w-3/4', 'w-2/3', 'w-1/2', 'w-5/6', 'w-4/5', 'w-2/5'];
@@ -416,6 +435,7 @@ export function CustomTable<TData, TValue>({
 								</div>
 							</div>
 						)}
+						{topContent}
 						<Table
 							className={cn(
 								'relative',
@@ -520,6 +540,8 @@ export function CustomTable<TData, TValue>({
 												}
 											}}
 											onClick={(e) => {
+												if (shouldIgnoreRowClick(e)) return;
+
 												if (isSelectable) {
 													const rows = table.getRowModel().rows as Row<TData>[];
 													const rowOriginalId = getRowOriginalId(row as Row<TData>);
@@ -561,40 +583,58 @@ export function CustomTable<TData, TValue>({
 											key={row.id}
 											data-state={row.getIsSelected() && 'selected'}
 										>
-											{row.getVisibleCells().map((cell) => {
-												const totalColumns = row.getVisibleCells().length;
-												const fallbackWidth = `${100 / totalColumns}%`;
-												const defSize = (cell.column.columnDef as ColumnDefWithSize)
-													?.size;
-												const cellSize = cell.column.getSize
-													? cell.column.getSize()
-													: undefined;
-												return (
-													<TableCell
-														key={cell.id}
-														variant={variant}
-														style={
-															useAutoLayout
-																? undefined
-																: {
-																		width:
-																			defSize && defSize > 0
-																				? `${defSize}px`
-																				: cellSize && cellSize > 0
-																				? `${cellSize}px`
-																				: fallbackWidth,
-																		minWidth:
-																			defSize && defSize > 0 ? `${defSize}px` : undefined,
-																		maxWidth:
-																			defSize && defSize > 0 ? `${defSize}px` : undefined,
-																  }
-														}
-														className="whitespace-nowrap"
-													>
-														{flexRender(cell.column.columnDef.cell, cell.getContext())}
-													</TableCell>
-												);
-											})}
+											{(() => {
+												const cells = row.getVisibleCells();
+												const firstCell = cells[0];
+
+												if (shouldSpanAllCells(row.original) && firstCell) {
+													return (
+														<TableCell
+															key={firstCell.id}
+															variant={variant}
+															colSpan={cells.length}
+															className="whitespace-nowrap"
+														>
+															{flexRender(firstCell.column.columnDef.cell, firstCell.getContext())}
+														</TableCell>
+													);
+												}
+
+												return cells.map((cell) => {
+													const totalColumns = cells.length;
+													const fallbackWidth = `${100 / totalColumns}%`;
+													const defSize = (cell.column.columnDef as ColumnDefWithSize)
+														?.size;
+													const cellSize = cell.column.getSize
+														? cell.column.getSize()
+														: undefined;
+													return (
+														<TableCell
+															key={cell.id}
+															variant={variant}
+															style={
+																useAutoLayout
+																	? undefined
+																	: {
+																			width:
+																				defSize && defSize > 0
+																					? `${defSize}px`
+																					: cellSize && cellSize > 0
+																					? `${cellSize}px`
+																					: fallbackWidth,
+																			minWidth:
+																				defSize && defSize > 0 ? `${defSize}px` : undefined,
+																			maxWidth:
+																				defSize && defSize > 0 ? `${defSize}px` : undefined,
+																	  }
+															}
+															className="whitespace-nowrap"
+														>
+															{flexRender(cell.column.columnDef.cell, cell.getContext())}
+														</TableCell>
+													);
+												});
+											})()}
 										</TableRow>
 									))
 								) : showLoadingSkeleton ? (
@@ -615,6 +655,7 @@ export function CustomTable<TData, TValue>({
 								)}
 							</TableBody>
 						</Table>
+						{footerContent}
 					</div>
 				</CustomScrollbar>
 			) : (
@@ -636,6 +677,7 @@ export function CustomTable<TData, TValue>({
 						}
 					}}
 				>
+					{topContent}
 					<Table
 						className={cn(
 							'relative',
@@ -734,6 +776,8 @@ export function CustomTable<TData, TValue>({
 											}
 										}}
 										onClick={(e) => {
+											if (shouldIgnoreRowClick(e)) return;
+
 											if (isSelectable) {
 												const rows = table.getRowModel().rows as Row<TData>[];
 												const rowOriginalId = getRowOriginalId(row as Row<TData>);
@@ -775,39 +819,57 @@ export function CustomTable<TData, TValue>({
 										key={row.id}
 										data-state={row.getIsSelected() && 'selected'}
 									>
-										{row.getVisibleCells().map((cell) => {
-											const totalColumns = row.getVisibleCells().length;
-											const fallbackWidth = `${100 / totalColumns}%`;
-											const defSize = (cell.column.columnDef as ColumnDefWithSize)?.size;
-											const cellSize = cell.column.getSize
-												? cell.column.getSize()
-												: undefined;
-											return (
-												<TableCell
-													key={cell.id}
-													variant={variant}
-													style={
-														useAutoLayout
-															? undefined
-															: {
-																	width:
-																		defSize && defSize > 0
-																			? `${defSize}px`
-																			: cellSize && cellSize > 0
-																			? `${cellSize}px`
-																			: fallbackWidth,
-																	minWidth:
-																		defSize && defSize > 0 ? `${defSize}px` : undefined,
-																	maxWidth:
-																		defSize && defSize > 0 ? `${defSize}px` : undefined,
-															  }
-													}
-													className="whitespace-nowrap"
-												>
-													{flexRender(cell.column.columnDef.cell, cell.getContext())}
-												</TableCell>
-											);
-										})}
+										{(() => {
+											const cells = row.getVisibleCells();
+											const firstCell = cells[0];
+
+											if (shouldSpanAllCells(row.original) && firstCell) {
+												return (
+													<TableCell
+														key={firstCell.id}
+														variant={variant}
+														colSpan={cells.length}
+														className="whitespace-nowrap"
+													>
+														{flexRender(firstCell.column.columnDef.cell, firstCell.getContext())}
+													</TableCell>
+												);
+											}
+
+											return cells.map((cell) => {
+												const totalColumns = cells.length;
+												const fallbackWidth = `${100 / totalColumns}%`;
+												const defSize = (cell.column.columnDef as ColumnDefWithSize)?.size;
+												const cellSize = cell.column.getSize
+													? cell.column.getSize()
+													: undefined;
+												return (
+													<TableCell
+														key={cell.id}
+														variant={variant}
+														style={
+															useAutoLayout
+																? undefined
+																: {
+																		width:
+																			defSize && defSize > 0
+																				? `${defSize}px`
+																				: cellSize && cellSize > 0
+																				? `${cellSize}px`
+																				: fallbackWidth,
+																		minWidth:
+																			defSize && defSize > 0 ? `${defSize}px` : undefined,
+																		maxWidth:
+																			defSize && defSize > 0 ? `${defSize}px` : undefined,
+																  }
+														}
+														className="whitespace-nowrap"
+													>
+														{flexRender(cell.column.columnDef.cell, cell.getContext())}
+													</TableCell>
+												);
+											});
+										})()}
 									</TableRow>
 								))
 							) : showLoadingSkeleton ? (
@@ -825,6 +887,7 @@ export function CustomTable<TData, TValue>({
 							)}
 						</TableBody>
 					</Table>
+					{footerContent}
 				</div>
 			)}
 			{!hidePagination && (

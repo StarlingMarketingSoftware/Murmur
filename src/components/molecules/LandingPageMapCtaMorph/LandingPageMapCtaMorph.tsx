@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import Link from 'next/link';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useLenis } from '@/contexts/ScrollContext';
@@ -410,14 +409,6 @@ export function LandingPageMapCtaMorph({ mapContainerRef }: Props) {
 								<br />
 								thoroughly verified by musicians.
 							</p>
-							<Link
-								href="/map"
-								className="landing-learn-research-btn mt-[39px] inline-flex items-center justify-center w-[302px] h-[51px] rounded-[6px] bg-transparent"
-							>
-								<span className="font-inter font-normal text-[24px] text-[#5DAB68]">
-									Learn about the Map
-								</span>
-							</Link>
 						</div>
 					</div>
 				</div>
@@ -435,14 +426,6 @@ export function LandingPageMapCtaMorph({ mapContainerRef }: Props) {
 							<br />
 							thoroughly verified by musicians.
 						</p>
-						<Link
-							href="/map"
-							className="landing-learn-research-btn mt-auto inline-flex items-center justify-center w-[230px] h-[39px] rounded-[6px] bg-transparent"
-						>
-							<span className="font-inter font-normal text-[18px] text-[#5DAB68]">
-								Learn about the Map
-							</span>
-						</Link>
 					</div>
 				</div>
 

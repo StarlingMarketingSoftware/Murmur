@@ -1,0 +1,21 @@
+import { SVGProps } from 'react';
+
+const DashboardActionBarStarIcon = (props: SVGProps<SVGSVGElement>) => (
+	<svg
+		width="21"
+		height="20"
+		viewBox="0 0 21 20"
+		fill="none"
+		xmlns="http://www.w3.org/2000/svg"
+		{...props}
+	>
+		<path
+			d="M6.26387 6.67699L6.67385 6.6203L6.63986 6.20754L6.21741 1.10878L9.92411 4.63654L10.2242 4.9213L10.5251 4.63799L14.2488 1.12886L13.8016 6.22629L13.7657 6.63795L14.1752 6.69639L19.2409 7.41991L14.9759 10.2478L14.6313 10.477L14.8408 10.833L17.4342 15.2453L12.5643 13.674L12.1706 13.547L12.0222 13.9337L10.1894 18.7122L8.38106 13.925L8.235 13.5374L7.84024 13.6628L2.96199 15.2096L5.57727 10.8101L5.78855 10.455L5.44491 10.2243L1.19473 7.37488L6.26387 6.67699Z"
+			fill="currentColor"
+			stroke="currentColor"
+			strokeWidth="0.873559"
+		/>
+	</svg>
+);
+
+export default DashboardActionBarStarIcon;

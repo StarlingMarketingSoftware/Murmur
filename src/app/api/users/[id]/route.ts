@@ -1,19 +1,19 @@
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
-import { auth, clerkClient } from '@clerk/nextjs/server';
+import { auth } from '@clerk/nextjs/server';
 import {
 	apiBadRequest,
+	apiForbidden,
 	apiNotFound,
 	apiResponse,
-	apiServerError,
 	apiUnauthorized,
+	getIsAdmin,
 	handleApiError,
+	provisionLocalUser,
 } from '@/app/api/_utils';
 import { ApiRouteParams } from '@/types';
 import { NextRequest } from 'next/server';
-import { generateMurmurEmail, generateMurmurReplyToEmail } from '@/utils';
-import { stripe } from '@/stripe/client';
-import { Prisma } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 
 const patchUserSchema = z.object({
 	firstName: z.string().optional(),
@@ -31,6 +31,24 @@ const patchUserSchema = z.object({
 });
 export type PatchUserData = z.infer<typeof patchUserSchema>;
 
+// Fields a non-admin may update on their OWN row. Everything else (Stripe ids,
+// custom domain) is server/webhook-managed or admin-only.
+const SELF_PATCHABLE_FIELDS = new Set<string>([
+	'firstName',
+	'lastName',
+	'draftCredits',
+	'sendingCredits',
+	'verificationCredits',
+	'aiDraftCredits',
+	'aiTestCredits',
+	'stripeSubscriptionStatus',
+]);
+
+// Demo-trial activation is the one legitimate self-increase (useDemo.tsx sends
+// exactly these values); everything else must be a decrement.
+const TRIAL_AI_DRAFT_CREDITS_CAP = 500;
+const TRIAL_AI_TEST_CREDITS_CAP = 50;
+
 export const GET = async function GET(
 	req: NextRequest,
 	{ params }: { params: ApiRouteParams }
@@ -43,98 +61,17 @@ export const GET = async function GET(
 
 		const { id } = await params;
 
+		// Users may only read their own row; the admin user-detail page reads others.
+		if (id !== userId && !(await getIsAdmin(userId))) {
+			return apiForbidden();
+		}
+
 		let user = await prisma.user.findUnique({ where: { clerkId: id } });
 
 		// If the signed-in Clerk user doesn't exist locally yet (common right after sign-up),
 		// create the user record on-demand so the app can proceed even if webhooks lag.
 		if (!user && id === userId) {
-			const clerk = await clerkClient();
-			const clerkUser = await clerk.users.getUser(userId);
-			const email =
-				clerkUser.emailAddresses.find(
-					(e) => e.id === clerkUser.primaryEmailAddressId
-				)?.emailAddress ?? clerkUser.emailAddresses[0]?.emailAddress;
-
-			if (!email) {
-				return apiServerError('No email address found for this user');
-			}
-
-			const firstName = clerkUser.firstName ?? null;
-			const lastName = clerkUser.lastName ?? null;
-
-			const stripeCustomer = await stripe.customers.create(
-				{
-					email,
-					name: `${firstName ?? ''} ${lastName ?? ''}`.trim() || 'User',
-					metadata: { clerkId: userId },
-				},
-				{ idempotencyKey: `murmur-create-customer-${userId}` }
-			);
-
-			const murmurEmail = generateMurmurEmail(firstName, lastName);
-
-			try {
-				user = await prisma.$transaction(async (tx) => {
-					const createdUser = await tx.user.create({
-						data: {
-							clerkId: userId,
-							email,
-							firstName,
-							lastName,
-							stripeCustomerId: stripeCustomer.id,
-							murmurEmail,
-						},
-					});
-
-					const replyToEmail = generateMurmurReplyToEmail(
-						createdUser.firstName,
-						createdUser.lastName,
-						createdUser.id
-					);
-
-					return await tx.user.update({
-						where: { id: createdUser.id },
-						data: { replyToEmail },
-					});
-				});
-			} catch (error) {
-				// If another request (or the Clerk webhook) created the user concurrently, fetch and return it.
-				if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-					const existingUser = await prisma.user.findUnique({ where: { clerkId: userId } });
-					if (existingUser) {
-						user = existingUser;
-					} else {
-						// Most common cause here is murmurEmail uniqueness collisions; fall back to a null murmurEmail.
-						user = await prisma.$transaction(async (tx) => {
-							const createdUser = await tx.user.create({
-								data: {
-									clerkId: userId,
-									email,
-									firstName,
-									lastName,
-									stripeCustomerId: stripeCustomer.id,
-									murmurEmail: null,
-								},
-							});
-
-							const replyToEmail = generateMurmurReplyToEmail(
-								createdUser.firstName,
-								createdUser.lastName,
-								createdUser.id
-							);
-
-							return await tx.user.update({
-								where: { id: createdUser.id },
-								data: { replyToEmail },
-							});
-						});
-					}
-				}
-				// If it's some other error, let handleApiError format it.
-				if (!user) {
-					throw error;
-				}
-			}
+			user = await provisionLocalUser(userId);
 		}
 
 		if (!user) {
@@ -164,6 +101,80 @@ export const PATCH = async function PATCH(
 
 		if (!validatedData.success) {
 			return apiBadRequest();
+		}
+
+		const caller = await prisma.user.findUnique({
+			where: { clerkId: userId },
+			select: {
+				role: true,
+				draftCredits: true,
+				sendingCredits: true,
+				verificationCredits: true,
+				aiDraftCredits: true,
+				aiTestCredits: true,
+			},
+		});
+		if (!caller) {
+			return apiUnauthorized();
+		}
+
+		if (caller.role !== UserRole.admin) {
+			// Non-admins may only update their own row.
+			if (id !== userId) {
+				return apiForbidden();
+			}
+
+			const updates = validatedData.data;
+			const disallowedFields = Object.keys(updates).filter(
+				(field) => !SELF_PATCHABLE_FIELDS.has(field)
+			);
+			if (disallowedFields.length > 0) {
+				return apiBadRequest(
+					`Cannot update field(s): ${disallowedFields.join(', ')}`
+				);
+			}
+
+			// Credits are decremented client-side after drafting/sending; a self-update
+			// must never increase them (caller === target here).
+			const decrementOnlyFields = [
+				'draftCredits',
+				'sendingCredits',
+				'verificationCredits',
+			] as const;
+			for (const field of decrementOnlyFields) {
+				const next = updates[field];
+				if (next !== undefined && (next < 0 || next > caller[field])) {
+					return apiBadRequest(`Invalid ${field} value`);
+				}
+			}
+
+			// Demo-trial activation may set these up to the trial amounts; otherwise
+			// they may only decrease.
+			if (
+				updates.aiDraftCredits !== undefined &&
+				(updates.aiDraftCredits < 0 ||
+					updates.aiDraftCredits >
+						Math.max(caller.aiDraftCredits, TRIAL_AI_DRAFT_CREDITS_CAP))
+			) {
+				return apiBadRequest('Invalid aiDraftCredits value');
+			}
+			if (
+				updates.aiTestCredits !== undefined &&
+				(updates.aiTestCredits < 0 ||
+					updates.aiTestCredits >
+						Math.max(caller.aiTestCredits, TRIAL_AI_TEST_CREDITS_CAP))
+			) {
+				return apiBadRequest('Invalid aiTestCredits value');
+			}
+
+			// Subscription status is Stripe-webhook-managed; the demo trial is the one
+			// self-service exception.
+			if (
+				updates.stripeSubscriptionStatus !== undefined &&
+				updates.stripeSubscriptionStatus !== 'trialing'
+			) {
+				return apiBadRequest('Invalid stripeSubscriptionStatus value');
+			}
 		}
 
 		const updatedUser = await prisma.user.update({

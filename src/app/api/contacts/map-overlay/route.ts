@@ -11,40 +11,101 @@ import {
 import { getValidatedParamsFromUrl } from '@/utils';
 import { Prisma } from '@prisma/client';
 import { StripeSubscriptionStatus } from '@/types';
+import {
+	BOOKING_CONTACT_TITLE_PREFIXES,
+	PROMOTION_CONTACT_TITLE_PREFIXES,
+} from '@/constants/contactCategories';
 
 export const maxDuration = 60;
 
 const mapOverlaySchema = z.object({
-	mode: z.enum(['booking', 'promotion', 'all']).optional().default('booking'),
+	mode: z.enum(['booking', 'promotion', 'all', 'ambient']).optional().default('booking'),
 	south: z.coerce.number(),
 	west: z.coerce.number(),
 	north: z.coerce.number(),
 	east: z.coerce.number(),
 	limit: z.coerce.number().optional(),
+	zoom: z.coerce.number().optional(),
+	seed: z.string().optional(),
+	phase: z.enum(['visible', 'buffer']).optional(),
 });
-
-const BOOKING_TITLE_PREFIXES = [
-	'Music Venues',
-	'Restaurants',
-	'Coffee Shops',
-	'Music Festivals',
-	'Breweries',
-	'Distilleries',
-	'Wineries',
-	'Cideries',
-	'Wedding Planners',
-	'Wedding Venues',
-] as const;
-
-const PROMOTION_TITLE_PREFIXES = [
-	'Radio Stations',
-	'College Radio',
-] as const;
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
 const DEFAULT_LIMIT = 1200;
 const MAX_LIMIT = 2000;
+const MAP_OVERLAY_QUERY_TIMEOUT_MS = 18000;
+
+// Research-detail fields (metadata/website/address/companyType/companyFoundedYear) are only read
+// by ContactResearchPanel. On thousands of rows they are dead weight, so low-zoom fetches ship
+// only the slim plotting/tooltip set (the ambient atlas always does — its raw SQL never selects
+// them). Slim rows are not a dead end: when one is hovered, the dashboard backfills these fields
+// per-contact via GET /api/contacts/[id]/research (see useContactWithResearch in
+// murmur/dashboard/page.tsx), so the research panel still populates.
+const OVERLAY_RESEARCH_FIELDS_MIN_ZOOM = 7;
+
+// Shared shape for every map-overlay response row. The core fields are always present
+// (plotting + hover tooltip + the map-panel list row). The research-detail fields are only
+// present when the request is zoomed in enough to reach ContactResearchPanel (see
+// OVERLAY_RESEARCH_FIELDS_MIN_ZOOM); below that they are omitted to keep the payload small.
+type OverlayContactRow = {
+	id: number;
+	latitude: number | null;
+	longitude: number | null;
+	title: string | null;
+	firstName: string | null;
+	lastName: string | null;
+	name: string | null;
+	company: string | null;
+	headline: string | null;
+	venueId: number | null;
+	state: string | null;
+	city: string | null;
+	metadata?: string | null;
+	website?: string | null;
+	address?: string | null;
+	companyType?: string | null;
+	companyFoundedYear?: string | null;
+};
+
+const hashSeedToPositiveInt = (value: string): number => {
+	let hash = 2166136261;
+	for (let i = 0; i < value.length; i += 1) {
+		hash ^= value.charCodeAt(i);
+		hash = Math.imul(hash, 16777619);
+	}
+	return (hash >>> 0) % 2147483647;
+};
+
+const withOverlayBudgetFallback = async <T,>(
+	operation: () => Promise<T>,
+	fallbackValue: T,
+	label: string
+): Promise<T> => {
+	let timeoutId: ReturnType<typeof setTimeout> | null = null;
+	let timedOut = false;
+
+	try {
+		const timeoutPromise = new Promise<T>((resolve) => {
+			timeoutId = setTimeout(() => {
+				timedOut = true;
+				resolve(fallbackValue);
+			}, MAP_OVERLAY_QUERY_TIMEOUT_MS);
+		});
+		const result = await Promise.race([operation(), timeoutPromise]);
+		if (timedOut) {
+			console.warn(
+				`[contacts-map-overlay] ${label} exceeded ${MAP_OVERLAY_QUERY_TIMEOUT_MS}ms; returning fallback response`
+			);
+		}
+		return result;
+	} catch (error) {
+		console.warn(`[contacts-map-overlay] ${label} failed; returning fallback response`, error);
+		return fallbackValue;
+	} finally {
+		if (timeoutId) clearTimeout(timeoutId);
+	}
+};
 
 // Guard rails: prevent accidentally querying an entire region at once.
 // Booking overlays are denser than promotion overlays, but we still want pins to be visible
@@ -58,6 +119,19 @@ const MAX_LNG_SPAN_DEG_PROMOTION = 360;
 // accidentally querying dense regions at once.
 const MAX_LAT_SPAN_DEG_ALL = 3;
 const MAX_LNG_SPAN_DEG_ALL = 3;
+// Ambient mode is intentionally regional: it powers the disengaged-map atlas at moderate zoom.
+// Keep it wide enough for farther-out multi-state screens but bounded enough for indexed bbox queries.
+const MAX_LAT_SPAN_DEG_AMBIENT = 110;
+const MAX_LNG_SPAN_DEG_AMBIENT = 240;
+
+const getAmbientGridSize = (zoom: number | undefined, latSpan: number, lngSpan: number) => {
+	const safeZoom = Number.isFinite(zoom) ? zoom! : 6;
+	const aspect = lngSpan > 0 && latSpan > 0 ? clamp(lngSpan / latSpan, 0.8, 2.8) : 1.7;
+	const baseCols = safeZoom < 6.25 ? 26 : safeZoom < 8 ? 32 : 40;
+	const cols = Math.max(12, Math.min(54, Math.round(baseCols * Math.sqrt(aspect / 1.7))));
+	const rows = Math.max(8, Math.min(36, Math.round(cols / aspect)));
+	return { cols, rows };
+};
 
 export async function GET(req: NextRequest) {
 	try {
@@ -86,7 +160,7 @@ export async function GET(req: NextRequest) {
 			return apiBadRequest(validated.error);
 		}
 
-		const { mode, south, west, north, east, limit } = validated.data;
+		const { mode, south, west, north, east, limit, zoom, seed, phase } = validated.data;
 		if (![south, west, north, east].every((n) => Number.isFinite(n))) {
 			return apiBadRequest('Invalid bounds');
 		}
@@ -104,23 +178,106 @@ export async function GET(req: NextRequest) {
 
 		const latSpan = maxLat - minLat;
 		const lngSpan = maxLng - minLng;
+		if (latSpan <= 0 || lngSpan <= 0) {
+			return apiBadRequest('Invalid bounds');
+		}
 		const maxLatSpan =
 			mode === 'promotion'
 				? MAX_LAT_SPAN_DEG_PROMOTION
-				: mode === 'all'
-					? MAX_LAT_SPAN_DEG_ALL
-					: MAX_LAT_SPAN_DEG_BOOKING;
+				: mode === 'ambient'
+					? MAX_LAT_SPAN_DEG_AMBIENT
+					: mode === 'all'
+						? MAX_LAT_SPAN_DEG_ALL
+						: MAX_LAT_SPAN_DEG_BOOKING;
 		const maxLngSpan =
 			mode === 'promotion'
 				? MAX_LNG_SPAN_DEG_PROMOTION
-				: mode === 'all'
-					? MAX_LNG_SPAN_DEG_ALL
-					: MAX_LNG_SPAN_DEG_BOOKING;
+				: mode === 'ambient'
+					? MAX_LNG_SPAN_DEG_AMBIENT
+					: mode === 'all'
+						? MAX_LNG_SPAN_DEG_ALL
+						: MAX_LNG_SPAN_DEG_BOOKING;
 		if (latSpan > maxLatSpan || lngSpan > maxLngSpan) {
 			return apiBadRequest('Viewport too large; zoom in to load overlay markers');
 		}
 
 		const take = Math.max(1, Math.min(limit ?? DEFAULT_LIMIT, MAX_LIMIT));
+
+		if (mode === 'ambient') {
+			const ambientSeed = (seed ?? '').trim() || `${minLat},${minLng},${maxLat},${maxLng}`;
+			const seedHash = hashSeedToPositiveInt(ambientSeed);
+			const { cols, rows } = getAmbientGridSize(zoom, latSpan, lngSpan);
+			const ambientTake = Math.min(take, phase === 'visible' ? 760 : MAX_LIMIT);
+			const perCellCategory = Math.max(
+				1,
+				Math.min(4, Math.ceil((ambientTake * 1.4) / Math.max(1, cols * rows)))
+			);
+
+			const contacts = await withOverlayBudgetFallback(
+				() =>
+					prisma.$queryRaw<OverlayContactRow[]>(Prisma.sql`
+						WITH ranked AS (
+							SELECT
+								"id",
+								"company",
+								"state",
+								"city",
+								"firstName",
+								"headline",
+								"lastName",
+								"title",
+								"latitude",
+								"longitude",
+								"venueId",
+								NULLIF(TRIM(CONCAT_WS(' ', NULLIF("firstName", ''), NULLIF("lastName", ''))), '') AS "name",
+								ROW_NUMBER() OVER (
+									PARTITION BY
+										FLOOR((("longitude" - ${minLng}) / ${lngSpan}) * ${cols}),
+										FLOOR((("latitude" - ${minLat}) / ${latSpan}) * ${rows}),
+										CASE
+											WHEN "title" ILIKE 'Radio Stations%' OR "title" ILIKE 'College Radio%' THEN 'radio'
+											WHEN "title" ILIKE 'Wedding Planners%' OR "title" ILIKE 'Wedding Venues%' THEN 'wedding'
+											WHEN "title" ILIKE 'Coffee Shops%' THEN 'coffee'
+											WHEN "title" ILIKE 'Music Festivals%' THEN 'festival'
+											WHEN "title" ILIKE 'Breweries%' OR "title" ILIKE 'Distilleries%' OR "title" ILIKE 'Wineries%' OR "title" ILIKE 'Cideries%' THEN 'winebeer'
+											WHEN "title" ILIKE 'Music Venues%' THEN 'venue'
+											WHEN "title" ILIKE 'Restaurants%' THEN 'restaurant'
+											ELSE 'general'
+										END
+									ORDER BY (("id"::bigint * 1103515245 + ${seedHash}) % 2147483647)
+								) AS rn,
+								(("id"::bigint * 1103515245 + ${seedHash}) % 2147483647) AS stable_key
+							FROM "Contact"
+							WHERE "latitude" IS NOT NULL
+								AND "longitude" IS NOT NULL
+								AND "latitude" >= ${minLat}
+								AND "latitude" <= ${maxLat}
+								AND "longitude" >= ${minLng}
+								AND "longitude" <= ${maxLng}
+						)
+						SELECT
+							"id",
+							"company",
+							"state",
+							"city",
+							"firstName",
+							"headline",
+							"lastName",
+							"title",
+							"latitude",
+							"longitude",
+							"venueId",
+							"name"
+						FROM ranked
+						WHERE rn <= ${perCellCategory} OR "venueId" IS NOT NULL
+						ORDER BY ("venueId" IS NOT NULL) DESC, rn ASC, stable_key ASC
+						LIMIT ${ambientTake}
+					`),
+				[],
+				`ambient ${phase ?? 'buffer'} overlay query`
+			);
+			return apiResponse(contacts);
+		}
 
 		const bboxWhere: Prisma.ContactWhereInput = {
 			latitude: { gte: minLat, lte: maxLat },
@@ -134,7 +291,7 @@ export async function GET(req: NextRequest) {
 					bboxWhere,
 					{ title: { not: null } },
 					{
-						OR: BOOKING_TITLE_PREFIXES.map((p) => ({
+						OR: BOOKING_CONTACT_TITLE_PREFIXES.map((p) => ({
 							title: { mode: 'insensitive', startsWith: p },
 						})),
 					},
@@ -146,7 +303,7 @@ export async function GET(req: NextRequest) {
 					bboxWhere,
 					{ title: { not: null } },
 					{
-						OR: PROMOTION_TITLE_PREFIXES.map((p) => ({
+						OR: PROMOTION_CONTACT_TITLE_PREFIXES.map((p) => ({
 							title: { mode: 'insensitive', startsWith: p },
 						})),
 					},
@@ -154,15 +311,53 @@ export async function GET(req: NextRequest) {
 			};
 		}
 
-		const contacts = await prisma.contact.findMany({
-			where,
-			take,
-			orderBy: [{ id: 'asc' }],
-		});
+		// Ambient already returned above, so this path only runs for booking/promotion/all — all of
+		// which are themselves fetched only at zoom >= 8. Gate the research-detail fields on zoom so
+		// they're present whenever the detail panel can open, and dropped for any lower-zoom fetch.
+		const includeResearchFields =
+			(zoom ?? Number.POSITIVE_INFINITY) >= OVERLAY_RESEARCH_FIELDS_MIN_ZOOM;
+
+		const overlaySelect = {
+			id: true,
+			latitude: true,
+			longitude: true,
+			title: true,
+			firstName: true,
+			lastName: true,
+			company: true,
+			headline: true,
+			venueId: true,
+			state: true,
+			city: true,
+			metadata: includeResearchFields,
+			website: includeResearchFields,
+			address: includeResearchFields,
+			companyType: includeResearchFields,
+			companyFoundedYear: includeResearchFields,
+		} satisfies Prisma.ContactSelect;
+
+		const rows = await withOverlayBudgetFallback(
+			() =>
+				prisma.contact.findMany({
+					where,
+					take,
+					orderBy: [{ id: 'asc' }],
+					select: overlaySelect,
+				}),
+			[],
+			`${mode} overlay query`
+		);
+
+		// Mirror the Prisma `name` result-extension rather than selecting it (selecting an
+		// extension-computed field via `select` is version-fragile). firstName/lastName are
+		// always selected, so derive `name` here exactly as the extension does.
+		const contacts: OverlayContactRow[] = rows.map((row) => ({
+			...row,
+			name: `${row.firstName ?? ''} ${row.lastName ?? ''}`.trim() || null,
+		}));
 
 		return apiResponse(contacts);
 	} catch (error) {
 		return handleApiError(error);
 	}
 }
-

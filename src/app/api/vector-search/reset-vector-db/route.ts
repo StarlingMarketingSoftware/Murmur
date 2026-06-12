@@ -1,7 +1,9 @@
 import { auth } from '@clerk/nextjs/server';
 import {
 	apiBadRequest,
+	apiForbidden,
 	apiResponse,
+	apiServerError,
 	apiUnauthorized,
 	handleApiError,
 } from '@/app/api/_utils';
@@ -9,7 +11,7 @@ import { Client } from '@elastic/elasticsearch';
 import { UserRole } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import z from 'zod';
-import { getValidatedParamsFromUrl } from '@/utils/url';
+import crypto from 'crypto';
 import { NextRequest } from 'next/server';
 
 if (!process.env.ELASTICSEARCH_API_KEY) {
@@ -25,11 +27,20 @@ const elasticsearch = new Client({
 
 const INDEX_NAME = 'contacts';
 
+// Destructive admin op: password travels in the POST body (never the URL, which
+// leaks into logs/history) alongside an explicit confirmation token.
 const deleteSecuritySchema = z.object({
-	password: z.string(),
+	password: z.string().min(1),
+	confirm: z.literal('RESET_VECTOR_DB'),
 });
 
-export async function GET(req: NextRequest) {
+const timingSafeStringEqual = (a: string, b: string): boolean => {
+	const aBuf = Buffer.from(a);
+	const bBuf = Buffer.from(b);
+	return aBuf.length === bBuf.length && crypto.timingSafeEqual(aBuf, bBuf);
+};
+
+export async function POST(req: NextRequest) {
 	try {
 		const { userId } = await auth();
 		if (!userId) {
@@ -43,15 +54,22 @@ export async function GET(req: NextRequest) {
 			},
 		});
 		if (user?.role !== UserRole.admin) {
-			return apiUnauthorized();
+			return apiForbidden();
 		}
 
-		const validatedParams = getValidatedParamsFromUrl(req.url, deleteSecuritySchema);
+		const body = await req.json();
+		const validatedParams = deleteSecuritySchema.safeParse(body);
 		if (!validatedParams.success) {
 			return apiBadRequest(validatedParams.error);
 		}
 
-		if (validatedParams.data.password !== process.env.ELASTICSEARCH_RESET_PASSWORD) {
+		// Fail closed: without a configured reset password this endpoint is inert.
+		const resetPassword = process.env.ELASTICSEARCH_RESET_PASSWORD;
+		if (!resetPassword) {
+			return apiServerError('Reset password is not configured');
+		}
+
+		if (!timingSafeStringEqual(validatedParams.data.password, resetPassword)) {
 			return apiBadRequest('Invalid password');
 		}
 

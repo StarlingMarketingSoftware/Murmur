@@ -85,7 +85,7 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 				style={{
 					width: '100%',
 					height: '100%',
-					border: '3px solid #000000',
+					border: '1px solid #000000',
 					borderRadius: '8px',
 					position: 'relative',
 					display: 'flex',
@@ -101,7 +101,7 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 						style={{
 							width: '366px',
 							height: '41px',
-							border: '2px solid #000000',
+							border: '1px solid #000000',
 							borderRadius: '8px',
 							backgroundColor: shouldBlankWave ? undefined : 'white',
 						}}
@@ -169,7 +169,7 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 					style={{
 						width: '366px',
 						height: '390px',
-						border: '2px solid #000000',
+						border: '1px solid #000000',
 						borderRadius: '8px',
 						backgroundColor: shouldBlankWave ? undefined : 'white',
 					}}
@@ -187,12 +187,12 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 						>
 							{hasLinks ? (
 								<div
-									className="p-3 text-[14px] leading-[1.6] draft-preview-content"
+									className="murmur-selectable p-3 text-[14px] leading-[1.6] draft-preview-content"
 									style={{ wordBreak: 'break-word' }}
 									dangerouslySetInnerHTML={{ __html: draft.message || 'No content' }}
 								/>
 							) : (
-								<div className="p-3 whitespace-pre-wrap text-[14px] leading-[1.6]">
+								<div className="murmur-selectable p-3 whitespace-pre-wrap text-[14px] leading-[1.6]">
 									{plainMessage || 'No content'}
 								</div>
 							)}

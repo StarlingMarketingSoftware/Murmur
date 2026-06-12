@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { apiResponse, apiUnauthorized } from '@/app/api/_utils';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import { initializeVectorDb, upsertContactToVectorDb } from '../../_utils/vectorDb';
 import { EmailVerificationStatus, UserRole } from '@prisma/client';
 
@@ -13,8 +14,15 @@ const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
 	]);
 };
 
-export async function GET() {
+export async function GET(req: Request) {
 	try {
+		// Admin-only bulk embedding job (paid OpenAI embeddings) — keep it to a few runs/hour.
+		const limited = await withRateLimit(req, 'ai-expensive', 'generate-embeddings', {
+			user: [{ tokens: 5, window: '3600 s' }],
+			ip: [{ tokens: 5, window: '3600 s' }],
+		});
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();

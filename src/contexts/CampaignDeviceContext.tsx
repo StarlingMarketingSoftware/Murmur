@@ -4,11 +4,14 @@ import { createContext, type FC, type ReactNode, useContext } from 'react';
 
 export type CampaignViewType =
 	| 'contacts'
+	| 'overview'
 	| 'testing'
 	| 'drafting'
 	| 'sent'
 	| 'inbox'
-	| 'all';
+	| 'all'
+	| 'search'
+	| 'summary';
 
 export type CampaignDeviceContextValue = {
 	/**

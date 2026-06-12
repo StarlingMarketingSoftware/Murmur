@@ -1,6 +1,7 @@
 'use client';
-import { useAuth, UserButton, SignUpButton, SignInButton } from '@clerk/nextjs';
+import { useAuth, UserButton, SignInButton } from '@clerk/nextjs';
 import { urls } from '@/constants/urls';
+import { AccountType } from '@/constants/prismaEnums';
 import { useMe } from '@/hooks/useMe';
 import Link from 'next/link';
 import { cn } from '@/utils';
@@ -23,6 +24,12 @@ export const Navbar = () => {
 		user?.stripeSubscriptionStatus === StripeSubscriptionStatus.ACTIVE ||
 		user?.stripeSubscriptionStatus === StripeSubscriptionStatus.TRIALING;
 	const canAccessApp = hasActiveSubscription || user?.role === 'admin';
+	const isVenue = user?.accountType === AccountType.venue;
+	// Venue accounts reach their portal without an artist subscription.
+	const canEnterApp = isVenue || canAccessApp;
+	const landingTarget = isVenue
+		? urls.venuePortal.index
+		: urls.murmur.dashboard.index;
 
 	// If a signed-in user has an active subscription, keep them out of the landing page.
 	// Also, if they just signed in (modal), send them to the dashboard immediately.
@@ -31,7 +38,7 @@ export const Navbar = () => {
 		prevIsSignedInRef.current = isSignedIn;
 
 		if (!isSignedIn) return;
-		if (!canAccessApp) return;
+		if (!canEnterApp) return;
 
 		const justSignedIn = !wasSignedIn && isSignedIn;
 		const isLanding = pathname === urls.home.index;
@@ -42,8 +49,8 @@ export const Navbar = () => {
 		// (e.g. navigating from the dashboard via a special link).
 		if (!justSignedIn && isActiveLandingView) return;
 
-		router.replace(urls.murmur.dashboard.index);
-	}, [canAccessApp, isSignedIn, pathname, router, searchParams]);
+		router.replace(landingTarget);
+	}, [canEnterApp, landingTarget, isSignedIn, pathname, router, searchParams]);
 
 	useEffect(() => {
 		const update = () => {
@@ -101,42 +108,24 @@ export const Navbar = () => {
 	const navItems: NavItem[] = [
 		{ path: urls.home.index, label: 'Home' },
 		{ path: urls.pricing.index, label: 'Pricing' },
-		{ path: urls.resources.index, label: 'Resources' },
+		{ path: urls.venue.index, label: 'Venue' },
 		{ path: urls.admin.index, label: 'Admin' },
 	].filter((item) => !(user?.role !== 'admin' && item.path === '/admin'));
 
 	const isLanding = pathname === urls.home.index;
-	const isMapPage = pathname === '/map' || pathname.startsWith('/map/');
+	const isLandingLikePage = isLanding || pathname === urls.venue.index;
 	const isPricingPage = pathname === urls.pricing.index || pathname.startsWith(`${urls.pricing.index}/`);
-	const isResourcesPage =
-		pathname === urls.resources.index || pathname.startsWith(`${urls.resources.index}/`);
-	const isResearchPage = pathname === '/research' || pathname.startsWith('/research/');
-	const isInboxPage = pathname === '/inbox' || pathname.startsWith('/inbox/');
-	const isDraftingPage = pathname === '/drafting' || pathname.startsWith('/drafting/');
-	const showBackArrow = isMapPage || isResearchPage || isInboxPage || isDraftingPage;
-	const isLandingNavbarZoom80 = isLanding || isMapPage;
-	const isFreeTrial =
-		pathname === urls.freeTrial.index || pathname.startsWith(`${urls.freeTrial.index}/`);
+	const isLandingNavbarZoom80 = isLandingLikePage;
 	// Navbar is transparent only at the very top of the landing page (before any scroll)
-	const isLandingAtTop = isLanding && !scrolled;
-	const isTransparentHeader = isFreeTrial || isLandingAtTop;
-	// Map + Research + Inbox + Drafting pages: navbar should be fully invisible at the top (so the gradient shows behind it),
-	// then become visible once the user scrolls.
-	const isMapTopTransparent =
-		(isMapPage || isResearchPage || isInboxPage || isDraftingPage) && !scrolled;
+	const isLandingAtTop = isLandingLikePage && !scrolled;
+	const isTransparentHeader = isLandingAtTop;
 	// Hamburger/X icon color based on page and scroll position:
 	// - Landing page over video hero: white icon for visibility
 	// - Scrolled past hero or other pages (lighter background): dark icon
-	const isLandingOverVideo = isLanding && !scrolledPastHero;
+	const isLandingOverVideo = isLandingLikePage && !scrolledPastHero;
 	const mobileMenuIconColor = isLandingOverVideo ? 'bg-white/90' : 'bg-gray-700';
 	// Mobile menu text should be white while over the hero video, dark when scrolled past it
 	const isMobileMenuTextLight = isLandingOverVideo;
-
-	// On `/free-trial` we show either the Clerk auth flow or embedded Stripe checkout;
-	// hide the header entirely in both cases so it doesn't distract or clip.
-	if (isFreeTrial) {
-		return null;
-	}
 
 	return (
 		<>
@@ -166,62 +155,40 @@ export const Navbar = () => {
 									? 'landing-navbar-zoom-80'
 									: isPricingPage
 										? 'pricing-navbar-zoom-80'
-										: isResourcesPage
-											? 'resources-navbar-zoom-80'
 										: 'left-0 right-0',
 								// Smooth transition for background color changes in both directions
 								'transition-[background-color,backdrop-filter,border-color,box-shadow] duration-500 ease-out',
 								isTransparentHeader
-									? 'bg-transparent'
-									: isMapTopTransparent
-										? 'bg-transparent'
-										: scrolled
-											? [
-												// Liquid glass - refractive blur that distorts but keeps colors vivid
-												'bg-white/[0.1] backdrop-blur-[10px] backdrop-saturate-[1.8] backdrop-brightness-[1.05]',
-												// Thin bright border line
-												'border-b border-white/25',
-												// Subtle inset highlight
-												'shadow-[inset_0_0.5px_0_0_rgba(255,255,255,0.25)]',
-											]
-											: [
-												// Resting state - lighter refractive effect
-												'bg-white/[0.06] backdrop-blur-[6px] backdrop-saturate-[1.5] backdrop-brightness-[1.02]',
-												'border-b border-white/15',
-											],
+									? // Keep the bottom border present (width 1px) but fully transparent so it
+										// fades in via the border-color transition instead of snapping from 0→1px
+										// when navigating to an opaque page (e.g. home/venue → pricing).
+										'bg-transparent border-b border-white/0'
+									: scrolled
+										? [
+											// Liquid glass - refractive blur that distorts but keeps colors vivid
+											'bg-white/[0.1] backdrop-blur-[10px] backdrop-saturate-[1.8] backdrop-brightness-[1.05]',
+											// Thin bright border line
+											'border-b border-white/25',
+											// Subtle inset highlight
+											'shadow-[inset_0_0.5px_0_0_rgba(255,255,255,0.25)]',
+										]
+										: [
+											// Resting state - lighter refractive effect
+											'bg-white/[0.06] backdrop-blur-[6px] backdrop-saturate-[1.5] backdrop-brightness-[1.02]',
+											'border-b border-white/15',
+										],
 							]
 				)}
 			>
 				<div className="w-full">
 					<div
 						className={cn(
-							'flex items-center justify-between h-12 px-5 sm:px-6 min-[1145px]:px-12',
-							isFreeTrial && 'pt-[4px]'
+							'flex items-center justify-between h-12 px-5 sm:px-6 min-[1145px]:px-12'
 						)}
 					>
-						{/* Left Section - Back arrow on feature pages, UserButton on mobile otherwise */}
+						{/* Left Section - UserButton on mobile when signed in, spacer otherwise */}
 						<div className="min-[1145px]:hidden flex items-center">
-							{showBackArrow ? (
-								<Link
-									href="/"
-									className="text-[#060606] hover:text-gray-500 transition-colors"
-									title="Back to Home"
-									aria-label="Back to Home"
-								>
-									<svg
-										width="22"
-										height="13"
-										viewBox="0 0 27 16"
-										fill="none"
-										xmlns="http://www.w3.org/2000/svg"
-									>
-										<path
-											d="M0.292892 7.29289C-0.0976315 7.68342 -0.0976315 8.31658 0.292892 8.70711L6.65685 15.0711C7.04738 15.4616 7.68054 15.4616 8.07107 15.0711C8.46159 14.6805 8.46159 14.0474 8.07107 13.6569L2.41421 8L8.07107 2.34315C8.46159 1.95262 8.46159 1.31946 8.07107 0.928932C7.68054 0.538408 7.04738 0.538408 6.65685 0.928932L0.292892 7.29289ZM27 8V7L1 7V8V9L27 9V8Z"
-											fill="currentColor"
-										/>
-									</svg>
-								</Link>
-							) : isSignedIn ? (
+							{isSignedIn ? (
 								<UserButton
 									appearance={{
 										elements: {
@@ -238,29 +205,8 @@ export const Navbar = () => {
 								<div className={cn(isMobileMenuOpen ? 'w-5 h-5' : 'w-6 h-6')} /> /* Empty spacer */
 							)}
 						</div>
-						{/* Desktop left section - Back arrow on feature pages, spacer otherwise */}
+						{/* Desktop left section - spacer to balance the layout */}
 						<div className="hidden min-[1145px]:flex items-center w-7 h-7">
-							{showBackArrow && (
-								<Link
-									href="/"
-									className="text-[#060606] hover:text-gray-500 transition-colors"
-									title="Back to Home"
-									aria-label="Back to Home"
-								>
-									<svg
-										width="16"
-										height="10"
-										viewBox="0 0 27 16"
-										fill="none"
-										xmlns="http://www.w3.org/2000/svg"
-									>
-										<path
-											d="M0.292892 7.29289C-0.0976315 7.68342 -0.0976315 8.31658 0.292892 8.70711L6.65685 15.0711C7.04738 15.4616 7.68054 15.4616 8.07107 15.0711C8.46159 14.6805 8.46159 14.0474 8.07107 13.6569L2.41421 8L8.07107 2.34315C8.46159 1.95262 8.46159 1.31946 8.07107 0.928932C7.68054 0.538408 7.04738 0.538408 6.65685 0.928932L0.292892 7.29289ZM27 8V7L1 7V8V9L27 9V8Z"
-											fill="currentColor"
-										/>
-									</svg>
-								</Link>
-							)}
 						</div>
 						{/* Desktop Navigation */}
 						<div className="absolute inset-0 hidden min-[1145px]:flex items-center justify-center pointer-events-none">
@@ -339,51 +285,18 @@ export const Navbar = () => {
 										}}
 									/>
 								) : (
-									<div className="flex items-center">
-										<Link
-											href={urls.freeTrial.index}
-											className="mr-6 flex items-center justify-center text-white text-[12px] font-medium tracking-[0.02em] transition-all duration-300 hover:opacity-90"
-											style={{
-												width: '219px',
-												height: '33px',
-												backgroundColor: '#53B060',
-												border: '1px solid #118521',
-												borderRadius: '8px',
-											}}
-										>
-											Start Free Trial
-										</Link>
-										<SignInButton mode="modal">
-											<button
-												className={cn(
-													'relative px-4 text-[12px] font-medium tracking-[0.02em] transition-all duration-300',
-													'after:absolute after:bottom-[-8px] after:left-4 after:right-4 after:h-[1px]',
-													'after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-center',
-													'text-gray-700/70 hover:text-gray-900 after:bg-gray-900'
-												)}
-											>
-												Sign in
-											</button>
-										</SignInButton>
-										<div
+									<SignInButton mode="modal" withSignUp>
+										<button
 											className={cn(
-												'w-[1px] h-4 mx-3',
-												'bg-gray-300/50'
+												'relative px-4 text-[12px] font-medium tracking-[0.02em] transition-all duration-300',
+												'after:absolute after:bottom-[-8px] after:left-4 after:right-4 after:h-[1px]',
+												'after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-center',
+												'text-gray-700/70 hover:text-gray-900 after:bg-gray-900'
 											)}
-										/>
-										<SignUpButton mode="modal">
-											<button
-												className={cn(
-													'relative px-4 text-[12px] font-medium tracking-[0.02em] transition-all duration-300',
-													'after:absolute after:bottom-[-8px] after:left-4 after:right-4 after:h-[1px]',
-													'after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-center',
-													'text-gray-700/70 hover:text-gray-900 after:bg-gray-900'
-												)}
-											>
-												Sign up
-											</button>
-										</SignUpButton>
-									</div>
+										>
+											Sign in
+										</button>
+									</SignInButton>
 								)}
 							</div>
 						</div>
@@ -438,8 +351,8 @@ export const Navbar = () => {
 									'px-5 py-4 border-t transition-colors duration-300',
 									isMobileMenuTextLight ? 'border-white/20' : 'border-gray-200/20'
 								)}>
-									<div className="flex space-x-6">
-										<SignInButton mode="modal">
+									<div className="flex">
+										<SignInButton mode="modal" withSignUp>
 											<button
 												className={cn(
 													'flex-1 py-2.5 text-center text-[14px] font-secondary transition-colors duration-300',
@@ -452,19 +365,6 @@ export const Navbar = () => {
 												Sign in
 											</button>
 										</SignInButton>
-										<SignUpButton mode="modal">
-											<button
-												className={cn(
-													'flex-1 py-2.5 text-center text-[14px] font-secondary transition-colors duration-300',
-													isMobileMenuTextLight
-														? 'text-white/80 hover:text-white'
-														: 'text-gray-600 hover:text-gray-900'
-												)}
-												onClick={() => setMobileMenuOpen(false)}
-											>
-												Sign up
-											</button>
-										</SignUpButton>
 									</div>
 								</div>
 							)}
@@ -490,8 +390,13 @@ export const Navbar = () => {
 				/>
 			</div>
 
-			{/* Spacer - skip on landing, free-trial, and marketing feature pages that want full-bleed gradients */}
-			{!(isLanding || isFreeTrial || isMapPage || isResearchPage || isInboxPage || isDraftingPage) && <div className="h-12" />}
+			{/* Spacer - skip on landing; on pricing keep it on mobile but drop it on
+			    desktop so the gradient goes full-bleed behind the navbar like the landing page */}
+			{isPricingPage ? (
+				<div className="h-12 lg:hidden" />
+			) : (
+				!isLandingLikePage && <div className="h-12" />
+			)}
 		</>
 	);
 };

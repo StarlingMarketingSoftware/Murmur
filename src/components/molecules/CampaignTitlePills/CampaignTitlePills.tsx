@@ -134,28 +134,18 @@ const parseTitleStatePillLocation = (locationBase: string): TitleStatePillLocati
 const sizeStyles = (size: CampaignTitlePillsSize) => {
 	if (size === 'table') {
 		return {
-			pillHeight: 'h-[16px]',
+			pillHeight: 'h-[20px]',
 			pillPx: 'px-[6px]',
 			categoryGap: 'gap-[6px]',
-			// Dashboard Campaigns table: keep category pills a consistent width
-			// so the trailing "in" + state pill align row-to-row.
 			categoryPillWidthClassName: 'w-[111px] min-w-[111px] max-w-[111px]',
-			categoryTextClassName: 'flex-1 min-w-0 truncate',
-			// Reserve a fixed icon "slot" so different SVGs don't appear to drift left/right.
+			categoryTextClassName: 'flex-1 min-w-0 truncate text-[13.854px] font-medium leading-[17.186px]',
 			categoryIconWrapperClassName:
 				'ml-auto flex-none w-[15px] h-[15px] inline-flex items-center justify-center translate-x-[1px] [&>svg]:block',
-			// Dashboard Campaigns table: keep state pills a consistent width
-			// so every row lines up cleanly.
 			statePillWidthClassName: 'w-[49px] min-w-[49px] max-w-[49px]',
-			// Slightly tighter padding so 2-letter states + icon fit in 49px.
 			statePillPxClassName: 'px-[4px]',
-			// Use justify-between (instead of a fixed gap) inside a fixed-width pill.
 			stateGap: 'justify-between',
-			// Slightly smaller icon so it breathes in the 49px pill.
 			stateIconSize: '[&>svg]:w-[14px] [&>svg]:h-[11px] [&>svg]:block',
 			supClassName: 'ml-[3px] text-[10px] leading-none',
-			// Fixed spacing region between category pill and state pill.
-			// This makes the Campaigns table titles feel uniform row-to-row.
 			inWordSpacingClassName: 'w-[33px] mx-0 text-center flex-none',
 			iconScale: 16 / 26,
 		} as const;
@@ -237,7 +227,7 @@ const renderCampaignTitleWithStatePill = (title: string, size: CampaignTitlePill
 					<>
 						{beforeInText || null}
 						{inWord ? (
-							<span className={cn('inline-block', inWordSpacingClassName)}>{inWord}</span>
+							<span className={cn('inline-block font-inter font-medium text-[13.854px] text-black', inWordSpacingClassName)}>{inWord}</span>
 						) : null}
 					</>
 				);
@@ -253,7 +243,7 @@ const renderCampaignTitleWithStatePill = (title: string, size: CampaignTitlePill
 				)}
 				style={{ backgroundColor }}
 			>
-				<span className="leading-none flex-none">{abbr}</span>
+				<span className="leading-none flex-none font-inter font-medium text-[13.854px] text-black">{abbr}</span>
 				<span
 					className={cn(
 						'inline-flex items-center justify-center translate-y-[1px] flex-none',
@@ -318,7 +308,7 @@ const renderCampaignTitleWithCategoryPill = (
 					)}
 					style={{ backgroundColor: spec.backgroundColor }}
 				>
-					<span className={cn('leading-none', categoryTextClassName)}>{displayText}</span>
+					<span className={cn('leading-none font-inter font-medium text-[13.854px] text-black', categoryTextClassName)}>{displayText}</span>
 					<span
 						className={cn(
 							'translate-y-[1px]',

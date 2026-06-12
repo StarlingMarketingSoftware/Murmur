@@ -42,14 +42,14 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 	// - Identity bar: 40px tall (between the two divider lines)
 	// - Subject box: 5px below the identity bar
 	const TOP_DIVIDER_Y = 4;
-	const STROKE_PX = 3;
-	// Identity bar is 40px including its 3px bottom border (box-sizing: border-box)
+	const STROKE_PX = 1;
+	// Identity bar is 40px including its bottom border (box-sizing: border-box)
 	const IDENTITY_BAR_HEIGHT = 40;
 	const IDENTITY_BAR_TOP = TOP_DIVIDER_Y + STROKE_PX;
 	const SUBJECT_GAP_BELOW_IDENTITY = 5;
 	const SUBJECT_BOX_HEIGHT = 46;
 	const BODY_BOTTOM_GAP = 12;
-	// Body marginTop = first divider (3px) + identity bar (40px) + gap (5px) = 48px
+	// Body marginTop = first divider (STROKE_PX) + identity bar (40px) + gap (5px)
 	// This places the subject box 5px below the identity bar's bottom border
 	const BODY_TOP_MARGIN = STROKE_PX + IDENTITY_BAR_HEIGHT + SUBJECT_GAP_BELOW_IDENTITY;
 
@@ -161,7 +161,7 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 	return (
 		<div
 			className={cn(
-				'max-[480px]:w-[96.27vw] rounded-md pb-2 flex flex-col relative border-[3px] border-black'
+				'max-[480px]:w-[96.27vw] rounded-md pb-2 flex flex-col relative border border-black'
 			)}
 			style={{
 				width: `${width}px`,
@@ -336,13 +336,13 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 						lockHorizontalScroll
 					>
 						{hasLinks ? (
-							<div 
-								className="p-3 text-[14px] leading-[1.6] draft-preview-content"
+							<div
+								className="murmur-selectable p-3 text-[14px] leading-[1.6] draft-preview-content"
 								style={{ wordBreak: 'break-word' }}
 								dangerouslySetInnerHTML={{ __html: rawHtmlMessage || 'No content' }}
 							/>
 						) : (
-							<div className="p-3 whitespace-pre-wrap text-[14px] leading-[1.6]">
+							<div className="murmur-selectable p-3 whitespace-pre-wrap text-[14px] leading-[1.6]">
 								{plainMessage || 'No content'}
 							</div>
 						)}

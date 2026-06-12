@@ -13,6 +13,7 @@ import React, {
 	type FC,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { getMurmurRootScale } from '@/utils/rootScale';
  
 type BookingForTab = 'Anytime' | 'Season' | 'Calendar';
 type BookingForSeason = 'Spring' | 'Summer' | 'Fall' | 'Winter';
@@ -127,20 +128,11 @@ export const useBookingForDropdownController = ({
 		const button = bookingForButtonRef.current;
 		if (!container || !button) return;
  
-		// Get the page zoom factor. Murmur uses `zoom: 0.9` (or similar) on <html>.
-		// getBoundingClientRect() returns zoomed coordinates, but position: fixed uses unzoomed.
-		// We need to divide by zoom to convert.
-		const getZoomFactor = (): number => {
-			const html = document.documentElement;
-			const computed = window.getComputedStyle(html);
-			const zoom = computed.zoom;
-			if (zoom && zoom !== 'normal') {
-				const zoomValue = parseFloat(zoom);
-				if (Number.isFinite(zoomValue) && zoomValue > 0) return zoomValue;
-			}
-			return 1;
-		};
-		const zoom = getZoomFactor();
+		// Get the page scale factor. Murmur scales compact pages with `zoom` on <html>
+		// (Chrome) or `transform: scale()` on <body> (Safari force-transform mode).
+		// getBoundingClientRect() returns scaled coordinates, but position: fixed values
+		// resolve in unscaled units in both modes, so divide by the applied scale.
+		const zoom = getMurmurRootScale();
  
 		const containerRect = container.getBoundingClientRect();
 		const buttonRect = button.getBoundingClientRect();
@@ -437,9 +429,11 @@ export const BookingForDropdownControl: FC<BookingForDropdownControlProps> = ({
 			{isBookingForOpen &&
 				(bookingForDropdownPosition || bookingForTab !== 'Calendar') &&
 				(() => {
-					// Anytime/Season use static (absolute) positioning - they fit in the container.
-					// Calendar uses portal with fixed positioning so it's not clipped by overflow.
-					const useStatic = bookingForTab !== 'Calendar';
+					// All tabs portal with fixed positioning so the dropdown isn't clipped by
+					// the prompt panel's overflow. Landing mode (useStaticDropdownPosition) keeps
+					// Anytime/Season static because the whole panel is transform-scaled there;
+					// Calendar always portals (it never fits in the container).
+					const useStatic = useStaticDropdownPosition && bookingForTab !== 'Calendar';
  
 					// For Calendar in landing page mode, calculate position to align tabs with button
 					// Note: In landing mode the entire HybridPromptInput panel is scaled down (see `LandingDraftingDemo`).
@@ -710,7 +704,7 @@ export const BookingForDropdownControl: FC<BookingForDropdownControlProps> = ({
  
 														<div className="flex items-center justify-center gap-[24px]">
 															<div
-																className="w-[364px] h-[42px] rounded-[8px] bg-[#E2E2E2] flex items-center px-[18px]"
+																className="w-[364px] h-[42px] rounded-[8px] bg-[#D2EFFF] flex items-center px-[18px]"
 																data-hover-description-suppress="true"
 															>
 																<span className="font-inter font-semibold text-[16px] leading-[16px] text-black">
@@ -718,7 +712,7 @@ export const BookingForDropdownControl: FC<BookingForDropdownControlProps> = ({
 																</span>
 															</div>
 															<div
-																className="w-[364px] h-[42px] rounded-[8px] bg-[#E2E2E2] flex items-center px-[18px]"
+																className="w-[364px] h-[42px] rounded-[8px] bg-[#D2EFFF] flex items-center px-[18px]"
 																data-hover-description-suppress="true"
 															>
 																<span className="font-inter font-semibold text-[16px] leading-[16px] text-black">
@@ -822,7 +816,7 @@ export const BookingForDropdownControl: FC<BookingForDropdownControlProps> = ({
  
 													return (
 														<div
-															className="w-[364px] h-[312px] rounded-[8px] bg-[#E2E2E2] p-[18px] flex flex-col"
+															className="w-[364px] h-[312px] rounded-[8px] bg-[#D2EFFF] p-[18px] flex flex-col"
 															data-hover-description-suppress="true"
 														>
 															<div className="grid grid-cols-7 text-center">

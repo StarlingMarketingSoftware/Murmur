@@ -75,6 +75,17 @@ For Stripe subscription functionality, set up a webhook:
 
 5. For testing Klarna payments, reference these docs: https://docs.stripe.com/payments/klarna/accept-a-payment?platform=web&ui=API&country=united-states#testmode-guide
 
+## API Rate Limiting (Upstash Redis)
+
+API routes are rate limited via `@upstash/ratelimit` (see `src/app/api/_utils/rateLimit.ts`). To enable it, create a free [Upstash Redis](https://upstash.com/) database and add to your `.env`:
+
+```bash
+UPSTASH_REDIS_REST_URL=...
+UPSTASH_REDIS_REST_TOKEN=...
+```
+
+When these are unset, rate limiting is **disabled (fail-open)** — acceptable for local dev but it **must** be configured in production to prevent cost-amplification abuse of the AI/paid-API endpoints.
+
 ## Clerk Webhook Setup
 
 1. https://clerk.com/docs/webhooks/sync-data

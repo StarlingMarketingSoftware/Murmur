@@ -6,7 +6,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import HomeIcon from '@/components/atoms/_svg/HomeIcon';
+import SettingsGearIcon from '@/components/atoms/_svg/SettingsGearIcon';
 import { OutlinedInitialAvatar } from '@/components/atoms/OutlinedInitialAvatar/OutlinedInitialAvatar';
+import { SettingsModal } from '@/components/organisms/SettingsModal/SettingsModal';
+import { PersistentDashboardMap } from '@/components/molecules/PersistentDashboardMap';
+import { PersistentMapProvider } from '@/contexts/PersistentMapContext';
+import { SendingSessionProvider } from '@/contexts/SendingSessionContext';
+import { isSafariBrowser } from '@/utils/browserDetection';
 
 export default function MurmurLayoutClient({ children }: { children: React.ReactNode }) {
 	const { isSignedIn } = useAuth();
@@ -30,16 +36,27 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 	const [mounted, setMounted] = useState(false);
 	useEffect(() => setMounted(true), []);
 
+	const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+	useEffect(() => {
+		setIsSettingsOpen(false);
+	}, [pathname]);
+
 	// Hide footer for murmur pages and apply animations
 	useEffect(() => {
 		document.body.classList.add('murmur-page');
 		document.documentElement.classList.add('murmur-compact');
+		// Safari-only CSS hooks (e.g. swapping backdrop-filter over the WebGL map
+		// for opaque fills — a WebKit compositing perf cliff).
+		if (isSafariBrowser()) {
+			document.documentElement.classList.add('is-safari');
+		}
 
 		// Removed slide-up animation on nav to avoid bounce-in effect
 
 		return () => {
 			document.body.classList.remove('murmur-page');
 			document.documentElement.classList.remove('murmur-compact');
+			document.documentElement.classList.remove('is-safari');
 		};
 	}, []);
 
@@ -78,7 +95,9 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 	}, []);
 
 	return (
-		<>
+		<SendingSessionProvider>
+		<PersistentMapProvider>
+			<PersistentDashboardMap />
 			{/* Persistent Clerk login icon in top right corner */}
 			<div
 				className={`clerk-user-button fixed top-3 z-50 ${
@@ -88,20 +107,37 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 			{mounted ? (
 				isSignedIn ? (
 					isDashboardOrCampaign ? (
-						<div className="group relative w-7 h-7 cursor-pointer">
-							<OutlinedInitialAvatar
-								initial={outlinedInitial}
-								className="pointer-events-none absolute inset-0 w-7 h-7 group-hover:border-black group-hover:text-black group-focus-within:border-black group-focus-within:text-black group-active:border-black group-active:text-black"
-							/>
-							<div className="absolute inset-0 opacity-0">
-								<UserButton
-									appearance={{
-										elements: {
-											avatarBox: 'w-7 h-7',
-											userButtonTrigger: 'w-7 h-7 p-0',
-										},
-									}}
+						<div className="flex items-center gap-[10px]">
+							{!isMobile && (
+								<button
+									type="button"
+									aria-label="Settings"
+									aria-expanded={isSettingsOpen}
+									onClick={() => setIsSettingsOpen((prev) => !prev)}
+									className={`flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-2 transition-colors duration-150 ${
+										isSettingsOpen
+											? 'border-black bg-white text-black'
+											: 'border-[#6F6F6F] bg-transparent text-[#6F6F6F] hover:border-black hover:text-black'
+									}`}
+								>
+									<SettingsGearIcon width={20} height={20} />
+								</button>
+							)}
+							<div className="group relative w-7 h-7 cursor-pointer">
+								<OutlinedInitialAvatar
+									initial={outlinedInitial}
+									className="pointer-events-none absolute inset-0 w-7 h-7 group-hover:border-black group-hover:text-black group-focus-within:border-black group-focus-within:text-black group-active:border-black group-active:text-black"
 								/>
+								<div className="absolute inset-0 opacity-0">
+									<UserButton
+										appearance={{
+											elements: {
+												avatarBox: 'w-7 h-7',
+												userButtonTrigger: 'w-7 h-7 p-0',
+											},
+										}}
+									/>
+								</div>
 							</div>
 						</div>
 					) : (
@@ -135,6 +171,9 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 				</Link>
 			)}
 			{children}
+			{mounted && isSignedIn && isDashboardOrCampaign && !isMobile && (
+				<SettingsModal open={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+			)}
 			<style jsx global>{`
 				/* Prevent iOS Safari zoom on focus by ensuring form controls have >=16px font-size */
 				body.murmur-page.murmur-ios input,
@@ -172,7 +211,8 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 					display: none !important;
 				}
 			`}</style>
-		</>
+		</PersistentMapProvider>
+		</SendingSessionProvider>
 	);
 }
 

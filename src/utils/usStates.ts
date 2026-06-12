@@ -151,6 +151,46 @@ export const getNearestUsStateNames = (
 export const getAllUsStateNames = (): string[] => US_STATES.map((s) => s.name);
 
 /**
+ * Extracts a canonical US state name from free text like "Brooklyn, NY",
+ * "Brooklyn, New York" or "New York". Tries comma segments from the end
+ * (so "Brooklyn, NY, USA" matches NY), then trailing 1- and 2-word windows
+ * within each segment (so "Brooklyn NY" / "Brooklyn New York" match).
+ */
+export const extractUsStateNameFromText = (
+	text: string | null | undefined
+): string | null => {
+	const segments = (text ?? '')
+		.split(',')
+		.map((s) => s.trim())
+		.filter(Boolean);
+	for (let i = segments.length - 1; i >= 0; i--) {
+		const whole = normalizeUsStateName(segments[i]);
+		if (whole) return whole;
+		const words = segments[i].split(/\s+/).filter(Boolean);
+		const lastOne = normalizeUsStateName(words[words.length - 1]);
+		if (lastOne) return lastOne;
+		if (words.length >= 2) {
+			const lastTwo = normalizeUsStateName(words.slice(-2).join(' '));
+			if (lastTwo) return lastTwo;
+		}
+	}
+	return null;
+};
+
+/** Canonical name of the US state whose centroid is nearest to a point. */
+export const getNearestUsStateNameForPoint = (
+	lat: number,
+	lng: number
+): string | null => {
+	let best: { name: string; distanceKm: number } | null = null;
+	for (const s of US_STATES) {
+		const distanceKm = haversineKm({ lat, lng }, s.centroid);
+		if (!best || distanceKm < best.distanceKm) best = { name: s.name, distanceKm };
+	}
+	return best?.name ?? null;
+};
+
+/**
  * Returns an ordered list of canonical US state names where:
  * - The provided `preferred` states appear first (in their original order)
  * - The remaining states are appended (ensuring all 50 states are present)

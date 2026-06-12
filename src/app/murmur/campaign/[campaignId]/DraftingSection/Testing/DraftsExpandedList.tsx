@@ -13,13 +13,17 @@ import { EmailStatus } from '@/constants/prismaEnums';
 import { useGetCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { EmailWithRelations } from '@/types';
 import { ContactWithName } from '@/types/contact';
+import {
+	getSendDwellMs,
+	useSendingSessionActions,
+	waitForSendDwell,
+} from '@/contexts/SendingSessionContext';
 import { cn, convertHtmlToPlainText } from '@/utils';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 import OpenIcon from '@/components/atoms/svg/OpenIcon';
-import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 import {
 	canadianProvinceAbbreviations,
 	canadianProvinceNames,
@@ -302,13 +306,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	});
 	const { mutateAsync: updateEmail } = useEditEmail({ suppressToasts: true });
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
-
-	// Used contacts indicator
-	const { data: usedContactIds } = useGetUsedContactIds();
-	const usedContactIdsSet = useMemo(
-		() => new Set(usedContactIds || []),
-		[usedContactIds]
-	);
+	const sendingActions = useSendingSessionActions();
 
 	const handleDraftClick = (draft: EmailWithRelations, e: MouseEvent) => {
 		if (isPreviewMode && onDraftPreviewClick) {
@@ -363,12 +361,15 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	const isAllTabNavigation = interactionMode === 'allTab';
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
 	const isBottomView = customWhiteSectionHeight === 15 || customWhiteSectionHeight === 16;
-	// Compressed bottom panel spec: 40px total = 12px white + 28px color.
-	const effectiveWhiteSectionHeight = collapsed && isBottomView ? 12 : whiteSectionHeight;
+	// Compressed bottom panel spec: 45px total = 13px label strip + 26px inner bar.
+	const collapsedOuterWidthPx = 197;
+	const collapsedOuterHeightPx = 45;
+	const collapsedLabelHeightPx = 13;
+	const effectiveWhiteSectionHeight = collapsed && isBottomView ? collapsedLabelHeightPx : whiteSectionHeight;
 	const shouldRenderCollapsedTopBox = collapsed && isBottomView;
-	const collapsedTopBoxHeightPx = 22;
-	const collapsedTopBoxWidthPx = 224;
-	const collapsedTopBoxRadiusPx = 4.7;
+	const collapsedTopBoxHeightPx = 26;
+	const collapsedTopBoxWidthPx = 191;
+	const collapsedTopBoxRadiusPx = 3.33;
 	const resolvedRowWidth = rowWidth ?? 356;
 	const resolvedRowHeight = rowHeight ?? 64;
 	const hasCustomRowSize = Boolean(rowWidth || rowHeight);
@@ -436,6 +437,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 		(isDraftingBatchActive ? 1 : 0) + bottomViewBatchesToShow.length;
 	const bottomViewPlaceholderCount = Math.max(0, 3 - bottomViewRowCount);
 	const bottomViewPlaceholderBgColor = '#F7EBD3';
+	const collapsedTopColor = '#F7EBD3';
+	const collapsedFillColor = '#FFDC9E';
 
 	const horizontalPaddingClass = hasCustomRowSize
 		? 'px-0'
@@ -453,7 +456,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 
 		console.log('Campaign identity:', campaign?.identity);
 		if (!campaign?.identity?.email || !campaign?.identity?.name) {
-			toast.error('Please create an Identity before sending emails.');
+			toast.error('Please create an Identity before sending messages.');
 			return;
 		}
 
@@ -461,7 +464,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 			!subscriptionTier &&
 			user?.stripeSubscriptionStatus !== StripeSubscriptionStatus.TRIALING
 		) {
-			toast.error('Please upgrade to a paid plan to send emails.');
+			toast.error('Please upgrade to a paid plan to send messages.');
 			return;
 		}
 
@@ -476,12 +479,35 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 		const emailsWeCanSend = Math.min(selectedDrafts.length, sendingCredits);
 		const emailsToProcess = selectedDrafts.slice(0, emailsWeCanSend);
 
+		// Drive the campaign-global sending UI; queue mirrors the processing order below.
+		const sessionStarted = sendingActions.startSession({
+			campaignId: campaign.id,
+			queue: emailsToProcess.map((email) => ({
+				emailId: email.id as number,
+				contactId: email.contactId,
+				contact: (contacts.find((c) => c.id === email.contactId) ??
+					email.contact) as ContactWithName,
+				kind: 'email',
+				subject: email.subject,
+			})),
+		});
+		if (!sessionStarted) {
+			toast.error('A send is already in progress.');
+			return;
+		}
+		// No sending UI without the provider — skip the dwell.
+		const dwellMs = sendingActions.hasProvider
+			? getSendDwellMs(emailsToProcess.length)
+			: 0;
+
 		setIsSending(true);
 		if (onSendingPreviewReset) onSendingPreviewReset();
 		let successfulSends = 0;
 		try {
 			for (let i = 0; i < emailsToProcess.length; i++) {
 				const email = emailsToProcess[i];
+				const dwellStart = Date.now();
+				sendingActions.beginEmail(email.id as number);
 				if (onSendingPreviewUpdate) {
 					onSendingPreviewUpdate({
 						contactId: email.contactId,
@@ -494,6 +520,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 
 					if (!recipientEmail) {
 						console.error('No recipient email found for draft:', email.id);
+						sendingActions.failEmail(email.id as number);
 						continue;
 					}
 
@@ -508,6 +535,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 								? user?.customDomain
 								: user?.murmurEmail,
 						replyToEmail: user?.replyToEmail ?? user?.murmurEmail ?? undefined,
+						template: 'newMessage',
+						campaignId: campaign.id,
 					});
 					if (res.success) {
 						await updateEmail({
@@ -515,11 +544,16 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							data: { status: EmailStatus.sent, sentAt: new Date() },
 						});
 						successfulSends++;
+						sendingActions.completeEmail(email.id as number);
 						if (onSendingPreviewReset) onSendingPreviewReset();
+					} else {
+						sendingActions.failEmail(email.id as number);
 					}
 				} catch (err) {
 					console.error('Failed to send email:', err);
+					sendingActions.failEmail(email.id as number);
 				}
+				await waitForSendDwell(dwellStart, dwellMs);
 			}
 
 			// Update credits per user with this
@@ -538,19 +572,20 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 			// Clear selection and notify
 			setSelectedDraftIds(new Set());
 			if (successfulSends === selectedDrafts.length) {
-				toast.success(`All ${successfulSends} emails sent successfully!`);
+				toast.success(`All ${successfulSends} messages sent successfully!`);
 			} else if (successfulSends > 0) {
 				if (emailsWeCanSend < selectedDrafts.length) {
-					toast.warning(`Sent ${successfulSends} emails before running out of credits.`);
+					toast.warning(`Sent ${successfulSends} messages before running out of credits.`);
 				} else {
 					toast.warning(
-						`${successfulSends} of ${selectedDrafts.length} emails sent successfully.`
+						`${successfulSends} of ${selectedDrafts.length} messages sent successfully.`
 					);
 				}
 			} else {
-				toast.error('Failed to send emails. Please try again.');
+				toast.error('Failed to send messages. Please try again.');
 			}
 		} finally {
+			sendingActions.finishSession();
 			setIsSending(false);
 			// Clear live Send Preview in status panel
 			if (onSendingPreviewReset) onSendingPreviewReset();
@@ -560,7 +595,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 		<div
 			className={cn(
 				'relative max-[480px]:w-[96.27vw] rounded-md flex flex-col overflow-visible',
-				// In the compressed bottom-panel view we need exact internal pixel heights (16px white + 24px color).
+				// In the compressed bottom-panel view we need exact internal pixel heights.
 				// Use a stroke via box-shadow so it doesn't consume layout height.
 				shouldRenderCollapsedTopBox
 					? 'border-0'
@@ -571,9 +606,12 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 					: 'border-2 border-black/30'
 			)}
 			style={{
-				width: `${width}px`,
-				height: `${height}px`,
-				background: `linear-gradient(to bottom, #ffffff ${effectiveWhiteSectionHeight}px, #FFDC9E ${effectiveWhiteSectionHeight}px)`,
+				width: `${shouldRenderCollapsedTopBox ? collapsedOuterWidthPx : width}px`,
+				height: `${shouldRenderCollapsedTopBox ? collapsedOuterHeightPx : height}px`,
+				background: shouldRenderCollapsedTopBox
+					? `linear-gradient(to bottom, ${collapsedTopColor} ${effectiveWhiteSectionHeight}px, ${collapsedFillColor} ${effectiveWhiteSectionHeight}px)`
+					: `linear-gradient(to bottom, #ffffff ${effectiveWhiteSectionHeight}px, ${collapsedFillColor} ${effectiveWhiteSectionHeight}px)`,
+				borderRadius: shouldRenderCollapsedTopBox ? '3.33px' : undefined,
 				boxShadow: shouldRenderCollapsedTopBox
 					? 'inset 0 0 0 2px #000000'
 					: undefined,
@@ -602,10 +640,19 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 					}}
 				/>
 			)}
-			<DraftsHeaderChrome
-				isAllTab={isAllTab}
-				whiteSectionHeight={shouldRenderCollapsedTopBox ? effectiveWhiteSectionHeight : customWhiteSectionHeight}
-			/>
+			{!shouldRenderCollapsedTopBox && (
+				<DraftsHeaderChrome
+					isAllTab={isAllTab}
+					whiteSectionHeight={customWhiteSectionHeight}
+				/>
+			)}
+			{shouldRenderCollapsedTopBox && (
+				<div className="absolute left-[8px] top-[1px] z-20 flex h-[13px] items-center pointer-events-none">
+					<span className="font-inter text-[12px] font-semibold leading-none text-black">
+						Drafts
+					</span>
+				</div>
+			)}
 			<div
 				className={cn(
 					'flex items-center gap-2 px-3 shrink-0',
@@ -624,7 +671,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 				}}
 			></div>
 
-			{(isAllTab || isBottomView) && (
+			{isAllTab && (
 				<div
 					className={cn(
 						'absolute z-20 flex items-center gap-[12px]',
@@ -654,9 +701,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 				</div>
 			)}
 
-			{/* Collapsed bottom panels: show only the top "batch" box (22px) centered in the 24px color region */}
+			{/* Collapsed bottom panels: label strip + bottom-aligned summary bar. */}
 			{shouldRenderCollapsedTopBox && (
-				<div className="flex-1 flex items-center justify-center px-[2px]">
+				<div className="flex-1 flex items-end justify-center px-[2px]" style={{ paddingBottom: 3 }}>
 					{(() => {
 						// Compressed view uses a distinct "summary" top box:
 						// - Left: drafts count (live progress when generating)
@@ -664,7 +711,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 						const draftCount = drafts.filter((d) => d.status === EmailStatus.draft).length;
 						const leftCount = isDraftingBatchActive ? draftedCount : draftCount;
 						const totalCount = Math.max(0, resolvedGenerationTotal);
-						const rightSegmentWidthPx = 80;
+						const rightSegmentWidthPx = 68;
 
 						return (
 							<div
@@ -674,7 +721,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 									width: `${collapsedTopBoxWidthPx}px`,
 									height: `${collapsedTopBoxHeightPx}px`,
 									borderRadius: `${collapsedTopBoxRadiusPx}px`,
-									backgroundColor: '#F7EBD3',
+									backgroundColor: collapsedTopColor,
 								}}
 							>
 								{/* Left segment */}
@@ -691,7 +738,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 									className="flex items-center justify-center"
 									style={{
 										width: `${rightSegmentWidthPx}px`,
-										backgroundColor: '#FFFFFF',
+										backgroundColor: collapsedTopColor,
 										borderLeft: '2px solid #000000',
 									}}
 								>
@@ -916,27 +963,6 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 												handleDraftClick(draft, e);
 											}}
 										>
-											{/* Used-contact indicator - stacked above reject/approve when both present */}
-											{usedContactIdsSet.has(draft.contactId) && (
-												<span
-													className={cn('absolute', indicatorLeftClass)}
-													style={{
-														// Align used-contact dot with the Company line.
-														// Different positioning for Drafts tab vs All tab vs bottom view.
-														top: isBottomView
-															? '50%'
-															: isAllTab
-																? 'calc(50% - 16px)'
-																: 'calc(50% - 32px)', // Drafts tab - higher
-														transform: isBottomView ? 'translateY(-50%)' : 'none',
-														width: isBottomView ? '12px' : '13px',
-														height: isBottomView ? '12px' : '13px',
-														borderRadius: '50%',
-														border: '1px solid #000000',
-														backgroundColor: '#DAE6FE',
-													}}
-												/>
-											)}
 											{/* Rejected indicator - stacked below used-contact when both present */}
 											{isRejected && (
 												<span
@@ -944,18 +970,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 													title="Marked for rejection"
 													aria-label="Rejected draft"
 													style={{
-														// When stacked under the used-contact dot, align with the Subject line.
-														// Different positioning for Drafts tab vs All tab vs bottom view.
-														top: usedContactIdsSet.has(draft.contactId)
-															? (isBottomView
-																? 'calc(50% + 3px)'
-																: isAllTab
-																	? 'calc(50% + 6px)'
-																	: 'calc(50% - 10px)') // Drafts tab - higher
-															: '50%',
-														transform: usedContactIdsSet.has(draft.contactId)
-															? 'none'
-															: 'translateY(-50%)',
+														top: '50%',
+														transform: 'translateY(-50%)',
 														width: isBottomView ? '12px' : '13px',
 														height: isBottomView ? '12px' : '13px',
 														borderRadius: '50%',
@@ -970,18 +986,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 													title="Marked for approval"
 													aria-label="Approved draft"
 													style={{
-														// When stacked under the used-contact dot, align with the Subject line.
-														// Different positioning for Drafts tab vs All tab vs bottom view.
-														top: usedContactIdsSet.has(draft.contactId)
-															? (isBottomView
-																? 'calc(50% + 3px)'
-																: isAllTab
-																	? 'calc(50% + 6px)'
-																	: 'calc(50% - 10px)') // Drafts tab - higher
-															: '50%',
-														transform: usedContactIdsSet.has(draft.contactId)
-															? 'none'
-															: 'translateY(-50%)',
+														top: '50%',
+														transform: 'translateY(-50%)',
 														width: isBottomView ? '12px' : '13px',
 														height: isBottomView ? '12px' : '13px',
 														borderRadius: '50%',

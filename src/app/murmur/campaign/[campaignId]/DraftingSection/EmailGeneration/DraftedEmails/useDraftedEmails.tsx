@@ -35,7 +35,7 @@ export interface DraftedEmailsProps {
 	draftEmails: EmailWithRelations[];
 	isPendingEmails: boolean;
 	setSelectedDraftIds: Dispatch<SetStateAction<Set<number>>>;
-	onSend: (draftIds?: Iterable<number>) => void | Promise<void>;
+	onSend: (draftIds?: Iterable<number>) => void | Promise<void> | Promise<number>;
 	isSendingDisabled: boolean;
 	isFreeTrial: boolean;
 	fromName?: string;
@@ -99,8 +99,12 @@ export interface DraftedEmailsProps {
 	disableOutsideClickClose?: boolean;
 	/** Optional: hide the small approved/rejected counter box (above or bottom-left depending on breakpoint) in draft review UI */
 	hideDraftReviewCounter?: boolean;
-	/** Optional: hide the bottom action row (Approve / Regenerate / Reject + nav arrows) in draft review UI */
+	/** Optional: hide the bottom action row (Send / Regenerate / Delete + nav arrows) in draft review UI */
 	hideDraftReviewActionRow?: boolean;
+	/** Optional: use the shorter dashboard search review card proportions. */
+	compactDraftReview?: boolean;
+	/** Optional: keeps draft review open by hiding/ignoring controls that return to the drafts list */
+	lockDraftReviewOpen?: boolean;
 	/**
 	 * Optional: override the behavior of the draft review header close ("-") button.
 	 * Useful when rendering the draft review UI as a side preview inside regenerate mode.
@@ -255,7 +259,7 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 						? injectMurmurDraftSettingsSnapshot(
 								htmlMessageBase,
 								draftSettingsSnapshotRef.current
-						  )
+							)
 						: htmlMessageBase;
 				await updateEmail({
 					id: selectedDraft.id.toString(),

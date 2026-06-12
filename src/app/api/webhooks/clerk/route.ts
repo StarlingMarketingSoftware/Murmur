@@ -10,10 +10,20 @@ import {
 	apiResponse,
 	apiServerError,
 	handleApiError,
+	resolveAccountType,
 } from '@/app/api/_utils';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import { generateMurmurEmail, generateMurmurReplyToEmail } from '@/utils';
+import { unpublishVenueContact } from '@/app/api/_utils/venueContactSync';
 
 export async function POST(req: Request) {
+	// Generous IP circuit-breaker against webhook-URL floods; high enough not to drop
+	// legitimate Clerk delivery bursts.
+	const limited = await withRateLimit(req, 'public-unauth', 'webhooks-clerk', {
+		ip: [{ tokens: 600, window: '60 s' }],
+	});
+	if (limited) return limited;
+
 	const SIGNING_SECRET = process.env.CLERK_SIGNING_SECRET;
 
 	if (!SIGNING_SECRET) {
@@ -81,6 +91,7 @@ export async function POST(req: Request) {
 						firstName: first_name ?? null,
 						lastName: last_name ?? null,
 						murmurEmail,
+						accountType: resolveAccountType(evt.data.unsafe_metadata),
 					},
 				});
 
@@ -143,6 +154,19 @@ export async function POST(req: Request) {
 		const { id } = evt.data;
 
 		try {
+			// The venue's public Contact projection has userId=null, so it is NOT
+			// cascade-deleted with the user (the cascade removes the Venue row).
+			// Remove the projected contact (+ its ES doc) explicitly first.
+			const venue = id
+				? await prisma.venue.findUnique({
+						where: { userId: id },
+						select: { id: true },
+					})
+				: null;
+			if (venue) {
+				await unpublishVenueContact(venue.id);
+			}
+
 			await prisma.user.delete({
 				where: {
 					clerkId: id,

@@ -12,6 +12,7 @@ export const useCampaignDetail = () => {
 
 	return {
 		campaign,
+		campaignId,
 		isPendingCampaign,
 		isIdentityDialogOpen,
 		setIsIdentityDialogOpen,

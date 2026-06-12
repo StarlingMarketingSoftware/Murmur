@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { geocodeAddress, geocodeContact, batchGeocodeAddresses } from '@/utils/geocoding';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 
 /**
  * POST /api/geocode
@@ -12,6 +13,9 @@ import { geocodeAddress, geocodeContact, batchGeocodeAddresses } from '@/utils/g
  */
 export async function POST(req: NextRequest) {
   try {
+    const limited = await withRateLimit(req, 'paid-external', 'geocode');
+    if (limited) return limited;
+
     const body = await req.json();
 
     // Batch geocoding
@@ -79,6 +83,9 @@ export async function POST(req: NextRequest) {
  */
 export async function GET(req: NextRequest) {
   try {
+    const limited = await withRateLimit(req, 'paid-external', 'geocode');
+    if (limited) return limited;
+
     const { searchParams } = new URL(req.url);
     const address = searchParams.get('address');
     

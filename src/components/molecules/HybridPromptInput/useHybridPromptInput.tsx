@@ -186,6 +186,10 @@ export interface HybridPromptInputProps {
 	 */
 	autoOpenProfileTabWhenIncomplete?: boolean;
 	/**
+	 * Optional: opens profile UI outside this box instead of switching to the internal Profile tab.
+	 */
+	onProfilePanelOpen?: () => void;
+	/**
 	 * Optional: when true, default-open the Full Auto "Custom Instructions" expander on mount.
 	 * Useful for demos (e.g. landing page) so the Suggestions UI is visible immediately.
 	 */

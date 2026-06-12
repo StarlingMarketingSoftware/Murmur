@@ -5,6 +5,7 @@ import {
 	handleApiError,
 } from '@/app/api/_utils';
 import { fetchOpenRouter } from '@/app/api/_utils/openrouter';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import { OPENROUTER_DRAFTING_MODELS } from '@/constants/ai';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest } from 'next/server';
@@ -14,9 +15,9 @@ const ALLOWED_OPENROUTER_DRAFTING_MODELS = new Set<string>(OPENROUTER_DRAFTING_M
 const DEFAULT_OPENROUTER_DRAFTING_MODEL = OPENROUTER_DRAFTING_MODELS[0];
 
 const postOpenRouterSchema = z.object({
-	model: z.string().min(1),
-	prompt: z.string().min(1),
-	content: z.string().min(1),
+	model: z.string().min(1).max(200),
+	prompt: z.string().min(1).max(100000),
+	content: z.string().min(1).max(100000),
 	debug: z
 		.object({
 			draftIndex: z.number().int().positive().optional(),
@@ -37,6 +38,9 @@ export const maxDuration = 120;
 
 export async function POST(request: NextRequest) {
 	try {
+		const limited = await withRateLimit(request, 'ai-expensive', 'openrouter');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();

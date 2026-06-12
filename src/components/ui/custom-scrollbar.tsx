@@ -16,8 +16,12 @@ interface CustomScrollbarProps
 	style?: React.CSSProperties;
 	offsetRight?: number;
 	contentClassName?: string;
+	scrollContainerRef?: React.Ref<HTMLDivElement>;
+	hideThumb?: boolean;
 	/** When true, show a full-height thumb even if there is no overflow. */
 	alwaysShow?: boolean;
+	/** Fixed thumb height in px instead of the proportional height (capped to the container). */
+	thumbHeightOverride?: number;
 	/** When true, do not apply the Tailwind overflow-y-auto class to the inner container. */
 	disableOverflowClass?: boolean;
 	/**
@@ -42,7 +46,10 @@ export function CustomScrollbar({
 	style,
 	offsetRight = -4,
 	contentClassName,
+	scrollContainerRef,
+	hideThumb = false,
 	alwaysShow = false,
+	thumbHeightOverride,
 	disableOverflowClass = false,
 	alignTrackToScrollContainer = false,
 	onScroll,
@@ -51,7 +58,7 @@ export function CustomScrollbar({
 	onWheel: onWheelProp,
 	...rest
 }: CustomScrollbarProps) {
-	const scrollContainerRef = useRef<HTMLDivElement>(null);
+	const internalScrollContainerRef = useRef<HTMLDivElement>(null);
 	const scrollThumbRef = useRef<HTMLDivElement>(null);
 	const [thumbHeight, setThumbHeight] = useState(0);
 	const [thumbTop, setThumbTop] = useState(0);
@@ -61,8 +68,22 @@ export function CustomScrollbar({
 	const [dragStartY, setDragStartY] = useState(0);
 	const [scrollStartY, setScrollStartY] = useState(0);
 
+	const setScrollContainerRef = useCallback(
+		(node: HTMLDivElement | null) => {
+			internalScrollContainerRef.current = node;
+			if (typeof scrollContainerRef === 'function') {
+				scrollContainerRef(node);
+			} else if (scrollContainerRef) {
+				(
+					scrollContainerRef as React.MutableRefObject<HTMLDivElement | null>
+				).current = node;
+			}
+		},
+		[scrollContainerRef]
+	);
+
 	const updateScrollbar = useCallback(() => {
-		const container = scrollContainerRef.current;
+		const container = internalScrollContainerRef.current;
 		if (!container) return;
 
 		const { scrollTop, scrollHeight, clientHeight } = container;
@@ -87,14 +108,16 @@ export function CustomScrollbar({
 		}
 
 		// Calculate thumb height and position
-		const calculatedThumbHeight = Math.max(scrollRatio * clientHeight, 30);
+		const calculatedThumbHeight = thumbHeightOverride
+			? Math.min(thumbHeightOverride, clientHeight)
+			: Math.max(scrollRatio * clientHeight, 30);
 		const maxScrollTop = scrollHeight - clientHeight;
 		const thumbPosition =
 			(scrollTop / maxScrollTop) * (clientHeight - calculatedThumbHeight);
 
 		setThumbHeight(calculatedThumbHeight);
 		setThumbTop(thumbPosition);
-	}, [alwaysShow, alignTrackToScrollContainer]);
+	}, [alwaysShow, alignTrackToScrollContainer, thumbHeightOverride]);
 
 	const handleScroll = useCallback(() => {
 		updateScrollbar();
@@ -104,7 +127,7 @@ export function CustomScrollbar({
 		e.preventDefault();
 		setIsDragging(true);
 		setDragStartY(e.clientY);
-		const container = scrollContainerRef.current;
+		const container = internalScrollContainerRef.current;
 		if (container) {
 			setScrollStartY(container.scrollTop);
 		}
@@ -112,10 +135,10 @@ export function CustomScrollbar({
 
 	const handleMouseMove = useCallback(
 		(e: MouseEvent) => {
-			if (!isDragging || !scrollContainerRef.current) return;
+			if (!isDragging || !internalScrollContainerRef.current) return;
 
 			const deltaY = e.clientY - dragStartY;
-			const container = scrollContainerRef.current;
+			const container = internalScrollContainerRef.current;
 			const { scrollHeight, clientHeight } = container;
 			const maxScrollTop = scrollHeight - clientHeight;
 			const scrollRatio = maxScrollTop / (clientHeight - thumbHeight);
@@ -131,7 +154,7 @@ export function CustomScrollbar({
 
 	// Handle track clicks
 	const handleTrackClick = useCallback((e: React.MouseEvent) => {
-		const container = scrollContainerRef.current;
+		const container = internalScrollContainerRef.current;
 		const thumb = scrollThumbRef.current;
 		if (!container || !thumb || e.target === thumb) return;
 
@@ -159,7 +182,7 @@ export function CustomScrollbar({
 			// ignore and fall back to default behavior
 		}
 
-		const container = scrollContainerRef.current;
+		const container = internalScrollContainerRef.current;
 		if (!container) return;
 		const previousScrollTop = container.scrollTop;
 		container.scrollTop += e.deltaY;
@@ -172,7 +195,7 @@ export function CustomScrollbar({
 	useEffect(() => {
 		if (nativeScroll) return;
 
-		const container = scrollContainerRef.current;
+		const container = internalScrollContainerRef.current;
 		if (!container) return;
 
 		// Initial calculation
@@ -227,7 +250,7 @@ export function CustomScrollbar({
 		return (
 			<div
 				{...rest}
-				ref={scrollContainerRef}
+				ref={setScrollContainerRef}
 				className={cn(className, 'overflow-y-auto')}
 				onScroll={onScroll}
 				onWheel={onWheelProp}
@@ -242,7 +265,7 @@ export function CustomScrollbar({
 		<div {...rest} className={cn('relative', className)} style={style} onWheel={handleWheel}>
 			{/* Scrollable content container */}
 			<div
-				ref={scrollContainerRef}
+				ref={setScrollContainerRef}
 				onScroll={onScroll}
 				className={cn(
 					'h-full scrollbar-hide hide-native-scrollbar',
@@ -268,7 +291,7 @@ export function CustomScrollbar({
 			</div>
 
 			{/* Custom scrollbar track */}
-			{thumbHeight > 0 && (
+			{thumbHeight > 0 && !hideThumb && (
 				<div
 					className="absolute top-0 right-0 h-full cursor-pointer"
 					style={{

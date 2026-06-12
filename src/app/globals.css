@@ -502,6 +502,30 @@ body {
 	}
 }
 
+/* Dashboard calendar popover: gentle Apple-style scale + fade from its anchor edge. */
+
+@keyframes dashboardCalendarPopupEnter {
+	0% {
+		opacity: 0;
+		transform: scale(0.94) translateY(-2px);
+	}
+	100% {
+		opacity: 1;
+		transform: scale(1) translateY(0);
+	}
+}
+
+/* Dimmed backdrop behind the touch-device modal presentation of the calendar popup. */
+
+@keyframes dashboardCalendarBackdropEnter {
+	0% {
+		opacity: 0;
+	}
+	100% {
+		opacity: 1;
+	}
+}
+
 /* TipTap Placeholder Styles */
 .is-editor-empty:first-child::before {
 	content: attr(data-placeholder);
@@ -545,6 +569,416 @@ body {
 		filter: blur(60px);
 	}
 }
+
+	@keyframes gradient-breathe {
+		0%, 100% {
+			background-position: 0% 50%;
+			filter: brightness(1) saturate(1);
+		}
+		50% {
+			background-position: 100% 50%;
+			filter: brightness(1.08) saturate(1.05);
+		}
+	}
+
+	/* Hover-only "pond" shimmer: slow caustics drift (subtle, meant for tiny surfaces). */
+	@keyframes pond-caustics-drift {
+		0% {
+			background-position: 0 0, 0px 0px, 0px 0px, 0px 0px;
+		}
+		50% {
+			background-position: 0 0, 70px -34px, -44px 62px, 58px 42px;
+		}
+		100% {
+			background-position: 0 0, 140px -68px, -88px 124px, 116px 84px;
+		}
+	}
+
+	/* Premium prismatic refraction animation: gentle waves of light distortion. */
+	@keyframes prismatic-flow {
+		0% {
+			background-position: 0% 50%, 100% 50%, 50% 0%, 50% 100%;
+		}
+		50% {
+			background-position: 100% 50%, 0% 50%, 50% 100%, 50% 0%;
+		}
+		100% {
+			background-position: 0% 50%, 100% 50%, 50% 0%, 50% 100%;
+		}
+	}
+
+	/* Micro-shimmer: tiny specular beads drifting along the gradient direction. */
+	@keyframes micro-shimmer-drift {
+		0% {
+			background-position: 0% 0%, 40% 20%, 80% 60%, 20% 80%;
+		}
+		33% {
+			background-position: 30% 40%, 70% 10%, 10% 80%, 60% 50%;
+		}
+		66% {
+			background-position: 60% 20%, 10% 70%, 50% 30%, 90% 10%;
+		}
+		100% {
+			background-position: 0% 0%, 40% 20%, 80% 60%, 20% 80%;
+		}
+	}
+
+	/* Specular pulse: very slow brightening / dimming of the refraction core. */
+	@keyframes specular-breathe {
+		0%, 100% {
+			opacity: 0.35;
+			transform: scale(1);
+		}
+		50% {
+			opacity: 0.55;
+			transform: scale(1.04);
+		}
+	}
+
+	/* Anisotropic streak drift: soft horizontal flares that follow gradient flow. */
+	@keyframes streak-drift {
+		0% {
+			background-position: -120% 50%, 220% 50%;
+		}
+		50% {
+			background-position: 20% 50%, 80% 50%;
+		}
+		100% {
+			background-position: -120% 50%, 220% 50%;
+		}
+	}
+
+		.search-gradient-button {
+			background: var(
+				--search-gradient,
+				linear-gradient(
+					90deg,
+					#DA29B4 1.69%,
+					#EA1F1F 34.7%,
+					#E122F2 65.83%,
+					#F00404 98.97%
+				)
+			);
+			background-size: 250% 100%;
+			animation: gradient-breathe 16s ease-in-out infinite;
+		}
+
+		/* The booking-confirm footer: the search bar's breathe, recolored green. */
+		.booking-confirm-gradient-button {
+			background: linear-gradient(
+				90deg,
+				#B7FFC5 1.69%,
+				#4DC864 34.7%,
+				#38E497 65.83%,
+				#A4F5B3 98.97%
+			);
+			background-size: 250% 100%;
+			animation: gradient-breathe 16s ease-in-out infinite;
+		}
+
+		/* Hero searchbar: cursor-follow spotlight overlay (opt-in via extra class) */
+		@media (hover: hover) and (pointer: fine) {
+			.search-spotlight-zone {
+				overflow: hidden;
+				isolation: isolate; /* keep blend effects self-contained */
+				--spotlight-x: 50%;
+				--spotlight-y: 50%;
+				--spotlight-size: 260px;
+				--pond-mask-size: 220px;
+				/* Add smooth transitions for the CSS variables themselves */
+				transition: 
+					--spotlight-x 160ms ease-out,
+					--spotlight-y 160ms ease-out;
+				/* Vendor prefixes for broader browser support */
+				-webkit-transition: 
+					--spotlight-x 160ms ease-out,
+					--spotlight-y 160ms ease-out;
+				-moz-transition: 
+					--spotlight-x 160ms ease-out,
+					--spotlight-y 160ms ease-out;
+				-o-transition: 
+					--spotlight-x 160ms ease-out,
+					--spotlight-y 160ms ease-out;
+			}
+
+			.search-spotlight-zone-sm {
+				--spotlight-size: 170px;
+				--pond-mask-size: 140px;
+			}
+
+			/*
+			 * LAYER 1 — Soft volumetric glow
+			 * A wide, diffused radial glow that follows the cursor. Very subtle, sets the stage.
+			 */
+			.search-spotlight-zone::before {
+				content: '';
+				position: absolute;
+				inset: 0;
+				border-radius: inherit;
+				pointer-events: none;
+				z-index: 0;
+				opacity: 0;
+				background: radial-gradient(
+					ellipse var(--spotlight-size) calc(var(--spotlight-size) * 0.6) at var(--spotlight-x) var(--spotlight-y),
+					rgba(255, 255, 255, 0.14) 0%,
+					rgba(255, 255, 255, 0.06) 35%,
+					rgba(255, 255, 255, 0.00) 65%
+				);
+				mix-blend-mode: screen;
+				filter: blur(18px);
+				/* Slower, more fluid transition for the base glow */
+				transition: opacity 480ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+			}
+
+			/*
+			 * LAYER 2 — Prismatic light refraction (cursor-follow)
+			 * Chromatic dispersion: slightly offset warm/cool cores that split light
+			 * like a prism. Feels like studio light hitting polished glass.
+			 */
+			.search-spotlight-zone::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				border-radius: inherit;
+				pointer-events: none;
+				z-index: 1;
+				opacity: 0;
+				background:
+					/* Warm core (amber/pink) — trails cursor slightly */
+					radial-gradient(
+						ellipse calc(var(--spotlight-size) * 0.55) calc(var(--spotlight-size) * 0.35)
+						at calc(var(--spotlight-x) - 18px) calc(var(--spotlight-y) + 6px),
+						rgba(255, 210, 160, 0.22) 0%,
+						rgba(255, 180, 140, 0.08) 45%,
+						transparent 72%
+					),
+					/* Cool core (cyan/white) — leads cursor slightly */
+					radial-gradient(
+						ellipse calc(var(--spotlight-size) * 0.45) calc(var(--spotlight-size) * 0.3)
+						at calc(var(--spotlight-x) + 14px) calc(var(--spotlight-y) - 4px),
+						rgba(200, 240, 255, 0.18) 0%,
+						rgba(180, 220, 255, 0.06) 50%,
+						transparent 78%
+					),
+					/* Specular micro-beads — tiny bright spots that drift with the gradient flow */
+					radial-gradient(
+						ellipse 6px 3px at calc(var(--spotlight-x) + 40px) calc(var(--spotlight-y) - 20px),
+						rgba(255, 255, 255, 0.55) 0%,
+						transparent 100%
+					),
+					radial-gradient(
+						ellipse 4px 2px at calc(var(--spotlight-x) - 30px) calc(var(--spotlight-y) + 14px),
+						rgba(255, 255, 255, 0.4) 0%,
+						transparent 100%
+					),
+					radial-gradient(
+						ellipse 8px 4px at calc(var(--spotlight-x) + 12px) calc(var(--spotlight-y) + 28px),
+						rgba(255, 255, 255, 0.3) 0%,
+						transparent 100%
+					);
+				mix-blend-mode: soft-light;
+				filter: blur(0px);
+				/* Medium speed transition for the prismatic layer */
+				transition: opacity 420ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+				animation: specular-breathe 8s ease-in-out infinite;
+			}
+
+			/*
+			 * LAYER 3 — Anisotropic streak field (pond zone only)
+			 * Soft horizontal light streaks that mimic the gradient's linear flow.
+			 * They drift gently and create that "light brushing across satin" feel.
+			 */
+			.search-pond-zone .search-refraction-streaks {
+				position: absolute;
+				inset: 0;
+				border-radius: inherit;
+				pointer-events: none;
+				z-index: 0;
+				opacity: 0;
+				background:
+					linear-gradient(
+						90deg,
+						transparent 0%,
+						rgba(255, 255, 255, 0.035) 18%,
+						rgba(255, 255, 255, 0.08) 32%,
+						rgba(255, 255, 255, 0.035) 46%,
+						transparent 58%,
+						rgba(255, 255, 255, 0.045) 72%,
+						rgba(255, 255, 255, 0.09) 84%,
+						rgba(255, 255, 255, 0.03) 94%,
+						transparent 100%
+					),
+					linear-gradient(
+						90deg,
+						transparent 0%,
+						rgba(255, 240, 220, 0.025) 25%,
+						rgba(255, 255, 255, 0.055) 50%,
+						rgba(220, 240, 255, 0.025) 75%,
+						transparent 100%
+					);
+				background-size: 240% 100%, 180% 100%;
+				background-position: -120% 50%, 220% 50%;
+				mix-blend-mode: overlay;
+				-webkit-mask-image: radial-gradient(
+					ellipse calc(var(--pond-mask-size) * 1.1) calc(var(--pond-mask-size) * 0.65)
+					at var(--spotlight-x) var(--spotlight-y),
+					rgba(0, 0, 0, 1) 0%,
+					rgba(0, 0, 0, 0.6) 45%,
+					transparent 72%
+				);
+				mask-image: radial-gradient(
+					ellipse calc(var(--pond-mask-size) * 1.1) calc(var(--pond-mask-size) * 0.65)
+					at var(--spotlight-x) var(--spotlight-y),
+					rgba(0, 0, 0, 1) 0%,
+					rgba(0, 0, 0, 0.6) 45%,
+					transparent 72%
+				);
+				-webkit-mask-repeat: no-repeat;
+				mask-repeat: no-repeat;
+				-webkit-mask-size: 100% 100%;
+				mask-size: 100% 100%;
+				/* Slower transition for streaks to create a "dragging through water" effect */
+				transition: opacity 520ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+				animation: streak-drift 12s ease-in-out infinite;
+			}
+
+			/*
+			 * LAYER 4 — Micro caustics (pond zone only)
+			 * A scaled-down, more refined version of the original caustics.
+			 * Much subtler, acts like tiny light ripples moving across the surface.
+			 */
+			.search-pond-zone .search-refraction-caustics {
+				position: absolute;
+				inset: 1px;
+				border-radius: inherit;
+				pointer-events: none;
+				z-index: 0;
+				opacity: 0;
+				background-image:
+					radial-gradient(
+						ellipse 140px 90px at var(--spotlight-x) var(--spotlight-y),
+						rgba(255, 255, 255, 0.16) 0%,
+						rgba(255, 255, 255, 0.06) 40%,
+						transparent 68%
+					),
+					radial-gradient(
+						ellipse 50% 40% at 22% 32%,
+						rgba(255, 255, 255, 0.10) 0%,
+						transparent 55%
+					),
+					radial-gradient(
+						ellipse 55% 35% at 78% 64%,
+						rgba(255, 255, 255, 0.08) 0%,
+						transparent 52%
+					),
+					radial-gradient(
+						ellipse 35% 45% at 44% 14%,
+						rgba(255, 255, 255, 0.07) 0%,
+						transparent 48%
+					);
+				background-repeat: no-repeat, repeat, repeat, repeat;
+				background-size: 100% 100%, 200px 130px, 240px 180px, 180px 130px;
+				background-position: 0 0, 0px 0px, 0px 0px, 0px 0px;
+				background-blend-mode: normal;
+				mix-blend-mode: screen;
+				filter: blur(8px) contrast(1.15) saturate(1.05);
+				-webkit-mask-image: radial-gradient(
+					ellipse calc(var(--pond-mask-size) * 0.9) calc(var(--pond-mask-size) * 0.55)
+					at var(--spotlight-x) var(--spotlight-y),
+					rgba(0, 0, 0, 1) 0%,
+						rgba(0, 0, 0, 0.5) 55%,
+						transparent 78%
+				);
+				mask-image: radial-gradient(
+					ellipse calc(var(--pond-mask-size) * 0.9) calc(var(--pond-mask-size) * 0.55)
+					at var(--spotlight-x) var(--spotlight-y),
+					rgba(0, 0, 0, 1) 0%,
+						rgba(0, 0, 0, 0.5) 55%,
+						transparent 78%
+				);
+				-webkit-mask-repeat: no-repeat;
+				mask-repeat: no-repeat;
+				-webkit-mask-size: 100% 100%;
+				mask-size: 100% 100%;
+				/* Fastest transition for micro-caustics to respond quickly to cursor */
+				transition: opacity 380ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+				animation: pond-caustics-drift 16s ease-in-out infinite;
+			}
+
+			/*
+			 * HOVER STATES
+			 * We reveal layers progressively for a richer, more premium feel.
+			 * Staggered timing creates a "liquid displacement" effect.
+			 */
+			.search-spotlight-zone:hover::before,
+			.search-spotlight-zone:focus-visible::before {
+				opacity: 1;
+			}
+
+			.search-spotlight-zone:hover::after,
+			.search-spotlight-zone:focus-visible::after {
+				opacity: 1;
+			}
+
+			.search-pond-zone:hover .search-refraction-streaks,
+			.search-pond-zone:focus-visible .search-refraction-streaks {
+				/* Slightly delayed entrance for streaks to create water-like displacement */
+				transition-delay: 80ms;
+				opacity: 0.45;
+			}
+
+			.search-pond-zone:hover .search-refraction-caustics,
+			.search-pond-zone:focus-visible .search-refraction-caustics {
+				/* Fast response for micro-caustics */
+				opacity: 0.32;
+			}
+
+			/* Exit animations with staggered delays for a smooth "settling" effect */
+			.search-pond-zone:not(:hover):not(:focus-visible) .search-refraction-streaks {
+				transition-delay: 0ms;
+			}
+
+			.search-pond-zone:not(:hover):not(:focus-visible) .search-refraction-caustics {
+				transition-delay: 40ms;
+			}
+
+			/* These layers are opacity:0 at rest, yet their infinite animations keep
+			   ticking style invalidations over the live WebGL globe forever. Pause
+			   the timelines until hover; resuming mid-phase on hover reads better
+			   than a restart anyway. */
+			.search-spotlight-zone:not(:hover):not(:focus-visible)::after {
+				animation-play-state: paused;
+			}
+
+			.search-pond-zone:not(:hover):not(:focus-visible) .search-refraction-streaks,
+			.search-pond-zone:not(:hover):not(:focus-visible) .search-refraction-caustics {
+				animation-play-state: paused;
+			}
+
+			.search-spotlight-zone > .search-spotlight-content {
+				position: relative;
+				z-index: 2;
+			}
+		}
+
+		@media (prefers-reduced-motion: reduce) {
+			.search-gradient-button {
+				animation: none;
+				background: var(
+					--search-gradient,
+					linear-gradient(90deg, #DA29B4 1.69%, #EA1F1F 34.7%, #E122F2 65.83%, #F00404 98.97%)
+				);
+			}
+
+			.search-spotlight-zone::after {
+				animation: none;
+			}
+
+			.search-pond-zone .search-refraction-streaks,
+			.search-pond-zone .search-refraction-caustics {
+				animation: none;
+			}
+		}
 
 .search-wave-container {
 	position: relative;
@@ -631,6 +1065,23 @@ body {
 	text-rendering: optimizeLegibility;
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
+}
+
+/* Safari: blur(10px) here is a persistent backdrop root re-evaluated on every
+   map frame (the WebKit perf cliff named at the .search-query-display rule).
+   The resting hero container and the focused input are opaque, so dropping the
+   blur is a visual no-op everywhere except the map-view mini searchbar, whose
+   sheen gets a compensating bump below. */
+html.is-safari .search-wave-input {
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+}
+
+html.is-safari
+	body.murmur-map-view
+	.results-search-input-group
+	.search-wave-container::before {
+	background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.62));
 }
 
 .search-wave-input:hover {
@@ -1914,8 +2365,10 @@ body {
 
 /* Desktop campaigns table: keep ticks centered and ensure the 4-pill block fits (no right-side clipping) */
 .my-campaigns-table {
-	/* Responsive but capped so 4x92px pills never overflow the metrics column */
-	--campaign-metric-gap: clamp(18px, 2.5vw, 31px);
+	/* Fixed-width container (654px) — integer gap so the 1px tick separators
+	   land on whole pixels and antialias uniformly across all 3 ticks. */
+	--campaign-metric-gap: 30px;
+	--campaign-metric-tick-height: 20px;
 }
 
 /* Give the metrics column a touch more usable width on desktop by reducing cell padding.
@@ -1932,19 +2385,48 @@ body {
 	text-overflow: unset !important;
 }
 
-/* Desktop campaigns table: ticks centered between 92px metric pills */
+/* Desktop campaigns table: ticks centered between 80px metric pills.
+   Use transform to center the 1px tick, ensuring consistent width rendering
+   without subpixel antialiasing differences. */
 .my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
-	.campaign-metric-slot:not(:last-child)::after {
+	.campaign-metric-slot:not(:last-child)::after,
+.my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
+	.campaign-metric-slot:first-child:has(.metric-box[data-draft-fill])::before {
 	content: '';
 	position: absolute;
-	top: 50%;
-	/* Center a 1px tick in the middle of the inter-pill gap */
-	left: calc(100% + (var(--campaign-metric-gap, 32px) / 2) - 0.5px);
-	transform: translateY(-50%);
+	top: 0;
+	height: var(--campaign-metric-tick-height, 20px);
 	width: 1px;
-	height: 20px;
 	background-color: #000000;
 	pointer-events: none;
+	transform: translateX(-0.5px);
+	backface-visibility: hidden;
+	will-change: transform;
+}
+
+.my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
+	.campaign-metric-slot:not(:last-child)::after {
+	/* Center a 1px tick in the middle of the inter-pill gap */
+	left: calc(100% + (var(--campaign-metric-gap, 32px) / 2));
+}
+
+/* Tick separating the combined folder pill from the first metric slot.
+   Only applies when Drafts is the first slot (i.e., 1+ new rows where the
+   metrics row has 3 slots and the combined 307 pill sits to the left).
+   For 0-new rows the first slot is the empty New pill — the inter-pill
+   ticks from :not(:last-child)::after already cover that case, and a tick
+   between the folder pill and the empty New pill is not wanted. */
+.my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
+	.campaign-metric-slot:first-child:has(.metric-box[data-draft-fill])::before {
+	left: calc(0px - (var(--campaign-metric-gap, 32px) / 2));
+}
+
+/* All rows have 0 new messages: the New pill/header are hidden, so keep separators
+   only between the three visible metric pills. */
+.my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
+	.campaign-metrics-no-new-layout
+	.campaign-metric-slot:first-child:has(.metric-box[data-draft-fill])::before {
+	content: none;
 }
 
 /* Keep exclude contacts box consistent on smaller screens */
@@ -2202,6 +2684,49 @@ body {
 	animation: elegantSlideDown 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 	animation-delay: 0.6s;
 	opacity: 0;
+}
+
+/* Safari: backdrop-filter over the WebGL globe forces WebKit to re-blur the
+   backdrop on every map frame — a major perf cliff. The band is already 88-98%
+   opaque white, so a slightly more opaque fill reads the same without the blur. */
+html.is-safari .search-active .search-query-display {
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+	background: linear-gradient(
+		to bottom,
+		rgba(255, 255, 255, 0.99) 0%,
+		rgba(255, 255, 255, 0.97) 50%,
+		rgba(255, 255, 255, 0.94) 100%
+	);
+}
+
+/* Safari: same perf cliff for every Tailwind backdrop-blur utility over the
+   map sections (campaign status badges, dialog/drawer overlays, venue popups —
+   each is a backdrop root WebKit re-evaluates per map frame). html.is-safari
+   only exists under /murmur and /venue-portal, so landing pages keep their
+   blurs. Most affected fills are opaque (exact parity); the translucent ones
+   get compensating fills right below. NOTE: keep these rules unlayered — they
+   must out-cascade Tailwind's utilities layer without !important. */
+html.is-safari [class*='backdrop-blur'] {
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+}
+
+/* Compensating fills for the genuinely translucent kill-switch sites. */
+html.is-safari [data-slot='dialog-overlay'][data-overlay-variant='gradient'] {
+	background: linear-gradient(
+		to bottom,
+		var(--background),
+		color-mix(in srgb, var(--background) 38%, transparent)
+	);
+}
+
+html.is-safari [data-slot='drawer-overlay'] {
+	background-color: color-mix(in srgb, var(--background) 62%, transparent);
+}
+
+html.is-safari [data-venue-tool-ui][aria-label='Select event timeframe'] {
+	background-color: rgba(229, 96, 98, 0.96);
 }
 
 /* Results page persistent search bar */
@@ -3404,6 +3929,27 @@ body.murmur-page.murmur-map-view .results-search-input-group .search-wave-contai
 	max-width: 100%;
 }
 
+/* Smooth fade-in for the full-screen map-view overlay groups (top nav + pill, bottom
+   search bar, left rail, right results/selection panel) when entering search/map view.
+   These overlays are portaled to <body>, so they can't inherit a parent fade — each
+   overlay group gets this class so the whole apparatus eases in instead of popping. */
+@keyframes mapOverlayAppear {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+.map-overlay-appear {
+	animation: mapOverlayAppear 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+	.map-overlay-appear {
+		animation: none;
+	}
+}
+
 /* Desktop: position dashboard search results elements at fixed offsets
    from the very top of the page when viewing dashboard search results
    in table view (non-map). */
@@ -3593,6 +4139,32 @@ body.murmur-mobile .results-align {
 	height: 540px !important; /* Balanced height to keep everything feeling centered */
 }
 
+/* Short landscape monitors: keep the initial dashboard landing view single-screen.
+   (Calendar panel is taller than the campaigns table, so we compact the hero block
+   rather than unlocking page scroll.)
+   Not on the zoomed desktop dashboard (.murmur-dashboard-compact): its root zoom
+   scales the whole layout to the viewport, so the anchor-height hero always fits. */
+@media (max-height: 820px) and (orientation: landscape) {
+	html:not(.murmur-dashboard-compact) .hero-wrapper {
+		min-height: 520px !important;
+		height: 520px !important;
+	}
+}
+
+@media (max-height: 800px) and (orientation: landscape) {
+	html:not(.murmur-dashboard-compact) .hero-wrapper {
+		min-height: 480px !important;
+		height: 480px !important;
+	}
+}
+
+@media (max-height: 720px) and (orientation: landscape) {
+	html:not(.murmur-dashboard-compact) .hero-wrapper {
+		min-height: 430px !important;
+		height: 430px !important;
+	}
+}
+
 .search-bar-wrapper {
 	width: 100%;
 	max-width: 100%;
@@ -3671,13 +4243,23 @@ body.murmur-mobile .results-align {
 	z-index: 30; /* Ensure table is above other elements */
 }
 
-/* Dashboard: show only 3 visible rows, but keep internal scroll + custom scrollbar */
+.campaigns-table-wrapper:has(.campaigns-finder-open),
+.campaigns-table-wrapper:has(.campaign-finder-split-shell) {
+	z-index: 90; /* Expanded finder should overlay the fixed Ask Anything bar. */
+}
+
+/* Dashboard Calendar panel can be taller than the locked landing viewport; keep it above the fixed Ask Anything bar. */
+.campaigns-table-wrapper:has([data-dashboard-calendar-panel='true']) {
+	z-index: 90;
+}
+
+/* Dashboard: show only 3 visible rows, but keep internal scroll + custom scrollbar. */
 .dashboard-recent-campaigns .campaigns-table-container .my-campaigns-table {
 	height: 184px !important;
 	max-height: 184px !important;
 	min-height: 184px !important;
 	width: 100% !important;
-	max-width: 654px !important;
+	max-width: 655px !important;
 	margin-left: auto !important;
 	margin-right: auto !important;
 }
@@ -3695,9 +4277,31 @@ body.murmur-mobile .results-align {
 	.mobile-campaigns-wrapper:not(.mobile-portrait-mode)
 	.campaigns-table-container
 	.my-campaigns-table {
-	/* Slightly more spread than the default clamp */
-	--campaign-metric-gap: 44px;
+	--campaign-metric-gap: 26px;
 }
+
+/* Dashboard Campaigns table metric column padding.
+   Horizontal table padding is pushed into the cells so row hover fills can reach
+   the full outer box width while the pills keep their original placement. */
+.dashboard-recent-campaigns
+	.mobile-campaigns-wrapper:not(.mobile-portrait-mode)
+	.campaigns-table-container
+	.my-campaigns-table
+	thead
+	th:nth-child(2),
+.dashboard-recent-campaigns
+	.mobile-campaigns-wrapper:not(.mobile-portrait-mode)
+	.campaigns-table-container
+	.my-campaigns-table
+	tbody
+	td:nth-child(2) {
+	padding-left: 16px !important;
+	padding-right: 13px !important;
+}
+/* First column fits the original 219px folder pill. For 1+ new rows the wider
+   307px combined pill extends past this boundary into the metrics column area
+   (where the empty New pill would otherwise sit); first cell must allow
+   overflow so the combined pill can paint through. */
 .dashboard-recent-campaigns
 	.mobile-campaigns-wrapper:not(.mobile-portrait-mode)
 	.campaigns-table-container
@@ -3710,7 +4314,10 @@ body.murmur-mobile .results-align {
 	.my-campaigns-table
 	tbody
 	td:first-child {
-	width: 240px !important;
+	width: 228px !important;
+	padding-left: 17px !important;
+	padding-right: 0 !important;
+	overflow: visible !important;
 }
 
 /* Mobile landscape: scale campaigns table wrapper width proportionally
@@ -3744,32 +4351,34 @@ body.murmur-mobile .results-align {
 	margin-top: -76px;
 }
 
-/* Portrait monitors: lower the dashboard to avoid top clipping */
+/* Portrait monitors: lower the dashboard to avoid top clipping.
+   Not on the zoomed desktop dashboard (.murmur-dashboard-compact): a narrow desktop
+   window is portrait, and these would restructure the uniformly scaled hero. */
 @media (orientation: portrait) {
-	.dashboard-main-offset {
+	html:not(.murmur-dashboard-compact) .dashboard-main-offset {
 		margin-top: 16px;
 	}
 
 	/* Keep search results view at previous position on portrait */
-	.dashboard-main-offset.search-active {
+	html:not(.murmur-dashboard-compact) .dashboard-main-offset.search-active {
 		margin-top: 6px;
 	}
 }
 
 /* Adjust table position for portrait orientation screens to prevent overlap */
 @media (orientation: portrait) {
-	.campaigns-table-wrapper {
+	html:not(.murmur-dashboard-compact) .campaigns-table-wrapper {
 		margin-top: 0px; /* Tight spacing for portrait screens */
 	}
 
 	/* Add extra spacing between search area and table on portrait */
-	.hero-wrapper {
+	html:not(.murmur-dashboard-compact) .hero-wrapper {
 		min-height: auto !important; /* Allow flexible height on portrait */
 		height: auto !important; /* Allow flexible height */
 	}
 
 	/* Ensure search bar area has enough bottom spacing */
-	.search-bar-wrapper {
+	html:not(.murmur-dashboard-compact) .search-bar-wrapper {
 		margin-bottom: 40px;
 	}
 }
@@ -3783,12 +4392,12 @@ body.murmur-mobile .results-align {
 
 /* Mobile portrait specific fix to ensure no white margin */
 @media (max-width: 640px) and (orientation: portrait) {
-	.campaigns-table-wrapper {
+	html:not(.murmur-dashboard-compact) .campaigns-table-wrapper {
 		margin-top: 0px !important; /* Tight spacing */
 	}
 
 	/* Ensure the dashboard offset doesn't interfere */
-	.dashboard-main-offset {
+	html:not(.murmur-dashboard-compact) .dashboard-main-offset {
 		margin-top: 0;
 		padding-top: 80px;
 	}
@@ -3972,6 +4581,13 @@ body.murmur-mobile .results-align {
 	z-index: 1;
 }
 
+/* Safari: blur(1px) is imperceptible but each instance is a backdrop root WebKit
+   re-evaluates per map frame; results lists render many of these over the globe. */
+html.is-safari .email-obfuscated-local::before {
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+}
+
 /* Subtle hover state for the entire row (not the blurred email itself) */
 tr:hover .email-obfuscated-local {
 	filter: blur(2px);
@@ -3999,9 +4615,38 @@ body.murmur-page.murmur-map-view {
 	background: #afd6ef;
 }
 
-/* Move Clerk user button below the map view header */
+/* Safari/WebKit: a drag starting on a select-none element (or the map) can
+   still begin a document-wide selection and sweep the whole page. Make the
+   app chrome non-selectable at the page scope; re-enable selection on every
+   read/edit surface below. No !important anywhere: inline user-select (e.g.
+   fill-in chips' `user-select: all`) and Tailwind select-text/select-none
+   utilities must keep working on top of these. */
+body.murmur-page {
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+body.murmur-page input,
+body.murmur-page textarea,
+body.murmur-page select,
+body.murmur-page [contenteditable],
+body.murmur-page [contenteditable] *,
+body.murmur-page [role='textbox'],
+body.murmur-page .ProseMirror,
+body.murmur-page .ProseMirror *,
+body.murmur-page .murmur-selectable,
+body.murmur-page .murmur-selectable * {
+	-webkit-user-select: text;
+	user-select: text;
+}
+
+/* Map view: lift the settings/avatar icons into the free band above the
+   search-results campaign card (top ≈45 visual px), so they stay visible
+   instead of being covered by the right-side panel chrome. The interactive
+   reveal map canvas stacks at z-98, so the icons need z-99+ here. */
 body.murmur-page.murmur-map-view .clerk-user-button {
-	top: 44px;
+	top: 2px;
+	z-index: 99;
 }
 
 /* Also ensure the hero wrapper can contain the growing search bar */
@@ -4111,6 +4756,272 @@ main {
 	background-color: #ffffff !important;
 }
 
+.my-campaigns-table thead,
+.my-campaigns-table thead tr,
+.my-campaigns-table thead th {
+	height: 28px !important;
+	max-height: 28px !important;
+}
+
+.my-campaigns-table thead th {
+	padding-top: 0 !important;
+	padding-bottom: 0 !important;
+	vertical-align: middle !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) {
+	border: none !important;
+	box-shadow: none !important;
+	--campaign-metric-tick-height: 20px;
+	--campaign-row-left-hover-left-offset: 17px;
+	--campaign-row-left-hover-width: 236px;
+	--campaign-row-hover-fill-height: 22px;
+	--campaign-row-hover-fill-color: #d2e7f6;
+	--campaign-row-right-hover-fill-color: #D6F7DD;
+	--campaign-row-right-hover-box-color: #A0F2B2;
+}
+
+.my-campaigns-table.desktop-campaigns-table::before {
+	content: '';
+	position: absolute;
+	top: 6px;
+	left: 4px;
+	right: 4px;
+	height: 30px;
+	background: #ffffff;
+	border-radius: 4px 4px 0 0;
+	pointer-events: none;
+	z-index: 1;
+}
+
+.my-campaigns-table.desktop-campaigns-table.campaigns-finder-open::before {
+	top: 53px;
+	left: 10px;
+	right: 10px;
+	height: 28px;
+	border-radius: 8px 8px 0 0;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) tbody td {
+	padding-top: 6.5px !important;
+	padding-bottom: 6.5px !important;
+	transition: none !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) tbody tr {
+	transition: none !important;
+}
+
+.my-campaigns-table tbody td:first-child {
+	overflow: visible !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) tbody tr:first-child > td {
+	padding-top: 8px !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) tbody tr:hover {
+	background-color: transparent !important;
+}
+
+.my-campaigns-table .campaign-row-left-hover-surface,
+.my-campaigns-table .campaign-folder-show-content,
+.my-campaigns-table .campaign-folder-goto-content,
+.my-campaigns-table .metric-box-goto-label {
+	display: none;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) .campaign-row-left-hover-surface {
+	display: block;
+	position: absolute;
+	z-index: 4;
+	top: -6.5px;
+	left: calc(-1 * var(--campaign-row-left-hover-left-offset, 9px));
+	width: var(--campaign-row-left-hover-width, 228px);
+	height: 33px;
+	background: transparent;
+	cursor: pointer;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.campaign-row-left-hover-surface:hover)
+	> td {
+	background-color: transparent !important;
+	background-image: linear-gradient(
+		var(--campaign-row-hover-fill-color, #d2e7f6),
+		var(--campaign-row-hover-fill-color, #d2e7f6)
+	) !important;
+	background-position: center !important;
+	background-repeat: no-repeat !important;
+	background-size: 100% var(--campaign-row-hover-fill-height, 22px) !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:first-child:has(.campaign-row-left-hover-surface:hover)
+	> td {
+	background-position: center top 8px !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(td:nth-child(2):hover)
+	> td,
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.campaign-folder-new-count:hover)
+	> td {
+	background-color: transparent !important;
+	background-image: linear-gradient(
+		var(--campaign-row-right-hover-fill-color, #D6F7DD),
+		var(--campaign-row-right-hover-fill-color, #D6F7DD)
+	) !important;
+	background-position: center !important;
+	background-repeat: no-repeat !important;
+	background-size: 100% var(--campaign-row-hover-fill-height, 22px) !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:first-child:has(td:nth-child(2):hover)
+	> td,
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:first-child:has(.campaign-folder-new-count:hover)
+	> td {
+	background-position: center top 8px !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(td:nth-child(2):hover)
+	.folder-pill,
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.campaign-folder-new-count:hover)
+	.folder-pill,
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(td:nth-child(2):hover)
+	.metric-box,
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.campaign-folder-new-count:hover)
+	.metric-box {
+	background: var(--campaign-row-right-hover-box-color, #A0F2B2) !important;
+	background-color: var(--campaign-row-right-hover-box-color, #A0F2B2) !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(td:nth-child(2):hover)
+	.campaign-folder-name-box,
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.campaign-folder-new-count:hover)
+	.campaign-folder-name-box {
+	background: transparent !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(td:nth-child(2):hover)
+	.campaign-folder-name-content,
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.campaign-folder-new-count:hover)
+	.campaign-folder-name-content {
+	display: none !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(td:nth-child(2):hover)
+	.campaign-folder-goto-content,
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.campaign-folder-new-count:hover)
+	.campaign-folder-goto-content {
+	display: inline-flex !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	.metric-box[data-draft-fill]:hover
+	.metric-box-label,
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	.metric-box[data-sent-fill]:hover
+	.metric-box-label,
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	.metric-box[data-updated-fill]:hover
+	.metric-box-label {
+	display: none !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	.metric-box[data-draft-fill]:hover
+	.metric-box-goto-label,
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	.metric-box[data-sent-fill]:hover
+	.metric-box-goto-label,
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	.metric-box[data-updated-fill]:hover
+	.metric-box-goto-label {
+	display: inline !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.campaign-row-left-hover-surface:hover)
+	.folder-pill,
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.campaign-row-left-hover-surface:hover)
+	.campaign-folder-name-box {
+	background: transparent !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.campaign-row-left-hover-surface:hover)
+	.campaign-folder-name-content {
+	display: none !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.campaign-row-left-hover-surface:hover)
+	.campaign-folder-show-content {
+	display: inline-flex !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) .campaign-folder-show-caret {
+	width: 10px;
+	height: 10px;
+	margin-left: 7px;
+	border-right: 2px solid currentColor;
+	border-bottom: 2px solid currentColor;
+	transform: translateY(-2px) rotate(45deg);
+	color: #000000;
+	flex: none;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) .folder-pill,
+.my-campaigns-table:not(.mobile-table-no-scroll) .metric-box,
+.my-campaigns-table:not(.mobile-table-no-scroll) .campaign-metric-slot {
+	height: 20px !important;
+	min-height: 20px !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) .folder-pill,
+.my-campaigns-table:not(.mobile-table-no-scroll) .metric-box,
+.my-campaigns-table:not(.mobile-table-no-scroll) .campaign-folder-name-box,
+.my-campaigns-table:not(.mobile-table-no-scroll) .campaign-folder-show-icon,
+.my-campaigns-table:not(.mobile-table-no-scroll) .campaign-folder-goto-icon {
+	transition: none !important;
+	transform: none !important;
+}
+
 /* Campaigns table: keep body on the container fill (#F8F8F8)
    The shared "secondary" table styles give tbody a white background; for this table we want
    the wrapper/container background to show through behind rows. */
@@ -4177,6 +5088,14 @@ html.murmur-compact {
 		transform-origin: top center;
 		width: calc(100% / 0.9);
 	}
+}
+
+/* Mobile campaign search/summary overlay: counter the compact zoom so the inline
+   Mapbox canvas sizes in true viewport pixels (it measures via getBoundingClientRect,
+   so under zoom it renders ~10% short — black band at right/bottom). Mirrors the
+   PersistentDashboardMap counter-zoom pattern. */
+html.murmur-compact .mobile-campaign-search-overlay {
+	zoom: calc(1 / 0.9);
 }
 
 /* Research public page scaling (80%) */
@@ -4263,6 +5182,8 @@ html.murmur-compact.murmur-campaign-compact {
    to avoid any chance of double-scaling. */
 html.murmur-compact.murmur-campaign-compact.murmur-campaign-force-transform {
 	zoom: 1 !important;
+	/* Real viewport height; Safari can leave percentage heights stale while resizing/fullscreening. */
+	height: var(--murmur-campaign-viewport-h, 100vh);
 }
 
 html.murmur-compact.murmur-campaign-compact.murmur-campaign-force-transform body {
@@ -4270,6 +5191,24 @@ html.murmur-compact.murmur-campaign-compact.murmur-campaign-force-transform body
 	/* Using `top left` prevents the whole page from drifting right after scale. */
 	transform-origin: top left;
 	width: calc(100% / var(--murmur-campaign-zoom, 0.85));
+	/* Height must be compensated from real innerHeight: Safari can resolve
+	   `100%` through a stale transformed html/body chain during fullscreen
+	   or rapid vertical resize, detaching bottom-anchored campaign chrome. */
+	height: calc(
+		var(--murmur-campaign-viewport-h, 100vh) / var(--murmur-campaign-zoom, 0.85)
+	);
+	min-height: calc(
+		var(--murmur-campaign-viewport-h, 100vh) / var(--murmur-campaign-zoom, 0.85)
+	);
+}
+
+/* Residual gaps behind the transformed body (sub-pixel rounding, first paint)
+   should read as map water, not white. Out-specifies the transparent override
+   injected by PersistentDashboardMap. */
+html.murmur-compact.murmur-campaign-compact.murmur-campaign-force-transform:has(
+		.dashboard-globe-bg
+	) {
+	background-color: #afd6ef !important;
 }
 
 html.murmur-compact.murmur-campaign-compact body {
@@ -4302,9 +5241,14 @@ html.murmur-campaign-scrollable [data-lenis-prevent] {
 	overscroll-behavior-y: auto !important;
 }
 
-/* Dashboard compact scaling (defaults to 85%, can be driven by JS via --murmur-dashboard-zoom) */
+/* Dashboard compact scaling, driven by JS via --murmur-dashboard-zoom. The non-map
+   dashboard pins the var to a viewport-aware baseline (0.81 at laptop sizes, larger
+   on bigger monitors); map view sets a per-monitor zoom. The fallbacks only cover the
+   window before those effects run. The map rule must stay AFTER the non-map rule:
+   both classes can be present in map view, and source order decides which fallback
+   wins when the var is unset. */
 html.murmur-compact.murmur-dashboard-compact {
-	zoom: var(--murmur-dashboard-zoom, 0.85);
+	zoom: var(--murmur-dashboard-zoom, 0.81);
 }
 
 html.murmur-compact.murmur-dashboard-map-compact {
@@ -4312,10 +5256,21 @@ html.murmur-compact.murmur-dashboard-map-compact {
 }
 
 @supports not (zoom: 1) {
+	html.murmur-compact.murmur-campaign-compact {
+		height: var(--murmur-campaign-viewport-h, 100vh);
+	}
+
 	html.murmur-compact.murmur-campaign-compact body {
 		transform: scale(var(--murmur-campaign-zoom, 0.85));
 		transform-origin: top center;
 		width: calc(100% / var(--murmur-campaign-zoom, 0.85));
+		/* Same height compensation as the Safari force-transform path above. */
+		height: calc(
+			var(--murmur-campaign-viewport-h, 100vh) / var(--murmur-campaign-zoom, 0.85)
+		);
+		min-height: calc(
+			var(--murmur-campaign-viewport-h, 100vh) / var(--murmur-campaign-zoom, 0.85)
+		);
 	}
 
 	html.murmur-compact.murmur-dashboard-compact body,
@@ -4323,6 +5278,20 @@ html.murmur-compact.murmur-dashboard-map-compact {
 		transform: scale(var(--murmur-dashboard-zoom, 0.85));
 		transform-origin: top center;
 		width: calc(100% / var(--murmur-dashboard-zoom, 0.85));
+	}
+}
+
+/* Venue portal: scale the venue card cluster to 85% to match campaign sizing.
+   Scoped to the form (not the html root) so the full-bleed background globe stays
+   full size; the flex parent keeps the smaller cluster centered. */
+.venue-portal-compact {
+	zoom: 0.85;
+}
+
+@supports not (zoom: 1) {
+	.venue-portal-compact {
+		transform: scale(0.85);
+		transform-origin: top center;
 	}
 }
 
@@ -4340,6 +5309,14 @@ html.murmur-compact.murmur-dashboard-map-compact {
 .my-campaigns-table {
 	height: 172px !important;
 	max-height: 172px !important;
+}
+
+.campaigns-table-container .my-campaigns-table.desktop-campaigns-table {
+	width: 654px !important;
+	max-width: 654px !important;
+	height: 253px !important;
+	max-height: 253px !important;
+	min-height: 253px !important;
 }
 
 .my-campaigns-table .scrollbar-hide {
@@ -4664,6 +5641,65 @@ body,
 	}
 }
 
+/* Inbox variant: blue ramp, same 4.5s cadence as the red wave so the per-row
+   animationDelay stagger lands identically. */
+.contacts-expanded-list-loading-wave-row.contacts-expanded-list-loading-wave-row--inbox {
+	background-color: #AEE1FD;
+	animation: contactsExpandedListLoadingWaveInbox 4.5s linear infinite;
+}
+
+@keyframes contactsExpandedListLoadingWaveInbox {
+	0%,
+	100% {
+		background-color: #AEE1FD;
+	}
+	6.25% {
+		background-color: #9FD7F4;
+	}
+	12.5% {
+		background-color: #8FCDEC;
+	}
+	18.75% {
+		background-color: #7DC0E1;
+	}
+	25% {
+		background-color: #6EB4D8;
+	}
+	31.25% {
+		background-color: #5AA3CA;
+	}
+	37.5% {
+		background-color: #4690BC;
+	}
+	43.75% {
+		background-color: #2E78A6;
+	}
+	50% {
+		background-color: #1B5F8E;
+	}
+	56.25% {
+		background-color: #2E78A6;
+	}
+	62.5% {
+		background-color: #4690BC;
+	}
+	68.75% {
+		background-color: #5AA3CA;
+	}
+	75% {
+		background-color: #6EB4D8;
+	}
+	81.25% {
+		background-color: #7DC0E1;
+	}
+	87.5% {
+		background-color: #8FCDEC;
+	}
+	93.75% {
+		background-color: #9FD7F4;
+	}
+}
+
 /* --- Research Panel Loading Wave (Hold light briefly, then smooth wave) --- */
 .research-panel-loading-wave-box {
 	background-color: #E9F7FF;
@@ -4693,6 +5729,86 @@ body,
 	}
 }
 
+/* --- Mobile Folder Cards Loading Wave (cycles the 4 campaign folder scheme pastels) --- */
+.mobile-folder-cards-loading-wave-card {
+	background-color: #b9eaf1;
+	animation: mobileFolderCardsLoadingWave 4.8s ease-in-out infinite;
+	will-change: background-color;
+}
+
+@keyframes mobileFolderCardsLoadingWave {
+	0%,
+	100% {
+		background-color: #b9eaf1;
+	}
+	25% {
+		background-color: #cdcff9;
+	}
+	50% {
+		background-color: #bff2c8;
+	}
+	75% {
+		background-color: #ffe9c9;
+	}
+}
+
+/* --- Mobile Venue Cards Loading Wave (cycles the venue portal pastels) --- */
+.mobile-venue-cards-loading-wave-card {
+	background-color: #f3fff0;
+	animation: mobileVenueCardsLoadingWave 4.8s ease-in-out infinite;
+	will-change: background-color;
+}
+
+@keyframes mobileVenueCardsLoadingWave {
+	0%,
+	100% {
+		background-color: #f3fff0;
+	}
+	25% {
+		background-color: #c5eda0;
+	}
+	50% {
+		background-color: #bcf1fa;
+	}
+	75% {
+		background-color: #d6ffed;
+	}
+}
+
+/* --- Dashboard Responses Loading Wave (row white toward the responses-tab blue) --- */
+.dashboard-responses-loading-wave-row {
+	background-color: #fefefe;
+	animation: dashboardResponsesLoadingWave 2.5s ease-in-out infinite;
+	will-change: background-color;
+}
+
+@keyframes dashboardResponsesLoadingWave {
+	0%,
+	100% {
+		background-color: #fefefe;
+	}
+	50% {
+		background-color: #cdedfe;
+	}
+}
+
+/* --- Dashboard Opportunities Loading Wave (row white toward the opportunities pink) --- */
+.dashboard-opportunities-loading-wave-row {
+	background-color: #fefefe;
+	animation: dashboardOpportunitiesLoadingWave 2.5s ease-in-out infinite;
+	will-change: background-color;
+}
+
+@keyframes dashboardOpportunitiesLoadingWave {
+	0%,
+	100% {
+		background-color: #fefefe;
+	}
+	50% {
+		background-color: #ffe3e3;
+	}
+}
+
 @media (prefers-reduced-motion: reduce) {
 	.map-results-panel-loading-wave-row {
 		animation: none;
@@ -4700,7 +5816,22 @@ body,
 	.contacts-expanded-list-loading-wave-row {
 		animation: none;
 	}
+	.contacts-expanded-list-loading-wave-row.contacts-expanded-list-loading-wave-row--inbox {
+		animation: none;
+	}
 	.research-panel-loading-wave-box {
+		animation: none;
+	}
+	.mobile-folder-cards-loading-wave-card {
+		animation: none;
+	}
+	.mobile-venue-cards-loading-wave-card {
+		animation: none;
+	}
+	.dashboard-responses-loading-wave-row {
+		animation: none;
+	}
+	.dashboard-opportunities-loading-wave-row {
 		animation: none;
 	}
 }
@@ -5038,10 +6169,12 @@ body.murmur-mobile .search-results-table thead[data-slot='table-header'] {
 	margin-bottom: -6px !important;
 }
 
-/* Mobile: ensure the initial dashboard search input is 41px tall */
+/* Mobile: ensure the initial dashboard search input is 41px tall.
+   Not on the zoomed desktop dashboard (.murmur-dashboard-compact): it scales
+   uniformly via root zoom, so width-based fallbacks must not restyle the hero. */
 @media (max-width: 640px) {
 	/* Target only the hero/initial search input, not the results view */
-	.search-wave-input:not(.results-search-input) {
+	html:not(.murmur-dashboard-compact) .search-wave-input:not(.results-search-input) {
 		height: 41px !important;
 		font-size: 13px !important;
 	}
@@ -5057,15 +6190,15 @@ body.murmur-mobile .search-bar-wrapper {
 	margin-top: 30px !important;
 }
 @media (max-width: 640px) {
-	.search-bar-wrapper {
+	html:not(.murmur-dashboard-compact) .search-bar-wrapper {
 		margin-top: 30px;
 	}
 	/* Make room for the right icon in the initial input */
-	.search-wave-input:not(.results-search-input) {
+	html:not(.murmur-dashboard-compact) .search-wave-input:not(.results-search-input) {
 		padding-right: 44px !important;
 	}
 	/* Prevent placeholder text from overlapping the icon */
-	.search-input-group .custom-placeholder {
+	html:not(.murmur-dashboard-compact) .search-input-group .custom-placeholder {
 		right: 44px !important;
 	}
 }
@@ -5209,12 +6342,12 @@ body.murmur-mobile .search-bar-wrapper .flex-wrap > .h-\[39px\] {
 
 /* Width-based fallback for responsive mode/devtools */
 @media (max-width: 640px) {
-	.search-bar-wrapper .flex-wrap > .h-\[39px\] {
+	html:not(.murmur-dashboard-compact) .search-bar-wrapper .flex-wrap > .h-\[39px\] {
 		height: auto !important;
 		min-height: 16px !important;
 		align-self: flex-start !important;
 	}
-	.exclude-contacts-box {
+	html:not(.murmur-dashboard-compact) .exclude-contacts-box {
 		margin-top: 0 !important;
 		margin-bottom: 0 !important;
 		align-self: flex-start !important;
@@ -5224,21 +6357,24 @@ body.murmur-mobile .search-bar-wrapper .flex-wrap > .h-\[39px\] {
 /* Width-based mobile fallback: ensure 3px gap below the search bar even when
    the runtime mobile class is not present (e.g., devtools responsive mode). */
 @media (max-width: 640px) {
-	.search-bar-wrapper [data-slot='form-item'] {
+	html:not(.murmur-dashboard-compact) .search-bar-wrapper [data-slot='form-item'] {
 		margin-bottom: 0 !important;
 	}
-	.search-bar-wrapper .search-input-group {
+	html:not(.murmur-dashboard-compact) .search-bar-wrapper .search-input-group {
 		margin-bottom: 0 !important;
 	}
-	.search-bar-wrapper form > [data-slot='form-item'] {
+	html:not(.murmur-dashboard-compact) .search-bar-wrapper form > [data-slot='form-item'] {
 		margin-bottom: 0 !important;
 	}
-	.search-bar-wrapper form > .flex-wrap {
+	html:not(.murmur-dashboard-compact) .search-bar-wrapper form > .flex-wrap {
 		margin-top: 3px !important;
 		padding-top: 0 !important;
 	}
 	/* Adjacent sibling fallback as well */
-	.search-bar-wrapper [data-slot='form-item'] + .flex-wrap {
+	html:not(.murmur-dashboard-compact)
+		.search-bar-wrapper
+		[data-slot='form-item']
+		+ .flex-wrap {
 		margin-top: 3px !important;
 		padding-top: 0 !important;
 	}
@@ -5276,6 +6412,44 @@ body.murmur-mobile .search-bar-wrapper .flex-wrap > .h-\[39px\] {
 		padding-right: 1.25rem !important;
 		font-size: 1.0625rem;
 	}
+}
+
+/* Zoomed desktop dashboard: same hero input styling at EVERY window width — the root
+   zoom owns responsive scaling, so the styling above must not key off real width. */
+html.murmur-dashboard-compact .search-bar-wrapper:not(.search-bar-active) .search-input-group {
+	width: 603px !important;
+	max-width: 603px !important;
+	min-width: 603px !important;
+	margin-left: auto !important;
+	margin-right: auto !important;
+}
+
+html.murmur-dashboard-compact
+	.search-bar-wrapper:not(.search-bar-active)
+	.search-wave-container {
+	width: 100% !important;
+	min-width: 100% !important;
+	max-width: 100% !important;
+	border-radius: 8px !important;
+	background: #f2f2f2 !important;
+}
+
+html.murmur-dashboard-compact
+	.search-bar-wrapper:not(.search-bar-active)
+	.search-wave-container::before {
+	background: #f2f2f2 !important;
+	border-radius: 8px !important;
+}
+
+html.murmur-dashboard-compact
+	.search-bar-wrapper:not(.search-bar-active)
+	.search-wave-input:not(.results-search-input) {
+	width: 100% !important;
+	height: 72px !important;
+	border-radius: 8px !important;
+	padding-left: 1.25rem !important;
+	padding-right: 1.25rem !important;
+	font-size: 1.0625rem;
 }
 
 /* Mobile-only button inside the initial search input */
@@ -5854,26 +7028,29 @@ body.murmur-mobile .search-input-icon-btn {
 	.mobile-landscape-mode
 		.my-campaigns-table
 		.metrics-grid-container
+		> div:not(:first-child) {
+		margin-left: 0 !important;
+		border-left: 0 !important;
+		padding-left: 0 !important;
+	}
+	.mobile-landscape-mode
+		.my-campaigns-table
+		.metrics-grid-container
 		> div:not(:first-child)::before {
 		content: '';
 		position: absolute;
 		left: -4.5px; /* center within 8px column gap, adjusted for pixel alignment */
-		top: 50%;
-		transform: translateY(-50%) translateZ(0); /* force GPU rendering */
+		top: 0;
 		width: 1px;
-		height: 17px;
+		height: var(--campaign-metric-tick-height, 20px);
 		background-color: #000000;
 		pointer-events: none;
 		z-index: 1;
-		/* Prevent sub-pixel rendering issues */
-		will-change: transform;
 		backface-visibility: hidden;
 		-webkit-backface-visibility: hidden;
 		/* Force crisp edges */
 		image-rendering: -webkit-optimize-contrast;
 		image-rendering: crisp-edges;
-		/* Ensure pixel-perfect rendering */
-		transform-origin: center center;
 	}
 
 	/* Additional fixes for specific breakpoints where dividers appear thick */
@@ -5885,7 +7062,6 @@ body.murmur-mobile .search-input-icon-btn {
 			> div:not(:first-child)::before {
 			/* Force exact pixel alignment at problematic breakpoints */
 			left: -4px;
-			transform: translateY(-8.5px) translateZ(0); /* exact pixel position */
 		}
 	}
 }
@@ -5910,6 +7086,8 @@ body.murmur-mobile .search-input-icon-btn {
 		max-width: clamp(460px, calc(100vw - 210px), 750px) !important;
 		/* Shared gap used by the compact metrics layout */
 		--narrow-metric-gap: clamp(6px, calc(0px + 1vw), 12px);
+		--campaign-row-left-hover-left-offset: 8px;
+		--campaign-row-left-hover-width: 100%;
 	}
 
 	/* Give the metrics column a couple extra pixels so the last box never gets clipped */
@@ -5919,7 +7097,7 @@ body.murmur-mobile .search-input-icon-btn {
 		padding-right: 8px !important;
 	}
 
-	/* Compact metrics: distribute the 3 boxes across the available space (and scale down cleanly). */
+	/* Compact metrics: distribute the 4 boxes across the available space (and scale down cleanly). */
 	.narrow-desktop-table .metrics-grid-container,
 	.narrow-desktop-table .metrics-header-grid {
 		gap: var(--narrow-metric-gap) !important;
@@ -5929,7 +7107,7 @@ body.murmur-mobile .search-input-icon-btn {
 		/* Per-slot width derived from the available column width (clamped to a sensible range). */
 		--narrow-metric-slot: clamp(
 			40px,
-			calc((100% - (2 * var(--narrow-metric-gap))) / 3),
+			calc((100% - (3 * var(--narrow-metric-gap))) / 4),
 			80px
 		);
 	}
@@ -6017,6 +7195,7 @@ body.murmur-mobile .search-input-icon-btn {
    ========================================================= */
 .campaigns-table-container {
 	--campaigns-table-scale: 1;
+	--campaigns-finder-height: 415px;
 }
 
 .campaigns-table-container[data-ultra-narrow-scale='true'] .narrow-desktop-table {
@@ -6096,4 +7275,1146 @@ body.murmur-mobile .search-input-icon-btn {
 	}
 }
 
+/* =========================================================
+   CAMPAIGNS FINDER ROW
+   Finder is rendered as a synthetic table row; the first cell visually spans
+   the metrics cell so CustomTable can remain unchanged.
+   ========================================================= */
+.campaigns-table-container .my-campaigns-table.desktop-campaigns-table.campaigns-finder-open {
+	width: 660px !important;
+	max-width: 660px !important;
+	height: var(--campaigns-finder-height, 415px) !important;
+	max-height: var(--campaigns-finder-height, 415px) !important;
+	min-height: var(--campaigns-finder-height, 415px) !important;
+	box-sizing: border-box !important;
+	border: none !important;
+	border-radius: 8px !important;
+	overflow: hidden !important;
+	padding-top: 0 !important;
+	padding-bottom: 8px !important;
+	transition: none !important;
+}
 
+.campaign-finder-split-shell {
+	display: flex;
+	align-items: stretch;
+	justify-content: center;
+	width: 743px;
+	height: var(--campaigns-finder-height, 415px);
+	margin: 0 auto;
+	font-family: var(--font-inter), Inter, sans-serif;
+}
+
+.campaign-finder-split-pane {
+	position: relative;
+	width: 367px;
+	height: var(--campaigns-finder-height, 415px);
+	max-width: 367px;
+	min-width: 367px;
+	overflow: hidden;
+	background: #f8f8f8;
+}
+
+.campaign-finder-split-pane-left {
+	border-radius: 8px 0 0 8px;
+}
+
+.campaign-finder-split-pane-right {
+	border-radius: 0 8px 8px 0;
+}
+
+.campaign-finder-split-divider {
+	width: 9px;
+	height: var(--campaigns-finder-height, 415px);
+	min-width: 9px;
+	background: #e8e8e8;
+	flex: 0 0 9px;
+}
+
+.campaign-finder-split-pane .my-campaigns-table.desktop-campaigns-table.campaigns-finder-open {
+	width: 367px !important;
+	max-width: 367px !important;
+	min-width: 367px !important;
+	margin-left: 0 !important;
+	margin-right: 0 !important;
+	border-radius: 0 !important;
+}
+
+.campaign-finder-split-table thead {
+	display: none !important;
+}
+
+.campaign-finder-split-table [data-slot='table'] {
+	margin-top: 28px;
+}
+
+.campaign-finder-split-table::after {
+	content: 'Folders';
+	position: absolute;
+	top: 53px;
+	left: 10px;
+	z-index: 2;
+	display: flex;
+	align-items: center;
+	box-sizing: border-box;
+	width: calc(100% - 20px);
+	max-width: calc(100% - 20px);
+	height: 28px;
+	padding: 0 12px;
+	border-radius: 8px 8px 0 0;
+	background: #ffffff;
+	color: #000000;
+	font-family: var(--font-inter), Inter, sans-serif;
+	font-size: 13px;
+	font-weight: 500;
+	line-height: 16px;
+	pointer-events: none;
+}
+
+.campaign-finder-split-table tbody tr:not(:has(.campaign-finder-cell)) > td:nth-child(2) {
+	display: none !important;
+}
+
+.campaign-finder-split-table tbody tr:not(:has(.campaign-finder-cell)) > td:first-child {
+	width: 100% !important;
+	min-width: 0 !important;
+	max-width: none !important;
+	overflow: visible !important;
+}
+
+.campaign-finder-split-table tbody tr:not(:has(.campaign-finder-cell)) .campaign-row-folder-cell {
+	width: 307px !important;
+	max-width: calc(100% + 64px) !important;
+}
+
+.campaign-finder-split-table
+	tbody
+	tr:not(:has(.campaign-finder-cell))
+	.campaign-row-folder-cell:has(.campaign-folder-new-count) {
+	width: calc(100% + 64px) !important;
+}
+
+.campaign-finder-split-table tbody tr:not(:has(.campaign-finder-cell)) .folder-pill {
+	position: relative !important;
+	width: 100% !important;
+	min-width: 0 !important;
+	max-width: 100% !important;
+	padding-right: 7px !important;
+	overflow: hidden !important;
+}
+
+.campaign-finder-split-table
+	tbody
+	tr:not(:has(.campaign-finder-cell))
+	.folder-pill:has(.campaign-folder-new-count) {
+	min-width: 335px !important;
+}
+
+.campaign-finder-split-table tbody tr:not(:has(.campaign-finder-cell)) .campaign-folder-name-box {
+	flex: 1 1 112px !important;
+	width: auto !important;
+	min-width: 96px !important;
+	max-width: 174px !important;
+}
+
+.campaign-finder-split-table tbody tr:not(:has(.campaign-finder-cell)) .folder-icon-strip {
+	flex: 0 0 78px !important;
+	min-width: 78px !important;
+	max-width: 78px !important;
+	margin-left: 8px !important;
+	margin-right: 6px !important;
+	overflow: visible !important;
+}
+
+.campaign-finder-split-table tbody tr:not(:has(.campaign-finder-cell)) .campaign-folder-new-count {
+	flex: none !important;
+	margin-left: auto !important;
+}
+
+.campaign-finder-split-table .campaign-finder-cell,
+.campaign-finder-split-table .campaign-finder-panel,
+.campaign-finder-split-table .campaign-finder-folder-group,
+.campaign-finder-split-table .campaign-finder-search-results,
+.campaign-finder-split-table .campaign-finder-folder-row,
+.campaign-finder-split-table .campaign-finder-contact-row,
+.campaign-finder-split-table .campaign-finder-empty-row {
+	width: 100% !important;
+	max-width: 100% !important;
+}
+
+.campaign-finder-split-shell .campaign-finder-contact-row {
+	grid-template-columns: 8px minmax(90px, 128px) minmax(118px, 1fr);
+}
+
+.campaign-finder-split-shell .campaign-finder-contact-descriptor,
+.campaign-finder-split-shell .campaign-finder-contact-category-icon,
+.campaign-finder-split-shell .campaign-finder-state-badge,
+.campaign-finder-split-shell .campaign-finder-state-badge-empty,
+.campaign-finder-split-shell .campaign-finder-contact-city,
+.campaign-finder-split-shell .campaign-finder-contact-city-empty {
+	display: none;
+}
+
+.campaign-finder-split-pane-left .my-campaigns-table.desktop-campaigns-table.campaigns-finder-open {
+	border-radius: 8px 0 0 8px !important;
+}
+
+.campaign-finder-split-pane-right .my-campaigns-table.desktop-campaigns-table.campaigns-finder-open {
+	border-radius: 0 8px 8px 0 !important;
+}
+
+.campaign-finder-split-pane .campaign-finder-topbar {
+	grid-template-columns: minmax(90px, 1fr) 56px minmax(132px, 172px);
+	width: 367px;
+	padding: 0 10px 0 24px;
+}
+
+.campaign-finder-split-pane-left .campaign-finder-topbar {
+	border-radius: 8px 0 0 0;
+}
+
+.campaign-finder-split-pane-right .campaign-finder-topbar {
+	border-radius: 0 8px 0 0;
+}
+
+.campaign-finder-topbar[data-split-pane='left'] {
+	grid-template-columns: 1fr;
+}
+
+.campaign-finder-topbar[data-split-pane='left'] .campaign-finder-view-control,
+.campaign-finder-topbar[data-split-pane='left'] .campaign-finder-topbar-search {
+	display: none;
+}
+
+.campaign-finder-split-pane .campaign-finder-view-icons {
+	gap: 5px;
+}
+
+.campaign-finder-split-pane .campaign-finder-topbar-search {
+	width: 172px;
+	padding-left: 12px;
+	gap: 8px;
+}
+
+.campaign-finder-split-pane .campaign-finder-topbar-search-input {
+	font-size: 16px;
+}
+
+.campaign-finder-topbar {
+	position: relative;
+	z-index: 3;
+	display: grid;
+	grid-template-columns: minmax(145px, 1fr) 112px minmax(250px, 286px);
+	align-items: center;
+	box-sizing: border-box;
+	width: 100%;
+	height: 53px;
+	padding: 0 10px 0 25px;
+	border-radius: 8px 8px 0 0;
+	background: #f8f8f8;
+	color: #000000;
+	font-family: var(--font-inter), Inter, sans-serif;
+}
+
+.campaign-finder-topbar-brand {
+	font-size: 13px;
+	font-weight: 500;
+	line-height: 16px;
+	letter-spacing: -0.02em;
+	transform: translateY(-4px);
+}
+
+.campaign-finder-view-control {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-self: center;
+	gap: 1px;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: #a3a3a3;
+	cursor: pointer;
+	font: inherit;
+	appearance: none;
+}
+
+.campaign-finder-view-control:hover .campaign-finder-view-icon {
+	border-color: #e0e0e0;
+}
+
+.campaign-finder-view-control:hover .campaign-finder-view-icon-active {
+	border-color: #cecece;
+}
+
+.campaign-finder-view-control:hover .campaign-finder-view-label {
+	color: #737373;
+}
+
+.campaign-finder-view-control:focus-visible {
+	outline: 2px solid #000000;
+	outline-offset: 4px;
+	border-radius: 6px;
+}
+
+.campaign-finder-view-icons {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	height: 22px;
+}
+
+.campaign-finder-view-icon {
+	display: block;
+	box-sizing: border-box;
+	width: 17px;
+	height: 17px;
+	border: 1px solid #e0e0e0;
+	background: #f8f8f8;
+}
+
+.campaign-finder-view-icon-active {
+	width: 17px;
+	height: 17px;
+	border: 1px solid #cecece;
+	border-radius: 3px;
+	background: #ffffff;
+	box-shadow: 0 0 0 4px rgba(206, 206, 206, 0.32);
+}
+
+.campaign-finder-view-icon-split {
+	background: linear-gradient(
+		90deg,
+		transparent 0,
+		transparent calc(50% - 0.5px),
+		#e0e0e0 calc(50% - 0.5px),
+		#e0e0e0 calc(50% + 0.5px),
+		transparent calc(50% + 0.5px)
+	),
+		#f8f8f8;
+}
+
+.campaign-finder-view-icon-split.campaign-finder-view-icon-active {
+	background: linear-gradient(
+		90deg,
+		transparent 0,
+		transparent calc(50% - 0.5px),
+		#cecece calc(50% - 0.5px),
+		#cecece calc(50% + 0.5px),
+		transparent calc(50% + 0.5px)
+	),
+		#ffffff;
+}
+
+.campaign-finder-view-label {
+	font-size: 8px;
+	font-weight: 400;
+	line-height: 10px;
+}
+
+.campaign-finder-topbar-search {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-self: end;
+	box-sizing: border-box;
+	width: 286px;
+	height: 29px;
+	padding: 0 8px 0 16px;
+	border: 1px solid transparent;
+	border-radius: 8px;
+	background: #ffffff;
+	color: #737373;
+	gap: 10px;
+	cursor: text;
+	transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.campaign-finder-topbar-search:focus-within {
+	border-color: rgba(0, 0, 0, 0.12);
+	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9), 0 0 14px rgba(0, 0, 0, 0.12);
+}
+
+.campaign-finder-topbar-search-input {
+	min-width: 0;
+	width: 100%;
+	height: 100%;
+	padding: 0;
+	border: 0;
+	outline: 0;
+	appearance: none;
+	-webkit-appearance: none;
+	background: transparent;
+	font-family: var(--font-inter), Inter, sans-serif;
+	font-size: 16px;
+	font-weight: 400;
+	line-height: 20px;
+	color: #2d2d2d;
+}
+
+.campaign-finder-topbar-search-input::placeholder {
+	color: #737373;
+	opacity: 1;
+}
+
+.campaign-finder-topbar-search-input::-webkit-search-decoration,
+.campaign-finder-topbar-search-input::-webkit-search-cancel-button,
+.campaign-finder-topbar-search-input::-webkit-search-results-button,
+.campaign-finder-topbar-search-input::-webkit-search-results-decoration {
+	display: none;
+}
+
+.campaign-finder-topbar-search-clear {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	box-sizing: border-box;
+	width: 15px;
+	height: 15px;
+	min-width: 15px;
+	padding: 0;
+	border: 0;
+	border-radius: 9999px;
+	appearance: none;
+	background: rgba(0, 0, 0, 0.12);
+	cursor: default;
+	font-size: 0;
+	line-height: 0;
+}
+
+.campaign-finder-topbar-search-clear::before,
+.campaign-finder-topbar-search-clear::after {
+	content: '';
+	position: absolute;
+	left: 3.875px;
+	top: 7px;
+	width: 7.25px;
+	height: 1.25px;
+	border-radius: 9999px;
+	background: rgba(0, 0, 0, 0.42);
+	transform-origin: center center;
+}
+
+.campaign-finder-topbar-search-clear::before {
+	transform: rotate(45deg);
+}
+
+.campaign-finder-topbar-search-clear::after {
+	transform: rotate(-45deg);
+}
+
+.campaign-finder-topbar-search-clear:hover {
+	background: rgba(0, 0, 0, 0.18);
+}
+
+.campaign-finder-topbar-search-placeholder {
+	font-size: 16px;
+	font-weight: 400;
+	line-height: 20px;
+	color: #737373;
+}
+
+@media (max-width: 960px) {
+	.campaigns-table-container .my-campaigns-table.desktop-campaigns-table.campaigns-finder-open {
+		width: min(660px, calc(100vw - 32px)) !important;
+		max-width: calc(100vw - 32px) !important;
+		height: var(--campaigns-finder-height, 415px) !important;
+		max-height: var(--campaigns-finder-height, 415px) !important;
+		min-height: var(--campaigns-finder-height, 415px) !important;
+	}
+
+	.campaign-finder-split-pane .my-campaigns-table.desktop-campaigns-table.campaigns-finder-open {
+		width: 367px !important;
+		max-width: 367px !important;
+		min-width: 367px !important;
+	}
+
+	.campaign-finder-topbar {
+		grid-template-columns: minmax(110px, 1fr) 88px minmax(180px, 1.6fr);
+		padding-left: 20px;
+	}
+
+	.campaign-finder-topbar-search {
+		width: 100%;
+	}
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) .campaign-row-left-hover-surface {
+	border: 0;
+	padding: 0;
+	appearance: none;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) .campaign-row-chevron-open {
+	transform: translateY(calc(-50% + 1.5px)) rotate(90deg) !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	.campaign-row-folder-cell[data-finder-open='true'] {
+	transform: translateX(6px);
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.campaign-row-folder-cell[data-finder-open='true'])
+	.campaign-folder-name-content {
+	display: inline-flex !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.campaign-row-folder-cell[data-finder-open='true'])
+	.campaign-folder-show-content,
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.campaign-row-folder-cell[data-finder-open='true'])
+	.campaign-folder-goto-content {
+	display: none !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.campaign-finder-cell),
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.campaign-finder-cell)
+	> td {
+	cursor: default !important;
+	background: transparent !important;
+	background-image: none !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.campaign-finder-cell)
+	> td {
+	padding-top: 0 !important;
+	padding-bottom: 0 !important;
+	height: auto !important;
+	overflow: visible !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.campaign-finder-cell)
+	> td:first-child {
+	position: relative !important;
+	z-index: 20 !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.campaign-finder-cell)
+	> td:nth-child(2) {
+	padding: 0 !important;
+	width: 0 !important;
+	min-width: 0 !important;
+	max-width: none !important;
+	pointer-events: none !important;
+	position: relative !important;
+	z-index: 0 !important;
+}
+
+.campaign-finder-cell {
+	position: relative;
+	z-index: 6;
+	width: 650px;
+	max-width: 650px;
+	overflow: visible;
+	white-space: normal;
+}
+
+.campaign-finder-panel {
+	width: 650px;
+	max-width: 650px;
+	padding: 0 0 5px;
+	font-family: var(--font-inter), Inter, sans-serif;
+	color: #000000;
+	transition: none !important;
+	pointer-events: auto !important;
+}
+
+.campaign-finder-folder-group {
+	width: 650px;
+	max-width: 650px;
+}
+
+.campaign-finder-search-results {
+	width: 650px;
+	max-width: 650px;
+}
+
+.campaign-finder-folder-row,
+.campaign-finder-contact-row,
+.campaign-finder-empty-row {
+	box-sizing: border-box;
+	width: 650px;
+	max-width: 650px;
+	height: 27px;
+	min-height: 27px;
+	border: 0;
+	transition: none !important;
+}
+
+.campaign-finder-drag-preview {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	width: 240px;
+	max-width: 240px;
+	min-height: 42px;
+	padding: 8px 14px 8px 12px;
+	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.96);
+	border: 1px solid rgba(0, 0, 0, 0.06);
+	box-shadow:
+		0 1px 2px rgba(0, 0, 0, 0.08),
+		0 10px 24px rgba(0, 0, 0, 0.18);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+	font-family: var(--font-inter), Inter, sans-serif;
+	color: #000000;
+}
+
+.campaign-finder-drag-preview-dot {
+	display: block;
+	width: 10px;
+	height: 10px;
+	border-radius: 9999px;
+	flex: none;
+	box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+
+.campaign-finder-drag-preview-text {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	gap: 2px;
+}
+
+.campaign-finder-drag-preview-label {
+	min-width: 0;
+	font-size: 13px;
+	font-weight: 600;
+	line-height: 16px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.campaign-finder-drag-preview-secondary {
+	min-width: 0;
+	font-size: 11px;
+	font-weight: 500;
+	line-height: 13px;
+	color: #545454;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.campaign-finder-folder-row {
+	display: flex;
+	align-items: center;
+	padding: 0 12px 0 24px;
+	appearance: none;
+	background: transparent;
+	border-radius: 0;
+	color: #000000;
+	cursor: pointer;
+	font: inherit;
+	text-align: left;
+	pointer-events: auto !important;
+}
+
+.campaign-finder-folder-chevron {
+	width: 14px;
+	height: 14px;
+	margin-right: 8px;
+	color: #000000;
+	transform: rotate(0deg);
+	transition: none !important;
+	flex: none;
+}
+
+.campaign-finder-folder-chevron-open {
+	transform: translateY(0.5px) rotate(90deg) !important;
+}
+
+.campaign-finder-folder-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 10px;
+	margin-right: 9px;
+	flex: none;
+}
+
+.campaign-finder-folder-label {
+	min-width: 0;
+	font-size: 13px;
+	font-weight: 500;
+	line-height: 16px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.campaign-finder-contact-row {
+	display: grid;
+	grid-template-columns: 8px minmax(90px, 128px) minmax(118px, 1fr) minmax(76px, 104px) 17px 42px minmax(58px, 86px);
+	align-items: center;
+	column-gap: 10px;
+	padding: 0 16px 0 70px;
+}
+
+.campaign-finder-empty-row {
+	display: flex;
+	align-items: center;
+	padding: 0 16px 0 70px;
+	background: #FAF7F7;
+	font-size: 12px;
+	font-weight: 400;
+	line-height: 14px;
+	color: #737373;
+}
+
+.campaign-finder-contact-dot {
+	display: block;
+	width: 8px;
+	height: 8px;
+	border-radius: 9999px;
+	flex: none;
+}
+
+.campaign-finder-contact-name,
+.campaign-finder-contact-company,
+.campaign-finder-contact-descriptor,
+.campaign-finder-contact-city {
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.campaign-finder-contact-name,
+.campaign-finder-contact-company {
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 14px;
+	color: #000000;
+}
+
+.campaign-finder-contact-descriptor,
+.campaign-finder-contact-city {
+	font-size: 11px;
+	font-weight: 400;
+	line-height: 13px;
+	color: #343434;
+}
+
+.campaign-finder-contact-category-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 17px;
+	height: 17px;
+	min-width: 0;
+}
+
+.campaign-finder-state-badge,
+.campaign-finder-state-badge-empty {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 42px;
+	height: 17px;
+	border: 0;
+	border-radius: 8px;
+	font-size: 11px;
+	font-weight: 500;
+	line-height: 1;
+	color: #000000;
+	flex: none;
+}
+
+.campaign-finder-state-badge-empty {
+	border-color: transparent;
+	background: transparent;
+}
+
+.campaign-finder-context-menu {
+	position: fixed;
+	z-index: 10000;
+	box-sizing: border-box;
+	width: 180px;
+	padding: 7px 0;
+	border: 1px solid #dedede;
+	border-radius: 12px;
+	background: #ffffff;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+	font-family: var(--font-inter), Inter, sans-serif;
+	color: #000000;
+	overflow: hidden;
+	pointer-events: auto;
+	user-select: none;
+}
+
+.campaign-finder-context-menu-item {
+	display: flex;
+	align-items: center;
+	width: 100%;
+	height: 29px;
+	padding: 0 14px;
+	border: 0;
+	appearance: none;
+	background: transparent;
+	color: #000000;
+	font: inherit;
+	font-size: 14px;
+	font-weight: 500;
+	line-height: 18px;
+	text-align: left;
+	cursor: pointer;
+}
+
+.campaign-finder-context-menu-item:hover:not(:disabled),
+.campaign-finder-context-menu-item:focus-visible:not(:disabled) {
+	background: rgba(0, 0, 0, 0.045);
+}
+
+.campaign-finder-context-menu-item:focus-visible {
+	outline: none;
+}
+
+.campaign-finder-context-menu-item:disabled {
+	cursor: default;
+	opacity: 0.45;
+}
+
+.campaign-finder-context-menu-separator {
+	height: 1px;
+	margin: 5px 12px;
+	background: #222222;
+}
+
+.campaign-finder-context-menu-label {
+	display: flex;
+	align-items: center;
+	height: 24px;
+	padding: 0 14px;
+	font-family: var(--font-inter), Inter, sans-serif;
+	font-size: 14px;
+	font-weight: 500;
+	line-height: 18px;
+	color: #000000;
+}
+
+.campaign-finder-context-menu-move-item {
+	height: 27px;
+	gap: 9px;
+}
+
+.campaign-finder-context-menu-folder-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 11px;
+	flex: 0 0 18px;
+}
+
+.campaign-finder-context-menu-target-name {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.campaign-finder-info-popup-layer {
+	position: fixed;
+	inset: 0;
+	z-index: 10001;
+	pointer-events: none;
+}
+
+.campaign-finder-info-popup {
+	position: fixed;
+	box-sizing: border-box;
+	width: 318px;
+	max-height: 352px;
+	padding: 5px;
+	overflow: auto;
+	border: 1px solid #dedede;
+	border-radius: 12px;
+	background: #ffffff;
+	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.campaign-finder-info-popup-close {
+	position: absolute;
+	top: 9px;
+	right: 9px;
+	z-index: 1;
+	width: 20px;
+	height: 20px;
+	border: 1px solid #d9d9d9;
+	border-radius: 9999px;
+	appearance: none;
+	background: rgba(255, 255, 255, 0.9);
+	cursor: pointer;
+}
+
+.campaign-finder-info-popup-close::before,
+.campaign-finder-info-popup-close::after {
+	content: '';
+	position: absolute;
+	top: 9px;
+	left: 5px;
+	width: 10px;
+	height: 2px;
+	border-radius: 9999px;
+	background: #000000;
+}
+
+.campaign-finder-info-popup-close::before {
+	transform: rotate(45deg);
+}
+
+.campaign-finder-info-popup-close::after {
+	transform: rotate(-45deg);
+}
+
+@media (max-width: 960px) {
+	.campaign-finder-cell,
+	.campaign-finder-panel,
+	.campaign-finder-folder-group,
+	.campaign-finder-search-results,
+	.campaign-finder-folder-row,
+	.campaign-finder-contact-row,
+	.campaign-finder-empty-row {
+		width: min(650px, calc(100vw - 42px));
+		max-width: min(650px, calc(100vw - 42px));
+	}
+
+	.campaign-finder-contact-row {
+		grid-template-columns: 8px minmax(64px, 1fr) minmax(64px, 1fr) minmax(52px, 72px) 15px 32px;
+		column-gap: 6px;
+		padding: 0 8px 0 42px;
+	}
+
+	.campaign-finder-empty-row {
+		padding: 0 8px 0 42px;
+	}
+
+	.campaign-finder-contact-city,
+	.campaign-finder-contact-city-empty {
+		display: none;
+	}
+
+	.campaign-finder-state-badge,
+	.campaign-finder-state-badge-empty {
+		width: 32px;
+	}
+}
+
+/* === Dashboard cinematic boot ============================================
+   Initial-dashboard loading state: a dark starfield (DashboardBootBackdrop)
+   covers the cold-loading Mapbox canvas while body.dashboard-booting reskins
+   the hero chrome as outlined skeletons (white logo triangles, dark search
+   bar/toolbar). body.dashboard-boot-fading carries the transitions so every
+   property crossfades back to its normal value as the backdrop fades out.
+   Lives here (not styled-jsx) because the backdrop must be dark from the
+   server-rendered first paint. */
+
+.dashboard-boot-backdrop {
+	position: fixed;
+	inset: 0;
+	/* Same z as the map's .dashboard-globe-bg but later in the DOM, so it paints
+	   above the canvas while staying under all static-flow page content. */
+	z-index: -1;
+	background-color: #1f2123;
+	pointer-events: none;
+}
+
+/* Pre-map paint: html/body only go transparent once .dashboard-globe-bg mounts,
+   so keep the page itself dark while the splash exists. */
+html:has(.dashboard-boot-backdrop) {
+	background-color: #1f2123 !important;
+}
+
+/* Mirror the persistent map's counter-zoom so the backdrop covers the true
+   viewport (and star sizes stay design-true) under the dashboard root zoom. */
+html.murmur-compact .dashboard-boot-backdrop {
+	zoom: calc(1 / var(--murmur-dashboard-zoom, var(--murmur-campaign-zoom, 0.85)));
+}
+
+.dashboard-boot-backdrop--fading {
+	opacity: 0;
+	transition: opacity 800ms ease;
+}
+
+.dashboard-boot-starfield {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+}
+
+.dashboard-boot-vignette {
+	position: absolute;
+	inset: 0;
+	background: radial-gradient(
+		ellipse 75% 60% at 50% 44%,
+		transparent 55%,
+		rgba(0, 0, 0, 0.4) 100%
+	);
+}
+
+@keyframes dashboard-boot-twinkle {
+	0%,
+	100% {
+		opacity: var(--boot-star-o, 0.8);
+	}
+	50% {
+		opacity: 0.08;
+	}
+}
+
+.boot-star--twinkle {
+	animation: dashboard-boot-twinkle 3000ms ease-in-out infinite;
+}
+
+/* --- Logo skin: fast-forward triangles white, shards black, wordmark hidden.
+   .murmur-logo-boot is the standalone variant for the Suspense fallback. */
+body.dashboard-booting .dashboard-hero-logo .murmur-logo-word,
+.murmur-logo-boot .murmur-logo-word {
+	opacity: 0;
+}
+body.dashboard-booting .dashboard-hero-logo .murmur-logo-tri,
+.murmur-logo-boot .murmur-logo-tri {
+	fill: #ffffff;
+	stroke: #ffffff;
+}
+body.dashboard-booting .dashboard-hero-logo .murmur-logo-shard,
+.murmur-logo-boot .murmur-logo-shard {
+	fill: #000000;
+	stroke: #000000;
+}
+/* Wordmark hidden → center the visible mark over the search bar. Mark center sits
+   at 44.9px of the 300px hero box after the 1.5 bottom-origin scale; +52.5% of the
+   box brings it to the middle (unlayered `translate` beats the layered utility). */
+body.dashboard-booting .dashboard-hero-logo {
+	translate: 52.5% 40px;
+}
+/* Fallback-logo variant (180px box, no scale utilities): mark center 27px → +35%. */
+.murmur-logo-boot {
+	translate: 35% 0;
+}
+
+/* --- Search bar skeleton: dark fill, light outline, empty outlined button. */
+body.dashboard-booting .hero-wrapper {
+	pointer-events: none;
+}
+/* Specificity note: the hero-width rules above (`html.murmur-dashboard-compact
+   .search-bar-wrapper:not(.search-bar-active) .search-wave-container`, ~line 6275)
+   pin the resting fill to #f2f2f2 at (0,4,1) — the doubled class outranks them. */
+body.dashboard-booting .search-bar-wrapper .search-wave-container.search-wave-container {
+	background: #191b1d !important;
+	opacity: 1 !important;
+}
+body.dashboard-booting .search-wave-container::before {
+	opacity: 0; /* the white inner-gradient sheen */
+}
+body.dashboard-booting .search-wave-input.search-wave-input {
+	border-color: #caccce !important; /* outranks the unlayered :hover/:focus rules above */
+	background: transparent !important;
+	-webkit-backdrop-filter: none !important;
+	backdrop-filter: none !important;
+	caret-color: transparent;
+}
+body.dashboard-booting .search-gradient-button {
+	opacity: 0 !important;
+}
+body.dashboard-booting .dashboard-search-button {
+	background-color: transparent !important;
+	border: 2px solid #caccce !important;
+}
+body.dashboard-booting .dashboard-search-button .search-spotlight-content {
+	opacity: 0;
+}
+
+/* --- Action toolbar: dark fill, light border, uniformly dim icons. */
+body.dashboard-booting .dashboard-action-bar {
+	background: #191b1d !important;
+	border: 2px solid #caccce !important;
+}
+body.dashboard-booting .dashboard-action-bar button {
+	color: #caccce !important;
+	opacity: 0.3 !important;
+}
+
+/* --- Everything else on the landing hides until the reveal. */
+body.dashboard-booting .dashboard-recent-campaigns,
+body.dashboard-booting .dashboard-ask-anything-root,
+body.dashboard-booting .clerk-user-button {
+	opacity: 0 !important;
+}
+body.dashboard-booting .dashboard-ask-anything-root,
+body.dashboard-booting .dashboard-ask-anything-root * {
+	pointer-events: none !important;
+}
+
+/* --- Crossfade back: transitions live only on the fading class, so swapping
+   dashboard-booting → dashboard-boot-fading in one commit animates every skinned
+   property to its normal value, then both classes drop at 'done'. */
+body.dashboard-boot-fading .dashboard-hero-logo {
+	transition: translate 800ms ease;
+}
+body.dashboard-boot-fading .dashboard-hero-logo path {
+	transition:
+		fill 800ms ease,
+		stroke 800ms ease,
+		opacity 800ms ease;
+}
+/* !important: several of these carry inline `transition: none` (wave container) or
+   inline micro-transitions (action-bar buttons) that would make the crossfade snap. */
+body.dashboard-boot-fading .search-wave-container,
+body.dashboard-boot-fading .search-wave-container::before,
+body.dashboard-boot-fading .search-gradient-button,
+body.dashboard-boot-fading .dashboard-search-button,
+body.dashboard-boot-fading .dashboard-search-button .search-spotlight-content,
+body.dashboard-boot-fading .dashboard-action-bar,
+body.dashboard-boot-fading .dashboard-action-bar button,
+body.dashboard-boot-fading .dashboard-recent-campaigns,
+body.dashboard-boot-fading .dashboard-ask-anything-root,
+body.dashboard-boot-fading .clerk-user-button {
+	transition:
+		opacity 700ms ease,
+		background-color 700ms ease,
+		border-color 700ms ease,
+		color 700ms ease !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.boot-star--twinkle {
+		animation: none;
+	}
+	.dashboard-boot-backdrop--fading,
+	body.dashboard-boot-fading .dashboard-hero-logo,
+	body.dashboard-boot-fading .dashboard-hero-logo path,
+	body.dashboard-boot-fading .search-wave-container,
+	body.dashboard-boot-fading .search-wave-container::before,
+	body.dashboard-boot-fading .search-gradient-button,
+	body.dashboard-boot-fading .dashboard-search-button,
+	body.dashboard-boot-fading .dashboard-search-button .search-spotlight-content,
+	body.dashboard-boot-fading .dashboard-action-bar,
+	body.dashboard-boot-fading .dashboard-action-bar button,
+	body.dashboard-boot-fading .dashboard-recent-campaigns,
+	body.dashboard-boot-fading .dashboard-ask-anything-root,
+	body.dashboard-boot-fading .clerk-user-button {
+		transition-duration: 1ms !important;
+	}
+}

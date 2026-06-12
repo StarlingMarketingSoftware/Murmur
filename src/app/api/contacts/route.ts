@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import {
 	apiBadRequest,
 	apiResponse,
@@ -27,6 +28,10 @@ import { applyHardcodedLocationOverrides } from '@/app/api/_utils/searchPreproce
 import { Contact, EmailVerificationStatus, Prisma } from '@prisma/client';
 import { searchSimilarContacts, upsertContactToVectorDb } from '../_utils/vectorDb';
 import { GEMINI_MODEL_OPTIONS } from '@/constants';
+import {
+	BOOKING_CONTACT_TITLE_PREFIXES,
+	PROMOTION_CONTACT_TITLE_PREFIXES,
+} from '@/constants/contactCategories';
 import { StripeSubscriptionStatus } from '@/types';
 
 const VECTOR_SEARCH_LIMIT_DEFAULT = 500;
@@ -68,6 +73,9 @@ const contactFilterSchema = z.object({
 	useVectorSearch: z.boolean().optional(),
 	location: z.string().optional(),
 	excludeUsedContacts: z.boolean().optional(),
+	// Client-side cache buster so repeating the exact same dashboard search
+	// requests a fresh randomized sample.
+	searchRunId: z.coerce.number().optional(),
 	// Optional bounding-box override (used by map rectangle selection).
 	// When present, the API will return contacts inside this box, optionally filtered by `bboxTitlePrefix`.
 	bboxSouth: z.coerce.number().optional(),
@@ -89,28 +97,82 @@ export type PostContactData = z.infer<typeof createContactSchema>;
 
 export const maxDuration = 60;
 
+const CONTACTS_ROUTE_SOFT_BUDGET_MS = 52000;
+const CONTACTS_ROUTE_SAFETY_MARGIN_MS = 3000;
+const CONTACTS_VECTOR_SEARCH_TIMEOUT_MS = 14000;
+const CONTACTS_SUBSTRING_FALLBACK_TIMEOUT_MS = 8000;
+const CONTACTS_PRISMA_HYDRATION_TIMEOUT_MS = 8000;
+
+const getRouteRemainingMs = (startedAtMs: number): number =>
+	Math.max(0, CONTACTS_ROUTE_SOFT_BUDGET_MS - (Date.now() - startedAtMs));
+
+const getBudgetedTimeoutMs = (startedAtMs: number, maxTimeoutMs: number): number =>
+	Math.max(
+		0,
+		Math.min(maxTimeoutMs, getRouteRemainingMs(startedAtMs) - CONTACTS_ROUTE_SAFETY_MARGIN_MS)
+	);
+
+const withBudgetFallback = async <T,>(
+	operation: () => Promise<T>,
+	options: {
+		timeoutMs: number;
+		fallbackValue: T;
+		label: string;
+	}
+): Promise<T> => {
+	if (options.timeoutMs <= 0) {
+		console.warn(`[contacts] ${options.label} skipped because route budget is exhausted`);
+		return options.fallbackValue;
+	}
+
+	let timeoutId: ReturnType<typeof setTimeout> | null = null;
+	let timedOut = false;
+
+	try {
+		const timeoutPromise = new Promise<T>((resolve) => {
+			timeoutId = setTimeout(() => {
+				timedOut = true;
+				resolve(options.fallbackValue);
+			}, options.timeoutMs);
+		});
+		const result = await Promise.race([operation(), timeoutPromise]);
+		if (timedOut) {
+			console.warn(
+				`[contacts] ${options.label} exceeded ${options.timeoutMs}ms; returning fallback response`
+			);
+		}
+		return result;
+	} catch (error) {
+		console.warn(`[contacts] ${options.label} failed; returning fallback response`, error);
+		return options.fallbackValue;
+	} finally {
+		if (timeoutId) clearTimeout(timeoutId);
+	}
+};
+
 const normalizeSearchText = (value: string | null | undefined): string =>
 	(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+const shuffleItems = <T,>(items: readonly T[]): T[] => {
+	const shuffled = [...items];
+	for (let i = shuffled.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+	}
+	return shuffled;
+};
+
+const takeRandomized = <T,>(items: readonly T[], limit: number): T[] =>
+	shuffleItems(items).slice(0, Math.max(0, limit));
 
 type ContactSearchMode = 'booking' | 'promotion';
 
 const stripLeadingBracketTag = (value: string | null | undefined): string =>
 	(value ?? '').replace(/^\s*\[[^\]]+\]\s*/i, '').trim();
 
-const BOOKING_TITLE_PREFIXES = [
-	'Music Venues',
-	'Restaurants',
-	'Coffee Shops',
-	'Music Festivals',
-	'Breweries',
-	'Distilleries',
-	'Wineries',
-	'Cideries',
-	'Wedding Planners',
-	'Wedding Venues',
-] as const;
+const BOOKING_TITLE_PREFIXES = BOOKING_CONTACT_TITLE_PREFIXES;
 
-const PROMOTION_TITLE_PREFIXES = ['Radio Stations', 'College Radio'] as const;
+const PROMOTION_TITLE_PREFIXES = PROMOTION_CONTACT_TITLE_PREFIXES;
 
 // Map user-facing "What" labels to the DB title prefixes used for filtering.
 const WHAT_TO_TITLE_PREFIX_ALIASES: Record<string, string> = {
@@ -1192,7 +1254,11 @@ const extractParentheticalLocation = (query: string): ParentheticalLocation | nu
 };
 
 export async function GET(req: NextRequest) {
+	const requestStartedAtMs = Date.now();
 	try {
+		const limited = await withRateLimit(req, 'search-heavy', 'contacts');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
@@ -3189,7 +3255,16 @@ export async function GET(req: NextRequest) {
 						return (a.contact.company || '').localeCompare(b.contact.company || '');
 					});
 
-					return apiResponse(scored.map((x) => x.contact).slice(0, finalLimit));
+					const randomizedPool = scored.slice(
+						0,
+						Math.min(scored.length, Math.max(finalLimit * 4, finalLimit))
+					);
+					return apiResponse(
+						takeRandomized(
+							randomizedPool.map((x) => x.contact),
+							finalLimit
+						)
+					);
 				}
 				// If still empty and vector requested, let vector path try below
 			}
@@ -3198,6 +3273,7 @@ export async function GET(req: NextRequest) {
 		// Special-case: wine/beer/spirits queries - return only beverage venue titles
 		if (isWineBeerSpiritsQuery) {
 			const finalLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 500));
+			const fetchTake = Math.min(finalLimit * 6, 500);
 			const beveragePrefixes = ['Wineries', 'Distilleries', 'Breweries', 'Cideries'];
 
 			const baseWhere: Prisma.ContactWhereInput = {
@@ -3254,7 +3330,7 @@ export async function GET(req: NextRequest) {
 					],
 				},
 				orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
-				take: finalLimit,
+				take: fetchTake,
 			});
 
 			const results = primary.slice();
@@ -3264,7 +3340,6 @@ export async function GET(req: NextRequest) {
 					if (seen.has(c.id)) continue;
 					results.push(c);
 					seen.add(c.id);
-					if (results.length >= finalLimit) break;
 				}
 			};
 			const buildSeenExclusion = (): Prisma.ContactWhereInput =>
@@ -3433,7 +3508,7 @@ export async function GET(req: NextRequest) {
 
 			// Do not apply booking title-prefix filtering here; this flow enforces the
 			// beverage categories directly.
-			return apiResponse(results.slice(0, finalLimit));
+			return apiResponse(takeRandomized(results, finalLimit));
 		}
 
 		// Special-case: Wedding planner searches - more lenient matching for wedding-related contacts
@@ -3792,6 +3867,7 @@ export async function GET(req: NextRequest) {
 		// Special-case: Promotion searches prioritize Radio Stations across all states
 		if (isPromotionSearch) {
 			const finalLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 500));
+			const fetchTake = Math.min(finalLimit * 6, 500);
 			const radioTitleWhere: Prisma.StringFilter = {
 				mode: 'insensitive',
 				contains: 'radio station',
@@ -3853,7 +3929,7 @@ export async function GET(req: NextRequest) {
 					],
 				},
 				orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
-				take: finalLimit,
+				take: fetchTake,
 			});
 
 			const results = primary;
@@ -4011,7 +4087,7 @@ export async function GET(req: NextRequest) {
 				}
 			}
 
-			return apiResponse(results.slice(0, finalLimit));
+			return apiResponse(takeRandomized(results, finalLimit));
 		}
 
 		const substringSearch = async (): Promise<Contact[]> => {
@@ -4140,6 +4216,16 @@ export async function GET(req: NextRequest) {
 			});
 		};
 
+		const runSubstringSearchWithBudget = (label: string): Promise<Contact[]> =>
+			withBudgetFallback(() => substringSearch(), {
+				timeoutMs: getBudgetedTimeoutMs(
+					requestStartedAtMs,
+					CONTACTS_SUBSTRING_FALLBACK_TIMEOUT_MS
+				),
+				fallbackValue: [],
+				label,
+			});
+
 		// if it's a search by ContactListId, only filter by this ContactList.id and validation status
 		if (numberContactListIds.length > 0) {
 			contacts = await prisma.contact.findMany({
@@ -4149,6 +4235,8 @@ export async function GET(req: NextRequest) {
 							id: {
 								in: numberContactListIds,
 							},
+							// the referenced lists must belong to the caller
+							userId,
 						},
 					},
 					emailValidationStatus: {
@@ -4172,25 +4260,39 @@ export async function GET(req: NextRequest) {
 				: requestedLimit;
 			// Protect the vector path with a timeout and fallback to substring search
 			const vectorSearchWithTimeout = async () => {
-				const timeoutMs = 14000;
-				return await Promise.race([
-					searchSimilarContacts(
-						queryJson,
-						effectiveVectorLimit,
-						effectiveLocationStrategy,
-						{
-							penaltyCities,
-							forceCityExactCity,
-							forceStateAny,
-							forceCityAny,
-							penaltyTerms,
-							strictPenalty,
-						}
-					),
-					new Promise<never>((_, reject) =>
-						setTimeout(() => reject(new Error('Vector search timed out')), timeoutMs)
-					),
-				]);
+				const timeoutMs = getBudgetedTimeoutMs(
+					requestStartedAtMs,
+					CONTACTS_VECTOR_SEARCH_TIMEOUT_MS
+				);
+				if (timeoutMs <= 0) {
+					throw new Error('Vector search skipped because route budget is exhausted');
+				}
+				let timeoutId: ReturnType<typeof setTimeout> | null = null;
+				try {
+					return await Promise.race([
+						searchSimilarContacts(
+							queryJson,
+							effectiveVectorLimit,
+							effectiveLocationStrategy,
+							{
+								penaltyCities,
+								forceCityExactCity,
+								forceStateAny,
+								forceCityAny,
+								penaltyTerms,
+								strictPenalty,
+							}
+						),
+						new Promise<never>((_, reject) => {
+							timeoutId = setTimeout(
+								() => reject(new Error('Vector search timed out')),
+								timeoutMs
+							);
+						}),
+					]);
+				} finally {
+					if (timeoutId) clearTimeout(timeoutId);
+				}
 			};
 
 			let vectorSearchResults;
@@ -4204,7 +4306,9 @@ export async function GET(req: NextRequest) {
 					'Vector search timed out or failed, falling back to substring search.',
 					e
 				);
-				const fallback = await substringSearch();
+				const fallback = await runSubstringSearchWithBudget(
+					'vector failure substring fallback'
+				);
 				const filteredFallback = shouldFilterBookingTitles
 					? await filterItemsByTitlePrefixes(fallback, [bookingTitlePrefix], {
 							keepNullTitles: false,
@@ -4218,7 +4322,9 @@ export async function GET(req: NextRequest) {
 				console.warn(
 					'Vector search returned no matches, falling back to substring search.'
 				);
-				const fallback = await substringSearch();
+				const fallback = await runSubstringSearchWithBudget(
+					'empty vector substring fallback'
+				);
 				const filteredFallback = shouldFilterBookingTitles
 					? await filterItemsByTitlePrefixes(fallback, [bookingTitlePrefix], {
 							keepNullTitles: false,
@@ -4351,20 +4457,31 @@ export async function GET(req: NextRequest) {
 			let hydratedContacts: PrismaHydrationContact[] = [];
 			if (hydrationIds.length > 0) {
 				const prismaHydrationStartMs = Date.now();
-				hydratedContacts = await prisma.contact.findMany({
-					where: {
-						id: {
-							in: hydrationIds,
-							notIn: addedContactIds,
-						},
-						emailValidationStatus: verificationStatus
-							? {
-									equals: verificationStatus,
-							  }
-							: undefined,
-					},
-					select: VECTOR_PRISMA_HYDRATION_SELECT,
-				});
+				hydratedContacts = await withBudgetFallback(
+					() =>
+						prisma.contact.findMany({
+							where: {
+								id: {
+									in: hydrationIds,
+									notIn: addedContactIds,
+								},
+								emailValidationStatus: verificationStatus
+									? {
+											equals: verificationStatus,
+									  }
+									: undefined,
+							},
+							select: VECTOR_PRISMA_HYDRATION_SELECT,
+						}),
+					{
+						timeoutMs: getBudgetedTimeoutMs(
+							requestStartedAtMs,
+							CONTACTS_PRISMA_HYDRATION_TIMEOUT_MS
+						),
+						fallbackValue: [],
+						label: 'vector Prisma hydration',
+					}
+				);
 				prismaHydrationMs = Date.now() - prismaHydrationStartMs;
 			}
 
@@ -4534,7 +4651,7 @@ export async function GET(req: NextRequest) {
 			return apiResponse(contacts.slice(0, requestedLimit));
 		} else {
 			// Use regular search if vector search is not enabled
-			contacts = await substringSearch();
+			contacts = await runSubstringSearchWithBudget('regular substring search');
 
 			return apiResponse(contacts);
 		}
@@ -4551,6 +4668,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
 	try {
+		const limited = await withRateLimit(req, 'mutation', 'contacts');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 
 		if (!userId) {

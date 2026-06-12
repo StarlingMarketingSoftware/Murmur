@@ -23,20 +23,29 @@ interface EditEmailData {
 	data: PatchEmailData;
 }
 
+// Exported so callers (e.g. dashboard hover prefetch) can warm the exact same
+// React Query cache entry that useGetEmails reads — same key, same fetcher.
+export const getEmailsListQueryKey = (filters?: EmailFilterData) =>
+	[...EMAIL_QUERY_KEYS.list(), filters] as const;
+
+export const fetchEmailsList = async (
+	filters?: EmailFilterData
+): Promise<EmailWithRelations[]> => {
+	const url = appendQueryParamsToUrl(urls.api.emails.index, filters);
+	const response = await _fetch(url);
+
+	if (!response.ok) {
+		const errorData = await response.json();
+		throw new Error(errorData.error || 'Failed to _fetch emails');
+	}
+
+	return response.json() as Promise<EmailWithRelations[]>;
+};
+
 export const useGetEmails = (options: EmailQueryOptions) => {
 	return useQuery({
-		queryKey: [...EMAIL_QUERY_KEYS.list(), options.filters],
-		queryFn: async () => {
-			const url = appendQueryParamsToUrl(urls.api.emails.index, options.filters);
-			const response = await _fetch(url);
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to _fetch emails');
-			}
-
-			return response.json() as Promise<EmailWithRelations[]>;
-		},
+		queryKey: getEmailsListQueryKey(options.filters),
+		queryFn: () => fetchEmailsList(options.filters),
 		enabled: options.enabled,
 	});
 };
@@ -44,8 +53,8 @@ export const useGetEmails = (options: EmailQueryOptions) => {
 export const useCreateEmail = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,
-		successMessage = 'Email created successfully',
-		errorMessage = 'Failed to create email',
+		successMessage = 'Message created successfully',
+		errorMessage = 'Failed to create message',
 		onSuccess: onSuccessCallback,
 	} = options;
 	const queryClient = useQueryClient();
@@ -78,8 +87,8 @@ export const useCreateEmail = (options: CustomMutationOptions = {}) => {
 export const useEditEmail = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,
-		successMessage = 'Email updated successfully',
-		errorMessage = 'Failed to update email',
+		successMessage = 'Message updated successfully',
+		errorMessage = 'Failed to update message',
 		onSuccess: onSuccessCallback,
 	} = options;
 	const queryClient = useQueryClient();
@@ -100,14 +109,14 @@ export const useEditEmail = (options: CustomMutationOptions = {}) => {
 			});
 
 			if (!suppressToasts) {
-				toast.success(successMessage || 'Email updated successfully');
+				toast.success(successMessage || 'Message updated successfully');
 			}
 
 			onSuccessCallback?.();
 		},
 		onError: () => {
 			if (!suppressToasts) {
-				toast.error(errorMessage || 'Failed to update email. Please try again.');
+				toast.error(errorMessage || 'Failed to update message. Please try again.');
 			}
 		},
 	});
@@ -116,8 +125,8 @@ export const useEditEmail = (options: CustomMutationOptions = {}) => {
 export const useDeleteEmail = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,
-		successMessage = 'Email deleted successfully',
-		errorMessage = 'Failed to delete email',
+		successMessage = 'Message deleted successfully',
+		errorMessage = 'Failed to delete message',
 		onSuccess: onSuccessCallback,
 	} = options;
 	const queryClient = useQueryClient();

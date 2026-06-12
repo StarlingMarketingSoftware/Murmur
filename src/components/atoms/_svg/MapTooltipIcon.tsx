@@ -28,7 +28,7 @@ const TOOLTIP_CATEGORY_ICON_BASELINE_OFFSET = 5;
 
 // Convert React-style SVG attrs (camelCase) to SVG/XML attrs (kebab-case).
 // The tooltip is rendered via `data:image/svg+xml`, which is parsed as XML.
-const normalizeInlineSvgMarkupForXml = (markup: string): string =>
+export const normalizeInlineSvgMarkupForXml = (markup: string): string =>
 	markup
 		.replaceAll('strokeWidth', 'stroke-width')
 		.replaceAll('strokeLinecap', 'stroke-linecap')
@@ -245,25 +245,6 @@ ${normalized}
 </g>
 <path d="${bubblePathD}" fill="none" stroke="black" stroke-width="2"/>
 </svg>`;
-};
-
-// Generate data URL for use in Google Maps markers
-export const generateMapTooltipIconUrl = (
-	name: string,
-	company: string,
-	title: string,
-	fillColor?: string,
-	searchWhat?: string | null
-): string => {
-	return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-		generateMapTooltipSvg(
-			name,
-			company,
-			title,
-			fillColor ?? DEFAULT_TOOLTIP_FILL_COLOR,
-			searchWhat
-		)
-	)}`;
 };
 
 // Stroke padding added to SVG dimensions

@@ -17,6 +17,20 @@ const requiredEnvVars = {
 	MISTRAL_PARAGRAPH_4_AGENT_ID: 'Mistral agent for 4 paragraphs formatting',
 	MISTRAL_PARAGRAPH_5_AGENT_ID: 'Mistral agent for 5 paragraphs formatting',
 	MISTRAL_HYBRID_AGENT_ID: 'Mistral agent for hybrid mode',
+
+	// Cloudflare R2 media storage (profile video/audio/photo uploads)
+	R2_ACCOUNT_ID: 'Cloudflare R2 account id (media uploads)',
+	R2_ACCESS_KEY_ID: 'Cloudflare R2 S3 access key id (media uploads)',
+	R2_SECRET_ACCESS_KEY: 'Cloudflare R2 S3 secret access key (media uploads)',
+	R2_BUCKET: 'Cloudflare R2 bucket name, e.g. murmur (media uploads)',
+};
+
+// Optional but strongly recommended: Upstash Redis powers API rate limiting.
+// When unset, rate limiting is disabled (fail-open) — fine for local dev,
+// but it MUST be configured in production to prevent cost-amplification abuse.
+const optionalEnvVars = {
+	UPSTASH_REDIS_REST_URL: 'Upstash Redis REST URL (API rate limiting)',
+	UPSTASH_REDIS_REST_TOKEN: 'Upstash Redis REST token (API rate limiting)',
 };
 
 export function checkRequiredEnvVariables() {
@@ -43,7 +57,22 @@ export function checkRequiredEnvVariables() {
 	return true;
 }
 
+export function checkOptionalEnvVariables() {
+	const missing = Object.entries(optionalEnvVars)
+		.filter(([varName]) => !process.env[varName])
+		.map(([varName, description]) => `  ⚠️  ${varName}: ${description}`);
+
+	if (missing.length > 0) {
+		console.warn('⚠️  Optional environment variables not set:');
+		console.warn(missing.join('\n'));
+		console.warn(
+			'🛡️  API rate limiting is DISABLED until UPSTASH_REDIS_REST_URL/TOKEN are set.\n'
+		);
+	}
+}
+
 // Only run the check in development mode and on the server side
 if (process.env.NODE_ENV === 'development' && typeof window === 'undefined') {
 	checkRequiredEnvVariables();
+	checkOptionalEnvVariables();
 }

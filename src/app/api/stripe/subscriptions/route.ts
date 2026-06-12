@@ -9,6 +9,7 @@ import {
 	handleApiError,
 } from '@/app/api/_utils';
 import { getUser } from '../../_utils';
+import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import z from 'zod';
 import prisma from '@/lib/prisma';
 
@@ -26,6 +27,9 @@ export type CreateStripeSubscriptionData = z.infer<typeof createStripeSubscripti
 
 export async function POST(req: Request) {
 	try {
+		const limited = await withRateLimit(req, 'mutation', 'stripe-subscriptions');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 
 		if (!userId) {
@@ -67,6 +71,9 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
 	try {
+		const limited = await withRateLimit(req, 'mutation', 'stripe-subscriptions');
+		if (limited) return limited;
+
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();

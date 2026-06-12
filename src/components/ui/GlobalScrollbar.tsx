@@ -24,9 +24,12 @@ export function GlobalScrollbar() {
 	// Campaign UI uses fixed-layout panels and should never show a page-level scrollbar.
 	const hideOnCampaignRoute =
 		typeof pathname === 'string' && pathname.startsWith('/murmur/campaign');
+	const hideOnPricingRoute =
+		typeof pathname === 'string' &&
+		(pathname === '/pricing' || pathname.startsWith('/pricing/'));
 	const hideOnMobileByRoute =
 		typeof pathname === 'string' &&
-		new Set(['/', '/map', '/research', '/inbox', '/drafting']).has(pathname);
+		new Set(['/']).has(pathname);
 
 	const updateScrollbar = useCallback(() => {
 		const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
@@ -238,7 +241,7 @@ export function GlobalScrollbar() {
 	// Keep these around for potential route-specific behavior, but the hide rule is now global.
 	void isCampaignPage;
 	void isDashboardPage;
-	if (hideOnCampaignRoute || isDialogOpen || isMobileLandscape) {
+	if (hideOnCampaignRoute || hideOnPricingRoute || isDialogOpen || isMobileLandscape) {
 		return null;
 	}
 

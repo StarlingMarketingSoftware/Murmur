@@ -8,6 +8,7 @@ import {
 	apiNotFound,
 	apiResponse,
 	apiUnauthorized,
+	getIsAdmin,
 	handleApiError,
 } from '@/app/api/_utils';
 import { ApiRouteParams } from '@/types';
@@ -39,7 +40,9 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 			},
 		});
 
-		if (!existingList) {
+		// Global curated lists (userId null) are managed from /admin/contacts; 404
+		// rather than 401 to avoid an existence oracle on other users' lists.
+		if (!existingList || (existingList.userId !== userId && !(await getIsAdmin(userId)))) {
 			return apiNotFound();
 		}
 
@@ -80,7 +83,14 @@ export async function GET(req: NextRequest, { params }: { params: ApiRouteParams
 			},
 		});
 
-		if (!contactList) {
+		// Global lists (userId null) are readable by everyone; private lists only
+		// by their owner or an admin.
+		if (
+			!contactList ||
+			(contactList.userId !== null &&
+				contactList.userId !== userId &&
+				!(await getIsAdmin(userId)))
+		) {
 			return apiNotFound();
 		}
 
@@ -104,7 +114,8 @@ export async function DELETE(req: NextRequest, { params }: { params: ApiRoutePar
 			},
 		});
 
-		if (!existingList) {
+		// Same rule as PATCH: owner or admin only (global lists are admin-managed).
+		if (!existingList || (existingList.userId !== userId && !(await getIsAdmin(userId)))) {
 			return apiNotFound();
 		}
 

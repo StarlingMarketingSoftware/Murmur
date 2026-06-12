@@ -19,21 +19,26 @@ export const GET = async function GET() {
 
 		const users = await prisma.user.findMany({});
 
-		for (const user of users) {
+		// All-or-nothing: a mid-loop failure must not leave half the user base with
+		// reset credits and the other half untouched.
+		const creditUpdates = users.flatMap((user) => {
 			const subscriptionTier = getSubscriptionTierWithPriceId(user.stripePriceId);
 			if (!subscriptionTier) {
-				continue;
+				return [];
 			}
 			const { draftCredits, sendingCredits, verificationCredits } = subscriptionTier;
-			await prisma.user.update({
-				where: { clerkId: user.clerkId },
-				data: {
-					draftCredits,
-					sendingCredits,
-					verificationCredits,
-				},
-			});
-		}
+			return [
+				prisma.user.update({
+					where: { clerkId: user.clerkId },
+					data: {
+						draftCredits,
+						sendingCredits,
+						verificationCredits,
+					},
+				}),
+			];
+		});
+		await prisma.$transaction(creditUpdates);
 
 		return apiResponse({
 			message: `Updated ${users.length} users`,

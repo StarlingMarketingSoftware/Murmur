@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { PostPortalRequestData } from '@/app/api/stripe/portal/update-subscription/route';
 import { PostPortalManageSubscriptionData } from '@/app/api/stripe/portal/manage-subscription/route';
+import { PostPortalChangePlanData } from '@/app/api/stripe/portal/change-plan/route';
 import { PostCheckoutSessionData } from '@/app/api/stripe/checkout/route';
 
 const QUERY_KEYS = {
@@ -62,6 +63,39 @@ export const useCreateCustomerPortal = (options: CustomMutationOptions = {}) => 
 				'POST',
 				data
 			);
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to create customer portal');
+			}
+			return response.json();
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
+			if (!suppressToasts) {
+				toast.success(successMessage);
+			}
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
+			}
+		},
+	});
+};
+
+export const useChangePlanPortal = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Portal session created successfully',
+		errorMessage = 'Failed to start customer portal. Please try again.',
+		onSuccess: onSuccessCallback,
+	} = options;
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async (data: PostPortalChangePlanData) => {
+			const response = await _fetch(urls.api.stripe.portal.changePlan.index, 'POST', data);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to create customer portal');
