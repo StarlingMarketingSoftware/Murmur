@@ -8367,9 +8367,21 @@ html.murmur-compact .dashboard-boot-backdrop {
 	pointer-events: none;
 }
 
+/* Mobile has no dark splash — it sits over the tab frame / loading folder cards,
+   so the bar needs its own readable backing: a compact centered "loading" pill. */
 .dashboard-boot-progress--mobile {
 	top: 50%;
 	transform: translate(-50%, -50%);
+	width: auto;
+	max-width: 70vw;
+	padding: 16px 20px;
+	border-radius: 14px;
+	background: rgba(20, 21, 23, 0.9);
+	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.dashboard-boot-progress--mobile .dashboard-boot-progress-track {
+	width: 150px;
 }
 
 /* Fade matches the splash's 800ms (DASHBOARD_BOOT_FADE_MS, passed as fadeMs). */
