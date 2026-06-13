@@ -1,17 +1,21 @@
 'use client';
 
-const CLERK_CARD_FILL = '#6FCF84';
-const CLERK_CARD_STROKE = '#000000';
-const CLERK_CONTINUE_BUTTON_FILL = '#8E8E8E';
-const CLERK_CONTINUE_BUTTON_HOVER_FILL = '#808080';
-const CLERK_SOCIAL_BUTTON_FILL = '#ffffff';
-const CLERK_SOCIAL_BUTTON_HOVER_FILL = '#e6e6e6';
+import { withClerkNoBranding } from '@/constants/auth';
 
-export const FREE_TRIAL_CLERK_APPEARANCE = {
+const CLERK_CARD_FILL = '#FFFFFF';
+const CLERK_CARD_STROKE = '#D9D6CE';
+const CLERK_TEXT = '#111113';
+const CLERK_TEXT_SECONDARY = '#62666F';
+const CLERK_CONTINUE_BUTTON_FILL = '#111113';
+const CLERK_CONTINUE_BUTTON_HOVER_FILL = '#2A2A2D';
+const CLERK_SOCIAL_BUTTON_FILL = '#ffffff';
+const CLERK_SOCIAL_BUTTON_HOVER_FILL = '#F7F6F3';
+
+export const FREE_TRIAL_CLERK_APPEARANCE = withClerkNoBranding({
 	variables: {
-		colorPrimary: CLERK_CARD_STROKE,
-		colorText: CLERK_CARD_STROKE,
-		colorTextSecondary: CLERK_CARD_STROKE,
+		colorPrimary: CLERK_TEXT,
+		colorText: CLERK_TEXT,
+		colorTextSecondary: CLERK_TEXT_SECONDARY,
 		// Note: Clerk uses this as a base background for some surfaces.
 		// We still explicitly set the card's background below to ensure the exact fill.
 		colorBackground: CLERK_CARD_FILL,
@@ -28,10 +32,13 @@ export const FREE_TRIAL_CLERK_APPEARANCE = {
 		},
 		// Put the stroke on the outer container so it wraps the footer too.
 		cardBox: {
-			boxShadow: 'none',
+			width: 'min(calc(100vw - 16px), 420px)',
+			boxSizing: 'border-box',
+			boxShadow:
+				'0 26px 80px rgba(17, 17, 19, 0.24), 0 2px 10px rgba(17, 17, 19, 0.08)',
 			backgroundColor: CLERK_CARD_FILL,
-			border: `3px solid ${CLERK_CARD_STROKE}`,
-			borderRadius: '12px',
+			border: `1px solid ${CLERK_CARD_STROKE}`,
+			borderRadius: '18px',
 			overflow: 'hidden',
 			display: 'flex',
 			flexDirection: 'column',
@@ -48,26 +55,30 @@ export const FREE_TRIAL_CLERK_APPEARANCE = {
 			// Don't let internal rubber-banding chain to the (locked) page behind.
 			overscrollBehavior: 'contain',
 		},
-		footer: { flexShrink: 0 },
-		headerTitle: { color: CLERK_CARD_STROKE },
-		headerSubtitle: { color: CLERK_CARD_STROKE },
-		formFieldLabel: { color: CLERK_CARD_STROKE },
+		footer: {
+			flexShrink: 0,
+			backgroundColor: '#FBFAF7',
+			borderTop: `1px solid ${CLERK_CARD_STROKE}`,
+		},
+		headerTitle: { color: CLERK_TEXT, letterSpacing: 0 },
+		headerSubtitle: { color: CLERK_TEXT_SECONDARY },
+		formFieldLabel: { color: CLERK_TEXT },
 		formFieldInput: {
-			border: `2px solid ${CLERK_CARD_STROKE}`,
+			border: `1px solid #D7DADF`,
 			boxShadow: 'none',
-			backgroundColor: '#ffffff',
-			color: CLERK_CARD_STROKE,
+			backgroundColor: '#FBFBFA',
+			color: CLERK_TEXT,
 		},
 		// Use a class so we can control :hover (Clerk adds a green-ish hover by default).
 		// The base styles are applied via CSS below.
 		socialButtonsBlockButton: 'free-trial-clerk-social-button',
-		dividerLine: { backgroundColor: CLERK_CARD_STROKE },
-		dividerText: { color: CLERK_CARD_STROKE },
-		footerActionLink: { color: CLERK_CARD_STROKE },
+		dividerLine: { backgroundColor: '#DFE1E5' },
+		dividerText: { color: CLERK_TEXT },
+		footerActionLink: { color: CLERK_TEXT },
 		// Use a class so we can neutralize gradients/pseudo-elements with CSS.
 		formButtonPrimary: 'free-trial-clerk-primary-button',
 	},
-} as const;
+} as const);
 
 export function FreeTrialClerkGlobalStyles() {
 	return (
@@ -78,9 +89,9 @@ export function FreeTrialClerkGlobalStyles() {
 			.free-trial-clerk-primary-button:active {
 				background: ${CLERK_CONTINUE_BUTTON_FILL} !important;
 				background-image: none !important;
-				box-shadow: none !important;
+				box-shadow: 0 8px 18px rgba(17, 17, 19, 0.16) !important;
 				filter: none !important;
-				border: 2px solid ${CLERK_CARD_STROKE} !important;
+				border: 1px solid ${CLERK_TEXT} !important;
 				color: #ffffff !important;
 				text-shadow: none !important;
 				text-transform: none !important;
@@ -89,7 +100,7 @@ export function FreeTrialClerkGlobalStyles() {
 			.free-trial-clerk-primary-button:hover {
 				background: ${CLERK_CONTINUE_BUTTON_HOVER_FILL} !important;
 				background-image: none !important;
-				box-shadow: none !important;
+				box-shadow: 0 10px 22px rgba(17, 17, 19, 0.18) !important;
 				filter: none !important;
 			}
 
@@ -107,17 +118,17 @@ export function FreeTrialClerkGlobalStyles() {
 			.free-trial-clerk-social-button:active {
 				background: ${CLERK_SOCIAL_BUTTON_FILL} !important;
 				background-image: none !important;
-				box-shadow: none !important;
+				box-shadow: 0 1px 2px rgba(17, 17, 19, 0.05) !important;
 				filter: none !important;
-				border: 2px solid ${CLERK_CARD_STROKE} !important;
-				color: ${CLERK_CARD_STROKE} !important;
+				border: 1px solid ${CLERK_CARD_STROKE} !important;
+				color: ${CLERK_TEXT} !important;
 				text-shadow: none !important;
 			}
 
 			.free-trial-clerk-social-button:hover {
 				background: ${CLERK_SOCIAL_BUTTON_HOVER_FILL} !important;
 				background-image: none !important;
-				box-shadow: none !important;
+				box-shadow: 0 3px 10px rgba(17, 17, 19, 0.08) !important;
 				filter: none !important;
 			}
 
@@ -132,8 +143,13 @@ export function FreeTrialClerkGlobalStyles() {
 			/* Internal form scroller: thin black scrollbar (site convention). */
 			.free-trial-clerk-modal .cl-card {
 				scrollbar-width: thin !important;
-				scrollbar-color: #000000 transparent !important;
+				scrollbar-color: ${CLERK_TEXT} transparent !important;
 				-webkit-overflow-scrolling: touch;
+			}
+
+			.free-trial-clerk-modal .cl-formFieldInput:focus {
+				border-color: ${CLERK_TEXT} !important;
+				box-shadow: 0 0 0 3px rgba(17, 17, 19, 0.08) !important;
 			}
 
 			/* Phones: tighten the Clerk card so little (or nothing) needs to

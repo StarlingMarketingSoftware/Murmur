@@ -4,6 +4,7 @@ import { AuthPageLayout } from '../../AuthPageLayout';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
+import { withClerkNoBranding } from '@/constants/auth';
 
 export default function SignInPage() {
 	const router = useRouter();
@@ -24,11 +25,11 @@ export default function SignInPage() {
 	return (
 		<AuthPageLayout>
 			<SignIn
-				appearance={{
+				appearance={withClerkNoBranding({
 					elements: {
 						formButtonPrimary: 'bg-black hover:bg-gray-800 text-sm normal-case',
 					},
-				}}
+				})}
 				path="/sign-in"
 				routing="path"
 				signUpUrl="/sign-up"

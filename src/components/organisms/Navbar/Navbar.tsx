@@ -2,6 +2,7 @@
 import { useAuth, UserButton, SignInButton } from '@clerk/nextjs';
 import { urls } from '@/constants/urls';
 import { AccountType } from '@/constants/prismaEnums';
+import { withClerkNoBranding } from '@/constants/auth';
 import { useMe } from '@/hooks/useMe';
 import Link from 'next/link';
 import { cn } from '@/utils';
@@ -307,7 +308,7 @@ export const Navbar = () => {
 							<div className="hidden min-[1145px]:flex items-center">
 								{isSignedIn ? (
 									<UserButton
-										appearance={{
+										appearance={withClerkNoBranding({
 											elements: {
 												avatarBox: cn(
 													'w-7 h-7 ring-1',
@@ -319,7 +320,7 @@ export const Navbar = () => {
 														null
 													),
 											},
-										}}
+										})}
 									/>
 								) : (
 									<SignInButton mode="modal" withSignUp>
@@ -379,13 +380,13 @@ export const Navbar = () => {
 							<div className="px-5 py-4 border-t border-gray-200/20">
 								{isSignedIn ? (
 									<UserButton
-										appearance={{
+										appearance={withClerkNoBranding({
 											elements: {
 												avatarBox: 'w-7 h-7 shrink-0',
 												userButtonTrigger:
 													'p-0 opacity-80 hover:opacity-100 transition-opacity duration-300',
 											},
-										}}
+										})}
 									/>
 								) : (
 									<div className="flex">

@@ -43,6 +43,7 @@ import {
 	type ProfileAreaMapFeature,
 } from '@/components/molecules/HybridPromptInput/ProfileSidePanelBox';
 import { profileGenreOptionRows } from '@/components/molecules/HybridPromptInput/profileFieldIcons';
+import { withClerkNoBranding } from '@/constants/auth';
 import { AccountType } from '@/constants/prismaEnums';
 import { urls } from '@/constants/urls';
 import {
@@ -2966,12 +2967,12 @@ function VenuePortalForm({
 					/>
 					<div className="absolute inset-0 opacity-0">
 						<UserButton
-							appearance={{
+							appearance={withClerkNoBranding({
 								elements: {
 									avatarBox: 'w-7 h-7',
 									userButtonTrigger: 'w-7 h-7 p-0',
 								},
-							}}
+							})}
 						/>
 					</div>
 				</div>
