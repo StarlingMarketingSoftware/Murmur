@@ -5,6 +5,7 @@ import { useAuth, useUser, UserButton, SignInButton } from '@clerk/nextjs';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { urls } from '@/constants/urls';
+import { withClerkNoBranding } from '@/constants/auth';
 import HomeIcon from '@/components/atoms/_svg/HomeIcon';
 import SettingsGearIcon from '@/components/atoms/_svg/SettingsGearIcon';
 import { OutlinedInitialAvatar } from '@/components/atoms/OutlinedInitialAvatar/OutlinedInitialAvatar';
@@ -130,25 +131,25 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 								/>
 								<div className="absolute inset-0 opacity-0">
 									<UserButton
-										appearance={{
+										appearance={withClerkNoBranding({
 											elements: {
 												avatarBox: 'w-7 h-7',
 												userButtonTrigger: 'w-7 h-7 p-0',
 											},
-										}}
+										})}
 									/>
 								</div>
 							</div>
 						</div>
 					) : (
 						<UserButton
-							appearance={{
+							appearance={withClerkNoBranding({
 								elements: {
 									avatarBox: 'w-7 h-7 ring-1 ring-black/10',
 									userButtonTrigger:
 										'opacity-80 hover:opacity-100 transition-opacity duration-300',
 								},
-							}}
+							})}
 						/>
 					)
 				) : (
@@ -210,4 +211,3 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 		</SendingSessionProvider>
 	);
 }
-

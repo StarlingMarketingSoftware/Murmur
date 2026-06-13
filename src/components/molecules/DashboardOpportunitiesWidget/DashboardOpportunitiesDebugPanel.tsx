@@ -208,7 +208,8 @@ const RowCard: FC<{
 	onRemove: () => void;
 	canRemove: boolean;
 }> = ({ index, row, isCollapsed, onToggleCollapsed, onChange, onRemove, canRemove }) => {
-	const patch = (partial: Partial<OpportunitiesMockRow>) => onChange({ ...row, ...partial });
+	const patch = (partial: Partial<OpportunitiesMockRow>) =>
+		onChange({ ...row, ...partial });
 	const contactLabel = row.contactLabel?.trim() || 'No contact';
 	const rowSummary = `${getStatusLabel(row.status)} - ${contactLabel}`;
 
@@ -465,11 +466,7 @@ export const DashboardOpportunitiesDebugPanel: FC<Props> = ({ value, onChange })
 				<strong style={{ fontSize: '13px' }}>
 					Opportunities Debug{overrideActive ? '' : ' (off)'}
 				</strong>
-				<button
-					type="button"
-					onClick={() => setCollapsed((c) => !c)}
-					style={buttonStyle}
-				>
+				<button type="button" onClick={() => setCollapsed((c) => !c)} style={buttonStyle}>
 					{collapsed ? 'Expand' : 'Collapse'}
 				</button>
 			</div>
@@ -547,9 +544,9 @@ export const DashboardOpportunitiesDebugPanel: FC<Props> = ({ value, onChange })
 					</div>
 
 					<div style={{ color: '#888', marginTop: 8, lineHeight: 1.4 }}>
-						Status drives which sub-tab (Booked / Closed / In Progress) shows the
-						row and the chip color. State (2-letter) renders the colored state
-						badge. Leave fields blank to fall back to placeholders.
+						Status drives which sub-tab (Booked / Closed / In Progress) shows the row and
+						the chip color. State (2-letter) renders the colored state badge. Leave fields
+						blank to fall back to placeholders.
 					</div>
 				</div>
 			)}

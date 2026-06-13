@@ -334,12 +334,6 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		setIsAllSelected(allSelected);
 	}, [selectedContacts, contacts]);
 
-	useEffect(() => {
-		if (hasSearched && activeSearchQuery && activeSearchQuery.trim().length > 0) {
-			console.log('Search triggered with query:', activeSearchQuery);
-		}
-	}, [hasSearched, activeSearchQuery, activeExcludeUsedContacts, limit]);
-
 	// Keep the form input in sync with the active query on results view
 	useEffect(() => {
 		if (hasSearched) {
@@ -1270,19 +1264,6 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					const nameValue = hasName ? computeName(contact) : '';
 					const companyValue = contact.company || '';
 					const hasCompany = !!companyValue;
-
-					// Debug log to see actual data
-					if (row.index === 0) {
-						console.log('First contact data:', {
-							contact,
-							firstName: contact.firstName,
-							lastName: contact.lastName,
-							hasName,
-							nameValue,
-							company: contact.company,
-							hasCompany,
-						});
-					}
 
 					// If neither name nor company, show a dash
 					if (!hasName && !hasCompany) {

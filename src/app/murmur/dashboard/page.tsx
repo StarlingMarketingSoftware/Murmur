@@ -37,6 +37,7 @@ import { MobileFolderCards } from '@/components/molecules/MobileFolderCards/Mobi
 import { MobileDashboardSearch } from '@/app/murmur/dashboard/MobileDashboardSearch';
 import { useDashboard } from './useDashboard';
 import { useLenis } from '@/contexts/ScrollContext';
+import { withClerkNoBranding } from '@/constants/auth';
 import { urls } from '@/constants/urls';
 import {
 	getMsUntilNextSearchGradientBucket,
@@ -6412,13 +6413,7 @@ const DashboardContent = () => {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isMobile, isAddToCampaignMode, hasSearched, isMapView]);
 
-	// Zero-campaign mobile entry: instead of an empty tab frame, drop the user
-	// straight into the map search — create their starter campaign (same
-	// generated-name convention as every desktop search) and replace the URL
-	// into the For You pick-flow entry, exactly like the tab bar's Search
-	// button. Gated on isMobileZeroCampaigns (a SUCCESSFUL empty load), so a
-	// failed campaigns fetch falls through to the tab frame instead of
-	// spuriously creating a campaign.
+	// Zero-campaign mobile entry starts the pick flow without hiding the dashboard shell.
 	const hasStartedZeroCampaignSearchEntryRef = useRef(false);
 	const [zeroCampaignEntryState, setZeroCampaignEntryState] = useState<
 		'idle' | 'redirecting' | 'failed'
@@ -6431,7 +6426,6 @@ const DashboardContent = () => {
 		void (async () => {
 			const campaignId = await ensureActiveCampaign('');
 			if (campaignId == null) {
-				// ensureActiveCampaign already toasted; let the tab frame render.
 				setZeroCampaignEntryState('failed');
 				return;
 			}
@@ -6451,12 +6445,17 @@ const DashboardContent = () => {
 		ensureActiveCampaign,
 		router,
 	]);
-	// Once the pick params land the search chrome owns the screen — clear the
-	// redirect flag so a later pick-flow exit gets the normal tab frame.
 	useEffect(() => {
 		if (isAddToCampaignMode && zeroCampaignEntryState === 'redirecting') {
 			setZeroCampaignEntryState('idle');
 		}
+	}, [isAddToCampaignMode, zeroCampaignEntryState]);
+	useEffect(() => {
+		if (zeroCampaignEntryState !== 'redirecting' || isAddToCampaignMode) return;
+		const timer = window.setTimeout(() => {
+			setZeroCampaignEntryState('failed');
+		}, 3000);
+		return () => window.clearTimeout(timer);
 	}, [isAddToCampaignMode, zeroCampaignEntryState]);
 	const [
 		initialDashboardSearchSuggestionSeeds,
@@ -9522,17 +9521,6 @@ const DashboardContent = () => {
 			);
 		}
 
-		// Bare-map hold while the zero-campaign auto-entry is creating the
-		// starter campaign and swapping in the pick params — keeps the tab
-		// frame from flashing before the search chrome mounts. A failed create
-		// ('failed') falls through to the tab frame.
-		if (
-			zeroCampaignEntryState === 'redirecting' ||
-			(isMobileZeroCampaigns && zeroCampaignEntryState !== 'failed')
-		) {
-			return <div className="w-full">{mapPortal}</div>;
-		}
-
 		// Fixed (out of flow) rather than an in-flow 100dvh column: under the root
 		// murmur-compact zoom, in-flow viewport-unit heights give the document
 		// ~11% of bogus scroll slack on real Safari (swipe-up exposed a white
@@ -10606,9 +10594,6 @@ const DashboardContent = () => {
 
 															if (!isSignedIn) {
 																if (hasProblematicBrowser) {
-																	console.log(
-																		'[Dashboard] Edge/Safari detected, navigating to sign-in page'
-																	);
 																	if (typeof window !== 'undefined') {
 																		sessionStorage.setItem(
 																			'redirectAfterSignIn',
@@ -11913,9 +11898,6 @@ const DashboardContent = () => {
 															await ensureNonEmptyDashboardSearchOnBlankSubmit();
 															if (!isSignedIn) {
 																if (hasProblematicBrowser) {
-																	console.log(
-																		'[Dashboard] Edge/Safari detected, navigating to sign-in page'
-																	);
 																	if (typeof window !== 'undefined') {
 																		sessionStorage.setItem(
 																			'redirectAfterSignIn',
@@ -14534,7 +14516,7 @@ const DashboardContent = () => {
 							createPortal(
 								<div className="fixed inset-0 z-[10000] flex items-center justify-center">
 									<SignUp
-										appearance={{
+										appearance={withClerkNoBranding({
 											elements: {
 												rootBox: 'w-full max-w-[420px] mx-4',
 												cardBox: { boxShadow: 'none' },
@@ -14553,7 +14535,7 @@ const DashboardContent = () => {
 													'border-gray-300 focus:border-black focus:ring-black',
 												footerActionLink: 'text-black hover:text-gray-700',
 											},
-										}}
+										})}
 										routing="hash"
 										forceRedirectUrl={`${urls.murmur.dashboard.index}?fromHome=true`}
 										signInUrl={`/sign-in?redirect_url=${encodeURIComponent(`${urls.murmur.dashboard.index}?fromHome=true`)}`}

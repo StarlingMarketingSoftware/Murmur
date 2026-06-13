@@ -130,7 +130,7 @@ export function StartFreeTrialModal({ open, onClose }: StartFreeTrialModalProps)
 		<div
 			ref={overlayRef}
 			data-lenis-prevent
-			className="free-trial-clerk-modal fixed inset-0 z-[60] flex flex-col overflow-hidden bg-black/20 p-2 sm:p-4"
+			className="free-trial-clerk-modal fixed inset-0 z-[60] flex flex-col overflow-hidden bg-white/45 p-2 backdrop-blur-[2px] sm:p-4"
 			onMouseDown={(event) => {
 				if (event.target === event.currentTarget) handleClose();
 			}}
