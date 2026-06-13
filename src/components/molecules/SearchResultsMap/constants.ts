@@ -971,7 +971,7 @@ export const NIGHT_STATE_LINE_DARKEN_MAX = 0;
 
 // We hide every Mapbox symbol layer EXCEPT city/town labels and the road/street
 // label, then restyle the kept ones for contrast against the cream land
-// (#F1EDE2) and light-gray roads (#E5E9EC): dark ink + a soft near-white cream
+// (#F1EDE2) and gray roads (#C2C9D0): dark ink + a soft near-white cream
 // halo so glyphs stay legible over both. Labels fade in only when zoomed in so
 // the globe/US-wide overview stays clean (state labels carry it).
 export const BASEMAP_LABEL_TEXT_COLOR = STATE_LABEL_COLOR; // '#111827'

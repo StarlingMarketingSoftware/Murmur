@@ -563,7 +563,8 @@ export const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 				continue;
 			}
 
-			// Roads / highways — recolor to a soft light gray (lighter than state borders).
+			// Roads / highways — recolor to a soft gray (darker than the land cream so
+			// the network reads clearly, Google-Maps style; still lighter than borders).
 			if (
 				type === 'line' &&
 				(sourceLayer === 'road' ||
@@ -574,7 +575,7 @@ export const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 					idLower.includes('tunnel'))
 			) {
 				try {
-					mapInstance.setPaintProperty(id, 'line-color', '#E5E9EC');
+					mapInstance.setPaintProperty(id, 'line-color', '#C2C9D0');
 				} catch {
 					// Data-driven color expression we can't override — skip.
 				}
