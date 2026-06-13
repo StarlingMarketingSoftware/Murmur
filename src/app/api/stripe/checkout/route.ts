@@ -14,12 +14,14 @@ import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import { urls } from '@/constants/urls';
 import { BASE_URL } from '@/constants';
 import prisma from '@/lib/prisma';
+import { checkoutReturnPathSchema, getHostedCheckoutCancelPath } from './returnPaths';
 
 const stripeCheckoutRequestSchema = z.object({
 	priceId: z.string().min(1),
 	isYearly: z.boolean().optional(),
 	freeTrial: z.boolean().optional(),
 	uiMode: z.enum(['embedded', 'hosted']).optional(),
+	cancelPath: checkoutReturnPathSchema.optional(),
 });
 
 export type PostCheckoutSessionData = z.infer<typeof stripeCheckoutRequestSchema>;
@@ -41,7 +43,7 @@ export async function POST(req: Request) {
 			return apiBadRequest(validatedData.error);
 		}
 
-		const { priceId, freeTrial, isYearly, uiMode } = validatedData.data;
+		const { priceId, freeTrial, isYearly, uiMode, cancelPath } = validatedData.data;
 		if (!priceId) {
 			return apiBadRequest('Price ID is required');
 		}
@@ -80,6 +82,7 @@ export async function POST(req: Request) {
 		}
 
 		const isEmbedded = uiMode === 'embedded';
+		const hostedCheckoutCancelPath = getHostedCheckoutCancelPath(cancelPath);
 
 		const session: Stripe.Response<Stripe.Checkout.Session> =
 			await stripe.checkout.sessions.create({
@@ -99,8 +102,8 @@ export async function POST(req: Request) {
 							return_url: `${BASE_URL}${urls.murmur.dashboard.index}?session_id={CHECKOUT_SESSION_ID}`,
 					  }
 					: {
-							success_url: `${BASE_URL}${urls.murmur.dashboard.index}?success=true`,
-							cancel_url: `${BASE_URL}${urls.murmur.dashboard.index}?canceled=true`,
+							success_url: `${BASE_URL}${urls.murmur.dashboard.index}?session_id={CHECKOUT_SESSION_ID}`,
+							cancel_url: `${BASE_URL}${hostedCheckoutCancelPath}`,
 					  }),
 				allow_promotion_codes: true,
 				subscription_data: freeTrial

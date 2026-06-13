@@ -39,6 +39,15 @@ export function CheckoutButton({
 		return `${pathname}${queryString ? `?${queryString}` : ''}`;
 	}, [billingCycle, pathname, priceId, searchParams]);
 
+	const hostedCheckoutCancelPath = useMemo(() => {
+		const params = new URLSearchParams(searchParams.toString());
+		params.delete('checkoutPriceId');
+		params.delete('checkoutBillingCycle');
+		params.delete('auth');
+		const queryString = params.toString();
+		return `${pathname}${queryString ? `?${queryString}` : ''}`;
+	}, [pathname, searchParams]);
+
 	const clearCheckoutParams = useCallback(() => {
 		if (typeof window === 'undefined') return;
 
@@ -80,7 +89,11 @@ export function CheckoutButton({
 		if (onButtonClick) {
 			onButtonClick();
 		} else {
-			const res = await checkout({ priceId, isYearly: billingCycle === 'year' });
+			const res = await checkout({
+				priceId,
+				isYearly: billingCycle === 'year',
+				cancelPath: hostedCheckoutCancelPath,
+			});
 			if (res.url) {
 				window.location.href = res.url;
 			} else {
