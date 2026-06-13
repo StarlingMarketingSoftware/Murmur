@@ -56,30 +56,31 @@ export function PersistentDashboardMap() {
 	const isInteractiveCampaignMap = isCampaignRoute;
 	const isInteractiveMap = isInteractiveRevealMap || isInteractiveCampaignMap;
 
-	const mapProps = useMemo<SearchResultsMapProps>(
-		() => {
-			const props = mapConfig?.mapProps ?? FALLBACK_MAP_PROPS;
-			if (!isInteractiveCampaignMap) return props;
+	const mapProps = useMemo<SearchResultsMapProps>(() => {
+		const props = mapConfig?.mapProps ?? FALLBACK_MAP_PROPS;
+		if (!isInteractiveCampaignMap) return props;
 
-			return {
-				...props,
-				presentation: 'interactive',
-				autoSpin: false,
-			};
-		},
-		[isInteractiveCampaignMap, mapConfig?.mapProps]
-	);
+		return {
+			...props,
+			presentation: 'interactive',
+			autoSpin: false,
+		};
+	}, [isInteractiveCampaignMap, mapConfig?.mapProps]);
 
 	if (!shouldRenderMap) return null;
 
 	const mapViewClip = isInteractiveRevealMap
-		? mapConfig?.mapViewClip ?? IDLE_CLIP_PATH
+		? (mapConfig?.mapViewClip ?? IDLE_CLIP_PATH)
 		: IDLE_CLIP_PATH;
 	const mapViewFrameTransition =
 		mapConfig?.mapViewFrameTransition ?? IDLE_FRAME_TRANSITION;
-	const frameInsetPx = isInteractiveRevealMap ? mapConfig?.mapViewFrameInsetPx ?? 0 : 0;
-	const frameRadiusPx = isInteractiveRevealMap ? mapConfig?.mapViewFrameRadiusPx ?? 0 : 0;
-	const frameBorderPx = isInteractiveRevealMap ? mapConfig?.mapViewFrameBorderPx ?? 0 : 0;
+	const frameInsetPx = isInteractiveRevealMap ? (mapConfig?.mapViewFrameInsetPx ?? 0) : 0;
+	const frameRadiusPx = isInteractiveRevealMap
+		? (mapConfig?.mapViewFrameRadiusPx ?? 0)
+		: 0;
+	const frameBorderPx = isInteractiveRevealMap
+		? (mapConfig?.mapViewFrameBorderPx ?? 0)
+		: 0;
 	// While the clip/frame are at their no-op idle values (every host today),
 	// skip the clip-path + will-change wrappers entirely: they pin extra
 	// composited layers around the WebGL canvas that WebKit re-evaluates every

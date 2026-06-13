@@ -4583,7 +4583,25 @@ const DashboardContent = () => {
 			// an unset var leaves the canvas ~6% oversized and skews marker tap targets.
 			document.documentElement.style.setProperty(DASHBOARD_ZOOM_VAR, '0.9');
 			document.documentElement.style.removeProperty(DASHBOARD_INITIAL_ZOOM_VAR);
-			return;
+			// Publish the real (JS-measured) window height so the in-flow mobile app frame
+			// can size as `viewport-h / zoom` and fill the viewport exactly under the 0.9
+			// root zoom (a bare 100dvh renders at 100dvh·0.9 — ~10% short — leaving a band).
+			// Re-applied on resize/orientation so the height stays true. The desktop branch
+			// below owns this same var via applyInitialZoom.
+			const applyMobileViewportH = () => {
+				document.documentElement.style.setProperty(
+					DASHBOARD_VIEWPORT_H_VAR,
+					`${window.innerHeight}px`
+				);
+			};
+			applyMobileViewportH();
+			window.addEventListener('resize', applyMobileViewportH);
+			window.addEventListener('orientationchange', applyMobileViewportH);
+			return () => {
+				window.removeEventListener('resize', applyMobileViewportH);
+				window.removeEventListener('orientationchange', applyMobileViewportH);
+				document.documentElement.style.removeProperty(DASHBOARD_VIEWPORT_H_VAR);
+			};
 		}
 
 		const applyInitialZoom = () => {
@@ -9521,13 +9539,26 @@ const DashboardContent = () => {
 			);
 		}
 
-		// Fixed (out of flow) rather than an in-flow 100dvh column: under the root
-		// murmur-compact zoom, in-flow viewport-unit heights give the document
-		// ~11% of bogus scroll slack on real Safari (swipe-up exposed a white
-		// band below the map). fixed inset-0 is geometry-true under the zoom in
-		// both engines and contributes zero document height.
+		// In-flow column sized to `viewport-h / zoom`, NOT `position: fixed; inset: 0`.
+		// Under the root `html.murmur-compact { zoom: 0.9 }`, a fixed element with no
+		// counter-zoom hits WebKit's fixed+ancestor-zoom containing-block bug: on real
+		// iOS (Safari AND Chrome — both WebKit) the frame collapses to nothing and only
+		// the map-water html background paints (the "blue screen"). Blink (desktop
+		// Chrome / its device emulation) resolves fixed against the true viewport, so it
+		// looked fine there. An in-flow element is geometry-true under the zoom in both
+		// engines; dividing the JS-measured viewport height by the zoom makes it fill the
+		// viewport exactly with no white/blue band (the `--murmur-dashboard-viewport-h`
+		// var is published on mobile by the zoom effect above; 100dvh is the first-paint
+		// fallback). The sibling pick-flow overlay stays fixed because it counter-zooms
+		// via `.mobile-campaign-search-overlay`.
 		return (
-			<div className="fixed inset-0 flex flex-col overflow-hidden">
+			<div
+				className="w-full flex flex-col overflow-hidden"
+				style={{
+					height:
+						'calc(var(--murmur-dashboard-viewport-h, 100dvh) / var(--murmur-dashboard-zoom, 0.9))',
+				}}
+			>
 				{mapPortal}
 
 				{/* Logo row — left-aligned over the map; the Clerk avatar stays fixed top-right */}
