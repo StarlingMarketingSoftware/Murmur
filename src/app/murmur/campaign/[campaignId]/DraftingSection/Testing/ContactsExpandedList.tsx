@@ -597,6 +597,12 @@ export interface ContactsExpandedListProps {
 	 */
 	interactionMode?: 'default' | 'allTab';
 	focusMode?: ContactsExpandedListFocusMode;
+	/**
+	 * One-shot request to land the inbox panel on a specific Responses/Opportunities
+	 * filter (e.g. the overview star pill). Consumed by requestId, otherwise the
+	 * filter resets to 'responses' whenever inbox focus mode engages.
+	 */
+	inboxPanelTabRequest?: { tab: 'responses' | 'opportunities'; requestId: number } | null;
 }
 
 export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
@@ -639,6 +645,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	collapsed = false,
 	interactionMode = 'default',
 	focusMode = 'contacts',
+	inboxPanelTabRequest,
 }) => {
 	const router = useRouter();
 	const [internalSelectedContactIds, setInternalSelectedContactIds] = useState<
@@ -770,9 +777,27 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const isDraftsFocusMode = focusMode === 'drafts';
 	const isInboxFocusMode = focusMode === 'inbox';
 
+	const lastHandledInboxPanelTabRequestIdRef = useRef<number | null>(null);
+	const wasInboxFocusModeRef = useRef(false);
 	useEffect(() => {
-		if (isInboxFocusMode) setInboxPanelTab('responses');
-	}, [isInboxFocusMode]);
+		const enteredInboxFocusMode = isInboxFocusMode && !wasInboxFocusModeRef.current;
+		wasInboxFocusModeRef.current = isInboxFocusMode;
+		if (!isInboxFocusMode) return;
+		// An unhandled request (star pill → Opportunities) seeds the filter instead of
+		// the entry reset; the requestId guard makes it one-shot. The reset only fires
+		// on *entering* inbox mode — a consumed request must not bounce the filter back
+		// on later re-runs (StrictMode double-invoke included).
+		if (
+			inboxPanelTabRequest &&
+			lastHandledInboxPanelTabRequestIdRef.current !== inboxPanelTabRequest.requestId
+		) {
+			lastHandledInboxPanelTabRequestIdRef.current = inboxPanelTabRequest.requestId;
+			setInboxPanelTab(inboxPanelTabRequest.tab);
+			return;
+		}
+		if (enteredInboxFocusMode) setInboxPanelTab('responses');
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [isInboxFocusMode, inboxPanelTabRequest?.requestId]);
 
 	const updateSelection = useCallback(
 		(updater: (prev: Set<number>) => Set<number>) => {

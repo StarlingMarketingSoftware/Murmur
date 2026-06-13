@@ -28,10 +28,56 @@ import {
 } from '@/hooks/queryHooks/useMediaAssets';
 import { useMediaUpload, type UploadState } from '@/hooks/useMediaUpload';
 import { MediaAssetPlayer } from '@/components/molecules/MediaAssetPlayer/MediaAssetPlayer';
-import { useApplyToEvent } from '@/hooks/queryHooks/useEventApplications';
+import {
+	useApplyToEvent,
+	useGetMyEventApplications,
+	type MyEventApplication,
+} from '@/hooks/queryHooks/useEventApplications';
+import { useGetIdentities } from '@/hooks/queryHooks/useIdentities';
+import type { Identity } from '@prisma/client';
 
 // Drop a file extension for display; YouTube embeds already have a clean "YouTube video".
 const getApplyMediaTitle = (filename: string) => filename.replace(/\.[^/.]+$/, '') || filename;
+
+// Map a stored genre (application snapshot or Identity free text) onto the modal's
+// canonical option labels; the genre pill only renders on an exact label match, so a
+// non-matching value must fall through rather than seed an invisible selection.
+const canonicalGenre = (raw?: string | null): string | null => {
+	const target = raw?.trim().toLowerCase();
+	if (!target) return null;
+	return (
+		profileGenreOptionRows.flat().find((g) => g.label.toLowerCase() === target)?.label ??
+		null
+	);
+};
+
+// Per-field prefill coalesce: this event's existing application (re-apply shows what
+// was submitted) → the most recent application to any other event → the newest-updated
+// Identity (campaign profile; its "Performing Name" field is stored as bandName).
+const computeApplySeed = (
+	eventId: number,
+	applications: MyEventApplication[] = [],
+	identities: Identity[] = []
+) => {
+	const forThisEvent = applications.find((a) => a.eventId === eventId); // upsert ⇒ ≤1 per event
+	const mostRecentOther = applications.find((a) => a.eventId !== eventId); // createdAt desc
+	const identity = identities[0]; // updatedAt desc
+	const pick = (...vals: Array<string | null | undefined>) =>
+		vals.find((v) => typeof v === 'string' && v.trim() !== '')?.trim() ?? null;
+	return {
+		genre:
+			[forThisEvent?.genre, mostRecentOther?.genre, identity?.genre]
+				.map(canonicalGenre)
+				.find(Boolean) ?? null,
+		area: pick(forThisEvent?.area, mostRecentOther?.area, identity?.area),
+		performingName: pick(
+			forThisEvent?.performingName,
+			mostRecentOther?.performingName,
+			identity?.bandName
+		),
+		bio: pick(forThisEvent?.bio, mostRecentOther?.bio, identity?.bio),
+	};
+};
 
 /** A ready video slot (273px) — thumbnail, title, play, and delete-on-hover. */
 const ApplyMediaSlotCard = ({
@@ -97,7 +143,8 @@ export function ApplyModal({
 	event: MapEventData | null;
 	onClose: () => void;
 }) {
-	// Genre + Area selectors (local-only; the modal is visual and does not persist yet).
+	// Answer fields — seeded from the user's existing data when the modal opens (see the
+	// seeding effect below); submitted as the application snapshot.
 	const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
 	const [isGenreChooserOpen, setIsGenreChooserOpen] = useState(false);
 	const [hoveredGenre, setHoveredGenre] = useState<string | null>(null);
@@ -128,6 +175,70 @@ export function ApplyModal({
 			onClose();
 		},
 	});
+
+	// Prefill sources. `enabled: open` matters: the modal stays mounted while closed, and
+	// this hook polls on a 30s interval — the page's own instance is gated to map view, so
+	// an ungated copy here would keep that poll alive everywhere. Disabled still reads the
+	// warm cache. The identities query shares the page's static ['identities','list'] entry.
+	const appsQuery = useGetMyEventApplications({ enabled: open });
+	const identitiesQuery = useGetIdentities({});
+
+	// Seed the four answer fields when the modal opens for a new event. lastSeeded is set
+	// only once real (settled) data has been applied, so a cold open waits for the queries;
+	// seedTarget makes the blank-reset fire exactly once per event so those re-runs don't
+	// wipe values the user typed while waiting. Same-event reopens keep local edits.
+	const lastSeededEventIdRef = useRef<number | null>(null);
+	const seedTargetEventIdRef = useRef<number | null>(null);
+	const dirtyFieldsRef = useRef<Set<'genre' | 'area' | 'performingName' | 'bio'>>(
+		new Set()
+	);
+
+	useEffect(() => {
+		if (!open || !event) return;
+		if (lastSeededEventIdRef.current === event.id) return;
+
+		if (seedTargetEventIdRef.current !== event.id) {
+			seedTargetEventIdRef.current = event.id;
+			dirtyFieldsRef.current = new Set();
+			setSelectedGenre(null);
+			setSelectedArea(null);
+			setSelectedPerformingName(null);
+			setSelectedBio(null);
+			setPerformingNameDraft('');
+			setBioDraft('');
+			setIsGenreChooserOpen(false);
+			setIsAreaChooserOpen(false);
+			setIsPerformingNameEditorOpen(false);
+			setIsBioEditorOpen(false);
+		}
+
+		// Errors count as settled so one failed source never blocks seeding from the other.
+		const appsSettled = appsQuery.isSuccess || appsQuery.isError;
+		const identitiesSettled = identitiesQuery.isSuccess || identitiesQuery.isError;
+		if (!appsSettled || !identitiesSettled) return;
+
+		const seed = computeApplySeed(event.id, appsQuery.data, identitiesQuery.data);
+		const dirty = dirtyFieldsRef.current;
+		if (!dirty.has('genre')) setSelectedGenre(seed.genre);
+		if (!dirty.has('area')) setSelectedArea(seed.area);
+		// Skip a field whose editor is open mid-load: its blur commit (`trim() || null`)
+		// would otherwise silently null a value seeded underneath it.
+		if (!dirty.has('performingName') && !isPerformingNameEditorOpen)
+			setSelectedPerformingName(seed.performingName);
+		if (!dirty.has('bio') && !isBioEditorOpen) setSelectedBio(seed.bio);
+		lastSeededEventIdRef.current = event.id;
+	}, [
+		open,
+		event,
+		appsQuery.isSuccess,
+		appsQuery.isError,
+		appsQuery.data,
+		identitiesQuery.isSuccess,
+		identitiesQuery.isError,
+		identitiesQuery.data,
+		isPerformingNameEditorOpen,
+		isBioEditorOpen,
+	]);
 
 	useEffect(() => {
 		if (!open) return;
@@ -205,11 +316,15 @@ export function ApplyModal({
 		}
 	};
 
+	// Match options case-insensitively (like getProfileGenreIcon) so any seeded
+	// free-text genre still maps to its canonical chip.
+	const normalizedSelectedGenre = selectedGenre?.trim().toLowerCase() ?? null;
 	const selectedGenreOption = profileGenreOptionRows
 		.flat()
-		.find((genre) => genre.label === selectedGenre);
+		.find((genre) => genre.label.toLowerCase() === normalizedSelectedGenre);
 	const SelectedGenreIcon = selectedGenreOption?.Icon;
 	const handleGenrePick = (label: string) => {
+		dirtyFieldsRef.current.add('genre');
 		setSelectedGenre(label);
 		setIsGenreChooserOpen(false);
 	};
@@ -217,7 +332,10 @@ export function ApplyModal({
 	// it collapses to the pill on an outside click.
 	const handleAreaUpdate = (area: string) => {
 		const next = area.trim();
-		if (next) setSelectedArea(next);
+		if (next) {
+			dirtyFieldsRef.current.add('area');
+			setSelectedArea(next);
+		}
 	};
 	// Performing Name is a plain text editor: commit on blur, cancel on Escape.
 	const openPerformingNameEditor = () => {
@@ -225,6 +343,7 @@ export function ApplyModal({
 		setIsPerformingNameEditorOpen(true);
 	};
 	const commitPerformingName = () => {
+		dirtyFieldsRef.current.add('performingName');
 		setSelectedPerformingName(performingNameDraft.trim() || null);
 		setIsPerformingNameEditorOpen(false);
 	};
@@ -238,6 +357,7 @@ export function ApplyModal({
 		setIsBioEditorOpen(true);
 	};
 	const commitBio = () => {
+		dirtyFieldsRef.current.add('bio');
 		setSelectedBio(bioDraft.trim() || null);
 		setIsBioEditorOpen(false);
 	};
@@ -614,7 +734,8 @@ export function ApplyModal({
 														>
 															{row.map((genre) => {
 																const Icon = genre.Icon;
-																const isSelected = genre.label === selectedGenre;
+																const isSelected =
+																	genre.label.toLowerCase() === normalizedSelectedGenre;
 																const isHovered = genre.label === hoveredGenre;
 
 																return (

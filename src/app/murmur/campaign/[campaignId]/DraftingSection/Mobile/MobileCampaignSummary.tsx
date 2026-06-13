@@ -20,6 +20,13 @@ const CONVERSATION_BODY_FILL = '#D6E2FF';
 const DRAFT_TOP_BAR_FILL = '#FFE3AA';
 const DRAFT_BODY_FILL = '#FFF8E7';
 
+// 4 keyframe stops over 4.8s => 1.2s per scheme; negative delays start card i on
+// scheme i so the skeleton stack reads as cycling through the summary card pastels.
+const SKELETON_WAVE_DURATION_S = 4.8;
+const SKELETON_WAVE_STEP_S = 1.2;
+const SKELETON_CARD_COUNT = 6;
+const SKELETON_BLOCK_FILL = 'rgba(0,0,0,0.08)';
+
 export type MobileSummarySection = 'conversations' | 'drafts' | 'contacts';
 
 export type MobileSummaryScrollRequest = {
@@ -128,6 +135,8 @@ interface MobileCampaignSummaryProps {
 	plainContacts: ContactWithName[];
 	/** Campaign contacts indexed by normalized email for canonical names. */
 	contactByEmail?: Record<string, ContactWithName>;
+	/** Contacts/emails still fetching — show skeleton cards instead of the empty state. */
+	isLoading?: boolean;
 	scrollRequest: MobileSummaryScrollRequest | null;
 	onOpenConversation: (key: string) => void;
 	onOpenDraft: (draftId: number) => void;
@@ -141,6 +150,7 @@ export const MobileCampaignSummary: FC<MobileCampaignSummaryProps> = ({
 	drafts,
 	plainContacts,
 	contactByEmail,
+	isLoading,
 	scrollRequest,
 	onOpenConversation,
 	onOpenDraft,
@@ -155,6 +165,9 @@ export const MobileCampaignSummary: FC<MobileCampaignSummaryProps> = ({
 
 	const isEmpty =
 		conversations.length === 0 && drafts.length === 0 && plainContacts.length === 0;
+	// Skeleton only while the list has nothing to show — cached cards stay put
+	// during background refetches.
+	const showSkeleton = Boolean(isLoading) && isEmpty;
 
 	// Header pill scroll requests: jump to the section anchor.
 	useEffect(() => {
@@ -181,7 +194,51 @@ export const MobileCampaignSummary: FC<MobileCampaignSummaryProps> = ({
 					className="flex-1 min-h-0 overflow-y-auto px-[10px] py-[10px]"
 					style={{ WebkitOverflowScrolling: 'touch' }}
 					onScroll={(e) => setIsScrolled(e.currentTarget.scrollTop > 80)}
+					aria-busy={showSkeleton}
 				>
+					{/* Loading skeleton: contact-card-shaped wave placeholders */}
+					{showSkeleton && (
+						<div className="flex flex-col gap-[10px]" aria-hidden="true">
+							{Array.from({ length: SKELETON_CARD_COUNT }).map((_, idx) => (
+								<div
+									key={`mobile-summary-skeleton-${idx}`}
+									className="mobile-campaign-summary-loading-wave-card w-full rounded-[10px] border-2 border-black px-3 py-[9px]"
+									style={{
+										animationDelay: `${-(SKELETON_WAVE_DURATION_S - (idx % 4) * SKELETON_WAVE_STEP_S)}s`,
+									}}
+								>
+									<div className="flex items-start justify-between gap-2">
+										<div className="flex flex-col gap-[6px] flex-1 pt-[3px]">
+											<span
+												className="h-[14px] w-[96px] rounded-[7px]"
+												style={{ backgroundColor: SKELETON_BLOCK_FILL }}
+											/>
+											<span
+												className="h-[12px] w-[70px] rounded-[6px]"
+												style={{ backgroundColor: SKELETON_BLOCK_FILL }}
+											/>
+										</div>
+										<div className="flex flex-col items-end gap-[4px] flex-shrink-0 w-[46%]">
+											<span
+												className="h-[17px] w-[80px] rounded-[9px]"
+												style={{ backgroundColor: SKELETON_BLOCK_FILL }}
+											/>
+											<div className="flex items-center gap-1 justify-end w-full">
+												<span
+													className="h-[18px] w-[30px] rounded-[5px] flex-shrink-0"
+													style={{ backgroundColor: SKELETON_BLOCK_FILL }}
+												/>
+												<span
+													className="h-[12px] w-[54px] rounded-[6px]"
+													style={{ backgroundColor: SKELETON_BLOCK_FILL }}
+												/>
+											</div>
+										</div>
+									</div>
+								</div>
+							))}
+						</div>
+					)}
 					{/* Conversations (ongoing first) */}
 					<div ref={conversationsRef} className="flex flex-col gap-[10px]">
 						{conversations.map((conversation) => {
@@ -288,7 +345,7 @@ export const MobileCampaignSummary: FC<MobileCampaignSummaryProps> = ({
 						))}
 					</div>
 
-					{isEmpty && (
+					{isEmpty && !isLoading && (
 						<div className="font-inter text-[14px] text-black text-center py-10">
 							No contacts yet — search the map to add some.
 						</div>
@@ -300,7 +357,7 @@ export const MobileCampaignSummary: FC<MobileCampaignSummaryProps> = ({
 			</div>
 
 			{/* Floating "+" back to Search (revealed on scroll; always shown when empty) */}
-			{(isScrolled || isEmpty) && (
+			{(isScrolled || (isEmpty && !isLoading)) && (
 				<button
 					type="button"
 					aria-label="Back to search"

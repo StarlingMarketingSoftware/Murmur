@@ -1391,6 +1391,24 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					? 'yes-pending'
 					: 'question';
 
+	// The booked-banner shift on the section root must NOT animate on tab entry:
+	// the auto-selected conversation resolves a commit after mount, and animating
+	// its banner into place slides the whole inbox box right as the tab crossfade
+	// reveals it (reads as a jerk). Enable the transition only after the first
+	// two frames — by then the entry state (banner or not) has painted; banner
+	// changes from in-inbox interactions still animate.
+	const [bannerShiftAnimEnabled, setBannerShiftAnimEnabled] = useState(false);
+	useEffect(() => {
+		let raf2: number | null = null;
+		const raf1 = requestAnimationFrame(() => {
+			raf2 = requestAnimationFrame(() => setBannerShiftAnimEnabled(true));
+		});
+		return () => {
+			cancelAnimationFrame(raf1);
+			if (raf2 != null) cancelAnimationFrame(raf2);
+		};
+	}, []);
+
 	// Drop stale dropdown state when the selection moves to another conversation —
 	// taking back any confirm-mode provisional placement with it (idempotent
 	// DELETE, so a StrictMode double-run is harmless).
@@ -3026,7 +3044,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					bookedBannerState !== 'hidden'
 						? `translateY(${BOOKED_BANNER_OFFSET_PX}px)`
 						: undefined,
-				transition: 'transform 180ms ease-out',
+				transition: bannerShiftAnimEnabled ? 'transform 180ms ease-out' : 'none',
 				// The dropdown is portaled above fixed chrome; keep this shifted subtree
 				// above nearby inbox content while it is open.
 				zIndex: isBookingDropdownOpen ? 70 : undefined,

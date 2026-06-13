@@ -38,7 +38,9 @@ export const VENUE_MAP_TAB_BAR_NATIVE_H_PX = 36;
 export const VENUE_MAP_LEFT_CLUSTER_NATIVE_W_PX = 656; // profile/calendar/events stack
 export const VENUE_DOCKED_CHAT_NATIVE_W_PX = 515;
 
-// Width tiers for the map view's responsive cascade. Derivations (rendered px):
+// Width tiers for the map view's responsive cascade, in DESIGN px — on boosted
+// large monitors useVenuePortalLayout compares them against the boost-shrunk
+// design viewport, not the raw one. Derivations (rendered px at boost 1):
 //   hide notifications: panels' right edge 500 + 781×0.8 (=1124.8) + 12 clearance
 //     + notifications 431×0.7 (=301.7) + 24 right margin ≈ 1462.5
 //   hide left cluster:  500 + 781×0.8 + 24 right margin ≈ 1148.8

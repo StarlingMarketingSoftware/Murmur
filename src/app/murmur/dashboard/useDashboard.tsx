@@ -8,10 +8,14 @@ import type { UserContactList } from '@prisma/client';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import {
 	CampaignApiError,
+	type CampaignListItem,
+	fetchCampaignsList,
+	getCampaignsListQueryKey,
 	useActiveCampaign,
 	useCreateCampaign,
 	useGetCampaigns,
 } from '@/hooks/queryHooks/useCampaigns';
+import { useQueryClient } from '@tanstack/react-query';
 import { urls } from '@/constants/urls';
 import {
 	useBatchUpdateContacts,
@@ -403,6 +407,8 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 
 	const { data: existingCampaigns } = useGetCampaigns();
 
+	const queryClient = useQueryClient();
+
 	const existingCampaignNames = useMemo<string[]>(() => {
 		const list = (existingCampaigns ?? []) as Array<{ name?: string }>;
 		return list
@@ -417,11 +423,53 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	const ensureActiveCampaign = useCallback(
 		async (searchQuery: string): Promise<number | null> => {
 			void searchQuery;
-			if (activeCampaignId != null) return activeCampaignId;
 			if (creatingCampaignRef.current) return creatingCampaignRef.current;
 
 			const promise = (async () => {
-				const name = generateCampaignName(existingCampaignNames);
+				// activeCampaignId can't be trusted on its own: before the campaigns
+				// list resolves it falls back to the raw localStorage id, which may
+				// point at a soft-deleted campaign (deleted from another device, or
+				// directly in the DB). Await the active-only list (instant when the
+				// mounted query already resolved, deduped when it's in flight) and
+				// validate against it before deciding whether to create.
+				let activeList: CampaignListItem[] | null = null;
+				try {
+					activeList = (await queryClient.ensureQueryData({
+						queryKey: getCampaignsListQueryKey(),
+						queryFn: fetchCampaignsList,
+					})) as CampaignListItem[];
+				} catch {
+					// Degraded (list fetch failed): fall back to the pre-validation
+					// behavior — trust a non-null id, otherwise attempt the create.
+				}
+
+				if (activeList) {
+					if (
+						activeCampaignId != null &&
+						activeList.some((c) => c.id === activeCampaignId)
+					) {
+						return activeCampaignId;
+					}
+					if (activeList.length > 0) {
+						// Stale stored id but other active campaigns exist: adopt the
+						// most recent one (same rule as useActiveCampaign's resolution).
+						const mostRecent = [...activeList].sort(
+							(a, b) =>
+								new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+						)[0];
+						setActiveCampaignId(mostRecent.id);
+						return mostRecent.id;
+					}
+				} else if (activeCampaignId != null) {
+					return activeCampaignId;
+				}
+
+				const names = activeList
+					? activeList
+							.map((c) => c.name)
+							.filter((n): n is string => typeof n === 'string' && n.length > 0)
+					: existingCampaignNames;
+				const name = generateCampaignName(names);
 				const newUcl = await createContactList({ name, contactIds: [] });
 				const campaign = await createCampaign({
 					name,
@@ -454,6 +502,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			createContactList,
 			createCampaign,
 			existingCampaignNames,
+			queryClient,
 			setActiveCampaignId,
 		]
 	);

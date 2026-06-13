@@ -64,7 +64,12 @@ const PILL_STYLE: CSSProperties = {
 /** Mobile dashboard "Folders" tab: pastel campaign cards floating over the map. */
 export const MobileFolderCards: FC<{ className?: string }> = ({ className }) => {
 	const router = useRouter();
-	const { data: campaigns, isLoading: isLoadingCampaigns } = useGetCampaigns();
+	const {
+		data: campaigns,
+		isLoading: isLoadingCampaigns,
+		isError: isCampaignsError,
+		refetch: refetchCampaigns,
+	} = useGetCampaigns();
 	const { data: inboundEmails } = useGetInboundEmails();
 
 	return (
@@ -165,7 +170,69 @@ export const MobileFolderCards: FC<{ className?: string }> = ({ className }) => 
 							</div>
 						</div>
 				  ))
-				: (campaigns as CampaignWithCounts[] | undefined)?.map((campaign, index) => {
+				: isCampaignsError ? (
+						<div
+							style={{
+								...CARD_STYLE,
+								backgroundColor: '#FFFFFF',
+								justifyContent: 'center',
+								alignItems: 'flex-start',
+								gap: '8px',
+							}}
+						>
+							<span
+								style={{
+									fontFamily: 'Inter, sans-serif',
+									fontSize: '17px',
+									fontWeight: 700,
+									color: '#000000',
+								}}
+							>
+								Couldn&apos;t load campaigns
+							</span>
+							<button
+								type="button"
+								onClick={() => refetchCampaigns()}
+								style={{ ...PILL_STYLE, backgroundColor: '#A7E1FF', cursor: 'pointer' }}
+							>
+								Tap to retry
+							</button>
+						</div>
+				  ) : (campaigns as CampaignWithCounts[] | undefined)?.length === 0 ? (
+						// Fallback only: zero-campaign accounts are normally auto-redirected
+						// into the For You map search before this frame renders.
+						<div
+							style={{
+								...CARD_STYLE,
+								backgroundColor: '#FFFFFF',
+								justifyContent: 'center',
+								alignItems: 'flex-start',
+								gap: '4px',
+							}}
+						>
+							<span
+								style={{
+									fontFamily: 'Inter, sans-serif',
+									fontSize: '17px',
+									fontWeight: 700,
+									color: '#000000',
+								}}
+							>
+								No campaigns yet
+							</span>
+							<span
+								style={{
+									fontFamily: 'Inter, sans-serif',
+									fontSize: '14px',
+									fontWeight: 300,
+									fontStyle: 'italic',
+									color: '#145B81',
+								}}
+							>
+								Search contacts to start your first campaign
+							</span>
+						</div>
+				  ) : (campaigns as CampaignWithCounts[] | undefined)?.map((campaign, index) => {
 						const scheme = getCampaignFolderScheme(index);
 						const draftCount = campaign.draftCount ?? 0;
 						const sentCount = campaign.sentCount ?? 0;

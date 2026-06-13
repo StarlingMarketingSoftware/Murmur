@@ -725,10 +725,403 @@ export const DashboardOpportunitiesContent: FC<{
 	}, [activeStatus, allOpportunities, searchQuery]);
 	const isUnfilteredView = activeStatus === null && searchQuery.trim() === '';
 	const isFullyEmpty = !isLoading && allOpportunities.length === 0;
+	// Expired/active partition is recomputed per render (not memoized) so it
+	// shares the same Date.now() frame as the rows' red expired styling. Only the
+	// unfiltered view partitions — with a tab or search active the flat list keeps
+	// expired rows visible inline.
+	const expiredRows: OpportunityRow[] = [];
+	const activeRows: OpportunityRow[] = [];
+	if (isUnfilteredView) {
+		for (const row of opportunities) {
+			(isOpportunityDatePassed(row.opportunityDate) ? expiredRows : activeRows).push(row);
+		}
+	}
+	const expiredKeysKey = expiredRows.map((row) => `${row.source}-${row.id}`).join(',');
+	const scrollerRef = useRef<HTMLDivElement | null>(null);
+	const activeSectionRef = useRef<HTMLDivElement | null>(null);
+	// Expired keys the pin effect has already accounted for; null forces a re-pin
+	// (set while a tab/search/disabled render has the pinned layout inactive).
+	const seenExpiredKeysRef = useRef<Set<string> | null>(null);
+	const [isPinnedScrollbarVisible, setIsPinnedScrollbarVisible] = useState(false);
+	// Pin the initial scroll to the active section so the visible list renders
+	// exactly like an active-only list; expired rows sit above the fold and reveal
+	// only by scrolling up (the venue Events-panel pattern). Re-pins when the
+	// unfiltered view (re)mounts or a NEW expired key appears (a refetch / a date
+	// passing mid-session), but not on removals — deleting an expired row while
+	// inspecting it must not yank the view back down. Layout effect so the first
+	// paint is already pinned.
+	useLayoutEffect(() => {
+		if (!enabled || !isUnfilteredView) {
+			seenExpiredKeysRef.current = null;
+			return;
+		}
+		const scroller = scrollerRef.current;
+		const activeSection = activeSectionRef.current;
+		if (!scroller || !activeSection) return;
+		const previous = seenExpiredKeysRef.current;
+		const nextKeys = expiredKeysKey === '' ? [] : expiredKeysKey.split(',');
+		seenExpiredKeysRef.current = new Set(nextKeys);
+		if (previous && nextKeys.every((key) => previous.has(key))) return;
+		// offsetTop is scroller-relative (the CustomScrollbar root is the
+		// offsetParent, top-aligned with the scroll container), so it equals the
+		// expired band's height whether or not the active content overflows.
+		scroller.scrollTop = activeSection.offsetTop;
+	}, [enabled, isUnfilteredView, expiredKeysKey]);
+	// Hide the thumb unless the active section itself overflows the scroller —
+	// min-h-full makes the total scroll height exceed the viewport whenever an
+	// expired band exists, which would otherwise paint a misleading thumb on an
+	// apparently short list.
+	useLayoutEffect(() => {
+		if (!enabled || !isUnfilteredView) {
+			setIsPinnedScrollbarVisible(false);
+			return;
+		}
+		const scroller = scrollerRef.current;
+		const activeSection = activeSectionRef.current;
+		if (!scroller || !activeSection) return;
+		setIsPinnedScrollbarVisible(activeSection.offsetHeight > scroller.clientHeight + 1);
+	}, [enabled, isUnfilteredView, opportunities, isLoading]);
 
 	if (!enabled) return null;
 
 	const rowWidth = fluid ? '100%' : '639px';
+
+	const renderOpportunityRow = (
+		opportunity: OpportunityRow,
+		isExpiredOpportunity: boolean
+	) => {
+		const statusMeta = STATUS_META[opportunity.status];
+		const categoryMeta = getOpportunityCategoryMeta(opportunity.categoryTitle);
+		const isCompactClosedRow =
+			isUnfilteredView &&
+			(opportunity.status === 'closed' || opportunity.status === 'canceled');
+		return (
+			<button
+				key={`${opportunity.source}-${opportunity.id}`}
+				type="button"
+				onClick={
+					opportunity.inboxLink
+						? () => router.push(opportunity.inboxLink!)
+						: undefined
+				}
+				className="text-left hover:brightness-[0.985] transition-[filter]"
+				style={{
+					width: rowWidth,
+					height: isCompactClosedRow ? '25px' : '48px',
+					borderRadius: '6.389px',
+					border: isExpiredOpportunity ? '1px solid #000000' : 'none',
+					background: isExpiredOpportunity
+						? EXPIRED_OPPORTUNITY_FILL
+						: isCompactClosedRow
+							? '#E6E6E6'
+							: '#FEFEFE',
+					boxShadow: isExpiredOpportunity
+						? 'none'
+						: '0px 1px 0px rgba(0, 0, 0, 0.05)',
+					boxSizing: 'border-box',
+					overflow: 'hidden',
+					position: 'relative',
+					display: 'block',
+					appearance: 'none',
+					padding: 0,
+					fontFamily: 'Inter, sans-serif',
+					color: '#000000',
+					cursor: opportunity.inboxLink ? 'pointer' : 'default',
+				}}
+			>
+				<span
+					aria-hidden="true"
+					style={{
+						position: 'absolute',
+						left: 0,
+						top: 0,
+						width: '6px',
+						height: '100%',
+						background: isExpiredOpportunity
+							? EXPIRED_OPPORTUNITY_FILL
+							: statusMeta.accent,
+					}}
+				/>
+
+				<span
+					style={{
+						position: 'absolute',
+						left: '27px',
+						top: isCompactClosedRow ? '4px' : '7px',
+						// On fluid (mobile) widths, keep the label clear of the
+						// right-anchored date pill.
+						width: fluid ? 'min(190px, calc(100% - 130px))' : '190px',
+						height: '17.186px',
+						display: 'flex',
+						alignItems: isCompactClosedRow ? 'center' : 'baseline',
+						gap: '5px',
+						overflow: 'hidden',
+						color: '#000000',
+						fontFamily: 'Inter, sans-serif',
+						fontSize: '14px',
+						fontStyle: 'normal',
+						fontWeight: 600,
+						lineHeight: '17.186px',
+					}}
+			>
+					{opportunity.unread && (
+						<span
+							aria-label="New response"
+							style={{
+								flex: '0 0 auto',
+								width: '8px',
+								height: '8px',
+								borderRadius: '9999px',
+								background: '#2F6FED',
+								alignSelf: 'center',
+							}}
+						/>
+					)}
+					<FadeOverflowText text={opportunity.contactLabel} style={{ minWidth: 0 }} />
+					<span
+						style={{
+							flex: '0 0 auto',
+							marginLeft: isCompactClosedRow ? '22px' : undefined,
+							fontSize: '10px',
+							fontWeight: 400,
+							lineHeight: 1,
+							transform: isCompactClosedRow ? undefined : 'translateY(-4px)',
+						}}
+					>
+						{opportunity.exchangeCount}
+					</span>
+				</span>
+
+				{!isCompactClosedRow && opportunity.folder && (
+					<span
+						style={{
+							position: 'absolute',
+							left: '27px',
+							bottom: '9px',
+							width: '80px',
+							height: '15px',
+							borderRadius: '3px',
+							border: isExpiredOpportunity ? '1px solid #000000' : 'none',
+							background: isExpiredOpportunity
+								? EXPIRED_OPPORTUNITY_FILL
+								: '#B9BBF1',
+							display: 'flex',
+							alignItems: 'center',
+							overflow: 'hidden',
+							boxSizing: 'border-box',
+							padding: '0 4px',
+						}}
+					>
+						<DashboardActionBarFolderIcon
+							width={20}
+							height={12}
+							style={{
+								color: isExpiredOpportunity
+									? EXPIRED_OPPORTUNITY_FOLDER_ICON
+									: '#C847CB',
+								flex: '0 0 auto',
+							}}
+						/>
+						<FadeOverflowText
+							text={opportunity.folder}
+							style={{
+								minWidth: 0,
+								flex: 1,
+								marginLeft: '6px',
+								color: '#000000',
+								fontFamily: 'Inter, sans-serif',
+								fontSize: '13.854px',
+								fontStyle: 'normal',
+								fontWeight: 500,
+								lineHeight: '17.186px',
+							}}
+						/>
+					</span>
+				)}
+
+				{!isCompactClosedRow && (
+					<div
+						style={{
+							position: 'absolute',
+							left: '115px',
+							bottom: '9px',
+							right: '409px',
+							height: '15px',
+							display: 'flex',
+							alignItems: 'center',
+							gap: '5px',
+							overflow: 'hidden',
+						}}
+					>
+						{categoryMeta && (
+							<span
+								aria-label={categoryMeta.label}
+								title={categoryMeta.label}
+								style={{
+									width: '24px',
+									height: '15px',
+									borderRadius: '5.6px',
+									border: '1px solid #000000',
+									background: categoryMeta.background,
+									display: 'inline-flex',
+									alignItems: 'center',
+									justifyContent: 'center',
+									boxSizing: 'border-box',
+									flex: '0 0 auto',
+									overflow: 'hidden',
+								}}
+							>
+								{categoryMeta.icon}
+							</span>
+						)}
+						{opportunity.stateAbbr && (
+							<span
+								style={{
+									minWidth: '27px',
+									height: '15px',
+									borderRadius: '5.6px',
+									border: '1px solid #000000',
+									backgroundColor:
+										stateBadgeColorMap[opportunity.stateAbbr] || '#F8F1C8',
+									display: 'inline-flex',
+									alignItems: 'center',
+									justifyContent: 'center',
+									boxSizing: 'border-box',
+									flex: '0 0 auto',
+									color: '#000000',
+									fontFamily: 'Inter, sans-serif',
+									fontSize: '12px',
+									fontWeight: 600,
+									lineHeight: 1,
+								}}
+							>
+								{opportunity.stateAbbr}
+							</span>
+						)}
+						{opportunity.city && (
+							<FadeOverflowText
+								text={opportunity.city}
+								style={{
+									minWidth: 0,
+									height: '15px',
+									display: 'inline-flex',
+									alignItems: 'center',
+									justifyContent: 'center',
+									transform: 'translateY(1px)',
+									color: '#000000',
+									textAlign: 'center',
+									fontFamily: 'Inter, sans-serif',
+									fontSize: '9.454px',
+									fontStyle: 'normal',
+									fontWeight: 500,
+									lineHeight: '12.482px',
+								}}
+							/>
+						)}
+					</div>
+				)}
+
+				<div
+					style={{
+						position: 'absolute',
+						left: '232px',
+						top: '2px',
+						right: '269.118px',
+						height: '19.936px',
+						overflow: 'hidden',
+						whiteSpace: 'nowrap',
+						color: '#000000',
+						textAlign: 'left',
+						fontFamily: 'Inter, sans-serif',
+						fontSize: '14px',
+						fontStyle: 'normal',
+						fontWeight: 400,
+						lineHeight: '20px',
+					}}
+				>
+					{opportunity.opportunityType}
+				</div>
+
+				<div
+					style={{
+						position: 'absolute',
+						right: '137px',
+						top: '2px',
+						width: '124.118px',
+						height: '19.936px',
+						borderRadius: '4.502px',
+						border: isExpiredOpportunity ? '1px solid #000000' : 'none',
+						background: isExpiredOpportunity
+							? EXPIRED_OPPORTUNITY_FILL
+							: '#B6E8F1',
+						overflow: 'hidden',
+						display: 'flex',
+						alignItems: 'center',
+						justifyContent: 'flex-start',
+						boxSizing: 'border-box',
+						padding: '0 14px',
+						color: '#000000',
+						textAlign: 'left',
+						fontFamily: 'Inter, sans-serif',
+						fontSize: '14px',
+						fontStyle: 'normal',
+						fontWeight: 400,
+						lineHeight: '20px',
+					}}
+				>
+					<FadeOverflowText text={opportunity.opportunityDate} style={{ width: '100%' }} />
+				</div>
+
+				{!isCompactClosedRow && (
+					<div
+						style={{
+							position: 'absolute',
+							left: '232px',
+							top: '25px',
+							right: '100px',
+							height: '20px',
+							overflow: 'hidden',
+							color: '#000000',
+							whiteSpace: 'nowrap',
+							fontFamily: 'Inter, sans-serif',
+							fontSize: '14px',
+							fontStyle: 'normal',
+							fontWeight: 200,
+							lineHeight: '20px',
+						}}
+					>
+						<FadeOverflowText
+							text={
+								opportunity.lastMessage ||
+								'Reply received. Add details as this opportunity develops.'
+							}
+							style={{ display: 'block', width: '100%' }}
+						/>
+					</div>
+				)}
+
+				<div
+					style={{
+						position: 'absolute',
+						right: '10px',
+						top: isCompactClosedRow ? '4px' : '26px',
+						width: '82px',
+						height: '17.186px',
+						color: '#000',
+						textAlign: 'right',
+						fontFamily: 'Inter, sans-serif',
+						fontSize: '13px',
+						fontStyle: 'normal',
+						fontWeight: 500,
+						lineHeight: '17.186px',
+						whiteSpace: 'nowrap',
+					}}
+				>
+					{opportunity.lastReceivedLabel}
+				</div>
+			</button>
+		);
+	};
 
 	return (
 		<div
@@ -786,6 +1179,7 @@ export const DashboardOpportunitiesContent: FC<{
 			</div>
 
 			<CustomScrollbar
+				scrollContainerRef={scrollerRef}
 				className="flex-1 min-h-0 self-center"
 				contentClassName="flex flex-col items-center"
 				thumbWidth={2}
@@ -793,14 +1187,35 @@ export const DashboardOpportunitiesContent: FC<{
 				trackColor="transparent"
 				offsetRight={-12}
 				lockHorizontalScroll
+				hideThumb={isUnfilteredView && !isPinnedScrollbarVisible}
 				style={{
 					width: rowWidth,
 					marginTop: '8px',
 				}}
 			>
+				{/* Expired band: sits above the active section's fold (see the pin
+				    effect). pb-[5px] keeps the 5px visual gap to the first active row
+				    and counts toward the band height, so the pinned view starts flush
+				    like today's unscrolled list. */}
+				{expiredRows.length > 0 && (
+					<div className="w-full shrink-0 flex flex-col items-center gap-[5px] pb-[5px]">
+						{expiredRows.map((row) => renderOpportunityRow(row, true))}
+					</div>
+				)}
 				{/* w-full: rows are width:100%, so on fluid (mobile) widths the column
-				    must take the scroll container's width or every row collapses to 0. */}
-				<div className="w-full flex flex-col items-center gap-[5px] pb-[1px]">
+				    must take the scroll container's width or every row collapses to 0.
+				    min-h-full pins max-scrollTop to the expired band's height when the
+				    active content is short, making the pinned view exactly the
+				    active-only layout; shrink-0 is load-bearing (min-h-full replaces
+				    the flex min-height:auto floor, so without it overflowing active
+				    content would get squashed). */}
+				<div
+					ref={activeSectionRef}
+					className={cn(
+						'w-full flex flex-col items-center gap-[5px] pb-[1px]',
+						isUnfilteredView && 'min-h-full shrink-0'
+					)}
+				>
 					{isLoading ? (
 						// Wave skeleton rows mirroring the loaded row anatomy; negative
 						// delays stagger the wave so it reads downward.
@@ -906,342 +1321,13 @@ export const DashboardOpportunitiesContent: FC<{
 								: 'No opportunities yet'}
 						</div>
 					) : (
-						opportunities.map((opportunity) => {
-							const statusMeta = STATUS_META[opportunity.status];
-							const categoryMeta = getOpportunityCategoryMeta(opportunity.categoryTitle);
-							const isCompactClosedRow =
-								isUnfilteredView &&
-								(opportunity.status === 'closed' || opportunity.status === 'canceled');
-							const isExpiredOpportunity = isOpportunityDatePassed(
-								opportunity.opportunityDate
-							);
-							return (
-								<button
-									key={`${opportunity.source}-${opportunity.id}`}
-									type="button"
-									onClick={
-										opportunity.inboxLink
-											? () => router.push(opportunity.inboxLink!)
-											: undefined
-									}
-									className="text-left hover:brightness-[0.985] transition-[filter]"
-									style={{
-										width: rowWidth,
-										height: isCompactClosedRow ? '25px' : '48px',
-										borderRadius: '6.389px',
-										border: isExpiredOpportunity ? '1px solid #000000' : 'none',
-										background: isExpiredOpportunity
-											? EXPIRED_OPPORTUNITY_FILL
-											: isCompactClosedRow
-												? '#E6E6E6'
-												: '#FEFEFE',
-										boxShadow: isExpiredOpportunity
-											? 'none'
-											: '0px 1px 0px rgba(0, 0, 0, 0.05)',
-										boxSizing: 'border-box',
-										overflow: 'hidden',
-										position: 'relative',
-										display: 'block',
-										appearance: 'none',
-										padding: 0,
-										fontFamily: 'Inter, sans-serif',
-										color: '#000000',
-										cursor: opportunity.inboxLink ? 'pointer' : 'default',
-									}}
-								>
-									<span
-										aria-hidden="true"
-										style={{
-											position: 'absolute',
-											left: 0,
-											top: 0,
-											width: '6px',
-											height: '100%',
-											background: isExpiredOpportunity
-												? EXPIRED_OPPORTUNITY_FILL
-												: statusMeta.accent,
-										}}
-									/>
-
-									<span
-										style={{
-											position: 'absolute',
-											left: '27px',
-											top: isCompactClosedRow ? '4px' : '7px',
-											// On fluid (mobile) widths, keep the label clear of the
-											// right-anchored date pill.
-											width: fluid ? 'min(190px, calc(100% - 130px))' : '190px',
-											height: '17.186px',
-											display: 'flex',
-											alignItems: isCompactClosedRow ? 'center' : 'baseline',
-											gap: '5px',
-											overflow: 'hidden',
-											color: '#000000',
-											fontFamily: 'Inter, sans-serif',
-											fontSize: '14px',
-											fontStyle: 'normal',
-											fontWeight: 600,
-											lineHeight: '17.186px',
-										}}
-								>
-										{opportunity.unread && (
-											<span
-												aria-label="New response"
-												style={{
-													flex: '0 0 auto',
-													width: '8px',
-													height: '8px',
-													borderRadius: '9999px',
-													background: '#2F6FED',
-													alignSelf: 'center',
-												}}
-											/>
-										)}
-										<FadeOverflowText text={opportunity.contactLabel} style={{ minWidth: 0 }} />
-										<span
-											style={{
-												flex: '0 0 auto',
-												marginLeft: isCompactClosedRow ? '22px' : undefined,
-												fontSize: '10px',
-												fontWeight: 400,
-												lineHeight: 1,
-												transform: isCompactClosedRow ? undefined : 'translateY(-4px)',
-											}}
-										>
-											{opportunity.exchangeCount}
-										</span>
-									</span>
-
-									{!isCompactClosedRow && opportunity.folder && (
-										<span
-											style={{
-												position: 'absolute',
-												left: '27px',
-												bottom: '9px',
-												width: '80px',
-												height: '15px',
-												borderRadius: '3px',
-												border: isExpiredOpportunity ? '1px solid #000000' : 'none',
-												background: isExpiredOpportunity
-													? EXPIRED_OPPORTUNITY_FILL
-													: '#B9BBF1',
-												display: 'flex',
-												alignItems: 'center',
-												overflow: 'hidden',
-												boxSizing: 'border-box',
-												padding: '0 4px',
-											}}
-										>
-											<DashboardActionBarFolderIcon
-												width={20}
-												height={12}
-												style={{
-													color: isExpiredOpportunity
-														? EXPIRED_OPPORTUNITY_FOLDER_ICON
-														: '#C847CB',
-													flex: '0 0 auto',
-												}}
-											/>
-											<FadeOverflowText
-												text={opportunity.folder}
-												style={{
-													minWidth: 0,
-													flex: 1,
-													marginLeft: '6px',
-													color: '#000000',
-													fontFamily: 'Inter, sans-serif',
-													fontSize: '13.854px',
-													fontStyle: 'normal',
-													fontWeight: 500,
-													lineHeight: '17.186px',
-												}}
-											/>
-										</span>
-									)}
-
-									{!isCompactClosedRow && (
-										<div
-											style={{
-												position: 'absolute',
-												left: '115px',
-												bottom: '9px',
-												right: '409px',
-												height: '15px',
-												display: 'flex',
-												alignItems: 'center',
-												gap: '5px',
-												overflow: 'hidden',
-											}}
-										>
-											{categoryMeta && (
-												<span
-													aria-label={categoryMeta.label}
-													title={categoryMeta.label}
-													style={{
-														width: '24px',
-														height: '15px',
-														borderRadius: '5.6px',
-														border: '1px solid #000000',
-														background: categoryMeta.background,
-														display: 'inline-flex',
-														alignItems: 'center',
-														justifyContent: 'center',
-														boxSizing: 'border-box',
-														flex: '0 0 auto',
-														overflow: 'hidden',
-													}}
-												>
-													{categoryMeta.icon}
-												</span>
-											)}
-											{opportunity.stateAbbr && (
-												<span
-													style={{
-														minWidth: '27px',
-														height: '15px',
-														borderRadius: '5.6px',
-														border: '1px solid #000000',
-														backgroundColor:
-															stateBadgeColorMap[opportunity.stateAbbr] || '#F8F1C8',
-														display: 'inline-flex',
-														alignItems: 'center',
-														justifyContent: 'center',
-														boxSizing: 'border-box',
-														flex: '0 0 auto',
-														color: '#000000',
-														fontFamily: 'Inter, sans-serif',
-														fontSize: '12px',
-														fontWeight: 600,
-														lineHeight: 1,
-													}}
-												>
-													{opportunity.stateAbbr}
-												</span>
-											)}
-											{opportunity.city && (
-												<FadeOverflowText
-													text={opportunity.city}
-													style={{
-														minWidth: 0,
-														height: '15px',
-														display: 'inline-flex',
-														alignItems: 'center',
-														justifyContent: 'center',
-														transform: 'translateY(1px)',
-														color: '#000000',
-														textAlign: 'center',
-														fontFamily: 'Inter, sans-serif',
-														fontSize: '9.454px',
-														fontStyle: 'normal',
-														fontWeight: 500,
-														lineHeight: '12.482px',
-													}}
-												/>
-											)}
-										</div>
-									)}
-
-									<div
-										style={{
-											position: 'absolute',
-											left: '232px',
-											top: '2px',
-											right: '269.118px',
-											height: '19.936px',
-											overflow: 'hidden',
-											whiteSpace: 'nowrap',
-											color: '#000000',
-											textAlign: 'left',
-											fontFamily: 'Inter, sans-serif',
-											fontSize: '14px',
-											fontStyle: 'normal',
-											fontWeight: 400,
-											lineHeight: '20px',
-										}}
-									>
-										{opportunity.opportunityType}
-									</div>
-
-									<div
-										style={{
-											position: 'absolute',
-											right: '137px',
-											top: '2px',
-											width: '124.118px',
-											height: '19.936px',
-											borderRadius: '4.502px',
-											border: isExpiredOpportunity ? '1px solid #000000' : 'none',
-											background: isExpiredOpportunity
-												? EXPIRED_OPPORTUNITY_FILL
-												: '#B6E8F1',
-											overflow: 'hidden',
-											display: 'flex',
-											alignItems: 'center',
-											justifyContent: 'flex-start',
-											boxSizing: 'border-box',
-											padding: '0 14px',
-											color: '#000000',
-											textAlign: 'left',
-											fontFamily: 'Inter, sans-serif',
-											fontSize: '14px',
-											fontStyle: 'normal',
-											fontWeight: 400,
-											lineHeight: '20px',
-										}}
-									>
-										<FadeOverflowText text={opportunity.opportunityDate} style={{ width: '100%' }} />
-									</div>
-
-									{!isCompactClosedRow && (
-										<div
-											style={{
-												position: 'absolute',
-												left: '232px',
-												top: '25px',
-												right: '100px',
-												height: '20px',
-												overflow: 'hidden',
-												color: '#000000',
-												whiteSpace: 'nowrap',
-												fontFamily: 'Inter, sans-serif',
-												fontSize: '14px',
-												fontStyle: 'normal',
-												fontWeight: 200,
-												lineHeight: '20px',
-											}}
-										>
-											<FadeOverflowText
-												text={
-													opportunity.lastMessage ||
-													'Reply received. Add details as this opportunity develops.'
-												}
-												style={{ display: 'block', width: '100%' }}
-											/>
-										</div>
-									)}
-
-									<div
-										style={{
-											position: 'absolute',
-											right: '10px',
-											top: isCompactClosedRow ? '4px' : '26px',
-											width: '82px',
-											height: '17.186px',
-											color: '#000',
-											textAlign: 'right',
-											fontFamily: 'Inter, sans-serif',
-											fontSize: '13px',
-											fontStyle: 'normal',
-											fontWeight: 500,
-											lineHeight: '17.186px',
-											whiteSpace: 'nowrap',
-										}}
-									>
-										{opportunity.lastReceivedLabel}
-									</div>
-								</button>
-							);
-						})
+						isUnfilteredView ? (
+							activeRows.map((row) => renderOpportunityRow(row, false))
+						) : (
+							opportunities.map((row) =>
+								renderOpportunityRow(row, isOpportunityDatePassed(row.opportunityDate))
+							)
+						)
 					)}
 				</div>
 			</CustomScrollbar>

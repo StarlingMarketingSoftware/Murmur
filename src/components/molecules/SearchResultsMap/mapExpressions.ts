@@ -18,11 +18,15 @@ import { clamp } from './math';
 // Curated orb transition
 // ============================================================================
 
-export const computeCuratedOrbT = (zoom: number) => {
-	if (zoom >= CURATED_ORB_TRANSITION_START_ZOOM) return 0;
-	if (zoom <= CURATED_ORB_TRANSITION_END_ZOOM) return 1;
+// `floorDelta` (viewport-proportional raise of the interactive zoom floor)
+// shifts the morph range so the blob→circle transition still completes by the
+// time the camera reaches the floor on large monitors.
+export const computeCuratedOrbT = (zoom: number, floorDelta = 0) => {
+	const z = zoom - floorDelta;
+	if (z >= CURATED_ORB_TRANSITION_START_ZOOM) return 0;
+	if (z <= CURATED_ORB_TRANSITION_END_ZOOM) return 1;
 	const raw =
-		(CURATED_ORB_TRANSITION_START_ZOOM - zoom) /
+		(CURATED_ORB_TRANSITION_START_ZOOM - z) /
 		(CURATED_ORB_TRANSITION_START_ZOOM - CURATED_ORB_TRANSITION_END_ZOOM);
 	return raw * raw * (3 - 2 * raw);
 };

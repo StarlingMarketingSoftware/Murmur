@@ -73,6 +73,11 @@ export default function RootLayout({
 				className={`${inter.variable} ${timesNewRoman.variable} ${zenAntique.variable} ${crimsonText.variable}`}
 				suppressHydrationWarning
 			>
+				<head>
+					{/* Mapbox style/tile/glyph requests all hit api.mapbox.com; warming the
+					    connection here takes DNS+TCP+TLS off the globe's first-paint path. */}
+					<link rel="preconnect" href="https://api.mapbox.com" crossOrigin="anonymous" />
+				</head>
 				<body
 					className={`antialiased min-h-screen flex flex-col`}
 					suppressHydrationWarning

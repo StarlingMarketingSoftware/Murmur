@@ -17,8 +17,10 @@ export const Navbar = () => {
 	const router = useRouter();
 	const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
 	const [scrolled, setScrolled] = useState(false);
-	const [scrolledPastHero, setScrolledPastHero] = useState(false);
+	// Mobile landing: how far the hamburger drops to sit on the logo's line.
+	const [burgerShiftPx, setBurgerShiftPx] = useState(0);
 	const prevIsSignedInRef = useRef(isSignedIn);
+	const navRef = useRef<HTMLElement | null>(null);
 
 	const hasActiveSubscription =
 		user?.stripeSubscriptionStatus === StripeSubscriptionStatus.ACTIVE ||
@@ -56,9 +58,6 @@ export const Navbar = () => {
 		const update = () => {
 			// Show navbar background once user scrolls past a small threshold
 			setScrolled(window.scrollY > 20);
-			// Track when user has scrolled past the hero video section (full viewport height)
-			// This is used for mobile menu text color on the landing page
-			setScrolledPastHero(window.scrollY > window.innerHeight);
 		};
 
 		update();
@@ -115,22 +114,60 @@ export const Navbar = () => {
 	const isLanding = pathname === urls.home.index;
 	const isLandingLikePage = isLanding || pathname === urls.venue.index;
 	const isPricingPage = pathname === urls.pricing.index || pathname.startsWith(`${urls.pricing.index}/`);
+	// Only the pricing index gets the page-anchored mobile navbar; free-trial
+	// always scrolls and must keep a reachable menu.
+	const isPricingIndexPage = pathname === urls.pricing.index;
 	const isLandingNavbarZoom80 = isLandingLikePage;
 	// Navbar is transparent only at the very top of the landing page (before any scroll)
 	const isLandingAtTop = isLandingLikePage && !scrolled;
 	const isTransparentHeader = isLandingAtTop;
-	// Hamburger/X icon color based on page and scroll position:
-	// - Landing page over video hero: white icon for visibility
-	// - Scrolled past hero or other pages (lighter background): dark icon
-	const isLandingOverVideo = isLandingLikePage && !scrolledPastHero;
-	const mobileMenuIconColor = isLandingOverVideo ? 'bg-white/90' : 'bg-gray-700';
-	// Mobile menu text should be white while over the hero video, dark when scrolled past it
-	const isMobileMenuTextLight = isLandingOverVideo;
+	// Landing/venue pages are white now, so the hamburger/X must be black to be visible.
+	const mobileMenuIconColor = isLandingLikePage ? 'bg-black' : 'bg-gray-700';
+
+	// Mobile landing: the Murmur logo lives in the page flow (vertically centered
+	// stack), while the hamburger sits in the page-anchored navbar. Measure the logo
+	// so the hamburger can drop down onto its line and scroll away with it.
+	useEffect(() => {
+		if (!isLandingLikePage) {
+			setBurgerShiftPx(0);
+			return;
+		}
+		const update = () => {
+			const logo = document.querySelector('.landing-home-logo');
+			const nav = navRef.current;
+			if (!logo || !nav || window.innerWidth >= 1145) {
+				setBurgerShiftPx(0);
+				return;
+			}
+			const logoRect = logo.getBoundingClientRect();
+			// The navbar may be scaled (landing-navbar-zoom-80): convert the logo's
+			// document position into the nav's local coordinate space.
+			const scale = nav.offsetWidth
+				? nav.getBoundingClientRect().width / nav.offsetWidth
+				: 1;
+			const logoCenterY = logoRect.top + window.scrollY + logoRect.height / 2;
+			// The hamburger's resting center is at half the 48px navbar row.
+			setBurgerShiftPx(Math.max(0, logoCenterY / scale - 24));
+		};
+		update();
+		window.addEventListener('resize', update);
+		// The stack is vertically centered, so its own size changes (fonts/images
+		// loading) move the logo without firing a window resize.
+		const stack = document.querySelector('.landing-home-stack');
+		const observer = stack ? new ResizeObserver(update) : null;
+		if (stack && observer) observer.observe(stack);
+		return () => {
+			window.removeEventListener('resize', update);
+			observer?.disconnect();
+		};
+		// Re-measure when the menu closes: the nav swaps back to its scaled geometry.
+	}, [isLandingLikePage, isMobileMenuOpen]);
 
 	return (
 		<>
 			{/* Main Navigation Bar - Artistic Glass */}
 			<nav
+				ref={navRef}
 				data-mobile-menu-open={isMobileMenuOpen ? 'true' : 'false'}
 				className={cn(
 					'fixed z-50 font-secondary',
@@ -150,6 +187,10 @@ export const Navbar = () => {
 							]
 						: [
 								'top-0',
+								// Mobile landing/venue/pricing: anchor the navbar to the page (like
+								// the logo) so the hamburger scrolls away with the hero instead of
+								// following.
+								(isLandingLikePage || isPricingIndexPage) && 'max-[1144px]:absolute',
 								// Landing page: zoom the fixed navbar without drifting horizontally.
 								isLandingNavbarZoom80
 									? 'landing-navbar-zoom-80'
@@ -171,6 +212,9 @@ export const Navbar = () => {
 											'border-b border-white/25',
 											// Subtle inset highlight
 											'shadow-[inset_0_0.5px_0_0_rgba(255,255,255,0.25)]',
+											// Mobile landing/pricing: no header band — the page scrolls under the bare hamburger.
+											(isLandingLikePage || isPricingIndexPage) &&
+												'max-[1144px]:bg-transparent max-[1144px]:backdrop-filter-none max-[1144px]:border-white/0 max-[1144px]:shadow-none',
 										]
 										: [
 											// Resting state - lighter refractive effect
@@ -186,24 +230,9 @@ export const Navbar = () => {
 							'flex items-center justify-between h-12 px-5 sm:px-6 min-[1145px]:px-12'
 						)}
 					>
-						{/* Left Section - UserButton on mobile when signed in, spacer otherwise */}
+						{/* Left Section - spacer to balance the hamburger (UserButton lives in the dropdown) */}
 						<div className="min-[1145px]:hidden flex items-center">
-							{isSignedIn ? (
-								<UserButton
-									appearance={{
-										elements: {
-											avatarBox: cn(
-												'shrink-0',
-												isMobileMenuOpen ? 'w-5 h-5' : 'w-6 h-6'
-											),
-											userButtonTrigger:
-												'p-0 opacity-70 hover:opacity-100 transition-opacity duration-300',
-										},
-									}}
-								/>
-							) : (
-								<div className={cn(isMobileMenuOpen ? 'w-5 h-5' : 'w-6 h-6')} /> /* Empty spacer */
-							)}
+							<div className={cn(isMobileMenuOpen ? 'w-5 h-5' : 'w-6 h-6')} /> {/* Empty spacer */}
 						</div>
 						{/* Desktop left section - spacer to balance the layout */}
 						<div className="hidden min-[1145px]:flex items-center w-7 h-7">
@@ -244,6 +273,14 @@ export const Navbar = () => {
 									'min-[1145px]:hidden relative w-7 h-7 flex items-center justify-center',
 									'transition-all duration-300'
 								)}
+								style={
+									// Sit on the logo's line on the mobile landing (the page-anchored
+									// navbar scrolls away with it); return to the bar when the menu opens.
+									// burgerShiftPx is only non-zero on the mobile home landing.
+									!isMobileMenuOpen && burgerShiftPx > 0
+										? { transform: `translateY(${burgerShiftPx}px)` }
+										: undefined
+								}
 								aria-label="Toggle menu"
 							>
 								<span
@@ -312,10 +349,7 @@ export const Navbar = () => {
 								: 'max-h-0 opacity-0 -translate-y-2 overflow-hidden'
 						)}
 					>
-						<div className={cn(
-							'border-t transition-colors duration-300',
-							isMobileMenuTextLight ? 'border-white/20' : 'border-gray-200/20'
-						)}>
+						<div className="border-t border-gray-200/20">
 							{/* Mobile Navigation Links */}
 							<div className="px-5 pt-4 pb-3">
 								<nav>
@@ -327,13 +361,9 @@ export const Navbar = () => {
 													className={cn(
 														'block py-3 text-[20px] font-secondary',
 														'transition-colors duration-300',
-														isMobileMenuTextLight
-															? pathname === item.path
-																? 'text-white'
-																: 'text-white/90 hover:text-white'
-															: pathname === item.path
-																? 'text-gray-900'
-																: 'text-gray-800 hover:text-gray-900'
+														pathname === item.path
+															? 'text-gray-900'
+															: 'text-gray-800 hover:text-gray-900'
 													)}
 													onClick={() => setMobileMenuOpen(false)}
 												>
@@ -346,28 +376,30 @@ export const Navbar = () => {
 							</div>
 
 							{/* Mobile Auth Section */}
-							{!isSignedIn && (
-								<div className={cn(
-									'px-5 py-4 border-t transition-colors duration-300',
-									isMobileMenuTextLight ? 'border-white/20' : 'border-gray-200/20'
-								)}>
+							<div className="px-5 py-4 border-t border-gray-200/20">
+								{isSignedIn ? (
+									<UserButton
+										appearance={{
+											elements: {
+												avatarBox: 'w-7 h-7 shrink-0',
+												userButtonTrigger:
+													'p-0 opacity-80 hover:opacity-100 transition-opacity duration-300',
+											},
+										}}
+									/>
+								) : (
 									<div className="flex">
 										<SignInButton mode="modal" withSignUp>
 											<button
-												className={cn(
-													'flex-1 py-2.5 text-center text-[14px] font-secondary transition-colors duration-300',
-													isMobileMenuTextLight
-														? 'text-white/80 hover:text-white'
-														: 'text-gray-600 hover:text-gray-900'
-												)}
+												className="flex-1 py-2.5 text-center text-[14px] font-secondary transition-colors duration-300 text-gray-600 hover:text-gray-900"
 												onClick={() => setMobileMenuOpen(false)}
 											>
 												Sign in
 											</button>
 										</SignInButton>
 									</div>
-								</div>
-							)}
+								)}
+							</div>
 						</div>
 					</div>
 				</div>

@@ -17,6 +17,15 @@ export const FREE_TRIAL_CLERK_APPEARANCE = {
 		colorBackground: CLERK_CARD_FILL,
 	},
 	elements: {
+		// Viewport-fit chain: the modal wrapper clamps rootBox's height, cardBox
+		// becomes a flex column capped to it, and the form area (.cl-card) scrolls
+		// internally while the footer stays pinned inside the border. On tall
+		// windows nothing overflows and the clamp is inert.
+		rootBox: {
+			display: 'flex',
+			maxHeight: '100%',
+			minHeight: 0,
+		},
 		// Put the stroke on the outer container so it wraps the footer too.
 		cardBox: {
 			boxShadow: 'none',
@@ -24,13 +33,22 @@ export const FREE_TRIAL_CLERK_APPEARANCE = {
 			border: `3px solid ${CLERK_CARD_STROKE}`,
 			borderRadius: '12px',
 			overflow: 'hidden',
+			display: 'flex',
+			flexDirection: 'column',
+			maxHeight: '100%',
+			minHeight: 0,
 		},
 		card: {
 			boxShadow: 'none',
 			backgroundColor: 'transparent',
 			border: 'none',
 			borderRadius: 0,
+			minHeight: 0,
+			overflowY: 'auto',
+			// Don't let internal rubber-banding chain to the (locked) page behind.
+			overscrollBehavior: 'contain',
 		},
+		footer: { flexShrink: 0 },
 		headerTitle: { color: CLERK_CARD_STROKE },
 		headerSubtitle: { color: CLERK_CARD_STROKE },
 		formFieldLabel: { color: CLERK_CARD_STROKE },
@@ -109,6 +127,43 @@ export function FreeTrialClerkGlobalStyles() {
 				background-image: none !important;
 				box-shadow: none !important;
 				filter: none !important;
+			}
+
+			/* Internal form scroller: thin black scrollbar (site convention). */
+			.free-trial-clerk-modal .cl-card {
+				scrollbar-width: thin !important;
+				scrollbar-color: #000000 transparent !important;
+				-webkit-overflow-scrolling: touch;
+			}
+
+			/* Phones: tighten the Clerk card so little (or nothing) needs to
+			   scroll. Scoped to the modal so the navbar Clerk UI is untouched. */
+			@media (max-width: 639px) {
+				.free-trial-clerk-modal .cl-card {
+					padding: 1rem 1rem 1.25rem !important;
+					gap: 0.875rem !important;
+				}
+				.free-trial-clerk-modal .cl-header {
+					gap: 0.125rem !important;
+				}
+				.free-trial-clerk-modal .cl-headerTitle {
+					font-size: 1.0625rem !important;
+				}
+				.free-trial-clerk-modal .cl-headerSubtitle {
+					font-size: 0.8125rem !important;
+				}
+				.free-trial-clerk-modal .cl-main {
+					gap: 0.875rem !important;
+				}
+				.free-trial-clerk-modal .cl-form {
+					gap: 0.75rem !important;
+				}
+				.free-trial-clerk-modal .cl-socialButtons {
+					gap: 0.5rem !important;
+				}
+				.free-trial-clerk-modal .cl-footer .cl-footerAction {
+					padding: 0.625rem 1rem !important;
+				}
 			}
 		`}</style>
 	);

@@ -44,6 +44,9 @@ import {
 } from '@/constants/searchGradients';
 import { isProblematicBrowser } from '@/utils/browserDetection';
 import {
+	computeMapSelectGrabViewScale,
+	computeSideRailCenterShiftPx,
+	DASHBOARD_SIDE_SHIFT_VAR,
 	getMurmurChromeZoomForWindow,
 	MURMUR_CHROME_ZOOM_DEFAULT,
 } from '@/utils/murmurChromeZoom';
@@ -136,6 +139,14 @@ import SearchResultsMap, {
 	DASHBOARD_TO_INTERACTIVE_TRANSITION_MS,
 	type SearchResultsMapProps,
 } from '@/components/molecules/SearchResultsMap/SearchResultsMap';
+import { MAP_MIN_ZOOM } from '@/components/molecules/SearchResultsMap/constants';
+import {
+	MAP_ZOOM_CONTROL_MAX_INDEX,
+	buildZoomControlLevels,
+	clampZoomControlValue,
+	controlValueForZoom,
+	zoomForControlValue,
+} from '@/utils/mapZoomControlLadder';
 import MapRadiusSlider, {
 	RADIUS_DEFAULT_MILES,
 } from '@/components/molecules/MapRadiusSlider';
@@ -145,7 +156,7 @@ import type {
 } from '@/components/molecules/SearchResultsMap/types';
 import {
 	type PersistentDashboardMapConfig,
-	usePersistentMapReady,
+	usePersistentMapFirstPaint,
 	usePersistentMapSetter,
 } from '@/contexts/PersistentMapContext';
 import { DashboardBootBackdrop } from '@/components/molecules/DashboardBootBackdrop/DashboardBootBackdrop';
@@ -565,10 +576,11 @@ const MAP_RESULTS_BOTTOM_SEARCH_BOX = {
 const MAP_CHROME_MID_MAX_LAYOUT_WIDTH_PX = 1490;
 const MAP_CHROME_COMPRESSED_MAX_LAYOUT_WIDTH_PX = 1080;
 
-// Cinematic boot splash over the cold-loading map: minimum on-screen time (so a fast
-// cached load never flashes the starfield), fade-out duration, and a safety cap that
-// dismisses the splash even if Mapbox errors or never loads.
-const DASHBOARD_BOOT_MIN_VISIBLE_MS = 1200;
+// Cinematic boot splash over the cold-loading map: minimum on-screen time, fade-out
+// duration, and a safety cap that dismisses the splash even if Mapbox errors or never
+// loads. The minimum is 0 by explicit choice: the fade starts the moment the globe's
+// land silhouette has painted (the 800ms fade itself keeps the reveal cinematic).
+const DASHBOARD_BOOT_MIN_VISIBLE_MS = 0;
 const DASHBOARD_BOOT_FADE_MS = 800;
 const DASHBOARD_BOOT_MAX_WAIT_MS = 10000;
 type DashboardBootPhase = 'active' | 'fading' | 'done';
@@ -1571,14 +1583,8 @@ const computeDashboardInitialZoomForViewport = (w: number, h: number): number =>
 };
 
 const MAP_SELECT_GRAB_LEFT_PX = 26;
-// Base scales for the left-side map tools. Slightly higher than the chrome's 0.85 so they
-// don't shrink too far under the resolution-aware root zoom.
-const MAP_SELECT_GRAB_MIN_VIEW_SCALE = 0.8;
-const MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE = 0.84;
-const MAP_SELECT_GRAB_MAX_VIEW_SCALE = 0.95;
-const MAP_SELECT_GRAB_SCALE_GROW_START_HEIGHT_PX = 1180;
-const MAP_SELECT_GRAB_SCALE_GROW_END_HEIGHT_PX = 1480;
-const MAP_SELECT_GRAB_VIEWPORT_INSET_PX = 16;
+// The rail view-scale curve lives in murmurChromeZoom.ts (computeMapSelectGrabViewScale),
+// shared with the campaign page and the side-shift centering math.
 const MAP_VIEW_SIDE_PANEL_VISUAL_TOP_PX = 106;
 const MAP_VIEW_SIDE_PANEL_BOTTOM_GAP_PX = 20;
 const MAP_VIEW_SIDE_PANEL_GROUP_NUDGE_UP_PX = 24;
@@ -1595,8 +1601,10 @@ const MAP_MARKER_RESEARCH_DOCK_FLIP_MARGIN_PX = 24;
 const MAP_VIEW_CAMPAIGN_HEADER_HEIGHT_PX = 59;
 const MAP_VIEW_CAMPAIGN_HEADER_GAP_PX = 13;
 // Keep both map side panels visually pinned after the dashboard root zoom is applied.
-const MAP_VIEW_SIDE_PANEL_TOP_CSS = `calc(${MAP_VIEW_SIDE_PANEL_VISUAL_TOP_PX}px / var(--murmur-dashboard-zoom, ${DASHBOARD_MAP_ZOOM_DEFAULT}))`;
-const MAP_VIEW_SIDE_PANEL_GROUP_TOP_CSS = `calc((${MAP_VIEW_SIDE_PANEL_VISUAL_TOP_PX}px - ${MAP_VIEW_SIDE_PANEL_GROUP_NUDGE_UP_PX}px) / var(--murmur-dashboard-zoom, ${DASHBOARD_MAP_ZOOM_DEFAULT}))`;
+// The side-shift var (written by the map-view zoom effect) lowers the whole side
+// chrome toward vertical center on tall monitors; 0px on the 1080p baseline.
+const MAP_VIEW_SIDE_PANEL_TOP_CSS = `calc((${MAP_VIEW_SIDE_PANEL_VISUAL_TOP_PX}px + var(${DASHBOARD_SIDE_SHIFT_VAR}, 0px)) / var(--murmur-dashboard-zoom, ${DASHBOARD_MAP_ZOOM_DEFAULT}))`;
+const MAP_VIEW_SIDE_PANEL_GROUP_TOP_CSS = `calc((${MAP_VIEW_SIDE_PANEL_VISUAL_TOP_PX}px - ${MAP_VIEW_SIDE_PANEL_GROUP_NUDGE_UP_PX}px + var(${DASHBOARD_SIDE_SHIFT_VAR}, 0px)) / var(--murmur-dashboard-zoom, ${DASHBOARD_MAP_ZOOM_DEFAULT}))`;
 const MAP_SELECT_GRAB_VISUAL_TOP_NUDGE_UP_CSS = `calc(4px / var(--murmur-dashboard-zoom, ${DASHBOARD_MAP_ZOOM_DEFAULT}))`;
 const MAP_SELECT_GRAB_TOP_EXTENT_PX =
 	MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
@@ -1609,47 +1617,10 @@ const MAP_SELECT_GRAB_TOP_EXTENT_PX =
 	MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX;
 const MAP_SELECT_GRAB_TOTAL_HEIGHT_PX =
 	MAP_SELECT_GRAB_TOP_EXTENT_PX + MAP_SELECT_GRAB_TOOL_COLLAPSED_HEIGHT_PX;
-const MAP_ZOOM_CONTROL_LEVELS = [
-	2.25, 2.41, 2.57, 2.73, 2.88, 3.04, 3.2, 3.52, 3.83, 4.15, 4.47, 4.78, 5.1, 5.34, 5.58,
-	5.81, 6.05, 6.29, 6.52, 6.76, 7,
-] as const;
-const MAP_ZOOM_CONTROL_MAX_INDEX = MAP_ZOOM_CONTROL_LEVELS.length - 1;
+// Zoom-control ladder + converters live in @/utils/mapZoomControlLadder (shared
+// with the campaign page); the ladder is rebased at runtime off the map's
+// viewport-proportional minimum zoom.
 type MapZoomControlRequest = { zoom: number; nonce: number; isDragging?: boolean };
-
-const clampMapZoomControlValue = (levelValue: number) => {
-	if (!Number.isFinite(levelValue)) return 0;
-	return Math.min(Math.max(levelValue, 0), MAP_ZOOM_CONTROL_MAX_INDEX);
-};
-
-const getMapZoomForControlValue = (levelValue: number) => {
-	const safeValue = clampMapZoomControlValue(levelValue);
-	const lowerIndex = Math.floor(safeValue);
-	const upperIndex = Math.min(lowerIndex + 1, MAP_ZOOM_CONTROL_MAX_INDEX);
-	const progress = safeValue - lowerIndex;
-	const lowerZoom = MAP_ZOOM_CONTROL_LEVELS[lowerIndex] ?? MAP_ZOOM_CONTROL_LEVELS[0];
-	const upperZoom = MAP_ZOOM_CONTROL_LEVELS[upperIndex] ?? lowerZoom;
-	return lowerZoom + (upperZoom - lowerZoom) * progress;
-};
-
-const getMapZoomControlValueForZoom = (zoom: number) => {
-	if (!Number.isFinite(zoom)) return 0;
-	const minZoom = MAP_ZOOM_CONTROL_LEVELS[0] ?? 0;
-	const maxZoom = MAP_ZOOM_CONTROL_LEVELS[MAP_ZOOM_CONTROL_MAX_INDEX] ?? minZoom;
-	if (zoom <= minZoom) return 0;
-	if (zoom >= maxZoom) return MAP_ZOOM_CONTROL_MAX_INDEX;
-
-	for (let index = 0; index < MAP_ZOOM_CONTROL_MAX_INDEX; index += 1) {
-		const lowerZoom = MAP_ZOOM_CONTROL_LEVELS[index] ?? minZoom;
-		const upperZoom = MAP_ZOOM_CONTROL_LEVELS[index + 1] ?? lowerZoom;
-		if (zoom <= upperZoom) {
-			const span = upperZoom - lowerZoom;
-			if (span <= 0) return index;
-			return index + (zoom - lowerZoom) / span;
-		}
-	}
-
-	return MAP_ZOOM_CONTROL_MAX_INDEX;
-};
 
 const MAP_RESULTS_BOTTOM_CATEGORY_SEARCH_BOX = {
 	width: 401,
@@ -2782,8 +2753,12 @@ const DashboardContent = () => {
 	const router = useRouter();
 	const pathname = usePathname();
 	const isMobile = useIsMobile();
-	const { data: campaigns, isLoading: isLoadingCampaigns } = useGetCampaigns();
-	const hasCampaigns = campaigns && campaigns.length > 0;
+	const { data: campaigns, isSuccess: hasLoadedCampaigns } = useGetCampaigns();
+	// Loaded-and-empty only: a FAILED campaigns fetch must never count as "no
+	// campaigns" (it would auto-create a starter campaign for an account that
+	// merely couldn't load its list — the tab frame handles the error instead).
+	const isMobileZeroCampaigns =
+		isMobile === true && hasLoadedCampaigns && (campaigns?.length ?? 0) === 0;
 	const queryClient = useQueryClient();
 	const setPersistentMapConfig = usePersistentMapSetter();
 	const {
@@ -3024,18 +2999,6 @@ const DashboardContent = () => {
 			style.remove();
 		};
 	}, []);
-
-	// Add body class when on mobile with empty dashboard to hide global Clerk button
-	useEffect(() => {
-		if (isMobile && !hasCampaigns) {
-			document.body.classList.add('murmur-mobile-empty');
-		} else {
-			document.body.classList.remove('murmur-mobile-empty');
-		}
-		return () => {
-			document.body.classList.remove('murmur-mobile-empty');
-		};
-	}, [isMobile, hasCampaigns]);
 
 	// Pick the hero search-bar gradient for the current AM/PM bucket and publish it
 	// as `--search-gradient` on the document root. `.search-gradient-button` reads
@@ -4594,6 +4557,20 @@ const DashboardContent = () => {
 	const DASHBOARD_INITIAL_ZOOM_VAR = '--murmur-dashboard-initial-zoom';
 	const DASHBOARD_VIEWPORT_H_VAR = '--murmur-dashboard-viewport-h';
 
+	// Mobile dashboard marker class: scopes the map-water html background that
+	// covers anything iOS exposes beyond the rendered content (keyboard pan,
+	// toolbar transitions, rubber band) — see globals.css next to the campaign
+	// force-transform background precedent. Standalone effect (not the zoom-pin
+	// effect below) so cleanup always runs and the class never leaks to other
+	// murmur routes.
+	useLayoutEffect(() => {
+		if (isMobile !== true) return;
+		document.documentElement.classList.add('murmur-mobile-dashboard');
+		return () => {
+			document.documentElement.classList.remove('murmur-mobile-dashboard');
+		};
+	}, [isMobile]);
+
 	// Apply dashboard-only compact class + viewport-aware zoom; clear on mobile/unmount.
 	// Layout effect so narrow windows never paint a frame at the unscaled fallback zoom.
 	useLayoutEffect(() => {
@@ -4661,6 +4638,7 @@ const DashboardContent = () => {
 			// Same as the dashboard-compact effect above: pin the var to the base
 			// murmur-compact zoom so the persistent map's counter-zoom cancels exactly.
 			document.documentElement.style.setProperty(DASHBOARD_ZOOM_VAR, '0.9');
+			document.documentElement.style.setProperty(DASHBOARD_SIDE_SHIFT_VAR, '0px');
 			return;
 		}
 
@@ -4675,6 +4653,7 @@ const DashboardContent = () => {
 					window.innerHeight,
 				).toFixed(3),
 			);
+			document.documentElement.style.setProperty(DASHBOARD_SIDE_SHIFT_VAR, '0px');
 			return;
 		}
 
@@ -4686,6 +4665,22 @@ const DashboardContent = () => {
 			// Always set the var inline: the non-map baseline (DASHBOARD_INITIAL_ZOOM) differs
 			// from the map default, so an unset var no longer means "the right zoom applies".
 			document.documentElement.style.setProperty(DASHBOARD_ZOOM_VAR, zoom.toFixed(3));
+			// Vertical-centering shift for the side chrome (rail, right panel cluster and
+			// the overlays docked to them). 0 in compressed chrome — the bottom-sheet
+			// layout doesn't use the side-panel top anchors.
+			const layoutWidth = zoom > 0 ? window.innerWidth / zoom : window.innerWidth;
+			const sideShiftPx =
+				layoutWidth < MAP_CHROME_COMPRESSED_MAX_LAYOUT_WIDTH_PX
+					? 0
+					: computeSideRailCenterShiftPx(
+							window.innerHeight,
+							zoom,
+							MAP_SELECT_GRAB_TOTAL_HEIGHT_PX
+						);
+			document.documentElement.style.setProperty(
+				DASHBOARD_SIDE_SHIFT_VAR,
+				`${sideShiftPx}px`
+			);
 		};
 
 		applyMapViewZoom();
@@ -4695,6 +4690,7 @@ const DashboardContent = () => {
 			window.removeEventListener('resize', applyMapViewZoom);
 			document.documentElement.classList.remove(DASHBOARD_MAP_COMPACT_CLASS);
 			document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
+			document.documentElement.style.removeProperty(DASHBOARD_SIDE_SHIFT_VAR);
 		};
 	}, [isMapView, isMobile]);
 
@@ -5705,6 +5701,22 @@ const DashboardContent = () => {
 		isDragging: boolean;
 	} | null>(null);
 	const mapZoomControlRequestRafRef = useRef<number | null>(null);
+	// Live interactive zoom floor reported by the map (viewport-proportional on
+	// large monitors); the slider ladder rebases off it so index 0 always lands
+	// exactly on the floor — no dead zone at the bottom of the track.
+	const [mapInteractiveMinZoom, setMapInteractiveMinZoom] = useState(MAP_MIN_ZOOM);
+	const handleInteractiveMinZoomChange = useCallback((minZoom: number) => {
+		if (!Number.isFinite(minZoom)) return;
+		// Functional dedup breaks the callback → state → mapProps → re-render loop.
+		setMapInteractiveMinZoom((current) => (current === minZoom ? current : minZoom));
+	}, []);
+	const mapZoomControlLevels = useMemo(
+		() => buildZoomControlLevels(mapInteractiveMinZoom),
+		[mapInteractiveMinZoom]
+	);
+	// Last zoom the map reported — lets the ladder-rebase effect re-place the
+	// thumb when the floor changes without any camera movement (window shrink).
+	const lastMapViewportZoomRef = useRef<number | null>(null);
 	const [selectAllInViewNonce, setSelectAllInViewNonce] = useState(0);
 	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] =
 		useState<ContactWithName | null>(null);
@@ -5866,10 +5878,13 @@ const DashboardContent = () => {
 	);
 	const handleMapZoomControlValueChange = useCallback(
 		(levelValue: number) => {
-			const safeLevelValue = clampMapZoomControlValue(levelValue);
-			scheduleMapZoomControlRequest(getMapZoomForControlValue(safeLevelValue), true);
+			const safeLevelValue = clampZoomControlValue(levelValue);
+			scheduleMapZoomControlRequest(
+				zoomForControlValue(mapZoomControlLevels, safeLevelValue),
+				true
+			);
 		},
-		[scheduleMapZoomControlRequest]
+		[scheduleMapZoomControlRequest, mapZoomControlLevels]
 	);
 	const handleMapZoomControlInteractionChange = useCallback((isDragging: boolean) => {
 		setIsMapZoomControlDragging(isDragging);
@@ -5882,7 +5897,7 @@ const DashboardContent = () => {
 			);
 			const nextControlValue =
 				meta?.source === 'drag-release'
-					? clampMapZoomControlValue(meta.levelValue)
+					? clampZoomControlValue(meta.levelValue)
 					: safeLevelIndex;
 			setMapZoomControlIndex(nextControlValue);
 			if (meta?.source === 'drag-release') {
@@ -5891,15 +5906,18 @@ const DashboardContent = () => {
 					mapZoomControlRequestRafRef.current = null;
 				}
 				pendingMapZoomControlRequestRef.current = null;
-				pushMapZoomControlRequest(getMapZoomForControlValue(nextControlValue), true);
+				pushMapZoomControlRequest(
+					zoomForControlValue(mapZoomControlLevels, nextControlValue),
+					true
+				);
 				return;
 			}
 			pushMapZoomControlRequest(
-				MAP_ZOOM_CONTROL_LEVELS[safeLevelIndex] ?? MAP_ZOOM_CONTROL_LEVELS[0],
+				mapZoomControlLevels[safeLevelIndex] ?? mapZoomControlLevels[0],
 				false
 			);
 		},
-		[pushMapZoomControlRequest]
+		[pushMapZoomControlRequest, mapZoomControlLevels]
 	);
 
 	useEffect(() => {
@@ -6105,27 +6123,8 @@ const DashboardContent = () => {
 	const mapViewResultsPanelMaxHeightCss = `calc(100% - ${mapViewSidePanelGroupTopCss} - ${MAP_VIEW_SIDE_PANEL_BOTTOM_GAP_PX + mapViewResultsPanelTopOffsetPx}px)`;
 	const mapSelectGrabViewScale = useMemo(() => {
 		if (isMobile) return 1;
-		const availableHeight =
-			viewportHeight > 0
-				? viewportHeight - MAP_SELECT_GRAB_VIEWPORT_INSET_PX * 2
-				: MAP_SELECT_GRAB_TOTAL_HEIGHT_PX * MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE;
-		const fitScale = availableHeight / MAP_SELECT_GRAB_TOTAL_HEIGHT_PX;
-		const tallViewportProgress = clampNumber(
-			(viewportHeight - MAP_SELECT_GRAB_SCALE_GROW_START_HEIGHT_PX) /
-				(MAP_SELECT_GRAB_SCALE_GROW_END_HEIGHT_PX -
-					MAP_SELECT_GRAB_SCALE_GROW_START_HEIGHT_PX),
-			0,
-			1
-		);
-		const preferredScale =
-			MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE +
-			(MAP_SELECT_GRAB_MAX_VIEW_SCALE - MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE) *
-				tallViewportProgress;
-		return clampNumber(
-			Math.min(fitScale, preferredScale),
-			MAP_SELECT_GRAB_MIN_VIEW_SCALE,
-			MAP_SELECT_GRAB_MAX_VIEW_SCALE
-		);
+		// Shared curve (murmurChromeZoom.ts) — also feeds the side-shift centering math.
+		return computeMapSelectGrabViewScale(viewportHeight, MAP_SELECT_GRAB_TOTAL_HEIGHT_PX);
 	}, [isMobile, viewportHeight]);
 	const mapSelectGrabOriginOffsetPx =
 		MAP_SELECT_GRAB_TOP_EXTENT_PX * mapSelectGrabViewScale;
@@ -6278,18 +6277,23 @@ const DashboardContent = () => {
 
 	const handleMapViewportZoom = useCallback(
 		(zoom: number) => {
+			lastMapViewportZoomRef.current = zoom;
 			if (isMapZoomControlDragging) return;
-			const nextControlValue = getMapZoomControlValueForZoom(zoom);
+			const nextControlValue = controlValueForZoom(mapZoomControlLevels, zoom);
 			mapZoomControlLiveRef.current?.setLevelValue(nextControlValue);
 		},
-		[isMapZoomControlDragging]
+		[isMapZoomControlDragging, mapZoomControlLevels]
 	);
 
 	const handleMapViewportIdle = useCallback(
 		(payload: SearchThisAreaViewportIdlePayload) => {
 			lastSearchThisAreaViewportRef.current = payload;
+			lastMapViewportZoomRef.current = payload.zoom;
 			if (!isMapZoomControlDragging) {
-				const nextControlValue = getMapZoomControlValueForZoom(payload.zoom);
+				const nextControlValue = controlValueForZoom(
+					mapZoomControlLevels,
+					payload.zoom
+				);
 				setMapZoomControlIndex((current) =>
 					Math.abs(current - nextControlValue) < 0.005 ? current : nextControlValue
 				);
@@ -6318,8 +6322,23 @@ const DashboardContent = () => {
 			isMapResultsLoading,
 			isMapView,
 			isMapZoomControlDragging,
+			mapZoomControlLevels,
 		]
 	);
+
+	// When the ladder rebases (interactive floor changed with the viewport), the
+	// map may not move at all — e.g. the floor *dropped* after a window shrink —
+	// so no zoom/idle event fires. Re-place the thumb against the new ladder.
+	useEffect(() => {
+		if (isMapZoomControlDragging) return;
+		const lastZoom = lastMapViewportZoomRef.current;
+		if (lastZoom == null) return;
+		const nextControlValue = controlValueForZoom(mapZoomControlLevels, lastZoom);
+		mapZoomControlLiveRef.current?.setLevelValue(nextControlValue);
+		setMapZoomControlIndex((current) =>
+			Math.abs(current - nextControlValue) < 0.005 ? current : nextControlValue
+		);
+	}, [mapZoomControlLevels, isMapZoomControlDragging]);
 
 	const handleSearchThisAreaClick = useCallback(() => {
 		const payload = lastSearchThisAreaViewportRef.current;
@@ -6392,6 +6411,53 @@ const DashboardContent = () => {
 		setMapBottomSearchValue('');
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isMobile, isAddToCampaignMode, hasSearched, isMapView]);
+
+	// Zero-campaign mobile entry: instead of an empty tab frame, drop the user
+	// straight into the map search — create their starter campaign (same
+	// generated-name convention as every desktop search) and replace the URL
+	// into the For You pick-flow entry, exactly like the tab bar's Search
+	// button. Gated on isMobileZeroCampaigns (a SUCCESSFUL empty load), so a
+	// failed campaigns fetch falls through to the tab frame instead of
+	// spuriously creating a campaign.
+	const hasStartedZeroCampaignSearchEntryRef = useRef(false);
+	const [zeroCampaignEntryState, setZeroCampaignEntryState] = useState<
+		'idle' | 'redirecting' | 'failed'
+	>('idle');
+	useEffect(() => {
+		if (!isMobileZeroCampaigns || isAddToCampaignMode || !isSignedIn) return;
+		if (hasStartedZeroCampaignSearchEntryRef.current) return;
+		hasStartedZeroCampaignSearchEntryRef.current = true;
+		setZeroCampaignEntryState('redirecting');
+		void (async () => {
+			const campaignId = await ensureActiveCampaign('');
+			if (campaignId == null) {
+				// ensureActiveCampaign already toasted; let the tab frame render.
+				setZeroCampaignEntryState('failed');
+				return;
+			}
+			try {
+				sessionStorage.removeItem('murmur_pending_search');
+			} catch {
+				// sessionStorage may be unavailable — navigation can still proceed.
+			}
+			router.replace(
+				`${urls.murmur.dashboard.index}?fromCampaignId=${campaignId}&pick=1&instant=1`
+			);
+		})();
+	}, [
+		isMobileZeroCampaigns,
+		isAddToCampaignMode,
+		isSignedIn,
+		ensureActiveCampaign,
+		router,
+	]);
+	// Once the pick params land the search chrome owns the screen — clear the
+	// redirect flag so a later pick-flow exit gets the normal tab frame.
+	useEffect(() => {
+		if (isAddToCampaignMode && zeroCampaignEntryState === 'redirecting') {
+			setZeroCampaignEntryState('idle');
+		}
+	}, [isAddToCampaignMode, zeroCampaignEntryState]);
 	const [
 		initialDashboardSearchSuggestionSeeds,
 		setInitialDashboardSearchSuggestionSeeds,
@@ -6853,9 +6919,8 @@ const DashboardContent = () => {
 		setMapBottomSearchValue('');
 		setActiveSection(null);
 
-		// "For You" has no user-typed query — pass an empty string and let
-		// generateCampaignName fall back to the "Untitled Campaign" default
-		// (the user's forthcoming naming scheme can refine this).
+		// "For You" has no user-typed query — pass an empty string; the campaign
+		// gets a generateCampaignName constellation name like any other search.
 		if (!isAddToCampaignMode && !isFromHomeDemoMode) {
 			void ensureActiveCampaign('');
 		}
@@ -8090,7 +8155,10 @@ const DashboardContent = () => {
 		!fromHomeParam &&
 		!isMapView &&
 		!shouldUnlockLandingDashboardScroll;
-	const shouldLockDashboardPageScroll = isMapView || shouldLockLandingDashboardScroll;
+	// Mobile is always locked: the dashboard is a fixed app frame there, and any
+	// document scroll slack reads as a white band below the persistent map.
+	const shouldLockDashboardPageScroll =
+		isMapView || shouldLockLandingDashboardScroll || isMobile === true;
 
 	// The calendar panel's natural height can exceed the locked-100vh wrapper on shorter
 	// monitors, which clips its bottom row. Treat it the same way the open campaign finder
@@ -8101,28 +8169,31 @@ const DashboardContent = () => {
 	const isOverflowingDashboardPanelOpen = isCampaignFinderOpen || isCalendarPanelOpen;
 
 	// Cinematic boot splash: a dark starfield + skeleton hero chrome shown over the
-	// cold-loading map, fading into the globe once Mapbox's `load` fires. Lazy init
-	// from the layout-persistent ready flag so client-side route returns (dashboard →
-	// campaign → dashboard, map still mounted/loaded) skip the splash entirely.
-	const isPersistentMapReady = usePersistentMapReady();
+	// cold-loading map, fading into the globe once the land silhouette has painted
+	// (the map's first-paint stage — earlier than the full `load`, so street detail
+	// streams in behind the fade). Lazy init from the layout-persistent flag so
+	// client-side route returns (dashboard → campaign → dashboard, map still
+	// mounted/painted) skip the splash entirely.
+	const isPersistentMapFirstPainted = usePersistentMapFirstPaint();
 	const [bootPhase, setBootPhase] = useState<DashboardBootPhase>(() =>
-		isPersistentMapReady ? 'done' : 'active'
+		isPersistentMapFirstPainted ? 'done' : 'active'
 	);
 	const bootStartRef = useRef(Date.now());
 
-	// Map ready → hold until the minimum splash time has elapsed, then start the fade.
+	// Land painted → hold until the minimum splash time has elapsed, then start the fade.
 	useEffect(() => {
-		if (bootPhase !== 'active' || !isPersistentMapReady) return;
+		if (bootPhase !== 'active' || !isPersistentMapFirstPainted) return;
 		const elapsed = Date.now() - bootStartRef.current;
 		const timer = setTimeout(
 			() => setBootPhase('fading'),
 			Math.max(0, DASHBOARD_BOOT_MIN_VISIBLE_MS - elapsed)
 		);
 		return () => clearTimeout(timer);
-	}, [bootPhase, isPersistentMapReady]);
+	}, [bootPhase, isPersistentMapFirstPainted]);
 
 	useEffect(() => {
 		if (bootPhase !== 'fading') return;
+		markPerf('murmur:map:reveal-start');
 		const timer = setTimeout(() => setBootPhase('done'), DASHBOARD_BOOT_FADE_MS);
 		return () => clearTimeout(timer);
 	}, [bootPhase]);
@@ -8183,10 +8254,34 @@ const DashboardContent = () => {
 			const previousRootOverscrollBehavior = root.style.overscrollBehavior;
 			const previousBodyOverflow = body.style.overflow;
 			const previousBodyHeight = body.style.height;
+			const previousBodyMinHeight = body.style.minHeight;
 			const previousBodyOverscrollBehavior = body.style.overscrollBehavior;
 
-			if (shouldLockLandingDashboardScroll) {
+			if (shouldLockLandingDashboardScroll || isMobile === true) {
 				window.scrollTo({ top: 0, left: 0 });
+			}
+
+			if (isMobile === true) {
+				// Mobile: collapse the document instead of pinning it to a viewport
+				// unit. Under the root murmur-compact zoom, 100vh/100dvh on html/body
+				// resolves to ~innerHeight/0.9 CSS px on real Safari — scrollable
+				// slack that iOS keyboard-reveal scrolling exploits even through
+				// overflow:hidden, exposing a white band below the map. All mobile
+				// dashboard content is fixed, so body needs no height at all; min-height
+				// 0 neutralizes the root layout's min-h-screen on body.
+				root.style.overflow = 'hidden';
+				root.style.overscrollBehavior = 'none';
+				body.style.overflow = 'hidden';
+				body.style.minHeight = '0';
+				body.style.overscrollBehavior = 'none';
+
+				return () => {
+					root.style.overflow = previousRootOverflow;
+					root.style.overscrollBehavior = previousRootOverscrollBehavior;
+					body.style.overflow = previousBodyOverflow;
+					body.style.minHeight = previousBodyMinHeight;
+					body.style.overscrollBehavior = previousBodyOverscrollBehavior;
+				};
 			}
 
 			const overflowValue = isOverflowingDashboardPanelOpen ? 'visible' : 'hidden';
@@ -8213,6 +8308,7 @@ const DashboardContent = () => {
 		shouldLockDashboardPageScroll,
 		shouldLockLandingDashboardScroll,
 		isOverflowingDashboardPanelOpen,
+		isMobile,
 	]);
 
 	// When the campaign finder OR the calendar panel is open we allow the panel to overflow
@@ -9215,6 +9311,9 @@ const DashboardContent = () => {
 			onViewportInteraction: isMapView ? handleMapViewportInteraction : undefined,
 			onViewportZoom: isMapView ? handleMapViewportZoom : undefined,
 			onViewportIdle: isMapView ? handleMapViewportIdle : undefined,
+			// Ungated by isMapView (informational): the slider ladder is already
+			// rebased before the user enters map view.
+			onInteractiveMinZoomChange: handleInteractiveMinZoomChange,
 			onAreaSelect: isMapView ? handleMapAreaSelect : undefined,
 			onMarkerHover: isMapView ? handleMapMarkerHover : undefined,
 			lockedStateName: lockedStateNameForMap,
@@ -9272,6 +9371,7 @@ const DashboardContent = () => {
 			handleMapViewportIdle,
 			handleMapViewportInteraction,
 			handleMapViewportZoom,
+			handleInteractiveMinZoomChange,
 			handleMapVisibleOverlayContactsChange,
 			hoveredMapPanelContactId,
 			instantTabFitNonce,
@@ -9372,17 +9472,20 @@ const DashboardContent = () => {
 
 	// Mobile dashboard: tabbed app frame over the persistent map (folders /
 	// calendar / inbox, switched by the white tab bar). While campaigns load the
-	// frame renders normally (MobileFolderCards shows its own wave skeletons);
-	// only the true loaded-and-empty state falls back to the original "open on
-	// desktop" CampaignsInboxView empty state.
+	// frame renders normally (MobileFolderCards shows its own wave skeletons).
+	// Zero-campaign accounts never see the empty frame: the auto-entry effect
+	// creates their starter campaign and replaces the URL into the For You
+	// pick-flow search.
 	if (isMobile) {
 		// Pick flow (add contacts to a campaign): the search chrome renders over the
 		// persistent map, driven by the same search machinery as desktop. Gated on the
 		// URL params alone so the chrome is already up while the entry search is still
 		// fetching.
 		if (isAddToCampaignMode) {
+			// Plain wrapper (no min-h-screen): the overlay is fixed and in-flow
+			// viewport-unit height creates Safari scroll slack under the root zoom.
 			return (
-				<div className="min-h-screen w-full">
+				<div className="w-full">
 					{mapPortal}
 					<MobileDashboardSearch
 						campaignName={fromCampaign?.name || 'Untitled Campaign'}
@@ -9419,25 +9522,24 @@ const DashboardContent = () => {
 			);
 		}
 
-		if (!isLoadingCampaigns && !hasCampaigns) {
-			return (
-				<div className="min-h-screen w-full">
-					{mapPortal}
-					<div style={{ marginTop: '40px' }}>
-						<CampaignsInboxView
-							hideSearchBar
-							containerHeight="calc(100dvh - 60px - env(safe-area-inset-bottom, 0px))"
-						/>
-					</div>
-				</div>
-			);
+		// Bare-map hold while the zero-campaign auto-entry is creating the
+		// starter campaign and swapping in the pick params — keeps the tab
+		// frame from flashing before the search chrome mounts. A failed create
+		// ('failed') falls through to the tab frame.
+		if (
+			zeroCampaignEntryState === 'redirecting' ||
+			(isMobileZeroCampaigns && zeroCampaignEntryState !== 'failed')
+		) {
+			return <div className="w-full">{mapPortal}</div>;
 		}
 
+		// Fixed (out of flow) rather than an in-flow 100dvh column: under the root
+		// murmur-compact zoom, in-flow viewport-unit heights give the document
+		// ~11% of bogus scroll slack on real Safari (swipe-up exposed a white
+		// band below the map). fixed inset-0 is geometry-true under the zoom in
+		// both engines and contributes zero document height.
 		return (
-			<div
-				className="w-full flex flex-col"
-				style={{ height: '100dvh', overflow: 'hidden' }}
-			>
+			<div className="fixed inset-0 flex flex-col overflow-hidden">
 				{mapPortal}
 
 				{/* Logo row — left-aligned over the map; the Clerk avatar stays fixed top-right */}
@@ -10530,6 +10632,12 @@ const DashboardContent = () => {
 																!whereValue.trim();
 															if (isWhyWhatWhereBlank && !isFromHomeDemoMode) {
 																setActiveSection(null);
+																// First search of the session creates the active campaign,
+																// same as the other search entry points. Skip in URL-pinned
+																// add-to-campaign mode, where searches target that campaign.
+																if (!isAddToCampaignMode) {
+																	void ensureActiveCampaign('');
+																}
 																// Resolve coarse lat/lon from the user's IP (cached 24h,
 																// no permission prompt). Works locally and in prod —
 																// covers the gaps where Vercel headers aren't populated.
@@ -12885,7 +12993,9 @@ const DashboardContent = () => {
 												<div
 													className="fixed map-overlay-appear"
 													style={{
-														top: '110px',
+														// Aligned with the side-chrome band; rides the centering
+														// shift so it stays level with the rail on tall monitors.
+														top: `calc(110px + var(${DASHBOARD_SIDE_SHIFT_VAR}, 0px) / var(--murmur-dashboard-zoom, ${DASHBOARD_MAP_ZOOM_DEFAULT}))`,
 														left: 'max(80px, calc(50% - 480px))',
 														zIndex: 9990,
 														pointerEvents: 'none',

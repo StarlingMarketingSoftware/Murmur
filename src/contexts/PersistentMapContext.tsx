@@ -28,10 +28,17 @@ const PersistentMapSetterContext = createContext<PersistentMapSetter>(() => {});
 // disturb the config setter's lastConfigRef dedupe or re-render config consumers.
 const PersistentMapReadyContext = createContext(false);
 const PersistentMapReadySetterContext = createContext<(ready: boolean) => void>(() => {});
+// Earlier "land painted" readiness stage (style in + world-land fill painted, before the
+// full `load`); own context pair for the same re-render-isolation reason as above.
+const PersistentMapFirstPaintContext = createContext(false);
+const PersistentMapFirstPaintSetterContext = createContext<(painted: boolean) => void>(
+	() => {}
+);
 
 export function PersistentMapProvider({ children }: { children: ReactNode }) {
 	const [mapConfig, setMapConfig] = useState<PersistentDashboardMapConfig | null>(null);
 	const [isMapReady, setIsMapReady] = useState(false);
+	const [isMapFirstPainted, setIsMapFirstPainted] = useState(false);
 	const lastConfigRef = useRef<PersistentDashboardMapConfig | null>(null);
 
 	const setPersistentMapConfig = useCallback<PersistentMapSetter>((config) => {
@@ -43,11 +50,15 @@ export function PersistentMapProvider({ children }: { children: ReactNode }) {
 	return (
 		<PersistentMapSetterContext.Provider value={setPersistentMapConfig}>
 			<PersistentMapReadySetterContext.Provider value={setIsMapReady}>
-				<PersistentMapValueContext.Provider value={mapConfig}>
-					<PersistentMapReadyContext.Provider value={isMapReady}>
-						{children}
-					</PersistentMapReadyContext.Provider>
-				</PersistentMapValueContext.Provider>
+				<PersistentMapFirstPaintSetterContext.Provider value={setIsMapFirstPainted}>
+					<PersistentMapValueContext.Provider value={mapConfig}>
+						<PersistentMapReadyContext.Provider value={isMapReady}>
+							<PersistentMapFirstPaintContext.Provider value={isMapFirstPainted}>
+								{children}
+							</PersistentMapFirstPaintContext.Provider>
+						</PersistentMapReadyContext.Provider>
+					</PersistentMapValueContext.Provider>
+				</PersistentMapFirstPaintSetterContext.Provider>
 			</PersistentMapReadySetterContext.Provider>
 		</PersistentMapSetterContext.Provider>
 	);
@@ -68,4 +79,13 @@ export function usePersistentMapReady() {
 
 export function usePersistentMapReadySetter() {
 	return useContext(PersistentMapReadySetterContext);
+}
+
+/** True once the globe silhouette (world-land fill) has painted — earlier than full readiness. */
+export function usePersistentMapFirstPaint() {
+	return useContext(PersistentMapFirstPaintContext);
+}
+
+export function usePersistentMapFirstPaintSetter() {
+	return useContext(PersistentMapFirstPaintSetterContext);
 }

@@ -32,7 +32,12 @@ import {
 } from '@/constants/contactCategories';
 import { US_STATES } from '@/constants/usStates';
 import { runCuratedNearbyPicks } from '@/app/api/contacts/curated-search/runCuratedNearbyPicks';
+import {
+	buildCityAnchorRadiusLadder,
+	buildRadiusLadder,
+} from '@/app/api/contacts/curated-search/distribution';
 import { parseFreeTextSearchQuery } from './parse';
+import { getCityGazetteer } from './cityGazetteer';
 
 export const maxDuration = 60;
 
@@ -49,6 +54,12 @@ const PREFIX_TIMEOUT_MS = 6000;
 // with a 1200km radius when there's no center at all (rare in prod where
 // Vercel headers are populated; common locally).
 const DEFAULT_LOCALITY_RADIUS_KM = 250;
+// Exact-city anchors ("Hartford CT") search tight around the city and expand
+// gradually only when sparse — the 250km default around a city scatters the
+// tray across neighboring states. The hybrid retrievers keep a slightly wider
+// hard geo circle so recall doesn't starve before proximity scoring orders it.
+const CITY_ANCHOR_RADIUS_KM = 30;
+const CITY_HYBRID_GEO_RADIUS_KM = 60;
 const FALLBACK_CENTER = { lat: 39.83, lon: -98.58 };
 const FALLBACK_BBOX_RADIUS_KM = 1200;
 const CURATED_CATEGORY_FETCH_BUFFER = 1.4;
@@ -348,6 +359,25 @@ const VAGUE_REST_TOKENS = new Set([
 	'nearby',
 	'nice',
 	'top',
+	// Articles left behind by place stripping ("in the pacific northwest" →
+	// "the" once the region phrase is consumed).
+	'the',
+	'a',
+	'an',
+	// Directional leftovers from the parser's region guard ("northeast ohio"
+	// parses as Ohio with "northeast" remaining) — place words, not intent.
+	'northeast',
+	'northeastern',
+	'northwest',
+	'northwestern',
+	'southeast',
+	'southeastern',
+	'southwest',
+	'southwestern',
+	'midwest',
+	'midwestern',
+	'upper',
+	'central',
 ]);
 
 type LocalBusinessIntent = {
@@ -532,9 +562,38 @@ const buildCategoryPool = (
 	requestedLimit: number,
 	center: { lat: number; lon: number } | null,
 	requestedRadiusKm: number | null,
-	radiusLadder: (number | null)[]
+	radiusLadder: (number | null)[],
+	nearFirst?: boolean
 ): { contacts: Contact[]; radiusUsed: number | null } => {
 	const perPoolLimit = Math.max(requestedLimit * 2, perCategoryShare * 3, 12);
+
+	// City-precision anchors: concatenate rung outputs tightest-first (dedup)
+	// so allocation consumes in-town picks before padding from wider rungs.
+	// Mirrors runCuratedNearbyPicks' buildCategoryPool nearFirst mode.
+	if (nearFirst && center) {
+		const picked: Contact[] = [];
+		const seen = new Set<number>();
+		for (const radius of radiusLadder) {
+			if (picked.length >= perPoolLimit) break;
+			const localized = applyRadius(contacts, center, radius);
+			if (localized.length === 0) continue;
+			const fresh = localized.filter((c) => !seen.has(c.id));
+			if (fresh.length === 0) continue;
+			const distributed = distributeAcrossBuckets(
+				fresh,
+				perPoolLimit - picked.length,
+				center,
+				radius
+			);
+			for (const c of distributed) {
+				if (seen.has(c.id)) continue;
+				seen.add(c.id);
+				picked.push(c);
+			}
+		}
+		return { contacts: picked, radiusUsed: requestedRadiusKm };
+	}
+
 	const desiredCount = Math.min(perPoolLimit, Math.max(perCategoryShare, 1));
 	let best: { contacts: Contact[]; radiusUsed: number | null } | null = null;
 
@@ -797,6 +856,44 @@ const applyStrictRadiusToResponse = (
 	};
 };
 
+type EnforcedState = { name: string; abbr: string };
+
+// Permissive any-of state predicate shared by the post-hydration safety net
+// and the curated/local-business candidate filters. Accepts a contact when
+// its state exactly matches or starts with any enforced state's name/abbr
+// (handles dirty values like "Arkansas, USA"), or when its title carries the
+// state name/abbr (canonical "<Category> <State>" rows with null state).
+const contactMatchesAnyEnforcedState = (
+	contact: { state: string | null; title: string | null },
+	states: readonly EnforcedState[]
+): boolean => {
+	const s = (contact.state ?? '').trim().toLowerCase();
+	const titleLc = (contact.title ?? '').toLowerCase();
+	for (const state of states) {
+		const nameLc = state.name.toLowerCase();
+		const abbrLc = state.abbr.toLowerCase();
+		if (s.length > 0) {
+			if (s === nameLc || s === abbrLc) return true;
+			if (
+				s.startsWith(nameLc + ',') ||
+				s.startsWith(nameLc + ' ') ||
+				s.startsWith(abbrLc + ',') ||
+				s.startsWith(abbrLc + ' ')
+			) {
+				return true;
+			}
+		}
+		if (
+			titleLc.includes(' ' + nameLc) ||
+			titleLc.endsWith(' ' + nameLc) ||
+			titleLc.endsWith(' ' + abbrLc)
+		) {
+			return true;
+		}
+	}
+	return false;
+};
+
 const runCuratedCategorySearch = async (options: {
 	rawQuery: string;
 	parsed: ReturnType<typeof parseFreeTextSearchQuery>;
@@ -804,6 +901,9 @@ const runCuratedCategorySearch = async (options: {
 	radiusKm: number;
 	requestedLimit: number;
 	strictRadius?: boolean;
+	enforcedStates?: EnforcedState[] | null;
+	cityPrecisionAnchor?: boolean;
+	metroRegionAnchor?: boolean;
 }): Promise<FreeTextSearchResponse> => {
 	const {
 		rawQuery,
@@ -812,6 +912,9 @@ const runCuratedCategorySearch = async (options: {
 		radiusKm,
 		requestedLimit,
 		strictRadius = false,
+		enforcedStates = null,
+		cityPrecisionAnchor = false,
+		metroRegionAnchor = false,
 	} = options;
 	const activeCategories = parsed.categories;
 	const emptyResponse = (retrieverBreakdown: Record<string, number>): FreeTextSearchResponse => ({
@@ -841,13 +944,22 @@ const runCuratedCategorySearch = async (options: {
 
 	const queryCenter = centerPoint;
 	const requestedRadiusKm = radiusKm;
-	const fetchBboxRadiusKm = Math.max(
-		requestedRadiusKm,
-		DEFAULT_LOCALITY_RADIUS_KM
-	) * CURATED_CATEGORY_FETCH_BUFFER;
+	const tightCityAnchor = cityPrecisionAnchor && !strictRadius;
+	// City anchors fetch tight around the city — the wide default envelope
+	// (~350km for a 30km anchor) spans whole other metros and the take-cap
+	// (id-ordered) would starve the tight rungs of local candidates. Metro
+	// regions fetch their own circle.
+	const fetchBboxRadiusKm = tightCityAnchor
+		? Math.max(120, requestedRadiusKm * 4)
+		: metroRegionAnchor
+		? requestedRadiusKm * CURATED_CATEGORY_FETCH_BUFFER
+		: Math.max(
+				requestedRadiusKm,
+				DEFAULT_LOCALITY_RADIUS_KM
+		  ) * CURATED_CATEGORY_FETCH_BUFFER;
 	const fetchBbox = bboxFromCenter(queryCenter, fetchBboxRadiusKm);
 
-	const candidates = await prisma.contact.findMany({
+	const fetched = await prisma.contact.findMany({
 		where: {
 			AND: [
 				{ title: { not: null } },
@@ -865,13 +977,27 @@ const runCuratedCategorySearch = async (options: {
 		take: CURATED_CATEGORY_CANDIDATE_TAKE,
 		orderBy: [{ id: 'asc' }],
 	});
+	// Region/state enforcement happens at the candidate level — the fetch bbox
+	// is a circle and circles around multi-state regions admit neighbors
+	// ("midwest" circle includes Denver/Nashville/Toronto).
+	const candidates =
+		enforcedStates && enforcedStates.length > 0
+			? fetched.filter((contact) =>
+					contactMatchesAnyEnforcedState(contact, enforcedStates)
+			  )
+			: fetched;
 
 	const perCategoryShare = Math.ceil(
 		requestedLimit / Math.max(1, activeCategories.length)
 	);
-	const radiusLadder: (number | null)[] = strictRadius
-		? [requestedRadiusKm]
-		: [requestedRadiusKm, Math.min(fetchBboxRadiusKm, 1500), null];
+	// Metro regions never expand past their circle — "bay area" filled from
+	// 250km away isn't the Bay Area. City anchors get the tight near-first
+	// ladder; everything else keeps the classic expansion.
+	const radiusLadder = tightCityAnchor
+		? buildCityAnchorRadiusLadder(requestedRadiusKm)
+		: metroRegionAnchor && !strictRadius
+		? [requestedRadiusKm, requestedRadiusKm * 1.25]
+		: buildRadiusLadder(requestedRadiusKm, fetchBboxRadiusKm, strictRadius);
 
 	const buildPools = (predicate: (contact: Contact) => boolean): CategoryPool[] =>
 		activeCategories.map((category) => {
@@ -887,7 +1013,8 @@ const runCuratedCategorySearch = async (options: {
 				requestedLimit,
 				queryCenter,
 				requestedRadiusKm,
-				radiusLadder
+				radiusLadder,
+				tightCityAnchor
 			);
 			return {
 				key: category,
@@ -1063,6 +1190,9 @@ const runLocalBusinessSearch = async (options: {
 	radiusKm: number;
 	requestedLimit: number;
 	strictRadius?: boolean;
+	enforcedStates?: EnforcedState[] | null;
+	cityPrecisionAnchor?: boolean;
+	metroRegionAnchor?: boolean;
 }): Promise<FreeTextSearchResponse> => {
 	const {
 		rawQuery,
@@ -1072,6 +1202,9 @@ const runLocalBusinessSearch = async (options: {
 		radiusKm,
 		requestedLimit,
 		strictRadius = false,
+		enforcedStates = null,
+		cityPrecisionAnchor = false,
+		metroRegionAnchor = false,
 	} = options;
 	if (!centerPoint) {
 		return emptyFreeTextSearchResponse({
@@ -1082,8 +1215,12 @@ const runLocalBusinessSearch = async (options: {
 		});
 	}
 
-	const fetchBboxRadiusKm =
-		Math.max(radiusKm, DEFAULT_LOCALITY_RADIUS_KM) * CURATED_CATEGORY_FETCH_BUFFER;
+	const tightCityAnchor = cityPrecisionAnchor && !strictRadius;
+	const fetchBboxRadiusKm = tightCityAnchor
+		? Math.max(120, radiusKm * 4)
+		: metroRegionAnchor
+		? radiusKm * CURATED_CATEGORY_FETCH_BUFFER
+		: Math.max(radiusKm, DEFAULT_LOCALITY_RADIUS_KM) * CURATED_CATEGORY_FETCH_BUFFER;
 	const fetchBbox = bboxFromCenter(centerPoint, fetchBboxRadiusKm);
 	const textFields = [
 		'company',
@@ -1118,26 +1255,63 @@ const runLocalBusinessSearch = async (options: {
 			contact,
 			score: localBusinessIntentScore(contact, intent),
 		}))
-		.filter(({ contact, score }) => score > 0 && cleanBusinessCandidate(contact));
+		.filter(
+			({ contact, score }) =>
+				score > 0 &&
+				cleanBusinessCandidate(contact) &&
+				(!enforcedStates ||
+					enforcedStates.length === 0 ||
+					contactMatchesAnyEnforcedState(contact, enforcedStates))
+		);
 
-	const radiusLadder: (number | null)[] = strictRadius
-		? [radiusKm]
-		: [radiusKm, Math.min(fetchBboxRadiusKm, 1500), null];
+	const radiusLadder = tightCityAnchor
+		? buildCityAnchorRadiusLadder(radiusKm)
+		: metroRegionAnchor && !strictRadius
+		? [radiusKm, radiusKm * 1.25]
+		: buildRadiusLadder(radiusKm, fetchBboxRadiusKm, strictRadius);
 	let selected: Contact[] = [];
-	for (const radius of radiusLadder) {
-		const localized = applyRadius(
-			scored.map(({ contact }) => contact),
-			centerPoint,
-			radius
-		);
-		if (localized.length === 0) continue;
-		selected = distributeAcrossBuckets(
-			localized,
-			Math.max(requestedLimit, 1),
-			centerPoint,
-			radius
-		);
-		if (selected.length > 0) break;
+	if (tightCityAnchor) {
+		// Tight anchor: fill near-first across the graduated rungs instead of
+		// stopping at the first non-empty rung (which could return 2 rows) or
+		// jumping wide (which scatters).
+		const seen = new Set<number>();
+		for (const radius of radiusLadder) {
+			if (selected.length >= Math.max(requestedLimit, 1)) break;
+			const localized = applyRadius(
+				scored.map(({ contact }) => contact),
+				centerPoint,
+				radius
+			);
+			const fresh = localized.filter((c) => !seen.has(c.id));
+			if (fresh.length === 0) continue;
+			const distributed = distributeAcrossBuckets(
+				fresh,
+				Math.max(requestedLimit, 1) - selected.length,
+				centerPoint,
+				radius
+			);
+			for (const c of distributed) {
+				if (seen.has(c.id)) continue;
+				seen.add(c.id);
+				selected.push(c);
+			}
+		}
+	} else {
+		for (const radius of radiusLadder) {
+			const localized = applyRadius(
+				scored.map(({ contact }) => contact),
+				centerPoint,
+				radius
+			);
+			if (localized.length === 0) continue;
+			selected = distributeAcrossBuckets(
+				localized,
+				Math.max(requestedLimit, 1),
+				centerPoint,
+				radius
+			);
+			if (selected.length > 0) break;
+		}
 	}
 
 	if (selected.length === 0) {
@@ -1192,8 +1366,9 @@ const runPlaceOnlyCuratedSearch = async (options: {
 	centerPoint: { lat: number; lon: number };
 	radiusKm: number;
 	requestedLimit: number;
-	enforcedState: { name: string; abbr: string } | null;
+	enforcedStates: EnforcedState[] | null;
 	strictRadius?: boolean;
+	cityPrecisionAnchor?: boolean;
 	logTag: string;
 }): Promise<FreeTextSearchResponse> => {
 	const {
@@ -1202,45 +1377,48 @@ const runPlaceOnlyCuratedSearch = async (options: {
 		centerPoint,
 		radiusKm,
 		requestedLimit,
-		enforcedState,
+		enforcedStates,
 		strictRadius = false,
+		cityPrecisionAnchor = false,
 		logTag,
 	} = options;
+
+	// State safety net for state/region queries — the centroid + radius will
+	// mostly stay in-region but border picks can leak. Applied INSIDE the
+	// picks pipeline (candidate level) so allocation fills the tray with
+	// valid rows instead of having a post-filter gut it. City-only queries
+	// are NOT state-restricted: typing "Brooklyn" should legitimately surface
+	// metro-area picks across NJ too, and the radius keeps things local.
+	const stateFilter =
+		enforcedStates && enforcedStates.length > 0
+			? (c: Contact) => contactMatchesAnyEnforcedState(c, enforcedStates)
+			: null;
 
 	const result = await runCuratedNearbyPicks({
 		center: centerPoint,
 		radiusKm,
 		limit: requestedLimit,
 		strictRadius,
+		stateFilter,
+		cityPrecisionAnchor,
 		logTag,
 	});
 
-	// State safety net for state-only queries — the centroid + radius will
-	// mostly stay in-state but border picks can leak. When the user typed a
-	// state (directly), restrict to that state. City-only queries are NOT
-	// state-restricted: typing "Brooklyn" should legitimately surface metro-area
-	// picks across NJ too, and the radius already keeps things local.
+	// In-city rows lead the tray for exact-city searches ("Hartford CT" shows
+	// Hartford first, then the surrounding towns). Stable partition — the
+	// by-design shuffle survives within each group.
 	let curatedContacts = result.contacts;
-	if (enforcedState) {
-		const stateNameLc = enforcedState.name.toLowerCase();
-		const stateAbbrLc = enforcedState.abbr.toLowerCase();
-		const allowed = new Set([stateNameLc, stateAbbrLc]);
-		curatedContacts = curatedContacts.filter((c) => {
-			const s = (c.state ?? '').trim().toLowerCase();
-			const titleLc = (c.title ?? '').toLowerCase();
-			const stateExact = s.length > 0 && allowed.has(s);
-			const statePrefixed =
-				s.length > 0 &&
-				(s.startsWith(stateNameLc + ',') ||
-					s.startsWith(stateNameLc + ' ') ||
-					s.startsWith(stateAbbrLc + ',') ||
-					s.startsWith(stateAbbrLc + ' '));
-			const titleHasState =
-				titleLc.includes(' ' + stateNameLc) ||
-				titleLc.endsWith(' ' + stateNameLc) ||
-				titleLc.endsWith(' ' + stateAbbrLc);
-			return stateExact || statePrefixed || titleHasState;
-		});
+	if (parsed.city) {
+		const cityLc = parsed.city.name.trim().toLowerCase();
+		const inCity = curatedContacts.filter(
+			(c) => (c.city ?? '').trim().toLowerCase() === cityLc
+		);
+		if (inCity.length > 0) {
+			const rest = curatedContacts.filter(
+				(c) => (c.city ?? '').trim().toLowerCase() !== cityLc
+			);
+			curatedContacts = [...inCity, ...rest];
+		}
 	}
 
 	// Note: `curatedDisplayLabel` and `curatedQualityTier` ride along on the
@@ -1367,8 +1545,28 @@ const scoreAndInterleave = (
 				(s) => s.abbr.toLowerCase() === parsed.city!.state!.toLowerCase()
 			  )
 		: null;
-	const localityStateNameLc = (parsed.state?.name ?? cityState?.name ?? null)?.toLowerCase() ?? null;
-	const localityStateAbbrLc = (parsed.state?.abbr ?? parsed.city?.state ?? null)?.toLowerCase() ?? null;
+	// State(s) that count as a locality match: the explicit state, the city's
+	// state, or — for region queries — every state in the region.
+	const localityStates: { nameLc: string; abbrLc: string }[] = parsed.state
+		? [
+				{
+					nameLc: parsed.state.name.toLowerCase(),
+					abbrLc: parsed.state.abbr.toLowerCase(),
+				},
+		  ]
+		: cityState
+		? [
+				{
+					nameLc: cityState.name.toLowerCase(),
+					abbrLc: cityState.abbr.toLowerCase(),
+				},
+		  ]
+		: parsed.region
+		? parsed.region.states.map((s) => ({
+				nameLc: s.name.toLowerCase(),
+				abbrLc: s.abbr.toLowerCase(),
+		  }))
+		: [];
 	const softDescriptorTerms = getSoftDescriptorTerms(parsed.restOfQuery);
 
 	const restOfQueryLc = parsed.restOfQuery.trim().toLowerCase();
@@ -1429,14 +1627,15 @@ const scoreAndInterleave = (
 				const contactStateLc = (contact.state ?? '').trim().toLowerCase();
 				const stateMatch =
 					contactStateLc.length > 0 &&
-					((localityStateNameLc != null &&
-						(contactStateLc === localityStateNameLc ||
-							contactStateLc.startsWith(localityStateNameLc + ',') ||
-							contactStateLc.startsWith(localityStateNameLc + ' '))) ||
-						(localityStateAbbrLc != null &&
-							(contactStateLc === localityStateAbbrLc ||
-								contactStateLc.startsWith(localityStateAbbrLc + ',') ||
-								contactStateLc.startsWith(localityStateAbbrLc + ' '))));
+					localityStates.some(
+						({ nameLc, abbrLc }) =>
+							contactStateLc === nameLc ||
+							contactStateLc.startsWith(nameLc + ',') ||
+							contactStateLc.startsWith(nameLc + ' ') ||
+							contactStateLc === abbrLc ||
+							contactStateLc.startsWith(abbrLc + ',') ||
+							contactStateLc.startsWith(abbrLc + ' ')
+					);
 				const d =
 					hasCenter && contact.latitude != null && contact.longitude != null
 						? distanceKm(centerPoint!, {
@@ -1694,23 +1893,34 @@ export async function GET(req: NextRequest) {
 			} satisfies FreeTextSearchResponse);
 		}
 
-		const parsed = parseFreeTextSearchQuery(rawQuery);
+		// DB-derived town gazetteer: cached module-level (6h TTL), so this is a
+		// one-time cost per instance. null (build failure) degrades the parser
+		// to the static dictionaries.
+		const gazetteer = await getCityGazetteer();
+		const parsed = parseFreeTextSearchQuery(rawQuery, { gazetteer });
 		const cityStateForCenter = parsed.city?.state
 			? US_STATES.find(
 					(s) => s.abbr.toLowerCase() === parsed.city!.state!.toLowerCase()
 			  )
 			: null;
 		const parsedCityHasExactCenter = parsed.city?.coordinatePrecision === 'city';
+		// Anchor precedence: exact city > state centroid > region centroid.
 		const parsedCenterLat = parsedCityHasExactCenter
 			? parsed.city!.lat
-			: parsed.state?.lat ?? cityStateForCenter?.centroid.lat ?? null;
+			: parsed.state?.lat ??
+			  cityStateForCenter?.centroid.lat ??
+			  parsed.region?.lat ??
+			  null;
 		const parsedCenterLon = parsedCityHasExactCenter
 			? parsed.city!.lon
-			: parsed.state?.lon ?? cityStateForCenter?.centroid.lng ?? null;
+			: parsed.state?.lon ??
+			  cityStateForCenter?.centroid.lng ??
+			  parsed.region?.lon ??
+			  null;
 		// Profile area as a SOFT location anchor: only when the user named no place,
 		// gave no override coords, and isn't in strict-radius mode. Reuses the
-		// free-text parser so "Austin" / "Austin, TX" resolve; fail-closed for
-		// unrecognized regions like "Pacific Northwest" (no anchor, no pollution).
+		// free-text parser (with the gazetteer) so "Austin" / "Austin, TX" and
+		// obscure towns resolve; fail-closed for unresolvable areas.
 		const profileAreaParsed =
 			profileActive &&
 			profileArea &&
@@ -1718,7 +1928,7 @@ export async function GET(req: NextRequest) {
 			!strictRadiusActive &&
 			overrideLat == null &&
 			overrideLon == null
-				? parseFreeTextSearchQuery(profileArea)
+				? parseFreeTextSearchQuery(profileArea, { gazetteer })
 				: null;
 		let profileAreaCenterLat: number | null = null;
 		let profileAreaCenterLon: number | null = null;
@@ -1770,11 +1980,21 @@ export async function GET(req: NextRequest) {
 		const centerPoint = hasCenter
 			? { lat: center.lat as number, lon: center.lon as number }
 			: null;
-		// When the query had an explicit place we use a tighter radius. With no
-		// place at all and only an IP-resolved center, we soft-bias toward locality
-		// without hard-filtering — anything beyond the radius can still surface,
-		// just with a smaller locality multiplier.
-		const radiusKm = overrideRadiusKm ?? (parsed.hadExplicitPlace ? 250 : DEFAULT_LOCALITY_RADIUS_KM);
+		// Radius derivation. When the user typed an explicit place, the PLACE
+		// decides the radius — exact cities get a tight anchor, regions their
+		// own extent — and the client's soft radius is ignored (the dashboard
+		// unconditionally sends radiusKm=250 alongside IP coords, which must
+		// not defeat a parsed place). Strict-radius mode keeps full override
+		// precedence. With no place at all, the soft override / default keeps
+		// the locality-bias behavior.
+		const radiusKm =
+			parsed.hadExplicitPlace && !strictRadiusActive
+				? parsedCityHasExactCenter
+					? CITY_ANCHOR_RADIUS_KM
+					: parsed.state || cityStateForCenter
+					? DEFAULT_LOCALITY_RADIUS_KM
+					: parsed.region?.radiusKm ?? DEFAULT_LOCALITY_RADIUS_KM
+				: overrideRadiusKm ?? DEFAULT_LOCALITY_RADIUS_KM;
 		const emptyResponse = (
 			retrieverBreakdown: Record<string, number>
 		): FreeTextSearchResponse =>
@@ -1825,28 +2045,49 @@ export async function GET(req: NextRequest) {
 		// like "music venues in brooklyn" → NY), we hard-filter every retriever
 		// to that state and apply a final post-hydration safety net. Out-of-state
 		// matches don't help no matter how strong the semantic match is.
-		const enforcedState = strictRadiusActive
+		// Strict state enforcement, generalized to a SET so multi-state regions
+		// ("pacific northwest" → WA+OR) ride the same plumbing as single states.
+		// Precedence: explicit state > city's state > region's states. Empty
+		// region state lists (circle-scoped regions like Gulf Coast) normalize
+		// to null — the metro distance net is their authority.
+		const enforcedStates: EnforcedState[] | null = strictRadiusActive
 			? null
-			: parsed.state ??
-			  (parsed.city?.state
-					? (() => {
-							const abbr = parsed.city!.state as string;
-							// Resolve the city's state abbr back to a state name for enforcement.
-							const us = US_STATES.find(
-								(s) => s.abbr.toLowerCase() === abbr.toLowerCase()
-							);
-							return us
-								? {
-										name: us.name,
-										abbr: us.abbr,
-										lat: us.centroid.lat,
-										lon: us.centroid.lng,
-								  }
-								: null;
-					  })()
-					: null);
-		const enforcedStateValues = enforcedState
-			? [enforcedState.name.toLowerCase(), enforcedState.abbr.toLowerCase()]
+			: parsed.state
+			? [{ name: parsed.state.name, abbr: parsed.state.abbr }]
+			: cityStateForCenter
+			? [{ name: cityStateForCenter.name, abbr: cityStateForCenter.abbr }]
+			: parsed.region && parsed.region.states.length > 0
+			? parsed.region.states
+			: null;
+		const enforcedStateValues = enforcedStates
+			? enforcedStates.flatMap((s) => [
+					s.name.toLowerCase(),
+					s.abbr.toLowerCase(),
+			  ])
+			: null;
+		// Single-state queries keep the soft state boost inside the retrievers;
+		// multi-state regions rely on the hard filter + post-hydration net.
+		const singleEnforcedState =
+			enforcedStates && enforcedStates.length === 1 ? enforcedStates[0] : null;
+		const metroRegion =
+			!strictRadiusActive && parsed.region?.scope === 'metro'
+				? parsed.region
+				: null;
+		// The metro circle is the anchor only when no more-specific place was
+		// parsed alongside it ("bay area venues" vs "venues in oakland, bay area").
+		const metroRegionIsAnchor = !!metroRegion && !parsed.city && !parsed.state;
+		// The curated paths only enforce states the user actually TYPED (a
+		// state or a region) — never the city's own state. City-only queries
+		// legitimately surface metro picks across a state line ("Brooklyn" →
+		// NJ neighbors); their tight radius keeps things local. The hybrid
+		// path below keeps city-derived enforcement (its kNN retriever roams
+		// nationally and needs the harder net).
+		const typedEnforcedStates: EnforcedState[] | null = strictRadiusActive
+			? null
+			: parsed.state
+			? [{ name: parsed.state.name, abbr: parsed.state.abbr }]
+			: parsed.region && parsed.region.states.length > 0
+			? parsed.region.states
 			: null;
 
 		// Curated-style locality anchoring. When the query has no explicit place
@@ -1854,7 +2095,7 @@ export async function GET(req: NextRequest) {
 		// curated default radius around that center — vague queries should
 		// surface local results, not global. With no center at all, we fall back
 		// to a CONUS centroid + wide bbox, mirroring curated-search exactly.
-		const useImplicitLocality = !parsed.hadExplicitPlace && !enforcedState;
+		const useImplicitLocality = !parsed.hadExplicitPlace && !enforcedStates;
 		const implicitLocalityCenter = useImplicitLocality
 			? hasCenter
 				? centerPoint
@@ -1866,20 +2107,28 @@ export async function GET(req: NextRequest) {
 				: FALLBACK_BBOX_RADIUS_KM
 			: null;
 		// Center+radius passed to the lexical and prefix retrievers as a hard
-		// geo_distance filter. Explicit state still enforces state; if the user also
-		// named a city with exact coordinates, geo narrows to that city's radius.
-		// With no explicit place, the implicit locality above is used.
+		// geo_distance filter. Explicit state still enforces state; if the user
+		// named a city with exact coordinates, geo narrows to a city-scale
+		// circle (slightly wider than the anchor so recall doesn't starve);
+		// metro-scope regions get their circle as hard geo. With no explicit
+		// place, the implicit locality above is used.
 		const explicitCityCenter = parsedCityHasExactCenter && parsed.city
 			? { lat: parsed.city.lat, lon: parsed.city.lon }
 			: null;
-		const retrieverCenter = enforcedState
-			? explicitCityCenter
+		const metroRegionCenter =
+			metroRegion && !explicitCityCenter
+				? { lat: metroRegion.lat, lon: metroRegion.lon }
+				: null;
+		const retrieverCenter = enforcedStates
+			? explicitCityCenter ?? metroRegionCenter
 			: hasCenter
 			? centerPoint
 			: implicitLocalityCenter;
-		const retrieverRadiusKm = enforcedState
+		const retrieverRadiusKm = enforcedStates
 			? explicitCityCenter
-				? radiusKm
+				? Math.max(radiusKm, CITY_HYBRID_GEO_RADIUS_KM)
+				: metroRegionCenter
+				? metroRegion!.radiusKm
 				: null
 			: hasCenter
 			? radiusKm
@@ -1888,7 +2137,7 @@ export async function GET(req: NextRequest) {
 		const isNounLed = isNounLedQuery(parsed);
 
 		console.info(
-			`[contacts-search][${requestId}] start q="${rawQuery}" categories=${parsed.categories.join(',') || 'none'} city=${parsed.city?.name ?? 'none'} cityPrecision=${parsed.city?.coordinatePrecision ?? 'none'} state=${parsed.state?.abbr ?? 'none'} enforcedState=${enforcedState?.abbr ?? 'none'} implicitLocality=${useImplicitLocality ? `center=${implicitLocalityCenter?.lat},${implicitLocalityCenter?.lon} r=${implicitLocalityRadiusKm}km` : 'no'} restOfQuery="${parsed.restOfQuery}" nounLed=${isNounLed} centerSource=${center.source} radiusKm=${radiusKm} limit=${requestedLimit}`
+			`[contacts-search][${requestId}] start q="${rawQuery}" categories=${parsed.categories.join(',') || 'none'} city=${parsed.city?.name ?? 'none'} cityPrecision=${parsed.city?.coordinatePrecision ?? 'none'} state=${parsed.state?.abbr ?? 'none'} region=${parsed.region?.name ?? 'none'} enforcedStates=${enforcedStates?.map((s) => s.abbr).join('+') ?? 'none'} implicitLocality=${useImplicitLocality ? `center=${implicitLocalityCenter?.lat},${implicitLocalityCenter?.lon} r=${implicitLocalityRadiusKm}km` : 'no'} restOfQuery="${parsed.restOfQuery}" nounLed=${isNounLed} centerSource=${center.source} radiusKm=${radiusKm} limit=${requestedLimit}`
 		);
 
 		// Person-target probe runs only on noun-led queries. The other routing
@@ -1908,6 +2157,9 @@ export async function GET(req: NextRequest) {
 						radiusKm,
 						requestedLimit,
 						strictRadius: strictRadiusActive,
+						enforcedStates: typedEnforcedStates,
+						cityPrecisionAnchor: parsedCityHasExactCenter,
+						metroRegionAnchor: metroRegionIsAnchor,
 					}),
 				{
 					timeoutMs: getSearchRouteTimeoutMs(
@@ -1933,17 +2185,38 @@ export async function GET(req: NextRequest) {
 		// surfaces these through the existing curated-results state pipe.
 		// Live-music prioritization is intrinsic to the curated ES sampler.
 		if (isPlaceOnlyQuery(parsed)) {
+			// Anchor precedence: drawn circle (strict) > exact city > state
+			// centroid > region centroid.
 			const placeCenter =
 				strictRadiusActive && strictCenter
 					? strictCenter
 					: parsed.city
 					? { lat: parsed.city.lat, lon: parsed.city.lon }
-					: { lat: parsed.state!.lat, lon: parsed.state!.lon };
-			const placeRadiusKm = overrideRadiusKm ?? DEFAULT_LOCALITY_RADIUS_KM;
-			const placeEnforcedState =
+					: parsed.state
+					? { lat: parsed.state.lat, lon: parsed.state.lon }
+					: { lat: parsed.region!.lat, lon: parsed.region!.lon };
+			const placeRadiusKm = strictRadiusActive
+				? overrideRadiusKm ?? DEFAULT_LOCALITY_RADIUS_KM
+				: radiusKm;
+			// State enforcement: explicit state, or the region's state set.
+			// City-only queries stay un-restricted (metro areas cross state
+			// lines). Metro-scope regions anchored at the region itself cap the
+			// ladder at the region circle — expanding a "bay area" search to
+			// 350km would betray the region's meaning.
+			const placeEnforcedStates =
 				!strictRadiusActive && parsed.state
-					? { name: parsed.state.name, abbr: parsed.state.abbr }
+					? [{ name: parsed.state.name, abbr: parsed.state.abbr }]
+					: !strictRadiusActive &&
+					  !parsed.city &&
+					  parsed.region &&
+					  parsed.region.states.length > 0
+					? parsed.region.states
 					: null;
+			const placeIsMetroRegion =
+				!strictRadiusActive &&
+				!parsed.city &&
+				!parsed.state &&
+				parsed.region?.scope === 'metro';
 			const placeResponse = await withBudgetFallback(
 				() =>
 					runPlaceOnlyCuratedSearch({
@@ -1952,8 +2225,10 @@ export async function GET(req: NextRequest) {
 						centerPoint: placeCenter,
 						radiusKm: placeRadiusKm,
 						requestedLimit,
-						enforcedState: placeEnforcedState,
-						strictRadius: strictRadiusActive,
+						enforcedStates: placeEnforcedStates,
+						strictRadius: strictRadiusActive || placeIsMetroRegion,
+						cityPrecisionAnchor:
+							!strictRadiusActive && parsedCityHasExactCenter,
 						logTag: `[contacts-search][${requestId}][place-only]`,
 					}),
 				{
@@ -1968,8 +2243,8 @@ export async function GET(req: NextRequest) {
 			);
 			console.info(
 				`[contacts-search][${requestId}] place-only path place=${
-					parsed.city?.name ?? parsed.state?.name ?? 'unknown'
-				} stateEnforced=${placeEnforcedState?.abbr ?? 'no'} returned=${
+					parsed.city?.name ?? parsed.state?.name ?? parsed.region?.name ?? 'unknown'
+				} statesEnforced=${placeEnforcedStates?.map((s) => s.abbr).join('+') ?? 'no'} radiusKm=${placeRadiusKm} cityAnchor=${!strictRadiusActive && parsedCityHasExactCenter} returned=${
 					placeResponse.contacts.length
 				} totalMs=${Date.now() - requestStartedAt}`
 			);
@@ -1991,6 +2266,9 @@ export async function GET(req: NextRequest) {
 						radiusKm,
 						requestedLimit,
 						strictRadius: strictRadiusActive,
+						enforcedStates: typedEnforcedStates,
+						cityPrecisionAnchor: parsedCityHasExactCenter,
+						metroRegionAnchor: metroRegionIsAnchor,
 					}),
 				{
 					timeoutMs: getSearchRouteTimeoutMs(
@@ -2048,7 +2326,10 @@ export async function GET(req: NextRequest) {
 							searchSimilarContacts(
 								{
 									city: parsed.city?.name ?? null,
-									state: enforcedState?.name ?? null,
+									// Single state only — multi-state regions rely on the
+									// hard lexical/prefix filter + post-hydration net; a
+									// lone state name would skew the soft boost.
+									state: singleEnforcedState?.name ?? null,
 									country: parsed.country,
 									restOfQuery: knnText,
 								},
@@ -2072,7 +2353,7 @@ export async function GET(req: NextRequest) {
 						limit: PER_RETRIEVER_TAKE,
 						titlePrefixes: parsed.categories.length > 0 ? parsed.categories : undefined,
 						city: parsed.city?.name ?? null,
-						state: enforcedState?.abbr ?? null,
+						state: singleEnforcedState?.abbr ?? null,
 						country: parsed.country,
 						center: retrieverCenter,
 						radiusKm: retrieverRadiusKm,
@@ -2226,25 +2507,30 @@ export async function GET(req: NextRequest) {
 			}
 		}
 
-		if (enforcedStateValues && enforcedState) {
-			const stateNameLc = enforcedState.name.toLowerCase();
-			const stateAbbrLc = enforcedState.abbr.toLowerCase();
-			const allowed = new Set(enforcedStateValues);
+		if (enforcedStates && enforcedStates.length > 0) {
 			for (const [id, contact] of byIdStage1) {
-				const s = (contact.state ?? '').trim().toLowerCase();
-				const titleLc = (contact.title ?? '').toLowerCase();
-				const stateExact = s.length > 0 && allowed.has(s);
-				const statePrefixed =
-					s.length > 0 &&
-					(s.startsWith(stateNameLc + ',') ||
-						s.startsWith(stateNameLc + ' ') ||
-						s.startsWith(stateAbbrLc + ',') ||
-						s.startsWith(stateAbbrLc + ' '));
-				const titleHasState =
-					titleLc.includes(' ' + stateNameLc) ||
-					titleLc.endsWith(' ' + stateNameLc) ||
-					titleLc.endsWith(' ' + stateAbbrLc);
-				if (!stateExact && !statePrefixed && !titleHasState) byIdStage1.delete(id);
+				if (!contactMatchesAnyEnforcedState(contact, enforcedStates)) {
+					byIdStage1.delete(id);
+				}
+			}
+		}
+
+		// Metro-scope regions ("bay area", "socal") are circles, not state
+		// sets — drop hydrated rows beyond the region circle (with slack for
+		// the fringe). Mirrors the implicit-locality kNN-leak guard above.
+		if (metroRegion && !explicitCityCenter) {
+			const metroCenter = { lat: metroRegion.lat, lon: metroRegion.lon };
+			const maxDistanceKm = metroRegion.radiusKm * 1.2;
+			for (const [id, contact] of byIdStage1) {
+				if (contact.latitude == null || contact.longitude == null) {
+					byIdStage1.delete(id);
+					continue;
+				}
+				const d = distanceKm(metroCenter, {
+					lat: contact.latitude,
+					lon: contact.longitude,
+				});
+				if (d > maxDistanceKm) byIdStage1.delete(id);
 			}
 		}
 

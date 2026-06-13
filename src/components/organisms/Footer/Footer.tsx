@@ -3,7 +3,7 @@ import { urls } from '@/constants/urls';
 
 export const Footer = () => {
 	return (
-		<footer className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex h-9 items-center justify-between px-5 font-secondary text-[11px] font-medium tracking-[0.02em] text-[#909090] sm:px-6 sm:text-[13px] min-[1145px]:px-12">
+		<footer className="landing-footer pointer-events-none fixed inset-x-0 bottom-0 z-30 flex h-9 items-center justify-between px-5 font-secondary text-[11px] font-medium tracking-[0.02em] text-[#909090] sm:px-6 sm:text-[13px] min-[1145px]:px-12">
 			<span>
 				© {new Date().getFullYear()} Murmur
 				<span className="hidden sm:inline"> Technologies</span>
