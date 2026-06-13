@@ -7,10 +7,6 @@ import {
 	getInteractiveMapMinZoomDelta,
 } from './constants';
 import { computeCuratedOrbT } from './mapExpressions';
-import {
-	computeNightLightsSpaceGlowFade,
-	computeNightLightsZoomOutLift,
-} from './nightLightsCompute';
 import { computeLightingOverlayOpacity } from './lightingOverlay';
 import { getLightningZoomedOutBoostT } from './lightning';
 import { buildCloudsOpacityExpr } from './clouds';
@@ -53,8 +49,6 @@ test('delta caps at the max and guards degenerate inputs', () => {
 test('runtime fades are exactly z-shifted by the floor delta', () => {
 	const computers: Array<(zoom: number, floorDelta?: number) => number> = [
 		computeCuratedOrbT,
-		computeNightLightsSpaceGlowFade,
-		computeNightLightsZoomOutLift,
 		computeLightingOverlayOpacity,
 		getLightningZoomedOutBoostT,
 	];

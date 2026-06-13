@@ -63,6 +63,7 @@ import {
 	getWineBeerSpiritsLabel,
 } from '@/utils/restaurantTitle';
 import { isSafariBrowser } from '@/utils/browserDetection';
+import { markPerf } from '@/utils/perfMarks';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { WeatherMood } from '@/lib/weather/regions';
@@ -142,11 +143,6 @@ import {
 	CLOUDS_TURBULENCE_AMPLITUDE_X_PX,
 	CLOUDS_TURBULENCE_LOOP_MS,
 	CLOUDS_TURBULENCE_STRIP_PX,
-	CONTACT_LIGHTS_REVEAL_TILES_URL_TEMPLATE,
-	CONTACT_LIGHTS_TILES_BOUNDS,
-	CONTACT_LIGHTS_TILES_MAX_ZOOM,
-	CONTACT_LIGHTS_TILES_MIN_ZOOM,
-	CONTACT_LIGHTS_TILES_URL_TEMPLATE,
 	CURATED_BLOB_LOBE_MAX_COUNT,
 	CURATED_BLOB_LOBE_MAX_RADIUS_KM,
 	CURATED_BLOB_LOBE_MIN_COUNT,
@@ -242,10 +238,10 @@ import {
 	MAP_DEFAULT_ZOOM,
 	MAP_MIN_ZOOM,
 	MOBILE_MAP_MIN_ZOOM,
-	INTERACTIVE_MAP_MIN_ZOOM_DELTA_MAX,
 	getInteractiveMapMinZoomDelta,
 	MAP_PINCH_ZOOM_RATE,
 	MAP_WHEEL_ZOOM_RATE,
+	MAP_WORLD_LAND_LOCAL_SOURCE_ID,
 	MARKER_CONSTELLATION_CORE_OPACITY,
 	MARKER_CONSTELLATION_GLOW_OPACITY,
 	MARKER_CONSTELLATION_HALO_COLOR,
@@ -268,20 +264,6 @@ import {
 	NIGHT_FACE_SHADE_BG,
 	NIGHT_FACE_SHADE_OPACITY,
 	NIGHT_GLOOM_WASH_OPACITY,
-	NIGHT_LIGHTS_CLOSE_GLOW_OPACITY_MULT,
-	NIGHT_LIGHTS_FADE_END_ZOOM,
-	NIGHT_LIGHTS_GLOW_OPACITY_MULT,
-	NIGHT_LIGHTS_INTRO_CROSSFADE_MS,
-	NIGHT_LIGHTS_INTRO_REVEAL_MS,
-	NIGHT_LIGHTS_LOAD_FADE_MS,
-	NIGHT_LIGHTS_LOAD_POLL_MS,
-	NIGHT_LIGHTS_SPACE_GLOW_EXTRA_PASS_OPACITY_MUL,
-	NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM,
-	NIGHT_LIGHTS_SPACE_GLOW_OPACITY_MULT,
-	NIGHT_LIGHTS_ZOOM_LOAD_DIM_FLOOR,
-	NIGHT_LIGHTS_ZOOM_LOAD_FADE_MS,
-	NIGHT_LIGHTS_ZOOM_LOAD_OUT_FADE_MS,
-	NIGHT_LIGHTS_ZOOM_LOAD_POLL_MS,
 	NIGHT_LOWER_LEFT_SHADOW_BG,
 	NIGHT_LOWER_LEFT_SHADOW_OPACITY,
 	NIGHT_MOONLIGHT_KEY_BG,
@@ -290,14 +272,13 @@ import {
 	NIGHT_MOON_RIM_OPACITY,
 	NIGHT_SHADOW_OVERLAY_MUL_MIN,
 	NIGHT_STATE_LINE_OPACITY_MUL_MIN,
-	NIGHT_US_LIGHTS_OPACITY,
 	NIGHT_VIGNETTE_BG,
 	NIGHT_VIGNETTE_OPACITY,
 	NIGHT_WARM_KEY_MIN_MUL,
 	OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE,
 	OVERVIEW_PREWARM_CENTER_QUANT_DEG,
 	OVERVIEW_PREWARM_DEBOUNCE_MS,
-	OVERVIEW_PREWARM_MIN_ZOOM,
+	OVERVIEW_PREWARM_FLOOR_SKIP_MARGIN,
 	OVERVIEW_PREWARM_ZOOMS,
 	PROMOTION_OVERLAY_MARKERS_MAX_PINS,
 	PROMOTION_OVERLAY_MARKERS_MIN_ZOOM,
@@ -408,7 +389,6 @@ import {
 	applyMapboxFogForMoodAndNight,
 	applyMurmurGlobeLighting,
 	applyNightLandPalette,
-	applyUnsubscribeBurnEmberTint,
 	applyUsOnlyBasemapCartography,
 	ensureWorldLandFill,
 	restoreBasemapCartography,
@@ -514,16 +494,7 @@ import {
 	getSunTransitionVisualState,
 	paintSunTransitionCanvas,
 } from './sunTransition';
-import {
-	computeNightLightsCloseGlowMul,
-	computeNightLightsCrispMul,
-	computeNightLightsFade,
-	computeNightLightsGlowFade,
-	computeNightLightsSpaceGlowFade,
-	computeNightLightsZoomOutLift,
-	computeRuntimeNightT,
-	getDevMoodTransitionMs,
-} from './nightLightsCompute';
+import { computeRuntimeNightT, getDevMoodTransitionMs } from './nightLightsCompute';
 import {
 	getStateAbbreviation,
 	normalizeStateKey,
@@ -555,6 +526,17 @@ export {
 	DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING,
 	DASHBOARD_TO_INTERACTIVE_TRANSITION_MS,
 } from './constants';
+
+// Pre-spin Mapbox's shared worker pool at chunk eval, well before the
+// construction effect runs, so map creation doesn't pay worker startup on the
+// boot-critical path. SSR-guarded: 'use client' modules still evaluate on the server.
+if (typeof window !== 'undefined') {
+	try {
+		mapboxgl.prewarm();
+	} catch {
+		// Best-effort optimization only.
+	}
+}
 
 // Safari/WebKit: canvas→GPU-texture uploads are far slower than Chrome's, and any
 // *playing* Mapbox canvas source forces the map to re-render (and re-upload every
@@ -1096,6 +1078,13 @@ export interface SearchResultsMapProps {
 	 */
 	onMapLoadedChange?: (loaded: boolean) => void;
 	/**
+	 * Reports the earlier "globe silhouette ready" stage: true once the style is in
+	 * and the world-land fill has painted (cream continents on ocean blue) — usually
+	 * well before the full `load` event — and false on teardown/recreate or unmount.
+	 * Hosts can drop boot masks on this and let street detail stream in behind.
+	 */
+	onMapFirstPaintChange?: (painted: boolean) => void;
+	/**
 	 * Reports the *computed* interactive zoom floor: desktop MAP_MIN_ZOOM plus the
 	 * viewport-proportional delta (large monitors), mobile MOBILE_MAP_MIN_ZOOM.
 	 * Fires when the value changes AND when the callback attaches (the persistent
@@ -1215,8 +1204,6 @@ export interface SearchResultsMapProps {
 	suppressEventPopups?: boolean;
 }
 
-// NOTE: Night lights are generated offline as raster dot tiles (see scripts/generate_contact_lights_tiles.py).
-
 // Identity key for an interactive entry camera, so a refetch that re-delivers the
 // same values (new object identity) is distinguishable from actually-new values.
 const interactiveEntryCameraKey = (
@@ -1272,6 +1259,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	lockedStateName,
 	isLoading,
 	onMapLoadedChange,
+	onMapFirstPaintChange,
 	onInteractiveMinZoomChange,
 	disableDotWaveReveal = false,
 	skipAutoFit,
@@ -1313,23 +1301,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}),
 		[curatedOrbSvgIdPrefix]
 	);
-
-	const contactLightsTilesEnabled = useMemo(() => {
-		// Enabled by default (it's a lightweight raster overlay), but allow a
-		// URL escape hatch to disable while tuning: `?devContactLights=0`.
-		if (typeof window === 'undefined') return true;
-		const raw = new URLSearchParams(window.location.search).get('devContactLights');
-		return !(raw === '0' || raw === 'false');
-	}, []);
-
-	const contactLightsDebugEnabled = useMemo(() => {
-		// Debug helper: logs tile errors + shows tile boundaries so we can diagnose
-		// "missing ranges" (404s vs opacity gating vs empty tiles).
-		// Enable with: `?devContactLightsDebug=1`
-		if (typeof window === 'undefined') return false;
-		const raw = new URLSearchParams(window.location.search).get('devContactLightsDebug');
-		return raw === '1' || raw === 'true';
-	}, []);
 
 	const snowCloudInteractionMultiplier = useMemo(() => {
 		// Debug/tuning helper: scale the snow→cloud interaction strength.
@@ -1595,17 +1566,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// effect toward the unsubscribe flow's published target. A ref (like
 	// `nightTRef`) so every pipeline reapplication can read the live value.
 	const unsubscribeBurnTRef = useRef<number>(0);
-	// 0..1 fade that suppresses the lights overlay until tiles are ready, avoiding
-	// the half-loaded "patchy" initial look.
-	const nightLightsLoadTRef = useRef<number>(0);
-	const nightLightsLoadStartedRef = useRef<boolean>(false);
-	// 0..1 fade used during zoom interactions; we hide the overlay while raster tiles
-	// are streaming to avoid the "hairy" intermediate look.
-	const nightLightsZoomLoadTRef = useRef<number>(1);
-	// Intro reveal animation state (west->east dot reveal, then crossfade to real tiles).
-	const nightLightsIntroRevealTRef = useRef<number>(0);
-	const nightLightsIntroCrossfadeTRef = useRef<number>(0);
-	const nightLightsIntroDoneRef = useRef<boolean>(false);
 	// Capture the base Mapbox paint values once, then we apply a multiplier for fading.
 	const stateLineOpacityBaseRef = useRef<{ dividers: any; borders: any } | null>(null);
 
@@ -1679,15 +1639,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		onMapLoadedChangeRef.current?.(isMapLoaded);
 	}, [isMapLoaded]);
 	useEffect(() => () => onMapLoadedChangeRef.current?.(false), []);
+	// Earlier "land painted" readiness stage; same ref-based notify pattern.
+	const [isMapFirstPainted, setIsMapFirstPainted] = useState(false);
+	const onMapFirstPaintChangeRef = useRef(onMapFirstPaintChange);
+	useEffect(() => {
+		onMapFirstPaintChangeRef.current = onMapFirstPaintChange;
+	});
+	useEffect(() => {
+		onMapFirstPaintChangeRef.current?.(isMapFirstPainted);
+	}, [isMapFirstPainted]);
+	useEffect(() => () => onMapFirstPaintChangeRef.current?.(false), []);
 	const onInteractiveMinZoomChangeRef = useRef(onInteractiveMinZoomChange);
 	useEffect(() => {
 		onInteractiveMinZoomChangeRef.current = onInteractiveMinZoomChange;
 		// The singleton map outlives route handoffs; host pages attach this callback
 		// after mount via a mapProps swap, so re-fire the current floor at them.
-		if (
-			onInteractiveMinZoomChange &&
-			lastReportedInteractiveMinZoomRef.current != null
-		) {
+		if (onInteractiveMinZoomChange && lastReportedInteractiveMinZoomRef.current != null) {
 			onInteractiveMinZoomChange(lastReportedInteractiveMinZoomRef.current);
 		}
 	}, [onInteractiveMinZoomChange]);
@@ -2910,8 +2877,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// fully-zoomed-out browse state survives on large monitors.
 			const minZoom =
 				overlayMode === 'ambient'
-					? AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM +
-						interactiveFloorDeltaRef.current
+					? AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM + interactiveFloorDeltaRef.current
 					: ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM;
 			if (zoomRaw < minZoom) {
 				clearAllContactsFetchWindows();
@@ -6640,34 +6606,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 		}
 
-		if (contactLightsTilesEnabled) {
-			// Contact lights: dot-only raster tiles derived from contact coords.
-			try {
-				if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.nightLights)) {
-					mapInstance.addSource(MAPBOX_SOURCE_IDS.nightLights, {
-						type: 'raster',
-						tiles: [CONTACT_LIGHTS_TILES_URL_TEMPLATE],
-						tileSize: 512,
-						minzoom: CONTACT_LIGHTS_TILES_MIN_ZOOM,
-						maxzoom: CONTACT_LIGHTS_TILES_MAX_ZOOM,
-						bounds: CONTACT_LIGHTS_TILES_BOUNDS,
-					} as any);
-				}
-				if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.nightLightsReveal)) {
-					mapInstance.addSource(MAPBOX_SOURCE_IDS.nightLightsReveal, {
-						type: 'raster',
-						tiles: [CONTACT_LIGHTS_REVEAL_TILES_URL_TEMPLATE],
-						tileSize: 512,
-						minzoom: CONTACT_LIGHTS_TILES_MIN_ZOOM,
-						maxzoom: CONTACT_LIGHTS_TILES_MAX_ZOOM,
-						bounds: CONTACT_LIGHTS_TILES_BOUNDS,
-					} as any);
-				}
-			} catch {
-				// Non-fatal.
-			}
-		}
-
 		// States source needs `promoteId` so Mapbox uses the string "key" property (e.g. "CA", "TX")
 		// as the feature identifier — required for setFeatureState with non-numeric IDs.
 		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.states)) {
@@ -6883,119 +6821,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					'raster-resampling': 'linear',
 				},
 			});
-		}
-
-		// Contact lights (dot tiles). Default opacity is 0; we drive visibility from
-		// applyLightingOverlayOpacity based on zoom + `nightT`.
-		//
-		// Note: this sits above clouds so it reads at globe zoom (clouds can wash out
-		// tiny dots when fully zoomed out). We render a subtle low-zoom glow pass under
-		// a crisp dot pass so it reads as "sparkling", not blurred.
-		try {
-			if (mapInstance.getSource(MAPBOX_SOURCE_IDS.nightLights)) {
-				ensureLayer({
-					id: MAPBOX_LAYER_IDS.nightLightsSpaceGlow,
-					type: 'raster',
-					source: MAPBOX_SOURCE_IDS.nightLights,
-					// Only relevant for the "from space" view. The fade itself is computed
-					// at runtime (floor-delta-shifted on large monitors), so widen the cull
-					// window by the max delta; the runtime opacity flips visibility:none
-					// outside the visible band, so the extra range costs nothing.
-					maxzoom:
-						NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM +
-						INTERACTIVE_MAP_MIN_ZOOM_DELTA_MAX +
-						0.01,
-					paint: {
-						'raster-opacity': 0,
-						// Avoid Mapbox's per-tile crossfade (it can look like a "hair texture"
-						// while zooming). We do our own deliberate fade via raster-opacity.
-						'raster-fade-duration': 0,
-						// Slight bloom: linear resampling.
-						'raster-resampling': 'linear',
-					},
-				} as any);
-				// Second space-only pass: pushes visibility when fully zoomed out without touching tiles.
-				ensureLayer({
-					id: MAPBOX_LAYER_IDS.nightLightsSpaceGlow2,
-					type: 'raster',
-					source: MAPBOX_SOURCE_IDS.nightLights,
-					maxzoom:
-						NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM +
-						INTERACTIVE_MAP_MIN_ZOOM_DELTA_MAX +
-						0.01,
-					paint: {
-						'raster-opacity': 0,
-						'raster-fade-duration': 0,
-						'raster-resampling': 'linear',
-					},
-				} as any);
-				// Intro reveal layers (alpha-biased tiles). These are crossfaded away once the
-				// real tiles are fully visible.
-				if (mapInstance.getSource(MAPBOX_SOURCE_IDS.nightLightsReveal)) {
-					ensureLayer({
-						id: MAPBOX_LAYER_IDS.nightLightsRevealGlow,
-						type: 'raster',
-						source: MAPBOX_SOURCE_IDS.nightLightsReveal,
-						maxzoom: NIGHT_LIGHTS_FADE_END_ZOOM + 0.01,
-						paint: {
-							'raster-opacity': 0,
-							'raster-fade-duration': 0,
-							'raster-resampling': 'linear',
-						},
-					} as any);
-					ensureLayer({
-						id: MAPBOX_LAYER_IDS.nightLightsReveal,
-						type: 'raster',
-						source: MAPBOX_SOURCE_IDS.nightLightsReveal,
-						maxzoom: NIGHT_LIGHTS_FADE_END_ZOOM + 0.01,
-						paint: {
-							'raster-opacity': 0,
-							'raster-fade-duration': 0,
-							'raster-resampling': 'nearest',
-						},
-					} as any);
-				}
-				ensureLayer({
-					id: MAPBOX_LAYER_IDS.nightLightsGlow,
-					type: 'raster',
-					source: MAPBOX_SOURCE_IDS.nightLights,
-					maxzoom: NIGHT_LIGHTS_FADE_END_ZOOM + 0.01,
-					paint: {
-						'raster-opacity': 0,
-						// Avoid Mapbox's per-tile crossfade (it can look like a "hair texture"
-						// while zooming). We do our own deliberate fade via raster-opacity.
-						'raster-fade-duration': 0,
-						// Linear resampling = tiny bloom at far zoom.
-						'raster-resampling': 'linear',
-					},
-				} as any);
-				ensureLayer({
-					id: MAPBOX_LAYER_IDS.nightLightsCloseGlow,
-					type: 'raster',
-					source: MAPBOX_SOURCE_IDS.nightLights,
-					maxzoom: NIGHT_LIGHTS_FADE_END_ZOOM + 0.01,
-					paint: {
-						'raster-opacity': 0,
-						'raster-fade-duration': 0,
-						// Linear resampling so dots read as a soft local glow at mid zoom.
-						'raster-resampling': 'linear',
-					},
-				} as any);
-				ensureLayer({
-					id: MAPBOX_LAYER_IDS.nightLights,
-					type: 'raster',
-					source: MAPBOX_SOURCE_IDS.nightLights,
-					maxzoom: NIGHT_LIGHTS_FADE_END_ZOOM + 0.01,
-					paint: {
-						'raster-opacity': 0,
-						'raster-fade-duration': 0,
-						// Keep it dotty: nearest resampling avoids a low-zoom blur smear.
-						'raster-resampling': 'nearest',
-					},
-				} as any);
-			}
-		} catch {
-			// Non-fatal.
 		}
 
 		const resultDotRadiusScaleExpr = ['coalesce', ['get', 'radiusScale'], 1];
@@ -8240,6 +8065,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// computes + reports.
 		syncInteractiveFloor();
 
+		markPerf('murmur:map:construct');
 		const mapInstance = new mapboxgl.Map({
 			container: mapContainerRef.current,
 			style: MAPBOX_STYLE,
@@ -8261,7 +8087,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			minTileCacheSize: 128,
 			maxTileCacheSize: 1024,
 			refreshExpiredTiles: false,
-			...(contactLightsDebugEnabled ? { showTileBoundaries: true } : {}),
 		});
 
 		mapRef.current = mapInstance;
@@ -8288,7 +8113,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Non-fatal — older Mapbox builds may not expose these setters.
 		}
 
+		// Boot-stage marks (construct → style-load → land-ready → load) for the
+		// measurement scripts; latched so style reload re-fires don't re-mark.
+		let styleLoadMarked = false;
 		const onStyleLoad = () => {
+			if (!styleLoadMarked) {
+				styleLoadMarked = true;
+				markPerf('murmur:map:style-load');
+			}
 			applyFreeTrialMapVisualTuning(mapInstance);
 			const initialVisualNightT = computeMoodVisualNightT(
 				nightTRef.current,
@@ -8307,6 +8139,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 
 		const onLoad = () => {
+			markPerf('murmur:map:load');
 			applyFreeTrialMapVisualTuning(mapInstance);
 			const initialVisualNightT = computeMoodVisualNightT(
 				nightTRef.current,
@@ -8454,204 +8287,86 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			mapRef.current = null;
 			setMap(null);
 			setIsMapLoaded(false);
+			setIsMapFirstPainted(false);
 		};
-	}, [ensureMapboxSourcesAndLayers, contactLightsDebugEnabled, syncInteractiveFloor]);
+	}, [ensureMapboxSourcesAndLayers, syncInteractiveFloor]);
 
-	// Debug: detect missing tiles / error events for the contact-lights raster overlay.
+	// Land-first readiness latch: flip `isMapFirstPainted` once the local
+	// world-land fill has painted (style in + cream continents on ocean blue) —
+	// typically well before the full `load` event, which also waits on composite
+	// tiles, glyphs and the country-boundaries tileset. The dashboard boot splash
+	// gates on this signal so street detail streams in behind its fade.
+	// `isMapLoaded` is both the warm-return fast path and the backstop for a
+	// world-land source-add failure (offline → the poll would never settle).
 	useEffect(() => {
 		if (!map) return;
-		if (!isMapLoaded) return;
-		if (!contactLightsDebugEnabled) return;
+		if (isMapFirstPainted) return;
 		if (typeof window === 'undefined') return;
 
-		const isContactLightsUrl = (url: unknown) =>
-			typeof url === 'string' &&
-			(url.includes('/maps/contact_lights/') ||
-				url.includes('/maps/contact_lights_reveal/'));
+		let cancelled = false;
+		let rafId: number | null = null;
+		let intervalId: number | null = null;
 
-		const logLoadState = (tag: string) => {
-			try {
-				const zoom = map.getZoom();
-				const night = clamp(nightTRef.current, 0, 1);
-				const zoomOutLift = computeNightLightsZoomOutLift(
-					zoom,
-					interactiveFloorDeltaRef.current
-				);
-				const loadT =
-					clamp(nightLightsLoadTRef.current, 0, 1) *
-					clamp(nightLightsZoomLoadTRef.current, 0, 1);
-				const nightForLights = Math.pow(night, 0.65);
-				const lightsBase =
-					nightForLights *
-					(NIGHT_US_LIGHTS_OPACITY + zoomOutLift) *
-					computeNightLightsFade(zoom) *
-					loadT;
-
-				const introDone = nightLightsIntroDoneRef.current;
-				const introRevealT = clamp(nightLightsIntroRevealTRef.current, 0, 1);
-				const introCrossT = clamp(nightLightsIntroCrossfadeTRef.current, 0, 1);
-				let introFinalMul = 1;
-				let introRevealMul = 0;
-				if (!introDone) {
-					if (introCrossT > 0) {
-						introFinalMul = introCrossT;
-						introRevealMul = 1 - introCrossT;
-					} else {
-						introFinalMul = 0;
-						introRevealMul = introRevealT;
-					}
-				}
-
-				const crispMul = computeNightLightsCrispMul(zoom);
-				const closeGlowMul = computeNightLightsCloseGlowMul(zoom);
-				const finalCrispOpacity = clamp(lightsBase * introFinalMul * crispMul, 0, 1);
-				const finalGlowOpacity = clamp(
-					lightsBase *
-						NIGHT_LIGHTS_GLOW_OPACITY_MULT *
-						computeNightLightsGlowFade(zoom) *
-						introFinalMul,
-					0,
-					1
-				);
-				const finalCloseGlowOpacity = clamp(
-					lightsBase *
-						NIGHT_LIGHTS_CLOSE_GLOW_OPACITY_MULT *
-						closeGlowMul *
-						introFinalMul,
-					0,
-					1
-				);
-				const finalSpaceGlowOpacity = clamp(
-					lightsBase *
-						NIGHT_LIGHTS_SPACE_GLOW_OPACITY_MULT *
-						computeNightLightsSpaceGlowFade(zoom, interactiveFloorDeltaRef.current) *
-						introFinalMul,
-					0,
-					1
-				);
-				const revealCrispOpacity = clamp(lightsBase * introRevealMul * crispMul, 0, 1);
-
-				let finalLoaded = false;
-				let revealLoaded: boolean | null = null;
+		const latch = () => {
+			if (cancelled) return;
+			// Replicate the decorative framing applied at `load` before revealing —
+			// without it the globe would visibly jump into position when `load`
+			// fires after the splash has already dropped. (The `load` copy stays:
+			// both are idempotent 0ms eases to the same camera.)
+			if (presentationRef.current === 'background') {
 				try {
-					finalLoaded = map.isSourceLoaded(MAPBOX_SOURCE_IDS.nightLights);
+					map.easeTo({
+						center: DASHBOARD_DECORATIVE_CENTER,
+						zoom: DASHBOARD_DECORATIVE_ZOOM,
+						pitch: DASHBOARD_DECORATIVE_PITCH,
+						bearing: 0,
+						offset: DASHBOARD_DECORATIVE_OFFSET_PX,
+						duration: 0,
+					});
 				} catch {
-					finalLoaded = false;
+					// Ignore.
 				}
+			}
+			// Double rAF so the frame that drew the land has actually painted.
+			rafId = window.requestAnimationFrame(() => {
+				rafId = window.requestAnimationFrame(() => {
+					if (cancelled) return;
+					markPerf('murmur:map:land-ready');
+					setIsMapFirstPainted(true);
+				});
+			});
+		};
+
+		if (isMapLoaded) {
+			latch();
+		} else {
+			const poll = () => {
+				if (cancelled) return;
 				try {
-					if ((map as any).getSource?.(MAPBOX_SOURCE_IDS.nightLightsReveal)) {
-						revealLoaded = map.isSourceLoaded(MAPBOX_SOURCE_IDS.nightLightsReveal);
+					if (
+						map.getSource(MAP_WORLD_LAND_LOCAL_SOURCE_ID) &&
+						map.isSourceLoaded(MAP_WORLD_LAND_LOCAL_SOURCE_ID)
+					) {
+						if (intervalId != null) {
+							window.clearInterval(intervalId);
+							intervalId = null;
+						}
+						latch();
 					}
 				} catch {
-					revealLoaded = null;
+					// Source not queryable yet — keep polling; `load` is the backstop.
 				}
-
-				console.debug('[contact-lights]', tag, {
-					zoom: typeof zoom === 'number' ? Number(zoom.toFixed(2)) : zoom,
-					nightT: Number(night.toFixed(2)),
-					finalLoaded,
-					revealLoaded,
-					fadeT: Number(clamp(computeNightLightsFade(zoom), 0, 1).toFixed(2)),
-					zoomOutLift: Number(zoomOutLift.toFixed(2)),
-					loadT: Number(clamp(nightLightsLoadTRef.current, 0, 1).toFixed(2)),
-					zoomLoadT: Number(clamp(nightLightsZoomLoadTRef.current, 0, 1).toFixed(2)),
-					lightsBase: Number(clamp(lightsBase, 0, 1).toFixed(2)),
-					crispMul: Number(clamp(crispMul, 0, 1).toFixed(2)),
-					closeGlowMul: Number(clamp(closeGlowMul, 0, 1).toFixed(2)),
-					finalCrispOpacity: Number(finalCrispOpacity.toFixed(2)),
-					finalGlowOpacity: Number(finalGlowOpacity.toFixed(2)),
-					finalCloseGlowOpacity: Number(finalCloseGlowOpacity.toFixed(2)),
-					finalSpaceGlowOpacity: Number(finalSpaceGlowOpacity.toFixed(2)),
-					revealCrispOpacity: Number(revealCrispOpacity.toFixed(2)),
-					introDone: nightLightsIntroDoneRef.current,
-					introRevealT: Number(
-						clamp(nightLightsIntroRevealTRef.current, 0, 1).toFixed(2)
-					),
-					introCrossT: Number(
-						clamp(nightLightsIntroCrossfadeTRef.current, 0, 1).toFixed(2)
-					),
-				});
-			} catch {
-				// Ignore.
-			}
-		};
-
-		const onError = (e: any) => {
-			const sourceId = e?.sourceId;
-			const url =
-				e?.error?.url ??
-				e?.url ??
-				e?.error?.request?.url ??
-				e?.error?.resource?.url ??
-				e?.error?.resourceUrl;
-			if (
-				sourceId === MAPBOX_SOURCE_IDS.nightLights ||
-				sourceId === MAPBOX_SOURCE_IDS.nightLightsReveal ||
-				isContactLightsUrl(url)
-			) {
-				console.warn('[contact-lights] tile error', {
-					sourceId,
-					url,
-					tile: e?.tile,
-					status: e?.error?.status,
-					message: e?.error?.message ?? e?.message,
-				});
-			}
-		};
-
-		let lastFinalLoaded: boolean | null = null;
-		let lastRevealLoaded: boolean | null = null;
-		const onSourceData = (e: any) => {
-			const sid = e?.sourceId;
-			if (
-				sid !== MAPBOX_SOURCE_IDS.nightLights &&
-				sid !== MAPBOX_SOURCE_IDS.nightLightsReveal
-			)
-				return;
-			try {
-				const finalLoaded = map.isSourceLoaded(MAPBOX_SOURCE_IDS.nightLights);
-				const revealLoaded =
-					(map as any).getSource?.(MAPBOX_SOURCE_IDS.nightLightsReveal) != null
-						? map.isSourceLoaded(MAPBOX_SOURCE_IDS.nightLightsReveal)
-						: null;
-				if (finalLoaded !== lastFinalLoaded || revealLoaded !== lastRevealLoaded) {
-					lastFinalLoaded = finalLoaded;
-					lastRevealLoaded = revealLoaded;
-					logLoadState('sourcedata');
-				}
-			} catch {
-				// Ignore.
-			}
-		};
-
-		try {
-			(map as any).showTileBoundaries = true;
-			(map as any).triggerRepaint?.();
-		} catch {
-			// Ignore.
+			};
+			intervalId = window.setInterval(poll, 100);
+			poll();
 		}
 
-		map.on('error', onError);
-		map.on('sourcedata', onSourceData);
-		const onZoomEnd = () => logLoadState('zoomend');
-		const onMoveEnd = () => logLoadState('moveend');
-		map.on('zoomend', onZoomEnd);
-		map.on('moveend', onMoveEnd);
-		logLoadState('init');
-
 		return () => {
-			try {
-				(map as any).showTileBoundaries = false;
-				(map as any).triggerRepaint?.();
-			} catch {
-				// Ignore.
-			}
-			map.off('error', onError);
-			map.off('sourcedata', onSourceData);
-			map.off('zoomend', onZoomEnd);
-			map.off('moveend', onMoveEnd);
+			cancelled = true;
+			if (intervalId != null) window.clearInterval(intervalId);
+			if (rafId != null) window.cancelAnimationFrame(rafId);
 		};
-	}, [map, isMapLoaded, contactLightsDebugEnabled]);
+	}, [map, isMapLoaded, isMapFirstPainted]);
 
 	const prevPresentationRef = useRef<'background' | 'interactive'>(presentation);
 
@@ -11104,7 +10819,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// instead of streaming streets-v12 across the periphery. Uses Mapbox's public,
 	// event-free `jumpTo(preloadOnly)`: it clones the transform (no camera move, no
 	// events) and warms the browser tile cache for that camera. Fires on a debounced
-	// settle so it stays off the interaction hot path.
+	// settle so it stays off the interaction hot path. The first settle after the
+	// map turns interactive seeds the whole zoom-out path (overview levels + floor
+	// view), so even a boot-then-immediate-zoom-out never streams.
+	//
+	// The background-presentation gate below is load-bearing beyond etiquette: the
+	// decorative dashboard locks minZoom=maxZoom, and `preloadOnly` transforms clamp
+	// to the live zoom constraints — a background-mode preload would silently warm
+	// nothing useful.
 	useEffect(() => {
 		if (!map) return;
 		if (!isMapLoaded) return;
@@ -11121,15 +10843,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					return;
 				}
 				const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
-				if (zoom < OVERVIEW_PREWARM_MIN_ZOOM) return;
 				if (typeof document !== 'undefined' && document.hidden) return;
 				const c = map.getCenter();
 				if (!c) return;
+				// Warm only the levels a zoom-out from here would newly reveal, plus
+				// the floor view itself — the level every zoom-out ultimately lands
+				// on (live getMinZoom: z2 desktop / z1 mobile / z3 large monitors).
+				const minZoom =
+					typeof map.getMinZoom === 'function' ? map.getMinZoom() : MAP_MIN_ZOOM;
+				const zoomBand = Math.floor(zoom);
+				const levels: number[] = OVERVIEW_PREWARM_ZOOMS.filter((z) => z < zoomBand);
+				if (zoom - minZoom >= OVERVIEW_PREWARM_FLOOR_SKIP_MARGIN) {
+					levels.push(minZoom);
+				}
+				if (levels.length === 0) return;
 				const q = OVERVIEW_PREWARM_CENTER_QUANT_DEG;
-				const key = `${Math.round(c.lng / q) * q}:${Math.round(c.lat / q) * q}`;
+				// Key includes the zoom band so descending in steps re-warms the levels
+				// each step newly uncovers, while micro-zooms within a band still dedupe.
+				const key = `${Math.round(c.lng / q) * q}:${Math.round(c.lat / q) * q}:${zoomBand}`;
 				if (lastPrewarmKeyRef.current === key) return;
 				lastPrewarmKeyRef.current = key;
-				for (const z of OVERVIEW_PREWARM_ZOOMS) {
+				for (const z of levels) {
 					map.jumpTo({ center: [c.lng, c.lat], zoom: z, preloadOnly: true } as any);
 				}
 			} catch {
@@ -12140,10 +11874,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (!m.getLayer(layerId)) return;
 			m.setPaintProperty(layerId, 'raster-opacity', value);
 			// While effectively invisible, hide the layer outright: mapbox keeps
-			// loading + compositing raster tiles for opacity-0 layers (the 7
-			// night-lights layers cost dashboard zoom/wheel tile churn all day).
-			// The load-fade machinery (nightLightsLoadT / isSourceLoaded polls)
-			// handles the gradual reveal when night flips them visible again.
+			// loading + compositing raster/canvas sources for opacity-0 layers.
 			const visibility = value < 0.0005 ? 'none' : 'visible';
 			if (lightingLayerVisibilityAppliedRef.current[layerId] !== visibility) {
 				m.setLayoutProperty(layerId, 'visibility', visibility);
@@ -12288,121 +12019,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (lightingOverlayNightVignetteRef.current)
 			lightingOverlayNightVignetteRef.current.style.opacity = String(vignetteOpacity);
 
-		// US night lights (Mapbox raster dot-tiles layer) — helps keep the globe readable at night
-		// without turning the whole basemap into a "night mode" style.
-		const zoomOutLift = computeNightLightsZoomOutLift(
-			zoom,
-			interactiveFloorDeltaRef.current
-		);
-		const loadT =
-			clamp(nightLightsLoadTRef.current, 0, 1) *
-			clamp(nightLightsZoomLoadTRef.current, 0, 1);
-		// Make lights appear earlier in dusk/dawn (and feel more "present" at night)
-		// without showing them during full daylight.
-		const nightForLights = Math.pow(night, 0.65);
-		// Unsubscribe burn: surface the dots as embers even in full daylight,
-		// scaling with the burn factor (their ember tint is owned by the burn
-		// tween via `applyUnsubscribeBurnEmberTint`). Same fast-start power
-		// curve as `nightForLights` so embers read clearly from the first step.
-		const unsubscribeBurn = unsubscribeBurnEase(unsubscribeBurnTRef.current);
-		const burnForLights = Math.pow(unsubscribeBurn, 0.65);
-		const lightsBase =
-			Math.max(nightForLights, burnForLights) *
-			(NIGHT_US_LIGHTS_OPACITY + zoomOutLift) *
-			computeNightLightsFade(zoom) *
-			loadT;
-
-		// Intro: reveal alpha-biased tiles first (reads as dot-by-dot sweep), then crossfade
-		// to the real tiles so final brightness/density is correct.
-		const introDone = nightLightsIntroDoneRef.current;
-		const introRevealT = clamp(nightLightsIntroRevealTRef.current, 0, 1);
-		const introCrossT = clamp(nightLightsIntroCrossfadeTRef.current, 0, 1);
-		let introFinalMul = 1;
-		let introRevealMul = 0;
-		if (!introDone) {
-			if (introCrossT > 0) {
-				introFinalMul = introCrossT;
-				introRevealMul = 1 - introCrossT;
-			} else {
-				introFinalMul = 0;
-				introRevealMul = introRevealT;
-			}
-		}
-
-		const crispMul = computeNightLightsCrispMul(zoom);
-		const closeGlowMul = computeNightLightsCloseGlowMul(zoom);
-
-		const finalCrispOpacity = clamp(lightsBase * introFinalMul * crispMul, 0, 1);
-		const finalSpaceGlowOpacity = clamp(
-			lightsBase *
-				NIGHT_LIGHTS_SPACE_GLOW_OPACITY_MULT *
-				computeNightLightsSpaceGlowFade(zoom, interactiveFloorDeltaRef.current) *
-				introFinalMul,
-			0,
-			1
-		);
-		const finalSpaceGlowOpacity2 = clamp(
-			finalSpaceGlowOpacity * NIGHT_LIGHTS_SPACE_GLOW_EXTRA_PASS_OPACITY_MUL,
-			0,
-			1
-		);
-		const finalGlowOpacity = clamp(
-			lightsBase *
-				NIGHT_LIGHTS_GLOW_OPACITY_MULT *
-				computeNightLightsGlowFade(zoom) *
-				introFinalMul,
-			0,
-			1
-		);
-		const finalCloseGlowOpacity = clamp(
-			lightsBase * NIGHT_LIGHTS_CLOSE_GLOW_OPACITY_MULT * closeGlowMul * introFinalMul,
-			0,
-			1
-		);
-		const revealCrispOpacity = clamp(lightsBase * introRevealMul * crispMul, 0, 1);
-		const revealGlowOpacity = clamp(
-			lightsBase *
-				NIGHT_LIGHTS_GLOW_OPACITY_MULT *
-				computeNightLightsGlowFade(zoom) *
-				introRevealMul,
-			0,
-			1
-		);
-		try {
-			const m = mapRef.current;
-			if (m) {
-				setRasterOpacityIfChanged(
-					m,
-					MAPBOX_LAYER_IDS.nightLightsSpaceGlow,
-					finalSpaceGlowOpacity
-				);
-				setRasterOpacityIfChanged(
-					m,
-					MAPBOX_LAYER_IDS.nightLightsSpaceGlow2,
-					finalSpaceGlowOpacity2
-				);
-				setRasterOpacityIfChanged(
-					m,
-					MAPBOX_LAYER_IDS.nightLightsRevealGlow,
-					revealGlowOpacity
-				);
-				setRasterOpacityIfChanged(
-					m,
-					MAPBOX_LAYER_IDS.nightLightsReveal,
-					revealCrispOpacity
-				);
-				setRasterOpacityIfChanged(m, MAPBOX_LAYER_IDS.nightLightsGlow, finalGlowOpacity);
-				setRasterOpacityIfChanged(
-					m,
-					MAPBOX_LAYER_IDS.nightLightsCloseGlow,
-					finalCloseGlowOpacity
-				);
-				setRasterOpacityIfChanged(m, MAPBOX_LAYER_IDS.nightLights, finalCrispOpacity);
-			}
-		} catch {
-			// Non-fatal.
-		}
-
 		// Hot wash — uniform warm-white screen-blend overlay that brightens the
 		// whole globe. Gated on the mood's `hotWashEligible` flag (only sunny/normal)
 		// so cloudy/stormy/snowy don't get a brightening lift, and on the raw
@@ -12439,6 +12055,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// Unsubscribe burn washes — uniform multiply char plus a late-stage
 		// screen-blend ember under-glow (only emerges past mid-burn). Both are
 		// 0 outside the unsubscribe flow.
+		const unsubscribeBurn = unsubscribeBurnEase(unsubscribeBurnTRef.current);
 		const burnWashOpacity = clamp(
 			unsubscribeBurn * UNSUBSCRIBE_BURN_WASH_MAX_OPACITY,
 			0,
@@ -12617,227 +12234,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [map, isMapLoaded, applyBlobMorph]);
 
-	// Fade in night lights once their tiles are ready to avoid the initial "patchy" look.
-	useEffect(() => {
-		if (!map) return;
-		if (!isMapLoaded) return;
-		if (!contactLightsTilesEnabled) return;
-		if (typeof window === 'undefined') return;
-
-		nightLightsLoadTRef.current = 0;
-		nightLightsLoadStartedRef.current = false;
-		nightLightsZoomLoadTRef.current = 1;
-		nightLightsIntroRevealTRef.current = 0;
-		nightLightsIntroCrossfadeTRef.current = 0;
-		nightLightsIntroDoneRef.current = false;
-		applyLightingOverlayOpacity();
-
-		let cancelled = false;
-		let rafId: number | null = null;
-		let intervalId: number | null = null;
-		let attempts = 0;
-
-		const clearTimers = () => {
-			if (intervalId != null) window.clearInterval(intervalId);
-			if (rafId != null) window.cancelAnimationFrame(rafId);
-			intervalId = null;
-			rafId = null;
-		};
-
-		const startFallbackFade = () => {
-			if (nightLightsLoadStartedRef.current) return;
-			nightLightsLoadStartedRef.current = true;
-			nightLightsIntroDoneRef.current = true;
-			const start = performance.now();
-			const tick = () => {
-				if (cancelled) return;
-				const now = performance.now();
-				const t = clamp((now - start) / NIGHT_LIGHTS_LOAD_FADE_MS, 0, 1);
-				const inv = 1 - t;
-				const eased = 1 - inv * inv * inv;
-				nightLightsLoadTRef.current = eased;
-				applyLightingOverlayOpacity();
-				if (t < 1) rafId = window.requestAnimationFrame(tick);
-			};
-			rafId = window.requestAnimationFrame(tick);
-		};
-
-		const startIntroReveal = () => {
-			if (nightLightsLoadStartedRef.current) return;
-			nightLightsLoadStartedRef.current = true;
-			// Once tiles are ready, unlock visibility and run the west->east reveal.
-			nightLightsLoadTRef.current = 1;
-			nightLightsIntroRevealTRef.current = 0;
-			nightLightsIntroCrossfadeTRef.current = 0;
-			nightLightsIntroDoneRef.current = false;
-
-			const startReveal = performance.now();
-			const tickReveal = () => {
-				if (cancelled) return;
-				const now = performance.now();
-				const t = clamp((now - startReveal) / NIGHT_LIGHTS_INTRO_REVEAL_MS, 0, 1);
-				// Ease-in-out: lets the left edge "sparkle" before ramping across.
-				const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-				nightLightsIntroRevealTRef.current = eased;
-				applyLightingOverlayOpacity();
-				if (t < 1) {
-					rafId = window.requestAnimationFrame(tickReveal);
-					return;
-				}
-
-				// Crossfade to the real tiles so final brightness is correct everywhere.
-				const startCross = performance.now();
-				const tickCross = () => {
-					if (cancelled) return;
-					const now2 = performance.now();
-					const t2 = clamp((now2 - startCross) / NIGHT_LIGHTS_INTRO_CROSSFADE_MS, 0, 1);
-					// Ease-out cubic.
-					const inv = 1 - t2;
-					const eased2 = 1 - inv * inv * inv;
-					nightLightsIntroCrossfadeTRef.current = eased2;
-					applyLightingOverlayOpacity();
-					if (t2 < 1) {
-						rafId = window.requestAnimationFrame(tickCross);
-						return;
-					}
-					nightLightsIntroDoneRef.current = true;
-					applyLightingOverlayOpacity();
-				};
-				rafId = window.requestAnimationFrame(tickCross);
-			};
-
-			rafId = window.requestAnimationFrame(tickReveal);
-		};
-
-		const poll = () => {
-			if (cancelled) return;
-			attempts++;
-			const m = mapRef.current;
-			if (!m) return;
-			let readyFinal = false;
-			let readyReveal = false;
-			const hasRevealSource = Boolean(
-				(m as any).getSource?.(MAPBOX_SOURCE_IDS.nightLightsReveal)
-			);
-			try {
-				readyFinal = m.isSourceLoaded(MAPBOX_SOURCE_IDS.nightLights);
-			} catch {
-				readyFinal = false;
-			}
-			if (hasRevealSource) {
-				try {
-					readyReveal = m.isSourceLoaded(MAPBOX_SOURCE_IDS.nightLightsReveal);
-				} catch {
-					readyReveal = false;
-				}
-			}
-
-			const ready = hasRevealSource ? readyFinal && readyReveal : readyFinal;
-
-			// If we can't confirm readiness quickly, still start after a short grace period.
-			if (ready || attempts >= 28) {
-				clearTimers();
-				if (hasRevealSource) startIntroReveal();
-				else startFallbackFade();
-			}
-		};
-
-		intervalId = window.setInterval(poll, NIGHT_LIGHTS_LOAD_POLL_MS);
-		poll();
-
-		return () => {
-			cancelled = true;
-			clearTimers();
-		};
-	}, [map, isMapLoaded, contactLightsTilesEnabled, applyLightingOverlayOpacity]);
-
-	// During zooming, Mapbox will temporarily resample/scale raster tiles while new tiles stream in.
-	// For this dot overlay that can read as a "hairy" texture, we dim it slightly during the
-	// interaction and ease it back in once the source reports loaded.
-	useEffect(() => {
-		if (!map) return;
-		if (!isMapLoaded) return;
-		if (!contactLightsTilesEnabled) return;
-		if (typeof window === 'undefined') return;
-
-		let cancelled = false;
-		let rafId: number | null = null;
-		let intervalId: number | null = null;
-		let attempts = 0;
-
-		const clearTimers = () => {
-			if (intervalId != null) window.clearInterval(intervalId);
-			if (rafId != null) window.cancelAnimationFrame(rafId);
-			intervalId = null;
-			rafId = null;
-		};
-
-		const fadeTo = (target: number, ms: number) => {
-			clearTimers();
-			const startT = performance.now();
-			const from = clamp(nightLightsZoomLoadTRef.current, 0, 1);
-			const to = clamp(target, 0, 1);
-			const tick = () => {
-				if (cancelled) return;
-				const now = performance.now();
-				const t = clamp((now - startT) / ms, 0, 1);
-				// Ease-out cubic.
-				const inv = 1 - t;
-				const eased = 1 - inv * inv * inv;
-				nightLightsZoomLoadTRef.current = from + (to - from) * eased;
-				applyLightingOverlayOpacity();
-				if (t < 1) rafId = window.requestAnimationFrame(tick);
-			};
-			rafId = window.requestAnimationFrame(tick);
-		};
-
-		const startFadeInWhenReady = () => {
-			clearTimers();
-			attempts = 0;
-
-			const poll = () => {
-				if (cancelled) return;
-				attempts++;
-				const m = mapRef.current;
-				if (!m) return;
-				let ready = false;
-				try {
-					ready = m.isSourceLoaded(MAPBOX_SOURCE_IDS.nightLights);
-				} catch {
-					ready = false;
-				}
-				if (ready || attempts >= 16) {
-					fadeTo(1, NIGHT_LIGHTS_ZOOM_LOAD_FADE_MS);
-				}
-			};
-
-			intervalId = window.setInterval(poll, NIGHT_LIGHTS_ZOOM_LOAD_POLL_MS);
-			poll();
-		};
-
-		const handleZoomStart = () => {
-			// Dim quickly so we don't stare at the scaled/intermediate raster state,
-			// but keep the lights present so they feel "part of the map".
-			fadeTo(NIGHT_LIGHTS_ZOOM_LOAD_DIM_FLOOR, NIGHT_LIGHTS_ZOOM_LOAD_OUT_FADE_MS);
-		};
-
-		const handleZoomEnd = () => {
-			nightLightsZoomLoadTRef.current = NIGHT_LIGHTS_ZOOM_LOAD_DIM_FLOOR;
-			applyLightingOverlayOpacity();
-			startFadeInWhenReady();
-		};
-
-		map.on('zoomstart', handleZoomStart);
-		map.on('zoomend', handleZoomEnd);
-
-		return () => {
-			cancelled = true;
-			clearTimers();
-			map.off('zoomstart', handleZoomStart);
-			map.off('zoomend', handleZoomEnd);
-		};
-	}, [map, isMapLoaded, contactLightsTilesEnabled, applyLightingOverlayOpacity]);
-
 	// Update overlays when the day/night factor changes (e.g. dusk progression).
 	useEffect(() => {
 		if (!map) return;
@@ -12966,7 +12362,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				visualNightT,
 				burn
 			);
-			applyUnsubscribeBurnEmberTint(map, burn);
 			applyLightingOverlayOpacity();
 			try {
 				map.triggerRepaint();

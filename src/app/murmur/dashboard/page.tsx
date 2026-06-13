@@ -156,7 +156,7 @@ import type {
 } from '@/components/molecules/SearchResultsMap/types';
 import {
 	type PersistentDashboardMapConfig,
-	usePersistentMapReady,
+	usePersistentMapFirstPaint,
 	usePersistentMapSetter,
 } from '@/contexts/PersistentMapContext';
 import { DashboardBootBackdrop } from '@/components/molecules/DashboardBootBackdrop/DashboardBootBackdrop';
@@ -576,10 +576,11 @@ const MAP_RESULTS_BOTTOM_SEARCH_BOX = {
 const MAP_CHROME_MID_MAX_LAYOUT_WIDTH_PX = 1490;
 const MAP_CHROME_COMPRESSED_MAX_LAYOUT_WIDTH_PX = 1080;
 
-// Cinematic boot splash over the cold-loading map: minimum on-screen time (so a fast
-// cached load never flashes the starfield), fade-out duration, and a safety cap that
-// dismisses the splash even if Mapbox errors or never loads.
-const DASHBOARD_BOOT_MIN_VISIBLE_MS = 1200;
+// Cinematic boot splash over the cold-loading map: minimum on-screen time, fade-out
+// duration, and a safety cap that dismisses the splash even if Mapbox errors or never
+// loads. The minimum is 0 by explicit choice: the fade starts the moment the globe's
+// land silhouette has painted (the 800ms fade itself keeps the reveal cinematic).
+const DASHBOARD_BOOT_MIN_VISIBLE_MS = 0;
 const DASHBOARD_BOOT_FADE_MS = 800;
 const DASHBOARD_BOOT_MAX_WAIT_MS = 10000;
 type DashboardBootPhase = 'active' | 'fading' | 'done';
@@ -8168,28 +8169,31 @@ const DashboardContent = () => {
 	const isOverflowingDashboardPanelOpen = isCampaignFinderOpen || isCalendarPanelOpen;
 
 	// Cinematic boot splash: a dark starfield + skeleton hero chrome shown over the
-	// cold-loading map, fading into the globe once Mapbox's `load` fires. Lazy init
-	// from the layout-persistent ready flag so client-side route returns (dashboard →
-	// campaign → dashboard, map still mounted/loaded) skip the splash entirely.
-	const isPersistentMapReady = usePersistentMapReady();
+	// cold-loading map, fading into the globe once the land silhouette has painted
+	// (the map's first-paint stage — earlier than the full `load`, so street detail
+	// streams in behind the fade). Lazy init from the layout-persistent flag so
+	// client-side route returns (dashboard → campaign → dashboard, map still
+	// mounted/painted) skip the splash entirely.
+	const isPersistentMapFirstPainted = usePersistentMapFirstPaint();
 	const [bootPhase, setBootPhase] = useState<DashboardBootPhase>(() =>
-		isPersistentMapReady ? 'done' : 'active'
+		isPersistentMapFirstPainted ? 'done' : 'active'
 	);
 	const bootStartRef = useRef(Date.now());
 
-	// Map ready → hold until the minimum splash time has elapsed, then start the fade.
+	// Land painted → hold until the minimum splash time has elapsed, then start the fade.
 	useEffect(() => {
-		if (bootPhase !== 'active' || !isPersistentMapReady) return;
+		if (bootPhase !== 'active' || !isPersistentMapFirstPainted) return;
 		const elapsed = Date.now() - bootStartRef.current;
 		const timer = setTimeout(
 			() => setBootPhase('fading'),
 			Math.max(0, DASHBOARD_BOOT_MIN_VISIBLE_MS - elapsed)
 		);
 		return () => clearTimeout(timer);
-	}, [bootPhase, isPersistentMapReady]);
+	}, [bootPhase, isPersistentMapFirstPainted]);
 
 	useEffect(() => {
 		if (bootPhase !== 'fading') return;
+		markPerf('murmur:map:reveal-start');
 		const timer = setTimeout(() => setBootPhase('done'), DASHBOARD_BOOT_FADE_MS);
 		return () => clearTimeout(timer);
 	}, [bootPhase]);

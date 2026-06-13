@@ -1,8 +1,91 @@
 import { type BookingContactTitlePrefix } from '@/constants/contactCategories';
 import { CITY_LOCATIONS_LIST } from '@/constants/cityLocations';
 import { US_STATES } from '@/constants/usStates';
+import {
+	SEARCH_REGIONS_LIST,
+	type SearchRegionDef,
+} from '@/constants/searchRegions';
 
 type ParsedCityCoordinatePrecision = 'city' | 'state';
+
+// ---------------------------------------------------------------------------
+// DB-derived city gazetteer (built in ./cityGazetteer.ts from contact data).
+// parse.ts owns the types and key normalization so the gazetteer module and
+// the check-script fixtures share one contract without pulling Prisma here.
+// ---------------------------------------------------------------------------
+
+export type GazetteerEntry = {
+	/** Display-cased city name ("New Haven"). */
+	name: string;
+	/** Uppercase two-letter state abbreviation. */
+	stateAbbr: string;
+	lat: number;
+	lon: number;
+	/** Number of contacts backing this (city, state) median. */
+	count: number;
+};
+
+export type CityGazetteer = {
+	/** Keyed by gazetteerPairKey(cityKey, stateAbbr). */
+	byCityState: Map<string, GazetteerEntry>;
+	/** Keyed by normalizeCityKey(city); entries sorted by count descending. */
+	byName: Map<string, GazetteerEntry[]>;
+	/** Longest city name in tokens (caps n-gram probing). */
+	maxNameTokens: number;
+};
+
+// Leading-token abbreviation pairs canonicalized to the short form so
+// "Saint Paul" and "St. Paul" share a key. Only the leading token of a
+// multi-token name is touched — "st"/"mt" alone are noise/Montana.
+const CITY_LEADING_TOKEN_CANONICAL: Record<string, string> = {
+	saint: 'st',
+	fort: 'ft',
+	mount: 'mt',
+};
+
+export const normalizeCityKey = (raw: string): string => {
+	const tokens = raw
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, ' ')
+		.trim()
+		.split(' ')
+		.filter(Boolean);
+	if (tokens.length >= 2) {
+		const canonical = CITY_LEADING_TOKEN_CANONICAL[tokens[0]];
+		if (canonical) tokens[0] = canonical;
+	}
+	return tokens.join(' ');
+};
+
+export const gazetteerPairKey = (cityKey: string, stateAbbr: string): string =>
+	`${cityKey}|${stateAbbr.toLowerCase()}`;
+
+// Bare gazetteer names (no state qualifier in the query) must clear these
+// guards — common English words that are also real towns would otherwise
+// hijack descriptor text ("poetry reading venues" → Reading PA).
+const BARE_GAZETTEER_MIN_CONTACTS = 10;
+const BARE_GAZETTEER_MIN_NAME_LENGTH = 4;
+const BARE_GAZETTEER_DOMINANCE = 0.8;
+const BARE_GAZETTEER_STOPLIST = new Set([
+	'surprise',
+	'mobile',
+	'normal',
+	'independence',
+	'enterprise',
+	'industry',
+	'reading',
+	'media',
+	'florence',
+	'venice',
+	'jackson',
+	'columbia',
+	'clinton',
+	'union',
+	'liberty',
+	'commerce',
+	'gateway',
+	'crossroads',
+]);
 
 type KnownCity = {
 	name: string;
@@ -178,6 +261,15 @@ const buildKnownCities = (): KnownCity[] => {
 
 const KNOWN_CITIES_LONGEST_FIRST = buildKnownCities();
 
+export type ParsedSearchRegion = {
+	name: string;
+	states: { name: string; abbr: string }[];
+	lat: number;
+	lon: number;
+	radiusKm: number;
+	scope: 'states' | 'metro';
+};
+
 export type ParsedSearchQuery = {
 	raw: string;
 	categories: BookingContactTitlePrefix[];
@@ -189,6 +281,7 @@ export type ParsedSearchQuery = {
 		coordinatePrecision: ParsedCityCoordinatePrecision;
 	} | null;
 	state: { name: string; abbr: string; lat: number; lon: number } | null;
+	region: ParsedSearchRegion | null;
 	country: string | null;
 	restOfQuery: string;
 	hadExplicitCategory: boolean;
@@ -358,13 +451,280 @@ const findStateAbbreviationMatch = (
 const stripRangeFromQuery = (query: string, start: number, end: number): string =>
 	normalizeAfterStrip(`${query.slice(0, start)} ${query.slice(end)}`);
 
+// ---------------------------------------------------------------------------
+// Region detection
+// ---------------------------------------------------------------------------
+
+type RegionAliasEntry = {
+	alias: string;
+	def: SearchRegionDef;
+	requiresUppercase: boolean;
+};
+
+const REGION_ALIASES_LONGEST_FIRST: RegionAliasEntry[] = (() => {
+	const flat: RegionAliasEntry[] = [];
+	for (const def of SEARCH_REGIONS_LIST) {
+		for (const alias of def.aliases) {
+			flat.push({
+				alias,
+				def,
+				requiresUppercase:
+					def.requiresUppercaseAliases?.includes(alias) ?? false,
+			});
+		}
+	}
+	flat.sort((a, b) => b.alias.length - a.alias.length);
+	return flat;
+})();
+
+// "the south carolina coast": the alias's trailing direction word concatenates
+// with the next token into a state name that the plain state check below
+// can't see ("carolina" alone is not a state).
+const DIRECTIONAL_GUARD_CONTINUATIONS = new Set(['carolina', 'dakota']);
+
+const stripTokenPunctuation = (token: string): string =>
+	token.replace(/^[(,.!?]+/, '').replace(/[),.!?]+$/, '');
+
+// A direction-family alias ("northeast", "midwest"...) immediately followed
+// by a state means the user qualified a state, not a region — "northeast
+// ohio" is Ohio. Reject the region match and let the state loops consume it.
+const directionalGuardRejects = (working: string, aliasEnd: number): boolean => {
+	const following = working.slice(aliasEnd).replace(/^[\s,]+/, '');
+	const rawTokens = following.split(/\s+/).filter(Boolean).slice(0, 2);
+	if (rawTokens.length === 0) return false;
+	const t1 = stripTokenPunctuation(rawTokens[0]);
+	const t1Lc = t1.toLowerCase();
+	if (!t1Lc) return false;
+	if (DIRECTIONAL_GUARD_CONTINUATIONS.has(t1Lc)) return true;
+	if (t1Lc.length > 2 && STATE_BY_NAME_OR_ABBR.has(t1Lc)) return true;
+	if (rawTokens.length >= 2) {
+		const t2Lc = stripTokenPunctuation(rawTokens[1]).toLowerCase();
+		if (t2Lc && STATE_BY_NAME_OR_ABBR.has(`${t1Lc} ${t2Lc}`)) return true;
+	}
+	if (t1.length === 2 && STATE_BY_NAME_OR_ABBR.has(t1Lc)) {
+		const state = STATE_BY_NAME_OR_ABBR.get(t1Lc)!;
+		const ambiguous = AMBIGUOUS_STATE_ABBRS.has(state.abbr);
+		if (!ambiguous || t1 === state.abbr) return true;
+	}
+	return false;
+};
+
+const findRegionMatch = (
+	working: string
+): { region: ParsedSearchRegion; re: RegExp } | null => {
+	for (const { alias, def, requiresUppercase } of REGION_ALIASES_LONGEST_FIRST) {
+		const re = new RegExp(boundaryWrappedPhrase(alias), 'i');
+		const match = re.exec(working);
+		if (!match) continue;
+		// boundaryWrappedPhrase consumes the leading boundary char; the alias
+		// itself is a fixed-length literal, so its span is the match tail.
+		const aliasStart = match.index + match[0].length - alias.length;
+		if (requiresUppercase) {
+			const aliasText = working.slice(aliasStart, aliasStart + alias.length);
+			if (aliasText !== alias.toUpperCase()) continue;
+		}
+		if (
+			def.directionalGuard &&
+			directionalGuardRejects(working, aliasStart + alias.length)
+		) {
+			continue;
+		}
+		const states = def.stateAbbrs
+			.map((abbr) => STATE_BY_NAME_OR_ABBR.get(abbr.toLowerCase()))
+			.filter((s): s is NonNullable<typeof s> => Boolean(s))
+			.map((s) => ({ name: s.name, abbr: s.abbr }));
+		return {
+			region: {
+				name: def.name,
+				states,
+				lat: def.centroid.lat,
+				lon: def.centroid.lng,
+				radiusKm: def.radiusKm,
+				scope: def.scope,
+			},
+			re,
+		};
+	}
+	return null;
+};
+
+// ---------------------------------------------------------------------------
+// Gazetteer matching (token/Map probes — never regexes over ~10k names)
+// ---------------------------------------------------------------------------
+
+type TokenSpan = {
+	raw: string;
+	cleaned: string;
+	lc: string;
+	start: number;
+	end: number;
+};
+
+const tokenizeWorking = (working: string): TokenSpan[] => {
+	const tokens: TokenSpan[] = [];
+	const re = /\S+/g;
+	let m: RegExpExecArray | null;
+	while ((m = re.exec(working)) !== null) {
+		const cleaned = stripTokenPunctuation(m[0]);
+		tokens.push({
+			raw: m[0],
+			cleaned,
+			lc: cleaned.toLowerCase(),
+			start: m.index,
+			end: m.index + m[0].length,
+		});
+	}
+	return tokens;
+};
+
+// State mention starting at token i: a one/two-token full state name, or a
+// two-letter abbreviation. Ambiguous abbrs (IN/OR/ME/HI) are accepted here in
+// any case — unlike the standalone abbr scan, the caller requires a gazetteer
+// city hit immediately before the abbr, which is the disambiguator (same
+// contract as the curated "Portland or" behavior).
+const gazetteerStateMentionAt = (
+	tokens: TokenSpan[],
+	i: number
+): { state: (typeof SEARCH_REGIONS)[number]; endIndex: number } | null => {
+	const t = tokens[i];
+	if (!t || !t.lc) return null;
+	const next = tokens[i + 1];
+	if (next && next.lc) {
+		const two = STATE_BY_NAME_OR_ABBR.get(`${t.lc} ${next.lc}`);
+		if (two) return { state: two, endIndex: i + 1 };
+	}
+	const one = STATE_BY_NAME_OR_ABBR.get(t.lc);
+	if (!one) return null;
+	return { state: one, endIndex: i };
+};
+
+const gazetteerCityFromEntry = (
+	entry: GazetteerEntry
+): NonNullable<ParsedSearchQuery['city']> => ({
+	name: entry.name,
+	state: entry.stateAbbr,
+	lat: entry.lat,
+	lon: entry.lon,
+	coordinatePrecision: 'city',
+});
+
+const findGazetteerCityStateMatch = (
+	working: string,
+	gazetteer: CityGazetteer
+): {
+	city: NonNullable<ParsedSearchQuery['city']>;
+	state: ParsedSearchQuery['state'];
+	start: number;
+	end: number;
+} | null => {
+	const tokens = tokenizeWorking(working);
+	for (let i = 1; i < tokens.length; i++) {
+		const mention = gazetteerStateMentionAt(tokens, i);
+		if (!mention) continue;
+		const maxK = Math.min(4, gazetteer.maxNameTokens, i);
+		for (let k = maxK; k >= 1; k--) {
+			const cityTokens = tokens.slice(i - k, i);
+			const key = normalizeCityKey(
+				cityTokens.map((t) => t.cleaned).join(' ')
+			);
+			if (!key) continue;
+			const entry = gazetteer.byCityState.get(
+				gazetteerPairKey(key, mention.state.abbr)
+			);
+			if (!entry) continue;
+			return {
+				city: gazetteerCityFromEntry(entry),
+				state: stateFromRegion(mention.state),
+				start: cityTokens[0].start,
+				end: tokens[mention.endIndex].end,
+			};
+		}
+	}
+	return null;
+};
+
+const findGazetteerBareCityMatch = (
+	working: string,
+	gazetteer: CityGazetteer,
+	restrictToStateAbbr: string | null
+): {
+	city: NonNullable<ParsedSearchQuery['city']>;
+	start: number;
+	end: number;
+} | null => {
+	const tokens = tokenizeWorking(working);
+	const maxK = Math.min(4, gazetteer.maxNameTokens, tokens.length);
+	for (let k = maxK; k >= 1; k--) {
+		for (let i = 0; i + k <= tokens.length; i++) {
+			const span = tokens.slice(i, i + k);
+			const key = normalizeCityKey(span.map((t) => t.cleaned).join(' '));
+			if (!key) continue;
+			if (restrictToStateAbbr) {
+				const entry = gazetteer.byCityState.get(
+					gazetteerPairKey(key, restrictToStateAbbr)
+				);
+				if (!entry) continue;
+				return {
+					city: gazetteerCityFromEntry(entry),
+					start: span[0].start,
+					end: span[k - 1].end,
+				};
+			}
+			// Stateless bare names need every guard: no stoplisted common words,
+			// a minimum length and contact count, and state dominance so split
+			// names (Springfield) stay neutral rather than guessing wrong.
+			if (BARE_GAZETTEER_STOPLIST.has(key)) continue;
+			if (key.length < BARE_GAZETTEER_MIN_NAME_LENGTH) continue;
+			const entries = gazetteer.byName.get(key);
+			if (!entries || entries.length === 0) continue;
+			const total = entries.reduce((sum, e) => sum + e.count, 0);
+			if (total < BARE_GAZETTEER_MIN_CONTACTS) continue;
+			const top = entries[0];
+			if (entries.length > 1 && top.count < total * BARE_GAZETTEER_DOMINANCE) {
+				continue;
+			}
+			return {
+				city: gazetteerCityFromEntry(top),
+				start: span[0].start,
+				end: span[k - 1].end,
+			};
+		}
+	}
+	return null;
+};
+
+// Curated CITY_LOCATIONS_LIST entries only carry state-centroid coordinates.
+// When the gazetteer knows the actual (city, state) median, upgrade the match
+// to true city precision. Seeded cities (already 'city') are never touched.
+const upgradeCityPrecisionFromGazetteer = (
+	city: ParsedSearchQuery['city'],
+	gazetteer: CityGazetteer | null | undefined
+): ParsedSearchQuery['city'] => {
+	if (!city || !gazetteer) return city;
+	if (city.coordinatePrecision === 'city' || !city.state) return city;
+	const entry = gazetteer.byCityState.get(
+		gazetteerPairKey(normalizeCityKey(city.name), city.state)
+	);
+	if (!entry) return city;
+	return {
+		...city,
+		lat: entry.lat,
+		lon: entry.lon,
+		coordinatePrecision: 'city',
+	};
+};
+
 const COUNTRY_DETECTORS: { country: string; patterns: RegExp[] }[] = [
 	{ country: 'United States', patterns: [/\busa\b/i, /\bunited states\b/i, /\bu\.s\.?a?\b/i, /\bamerica\b/i] },
 	{ country: 'Canada', patterns: [/\bcanada\b/i, /\bcanadian\b/i] },
 	{ country: 'United Kingdom', patterns: [/\buk\b/i, /\bunited kingdom\b/i, /\bbritain\b/i, /\benglish?\b/i] },
 ];
 
-export const parseFreeTextSearchQuery = (rawQuery: string): ParsedSearchQuery => {
+export const parseFreeTextSearchQuery = (
+	rawQuery: string,
+	options?: { gazetteer?: CityGazetteer | null }
+): ParsedSearchQuery => {
+	const gazetteer = options?.gazetteer ?? null;
 	const raw = (rawQuery ?? '').trim();
 	let working = normalizeWorkingQuery(raw);
 
@@ -381,12 +741,38 @@ export const parseFreeTextSearchQuery = (rawQuery: string): ParsedSearchQuery =>
 
 	let stateMatch: ParsedSearchQuery['state'] = null;
 	let cityMatch: ParsedSearchQuery['city'] = null;
+	let regionMatch: ParsedSearchRegion | null = null;
 
 	const explicitCityState = findCityStateMatch(working);
 	if (explicitCityState) {
-		cityMatch = explicitCityState.city;
+		cityMatch = upgradeCityPrecisionFromGazetteer(
+			explicitCityState.city,
+			gazetteer
+		);
 		stateMatch = explicitCityState.state;
 		working = stripRegexMatchFromQuery(working, explicitCityState.re);
+	}
+
+	// Gazetteer "City, ST" / "City ST" pair match — covers towns outside the
+	// curated dictionary ("Willimantic CT"). Runs before region detection so
+	// direction-named towns ("Midwest City OK") resolve as towns.
+	if (!cityMatch && gazetteer) {
+		const pair = findGazetteerCityStateMatch(working, gazetteer);
+		if (pair) {
+			cityMatch = pair.city;
+			stateMatch = pair.state;
+			working = stripRangeFromQuery(working, pair.start, pair.end);
+		}
+	}
+
+	// Regions before the state-name loop: "southern california" must resolve
+	// as SoCal, not the bare state. A region can coexist with a parsed city
+	// ("portland pacific northwest") — the city wins for centering, the
+	// region widens state enforcement.
+	const regionFound = findRegionMatch(working);
+	if (regionFound) {
+		regionMatch = regionFound.region;
+		working = stripRegexMatchFromQuery(working, regionFound.re);
 	}
 
 	for (const state of STATES_LONGEST_FIRST) {
@@ -402,7 +788,7 @@ export const parseFreeTextSearchQuery = (rawQuery: string): ParsedSearchQuery =>
 	if (!cityMatch) {
 		const city = findKnownCityMatch(working);
 		if (city) {
-			cityMatch = city.city;
+			cityMatch = upgradeCityPrecisionFromGazetteer(city.city, gazetteer);
 			working = stripRegexMatchFromQuery(working, city.re);
 		}
 	}
@@ -423,6 +809,25 @@ export const parseFreeTextSearchQuery = (rawQuery: string): ParsedSearchQuery =>
 		}
 	}
 
+	// Gazetteer fallbacks for towns the curated dictionary missed. With a
+	// parsed state, any in-state town resolves ("connecticut venues in
+	// willimantic"); with no place signal at all, bare names must clear the
+	// stoplist/count/dominance guards.
+	if (!cityMatch && gazetteer && stateMatch) {
+		const bare = findGazetteerBareCityMatch(working, gazetteer, stateMatch.abbr);
+		if (bare) {
+			cityMatch = bare.city;
+			working = stripRangeFromQuery(working, bare.start, bare.end);
+		}
+	}
+	if (!cityMatch && gazetteer && !stateMatch && !regionMatch) {
+		const bare = findGazetteerBareCityMatch(working, gazetteer, null);
+		if (bare) {
+			cityMatch = bare.city;
+			working = stripRangeFromQuery(working, bare.start, bare.end);
+		}
+	}
+
 	let country: string | null = null;
 	for (const detector of COUNTRY_DETECTORS) {
 		for (const pattern of detector.patterns) {
@@ -435,12 +840,16 @@ export const parseFreeTextSearchQuery = (rawQuery: string): ParsedSearchQuery =>
 		if (country) break;
 	}
 
-	// Strip filler "in" / "near" / "around" connectives now that the place
-	// candidates are gone. The remaining tokens become `restOfQuery` for the
-	// kNN retriever — best when it's the substantive intent ("indie rock with
-	// craft beer" rather than "music venues in austin").
+	// Strip filler "in" / "near" / "around" connectives and bare articles now
+	// that the place candidates are gone ("in the pacific northwest" leaves
+	// "the" once the region phrase is consumed). The remaining tokens become
+	// `restOfQuery` for the kNN retriever — best when it's the substantive
+	// intent ("indie rock with craft beer" rather than "music venues in austin").
 	const restOfQuery = working
-		.replace(/\b(in|near|around|at|located|within|that|which|who|and|or)\b/gi, ' ')
+		.replace(
+			/\b(in|near|around|at|located|within|that|which|who|and|or|the|a|an)\b/gi,
+			' '
+		)
 		.replace(/\s+/g, ' ')
 		.trim();
 
@@ -451,10 +860,12 @@ export const parseFreeTextSearchQuery = (rawQuery: string): ParsedSearchQuery =>
 		categories: [...categoriesFound],
 		city: cityMatch,
 		state: stateMatch,
+		region: regionMatch,
 		country,
 		restOfQuery,
 		hadExplicitCategory: categoriesFound.size > 0,
-		hadExplicitPlace: cityMatch !== null || stateMatch !== null,
+		hadExplicitPlace:
+			cityMatch !== null || stateMatch !== null || regionMatch !== null,
 		mentionsLiveMusic,
 	};
 };

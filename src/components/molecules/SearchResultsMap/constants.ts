@@ -279,15 +279,17 @@ export const STATE_LABELS_FULL_OPACITY_ZOOM = MAP_MIN_ZOOM + 0.5;
 export const STATE_HOVER_HIGHLIGHT_MAX_ZOOM = MAP_DEFAULT_ZOOM + 1;
 
 // --- Basemap overview prewarming ---------------------------------------------
-// While zoomed in, quietly warm the coarse low-zoom basemap tiles for the wide
-// region a zoom-out would reveal, so the periphery is served from the browser
-// cache instead of streaming in. Only prewarm once we're deep enough that
-// zooming out actually reveals never-loaded periphery.
-export const OVERVIEW_PREWARM_MIN_ZOOM = 8;
-// Overview zooms to warm: ceil(MAP_MIN_ZOOM)=3 up through 6 — the levels a
-// zoom-out settles on. z7+ near the threshold is already covered by the scaled
-// child tiles loaded from the deep view.
+// Whenever the map settles, quietly warm the coarse low-zoom basemap tiles for
+// the wide region a zoom-out would reveal, so the periphery is served from the
+// browser cache instead of streaming in. Candidate levels are filtered to those
+// strictly below the current view (floor(zoom)); the fully-zoomed-out floor view
+// is warmed separately at the live `getMinZoom()` (z2 desktop / z1 mobile / z3
+// large monitors via the viewport-proportional floor), since that's the level
+// every zoom-out ultimately lands on.
 export const OVERVIEW_PREWARM_ZOOMS = [3, 4, 5, 6] as const;
+// Skip the floor-view preload when we're already (nearly) at the floor — its
+// tiles are on screen.
+export const OVERVIEW_PREWARM_FLOOR_SKIP_MARGIN = 0.5;
 // Debounce after the map settles, to keep prewarm off the interaction hot path.
 export const OVERVIEW_PREWARM_DEBOUNCE_MS = 350;
 // Dedupe: round center to this many degrees; re-warm only when it moves a tile's
@@ -455,31 +457,6 @@ export const CLOUDS_SNOW_INTERACTION_STAMP_SIZE_PX = 96;
 export const CLOUDS_SNOW_INTERACTION_TARGET_IMPACTS = 360;
 export const CLOUDS_SNOW_INTERACTION_TARGET_IMPACTS_REDUCED = 140;
 export const CLOUDS_SNOW_INTERACTION_MAX_REFRACT_SHIFT_PX = 3.2;
-
-// ============================================================================
-// Contact-lights overlay (night dot tiles)
-// ============================================================================
-
-// Contact-lights overlay: dot-only night lights derived from contact coordinates.
-// Implemented as local raster tiles (like clouds) so it stays glued to the globe.
-// NOTE: include a version query param to bust browser caches when tiles regenerate.
-export const CONTACT_LIGHTS_TILES_URL_TEMPLATE = '/maps/contact_lights/{z}/{x}/{y}.png?v=9';
-// "Intro reveal" tiles: same dots, but alpha is biased west->east so a global fade-in reads
-// like dots revealing left-to-right. We crossfade to the real tiles after the intro.
-export const CONTACT_LIGHTS_REVEAL_TILES_URL_TEMPLATE =
-	'/maps/contact_lights_reveal/{z}/{x}/{y}.png?v=9';
-// Tiles only exist for z2..z6 (generate_contact_lights_tiles.py defaults).
-// The mobile full-globe floor sits below z2, so the source must declare its
-// real minzoom or Mapbox requests missing z0/z1 tiles there.
-export const CONTACT_LIGHTS_TILES_MIN_ZOOM = 2;
-export const CONTACT_LIGHTS_TILES_MAX_ZOOM = 6;
-// CONUS-ish bounds (limits Mapbox tile requests).
-export const CONTACT_LIGHTS_TILES_BOUNDS: [number, number, number, number] = [
-	-125.5, // lon min
-	24.0, // lat min
-	-66.0, // lon max
-	50.0, // lat max
-];
 
 // ============================================================================
 // Web Mercator constants & cloud canvas coordinates
@@ -747,14 +724,6 @@ export const UNSUBSCRIBE_BURN_OCEAN_HOT = '#1C272D';
 export const UNSUBSCRIBE_BURN_LANDCOVER_MID = '#7E8168';
 export const UNSUBSCRIBE_BURN_LANDCOVER_HOT = '#241F18';
 
-// Ember tint for the contact-lights raster dots (`raster-color` ramp). The
-// tiles are uniform warm-white dots, so ramping on raster-value gives a
-// hot-core / dark-rim ember falloff at the resampled dot edges for free.
-export const UNSUBSCRIBE_BURN_EMBER_EDGE_COLOR = 'rgba(70, 8, 0, 0)';
-export const UNSUBSCRIBE_BURN_EMBER_DIM_COLOR = 'rgb(160, 40, 8)';
-export const UNSUBSCRIBE_BURN_EMBER_HOT_COLOR_MID = 'rgb(255, 150, 60)';
-export const UNSUBSCRIBE_BURN_EMBER_HOT_COLOR_HOT = 'rgb(255, 58, 26)';
-
 // DOM overlay washes (multiply char + screen under-glow).
 export const UNSUBSCRIBE_BURN_WASH_COLOR = 'rgb(98, 28, 12)';
 export const UNSUBSCRIBE_BURN_WASH_MAX_OPACITY = 0.45;
@@ -776,6 +745,19 @@ export const MAP_WORLD_LAND_LAYER_ID = 'murmur-world-land-fill';
 export const MAP_WORLD_LAND_TILESET_URL = 'mapbox://mapbox.country-boundaries-v1';
 export const MAP_WORLD_LAND_SOURCE_LAYER = 'country_boundaries';
 
+// Local back-stop under the tileset fill: a bundled Natural Earth 110m land
+// silhouette (same cream color) that loads once from our own origin with zero
+// Mapbox round trips and is immune to tile eviction. It only shows where the
+// precise country-boundaries tiles haven't painted yet (cold boot, aggressive
+// zoom-outs past the underzoom placeholder window), which is exactly when its
+// 110m coarseness is invisible.
+export const MAP_WORLD_LAND_LOCAL_SOURCE_ID = 'murmur-world-land-local';
+export const MAP_WORLD_LAND_LOCAL_LAYER_ID = 'murmur-world-land-fill-local';
+export const MAP_WORLD_LAND_LOCAL_DATA_URL = '/maps/world-land-110m.json';
+// Cap geojson-vt tiling depth: past z6 the tileset fill has long since painted,
+// so deeper local tiles would be pure worker memory/CPU waste.
+export const MAP_WORLD_LAND_LOCAL_MAX_ZOOM = 6;
+
 // Performance: the `within` filter is helpful when zoomed out (to hide Canada/Mexico labels/roads),
 // but it adds overhead at high zoom where there are many more road/label features.
 // Only apply the US-only basemap clipping up to this zoom level.
@@ -791,8 +773,6 @@ export const MAPBOX_SOURCE_IDS = {
 	snow: 'murmur-snow',
 	dayFarSideShade: 'murmur-day-far-side-shade',
 	sunTransition: 'murmur-sun-transition',
-	nightLights: 'murmur-night-lights',
-	nightLightsReveal: 'murmur-night-lights-reveal',
 	states: 'murmur-states',
 	resultsOutline: 'murmur-results-outline',
 	lockedOutline: 'murmur-locked-outline',
@@ -829,13 +809,6 @@ export const MAPBOX_LAYER_IDS = {
 	dayFarSideShade: 'murmur-day-far-side-shade-raster',
 	sunTransition: 'murmur-sun-transition-raster',
 	sunTransitionCloudCatchlight: 'murmur-sun-transition-cloud-catchlight-raster',
-	nightLightsSpaceGlow: 'murmur-night-lights-space-glow',
-	nightLightsSpaceGlow2: 'murmur-night-lights-space-glow-2',
-	nightLightsGlow: 'murmur-night-lights-glow',
-	nightLightsCloseGlow: 'murmur-night-lights-close-glow',
-	nightLights: 'murmur-night-lights-raster',
-	nightLightsRevealGlow: 'murmur-night-lights-reveal-glow',
-	nightLightsReveal: 'murmur-night-lights-reveal-raster',
 	// States
 	statesFillHit: 'murmur-states-fill-hit',
 	statesFillHover: 'murmur-states-fill-hover',
@@ -1240,62 +1213,8 @@ export const NIGHT_WARM_KEY_MIN_MUL = 0.04;
 export const NIGHT_DARK_WASH_OPACITY = 0.17;
 // Keep the night basemap visually matched to the normal day map.
 export const NIGHT_FACE_SHADE_OPACITY = 0;
-// US night visibility: dot-only contact-lights tiles (not a heatmap). Kept
-// well below 1 so the lights read as a soft glow rather than a stark
-// NASA-earth-at-night photo (which feels eerie/lonely on its own).
-export const NIGHT_US_LIGHTS_OPACITY = 0.55;
 export const NIGHT_MOON_RIM_OPACITY = 0;
 export const NIGHT_SHADOW_OVERLAY_MUL_MIN = 0.18;
-
-// City-lights persistence: this is primarily a "zoomed out / from space" aesthetic.
-// Fade out aggressively as we approach state/city zoom so it doesn't compete with markers.
-export const NIGHT_LIGHTS_FADE_START_ZOOM = 3.7;
-// Keep visible through a "medium" multi-state view, then drop off quickly before city-level zoom.
-export const NIGHT_LIGHTS_FADE_END_ZOOM = 6.65;
-// When the map first mounts, the lights tiles can appear in patches as they stream
-// in. We keep the overlay hidden until the raster source reports "loaded", then
-// fade it in so the first impression feels deliberate.
-export const NIGHT_LIGHTS_LOAD_POLL_MS = 120;
-export const NIGHT_LIGHTS_LOAD_FADE_MS = 750;
-// Zoom interaction: hide while tiles stream, then fade back in quickly.
-export const NIGHT_LIGHTS_ZOOM_LOAD_POLL_MS = 90;
-export const NIGHT_LIGHTS_ZOOM_LOAD_FADE_MS = 320;
-export const NIGHT_LIGHTS_ZOOM_LOAD_OUT_FADE_MS = 140;
-// Keep lights present during zoom gestures (no "blink"), but dim slightly so
-// intermediate overzoomed raster state is less noticeable.
-export const NIGHT_LIGHTS_ZOOM_LOAD_DIM_FLOOR = 0.72;
-// Intro animation: reveal left-to-right, then crossfade to the real tiles.
-export const NIGHT_LIGHTS_INTRO_REVEAL_MS = 900;
-export const NIGHT_LIGHTS_INTRO_CROSSFADE_MS = 260;
-
-// Zoomed-out visibility: at the minimum zoom the US is only a few screen pixels wide,
-// so we apply a small opacity lift so the dots still read as a faint glow.
-export const NIGHT_LIGHTS_ZOOM_OUT_LIFT_START_ZOOM = MAP_MIN_ZOOM;
-export const NIGHT_LIGHTS_ZOOM_OUT_LIFT_END_ZOOM = NIGHT_LIGHTS_FADE_START_ZOOM;
-export const NIGHT_LIGHTS_ZOOM_OUT_LIFT_MAX = 0.62;
-// Extra "bloom" pass: a low-zoom glow layer that makes the US read as sparkling
-// from far zoom without turning the crisp dot layer into a blur.
-export const NIGHT_LIGHTS_GLOW_OPACITY_MULT = 0.75;
-// Fade the glow out by "medium" zoom so the pattern reads as city clusters, not
-// a noisy texture. (We still keep the crisp dot layer.)
-export const NIGHT_LIGHTS_GLOW_FADE_START_ZOOM = 3.2;
-export const NIGHT_LIGHTS_GLOW_FADE_END_ZOOM = 4.2;
-// Extra "space" glow: a short-lived boost that makes the US read from fully zoomed-out
-// view, then disappears before any state-level interaction.
-export const NIGHT_LIGHTS_SPACE_GLOW_OPACITY_MULT = 1.55;
-// A second space-only pass (same tiles) to push the glow to be visible from "space"
-// without changing the dot tile generation.
-export const NIGHT_LIGHTS_SPACE_GLOW_EXTRA_PASS_OPACITY_MUL = 0.85;
-export const NIGHT_LIGHTS_SPACE_GLOW_FADE_START_ZOOM = MAP_MIN_ZOOM;
-export const NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM = 3.55;
-
-// Zoomed-in behavior: instead of many crisp points at mid zoom (which can read as "hair"),
-// crossfade toward a very subtle, local glow pass.
-export const NIGHT_LIGHTS_CRISP_FADE_OUT_START_ZOOM = 4.05;
-export const NIGHT_LIGHTS_CRISP_FADE_OUT_END_ZOOM = 4.55;
-export const NIGHT_LIGHTS_CLOSE_GLOW_FADE_IN_START_ZOOM = 4.05;
-export const NIGHT_LIGHTS_CLOSE_GLOW_FADE_IN_END_ZOOM = 4.35;
-export const NIGHT_LIGHTS_CLOSE_GLOW_OPACITY_MULT = 0.55;
 
 // ============================================================================
 // Night DOM overlay backgrounds
@@ -1342,5 +1261,3 @@ export const SUN_TRANSITION_SPACE_GLOW_BG = [
 	'radial-gradient(ellipse 58% 44% at 18% 14%, rgba(217, 86, 184, 0.18) 0%, rgba(142, 88, 210, 0.09) 42%, rgba(142, 88, 210, 0) 78%)',
 	'radial-gradient(ellipse 120% 84% at -18% -14%, rgba(255, 238, 182, 0.13) 0%, rgba(255, 210, 150, 0.06) 48%, rgba(255, 210, 150, 0) 82%)',
 ].join(', ');
-
-// NOTE: Night lights are generated offline as raster dot tiles (see scripts/generate_contact_lights_tiles.py).

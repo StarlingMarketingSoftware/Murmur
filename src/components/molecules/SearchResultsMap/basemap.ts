@@ -13,8 +13,11 @@ import {
 	MAP_LAND_CREAM,
 	MAP_LANDCOVER_GREEN,
 	MAP_OCEAN_BLUE,
-	MAPBOX_LAYER_IDS,
 	MAP_WORLD_LAND_LAYER_ID,
+	MAP_WORLD_LAND_LOCAL_DATA_URL,
+	MAP_WORLD_LAND_LOCAL_LAYER_ID,
+	MAP_WORLD_LAND_LOCAL_MAX_ZOOM,
+	MAP_WORLD_LAND_LOCAL_SOURCE_ID,
 	MAP_WORLD_LAND_SOURCE_ID,
 	MAP_WORLD_LAND_SOURCE_LAYER,
 	MAP_WORLD_LAND_TILESET_URL,
@@ -33,10 +36,6 @@ import {
 	UNSUBSCRIBE_BURN_AMBIENT_LIGHT_COLOR,
 	UNSUBSCRIBE_BURN_AMBIENT_LIGHT_INTENSITY,
 	UNSUBSCRIBE_BURN_CLOSE_FOG_COLOR,
-	UNSUBSCRIBE_BURN_EMBER_DIM_COLOR,
-	UNSUBSCRIBE_BURN_EMBER_EDGE_COLOR,
-	UNSUBSCRIBE_BURN_EMBER_HOT_COLOR_HOT,
-	UNSUBSCRIBE_BURN_EMBER_HOT_COLOR_MID,
 	UNSUBSCRIBE_BURN_HIGH_COLOR_HOT,
 	UNSUBSCRIBE_BURN_HIGH_COLOR_MID,
 	UNSUBSCRIBE_BURN_HORIZON_BLEND,
@@ -334,6 +333,13 @@ export const applyNightLandPalette = (
 		if (mapInstance.getLayer(MAP_WORLD_LAND_LAYER_ID)) {
 			mapInstance.setPaintProperty(MAP_WORLD_LAND_LAYER_ID, 'fill-color', palette.land);
 		}
+		if (mapInstance.getLayer(MAP_WORLD_LAND_LOCAL_LAYER_ID)) {
+			mapInstance.setPaintProperty(
+				MAP_WORLD_LAND_LOCAL_LAYER_ID,
+				'fill-color',
+				palette.land
+			);
+		}
 	} catch {
 		// Non-fatal.
 	}
@@ -400,58 +406,6 @@ export const applyNightLandPalette = (
 		}
 	} catch {
 		// Non-fatal.
-	}
-};
-
-// ============================================================================
-// Unsubscribe burn ember tint (contact-lights raster dots)
-// ============================================================================
-
-// Tints the warm-white contact-lights dots into embers via a `raster-color`
-// ramp (the dots' visibility floor lives in `applyLightingOverlayOpacity`).
-// Nothing else in the pipeline touches `raster-color`, so this is applied
-// only by the burn tween; at burnT=0 the property is removed so the dots
-// return to their native warm-white look.
-export const applyUnsubscribeBurnEmberTint = (
-	mapInstance: mapboxgl.Map,
-	burnT: number
-) => {
-	const burn = unsubscribeBurnEase(burnT);
-	const ramp =
-		burn <= 0
-			? undefined
-			: [
-					'interpolate',
-					['linear'],
-					['raster-value'],
-					0,
-					UNSUBSCRIBE_BURN_EMBER_EDGE_COLOR,
-					0.55,
-					UNSUBSCRIBE_BURN_EMBER_DIM_COLOR,
-					1,
-					// Orange embers mid-burn, saturated red at full burn.
-					mixBurnColor(
-						UNSUBSCRIBE_BURN_EMBER_HOT_COLOR_MID,
-						UNSUBSCRIBE_BURN_EMBER_HOT_COLOR_HOT,
-						clamp((burn - 0.5) * 2, 0, 1)
-					),
-				];
-	const layerIds = [
-		MAPBOX_LAYER_IDS.nightLightsSpaceGlow,
-		MAPBOX_LAYER_IDS.nightLightsSpaceGlow2,
-		MAPBOX_LAYER_IDS.nightLightsRevealGlow,
-		MAPBOX_LAYER_IDS.nightLightsReveal,
-		MAPBOX_LAYER_IDS.nightLightsGlow,
-		MAPBOX_LAYER_IDS.nightLightsCloseGlow,
-		MAPBOX_LAYER_IDS.nightLights,
-	];
-	for (const id of layerIds) {
-		try {
-			if (!mapInstance.getLayer(id)) continue;
-			mapInstance.setPaintProperty(id, 'raster-color', ramp as any);
-		} catch {
-			// Non-fatal.
-		}
 	}
 };
 
@@ -578,6 +532,20 @@ export const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 					// Settlement layers also carry an icon (the city-center dot). Fade it
 					// on the same ramp so the dots don't litter the zoomed-out overview.
 					mapInstance.setPaintProperty(id, 'icon-opacity', fade);
+					// The opacity ramp hides the labels below startZoom, but the layers are
+					// still "visible" there — glyphs get fetched and symbol layout/placement
+					// runs in tiles where nothing is legible (boot zoom 4 included). Also
+					// cull by zoom range so that work disappears entirely. Floor matters:
+					// tiles lay out at their integer tile zoom, so a 6.5 minzoom would skip
+					// layout in z6 tiles and break the 6.5→8 fade-in.
+					const live = mapInstance.getLayer(id) as
+						| { minzoom?: number; maxzoom?: number }
+						| undefined;
+					mapInstance.setLayerZoomRange(
+						id,
+						Math.max(live?.minzoom ?? 0, Math.floor(startZoom)),
+						live?.maxzoom ?? 24
+					);
 				} catch {
 					// Data-driven property we can't override — leave the layer as-is.
 				}
@@ -654,6 +622,45 @@ export const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 // World-land fill (cream continents under the ocean-blue background)
 // ============================================================================
 
+// Adds the local back-stop fill directly beneath the tileset fill (or, when the
+// tileset layer is missing, beneath the first non-background basemap layer).
+const ensureLocalWorldLandLayer = (mapInstance: mapboxgl.Map) => {
+	try {
+		if (!mapInstance.getSource(MAP_WORLD_LAND_LOCAL_SOURCE_ID)) return;
+		if (mapInstance.getLayer(MAP_WORLD_LAND_LOCAL_LAYER_ID)) return;
+
+		let beforeId: string | undefined;
+		if (mapInstance.getLayer(MAP_WORLD_LAND_LAYER_ID)) {
+			beforeId = MAP_WORLD_LAND_LAYER_ID;
+		} else {
+			const style = mapInstance.getStyle();
+			for (const layer of style?.layers ?? []) {
+				const id = (layer as any)?.id as string | undefined;
+				if (!id) continue;
+				if (id.startsWith('murmur-')) continue;
+				if ((layer as any)?.type === 'background') continue;
+				beforeId = id;
+				break;
+			}
+		}
+
+		mapInstance.addLayer(
+			{
+				id: MAP_WORLD_LAND_LOCAL_LAYER_ID,
+				type: 'fill',
+				source: MAP_WORLD_LAND_LOCAL_SOURCE_ID,
+				paint: {
+					'fill-color': MAP_LAND_CREAM,
+					'fill-antialias': true,
+				},
+			} as any,
+			beforeId
+		);
+	} catch {
+		// Non-fatal.
+	}
+};
+
 export const ensureWorldLandFill = (mapInstance: mapboxgl.Map) => {
 	try {
 		if (!mapInstance.getSource(MAP_WORLD_LAND_SOURCE_ID)) {
@@ -664,11 +671,29 @@ export const ensureWorldLandFill = (mapInstance: mapboxgl.Map) => {
 		}
 	} catch {
 		// If source add fails (offline / token scoped out) the background stays
-		// ocean-blue everywhere, which is a graceful degradation.
-		return;
+		// ocean-blue everywhere, which is a graceful degradation (the local
+		// back-stop below still paints the continents).
 	}
 
-	if (mapInstance.getLayer(MAP_WORLD_LAND_LAYER_ID)) return;
+	// Local land back-stop (see MAP_WORLD_LAND_LOCAL_* constants): same cream,
+	// inserted directly beneath the tileset fill so it only ever shows where
+	// country-boundaries tiles haven't painted yet.
+	try {
+		if (!mapInstance.getSource(MAP_WORLD_LAND_LOCAL_SOURCE_ID)) {
+			mapInstance.addSource(MAP_WORLD_LAND_LOCAL_SOURCE_ID, {
+				type: 'geojson',
+				data: MAP_WORLD_LAND_LOCAL_DATA_URL,
+				maxzoom: MAP_WORLD_LAND_LOCAL_MAX_ZOOM,
+			} as any);
+		}
+	} catch {
+		// Non-fatal.
+	}
+
+	if (mapInstance.getLayer(MAP_WORLD_LAND_LAYER_ID)) {
+		ensureLocalWorldLandLayer(mapInstance);
+		return;
+	}
 
 	// Insert the land fill as the first layer above `background` so every other
 	// Mapbox layer (water, landuse, roads, labels) draws on top. We can't assume
@@ -706,6 +731,8 @@ export const ensureWorldLandFill = (mapInstance: mapboxgl.Map) => {
 	} catch {
 		// Non-fatal.
 	}
+
+	ensureLocalWorldLandLayer(mapInstance);
 };
 
 // ============================================================================
