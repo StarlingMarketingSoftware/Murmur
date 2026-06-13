@@ -49,16 +49,24 @@ export interface CampaignContactEventDto {
 	metadata: unknown | null;
 }
 
+// Exported so callers (e.g. the dashboard's ensureActiveCampaign) can read/await the
+// exact same React Query cache entry that useGetCampaigns populates — same key, same
+// fetcher. The list is the authority on which campaigns are active (the API filters
+// out soft-deleted ones).
+export const getCampaignsListQueryKey = () => QUERY_KEYS.list();
+
+export const fetchCampaignsList = async () => {
+	const response = await _fetch(urls.api.campaigns.index);
+	if (!response.ok) {
+		throw new Error('Failed to fetch campaigns');
+	}
+	return response.json();
+};
+
 export const useGetCampaigns = () => {
 	return useQuery({
-		queryKey: QUERY_KEYS.list(),
-		queryFn: async () => {
-			const response = await _fetch(urls.api.campaigns.index);
-			if (!response.ok) {
-				throw new Error('Failed to fetch campaigns');
-			}
-			return response.json();
-		},
+		queryKey: getCampaignsListQueryKey(),
+		queryFn: fetchCampaignsList,
 	});
 };
 
@@ -242,7 +250,7 @@ const writeActiveCampaignStorage = (id: number | null): void => {
 	}
 };
 
-type CampaignListItem = { id: number; updatedAt: string | Date; name?: string };
+export type CampaignListItem = { id: number; updatedAt: string | Date; name?: string };
 
 export interface UseActiveCampaignResult {
 	activeCampaignId: number | null;
@@ -304,6 +312,11 @@ export const useActiveCampaign = (): UseActiveCampaignResult => {
 	useEffect(() => {
 		if (!activeCampaign) return;
 		if (activeCampaign.id !== resolvedId) return;
+		// The detail endpoint doesn't filter soft-deleted campaigns, so a stale
+		// stored id can resolve to one before the list loads — only backfill ids
+		// the active list vouches for.
+		const list = campaigns as CampaignListItem[] | undefined;
+		if (!list?.some((c) => c.id === activeCampaign.id)) return;
 		const ucls = activeCampaign.userContactLists ?? [];
 		if (ucls.length > 0) return;
 		if (backfillInFlightForId.current === activeCampaign.id) return;
@@ -331,7 +344,7 @@ export const useActiveCampaign = (): UseActiveCampaignResult => {
 				backfillInFlightForId.current = null;
 			}
 		})();
-	}, [activeCampaign, resolvedId, createUserContactList, editCampaign]);
+	}, [activeCampaign, resolvedId, campaigns, createUserContactList, editCampaign]);
 
 	const isResolving = isLoadingList && resolvedId == null;
 

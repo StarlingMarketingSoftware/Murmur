@@ -59,6 +59,11 @@ export type InboxSentTabRequest = {
 	preserveSelection?: boolean;
 };
 
+export type InboxPanelTabRequest = {
+	tab: 'responses' | 'opportunities';
+	requestId: number;
+};
+
 export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
 	view?: DraftingSectionView;
@@ -103,6 +108,11 @@ export interface DraftingSectionProps {
 	 * Used by the campaign page to route "Sent" navigation into the inbox's Sent view.
 	 */
 	inboxSentTabRequest?: InboxSentTabRequest | null;
+	/**
+	 * Optional request to switch the inbox left panel's Responses/Opportunities filter.
+	 * Used by the campaign page's overview star pill to land on Opportunities.
+	 */
+	inboxPanelTabRequest?: InboxPanelTabRequest | null;
 	/**
 	 * Optional callback fired whenever the InboxSection's Inbox/Sent tab changes.
 	 */

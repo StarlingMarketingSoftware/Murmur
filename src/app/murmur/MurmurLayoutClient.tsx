@@ -205,11 +205,6 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 						line-height: 1.2 !important;
 					}
 				}
-
-				/* Hide global Clerk button on mobile empty dashboard */
-				body.murmur-mobile-empty .clerk-user-button {
-					display: none !important;
-				}
 			`}</style>
 		</PersistentMapProvider>
 		</SendingSessionProvider>

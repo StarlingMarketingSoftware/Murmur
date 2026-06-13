@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 import { useCampaignDetail } from './useCampaignDetail';
 import type {
 	DraftingSectionView,
+	InboxPanelTabRequest,
 	InboxSentTab,
 	InboxSentTabRequest,
 } from './DraftingSection/useDraftingSection';
@@ -16,11 +17,14 @@ import { getApproximateLocation } from '@/utils/approximateLocation';
 import { markPerf } from '@/utils/perfMarks';
 import { prefetchCuratedForYouFromCampaign } from '@/app/murmur/dashboard/searchResultCache';
 import {
+	CAMPAIGN_SIDE_SHIFT_VAR,
 	CAMPAIGN_SNUG_MAX_HEIGHT_FIT_ZOOM,
 	CAMPAIGN_SNUG_MIN_EFFECTIVE_WIDTH_PX,
 	CAMPAIGN_SNUG_SAFE_BOTTOM_MARGIN_PX,
 	CAMPAIGN_WORKSPACE_CONTENT_SCALE,
+	computeMapSelectGrabViewScale,
 	computeMurmurChromeZoomForViewport,
+	computeSideRailCenterShiftPx,
 } from '@/utils/murmurChromeZoom';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useMe } from '@/hooks/useMe';
@@ -74,6 +78,14 @@ import type {
 	CampaignContactMapStatus,
 	SearchResultsMapProps,
 } from '@/components/molecules/SearchResultsMap/SearchResultsMap';
+import { MAP_MIN_ZOOM } from '@/components/molecules/SearchResultsMap/constants';
+import {
+	MAP_ZOOM_CONTROL_MAX_INDEX,
+	buildZoomControlLevels,
+	clampZoomControlValue,
+	controlValueForZoom,
+	zoomForControlValue,
+} from '@/utils/mapZoomControlLadder';
 import {
 	MapSelectGrabStarterBox,
 	MapSelectGrabStackBox,
@@ -116,6 +128,13 @@ type CampaignOverviewBottomBoxesProps = {
 	draftCount: number;
 	inboxCount: number;
 	sentCount: number;
+	// Navigation handlers; undefined renders that box as a disabled, display-only pill.
+	onOpenSearch?: () => void;
+	onOpenContacts?: () => void;
+	onOpenDrafts?: () => void;
+	onOpenInbox?: () => void;
+	onOpenSent?: () => void;
+	onOpenOpportunities?: () => void;
 };
 
 // The overview bottom cluster (status toggle + strip + ask box + count boxes) is
@@ -599,6 +618,12 @@ const CampaignOverviewBottomBoxes = ({
 	draftCount,
 	inboxCount,
 	sentCount,
+	onOpenSearch,
+	onOpenContacts,
+	onOpenDrafts,
+	onOpenInbox,
+	onOpenSent,
+	onOpenOpportunities,
 }: CampaignOverviewBottomBoxesProps) => {
 	const boxStyle: CSSProperties = {
 		width: 39.154,
@@ -621,6 +646,7 @@ const CampaignOverviewBottomBoxes = ({
 	const inactiveBox = (key: string, opacity: number) => (
 		<div
 			key={key}
+			aria-hidden="true"
 			style={{
 				...boxStyle,
 				opacity,
@@ -628,34 +654,99 @@ const CampaignOverviewBottomBoxes = ({
 			}}
 		/>
 	);
+	const navBoxClassName = (onClick?: () => void) =>
+		cn(
+			'pointer-events-auto border-0 p-0 transition-opacity duration-150',
+			onClick && 'hover:opacity-85'
+		);
+	const countBox = ({
+		label,
+		count,
+		background,
+		onClick,
+	}: {
+		label: string;
+		count: number;
+		background: string;
+		onClick?: () => void;
+	}) => (
+		<button
+			type="button"
+			aria-label={`${count} ${label}`}
+			disabled={!onClick}
+			className={navBoxClassName(onClick)}
+			style={{
+				...boxStyle,
+				...countStyle,
+				background,
+				cursor: onClick ? 'pointer' : 'default',
+			}}
+			onClick={onClick}
+		>
+			{count}
+		</button>
+	);
 
 	return (
 		<div
-			aria-hidden="true"
 			className="pointer-events-none fixed left-0 right-0 flex justify-center"
 			style={{ bottom: CAMPAIGN_OVERVIEW_BOTTOM_BOXES_BOTTOM_PX, zIndex: 125 }}
 		>
 			<div className="flex" style={{ gap: 3 }}>
 				{inactiveBox('left-1', 0.1)}
 				{inactiveBox('left-2', 0.2)}
-				<div style={{ ...boxStyle, background: '#FFFFFF' }}>
+				<button
+					type="button"
+					aria-label="Open search"
+					disabled={!onOpenSearch}
+					className={navBoxClassName(onOpenSearch)}
+					style={{
+						...boxStyle,
+						background: '#FFFFFF',
+						cursor: onOpenSearch ? 'pointer' : 'default',
+					}}
+					onClick={onOpenSearch}
+				>
 					<SearchIconDesktop width={17} height={18} stroke="#8B8B8B" strokeWidth={2.3} />
-				</div>
-				<div style={{ ...boxStyle, ...countStyle, background: '#EB8586' }}>
-					{contactsCount}
-				</div>
-				<div style={{ ...boxStyle, ...countStyle, background: '#FFE3AA' }}>
-					{draftCount}
-				</div>
-				<div style={{ ...boxStyle, ...countStyle, background: '#6EBED5' }}>
-					{inboxCount}
-				</div>
-				<div style={{ ...boxStyle, ...countStyle, background: '#5AB478' }}>
-					{sentCount}
-				</div>
-				<div style={{ ...boxStyle, background: '#EFD7D3' }}>
+				</button>
+				{countBox({
+					label: 'contacts',
+					count: contactsCount,
+					background: '#EB8586',
+					onClick: onOpenContacts,
+				})}
+				{countBox({
+					label: 'drafts',
+					count: draftCount,
+					background: '#FFE3AA',
+					onClick: onOpenDrafts,
+				})}
+				{countBox({
+					label: 'inbox',
+					count: inboxCount,
+					background: '#6EBED5',
+					onClick: onOpenInbox,
+				})}
+				{countBox({
+					label: 'sent',
+					count: sentCount,
+					background: '#5AB478',
+					onClick: onOpenSent,
+				})}
+				<button
+					type="button"
+					aria-label="Open inbox opportunities"
+					disabled={!onOpenOpportunities}
+					className={navBoxClassName(onOpenOpportunities)}
+					style={{
+						...boxStyle,
+						background: '#EFD7D3',
+						cursor: onOpenOpportunities ? 'pointer' : 'default',
+					}}
+					onClick={onOpenOpportunities}
+				>
 					<DashboardActionBarStarIcon width={15} height={15} style={{ color: '#E32222' }} />
-				</div>
+				</button>
 				{inactiveBox('right-1', 0.2)}
 				{inactiveBox('right-2', 0.1)}
 			</div>
@@ -741,6 +832,68 @@ const CAMPAIGN_TOP_NAV_SHIFT_X_VAR = '--murmur-campaign-top-nav-shift-x';
 const CAMPAIGN_MAP_BACKDROP_START_VAR = '--murmur-campaign-map-backdrop-start';
 const CAMPAIGN_MAP_BACKDROP_END_VAR = '--murmur-campaign-map-backdrop-end';
 const CAMPAIGN_MAP_CONTENT_SCALE = CAMPAIGN_WORKSPACE_CONTENT_SCALE;
+
+// The shift-x value the current DOM was painted with, read from the INLINE html
+// style on purpose: the var is absent in scrollable/mobile modes, where the
+// previous-layer pinning below must be skipped.
+const readCampaignShiftXSnapshotPx = (): number | null => {
+	if (typeof document === 'undefined') return null;
+	const raw = document.documentElement.style.getPropertyValue(CAMPAIGN_MAP_SHIFT_X_VAR);
+	const parsed = raw ? parseFloat(raw) : NaN;
+	return Number.isFinite(parsed) ? parsed : null;
+};
+
+type CampaignViewSnapshot = {
+	node: HTMLElement;
+	// [flat element index, scrollTop, scrollLeft] — scroll offsets can only be
+	// applied once the clone is attached and has layout, so they're replayed in
+	// the overlay's mount callback rather than written onto the detached clone.
+	scrolls: Array<[number, number, number]>;
+};
+
+// Static DOM snapshot of the active view layer for the tab crossfade's previous
+// layer. A second React DraftingSection cannot faithfully reproduce what was on
+// screen — component-local state (envelope expansion, breakpoint tiers, form
+// text, selections, scroll) resets and pops at full opacity — and mounting that
+// whole tree at click time is itself a frame hitch. A clone is pixel-faithful
+// by construction and inert.
+const cloneCampaignActiveViewLayer = (): CampaignViewSnapshot | null => {
+	if (typeof document === 'undefined') return null;
+	const layer = document.querySelector(
+		'[data-campaign-view-layer="active"]'
+	) as HTMLElement | null;
+	if (!layer) return null;
+	const node = layer.cloneNode(true) as HTMLElement;
+	// Never a second "active" layer in the document: every zoom/envelope
+	// measurement pass scopes its anchor queries to that selector.
+	node.removeAttribute('data-campaign-view-layer');
+	node.setAttribute('aria-hidden', 'true');
+	// cloneNode copies attributes, not live element state — controlled inputs
+	// keep their value in a DOM property, so restore it by walking both
+	// (structurally identical) trees in parallel.
+	const originals = layer.querySelectorAll<HTMLElement>('*');
+	const copies = node.querySelectorAll<HTMLElement>('*');
+	const scrolls: CampaignViewSnapshot['scrolls'] = [];
+	const count = Math.min(originals.length, copies.length);
+	for (let i = 0; i < count; i++) {
+		const src = originals[i];
+		const dst = copies[i];
+		if (
+			(src instanceof HTMLInputElement && dst instanceof HTMLInputElement) ||
+			(src instanceof HTMLTextAreaElement && dst instanceof HTMLTextAreaElement) ||
+			(src instanceof HTMLSelectElement && dst instanceof HTMLSelectElement)
+		) {
+			dst.value = src.value;
+		}
+		if (src instanceof HTMLInputElement && dst instanceof HTMLInputElement) {
+			dst.checked = src.checked;
+		}
+		if (src.scrollTop || src.scrollLeft) {
+			scrolls.push([i, src.scrollTop, src.scrollLeft]);
+		}
+	}
+	return { node, scrolls };
+};
 const CAMPAIGN_MAP_FALLBACK_SHIFT_X_PX = 160;
 const CAMPAIGN_MAP_MIN_SHIFT_X_PX = 88;
 const CAMPAIGN_MAP_MAX_SHIFT_X_PX = 900;
@@ -749,6 +902,11 @@ const CAMPAIGN_STANDARD_LEFT_PANEL_LEFT_FROM_CENTER_PX = -657;
 const CAMPAIGN_RESEARCH_RIGHT_GAP_PX = 52;
 const CAMPAIGN_BACKDROP_CONTENT_GUTTER_PX = 52;
 const CAMPAIGN_BACKDROP_TARGET_START_RATIO = 1 / 3;
+// Standard stage: the band targets a 1/3-viewport start, but on very wide layouts
+// (ultrawides) that opens a huge empty gutter left of the content. Cap the extra
+// at just above the largest tuned look (556px at 2560×1440) so tuned sizes are
+// pixel-identical and only ultrawide layouts pull the band back toward content.
+const CAMPAIGN_BACKDROP_MAX_EXTRA_GUTTER_PX = 600;
 const CAMPAIGN_COMPACT_WORKSPACE_BACKDROP_WIDTH_PX = 985;
 const CAMPAIGN_COMPACT_WORKSPACE_LEFT_PANEL_INSET_PX = 52;
 const CAMPAIGN_COMPACT_WORKSPACE_TOP_NAV_INSET_PX = 184;
@@ -785,14 +943,8 @@ const CAMPAIGN_TOP_NAV_BACKDROP_VISUAL_WIDTH_PX =
 	CAMPAIGN_TOP_NAV_BACKDROP_BOX_WIDTH_PX * CAMPAIGN_TOP_NAV_UI_SCALE;
 const CAMPAIGN_MAP_SELECT_GRAB_LEFT_PX = 26;
 
-// Match dashboard map-view scaling so the left-side map tools look identical.
-// See: src/app/murmur/dashboard/page.tsx (mapSelectGrabViewScale)
-const CAMPAIGN_MAP_SELECT_GRAB_MIN_VIEW_SCALE = 0.8;
-const CAMPAIGN_MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE = 0.84;
-const CAMPAIGN_MAP_SELECT_GRAB_MAX_VIEW_SCALE = 0.95;
-const CAMPAIGN_MAP_SELECT_GRAB_SCALE_GROW_START_HEIGHT_PX = 1180;
-const CAMPAIGN_MAP_SELECT_GRAB_SCALE_GROW_END_HEIGHT_PX = 1480;
-const CAMPAIGN_MAP_SELECT_GRAB_VIEWPORT_INSET_PX = 16;
+// The rail view-scale curve lives in murmurChromeZoom.ts (computeMapSelectGrabViewScale),
+// shared with the dashboard map view so the left-side map tools look identical.
 const CAMPAIGN_MAP_SELECT_GRAB_TOP_EXTENT_PX =
 	MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
 	MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
@@ -806,15 +958,15 @@ const CAMPAIGN_MAP_SELECT_GRAB_TOTAL_HEIGHT_PX =
 	CAMPAIGN_MAP_SELECT_GRAB_TOP_EXTENT_PX + MAP_SELECT_GRAB_TOOL_COLLAPSED_HEIGHT_PX;
 
 // Keep the left tool stack aligned with the dashboard's map-view chrome.
+// The side-shift var (written by updateCampaignZoomForViewport) lowers the rail —
+// and everything docked to it — toward vertical center on tall monitors; 0px on
+// the 1080p baseline. Same scheme as the dashboard's --murmur-dashboard-side-shift.
 const CAMPAIGN_MAP_TOOL_VISUAL_TOP_PX = 106;
-const CAMPAIGN_MAP_TOOL_VISUAL_TOP_CSS = `calc(${CAMPAIGN_MAP_TOOL_VISUAL_TOP_PX}px / var(--murmur-campaign-zoom, 0.85))`;
+const CAMPAIGN_MAP_TOOL_VISUAL_TOP_CSS = `calc((${CAMPAIGN_MAP_TOOL_VISUAL_TOP_PX}px + var(${CAMPAIGN_SIDE_SHIFT_VAR}, 0px)) / var(--murmur-campaign-zoom, 0.85))`;
 const CAMPAIGN_MAP_TOOL_VISUAL_TOP_NUDGE_UP_CSS = `calc(4px / var(--murmur-campaign-zoom, 0.85))`;
-const CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS = [
-	// Match dashboard map-view zoom calibration.
-	2.25, 2.41, 2.57, 2.73, 2.88, 3.04, 3.2, 3.52, 3.83, 4.15, 4.47, 4.78, 5.1, 5.34, 5.58,
-	5.81, 6.05, 6.29, 6.52, 6.76, 7,
-] as const;
-const CAMPAIGN_MAP_ZOOM_CONTROL_MAX_INDEX = CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS.length - 1;
+// Zoom-control ladder + converters live in @/utils/mapZoomControlLadder (shared
+// with the dashboard map view, so the calibration can't drift); the ladder is
+// rebased at runtime off the map's viewport-proportional minimum zoom.
 
 const resetCampaignDocumentScroll = () => {
 	if (typeof window === 'undefined' || typeof document === 'undefined') return;
@@ -850,43 +1002,6 @@ type CampaignMapZoomControlRequest = {
 	zoom: number;
 	nonce: number;
 	isDragging?: boolean;
-};
-
-const clampCampaignMapZoomControlValue = (levelValue: number) => {
-	if (!Number.isFinite(levelValue)) return 0;
-	return Math.min(Math.max(levelValue, 0), CAMPAIGN_MAP_ZOOM_CONTROL_MAX_INDEX);
-};
-
-const getCampaignMapZoomForControlValue = (levelValue: number) => {
-	const safeValue = clampCampaignMapZoomControlValue(levelValue);
-	const lowerIndex = Math.floor(safeValue);
-	const upperIndex = Math.min(lowerIndex + 1, CAMPAIGN_MAP_ZOOM_CONTROL_MAX_INDEX);
-	const progress = safeValue - lowerIndex;
-	const lowerZoom =
-		CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS[lowerIndex] ?? CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS[0];
-	const upperZoom = CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS[upperIndex] ?? lowerZoom;
-	return lowerZoom + (upperZoom - lowerZoom) * progress;
-};
-
-const getCampaignMapZoomControlValueForZoom = (zoom: number) => {
-	if (!Number.isFinite(zoom)) return 0;
-	const minZoom = CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS[0] ?? 0;
-	const maxZoom =
-		CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS[CAMPAIGN_MAP_ZOOM_CONTROL_MAX_INDEX] ?? minZoom;
-	if (zoom <= minZoom) return 0;
-	if (zoom >= maxZoom) return CAMPAIGN_MAP_ZOOM_CONTROL_MAX_INDEX;
-
-	for (let index = 0; index < CAMPAIGN_MAP_ZOOM_CONTROL_MAX_INDEX; index += 1) {
-		const lowerZoom = CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS[index] ?? minZoom;
-		const upperZoom = CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS[index + 1] ?? lowerZoom;
-		if (zoom <= upperZoom) {
-			const span = upperZoom - lowerZoom;
-			if (span <= 0) return index;
-			return index + (zoom - lowerZoom) / span;
-		}
-	}
-
-	return CAMPAIGN_MAP_ZOOM_CONTROL_MAX_INDEX;
 };
 
 // Dynamically import heavy components to reduce initial bundle size and prevent Vercel timeout
@@ -1014,167 +1129,6 @@ const DashboardInboxSection = nextDynamic(
 		),
 	}
 );
-const DashboardCampaignsInboxView = nextDynamic(
-	() => import('@/components/molecules/CampaignsInboxView/CampaignsInboxView'),
-	{
-		ssr: false,
-		loading: () => (
-			<div
-				className="relative flex flex-col items-center overflow-hidden"
-				style={{
-					width: '625px',
-					height: '561px',
-					border: '3px solid #000000',
-					borderRadius: '8px',
-					padding: '16px',
-					paddingTop: '76px',
-					backgroundColor: '#4ca9db',
-				}}
-				aria-busy="true"
-				aria-label="Loading campaigns"
-			>
-				<span className="sr-only">Loading campaigns…</span>
-
-				{/* Search Bar skeleton */}
-				<div
-					className="animate-pulse"
-					style={{
-						position: 'absolute',
-						top: '13px',
-						left: '14px',
-						right: '286px', // 14px + 260px toggle + 12px gap
-						height: '48px',
-						border: '3px solid #000000',
-						borderRadius: '8px',
-						backgroundColor: '#FFFFFF',
-						zIndex: 10,
-						display: 'flex',
-						alignItems: 'center',
-						paddingLeft: '16px',
-					}}
-					aria-hidden
-				>
-					<div className="w-[18px] h-[18px] rounded-[3px] bg-black/20" />
-					<div className="ml-4 h-[14px] w-[180px] rounded-[4px] bg-black/15" />
-				</div>
-
-				{/* Messages/Campaigns toggle skeleton (Campaigns selected) */}
-				<div
-					style={{
-						position: 'absolute',
-						top: '13px',
-						right: '14px',
-						width: '260px',
-						height: '48px',
-						border: '3px solid #000000',
-						borderRadius: '8px',
-						overflow: 'hidden',
-						zIndex: 10,
-						display: 'flex',
-						pointerEvents: 'none',
-					}}
-					aria-hidden
-				>
-					<div
-						aria-hidden
-						style={{
-							position: 'absolute',
-							left: '50%',
-							top: 0,
-							bottom: 0,
-							width: '3px',
-							backgroundColor: '#000000',
-							transform: 'translateX(-1.5px)',
-							pointerEvents: 'none',
-						}}
-					/>
-					<div
-						style={{
-							flex: 1,
-							height: '100%',
-							display: 'flex',
-							alignItems: 'center',
-							justifyContent: 'center',
-							backgroundColor: '#4DA6D7',
-						}}
-					>
-						<span
-							style={{
-								fontFamily: 'Inter, sans-serif',
-								fontSize: '15px',
-								fontWeight: 500,
-								color: '#000000',
-								opacity: 0.55,
-								userSelect: 'none',
-							}}
-						>
-							Messages
-						</span>
-					</div>
-					<div
-						style={{
-							flex: 1,
-							height: '100%',
-							display: 'flex',
-							alignItems: 'center',
-							justifyContent: 'center',
-							backgroundColor: '#B3E5FF',
-						}}
-					>
-						<span
-							style={{
-								fontFamily: 'Inter, sans-serif',
-								fontSize: '15px',
-								fontWeight: 500,
-								color: '#000000',
-								opacity: 0.65,
-								userSelect: 'none',
-							}}
-						>
-							Campaigns
-						</span>
-					</div>
-				</div>
-
-				{/* Campaign row skeletons (campaign page inbox pill variant) */}
-				<div className="w-full flex flex-col items-center">
-					{Array.from({ length: 5 }).map((_, idx) => (
-						<div
-							key={`dashboard-campaigns-loading-${idx}`}
-							className="select-none mb-2 w-full overflow-hidden"
-							style={{
-								height: '66px',
-								minHeight: '66px',
-								border: '3px solid #000000',
-								borderRadius: '10px',
-								backgroundColor: '#EAEAEA',
-								display: 'flex',
-								alignItems: 'flex-start',
-								padding: '10px 16px',
-							}}
-							aria-hidden
-						>
-							<div className="flex flex-col w-full gap-2 animate-pulse">
-								{/* Campaign name */}
-								<div className="h-[16px] bg-black/20 rounded w-[60%]" />
-								{/* Pills row */}
-								<div className="flex items-center gap-3 w-full">
-									<div className="h-[15px] w-[121px] rounded-[7px] bg-black/10 border border-black/25" />
-									{Array.from({ length: 4 }).map((__, metricIdx) => (
-										<div
-											key={`dashboard-campaigns-loading-pill-${idx}-${metricIdx}`}
-											className="h-[20px] w-[92px] rounded-[6px] bg-black/10 border border-black/25"
-										/>
-									))}
-								</div>
-							</div>
-						</div>
-					))}
-				</div>
-			</div>
-		),
-	}
-);
 
 const Murmur = () => {
 	// Add campaign-specific class to body for background styling
@@ -1220,28 +1174,10 @@ const Murmur = () => {
 
 	const campaignMapSelectGrabViewScale = useMemo(() => {
 		if (isMobile) return 1;
-		const availableHeight =
-			viewportHeight > 0
-				? viewportHeight - CAMPAIGN_MAP_SELECT_GRAB_VIEWPORT_INSET_PX * 2
-				: CAMPAIGN_MAP_SELECT_GRAB_TOTAL_HEIGHT_PX *
-					CAMPAIGN_MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE;
-		const fitScale = availableHeight / CAMPAIGN_MAP_SELECT_GRAB_TOTAL_HEIGHT_PX;
-		const tallViewportProgress = clampNumber(
-			(viewportHeight - CAMPAIGN_MAP_SELECT_GRAB_SCALE_GROW_START_HEIGHT_PX) /
-				(CAMPAIGN_MAP_SELECT_GRAB_SCALE_GROW_END_HEIGHT_PX -
-					CAMPAIGN_MAP_SELECT_GRAB_SCALE_GROW_START_HEIGHT_PX),
-			0,
-			1
-		);
-		const preferredScale =
-			CAMPAIGN_MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE +
-			(CAMPAIGN_MAP_SELECT_GRAB_MAX_VIEW_SCALE -
-				CAMPAIGN_MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE) *
-				tallViewportProgress;
-		return clampNumber(
-			Math.min(fitScale, preferredScale),
-			CAMPAIGN_MAP_SELECT_GRAB_MIN_VIEW_SCALE,
-			CAMPAIGN_MAP_SELECT_GRAB_MAX_VIEW_SCALE
+		// Shared curve (murmurChromeZoom.ts) — also feeds the side-shift centering math.
+		return computeMapSelectGrabViewScale(
+			viewportHeight,
+			CAMPAIGN_MAP_SELECT_GRAB_TOTAL_HEIGHT_PX
 		);
 	}, [isMobile, viewportHeight]);
 	const campaignMapSelectGrabOriginOffsetPx =
@@ -1305,6 +1241,7 @@ const Murmur = () => {
 			html.style.removeProperty(CAMPAIGN_TOP_NAV_SHIFT_X_VAR);
 			html.style.removeProperty(CAMPAIGN_MAP_BACKDROP_START_VAR);
 			html.style.removeProperty(CAMPAIGN_MAP_BACKDROP_END_VAR);
+			html.style.removeProperty(CAMPAIGN_SIDE_SHIFT_VAR);
 			// Clear any inline scroll locks that could prevent scrolling (defensive).
 			try {
 				document.body.style.overflow = '';
@@ -1333,6 +1270,7 @@ const Murmur = () => {
 			html.style.removeProperty(CAMPAIGN_TOP_NAV_SHIFT_X_VAR);
 			html.style.removeProperty(CAMPAIGN_MAP_BACKDROP_START_VAR);
 			html.style.removeProperty(CAMPAIGN_MAP_BACKDROP_END_VAR);
+			html.style.removeProperty(CAMPAIGN_SIDE_SHIFT_VAR);
 			return;
 		}
 
@@ -1477,6 +1415,11 @@ const Murmur = () => {
 
 		const campaignZoom = targetZoom > 0 ? targetZoom : DEFAULT_CAMPAIGN_ZOOM;
 		const layoutViewportW = viewportW / campaignZoom;
+		// Both split branches legitimately want shift ≈ layoutViewportW/2 − k (k ≥ ~315),
+		// so the fixed 900px cap binds on large monitors and drags the workspace left of
+		// the band. Derive the guard from geometry — the content center may never shift
+		// past the right viewport edge — keeping 900 as the floor for continuity.
+		const maxMapShiftXPx = Math.max(CAMPAIGN_MAP_MAX_SHIFT_X_PX, layoutViewportW / 2);
 		const isCompactWorkspaceActive =
 			!isCampaignWorkspaceExpandedRef.current &&
 			isCompactCampaignWorkspaceView(campaignWorkspaceActiveViewRef.current);
@@ -1518,7 +1461,7 @@ const Murmur = () => {
 			campaignMapShiftX = clampZoom(
 				calculatedShiftX,
 				CAMPAIGN_MAP_MIN_SHIFT_X_PX,
-				CAMPAIGN_MAP_MAX_SHIFT_X_PX
+				maxMapShiftXPx
 			);
 
 			const currentTopNavLeftCss =
@@ -1537,7 +1480,7 @@ const Murmur = () => {
 			campaignMapShiftX = clampZoom(
 				calculatedShiftX,
 				CAMPAIGN_MAP_MIN_SHIFT_X_PX,
-				CAMPAIGN_MAP_MAX_SHIFT_X_PX
+				maxMapShiftXPx
 			);
 			campaignTopNavShiftX = campaignMapShiftX;
 
@@ -1550,7 +1493,10 @@ const Murmur = () => {
 			const twoThirdsBackdropStartCss =
 				layoutViewportW * CAMPAIGN_BACKDROP_TARGET_START_RATIO;
 			campaignBackdropStartCss = clampZoom(
-				Math.min(contentAlignedBackdropStartCss, twoThirdsBackdropStartCss),
+				Math.max(
+					Math.min(contentAlignedBackdropStartCss, twoThirdsBackdropStartCss),
+					contentAlignedBackdropStartCss - CAMPAIGN_BACKDROP_MAX_EXTRA_GUTTER_PX
+				),
 				0,
 				layoutViewportW
 			);
@@ -1569,6 +1515,17 @@ const Murmur = () => {
 		html.style.setProperty(
 			CAMPAIGN_MAP_BACKDROP_END_VAR,
 			`${campaignBackdropEndCss.toFixed(2)}px`
+		);
+		// Vertical-centering shift for the side chrome (left rail + the All-tab panels
+		// docked to it / to the header). Written before the zoom-changed dispatch below
+		// so DraftingSection's dock re-measures read the shifted rail rects.
+		html.style.setProperty(
+			CAMPAIGN_SIDE_SHIFT_VAR,
+			`${computeSideRailCenterShiftPx(
+				viewportH,
+				targetZoom,
+				CAMPAIGN_MAP_SELECT_GRAB_TOTAL_HEIGHT_PX
+			)}px`
 		);
 
 		const existingOverrideStr = html.style.getPropertyValue(CAMPAIGN_ZOOM_VAR);
@@ -1756,10 +1713,15 @@ const Murmur = () => {
 		// DraftingSection grows its vertical envelope (extraEnvelopeHeightPx) so the
 		// snug fit lands at the shared chrome zoom target. That can commit AFTER the
 		// resize settle passes (e.g. inbox content loads late), so it announces the
-		// change and we re-fit against the moved anchors.
+		// change and we re-fit against the moved anchors. The re-fit must be
+		// SYNCHRONOUS: the dispatch comes from a layout effect (pre-paint), and a
+		// rAF here can land after the paint (WebKit always; any engine when the
+		// dispatching commit itself ran in the rAF phase), painting a frame with
+		// vars computed against the pre-envelope DOM — a visible tab-switch jerk.
 		const onEnvelopeChanged = () => {
+			if (cancelled) return;
 			refreshBottomAnchors();
-			scheduleZoomUpdate();
+			updateCampaignZoomForViewport();
 		};
 		window.addEventListener(
 			'murmur:campaign-envelope-changed',
@@ -1773,6 +1735,7 @@ const Murmur = () => {
 			document.documentElement.style.removeProperty(CAMPAIGN_TOP_NAV_SHIFT_X_VAR);
 			document.documentElement.style.removeProperty(CAMPAIGN_MAP_BACKDROP_START_VAR);
 			document.documentElement.style.removeProperty(CAMPAIGN_MAP_BACKDROP_END_VAR);
+			document.documentElement.style.removeProperty(CAMPAIGN_SIDE_SHIFT_VAR);
 		} catch {
 			// ignore
 		}
@@ -1849,6 +1812,7 @@ const Murmur = () => {
 			document.documentElement.style.removeProperty(CAMPAIGN_TOP_NAV_SHIFT_X_VAR);
 			document.documentElement.style.removeProperty(CAMPAIGN_MAP_BACKDROP_START_VAR);
 			document.documentElement.style.removeProperty(CAMPAIGN_MAP_BACKDROP_END_VAR);
+			document.documentElement.style.removeProperty(CAMPAIGN_SIDE_SHIFT_VAR);
 			if (scheduledRaf !== null) window.cancelAnimationFrame(scheduledRaf);
 			if (scrollResetRaf !== null) window.cancelAnimationFrame(scrollResetRaf);
 			clearResizeSettleTimers();
@@ -2356,6 +2320,18 @@ const Murmur = () => {
 			requestId: (prev?.requestId ?? 0) + 1,
 		}));
 	}, []);
+	// One-shot Responses/Opportunities filter seed for the inbox left panel (the
+	// overview star pill). Cleared whenever navigation lands anywhere but the inbox
+	// so a consumed request can't re-apply on a later plain Inbox visit (the list
+	// remounts per entry/breakpoint tier with a fresh handled-ref).
+	const [inboxPanelTabRequest, setInboxPanelTabRequest] =
+		useState<InboxPanelTabRequest | null>(null);
+	const requestInboxPanelTab = useCallback((tab: InboxPanelTabRequest['tab']) => {
+		setInboxPanelTabRequest((prev) => ({
+			tab,
+			requestId: (prev?.requestId ?? 0) + 1,
+		}));
+	}, []);
 	// Track if we navigated from inbox to sent via down arrow (so up arrow can return to inbox)
 	const [cameToSentFromInbox, setCameToSentFromInbox] = useState(false);
 	// Track the latest requested view so rapid tab flips don't get dropped due to stale closures.
@@ -2457,6 +2433,22 @@ const Murmur = () => {
 		isDragging: boolean;
 	} | null>(null);
 	const mapZoomControlRequestRafRef = useRef<number | null>(null);
+	// Live interactive zoom floor reported by the map (viewport-proportional on
+	// large monitors); the slider ladder rebases off it so index 0 always lands
+	// exactly on the floor — no dead zone at the bottom of the track.
+	const [mapInteractiveMinZoom, setMapInteractiveMinZoom] = useState(MAP_MIN_ZOOM);
+	const handleInteractiveMinZoomChange = useCallback((minZoom: number) => {
+		if (!Number.isFinite(minZoom)) return;
+		// Functional dedup breaks the callback → state → mapProps → re-render loop.
+		setMapInteractiveMinZoom((current) => (current === minZoom ? current : minZoom));
+	}, []);
+	const mapZoomControlLevels = useMemo(
+		() => buildZoomControlLevels(mapInteractiveMinZoom),
+		[mapInteractiveMinZoom]
+	);
+	// Last zoom the map reported — lets the ladder-rebase effect re-place the
+	// thumb when the floor changes without any camera movement (window shrink).
+	const lastMapViewportZoomRef = useRef<number | null>(null);
 	const isSelectMapToolActive = activeMapTool === 'select';
 	const mapZoomControlDisplayValue = mapZoomControlIndex;
 	const pushMapZoomControlRequest = useCallback((zoom: number, isDragging = false) => {
@@ -2483,13 +2475,13 @@ const Murmur = () => {
 	);
 	const handleMapZoomControlValueChange = useCallback(
 		(levelValue: number) => {
-			const safeLevelValue = clampCampaignMapZoomControlValue(levelValue);
+			const safeLevelValue = clampZoomControlValue(levelValue);
 			scheduleMapZoomControlRequest(
-				getCampaignMapZoomForControlValue(safeLevelValue),
+				zoomForControlValue(mapZoomControlLevels, safeLevelValue),
 				true
 			);
 		},
-		[scheduleMapZoomControlRequest]
+		[scheduleMapZoomControlRequest, mapZoomControlLevels]
 	);
 	const handleMapZoomControlInteractionChange = useCallback((isDragging: boolean) => {
 		setIsMapZoomControlDragging(isDragging);
@@ -2498,11 +2490,11 @@ const Murmur = () => {
 		(levelIndex: number, meta?: MapZoomControlIndexChangeMeta) => {
 			const safeLevelIndex = Math.min(
 				Math.max(Math.round(levelIndex), 0),
-				CAMPAIGN_MAP_ZOOM_CONTROL_MAX_INDEX
+				MAP_ZOOM_CONTROL_MAX_INDEX
 			);
 			const nextControlValue =
 				meta?.source === 'drag-release'
-					? clampCampaignMapZoomControlValue(meta.levelValue)
+					? clampZoomControlValue(meta.levelValue)
 					: safeLevelIndex;
 			setMapZoomControlIndex(nextControlValue);
 			if (meta?.source === 'drag-release') {
@@ -2512,40 +2504,55 @@ const Murmur = () => {
 				}
 				pendingMapZoomControlRequestRef.current = null;
 				pushMapZoomControlRequest(
-					getCampaignMapZoomForControlValue(nextControlValue),
+					zoomForControlValue(mapZoomControlLevels, nextControlValue),
 					true
 				);
 				return;
 			}
 			pushMapZoomControlRequest(
-				CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS[safeLevelIndex] ??
-					CAMPAIGN_MAP_ZOOM_CONTROL_LEVELS[0],
+				mapZoomControlLevels[safeLevelIndex] ?? mapZoomControlLevels[0],
 				false
 			);
 		},
-		[pushMapZoomControlRequest]
+		[pushMapZoomControlRequest, mapZoomControlLevels]
 	);
 	const handleSelectMapToolClick = useCallback(() => {
 		setActiveMapTool((prev) => (prev === 'select' ? 'grab' : 'select'));
 	}, []);
 	const handleMapViewportZoom = useCallback(
 		(zoom: number) => {
+			lastMapViewportZoomRef.current = zoom;
 			if (isMapZoomControlDragging) return;
-			const nextControlValue = getCampaignMapZoomControlValueForZoom(zoom);
+			const nextControlValue = controlValueForZoom(mapZoomControlLevels, zoom);
 			mapZoomControlLiveRef.current?.setLevelValue(nextControlValue);
 		},
-		[isMapZoomControlDragging]
+		[isMapZoomControlDragging, mapZoomControlLevels]
 	);
 	const handleMapViewportIdle = useCallback(
 		(payload: { zoom: number }) => {
+			lastMapViewportZoomRef.current = payload.zoom;
 			if (isMapZoomControlDragging) return;
-			const nextControlValue = getCampaignMapZoomControlValueForZoom(payload.zoom);
+			const nextControlValue = controlValueForZoom(mapZoomControlLevels, payload.zoom);
 			setMapZoomControlIndex((current) =>
 				Math.abs(current - nextControlValue) < 0.005 ? current : nextControlValue
 			);
 		},
-		[isMapZoomControlDragging]
+		[isMapZoomControlDragging, mapZoomControlLevels]
 	);
+
+	// When the ladder rebases (interactive floor changed with the viewport), the
+	// map may not move at all — e.g. the floor *dropped* after a window shrink —
+	// so no zoom/idle event fires. Re-place the thumb against the new ladder.
+	useEffect(() => {
+		if (isMapZoomControlDragging) return;
+		const lastZoom = lastMapViewportZoomRef.current;
+		if (lastZoom == null) return;
+		const nextControlValue = controlValueForZoom(mapZoomControlLevels, lastZoom);
+		mapZoomControlLiveRef.current?.setLevelValue(nextControlValue);
+		setMapZoomControlIndex((current) =>
+			Math.abs(current - nextControlValue) < 0.005 ? current : nextControlValue
+		);
+	}, [mapZoomControlLevels, isMapZoomControlDragging]);
 
 	useEffect(() => {
 		return () => {
@@ -2846,6 +2853,40 @@ const Murmur = () => {
 	const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const maxWaitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const crossfadeContainerRef = useRef<HTMLDivElement>(null);
+	// The previous layer is a static DOM snapshot of what was on screen, captured
+	// in setActiveView while the DOM still shows the origin view (see
+	// cloneCampaignActiveViewLayer). The id keys the overlay div so a mid-fade
+	// restage remounts it with the fresh clone.
+	const previousViewSnapshotRef = useRef<CampaignViewSnapshot | null>(null);
+	const [previousViewSnapshotId, setPreviousViewSnapshotId] = useState(0);
+	// Shift-x the snapshot was painted with; pins it in place when the new view
+	// writes a different shift (null = scrollable/mobile modes, no pinning).
+	const [previousViewShiftXSnapshotPx, setPreviousViewShiftXSnapshotPx] = useState<
+		number | null
+	>(null);
+	const mountPreviousViewSnapshot = useCallback((container: HTMLDivElement | null) => {
+		if (!container) return;
+		// Ref callbacks can re-run (StrictMode, remount on key change) — never double-append.
+		container.replaceChildren();
+		const snapshot = previousViewSnapshotRef.current;
+		if (!snapshot) return;
+		container.appendChild(snapshot.node);
+		// Scroll offsets only stick once the clone is attached and has layout.
+		const all = snapshot.node.querySelectorAll<HTMLElement>('*');
+		for (const [i, top, left] of snapshot.scrolls) {
+			const el = all[i];
+			if (!el) continue;
+			if (top) el.scrollTop = top;
+			if (left) el.scrollLeft = left;
+		}
+	}, []);
+	// Every path that ends a transition nulls previousView — release the snapshot
+	// there instead of threading cleanup through each branch.
+	useEffect(() => {
+		if (previousView) return;
+		previousViewSnapshotRef.current = null;
+		setPreviousViewShiftXSnapshotPx(null);
+	}, [previousView]);
 
 	// Mobile never supports the Writing ("testing") tab. Clamp immediately so we never mount
 	// HybridPromptInput on mobile (and never transition through it). Search lives on the
@@ -2927,6 +2968,11 @@ const Murmur = () => {
 					});
 				}
 			}
+			// A pending Opportunities-filter seed only makes sense while landing on the
+			// inbox — clear it for any other destination (covers every leave-inbox path).
+			if (newView !== 'inbox') {
+				setInboxPanelTabRequest(null);
+			}
 			// Dedupe against the *latest requested* view (not just the last committed render) so
 			// rapid flips like A -> B -> A still enqueue the final A update and don't get dropped.
 			if (newView === requestedViewRef.current) return;
@@ -2980,6 +3026,22 @@ const Murmur = () => {
 			// Start transition: keep previous view visible while the destination paints.
 			// Desktop: fade out the previous view once the destination is ready.
 			// Mobile: no fade (hard swap) once the destination is ready.
+			// Snapshot the on-screen DOM NOW, before React renders the destination —
+			// the previous layer shows this static clone (a fresh DraftingSection
+			// can't reproduce component-local state and flashes defaults at full
+			// opacity: envelope expansion, breakpoint tiers, typed text, selections).
+			const snapshot = cloneCampaignActiveViewLayer();
+			if (!snapshot) {
+				// Nothing to cover with — hard swap rather than staging an empty overlay.
+				setPreviousView(null);
+				setIsTransitioning(false);
+				setIsFadingOutPreviousView(false);
+				setActiveViewInternal(newView);
+				return;
+			}
+			previousViewSnapshotRef.current = snapshot;
+			setPreviousViewSnapshotId((id) => id + 1);
+			setPreviousViewShiftXSnapshotPx(readCampaignShiftXSnapshotPx());
 			setPreviousView(activeView);
 			setIsTransitioning(true);
 			setIsFadingOutPreviousView(false);
@@ -3025,6 +3087,15 @@ const Murmur = () => {
 		setActiveView(requestedView);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [tabParam, inboxEmailIdParam]);
+
+	// Overview star pill: land on the Inbox tab with the Opportunities filter
+	// selected. The explicit 'inbox' sent-tab request beats a stale 'sent' request
+	// left by a prior Sent navigation (the view dedupe can skip re-requesting).
+	const handleOpenInboxOpportunities = useCallback(() => {
+		requestInboxSentTab('inbox');
+		requestInboxPanelTab('opportunities');
+		setActiveView('inbox');
+	}, [requestInboxSentTab, requestInboxPanelTab, setActiveView]);
 
 	// Launch a campaign search from the Write/Drafts/Inbox tabs: jump to the All
 	// tab, drop that tab's preset status filter (so results aren't scoped to e.g.
@@ -3300,6 +3371,7 @@ const Murmur = () => {
 			requestedZoom: mapZoomControlRequest,
 			onViewportZoom: handleMapViewportZoom,
 			onViewportIdle: handleMapViewportIdle,
+			onInteractiveMinZoomChange: handleInteractiveMinZoomChange,
 			isLoading: isCampaignMapContactsLoading,
 			skipAutoFit: true,
 		}),
@@ -3316,6 +3388,7 @@ const Murmur = () => {
 			handleMapViewportIdle,
 			isCampaignMapContactsLoading,
 			handleMapViewportZoom,
+			handleInteractiveMinZoomChange,
 			mapZoomControlRequest,
 		]
 	);
@@ -3594,6 +3667,18 @@ const Murmur = () => {
 			activeView === 'inbox') &&
 		!isMobile &&
 		!isNarrowestDesktop;
+	// Per-view version of the crossfade wrapper's margin (mt-6 = 24px unless the
+	// top shift above applies for that view). The previous-layer snapshot offsets
+	// itself by the delta so it stays at the margin its view was painted with.
+	const getCampaignViewContentTopMarginPx = (view: ViewType): number =>
+		(view === 'testing' ||
+			view === 'drafting' ||
+			view === 'sent' ||
+			view === 'inbox') &&
+		!isMobile &&
+		!isNarrowestDesktop
+			? writingContentTopMarginPx
+			: 24;
 	return (
 		<CampaignDeviceProvider isMobile={isMobile} activeView={activeView}>
 			<HoverDescriptionProvider enabled={selectedRightBoxIcon === 'info'}>
@@ -3636,6 +3721,29 @@ const Murmur = () => {
 									draftCount={headerDraftCount}
 									inboxCount={overviewInboxCount}
 									sentCount={headerSentCount}
+									onOpenSearch={handleOpenDashboardSearchForCampaign}
+									onOpenContacts={
+										headerContactsCount > 0 ? () => setActiveView('testing') : undefined
+									}
+									onOpenDrafts={
+										headerDraftCount > 0 ? () => setActiveView('drafting') : undefined
+									}
+									onOpenInbox={
+										overviewInboxCount > 0
+											? () => {
+													// Explicit 'inbox' request beats a stale 'sent' one when the
+													// view dedupe skips re-requesting (sent pill → inbox pill).
+													requestInboxSentTab('inbox');
+													setActiveView('inbox');
+												}
+											: undefined
+									}
+									onOpenSent={
+										headerSentCount > 0 ? () => setActiveView('sent') : undefined
+									}
+									onOpenOpportunities={
+										overviewInboxCount > 0 ? handleOpenInboxOpportunities : undefined
+									}
 								/>
 							</div>
 						)}
@@ -4349,7 +4457,11 @@ const Murmur = () => {
 								className="fixed flex items-center justify-center border-0 bg-transparent p-0 transition-opacity hover:opacity-70"
 								style={{
 									left: `var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333vw)`,
-									top: '56dvh',
+									// Inside the zoomed root dvh renders at value·zoom, so above the
+									// 1080p baseline (zoom 0.92) a bare 56dvh drifts toward the bottom
+									// of big monitors. Cap the visual position at the baseline
+									// fraction (56 · 0.92 = 51.52% of the viewport).
+									top: `min(56dvh, calc(51.52dvh / var(--murmur-campaign-zoom, 0.85)))`,
 									transform: 'translateY(-50%)',
 									zIndex: 140,
 									width: '34px',
@@ -4680,6 +4792,7 @@ const Murmur = () => {
 											onDraftOperationsProgress={setDraftOperationsProgress}
 												autoOpenProfileTabWhenIncomplete={cameFromSearch}
 												inboxSentTabRequest={inboxSentTabRequest}
+												inboxPanelTabRequest={inboxPanelTabRequest}
 												onInboxSentTabChange={setInboxSentTab}
 												goToOverview={() => setActiveView('overview')}
 												goToDrafting={() => setActiveView('drafting')}
@@ -4703,56 +4816,36 @@ const Murmur = () => {
 											/>
 										</div>
 
-										{/* Previous view - fades out above the current view */}
+										{/* Previous view — a static DOM snapshot of what was on screen,
+										    fading out above the current view. top/left pin it at the
+										    geometry its view was painted with while the page vars move to
+										    the new view's values (left, NOT transform: a transform would
+										    become the containing block for the clone's fixed children). */}
 										{isTransitioning && previousView && (
 											<div
+												key={previousViewSnapshotId}
+												ref={mountPreviousViewSnapshot}
 												data-campaign-view-layer="previous"
-												className="absolute inset-0 w-full pointer-events-none"
+												className="absolute w-full pointer-events-none"
 												aria-hidden="true"
 												style={{
 													zIndex: 2,
 													willChange: 'opacity',
+													top: `${
+														getCampaignViewContentTopMarginPx(previousView) -
+														getCampaignViewContentTopMarginPx(activeView)
+													}px`,
+													left:
+														previousViewShiftXSnapshotPx != null
+															? `calc((${previousViewShiftXSnapshotPx}px - var(${CAMPAIGN_MAP_SHIFT_X_VAR}, ${previousViewShiftXSnapshotPx}px)) / ${CAMPAIGN_MAP_CONTENT_SCALE})`
+															: undefined,
 													...(isFadingOutPreviousView
 														? {
 																animation: `viewFadeOut ${TRANSITION_DURATION}ms ease-out forwards`,
 															}
 														: { opacity: 1 }),
 												}}
-											>
-												<DraftingSection
-													campaign={campaign}
-													view={previousView}
-													overviewRightRailSearchQuery={overviewSearchQuery}
-													onClearOverviewRightRailSearch={handleClearOverviewSearchQuery}
-													overviewRightRailSearchContacts={campaignMapContacts ?? []}
-													overviewRightRailSearchContactsLoading={
-													isCampaignMapContactsLoading
-												}
-													renderGlobalOverlays={false}
-													autoOpenProfileTabWhenIncomplete={cameFromSearch}
-													inboxSentTabRequest={inboxSentTabRequest}
-													onInboxSentTabChange={setInboxSentTab}
-													goToOverview={() => setActiveView('overview')}
-													goToDrafting={() => setActiveView('drafting')}
-													goToWriting={() => setActiveView('testing')}
-													onGoToSearch={handleOpenDashboardSearchForCampaign}
-													goToInbox={() => setActiveView('inbox')}
-													goToSent={() => setActiveView('sent')}
-													goToSummary={() => setActiveView('summary')}
-													onOpenIdentityDialog={() => {
-														setIdentityDialogOrigin('campaign');
-														setIsIdentityDialogOpen(true);
-													}}
-													goToPreviousTab={goToPreviousTab}
-													goToNextTab={goToNextTab}
-													hideHeaderBox={isNarrowestDesktop && !isMobile}
-													isCampaignWorkspaceExpanded={isCampaignWorkspaceExpanded}
-													onRequestCampaignWorkspaceExpanded={
-														requestCampaignWorkspaceExpanded
-													}
-													inboxMockState={inboxDebugEnabled ? inboxMockState : undefined}
-												/>
-											</div>
+											/>
 										)}
 									</div>
 								</div>

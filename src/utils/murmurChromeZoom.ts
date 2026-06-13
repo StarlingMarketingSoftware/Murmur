@@ -19,7 +19,10 @@ export const MURMUR_CHROME_ZOOM_MAX = 1.6;
 // Campaign snug-fit constants, exported so the campaign page (zoom cap) and
 // DraftingSection (envelope expansion) can never drift apart.
 export const CAMPAIGN_SNUG_SAFE_BOTTOM_MARGIN_PX = 22;
-export const CAMPAIGN_SNUG_MAX_HEIGHT_FIT_ZOOM = 1.2;
+// Equal to MURMUR_CHROME_ZOOM_MAX by design: the chrome target (itself clamped to
+// that max) is the real growth cap in both consumers' min(); a lower value here
+// made the campaign chrome undershoot the dashboard's on large monitors.
+export const CAMPAIGN_SNUG_MAX_HEIGHT_FIT_ZOOM = MURMUR_CHROME_ZOOM_MAX;
 export const CAMPAIGN_SNUG_MIN_EFFECTIVE_WIDTH_PX = 952;
 // Inner workspace scale applied to [data-slot='campaign-content'] (page.tsx).
 export const CAMPAIGN_WORKSPACE_CONTENT_SCALE = 0.94;
@@ -60,6 +63,12 @@ const SIXTEEN_BY_NINE_ZOOM_MAP: ZoomMapEntry[] = [
 	{ w: 1600, h: 900, zoom: 0.78 },
 	{ w: 1920, h: 1080, zoom: 0.92 },
 	{ w: 2560, h: 1440, zoom: 1.02 },
+	// Large-monitor entries (macOS "looks like" scaled modes for 5K/6K panels plus
+	// native-ish 4K). Values follow the proportional rule from the 2560×1440 point
+	// (zoom = 1.02 × w/2560) so near-match and interpolation agree.
+	{ w: 3008, h: 1692, zoom: 1.2 },
+	{ w: 3360, h: 1890, zoom: 1.34 },
+	{ w: 3840, h: 2160, zoom: 1.53 },
 ];
 const SIXTEEN_BY_NINE_FALLBACK_ZOOM = 0.85;
 
@@ -112,7 +121,8 @@ export const computeMurmurChromeZoomForViewport = (
 	const pickFromTable = (
 		table: ZoomMapEntry[],
 		points: ZoomPoint[],
-		fallback: number
+		fallback: number,
+		dims: { screenW: number; screenH: number; viewportW: number; viewportH: number }
 	) => {
 		const findNearMatch = (w: number, h: number) =>
 			table.find(
@@ -129,7 +139,13 @@ export const computeMurmurChromeZoomForViewport = (
 			const first = points[0];
 			const last = points[points.length - 1];
 			if (metric <= first.metric) return first.zoom;
-			if (metric >= last.metric) return last.zoom;
+			if (metric >= last.metric) {
+				// Beyond the last tuned point: scale proportionally with viewport size
+				// instead of flat-lining (large monitors used to render tiny chrome).
+				// Continuous at the last point (factor = 1); the final guardrail clamp
+				// enforces MURMUR_CHROME_ZOOM_MAX.
+				return last.zoom * (metric / last.metric);
+			}
 			for (let i = 0; i < points.length - 1; i++) {
 				const a = points[i];
 				const b = points[i + 1];
@@ -150,32 +166,52 @@ export const computeMurmurChromeZoomForViewport = (
 		};
 
 		// Prefer a tuned near-match when possible (screen first, then viewport).
-		const screenNearMatch = findNearMatch(matchScreenW, matchScreenH);
+		const screenNearMatch = findNearMatch(dims.screenW, dims.screenH);
 		if (screenNearMatch) return screenNearMatch.zoom;
-		const viewportNearMatch = findNearMatch(viewportW, viewportH);
+		const viewportNearMatch = findNearMatch(dims.viewportW, dims.viewportH);
 		if (viewportNearMatch) return viewportNearMatch.zoom;
 		// Otherwise interpolate smoothly between the two nearest tuned points,
 		// choosing whichever dimensions are "closer" to our tuned resolution set.
-		const screenDistance = distanceToMap(matchScreenW, matchScreenH);
-		const viewportDistance = distanceToMap(viewportW, viewportH);
+		const screenDistance = distanceToMap(dims.screenW, dims.screenH);
+		const viewportDistance = distanceToMap(dims.viewportW, dims.viewportH);
 		const useViewportDims = viewportDistance + 0.5 < screenDistance; // bias ties toward screen dims
-		const w = useViewportDims ? viewportW : matchScreenW;
-		const h = useViewportDims ? viewportH : matchScreenH;
+		const w = useViewportDims ? dims.viewportW : dims.screenW;
+		const h = useViewportDims ? dims.viewportH : dims.screenH;
 		return interpolateZoom(w, h);
 	};
+
+	// Ultrawide / odd-wide displays (wider than the 16:9 tolerance band): height is
+	// the binding dimension for the chrome, so treat the display as the 16:9 monitor
+	// of the same height and reuse the tuned 16:9 table.
+	const isWiderThanSixteenByNine =
+		ratio - IDEAL_16X9 > 0.08 || screenRatio - IDEAL_16X9 > 0.08;
 
 	let targetZoom = MURMUR_CHROME_ZOOM_DEFAULT;
 	if (isSixteenByTenish) {
 		targetZoom = pickFromTable(
 			SIXTEEN_BY_TEN_ZOOM_MAP,
 			SIXTEEN_BY_TEN_ZOOM_POINTS,
-			SIXTEEN_BY_TEN_FALLBACK_ZOOM
+			SIXTEEN_BY_TEN_FALLBACK_ZOOM,
+			{ screenW: matchScreenW, screenH: matchScreenH, viewportW, viewportH }
 		);
 	} else if (isSixteenByNineish) {
 		targetZoom = pickFromTable(
 			SIXTEEN_BY_NINE_ZOOM_MAP,
 			SIXTEEN_BY_NINE_ZOOM_POINTS,
-			SIXTEEN_BY_NINE_FALLBACK_ZOOM
+			SIXTEEN_BY_NINE_FALLBACK_ZOOM,
+			{ screenW: matchScreenW, screenH: matchScreenH, viewportW, viewportH }
+		);
+	} else if (isWiderThanSixteenByNine) {
+		targetZoom = pickFromTable(
+			SIXTEEN_BY_NINE_ZOOM_MAP,
+			SIXTEEN_BY_NINE_ZOOM_POINTS,
+			SIXTEEN_BY_NINE_FALLBACK_ZOOM,
+			{
+				screenW: matchScreenH * IDEAL_16X9,
+				screenH: matchScreenH,
+				viewportW: viewportH * IDEAL_16X9,
+				viewportH,
+			}
 		);
 	}
 
@@ -208,5 +244,106 @@ export const getMurmurChromeZoomForWindow = (): number => {
 		window.innerWidth,
 		window.innerHeight,
 		window.screen
+	);
+};
+
+// --- Side-rail vertical centering -------------------------------------------
+// Both map workspaces pin their side chrome (the left MapSelectGrab rail and the
+// panels that align with it) to a 106px visual top. On tall monitors that leaves
+// a huge dead band below, so each page's zoom pass writes a per-page CSS var with
+// a shared downward shift that re-centers the rail. The shift is rail-driven on
+// BOTH pages (the rail is the one element they share, with identical constants),
+// which gives cross-page parity: whenever the shift is > 0 the rail's visual
+// midpoint lands at exactly `viewportH/2 − deadband(viewportH)` regardless of
+// rail size or zoom, so the campaign and dashboard rails stay even even if their
+// zooms differ.
+export const DASHBOARD_SIDE_SHIFT_VAR = '--murmur-dashboard-side-shift';
+export const CAMPAIGN_SIDE_SHIFT_VAR = '--murmur-campaign-side-shift';
+
+// Must mirror MAP_VIEW_SIDE_PANEL_VISUAL_TOP_PX (dashboard) and
+// CAMPAIGN_MAP_TOOL_VISUAL_TOP_PX (campaign), and the rail's 4px visual nudge.
+const SIDE_RAIL_VISUAL_TOP_PX = 106;
+const SIDE_RAIL_VISUAL_TOP_NUDGE_UP_PX = 4;
+// Dead band that keeps the 1080p reference layout pixel-identical: a maximized
+// fullscreen 1920×1080 window (zoom 0.92, rail scale 0.84) has a centering delta
+// of 84.05px, so anything ≤ 85 floors to 0 there and on smaller monitors. Below
+// the taper window the centered chrome deliberately sits a constant 85 visual px
+// above true center, but on very tall monitors that read as "too high", so the
+// dead band tapers linearly to 0 across the 1500→1960 viewport-height window —
+// beyond it the rail midpoint lands at exactly viewportH/2.
+export const MURMUR_SIDE_RAIL_CENTER_DEADBAND_PX = 85;
+const SIDE_RAIL_DEADBAND_TAPER_START_VIEWPORT_H_PX = 1500;
+const SIDE_RAIL_DEADBAND_TAPER_END_VIEWPORT_H_PX = 1960;
+
+export const computeSideRailCenterDeadbandPx = (viewportH: number): number => {
+	if (!Number.isFinite(viewportH)) return MURMUR_SIDE_RAIL_CENTER_DEADBAND_PX;
+	const taperProgress = clampZoom(
+		(viewportH - SIDE_RAIL_DEADBAND_TAPER_START_VIEWPORT_H_PX) /
+			(SIDE_RAIL_DEADBAND_TAPER_END_VIEWPORT_H_PX -
+				SIDE_RAIL_DEADBAND_TAPER_START_VIEWPORT_H_PX),
+		0,
+		1
+	);
+	return MURMUR_SIDE_RAIL_CENTER_DEADBAND_PX * (1 - taperProgress);
+};
+
+// View-scale curve for the left MapSelectGrab rail — previously duplicated
+// verbatim in the dashboard and campaign page memos. `railTotalHeightPx` is the
+// page's MAP_SELECT_GRAB_TOTAL_HEIGHT_PX / CAMPAIGN_MAP_SELECT_GRAB_TOTAL_HEIGHT_PX
+// (passed in so this util never imports the component module).
+const MAP_SELECT_GRAB_MIN_VIEW_SCALE = 0.8;
+const MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE = 0.84;
+const MAP_SELECT_GRAB_MAX_VIEW_SCALE = 0.95;
+const MAP_SELECT_GRAB_SCALE_GROW_START_HEIGHT_PX = 1180;
+const MAP_SELECT_GRAB_SCALE_GROW_END_HEIGHT_PX = 1480;
+const MAP_SELECT_GRAB_VIEWPORT_INSET_PX = 16;
+
+export const computeMapSelectGrabViewScale = (
+	viewportH: number,
+	railTotalHeightPx: number
+): number => {
+	const availableHeight =
+		viewportH > 0
+			? viewportH - MAP_SELECT_GRAB_VIEWPORT_INSET_PX * 2
+			: railTotalHeightPx * MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE;
+	const fitScale = availableHeight / railTotalHeightPx;
+	const tallViewportProgress = clampZoom(
+		(viewportH - MAP_SELECT_GRAB_SCALE_GROW_START_HEIGHT_PX) /
+			(MAP_SELECT_GRAB_SCALE_GROW_END_HEIGHT_PX -
+				MAP_SELECT_GRAB_SCALE_GROW_START_HEIGHT_PX),
+		0,
+		1
+	);
+	const preferredScale =
+		MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE +
+		(MAP_SELECT_GRAB_MAX_VIEW_SCALE - MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE) *
+			tallViewportProgress;
+	return clampZoom(
+		Math.min(fitScale, preferredScale),
+		MAP_SELECT_GRAB_MIN_VIEW_SCALE,
+		MAP_SELECT_GRAB_MAX_VIEW_SCALE
+	);
+};
+
+// Visual-px downward shift for the side chrome (consumed inside the pages' top
+// calcs as `calc((106px + var(shift)) / var(zoom))`). 0 at the 1080p baseline
+// and below; rail-centering beyond it.
+export const computeSideRailCenterShiftPx = (
+	viewportH: number,
+	zoom: number,
+	railTotalHeightPx: number
+): number => {
+	if (!Number.isFinite(viewportH) || viewportH <= 0) return 0;
+	if (!Number.isFinite(zoom) || zoom <= 0) return 0;
+	const railVisualHeightPx =
+		railTotalHeightPx *
+		computeMapSelectGrabViewScale(viewportH, railTotalHeightPx) *
+		zoom;
+	const centeringDeltaPx =
+		(viewportH - railVisualHeightPx) / 2 -
+		(SIDE_RAIL_VISUAL_TOP_PX - SIDE_RAIL_VISUAL_TOP_NUDGE_UP_PX);
+	return Math.max(
+		0,
+		Math.round(centeringDeltaPx - computeSideRailCenterDeadbandPx(viewportH))
 	);
 };

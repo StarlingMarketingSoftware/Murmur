@@ -8,6 +8,8 @@ import {
 import { US_STATES } from '@/constants/usStates';
 import {
 	allocateAcrossCategories,
+	buildCityAnchorRadiusLadder,
+	buildRadiusLadder,
 	contactLooksLikeBusinessEntity,
 	contactLooksLikeEducationInstitution,
 	distributeAcrossBuckets,
@@ -242,11 +244,43 @@ const buildCategoryPool = (
 	requestedRadiusKm: number | null,
 	radiusLadder: (number | null)[],
 	tierMemo?: Map<Contact, number>,
-	distanceMemo?: Map<Contact, number>
+	distanceMemo?: Map<Contact, number>,
+	nearFirst?: boolean
 ): { contacts: Contact[]; radiusUsed: number | null } => {
 	if (allCandidates.length === 0) return { contacts: [], radiusUsed: requestedRadiusKm };
 
 	const perPoolLimit = Math.max(requestedLimit * 2, perCategoryShare * 3, 12);
+
+	// Tight (city-precision) anchors concatenate rung outputs tightest-first
+	// so allocation consumes in-town picks before padding from wider rungs —
+	// the classic ladder below would jump to a wide rung whenever the tight
+	// rung can't fill the whole pool, reintroducing the scatter it's meant to
+	// fix. Shuffle within each rung is preserved (results stay randomized).
+	if (nearFirst && center) {
+		const picked: Contact[] = [];
+		const seen = new Set<number>();
+		for (const r of radiusLadder) {
+			if (picked.length >= perPoolLimit) break;
+			const localized = applyRadius(allCandidates, center, r, distanceMemo);
+			if (localized.length === 0) continue;
+			const fresh = localized.filter((c) => !seen.has(c.id));
+			if (fresh.length === 0) continue;
+			const distributed = distributeAcrossBuckets(
+				fresh,
+				perPoolLimit - picked.length,
+				center,
+				r,
+				tierMemo
+			);
+			for (const c of distributed) {
+				if (seen.has(c.id)) continue;
+				seen.add(c.id);
+				picked.push(c);
+			}
+		}
+		return { contacts: picked, radiusUsed: requestedRadiusKm };
+	}
+
 	let best: { contacts: Contact[]; radiusUsed: number | null } | null = null;
 	const desiredCount = Math.min(perPoolLimit, Math.max(perCategoryShare, 1));
 
@@ -295,6 +329,18 @@ export interface CuratedNearbyPicksOptions {
 	strictRadius?: boolean;
 	/** Optional category filter — restrict the curated mix to these prefixes only. */
 	requestedCategoryPrefixes?: readonly BookingContactTitlePrefix[] | null;
+	/**
+	 * Geography predicate applied to candidates BEFORE pooling/allocation.
+	 * Filtering after allocation would silently shrink the returned tray —
+	 * the allocator would fill slots with rows the filter then deletes.
+	 */
+	stateFilter?: ((contact: Contact) => boolean) | null;
+	/**
+	 * True when the anchor is an exact city ("Hartford CT"). Switches to the
+	 * graduated near-first radius ladder and samples ES tight around the
+	 * city instead of across the wide fetch circle.
+	 */
+	cityPrecisionAnchor?: boolean;
 	/** Prefix for log lines so the caller can identify which route triggered this run. */
 	logTag?: string;
 }
@@ -318,24 +364,37 @@ export const runCuratedNearbyPicks = async (
 		limit,
 		strictRadius = false,
 		requestedCategoryPrefixes,
+		stateFilter = null,
+		cityPrecisionAnchor = false,
 		logTag,
 	} = options;
 
 	const hasRealCenter = center !== null;
 	const effectiveCenter = center ?? FALLBACK_CENTER;
 	const effectiveRadiusKm = hasRealCenter ? radiusKm ?? DEFAULT_RADIUS_KM : null;
+	const tightCityAnchor = hasRealCenter && cityPrecisionAnchor && !strictRadius;
+	// City anchors fetch (and sample) tight around the city. The wide default
+	// envelope (~350km for a 30km anchor) spans whole other metros, so both
+	// the Prisma take-cap and the ES random sampler would dilute the local
+	// candidates that the tight rungs need.
 	const fetchBboxRadiusKm = hasRealCenter
-		? Math.max(effectiveRadiusKm ?? DEFAULT_RADIUS_KM, DEFAULT_RADIUS_KM) * FETCH_BUFFER
+		? tightCityAnchor
+			? Math.max(120, (effectiveRadiusKm ?? DEFAULT_RADIUS_KM) * 4)
+			: Math.max(effectiveRadiusKm ?? DEFAULT_RADIUS_KM, DEFAULT_RADIUS_KM) *
+			  FETCH_BUFFER
 		: FALLBACK_BBOX_RADIUS_KM;
 	const radiusLadder: (number | null)[] = hasRealCenter
-		? strictRadius
-			? [effectiveRadiusKm ?? DEFAULT_RADIUS_KM]
-			: [
+		? tightCityAnchor
+			? buildCityAnchorRadiusLadder(effectiveRadiusKm ?? DEFAULT_RADIUS_KM)
+			: buildRadiusLadder(
 					effectiveRadiusKm ?? DEFAULT_RADIUS_KM,
-					Math.min(fetchBboxRadiusKm, 1500),
-					null,
-			  ]
+					fetchBboxRadiusKm,
+					strictRadius
+			  )
 		: [null];
+	const esSampleRadiusKm = tightCityAnchor
+		? Math.max(60, (effectiveRadiusKm ?? DEFAULT_RADIUS_KM) * 2)
+		: fetchBboxRadiusKm;
 
 	const activeCategories = requestedCategoryPrefixes
 		? CURATED_CATEGORIES.filter((category) =>
@@ -437,7 +496,7 @@ export const runCuratedNearbyPicks = async (
 						limit: PER_CATEGORY_ES_TAKE,
 						candidatePool: PER_CATEGORY_ES_TAKE,
 						center: effectiveCenter,
-						radiusKm: fetchBboxRadiusKm,
+						radiusKm: esSampleRadiusKm,
 						seed: Date.now() + Math.floor(Math.random() * 1_000_000),
 					}),
 					ES_SAMPLE_TIMEOUT_MS,
@@ -581,15 +640,19 @@ export const runCuratedNearbyPicks = async (
 	const buildPools = (predicate: (contact: Contact) => boolean): CategoryPool[] =>
 		activeCategories.map((category) => {
 			const canonicalKey = category.titlePrefixes[0];
+			const categoryCandidatePool = (byCategory.get(canonicalKey) ?? []).filter(
+				(contact) => predicate(contact) && (!stateFilter || stateFilter(contact))
+			);
 			const built = buildCategoryPool(
-				(byCategory.get(canonicalKey) ?? []).filter(predicate),
+				categoryCandidatePool,
 				perCategoryShare,
 				limit,
 				hasRealCenter ? effectiveCenter : null,
 				effectiveRadiusKm,
 				radiusLadder,
 				tierMemo,
-				distanceMemo
+				distanceMemo,
+				tightCityAnchor
 			);
 			return {
 				key: canonicalKey,

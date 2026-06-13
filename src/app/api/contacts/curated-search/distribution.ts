@@ -319,6 +319,42 @@ const bucketKeyFor = (
 	return `state:${(contact.state ?? '∅').toLowerCase()}`;
 };
 
+// Radius expansion ladder shared by the curated/place-only/local-business
+// pipelines. For the default 250km anchor this is byte-identical to the
+// historical three-rung ladder. Tight city-precision anchors (e.g. 30km)
+// expand gradually (30 → 60 → 120 → 250 → wide) instead of jumping straight
+// to a few-hundred-km scatter when a rung comes up sparse.
+export const buildRadiusLadder = (
+	radiusKm: number,
+	fetchBboxRadiusKm: number,
+	strictRadius: boolean
+): (number | null)[] => {
+	if (strictRadius) return [radiusKm];
+	if (radiusKm >= 250) {
+		return [radiusKm, Math.min(fetchBboxRadiusKm, 1500), null];
+	}
+	const rungs: (number | null)[] = [];
+	let rung = radiusKm;
+	while (rung < 200) {
+		rungs.push(rung);
+		rung *= 2;
+	}
+	rungs.push(250, Math.min(fetchBboxRadiusKm, 1500), null);
+	return rungs;
+};
+
+// Expansion ladder for exact-city anchors, used with near-first pooling:
+// city proper leads, and expansion caps at metro scale (4× the anchor) —
+// padding a "Hartford" tray from 250km away isn't what the user asked for.
+export const buildCityAnchorRadiusLadder = (
+	radiusKm: number
+): (number | null)[] => [
+	Math.max(8, radiusKm / 3),
+	radiusKm,
+	radiusKm * 2,
+	radiusKm * 4,
+];
+
 // Round-robin across geographic buckets so the same city doesn't dog-pile a
 // category. Within each bucket: quality tier (desc) + random tie-break.
 export const distributeAcrossBuckets = (

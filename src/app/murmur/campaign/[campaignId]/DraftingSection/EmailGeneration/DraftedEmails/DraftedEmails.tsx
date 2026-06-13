@@ -1168,12 +1168,15 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 			const desktopEditorBoxWidthPx = isCompactDraftReview ? 442 : 484;
 			// Compact dashboard review shrinks the Send / Regenerate / Delete action row (buttons +
 			// nav arrows) so it still fits centered above the narrower card; campaign review keeps the
-			// larger sizes.
-			const reviewActionButtonWidthPx = isCompactDraftReview ? 116 : 124;
-			const reviewActionButtonGapPx = isCompactDraftReview ? 11 : 13;
-			const reviewNavArrowMarginPx = isCompactDraftReview ? 17 : 20;
-			const reviewNavArrowWidth = isCompactDraftReview ? 16 : 18;
-			const reviewNavArrowHeight = isCompactDraftReview ? 13 : 15;
+			// larger sizes. compactReviewActionRow shrinks the row alone (card untouched) so the row
+			// clears the drafts-tab bottom Send bar.
+			const isCompactActionRow = props.compactReviewActionRow ?? false;
+			const useCompactRowSizes = isCompactDraftReview || isCompactActionRow;
+			const reviewActionButtonWidthPx = useCompactRowSizes ? 116 : 124;
+			const reviewActionButtonGapPx = useCompactRowSizes ? 11 : 13;
+			const reviewNavArrowMarginPx = useCompactRowSizes ? 17 : 20;
+			const reviewNavArrowWidth = useCompactRowSizes ? 16 : 18;
+			const reviewNavArrowHeight = useCompactRowSizes ? 13 : 15;
 			const draftReviewScrollbarOffset = isCompactDraftReview ? -8 : -6;
 			// Keep the bottom strip (Send / Delete + dividers) a consistent height across drafts.
 			// When a status bar is present, the editor container is shorter; we compensate by slightly
@@ -2079,7 +2082,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 						<div
 							className="flex items-center justify-center"
 							style={{
-								marginTop: isMobile ? '12px' : '22px',
+								marginTop: isMobile || isCompactActionRow ? '12px' : '22px',
 								// Ensure this row has a stable width so centering math is correct
 								// (otherwise it can shrink-to-fit in narrow layouts and appear shifted right).
 								width: '100%',
@@ -2138,7 +2141,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 											style={{
 												width: isMobile ? 'calc(100vw - 140px)' : '397px',
 												maxWidth: '397px',
-												height: isMobile ? '36px' : '40px',
+												height: isMobile || isCompactActionRow ? '36px' : '40px',
 												borderRadius: '8px',
 												backgroundColor: isRegenerating ? '#FEF3E0' : '#FFDC9E',
 											}}
@@ -2181,7 +2184,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 												)}
 												style={{
 													width: isMobile ? '80px' : `${reviewActionButtonWidthPx}px`,
-													height: isMobile ? '36px' : '40px',
+													height: isMobile || isCompactActionRow ? '36px' : '40px',
 													borderTopLeftRadius: '8px',
 													borderBottomLeftRadius: '8px',
 													backgroundColor: '#D5FFCB',
@@ -2206,7 +2209,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 												)}
 												style={{
 													width: isMobile ? '80px' : `${reviewActionButtonWidthPx}px`,
-													height: isMobile ? '36px' : '40px',
+													height: isMobile || isCompactActionRow ? '36px' : '40px',
 													backgroundColor: isRegenerating ? '#FEF3E0' : '#FFDC9E',
 												}}
 												data-hover-description="Click to preview your prompt/settings before regenerating this draft"
@@ -2230,7 +2233,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 												)}
 												style={{
 													width: isMobile ? '80px' : `${reviewActionButtonWidthPx}px`,
-													height: isMobile ? '36px' : '40px',
+													height: isMobile || isCompactActionRow ? '36px' : '40px',
 													borderTopRightRadius: '8px',
 													borderBottomRightRadius: '8px',
 													backgroundColor: '#E17272',

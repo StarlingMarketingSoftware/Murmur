@@ -2,7 +2,9 @@
 
 import { loadStripe, StripeEmbeddedCheckout } from '@stripe/stripe-js';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { createPortal } from 'react-dom';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import { useKeyboardViewportFit } from '@/hooks/useKeyboardViewportFit';
 
 interface StripeEmbeddedCheckoutModalProps {
 	open: boolean;
@@ -23,7 +25,20 @@ export function StripeEmbeddedCheckoutModal({
 }: StripeEmbeddedCheckoutModalProps) {
 	const containerIdRef = useRef(`embedded-checkout-${Math.random().toString(36).slice(2)}`);
 	const embeddedCheckoutRef = useRef<StripeEmbeddedCheckout | null>(null);
+	const overlayRef = useRef<HTMLDivElement>(null);
 	const [stripeError, setStripeError] = useState<string | null>(null);
+
+	// Lock the page behind while open: landing-animations.css forces html/body
+	// scrollable with !important on mobile landing, so the lock is a
+	// higher-specificity !important rule keyed off this html class.
+	useEffect(() => {
+		if (!open) return;
+		document.documentElement.classList.add('murmur-checkout-open');
+		return () => document.documentElement.classList.remove('murmur-checkout-open');
+	}, [open]);
+
+	// Keep the overlay (and the Pay button) above the iOS keyboard.
+	useKeyboardViewportFit(overlayRef, open);
 
 	useEffect(() => {
 		if (!open) return;
@@ -75,12 +90,25 @@ export function StripeEmbeddedCheckoutModal({
 		};
 	}, [open, clientSecret]);
 
-	if (!open) return null;
+	if (!open || typeof window === 'undefined') return null;
 
-	return (
-		<div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20 p-2 sm:p-4">
-			<div className="w-full max-w-[1100px] max-h-[92dvh] overflow-hidden rounded-[8px] border-[3px] border-black bg-white shadow-lg">
-				<div className="flex items-center justify-between border-b-[3px] border-black bg-white px-4 py-2">
+	// Portal to <body>: globals.css sets `main { isolation: isolate }`, so a fixed
+	// overlay rendered inside a page's <main> is trapped below the z-50 navbar
+	// (Clerk avatar / hamburger) no matter its z-index.
+	return createPortal(
+		<div
+			ref={overlayRef}
+			className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20 p-2 sm:p-4"
+			onMouseDown={
+				onClose
+					? (event) => {
+							if (event.target === event.currentTarget) onClose();
+						}
+					: undefined
+			}
+		>
+			<div className="flex max-h-[min(92dvh,100%)] w-full max-w-[1100px] flex-col overflow-hidden rounded-[8px] border-[3px] border-black bg-white shadow-lg">
+				<div className="flex shrink-0 items-center justify-between border-b-[3px] border-black bg-white px-4 py-2">
 					<div className="text-sm font-semibold">{title}</div>
 					{onClose && (
 						<button
@@ -93,7 +121,15 @@ export function StripeEmbeddedCheckoutModal({
 					)}
 				</div>
 
-				<ScrollArea className="w-full h-[calc(92dvh-50px)] min-h-[220px] sm:min-h-[280px] [&_[data-slot='scroll-area-scrollbar']]:-translate-x-[2px]">
+				{/* The box is auto-height + max-h (NOT definite), so the scroller's h-full
+				    can't resolve — size it by flex-shrink instead: this wrapper is a column
+				    flex container and the inner scroller (min-h-0) shrinks to fit it. */}
+				<CustomScrollbar
+					className="flex min-h-0 w-full flex-1 flex-col"
+					contentClassName="min-h-0"
+					offsetRight={2}
+					lockHorizontalScroll
+				>
 					<div className="p-3 sm:p-4 md:p-6">
 						{error ? (
 							<div className="text-sm text-red-600">{error}</div>
@@ -110,9 +146,10 @@ export function StripeEmbeddedCheckoutModal({
 							/>
 						)}
 					</div>
-				</ScrollArea>
+				</CustomScrollbar>
 			</div>
-		</div>
+		</div>,
+		document.body
 	);
 }
 

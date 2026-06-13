@@ -7,6 +7,7 @@ import SearchResultsMap, {
 } from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import { urls } from '@/constants/urls';
 import {
+	usePersistentMapFirstPaintSetter,
 	usePersistentMapReadySetter,
 	usePersistentMapValue,
 } from '@/contexts/PersistentMapContext';
@@ -26,6 +27,7 @@ export function PersistentDashboardMap() {
 	const pathname = usePathname();
 	const mapConfig = usePersistentMapValue();
 	const setPersistentMapReady = usePersistentMapReadySetter();
+	const setPersistentMapFirstPaint = usePersistentMapFirstPaintSetter();
 	const [mounted, setMounted] = useState(false);
 
 	useEffect(() => {
@@ -128,11 +130,12 @@ export function PersistentDashboardMap() {
 									}),
 						}}
 					>
-						{/* onMapLoadedChange stays after the spread so a host-config mapProps
-						    update can never clobber the readiness wiring. */}
+						{/* Readiness wiring stays after the spread so a host-config mapProps
+						    update can never clobber it. */}
 						<SearchResultsMap
 							{...mapProps}
 							onMapLoadedChange={setPersistentMapReady}
+							onMapFirstPaintChange={setPersistentMapFirstPaint}
 						/>
 					</div>
 

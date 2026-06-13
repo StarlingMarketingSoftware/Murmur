@@ -11,6 +11,7 @@ import {
 } from '@/hooks/queryHooks/useMediaAssets';
 import { useMediaUpload, type UploadState } from '@/hooks/useMediaUpload';
 import { MediaPreviewDialog } from '@/components/organisms/_dialogs/MediaPreviewDialog/MediaPreviewDialog';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import type { MediaAssetDto } from '@/app/api/media/route';
 
 import {
@@ -757,9 +758,12 @@ export const ProfileSidePanelBox = ({
 	const selectedArea = selectedAreaDraft;
 	const selectedPerformingName = performingNameDraft.trim();
 	const selectedBio = bioDraft.trim();
+	// Stored genres are free user input (e.g. "rock"); match options case-insensitively
+	// like getProfileGenreIcon does, so a saved genre maps to its canonical chip.
+	const normalizedSelectedGenre = selectedGenre.trim().toLowerCase();
 	const selectedGenreOption = profileGenreOptionRows
 		.flat()
-		.find((genre) => genre.label === selectedGenre);
+		.find((genre) => genre.label.toLowerCase() === normalizedSelectedGenre);
 	const SelectedGenreIcon = selectedGenreOption?.Icon;
 	const isGenreEditable = Boolean(onProfileGenreUpdate);
 	const showAreaStep = Boolean(selectedGenre);
@@ -898,7 +902,7 @@ export const ProfileSidePanelBox = ({
 		setIsAreaChooserOpen(!hasArea);
 		setIsPerformingNameEditorOpen(hasArea && !selectedPerformingName);
 		setIsBioEditorOpen(!selectedBio);
-		if (genre !== selectedGenre) onProfileGenreUpdate?.(genre);
+		if (genre.toLowerCase() !== normalizedSelectedGenre) onProfileGenreUpdate?.(genre);
 	};
 
 	const openGenreChooser = () => {
@@ -1050,7 +1054,15 @@ export const ProfileSidePanelBox = ({
 					))}
 				</div>
 				<div className="flex flex-1 items-center justify-center bg-[#F2F7FF]">
-					<div className="box-border flex h-[578px] w-[352px] flex-col overflow-y-auto rounded-[9px] bg-white px-[9px] pt-[8px] pb-[18px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+					<CustomScrollbar
+						className="h-[578px] w-[352px] rounded-[9px] bg-white"
+						contentClassName="box-border flex flex-col rounded-[9px] px-[9px] pt-[8px] pb-[18px]"
+						thumbWidth={2}
+						thumbColor="#000000"
+						trackColor="transparent"
+						offsetRight={-5}
+						lockHorizontalScroll
+					>
 						<ProfileFieldLabel completed={Boolean(selectedGenre)}>
 							Genre
 						</ProfileFieldLabel>
@@ -1059,7 +1071,7 @@ export const ProfileSidePanelBox = ({
 								type="button"
 								disabled={!isGenreEditable}
 								onClick={openGenreChooser}
-								className="mt-[5px] flex h-[21.374px] appearance-none items-center justify-center gap-[3px] rounded-[7.491px] border-0 bg-[#F4F4F4] px-[4px] font-inter text-[14px] font-medium leading-[21.374px] text-black transition hover:brightness-95 disabled:cursor-default disabled:opacity-100"
+								className="mt-[5px] flex h-[21.374px] shrink-0 appearance-none items-center justify-center gap-[3px] rounded-[7.491px] border-0 bg-[#F4F4F4] px-[4px] font-inter text-[14px] font-medium leading-[21.374px] text-black transition hover:brightness-95 disabled:cursor-default disabled:opacity-100"
 								style={{ width: `${selectedGenreOption.width}px` }}
 							>
 								{SelectedGenreIcon && (
@@ -1082,7 +1094,8 @@ export const ProfileSidePanelBox = ({
 										>
 											{row.map((genre) => {
 												const Icon = genre.Icon;
-												const isSelected = genre.label === selectedGenre;
+												const isSelected =
+													genre.label.toLowerCase() === normalizedSelectedGenre;
 												const isHovered = genre.label === hoveredGenre;
 
 												return (
@@ -1118,7 +1131,7 @@ export const ProfileSidePanelBox = ({
 							<button
 								type="button"
 								onClick={openAreaChooser}
-								className="mt-[5px] flex h-[21.374px] w-fit max-w-[334px] appearance-none items-center gap-[4px] overflow-hidden rounded-[7.491px] border-0 bg-[#F4F4F4] px-[6px] font-inter text-[14px] font-medium leading-[21.374px] text-black transition hover:brightness-95"
+								className="mt-[5px] flex h-[21.374px] w-fit max-w-[334px] shrink-0 appearance-none items-center gap-[4px] overflow-hidden rounded-[7.491px] border-0 bg-[#F4F4F4] px-[6px] font-inter text-[14px] font-medium leading-[21.374px] text-black transition hover:brightness-95"
 							>
 								<span aria-hidden="true" className="block h-[16px] w-[13px] shrink-0">
 									<ProfileAreaMarkerIcon className="h-full w-full" />
@@ -1138,7 +1151,7 @@ export const ProfileSidePanelBox = ({
 							<button
 								type="button"
 								onClick={openPerformingNameEditor}
-								className="mt-[5px] flex h-[21.374px] w-fit max-w-[334px] appearance-none items-center gap-[4px] overflow-hidden rounded-[7.491px] border-0 bg-[#F4F4F4] px-[6px] font-inter text-[14px] font-medium leading-[21.374px] text-black transition hover:brightness-95"
+								className="mt-[5px] flex h-[21.374px] w-fit max-w-[334px] shrink-0 appearance-none items-center gap-[4px] overflow-hidden rounded-[7.491px] border-0 bg-[#F4F4F4] px-[6px] font-inter text-[14px] font-medium leading-[21.374px] text-black transition hover:brightness-95"
 							>
 								<span
 									aria-hidden="true"
@@ -1171,7 +1184,7 @@ export const ProfileSidePanelBox = ({
 							<button
 								type="button"
 								onClick={openBioEditor}
-								className="mt-[5px] flex h-[81px] w-[326px] appearance-none items-start gap-[9px] overflow-hidden rounded-[9px] border-0 bg-[#F4F4F4] px-[10px] py-[9px] text-left font-inter text-[13px] font-medium leading-[16px] text-black transition hover:brightness-95"
+								className="mt-[5px] flex h-[81px] w-[326px] shrink-0 appearance-none items-start gap-[9px] overflow-hidden rounded-[9px] border-0 bg-[#F4F4F4] px-[10px] py-[9px] text-left font-inter text-[13px] font-medium leading-[16px] text-black transition hover:brightness-95"
 							>
 								<span
 									aria-hidden="true"
@@ -1195,12 +1208,12 @@ export const ProfileSidePanelBox = ({
 								}}
 								autoFocus={!selectedBio}
 								aria-label="Bio"
-								className="ml-[27px] mt-[24px] h-[132px] w-[301px] resize-none border-0 bg-transparent p-0 font-inter text-[18px] font-medium leading-[24px] text-black outline-none"
+								className="ml-[27px] mt-[24px] h-[132px] w-[301px] shrink-0 resize-none border-0 bg-transparent p-0 font-inter text-[18px] font-medium leading-[24px] text-black outline-none"
 							/>
 						) : null}
 						{showVideoVerificationSection && (
 							<>
-								<div className="ml-[26px] mt-[20px] w-[236px] font-inter text-[10.5px] font-normal italic leading-[15px] text-black">
+								<div className="ml-[26px] mt-[20px] w-[236px] shrink-0 font-inter text-[10.5px] font-normal italic leading-[15px] text-black">
 									Add a video or audio clip to verify your account and improve your
 									profile
 								</div>
@@ -1211,7 +1224,7 @@ export const ProfileSidePanelBox = ({
 									className="hidden"
 									onChange={handleSelectMediaFile}
 								/>
-								<div className="mt-[24px] flex flex-col items-center gap-[14px]">
+								<div className="mt-[24px] flex shrink-0 flex-col items-center gap-[14px]">
 									{[0, 1, 2].map((index) => {
 										const slot = mediaSlots[index];
 
@@ -1343,7 +1356,7 @@ export const ProfileSidePanelBox = ({
 								/>
 							</>
 						)}
-					</div>
+					</CustomScrollbar>
 				</div>
 			</div>
 		</div>

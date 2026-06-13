@@ -51,19 +51,25 @@ export const drawCloudExtraPasses = (
 // Mapbox layer opacity expression
 // ============================================================================
 
+// `floorDelta` shifts the near-floor stops by the viewport-proportional raise
+// of the interactive zoom floor so the densest "globe" cloud cover stays a
+// floor state on every monitor. The 0 stop must stay (mobile floor is 1); the
+// fade-out stops (8/10.5) govern zoomed-in behavior and never move. Max
+// shifted stop: 4 + 1.25 = 5.25 < CLOUDS_OVERLAY_FADE_OUT_START_ZOOM (8).
 export const buildCloudsOpacityExpr = (
 	globeZoomOpacity: number,
 	decorativeZoomOpacity: number,
-	deepZoomFloor: number = 0
+	deepZoomFloor: number = 0,
+	floorDelta: number = 0
 ) => [
 	'interpolate',
 	['linear'],
 	['zoom'],
 	0,
 	globeZoomOpacity,
-	MAP_MIN_ZOOM,
+	MAP_MIN_ZOOM + floorDelta,
 	globeZoomOpacity,
-	4,
+	4 + floorDelta,
 	decorativeZoomOpacity,
 	CLOUDS_OVERLAY_FADE_OUT_START_ZOOM,
 	decorativeZoomOpacity,

@@ -979,6 +979,51 @@ export const searchContactsByLocation = async (
 // metadata is broad context only. City/state, when supplied, are added as
 // soft `should` boosts on `.keyword` so an exact place match outranks
 // semantic-only matches without filtering anything out.
+// Two-letter state abbreviations that are also common English words. A
+// match_phrase on `title` for these would match nearly every document
+// ("in", "or"...), so the title clause is skipped for them — their canonical
+// "<Category> <ABBR>" rows are still reachable via the state clauses and the
+// full-name title clause.
+const WORD_COLLISION_STATE_ABBRS = new Set([
+	'in',
+	'or',
+	'me',
+	'hi',
+	'ok',
+	'de',
+	'la',
+	'id',
+	'oh',
+]);
+
+// Hard state filter shared by the lexical and title-prefix retrievers.
+// Permissive against dirty production values, but anchored:
+//   - `term state.keyword` catches the clean case ("arkansas" / "ar")
+//   - `prefix state.keyword "<value>,"` catches comma-suffixed dirty values
+//     ("arkansas, usa"). The comma is baked in — a bare prefix would let
+//     "ne" match nevada/new hampshire/new jersey/... which turns multi-state
+//     filters into a no-op.
+//   - `match_phrase state` catches space-separated dirty values ("AR US")
+//   - `match_phrase title` catches canonical "<Category> <State>" rows whose
+//     state field is null, except word-collision abbrs (see above).
+const buildEnforcedStateClauses = (
+	values: readonly string[]
+): Record<string, unknown>[] => {
+	const stateClauses: Record<string, unknown>[] = [];
+	for (const v of values) {
+		const lc = v.toLowerCase();
+		stateClauses.push({ term: { 'state.keyword': { value: lc } } });
+		stateClauses.push({
+			prefix: { 'state.keyword': { value: `${lc},`, case_insensitive: true } },
+		});
+		stateClauses.push({ match_phrase: { state: v } });
+		if (!(lc.length === 2 && WORD_COLLISION_STATE_ABBRS.has(lc))) {
+			stateClauses.push({ match_phrase: { title: v } });
+		}
+	}
+	return stateClauses;
+};
+
 export type LexicalSearchOptions = {
 	queryText: string;
 	limit?: number;
@@ -1177,21 +1222,12 @@ export const lexicalSearchContacts = async (options: LexicalSearchOptions) => {
 		});
 	}
 	if (options.enforcedStateValues && options.enforcedStateValues.length > 0) {
-		// Permissive state filter — `state.keyword` exact match catches the clean
-		// case ("arkansas" / "ar"), `prefix` catches comma-suffixed dirty values
-		// ("arkansas, usa"), and a `match_phrase` on title catches canonical
-		// "Restaurants Arkansas" rows whose state field is null.
-		const stateClauses: Record<string, unknown>[] = [];
-		for (const v of options.enforcedStateValues) {
-			const lc = v.toLowerCase();
-			stateClauses.push({ term: { 'state.keyword': { value: lc } } });
-			stateClauses.push({
-				prefix: { 'state.keyword': { value: lc, case_insensitive: true } },
-			});
-			stateClauses.push({ match_phrase: { state: v } });
-			stateClauses.push({ match_phrase: { title: v } });
-		}
-		filter.push({ bool: { should: stateClauses, minimum_should_match: 1 } });
+		filter.push({
+			bool: {
+				should: buildEnforcedStateClauses(options.enforcedStateValues),
+				minimum_should_match: 1,
+			},
+		});
 	}
 
 	if (should.length === 0) {
@@ -1457,17 +1493,12 @@ export const titlePrefixSearchContacts = async (options: {
 		});
 	}
 	if (options.enforcedStateValues && options.enforcedStateValues.length > 0) {
-		const stateClauses: Record<string, unknown>[] = [];
-		for (const v of options.enforcedStateValues) {
-			const lc = v.toLowerCase();
-			stateClauses.push({ term: { 'state.keyword': { value: lc } } });
-			stateClauses.push({
-				prefix: { 'state.keyword': { value: lc, case_insensitive: true } },
-			});
-			stateClauses.push({ match_phrase: { state: v } });
-			stateClauses.push({ match_phrase: { title: v } });
-		}
-		filter.push({ bool: { should: stateClauses, minimum_should_match: 1 } });
+		filter.push({
+			bool: {
+				should: buildEnforcedStateClauses(options.enforcedStateValues),
+				minimum_should_match: 1,
+			},
+		});
 	}
 
 	const results = await elasticsearch.search<ContactDocument>({
