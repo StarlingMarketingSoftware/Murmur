@@ -161,6 +161,7 @@ import {
 	usePersistentMapSetter,
 } from '@/contexts/PersistentMapContext';
 import { DashboardBootBackdrop } from '@/components/molecules/DashboardBootBackdrop/DashboardBootBackdrop';
+import { DashboardBootProgress } from '@/components/molecules/DashboardBootProgress/DashboardBootProgress';
 import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
 import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
 import { ContactWithName } from '@/types/contact';
@@ -9561,6 +9562,17 @@ const DashboardContent = () => {
 			>
 				{mapPortal}
 
+				{/* Loading-progress % during the cold map load. Mobile has no boot splash,
+				    so this is the only loading UI here; keyed to the raw land-ready signal
+				    (bootPhase is force-'done' on mobile) and self-dismisses via its own cap. */}
+				<DashboardBootProgress
+					enabled={true}
+					done={isPersistentMapFirstPainted}
+					isMobile={true}
+					fadeMs={DASHBOARD_BOOT_FADE_MS}
+					maxWaitMs={DASHBOARD_BOOT_MAX_WAIT_MS}
+				/>
+
 				{/* Logo row — left-aligned over the map; the Clerk avatar stays fixed top-right */}
 				<div
 					className="flex items-center justify-start"
@@ -10407,6 +10419,16 @@ const DashboardContent = () => {
 			{bootPhase !== 'done' && shouldLockLandingDashboardScroll && (
 				<DashboardBootBackdrop fading={bootPhase === 'fading'} />
 			)}
+			{/* Loading-progress % below the hero logo. Keyed to the splash lifecycle
+			    (bootPhase leaves 'active' on land-ready OR the safety cap), so it snaps
+			    to 100% and fades out in lockstep with the starfield. */}
+			<DashboardBootProgress
+				enabled={shouldLockLandingDashboardScroll}
+				done={bootPhase !== 'active'}
+				isMobile={false}
+				fadeMs={DASHBOARD_BOOT_FADE_MS}
+				maxWaitMs={DASHBOARD_BOOT_MAX_WAIT_MS}
+			/>
 			{!hasSearched &&
 				activeTab === 'search' &&
 				!fromHomeParam &&

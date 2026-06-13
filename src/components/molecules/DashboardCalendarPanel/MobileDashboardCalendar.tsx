@@ -61,6 +61,8 @@ export const MobileDashboardCalendar: FC<{ persistEvents?: boolean }> = ({
 						// real-date "today" highlight.
 						mockState={{ year: today.getFullYear(), monthIndex: today.getMonth() }}
 						persistEvents={persistEvents}
+						// Native momentum scrolling on mobile (no custom smooth-scroll/fling).
+						nativeTouchScroll
 					/>
 				</div>
 			)}

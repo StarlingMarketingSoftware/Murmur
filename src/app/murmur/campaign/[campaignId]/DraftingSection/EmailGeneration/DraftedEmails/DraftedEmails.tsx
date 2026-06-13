@@ -2080,6 +2080,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 					</div>
 					{!props.hideDraftReviewActionRow && (
 						<div
+							data-draft-review-action-row
 							className="flex items-center justify-center"
 							style={{
 								marginTop: isMobile || isCompactActionRow ? '12px' : '22px',
