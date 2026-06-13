@@ -13,3 +13,28 @@ export enum LOCAL_STORAGE_KEYS {
 	GoogleScopes = 'googleScopes',
 	GoogleExpiresAt = 'googleExpiresAt',
 }
+
+export const CLERK_NO_BRANDING_LAYOUT = {
+	logoPlacement: 'none',
+	unsafe_disableDevelopmentModeWarnings: true,
+} as const;
+
+export const CLERK_NO_BRANDING_APPEARANCE = {
+	layout: CLERK_NO_BRANDING_LAYOUT,
+} as const;
+
+type ClerkAppearance = {
+	layout?: Record<string, unknown>;
+	elements?: Record<string, unknown>;
+	variables?: Record<string, unknown>;
+};
+
+export function withClerkNoBranding<T extends ClerkAppearance>(appearance: T) {
+	return {
+		...appearance,
+		layout: {
+			...appearance.layout,
+			...CLERK_NO_BRANDING_LAYOUT,
+		},
+	} as T & typeof CLERK_NO_BRANDING_APPEARANCE;
+}

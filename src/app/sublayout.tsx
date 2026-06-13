@@ -5,6 +5,8 @@ import { ClerkProvider, useAuth } from '@clerk/nextjs';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FC, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { CLERK_NO_BRANDING_APPEARANCE } from '@/constants/auth';
+import { urls } from '@/constants/urls';
 
 const isTimeoutError = (error: unknown): boolean =>
 	error instanceof Error && /\b(timeout|timed\s*out)\b/i.test(error.message);
@@ -66,10 +68,21 @@ const SubLayout: FC<SubLayoutProps> = ({ children }) => {
 	}, [setTheme]);
 
 	return (
-		<ClerkProvider>
+		<ClerkProvider
+			appearance={CLERK_NO_BRANDING_APPEARANCE}
+			signInUrl={urls.signIn.index}
+			signUpUrl={urls.signUp.index}
+		>
 			<RedirectAfterSignIn>
 				<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 			</RedirectAfterSignIn>
+			<style jsx global>{`
+				.cl-footer > *:has(a[href*='clerk.com']),
+				.cl-footer > *:has([aria-label*='Clerk']),
+				.cl-footer > *:has([aria-label*='clerk']) {
+					display: none !important;
+				}
+			`}</style>
 		</ClerkProvider>
 	);
 };

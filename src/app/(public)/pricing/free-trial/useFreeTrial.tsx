@@ -1,5 +1,6 @@
 import { useCreateCheckoutSession } from '@/hooks/queryHooks/useStripeCheckouts';
 import { useMe } from '@/hooks/useMe';
+import { urls } from '@/constants/urls';
 import { StripeSubscriptionStatus } from '@/types';
 import { toast } from 'sonner';
 
@@ -22,6 +23,7 @@ export const useFreeTrial = () => {
 		const res = await createCheckoutSession({
 			priceId: proPriceId,
 			freeTrial: true,
+			cancelPath: urls.pricing.freeTrial.index,
 		});
 
 		if (res.url) {
