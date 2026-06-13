@@ -11328,11 +11328,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				contactsWithCoords.length > lastContactsCountRef.current ||
 				Math.abs(contactsWithCoords.length - lastContactsCountRef.current) > 5;
 
-		// Keep new-search detection refs up to date even if we can't fit yet.
-		if (isSearchMode) lastSearchQueryKeyRef.current = searchQueryKey;
-		else lastFirstContactIdRef.current = currentFirstId;
-		lastLockedStateKeyRef.current = lockedStateKey;
-
 		if (!shouldFitBounds && !shouldFitLockedState) return;
 
 		// If we can't fit to anything yet (no coords and no state geometry ready), wait for the next update.
@@ -11349,6 +11344,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			!canFitToStateNow &&
 			(isNewSearch || !hasFitBoundsRef.current);
 		if (shouldWaitForFreshContactFit) return;
+
+		// Only advance new-search detection refs once we're committed to scheduling a fit.
+		// Advancing earlier (before the wait-for-fresh-contacts gate) consumes the
+		// `isNewSearch` signal on the stale-contacts run, so the fresh-contacts run
+		// can no longer detect the new search and never re-fits to the new location.
+		if (isSearchMode) lastSearchQueryKeyRef.current = searchQueryKey;
+		else lastFirstContactIdRef.current = currentFirstId;
+		lastLockedStateKeyRef.current = lockedStateKey;
 
 		// Debounce camera moves so rapid updates don't cause zoom in/out oscillation.
 		if (autoFitTimeoutRef.current) {

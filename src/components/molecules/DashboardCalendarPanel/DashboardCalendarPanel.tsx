@@ -73,6 +73,13 @@ type DashboardCalendarPanelProps = {
 	 * calendar (venue map view) pass their composite scale to match.
 	 */
 	popupScale?: number;
+	/**
+	 * Mobile dashboard calendar tab. Switches the scroll container to native
+	 * touch scrolling and disables the custom touch smooth-scroll/fling/row-snap
+	 * so it feels like a normal mobile list. Desktop / venue map / debug leave
+	 * this false (wheel smooth-scroll + snapping unchanged).
+	 */
+	nativeTouchScroll?: boolean;
 };
 
 type ActiveCalendarPopup = {
@@ -130,6 +137,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	innerHeightPx,
 	persistEvents = false,
 	popupScale = 1,
+	nativeTouchScroll = false,
 }) => {
 	// Layout constants (hard dashboard sizing)
 	const ROWS = 6;
@@ -539,6 +547,10 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		const container = scrollContainerRef.current;
 		if (!container) return;
 		if (MAX_SCROLL_TOP_PX <= 0) return;
+		// Mobile: let the browser scroll natively (native momentum, no custom
+		// LERP/fling/row-snap). The container switches to overflowY:auto +
+		// touchAction:pan-y below, and onScroll still mirrors scrollTop.
+		if (nativeTouchScroll) return;
 
 		let lastY: number | null = null;
 		let lastMoveTime = 0;
@@ -626,7 +638,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 			container.removeEventListener('touchcancel', handleTouchEnd);
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [MAX_SCROLL_TOP_PX]);
+	}, [MAX_SCROLL_TOP_PX, nativeTouchScroll]);
 
 	useEffect(() => {
 		if (!isDraggingScrollbar) return;
@@ -1480,15 +1492,18 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 						{
 							width: '100%',
 							height: '100%',
-							overflowY: 'hidden',
+							// Mobile uses native scrolling (overflowY:auto + pan-y);
+							// desktop keeps the JS-driven smooth scroll (overflow:hidden +
+							// touch-action:none so the custom wheel/touch handlers own it).
+							overflowY: nativeTouchScroll ? 'auto' : 'hidden',
 							overflowX: 'hidden',
 							scrollbarWidth: 'none',
 							msOverflowStyle: 'none',
+							// overscroll-behavior:contain keeps the native gesture inside the
+							// calendar (no page-behind chaining) when overflowY is auto.
 							overscrollBehavior: 'contain',
 							WebkitOverflowScrolling: 'touch',
-							// The container is overflow:hidden, so 'pan-y' would just chain
-							// the gesture to the page; the touch handlers above own it instead.
-							touchAction: 'none',
+							touchAction: nativeTouchScroll ? 'pan-y' : 'none',
 						} as CSSProperties
 					}
 				>

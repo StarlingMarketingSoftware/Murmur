@@ -8349,6 +8349,70 @@ html.murmur-compact .dashboard-boot-backdrop {
 	animation: dashboard-boot-twinkle 3000ms ease-in-out infinite;
 }
 
+/* --- Loading-progress %: portaled to <body> (DashboardBootProgress), so it carries
+   its own positioning rather than living inside the counter-zoomed backdrop. Desktop
+   sits just below the centered hero logo; mobile centers over the dark map. */
+.dashboard-boot-progress {
+	position: fixed;
+	left: 50%;
+	top: 60%;
+	transform: translateX(-50%);
+	z-index: 60;
+	width: 200px;
+	max-width: 60vw;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 9px;
+	pointer-events: none;
+}
+
+/* Mobile has no dark splash — it sits over the tab frame / loading folder cards,
+   so the bar needs its own readable backing: a compact centered "loading" pill. */
+.dashboard-boot-progress--mobile {
+	top: 50%;
+	transform: translate(-50%, -50%);
+	width: auto;
+	max-width: 70vw;
+	padding: 16px 20px;
+	border-radius: 14px;
+	background: rgba(20, 21, 23, 0.9);
+	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.dashboard-boot-progress--mobile .dashboard-boot-progress-track {
+	width: 150px;
+}
+
+/* Fade matches the splash's 800ms (DASHBOARD_BOOT_FADE_MS, passed as fadeMs). */
+.dashboard-boot-progress--fading {
+	opacity: 0;
+	transition: opacity 800ms ease;
+}
+
+.dashboard-boot-progress-track {
+	width: 100%;
+	height: 3px;
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.15);
+	overflow: hidden;
+}
+
+.dashboard-boot-progress-fill {
+	height: 100%;
+	border-radius: 999px;
+	background: #caccce;
+	transition: width 200ms ease;
+}
+
+.dashboard-boot-progress-label {
+	font-size: 12px;
+	letter-spacing: 0.08em;
+	color: #caccce;
+	font-variant-numeric: tabular-nums;
+	user-select: none;
+}
+
 /* --- Logo skin: fast-forward triangles white, shards black, wordmark hidden.
    .murmur-logo-boot is the standalone variant for the Suspense fallback. */
 body.dashboard-booting .dashboard-hero-logo .murmur-logo-word,
@@ -8463,6 +8527,11 @@ body.dashboard-boot-fading .clerk-user-button {
 @media (prefers-reduced-motion: reduce) {
 	.boot-star--twinkle {
 		animation: none;
+	}
+	/* The percentage still advances; just drop the easing motion. */
+	.dashboard-boot-progress--fading,
+	.dashboard-boot-progress-fill {
+		transition-duration: 1ms !important;
 	}
 	.dashboard-boot-backdrop--fading,
 	body.dashboard-boot-fading .dashboard-hero-logo,

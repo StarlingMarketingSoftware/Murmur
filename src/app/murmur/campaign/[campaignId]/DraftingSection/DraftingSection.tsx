@@ -707,6 +707,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// wide 863px panel never renders once the page centers; this state stays <= 1279 because
 	// shouldReserveSharedWideTabZoomEnvelope (overview/search) depends on it as-is.
 	const [isInboxTabStacked, setIsInboxTabStacked] = useState(false);
+	// On the Drafts tab, the absolutely-positioned bulk send-bar sits at a fixed slot, while
+	// the per-draft Send/Regenerate/Delete action row flows below the open preview card.
+	// On smaller screens (and with taller drafts) the action row grows down into the bar's
+	// slot, so they visually overlap. We measure both at runtime and hide the bar only when
+	// they would actually collide (see the overlap-detection effect below).
+	const [isDraftReviewOverlappingSendBar, setIsDraftReviewOverlappingSendBar] =
+		useState(false);
+	const draftsSendBarWrapperRef = useRef<HTMLDivElement | null>(null);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		// Matches `DEFAULT_CAMPAIGN_ZOOM` in the campaign page.
@@ -1581,6 +1589,71 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		!shouldRenderSharedBottomPanels &&
 		!shouldRenderWriteBottomDraftBar &&
 		!isInboxTabStacked;
+
+	// Hide the bulk send-bar only when it would actually collide with the per-draft action
+	// row. The bar is absolute (out of flow) and is hidden via `visibility` (kept mounted),
+	// so neither hiding it nor measuring it perturbs the action row's geometry — the overlap
+	// computation is stable and won't oscillate at the threshold.
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		if (!isDraftPreviewOpen || !shouldRenderDraftsBottomSendBar) {
+			setIsDraftReviewOverlappingSendBar(false);
+			return;
+		}
+		const SAFETY_PX = 8;
+		let raf = 0;
+		let ro: ResizeObserver | null = null;
+		let observedRow: Element | null = null;
+
+		const measure = () => {
+			const bar = draftsSendBarWrapperRef.current;
+			const row = document.querySelector('[data-draft-review-action-row]');
+			if (!bar || !row) {
+				setIsDraftReviewOverlappingSendBar(false);
+			} else {
+				const barRect = bar.getBoundingClientRect();
+				const rowRect = row.getBoundingClientRect();
+				// Both elements live under the same root zoom/scale, so their viewport rects
+				// are directly comparable. They overlap once the row's bottom reaches the bar.
+				setIsDraftReviewOverlappingSendBar(rowRect.bottom + SAFETY_PX > barRect.top);
+			}
+			// (Re)observe the live action row and its parent so a taller draft or regen
+			// streaming (which grows the preview card above the row) re-triggers a measure.
+			if (row !== observedRow) {
+				ro?.disconnect();
+				observedRow = row;
+				if (ro && row) {
+					ro.observe(row);
+					if (row.parentElement) ro.observe(row.parentElement);
+				}
+			}
+		};
+
+		const schedule = () => {
+			if (raf) window.cancelAnimationFrame(raf);
+			raf = window.requestAnimationFrame(measure);
+		};
+
+		ro = new ResizeObserver(schedule);
+		schedule();
+		window.addEventListener('resize', schedule);
+		window.addEventListener('murmur:campaign-zoom-changed', schedule as EventListener);
+		return () => {
+			if (raf) window.cancelAnimationFrame(raf);
+			ro?.disconnect();
+			ro = null;
+			window.removeEventListener('resize', schedule);
+			window.removeEventListener(
+				'murmur:campaign-zoom-changed',
+				schedule as EventListener
+			);
+		};
+	}, [
+		isDraftPreviewOpen,
+		shouldRenderDraftsBottomSendBar,
+		selectedDraft?.id,
+		isSelectedDraftRegenSettingsPreviewOpen,
+	]);
 
 	const clampedPromptScore =
 		typeof promptQualityScore === 'number'
@@ -8811,12 +8884,18 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 						{shouldRenderDraftsBottomSendBar && (
 							<div
+								ref={draftsSendBarWrapperRef}
 								className="absolute left-0 right-0 z-30 flex justify-center"
 								style={{
 									top: `${writeDraftBottomBarSlotTopPx}px`,
 									transform: isCampaignWorkspaceCompact
 										? 'translateX(-180px)'
 										: undefined,
+									// Kept mounted (so it stays measurable) but hidden when the open
+									// draft's action row would collide with it. See the overlap-
+									// detection effect above.
+									visibility: isDraftReviewOverlappingSendBar ? 'hidden' : 'visible',
+									pointerEvents: isDraftReviewOverlappingSendBar ? 'none' : undefined,
 								}}
 							>
 								{renderDraftsBottomSendBar()}
