@@ -39,6 +39,7 @@ import { useDashboard } from './useDashboard';
 import { useLenis } from '@/contexts/ScrollContext';
 import { withClerkNoBranding } from '@/constants/auth';
 import { urls } from '@/constants/urls';
+import { ContactsHeaderChrome } from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraftingTable/DraftingTable';
 import {
 	getMsUntilNextSearchGradientBucket,
 	getSearchGradientForDate,
@@ -5661,6 +5662,12 @@ const DashboardContent = () => {
 		useState<Record<number, string>>({});
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
 	const [isMapSearchEngaged, setIsMapSearchEngaged] = useState(true);
+	// True only when the user explicitly exits the focused search via the map-view
+	// search-bar X (or the map's "Click to see all contacts"). Distinguishes that
+	// user-initiated deselect — which grays the bar + hides the Searching pill —
+	// from the automatic entry disengages (pick-mode landing, For You scroll-entry),
+	// which must keep their normal look.
+	const [isSearchDeselectedByUser, setIsSearchDeselectedByUser] = useState(false);
 	const [mapSearchAutoFitRequestNonce, setMapSearchAutoFitRequestNonce] = useState(0);
 	// Crossing the compressed-chrome boundary hides/shows the left rail and swaps the
 	// results panel between the right edge and a bottom sheet: never strand the
@@ -6254,11 +6261,19 @@ const DashboardContent = () => {
 
 	const handleEmptyMapClick = useCallback(() => {
 		if (!canDisengageMapSearch) return;
+		setIsSearchDeselectedByUser(true);
 		setIsMapSearchEngaged(false);
 		setActiveMapTool('grab');
 		setActiveSection(null);
 		hideSearchThisAreaCta();
 	}, [canDisengageMapSearch, hideSearchThisAreaCta]);
+
+	// Whenever a search becomes engaged again (re-engage click, new-search
+	// force-engage, etc.), drop the user-deselected styling so the bar returns
+	// to its active look and the Searching pill reappears.
+	useEffect(() => {
+		if (isMapSearchEngaged) setIsSearchDeselectedByUser(false);
+	}, [isMapSearchEngaged]);
 
 	// Scroll-entry: the instant the committed For You search registers (hasSearched + a query),
 	// disengage straight into the "show all contacts" view so the focused/engaged search view
@@ -11808,7 +11823,13 @@ const DashboardContent = () => {
 								// Staged reveal for the scroll-to-map entry: hold the pill empty/white
 								// until the For You results have loaded, then show the gradient pill.
 								const showCuratedPill =
-									mapTopSearchDisplay.kind === 'curated' && !pendingForYouReveal;
+									mapTopSearchDisplay.kind === 'curated' &&
+									!pendingForYouReveal &&
+									!isSearchDeselectedByUser;
+								// When the user exits the focused search via the bar X, the bar drops
+								// to a plain white pill showing the prior query grayed out.
+								const showExitSearchButton =
+									canDisengageMapSearch && isMapSearchEngaged;
 
 								const searchBarBase = (
 									<div
@@ -11909,10 +11930,20 @@ const DashboardContent = () => {
 																				: '#FFFFFF',
 																	}}
 																>
-																	{pendingForYouReveal ? (
+																	{isSearchDeselectedByUser ? (
+																		<div className="flex h-full w-full min-w-0 items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-black/40">
+																			<span className="truncate">
+																				{mapTopSearchLabel}
+																			</span>
+																		</div>
+																	) : pendingForYouReveal ? (
 																		<div className="flex h-full w-full items-center px-[24px]" />
 																	) : mapTopSearchDisplay.kind === 'curated' ? (
-																		<div className="flex h-full w-full items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-white">
+																		<div
+																			className={`flex h-full w-full items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-white ${
+																				showExitSearchButton ? 'pr-[40px]' : ''
+																			}`}
+																		>
 																			{mapTopSearchDisplay.label}
 																		</div>
 																	) : isSplitCategoryTopSearch &&
@@ -11931,13 +11962,32 @@ const DashboardContent = () => {
 																			</div>
 																		</div>
 																	) : (
-																		<div className="flex h-full w-full min-w-0 items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-black">
+																		<div
+																			className={`flex h-full w-full min-w-0 items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-black ${
+																				showExitSearchButton ? 'pr-[40px]' : ''
+																			}`}
+																		>
 																			<span className="truncate">
 																				{mapTopSearchLabel}
 																			</span>
 																		</div>
 																	)}
 																</div>
+																{showExitSearchButton && (
+																	<button
+																		type="button"
+																		aria-label="Exit search"
+																		onClick={(event) => {
+																			event.stopPropagation();
+																			handleEmptyMapClick();
+																		}}
+																		className="absolute right-[10px] top-1/2 z-20 flex h-[23.147px] w-[24.927px] -translate-y-1/2 items-center justify-center rounded-[5.342px] bg-[#ABABAB] text-white opacity-80 transition-opacity hover:opacity-100"
+																	>
+																		<span className="text-[16px] leading-none -translate-y-[1px]">
+																			×
+																		</span>
+																	</button>
+																)}
 															</div>
 														</div>
 													</div>
@@ -12546,6 +12596,73 @@ const DashboardContent = () => {
 									</div>
 								) : null;
 
+								// Persistent "Searching New" status pill, centered directly below the
+								// map-view search bar. Display-only; shown for every map-view search
+								// (including the add-to-campaign pick flow) per the surface-based design.
+								const mapTopSearchingPill =
+									isMapView && !isMobile && !isSearchDeselectedByUser ? (
+										<div
+											aria-hidden="true"
+											className="fixed left-0 right-0 flex justify-center pointer-events-none map-overlay-appear"
+											style={{
+												top: `${
+													MAP_VIEW_SEARCH_BAR_TOP_PX +
+													MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX * MAP_VIEW_UI_SCALE +
+													10
+												}px`,
+												zIndex: 115,
+												paddingRight: isMidMapChrome
+													? `${MAP_VIEW_RIGHT_PANEL_FOOTPRINT_PX}px`
+													: undefined,
+											}}
+										>
+											<div
+												style={{
+													transform: `scale(${MAP_VIEW_UI_SCALE})`,
+													transformOrigin: 'top center',
+													display: 'inline-flex',
+													height: '33px',
+													padding: '7px 8px 7px 12px',
+													alignItems: 'center',
+													gap: '8px',
+													borderRadius: '9999px',
+													backgroundColor: '#B9EAF1',
+													fontFamily: 'Inter, sans-serif',
+													whiteSpace: 'nowrap',
+												}}
+											>
+												<span style={{ color: '#000', fontSize: '15px', fontWeight: 600, lineHeight: 1 }}>
+													Searching
+												</span>
+												<span
+													style={{
+														display: 'inline-flex',
+														alignItems: 'center',
+														justifyContent: 'center',
+														gap: '6px',
+														minWidth: '85px',
+														height: '19px',
+														boxSizing: 'border-box',
+														background: '#EAF6FF',
+														borderRadius: '4px',
+														padding: '0 8px',
+													}}
+												>
+													<MapBottomSearchProfileIcon
+														aria-hidden="true"
+														viewBox="0 0 28 28"
+														textColor="transparent"
+														iconColor="#3498DB"
+														style={{ width: 16, height: 16, flexShrink: 0, display: 'block' }}
+													/>
+													<span style={{ color: '#000', fontSize: '15px', fontWeight: 600, lineHeight: 1 }}>
+														New
+													</span>
+												</span>
+											</div>
+										</div>
+									) : null;
+
 								const mapTopActionDropdowns = isMapView ? (
 									<>
 										{openMapTopAction === 'playbook' ? (
@@ -13019,6 +13136,7 @@ const DashboardContent = () => {
 										<>
 											{mapTopBackdropBox}
 											{mapTopOutlineBox}
+											{mapTopSearchingPill}
 											{campaignMapTopTabs}
 											{searchBar}
 											{mapTopActionDropdowns}
@@ -13733,45 +13851,74 @@ const DashboardContent = () => {
 																						</button>
 																					</div>
 																				)}
-																				{/* Selection sub-panel — appears once at least one contact is selected. */}
-																				{selectedContacts.length > 0 && (
+																				{/* Selection sub-panel — always present on desktop (header carries the campaign-stops chrome); mobile/compressed keeps the existing gated sheet behaviour. */}
+																				{(!isCompressedMapChrome || selectedContacts.length > 0) && (
 																					<div
 																						className="flex flex-col flex-shrink-0"
 																						style={{
-																							maxHeight: isCompressedMapChrome
-																								? '30%'
-																								: '342px',
-																							backgroundColor: 'rgba(175, 214, 239, 0.8)',
-																							border: '3px solid #143883',
-																							borderRadius: '8px',
+																							maxHeight: isCompressedMapChrome ? '30%' : '342px',
+																							backgroundColor: isCompressedMapChrome
+																								? 'rgba(175, 214, 239, 0.8)'
+																								: 'rgba(184, 224, 255, 0.54)',
+																							border: isCompressedMapChrome ? '3px solid #143883' : '2px solid #000',
+																							borderRadius: isCompressedMapChrome ? '8px' : '7px',
 																							overflow: 'hidden',
 																						}}
 																					>
-																						<div className="w-full h-[49px] flex-shrink-0 flex items-center justify-center px-4 relative">
-																							<span className="absolute left-[10px] top-1/2 -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
-																								Selection
-																							</span>
-																				<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
-																					{selectedContacts.length}/
-																					{displayedMapPanelContacts.length} selected
-																				</span>
-																							<button
-																					type="button"
-																					onClick={() =>
-																						handleSelectAll(displayedMapPanelContacts)
-																					}
-																								disabled={isMapResultsLoading}
-																								className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 translate-y-[4px] ${
-																									isMapResultsLoading
-																										? 'opacity-60 pointer-events-none'
-																										: 'hover:underline'
-																								}`}
+																						{isCompressedMapChrome ? (
+																							<div className="w-full h-[49px] flex-shrink-0 flex items-center justify-center px-4 relative">
+																								<span className="absolute left-[10px] top-1/2 -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
+																									Selection
+																								</span>
+																								<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
+																									{selectedContacts.length}/{displayedMapPanelContacts.length} selected
+																								</span>
+																								<button
+																									type="button"
+																									onClick={() => handleSelectAll(displayedMapPanelContacts)}
+																									disabled={isMapResultsLoading}
+																									className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 translate-y-[4px] ${
+																										isMapResultsLoading ? 'opacity-60 pointer-events-none' : 'hover:underline'
+																									}`}
+																								>
+																									{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
+																								</button>
+																							</div>
+																						) : (
+																							<div
+																								className="w-full h-[77px] flex-shrink-0 relative"
+																								style={{ backgroundColor: '#CBF0FF', borderBottom: '2px solid #000' }}
 																							>
-																								{isAllPanelContactsSelected
-																									? 'Deselect All'
-																									: 'Select all'}
-																							</button>
-																						</div>
+																								<ContactsHeaderChrome
+																									variant="campaignStops"
+																									activeCampaignStop="search"
+																									whiteSectionHeight={77}
+																									offsetY={-19.5}
+																									hasData
+																									interactive
+																									onAllClick={() => mapCampaignId && router.push(`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=all${campaignReturnAddedSuffix()}`)}
+																									onWriteClick={() => mapCampaignId && router.push(`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=write${campaignReturnAddedSuffix()}`)}
+																									onSendClick={() => mapCampaignId && router.push(`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts${campaignReturnAddedSuffix()}`)}
+																									onInboxClick={() => mapCampaignId && router.push(`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=inbox${campaignReturnAddedSuffix()}`)}
+																								/>
+																								<span className="absolute left-[10px] top-[58px] -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
+																									Selection
+																								</span>
+																								<span className="absolute left-1/2 top-[58px] -translate-x-1/2 -translate-y-1/2 font-inter text-[13px] font-medium text-black">
+																									{selectedContacts.length}/{displayedMapPanelContacts.length} selected
+																								</span>
+																								<button
+																									type="button"
+																									onClick={() => handleSelectAll(displayedMapPanelContacts)}
+																									disabled={isMapResultsLoading}
+																									className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-[58px] -translate-y-1/2 ${
+																										isMapResultsLoading ? 'opacity-60 pointer-events-none' : 'hover:underline'
+																									}`}
+																								>
+																									{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
+																								</button>
+																							</div>
+																						)}
 																						<CustomScrollbar
 																							className="flex-1 min-h-0"
 																							contentClassName="p-[6px] pb-[14px] space-y-[7px]"
@@ -13782,9 +13929,7 @@ const DashboardContent = () => {
 																							disableOverflowClass
 																						>
 																							<div className="space-y-[7px]">
-																								{mapPanelSelectedContacts.map(
-																									renderMapPanelDesktopRow
-																								)}
+																								{mapPanelSelectedContacts.map(renderMapPanelDesktopRow)}
 																							</div>
 																						</CustomScrollbar>
 																					</div>

@@ -4044,6 +4044,104 @@ const Murmur = () => {
 											/>
 										</div>
 
+										{/* Persistent "Filtering in {campaign}" status pill, centered over the
+										    map strip left of the panels. Display-only (pointer-events:none) and
+										    intentionally NOT added to the top-nav right-shift rule below, so it
+										    stays over the map instead of riding the chrome's translateX. */}
+										<div
+											data-slot={
+												activeView === 'overview'
+													? 'campaign-top-filter-pill-nav'
+													: 'campaign-top-filter-pill'
+											}
+											aria-hidden="true"
+											className="fixed flex justify-center pointer-events-none"
+											style={
+												activeView === 'overview'
+													? {
+															// All/overview tab: center the pill UNDER the middle top-nav
+															// panel, just below the backdrop. The horizontal centering +
+															// right-shift are inherited from the shared top-nav shift CSS
+															// rule (which matches the campaign-top-filter-pill-nav slot),
+															// so the pill tracks the nav exactly in every layout mode
+															// (including origin=search, where the nav shift is 0).
+															top: `${
+																MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX +
+																MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX * MAP_VIEW_UI_SCALE +
+																8
+															}px`,
+															left: 0,
+															right: 0,
+															zIndex: 115,
+													  }
+													: {
+															// Other tabs: top-center over the left map strip.
+															top: '10px',
+															left: 0,
+															width: `var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333%)`,
+															zIndex: 115,
+													  }
+											}
+										>
+											<div
+												style={{
+													transform: `scale(${MAP_VIEW_UI_SCALE})`,
+													transformOrigin: 'top center',
+													display: 'inline-flex',
+													height: '33px',
+													padding: '7px 8px 7px 12px',
+													alignItems: 'center',
+													gap: '8px',
+													borderRadius: '9999px',
+													backgroundColor: '#CDEFCF',
+													fontFamily: 'Inter, sans-serif',
+													whiteSpace: 'nowrap',
+												}}
+											>
+												<span style={{ color: '#000', fontSize: '15px', fontWeight: 600, lineHeight: 1 }}>
+													Filtering in
+												</span>
+												<span
+													style={{
+														display: 'inline-flex',
+														alignItems: 'center',
+														justifyContent: 'center',
+														gap: '6px',
+														minWidth: '85px',
+														height: '19px',
+														maxWidth: '180px',
+														boxSizing: 'border-box',
+														background: '#FFFFFF',
+														borderRadius: '4px',
+														padding: '0 8px',
+													}}
+												>
+													<svg
+														aria-hidden="true"
+														focusable="false"
+														width="23"
+														height="13"
+														viewBox="0 0 30 17"
+														fill="none"
+														xmlns="http://www.w3.org/2000/svg"
+														className="block flex-shrink-0"
+													>
+														<rect y="2" width="30" height="15" rx="1" fill="#B43A35" />
+														<path
+															d="M0 2C0 0.89543 0.895431 0 2 0H13C14.1046 0 15 0.895431 15 2V4C15 4.55228 14.5523 5 14 5H1C0.447715 5 0 4.55228 0 4V2Z"
+															fill="#B43A35"
+														/>
+													</svg>
+													<span
+														className="min-w-0 truncate"
+														style={{ color: '#000', fontSize: '15px', fontWeight: 600, lineHeight: 1 }}
+													>
+														{campaignName}
+													</span>
+												</span>
+											</div>
+										</div>
+
 										{/* Tabs row: Search / Write / [campaign chip] / Inbox / Drafts */}
 										<div
 											data-slot="campaign-top-tabs"
@@ -4903,6 +5001,13 @@ const Murmur = () => {
 										display: none;
 									}
 
+									/* ≤776px scrollable mode: there is no left map strip, so the
+									   "Filtering in" pill (centered over that strip) has nowhere to live.
+									   Matches both the map-strip slot and the under-nav (overview) slot. */
+									html.murmur-campaign-scrollable [data-slot^='campaign-top-filter-pill'] {
+										display: none;
+									}
+
 									/* ≤776px scrollable mode: the fixed top-right settings gear + Clerk
 									   avatar cluster (from MurmurLayoutClient) collides with the top-nav
 									   backdrop — hide it. Desktop only; mobile keeps its avatar. */
@@ -4946,6 +5051,7 @@ const Murmur = () => {
 									body.murmur-campaign-persistent-map [data-slot='campaign-top-outline-boxes'],
 									body.murmur-campaign-persistent-map [data-slot='campaign-top-tabs'],
 									body.murmur-campaign-persistent-map [data-slot='campaign-top-search-bar'],
+									body.murmur-campaign-persistent-map [data-slot='campaign-top-filter-pill-nav'],
 									body.murmur-campaign-persistent-map [data-slot='campaign-top-strategy-dropdown'],
 									body.murmur-campaign-persistent-map [data-slot='campaign-top-campaigns-dropdown'],
 									body.murmur-campaign-persistent-map [data-slot='campaign-top-opportunities-popup'] {
