@@ -100,7 +100,10 @@ export const formatHTMLForEmailClients = (html: string): string => {
 		return `${entries.map(([k, v]) => `${k}: ${v}`).join('; ')};`;
 	};
 
-	const upsertStyleAttr = (tag: string, updater: (existing: string) => string): string => {
+	const upsertStyleAttr = (
+		tag: string,
+		updater: (existing: string) => string
+	): string => {
 		const match = tag.match(/\sstyle=("([^"]*)"|'([^']*)')/i);
 		if (match) {
 			const existing = match[2] ?? match[3] ?? '';
@@ -141,7 +144,8 @@ export const formatHTMLForEmailClients = (html: string): string => {
 
 	// Wrap snippets (most of our drafts) in a Gmail-like baseline container.
 	// Don't force a px font-size here: Gmail applies device-specific sizing.
-	const looksLikeFullDoc = /<html\b/i.test(out) || /<body\b/i.test(out) || /<!doctype\b/i.test(out);
+	const looksLikeFullDoc =
+		/<html\b/i.test(out) || /<body\b/i.test(out) || /<!doctype\b/i.test(out);
 	if (!looksLikeFullDoc) {
 		const desiredOuterStyle = `font-family: ${OUTER_FONT_FAMILY}; color: ${OUTER_TEXT_COLOR};`;
 		const singleDivWrapper = /^\s*<div\b[^>]*>[\s\S]*<\/div>\s*$/i.test(out);

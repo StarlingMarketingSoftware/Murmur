@@ -2357,6 +2357,7 @@ type MapBottomSearchFollowupBoxProps = {
 	previewedSearchFollowup: MapBottomSearchFollowupPreview;
 	onSelectedSearchFollowupChange: (selection: MapBottomSearchFollowupSelection) => void;
 	onPreviewSearchFollowupChange: (selection: MapBottomSearchFollowupPreview) => void;
+	onForYouSubmit: () => void;
 	isKeywordModeEnabled: boolean;
 	onKeywordToggle: () => void;
 	isRadiusModeEnabled: boolean;
@@ -2373,6 +2374,7 @@ const MapBottomSearchFollowupBox = memo(
 		previewedSearchFollowup,
 		onSelectedSearchFollowupChange,
 		onPreviewSearchFollowupChange,
+		onForYouSubmit,
 		isKeywordModeEnabled,
 		onKeywordToggle,
 		isRadiusModeEnabled,
@@ -2422,8 +2424,7 @@ const MapBottomSearchFollowupBox = memo(
 			>
 				<button
 					type="button"
-					aria-label="Select For You"
-					aria-pressed={isForYouSelected}
+					aria-label="Run For You search"
 					className="absolute flex items-center justify-center"
 					style={{
 						left: `${leftTileBox.leftOffset}px`,
@@ -2444,9 +2445,7 @@ const MapBottomSearchFollowupBox = memo(
 					}}
 					onMouseEnter={() => onPreviewSearchFollowupChange('for-you')}
 					onFocus={() => onPreviewSearchFollowupChange('for-you')}
-					onClick={() =>
-						onSelectedSearchFollowupChange(isForYouSelected ? null : 'for-you')
-					}
+					onClick={() => onForYouSubmit()}
 				>
 					<MapBottomSearchForYouIcon
 						aria-hidden="true"
@@ -3148,7 +3147,6 @@ const DashboardContent = () => {
 		}
 	}, [radiusHydrated, isRadiusModeEnabled, radiusCenter, radiusMiles]);
 
-	const isMapBottomForYouMode = mapBottomSearchFollowupSelection === 'for-you';
 	const isMapBottomCategoryMode = mapBottomSearchFollowupSelection === 'category';
 	// When the scroll-to-map gesture commits, it fires a "For You" search but holds the top
 	// search pill empty/white until the curated results have actually loaded into the right
@@ -9649,10 +9647,16 @@ const DashboardContent = () => {
 		: isMobile && hasSearched
 			? 'pb-[64px]'
 			: 'pb-0 md:pb-[100px]';
+	// For You preview bar is hover-driven. Suppressed while the search bar is being
+	// typed in, so an accidental tile hover never unmounts the user's active input.
+	const isMapBottomForYouMode =
+		mapBottomSearchFollowupPreview === 'for-you' && !isMapBottomSearchActive;
 	const mapBottomSearchShellWidth = isMapBottomCategoryMode
 		? MAP_RESULTS_BOTTOM_CATEGORY_SEARCH_BOX.width
 		: isMapBottomForYouMode
-			? MAP_RESULTS_BOTTOM_SEARCH_BOX.activeWidth
+			? // Match the idle width (474, not the 472 activeWidth) so the hover-driven
+				// For You preview doesn't nudge the bar/tiles sideways by 2px.
+				MAP_RESULTS_BOTTOM_SEARCH_BOX.width
 			: isMapBottomSearchExpanded
 				? MAP_RESULTS_BOTTOM_SEARCH_BOX.activeWidth
 				: MAP_RESULTS_BOTTOM_SEARCH_BOX.width;
@@ -14379,6 +14383,7 @@ const DashboardContent = () => {
 																		onPreviewSearchFollowupChange={
 																			handleMapBottomSearchFollowupPreviewChange
 																		}
+																		onForYouSubmit={handleMapBottomForYouSubmit}
 																		isKeywordModeEnabled={isKeywordModeEnabled}
 																		onKeywordToggle={handleKeywordToggle}
 																		isRadiusModeEnabled={isRadiusModeEnabled}
