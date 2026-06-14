@@ -2797,6 +2797,7 @@ const DashboardSearchFlankBoxes = ({
 	sentCount,
 	navEnabled,
 	onNavigate,
+	dimmed,
 }: {
 	contactsCount: number;
 	draftCount: number;
@@ -2804,6 +2805,9 @@ const DashboardSearchFlankBoxes = ({
 	sentCount: number;
 	navEnabled: boolean;
 	onNavigate: (tab: 'write' | 'drafts' | 'inbox' | 'sent') => void;
+	// Recede the right-of-bar group to very low opacity while an expanded Description
+	// card overlaps it, so the (translucent) card reads cleanly above those boxes.
+	dimmed?: boolean;
 }) => {
 	const handler = (
 		tab: 'write' | 'drafts' | 'inbox' | 'sent',
@@ -2813,6 +2817,11 @@ const DashboardSearchFlankBoxes = ({
 	// row reads as the campaign control trailing off into the map on both sides.
 	const OUTER = 0.18;
 	const MID = 0.45;
+	// Receded opacity for the right-of-bar group (the one the right-docked
+	// Description card overlaps) while that card is expanded.
+	const DIM = 0.08;
+	const groupOpacity = dimmed ? DIM : 1;
+	const dimTransition = 'opacity 150ms ease-out';
 	return (
 		<>
 			<div
@@ -2842,7 +2851,13 @@ const DashboardSearchFlankBoxes = ({
 			</div>
 			<div
 				className={DASHBOARD_SEARCH_FLANK_GROUP_CLASS}
-				style={{ left: 'calc(100% + 8px)', bottom: 0, gap: 3 }}
+				style={{
+					left: 'calc(100% + 8px)',
+					bottom: 0,
+					gap: 3,
+					opacity: groupOpacity,
+					transition: dimTransition,
+				}}
 			>
 				<DashboardAskFlankBox
 					label="contacts"
@@ -5910,6 +5925,10 @@ const DashboardContent = () => {
 	>('right');
 	// Tab toggles the Description box; persists across hovered contacts until collapsed.
 	const [isMapMarkerResearchExpanded, setIsMapMarkerResearchExpanded] = useState(false);
+	// Mirror of the side-panel row-hover card's (separate, internally-owned) expand
+	// state, so the parent can lift that card above — and recede — the bottom nav boxes.
+	const [mapPanelHoverResearchExpanded, setMapPanelHoverResearchExpanded] =
+		useState(false);
 	// When hovering a row in the map side panel, highlight/show the corresponding marker on the map.
 	const [hoveredMapPanelContactId, setHoveredMapPanelContactId] = useState<number | null>(
 		null
@@ -8109,6 +8128,15 @@ const DashboardContent = () => {
 				: null,
 		[getMapResearchDisplayFields, mapResearchPanelContact]
 	);
+
+	// The row-hover card owns its expand state internally and resets it on unmount;
+	// clear the parent mirror whenever that card isn't showing so the nav boxes
+	// don't stay receded after the hover ends.
+	const isMapPanelHoverResearchVisible =
+		Boolean(mapPanelHoveredResearchContact) && !mapResearchPanelContact;
+	useEffect(() => {
+		if (!isMapPanelHoverResearchVisible) setMapPanelHoverResearchExpanded(false);
+	}, [isMapPanelHoverResearchVisible]);
 
 	// Hovered overlay markers/rows may be slim map-overlay payloads; backfill their
 	// research fields so the hover research panels don't render blank.
@@ -13890,7 +13918,9 @@ const DashboardContent = () => {
 													<div
 														className="absolute pointer-events-none"
 														style={{
-															zIndex: 124,
+															// Lift above the bottom nav boxes (z-130) only while expanded,
+															// matching the marker-hover card's behavior.
+															zIndex: mapPanelHoverResearchExpanded ? 131 : 124,
 															top:
 																mapPanelHoverResearchTopPx != null
 																	? `${mapPanelHoverResearchTopPx}px`
@@ -13914,6 +13944,7 @@ const DashboardContent = () => {
 															displayTitleCategory={
 																mapPanelHoveredResearchContact.displayTitleCategory
 															}
+															onExpandedChange={setMapPanelHoverResearchExpanded}
 														/>
 													</div>
 												)}
@@ -13923,7 +13954,10 @@ const DashboardContent = () => {
 													<div
 														className="absolute pointer-events-none"
 														style={{
-															zIndex: 124,
+															// Lift above the bottom search bar's nav boxes (z-130) only while
+															// expanded — when the taller card overlaps that row — so collapsed
+															// hover keeps its prior ordering vs. the z-125 Write panel.
+															zIndex: isMapMarkerResearchExpanded ? 131 : 124,
 															top: MAP_VIEW_SIDE_PANEL_TOP_CSS,
 															...(mapMarkerResearchDockSide === 'right'
 																? {
@@ -14536,6 +14570,13 @@ const DashboardContent = () => {
 										sentCount={dashboardMapHeaderSentCount}
 										navEnabled={Boolean(mapCampaignId)}
 										onNavigate={navigateToCampaignTab}
+										dimmed={
+											!isCompressedMapChrome &&
+											((isMapResearchPanelVisible &&
+												isMapMarkerResearchExpanded) ||
+												(isMapPanelHoverResearchVisible &&
+													mapPanelHoverResearchExpanded))
+										}
 									/>
 									{shouldShowMapBottomKeywordBadge && (
 										<div
