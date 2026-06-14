@@ -2707,6 +2707,163 @@ const MapBottomSearchFollowupBox = memo(
 );
 MapBottomSearchFollowupBox.displayName = 'MapBottomSearchFollowupBox';
 
+// Campaign-style nav boxes flanking the dashboard "Search Anything" bar. Values
+// mirror the campaign overview's count boxes (see CampaignOverviewBottomBoxes in
+// campaign/[campaignId]/page.tsx) so the two surfaces read as the same control.
+const DASHBOARD_ASK_FLANK_BOX_STYLE: React.CSSProperties = {
+	width: 39.154,
+	height: 39.154,
+	borderRadius: 7.458,
+	border: '0.725px solid #000',
+	boxSizing: 'border-box',
+	display: 'flex',
+	alignItems: 'center',
+	justifyContent: 'center',
+};
+const DASHBOARD_ASK_FLANK_COUNT_STYLE: React.CSSProperties = {
+	fontFamily: 'Inter, sans-serif',
+	fontSize: 12.326,
+	fontWeight: 500,
+	lineHeight: '10.151px',
+	color: '#000',
+};
+
+// A single flanking box: a decorative spacer, or an interactive count/icon box
+// that is disabled (display-only) until a non-null onClick is supplied — matching
+// the campaign's "no handler => not clickable when count is 0" behavior.
+const DashboardAskFlankBox = ({
+	label,
+	background,
+	count,
+	icon,
+	opacity,
+	decorative,
+	onClick,
+}: {
+	label?: string;
+	background: string;
+	count?: number;
+	icon?: ReactNode;
+	opacity?: number;
+	decorative?: boolean;
+	onClick?: () => void;
+}) => {
+	if (decorative) {
+		return (
+			<div
+				aria-hidden="true"
+				style={{ ...DASHBOARD_ASK_FLANK_BOX_STYLE, background, opacity }}
+			/>
+		);
+	}
+	return (
+		<button
+			type="button"
+			aria-label={label}
+			disabled={!onClick}
+			className={`pointer-events-auto border-0 p-0 transition-opacity duration-150${
+				onClick ? ' hover:opacity-85' : ''
+			}`}
+			style={{
+				...DASHBOARD_ASK_FLANK_BOX_STYLE,
+				...DASHBOARD_ASK_FLANK_COUNT_STYLE,
+				background,
+				opacity,
+				cursor: onClick ? 'pointer' : 'default',
+			}}
+			onClick={onClick}
+		>
+			{icon ?? count}
+		</button>
+	);
+};
+
+// Left + right groups of campaign nav boxes that flank the dashboard search bar
+// (same row). Rendered inside the bar's positioned wrapper as siblings of the
+// bar, so `right/left: calc(100% + 8px)` anchors each group just outside the bar
+// and `bottom: 0` pins them to the resting bar row. Used by both the pre-search
+// ask box and the map-results search bar.
+const DASHBOARD_SEARCH_FLANK_GROUP_CLASS =
+	'dashboard-ask-flank pointer-events-none absolute flex items-end';
+const DashboardSearchFlankBoxes = ({
+	contactsCount,
+	draftCount,
+	inboxCount,
+	sentCount,
+	navEnabled,
+	onNavigate,
+}: {
+	contactsCount: number;
+	draftCount: number;
+	inboxCount: number;
+	sentCount: number;
+	navEnabled: boolean;
+	onNavigate: (tab: 'write' | 'drafts' | 'inbox' | 'sent') => void;
+}) => {
+	const handler = (
+		tab: 'write' | 'drafts' | 'inbox' | 'sent',
+		count: number
+	) => (navEnabled && count > 0 ? () => onNavigate(tab) : undefined);
+	// Boxes fade out toward the outer edges (full opacity nearest the bar), so the
+	// row reads as the campaign control trailing off into the map on both sides.
+	const OUTER = 0.18;
+	const MID = 0.45;
+	return (
+		<>
+			<div
+				className={DASHBOARD_SEARCH_FLANK_GROUP_CLASS}
+				style={{ right: 'calc(100% + 8px)', bottom: 0, gap: 3 }}
+			>
+				<DashboardAskFlankBox decorative background="#F3EEE1" opacity={OUTER} />
+				<DashboardAskFlankBox
+					label="sent"
+					background="#5AB478"
+					count={sentCount}
+					opacity={MID}
+					onClick={handler('sent', sentCount)}
+				/>
+				<DashboardAskFlankBox
+					label="opportunities"
+					background="#EFD7D3"
+					icon={
+						<DashboardActionBarStarIcon
+							width={15}
+							height={15}
+							style={{ color: '#E32222' }}
+						/>
+					}
+					onClick={handler('inbox', inboxCount)}
+				/>
+			</div>
+			<div
+				className={DASHBOARD_SEARCH_FLANK_GROUP_CLASS}
+				style={{ left: 'calc(100% + 8px)', bottom: 0, gap: 3 }}
+			>
+				<DashboardAskFlankBox
+					label="contacts"
+					background="#EB8586"
+					count={contactsCount}
+					onClick={handler('write', contactsCount)}
+				/>
+				<DashboardAskFlankBox
+					label="drafts"
+					background="#FFE3AA"
+					count={draftCount}
+					opacity={MID}
+					onClick={handler('drafts', draftCount)}
+				/>
+				<DashboardAskFlankBox
+					label="inbox"
+					background="#6EBED5"
+					count={inboxCount}
+					opacity={OUTER}
+					onClick={handler('inbox', inboxCount)}
+				/>
+			</div>
+		</>
+	);
+};
+
 const SearchTrayIconTile = ({
 	backgroundColor,
 	children,
@@ -4282,6 +4439,18 @@ const DashboardContent = () => {
 		[]
 	);
 
+	// The ask-box flanking nav boxes jump to the in-scope campaign's tabs, reusing
+	// the same push pattern as the map-view tab buttons below.
+	const navigateToCampaignTab = useCallback(
+		(tab: 'write' | 'drafts' | 'inbox' | 'sent') => {
+			if (!mapCampaignId) return;
+			router.push(
+				`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=${tab}${campaignReturnAddedSuffix()}`
+			);
+		},
+		[mapCampaignId, router, campaignReturnAddedSuffix]
+	);
+
 	const prefetchedCampaignRoutes = useRef<Set<string>>(new Set());
 
 	// Tier 1: warm the campaign route's JS chunks. The ?tab= query doesn't change the
@@ -5666,6 +5835,9 @@ const DashboardContent = () => {
 	// from the automatic entry disengages (pick-mode landing, For You scroll-entry),
 	// which must keep their normal look.
 	const [isSearchDeselectedByUser, setIsSearchDeselectedByUser] = useState(false);
+	// Hover over the user-deselected (grayed) search bar reveals the green
+	// "Activate" affordance that re-engages the just-disengaged search.
+	const [isDisengagedSearchHovered, setIsDisengagedSearchHovered] = useState(false);
 	const [mapSearchAutoFitRequestNonce, setMapSearchAutoFitRequestNonce] = useState(0);
 	// Crossing the compressed-chrome boundary hides/shows the left rail and swaps the
 	// results panel between the right edge and a bottom sheet: never strand the
@@ -5795,6 +5967,15 @@ const DashboardContent = () => {
 	const isSelectMapToolActive = activeMapTool === 'select';
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
+	// The pre-search dashboard ask box (with its flanking campaign nav boxes) is
+	// visible under the same condition the box itself renders below. The nav boxes
+	// show that campaign's live counts, so the metrics fetches need to run here too.
+	const isAskBoxNavVisible =
+		!hasSearched &&
+		activeTab === 'search' &&
+		!fromHomeParam &&
+		!isMapView &&
+		!isUnsubscribeFlowOpen;
 	const dashboardMapCampaignForHeader = fromCampaign ?? activeCampaign;
 	const dashboardMapCampaignContactListIds = useMemo(
 		() => dashboardMapCampaignForHeader?.userContactLists?.map((list) => list.id) ?? [],
@@ -5820,9 +6001,8 @@ const DashboardContent = () => {
 	const isMobileAddToCampaignSearch = isMobile === true && isAddToCampaignMode;
 	const shouldLoadDashboardMapCampaignHeaderMetrics = isMobileAddToCampaignSearch
 		? Boolean(dashboardMapCampaignForHeader)
-		: isMapView &&
-			!isCompressedMapChrome &&
-			!hasNoSearchResults &&
+		: ((isMapView && !isCompressedMapChrome && !hasNoSearchResults) ||
+				isAskBoxNavVisible) &&
 			Boolean(dashboardMapCampaignForHeader);
 	const { data: dashboardMapHeaderContacts } = useGetContacts({
 		filters: dashboardMapCampaignContactsFilter,
@@ -5841,9 +6021,13 @@ const DashboardContent = () => {
 	const { data: mobileSearchInboundEmails } = useGetInboundEmails({
 		filters: { campaignId: dashboardMapCampaignForHeader?.id },
 		enabled:
-			isMobileAddToCampaignSearch && Boolean(dashboardMapCampaignForHeader?.id),
+			shouldLoadDashboardMapCampaignHeaderMetrics &&
+			Boolean(dashboardMapCampaignForHeader?.id),
 	});
 	const mobileSearchNewMessageCount = mobileSearchInboundEmails?.length || 0;
+	// Same inbound data drives the desktop ask-box Inbox/Opportunities nav boxes
+	// (mirrors the campaign overview's `overviewInboxCount`).
+	const dashboardMapHeaderInboxCount = mobileSearchInboundEmails?.length || 0;
 	const dashboardMapHeaderContactsCount = dashboardMapHeaderContacts?.length || 0;
 	const dashboardMapHeaderDraftCount = (dashboardMapHeaderEmails || []).filter(
 		(email) => email.status === EmailStatus.draft
@@ -10530,6 +10714,15 @@ const DashboardContent = () => {
 										))}
 									</div>
 								)}
+							{/* Campaign nav boxes flanking the pre-search ask bar (same row). */}
+							<DashboardSearchFlankBoxes
+								contactsCount={dashboardMapHeaderContactsCount}
+								draftCount={dashboardMapHeaderDraftCount}
+								inboxCount={dashboardMapHeaderInboxCount}
+								sentCount={dashboardMapHeaderSentCount}
+								navEnabled={Boolean(mapCampaignId)}
+								onNavigate={navigateToCampaignTab}
+							/>
 							<MapBottomSearchBar
 								value={mapBottomSearchValue}
 								isExpanded={isMapBottomSearchExpanded}
@@ -11834,6 +12027,12 @@ const DashboardContent = () => {
 								// to a plain white pill showing the prior query grayed out.
 								const showExitSearchButton =
 									canDisengageMapSearch && isMapSearchEngaged;
+								// Hovering the user-deselected (grayed) bar reveals the green
+								// "Activate" affordance that re-engages the prior search.
+								const showDisengagedActivate =
+									isSearchDeselectedByUser &&
+									isDisengagedSearchHovered &&
+									isMapTopSearchReengageAvailable;
 
 								const searchBarBase = (
 									<div
@@ -11901,6 +12100,12 @@ const DashboardContent = () => {
 																		}
 																	: undefined
 															}
+															onMouseEnter={() =>
+																setIsDisengagedSearchHovered(true)
+															}
+															onMouseLeave={() =>
+																setIsDisengagedSearchHovered(false)
+															}
 															style={{
 																cursor: isMapTopSearchReengageAvailable
 																	? 'pointer'
@@ -11908,7 +12113,7 @@ const DashboardContent = () => {
 															}}
 														>
 															<div
-																className="search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black !bg-white !pr-[12px] !text-black"
+																className={`search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black ${showExitSearchButton ? '!bg-[#A6C5F3]' : '!bg-white'} !pr-[12px] !text-black`}
 																style={{
 																	accentColor: 'transparent',
 																	cursor: isMapTopSearchReengageAvailable
@@ -11931,11 +12136,27 @@ const DashboardContent = () => {
 																		background:
 																			showCuratedPill
 																				? undefined
-																				: '#FFFFFF',
+																				: showDisengagedActivate
+																					? 'linear-gradient(90deg, #ADFFC2 0%, #EFFFF3 100%)'
+																					: '#FFFFFF',
 																	}}
 																>
 																	{isSearchDeselectedByUser ? (
-																		<div className="flex h-full w-full min-w-0 items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-black/40">
+																		<div className="relative flex h-full w-full min-w-0 items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-black/40">
+																			{showDisengagedActivate && (
+																				<button
+																					type="button"
+																					aria-label={`Activate ${mapTopSearchLabel}`}
+																					title="Activate this search"
+																					onClick={(event) => {
+																						event.stopPropagation();
+																						handleMapTopSearchReengage();
+																					}}
+																					className="absolute left-[12px] top-1/2 z-10 -translate-y-1/2 cursor-pointer rounded-[10px] bg-[#D9D9D9] px-[10px] py-[6px] font-secondary text-[13px] font-bold leading-none text-black/60 transition-colors hover:bg-[#cfcfcf] hover:text-black/80"
+																				>
+																					Activate
+																				</button>
+																			)}
 																			<span className="truncate">
 																				{mapTopSearchLabel}
 																			</span>
@@ -11985,7 +12206,7 @@ const DashboardContent = () => {
 																			event.stopPropagation();
 																			handleEmptyMapClick();
 																		}}
-																		className="absolute right-[10px] top-1/2 z-20 flex h-[23.147px] w-[24.927px] -translate-y-1/2 items-center justify-center rounded-[5.342px] bg-[#ABABAB] text-white opacity-80 transition-opacity hover:opacity-100"
+																		className="absolute right-[14px] top-1/2 z-20 flex h-[23.147px] w-[24.927px] -translate-y-1/2 items-center justify-center rounded-[5.342px] bg-[#EBEBEB] text-[#B1ABAB] opacity-80 transition-opacity hover:opacity-100"
 																	>
 																		<span className="text-[16px] leading-none -translate-y-[1px]">
 																			×
@@ -14313,6 +14534,15 @@ const DashboardContent = () => {
 										radiusEnabled={isRadiusModeEnabled}
 										profileModeEnabled={isProfileModeEnabled}
 										keywordModeEnabled={isKeywordModeEnabled}
+									/>
+									{/* Campaign nav boxes flanking the map-results search bar (same row). */}
+									<DashboardSearchFlankBoxes
+										contactsCount={dashboardMapHeaderContactsCount}
+										draftCount={dashboardMapHeaderDraftCount}
+										inboxCount={dashboardMapHeaderInboxCount}
+										sentCount={dashboardMapHeaderSentCount}
+										navEnabled={Boolean(mapCampaignId)}
+										onNavigate={navigateToCampaignTab}
 									/>
 									{shouldShowMapBottomKeywordBadge && (
 										<div

@@ -8493,6 +8493,15 @@ body.dashboard-booting .dashboard-ask-anything-root * {
 	pointer-events: none !important;
 }
 
+/* The "Search Anything" bar's flanking campaign nav boxes need ~686px of width
+   alongside the centered bar; below that they'd clip off-screen or overlap the
+   bar, so hide them on narrow viewports (the bar itself stays usable). */
+@media (max-width: 720px) {
+	.dashboard-ask-flank {
+		display: none !important;
+	}
+}
+
 /* --- Crossfade back: transitions live only on the fading class, so swapping
    dashboard-booting → dashboard-boot-fading in one commit animates every skinned
    property to its normal value, then both classes drop at 'done'. */
