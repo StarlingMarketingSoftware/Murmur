@@ -332,7 +332,6 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 						trackColor="transparent"
 						offsetRight={2}
 						contentClassName="overflow-x-hidden"
-						alwaysShow
 						lockHorizontalScroll
 					>
 						{hasLinks ? (
