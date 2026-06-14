@@ -3833,8 +3833,14 @@ const Murmur = () => {
 									/>
 									<div className="pointer-events-none">
 										<div
-											className="absolute left-0 pointer-events-none rounded-[5px] bg-white px-[4px] py-[1px] font-inter text-[11px] font-medium text-black"
+											className="absolute pointer-events-none flex items-center justify-center overflow-hidden rounded-[10px] bg-[#FDFCFB] font-inter font-normal text-black"
 											style={{
+												width: '66px',
+												height: '17px',
+												fontSize: '14px',
+												lineHeight: '39.473px',
+												textAlign: 'center',
+												left: '-5.5px',
 												top: `-${
 													MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
 													MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
@@ -3844,7 +3850,8 @@ const Murmur = () => {
 													MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
 													MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
 													MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX +
-													22
+													17 +
+													6
 												}px`,
 											}}
 										>
@@ -4968,6 +4975,7 @@ const Murmur = () => {
 									.campaign-map-interactive-page [data-research-panel-container],
 									.campaign-map-interactive-page [data-campaign-workspace-toggle],
 									.campaign-map-interactive-page [data-campaign-bottom-anchor],
+									.campaign-map-interactive-page [data-history-ledger-box],
 									.campaign-map-interactive-page [data-draft-button-container],
 									.campaign-map-interactive-page [data-draft-review-side-preview],
 									.campaign-map-interactive-page [data-left-expanded-panel],

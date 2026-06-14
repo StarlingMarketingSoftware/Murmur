@@ -245,6 +245,23 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 		setIsHovered(false); // Hide button at same time as panel
 	}, []);
 
+	// Clicking a ledger box (the "+NN" batch boxes inside the panels) opens the
+	// History panel, anchored to the side the box was clicked on.
+	const handleLedgerBoxClick = useCallback(
+		(e: React.MouseEvent<HTMLDivElement>) => {
+			if (!(e.target as HTMLElement).closest('[data-history-ledger-box]')) return;
+			// Captured before the panel's own onClick (which navigates to that tab),
+			// so a ledger-box click only opens History and doesn't change tabs.
+			e.stopPropagation();
+			const rect = containerRef.current?.getBoundingClientRect();
+			const onRight = rect ? e.clientX > rect.left + rect.width / 2 : cursorOnRightSide;
+			setLockedSide(onRight ? 'right' : 'left');
+			setIsHovered(true);
+			setIsHistoryOpen(true);
+		},
+		[cursorOnRightSide]
+	);
+
 	// Filter and sort history actions (oldest at top, newest at bottom)
 	const filteredActions = historyActions
 		.filter((action) => activeFilter === 'all' || action.type === activeFilter)
@@ -303,6 +320,7 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 				ref={innerRef}
 				className={`relative ${className}`}
 				{...rest}
+				onClickCapture={handleLedgerBoxClick}
 			>
 				{children}
 

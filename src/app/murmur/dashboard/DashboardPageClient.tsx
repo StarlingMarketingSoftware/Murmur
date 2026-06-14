@@ -127,7 +127,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import {
 	useBatchUpdateContacts,
 	useGetContacts,
-	useGetContactResearch,
+	useContactWithResearch,
 	getContactsListQueryKey,
 	fetchContactsList,
 } from '@/hooks/queryHooks/useContacts';
@@ -188,6 +188,7 @@ import {
 	ContactResearchHorizontalStrip,
 } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { ContactResearchDescriptionBox } from '@/components/molecules/ContactResearchPanel/ContactResearchDescriptionBox';
+import { ContactResearchHoverCard } from '@/components/molecules/ContactResearchPanel/ContactResearchHoverCard';
 import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
@@ -1591,7 +1592,11 @@ const MAP_SELECT_GRAB_LEFT_PX = 26;
 const MAP_VIEW_SIDE_PANEL_VISUAL_TOP_PX = 106;
 const MAP_VIEW_SIDE_PANEL_BOTTOM_GAP_PX = 20;
 const MAP_VIEW_SIDE_PANEL_GROUP_NUDGE_UP_PX = 24;
-const MAP_PANEL_ABRIDGED_RESEARCH_HEIGHT_PX = 292;
+// Full row-following hover card height: abridged card (312.713) + 13 gap + the
+// Description box at its EXPANDED height incl. the "Press Tab" pill (415 + 9 gap +
+// 23 pill). Reserving the expanded height keeps the card's y stable across Tab
+// toggles so a low row's Description box never gets clipped at the viewport bottom.
+const MAP_PANEL_HOVER_RESEARCH_CARD_HEIGHT_PX = 312.713 + 13 + 415 + 9 + 23; // ≈ 773
 const MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX = 13;
 const MAP_PANEL_ABRIDGED_RESEARCH_CLEAR_DELAY_MS = 220;
 // Marker-hover research group (abridged card + Description box docked left/right).
@@ -2884,25 +2889,6 @@ const SearchTrayIconTile = ({
 			{children}
 		</div>
 	);
-};
-
-// Map-overlay rows can arrive without the research-detail fields (slim payload — see
-// api/contacts/map-overlay). When a hovered contact is missing them entirely (key absent;
-// null means fetched-but-empty), lazily fetch and merge them so the hover research panel
-// fills in instead of rendering blank.
-const useContactWithResearch = (contact: ContactWithName | null) => {
-	// Cast for the `in` check: ContactWithName declares `metadata`, so TS would
-	// otherwise narrow the no-key branch (a slim overlay row) to `never`.
-	const needsResearch =
-		contact != null && !('metadata' in (contact as Record<string, unknown>));
-	const { data: research } = useGetContactResearch(
-		contact && needsResearch ? contact.id : null
-	);
-	return useMemo(() => {
-		if (!contact) return null;
-		if (!research || research.id !== contact.id) return contact;
-		return { ...contact, ...research };
-	}, [contact, research]);
 };
 
 const DashboardContent = () => {
@@ -5967,15 +5953,6 @@ const DashboardContent = () => {
 	const isSelectMapToolActive = activeMapTool === 'select';
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
-	// The pre-search dashboard ask box (with its flanking campaign nav boxes) is
-	// visible under the same condition the box itself renders below. The nav boxes
-	// show that campaign's live counts, so the metrics fetches need to run here too.
-	const isAskBoxNavVisible =
-		!hasSearched &&
-		activeTab === 'search' &&
-		!fromHomeParam &&
-		!isMapView &&
-		!isUnsubscribeFlowOpen;
 	const dashboardMapCampaignForHeader = fromCampaign ?? activeCampaign;
 	const dashboardMapCampaignContactListIds = useMemo(
 		() => dashboardMapCampaignForHeader?.userContactLists?.map((list) => list.id) ?? [],
@@ -6001,8 +5978,9 @@ const DashboardContent = () => {
 	const isMobileAddToCampaignSearch = isMobile === true && isAddToCampaignMode;
 	const shouldLoadDashboardMapCampaignHeaderMetrics = isMobileAddToCampaignSearch
 		? Boolean(dashboardMapCampaignForHeader)
-		: ((isMapView && !isCompressedMapChrome && !hasNoSearchResults) ||
-				isAskBoxNavVisible) &&
+		: isMapView &&
+			!isCompressedMapChrome &&
+			!hasNoSearchResults &&
 			Boolean(dashboardMapCampaignForHeader);
 	const { data: dashboardMapHeaderContacts } = useGetContacts({
 		filters: dashboardMapCampaignContactsFilter,
@@ -9876,7 +9854,7 @@ const DashboardContent = () => {
 		const dashboardZoom = Number.parseFloat(rawDashboardZoom) || DASHBOARD_MAP_ZOOM_DEFAULT;
 		const rowRect = rowElement.getBoundingClientRect();
 		const visualCardHeight =
-			MAP_PANEL_ABRIDGED_RESEARCH_HEIGHT_PX * MAP_VIEW_PANEL_SCALE * dashboardZoom;
+			MAP_PANEL_HOVER_RESEARCH_CARD_HEIGHT_PX * MAP_VIEW_PANEL_SCALE * dashboardZoom;
 		const minVisualTop = 12;
 		const maxVisualTop = Math.max(
 			minVisualTop,
@@ -10714,15 +10692,6 @@ const DashboardContent = () => {
 										))}
 									</div>
 								)}
-							{/* Campaign nav boxes flanking the pre-search ask bar (same row). */}
-							<DashboardSearchFlankBoxes
-								contactsCount={dashboardMapHeaderContactsCount}
-								draftCount={dashboardMapHeaderDraftCount}
-								inboxCount={dashboardMapHeaderInboxCount}
-								sentCount={dashboardMapHeaderSentCount}
-								navEnabled={Boolean(mapCampaignId)}
-								onNavigate={navigateToCampaignTab}
-							/>
 							<MapBottomSearchBar
 								value={mapBottomSearchValue}
 								isExpanded={isMapBottomSearchExpanded}
@@ -13040,6 +13009,31 @@ const DashboardContent = () => {
 												transformOrigin: 'top left',
 											}}
 										>
+											<div
+												className="absolute pointer-events-none flex items-center justify-center overflow-hidden rounded-[10px] bg-[#FDFCFB] font-inter font-normal text-black"
+												style={{
+													width: '66px',
+													height: '17px',
+													fontSize: '14px',
+													lineHeight: '39.473px',
+													textAlign: 'center',
+													left: '-5.5px',
+													top: `-${
+														MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+														MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+														MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+														MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+														MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
+														MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+														MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
+														MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX +
+														17 +
+														6
+													}px`,
+												}}
+											>
+												Showing
+											</div>
 											<MapSelectGrabTallStackBox
 												className="absolute pointer-events-none"
 												isSelectActive={isSelectMapToolActive}
@@ -13909,12 +13903,11 @@ const DashboardContent = () => {
 															transformOrigin: 'top right',
 														}}
 													>
-														<ContactResearchPanel
+														<ContactResearchHoverCard
 															contact={
 																mapPanelHoveredResearchContactEnriched ??
 																mapPanelHoveredResearchContact.contact
 															}
-															variant="abridged"
 															displayHeadline={
 																mapPanelHoveredResearchContact.displayHeadline
 															}

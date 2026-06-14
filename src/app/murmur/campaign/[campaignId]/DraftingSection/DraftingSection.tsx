@@ -8,7 +8,9 @@ import {
 	useRef,
 	useState,
 	type CSSProperties,
+	type MouseEvent as ReactMouseEvent,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { gsap } from 'gsap';
 import {
@@ -26,6 +28,7 @@ import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptio
 // EmailGeneration kept available but not used in current view
 // import { EmailGeneration } from './EmailGeneration/EmailGeneration';
 import { cn } from '@/utils';
+import { getMurmurRootScale } from '@/utils/rootScale';
 import { markAfterPaint } from '@/utils/perfMarks';
 import {
 	CAMPAIGN_SIDE_SHIFT_VAR,
@@ -66,6 +69,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ContactWithName } from '@/types/contact';
 import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
+import { ContactResearchHoverCard } from '@/components/molecules/ContactResearchPanel/ContactResearchHoverCard';
 import { TestPreviewPanel } from '@/components/molecules/TestPreviewPanel/TestPreviewPanel';
 import { MiniEmailStructure } from './EmailGeneration/MiniEmailStructure';
 import ContactsExpandedList, {
@@ -282,12 +286,18 @@ type CampaignBottomPanelKind = 'contacts' | 'drafts' | 'sent' | 'inbox';
 // list (Write / Drafts / Inbox tabs). Mirrors the dashboard map-panel hover
 // research convention (gap + delayed clear).
 const ROW_HOVER_RESEARCH_CARD_WIDTH_PX = 272.425; // ContactResearchPanel abridged width
-const ROW_HOVER_RESEARCH_CARD_HEIGHT_PX = 313; // ceil of abridged max height
 const ROW_HOVER_RESEARCH_GAP_PX = 13;
 const ROW_HOVER_RESEARCH_DOCKED_LEFT_PX = -(
 	ROW_HOVER_RESEARCH_CARD_WIDTH_PX + ROW_HOVER_RESEARCH_GAP_PX
 );
 const ROW_HOVER_RESEARCH_CLEAR_DELAY_MS = 220;
+// Full hover-card height (abridged card 312.713 + 13 gap + Description box at its
+// EXPANDED height incl. the "Press Tab" pill: 415 + 9 + 23 ≈ 773). Both the pinned-list
+// and rail cards statically center this full height in the viewport, so the card never
+// drops below the fold and always has room to Tab-expand.
+const HOVER_RESEARCH_CARD_FULL_HEIGHT_PX = 312.713 + 13 + 415 + 9 + 23; // ≈ 773
+// The search/overview rail card sits slightly above true-center (screen px).
+const RAIL_HOVER_RESEARCH_TOP_NUDGE_PX = 56;
 // Event-chat rows dock the opportunity panel in the same slot (larger card).
 const ROW_HOVER_OPPORTUNITY_DOCKED_LEFT_PX = -(
 	OPPORTUNITY_HOVER_PANEL_WIDTH_PX + ROW_HOVER_RESEARCH_GAP_PX
@@ -2717,6 +2727,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		ROW_HOVER_RESEARCH_DOCKED_LEFT_PX
 	);
 	const rowHoverResearchClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	// Search-view results panel + overview rail rows hover the same research card, but
+	// those surfaces are clipped/scaled (overflow-hidden panels, the rail's fixed +
+	// scale(0.95) wrapper), so the card is portaled to <body> as a fixed overlay and
+	// positioned from each row's screen rect instead of an anchor.
+	const [railHoverResearchContact, setRailHoverResearchContact] =
+		useState<ContactWithName | null>(null);
+	const [railHoverResearchPos, setRailHoverResearchPos] = useState<{
+		topPx: number;
+		leftPx: number;
+		scale: number;
+	} | null>(null);
+	const railHoverResearchClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const railHoverResearchContactIdRef = useRef<number | null>(null);
+	railHoverResearchContactIdRef.current = railHoverResearchContact?.id ?? null;
 	// Event-chat rows hover the opportunity panel instead of contact research.
 	// Shares the docked slot, position state and clear timer — one card at a time.
 	const [rowHoverOpportunity, setRowHoverOpportunity] =
@@ -3164,14 +3188,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			if (!anchor) return;
 			cancelRowHoverResearchClear();
 			const anchorRect = anchor.getBoundingClientRect();
-			const rowRect = rowElement.getBoundingClientRect();
 			// Rects are post-transform; absolute `top` inside the anchor is pre-transform.
 			// The rect/offset ratio captures the full cumulative scale (campaign zoom,
 			// incl. the Safari transform fallback, and the 0.94 campaign-content scale).
 			const scale = anchor.offsetHeight > 0 ? anchorRect.height / anchor.offsetHeight : 1;
-			const rawTopPx = (rowRect.top - anchorRect.top) / (scale || 1);
-			const maxTopPx = Math.max(0, anchor.offsetHeight - ROW_HOVER_RESEARCH_CARD_HEIGHT_PX);
-			setRowHoverResearchTopPx(Math.min(Math.max(rawTopPx, 0), maxTopPx));
+			// Standardized vertical placement: statically center the FULL (expanded) card in
+			// the viewport instead of following the hovered row, so it never drops below the
+			// fold and always has room to Tab-expand. Converted into the anchor's pre-transform
+			// coords (the absolute `top` the card renders at).
+			const cardScreenHeightPx = HOVER_RESEARCH_CARD_FULL_HEIGHT_PX * (scale || 1);
+			const centeredScreenTopPx = Math.max(8, (window.innerHeight - cardScreenHeightPx) / 2);
+			setRowHoverResearchTopPx((centeredScreenTopPx - anchorRect.top) / (scale || 1));
 			// When the split stages leave a clear map strip left of the translucent
 			// band, move the card out of the band: right edge one gap left of the band
 			// edge. Centered/scrollable stages pin the band to x=0, so the fits-left-
@@ -3240,24 +3267,126 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const isRowHoverResearchEnabled =
 		!isMobile && (view === 'testing' || view === 'drafting' || view === 'inbox');
+	const isRailHoverResearchEnabled =
+		!isMobile && (view === 'search' || view === 'overview');
+
+	// Id → contact for every row that lives in a rail surface, so the delegated
+	// container hover can resolve a hovered row back to its contact.
+	const railContactById = useMemo(() => {
+		const map = new Map<number, ContactWithName>();
+		for (const contact of searchResultsForPanel) map.set(contact.id, contact);
+		for (const contact of overviewRightRailSelectedContactsFull) map.set(contact.id, contact);
+		for (const contact of overviewRightRailUnselectedContactsFiltered)
+			map.set(contact.id, contact);
+		return map;
+	}, [
+		searchResultsForPanel,
+		overviewRightRailSelectedContactsFull,
+		overviewRightRailUnselectedContactsFiltered,
+	]);
+
+	const cancelRailHoverResearchClear = useCallback(() => {
+		if (!railHoverResearchClearTimeoutRef.current) return;
+		clearTimeout(railHoverResearchClearTimeoutRef.current);
+		railHoverResearchClearTimeoutRef.current = null;
+	}, []);
+	const scheduleRailHoverResearchClear = useCallback(() => {
+		if (railHoverResearchClearTimeoutRef.current) return;
+		railHoverResearchClearTimeoutRef.current = setTimeout(() => {
+			railHoverResearchClearTimeoutRef.current = null;
+			setRailHoverResearchContact(null);
+			setRailHoverResearchPos(null);
+		}, ROW_HOVER_RESEARCH_CLEAR_DELAY_MS);
+	}, []);
+
+	const handleRailRowHoverResearch = useCallback(
+		(contact: ContactWithName | null, rowElement: HTMLElement | null) => {
+			if (!isRailHoverResearchEnabled || !contact || !rowElement) {
+				scheduleRailHoverResearchClear();
+				return;
+			}
+			cancelRailHoverResearchClear();
+			const rootScale = getMurmurRootScale() || 1;
+			const rect = rowElement.getBoundingClientRect();
+			// offsetHeight (design px) vs rendered height = the row's cumulative
+			// design→screen scale; the card matches it so it reads the same size as
+			// the rows beside it, regardless of the rail's nested scale transforms.
+			const rowScale =
+				rowElement.offsetHeight > 0 ? rect.height / rowElement.offsetHeight : rootScale;
+			const cardScreenWidth =
+				(ROW_HOVER_RESEARCH_CARD_WIDTH_PX + ROW_HOVER_RESEARCH_GAP_PX) * rowScale;
+			// Dock left of the row; flip to the right if there's no room on the left.
+			let leftScreen = rect.left - cardScreenWidth;
+			if (leftScreen < 8) leftScreen = rect.right + ROW_HOVER_RESEARCH_GAP_PX * rowScale;
+			// Standardized vertical placement: statically center the FULL (expanded) card in
+			// the viewport instead of following the hovered row, so it never drops below the
+			// fold and always has room to Tab-expand (matches the pinned-list card), nudged
+			// slightly above true-center on the rail.
+			const cardScreenHeight = HOVER_RESEARCH_CARD_FULL_HEIGHT_PX * rowScale;
+			const topScreen = Math.max(
+				8,
+				(window.innerHeight - cardScreenHeight) / 2 - RAIL_HOVER_RESEARCH_TOP_NUDGE_PX
+			);
+			// getBoundingClientRect is screen space; `position: fixed` children of the
+			// root-scaled <body> need those divided by the root scale (see getMurmurRootScale).
+			setRailHoverResearchPos({
+				topPx: topScreen / rootScale,
+				leftPx: leftScreen / rootScale,
+				scale: rowScale / rootScale,
+			});
+			setRailHoverResearchContact(contact);
+		},
+		[isRailHoverResearchEnabled, cancelRailHoverResearchClear, scheduleRailHoverResearchClear]
+	);
+
+	// Delegated hover on a rail container: resolve the hovered row via data-contact-id
+	// so no per-row wiring is needed across the responsive search-panel tiers.
+	const handleRailContainerMouseOver = useCallback(
+		(event: ReactMouseEvent<HTMLElement>) => {
+			const row = (event.target as HTMLElement).closest<HTMLElement>('[data-contact-id]');
+			if (!row) return;
+			const id = Number(row.getAttribute('data-contact-id'));
+			if (railHoverResearchContactIdRef.current === id) return; // already shown
+			const contact = railContactById.get(id);
+			if (contact) handleRailRowHoverResearch(contact, row);
+		},
+		[railContactById, handleRailRowHoverResearch]
+	);
+	const handleRailContainerMouseOut = useCallback(
+		(event: ReactMouseEvent<HTMLElement>) => {
+			const related = event.relatedTarget as Node | null;
+			if (related && event.currentTarget.contains(related)) return; // moved within the rail
+			handleRailRowHoverResearch(null, null);
+		},
+		[handleRailRowHoverResearch]
+	);
 
 	useEffect(() => {
 		// Never carry a card across tab switches; also cleans the timer on unmount.
 		cancelRowHoverResearchClear();
 		setRowHoverResearchContact(null);
 		setRowHoverOpportunity(null);
-		return cancelRowHoverResearchClear;
-	}, [view, cancelRowHoverResearchClear]);
+		cancelRailHoverResearchClear();
+		setRailHoverResearchContact(null);
+		setRailHoverResearchPos(null);
+		return () => {
+			cancelRowHoverResearchClear();
+			cancelRailHoverResearchClear();
+		};
+	}, [view, cancelRowHoverResearchClear, cancelRailHoverResearchClear]);
 
 	useEffect(() => {
-		// The card's left offset is captured per-hover relative to the backdrop
-		// band; a resize/zoom change moves the band, so drop the card instead of
-		// leaving it at a stale offset (next row hover recomputes).
+		// The card's offset is captured per-hover relative to the live layout; a
+		// resize/zoom change moves it, so drop the card instead of leaving it at a
+		// stale offset (next row hover recomputes).
 		if (typeof window === 'undefined') return;
 		const clearCard = () => {
 			cancelRowHoverResearchClear();
 			setRowHoverResearchContact(null);
 			setRowHoverOpportunity(null);
+			cancelRailHoverResearchClear();
+			setRailHoverResearchContact(null);
+			setRailHoverResearchPos(null);
 		};
 		window.addEventListener('resize', clearCard);
 		window.addEventListener('murmur:campaign-zoom-changed', clearCard);
@@ -3265,7 +3394,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			window.removeEventListener('resize', clearCard);
 			window.removeEventListener('murmur:campaign-zoom-changed', clearCard);
 		};
-	}, [cancelRowHoverResearchClear]);
+	}, [cancelRowHoverResearchClear, cancelRailHoverResearchClear]);
 
 	const handleDraftPreviewClick = useCallback((draft: EmailWithRelations) => {
 		setSelectedDraft(draft);
@@ -3528,12 +3657,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const fromName = campaign?.identity?.name || '';
 	const fromEmail = campaign?.identity?.email || '';
 
-	// Abridged research card top-aligned to the hovered row, docked left of the
-	// pinned list (pushed further left to clear the translucent band when the
-	// split map strip is visible). Rendered inside the
-	// [data-row-hover-research-anchor] wrapper.
-	const renderRowHoverResearchCard = () =>
-		isRowHoverResearchEnabled && rowHoverOpportunity ? (
+	// Research hover card (abridged card + Description box) top-aligned to the hovered
+	// row, docked left of the list (pushed further left to clear the translucent band
+	// when the split map strip is visible). Rendered inside the
+	// [data-row-hover-research-anchor] wrapper. `enabled` lets the search/overview rail
+	// reuse this with its own gate (defaults to the pinned-list gate).
+	const renderRowHoverResearchCard = (enabled = isRowHoverResearchEnabled) =>
+		enabled && rowHoverOpportunity ? (
 			<div
 				className="absolute pointer-events-none"
 				style={{
@@ -3544,7 +3674,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			>
 				<OpportunityHoverPanel application={rowHoverOpportunity} nowMs={Date.now()} />
 			</div>
-		) : isRowHoverResearchEnabled && rowHoverResearchContact ? (
+		) : enabled && rowHoverResearchContact ? (
 			<div
 				className="absolute pointer-events-none"
 				style={{
@@ -3553,7 +3683,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					left: `${rowHoverResearchLeftPx}px`,
 				}}
 			>
-				<ContactResearchPanel contact={rowHoverResearchContact} variant="abridged" />
+				<ContactResearchHoverCard contact={rowHoverResearchContact} />
 			</div>
 		) : null;
 
@@ -5173,6 +5303,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											width: '396px',
 											height: '703px',
 										}}
+										onMouseOver={handleRailContainerMouseOver}
+										onMouseOut={handleRailContainerMouseOut}
 									>
 										{/* Fixed header section - 52px */}
 										<div
@@ -5537,6 +5669,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										zIndex: 130,
 										gap: shouldShowOverviewRightRailSearchPanel ? '0px' : '16px',
 									}}
+									onMouseOver={handleRailContainerMouseOver}
+									onMouseOut={handleRailContainerMouseOut}
 								>
 									{shouldShowOverviewRightRailSearchPanel ? (
 										<div
@@ -7510,6 +7644,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															width: '375px',
 															height: '557px',
 														}}
+														onMouseOver={handleRailContainerMouseOver}
+														onMouseOut={handleRailContainerMouseOut}
 													>
 														{/* Fixed header section */}
 														<div
@@ -8365,6 +8501,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													width: '498px',
 													height: '400px',
 												}}
+												onMouseOver={handleRailContainerMouseOver}
+												onMouseOut={handleRailContainerMouseOut}
 											>
 												{/* Fixed header section */}
 												<div
@@ -8963,6 +9101,32 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				setIsOpen={setIsOpenUpgradeSubscriptionDrawer}
 				hideTriggerButton
 			/>
+			{/* Search/overview rail rows hover the same research card, rendered as a fixed
+			    overlay so it escapes the rails' clipping/scaled wrappers. Portaled INTO the
+			    campaign interactive layer (not <body>) so it shares the stacking context of
+			    the bottom count boxes — that layer is `isolation: isolate`, so a <body> portal
+			    paints BELOW it regardless of z-index; inside it, z-9999 wins. The layer isn't
+			    transformed (campaign zoom lives on <html>), so a fixed child positions the
+			    same as a body portal and the getMurmurRootScale math is unchanged. */}
+			{isRailHoverResearchEnabled &&
+				railHoverResearchContact &&
+				railHoverResearchPos &&
+				typeof document !== 'undefined' &&
+				createPortal(
+					<div
+						className="fixed pointer-events-none"
+						style={{
+							zIndex: 9999,
+							top: `${railHoverResearchPos.topPx}px`,
+							left: `${railHoverResearchPos.leftPx}px`,
+							transform: `scale(${railHoverResearchPos.scale})`,
+							transformOrigin: 'top left',
+						}}
+					>
+						<ContactResearchHoverCard contact={railHoverResearchContact} />
+					</div>,
+					document.querySelector('.campaign-map-interactive-page') ?? document.body
+				)}
 		</div>
 	);
 };

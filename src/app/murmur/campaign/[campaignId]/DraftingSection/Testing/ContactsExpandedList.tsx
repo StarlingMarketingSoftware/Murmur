@@ -2204,8 +2204,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					{bottomViewBatchesToShow[0] ? (
 						<div
 							key="contacts-collapsed-batch"
+								data-history-ledger-box
 							className={cn(
-								'select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between'
+								'cursor-pointer select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between'
 							)}
 							style={{
 								width: `${collapsedTopBoxWidthPx}px`,
@@ -2489,8 +2490,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 										return (
 											<div
 												key={`${batch.createdAt.getTime()}-${batch.addedCount}-${idx}`}
+												data-history-ledger-box
 												className={cn(
-													'select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between',
+													'cursor-pointer select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between',
 													'w-[224px] h-[30px] rounded-[4.7px] bg-[#F5DADA]'
 												)}
 											>

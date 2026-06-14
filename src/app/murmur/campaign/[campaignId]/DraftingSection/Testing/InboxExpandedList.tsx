@@ -447,8 +447,9 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 					{bottomViewInboundBatches[0] ? (
 						<div
 							key="inbox-collapsed-batch"
+								data-history-ledger-box
 							className={cn(
-								'select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between'
+								'cursor-pointer select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between'
 							)}
 							style={{
 								width: `${collapsedTopBoxWidthPx}px`,
@@ -518,8 +519,9 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 										return (
 											<div
 												key={`${batch.endAt.getTime()}-${batch.count}-${idx}`}
+												data-history-ledger-box
 												className={cn(
-													'select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between',
+													'cursor-pointer select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between',
 													'w-[224px] h-[30px] rounded-[4.7px]'
 												)}
 												style={{ backgroundColor: '#CCDFF4' }}

@@ -58,7 +58,7 @@ export const formatHTMLForEmailClients = (html: string): string => {
 			.replace(/"/g, '&quot;')
 			.replace(/'/g, '&#39;');
 
-	const looksLikeHtml = /<\/?[a-z][\s>]/i.test(out);
+	const looksLikeHtml = /<\/?[a-z][a-z0-9]*(\s|\/?>)/i.test(out);
 	if (!looksLikeHtml) {
 		// Convert plain text (with \n) into Gmail-like HTML with <br> breaks.
 		const normalized = out.trim();
@@ -202,7 +202,7 @@ export const replaceLineBreaksWithRichTextTags = (text: string, font: string): s
 	const normalized = (text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
 	if (!normalized) return `<div style="font-family: ${font};"></div>`;
 
-	const looksLikeHtml = /<\/?[a-z][\s>]/i.test(normalized);
+	const looksLikeHtml = /<\/?[a-z][a-z0-9]*(\s|\/?>)/i.test(normalized);
 	if (looksLikeHtml) {
 		const content = normalized
 			.replace(/<\/p>\s*<p\b[^>]*>/gi, '<br><br>')

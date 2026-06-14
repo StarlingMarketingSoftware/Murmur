@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { CustomMutationOptions, CustomQueryOptions } from '@/types';
 import { toast } from 'sonner';
 import { ContactFilterData, PostContactData } from '@/app/api/contacts/route';
@@ -536,6 +537,25 @@ export const useGetContactResearch = (contactId: number | null) => {
 		staleTime: 1000 * 60 * 30, // research metadata rarely changes
 		gcTime: 1000 * 60 * 30,
 	});
+};
+
+// Map-overlay rows can arrive without the research-detail fields (slim payload — see
+// api/contacts/map-overlay). When a hovered contact is missing them entirely (key absent;
+// null means fetched-but-empty), lazily fetch and merge them so the hover research panel
+// fills in instead of rendering blank.
+export const useContactWithResearch = (contact: ContactWithName | null) => {
+	// Cast for the `in` check: ContactWithName declares `metadata`, so TS would
+	// otherwise narrow the no-key branch (a slim overlay row) to `never`.
+	const needsResearch =
+		contact != null && !('metadata' in (contact as Record<string, unknown>));
+	const { data: research } = useGetContactResearch(
+		contact && needsResearch ? contact.id : null
+	);
+	return useMemo(() => {
+		if (!contact) return null;
+		if (!research || research.id !== contact.id) return contact;
+		return { ...contact, ...research };
+	}, [contact, research]);
 };
 
 export interface CuratedSearchResult {
