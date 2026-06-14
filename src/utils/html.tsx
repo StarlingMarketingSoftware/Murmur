@@ -202,6 +202,15 @@ export const replaceLineBreaksWithRichTextTags = (text: string, font: string): s
 	const normalized = (text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
 	if (!normalized) return `<div style="font-family: ${font};"></div>`;
 
+	const looksLikeHtml = /<\/?[a-z][\s>]/i.test(normalized);
+	if (looksLikeHtml) {
+		const content = normalized
+			.replace(/<\/p>\s*<p\b[^>]*>/gi, '<br><br>')
+			.replace(/<p\b[^>]*>/gi, '')
+			.replace(/<\/p>/gi, '');
+		return `<div style="font-family: ${font};">${content}</div>`;
+	}
+
 	const paragraphs = normalized.split(/\n{2,}/).filter((p) => p.trim() !== '');
 	const content = paragraphs
 		.map((paragraph) => escapeHtml(paragraph).replace(/\n/g, '<br>'))
