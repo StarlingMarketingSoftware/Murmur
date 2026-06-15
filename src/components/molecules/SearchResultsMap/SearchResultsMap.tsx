@@ -2369,7 +2369,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			| undefined;
 		if (!glowSource || !ringsSource || !pulseSource) return;
 
-		const clearPulse = () => pulseSource.setData(emptyFeatureCollection());
+		const clearPulse = () => {
+			try {
+				pulseSource.setData(emptyFeatureCollection());
+			} catch {
+				// Non-fatal; source may be tearing down.
+			}
+		};
 
 		if (!ownedVenueCenter) {
 			clearPulse();
@@ -2402,23 +2408,46 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lastFrameMs = nowMs;
 
 			const phase = (nowMs % OWNED_VENUE_RADAR_MS) / OWNED_VENUE_RADAR_MS;
-			glowSource.setData({
-				type: 'FeatureCollection',
-				features: buildOwnedVenueGlowFeatures(ownedVenueCenter, phase, true),
-			});
-			ringsSource.setData({
-				type: 'FeatureCollection',
-				features: buildOwnedVenueRadarLineFeatures(ownedVenueCenter, phase, {
-					animated: true,
-				}),
-			});
-			pulseSource.setData({
-				type: 'FeatureCollection',
-				features: buildOwnedVenueRadarLineFeatures(ownedVenueCenter, phase, {
-					animated: true,
-					bloom: true,
-				}),
-			});
+			// Re-fetch the sources each tick: the once-captured refs go stale if a
+			// source is invalidated under rapid camera churn, and setData() on a stale
+			// source throws — uncaught in rAF, which would crash the whole app.
+			const glow = map.getSource(MAPBOX_SOURCE_IDS.ownedVenueGlow) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			const rings = map.getSource(MAPBOX_SOURCE_IDS.ownedVenueRings) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			const pulse = map.getSource(MAPBOX_SOURCE_IDS.ownedVenuePulse) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			if (!glow || !rings || !pulse) {
+				ownedVenuePulseRafRef.current = window.requestAnimationFrame(animateRadar);
+				return;
+			}
+			try {
+				glow.setData({
+					type: 'FeatureCollection',
+					features: buildOwnedVenueGlowFeatures(ownedVenueCenter, phase, true),
+				});
+				rings.setData({
+					type: 'FeatureCollection',
+					features: buildOwnedVenueRadarLineFeatures(ownedVenueCenter, phase, {
+						animated: true,
+					}),
+				});
+				pulse.setData({
+					type: 'FeatureCollection',
+					features: buildOwnedVenueRadarLineFeatures(ownedVenueCenter, phase, {
+						animated: true,
+						bloom: true,
+					}),
+				});
+			} catch {
+				// Source transiently invalid mid-churn; stop cleanly. The effect
+				// re-arms on the next map / center change.
+				cancelled = true;
+				return;
+			}
 
 			ownedVenuePulseRafRef.current = window.requestAnimationFrame(animateRadar);
 		};
@@ -2514,7 +2543,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			| undefined;
 		if (!glowSource || !ringsSource || !pulseSource) return;
 
-		const clearPulse = () => pulseSource.setData(emptyFeatureCollection());
+		const clearPulse = () => {
+			try {
+				pulseSource.setData(emptyFeatureCollection());
+			} catch {
+				// Non-fatal; source may be tearing down.
+			}
+		};
 
 		if (eventCenters.length === 0) {
 			clearPulse();
@@ -2547,23 +2582,46 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lastFrameMs = nowMs;
 
 			const phase = (nowMs % OWNED_VENUE_RADAR_MS) / OWNED_VENUE_RADAR_MS;
-			glowSource.setData({
-				type: 'FeatureCollection',
-				features: buildEventsGlowFeatures(eventCenters, phase, true),
-			});
-			ringsSource.setData({
-				type: 'FeatureCollection',
-				features: buildEventsRadarLineFeatures(eventCenters, phase, {
-					animated: true,
-				}),
-			});
-			pulseSource.setData({
-				type: 'FeatureCollection',
-				features: buildEventsRadarLineFeatures(eventCenters, phase, {
-					animated: true,
-					bloom: true,
-				}),
-			});
+			// Re-fetch the sources each tick: the once-captured refs go stale if a
+			// source is invalidated under rapid camera churn, and setData() on a stale
+			// source throws — uncaught in rAF, which would crash the whole app.
+			const glow = map.getSource(MAPBOX_SOURCE_IDS.eventsGlow) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			const rings = map.getSource(MAPBOX_SOURCE_IDS.eventsRings) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			const pulse = map.getSource(MAPBOX_SOURCE_IDS.eventsPulse) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			if (!glow || !rings || !pulse) {
+				eventsPulseRafRef.current = window.requestAnimationFrame(animateRadar);
+				return;
+			}
+			try {
+				glow.setData({
+					type: 'FeatureCollection',
+					features: buildEventsGlowFeatures(eventCenters, phase, true),
+				});
+				rings.setData({
+					type: 'FeatureCollection',
+					features: buildEventsRadarLineFeatures(eventCenters, phase, {
+						animated: true,
+					}),
+				});
+				pulse.setData({
+					type: 'FeatureCollection',
+					features: buildEventsRadarLineFeatures(eventCenters, phase, {
+						animated: true,
+						bloom: true,
+					}),
+				});
+			} catch {
+				// Source transiently invalid mid-churn; stop cleanly. The effect
+				// re-arms on the next map / centers change.
+				cancelled = true;
+				return;
+			}
 
 			eventsPulseRafRef.current = window.requestAnimationFrame(animateRadar);
 		};
@@ -11990,7 +12048,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		curatedBlobLngLatShapeMultiPolygonsRef.current = lngLatShapes;
 		curatedBlobLngLatMultiPolygonRef.current = lngLat;
 		const fc = createOutlineGeoJsonFromMultiPolygon(lngLat);
-		source.setData(fc as GeoJSON.FeatureCollection);
+		try {
+			source.setData(fc as GeoJSON.FeatureCollection);
+		} catch {
+			// Non-fatal; the source can be transiently invalid mid camera churn. The
+			// orb resyncs on the next move/idle frame.
+		}
 		applyCuratedOrbStateRef.current?.();
 	}, []);
 	applyBlobMorphRef.current = applyBlobMorph;

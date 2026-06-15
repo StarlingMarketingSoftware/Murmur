@@ -11,6 +11,7 @@ import SettingsGearIcon from '@/components/atoms/_svg/SettingsGearIcon';
 import { OutlinedInitialAvatar } from '@/components/atoms/OutlinedInitialAvatar/OutlinedInitialAvatar';
 import { SettingsModal } from '@/components/organisms/SettingsModal/SettingsModal';
 import { PersistentDashboardMap } from '@/components/molecules/PersistentDashboardMap';
+import { MapErrorBoundary } from '@/components/molecules/MapErrorBoundary';
 import { PersistentMapProvider } from '@/contexts/PersistentMapContext';
 import { SendingSessionProvider } from '@/contexts/SendingSessionContext';
 import { isSafariBrowser } from '@/utils/browserDetection';
@@ -98,7 +99,9 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 	return (
 		<SendingSessionProvider>
 		<PersistentMapProvider>
-			<PersistentDashboardMap />
+			<MapErrorBoundary>
+				<PersistentDashboardMap />
+			</MapErrorBoundary>
 			{/* Persistent Clerk login icon in top right corner */}
 			<div
 				className={`clerk-user-button fixed top-3 z-50 ${
