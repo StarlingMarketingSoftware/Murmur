@@ -6875,13 +6875,33 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			['linear'],
 			['zoom'],
 			0,
-			['*', RESULT_DOT_SCALE_MIN, resultDotHoverRadiusScaleExpr, selectedStatusDotRadiusMultiplierExpr],
+			[
+				'*',
+				RESULT_DOT_SCALE_MIN,
+				resultDotHoverRadiusScaleExpr,
+				selectedStatusDotRadiusMultiplierExpr,
+			],
 			RESULT_DOT_ZOOM_MIN,
-			['*', RESULT_DOT_SCALE_MIN, resultDotHoverRadiusScaleExpr, selectedStatusDotRadiusMultiplierExpr],
+			[
+				'*',
+				RESULT_DOT_SCALE_MIN,
+				resultDotHoverRadiusScaleExpr,
+				selectedStatusDotRadiusMultiplierExpr,
+			],
 			RESULT_DOT_ZOOM_MAX,
-			['*', RESULT_DOT_SCALE_MAX, resultDotHoverRadiusScaleExpr, selectedStatusDotRadiusMultiplierExpr],
+			[
+				'*',
+				RESULT_DOT_SCALE_MAX,
+				resultDotHoverRadiusScaleExpr,
+				selectedStatusDotRadiusMultiplierExpr,
+			],
 			24,
-			['*', RESULT_DOT_SCALE_MAX, resultDotHoverRadiusScaleExpr, selectedStatusDotRadiusMultiplierExpr],
+			[
+				'*',
+				RESULT_DOT_SCALE_MAX,
+				resultDotHoverRadiusScaleExpr,
+				selectedStatusDotRadiusMultiplierExpr,
+			],
 		];
 		// `sent` status dots are drawn hollow (fillOpacity 0, strokeOpacity 0.3); when
 		// selected they must read as a solid blue disc, so force the opacity factors to 1.
@@ -6931,13 +6951,33 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			['linear'],
 			['zoom'],
 			0,
-			['*', RESULT_DOT_GLOW_RADIUS_MIN_PX, resultDotRadiusScaleExpr, selectedStatusDotRadiusMultiplierExpr],
+			[
+				'*',
+				RESULT_DOT_GLOW_RADIUS_MIN_PX,
+				resultDotRadiusScaleExpr,
+				selectedStatusDotRadiusMultiplierExpr,
+			],
 			RESULT_DOT_ZOOM_MIN,
-			['*', RESULT_DOT_GLOW_RADIUS_MIN_PX, resultDotRadiusScaleExpr, selectedStatusDotRadiusMultiplierExpr],
+			[
+				'*',
+				RESULT_DOT_GLOW_RADIUS_MIN_PX,
+				resultDotRadiusScaleExpr,
+				selectedStatusDotRadiusMultiplierExpr,
+			],
 			RESULT_DOT_ZOOM_MAX,
-			['*', RESULT_DOT_GLOW_RADIUS_MAX_PX, resultDotRadiusScaleExpr, selectedStatusDotRadiusMultiplierExpr],
+			[
+				'*',
+				RESULT_DOT_GLOW_RADIUS_MAX_PX,
+				resultDotRadiusScaleExpr,
+				selectedStatusDotRadiusMultiplierExpr,
+			],
 			24,
-			['*', RESULT_DOT_GLOW_RADIUS_MAX_PX, resultDotRadiusScaleExpr, selectedStatusDotRadiusMultiplierExpr],
+			[
+				'*',
+				RESULT_DOT_GLOW_RADIUS_MAX_PX,
+				resultDotRadiusScaleExpr,
+				selectedStatusDotRadiusMultiplierExpr,
+			],
 		];
 
 		const allOverlayRadiusLow = RESULT_DOT_SCALE_MIN * 0.72;
@@ -17903,11 +17943,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						top: 0,
 						width: `${EVENT_POPUP_W}px`,
 						height: `${EVENT_POPUP_H}px`,
-						// Interactive only while this event is the hovered one, so the cursor can travel
-						// into / dwell on the card (entering cancels the pending hover-close; leaving
-						// reschedules it). A purely pinned card reverts to 'none' so it never becomes a
-						// dead zone over the map (pan/zoom/select/marker clicks pass through), mirroring
-						// the contact tooltip's hover-gated pointer capture.
 						pointerEvents: hoveredEventId === activeEvent.id ? 'auto' : 'none',
 						zIndex: HOVER_TOOLTIP_Z_INDEX + 12,
 					}}
