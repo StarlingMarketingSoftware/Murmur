@@ -105,6 +105,10 @@ import {
 	ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR,
 	ALL_CONTACTS_OVERLAY_LIMIT,
 	ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM,
+	CAMPAIGN_HEATMAP_FADE_MS,
+	CAMPAIGN_HEATMAP_GLOW_BLUR,
+	CAMPAIGN_HEATMAP_GLOW_OPACITY_MAX,
+	campaignHeatmapGlowRadiusExpr,
 	ALL_CONTACTS_OVERLAY_TOOLTIP_FILL_COLOR,
 	AMBIENT_CONTACTS_OVERLAY_BUFFER_DOTS,
 	AMBIENT_CONTACTS_OVERLAY_LIMIT,
@@ -1013,6 +1017,19 @@ export interface SearchResultsMapProps {
 	campaignMarkerMode?: 'category' | 'status';
 	/** Per-contact campaign status used when `campaignMarkerMode` is `status`. */
 	campaignContactStatusById?: ReadonlyMap<number, CampaignContactMapStatus>;
+	/**
+	 * Tint for the campaign selection heatmap glow (rendered behind the status
+	 * pins). `null`/absent disables the glow. Only takes effect in
+	 * `campaignMarkerMode === 'status'`.
+	 */
+	campaignHeatmapColor?: string | null;
+	/**
+	 * When true, the heatmap glow shows the whole tab set while nothing is
+	 * selected (ambient mode — used by the Inbox tab). When false/absent, the
+	 * glow is selection-only and stays hidden until contacts are selected
+	 * (Contacts and Drafts tabs).
+	 */
+	campaignHeatmapAmbient?: boolean;
 	/** When true, renders a browse-oriented all-contact atlas while search results are visually disengaged. */
 	ambientContactsEnabled?: boolean;
 	/** When true, warms the ambient atlas cache before the user disengages the search. */
@@ -1240,6 +1257,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	categoryConstellationsEnabled = false,
 	campaignMarkerMode = 'category',
 	campaignContactStatusById,
+	campaignHeatmapColor = null,
+	campaignHeatmapAmbient = false,
 	ambientContactsEnabled = false,
 	ambientContactsPreloadEnabled = false,
 	ambientActiveCategories,
@@ -6700,6 +6719,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		ensureSource(MAPBOX_SOURCE_IDS.markersPromotionDot);
 		ensureSource(MAPBOX_SOURCE_IDS.markersBase);
 		ensureSource(MAPBOX_SOURCE_IDS.markersSelected);
+		ensureSource(MAPBOX_SOURCE_IDS.campaignHeatmap);
 		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueGlow);
 		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueRings);
 		ensureSource(MAPBOX_SOURCE_IDS.ownedVenuePulse);
@@ -7406,6 +7426,29 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					'line-opacity': 0.98,
 					'line-width': buildLockedStateOutlineWidthExpr(),
 					'line-blur': 0,
+				},
+			},
+			MAPBOX_LAYER_IDS.markerConstellationGlow
+		);
+
+		// Campaign selection heatmap glow — a soft colored cloud behind the status
+		// pins and constellation lines. Inserted before the constellation glow so it
+		// sits under all linework/markers but above the basemap and curated blob.
+		ensureLayer(
+			{
+				id: MAPBOX_LAYER_IDS.campaignHeatmapGlow,
+				type: 'circle',
+				source: MAPBOX_SOURCE_IDS.campaignHeatmap,
+				paint: {
+					'circle-radius': campaignHeatmapGlowRadiusExpr,
+					'circle-color': ['coalesce', ['get', 'glowColor'], '#FFA5A5'],
+					'circle-opacity': [
+						'*',
+						CAMPAIGN_HEATMAP_GLOW_OPACITY_MAX,
+						['coalesce', ['get', 'glowFade'], 1],
+					],
+					'circle-blur': CAMPAIGN_HEATMAP_GLOW_BLUR,
+					'circle-stroke-width': 0,
 				},
 			},
 			MAPBOX_LAYER_IDS.markerConstellationGlow
@@ -9172,6 +9215,124 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			coordsByContactId.get(contact.id) ?? null,
 		[coordsByContactId]
 	);
+
+	// --- Campaign selection heatmap glow -------------------------------------
+	// The heatmap envelops the currently-selected contacts (intersected with the
+	// tab's on-map set so off-tab/coordless ids are dropped). On the Contacts and
+	// Drafts tabs there is no glow until something is selected. The Inbox tab is
+	// "ambient": with nothing selected it glows the whole tab set instead.
+	const heatmapContactIds = useMemo<number[]>(() => {
+		if (campaignMarkerMode !== 'status' || !campaignHeatmapColor) return [];
+		const onMapIds = contactsWithCoords.map((c) => c.id);
+		if (selectedContacts.length === 0) return campaignHeatmapAmbient ? onMapIds : [];
+		const onMap = new Set(onMapIds);
+		return selectedContacts.filter((id) => onMap.has(id));
+	}, [
+		campaignMarkerMode,
+		campaignHeatmapColor,
+		campaignHeatmapAmbient,
+		contactsWithCoords,
+		selectedContacts,
+	]);
+
+	const campaignHeatmapFadeRafRef = useRef<number | null>(null);
+	// Last rendered glowFade per contact id — the start of the next crossfade.
+	const campaignHeatmapFadeByIdRef = useRef<Map<number, number>>(new Map());
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const source = map.getSource(MAPBOX_SOURCE_IDS.campaignHeatmap) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		if (!source) return;
+
+		const cancelFade = () => {
+			if (campaignHeatmapFadeRafRef.current != null) {
+				cancelAnimationFrame(campaignHeatmapFadeRafRef.current);
+				campaignHeatmapFadeRafRef.current = null;
+			}
+		};
+
+		// Off unless in status mode with a tint supplied.
+		if (campaignMarkerMode !== 'status' || !campaignHeatmapColor) {
+			cancelFade();
+			campaignHeatmapFadeByIdRef.current.clear();
+			source.setData(emptyFeatureCollection());
+			return;
+		}
+
+		// The source carries the full tab set so members can crossfade in and out:
+		// each contact's target glowFade is 1 when it's in the heatmap set and 0
+		// otherwise. Animate from the last rendered value toward the target, then
+		// go idle (the GPU re-projects the static layer on pan/zoom for free).
+		const targetSet = new Set(heatmapContactIds);
+		const coordsById = new Map<number, LatLngLiteral>();
+		for (const contact of contactsWithCoords) {
+			const coords = getContactCoords(contact);
+			if (coords) coordsById.set(contact.id, coords);
+		}
+
+		const startById = campaignHeatmapFadeByIdRef.current;
+		const needsAnim = Array.from(coordsById.keys()).some((id) => {
+			const start = startById.get(id) ?? 0;
+			const target = targetSet.has(id) ? 1 : 0;
+			return Math.abs(start - target) > 0.001;
+		});
+
+		const writeFrame = (eased: number) => {
+			const nextById = new Map<number, number>();
+			const features: GeoJSON.Feature[] = [];
+			coordsById.forEach((coords, id) => {
+				const start = startById.get(id) ?? 0;
+				const target = targetSet.has(id) ? 1 : 0;
+				const fade = eased >= 1 ? target : start + (target - start) * eased;
+				nextById.set(id, fade);
+				if (fade <= 0.001) return; // fully faded out — omit (opacity 0)
+				features.push({
+					type: 'Feature' as const,
+					id,
+					properties: { glowColor: campaignHeatmapColor, glowFade: fade },
+					geometry: { type: 'Point' as const, coordinates: [coords.lng, coords.lat] },
+				});
+			});
+			campaignHeatmapFadeByIdRef.current = nextById;
+			source.setData({ type: 'FeatureCollection' as const, features });
+		};
+
+		cancelFade();
+
+		if (!needsAnim) {
+			writeFrame(1);
+			return;
+		}
+
+		const startMs = performance.now();
+		writeFrame(0);
+		const tick = () => {
+			const progress = Math.min(
+				1,
+				(performance.now() - startMs) / CAMPAIGN_HEATMAP_FADE_MS
+			);
+			writeFrame(smoothstep(0, 1, progress));
+			if (progress < 1) {
+				campaignHeatmapFadeRafRef.current = requestAnimationFrame(tick);
+				return;
+			}
+			campaignHeatmapFadeRafRef.current = null;
+		};
+		campaignHeatmapFadeRafRef.current = requestAnimationFrame(tick);
+
+		return cancelFade;
+	}, [
+		map,
+		isMapLoaded,
+		campaignMarkerMode,
+		campaignHeatmapColor,
+		heatmapContactIds,
+		contactsWithCoords,
+		coordsByContactId,
+		getContactCoords,
+	]);
 
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
@@ -14057,6 +14218,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (!map.getLayer(layerId)) continue;
 			try {
 				map.setLayoutProperty(layerId, 'visibility', hideStatusGlow ? 'none' : 'visible');
+			} catch {
+				// Ignore style timing races.
+			}
+		}
+		// The campaign heatmap glow is the colored replacement for that white halo,
+		// so it shows exactly when the per-dot glow hides (status mode only).
+		if (map.getLayer(MAPBOX_LAYER_IDS.campaignHeatmapGlow)) {
+			try {
+				map.setLayoutProperty(
+					MAPBOX_LAYER_IDS.campaignHeatmapGlow,
+					'visibility',
+					hideStatusGlow ? 'visible' : 'none'
+				);
 			} catch {
 				// Ignore style timing races.
 			}

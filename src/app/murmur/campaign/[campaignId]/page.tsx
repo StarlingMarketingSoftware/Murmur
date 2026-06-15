@@ -208,6 +208,15 @@ const CAMPAIGN_TAB_PRESET_STATUSES: Partial<
 	inbox: ['sent', 'new-message'],
 };
 
+// Per-tab tint for the map selection heatmap glow (rendered behind the status
+// pins). Keyed on the active view; tabs without an entry (e.g. overview) get no
+// glow. The overview/All tab is intentionally omitted for now.
+const CAMPAIGN_TAB_HEATMAP_COLOR: Partial<Record<ViewType, string>> = {
+	testing: '#FFA5A5', // Contacts — pink/red
+	drafting: '#FFD4A9', // Drafts — orange
+	inbox: '#ABD1FF', // Inbox — blue
+};
+
 const CAMPAIGN_OVERVIEW_STATUS_PILL_HEIGHT_PX = 27;
 const CAMPAIGN_OVERVIEW_STATUS_PILL_RADIUS_PX = 8;
 const CAMPAIGN_OVERVIEW_STATUS_PILL_PADDING_X_PX = 9;
@@ -3389,6 +3398,9 @@ const Murmur = () => {
 			onToggleSelection: requestMapMarkerSelection,
 			campaignContactStatusById: campaignOverviewContactStatusById,
 			campaignMarkerMode: effectiveMapGroupingForActiveView,
+			campaignHeatmapColor: CAMPAIGN_TAB_HEATMAP_COLOR[activeView] ?? null,
+			// Inbox glows its whole set ambiently; Contacts/Drafts glow only the selection.
+			campaignHeatmapAmbient: activeView === 'inbox',
 			categoryConstellationsEnabled: true,
 			activeTool: activeMapTool,
 			requestedZoom: mapZoomControlRequest,
@@ -3399,6 +3411,7 @@ const Murmur = () => {
 			skipAutoFit: true,
 		}),
 		[
+			activeView,
 			activeMapTool,
 			campaignMapCameraPadding,
 			campaignMapContactsForMap,
