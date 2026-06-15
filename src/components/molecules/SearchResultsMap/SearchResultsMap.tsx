@@ -640,17 +640,6 @@ const CAMPAIGN_STATUS_MARKER_STYLES: Record<
 	},
 };
 
-// Multiplies a circle layer's fill-opacity expression by the per-feature
-// `fillOpacity` (default 1). Lets a status marker render as a hollow ring
-// (e.g. "sent") without touching non-status dots, which carry no fillOpacity.
-//
-// A "zoom" expression must be the input of the OUTERMOST "step"/"interpolate"
-// (mapbox-gl v3). When `opacityExpr` is itself a top-level zoom curve, wrapping
-// it in ["*", ...] nests the zoom curve and fails style validation with
-// '"zoom" expression may only be used as input to a top-level "step" or
-// "interpolate" expression'. So in that case we distribute the factor into each
-// output stop — exactly equivalent for a per-feature constant — which leaves the
-// zoom curve outermost. Plain (non-zoom) expressions are multiplied directly.
 const FEATURE_FILL_OPACITY_FACTOR: any = ['coalesce', ['get', 'fillOpacity'], 1];
 const FEATURE_STROKE_OPACITY_FACTOR = ['coalesce', ['get', 'strokeOpacity'], 0] as const;
 

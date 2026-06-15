@@ -93,6 +93,9 @@ const CONTACT_ROW_RADIUS_PX = 8.269;
 const SUPPLEMENTAL_DRAFT_ROW_HEIGHT_PX = 108;
 const SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX = 7.798;
 const SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX = 92;
+// Grace delay before a hover-peek clears, so moving between rows through the gap
+// doesn't flicker the reveal off (mirrors the research card's clear delay).
+const PEEK_CLEAR_DELAY_MS = 220;
 const WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR = '#F5C0BD';
 const WRITE_TAB_SUPPLEMENTAL_BADGE_FILL_COLOR = '#EE9798';
 const WRITE_TAB_SUPPLEMENTAL_ROW_FILL_COLOR = '#EB8586';
@@ -603,6 +606,17 @@ export interface ContactsExpandedListProps {
 	 * filter resets to 'responses' whenever inbox focus mode engages.
 	 */
 	inboxPanelTabRequest?: { tab: 'responses' | 'opportunities'; requestId: number } | null;
+	/**
+	 * Navigate-and-focus a contact on the Write tab. Fired when a redded-out contact
+	 * row (Drafts tab) is clicked; the parent switches to Write and bumps
+	 * `focusContactRequest` so the list scrolls to and highlights the contact.
+	 */
+	onFocusContact?: (contactId: number) => void;
+	/**
+	 * One-shot request to scroll a contact row into view and highlight it. Consumed
+	 * by requestId (idempotent across re-renders / StrictMode).
+	 */
+	focusContactRequest?: { contactId: number; requestId: number } | null;
 }
 
 export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
@@ -646,6 +660,8 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	interactionMode = 'default',
 	focusMode = 'contacts',
 	inboxPanelTabRequest,
+	onFocusContact,
+	focusContactRequest,
 }) => {
 	const router = useRouter();
 	const [internalSelectedContactIds, setInternalSelectedContactIds] = useState<
@@ -661,6 +677,26 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 
 	// Track hovered contact index for keyboard navigation
 	const [hoveredContactIndex, setHoveredContactIndex] = useState<number | null>(null);
+	// Hover-peek: which redded-out supplemental row (if any) is being hovered, so it
+	// reveals in its non-redded "active" style with content visible. Keyed as
+	// `<kind>:<id>`. The clear is delayed (and canceled on the next row's enter) so
+	// moving between rows through the gap doesn't flicker the reveal off — same grace
+	// behavior as the docked research card.
+	const [peekRowKey, setPeekRowKey] = useState<string | null>(null);
+	const peekClearTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const cancelPeekClear = useCallback(() => {
+		if (peekClearTimeoutRef.current) {
+			clearTimeout(peekClearTimeoutRef.current);
+			peekClearTimeoutRef.current = null;
+		}
+	}, []);
+	const schedulePeekClear = useCallback(() => {
+		cancelPeekClear();
+		peekClearTimeoutRef.current = setTimeout(() => {
+			peekClearTimeoutRef.current = null;
+			setPeekRowKey(null);
+		}, PEEK_CLEAR_DELAY_MS);
+	}, [cancelPeekClear]);
 
 	const [hoveredUsedContactId, setHoveredUsedContactId] = useState<number | null>(null);
 	const [inboxPanelTab, setInboxPanelTab] = useState<DashboardResponsesTab>('responses');
@@ -1031,21 +1067,8 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const shouldRedOutInboxRows =
 		!isBottomView &&
 		(isDraftsFocusMode || (!isDraftsFocusMode && resolvedActiveTopNavStop === 'write'));
-	const draftSupplementalTextClassName = shouldRedOutDraftRows
-		? 'text-[#F5C0BD]'
-		: 'text-black';
-	const draftSupplementalBorderColor = shouldRedOutDraftRows
-		? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
-		: '#000000';
-	const draftSupplementalRowFillColor = shouldRedOutDraftRows
-		? WRITE_TAB_SUPPLEMENTAL_ROW_FILL_COLOR
-		: undefined;
-	const draftSupplementalBadgeFillColor = shouldRedOutDraftRows
-		? WRITE_TAB_SUPPLEMENTAL_BADGE_FILL_COLOR
-		: undefined;
-	const draftSupplementalTextColor = shouldRedOutDraftRows
-		? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
-		: undefined;
+	// draftSupplemental* colors are computed per-row inside renderSupplementalDraftRow
+	// so a hovered (peeked) row reveals in its non-redded "showing" style.
 	const inboxSupplementalTextClassName = shouldRedOutInboxRows
 		? 'text-[#F5C0BD]'
 		: 'text-black';
@@ -1137,6 +1160,20 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		rowEl.scrollIntoView({ behavior: 'auto', block: 'nearest' });
 		lastAutoScrolledDraftIdRef.current = selectedDraftId;
 	}, [selectedDraftId, supplementalDraftRows.length]);
+	// One-shot: scroll a contact row into view and highlight it after a redded-out
+	// contact row is clicked on the Drafts tab and the parent switches to Write. The
+	// handled-ref makes it idempotent across re-renders and StrictMode double-invoke.
+	const lastHandledFocusContactReqIdRef = useRef<number | null>(null);
+	useEffect(() => {
+		if (!focusContactRequest) return;
+		if (lastHandledFocusContactReqIdRef.current === focusContactRequest.requestId) return;
+		lastHandledFocusContactReqIdRef.current = focusContactRequest.requestId;
+		const rowEl = usedContactRowElsRef.current.get(focusContactRequest.contactId);
+		if (rowEl) rowEl.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+		const idx = contacts.findIndex((c) => c.id === focusContactRequest.contactId);
+		if (idx !== -1) setHoveredContactIndex(idx);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [focusContactRequest?.requestId]);
 	const supplementalInboxRows = useMemo(() => {
 		const rows = inboxEmails ?? [];
 		const shouldScopeToCampaignContacts = Boolean(allContacts || contactByEmail);
@@ -1248,6 +1285,21 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			: liveInboxPanelConversations
 		).push(conversation);
 	}
+	// Write/Drafts tab inbox ordering: group all live opportunities together at the
+	// top, keep regular replies in the middle, and sink closed/canceled opportunities
+	// to the very bottom — so the redded box reads opportunities → replies → closed
+	// instead of interleaving opportunity and non-opportunity rows.
+	const getInboxGroupRank = (conversation: InboxConversation) => {
+		const appId = getConversationThreadApplicationId(conversation);
+		const application = appId != null ? applicationById.get(appId) : undefined;
+		if (!application) return 1;
+		const status = deriveEventChatStatus(application, nowMs).status;
+		return status === 'closed' || status === 'canceled' ? 2 : 0;
+	};
+	// Array.sort is stable, so the time-desc order is preserved within each group.
+	const supplementalInboxConversationsGrouped = [...supplementalInboxConversations].sort(
+		(a, b) => getInboxGroupRank(a) - getInboxGroupRank(b)
+	);
 	const pastInboxIdsKey = pastInboxPanelConversations
 		.map((conversation) => conversation.key)
 		.join(',');
@@ -1370,14 +1422,35 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		const isBatchSelectedDraft = selectedDraftIds?.has(draft.id) ?? false;
 		const isShowingDraft = isSelectedDraft;
 		const isInactiveSelectedDraft = isBatchSelectedDraft && !isShowingDraft;
-		const topBarLeftColor = shouldRedOutDraftRows
+		// Hovering a redded-out draft row reveals it in the gold "showing" style with
+		// its subject + body visible (peek). The base flag still drives navigation.
+		const draftPeekKey = `draft:${draft.id}`;
+		const isReddedOut = shouldRedOutDraftRows && peekRowKey !== draftPeekKey;
+		// A peeked redded draft reveals in the gold "showing" style (Write tab has no
+		// real selected draft, so without this it would reveal as plain white).
+		const isPeeked = shouldRedOutDraftRows && peekRowKey === draftPeekKey;
+		const showAsShowingStyle = isShowingDraft || isPeeked;
+		const draftSupplementalTextClassName = isReddedOut ? 'text-[#F5C0BD]' : 'text-black';
+		const draftSupplementalBorderColor = isReddedOut
+			? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
+			: '#000000';
+		const draftSupplementalRowFillColor = isReddedOut
+			? WRITE_TAB_SUPPLEMENTAL_ROW_FILL_COLOR
+			: undefined;
+		const draftSupplementalBadgeFillColor = isReddedOut
+			? WRITE_TAB_SUPPLEMENTAL_BADGE_FILL_COLOR
+			: undefined;
+		const draftSupplementalTextColor = isReddedOut
+			? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
+			: undefined;
+		const topBarLeftColor = isReddedOut
 			? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
 			: isInactiveSelectedDraft
 				? SELECTED_DRAFT_TOP_BAR_COLOR
 				: SHOWING_DRAFT_TOP_BAR_COLOR;
-		const topBarRightColor = shouldRedOutDraftRows
+		const topBarRightColor = isReddedOut
 			? WRITE_TAB_SUPPLEMENTAL_ROW_FILL_COLOR
-			: isShowingDraft
+			: showAsShowingStyle
 				? SHOWING_DRAFT_TOP_BAR_COLOR
 				: '#F9FAFB';
 		const topBarLeftWidthPx = isInactiveSelectedDraft ? 177 : 115;
@@ -1406,7 +1479,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					borderLeft: `1.949px solid ${draftSupplementalBorderColor}`,
 					backgroundColor:
 						draftSupplementalRowFillColor ??
-						(isShowingDraft
+						(showAsShowingStyle
 							? SHOWING_DRAFT_ROW_FILL_COLOR
 							: isInactiveSelectedDraft
 								? SELECTED_DRAFT_ROW_FILL_COLOR
@@ -1415,11 +1488,18 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				}}
 				onMouseEnter={(e) => {
 					if (!isAllTabNavigation) setHoveredContactIndex(null);
+					if (!isAllTabNavigation && shouldRedOutDraftRows) {
+						cancelPeekClear();
+						setPeekRowKey(draftPeekKey);
+					}
 					onDraftHover?.(draft);
 					onContactHover?.(contact);
 					onContactRowHover?.(contact, e.currentTarget);
 				}}
-				onMouseLeave={() => onContactRowHover?.(null, null)}
+				onMouseLeave={() => {
+					schedulePeekClear();
+					onContactRowHover?.(null, null);
+				}}
 				onMouseDown={(e) => {
 					if (e.shiftKey) e.preventDefault();
 				}}
@@ -1457,6 +1537,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					lastClickedDraftRef.current = draft.id;
 					onDraftClick?.(draft);
 					if (contact) onContactClick?.(contact);
+					// Redded-out on the Write tab: jump to the Drafts tab (the draft
+					// opens + scrolls into view via the selectedDraftId effect there).
+					if (shouldRedOutDraftRows) onOpenSend?.();
 				}}
 			>
 				<div className="absolute left-0 top-0 h-[13px] w-full pointer-events-none flex">
@@ -1514,7 +1597,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 							fillColor={draftSupplementalBadgeFillColor}
 							strokeColor={draftSupplementalBorderColor}
 							textColor={draftSupplementalTextColor}
-							showStroke={!shouldRedOutDraftRows}
+							showStroke={!isReddedOut}
 							restaurantIconSize={12}
 							coffeeIconSize={7}
 							defaultIconSize={12}
@@ -1532,7 +1615,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						badgeFillColor={draftSupplementalBadgeFillColor}
 						strokeColor={draftSupplementalBorderColor}
 						textColor={draftSupplementalTextColor}
-						showBadgeStroke={!shouldRedOutDraftRows}
+						showBadgeStroke={!isReddedOut}
 					/>
 				</div>
 
@@ -1559,6 +1642,23 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	};
 
 	const renderSupplementalInboxRow = (conversation: InboxConversation, inboxIndex: number) => {
+		// Hovering a redded-out inbox row reveals it in its normal style with content
+		// visible (peek). The base flag still drives navigation.
+		const inboxPeekKey = `inbox:${conversation.key}`;
+		const isReddedOut = shouldRedOutInboxRows && peekRowKey !== inboxPeekKey;
+		const inboxSupplementalTextClassName = isReddedOut ? 'text-[#F5C0BD]' : 'text-black';
+		const inboxSupplementalBorderColor = isReddedOut
+			? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
+			: '#000000';
+		const inboxSupplementalRowFillColor = isReddedOut
+			? WRITE_TAB_SUPPLEMENTAL_ROW_FILL_COLOR
+			: undefined;
+		const inboxSupplementalBadgeFillColor = isReddedOut
+			? WRITE_TAB_SUPPLEMENTAL_BADGE_FILL_COLOR
+			: undefined;
+		const inboxSupplementalTextColor = isReddedOut
+			? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
+			: undefined;
 		const selectionEmail = getInboxConversationSelectionEmail(conversation);
 		const email = selectionEmail;
 		const previewEmail = conversation.latestMessage;
@@ -1582,13 +1682,19 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		const threadApplicationId = getConversationThreadApplicationId(conversation);
 		const eventApplication =
 			threadApplicationId != null ? applicationById.get(threadApplicationId) : undefined;
-		const eventChatState =
-			eventApplication && !shouldRedOutInboxRows
-				? deriveEventChatStatus(eventApplication, nowMs)
-				: null;
+		// Event-chat rows render the full EventChatCard even when redded — the card is
+		// redded via the murmur-contacts-drafts-redout class on its wrapper, and the
+		// height comes from the status regardless of red-out. So the redded and
+		// hover-revealed states share one layout and size: no jump, full UI shown
+		// redded, hover just restores the colors.
+		const eventChatStateForLayout = eventApplication
+			? deriveEventChatStatus(eventApplication, nowMs)
+			: null;
+		const eventChatState = eventChatStateForLayout;
 		const isEventChatCompact =
-			eventChatState?.status === 'closed' || eventChatState?.status === 'canceled';
-		const rowHeightPx = eventChatState
+			eventChatStateForLayout?.status === 'closed' ||
+			eventChatStateForLayout?.status === 'canceled';
+		const rowHeightPx = eventChatStateForLayout
 			? isEventChatCompact
 				? EVENT_CHAT_COMPACT_ROW_HEIGHT_PX
 				: EVENT_CHAT_ROW_HEIGHT_PX
@@ -1639,6 +1745,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				tabIndex={!isAllTabNavigation ? 0 : undefined}
 				onMouseEnter={(e) => {
 					if (!isAllTabNavigation) setHoveredContactIndex(null);
+					if (!isAllTabNavigation && shouldRedOutInboxRows) {
+						cancelPeekClear();
+						setPeekRowKey(inboxPeekKey);
+					}
 					if (isDraftsFocusMode) onDraftHover?.(null);
 					onContactHover?.(contact);
 					if (eventApplication && eventChatState) {
@@ -1648,6 +1758,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					}
 				}}
 				onMouseLeave={() => {
+					schedulePeekClear();
 					if (eventApplication && eventChatState) {
 						onEventChatRowHover?.(null, null);
 					} else {
@@ -1659,6 +1770,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					e.stopPropagation();
 					if (onInboxEmailClick) {
 						onInboxEmailClick(selectionEmail);
+						// Redded-out on the Write/Drafts tab: jump to the Inbox tab (the
+						// conversation is preselected via selectedInboxEmailId).
+						if (shouldRedOutInboxRows) onOpenInbox?.();
 						return;
 					}
 					if (contact) onContactClick?.(contact);
@@ -1672,7 +1786,12 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				}}
 			>
 				{eventApplication && eventChatState ? (
-					<div className="pointer-events-none h-full w-full">
+					<div
+						className={cn(
+							'pointer-events-none h-full w-full',
+							isReddedOut && 'murmur-contacts-drafts-redout'
+						)}
+					>
 						<EventChatCard
 							application={eventApplication}
 							state={eventChatState}
@@ -1715,7 +1834,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 							)}
 							strokeColor={inboxSupplementalBorderColor}
 							textColor={inboxSupplementalTextColor}
-							showStroke={!shouldRedOutInboxRows}
+							showStroke={!isReddedOut}
 						/>
 					) : contactTitle ? (
 						<TitleBadge
@@ -1728,7 +1847,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 							fillColor={inboxSupplementalBadgeFillColor}
 							strokeColor={inboxSupplementalBorderColor}
 							textColor={inboxSupplementalTextColor}
-							showStroke={!shouldRedOutInboxRows}
+							showStroke={!isReddedOut}
 							restaurantIconSize={12}
 							coffeeIconSize={7}
 							defaultIconSize={12}
@@ -1751,7 +1870,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						badgeFillColor={inboxSupplementalBadgeFillColor}
 						strokeColor={inboxSupplementalBorderColor}
 						textColor={inboxSupplementalTextColor}
-						showBadgeStroke={!shouldRedOutInboxRows}
+						showBadgeStroke={!isReddedOut}
 					/>
 				</div>
 
@@ -1780,6 +1899,23 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	};
 
 	const renderSupplementalSentRow = (conversation: InboxConversation, sentIndex: number) => {
+		// Sent rows only render in inbox focus (never redded), so isReddedOut is always
+		// false here; defined for parity with renderSupplementalInboxRow.
+		const inboxPeekKey = `inbox:${conversation.key}`;
+		const isReddedOut = shouldRedOutInboxRows && peekRowKey !== inboxPeekKey;
+		const inboxSupplementalTextClassName = isReddedOut ? 'text-[#F5C0BD]' : 'text-black';
+		const inboxSupplementalBorderColor = isReddedOut
+			? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
+			: '#000000';
+		const inboxSupplementalRowFillColor = isReddedOut
+			? WRITE_TAB_SUPPLEMENTAL_ROW_FILL_COLOR
+			: undefined;
+		const inboxSupplementalBadgeFillColor = isReddedOut
+			? WRITE_TAB_SUPPLEMENTAL_BADGE_FILL_COLOR
+			: undefined;
+		const inboxSupplementalTextColor = isReddedOut
+			? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
+			: undefined;
 		const email = conversation.latestMessage;
 		const contact = resolveInboundContact(email, contactByEmail, contactsById);
 		const contactName = getContactDisplayName(contact, contact?.email || 'Unknown recipient');
@@ -1795,13 +1931,19 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		const threadApplicationId = getConversationThreadApplicationId(conversation);
 		const eventApplication =
 			threadApplicationId != null ? applicationById.get(threadApplicationId) : undefined;
-		const eventChatState =
-			eventApplication && !shouldRedOutInboxRows
-				? deriveEventChatStatus(eventApplication, nowMs)
-				: null;
+		// Event-chat rows render the full EventChatCard even when redded — the card is
+		// redded via the murmur-contacts-drafts-redout class on its wrapper, and the
+		// height comes from the status regardless of red-out. So the redded and
+		// hover-revealed states share one layout and size: no jump, full UI shown
+		// redded, hover just restores the colors.
+		const eventChatStateForLayout = eventApplication
+			? deriveEventChatStatus(eventApplication, nowMs)
+			: null;
+		const eventChatState = eventChatStateForLayout;
 		const isEventChatCompact =
-			eventChatState?.status === 'closed' || eventChatState?.status === 'canceled';
-		const rowHeightPx = eventChatState
+			eventChatStateForLayout?.status === 'closed' ||
+			eventChatStateForLayout?.status === 'canceled';
+		const rowHeightPx = eventChatStateForLayout
 			? isEventChatCompact
 				? EVENT_CHAT_COMPACT_ROW_HEIGHT_PX
 				: EVENT_CHAT_ROW_HEIGHT_PX
@@ -1873,7 +2015,12 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				}}
 			>
 				{eventApplication && eventChatState ? (
-					<div className="pointer-events-none h-full w-full">
+					<div
+						className={cn(
+							'pointer-events-none h-full w-full',
+							isReddedOut && 'murmur-contacts-drafts-redout'
+						)}
+					>
 						<EventChatCard
 							application={eventApplication}
 							state={eventChatState}
@@ -1915,7 +2062,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 							)}
 							strokeColor={inboxSupplementalBorderColor}
 							textColor={inboxSupplementalTextColor}
-							showStroke={!shouldRedOutInboxRows}
+							showStroke={!isReddedOut}
 						/>
 					) : contactTitle ? (
 						<TitleBadge
@@ -1928,7 +2075,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 							fillColor={inboxSupplementalBadgeFillColor}
 							strokeColor={inboxSupplementalBorderColor}
 							textColor={inboxSupplementalTextColor}
-							showStroke={!shouldRedOutInboxRows}
+							showStroke={!isReddedOut}
 							restaurantIconSize={12}
 							coffeeIconSize={7}
 							defaultIconSize={12}
@@ -1951,7 +2098,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						badgeFillColor={inboxSupplementalBadgeFillColor}
 						strokeColor={inboxSupplementalBorderColor}
 						textColor={inboxSupplementalTextColor}
-						showBadgeStroke={!shouldRedOutInboxRows}
+						showBadgeStroke={!isReddedOut}
 					/>
 				</div>
 
@@ -2534,10 +2681,15 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 										// Keyboard focus shows hover UI independently of mouse hover
 										const isKeyboardFocused = hoveredContactIndex === contactIndex;
 										const shouldShowSelectedState = !isAllTabNavigation && isSelected;
+										// Hovering a redded-out contact row (Drafts tab) reveals it in its
+										// normal style (peek). The base flag still drives navigation.
+										const contactPeekKey = `contact:${contact.id}`;
+										const isReddedOut =
+											shouldRedOutContactRows && peekRowKey !== contactPeekKey;
 										// Final background: actively drafting > selected > keyboard focus > white (mouse hover handled by CSS)
 										const contactBgColor = isActivelyDrafting
 											? 'murmur-actively-drafting'
-											: shouldRedOutContactRows
+											: isReddedOut
 												? 'bg-[#EB8586]'
 												: isAllTabNavigation
 													? 'bg-[#FFF]'
@@ -2548,7 +2700,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 															: 'bg-[#FFF] hover:bg-[#FAE6E6]';
 										const contactBorderColor = shouldShowSelectedState
 											? 'border-white'
-											: shouldRedOutContactRows
+											: isReddedOut
 												? 'border-[#F5C0BD]'
 												: 'border-[#000000]';
 										return (
@@ -2567,7 +2719,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 													isBottomView
 														? 'w-[224px] h-[30px] rounded-[4.7px]'
 														: 'max-[480px]:w-[96.27vw]',
-													shouldRedOutContactRows && 'murmur-contacts-drafts-redout',
+													isReddedOut && 'murmur-contacts-drafts-redout',
 													contactBorderColor,
 													contactBgColor
 												)}
@@ -2577,16 +2729,29 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 												}}
 												onMouseEnter={(e) => {
 													if (!isAllTabNavigation) setHoveredContactIndex(contactIndex);
+													if (!isAllTabNavigation && shouldRedOutContactRows) {
+														cancelPeekClear();
+														setPeekRowKey(contactPeekKey);
+													}
 													if (isDraftsFocusMode) onDraftHover?.(null);
 													onContactHover?.(contact);
 													onContactRowHover?.(contact, e.currentTarget);
 												}}
-												onMouseLeave={() => onContactRowHover?.(null, null)}
+												onMouseLeave={() => {
+													schedulePeekClear();
+													onContactRowHover?.(null, null);
+												}}
 												onClick={(e) => {
 													if (isAllTabNavigation) return;
 													if (isDraftsFocusMode) {
 														e.stopPropagation();
 														onContactClick?.(contact);
+														// Redded-out on the Drafts tab: jump to the Write tab
+														// and scroll to + highlight this contact.
+														if (shouldRedOutContactRows) {
+															onOpenWriting?.();
+															onFocusContact?.(contact.id);
+														}
 														return;
 													}
 													// Don't allow selecting contacts that are actively drafting.
@@ -3304,7 +3469,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									})}
 									{!isDraftsFocusMode &&
 										supplementalDraftRows.map(renderSupplementalDraftRow)}
-									{supplementalInboxConversations.map(renderSupplementalInboxRow)}
+									{supplementalInboxConversationsGrouped.map(renderSupplementalInboxRow)}
 								</>
 							)}
 							{Array.from({

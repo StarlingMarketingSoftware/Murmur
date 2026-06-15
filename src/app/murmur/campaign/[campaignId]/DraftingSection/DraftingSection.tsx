@@ -106,7 +106,6 @@ import {
 } from '@/hooks/queryHooks/useEventApplications';
 import {
 	OpportunityHoverPanel,
-	OPPORTUNITY_HOVER_PANEL_HEIGHT_PX,
 	OPPORTUNITY_HOVER_PANEL_WIDTH_PX,
 } from '@/components/molecules/OpportunityHoverPanel/OpportunityHoverPanel';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
@@ -136,6 +135,12 @@ import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
 import { BottomPanelsContainer } from '../../../../../components/atoms/BottomPanelsContainer';
 import type { HistoryAction } from '../../../../../components/atoms/BottomPanelsContainer';
+import { HistoryLedgerPanel } from '../../../../../components/atoms/HistoryLedgerPanel';
+import {
+	CampaignCornerPill,
+	CAMPAIGN_CORNER_PILL_HEIGHT,
+} from '../../../../../components/atoms/CampaignCornerPill';
+import DashboardCalendarPanel from '@/components/molecules/DashboardCalendarPanel/DashboardCalendarPanel';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useGetCampaignContactEvents } from '@/hooks/queryHooks/useCampaigns';
 import { buildCampaignInboxMockData } from '../CampaignInboxDebugPanel';
@@ -2720,6 +2725,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		useState<ContactWithName | null>(null);
 	const [hasUserSelectedResearchContact, setHasUserSelectedResearchContact] =
 		useState(false);
+	// Bottom-right corner pill: which panel (if any) is open. One at a time.
+	const [cornerPanel, setCornerPanel] = useState<'none' | 'history' | 'calendar'>(
+		'none'
+	);
+	// On-screen scale for the corner calendar popup (native ~669×381 → ~401×229).
+	const CAMPAIGN_CALENDAR_SCALE = 0.6;
+	// Inset of the corner pill (and its panels) from the right viewport edge.
+	const CAMPAIGN_CORNER_PILL_RIGHT = 20;
 	// Row-aligned abridged research card left of the pinned list (Write/Drafts/Inbox).
 	// Additive to the standard research panels — fully separate state.
 	const [rowHoverResearchContact, setRowHoverResearchContact] =
@@ -2802,6 +2815,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		},
 		[inboxSentTabRequest?.requestId]
 	);
+	// One-shot request consumed by ContactsExpandedList to scroll a contact row into
+	// view and highlight it — fired when a redded-out contact row (Drafts tab) is
+	// clicked and we navigate to the Write tab.
+	const [focusContactRequest, setFocusContactRequest] = useState<{
+		contactId: number;
+		requestId: number;
+	} | null>(null);
+	const handleFocusContact = useCallback((contactId: number) => {
+		setFocusContactRequest((prev) => ({
+			contactId,
+			requestId: (prev?.requestId ?? 0) + 1,
+		}));
+	}, []);
 	const handleInboxThreadReplySent = useCallback(
 		(messageIds: number[], sentAtMs: number) => {
 			setOptimisticInboxReplyByEmailId((prev) => {
@@ -3314,14 +3340,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			if (!anchor) return;
 			cancelRowHoverResearchClear();
 			const anchorRect = anchor.getBoundingClientRect();
-			const rowRect = rowElement.getBoundingClientRect();
 			const scale = anchor.offsetHeight > 0 ? anchorRect.height / anchor.offsetHeight : 1;
-			const rawTopPx = (rowRect.top - anchorRect.top) / (scale || 1);
-			const maxTopPx = Math.max(
-				0,
-				anchor.offsetHeight - OPPORTUNITY_HOVER_PANEL_HEIGHT_PX
-			);
-			setRowHoverResearchTopPx(Math.min(Math.max(rawTopPx, 0), maxTopPx));
+			// Match the research card's vertical placement (statically centered on the
+			// research card's full height) so the opportunity panel sits in roughly the
+			// same spot instead of following the hovered row.
+			const cardScreenHeightPx = HOVER_RESEARCH_CARD_FULL_HEIGHT_PX * (scale || 1);
+			const centeredScreenTopPx = Math.max(8, (window.innerHeight - cardScreenHeightPx) / 2);
+			setRowHoverResearchTopPx((centeredScreenTopPx - anchorRect.top) / (scale || 1));
 			let leftPx = ROW_HOVER_OPPORTUNITY_DOCKED_LEFT_PX;
 			const splitOverlay = document.querySelector('.campaign-map-split-overlay');
 			if (splitOverlay) {
@@ -3530,6 +3555,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			inboxEmails: inboxEmailsForContactsExpandedList,
 			optimisticInboxReplyByEmailId,
 			contactByEmail: campaignContactsByEmail,
+			// Enable redded-row click-to-navigate on the Write/Drafts lists: inbox rows
+			// need a click handler + selection, contacts need a focus request.
+			selectedInboxEmailId,
+			onInboxEmailClick: handleInboxEmailClick,
+			onFocusContact: handleFocusContact,
+			focusContactRequest,
 		}),
 		[
 			contacts,
@@ -3539,6 +3570,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			optimisticInboxReplyByEmailId,
 			campaignContactsByEmail,
 			inboxMockData,
+			selectedInboxEmailId,
+			handleInboxEmailClick,
+			handleFocusContact,
+			focusContactRequest,
 		]
 	);
 
@@ -9203,6 +9238,81 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					>
 						<ContactResearchHoverCard contact={railHoverResearchContact} />
 					</div>,
+					document.querySelector('.campaign-map-interactive-page') ?? document.body
+				)}
+			{/* Bottom-right corner pill (history ledger + calendar). Portaled INTO the
+			    campaign interactive layer — that layer is `isolation: isolate`, so a
+			    <body> portal would paint BELOW the map; inside it, our z wins. The layer
+			    isn't transformed, so the corner-anchored (right/bottom) fixed children land
+			    at the true viewport corner. The layer is `pointer-events: none`, so the
+			    pill/panels set `pointer-events: auto` themselves. */}
+			{shouldRenderSharedBottomPanels &&
+				typeof document !== 'undefined' &&
+				createPortal(
+					<>
+						{/* History ledger, anchored above the pill, right-aligned. */}
+						{cornerPanel === 'history' && (
+							<div
+								className="fixed pointer-events-auto"
+								style={{
+									right: CAMPAIGN_CORNER_PILL_RIGHT,
+									bottom: CAMPAIGN_CORNER_PILL_HEIGHT + 10,
+									zIndex: 131,
+								}}
+							>
+								<HistoryLedgerPanel
+									historyActions={historyActions}
+									onClose={() => setCornerPanel('none')}
+								/>
+							</div>
+						)}
+
+						{/* Calendar, anchored above the pill. Its event-editor popup portals to
+						    body (fixed) and ignores ancestor transforms, so popupScale must
+						    equal the on-screen scale = CAMPAIGN_CALENDAR_SCALE × root zoom. */}
+						{cornerPanel === 'calendar' && (
+							<>
+								<div
+									className="fixed inset-0 pointer-events-auto"
+									style={{ zIndex: 130 }}
+									onClick={() => setCornerPanel('none')}
+								/>
+								<div
+									className="fixed pointer-events-auto"
+									style={{
+										right: CAMPAIGN_CORNER_PILL_RIGHT,
+										bottom: CAMPAIGN_CORNER_PILL_HEIGHT + 10,
+										zIndex: 131,
+										transform: `scale(${CAMPAIGN_CALENDAR_SCALE})`,
+										transformOrigin: 'bottom right',
+									}}
+								>
+									<DashboardCalendarPanel
+										persistEvents
+										popupScale={CAMPAIGN_CALENDAR_SCALE * (getMurmurRootScale() || 1)}
+									/>
+								</div>
+							</>
+						)}
+
+						{/* The pill itself, pinned to the bottom-right corner. Rendered last so
+						    it stays clickable above the panels' close-backdrops. */}
+						<div
+							className="fixed"
+							style={{ right: CAMPAIGN_CORNER_PILL_RIGHT, bottom: 0, zIndex: 131 }}
+						>
+							<CampaignCornerPill
+								onHistoryClick={() =>
+									setCornerPanel((p) => (p === 'history' ? 'none' : 'history'))
+								}
+								onCalendarClick={() =>
+									setCornerPanel((p) => (p === 'calendar' ? 'none' : 'calendar'))
+								}
+								historyActive={cornerPanel === 'history'}
+								calendarActive={cornerPanel === 'calendar'}
+							/>
+						</div>
+					</>,
 					document.querySelector('.campaign-map-interactive-page') ?? document.body
 				)}
 		</div>
