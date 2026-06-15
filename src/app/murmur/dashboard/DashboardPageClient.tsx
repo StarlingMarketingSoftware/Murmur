@@ -12179,14 +12179,21 @@ const DashboardContent = () => {
 																	) : isSplitCategoryTopSearch &&
 																	  mapTopSearchDisplay.kind === 'category' ? (
 																		<div className="flex h-full w-full items-center font-secondary text-[13px] font-bold leading-none text-black">
-																			<div className="flex h-full min-w-0 flex-1 items-center justify-center px-[12px]">
-																				<span className="truncate">
+																			<div className="flex h-full min-w-0 basis-[46%] items-center justify-start pl-[20px] pr-[8px]">
+																				<MapBottomSearchCategoryIcon
+																					aria-hidden="true"
+																					active
+																					viewBox="2 0 31 24"
+																					width={28}
+																					height={22}
+																					className="mr-[13px] flex-shrink-0"
+																				/>
+																				<span className="min-w-0 truncate">
 																					{mapTopSearchDisplay.what}
 																				</span>
 																			</div>
-																			<div className="h-full w-px flex-shrink-0 bg-black/10" />
-																			<div className="flex h-full min-w-0 flex-1 items-center justify-center px-[12px]">
-																				<span className="truncate">
+																			<div className="flex h-full min-w-0 flex-1 items-center justify-start pl-[24px] pr-[44px]">
+																				<span className="min-w-0 truncate">
 																					{mapTopSearchDisplay.whereLabel}
 																				</span>
 																			</div>
