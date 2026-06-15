@@ -2332,6 +2332,28 @@ const Murmur = () => {
 			requestId: (prev?.requestId ?? 0) + 1,
 		}));
 	}, []);
+	// Bidirectional campaign-map ↔ tab selection. The child DraftingSection owns each
+	// tab's native selection; it publishes the active tab's selected contact ids here
+	// (so the map can highlight their markers as the bigger blue circle), and a marker
+	// click bumps a request the child consumes to run the tab's native selection action.
+	// Mirrors the inboxSentTab publish + inboxSentTabRequest request pattern above.
+	const [campaignMapSelectedContactIds, setCampaignMapSelectedContactIds] = useState<
+		number[]
+	>([]);
+	const [mapMarkerSelectionRequest, setMapMarkerSelectionRequest] = useState<{
+		contactId: number;
+		requestId: number;
+	} | null>(null);
+	const requestMapMarkerSelection = useCallback((contactId: number) => {
+		setMapMarkerSelectionRequest((prev) => ({
+			contactId,
+			requestId: (prev?.requestId ?? 0) + 1,
+		}));
+	}, []);
+	// Note: no separate reset-on-tab-switch effect — DraftingSection republishes the
+	// active tab's selection (defaulting to []) whenever `view` changes, which is the
+	// single source of truth. A parent reset here would fire AFTER the child's publish
+	// (React runs child effects first) and wipe the freshly published set.
 	// Track if we navigated from inbox to sent via down arrow (so up arrow can return to inbox)
 	const [cameToSentFromInbox, setCameToSentFromInbox] = useState(false);
 	// Track the latest requested view so rapid tab flips don't get dropped due to stale closures.
@@ -3363,7 +3385,8 @@ const Murmur = () => {
 			autoSpin: false,
 			cameraPadding: campaignMapCameraPadding,
 			contacts: campaignMapContactsForMap,
-			selectedContacts: [],
+			selectedContacts: campaignMapSelectedContactIds,
+			onToggleSelection: requestMapMarkerSelection,
 			campaignContactStatusById: campaignOverviewContactStatusById,
 			campaignMarkerMode: effectiveMapGroupingForActiveView,
 			categoryConstellationsEnabled: true,
@@ -3379,6 +3402,8 @@ const Murmur = () => {
 			activeMapTool,
 			campaignMapCameraPadding,
 			campaignMapContactsForMap,
+			campaignMapSelectedContactIds,
+			requestMapMarkerSelection,
 			campaignOverviewContactStatusById,
 			effectiveMapGroupingForActiveView,
 			globeNightLighting,
@@ -4899,6 +4924,8 @@ const Murmur = () => {
 												inboxSentTabRequest={inboxSentTabRequest}
 												inboxPanelTabRequest={inboxPanelTabRequest}
 												onInboxSentTabChange={setInboxSentTab}
+												onMapSelectionChange={setCampaignMapSelectedContactIds}
+												mapMarkerSelectionRequest={mapMarkerSelectionRequest}
 												goToOverview={() => setActiveView('overview')}
 												goToDrafting={() => setActiveView('drafting')}
 												goToWriting={() => setActiveView('testing')}

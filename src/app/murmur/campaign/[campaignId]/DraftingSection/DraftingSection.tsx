@@ -321,6 +321,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		inboxSentTabRequest,
 		inboxPanelTabRequest,
 		onInboxSentTabChange,
+		onMapSelectionChange,
+		mapMarkerSelectionRequest,
 		goToPreviousTab,
 		goToNextTab,
 		hideHeaderBox,
@@ -2812,6 +2814,82 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		},
 		[]
 	);
+
+	// Campaign map ↔ tab selection bridge --------------------------------------
+	// Publish the active tab's selected contact ids so the map highlights their
+	// markers as the bigger blue circle. Write = the multi-select draft set,
+	// Drafts = the contacts of selected drafts. Inbox is intentionally excluded:
+	// there a marker click just OPENS the conversation (handled below) — it is not
+	// a persistent map selection, so inbox markers never get the blue treatment.
+	const lastPublishedMapSelectionKeyRef = useRef<string>('');
+	useEffect(() => {
+		if (!onMapSelectionChange) return;
+		let contactIds: number[] = [];
+		if (view === 'testing') {
+			contactIds = Array.from(contactsTabSelectedIds);
+		} else if (view === 'drafting') {
+			contactIds = draftEmailsForView
+				.filter((d) => draftsTabSelectedIds.has(d.id))
+				.map((d) => d.contactId)
+				.filter((id): id is number => id != null);
+		}
+		// Skip redundant publishes (e.g. on draft refetches) so the parent's memoized
+		// map props don't rebuild when the selection hasn't actually changed.
+		const key = contactIds.join(',');
+		if (key === lastPublishedMapSelectionKeyRef.current) return;
+		lastPublishedMapSelectionKeyRef.current = key;
+		onMapSelectionChange(contactIds);
+	}, [
+		onMapSelectionChange,
+		view,
+		contactsTabSelectedIds,
+		draftsTabSelectedIds,
+		draftEmailsForView,
+	]);
+
+	// Run a campaign map marker click through the active tab's native selection.
+	// One-shot per requestId; the handled-ref keeps a click on one tab from
+	// replaying into another after a tab switch (requestId is monotonic).
+	const handledMapMarkerRequestIdRef = useRef<number | null>(null);
+	useEffect(() => {
+		const req = mapMarkerSelectionRequest;
+		if (!req) return;
+		if (handledMapMarkerRequestIdRef.current === req.requestId) return;
+		handledMapMarkerRequestIdRef.current = req.requestId;
+		const { contactId } = req;
+		if (view === 'testing') {
+			setContactsTabSelectedIds((prev) => {
+				const next = new Set(prev);
+				if (next.has(contactId)) next.delete(contactId);
+				else next.add(contactId);
+				return next;
+			});
+		} else if (view === 'drafting') {
+			const draft = draftEmailsForView.find((d) => d.contactId === contactId);
+			if (draft) handleDraftSelection(draft.id);
+		} else if (view === 'inbox') {
+			const byCreatedDesc = (a: { createdAt: string | Date }, b: { createdAt: string | Date }) =>
+				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+			const inbound = (inboundEmails || [])
+				.filter(
+					(e) =>
+						(e.contactId ?? (e.contact as { id?: number } | null | undefined)?.id) ===
+						contactId
+				)
+				.sort(byCreatedDesc)[0];
+			if (inbound) {
+				handleInboxEmailClick({ id: inbound.id, isSent: false });
+			} else {
+				const sent = (sentEmails || [])
+					.filter((e) => e.contactId === contactId)
+					.sort(byCreatedDesc)[0];
+				if (sent) handleInboxEmailClick({ id: sent.id, isSent: true });
+			}
+		}
+		// handleDraftSelection / handleInboxEmailClick read live state at call time;
+		// the request id is the trigger and the handled-ref guards re-execution.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [mapMarkerSelectionRequest, view, draftEmailsForView, inboundEmails, sentEmails]);
 
 	// Mobile Summary view: which fullscreen overlay (chat / draft review) is open,
 	// the header-pill scroll target, and this session's send/delete counters.

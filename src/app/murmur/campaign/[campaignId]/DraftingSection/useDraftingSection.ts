@@ -64,6 +64,12 @@ export type InboxPanelTabRequest = {
 	requestId: number;
 };
 
+/** One-shot request to run the active tab's native selection for a clicked map marker. */
+export type MapMarkerSelectionRequest = {
+	contactId: number;
+	requestId: number;
+};
+
 export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
 	view?: DraftingSectionView;
@@ -117,6 +123,16 @@ export interface DraftingSectionProps {
 	 * Optional callback fired whenever the InboxSection's Inbox/Sent tab changes.
 	 */
 	onInboxSentTabChange?: (next: InboxSentTab) => void;
+	/**
+	 * Optional callback publishing the active tab's selected contact ids to the
+	 * campaign map, so their markers render as the bigger blue selected circle.
+	 */
+	onMapSelectionChange?: (contactIds: number[]) => void;
+	/**
+	 * Optional one-shot request from a campaign map marker click. The active tab
+	 * routes the contactId into its own native selection action.
+	 */
+	mapMarkerSelectionRequest?: MapMarkerSelectionRequest | null;
 	/**
 	 * Optional callback to navigate to the previous tab.
 	 */

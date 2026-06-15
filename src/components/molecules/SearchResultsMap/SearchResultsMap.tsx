@@ -567,6 +567,14 @@ const CAMPAIGN_STATUS_CONSTELLATION_CORE_OPACITY = 1;
 const CAMPAIGN_STATUS_CONSTELLATION_GLOW_OPACITY = 0.18;
 const CAMPAIGN_STATUS_MARKER_RADIUS_SCALE = 1;
 const CAMPAIGN_STATUS_MARKER_STROKE_WIDTH = 2.32338;
+// Selected campaign status marker (Write/Drafts/Inbox tabs): a bigger light-blue
+// circle (#A8BFF5 fill, #5A81DA stroke) per the campaign marker spec. Applied via
+// the `selected` feature-state, gated on the per-feature `statusMode` flag so the
+// dashboard pick-flow / category-mode dots stay untouched.
+const SELECTED_STATUS_DOT_RADIUS_SCALE = 1.45;
+const SELECTED_STATUS_DOT_FILL_COLOR = '#A8BFF5';
+const SELECTED_STATUS_DOT_STROKE_COLOR = '#5A81DA';
+const SELECTED_STATUS_DOT_STROKE_WIDTH = 2.4;
 
 export type CampaignContactMapStatus = 'contacts' | 'drafts' | 'new-message' | 'sent';
 
@@ -6845,6 +6853,50 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			24,
 			['*', RESULT_DOT_SCALE_MAX, resultDotHoverRadiusScaleExpr],
 		];
+		// Selected status dot (campaign Write/Drafts/Inbox): bigger blue circle.
+		// Gated on the per-feature `statusMode` flag AND the `selected` feature-state
+		// so category-mode / dashboard pick-flow dots (statusMode:false) are untouched.
+		const isSelectedStatusDotExpr: any = [
+			'all',
+			['boolean', ['get', 'statusMode'], false],
+			['boolean', ['feature-state', 'selected'], false],
+		];
+		// `zoom` must stay the OUTERMOST input of an interpolate/step (mapbox-gl v3), so
+		// the selected-size boost is folded into each stop as a per-feature multiplier
+		// rather than wrapping two interpolates in a `case` (which nests zoom and errors).
+		const selectedStatusDotRadiusMultiplierExpr = [
+			'case',
+			isSelectedStatusDotExpr,
+			SELECTED_STATUS_DOT_RADIUS_SCALE,
+			1,
+		];
+		const baseDotsRadiusExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			['*', RESULT_DOT_SCALE_MIN, resultDotHoverRadiusScaleExpr, selectedStatusDotRadiusMultiplierExpr],
+			RESULT_DOT_ZOOM_MIN,
+			['*', RESULT_DOT_SCALE_MIN, resultDotHoverRadiusScaleExpr, selectedStatusDotRadiusMultiplierExpr],
+			RESULT_DOT_ZOOM_MAX,
+			['*', RESULT_DOT_SCALE_MAX, resultDotHoverRadiusScaleExpr, selectedStatusDotRadiusMultiplierExpr],
+			24,
+			['*', RESULT_DOT_SCALE_MAX, resultDotHoverRadiusScaleExpr, selectedStatusDotRadiusMultiplierExpr],
+		];
+		// `sent` status dots are drawn hollow (fillOpacity 0, strokeOpacity 0.3); when
+		// selected they must read as a solid blue disc, so force the opacity factors to 1.
+		const selectedAwareFillFactor: any = [
+			'case',
+			isSelectedStatusDotExpr,
+			1,
+			FEATURE_FILL_OPACITY_FACTOR,
+		];
+		const selectedAwareStrokeFactor: any = [
+			'case',
+			isSelectedStatusDotExpr,
+			1,
+			FEATURE_STROKE_OPACITY_FACTOR,
+		];
 		const resultDotGlowRadiusExpr = [
 			'interpolate',
 			['linear'],
@@ -6870,6 +6922,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			['*', RESULT_DOT_GLOW_RADIUS_MAX_PX, resultDotRadiusScaleExpr],
 			24,
 			['*', RESULT_DOT_GLOW_RADIUS_MAX_PX, resultDotRadiusScaleExpr],
+		];
+		// Grow the invisible hit target in step with the bigger selected status dot so
+		// the larger circle stays comfortably clickable (the dot must never exceed it).
+		// Same zoom-outermost rule: fold the multiplier into each stop.
+		const baseHitRadiusExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			['*', RESULT_DOT_GLOW_RADIUS_MIN_PX, resultDotRadiusScaleExpr, selectedStatusDotRadiusMultiplierExpr],
+			RESULT_DOT_ZOOM_MIN,
+			['*', RESULT_DOT_GLOW_RADIUS_MIN_PX, resultDotRadiusScaleExpr, selectedStatusDotRadiusMultiplierExpr],
+			RESULT_DOT_ZOOM_MAX,
+			['*', RESULT_DOT_GLOW_RADIUS_MAX_PX, resultDotRadiusScaleExpr, selectedStatusDotRadiusMultiplierExpr],
+			24,
+			['*', RESULT_DOT_GLOW_RADIUS_MAX_PX, resultDotRadiusScaleExpr, selectedStatusDotRadiusMultiplierExpr],
 		];
 
 		const allOverlayRadiusLow = RESULT_DOT_SCALE_MIN * 0.72;
@@ -7281,7 +7349,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			source: MAPBOX_SOURCE_IDS.markerConstellationSelected,
 			layout: { 'line-join': 'round', 'line-cap': 'round' },
 			paint: {
-				'line-color': MARKER_CONSTELLATION_SELECTED_HALO_COLOR,
+				'line-color': [
+					'case',
+					['boolean', ['get', 'statusMode'], false],
+					SELECTED_STATUS_DOT_FILL_COLOR,
+					MARKER_CONSTELLATION_SELECTED_HALO_COLOR,
+				],
 				'line-opacity': getSelectedMarkerConstellationZoomFadedOpacity(
 					MARKER_CONSTELLATION_SELECTED_GLOW_OPACITY
 				),
@@ -7295,7 +7368,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			source: MAPBOX_SOURCE_IDS.markerConstellationSelected,
 			layout: { 'line-join': 'round', 'line-cap': 'round' },
 			paint: {
-				'line-color': MARKER_CONSTELLATION_SELECTED_LINE_COLOR,
+				'line-color': [
+					'case',
+					['boolean', ['get', 'statusMode'], false],
+					SELECTED_STATUS_DOT_STROKE_COLOR,
+					MARKER_CONSTELLATION_SELECTED_LINE_COLOR,
+				],
 				'line-opacity': getSelectedMarkerConstellationZoomFadedOpacity(
 					MARKER_CONSTELLATION_SELECTED_CORE_OPACITY
 				),
@@ -7595,7 +7673,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersBase,
 			paint: {
-				'circle-radius': resultDotHitRadiusExpr,
+				'circle-radius': baseHitRadiusExpr,
 				'circle-opacity': 0,
 				'circle-stroke-width': 0,
 			},
@@ -7619,19 +7697,32 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersBase,
 			paint: {
-				'circle-radius': resultDotRadiusExpr,
-				'circle-color': getMarkerHoverFillColorExpr(),
-				'circle-opacity': withFeatureFillOpacity(
-					getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
+				'circle-radius': baseDotsRadiusExpr,
+				'circle-color': [
+					'case',
+					isSelectedStatusDotExpr,
+					SELECTED_STATUS_DOT_FILL_COLOR,
+					getMarkerHoverFillColorExpr(),
+				],
+				'circle-opacity': withFeatureOpacityFactor(
+					getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr()),
+					selectedAwareFillFactor
 				),
 				'circle-stroke-color': [
-					'coalesce',
-					['get', 'strokeColor'],
-					RESULT_DOT_TRANSPARENT_STROKE_COLOR,
+					'case',
+					isSelectedStatusDotExpr,
+					SELECTED_STATUS_DOT_STROKE_COLOR,
+					['coalesce', ['get', 'strokeColor'], RESULT_DOT_TRANSPARENT_STROKE_COLOR],
 				],
-				'circle-stroke-width': ['coalesce', ['get', 'strokeWidth'], 0],
-				'circle-stroke-opacity': withFeatureStrokeOpacity(
-					getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
+				'circle-stroke-width': [
+					'case',
+					isSelectedStatusDotExpr,
+					SELECTED_STATUS_DOT_STROKE_WIDTH,
+					['coalesce', ['get', 'strokeWidth'], 0],
+				],
+				'circle-stroke-opacity': withFeatureOpacityFactor(
+					getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr()),
+					selectedAwareStrokeFactor
 				),
 			},
 		});
@@ -14211,6 +14302,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						id: featureId,
 						properties: {
 							selectedLineOpacity: selectedConstellationLineOpacityRef.current,
+							// Campaign status mode recolors the selected lines blue to match the
+							// blue selected circles (dashboard pick-flow keeps the white lines).
+							statusMode: campaignMarkerMode === 'status',
 							fromId: edge.fromId,
 							toId: edge.toId,
 						},
@@ -14256,6 +14350,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lockedStateKey,
 			isCoordsInLockedState,
 			searchWhat,
+			campaignMarkerMode,
 		]
 	);
 
@@ -14418,6 +14513,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			isCurated: boolean;
 			isUncategorized: boolean;
 			isVenue: boolean;
+			statusMode: boolean;
 			fadeWithSelectedStateOrb: boolean;
 		};
 		const dots: DotSeed[] = [];
@@ -14470,6 +14566,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				isCurated: statusMarkerStyle ? false : Boolean(contact.curatedCategory),
 				isUncategorized,
 				isVenue,
+				statusMode: Boolean(statusMarkerStyle),
 				fadeWithSelectedStateOrb,
 			});
 			minLng = Math.min(minLng, coords.lng);
@@ -14520,6 +14617,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				':' +
 				(d.isVenue ? 'v' : 'n') +
 				':' +
+				(d.statusMode ? 's' : 'n') +
+				':' +
 				(d.fadeWithSelectedStateOrb ? 'f' : 'n');
 		}
 		if (dataKey === baseDotsLastDataKeyRef.current) {
@@ -14567,6 +14666,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					isCurated: dot.isCurated,
 					isUncategorized: dot.isUncategorized,
 					isVenue: dot.isVenue,
+					statusMode: dot.statusMode,
 					fadeWithSelectedStateOrb: dot.fadeWithSelectedStateOrb,
 					fallbackIcon: dot.isUncategorized ? uncategorizedContactMarkerImageName : '',
 					fallbackIconHover: dot.isUncategorized
@@ -14702,7 +14802,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 
-		if (!searchEngaged && !isAmbientContactsEnabled) {
+		// Campaign status mode (Write/Drafts/Inbox) renders selection as the bigger
+		// blue circle on the base dot itself — keep this bespoke halo artwork cleared
+		// so it never fades the base dot out (its selectedMarkerT) or overlays the
+		// dashboard pick-flow halo on top of the status-colored markers.
+		if (
+			campaignMarkerMode === 'status' ||
+			(!searchEngaged && !isAmbientContactsEnabled)
+		) {
 			if (selectedMarkerFadeRafRef.current != null) {
 				cancelAnimationFrame(selectedMarkerFadeRafRef.current);
 				selectedMarkerFadeRafRef.current = null;
@@ -14985,6 +15092,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isLoading,
 		searchEngaged,
 		isAmbientContactsEnabled,
+		campaignMarkerMode,
 		selectedContacts,
 		selectedContactObjects,
 		contactsWithCoords,
