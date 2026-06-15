@@ -2729,10 +2729,6 @@ const Murmur = () => {
 	const [isTopStrategyDropdownOpen, setIsTopStrategyDropdownOpen] = useState(false);
 	const [isTopOpportunitiesOpen, setIsTopOpportunitiesOpen] = useState(false);
 
-	// State for right box icon selection ('info' or 'circle')
-	const [selectedRightBoxIcon, setSelectedRightBoxIcon] = useState<'info' | 'circle'>(
-		'info'
-	);
 	const topCampaignsDropdownRef = useRef<HTMLDivElement>(null);
 	const topCampaignsFolderButtonRef = useRef<HTMLButtonElement>(null);
 	const topStrategyDropdownRef = useRef<HTMLDivElement>(null);
@@ -3719,7 +3715,7 @@ const Murmur = () => {
 			: 24;
 	return (
 		<CampaignDeviceProvider isMobile={isMobile} activeView={activeView}>
-			<HoverDescriptionProvider enabled={selectedRightBoxIcon === 'info'}>
+			<HoverDescriptionProvider defaultEnabled>
 				<CampaignTopSearchHighlightProvider value={topSearchHighlightCtx}>
 					<div
 						className={cn(

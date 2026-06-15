@@ -1,15 +1,28 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+	createContext,
+	useCallback,
+	useContext,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 
 type HoverDescriptionContextValue = {
 	enabled: boolean;
 	description: string;
+	toggle: () => void;
+	/** True only inside a real provider, so consumers can gate the toggle UI. */
+	canToggle: boolean;
 };
 
 const HoverDescriptionContext = createContext<HoverDescriptionContextValue>({
 	enabled: false,
 	description: '',
+	toggle: () => {},
+	canToggle: false,
 });
 
 const DATA_ATTR = 'data-hover-description';
@@ -82,12 +95,14 @@ function computeDescriptionFromTarget(target: EventTarget | null): string | null
 }
 
 export function HoverDescriptionProvider({
-	enabled,
+	defaultEnabled,
 	children,
 }: {
-	enabled: boolean;
+	defaultEnabled: boolean;
 	children: React.ReactNode;
 }) {
+	const [enabled, setEnabled] = useState(defaultEnabled);
+	const toggle = useCallback(() => setEnabled((v) => !v), []);
 	const [description, setDescription] = useState('');
 	const descriptionRef = useRef('');
 	const setTimeoutRef = useRef<number | null>(null);
@@ -223,8 +238,8 @@ export function HoverDescriptionProvider({
 	}, [enabled]);
 
 	const value = useMemo<HoverDescriptionContextValue>(
-		() => ({ enabled, description }),
-		[enabled, description]
+		() => ({ enabled, description, toggle, canToggle: true }),
+		[enabled, description, toggle]
 	);
 
 	return (
