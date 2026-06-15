@@ -3889,7 +3889,7 @@ const Murmur = () => {
 												}px`,
 											}}
 										>
-											Showing
+											{isSelectMapToolActive ? 'Select' : 'Showing'}
 										</div>
 										<MapSelectGrabTallStackBox
 											className="absolute pointer-events-none"
@@ -4660,7 +4660,7 @@ const Murmur = () => {
 									}px`,
 								}}
 							>
-								Showing
+								{isSelectMapToolActive ? 'Select' : 'Showing'}
 							</div>
 								<MapSelectGrabTallStackBox
 									className="absolute pointer-events-none"

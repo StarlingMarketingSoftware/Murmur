@@ -357,6 +357,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const {
 		mood: globeWeatherMood,
 		temperatureF: globeWeatherTemperatureF,
+		weatherCode: globeWeatherWeatherCode,
 		regionCenter: globeWeatherRegionCenter,
 	} = useGlobeWeatherMood();
 	const globeNightLighting = useGlobeNightLighting();
@@ -1922,6 +1923,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// Get active tab data
 	const activeSearchTab = searchTabs.find((tab) => tab.id === activeSearchTabId);
 	const hasCampaignSearched = activeSearchTabId !== null;
+	// The large right-side research panel renders only in these states. We reuse this
+	// single gate both for the panel's JSX and to suppress the left-over-map hover card
+	// (the map-area card is reserved for the compressed/compact view, where this is false).
+	const isRightResearchPanelActive =
+		!isMobile &&
+		!isCampaignWorkspaceCompact &&
+		!isNarrowDesktop &&
+		!isNarrowestDesktop &&
+		['testing', 'drafting', 'sent', 'search'].includes(view) &&
+		!(view === 'search' && hasCampaignSearched) &&
+		!(view === 'search' && isSearchTabNarrow);
 	const activeCampaignSearchQuery = activeSearchTab?.query || '';
 	const searchResultsSelectedContacts = activeSearchTab?.selectedContacts || [];
 
@@ -3776,7 +3788,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// [data-row-hover-research-anchor] wrapper. `enabled` lets the search/overview rail
 	// reuse this with its own gate (defaults to the pinned-list gate).
 	const renderRowHoverResearchCard = (enabled = isRowHoverResearchEnabled) =>
-		enabled && rowHoverOpportunity ? (
+		// When the large right-side research panel is showing (expanded layout), the
+		// over-map hover card is suppressed — research/opportunity render in the right
+		// panel instead. The map-area card is reserved for the compressed/compact view.
+		isRightResearchPanelActive ? null : enabled && rowHoverOpportunity ? (
 			<div
 				className="absolute pointer-events-none"
 				style={{
@@ -5301,15 +5316,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						)}
 
 						{/* Shared Research / Test Preview panel to the right of the drafting tables / writing view */}
-						{!isMobile &&
-							!isCampaignWorkspaceCompact &&
-							// Use our *effective* width breakpoints (which account for campaign zoom),
-							// rather than Tailwind's `xl:` media query which ignores CSS zoom.
-							!isNarrowDesktop &&
-							!isNarrowestDesktop &&
-							['testing', 'drafting', 'sent', 'search'].includes(view) &&
-							!(view === 'search' && hasCampaignSearched) &&
-							!(view === 'search' && isSearchTabNarrow) && (
+						{isRightResearchPanelActive && (
 								<div
 									className="absolute"
 									data-research-panel-container
@@ -5358,6 +5365,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												!(contacts?.[0] || displayedContactForResearch)
 											}
 											style={{ width: 375, height: 672, marginTop: -8 }}
+										/>
+									) : (view === 'testing' || view === 'drafting') &&
+									  !isDraftPreviewOpen &&
+									  rowHoverOpportunity?.event ? (
+										// Hovering an opportunity (event-chat) row shows the opportunity
+										// panel here, sized to the research panel's footprint, instead of
+										// docking it over the left map area.
+										<OpportunityHoverPanel
+											application={rowHoverOpportunity}
+											nowMs={Date.now()}
+											widthPx={375}
+											heightPx={standardResearchPanelHeightPx}
+											borderRadiusPx={11.48}
+											borderPx={1.913}
 										/>
 									) : (
 										<ContactResearchPanel
@@ -9302,6 +9323,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							style={{ right: CAMPAIGN_CORNER_PILL_RIGHT, bottom: 0, zIndex: 131 }}
 						>
 							<CampaignCornerPill
+								expanded={isCampaignWorkspaceExpanded}
+								temperatureF={globeWeatherTemperatureF}
+								weatherCode={globeWeatherWeatherCode}
 								onHistoryClick={() =>
 									setCornerPanel((p) => (p === 'history' ? 'none' : 'history'))
 								}

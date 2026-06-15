@@ -165,6 +165,7 @@ import { DashboardBootBackdrop } from '@/components/molecules/DashboardBootBackd
 import { DashboardBootProgress } from '@/components/molecules/DashboardBootProgress/DashboardBootProgress';
 import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
 import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
+import DashboardHeroDateWeatherBar from './DashboardHeroDateWeatherBar';
 import { ContactWithName } from '@/types/contact';
 import { MapResultsPanelSkeleton } from '@/components/molecules/MapResultsPanelSkeleton/MapResultsPanelSkeleton';
 import {
@@ -2924,6 +2925,7 @@ const DashboardContent = () => {
 	const {
 		mood: globeWeatherMood,
 		temperatureF: globeWeatherTemperatureF,
+		weatherCode: globeWeatherCode,
 		regionCenter: globeWeatherRegionCenter,
 	} = useGlobeWeatherMood();
 	const globeNightLighting = useGlobeNightLighting();
@@ -10799,6 +10801,12 @@ const DashboardContent = () => {
 								: undefined
 						}
 					>
+						{!hasSearched && activeTab === 'search' && (
+							<DashboardHeroDateWeatherBar
+								temperatureF={globeWeatherTemperatureF}
+								weatherCode={globeWeatherCode}
+							/>
+						)}
 						<div
 							className={`hero-wrapper flex flex-col items-center !z-[40] ${
 								activeTab === 'inbox' ? 'justify-start' : 'justify-center'
@@ -13060,7 +13068,7 @@ const DashboardContent = () => {
 													}px`,
 												}}
 											>
-												Showing
+												{isSelectMapToolActive ? 'Select' : 'Showing'}
 											</div>
 											<MapSelectGrabTallStackBox
 												className="absolute pointer-events-none"
