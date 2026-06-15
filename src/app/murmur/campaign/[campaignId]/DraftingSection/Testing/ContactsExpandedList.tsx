@@ -567,6 +567,8 @@ export interface ContactsExpandedListProps {
 	 * These should not be treated as "selected" in the UI.
 	 */
 	activelyDraftingContactIds?: Set<number>;
+	/** Optional set of contact IDs that already have drafts. */
+	contactsWithDraftIds?: Set<number>;
 	onContactSelectionChange?: (updater: (prev: Set<number>) => Set<number>) => void;
 	width?: number | string;
 	height?: number | string;
@@ -1147,6 +1149,101 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			return new Set(selectableDraftIds);
 		});
 	}, [areAllDraftsSelected, onDraftSelectionChange, selectableDraftIds]);
+	const shouldSelectContactsAndDrafts =
+		!isDraftsFocusMode &&
+		!isInboxFocusMode &&
+		resolvedActiveTopNavStop === 'all' &&
+		Boolean(onDraftSelectionChange);
+	const selectedVisibleDraftCount = useMemo(() => {
+		if (!selectedDraftIds) return 0;
+		let count = 0;
+		for (const id of selectedDraftIds) {
+			if (selectableDraftIds.has(id)) count += 1;
+		}
+		return count;
+	}, [selectableDraftIds, selectedDraftIds]);
+	const combinedSelectionCount = selectedCount + selectedVisibleDraftCount;
+	const areAllContactsAndDraftsSelected = Boolean(
+		selectableContactIds.size + selectableDraftIds.size > 0 &&
+		selectedCount === selectableContactIds.size &&
+		Array.from(selectableContactIds).every((id) => currentSelectedIds.has(id)) &&
+		selectedVisibleDraftCount === selectableDraftIds.size &&
+		(selectedDraftIds
+			? Array.from(selectableDraftIds).every((id) => selectedDraftIds.has(id))
+			: selectableDraftIds.size === 0)
+	);
+	const displayedSelectionCount = shouldSelectContactsAndDrafts
+		? combinedSelectionCount
+		: selectedCount;
+	const areAllDisplayedRowsSelected = shouldSelectContactsAndDrafts
+		? areAllContactsAndDraftsSelected
+		: areAllSelected;
+	const handleDisplayedSelectAllToggle = useCallback(() => {
+		if (!shouldSelectContactsAndDrafts) {
+			handleSelectAllToggle();
+			return;
+		}
+
+		if (areAllContactsAndDraftsSelected) {
+			updateSelection(() => new Set<number>());
+			onDraftSelectionChange?.(() => new Set<number>());
+			return;
+		}
+
+		updateSelection(() => new Set(selectableContactIds));
+		onDraftSelectionChange?.(() => new Set(selectableDraftIds));
+	}, [
+		areAllContactsAndDraftsSelected,
+		handleSelectAllToggle,
+		onDraftSelectionChange,
+		selectableContactIds,
+		selectableDraftIds,
+		shouldSelectContactsAndDrafts,
+		updateSelection,
+	]);
+	const handleDraftSelectionClick = useCallback(
+		(draft: EmailWithRelations, e: MouseEvent) => {
+			if (!onDraftSelectionChange) return;
+
+			if (e.shiftKey && lastClickedDraftRef.current !== null) {
+				e.preventDefault();
+				window.getSelection()?.removeAllRanges();
+
+				const currentIndex = supplementalDraftRows.findIndex(
+					(row) => row.id === draft.id
+				);
+				const anchorIndex = supplementalDraftRows.findIndex(
+					(row) => row.id === lastClickedDraftRef.current
+				);
+
+				if (currentIndex !== -1 && anchorIndex !== -1) {
+					const start = Math.min(currentIndex, anchorIndex);
+					const end = Math.max(currentIndex, anchorIndex);
+
+					onDraftSelectionChange(() => {
+						const next = new Set<number>();
+						for (let i = start; i <= end; i++) {
+							next.add(supplementalDraftRows[i].id);
+						}
+						return next;
+					});
+				}
+				return;
+			}
+
+			onDraftSelectionChange((prev) => {
+				const next = new Set(prev);
+				if (next.has(draft.id)) {
+					next.delete(draft.id);
+				} else {
+					next.add(draft.id);
+				}
+				return next;
+			});
+			lastClickedDraftRef.current = draft.id;
+		},
+		[onDraftSelectionChange, supplementalDraftRows]
+	);
 	useEffect(() => {
 		if (selectedDraftId == null) {
 			lastAutoScrolledDraftIdRef.current = null;
@@ -1422,6 +1519,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		const isBatchSelectedDraft = selectedDraftIds?.has(draft.id) ?? false;
 		const isShowingDraft = isSelectedDraft;
 		const isInactiveSelectedDraft = isBatchSelectedDraft && !isShowingDraft;
+		const shouldSelectDraftInPlace = !isDraftsFocusMode && Boolean(onDraftSelectionChange);
 		// Hovering a redded-out draft row reveals it in the gold "showing" style with
 		// its subject + body visible (peek). The base flag still drives navigation.
 		const draftPeekKey = `draft:${draft.id}`;
@@ -1506,6 +1604,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				onClick={(e) => {
 					if (isAllTabNavigation) return;
 					e.stopPropagation();
+					if (shouldSelectDraftInPlace) {
+						handleDraftSelectionClick(draft, e);
+						if (contact) onContactClick?.(contact);
+						return;
+					}
 					if (e.shiftKey && onDraftSelectionChange) {
 						e.preventDefault();
 						window.getSelection()?.removeAllRanges();
@@ -2408,7 +2511,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 
 			{!collapsed && !isBottomView && !isDraftsFocusMode && !isInboxFocusMode && (
 				<div className="px-3 mt-2 mb-0 flex items-center justify-center relative z-10 text-[13px] font-inter font-medium text-black/70">
-					<span>{isAllTabNavigation ? 0 : selectedCount} Selected</span>
+					<span>{isAllTabNavigation ? 0 : displayedSelectionCount} Selected</span>
 					{isAllTabNavigation ? (
 						<span className="absolute right-3 bg-transparent border-none p-0 text-[13px] font-inter font-medium text-black/70 cursor-default">
 							Select All
@@ -2419,10 +2522,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 							className="absolute right-3 bg-transparent border-none p-0 hover:text-black text-[13px] font-inter font-medium text-black/70 cursor-pointer"
 							onClick={(e) => {
 								e.stopPropagation();
-								handleSelectAllToggle();
+								handleDisplayedSelectAllToggle();
 							}}
 						>
-							{areAllSelected ? 'Deselect All' : 'Select All'}
+							{areAllDisplayedRowsSelected ? 'Deselect All' : 'Select All'}
 						</button>
 					)}
 				</div>

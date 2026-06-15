@@ -79,6 +79,7 @@ import ContactsExpandedList, {
 import { DraftsExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftsExpandedList';
 import { DraftPreviewExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftPreviewExpandedList';
 import { SendingExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/SendingExpandedList';
+import { OverviewSelectionActionCard } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/OverviewSelectionActionCard';
 import { SearchSendingOverlay } from '@/components/molecules/SendingProgress/SearchSendingOverlay';
 import { useSendingSessionState } from '@/contexts/SendingSessionContext';
 import { SentExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/SentExpandedList';
@@ -2252,6 +2253,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		approved: new Set<number>(),
 		rejected: new Set<number>(),
 	});
+	const [overviewSelectedDraftIds, setOverviewSelectedDraftIds] = useState<Set<number>>(
+		new Set()
+	);
 	const draftsTabSelectedIds = draftSelectionsByFilter[draftStatusFilter];
 	const setDraftsTabSelectedIds = (
 		value: Set<number> | ((prev: Set<number>) => Set<number>)
@@ -2287,6 +2291,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const contactsCount = headerContacts?.length || 0;
 	const draftEmails = (headerEmails || []).filter((e) => e.status === EmailStatus.draft);
 	const draftCount = draftEmails.length;
+	useEffect(() => {
+		setOverviewSelectedDraftIds((prev) => {
+			if (prev.size === 0) return prev;
+
+			const draftIds = new Set(draftEmails.map((draft) => draft.id));
+			const next = new Set<number>();
+			let hasChange = false;
+
+			prev.forEach((id) => {
+				if (draftIds.has(id)) {
+					next.add(id);
+				} else {
+					hasChange = true;
+				}
+			});
+
+			return hasChange ? next : prev;
+		});
+	}, [draftEmails]);
 	// Drafts belonging to the batch the user just drafted from the Write tab (empty otherwise).
 	const batchDrafts = useMemo(
 		() => draftEmails.filter((d) => writeReviewBatchContactIds.has(d.contactId)),
@@ -2312,6 +2335,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	});
 	const sentEmails = (headerEmails || []).filter((e) => e.status === EmailStatus.sent);
 	const sentCount = sentEmails.length;
+
+	// Contacts that currently have a draft — drives the All-tab list draft indicator and
+	// the "Send {N} Drafts" split (selected contacts with a draft).
+	const draftContactIdSet = useMemo(
+		() => new Set(draftEmails.map((d) => d.contactId)),
+		[draftEmails]
+	);
+	const sentContactIdSet = useMemo(
+		() => new Set(sentEmails.map((e) => e.contactId)),
+		[sentEmails]
+	);
+	// The All-tab ("overview") contacts list shows fresh + drafted contacts (hides
+	// already-sent ones), so the user can select fresh contacts to Write AND drafted
+	// contacts to Send from one list. (The Write tab keeps `contactsForContactsExpandedList`,
+	// which is un-contacted-only.)
+	const overviewListContacts = useMemo(
+		() => (contacts ?? []).filter((c) => !sentContactIdSet.has(c.id)),
+		[contacts, sentContactIdSet]
+	);
 
 	// Campaign-global "actively sending" session (driven by the send loops). While
 	// visible, the left expanded panel swaps to the sending list and — on the search
@@ -3191,12 +3233,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	useEffect(() => {
 		if (!contactsAvailableForDrafting) return;
-		const availableIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
+		// On the All tab the list shows fresh + drafted contacts, so a drafted contact is a
+		// valid selection (it feeds "Send Drafts"). Everywhere else the selection is the
+		// write set, which is un-contacted-only.
+		const allowedIds = new Set(
+			(view === 'overview' ? overviewListContacts : contactsAvailableForDrafting).map(
+				(c) => c.id
+			)
+		);
 		setContactsTabSelectedIds((prev) => {
 			let hasChange = false;
 			const next = new Set<number>();
 			prev.forEach((id) => {
-				if (availableIds.has(id)) {
+				if (allowedIds.has(id)) {
 					next.add(id);
 				} else {
 					hasChange = true;
@@ -3207,7 +3256,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			}
 			return next;
 		});
-	}, [contactsAvailableForDrafting, setContactsTabSelectedIds]);
+	}, [contactsAvailableForDrafting, overviewListContacts, view, setContactsTabSelectedIds]);
 
 	// Compute whether all contacts are selected (regardless of how they were selected)
 	const areAllContactsSelected = useMemo(() => {
@@ -3236,6 +3285,41 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 		await handleGenerateDrafts(selectedIds);
 	}, [contactsTabSelectedIds, handleGenerateDrafts]);
+
+	// --- Overview "All" tab bulk-selection action card wiring -----------------
+	// "Write {N} Contacts": copy the selection into the Write tab's state, navigate
+	// to Write, and defer generation until `view` has flipped to 'testing' (see the
+	// effect below) — handleGenerateDrafts only arms the inline batch review when
+	// props.view === 'testing'.
+	const pendingOverviewWriteGenerationRef = useRef<number[] | null>(null);
+	const handleOverviewWriteContacts = useCallback(
+		(selectedIds: number[]) => {
+			if (selectedIds.length === 0) return;
+			setContactsTabSelectedIds(new Set(selectedIds));
+			pendingOverviewWriteGenerationRef.current = selectedIds;
+			goToWriting?.();
+		},
+		[goToWriting]
+	);
+	useEffect(() => {
+		if (view !== 'testing') return;
+		const ids = pendingOverviewWriteGenerationRef.current;
+		if (!ids || ids.length === 0) return;
+		// Clear before awaiting so a re-render during the tab transition can't re-fire.
+		pendingOverviewWriteGenerationRef.current = null;
+		void handleGenerateDrafts(ids);
+	}, [view, handleGenerateDrafts]);
+
+	// "Send {N} Drafts": send only the draft rows selected on the All tab.
+	const handleOverviewSendDrafts = useCallback(async () => {
+		const selectedIds = Array.from(overviewSelectedDraftIds);
+		if (selectedIds.length === 0) return;
+
+		const processed = await handleSendDrafts(selectedIds);
+		if (processed > 0) {
+			setOverviewSelectedDraftIds(new Set());
+		}
+	}, [handleSendDrafts, overviewSelectedDraftIds]);
 
 	// Click-outside handler to deselect when all contacts are selected
 	useEffect(() => {
@@ -6247,13 +6331,32 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														overflow: 'hidden',
 													}}
 												>
-													<div aria-hidden style={{ pointerEvents: 'none' }}>
-														<CampaignOverviewStrategyBox />
-													</div>
-													<div className="absolute inset-0" style={{ cursor: 'default' }} />
+													<CampaignOverviewStrategyBox
+														onReplyEmails={openInboxTab}
+														onSendDrafts={goToDrafting}
+														onSearchContacts={onGoToSearch}
+													/>
 												</div>
 											</>
 									)}
+								{shouldShowOverviewRightRailSearchPanel &&
+									overviewRightRailSelectedContacts.length > 0 && (
+									<OverviewSelectionActionCard
+										writeCount={overviewRightRailSelectedContacts.length}
+										draftCount={overviewSelectedDraftIds.size}
+										onWriteContacts={() =>
+											handleOverviewWriteContacts(overviewRightRailSelectedContacts)
+										}
+										onSendDrafts={handleOverviewSendDrafts}
+										style={{
+											position: 'absolute',
+											right: 'calc(100% + 12px)',
+											top: '50%',
+											transform: 'translateY(-50%)',
+											zIndex: 200,
+										}}
+									/>
+								)}
 								</div>
 							)}
 							{shouldDockOverviewContacts && (
@@ -6323,13 +6426,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										}}
 									>
 										<ContactsExpandedList
-											contacts={contactsForContactsExpandedList}
+											contacts={overviewListContacts}
 											{...contactsListSupplementalProps}
 											{...contactsListTopNavProps}
 											isLoading={isContactsLoading}
 											campaign={campaign}
 											enableUsedContactTooltip={false}
 											selectedContactIds={contactsTabSelectedIds}
+											selectedDraftIds={overviewSelectedDraftIds}
+											onDraftSelectionChange={setOverviewSelectedDraftIds}
+											contactsWithDraftIds={draftContactIdSet}
 											activelyDraftingContactIds={
 												activelyDraftingContactIdsForContactsExpandedList
 											}
@@ -6349,6 +6455,23 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onSearchFromMiniBar={handleMiniContactsSearch}
 										/>
 									</div>
+									{(contactsTabSelectedIds.size > 0 || overviewSelectedDraftIds.size > 0) && (
+										<OverviewSelectionActionCard
+											writeCount={contactsTabSelectedIds.size}
+											draftCount={overviewSelectedDraftIds.size}
+											onWriteContacts={() =>
+												handleOverviewWriteContacts(Array.from(contactsTabSelectedIds))
+											}
+											onSendDrafts={handleOverviewSendDrafts}
+											style={{
+												position: 'absolute',
+												left: `${mainContactsPanelWidthPx + 12}px`,
+												top: '50%',
+												transform: 'translateY(-50%)',
+												zIndex: 200,
+											}}
+										/>
+									)}
 								</div>
 							)}
 							</div>

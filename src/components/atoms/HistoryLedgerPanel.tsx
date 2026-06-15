@@ -2,6 +2,7 @@
 
 import React, { useCallback, useState } from 'react';
 import type { HistoryAction, HistoryActionType } from '@/components/atoms/BottomPanelsContainer';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 
 // History panel dimensions
 const HISTORY_PANEL_WIDTH = 343;
@@ -226,7 +227,7 @@ export const HistoryLedgerPanel: React.FC<HistoryLedgerPanelProps> = ({ historyA
 				onClick={onClose}
 			/>
 			<div
-				className="relative z-50 overflow-hidden animate-inbox-pop-in"
+				className="relative z-50 animate-inbox-pop-in"
 				style={{
 					width: HISTORY_PANEL_WIDTH,
 					height: dynamicPanelHeight,
@@ -307,23 +308,36 @@ export const HistoryLedgerPanel: React.FC<HistoryLedgerPanelProps> = ({ historyA
 				</div>
 
 				{/* Action Rows */}
-				<div
-					className="overflow-y-auto overflow-x-hidden flex flex-col gap-[4px]"
+				<CustomScrollbar
 					style={{
 						height: dynamicPanelHeight - HEADER_HEIGHT - TABS_HEIGHT,
 						backgroundColor: '#D66296',
-						paddingTop: CONTENT_PADDING_TOP,
-						paddingLeft: 5,
-						paddingRight: 5,
-						paddingBottom: CONTENT_PADDING_BOTTOM,
+						// Card no longer clips (overflow-hidden removed so the scrollbar can sit
+						// outside the box) — round our own bottom corners to the inner radius.
+						borderBottomLeftRadius: 6,
+						borderBottomRightRadius: 6,
 					}}
-					onClick={(e) => {
-						// Only reset if clicking directly on the container, not on a row
-						if (e.target === e.currentTarget) {
-							setActiveFilter('all');
-						}
-					}}
+					thumbWidth={2}
+					thumbColor="#000000"
+					trackColor="transparent"
+					offsetRight={-8}
+					lockHorizontalScroll
 				>
+					<div
+						className="flex flex-col gap-[4px]"
+						style={{
+							paddingTop: CONTENT_PADDING_TOP,
+							paddingLeft: 5,
+							paddingRight: 5,
+							paddingBottom: CONTENT_PADDING_BOTTOM,
+						}}
+						onClick={(e) => {
+							// Only reset if clicking directly on the container, not on a row
+							if (e.target === e.currentTarget) {
+								setActiveFilter('all');
+							}
+						}}
+					>
 					{/* Render action rows */}
 					{filteredActions.map((action, index) => (
 						<div
@@ -362,7 +376,8 @@ export const HistoryLedgerPanel: React.FC<HistoryLedgerPanelProps> = ({ historyA
 							</span>
 						</div>
 					))}
-				</div>
+					</div>
+				</CustomScrollbar>
 			</div>
 		</>
 	);

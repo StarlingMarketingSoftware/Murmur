@@ -172,10 +172,11 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	const POPUP_VISUAL_WIDTH_PX = POPUP_WIDTH_PX * popupScale;
 	const POPUP_VISUAL_HEIGHT_PX = POPUP_HEIGHT_PX * popupScale;
 
-	// Active month/year + optional highlighted day (defaults to Jan 2026 — the
-	// original static design baseline).
-	const inMonthYear = mockState?.year ?? 2026;
-	const rawMonthIndex = mockState?.monthIndex ?? 0;
+	// Active month/year + optional highlighted day (defaults to the current
+	// month so the calendar always opens on "today" unless a caller overrides).
+	const defaultToday = new Date();
+	const inMonthYear = mockState?.year ?? defaultToday.getFullYear();
+	const rawMonthIndex = mockState?.monthIndex ?? defaultToday.getMonth();
 	const inMonthIndex = ((rawMonthIndex % 12) + 12) % 12;
 	// Highlight reflects today's date. In debug mode, mockState stands in for "today"
 	// so previews of arbitrary dates exercise the same highlight code path.

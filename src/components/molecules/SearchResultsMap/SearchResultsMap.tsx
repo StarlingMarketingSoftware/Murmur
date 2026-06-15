@@ -16130,7 +16130,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 
-		if (!searchEngaged && !isAmbientContactsEnabled) {
+		// Gate on `isAnySearch` (a real, non-empty query) rather than the overloaded
+		// `searchEngaged`, which defaults to `true` and is left at that default by the
+		// campaign map. This mirrors the overlay's own populate gate (`isSearchAllContactsOverlay`)
+		// so the gray dots clear deterministically when no dashboard search/ambient mode is active.
+		if (!isAnySearch && !isAmbientContactsEnabled) {
 			source.setData({ type: 'FeatureCollection', features: [] } as any);
 			return;
 		}
@@ -16174,7 +16178,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map,
 		isMapLoaded,
 		isLoading,
-		searchEngaged,
+		isAnySearch,
 		isAmbientContactsEnabled,
 		allContactsOverlayVisibleContacts,
 		getAllContactsOverlayContactCoords,
