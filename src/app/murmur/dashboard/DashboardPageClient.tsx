@@ -10355,9 +10355,7 @@ const DashboardContent = () => {
 			? contact.id === activeWriteReviewContactId
 				? '#F8C262'
 				: '#FDDEA5'
-			: isHovered
-				? '#FAE6E6'
-				: '#FD8E89';
+			: '#FD8E89';
 
 		return (
 			<div
@@ -10365,6 +10363,7 @@ const DashboardContent = () => {
 				data-contact-id={contact.id}
 				className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-[3px] border-[#ABABAB] select-none relative"
 				style={{
+					border: isSelected && isWriteMode ? '2px solid #FFF' : undefined,
 					backgroundColor: isSelected
 						? isWriteMode
 							? writeModeSelectedRowBackground
