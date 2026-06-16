@@ -14315,6 +14315,38 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		(url: string) => `murmur-marker-${hashStringToStableKey(url)}`,
 		[]
 	);
+	const selectedCategorizedContactMarkerAssetCacheRef = useRef<
+		Map<
+			string,
+			{
+				imageName: string;
+				url: string;
+				hoverImageName: string;
+				hoverUrl: string;
+			}
+		>
+	>(new Map());
+	const getSelectedCategorizedContactMarkerAssets = useCallback(
+		(accentColor: string) => {
+			const key = accentColor.trim();
+			const cached = selectedCategorizedContactMarkerAssetCacheRef.current.get(key);
+			if (cached) return cached;
+
+			const url = generateSelectedCategorizedContactMarkerIconUrl(key);
+			const hoverUrl = generateSelectedCategorizedContactMarkerIconUrl(
+				darkenHexColor(key, MARKER_HOVER_DARKEN_AMOUNT)
+			);
+			const assets = {
+				imageName: imageNameFromUrl(url),
+				url,
+				hoverImageName: imageNameFromUrl(hoverUrl),
+				hoverUrl,
+			};
+			selectedCategorizedContactMarkerAssetCacheRef.current.set(key, assets);
+			return assets;
+		},
+		[imageNameFromUrl]
+	);
 
 	const uncategorizedContactMarkerUrl = useMemo(
 		() => generateUncategorizedContactMarkerIconUrl(),
@@ -14335,17 +14367,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		() => imageNameFromUrl(uncategorizedContactMarkerHoverUrl),
 		[imageNameFromUrl, uncategorizedContactMarkerHoverUrl]
 	);
-	const selectedCategorizedContactMarkerUrl = useMemo(
-		() => generateSelectedCategorizedContactMarkerIconUrl(),
-		[]
-	);
-	const selectedCategorizedContactMarkerHoverUrl = useMemo(
-		() =>
-			generateSelectedCategorizedContactMarkerIconUrl(
-				darkenHexColor('#739EE8', MARKER_HOVER_DARKEN_AMOUNT)
-			),
-		[]
-	);
 	const selectedUncategorizedContactMarkerUrl = useMemo(
 		() => generateSelectedUncategorizedContactMarkerIconUrl(),
 		[]
@@ -14356,14 +14377,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				darkenHexColor('#50A5C9', MARKER_HOVER_DARKEN_AMOUNT)
 			),
 		[]
-	);
-	const selectedCategorizedContactMarkerImageName = useMemo(
-		() => imageNameFromUrl(selectedCategorizedContactMarkerUrl),
-		[imageNameFromUrl, selectedCategorizedContactMarkerUrl]
-	);
-	const selectedCategorizedContactMarkerHoverImageName = useMemo(
-		() => imageNameFromUrl(selectedCategorizedContactMarkerHoverUrl),
-		[imageNameFromUrl, selectedCategorizedContactMarkerHoverUrl]
 	);
 	const selectedUncategorizedContactMarkerImageName = useMemo(
 		() => imageNameFromUrl(selectedUncategorizedContactMarkerUrl),
@@ -14401,16 +14414,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			height: SELECTED_CONTACT_MARKER_VIEWBOX_HEIGHT,
 		};
 		void ensureMapImageFromUrl(
-			selectedCategorizedContactMarkerImageName,
-			selectedCategorizedContactMarkerUrl,
-			selectedMarkerDimensions
-		);
-		void ensureMapImageFromUrl(
-			selectedCategorizedContactMarkerHoverImageName,
-			selectedCategorizedContactMarkerHoverUrl,
-			selectedMarkerDimensions
-		);
-		void ensureMapImageFromUrl(
 			selectedUncategorizedContactMarkerImageName,
 			selectedUncategorizedContactMarkerUrl,
 			selectedMarkerDimensions
@@ -14424,10 +14427,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map,
 		isMapLoaded,
 		ensureMapImageFromUrl,
-		selectedCategorizedContactMarkerImageName,
-		selectedCategorizedContactMarkerUrl,
-		selectedCategorizedContactMarkerHoverImageName,
-		selectedCategorizedContactMarkerHoverUrl,
 		selectedUncategorizedContactMarkerImageName,
 		selectedUncategorizedContactMarkerUrl,
 		selectedUncategorizedContactMarkerHoverImageName,
@@ -15528,6 +15527,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const selectedSet = new Set<number>(selectedContacts);
 			const seenIds = new Set<number>();
 			const nextSelectedFeaturesById = new Map<number, any>();
+			const selectedMarkerImagesToEnsure = new Map<string, string>();
 			const fadeWithSelectedStateOrb = Boolean(
 				lockedStateKey &&
 				lockedStateSelectionKeyRef.current === lockedStateKey &&
@@ -15544,17 +15544,31 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				if (!coords) return;
 
 				const isUncategorized = !isCleanMapMarkerCategory(whatForMarker);
+				const selectedIconAssets = isUncategorized
+					? {
+							imageName: selectedUncategorizedContactMarkerImageName,
+							url: selectedUncategorizedContactMarkerUrl,
+							hoverImageName: selectedUncategorizedContactMarkerHoverImageName,
+							hoverUrl: selectedUncategorizedContactMarkerHoverUrl,
+						}
+					: getSelectedCategorizedContactMarkerAssets(
+							getResultDotColorForWhat(whatForMarker)
+						);
+				selectedMarkerImagesToEnsure.set(
+					selectedIconAssets.imageName,
+					selectedIconAssets.url
+				);
+				selectedMarkerImagesToEnsure.set(
+					selectedIconAssets.hoverImageName,
+					selectedIconAssets.hoverUrl
+				);
 				seenIds.add(contact.id);
 				nextSelectedFeaturesById.set(contact.id, {
 					type: 'Feature',
 					id: contact.id,
 					properties: {
-						selectedIcon: isUncategorized
-							? selectedUncategorizedContactMarkerImageName
-							: selectedCategorizedContactMarkerImageName,
-						selectedIconHover: isUncategorized
-							? selectedUncategorizedContactMarkerHoverImageName
-							: selectedCategorizedContactMarkerHoverImageName,
+						selectedIcon: selectedIconAssets.imageName,
+						selectedIconHover: selectedIconAssets.hoverImageName,
 						isUncategorized,
 						fadeWithSelectedStateOrb,
 					},
@@ -15619,13 +15633,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			)) {
 				const feature = nextSelectedFeaturesById.get(id);
 				const [lng, lat] = feature.geometry.coordinates;
+				const properties = feature.properties ?? {};
 				signatureParts.push(
-					`${id}:${feature.properties.isUncategorized ? 'u' : 'c'}:${
-						feature.properties.fadeWithSelectedStateOrb ? '1' : '0'
+					`${id}:${properties.selectedIcon ?? ''}:${
+						properties.selectedIconHover ?? ''
+					}:${properties.isUncategorized ? 'u' : 'c'}:${
+						properties.fadeWithSelectedStateOrb ? '1' : '0'
 					}:${lng.toFixed(5)}:${lat.toFixed(5)}`
 				);
 			}
 			const nextSignature = signatureParts.join(',');
+			const selectedMarkerDimensions = {
+				width: SELECTED_CONTACT_MARKER_VIEWBOX_WIDTH,
+				height: SELECTED_CONTACT_MARKER_VIEWBOX_HEIGHT,
+			};
+			await Promise.all(
+				Array.from(selectedMarkerImagesToEnsure.entries()).map(([imageName, url]) =>
+					ensureMapImageFromUrl(imageName, url, selectedMarkerDimensions)
+				)
+			);
+			if (cancelled) return;
+
 			if (
 				nextSignature === selectedMarkerBuildSignatureRef.current &&
 				selectedMarkerFadeRafRef.current == null
@@ -15633,34 +15661,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				return;
 			}
 			selectedMarkerBuildSignatureRef.current = nextSignature;
-
-			const selectedMarkerDimensions = {
-				width: SELECTED_CONTACT_MARKER_VIEWBOX_WIDTH,
-				height: SELECTED_CONTACT_MARKER_VIEWBOX_HEIGHT,
-			};
-			void Promise.all([
-				ensureMapImageFromUrl(
-					selectedCategorizedContactMarkerImageName,
-					selectedCategorizedContactMarkerUrl,
-					selectedMarkerDimensions
-				),
-				ensureMapImageFromUrl(
-					selectedCategorizedContactMarkerHoverImageName,
-					selectedCategorizedContactMarkerHoverUrl,
-					selectedMarkerDimensions
-				),
-				ensureMapImageFromUrl(
-					selectedUncategorizedContactMarkerImageName,
-					selectedUncategorizedContactMarkerUrl,
-					selectedMarkerDimensions
-				),
-				ensureMapImageFromUrl(
-					selectedUncategorizedContactMarkerHoverImageName,
-					selectedUncategorizedContactMarkerHoverUrl,
-					selectedMarkerDimensions
-				),
-			]);
-			if (cancelled) return;
 
 			if (selectedMarkerFadeRafRef.current != null) {
 				cancelAnimationFrame(selectedMarkerFadeRafRef.current);
@@ -15804,10 +15804,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		lockedStateKey,
 		isStateLayerReady,
 		ensureMapImageFromUrl,
-		selectedCategorizedContactMarkerImageName,
-		selectedCategorizedContactMarkerUrl,
-		selectedCategorizedContactMarkerHoverImageName,
-		selectedCategorizedContactMarkerHoverUrl,
+		getSelectedCategorizedContactMarkerAssets,
 		selectedUncategorizedContactMarkerImageName,
 		selectedUncategorizedContactMarkerUrl,
 		selectedUncategorizedContactMarkerHoverImageName,
