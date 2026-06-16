@@ -9,6 +9,7 @@ import { useHoverDescription } from '@/contexts/HoverDescriptionContext';
 import { useSendingSessionState } from '@/contexts/SendingSessionContext';
 import { CampaignTitlePills } from '@/components/molecules/CampaignTitlePills/CampaignTitlePills';
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
+import DiamondIcon from '@/components/atoms/_svg/DiamondIcon';
 
 interface CampaignHeaderBoxProps {
 	campaignId: number;
@@ -428,6 +429,8 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 						{sendQueueRemaining} in send queue
 					</div>
 				) : null}
+				{/* Decorative diamond marker, pinned to the box's upper-right corner */}
+				<DiamondIcon aria-hidden="true" className="ml-auto mr-[10px] flex-shrink-0" />
 			</div>
 
 			{/* Spacer above To/From */}
