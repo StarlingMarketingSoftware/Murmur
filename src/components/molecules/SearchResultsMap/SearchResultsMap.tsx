@@ -26,7 +26,6 @@ import {
 	calculateTooltipHeight,
 	calculateTooltipAnchorY,
 	generateMapTooltipSvg,
-	MAP_TOOLTIP_ANCHOR_X,
 } from '@/components/atoms/_svg/MapTooltipIcon';
 import {
 	generateMapMarkerPinIconUrl,
@@ -522,6 +521,7 @@ import {
 } from './metadata';
 import { StreetViewContactCard } from './StreetViewContactCard';
 import {
+	WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR,
 	WHAT_TO_HOVER_TOOLTIP_FILL_COLOR,
 	bookingTitlePrefixMatchesSearchWhatKey,
 	extractSearchModeFromQueryPrefix,
@@ -17381,6 +17381,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const tooltipFillColor = isSelected
 					? TOOLTIP_FILL_COLOR_SELECTED
 					: (WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? dotFillColor);
+				const tooltipBodyFillColor = isSelected
+					? TOOLTIP_FILL_COLOR_SELECTED
+					: (WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR[normalizedWhat] ?? tooltipFillColor);
 				const width = calculateTooltipWidth(
 					nameForTooltip,
 					companyForTooltip,
@@ -17395,7 +17398,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						companyForTooltip,
 						titleForTooltip,
 						tooltipFillColor,
-						whatForMarker
+						whatForMarker,
+						tooltipBodyFillColor
 					),
 					width,
 					height,
@@ -17441,10 +17445,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const baseTooltipFillColor = normalizedWhat
 			? (WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? dotFillColor)
 			: dotFillColor;
+		const baseTooltipBodyFillColor = normalizedWhat
+			? (WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR[normalizedWhat] ?? baseTooltipFillColor)
+			: baseTooltipFillColor;
 
 		const tooltipFillColor = isSelected
 			? TOOLTIP_FILL_COLOR_SELECTED
 			: baseTooltipFillColor;
+		const tooltipBodyFillColor = isSelected
+			? TOOLTIP_FILL_COLOR_SELECTED
+			: baseTooltipBodyFillColor;
 
 		const width = calculateTooltipWidth(
 			nameForTooltip,
@@ -17461,7 +17471,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				companyForTooltip,
 				titleForTooltip,
 				tooltipFillColor,
-				whatForMarker
+				whatForMarker,
+				tooltipBodyFillColor
 			),
 			width,
 			height,
@@ -17469,17 +17480,29 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [hoverTooltipEntry, selectedContactIdSet, searchWhat]);
 
+	const hoverTooltipLat = hoverTooltipCoords?.lat ?? null;
+	const hoverTooltipLng = hoverTooltipCoords?.lng ?? null;
+	const hoverTooltipWidth = hoverTooltipData?.width ?? null;
+	const hoverTooltipAnchorY = hoverTooltipData?.anchorY ?? null;
+
 	useLayoutEffect(() => {
 		if (!map || !isMapLoaded) return;
 		if (isLoading) return;
 		const el = hoverTooltipOverlayRef.current;
-		if (!el || !hoverTooltipCoords || !hoverTooltipData) return;
+		if (
+			!el ||
+			hoverTooltipLat == null ||
+			hoverTooltipLng == null ||
+			hoverTooltipWidth == null ||
+			hoverTooltipAnchorY == null
+		)
+			return;
 
 		const update = () => {
-			const p = map.project([hoverTooltipCoords.lng, hoverTooltipCoords.lat]);
+			const p = map.project([hoverTooltipLng, hoverTooltipLat]);
 			el.style.transform = `translate(${Math.round(
-				p.x - MAP_TOOLTIP_ANCHOR_X - hoverTooltipHitSlopPx
-			)}px, ${Math.round(p.y - hoverTooltipData.anchorY - hoverTooltipHitSlopPx)}px)`;
+				p.x - hoverTooltipWidth / 2 - hoverTooltipHitSlopPx
+			)}px, ${Math.round(p.y - hoverTooltipAnchorY - hoverTooltipHitSlopPx)}px)`;
 		};
 
 		update();
@@ -17497,9 +17520,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// positioned before paint.
 		isStreetCardMode,
 		hoverTooltipContactId,
-		hoverTooltipCoords?.lat,
-		hoverTooltipCoords?.lng,
-		hoverTooltipData?.anchorY,
+		hoverTooltipLat,
+		hoverTooltipLng,
+		hoverTooltipWidth,
+		hoverTooltipAnchorY,
 		hoverTooltipHitSlopPx,
 	]);
 
