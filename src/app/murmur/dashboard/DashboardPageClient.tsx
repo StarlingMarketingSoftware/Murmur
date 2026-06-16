@@ -14150,35 +14150,16 @@ const DashboardContent = () => {
 																						className="flex flex-col flex-shrink-0"
 																						style={{
 																							maxHeight: isCompressedMapChrome ? '30%' : `calc(100% - ${MAP_VIEW_SEARCH_RESULTS_MIN_HEIGHT_PX + (!isMapResultsLoading && !fromHomeParam ? 39 + 18 : 9)}px)`,
-																							backgroundColor: isWriteMode
-																								? isCompressedMapChrome
-																									? 'rgba(214, 33, 39, 0.8)'
-																									: 'rgba(214, 33, 39, 0.518)'
-																								: isCompressedMapChrome
-																									? 'rgba(175, 214, 239, 0.8)'
-																									: 'rgba(184, 224, 255, 0.54)',
-																							border: isCompressedMapChrome
-																								? isWriteMode
-																									? '3px solid #000'
-																									: '3px solid #143883'
-																								: '2px solid #000',
+																							backgroundColor: isCompressedMapChrome
+																								? 'rgba(175, 214, 239, 0.8)'
+																								: 'rgba(184, 224, 255, 0.54)',
+																							border: isCompressedMapChrome ? '3px solid #143883' : '2px solid #000',
 																							borderRadius: isCompressedMapChrome ? '8px' : '7px',
 																							overflow: 'hidden',
 																						}}
 																					>
 																						{isCompressedMapChrome ? (
-																							<div
-																								className="w-full h-[49px] flex-shrink-0 flex items-center justify-center px-4 relative"
-																								style={{
-																									backgroundColor: isWriteMode
-																										? '#D66B6F'
-																										: 'rgba(175, 214, 239, 0.8)',
-																									border: isWriteMode
-																										? '3px solid #000'
-																										: '3px solid #143883',
-																									borderRadius: '8px',
-																								}}
-																							>
+																							<div className="w-full h-[49px] flex-shrink-0 flex items-center justify-center px-4 relative">
 																								<span className="absolute left-[10px] top-1/2 -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
 																									Selection
 																								</span>
@@ -14199,10 +14180,7 @@ const DashboardContent = () => {
 																						) : (
 																							<div
 																								className="w-full h-[77px] flex-shrink-0 relative"
-																								style={{
-																									backgroundColor: isWriteMode ? '#D66B6F' : '#CBF0FF',
-																									borderBottom: '2px solid #000',
-																								}}
+																								style={{ backgroundColor: '#CBF0FF', borderBottom: '2px solid #000' }}
 																							>
 																								<ContactsHeaderChrome
 																									variant="campaignStops"
