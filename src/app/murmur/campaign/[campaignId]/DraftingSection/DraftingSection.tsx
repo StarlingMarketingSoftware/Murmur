@@ -31,10 +31,10 @@ import { cn, convertHtmlToPlainText } from '@/utils';
 import { getMurmurRootScale } from '@/utils/rootScale';
 import { markAfterPaint } from '@/utils/perfMarks';
 import {
-	CAMPAIGN_SIDE_SHIFT_VAR,
 	CAMPAIGN_SNUG_MAX_HEIGHT_FIT_ZOOM,
 	CAMPAIGN_SNUG_MIN_EFFECTIVE_WIDTH_PX,
 	CAMPAIGN_SNUG_SAFE_BOTTOM_MARGIN_PX,
+	CAMPAIGN_SIDE_SHIFT_VAR,
 	CAMPAIGN_WORKSPACE_CONTENT_SCALE,
 	getMurmurChromeZoomForWindow,
 } from '@/utils/murmurChromeZoom';
@@ -947,15 +947,38 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// Default right-rail width matches the existing Campaigns mini + Strategy stack.
 	// When the overview right-rail is in search mode, we match the dashboard map-side panel width.
 	const OVERVIEW_RIGHT_RAIL_WIDTH_PX = isOverviewRightRailSearchActive ? 433 : 371;
-	// Match the dashboard map-view panel (right-[10px]).
+	// Match the dashboard map-view search panel: reserve enough room for the Search
+	// Results header, category toolbar, and breathing room even when Selection expands.
+	const OVERVIEW_SEARCH_RESULTS_MIN_HEIGHT_PX = 125;
+	const OVERVIEW_SELECTION_PANEL_MIN_HEIGHT_PX = 260;
+	// CampaignHeaderBox sits above the results panel (same split as dashboard map search).
+	const MAP_VIEW_CAMPAIGN_HEADER_HEIGHT_PX = 59;
+	const MAP_VIEW_CAMPAIGN_HEADER_GAP_PX = 13;
+	const MAP_VIEW_SIDE_PANEL_VISUAL_TOP_PX = 106;
+	const MAP_VIEW_SIDE_PANEL_GROUP_NUDGE_UP_PX = 24;
+	const MAP_VIEW_SIDE_PANEL_BOTTOM_GAP_PX = 20;
+	const OVERVIEW_SEARCH_PANEL_SCALE = 0.95;
+	const OVERVIEW_SEARCH_PANEL_HEIGHT_PX = 800;
+	const OVERVIEW_SEARCH_PANEL_GROUP_TOP_CSS = `calc((${MAP_VIEW_SIDE_PANEL_VISUAL_TOP_PX}px - ${MAP_VIEW_SIDE_PANEL_GROUP_NUDGE_UP_PX}px + var(${CAMPAIGN_SIDE_SHIFT_VAR}, 0px)) / var(--murmur-campaign-zoom, 0.85))`;
+	const overviewSearchPanelCampaignHeaderTopOffsetPx =
+		MAP_VIEW_CAMPAIGN_HEADER_HEIGHT_PX * OVERVIEW_SEARCH_PANEL_SCALE +
+		MAP_VIEW_CAMPAIGN_HEADER_GAP_PX;
+	const OVERVIEW_SEARCH_PANEL_RESULTS_TOP_CSS = `calc(${OVERVIEW_SEARCH_PANEL_GROUP_TOP_CSS} + ${overviewSearchPanelCampaignHeaderTopOffsetPx}px)`;
+	const OVERVIEW_SEARCH_PANEL_MAX_HEIGHT_CSS = `calc(100% - ${OVERVIEW_SEARCH_PANEL_GROUP_TOP_CSS} - ${MAP_VIEW_SIDE_PANEL_BOTTOM_GAP_PX + overviewSearchPanelCampaignHeaderTopOffsetPx}px)`;
+	const OVERVIEW_SEARCH_PANEL_RIGHT_CSS =
+		'calc(10px / var(--murmur-campaign-zoom, 0.85))';
+	// Match the dashboard map-view right results panel.
 	const OVERVIEW_RIGHT_RAIL_GAP_FROM_RIGHT_WALL_PX = isOverviewRightRailSearchActive ? 10 : 40;
-	const OVERVIEW_RIGHT_RAIL_GAP_FROM_HEADER_PX = 74;
 	const inboxMainPanelWidthPx = 863;
 	const inboxMainPanelHeightPx = 706;
-	// Overview degrades progressively as the viewport narrows: the right rail goes
-	// first (isNarrowDesktop), then the docked contacts column (isNarrowestDesktop).
+	// Overview degrades progressively as the viewport narrows; during an active
+	// overview search, the campaign header moves into the right search rail and
+	// the left contacts column is hidden.
 	const shouldDockOverviewContacts =
-		view === 'overview' && !isMobile && !isNarrowestDesktop;
+		view === 'overview' &&
+		!isMobile &&
+		!isNarrowestDesktop &&
+		!isOverviewRightRailSearchActive;
 	const shouldShowOverviewRightRail =
 		view === 'overview' && !isMobile && !isNarrowDesktop && !isNarrowestDesktop;
 	const shouldShowOverviewRightRailSearchPanel =
@@ -1137,36 +1160,24 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 		let raf: number | null = null;
 		const compute = () => {
-			const headerBackdrop = document.querySelector<HTMLElement>(
-				'[data-slot="campaign-top-backdrop"]'
+			const showingPill = document.querySelector<HTMLElement>(
+				'[data-campaign-overview-showing-pill="true"]'
 			);
-			const headerBox =
-				(headerBackdrop?.firstElementChild as HTMLElement | null) ?? headerBackdrop;
-			const headerRect = headerBox?.getBoundingClientRect();
 			const zoom = getEffectiveCampaignZoom();
 			const safeZoom = zoom || 1;
-			const headerBottomVisualPx =
-				headerRect && headerRect.height > 0
-					? headerRect.bottom
-					: 72 * safeZoom;
-			// Ride the side-chrome centering shift (written by the campaign zoom pass)
-			// so the Folders/Strategy rail comes down with the left rail on tall monitors.
-			const sideShiftStr = window
-				.getComputedStyle(document.documentElement)
-				.getPropertyValue(CAMPAIGN_SIDE_SHIFT_VAR);
-			const parsedSideShift = sideShiftStr ? parseFloat(sideShiftStr) : NaN;
-			const sideShiftVisualPx = Number.isFinite(parsedSideShift)
-				? parsedSideShift
-				: 0;
 			const nextLeft =
 				(window.innerWidth - OVERVIEW_RIGHT_RAIL_GAP_FROM_RIGHT_WALL_PX) /
 					safeZoom -
 				OVERVIEW_RIGHT_RAIL_WIDTH_PX;
-			const nextTop =
-				(headerBottomVisualPx +
-					OVERVIEW_RIGHT_RAIL_GAP_FROM_HEADER_PX +
-					sideShiftVisualPx) /
-				safeZoom;
+			// Match the docked contacts column top so Folders/Strategy stay even with
+			// the left CampaignHeaderBox + list stack (including side-chrome centering).
+			const showingRect = showingPill?.getBoundingClientRect();
+			const nextTop = showingRect
+				? (showingRect.top +
+						OVERVIEW_CONTACTS_DOCK_GAP_DOWN_PX -
+						OVERVIEW_CONTACTS_DOCK_NUDGE_UP_PX) /
+					safeZoom
+				: 72;
 
 			setOverviewRightRailPos((prev) => {
 				if (
@@ -1200,14 +1211,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		let ro: ResizeObserver | null = null;
 		try {
 			if (typeof ResizeObserver !== 'undefined') {
-				const headerBackdrop = document.querySelector<HTMLElement>(
-					'[data-slot="campaign-top-backdrop"]'
+				const leftPanel = document.querySelector<HTMLElement>(
+					'[data-campaign-overview-left-panel="true"]'
 				);
-				const headerBox =
-					(headerBackdrop?.firstElementChild as HTMLElement | null) ?? headerBackdrop;
-				if (headerBox) {
+				if (leftPanel) {
 					ro = new ResizeObserver(() => schedule());
-					ro.observe(headerBox);
+					ro.observe(leftPanel);
 				}
 			}
 		} catch {
@@ -1228,6 +1237,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		shouldShowOverviewRightRail,
 		OVERVIEW_RIGHT_RAIL_WIDTH_PX,
 		OVERVIEW_RIGHT_RAIL_GAP_FROM_RIGHT_WALL_PX,
+		OVERVIEW_CONTACTS_DOCK_GAP_DOWN_PX,
+		OVERVIEW_CONTACTS_DOCK_NUDGE_UP_PX,
 	]);
 	useLayoutEffect(() => {
 		if (typeof window === 'undefined') return;
@@ -3559,9 +3570,35 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				rowElement.offsetHeight > 0 ? rect.height / rowElement.offsetHeight : rootScale;
 			const cardScreenWidth =
 				(ROW_HOVER_RESEARCH_CARD_WIDTH_PX + ROW_HOVER_RESEARCH_GAP_PX) * rowScale;
-			// Dock left of the row; flip to the right if there's no room on the left.
-			let leftScreen = rect.left - cardScreenWidth;
-			if (leftScreen < 8) leftScreen = rect.right + ROW_HOVER_RESEARCH_GAP_PX * rowScale;
+			// Overview docks the card in a fixed SLOT on the opposite side of the
+			// hovered list (so it fills the empty column), rather than beside the row.
+			let leftScreen: number;
+			if (view === 'overview' && isOverviewRightRailSearchActive) {
+				// Search rows live in the right rail → dock in the LEFT slot, where the
+				// contacts panel sits when not searching. The dock offsets are screen-px
+				// (added to a screen-space rect), so they are NOT scaled by rowScale.
+				const leftPanel = document.querySelector<HTMLElement>(
+					'[data-campaign-overview-left-panel="true"]'
+				);
+				const r = leftPanel?.getBoundingClientRect();
+				leftScreen = r
+					? r.right +
+						(OVERVIEW_CONTACTS_DOCK_GAP_RIGHT_PX - OVERVIEW_CONTACTS_DOCK_NUDGE_LEFT_PX)
+					: rect.left - cardScreenWidth; // fallback: dock left of the row
+			} else if (view === 'overview') {
+				// Contacts list on the left → dock just left of the Folders/Strategy rail.
+				const rail = document.querySelector<HTMLElement>(
+					'[data-campaign-overview-right-rail="true"]'
+				);
+				const r = rail?.getBoundingClientRect();
+				leftScreen = r
+					? r.left - cardScreenWidth
+					: rect.right + ROW_HOVER_RESEARCH_GAP_PX * rowScale; // fallback: dock right of the row
+			} else {
+				// Search tab and any other rail: dock left of the row, flip right if no room.
+				leftScreen = rect.left - cardScreenWidth;
+				if (leftScreen < 8) leftScreen = rect.right + ROW_HOVER_RESEARCH_GAP_PX * rowScale;
+			}
 			// Standardized vertical placement: statically center the FULL (expanded) card in
 			// the viewport instead of following the hovered row, so it never drops below the
 			// fold and always has room to Tab-expand (matches the pinned-list card), nudged
@@ -3580,7 +3617,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			});
 			setRailHoverResearchContact(contact);
 		},
-		[isRailHoverResearchEnabled, cancelRailHoverResearchClear, scheduleRailHoverResearchClear]
+		[
+			isRailHoverResearchEnabled,
+			cancelRailHoverResearchClear,
+			scheduleRailHoverResearchClear,
+			view,
+			isOverviewRightRailSearchActive,
+			OVERVIEW_CONTACTS_DOCK_GAP_RIGHT_PX,
+			OVERVIEW_CONTACTS_DOCK_NUDGE_LEFT_PX,
+		]
 	);
 
 	// Delegated hover on a rail container: resolve the hovered row via data-contact-id
@@ -5931,40 +5976,82 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					{view === 'overview' && (
 						<div className="relative w-full min-h-[720px]">
 							{shouldShowOverviewRightRail && (
-								<div
+								<>
+									{shouldShowOverviewRightRailSearchPanel && campaign && (
+										<div
+											data-campaign-interactive-surface
+											className="fixed pointer-events-auto"
+											style={{
+												top: OVERVIEW_SEARCH_PANEL_GROUP_TOP_CSS,
+												right: OVERVIEW_SEARCH_PANEL_RIGHT_CSS,
+												width: `${OVERVIEW_RIGHT_RAIL_WIDTH_PX}px`,
+												zIndex: 130,
+												transform: `scale(${OVERVIEW_SEARCH_PANEL_SCALE})`,
+												transformOrigin: 'top right',
+											}}
+											onMouseOver={handleRailContainerMouseOver}
+											onMouseOut={handleRailContainerMouseOut}
+										>
+											<CampaignHeaderBox
+												campaignId={campaign.id}
+												campaignName={campaign.name || 'Untitled Campaign'}
+												toListNames={toListNames}
+												fromName={fromName}
+												contactsCount={contactsCount}
+												draftCount={draftCount}
+												sentCount={sentCount}
+												draftingProgress={draftingProgressForHeader}
+												onFromClick={onOpenIdentityDialog}
+												onDraftsClick={goToDrafting}
+												onSentClick={goToSent}
+												onFolderDropdownOpenChange={setIsCampaignHeaderDropdownOpen}
+												width={OVERVIEW_RIGHT_RAIL_WIDTH_PX}
+											/>
+										</div>
+									)}
+									<div
 									data-campaign-interactive-surface
 									data-campaign-overview-right-rail="true"
-									className="fixed flex flex-col"
+									className={cn(
+										'fixed flex flex-col',
+										shouldShowOverviewRightRailSearchPanel && 'pointer-events-auto'
+									)}
 									style={{
-										left: overviewRightRailPos
-											? `${overviewRightRailPos.leftPx}px`
-											: 'calc(50% + 250px + 32px)',
-										top: overviewRightRailPos ? `${overviewRightRailPos.topPx}px` : '72px',
-										width: `${OVERVIEW_RIGHT_RAIL_WIDTH_PX}px`,
+										...(shouldShowOverviewRightRailSearchPanel
+											? {
+												top: OVERVIEW_SEARCH_PANEL_RESULTS_TOP_CSS,
+												right: OVERVIEW_SEARCH_PANEL_RIGHT_CSS,
+												width: `${OVERVIEW_RIGHT_RAIL_WIDTH_PX}px`,
+												height: OVERVIEW_SEARCH_PANEL_HEIGHT_PX,
+												maxHeight: OVERVIEW_SEARCH_PANEL_MAX_HEIGHT_CSS,
+												overflow: 'hidden',
+												transform: `scale(${OVERVIEW_SEARCH_PANEL_SCALE})`,
+												transformOrigin: 'top right',
+											  }
+											: {
+												left: overviewRightRailPos
+													? `${overviewRightRailPos.leftPx}px`
+													: 'calc(50% + 250px + 32px)',
+												top: overviewRightRailPos ? `${overviewRightRailPos.topPx}px` : '72px',
+												width: `${OVERVIEW_RIGHT_RAIL_WIDTH_PX}px`,
+											  }),
 										zIndex: 130,
-										gap: shouldShowOverviewRightRailSearchPanel ? '0px' : '16px',
+										gap: shouldShowOverviewRightRailSearchPanel ? '9px' : '16px',
 									}}
 									onMouseOver={handleRailContainerMouseOver}
 									onMouseOut={handleRailContainerMouseOut}
 								>
 									{shouldShowOverviewRightRailSearchPanel ? (
-										<div
-											className="flex flex-col gap-[9px] pointer-events-auto"
-											style={{
-												width: '433px',
-												height: 800,
-												maxHeight: 'calc(100dvh - 72px - env(safe-area-inset-bottom, 0px) - 20px)',
-												overflow: 'hidden',
-												transform: 'scale(0.95)',
-												transformOrigin: 'top right',
-											}}
-										>
-											{/* Selection sub-panel — appears once at least one contact is selected. */}
-											{overviewRightRailSelectedContacts.length > 0 && (
+										<>
+											{overviewRightRailFilteredContacts.length > 0 && (
 												<div
 													className="flex flex-col flex-shrink-0"
 													style={{
-														maxHeight: '342px',
+														minHeight:
+															overviewRightRailSelectedContacts.length > 0
+																? OVERVIEW_SELECTION_PANEL_MIN_HEIGHT_PX
+																: 77 + 17 /* 77px header + ~17px translucent strip */,
+														maxHeight: `calc(100% - ${OVERVIEW_SEARCH_RESULTS_MIN_HEIGHT_PX + 9}px)`,
 														backgroundColor: 'rgba(214, 33, 39, 0.518)',
 														border: '3px solid #000',
 														borderRadius: '8px',
@@ -5978,7 +6065,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														<div
 															className="absolute left-1/2 top-[6px] -translate-x-1/2 flex items-center pl-[12px] pr-[8px] gap-[6px]"
 															style={{
-																width: '419px',
+																width: `${OVERVIEW_RIGHT_RAIL_WIDTH_PX - 14}px`,
 																height: '33px',
 																borderRadius: '8px',
 																border: '2px solid #000',
@@ -6023,26 +6110,28 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														>
 															{overviewRightRailSelectedContacts.length ===
 																overviewRightRailFilteredContacts.length &&
-																overviewRightRailFilteredContacts.length > 0
+															overviewRightRailFilteredContacts.length > 0
 																? 'Deselect All'
 																: 'Select all'}
 														</button>
 													</div>
-													<CustomScrollbar
-														className="flex-1 min-h-0"
-														contentClassName="p-[6px] pb-[14px] space-y-[7px]"
-														thumbWidth={2}
-														thumbColor="#000000"
-														trackColor="transparent"
-														offsetRight={-6}
-														disableOverflowClass
-													>
-														<div className="space-y-[7px]">
-															{overviewRightRailSelectedContactsFull.map(
-																renderOverviewRightRailDesktopRow
-															)}
-														</div>
-													</CustomScrollbar>
+													{overviewRightRailSelectedContacts.length > 0 && (
+														<CustomScrollbar
+															className="flex-1 min-h-0"
+															contentClassName="p-[6px] pb-[14px] space-y-[7px]"
+															thumbWidth={2}
+															thumbColor="#000000"
+															trackColor="transparent"
+															offsetRight={-6}
+															disableOverflowClass
+														>
+															<div className="space-y-[7px]">
+																{overviewRightRailSelectedContactsFull.map(
+																	renderOverviewRightRailDesktopRow
+																)}
+															</div>
+														</CustomScrollbar>
+													)}
 												</div>
 											)}
 
@@ -6050,6 +6139,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												className="flex flex-col flex-1 min-h-0"
 												style={{
+													minHeight: OVERVIEW_SEARCH_RESULTS_MIN_HEIGHT_PX,
 													backgroundColor: 'rgba(214, 33, 39, 0.518)',
 													border: '1px solid #000',
 													borderRadius: '8px',
@@ -6357,7 +6447,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													</div>
 											</div>
 										</div>
-									</div>
+									</>
 									) : (
 											<div
 												className="flex flex-col gap-[16px] pointer-events-auto"
@@ -6433,6 +6523,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									/>
 								)}
 								</div>
+								</>
 							)}
 							{shouldDockOverviewContacts && (
 							<div
@@ -6521,6 +6612,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}
 											onContactClick={handleResearchContactClick}
 											onContactHover={handleResearchContactHover}
+											onContactRowHover={
+												isRailHoverResearchEnabled ? handleRailRowHoverResearch : undefined
+											}
 											onDraftSelected={async (ids) => {
 												await handleGenerateDrafts(ids);
 											}}
