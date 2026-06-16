@@ -93,6 +93,89 @@ const CONTACT_ROW_RADIUS_PX = 8.269;
 const SUPPLEMENTAL_DRAFT_ROW_HEIGHT_PX = 108;
 const SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX = 7.798;
 const SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX = 92;
+const ALL_TAB_EMPTY_PLACEHOLDER_CONTACTS = [
+	{
+		name: 'Maya Torres',
+		company: 'The Lantern Room',
+		chipLabel: 'Music Venue',
+		chipColor: '#B7E5FF',
+		category: 'music-venues',
+		stateAbbr: 'NY',
+		city: 'Brooklyn',
+	},
+	{
+		name: 'Caleb Price',
+		company: 'Northline Hall',
+		chipLabel: 'Music Venue',
+		chipColor: '#B7E5FF',
+		category: 'music-venues',
+		stateAbbr: 'IL',
+		city: 'Chicago',
+	},
+	{
+		name: 'June Avery',
+		company: 'Harbor Lights Fest',
+		chipLabel: 'Music Festival',
+		chipColor: '#C1D6FF',
+		category: 'music-festivals',
+		stateAbbr: 'CA',
+		city: 'Oakland',
+	},
+	{
+		name: 'Nico Bennett',
+		company: 'Second Set Lounge',
+		chipLabel: 'Music Venue',
+		chipColor: '#B7E5FF',
+		category: 'music-venues',
+		stateAbbr: 'TN',
+		city: 'Nashville',
+	},
+	{
+		name: 'Priya Shah',
+		company: 'Cedar Table',
+		chipLabel: 'Restaurant',
+		chipColor: '#C3FBD1',
+		category: 'restaurants',
+		stateAbbr: 'TX',
+		city: 'Austin',
+	},
+	{
+		name: 'Theo Martin',
+		company: 'Signal Coffee',
+		chipLabel: 'Coffee Shop',
+		chipColor: '#D6F1BD',
+		category: 'coffee-shops',
+		stateAbbr: 'WA',
+		city: 'Seattle',
+	},
+	{
+		name: 'Elena Ruiz',
+		company: 'Golden Hour Events',
+		chipLabel: 'Wedding Planner',
+		chipColor: '#FFF2BC',
+		category: 'wedding-planners',
+		stateAbbr: 'CO',
+		city: 'Denver',
+	},
+	{
+		name: 'Sofia Chen',
+		company: 'Willow Glass House',
+		chipLabel: 'Wedding Venue',
+		chipColor: '#FFF2BC',
+		category: 'wedding-venues',
+		stateAbbr: 'GA',
+		city: 'Atlanta',
+	},
+	{
+		name: 'Marcus Lee',
+		company: 'Vine & Barrel',
+		chipLabel: 'Wine/Beer/Spirits',
+		chipColor: '#BFC4FF',
+		category: 'wine-beer-spirits',
+		stateAbbr: 'OR',
+		city: 'Portland',
+	},
+] as const;
 // Grace delay before a hover-peek clears, so moving between rows through the gap
 // doesn't flicker the reveal off (mirrors the research card's clear delay).
 const PEEK_CLEAR_DELAY_MS = 220;
@@ -1274,6 +1357,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	minRows = 7,
 	campaign,
 	enableUsedContactTooltip = false,
+	onSearchFromMiniBar,
 	whiteSectionHeight: customWhiteSectionHeight,
 	activeTopNavStop,
 	onOpenAll,
@@ -2041,6 +2125,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		: contacts.length +
 			supplementalDraftRows.length +
 			supplementalInboxConversations.length;
+	const shouldShowAllTabEmptyContacts =
+		!shouldShowLoadingWave &&
+		!isBottomView &&
+		!isDraftsFocusMode &&
+		!isInboxFocusMode &&
+		activeTopNavStop === 'all' &&
+		totalRenderedRows === 0;
 	const shouldShowScrollbar =
 		!isBottomView &&
 		(isInboxFocusMode ? visibleInboxPanelRowCount >= 6 : totalRenderedRows >= 14);
@@ -3258,6 +3349,121 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 											/>
 										))}
 									</>
+								) : shouldShowAllTabEmptyContacts ? (
+									<div className="relative flex flex-col items-center pb-2">
+										<button
+											type="button"
+											className="absolute left-1/2 top-[18px] z-20 -translate-x-1/2 rounded-full bg-white px-[18px] py-[9px] font-inter text-[15px] font-semibold leading-none text-black transition-colors hover:bg-[#F3F4F6]"
+											onClick={(e) => {
+												e.stopPropagation();
+												if (onSearchFromMiniBar) {
+													onSearchFromMiniBar({ why: '', what: '', where: '' });
+													return;
+												}
+												onOpenSearch?.();
+											}}
+										>
+											Add new contacts
+										</button>
+										<div
+											aria-hidden="true"
+											className="flex flex-col items-center space-y-2 pointer-events-none select-none"
+										>
+											{Array.from(
+												{
+													length: Math.max(
+														minRows,
+														ALL_TAB_EMPTY_PLACEHOLDER_CONTACTS.length
+													),
+												},
+												(_, index) => {
+												const placeholder =
+													ALL_TAB_EMPTY_PLACEHOLDER_CONTACTS[
+														index % ALL_TAB_EMPTY_PLACEHOLDER_CONTACTS.length
+													];
+												const opacity = Math.max(0.1, 0.58 - index * 0.07);
+
+												return (
+													<div
+														key={`all-tab-empty-placeholder-${index}`}
+														className="grid grid-cols-2 grid-rows-2 overflow-hidden border-2 border-[#000000] bg-white max-[480px]:w-[96.27vw]"
+														style={{
+															...(contactRowStyle ?? {}),
+															opacity,
+														}}
+													>
+														<div className="col-start-1 row-start-1 row-span-2 pl-3 pr-1 flex flex-col justify-center gap-[1px] overflow-hidden">
+															<div className="font-inter text-[14.661px] font-normal leading-[17px] text-black text-left w-full truncate">
+																{placeholder.name}
+															</div>
+															<div
+																className="font-inter text-[14.661px] font-medium leading-[17px] text-black text-left w-full overflow-hidden whitespace-nowrap"
+																style={{
+																	maskImage:
+																		'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+																	WebkitMaskImage:
+																		'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+																}}
+															>
+																{placeholder.company}
+															</div>
+														</div>
+														<div className="col-start-2 row-start-1 pr-2 pl-1 flex items-end pb-[2px] overflow-hidden">
+															<div
+																className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																style={{ backgroundColor: placeholder.chipColor }}
+															>
+																{placeholder.category === 'coffee-shops' && (
+																	<CoffeeShopsIcon size={7} />
+																)}
+																{placeholder.category === 'restaurants' && (
+																	<RestaurantsIcon size={12} className="flex-shrink-0" />
+																)}
+																{placeholder.category === 'music-venues' && (
+																	<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																)}
+																{placeholder.category === 'music-festivals' && (
+																	<FestivalsIcon size={12} className="flex-shrink-0" />
+																)}
+																{(placeholder.category === 'wedding-planners' ||
+																	placeholder.category === 'wedding-venues') && (
+																	<WeddingPlannersIcon size={12} />
+																)}
+																{placeholder.category === 'wine-beer-spirits' && (
+																	<WineBeerSpiritsIcon
+																		size={12}
+																		className="flex-shrink-0"
+																	/>
+																)}
+																<span className="text-[10px] text-black leading-none truncate">
+																	{placeholder.chipLabel}
+																</span>
+															</div>
+														</div>
+														<div className="col-start-2 row-start-2 pr-2 pl-1 flex items-start pt-[2px] overflow-hidden">
+															<div className="flex items-center gap-1 w-full">
+																<span
+																	className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+																	style={{
+																		backgroundColor:
+																			stateBadgeColorMap[placeholder.stateAbbr] ||
+																			'transparent',
+																		borderColor: '#000000',
+																	}}
+																>
+																	{placeholder.stateAbbr}
+																</span>
+																<span className="text-[10px] text-black leading-none truncate">
+																	{placeholder.city}
+																</span>
+															</div>
+														</div>
+													</div>
+												);
+												}
+											)}
+										</div>
+									</div>
 								) : (
 									<>
 										{isDraftsFocusMode &&
@@ -4077,7 +4283,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									</>
 								)}
 								{Array.from({
-									length: Math.max(0, (!isBottomView ? minRows : 0) - totalRenderedRows),
+									length: shouldShowAllTabEmptyContacts
+										? 0
+										: Math.max(0, (!isBottomView ? minRows : 0) - totalRenderedRows),
 								}).map((_, idx) => {
 									const inboxPlaceholderStyle = isInboxFocusMode
 										? {

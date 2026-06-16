@@ -1107,6 +1107,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 		return set;
 	}, [overviewRightRailFilteredContacts, getOverviewRightRailChipKeyForContact]);
+	const shouldShowOverviewRightRailCategoryBar =
+		overviewRightRailCategoryKeys.size > 0;
 
 	const overviewRightRailUnselectedContactsFiltered = useMemo(() => {
 		if (overviewRightRailSelectedCategoryChips.size === 0)
@@ -6255,7 +6257,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											>
 												<CustomScrollbar
 													className="flex-1 min-h-0"
-													contentClassName="p-[6px] pb-[78px] space-y-[7px]"
+													contentClassName={`p-[6px] ${
+														shouldShowOverviewRightRailCategoryBar
+															? 'pb-[78px]'
+															: 'pb-[14px]'
+													} space-y-[7px]`}
 													thumbWidth={2}
 													thumbColor="#000000"
 													trackColor="transparent"
@@ -6361,94 +6367,100 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														</div>
 													)}
 												</CustomScrollbar>
-												<div
-													className="absolute left-1/2 -translate-x-1/2 bottom-[9px] flex items-center gap-[2px] pl-[4px]"
-													style={{
-														width: '420px',
-														height: '55px',
-														borderRadius: '9.86px',
-														border: '1.446px solid #000',
-														backgroundColor: '#65A1B9',
-													}}
-												>
-													{[
-														{
-															key: 'music-venues',
-															color: '#71C9FD',
-															Icon: MusicVenuesIcon,
-															size: 32,
-														},
-														{
-															key: 'wine-beer-spirits',
-															color: '#80AAFF',
-															Icon: WineBeerSpiritsIcon,
-															size: 25,
-														},
-														{
-															key: 'restaurants',
-															color: '#77DD91',
-															Icon: RestaurantsIcon,
-															size: 32,
-														},
-														{
-															key: 'coffee-shops',
-															color: '#A9DE78',
-															Icon: CoffeeShopsIcon,
-															size: 18,
-														},
-														{
-															key: 'wedding-planners',
-															color: '#EED56E',
-															Icon: WeddingPlannersIcon,
-															size: 30,
-														},
-														{
-															key: 'festivals',
-															color: '#80AAFF',
-															Icon: FestivalsIcon,
-															size: 32,
-														},
-														{
-															key: 'radio-stations',
-															color: '#56DA73',
-															Icon: RadioStationsIcon,
-															size: 32,
-														},
-													]
-															.filter(({ key }) => overviewRightRailCategoryKeys.has(key))
-															.map(({ key, color, Icon, size }) => {
-																const isSelected =
-																	overviewRightRailSelectedCategoryChips.has(key);
-																return (
-																	<div
-																		key={key}
-																		className="flex items-center justify-center flex-shrink-0 cursor-pointer"
-																		style={{
-																			width: 45,
-																			height: 45,
-																			backgroundColor: isSelected ? 'transparent' : color,
-																			borderRadius: 6,
-																			border: isSelected
-																				? `2px solid ${color}`
-																				: '1px solid #000',
-																		}}
-																		onClick={() => {
-																			setOverviewRightRailSelectedCategoryChips((prev) => {
-																				const next = new Set(prev);
-																				if (next.has(key)) next.delete(key);
-																				else next.add(key);
-																				return next;
-																			});
-																		}}
-																	>
-																		<Icon
-																			size={size}
-																			innerFill={isSelected ? color : 'white'}
-																		/>
-																	</div>
-																);
-															})}
-													</div>
+												{shouldShowOverviewRightRailCategoryBar && (
+													<div
+														className="absolute left-1/2 -translate-x-1/2 bottom-[9px] flex items-center gap-[2px] pl-[4px]"
+														style={{
+															width: '420px',
+															height: '55px',
+															borderRadius: '9.86px',
+															border: '1.446px solid #000',
+															backgroundColor: '#65A1B9',
+														}}
+													>
+														{[
+															{
+																key: 'music-venues',
+																color: '#71C9FD',
+																Icon: MusicVenuesIcon,
+																size: 32,
+															},
+															{
+																key: 'wine-beer-spirits',
+																color: '#80AAFF',
+																Icon: WineBeerSpiritsIcon,
+																size: 25,
+															},
+															{
+																key: 'restaurants',
+																color: '#77DD91',
+																Icon: RestaurantsIcon,
+																size: 32,
+															},
+															{
+																key: 'coffee-shops',
+																color: '#A9DE78',
+																Icon: CoffeeShopsIcon,
+																size: 18,
+															},
+															{
+																key: 'wedding-planners',
+																color: '#EED56E',
+																Icon: WeddingPlannersIcon,
+																size: 30,
+															},
+															{
+																key: 'festivals',
+																color: '#80AAFF',
+																Icon: FestivalsIcon,
+																size: 32,
+															},
+															{
+																key: 'radio-stations',
+																color: '#56DA73',
+																Icon: RadioStationsIcon,
+																size: 32,
+															},
+														]
+																.filter(({ key }) => overviewRightRailCategoryKeys.has(key))
+																.map(({ key, color, Icon, size }) => {
+																	const isSelected =
+																		overviewRightRailSelectedCategoryChips.has(key);
+																	return (
+																		<div
+																			key={key}
+																			className="flex items-center justify-center flex-shrink-0 cursor-pointer"
+																			style={{
+																				width: 45,
+																				height: 45,
+																				backgroundColor: isSelected
+																					? 'transparent'
+																					: color,
+																				borderRadius: 6,
+																				border: isSelected
+																					? `2px solid ${color}`
+																					: '1px solid #000',
+																			}}
+																			onClick={() => {
+																				setOverviewRightRailSelectedCategoryChips(
+																					(prev) => {
+																						const next = new Set(prev);
+																						if (next.has(key)) next.delete(key);
+																						else next.add(key);
+																						return next;
+																					}
+																				);
+																			}}
+																		>
+																			<Icon
+																				size={size}
+																				innerFill={isSelected ? color : 'white'}
+																			/>
+																		</div>
+																	);
+																})}
+														</div>
+												)}
 											</div>
 										</div>
 									</>
