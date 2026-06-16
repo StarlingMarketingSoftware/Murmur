@@ -13,6 +13,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import { createPortal } from 'react-dom';
 import mapboxgl from 'mapbox-gl';
 import { ContactWithName } from '@/types/contact';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
@@ -21,6 +22,21 @@ import {
 	useGetContactsMapOverlay,
 } from '@/hooks/queryHooks/useContacts';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import {
+	MAP_SELECT_GRAB_STARTER_BOX_GAP_PX,
+	MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX,
+	MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX,
+	MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX,
+	MAP_SELECT_GRAB_STACK_BOX_SIZE_PX,
+	MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX,
+	MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX,
+	MAP_SELECT_GRAB_TOOL_COLLAPSED_HEIGHT_PX,
+} from '@/components/molecules/MapSelectGrabTool/MapSelectGrabTool';
+import {
+	computeMapSelectGrabViewScale,
+	DASHBOARD_SIDE_SHIFT_VAR,
+	MURMUR_CHROME_ZOOM_DEFAULT,
+} from '@/utils/murmurChromeZoom';
 import {
 	calculateTooltipWidth,
 	calculateTooltipHeight,
@@ -899,6 +915,25 @@ const EVENT_POPUP_STAR_HALF = 14;
 const EVENT_POPUP_HOVER_CLOSE_DELAY_MS = 90;
 const SELECTED_TOOLTIP_FADE_START_ZOOM = 5.4;
 const SELECTED_TOOLTIP_FADE_END_ZOOM = 4.7;
+// Multi-select action card dock layout (mirrors dashboard MapSelectGrab rail).
+const SELECTION_ACTIONS_MAP_SELECT_GRAB_LEFT_PX = 26;
+const SELECTION_ACTIONS_MAP_VIEW_SIDE_PANEL_TOP_PX = 106;
+const SELECTION_ACTIONS_MAP_SELECT_GRAB_TOP_EXTENT_PX =
+	MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+	MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+	MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+	MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+	MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
+	MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+	MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
+	MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX;
+const SELECTION_ACTIONS_SHOWING_ABOVE_GRAB_ORIGIN_PX =
+	SELECTION_ACTIONS_MAP_SELECT_GRAB_TOP_EXTENT_PX + 17 + 6;
+const SELECTION_ACTIONS_DOCK_RAIL_WIDTH_PX = 66;
+const SELECTION_ACTIONS_DOCK_GAP_PX = 16;
+const SELECTION_ACTIONS_ANCHOR_GAP_PX = 64;
+const SELECTION_ACTIONS_ANCHOR_MIN_ZOOM = 4;
+const SELECTION_ACTIONS_VIEWPORT_MARGIN_PX = 16;
 const SELECTED_TOOLTIP_STACK_MIN_SCALE = 0.9;
 const SELECTED_TOOLTIP_LEGACY_STACK_T = 0.18;
 const SELECTED_TOOLTIP_STACK_GROUP_SIZE = 10;
@@ -1735,10 +1770,11 @@ export interface SearchResultsMapProps {
 	onMarkerHover?: (contact: ContactWithName | null, meta?: MarkerHoverMeta) => void;
 	onToggleSelection?: (contactId: number) => void;
 	/**
-	 * Multi-select action card (dashboard search map). When >= 2 contacts are
-	 * selected, a floating card anchored to the selection centroid offers these
-	 * actions. Providing `onAddSelectionToFolder` is what opts a host into showing
-	 * the card, so it never appears in the campaign/venue maps.
+	 * Multi-select action card (dashboard search map). When >= 1 contacts are
+	 * selected, a floating card offers these actions. While the selection is
+	 * on-screen at street zoom it tracks the top-most dot; otherwise it docks
+	 * beside the left "Showing" rail (venue-portal pill pattern). Providing
+	 * `onAddSelectionToFolder` opts a host into showing the card.
 	 */
 	onAddSelectionToFolder?: () => void;
 	onWriteSelectionMessage?: () => void;
@@ -17797,16 +17833,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		rightSafeAreaPx,
 	]);
 
-	// Multi-select action card anchoring. Resolves each selected contact's
-	// coordinates (across the base + overlay coord maps); the card is anchored to
-	// the TOP-most selected dot on screen, scales down with the map and fades out
-	// as the user zooms further out, and re-anchors on every map move — same
-	// projection pattern as the selected-marker "Research" panel above.
+	// Multi-select action card anchoring. Follows the venue-portal action-pill
+	// pattern: track the top-most selected dot while it is on-screen at street
+	// zoom, otherwise dock beside the dashboard's left "Showing" rail so the
+	// actions stay accessible when panning away or zooming out.
 	const selectionActionsOverlayRef = useRef<HTMLDivElement | null>(null);
-	// Zoom level captured when the card first appears; scale/fade are measured
-	// relative to it. Cleared (below) when the selection clears so the next
-	// selection re-captures its own baseline.
-	const selectionBaseZoomRef = useRef<number | null>(null);
 	const selectedAnchorPoints = useMemo(() => {
 		if (selectedContacts.length < 1) return null;
 		const points: LatLngLiteral[] = [];
@@ -17815,7 +17846,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				coordsByContactId.get(id) ??
 				bookingExtraCoordsByContactId.get(id) ??
 				promotionOverlayCoordsByContactId.get(id) ??
-				allContactsOverlayCoordsByContactId.get(id);
+				allContactsOverlayCoordsByContactId.get(id) ??
+				(selectedContactObjectsById.get(id)
+					? getLatLngFromContact(selectedContactObjectsById.get(id)!)
+					: null);
 			if (coords) points.push(coords);
 		}
 		return points.length >= 1 ? points : null;
@@ -17825,65 +17859,129 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		bookingExtraCoordsByContactId,
 		promotionOverlayCoordsByContactId,
 		allContactsOverlayCoordsByContactId,
+		selectedContactObjectsById,
 	]);
-	useEffect(() => {
-		if (!selectedAnchorPoints) selectionBaseZoomRef.current = null;
-	}, [selectedAnchorPoints]);
-	useEffect(() => {
-		if (!map || !isMapLoaded) return;
-		if (isLoading) return;
+	useLayoutEffect(() => {
+		if (!map || !isMapLoaded || isLoading || !onAddSelectionToFolder) return;
+		if (selectedContacts.length < 1) return;
 		const el = selectionActionsOverlayRef.current;
-		if (!el || !selectedAnchorPoints) return;
+		if (!el) return;
 
-		const update = () => {
-			// Anchor above the TOP-most selected dot on screen (smallest projected y)
-			// so the card sits in the emptier space above the selection rather than
-			// over the cluster, where more dots may still be picked.
-			let top: { x: number; y: number } | null = null;
-			for (const pt of selectedAnchorPoints) {
-				const projected = map.project([pt.lng, pt.lat]);
-				if (!top || projected.y < top.y) {
-					top = { x: projected.x, y: projected.y };
+		let transitionTimeout: number | null = null;
+		let wasAnchored: boolean | null = null;
+
+		const readSelectionActionsDock = () => {
+			const rootStyles = getComputedStyle(document.documentElement);
+			const dashboardZoom =
+				Number.parseFloat(
+					rootStyles.getPropertyValue('--murmur-dashboard-zoom').trim()
+				) || MURMUR_CHROME_ZOOM_DEFAULT;
+			const sideShiftPx =
+				Number.parseFloat(rootStyles.getPropertyValue(DASHBOARD_SIDE_SHIFT_VAR).trim()) ||
+				0;
+			const viewportH = window.innerHeight;
+			const railTotalHeightPx =
+				SELECTION_ACTIONS_MAP_SELECT_GRAB_TOP_EXTENT_PX +
+				MAP_SELECT_GRAB_TOOL_COLLAPSED_HEIGHT_PX;
+			const grabViewScale = computeMapSelectGrabViewScale(
+				viewportH,
+				railTotalHeightPx
+			);
+			const sidePanelTop =
+				(SELECTION_ACTIONS_MAP_VIEW_SIDE_PANEL_TOP_PX + sideShiftPx) /
+				dashboardZoom;
+			const grabOriginTop =
+				sidePanelTop +
+				SELECTION_ACTIONS_MAP_SELECT_GRAB_TOP_EXTENT_PX * grabViewScale -
+				4 / dashboardZoom;
+			return {
+				minX:
+					SELECTION_ACTIONS_MAP_SELECT_GRAB_LEFT_PX +
+					SELECTION_ACTIONS_DOCK_RAIL_WIDTH_PX * grabViewScale +
+					SELECTION_ACTIONS_DOCK_GAP_PX,
+				top:
+					grabOriginTop -
+					SELECTION_ACTIONS_SHOWING_ABOVE_GRAB_ORIGIN_PX * grabViewScale,
+			};
+		};
+
+		const place = () => {
+			const container = mapContainerRef.current;
+			if (!container) return;
+
+			let topPoint: { x: number; y: number } | null = null;
+			if (selectedAnchorPoints) {
+				for (const pt of selectedAnchorPoints) {
+					const projected = map.project([pt.lng, pt.lat]);
+					if (!topPoint || projected.y < topPoint.y) {
+						topPoint = { x: projected.x, y: projected.y };
+					}
 				}
 			}
-			if (!top) return;
 
-			// Scale with the map (2x per zoom level), capped at 1x when zooming in,
-			// and fade out as the user zooms further out than where the card appeared.
-			if (selectionBaseZoomRef.current == null) {
-				selectionBaseZoomRef.current = map.getZoom();
-			}
-			const zoomDelta = map.getZoom() - selectionBaseZoomRef.current;
-			const scale = Math.min(1, 2 ** zoomDelta);
-			const FADE_START = -0.4;
-			const FADE_END = -2.2;
-			const opacity = Math.max(
-				0,
-				Math.min(1, (zoomDelta - FADE_END) / (FADE_START - FADE_END))
-			) * getSelectedTooltipZoomOpacity(map.getZoom());
+			const rect = container.getBoundingClientRect();
+			const pad = 40;
+			const isOnScreen =
+				topPoint != null &&
+				topPoint.x >= -pad &&
+				topPoint.x <= rect.width + pad &&
+				topPoint.y >= -pad &&
+				topPoint.y <= rect.height + pad;
+			const isAnchored =
+				isOnScreen && map.getZoom() >= SELECTION_ACTIONS_ANCHOR_MIN_ZOOM;
 
-			// offsetWidth/Height are the UNSCALED box; using them (not
-			// getBoundingClientRect, which includes the scale) keeps the centering
-			// stable as the scale changes. Pivot the scale at the bottom-center so the
-			// card shrinks toward the dot it is anchored above.
 			const w = el.offsetWidth;
 			const h = el.offsetHeight;
-			const x = top.x - w / 2;
-			const y = top.y - h - 64;
-			el.style.transformOrigin = 'bottom center';
-			el.style.transform = `translate(${Math.round(x)}px, ${Math.round(
-				y
-			)}px) scale(${scale})`;
-			el.style.opacity = String(opacity);
-			el.style.pointerEvents = opacity < 0.1 ? 'none' : 'auto';
+			const vw = window.innerWidth;
+			const vh = window.innerHeight;
+			const margin = SELECTION_ACTIONS_VIEWPORT_MARGIN_PX;
+			const { minX: dockMinX, top: dockTop } = readSelectionActionsDock();
+			const maxX = vw - w - margin;
+
+			let x: number;
+			let y: number;
+			if (isAnchored && topPoint) {
+				x = rect.left + topPoint.x - w / 2;
+				y = rect.top + topPoint.y - h - SELECTION_ACTIONS_ANCHOR_GAP_PX;
+				x = clamp(x, margin, maxX);
+				y = clamp(y, margin, vh - h - margin);
+			} else {
+				x = clamp(dockMinX, margin, maxX);
+				y = clamp(dockTop, margin, vh - h - margin);
+			}
+
+			if (wasAnchored !== null && wasAnchored !== isAnchored) {
+				el.style.transition = 'transform 280ms ease';
+				if (transitionTimeout != null) window.clearTimeout(transitionTimeout);
+				transitionTimeout = window.setTimeout(() => {
+					el.style.transition = '';
+					transitionTimeout = null;
+				}, 300);
+			}
+			wasAnchored = isAnchored;
+
+			el.style.transformOrigin = isAnchored ? 'bottom center' : 'top left';
+			el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+			el.style.opacity = '1';
+			el.style.pointerEvents = 'auto';
 		};
 
-		update();
-		map.on('move', update);
+		place();
+		map.on('move', place);
+		window.addEventListener('resize', place);
 		return () => {
-			map.off('move', update);
+			map.off('move', place);
+			window.removeEventListener('resize', place);
+			if (transitionTimeout != null) window.clearTimeout(transitionTimeout);
 		};
-	}, [map, isMapLoaded, isLoading, selectedAnchorPoints, getSelectedTooltipZoomOpacity]);
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		onAddSelectionToFolder,
+		selectedContacts.length,
+		selectedAnchorPoints,
+	]);
 
 	// Hover tooltip anchoring (single overlay).
 	const stackedSelectedContactIdSet = useMemo(() => {
@@ -19919,22 +20017,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				</div>
 			)}
 
-			{/* Multi-select action card — anchored to the selection centroid.
-			    Only rendered on hosts that wire `onAddSelectionToFolder` (the
-			    dashboard search map), for 1+ selected contacts. */}
+			{/* Multi-select action card — docked beside the left "Showing" rail when the
+			    selection is off-screen or zoomed out; otherwise anchored above the
+			    top-most selected dot. Portaled to body so fixed positioning matches
+			    the dashboard's left rail (see VenueMapActionPills). */}
 			{!isLoading &&
 				selectedContacts.length >= 1 &&
 				onAddSelectionToFolder &&
-				selectedAnchorPoints && (
+				typeof window !== 'undefined' &&
+				createPortal(
 					<div
 						ref={selectionActionsOverlayRef}
+						className="pointer-events-none fixed left-0 top-0 will-change-transform"
 						style={{
-							position: 'absolute',
-							left: 0,
-							top: 0,
 							opacity: 0,
-							pointerEvents: 'none',
-							zIndex: HOVER_TOOLTIP_Z_INDEX + 11,
+							zIndex: 131,
 						}}
 						onMouseDown={(e) => e.stopPropagation()}
 						onPointerDown={(e) => e.stopPropagation()}
@@ -19991,7 +20088,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 								Write Message
 							</button>
 						</div>
-					</div>
+					</div>,
+					document.body
 				)}
 		</div>
 	);
