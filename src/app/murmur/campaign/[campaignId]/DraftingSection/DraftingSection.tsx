@@ -7603,7 +7603,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												width={330}
 											/>
 												{/* Mini Email Structure panel */}
-												<div style={{ width: '330px' }}>
+											<div style={{ width: '330px', ...campaignHeaderPanelDimStyle }}>
 													<MiniEmailStructure
 														form={
 															isDraftingView
