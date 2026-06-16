@@ -10,6 +10,7 @@ import { useSendingSessionState } from '@/contexts/SendingSessionContext';
 import { CampaignTitlePills } from '@/components/molecules/CampaignTitlePills/CampaignTitlePills';
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 import DiamondIcon from '@/components/atoms/_svg/DiamondIcon';
+import { CampaignFolderDropdown } from './CampaignFolderDropdown';
 
 interface CampaignHeaderBoxProps {
 	campaignId: number;
@@ -62,6 +63,9 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	const [isEditing, setIsEditing] = useState(false);
 	const [editedName, setEditedName] = useState(campaignName);
 	const inputRef = useRef<HTMLInputElement>(null);
+	const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
+	const chevronButtonRef = useRef<HTMLButtonElement>(null);
+	const headerBoxRef = useRef<HTMLDivElement>(null);
 	const {
 		enabled: hoverDescriptionsEnabled,
 		description: hoverDescription,
@@ -213,29 +217,36 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	return (
 		<div
 			data-campaign-header-box="true"
+			ref={headerBoxRef}
 			className={cn(
 				'relative overflow-visible border border-black rounded-[8px] flex flex-col px-3 pt-0 pb-[6px] box-border',
 				fullWidth && 'w-[96.27vw] max-w-[499px]',
 				className
 			)}
-			style={
-				fullWidth
-					? {
-							height: '59px',
-							minHeight: '59px',
-							maxHeight: '59px',
-							background: 'rgba(255, 255, 255, 0.31)',
-						}
+			style={{
+				...(fullWidth
+					? {}
 					: {
 							width: `${width}px`,
-							height: '59px',
 							minWidth: `${width}px`,
 							maxWidth: `${width}px`,
-							minHeight: '59px',
-							maxHeight: '59px',
-							background: 'rgba(255, 255, 255, 0.31)',
+						}),
+				height: '59px',
+				minHeight: '59px',
+				maxHeight: '59px',
+				// When the folder dropdown is open, the header turns opaque white, thickens
+				// its stroke, and drops its bottom edge so it reads as one box with the
+				// dropdown (whose 2px top border becomes the divider under the pills).
+				background: isFolderDropdownOpen ? '#FFFFFF' : 'rgba(255, 255, 255, 0.31)',
+				...(isFolderDropdownOpen
+					? {
+							borderWidth: '2px',
+							borderBottomWidth: 0,
+							borderBottomLeftRadius: 0,
+							borderBottomRightRadius: 0,
 						}
-			}
+					: {}),
+			}}
 		>
 			{/* Drafting progress box (shown above the header; must NOT shift layout) */}
 			{shouldShowDraftingProgress ? (
@@ -429,8 +440,17 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 						{sendQueueRemaining} in send queue
 					</div>
 				) : null}
-				{/* Decorative diamond marker, pinned to the box's upper-right corner */}
-				<DiamondIcon aria-hidden="true" className="ml-auto mr-[10px] flex-shrink-0" />
+				{/* Chevron marker — toggles the folder dropdown, pinned upper-right */}
+				<button
+					type="button"
+					ref={chevronButtonRef}
+					onClick={() => setIsFolderDropdownOpen((v) => !v)}
+					aria-label="Choose folder"
+					aria-expanded={isFolderDropdownOpen}
+					className="ml-auto mr-[10px] flex flex-shrink-0 cursor-pointer items-center justify-center border-none bg-transparent p-0 outline-none focus:outline-none"
+				>
+					<DiamondIcon aria-hidden="true" />
+				</button>
 			</div>
 
 			{/* Spacer above To/From */}
@@ -582,6 +602,15 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					</span>
 				</button>
 			</div>
+
+			{isFolderDropdownOpen ? (
+				<CampaignFolderDropdown
+					currentCampaignId={campaignId}
+					onClose={() => setIsFolderDropdownOpen(false)}
+					chevronRef={chevronButtonRef}
+					anchorRef={headerBoxRef}
+				/>
+			) : null}
 		</div>
 	);
 };

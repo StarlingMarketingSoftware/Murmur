@@ -4743,6 +4743,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onFromClick={onOpenIdentityDialog}
 											onDraftsClick={goToDrafting}
 											onSentClick={goToSent}
+											width={mainContactsPanelWidthPx}
 										/>
 										{view === 'inbox' && (
 									<div data-row-hover-research-anchor style={{ position: 'relative' }}>
