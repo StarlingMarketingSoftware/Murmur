@@ -29,6 +29,7 @@ interface CampaignHeaderBoxProps {
 	onContactsClick?: () => void;
 	onDraftsClick?: () => void;
 	onSentClick?: () => void;
+	onFolderDropdownOpenChange?: (isOpen: boolean) => void;
 	width?: number;
 	/** When true, uses responsive width (matching writing box) with left-aligned content */
 	fullWidth?: boolean;
@@ -56,6 +57,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	onContactsClick,
 	onDraftsClick,
 	onSentClick,
+	onFolderDropdownOpenChange,
 	width = 374,
 	fullWidth = false,
 	className,
@@ -191,6 +193,13 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	useEffect(() => {
 		setEditedName(campaignName);
 	}, [campaignName]);
+
+	useEffect(() => {
+		onFolderDropdownOpenChange?.(isFolderDropdownOpen);
+		if (!isFolderDropdownOpen) return;
+
+		return () => onFolderDropdownOpenChange?.(false);
+	}, [isFolderDropdownOpen, onFolderDropdownOpenChange]);
 
 	const handleSave = () => {
 		if (editedName.trim() && editedName !== campaignName) {

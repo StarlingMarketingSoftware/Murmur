@@ -1851,6 +1851,8 @@ const Murmur = () => {
 	const [identityDialogOrigin, setIdentityDialogOrigin] = useState<'campaign' | 'search'>(
 		cameFromSearch ? 'search' : 'campaign'
 	);
+	const [isNarrowCampaignHeaderDropdownOpen, setIsNarrowCampaignHeaderDropdownOpen] =
+		useState(false);
 
 	const [isTopSearchHighlighted, setTopSearchHighlighted] = useState(false);
 	const [isHomeButtonHighlighted, setHomeButtonHighlighted] = useState(false);
@@ -4891,6 +4893,7 @@ const Murmur = () => {
 											}}
 											onDraftsClick={() => setActiveView('drafting')}
 											onSentClick={() => setActiveView('sent')}
+											onFolderDropdownOpenChange={setIsNarrowCampaignHeaderDropdownOpen}
 											fullWidth
 										/>
 									</div>
@@ -4949,6 +4952,7 @@ const Murmur = () => {
 												goToPreviousTab={goToPreviousTab}
 												goToNextTab={goToNextTab}
 												hideHeaderBox={isNarrowestDesktop && !isMobile}
+												dimContactsExpandedList={isNarrowCampaignHeaderDropdownOpen}
 												isCampaignWorkspaceExpanded={isCampaignWorkspaceExpanded}
 												onRequestCampaignWorkspaceExpanded={
 													requestCampaignWorkspaceExpanded

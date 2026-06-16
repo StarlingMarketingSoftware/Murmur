@@ -7355,6 +7355,8 @@ const DashboardContent = () => {
 	]);
 
 	const [isPointerInMapSidePanel, setIsPointerInMapSidePanel] = useState(false);
+	const [isMapCampaignHeaderDropdownOpen, setIsMapCampaignHeaderDropdownOpen] =
+		useState(false);
 	const [selectedCategoryChips, setSelectedCategoryChips] = useState<Set<string>>(
 		new Set()
 	);
@@ -13900,14 +13902,15 @@ const DashboardContent = () => {
 																				`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts${campaignReturnAddedSuffix()}`
 																			);
 																		}}
-																		onSentClick={() => {
-																			if (!mapCampaignId) return;
-																			router.push(
-																				`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=sent${campaignReturnAddedSuffix()}`
-																			);
-																		}}
-																		width={433}
-																	/>
+																			onSentClick={() => {
+																				if (!mapCampaignId) return;
+																				router.push(
+																					`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=sent${campaignReturnAddedSuffix()}`
+																				);
+																			}}
+																			onFolderDropdownOpenChange={setIsMapCampaignHeaderDropdownOpen}
+																			width={433}
+																		/>
 																</div>
 															)}
 														{/* Inline "Write Message" drafting panel — floats over the map (left of the
@@ -14066,22 +14069,26 @@ const DashboardContent = () => {
 																				style={
 																					isCompressedMapChrome
 																						? {
-																								left: 10,
+																							left: 10,
+																							right: 10,
+																							bottom: 10,
+																							height: 'calc(50% - 20px)',
+																							opacity: isMapCampaignHeaderDropdownOpen ? 0.5 : 1,
+																							transition: 'opacity 0.2s ease',
+																							overflow: 'hidden',
+																						}
+																						: {
 																								right: 10,
-																								bottom: 10,
-																								height: 'calc(50% - 20px)',
+																								top: mapViewResultsPanelTopCss,
+																								width: '433px',
+																								height: 800,
+																								maxHeight: mapViewResultsPanelMaxHeightCss,
+																								opacity: isMapCampaignHeaderDropdownOpen ? 0.5 : 1,
+																								transition: 'opacity 0.2s ease',
 																								overflow: 'hidden',
-																							}
-																		: {
-																				right: 10,
-																				top: mapViewResultsPanelTopCss,
-																				width: '433px',
-																				height: 800,
-																				maxHeight: mapViewResultsPanelMaxHeightCss,
-																				overflow: 'hidden',
-																								transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
-																								transformOrigin: 'top right',
-																							}
+																												transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
+																												transformOrigin: 'top right',
+																											}
 																				}
 																			>
 																				{/* Compressed-only sheet header: Map button, selection count, Select all. */}

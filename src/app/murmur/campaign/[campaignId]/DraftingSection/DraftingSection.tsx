@@ -284,6 +284,7 @@ interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 	overviewRightRailSearchContacts?: ContactWithName[];
 	overviewRightRailSearchContactsLoading?: boolean;
 	onClearOverviewRightRailSearch?: () => void;
+	dimContactsExpandedList?: boolean;
 }
 
 type CampaignBottomPanelKind = 'contacts' | 'drafts' | 'sent' | 'inbox';
@@ -338,7 +339,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		overviewRightRailSearchContacts,
 		overviewRightRailSearchContactsLoading,
 		onClearOverviewRightRailSearch,
+		dimContactsExpandedList = false,
 	} = props;
+	const [isCampaignHeaderDropdownOpen, setIsCampaignHeaderDropdownOpen] = useState(false);
+	const campaignHeaderPanelDimStyle: CSSProperties = {
+		opacity: isCampaignHeaderDropdownOpen || dimContactsExpandedList ? 0.5 : 1,
+		transition: 'opacity 0.2s ease',
+	};
 
 	// Search→campaign-tab timing: first paint of the campaign tool view after a tab click
 	// on the dashboard map (the click mark is set in handleCampaignTabPointerDown there).
@@ -4743,10 +4750,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onFromClick={onOpenIdentityDialog}
 											onDraftsClick={goToDrafting}
 											onSentClick={goToSent}
+											onFolderDropdownOpenChange={setIsCampaignHeaderDropdownOpen}
 											width={mainContactsPanelWidthPx}
 										/>
 										{view === 'inbox' && (
-									<div data-row-hover-research-anchor style={{ position: 'relative' }}>
+									<div
+										data-row-hover-research-anchor
+										style={{ position: 'relative', ...campaignHeaderPanelDimStyle }}
+									>
 										<ContactsExpandedList
 											contacts={contactsForContactsExpandedList}
 											{...contactsListSupplementalProps}
@@ -4772,20 +4783,23 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								)}
 								{view !== 'inbox' &&
 									(isSendingUiVisible ? (
-										<SendingExpandedList
-											width={mainContactsPanelWidthPx}
-											height={mainContactsPanelHeightPx}
-										/>
+										<div style={campaignHeaderPanelDimStyle}>
+											<SendingExpandedList
+												width={mainContactsPanelWidthPx}
+												height={mainContactsPanelHeightPx}
+											/>
+										</div>
 									) : isDraftPreviewOpen ? (
 										shouldShowPinnedRegenEmailPreview ? (
 											<div
 												data-draft-review-side-preview
-												style={{
-													width: '376px',
-													height: '587px',
-													overflow: 'hidden',
-													position: 'relative',
-												}}
+													style={{
+														width: '376px',
+														height: '587px',
+														overflow: 'hidden',
+														position: 'relative',
+														...campaignHeaderPanelDimStyle,
+													}}
 											>
 												<div
 													style={{
@@ -4847,11 +4861,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										) : (
 											<div
 												data-row-hover-research-anchor
-												style={{
-													width: '376px',
-													height: '587px',
-													position: 'relative',
-												}}
+											style={{
+												width: '376px',
+												height: '587px',
+												position: 'relative',
+												...campaignHeaderPanelDimStyle,
+											}}
 											>
 												<ContactsExpandedList
 													contacts={contactsForContactsExpandedList}
@@ -4893,11 +4908,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									) : (
 										<div
 											data-row-hover-research-anchor
-											style={{
-												width: `${mainContactsPanelWidthPx}px`,
-												overflow: 'visible',
-												position: 'relative',
-											}}
+										style={{
+											width: `${mainContactsPanelWidthPx}px`,
+											overflow: 'visible',
+											position: 'relative',
+											...campaignHeaderPanelDimStyle,
+										}}
 										>
 											{pinnedLeftPanelVariant === 'contacts' ? (
 												<div>
@@ -5514,14 +5530,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										onFromClick={onOpenIdentityDialog}
 										onDraftsClick={goToDrafting}
 										onSentClick={goToSent}
+										onFolderDropdownOpenChange={setIsCampaignHeaderDropdownOpen}
 										width={396}
 									/>
 									<div
 										className="bg-[#D8E5FB] border-[3px] border-[#143883] rounded-[7px] overflow-hidden flex flex-col"
-										style={{
-											width: '396px',
-											height: '703px',
-										}}
+									style={{
+										width: '396px',
+										height: '703px',
+										...campaignHeaderPanelDimStyle,
+									}}
 										onMouseOver={handleRailContainerMouseOver}
 										onMouseOut={handleRailContainerMouseOut}
 									>
@@ -6417,14 +6435,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onFromClick={onOpenIdentityDialog}
 											onDraftsClick={goToDrafting}
 											onSentClick={goToSent}
+											onFolderDropdownOpenChange={setIsCampaignHeaderDropdownOpen}
 										/>
 									)}
 									<div
-										style={{
-											width: `${mainContactsPanelWidthPx}px`,
-											height: `${mainContactsPanelHeightPx}px`,
-											overflow: 'visible',
-										}}
+									style={{
+										width: `${mainContactsPanelWidthPx}px`,
+										height: `${mainContactsPanelHeightPx}px`,
+										overflow: 'visible',
+										...campaignHeaderPanelDimStyle,
+									}}
 									>
 										<ContactsExpandedList
 											contacts={overviewListContacts}
@@ -6517,18 +6537,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													draftCount={draftCount}
 													sentCount={sentCount}
 													draftingProgress={draftingProgressForHeader}
-													onFromClick={onOpenIdentityDialog}
-													onDraftsClick={goToDrafting}
-													onSentClick={goToSent}
-													width={330}
-												/>
+																	onFromClick={onOpenIdentityDialog}
+																	onDraftsClick={goToDrafting}
+																	onSentClick={goToSent}
+																	onFolderDropdownOpenChange={setIsCampaignHeaderDropdownOpen}
+																	width={330}
+																/>
 												{/* Compact Contacts table */}
 												<div
-													style={{
-														width: '330px',
-														height: '263px',
-														overflow: 'visible',
-													}}
+									style={{
+										width: '330px',
+										height: '263px',
+										overflow: 'visible',
+										...campaignHeaderPanelDimStyle,
+									}}
 												>
 													{isSendingUiVisible ? (
 														<SendingExpandedList width={330} height={263} />
@@ -6957,10 +6979,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										)}
 										{/* Contacts table below writing box at narrowest breakpoint */}
 										{isNarrowestDesktop && (
-											<div
-												data-campaign-interactive-surface
-												className="mt-[20px] w-full flex justify-center"
-											>
+										<div
+											data-campaign-interactive-surface
+											className="mt-[20px] w-full flex justify-center"
+											style={campaignHeaderPanelDimStyle}
+										>
 												{isSendingUiVisible ? (
 													<SendingExpandedList width={489} height={349} />
 												) : (
@@ -7133,10 +7156,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														onFromClick={onOpenIdentityDialog}
 														onDraftsClick={goToDrafting}
 														onSentClick={goToSent}
+														onFolderDropdownOpenChange={setIsCampaignHeaderDropdownOpen}
 														width={330}
 													/>
 													{/* Drafts-mode activity list */}
-													<div style={{ width: '330px' }}>
+													<div style={{ width: '330px', ...campaignHeaderPanelDimStyle }}>
 														{isSendingUiVisible ? (
 															<SendingExpandedList width={330} height={316} />
 														) : (
@@ -7572,11 +7596,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													draftCount={draftCount}
 													sentCount={sentCount}
 													draftingProgress={draftingProgressForHeader}
-													onFromClick={onOpenIdentityDialog}
-													onDraftsClick={goToDrafting}
-													onSentClick={goToSent}
-													width={330}
-												/>
+												onFromClick={onOpenIdentityDialog}
+												onDraftsClick={goToDrafting}
+												onSentClick={goToSent}
+												onFolderDropdownOpenChange={setIsCampaignHeaderDropdownOpen}
+												width={330}
+											/>
 												{/* Mini Email Structure panel */}
 												<div style={{ width: '330px' }}>
 													<MiniEmailStructure
@@ -7881,16 +7906,18 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												draftCount={draftCount}
 												sentCount={sentCount}
 												draftingProgress={draftingProgressForHeader}
-												onFromClick={onOpenIdentityDialog}
-												onDraftsClick={goToDrafting}
-												onSentClick={goToSent}
-											/>
+											onFromClick={onOpenIdentityDialog}
+											onDraftsClick={goToDrafting}
+											onSentClick={goToSent}
+											onFolderDropdownOpenChange={setIsCampaignHeaderDropdownOpen}
+										/>
 											<div
-												style={{
-													width: '375px',
-													height: '557px',
-													overflow: 'visible',
-												}}
+											style={{
+												width: '375px',
+												height: '557px',
+												overflow: 'visible',
+												...campaignHeaderPanelDimStyle,
+											}}
 											>
 												{/* Show search results table when search has been performed, otherwise show research panel */}
 												{hasCampaignSearched &&
@@ -9110,7 +9137,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											isNarrow={true}
 										/>
 										{/* Inbox mode of ContactsExpandedList drives the selected email in the detail panel above. */}
-										<div className="mt-[20px]" data-campaign-interactive-surface>
+										<div
+											className="mt-[20px]"
+											data-campaign-interactive-surface
+											style={campaignHeaderPanelDimStyle}
+										>
 											<ContactsExpandedList
 												contacts={contactsForContactsExpandedList}
 												{...contactsListSupplementalProps}
@@ -9152,27 +9183,30 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													draftCount={draftCount}
 													sentCount={sentCount}
 													draftingProgress={draftingProgressForHeader}
-													onFromClick={onOpenIdentityDialog}
-													onDraftsClick={goToDrafting}
-													onSentClick={goToSent}
-													width={375}
-												/>
+												onFromClick={onOpenIdentityDialog}
+												onDraftsClick={goToDrafting}
+												onSentClick={goToSent}
+												onFolderDropdownOpenChange={setIsCampaignHeaderDropdownOpen}
+												width={375}
+											/>
 												{/* Inbox mode of ContactsExpandedList drives the selected email in the center panel. */}
-												<ContactsExpandedList
-													contacts={contactsForContactsExpandedList}
-													{...contactsListSupplementalProps}
-													{...contactsListTopNavProps}
-													isLoading={isContactsLoading}
-													campaign={campaign}
-													focusMode="inbox"
-													inboxPanelTabRequest={inboxPanelTabRequest}
-													selectedInboxEmailId={selectedInboxEmailId}
-													onInboxEmailClick={handleInboxEmailClick}
-													onContactHover={handleResearchContactHover}
-													width={375}
-													height={582}
-													minRows={6}
-												/>
+												<div style={campaignHeaderPanelDimStyle}>
+													<ContactsExpandedList
+														contacts={contactsForContactsExpandedList}
+														{...contactsListSupplementalProps}
+														{...contactsListTopNavProps}
+														isLoading={isContactsLoading}
+														campaign={campaign}
+														focusMode="inbox"
+														inboxPanelTabRequest={inboxPanelTabRequest}
+														selectedInboxEmailId={selectedInboxEmailId}
+														onInboxEmailClick={handleInboxEmailClick}
+														onContactHover={handleResearchContactHover}
+														width={375}
+														height={582}
+														minRows={6}
+													/>
+												</div>
 											</div>
 											{/* Right column: selected email detail */}
 											<div className="flex-shrink-0">
