@@ -246,11 +246,13 @@ const FadeOverflowText: FC<{
 	);
 };
 
-const getContactFullName = (contact?: ContactWithName | null) =>
+export const getContactFullName = (contact?: ContactWithName | null) =>
 	contact?.name || `${contact?.firstName || ''} ${contact?.lastName || ''}`.trim();
 
-const getContactDisplayName = (contact?: ContactWithName | null, fallback = 'Contact') =>
-	getContactFullName(contact) || contact?.company || contact?.email || fallback;
+export const getContactDisplayName = (
+	contact?: ContactWithName | null,
+	fallback = 'Contact'
+) => getContactFullName(contact) || contact?.company || contact?.email || fallback;
 
 const hasSeparateContactName = (contact?: ContactWithName | null) =>
 	Boolean(
@@ -259,10 +261,10 @@ const hasSeparateContactName = (contact?: ContactWithName | null) =>
 		(contact?.lastName && contact.lastName.trim())
 	);
 
-const getContactCompanyLabel = (contact?: ContactWithName | null) =>
+export const getContactCompanyLabel = (contact?: ContactWithName | null) =>
 	hasSeparateContactName(contact) ? contact?.company || '' : '';
 
-const getContactTitle = (contact?: ContactWithName | null) =>
+export const getContactTitle = (contact?: ContactWithName | null) =>
 	contact?.title || contact?.headline || '';
 
 const getTitleBadgeBgColor = (title: string) =>
@@ -493,6 +495,631 @@ export const StateLocationRow: FC<{
 		</div>
 	);
 };
+
+// Presentational inner content of a plain contact card (the grid cells). The
+// caller owns the outer `grid grid-cols-2 grid-rows-2` wrapper (border, bg,
+// click/hover, refs). This is a verbatim mirror of the inline contact-card
+// markup in the left expanded list below (kept inline there to avoid churning
+// the most-visible tab); the All-tab right-rail Search Results renders THIS so
+// the two stay pixel-identical. Keep both in sync if the layout changes.
+export const ContactCardInner: FC<{ contact: ContactWithName }> = ({ contact }) => {
+	const fullName =
+		contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+	const contactTitle = contact.title || contact.headline || '';
+	const leftPadding = 'pl-3';
+	return fullName ? (
+		<>
+			{/* Left - Name and company centered as a tighter stack */}
+			<div
+				className={cn(
+					leftPadding,
+					'col-start-1 row-start-1 row-span-2 pr-1 flex flex-col justify-center gap-[1px] overflow-hidden'
+				)}
+			>
+				<div className="font-inter text-[14.661px] font-normal leading-[17px] text-black text-left w-full truncate">
+					{fullName}
+				</div>
+				{contact.company ? (
+					<div
+						className="font-inter text-[14.661px] font-medium leading-[17px] text-black text-left w-full overflow-hidden whitespace-nowrap"
+						style={{
+							maskImage:
+								'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+							WebkitMaskImage:
+								'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+						}}
+					>
+						{contact.company}
+					</div>
+				) : null}
+			</div>
+
+			{/* Top Right - Title (aligned to top slot) */}
+			<div className="col-start-2 row-start-1 pr-2 pl-1 flex items-end pb-[2px] overflow-hidden">
+				{contactTitle ? (
+					<div
+						className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+						style={{
+							backgroundColor: isRestaurantTitle(contactTitle)
+								? '#C3FBD1'
+								: isCoffeeShopTitle(contactTitle)
+									? '#D6F1BD'
+									: isMusicVenueTitle(contactTitle)
+										? '#B7E5FF'
+										: isMusicFestivalTitle(contactTitle)
+											? '#C1D6FF'
+											: isWeddingPlannerTitle(contactTitle) ||
+												  isWeddingVenueTitle(contactTitle)
+												? '#FFF2BC'
+												: '#E8EFFF',
+						}}
+					>
+						{isRestaurantTitle(contactTitle) && <RestaurantsIcon size={12} />}
+						{isCoffeeShopTitle(contactTitle) && <CoffeeShopsIcon size={7} />}
+						{isMusicVenueTitle(contactTitle) && (
+							<MusicVenuesIcon size={12} className="flex-shrink-0" />
+						)}
+						{isMusicFestivalTitle(contactTitle) && (
+							<FestivalsIcon size={12} className="flex-shrink-0" />
+						)}
+						{(isWeddingPlannerTitle(contactTitle) ||
+							isWeddingVenueTitle(contactTitle)) && (
+							<WeddingPlannersIcon size={12} />
+						)}
+						<ScrollableText
+							text={
+								isRestaurantTitle(contactTitle)
+									? 'Restaurant'
+									: isCoffeeShopTitle(contactTitle)
+										? 'Coffee Shop'
+										: isMusicVenueTitle(contactTitle)
+											? 'Music Venue'
+											: isMusicFestivalTitle(contactTitle)
+												? 'Music Festival'
+												: isWeddingPlannerTitle(contactTitle)
+													? 'Wedding Planner'
+													: isWeddingVenueTitle(contactTitle)
+														? 'Wedding Venue'
+														: contactTitle
+							}
+							className="text-[10px] text-black leading-none"
+							scrollPixelsPerSecond={60}
+						/>
+					</div>
+				) : (
+					<div className="w-full" />
+				)}
+			</div>
+
+			{/* Bottom Right - Location (aligned to bottom slot) */}
+			<div className="col-start-2 row-start-2 pr-2 pl-1 flex items-start pt-[2px] overflow-hidden">
+				{contact.city || contact.state ? (
+					<div className="flex items-center gap-1 w-full">
+						{(() => {
+							const fullStateName = (contact.state as string) || '';
+							const stateAbbr = getStateAbbreviation(fullStateName) || '';
+							const normalizedState = fullStateName.trim();
+							const lowercaseCanadianProvinceNames = canadianProvinceNames.map(
+								(s) => s.toLowerCase()
+							);
+							const isCanadianProvince =
+								lowercaseCanadianProvinceNames.includes(
+									normalizedState.toLowerCase()
+								) ||
+								canadianProvinceAbbreviations.includes(
+									normalizedState.toUpperCase()
+								) ||
+								canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
+							const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+
+							if (!stateAbbr) return null;
+							return isCanadianProvince ? (
+								<div
+									className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border overflow-hidden"
+									style={{ borderColor: '#000000' }}
+									title="Canadian province"
+								>
+									<CanadianFlag
+										width="100%"
+										height="100%"
+										className="w-full h-full"
+									/>
+								</div>
+							) : isUSAbbr ? (
+								<span
+									className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
+									style={{
+										backgroundColor:
+											stateBadgeColorMap[stateAbbr] || 'transparent',
+										borderColor: '#000000',
+									}}
+								>
+									{stateAbbr}
+								</span>
+							) : (
+								<span
+									className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border"
+									style={{ borderColor: '#000000' }}
+								/>
+							);
+						})()}
+
+						{contact.city ? (
+							<ScrollableText
+								text={contact.city}
+								className="text-[10px] text-black leading-none"
+							/>
+						) : (
+							<div className="w-full" />
+						)}
+					</div>
+				) : (
+					<div className="w-full" />
+				)}
+			</div>
+		</>
+	) : (
+		<>
+			{/* Top Left - Company only */}
+			<div
+				className={cn(
+					leftPadding,
+					'col-start-1 row-start-1 pr-1 flex items-end pb-[2px] overflow-hidden'
+				)}
+			>
+				<div
+					className="font-inter text-[14.661px] font-medium leading-[17px] text-black text-left w-full overflow-hidden whitespace-nowrap"
+					style={{
+						maskImage:
+							'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+						WebkitMaskImage:
+							'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+					}}
+				>
+					{contact.company || 'Contact'}
+				</div>
+			</div>
+			<div className="col-start-1 row-start-2" />
+
+			{contactTitle ? (
+				<>
+					{/* Top Right - Title */}
+					<div className="col-start-2 row-start-1 pr-2 pl-1 flex items-end pb-[2px] overflow-hidden">
+						<div
+							className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+							style={{
+								backgroundColor: isRestaurantTitle(contactTitle)
+									? '#C3FBD1'
+									: isCoffeeShopTitle(contactTitle)
+										? '#D6F1BD'
+										: isMusicVenueTitle(contactTitle)
+											? '#B7E5FF'
+											: isMusicFestivalTitle(contactTitle)
+												? '#C1D6FF'
+												: isWeddingPlannerTitle(contactTitle) ||
+													  isWeddingVenueTitle(contactTitle)
+													? '#FFF2BC'
+													: '#E8EFFF',
+							}}
+						>
+							{isRestaurantTitle(contactTitle) && <RestaurantsIcon size={12} />}
+							{isCoffeeShopTitle(contactTitle) && <CoffeeShopsIcon size={7} />}
+							{isMusicVenueTitle(contactTitle) && (
+								<MusicVenuesIcon size={12} className="flex-shrink-0" />
+							)}
+							{isMusicFestivalTitle(contactTitle) && (
+								<FestivalsIcon size={12} className="flex-shrink-0" />
+							)}
+							{(isWeddingPlannerTitle(contactTitle) ||
+								isWeddingVenueTitle(contactTitle)) && (
+								<WeddingPlannersIcon size={12} />
+							)}
+							<ScrollableText
+								text={
+									isRestaurantTitle(contactTitle)
+										? 'Restaurant'
+										: isCoffeeShopTitle(contactTitle)
+											? 'Coffee Shop'
+											: isMusicVenueTitle(contactTitle)
+												? 'Music Venue'
+												: isMusicFestivalTitle(contactTitle)
+													? 'Music Festival'
+													: isWeddingPlannerTitle(contactTitle)
+														? 'Wedding Planner'
+														: isWeddingVenueTitle(contactTitle)
+															? 'Wedding Venue'
+															: contactTitle
+								}
+								className="text-[10px] text-black leading-none"
+							/>
+						</div>
+					</div>
+
+					{/* Bottom Right - Location */}
+					<div className="col-start-2 row-start-2 pr-2 pl-1 flex items-start pt-[2px] overflow-hidden">
+						{contact.city || contact.state ? (
+							<div className="flex items-center gap-1 w-full">
+								{(() => {
+									const fullStateName = (contact.state as string) || '';
+									const stateAbbr = getStateAbbreviation(fullStateName) || '';
+									const normalizedState = fullStateName.trim();
+									const lowercaseCanadianProvinceNames =
+										canadianProvinceNames.map((s) => s.toLowerCase());
+									const isCanadianProvince =
+										lowercaseCanadianProvinceNames.includes(
+											normalizedState.toLowerCase()
+										) ||
+										canadianProvinceAbbreviations.includes(
+											normalizedState.toUpperCase()
+										) ||
+										canadianProvinceAbbreviations.includes(
+											stateAbbr.toUpperCase()
+										);
+									const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+
+									if (!stateAbbr) return null;
+									return isCanadianProvince ? (
+										<div
+											className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border overflow-hidden"
+											style={{ borderColor: '#000000' }}
+											title="Canadian province"
+										>
+											<CanadianFlag
+												width="100%"
+												height="100%"
+												className="w-full h-full"
+											/>
+										</div>
+									) : isUSAbbr ? (
+										<span
+											className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
+											style={{
+												backgroundColor:
+													stateBadgeColorMap[stateAbbr] || 'transparent',
+												borderColor: '#000000',
+											}}
+										>
+											{stateAbbr}
+										</span>
+									) : (
+										<span
+											className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border"
+											style={{ borderColor: '#000000' }}
+										/>
+									);
+								})()}
+								{contact.city ? (
+									<ScrollableText
+										text={contact.city}
+										className="text-xs text-black w-full"
+									/>
+								) : (
+									<div className="w-full"></div>
+								)}
+							</div>
+						) : (
+							<div className="w-full"></div>
+						)}
+					</div>
+				</>
+			) : (
+				<div className="col-start-2 row-span-2 pr-2 pl-1 flex items-center h-full">
+					{contact.city || contact.state ? (
+						<div className="flex items-center gap-1 w-full">
+							{(() => {
+								const fullStateName = (contact.state as string) || '';
+								const stateAbbr = getStateAbbreviation(fullStateName) || '';
+								const normalizedState = fullStateName.trim();
+								const isCanadianProvince =
+									canadianProvinceNames.includes(
+										normalizedState.toLowerCase()
+									) ||
+									canadianProvinceAbbreviations.includes(
+										normalizedState.toUpperCase()
+									) ||
+									canadianProvinceAbbreviations.includes(
+										stateAbbr.toUpperCase()
+									);
+								const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+
+								if (!stateAbbr) return null;
+								return isCanadianProvince ? (
+									<div
+										className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border overflow-hidden"
+										style={{ borderColor: '#000000' }}
+										title="Canadian province"
+									>
+										<CanadianFlag
+											width="100%"
+											height="100%"
+											className="w-full h-full"
+										/>
+									</div>
+								) : isUSAbbr ? (
+									<span
+										className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
+										style={{
+											backgroundColor:
+												stateBadgeColorMap[stateAbbr] || 'transparent',
+											borderColor: '#000000',
+										}}
+									>
+										{stateAbbr}
+									</span>
+								) : (
+									<span
+										className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border"
+										style={{ borderColor: '#000000' }}
+									/>
+								);
+							})()}
+							{contact.city ? (
+								<ScrollableText
+									text={contact.city}
+									className="text-xs text-black w-full"
+								/>
+							) : (
+								<div className="w-full"></div>
+							)}
+						</div>
+					) : (
+						<div className="w-full"></div>
+					)}
+				</div>
+			)}
+		</>
+	);
+};
+
+// Presentational inner content of a supplemental draft row (top bar + stacked
+// company/name, category badge, state row, bold subject + body preview). The
+// caller owns the 108px-tall outer wrapper (border, bg, click/hover). Defaults
+// reproduce the non-redout, non-showing look used by the right-rail.
+export const DraftCardInner: FC<{
+	contact?: ContactWithName | null;
+	companyLabel: string;
+	contactName: string;
+	contactTitle: string;
+	subject: string;
+	bodyPreview: string;
+	textClassName?: string;
+	borderColor?: string;
+	badgeFillColor?: string;
+	textColor?: string;
+	topBarLeftColor?: string;
+	topBarRightColor?: string;
+	topBarLeftWidthPx?: number;
+	showStroke?: boolean;
+	showShowingBadge?: boolean;
+}> = ({
+	contact,
+	companyLabel,
+	contactName,
+	contactTitle,
+	subject,
+	bodyPreview,
+	textClassName = 'text-black',
+	borderColor = '#000000',
+	badgeFillColor,
+	textColor,
+	topBarLeftColor = SHOWING_DRAFT_TOP_BAR_COLOR,
+	topBarRightColor = '#F9FAFB',
+	topBarLeftWidthPx = 115,
+	showStroke = true,
+	showShowingBadge = false,
+}) => (
+	<>
+		<div className="absolute left-0 top-0 h-[13px] w-full pointer-events-none flex">
+			<div
+				className="h-full shrink-0"
+				style={{
+					width: `${topBarLeftWidthPx}px`,
+					backgroundColor: topBarLeftColor,
+				}}
+			/>
+			<div className="h-full flex-1" style={{ backgroundColor: topBarRightColor }} />
+		</div>
+
+		<div className="absolute left-3 top-[17px] right-1/2 pr-1 pointer-events-none">
+			<FadeOverflowText
+				text={companyLabel}
+				className={cn(
+					'font-inter text-[14.661px] font-medium leading-[19.547px]',
+					textClassName
+				)}
+				splitNumericSuffix={false}
+			/>
+			<FadeOverflowText
+				text={contactName}
+				className={cn(
+					'font-inter text-[14.661px] font-normal leading-[19.547px]',
+					textClassName
+				)}
+				splitNumericSuffix={false}
+			/>
+		</div>
+
+		<div className="absolute top-[16px] left-1/2 right-2 pl-1 pointer-events-none">
+			{showShowingBadge ? (
+				<div
+					className="w-full h-[17px] rounded-[6px] pl-2 pr-2 border overflow-hidden flex items-center justify-start gap-2"
+					style={{
+						backgroundColor: SHOWING_DRAFT_TOP_BAR_COLOR,
+						borderColor: borderColor,
+					}}
+				>
+					<ShowingDraftViewIcon className="w-[20px] h-[11px] shrink-0" />
+					<span className="font-inter text-[10px] font-medium leading-none text-black">
+						Showing
+					</span>
+				</div>
+			) : contactTitle ? (
+				<TitleBadge
+					title={contactTitle}
+					className="w-full h-[17px] rounded-[6px] px-2 gap-1"
+					textClassName={cn('text-[10px] leading-none', textClassName)}
+					fillColor={badgeFillColor}
+					strokeColor={borderColor}
+					textColor={textColor}
+					showStroke={showStroke}
+					restaurantIconSize={12}
+					coffeeIconSize={7}
+					defaultIconSize={12}
+				/>
+			) : null}
+		</div>
+
+		<div className="absolute top-[37px] left-1/2 right-2 pl-1 pointer-events-none">
+			<StateLocationRow
+				contact={contact}
+				className="h-[16px] w-full gap-1"
+				badgeClassName="box-border w-[29px] h-[16px] rounded-[4px] shrink-0"
+				badgeTextClassName="font-inter text-[10px] leading-none font-bold"
+				cityClassName={cn('text-[10px] leading-none', textClassName)}
+				badgeFillColor={badgeFillColor}
+				strokeColor={borderColor}
+				textColor={textColor}
+				showBadgeStroke={showStroke}
+			/>
+		</div>
+
+		<div className="absolute left-3 right-[12px] top-[57px] pointer-events-none">
+			<FadeOverflowText
+				text={subject}
+				className={cn(
+					'font-inter text-[13.215px] font-semibold leading-[21.144px]',
+					textClassName
+				)}
+				splitNumericSuffix={false}
+			/>
+			<FadeOverflowText
+				text={bodyPreview}
+				className={cn(
+					'font-inter text-[13.215px] font-normal leading-[21.144px]',
+					textClassName
+				)}
+				splitNumericSuffix={false}
+			/>
+		</div>
+	</>
+);
+
+// Presentational inner content of a supplemental inbox row (stacked
+// company/name, event-or-category badge, state row, subject + preview). Mirrors
+// the draft row without the top strip. Caller owns the 92px-tall outer wrapper.
+export const InboxCardInner: FC<{
+	contact?: ContactWithName | null;
+	companyLabel: string;
+	contactName: string;
+	contactTitle: string;
+	threadEventName?: string;
+	subject: string;
+	bodyPreview: string;
+	textClassName?: string;
+	borderColor?: string;
+	badgeFillColor?: string;
+	textColor?: string;
+	showStroke?: boolean;
+}> = ({
+	contact,
+	companyLabel,
+	contactName,
+	contactTitle,
+	threadEventName = '',
+	subject,
+	bodyPreview,
+	textClassName = 'text-black',
+	borderColor = '#000000',
+	badgeFillColor,
+	textColor,
+	showStroke = true,
+}) => (
+	<>
+		{/* Layout mirrors supplemental draft rows, but without the top strip. */}
+		<div className="absolute left-3 top-[10px] right-1/2 pr-1 pointer-events-none">
+			<FadeOverflowText
+				text={companyLabel}
+				className={cn(
+					'font-inter text-[14.661px] font-medium leading-[19.547px]',
+					textClassName
+				)}
+				splitNumericSuffix={false}
+			/>
+			<FadeOverflowText
+				text={contactName}
+				className={cn(
+					'font-inter text-[14.661px] font-normal leading-[19.547px]',
+					textClassName
+				)}
+				splitNumericSuffix={false}
+			/>
+		</div>
+
+		<div className="absolute top-[9px] left-1/2 right-2 pl-1 pointer-events-none">
+			{threadEventName ? (
+				<EventThreadBadge
+					name={threadEventName}
+					className="w-full h-[17px] rounded-[6px] px-2 gap-1"
+					textClassName={cn('text-[10px] leading-none', textClassName)}
+					strokeColor={borderColor}
+					textColor={textColor}
+					showStroke={showStroke}
+				/>
+			) : contactTitle ? (
+				<TitleBadge
+					title={contactTitle}
+					className="w-full h-[17px] rounded-[6px] px-2 gap-1"
+					textClassName={cn('text-[10px] leading-none', textClassName)}
+					fillColor={badgeFillColor}
+					strokeColor={borderColor}
+					textColor={textColor}
+					showStroke={showStroke}
+					restaurantIconSize={12}
+					coffeeIconSize={7}
+					defaultIconSize={12}
+				/>
+			) : null}
+		</div>
+
+		<div
+			className={cn(
+				'absolute left-1/2 right-2 pl-1 pointer-events-none',
+				threadEventName || contactTitle ? 'top-[30px]' : 'top-[9px]'
+			)}
+		>
+			<StateLocationRow
+				contact={contact}
+				className="h-[16px] w-full gap-1"
+				badgeClassName="box-border w-[29px] h-[16px] rounded-[4px] shrink-0"
+				badgeTextClassName="font-inter text-[10px] leading-none font-bold"
+				cityClassName={cn('text-[10px] leading-none', textClassName)}
+				badgeFillColor={badgeFillColor}
+				strokeColor={borderColor}
+				textColor={textColor}
+				showBadgeStroke={showStroke}
+			/>
+		</div>
+
+		<div className="absolute left-3 right-[12px] top-[48px] pointer-events-none">
+			<FadeOverflowText
+				text={subject}
+				className={cn(
+					'font-inter text-[13.215px] font-semibold leading-[17px]',
+					textClassName
+				)}
+				splitNumericSuffix={false}
+			/>
+			<FadeOverflowText
+				text={bodyPreview}
+				className={cn(
+					'font-inter text-[13.215px] font-normal leading-[17px]',
+					textClassName
+				)}
+				splitNumericSuffix={false}
+			/>
+		</div>
+	</>
+);
 
 const resolveInboundContact = (
 	email: InboundEmailWithRelations,
@@ -1651,101 +2278,23 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					if (shouldRedOutDraftRows) onOpenSend?.();
 				}}
 			>
-				<div className="absolute left-0 top-0 h-[13px] w-full pointer-events-none flex">
-					<div
-						className="h-full shrink-0"
-						style={{
-							width: `${topBarLeftWidthPx}px`,
-							backgroundColor: topBarLeftColor,
-						}}
-					/>
-					<div className="h-full flex-1" style={{ backgroundColor: topBarRightColor }} />
-				</div>
-
-				<div className="absolute left-3 top-[17px] right-1/2 pr-1 pointer-events-none">
-					<FadeOverflowText
-						text={companyLabel}
-						className={cn(
-							'font-inter text-[14.661px] font-medium leading-[19.547px]',
-							draftSupplementalTextClassName
-						)}
-						splitNumericSuffix={false}
-					/>
-					<FadeOverflowText
-						text={contactName}
-						className={cn(
-							'font-inter text-[14.661px] font-normal leading-[19.547px]',
-							draftSupplementalTextClassName
-						)}
-						splitNumericSuffix={false}
-					/>
-				</div>
-
-				<div className="absolute top-[16px] left-1/2 right-2 pl-1 pointer-events-none">
-					{isShowingDraft ? (
-						<div
-							className="w-full h-[17px] rounded-[6px] pl-2 pr-2 border overflow-hidden flex items-center justify-start gap-2"
-							style={{
-								backgroundColor: SHOWING_DRAFT_TOP_BAR_COLOR,
-								borderColor: draftSupplementalBorderColor,
-							}}
-						>
-							<ShowingDraftViewIcon className="w-[20px] h-[11px] shrink-0" />
-							<span className="font-inter text-[10px] font-medium leading-none text-black">
-								Showing
-							</span>
-						</div>
-					) : contactTitle ? (
-						<TitleBadge
-							title={contactTitle}
-							className="w-full h-[17px] rounded-[6px] px-2 gap-1"
-							textClassName={cn(
-								'text-[10px] leading-none',
-								draftSupplementalTextClassName
-							)}
-							fillColor={draftSupplementalBadgeFillColor}
-							strokeColor={draftSupplementalBorderColor}
-							textColor={draftSupplementalTextColor}
-							showStroke={!isReddedOut}
-							restaurantIconSize={12}
-							coffeeIconSize={7}
-							defaultIconSize={12}
-						/>
-					) : null}
-				</div>
-
-				<div className="absolute top-[37px] left-1/2 right-2 pl-1 pointer-events-none">
-					<StateLocationRow
-						contact={contact}
-						className="h-[16px] w-full gap-1"
-						badgeClassName="box-border w-[29px] h-[16px] rounded-[4px] shrink-0"
-						badgeTextClassName="font-inter text-[10px] leading-none font-bold"
-						cityClassName={cn('text-[10px] leading-none', draftSupplementalTextClassName)}
-						badgeFillColor={draftSupplementalBadgeFillColor}
-						strokeColor={draftSupplementalBorderColor}
-						textColor={draftSupplementalTextColor}
-						showBadgeStroke={!isReddedOut}
-					/>
-				</div>
-
-				<div className="absolute left-3 right-[12px] top-[57px] pointer-events-none">
-					<FadeOverflowText
-						text={draft.subject || 'No subject'}
-						className={cn(
-							'font-inter text-[13.215px] font-semibold leading-[21.144px]',
-							draftSupplementalTextClassName
-						)}
-						splitNumericSuffix={false}
-					/>
-					<FadeOverflowText
-						text={messagePreview}
-						className={cn(
-							'font-inter text-[13.215px] font-normal leading-[21.144px]',
-							draftSupplementalTextClassName
-						)}
-						splitNumericSuffix={false}
-					/>
-				</div>
+				<DraftCardInner
+					contact={contact}
+					companyLabel={companyLabel}
+					contactName={contactName}
+					contactTitle={contactTitle}
+					subject={draft.subject || 'No subject'}
+					bodyPreview={messagePreview}
+					textClassName={draftSupplementalTextClassName}
+					borderColor={draftSupplementalBorderColor}
+					badgeFillColor={draftSupplementalBadgeFillColor}
+					textColor={draftSupplementalTextColor}
+					topBarLeftColor={topBarLeftColor}
+					topBarRightColor={topBarRightColor}
+					topBarLeftWidthPx={topBarLeftWidthPx}
+					showStroke={!isReddedOut}
+					showShowingBadge={isShowingDraft}
+				/>
 			</div>
 		);
 	};
@@ -1914,100 +2463,20 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						/>
 					</div>
 				) : (
-					<>
-						{/* Layout mirrors supplemental draft rows, but without the top strip. */}
-						<div className="absolute left-3 top-[10px] right-1/2 pr-1 pointer-events-none">
-							<FadeOverflowText
-								text={companyLabel}
-								className={cn(
-									'font-inter text-[14.661px] font-medium leading-[19.547px]',
-									inboxSupplementalTextClassName
-								)}
-								splitNumericSuffix={false}
-							/>
-							<FadeOverflowText
-								text={contactName}
-								className={cn(
-									'font-inter text-[14.661px] font-normal leading-[19.547px]',
-									inboxSupplementalTextClassName
-								)}
-								splitNumericSuffix={false}
-							/>
-						</div>
-
-						<div className="absolute top-[9px] left-1/2 right-2 pl-1 pointer-events-none">
-							{threadEventName ? (
-								<EventThreadBadge
-									name={threadEventName}
-									className="w-full h-[17px] rounded-[6px] px-2 gap-1"
-									textClassName={cn(
-										'text-[10px] leading-none',
-										inboxSupplementalTextClassName
-									)}
-									strokeColor={inboxSupplementalBorderColor}
-									textColor={inboxSupplementalTextColor}
-									showStroke={!isReddedOut}
-								/>
-							) : contactTitle ? (
-								<TitleBadge
-									title={contactTitle}
-									className="w-full h-[17px] rounded-[6px] px-2 gap-1"
-									textClassName={cn(
-										'text-[10px] leading-none',
-										inboxSupplementalTextClassName
-									)}
-									fillColor={inboxSupplementalBadgeFillColor}
-									strokeColor={inboxSupplementalBorderColor}
-									textColor={inboxSupplementalTextColor}
-									showStroke={!isReddedOut}
-									restaurantIconSize={12}
-									coffeeIconSize={7}
-									defaultIconSize={12}
-								/>
-							) : null}
-						</div>
-
-						<div
-							className={cn(
-								'absolute left-1/2 right-2 pl-1 pointer-events-none',
-								threadEventName || contactTitle ? 'top-[30px]' : 'top-[9px]'
-							)}
-						>
-							<StateLocationRow
-								contact={contact}
-								className="h-[16px] w-full gap-1"
-								badgeClassName="box-border w-[29px] h-[16px] rounded-[4px] shrink-0"
-								badgeTextClassName="font-inter text-[10px] leading-none font-bold"
-								cityClassName={cn(
-									'text-[10px] leading-none',
-									inboxSupplementalTextClassName
-								)}
-								badgeFillColor={inboxSupplementalBadgeFillColor}
-								strokeColor={inboxSupplementalBorderColor}
-								textColor={inboxSupplementalTextColor}
-								showBadgeStroke={!isReddedOut}
-							/>
-						</div>
-
-						<div className="absolute left-3 right-[12px] top-[48px] pointer-events-none">
-							<FadeOverflowText
-								text={previewEmail.subject || 'No subject'}
-								className={cn(
-									'font-inter text-[13.215px] font-semibold leading-[17px]',
-									inboxSupplementalTextClassName
-								)}
-								splitNumericSuffix={false}
-							/>
-							<FadeOverflowText
-								text={bodyPreview}
-								className={cn(
-									'font-inter text-[13.215px] font-normal leading-[17px]',
-									inboxSupplementalTextClassName
-								)}
-								splitNumericSuffix={false}
-							/>
-						</div>
-					</>
+					<InboxCardInner
+						contact={contact}
+						companyLabel={companyLabel}
+						contactName={contactName}
+						contactTitle={contactTitle}
+						threadEventName={threadEventName}
+						subject={previewEmail.subject || 'No subject'}
+						bodyPreview={bodyPreview}
+						textClassName={inboxSupplementalTextClassName}
+						borderColor={inboxSupplementalBorderColor}
+						badgeFillColor={inboxSupplementalBadgeFillColor}
+						textColor={inboxSupplementalTextColor}
+						showStroke={!isReddedOut}
+					/>
 				)}
 			</div>
 		);

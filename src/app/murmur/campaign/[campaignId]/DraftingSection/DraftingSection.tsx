@@ -9,7 +9,6 @@ import {
 	useState,
 	type CSSProperties,
 	type MouseEvent as ReactMouseEvent,
-	type SVGProps,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -28,7 +27,7 @@ import { ProfileSidePanelBox } from '@/components/molecules/HybridPromptInput/Pr
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 // EmailGeneration kept available but not used in current view
 // import { EmailGeneration } from './EmailGeneration/EmailGeneration';
-import { cn } from '@/utils';
+import { cn, convertHtmlToPlainText } from '@/utils';
 import { getMurmurRootScale } from '@/utils/rootScale';
 import { markAfterPaint } from '@/utils/perfMarks';
 import {
@@ -63,7 +62,7 @@ import {
 	type DraftedEmailsHandle,
 } from './EmailGeneration/DraftedEmails/DraftedEmails';
 import { useDraftReviewHandlers } from './EmailGeneration/DraftedEmails/useDraftReviewHandlers';
-import { EmailWithRelations } from '@/types';
+import { EmailWithRelations, InboundEmailWithRelations } from '@/types';
 import { useEditIdentity } from '@/hooks/queryHooks/useIdentities';
 import { useMe } from '@/hooks/useMe';
 import { useQueryClient } from '@tanstack/react-query';
@@ -76,6 +75,13 @@ import { MiniEmailStructure } from './EmailGeneration/MiniEmailStructure';
 import ContactsExpandedList, {
 	type ContactsExpandedListFocusMode,
 	type ContactsExpandedTopNavStop,
+	ContactCardInner,
+	DraftCardInner,
+	InboxCardInner,
+	getContactFullName,
+	getContactDisplayName,
+	getContactCompanyLabel,
+	getContactTitle,
 } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/ContactsExpandedList';
 import { DraftsExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftsExpandedList';
 import { DraftPreviewExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftPreviewExpandedList';
@@ -96,6 +102,8 @@ import { MobileDraftReviewView } from '@/app/murmur/campaign/[campaignId]/Drafti
 import {
 	buildInboxConversations,
 	inboxConversationContainsEmailId,
+	getInboxMessageSnippet,
+	getInboxMessageTimeMs,
 	normalizeApplicationForInboxConversation,
 	normalizeInboxEmailAddress,
 	normalizeSentEmailForInboxConversation,
@@ -113,9 +121,6 @@ import {
 import SearchResultsMap, {
 	type CampaignContactMapStatus,
 } from '@/components/molecules/SearchResultsMap/SearchResultsMap';
-import StatusDraftsIcon from '@/components/atoms/svg/StatusDraftsIcon';
-import StatusNewMessageIcon from '@/components/atoms/svg/StatusNewMessageIcon';
-import StatusSentIcon from '@/components/atoms/svg/StatusSentIcon';
 import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
 import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
@@ -321,21 +326,6 @@ const RAIL_HOVER_RESEARCH_TOP_NUDGE_PX = 56;
 const ROW_HOVER_OPPORTUNITY_DOCKED_LEFT_PX = -(
 	OPPORTUNITY_HOVER_PANEL_WIDTH_PX + ROW_HOVER_RESEARCH_GAP_PX
 );
-
-// Right-rail search-result status pill: reuses the campaign overview status
-// colors/icons (page.tsx CAMPAIGN_OVERVIEW_STATUS_PILL_COLOR + the status strip
-// icons) so a result reads as Draft / New Message / Sent. Plain 'contacts' get
-// no pill, so they're omitted here.
-const OVERVIEW_RIGHT_RAIL_STATUS_PILL: Partial<
-	Record<
-		CampaignContactMapStatus,
-		{ color: string; label: string; Icon: FC<SVGProps<SVGSVGElement>> }
-	>
-> = {
-	drafts: { color: '#FDDEA5', label: 'Draft', Icon: StatusDraftsIcon },
-	'new-message': { color: '#AEE1FD', label: 'New', Icon: StatusNewMessageIcon },
-	sent: { color: '#AEFDC3', label: 'Sent', Icon: StatusSentIcon },
-};
 
 export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const {
@@ -1113,253 +1103,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		return set;
 	}, [overviewRightRailUnselectedContactsFiltered, getOverviewRightRailChipKeyForContact]);
 
-	const renderOverviewRightRailDesktopRow = useCallback(
-		(contact: ContactWithName) => {
-			const isSelected = overviewRightRailSelectedIdSet.has(contact.id);
-			const isHovered = overviewRightRailHoveredContactId === contact.id;
-			const firstName = contact.firstName || '';
-			const lastName = contact.lastName || '';
-			const fullName = contact.name || `${firstName} ${lastName}`.trim();
-			const company = contact.company || '';
-			const headline =
-				contact.curatedDisplayLabel || contact.headline || contact.title || '';
-			const stateAbbr = getStateAbbreviation(contact.state || '') || '';
-			const city = contact.city || '';
-			const status =
-				overviewRightRailContactStatusById?.get(contact.id) ?? 'contacts';
-			const statusPill = OVERVIEW_RIGHT_RAIL_STATUS_PILL[status];
-			const StatusPillIcon = statusPill?.Icon;
-
-			return (
-				<div
-					key={contact.id}
-					data-contact-id={contact.id}
-					className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-[3px] border-[#ABABAB] select-none relative"
-					style={{
-						backgroundColor: isSelected
-							? isRestaurantTitle(headline)
-								? isHovered
-									? '#C5F5D1'
-									: '#D7FFE1'
-								: isCoffeeShopTitle(headline)
-									? isHovered
-										? '#DDF4CC'
-										: '#EDFEDC'
-									: isMusicVenueTitle(headline)
-										? isHovered
-											? '#C5E8FF'
-											: '#D7F0FF'
-										: isMusicFestivalTitle(headline)
-											? isHovered
-												? '#ADD4FF'
-												: '#BFDCFF'
-											: isWeddingPlannerTitle(headline) ||
-												  isWeddingVenueTitle(headline)
-													? isHovered
-														? '#F5EDCE'
-														: '#FFF8DC'
-												: isWineBeerSpiritsTitle(headline)
-													? isHovered
-														? '#C8CBFF'
-														: '#DADDFF'
-													: isHovered
-														? '#BFE3FF'
-														: '#C9EAFF'
-							: isHovered
-								? '#F3F4F6'
-								: '#FFFFFF',
-					}}
-					onClick={() => {
-						setOverviewRightRailSelectedContacts((prev) => {
-							if (prev.includes(contact.id)) {
-								return prev.filter((id) => id !== contact.id);
-							}
-							return [...prev, contact.id];
-						});
-					}}
-					onMouseEnter={() => setOverviewRightRailHoveredContactId(contact.id)}
-					onMouseLeave={() =>
-						setOverviewRightRailHoveredContactId((prev) =>
-							prev === contact.id ? null : prev
-						)
-					}
-				>
-					{fullName ? (
-						<>
-							<div className="pl-3 pr-1 flex items-center h-[23px]">
-								<div className="font-bold text-[11px] w-full truncate leading-tight">
-									{fullName}
-								</div>
-							</div>
-							<div className="pr-2 pl-1 flex items-center h-[23px]">
-								{headline ? (
-									<div
-										className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
-										style={{
-											backgroundColor: isRestaurantTitle(headline)
-												? '#C3FBD1'
-												: isCoffeeShopTitle(headline)
-													? '#D6F1BD'
-													: isMusicVenueTitle(headline)
-														? '#B7E5FF'
-														: isMusicFestivalTitle(headline)
-															? '#C1D6FF'
-															: isWeddingPlannerTitle(headline) ||
-																  isWeddingVenueTitle(headline)
-																? '#FFF8DC'
-																: isWineBeerSpiritsTitle(headline)
-																	? '#BFC4FF'
-																	: '#E8EFFF',
-										}}
-									>
-										{isRestaurantTitle(headline) && (
-											<RestaurantsIcon size={12} className="flex-shrink-0" />
-										)}
-										{isCoffeeShopTitle(headline) && <CoffeeShopsIcon size={7} />}
-										{isMusicVenueTitle(headline) && (
-											<MusicVenuesIcon size={12} className="flex-shrink-0" />
-										)}
-										{isMusicFestivalTitle(headline) && (
-											<FestivalsIcon size={12} className="flex-shrink-0" />
-										)}
-										{(isWeddingPlannerTitle(headline) ||
-											isWeddingVenueTitle(headline)) && (
-											<WeddingPlannersIcon size={12} />
-										)}
-										{isWineBeerSpiritsTitle(headline) && (
-											<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
-										)}
-										<span className="text-[10px] text-black leading-none truncate">
-											{isWineBeerSpiritsTitle(headline)
-												? getWineBeerSpiritsLabel(headline)
-												: headline}
-										</span>
-									</div>
-								) : (
-									<div className="w-full" />
-								)}
-							</div>
-							<div className="pl-3 pr-1 flex items-center h-[22px]">
-								<div className="text-[11px] text-black w-full truncate leading-tight">
-									{company}
-								</div>
-							</div>
-							<div className="pr-2 pl-1 flex items-center gap-1 h-[22px]">
-								<div className="flex items-center gap-1 flex-1 min-w-0">
-									{stateAbbr && (
-										<span
-											className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
-											style={{
-												backgroundColor:
-													stateBadgeColorMap[stateAbbr] || 'transparent',
-												borderColor: '#000000',
-											}}
-										>
-											{stateAbbr}
-										</span>
-									)}
-									{city && (
-										<span className="text-[10px] text-black leading-none truncate">
-											{city}
-										</span>
-									)}
-								</div>
-								{statusPill && StatusPillIcon && (
-									<div
-										className="flex items-center gap-1 flex-shrink-0 h-[17px] rounded-[6px] px-1.5 border border-black"
-										style={{ backgroundColor: statusPill.color }}
-									>
-										<StatusPillIcon width={11} height={11} />
-										<span className="text-[9px] text-black leading-none whitespace-nowrap">
-											{statusPill.label}
-										</span>
-									</div>
-								)}
-							</div>
-						</>
-					) : (
-						<>
-							<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
-								<div className="font-bold text-[11px] w-full truncate leading-tight">
-									{company || '—'}
-								</div>
-							</div>
-							<div className="pr-2 pl-1 flex items-center h-[23px]">
-								{headline ? (
-									<div
-										className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
-										style={{
-											backgroundColor: isRestaurantTitle(headline)
-												? '#C3FBD1'
-												: isCoffeeShopTitle(headline)
-													? '#D6F1BD'
-													: isMusicVenueTitle(headline)
-														? '#B7E5FF'
-														: isMusicFestivalTitle(headline)
-															? '#C1D6FF'
-															: isWeddingPlannerTitle(headline) ||
-																  isWeddingVenueTitle(headline)
-																? '#FFF8DC'
-																: isWineBeerSpiritsTitle(headline)
-																	? '#BFC4FF'
-																	: '#E8EFFF',
-										}}
-									>
-										<span className="text-[10px] text-black leading-none truncate">
-											{isWineBeerSpiritsTitle(headline)
-												? getWineBeerSpiritsLabel(headline)
-												: headline}
-										</span>
-									</div>
-								) : (
-									<div className="w-full" />
-								)}
-							</div>
-							<div className="pr-2 pl-1 flex items-center gap-1 h-[22px]">
-								<div className="flex items-center gap-1 flex-1 min-w-0">
-									{stateAbbr && (
-										<span
-											className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
-											style={{
-												backgroundColor:
-													stateBadgeColorMap[stateAbbr] || 'transparent',
-												borderColor: '#000000',
-											}}
-										>
-											{stateAbbr}
-										</span>
-									)}
-									{city && (
-										<span className="text-[10px] text-black leading-none truncate">
-											{city}
-										</span>
-									)}
-								</div>
-								{statusPill && StatusPillIcon && (
-									<div
-										className="flex items-center gap-1 flex-shrink-0 h-[17px] rounded-[6px] px-1.5 border border-black"
-										style={{ backgroundColor: statusPill.color }}
-									>
-										<StatusPillIcon width={11} height={11} />
-										<span className="text-[9px] text-black leading-none whitespace-nowrap">
-											{statusPill.label}
-										</span>
-									</div>
-								)}
-							</div>
-						</>
-					)}
-				</div>
-			);
-		},
-		[
-			overviewRightRailContactStatusById,
-			overviewRightRailHoveredContactId,
-			overviewRightRailSelectedIdSet,
-			setOverviewRightRailHoveredContactId,
-			setOverviewRightRailSelectedContacts,
-		]
-	);
 	const [overviewContactsDockPos, setOverviewContactsDockPos] = useState<{
 		leftPx: number;
 		topPx: number;
@@ -2723,6 +2466,211 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	});
 	const inboxCount = inboundEmails?.length || 0;
 
+	// Per-contact draft/sent/inbound lookups so the All-tab right-rail Search
+	// Results can render the SAME rich cards (subject + body preview) the left
+	// expanded list shows. headerEmails is ordered latest-first, so the first
+	// draft/sent we see per contact is the latest (matching the status map in
+	// page.tsx). Inbound keeps the latest by message time.
+	const railDraftByContactId = useMemo(() => {
+		const map = new Map<number, EmailWithRelations>();
+		for (const draft of draftEmailsForView) {
+			if (typeof draft.contactId !== 'number') continue;
+			if (!map.has(draft.contactId)) map.set(draft.contactId, draft);
+		}
+		return map;
+	}, [draftEmailsForView]);
+	const railSentByContactId = useMemo(() => {
+		const map = new Map<number, EmailWithRelations>();
+		for (const email of sentEmails) {
+			if (typeof email.contactId !== 'number') continue;
+			if (!map.has(email.contactId)) map.set(email.contactId, email);
+		}
+		return map;
+	}, [sentEmails]);
+	const railInboundByContactId = useMemo(() => {
+		const map = new Map<number, InboundEmailWithRelations>();
+		for (const email of inboundEmails || []) {
+			if (typeof email.contactId !== 'number') continue;
+			const existing = map.get(email.contactId);
+			if (!existing || getInboxMessageTimeMs(email) >= getInboxMessageTimeMs(existing)) {
+				map.set(email.contactId, email);
+			}
+		}
+		return map;
+	}, [inboundEmails]);
+
+	// Renders one All-tab right-rail Search Results card. Defined after the
+	// rail*ByContactId maps so it can read them (it's only called from JSX far
+	// below). Branches on the contact's overview status to render the SAME rich
+	// cards the left expanded list shows: draft / inbox cards carry the bold
+	// subject + body preview; plain contacts get the contact card. The clickable
+	// wrapper keeps the rail's selection/hover tint; the card body is shared.
+	const renderOverviewRightRailDesktopRow = (contact: ContactWithName) => {
+		const isSelected = overviewRightRailSelectedIdSet.has(contact.id);
+		const isHovered = overviewRightRailHoveredContactId === contact.id;
+		const headline =
+			contact.curatedDisplayLabel || contact.headline || contact.title || '';
+		const status =
+			overviewRightRailContactStatusById?.get(contact.id) ?? 'contacts';
+
+		const handleSelectToggle = () =>
+			setOverviewRightRailSelectedContacts((prev) =>
+				prev.includes(contact.id)
+					? prev.filter((id) => id !== contact.id)
+					: [...prev, contact.id]
+			);
+		const handleMouseEnter = () => setOverviewRightRailHoveredContactId(contact.id);
+		const handleMouseLeave = () =>
+			setOverviewRightRailHoveredContactId((prev) =>
+				prev === contact.id ? null : prev
+			);
+
+		// Selected rows tint by category (the rail's existing selection
+		// affordance); hover greys; otherwise the card's natural base fill. The
+		// card CONTENT below is the shared expanded-list markup, so it stays
+		// identical to the left list regardless of this wrapper tint.
+		const selectedTint = isRestaurantTitle(headline)
+			? isHovered
+				? '#C5F5D1'
+				: '#D7FFE1'
+			: isCoffeeShopTitle(headline)
+				? isHovered
+					? '#DDF4CC'
+					: '#EDFEDC'
+				: isMusicVenueTitle(headline)
+					? isHovered
+						? '#C5E8FF'
+						: '#D7F0FF'
+					: isMusicFestivalTitle(headline)
+						? isHovered
+							? '#ADD4FF'
+							: '#BFDCFF'
+						: isWeddingPlannerTitle(headline) ||
+							  isWeddingVenueTitle(headline)
+							? isHovered
+								? '#F5EDCE'
+								: '#FFF8DC'
+							: isWineBeerSpiritsTitle(headline)
+								? isHovered
+									? '#C8CBFF'
+									: '#DADDFF'
+								: isHovered
+									? '#BFE3FF'
+									: '#C9EAFF';
+		const isInboxLike = status === 'sent' || status === 'new-message';
+		const baseBg = isInboxLike ? '#F9FAFB' : '#FFFFFF';
+		const wrapperBg = isSelected ? selectedTint : isHovered ? '#F3F4F6' : baseBg;
+
+		// Draft card — bold subject + body preview, identical to the left draft row.
+		if (status === 'drafts') {
+			const draft = railDraftByContactId.get(contact.id);
+			if (draft) {
+				const rawContactName = getContactFullName(contact);
+				const contactName = rawContactName.includes('@') ? '' : rawContactName;
+				const rawCompanyLabel = contact.company || '';
+				const companyLabel = rawCompanyLabel.includes('@')
+					? !contactName
+						? 'Unknown Contact'
+						: ''
+					: rawCompanyLabel || (!contactName ? 'Unknown Contact' : '');
+				return (
+					<div
+						key={contact.id}
+						data-contact-id={contact.id}
+						className="cursor-pointer transition-colors relative w-full overflow-hidden select-none"
+						style={{
+							height: '108px',
+							borderRadius: '7.798px',
+							border: '1.949px solid #000000',
+							backgroundColor: wrapperBg,
+							boxSizing: 'border-box',
+						}}
+						onClick={handleSelectToggle}
+						onMouseEnter={handleMouseEnter}
+						onMouseLeave={handleMouseLeave}
+					>
+						<DraftCardInner
+							contact={contact}
+							companyLabel={companyLabel}
+							contactName={contactName}
+							contactTitle={getContactTitle(contact)}
+							subject={draft.subject || 'No subject'}
+							bodyPreview={
+								draft.message ? convertHtmlToPlainText(draft.message) : 'No content'
+							}
+						/>
+					</div>
+				);
+			}
+		}
+
+		// Inbox card — latest inbound reply ('new-message') or latest sent email
+		// ('sent'), identical to the left inbox row.
+		if (isInboxLike) {
+			const inbound =
+				status === 'new-message'
+					? railInboundByContactId.get(contact.id)
+					: undefined;
+			const sent =
+				status === 'sent' ? railSentByContactId.get(contact.id) : undefined;
+			const source = inbound ?? sent;
+			if (source) {
+				const bodyPreview = inbound
+					? getInboxMessageSnippet(inbound) || 'No content'
+					: `You: ${
+							sent?.message ? convertHtmlToPlainText(sent.message) : 'No content'
+						}`;
+				return (
+					<div
+						key={contact.id}
+						data-contact-id={contact.id}
+						className="cursor-pointer transition-colors relative w-full overflow-hidden select-none"
+						style={{
+							height: '92px',
+							borderRadius: '7.798px',
+							border: '1.949px solid #000000',
+							backgroundColor: wrapperBg,
+							boxSizing: 'border-box',
+						}}
+						onClick={handleSelectToggle}
+						onMouseEnter={handleMouseEnter}
+						onMouseLeave={handleMouseLeave}
+					>
+						<InboxCardInner
+							contact={contact}
+							companyLabel={getContactCompanyLabel(contact)}
+							contactName={getContactDisplayName(contact, 'Unknown sender')}
+							contactTitle={getContactTitle(contact)}
+							subject={source.subject || 'No subject'}
+							bodyPreview={bodyPreview}
+						/>
+					</div>
+				);
+			}
+		}
+
+		// Plain contact card (default, and fallback when a status has no email
+		// content to render) — identical to the left expanded-list contact card.
+		return (
+			<div
+				key={contact.id}
+				data-contact-id={contact.id}
+				className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full overflow-hidden border-2 border-black select-none relative"
+				style={{
+					height: '49.657px',
+					borderRadius: '8.269px',
+					backgroundColor: wrapperBg,
+					boxSizing: 'border-box',
+				}}
+				onClick={handleSelectToggle}
+				onMouseEnter={handleMouseEnter}
+				onMouseLeave={handleMouseLeave}
+			>
+				<ContactCardInner contact={contact} />
+			</div>
+		);
+	};
+
 	// Fetch campaign contact events for history panel
 	const { data: campaignContactEvents } = useGetCampaignContactEvents(campaign?.id);
 
@@ -3375,6 +3323,48 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			setOverviewSelectedDraftIds(new Set());
 		}
 	}, [handleSendDrafts, overviewSelectedDraftIds]);
+
+	// The right-rail Search Results selection mixes drafted + un-drafted contacts in one
+	// flat list (unlike the docked list, which separates contact-rows from draft-rows).
+	// Split it the same way the docked card does: un-drafted → "Write {N} Contacts",
+	// already-drafted → "Send {N} Drafts" (you can't draft an existing draft again).
+	// Classify by the same status map that drives the row's top-bar notation, so the menu
+	// matches the bar the user clicked. Only the two actionable statuses get an action:
+	// un-contacted ('contacts') → Write, 'drafts' → Send. Already-'sent' and 'new-message'
+	// (inbox) rows are selectable but carry NO action (you don't re-contact / re-draft them).
+	const overviewRightRailSelectedDraftContactIds = useMemo(
+		() =>
+			overviewRightRailSelectedContacts.filter(
+				(id) => (overviewRightRailContactStatusById?.get(id) ?? 'contacts') === 'drafts'
+			),
+		[overviewRightRailSelectedContacts, overviewRightRailContactStatusById]
+	);
+	const overviewRightRailSelectedWriteContactIds = useMemo(
+		() =>
+			overviewRightRailSelectedContacts.filter(
+				(id) => (overviewRightRailContactStatusById?.get(id) ?? 'contacts') === 'contacts'
+			),
+		[overviewRightRailSelectedContacts, overviewRightRailContactStatusById]
+	);
+	const handleOverviewRightRailSendDrafts = useCallback(async () => {
+		const contactIds = new Set(overviewRightRailSelectedDraftContactIds);
+		const draftIds = draftEmails
+			.filter((d) => contactIds.has(d.contactId))
+			.map((d) => d.id);
+		if (draftIds.length === 0) return;
+
+		const processed = await handleSendDrafts(draftIds);
+		if (processed > 0) {
+			setOverviewRightRailSelectedContacts((prev) =>
+				prev.filter((id) => !contactIds.has(id))
+			);
+		}
+	}, [
+		overviewRightRailSelectedDraftContactIds,
+		draftEmails,
+		handleSendDrafts,
+		setOverviewRightRailSelectedContacts,
+	]);
 
 	// Click-outside handler to deselect when all contacts are selected
 	useEffect(() => {
@@ -6425,12 +6415,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								{shouldShowOverviewRightRailSearchPanel &&
 									overviewRightRailSelectedContacts.length > 0 && (
 									<OverviewSelectionActionCard
-										writeCount={overviewRightRailSelectedContacts.length}
-										draftCount={overviewSelectedDraftIds.size}
+										writeCount={overviewRightRailSelectedWriteContactIds.length}
+										draftCount={overviewRightRailSelectedDraftContactIds.length}
 										onWriteContacts={() =>
-											handleOverviewWriteContacts(overviewRightRailSelectedContacts)
+											handleOverviewWriteContacts(
+												overviewRightRailSelectedWriteContactIds
+											)
 										}
-										onSendDrafts={handleOverviewSendDrafts}
+										onSendDrafts={handleOverviewRightRailSendDrafts}
 										style={{
 											position: 'absolute',
 											right: 'calc(100% + 12px)',
