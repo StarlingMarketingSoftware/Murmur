@@ -21,6 +21,8 @@ interface DashboardWriteOverlayProps {
 	onSwitchToAddToFolder: () => void;
 	/** Notify the parent whether the batch review is active (so it can keep the overlay mounted). */
 	onReviewActiveChange?: (active: boolean) => void;
+	/** Notify the parent which reviewed draft/contact is currently open. */
+	onActiveReviewContactChange?: (contactId: number | null) => void;
 }
 
 // The campaign drafting panel renders natively at 499px wide; scale it down to the design's
@@ -43,6 +45,7 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 	targetContactIds,
 	onSwitchToAddToFolder,
 	onReviewActiveChange,
+	onActiveReviewContactChange,
 }) => {
 	const d = useDraftingSection({ campaign, view: 'testing' });
 
@@ -118,6 +121,10 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 		onReviewActiveChange?.(isReviewActive);
 	}, [isReviewActive, onReviewActiveChange]);
 
+	useEffect(() => {
+		if (!isReviewActive) onActiveReviewContactChange?.(null);
+	}, [isReviewActive, onActiveReviewContactChange]);
+
 	// `handleGetSuggestions` lives in the campaign-page component (not the hook); replicate it.
 	const handleGetSuggestions = useCallback(
 		async (text: string) => {
@@ -170,6 +177,7 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 					contacts={d.contacts ?? []}
 					batchDrafts={batchDrafts}
 					isPendingEmails={isPendingEmails}
+					onActiveReviewContactChange={onActiveReviewContactChange}
 					onClose={() => d.clearWriteReviewBatch()}
 				/>
 			) : (

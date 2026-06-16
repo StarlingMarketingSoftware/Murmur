@@ -1,6 +1,6 @@
 'use client';
 
-import { type FC, useCallback, useEffect, useMemo, useState } from 'react';
+import { type FC, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -21,6 +21,8 @@ interface DashboardDraftReviewProps {
 	/** Drafts for the just-drafted batch (already scoped to the batch contact IDs). */
 	batchDrafts: EmailWithRelations[];
 	isPendingEmails: boolean;
+	/** Report which draft/contact is currently open so the dashboard selection row can follow it. */
+	onActiveReviewContactChange?: (contactId: number | null) => void;
 	/** Exit the review back to the prompt box (clears the review batch in the overlay). */
 	onClose: () => void;
 }
@@ -52,6 +54,7 @@ export const DashboardDraftReview: FC<DashboardDraftReviewProps> = ({
 	contacts,
 	batchDrafts,
 	isPendingEmails,
+	onActiveReviewContactChange,
 	onClose,
 }) => {
 	const { user, isFreeTrial } = useMe();
@@ -67,6 +70,10 @@ export const DashboardDraftReview: FC<DashboardDraftReviewProps> = ({
 		'all'
 	);
 	const [, setIsDraftDialogOpen] = useState(false);
+
+	useLayoutEffect(() => {
+		onActiveReviewContactChange?.(selectedDraft?.contactId ?? null);
+	}, [onActiveReviewContactChange, selectedDraft?.contactId]);
 
 	const handleDraftSelection = useCallback((draftId: number) => {
 		setSelectedDraftIds((prev) => {

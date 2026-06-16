@@ -194,6 +194,7 @@ import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/Ca
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import { DashboardWriteOverlay } from './DashboardWriteOverlay';
+import { SelectionFolderMoveBanner } from './SelectionFolderMoveBanner';
 import { MapEventPopupCard, formatMapPostedEventDate } from './MapEventPopupCard';
 import { ApplyModal } from './ApplyModal';
 import { UnsubscribeFlow } from '@/components/organisms/UnsubscribeFlow/UnsubscribeFlow';
@@ -343,6 +344,12 @@ type MapPanelResultsSnapshot = {
 	isMusicVenuesSearch: boolean;
 	isMusicFestivalsSearch: boolean;
 	isWeddingPlannersSearch: boolean;
+};
+
+type FolderMoveNotice = {
+	count: number;
+	folderName: string;
+	phase: 'moving' | 'complete' | 'exiting';
 };
 
 const parsePendingDashboardSearch = (raw: string): PendingDashboardSearch => {
@@ -4398,9 +4405,53 @@ const DashboardContent = () => {
 	// True while the dashboard Write overlay shows the post-draft review; keeps the overlay mounted
 	// even if the live map selection changes mid-review.
 	const [isWriteReviewActive, setIsWriteReviewActive] = useState(false);
+	const [activeWriteReviewContactId, setActiveWriteReviewContactId] = useState<
+		number | null
+	>(null);
+	const [folderMoveNotice, setFolderMoveNotice] = useState<FolderMoveNotice | null>(
+		null
+	);
 	useEffect(() => {
-		if (!isWriteMode) setIsWriteReviewActive(false);
+		if (!isWriteMode) {
+			setIsWriteReviewActive(false);
+			setActiveWriteReviewContactId(null);
+		}
 	}, [isWriteMode]);
+
+	useEffect(() => {
+		if (!isWriteReviewActive) setActiveWriteReviewContactId(null);
+	}, [isWriteReviewActive]);
+
+	const handleActiveWriteReviewContactChange = useCallback((contactId: number | null) => {
+		setActiveWriteReviewContactId(contactId);
+		if (contactId != null) {
+			setIsWriteReviewActive(true);
+		}
+	}, []);
+
+	useEffect(() => {
+		if (folderMoveNotice?.phase !== 'complete') return;
+
+		const fadeTimer = window.setTimeout(() => {
+			setFolderMoveNotice((current) =>
+				current?.phase === 'complete' ? { ...current, phase: 'exiting' } : current
+			);
+		}, 900);
+
+		return () => window.clearTimeout(fadeTimer);
+	}, [folderMoveNotice]);
+
+	useEffect(() => {
+		if (folderMoveNotice?.phase !== 'exiting') return;
+
+		const removeTimer = window.setTimeout(() => {
+			setFolderMoveNotice((current) =>
+				current?.phase === 'exiting' ? null : current
+			);
+		}, 220);
+
+		return () => window.clearTimeout(removeTimer);
+	}, [folderMoveNotice]);
 
 	useEffect(() => {
 		if (!isMapView) setOpenMapTopAction(null);
@@ -5668,11 +5719,23 @@ const DashboardContent = () => {
 			return;
 		}
 
+		const contactIdsToAdd = [...selectedContacts];
+		const addedCount = contactIdsToAdd.length;
+		const folderName =
+			activeCampaign?.userContactLists?.[0]?.name ?? activeCampaign?.name ?? 'folder';
+
+		setFolderMoveNotice({
+			count: addedCount,
+			folderName,
+			phase: 'moving',
+		});
+		setSelectedContacts([]);
+
 		try {
 			if (derivedContactTitle && contacts) {
 				const contactsToUpdate = contacts.filter(
 					(c) =>
-						selectedContacts.includes(c.id) &&
+						contactIdsToAdd.includes(c.id) &&
 						(shouldForceApplyDerivedTitle || (!c.title && !c.headline))
 				);
 				if (contactsToUpdate.length > 0) {
@@ -5690,13 +5753,11 @@ const DashboardContent = () => {
 				data: {
 					contactOperation: {
 						action: 'connect',
-						contactIds: selectedContacts,
+						contactIds: contactIdsToAdd,
 					},
 				},
 			});
 
-			const addedCount = selectedContacts.length;
-			setSelectedContacts([]);
 			hasAddedContactsThisVisitRef.current = true;
 
 			await Promise.all([
@@ -5705,13 +5766,14 @@ const DashboardContent = () => {
 				queryClient.invalidateQueries({ queryKey: ['userContactLists'] }),
 			]);
 
-			const folderName =
-				activeCampaign?.userContactLists?.[0]?.name ?? activeCampaign?.name ?? 'folder';
-			toast.success(
-				`${addedCount} contact${addedCount === 1 ? '' : 's'} added to ${folderName}`
-			);
+			setFolderMoveNotice({
+				count: addedCount,
+				folderName,
+				phase: 'complete',
+			});
 		} catch (error) {
 			console.error('Error adding contacts to context folder:', error);
+			setFolderMoveNotice(null);
 			toast.error('Failed to add contacts to folder');
 		}
 	}, [
@@ -10274,7 +10336,15 @@ const DashboardContent = () => {
 			displayedIsWeddingPlannersSearch && isInBaseResults;
 		const stateAbbr = getStateAbbreviation(contact.state || '') || '';
 		const city = contact.city || '';
-		const writeModeSelectedRowBackground = isHovered ? '#FAE6E6' : '#FD8E89';
+		const isWriteReviewRow =
+			isWriteReviewActive || activeWriteReviewContactId != null;
+		const writeModeSelectedRowBackground = isWriteReviewRow
+			? contact.id === activeWriteReviewContactId
+				? '#F8C262'
+				: '#FDDEA5'
+			: isHovered
+				? '#FAE6E6'
+				: '#FD8E89';
 
 		return (
 			<div
@@ -13945,6 +14015,9 @@ const DashboardContent = () => {
 																				setIsWriteMode(false);
 																			}}
 																			onReviewActiveChange={setIsWriteReviewActive}
+																			onActiveReviewContactChange={
+																				handleActiveWriteReviewContactChange
+																			}
 																		/>
 																	</div>
 													</div>
@@ -14145,7 +14218,9 @@ const DashboardContent = () => {
 																					</div>
 																				)}
 																				{/* Selection sub-panel — always present on desktop (header carries the campaign-stops chrome); mobile/compressed keeps the existing gated sheet behaviour. */}
-																				{(!isCompressedMapChrome || selectedContacts.length > 0) && (
+																				{(!isCompressedMapChrome ||
+																					selectedContacts.length > 0 ||
+																					folderMoveNotice != null) && (
 																					<div
 																						className="flex flex-col flex-shrink-0"
 																						style={{
@@ -14211,6 +14286,22 @@ const DashboardContent = () => {
 																									{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
 																								</button>
 																							</div>
+																						)}
+																						{folderMoveNotice && (
+																							<SelectionFolderMoveBanner
+																								count={folderMoveNotice.count}
+																								folderName={folderMoveNotice.folderName}
+																								iconColor={topNavScheme.icon}
+																								includeTopDivider={isCompressedMapChrome}
+																								phase={folderMoveNotice.phase}
+																								onDismiss={() =>
+																									setFolderMoveNotice((current) =>
+																										current
+																											? { ...current, phase: 'exiting' }
+																											: current
+																									)
+																								}
+																							/>
 																						)}
 																						<CustomScrollbar
 																							className="flex-1 min-h-0"
