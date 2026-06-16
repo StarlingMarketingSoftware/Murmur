@@ -1,6 +1,7 @@
 'use client';
 
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 import {
 	CampaignApiError,
 	useCreateCampaign,
@@ -8,6 +9,7 @@ import {
 } from '@/hooks/queryHooks/useCampaigns';
 import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { generateCampaignName } from '@/utils/campaignNames';
+import { urls } from '@/constants/urls';
 
 export const MAX_CAMPAIGNS = 5;
 const CAP_REACHED_MESSAGE = `You have reached the maximum of ${MAX_CAMPAIGNS} active campaigns. Delete one to create a new one.`;
@@ -18,6 +20,7 @@ const CAP_REACHED_MESSAGE = `You have reached the maximum of ${MAX_CAMPAIGNS} ac
  * dropdown and the All-tab folders table so the two stay in sync.
  */
 export const useAddCampaignFolder = () => {
+	const router = useRouter();
 	const { data: campaignsData } = useGetCampaigns();
 	const { mutateAsync: createContactList, isPending: isPendingCreateContactList } =
 		useCreateUserContactList({ suppressToasts: true });
@@ -41,7 +44,12 @@ export const useAddCampaignFolder = () => {
 
 		try {
 			const contactList = await createContactList({ name, contactIds: [] });
-			await createCampaign({ name, userContactLists: [contactList.id] });
+			const campaign = await createCampaign({ name, userContactLists: [contactList.id] });
+			if (campaign?.id) {
+				router.push(
+					`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}&pick=1&allContacts=1&instant=1`
+				);
+			}
 		} catch (error) {
 			if (error instanceof CampaignApiError && error.code === 'CAMPAIGN_CAP_REACHED') {
 				toast.error(error.message || CAP_REACHED_MESSAGE);

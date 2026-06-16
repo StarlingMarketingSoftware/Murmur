@@ -108,7 +108,6 @@ import {
 	CAMPAIGN_HEATMAP_GLOW_BLUR,
 	CAMPAIGN_HEATMAP_GLOW_OPACITY_MAX,
 	campaignHeatmapGlowRadiusExpr,
-	ALL_CONTACTS_OVERLAY_TOOLTIP_FILL_COLOR,
 	AMBIENT_CONTACTS_OVERLAY_BUFFER_DOTS,
 	AMBIENT_CONTACTS_OVERLAY_LIMIT,
 	AMBIENT_CONTACTS_OVERLAY_MARKERS_FULL_ZOOM,
@@ -365,7 +364,6 @@ import {
 	SUN_TRANSITION_PROGRESS_PAINT_STEPS,
 	SUN_TRANSITION_SPACE_GLOW_BG,
 	SUN_TRANSITION_SPACE_GLOW_OPACITY_MULT,
-	TOOLTIP_FILL_COLOR_SELECTED,
 	UNSUBSCRIBE_BURN_GLOW_BG,
 	UNSUBSCRIBE_BURN_GLOW_MAX_OPACITY,
 	UNSUBSCRIBE_BURN_TRANSITION_MS,
@@ -899,6 +897,626 @@ const EVENT_POPUP_STAR_HALF = 14;
 // Bridges the star→box gap so the cursor can travel into the (interactive) popup and
 // hover/click it, instead of the popup vanishing the instant the star is no longer hit.
 const EVENT_POPUP_HOVER_CLOSE_DELAY_MS = 90;
+const SELECTED_TOOLTIP_FADE_START_ZOOM = 5.4;
+const SELECTED_TOOLTIP_FADE_END_ZOOM = 4.7;
+const SELECTED_TOOLTIP_STACK_MIN_SCALE = 0.9;
+const SELECTED_TOOLTIP_LEGACY_STACK_T = 0.18;
+const SELECTED_TOOLTIP_STACK_GROUP_SIZE = 10;
+const SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX = 6;
+const SELECTED_TOOLTIP_PLACEMENT_VIEWPORT_PADDING_PX = 8;
+const SELECTED_TOOLTIP_PLACEMENT_OVERLAP_WEIGHT = 200;
+const SELECTED_TOOLTIP_PLACEMENT_OVERFLOW_WEIGHT = 250;
+const SELECTED_TOOLTIP_PLACEMENT_DISTANCE_WEIGHT = 0.08;
+const SELECTED_TOOLTIP_PLACEMENT_MAX_RING = 18;
+const SELECTED_TOOLTIP_PLACEMENT_RING_STEP_PX = 28;
+const SELECTED_TOOLTIP_PLACEMENT_MIN_SEPARATION_PX = 2;
+// Stack cards use a tiny up-left offset, enough to read as a deck without
+// becoming a diagonal ribbon across the map.
+const SELECTED_TOOLTIP_STACK_OFFSET_X_PX = 3;
+const SELECTED_TOOLTIP_STACK_OFFSET_Y_PX = 6;
+const SELECTED_TOOLTIP_STACK_FAKE_BACK_COUNT = 3;
+const PEOPLE_TOOLTIP_FILL_COLOR = '#99E0FF';
+
+type SelectedCompactTooltipEntry = {
+	contact: ContactWithName;
+	coords: LatLngLiteral;
+	width: number;
+	height: number;
+	anchorY: number;
+	svg: string;
+	bodyFillColor: string;
+	categoryKey: string;
+	categoryFillColor: string;
+	selectedOrder: number;
+};
+
+type ProjectedSelectedTooltipEntry = SelectedCompactTooltipEntry & {
+	markerX: number;
+	markerY: number;
+	naturalX: number;
+	naturalY: number;
+	left: number;
+	top: number;
+	right: number;
+	bottom: number;
+	centerX: number;
+	centerY: number;
+};
+
+type SelectedTooltipStackGroup = {
+	id: string;
+	contactIds: number[];
+	count: number;
+	colors: string[];
+	width: number;
+	height: number;
+	svg: string;
+	bodyFillColor: string;
+};
+
+type SelectedTooltipStackPlacement = SelectedTooltipStackGroup & {
+	x: number;
+	y: number;
+	opacity?: number;
+	scale?: number;
+};
+
+type SelectedTooltipHoverHiddenTarget =
+	| { type: 'contact'; id: number }
+	| { type: 'stack'; id: string };
+
+type SelectedTooltipPlacementSide =
+	| 'top'
+	| 'right'
+	| 'left'
+	| 'bottom'
+	| 'top-right'
+	| 'top-left'
+	| 'bottom-right'
+	| 'bottom-left';
+
+type SelectedTooltipBounds = {
+	left: number;
+	top: number;
+	right: number;
+	bottom: number;
+};
+
+type SelectedTooltipIndividualPlacement = SelectedTooltipBounds & {
+	side: SelectedTooltipPlacementSide;
+	x: number;
+	y: number;
+	centerX: number;
+	centerY: number;
+	transformOrigin: string;
+	preferenceRank: number;
+};
+
+type SelectedTooltipViewport = {
+	width: number;
+	height: number;
+	padding: number;
+};
+
+const selectedTooltipHoverTargetsEqual = (
+	a: SelectedTooltipHoverHiddenTarget | null,
+	b: SelectedTooltipHoverHiddenTarget | null
+): boolean => a?.type === b?.type && a?.id === b?.id;
+
+const isClientPointInsideRect = (
+	clientX: number,
+	clientY: number,
+	rect: DOMRect
+): boolean =>
+	rect.width > 0 &&
+	rect.height > 0 &&
+	clientX >= rect.left &&
+	clientX <= rect.right &&
+	clientY >= rect.top &&
+	clientY <= rect.bottom;
+
+const selectedTooltipRectsOverlap = (
+	a: ProjectedSelectedTooltipEntry,
+	b: ProjectedSelectedTooltipEntry
+): boolean =>
+	a.left - SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX <
+		b.right + SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX &&
+	a.right + SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX >
+		b.left - SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX &&
+	a.top - SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX <
+		b.bottom + SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX &&
+	a.bottom + SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX >
+		b.top - SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX;
+
+const SELECTED_TOOLTIP_PLACEMENT_SIDES: SelectedTooltipPlacementSide[] = [
+	'top',
+	'right',
+	'left',
+	'bottom',
+	'top-right',
+	'top-left',
+	'bottom-right',
+	'bottom-left',
+];
+
+const getSelectedTooltipPlacementTransformOrigin = (
+	side: SelectedTooltipPlacementSide
+): string => {
+	switch (side) {
+		case 'bottom':
+			return 'top center';
+		case 'left':
+			return 'center right';
+		case 'right':
+			return 'center left';
+		case 'top-left':
+			return 'bottom right';
+		case 'top-right':
+			return 'bottom left';
+		case 'bottom-left':
+			return 'top right';
+		case 'bottom-right':
+			return 'top left';
+		case 'top':
+		default:
+			return 'bottom center';
+	}
+};
+
+const createSelectedTooltipPlacement = (
+	entry: ProjectedSelectedTooltipEntry,
+	side: SelectedTooltipPlacementSide,
+	gapPx: number,
+	preferenceRank: number
+): SelectedTooltipIndividualPlacement => {
+	const { markerX, markerY, width, height } = entry;
+	let x = markerX - width / 2;
+	let y = markerY - height - gapPx;
+
+	switch (side) {
+		case 'bottom':
+			x = markerX - width / 2;
+			y = markerY + gapPx;
+			break;
+		case 'left':
+			x = markerX - width - gapPx;
+			y = markerY - height / 2;
+			break;
+		case 'right':
+			x = markerX + gapPx;
+			y = markerY - height / 2;
+			break;
+		case 'top-left':
+			x = markerX - width - gapPx;
+			y = markerY - height - gapPx;
+			break;
+		case 'top-right':
+			x = markerX + gapPx;
+			y = markerY - height - gapPx;
+			break;
+		case 'bottom-left':
+			x = markerX - width - gapPx;
+			y = markerY + gapPx;
+			break;
+		case 'bottom-right':
+			x = markerX + gapPx;
+			y = markerY + gapPx;
+			break;
+		case 'top':
+		default:
+			break;
+	}
+
+	return {
+		side,
+		x,
+		y,
+		left: x,
+		top: y,
+		right: x + width,
+		bottom: y + height,
+		centerX: x + width / 2,
+		centerY: y + height / 2,
+		transformOrigin: getSelectedTooltipPlacementTransformOrigin(side),
+		preferenceRank,
+	};
+};
+
+const getSelectedTooltipOverlapArea = (
+	a: SelectedTooltipBounds,
+	b: SelectedTooltipBounds
+): number => {
+	const overlapWidth = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+	const overlapHeight = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+	return overlapWidth * overlapHeight;
+};
+
+const selectedTooltipBoundsOverlap = (
+	a: SelectedTooltipBounds,
+	b: SelectedTooltipBounds,
+	paddingPx = 0
+): boolean =>
+	a.left - paddingPx < b.right + paddingPx &&
+	a.right + paddingPx > b.left - paddingPx &&
+	a.top - paddingPx < b.bottom + paddingPx &&
+	a.bottom + paddingPx > b.top - paddingPx;
+
+const selectedTooltipPlacementOverlapsAny = (
+	placement: SelectedTooltipIndividualPlacement,
+	blockingBounds: SelectedTooltipBounds[]
+): boolean =>
+	blockingBounds.some((bounds) =>
+		selectedTooltipBoundsOverlap(
+			placement,
+			bounds,
+			SELECTED_TOOLTIP_PLACEMENT_MIN_SEPARATION_PX
+		)
+	);
+
+const getSelectedTooltipViewportOverflowArea = (
+	placement: SelectedTooltipIndividualPlacement,
+	viewport: SelectedTooltipViewport | null
+): number => {
+	if (!viewport) return 0;
+	const minX = viewport.padding;
+	const minY = viewport.padding;
+	const maxX = viewport.width - viewport.padding;
+	const maxY = viewport.height - viewport.padding;
+	const visibleLeft = clamp(placement.left, minX, maxX);
+	const visibleRight = clamp(placement.right, minX, maxX);
+	const visibleTop = clamp(placement.top, minY, maxY);
+	const visibleBottom = clamp(placement.bottom, minY, maxY);
+	const visibleArea =
+		Math.max(0, visibleRight - visibleLeft) *
+		Math.max(0, visibleBottom - visibleTop);
+	const totalArea =
+		Math.max(0, placement.right - placement.left) *
+		Math.max(0, placement.bottom - placement.top);
+	return Math.max(0, totalArea - visibleArea);
+};
+
+const scoreSelectedTooltipPlacement = (
+	entry: ProjectedSelectedTooltipEntry,
+	placement: SelectedTooltipIndividualPlacement,
+	placedTooltips: SelectedTooltipIndividualPlacement[],
+	viewport: SelectedTooltipViewport | null
+): number => {
+	const overlapArea = placedTooltips.reduce(
+		(sum, placed) => sum + getSelectedTooltipOverlapArea(placement, placed),
+		0
+	);
+	const overflowArea = getSelectedTooltipViewportOverflowArea(placement, viewport);
+	const distanceFromNatural = Math.hypot(
+		placement.x - entry.naturalX,
+		placement.y - entry.naturalY
+	);
+	return (
+		overlapArea * SELECTED_TOOLTIP_PLACEMENT_OVERLAP_WEIGHT +
+		overflowArea * SELECTED_TOOLTIP_PLACEMENT_OVERFLOW_WEIGHT +
+		distanceFromNatural * SELECTED_TOOLTIP_PLACEMENT_DISTANCE_WEIGHT +
+		placement.preferenceRank
+	);
+};
+
+const createSelectedTooltipFallbackPlacement = (
+	entry: ProjectedSelectedTooltipEntry,
+	blockingBounds: SelectedTooltipBounds[],
+	gapPx: number
+): SelectedTooltipIndividualPlacement => {
+	let placement = createSelectedTooltipPlacement(
+		entry,
+		'bottom',
+		gapPx,
+		SELECTED_TOOLTIP_PLACEMENT_SIDES.length
+	);
+
+	while (selectedTooltipPlacementOverlapsAny(placement, blockingBounds)) {
+		const nextY =
+			blockingBounds.reduce((bottom, bounds) => Math.max(bottom, bounds.bottom), placement.y) +
+			SELECTED_TOOLTIP_PLACEMENT_MIN_SEPARATION_PX;
+		const nextX = entry.markerX - entry.width / 2;
+		placement = {
+			...placement,
+			x: nextX,
+			y: nextY,
+			left: nextX,
+			top: nextY,
+			right: nextX + entry.width,
+			bottom: nextY + entry.height,
+			centerX: nextX + entry.width / 2,
+			centerY: nextY + entry.height / 2,
+			transformOrigin: 'top center',
+		};
+	}
+
+	return placement;
+};
+
+const buildSelectedTooltipIndividualPlacements = (
+	projectedEntries: ProjectedSelectedTooltipEntry[],
+	hiddenContactIds: ReadonlySet<number>,
+	blockingBounds: SelectedTooltipBounds[],
+	viewport: SelectedTooltipViewport | null,
+	gapPx: number
+): Map<number, SelectedTooltipIndividualPlacement> => {
+	const placements = new Map<number, SelectedTooltipIndividualPlacement>();
+	const placedBounds: SelectedTooltipBounds[] = [...blockingBounds];
+	const placedTooltips: SelectedTooltipIndividualPlacement[] = [];
+	const visibleEntries = projectedEntries
+		.filter((entry) => !hiddenContactIds.has(entry.contact.id))
+		.slice()
+		.sort((a, b) => a.selectedOrder - b.selectedOrder);
+
+	for (const entry of visibleEntries) {
+		let bestPlacement: SelectedTooltipIndividualPlacement | null = null;
+		let bestScore = Number.POSITIVE_INFINITY;
+
+		for (let ring = 0; ring <= SELECTED_TOOLTIP_PLACEMENT_MAX_RING; ring += 1) {
+			const ringGapPx = gapPx + ring * SELECTED_TOOLTIP_PLACEMENT_RING_STEP_PX;
+			for (let index = 0; index < SELECTED_TOOLTIP_PLACEMENT_SIDES.length; index += 1) {
+				const side = SELECTED_TOOLTIP_PLACEMENT_SIDES[index];
+				const placement = createSelectedTooltipPlacement(
+					entry,
+					side,
+					ringGapPx,
+					ring * SELECTED_TOOLTIP_PLACEMENT_SIDES.length + index
+				);
+				if (selectedTooltipPlacementOverlapsAny(placement, placedBounds)) continue;
+
+				const score = scoreSelectedTooltipPlacement(
+					entry,
+					placement,
+					placedTooltips,
+					viewport
+				);
+				if (score < bestScore) {
+					bestScore = score;
+					bestPlacement = placement;
+				}
+			}
+		}
+
+		const placement =
+			bestPlacement ??
+			createSelectedTooltipFallbackPlacement(entry, placedBounds, gapPx);
+		placements.set(entry.contact.id, placement);
+		placedBounds.push(placement);
+		placedTooltips.push(placement);
+	}
+
+	return placements;
+};
+
+const getSelectedTooltipGroupColors = (
+	entries: ProjectedSelectedTooltipEntry[]
+): string[] => {
+	const colors: string[] = [];
+	const seen = new Set<string>();
+	for (const entry of entries) {
+		const color = entry.bodyFillColor || entry.categoryFillColor || PEOPLE_TOOLTIP_FILL_COLOR;
+		if (seen.has(color)) continue;
+		seen.add(color);
+		colors.push(color);
+		if (colors.length >= SELECTED_TOOLTIP_STACK_FAKE_BACK_COUNT + 1) break;
+	}
+	return colors.length > 0 ? colors : [PEOPLE_TOOLTIP_FILL_COLOR];
+};
+
+const getSelectedTooltipStackBounds = (placement: SelectedTooltipStackPlacement) => {
+	const backLayerCount = Math.min(
+		SELECTED_TOOLTIP_STACK_FAKE_BACK_COUNT,
+		Math.max(0, placement.count - 1)
+	);
+	return {
+		left:
+			placement.x -
+			backLayerCount * SELECTED_TOOLTIP_STACK_OFFSET_X_PX -
+			SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX,
+		top:
+			placement.y -
+			backLayerCount * SELECTED_TOOLTIP_STACK_OFFSET_Y_PX -
+			SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX,
+		right:
+			placement.x +
+			placement.width +
+			SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX,
+		bottom:
+			placement.y +
+			placement.height +
+			SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX,
+	};
+};
+
+const selectedTooltipStackPlacementsOverlap = (
+	a: SelectedTooltipStackPlacement,
+	b: SelectedTooltipStackPlacement
+): boolean => {
+	const aBounds = getSelectedTooltipStackBounds(a);
+	const bBounds = getSelectedTooltipStackBounds(b);
+	return (
+		aBounds.left < bBounds.right &&
+		aBounds.right > bBounds.left &&
+		aBounds.top < bBounds.bottom &&
+		aBounds.bottom > bBounds.top
+	);
+};
+
+const mergeSelectedTooltipStackPlacements = (
+	placements: SelectedTooltipStackPlacement[]
+): SelectedTooltipStackPlacement => {
+	const frontPlacement = placements
+		.slice()
+		.sort((a, b) => b.count - a.count || b.width - a.width || a.y - b.y)[0];
+	const contactIds: number[] = [];
+	const seenContactIds = new Set<number>();
+	const colors: string[] = [];
+	const seenColors = new Set<string>();
+
+	for (const placement of placements) {
+		for (const contactId of placement.contactIds) {
+			if (seenContactIds.has(contactId)) continue;
+			seenContactIds.add(contactId);
+			contactIds.push(contactId);
+		}
+		for (const color of placement.colors) {
+			if (seenColors.has(color)) continue;
+			seenColors.add(color);
+			colors.push(color);
+		}
+	}
+
+	const totalCount = contactIds.length;
+	const weightedCenterX =
+		placements.reduce(
+			(sum, placement) => sum + (placement.x + placement.width / 2) * placement.count,
+			0
+		) / Math.max(1, placements.reduce((sum, placement) => sum + placement.count, 0));
+	const topY = Math.min(...placements.map((placement) => placement.y));
+
+	return {
+		id: `selected-stack-${contactIds.join('-')}`,
+		contactIds,
+		count: totalCount,
+		colors: colors.length > 0 ? colors.slice(0, SELECTED_TOOLTIP_STACK_FAKE_BACK_COUNT + 1) : [PEOPLE_TOOLTIP_FILL_COLOR],
+		width: frontPlacement.width,
+		height: frontPlacement.height,
+		svg: frontPlacement.svg,
+		bodyFillColor: frontPlacement.bodyFillColor,
+		x: weightedCenterX - frontPlacement.width / 2,
+		y: topY,
+	};
+};
+
+const compressOverlappingSelectedTooltipStacks = (
+	placements: SelectedTooltipStackPlacement[]
+): SelectedTooltipStackPlacement[] => {
+	let current = placements;
+	let didMerge = true;
+
+	while (didMerge && current.length > 1) {
+		didMerge = false;
+		const visited = new Set<number>();
+		const next: SelectedTooltipStackPlacement[] = [];
+
+		for (let startIndex = 0; startIndex < current.length; startIndex += 1) {
+			if (visited.has(startIndex)) continue;
+			const queue = [startIndex];
+			const component: SelectedTooltipStackPlacement[] = [];
+			visited.add(startIndex);
+
+			while (queue.length > 0) {
+				const index = queue.shift();
+				if (index == null) continue;
+				const placement = current[index];
+				component.push(placement);
+
+				for (let nextIndex = 0; nextIndex < current.length; nextIndex += 1) {
+					if (visited.has(nextIndex)) continue;
+					if (!selectedTooltipStackPlacementsOverlap(placement, current[nextIndex])) continue;
+					visited.add(nextIndex);
+					queue.push(nextIndex);
+				}
+			}
+
+			if (component.length > 1) {
+				didMerge = true;
+				next.push(mergeSelectedTooltipStackPlacements(component));
+			} else {
+				next.push(component[0]);
+			}
+		}
+
+		current = next;
+	}
+
+	return current;
+};
+
+const buildSelectedTooltipStackPlacements = (
+	projectedEntries: ProjectedSelectedTooltipEntry[]
+): SelectedTooltipStackPlacement[] => {
+	if (projectedEntries.length <= SELECTED_TOOLTIP_STACK_GROUP_SIZE) return [];
+
+	const components: ProjectedSelectedTooltipEntry[][] = [];
+	const visited = new Set<number>();
+
+	for (let startIndex = 0; startIndex < projectedEntries.length; startIndex += 1) {
+		if (visited.has(startIndex)) continue;
+
+		const queue = [startIndex];
+		const component: ProjectedSelectedTooltipEntry[] = [];
+		visited.add(startIndex);
+
+		while (queue.length > 0) {
+			const index = queue.shift();
+			if (index == null) continue;
+			const entry = projectedEntries[index];
+			component.push(entry);
+
+			for (let nextIndex = 0; nextIndex < projectedEntries.length; nextIndex += 1) {
+				if (visited.has(nextIndex)) continue;
+				if (!selectedTooltipRectsOverlap(entry, projectedEntries[nextIndex])) continue;
+				visited.add(nextIndex);
+				queue.push(nextIndex);
+			}
+		}
+
+		components.push(component);
+	}
+
+	const placements: SelectedTooltipStackPlacement[] = [];
+	for (const component of components) {
+		if (component.length <= 1) continue;
+
+		const sorted = component.slice().sort((a, b) => {
+			const yDelta = a.centerY - b.centerY;
+			if (Math.abs(yDelta) > 1) return yDelta;
+			const xDelta = a.centerX - b.centerX;
+			if (Math.abs(xDelta) > 1) return xDelta;
+			return a.selectedOrder - b.selectedOrder;
+		});
+
+		for (
+			let startIndex = 0;
+			startIndex < sorted.length;
+			startIndex += SELECTED_TOOLTIP_STACK_GROUP_SIZE
+		) {
+			const groupEntries = sorted.slice(
+				startIndex,
+				startIndex + SELECTED_TOOLTIP_STACK_GROUP_SIZE
+			);
+			if (groupEntries.length <= 1) continue;
+
+			const centerX =
+				groupEntries.reduce((sum, entry) => sum + entry.centerX, 0) / groupEntries.length;
+			const topY = Math.min(...groupEntries.map((entry) => entry.top));
+			const frontEntry =
+				groupEntries
+					.slice()
+					.sort((a, b) => a.selectedOrder - b.selectedOrder)
+					.at(-1) ?? groupEntries[groupEntries.length - 1];
+			const contactIds = groupEntries
+				.slice()
+				.sort((a, b) => a.selectedOrder - b.selectedOrder)
+				.map((entry) => entry.contact.id);
+
+			placements.push({
+				id: `selected-stack-${contactIds.join('-')}`,
+				contactIds,
+				count: groupEntries.length,
+				colors: getSelectedTooltipGroupColors(groupEntries),
+				width: frontEntry.width,
+				height: frontEntry.height,
+				svg: frontEntry.svg,
+				bodyFillColor: frontEntry.bodyFillColor,
+				x: centerX - frontEntry.width / 2,
+				y: topY,
+			});
+		}
+	}
+
+	return compressOverlappingSelectedTooltipStacks(placements);
+};
 
 // The opportunity markers reuse the owned-venue radar builders per event center,
 // re-keying each feature id so features from different events never collide inside a
@@ -1649,6 +2267,65 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const fadingTooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const mapContainerRef = useRef<HTMLDivElement | null>(null);
 	const hoverTooltipOverlayRef = useRef<HTMLDivElement | null>(null);
+	const [selectedTooltipHoverHiddenTarget, setSelectedTooltipHoverHiddenTarget] =
+		useState<SelectedTooltipHoverHiddenTarget | null>(null);
+	const selectedTooltipHoverHiddenTargetRef =
+		useRef<SelectedTooltipHoverHiddenTarget | null>(null);
+	const setSelectedTooltipHoverHiddenTargetIfChanged = useCallback(
+		(target: SelectedTooltipHoverHiddenTarget | null) => {
+			if (selectedTooltipHoverTargetsEqual(selectedTooltipHoverHiddenTargetRef.current, target))
+				return;
+			selectedTooltipHoverHiddenTargetRef.current = target;
+			setSelectedTooltipHoverHiddenTarget(target);
+		},
+		[]
+	);
+	const selectedCompactTooltipRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+	const registerSelectedCompactTooltipEl = useCallback(
+		(id: number, el: HTMLDivElement | null) => {
+			if (el) {
+				selectedCompactTooltipRefs.current.set(id, el);
+			} else {
+				selectedCompactTooltipRefs.current.delete(id);
+			}
+		},
+		[]
+	);
+	const selectedTooltipStackRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+	const selectedTooltipStackSignatureRef = useRef('');
+	const [selectedTooltipStackGroups, setSelectedTooltipStackGroups] = useState<
+		SelectedTooltipStackGroup[]
+	>([]);
+	const registerSelectedTooltipStackEl = useCallback(
+		(id: string, el: HTMLDivElement | null) => {
+			if (el) {
+				selectedTooltipStackRefs.current.set(id, el);
+			} else {
+				selectedTooltipStackRefs.current.delete(id);
+			}
+		},
+		[]
+	);
+	const updateSelectedTooltipHoverHiddenTarget = useCallback(
+		(clientX: number, clientY: number) => {
+			for (const [id, el] of selectedTooltipStackRefs.current) {
+				if (isClientPointInsideRect(clientX, clientY, el.getBoundingClientRect())) {
+					setSelectedTooltipHoverHiddenTargetIfChanged({ type: 'stack', id });
+					return;
+				}
+			}
+
+			for (const [id, el] of selectedCompactTooltipRefs.current) {
+				if (isClientPointInsideRect(clientX, clientY, el.getBoundingClientRect())) {
+					setSelectedTooltipHoverHiddenTargetIfChanged({ type: 'contact', id });
+					return;
+				}
+			}
+
+			setSelectedTooltipHoverHiddenTargetIfChanged(null);
+		},
+		[setSelectedTooltipHoverHiddenTargetIfChanged]
+	);
 	const streetCardOverlayRef = useRef<HTMLDivElement | null>(null);
 	// Persistent street-view research cards: container + per-contact card elements,
 	// positioned imperatively by a single shared 'move' listener.
@@ -11482,9 +12159,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (isBackgroundPresentation) return;
 		if (!streetViewEnabled) return;
 
-		const onZoomFrame = (e: { originalEvent?: Event }) => {
+		const onZoomFrame = (e: mapboxgl.MapboxEvent) => {
 			try {
-				if (!e.originalEvent) return; // programmatic camera move — skip
+				const originalEvent = (e as { originalEvent?: Event }).originalEvent;
+				if (!originalEvent) return; // programmatic camera move — skip
 				const tr = map.transform;
 				if (!tr || typeof tr.pitch !== 'number') return; // private-API fence
 				const target = computeStreetViewPitch(map.getZoom() ?? MAP_DEFAULT_ZOOM);
@@ -13674,6 +14352,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			),
 		[allContactsOverlayVisibleContacts]
 	);
+	const selectedContactObjectsById = useMemo(
+		() =>
+			new Map<number, ContactWithName>(
+				selectedContactObjects.map((contact) => [contact.id, contact])
+			),
+		[selectedContactObjects]
+	);
 
 	// Marker hover/click + (optional) state hover/click interactions.
 	useEffect(() => {
@@ -13816,6 +14501,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 
 		const processMouseMove = (e: mapboxgl.MapMouseEvent) => {
+			const pointer = getClientPointFromDomEvent(e.originalEvent);
+			if (pointer) {
+				updateSelectedTooltipHoverHiddenTarget(pointer.x, pointer.y);
+			} else {
+				setSelectedTooltipHoverHiddenTargetIfChanged(null);
+			}
+
 			if (areaSelectionEnabled || isAreaSelecting) {
 				clearEmptyMapPrompt();
 				clearEventHoverImmediate();
@@ -14155,11 +14847,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map.on('click', onClick);
 		const canvas = map.getCanvas();
 		const isInsideHoverTooltip = (event: MouseEvent): boolean => {
-			// Covers the slim SVG tooltip, the ambient street-view hover card, and the
-			// persistent street-view card layer — whichever overlay is mounted keeps
-			// hover alive across canvas → DOM moves.
+			// Street-view cards are interactive, so moving from the canvas into them keeps
+			// hover alive. The slim SVG tooltip is intentionally excluded so it does not
+			// block hovering markers that sit behind/above it.
 			for (const tooltipEl of [
-				hoverTooltipOverlayRef.current,
 				streetCardOverlayRef.current,
 				streetCardsContainerRef.current,
 			]) {
@@ -14182,6 +14873,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (isInsideHoverTooltip(event)) return;
 			clearEmptyMapPrompt();
 			clearMarkerVisualHover();
+			setSelectedTooltipHoverHiddenTargetIfChanged(null);
 			// Schedule (don't force) the popup close: if the cursor is leaving the canvas to
 			// enter the popup box, the box's onMouseEnter cancels this before it fires.
 			scheduleEventHoverClose();
@@ -14232,6 +14924,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		setEventHover,
 		clearEventHoverImmediate,
 		scheduleEventHoverClose,
+		updateSelectedTooltipHoverHiddenTarget,
+		setSelectedTooltipHoverHiddenTargetIfChanged,
 	]);
 
 	// ---- Mapbox marker sources (rendered via layers) ----
@@ -16960,6 +17654,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		() => Math.max(14, markerScale * 2),
 		[markerScale]
 	);
+	const tooltipMarkerGapPx = useMemo(
+		() => Math.max(18, markerScale + 10),
+		[markerScale]
+	);
+	const getSelectedTooltipZoomOpacity = useCallback((zoom: number): number => {
+		return clamp(
+			(zoom - SELECTED_TOOLTIP_FADE_END_ZOOM) /
+				(SELECTED_TOOLTIP_FADE_START_ZOOM - SELECTED_TOOLTIP_FADE_END_ZOOM),
+			0,
+			1
+		);
+	}, []);
+	const getSelectedTooltipStackT = useCallback((zoom: number): number => {
+		return clamp(
+			(SELECTED_TOOLTIP_FADE_START_ZOOM - zoom) /
+				(SELECTED_TOOLTIP_FADE_START_ZOOM - SELECTED_TOOLTIP_FADE_END_ZOOM),
+			0,
+			1
+		);
+	}, []);
 
 	const selectedContactIdSet = useMemo(
 		() => new Set<number>(selectedContacts),
@@ -17146,7 +17860,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const opacity = Math.max(
 				0,
 				Math.min(1, (zoomDelta - FADE_END) / (FADE_START - FADE_END))
-			);
+			) * getSelectedTooltipZoomOpacity(map.getZoom());
 
 			// offsetWidth/Height are the UNSCALED box; using them (not
 			// getBoundingClientRect, which includes the scale) keeps the centering
@@ -17155,7 +17869,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const w = el.offsetWidth;
 			const h = el.offsetHeight;
 			const x = top.x - w / 2;
-			const y = top.y - h - 40;
+			const y = top.y - h - 64;
 			el.style.transformOrigin = 'bottom center';
 			el.style.transform = `translate(${Math.round(x)}px, ${Math.round(
 				y
@@ -17169,12 +17883,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return () => {
 			map.off('move', update);
 		};
-	}, [map, isMapLoaded, isLoading, selectedAnchorPoints]);
+	}, [map, isMapLoaded, isLoading, selectedAnchorPoints, getSelectedTooltipZoomOpacity]);
 
 	// Hover tooltip anchoring (single overlay).
+	const stackedSelectedContactIdSet = useMemo(() => {
+		const ids = new Set<number>();
+		for (const group of selectedTooltipStackGroups) {
+			for (const contactId of group.contactIds) ids.add(contactId);
+		}
+		return ids;
+	}, [selectedTooltipStackGroups]);
 	const hoverTooltipContactId = hoveredMarkerId ?? fadingTooltipId;
 	const hoverTooltipEntry = useMemo(() => {
 		if (hoverTooltipContactId == null) return null;
+		if (stackedSelectedContactIdSet.has(hoverTooltipContactId)) return null;
 		const base = visibleContactsById.get(hoverTooltipContactId);
 		if (base) return { kind: 'base' as const, contact: base };
 		const booking = bookingExtraContactsById.get(hoverTooltipContactId);
@@ -17186,6 +17908,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return null;
 	}, [
 		hoverTooltipContactId,
+		stackedSelectedContactIdSet,
 		visibleContactsById,
 		bookingExtraContactsById,
 		promotionOverlayContactsById,
@@ -17220,6 +17943,381 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// streetCardEntries below); this hover-gated single-card path now serves
 	// only the ambient 'all'-contacts gray dots, which stay hover-only.
 	const isStreetCardMode = streetViewEnabled && zoomLevel >= STREET_VIEW_MIN_ZOOM;
+	const selectedCompactTooltipEntries = useMemo(() => {
+		if (!onAddSelectionToFolder || isStreetCardMode) return [];
+
+		type SelectedTooltipKind = 'base' | 'booking' | 'promotion' | 'all' | 'fallback';
+
+		const compactTooltipOptions = { showTitleBand: false };
+		const entries: SelectedCompactTooltipEntry[] = [];
+		const seenIds = new Set<number>();
+
+		const resolveSelectedContact = (
+			id: number
+		): { kind: SelectedTooltipKind; contact: ContactWithName; coords: LatLngLiteral | null } | null => {
+			const base = contactsWithCoordsById.get(id) ?? visibleContactsById.get(id);
+			if (base) return { kind: 'base', contact: base, coords: getContactCoords(base) };
+
+			const booking = bookingExtraContactsById.get(id);
+			if (booking) {
+				return {
+					kind: 'booking',
+					contact: booking,
+					coords: getBookingExtraContactCoords(booking),
+				};
+			}
+
+			const promo = promotionOverlayContactsById.get(id);
+			if (promo) {
+				return {
+					kind: 'promotion',
+					contact: promo,
+					coords: getPromotionOverlayContactCoords(promo),
+				};
+			}
+
+			const all = allOverlayContactsById.get(id);
+			if (all) {
+				return {
+					kind: 'all',
+					contact: all,
+					coords: getAllContactsOverlayContactCoords(all),
+				};
+			}
+
+			const fallback = selectedContactObjectsById.get(id);
+			if (fallback) {
+				return {
+					kind: 'fallback',
+					contact: fallback,
+					coords: getLatLngFromContact(fallback),
+				};
+			}
+
+			return null;
+		};
+
+		const getWhatForSelectedTooltip = (
+			contact: ContactWithName,
+			kind: SelectedTooltipKind
+		): string | null => {
+			switch (kind) {
+				case 'base':
+					return contact.curatedCategory ?? searchWhat ?? null;
+				case 'booking':
+					return getBookingTitlePrefixFromContactTitle(contact.title) ?? null;
+				case 'promotion':
+					return getPromotionOverlayWhatFromContactTitle(contact.title) ?? null;
+				case 'all':
+					return getAmbientContactWhatFromTitle(contact.title);
+				case 'fallback':
+					return (
+						contact.curatedCategory ??
+						searchWhat ??
+						getAmbientContactWhatFromTitle(contact.title) ??
+						null
+					);
+				default:
+					return null;
+			}
+		};
+
+		for (let selectedIndex = 0; selectedIndex < selectedContacts.length; selectedIndex += 1) {
+			const id = selectedContacts[selectedIndex];
+			if (seenIds.has(id)) continue;
+			seenIds.add(id);
+
+			const resolved = resolveSelectedContact(id);
+			if (!resolved || !resolved.coords) continue;
+
+			const { contact, coords, kind } = resolved;
+			const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+			const nameForTooltip = fullName || contact.name || '';
+			const companyForTooltip = contact.company || '';
+			const titleForTooltip = (
+				contact.curatedDisplayLabel ||
+				contact.title ||
+				contact.headline ||
+				''
+			).trim();
+			const whatForMarker = getWhatForSelectedTooltip(contact, kind);
+			const normalizedWhat = whatForMarker ? normalizeWhatKey(whatForMarker) : null;
+			const tooltipFillColor = normalizedWhat
+				? (WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? PEOPLE_TOOLTIP_FILL_COLOR)
+				: kind === 'all'
+					? PEOPLE_TOOLTIP_FILL_COLOR
+					: PEOPLE_TOOLTIP_FILL_COLOR;
+			const tooltipBodyFillColor = normalizedWhat
+				? (WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR[normalizedWhat] ?? PEOPLE_TOOLTIP_FILL_COLOR)
+				: tooltipFillColor;
+			const width = calculateTooltipWidth(
+				nameForTooltip,
+				companyForTooltip,
+				titleForTooltip,
+				whatForMarker,
+				compactTooltipOptions
+			);
+			const height = calculateTooltipHeight(
+				nameForTooltip,
+				companyForTooltip,
+				compactTooltipOptions
+			);
+			const anchorY = calculateTooltipAnchorY(
+				nameForTooltip,
+				companyForTooltip,
+				compactTooltipOptions
+			);
+
+			entries.push({
+				contact,
+				coords,
+				width,
+				height,
+				anchorY,
+				bodyFillColor: tooltipBodyFillColor,
+				categoryKey: normalizedWhat ?? '__people__',
+				categoryFillColor: tooltipFillColor,
+				selectedOrder: selectedIndex,
+				svg: generateMapTooltipSvg(
+					nameForTooltip,
+					companyForTooltip,
+					titleForTooltip,
+					tooltipFillColor,
+					whatForMarker,
+					tooltipBodyFillColor,
+					compactTooltipOptions
+				),
+			});
+		}
+
+		return entries;
+	}, [
+		onAddSelectionToFolder,
+		isStreetCardMode,
+		selectedContacts,
+		contactsWithCoordsById,
+		visibleContactsById,
+		bookingExtraContactsById,
+		promotionOverlayContactsById,
+		allOverlayContactsById,
+		selectedContactObjectsById,
+		getContactCoords,
+		getBookingExtraContactCoords,
+		getPromotionOverlayContactCoords,
+		getAllContactsOverlayContactCoords,
+		searchWhat,
+	]);
+	useEffect(() => {
+		const target = selectedTooltipHoverHiddenTargetRef.current;
+		if (!target) return;
+		if (isStreetCardMode || selectedCompactTooltipEntries.length === 0) {
+			setSelectedTooltipHoverHiddenTargetIfChanged(null);
+			return;
+		}
+
+		if (target.type === 'contact') {
+			const stillSelected = selectedCompactTooltipEntries.some(
+				(entry) => entry.contact.id === target.id
+			);
+			if (!stillSelected) setSelectedTooltipHoverHiddenTargetIfChanged(null);
+			return;
+		}
+
+		const stillStacked = selectedTooltipStackGroups.some((group) => group.id === target.id);
+		if (!stillStacked) setSelectedTooltipHoverHiddenTargetIfChanged(null);
+	}, [
+		isStreetCardMode,
+		selectedCompactTooltipEntries,
+		selectedTooltipStackGroups,
+		setSelectedTooltipHoverHiddenTargetIfChanged,
+	]);
+	useLayoutEffect(() => {
+		if (selectedCompactTooltipEntries.length === 0) {
+			if (selectedTooltipStackSignatureRef.current) {
+				selectedTooltipStackSignatureRef.current = '';
+				setSelectedTooltipStackGroups([]);
+			}
+			return;
+		}
+		if (!map || !isMapLoaded || isLoading) return;
+
+		const update = () => {
+			const projectedEntries = selectedCompactTooltipEntries.map((entry) => {
+				const p = map.project([entry.coords.lng, entry.coords.lat]);
+				const naturalX = p.x - entry.width / 2;
+				const naturalY = p.y - entry.anchorY - tooltipMarkerGapPx;
+				return {
+					...entry,
+					markerX: p.x,
+					markerY: p.y,
+					naturalX,
+					naturalY,
+					left: naturalX,
+					top: naturalY,
+					right: naturalX + entry.width,
+					bottom: naturalY + entry.height,
+					centerX: naturalX + entry.width / 2,
+					centerY: naturalY + entry.height / 2,
+				};
+			});
+			const stackT =
+				selectedCompactTooltipEntries.length > 1
+					? getSelectedTooltipStackT(map.getZoom())
+					: 0;
+			const shouldUseLegacyStack = stackT >= SELECTED_TOOLTIP_LEGACY_STACK_T;
+			const stackScale = lerp(1, SELECTED_TOOLTIP_STACK_MIN_SCALE, stackT);
+
+			const buildLegacyStackPlacement = (): SelectedTooltipStackPlacement[] => {
+				const frontEntry =
+					projectedEntries
+						.slice()
+						.sort((a, b) => a.selectedOrder - b.selectedOrder)
+						.at(-1) ?? null;
+				const firstProjectedEntry = projectedEntries[0] ?? null;
+				if (!frontEntry || !firstProjectedEntry) return [];
+				const stackAnchor = projectedEntries.reduce<ProjectedSelectedTooltipEntry>(
+					(topEntry, entry) => (entry.naturalY < topEntry.naturalY ? entry : topEntry),
+					firstProjectedEntry
+				);
+				const contactIds = projectedEntries
+					.slice()
+					.sort((a, b) => a.selectedOrder - b.selectedOrder)
+					.map((entry) => entry.contact.id);
+				return [
+					{
+						id: 'selected-stack-legacy-zoomed-out',
+						contactIds,
+						count: projectedEntries.length,
+						colors: getSelectedTooltipGroupColors(projectedEntries),
+						width: frontEntry.width,
+						height: frontEntry.height,
+						svg: frontEntry.svg,
+						bodyFillColor: frontEntry.bodyFillColor,
+						x: stackAnchor.centerX - frontEntry.width / 2,
+						y: stackAnchor.naturalY,
+						opacity: 1,
+						scale: stackScale,
+					},
+				];
+			};
+
+			const collisionStackPlacements =
+				shouldUseLegacyStack
+					? []
+					: buildSelectedTooltipStackPlacements(projectedEntries).map((placement) => ({
+							...placement,
+							opacity: 1,
+							scale: stackScale,
+						}));
+			const legacyStackPlacements =
+				shouldUseLegacyStack ? buildLegacyStackPlacement() : [];
+			const stackPlacements = [...collisionStackPlacements, ...legacyStackPlacements];
+			const collisionGroupedContactIds = new Set<number>();
+			for (const group of collisionStackPlacements) {
+				for (const contactId of group.contactIds) collisionGroupedContactIds.add(contactId);
+			}
+			const container = mapContainerRef.current;
+			const viewport =
+				container && container.clientWidth > 0 && container.clientHeight > 0
+					? {
+							width: container.clientWidth,
+							height: container.clientHeight,
+							padding: SELECTED_TOOLTIP_PLACEMENT_VIEWPORT_PADDING_PX,
+						}
+					: null;
+			const stackBlockingBounds = stackPlacements.map(getSelectedTooltipStackBounds);
+			const individualPlacements = shouldUseLegacyStack
+				? new Map<number, SelectedTooltipIndividualPlacement>()
+				: buildSelectedTooltipIndividualPlacements(
+						projectedEntries,
+						collisionGroupedContactIds,
+						stackBlockingBounds,
+						viewport,
+						tooltipMarkerGapPx
+					);
+
+			const stackGroups = stackPlacements.map<SelectedTooltipStackGroup>(
+				({ id, contactIds, count, colors, width, height, svg, bodyFillColor }) => ({
+					id,
+					contactIds,
+					count,
+					colors,
+					width,
+					height,
+					svg,
+					bodyFillColor,
+				})
+			);
+			const nextStackSignature = stackGroups
+				.map(
+					(group) =>
+						`${group.id}:${group.count}:${group.width}:${group.height}:${group.bodyFillColor}:${group.contactIds.join(',')}:${group.colors.join(',')}`
+				)
+				.join('|');
+			if (selectedTooltipStackSignatureRef.current !== nextStackSignature) {
+				selectedTooltipStackSignatureRef.current = nextStackSignature;
+				setSelectedTooltipStackGroups(stackGroups);
+			}
+
+			for (const entry of projectedEntries) {
+				const el = selectedCompactTooltipRefs.current.get(entry.contact.id);
+				if (!el) continue;
+				const placement = individualPlacements.get(entry.contact.id);
+				const isHiddenByTooltipHover =
+					selectedTooltipHoverHiddenTarget?.type === 'contact' &&
+					selectedTooltipHoverHiddenTarget.id === entry.contact.id;
+				el.style.transformOrigin = placement?.transformOrigin ?? 'bottom center';
+				el.style.transform = `translate(${Math.round(
+					placement?.x ?? entry.naturalX
+				)}px, ${Math.round(
+					placement?.y ?? entry.naturalY
+				)}px)`;
+				el.style.zIndex = String(HOVER_TOOLTIP_Z_INDEX - 1);
+				el.style.opacity =
+					isHiddenByTooltipHover ||
+					hoveredMarkerId === entry.contact.id ||
+					collisionGroupedContactIds.has(entry.contact.id) ||
+					shouldUseLegacyStack
+						? '0'
+						: '1';
+			}
+
+			const placementById = new Map(stackPlacements.map((placement) => [placement.id, placement]));
+			for (const [id, el] of selectedTooltipStackRefs.current) {
+				const placement = placementById.get(id);
+				if (!placement) {
+					el.style.opacity = '0';
+					continue;
+				}
+				el.style.transformOrigin = 'center center';
+				el.style.transform = `translate(${Math.round(placement.x)}px, ${Math.round(
+					placement.y
+				)}px) scale(${placement.scale ?? 1})`;
+				el.style.opacity =
+					selectedTooltipHoverHiddenTarget?.type === 'stack' &&
+					selectedTooltipHoverHiddenTarget.id === id
+						? '0'
+						: String(placement.opacity ?? 1);
+				el.style.zIndex = String(HOVER_TOOLTIP_Z_INDEX + 1);
+			}
+		};
+
+		update();
+		map.on('move', update);
+		return () => {
+			map.off('move', update);
+		};
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		selectedCompactTooltipEntries,
+		selectedTooltipStackGroups,
+		tooltipMarkerGapPx,
+		getSelectedTooltipStackT,
+		hoveredMarkerId,
+		selectedTooltipHoverHiddenTarget,
+	]);
 	const streetCardContact =
 		isStreetCardMode && hoverTooltipEntry?.kind === 'all'
 			? hoverTooltipEntry.contact
@@ -17238,19 +18336,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!isStreetCardMode || !hoverTooltipEntry || hoverTooltipEntry.kind !== 'all')
 			return null;
 		const contact = hoverTooltipEntry.contact;
-		const kind = hoverTooltipEntry.kind;
 		const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
 		const name = fullName || contact.name || contact.company || 'Unknown';
 		const company = fullName || contact.name ? contact.company || '' : '';
-		// Same per-kind category resolution as the slim tooltip (see hoverTooltipData).
-		const whatForMarker =
-			kind === 'base'
-				? (contact.curatedCategory ?? searchWhat ?? null)
-				: kind === 'booking'
-					? (getBookingTitlePrefixFromContactTitle(contact.title) ?? null)
-					: kind === 'promotion'
-						? (getPromotionOverlayWhatFromContactTitle(contact.title) ?? null)
-						: (getAmbientContactWhatFromTitle(contact.title) ?? null);
+		const whatForMarker = getAmbientContactWhatFromTitle(contact.title);
 		const accentColor = getResultDotColorForWhat(whatForMarker);
 		const cityStateFallback = [
 			contact.city,
@@ -17361,7 +18450,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!hoverTooltipEntry) return null;
 		const contact = hoverTooltipEntry.contact;
 		const kind = hoverTooltipEntry.kind;
-		const isSelected = selectedContactIdSet.has(contact.id);
 
 		const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
 		const nameForTooltip = fullName || contact.name || '';
@@ -17376,14 +18464,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (kind === 'all') {
 			const whatForMarker = getAmbientContactWhatFromTitle(contact.title);
 			if (whatForMarker) {
-				const dotFillColor = getResultDotColorForWhat(whatForMarker);
 				const normalizedWhat = normalizeWhatKey(whatForMarker);
-				const tooltipFillColor = isSelected
-					? TOOLTIP_FILL_COLOR_SELECTED
-					: (WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? dotFillColor);
-				const tooltipBodyFillColor = isSelected
-					? TOOLTIP_FILL_COLOR_SELECTED
-					: (WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR[normalizedWhat] ?? tooltipFillColor);
+				const tooltipFillColor =
+					WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? PEOPLE_TOOLTIP_FILL_COLOR;
+				const tooltipBodyFillColor =
+					WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR[normalizedWhat] ?? PEOPLE_TOOLTIP_FILL_COLOR;
 				const width = calculateTooltipWidth(
 					nameForTooltip,
 					companyForTooltip,
@@ -17407,9 +18492,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				};
 			}
 
-			const tooltipFillColor = isSelected
-				? TOOLTIP_FILL_COLOR_SELECTED
-				: ALL_CONTACTS_OVERLAY_TOOLTIP_FILL_COLOR;
+			const tooltipFillColor = PEOPLE_TOOLTIP_FILL_COLOR;
 			const width = calculateTooltipWidth(
 				nameForTooltip,
 				companyForTooltip,
@@ -17439,22 +18522,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		// Even if the marker dot is "washed out" outside the locked/selected state, keep the hover tooltip
 		// using the base category color so it consistently communicates the search intent.
-		const dotFillColor = getResultDotColorForWhat(whatForMarker);
-
 		const normalizedWhat = whatForMarker ? normalizeWhatKey(whatForMarker) : null;
 		const baseTooltipFillColor = normalizedWhat
-			? (WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? dotFillColor)
-			: dotFillColor;
+			? (WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? PEOPLE_TOOLTIP_FILL_COLOR)
+			: PEOPLE_TOOLTIP_FILL_COLOR;
 		const baseTooltipBodyFillColor = normalizedWhat
-			? (WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR[normalizedWhat] ?? baseTooltipFillColor)
+			? (WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR[normalizedWhat] ?? PEOPLE_TOOLTIP_FILL_COLOR)
 			: baseTooltipFillColor;
-
-		const tooltipFillColor = isSelected
-			? TOOLTIP_FILL_COLOR_SELECTED
-			: baseTooltipFillColor;
-		const tooltipBodyFillColor = isSelected
-			? TOOLTIP_FILL_COLOR_SELECTED
-			: baseTooltipBodyFillColor;
 
 		const width = calculateTooltipWidth(
 			nameForTooltip,
@@ -17470,15 +18544,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				nameForTooltip,
 				companyForTooltip,
 				titleForTooltip,
-				tooltipFillColor,
+				baseTooltipFillColor,
 				whatForMarker,
-				tooltipBodyFillColor
+				baseTooltipBodyFillColor
 			),
 			width,
 			height,
 			anchorY,
 		};
-	}, [hoverTooltipEntry, selectedContactIdSet, searchWhat]);
+	}, [hoverTooltipEntry, searchWhat]);
 
 	const hoverTooltipLat = hoverTooltipCoords?.lat ?? null;
 	const hoverTooltipLng = hoverTooltipCoords?.lng ?? null;
@@ -17502,7 +18576,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const p = map.project([hoverTooltipLng, hoverTooltipLat]);
 			el.style.transform = `translate(${Math.round(
 				p.x - hoverTooltipWidth / 2 - hoverTooltipHitSlopPx
-			)}px, ${Math.round(p.y - hoverTooltipAnchorY - hoverTooltipHitSlopPx)}px)`;
+			)}px, ${Math.round(
+				p.y - hoverTooltipAnchorY - hoverTooltipHitSlopPx - tooltipMarkerGapPx
+			)}px)`;
 		};
 
 		update();
@@ -17525,6 +18601,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		hoverTooltipWidth,
 		hoverTooltipAnchorY,
 		hoverTooltipHitSlopPx,
+		tooltipMarkerGapPx,
 	]);
 
 	// Street-view research card positioning: the outer overlay anchors at the marker's
@@ -18091,6 +19168,107 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				</div>
 			)}
 
+			{!isLoading &&
+				!isStreetCardMode &&
+				selectedTooltipStackGroups.length > 0 &&
+				selectedTooltipStackGroups.map((group) => {
+					const backLayerCount = Math.min(
+						SELECTED_TOOLTIP_STACK_FAKE_BACK_COUNT,
+						Math.max(0, group.count - 1)
+					);
+					return (
+						<div
+							key={group.id}
+							ref={(el) => registerSelectedTooltipStackEl(group.id, el)}
+							aria-hidden="true"
+							style={{
+								position: 'absolute',
+								left: 0,
+								top: 0,
+								width: `${group.width}px`,
+								height: `${group.height}px`,
+								pointerEvents: 'none',
+								opacity: 0,
+								zIndex: HOVER_TOOLTIP_Z_INDEX + 1,
+								transition: 'opacity 150ms ease-in-out',
+							}}
+						>
+							{Array.from({ length: backLayerCount }).map((_, index) => {
+								const depth = backLayerCount - index;
+								return (
+									<div
+										key={index}
+										style={{
+											position: 'absolute',
+											left: `${-depth * SELECTED_TOOLTIP_STACK_OFFSET_X_PX}px`,
+											top: `${-depth * SELECTED_TOOLTIP_STACK_OFFSET_Y_PX}px`,
+											width: '100%',
+											height: '100%',
+											boxSizing: 'border-box',
+											border: '1.5px solid black',
+											borderRadius: '8px',
+											backgroundColor:
+												group.colors[depth % group.colors.length] ??
+												group.bodyFillColor,
+										}}
+									/>
+								);
+							})}
+							<div
+								dangerouslySetInnerHTML={{ __html: group.svg }}
+								style={{
+									position: 'absolute',
+									left: 0,
+									top: 0,
+									width: '100%',
+									height: '100%',
+									display: 'block',
+									lineHeight: 0,
+								}}
+							/>
+						</div>
+					);
+				})}
+
+			{/* Selected compact SVG tooltips: persistent top-card-only labels for the
+			    dashboard search map. The active hover tooltip renders above these and
+			    includes the bottom title band. */}
+			{!isLoading &&
+				!isStreetCardMode &&
+				selectedCompactTooltipEntries.length > 0 &&
+				selectedCompactTooltipEntries.map((entry) => (
+					<div
+						key={entry.contact.id}
+						ref={(el) => registerSelectedCompactTooltipEl(entry.contact.id, el)}
+						style={{
+							position: 'absolute',
+							left: 0,
+							top: 0,
+							width: `${entry.width}px`,
+							height: `${entry.height}px`,
+							pointerEvents: 'none',
+							opacity:
+								hoveredMarkerId === entry.contact.id ||
+								(selectedTooltipHoverHiddenTarget?.type === 'contact' &&
+									selectedTooltipHoverHiddenTarget.id === entry.contact.id)
+									? 0
+									: 1,
+							transition: 'opacity 150ms ease-in-out',
+							zIndex: HOVER_TOOLTIP_Z_INDEX - 1,
+						}}
+					>
+						<div
+							dangerouslySetInnerHTML={{ __html: entry.svg }}
+							style={{
+								width: '100%',
+								height: '100%',
+								display: 'block',
+								lineHeight: 0,
+							}}
+						/>
+					</div>
+				))}
+
 			{/* Hover SVG tooltip (single overlay; positioned via map.project). At street
 			    zoom the rich research card below replaces it. */}
 			{!isLoading &&
@@ -18106,18 +19284,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							top: 0,
 							width: `${hoverTooltipData.width + hoverTooltipHitSlopPx * 2}px`,
 							height: `${hoverTooltipData.height + hoverTooltipHitSlopPx * 2}px`,
-							pointerEvents:
-								hoverTooltipContactId != null && hoveredMarkerId === hoverTooltipContactId
-									? 'auto'
-									: 'none',
+							pointerEvents: 'none',
 							padding: `${hoverTooltipHitSlopPx}px`,
 							boxSizing: 'border-box',
 							zIndex: HOVER_TOOLTIP_Z_INDEX,
 						}}
-						onMouseEnter={() => handleMarkerMouseOver(hoverTooltipEntry.contact)}
-						onMouseLeave={() => handleMarkerMouseOut(hoverTooltipEntry.contact.id)}
-						onClick={() => handleMarkerClick(hoverTooltipEntry.contact)}
-						onWheel={forwardWheelToMap}
 					>
 						<div
 							style={{

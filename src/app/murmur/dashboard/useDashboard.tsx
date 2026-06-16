@@ -1210,7 +1210,9 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				userContactLists: selectedContactListRows.map((row) => row.id),
 			});
 			if (campaign) {
-				startTransition(`${urls.murmur.campaign.detail(campaign.id)}?silent=1`);
+				startTransition(
+					`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}&pick=1&allContacts=1&instant=1`
+				);
 			}
 		}
 	};

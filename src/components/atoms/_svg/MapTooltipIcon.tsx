@@ -147,6 +147,10 @@ type TooltipLineExtras = {
 	title?: number;
 };
 
+type MapTooltipOptions = {
+	showTitleBand?: boolean;
+};
+
 const calculateTooltipInnerWidth = (
 	primaryText: string,
 	secondaryText: string,
@@ -189,7 +193,8 @@ export const generateMapTooltipSvg = (
 	title: string,
 	fillColor: string = DEFAULT_TOOLTIP_FILL_COLOR,
 	searchWhat?: string | null,
-	bodyFillColor?: string | null
+	bodyFillColor?: string | null,
+	options: MapTooltipOptions = {}
 ): string => {
 	// Escape special characters for SVG/XML
 	const escapeSvgText = (text: string) =>
@@ -205,6 +210,7 @@ export const generateMapTooltipSvg = (
 		bodyFillColor && isValidHexColor(bodyFillColor)
 			? bodyFillColor.trim()
 			: safeFillColor;
+	const showTitleBand = options.showTitleBand ?? true;
 	const bodyTextFill = 'black';
 	const titleTextFill = 'white';
 
@@ -234,7 +240,8 @@ export const generateMapTooltipSvg = (
 	const titleText = titleTextRaw ? escapeSvgText(titleTextRaw) : '';
 
 	// Calculate width based on actual measured text width (tight fit)
-	const innerWidth = calculateTooltipInnerWidth(primaryTextRaw, secondaryTextRaw, titleTextRaw, {
+	const titleTextForWidth = showTitleBand ? titleTextRaw : '';
+	const innerWidth = calculateTooltipInnerWidth(primaryTextRaw, secondaryTextRaw, titleTextForWidth, {
 		primary: primaryLineExtra,
 		secondary: secondaryLineExtra,
 	});
@@ -244,7 +251,9 @@ export const generateMapTooltipSvg = (
 	const svgWidth = innerWidth + strokePadding * 2;
 
 	// Overall tooltip geometry (without stroke padding offset)
-	const tooltipHeight = TOP_CARD_HEIGHT + TITLE_BOX_GAP + TITLE_BAND_HEIGHT;
+	const tooltipHeight = showTitleBand
+		? TOP_CARD_HEIGHT + TITLE_BOX_GAP + TITLE_BAND_HEIGHT
+		: TOP_CARD_HEIGHT;
 	const svgHeight = tooltipHeight + strokePadding * 2;
 
 	const titleBandTopY = TOP_CARD_HEIGHT + TITLE_BOX_GAP;
@@ -326,6 +335,27 @@ ${normalized}
 
 	const bodyCornerRadius = 8;
 	const titleCornerRadius = 4;
+	const titleDefs = showTitleBand
+		? `  <clipPath id="titleBoxClip">
+    <rect x="${offsetX}" y="${titleBandTopY + offsetY}" width="${innerWidth}" height="${TITLE_BAND_HEIGHT}" rx="${titleCornerRadius}"/>
+  </clipPath>
+  <linearGradient id="titleFadeOverlayGradient" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0%" stop-color="${safeFillColor}" stop-opacity="0"/>
+    <stop offset="100%" stop-color="${safeFillColor}" stop-opacity="1"/>
+  </linearGradient>`
+		: '';
+	const titleBand = showTitleBand
+		? `<rect x="${offsetX}" y="${titleBandTopY + offsetY}" width="${innerWidth}" height="${TITLE_BAND_HEIGHT}" rx="${titleCornerRadius}" fill="${safeFillColor}"/>
+<g clip-path="url(#titleBoxClip)">
+  ${
+		titleText
+			? `<text x="${titleTextX}" y="${titleBaselineY}" font-family="Arial, sans-serif" font-size="11" fill="${titleTextFill}" text-anchor="start">${titleText}</text>
+  <rect x="${titleFadeOverlayX}" y="${titleBandTopY + offsetY + 1}" width="${titleFadeOverlayWidth}" height="${TITLE_BAND_HEIGHT - 2}" fill="url(#titleFadeOverlayGradient)"/>`
+			: ''
+	}
+</g>
+<rect x="${offsetX}" y="${titleBandTopY + offsetY}" width="${innerWidth}" height="${TITLE_BAND_HEIGHT}" rx="${titleCornerRadius}" fill="none" stroke="black" stroke-width="${TOOLTIP_STROKE_WIDTH}"/>`
+		: '';
 
 	return `<svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" fill="none" xmlns="http://www.w3.org/2000/svg">
 <defs>
@@ -338,17 +368,11 @@ ${normalized}
   <clipPath id="topCardLineTwoClip">
     <rect x="${primaryTextX}" y="${offsetY + TOP_CARD_HEIGHT / 2}" width="${topCardLineTwoMaxWidth}" height="${TOP_CARD_HEIGHT / 2}"/>
   </clipPath>
-  <clipPath id="titleBoxClip">
-    <rect x="${offsetX}" y="${titleBandTopY + offsetY}" width="${innerWidth}" height="${TITLE_BAND_HEIGHT}" rx="${titleCornerRadius}"/>
-  </clipPath>
   <linearGradient id="topCardFadeOverlayGradient" x1="0" y1="0" x2="1" y2="0">
     <stop offset="0%" stop-color="${safeBodyFillColor}" stop-opacity="0"/>
     <stop offset="100%" stop-color="${safeBodyFillColor}" stop-opacity="1"/>
   </linearGradient>
-  <linearGradient id="titleFadeOverlayGradient" x1="0" y1="0" x2="1" y2="0">
-    <stop offset="0%" stop-color="${safeFillColor}" stop-opacity="0"/>
-    <stop offset="100%" stop-color="${safeFillColor}" stop-opacity="1"/>
-  </linearGradient>
+${titleDefs}
 </defs>
 <rect x="${offsetX}" y="${offsetY}" width="${innerWidth}" height="${TOP_CARD_HEIGHT}" rx="${bodyCornerRadius}" fill="${safeBodyFillColor}" stroke="black" stroke-width="${TOOLTIP_STROKE_WIDTH}"/>
 <g clip-path="url(#topCardClip)">
@@ -362,16 +386,7 @@ ${normalized}
   ${topCardLineTwo && topCardLineTwoOverflows ? `<rect x="${topCardLineTwoFadeX}" y="${offsetY + TOP_CARD_HEIGHT / 2}" width="${topCardLineTwoFadeWidth}" height="${TOP_CARD_HEIGHT / 2 - 1}" fill="url(#topCardFadeOverlayGradient)"/>` : ''}
   ${categoryIconPlacement === 'primary' ? renderCategoryIcon(primaryIconX, categoryIconPrimaryY) : ''}
 </g>
-<rect x="${offsetX}" y="${titleBandTopY + offsetY}" width="${innerWidth}" height="${TITLE_BAND_HEIGHT}" rx="${titleCornerRadius}" fill="${safeFillColor}"/>
-<g clip-path="url(#titleBoxClip)">
-  ${
-		titleText
-			? `<text x="${titleTextX}" y="${titleBaselineY}" font-family="Arial, sans-serif" font-size="11" fill="${titleTextFill}" text-anchor="start">${titleText}</text>
-  <rect x="${titleFadeOverlayX}" y="${titleBandTopY + offsetY + 1}" width="${titleFadeOverlayWidth}" height="${TITLE_BAND_HEIGHT - 2}" fill="url(#titleFadeOverlayGradient)"/>`
-			: ''
-	}
-</g>
-<rect x="${offsetX}" y="${titleBandTopY + offsetY}" width="${innerWidth}" height="${TITLE_BAND_HEIGHT}" rx="${titleCornerRadius}" fill="none" stroke="black" stroke-width="${TOOLTIP_STROKE_WIDTH}"/>
+${titleBand}
 </svg>`;
 };
 
@@ -380,7 +395,8 @@ export const calculateTooltipWidth = (
 	name: string,
 	company: string,
 	title: string,
-	searchWhat?: string | null
+	searchWhat?: string | null,
+	options: MapTooltipOptions = {}
 ): number => {
 	const trimmedName = (name ?? '').trim();
 	const trimmedCompany = (company ?? '').trim();
@@ -390,6 +406,7 @@ export const calculateTooltipWidth = (
 
 	const primaryText = hasName ? trimmedName : hasCompany ? trimmedCompany : 'Unknown';
 	const secondaryText = hasName && hasCompany ? trimmedCompany : '';
+	const titleTextForWidth = options.showTitleBand === false ? '' : trimmedTitle;
 
 	const showCategoryIcon = Boolean(getTooltipCategoryIconSpec(searchWhat) && hasCompany);
 	const categoryIconSlotExtra = showCategoryIcon
@@ -399,7 +416,7 @@ export const calculateTooltipWidth = (
 	const primaryLineExtra = showCategoryIcon ? categoryIconSlotExtra : 0;
 	const secondaryLineExtra = 0;
 
-	const innerWidth = calculateTooltipInnerWidth(primaryText, secondaryText, trimmedTitle, {
+	const innerWidth = calculateTooltipInnerWidth(primaryText, secondaryText, titleTextForWidth, {
 		primary: primaryLineExtra,
 		secondary: secondaryLineExtra,
 	});
@@ -407,10 +424,17 @@ export const calculateTooltipWidth = (
 };
 
 // Calculate height based on whether there's one or two lines of text
-export const calculateTooltipHeight = (name: string, company: string): number => {
+export const calculateTooltipHeight = (
+	name: string,
+	company: string,
+	options: MapTooltipOptions = {}
+): number => {
 	void name;
 	void company;
-	const tooltipHeight = TOP_CARD_HEIGHT + TITLE_BOX_GAP + TITLE_BAND_HEIGHT;
+	const tooltipHeight =
+		options.showTitleBand === false
+			? TOP_CARD_HEIGHT
+			: TOP_CARD_HEIGHT + TITLE_BOX_GAP + TITLE_BAND_HEIGHT;
 	return tooltipHeight + STROKE_PADDING * 2;
 };
 
@@ -422,8 +446,12 @@ export const MAP_TOOLTIP_HEIGHT =
 export const MAP_TOOLTIP_ANCHOR_X = (MIN_TOOLTIP_INNER_WIDTH + STROKE_PADDING * 2) / 2;
 
 // Calculate anchor Y based on tooltip height
-export const calculateTooltipAnchorY = (name: string, company: string): number => {
-	return calculateTooltipHeight(name, company);
+export const calculateTooltipAnchorY = (
+	name: string,
+	company: string,
+	options: MapTooltipOptions = {}
+): number => {
+	return calculateTooltipHeight(name, company, options);
 };
 
 // Legacy constant for backwards compatibility

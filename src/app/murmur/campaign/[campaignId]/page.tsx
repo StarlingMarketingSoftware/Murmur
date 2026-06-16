@@ -2117,17 +2117,11 @@ const Murmur = () => {
 		}
 	}, [cameFromSearch, searchAddedContacts, campaign, queryClient]);
 
-	// If we landed here without an identity:
-	// - Normal flow: force the IdentityDialog (existing behavior)
-	// - Search -> campaign flow: silently create/assign an identity so Profile tab can populate it
+	// If we landed here without an identity, silently create/assign one so the
+	// legacy create/select profile screen is never part of campaign creation.
 	useEffect(() => {
 		if (!campaign) return;
 		if (campaign.identityId) return;
-
-		if (!cameFromSearch) {
-			setIsIdentityDialogOpen(true);
-			return;
-		}
 
 		if (autoEnsureIdentityOnceRef.current) return;
 		if (isPendingIdentities) return;
@@ -2137,11 +2131,10 @@ const Murmur = () => {
 		if (needsCreate) {
 			// Wait for auth + user record, otherwise we can't create an identity.
 			if (!isLoaded || isPendingUser) return;
-			// If we still can't access a user email, fall back to the dialog to avoid a dead-end.
+			// Without an email we cannot create the required Identity record. Leave the
+			// page usable; the user can still open settings manually if needed.
 			if (!user?.email) {
 				autoEnsureIdentityOnceRef.current = true;
-				setIdentityDialogOrigin('search');
-				setIsIdentityDialogOpen(true);
 				return;
 			}
 		}
@@ -2172,14 +2165,10 @@ const Murmur = () => {
 				});
 			} catch (error) {
 				console.error('Failed to auto-assign identity for campaign:', error);
-				// Fallback: allow the existing IdentityDialog flow so the user isn't blocked
-				setIdentityDialogOrigin('search');
-				setIsIdentityDialogOpen(true);
 			}
 		})();
 	}, [
 		campaign,
-		cameFromSearch,
 		identities,
 		isPendingIdentities,
 		isLoaded,
@@ -2187,7 +2176,6 @@ const Murmur = () => {
 		user,
 		createIdentity,
 		editCampaign,
-		setIsIdentityDialogOpen,
 	]);
 
 	// Determine initial view based on tab query parameter.
@@ -3631,10 +3619,8 @@ const Murmur = () => {
 			</CampaignDeviceProvider>
 		);
 	}
-	// Hide underlying content and show a white overlay when we require the user to set up an identity
-	// or while the full-screen User Settings dialog is open. This prevents any visual "glimpses" and
-	// ensures a premium, smooth transition with no scale effects.
-	const shouldHideContent = isIdentityDialogOpen || !campaign.identityId;
+	// Hide underlying content while the full-screen User Settings dialog is open.
+	const shouldHideContent = isIdentityDialogOpen;
 
 	// The Write/Drafts/Inbox tabs reuse the overview map controls: a status legend
 	// locked to the tab's preset, plus a dimmed, display-only category strip and
@@ -4875,15 +4861,7 @@ const Murmur = () => {
 										'fixed inset-0 z-40 pointer-events-none flex items-center justify-center',
 										isMobile ? 'bg-white' : 'bg-background'
 									)}
-								>
-									{cameFromSearch && !campaign.identityId && !isIdentityDialogOpen ? (
-										<div className="text-center">
-											<p className="font-inter text-[14px] text-[#3b3b3b]">
-												Setting up your profile…
-											</p>
-										</div>
-									) : null}
-								</div>
+								/>
 							)}
 							<div
 								className={cn(
