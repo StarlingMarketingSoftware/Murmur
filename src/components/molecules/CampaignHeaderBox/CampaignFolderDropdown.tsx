@@ -3,20 +3,12 @@
 import { FC, RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
 import { urls } from '@/constants/urls';
 import { getMurmurRootScale } from '@/utils/rootScale';
-import {
-	CampaignApiError,
-	useCreateCampaign,
-	useGetCampaigns,
-} from '@/hooks/queryHooks/useCampaigns';
-import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
-import { generateCampaignName } from '@/utils/campaignNames';
+import { useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
+import { MAX_CAMPAIGNS, useAddCampaignFolder } from '@/hooks/useAddCampaignFolder';
 import { CampaignsTableMini } from '@/components/organisms/_tables/CampaignsTable/CampaignsTableMini';
 
-const MAX_CAMPAIGNS = 5;
-const CAP_REACHED_MESSAGE = `You have reached the maximum of ${MAX_CAMPAIGNS} active campaigns. Delete one to create a new one.`;
 const PANEL_HEIGHT = 288;
 
 interface CampaignFolderDropdownProps {
@@ -54,11 +46,7 @@ export const CampaignFolderDropdown: FC<CampaignFolderDropdownProps> = ({
 	);
 
 	const { data: campaignsData } = useGetCampaigns();
-	const { mutateAsync: createContactList, isPending: isPendingCreateContactList } =
-		useCreateUserContactList({ suppressToasts: true });
-	const { mutateAsync: createCampaign, isPending: isPendingCreateCampaign } =
-		useCreateCampaign({ suppressToasts: true });
-	const isAddingFolder = isPendingCreateContactList || isPendingCreateCampaign;
+	const { addFolder, isAddingFolder } = useAddCampaignFolder();
 
 	// Anchor the panel flush beneath the header box. getBoundingClientRect() is in
 	// scaled (visual) units; position: fixed resolves in unscaled units, so divide
@@ -112,32 +100,6 @@ export const CampaignFolderDropdown: FC<CampaignFolderDropdownProps> = ({
 		}
 	};
 
-	const handleAddFolder = async () => {
-		if (isAddingFolder) return;
-
-		const campaigns = (campaignsData ?? []) as Array<{ name?: unknown }>;
-		if (campaigns.length >= MAX_CAMPAIGNS) {
-			toast.error(CAP_REACHED_MESSAGE);
-			return;
-		}
-
-		const existingNames = campaigns
-			.map((c) => (typeof c.name === 'string' ? c.name : null))
-			.filter((name): name is string => Boolean(name));
-		const name = generateCampaignName(existingNames);
-
-		try {
-			const contactList = await createContactList({ name, contactIds: [] });
-			await createCampaign({ name, userContactLists: [contactList.id] });
-		} catch (error) {
-			if (error instanceof CampaignApiError && error.code === 'CAMPAIGN_CAP_REACHED') {
-				toast.error(error.message || CAP_REACHED_MESSAGE);
-				return;
-			}
-			toast.error('Could not create campaign. Please try again.');
-		}
-	};
-
 	if (typeof document === 'undefined' || !pos) return null;
 
 	return createPortal(
@@ -171,7 +133,7 @@ export const CampaignFolderDropdown: FC<CampaignFolderDropdownProps> = ({
 				currentCampaignId={currentCampaignId}
 				selectedCampaignId={selectedId}
 				onRowClick={setSelectedId}
-				onAddRow={handleAddFolder}
+				onAddRow={addFolder}
 				isAddingFolder={isAddingFolder}
 				onChooseFolder={handleChooseFolder}
 			/>

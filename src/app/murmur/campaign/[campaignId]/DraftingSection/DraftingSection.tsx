@@ -9,6 +9,7 @@ import {
 	useState,
 	type CSSProperties,
 	type MouseEvent as ReactMouseEvent,
+	type SVGProps,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -109,7 +110,12 @@ import {
 	OpportunityHoverPanel,
 	OPPORTUNITY_HOVER_PANEL_WIDTH_PX,
 } from '@/components/molecules/OpportunityHoverPanel/OpportunityHoverPanel';
-import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
+import SearchResultsMap, {
+	type CampaignContactMapStatus,
+} from '@/components/molecules/SearchResultsMap/SearchResultsMap';
+import StatusDraftsIcon from '@/components/atoms/svg/StatusDraftsIcon';
+import StatusNewMessageIcon from '@/components/atoms/svg/StatusNewMessageIcon';
+import StatusSentIcon from '@/components/atoms/svg/StatusSentIcon';
 import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
 import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
@@ -147,6 +153,7 @@ import { useGetCampaignContactEvents } from '@/hooks/queryHooks/useCampaigns';
 import { buildCampaignInboxMockData } from '../CampaignInboxDebugPanel';
 import { CampaignsTableMini } from '@/components/organisms/_tables/CampaignsTable/CampaignsTableMini';
 import { CampaignOverviewStrategyBox } from '@/components/molecules/DashboardStrategyBox/CampaignOverviewStrategyBox';
+import { useAddCampaignFolder } from '@/hooks/useAddCampaignFolder';
 import { MapResultsPanelSkeleton } from '@/components/molecules/MapResultsPanelSkeleton/MapResultsPanelSkeleton';
 import {
 	isRestaurantTitle,
@@ -283,6 +290,11 @@ interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 	overviewRightRailSearchQuery?: string | null;
 	overviewRightRailSearchContacts?: ContactWithName[];
 	overviewRightRailSearchContactsLoading?: boolean;
+	// Per-contact status (draft / new-message / sent / contacts) so the right-rail
+	// search results can show each match's real type, mirroring the bottom status
+	// strip and the map pins. Computed once on the page; absent ids fall back to
+	// plain 'contacts'.
+	overviewRightRailContactStatusById?: ReadonlyMap<number, CampaignContactMapStatus>;
 	onClearOverviewRightRailSearch?: () => void;
 	dimContactsExpandedList?: boolean;
 }
@@ -309,6 +321,21 @@ const RAIL_HOVER_RESEARCH_TOP_NUDGE_PX = 56;
 const ROW_HOVER_OPPORTUNITY_DOCKED_LEFT_PX = -(
 	OPPORTUNITY_HOVER_PANEL_WIDTH_PX + ROW_HOVER_RESEARCH_GAP_PX
 );
+
+// Right-rail search-result status pill: reuses the campaign overview status
+// colors/icons (page.tsx CAMPAIGN_OVERVIEW_STATUS_PILL_COLOR + the status strip
+// icons) so a result reads as Draft / New Message / Sent. Plain 'contacts' get
+// no pill, so they're omitted here.
+const OVERVIEW_RIGHT_RAIL_STATUS_PILL: Partial<
+	Record<
+		CampaignContactMapStatus,
+		{ color: string; label: string; Icon: FC<SVGProps<SVGSVGElement>> }
+	>
+> = {
+	drafts: { color: '#FDDEA5', label: 'Draft', Icon: StatusDraftsIcon },
+	'new-message': { color: '#AEE1FD', label: 'New', Icon: StatusNewMessageIcon },
+	sent: { color: '#AEFDC3', label: 'Sent', Icon: StatusSentIcon },
+};
 
 export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const {
@@ -338,6 +365,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		overviewRightRailSearchQuery,
 		overviewRightRailSearchContacts,
 		overviewRightRailSearchContactsLoading,
+		overviewRightRailContactStatusById,
 		onClearOverviewRightRailSearch,
 		dimContactsExpandedList = false,
 	} = props;
@@ -1097,6 +1125,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				contact.curatedDisplayLabel || contact.headline || contact.title || '';
 			const stateAbbr = getStateAbbreviation(contact.state || '') || '';
 			const city = contact.city || '';
+			const status =
+				overviewRightRailContactStatusById?.get(contact.id) ?? 'contacts';
+			const statusPill = OVERVIEW_RIGHT_RAIL_STATUS_PILL[status];
+			const StatusPillIcon = statusPill?.Icon;
 
 			return (
 				<div
@@ -1212,29 +1244,36 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									{company}
 								</div>
 							</div>
-							<div className="pr-2 pl-1 flex items-center h-[22px]">
-								{city || stateAbbr ? (
-									<div className="flex items-center gap-1 w-full">
-										{stateAbbr && (
-											<span
-												className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
-												style={{
-													backgroundColor:
-														stateBadgeColorMap[stateAbbr] || 'transparent',
-													borderColor: '#000000',
-												}}
-											>
-												{stateAbbr}
-											</span>
-										)}
-										{city && (
-											<span className="text-[10px] text-black leading-none truncate">
-												{city}
-											</span>
-										)}
+							<div className="pr-2 pl-1 flex items-center gap-1 h-[22px]">
+								<div className="flex items-center gap-1 flex-1 min-w-0">
+									{stateAbbr && (
+										<span
+											className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+											style={{
+												backgroundColor:
+													stateBadgeColorMap[stateAbbr] || 'transparent',
+												borderColor: '#000000',
+											}}
+										>
+											{stateAbbr}
+										</span>
+									)}
+									{city && (
+										<span className="text-[10px] text-black leading-none truncate">
+											{city}
+										</span>
+									)}
+								</div>
+								{statusPill && StatusPillIcon && (
+									<div
+										className="flex items-center gap-1 flex-shrink-0 h-[17px] rounded-[6px] px-1.5 border border-black"
+										style={{ backgroundColor: statusPill.color }}
+									>
+										<StatusPillIcon width={11} height={11} />
+										<span className="text-[9px] text-black leading-none whitespace-nowrap">
+											{statusPill.label}
+										</span>
 									</div>
-								) : (
-									<div className="w-full" />
 								)}
 							</div>
 						</>
@@ -1276,29 +1315,36 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									<div className="w-full" />
 								)}
 							</div>
-							<div className="pr-2 pl-1 flex items-center h-[22px]">
-								{city || stateAbbr ? (
-									<div className="flex items-center gap-1 w-full">
-										{stateAbbr && (
-											<span
-												className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
-												style={{
-													backgroundColor:
-														stateBadgeColorMap[stateAbbr] || 'transparent',
-													borderColor: '#000000',
-												}}
-											>
-												{stateAbbr}
-											</span>
-										)}
-										{city && (
-											<span className="text-[10px] text-black leading-none truncate">
-												{city}
-											</span>
-										)}
+							<div className="pr-2 pl-1 flex items-center gap-1 h-[22px]">
+								<div className="flex items-center gap-1 flex-1 min-w-0">
+									{stateAbbr && (
+										<span
+											className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+											style={{
+												backgroundColor:
+													stateBadgeColorMap[stateAbbr] || 'transparent',
+												borderColor: '#000000',
+											}}
+										>
+											{stateAbbr}
+										</span>
+									)}
+									{city && (
+										<span className="text-[10px] text-black leading-none truncate">
+											{city}
+										</span>
+									)}
+								</div>
+								{statusPill && StatusPillIcon && (
+									<div
+										className="flex items-center gap-1 flex-shrink-0 h-[17px] rounded-[6px] px-1.5 border border-black"
+										style={{ backgroundColor: statusPill.color }}
+									>
+										<StatusPillIcon width={11} height={11} />
+										<span className="text-[9px] text-black leading-none whitespace-nowrap">
+											{statusPill.label}
+										</span>
 									</div>
-								) : (
-									<div className="w-full" />
 								)}
 							</div>
 						</>
@@ -1307,6 +1353,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			);
 		},
 		[
+			overviewRightRailContactStatusById,
 			overviewRightRailHoveredContactId,
 			overviewRightRailSelectedIdSet,
 			setOverviewRightRailHoveredContactId,
@@ -1321,6 +1368,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		leftPx: number;
 		topPx: number;
 	} | null>(null);
+	const { addFolder, isAddingFolder } = useAddCampaignFolder();
 	const getEffectiveCampaignZoom = useCallback(() => {
 		if (typeof window === 'undefined') return 0.85;
 		const html = document.documentElement;
@@ -6321,15 +6369,27 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 									</div>
 									) : (
-											<>
-												{/* Mini Campaigns table */}
+											<div
+												className="flex flex-col gap-[16px] pointer-events-auto"
+												style={{
+													// Fixed-height envelope: stable top (the rail's topPx) AND
+													// bottom, matching the area's original footprint
+													// (135 + 16 + 486 = 637). The Folders box grows with
+													// folders (flex-shrink-0) while the Strategy box collapses
+													// from a fixed bottom to fill what's left. maxHeight only
+													// kicks in to keep short viewports on-screen.
+													height: 637,
+													maxHeight: `calc(100dvh - ${
+														overviewRightRailPos ? overviewRightRailPos.topPx : 72
+													}px - env(safe-area-inset-bottom, 0px) - 20px)`,
+													overflow: 'hidden',
+												}}
+											>
+												{/* Mini Campaigns table — fixed top, grows with folders */}
 												<div
 													style={{
-														display: 'flex',
+														flexShrink: 0,
 														width: '371px',
-														height: '135px',
-														justifyContent: 'center',
-														alignItems: 'center',
 														position: 'relative',
 													}}
 												>
@@ -6338,14 +6398,18 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														onSelectCampaign={(id) =>
 															router.push(`${urls.murmur.campaign.detail(id)}?tab=all`)
 														}
+														showAllRows
+														showAddRow
+														onAddRow={addFolder}
+														isAddingFolder={isAddingFolder}
 													/>
 												</div>
 
-												{/* Mini Strategy box */}
+												{/* Mini Strategy box — collapses to fill remaining space */}
 												<div
+													className="flex-1 min-h-0"
 													style={{
 														width: '369px',
-														height: '486px',
 														position: 'relative',
 														overflow: 'hidden',
 													}}
@@ -6356,7 +6420,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														onSearchContacts={onGoToSearch}
 													/>
 												</div>
-											</>
+											</div>
 									)}
 								{shouldShowOverviewRightRailSearchPanel &&
 									overviewRightRailSelectedContacts.length > 0 && (

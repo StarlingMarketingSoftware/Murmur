@@ -12319,6 +12319,31 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[onMarkerClick, onToggleSelection]
 	);
 
+	// Hover cards flip to pointer-events:auto while their marker is hovered, which
+	// otherwise swallows wheel events before they reach Mapbox's scroll-zoom handler
+	// (it lives on the canvas container, a sibling subtree). Re-dispatch the wheel
+	// onto that element so native zoom-to-cursor / wheel rate / pinch all still apply.
+	const forwardWheelToMap = useCallback((e: React.WheelEvent) => {
+		const map = mapRef.current;
+		if (!map) return;
+		map.getCanvasContainer().dispatchEvent(
+			new WheelEvent('wheel', {
+				deltaX: e.deltaX,
+				deltaY: e.deltaY,
+				deltaZ: e.deltaZ,
+				deltaMode: e.deltaMode,
+				clientX: e.clientX,
+				clientY: e.clientY,
+				ctrlKey: e.ctrlKey,
+				metaKey: e.metaKey,
+				shiftKey: e.shiftKey,
+				altKey: e.altKey,
+				bubbles: false,
+				cancelable: true,
+			})
+		);
+	}, []);
+
 	const handleMarkerMouseOver = useCallback(
 		(contact: ContactWithName, domEvent?: MouseEvent | TouchEvent) => {
 			clearEmptyMapPrompt();
@@ -17069,7 +17094,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// selection re-captures its own baseline.
 	const selectionBaseZoomRef = useRef<number | null>(null);
 	const selectedAnchorPoints = useMemo(() => {
-		if (selectedContacts.length < 2) return null;
+		if (selectedContacts.length < 1) return null;
 		const points: LatLngLiteral[] = [];
 		for (const id of selectedContacts) {
 			const coords =
@@ -17079,7 +17104,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				allContactsOverlayCoordsByContactId.get(id);
 			if (coords) points.push(coords);
 		}
-		return points.length >= 2 ? points : null;
+		return points.length >= 1 ? points : null;
 	}, [
 		selectedContacts,
 		coordsByContactId,
@@ -18068,6 +18093,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						onMouseEnter={() => handleMarkerMouseOver(hoverTooltipEntry.contact)}
 						onMouseLeave={() => handleMarkerMouseOut(hoverTooltipEntry.contact.id)}
 						onClick={() => handleMarkerClick(hoverTooltipEntry.contact)}
+						onWheel={forwardWheelToMap}
 					>
 						<div
 							style={{
@@ -18120,6 +18146,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							onHoverStart={handleMarkerMouseOver}
 							onHoverEnd={handleMarkerMouseOut}
 							onToggleSelection={handleStreetCardToggleSelection}
+							onWheelForward={forwardWheelToMap}
 							registerEl={registerStreetCardEl}
 						/>
 					))}
@@ -18165,6 +18192,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							}}
 							onMouseEnter={() => handleMarkerMouseOver(hoverTooltipEntry.contact)}
 							onMouseLeave={() => handleMarkerMouseOut(hoverTooltipEntry.contact.id)}
+							onWheel={forwardWheelToMap}
 						>
 							<div
 								className="relative w-[280px] rounded-[10px] bg-white overflow-hidden font-inter"
@@ -18633,6 +18661,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						isPointerOverEventPopupRef.current = false;
 						scheduleEventHoverClose();
 					}}
+					onWheel={forwardWheelToMap}
 				>
 					{/* Outer red box — authored at its natural design size and uniformly
 					    scaled down to the footprint above. transform-origin top-left so the
@@ -18697,9 +18726,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			{/* Multi-select action card — anchored to the selection centroid.
 			    Only rendered on hosts that wire `onAddSelectionToFolder` (the
-			    dashboard search map), and only for 2+ selected contacts. */}
+			    dashboard search map), for 1+ selected contacts. */}
 			{!isLoading &&
-				selectedContacts.length >= 2 &&
+				selectedContacts.length >= 1 &&
 				onAddSelectionToFolder &&
 				selectedAnchorPoints && (
 					<div

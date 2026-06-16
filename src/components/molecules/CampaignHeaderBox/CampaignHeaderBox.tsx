@@ -11,6 +11,7 @@ import { CampaignTitlePills } from '@/components/molecules/CampaignTitlePills/Ca
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 import DiamondIcon from '@/components/atoms/_svg/DiamondIcon';
 import { CampaignFolderDropdown } from './CampaignFolderDropdown';
+import { useCampaignTopNavScheme } from '@/hooks/useCampaignTopNavScheme';
 
 interface CampaignHeaderBoxProps {
 	campaignId: number;
@@ -41,9 +42,6 @@ const getContactsFillColor = (): string => '#F5DADA';
 const getDraftFillColor = (): string => '#FFE3AA';
 const getSentFillColor = (): string => '#B0E0A6';
 
-const FOLDER_BOX_FILL = '#B9EAF1';
-const FOLDER_ICON_COLOR = '#C5494F';
-
 export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	campaignId,
 	campaignName,
@@ -62,6 +60,9 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	fullWidth = false,
 	className,
 }) => {
+	// Folder box fill + icon color follow the campaign's shared top-nav scheme so
+	// they match the top navigation box and the "Filtering in {campaign}" pill.
+	const topNavScheme = useCampaignTopNavScheme(campaignId);
 	const [isEditing, setIsEditing] = useState(false);
 	const [editedName, setEditedName] = useState(campaignName);
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -365,14 +366,14 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 						maxWidth: '258px',
 						height: '26px',
 						borderRadius: '6px',
-						background: FOLDER_BOX_FILL,
+						background: topNavScheme.box,
 					}}
 				>
 					<DashboardActionBarFolderIcon
 						width={26}
 						height={15}
 						aria-hidden="true"
-						style={{ color: FOLDER_ICON_COLOR, flexShrink: 0, display: 'block' }}
+						style={{ color: topNavScheme.icon, flexShrink: 0, display: 'block' }}
 					/>
 					{isEditing ? (
 						<input

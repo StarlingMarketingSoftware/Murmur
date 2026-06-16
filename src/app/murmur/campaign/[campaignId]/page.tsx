@@ -59,6 +59,7 @@ import nextDynamic from 'next/dynamic';
 import { CampaignsTable } from '@/components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import { useEditCampaign, useGetCampaignContacts } from '@/hooks/queryHooks/useCampaigns';
+import { useCampaignTopNavScheme } from '@/hooks/useCampaignTopNavScheme';
 import { EMAIL_QUERY_KEYS, useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { toast } from 'sonner';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
@@ -1152,6 +1153,8 @@ const Murmur = () => {
 	// Route id is known immediately (before the detail query resolves), so the contact/email/inbound
 	// queries can fire in parallel with useGetCampaign instead of waiting on campaign?.id.
 	const routeCampaignId = campaignId ? Number(campaignId) : undefined;
+	// Per-campaign color scheme for the top navigation box + folder icon.
+	const topNavScheme = useCampaignTopNavScheme(routeCampaignId);
 	const isMobile = useIsMobile();
 	const [viewportWidth, setViewportWidth] = useState(0);
 	const [viewportHeight, setViewportHeight] = useState(0);
@@ -4081,7 +4084,7 @@ const Murmur = () => {
 													width: `${MAP_VIEW_TOP_BACKDROP_BOX_WIDTH_PX}px`,
 													height: `${MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX}px`,
 													borderRadius: '8px',
-													backgroundColor: '#B9EAF1',
+													backgroundColor: topNavScheme.box,
 													opacity: 0.9,
 												}}
 											/>
@@ -4169,10 +4172,10 @@ const Murmur = () => {
 														xmlns="http://www.w3.org/2000/svg"
 														className="block flex-shrink-0"
 													>
-														<rect y="2" width="30" height="15" rx="1" fill="#B43A35" />
+														<rect y="2" width="30" height="15" rx="1" fill={topNavScheme.icon} />
 														<path
 															d="M0 2C0 0.89543 0.895431 0 2 0H13C14.1046 0 15 0.895431 15 2V4C15 4.55228 14.5523 5 14 5H1C0.447715 5 0 4.55228 0 4V2Z"
-															fill="#B43A35"
+															fill={topNavScheme.icon}
 														/>
 													</svg>
 													<span
@@ -4240,7 +4243,7 @@ const Murmur = () => {
 															fontSize: '20.719px',
 															fontStyle: 'normal',
 															fontWeight: activeView === 'overview' ? 600 : 500,
-															lineHeight: '17.063px',
+															lineHeight: '24px',
 															opacity: activeView === 'overview' ? 1 : 0.72,
 														}}
 													>
@@ -4254,10 +4257,10 @@ const Murmur = () => {
 															xmlns="http://www.w3.org/2000/svg"
 															className="block flex-shrink-0"
 														>
-															<rect y="2" width="30" height="15" rx="1" fill="#B43A35" />
+															<rect y="2" width="30" height="15" rx="1" fill={topNavScheme.icon} />
 															<path
 																d="M0 2C0 0.89543 0.895431 0 2 0H13C14.1046 0 15 0.895431 15 2V4C15 4.55228 14.5523 5 14 5H1C0.447715 5 0 4.55228 0 4V2Z"
-																fill="#B43A35"
+																fill={topNavScheme.icon}
 															/>
 														</svg>
 														<span className="min-w-0 truncate">{campaignName}</span>
@@ -4928,6 +4931,9 @@ const Murmur = () => {
 											overviewRightRailSearchContacts={campaignMapContacts ?? []}
 											overviewRightRailSearchContactsLoading={
 												isCampaignMapContactsLoading
+											}
+											overviewRightRailContactStatusById={
+												campaignOverviewContactStatusById
 											}
 											renderGlobalOverlays
 											onViewReady={handleActiveViewReady}

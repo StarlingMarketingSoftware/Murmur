@@ -2,6 +2,7 @@
 
 import { FC, ReactNode, useMemo } from 'react';
 import { useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
+import { MAX_CAMPAIGNS } from '@/hooks/useAddCampaignFolder';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { mmdd } from '@/utils';
 import type {
@@ -384,6 +385,60 @@ export const CampaignsTableMini: FC<Props> = ({
 		);
 	};
 
+	// Card-variant "+" ghost row: a placeholder folder swatch, a bordered "+" in
+	// the Drafts column, and empty Sent/Updated pill outlines. Clicking it adds a
+	// folder. Reuses the same column offsets as a real row.
+	const renderAddRow = () => {
+		const folderPillTop =
+			(ROW_HEIGHT - FOLDER_PILL_HEIGHT) / 2 + FOLDER_PILL_TOP_OFFSET;
+		const metricPillTop =
+			(ROW_HEIGHT - METRIC_PILL_HEIGHT) / 2 + METRIC_PILL_TOP_OFFSET;
+		const ghostPill = {
+			width: METRIC_PILL_WIDTH,
+			height: METRIC_PILL_HEIGHT,
+			borderRadius: 5,
+			border: '1px solid rgba(0, 0, 0, 0.18)',
+			boxSizing: 'border-box' as const,
+		};
+		return (
+			<div
+				key="__add-folder-row"
+				onClick={isAddingFolder ? undefined : onAddRow}
+				role="button"
+				tabIndex={isAddingFolder ? -1 : 0}
+				aria-label="Add folder"
+				className={`relative transition-colors ${
+					isAddingFolder
+						? 'cursor-default bg-[#F3F3F3] opacity-70'
+						: 'cursor-pointer bg-[#F3F3F3] hover:bg-[#ECECEC]'
+				}`}
+				style={{ height: ROW_HEIGHT, boxSizing: 'border-box' }}
+			>
+				<div style={{ position: 'absolute', left: FOLDER_PILL_LEFT, top: folderPillTop }}>
+					<div
+						style={{
+							width: 22,
+							height: FOLDER_PILL_HEIGHT,
+							borderRadius: 2.5,
+							background: 'rgba(0, 0, 0, 0.08)',
+						}}
+					/>
+				</div>
+				<div style={{ position: 'absolute', left: DRAFT_PILL_LEFT, top: metricPillTop }}>
+					<MetricPill background="#FCFCFC">
+						<MiniPlusIcon />
+					</MetricPill>
+				</div>
+				<div style={{ position: 'absolute', left: SENT_PILL_LEFT, top: metricPillTop }}>
+					<div style={ghostPill} />
+				</div>
+				<div style={{ position: 'absolute', left: UPDATED_PILL_LEFT, top: metricPillTop }}>
+					<div style={ghostPill} />
+				</div>
+			</div>
+		);
+	};
+
 	const headerRow = (
 		<div
 			style={{
@@ -524,7 +579,9 @@ export const CampaignsTableMini: FC<Props> = ({
 			className={className}
 			style={{
 				width: 371,
-				height: 135,
+				// Roomy floor with 1–2 folders; grows row-by-row toward the 5-folder
+				// cap (pushing the Strategy box below it down).
+				minHeight: 165,
 				borderRadius: 8,
 				background: '#F8F8F8',
 				overflow: 'hidden',
@@ -556,6 +613,9 @@ export const CampaignsTableMini: FC<Props> = ({
 								onClick: () => onSelectCampaign?.(row.id),
 							});
 						})}
+			{showAddRow && !isPending && rows.length < MAX_CAMPAIGNS
+				? renderAddRow()
+				: null}
 		</div>
 	);
 };

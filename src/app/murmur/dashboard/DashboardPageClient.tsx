@@ -212,6 +212,7 @@ import {
 	getCampaignDetailQueryKey,
 	fetchCampaignDetail,
 } from '@/hooks/queryHooks/useCampaigns';
+import { useCampaignTopNavScheme } from '@/hooks/useCampaignTopNavScheme';
 import {
 	useGetEmails,
 	getEmailsListQueryKey,
@@ -4415,6 +4416,9 @@ const DashboardContent = () => {
 	const mapCampaignId =
 		fromCampaignIdParam ||
 		(activeCampaignId != null ? String(activeCampaignId) : '');
+	// Per-campaign color scheme for the top navigation box + folder icon (matches
+	// the campaign page's header for the same campaign).
+	const topNavScheme = useCampaignTopNavScheme(mapCampaignId);
 
 	// The exact contacts filter the campaign page issues (see useDraftingSection):
 	// derived purely from the campaign's contact lists, so the prefetch lands on the
@@ -12679,7 +12683,7 @@ const DashboardContent = () => {
 												width: `${MAP_VIEW_TOP_BACKDROP_BOX_WIDTH_PX}px`,
 												height: `${MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX}px`,
 												borderRadius: '8px',
-												backgroundColor: '#B9EAF1',
+												backgroundColor: topNavScheme.box,
 												opacity: 0.9,
 											}}
 										/>
@@ -13318,7 +13322,7 @@ const DashboardContent = () => {
 														fontSize: '20.719px',
 														fontStyle: 'normal',
 														fontWeight: 500,
-														lineHeight: '17.063px',
+														lineHeight: '24px',
 													}}
 													onPointerEnter={handleCampaignTabPointerEnter}
 													onFocus={handleCampaignTabPointerEnter}
@@ -13343,10 +13347,10 @@ const DashboardContent = () => {
 																xmlns="http://www.w3.org/2000/svg"
 																className="block flex-shrink-0"
 															>
-																<rect y="2" width="30" height="15" rx="1" fill="#B43A35" />
+																<rect y="2" width="30" height="15" rx="1" fill={topNavScheme.icon} />
 																<path
 																	d="M0 2C0 0.89543 0.895431 0 2 0H13C14.1046 0 15 0.895431 15 2V4C15 4.55228 14.5523 5 14 5H1C0.447715 5 0 4.55228 0 4V2Z"
-																	fill="#B43A35"
+																	fill={topNavScheme.icon}
 																/>
 															</svg>
 															<span className="min-w-0 truncate">{mapCampaignName}</span>

@@ -129,7 +129,7 @@ const StrategyEmailRow = ({ email }: { email: StrategyEmail }) => (
 	<div
 		style={{
 			height: 43.5,
-			width: 303,
+			width: 331,
 			borderRadius: 4,
 			background: '#F8F8F8',
 			display: 'grid',
@@ -331,7 +331,7 @@ export const CampaignOverviewStrategyBox: FC<Props> = ({
 				<div
 					style={{
 						position: 'absolute',
-						left: 15,
+						left: 10,
 						top: 43,
 						display: 'flex',
 						flexDirection: 'column',
