@@ -302,6 +302,7 @@ interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 	overviewRightRailContactStatusById?: ReadonlyMap<number, CampaignContactMapStatus>;
 	onClearOverviewRightRailSearch?: () => void;
 	dimContactsExpandedList?: boolean;
+	whiteOutOverviewCampaignsMiniTable?: boolean;
 }
 
 type CampaignBottomPanelKind = 'contacts' | 'drafts' | 'sent' | 'inbox';
@@ -358,6 +359,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		overviewRightRailContactStatusById,
 		onClearOverviewRightRailSearch,
 		dimContactsExpandedList = false,
+		whiteOutOverviewCampaignsMiniTable = false,
 	} = props;
 	const [isCampaignHeaderDropdownOpen, setIsCampaignHeaderDropdownOpen] = useState(false);
 	const campaignHeaderPanelDimStyle: CSSProperties = {
@@ -6483,6 +6485,18 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														onAddRow={addFolder}
 														isAddingFolder={isAddingFolder}
 													/>
+													{whiteOutOverviewCampaignsMiniTable ? (
+														<div
+															aria-hidden="true"
+															style={{
+																position: 'absolute',
+																inset: 0,
+																zIndex: 2,
+																borderRadius: 8,
+																background: '#FFFFFF',
+															}}
+														/>
+													) : null}
 												</div>
 
 												{/* Mini Strategy box — collapses to fill remaining space */}

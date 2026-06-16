@@ -107,7 +107,7 @@ const TALL_STACK_INNER_BOX_STYLES = [
 	{ backgroundColor: '#EFEFEF' },
 	{ backgroundColor: '#F0E0A15C' },
 	{ backgroundColor: '#C5EDA05C' },
-	{ backgroundColor: '#C0D5FF' },
+	{ backgroundColor: '#B9D0FF5C' },
 	{
 		backgroundColor: 'rgba(165, 195, 255, 0.36)',
 		opacity: 0.43,
@@ -116,7 +116,7 @@ const TALL_STACK_INNER_BOX_STYLES = [
 		backgroundColor: 'rgba(155, 218, 255, 0.36)',
 		opacity: 0.5,
 	},
-	{ backgroundColor: 'rgba(119, 221, 145, 0.77)' },
+	{ backgroundColor: '#81D6975C' },
 ] as const satisfies readonly CSSProperties[];
 
 // Selected (square-select tool active) inner-box overlay. The box is sized

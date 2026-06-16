@@ -4998,6 +4998,9 @@ const Murmur = () => {
 												goToNextTab={goToNextTab}
 												hideHeaderBox={isNarrowestDesktop && !isMobile}
 												dimContactsExpandedList={isNarrowCampaignHeaderDropdownOpen}
+												whiteOutOverviewCampaignsMiniTable={
+													activeView === 'overview' && showTopCampaignsDropdown
+												}
 												isCampaignWorkspaceExpanded={isCampaignWorkspaceExpanded}
 												onRequestCampaignWorkspaceExpanded={
 													requestCampaignWorkspaceExpanded
