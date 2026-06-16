@@ -19,6 +19,8 @@ interface DashboardWriteOverlayProps {
 	targetContactIds: number[];
 	/** Switch the floating-card mode back to "Add Contacts to Folder" (also exits Write mode). */
 	onSwitchToAddToFolder: () => void;
+	/** Close the write overlay and abandon the current map selection. */
+	onClose: () => void;
 	/** Notify the parent whether the batch review is active (so it can keep the overlay mounted). */
 	onReviewActiveChange?: (active: boolean) => void;
 	/** Notify the parent which reviewed draft/contact is currently open. */
@@ -44,6 +46,7 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 	campaign,
 	targetContactIds,
 	onSwitchToAddToFolder,
+	onClose,
 	onReviewActiveChange,
 	onActiveReviewContactChange,
 }) => {
@@ -204,6 +207,7 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 					borderRadius: 6,
 					background: '#EB8586',
 					paddingLeft: 4,
+					paddingRight: 8,
 				}}
 			>
 				<button
@@ -231,6 +235,41 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 					}}
 				>
 					Add Contacts to Folder
+				</button>
+				<button
+					type="button"
+					aria-label="Close write message panel"
+					onClick={onClose}
+					className="ml-auto flex items-center justify-center"
+					style={{
+						width: 18,
+						height: 18,
+						background: 'transparent',
+						border: 'none',
+						padding: 0,
+						cursor: 'pointer',
+					}}
+				>
+					<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+						<line
+							x1="3"
+							y1="3"
+							x2="13"
+							y2="13"
+							stroke="#000000"
+							strokeWidth="2.5"
+							strokeLinecap="butt"
+						/>
+						<line
+							x1="13"
+							y1="3"
+							x2="3"
+							y2="13"
+							stroke="#000000"
+							strokeWidth="2.5"
+							strokeLinecap="butt"
+						/>
+					</svg>
 				</button>
 			</div>
 

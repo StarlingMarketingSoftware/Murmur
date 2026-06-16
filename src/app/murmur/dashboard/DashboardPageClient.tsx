@@ -4422,12 +4422,25 @@ const DashboardContent = () => {
 		if (!isWriteReviewActive) setActiveWriteReviewContactId(null);
 	}, [isWriteReviewActive]);
 
+	useEffect(() => {
+		if (isWriteMode && selectedContacts.length === 0 && !isWriteReviewActive) {
+			setIsWriteMode(false);
+		}
+	}, [isWriteMode, isWriteReviewActive, selectedContacts.length, setIsWriteMode]);
+
 	const handleActiveWriteReviewContactChange = useCallback((contactId: number | null) => {
 		setActiveWriteReviewContactId(contactId);
 		if (contactId != null) {
 			setIsWriteReviewActive(true);
 		}
 	}, []);
+
+	const handleCloseWriteOverlay = useCallback(() => {
+		setIsWriteMode(false);
+		setIsWriteReviewActive(false);
+		setActiveWriteReviewContactId(null);
+		setSelectedContacts([]);
+	}, [setIsWriteMode, setSelectedContacts]);
 
 	useEffect(() => {
 		if (folderMoveNotice?.phase !== 'complete') return;
@@ -14010,6 +14023,7 @@ const DashboardContent = () => {
 																		<DashboardWriteOverlay
 																			campaign={dashboardMapCampaignForHeader}
 																			targetContactIds={selectedContacts}
+																			onClose={handleCloseWriteOverlay}
 																			onSwitchToAddToFolder={() => {
 																				void handleAddSelectedToContextFolder();
 																				setIsWriteMode(false);
