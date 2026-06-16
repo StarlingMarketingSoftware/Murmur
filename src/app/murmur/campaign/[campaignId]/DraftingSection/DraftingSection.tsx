@@ -303,6 +303,7 @@ interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 	onClearOverviewRightRailSearch?: () => void;
 	dimContactsExpandedList?: boolean;
 	whiteOutOverviewCampaignsMiniTable?: boolean;
+	whiteOutOverviewStrategyBox?: boolean;
 }
 
 type CampaignBottomPanelKind = 'contacts' | 'drafts' | 'sent' | 'inbox';
@@ -360,6 +361,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		onClearOverviewRightRailSearch,
 		dimContactsExpandedList = false,
 		whiteOutOverviewCampaignsMiniTable = false,
+		whiteOutOverviewStrategyBox = false,
 	} = props;
 	const [isCampaignHeaderDropdownOpen, setIsCampaignHeaderDropdownOpen] = useState(false);
 	const campaignHeaderPanelDimStyle: CSSProperties = {
@@ -6513,6 +6515,18 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														onSendDrafts={goToDrafting}
 														onSearchContacts={onGoToSearch}
 													/>
+													{whiteOutOverviewStrategyBox ? (
+														<div
+															aria-hidden="true"
+															style={{
+																position: 'absolute',
+																inset: 0,
+																zIndex: 2,
+																borderRadius: 8,
+																background: '#FFFFFF',
+															}}
+														/>
+													) : null}
 												</div>
 											</div>
 									)}

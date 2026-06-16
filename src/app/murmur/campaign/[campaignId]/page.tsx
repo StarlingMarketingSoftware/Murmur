@@ -5001,6 +5001,9 @@ const Murmur = () => {
 												whiteOutOverviewCampaignsMiniTable={
 													activeView === 'overview' && showTopCampaignsDropdown
 												}
+												whiteOutOverviewStrategyBox={
+													activeView === 'overview' && isTopStrategyDropdownOpen
+												}
 												isCampaignWorkspaceExpanded={isCampaignWorkspaceExpanded}
 												onRequestCampaignWorkspaceExpanded={
 													requestCampaignWorkspaceExpanded
