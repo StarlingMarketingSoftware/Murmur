@@ -122,6 +122,22 @@ import {
 	BOOKING_EXTRA_MARKERS_MAX_DOTS,
 	BOOKING_EXTRA_MARKERS_MIN_ZOOM,
 	BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR,
+	CAMPAIGN_FOOTPRINT_COLOR,
+	CAMPAIGN_FOOTPRINT_GLOW_OPACITY,
+	CAMPAIGN_FOOTPRINT_LINE_COLOR,
+	CAMPAIGN_FOOTPRINT_LINE_CORE_COLOR,
+	CAMPAIGN_FOOTPRINT_LINE_CORE_OPACITY,
+	CAMPAIGN_FOOTPRINT_LINE_GLOW_OPACITY,
+	CAMPAIGN_FOOTPRINT_MAX_POINTS,
+	CAMPAIGN_FOOTPRINT_NODE_GLOW_OPACITY,
+	CAMPAIGN_FOOTPRINT_REPLACE_MARKER_MIN_ZOOM,
+	CAMPAIGN_FOOTPRINT_SPARK_COLOR,
+	CAMPAIGN_FOOTPRINT_SPARK_OPACITY,
+	campaignFootprintGlowRadiusExpr,
+	campaignFootprintLineCoreWidthExpr,
+	campaignFootprintLineGlowWidthExpr,
+	campaignFootprintNodeGlowRadiusExpr,
+	campaignFootprintSparkSizeExpr,
 	CLOUDS_CANVAS_COORDINATES,
 	CLOUDS_CANVAS_SIZE_PX,
 	CLOUDS_CANVAS_TEXTURE_URL,
@@ -851,6 +867,15 @@ const EVENT_STAR_ICON_URL = `data:image/svg+xml;charset=UTF-8,${encodeURICompone
 	mapStackStarIconSvg
 )}`;
 const EVENT_STAR_ICON_IMAGE_DIMENSIONS = { width: 54, height: 54 } as const;
+const CAMPAIGN_FOOTPRINT_SPARK_ICON_IMAGE_NAME = 'murmur-campaign-footprint-spark-icon-image';
+const CAMPAIGN_FOOTPRINT_SPARK_ICON_IMAGE_DIMENSIONS = { width: 32, height: 32 } as const;
+const CAMPAIGN_FOOTPRINT_SPARK_ICON_URL = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+	<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+		<rect x="7" y="7" width="18" height="18" rx="3.2" fill="${CAMPAIGN_FOOTPRINT_SPARK_COLOR}" opacity="0.16"/>
+		<rect x="9" y="9" width="14" height="14" rx="2.6" fill="${CAMPAIGN_FOOTPRINT_SPARK_COLOR}" opacity="0.4"/>
+		<rect x="10.75" y="10.75" width="10.5" height="10.5" rx="2" fill="${CAMPAIGN_FOOTPRINT_SPARK_COLOR}" stroke="${CAMPAIGN_FOOTPRINT_COLOR}" stroke-width="0.7"/>
+	</svg>
+`)}`;
 
 // Event opportunity popup (phase 1: shapes + lat/lng only). Outer red box, inner white
 // box inset 5px from the top, and a bottom red strip showing the event coordinates.
@@ -949,6 +974,22 @@ const withFeatureFillOpacity = (opacityExpr: any): any =>
 const withFeatureStrokeOpacity = (opacityExpr: any): any =>
 	withFeatureOpacityFactor(opacityExpr, FEATURE_STROKE_OPACITY_FACTOR);
 
+const buildBaseMarkerVisibilityFilter = (
+	visibleIds: number[],
+	zoom: number,
+	campaignFootprintContactIds: ReadonlySet<number>
+): any => {
+	const effectiveVisibleIds =
+		zoom >= CAMPAIGN_FOOTPRINT_REPLACE_MARKER_MIN_ZOOM &&
+		campaignFootprintContactIds.size > 0
+			? visibleIds.filter((id) => !campaignFootprintContactIds.has(id))
+			: visibleIds;
+
+	return effectiveVisibleIds.length === 0
+		? ['==', ['id'], -1]
+		: ['match', ['id'], effectiveVisibleIds, true, false];
+};
+
 type AllContactsOverlayFetchMode = 'all' | 'ambient';
 type AllContactsOverlayFetchPhase = 'visible' | 'buffer';
 type AllContactsOverlayFetchBbox = BoundingBox & {
@@ -1019,6 +1060,8 @@ export interface SearchResultsMapProps {
 	 * (Contacts and Drafts tabs).
 	 */
 	campaignHeatmapAmbient?: boolean;
+	/** Real contacts from the active campaign, rendered as a subtle non-interactive footprint under search results. */
+	campaignFootprintContacts?: ContactWithName[];
 	/** When true, renders a browse-oriented all-contact atlas while search results are visually disengaged. */
 	ambientContactsEnabled?: boolean;
 	/** When true, warms the ambient atlas cache before the user disengages the search. */
@@ -1248,6 +1291,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	campaignContactStatusById,
 	campaignHeatmapColor = null,
 	campaignHeatmapAmbient = false,
+	campaignFootprintContacts = [],
 	ambientContactsEnabled = false,
 	ambientContactsPreloadEnabled = false,
 	ambientActiveCategories,
@@ -6695,6 +6739,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		ensureSource(MAPBOX_SOURCE_IDS.markerConstellation);
 		ensureSource(MAPBOX_SOURCE_IDS.markerConstellationSelected);
 		ensureSource(MAPBOX_SOURCE_IDS.markerConstellationNodes);
+		ensureSource(MAPBOX_SOURCE_IDS.campaignFootprintPoints);
+		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.campaignFootprintLines)) {
+			mapInstance.addSource(MAPBOX_SOURCE_IDS.campaignFootprintLines, {
+				type: 'geojson',
+				data: emptyFc,
+				lineMetrics: true,
+			});
+		}
+		ensureSource(MAPBOX_SOURCE_IDS.campaignFootprintNodes);
 		ensureSource(MAPBOX_SOURCE_IDS.selectedAreaRect);
 		ensureSource(MAPBOX_SOURCE_IDS.selectionRect);
 
@@ -7443,6 +7496,155 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			MAPBOX_LAYER_IDS.markerConstellationGlow
 		);
 
+		// Active-campaign footprint — real campaign contacts rendered as subtle
+		// background context under the live search result constellation/markers.
+		ensureLayer(
+			{
+				id: MAPBOX_LAYER_IDS.campaignFootprintGlow,
+				type: 'circle',
+				source: MAPBOX_SOURCE_IDS.campaignFootprintPoints,
+				paint: {
+					'circle-radius': campaignFootprintGlowRadiusExpr,
+					'circle-color': CAMPAIGN_FOOTPRINT_COLOR,
+					'circle-opacity': CAMPAIGN_FOOTPRINT_GLOW_OPACITY,
+					'circle-blur': 1.45,
+					'circle-stroke-width': 0,
+				},
+			},
+			MAPBOX_LAYER_IDS.markerConstellationGlow
+		);
+		ensureLayer(
+			{
+				id: MAPBOX_LAYER_IDS.campaignFootprintLineGlow,
+				type: 'line',
+				source: MAPBOX_SOURCE_IDS.campaignFootprintLines,
+				layout: { 'line-join': 'round', 'line-cap': 'round' },
+				paint: {
+					'line-color': CAMPAIGN_FOOTPRINT_LINE_COLOR,
+					'line-gradient': [
+						'interpolate',
+						['linear'],
+						['line-progress'],
+						0,
+						'rgba(143, 180, 242, 0)',
+						0.18,
+						CAMPAIGN_FOOTPRINT_LINE_COLOR,
+						0.5,
+						'#CFE0FF',
+						0.82,
+						CAMPAIGN_FOOTPRINT_LINE_COLOR,
+						1,
+						'rgba(143, 180, 242, 0)',
+					],
+					'line-opacity': [
+						'*',
+						CAMPAIGN_FOOTPRINT_LINE_GLOW_OPACITY,
+						['coalesce', ['get', 'lineOpacity'], 1],
+					],
+					'line-width': campaignFootprintLineGlowWidthExpr,
+					'line-blur': 1.85,
+				},
+			},
+			MAPBOX_LAYER_IDS.markerConstellationGlow
+		);
+		ensureLayer(
+			{
+				id: MAPBOX_LAYER_IDS.campaignFootprintLineCore,
+				type: 'line',
+				source: MAPBOX_SOURCE_IDS.campaignFootprintLines,
+				layout: { 'line-join': 'round', 'line-cap': 'round' },
+				paint: {
+					'line-color': CAMPAIGN_FOOTPRINT_LINE_CORE_COLOR,
+					'line-gradient': [
+						'interpolate',
+						['linear'],
+						['line-progress'],
+						0,
+						'rgba(207, 224, 255, 0)',
+						0.2,
+						CAMPAIGN_FOOTPRINT_LINE_CORE_COLOR,
+						0.52,
+						'#EAF1FF',
+						0.8,
+						CAMPAIGN_FOOTPRINT_LINE_CORE_COLOR,
+						1,
+						'rgba(207, 224, 255, 0)',
+					],
+					'line-opacity': [
+						'*',
+						CAMPAIGN_FOOTPRINT_LINE_CORE_OPACITY,
+						['coalesce', ['get', 'lineOpacity'], 1],
+					],
+					'line-width': campaignFootprintLineCoreWidthExpr,
+					'line-blur': 0,
+				},
+			},
+			MAPBOX_LAYER_IDS.markerConstellationGlow
+		);
+		ensureLayer(
+			{
+				id: MAPBOX_LAYER_IDS.campaignFootprintNodeGlow,
+				type: 'circle',
+				source: MAPBOX_SOURCE_IDS.campaignFootprintNodes,
+				paint: {
+					'circle-radius': campaignFootprintNodeGlowRadiusExpr,
+					'circle-color': CAMPAIGN_FOOTPRINT_COLOR,
+					'circle-opacity': [
+						'interpolate',
+						['linear'],
+						['zoom'],
+						CAMPAIGN_FOOTPRINT_REPLACE_MARKER_MIN_ZOOM - 0.75,
+						[
+							'*',
+							CAMPAIGN_FOOTPRINT_NODE_GLOW_OPACITY,
+							['coalesce', ['get', 'nodeOpacity'], 1],
+						],
+						CAMPAIGN_FOOTPRINT_REPLACE_MARKER_MIN_ZOOM,
+						['coalesce', ['get', 'closeNodeGlowOpacity'], 0.9],
+						CAMPAIGN_FOOTPRINT_REPLACE_MARKER_MIN_ZOOM + 1.5,
+						['coalesce', ['get', 'closeNodeGlowOpacity'], 0.9],
+					],
+					'circle-blur': 0.82,
+					'circle-stroke-width': 0,
+				},
+			},
+			MAPBOX_LAYER_IDS.markerConstellationGlow
+		);
+		ensureLayer(
+			{
+				id: MAPBOX_LAYER_IDS.campaignFootprintNodeSpark,
+				type: 'symbol',
+				source: MAPBOX_SOURCE_IDS.campaignFootprintNodes,
+				layout: {
+					'icon-image': CAMPAIGN_FOOTPRINT_SPARK_ICON_IMAGE_NAME,
+					'icon-size': campaignFootprintSparkSizeExpr,
+					'icon-rotate': ['coalesce', ['get', 'sparkRotation'], 0],
+					'icon-rotation-alignment': 'viewport',
+					'icon-anchor': 'center',
+					'icon-allow-overlap': true,
+					'icon-ignore-placement': true,
+				},
+				paint: {
+					'icon-opacity': [
+						'interpolate',
+						['linear'],
+						['zoom'],
+						CAMPAIGN_FOOTPRINT_REPLACE_MARKER_MIN_ZOOM - 0.75,
+						[
+							'*',
+							CAMPAIGN_FOOTPRINT_SPARK_OPACITY,
+							['coalesce', ['get', 'nodeOpacity'], 1],
+						],
+						CAMPAIGN_FOOTPRINT_REPLACE_MARKER_MIN_ZOOM,
+						['coalesce', ['get', 'closeSparkOpacity'], 1],
+						CAMPAIGN_FOOTPRINT_REPLACE_MARKER_MIN_ZOOM + 1.5,
+						['coalesce', ['get', 'closeSparkOpacity'], 1],
+					],
+				},
+			},
+			MAPBOX_LAYER_IDS.markerConstellationGlow
+		);
+
 		// Frozen per-search constellation linework — understated background geometry
 		// that sits behind the marker dots and never participates in hit testing.
 		ensureLayer({
@@ -8156,6 +8358,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'icon-opacity': getSelectedMarkerHoverIconOpacityExpr(),
 			},
 		});
+
+		// Close-zoom campaign replacements need marker-level priority; keep them
+		// under selected halos, but above the normal result/event marker stack.
+		for (const layerId of [
+			MAPBOX_LAYER_IDS.campaignFootprintNodeGlow,
+			MAPBOX_LAYER_IDS.campaignFootprintNodeSpark,
+		]) {
+			try {
+				if (mapInstance.getLayer(layerId) && mapInstance.getLayer(MAPBOX_LAYER_IDS.selectedMarkerIcons)) {
+					mapInstance.moveLayer(layerId, MAPBOX_LAYER_IDS.selectedMarkerIcons);
+				}
+			} catch {
+				// Ignore style timing races.
+			}
+		}
 
 		// Persisted selected area (black outline) — above markers
 		ensureLayer({
@@ -9204,6 +9421,199 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			coordsByContactId.get(contact.id) ?? null,
 		[coordsByContactId]
 	);
+
+	const { campaignFootprintContactsWithCoords, campaignFootprintCoordsByContactId } =
+		useMemo(() => {
+			const coordsByContactId = new Map<number, LatLngLiteral>();
+			const contactsWithCoords: ContactWithName[] = [];
+			const groups = new Map<string, number[]>();
+			const seenContactIds = new Set<number>();
+
+			for (const contact of campaignFootprintContacts) {
+				if (seenContactIds.has(contact.id)) continue;
+				seenContactIds.add(contact.id);
+				const coords = getLatLngFromContact(contact);
+				if (!coords) continue;
+				coordsByContactId.set(contact.id, coords);
+				contactsWithCoords.push(contact);
+				const key = coordinateKey(coords);
+				const existing = groups.get(key);
+				if (existing) existing.push(contact.id);
+				else groups.set(key, [contact.id]);
+			}
+
+			for (const ids of groups.values()) {
+				if (ids.length <= 1) continue;
+				ids.sort((a, b) => a - b);
+				for (let i = 1; i < ids.length; i++) {
+					const id = ids[i];
+					const base = coordsByContactId.get(id);
+					if (!base) continue;
+					coordsByContactId.set(id, jitterDuplicateCoords(base, i));
+				}
+			}
+
+			return {
+				campaignFootprintContactsWithCoords: contactsWithCoords,
+				campaignFootprintCoordsByContactId: coordsByContactId,
+			};
+		}, [campaignFootprintContacts]);
+	const campaignFootprintContactIdSet = useMemo(
+		() => new Set(campaignFootprintContactsWithCoords.map((contact) => contact.id)),
+		[campaignFootprintContactsWithCoords]
+	);
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const pointSource = map.getSource(MAPBOX_SOURCE_IDS.campaignFootprintPoints) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		const lineSource = map.getSource(MAPBOX_SOURCE_IDS.campaignFootprintLines) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		const nodeSource = map.getSource(MAPBOX_SOURCE_IDS.campaignFootprintNodes) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		if (!pointSource || !lineSource || !nodeSource) return;
+
+		const clearFootprint = () => {
+			const empty = emptyFeatureCollection();
+			pointSource.setData(empty);
+			lineSource.setData(empty);
+			nodeSource.setData(empty);
+		};
+
+		// Hide the footprint whenever a search is engaged (typed query or a curated
+		// "For You" search) so it never clutters the live result dots/lines. It only
+		// shows in the disengaged/browse state.
+		if (
+			isBackgroundPresentation ||
+			searchEngaged ||
+			campaignFootprintContactsWithCoords.length === 0
+		) {
+			clearFootprint();
+			return;
+		}
+
+		const pointFeatures: GeoJSON.Feature[] = [];
+		for (const contact of campaignFootprintContactsWithCoords) {
+			const coords = campaignFootprintCoordsByContactId.get(contact.id);
+			if (!coords) continue;
+			pointFeatures.push({
+				type: 'Feature',
+				id: contact.id,
+				properties: { contactId: contact.id },
+				geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+			});
+		}
+
+		let contactsForConstellation = campaignFootprintContactsWithCoords.slice();
+		if (contactsForConstellation.length > CAMPAIGN_FOOTPRINT_MAX_POINTS) {
+			contactsForConstellation = contactsForConstellation
+				.map((contact) => ({
+					contact,
+					score: hashStringToUint32(`campaign-footprint|${contact.id}`),
+				}))
+				.sort((a, b) => a.score - b.score)
+				.slice(0, CAMPAIGN_FOOTPRINT_MAX_POINTS)
+				.map(({ contact }) => contact);
+		}
+		contactsForConstellation.sort((a, b) => a.id - b.id);
+
+		const constellationWorldSize = 512 * Math.pow(2, MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM);
+		const constellationPoints: MarkerConstellationPoint[] = [];
+		for (const contact of contactsForConstellation) {
+			const coords = campaignFootprintCoordsByContactId.get(contact.id);
+			if (!coords) continue;
+			const projected = latLngToWorldPixel(coords, constellationWorldSize);
+			if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y)) continue;
+			constellationPoints.push({
+				id: contact.id,
+				coords,
+				x: projected.x,
+				y: projected.y,
+				groupKey: 'campaign-footprint',
+			});
+		}
+
+		const formation =
+			constellationPoints.length >= 2
+				? buildBeautyMarkerConstellationFormation(
+						constellationPoints,
+						'campaign-footprint',
+						MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM
+					)
+				: { edges: [], nodes: [], lowZoomNodeIds: new Set<number>() };
+
+		const lineFeatures: GeoJSON.Feature[] = [];
+		for (const edge of formation.edges) {
+			const fromCoords = campaignFootprintCoordsByContactId.get(edge.fromId);
+			const toCoords = campaignFootprintCoordsByContactId.get(edge.toId);
+			if (!fromCoords || !toCoords) continue;
+			const edgeId = markerConstellationPairKey(edge.fromId, edge.toId);
+			const lineOpacity = Math.max(0.36, (1 - edge.rank * 0.34) * edge.opacityScale);
+			lineFeatures.push({
+				type: 'Feature',
+				id: `campaign-footprint:${edge.level}:${edgeId}`,
+				properties: { level: edge.level, lineOpacity },
+				geometry: {
+					type: 'LineString',
+					coordinates: [
+						[fromCoords.lng, fromCoords.lat],
+						[toCoords.lng, toCoords.lat],
+					],
+				},
+			});
+		}
+
+		const nodeFeatureById = new Map<number, GeoJSON.Feature>();
+		for (const node of formation.nodes) {
+			const coords = campaignFootprintCoordsByContactId.get(node.id);
+			if (!coords) continue;
+			const nodeOpacity = Math.max(0.46, (1 - node.rank * 0.26) * node.opacityScale);
+			nodeFeatureById.set(node.id, {
+				type: 'Feature',
+				id: `campaign-footprint:${node.level}:${node.id}`,
+				properties: {
+					level: node.level,
+					nodeOpacity,
+					closeNodeGlowOpacity: 0.9,
+					closeSparkOpacity: 1,
+					sparkRotation: hashStringToUint32(`campaign-footprint-spark|${node.id}`) % 90,
+				},
+				geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+			});
+		}
+		for (const contact of campaignFootprintContactsWithCoords) {
+			if (nodeFeatureById.has(contact.id)) continue;
+			const coords = campaignFootprintCoordsByContactId.get(contact.id);
+			if (!coords) continue;
+			nodeFeatureById.set(contact.id, {
+				type: 'Feature',
+				id: `campaign-footprint:contact:${contact.id}`,
+				properties: {
+					level: 'detail',
+					nodeOpacity: 0.46,
+					closeNodeGlowOpacity: 0.9,
+					closeSparkOpacity: 1,
+					sparkRotation: hashStringToUint32(`campaign-footprint-spark|${contact.id}`) % 90,
+				},
+				geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+			});
+		}
+		const nodeFeatures = Array.from(nodeFeatureById.values());
+
+		pointSource.setData({ type: 'FeatureCollection', features: pointFeatures });
+		lineSource.setData({ type: 'FeatureCollection', features: lineFeatures });
+		nodeSource.setData({ type: 'FeatureCollection', features: nodeFeatures });
+	}, [
+		map,
+		isMapLoaded,
+		isBackgroundPresentation,
+		searchEngaged,
+		campaignFootprintContactsWithCoords,
+		campaignFootprintCoordsByContactId,
+	]);
 
 	// --- Campaign selection heatmap glow -------------------------------------
 	// The heatmap envelops the currently-selected contacts (intersected with the
@@ -14036,6 +14446,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			EVENT_STAR_ICON_URL,
 			EVENT_STAR_ICON_IMAGE_DIMENSIONS
 		);
+		void ensureMapImageFromUrl(
+			CAMPAIGN_FOOTPRINT_SPARK_ICON_IMAGE_NAME,
+			CAMPAIGN_FOOTPRINT_SPARK_ICON_URL,
+			CAMPAIGN_FOOTPRINT_SPARK_ICON_IMAGE_DIMENSIONS
+		);
 	}, [map, isMapLoaded, ensureMapImageFromUrl]);
 
 	const promotionPinIdsRef = useRef<Set<number>>(new Set());
@@ -14182,16 +14597,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// the wave completes. Otherwise off-screen-sampled-out features
 				// would be hit-testable just because they're in the source.
 				const visibleIds = Array.from(visibleContactIdSetRef.current);
-				const visibilityFilter: any =
-					visibleIds.length === 0
-						? ['==', ['id'], -1]
-						: ['match', ['id'], visibleIds, true, false];
+				const visibilityFilter = buildBaseMarkerVisibilityFilter(
+					visibleIds,
+					map.getZoom() ?? 0,
+					campaignFootprintContactIdSet
+				);
 				map.setFilter(MAPBOX_LAYER_IDS.baseHit, visibilityFilter);
 			}
 		} catch {
 			// Ignore style timing races.
 		}
-	}, [map, isMapLoaded]);
+	}, [map, isMapLoaded, campaignFootprintContactIdSet]);
 
 	// Status mode renders every contact as a campaign-status dot, so the soft glow
 	// halos beneath them read as fuzzy "residue" around the crisp status circles.
@@ -15063,6 +15479,24 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			| undefined;
 		if (!source) return;
 
+		// Nothing selected: hard-clear the bespoke selected-marker source and cancel any
+		// in-flight fade. This must run BEFORE the isLoading / signature short-circuits below.
+		// When the selection empties during a refetch (e.g. right after "Add Contacts"
+		// invalidates queries) or while a fade-out is interrupted, those short-circuits
+		// otherwise strand phantom halo rings on the map with nothing selected.
+		if (selectedContacts.length === 0) {
+			if (selectedMarkerFadeRafRef.current != null) {
+				cancelAnimationFrame(selectedMarkerFadeRafRef.current);
+				selectedMarkerFadeRafRef.current = null;
+			}
+			selectedMarkerFadeByIdRef.current.clear();
+			selectedMarkerScaleByIdRef.current.clear();
+			selectedMarkerFeatureByIdRef.current = new Map();
+			selectedMarkerBuildSignatureRef.current = '';
+			source.setData({ type: 'FeatureCollection', features: [] } as any);
+			return;
+		}
+
 		if (isLoading) {
 			// Preserve existing selected markers while parent data is refetching.
 			return;
@@ -15389,10 +15823,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
 		const visibleIds = visibleContacts.map((c) => c.id);
-		const visibilityFilter: any =
-			visibleIds.length === 0
-				? ['==', ['id'], -1]
-				: ['match', ['id'], visibleIds, true, false];
 
 		const safeSet = (layerId: string, filter: any) => {
 			try {
@@ -15403,26 +15833,40 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 		};
 
-		// While a wave reveal is active, leave baseHit's filter alone — the
-		// wave manager owns it and will restore the visibility filter when
-		// the wave completes (see stopBaseDotsWaveAndRestoreSteadyRendering).
-		if (!baseDotsWaveCancelRef.current) {
-			safeSet(MAPBOX_LAYER_IDS.baseHit, visibilityFilter);
-		}
-		safeSet(MAPBOX_LAYER_IDS.baseGlow, visibilityFilter);
-		safeSet(MAPBOX_LAYER_IDS.baseDots, visibilityFilter);
-		// baseFallbackIcons already filters by isUncategorized; AND with visibility.
-		safeSet(MAPBOX_LAYER_IDS.baseFallbackIcons, [
-			'all',
-			['==', ['get', 'isUncategorized'], true],
-			visibilityFilter,
-		]);
-		safeSet(MAPBOX_LAYER_IDS.baseFallbackIconsHover, [
-			'all',
-			['==', ['get', 'isUncategorized'], true],
-			visibilityFilter,
-		]);
-	}, [map, isMapLoaded, visibleContacts]);
+		const applyFilters = () => {
+			const visibilityFilter = buildBaseMarkerVisibilityFilter(
+				visibleIds,
+				map.getZoom() ?? 0,
+				campaignFootprintContactIdSet
+			);
+
+			// While a wave reveal is active, leave baseHit's filter alone — the
+			// wave manager owns it and will restore the visibility filter when
+			// the wave completes (see stopBaseDotsWaveAndRestoreSteadyRendering).
+			if (!baseDotsWaveCancelRef.current) {
+				safeSet(MAPBOX_LAYER_IDS.baseHit, visibilityFilter);
+			}
+			safeSet(MAPBOX_LAYER_IDS.baseGlow, visibilityFilter);
+			safeSet(MAPBOX_LAYER_IDS.baseDots, visibilityFilter);
+			// baseFallbackIcons already filters by isUncategorized; AND with visibility.
+			safeSet(MAPBOX_LAYER_IDS.baseFallbackIcons, [
+				'all',
+				['==', ['get', 'isUncategorized'], true],
+				visibilityFilter,
+			]);
+			safeSet(MAPBOX_LAYER_IDS.baseFallbackIconsHover, [
+				'all',
+				['==', ['get', 'isUncategorized'], true],
+				visibilityFilter,
+			]);
+		};
+
+		applyFilters();
+		map.on('zoomend', applyFilters);
+		return () => {
+			map.off('zoomend', applyFilters);
+		};
+	}, [map, isMapLoaded, visibleContacts, campaignFootprintContactIdSet]);
 
 	// Sync `inConstellation` feature-state on the base markers source so the
 	// zoom-fade paint expressions can dim non-constellation dots at low zoom.
@@ -15469,14 +15913,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			try {
 				if (!map.getLayer(layerId)) return;
 				map.setFilter(layerId, filter);
-			} catch {
-				// Ignore.
-			}
-		};
-		const safeClearFilter = (layerId: string) => {
-			try {
-				if (!map.getLayer(layerId)) return;
-				map.setFilter(layerId, null as any);
 			} catch {
 				// Ignore.
 			}
@@ -15538,7 +15974,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'icon-opacity',
 				getSelectedStateOrbZoomFadedOpacity(1, getNormalMarkerFadeOpacityExpr())
 			);
-			safeClearFilter(MAPBOX_LAYER_IDS.baseHit);
+			safeSetFilter(
+				MAPBOX_LAYER_IDS.baseHit,
+				buildBaseMarkerVisibilityFilter(
+					Array.from(visibleContactIdSetRef.current),
+					map.getZoom() ?? 0,
+					campaignFootprintContactIdSet
+				)
+			);
 		};
 
 		const loading = Boolean(isLoading);
@@ -15712,9 +16155,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Don't churn filters at 60fps; updating every ~90ms is plenty for hit gating.
 			if (t - lastHitUpdateAt >= 90) {
 				safeSetFilter(MAPBOX_LAYER_IDS.baseHit, [
-					'<=',
-					['coalesce', ['get', DOT_WAVE_DELAY_PROP], 0],
-					t,
+					'all',
+					[
+						'<=',
+						['coalesce', ['get', DOT_WAVE_DELAY_PROP], 0],
+						t,
+					],
+					buildBaseMarkerVisibilityFilter(
+						Array.from(visibleContactIdSetRef.current),
+						map.getZoom() ?? 0,
+						campaignFootprintContactIdSet
+					),
 				] as any);
 				lastHitUpdateAt = t;
 			}
@@ -15763,6 +16214,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isBackgroundPresentation,
 		searchQuery,
 		disableDotWaveReveal,
+		campaignFootprintContactIdSet,
 	]);
 
 	// Keep the frozen constellation's rendered line source synced after style/coordinate changes.

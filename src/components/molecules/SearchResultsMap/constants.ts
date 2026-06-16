@@ -780,6 +780,9 @@ export const MAPBOX_SOURCE_IDS = {
 	markerConstellation: 'murmur-marker-constellation',
 	markerConstellationSelected: 'murmur-marker-constellation-selected',
 	markerConstellationNodes: 'murmur-marker-constellation-nodes',
+	campaignFootprintPoints: 'murmur-campaign-footprint-points',
+	campaignFootprintLines: 'murmur-campaign-footprint-lines',
+	campaignFootprintNodes: 'murmur-campaign-footprint-nodes',
 	selectionRect: 'murmur-selection-rect',
 	selectedAreaRect: 'murmur-selected-area-rect',
 	campaignHeatmap: 'murmur-campaign-heatmap',
@@ -828,6 +831,11 @@ export const MAPBOX_LAYER_IDS = {
 	markerConstellationSelectedCore: 'murmur-marker-constellation-selected-core-line',
 	markerConstellationNodeGlow: 'murmur-marker-constellation-node-glow',
 	markerConstellationNodeDots: 'murmur-marker-constellation-node-dots',
+	campaignFootprintGlow: 'murmur-campaign-footprint-glow',
+	campaignFootprintLineGlow: 'murmur-campaign-footprint-glow-line',
+	campaignFootprintLineCore: 'murmur-campaign-footprint-core-line',
+	campaignFootprintNodeGlow: 'murmur-campaign-footprint-node-glow',
+	campaignFootprintNodeSpark: 'murmur-campaign-footprint-node-spark',
 	// Markers (hit layers are used for hover/click priority)
 	markersAllHit: 'murmur-markers-all-hit',
 	markersAllGlow: 'murmur-markers-all-glow',
@@ -920,6 +928,78 @@ export const MARKER_CONSTELLATION_POINT_CLEARANCE_PX = 9;
 // Fade-in for the initial reveal so lines materialize over the camera fly-in
 // instead of popping in once it lands.
 export const MARKER_CONSTELLATION_REVEAL_FADE_MS = 450;
+
+// Active-campaign footprint overlay shown under dashboard search results.
+export const CAMPAIGN_FOOTPRINT_COLOR = '#A6DBE8';
+export const CAMPAIGN_FOOTPRINT_LINE_COLOR = '#8FB4F2';
+export const CAMPAIGN_FOOTPRINT_LINE_CORE_COLOR = '#CFE0FF';
+export const CAMPAIGN_FOOTPRINT_SPARK_COLOR = '#FFFFFF';
+export const CAMPAIGN_FOOTPRINT_GLOW_OPACITY = 0.09;
+export const CAMPAIGN_FOOTPRINT_LINE_CORE_OPACITY = 0.55;
+export const CAMPAIGN_FOOTPRINT_LINE_GLOW_OPACITY = 0.38;
+export const CAMPAIGN_FOOTPRINT_NODE_GLOW_OPACITY = 0.45;
+export const CAMPAIGN_FOOTPRINT_SPARK_OPACITY = 0.85;
+export const CAMPAIGN_FOOTPRINT_MAX_POINTS = MARKER_CONSTELLATION_MAX_POINTS;
+export const CAMPAIGN_FOOTPRINT_REPLACE_MARKER_MIN_ZOOM = 11.5;
+export const campaignFootprintGlowRadiusExpr: any = [
+	'interpolate',
+	['linear'],
+	['zoom'],
+	MAP_MIN_ZOOM,
+	30,
+	4,
+	58,
+	7,
+	78,
+	10,
+	62,
+	14,
+	44,
+];
+export const campaignFootprintLineGlowWidthExpr: any = [
+	'interpolate',
+	['linear'],
+	['zoom'],
+	3,
+	2.4,
+	7,
+	4.6,
+	13,
+	5.8,
+];
+export const campaignFootprintLineCoreWidthExpr: any = [
+	'interpolate',
+	['linear'],
+	['zoom'],
+	3,
+	0.72,
+	7,
+	1.35,
+	13,
+	1.8,
+];
+export const campaignFootprintNodeGlowRadiusExpr: any = [
+	'interpolate',
+	['linear'],
+	['zoom'],
+	3,
+	9,
+	7,
+	13,
+	13,
+	16,
+];
+export const campaignFootprintSparkSizeExpr: any = [
+	'interpolate',
+	['linear'],
+	['zoom'],
+	3,
+	0.38,
+	7,
+	0.52,
+	13,
+	0.62,
+];
 
 export const MARKER_CONSTELLATION_EDGE_RANK_OPACITY_EXPR: any = [
 	'interpolate',

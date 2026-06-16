@@ -207,6 +207,7 @@ import DashboardOpportunitiesWidget, {
 import { DashboardOpportunitiesDebugPanel } from '@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesDebugPanel';
 import {
 	useGetCampaign,
+	useGetCampaignContacts,
 	useGetCampaigns,
 	getCampaignDetailQueryKey,
 	fetchCampaignDetail,
@@ -1609,6 +1610,10 @@ const MAP_MARKER_RESEARCH_LEFT_DOCK_LEFT_PX = 110; // clears the left select/gra
 const MAP_MARKER_RESEARCH_DOCK_FLIP_MARGIN_PX = 24;
 const MAP_VIEW_CAMPAIGN_HEADER_HEIGHT_PX = 59;
 const MAP_VIEW_CAMPAIGN_HEADER_GAP_PX = 13;
+// Floor height for the Search Results sub-panel when the Selection sub-panel is fully
+// expanded: header (50px) + category toolbar (≈55px @ bottom-9) + breathing room. Below this
+// the Selection cap stops growing so the toolbar (and the bottom CTA) stay visible.
+const MAP_VIEW_SEARCH_RESULTS_MIN_HEIGHT_PX = 125;
 // Keep both map side panels visually pinned after the dashboard root zoom is applied.
 // The side-shift var (written by the map-view zoom effect) lowers the whole side
 // chrome toward vertical center on tall monitors; 0px on the 1080p baseline.
@@ -5975,6 +5980,12 @@ const DashboardContent = () => {
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
 	const dashboardMapCampaignForHeader = fromCampaign ?? activeCampaign;
+	const shouldLoadDashboardMapCampaignFootprint =
+		activeTab === 'search' && isMapView && Boolean(dashboardMapCampaignForHeader?.id);
+	const { data: dashboardMapCampaignFootprintContacts } = useGetCampaignContacts(
+		dashboardMapCampaignForHeader?.id,
+		{ enabled: shouldLoadDashboardMapCampaignFootprint }
+	);
 	const dashboardMapCampaignContactListIds = useMemo(
 		() => dashboardMapCampaignForHeader?.userContactLists?.map((list) => list.id) ?? [],
 		[dashboardMapCampaignForHeader?.userContactLists]
@@ -9513,6 +9524,9 @@ const DashboardContent = () => {
 			searchQuery: shouldShowSearchGeometryOnMap ? activeSearchQuery : '',
 			searchWhat: shouldShowSearchGeometryOnMap ? searchWhatForMap : null,
 			searchEngaged: shouldShowSearchGeometryOnMap,
+			campaignFootprintContacts: shouldLoadDashboardMapCampaignFootprint
+				? (dashboardMapCampaignFootprintContacts ?? [])
+				: [],
 			ambientContactsEnabled: shouldShowAmbientContactsOnMap,
 			ambientContactsPreloadEnabled: shouldPreloadAmbientContactsOnMap,
 			ambientActiveCategories: mapGrabActiveCategories,
@@ -9578,6 +9592,7 @@ const DashboardContent = () => {
 			canDisengageMapSearch,
 			compressedMapChromePadding,
 			contactsForMap,
+			dashboardMapCampaignFootprintContacts,
 			handleRadiusCenterChange,
 			globeNightLighting,
 			globeWeatherMood,
@@ -9623,6 +9638,7 @@ const DashboardContent = () => {
 			shouldShowMapResultsSidePanel,
 			shouldShowSearchGeometryOnMap,
 			shouldShowAmbientContactsOnMap,
+			shouldLoadDashboardMapCampaignFootprint,
 			shouldPreloadAmbientContactsOnMap,
 			shouldSpinBackgroundMap,
 			skipAutoFitForMap,
@@ -14123,7 +14139,7 @@ const DashboardContent = () => {
 																					<div
 																						className="flex flex-col flex-shrink-0"
 																						style={{
-																							maxHeight: isCompressedMapChrome ? '30%' : '342px',
+																							maxHeight: isCompressedMapChrome ? '30%' : `calc(100% - ${MAP_VIEW_SEARCH_RESULTS_MIN_HEIGHT_PX + (!isMapResultsLoading && !fromHomeParam ? 39 + 18 : 9)}px)`,
 																							backgroundColor: isCompressedMapChrome
 																								? 'rgba(175, 214, 239, 0.8)'
 																								: 'rgba(184, 224, 255, 0.54)',
@@ -14206,6 +14222,9 @@ const DashboardContent = () => {
 																					className="flex flex-col flex-1 min-h-0"
 																					style={{
 																						backgroundColor: 'rgba(99, 155, 244, 0.5)',
+																						// Desktop floor so a fully expanded Selection can't compress this below its
+																						// header + category toolbar; compressed sheet keeps its own 30% split.
+																						minHeight: isCompressedMapChrome ? undefined : MAP_VIEW_SEARCH_RESULTS_MIN_HEIGHT_PX,
 																						borderRadius: '8px',
 																						overflow: 'hidden',
 																					}}
