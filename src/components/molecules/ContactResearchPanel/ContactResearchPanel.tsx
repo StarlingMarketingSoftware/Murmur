@@ -616,7 +616,7 @@ const ContactResearchPanelAbridged: FC<
 				className="absolute left-[14px] right-[10px] top-0 z-10 flex items-center font-inter text-left text-black"
 				style={{ height: `${RESEARCH_PANEL_ABRIDGED_HEADER_HEIGHT}px` }}
 			>
-				<div className="min-w-0 pr-[112px]">
+				<div className="h-full w-full min-w-0 pt-[15px]">
 					<div
 						className="block w-full min-w-0"
 						style={{
@@ -652,7 +652,7 @@ const ContactResearchPanelAbridged: FC<
 				</div>
 				{coordinateText && (
 					<div
-						className="absolute right-0 top-[8px] whitespace-nowrap"
+						className="absolute right-0 top-[5px] whitespace-nowrap"
 						style={{
 							color: '#000',
 							fontFamily: 'Inter',
@@ -1484,7 +1484,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 					height: `${isCompanyOnlyHeader || showCompanyName ? headerHeight : headerHeight - 10}px`,
 				}}
 			>
-				<div className={cn('min-w-0 pr-[130px]', isCompanyOnlyHeader && 'w-full')}>
+				<div className="w-full min-w-0">
 					<div
 						className={cn(
 							'block w-full min-w-0',
