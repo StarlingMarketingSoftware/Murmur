@@ -991,6 +991,9 @@ const SELECTED_TOOLTIP_PLACEMENT_MIN_SEPARATION_PX = 2;
 const SELECTED_TOOLTIP_STACK_OFFSET_X_PX = 3;
 const SELECTED_TOOLTIP_STACK_OFFSET_Y_PX = 6;
 const SELECTED_TOOLTIP_STACK_FAKE_BACK_COUNT = 3;
+const HOVER_TOOLTIP_SIDE_GAP_X_PX = 3;
+const HOVER_TOOLTIP_SIDE_GAP_Y_PX = 8;
+const HOVER_TOOLTIP_VIEWPORT_PADDING_PX = 8;
 const PEOPLE_TOOLTIP_FILL_COLOR = '#99E0FF';
 
 type SelectedCompactTooltipEntry = {
@@ -1072,6 +1075,51 @@ type SelectedTooltipViewport = {
 	width: number;
 	height: number;
 	padding: number;
+};
+
+const createHoverTooltipSidePlacement = ({
+	markerX,
+	markerY,
+	tooltipWidth,
+	tooltipHeight,
+	hitSlopPx,
+	sideGapXPx,
+	sideGapYPx,
+	viewportWidth,
+	viewportHeight,
+}: {
+	markerX: number;
+	markerY: number;
+	tooltipWidth: number;
+	tooltipHeight: number;
+	hitSlopPx: number;
+	sideGapXPx: number;
+	sideGapYPx: number;
+	viewportWidth: number;
+	viewportHeight: number;
+}): { x: number; y: number } => {
+	const minX = HOVER_TOOLTIP_VIEWPORT_PADDING_PX;
+	const maxX = Math.max(
+		minX,
+		viewportWidth - HOVER_TOOLTIP_VIEWPORT_PADDING_PX - tooltipWidth
+	);
+	const rightX = markerX + sideGapXPx;
+	const leftX = markerX - tooltipWidth - sideGapXPx;
+	const rightFits = rightX + tooltipWidth <= viewportWidth - HOVER_TOOLTIP_VIEWPORT_PADDING_PX;
+	const leftFits = leftX >= HOVER_TOOLTIP_VIEWPORT_PADDING_PX;
+	const innerX = clamp(rightFits || !leftFits ? rightX : leftX, minX, maxX);
+
+	const minY = HOVER_TOOLTIP_VIEWPORT_PADDING_PX;
+	const maxY = Math.max(
+		minY,
+		viewportHeight - HOVER_TOOLTIP_VIEWPORT_PADDING_PX - tooltipHeight
+	);
+	const innerY = clamp(markerY - tooltipHeight - sideGapYPx, minY, maxY);
+
+	return {
+		x: innerX - hitSlopPx,
+		y: innerY - hitSlopPx,
+	};
 };
 
 const selectedTooltipHoverTargetsEqual = (
@@ -15185,8 +15233,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (cached) return cached;
 
 			const url = generateSelectedCategorizedContactMarkerIconUrl(key);
+			const hoverColor = darkenHexColor(key, MARKER_HOVER_DARKEN_AMOUNT);
 			const hoverUrl = generateSelectedCategorizedContactMarkerIconUrl(
-				darkenHexColor(key, MARKER_HOVER_DARKEN_AMOUNT)
+				hoverColor,
+				hoverColor
 			);
 			const assets = {
 				imageName: imageNameFromUrl(url),
@@ -15224,10 +15274,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[]
 	);
 	const selectedUncategorizedContactMarkerHoverUrl = useMemo(
-		() =>
-			generateSelectedUncategorizedContactMarkerIconUrl(
-				darkenHexColor('#50A5C9', MARKER_HOVER_DARKEN_AMOUNT)
-			),
+		() => {
+			const hoverColor = darkenHexColor('#50A5C9', MARKER_HOVER_DARKEN_AMOUNT);
+			return generateSelectedUncategorizedContactMarkerIconUrl(hoverColor, hoverColor);
+		},
 		[]
 	);
 	const selectedUncategorizedContactMarkerImageName = useMemo(
@@ -19029,7 +19079,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const hoverTooltipLat = hoverTooltipCoords?.lat ?? null;
 	const hoverTooltipLng = hoverTooltipCoords?.lng ?? null;
 	const hoverTooltipWidth = hoverTooltipData?.width ?? null;
-	const hoverTooltipAnchorY = hoverTooltipData?.anchorY ?? null;
+	const hoverTooltipHeight = hoverTooltipData?.height ?? null;
 
 	useLayoutEffect(() => {
 		if (!map || !isMapLoaded) return;
@@ -19040,16 +19090,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			hoverTooltipLat == null ||
 			hoverTooltipLng == null ||
 			hoverTooltipWidth == null ||
-			hoverTooltipAnchorY == null
+			hoverTooltipHeight == null
 		)
 			return;
 
 		const update = () => {
 			const p = map.project([hoverTooltipLng, hoverTooltipLat]);
-			el.style.transform = `translate(${Math.round(
-				p.x - hoverTooltipWidth / 2 - hoverTooltipHitSlopPx
-			)}px, ${Math.round(
-				p.y - hoverTooltipAnchorY - hoverTooltipHitSlopPx - tooltipMarkerGapPx
+			const { clientWidth, clientHeight } = map.getContainer();
+			const placement = createHoverTooltipSidePlacement({
+				markerX: p.x,
+				markerY: p.y,
+				tooltipWidth: hoverTooltipWidth,
+				tooltipHeight: hoverTooltipHeight,
+				hitSlopPx: hoverTooltipHitSlopPx,
+				sideGapXPx: HOVER_TOOLTIP_SIDE_GAP_X_PX,
+				sideGapYPx: HOVER_TOOLTIP_SIDE_GAP_Y_PX,
+				viewportWidth: clientWidth,
+				viewportHeight: clientHeight,
+			});
+			el.style.transform = `translate(${Math.round(placement.x)}px, ${Math.round(
+				placement.y
 			)}px)`;
 		};
 
@@ -19071,7 +19131,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		hoverTooltipLat,
 		hoverTooltipLng,
 		hoverTooltipWidth,
-		hoverTooltipAnchorY,
+		hoverTooltipHeight,
 		hoverTooltipHitSlopPx,
 		tooltipMarkerGapPx,
 	]);
