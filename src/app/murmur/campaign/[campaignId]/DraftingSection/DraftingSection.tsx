@@ -2905,6 +2905,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// Shares the docked slot, position state and clear timer — one card at a time.
 	const [rowHoverOpportunity, setRowHoverOpportunity] =
 		useState<MyEventApplication | null>(null);
+	// Inbox tab: keep the opportunity panel visible for the selected event thread
+	// (not only while hovering). Cleared when leaving Inbox or selecting a non-event row.
+	const [pinnedInboxOpportunity, setPinnedInboxOpportunity] =
+		useState<MyEventApplication | null>(null);
+	const pinnedInboxOpportunityIdRef = useRef<number | null>(null);
+	// Write/Drafts tabs: keep the research card visible for the selected contact
+	// (not only while hovering). Cleared when leaving those tabs.
+	const [pinnedRowResearchContact, setPinnedRowResearchContact] =
+		useState<ContactWithName | null>(null);
+	const pinnedRowResearchContactIdRef = useRef<number | null>(null);
 	const [showTestPreview, setShowTestPreview] = useState(false);
 	const handleTestPreviewToggle = useCallback(
 		(open: boolean) => {
@@ -3324,6 +3334,85 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		setHasUserSelectedResearchContact(true);
 	}, [contentView, selectedDraft?.id, contacts]);
 
+	const pinRowResearchContact = useCallback((contact: ContactWithName | null) => {
+		if (!contact) {
+			pinnedRowResearchContactIdRef.current = null;
+			setPinnedRowResearchContact(null);
+			return;
+		}
+		if (pinnedRowResearchContactIdRef.current === contact.id) return;
+		pinnedRowResearchContactIdRef.current = contact.id;
+		setPinnedRowResearchContact(contact);
+	}, []);
+
+	useLayoutEffect(() => {
+		if (view !== 'testing' && view !== 'drafting') return;
+		const anchor = document.querySelector<HTMLElement>('[data-row-hover-research-anchor]');
+		if (!anchor || !pinnedRowResearchContact) return;
+		const anchorRect = anchor.getBoundingClientRect();
+		const scale = anchor.offsetHeight > 0 ? anchorRect.height / anchor.offsetHeight : 1;
+		const cardScreenHeightPx = HOVER_RESEARCH_CARD_FULL_HEIGHT_PX * (scale || 1);
+		const centeredScreenTopPx = Math.max(8, (window.innerHeight - cardScreenHeightPx) / 2);
+		setRowHoverResearchTopPx((centeredScreenTopPx - anchorRect.top) / (scale || 1));
+		let leftPx = ROW_HOVER_RESEARCH_DOCKED_LEFT_PX;
+		const splitOverlay = document.querySelector('.campaign-map-split-overlay');
+		if (splitOverlay) {
+			const overlayLeftPx = splitOverlay.getBoundingClientRect().left;
+			const cardFootprintRealPx =
+				(ROW_HOVER_RESEARCH_CARD_WIDTH_PX + ROW_HOVER_RESEARCH_GAP_PX) * (scale || 1);
+			if (overlayLeftPx > cardFootprintRealPx) {
+				leftPx = Math.min(
+					leftPx,
+					(overlayLeftPx - anchorRect.left) / (scale || 1) +
+						ROW_HOVER_RESEARCH_DOCKED_LEFT_PX
+				);
+			}
+		}
+		setRowHoverResearchLeftPx(leftPx);
+	}, [pinnedRowResearchContact, view]);
+
+	useEffect(() => {
+		if (view !== 'testing') return;
+		const selectedIds = Array.from(contactsTabSelectedIds);
+		if (selectedIds.length === 0) {
+			pinRowResearchContact(null);
+			return;
+		}
+		if (
+			pinnedRowResearchContact &&
+			contactsTabSelectedIds.has(pinnedRowResearchContact.id)
+		) {
+			return;
+		}
+		const contact = contacts?.find((candidate) => candidate.id === selectedIds[0]) ?? null;
+		if (contact) pinRowResearchContact(contact);
+	}, [
+		contacts,
+		contactsTabSelectedIds,
+		pinRowResearchContact,
+		pinnedRowResearchContact,
+		view,
+	]);
+
+	useEffect(() => {
+		if (view !== 'drafting') return;
+		if (!selectedDraft) {
+			pinRowResearchContact(null);
+			return;
+		}
+		const contactFromList =
+			contacts?.find((candidate) => candidate.id === selectedDraft.contactId) ?? null;
+		const synthesizedFromEmail = {
+			...selectedDraft.contact,
+			name:
+				`${selectedDraft.contact.firstName || ''} ${
+					selectedDraft.contact.lastName || ''
+				}`.trim() || null,
+		} as ContactWithName;
+		const contact = contactFromList ?? synthesizedFromEmail;
+		pinRowResearchContact(contact);
+	}, [contacts, pinRowResearchContact, selectedDraft, view]);
+
 	useEffect(() => {
 		if (!contactsAvailableForDrafting) return;
 		// On the All tab the list shows fresh + drafted contacts, so a drafted contact is a
@@ -3482,6 +3571,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		if (!contact) return;
 		setSelectedContactForResearch(contact);
 		setHasUserSelectedResearchContact(true);
+		if (view === 'testing' || view === 'drafting') {
+			pinRowResearchContact(contact);
+		}
 	};
 
 	const handleResearchContactHover = (contact: ContactWithName | null) => {
@@ -3597,6 +3689,41 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			setRowHoverOpportunity(application);
 		},
 		[cancelRowHoverResearchClear, scheduleRowHoverResearchClear]
+	);
+
+	const applyInboxOpportunityPanelPlacement = useCallback(() => {
+		const anchor = document.querySelector<HTMLElement>('[data-row-hover-research-anchor]');
+		if (!anchor) return;
+		const anchorRect = anchor.getBoundingClientRect();
+		const scale = anchor.offsetHeight > 0 ? anchorRect.height / anchor.offsetHeight : 1;
+		const cardScreenHeightPx = HOVER_RESEARCH_CARD_FULL_HEIGHT_PX * (scale || 1);
+		const centeredScreenTopPx = Math.max(8, (window.innerHeight - cardScreenHeightPx) / 2);
+		setRowHoverResearchTopPx((centeredScreenTopPx - anchorRect.top) / (scale || 1));
+		let leftPx = ROW_HOVER_OPPORTUNITY_DOCKED_LEFT_PX;
+		const splitOverlay = document.querySelector('.campaign-map-split-overlay');
+		if (splitOverlay) {
+			const overlayLeftPx = splitOverlay.getBoundingClientRect().left;
+			const cardFootprintRealPx =
+				(OPPORTUNITY_HOVER_PANEL_WIDTH_PX + ROW_HOVER_RESEARCH_GAP_PX) * (scale || 1);
+			if (overlayLeftPx > cardFootprintRealPx) {
+				leftPx = Math.min(
+					leftPx,
+					(overlayLeftPx - anchorRect.left) / (scale || 1) +
+						ROW_HOVER_OPPORTUNITY_DOCKED_LEFT_PX
+				);
+			}
+		}
+		setRowHoverResearchLeftPx(leftPx);
+	}, []);
+
+	const handleEventChatRowClick = useCallback(
+		(application: MyEventApplication) => {
+			if (!application.event) return;
+			pinnedInboxOpportunityIdRef.current = application.id;
+			setPinnedInboxOpportunity(application);
+			applyInboxOpportunityPanelPlacement();
+		},
+		[applyInboxOpportunityPanelPlacement]
 	);
 
 	const isRowHoverResearchEnabled =
@@ -3736,6 +3863,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		cancelRowHoverResearchClear();
 		setRowHoverResearchContact(null);
 		setRowHoverOpportunity(null);
+		pinnedInboxOpportunityIdRef.current = null;
+		setPinnedInboxOpportunity(null);
+		if (view !== 'testing' && view !== 'drafting') {
+			pinnedRowResearchContactIdRef.current = null;
+			setPinnedRowResearchContact(null);
+		}
 		cancelRailHoverResearchClear();
 		setRailHoverResearchContact(null);
 		setRailHoverResearchPos(null);
@@ -3847,8 +3980,55 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// The artist's submitted applications thread into the mobile conversations as
 	// per-event "sent" items (same scoping as the inbox rows: campaign contacts).
 	const { data: myEventApplications } = useGetMyEventApplications({
-		enabled: isMobile === true && !inboxMockData,
+		enabled: !inboxMockData && (isMobile === true || view === 'inbox'),
 	});
+
+	const resolveInboxOpportunityFromEmailId = useCallback(
+		(emailId: number | null): MyEventApplication | null => {
+			if (emailId == null) return null;
+
+			for (const application of myEventApplications ?? []) {
+				const row = normalizeApplicationForInboxConversation(application);
+				if (row?.id === emailId) return application;
+			}
+
+			const inbound =
+				inboxEmailsForContactsExpandedList.find((email) => email.id === emailId) ?? null;
+			const threadApplicationId = inbound?.venueThreadApplicationId ?? null;
+			if (threadApplicationId != null) {
+				return (
+					(myEventApplications ?? []).find(
+						(candidate) => candidate.id === threadApplicationId
+					) ?? null
+				);
+			}
+
+			return null;
+		},
+		[inboxEmailsForContactsExpandedList, myEventApplications]
+	);
+
+	const selectedInboxOpportunity = useMemo(() => {
+		if (view !== 'inbox' || selectedInboxEmailId == null) return null;
+		return resolveInboxOpportunityFromEmailId(selectedInboxEmailId);
+	}, [resolveInboxOpportunityFromEmailId, selectedInboxEmailId, view]);
+
+	useLayoutEffect(() => {
+		if (view !== 'inbox') {
+			pinnedInboxOpportunityIdRef.current = null;
+			setPinnedInboxOpportunity(null);
+			return;
+		}
+		if (!selectedInboxOpportunity?.event) {
+			pinnedInboxOpportunityIdRef.current = null;
+			setPinnedInboxOpportunity(null);
+			return;
+		}
+		if (pinnedInboxOpportunityIdRef.current === selectedInboxOpportunity.id) return;
+		pinnedInboxOpportunityIdRef.current = selectedInboxOpportunity.id;
+		setPinnedInboxOpportunity(selectedInboxOpportunity);
+		applyInboxOpportunityPanelPlacement();
+	}, [applyInboxOpportunityPanelPlacement, selectedInboxOpportunity, view]);
 
 	// Summary list is "loading" until both the campaign contacts and emails resolve —
 	// before that, all three lists are empty and the empty state would flash. The mock
@@ -4042,11 +4222,18 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// when the split map strip is visible). Rendered inside the
 	// [data-row-hover-research-anchor] wrapper. `enabled` lets the search/overview rail
 	// reuse this with its own gate (defaults to the pinned-list gate).
+	const activeRowOpportunity =
+		rowHoverOpportunity ?? (view === 'inbox' ? pinnedInboxOpportunity : null);
+	const pinnedResearchForList =
+		view === 'testing' || view === 'drafting' ? pinnedRowResearchContact : null;
+	const activeRowResearchContact = activeRowOpportunity
+		? null
+		: rowHoverResearchContact ?? pinnedResearchForList;
 	const renderRowHoverResearchCard = (enabled = isRowHoverResearchEnabled) =>
 		// When the large right-side research panel is showing (expanded layout), the
 		// over-map hover card is suppressed — research/opportunity render in the right
 		// panel instead. The map-area card is reserved for the compressed/compact view.
-		isRightResearchPanelActive ? null : enabled && rowHoverOpportunity ? (
+		isRightResearchPanelActive ? null : enabled && activeRowOpportunity?.event ? (
 			<div
 				className="absolute pointer-events-none"
 				style={{
@@ -4055,9 +4242,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					left: `${rowHoverResearchLeftPx}px`,
 				}}
 			>
-				<OpportunityHoverPanel application={rowHoverOpportunity} nowMs={Date.now()} />
+				<OpportunityHoverPanel application={activeRowOpportunity} nowMs={Date.now()} />
 			</div>
-		) : enabled && rowHoverResearchContact ? (
+		) : enabled && activeRowResearchContact ? (
 			<div
 				className="absolute pointer-events-none"
 				style={{
@@ -4066,7 +4253,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					left: `${rowHoverResearchLeftPx}px`,
 				}}
 			>
-				<ContactResearchHoverCard contact={rowHoverResearchContact} />
+				<ContactResearchHoverCard contact={activeRowResearchContact} />
 			</div>
 		) : null;
 
@@ -4939,6 +5126,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onEventChatRowHover={
 												isRowHoverResearchEnabled ? handleEventChatRowHover : undefined
 											}
+											onEventChatRowClick={handleEventChatRowClick}
 											width={mainContactsPanelWidthPx}
 											height={mainContactsPanelHeightPx}
 										/>

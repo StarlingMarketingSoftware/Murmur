@@ -119,7 +119,7 @@ export type InboxSentTabRequest = {
 };
 
 export type InboxPanelTabRequest = {
-	tab: 'responses' | 'opportunities';
+	tab: 'responses' | 'sent' | 'opportunities';
 	requestId: number;
 };
 

@@ -87,6 +87,7 @@ export const CampaignCornerPill: React.FC<CampaignCornerPillProps> = ({
 
 	const historyButton = (style: React.CSSProperties) => (
 		<button
+			data-history-toggle
 			type="button"
 			aria-label="Open history ledger"
 			aria-pressed={historyActive}

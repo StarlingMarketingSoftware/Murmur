@@ -2396,6 +2396,9 @@ const Murmur = () => {
 	const isOverviewSearchActive = (overviewSearchQuery ?? '').trim().length > 0;
 	const effectiveCampaignOverviewMapGrouping: CampaignOverviewMapGrouping =
 		isOverviewSearchActive ? 'category' : campaignOverviewMapGrouping;
+	const [inboxPresetSelectedStatuses, setInboxPresetSelectedStatuses] = useState<
+		readonly CampaignOverviewStatusKey[]
+	>(() => (CAMPAIGN_TAB_PRESET_STATUSES.inbox ?? ['sent', 'new-message']).slice());
 	const [campaignOverviewSelectedStatuses, setCampaignOverviewSelectedStatuses] =
 		useState<readonly CampaignOverviewStatusKey[]>([]);
 	const campaignOverviewSelectedStatusSet = useMemo(
@@ -2415,7 +2418,10 @@ const Murmur = () => {
 	// (see CAMPAIGN_TAB_PRESET_STATUSES). These derived values shadow the overview
 	// ones for the map filter only — the overview's own selection state is left
 	// untouched so returning to All restores whatever the user had chosen there.
-	const activeTabPresetStatuses = CAMPAIGN_TAB_PRESET_STATUSES[activeView];
+	const activeTabPresetStatuses =
+		activeView === 'inbox'
+			? inboxPresetSelectedStatuses
+			: CAMPAIGN_TAB_PRESET_STATUSES[activeView];
 	const effectiveMapGroupingForActiveView: CampaignOverviewMapGrouping =
 		activeTabPresetStatuses ? 'status' : effectiveCampaignOverviewMapGrouping;
 	const effectiveActiveStatusSetForActiveView = useMemo<
@@ -3122,10 +3128,11 @@ const Murmur = () => {
 	// selected. The explicit 'inbox' sent-tab request beats a stale 'sent' request
 	// left by a prior Sent navigation (the view dedupe can skip re-requesting).
 	const handleOpenInboxOpportunities = useCallback(() => {
+		setInboxPresetSelectedStatuses(['sent', 'new-message']);
 		requestInboxSentTab('inbox');
 		requestInboxPanelTab('opportunities');
 		setActiveView('inbox');
-	}, [requestInboxSentTab, requestInboxPanelTab, setActiveView]);
+	}, [requestInboxSentTab, requestInboxPanelTab, setActiveView, setInboxPresetSelectedStatuses]);
 
 	// Launch a campaign search from the Write/Drafts/Inbox tabs: jump to the All
 	// tab, drop that tab's preset status filter (so results aren't scoped to e.g.
@@ -3707,6 +3714,43 @@ const Murmur = () => {
 		CAMPAIGN_PRESET_ASK_BOX_BOTTOM_PX + presetMapControlsExtraBottomPx;
 	const presetMapStatusStripBottomPx =
 		CAMPAIGN_PRESET_STATUS_STRIP_BOTTOM_PX + presetMapControlsExtraBottomPx;
+	const handlePresetStatusStripClick = (status: CampaignOverviewStatusKey) => {
+		if (activeView === 'inbox' && (status === 'sent' || status === 'new-message')) {
+			const isEnabled = inboxPresetSelectedStatuses.includes(status);
+			const nextStatuses = (
+				isEnabled
+					? inboxPresetSelectedStatuses.filter((value) => value !== status)
+					: [...inboxPresetSelectedStatuses, status]
+			).filter((value): value is 'sent' | 'new-message' => value === 'sent' || value === 'new-message');
+			// Keep at least one status enabled so Inbox doesn't become an empty/undefined slice.
+			if (nextStatuses.length === 0) return;
+			setInboxPresetSelectedStatuses(nextStatuses);
+			// If we just *disabled* one of the two, jump the inbox contacts list to the remaining tab.
+			if (isEnabled && nextStatuses.length === 1) {
+				requestInboxPanelTab(nextStatuses[0] === 'sent' ? 'sent' : 'responses');
+			}
+			return;
+		}
+		switch (status) {
+			case 'contacts':
+				setActiveView('testing');
+				return;
+			case 'drafts':
+				setActiveView('drafting');
+				return;
+			case 'new-message':
+				setInboxPresetSelectedStatuses(['new-message']);
+				requestInboxSentTab('inbox');
+				requestInboxPanelTab('responses');
+				setActiveView('inbox');
+				return;
+			case 'sent':
+				setInboxPresetSelectedStatuses(['sent']);
+				requestInboxPanelTab('sent');
+				setActiveView('sent');
+				return;
+		}
+	};
 
 	// Writing + Drafts + Sent + Inbox tab vertical alignment:
 	// Sit the top of the main content box exactly 27px below the bottom edge of the
@@ -3797,6 +3841,7 @@ const Murmur = () => {
 											? () => {
 													// Explicit 'inbox' request beats a stale 'sent' one when the
 													// view dedupe skips re-requesting (sent pill → inbox pill).
+													setInboxPresetSelectedStatuses(['sent', 'new-message']);
 													requestInboxSentTab('inbox');
 													setActiveView('inbox');
 												}
@@ -3827,10 +3872,9 @@ const Murmur = () => {
 									>
 										<CampaignOverviewStatusStrip
 											selectedStatuses={effectiveActiveStatusSetForActiveView}
-											locked
 											leftOverride={presetMapControlsLeftCss}
 											bottomOverride={presetMapStatusStripBottomPx}
-											onToggleStatus={() => undefined}
+											onToggleStatus={handlePresetStatusStripClick}
 										/>
 										<CampaignOverviewAskAnythingBox
 											onSubmit={handlePresetAskAnythingSubmit}
@@ -4327,7 +4371,15 @@ const Murmur = () => {
 														type="button"
 														className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
 														style={inactiveTabStyle(activeView === 'inbox')}
-														onClick={() => setActiveView('inbox')}
+														onClick={() => {
+															if (activeView !== 'inbox') {
+																setInboxPresetSelectedStatuses([
+																	'sent',
+																	'new-message',
+																]);
+															}
+															setActiveView('inbox');
+														}}
 													>
 														Inbox
 													</button>
@@ -4870,7 +4922,12 @@ const Murmur = () => {
 														? 'text-black border-black'
 														: 'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
 												)}
-												onClick={() => setActiveView('inbox')}
+												onClick={() => {
+													if (activeView !== 'inbox') {
+														setInboxPresetSelectedStatuses(['sent', 'new-message']);
+													}
+													setActiveView('inbox');
+												}}
 											>
 												Inbox
 											</button>
@@ -5004,7 +5061,12 @@ const Murmur = () => {
 												goToDrafting={() => setActiveView('drafting')}
 												goToWriting={() => setActiveView('testing')}
 												onGoToSearch={handleOpenDashboardSearchForCampaign}
-												goToInbox={() => setActiveView('inbox')}
+												goToInbox={() => {
+													if (activeView !== 'inbox') {
+														setInboxPresetSelectedStatuses(['sent', 'new-message']);
+													}
+													setActiveView('inbox');
+												}}
 												goToSent={() => setActiveView('sent')}
 												goToSummary={() => setActiveView('summary')}
 												onOpenIdentityDialog={() => {

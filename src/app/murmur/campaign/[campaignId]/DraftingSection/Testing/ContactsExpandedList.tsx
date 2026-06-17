@@ -1303,6 +1303,7 @@ export interface ContactsExpandedListProps {
 		application: MyEventApplication | null,
 		rowElement: HTMLElement | null
 	) => void;
+	onEventChatRowClick?: (application: MyEventApplication) => void;
 	onDraftClick?: (draft: EmailWithRelations) => void;
 	onDraftHover?: (draft: EmailWithRelations | null) => void;
 	selectedInboxEmailId?: number | null;
@@ -1356,11 +1357,14 @@ export interface ContactsExpandedListProps {
 	interactionMode?: 'default' | 'allTab';
 	focusMode?: ContactsExpandedListFocusMode;
 	/**
-	 * One-shot request to land the inbox panel on a specific Responses/Opportunities
+	 * One-shot request to land the inbox panel on a specific Responses/Sent/Opportunities
 	 * filter (e.g. the overview star pill). Consumed by requestId, otherwise the
 	 * filter resets to 'responses' whenever inbox focus mode engages.
 	 */
-	inboxPanelTabRequest?: { tab: 'responses' | 'opportunities'; requestId: number } | null;
+	inboxPanelTabRequest?: {
+		tab: 'responses' | 'sent' | 'opportunities';
+		requestId: number;
+	} | null;
 
 	onFocusContact?: (contactId: number) => void;
 	/**
@@ -1383,6 +1387,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	onContactHover,
 	onContactRowHover,
 	onEventChatRowHover,
+	onEventChatRowClick,
 	onDraftClick,
 	onDraftHover,
 	selectedInboxEmailId,
@@ -2538,6 +2543,8 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		const isEventChatCompact =
 			eventChatStateForLayout?.status === 'closed' ||
 			eventChatStateForLayout?.status === 'canceled';
+		const shouldRenderNoFillEventChatRow =
+			isInboxFocusMode && Boolean(eventChatStateForLayout?.isAboveFold);
 		const rowHeightPx = eventChatStateForLayout
 			? isEventChatCompact
 				? EVENT_CHAT_COMPACT_ROW_HEIGHT_PX
@@ -2579,9 +2586,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					borderRight: `1.949px solid ${inboxSupplementalBorderColor}`,
 					borderBottom: `1.949px solid ${inboxSupplementalBorderColor}`,
 					borderLeft: `1.949px solid ${inboxSupplementalBorderColor}`,
-					background: isSelectedInboxConversation
-						? selectedInboxRowFillColor
-						: (inboxSupplementalRowFillColor ?? '#F9FAFB'),
+					background: shouldRenderNoFillEventChatRow
+						? 'transparent'
+						: isSelectedInboxConversation
+							? selectedInboxRowFillColor
+							: (inboxSupplementalRowFillColor ?? '#F9FAFB'),
 					boxSizing: 'border-box',
 				}}
 				role={!isAllTabNavigation ? 'button' : undefined}
@@ -2612,6 +2621,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				onClick={(e) => {
 					if (isAllTabNavigation) return;
 					e.stopPropagation();
+					if (eventApplication && eventChatState) {
+						onEventChatRowClick?.(eventApplication);
+					}
 					if (onInboxEmailClick) {
 						onInboxEmailClick(selectionEmail);
 						// Redded-out on the Write/Drafts tab: jump to the Inbox tab (the
@@ -2625,6 +2637,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					if (isAllTabNavigation || !onInboxEmailClick) return;
 					if (e.key === 'Enter' || e.key === ' ') {
 						e.preventDefault();
+						if (eventApplication && eventChatState) {
+							onEventChatRowClick?.(eventApplication);
+						}
 						onInboxEmailClick(selectionEmail);
 					}
 				}}
@@ -2769,6 +2784,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				onClick={(e) => {
 					if (isAllTabNavigation) return;
 					e.stopPropagation();
+					if (eventApplication && eventChatState) {
+						onEventChatRowClick?.(eventApplication);
+					}
 					if (onInboxEmailClick) {
 						onInboxEmailClick(email);
 						return;
@@ -2779,6 +2797,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					if (isAllTabNavigation) return;
 					if (e.key === 'Enter' || e.key === ' ') {
 						e.preventDefault();
+						if (eventApplication && eventChatState) {
+							onEventChatRowClick?.(eventApplication);
+						}
 						if (onInboxEmailClick) {
 							onInboxEmailClick(email);
 							return;
@@ -3396,7 +3417,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						})()}
 					{/* Scrollable list */}
 					<CustomScrollbar
-						className="flex-1 drafting-table-content"
+						className="z-0 flex-1 drafting-table-content"
 						thumbWidth={shouldShowScrollbar ? 2 : 0}
 						thumbColor={shouldShowScrollbar ? '#000000' : 'transparent'}
 						trackColor="transparent"
