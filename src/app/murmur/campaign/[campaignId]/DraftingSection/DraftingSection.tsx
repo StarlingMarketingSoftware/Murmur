@@ -957,7 +957,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// Match the dashboard map-view search panel: reserve enough room for the Search
 	// Results header, category toolbar, and breathing room even when Selection expands.
 	const OVERVIEW_SEARCH_RESULTS_MIN_HEIGHT_PX = 125;
-	const OVERVIEW_SELECTION_PANEL_MIN_HEIGHT_PX = 260;
+	const OVERVIEW_SEARCH_RESULTS_COMPRESS_THRESHOLD = 5;
 	// CampaignHeaderBox sits above the results panel (same split as dashboard map search).
 	const MAP_VIEW_CAMPAIGN_HEADER_HEIGHT_PX = 59;
 	const MAP_VIEW_CAMPAIGN_HEADER_GAP_PX = 13;
@@ -1134,6 +1134,71 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 		return set;
 	}, [overviewRightRailUnselectedContactsFiltered, getOverviewRightRailChipKeyForContact]);
+
+	const getOverviewRightRailRowHeightPx = (contactId: number) => {
+		const status = overviewRightRailContactStatusById?.get(contactId) ?? 'contacts';
+		if (status === 'drafts') return 108;
+		if (status === 'sent' || status === 'new-message') return 92;
+		return 49.657;
+	};
+
+	// Match the dashboard map-side panel behavior:
+	// - Selection caps at ~50/50 while plenty of unselected results remain
+	// - As results get low, gradually allow Selection to grow and results to compress
+	// - When there are only 1–2 unselected results, keep them fully visible above the category bar
+	const overviewRightRailPanelGapPx = 9;
+	const overviewRightRailCompressedVisibleSelected = overviewRightRailSelectedContactsFull.slice(
+		0,
+		2
+	);
+	const overviewRightRailCompressedVisibleSelectedHeightPx =
+		overviewRightRailCompressedVisibleSelected.reduce(
+			(sum, c) => sum + getOverviewRightRailRowHeightPx(c.id),
+			0
+		) +
+		Math.max(0, overviewRightRailCompressedVisibleSelected.length - 1) * 7;
+	const overviewRightRailSelectionMinHeightPx =
+		overviewRightRailSelectedContactsFull.length > 0
+			? 77 + 6 + overviewRightRailCompressedVisibleSelectedHeightPx + 14
+			: 77 + 17 /* 77px header + ~17px translucent strip */;
+
+	const overviewRightRailCompressedVisibleUnselected =
+		overviewRightRailUnselectedContactsFiltered.slice(0, 2);
+	const overviewRightRailCompressedVisibleUnselectedHeightPx =
+		overviewRightRailCompressedVisibleUnselected.reduce(
+			(sum, c) => sum + getOverviewRightRailRowHeightPx(c.id),
+			0
+		) +
+		Math.max(0, overviewRightRailCompressedVisibleUnselected.length - 1) * 7;
+	const overviewRightRailSearchResultsMinHeightPx =
+		OVERVIEW_SEARCH_RESULTS_MIN_HEIGHT_PX +
+		(shouldShowOverviewRightRailCategoryBar &&
+		overviewRightRailUnselectedContactsFiltered.length <=
+			OVERVIEW_SEARCH_RESULTS_COMPRESS_THRESHOLD
+			? overviewRightRailCompressedVisibleUnselectedHeightPx
+			: 0);
+
+	const overviewRightRailSelectionRampSpan =
+		OVERVIEW_SEARCH_RESULTS_COMPRESS_THRESHOLD + 1;
+	const overviewRightRailSelectionRampProgress = Math.min(
+		1,
+		Math.max(
+			0,
+			(overviewRightRailSelectionRampSpan -
+				overviewRightRailUnselectedContactsFiltered.length) /
+				overviewRightRailSelectionRampSpan
+		)
+	);
+	const overviewRightRailSelectionRampEased =
+		overviewRightRailSelectionRampProgress * overviewRightRailSelectionRampProgress;
+	const overviewRightRailSelectionFraction =
+		0.5 + 0.5 * overviewRightRailSelectionRampEased;
+	const overviewRightRailSelectionDivisor = 1 / overviewRightRailSelectionFraction;
+	const overviewRightRailSelectionMaxHeightCss = `min(calc((100% - ${overviewRightRailPanelGapPx}px) / ${overviewRightRailSelectionDivisor.toFixed(
+		4
+	)}), calc(100% - ${
+		overviewRightRailSearchResultsMinHeightPx + overviewRightRailPanelGapPx
+	}px))`;
 
 	const [overviewContactsDockPos, setOverviewContactsDockPos] = useState<{
 		leftPx: number;
@@ -6063,11 +6128,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<div
 													className="flex flex-col flex-shrink-0"
 													style={{
-														minHeight:
-															overviewRightRailSelectedContacts.length > 0
-																? OVERVIEW_SELECTION_PANEL_MIN_HEIGHT_PX
-																: 77 + 17 /* 77px header + ~17px translucent strip */,
-														maxHeight: `calc(100% - ${OVERVIEW_SEARCH_RESULTS_MIN_HEIGHT_PX + 9}px)`,
+														minHeight: overviewRightRailSelectionMinHeightPx,
+														maxHeight: overviewRightRailSelectionMaxHeightCss,
 														backgroundColor: 'rgba(214, 33, 39, 0.518)',
 														border: '3px solid #000',
 														borderRadius: '8px',
@@ -6155,7 +6217,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												className="flex flex-col flex-1 min-h-0"
 												style={{
-													minHeight: OVERVIEW_SEARCH_RESULTS_MIN_HEIGHT_PX,
+													minHeight: overviewRightRailSearchResultsMinHeightPx,
 													backgroundColor: 'rgba(214, 33, 39, 0.518)',
 													border: '1px solid #000',
 													borderRadius: '8px',
