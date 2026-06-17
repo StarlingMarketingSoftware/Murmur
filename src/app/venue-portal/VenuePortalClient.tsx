@@ -15,13 +15,13 @@ import {
 } from 'react';
 // Venue events carry confirmed-booking attribution from GET /api/venue/events.
 import type { VenueEventWithBooking as VenueEvent } from '@/app/api/venue/events/route';
-import { useAuth, UserButton, useUser } from '@clerk/nextjs';
+import { useAuth, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { BadgeCheck, X } from 'lucide-react';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
-import { OutlinedInitialAvatar } from '@/components/atoms/OutlinedInitialAvatar/OutlinedInitialAvatar';
+import { TopRightClerkButton } from '@/components/atoms/TopRightHeaderIcon/TopRightClerkButton';
 import { PayRangeMoneyIcon } from '@/components/atoms/_svg/PayRangeMoneyIcon';
 import { ProfileAreaMarkerIcon } from '@/components/atoms/_svg/ProfileAreaMarkerIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
@@ -43,7 +43,6 @@ import {
 	type ProfileAreaMapFeature,
 } from '@/components/molecules/HybridPromptInput/ProfileSidePanelBox';
 import { profileGenreOptionRows } from '@/components/molecules/HybridPromptInput/profileFieldIcons';
-import { withClerkNoBranding } from '@/constants/auth';
 import { AccountType } from '@/constants/prismaEnums';
 import { urls } from '@/constants/urls';
 import {
@@ -2960,22 +2959,7 @@ function VenuePortalForm({
 	return (
 		<div className="relative z-10 flex min-h-[100dvh] w-full flex-col items-center justify-center overflow-x-auto px-4 py-10 sm:px-6">
 			<div className="absolute right-4 top-3 z-20 pt-3 pr-4">
-				<div className="group relative w-7 h-7 cursor-pointer">
-					<OutlinedInitialAvatar
-						initial={outlinedInitial}
-						className="pointer-events-none absolute inset-0 w-7 h-7 group-hover:border-black group-hover:text-black group-focus-within:border-black group-focus-within:text-black group-active:border-black group-active:text-black"
-					/>
-					<div className="absolute inset-0 opacity-0">
-						<UserButton
-							appearance={withClerkNoBranding({
-								elements: {
-									avatarBox: 'w-7 h-7',
-									userButtonTrigger: 'w-7 h-7 p-0',
-								},
-							})}
-						/>
-					</div>
-				</div>
+				<TopRightClerkButton initial={outlinedInitial} />
 			</div>
 
 			<form
