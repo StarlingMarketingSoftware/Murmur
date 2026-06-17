@@ -144,6 +144,7 @@ export type CampaignsMockFolder = {
 	updatedDaysAgo?: number;
 	newEmailCount?: number;
 	contactCount?: number;
+	contactIds?: number[];
 	campaignDataTypes?: CampaignDataTypeSummary[];
 };
 
