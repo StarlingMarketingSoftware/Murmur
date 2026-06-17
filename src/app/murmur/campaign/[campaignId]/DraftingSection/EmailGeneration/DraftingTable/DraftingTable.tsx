@@ -265,6 +265,7 @@ export const ContactsHeaderChrome: FC<{
 				(activeStopIndex === campaignStops.length - 1 && activePillHoverDirection > 0))
 				? -activePillHoverOffset
 				: 0;
+		const shouldRenderActiveCampaignPill = safeActiveStop !== 'all';
 
 		return (
 			<div
@@ -282,43 +283,45 @@ export const ContactsHeaderChrome: FC<{
 				}}
 				onMouseLeave={() => setHoveredCampaignStop(null)}
 			>
-				<div
-					data-campaign-shared-pill="campaign-tabs-pill"
-					data-campaign-shared-pill-variant="contacts-campaign-stops"
-					style={{
-						position: 'absolute',
-						top: '50%',
-						left: getCampaignPillLeft(activeStopIndex, activePillHoverOffset),
-						width: `${campaignPillWidth}px`,
-						height: `${campaignPillHeight}px`,
-						backgroundColor: hoveredStopConfig
-							? '#FFFFFF'
-							: activeStopConfig.backgroundColor,
-						border: `${campaignPillBorderWidth}px solid #000000`,
-						borderRadius: `${campaignPillBorderRadius}px`,
-						boxSizing: 'border-box',
-						display: 'flex',
-						alignItems: 'center',
-						justifyContent: 'center',
-						zIndex: 2,
-						transform: 'translateY(-50%)',
-						transition: `left ${stopTransition}, background-color ${stopFadeTransition}`,
-						pointerEvents: 'none',
-					}}
-				>
-					<span
-						className="font-semibold font-inter leading-none"
+				{shouldRenderActiveCampaignPill && (
+					<div
+						data-campaign-shared-pill="campaign-tabs-pill"
+						data-campaign-shared-pill-variant="contacts-campaign-stops"
 						style={{
-							fontSize: campaignFontSize,
-							color: '#000000',
-							marginTop: isBottomView ? '-1px' : 0,
-							opacity: hoveredStopConfig ? 0 : 1,
-							transition: `opacity ${stopFadeTransition}`,
+							position: 'absolute',
+							top: '50%',
+							left: getCampaignPillLeft(activeStopIndex, activePillHoverOffset),
+							width: `${campaignPillWidth}px`,
+							height: `${campaignPillHeight}px`,
+							backgroundColor: hoveredStopConfig
+								? '#FFFFFF'
+								: activeStopConfig.backgroundColor,
+							border: `${campaignPillBorderWidth}px solid #000000`,
+							borderRadius: `${campaignPillBorderRadius}px`,
+							boxSizing: 'border-box',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							zIndex: 2,
+							transform: 'translateY(-50%)',
+							transition: `left ${stopTransition}, background-color ${stopFadeTransition}`,
+							pointerEvents: 'none',
 						}}
 					>
-						{activeStopConfig.label}
-					</span>
-				</div>
+						<span
+							className="font-semibold font-inter leading-none"
+							style={{
+								fontSize: campaignFontSize,
+								color: '#000000',
+								marginTop: isBottomView ? '-1px' : 0,
+								opacity: hoveredStopConfig ? 0 : 1,
+								transition: `opacity ${stopFadeTransition}`,
+							}}
+						>
+							{activeStopConfig.label}
+						</span>
+					</div>
+				)}
 				{displayedHoveredStopConfig && (
 					<div
 						style={{
@@ -370,6 +373,8 @@ export const ContactsHeaderChrome: FC<{
 					{campaignStops.map((stop) => {
 						const isDisplayed = stop.id === safeActiveStop || stop.id === hoveredStop;
 						const canClick = Boolean(stop.onClick);
+						const shouldShowInlineActiveLabel =
+							!shouldRenderActiveCampaignPill && stop.id === safeActiveStop;
 
 						return (
 							<button
@@ -402,17 +407,30 @@ export const ContactsHeaderChrome: FC<{
 									cursor: interactive && canClick ? 'pointer' : 'default',
 								}}
 							>
-								<span
-									aria-hidden="true"
-									style={{
-										width: `${campaignDotSize}px`,
-										height: `${campaignDotSize}px`,
-										borderRadius: '9999px',
-										backgroundColor: campaignDotColor,
-										opacity: isDisplayed ? 0 : 1,
-										transition: `opacity ${stopFadeTransition}`,
-									}}
-								/>
+								{shouldShowInlineActiveLabel ? (
+									<span
+										className="font-semibold font-inter leading-none"
+										style={{
+											fontSize: campaignFontSize,
+											color: '#000000',
+											marginTop: isBottomView ? '-1px' : 0,
+										}}
+									>
+										{stop.label}
+									</span>
+								) : (
+									<span
+										aria-hidden="true"
+										style={{
+											width: `${campaignDotSize}px`,
+											height: `${campaignDotSize}px`,
+											borderRadius: '9999px',
+											backgroundColor: campaignDotColor,
+											opacity: isDisplayed ? 0 : 1,
+											transition: `opacity ${stopFadeTransition}`,
+										}}
+									/>
+								)}
 							</button>
 						);
 					})}

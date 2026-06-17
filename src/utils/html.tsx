@@ -58,7 +58,7 @@ export const formatHTMLForEmailClients = (html: string): string => {
 			.replace(/"/g, '&quot;')
 			.replace(/'/g, '&#39;');
 
-	const looksLikeHtml = /<\/?[a-z][\s>]/i.test(out);
+	const looksLikeHtml = /<\/?[a-z][a-z0-9]*(\s|\/?>)/i.test(out);
 	if (!looksLikeHtml) {
 		// Convert plain text (with \n) into Gmail-like HTML with <br> breaks.
 		const normalized = out.trim();
@@ -100,7 +100,10 @@ export const formatHTMLForEmailClients = (html: string): string => {
 		return `${entries.map(([k, v]) => `${k}: ${v}`).join('; ')};`;
 	};
 
-	const upsertStyleAttr = (tag: string, updater: (existing: string) => string): string => {
+	const upsertStyleAttr = (
+		tag: string,
+		updater: (existing: string) => string
+	): string => {
 		const match = tag.match(/\sstyle=("([^"]*)"|'([^']*)')/i);
 		if (match) {
 			const existing = match[2] ?? match[3] ?? '';
@@ -141,7 +144,8 @@ export const formatHTMLForEmailClients = (html: string): string => {
 
 	// Wrap snippets (most of our drafts) in a Gmail-like baseline container.
 	// Don't force a px font-size here: Gmail applies device-specific sizing.
-	const looksLikeFullDoc = /<html\b/i.test(out) || /<body\b/i.test(out) || /<!doctype\b/i.test(out);
+	const looksLikeFullDoc =
+		/<html\b/i.test(out) || /<body\b/i.test(out) || /<!doctype\b/i.test(out);
 	if (!looksLikeFullDoc) {
 		const desiredOuterStyle = `font-family: ${OUTER_FONT_FAMILY}; color: ${OUTER_TEXT_COLOR};`;
 		const singleDivWrapper = /^\s*<div\b[^>]*>[\s\S]*<\/div>\s*$/i.test(out);
@@ -197,6 +201,15 @@ export const replaceLineBreaksWithRichTextTags = (text: string, font: string): s
 	// Gmail-style structure: a single wrapper with paragraphs separated by <br><br>.
 	const normalized = (text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
 	if (!normalized) return `<div style="font-family: ${font};"></div>`;
+
+	const looksLikeHtml = /<\/?[a-z][a-z0-9]*(\s|\/?>)/i.test(normalized);
+	if (looksLikeHtml) {
+		const content = normalized
+			.replace(/<\/p>\s*<p\b[^>]*>/gi, '<br><br>')
+			.replace(/<p\b[^>]*>/gi, '')
+			.replace(/<\/p>/gi, '');
+		return `<div style="font-family: ${font};">${content}</div>`;
+	}
 
 	const paragraphs = normalized.split(/\n{2,}/).filter((p) => p.trim() !== '');
 	const content = paragraphs

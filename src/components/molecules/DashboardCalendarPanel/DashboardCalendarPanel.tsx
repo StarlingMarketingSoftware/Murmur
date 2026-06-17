@@ -73,13 +73,6 @@ type DashboardCalendarPanelProps = {
 	 * calendar (venue map view) pass their composite scale to match.
 	 */
 	popupScale?: number;
-	/**
-	 * Mobile dashboard calendar tab. Switches the scroll container to native
-	 * touch scrolling and disables the custom touch smooth-scroll/fling/row-snap
-	 * so it feels like a normal mobile list. Desktop / venue map / debug leave
-	 * this false (wheel smooth-scroll + snapping unchanged).
-	 */
-	nativeTouchScroll?: boolean;
 };
 
 type ActiveCalendarPopup = {
@@ -95,16 +88,6 @@ type ActiveCalendarPopup = {
 type CalendarScrollbarState =
 	| { visible: false; direction: null; thumbTop: number }
 	| { visible: true; direction: 'up' | 'down'; thumbTop: number };
-
-const SMOOTH_SCROLL_LERP = 0.14;
-const WHEEL_SCROLL_MULTIPLIER = 1.12;
-// Quiet period after the last wheel event before we ease to the nearest month boundary.
-const WHEEL_SNAP_DELAY_MS = 150;
-// Cumulative wheel |deltaY| required to dismiss an open event popup — smaller
-// (trackpad-inertia) nudges are swallowed so they can't kill the popup mid-edit.
-const POPUP_WHEEL_DISMISS_THRESHOLD_PX = 36;
-// How far a touch fling projects the release velocity before settling on a row.
-const TOUCH_FLING_MS = 160;
 
 const clamp = (value: number, min: number, max: number): number =>
 	Math.min(Math.max(value, min), max);
@@ -137,7 +120,6 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	innerHeightPx,
 	persistEvents = false,
 	popupScale = 1,
-	nativeTouchScroll = false,
 }) => {
 	// Layout constants (hard dashboard sizing)
 	const ROWS = 6;
@@ -172,10 +154,11 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	const POPUP_VISUAL_WIDTH_PX = POPUP_WIDTH_PX * popupScale;
 	const POPUP_VISUAL_HEIGHT_PX = POPUP_HEIGHT_PX * popupScale;
 
-	// Active month/year + optional highlighted day (defaults to Jan 2026 — the
-	// original static design baseline).
-	const inMonthYear = mockState?.year ?? 2026;
-	const rawMonthIndex = mockState?.monthIndex ?? 0;
+	// Active month/year + optional highlighted day (defaults to the current
+	// month so the calendar always opens on "today" unless a caller overrides).
+	const defaultToday = new Date();
+	const inMonthYear = mockState?.year ?? defaultToday.getFullYear();
+	const rawMonthIndex = mockState?.monthIndex ?? defaultToday.getMonth();
 	const inMonthIndex = ((rawMonthIndex % 12) + 12) % 12;
 	// Highlight reflects today's date. In debug mode, mockState stands in for "today"
 	// so previews of arbitrary dates exercise the same highlight code path.
@@ -198,13 +181,18 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		monthTopOffsetsPx.push(windowRowCount * CELL_H_PX);
 		windowRowCount += weeks;
 	}
-	const INITIAL_SCROLL_TOP_PX = monthTopOffsetsPx[MONTH_WINDOW_RADIUS];
+	const currentMonthFirstDayOfWeek = new Date(inMonthYear, inMonthIndex, 1).getDay();
+	const currentMonthLeadInWeeks = currentMonthFirstDayOfWeek === 0 ? 0 : 1;
+	const currentMonthDisplayWeekCount =
+		monthWeekCounts[MONTH_WINDOW_RADIUS] + currentMonthLeadInWeeks;
+	const INITIAL_SCROLL_TOP_PX = Math.max(
+		0,
+		monthTopOffsetsPx[MONTH_WINDOW_RADIUS] - currentMonthLeadInWeeks * CELL_H_PX
+	);
 	// Clamped: a 4-row month is shorter than the default 373px viewport.
 	const CURRENT_MONTH_MAX_SCROLL_TOP_PX = Math.max(
 		INITIAL_SCROLL_TOP_PX,
-		INITIAL_SCROLL_TOP_PX +
-			monthWeekCounts[MONTH_WINDOW_RADIUS] * CELL_H_PX -
-			INNER_HEIGHT_PX
+		INITIAL_SCROLL_TOP_PX + currentMonthDisplayWeekCount * CELL_H_PX - INNER_HEIGHT_PX
 	);
 	const TOTAL_SCROLL_HEIGHT_PX = windowRowCount * CELL_H_PX;
 	const MAX_SCROLL_TOP_PX = TOTAL_SCROLL_HEIGHT_PX - INNER_HEIGHT_PX;
@@ -215,23 +203,14 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	const popupPersonNameInputRef = useRef<HTMLInputElement>(null);
 	const timePickerRef = useRef<HTMLDivElement>(null);
 	const timeDropdownMenuRef = useRef<HTMLDivElement>(null);
-	const smoothScrollTargetRef = useRef(INITIAL_SCROLL_TOP_PX);
-	const smoothScrollRafRef = useRef<number | null>(null);
 	const dragStateRef = useRef<{
 		direction: 'up' | 'down';
 		startClientY: number;
 		startScrollTop: number;
 	} | null>(null);
-	const wheelSnapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const [scrollTop, setScrollTop] = useState(INITIAL_SCROLL_TOP_PX);
 	const [isDraggingScrollbar, setIsDraggingScrollbar] = useState(false);
 	const [activePopup, setActivePopup] = useState<ActiveCalendarPopup | null>(null);
-	// Mirrored for the wheel handler, whose effect deliberately doesn't
-	// re-subscribe on popup changes (its cleanup would kill in-flight scrolls).
-	const activePopupRef = useRef<ActiveCalendarPopup | null>(activePopup);
-	activePopupRef.current = activePopup;
-	// Cumulative wheel delta while a popup is open; reset on every popup open.
-	const popupWheelAccumRef = useRef(0);
 	// Cell clicks are swallowed until this timestamp after the Delete button
 	// unmounts the popup mid-double-click (see deleteActiveEvent).
 	const deleteClickGuardUntilRef = useRef(0);
@@ -363,6 +342,17 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	const addDays = (d: Date, days: number): Date =>
 		new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
 
+	const getMonthLabelForWeekStart = (weekStartDate: Date): string | null => {
+		for (let dayOffset = 0; dayOffset < COLS; dayOffset += 1) {
+			const dayInWeek = addDays(weekStartDate, dayOffset);
+			if (dayInWeek.getDate() === 1) {
+				return MONTH_LABELS_UPPER[dayInWeek.getMonth()];
+			}
+		}
+
+		return null;
+	};
+
 	const getCellDateForGridIndex = (
 		calendarGridStartDate: Date,
 		gridIndex: number
@@ -419,226 +409,13 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 
 	const scrollbarState = getScrollbarState(scrollTop);
 
-	const animateSmoothScroll = () => {
-		const activeContainer = scrollContainerRef.current;
-		if (!activeContainer) {
-			smoothScrollRafRef.current = null;
-			return;
-		}
-
-		const distance = smoothScrollTargetRef.current - activeContainer.scrollTop;
-		if (Math.abs(distance) < 0.5) {
-			activeContainer.scrollTop = smoothScrollTargetRef.current;
-			smoothScrollRafRef.current = null;
-			return;
-		}
-
-		activeContainer.scrollTop += distance * SMOOTH_SCROLL_LERP;
-		smoothScrollRafRef.current = requestAnimationFrame(animateSmoothScroll);
-	};
-
-	// Gently align the smooth-scroll target with the nearest row boundary, so the
-	// calendar settles on a clean week-row after wheel/drag input finishes.
-	const snapToNearestRow = () => {
-		if (MAX_SCROLL_TOP_PX <= 0 || CELL_H_PX <= 0) return;
-		const container = scrollContainerRef.current;
-		if (!container) return;
-
-		const reference =
-			smoothScrollRafRef.current != null
-				? smoothScrollTargetRef.current
-				: container.scrollTop;
-		const snapped = clamp(
-			Math.round(reference / CELL_H_PX) * CELL_H_PX,
-			0,
-			MAX_SCROLL_TOP_PX
-		);
-		if (Math.abs(snapped - reference) < 0.5) return;
-
-		smoothScrollTargetRef.current = snapped;
-		if (smoothScrollRafRef.current == null) {
-			smoothScrollRafRef.current = requestAnimationFrame(animateSmoothScroll);
-		}
-	};
-
 	useLayoutEffect(() => {
 		const container = scrollContainerRef.current;
 		if (!container) return;
 
-		if (smoothScrollRafRef.current != null) {
-			cancelAnimationFrame(smoothScrollRafRef.current);
-			smoothScrollRafRef.current = null;
-		}
-		if (wheelSnapTimeoutRef.current != null) {
-			clearTimeout(wheelSnapTimeoutRef.current);
-			wheelSnapTimeoutRef.current = null;
-		}
-		smoothScrollTargetRef.current = INITIAL_SCROLL_TOP_PX;
 		container.scrollTop = INITIAL_SCROLL_TOP_PX;
 		setScrollTop(INITIAL_SCROLL_TOP_PX);
 	}, [INITIAL_SCROLL_TOP_PX, INNER_HEIGHT_PX, inMonthIndex, inMonthYear]);
-
-	useEffect(() => {
-		const container = scrollContainerRef.current;
-		if (!container) return;
-		// If there is no internal scroll capacity, leave wheel events alone.
-		if (MAX_SCROLL_TOP_PX <= 0) return;
-
-		const handleWheel = (event: WheelEvent) => {
-			if (event.ctrlKey) return;
-
-			event.preventDefault();
-			event.stopPropagation();
-
-			// While the event popup is open, swallow small (inertia) deltas entirely —
-			// no target update, rAF, or snap re-arm — so an accidental nudge can't
-			// dismiss it. Past the threshold, fall through: the container scroll trips
-			// the window-capture scroll-dismiss listener, whose close path flushes the
-			// pending draft sync. deltaMode 1 = line-based wheels (Firefox), ~3/tick.
-			if (activePopupRef.current) {
-				popupWheelAccumRef.current +=
-					Math.abs(event.deltaY) * (event.deltaMode === 1 ? 16 : 1);
-				if (popupWheelAccumRef.current < POPUP_WHEEL_DISMISS_THRESHOLD_PX) return;
-			}
-
-			if (smoothScrollRafRef.current == null) {
-				smoothScrollTargetRef.current = container.scrollTop;
-			}
-
-			smoothScrollTargetRef.current = clamp(
-				smoothScrollTargetRef.current + event.deltaY * WHEEL_SCROLL_MULTIPLIER,
-				0,
-				MAX_SCROLL_TOP_PX
-			);
-
-			if (smoothScrollRafRef.current == null) {
-				smoothScrollRafRef.current = requestAnimationFrame(animateSmoothScroll);
-			}
-
-			if (wheelSnapTimeoutRef.current != null) {
-				clearTimeout(wheelSnapTimeoutRef.current);
-			}
-			wheelSnapTimeoutRef.current = setTimeout(() => {
-				wheelSnapTimeoutRef.current = null;
-				snapToNearestRow();
-			}, WHEEL_SNAP_DELAY_MS);
-		};
-
-		container.addEventListener('wheel', handleWheel, { passive: false });
-
-		return () => {
-			container.removeEventListener('wheel', handleWheel);
-			if (smoothScrollRafRef.current != null) {
-				cancelAnimationFrame(smoothScrollRafRef.current);
-				smoothScrollRafRef.current = null;
-			}
-			if (wheelSnapTimeoutRef.current != null) {
-				clearTimeout(wheelSnapTimeoutRef.current);
-				wheelSnapTimeoutRef.current = null;
-			}
-		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [MAX_SCROLL_TOP_PX]);
-
-	// Touch scrolling (mobile): drives the same smooth-scroll machinery as the
-	// wheel path. The container is overflow:hidden, so without this iOS would
-	// hand the pan gesture to the page behind the calendar.
-	useEffect(() => {
-		const container = scrollContainerRef.current;
-		if (!container) return;
-		if (MAX_SCROLL_TOP_PX <= 0) return;
-		// Mobile: let the browser scroll natively (native momentum, no custom
-		// LERP/fling/row-snap). The container switches to overflowY:auto +
-		// touchAction:pan-y below, and onScroll still mirrors scrollTop.
-		if (nativeTouchScroll) return;
-
-		let lastY: number | null = null;
-		let lastMoveTime = 0;
-		let velocityPxPerMs = 0;
-
-		// Finger deltas arrive in visual px while scrollTop is in unscaled layout
-		// px — divide by the ancestor scale (the mobile dashboard wraps the panel
-		// in a transform: scale() to fit the viewport width).
-		const getVisualScale = () => {
-			const width = container.getBoundingClientRect().width;
-			return container.offsetWidth > 0 && width > 0 ? width / container.offsetWidth : 1;
-		};
-
-		const handleTouchStart = (event: TouchEvent) => {
-			if (event.touches.length !== 1) return;
-			lastY = event.touches[0].clientY;
-			lastMoveTime = event.timeStamp;
-			velocityPxPerMs = 0;
-			if (wheelSnapTimeoutRef.current != null) {
-				clearTimeout(wheelSnapTimeoutRef.current);
-				wheelSnapTimeoutRef.current = null;
-			}
-			if (smoothScrollRafRef.current == null) {
-				smoothScrollTargetRef.current = container.scrollTop;
-			}
-		};
-
-		const handleTouchMove = (event: TouchEvent) => {
-			if (lastY == null || event.touches.length !== 1) return;
-			// Keep the page from scrolling/rubber-banding behind the calendar.
-			event.preventDefault();
-
-			const y = event.touches[0].clientY;
-			const deltaLayoutPx = (lastY - y) / getVisualScale();
-			const elapsedMs = event.timeStamp - lastMoveTime;
-			if (elapsedMs > 0) {
-				velocityPxPerMs = deltaLayoutPx / elapsedMs;
-			}
-			lastY = y;
-			lastMoveTime = event.timeStamp;
-
-			smoothScrollTargetRef.current = clamp(
-				smoothScrollTargetRef.current + deltaLayoutPx,
-				0,
-				MAX_SCROLL_TOP_PX
-			);
-			if (smoothScrollRafRef.current == null) {
-				smoothScrollRafRef.current = requestAnimationFrame(animateSmoothScroll);
-			}
-		};
-
-		const handleTouchEnd = () => {
-			if (lastY == null) return;
-			lastY = null;
-
-			// Light fling: project the release velocity briefly, then settle on a row.
-			smoothScrollTargetRef.current = clamp(
-				smoothScrollTargetRef.current + velocityPxPerMs * TOUCH_FLING_MS,
-				0,
-				MAX_SCROLL_TOP_PX
-			);
-			velocityPxPerMs = 0;
-			if (smoothScrollRafRef.current == null) {
-				smoothScrollRafRef.current = requestAnimationFrame(animateSmoothScroll);
-			}
-
-			if (wheelSnapTimeoutRef.current != null) {
-				clearTimeout(wheelSnapTimeoutRef.current);
-			}
-			wheelSnapTimeoutRef.current = setTimeout(() => {
-				wheelSnapTimeoutRef.current = null;
-				snapToNearestRow();
-			}, WHEEL_SNAP_DELAY_MS);
-		};
-
-		container.addEventListener('touchstart', handleTouchStart, { passive: true });
-		container.addEventListener('touchmove', handleTouchMove, { passive: false });
-		container.addEventListener('touchend', handleTouchEnd);
-		container.addEventListener('touchcancel', handleTouchEnd);
-
-		return () => {
-			container.removeEventListener('touchstart', handleTouchStart);
-			container.removeEventListener('touchmove', handleTouchMove);
-			container.removeEventListener('touchend', handleTouchEnd);
-			container.removeEventListener('touchcancel', handleTouchEnd);
-		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [MAX_SCROLL_TOP_PX, nativeTouchScroll]);
 
 	useEffect(() => {
 		if (!isDraggingScrollbar) return;
@@ -675,13 +452,8 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		};
 
 		const handleMouseUp = () => {
-			const container = scrollContainerRef.current;
-			if (container) {
-				smoothScrollTargetRef.current = container.scrollTop;
-			}
 			dragStateRef.current = null;
 			setIsDraggingScrollbar(false);
-			snapToNearestRow();
 		};
 
 		document.addEventListener('mousemove', handleMouseMove);
@@ -695,8 +467,6 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 			document.body.style.cursor = '';
 			document.body.style.userSelect = '';
 		};
-		// The dependency list covers the layout constants used by snapToNearestRow.
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [
 		CURRENT_MONTH_MAX_SCROLL_TOP_PX,
 		INITIAL_SCROLL_TOP_PX,
@@ -829,11 +599,6 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 
 		event.preventDefault();
 		event.stopPropagation();
-		if (smoothScrollRafRef.current != null) {
-			cancelAnimationFrame(smoothScrollRafRef.current);
-			smoothScrollRafRef.current = null;
-		}
-		smoothScrollTargetRef.current = scrollTop;
 		dragStateRef.current = {
 			direction: scrollbarState.direction,
 			startClientY: event.clientY,
@@ -855,18 +620,12 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 				MAX_SCROLL_TOP_PX - CURRENT_MONTH_MAX_SCROLL_TOP_PX,
 				1
 			);
-			smoothScrollTargetRef.current =
-				CURRENT_MONTH_MAX_SCROLL_TOP_PX + clickProgress * maxBeyondCurrent;
 			container.scrollTop =
 				CURRENT_MONTH_MAX_SCROLL_TOP_PX + clickProgress * maxBeyondCurrent;
 		} else {
-			smoothScrollTargetRef.current =
-				INITIAL_SCROLL_TOP_PX - (1 - clickProgress) * INITIAL_SCROLL_TOP_PX;
 			container.scrollTop =
 				INITIAL_SCROLL_TOP_PX - (1 - clickProgress) * INITIAL_SCROLL_TOP_PX;
 		}
-
-		snapToNearestRow();
 	};
 
 	const activeDraft = activePopup
@@ -996,20 +755,6 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		date: Date
 	) => {
 		if (Date.now() < deleteClickGuardUntilRef.current) return;
-		// Abandon any in-flight smooth-scroll settle: its next frame would move the
-		// container and trip the scroll-dismiss listener right after the popup opens.
-		if (smoothScrollRafRef.current != null) {
-			cancelAnimationFrame(smoothScrollRafRef.current);
-			smoothScrollRafRef.current = null;
-		}
-		if (wheelSnapTimeoutRef.current != null) {
-			clearTimeout(wheelSnapTimeoutRef.current);
-			wheelSnapTimeoutRef.current = null;
-		}
-		if (scrollContainerRef.current) {
-			smoothScrollTargetRef.current = scrollContainerRef.current.scrollTop;
-		}
-		popupWheelAccumRef.current = 0;
 
 		// Convert visual px (gBCR/innerWidth) to the zoomed CSS coordinate space
 		// that the fixed-position portal is laid out in.
@@ -1279,8 +1024,6 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 			gridMonthYear,
 			gridMonthIndex
 		);
-		const gridMonthLabel = MONTH_LABELS_UPPER[gridMonthIndex];
-
 		return (
 			<div
 				key={`${gridMonthYear}-${gridMonthIndex}`}
@@ -1301,9 +1044,10 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 					const col = gridIndex % COLS;
 					const date = getCellDateForGridIndex(gridCalendarStartDate, gridIndex);
 					const inPrimary = isInPrimaryMonth(date, gridMonthYear, gridMonthIndex);
-					// Cell 0 (the month's first Sunday) carries the big month label and
-					// moves its own date number to the bottom-right corner.
-					const isLabelCell = gridIndex === 0;
+					const monthLabel = col === 0 ? getMonthLabelForWeekStart(date) : null;
+					// The left cell of the week containing the 1st carries the big month
+					// label, matching Apple Calendar's boundary-row placement.
+					const isLabelCell = monthLabel != null;
 					const isTopRow = row === 0;
 					const isFirstOfMonth = date.getDate() === 1;
 					const isToday =
@@ -1386,7 +1130,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 										pointerEvents: 'none',
 									}}
 								>
-									{gridMonthLabel}
+									{monthLabel}
 								</div>
 							)}
 							{!(isLabelCell && showDraftSummary) && (
@@ -1487,23 +1231,19 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 			>
 				<div
 					ref={scrollContainerRef}
+					data-lenis-prevent
 					onScroll={handleCalendarScroll}
 					style={
 						{
 							width: '100%',
 							height: '100%',
-							// Mobile uses native scrolling (overflowY:auto + pan-y);
-							// desktop keeps the JS-driven smooth scroll (overflow:hidden +
-							// touch-action:none so the custom wheel/touch handlers own it).
-							overflowY: nativeTouchScroll ? 'auto' : 'hidden',
+							overflowY: 'auto',
 							overflowX: 'hidden',
 							scrollbarWidth: 'none',
 							msOverflowStyle: 'none',
-							// overscroll-behavior:contain keeps the native gesture inside the
-							// calendar (no page-behind chaining) when overflowY is auto.
 							overscrollBehavior: 'contain',
 							WebkitOverflowScrolling: 'touch',
-							touchAction: nativeTouchScroll ? 'pan-y' : 'none',
+							touchAction: 'pan-y',
 						} as CSSProperties
 					}
 				>

@@ -8,6 +8,7 @@ type GlobeMoodResponse = {
 	regionKey: string;
 	mood: WeatherMood;
 	temperatureF: number | null;
+	weatherCode: number | null;
 	fetchedAt: number | null;
 };
 
@@ -27,6 +28,7 @@ const FALLBACK: GlobeMoodResponse = {
 	regionKey: 'normal',
 	mood: 'normal',
 	temperatureF: null,
+	weatherCode: null,
 	fetchedAt: null,
 };
 
@@ -100,6 +102,7 @@ export function useGlobeWeatherMood() {
 		mood: query.data?.mood ?? 'normal',
 		regionCenter,
 		temperatureF: query.data?.temperatureF ?? null,
+		weatherCode: query.data?.weatherCode ?? null,
 		isLoading: query.isLoading,
 	};
 }

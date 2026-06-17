@@ -28,6 +28,7 @@ type GlobeMoodResponse = {
 	regionKey: string;
 	mood: WeatherMood;
 	temperatureF: number | null;
+	weatherCode: number | null;
 	fetchedAt: number | null;
 };
 
@@ -35,6 +36,7 @@ const NORMAL_FALLBACK: GlobeMoodResponse = {
 	regionKey: 'normal',
 	mood: 'normal',
 	temperatureF: null,
+	weatherCode: null,
 	fetchedAt: null,
 };
 
@@ -89,6 +91,7 @@ function toResponse(region: RegionWeather): GlobeMoodResponse {
 		regionKey: region.regionKey,
 		mood: region.mood,
 		temperatureF: region.temperatureF,
+		weatherCode: region.weatherCode,
 		fetchedAt: region.fetchedAt,
 	};
 }

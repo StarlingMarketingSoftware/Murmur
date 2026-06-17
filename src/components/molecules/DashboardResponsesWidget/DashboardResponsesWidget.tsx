@@ -326,7 +326,6 @@ export const DashboardResponsesWidget: FC<{
 	const campaignAssignmentPromisesRef = useRef<Record<string, Promise<number | null>>>({});
 	const [searchQuery, setSearchQuery] = useState('');
 	const [activeTab, setActiveTab] = useState<DashboardResponsesTab>('responses');
-	const [openedEmailIds, setOpenedEmailIds] = useState<Record<string, true>>({});
 	const [showEmailPreview, setShowEmailPreview] = useState(false);
 	const [previewEmail, setPreviewEmail] = useState<InboundEmailWithRelations | null>(null);
 	const [previewPosition, setPreviewPosition] = useState<{
@@ -451,10 +450,6 @@ export const DashboardResponsesWidget: FC<{
 		setPreviewEmail(null);
 	}, [clearEmailPreviewTimer]);
 
-	const markEmailOpened = useCallback((rowKey: string) => {
-		setOpenedEmailIds((prev) => (prev[rowKey] ? prev : { ...prev, [rowKey]: true }));
-	}, []);
-
 	const ensureEmailCampaign = useCallback(
 		(email: InboundEmailWithRelations) => {
 			const existingCampaignId = email.campaignId ?? email.campaign?.id;
@@ -481,38 +476,41 @@ export const DashboardResponsesWidget: FC<{
 		[assignInboundEmailToCampaign, mockOverrideActive]
 	);
 
-	const handleEmailClick = useCallback(
-		(email: InboundEmailWithRelations, rowKey: string) => {
-			markEmailOpened(rowKey);
-			void ensureEmailCampaign(email).catch(() => null);
-		},
-		[ensureEmailCampaign, markEmailOpened]
-	);
-
-	const handleEmailDoubleClick = useCallback(
-		async (email: InboundEmailWithRelations, rowKey: string) => {
-			markEmailOpened(rowKey);
-
-			const targetCampaignId = await ensureEmailCampaign(email).catch(() => null);
+	const navigateToEmail = useCallback(
+		async (email: InboundEmailWithRelations) => {
+			const isSent = Boolean((email as { isSent?: boolean }).isSent);
+			const existingCampaignId = email.campaignId ?? email.campaign?.id ?? null;
+			const targetCampaignId =
+				existingCampaignId ??
+				(isSent ? null : await ensureEmailCampaign(email).catch(() => null));
 			if (!targetCampaignId) return;
 
 			hideEmailPreview();
-			router.push(`${urls.murmur.campaign.detail(targetCampaignId)}?tab=inbox&silent=1`);
+			const tab = isSent ? 'sent' : 'inbox';
+			router.push(
+				`${urls.murmur.campaign.detail(targetCampaignId)}?tab=${tab}&inboxEmailId=${email.id}&silent=1`
+			);
 		},
-		[ensureEmailCampaign, hideEmailPreview, markEmailOpened, router]
+		[ensureEmailCampaign, hideEmailPreview, router]
+	);
+
+	const handleEmailClick = useCallback(
+		(email: InboundEmailWithRelations) => {
+			void navigateToEmail(email);
+		},
+		[navigateToEmail]
 	);
 
 	const handleEmailHoverStart = useCallback(
-		(email: InboundEmailWithRelations, rowKey: string) => {
+		(email: InboundEmailWithRelations) => {
 			clearEmailPreviewTimer();
 			emailHoverTimerRef.current = setTimeout(() => {
 				updateEmailPreviewPosition();
-				markEmailOpened(rowKey);
 				setPreviewEmail(email);
 				setShowEmailPreview(true);
 			}, EMAIL_PREVIEW_HOVER_DELAY_MS);
 		},
-		[clearEmailPreviewTimer, markEmailOpened, updateEmailPreviewPosition]
+		[clearEmailPreviewTimer, updateEmailPreviewPosition]
 	);
 
 	useEffect(() => {
@@ -839,8 +837,6 @@ export const DashboardResponsesWidget: FC<{
 							const subject = email.subject?.trim() || '(No Subject)';
 							const snippet = getEmailSnippet(email);
 							const timeLabel = formatInboxTimestamp(email.receivedAt);
-							const isOpened = openedEmailIds[rowKey] === true;
-							const rowFill = isOpened ? '#E6E6E6' : '#FEFEFE';
 							const emailCampaignId = email.campaignId ?? email.campaign?.id;
 							const campaignIndex =
 								emailCampaignId != null
@@ -860,7 +856,7 @@ export const DashboardResponsesWidget: FC<{
 										width: mobile ? '100%' : '639px',
 										height: mobile ? '64px' : '48px',
 										borderRadius: '6.389px',
-										backgroundColor: rowFill,
+										backgroundColor: '#FEFEFE',
 										border: 'none',
 										boxShadow: '0px 1px 0px rgba(0,0,0,0.05)',
 										boxSizing: 'border-box',
@@ -873,18 +869,9 @@ export const DashboardResponsesWidget: FC<{
 										color: '#000000',
 										cursor: 'pointer',
 									}}
-									onClick={
-										mobile
-											? // Touch: a single tap opens the conversation (double-tap
-												// is unreliable on iOS and hover doesn't exist).
-												() => void handleEmailDoubleClick(email, rowKey)
-											: () => handleEmailClick(email, rowKey)
-									}
-									onDoubleClick={
-										mobile ? undefined : () => handleEmailDoubleClick(email, rowKey)
-									}
+									onClick={() => handleEmailClick(email)}
 									onMouseEnter={
-										mobile ? undefined : () => handleEmailHoverStart(email, rowKey)
+										mobile ? undefined : () => handleEmailHoverStart(email)
 									}
 									onMouseLeave={mobile ? undefined : hideEmailPreview}
 								>

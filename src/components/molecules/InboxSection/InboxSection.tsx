@@ -2152,9 +2152,11 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		setSelectedEmailId,
 	]);
 
-	if (isLoading) {
+	if (isLoading || (error && visibleEmails.length === 0)) {
 		// Campaign inbox detail design loads into the teal detail box (header pill +
 		// thread + composer), so mirror that layout instead of the list-style skeleton.
+		// A failed/timed-out load with nothing to show keeps the skeleton too (rather
+		// than a bare error box); the 15s inbound refetch resolves it into the list.
 		if (shouldUseCampaignInboxDetailDesign) {
 			const detailSkeletonPanelStyle = {
 				position: 'absolute' as const,
@@ -2556,9 +2558,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		);
 	}
 
-	// A fetch error renders the same styled empty-inbox frame (with softer copy)
-	// rather than a bare error box — this view sits directly over the map.
-	if (error || visibleEmails.length === 0) {
+	// Genuinely-empty inbox (no error — errored-with-no-data renders the skeleton
+	// above, and an error while emails are already loaded falls through to the list).
+	if (visibleEmails.length === 0) {
 		return (
 			<div className={`w-full flex justify-center ${outerPaddingClass}`}>
 				<div
@@ -2898,7 +2900,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 										textAlign: 'center',
 									}}
 								>
-									{error ? "Couldn't load emails — check back soon" : 'Check Back Later'}
+									Check Back Later
 								</span>
 							)}
 							{idx >= 1 && idx <= 4 && (

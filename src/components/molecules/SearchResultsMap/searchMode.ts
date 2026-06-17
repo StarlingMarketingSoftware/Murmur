@@ -185,28 +185,60 @@ export const WHAT_TO_RESULT_DOT_COLOR: Record<string, string> = {
 	[normalizeWhatKey('Wedding Venues')]: '#D6990A',
 };
 
-// Hover tooltip (SVG bubble) fill colors by search "What" value.
-// These are intentionally allowed to differ from the dot colors.
+// Hover tooltip title-box fill colors by search "What" value.
+// Match the category dropdown icon background palette.
 export const WHAT_TO_HOVER_TOOLTIP_FILL_COLOR: Record<string, string> = {
 	// Promotion: match the search tray palette.
 	[normalizeWhatKey('Radio Stations')]: '#56DA73',
-	// Music venues should be a lighter blue on hover.
 	[normalizeWhatKey('Venues')]: '#71C9FD',
 	[normalizeWhatKey('Music Venues')]: '#71C9FD',
 
-	// Wine/beer/spirits should be periwinkle on hover.
 	[normalizeWhatKey('Wine, Beer, and Spirits')]: '#80AAFF',
 	[normalizeWhatKey('Wine, Beer, Spirits')]: '#80AAFF',
 	[normalizeWhatKey('Wine Beer and Spirits')]: '#80AAFF',
 	[normalizeWhatKey('Wine Beer Spirits')]: '#80AAFF',
+	[normalizeWhatKey('Breweries')]: '#80AAFF',
+	[normalizeWhatKey('Wineries')]: '#80AAFF',
+	[normalizeWhatKey('Distilleries')]: '#80AAFF',
+	[normalizeWhatKey('Cideries')]: '#80AAFF',
 	// Defensive: handle a misspelling we've seen in copy.
 	[normalizeWhatKey('Wine, Beer, and Spiriti')]: '#80AAFF',
 	[normalizeWhatKey('Wine Beer and Spiriti')]: '#80AAFF',
 	[normalizeWhatKey('Wine Beer Spiriti')]: '#80AAFF',
 
-	// Keep existing behavior for festivals.
+	[normalizeWhatKey('Restaurants')]: '#77DD91',
+	[normalizeWhatKey('Coffee Shops')]: '#A9DE78',
+	[normalizeWhatKey('Wedding Planners')]: '#EED56E',
+	[normalizeWhatKey('Wedding Venues')]: '#EED56E',
 	[normalizeWhatKey('Festivals')]: '#80AAFF',
 	[normalizeWhatKey('Music Festivals')]: '#80AAFF',
+};
+
+// Hover tooltip top-card fill colors by search "What" value.
+// Match the faded category backgrounds used by the Showing rail.
+export const WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR: Record<string, string> = {
+	[normalizeWhatKey('Radio Stations')]: '#C5F0CC',
+	[normalizeWhatKey('Venues')]: '#B7E5FF',
+	[normalizeWhatKey('Music Venues')]: '#B7E5FF',
+
+	[normalizeWhatKey('Wine, Beer, and Spirits')]: '#BFC4FF',
+	[normalizeWhatKey('Wine, Beer, Spirits')]: '#BFC4FF',
+	[normalizeWhatKey('Wine Beer and Spirits')]: '#BFC4FF',
+	[normalizeWhatKey('Wine Beer Spirits')]: '#BFC4FF',
+	[normalizeWhatKey('Breweries')]: '#BFC4FF',
+	[normalizeWhatKey('Wineries')]: '#BFC4FF',
+	[normalizeWhatKey('Distilleries')]: '#BFC4FF',
+	[normalizeWhatKey('Cideries')]: '#BFC4FF',
+	[normalizeWhatKey('Wine, Beer, and Spiriti')]: '#BFC4FF',
+	[normalizeWhatKey('Wine Beer and Spiriti')]: '#BFC4FF',
+	[normalizeWhatKey('Wine Beer Spiriti')]: '#BFC4FF',
+
+	[normalizeWhatKey('Restaurants')]: '#C3FBD1',
+	[normalizeWhatKey('Coffee Shops')]: '#D6F1BD',
+	[normalizeWhatKey('Wedding Planners')]: '#FFF8DC',
+	[normalizeWhatKey('Wedding Venues')]: '#FFF8DC',
+	[normalizeWhatKey('Festivals')]: '#C1D6FF',
+	[normalizeWhatKey('Music Festivals')]: '#C1D6FF',
 };
 
 export const getResultDotColorForWhat = (searchWhat?: string | null): string => {

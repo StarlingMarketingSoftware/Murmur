@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, ReactNode, useMemo } from 'react';
+import { FC, ReactNode, useMemo, useState } from 'react';
 import { useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import type { InboundEmailWithRelations } from '@/types';
@@ -18,6 +18,22 @@ type StrategyEmail = {
 	subject: string;
 	preview: string;
 };
+
+type Props = {
+	onReplyEmails?: () => void;
+	onSendDrafts?: () => void;
+	onSearchContacts?: () => void;
+	isEmptyCampaign?: boolean;
+};
+
+const handleActivateKeyDown =
+	(onActivate?: () => void) => (e: React.KeyboardEvent) => {
+		if (!onActivate) return;
+		if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault();
+			onActivate();
+		}
+	};
 
 const FALLBACK_EMAILS: StrategyEmail[] = [
 	{
@@ -114,7 +130,7 @@ const StrategyEmailRow = ({ email }: { email: StrategyEmail }) => (
 	<div
 		style={{
 			height: 43.5,
-			width: 303,
+			width: 331,
 			borderRadius: 4,
 			background: '#F8F8F8',
 			display: 'grid',
@@ -178,37 +194,61 @@ const ActionBar = ({
 	children,
 	background,
 	marginTop,
+	onClick,
+	ariaLabel,
 }: {
 	children: ReactNode;
 	background: string;
 	marginTop: number;
-}) => (
-	<div
-		style={{
-			width: STRATEGY_ITEM_WIDTH,
-			height: SECONDARY_ACTION_HEIGHT,
-			margin: `${marginTop}px auto 0`,
-			borderRadius: 6,
-			background,
-			display: 'flex',
-			alignItems: 'center',
-			paddingLeft: 17,
-			boxSizing: 'border-box',
-			fontFamily: 'Inter, sans-serif',
-			fontSize: 12.555,
-			fontWeight: 500,
-			lineHeight: '15.426px',
-			color: '#000',
-			overflow: 'hidden',
-		}}
-	>
-		{children}
-	</div>
-);
+	onClick?: () => void;
+	ariaLabel?: string;
+}) => {
+	const [hovered, setHovered] = useState(false);
+	const interactive = Boolean(onClick);
+	return (
+		<div
+			onClick={onClick}
+			onKeyDown={interactive ? handleActivateKeyDown(onClick) : undefined}
+			onMouseEnter={interactive ? () => setHovered(true) : undefined}
+			onMouseLeave={interactive ? () => setHovered(false) : undefined}
+			role={interactive ? 'button' : undefined}
+			tabIndex={interactive ? 0 : undefined}
+			aria-label={ariaLabel}
+			style={{
+				width: STRATEGY_ITEM_WIDTH,
+				height: SECONDARY_ACTION_HEIGHT,
+				margin: `${marginTop}px auto 0`,
+				borderRadius: 6,
+				background,
+				display: 'flex',
+				alignItems: 'center',
+				paddingLeft: 17,
+				boxSizing: 'border-box',
+				fontFamily: 'Inter, sans-serif',
+				fontSize: 12.555,
+				fontWeight: 500,
+				lineHeight: '15.426px',
+				color: '#000',
+				overflow: 'hidden',
+				cursor: interactive ? 'pointer' : undefined,
+				filter: interactive && hovered ? 'brightness(0.97)' : undefined,
+				transition: 'filter 120ms ease',
+			}}
+		>
+			{children}
+		</div>
+	);
+};
 
-export const CampaignOverviewStrategyBox: FC = () => {
+export const CampaignOverviewStrategyBox: FC<Props> = ({
+	onReplyEmails,
+	onSendDrafts,
+	onSearchContacts,
+	isEmptyCampaign = false,
+}) => {
 	const { data: campaignsData } = useGetCampaigns();
 	const { data: inboundEmails } = useGetInboundEmails({ enabled: true });
+	const [replyHovered, setReplyHovered] = useState(false);
 
 	const emails = useMemo(() => {
 		const real = (inboundEmails ?? [])
@@ -226,6 +266,16 @@ export const CampaignOverviewStrategyBox: FC = () => {
 	const realReplyCount = inboundEmails?.length ?? 0;
 	const replyCount = realReplyCount > 0 ? realReplyCount : emails.length;
 	const draftCount = draftCampaign.draftCount ?? 0;
+	const renderSearchContactsAction = (marginTop = 18) => (
+		<ActionBar
+			background="#C9EFA9"
+			marginTop={marginTop}
+			onClick={onSearchContacts}
+			ariaLabel="Search for new contacts"
+		>
+			Search for new contacts
+		</ActionBar>
+	);
 
 	return (
 		<div
@@ -252,7 +302,16 @@ export const CampaignOverviewStrategyBox: FC = () => {
 				Strategy
 			</div>
 
+			{isEmptyCampaign ? renderSearchContactsAction(13) : null}
+
 			<div
+				onClick={onReplyEmails}
+				onKeyDown={onReplyEmails ? handleActivateKeyDown(onReplyEmails) : undefined}
+				onMouseEnter={onReplyEmails ? () => setReplyHovered(true) : undefined}
+				onMouseLeave={onReplyEmails ? () => setReplyHovered(false) : undefined}
+				role={onReplyEmails ? 'button' : undefined}
+				tabIndex={onReplyEmails ? 0 : undefined}
+				aria-label={`Reply to ${replyCount} new email${replyCount === 1 ? '' : 's'}`}
 				style={{
 					width: STRATEGY_ITEM_WIDTH,
 					height: 156,
@@ -262,6 +321,9 @@ export const CampaignOverviewStrategyBox: FC = () => {
 						'linear-gradient(180deg, #A9EDD2 0%, rgba(169, 237, 210, 0.20) 100%)',
 					position: 'relative',
 					overflow: 'hidden',
+					cursor: onReplyEmails ? 'pointer' : undefined,
+					filter: onReplyEmails && replyHovered ? 'brightness(0.97)' : undefined,
+					transition: 'filter 120ms ease',
 				}}
 			>
 				<div
@@ -283,7 +345,7 @@ export const CampaignOverviewStrategyBox: FC = () => {
 				<div
 					style={{
 						position: 'absolute',
-						left: 15,
+						left: 10,
 						top: 43,
 						display: 'flex',
 						flexDirection: 'column',
@@ -296,16 +358,19 @@ export const CampaignOverviewStrategyBox: FC = () => {
 				</div>
 			</div>
 
-			<ActionBar background="#A9EFB4" marginTop={18}>
+			<ActionBar
+				background="#A9EFB4"
+				marginTop={18}
+				onClick={onSendDrafts}
+				ariaLabel={`Send ${draftCount} drafts in ${draftCampaign.name}`}
+			>
 				<span>Send {draftCount} Drafts in</span>
 				<span style={{ marginLeft: 15 }}>
 					<FolderPill name={draftCampaign.name} />
 				</span>
 			</ActionBar>
 
-			<ActionBar background="#C9EFA9" marginTop={18}>
-				Search for new contacts
-			</ActionBar>
+			{isEmptyCampaign ? null : renderSearchContactsAction()}
 		</div>
 	);
 };

@@ -3944,8 +3944,45 @@ body.murmur-page.murmur-map-view .results-search-input-group .search-wave-contai
 .map-overlay-appear {
 	animation: mapOverlayAppear 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+@keyframes selectionFolderMoveBannerIn {
+	from {
+		max-height: 0;
+		opacity: 0;
+		transform: translateY(-6px);
+	}
+	to {
+		max-height: 42px;
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+@keyframes selectionFolderMoveBannerOut {
+	from {
+		max-height: 42px;
+		opacity: 1;
+		transform: translateY(0);
+	}
+	to {
+		max-height: 0;
+		opacity: 0;
+		transform: translateY(-4px);
+	}
+}
+.selection-folder-move-banner {
+	max-height: 42px;
+	overflow: hidden;
+	animation: selectionFolderMoveBannerIn 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.selection-folder-move-banner.selection-folder-move-banner-exit {
+	animation: selectionFolderMoveBannerOut 220ms ease-out both;
+}
 @media (prefers-reduced-motion: reduce) {
 	.map-overlay-appear {
+		animation: none;
+	}
+	.selection-folder-move-banner,
+	.selection-folder-move-banner.selection-folder-move-banner-exit {
 		animation: none;
 	}
 }
@@ -8491,6 +8528,15 @@ body.dashboard-booting .clerk-user-button {
 body.dashboard-booting .dashboard-ask-anything-root,
 body.dashboard-booting .dashboard-ask-anything-root * {
 	pointer-events: none !important;
+}
+
+/* The "Search Anything" bar's flanking campaign nav boxes need ~686px of width
+   alongside the centered bar; below that they'd clip off-screen or overlap the
+   bar, so hide them on narrow viewports (the bar itself stays usable). */
+@media (max-width: 720px) {
+	.dashboard-ask-flank {
+		display: none !important;
+	}
 }
 
 /* --- Crossfade back: transitions live only on the fading class, so swapping
