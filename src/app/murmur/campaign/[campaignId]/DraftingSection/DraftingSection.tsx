@@ -2104,6 +2104,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	});
 
 	const contactsCount = headerContacts?.length || 0;
+	const isHeaderContactsResolved =
+		Boolean(campaign) && (contactListIds.length === 0 || headerContacts !== undefined);
+	const isEmptyCampaign = isHeaderContactsResolved && contactsCount === 0;
 	const draftEmails = (headerEmails || []).filter((e) => e.status === EmailStatus.draft);
 	const draftCount = draftEmails.length;
 	useEffect(() => {
@@ -6526,6 +6529,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														onReplyEmails={openInboxTab}
 														onSendDrafts={goToDrafting}
 														onSearchContacts={onGoToSearch}
+														isEmptyCampaign={isEmptyCampaign}
 													/>
 													{whiteOutOverviewStrategyBox ? (
 														<div

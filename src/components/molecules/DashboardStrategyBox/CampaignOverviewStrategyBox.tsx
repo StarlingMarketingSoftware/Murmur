@@ -23,6 +23,7 @@ type Props = {
 	onReplyEmails?: () => void;
 	onSendDrafts?: () => void;
 	onSearchContacts?: () => void;
+	isEmptyCampaign?: boolean;
 };
 
 const handleActivateKeyDown =
@@ -243,6 +244,7 @@ export const CampaignOverviewStrategyBox: FC<Props> = ({
 	onReplyEmails,
 	onSendDrafts,
 	onSearchContacts,
+	isEmptyCampaign = false,
 }) => {
 	const { data: campaignsData } = useGetCampaigns();
 	const { data: inboundEmails } = useGetInboundEmails({ enabled: true });
@@ -264,6 +266,16 @@ export const CampaignOverviewStrategyBox: FC<Props> = ({
 	const realReplyCount = inboundEmails?.length ?? 0;
 	const replyCount = realReplyCount > 0 ? realReplyCount : emails.length;
 	const draftCount = draftCampaign.draftCount ?? 0;
+	const renderSearchContactsAction = (marginTop = 18) => (
+		<ActionBar
+			background="#C9EFA9"
+			marginTop={marginTop}
+			onClick={onSearchContacts}
+			ariaLabel="Search for new contacts"
+		>
+			Search for new contacts
+		</ActionBar>
+	);
 
 	return (
 		<div
@@ -289,6 +301,8 @@ export const CampaignOverviewStrategyBox: FC<Props> = ({
 			>
 				Strategy
 			</div>
+
+			{isEmptyCampaign ? renderSearchContactsAction(13) : null}
 
 			<div
 				onClick={onReplyEmails}
@@ -356,14 +370,7 @@ export const CampaignOverviewStrategyBox: FC<Props> = ({
 				</span>
 			</ActionBar>
 
-			<ActionBar
-				background="#C9EFA9"
-				marginTop={18}
-				onClick={onSearchContacts}
-				ariaLabel="Search for new contacts"
-			>
-				Search for new contacts
-			</ActionBar>
+			{isEmptyCampaign ? null : renderSearchContactsAction()}
 		</div>
 	);
 };
