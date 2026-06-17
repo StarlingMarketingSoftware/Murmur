@@ -1629,6 +1629,9 @@ const MAP_VIEW_CAMPAIGN_HEADER_GAP_PX = 13;
 // expanded: header (50px) + category toolbar (≈55px @ bottom-9) + breathing room. Below this
 // the Selection cap stops growing so the toolbar (and the bottom CTA) stay visible.
 const MAP_VIEW_SEARCH_RESULTS_MIN_HEIGHT_PX = 125;
+// Hold the Selection panel to ~50% height until Search Results is down to the last few rows,
+// then allow the existing “compress results, expand selection” behavior.
+const MAP_VIEW_SEARCH_RESULTS_COMPRESS_THRESHOLD = 5;
 // Keep both map side panels visually pinned after the dashboard root zoom is applied.
 // The side-shift var (written by the map-view zoom effect) lowers the whole side
 // chrome toward vertical center on tall monitors; 0px on the 1080p baseline.
@@ -5940,6 +5943,7 @@ const DashboardContent = () => {
 	const [selectedContactStickyHeadlineById, setSelectedContactStickyHeadlineById] =
 		useState<Record<number, string>>({});
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
+	const [isMapShowingRailHovered, setIsMapShowingRailHovered] = useState(false);
 	const [isMapSearchEngaged, setIsMapSearchEngaged] = useState(true);
 	// True only when the user explicitly exits the focused search via the map-view
 	// search-bar X (or the map's "Click to see all contacts"). Distinguishes that
@@ -8180,6 +8184,47 @@ const DashboardContent = () => {
 
 	// Bottom category-tile box — only once results are loaded and at least one maps to a category.
 	const showMapPanelCategoryBox = !isMapResultsLoading && mapPanelCategoryKeys.size > 0;
+	// When the Search Results panel is intentionally compressed (last few remaining),
+	// reserve enough height to keep 1–2 rows fully visible above the bottom category box
+	// (rows are `h-[49px]` with `space-y-[7px]` between them).
+	const mapPanelCompressedVisibleSearchRows = Math.min(
+		2,
+		mapPanelUnselectedContactsFiltered.length
+	);
+	const mapPanelDesktopSearchResultsMinHeightPx =
+		MAP_VIEW_SEARCH_RESULTS_MIN_HEIGHT_PX +
+		(showMapPanelCategoryBox &&
+		mapPanelUnselectedContactsFiltered.length <=
+			MAP_VIEW_SEARCH_RESULTS_COMPRESS_THRESHOLD
+			? mapPanelCompressedVisibleSearchRows * 49 +
+				Math.max(0, mapPanelCompressedVisibleSearchRows - 1) * 7
+			: 0);
+	const mapPanelDesktopPanelBottomPadPx =
+		!isMapResultsLoading && !fromHomeParam ? 39 + 18 : 9;
+	// Gradually release the Selection panel height as Search Results gets low
+	// (avoid a hard jump at 6→5 remaining items). Uses a quadratic ramp so the
+	// earliest steps change minimally, then accelerate as you approach 0.
+	const mapPanelDesktopSelectionRampSpan =
+		MAP_VIEW_SEARCH_RESULTS_COMPRESS_THRESHOLD + 1;
+	const mapPanelDesktopSelectionRampProgress = Math.min(
+		1,
+		Math.max(
+			0,
+			(mapPanelDesktopSelectionRampSpan -
+				mapPanelUnselectedContactsFiltered.length) /
+				mapPanelDesktopSelectionRampSpan
+		)
+	);
+	const mapPanelDesktopSelectionRampEased =
+		mapPanelDesktopSelectionRampProgress * mapPanelDesktopSelectionRampProgress;
+	const mapPanelDesktopSelectionFraction =
+		0.5 + 0.5 * mapPanelDesktopSelectionRampEased;
+	const mapPanelDesktopSelectionDivisor = 1 / mapPanelDesktopSelectionFraction;
+	const mapPanelDesktopSelectionMaxHeightCss = `min(calc((100% - ${mapPanelDesktopPanelBottomPadPx}px) / ${mapPanelDesktopSelectionDivisor.toFixed(
+		4
+	)}), calc(100% - ${
+		mapPanelDesktopSearchResultsMinHeightPx + mapPanelDesktopPanelBottomPadPx
+	}px))`;
 
 	const getMapResearchDisplayFields = useCallback(
 		(contact: ContactWithName) => {
@@ -13383,6 +13428,8 @@ const DashboardContent = () => {
 									isMapView && !isMobile && !isCompressedMapChrome ? (
 										<div
 											className="fixed z-[130] pointer-events-none"
+											onMouseEnter={() => setIsMapShowingRailHovered(true)}
+											onMouseLeave={() => setIsMapShowingRailHovered(false)}
 											style={{
 												left: `${MAP_SELECT_GRAB_LEFT_PX}px`,
 												// The visible column starts `TOP_EXTENT * scale` above this origin.
@@ -13390,8 +13437,23 @@ const DashboardContent = () => {
 												top: `calc(${MAP_VIEW_SIDE_PANEL_TOP_CSS} + ${mapSelectGrabOriginOffsetPx}px - ${MAP_SELECT_GRAB_VISUAL_TOP_NUDGE_UP_CSS})`,
 												transform: `scale(${mapSelectGrabViewScale})`,
 												transformOrigin: 'top left',
+												opacity: isMapShowingRailHovered ? 1 : 0.4,
+												transition: 'opacity 0.18s ease',
 											}}
 										>
+											<div
+												aria-hidden="true"
+												style={{
+													position: 'absolute',
+													left: '-2px',
+													width: '60px',
+													top: `-${
+														MAP_SELECT_GRAB_TOP_EXTENT_PX + 40
+													}px`,
+													height: `${MAP_SELECT_GRAB_TOP_EXTENT_PX + 200}px`,
+													pointerEvents: 'auto',
+												}}
+											/>
 											<div
 												className="absolute pointer-events-none flex items-center justify-center overflow-hidden rounded-[10px] bg-[#FDFCFB] font-inter font-normal text-black"
 												style={{
@@ -14352,7 +14414,9 @@ const DashboardContent = () => {
 																					<div
 																						className="flex flex-col flex-shrink-0"
 																						style={{
-																							maxHeight: isCompressedMapChrome ? '30%' : `calc(100% - ${MAP_VIEW_SEARCH_RESULTS_MIN_HEIGHT_PX + (!isMapResultsLoading && !fromHomeParam ? 39 + 18 : 9)}px)`,
+																							maxHeight: isCompressedMapChrome
+																								? '30%'
+																								: mapPanelDesktopSelectionMaxHeightCss,
 																							backgroundColor: isCompressedMapChrome
 																								? 'rgba(175, 214, 239, 0.8)'
 																								: 'rgba(184, 224, 255, 0.54)',
