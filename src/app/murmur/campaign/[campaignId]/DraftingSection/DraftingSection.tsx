@@ -3345,32 +3345,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		setPinnedRowResearchContact(contact);
 	}, []);
 
-	useLayoutEffect(() => {
-		if (view !== 'testing' && view !== 'drafting') return;
-		const anchor = document.querySelector<HTMLElement>('[data-row-hover-research-anchor]');
-		if (!anchor || !pinnedRowResearchContact) return;
-		const anchorRect = anchor.getBoundingClientRect();
-		const scale = anchor.offsetHeight > 0 ? anchorRect.height / anchor.offsetHeight : 1;
-		const cardScreenHeightPx = HOVER_RESEARCH_CARD_FULL_HEIGHT_PX * (scale || 1);
-		const centeredScreenTopPx = Math.max(8, (window.innerHeight - cardScreenHeightPx) / 2);
-		setRowHoverResearchTopPx((centeredScreenTopPx - anchorRect.top) / (scale || 1));
-		let leftPx = ROW_HOVER_RESEARCH_DOCKED_LEFT_PX;
-		const splitOverlay = document.querySelector('.campaign-map-split-overlay');
-		if (splitOverlay) {
-			const overlayLeftPx = splitOverlay.getBoundingClientRect().left;
-			const cardFootprintRealPx =
-				(ROW_HOVER_RESEARCH_CARD_WIDTH_PX + ROW_HOVER_RESEARCH_GAP_PX) * (scale || 1);
-			if (overlayLeftPx > cardFootprintRealPx) {
-				leftPx = Math.min(
-					leftPx,
-					(overlayLeftPx - anchorRect.left) / (scale || 1) +
-						ROW_HOVER_RESEARCH_DOCKED_LEFT_PX
-				);
-			}
-		}
-		setRowHoverResearchLeftPx(leftPx);
-	}, [pinnedRowResearchContact, view]);
-
 	useEffect(() => {
 		if (view !== 'testing') return;
 		const selectedIds = Array.from(contactsTabSelectedIds);
@@ -3571,7 +3545,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		if (!contact) return;
 		setSelectedContactForResearch(contact);
 		setHasUserSelectedResearchContact(true);
-		if (view === 'testing' || view === 'drafting') {
+		if (view === 'testing' || view === 'drafting' || view === 'inbox') {
 			pinRowResearchContact(contact);
 		}
 	};
@@ -3714,6 +3688,32 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			}
 		}
 		setRowHoverResearchLeftPx(leftPx);
+	}, []);
+
+	const applyPinnedRowResearchPanelPlacement = useCallback(() => {
+		const anchor = document.querySelector<HTMLElement>('[data-row-hover-research-anchor]');
+		if (!anchor) return null;
+		const anchorRect = anchor.getBoundingClientRect();
+		const scale = anchor.offsetHeight > 0 ? anchorRect.height / anchor.offsetHeight : 1;
+		const cardScreenHeightPx = HOVER_RESEARCH_CARD_FULL_HEIGHT_PX * (scale || 1);
+		const centeredScreenTopPx = Math.max(8, (window.innerHeight - cardScreenHeightPx) / 2);
+		setRowHoverResearchTopPx((centeredScreenTopPx - anchorRect.top) / (scale || 1));
+		let leftPx = ROW_HOVER_RESEARCH_DOCKED_LEFT_PX;
+		const splitOverlay = document.querySelector('.campaign-map-split-overlay');
+		if (splitOverlay) {
+			const overlayLeftPx = splitOverlay.getBoundingClientRect().left;
+			const cardFootprintRealPx =
+				(ROW_HOVER_RESEARCH_CARD_WIDTH_PX + ROW_HOVER_RESEARCH_GAP_PX) * (scale || 1);
+			if (overlayLeftPx > cardFootprintRealPx) {
+				leftPx = Math.min(
+					leftPx,
+					(overlayLeftPx - anchorRect.left) / (scale || 1) +
+						ROW_HOVER_RESEARCH_DOCKED_LEFT_PX
+				);
+			}
+		}
+		setRowHoverResearchLeftPx(leftPx);
+		return leftPx;
 	}, []);
 
 	const handleEventChatRowClick = useCallback(
@@ -3865,7 +3865,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		setRowHoverOpportunity(null);
 		pinnedInboxOpportunityIdRef.current = null;
 		setPinnedInboxOpportunity(null);
-		if (view !== 'testing' && view !== 'drafting') {
+		if (view !== 'testing' && view !== 'drafting' && view !== 'inbox') {
 			pinnedRowResearchContactIdRef.current = null;
 			setPinnedRowResearchContact(null);
 		}
@@ -4008,6 +4008,37 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		[inboxEmailsForContactsExpandedList, myEventApplications]
 	);
 
+	const resolveInboxContactFromEmailId = useCallback(
+		(emailId: number | null): ContactWithName | null => {
+			if (emailId == null) return null;
+			if (resolveInboxOpportunityFromEmailId(emailId)?.event) return null;
+
+			const inbound =
+				inboxEmailsForContactsExpandedList.find((email) => email.id === emailId) ?? null;
+			if (inbound) {
+				const senderKey = normalizeInboxEmailAddress(inbound.sender);
+				if (senderKey && campaignContactsByEmail?.[senderKey]) {
+					return campaignContactsByEmail[senderKey];
+				}
+				return (inbound.contact as ContactWithName | null) ?? null;
+			}
+
+			const sent = sentEmails.find((email) => email.id === emailId) ?? null;
+			if (sent) {
+				return contacts?.find((candidate) => candidate.id === sent.contactId) ?? null;
+			}
+
+			return null;
+		},
+		[
+			campaignContactsByEmail,
+			contacts,
+			inboxEmailsForContactsExpandedList,
+			resolveInboxOpportunityFromEmailId,
+			sentEmails,
+		]
+	);
+
 	const selectedInboxOpportunity = useMemo(() => {
 		if (view !== 'inbox' || selectedInboxEmailId == null) return null;
 		return resolveInboxOpportunityFromEmailId(selectedInboxEmailId);
@@ -4029,6 +4060,77 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		setPinnedInboxOpportunity(selectedInboxOpportunity);
 		applyInboxOpportunityPanelPlacement();
 	}, [applyInboxOpportunityPanelPlacement, selectedInboxOpportunity, view]);
+
+	useLayoutEffect(() => {
+		if (view !== 'testing' && view !== 'drafting' && view !== 'inbox') return;
+		if (!pinnedRowResearchContact) return;
+		if (rowHoverOpportunity || rowHoverResearchContact) return;
+		if (
+			view === 'inbox' &&
+			(pinnedInboxOpportunity || selectedInboxOpportunity?.event)
+		) {
+			return;
+		}
+		applyPinnedRowResearchPanelPlacement();
+	}, [
+		applyPinnedRowResearchPanelPlacement,
+		pinnedInboxOpportunity,
+		pinnedRowResearchContact,
+		rowHoverOpportunity,
+		rowHoverResearchContact,
+		selectedInboxEmailId,
+		selectedInboxOpportunity,
+		view,
+	]);
+
+	useLayoutEffect(() => {
+		if (view !== 'inbox') return;
+		if (rowHoverOpportunity || rowHoverResearchContact) return;
+		if (selectedInboxOpportunity?.event || pinnedInboxOpportunity) {
+			pinRowResearchContact(null);
+			return;
+		}
+		if (selectedInboxEmailId == null) {
+			pinRowResearchContact(null);
+			return;
+		}
+		const contact = resolveInboxContactFromEmailId(selectedInboxEmailId);
+		if (!contact) return;
+		const isSamePinnedContact = pinnedRowResearchContactIdRef.current === contact.id;
+		pinnedRowResearchContactIdRef.current = contact.id;
+		if (!isSamePinnedContact) {
+			setPinnedRowResearchContact(contact);
+		}
+		applyPinnedRowResearchPanelPlacement();
+	}, [
+		applyPinnedRowResearchPanelPlacement,
+		pinRowResearchContact,
+		pinnedInboxOpportunity,
+		resolveInboxContactFromEmailId,
+		rowHoverOpportunity,
+		rowHoverResearchContact,
+		selectedInboxEmailId,
+		selectedInboxOpportunity,
+		view,
+	]);
+
+	useLayoutEffect(() => {
+		if (view !== 'inbox' || !rowHoverOpportunity) return;
+		applyInboxOpportunityPanelPlacement();
+	}, [applyInboxOpportunityPanelPlacement, rowHoverOpportunity, view]);
+
+	useLayoutEffect(() => {
+		if (view !== 'inbox') return;
+		if (rowHoverResearchContact || rowHoverOpportunity) return;
+		if (!pinnedInboxOpportunity) return;
+		applyInboxOpportunityPanelPlacement();
+	}, [
+		applyInboxOpportunityPanelPlacement,
+		pinnedInboxOpportunity,
+		rowHoverOpportunity,
+		rowHoverResearchContact,
+		view,
+	]);
 
 	// Summary list is "loading" until both the campaign contacts and emails resolve —
 	// before that, all three lists are empty and the empty state would flash. The mock
@@ -4223,9 +4325,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// [data-row-hover-research-anchor] wrapper. `enabled` lets the search/overview rail
 	// reuse this with its own gate (defaults to the pinned-list gate).
 	const activeRowOpportunity =
-		rowHoverOpportunity ?? (view === 'inbox' ? pinnedInboxOpportunity : null);
+		rowHoverOpportunity ??
+		(view === 'inbox' && !rowHoverResearchContact ? pinnedInboxOpportunity : null);
 	const pinnedResearchForList =
-		view === 'testing' || view === 'drafting' ? pinnedRowResearchContact : null;
+		view === 'testing' || view === 'drafting' || view === 'inbox'
+			? pinnedRowResearchContact
+			: null;
 	const activeRowResearchContact = activeRowOpportunity
 		? null
 		: rowHoverResearchContact ?? pinnedResearchForList;
