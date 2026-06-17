@@ -194,6 +194,7 @@ import { ContactResearchHoverCard } from '@/components/molecules/ContactResearch
 import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
+import { HoverDescriptionProvider } from '@/contexts/HoverDescriptionContext';
 import { DashboardWriteOverlay } from './DashboardWriteOverlay';
 import { SelectionFolderMoveBanner } from './SelectionFolderMoveBanner';
 import { MapEventPopupCard, formatMapPostedEventDate } from './MapEventPopupCard';
@@ -4673,7 +4674,13 @@ const DashboardContent = () => {
 		return () => window.clearTimeout(timer);
 	}, []);
 
-	const shouldEnableMapStateCategorySelection = isMapView && isMapBottomCategoryMode;
+	const activeCategorySearchForStateSelection = parseCategorySearchQuery(activeSearchQuery);
+	const shouldEnableMapStateCategorySelection =
+		isMapView &&
+		!isCuratedSearchActive &&
+		activeCategorySearchForStateSelection.isCategorySearch &&
+		Boolean(normalizeUsStateName(activeCategorySearchForStateSelection.where)) &&
+		!mapBboxFilter;
 
 	const handleMapStateSelect = useCallback(
 		(stateName: string) => {
@@ -8248,6 +8255,16 @@ const DashboardContent = () => {
 	// The row-hover card owns its expand state internally and resets it on unmount;
 	// clear the parent mirror whenever that card isn't showing so the nav boxes
 	// don't stay receded after the hover ends.
+	const isDashboardWriteOverlayVisible =
+		isWriteMode &&
+		Boolean(dashboardMapCampaignForHeader) &&
+		(selectedContacts.length > 0 || isWriteReviewActive) &&
+		!isCompressedMapChrome &&
+		shouldShowMapResultsSidePanel;
+	// While the write overlay occupies the space beside Search Results, dock row-hover
+	// research on the left rail so it doesn't stack under the contact boxes.
+	const mapPanelHoverResearchDockSide: 'left' | 'right' =
+		isDashboardWriteOverlayVisible ? 'left' : 'right';
 	const isMapPanelHoverResearchVisible =
 		Boolean(mapPanelHoveredResearchContact) && !mapResearchPanelContact;
 	useEffect(() => {
@@ -8710,6 +8727,8 @@ const DashboardContent = () => {
 	// Map view (results): automatically re-run the search when "What" changes.
 	// Intentionally do NOT auto-search on "Why"-only edits.
 	// "Where" changes do NOT auto-search; user must click a state from dropdown or press Enter.
+	// The bottom Category panel is explicit-submit only; opening/focusing it should not replay
+	// the current search.
 	const mapAutoSearchPayload = useMemo(
 		() => JSON.stringify({ what: whatValue.trim() }),
 		[whatValue]
@@ -8721,6 +8740,11 @@ const DashboardContent = () => {
 		// Reset when leaving results/map view
 		if (!hasSearched || !isMapView) {
 			lastMapAutoSearchPayloadRef.current = null;
+			return;
+		}
+
+		if (isMapBottomCategoryMode) {
+			lastMapAutoSearchPayloadRef.current = mapAutoSearchPayload;
 			return;
 		}
 
@@ -8783,7 +8807,9 @@ const DashboardContent = () => {
 		debouncedMapAutoSearchPayload,
 		form,
 		hasSearched,
+		isMapBottomCategoryMode,
 		isMapView,
+		mapAutoSearchPayload,
 		isSignedIn,
 		onSubmit,
 		whereValue,
@@ -14131,28 +14157,29 @@ const DashboardContent = () => {
 																		transformOrigin: 'top right',
 																	}}
 																>
-																	<CampaignHeaderBox
-																		campaignId={dashboardMapCampaignForHeader.id}
-																		campaignName={
-																			dashboardMapCampaignForHeader.name || 'Untitled Campaign'
-																		}
-																		toListNames={dashboardMapHeaderToListNames}
-																		fromName={dashboardMapHeaderFromName}
-																		contactsCount={dashboardMapHeaderContactsCount}
-																		draftCount={dashboardMapHeaderDraftCount}
-																		sentCount={dashboardMapHeaderSentCount}
-																		onContactsClick={() => {
-																			if (!mapCampaignId) return;
-																			router.push(
-																				`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=write${campaignReturnAddedSuffix()}`
-																			);
-																		}}
-																		onDraftsClick={() => {
-																			if (!mapCampaignId) return;
-																			router.push(
-																				`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts${campaignReturnAddedSuffix()}`
-																			);
-																		}}
+																	<HoverDescriptionProvider defaultEnabled>
+																		<CampaignHeaderBox
+																			campaignId={dashboardMapCampaignForHeader.id}
+																			campaignName={
+																				dashboardMapCampaignForHeader.name || 'Untitled Campaign'
+																			}
+																			toListNames={dashboardMapHeaderToListNames}
+																			fromName={dashboardMapHeaderFromName}
+																			contactsCount={dashboardMapHeaderContactsCount}
+																			draftCount={dashboardMapHeaderDraftCount}
+																			sentCount={dashboardMapHeaderSentCount}
+																			onContactsClick={() => {
+																				if (!mapCampaignId) return;
+																				router.push(
+																					`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=write${campaignReturnAddedSuffix()}`
+																				);
+																			}}
+																			onDraftsClick={() => {
+																				if (!mapCampaignId) return;
+																				router.push(
+																					`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts${campaignReturnAddedSuffix()}`
+																				);
+																			}}
 																			onSentClick={() => {
 																				if (!mapCampaignId) return;
 																				router.push(
@@ -14162,6 +14189,7 @@ const DashboardContent = () => {
 																			onFolderDropdownOpenChange={setIsMapCampaignHeaderDropdownOpen}
 																			width={433}
 																		/>
+																	</HoverDescriptionProvider>
 																</div>
 															)}
 														{/* Inline "Write Message" drafting panel — floats over the map (left of the
@@ -14214,12 +14242,21 @@ const DashboardContent = () => {
 																mapPanelHoverResearchTopPx != null
 																	? `${mapPanelHoverResearchTopPx}px`
 																	: MAP_VIEW_SIDE_PANEL_TOP_CSS,
-															right:
-																10 +
-																433 * MAP_VIEW_PANEL_SCALE +
-																MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX,
+															...(mapPanelHoverResearchDockSide === 'right'
+																? {
+																		right:
+																			10 +
+																			433 * MAP_VIEW_PANEL_SCALE +
+																			MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX,
+																	}
+																: {
+																		left: MAP_MARKER_RESEARCH_LEFT_DOCK_LEFT_PX,
+																	}),
 															transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
-															transformOrigin: 'top right',
+															transformOrigin:
+																mapPanelHoverResearchDockSide === 'right'
+																	? 'top right'
+																	: 'top left',
 														}}
 													>
 														<ContactResearchHoverCard

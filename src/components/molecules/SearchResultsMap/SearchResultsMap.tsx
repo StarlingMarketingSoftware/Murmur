@@ -14487,20 +14487,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const isActiveSearchSelectionHit = (e: mapboxgl.MapMouseEvent): boolean => {
 			const lng = e.lngLat.lng;
 			const lat = e.lngLat.lat;
-			return (
-				isPointInSelectionBounds(lng, lat) ||
-				isPointInSelectionMultiPolygon(
+			const stateSelectionHit =
+				stateInteractionsEnabled &&
+				(isPointInSelectionMultiPolygon(
 					lng,
 					lat,
 					lockedStateSelectionMultiPolygonRef.current,
 					lockedStateSelectionBboxRef.current
 				) ||
-				isPointInSelectionMultiPolygon(
-					lng,
-					lat,
-					resultsSelectionMultiPolygonRef.current,
-					resultsSelectionBboxRef.current
-				)
+					isPointInSelectionMultiPolygon(
+						lng,
+						lat,
+						resultsSelectionMultiPolygonRef.current,
+						resultsSelectionBboxRef.current
+					));
+			return (
+				isPointInSelectionBounds(lng, lat) ||
+				stateSelectionHit
 			);
 		};
 		const isSearchAreaHit = (e: mapboxgl.MapMouseEvent): boolean => {

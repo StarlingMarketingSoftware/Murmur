@@ -1,17 +1,19 @@
 'use client';
 
-import { FC, useEffect, useRef, useState } from 'react';
+import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { urls } from '@/constants/urls';
-import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { cn } from '@/utils';
 import { useHoverDescription } from '@/contexts/HoverDescriptionContext';
 import { useSendingSessionState } from '@/contexts/SendingSessionContext';
 import { CampaignTitlePills } from '@/components/molecules/CampaignTitlePills/CampaignTitlePills';
+import { CampaignDataTypeIconStrip } from '@/components/molecules/CampaignDataTypeIconStrip/CampaignDataTypeIconStrip';
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 import DiamondIcon from '@/components/atoms/_svg/DiamondIcon';
 import { CampaignFolderDropdown } from './CampaignFolderDropdown';
 import { useCampaignTopNavScheme } from '@/hooks/useCampaignTopNavScheme';
+import { useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
+import type { CampaignDataTypeSummary } from '@/utils/campaignDataTypes';
 
 interface CampaignHeaderBoxProps {
 	campaignId: number;
@@ -42,6 +44,11 @@ const getContactsFillColor = (): string => '#F5DADA';
 const getDraftFillColor = (): string => '#FFE3AA';
 const getSentFillColor = (): string => '#B0E0A6';
 
+type CampaignListItemWithDataTypes = {
+	id: number;
+	campaignDataTypes?: CampaignDataTypeSummary[];
+};
+
 export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	campaignId,
 	campaignName,
@@ -63,9 +70,13 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	// Folder box fill + icon color follow the campaign's shared top-nav scheme so
 	// they match the top navigation box and the "Filtering in {campaign}" pill.
 	const topNavScheme = useCampaignTopNavScheme(campaignId);
-	const [isEditing, setIsEditing] = useState(false);
-	const [editedName, setEditedName] = useState(campaignName);
-	const inputRef = useRef<HTMLInputElement>(null);
+	const { data: campaigns } = useGetCampaigns();
+	const campaignDataTypes = useMemo(() => {
+		const campaign = ((campaigns ?? []) as CampaignListItemWithDataTypes[]).find(
+			(candidate) => candidate.id === campaignId
+		);
+		return campaign?.campaignDataTypes ?? [];
+	}, [campaignId, campaigns]);
 	const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
 	const chevronButtonRef = useRef<HTMLButtonElement>(null);
 	const headerBoxRef = useRef<HTMLDivElement>(null);
@@ -112,13 +123,6 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	const [hoveredMetric, setHoveredMetric] = useState<
 		'contacts' | 'drafts' | 'sent' | null
 	>(null);
-
-	const { mutate: editCampaign } = useEditCampaign({
-		suppressToasts: true,
-		onSuccess: () => {
-			setIsEditing(false);
-		},
-	});
 
 	// Smooth hover-description transitions (tiny fade out -> swap -> fade in).
 	useEffect(() => {
@@ -182,47 +186,12 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 		};
 	}, []);
 
-	// Focus input when entering edit mode
-	useEffect(() => {
-		if (isEditing && inputRef.current) {
-			inputRef.current.focus();
-			inputRef.current.select();
-		}
-	}, [isEditing]);
-
-	// Sync editedName when campaignName prop changes
-	useEffect(() => {
-		setEditedName(campaignName);
-	}, [campaignName]);
-
 	useEffect(() => {
 		onFolderDropdownOpenChange?.(isFolderDropdownOpen);
 		if (!isFolderDropdownOpen) return;
 
 		return () => onFolderDropdownOpenChange?.(false);
 	}, [isFolderDropdownOpen, onFolderDropdownOpenChange]);
-
-	const handleSave = () => {
-		if (editedName.trim() && editedName !== campaignName) {
-			editCampaign({
-				id: campaignId,
-				data: { name: editedName.trim() },
-			});
-		} else {
-			setEditedName(campaignName);
-			setIsEditing(false);
-		}
-	};
-
-	const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-		if (e.key === 'Enter') {
-			e.preventDefault();
-			handleSave();
-		} else if (e.key === 'Escape') {
-			setEditedName(campaignName);
-			setIsEditing(false);
-		}
-	};
 
 	return (
 		<div
@@ -357,13 +326,13 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					{renderedHoverDescription}
 				</div>
 			) : null}
-			{/* Campaign Title — folder icon + name inside a light-blue folder box */}
+			{/* Campaign Title — folder icon + name + campaign data badges inside a long folder box */}
 			<div className="h-[28px] flex-shrink-0 mt-[6px] flex items-center">
 				<div
-					className="flex items-center gap-[8px] overflow-hidden box-border pl-[8px] pr-[28px]"
+					className="flex min-w-0 flex-none items-center gap-[8px] overflow-hidden box-border pl-[8px] pr-[10px]"
 					style={{
 						width: 'fit-content',
-						maxWidth: '258px',
+						maxWidth: 'min(258px, calc(100% - 76px))',
 						height: '26px',
 						borderRadius: '6px',
 						background: topNavScheme.box,
@@ -375,31 +344,23 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 						aria-hidden="true"
 						style={{ color: topNavScheme.icon, flexShrink: 0, display: 'block' }}
 					/>
-					{isEditing ? (
-						<input
-							ref={inputRef}
-							type="text"
-							value={editedName}
-							onChange={(e) => setEditedName(e.target.value)}
-							onBlur={handleSave}
-							onKeyDown={handleKeyDown}
-							className="min-w-0 flex-1 font-normal text-[26px] leading-none text-black bg-transparent border-none outline-none p-0 m-0"
-							style={{ fontFamily: 'Times New Roman, Times, serif' }}
-						/>
-					) : (
-						<div
-							className="min-w-0 flex-1 font-normal text-[26px] leading-none whitespace-nowrap overflow-hidden text-black cursor-text"
-							style={{
-								fontFamily: 'Times New Roman, Times, serif',
-								maskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
-								WebkitMaskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
-							}}
-							onClick={() => setIsEditing(true)}
-							title="Click to edit"
-						>
-							<CampaignTitlePills title={campaignName} size="header" />
-						</div>
-					)}
+					<div
+						className="min-w-0 flex-none font-normal text-[26px] leading-none whitespace-nowrap overflow-hidden text-black"
+						style={{
+							fontFamily: 'Times New Roman, Times, serif',
+							maxWidth: campaignDataTypes.length > 0 ? '135px' : '190px',
+							maskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
+							WebkitMaskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
+						}}
+					>
+						<CampaignTitlePills title={campaignName} size="header" />
+					</div>
+					<CampaignDataTypeIconStrip
+						dataTypes={campaignDataTypes}
+						fill={false}
+						renderEmpty={false}
+						spacingClassName="ml-[2px] mr-0"
+					/>
 				</div>
 				{canToggleHoverDescriptions ? (
 					<button

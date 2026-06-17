@@ -40,14 +40,10 @@ import {
 	getCampaignDataCategoryFromText,
 	getCampaignDataCategoryLabel,
 } from '@/utils/campaignDataTypes';
-import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
-import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
-import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
-import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
-import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
-import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
-import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
-import { getCityIconProps } from '@/utils/cityIcons';
+import {
+	CampaignDataTypeBadge,
+	CampaignDataTypeIconStrip,
+} from '@/components/molecules/CampaignDataTypeIconStrip/CampaignDataTypeIconStrip';
 import { EmailStatus } from '@/constants/prismaEnums';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { getStateAbbreviation } from '@/utils/string';
@@ -1346,114 +1342,6 @@ const getUpdatedLabel = (updatedAt: Date): string => {
 	const now = startOfDay(new Date());
 	const then = startOfDay(updatedAt);
 	return now.getTime() === then.getTime() ? 'Today' : mmdd(updatedAt);
-};
-
-const CAMPAIGN_DATA_CATEGORY_BACKGROUND: Record<CampaignDataTypeCategoryKey, string> = {
-	wine_beer_spirits: '#BFC4FF',
-	restaurants: '#C3FBD1',
-	coffee_shops: '#D6F1BD',
-	music_venues: '#B7E5FF',
-	music_festivals: '#C1D6FF',
-	wedding: '#FFF2BC',
-	radio: '#E8EFFF',
-};
-
-const renderCampaignDataCategoryIcon = (key: CampaignDataTypeCategoryKey) => {
-	switch (key) {
-		case 'wine_beer_spirits':
-			return <WineBeerSpiritsIcon size={11} className="flex-shrink-0" />;
-		case 'restaurants':
-			return <RestaurantsIcon size={12} className="flex-shrink-0" />;
-		case 'coffee_shops':
-			return <CoffeeShopsIcon size={7} className="flex-shrink-0" />;
-		case 'music_venues':
-			return <MusicVenuesIcon size={13} className="flex-shrink-0" />;
-		case 'music_festivals':
-			return <FestivalsIcon size={12} className="flex-shrink-0" />;
-		case 'wedding':
-			return <WeddingPlannersIcon size={12} className="flex-shrink-0" />;
-		case 'radio':
-			return <RadioStationsIcon size={13} className="flex-shrink-0" />;
-	}
-};
-
-const CampaignDataTypeBadge = ({ dataType }: { dataType: CampaignDataTypeSummary }) => {
-	if (dataType.kind === 'category') {
-		return (
-			<span
-				className="inline-flex h-[15px] w-[15px] flex-none items-center justify-center overflow-hidden rounded-[4px]"
-				style={{ backgroundColor: CAMPAIGN_DATA_CATEGORY_BACKGROUND[dataType.key] }}
-				title={dataType.label}
-			>
-				{renderCampaignDataCategoryIcon(dataType.key)}
-			</span>
-		);
-	}
-
-	const { icon, backgroundColor } = getCityIconProps('', dataType.key);
-	return (
-		<span
-			className="inline-flex h-[15px] w-[15px] flex-none items-center justify-center overflow-hidden rounded-[4px]"
-			style={{ backgroundColor }}
-			title={dataType.label}
-		>
-			<span className="inline-flex h-full w-full items-center justify-center [&>svg]:block [&>svg]:h-auto [&>svg]:max-h-[10px] [&>svg]:max-w-[11px] [&>svg]:w-auto">
-				{icon}
-			</span>
-		</span>
-	);
-};
-
-const CampaignDataTypeIconStrip = ({
-	dataTypes,
-	isConfirming,
-	hasNew,
-}: {
-	dataTypes: CampaignDataTypeSummary[];
-	isConfirming: boolean;
-	hasNew: boolean;
-}) => {
-	const stripSpacingClassName = hasNew ? 'ml-[23px] mr-2' : 'ml-[8px] mr-1';
-
-	if (isConfirming || dataTypes.length === 0) {
-		return (
-			<div
-				className={cn('folder-icon-strip h-[15px] flex-1', stripSpacingClassName)}
-				aria-hidden="true"
-			/>
-		);
-	}
-
-	const visibleDataTypes = dataTypes.slice(0, 3);
-	const overflowCount = Math.max(0, dataTypes.length - visibleDataTypes.length);
-	const label = dataTypes.map((dataType) => dataType.label).join(', ');
-
-	return (
-		<div
-			className={cn(
-				'folder-icon-strip flex h-[15px] min-w-0 flex-1 items-center justify-start gap-[4px] overflow-hidden',
-				stripSpacingClassName
-			)}
-			aria-label={`Campaign data types: ${label}`}
-		>
-			{visibleDataTypes.map((dataType) => (
-				<CampaignDataTypeBadge
-					key={`${dataType.kind}-${dataType.key}`}
-					dataType={dataType}
-				/>
-			))}
-			{overflowCount > 0 ? (
-				<span
-					className={cn(
-						'flex-none font-inter text-[8.021px] font-medium not-italic leading-[9.95px]',
-						isConfirming ? 'text-white' : 'text-black'
-					)}
-				>
-					+{overflowCount}
-				</span>
-			) : null}
-		</div>
-	);
 };
 
 export const useCampaignsTable = (options?: {
