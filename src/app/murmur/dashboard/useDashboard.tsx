@@ -27,6 +27,10 @@ import {
 } from '@/hooks/queryHooks/useContacts';
 import { ColumnDef, Table } from '@tanstack/react-table';
 import { ContactWithName } from '@/types/contact';
+import {
+	BOOKING_CONTACT_TITLE_PREFIXES,
+	PROMOTION_CONTACT_TITLE_PREFIXES,
+} from '@/constants/contactCategories';
 import { useCreateApolloContacts } from '@/hooks/queryHooks/useApollo';
 import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { toast } from 'sonner';
@@ -81,6 +85,69 @@ const getRandomSearchResultLimit = (): number =>
 
 const isTimeoutError = (error: unknown): boolean =>
 	error instanceof Error && /\b(timeout|timed\s*out)\b/i.test(error.message);
+
+const FREE_TEXT_FALLBACK_CURATED_CATEGORY = '_freetext';
+
+const FREE_TEXT_QUERY_CATEGORY_HINTS: Array<[RegExp, string]> = [
+	[/\bradio stations?\b|\bcollege radio\b/i, 'Radio Stations'],
+	[/\bcoffee shops?\b|\bcaf[eé]s?\b|\bespresso\b/i, 'Coffee Shops'],
+	[/\brestaurants?\b|\bbistros?\b|\bdiners?\b|\beatery\b/i, 'Restaurants'],
+	[/\bmusic festivals?\b|\bfestivals?\b/i, 'Music Festivals'],
+	[/\bwedding venues?\b/i, 'Wedding Venues'],
+	[/\bwedding planners?\b/i, 'Wedding Planners'],
+	[
+		/\bwiner(y|ies)\b|\bvineyards?\b|\bbrewer(y|ies)\b|\bdistiller(y|ies)\b|\bcider(y|ies)\b|\bwine\b|\bbeer\b|\bspirits?\b/i,
+		'Wine, Beer, and Spirits',
+	],
+	[/\bmusic venues?\b|\bvenues?\b|\bconcert halls?\b|\bclubs?\b|\bbars?\b/i, 'Music Venues'],
+];
+
+const FREE_TEXT_CONTACT_TITLE_PREFIXES = [
+	...BOOKING_CONTACT_TITLE_PREFIXES,
+	...PROMOTION_CONTACT_TITLE_PREFIXES,
+] as const;
+
+type FreeTextSearchContact = ContactWithName & {
+	searchCategoryMatch?: string | null;
+};
+
+const inferFreeTextCategoryFromQuery = (query: string): string | null => {
+	const trimmed = query.trim();
+	if (!trimmed) return null;
+	return FREE_TEXT_QUERY_CATEGORY_HINTS.find(([pattern]) => pattern.test(trimmed))?.[1] ?? null;
+};
+
+const normalizeFreeTextContactCategory = (category: string | null | undefined): string | null => {
+	const trimmed = category?.trim();
+	if (!trimmed) return null;
+	return trimmed === 'College Radio' ? 'Radio Stations' : trimmed;
+};
+
+const inferFreeTextCategoryFromContact = (contact: FreeTextSearchContact): string | null => {
+	const explicitMatch = normalizeFreeTextContactCategory(contact.searchCategoryMatch);
+	if (explicitMatch) return explicitMatch;
+
+	const title = contact.title?.trim();
+	if (!title) return null;
+	const titleLower = title.toLowerCase();
+	const prefix = FREE_TEXT_CONTACT_TITLE_PREFIXES.find((candidate) =>
+		titleLower.startsWith(candidate.toLowerCase())
+	);
+	return normalizeFreeTextContactCategory(prefix);
+};
+
+const decorateFreeTextContactsForMap = (
+	contacts: ContactWithName[],
+	fallbackCategory: string
+): ContactWithName[] =>
+	contacts.map((contact) => {
+		if (contact.curatedCategory) return contact;
+		const match = inferFreeTextCategoryFromContact(contact as FreeTextSearchContact);
+		return {
+			...contact,
+			curatedCategory: match ?? fallbackCategory,
+		};
+	});
 
 interface UseDashboardOptions {
 	/** Derived title to assign to contacts without a title when creating a campaign */
@@ -882,6 +949,13 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				  )
 				: null;
 			if (cachedEntry) {
+				const fallbackCategory =
+					inferFreeTextCategoryFromQuery(cachedEntry.query || q) ??
+					FREE_TEXT_FALLBACK_CURATED_CATEGORY;
+				const decoratedContacts = decorateFreeTextContactsForMap(
+					cachedEntry.contacts,
+					fallbackCategory
+				);
 				cancelInFlightSearches();
 				++searchGenerationRef.current;
 				setMapBboxFilter(null);
@@ -891,14 +965,15 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				setIsMapView(true);
 				setLastCuratedArgs(null);
 				setLastFreeTextArgs(rawArgs);
-				setCuratedContacts(cachedEntry.contacts);
+				setCuratedContacts(decoratedContacts);
 				setActiveSearchQuery(cachedEntry.query);
 				setIsSearchPending(false);
 				setIsRevalidatingCurated(false);
-				// Refresh recency (move to MRU) so the entry survives eviction longer.
+				// Refresh recency (move to MRU) and self-heal older cached entries that
+				// predate the marker metadata decoration.
 				writeSearchCacheEntry(
 					freeTextCacheKey,
-					{ ...cachedEntry, ts: Date.now() },
+					{ ...cachedEntry, ts: Date.now(), contacts: decoratedContacts },
 					freeTextArgsEqual
 				);
 				return;
@@ -939,13 +1014,14 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				// results don't carry one, so without this decoration they'd render as plain dots
 				// instead of the curated cluster visual. Prefer the per-contact category match,
 				// then the parsed query category, then a neutral sentinel as a last resort.
-				const fallbackCategory = result.parsed.categories[0] ?? '_freetext';
-				const decoratedContacts: ContactWithName[] = result.contacts.map((c) => {
-					if (c.curatedCategory) return c;
-					const match = (c as ContactWithName & { searchCategoryMatch?: string | null })
-						.searchCategoryMatch;
-					return { ...c, curatedCategory: match ?? fallbackCategory };
-				});
+				const fallbackCategory =
+					normalizeFreeTextContactCategory(result.parsed.categories[0]) ??
+					inferFreeTextCategoryFromQuery(q) ??
+					FREE_TEXT_FALLBACK_CURATED_CATEGORY;
+				const decoratedContacts = decorateFreeTextContactsForMap(
+					result.contacts,
+					fallbackCategory
+				);
 				setCuratedContacts(decoratedContacts);
 				setLastFreeTextArgs(rawArgs);
 				// Cache the *exact* contacts we just rendered (with their curatedCategory
@@ -1064,6 +1140,13 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				normalizeFreeTextArgs(args)
 			);
 			if (cached) {
+				const fallbackCategory =
+					inferFreeTextCategoryFromQuery(cached.query || trimmedQuery) ??
+					FREE_TEXT_FALLBACK_CURATED_CATEGORY;
+				const decoratedContacts = decorateFreeTextContactsForMap(
+					cached.contacts,
+					fallbackCategory
+				);
 				setMapBboxFilter(null);
 				setPendingFreeTextQuery(null);
 				setIsCuratedSearchActive(true);
@@ -1071,9 +1154,14 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				setIsMapView(true);
 				setLastCuratedArgs(null);
 				setLastFreeTextArgs(args);
-				setCuratedContacts(cached.contacts);
+				setCuratedContacts(decoratedContacts);
 				setActiveSearchQuery(cached.query);
 				setIsSearchPending(false);
+				writeSearchCacheEntry(
+					freeTextCacheKey,
+					{ ...cached, ts: Date.now(), contacts: decoratedContacts },
+					freeTextArgsEqual
+				);
 				return true;
 			}
 

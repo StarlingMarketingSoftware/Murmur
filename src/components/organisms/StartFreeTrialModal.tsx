@@ -1,13 +1,16 @@
 'use client';
 
 import { SignIn, SignUp, useAuth } from '@clerk/nextjs';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { urls } from '@/constants/urls';
+import { AccountType } from '@/constants/prismaEnums';
+import { useGetUser } from '@/hooks/queryHooks/useUsers';
 import { useFreeTrialCheckout } from '@/hooks/useFreeTrialCheckout';
 import { useKeyboardViewportFit } from '@/hooks/useKeyboardViewportFit';
 import { StripeEmbeddedCheckoutModal } from '@/components/organisms/StripeEmbeddedCheckoutModal';
+import { StripeSubscriptionStatus } from '@/types';
 import {
 	FREE_TRIAL_CLERK_APPEARANCE,
 	FreeTrialClerkGlobalStyles,
@@ -28,14 +31,47 @@ interface StartFreeTrialModalProps {
  * out, then the embedded Stripe checkout. Clicking the backdrop dismisses it.
  */
 export function StartFreeTrialModal({ open, onClose }: StartFreeTrialModalProps) {
-	const { isLoaded, isSignedIn } = useAuth();
+	const { isLoaded, isSignedIn, userId } = useAuth();
+	const router = useRouter();
 	const searchParams = useSearchParams();
 	const [latchedOpen, setLatchedOpen] = useState(false);
 
 	const isOpen = open || latchedOpen;
 	const showSignIn = searchParams.get('auth') === 'sign-in';
+	const {
+		data: user,
+		isPending: isPendingUser,
+		isLoading: isLoadingUser,
+		isError: isUserError,
+	} = useGetUser(userId);
 
-	const { clientSecret, checkoutError, checkoutLoadingText } = useFreeTrialCheckout(isOpen);
+	const isResolvingSignedInUser =
+		isLoaded &&
+		isSignedIn &&
+		(isPendingUser || isLoadingUser || (!user && !isUserError));
+	const hasActiveSubscription =
+		user?.stripeSubscriptionStatus === StripeSubscriptionStatus.ACTIVE ||
+		user?.stripeSubscriptionStatus === StripeSubscriptionStatus.TRIALING;
+	const postAuthRedirectUrl =
+		user?.accountType === AccountType.venue
+			? urls.venuePortal.index
+			: hasActiveSubscription
+				? urls.murmur.dashboard.index
+				: null;
+
+	const { clientSecret, checkoutError, checkoutLoadingText } = useFreeTrialCheckout(
+		isOpen &&
+			isLoaded &&
+			isSignedIn &&
+			!isResolvingSignedInUser &&
+			!isUserError &&
+			!postAuthRedirectUrl
+	);
+
+	useEffect(() => {
+		if (!isOpen || !isLoaded || !isSignedIn || !postAuthRedirectUrl) return;
+		router.replace(postAuthRedirectUrl);
+	}, [isLoaded, isOpen, isSignedIn, postAuthRedirectUrl, router]);
 
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
@@ -114,9 +150,23 @@ export function StartFreeTrialModal({ open, onClose }: StartFreeTrialModalProps)
 		return (
 			<StripeEmbeddedCheckoutModal
 				open
-				title="Start your 7-day free trial"
-				loadingText={checkoutLoadingText}
-				error={checkoutError}
+				title={
+					postAuthRedirectUrl || isResolvingSignedInUser
+						? 'Opening your account'
+						: 'Start your 7-day free trial'
+				}
+				loadingText={
+					postAuthRedirectUrl
+						? 'Opening your account...'
+						: isResolvingSignedInUser
+							? 'Checking your account...'
+							: checkoutLoadingText
+				}
+				error={
+					isUserError
+						? 'Could not check your account. Please refresh and try again.'
+						: checkoutError
+				}
 				clientSecret={clientSecret}
 				onClose={handleClose}
 			/>
