@@ -104,7 +104,7 @@ const TALL_STACK_INNER_BOX_BOTTOM_POSITIONS_PX = [
 	TALL_STACK_BOTTOM_ICON_BOTTOM_PX + TALL_STACK_ICON_PITCH_PX * 6,
 ] as const;
 const TALL_STACK_INNER_BOX_STYLES = [
-	{ backgroundColor: '#EFEFEF' },
+	{ backgroundColor: '#FFD5E4' },
 	{ backgroundColor: '#F0E0A15C' },
 	{ backgroundColor: '#C5EDA05C' },
 	{ backgroundColor: '#B9D0FF5C' },
@@ -845,7 +845,7 @@ const TALL_STACK_INNER_BOX_INACTIVE_TILE_STYLE: CSSProperties = {
 	backgroundColor: TALL_STACK_INNER_BOX_INACTIVE_TILE_FILL,
 };
 const TALL_STACK_INNER_BOX_INNER_FILLS = [
-	'#EFEFEF',
+	'#FF88B3',
 	'#F0E0A1',
 	'#C5EDA0',
 	'#B9D0FF',
