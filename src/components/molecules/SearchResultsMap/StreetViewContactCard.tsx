@@ -21,6 +21,8 @@ interface StreetViewContactCardProps {
 	onHoverEnd: (contactId: number) => void;
 	/** Receives the full contact — overlay-only contacts aren't resolvable by id upstream. */
 	onToggleSelection?: (contact: ContactWithName) => void;
+	/** Forwards wheel events to the map so the always-interactive card doesn't block zoom. */
+	onWheelForward: (e: React.WheelEvent) => void;
 	/**
 	 * Feeds the parent's contactId → element map; the parent positions the card
 	 * imperatively (el.style.transform) on map 'move', so this component must
@@ -38,6 +40,7 @@ const StreetViewContactCardImpl: React.FC<StreetViewContactCardProps> = ({
 	onHoverStart,
 	onHoverEnd,
 	onToggleSelection,
+	onWheelForward,
 	registerEl,
 }) => {
 	// Slim overlay payloads (booking/promotion — see api/contacts/map-overlay) omit
@@ -83,6 +86,7 @@ const StreetViewContactCardImpl: React.FC<StreetViewContactCardProps> = ({
 				}}
 				onMouseEnter={() => onHoverStart(contact)}
 				onMouseLeave={() => onHoverEnd(contact.id)}
+				onWheel={onWheelForward}
 			>
 				<div
 					className="relative w-[280px] rounded-[10px] bg-white overflow-hidden font-inter"

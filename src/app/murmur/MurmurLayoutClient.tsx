@@ -1,16 +1,16 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { useAuth, useUser, UserButton, SignInButton } from '@clerk/nextjs';
+import { useAuth, useUser, SignInButton } from '@clerk/nextjs';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { urls } from '@/constants/urls';
-import { withClerkNoBranding } from '@/constants/auth';
 import HomeIcon from '@/components/atoms/_svg/HomeIcon';
-import SettingsGearIcon from '@/components/atoms/_svg/SettingsGearIcon';
-import { OutlinedInitialAvatar } from '@/components/atoms/OutlinedInitialAvatar/OutlinedInitialAvatar';
+import { TopRightClerkButton } from '@/components/atoms/TopRightHeaderIcon/TopRightClerkButton';
+import { TopRightSettingsButton } from '@/components/atoms/TopRightHeaderIcon/TopRightSettingsButton';
 import { SettingsModal } from '@/components/organisms/SettingsModal/SettingsModal';
 import { PersistentDashboardMap } from '@/components/molecules/PersistentDashboardMap';
+import { MapErrorBoundary } from '@/components/molecules/MapErrorBoundary';
 import { PersistentMapProvider } from '@/contexts/PersistentMapContext';
 import { SendingSessionProvider } from '@/contexts/SendingSessionContext';
 import { isSafariBrowser } from '@/utils/browserDetection';
@@ -98,7 +98,9 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 	return (
 		<SendingSessionProvider>
 		<PersistentMapProvider>
-			<PersistentDashboardMap />
+			<MapErrorBoundary>
+				<PersistentDashboardMap />
+			</MapErrorBoundary>
 			{/* Persistent Clerk login icon in top right corner */}
 			<div
 				className={`clerk-user-button fixed top-3 z-50 ${
@@ -110,47 +112,15 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 					isDashboardOrCampaign ? (
 						<div className="flex items-center gap-[10px]">
 							{!isMobile && (
-								<button
-									type="button"
-									aria-label="Settings"
-									aria-expanded={isSettingsOpen}
+								<TopRightSettingsButton
+									isOpen={isSettingsOpen}
 									onClick={() => setIsSettingsOpen((prev) => !prev)}
-									className={`flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-2 transition-colors duration-150 ${
-										isSettingsOpen
-											? 'border-black bg-white text-black'
-											: 'border-[#6F6F6F] bg-transparent text-[#6F6F6F] hover:border-black hover:text-black'
-									}`}
-								>
-									<SettingsGearIcon width={20} height={20} />
-								</button>
-							)}
-							<div className="group relative w-7 h-7 cursor-pointer">
-								<OutlinedInitialAvatar
-									initial={outlinedInitial}
-									className="pointer-events-none absolute inset-0 w-7 h-7 group-hover:border-black group-hover:text-black group-focus-within:border-black group-focus-within:text-black group-active:border-black group-active:text-black"
 								/>
-								<div className="absolute inset-0 opacity-0">
-									<UserButton
-										appearance={withClerkNoBranding({
-											elements: {
-												avatarBox: 'w-7 h-7',
-												userButtonTrigger: 'w-7 h-7 p-0',
-											},
-										})}
-									/>
-								</div>
-							</div>
+							)}
+							<TopRightClerkButton initial={outlinedInitial} />
 						</div>
 					) : (
-						<UserButton
-							appearance={withClerkNoBranding({
-								elements: {
-									avatarBox: 'w-7 h-7 ring-1 ring-black/10',
-									userButtonTrigger:
-										'opacity-80 hover:opacity-100 transition-opacity duration-300',
-								},
-							})}
-						/>
+						<TopRightClerkButton initial={outlinedInitial} />
 					)
 				) : (
 					<SignInButton mode="modal">

@@ -31,7 +31,7 @@ import {
 	removeEmDashes,
 	stripEmailSignatureFromAiMessage,
 } from '@/utils';
-import { injectMurmurDraftSettingsSnapshot, type DraftProfileFields } from '@/utils/draftSettings';
+import { injectMurmurDraftSettingsSnapshot, extractMurmurDraftSettingsSnapshot, type DraftProfileFields } from '@/utils/draftSettings';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Contact, HybridBlock, Identity, Signature } from '@prisma/client';
 import { DraftingMode, DraftingTone, EmailStatus } from '@/constants/prismaEnums';
@@ -42,6 +42,65 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { HANDWRITTEN_PLACEHOLDER_OPTIONS } from '@/components/molecules/HandwrittenPromptInput/HandwrittenPromptInput';
 import { ContactWithName } from '@/types/contact';
+
+const stripInjectedSubjectFromTestMessageHtml = (
+	rawHtml: string
+): { messageHtml: string; injectedSubject: string } => {
+	const html = (rawHtml || '').toString();
+	if (!html) return { messageHtml: html, injectedSubject: '' };
+
+	if (typeof window === 'undefined' || typeof DOMParser === 'undefined') {
+		return { messageHtml: html, injectedSubject: '' };
+	}
+
+	try {
+		const parser = new DOMParser();
+		const doc = parser.parseFromString(
+			`<div id="__murmur_test_preview_root">${html}</div>`,
+			'text/html'
+		);
+		const root = doc.getElementById('__murmur_test_preview_root');
+		if (!root) return { messageHtml: html, injectedSubject: '' };
+
+		const subjectSpan = root.querySelector(
+			'span[style*="font-family: Inter"][style*="font-weight: bold"]'
+		) as HTMLSpanElement | null;
+		const injectedSubject = subjectSpan?.textContent?.trim() || '';
+
+		if (!subjectSpan) {
+			return { messageHtml: html, injectedSubject };
+		}
+
+		const parent = subjectSpan.parentNode;
+		let cursor: ChildNode | null = subjectSpan.nextSibling;
+		subjectSpan.remove();
+
+		let brsRemoved = 0;
+		while (parent && brsRemoved < 2 && cursor) {
+			const current = cursor;
+			cursor = cursor.nextSibling;
+
+			if (current.nodeType === Node.TEXT_NODE) {
+				if (!(current.textContent || '').trim()) {
+					current.parentNode?.removeChild(current);
+				}
+				continue;
+			}
+
+			if (current.nodeType === Node.ELEMENT_NODE) {
+				const el = current as Element;
+				if (el.tagName.toLowerCase() === 'br') {
+					el.parentNode?.removeChild(el);
+					brsRemoved += 1;
+				}
+			}
+		}
+
+		return { messageHtml: root.innerHTML, injectedSubject };
+	} catch {
+		return { messageHtml: html, injectedSubject: '' };
+	}
+};
 
 export type DraftingSectionView =
 	| 'search'
@@ -61,6 +120,12 @@ export type InboxSentTabRequest = {
 
 export type InboxPanelTabRequest = {
 	tab: 'responses' | 'opportunities';
+	requestId: number;
+};
+
+/** One-shot request to run the active tab's native selection for a clicked map marker. */
+export type MapMarkerSelectionRequest = {
+	contactId: number;
 	requestId: number;
 };
 
@@ -117,6 +182,16 @@ export interface DraftingSectionProps {
 	 * Optional callback fired whenever the InboxSection's Inbox/Sent tab changes.
 	 */
 	onInboxSentTabChange?: (next: InboxSentTab) => void;
+	/**
+	 * Optional callback publishing the active tab's selected contact ids to the
+	 * campaign map, so their markers render as the bigger blue selected circle.
+	 */
+	onMapSelectionChange?: (contactIds: number[]) => void;
+	/**
+	 * Optional one-shot request from a campaign map marker click. The active tab
+	 * routes the contactId into its own native selection action.
+	 */
+	mapMarkerSelectionRequest?: MapMarkerSelectionRequest | null;
 	/**
 	 * Optional callback to navigate to the previous tab.
 	 */
@@ -393,6 +468,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const [generationProgress, setGenerationProgress] = useState(-1);
 	const [generationTotal, setGenerationTotal] = useState(0);
 	const [isTest, setIsTest] = useState<boolean>(false);
+	const [isKeepingTestDraft, setIsKeepingTestDraft] = useState(false);
 	// Drafting queue: allow multiple drafting operations to be queued while one runs.
 	const [draftOperations, setDraftOperations] = useState<DraftingOperation[]>([]);
 	// Transient "review the batch I just drafted on the Write tab" state. Holds the contact IDs
@@ -404,6 +480,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	);
 	const clearWriteReviewBatch = useCallback(() => {
 		setWriteReviewBatchContactIds((prev) => (prev.size === 0 ? prev : new Set()));
+	}, []);
+	const armWriteReviewBatch = useCallback((contactIds: number[]) => {
+		if (contactIds.length === 0) return;
+		setWriteReviewBatchContactIds((prev) => {
+			const next = new Set(prev);
+			for (const id of contactIds) next.add(id);
+			return next;
+		});
 	}, []);
 	const draftOperationsRef = useRef<DraftingOperation[]>([]);
 	const updateDraftOperations = useCallback(
@@ -3345,6 +3429,123 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		(block) => block.type === 'full_automated'
 	);
 
+	const keepTestDraftForReview = useCallback(
+		async (
+			explicitContact?: ContactWithName | null,
+			options?: { armForReview?: boolean }
+		) => {
+			if (isKeepingTestDraft) return false;
+			if (!campaign?.id) {
+				toast.error('Missing campaign.');
+				return false;
+			}
+
+			const contactForTest = explicitContact ?? contacts?.[0] ?? null;
+			if (!contactForTest) {
+				toast.error('No contact available to save this test draft.');
+				return false;
+			}
+
+			const rawTestMessage = (campaign.testMessage || '').trim();
+			if (!rawTestMessage) {
+				toast.error('Generate a test draft first.');
+				return false;
+			}
+
+			setIsKeepingTestDraft(true);
+			try {
+				const existingSnapshot = extractMurmurDraftSettingsSnapshot(rawTestMessage);
+				const { messageHtml, injectedSubject } =
+					stripInjectedSubjectFromTestMessageHtml(rawTestMessage);
+
+				const subject = (campaign.testSubject || '').trim() || injectedSubject.trim();
+				if (!subject) {
+					toast.error('Test draft is missing a subject.');
+					return false;
+				}
+
+				const cleanedMessageHtml = (messageHtml || '').trim();
+				if (!cleanedMessageHtml) {
+					toast.error('Test draft is missing content.');
+					return false;
+				}
+
+				const identityProfile = campaign.identity;
+				const computedProfileFields: DraftProfileFields = {
+					name: identityProfile?.name ?? '',
+					genre: identityProfile?.genre ?? '',
+					area: identityProfile?.area ?? '',
+					band: identityProfile?.bandName ?? '',
+					bio: identityProfile?.bio ?? '',
+					links: identityProfile?.website ?? '',
+				};
+
+				const baseValues = existingSnapshot?.values ?? form.getValues();
+				const signatureForSnapshot =
+					resolveAutoSignatureText({
+						currentSignature: baseValues.signature ?? null,
+						fallbackSignature: `Thank you,\n${identityProfile?.name || ''}`,
+						context: {
+							name: identityProfile?.name ?? null,
+							bandName: identityProfile?.bandName ?? null,
+							website: identityProfile?.website ?? null,
+							email: identityProfile?.email ?? null,
+						},
+					}) ||
+					(typeof baseValues.signature === 'string' ? baseValues.signature : '') ||
+					'';
+
+				const valuesForSnapshot: DraftingFormValues = {
+					...baseValues,
+					signature: signatureForSnapshot,
+				};
+				const profileFieldsForSnapshot =
+					existingSnapshot?.profileFields ?? computedProfileFields;
+
+				const messageWithSettings = injectMurmurDraftSettingsSnapshot(
+					cleanedMessageHtml,
+					{
+						version: 1,
+						values: valuesForSnapshot,
+						profileFields: profileFieldsForSnapshot,
+					}
+				);
+
+				await createEmail({
+					subject,
+					message: messageWithSettings,
+					campaignId: campaign.id,
+					status: EmailStatus.draft,
+					contactId: contactForTest.id,
+				});
+
+				await queryClient.invalidateQueries({ queryKey: ['emails'] });
+
+				if (options?.armForReview) {
+					armWriteReviewBatch([contactForTest.id]);
+				}
+
+				toast.success('Saved to Drafts.');
+				return true;
+			} catch (error) {
+				console.error('Failed to keep test draft:', error);
+				toast.error('Failed to save draft. Please try again.');
+				return false;
+			} finally {
+				setIsKeepingTestDraft(false);
+			}
+		},
+		[
+			armWriteReviewBatch,
+			campaign,
+			contacts,
+			createEmail,
+			form,
+			isKeepingTestDraft,
+			queryClient,
+		]
+	);
+
 	return {
 		activeTab,
 		campaign,
@@ -3355,6 +3556,9 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		draftOperations,
 		writeReviewBatchContactIds,
 		clearWriteReviewBatch,
+		armWriteReviewBatch,
+		keepTestDraftForReview,
+		isKeepingTestDraft,
 		form,
 		generationProgress,
 		generationTotal,

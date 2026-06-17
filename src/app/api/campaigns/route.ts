@@ -148,11 +148,46 @@ export async function POST(req: NextRequest) {
 				existing.map((c) => c.name)
 			);
 
+			const existingIdentity = await tx.identity.findFirst({
+				where: { userId },
+				orderBy: { updatedAt: 'desc' },
+				select: { id: true },
+			});
+			let identityId = existingIdentity?.id ?? null;
+			if (!identityId) {
+				const user = await tx.user.findUnique({
+					where: { clerkId: userId },
+					select: {
+						email: true,
+						replyToEmail: true,
+						firstName: true,
+						lastName: true,
+					},
+				});
+				const email = user?.replyToEmail ?? user?.email;
+				if (email) {
+					const displayName =
+						[user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() ||
+						user?.email ||
+						'New Profile';
+					const createdIdentity = await tx.identity.create({
+						data: {
+							userId,
+							name: displayName,
+							email,
+						},
+						select: { id: true },
+					});
+					identityId = createdIdentity.id;
+				}
+			}
+
 			return tx.campaign.create({
 				data: {
 					...validatedData.data,
 					name: uniqueName,
 					userId,
+					identityId,
 					contacts: {
 						connect: contacts?.map((id) => ({ id })),
 					},

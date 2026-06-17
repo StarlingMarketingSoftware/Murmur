@@ -19,6 +19,8 @@ import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists
 import { generateCampaignName } from '@/utils/campaignNames';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
+import { urls } from '@/constants/urls';
 
 const MAX_CAMPAIGNS = 5;
 const CAMPAIGN_FINDER_MIN_HEIGHT = 415;
@@ -142,6 +144,7 @@ export type CampaignsMockFolder = {
 	updatedDaysAgo?: number;
 	newEmailCount?: number;
 	contactCount?: number;
+	contactIds?: number[];
 	campaignDataTypes?: CampaignDataTypeSummary[];
 };
 
@@ -165,6 +168,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 	defaultOpenContactsFolder,
 	onFinderOpenChange,
 }) => {
+	const router = useRouter();
 	// Treat all mobile orientations (portrait and landscape) as mobile for this table
 	const isMobile = useIsMobile();
 	const desktopMeasureRef = useRef<HTMLDivElement | null>(null);
@@ -452,10 +456,15 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 
 		try {
 			const contactList = await createContactList({ name, contactIds: [] });
-			await createCampaign({
+			const campaign = await createCampaign({
 				name,
 				userContactLists: [contactList.id],
 			});
+			if (campaign?.id) {
+				router.push(
+					`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}&pick=1&allContacts=1&instant=1`
+				);
+			}
 		} catch (error) {
 			if (error instanceof CampaignApiError && error.code === 'CAMPAIGN_CAP_REACHED') {
 				toast.error(

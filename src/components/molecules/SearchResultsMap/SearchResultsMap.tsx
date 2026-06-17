@@ -22,11 +22,25 @@ import {
 } from '@/hooks/queryHooks/useContacts';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import {
+	MAP_SELECT_GRAB_STARTER_BOX_GAP_PX,
+	MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX,
+	MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX,
+	MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX,
+	MAP_SELECT_GRAB_STACK_BOX_SIZE_PX,
+	MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX,
+	MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX,
+	MAP_SELECT_GRAB_TOOL_COLLAPSED_HEIGHT_PX,
+} from '@/components/molecules/MapSelectGrabTool/MapSelectGrabTool';
+import {
+	computeMapSelectGrabViewScale,
+	DASHBOARD_SIDE_SHIFT_VAR,
+	MURMUR_CHROME_ZOOM_DEFAULT,
+} from '@/utils/murmurChromeZoom';
+import {
 	calculateTooltipWidth,
 	calculateTooltipHeight,
 	calculateTooltipAnchorY,
 	generateMapTooltipSvg,
-	MAP_TOOLTIP_ANCHOR_X,
 } from '@/components/atoms/_svg/MapTooltipIcon';
 import {
 	generateMapMarkerPinIconUrl,
@@ -105,7 +119,10 @@ import {
 	ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR,
 	ALL_CONTACTS_OVERLAY_LIMIT,
 	ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM,
-	ALL_CONTACTS_OVERLAY_TOOLTIP_FILL_COLOR,
+	CAMPAIGN_HEATMAP_FADE_MS,
+	CAMPAIGN_HEATMAP_GLOW_BLUR,
+	CAMPAIGN_HEATMAP_GLOW_OPACITY_MAX,
+	campaignHeatmapGlowRadiusExpr,
 	AMBIENT_CONTACTS_OVERLAY_BUFFER_DOTS,
 	AMBIENT_CONTACTS_OVERLAY_LIMIT,
 	AMBIENT_CONTACTS_OVERLAY_MARKERS_FULL_ZOOM,
@@ -118,6 +135,22 @@ import {
 	BOOKING_EXTRA_MARKERS_MAX_DOTS,
 	BOOKING_EXTRA_MARKERS_MIN_ZOOM,
 	BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR,
+	CAMPAIGN_FOOTPRINT_COLOR,
+	CAMPAIGN_FOOTPRINT_GLOW_OPACITY,
+	CAMPAIGN_FOOTPRINT_LINE_COLOR,
+	CAMPAIGN_FOOTPRINT_LINE_CORE_COLOR,
+	CAMPAIGN_FOOTPRINT_LINE_CORE_OPACITY,
+	CAMPAIGN_FOOTPRINT_LINE_GLOW_OPACITY,
+	CAMPAIGN_FOOTPRINT_MAX_POINTS,
+	CAMPAIGN_FOOTPRINT_NODE_GLOW_OPACITY,
+	CAMPAIGN_FOOTPRINT_REPLACE_MARKER_MIN_ZOOM,
+	CAMPAIGN_FOOTPRINT_SPARK_COLOR,
+	CAMPAIGN_FOOTPRINT_SPARK_OPACITY,
+	campaignFootprintGlowRadiusExpr,
+	campaignFootprintLineCoreWidthExpr,
+	campaignFootprintLineGlowWidthExpr,
+	campaignFootprintNodeGlowRadiusExpr,
+	campaignFootprintSparkSizeExpr,
 	CLOUDS_CANVAS_COORDINATES,
 	CLOUDS_CANVAS_SIZE_PX,
 	CLOUDS_CANVAS_TEXTURE_URL,
@@ -346,7 +379,6 @@ import {
 	SUN_TRANSITION_PROGRESS_PAINT_STEPS,
 	SUN_TRANSITION_SPACE_GLOW_BG,
 	SUN_TRANSITION_SPACE_GLOW_OPACITY_MULT,
-	TOOLTIP_FILL_COLOR_SELECTED,
 	UNSUBSCRIBE_BURN_GLOW_BG,
 	UNSUBSCRIBE_BURN_GLOW_MAX_OPACITY,
 	UNSUBSCRIBE_BURN_TRANSITION_MS,
@@ -502,6 +534,7 @@ import {
 } from './metadata';
 import { StreetViewContactCard } from './StreetViewContactCard';
 import {
+	WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR,
 	WHAT_TO_HOVER_TOOLTIP_FILL_COLOR,
 	bookingTitlePrefixMatchesSearchWhatKey,
 	extractSearchModeFromQueryPrefix,
@@ -567,6 +600,14 @@ const CAMPAIGN_STATUS_CONSTELLATION_CORE_OPACITY = 1;
 const CAMPAIGN_STATUS_CONSTELLATION_GLOW_OPACITY = 0.18;
 const CAMPAIGN_STATUS_MARKER_RADIUS_SCALE = 1;
 const CAMPAIGN_STATUS_MARKER_STROKE_WIDTH = 2.32338;
+// Selected campaign status marker (Write/Drafts/Inbox tabs): a bigger light-blue
+// circle (#A8BFF5 fill, #5A81DA stroke) per the campaign marker spec. Applied via
+// the `selected` feature-state, gated on the per-feature `statusMode` flag so the
+// dashboard pick-flow / category-mode dots stay untouched.
+const SELECTED_STATUS_DOT_RADIUS_SCALE = 1.45;
+const SELECTED_STATUS_DOT_FILL_COLOR = '#A8BFF5';
+const SELECTED_STATUS_DOT_STROKE_COLOR = '#5A81DA';
+const SELECTED_STATUS_DOT_STROKE_WIDTH = 2.4;
 
 export type CampaignContactMapStatus = 'contacts' | 'drafts' | 'new-message' | 'sent';
 
@@ -628,17 +669,6 @@ const CAMPAIGN_STATUS_MARKER_STYLES: Record<
 	},
 };
 
-// Multiplies a circle layer's fill-opacity expression by the per-feature
-// `fillOpacity` (default 1). Lets a status marker render as a hollow ring
-// (e.g. "sent") without touching non-status dots, which carry no fillOpacity.
-//
-// A "zoom" expression must be the input of the OUTERMOST "step"/"interpolate"
-// (mapbox-gl v3). When `opacityExpr` is itself a top-level zoom curve, wrapping
-// it in ["*", ...] nests the zoom curve and fails style validation with
-// '"zoom" expression may only be used as input to a top-level "step" or
-// "interpolate" expression'. So in that case we distribute the factor into each
-// output stop — exactly equivalent for a per-feature constant — which leaves the
-// zoom curve outermost. Plain (non-zoom) expressions are multiplied directly.
 const FEATURE_FILL_OPACITY_FACTOR: any = ['coalesce', ['get', 'fillOpacity'], 1];
 const FEATURE_STROKE_OPACITY_FACTOR = ['coalesce', ['get', 'strokeOpacity'], 0] as const;
 
@@ -850,6 +880,15 @@ const EVENT_STAR_ICON_URL = `data:image/svg+xml;charset=UTF-8,${encodeURICompone
 	mapStackStarIconSvg
 )}`;
 const EVENT_STAR_ICON_IMAGE_DIMENSIONS = { width: 54, height: 54 } as const;
+const CAMPAIGN_FOOTPRINT_SPARK_ICON_IMAGE_NAME = 'murmur-campaign-footprint-spark-icon-image';
+const CAMPAIGN_FOOTPRINT_SPARK_ICON_IMAGE_DIMENSIONS = { width: 32, height: 32 } as const;
+const CAMPAIGN_FOOTPRINT_SPARK_ICON_URL = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+	<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+		<rect x="7" y="7" width="18" height="18" rx="3.2" fill="${CAMPAIGN_FOOTPRINT_SPARK_COLOR}" opacity="0.16"/>
+		<rect x="9" y="9" width="14" height="14" rx="2.6" fill="${CAMPAIGN_FOOTPRINT_SPARK_COLOR}" opacity="0.4"/>
+		<rect x="10.75" y="10.75" width="10.5" height="10.5" rx="2" fill="${CAMPAIGN_FOOTPRINT_SPARK_COLOR}" stroke="${CAMPAIGN_FOOTPRINT_COLOR}" stroke-width="0.7"/>
+	</svg>
+`)}`;
 
 // Event opportunity popup (phase 1: shapes + lat/lng only). Outer red box, inner white
 // box inset 5px from the top, and a bottom red strip showing the event coordinates.
@@ -873,6 +912,687 @@ const EVENT_POPUP_STAR_HALF = 14;
 // Bridges the star→box gap so the cursor can travel into the (interactive) popup and
 // hover/click it, instead of the popup vanishing the instant the star is no longer hit.
 const EVENT_POPUP_HOVER_CLOSE_DELAY_MS = 90;
+const SELECTED_TOOLTIP_FADE_START_ZOOM = 5.4;
+const SELECTED_TOOLTIP_FADE_END_ZOOM = 4.7;
+// Multi-select action card dock layout (mirrors dashboard MapSelectGrab rail).
+const SELECTION_ACTIONS_MAP_SELECT_GRAB_LEFT_PX = 26;
+const SELECTION_ACTIONS_MAP_VIEW_SIDE_PANEL_TOP_PX = 106;
+const SELECTION_ACTIONS_MAP_SELECT_GRAB_TOP_EXTENT_PX =
+	MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+	MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+	MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+	MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+	MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
+	MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+	MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
+	MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX;
+const SELECTION_ACTIONS_SHOWING_ABOVE_GRAB_ORIGIN_PX =
+	SELECTION_ACTIONS_MAP_SELECT_GRAB_TOP_EXTENT_PX + 17 + 6;
+const SELECTION_ACTIONS_DOCK_RAIL_WIDTH_PX = 66;
+const SELECTION_ACTIONS_DOCK_GAP_PX = 16;
+// Gap between the card and the selection's tooltip footprint when anchored.
+const SELECTION_ACTIONS_AROUND_SIDE_GAP_PX = 24;
+// Conservative first-frame obstacle before the tooltip placement effect has
+// published exact boxes. This prevents the card from flashing over the tooltip
+// on the initial selection frame.
+const SELECTION_ACTIONS_FALLBACK_TOOLTIP_HALF_W_PX = 210;
+const SELECTION_ACTIONS_FALLBACK_TOOLTIP_ABOVE_PX = 125;
+// The action card must also clear the selected marker/ring itself, not only the
+// tooltip. Use a little padding because selected marker rings pulse/scale.
+const SELECTION_ACTIONS_MARKER_CLEAR_RADIUS_PX = 40;
+// Continuous dock blend: the card eases from "anchored around the selection" to
+// "parked by the rail" as the view zooms out and/or the selection is panned
+// off-center — never a sudden snap. Fully anchored at/above the full-anchor zoom,
+// fully docked at/below the full-dock zoom, linearly blended between.
+const SELECTION_ACTIONS_ANCHOR_FULL_ZOOM = 6.5;
+const SELECTION_ACTIONS_DOCK_FULL_ZOOM = 4;
+// Pan blend: the cluster center stays fully anchored while inside the viewport
+// inset by COMFORT_PAD; past that it ramps to fully docked over DOCK_RAMP px.
+const SELECTION_ACTIONS_PAN_COMFORT_PAD_PX = 96;
+const SELECTION_ACTIONS_PAN_DOCK_RAMP_PX = 220;
+const SELECTION_ACTIONS_VIEWPORT_MARGIN_PX = 16;
+// Keep the docked card below the portaled top nav / search chrome (z-120+).
+const SELECTION_ACTIONS_MAP_VIEW_UI_SCALE = 0.85;
+const SELECTION_ACTIONS_TOP_BACKDROP_TOP_PX = 9;
+const SELECTION_ACTIONS_TOP_BACKDROP_HEIGHT_PX = 93;
+const SELECTION_ACTIONS_SEARCH_BAR_INPUT_HEIGHT_PX = 49;
+const SELECTION_ACTIONS_SEARCH_BAR_BOTTOM_INSET_PX = 4;
+const SELECTION_ACTIONS_TOP_CHROME_PAD_PX = 8;
+// Above the selection tooltips (HOVER_TOOLTIP_Z_INDEX ± a few) so the card never
+// hides behind them. Still inside the map subtree (body z-98), so the dashboard's
+// portaled top nav / side panel (z-120+) keeps painting above it.
+const SELECTION_ACTIONS_Z_INDEX = HOVER_TOOLTIP_Z_INDEX + 12;
+const readSelectionActionsTopChromeBottomPx = (): number => {
+	const scale = SELECTION_ACTIONS_MAP_VIEW_UI_SCALE;
+	const searchBarTop =
+		SELECTION_ACTIONS_TOP_BACKDROP_TOP_PX +
+		SELECTION_ACTIONS_TOP_BACKDROP_HEIGHT_PX * scale -
+		SELECTION_ACTIONS_SEARCH_BAR_BOTTOM_INSET_PX -
+		SELECTION_ACTIONS_SEARCH_BAR_INPUT_HEIGHT_PX * scale;
+	return (
+		searchBarTop +
+		SELECTION_ACTIONS_SEARCH_BAR_INPUT_HEIGHT_PX * scale +
+		SELECTION_ACTIONS_TOP_CHROME_PAD_PX
+	);
+};
+const SELECTED_TOOLTIP_STACK_MIN_SCALE = 0.9;
+const SELECTED_TOOLTIP_LEGACY_STACK_T = 0.18;
+const SELECTED_TOOLTIP_STACK_GROUP_SIZE = 10;
+const SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX = 6;
+const SELECTED_TOOLTIP_PLACEMENT_VIEWPORT_PADDING_PX = 8;
+const SELECTED_TOOLTIP_PLACEMENT_OVERLAP_WEIGHT = 200;
+const SELECTED_TOOLTIP_PLACEMENT_OVERFLOW_WEIGHT = 250;
+const SELECTED_TOOLTIP_PLACEMENT_DISTANCE_WEIGHT = 0.08;
+const SELECTED_TOOLTIP_PLACEMENT_MAX_RING = 18;
+const SELECTED_TOOLTIP_PLACEMENT_RING_STEP_PX = 28;
+const SELECTED_TOOLTIP_PLACEMENT_MIN_SEPARATION_PX = 2;
+// Stack cards use a tiny up-left offset, enough to read as a deck without
+// becoming a diagonal ribbon across the map.
+const SELECTED_TOOLTIP_STACK_OFFSET_X_PX = 3;
+const SELECTED_TOOLTIP_STACK_OFFSET_Y_PX = 6;
+const SELECTED_TOOLTIP_STACK_FAKE_BACK_COUNT = 3;
+const PEOPLE_TOOLTIP_FILL_COLOR = '#99E0FF';
+
+type SelectedCompactTooltipEntry = {
+	contact: ContactWithName;
+	coords: LatLngLiteral;
+	width: number;
+	height: number;
+	anchorY: number;
+	svg: string;
+	bodyFillColor: string;
+	categoryKey: string;
+	categoryFillColor: string;
+	selectedOrder: number;
+};
+
+type ProjectedSelectedTooltipEntry = SelectedCompactTooltipEntry & {
+	markerX: number;
+	markerY: number;
+	naturalX: number;
+	naturalY: number;
+	left: number;
+	top: number;
+	right: number;
+	bottom: number;
+	centerX: number;
+	centerY: number;
+};
+
+type SelectedTooltipStackGroup = {
+	id: string;
+	contactIds: number[];
+	count: number;
+	colors: string[];
+	width: number;
+	height: number;
+	svg: string;
+	bodyFillColor: string;
+};
+
+type SelectedTooltipStackPlacement = SelectedTooltipStackGroup & {
+	x: number;
+	y: number;
+	opacity?: number;
+	scale?: number;
+};
+
+type SelectedTooltipHoverHiddenTarget =
+	| { type: 'contact'; id: number }
+	| { type: 'stack'; id: string };
+
+type SelectedTooltipPlacementSide =
+	| 'top'
+	| 'right'
+	| 'left'
+	| 'bottom'
+	| 'top-right'
+	| 'top-left'
+	| 'bottom-right'
+	| 'bottom-left';
+
+type SelectedTooltipBounds = {
+	left: number;
+	top: number;
+	right: number;
+	bottom: number;
+};
+
+type SelectedTooltipIndividualPlacement = SelectedTooltipBounds & {
+	side: SelectedTooltipPlacementSide;
+	x: number;
+	y: number;
+	centerX: number;
+	centerY: number;
+	transformOrigin: string;
+	preferenceRank: number;
+};
+
+type SelectedTooltipViewport = {
+	width: number;
+	height: number;
+	padding: number;
+};
+
+const selectedTooltipHoverTargetsEqual = (
+	a: SelectedTooltipHoverHiddenTarget | null,
+	b: SelectedTooltipHoverHiddenTarget | null
+): boolean => a?.type === b?.type && a?.id === b?.id;
+
+const isClientPointInsideRect = (
+	clientX: number,
+	clientY: number,
+	rect: DOMRect
+): boolean =>
+	rect.width > 0 &&
+	rect.height > 0 &&
+	clientX >= rect.left &&
+	clientX <= rect.right &&
+	clientY >= rect.top &&
+	clientY <= rect.bottom;
+
+const selectedTooltipRectsOverlap = (
+	a: ProjectedSelectedTooltipEntry,
+	b: ProjectedSelectedTooltipEntry
+): boolean =>
+	a.left - SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX <
+		b.right + SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX &&
+	a.right + SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX >
+		b.left - SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX &&
+	a.top - SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX <
+		b.bottom + SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX &&
+	a.bottom + SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX >
+		b.top - SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX;
+
+const SELECTED_TOOLTIP_PLACEMENT_SIDES: SelectedTooltipPlacementSide[] = [
+	'top',
+	'right',
+	'left',
+	'bottom',
+	'top-right',
+	'top-left',
+	'bottom-right',
+	'bottom-left',
+];
+
+const getSelectedTooltipPlacementTransformOrigin = (
+	side: SelectedTooltipPlacementSide
+): string => {
+	switch (side) {
+		case 'bottom':
+			return 'top center';
+		case 'left':
+			return 'center right';
+		case 'right':
+			return 'center left';
+		case 'top-left':
+			return 'bottom right';
+		case 'top-right':
+			return 'bottom left';
+		case 'bottom-left':
+			return 'top right';
+		case 'bottom-right':
+			return 'top left';
+		case 'top':
+		default:
+			return 'bottom center';
+	}
+};
+
+const createSelectedTooltipPlacement = (
+	entry: ProjectedSelectedTooltipEntry,
+	side: SelectedTooltipPlacementSide,
+	gapPx: number,
+	preferenceRank: number
+): SelectedTooltipIndividualPlacement => {
+	const { markerX, markerY, width, height } = entry;
+	let x = markerX - width / 2;
+	let y = markerY - height - gapPx;
+
+	switch (side) {
+		case 'bottom':
+			x = markerX - width / 2;
+			y = markerY + gapPx;
+			break;
+		case 'left':
+			x = markerX - width - gapPx;
+			y = markerY - height / 2;
+			break;
+		case 'right':
+			x = markerX + gapPx;
+			y = markerY - height / 2;
+			break;
+		case 'top-left':
+			x = markerX - width - gapPx;
+			y = markerY - height - gapPx;
+			break;
+		case 'top-right':
+			x = markerX + gapPx;
+			y = markerY - height - gapPx;
+			break;
+		case 'bottom-left':
+			x = markerX - width - gapPx;
+			y = markerY + gapPx;
+			break;
+		case 'bottom-right':
+			x = markerX + gapPx;
+			y = markerY + gapPx;
+			break;
+		case 'top':
+		default:
+			break;
+	}
+
+	return {
+		side,
+		x,
+		y,
+		left: x,
+		top: y,
+		right: x + width,
+		bottom: y + height,
+		centerX: x + width / 2,
+		centerY: y + height / 2,
+		transformOrigin: getSelectedTooltipPlacementTransformOrigin(side),
+		preferenceRank,
+	};
+};
+
+const getSelectedTooltipOverlapArea = (
+	a: SelectedTooltipBounds,
+	b: SelectedTooltipBounds
+): number => {
+	const overlapWidth = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+	const overlapHeight = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+	return overlapWidth * overlapHeight;
+};
+
+const selectedTooltipBoundsOverlap = (
+	a: SelectedTooltipBounds,
+	b: SelectedTooltipBounds,
+	paddingPx = 0
+): boolean =>
+	a.left - paddingPx < b.right + paddingPx &&
+	a.right + paddingPx > b.left - paddingPx &&
+	a.top - paddingPx < b.bottom + paddingPx &&
+	a.bottom + paddingPx > b.top - paddingPx;
+
+const selectedTooltipPlacementOverlapsAny = (
+	placement: SelectedTooltipIndividualPlacement,
+	blockingBounds: SelectedTooltipBounds[]
+): boolean =>
+	blockingBounds.some((bounds) =>
+		selectedTooltipBoundsOverlap(
+			placement,
+			bounds,
+			SELECTED_TOOLTIP_PLACEMENT_MIN_SEPARATION_PX
+		)
+	);
+
+const getSelectedTooltipViewportOverflowArea = (
+	placement: SelectedTooltipIndividualPlacement,
+	viewport: SelectedTooltipViewport | null
+): number => {
+	if (!viewport) return 0;
+	const minX = viewport.padding;
+	const minY = viewport.padding;
+	const maxX = viewport.width - viewport.padding;
+	const maxY = viewport.height - viewport.padding;
+	const visibleLeft = clamp(placement.left, minX, maxX);
+	const visibleRight = clamp(placement.right, minX, maxX);
+	const visibleTop = clamp(placement.top, minY, maxY);
+	const visibleBottom = clamp(placement.bottom, minY, maxY);
+	const visibleArea =
+		Math.max(0, visibleRight - visibleLeft) *
+		Math.max(0, visibleBottom - visibleTop);
+	const totalArea =
+		Math.max(0, placement.right - placement.left) *
+		Math.max(0, placement.bottom - placement.top);
+	return Math.max(0, totalArea - visibleArea);
+};
+
+const scoreSelectedTooltipPlacement = (
+	entry: ProjectedSelectedTooltipEntry,
+	placement: SelectedTooltipIndividualPlacement,
+	placedTooltips: SelectedTooltipIndividualPlacement[],
+	viewport: SelectedTooltipViewport | null
+): number => {
+	const overlapArea = placedTooltips.reduce(
+		(sum, placed) => sum + getSelectedTooltipOverlapArea(placement, placed),
+		0
+	);
+	const overflowArea = getSelectedTooltipViewportOverflowArea(placement, viewport);
+	const distanceFromNatural = Math.hypot(
+		placement.x - entry.naturalX,
+		placement.y - entry.naturalY
+	);
+	return (
+		overlapArea * SELECTED_TOOLTIP_PLACEMENT_OVERLAP_WEIGHT +
+		overflowArea * SELECTED_TOOLTIP_PLACEMENT_OVERFLOW_WEIGHT +
+		distanceFromNatural * SELECTED_TOOLTIP_PLACEMENT_DISTANCE_WEIGHT +
+		placement.preferenceRank
+	);
+};
+
+const createSelectedTooltipFallbackPlacement = (
+	entry: ProjectedSelectedTooltipEntry,
+	blockingBounds: SelectedTooltipBounds[],
+	gapPx: number
+): SelectedTooltipIndividualPlacement => {
+	let placement = createSelectedTooltipPlacement(
+		entry,
+		'bottom',
+		gapPx,
+		SELECTED_TOOLTIP_PLACEMENT_SIDES.length
+	);
+
+	while (selectedTooltipPlacementOverlapsAny(placement, blockingBounds)) {
+		const nextY =
+			blockingBounds.reduce((bottom, bounds) => Math.max(bottom, bounds.bottom), placement.y) +
+			SELECTED_TOOLTIP_PLACEMENT_MIN_SEPARATION_PX;
+		const nextX = entry.markerX - entry.width / 2;
+		placement = {
+			...placement,
+			x: nextX,
+			y: nextY,
+			left: nextX,
+			top: nextY,
+			right: nextX + entry.width,
+			bottom: nextY + entry.height,
+			centerX: nextX + entry.width / 2,
+			centerY: nextY + entry.height / 2,
+			transformOrigin: 'top center',
+		};
+	}
+
+	return placement;
+};
+
+const buildSelectedTooltipIndividualPlacements = (
+	projectedEntries: ProjectedSelectedTooltipEntry[],
+	hiddenContactIds: ReadonlySet<number>,
+	blockingBounds: SelectedTooltipBounds[],
+	viewport: SelectedTooltipViewport | null,
+	gapPx: number
+): Map<number, SelectedTooltipIndividualPlacement> => {
+	const placements = new Map<number, SelectedTooltipIndividualPlacement>();
+	const placedBounds: SelectedTooltipBounds[] = [...blockingBounds];
+	const placedTooltips: SelectedTooltipIndividualPlacement[] = [];
+	const visibleEntries = projectedEntries
+		.filter((entry) => !hiddenContactIds.has(entry.contact.id))
+		.slice()
+		.sort((a, b) => a.selectedOrder - b.selectedOrder);
+
+	for (const entry of visibleEntries) {
+		let bestPlacement: SelectedTooltipIndividualPlacement | null = null;
+		let bestScore = Number.POSITIVE_INFINITY;
+
+		for (let ring = 0; ring <= SELECTED_TOOLTIP_PLACEMENT_MAX_RING; ring += 1) {
+			const ringGapPx = gapPx + ring * SELECTED_TOOLTIP_PLACEMENT_RING_STEP_PX;
+			for (let index = 0; index < SELECTED_TOOLTIP_PLACEMENT_SIDES.length; index += 1) {
+				const side = SELECTED_TOOLTIP_PLACEMENT_SIDES[index];
+				const placement = createSelectedTooltipPlacement(
+					entry,
+					side,
+					ringGapPx,
+					ring * SELECTED_TOOLTIP_PLACEMENT_SIDES.length + index
+				);
+				if (selectedTooltipPlacementOverlapsAny(placement, placedBounds)) continue;
+
+				const score = scoreSelectedTooltipPlacement(
+					entry,
+					placement,
+					placedTooltips,
+					viewport
+				);
+				if (score < bestScore) {
+					bestScore = score;
+					bestPlacement = placement;
+				}
+			}
+		}
+
+		const placement =
+			bestPlacement ??
+			createSelectedTooltipFallbackPlacement(entry, placedBounds, gapPx);
+		placements.set(entry.contact.id, placement);
+		placedBounds.push(placement);
+		placedTooltips.push(placement);
+	}
+
+	return placements;
+};
+
+const getSelectedTooltipGroupColors = (
+	entries: ProjectedSelectedTooltipEntry[]
+): string[] => {
+	const colors: string[] = [];
+	const seen = new Set<string>();
+	for (const entry of entries) {
+		const color = entry.bodyFillColor || entry.categoryFillColor || PEOPLE_TOOLTIP_FILL_COLOR;
+		if (seen.has(color)) continue;
+		seen.add(color);
+		colors.push(color);
+		if (colors.length >= SELECTED_TOOLTIP_STACK_FAKE_BACK_COUNT + 1) break;
+	}
+	return colors.length > 0 ? colors : [PEOPLE_TOOLTIP_FILL_COLOR];
+};
+
+const getSelectedTooltipStackBounds = (placement: SelectedTooltipStackPlacement) => {
+	const backLayerCount = Math.min(
+		SELECTED_TOOLTIP_STACK_FAKE_BACK_COUNT,
+		Math.max(0, placement.count - 1)
+	);
+	return {
+		left:
+			placement.x -
+			backLayerCount * SELECTED_TOOLTIP_STACK_OFFSET_X_PX -
+			SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX,
+		top:
+			placement.y -
+			backLayerCount * SELECTED_TOOLTIP_STACK_OFFSET_Y_PX -
+			SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX,
+		right:
+			placement.x +
+			placement.width +
+			SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX,
+		bottom:
+			placement.y +
+			placement.height +
+			SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX,
+	};
+};
+
+const selectedTooltipStackPlacementsOverlap = (
+	a: SelectedTooltipStackPlacement,
+	b: SelectedTooltipStackPlacement
+): boolean => {
+	const aBounds = getSelectedTooltipStackBounds(a);
+	const bBounds = getSelectedTooltipStackBounds(b);
+	return (
+		aBounds.left < bBounds.right &&
+		aBounds.right > bBounds.left &&
+		aBounds.top < bBounds.bottom &&
+		aBounds.bottom > bBounds.top
+	);
+};
+
+const mergeSelectedTooltipStackPlacements = (
+	placements: SelectedTooltipStackPlacement[]
+): SelectedTooltipStackPlacement => {
+	const frontPlacement = placements
+		.slice()
+		.sort((a, b) => b.count - a.count || b.width - a.width || a.y - b.y)[0];
+	const contactIds: number[] = [];
+	const seenContactIds = new Set<number>();
+	const colors: string[] = [];
+	const seenColors = new Set<string>();
+
+	for (const placement of placements) {
+		for (const contactId of placement.contactIds) {
+			if (seenContactIds.has(contactId)) continue;
+			seenContactIds.add(contactId);
+			contactIds.push(contactId);
+		}
+		for (const color of placement.colors) {
+			if (seenColors.has(color)) continue;
+			seenColors.add(color);
+			colors.push(color);
+		}
+	}
+
+	const totalCount = contactIds.length;
+	const weightedCenterX =
+		placements.reduce(
+			(sum, placement) => sum + (placement.x + placement.width / 2) * placement.count,
+			0
+		) / Math.max(1, placements.reduce((sum, placement) => sum + placement.count, 0));
+	const topY = Math.min(...placements.map((placement) => placement.y));
+
+	return {
+		id: `selected-stack-${contactIds.join('-')}`,
+		contactIds,
+		count: totalCount,
+		colors: colors.length > 0 ? colors.slice(0, SELECTED_TOOLTIP_STACK_FAKE_BACK_COUNT + 1) : [PEOPLE_TOOLTIP_FILL_COLOR],
+		width: frontPlacement.width,
+		height: frontPlacement.height,
+		svg: frontPlacement.svg,
+		bodyFillColor: frontPlacement.bodyFillColor,
+		x: weightedCenterX - frontPlacement.width / 2,
+		y: topY,
+	};
+};
+
+const compressOverlappingSelectedTooltipStacks = (
+	placements: SelectedTooltipStackPlacement[]
+): SelectedTooltipStackPlacement[] => {
+	let current = placements;
+	let didMerge = true;
+
+	while (didMerge && current.length > 1) {
+		didMerge = false;
+		const visited = new Set<number>();
+		const next: SelectedTooltipStackPlacement[] = [];
+
+		for (let startIndex = 0; startIndex < current.length; startIndex += 1) {
+			if (visited.has(startIndex)) continue;
+			const queue = [startIndex];
+			const component: SelectedTooltipStackPlacement[] = [];
+			visited.add(startIndex);
+
+			while (queue.length > 0) {
+				const index = queue.shift();
+				if (index == null) continue;
+				const placement = current[index];
+				component.push(placement);
+
+				for (let nextIndex = 0; nextIndex < current.length; nextIndex += 1) {
+					if (visited.has(nextIndex)) continue;
+					if (!selectedTooltipStackPlacementsOverlap(placement, current[nextIndex])) continue;
+					visited.add(nextIndex);
+					queue.push(nextIndex);
+				}
+			}
+
+			if (component.length > 1) {
+				didMerge = true;
+				next.push(mergeSelectedTooltipStackPlacements(component));
+			} else {
+				next.push(component[0]);
+			}
+		}
+
+		current = next;
+	}
+
+	return current;
+};
+
+const buildSelectedTooltipStackPlacements = (
+	projectedEntries: ProjectedSelectedTooltipEntry[]
+): SelectedTooltipStackPlacement[] => {
+	if (projectedEntries.length <= SELECTED_TOOLTIP_STACK_GROUP_SIZE) return [];
+
+	const components: ProjectedSelectedTooltipEntry[][] = [];
+	const visited = new Set<number>();
+
+	for (let startIndex = 0; startIndex < projectedEntries.length; startIndex += 1) {
+		if (visited.has(startIndex)) continue;
+
+		const queue = [startIndex];
+		const component: ProjectedSelectedTooltipEntry[] = [];
+		visited.add(startIndex);
+
+		while (queue.length > 0) {
+			const index = queue.shift();
+			if (index == null) continue;
+			const entry = projectedEntries[index];
+			component.push(entry);
+
+			for (let nextIndex = 0; nextIndex < projectedEntries.length; nextIndex += 1) {
+				if (visited.has(nextIndex)) continue;
+				if (!selectedTooltipRectsOverlap(entry, projectedEntries[nextIndex])) continue;
+				visited.add(nextIndex);
+				queue.push(nextIndex);
+			}
+		}
+
+		components.push(component);
+	}
+
+	const placements: SelectedTooltipStackPlacement[] = [];
+	for (const component of components) {
+		if (component.length <= 1) continue;
+
+		const sorted = component.slice().sort((a, b) => {
+			const yDelta = a.centerY - b.centerY;
+			if (Math.abs(yDelta) > 1) return yDelta;
+			const xDelta = a.centerX - b.centerX;
+			if (Math.abs(xDelta) > 1) return xDelta;
+			return a.selectedOrder - b.selectedOrder;
+		});
+
+		for (
+			let startIndex = 0;
+			startIndex < sorted.length;
+			startIndex += SELECTED_TOOLTIP_STACK_GROUP_SIZE
+		) {
+			const groupEntries = sorted.slice(
+				startIndex,
+				startIndex + SELECTED_TOOLTIP_STACK_GROUP_SIZE
+			);
+			if (groupEntries.length <= 1) continue;
+
+			const centerX =
+				groupEntries.reduce((sum, entry) => sum + entry.centerX, 0) / groupEntries.length;
+			const topY = Math.min(...groupEntries.map((entry) => entry.top));
+			const frontEntry =
+				groupEntries
+					.slice()
+					.sort((a, b) => a.selectedOrder - b.selectedOrder)
+					.at(-1) ?? groupEntries[groupEntries.length - 1];
+			const contactIds = groupEntries
+				.slice()
+				.sort((a, b) => a.selectedOrder - b.selectedOrder)
+				.map((entry) => entry.contact.id);
+
+			placements.push({
+				id: `selected-stack-${contactIds.join('-')}`,
+				contactIds,
+				count: groupEntries.length,
+				colors: getSelectedTooltipGroupColors(groupEntries),
+				width: frontEntry.width,
+				height: frontEntry.height,
+				svg: frontEntry.svg,
+				bodyFillColor: frontEntry.bodyFillColor,
+				x: centerX - frontEntry.width / 2,
+				y: topY,
+			});
+		}
+	}
+
+	return compressOverlappingSelectedTooltipStacks(placements);
+};
 
 // The opportunity markers reuse the owned-venue radar builders per event center,
 // re-keying each feature id so features from different events never collide inside a
@@ -948,6 +1668,22 @@ const withFeatureFillOpacity = (opacityExpr: any): any =>
 const withFeatureStrokeOpacity = (opacityExpr: any): any =>
 	withFeatureOpacityFactor(opacityExpr, FEATURE_STROKE_OPACITY_FACTOR);
 
+const buildBaseMarkerVisibilityFilter = (
+	visibleIds: number[],
+	zoom: number,
+	campaignFootprintContactIds: ReadonlySet<number>
+): any => {
+	const effectiveVisibleIds =
+		zoom >= CAMPAIGN_FOOTPRINT_REPLACE_MARKER_MIN_ZOOM &&
+		campaignFootprintContactIds.size > 0
+			? visibleIds.filter((id) => !campaignFootprintContactIds.has(id))
+			: visibleIds;
+
+	return effectiveVisibleIds.length === 0
+		? ['==', ['id'], -1]
+		: ['match', ['id'], effectiveVisibleIds, true, false];
+};
+
 type AllContactsOverlayFetchMode = 'all' | 'ambient';
 type AllContactsOverlayFetchPhase = 'visible' | 'buffer';
 type AllContactsOverlayFetchBbox = BoundingBox & {
@@ -1005,6 +1741,21 @@ export interface SearchResultsMapProps {
 	campaignMarkerMode?: 'category' | 'status';
 	/** Per-contact campaign status used when `campaignMarkerMode` is `status`. */
 	campaignContactStatusById?: ReadonlyMap<number, CampaignContactMapStatus>;
+	/**
+	 * Tint for the campaign selection heatmap glow (rendered behind the status
+	 * pins). `null`/absent disables the glow. Only takes effect in
+	 * `campaignMarkerMode === 'status'`.
+	 */
+	campaignHeatmapColor?: string | null;
+	/**
+	 * When true, the heatmap glow shows the whole tab set while nothing is
+	 * selected (ambient mode — used by the Inbox tab). When false/absent, the
+	 * glow is selection-only and stays hidden until contacts are selected
+	 * (Contacts and Drafts tabs).
+	 */
+	campaignHeatmapAmbient?: boolean;
+	/** Real contacts from the active campaign, rendered as a subtle non-interactive footprint under search results. */
+	campaignFootprintContacts?: ContactWithName[];
 	/** When true, renders a browse-oriented all-contact atlas while search results are visually disengaged. */
 	ambientContactsEnabled?: boolean;
 	/** When true, warms the ambient atlas cache before the user disengages the search. */
@@ -1060,10 +1811,11 @@ export interface SearchResultsMapProps {
 	onMarkerHover?: (contact: ContactWithName | null, meta?: MarkerHoverMeta) => void;
 	onToggleSelection?: (contactId: number) => void;
 	/**
-	 * Multi-select action card (dashboard search map). When >= 2 contacts are
-	 * selected, a floating card anchored to the selection centroid offers these
-	 * actions. Providing `onAddSelectionToFolder` is what opts a host into showing
-	 * the card, so it never appears in the campaign/venue maps.
+	 * Multi-select action card (dashboard search map). When >= 1 contacts are
+	 * selected, a floating card offers these actions. While the selection is
+	 * on-screen at street zoom it tracks the top-most dot; otherwise it docks
+	 * beside the left "Showing" rail (venue-portal pill pattern). Providing
+	 * `onAddSelectionToFolder` opts a host into showing the card.
 	 */
 	onAddSelectionToFolder?: () => void;
 	onWriteSelectionMessage?: () => void;
@@ -1232,6 +1984,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	categoryConstellationsEnabled = false,
 	campaignMarkerMode = 'category',
 	campaignContactStatusById,
+	campaignHeatmapColor = null,
+	campaignHeatmapAmbient = false,
+	campaignFootprintContacts = [],
 	ambientContactsEnabled = false,
 	ambientContactsPreloadEnabled = false,
 	ambientActiveCategories,
@@ -1589,6 +2344,66 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const fadingTooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const mapContainerRef = useRef<HTMLDivElement | null>(null);
 	const hoverTooltipOverlayRef = useRef<HTMLDivElement | null>(null);
+	const [selectedTooltipHoverHiddenTarget, setSelectedTooltipHoverHiddenTarget] =
+		useState<SelectedTooltipHoverHiddenTarget | null>(null);
+	const selectedTooltipHoverHiddenTargetRef =
+		useRef<SelectedTooltipHoverHiddenTarget | null>(null);
+	const setSelectedTooltipHoverHiddenTargetIfChanged = useCallback(
+		(target: SelectedTooltipHoverHiddenTarget | null) => {
+			if (selectedTooltipHoverTargetsEqual(selectedTooltipHoverHiddenTargetRef.current, target))
+				return;
+			selectedTooltipHoverHiddenTargetRef.current = target;
+			setSelectedTooltipHoverHiddenTarget(target);
+		},
+		[]
+	);
+	const selectedCompactTooltipRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+	const registerSelectedCompactTooltipEl = useCallback(
+		(id: number, el: HTMLDivElement | null) => {
+			if (el) {
+				selectedCompactTooltipRefs.current.set(id, el);
+			} else {
+				selectedCompactTooltipRefs.current.delete(id);
+			}
+		},
+		[]
+	);
+	const selectedTooltipStackRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+	const selectedTooltipStackSignatureRef = useRef('');
+	const selectedTooltipStackSelectionKeyRef = useRef('');
+	const [selectedTooltipStackGroups, setSelectedTooltipStackGroups] = useState<
+		SelectedTooltipStackGroup[]
+	>([]);
+	const registerSelectedTooltipStackEl = useCallback(
+		(id: string, el: HTMLDivElement | null) => {
+			if (el) {
+				selectedTooltipStackRefs.current.set(id, el);
+			} else {
+				selectedTooltipStackRefs.current.delete(id);
+			}
+		},
+		[]
+	);
+	const updateSelectedTooltipHoverHiddenTarget = useCallback(
+		(clientX: number, clientY: number) => {
+			for (const [id, el] of selectedTooltipStackRefs.current) {
+				if (isClientPointInsideRect(clientX, clientY, el.getBoundingClientRect())) {
+					setSelectedTooltipHoverHiddenTargetIfChanged({ type: 'stack', id });
+					return;
+				}
+			}
+
+			for (const [id, el] of selectedCompactTooltipRefs.current) {
+				if (isClientPointInsideRect(clientX, clientY, el.getBoundingClientRect())) {
+					setSelectedTooltipHoverHiddenTargetIfChanged({ type: 'contact', id });
+					return;
+				}
+			}
+
+			setSelectedTooltipHoverHiddenTargetIfChanged(null);
+		},
+		[setSelectedTooltipHoverHiddenTargetIfChanged]
+	);
 	const streetCardOverlayRef = useRef<HTMLDivElement | null>(null);
 	// Persistent street-view research cards: container + per-contact card elements,
 	// positioned imperatively by a single shared 'move' listener.
@@ -2361,7 +3176,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			| undefined;
 		if (!glowSource || !ringsSource || !pulseSource) return;
 
-		const clearPulse = () => pulseSource.setData(emptyFeatureCollection());
+		const clearPulse = () => {
+			try {
+				pulseSource.setData(emptyFeatureCollection());
+			} catch {
+				// Non-fatal; source may be tearing down.
+			}
+		};
 
 		if (!ownedVenueCenter) {
 			clearPulse();
@@ -2394,23 +3215,46 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lastFrameMs = nowMs;
 
 			const phase = (nowMs % OWNED_VENUE_RADAR_MS) / OWNED_VENUE_RADAR_MS;
-			glowSource.setData({
-				type: 'FeatureCollection',
-				features: buildOwnedVenueGlowFeatures(ownedVenueCenter, phase, true),
-			});
-			ringsSource.setData({
-				type: 'FeatureCollection',
-				features: buildOwnedVenueRadarLineFeatures(ownedVenueCenter, phase, {
-					animated: true,
-				}),
-			});
-			pulseSource.setData({
-				type: 'FeatureCollection',
-				features: buildOwnedVenueRadarLineFeatures(ownedVenueCenter, phase, {
-					animated: true,
-					bloom: true,
-				}),
-			});
+			// Re-fetch the sources each tick: the once-captured refs go stale if a
+			// source is invalidated under rapid camera churn, and setData() on a stale
+			// source throws — uncaught in rAF, which would crash the whole app.
+			const glow = map.getSource(MAPBOX_SOURCE_IDS.ownedVenueGlow) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			const rings = map.getSource(MAPBOX_SOURCE_IDS.ownedVenueRings) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			const pulse = map.getSource(MAPBOX_SOURCE_IDS.ownedVenuePulse) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			if (!glow || !rings || !pulse) {
+				ownedVenuePulseRafRef.current = window.requestAnimationFrame(animateRadar);
+				return;
+			}
+			try {
+				glow.setData({
+					type: 'FeatureCollection',
+					features: buildOwnedVenueGlowFeatures(ownedVenueCenter, phase, true),
+				});
+				rings.setData({
+					type: 'FeatureCollection',
+					features: buildOwnedVenueRadarLineFeatures(ownedVenueCenter, phase, {
+						animated: true,
+					}),
+				});
+				pulse.setData({
+					type: 'FeatureCollection',
+					features: buildOwnedVenueRadarLineFeatures(ownedVenueCenter, phase, {
+						animated: true,
+						bloom: true,
+					}),
+				});
+			} catch {
+				// Source transiently invalid mid-churn; stop cleanly. The effect
+				// re-arms on the next map / center change.
+				cancelled = true;
+				return;
+			}
 
 			ownedVenuePulseRafRef.current = window.requestAnimationFrame(animateRadar);
 		};
@@ -2506,7 +3350,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			| undefined;
 		if (!glowSource || !ringsSource || !pulseSource) return;
 
-		const clearPulse = () => pulseSource.setData(emptyFeatureCollection());
+		const clearPulse = () => {
+			try {
+				pulseSource.setData(emptyFeatureCollection());
+			} catch {
+				// Non-fatal; source may be tearing down.
+			}
+		};
 
 		if (eventCenters.length === 0) {
 			clearPulse();
@@ -2539,23 +3389,46 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lastFrameMs = nowMs;
 
 			const phase = (nowMs % OWNED_VENUE_RADAR_MS) / OWNED_VENUE_RADAR_MS;
-			glowSource.setData({
-				type: 'FeatureCollection',
-				features: buildEventsGlowFeatures(eventCenters, phase, true),
-			});
-			ringsSource.setData({
-				type: 'FeatureCollection',
-				features: buildEventsRadarLineFeatures(eventCenters, phase, {
-					animated: true,
-				}),
-			});
-			pulseSource.setData({
-				type: 'FeatureCollection',
-				features: buildEventsRadarLineFeatures(eventCenters, phase, {
-					animated: true,
-					bloom: true,
-				}),
-			});
+			// Re-fetch the sources each tick: the once-captured refs go stale if a
+			// source is invalidated under rapid camera churn, and setData() on a stale
+			// source throws — uncaught in rAF, which would crash the whole app.
+			const glow = map.getSource(MAPBOX_SOURCE_IDS.eventsGlow) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			const rings = map.getSource(MAPBOX_SOURCE_IDS.eventsRings) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			const pulse = map.getSource(MAPBOX_SOURCE_IDS.eventsPulse) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			if (!glow || !rings || !pulse) {
+				eventsPulseRafRef.current = window.requestAnimationFrame(animateRadar);
+				return;
+			}
+			try {
+				glow.setData({
+					type: 'FeatureCollection',
+					features: buildEventsGlowFeatures(eventCenters, phase, true),
+				});
+				rings.setData({
+					type: 'FeatureCollection',
+					features: buildEventsRadarLineFeatures(eventCenters, phase, {
+						animated: true,
+					}),
+				});
+				pulse.setData({
+					type: 'FeatureCollection',
+					features: buildEventsRadarLineFeatures(eventCenters, phase, {
+						animated: true,
+						bloom: true,
+					}),
+				});
+			} catch {
+				// Source transiently invalid mid-churn; stop cleanly. The effect
+				// re-arms on the next map / centers change.
+				cancelled = true;
+				return;
+			}
 
 			eventsPulseRafRef.current = window.requestAnimationFrame(animateRadar);
 		};
@@ -6621,6 +7494,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		ensureSource(MAPBOX_SOURCE_IDS.markerConstellation);
 		ensureSource(MAPBOX_SOURCE_IDS.markerConstellationSelected);
 		ensureSource(MAPBOX_SOURCE_IDS.markerConstellationNodes);
+		ensureSource(MAPBOX_SOURCE_IDS.campaignFootprintPoints);
+		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.campaignFootprintLines)) {
+			mapInstance.addSource(MAPBOX_SOURCE_IDS.campaignFootprintLines, {
+				type: 'geojson',
+				data: emptyFc,
+				lineMetrics: true,
+			});
+		}
+		ensureSource(MAPBOX_SOURCE_IDS.campaignFootprintNodes);
 		ensureSource(MAPBOX_SOURCE_IDS.selectedAreaRect);
 		ensureSource(MAPBOX_SOURCE_IDS.selectionRect);
 
@@ -6634,6 +7516,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		ensureSource(MAPBOX_SOURCE_IDS.markersPromotionDot);
 		ensureSource(MAPBOX_SOURCE_IDS.markersBase);
 		ensureSource(MAPBOX_SOURCE_IDS.markersSelected);
+		ensureSource(MAPBOX_SOURCE_IDS.campaignHeatmap);
 		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueGlow);
 		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueRings);
 		ensureSource(MAPBOX_SOURCE_IDS.ownedVenuePulse);
@@ -6845,6 +7728,70 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			24,
 			['*', RESULT_DOT_SCALE_MAX, resultDotHoverRadiusScaleExpr],
 		];
+		// Selected status dot (campaign Write/Drafts/Inbox): bigger blue circle.
+		// Gated on the per-feature `statusMode` flag AND the `selected` feature-state
+		// so category-mode / dashboard pick-flow dots (statusMode:false) are untouched.
+		const isSelectedStatusDotExpr: any = [
+			'all',
+			['boolean', ['get', 'statusMode'], false],
+			['boolean', ['feature-state', 'selected'], false],
+		];
+		// `zoom` must stay the OUTERMOST input of an interpolate/step (mapbox-gl v3), so
+		// the selected-size boost is folded into each stop as a per-feature multiplier
+		// rather than wrapping two interpolates in a `case` (which nests zoom and errors).
+		const selectedStatusDotRadiusMultiplierExpr = [
+			'case',
+			isSelectedStatusDotExpr,
+			SELECTED_STATUS_DOT_RADIUS_SCALE,
+			1,
+		];
+		const baseDotsRadiusExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			[
+				'*',
+				RESULT_DOT_SCALE_MIN,
+				resultDotHoverRadiusScaleExpr,
+				selectedStatusDotRadiusMultiplierExpr,
+			],
+			RESULT_DOT_ZOOM_MIN,
+			[
+				'*',
+				RESULT_DOT_SCALE_MIN,
+				resultDotHoverRadiusScaleExpr,
+				selectedStatusDotRadiusMultiplierExpr,
+			],
+			RESULT_DOT_ZOOM_MAX,
+			[
+				'*',
+				RESULT_DOT_SCALE_MAX,
+				resultDotHoverRadiusScaleExpr,
+				selectedStatusDotRadiusMultiplierExpr,
+			],
+			24,
+			[
+				'*',
+				RESULT_DOT_SCALE_MAX,
+				resultDotHoverRadiusScaleExpr,
+				selectedStatusDotRadiusMultiplierExpr,
+			],
+		];
+		// `sent` status dots are drawn hollow (fillOpacity 0, strokeOpacity 0.3); when
+		// selected they must read as a solid blue disc, so force the opacity factors to 1.
+		const selectedAwareFillFactor: any = [
+			'case',
+			isSelectedStatusDotExpr,
+			1,
+			FEATURE_FILL_OPACITY_FACTOR,
+		];
+		const selectedAwareStrokeFactor: any = [
+			'case',
+			isSelectedStatusDotExpr,
+			1,
+			FEATURE_STROKE_OPACITY_FACTOR,
+		];
 		const resultDotGlowRadiusExpr = [
 			'interpolate',
 			['linear'],
@@ -6870,6 +7817,42 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			['*', RESULT_DOT_GLOW_RADIUS_MAX_PX, resultDotRadiusScaleExpr],
 			24,
 			['*', RESULT_DOT_GLOW_RADIUS_MAX_PX, resultDotRadiusScaleExpr],
+		];
+		// Grow the invisible hit target in step with the bigger selected status dot so
+		// the larger circle stays comfortably clickable (the dot must never exceed it).
+		// Same zoom-outermost rule: fold the multiplier into each stop.
+		const baseHitRadiusExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			[
+				'*',
+				RESULT_DOT_GLOW_RADIUS_MIN_PX,
+				resultDotRadiusScaleExpr,
+				selectedStatusDotRadiusMultiplierExpr,
+			],
+			RESULT_DOT_ZOOM_MIN,
+			[
+				'*',
+				RESULT_DOT_GLOW_RADIUS_MIN_PX,
+				resultDotRadiusScaleExpr,
+				selectedStatusDotRadiusMultiplierExpr,
+			],
+			RESULT_DOT_ZOOM_MAX,
+			[
+				'*',
+				RESULT_DOT_GLOW_RADIUS_MAX_PX,
+				resultDotRadiusScaleExpr,
+				selectedStatusDotRadiusMultiplierExpr,
+			],
+			24,
+			[
+				'*',
+				RESULT_DOT_GLOW_RADIUS_MAX_PX,
+				resultDotRadiusScaleExpr,
+				selectedStatusDotRadiusMultiplierExpr,
+			],
 		];
 
 		const allOverlayRadiusLow = RESULT_DOT_SCALE_MIN * 0.72;
@@ -7245,6 +8228,178 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			MAPBOX_LAYER_IDS.markerConstellationGlow
 		);
 
+		// Campaign selection heatmap glow — a soft colored cloud behind the status
+		// pins and constellation lines. Inserted before the constellation glow so it
+		// sits under all linework/markers but above the basemap and curated blob.
+		ensureLayer(
+			{
+				id: MAPBOX_LAYER_IDS.campaignHeatmapGlow,
+				type: 'circle',
+				source: MAPBOX_SOURCE_IDS.campaignHeatmap,
+				paint: {
+					'circle-radius': campaignHeatmapGlowRadiusExpr,
+					'circle-color': ['coalesce', ['get', 'glowColor'], '#FFA5A5'],
+					'circle-opacity': [
+						'*',
+						CAMPAIGN_HEATMAP_GLOW_OPACITY_MAX,
+						['coalesce', ['get', 'glowFade'], 1],
+					],
+					'circle-blur': CAMPAIGN_HEATMAP_GLOW_BLUR,
+					'circle-stroke-width': 0,
+				},
+			},
+			MAPBOX_LAYER_IDS.markerConstellationGlow
+		);
+
+		// Active-campaign footprint — real campaign contacts rendered as subtle
+		// background context under the live search result constellation/markers.
+		ensureLayer(
+			{
+				id: MAPBOX_LAYER_IDS.campaignFootprintGlow,
+				type: 'circle',
+				source: MAPBOX_SOURCE_IDS.campaignFootprintPoints,
+				paint: {
+					'circle-radius': campaignFootprintGlowRadiusExpr,
+					'circle-color': CAMPAIGN_FOOTPRINT_COLOR,
+					'circle-opacity': CAMPAIGN_FOOTPRINT_GLOW_OPACITY,
+					'circle-blur': 1.45,
+					'circle-stroke-width': 0,
+				},
+			},
+			MAPBOX_LAYER_IDS.markerConstellationGlow
+		);
+		ensureLayer(
+			{
+				id: MAPBOX_LAYER_IDS.campaignFootprintLineGlow,
+				type: 'line',
+				source: MAPBOX_SOURCE_IDS.campaignFootprintLines,
+				layout: { 'line-join': 'round', 'line-cap': 'round' },
+				paint: {
+					'line-color': CAMPAIGN_FOOTPRINT_LINE_COLOR,
+					'line-gradient': [
+						'interpolate',
+						['linear'],
+						['line-progress'],
+						0,
+						'rgba(143, 180, 242, 0)',
+						0.18,
+						CAMPAIGN_FOOTPRINT_LINE_COLOR,
+						0.5,
+						'#CFE0FF',
+						0.82,
+						CAMPAIGN_FOOTPRINT_LINE_COLOR,
+						1,
+						'rgba(143, 180, 242, 0)',
+					],
+					'line-opacity': [
+						'*',
+						CAMPAIGN_FOOTPRINT_LINE_GLOW_OPACITY,
+						['coalesce', ['get', 'lineOpacity'], 1],
+					],
+					'line-width': campaignFootprintLineGlowWidthExpr,
+					'line-blur': 1.85,
+				},
+			},
+			MAPBOX_LAYER_IDS.markerConstellationGlow
+		);
+		ensureLayer(
+			{
+				id: MAPBOX_LAYER_IDS.campaignFootprintLineCore,
+				type: 'line',
+				source: MAPBOX_SOURCE_IDS.campaignFootprintLines,
+				layout: { 'line-join': 'round', 'line-cap': 'round' },
+				paint: {
+					'line-color': CAMPAIGN_FOOTPRINT_LINE_CORE_COLOR,
+					'line-gradient': [
+						'interpolate',
+						['linear'],
+						['line-progress'],
+						0,
+						'rgba(207, 224, 255, 0)',
+						0.2,
+						CAMPAIGN_FOOTPRINT_LINE_CORE_COLOR,
+						0.52,
+						'#EAF1FF',
+						0.8,
+						CAMPAIGN_FOOTPRINT_LINE_CORE_COLOR,
+						1,
+						'rgba(207, 224, 255, 0)',
+					],
+					'line-opacity': [
+						'*',
+						CAMPAIGN_FOOTPRINT_LINE_CORE_OPACITY,
+						['coalesce', ['get', 'lineOpacity'], 1],
+					],
+					'line-width': campaignFootprintLineCoreWidthExpr,
+					'line-blur': 0,
+				},
+			},
+			MAPBOX_LAYER_IDS.markerConstellationGlow
+		);
+		ensureLayer(
+			{
+				id: MAPBOX_LAYER_IDS.campaignFootprintNodeGlow,
+				type: 'circle',
+				source: MAPBOX_SOURCE_IDS.campaignFootprintNodes,
+				paint: {
+					'circle-radius': campaignFootprintNodeGlowRadiusExpr,
+					'circle-color': CAMPAIGN_FOOTPRINT_COLOR,
+					'circle-opacity': [
+						'interpolate',
+						['linear'],
+						['zoom'],
+						CAMPAIGN_FOOTPRINT_REPLACE_MARKER_MIN_ZOOM - 0.75,
+						[
+							'*',
+							CAMPAIGN_FOOTPRINT_NODE_GLOW_OPACITY,
+							['coalesce', ['get', 'nodeOpacity'], 1],
+						],
+						CAMPAIGN_FOOTPRINT_REPLACE_MARKER_MIN_ZOOM,
+						['coalesce', ['get', 'closeNodeGlowOpacity'], 0.9],
+						CAMPAIGN_FOOTPRINT_REPLACE_MARKER_MIN_ZOOM + 1.5,
+						['coalesce', ['get', 'closeNodeGlowOpacity'], 0.9],
+					],
+					'circle-blur': 0.82,
+					'circle-stroke-width': 0,
+				},
+			},
+			MAPBOX_LAYER_IDS.markerConstellationGlow
+		);
+		ensureLayer(
+			{
+				id: MAPBOX_LAYER_IDS.campaignFootprintNodeSpark,
+				type: 'symbol',
+				source: MAPBOX_SOURCE_IDS.campaignFootprintNodes,
+				layout: {
+					'icon-image': CAMPAIGN_FOOTPRINT_SPARK_ICON_IMAGE_NAME,
+					'icon-size': campaignFootprintSparkSizeExpr,
+					'icon-rotate': ['coalesce', ['get', 'sparkRotation'], 0],
+					'icon-rotation-alignment': 'viewport',
+					'icon-anchor': 'center',
+					'icon-allow-overlap': true,
+					'icon-ignore-placement': true,
+				},
+				paint: {
+					'icon-opacity': [
+						'interpolate',
+						['linear'],
+						['zoom'],
+						CAMPAIGN_FOOTPRINT_REPLACE_MARKER_MIN_ZOOM - 0.75,
+						[
+							'*',
+							CAMPAIGN_FOOTPRINT_SPARK_OPACITY,
+							['coalesce', ['get', 'nodeOpacity'], 1],
+						],
+						CAMPAIGN_FOOTPRINT_REPLACE_MARKER_MIN_ZOOM,
+						['coalesce', ['get', 'closeSparkOpacity'], 1],
+						CAMPAIGN_FOOTPRINT_REPLACE_MARKER_MIN_ZOOM + 1.5,
+						['coalesce', ['get', 'closeSparkOpacity'], 1],
+					],
+				},
+			},
+			MAPBOX_LAYER_IDS.markerConstellationGlow
+		);
+
 		// Frozen per-search constellation linework — understated background geometry
 		// that sits behind the marker dots and never participates in hit testing.
 		ensureLayer({
@@ -7281,7 +8436,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			source: MAPBOX_SOURCE_IDS.markerConstellationSelected,
 			layout: { 'line-join': 'round', 'line-cap': 'round' },
 			paint: {
-				'line-color': MARKER_CONSTELLATION_SELECTED_HALO_COLOR,
+				'line-color': [
+					'case',
+					['boolean', ['get', 'statusMode'], false],
+					SELECTED_STATUS_DOT_FILL_COLOR,
+					MARKER_CONSTELLATION_SELECTED_HALO_COLOR,
+				],
 				'line-opacity': getSelectedMarkerConstellationZoomFadedOpacity(
 					MARKER_CONSTELLATION_SELECTED_GLOW_OPACITY
 				),
@@ -7295,7 +8455,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			source: MAPBOX_SOURCE_IDS.markerConstellationSelected,
 			layout: { 'line-join': 'round', 'line-cap': 'round' },
 			paint: {
-				'line-color': MARKER_CONSTELLATION_SELECTED_LINE_COLOR,
+				'line-color': [
+					'case',
+					['boolean', ['get', 'statusMode'], false],
+					SELECTED_STATUS_DOT_STROKE_COLOR,
+					MARKER_CONSTELLATION_SELECTED_LINE_COLOR,
+				],
 				'line-opacity': getSelectedMarkerConstellationZoomFadedOpacity(
 					MARKER_CONSTELLATION_SELECTED_CORE_OPACITY
 				),
@@ -7595,7 +8760,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersBase,
 			paint: {
-				'circle-radius': resultDotHitRadiusExpr,
+				'circle-radius': baseHitRadiusExpr,
 				'circle-opacity': 0,
 				'circle-stroke-width': 0,
 			},
@@ -7619,19 +8784,32 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersBase,
 			paint: {
-				'circle-radius': resultDotRadiusExpr,
-				'circle-color': getMarkerHoverFillColorExpr(),
-				'circle-opacity': withFeatureFillOpacity(
-					getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
+				'circle-radius': baseDotsRadiusExpr,
+				'circle-color': [
+					'case',
+					isSelectedStatusDotExpr,
+					SELECTED_STATUS_DOT_FILL_COLOR,
+					getMarkerHoverFillColorExpr(),
+				],
+				'circle-opacity': withFeatureOpacityFactor(
+					getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr()),
+					selectedAwareFillFactor
 				),
 				'circle-stroke-color': [
-					'coalesce',
-					['get', 'strokeColor'],
-					RESULT_DOT_TRANSPARENT_STROKE_COLOR,
+					'case',
+					isSelectedStatusDotExpr,
+					SELECTED_STATUS_DOT_STROKE_COLOR,
+					['coalesce', ['get', 'strokeColor'], RESULT_DOT_TRANSPARENT_STROKE_COLOR],
 				],
-				'circle-stroke-width': ['coalesce', ['get', 'strokeWidth'], 0],
-				'circle-stroke-opacity': withFeatureStrokeOpacity(
-					getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
+				'circle-stroke-width': [
+					'case',
+					isSelectedStatusDotExpr,
+					SELECTED_STATUS_DOT_STROKE_WIDTH,
+					['coalesce', ['get', 'strokeWidth'], 0],
+				],
+				'circle-stroke-opacity': withFeatureOpacityFactor(
+					getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr()),
+					selectedAwareStrokeFactor
 				),
 			},
 		});
@@ -7935,6 +9113,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'icon-opacity': getSelectedMarkerHoverIconOpacityExpr(),
 			},
 		});
+
+		// Close-zoom campaign replacements need marker-level priority; keep them
+		// under selected halos, but above the normal result/event marker stack.
+		for (const layerId of [
+			MAPBOX_LAYER_IDS.campaignFootprintNodeGlow,
+			MAPBOX_LAYER_IDS.campaignFootprintNodeSpark,
+		]) {
+			try {
+				if (mapInstance.getLayer(layerId) && mapInstance.getLayer(MAPBOX_LAYER_IDS.selectedMarkerIcons)) {
+					mapInstance.moveLayer(layerId, MAPBOX_LAYER_IDS.selectedMarkerIcons);
+				}
+			} catch {
+				// Ignore style timing races.
+			}
+		}
 
 		// Persisted selected area (black outline) — above markers
 		ensureLayer({
@@ -8983,6 +10176,317 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			coordsByContactId.get(contact.id) ?? null,
 		[coordsByContactId]
 	);
+
+	const { campaignFootprintContactsWithCoords, campaignFootprintCoordsByContactId } =
+		useMemo(() => {
+			const coordsByContactId = new Map<number, LatLngLiteral>();
+			const contactsWithCoords: ContactWithName[] = [];
+			const groups = new Map<string, number[]>();
+			const seenContactIds = new Set<number>();
+
+			for (const contact of campaignFootprintContacts) {
+				if (seenContactIds.has(contact.id)) continue;
+				seenContactIds.add(contact.id);
+				const coords = getLatLngFromContact(contact);
+				if (!coords) continue;
+				coordsByContactId.set(contact.id, coords);
+				contactsWithCoords.push(contact);
+				const key = coordinateKey(coords);
+				const existing = groups.get(key);
+				if (existing) existing.push(contact.id);
+				else groups.set(key, [contact.id]);
+			}
+
+			for (const ids of groups.values()) {
+				if (ids.length <= 1) continue;
+				ids.sort((a, b) => a - b);
+				for (let i = 1; i < ids.length; i++) {
+					const id = ids[i];
+					const base = coordsByContactId.get(id);
+					if (!base) continue;
+					coordsByContactId.set(id, jitterDuplicateCoords(base, i));
+				}
+			}
+
+			return {
+				campaignFootprintContactsWithCoords: contactsWithCoords,
+				campaignFootprintCoordsByContactId: coordsByContactId,
+			};
+		}, [campaignFootprintContacts]);
+	const campaignFootprintContactIdSet = useMemo(
+		() => new Set(campaignFootprintContactsWithCoords.map((contact) => contact.id)),
+		[campaignFootprintContactsWithCoords]
+	);
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const pointSource = map.getSource(MAPBOX_SOURCE_IDS.campaignFootprintPoints) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		const lineSource = map.getSource(MAPBOX_SOURCE_IDS.campaignFootprintLines) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		const nodeSource = map.getSource(MAPBOX_SOURCE_IDS.campaignFootprintNodes) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		if (!pointSource || !lineSource || !nodeSource) return;
+
+		const clearFootprint = () => {
+			const empty = emptyFeatureCollection();
+			pointSource.setData(empty);
+			lineSource.setData(empty);
+			nodeSource.setData(empty);
+		};
+
+		// Hide the footprint whenever a search is engaged (typed query or a curated
+		// "For You" search) so it never clutters the live result dots/lines. It only
+		// shows in the disengaged/browse state.
+		if (
+			isBackgroundPresentation ||
+			searchEngaged ||
+			campaignFootprintContactsWithCoords.length === 0
+		) {
+			clearFootprint();
+			return;
+		}
+
+		const pointFeatures: GeoJSON.Feature[] = [];
+		for (const contact of campaignFootprintContactsWithCoords) {
+			const coords = campaignFootprintCoordsByContactId.get(contact.id);
+			if (!coords) continue;
+			pointFeatures.push({
+				type: 'Feature',
+				id: contact.id,
+				properties: { contactId: contact.id },
+				geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+			});
+		}
+
+		let contactsForConstellation = campaignFootprintContactsWithCoords.slice();
+		if (contactsForConstellation.length > CAMPAIGN_FOOTPRINT_MAX_POINTS) {
+			contactsForConstellation = contactsForConstellation
+				.map((contact) => ({
+					contact,
+					score: hashStringToUint32(`campaign-footprint|${contact.id}`),
+				}))
+				.sort((a, b) => a.score - b.score)
+				.slice(0, CAMPAIGN_FOOTPRINT_MAX_POINTS)
+				.map(({ contact }) => contact);
+		}
+		contactsForConstellation.sort((a, b) => a.id - b.id);
+
+		const constellationWorldSize = 512 * Math.pow(2, MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM);
+		const constellationPoints: MarkerConstellationPoint[] = [];
+		for (const contact of contactsForConstellation) {
+			const coords = campaignFootprintCoordsByContactId.get(contact.id);
+			if (!coords) continue;
+			const projected = latLngToWorldPixel(coords, constellationWorldSize);
+			if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y)) continue;
+			constellationPoints.push({
+				id: contact.id,
+				coords,
+				x: projected.x,
+				y: projected.y,
+				groupKey: 'campaign-footprint',
+			});
+		}
+
+		const formation =
+			constellationPoints.length >= 2
+				? buildBeautyMarkerConstellationFormation(
+						constellationPoints,
+						'campaign-footprint',
+						MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM
+					)
+				: { edges: [], nodes: [], lowZoomNodeIds: new Set<number>() };
+
+		const lineFeatures: GeoJSON.Feature[] = [];
+		for (const edge of formation.edges) {
+			const fromCoords = campaignFootprintCoordsByContactId.get(edge.fromId);
+			const toCoords = campaignFootprintCoordsByContactId.get(edge.toId);
+			if (!fromCoords || !toCoords) continue;
+			const edgeId = markerConstellationPairKey(edge.fromId, edge.toId);
+			const lineOpacity = Math.max(0.36, (1 - edge.rank * 0.34) * edge.opacityScale);
+			lineFeatures.push({
+				type: 'Feature',
+				id: `campaign-footprint:${edge.level}:${edgeId}`,
+				properties: { level: edge.level, lineOpacity },
+				geometry: {
+					type: 'LineString',
+					coordinates: [
+						[fromCoords.lng, fromCoords.lat],
+						[toCoords.lng, toCoords.lat],
+					],
+				},
+			});
+		}
+
+		const nodeFeatureById = new Map<number, GeoJSON.Feature>();
+		for (const node of formation.nodes) {
+			const coords = campaignFootprintCoordsByContactId.get(node.id);
+			if (!coords) continue;
+			const nodeOpacity = Math.max(0.46, (1 - node.rank * 0.26) * node.opacityScale);
+			nodeFeatureById.set(node.id, {
+				type: 'Feature',
+				id: `campaign-footprint:${node.level}:${node.id}`,
+				properties: {
+					level: node.level,
+					nodeOpacity,
+					closeNodeGlowOpacity: 0.9,
+					closeSparkOpacity: 1,
+					sparkRotation: hashStringToUint32(`campaign-footprint-spark|${node.id}`) % 90,
+				},
+				geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+			});
+		}
+		for (const contact of campaignFootprintContactsWithCoords) {
+			if (nodeFeatureById.has(contact.id)) continue;
+			const coords = campaignFootprintCoordsByContactId.get(contact.id);
+			if (!coords) continue;
+			nodeFeatureById.set(contact.id, {
+				type: 'Feature',
+				id: `campaign-footprint:contact:${contact.id}`,
+				properties: {
+					level: 'detail',
+					nodeOpacity: 0.46,
+					closeNodeGlowOpacity: 0.9,
+					closeSparkOpacity: 1,
+					sparkRotation: hashStringToUint32(`campaign-footprint-spark|${contact.id}`) % 90,
+				},
+				geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+			});
+		}
+		const nodeFeatures = Array.from(nodeFeatureById.values());
+
+		pointSource.setData({ type: 'FeatureCollection', features: pointFeatures });
+		lineSource.setData({ type: 'FeatureCollection', features: lineFeatures });
+		nodeSource.setData({ type: 'FeatureCollection', features: nodeFeatures });
+	}, [
+		map,
+		isMapLoaded,
+		isBackgroundPresentation,
+		searchEngaged,
+		campaignFootprintContactsWithCoords,
+		campaignFootprintCoordsByContactId,
+	]);
+
+	// --- Campaign selection heatmap glow -------------------------------------
+	// The heatmap envelops the currently-selected contacts (intersected with the
+	// tab's on-map set so off-tab/coordless ids are dropped). On the Contacts and
+	// Drafts tabs there is no glow until something is selected. The Inbox tab is
+	// "ambient": with nothing selected it glows the whole tab set instead.
+	const heatmapContactIds = useMemo<number[]>(() => {
+		if (campaignMarkerMode !== 'status' || !campaignHeatmapColor) return [];
+		const onMapIds = contactsWithCoords.map((c) => c.id);
+		if (selectedContacts.length === 0) return campaignHeatmapAmbient ? onMapIds : [];
+		const onMap = new Set(onMapIds);
+		return selectedContacts.filter((id) => onMap.has(id));
+	}, [
+		campaignMarkerMode,
+		campaignHeatmapColor,
+		campaignHeatmapAmbient,
+		contactsWithCoords,
+		selectedContacts,
+	]);
+
+	const campaignHeatmapFadeRafRef = useRef<number | null>(null);
+	// Last rendered glowFade per contact id — the start of the next crossfade.
+	const campaignHeatmapFadeByIdRef = useRef<Map<number, number>>(new Map());
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const source = map.getSource(MAPBOX_SOURCE_IDS.campaignHeatmap) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		if (!source) return;
+
+		const cancelFade = () => {
+			if (campaignHeatmapFadeRafRef.current != null) {
+				cancelAnimationFrame(campaignHeatmapFadeRafRef.current);
+				campaignHeatmapFadeRafRef.current = null;
+			}
+		};
+
+		// Off unless in status mode with a tint supplied.
+		if (campaignMarkerMode !== 'status' || !campaignHeatmapColor) {
+			cancelFade();
+			campaignHeatmapFadeByIdRef.current.clear();
+			source.setData(emptyFeatureCollection());
+			return;
+		}
+
+		// The source carries the full tab set so members can crossfade in and out:
+		// each contact's target glowFade is 1 when it's in the heatmap set and 0
+		// otherwise. Animate from the last rendered value toward the target, then
+		// go idle (the GPU re-projects the static layer on pan/zoom for free).
+		const targetSet = new Set(heatmapContactIds);
+		const coordsById = new Map<number, LatLngLiteral>();
+		for (const contact of contactsWithCoords) {
+			const coords = getContactCoords(contact);
+			if (coords) coordsById.set(contact.id, coords);
+		}
+
+		const startById = campaignHeatmapFadeByIdRef.current;
+		const needsAnim = Array.from(coordsById.keys()).some((id) => {
+			const start = startById.get(id) ?? 0;
+			const target = targetSet.has(id) ? 1 : 0;
+			return Math.abs(start - target) > 0.001;
+		});
+
+		const writeFrame = (eased: number) => {
+			const nextById = new Map<number, number>();
+			const features: GeoJSON.Feature[] = [];
+			coordsById.forEach((coords, id) => {
+				const start = startById.get(id) ?? 0;
+				const target = targetSet.has(id) ? 1 : 0;
+				const fade = eased >= 1 ? target : start + (target - start) * eased;
+				nextById.set(id, fade);
+				if (fade <= 0.001) return; // fully faded out — omit (opacity 0)
+				features.push({
+					type: 'Feature' as const,
+					id,
+					properties: { glowColor: campaignHeatmapColor, glowFade: fade },
+					geometry: { type: 'Point' as const, coordinates: [coords.lng, coords.lat] },
+				});
+			});
+			campaignHeatmapFadeByIdRef.current = nextById;
+			source.setData({ type: 'FeatureCollection' as const, features });
+		};
+
+		cancelFade();
+
+		if (!needsAnim) {
+			writeFrame(1);
+			return;
+		}
+
+		const startMs = performance.now();
+		writeFrame(0);
+		const tick = () => {
+			const progress = Math.min(
+				1,
+				(performance.now() - startMs) / CAMPAIGN_HEATMAP_FADE_MS
+			);
+			writeFrame(smoothstep(0, 1, progress));
+			if (progress < 1) {
+				campaignHeatmapFadeRafRef.current = requestAnimationFrame(tick);
+				return;
+			}
+			campaignHeatmapFadeRafRef.current = null;
+		};
+		campaignHeatmapFadeRafRef.current = requestAnimationFrame(tick);
+
+		return cancelFade;
+	}, [
+		map,
+		isMapLoaded,
+		campaignMarkerMode,
+		campaignHeatmapColor,
+		heatmapContactIds,
+		contactsWithCoords,
+		coordsByContactId,
+		getContactCoords,
+	]);
 
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
@@ -10733,9 +12237,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (isBackgroundPresentation) return;
 		if (!streetViewEnabled) return;
 
-		const onZoomFrame = (e: { originalEvent?: Event }) => {
+		const onZoomFrame = (e: mapboxgl.MapboxEvent) => {
 			try {
-				if (!e.originalEvent) return; // programmatic camera move — skip
+				const originalEvent = (e as { originalEvent?: Event }).originalEvent;
+				if (!originalEvent) return; // programmatic camera move — skip
 				const tr = map.transform;
 				if (!tr || typeof tr.pitch !== 'number') return; // private-API fence
 				const target = computeStreetViewPitch(map.getZoom() ?? MAP_DEFAULT_ZOOM);
@@ -11570,6 +13075,31 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[onMarkerClick, onToggleSelection]
 	);
 
+	// Hover cards flip to pointer-events:auto while their marker is hovered, which
+	// otherwise swallows wheel events before they reach Mapbox's scroll-zoom handler
+	// (it lives on the canvas container, a sibling subtree). Re-dispatch the wheel
+	// onto that element so native zoom-to-cursor / wheel rate / pinch all still apply.
+	const forwardWheelToMap = useCallback((e: React.WheelEvent) => {
+		const map = mapRef.current;
+		if (!map) return;
+		map.getCanvasContainer().dispatchEvent(
+			new WheelEvent('wheel', {
+				deltaX: e.deltaX,
+				deltaY: e.deltaY,
+				deltaZ: e.deltaZ,
+				deltaMode: e.deltaMode,
+				clientX: e.clientX,
+				clientY: e.clientY,
+				ctrlKey: e.ctrlKey,
+				metaKey: e.metaKey,
+				shiftKey: e.shiftKey,
+				altKey: e.altKey,
+				bubbles: false,
+				cancelable: true,
+			})
+		);
+	}, []);
+
 	const handleMarkerMouseOver = useCallback(
 		(contact: ContactWithName, domEvent?: MouseEvent | TouchEvent) => {
 			clearEmptyMapPrompt();
@@ -11859,7 +13389,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		curatedBlobLngLatShapeMultiPolygonsRef.current = lngLatShapes;
 		curatedBlobLngLatMultiPolygonRef.current = lngLat;
 		const fc = createOutlineGeoJsonFromMultiPolygon(lngLat);
-		source.setData(fc as GeoJSON.FeatureCollection);
+		try {
+			source.setData(fc as GeoJSON.FeatureCollection);
+		} catch {
+			// Non-fatal; the source can be transiently invalid mid camera churn. The
+			// orb resyncs on the next move/idle frame.
+		}
 		applyCuratedOrbStateRef.current?.();
 	}, []);
 	applyBlobMorphRef.current = applyBlobMorph;
@@ -12895,6 +14430,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			),
 		[allContactsOverlayVisibleContacts]
 	);
+	const selectedContactObjectsById = useMemo(
+		() =>
+			new Map<number, ContactWithName>(
+				selectedContactObjects.map((contact) => [contact.id, contact])
+			),
+		[selectedContactObjects]
+	);
 
 	// Marker hover/click + (optional) state hover/click interactions.
 	useEffect(() => {
@@ -12920,6 +14462,50 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		];
 		const markerHitLayerSet = new Set<string>(markerHitLayers);
 		const searchAreaHitLayerSet = new Set<string>(searchAreaHitLayers);
+		// Active search footprints are not "empty map"; the all-contacts prompt belongs outside them.
+		const isPointInSelectionBounds = (lng: number, lat: number): boolean => {
+			const bounds = selectedAreaBoundsRef.current;
+			if (!bounds) return false;
+			const { south, west, north, east } = bounds;
+			if (![south, west, north, east].every(Number.isFinite)) return false;
+
+			const isLatInside = lat >= south && lat <= north;
+			const isLngInside =
+				west <= east ? lng >= west && lng <= east : lng >= west || lng <= east;
+			return isLatInside && isLngInside;
+		};
+		const isPointInSelectionMultiPolygon = (
+			lng: number,
+			lat: number,
+			multiPolygon: ClippingMultiPolygon | null,
+			bbox: BoundingBox | null
+		): boolean => {
+			if (!multiPolygon?.length) return false;
+			if (bbox && !isLatLngInBbox(lat, lng, bbox)) return false;
+			return pointInMultiPolygon([lng, lat], multiPolygon);
+		};
+		const isActiveSearchSelectionHit = (e: mapboxgl.MapMouseEvent): boolean => {
+			const lng = e.lngLat.lng;
+			const lat = e.lngLat.lat;
+			const stateSelectionHit =
+				stateInteractionsEnabled &&
+				(isPointInSelectionMultiPolygon(
+					lng,
+					lat,
+					lockedStateSelectionMultiPolygonRef.current,
+					lockedStateSelectionBboxRef.current
+				) ||
+					isPointInSelectionMultiPolygon(
+						lng,
+						lat,
+						resultsSelectionMultiPolygonRef.current,
+						resultsSelectionBboxRef.current
+					));
+			return (
+				isPointInSelectionBounds(lng, lat) ||
+				stateSelectionHit
+			);
+		};
 		const isSearchAreaHit = (e: mapboxgl.MapMouseEvent): boolean => {
 			const searchAreaFeatures = map.queryRenderedFeatures(e.point, {
 				layers: searchAreaHitLayers,
@@ -13037,6 +14623,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 
 		const processMouseMove = (e: mapboxgl.MapMouseEvent) => {
+			const pointer = getClientPointFromDomEvent(e.originalEvent);
+			if (pointer) {
+				updateSelectedTooltipHoverHiddenTarget(pointer.x, pointer.y);
+			} else {
+				setSelectedTooltipHoverHiddenTargetIfChanged(null);
+			}
+
 			if (areaSelectionEnabled || isAreaSelecting) {
 				clearEmptyMapPrompt();
 				clearEventHoverImmediate();
@@ -13169,6 +14762,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					return pointInMultiPolygon([e.lngLat.lng, e.lngLat.lat], blobMultiPolygon);
 				})();
 			if (searchAreaHit) {
+				clearEmptyMapPrompt();
+				clearStateHover();
+				return;
+			}
+			if (emptyMapPromptEnabled && isActiveSearchSelectionHit(e)) {
 				clearEmptyMapPrompt();
 				clearStateHover();
 				return;
@@ -13360,6 +14958,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			setSelectedMarker(null);
 			setPinnedEventId(null);
 
+			if (emptyMapPromptEnabled && isActiveSearchSelectionHit(e)) {
+				clearEmptyMapPrompt();
+				clearStateHover();
+				return;
+			}
+
 			if (
 				!movedAfterPointerDown &&
 				emptyMapPromptEnabled &&
@@ -13376,11 +14980,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map.on('click', onClick);
 		const canvas = map.getCanvas();
 		const isInsideHoverTooltip = (event: MouseEvent): boolean => {
-			// Covers the slim SVG tooltip, the ambient street-view hover card, and the
-			// persistent street-view card layer — whichever overlay is mounted keeps
-			// hover alive across canvas → DOM moves.
+			// Street-view cards are interactive, so moving from the canvas into them keeps
+			// hover alive. The slim SVG tooltip is intentionally excluded so it does not
+			// block hovering markers that sit behind/above it.
 			for (const tooltipEl of [
-				hoverTooltipOverlayRef.current,
 				streetCardOverlayRef.current,
 				streetCardsContainerRef.current,
 			]) {
@@ -13403,6 +15006,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (isInsideHoverTooltip(event)) return;
 			clearEmptyMapPrompt();
 			clearMarkerVisualHover();
+			setSelectedTooltipHoverHiddenTargetIfChanged(null);
 			// Schedule (don't force) the popup close: if the cursor is leaving the canvas to
 			// enter the popup box, the box's onMouseEnter cancels this before it fires.
 			scheduleEventHoverClose();
@@ -13453,6 +15057,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		setEventHover,
 		clearEventHoverImmediate,
 		scheduleEventHoverClose,
+		updateSelectedTooltipHoverHiddenTarget,
+		setSelectedTooltipHoverHiddenTargetIfChanged,
 	]);
 
 	// ---- Mapbox marker sources (rendered via layers) ----
@@ -13561,6 +15167,38 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		(url: string) => `murmur-marker-${hashStringToStableKey(url)}`,
 		[]
 	);
+	const selectedCategorizedContactMarkerAssetCacheRef = useRef<
+		Map<
+			string,
+			{
+				imageName: string;
+				url: string;
+				hoverImageName: string;
+				hoverUrl: string;
+			}
+		>
+	>(new Map());
+	const getSelectedCategorizedContactMarkerAssets = useCallback(
+		(accentColor: string) => {
+			const key = accentColor.trim();
+			const cached = selectedCategorizedContactMarkerAssetCacheRef.current.get(key);
+			if (cached) return cached;
+
+			const url = generateSelectedCategorizedContactMarkerIconUrl(key);
+			const hoverUrl = generateSelectedCategorizedContactMarkerIconUrl(
+				darkenHexColor(key, MARKER_HOVER_DARKEN_AMOUNT)
+			);
+			const assets = {
+				imageName: imageNameFromUrl(url),
+				url,
+				hoverImageName: imageNameFromUrl(hoverUrl),
+				hoverUrl,
+			};
+			selectedCategorizedContactMarkerAssetCacheRef.current.set(key, assets);
+			return assets;
+		},
+		[imageNameFromUrl]
+	);
 
 	const uncategorizedContactMarkerUrl = useMemo(
 		() => generateUncategorizedContactMarkerIconUrl(),
@@ -13581,17 +15219,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		() => imageNameFromUrl(uncategorizedContactMarkerHoverUrl),
 		[imageNameFromUrl, uncategorizedContactMarkerHoverUrl]
 	);
-	const selectedCategorizedContactMarkerUrl = useMemo(
-		() => generateSelectedCategorizedContactMarkerIconUrl(),
-		[]
-	);
-	const selectedCategorizedContactMarkerHoverUrl = useMemo(
-		() =>
-			generateSelectedCategorizedContactMarkerIconUrl(
-				darkenHexColor('#739EE8', MARKER_HOVER_DARKEN_AMOUNT)
-			),
-		[]
-	);
 	const selectedUncategorizedContactMarkerUrl = useMemo(
 		() => generateSelectedUncategorizedContactMarkerIconUrl(),
 		[]
@@ -13602,14 +15229,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				darkenHexColor('#50A5C9', MARKER_HOVER_DARKEN_AMOUNT)
 			),
 		[]
-	);
-	const selectedCategorizedContactMarkerImageName = useMemo(
-		() => imageNameFromUrl(selectedCategorizedContactMarkerUrl),
-		[imageNameFromUrl, selectedCategorizedContactMarkerUrl]
-	);
-	const selectedCategorizedContactMarkerHoverImageName = useMemo(
-		() => imageNameFromUrl(selectedCategorizedContactMarkerHoverUrl),
-		[imageNameFromUrl, selectedCategorizedContactMarkerHoverUrl]
 	);
 	const selectedUncategorizedContactMarkerImageName = useMemo(
 		() => imageNameFromUrl(selectedUncategorizedContactMarkerUrl),
@@ -13647,16 +15266,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			height: SELECTED_CONTACT_MARKER_VIEWBOX_HEIGHT,
 		};
 		void ensureMapImageFromUrl(
-			selectedCategorizedContactMarkerImageName,
-			selectedCategorizedContactMarkerUrl,
-			selectedMarkerDimensions
-		);
-		void ensureMapImageFromUrl(
-			selectedCategorizedContactMarkerHoverImageName,
-			selectedCategorizedContactMarkerHoverUrl,
-			selectedMarkerDimensions
-		);
-		void ensureMapImageFromUrl(
 			selectedUncategorizedContactMarkerImageName,
 			selectedUncategorizedContactMarkerUrl,
 			selectedMarkerDimensions
@@ -13670,10 +15279,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map,
 		isMapLoaded,
 		ensureMapImageFromUrl,
-		selectedCategorizedContactMarkerImageName,
-		selectedCategorizedContactMarkerUrl,
-		selectedCategorizedContactMarkerHoverImageName,
-		selectedCategorizedContactMarkerHoverUrl,
 		selectedUncategorizedContactMarkerImageName,
 		selectedUncategorizedContactMarkerUrl,
 		selectedUncategorizedContactMarkerHoverImageName,
@@ -13691,6 +15296,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			EVENT_STAR_ICON_IMAGE_NAME,
 			EVENT_STAR_ICON_URL,
 			EVENT_STAR_ICON_IMAGE_DIMENSIONS
+		);
+		void ensureMapImageFromUrl(
+			CAMPAIGN_FOOTPRINT_SPARK_ICON_IMAGE_NAME,
+			CAMPAIGN_FOOTPRINT_SPARK_ICON_URL,
+			CAMPAIGN_FOOTPRINT_SPARK_ICON_IMAGE_DIMENSIONS
 		);
 	}, [map, isMapLoaded, ensureMapImageFromUrl]);
 
@@ -13838,16 +15448,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// the wave completes. Otherwise off-screen-sampled-out features
 				// would be hit-testable just because they're in the source.
 				const visibleIds = Array.from(visibleContactIdSetRef.current);
-				const visibilityFilter: any =
-					visibleIds.length === 0
-						? ['==', ['id'], -1]
-						: ['match', ['id'], visibleIds, true, false];
+				const visibilityFilter = buildBaseMarkerVisibilityFilter(
+					visibleIds,
+					map.getZoom() ?? 0,
+					campaignFootprintContactIdSet
+				);
 				map.setFilter(MAPBOX_LAYER_IDS.baseHit, visibilityFilter);
 			}
 		} catch {
 			// Ignore style timing races.
 		}
-	}, [map, isMapLoaded]);
+	}, [map, isMapLoaded, campaignFootprintContactIdSet]);
 
 	// Status mode renders every contact as a campaign-status dot, so the soft glow
 	// halos beneath them read as fuzzy "residue" around the crisp status circles.
@@ -13863,6 +15474,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (!map.getLayer(layerId)) continue;
 			try {
 				map.setLayoutProperty(layerId, 'visibility', hideStatusGlow ? 'none' : 'visible');
+			} catch {
+				// Ignore style timing races.
+			}
+		}
+		// The campaign heatmap glow is the colored replacement for that white halo,
+		// so it shows exactly when the per-dot glow hides (status mode only).
+		if (map.getLayer(MAPBOX_LAYER_IDS.campaignHeatmapGlow)) {
+			try {
+				map.setLayoutProperty(
+					MAPBOX_LAYER_IDS.campaignHeatmapGlow,
+					'visibility',
+					hideStatusGlow ? 'visible' : 'none'
+				);
 			} catch {
 				// Ignore style timing races.
 			}
@@ -14211,6 +15835,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						id: featureId,
 						properties: {
 							selectedLineOpacity: selectedConstellationLineOpacityRef.current,
+							// Campaign status mode recolors the selected lines blue to match the
+							// blue selected circles (dashboard pick-flow keeps the white lines).
+							statusMode: campaignMarkerMode === 'status',
 							fromId: edge.fromId,
 							toId: edge.toId,
 						},
@@ -14256,6 +15883,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lockedStateKey,
 			isCoordsInLockedState,
 			searchWhat,
+			campaignMarkerMode,
 		]
 	);
 
@@ -14418,6 +16046,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			isCurated: boolean;
 			isUncategorized: boolean;
 			isVenue: boolean;
+			statusMode: boolean;
 			fadeWithSelectedStateOrb: boolean;
 		};
 		const dots: DotSeed[] = [];
@@ -14470,6 +16099,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				isCurated: statusMarkerStyle ? false : Boolean(contact.curatedCategory),
 				isUncategorized,
 				isVenue,
+				statusMode: Boolean(statusMarkerStyle),
 				fadeWithSelectedStateOrb,
 			});
 			minLng = Math.min(minLng, coords.lng);
@@ -14520,6 +16150,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				':' +
 				(d.isVenue ? 'v' : 'n') +
 				':' +
+				(d.statusMode ? 's' : 'n') +
+				':' +
 				(d.fadeWithSelectedStateOrb ? 'f' : 'n');
 		}
 		if (dataKey === baseDotsLastDataKeyRef.current) {
@@ -14567,6 +16199,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					isCurated: dot.isCurated,
 					isUncategorized: dot.isUncategorized,
 					isVenue: dot.isVenue,
+					statusMode: dot.statusMode,
 					fadeWithSelectedStateOrb: dot.fadeWithSelectedStateOrb,
 					fallbackIcon: dot.isUncategorized ? uncategorizedContactMarkerImageName : '',
 					fallbackIconHover: dot.isUncategorized
@@ -14697,12 +16330,37 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			| undefined;
 		if (!source) return;
 
+		// Nothing selected: hard-clear the bespoke selected-marker source and cancel any
+		// in-flight fade. This must run BEFORE the isLoading / signature short-circuits below.
+		// When the selection empties during a refetch (e.g. right after "Add Contacts"
+		// invalidates queries) or while a fade-out is interrupted, those short-circuits
+		// otherwise strand phantom halo rings on the map with nothing selected.
+		if (selectedContacts.length === 0) {
+			if (selectedMarkerFadeRafRef.current != null) {
+				cancelAnimationFrame(selectedMarkerFadeRafRef.current);
+				selectedMarkerFadeRafRef.current = null;
+			}
+			selectedMarkerFadeByIdRef.current.clear();
+			selectedMarkerScaleByIdRef.current.clear();
+			selectedMarkerFeatureByIdRef.current = new Map();
+			selectedMarkerBuildSignatureRef.current = '';
+			source.setData({ type: 'FeatureCollection', features: [] } as any);
+			return;
+		}
+
 		if (isLoading) {
 			// Preserve existing selected markers while parent data is refetching.
 			return;
 		}
 
-		if (!searchEngaged && !isAmbientContactsEnabled) {
+		// Campaign status mode (Write/Drafts/Inbox) renders selection as the bigger
+		// blue circle on the base dot itself — keep this bespoke halo artwork cleared
+		// so it never fades the base dot out (its selectedMarkerT) or overlays the
+		// dashboard pick-flow halo on top of the status-colored markers.
+		if (
+			campaignMarkerMode === 'status' ||
+			(!searchEngaged && !isAmbientContactsEnabled)
+		) {
 			if (selectedMarkerFadeRafRef.current != null) {
 				cancelAnimationFrame(selectedMarkerFadeRafRef.current);
 				selectedMarkerFadeRafRef.current = null;
@@ -14721,6 +16379,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const selectedSet = new Set<number>(selectedContacts);
 			const seenIds = new Set<number>();
 			const nextSelectedFeaturesById = new Map<number, any>();
+			const selectedMarkerImagesToEnsure = new Map<string, string>();
 			const fadeWithSelectedStateOrb = Boolean(
 				lockedStateKey &&
 				lockedStateSelectionKeyRef.current === lockedStateKey &&
@@ -14737,17 +16396,31 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				if (!coords) return;
 
 				const isUncategorized = !isCleanMapMarkerCategory(whatForMarker);
+				const selectedIconAssets = isUncategorized
+					? {
+							imageName: selectedUncategorizedContactMarkerImageName,
+							url: selectedUncategorizedContactMarkerUrl,
+							hoverImageName: selectedUncategorizedContactMarkerHoverImageName,
+							hoverUrl: selectedUncategorizedContactMarkerHoverUrl,
+						}
+					: getSelectedCategorizedContactMarkerAssets(
+							getResultDotColorForWhat(whatForMarker)
+						);
+				selectedMarkerImagesToEnsure.set(
+					selectedIconAssets.imageName,
+					selectedIconAssets.url
+				);
+				selectedMarkerImagesToEnsure.set(
+					selectedIconAssets.hoverImageName,
+					selectedIconAssets.hoverUrl
+				);
 				seenIds.add(contact.id);
 				nextSelectedFeaturesById.set(contact.id, {
 					type: 'Feature',
 					id: contact.id,
 					properties: {
-						selectedIcon: isUncategorized
-							? selectedUncategorizedContactMarkerImageName
-							: selectedCategorizedContactMarkerImageName,
-						selectedIconHover: isUncategorized
-							? selectedUncategorizedContactMarkerHoverImageName
-							: selectedCategorizedContactMarkerHoverImageName,
+						selectedIcon: selectedIconAssets.imageName,
+						selectedIconHover: selectedIconAssets.hoverImageName,
 						isUncategorized,
 						fadeWithSelectedStateOrb,
 					},
@@ -14812,13 +16485,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			)) {
 				const feature = nextSelectedFeaturesById.get(id);
 				const [lng, lat] = feature.geometry.coordinates;
+				const properties = feature.properties ?? {};
 				signatureParts.push(
-					`${id}:${feature.properties.isUncategorized ? 'u' : 'c'}:${
-						feature.properties.fadeWithSelectedStateOrb ? '1' : '0'
+					`${id}:${properties.selectedIcon ?? ''}:${
+						properties.selectedIconHover ?? ''
+					}:${properties.isUncategorized ? 'u' : 'c'}:${
+						properties.fadeWithSelectedStateOrb ? '1' : '0'
 					}:${lng.toFixed(5)}:${lat.toFixed(5)}`
 				);
 			}
 			const nextSignature = signatureParts.join(',');
+			const selectedMarkerDimensions = {
+				width: SELECTED_CONTACT_MARKER_VIEWBOX_WIDTH,
+				height: SELECTED_CONTACT_MARKER_VIEWBOX_HEIGHT,
+			};
+			await Promise.all(
+				Array.from(selectedMarkerImagesToEnsure.entries()).map(([imageName, url]) =>
+					ensureMapImageFromUrl(imageName, url, selectedMarkerDimensions)
+				)
+			);
+			if (cancelled) return;
+
 			if (
 				nextSignature === selectedMarkerBuildSignatureRef.current &&
 				selectedMarkerFadeRafRef.current == null
@@ -14826,34 +16513,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				return;
 			}
 			selectedMarkerBuildSignatureRef.current = nextSignature;
-
-			const selectedMarkerDimensions = {
-				width: SELECTED_CONTACT_MARKER_VIEWBOX_WIDTH,
-				height: SELECTED_CONTACT_MARKER_VIEWBOX_HEIGHT,
-			};
-			void Promise.all([
-				ensureMapImageFromUrl(
-					selectedCategorizedContactMarkerImageName,
-					selectedCategorizedContactMarkerUrl,
-					selectedMarkerDimensions
-				),
-				ensureMapImageFromUrl(
-					selectedCategorizedContactMarkerHoverImageName,
-					selectedCategorizedContactMarkerHoverUrl,
-					selectedMarkerDimensions
-				),
-				ensureMapImageFromUrl(
-					selectedUncategorizedContactMarkerImageName,
-					selectedUncategorizedContactMarkerUrl,
-					selectedMarkerDimensions
-				),
-				ensureMapImageFromUrl(
-					selectedUncategorizedContactMarkerHoverImageName,
-					selectedUncategorizedContactMarkerHoverUrl,
-					selectedMarkerDimensions
-				),
-			]);
-			if (cancelled) return;
 
 			if (selectedMarkerFadeRafRef.current != null) {
 				cancelAnimationFrame(selectedMarkerFadeRafRef.current);
@@ -14985,6 +16644,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isLoading,
 		searchEngaged,
 		isAmbientContactsEnabled,
+		campaignMarkerMode,
 		selectedContacts,
 		selectedContactObjects,
 		contactsWithCoords,
@@ -14996,10 +16656,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		lockedStateKey,
 		isStateLayerReady,
 		ensureMapImageFromUrl,
-		selectedCategorizedContactMarkerImageName,
-		selectedCategorizedContactMarkerUrl,
-		selectedCategorizedContactMarkerHoverImageName,
-		selectedCategorizedContactMarkerHoverUrl,
+		getSelectedCategorizedContactMarkerAssets,
 		selectedUncategorizedContactMarkerImageName,
 		selectedUncategorizedContactMarkerUrl,
 		selectedUncategorizedContactMarkerHoverImageName,
@@ -15015,10 +16672,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
 		const visibleIds = visibleContacts.map((c) => c.id);
-		const visibilityFilter: any =
-			visibleIds.length === 0
-				? ['==', ['id'], -1]
-				: ['match', ['id'], visibleIds, true, false];
 
 		const safeSet = (layerId: string, filter: any) => {
 			try {
@@ -15029,26 +16682,40 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 		};
 
-		// While a wave reveal is active, leave baseHit's filter alone — the
-		// wave manager owns it and will restore the visibility filter when
-		// the wave completes (see stopBaseDotsWaveAndRestoreSteadyRendering).
-		if (!baseDotsWaveCancelRef.current) {
-			safeSet(MAPBOX_LAYER_IDS.baseHit, visibilityFilter);
-		}
-		safeSet(MAPBOX_LAYER_IDS.baseGlow, visibilityFilter);
-		safeSet(MAPBOX_LAYER_IDS.baseDots, visibilityFilter);
-		// baseFallbackIcons already filters by isUncategorized; AND with visibility.
-		safeSet(MAPBOX_LAYER_IDS.baseFallbackIcons, [
-			'all',
-			['==', ['get', 'isUncategorized'], true],
-			visibilityFilter,
-		]);
-		safeSet(MAPBOX_LAYER_IDS.baseFallbackIconsHover, [
-			'all',
-			['==', ['get', 'isUncategorized'], true],
-			visibilityFilter,
-		]);
-	}, [map, isMapLoaded, visibleContacts]);
+		const applyFilters = () => {
+			const visibilityFilter = buildBaseMarkerVisibilityFilter(
+				visibleIds,
+				map.getZoom() ?? 0,
+				campaignFootprintContactIdSet
+			);
+
+			// While a wave reveal is active, leave baseHit's filter alone — the
+			// wave manager owns it and will restore the visibility filter when
+			// the wave completes (see stopBaseDotsWaveAndRestoreSteadyRendering).
+			if (!baseDotsWaveCancelRef.current) {
+				safeSet(MAPBOX_LAYER_IDS.baseHit, visibilityFilter);
+			}
+			safeSet(MAPBOX_LAYER_IDS.baseGlow, visibilityFilter);
+			safeSet(MAPBOX_LAYER_IDS.baseDots, visibilityFilter);
+			// baseFallbackIcons already filters by isUncategorized; AND with visibility.
+			safeSet(MAPBOX_LAYER_IDS.baseFallbackIcons, [
+				'all',
+				['==', ['get', 'isUncategorized'], true],
+				visibilityFilter,
+			]);
+			safeSet(MAPBOX_LAYER_IDS.baseFallbackIconsHover, [
+				'all',
+				['==', ['get', 'isUncategorized'], true],
+				visibilityFilter,
+			]);
+		};
+
+		applyFilters();
+		map.on('zoomend', applyFilters);
+		return () => {
+			map.off('zoomend', applyFilters);
+		};
+	}, [map, isMapLoaded, visibleContacts, campaignFootprintContactIdSet]);
 
 	// Sync `inConstellation` feature-state on the base markers source so the
 	// zoom-fade paint expressions can dim non-constellation dots at low zoom.
@@ -15095,14 +16762,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			try {
 				if (!map.getLayer(layerId)) return;
 				map.setFilter(layerId, filter);
-			} catch {
-				// Ignore.
-			}
-		};
-		const safeClearFilter = (layerId: string) => {
-			try {
-				if (!map.getLayer(layerId)) return;
-				map.setFilter(layerId, null as any);
 			} catch {
 				// Ignore.
 			}
@@ -15164,7 +16823,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'icon-opacity',
 				getSelectedStateOrbZoomFadedOpacity(1, getNormalMarkerFadeOpacityExpr())
 			);
-			safeClearFilter(MAPBOX_LAYER_IDS.baseHit);
+			safeSetFilter(
+				MAPBOX_LAYER_IDS.baseHit,
+				buildBaseMarkerVisibilityFilter(
+					Array.from(visibleContactIdSetRef.current),
+					map.getZoom() ?? 0,
+					campaignFootprintContactIdSet
+				)
+			);
 		};
 
 		const loading = Boolean(isLoading);
@@ -15338,9 +17004,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Don't churn filters at 60fps; updating every ~90ms is plenty for hit gating.
 			if (t - lastHitUpdateAt >= 90) {
 				safeSetFilter(MAPBOX_LAYER_IDS.baseHit, [
-					'<=',
-					['coalesce', ['get', DOT_WAVE_DELAY_PROP], 0],
-					t,
+					'all',
+					[
+						'<=',
+						['coalesce', ['get', DOT_WAVE_DELAY_PROP], 0],
+						t,
+					],
+					buildBaseMarkerVisibilityFilter(
+						Array.from(visibleContactIdSetRef.current),
+						map.getZoom() ?? 0,
+						campaignFootprintContactIdSet
+					),
 				] as any);
 				lastHitUpdateAt = t;
 			}
@@ -15389,6 +17063,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isBackgroundPresentation,
 		searchQuery,
 		disableDotWaveReveal,
+		campaignFootprintContactIdSet,
 	]);
 
 	// Keep the frozen constellation's rendered line source synced after style/coordinate changes.
@@ -15756,7 +17431,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 
-		if (!searchEngaged && !isAmbientContactsEnabled) {
+		// Gate on `isAnySearch` (a real, non-empty query) rather than the overloaded
+		// `searchEngaged`, which defaults to `true` and is left at that default by the
+		// campaign map. This mirrors the overlay's own populate gate (`isSearchAllContactsOverlay`)
+		// so the gray dots clear deterministically when no dashboard search/ambient mode is active.
+		if (!isAnySearch && !isAmbientContactsEnabled) {
 			source.setData({ type: 'FeatureCollection', features: [] } as any);
 			return;
 		}
@@ -15800,7 +17479,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		map,
 		isMapLoaded,
 		isLoading,
-		searchEngaged,
+		isAnySearch,
 		isAmbientContactsEnabled,
 		allContactsOverlayVisibleContacts,
 		getAllContactsOverlayContactCoords,
@@ -16108,6 +17787,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		() => Math.max(14, markerScale * 2),
 		[markerScale]
 	);
+	const tooltipMarkerGapPx = useMemo(
+		() => Math.max(18, markerScale + 10),
+		[markerScale]
+	);
+	const getSelectedTooltipZoomOpacity = useCallback((zoom: number): number => {
+		return clamp(
+			(zoom - SELECTED_TOOLTIP_FADE_END_ZOOM) /
+				(SELECTED_TOOLTIP_FADE_START_ZOOM - SELECTED_TOOLTIP_FADE_END_ZOOM),
+			0,
+			1
+		);
+	}, []);
+	const getSelectedTooltipStackT = useCallback((zoom: number): number => {
+		return clamp(
+			(SELECTED_TOOLTIP_FADE_START_ZOOM - zoom) /
+				(SELECTED_TOOLTIP_FADE_START_ZOOM - SELECTED_TOOLTIP_FADE_END_ZOOM),
+			0,
+			1
+		);
+	}, []);
 
 	const selectedContactIdSet = useMemo(
 		() => new Set<number>(selectedContacts),
@@ -16231,98 +17930,346 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		rightSafeAreaPx,
 	]);
 
-	// Multi-select action card anchoring. Resolves each selected contact's
-	// coordinates (across the base + overlay coord maps); the card is anchored to
-	// the TOP-most selected dot on screen, scales down with the map and fades out
-	// as the user zooms further out, and re-anchors on every map move — same
-	// projection pattern as the selected-marker "Research" panel above.
+	// Multi-select action card anchoring. Follows the venue-portal action-pill
+	// pattern: track the top-most selected dot while it is on-screen at street
+	// zoom, otherwise dock beside the dashboard's left "Showing" rail so the
+	// actions stay accessible when panning away or zooming out.
 	const selectionActionsOverlayRef = useRef<HTMLDivElement | null>(null);
-	// Zoom level captured when the card first appears; scale/fade are measured
-	// relative to it. Cleared (below) when the selection clears so the next
-	// selection re-captures its own baseline.
-	const selectionBaseZoomRef = useRef<number | null>(null);
+	// Union of the currently-rendered selection tooltip boxes (container-px),
+	// written by the tooltip placement effect each frame. The action card reads
+	// it so it can place itself AROUND the tooltips with no overlap.
+	const selectionTooltipsFootprintRef = useRef<{
+		left: number;
+		top: number;
+		right: number;
+		bottom: number;
+	} | null>(null);
+	const selectionActionsSideRef = useRef<'top' | 'bottom' | 'left' | 'right' | null>(
+		null
+	);
 	const selectedAnchorPoints = useMemo(() => {
-		if (selectedContacts.length < 2) return null;
+		if (selectedContacts.length < 1) return null;
 		const points: LatLngLiteral[] = [];
 		for (const id of selectedContacts) {
 			const coords =
 				coordsByContactId.get(id) ??
 				bookingExtraCoordsByContactId.get(id) ??
 				promotionOverlayCoordsByContactId.get(id) ??
-				allContactsOverlayCoordsByContactId.get(id);
+				allContactsOverlayCoordsByContactId.get(id) ??
+				(selectedContactObjectsById.get(id)
+					? getLatLngFromContact(selectedContactObjectsById.get(id)!)
+					: null);
 			if (coords) points.push(coords);
 		}
-		return points.length >= 2 ? points : null;
+		return points.length >= 1 ? points : null;
 	}, [
 		selectedContacts,
 		coordsByContactId,
 		bookingExtraCoordsByContactId,
 		promotionOverlayCoordsByContactId,
 		allContactsOverlayCoordsByContactId,
+		selectedContactObjectsById,
 	]);
-	useEffect(() => {
-		if (!selectedAnchorPoints) selectionBaseZoomRef.current = null;
-	}, [selectedAnchorPoints]);
-	useEffect(() => {
-		if (!map || !isMapLoaded) return;
-		if (isLoading) return;
+	const selectedContactsKey = useMemo(
+		() => selectedContacts.slice().sort((a, b) => a - b).join(','),
+		[selectedContacts]
+	);
+	useLayoutEffect(() => {
+		selectionTooltipsFootprintRef.current = null;
+		selectionActionsSideRef.current = null;
+	}, [selectedContactsKey]);
+	useLayoutEffect(() => {
+		if (!map || !isMapLoaded || isLoading || !onAddSelectionToFolder) return;
+		if (selectedContacts.length < 1) return;
 		const el = selectionActionsOverlayRef.current;
-		if (!el || !selectedAnchorPoints) return;
+		if (!el) return;
 
-		const update = () => {
-			// Anchor above the TOP-most selected dot on screen (smallest projected y)
-			// so the card sits in the emptier space above the selection rather than
-			// over the cluster, where more dots may still be picked.
-			let top: { x: number; y: number } | null = null;
-			for (const pt of selectedAnchorPoints) {
-				const projected = map.project([pt.lng, pt.lat]);
-				if (!top || projected.y < top.y) {
-					top = { x: projected.x, y: projected.y };
+		const readSelectionActionsDock = () => {
+			const rootStyles = getComputedStyle(document.documentElement);
+			const dashboardZoom =
+				Number.parseFloat(
+					rootStyles.getPropertyValue('--murmur-dashboard-zoom').trim()
+				) || MURMUR_CHROME_ZOOM_DEFAULT;
+			const sideShiftPx =
+				Number.parseFloat(rootStyles.getPropertyValue(DASHBOARD_SIDE_SHIFT_VAR).trim()) ||
+				0;
+			const viewportH = window.innerHeight;
+			const railTotalHeightPx =
+				SELECTION_ACTIONS_MAP_SELECT_GRAB_TOP_EXTENT_PX +
+				MAP_SELECT_GRAB_TOOL_COLLAPSED_HEIGHT_PX;
+			const grabViewScale = computeMapSelectGrabViewScale(
+				viewportH,
+				railTotalHeightPx
+			);
+			const sidePanelTop =
+				(SELECTION_ACTIONS_MAP_VIEW_SIDE_PANEL_TOP_PX + sideShiftPx) /
+				dashboardZoom;
+			const grabOriginTop =
+				sidePanelTop +
+				SELECTION_ACTIONS_MAP_SELECT_GRAB_TOP_EXTENT_PX * grabViewScale -
+				4 / dashboardZoom;
+			return {
+				minX:
+					SELECTION_ACTIONS_MAP_SELECT_GRAB_LEFT_PX +
+					SELECTION_ACTIONS_DOCK_RAIL_WIDTH_PX * grabViewScale +
+					SELECTION_ACTIONS_DOCK_GAP_PX,
+				top:
+					grabOriginTop -
+					SELECTION_ACTIONS_SHOWING_ABOVE_GRAB_ORIGIN_PX * grabViewScale,
+			};
+		};
+
+		const place = () => {
+			const container = mapContainerRef.current;
+			if (!container) return;
+
+			// Project the selected dots into a screen-space cluster box so the card
+			// can sit AROUND the selection (on the side with the most room) instead
+			// of being pinned directly above the top-most dot.
+			let clusterLeft = Infinity;
+			let clusterTop = Infinity;
+			let clusterRight = -Infinity;
+			let clusterBottom = -Infinity;
+			let anyProjected = false;
+			if (selectedAnchorPoints) {
+				for (const pt of selectedAnchorPoints) {
+					const p = map.project([pt.lng, pt.lat]);
+					clusterLeft = Math.min(clusterLeft, p.x);
+					clusterTop = Math.min(clusterTop, p.y);
+					clusterRight = Math.max(clusterRight, p.x);
+					clusterBottom = Math.max(clusterBottom, p.y);
+					anyProjected = true;
 				}
 			}
-			if (!top) return;
 
-			// Scale with the map (2x per zoom level), capped at 1x when zooming in,
-			// and fade out as the user zooms further out than where the card appeared.
-			if (selectionBaseZoomRef.current == null) {
-				selectionBaseZoomRef.current = map.getZoom();
-			}
-			const zoomDelta = map.getZoom() - selectionBaseZoomRef.current;
-			const scale = Math.min(1, 2 ** zoomDelta);
-			const FADE_START = -0.4;
-			const FADE_END = -2.2;
-			const opacity = Math.max(
-				0,
-				Math.min(1, (zoomDelta - FADE_END) / (FADE_START - FADE_END))
-			);
+			const rect = container.getBoundingClientRect();
 
-			// offsetWidth/Height are the UNSCALED box; using them (not
-			// getBoundingClientRect, which includes the scale) keeps the centering
-			// stable as the scale changes. Pivot the scale at the bottom-center so the
-			// card shrinks toward the dot it is anchored above.
 			const w = el.offsetWidth;
 			const h = el.offsetHeight;
-			const x = top.x - w / 2;
-			const y = top.y - h - 40;
-			el.style.transformOrigin = 'bottom center';
-			el.style.transform = `translate(${Math.round(x)}px, ${Math.round(
-				y
-			)}px) scale(${scale})`;
-			el.style.opacity = String(opacity);
-			el.style.pointerEvents = opacity < 0.1 ? 'none' : 'auto';
+			const vw = window.innerWidth;
+			const vh = window.innerHeight;
+			const margin = SELECTION_ACTIONS_VIEWPORT_MARGIN_PX;
+			const { minX: dockMinX, top: dockTop } = readSelectionActionsDock();
+			const maxX = vw - w - margin;
+			const minY = readSelectionActionsTopChromeBottomPx();
+			const maxY = vh - h - margin;
+
+			const dockX = clamp(dockMinX, margin, maxX);
+			const dockY = clamp(dockTop, minY, maxY);
+
+			// Continuous 0..1 blend toward the docked spot: 0 = anchored around the
+			// selection, 1 = parked by the "Showing" rail. Driven by BOTH how far the
+			// view is zoomed out and how far the selection is panned off-center, so
+			// the card eases between the two states instead of snapping all at once.
+			let dockProgress = 1;
+			let anchoredX = dockX;
+			let anchoredY = dockY;
+			let obstacleBounds: {
+				left: number;
+				top: number;
+				right: number;
+				bottom: number;
+			} | null = null;
+			if (anyProjected) {
+				// Obstacle to avoid = tooltip footprint UNION selected-marker footprint.
+				// If the real tooltip footprint has not been published yet (first select
+				// frame), use a conservative tooltip-shaped fallback above the marker so
+				// the card never flashes over it.
+				const footprint = selectionTooltipsFootprintRef.current;
+				const markerLeft =
+					rect.left + clusterLeft - SELECTION_ACTIONS_MARKER_CLEAR_RADIUS_PX;
+				const markerTop =
+					rect.top + clusterTop - SELECTION_ACTIONS_MARKER_CLEAR_RADIUS_PX;
+				const markerRight =
+					rect.left + clusterRight + SELECTION_ACTIONS_MARKER_CLEAR_RADIUS_PX;
+				const markerBottom =
+					rect.top + clusterBottom + SELECTION_ACTIONS_MARKER_CLEAR_RADIUS_PX;
+				// Keep the conservative first-frame footprint in the union even
+				// after the exact tooltip footprint arrives. Otherwise the obstacle
+				// can shrink on the first pan after selection, making the card jump
+				// from its safe initial placement to a tighter placement.
+				const fallbackTooltipLeft =
+					rect.left + clusterLeft - SELECTION_ACTIONS_FALLBACK_TOOLTIP_HALF_W_PX;
+				const fallbackTooltipTop =
+					rect.top + clusterTop - SELECTION_ACTIONS_FALLBACK_TOOLTIP_ABOVE_PX;
+				const fallbackTooltipRight =
+					rect.left + clusterRight + SELECTION_ACTIONS_FALLBACK_TOOLTIP_HALF_W_PX;
+				const fallbackTooltipBottom = markerBottom;
+				const exactTooltipLeft = footprint ? rect.left + footprint.left : fallbackTooltipLeft;
+				const exactTooltipTop = footprint ? rect.top + footprint.top : fallbackTooltipTop;
+				const exactTooltipRight = footprint
+					? rect.left + footprint.right
+					: fallbackTooltipRight;
+				const exactTooltipBottom = footprint
+					? rect.top + footprint.bottom
+					: fallbackTooltipBottom;
+				const tooltipLeft = Math.min(fallbackTooltipLeft, exactTooltipLeft);
+				const tooltipTop = Math.min(fallbackTooltipTop, exactTooltipTop);
+				const tooltipRight = Math.max(fallbackTooltipRight, exactTooltipRight);
+				const tooltipBottom = Math.max(fallbackTooltipBottom, exactTooltipBottom);
+				const obLeft = Math.min(markerLeft, tooltipLeft);
+				const obTop = Math.min(markerTop, tooltipTop);
+				const obRight = Math.max(markerRight, tooltipRight);
+				const obBottom = Math.max(markerBottom, tooltipBottom);
+				obstacleBounds = { left: obLeft, top: obTop, right: obRight, bottom: obBottom };
+				const obCenterX = (obLeft + obRight) / 2;
+				const obCenterY = (obTop + obBottom) / 2;
+				const gap = SELECTION_ACTIONS_AROUND_SIDE_GAP_PX;
+				// Candidates fully clear of the obstacle on each side (a positive gap
+				// guarantees no overlap). Pick the one that best fits the viewport and
+				// otherwise hugs the selection — so it lands wherever is optimal at the
+				// moment instead of always favoring one side.
+				const candidates = [
+					{ side: 'top' as const, x: obCenterX - w / 2, y: obTop - gap - h },
+					{ side: 'bottom' as const, x: obCenterX - w / 2, y: obBottom + gap },
+					{ side: 'left' as const, x: obLeft - gap - w, y: obCenterY - h / 2 },
+					{ side: 'right' as const, x: obRight + gap, y: obCenterY - h / 2 },
+				];
+				const scoreCandidate = (c: (typeof candidates)[number]) => {
+					const outOfBounds =
+						Math.max(0, margin - c.x) +
+						Math.max(0, c.x - maxX) +
+						Math.max(0, minY - c.y) +
+						Math.max(0, c.y - maxY);
+					const cardCenterX = c.x + w / 2;
+					const cardCenterY = c.y + h / 2;
+					const hug = Math.hypot(cardCenterX - obCenterX, cardCenterY - obCenterY);
+					// Out-of-bounds dominates; hug distance breaks ties so the card
+					// snuggles the nearest comfortably-visible side.
+					return outOfBounds * 10000 + hug;
+				};
+				let best = candidates[0];
+				let bestScore = scoreCandidate(best);
+				for (const c of candidates) {
+					const score = scoreCandidate(c);
+					if (score < bestScore) {
+						bestScore = score;
+						best = c;
+					}
+				}
+				const current = candidates.find(
+					(c) => c.side === selectionActionsSideRef.current
+				);
+				if (current) {
+					const currentScore = scoreCandidate(current);
+					// Hysteresis: do not flip sides on tiny score changes while panning.
+					// That was the visible flicker. Only switch when the new side is
+					// meaningfully better or the current side is being clipped.
+					const currentOutOfBounds =
+						Math.max(0, margin - current.x) +
+						Math.max(0, current.x - maxX) +
+						Math.max(0, minY - current.y) +
+						Math.max(0, current.y - maxY);
+					if (currentOutOfBounds === 0 && currentScore <= bestScore + 80) {
+						best = current;
+					}
+				}
+				selectionActionsSideRef.current = best.side;
+				anchoredX = clamp(best.x, margin, maxX);
+				anchoredY = clamp(best.y, minY, maxY);
+
+				const boxCenterX = obCenterX;
+				const boxCenterY = obCenterY;
+				// Zoom term: ramps in as the view zooms out past the anchor zoom.
+				const zoomProgress = clamp(
+					(SELECTION_ACTIONS_ANCHOR_FULL_ZOOM - map.getZoom()) /
+						(SELECTION_ACTIONS_ANCHOR_FULL_ZOOM -
+							SELECTION_ACTIONS_DOCK_FULL_ZOOM),
+					0,
+					1
+				);
+				// Pan term: 0 while the selection's center sits inside the comfort
+				// rect, ramping to 1 as it travels toward / past the viewport edges.
+				const comfortPad = SELECTION_ACTIONS_PAN_COMFORT_PAD_PX;
+				const ramp = SELECTION_ACTIONS_PAN_DOCK_RAMP_PX;
+				const overX = Math.max(
+					0,
+					comfortPad - boxCenterX,
+					boxCenterX - (vw - comfortPad)
+				);
+				const overY = Math.max(
+					0,
+					minY + comfortPad - boxCenterY,
+					boxCenterY - (vh - comfortPad)
+				);
+				const panProgress = clamp(Math.max(overX, overY) / ramp, 0, 1);
+				dockProgress = Math.max(zoomProgress, panProgress);
+			} else {
+				selectionActionsSideRef.current = null;
+			}
+
+			let viewportX = lerp(anchoredX, dockX, dockProgress);
+			let viewportY = lerp(anchoredY, dockY, dockProgress);
+			if (obstacleBounds) {
+				const gap = SELECTION_ACTIONS_AROUND_SIDE_GAP_PX;
+				const overlapsObstacle =
+					viewportX < obstacleBounds.right + gap &&
+					viewportX + w > obstacleBounds.left - gap &&
+					viewportY < obstacleBounds.bottom + gap &&
+					viewportY + h > obstacleBounds.top - gap;
+				if (overlapsObstacle) {
+					switch (selectionActionsSideRef.current) {
+						case 'top':
+							viewportY = obstacleBounds.top - gap - h;
+							break;
+						case 'bottom':
+							viewportY = obstacleBounds.bottom + gap;
+							break;
+						case 'left':
+							viewportX = obstacleBounds.left - gap - w;
+							break;
+						case 'right':
+						default:
+							viewportX = obstacleBounds.right + gap;
+							break;
+					}
+					viewportX = clamp(viewportX, margin, maxX);
+					viewportY = clamp(viewportY, minY, maxY);
+				}
+			}
+
+			// Container-relative coords — stays in the map layer (z-99) so the
+			// dashboard's portaled top nav / side panel always paints above.
+			const x = viewportX - rect.left;
+			const y = viewportY - rect.top;
+
+			// Rigid per-frame placement (no CSS easing): the position itself is what
+			// moves gradually, since dockProgress changes smoothly with zoom/pan — so
+			// the follow stays strict like the tooltips and the dock never snaps.
+			el.style.transition = 'none';
+			el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+			el.style.opacity = '1';
+			el.style.pointerEvents = 'auto';
 		};
 
-		update();
-		map.on('move', update);
+		place();
+		map.on('move', place);
+		window.addEventListener('resize', place);
 		return () => {
-			map.off('move', update);
+			map.off('move', place);
+			window.removeEventListener('resize', place);
 		};
-	}, [map, isMapLoaded, isLoading, selectedAnchorPoints]);
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		onAddSelectionToFolder,
+		selectedContacts.length,
+		selectedAnchorPoints,
+	]);
 
 	// Hover tooltip anchoring (single overlay).
+	const stackedSelectedContactIdSet = useMemo(() => {
+		const ids = new Set<number>();
+		for (const group of selectedTooltipStackGroups) {
+			for (const contactId of group.contactIds) ids.add(contactId);
+		}
+		return ids;
+	}, [selectedTooltipStackGroups]);
 	const hoverTooltipContactId = hoveredMarkerId ?? fadingTooltipId;
 	const hoverTooltipEntry = useMemo(() => {
 		if (hoverTooltipContactId == null) return null;
+		if (stackedSelectedContactIdSet.has(hoverTooltipContactId)) return null;
 		const base = visibleContactsById.get(hoverTooltipContactId);
 		if (base) return { kind: 'base' as const, contact: base };
 		const booking = bookingExtraContactsById.get(hoverTooltipContactId);
@@ -16334,6 +18281,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return null;
 	}, [
 		hoverTooltipContactId,
+		stackedSelectedContactIdSet,
 		visibleContactsById,
 		bookingExtraContactsById,
 		promotionOverlayContactsById,
@@ -16368,6 +18316,480 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// streetCardEntries below); this hover-gated single-card path now serves
 	// only the ambient 'all'-contacts gray dots, which stay hover-only.
 	const isStreetCardMode = streetViewEnabled && zoomLevel >= STREET_VIEW_MIN_ZOOM;
+	const selectedCompactTooltipEntries = useMemo(() => {
+		if (!onAddSelectionToFolder || isStreetCardMode) return [];
+
+		type SelectedTooltipKind = 'base' | 'booking' | 'promotion' | 'all' | 'fallback';
+
+		const compactTooltipOptions = { showTitleBand: false };
+		const entries: SelectedCompactTooltipEntry[] = [];
+		const seenIds = new Set<number>();
+
+		const resolveSelectedContact = (
+			id: number
+		): { kind: SelectedTooltipKind; contact: ContactWithName; coords: LatLngLiteral | null } | null => {
+			const base = contactsWithCoordsById.get(id) ?? visibleContactsById.get(id);
+			if (base) return { kind: 'base', contact: base, coords: getContactCoords(base) };
+
+			const booking = bookingExtraContactsById.get(id);
+			if (booking) {
+				return {
+					kind: 'booking',
+					contact: booking,
+					coords: getBookingExtraContactCoords(booking),
+				};
+			}
+
+			const promo = promotionOverlayContactsById.get(id);
+			if (promo) {
+				return {
+					kind: 'promotion',
+					contact: promo,
+					coords: getPromotionOverlayContactCoords(promo),
+				};
+			}
+
+			const all = allOverlayContactsById.get(id);
+			if (all) {
+				return {
+					kind: 'all',
+					contact: all,
+					coords: getAllContactsOverlayContactCoords(all),
+				};
+			}
+
+			const fallback = selectedContactObjectsById.get(id);
+			if (fallback) {
+				return {
+					kind: 'fallback',
+					contact: fallback,
+					coords: getLatLngFromContact(fallback),
+				};
+			}
+
+			return null;
+		};
+
+		const getWhatForSelectedTooltip = (
+			contact: ContactWithName,
+			kind: SelectedTooltipKind
+		): string | null => {
+			switch (kind) {
+				case 'base':
+					return contact.curatedCategory ?? searchWhat ?? null;
+				case 'booking':
+					return getBookingTitlePrefixFromContactTitle(contact.title) ?? null;
+				case 'promotion':
+					return getPromotionOverlayWhatFromContactTitle(contact.title) ?? null;
+				case 'all':
+					return getAmbientContactWhatFromTitle(contact.title);
+				case 'fallback':
+					return (
+						contact.curatedCategory ??
+						searchWhat ??
+						getAmbientContactWhatFromTitle(contact.title) ??
+						null
+					);
+				default:
+					return null;
+			}
+		};
+
+		for (let selectedIndex = 0; selectedIndex < selectedContacts.length; selectedIndex += 1) {
+			const id = selectedContacts[selectedIndex];
+			if (seenIds.has(id)) continue;
+			seenIds.add(id);
+
+			const resolved = resolveSelectedContact(id);
+			if (!resolved || !resolved.coords) continue;
+
+			const { contact, coords, kind } = resolved;
+			const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+			const nameForTooltip = fullName || contact.name || '';
+			const companyForTooltip = contact.company || '';
+			const titleForTooltip = (
+				contact.curatedDisplayLabel ||
+				contact.title ||
+				contact.headline ||
+				''
+			).trim();
+			const whatForMarker = getWhatForSelectedTooltip(contact, kind);
+			const normalizedWhat = whatForMarker ? normalizeWhatKey(whatForMarker) : null;
+			const tooltipFillColor = normalizedWhat
+				? (WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? PEOPLE_TOOLTIP_FILL_COLOR)
+				: kind === 'all'
+					? PEOPLE_TOOLTIP_FILL_COLOR
+					: PEOPLE_TOOLTIP_FILL_COLOR;
+			const tooltipBodyFillColor = normalizedWhat
+				? (WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR[normalizedWhat] ?? PEOPLE_TOOLTIP_FILL_COLOR)
+				: tooltipFillColor;
+			const width = calculateTooltipWidth(
+				nameForTooltip,
+				companyForTooltip,
+				titleForTooltip,
+				whatForMarker,
+				compactTooltipOptions
+			);
+			const height = calculateTooltipHeight(
+				nameForTooltip,
+				companyForTooltip,
+				compactTooltipOptions
+			);
+			const anchorY = calculateTooltipAnchorY(
+				nameForTooltip,
+				companyForTooltip,
+				compactTooltipOptions
+			);
+
+			entries.push({
+				contact,
+				coords,
+				width,
+				height,
+				anchorY,
+				bodyFillColor: tooltipBodyFillColor,
+				categoryKey: normalizedWhat ?? '__people__',
+				categoryFillColor: tooltipFillColor,
+				selectedOrder: selectedIndex,
+				svg: generateMapTooltipSvg(
+					nameForTooltip,
+					companyForTooltip,
+					titleForTooltip,
+					tooltipFillColor,
+					whatForMarker,
+					tooltipBodyFillColor,
+					compactTooltipOptions
+				),
+			});
+		}
+
+		return entries;
+	}, [
+		onAddSelectionToFolder,
+		isStreetCardMode,
+		selectedContacts,
+		contactsWithCoordsById,
+		visibleContactsById,
+		bookingExtraContactsById,
+		promotionOverlayContactsById,
+		allOverlayContactsById,
+		selectedContactObjectsById,
+		getContactCoords,
+		getBookingExtraContactCoords,
+		getPromotionOverlayContactCoords,
+		getAllContactsOverlayContactCoords,
+		searchWhat,
+	]);
+	const selectedCompactTooltipEntryIdsKey = useMemo(
+		() => selectedCompactTooltipEntries.map((entry) => entry.contact.id).join(','),
+		[selectedCompactTooltipEntries]
+	);
+	const projectSelectedTooltipEntries = useCallback(
+		(m: mapboxgl.Map): ProjectedSelectedTooltipEntry[] =>
+			selectedCompactTooltipEntries.map((entry) => {
+				const p = m.project([entry.coords.lng, entry.coords.lat]);
+				const naturalX = p.x - entry.width / 2;
+				const naturalY = p.y - entry.anchorY - tooltipMarkerGapPx;
+				return {
+					...entry,
+					markerX: p.x,
+					markerY: p.y,
+					naturalX,
+					naturalY,
+					left: naturalX,
+					top: naturalY,
+					right: naturalX + entry.width,
+					bottom: naturalY + entry.height,
+					centerX: naturalX + entry.width / 2,
+					centerY: naturalY + entry.height / 2,
+				};
+			}),
+		[selectedCompactTooltipEntries, tooltipMarkerGapPx]
+	);
+	const buildSelectedTooltipStackLayout = useCallback(
+		(projectedEntries: ProjectedSelectedTooltipEntry[], zoom: number) => {
+			const stackT =
+				projectedEntries.length > 1 ? getSelectedTooltipStackT(zoom) : 0;
+			const shouldUseLegacyStack = stackT >= SELECTED_TOOLTIP_LEGACY_STACK_T;
+			const stackScale = lerp(1, SELECTED_TOOLTIP_STACK_MIN_SCALE, stackT);
+
+			const buildLegacyStackPlacement = (): SelectedTooltipStackPlacement[] => {
+				const frontEntry =
+					projectedEntries
+						.slice()
+						.sort((a, b) => a.selectedOrder - b.selectedOrder)
+						.at(-1) ?? null;
+				const firstProjectedEntry = projectedEntries[0] ?? null;
+				if (!frontEntry || !firstProjectedEntry) return [];
+				const stackAnchor = projectedEntries.reduce<ProjectedSelectedTooltipEntry>(
+					(topEntry, entry) => (entry.naturalY < topEntry.naturalY ? entry : topEntry),
+					firstProjectedEntry
+				);
+				const contactIds = projectedEntries
+					.slice()
+					.sort((a, b) => a.selectedOrder - b.selectedOrder)
+					.map((entry) => entry.contact.id);
+				return [
+					{
+						id: 'selected-stack-legacy-zoomed-out',
+						contactIds,
+						count: projectedEntries.length,
+						colors: getSelectedTooltipGroupColors(projectedEntries),
+						width: frontEntry.width,
+						height: frontEntry.height,
+						svg: frontEntry.svg,
+						bodyFillColor: frontEntry.bodyFillColor,
+						x: stackAnchor.centerX - frontEntry.width / 2,
+						y: stackAnchor.naturalY,
+						opacity: 1,
+						scale: stackScale,
+					},
+				];
+			};
+
+			const collisionStackPlacements =
+				shouldUseLegacyStack
+					? []
+					: buildSelectedTooltipStackPlacements(projectedEntries).map((placement) => ({
+							...placement,
+							opacity: 1,
+							scale: stackScale,
+						}));
+			const legacyStackPlacements =
+				shouldUseLegacyStack ? buildLegacyStackPlacement() : [];
+			const stackPlacements = [...collisionStackPlacements, ...legacyStackPlacements];
+			const collisionGroupedContactIds = new Set<number>();
+			for (const group of collisionStackPlacements) {
+				for (const contactId of group.contactIds) collisionGroupedContactIds.add(contactId);
+			}
+			const stackGroups = stackPlacements.map<SelectedTooltipStackGroup>(
+				({ id, contactIds, count, colors, width, height, svg, bodyFillColor }) => ({
+					id,
+					contactIds,
+					count,
+					colors,
+					width,
+					height,
+					svg,
+					bodyFillColor,
+				})
+			);
+
+			return {
+				shouldUseLegacyStack,
+				stackPlacements,
+				collisionGroupedContactIds,
+				stackGroups,
+			};
+		},
+		[getSelectedTooltipStackT]
+	);
+	const predictedSelectedTooltipStackGroups = useMemo(() => {
+		if (!map || !isMapLoaded || isLoading || selectedCompactTooltipEntries.length === 0) {
+			return [];
+		}
+		return buildSelectedTooltipStackLayout(
+			projectSelectedTooltipEntries(map),
+			map.getZoom() ?? MAP_DEFAULT_ZOOM
+		).stackGroups;
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		selectedCompactTooltipEntries,
+		projectSelectedTooltipEntries,
+		buildSelectedTooltipStackLayout,
+	]);
+	const committedSelectedTooltipStackGroups =
+		selectedTooltipStackSelectionKeyRef.current === selectedCompactTooltipEntryIdsKey
+			? selectedTooltipStackGroups
+			: [];
+	const renderedSelectedTooltipStackGroups =
+		committedSelectedTooltipStackGroups.length > 0
+			? committedSelectedTooltipStackGroups
+			: predictedSelectedTooltipStackGroups;
+	const renderedStackedSelectedContactIdSet = useMemo(() => {
+		const ids = new Set<number>();
+		for (const group of renderedSelectedTooltipStackGroups) {
+			for (const contactId of group.contactIds) ids.add(contactId);
+		}
+		return ids;
+	}, [renderedSelectedTooltipStackGroups]);
+	useEffect(() => {
+		const target = selectedTooltipHoverHiddenTargetRef.current;
+		if (!target) return;
+		if (isStreetCardMode || selectedCompactTooltipEntries.length === 0) {
+			setSelectedTooltipHoverHiddenTargetIfChanged(null);
+			return;
+		}
+
+		if (target.type === 'contact') {
+			const stillSelected = selectedCompactTooltipEntries.some(
+				(entry) => entry.contact.id === target.id
+			);
+			if (!stillSelected) setSelectedTooltipHoverHiddenTargetIfChanged(null);
+			return;
+		}
+
+		const stillStacked = renderedSelectedTooltipStackGroups.some(
+			(group) => group.id === target.id
+		);
+		if (!stillStacked) setSelectedTooltipHoverHiddenTargetIfChanged(null);
+	}, [
+		isStreetCardMode,
+		selectedCompactTooltipEntries,
+		renderedSelectedTooltipStackGroups,
+		setSelectedTooltipHoverHiddenTargetIfChanged,
+	]);
+	useLayoutEffect(() => {
+		if (selectedCompactTooltipEntries.length === 0) {
+			selectionTooltipsFootprintRef.current = null;
+			if (selectedTooltipStackSignatureRef.current) {
+				selectedTooltipStackSignatureRef.current = '';
+				selectedTooltipStackSelectionKeyRef.current = '';
+				setSelectedTooltipStackGroups([]);
+			}
+			return;
+		}
+		if (!map || !isMapLoaded || isLoading) return;
+
+		const update = () => {
+			const projectedEntries = projectSelectedTooltipEntries(map);
+			const {
+				shouldUseLegacyStack,
+				stackPlacements,
+				collisionGroupedContactIds,
+				stackGroups,
+			} = buildSelectedTooltipStackLayout(
+				projectedEntries,
+				map.getZoom() ?? MAP_DEFAULT_ZOOM
+			);
+			const container = mapContainerRef.current;
+			const viewport =
+				container && container.clientWidth > 0 && container.clientHeight > 0
+					? {
+							width: container.clientWidth,
+							height: container.clientHeight,
+							padding: SELECTED_TOOLTIP_PLACEMENT_VIEWPORT_PADDING_PX,
+						}
+					: null;
+			const stackBlockingBounds = stackPlacements.map(getSelectedTooltipStackBounds);
+			const individualPlacements = shouldUseLegacyStack
+				? new Map<number, SelectedTooltipIndividualPlacement>()
+				: buildSelectedTooltipIndividualPlacements(
+						projectedEntries,
+						collisionGroupedContactIds,
+						stackBlockingBounds,
+						viewport,
+						tooltipMarkerGapPx
+					);
+
+			const nextStackSignature = stackGroups
+				.map(
+					(group) =>
+						`${group.id}:${group.count}:${group.width}:${group.height}:${group.bodyFillColor}:${group.contactIds.join(',')}:${group.colors.join(',')}`
+				)
+				.join('|');
+			if (selectedTooltipStackSignatureRef.current !== nextStackSignature) {
+				selectedTooltipStackSignatureRef.current = nextStackSignature;
+				selectedTooltipStackSelectionKeyRef.current = selectedCompactTooltipEntryIdsKey;
+				setSelectedTooltipStackGroups(stackGroups);
+			}
+
+			for (const entry of projectedEntries) {
+				const el = selectedCompactTooltipRefs.current.get(entry.contact.id);
+				if (!el) continue;
+				const placement = individualPlacements.get(entry.contact.id);
+				const isHiddenByTooltipHover =
+					selectedTooltipHoverHiddenTarget?.type === 'contact' &&
+					selectedTooltipHoverHiddenTarget.id === entry.contact.id;
+				el.style.transformOrigin = placement?.transformOrigin ?? 'bottom center';
+				el.style.transform = `translate(${Math.round(
+					placement?.x ?? entry.naturalX
+				)}px, ${Math.round(
+					placement?.y ?? entry.naturalY
+				)}px)`;
+				el.style.zIndex = String(HOVER_TOOLTIP_Z_INDEX - 1);
+				el.style.opacity =
+					isHiddenByTooltipHover ||
+					hoveredMarkerId === entry.contact.id ||
+					collisionGroupedContactIds.has(entry.contact.id) ||
+					shouldUseLegacyStack
+						? '0'
+						: '1';
+			}
+
+			const placementById = new Map(stackPlacements.map((placement) => [placement.id, placement]));
+			for (const [id, el] of selectedTooltipStackRefs.current) {
+				const placement = placementById.get(id);
+				if (!placement) {
+					el.style.opacity = '0';
+					continue;
+				}
+				el.style.transformOrigin = 'center center';
+				el.style.transform = `translate(${Math.round(placement.x)}px, ${Math.round(
+					placement.y
+				)}px) scale(${placement.scale ?? 1})`;
+				el.style.opacity =
+					selectedTooltipHoverHiddenTarget?.type === 'stack' &&
+					selectedTooltipHoverHiddenTarget.id === id
+						? '0'
+						: String(placement.opacity ?? 1);
+				el.style.zIndex = String(HOVER_TOOLTIP_Z_INDEX + 1);
+			}
+
+			// Publish the union of every rendered tooltip box (container-px) so the
+			// action card can place itself clear of them. Skip individuals that are
+			// folded into a stack or hidden — they aren't visually present.
+			let fpLeft = Infinity;
+			let fpTop = Infinity;
+			let fpRight = -Infinity;
+			let fpBottom = -Infinity;
+			for (const entry of projectedEntries) {
+				if (
+					collisionGroupedContactIds.has(entry.contact.id) ||
+					shouldUseLegacyStack
+				) {
+					continue;
+				}
+				const placement = individualPlacements.get(entry.contact.id);
+				const px = placement?.x ?? entry.naturalX;
+				const py = placement?.y ?? entry.naturalY;
+				fpLeft = Math.min(fpLeft, px);
+				fpTop = Math.min(fpTop, py);
+				fpRight = Math.max(fpRight, px + entry.width);
+				fpBottom = Math.max(fpBottom, py + entry.height);
+			}
+			for (const placement of stackPlacements) {
+				const scale = placement.scale ?? 1;
+				fpLeft = Math.min(fpLeft, placement.x);
+				fpTop = Math.min(fpTop, placement.y);
+				fpRight = Math.max(fpRight, placement.x + placement.width * scale);
+				fpBottom = Math.max(fpBottom, placement.y + placement.height * scale);
+			}
+			selectionTooltipsFootprintRef.current =
+				fpLeft <= fpRight
+					? { left: fpLeft, top: fpTop, right: fpRight, bottom: fpBottom }
+					: null;
+		};
+
+		update();
+		map.on('move', update);
+		return () => {
+			map.off('move', update);
+		};
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		selectedCompactTooltipEntries,
+		selectedCompactTooltipEntryIdsKey,
+		projectSelectedTooltipEntries,
+		buildSelectedTooltipStackLayout,
+		tooltipMarkerGapPx,
+		hoveredMarkerId,
+		selectedTooltipHoverHiddenTarget,
+	]);
 	const streetCardContact =
 		isStreetCardMode && hoverTooltipEntry?.kind === 'all'
 			? hoverTooltipEntry.contact
@@ -16386,19 +18808,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!isStreetCardMode || !hoverTooltipEntry || hoverTooltipEntry.kind !== 'all')
 			return null;
 		const contact = hoverTooltipEntry.contact;
-		const kind = hoverTooltipEntry.kind;
 		const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
 		const name = fullName || contact.name || contact.company || 'Unknown';
 		const company = fullName || contact.name ? contact.company || '' : '';
-		// Same per-kind category resolution as the slim tooltip (see hoverTooltipData).
-		const whatForMarker =
-			kind === 'base'
-				? (contact.curatedCategory ?? searchWhat ?? null)
-				: kind === 'booking'
-					? (getBookingTitlePrefixFromContactTitle(contact.title) ?? null)
-					: kind === 'promotion'
-						? (getPromotionOverlayWhatFromContactTitle(contact.title) ?? null)
-						: (getAmbientContactWhatFromTitle(contact.title) ?? null);
+		const whatForMarker = getAmbientContactWhatFromTitle(contact.title);
 		const accentColor = getResultDotColorForWhat(whatForMarker);
 		const cityStateFallback = [
 			contact.city,
@@ -16509,7 +18922,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!hoverTooltipEntry) return null;
 		const contact = hoverTooltipEntry.contact;
 		const kind = hoverTooltipEntry.kind;
-		const isSelected = selectedContactIdSet.has(contact.id);
 
 		const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
 		const nameForTooltip = fullName || contact.name || '';
@@ -16524,11 +18936,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (kind === 'all') {
 			const whatForMarker = getAmbientContactWhatFromTitle(contact.title);
 			if (whatForMarker) {
-				const dotFillColor = getResultDotColorForWhat(whatForMarker);
 				const normalizedWhat = normalizeWhatKey(whatForMarker);
-				const tooltipFillColor = isSelected
-					? TOOLTIP_FILL_COLOR_SELECTED
-					: (WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? dotFillColor);
+				const tooltipFillColor =
+					WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? PEOPLE_TOOLTIP_FILL_COLOR;
+				const tooltipBodyFillColor =
+					WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR[normalizedWhat] ?? PEOPLE_TOOLTIP_FILL_COLOR;
 				const width = calculateTooltipWidth(
 					nameForTooltip,
 					companyForTooltip,
@@ -16543,7 +18955,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						companyForTooltip,
 						titleForTooltip,
 						tooltipFillColor,
-						whatForMarker
+						whatForMarker,
+						tooltipBodyFillColor
 					),
 					width,
 					height,
@@ -16551,9 +18964,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				};
 			}
 
-			const tooltipFillColor = isSelected
-				? TOOLTIP_FILL_COLOR_SELECTED
-				: ALL_CONTACTS_OVERLAY_TOOLTIP_FILL_COLOR;
+			const tooltipFillColor = PEOPLE_TOOLTIP_FILL_COLOR;
 			const width = calculateTooltipWidth(
 				nameForTooltip,
 				companyForTooltip,
@@ -16583,15 +18994,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		// Even if the marker dot is "washed out" outside the locked/selected state, keep the hover tooltip
 		// using the base category color so it consistently communicates the search intent.
-		const dotFillColor = getResultDotColorForWhat(whatForMarker);
-
 		const normalizedWhat = whatForMarker ? normalizeWhatKey(whatForMarker) : null;
 		const baseTooltipFillColor = normalizedWhat
-			? (WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? dotFillColor)
-			: dotFillColor;
-
-		const tooltipFillColor = isSelected
-			? TOOLTIP_FILL_COLOR_SELECTED
+			? (WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? PEOPLE_TOOLTIP_FILL_COLOR)
+			: PEOPLE_TOOLTIP_FILL_COLOR;
+		const baseTooltipBodyFillColor = normalizedWhat
+			? (WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR[normalizedWhat] ?? PEOPLE_TOOLTIP_FILL_COLOR)
 			: baseTooltipFillColor;
 
 		const width = calculateTooltipWidth(
@@ -16608,26 +19016,41 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				nameForTooltip,
 				companyForTooltip,
 				titleForTooltip,
-				tooltipFillColor,
-				whatForMarker
+				baseTooltipFillColor,
+				whatForMarker,
+				baseTooltipBodyFillColor
 			),
 			width,
 			height,
 			anchorY,
 		};
-	}, [hoverTooltipEntry, selectedContactIdSet, searchWhat]);
+	}, [hoverTooltipEntry, searchWhat]);
+
+	const hoverTooltipLat = hoverTooltipCoords?.lat ?? null;
+	const hoverTooltipLng = hoverTooltipCoords?.lng ?? null;
+	const hoverTooltipWidth = hoverTooltipData?.width ?? null;
+	const hoverTooltipAnchorY = hoverTooltipData?.anchorY ?? null;
 
 	useLayoutEffect(() => {
 		if (!map || !isMapLoaded) return;
 		if (isLoading) return;
 		const el = hoverTooltipOverlayRef.current;
-		if (!el || !hoverTooltipCoords || !hoverTooltipData) return;
+		if (
+			!el ||
+			hoverTooltipLat == null ||
+			hoverTooltipLng == null ||
+			hoverTooltipWidth == null ||
+			hoverTooltipAnchorY == null
+		)
+			return;
 
 		const update = () => {
-			const p = map.project([hoverTooltipCoords.lng, hoverTooltipCoords.lat]);
+			const p = map.project([hoverTooltipLng, hoverTooltipLat]);
 			el.style.transform = `translate(${Math.round(
-				p.x - MAP_TOOLTIP_ANCHOR_X - hoverTooltipHitSlopPx
-			)}px, ${Math.round(p.y - hoverTooltipData.anchorY - hoverTooltipHitSlopPx)}px)`;
+				p.x - hoverTooltipWidth / 2 - hoverTooltipHitSlopPx
+			)}px, ${Math.round(
+				p.y - hoverTooltipAnchorY - hoverTooltipHitSlopPx - tooltipMarkerGapPx
+			)}px)`;
 		};
 
 		update();
@@ -16645,10 +19068,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// positioned before paint.
 		isStreetCardMode,
 		hoverTooltipContactId,
-		hoverTooltipCoords?.lat,
-		hoverTooltipCoords?.lng,
-		hoverTooltipData?.anchorY,
+		hoverTooltipLat,
+		hoverTooltipLng,
+		hoverTooltipWidth,
+		hoverTooltipAnchorY,
 		hoverTooltipHitSlopPx,
+		tooltipMarkerGapPx,
 	]);
 
 	// Street-view research card positioning: the outer overlay anchors at the marker's
@@ -17215,6 +19640,108 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				</div>
 			)}
 
+			{!isLoading &&
+				!isStreetCardMode &&
+				renderedSelectedTooltipStackGroups.length > 0 &&
+				renderedSelectedTooltipStackGroups.map((group) => {
+					const backLayerCount = Math.min(
+						SELECTED_TOOLTIP_STACK_FAKE_BACK_COUNT,
+						Math.max(0, group.count - 1)
+					);
+					return (
+						<div
+							key={group.id}
+							ref={(el) => registerSelectedTooltipStackEl(group.id, el)}
+							aria-hidden="true"
+							style={{
+								position: 'absolute',
+								left: 0,
+								top: 0,
+								width: `${group.width}px`,
+								height: `${group.height}px`,
+								pointerEvents: 'none',
+								opacity: 0,
+								zIndex: HOVER_TOOLTIP_Z_INDEX + 1,
+								transition: 'opacity 150ms ease-in-out',
+							}}
+						>
+							{Array.from({ length: backLayerCount }).map((_, index) => {
+								const depth = backLayerCount - index;
+								return (
+									<div
+										key={index}
+										style={{
+											position: 'absolute',
+											left: `${-depth * SELECTED_TOOLTIP_STACK_OFFSET_X_PX}px`,
+											top: `${-depth * SELECTED_TOOLTIP_STACK_OFFSET_Y_PX}px`,
+											width: '100%',
+											height: '100%',
+											boxSizing: 'border-box',
+											border: '1.5px solid black',
+											borderRadius: '8px',
+											backgroundColor:
+												group.colors[depth % group.colors.length] ??
+												group.bodyFillColor,
+										}}
+									/>
+								);
+							})}
+							<div
+								dangerouslySetInnerHTML={{ __html: group.svg }}
+								style={{
+									position: 'absolute',
+									left: 0,
+									top: 0,
+									width: '100%',
+									height: '100%',
+									display: 'block',
+									lineHeight: 0,
+								}}
+							/>
+						</div>
+					);
+				})}
+
+			{/* Selected compact SVG tooltips: persistent top-card-only labels for the
+			    dashboard search map. The active hover tooltip renders above these and
+			    includes the bottom title band. */}
+			{!isLoading &&
+				!isStreetCardMode &&
+				selectedCompactTooltipEntries.length > 0 &&
+				selectedCompactTooltipEntries.map((entry) => (
+					<div
+						key={entry.contact.id}
+						ref={(el) => registerSelectedCompactTooltipEl(entry.contact.id, el)}
+						style={{
+							position: 'absolute',
+							left: 0,
+							top: 0,
+							width: `${entry.width}px`,
+							height: `${entry.height}px`,
+							pointerEvents: 'none',
+							opacity:
+								hoveredMarkerId === entry.contact.id ||
+								renderedStackedSelectedContactIdSet.has(entry.contact.id) ||
+								(selectedTooltipHoverHiddenTarget?.type === 'contact' &&
+									selectedTooltipHoverHiddenTarget.id === entry.contact.id)
+									? 0
+									: 1,
+							transition: 'opacity 150ms ease-in-out',
+							zIndex: HOVER_TOOLTIP_Z_INDEX - 1,
+						}}
+					>
+						<div
+							dangerouslySetInnerHTML={{ __html: entry.svg }}
+							style={{
+								width: '100%',
+								height: '100%',
+								display: 'block',
+								lineHeight: 0,
+							}}
+						/>
+					</div>
+				))}
+
 			{/* Hover SVG tooltip (single overlay; positioned via map.project). At street
 			    zoom the rich research card below replaces it. */}
 			{!isLoading &&
@@ -17230,17 +19757,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							top: 0,
 							width: `${hoverTooltipData.width + hoverTooltipHitSlopPx * 2}px`,
 							height: `${hoverTooltipData.height + hoverTooltipHitSlopPx * 2}px`,
-							pointerEvents:
-								hoverTooltipContactId != null && hoveredMarkerId === hoverTooltipContactId
-									? 'auto'
-									: 'none',
+							pointerEvents: 'none',
 							padding: `${hoverTooltipHitSlopPx}px`,
 							boxSizing: 'border-box',
 							zIndex: HOVER_TOOLTIP_Z_INDEX,
 						}}
-						onMouseEnter={() => handleMarkerMouseOver(hoverTooltipEntry.contact)}
-						onMouseLeave={() => handleMarkerMouseOut(hoverTooltipEntry.contact.id)}
-						onClick={() => handleMarkerClick(hoverTooltipEntry.contact)}
 					>
 						<div
 							style={{
@@ -17293,6 +19814,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							onHoverStart={handleMarkerMouseOver}
 							onHoverEnd={handleMarkerMouseOut}
 							onToggleSelection={handleStreetCardToggleSelection}
+							onWheelForward={forwardWheelToMap}
 							registerEl={registerStreetCardEl}
 						/>
 					))}
@@ -17338,6 +19860,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							}}
 							onMouseEnter={() => handleMarkerMouseOver(hoverTooltipEntry.contact)}
 							onMouseLeave={() => handleMarkerMouseOut(hoverTooltipEntry.contact.id)}
+							onWheel={forwardWheelToMap}
 						>
 							<div
 								className="relative w-[280px] rounded-[10px] bg-white overflow-hidden font-inter"
@@ -17795,11 +20318,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						top: 0,
 						width: `${EVENT_POPUP_W}px`,
 						height: `${EVENT_POPUP_H}px`,
-						// Interactive only while this event is the hovered one, so the cursor can travel
-						// into / dwell on the card (entering cancels the pending hover-close; leaving
-						// reschedules it). A purely pinned card reverts to 'none' so it never becomes a
-						// dead zone over the map (pan/zoom/select/marker clicks pass through), mirroring
-						// the contact tooltip's hover-gated pointer capture.
 						pointerEvents: hoveredEventId === activeEvent.id ? 'auto' : 'none',
 						zIndex: HOVER_TOOLTIP_Z_INDEX + 12,
 					}}
@@ -17811,6 +20329,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						isPointerOverEventPopupRef.current = false;
 						scheduleEventHoverClose();
 					}}
+					onWheel={forwardWheelToMap}
 				>
 					{/* Outer red box — authored at its natural design size and uniformly
 					    scaled down to the footprint above. transform-origin top-left so the
@@ -17873,80 +20392,76 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				</div>
 			)}
 
-			{/* Multi-select action card — anchored to the selection centroid.
-			    Only rendered on hosts that wire `onAddSelectionToFolder` (the
-			    dashboard search map), and only for 2+ selected contacts. */}
-			{!isLoading &&
-				selectedContacts.length >= 2 &&
-				onAddSelectionToFolder &&
-				selectedAnchorPoints && (
+			{/* Multi-select action card — docked beside the left "Showing" rail when the
+			    selection is off-screen or zoomed out; otherwise anchored above the
+			    top-most selected dot. Stays in the map layer so portaled top nav /
+			    side panel (z-120+) always stacks above (see VenueMapActionPills). */}
+			{!isLoading && selectedContacts.length >= 1 && onAddSelectionToFolder && (
+				<div
+					ref={selectionActionsOverlayRef}
+					className="pointer-events-none absolute left-0 top-0 will-change-transform"
+					style={{
+						opacity: 0,
+						zIndex: SELECTION_ACTIONS_Z_INDEX,
+					}}
+					onMouseDown={(e) => e.stopPropagation()}
+					onPointerDown={(e) => e.stopPropagation()}
+					onWheel={forwardWheelToMap}
+				>
 					<div
-						ref={selectionActionsOverlayRef}
 						style={{
-							position: 'absolute',
-							left: 0,
-							top: 0,
-							opacity: 0,
-							pointerEvents: 'none',
-							zIndex: HOVER_TOOLTIP_Z_INDEX + 11,
+							display: 'flex',
+							flexDirection: 'column',
+							gap: '4px',
+							padding: '5px',
+							backgroundColor: '#FFFFFF',
+							borderRadius: '9px',
+							boxSizing: 'border-box',
 						}}
-						onMouseDown={(e) => e.stopPropagation()}
-						onPointerDown={(e) => e.stopPropagation()}
 					>
-						<div
+						<button
+							type="button"
+							onClick={() => onAddSelectionToFolder?.()}
+							className="font-inter"
 							style={{
-								display: 'flex',
-								flexDirection: 'column',
-								gap: '4px',
-								padding: '5px',
-								backgroundColor: '#FFFFFF',
-								borderRadius: '9px',
-								boxSizing: 'border-box',
+								width: '100%',
+								padding: '5px 10px',
+								backgroundColor: '#EFEFEF',
+								border: 'none',
+								borderRadius: '6px',
+								fontSize: '12px',
+								fontWeight: 500,
+								color: '#000000',
+								textAlign: 'left',
+								whiteSpace: 'nowrap',
+								cursor: 'pointer',
 							}}
 						>
-							<button
-								type="button"
-								onClick={() => onAddSelectionToFolder?.()}
-								className="font-inter"
-								style={{
-									width: '100%',
-									padding: '5px 10px',
-									backgroundColor: '#EFEFEF',
-									border: 'none',
-									borderRadius: '6px',
-									fontSize: '12px',
-									fontWeight: 500,
-									color: '#000000',
-									textAlign: 'left',
-									whiteSpace: 'nowrap',
-									cursor: 'pointer',
-								}}
-							>
-								Add Contacts to Folder
-							</button>
-							<button
-								type="button"
-								onClick={() => onWriteSelectionMessage?.()}
-								className="font-inter"
-								style={{
-									width: '100%',
-									padding: '5px 10px',
-									backgroundColor: '#EFEFEF',
-									border: 'none',
-									borderRadius: '6px',
-									fontSize: '12px',
-									fontWeight: 500,
-									color: '#000000',
-									textAlign: 'left',
-									whiteSpace: 'nowrap',
-									cursor: 'pointer',
-								}}
-							>
-								Write Message
-							</button>
-						</div>
+							Add Contacts to Folder
+						</button>
+						<button
+							type="button"
+							onClick={() => onWriteSelectionMessage?.()}
+							className="font-inter"
+							style={{
+								width: '100%',
+								padding: '5px 10px',
+								backgroundColor: '#EFEFEF',
+								border: 'none',
+								borderRadius: '6px',
+								fontSize: '12px',
+								fontWeight: 500,
+								color: '#000000',
+								textAlign: 'left',
+								whiteSpace: 'nowrap',
+								cursor: 'pointer',
+							}}
+						>
+							Write Message
+						</button>
 					</div>
-				)}
+				</div>
+			)}
 		</div>
 	);
 };

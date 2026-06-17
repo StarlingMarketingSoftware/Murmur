@@ -447,8 +447,9 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 					{bottomViewInboundBatches[0] ? (
 						<div
 							key="inbox-collapsed-batch"
+								data-history-ledger-box
 							className={cn(
-								'select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between'
+								'cursor-pointer select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between'
 							)}
 							style={{
 								width: `${collapsedTopBoxWidthPx}px`,
@@ -518,8 +519,9 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 										return (
 											<div
 												key={`${batch.endAt.getTime()}-${batch.count}-${idx}`}
+												data-history-ledger-box
 												className={cn(
-													'select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between',
+													'cursor-pointer select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between',
 													'w-[224px] h-[30px] rounded-[4.7px]'
 												)}
 												style={{ backgroundColor: '#CCDFF4' }}
@@ -787,7 +789,6 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 														</div>
 													</div>
 
-													{/* Row 2: Company (only when there is a separate name) */}
 													{(() => {
 														const hasSeparateName = Boolean(
 															contact &&
@@ -803,12 +804,10 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 														);
 													})()}
 
-													{/* Row 3: Subject */}
 													<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]">
 														{email.subject || 'No subject'}
 													</div>
 
-													{/* Row 4: Message preview */}
 													<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px]">
 														{email.bodyPlain
 															? email.bodyPlain.substring(0, 60) + '...'

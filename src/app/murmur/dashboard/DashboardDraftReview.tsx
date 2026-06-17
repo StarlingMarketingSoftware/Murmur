@@ -1,6 +1,6 @@
 'use client';
 
-import { type FC, useCallback, useEffect, useMemo, useState } from 'react';
+import { type FC, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -21,6 +21,8 @@ interface DashboardDraftReviewProps {
 	/** Drafts for the just-drafted batch (already scoped to the batch contact IDs). */
 	batchDrafts: EmailWithRelations[];
 	isPendingEmails: boolean;
+	/** Report which draft/contact is currently open so the dashboard selection row can follow it. */
+	onActiveReviewContactChange?: (contactId: number | null) => void;
 	/** Exit the review back to the prompt box (clears the review batch in the overlay). */
 	onClose: () => void;
 }
@@ -52,6 +54,7 @@ export const DashboardDraftReview: FC<DashboardDraftReviewProps> = ({
 	contacts,
 	batchDrafts,
 	isPendingEmails,
+	onActiveReviewContactChange,
 	onClose,
 }) => {
 	const { user, isFreeTrial } = useMe();
@@ -67,6 +70,10 @@ export const DashboardDraftReview: FC<DashboardDraftReviewProps> = ({
 		'all'
 	);
 	const [, setIsDraftDialogOpen] = useState(false);
+
+	useLayoutEffect(() => {
+		onActiveReviewContactChange?.(selectedDraft?.contactId ?? null);
+	}, [onActiveReviewContactChange, selectedDraft?.contactId]);
 
 	const handleDraftSelection = useCallback((draftId: number) => {
 		setSelectedDraftIds((prev) => {
@@ -146,14 +153,76 @@ export const DashboardDraftReview: FC<DashboardDraftReviewProps> = ({
 	const isSendingDisabled = isFreeTrial || (user?.sendingCredits || 0) === 0;
 
 	return (
-		<div style={{ width: TARGET_WIDTH_PX, height: TARGET_HEIGHT_PX, marginLeft: 'auto' }}>
+		<div style={{ width: TARGET_WIDTH_PX, marginLeft: 'auto' }}>
+			{/* Drafts mode strip — yellow replica of the write overlay's red Draft/Add-to-Folder
+			    bar, shown above the review card while looking over drafts. */}
 			<div
+				className="flex flex-row items-center gap-[13px] mb-2"
 				style={{
-					width: REVIEW_NATIVE_WIDTH_PX,
-					transform: `scale(${REVIEW_SCALE})`,
-					transformOrigin: 'top left',
+					width: TARGET_WIDTH_PX,
+					height: 28,
+					borderRadius: 6,
+					background: '#FDDEA5',
+					paddingLeft: 4,
+					paddingRight: 8,
 				}}
 			>
+				<div
+					className="flex items-center pl-[12px] font-inter text-[13px] font-medium text-black"
+					style={{
+						width: 185,
+						height: 20,
+						borderRadius: 6,
+						background: '#F8C262',
+						border: '1.5px solid #FFFFFF',
+					}}
+				>
+					Drafts
+				</div>
+				<button
+					type="button"
+					aria-label="Close drafts review panel"
+					onClick={onClose}
+					className="ml-auto flex items-center justify-center"
+					style={{
+						width: 18,
+						height: 18,
+						background: 'transparent',
+						border: 'none',
+						padding: 0,
+						cursor: 'pointer',
+					}}
+				>
+					<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+						<line
+							x1="3"
+							y1="3"
+							x2="13"
+							y2="13"
+							stroke="#000000"
+							strokeWidth="2.5"
+							strokeLinecap="butt"
+						/>
+						<line
+							x1="13"
+							y1="3"
+							x2="3"
+							y2="13"
+							stroke="#000000"
+							strokeWidth="2.5"
+							strokeLinecap="butt"
+						/>
+					</svg>
+				</button>
+			</div>
+			<div style={{ width: TARGET_WIDTH_PX, height: TARGET_HEIGHT_PX }}>
+				<div
+					style={{
+						width: REVIEW_NATIVE_WIDTH_PX,
+						transform: `scale(${REVIEW_SCALE})`,
+						transformOrigin: 'top left',
+					}}
+				>
 				<DraftedEmails
 					contacts={contacts}
 					draftEmails={batchDrafts}
@@ -184,6 +253,7 @@ export const DashboardDraftReview: FC<DashboardDraftReviewProps> = ({
 					onDraftReviewCloseOverride={onClose}
 					compactDraftReview
 				/>
+				</div>
 			</div>
 		</div>
 	);

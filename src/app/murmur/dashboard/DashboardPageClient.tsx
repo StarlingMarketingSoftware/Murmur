@@ -10,6 +10,7 @@ import {
 	useMemo,
 	useRef,
 	useState,
+	type MouseEvent as ReactMouseEvent,
 	type PointerEvent as ReactPointerEvent,
 	type RefObject,
 	type ReactNode,
@@ -39,6 +40,7 @@ import { useDashboard } from './useDashboard';
 import { useLenis } from '@/contexts/ScrollContext';
 import { withClerkNoBranding } from '@/constants/auth';
 import { urls } from '@/constants/urls';
+import { ContactsHeaderChrome } from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraftingTable/DraftingTable';
 import {
 	getMsUntilNextSearchGradientBucket,
 	getSearchGradientForDate,
@@ -126,7 +128,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import {
 	useBatchUpdateContacts,
 	useGetContacts,
-	useGetContactResearch,
+	useContactWithResearch,
 	getContactsListQueryKey,
 	fetchContactsList,
 } from '@/hooks/queryHooks/useContacts';
@@ -164,6 +166,7 @@ import { DashboardBootBackdrop } from '@/components/molecules/DashboardBootBackd
 import { DashboardBootProgress } from '@/components/molecules/DashboardBootProgress/DashboardBootProgress';
 import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
 import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
+import DashboardHeroDateWeatherBar from './DashboardHeroDateWeatherBar';
 import { ContactWithName } from '@/types/contact';
 import { MapResultsPanelSkeleton } from '@/components/molecules/MapResultsPanelSkeleton/MapResultsPanelSkeleton';
 import {
@@ -187,10 +190,13 @@ import {
 	ContactResearchHorizontalStrip,
 } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { ContactResearchDescriptionBox } from '@/components/molecules/ContactResearchPanel/ContactResearchDescriptionBox';
+import { ContactResearchHoverCard } from '@/components/molecules/ContactResearchPanel/ContactResearchHoverCard';
 import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
+import { HoverDescriptionProvider } from '@/contexts/HoverDescriptionContext';
 import { DashboardWriteOverlay } from './DashboardWriteOverlay';
+import { SelectionFolderMoveBanner } from './SelectionFolderMoveBanner';
 import { MapEventPopupCard, formatMapPostedEventDate } from './MapEventPopupCard';
 import { ApplyModal } from './ApplyModal';
 import { UnsubscribeFlow } from '@/components/organisms/UnsubscribeFlow/UnsubscribeFlow';
@@ -204,10 +210,12 @@ import DashboardOpportunitiesWidget, {
 import { DashboardOpportunitiesDebugPanel } from '@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesDebugPanel';
 import {
 	useGetCampaign,
+	useGetCampaignContacts,
 	useGetCampaigns,
 	getCampaignDetailQueryKey,
 	fetchCampaignDetail,
 } from '@/hooks/queryHooks/useCampaigns';
+import { useCampaignTopNavScheme } from '@/hooks/useCampaignTopNavScheme';
 import {
 	useGetEmails,
 	getEmailsListQueryKey,
@@ -338,6 +346,12 @@ type MapPanelResultsSnapshot = {
 	isMusicVenuesSearch: boolean;
 	isMusicFestivalsSearch: boolean;
 	isWeddingPlannersSearch: boolean;
+};
+
+type FolderMoveNotice = {
+	count: number;
+	folderName: string;
+	phase: 'moving' | 'complete' | 'exiting';
 };
 
 const parsePendingDashboardSearch = (raw: string): PendingDashboardSearch => {
@@ -1590,7 +1604,11 @@ const MAP_SELECT_GRAB_LEFT_PX = 26;
 const MAP_VIEW_SIDE_PANEL_VISUAL_TOP_PX = 106;
 const MAP_VIEW_SIDE_PANEL_BOTTOM_GAP_PX = 20;
 const MAP_VIEW_SIDE_PANEL_GROUP_NUDGE_UP_PX = 24;
-const MAP_PANEL_ABRIDGED_RESEARCH_HEIGHT_PX = 292;
+// Full row-following hover card height: abridged card (312.713) + 13 gap + the
+// Description box at its EXPANDED height incl. the "Press Tab" pill (415 + 9 gap +
+// 23 pill). Reserving the expanded height keeps the card's y stable across Tab
+// toggles so a low row's Description box never gets clipped at the viewport bottom.
+const MAP_PANEL_HOVER_RESEARCH_CARD_HEIGHT_PX = 312.713 + 13 + 415 + 9 + 23; // ≈ 773
 const MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX = 13;
 const MAP_PANEL_ABRIDGED_RESEARCH_CLEAR_DELAY_MS = 220;
 // Marker-hover research group (abridged card + Description box docked left/right).
@@ -1602,6 +1620,10 @@ const MAP_MARKER_RESEARCH_LEFT_DOCK_LEFT_PX = 110; // clears the left select/gra
 const MAP_MARKER_RESEARCH_DOCK_FLIP_MARGIN_PX = 24;
 const MAP_VIEW_CAMPAIGN_HEADER_HEIGHT_PX = 59;
 const MAP_VIEW_CAMPAIGN_HEADER_GAP_PX = 13;
+// Floor height for the Search Results sub-panel when the Selection sub-panel is fully
+// expanded: header (50px) + category toolbar (≈55px @ bottom-9) + breathing room. Below this
+// the Selection cap stops growing so the toolbar (and the bottom CTA) stay visible.
+const MAP_VIEW_SEARCH_RESULTS_MIN_HEIGHT_PX = 125;
 // Keep both map side panels visually pinned after the dashboard root zoom is applied.
 // The side-shift var (written by the map-view zoom effect) lowers the whole side
 // chrome toward vertical center on tall monitors; 0px on the 1080p baseline.
@@ -2356,6 +2378,7 @@ type MapBottomSearchFollowupBoxProps = {
 	previewedSearchFollowup: MapBottomSearchFollowupPreview;
 	onSelectedSearchFollowupChange: (selection: MapBottomSearchFollowupSelection) => void;
 	onPreviewSearchFollowupChange: (selection: MapBottomSearchFollowupPreview) => void;
+	onForYouSubmit: () => void;
 	isKeywordModeEnabled: boolean;
 	onKeywordToggle: () => void;
 	isRadiusModeEnabled: boolean;
@@ -2372,6 +2395,7 @@ const MapBottomSearchFollowupBox = memo(
 		previewedSearchFollowup,
 		onSelectedSearchFollowupChange,
 		onPreviewSearchFollowupChange,
+		onForYouSubmit,
 		isKeywordModeEnabled,
 		onKeywordToggle,
 		isRadiusModeEnabled,
@@ -2421,8 +2445,7 @@ const MapBottomSearchFollowupBox = memo(
 			>
 				<button
 					type="button"
-					aria-label="Select For You"
-					aria-pressed={isForYouSelected}
+					aria-label="Run For You search"
 					className="absolute flex items-center justify-center"
 					style={{
 						left: `${leftTileBox.leftOffset}px`,
@@ -2443,9 +2466,7 @@ const MapBottomSearchFollowupBox = memo(
 					}}
 					onMouseEnter={() => onPreviewSearchFollowupChange('for-you')}
 					onFocus={() => onPreviewSearchFollowupChange('for-you')}
-					onClick={() =>
-						onSelectedSearchFollowupChange(isForYouSelected ? null : 'for-you')
-					}
+					onClick={() => onForYouSubmit()}
 				>
 					<MapBottomSearchForYouIcon
 						aria-hidden="true"
@@ -2707,6 +2728,178 @@ const MapBottomSearchFollowupBox = memo(
 );
 MapBottomSearchFollowupBox.displayName = 'MapBottomSearchFollowupBox';
 
+// Campaign-style nav boxes flanking the dashboard "Search Anything" bar. Values
+// mirror the campaign overview's count boxes (see CampaignOverviewBottomBoxes in
+// campaign/[campaignId]/page.tsx) so the two surfaces read as the same control.
+const DASHBOARD_ASK_FLANK_BOX_STYLE: React.CSSProperties = {
+	width: 39.154,
+	height: 39.154,
+	borderRadius: 7.458,
+	border: '0.725px solid #000',
+	boxSizing: 'border-box',
+	display: 'flex',
+	alignItems: 'center',
+	justifyContent: 'center',
+};
+const DASHBOARD_ASK_FLANK_COUNT_STYLE: React.CSSProperties = {
+	fontFamily: 'Inter, sans-serif',
+	fontSize: 12.326,
+	fontWeight: 500,
+	lineHeight: '10.151px',
+	color: '#000',
+};
+
+// A single flanking box: a decorative spacer, or an interactive count/icon box
+// that is disabled (display-only) until a non-null onClick is supplied — matching
+// the campaign's "no handler => not clickable when count is 0" behavior.
+const DashboardAskFlankBox = ({
+	label,
+	background,
+	count,
+	icon,
+	opacity,
+	decorative,
+	onClick,
+}: {
+	label?: string;
+	background: string;
+	count?: number;
+	icon?: ReactNode;
+	opacity?: number;
+	decorative?: boolean;
+	onClick?: () => void;
+}) => {
+	if (decorative) {
+		return (
+			<div
+				aria-hidden="true"
+				style={{ ...DASHBOARD_ASK_FLANK_BOX_STYLE, background, opacity }}
+			/>
+		);
+	}
+	return (
+		<button
+			type="button"
+			aria-label={label}
+			disabled={!onClick}
+			className={`pointer-events-auto border-0 p-0 transition-opacity duration-150${
+				onClick ? ' hover:opacity-85' : ''
+			}`}
+			style={{
+				...DASHBOARD_ASK_FLANK_BOX_STYLE,
+				...DASHBOARD_ASK_FLANK_COUNT_STYLE,
+				background,
+				opacity,
+				cursor: onClick ? 'pointer' : 'default',
+			}}
+			onClick={onClick}
+		>
+			{icon ?? count}
+		</button>
+	);
+};
+
+// Left + right groups of campaign nav boxes that flank the dashboard search bar
+// (same row). Rendered inside the bar's positioned wrapper as siblings of the
+// bar, so `right/left: calc(100% + 8px)` anchors each group just outside the bar
+// and `bottom: 0` pins them to the resting bar row. Used by both the pre-search
+// ask box and the map-results search bar.
+const DASHBOARD_SEARCH_FLANK_GROUP_CLASS =
+	'dashboard-ask-flank pointer-events-none absolute flex items-end';
+const DashboardSearchFlankBoxes = ({
+	contactsCount,
+	draftCount,
+	inboxCount,
+	sentCount,
+	navEnabled,
+	onNavigate,
+	dimmed,
+}: {
+	contactsCount: number;
+	draftCount: number;
+	inboxCount: number;
+	sentCount: number;
+	navEnabled: boolean;
+	onNavigate: (tab: 'write' | 'drafts' | 'inbox' | 'sent') => void;
+	// Recede the right-of-bar group to very low opacity while an expanded Description
+	// card overlaps it, so the (translucent) card reads cleanly above those boxes.
+	dimmed?: boolean;
+}) => {
+	const handler = (
+		tab: 'write' | 'drafts' | 'inbox' | 'sent',
+		count: number
+	) => (navEnabled && count > 0 ? () => onNavigate(tab) : undefined);
+	// Boxes fade out toward the outer edges (full opacity nearest the bar), so the
+	// row reads as the campaign control trailing off into the map on both sides.
+	const OUTER = 0.18;
+	const MID = 0.45;
+	// Receded opacity for the right-of-bar group (the one the right-docked
+	// Description card overlaps) while that card is expanded.
+	const DIM = 0.08;
+	const groupOpacity = dimmed ? DIM : 1;
+	const dimTransition = 'opacity 150ms ease-out';
+	return (
+		<>
+			<div
+				className={DASHBOARD_SEARCH_FLANK_GROUP_CLASS}
+				style={{ right: 'calc(100% + 8px)', bottom: 0, gap: 3 }}
+			>
+				<DashboardAskFlankBox decorative background="#F3EEE1" opacity={OUTER} />
+				<DashboardAskFlankBox
+					label="sent"
+					background="#5AB478"
+					count={sentCount}
+					opacity={MID}
+					onClick={handler('sent', sentCount)}
+				/>
+				<DashboardAskFlankBox
+					label="opportunities"
+					background="#EFD7D3"
+					icon={
+						<DashboardActionBarStarIcon
+							width={15}
+							height={15}
+							style={{ color: '#E32222' }}
+						/>
+					}
+					onClick={handler('inbox', inboxCount)}
+				/>
+			</div>
+			<div
+				className={DASHBOARD_SEARCH_FLANK_GROUP_CLASS}
+				style={{
+					left: 'calc(100% + 8px)',
+					bottom: 0,
+					gap: 3,
+					opacity: groupOpacity,
+					transition: dimTransition,
+				}}
+			>
+				<DashboardAskFlankBox
+					label="contacts"
+					background="#EB8586"
+					count={contactsCount}
+					onClick={handler('write', contactsCount)}
+				/>
+				<DashboardAskFlankBox
+					label="drafts"
+					background="#FFE3AA"
+					count={draftCount}
+					opacity={MID}
+					onClick={handler('drafts', draftCount)}
+				/>
+				<DashboardAskFlankBox
+					label="inbox"
+					background="#6EBED5"
+					count={inboxCount}
+					opacity={OUTER}
+					onClick={handler('inbox', inboxCount)}
+				/>
+			</div>
+		</>
+	);
+};
+
 const SearchTrayIconTile = ({
 	backgroundColor,
 	children,
@@ -2729,25 +2922,6 @@ const SearchTrayIconTile = ({
 	);
 };
 
-// Map-overlay rows can arrive without the research-detail fields (slim payload — see
-// api/contacts/map-overlay). When a hovered contact is missing them entirely (key absent;
-// null means fetched-but-empty), lazily fetch and merge them so the hover research panel
-// fills in instead of rendering blank.
-const useContactWithResearch = (contact: ContactWithName | null) => {
-	// Cast for the `in` check: ContactWithName declares `metadata`, so TS would
-	// otherwise narrow the no-key branch (a slim overlay row) to `never`.
-	const needsResearch =
-		contact != null && !('metadata' in (contact as Record<string, unknown>));
-	const { data: research } = useGetContactResearch(
-		contact && needsResearch ? contact.id : null
-	);
-	return useMemo(() => {
-		if (!contact) return null;
-		if (!research || research.id !== contact.id) return contact;
-		return { ...contact, ...research };
-	}, [contact, research]);
-};
-
 const DashboardContent = () => {
 	const { openSignIn } = useClerk();
 	const { isSignedIn, isLoaded: isAuthLoaded } = useAuth();
@@ -2766,6 +2940,7 @@ const DashboardContent = () => {
 	const {
 		mood: globeWeatherMood,
 		temperatureF: globeWeatherTemperatureF,
+		weatherCode: globeWeatherCode,
 		regionCenter: globeWeatherRegionCenter,
 	} = useGlobeWeatherMood();
 	const globeNightLighting = useGlobeNightLighting();
@@ -3147,7 +3322,6 @@ const DashboardContent = () => {
 		}
 	}, [radiusHydrated, isRadiusModeEnabled, radiusCenter, radiusMiles]);
 
-	const isMapBottomForYouMode = mapBottomSearchFollowupSelection === 'for-you';
 	const isMapBottomCategoryMode = mapBottomSearchFollowupSelection === 'category';
 	// When the scroll-to-map gesture commits, it fires a "For You" search but holds the top
 	// search pill empty/white until the curated results have actually loaded into the right
@@ -4233,9 +4407,66 @@ const DashboardContent = () => {
 	// True while the dashboard Write overlay shows the post-draft review; keeps the overlay mounted
 	// even if the live map selection changes mid-review.
 	const [isWriteReviewActive, setIsWriteReviewActive] = useState(false);
+	const [activeWriteReviewContactId, setActiveWriteReviewContactId] = useState<
+		number | null
+	>(null);
+	const [folderMoveNotice, setFolderMoveNotice] = useState<FolderMoveNotice | null>(
+		null
+	);
 	useEffect(() => {
-		if (!isWriteMode) setIsWriteReviewActive(false);
+		if (!isWriteMode) {
+			setIsWriteReviewActive(false);
+			setActiveWriteReviewContactId(null);
+		}
 	}, [isWriteMode]);
+
+	useEffect(() => {
+		if (!isWriteReviewActive) setActiveWriteReviewContactId(null);
+	}, [isWriteReviewActive]);
+
+	useEffect(() => {
+		if (isWriteMode && selectedContacts.length === 0 && !isWriteReviewActive) {
+			setIsWriteMode(false);
+		}
+	}, [isWriteMode, isWriteReviewActive, selectedContacts.length, setIsWriteMode]);
+
+	const handleActiveWriteReviewContactChange = useCallback((contactId: number | null) => {
+		setActiveWriteReviewContactId(contactId);
+		if (contactId != null) {
+			setIsWriteReviewActive(true);
+		}
+	}, []);
+
+	const handleCloseWriteOverlay = useCallback(() => {
+		setIsWriteMode(false);
+		setIsWriteReviewActive(false);
+		setActiveWriteReviewContactId(null);
+		setSelectedContacts([]);
+	}, [setIsWriteMode, setSelectedContacts]);
+
+	useEffect(() => {
+		if (folderMoveNotice?.phase !== 'complete') return;
+
+		const fadeTimer = window.setTimeout(() => {
+			setFolderMoveNotice((current) =>
+				current?.phase === 'complete' ? { ...current, phase: 'exiting' } : current
+			);
+		}, 900);
+
+		return () => window.clearTimeout(fadeTimer);
+	}, [folderMoveNotice]);
+
+	useEffect(() => {
+		if (folderMoveNotice?.phase !== 'exiting') return;
+
+		const removeTimer = window.setTimeout(() => {
+			setFolderMoveNotice((current) =>
+				current?.phase === 'exiting' ? null : current
+			);
+		}, 220);
+
+		return () => window.clearTimeout(removeTimer);
+	}, [folderMoveNotice]);
 
 	useEffect(() => {
 		if (!isMapView) setOpenMapTopAction(null);
@@ -4251,6 +4482,9 @@ const DashboardContent = () => {
 	const mapCampaignId =
 		fromCampaignIdParam ||
 		(activeCampaignId != null ? String(activeCampaignId) : '');
+	// Per-campaign color scheme for the top navigation box + folder icon (matches
+	// the campaign page's header for the same campaign).
+	const topNavScheme = useCampaignTopNavScheme(mapCampaignId);
 
 	// The exact contacts filter the campaign page issues (see useDraftingSection):
 	// derived purely from the campaign's contact lists, so the prefetch lands on the
@@ -4281,6 +4515,18 @@ const DashboardContent = () => {
 	const campaignReturnAddedSuffix = useCallback(
 		() => (hasAddedContactsThisVisitRef.current ? '&added=1' : ''),
 		[]
+	);
+
+	// The ask-box flanking nav boxes jump to the in-scope campaign's tabs, reusing
+	// the same push pattern as the map-view tab buttons below.
+	const navigateToCampaignTab = useCallback(
+		(tab: 'write' | 'drafts' | 'inbox' | 'sent') => {
+			if (!mapCampaignId) return;
+			router.push(
+				`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=${tab}${campaignReturnAddedSuffix()}`
+			);
+		},
+		[mapCampaignId, router, campaignReturnAddedSuffix]
 	);
 
 	const prefetchedCampaignRoutes = useRef<Set<string>>(new Set());
@@ -4428,7 +4674,13 @@ const DashboardContent = () => {
 		return () => window.clearTimeout(timer);
 	}, []);
 
-	const shouldEnableMapStateCategorySelection = isMapView && isMapBottomCategoryMode;
+	const activeCategorySearchForStateSelection = parseCategorySearchQuery(activeSearchQuery);
+	const shouldEnableMapStateCategorySelection =
+		isMapView &&
+		!isCuratedSearchActive &&
+		activeCategorySearchForStateSelection.isCategorySearch &&
+		Boolean(normalizeUsStateName(activeCategorySearchForStateSelection.where)) &&
+		!mapBboxFilter;
 
 	const handleMapStateSelect = useCallback(
 		(stateName: string) => {
@@ -4440,6 +4692,17 @@ const DashboardContent = () => {
 
 			const nextState = (stateName || '').trim();
 			if (!nextState) return;
+
+			const currentCategorySearch = parseCategorySearchQuery(activeSearchQuery);
+			const nextCanonicalState = normalizeUsStateName(nextState);
+			const currentCanonicalState = normalizeUsStateName(currentCategorySearch.where);
+			if (
+				currentCategorySearch.isCategorySearch &&
+				nextCanonicalState &&
+				currentCanonicalState === nextCanonicalState
+			) {
+				return;
+			}
 
 			const isCurrentNonCategorySearch =
 				isCuratedSearchActive || isCuratedPicksSearchQuery(activeSearchQuery);
@@ -4473,6 +4736,32 @@ const DashboardContent = () => {
 		]
 	);
 
+	const resolveDefaultCategorySearchWhere = useCallback(async (): Promise<string> => {
+		let inferredWhere: string | null = null;
+		try {
+			const loc = await Promise.race([
+				getApproximateLocation(),
+				new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+			]);
+			if (loc) {
+				inferredWhere =
+					normalizeUsStateName(loc.regionCode) ??
+					normalizeUsStateName(loc.region) ??
+					(loc.lat != null && loc.lon != null
+						? getNearestUsStateNameForPoint(loc.lat, loc.lon)
+						: null);
+			}
+		} catch {
+			// Non-fatal — falls through to the random-state fallback below.
+		}
+		if (inferredWhere) return inferredWhere;
+
+		const lower48States = buildAllUsStateNames().filter(
+			(s) => s !== 'Alaska' && s !== 'Hawaii'
+		);
+		return lower48States[Math.floor(Math.random() * lower48States.length)] ?? 'California';
+	}, []);
+
 	// If the user submits with missing segments, auto-fill sensible defaults
 	// and (when Where is blank) best-effort infer a US state so the search always runs.
 	const ensureNonEmptyDashboardSearchOnBlankSubmit = useCallback(async () => {
@@ -4487,12 +4776,15 @@ const DashboardContent = () => {
 		let nextWhat = trimmedWhat;
 		let nextWhere = trimmedWhere;
 
-		// If BOTH Why + What are empty, set a default "starter" search.
-		if (!nextWhy && !nextWhat) {
-			nextWhy = '[Booking]';
-			nextWhat = 'Wine, Beer, and Spirits';
+		// If What is empty, set a default "starter" category.
+		if (!nextWhat) {
+			nextWhat = DEFAULT_CATEGORY_SEARCH_WHAT;
+			nextWhy = getCategorySearchWhyForWhat(nextWhat);
 			setWhyValue(nextWhy);
 			setWhatValue(nextWhat);
+		} else if (!nextWhy) {
+			nextWhy = getCategorySearchWhyForWhat(nextWhat);
+			setWhyValue(nextWhy);
 		}
 
 		// If Where is empty, try to infer the user's state from coarse IP geolocation
@@ -4500,36 +4792,8 @@ const DashboardContent = () => {
 		// 24h and falls back through ipapi.co → ipwho.is, so this is essentially free
 		// after the first successful resolution.
 		if (!nextWhere) {
-			let inferredWhere: string | null = null;
-			try {
-				const loc = await Promise.race([
-					getApproximateLocation(),
-					new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
-				]);
-				if (loc) {
-					inferredWhere =
-						normalizeUsStateName(loc.regionCode) ?? normalizeUsStateName(loc.region);
-				}
-			} catch {
-				// Non-fatal — falls through to the random-state fallback below.
-			}
-			if (inferredWhere) {
-				nextWhere = inferredWhere;
-				setWhereValue(inferredWhere);
-				setIsNearMeLocation(false);
-			}
-		}
-
-		// Ultimate fallback: if we still can't infer a state, pick a random lower-48 state
-		// so "Where" is never blank. (Exclude Alaska/Hawaii.)
-		if (!nextWhere) {
-			const lower48States = buildAllUsStateNames().filter(
-				(s) => s !== 'Alaska' && s !== 'Hawaii'
-			);
-			const fallback =
-				lower48States[Math.floor(Math.random() * lower48States.length)] ?? 'California';
-			nextWhere = fallback;
-			setWhereValue(fallback);
+			nextWhere = await resolveDefaultCategorySearchWhere();
+			setWhereValue(nextWhere);
 			setIsNearMeLocation(false);
 		}
 
@@ -4546,7 +4810,7 @@ const DashboardContent = () => {
 			shouldValidate: false,
 			shouldDirty: true,
 		});
-	}, [form, hasSearched, whatValue, whereValue, whyValue]);
+	}, [form, hasSearched, resolveDefaultCategorySearchWhere, whatValue, whereValue, whyValue]);
 
 	// Free trial CTA for fromHome demo mode
 	const handleStartFreeTrial = useCallback(() => {
@@ -5488,11 +5752,23 @@ const DashboardContent = () => {
 			return;
 		}
 
+		const contactIdsToAdd = [...selectedContacts];
+		const addedCount = contactIdsToAdd.length;
+		const folderName =
+			activeCampaign?.userContactLists?.[0]?.name ?? activeCampaign?.name ?? 'folder';
+
+		setFolderMoveNotice({
+			count: addedCount,
+			folderName,
+			phase: 'moving',
+		});
+		setSelectedContacts([]);
+
 		try {
 			if (derivedContactTitle && contacts) {
 				const contactsToUpdate = contacts.filter(
 					(c) =>
-						selectedContacts.includes(c.id) &&
+						contactIdsToAdd.includes(c.id) &&
 						(shouldForceApplyDerivedTitle || (!c.title && !c.headline))
 				);
 				if (contactsToUpdate.length > 0) {
@@ -5510,13 +5786,11 @@ const DashboardContent = () => {
 				data: {
 					contactOperation: {
 						action: 'connect',
-						contactIds: selectedContacts,
+						contactIds: contactIdsToAdd,
 					},
 				},
 			});
 
-			const addedCount = selectedContacts.length;
-			setSelectedContacts([]);
 			hasAddedContactsThisVisitRef.current = true;
 
 			await Promise.all([
@@ -5525,13 +5799,14 @@ const DashboardContent = () => {
 				queryClient.invalidateQueries({ queryKey: ['userContactLists'] }),
 			]);
 
-			const folderName =
-				activeCampaign?.userContactLists?.[0]?.name ?? activeCampaign?.name ?? 'folder';
-			toast.success(
-				`${addedCount} contact${addedCount === 1 ? '' : 's'} added to ${folderName}`
-			);
+			setFolderMoveNotice({
+				count: addedCount,
+				folderName,
+				phase: 'complete',
+			});
 		} catch (error) {
 			console.error('Error adding contacts to context folder:', error);
+			setFolderMoveNotice(null);
 			toast.error('Failed to add contacts to folder');
 		}
 	}, [
@@ -5661,6 +5936,15 @@ const DashboardContent = () => {
 		useState<Record<number, string>>({});
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
 	const [isMapSearchEngaged, setIsMapSearchEngaged] = useState(true);
+	// True only when the user explicitly exits the focused search via the map-view
+	// search-bar X (or the map's "Click to see all contacts"). Distinguishes that
+	// user-initiated deselect — which grays the bar + hides the Searching pill —
+	// from the automatic entry disengages (pick-mode landing, For You scroll-entry),
+	// which must keep their normal look.
+	const [isSearchDeselectedByUser, setIsSearchDeselectedByUser] = useState(false);
+	// Hover over the user-deselected (grayed) search bar reveals the green
+	// "Activate" affordance that re-engages the just-disengaged search.
+	const [isDisengagedSearchHovered, setIsDisengagedSearchHovered] = useState(false);
 	const [mapSearchAutoFitRequestNonce, setMapSearchAutoFitRequestNonce] = useState(0);
 	// Crossing the compressed-chrome boundary hides/shows the left rail and swaps the
 	// results panel between the right edge and a bottom sheet: never strand the
@@ -5747,6 +6031,10 @@ const DashboardContent = () => {
 	>('right');
 	// Tab toggles the Description box; persists across hovered contacts until collapsed.
 	const [isMapMarkerResearchExpanded, setIsMapMarkerResearchExpanded] = useState(false);
+	// Mirror of the side-panel row-hover card's (separate, internally-owned) expand
+	// state, so the parent can lift that card above — and recede — the bottom nav boxes.
+	const [mapPanelHoverResearchExpanded, setMapPanelHoverResearchExpanded] =
+		useState(false);
 	// When hovering a row in the map side panel, highlight/show the corresponding marker on the map.
 	const [hoveredMapPanelContactId, setHoveredMapPanelContactId] = useState<number | null>(
 		null
@@ -5791,6 +6079,12 @@ const DashboardContent = () => {
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
 	const dashboardMapCampaignForHeader = fromCampaign ?? activeCampaign;
+	const shouldLoadDashboardMapCampaignFootprint =
+		activeTab === 'search' && isMapView && Boolean(dashboardMapCampaignForHeader?.id);
+	const { data: dashboardMapCampaignFootprintContacts } = useGetCampaignContacts(
+		dashboardMapCampaignForHeader?.id,
+		{ enabled: shouldLoadDashboardMapCampaignFootprint }
+	);
 	const dashboardMapCampaignContactListIds = useMemo(
 		() => dashboardMapCampaignForHeader?.userContactLists?.map((list) => list.id) ?? [],
 		[dashboardMapCampaignForHeader?.userContactLists]
@@ -5836,9 +6130,13 @@ const DashboardContent = () => {
 	const { data: mobileSearchInboundEmails } = useGetInboundEmails({
 		filters: { campaignId: dashboardMapCampaignForHeader?.id },
 		enabled:
-			isMobileAddToCampaignSearch && Boolean(dashboardMapCampaignForHeader?.id),
+			shouldLoadDashboardMapCampaignHeaderMetrics &&
+			Boolean(dashboardMapCampaignForHeader?.id),
 	});
 	const mobileSearchNewMessageCount = mobileSearchInboundEmails?.length || 0;
+	// Same inbound data drives the desktop ask-box Inbox/Opportunities nav boxes
+	// (mirrors the campaign overview's `overviewInboxCount`).
+	const dashboardMapHeaderInboxCount = mobileSearchInboundEmails?.length || 0;
 	const dashboardMapHeaderContactsCount = dashboardMapHeaderContacts?.length || 0;
 	const dashboardMapHeaderDraftCount = (dashboardMapHeaderEmails || []).filter(
 		(email) => email.status === EmailStatus.draft
@@ -6254,11 +6552,19 @@ const DashboardContent = () => {
 
 	const handleEmptyMapClick = useCallback(() => {
 		if (!canDisengageMapSearch) return;
+		setIsSearchDeselectedByUser(true);
 		setIsMapSearchEngaged(false);
 		setActiveMapTool('grab');
 		setActiveSection(null);
 		hideSearchThisAreaCta();
 	}, [canDisengageMapSearch, hideSearchThisAreaCta]);
+
+	// Whenever a search becomes engaged again (re-engage click, new-search
+	// force-engage, etc.), drop the user-deselected styling so the bar returns
+	// to its active look and the Searching pill reappears.
+	useEffect(() => {
+		if (isMapSearchEngaged) setIsSearchDeselectedByUser(false);
+	}, [isMapSearchEngaged]);
 
 	// Scroll-entry: the instant the committed For You search registers (hasSearched + a query),
 	// disengage straight into the "show all contacts" view so the focused/engaged search view
@@ -7097,32 +7403,30 @@ const DashboardContent = () => {
 		}
 
 		const initialTrimmedWhat = whatValue.trim();
-		const trimmedWhere = whereValue.trim();
+		let trimmedWhere = whereValue.trim();
 		// Where without What would build "[Booking] (Maine)" with no category — default
 		// to Wine/Beer/Spirits so the curated search has a real category to filter on.
-		const trimmedWhat =
-			trimmedWhere && !initialTrimmedWhat
-				? DEFAULT_CATEGORY_SEARCH_WHAT
-				: initialTrimmedWhat;
+		// If both fields are empty, also infer a state so the arrow always runs a useful
+		// starter search from Category mode.
+		const shouldAutoFillWhat = !initialTrimmedWhat;
+		const shouldAutoFillWhere = shouldAutoFillWhat && !trimmedWhere;
+		const trimmedWhat = shouldAutoFillWhat
+			? DEFAULT_CATEGORY_SEARCH_WHAT
+			: initialTrimmedWhat;
 		const nextWhy = getCategorySearchWhyForWhat(trimmedWhat);
 
 		if (trimmedWhat !== initialTrimmedWhat) {
 			setWhatValue(trimmedWhat);
 		}
+		if (shouldAutoFillWhere) {
+			trimmedWhere = await resolveDefaultCategorySearchWhere();
+			setWhereValue(trimmedWhere);
+			setIsNearMeLocation(false);
+		}
 		setWhyValue(nextWhy);
 		setActiveSection(null);
 		setIsMapBottomCategoryDropdownActive(false);
-
-		if (!trimmedWhat && !trimmedWhere) {
-			if (hasSearched) return;
-
-			await ensureNonEmptyDashboardSearchOnBlankSubmit();
-			const currentSearchText = (form.getValues('searchText') ?? '').trim();
-			if (currentSearchText && onSubmit) {
-				form.handleSubmit(onSubmit)();
-			}
-			return;
-		}
+		setIsMapSearchEngaged(true);
 
 		const formattedWhere = trimmedWhere ? `(${trimmedWhere})` : '';
 		const combinedSearch = [nextWhy, trimmedWhat, formattedWhere]
@@ -7138,19 +7442,24 @@ const DashboardContent = () => {
 			form.handleSubmit(onSubmit)();
 		}
 	}, [
-		ensureNonEmptyDashboardSearchOnBlankSubmit,
 		form,
-		hasSearched,
 		isFromHomeDemoMode,
 		onSubmit,
+		resolveDefaultCategorySearchWhere,
 		whatValue,
 		whereValue,
 	]);
 
 	const [isPointerInMapSidePanel, setIsPointerInMapSidePanel] = useState(false);
+	const [isMapCampaignHeaderDropdownOpen, setIsMapCampaignHeaderDropdownOpen] =
+		useState(false);
 	const [selectedCategoryChips, setSelectedCategoryChips] = useState<Set<string>>(
 		new Set()
 	);
+	const [mapPanelShiftClickAnchor, setMapPanelShiftClickAnchor] = useState<{
+		contactId: number;
+		index: number;
+	} | null>(null);
 	const hasAppliedInitialAllContactsMapDisengageRef = useRef(false);
 
 	useEffect(() => {
@@ -7168,6 +7477,7 @@ const DashboardContent = () => {
 		setActiveMapTool('grab');
 		setActiveSection(null);
 		setSelectedCategoryChips(new Set());
+		setMapPanelShiftClickAnchor(null);
 		setMapPanelExtraContactIds([]);
 		setMapPanelExtraContacts([]);
 		setMapPanelVisibleOverlayContacts([]);
@@ -7224,7 +7534,14 @@ const DashboardContent = () => {
 			const selectedSet = new Set<number>(selectedContacts);
 			return prev.filter((c) => selectedSet.has(c.id));
 		});
+		setMapPanelShiftClickAnchor(null);
 	}, [activeSearchQuery, selectedContacts]);
+
+	useEffect(() => {
+		if (isMapResultsLoading) {
+			setMapPanelShiftClickAnchor(null);
+		}
+	}, [isMapResultsLoading]);
 
 	// Cleanup timers on unmount
 	useEffect(() => {
@@ -7935,6 +8252,25 @@ const DashboardContent = () => {
 		[getMapResearchDisplayFields, mapResearchPanelContact]
 	);
 
+	// The row-hover card owns its expand state internally and resets it on unmount;
+	// clear the parent mirror whenever that card isn't showing so the nav boxes
+	// don't stay receded after the hover ends.
+	const isDashboardWriteOverlayVisible =
+		isWriteMode &&
+		Boolean(dashboardMapCampaignForHeader) &&
+		(selectedContacts.length > 0 || isWriteReviewActive) &&
+		!isCompressedMapChrome &&
+		shouldShowMapResultsSidePanel;
+	// While the write overlay occupies the space beside Search Results, dock row-hover
+	// research on the left rail so it doesn't stack under the contact boxes.
+	const mapPanelHoverResearchDockSide: 'left' | 'right' =
+		isDashboardWriteOverlayVisible ? 'left' : 'right';
+	const isMapPanelHoverResearchVisible =
+		Boolean(mapPanelHoveredResearchContact) && !mapResearchPanelContact;
+	useEffect(() => {
+		if (!isMapPanelHoverResearchVisible) setMapPanelHoverResearchExpanded(false);
+	}, [isMapPanelHoverResearchVisible]);
+
 	// Hovered overlay markers/rows may be slim map-overlay payloads; backfill their
 	// research fields so the hover research panels don't render blank.
 	const mapResearchPanelContactEnriched = useContactWithResearch(mapResearchPanelContact);
@@ -8391,6 +8727,8 @@ const DashboardContent = () => {
 	// Map view (results): automatically re-run the search when "What" changes.
 	// Intentionally do NOT auto-search on "Why"-only edits.
 	// "Where" changes do NOT auto-search; user must click a state from dropdown or press Enter.
+	// The bottom Category panel is explicit-submit only; opening/focusing it should not replay
+	// the current search.
 	const mapAutoSearchPayload = useMemo(
 		() => JSON.stringify({ what: whatValue.trim() }),
 		[whatValue]
@@ -8402,6 +8740,11 @@ const DashboardContent = () => {
 		// Reset when leaving results/map view
 		if (!hasSearched || !isMapView) {
 			lastMapAutoSearchPayloadRef.current = null;
+			return;
+		}
+
+		if (isMapBottomCategoryMode) {
+			lastMapAutoSearchPayloadRef.current = mapAutoSearchPayload;
 			return;
 		}
 
@@ -8464,7 +8807,9 @@ const DashboardContent = () => {
 		debouncedMapAutoSearchPayload,
 		form,
 		hasSearched,
+		isMapBottomCategoryMode,
 		isMapView,
+		mapAutoSearchPayload,
 		isSignedIn,
 		onSubmit,
 		whereValue,
@@ -8800,6 +9145,7 @@ const DashboardContent = () => {
 	// Enhanced reset search that also clears section values
 	const handleEnhancedResetSearch = () => {
 		handleResetSearch();
+		setMapPanelShiftClickAnchor(null);
 		setWhyValue('');
 		setWhatValue('');
 		setWhereValue('');
@@ -9210,7 +9556,82 @@ const DashboardContent = () => {
 	// the selected halo. Unlike the marker path, it does not auto-scroll the panel (the
 	// clicked row is already in view).
 	const handleMapPanelRowSelect = useCallback(
-		(contact: ContactWithName) => {
+		(
+			contact: ContactWithName,
+			event: ReactMouseEvent<HTMLDivElement> | undefined,
+			source: 'selection' | 'search-results'
+		) => {
+			const currentSearchIndex = mapPanelUnselectedContactsFiltered.findIndex(
+				(c) => c.id === contact.id
+			);
+
+			if (
+				source === 'search-results' &&
+				event?.shiftKey &&
+				mapPanelShiftClickAnchor &&
+				currentSearchIndex !== -1
+			) {
+				event.preventDefault();
+				window.getSelection()?.removeAllRanges();
+
+				const anchorVisualIndex = Math.max(
+					0,
+					Math.min(mapPanelShiftClickAnchor.index, mapPanelUnselectedContactsFiltered.length)
+				);
+				const currentVisualIndex =
+					currentSearchIndex >= anchorVisualIndex
+						? currentSearchIndex + 1
+						: currentSearchIndex;
+				const start = Math.min(anchorVisualIndex, currentVisualIndex);
+				const end = Math.max(anchorVisualIndex, currentVisualIndex);
+				const rangeContactIds = new Set<number>([mapPanelShiftClickAnchor.contactId]);
+				const contactsToPin: ContactWithName[] = [];
+				const anchorContact = displayedMapPanelContacts.find(
+					(c) => c.id === mapPanelShiftClickAnchor.contactId
+				);
+
+				if (anchorContact) {
+					contactsToPin.push(anchorContact);
+				}
+
+				mapPanelUnselectedContactsFiltered.forEach((resultContact, index) => {
+					const visualIndex = index >= anchorVisualIndex ? index + 1 : index;
+					if (visualIndex < start || visualIndex > end) return;
+					rangeContactIds.add(resultContact.id);
+					contactsToPin.push(resultContact);
+				});
+
+				if (contactsToPin.length > 0) {
+					setMapPanelExtraContacts((prev) => {
+						const existing = new Set(prev.map((c) => c.id));
+						const toAdd = contactsToPin.filter((c) => !existing.has(c.id));
+						return toAdd.length > 0 ? [...toAdd, ...prev] : prev;
+					});
+				}
+
+				setSelectedContacts((prev) => {
+					const next = [...prev];
+					const selectedSet = new Set(prev);
+					for (const contactId of rangeContactIds) {
+						if (selectedSet.has(contactId)) continue;
+						selectedSet.add(contactId);
+						next.push(contactId);
+					}
+					return next;
+				});
+				setMapPanelShiftClickAnchor(null);
+				return;
+			}
+
+			if (source === 'search-results' && currentSearchIndex !== -1) {
+				setMapPanelShiftClickAnchor({
+					contactId: contact.id,
+					index: currentSearchIndex,
+				});
+			} else {
+				setMapPanelShiftClickAnchor(null);
+			}
+
 			if (!selectedContacts.includes(contact.id)) {
 				setMapPanelExtraContacts((prev) =>
 					prev.some((c) => c.id === contact.id) ? prev : [contact, ...prev]
@@ -9222,7 +9643,19 @@ const DashboardContent = () => {
 					: [...prev, contact.id]
 			);
 		},
-		[selectedContacts, setSelectedContacts]
+		[
+			displayedMapPanelContacts,
+			mapPanelShiftClickAnchor,
+			mapPanelUnselectedContactsFiltered,
+			selectedContacts,
+			setSelectedContacts,
+		]
+	);
+	const handleMobileMapPanelRowSelect = useCallback(
+		(contact: ContactWithName) => {
+			handleMapPanelRowSelect(contact, undefined, 'selection');
+		},
+		[handleMapPanelRowSelect]
 	);
 
 	const activeRadiusSearchOverlay = useMemo<
@@ -9308,6 +9741,9 @@ const DashboardContent = () => {
 			searchQuery: shouldShowSearchGeometryOnMap ? activeSearchQuery : '',
 			searchWhat: shouldShowSearchGeometryOnMap ? searchWhatForMap : null,
 			searchEngaged: shouldShowSearchGeometryOnMap,
+			campaignFootprintContacts: shouldLoadDashboardMapCampaignFootprint
+				? (dashboardMapCampaignFootprintContacts ?? [])
+				: [],
 			ambientContactsEnabled: shouldShowAmbientContactsOnMap,
 			ambientContactsPreloadEnabled: shouldPreloadAmbientContactsOnMap,
 			ambientActiveCategories: mapGrabActiveCategories,
@@ -9373,6 +9809,7 @@ const DashboardContent = () => {
 			canDisengageMapSearch,
 			compressedMapChromePadding,
 			contactsForMap,
+			dashboardMapCampaignFootprintContacts,
 			handleRadiusCenterChange,
 			globeNightLighting,
 			globeWeatherMood,
@@ -9418,6 +9855,7 @@ const DashboardContent = () => {
 			shouldShowMapResultsSidePanel,
 			shouldShowSearchGeometryOnMap,
 			shouldShowAmbientContactsOnMap,
+			shouldLoadDashboardMapCampaignFootprint,
 			shouldPreloadAmbientContactsOnMap,
 			shouldSpinBackgroundMap,
 			skipAutoFitForMap,
@@ -9525,7 +9963,7 @@ const DashboardContent = () => {
 						onClearQuery={handleEmptyMapClick}
 						listContacts={displayedMapPanelContacts}
 						selectedContactIds={selectedContacts}
-						onToggleContact={handleMapPanelRowSelect}
+						onToggleContact={handleMobileMapPanelRowSelect}
 						isLoading={isMapResultsLoading}
 						hasNoResults={hasNoSearchResults}
 						hasSearched={hasSearched}
@@ -9634,10 +10072,16 @@ const DashboardContent = () => {
 		: isMobile && hasSearched
 			? 'pb-[64px]'
 			: 'pb-0 md:pb-[100px]';
+	// For You preview bar is hover-driven. Suppressed while the search bar is being
+	// typed in, so an accidental tile hover never unmounts the user's active input.
+	const isMapBottomForYouMode =
+		mapBottomSearchFollowupPreview === 'for-you' && !isMapBottomSearchActive;
 	const mapBottomSearchShellWidth = isMapBottomCategoryMode
 		? MAP_RESULTS_BOTTOM_CATEGORY_SEARCH_BOX.width
 		: isMapBottomForYouMode
-			? MAP_RESULTS_BOTTOM_SEARCH_BOX.activeWidth
+			? // Match the idle width (474, not the 472 activeWidth) so the hover-driven
+				// For You preview doesn't nudge the bar/tiles sideways by 2px.
+				MAP_RESULTS_BOTTOM_SEARCH_BOX.width
 			: isMapBottomSearchExpanded
 				? MAP_RESULTS_BOTTOM_SEARCH_BOX.activeWidth
 				: MAP_RESULTS_BOTTOM_SEARCH_BOX.width;
@@ -9673,7 +10117,7 @@ const DashboardContent = () => {
 		const dashboardZoom = Number.parseFloat(rawDashboardZoom) || DASHBOARD_MAP_ZOOM_DEFAULT;
 		const rowRect = rowElement.getBoundingClientRect();
 		const visualCardHeight =
-			MAP_PANEL_ABRIDGED_RESEARCH_HEIGHT_PX * MAP_VIEW_PANEL_SCALE * dashboardZoom;
+			MAP_PANEL_HOVER_RESEARCH_CARD_HEIGHT_PX * MAP_VIEW_PANEL_SCALE * dashboardZoom;
 		const minVisualTop = 12;
 		const maxVisualTop = Math.max(
 			minVisualTop,
@@ -10004,7 +10448,10 @@ const DashboardContent = () => {
 	// Renders one contact row in the map-view right-side panel (desktop variant).
 	// Used by both the "Selection" and "Search Results" sub-panels — they differ
 	// only in which slice of `displayedMapPanelContacts` they iterate over.
-	const renderMapPanelDesktopRow = (contact: ContactWithName) => {
+	const renderMapPanelDesktopRow = (
+		contact: ContactWithName,
+		source: 'selection' | 'search-results'
+	) => {
 		const isSelected = selectedContacts.includes(contact.id);
 		const isHovered = hoveredMapPanelContactId === contact.id;
 		const isInBaseResults = displayedBaseContactIdSet.has(contact.id);
@@ -10041,6 +10488,13 @@ const DashboardContent = () => {
 			displayedIsWeddingPlannersSearch && isInBaseResults;
 		const stateAbbr = getStateAbbreviation(contact.state || '') || '';
 		const city = contact.city || '';
+		const isWriteReviewRow =
+			isWriteReviewActive || activeWriteReviewContactId != null;
+		const writeModeSelectedRowBackground = isWriteReviewRow
+			? contact.id === activeWriteReviewContactId
+				? '#F8C262'
+				: '#FDDEA5'
+			: '#FD8E89';
 
 		return (
 			<div
@@ -10048,11 +10502,10 @@ const DashboardContent = () => {
 				data-contact-id={contact.id}
 				className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-[3px] border-[#ABABAB] select-none relative"
 				style={{
+					border: isSelected && isWriteMode ? '2px solid #FFF' : undefined,
 					backgroundColor: isSelected
 						? isWriteMode
-							? isHovered
-								? '#FAE6E6'
-								: '#F5DADA'
+							? writeModeSelectedRowBackground
 							: isRestaurantsSearchForContact || isRestaurantTitle(headline)
 							? isHovered
 								? '#C5F5D1'
@@ -10086,7 +10539,12 @@ const DashboardContent = () => {
 							? '#F3F4F6'
 							: '#FFFFFF',
 				}}
-				onClick={() => handleMapPanelRowSelect(contact)}
+				onMouseDown={(event) => {
+					if (source === 'search-results' && event.shiftKey) {
+						event.preventDefault();
+					}
+				}}
+				onClick={(event) => handleMapPanelRowSelect(contact, event, source)}
 				onMouseEnter={(event) => {
 					cancelMapPanelHoverResearchClear();
 					setHoveredMapPanelContactId(contact.id);
@@ -10312,6 +10770,54 @@ const DashboardContent = () => {
 				)}
 			</div>
 		);
+	};
+
+	const renderMapPanelShiftClickAnchorPlaceholder = () => (
+		<div
+			key="map-panel-shift-click-anchor"
+			aria-hidden="true"
+			className="pointer-events-none flex w-full items-center justify-center"
+			style={{ height: '14px', backgroundColor: 'transparent' }}
+		>
+			<div
+				style={{
+					width: '100%',
+					height: '14px',
+					borderRadius: '8px',
+					border: '2.33px solid #FFF',
+					backgroundColor: 'transparent',
+					boxSizing: 'border-box',
+				}}
+			/>
+		</div>
+	);
+
+	const renderMapPanelSearchResultRows = () => {
+		const rows: ReactNode[] = [];
+		const anchorIndex =
+			mapPanelShiftClickAnchor &&
+			selectedContacts.includes(mapPanelShiftClickAnchor.contactId)
+				? Math.max(
+						0,
+						Math.min(
+							mapPanelShiftClickAnchor.index,
+							mapPanelUnselectedContactsFiltered.length
+						)
+					)
+				: -1;
+
+		mapPanelUnselectedContactsFiltered.forEach((contact, index) => {
+			if (index === anchorIndex) {
+				rows.push(renderMapPanelShiftClickAnchorPlaceholder());
+			}
+			rows.push(renderMapPanelDesktopRow(contact, 'search-results'));
+		});
+
+		if (anchorIndex === mapPanelUnselectedContactsFiltered.length) {
+			rows.push(renderMapPanelShiftClickAnchorPlaceholder());
+		}
+
+		return rows;
 	};
 
 	return (
@@ -10590,6 +11096,12 @@ const DashboardContent = () => {
 								: undefined
 						}
 					>
+						{!hasSearched && activeTab === 'search' && (
+							<DashboardHeroDateWeatherBar
+								temperatureF={globeWeatherTemperatureF}
+								weatherCode={globeWeatherCode}
+							/>
+						)}
 						<div
 							className={`hero-wrapper flex flex-col items-center !z-[40] ${
 								activeTab === 'inbox' ? 'justify-start' : 'justify-center'
@@ -11808,7 +12320,19 @@ const DashboardContent = () => {
 								// Staged reveal for the scroll-to-map entry: hold the pill empty/white
 								// until the For You results have loaded, then show the gradient pill.
 								const showCuratedPill =
-									mapTopSearchDisplay.kind === 'curated' && !pendingForYouReveal;
+									mapTopSearchDisplay.kind === 'curated' &&
+									!pendingForYouReveal &&
+									!isSearchDeselectedByUser;
+								// When the user exits the focused search via the bar X, the bar drops
+								// to a plain white pill showing the prior query grayed out.
+								const showExitSearchButton =
+									canDisengageMapSearch && isMapSearchEngaged;
+								// Hovering the user-deselected (grayed) bar reveals the green
+								// "Activate" affordance that re-engages the prior search.
+								const showDisengagedActivate =
+									isSearchDeselectedByUser &&
+									isDisengagedSearchHovered &&
+									isMapTopSearchReengageAvailable;
 
 								const searchBarBase = (
 									<div
@@ -11876,6 +12400,12 @@ const DashboardContent = () => {
 																		}
 																	: undefined
 															}
+															onMouseEnter={() =>
+																setIsDisengagedSearchHovered(true)
+															}
+															onMouseLeave={() =>
+																setIsDisengagedSearchHovered(false)
+															}
 															style={{
 																cursor: isMapTopSearchReengageAvailable
 																	? 'pointer'
@@ -11883,7 +12413,7 @@ const DashboardContent = () => {
 															}}
 														>
 															<div
-																className="search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black !bg-white !pr-[12px] !text-black"
+																className={`search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black ${showExitSearchButton ? '!bg-[#A6C5F3]' : '!bg-white'} !pr-[12px] !text-black`}
 																style={{
 																	accentColor: 'transparent',
 																	cursor: isMapTopSearchReengageAvailable
@@ -11906,38 +12436,90 @@ const DashboardContent = () => {
 																		background:
 																			showCuratedPill
 																				? undefined
-																				: '#FFFFFF',
+																				: showDisengagedActivate
+																					? 'linear-gradient(90deg, #ADFFC2 0%, #EFFFF3 100%)'
+																					: '#FFFFFF',
 																	}}
 																>
-																	{pendingForYouReveal ? (
+																	{isSearchDeselectedByUser ? (
+																		<div className="relative flex h-full w-full min-w-0 items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-black/40">
+																			{showDisengagedActivate && (
+																				<button
+																					type="button"
+																					aria-label={`Activate ${mapTopSearchLabel}`}
+																					title="Activate this search"
+																					onClick={(event) => {
+																						event.stopPropagation();
+																						handleMapTopSearchReengage();
+																					}}
+																					className="absolute left-[12px] top-1/2 z-10 -translate-y-1/2 cursor-pointer rounded-[10px] bg-[#D9D9D9] px-[10px] py-[6px] font-secondary text-[13px] font-bold leading-none text-black/60 transition-colors hover:bg-[#cfcfcf] hover:text-black/80"
+																				>
+																					Activate
+																				</button>
+																			)}
+																			<span className="truncate">
+																				{mapTopSearchLabel}
+																			</span>
+																		</div>
+																	) : pendingForYouReveal ? (
 																		<div className="flex h-full w-full items-center px-[24px]" />
 																	) : mapTopSearchDisplay.kind === 'curated' ? (
-																		<div className="flex h-full w-full items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-white">
+																		<div
+																			className={`flex h-full w-full items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-white ${
+																				showExitSearchButton ? 'pr-[40px]' : ''
+																			}`}
+																		>
 																			{mapTopSearchDisplay.label}
 																		</div>
 																	) : isSplitCategoryTopSearch &&
 																	  mapTopSearchDisplay.kind === 'category' ? (
 																		<div className="flex h-full w-full items-center font-secondary text-[13px] font-bold leading-none text-black">
-																			<div className="flex h-full min-w-0 flex-1 items-center justify-center px-[12px]">
-																				<span className="truncate">
+																			<div className="flex h-full min-w-0 basis-[46%] items-center justify-start pl-[20px] pr-[8px]">
+																				<MapBottomSearchCategoryIcon
+																					aria-hidden="true"
+																					active
+																					viewBox="2 0 31 24"
+																					width={28}
+																					height={22}
+																					className="mr-[13px] flex-shrink-0"
+																				/>
+																				<span className="min-w-0 truncate">
 																					{mapTopSearchDisplay.what}
 																				</span>
 																			</div>
-																			<div className="h-full w-px flex-shrink-0 bg-black/10" />
-																			<div className="flex h-full min-w-0 flex-1 items-center justify-center px-[12px]">
-																				<span className="truncate">
+																			<div className="flex h-full min-w-0 flex-1 items-center justify-start pl-[24px] pr-[44px]">
+																				<span className="min-w-0 truncate">
 																					{mapTopSearchDisplay.whereLabel}
 																				</span>
 																			</div>
 																		</div>
 																	) : (
-																		<div className="flex h-full w-full min-w-0 items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-black">
+																		<div
+																			className={`flex h-full w-full min-w-0 items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-black ${
+																				showExitSearchButton ? 'pr-[40px]' : ''
+																			}`}
+																		>
 																			<span className="truncate">
 																				{mapTopSearchLabel}
 																			</span>
 																		</div>
 																	)}
 																</div>
+																{showExitSearchButton && (
+																	<button
+																		type="button"
+																		aria-label="Exit search"
+																		onClick={(event) => {
+																			event.stopPropagation();
+																			handleEmptyMapClick();
+																		}}
+																		className="absolute right-[14px] top-1/2 z-20 flex h-[23.147px] w-[24.927px] -translate-y-1/2 items-center justify-center rounded-[5.342px] bg-[#EBEBEB] text-[#B1ABAB] opacity-80 transition-opacity hover:opacity-100"
+																	>
+																		<span className="text-[16px] leading-none -translate-y-[1px]">
+																			×
+																		</span>
+																	</button>
+																)}
 															</div>
 														</div>
 													</div>
@@ -12374,7 +12956,7 @@ const DashboardContent = () => {
 												width: `${MAP_VIEW_TOP_BACKDROP_BOX_WIDTH_PX}px`,
 												height: `${MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX}px`,
 												borderRadius: '8px',
-												backgroundColor: '#B9EAF1',
+												backgroundColor: topNavScheme.box,
 												opacity: 0.9,
 											}}
 										/>
@@ -12546,6 +13128,73 @@ const DashboardContent = () => {
 									</div>
 								) : null;
 
+								// Persistent "Searching New" status pill, centered directly below the
+								// map-view search bar. Display-only; shown for every map-view search
+								// (including the add-to-campaign pick flow) per the surface-based design.
+								const mapTopSearchingPill =
+									isMapView && !isMobile && !isSearchDeselectedByUser ? (
+										<div
+											aria-hidden="true"
+											className="fixed left-0 right-0 flex justify-center pointer-events-none map-overlay-appear"
+											style={{
+												top: `${
+													MAP_VIEW_SEARCH_BAR_TOP_PX +
+													MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX * MAP_VIEW_UI_SCALE +
+													10
+												}px`,
+												zIndex: 115,
+												paddingRight: isMidMapChrome
+													? `${MAP_VIEW_RIGHT_PANEL_FOOTPRINT_PX}px`
+													: undefined,
+											}}
+										>
+											<div
+												style={{
+													transform: `scale(${MAP_VIEW_UI_SCALE})`,
+													transformOrigin: 'top center',
+													display: 'inline-flex',
+													height: '33px',
+													padding: '7px 8px 7px 12px',
+													alignItems: 'center',
+													gap: '8px',
+													borderRadius: '9999px',
+													backgroundColor: '#B9EAF1',
+													fontFamily: 'Inter, sans-serif',
+													whiteSpace: 'nowrap',
+												}}
+											>
+												<span style={{ color: '#000', fontSize: '15px', fontWeight: 600, lineHeight: 1 }}>
+													Searching
+												</span>
+												<span
+													style={{
+														display: 'inline-flex',
+														alignItems: 'center',
+														justifyContent: 'center',
+														gap: '6px',
+														minWidth: '85px',
+														height: '19px',
+														boxSizing: 'border-box',
+														background: '#EAF6FF',
+														borderRadius: '4px',
+														padding: '0 8px',
+													}}
+												>
+													<MapBottomSearchProfileIcon
+														aria-hidden="true"
+														viewBox="0 0 28 28"
+														textColor="transparent"
+														iconColor="#3498DB"
+														style={{ width: 16, height: 16, flexShrink: 0, display: 'block' }}
+													/>
+													<span style={{ color: '#000', fontSize: '15px', fontWeight: 600, lineHeight: 1 }}>
+														New
+													</span>
+												</span>
+											</div>
+										</div>
+									) : null;
+
 								const mapTopActionDropdowns = isMapView ? (
 									<>
 										{openMapTopAction === 'playbook' ? (
@@ -12698,6 +13347,31 @@ const DashboardContent = () => {
 												transformOrigin: 'top left',
 											}}
 										>
+											<div
+												className="absolute pointer-events-none flex items-center justify-center overflow-hidden rounded-[10px] bg-[#FDFCFB] font-inter font-normal text-black"
+												style={{
+													width: '66px',
+													height: '17px',
+													fontSize: '14px',
+													lineHeight: '39.473px',
+													textAlign: 'center',
+													left: '-5.5px',
+													top: `-${
+														MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+														MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+														MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+														MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+														MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
+														MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+														MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
+														MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX +
+														17 +
+														6
+													}px`,
+												}}
+											>
+												{isSelectMapToolActive ? 'Select' : 'Showing'}
+											</div>
 											<MapSelectGrabTallStackBox
 												className="absolute pointer-events-none"
 												isSelectActive={isSelectMapToolActive}
@@ -12921,7 +13595,7 @@ const DashboardContent = () => {
 														fontSize: '20.719px',
 														fontStyle: 'normal',
 														fontWeight: 500,
-														lineHeight: '17.063px',
+														lineHeight: '24px',
 													}}
 													onPointerEnter={handleCampaignTabPointerEnter}
 													onFocus={handleCampaignTabPointerEnter}
@@ -12946,10 +13620,10 @@ const DashboardContent = () => {
 																xmlns="http://www.w3.org/2000/svg"
 																className="block flex-shrink-0"
 															>
-																<rect y="2" width="30" height="15" rx="1" fill="#B43A35" />
+																<rect y="2" width="30" height="15" rx="1" fill={topNavScheme.icon} />
 																<path
 																	d="M0 2C0 0.89543 0.895431 0 2 0H13C14.1046 0 15 0.895431 15 2V4C15 4.55228 14.5523 5 14 5H1C0.447715 5 0 4.55228 0 4V2Z"
-																	fill="#B43A35"
+																	fill={topNavScheme.icon}
 																/>
 															</svg>
 															<span className="min-w-0 truncate">{mapCampaignName}</span>
@@ -13019,6 +13693,7 @@ const DashboardContent = () => {
 										<>
 											{mapTopBackdropBox}
 											{mapTopOutlineBox}
+											{mapTopSearchingPill}
 											{campaignMapTopTabs}
 											{searchBar}
 											{mapTopActionDropdowns}
@@ -13482,36 +14157,39 @@ const DashboardContent = () => {
 																		transformOrigin: 'top right',
 																	}}
 																>
-																	<CampaignHeaderBox
-																		campaignId={dashboardMapCampaignForHeader.id}
-																		campaignName={
-																			dashboardMapCampaignForHeader.name || 'Untitled Campaign'
-																		}
-																		toListNames={dashboardMapHeaderToListNames}
-																		fromName={dashboardMapHeaderFromName}
-																		contactsCount={dashboardMapHeaderContactsCount}
-																		draftCount={dashboardMapHeaderDraftCount}
-																		sentCount={dashboardMapHeaderSentCount}
-																		onContactsClick={() => {
-																			if (!mapCampaignId) return;
-																			router.push(
-																				`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=write${campaignReturnAddedSuffix()}`
-																			);
-																		}}
-																		onDraftsClick={() => {
-																			if (!mapCampaignId) return;
-																			router.push(
-																				`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts${campaignReturnAddedSuffix()}`
-																			);
-																		}}
-																		onSentClick={() => {
-																			if (!mapCampaignId) return;
-																			router.push(
-																				`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=sent${campaignReturnAddedSuffix()}`
-																			);
-																		}}
-																		width={433}
-																	/>
+																	<HoverDescriptionProvider defaultEnabled>
+																		<CampaignHeaderBox
+																			campaignId={dashboardMapCampaignForHeader.id}
+																			campaignName={
+																				dashboardMapCampaignForHeader.name || 'Untitled Campaign'
+																			}
+																			toListNames={dashboardMapHeaderToListNames}
+																			fromName={dashboardMapHeaderFromName}
+																			contactsCount={dashboardMapHeaderContactsCount}
+																			draftCount={dashboardMapHeaderDraftCount}
+																			sentCount={dashboardMapHeaderSentCount}
+																			onContactsClick={() => {
+																				if (!mapCampaignId) return;
+																				router.push(
+																					`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=write${campaignReturnAddedSuffix()}`
+																				);
+																			}}
+																			onDraftsClick={() => {
+																				if (!mapCampaignId) return;
+																				router.push(
+																					`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts${campaignReturnAddedSuffix()}`
+																				);
+																			}}
+																			onSentClick={() => {
+																				if (!mapCampaignId) return;
+																				router.push(
+																					`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=sent${campaignReturnAddedSuffix()}`
+																				);
+																			}}
+																			onFolderDropdownOpenChange={setIsMapCampaignHeaderDropdownOpen}
+																			width={433}
+																		/>
+																	</HoverDescriptionProvider>
 																</div>
 															)}
 														{/* Inline "Write Message" drafting panel — floats over the map (left of the
@@ -13538,11 +14216,15 @@ const DashboardContent = () => {
 																		<DashboardWriteOverlay
 																			campaign={dashboardMapCampaignForHeader}
 																			targetContactIds={selectedContacts}
+																			onClose={handleCloseWriteOverlay}
 																			onSwitchToAddToFolder={() => {
 																				void handleAddSelectedToContextFolder();
 																				setIsWriteMode(false);
 																			}}
 																			onReviewActiveChange={setIsWriteReviewActive}
+																			onActiveReviewContactChange={
+																				handleActiveWriteReviewContactChange
+																			}
 																		/>
 																	</div>
 													</div>
@@ -13553,31 +14235,42 @@ const DashboardContent = () => {
 													<div
 														className="absolute pointer-events-none"
 														style={{
-															zIndex: 124,
+															// Lift above the bottom nav boxes (z-130) only while expanded,
+															// matching the marker-hover card's behavior.
+															zIndex: mapPanelHoverResearchExpanded ? 131 : 124,
 															top:
 																mapPanelHoverResearchTopPx != null
 																	? `${mapPanelHoverResearchTopPx}px`
 																	: MAP_VIEW_SIDE_PANEL_TOP_CSS,
-															right:
-																10 +
-																433 * MAP_VIEW_PANEL_SCALE +
-																MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX,
+															...(mapPanelHoverResearchDockSide === 'right'
+																? {
+																		right:
+																			10 +
+																			433 * MAP_VIEW_PANEL_SCALE +
+																			MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX,
+																	}
+																: {
+																		left: MAP_MARKER_RESEARCH_LEFT_DOCK_LEFT_PX,
+																	}),
 															transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
-															transformOrigin: 'top right',
+															transformOrigin:
+																mapPanelHoverResearchDockSide === 'right'
+																	? 'top right'
+																	: 'top left',
 														}}
 													>
-														<ContactResearchPanel
+														<ContactResearchHoverCard
 															contact={
 																mapPanelHoveredResearchContactEnriched ??
 																mapPanelHoveredResearchContact.contact
 															}
-															variant="abridged"
 															displayHeadline={
 																mapPanelHoveredResearchContact.displayHeadline
 															}
 															displayTitleCategory={
 																mapPanelHoveredResearchContact.displayTitleCategory
 															}
+															onExpandedChange={setMapPanelHoverResearchExpanded}
 														/>
 													</div>
 												)}
@@ -13587,7 +14280,10 @@ const DashboardContent = () => {
 													<div
 														className="absolute pointer-events-none"
 														style={{
-															zIndex: 124,
+															// Lift above the bottom search bar's nav boxes (z-130) only while
+															// expanded — when the taller card overlaps that row — so collapsed
+															// hover keeps its prior ordering vs. the z-125 Write panel.
+															zIndex: isMapMarkerResearchExpanded ? 131 : 124,
 															top: MAP_VIEW_SIDE_PANEL_TOP_CSS,
 															...(mapMarkerResearchDockSide === 'right'
 																? {
@@ -13665,22 +14361,26 @@ const DashboardContent = () => {
 																				style={
 																					isCompressedMapChrome
 																						? {
-																								left: 10,
+																							left: 10,
+																							right: 10,
+																							bottom: 10,
+																							height: 'calc(50% - 20px)',
+																							opacity: isMapCampaignHeaderDropdownOpen ? 0.5 : 1,
+																							transition: 'opacity 0.2s ease',
+																							overflow: 'hidden',
+																						}
+																						: {
 																								right: 10,
-																								bottom: 10,
-																								height: 'calc(50% - 20px)',
+																								top: mapViewResultsPanelTopCss,
+																								width: '433px',
+																								height: 800,
+																								maxHeight: mapViewResultsPanelMaxHeightCss,
+																								opacity: isMapCampaignHeaderDropdownOpen ? 0.5 : 1,
+																								transition: 'opacity 0.2s ease',
 																								overflow: 'hidden',
-																							}
-																		: {
-																				right: 10,
-																				top: mapViewResultsPanelTopCss,
-																				width: '433px',
-																				height: 800,
-																				maxHeight: mapViewResultsPanelMaxHeightCss,
-																				overflow: 'hidden',
-																								transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
-																								transformOrigin: 'top right',
-																							}
+																												transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
+																												transformOrigin: 'top right',
+																											}
 																				}
 																			>
 																				{/* Compressed-only sheet header: Map button, selection count, Select all. */}
@@ -13717,9 +14417,10 @@ const DashboardContent = () => {
 																						</span>
 																						<button
 																							type="button"
-																							onClick={() =>
-																								handleSelectAll(displayedMapPanelContacts)
-																							}
+																							onClick={() => {
+																								setMapPanelShiftClickAnchor(null);
+																								handleSelectAll(displayedMapPanelContacts);
+																							}}
 																							disabled={isMapResultsLoading}
 																							className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 -translate-y-1/2 ${
 																								isMapResultsLoading
@@ -13733,45 +14434,98 @@ const DashboardContent = () => {
 																						</button>
 																					</div>
 																				)}
-																				{/* Selection sub-panel — appears once at least one contact is selected. */}
-																				{selectedContacts.length > 0 && (
+																				{/* Selection sub-panel — always present on desktop (header carries the campaign-stops chrome); mobile/compressed keeps the existing gated sheet behaviour. */}
+																				{(!isCompressedMapChrome ||
+																					selectedContacts.length > 0 ||
+																					folderMoveNotice != null) && (
 																					<div
 																						className="flex flex-col flex-shrink-0"
 																						style={{
-																							maxHeight: isCompressedMapChrome
-																								? '30%'
-																								: '342px',
-																							backgroundColor: 'rgba(175, 214, 239, 0.8)',
-																							border: '3px solid #143883',
-																							borderRadius: '8px',
+																							maxHeight: isCompressedMapChrome ? '30%' : `calc(100% - ${MAP_VIEW_SEARCH_RESULTS_MIN_HEIGHT_PX + (!isMapResultsLoading && !fromHomeParam ? 39 + 18 : 9)}px)`,
+																							backgroundColor: isCompressedMapChrome
+																								? 'rgba(175, 214, 239, 0.8)'
+																								: 'rgba(184, 224, 255, 0.54)',
+																							border: isCompressedMapChrome ? '3px solid #143883' : '2px solid #000',
+																							borderRadius: isCompressedMapChrome ? '8px' : '7px',
 																							overflow: 'hidden',
 																						}}
 																					>
-																						<div className="w-full h-[49px] flex-shrink-0 flex items-center justify-center px-4 relative">
-																							<span className="absolute left-[10px] top-1/2 -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
-																								Selection
-																							</span>
-																				<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
-																					{selectedContacts.length}/
-																					{displayedMapPanelContacts.length} selected
-																				</span>
-																							<button
-																					type="button"
-																					onClick={() =>
-																						handleSelectAll(displayedMapPanelContacts)
-																					}
-																								disabled={isMapResultsLoading}
-																								className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 translate-y-[4px] ${
-																									isMapResultsLoading
-																										? 'opacity-60 pointer-events-none'
-																										: 'hover:underline'
-																								}`}
+																						{isCompressedMapChrome ? (
+																							<div className="w-full h-[49px] flex-shrink-0 flex items-center justify-center px-4 relative">
+																								<span className="absolute left-[10px] top-1/2 -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
+																									Selection
+																								</span>
+																								<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
+																									{selectedContacts.length}/{displayedMapPanelContacts.length} selected
+																								</span>
+																								<button
+																									type="button"
+																									onClick={() => {
+																										setMapPanelShiftClickAnchor(null);
+																										handleSelectAll(displayedMapPanelContacts);
+																									}}
+																									disabled={isMapResultsLoading}
+																									className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 translate-y-[4px] ${
+																										isMapResultsLoading ? 'opacity-60 pointer-events-none' : 'hover:underline'
+																									}`}
+																								>
+																									{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
+																								</button>
+																							</div>
+																						) : (
+																							<div
+																								className="w-full h-[77px] flex-shrink-0 relative"
+																								style={{ backgroundColor: '#CBF0FF', borderBottom: '2px solid #000' }}
 																							>
-																								{isAllPanelContactsSelected
-																									? 'Deselect All'
-																									: 'Select all'}
-																							</button>
-																						</div>
+																								<ContactsHeaderChrome
+																									variant="campaignStops"
+																									activeCampaignStop="search"
+																									whiteSectionHeight={77}
+																									offsetY={-19.5}
+																									hasData
+																									interactive
+																									onAllClick={() => mapCampaignId && router.push(`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=all${campaignReturnAddedSuffix()}`)}
+																									onWriteClick={() => mapCampaignId && router.push(`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=write${campaignReturnAddedSuffix()}`)}
+																									onSendClick={() => mapCampaignId && router.push(`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts${campaignReturnAddedSuffix()}`)}
+																									onInboxClick={() => mapCampaignId && router.push(`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=inbox${campaignReturnAddedSuffix()}`)}
+																								/>
+																								<span className="absolute left-[10px] top-[58px] -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
+																									Selection
+																								</span>
+																								<span className="absolute left-1/2 top-[58px] -translate-x-1/2 -translate-y-1/2 font-inter text-[13px] font-medium text-black">
+																									{selectedContacts.length}/{displayedMapPanelContacts.length} selected
+																								</span>
+																								<button
+																									type="button"
+																									onClick={() => {
+																										setMapPanelShiftClickAnchor(null);
+																										handleSelectAll(displayedMapPanelContacts);
+																									}}
+																									disabled={isMapResultsLoading}
+																									className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-[58px] -translate-y-1/2 ${
+																										isMapResultsLoading ? 'opacity-60 pointer-events-none' : 'hover:underline'
+																									}`}
+																								>
+																									{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
+																								</button>
+																							</div>
+																						)}
+																						{folderMoveNotice && (
+																							<SelectionFolderMoveBanner
+																								count={folderMoveNotice.count}
+																								folderName={folderMoveNotice.folderName}
+																								iconColor={topNavScheme.icon}
+																								includeTopDivider={isCompressedMapChrome}
+																								phase={folderMoveNotice.phase}
+																								onDismiss={() =>
+																									setFolderMoveNotice((current) =>
+																										current
+																											? { ...current, phase: 'exiting' }
+																											: current
+																									)
+																								}
+																							/>
+																						)}
 																						<CustomScrollbar
 																							className="flex-1 min-h-0"
 																							contentClassName="p-[6px] pb-[14px] space-y-[7px]"
@@ -13782,8 +14536,8 @@ const DashboardContent = () => {
 																							disableOverflowClass
 																						>
 																							<div className="space-y-[7px]">
-																								{mapPanelSelectedContacts.map(
-																									renderMapPanelDesktopRow
+																								{mapPanelSelectedContacts.map((contact) =>
+																									renderMapPanelDesktopRow(contact, 'selection')
 																								)}
 																							</div>
 																						</CustomScrollbar>
@@ -13794,6 +14548,9 @@ const DashboardContent = () => {
 																					className="flex flex-col flex-1 min-h-0"
 																					style={{
 																						backgroundColor: 'rgba(99, 155, 244, 0.5)',
+																						// Desktop floor so a fully expanded Selection can't compress this below its
+																						// header + category toolbar; compressed sheet keeps its own 30% split.
+																						minHeight: isCompressedMapChrome ? undefined : MAP_VIEW_SEARCH_RESULTS_MIN_HEIGHT_PX,
 																						borderRadius: '8px',
 																						overflow: 'hidden',
 																					}}
@@ -13887,6 +14644,7 @@ const DashboardContent = () => {
 																												backgroundColor: pillColor,
 																											}}
 																											onClick={() => {
+																												setMapPanelShiftClickAnchor(null);
 																												setSelectedCategoryChips(
 																													(prev) => {
 																														const next = new Set(prev);
@@ -13950,9 +14708,7 @@ const DashboardContent = () => {
 																	className="space-y-[7px]"
 																>
 																	{renderMapPostedEventsSection()}
-																	{mapPanelUnselectedContactsFiltered.map(
-																		renderMapPanelDesktopRow
-																	)}
+																	{renderMapPanelSearchResultRows()}
 																</div>
 															)}
 																						</CustomScrollbar>
@@ -14033,6 +14789,7 @@ const DashboardContent = () => {
 																														: '1px solid #000',
 																												}}
 																												onClick={() => {
+																													setMapPanelShiftClickAnchor(null);
 																													setSelectedCategoryChips(
 																														(prev) => {
 																															const next = new Set(prev);
@@ -14165,6 +14922,22 @@ const DashboardContent = () => {
 										profileModeEnabled={isProfileModeEnabled}
 										keywordModeEnabled={isKeywordModeEnabled}
 									/>
+									{/* Campaign nav boxes flanking the map-results search bar (same row). */}
+									<DashboardSearchFlankBoxes
+										contactsCount={dashboardMapHeaderContactsCount}
+										draftCount={dashboardMapHeaderDraftCount}
+										inboxCount={dashboardMapHeaderInboxCount}
+										sentCount={dashboardMapHeaderSentCount}
+										navEnabled={Boolean(mapCampaignId)}
+										onNavigate={navigateToCampaignTab}
+										dimmed={
+											!isCompressedMapChrome &&
+											((isMapResearchPanelVisible &&
+												isMapMarkerResearchExpanded) ||
+												(isMapPanelHoverResearchVisible &&
+													mapPanelHoverResearchExpanded))
+										}
+									/>
 									{shouldShowMapBottomKeywordBadge && (
 										<div
 											aria-hidden="true"
@@ -14234,6 +15007,7 @@ const DashboardContent = () => {
 																		onPreviewSearchFollowupChange={
 																			handleMapBottomSearchFollowupPreviewChange
 																		}
+																		onForYouSubmit={handleMapBottomForYouSubmit}
 																		isKeywordModeEnabled={isKeywordModeEnabled}
 																		onKeywordToggle={handleKeywordToggle}
 																		isRadiusModeEnabled={isRadiusModeEnabled}
@@ -14364,7 +15138,10 @@ const DashboardContent = () => {
 																}
 																headerInlineAction={
 																	<button
-																		onClick={() => handleSelectAll(mapPanelContacts)}
+																		onClick={() => {
+																			setMapPanelShiftClickAnchor(null);
+																			handleSelectAll(mapPanelContacts);
+																		}}
 																		className="text-[14px] font-secondary font-normal text-black hover:underline"
 																		type="button"
 																	>
@@ -14402,6 +15179,7 @@ const DashboardContent = () => {
 																	className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
 																	onClick={(e) => {
 																		e.stopPropagation();
+																		setMapPanelShiftClickAnchor(null);
 																		handleSelectAll(mapPanelContacts);
 																	}}
 																>

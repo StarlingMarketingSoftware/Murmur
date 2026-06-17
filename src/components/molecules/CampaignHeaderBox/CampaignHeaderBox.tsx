@@ -1,14 +1,19 @@
 'use client';
 
-import { FC, useEffect, useRef, useState } from 'react';
+import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { urls } from '@/constants/urls';
-import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { cn } from '@/utils';
 import { useHoverDescription } from '@/contexts/HoverDescriptionContext';
 import { useSendingSessionState } from '@/contexts/SendingSessionContext';
 import { CampaignTitlePills } from '@/components/molecules/CampaignTitlePills/CampaignTitlePills';
+import { CampaignDataTypeIconStrip } from '@/components/molecules/CampaignDataTypeIconStrip/CampaignDataTypeIconStrip';
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
+import DiamondIcon from '@/components/atoms/_svg/DiamondIcon';
+import { CampaignFolderDropdown } from './CampaignFolderDropdown';
+import { useCampaignTopNavScheme } from '@/hooks/useCampaignTopNavScheme';
+import { useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
+import type { CampaignDataTypeSummary } from '@/utils/campaignDataTypes';
 
 interface CampaignHeaderBoxProps {
 	campaignId: number;
@@ -27,6 +32,7 @@ interface CampaignHeaderBoxProps {
 	onContactsClick?: () => void;
 	onDraftsClick?: () => void;
 	onSentClick?: () => void;
+	onFolderDropdownOpenChange?: (isOpen: boolean) => void;
 	width?: number;
 	/** When true, uses responsive width (matching writing box) with left-aligned content */
 	fullWidth?: boolean;
@@ -38,8 +44,10 @@ const getContactsFillColor = (): string => '#F5DADA';
 const getDraftFillColor = (): string => '#FFE3AA';
 const getSentFillColor = (): string => '#B0E0A6';
 
-const FOLDER_BOX_FILL = '#B9EAF1';
-const FOLDER_ICON_COLOR = '#C5494F';
+type CampaignListItemWithDataTypes = {
+	id: number;
+	campaignDataTypes?: CampaignDataTypeSummary[];
+};
 
 export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	campaignId,
@@ -54,15 +62,30 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	onContactsClick,
 	onDraftsClick,
 	onSentClick,
+	onFolderDropdownOpenChange,
 	width = 374,
 	fullWidth = false,
 	className,
 }) => {
-	const [isEditing, setIsEditing] = useState(false);
-	const [editedName, setEditedName] = useState(campaignName);
-	const inputRef = useRef<HTMLInputElement>(null);
-	const { enabled: hoverDescriptionsEnabled, description: hoverDescription } =
-		useHoverDescription();
+	// Folder box fill + icon color follow the campaign's shared top-nav scheme so
+	// they match the top navigation box and the "Filtering in {campaign}" pill.
+	const topNavScheme = useCampaignTopNavScheme(campaignId);
+	const { data: campaigns } = useGetCampaigns();
+	const campaignDataTypes = useMemo(() => {
+		const campaign = ((campaigns ?? []) as CampaignListItemWithDataTypes[]).find(
+			(candidate) => candidate.id === campaignId
+		);
+		return campaign?.campaignDataTypes ?? [];
+	}, [campaignId, campaigns]);
+	const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
+	const chevronButtonRef = useRef<HTMLButtonElement>(null);
+	const headerBoxRef = useRef<HTMLDivElement>(null);
+	const {
+		enabled: hoverDescriptionsEnabled,
+		description: hoverDescription,
+		toggle: toggleHoverDescriptions,
+		canToggle: canToggleHoverDescriptions,
+	} = useHoverDescription();
 	const [renderedHoverDescription, setRenderedHoverDescription] = useState('');
 	const [isHoverDescriptionVisible, setIsHoverDescriptionVisible] = useState(false);
 	const hoverDescriptionTimeoutRef = useRef<number | null>(null);
@@ -100,13 +123,6 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	const [hoveredMetric, setHoveredMetric] = useState<
 		'contacts' | 'drafts' | 'sent' | null
 	>(null);
-
-	const { mutate: editCampaign } = useEditCampaign({
-		suppressToasts: true,
-		onSuccess: () => {
-			setIsEditing(false);
-		},
-	});
 
 	// Smooth hover-description transitions (tiny fade out -> swap -> fade in).
 	useEffect(() => {
@@ -170,67 +186,46 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 		};
 	}, []);
 
-	// Focus input when entering edit mode
 	useEffect(() => {
-		if (isEditing && inputRef.current) {
-			inputRef.current.focus();
-			inputRef.current.select();
-		}
-	}, [isEditing]);
+		onFolderDropdownOpenChange?.(isFolderDropdownOpen);
+		if (!isFolderDropdownOpen) return;
 
-	// Sync editedName when campaignName prop changes
-	useEffect(() => {
-		setEditedName(campaignName);
-	}, [campaignName]);
-
-	const handleSave = () => {
-		if (editedName.trim() && editedName !== campaignName) {
-			editCampaign({
-				id: campaignId,
-				data: { name: editedName.trim() },
-			});
-		} else {
-			setEditedName(campaignName);
-			setIsEditing(false);
-		}
-	};
-
-	const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-		if (e.key === 'Enter') {
-			e.preventDefault();
-			handleSave();
-		} else if (e.key === 'Escape') {
-			setEditedName(campaignName);
-			setIsEditing(false);
-		}
-	};
+		return () => onFolderDropdownOpenChange?.(false);
+	}, [isFolderDropdownOpen, onFolderDropdownOpenChange]);
 
 	return (
 		<div
 			data-campaign-header-box="true"
+			ref={headerBoxRef}
 			className={cn(
 				'relative overflow-visible border border-black rounded-[8px] flex flex-col px-3 pt-0 pb-[6px] box-border',
 				fullWidth && 'w-[96.27vw] max-w-[499px]',
 				className
 			)}
-			style={
-				fullWidth
-					? {
-							height: '59px',
-							minHeight: '59px',
-							maxHeight: '59px',
-							background: 'rgba(255, 255, 255, 0.31)',
-						}
+			style={{
+				...(fullWidth
+					? {}
 					: {
 							width: `${width}px`,
-							height: '59px',
 							minWidth: `${width}px`,
 							maxWidth: `${width}px`,
-							minHeight: '59px',
-							maxHeight: '59px',
-							background: 'rgba(255, 255, 255, 0.31)',
+						}),
+				height: '59px',
+				minHeight: '59px',
+				maxHeight: '59px',
+				// When the folder dropdown is open, the header turns opaque white, thickens
+				// its stroke, and drops its bottom edge so it reads as one box with the
+				// dropdown (whose 2px top border becomes the divider under the pills).
+				background: isFolderDropdownOpen ? '#FFFFFF' : 'rgba(255, 255, 255, 0.31)',
+				...(isFolderDropdownOpen
+					? {
+							borderWidth: '2px',
+							borderBottomWidth: 0,
+							borderBottomLeftRadius: 0,
+							borderBottomRightRadius: 0,
 						}
-			}
+					: {}),
+			}}
 		>
 			{/* Drafting progress box (shown above the header; must NOT shift layout) */}
 			{shouldShowDraftingProgress ? (
@@ -331,50 +326,79 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					{renderedHoverDescription}
 				</div>
 			) : null}
-			{/* Campaign Title — folder icon + name inside a light-blue folder box */}
+			{/* Campaign Title — folder icon + name + campaign data badges inside a long folder box */}
 			<div className="h-[28px] flex-shrink-0 mt-[6px] flex items-center">
 				<div
-					className="flex items-center gap-[8px] overflow-hidden box-border pl-[8px] pr-[28px]"
+					className="flex min-w-0 flex-none items-center gap-[8px] overflow-hidden box-border pl-[8px] pr-[10px]"
 					style={{
 						width: 'fit-content',
-						maxWidth: '258px',
+						maxWidth: 'min(258px, calc(100% - 76px))',
 						height: '26px',
 						borderRadius: '6px',
-						background: FOLDER_BOX_FILL,
+						background: topNavScheme.box,
 					}}
 				>
 					<DashboardActionBarFolderIcon
 						width={26}
 						height={15}
 						aria-hidden="true"
-						style={{ color: FOLDER_ICON_COLOR, flexShrink: 0, display: 'block' }}
+						style={{ color: topNavScheme.icon, flexShrink: 0, display: 'block' }}
 					/>
-					{isEditing ? (
-						<input
-							ref={inputRef}
-							type="text"
-							value={editedName}
-							onChange={(e) => setEditedName(e.target.value)}
-							onBlur={handleSave}
-							onKeyDown={handleKeyDown}
-							className="min-w-0 flex-1 font-normal text-[26px] leading-none text-black bg-transparent border-none outline-none p-0 m-0"
-							style={{ fontFamily: 'Times New Roman, Times, serif' }}
-						/>
-					) : (
-						<div
-							className="min-w-0 flex-1 font-normal text-[26px] leading-none whitespace-nowrap overflow-hidden text-black cursor-text"
-							style={{
-								fontFamily: 'Times New Roman, Times, serif',
-								maskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
-								WebkitMaskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
-							}}
-							onClick={() => setIsEditing(true)}
-							title="Click to edit"
-						>
-							<CampaignTitlePills title={campaignName} size="header" />
-						</div>
-					)}
+					<div
+						className="min-w-0 flex-none font-normal text-[26px] leading-none whitespace-nowrap overflow-hidden text-black"
+						style={{
+							fontFamily: 'Times New Roman, Times, serif',
+							maxWidth: campaignDataTypes.length > 0 ? '135px' : '190px',
+							maskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
+							WebkitMaskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
+						}}
+					>
+						<CampaignTitlePills title={campaignName} size="header" />
+					</div>
+					<CampaignDataTypeIconStrip
+						dataTypes={campaignDataTypes}
+						fill={false}
+						renderEmpty={false}
+						spacingClassName="ml-[2px] mr-0"
+					/>
 				</div>
+				{canToggleHoverDescriptions ? (
+					<button
+						type="button"
+						onClick={toggleHoverDescriptions}
+						aria-label={hoverDescriptionsEnabled ? 'Turn info off' : 'Turn info on'}
+						className="group ml-[8px] flex h-[26px] w-[26px] flex-shrink-0 cursor-pointer items-center justify-center border-none bg-transparent p-0 outline-none focus:outline-none"
+					>
+						<svg
+							width="16"
+							height="16"
+							viewBox="0 0 13 13"
+							fill="none"
+							xmlns="http://www.w3.org/2000/svg"
+							className={cn(
+								'transition-opacity',
+								hoverDescriptionsEnabled
+									? 'opacity-100'
+									: 'opacity-40 group-hover:opacity-100'
+							)}
+						>
+							<g>
+								<circle
+									cx="6.22656"
+									cy="6.05078"
+									r="5.80078"
+									fill={hoverDescriptionsEnabled ? '#51A2E4' : 'none'}
+									stroke="black"
+									strokeWidth="0.5"
+								/>
+								<path
+									d="M8.05656 2.82696C7.8419 2.82696 7.68856 2.75796 7.59656 2.61996C7.53523 2.54329 7.50456 2.44363 7.50456 2.32096C7.50456 2.07563 7.61956 1.87629 7.84956 1.72296C8.01823 1.63096 8.17156 1.58496 8.30956 1.58496C8.53956 1.58496 8.70056 1.65396 8.79256 1.79196C8.8539 1.86863 8.88456 1.96829 8.88456 2.09096C8.88456 2.33629 8.7619 2.53563 8.51656 2.68896C8.37856 2.78096 8.22523 2.82696 8.05656 2.82696ZM4.05456 11.682C3.90123 11.682 3.7709 11.6513 3.66356 11.59C3.57156 11.5286 3.52556 11.4136 3.52556 11.245C3.52556 11.0303 3.57923 10.7773 3.68656 10.486C3.80923 10.1946 3.93956 9.90329 4.07756 9.61196C4.2309 9.32063 4.3459 9.08296 4.42256 8.89896C4.5299 8.68429 4.66023 8.40829 4.81356 8.07096C4.98223 7.71829 5.13556 7.38863 5.27356 7.08196C5.4269 6.75996 5.53423 6.53763 5.59556 6.41496C5.3809 6.64496 5.12023 6.93629 4.81356 7.28896C4.52223 7.62629 4.24623 7.95596 3.98556 8.27796C3.7249 8.59996 3.52556 8.85296 3.38756 9.03696C3.34156 9.09829 3.30323 9.12896 3.27256 9.12896C3.2419 9.12896 3.22656 9.09063 3.22656 9.01396C3.22656 8.89129 3.2649 8.77629 3.34156 8.66896C3.6329 8.30096 3.9549 7.88696 4.30756 7.42696C4.67556 6.96696 5.00523 6.54529 5.29656 6.16196C5.5879 5.76329 5.7719 5.50263 5.84856 5.37996C6.01723 5.34929 6.26256 5.30329 6.58456 5.24196C6.9219 5.18063 7.1519 5.09629 7.27456 4.98896C7.32056 4.94296 7.36656 4.91996 7.41256 4.91996C7.44323 4.91996 7.45856 4.95063 7.45856 5.01196C7.4739 5.05796 7.45856 5.11163 7.41256 5.17296C7.32056 5.28029 7.15956 5.54096 6.92956 5.95496C6.69956 6.36896 6.45423 6.82896 6.19356 7.33496C5.94823 7.82563 5.71823 8.27029 5.50356 8.66896C5.2889 9.08296 5.1049 9.48163 4.95156 9.86496C4.79823 10.2483 4.72156 10.5243 4.72156 10.693C4.72156 10.9076 4.8289 11.015 5.04356 11.015C5.2429 11.015 5.4959 10.8923 5.80256 10.647C6.12456 10.4016 6.44656 10.1103 6.76856 9.77296C7.09056 9.42029 7.37423 9.09829 7.61956 8.80696C7.69623 8.71496 7.78823 8.60763 7.89556 8.48496C8.01823 8.34696 8.0949 8.26263 8.12556 8.23196C8.15623 8.26263 8.17156 8.31629 8.17156 8.39296C8.15623 8.50029 8.1179 8.60763 8.05656 8.71496C7.99523 8.80696 7.9339 8.89129 7.87256 8.96796C7.55056 9.36663 7.1979 9.78063 6.81456 10.21C6.43123 10.624 6.00956 10.9766 5.54956 11.268C5.08956 11.544 4.59123 11.682 4.05456 11.682Z"
+									fill="black"
+								/>
+							</g>
+						</svg>
+					</button>
+				) : null}
 				{sendQueueRemaining > 0 ? (
 					<div
 						className="ml-[8px] flex items-center px-2 whitespace-nowrap font-inter font-semibold text-[12px] leading-none text-black"
@@ -387,6 +411,17 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 						{sendQueueRemaining} in send queue
 					</div>
 				) : null}
+				{/* Chevron marker — toggles the folder dropdown, pinned upper-right */}
+				<button
+					type="button"
+					ref={chevronButtonRef}
+					onClick={() => setIsFolderDropdownOpen((v) => !v)}
+					aria-label="Choose folder"
+					aria-expanded={isFolderDropdownOpen}
+					className="ml-auto mr-[10px] flex flex-shrink-0 cursor-pointer items-center justify-center border-none bg-transparent p-0 outline-none focus:outline-none"
+				>
+					<DiamondIcon aria-hidden="true" />
+				</button>
 			</div>
 
 			{/* Spacer above To/From */}
@@ -538,6 +573,15 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					</span>
 				</button>
 			</div>
+
+			{isFolderDropdownOpen ? (
+				<CampaignFolderDropdown
+					currentCampaignId={campaignId}
+					onClose={() => setIsFolderDropdownOpen(false)}
+					chevronRef={chevronButtonRef}
+					anchorRef={headerBoxRef}
+				/>
+			) : null}
 		</div>
 	);
 };

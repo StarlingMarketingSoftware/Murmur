@@ -29,7 +29,18 @@ const CHROME_EDGE_PX = 4;
 export const OpportunityHoverPanel: FC<{
 	application: MyEventApplication;
 	nowMs: number;
-}> = ({ application, nowMs }) => {
+	widthPx?: number;
+	heightPx?: number;
+	borderRadiusPx?: number;
+	borderPx?: number;
+}> = ({
+	application,
+	nowMs,
+	widthPx = OPPORTUNITY_HOVER_PANEL_WIDTH_PX,
+	heightPx = OPPORTUNITY_HOVER_PANEL_HEIGHT_PX,
+	borderRadiusPx = 12,
+	borderPx = 2,
+}) => {
 	const event = application.event;
 	if (!event) return null;
 
@@ -59,11 +70,11 @@ export const OpportunityHoverPanel: FC<{
 		<div
 			className="font-inter"
 			style={{
-				width: `${OPPORTUNITY_HOVER_PANEL_WIDTH_PX}px`,
-				height: `${OPPORTUNITY_HOVER_PANEL_HEIGHT_PX}px`,
-				borderRadius: '12px',
+				width: `${widthPx}px`,
+				height: `${heightPx}px`,
+				borderRadius: `${borderRadiusPx}px`,
 				background: CHROME_FILL,
-				border: '2px solid #000',
+				border: `${borderPx}px solid #000`,
 				boxSizing: 'border-box',
 				display: 'flex',
 				flexDirection: 'column',
