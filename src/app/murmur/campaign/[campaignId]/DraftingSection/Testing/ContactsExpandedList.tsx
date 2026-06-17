@@ -1220,6 +1220,48 @@ const resolveInboundContact = (
 const getInboxConversationSelectionEmail = (conversation: InboxConversation) =>
 	conversation.latestInboundMessage ?? conversation.latestMessage;
 
+const inboxConversationMatchesSearchQuery = (
+	conversation: InboxConversation,
+	query: string,
+	contactByEmail: Record<string, ContactWithName> | undefined,
+	contactsById: Map<number, ContactWithName>,
+	applicationById: Map<number, MyEventApplication>,
+	campaignName?: string | null
+) => {
+	const values: string[] = [conversation.key, campaignName || ''];
+	const threadApplicationId = getConversationThreadApplicationId(conversation);
+	const eventApplication =
+		threadApplicationId != null ? applicationById.get(threadApplicationId) : undefined;
+	if (eventApplication) {
+		values.push(
+			eventApplication.event?.name || '',
+			eventApplication.event?.venueName || '',
+			eventApplication.event?.venueCity || '',
+			eventApplication.event?.venueState || '',
+			eventApplication.status || ''
+		);
+	}
+
+	for (const message of conversation.messages) {
+		const contact = resolveInboundContact(message, contactByEmail, contactsById);
+		values.push(
+			message.subject || '',
+			getInboxMessageSnippet(message),
+			message.senderName || '',
+			message.sender || '',
+			message.recipient || '',
+			getContactDisplayName(contact, ''),
+			getContactCompanyLabel(contact),
+			getContactTitle(contact),
+			contact?.email || '',
+			contact?.city || '',
+			contact?.state || ''
+		);
+	}
+
+	return values.some((value) => value.toLowerCase().includes(query));
+};
+
 export interface ContactsExpandedListProps {
 	contacts: ContactWithName[];
 	/** Optional full campaign contact set used to resolve draft/inbox rows. */
@@ -1410,6 +1452,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 
 	const [hoveredUsedContactId, setHoveredUsedContactId] = useState<number | null>(null);
 	const [inboxPanelTab, setInboxPanelTab] = useState<DashboardResponsesTab>('responses');
+	const [isInboxSearchOpen, setIsInboxSearchOpen] = useState(false);
+	const [inboxSearchQuery, setInboxSearchQuery] = useState('');
+	const inboxSearchContainerRef = useRef<HTMLDivElement | null>(null);
+	const inboxSearchInputRef = useRef<HTMLInputElement | null>(null);
 	const { data: hoveredUsedContactCampaigns } =
 		useGetUsedContactCampaigns(hoveredUsedContactId);
 	const [activeUsedContactCampaignIndex, setActiveUsedContactCampaignIndex] = useState<
@@ -1544,6 +1590,28 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		if (enteredInboxFocusMode) setInboxPanelTab('responses');
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isInboxFocusMode, inboxPanelTabRequest?.requestId]);
+	useEffect(() => {
+		if (!isInboxFocusMode) {
+			setIsInboxSearchOpen(false);
+			setInboxSearchQuery('');
+		}
+	}, [isInboxFocusMode]);
+	useEffect(() => {
+		if (!isInboxSearchOpen) return;
+		inboxSearchInputRef.current?.focus();
+	}, [isInboxSearchOpen]);
+	useEffect(() => {
+		if (!isInboxSearchOpen) return;
+		const handleDocumentClick = (event: globalThis.MouseEvent) => {
+			const target = event.target;
+			if (!(target instanceof Node)) return;
+			if (inboxSearchContainerRef.current?.contains(target)) return;
+			setIsInboxSearchOpen(false);
+			setInboxSearchQuery('');
+		};
+		document.addEventListener('click', handleDocumentClick);
+		return () => document.removeEventListener('click', handleDocumentClick);
+	}, [isInboxSearchOpen]);
 
 	const updateSelection = useCallback(
 		(updater: (prev: Set<number>) => Set<number>) => {
@@ -2082,15 +2150,44 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		if (!application) return false;
 		return deriveEventChatStatus(application, nowMs).isAboveFold;
 	};
-	const activeInboxPanelConversations =
-		inboxPanelTab === 'sent'
-			? supplementalSentConversations
-			: inboxPanelTab === 'opportunities'
-				? supplementalOpportunityInboxConversations
-				: supplementalInboxConversationsResponsesOnly;
+	const activeInboxPanelConversations = useMemo(
+		() =>
+			inboxPanelTab === 'sent'
+				? supplementalSentConversations
+				: inboxPanelTab === 'opportunities'
+					? supplementalOpportunityInboxConversations
+					: supplementalInboxConversationsResponsesOnly,
+		[
+			inboxPanelTab,
+			supplementalInboxConversationsResponsesOnly,
+			supplementalOpportunityInboxConversations,
+			supplementalSentConversations,
+		]
+	);
+	const normalizedInboxSearchQuery = inboxSearchQuery.trim().toLowerCase();
+	const filteredInboxPanelConversations = useMemo(() => {
+		if (!normalizedInboxSearchQuery) return activeInboxPanelConversations;
+		return activeInboxPanelConversations.filter((conversation) =>
+			inboxConversationMatchesSearchQuery(
+				conversation,
+				normalizedInboxSearchQuery,
+				contactByEmail,
+				contactsById,
+				applicationById,
+				campaign?.name
+			)
+		);
+	}, [
+		activeInboxPanelConversations,
+		applicationById,
+		campaign?.name,
+		contactByEmail,
+		contactsById,
+		normalizedInboxSearchQuery,
+	]);
 	const pastInboxPanelConversations: InboxConversation[] = [];
 	const liveInboxPanelConversations: InboxConversation[] = [];
-	for (const conversation of activeInboxPanelConversations) {
+	for (const conversation of filteredInboxPanelConversations) {
 		(isConversationAboveFold(conversation)
 			? pastInboxPanelConversations
 			: liveInboxPanelConversations
@@ -2114,12 +2211,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const pastInboxIdsKey = pastInboxPanelConversations
 		.map((conversation) => conversation.key)
 		.join(',');
-	const visibleInboxPanelRowCount =
-		inboxPanelTab === 'sent'
-			? supplementalSentConversations.length
-			: inboxPanelTab === 'opportunities'
-				? supplementalOpportunityInboxConversations.length
-				: supplementalInboxConversationsResponsesOnly.length;
+	const visibleInboxPanelRowCount = filteredInboxPanelConversations.length;
 	const totalRenderedRows = isInboxFocusMode
 		? visibleInboxPanelRowCount
 		: contacts.length +
@@ -3001,8 +3093,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 
 			{!collapsed && !isBottomView && isInboxFocusMode && (
 				<div
+					ref={inboxSearchContainerRef}
 					className="absolute z-20 flex items-center gap-[6px]"
-					style={{ top: '45px', left: '6px' }}
+					style={{ top: '45px', left: '6px', width: '367px', height: '22px' }}
 				>
 					<DashboardResponsesFilterBar
 						activeTab={inboxPanelTab}
@@ -3014,18 +3107,83 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					<button
 						type="button"
 						aria-label="Search inbox contacts"
+						aria-expanded={isInboxSearchOpen}
 						className="flex items-center justify-center bg-white p-0"
 						style={{
 							width: '22px',
 							height: '22px',
 							borderRadius: '6px',
 							border: 'none',
-							cursor: 'default',
+							cursor: 'pointer',
 						}}
-						onClick={(e) => e.stopPropagation()}
+						onClick={(e) => {
+							e.stopPropagation();
+							setIsInboxSearchOpen(true);
+							inboxSearchInputRef.current?.focus();
+						}}
 					>
 						<SearchIconDesktop width={16} height={16} stroke="black" strokeWidth={2} />
 					</button>
+					{isInboxSearchOpen && (
+						<div
+							className="absolute z-30 flex items-center bg-white"
+							style={{
+								top: 0,
+								right: '28px',
+								width: '339px',
+								height: '22px',
+								borderRadius: '6px',
+								border: '1px solid rgba(0,0,0,0.25)',
+								boxSizing: 'border-box',
+								paddingLeft: '8px',
+								paddingRight: '4px',
+							}}
+							onClick={(e) => e.stopPropagation()}
+						>
+							<input
+								ref={inboxSearchInputRef}
+								value={inboxSearchQuery}
+								placeholder="Search inbox"
+								aria-label="Search inbox messages"
+								className="min-w-0 flex-1 bg-transparent p-0 font-inter text-[12px] font-medium text-black placeholder:text-black/45 outline-none"
+								onChange={(e) => setInboxSearchQuery(e.target.value)}
+								onKeyDown={(e) => {
+									e.stopPropagation();
+									if (e.key === 'Escape') {
+										if (inboxSearchQuery) {
+											setInboxSearchQuery('');
+										} else {
+											setIsInboxSearchOpen(false);
+										}
+									}
+								}}
+							/>
+							<button
+								type="button"
+								aria-label="Clear inbox search"
+								className="relative ml-[4px] flex h-[16px] w-[16px] items-center justify-center bg-transparent p-0"
+								style={{ border: 'none', cursor: 'pointer' }}
+								onClick={(e) => {
+									e.stopPropagation();
+									if (inboxSearchQuery) {
+										setInboxSearchQuery('');
+										inboxSearchInputRef.current?.focus();
+									} else {
+										setIsInboxSearchOpen(false);
+									}
+								}}
+							>
+								<span
+									aria-hidden
+									className="absolute h-[2px] w-[10px] rotate-45 rounded-full bg-black/65"
+								/>
+								<span
+									aria-hidden
+									className="absolute h-[2px] w-[10px] -rotate-45 rounded-full bg-black/65"
+								/>
+							</button>
+						</div>
+					)}
 				</div>
 			)}
 

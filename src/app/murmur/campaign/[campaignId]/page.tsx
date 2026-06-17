@@ -3281,6 +3281,37 @@ const Murmur = () => {
 		campaign?.userContactLists?.map((list) => list.name).join(', ') || '';
 	const headerFromName = campaign?.identity?.name || '';
 
+	// A Write tab with no campaign contacts is a dead end — send the user to the
+	// campaign-scoped Search flow so they can add contacts first.
+	const hasRedirectedEmptyWriteRef = useRef(false);
+	useEffect(() => {
+		if (isMobile !== false) return;
+		if (activeView !== 'testing') {
+			hasRedirectedEmptyWriteRef.current = false;
+			return;
+		}
+		if (!campaign) return;
+		if (campaignMapContacts === undefined) return;
+		if (headerContactsCount > 0) {
+			hasRedirectedEmptyWriteRef.current = false;
+			return;
+		}
+		if (hasRedirectedEmptyWriteRef.current) return;
+
+		hasRedirectedEmptyWriteRef.current = true;
+		toast('No contacts yet — search for contacts first.', {
+			id: 'campaign-empty-write-redirect',
+		});
+		handleOpenDashboardSearchForCampaign();
+	}, [
+		isMobile,
+		activeView,
+		campaign,
+		campaignMapContacts,
+		headerContactsCount,
+		handleOpenDashboardSearchForCampaign,
+	]);
+
 	// A Drafts tab with nothing drafted is just the blank placeholder page — redirect to
 	// Write. Covers the URL-initialized state (?tab=drafts deep link, which bypasses
 	// setActiveView) and the list emptying out while the tab is open (last draft deleted).
