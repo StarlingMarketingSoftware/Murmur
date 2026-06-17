@@ -13129,12 +13129,11 @@ const DashboardContent = () => {
 								) : null;
 
 								// Persistent "Searching New" status pill, centered directly below the
-								// map-view search bar. Display-only; shown for every map-view search
-								// (including the add-to-campaign pick flow) per the surface-based design.
+								// map-view search bar. When scoped to a campaign, it toggles back to
+								// that campaign's All tab.
 								const mapTopSearchingPill =
 									isMapView && !isMobile && !isSearchDeselectedByUser ? (
 										<div
-											aria-hidden="true"
 											className="fixed left-0 right-0 flex justify-center pointer-events-none map-overlay-appear"
 											style={{
 												top: `${
@@ -13148,8 +13147,21 @@ const DashboardContent = () => {
 													: undefined,
 											}}
 										>
-											<div
+											<button
+												type="button"
+												aria-label="Open all campaign contacts"
+												disabled={!mapCampaignId}
+												tabIndex={mapCampaignId ? 0 : -1}
+												onClick={() =>
+													mapCampaignId &&
+													router.push(
+														`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=all${campaignReturnAddedSuffix()}`
+													)
+												}
 												style={{
+													appearance: 'none',
+													border: 'none',
+													margin: 0,
 													transform: `scale(${MAP_VIEW_UI_SCALE})`,
 													transformOrigin: 'top center',
 													display: 'inline-flex',
@@ -13160,7 +13172,10 @@ const DashboardContent = () => {
 													borderRadius: '9999px',
 													backgroundColor: '#B9EAF1',
 													fontFamily: 'Inter, sans-serif',
+													color: '#000000',
 													whiteSpace: 'nowrap',
+													cursor: mapCampaignId ? 'pointer' : 'default',
+													pointerEvents: mapCampaignId ? 'auto' : 'none',
 												}}
 											>
 												<span style={{ color: '#000', fontSize: '15px', fontWeight: 600, lineHeight: 1 }}>
@@ -13191,7 +13206,7 @@ const DashboardContent = () => {
 														New
 													</span>
 												</span>
-											</div>
+											</button>
 										</div>
 									) : null;
 

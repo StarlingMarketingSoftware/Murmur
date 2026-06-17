@@ -372,7 +372,11 @@ export const ContactsHeaderChrome: FC<{
 				>
 					{campaignStops.map((stop) => {
 						const isDisplayed = stop.id === safeActiveStop || stop.id === hoveredStop;
-						const canClick = Boolean(stop.onClick);
+						const resolvedStopClick =
+							stop.id === 'search' && safeActiveStop === 'search'
+								? onAllClick
+								: stop.onClick;
+						const canClick = Boolean(resolvedStopClick);
 						const shouldShowInlineActiveLabel =
 							!shouldRenderActiveCampaignPill && stop.id === safeActiveStop;
 
@@ -393,7 +397,7 @@ export const ContactsHeaderChrome: FC<{
 								onClick={(e) => {
 									e.stopPropagation();
 									if (!interactive) return;
-									stop.onClick?.();
+									resolvedStopClick?.();
 								}}
 								style={{
 									appearance: 'none',

@@ -4117,7 +4117,7 @@ const Murmur = () => {
 										</div>
 
 										{/* Persistent "Filtering in {campaign}" status pill, centered over the
-										    map strip left of the panels. Display-only (pointer-events:none) and
+										    map strip left of the panels. Click returns to campaign search and
 										    intentionally NOT added to the top-nav right-shift rule below, so it
 										    stays over the map instead of riding the chrome's translateX. */}
 										<div
@@ -4126,7 +4126,6 @@ const Murmur = () => {
 													? 'campaign-top-filter-pill-nav'
 													: 'campaign-top-filter-pill'
 											}
-											aria-hidden="true"
 											className="fixed flex justify-center pointer-events-none"
 											style={
 												activeView === 'overview'
@@ -4155,8 +4154,14 @@ const Murmur = () => {
 														}
 											}
 										>
-											<div
+											<button
+												type="button"
+												aria-label="Open campaign search"
+												onClick={handleGoToDashboardSearch}
 												style={{
+													appearance: 'none',
+													border: 'none',
+													margin: 0,
 													transform: `scale(${MAP_VIEW_UI_SCALE})`,
 													transformOrigin: 'top center',
 													display: 'inline-flex',
@@ -4167,7 +4172,10 @@ const Murmur = () => {
 													borderRadius: '9999px',
 													backgroundColor: '#CDEFCF',
 													fontFamily: 'Inter, sans-serif',
+													color: '#000000',
 													whiteSpace: 'nowrap',
+													cursor: 'pointer',
+													pointerEvents: 'auto',
 												}}
 											>
 												<span
@@ -4229,7 +4237,7 @@ const Murmur = () => {
 														{campaignName}
 													</span>
 												</span>
-											</div>
+											</button>
 										</div>
 
 										{/* Tabs row: Search / Write / [campaign chip] / Inbox / Drafts */}
