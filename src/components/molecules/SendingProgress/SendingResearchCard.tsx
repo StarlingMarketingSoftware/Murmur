@@ -8,6 +8,16 @@ import {
 	parseMetadataSections,
 } from '@/components/molecules/SearchResultsMap/metadata';
 import { WebsiteIcon } from '@/components/atoms/_svg/WebsiteIcon';
+import {
+	useWebsitePreview,
+	buildWebsiteAnchorRect,
+} from '@/contexts/WebsitePreviewContext';
+import { normalizeWebsiteUrl, websiteHost } from '@/utils/websiteUrl';
+import {
+	useWebsitePreviewable,
+	WEBSITE_NOT_PREVIEWABLE_LABEL,
+} from '@/hooks/queryHooks/useWebsitePreviewable';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { SendingContactCard } from './SendingContactCard';
 import { SENDING_RESEARCH_CARD_WIDTH_PX } from './constants';
 
@@ -35,6 +45,7 @@ export const SendingResearchCard: FC<SendingResearchCardProps> = ({
 	tone,
 	width = SENDING_RESEARCH_CARD_WIDTH_PX,
 }) => {
+	const { openWebsite } = useWebsitePreview();
 	const contact = item.contact;
 	// Backfill research only for the front card, like StreetViewContactCard does
 	// for slim overlay payloads (30-min cache on the research endpoint).
@@ -47,6 +58,10 @@ export const SendingResearchCard: FC<SendingResearchCardProps> = ({
 	const cityText = contact?.city?.trim() || '';
 	const foundedYearText = contact?.companyFoundedYear?.trim() || '';
 	const websiteText = contact?.website?.trim() || '';
+	const websiteUrl = normalizeWebsiteUrl(contact?.website);
+	// Preemptive reachability: a `dead` site renders the Website row non-clickable + tooltip.
+	const { classification: websiteClassification } = useWebsitePreviewable(contact?.website);
+	const isWebsiteDead = websiteClassification === 'dead';
 	const hasKeywords = Boolean(
 		contact?.companyKeywords?.some((keyword) => keyword.trim().length > 0)
 	);
@@ -103,16 +118,68 @@ export const SendingResearchCard: FC<SendingResearchCardProps> = ({
 		);
 	}
 	if (websiteText) {
+		const websiteInner = (
+			<>
+				<WebsiteIcon size={13} className="flex-shrink-0" />
+				<span className="font-inter text-[12px] font-medium text-black truncate">
+					Website
+				</span>
+			</>
+		);
 		factRows.push(
-			factRow(
-				<>
-					<WebsiteIcon size={13} className="flex-shrink-0" />
-					<span className="font-inter text-[12px] font-medium text-black truncate">
-						Website
-					</span>
-				</>,
-				WEBSITE_ROW_COLOR,
-				'website'
+			websiteUrl && !isWebsiteDead ? (
+				<button
+					type="button"
+					key="website"
+					data-website-preview-trigger
+					className="flex w-full items-center gap-[6px] px-3 h-[24px] border-t-[1.5px] border-black overflow-hidden text-left hover:underline focus:outline-none focus-visible:underline"
+					style={{
+						backgroundColor: WEBSITE_ROW_COLOR,
+						pointerEvents: 'auto',
+						cursor: 'pointer',
+					}}
+					onMouseDown={(e) => {
+						e.stopPropagation();
+						e.preventDefault();
+						openWebsite(websiteUrl, {
+							label: websiteHost(websiteUrl),
+							anchorRect: buildWebsiteAnchorRect(e.currentTarget),
+						});
+					}}
+					onKeyDown={(e) => {
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault();
+							openWebsite(websiteUrl, {
+								label: websiteHost(websiteUrl),
+								anchorRect: buildWebsiteAnchorRect(e.currentTarget),
+							});
+						}
+					}}
+				>
+					{websiteInner}
+				</button>
+			) : isWebsiteDead ? (
+				// Known un-previewable (dead/unreachable): non-clickable row + hover tooltip.
+				<Tooltip key="website" delayDuration={150}>
+					<TooltipTrigger asChild>
+						<div
+							className="flex w-full items-center gap-[6px] px-3 h-[24px] border-t-[1.5px] border-black overflow-hidden"
+							style={{
+								backgroundColor: WEBSITE_ROW_COLOR,
+								pointerEvents: 'auto',
+								cursor: 'default',
+								opacity: 0.55,
+							}}
+						>
+							{websiteInner}
+						</div>
+					</TooltipTrigger>
+					<TooltipContent side="top" sideOffset={4} className="text-[12px]">
+						{WEBSITE_NOT_PREVIEWABLE_LABEL}
+					</TooltipContent>
+				</Tooltip>
+			) : (
+				factRow(websiteInner, WEBSITE_ROW_COLOR, 'website')
 			)
 		);
 	}

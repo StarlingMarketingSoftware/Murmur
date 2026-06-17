@@ -37,6 +37,16 @@ import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { WebsiteIcon } from '@/components/atoms/_svg/WebsiteIcon';
+import {
+	useWebsitePreview,
+	buildWebsiteAnchorRect,
+} from '@/contexts/WebsitePreviewContext';
+import { normalizeWebsiteUrl, websiteHost } from '@/utils/websiteUrl';
+import {
+	useWebsitePreviewable,
+	WEBSITE_NOT_PREVIEWABLE_LABEL,
+} from '@/hooks/queryHooks/useWebsitePreviewable';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 const RESEARCH_PANEL_DEFAULT_WIDTH = 375;
 const RESEARCH_PANEL_DEFAULT_HEIGHT = 672;
@@ -361,6 +371,12 @@ const ContactResearchPanelAbridged: FC<
 	displayHeadline,
 	displayTitleCategory,
 }) => {
+	const { openWebsite } = useWebsitePreview();
+	const [isWebsiteHovered, setIsWebsiteHovered] = useState(false);
+	// Preemptive reachability: when a site is classified `dead` we render the Website row
+	// non-clickable with a hover tooltip instead of opening a preview that would fail.
+	const { classification: websiteClassification } = useWebsitePreviewable(contact?.website);
+	const isWebsiteDead = websiteClassification === 'dead';
 	const fullName = `${contact?.firstName || ''} ${contact?.lastName || ''}`.trim();
 	const personalName = fullName || contact?.name?.trim() || '';
 	const companyName = contact?.company?.trim() || '';
@@ -387,6 +403,7 @@ const ContactResearchPanelAbridged: FC<
 	const companyTypeText = contact?.companyType?.trim() || '';
 	const foundedYearText = contact?.companyFoundedYear?.trim() || '';
 	const websiteText = contact?.website?.trim() || '';
+	const websiteUrl = normalizeWebsiteUrl(contact?.website);
 	const hasKeywords = Boolean(
 		contact?.companyKeywords?.some((keyword) => keyword.trim().length > 0)
 	);
@@ -494,23 +511,103 @@ const ContactResearchPanelAbridged: FC<
 	if (websiteText) {
 		detailRows.push({
 			key: 'website',
-			color: '#F8FCFF',
-			render: (top) => (
-				<div
-					className="absolute left-[20px] right-[13px] z-10 grid grid-cols-[18px_minmax(0,1fr)] items-center gap-x-[6px] overflow-hidden"
-					style={{ top: `${top}px`, height: smallRowHeight }}
-				>
-					<div className="flex items-center justify-start">
-						<WebsiteIcon size={15} className="flex-shrink-0" />
-					</div>
-					<span
-						className="block w-full min-w-0"
-						style={{ ...singleLineTextFadeStyle, ...rowTextBase }}
+			color: isWebsiteHovered ? '#F67C7E' : '#F8FCFF',
+			render: (top) => {
+				const rowClass =
+					'absolute left-[20px] right-[13px] z-10 grid grid-cols-[18px_minmax(0,1fr)] items-center gap-x-[6px] overflow-hidden';
+				const buttonRowClass =
+					'absolute left-0 right-0 z-10 grid grid-cols-[18px_minmax(0,1fr)] items-center gap-x-[6px] overflow-hidden border-0 bg-transparent p-0 pl-[20px] pr-[13px] text-left appearance-none focus:outline-none';
+				const rowStyle = { top: `${top}px`, height: smallRowHeight };
+				const inner = (
+					<>
+						<div className="flex items-center justify-start">
+							<WebsiteIcon size={15} className="flex-shrink-0" />
+						</div>
+						<span
+							className="block w-full min-w-0"
+							style={{ ...singleLineTextFadeStyle, ...rowTextBase }}
+						>
+							Website
+						</span>
+					</>
+				);
+				if (!websiteUrl) {
+					return (
+						<div className={rowClass} style={rowStyle}>
+							{inner}
+						</div>
+					);
+				}
+				if (isWebsiteDead) {
+					// Known un-previewable (dead/unreachable): render the row non-clickable with
+					// a hover tooltip rather than opening a preview that would just fail.
+					return (
+						<Tooltip delayDuration={150}>
+							<TooltipTrigger asChild>
+								<div
+									className={rowClass}
+									style={{
+										...rowStyle,
+										pointerEvents: 'auto',
+										cursor: 'default',
+										opacity: 0.55,
+									}}
+								>
+									{inner}
+								</div>
+							</TooltipTrigger>
+							<TooltipContent side="top" sideOffset={4} className="text-[12px]">
+								{WEBSITE_NOT_PREVIEWABLE_LABEL}
+							</TooltipContent>
+						</Tooltip>
+					);
+				}
+				const triggerOpen = (target: HTMLElement | null) => {
+					const abridgedPanel = target?.closest(
+						'[data-contact-research-panel-variant="abridged"]'
+					);
+					const isCampaignRowHoverPreview = Boolean(
+						abridgedPanel?.closest('[data-row-hover-research-anchor]')
+					);
+					openWebsite(websiteUrl, {
+						label: websiteHost(websiteUrl),
+						contactId: contact?.id ?? null,
+						size: target?.closest('[data-dashboard-website-preview-size="large"]')
+							? 'large'
+							: 'default',
+						placement: isCampaignRowHoverPreview ? 'left-slot' : 'auto',
+						anchorRect: buildWebsiteAnchorRect(target),
+					});
+				};
+				return (
+					<button
+						type="button"
+						data-website-preview-trigger
+						className={buttonRowClass}
+						// pointer-events:auto so it stays clickable inside pointer-events-none
+						// hover-card wrappers; onMouseDown latches the overlay before a
+						// transient card can unmount on mouseleave.
+						style={{ ...rowStyle, pointerEvents: 'auto', cursor: 'pointer' }}
+						onMouseEnter={() => setIsWebsiteHovered(true)}
+						onMouseLeave={() => setIsWebsiteHovered(false)}
+						onFocus={() => setIsWebsiteHovered(true)}
+						onBlur={() => setIsWebsiteHovered(false)}
+						onMouseDown={(e) => {
+							e.stopPropagation();
+							e.preventDefault();
+							triggerOpen(e.currentTarget);
+						}}
+						onKeyDown={(e) => {
+							if (e.key === 'Enter' || e.key === ' ') {
+								e.preventDefault();
+								triggerOpen(e.currentTarget);
+							}
+						}}
 					>
-						Website
-					</span>
-				</div>
-			),
+						{inner}
+					</button>
+				);
+			},
 		});
 	}
 
@@ -1047,6 +1144,13 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	width,
 	boxWidth,
 }) => {
+	const { openWebsite } = useWebsitePreview();
+	const [isWebsiteHovered, setIsWebsiteHovered] = useState(false);
+	// Preemptive reachability: a `dead` site renders the Website row non-clickable + tooltip.
+	// (Called before the abridged early-return so hook order stays stable; the abridged child
+	// runs its own copy keyed by the same url, which React Query dedupes.)
+	const { classification: websiteClassification } = useWebsitePreviewable(contact?.website);
+	const isWebsiteDead = websiteClassification === 'dead';
 	if (variant === 'abridged') {
 		return (
 			<ContactResearchPanelAbridged
@@ -1100,6 +1204,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	const cityText = contact?.city?.trim() || '';
 	const foundedYearText = contact?.companyFoundedYear?.trim() || '';
 	const websiteText = contact?.website?.trim() || '';
+	const websiteUrl = normalizeWebsiteUrl(contact?.website);
 	const metadataText = contact?.metadata || '';
 	const textStyle = hideAllText ? { color: 'transparent' } : undefined;
 	// Notes only apply to the full-size panel (375×672, e.g. the campaign
@@ -1360,16 +1465,10 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 		topDetailRows.push({
 			key: 'website',
 			height: 24,
-			color: '#F8FCFF',
-			render: (top) => (
-				<div
-					className="absolute left-[23px] right-[17px] z-10 flex items-center justify-start overflow-hidden"
-					style={{
-						top: `${top}px`,
-						height: '24px',
-					}}
-				>
-					<div className="grid w-full grid-cols-[18px_minmax(0,1fr)] items-center gap-x-[9px] overflow-hidden">
+			color: isWebsiteHovered ? '#F67C7E' : '#F8FCFF',
+			render: (top) => {
+				const inner = (
+					<>
 						<div className="flex items-center justify-start">
 							<WebsiteIcon className="flex-shrink-0" />
 						</div>
@@ -1388,9 +1487,75 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						>
 							Website
 						</span>
+					</>
+				);
+				const triggerOpen =
+					websiteUrl && !isWebsiteDead
+						? (target: HTMLElement | null) =>
+								openWebsite(websiteUrl, {
+									label: websiteHost(websiteUrl),
+									contactId: contact?.id ?? null,
+									size: target?.closest('[data-dashboard-website-preview-size="large"]')
+										? 'large'
+										: 'default',
+									anchorRect: buildWebsiteAnchorRect(target),
+								})
+						: null;
+				return (
+					<div
+						className="absolute left-0 right-0 z-10 flex items-center justify-start overflow-hidden"
+						style={{
+							top: `${top}px`,
+							height: '24px',
+						}}
+					>
+						{triggerOpen ? (
+							<button
+								type="button"
+								data-website-preview-trigger
+								className="grid h-full w-full grid-cols-[18px_minmax(0,1fr)] items-center gap-x-[9px] overflow-hidden border-0 bg-transparent p-0 pl-[23px] pr-[17px] text-left appearance-none focus:outline-none"
+								style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+								onMouseEnter={() => setIsWebsiteHovered(true)}
+								onMouseLeave={() => setIsWebsiteHovered(false)}
+								onFocus={() => setIsWebsiteHovered(true)}
+								onBlur={() => setIsWebsiteHovered(false)}
+								onMouseDown={(e) => {
+									e.stopPropagation();
+									e.preventDefault();
+									triggerOpen(e.currentTarget);
+								}}
+								onKeyDown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										triggerOpen(e.currentTarget);
+									}
+								}}
+							>
+								{inner}
+							</button>
+						) : isWebsiteDead ? (
+							// Known un-previewable (dead/unreachable): non-clickable row + hover tooltip.
+							<Tooltip delayDuration={150}>
+								<TooltipTrigger asChild>
+									<div
+										className="grid h-full w-full grid-cols-[18px_minmax(0,1fr)] items-center gap-x-[9px] overflow-hidden pl-[23px] pr-[17px]"
+										style={{ pointerEvents: 'auto', cursor: 'default', opacity: 0.55 }}
+									>
+										{inner}
+									</div>
+								</TooltipTrigger>
+								<TooltipContent side="top" sideOffset={4} className="text-[12px]">
+									{WEBSITE_NOT_PREVIEWABLE_LABEL}
+								</TooltipContent>
+							</Tooltip>
+						) : (
+							<div className="grid h-full w-full grid-cols-[18px_minmax(0,1fr)] items-center gap-x-[9px] overflow-hidden pl-[23px] pr-[17px]">
+								{inner}
+							</div>
+						)}
 					</div>
-				</div>
-			),
+				);
+			},
 		});
 	}
 

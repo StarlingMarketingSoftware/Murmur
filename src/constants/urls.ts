@@ -265,5 +265,10 @@ export const urls = {
 			applications: ((id) => `/api/events/${id}/applications`) as DetailRoute,
 			myApplications: '/api/events/applications',
 		},
+		// Batch reachability/framability classifier — used to preemptively mark a contact's
+		// website as un-previewable (dead) and disable its Website button.
+		websitePreviewable: {
+			index: '/api/website-previewable',
+		},
 	},
 };

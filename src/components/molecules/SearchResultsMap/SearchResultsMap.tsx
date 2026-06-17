@@ -19198,6 +19198,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	return (
 		<div
+			data-website-preview-scroll-dismiss
 			className={
 				isBackgroundPresentation
 					? 'murmur-search-results-map murmur-search-results-map--background'

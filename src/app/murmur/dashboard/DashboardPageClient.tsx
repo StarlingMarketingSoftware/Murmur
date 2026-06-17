@@ -167,6 +167,8 @@ import {
 	usePersistentMapFirstPaint,
 	usePersistentMapSetter,
 } from '@/contexts/PersistentMapContext';
+import { useWebsitePreview } from '@/contexts/WebsitePreviewContext';
+import { getMurmurRootScale } from '@/utils/rootScale';
 import { DashboardBootBackdrop } from '@/components/molecules/DashboardBootBackdrop/DashboardBootBackdrop';
 import { DashboardBootProgress } from '@/components/molecules/DashboardBootProgress/DashboardBootProgress';
 import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
@@ -7528,6 +7530,30 @@ const DashboardContent = () => {
 	const mapResearchPanelCloseDelayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const mapResearchPanelUnmountTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const mapResearchPanelContactRef = useRef<ContactWithName | null>(null);
+	const {
+		activeContactId: websitePreviewContactId,
+		activeAnchorRect: websitePreviewAnchorRect,
+	} = useWebsitePreview();
+	const isWebsitePreviewOpen = websitePreviewContactId != null;
+	const canShowContactForWebsitePreview = useCallback(
+		(contactId: number | null | undefined) =>
+			!isWebsitePreviewOpen || contactId === websitePreviewContactId,
+		[isWebsitePreviewOpen, websitePreviewContactId]
+	);
+	useEffect(() => {
+		if (
+			isWebsitePreviewOpen &&
+			hoveredMapPanelContactId != null &&
+			!canShowContactForWebsitePreview(hoveredMapPanelContactId)
+		) {
+			setHoveredMapPanelContactId(null);
+			setMapPanelHoverResearchTopPx(null);
+		}
+	}, [
+		canShowContactForWebsitePreview,
+		hoveredMapPanelContactId,
+		isWebsitePreviewOpen,
+	]);
 	// When the executed search changes, reset map-panel "extras" for the new search,
 	// but keep any currently-selected contacts so selection can persist across searches
 	// within the same map session.
@@ -7585,8 +7611,34 @@ const DashboardContent = () => {
 			return;
 		}
 
+		if (
+			isWebsitePreviewOpen &&
+			mapResearchPanelContactRef.current &&
+			!canShowContactForWebsitePreview(mapResearchPanelContactRef.current.id)
+		) {
+			if (mapResearchPanelCloseDelayTimeoutRef.current) {
+				clearTimeout(mapResearchPanelCloseDelayTimeoutRef.current);
+				mapResearchPanelCloseDelayTimeoutRef.current = null;
+			}
+			if (mapResearchPanelUnmountTimeoutRef.current) {
+				clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
+				mapResearchPanelUnmountTimeoutRef.current = null;
+			}
+			setHoveredMapMarkerContact((current) =>
+				canShowContactForWebsitePreview(current?.id) ? current : null
+			);
+			setIsMapResearchPanelVisible(false);
+			setMapResearchPanelContact(null);
+			mapResearchPanelContactRef.current = null;
+			return;
+		}
+
 		// Hovering a marker: show immediately (with snappy fade-in on first mount).
 		if (hoveredMapMarkerContact) {
+			if (!canShowContactForWebsitePreview(hoveredMapMarkerContact.id)) {
+				setHoveredMapMarkerContact(null);
+				return;
+			}
 			if (mapResearchPanelCloseDelayTimeoutRef.current) {
 				clearTimeout(mapResearchPanelCloseDelayTimeoutRef.current);
 				mapResearchPanelCloseDelayTimeoutRef.current = null;
@@ -7597,6 +7649,22 @@ const DashboardContent = () => {
 			}
 			setMapResearchPanelContact(hoveredMapMarkerContact);
 			mapResearchPanelContactRef.current = hoveredMapMarkerContact;
+			setIsMapResearchPanelVisible(true);
+			return;
+		}
+
+		if (
+			isWebsitePreviewOpen &&
+			mapResearchPanelContactRef.current?.id === websitePreviewContactId
+		) {
+			if (mapResearchPanelCloseDelayTimeoutRef.current) {
+				clearTimeout(mapResearchPanelCloseDelayTimeoutRef.current);
+				mapResearchPanelCloseDelayTimeoutRef.current = null;
+			}
+			if (mapResearchPanelUnmountTimeoutRef.current) {
+				clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
+				mapResearchPanelUnmountTimeoutRef.current = null;
+			}
 			setIsMapResearchPanelVisible(true);
 			return;
 		}
@@ -7616,10 +7684,23 @@ const DashboardContent = () => {
 				mapResearchPanelContactRef.current = null;
 			}, MAP_RESEARCH_PANEL_FADE_MS);
 		}, MAP_RESEARCH_PANEL_HOLD_MS);
-	}, [hoveredMapMarkerContact, isMapView, isMapResultsLoading]);
+	}, [
+		canShowContactForWebsitePreview,
+		hoveredMapMarkerContact,
+		isMapView,
+		isMapResultsLoading,
+		isWebsitePreviewOpen,
+		websitePreviewContactId,
+	]);
 
 	const handleMapMarkerHover = useCallback(
 		(contact: ContactWithName | null, meta?: MarkerHoverMeta) => {
+			if (contact && !canShowContactForWebsitePreview(contact.id)) {
+				setHoveredMapMarkerContact((current) =>
+					canShowContactForWebsitePreview(current?.id) ? current : null
+				);
+				return;
+			}
 			// Pick the dock side once per hover-start so it never flickers; when meta
 			// is absent (tooltip-overlay re-entry) or hover ends, keep the prior side.
 			if (contact && meta) {
@@ -7644,7 +7725,7 @@ const DashboardContent = () => {
 			}
 			setHoveredMapMarkerContact(contact);
 		},
-		[MAP_VIEW_PANEL_SCALE]
+		[MAP_VIEW_PANEL_SCALE, canShowContactForWebsitePreview]
 	);
 
 	// Tab toggles the marker-hover Description box while the panel is visible.
@@ -8284,12 +8365,13 @@ const DashboardContent = () => {
 	);
 
 	const mapPanelHoveredResearchContact = useMemo(() => {
-		if (!isMapView || isMapResultsLoading || hoveredMapPanelContactId == null) {
+		const effectiveContactId = websitePreviewContactId ?? hoveredMapPanelContactId;
+		if (!isMapView || isMapResultsLoading || effectiveContactId == null) {
 			return null;
 		}
 
 		const contact = displayedMapPanelContacts.find(
-			(candidate) => candidate.id === hoveredMapPanelContactId
+			(candidate) => candidate.id === effectiveContactId
 		);
 		if (!contact) return null;
 
@@ -8300,6 +8382,7 @@ const DashboardContent = () => {
 		hoveredMapPanelContactId,
 		isMapResultsLoading,
 		isMapView,
+		websitePreviewContactId,
 	]);
 
 	const mapMarkerResearchDisplayFields = useMemo(
@@ -8323,11 +8406,29 @@ const DashboardContent = () => {
 	// research on the left rail so it doesn't stack under the contact boxes.
 	const mapPanelHoverResearchDockSide: 'left' | 'right' =
 		isDashboardWriteOverlayVisible ? 'left' : 'right';
+	const shouldShowMapResearchPanel =
+		mapResearchPanelContact != null &&
+		canShowContactForWebsitePreview(mapResearchPanelContact.id);
+	const shouldShowMapPanelHoverResearch =
+		mapPanelHoveredResearchContact != null &&
+		canShowContactForWebsitePreview(mapPanelHoveredResearchContact.contact.id);
 	const isMapPanelHoverResearchVisible =
-		Boolean(mapPanelHoveredResearchContact) && !mapResearchPanelContact;
+		shouldShowMapPanelHoverResearch && !shouldShowMapResearchPanel;
 	useEffect(() => {
 		if (!isMapPanelHoverResearchVisible) setMapPanelHoverResearchExpanded(false);
 	}, [isMapPanelHoverResearchVisible]);
+	const websitePreviewPinnedResearchStyle = useMemo<React.CSSProperties | null>(() => {
+		if (!websitePreviewAnchorRect) return null;
+		const rootScale = getMurmurRootScale() || 1;
+		return {
+			position: 'fixed',
+			top: `${websitePreviewAnchorRect.top / rootScale}px`,
+			left: `${websitePreviewAnchorRect.left / rootScale}px`,
+			width: `${MAP_MARKER_RESEARCH_GROUP_WIDTH_PX}px`,
+			transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
+			transformOrigin: 'top left',
+		};
+	}, [MAP_VIEW_PANEL_SCALE, websitePreviewAnchorRect]);
 
 	// Hovered overlay markers/rows may be slim map-overlay payloads; backfill their
 	// research fields so the hover research panels don't render blank.
@@ -10210,6 +10311,7 @@ const DashboardContent = () => {
 	};
 
 	const scheduleMapPanelHoverResearchClear = (contactId: number) => {
+		if (isWebsitePreviewOpen) return;
 		cancelMapPanelHoverResearchClear();
 		mapPanelHoverResearchClearTimeoutRef.current = setTimeout(() => {
 			mapPanelHoverResearchClearTimeoutRef.current = null;
@@ -10622,6 +10724,7 @@ const DashboardContent = () => {
 				onClick={(event) => handleMapPanelRowSelect(contact, event, source)}
 				onMouseEnter={(event) => {
 					cancelMapPanelHoverResearchClear();
+					if (!canShowContactForWebsitePreview(contact.id)) return;
 					setHoveredMapPanelContactId(contact.id);
 					updateMapPanelHoverResearchTop(event.currentTarget);
 				}}
@@ -14204,32 +14307,47 @@ const DashboardContent = () => {
 												)}
 												{!isCompressedMapChrome &&
 													mapPanelHoveredResearchContact &&
-													!mapResearchPanelContact && (
+													shouldShowMapPanelHoverResearch &&
+													!shouldShowMapResearchPanel && (
 													<div
-														className="absolute pointer-events-none"
+														data-dashboard-website-preview-size="large"
+														className="absolute"
+														onMouseEnter={cancelMapPanelHoverResearchClear}
+														onMouseLeave={() =>
+															scheduleMapPanelHoverResearchClear(
+																mapPanelHoveredResearchContact.contact.id
+															)
+														}
 														style={{
+															pointerEvents: 'auto',
 															// Lift above the bottom nav boxes (z-130) only while expanded,
 															// matching the marker-hover card's behavior.
 															zIndex: mapPanelHoverResearchExpanded ? 131 : 124,
-															top:
-																mapPanelHoverResearchTopPx != null
-																	? `${mapPanelHoverResearchTopPx}px`
-																	: MAP_VIEW_SIDE_PANEL_TOP_CSS,
-															...(mapPanelHoverResearchDockSide === 'right'
-																? {
-																		right:
-																			10 +
-																			433 * MAP_VIEW_PANEL_SCALE +
-																			MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX,
-																	}
+															...(websitePreviewContactId ===
+																mapPanelHoveredResearchContact.contact.id &&
+															websitePreviewPinnedResearchStyle
+																? websitePreviewPinnedResearchStyle
 																: {
-																		left: MAP_MARKER_RESEARCH_LEFT_DOCK_LEFT_PX,
+																		top:
+																			mapPanelHoverResearchTopPx != null
+																				? `${mapPanelHoverResearchTopPx}px`
+																				: MAP_VIEW_SIDE_PANEL_TOP_CSS,
+																		...(mapPanelHoverResearchDockSide === 'right'
+																			? {
+																					right:
+																						10 +
+																						433 * MAP_VIEW_PANEL_SCALE +
+																						MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX,
+																				}
+																			: {
+																					left: MAP_MARKER_RESEARCH_LEFT_DOCK_LEFT_PX,
+																				}),
+																		transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
+																		transformOrigin:
+																			mapPanelHoverResearchDockSide === 'right'
+																				? 'top right'
+																				: 'top left',
 																	}),
-															transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
-															transformOrigin:
-																mapPanelHoverResearchDockSide === 'right'
-																	? 'top right'
-																	: 'top left',
 														}}
 													>
 														<ContactResearchHoverCard
@@ -14249,29 +14367,40 @@ const DashboardContent = () => {
 												)}
 												{/* Marker-hover research group: abridged card + Description box,
 												    statically docked beside the results panel or the left rail. */}
-												{!isMobile && !isCompressedMapChrome && mapResearchPanelContact && (
+												{!isMobile &&
+													!isCompressedMapChrome &&
+													mapResearchPanelContact &&
+													shouldShowMapResearchPanel && (
 													<div
+														data-dashboard-website-preview-size="large"
 														className="absolute pointer-events-none"
 														style={{
 															// Lift above the bottom search bar's nav boxes (z-130) only while
 															// expanded — when the taller card overlaps that row — so collapsed
 															// hover keeps its prior ordering vs. the z-125 Write panel.
 															zIndex: isMapMarkerResearchExpanded ? 131 : 124,
-															top: MAP_VIEW_SIDE_PANEL_TOP_CSS,
-															...(mapMarkerResearchDockSide === 'right'
-																? {
-																		right:
-																			10 +
-																			433 * MAP_VIEW_PANEL_SCALE +
-																			MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX,
-																	}
-																: { left: MAP_MARKER_RESEARCH_LEFT_DOCK_LEFT_PX }),
-															width: `${MAP_MARKER_RESEARCH_GROUP_WIDTH_PX}px`,
-															transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
-															transformOrigin:
-																mapMarkerResearchDockSide === 'right'
-																	? 'top right'
-																	: 'top left',
+															...(websitePreviewContactId === mapResearchPanelContact.id &&
+															websitePreviewPinnedResearchStyle
+																? websitePreviewPinnedResearchStyle
+																: {
+																		top: MAP_VIEW_SIDE_PANEL_TOP_CSS,
+																		...(mapMarkerResearchDockSide === 'right'
+																			? {
+																					right:
+																						10 +
+																						433 * MAP_VIEW_PANEL_SCALE +
+																						MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX,
+																				}
+																			: {
+																					left: MAP_MARKER_RESEARCH_LEFT_DOCK_LEFT_PX,
+																				}),
+																		width: `${MAP_MARKER_RESEARCH_GROUP_WIDTH_PX}px`,
+																		transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
+																		transformOrigin:
+																			mapMarkerResearchDockSide === 'right'
+																				? 'top right'
+																				: 'top left',
+																	}),
 															opacity: isMapResearchPanelVisible ? 1 : 0,
 															transition: `opacity ${MAP_RESEARCH_PANEL_FADE_MS}ms ease-out`,
 														}}

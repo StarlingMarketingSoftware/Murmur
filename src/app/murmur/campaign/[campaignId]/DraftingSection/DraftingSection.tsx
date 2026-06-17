@@ -70,6 +70,7 @@ import { toast } from 'sonner';
 import { ContactWithName } from '@/types/contact';
 import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { ContactResearchHoverCard } from '@/components/molecules/ContactResearchPanel/ContactResearchHoverCard';
+import { useWebsitePreview } from '@/contexts/WebsitePreviewContext';
 import { TestPreviewPanel } from '@/components/molecules/TestPreviewPanel/TestPreviewPanel';
 import { MiniEmailStructure } from './EmailGeneration/MiniEmailStructure';
 import ContactsExpandedList, {
@@ -366,6 +367,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		whiteOutOverviewCampaignsMiniTable = false,
 		whiteOutOverviewStrategyBox = false,
 	} = props;
+	const { activeContactId: websitePreviewContactId } = useWebsitePreview();
 	const [isCampaignHeaderDropdownOpen, setIsCampaignHeaderDropdownOpen] = useState(false);
 	const campaignHeaderPanelDimStyle: CSSProperties = {
 		opacity: isCampaignHeaderDropdownOpen || dimContactsExpandedList ? 0.5 : 1,
@@ -4334,6 +4336,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const activeRowResearchContact = activeRowOpportunity
 		? null
 		: rowHoverResearchContact ?? pinnedResearchForList;
+	const shouldHideRowResearchForWebsitePreview =
+		websitePreviewContactId != null &&
+		activeRowResearchContact?.id === websitePreviewContactId;
 	const renderRowHoverResearchCard = (enabled = isRowHoverResearchEnabled) =>
 		// When the large right-side research panel is showing (expanded layout), the
 		// over-map hover card is suppressed — research/opportunity render in the right
@@ -4349,14 +4354,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			>
 				<OpportunityHoverPanel application={activeRowOpportunity} nowMs={Date.now()} />
 			</div>
-		) : enabled && activeRowResearchContact ? (
+		) : enabled && activeRowResearchContact && !shouldHideRowResearchForWebsitePreview ? (
+			// Interactive (not pointer-events-none) + hover bridge so the card stays
+			// alive while the pointer travels onto it to click the Website row.
 			<div
-				className="absolute pointer-events-none"
+				className="absolute"
 				style={{
 					zIndex: 40,
 					top: `${rowHoverResearchTopPx}px`,
 					left: `${rowHoverResearchLeftPx}px`,
+					pointerEvents: 'auto',
 				}}
+				onMouseEnter={cancelRowHoverResearchClear}
+				onMouseLeave={scheduleRowHoverResearchClear}
 			>
 				<ContactResearchHoverCard contact={activeRowResearchContact} />
 			</div>
@@ -9961,15 +9971,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				railHoverResearchPos &&
 				typeof document !== 'undefined' &&
 				createPortal(
+					// Interactive (not pointer-events-none) + hover bridge so the card stays
+					// alive while the pointer travels onto it to click the Website row.
 					<div
-						className="fixed pointer-events-none"
+						className="fixed"
 						style={{
 							zIndex: 9999,
 							top: `${railHoverResearchPos.topPx}px`,
 							left: `${railHoverResearchPos.leftPx}px`,
 							transform: `scale(${railHoverResearchPos.scale})`,
 							transformOrigin: 'top left',
+							pointerEvents: 'auto',
 						}}
+						onMouseEnter={cancelRailHoverResearchClear}
+						onMouseLeave={scheduleRailHoverResearchClear}
 					>
 						<ContactResearchHoverCard contact={railHoverResearchContact} />
 					</div>,
