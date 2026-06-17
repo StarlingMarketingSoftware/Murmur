@@ -3053,19 +3053,21 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// reset just above. The preserve-selection tab request keeps the seeded id from
 	// being auto-selected away while the inbox data loads.
 	const inboxEmailIdParam = inboxDeepLinkParams.get('inboxEmailId');
+	const inboxDeepLinkTabParam = inboxDeepLinkParams.get('tab');
 	useEffect(() => {
 		if (inboxEmailIdParam == null) return;
 		const parsed = Number(inboxEmailIdParam);
 		if (!Number.isInteger(parsed) || parsed === 0) return;
+		const sentTab = inboxDeepLinkTabParam?.toLowerCase() === 'sent' ? 'sent' : 'inbox';
 		setSelectedInboxEmailId(parsed);
 		setLocalInboxSentTabRequest((prev) => ({
-			tab: 'inbox',
+			tab: sentTab,
 			requestId:
 				Math.max(prev?.requestId ?? 0, inboxSentTabRequest?.requestId ?? 0) + 1,
 			preserveSelection: true,
 		}));
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [inboxEmailIdParam, campaign?.id]);
+	}, [inboxEmailIdParam, inboxDeepLinkTabParam, campaign?.id]);
 
 	// When a draft is open, the research panel should stay locked to that draft's contact.
 	const displayedContactForResearch = isDraftPreviewOpen
