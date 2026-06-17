@@ -11867,8 +11867,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					maxLng: east,
 				};
 
-				const isAmbientContactAllowed = (contact: ContactWithName): boolean => {
-					if (!isAmbientAllContactsOverlay) return true;
+				const isAllContactsOverlayContactAllowed = (contact: ContactWithName): boolean => {
 					const categoryIndex = getAmbientContactCategoryIndexFromTitle(contact.title);
 					if (categoryIndex < 0) return ambientUncategorizedActive;
 					return ambientActiveCategories?.[categoryIndex] !== false;
@@ -11878,7 +11877,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const bufferInBounds: ContactWithName[] = [];
 				for (const contact of allContactsOverlayContactsWithCoords) {
 					if (excludeIdSet.has(contact.id)) continue;
-					if (!isAmbientContactAllowed(contact)) continue;
+					if (!isAllContactsOverlayContactAllowed(contact)) continue;
 					const coords = getAllContactsOverlayContactCoords(contact);
 					if (!coords) continue;
 					if (!isLatLngInBbox(coords.lat, coords.lng, viewportBbox)) continue;

@@ -10,7 +10,9 @@ import {
 	type CSSProperties,
 	type KeyboardEvent as ReactKeyboardEvent,
 	type MouseEvent as ReactMouseEvent,
+	type TouchEvent as ReactTouchEvent,
 	type UIEvent,
+	type WheelEvent as ReactWheelEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { debounce } from 'lodash';
@@ -592,6 +594,12 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 
 	const handleCalendarScroll = (event: UIEvent<HTMLDivElement>) => {
 		setScrollTop(event.currentTarget.scrollTop);
+	};
+
+	const containCalendarScrollGesture = (
+		event: ReactWheelEvent<HTMLDivElement> | ReactTouchEvent<HTMLDivElement>
+	) => {
+		event.stopPropagation();
 	};
 
 	const handleScrollbarThumbMouseDown = (event: ReactMouseEvent<HTMLDivElement>) => {
@@ -1233,6 +1241,8 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 					ref={scrollContainerRef}
 					data-lenis-prevent
 					onScroll={handleCalendarScroll}
+					onTouchMove={containCalendarScrollGesture}
+					onWheel={containCalendarScrollGesture}
 					style={
 						{
 							width: '100%',

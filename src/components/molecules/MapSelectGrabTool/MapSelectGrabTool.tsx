@@ -1230,9 +1230,9 @@ export function MapSelectGrabStackBox({
 	inactiveContent?: ReactNode;
 	isSelectActive?: boolean;
 	selectedContent?: ReactNode;
-	// Fires whenever the user toggles the grab-mode active state. Also fires
-	// once on mount with the initial active=true state. Consumers use this to
-	// drive map-marker visibility for the data this box represents.
+	// Fires whenever the active state changes. In grab mode this is the grabber
+	// active state; in select mode this is the selected state, so the visible
+	// markers match the icon's green/on state.
 	onActiveChange?: (isActive: boolean) => void;
 }) {
 	const [isSelected, setIsSelected] = useState(false);
@@ -1245,8 +1245,8 @@ export function MapSelectGrabStackBox({
 	}, [isSelectActive]);
 
 	useEffect(() => {
-		onActiveChange?.(isGrabActive);
-	}, [isGrabActive, onActiveChange]);
+		onActiveChange?.(isSelectActive ? isSelected : isGrabActive);
+	}, [isSelectActive, isSelected, isGrabActive, onActiveChange]);
 
 	const handleSelectClick = useCallback(() => {
 		setIsSelected((prev) => !prev);

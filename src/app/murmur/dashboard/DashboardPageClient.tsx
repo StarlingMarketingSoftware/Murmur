@@ -36,7 +36,12 @@ import {
 } from '@/components/molecules/MobileDashboardTabBar/MobileDashboardTabBar';
 import { MobileFolderCards } from '@/components/molecules/MobileFolderCards/MobileFolderCards';
 import { MobileDashboardSearch } from '@/app/murmur/dashboard/MobileDashboardSearch';
-import { useDashboard } from './useDashboard';
+import {
+	DASHBOARD_SEARCH_SELECTION_LIMIT,
+	getSelectionLimitedContactIds,
+	mergeContactIdsWithSelectionLimit,
+	useDashboard,
+} from './useDashboard';
 import { useLenis } from '@/contexts/ScrollContext';
 import { withClerkNoBranding } from '@/constants/auth';
 import { urls } from '@/constants/urls';
@@ -8088,11 +8093,19 @@ const DashboardContent = () => {
 
 	// Check if all panel contacts are selected (for map view "Select all" button)
 	const isAllPanelContactsSelected = useMemo(() => {
-		if (displayedMapPanelContacts.length === 0) return false;
-		return displayedMapPanelContacts.every((contact) =>
+		const cappedPanelContacts = displayedMapPanelContacts.slice(
+			0,
+			DASHBOARD_SEARCH_SELECTION_LIMIT
+		);
+		if (cappedPanelContacts.length === 0) return false;
+		return cappedPanelContacts.every((contact) =>
 			selectedContacts.includes(contact.id)
 		);
 	}, [displayedMapPanelContacts, selectedContacts]);
+	const mapSelectionDisplayTotal = Math.min(
+		displayedMapPanelContacts.length,
+		DASHBOARD_SEARCH_SELECTION_LIMIT
+	);
 
 	const mapPanelSelectedContacts = useMemo(
 		() => displayedMapPanelContacts.filter((c) => selectedContacts.includes(c.id)),
@@ -9416,32 +9429,33 @@ const DashboardContent = () => {
 		) => {
 			const ids = payload?.contactIds ?? [];
 			const extraContacts = payload?.extraContacts ?? [];
+			const acceptedIds = getSelectionLimitedContactIds(selectedContacts, ids);
+			const acceptedIdSet = new Set(acceptedIds);
+			const acceptedExtraContacts = extraContacts.filter((contact) =>
+				acceptedIdSet.has(contact.id)
+			);
 
 			if (ids.length > 0) {
-				setSelectedContacts((prev) => {
-					const next = new Set(prev);
-					for (const id of ids) next.add(id);
-					return Array.from(next);
-				});
+				setSelectedContacts((prev) => mergeContactIdsWithSelectionLimit(prev, ids));
 			}
 
-			if (extraContacts.length > 0) {
+			if (acceptedExtraContacts.length > 0) {
 				setMapPanelExtraContacts((prev) => {
 					const byId = new Map<number, ContactWithName>();
 					for (const c of prev) byId.set(c.id, c);
-					for (const c of extraContacts) {
+					for (const c of acceptedExtraContacts) {
 						if (!byId.has(c.id)) byId.set(c.id, c);
 					}
 					return Array.from(byId.values());
 				});
 			}
 
-			if (ids.length > 0) {
+			if (acceptedIds.length > 0) {
 				const nextExtraIds: number[] = [];
 				const byId = new Map<number, ContactWithName>();
 				for (const c of contacts || []) byId.set(c.id, c);
 
-				for (const id of ids) {
+				for (const id of acceptedIds) {
 					if (!baseContactIdSet.has(id)) {
 						nextExtraIds.push(id);
 						continue;
@@ -9457,7 +9471,7 @@ const DashboardContent = () => {
 					}
 				}
 
-				for (const c of extraContacts) nextExtraIds.push(c.id);
+				for (const c of acceptedExtraContacts) nextExtraIds.push(c.id);
 
 				if (nextExtraIds.length > 0) {
 					setMapPanelExtraContactIds((prev) => {
@@ -9470,7 +9484,13 @@ const DashboardContent = () => {
 
 			setActiveMapTool('grab');
 		},
-		[contacts, baseContactIdSet, searchedStateAbbrForMap, setSelectedContacts]
+		[
+			selectedContacts,
+			contacts,
+			baseContactIdSet,
+			searchedStateAbbrForMap,
+			setSelectedContacts,
+		]
 	);
 
 	const handleMapMarkerClick = useCallback(
@@ -9501,6 +9521,7 @@ const DashboardContent = () => {
 	const handleMapToggleSelection = useCallback(
 		(contactId: number) => {
 			const wasSelected = selectedContacts.includes(contactId);
+			if (!wasSelected && selectedContacts.length >= DASHBOARD_SEARCH_SELECTION_LIMIT) return;
 
 			if (!wasSelected) {
 				const fromBase = (contacts || []).find((c) => c.id === contactId);
@@ -9520,7 +9541,7 @@ const DashboardContent = () => {
 				if (prev.includes(contactId)) {
 					return prev.filter((id) => id !== contactId);
 				}
-				return [...prev, contactId];
+				return mergeContactIdsWithSelectionLimit(prev, [contactId]);
 			});
 
 			const tryScroll = (attempt = 0) => {
@@ -9601,23 +9622,25 @@ const DashboardContent = () => {
 					contactsToPin.push(resultContact);
 				});
 
-				if (contactsToPin.length > 0) {
+				const acceptedRangeContactIds = getSelectionLimitedContactIds(
+					selectedContacts,
+					Array.from(rangeContactIds)
+				);
+				const acceptedRangeContactIdSet = new Set(acceptedRangeContactIds);
+				const acceptedContactsToPin = contactsToPin.filter((contact) =>
+					acceptedRangeContactIdSet.has(contact.id)
+				);
+
+				if (acceptedContactsToPin.length > 0) {
 					setMapPanelExtraContacts((prev) => {
 						const existing = new Set(prev.map((c) => c.id));
-						const toAdd = contactsToPin.filter((c) => !existing.has(c.id));
+						const toAdd = acceptedContactsToPin.filter((c) => !existing.has(c.id));
 						return toAdd.length > 0 ? [...toAdd, ...prev] : prev;
 					});
 				}
 
 				setSelectedContacts((prev) => {
-					const next = [...prev];
-					const selectedSet = new Set(prev);
-					for (const contactId of rangeContactIds) {
-						if (selectedSet.has(contactId)) continue;
-						selectedSet.add(contactId);
-						next.push(contactId);
-					}
-					return next;
+					return mergeContactIdsWithSelectionLimit(prev, Array.from(rangeContactIds));
 				});
 				setMapPanelShiftClickAnchor(null);
 				return;
@@ -9632,6 +9655,13 @@ const DashboardContent = () => {
 				setMapPanelShiftClickAnchor(null);
 			}
 
+			if (
+				!selectedContacts.includes(contact.id) &&
+				selectedContacts.length >= DASHBOARD_SEARCH_SELECTION_LIMIT
+			) {
+				return;
+			}
+
 			if (!selectedContacts.includes(contact.id)) {
 				setMapPanelExtraContacts((prev) =>
 					prev.some((c) => c.id === contact.id) ? prev : [contact, ...prev]
@@ -9640,7 +9670,7 @@ const DashboardContent = () => {
 			setSelectedContacts((prev) =>
 				prev.includes(contact.id)
 					? prev.filter((id) => id !== contact.id)
-					: [...prev, contact.id]
+					: mergeContactIdsWithSelectionLimit(prev, [contact.id])
 			);
 		},
 		[
@@ -13390,7 +13420,6 @@ const DashboardContent = () => {
 											<MapSelectGrabTallStackBox
 												className="absolute pointer-events-none"
 												isSelectActive={isSelectMapToolActive}
-												onAllDeselected={() => setActiveMapTool('grab')}
 												onActiveCategoriesChange={handleMapGrabActiveCategoriesChange}
 												style={{
 													left: '-0.5px',
@@ -13823,84 +13852,7 @@ const DashboardContent = () => {
 																				}
 																				onViewportZoom={handleMapViewportZoom}
 																				onViewportIdle={handleMapViewportIdle}
-																				onAreaSelect={(bounds, payload) => {
-																					const ids = payload?.contactIds ?? [];
-																					const extraContacts =
-																						payload?.extraContacts ?? [];
-
-																					if (ids.length > 0) {
-																						setSelectedContacts((prev) => {
-																							const next = new Set(prev);
-																							for (const id of ids) next.add(id);
-																							return Array.from(next);
-																						});
-																					}
-
-																					// Ensure overlay-only contacts (booking/promotion map overlays) can appear
-																					// as rows in the right-hand panel.
-																					if (extraContacts.length > 0) {
-																						setMapPanelExtraContacts((prev) => {
-																							const byId = new Map<
-																								number,
-																								ContactWithName
-																							>();
-																							for (const c of prev) byId.set(c.id, c);
-																							for (const c of extraContacts) {
-																								if (!byId.has(c.id)) byId.set(c.id, c);
-																							}
-																							return Array.from(byId.values());
-																						});
-																					}
-
-																					// If selected contacts are outside the searched state (or are overlay-only),
-																					// include them in the panel list so the user sees what was selected.
-																					if (ids.length > 0) {
-																						const nextExtraIds: number[] = [];
-																						const byId = new Map<
-																							number,
-																							ContactWithName
-																						>();
-																						for (const c of contacts || [])
-																							byId.set(c.id, c);
-
-																						for (const id of ids) {
-																							if (!baseContactIdSet.has(id)) {
-																								nextExtraIds.push(id);
-																								continue;
-																							}
-																							if (!searchedStateAbbrForMap) continue;
-																							const c = byId.get(id);
-																							if (!c) continue;
-																							const contactStateAbbr =
-																								getStateAbbreviation(c.state || '')
-																									.trim()
-																									.toUpperCase();
-																							if (
-																								contactStateAbbr &&
-																								contactStateAbbr !==
-																									searchedStateAbbrForMap
-																							) {
-																								nextExtraIds.push(id);
-																							}
-																						}
-
-																						for (const c of extraContacts)
-																							nextExtraIds.push(c.id);
-
-																						if (nextExtraIds.length > 0) {
-																							setMapPanelExtraContactIds((prev) => {
-																								const next = new Set(prev);
-																								for (const id of nextExtraIds)
-																									next.add(id);
-																								return Array.from(next);
-																							});
-																						}
-																					}
-
-																					// After selecting an area, immediately switch back to Grab mode
-																					// so the user can pan/zoom without extra clicks.
-																					setActiveMapTool('grab');
-																				}}
+																				onAreaSelect={handleMapAreaSelect}
 																				onMarkerHover={handleMapMarkerHover}
 																				lockedStateName={
 																					// When a bbox search is active, don't lock/wash out a single state.
@@ -13962,63 +13914,7 @@ const DashboardContent = () => {
 																							: [...prev, contact.id]
 																					);
 																				}}
-																				onToggleSelection={(contactId) => {
-																					const wasSelected =
-																						selectedContacts.includes(contactId);
-
-																					// Ensure the selected contact stays renderable in the side panel across
-																					// subsequent searches by caching the full object.
-																					if (!wasSelected) {
-																						const fromBase = (contacts || []).find(
-																							(c) => c.id === contactId
-																						);
-																						const fromOverlay =
-																							mapPanelVisibleOverlayContacts.find(
-																								(c) => c.id === contactId
-																							);
-																						const fromExtra = mapPanelExtraContacts.find(
-																							(c) => c.id === contactId
-																						);
-																						const selectedContact =
-																							fromBase ?? fromOverlay ?? fromExtra;
-																						if (selectedContact) {
-																							setMapPanelExtraContacts((prev) =>
-																								prev.some((c) => c.id === contactId)
-																									? prev
-																									: [selectedContact, ...prev]
-																							);
-																						}
-																					}
-
-																					setSelectedContacts((prev) => {
-																						if (prev.includes(contactId)) {
-																							return prev.filter(
-																								(id) => id !== contactId
-																							);
-																						}
-																						return [...prev, contactId];
-																					});
-																					// Scroll to the contact in the side panel
-																					const tryScroll = (attempt = 0) => {
-																						const contactElement = document.querySelector(
-																							`[data-contact-id="${contactId}"]`
-																						);
-																						if (contactElement) {
-																							contactElement.scrollIntoView({
-																								behavior: 'smooth',
-																								block: 'center',
-																							});
-																							return;
-																						}
-																						if (attempt < 10) {
-																							setTimeout(
-																								() => tryScroll(attempt + 1),
-																								50
-																							);
-																						}
-																					};
-																					setTimeout(() => tryScroll(0), 0);
-																				}}
+																				onToggleSelection={handleMapToggleSelection}
 																			/>
 																		)}
 												{hasNoSearchResults && isMapSearchEngaged && !isError && (
@@ -14471,7 +14367,7 @@ const DashboardContent = () => {
 																									Selection
 																								</span>
 																								<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
-																									{selectedContacts.length}/{displayedMapPanelContacts.length} selected
+																									{selectedContacts.length}/{mapSelectionDisplayTotal} selected
 																								</span>
 																								<button
 																									type="button"
@@ -14508,7 +14404,7 @@ const DashboardContent = () => {
 																									Selection
 																								</span>
 																								<span className="absolute left-1/2 top-[58px] -translate-x-1/2 -translate-y-1/2 font-inter text-[13px] font-medium text-black">
-																									{selectedContacts.length}/{displayedMapPanelContacts.length} selected
+																									{selectedContacts.length}/{mapSelectionDisplayTotal} selected
 																								</span>
 																								<button
 																									type="button"
