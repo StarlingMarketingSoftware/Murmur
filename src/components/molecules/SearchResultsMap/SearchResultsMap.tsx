@@ -14462,6 +14462,47 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		];
 		const markerHitLayerSet = new Set<string>(markerHitLayers);
 		const searchAreaHitLayerSet = new Set<string>(searchAreaHitLayers);
+		// Active search footprints are not "empty map"; the all-contacts prompt belongs outside them.
+		const isPointInSelectionBounds = (lng: number, lat: number): boolean => {
+			const bounds = selectedAreaBoundsRef.current;
+			if (!bounds) return false;
+			const { south, west, north, east } = bounds;
+			if (![south, west, north, east].every(Number.isFinite)) return false;
+
+			const isLatInside = lat >= south && lat <= north;
+			const isLngInside =
+				west <= east ? lng >= west && lng <= east : lng >= west || lng <= east;
+			return isLatInside && isLngInside;
+		};
+		const isPointInSelectionMultiPolygon = (
+			lng: number,
+			lat: number,
+			multiPolygon: ClippingMultiPolygon | null,
+			bbox: BoundingBox | null
+		): boolean => {
+			if (!multiPolygon?.length) return false;
+			if (bbox && !isLatLngInBbox(lat, lng, bbox)) return false;
+			return pointInMultiPolygon([lng, lat], multiPolygon);
+		};
+		const isActiveSearchSelectionHit = (e: mapboxgl.MapMouseEvent): boolean => {
+			const lng = e.lngLat.lng;
+			const lat = e.lngLat.lat;
+			return (
+				isPointInSelectionBounds(lng, lat) ||
+				isPointInSelectionMultiPolygon(
+					lng,
+					lat,
+					lockedStateSelectionMultiPolygonRef.current,
+					lockedStateSelectionBboxRef.current
+				) ||
+				isPointInSelectionMultiPolygon(
+					lng,
+					lat,
+					resultsSelectionMultiPolygonRef.current,
+					resultsSelectionBboxRef.current
+				)
+			);
+		};
 		const isSearchAreaHit = (e: mapboxgl.MapMouseEvent): boolean => {
 			const searchAreaFeatures = map.queryRenderedFeatures(e.point, {
 				layers: searchAreaHitLayers,
@@ -14722,6 +14763,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				clearStateHover();
 				return;
 			}
+			if (emptyMapPromptEnabled && isActiveSearchSelectionHit(e)) {
+				clearEmptyMapPrompt();
+				clearStateHover();
+				return;
+			}
 
 			// Optional state hover highlight (only when state interactions are enabled).
 			if (!stateInteractionsEnabled || !isStateLayerReady) {
@@ -14908,6 +14954,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// event popup.
 			setSelectedMarker(null);
 			setPinnedEventId(null);
+
+			if (emptyMapPromptEnabled && isActiveSearchSelectionHit(e)) {
+				clearEmptyMapPrompt();
+				clearStateHover();
+				return;
+			}
 
 			if (
 				!movedAfterPointerDown &&
