@@ -324,6 +324,9 @@ const ROW_HOVER_RESEARCH_CLEAR_DELAY_MS = 220;
 const HOVER_RESEARCH_CARD_FULL_HEIGHT_PX = 312.713 + 13 + 415 + 9 + 23; // ≈ 773
 // The search/overview rail card sits slightly above true-center (screen px).
 const RAIL_HOVER_RESEARCH_TOP_NUDGE_PX = 56;
+// All-tab hover cards share the top campaign chrome; keep the fixed overlay clear
+// of that bar on short viewports where vertical centering would clamp near 0.
+const OVERVIEW_RAIL_HOVER_RESEARCH_MIN_TOP_PX = 136;
 // Event-chat rows dock the opportunity panel in the same slot (larger card).
 const ROW_HOVER_OPPORTUNITY_DOCKED_LEFT_PX = -(
 	OPPORTUNITY_HOVER_PANEL_WIDTH_PX + ROW_HOVER_RESEARCH_GAP_PX
@@ -3615,8 +3618,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			// fold and always has room to Tab-expand (matches the pinned-list card), nudged
 			// slightly above true-center on the rail.
 			const cardScreenHeight = HOVER_RESEARCH_CARD_FULL_HEIGHT_PX * rowScale;
+			const minTopScreen =
+				view === 'overview' ? OVERVIEW_RAIL_HOVER_RESEARCH_MIN_TOP_PX : 8;
 			const topScreen = Math.max(
-				8,
+				minTopScreen,
 				(window.innerHeight - cardScreenHeight) / 2 - RAIL_HOVER_RESEARCH_TOP_NUDGE_PX
 			);
 			// getBoundingClientRect is screen space; `position: fixed` children of the
