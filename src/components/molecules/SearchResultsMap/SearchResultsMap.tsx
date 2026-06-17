@@ -2370,6 +2370,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	);
 	const selectedTooltipStackRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 	const selectedTooltipStackSignatureRef = useRef('');
+	const selectedTooltipStackSelectionKeyRef = useRef('');
 	const [selectedTooltipStackGroups, setSelectedTooltipStackGroups] = useState<
 		SelectedTooltipStackGroup[]
 	>([]);
@@ -18424,44 +18425,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		getAllContactsOverlayContactCoords,
 		searchWhat,
 	]);
-	useEffect(() => {
-		const target = selectedTooltipHoverHiddenTargetRef.current;
-		if (!target) return;
-		if (isStreetCardMode || selectedCompactTooltipEntries.length === 0) {
-			setSelectedTooltipHoverHiddenTargetIfChanged(null);
-			return;
-		}
-
-		if (target.type === 'contact') {
-			const stillSelected = selectedCompactTooltipEntries.some(
-				(entry) => entry.contact.id === target.id
-			);
-			if (!stillSelected) setSelectedTooltipHoverHiddenTargetIfChanged(null);
-			return;
-		}
-
-		const stillStacked = selectedTooltipStackGroups.some((group) => group.id === target.id);
-		if (!stillStacked) setSelectedTooltipHoverHiddenTargetIfChanged(null);
-	}, [
-		isStreetCardMode,
-		selectedCompactTooltipEntries,
-		selectedTooltipStackGroups,
-		setSelectedTooltipHoverHiddenTargetIfChanged,
-	]);
-	useLayoutEffect(() => {
-		if (selectedCompactTooltipEntries.length === 0) {
-			selectionTooltipsFootprintRef.current = null;
-			if (selectedTooltipStackSignatureRef.current) {
-				selectedTooltipStackSignatureRef.current = '';
-				setSelectedTooltipStackGroups([]);
-			}
-			return;
-		}
-		if (!map || !isMapLoaded || isLoading) return;
-
-		const update = () => {
-			const projectedEntries = selectedCompactTooltipEntries.map((entry) => {
-				const p = map.project([entry.coords.lng, entry.coords.lat]);
+	const selectedCompactTooltipEntryIdsKey = useMemo(
+		() => selectedCompactTooltipEntries.map((entry) => entry.contact.id).join(','),
+		[selectedCompactTooltipEntries]
+	);
+	const projectSelectedTooltipEntries = useCallback(
+		(m: mapboxgl.Map): ProjectedSelectedTooltipEntry[] =>
+			selectedCompactTooltipEntries.map((entry) => {
+				const p = m.project([entry.coords.lng, entry.coords.lat]);
 				const naturalX = p.x - entry.width / 2;
 				const naturalY = p.y - entry.anchorY - tooltipMarkerGapPx;
 				return {
@@ -18477,11 +18448,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					centerX: naturalX + entry.width / 2,
 					centerY: naturalY + entry.height / 2,
 				};
-			});
+			}),
+		[selectedCompactTooltipEntries, tooltipMarkerGapPx]
+	);
+	const buildSelectedTooltipStackLayout = useCallback(
+		(projectedEntries: ProjectedSelectedTooltipEntry[], zoom: number) => {
 			const stackT =
-				selectedCompactTooltipEntries.length > 1
-					? getSelectedTooltipStackT(map.getZoom())
-					: 0;
+				projectedEntries.length > 1 ? getSelectedTooltipStackT(zoom) : 0;
 			const shouldUseLegacyStack = stackT >= SELECTED_TOOLTIP_LEGACY_STACK_T;
 			const stackScale = lerp(1, SELECTED_TOOLTIP_STACK_MIN_SCALE, stackT);
 
@@ -18534,6 +18507,108 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			for (const group of collisionStackPlacements) {
 				for (const contactId of group.contactIds) collisionGroupedContactIds.add(contactId);
 			}
+			const stackGroups = stackPlacements.map<SelectedTooltipStackGroup>(
+				({ id, contactIds, count, colors, width, height, svg, bodyFillColor }) => ({
+					id,
+					contactIds,
+					count,
+					colors,
+					width,
+					height,
+					svg,
+					bodyFillColor,
+				})
+			);
+
+			return {
+				shouldUseLegacyStack,
+				stackPlacements,
+				collisionGroupedContactIds,
+				stackGroups,
+			};
+		},
+		[getSelectedTooltipStackT]
+	);
+	const predictedSelectedTooltipStackGroups = useMemo(() => {
+		if (!map || !isMapLoaded || isLoading || selectedCompactTooltipEntries.length === 0) {
+			return [];
+		}
+		return buildSelectedTooltipStackLayout(
+			projectSelectedTooltipEntries(map),
+			map.getZoom() ?? MAP_DEFAULT_ZOOM
+		).stackGroups;
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		selectedCompactTooltipEntries,
+		projectSelectedTooltipEntries,
+		buildSelectedTooltipStackLayout,
+	]);
+	const committedSelectedTooltipStackGroups =
+		selectedTooltipStackSelectionKeyRef.current === selectedCompactTooltipEntryIdsKey
+			? selectedTooltipStackGroups
+			: [];
+	const renderedSelectedTooltipStackGroups =
+		committedSelectedTooltipStackGroups.length > 0
+			? committedSelectedTooltipStackGroups
+			: predictedSelectedTooltipStackGroups;
+	const renderedStackedSelectedContactIdSet = useMemo(() => {
+		const ids = new Set<number>();
+		for (const group of renderedSelectedTooltipStackGroups) {
+			for (const contactId of group.contactIds) ids.add(contactId);
+		}
+		return ids;
+	}, [renderedSelectedTooltipStackGroups]);
+	useEffect(() => {
+		const target = selectedTooltipHoverHiddenTargetRef.current;
+		if (!target) return;
+		if (isStreetCardMode || selectedCompactTooltipEntries.length === 0) {
+			setSelectedTooltipHoverHiddenTargetIfChanged(null);
+			return;
+		}
+
+		if (target.type === 'contact') {
+			const stillSelected = selectedCompactTooltipEntries.some(
+				(entry) => entry.contact.id === target.id
+			);
+			if (!stillSelected) setSelectedTooltipHoverHiddenTargetIfChanged(null);
+			return;
+		}
+
+		const stillStacked = renderedSelectedTooltipStackGroups.some(
+			(group) => group.id === target.id
+		);
+		if (!stillStacked) setSelectedTooltipHoverHiddenTargetIfChanged(null);
+	}, [
+		isStreetCardMode,
+		selectedCompactTooltipEntries,
+		renderedSelectedTooltipStackGroups,
+		setSelectedTooltipHoverHiddenTargetIfChanged,
+	]);
+	useLayoutEffect(() => {
+		if (selectedCompactTooltipEntries.length === 0) {
+			selectionTooltipsFootprintRef.current = null;
+			if (selectedTooltipStackSignatureRef.current) {
+				selectedTooltipStackSignatureRef.current = '';
+				selectedTooltipStackSelectionKeyRef.current = '';
+				setSelectedTooltipStackGroups([]);
+			}
+			return;
+		}
+		if (!map || !isMapLoaded || isLoading) return;
+
+		const update = () => {
+			const projectedEntries = projectSelectedTooltipEntries(map);
+			const {
+				shouldUseLegacyStack,
+				stackPlacements,
+				collisionGroupedContactIds,
+				stackGroups,
+			} = buildSelectedTooltipStackLayout(
+				projectedEntries,
+				map.getZoom() ?? MAP_DEFAULT_ZOOM
+			);
 			const container = mapContainerRef.current;
 			const viewport =
 				container && container.clientWidth > 0 && container.clientHeight > 0
@@ -18554,18 +18629,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						tooltipMarkerGapPx
 					);
 
-			const stackGroups = stackPlacements.map<SelectedTooltipStackGroup>(
-				({ id, contactIds, count, colors, width, height, svg, bodyFillColor }) => ({
-					id,
-					contactIds,
-					count,
-					colors,
-					width,
-					height,
-					svg,
-					bodyFillColor,
-				})
-			);
 			const nextStackSignature = stackGroups
 				.map(
 					(group) =>
@@ -18574,6 +18637,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				.join('|');
 			if (selectedTooltipStackSignatureRef.current !== nextStackSignature) {
 				selectedTooltipStackSignatureRef.current = nextStackSignature;
+				selectedTooltipStackSelectionKeyRef.current = selectedCompactTooltipEntryIdsKey;
 				setSelectedTooltipStackGroups(stackGroups);
 			}
 
@@ -18664,9 +18728,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isMapLoaded,
 		isLoading,
 		selectedCompactTooltipEntries,
-		selectedTooltipStackGroups,
+		selectedCompactTooltipEntryIdsKey,
+		projectSelectedTooltipEntries,
+		buildSelectedTooltipStackLayout,
 		tooltipMarkerGapPx,
-		getSelectedTooltipStackT,
 		hoveredMarkerId,
 		selectedTooltipHoverHiddenTarget,
 	]);
@@ -19522,8 +19587,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			{!isLoading &&
 				!isStreetCardMode &&
-				selectedTooltipStackGroups.length > 0 &&
-				selectedTooltipStackGroups.map((group) => {
+				renderedSelectedTooltipStackGroups.length > 0 &&
+				renderedSelectedTooltipStackGroups.map((group) => {
 					const backLayerCount = Math.min(
 						SELECTED_TOOLTIP_STACK_FAKE_BACK_COUNT,
 						Math.max(0, group.count - 1)
@@ -19601,6 +19666,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							pointerEvents: 'none',
 							opacity:
 								hoveredMarkerId === entry.contact.id ||
+								renderedStackedSelectedContactIdSet.has(entry.contact.id) ||
 								(selectedTooltipHoverHiddenTarget?.type === 'contact' &&
 									selectedTooltipHoverHiddenTarget.id === entry.contact.id)
 									? 0
@@ -20285,6 +20351,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					}}
 					onMouseDown={(e) => e.stopPropagation()}
 					onPointerDown={(e) => e.stopPropagation()}
+					onWheel={forwardWheelToMap}
 				>
 					<div
 						style={{

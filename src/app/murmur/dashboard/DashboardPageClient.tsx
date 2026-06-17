@@ -10,6 +10,7 @@ import {
 	useMemo,
 	useRef,
 	useState,
+	type MouseEvent as ReactMouseEvent,
 	type PointerEvent as ReactPointerEvent,
 	type RefObject,
 	type ReactNode,
@@ -7439,6 +7440,10 @@ const DashboardContent = () => {
 	const [selectedCategoryChips, setSelectedCategoryChips] = useState<Set<string>>(
 		new Set()
 	);
+	const [mapPanelShiftClickAnchor, setMapPanelShiftClickAnchor] = useState<{
+		contactId: number;
+		index: number;
+	} | null>(null);
 	const hasAppliedInitialAllContactsMapDisengageRef = useRef(false);
 
 	useEffect(() => {
@@ -7456,6 +7461,7 @@ const DashboardContent = () => {
 		setActiveMapTool('grab');
 		setActiveSection(null);
 		setSelectedCategoryChips(new Set());
+		setMapPanelShiftClickAnchor(null);
 		setMapPanelExtraContactIds([]);
 		setMapPanelExtraContacts([]);
 		setMapPanelVisibleOverlayContacts([]);
@@ -7512,7 +7518,14 @@ const DashboardContent = () => {
 			const selectedSet = new Set<number>(selectedContacts);
 			return prev.filter((c) => selectedSet.has(c.id));
 		});
+		setMapPanelShiftClickAnchor(null);
 	}, [activeSearchQuery, selectedContacts]);
+
+	useEffect(() => {
+		if (isMapResultsLoading) {
+			setMapPanelShiftClickAnchor(null);
+		}
+	}, [isMapResultsLoading]);
 
 	// Cleanup timers on unmount
 	useEffect(() => {
@@ -9097,6 +9110,7 @@ const DashboardContent = () => {
 	// Enhanced reset search that also clears section values
 	const handleEnhancedResetSearch = () => {
 		handleResetSearch();
+		setMapPanelShiftClickAnchor(null);
 		setWhyValue('');
 		setWhatValue('');
 		setWhereValue('');
@@ -9507,7 +9521,82 @@ const DashboardContent = () => {
 	// the selected halo. Unlike the marker path, it does not auto-scroll the panel (the
 	// clicked row is already in view).
 	const handleMapPanelRowSelect = useCallback(
-		(contact: ContactWithName) => {
+		(
+			contact: ContactWithName,
+			event: ReactMouseEvent<HTMLDivElement> | undefined,
+			source: 'selection' | 'search-results'
+		) => {
+			const currentSearchIndex = mapPanelUnselectedContactsFiltered.findIndex(
+				(c) => c.id === contact.id
+			);
+
+			if (
+				source === 'search-results' &&
+				event?.shiftKey &&
+				mapPanelShiftClickAnchor &&
+				currentSearchIndex !== -1
+			) {
+				event.preventDefault();
+				window.getSelection()?.removeAllRanges();
+
+				const anchorVisualIndex = Math.max(
+					0,
+					Math.min(mapPanelShiftClickAnchor.index, mapPanelUnselectedContactsFiltered.length)
+				);
+				const currentVisualIndex =
+					currentSearchIndex >= anchorVisualIndex
+						? currentSearchIndex + 1
+						: currentSearchIndex;
+				const start = Math.min(anchorVisualIndex, currentVisualIndex);
+				const end = Math.max(anchorVisualIndex, currentVisualIndex);
+				const rangeContactIds = new Set<number>([mapPanelShiftClickAnchor.contactId]);
+				const contactsToPin: ContactWithName[] = [];
+				const anchorContact = displayedMapPanelContacts.find(
+					(c) => c.id === mapPanelShiftClickAnchor.contactId
+				);
+
+				if (anchorContact) {
+					contactsToPin.push(anchorContact);
+				}
+
+				mapPanelUnselectedContactsFiltered.forEach((resultContact, index) => {
+					const visualIndex = index >= anchorVisualIndex ? index + 1 : index;
+					if (visualIndex < start || visualIndex > end) return;
+					rangeContactIds.add(resultContact.id);
+					contactsToPin.push(resultContact);
+				});
+
+				if (contactsToPin.length > 0) {
+					setMapPanelExtraContacts((prev) => {
+						const existing = new Set(prev.map((c) => c.id));
+						const toAdd = contactsToPin.filter((c) => !existing.has(c.id));
+						return toAdd.length > 0 ? [...toAdd, ...prev] : prev;
+					});
+				}
+
+				setSelectedContacts((prev) => {
+					const next = [...prev];
+					const selectedSet = new Set(prev);
+					for (const contactId of rangeContactIds) {
+						if (selectedSet.has(contactId)) continue;
+						selectedSet.add(contactId);
+						next.push(contactId);
+					}
+					return next;
+				});
+				setMapPanelShiftClickAnchor(null);
+				return;
+			}
+
+			if (source === 'search-results' && currentSearchIndex !== -1) {
+				setMapPanelShiftClickAnchor({
+					contactId: contact.id,
+					index: currentSearchIndex,
+				});
+			} else {
+				setMapPanelShiftClickAnchor(null);
+			}
+
 			if (!selectedContacts.includes(contact.id)) {
 				setMapPanelExtraContacts((prev) =>
 					prev.some((c) => c.id === contact.id) ? prev : [contact, ...prev]
@@ -9519,7 +9608,19 @@ const DashboardContent = () => {
 					: [...prev, contact.id]
 			);
 		},
-		[selectedContacts, setSelectedContacts]
+		[
+			displayedMapPanelContacts,
+			mapPanelShiftClickAnchor,
+			mapPanelUnselectedContactsFiltered,
+			selectedContacts,
+			setSelectedContacts,
+		]
+	);
+	const handleMobileMapPanelRowSelect = useCallback(
+		(contact: ContactWithName) => {
+			handleMapPanelRowSelect(contact, undefined, 'selection');
+		},
+		[handleMapPanelRowSelect]
 	);
 
 	const activeRadiusSearchOverlay = useMemo<
@@ -9827,7 +9928,7 @@ const DashboardContent = () => {
 						onClearQuery={handleEmptyMapClick}
 						listContacts={displayedMapPanelContacts}
 						selectedContactIds={selectedContacts}
-						onToggleContact={handleMapPanelRowSelect}
+						onToggleContact={handleMobileMapPanelRowSelect}
 						isLoading={isMapResultsLoading}
 						hasNoResults={hasNoSearchResults}
 						hasSearched={hasSearched}
@@ -10312,7 +10413,10 @@ const DashboardContent = () => {
 	// Renders one contact row in the map-view right-side panel (desktop variant).
 	// Used by both the "Selection" and "Search Results" sub-panels — they differ
 	// only in which slice of `displayedMapPanelContacts` they iterate over.
-	const renderMapPanelDesktopRow = (contact: ContactWithName) => {
+	const renderMapPanelDesktopRow = (
+		contact: ContactWithName,
+		source: 'selection' | 'search-results'
+	) => {
 		const isSelected = selectedContacts.includes(contact.id);
 		const isHovered = hoveredMapPanelContactId === contact.id;
 		const isInBaseResults = displayedBaseContactIdSet.has(contact.id);
@@ -10400,7 +10504,12 @@ const DashboardContent = () => {
 							? '#F3F4F6'
 							: '#FFFFFF',
 				}}
-				onClick={() => handleMapPanelRowSelect(contact)}
+				onMouseDown={(event) => {
+					if (source === 'search-results' && event.shiftKey) {
+						event.preventDefault();
+					}
+				}}
+				onClick={(event) => handleMapPanelRowSelect(contact, event, source)}
 				onMouseEnter={(event) => {
 					cancelMapPanelHoverResearchClear();
 					setHoveredMapPanelContactId(contact.id);
@@ -10626,6 +10735,54 @@ const DashboardContent = () => {
 				)}
 			</div>
 		);
+	};
+
+	const renderMapPanelShiftClickAnchorPlaceholder = () => (
+		<div
+			key="map-panel-shift-click-anchor"
+			aria-hidden="true"
+			className="pointer-events-none flex w-full items-center justify-center"
+			style={{ height: '14px', backgroundColor: 'transparent' }}
+		>
+			<div
+				style={{
+					width: '100%',
+					height: '14px',
+					borderRadius: '8px',
+					border: '2.33px solid #FFF',
+					backgroundColor: 'transparent',
+					boxSizing: 'border-box',
+				}}
+			/>
+		</div>
+	);
+
+	const renderMapPanelSearchResultRows = () => {
+		const rows: ReactNode[] = [];
+		const anchorIndex =
+			mapPanelShiftClickAnchor &&
+			selectedContacts.includes(mapPanelShiftClickAnchor.contactId)
+				? Math.max(
+						0,
+						Math.min(
+							mapPanelShiftClickAnchor.index,
+							mapPanelUnselectedContactsFiltered.length
+						)
+					)
+				: -1;
+
+		mapPanelUnselectedContactsFiltered.forEach((contact, index) => {
+			if (index === anchorIndex) {
+				rows.push(renderMapPanelShiftClickAnchorPlaceholder());
+			}
+			rows.push(renderMapPanelDesktopRow(contact, 'search-results'));
+		});
+
+		if (anchorIndex === mapPanelUnselectedContactsFiltered.length) {
+			rows.push(renderMapPanelShiftClickAnchorPlaceholder());
+		}
+
+		return rows;
 	};
 
 	return (
@@ -14214,9 +14371,10 @@ const DashboardContent = () => {
 																						</span>
 																						<button
 																							type="button"
-																							onClick={() =>
-																								handleSelectAll(displayedMapPanelContacts)
-																							}
+																							onClick={() => {
+																								setMapPanelShiftClickAnchor(null);
+																								handleSelectAll(displayedMapPanelContacts);
+																							}}
 																							disabled={isMapResultsLoading}
 																							className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 -translate-y-1/2 ${
 																								isMapResultsLoading
@@ -14256,7 +14414,10 @@ const DashboardContent = () => {
 																								</span>
 																								<button
 																									type="button"
-																									onClick={() => handleSelectAll(displayedMapPanelContacts)}
+																									onClick={() => {
+																										setMapPanelShiftClickAnchor(null);
+																										handleSelectAll(displayedMapPanelContacts);
+																									}}
 																									disabled={isMapResultsLoading}
 																									className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 translate-y-[4px] ${
 																										isMapResultsLoading ? 'opacity-60 pointer-events-none' : 'hover:underline'
@@ -14290,7 +14451,10 @@ const DashboardContent = () => {
 																								</span>
 																								<button
 																									type="button"
-																									onClick={() => handleSelectAll(displayedMapPanelContacts)}
+																									onClick={() => {
+																										setMapPanelShiftClickAnchor(null);
+																										handleSelectAll(displayedMapPanelContacts);
+																									}}
 																									disabled={isMapResultsLoading}
 																									className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-[58px] -translate-y-1/2 ${
 																										isMapResultsLoading ? 'opacity-60 pointer-events-none' : 'hover:underline'
@@ -14326,7 +14490,9 @@ const DashboardContent = () => {
 																							disableOverflowClass
 																						>
 																							<div className="space-y-[7px]">
-																								{mapPanelSelectedContacts.map(renderMapPanelDesktopRow)}
+																								{mapPanelSelectedContacts.map((contact) =>
+																									renderMapPanelDesktopRow(contact, 'selection')
+																								)}
 																							</div>
 																						</CustomScrollbar>
 																					</div>
@@ -14432,6 +14598,7 @@ const DashboardContent = () => {
 																												backgroundColor: pillColor,
 																											}}
 																											onClick={() => {
+																												setMapPanelShiftClickAnchor(null);
 																												setSelectedCategoryChips(
 																													(prev) => {
 																														const next = new Set(prev);
@@ -14495,9 +14662,7 @@ const DashboardContent = () => {
 																	className="space-y-[7px]"
 																>
 																	{renderMapPostedEventsSection()}
-																	{mapPanelUnselectedContactsFiltered.map(
-																		renderMapPanelDesktopRow
-																	)}
+																	{renderMapPanelSearchResultRows()}
 																</div>
 															)}
 																						</CustomScrollbar>
@@ -14578,6 +14743,7 @@ const DashboardContent = () => {
 																														: '1px solid #000',
 																												}}
 																												onClick={() => {
+																													setMapPanelShiftClickAnchor(null);
 																													setSelectedCategoryChips(
 																														(prev) => {
 																															const next = new Set(prev);
@@ -14926,7 +15092,10 @@ const DashboardContent = () => {
 																}
 																headerInlineAction={
 																	<button
-																		onClick={() => handleSelectAll(mapPanelContacts)}
+																		onClick={() => {
+																			setMapPanelShiftClickAnchor(null);
+																			handleSelectAll(mapPanelContacts);
+																		}}
 																		className="text-[14px] font-secondary font-normal text-black hover:underline"
 																		type="button"
 																	>
@@ -14964,6 +15133,7 @@ const DashboardContent = () => {
 																	className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
 																	onClick={(e) => {
 																		e.stopPropagation();
+																		setMapPanelShiftClickAnchor(null);
 																		handleSelectAll(mapPanelContacts);
 																	}}
 																>
