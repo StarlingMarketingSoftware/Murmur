@@ -1,6 +1,13 @@
 'use client';
 
-import { FC, useEffect, useMemo, useRef, useState } from 'react';
+import {
+	FC,
+	type MouseEvent as ReactMouseEvent,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import Link from 'next/link';
 import { urls } from '@/constants/urls';
 import { cn } from '@/utils';
@@ -43,6 +50,7 @@ interface CampaignHeaderBoxProps {
 const getContactsFillColor = (): string => '#F5DADA';
 const getDraftFillColor = (): string => '#FFE3AA';
 const getSentFillColor = (): string => '#B0E0A6';
+const FOLDER_TOGGLE_IGNORE_SELECTOR = '[data-campaign-header-folder-toggle-ignore]';
 
 type CampaignListItemWithDataTypes = {
 	id: number;
@@ -193,12 +201,21 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 		return () => onFolderDropdownOpenChange?.(false);
 	}, [isFolderDropdownOpen, onFolderDropdownOpenChange]);
 
+	const shouldIgnoreFolderToggle = (target: EventTarget | null): boolean =>
+		target instanceof Element && !!target.closest(FOLDER_TOGGLE_IGNORE_SELECTOR);
+
+	const handleHeaderClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+		if (shouldIgnoreFolderToggle(event.target)) return;
+		setIsFolderDropdownOpen((v) => !v);
+	};
+
 	return (
 		<div
 			data-campaign-header-box="true"
 			ref={headerBoxRef}
+			onClick={handleHeaderClick}
 			className={cn(
-				'relative overflow-visible border border-black rounded-[8px] flex flex-col px-3 pt-0 pb-[6px] box-border',
+				'relative overflow-visible border border-black rounded-[8px] flex flex-col px-3 pt-0 pb-[6px] box-border cursor-pointer',
 				fullWidth && 'w-[96.27vw] max-w-[499px]',
 				className
 			)}
@@ -366,6 +383,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					<button
 						type="button"
 						onClick={toggleHoverDescriptions}
+						data-campaign-header-folder-toggle-ignore="true"
 						aria-label={hoverDescriptionsEnabled ? 'Turn info off' : 'Turn info on'}
 						className="group ml-[8px] flex h-[26px] w-[26px] flex-shrink-0 cursor-pointer items-center justify-center border-none bg-transparent p-0 outline-none focus:outline-none"
 					>
@@ -415,7 +433,6 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 				<button
 					type="button"
 					ref={chevronButtonRef}
-					onClick={() => setIsFolderDropdownOpen((v) => !v)}
 					aria-label="Choose folder"
 					aria-expanded={isFolderDropdownOpen}
 					className="ml-auto mr-[10px] flex flex-shrink-0 cursor-pointer items-center justify-center border-none bg-transparent p-0 outline-none focus:outline-none"
@@ -496,6 +513,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					type="button"
 					onClick={onContactsClick}
 					onMouseEnter={() => setHoveredMetric('contacts')}
+					data-campaign-header-folder-toggle-ignore="true"
 					className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold cursor-pointer hover:brightness-95"
 					style={{
 						backgroundColor:
@@ -522,6 +540,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					type="button"
 					onClick={onDraftsClick}
 					onMouseEnter={() => setHoveredMetric('drafts')}
+					data-campaign-header-folder-toggle-ignore="true"
 					className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold cursor-pointer hover:brightness-95"
 					style={{
 						backgroundColor:
@@ -550,6 +569,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					type="button"
 					onClick={onSentClick}
 					onMouseEnter={() => setHoveredMetric('sent')}
+					data-campaign-header-folder-toggle-ignore="true"
 					className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold cursor-pointer hover:brightness-95"
 					style={{
 						backgroundColor:
