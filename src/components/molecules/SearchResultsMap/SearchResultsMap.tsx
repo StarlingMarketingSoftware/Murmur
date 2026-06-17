@@ -13,7 +13,6 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { createPortal } from 'react-dom';
 import mapboxgl from 'mapbox-gl';
 import { ContactWithName } from '@/types/contact';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
@@ -931,9 +930,51 @@ const SELECTION_ACTIONS_SHOWING_ABOVE_GRAB_ORIGIN_PX =
 	SELECTION_ACTIONS_MAP_SELECT_GRAB_TOP_EXTENT_PX + 17 + 6;
 const SELECTION_ACTIONS_DOCK_RAIL_WIDTH_PX = 66;
 const SELECTION_ACTIONS_DOCK_GAP_PX = 16;
-const SELECTION_ACTIONS_ANCHOR_GAP_PX = 64;
-const SELECTION_ACTIONS_ANCHOR_MIN_ZOOM = 4;
+// Gap between the card and the selection's tooltip footprint when anchored.
+const SELECTION_ACTIONS_AROUND_SIDE_GAP_PX = 24;
+// Conservative first-frame obstacle before the tooltip placement effect has
+// published exact boxes. This prevents the card from flashing over the tooltip
+// on the initial selection frame.
+const SELECTION_ACTIONS_FALLBACK_TOOLTIP_HALF_W_PX = 210;
+const SELECTION_ACTIONS_FALLBACK_TOOLTIP_ABOVE_PX = 125;
+// The action card must also clear the selected marker/ring itself, not only the
+// tooltip. Use a little padding because selected marker rings pulse/scale.
+const SELECTION_ACTIONS_MARKER_CLEAR_RADIUS_PX = 40;
+// Continuous dock blend: the card eases from "anchored around the selection" to
+// "parked by the rail" as the view zooms out and/or the selection is panned
+// off-center — never a sudden snap. Fully anchored at/above the full-anchor zoom,
+// fully docked at/below the full-dock zoom, linearly blended between.
+const SELECTION_ACTIONS_ANCHOR_FULL_ZOOM = 6.5;
+const SELECTION_ACTIONS_DOCK_FULL_ZOOM = 4;
+// Pan blend: the cluster center stays fully anchored while inside the viewport
+// inset by COMFORT_PAD; past that it ramps to fully docked over DOCK_RAMP px.
+const SELECTION_ACTIONS_PAN_COMFORT_PAD_PX = 96;
+const SELECTION_ACTIONS_PAN_DOCK_RAMP_PX = 220;
 const SELECTION_ACTIONS_VIEWPORT_MARGIN_PX = 16;
+// Keep the docked card below the portaled top nav / search chrome (z-120+).
+const SELECTION_ACTIONS_MAP_VIEW_UI_SCALE = 0.85;
+const SELECTION_ACTIONS_TOP_BACKDROP_TOP_PX = 9;
+const SELECTION_ACTIONS_TOP_BACKDROP_HEIGHT_PX = 93;
+const SELECTION_ACTIONS_SEARCH_BAR_INPUT_HEIGHT_PX = 49;
+const SELECTION_ACTIONS_SEARCH_BAR_BOTTOM_INSET_PX = 4;
+const SELECTION_ACTIONS_TOP_CHROME_PAD_PX = 8;
+// Above the selection tooltips (HOVER_TOOLTIP_Z_INDEX ± a few) so the card never
+// hides behind them. Still inside the map subtree (body z-98), so the dashboard's
+// portaled top nav / side panel (z-120+) keeps painting above it.
+const SELECTION_ACTIONS_Z_INDEX = HOVER_TOOLTIP_Z_INDEX + 12;
+const readSelectionActionsTopChromeBottomPx = (): number => {
+	const scale = SELECTION_ACTIONS_MAP_VIEW_UI_SCALE;
+	const searchBarTop =
+		SELECTION_ACTIONS_TOP_BACKDROP_TOP_PX +
+		SELECTION_ACTIONS_TOP_BACKDROP_HEIGHT_PX * scale -
+		SELECTION_ACTIONS_SEARCH_BAR_BOTTOM_INSET_PX -
+		SELECTION_ACTIONS_SEARCH_BAR_INPUT_HEIGHT_PX * scale;
+	return (
+		searchBarTop +
+		SELECTION_ACTIONS_SEARCH_BAR_INPUT_HEIGHT_PX * scale +
+		SELECTION_ACTIONS_TOP_CHROME_PAD_PX
+	);
+};
 const SELECTED_TOOLTIP_STACK_MIN_SCALE = 0.9;
 const SELECTED_TOOLTIP_LEGACY_STACK_T = 0.18;
 const SELECTED_TOOLTIP_STACK_GROUP_SIZE = 10;
@@ -17838,6 +17879,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// zoom, otherwise dock beside the dashboard's left "Showing" rail so the
 	// actions stay accessible when panning away or zooming out.
 	const selectionActionsOverlayRef = useRef<HTMLDivElement | null>(null);
+	// Union of the currently-rendered selection tooltip boxes (container-px),
+	// written by the tooltip placement effect each frame. The action card reads
+	// it so it can place itself AROUND the tooltips with no overlap.
+	const selectionTooltipsFootprintRef = useRef<{
+		left: number;
+		top: number;
+		right: number;
+		bottom: number;
+	} | null>(null);
+	const selectionActionsSideRef = useRef<'top' | 'bottom' | 'left' | 'right' | null>(
+		null
+	);
 	const selectedAnchorPoints = useMemo(() => {
 		if (selectedContacts.length < 1) return null;
 		const points: LatLngLiteral[] = [];
@@ -17861,14 +17914,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		allContactsOverlayCoordsByContactId,
 		selectedContactObjectsById,
 	]);
+	const selectedContactsKey = useMemo(
+		() => selectedContacts.slice().sort((a, b) => a - b).join(','),
+		[selectedContacts]
+	);
+	useLayoutEffect(() => {
+		selectionTooltipsFootprintRef.current = null;
+		selectionActionsSideRef.current = null;
+	}, [selectedContactsKey]);
 	useLayoutEffect(() => {
 		if (!map || !isMapLoaded || isLoading || !onAddSelectionToFolder) return;
 		if (selectedContacts.length < 1) return;
 		const el = selectionActionsOverlayRef.current;
 		if (!el) return;
-
-		let transitionTimeout: number | null = null;
-		let wasAnchored: boolean | null = null;
 
 		const readSelectionActionsDock = () => {
 			const rootStyles = getComputedStyle(document.documentElement);
@@ -17909,26 +17967,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const container = mapContainerRef.current;
 			if (!container) return;
 
-			let topPoint: { x: number; y: number } | null = null;
+			// Project the selected dots into a screen-space cluster box so the card
+			// can sit AROUND the selection (on the side with the most room) instead
+			// of being pinned directly above the top-most dot.
+			let clusterLeft = Infinity;
+			let clusterTop = Infinity;
+			let clusterRight = -Infinity;
+			let clusterBottom = -Infinity;
+			let anyProjected = false;
 			if (selectedAnchorPoints) {
 				for (const pt of selectedAnchorPoints) {
-					const projected = map.project([pt.lng, pt.lat]);
-					if (!topPoint || projected.y < topPoint.y) {
-						topPoint = { x: projected.x, y: projected.y };
-					}
+					const p = map.project([pt.lng, pt.lat]);
+					clusterLeft = Math.min(clusterLeft, p.x);
+					clusterTop = Math.min(clusterTop, p.y);
+					clusterRight = Math.max(clusterRight, p.x);
+					clusterBottom = Math.max(clusterBottom, p.y);
+					anyProjected = true;
 				}
 			}
 
 			const rect = container.getBoundingClientRect();
-			const pad = 40;
-			const isOnScreen =
-				topPoint != null &&
-				topPoint.x >= -pad &&
-				topPoint.x <= rect.width + pad &&
-				topPoint.y >= -pad &&
-				topPoint.y <= rect.height + pad;
-			const isAnchored =
-				isOnScreen && map.getZoom() >= SELECTION_ACTIONS_ANCHOR_MIN_ZOOM;
 
 			const w = el.offsetWidth;
 			const h = el.offsetHeight;
@@ -17937,30 +17995,192 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const margin = SELECTION_ACTIONS_VIEWPORT_MARGIN_PX;
 			const { minX: dockMinX, top: dockTop } = readSelectionActionsDock();
 			const maxX = vw - w - margin;
+			const minY = readSelectionActionsTopChromeBottomPx();
+			const maxY = vh - h - margin;
 
-			let x: number;
-			let y: number;
-			if (isAnchored && topPoint) {
-				x = rect.left + topPoint.x - w / 2;
-				y = rect.top + topPoint.y - h - SELECTION_ACTIONS_ANCHOR_GAP_PX;
-				x = clamp(x, margin, maxX);
-				y = clamp(y, margin, vh - h - margin);
+			const dockX = clamp(dockMinX, margin, maxX);
+			const dockY = clamp(dockTop, minY, maxY);
+
+			// Continuous 0..1 blend toward the docked spot: 0 = anchored around the
+			// selection, 1 = parked by the "Showing" rail. Driven by BOTH how far the
+			// view is zoomed out and how far the selection is panned off-center, so
+			// the card eases between the two states instead of snapping all at once.
+			let dockProgress = 1;
+			let anchoredX = dockX;
+			let anchoredY = dockY;
+			let obstacleBounds: {
+				left: number;
+				top: number;
+				right: number;
+				bottom: number;
+			} | null = null;
+			if (anyProjected) {
+				// Obstacle to avoid = tooltip footprint UNION selected-marker footprint.
+				// If the real tooltip footprint has not been published yet (first select
+				// frame), use a conservative tooltip-shaped fallback above the marker so
+				// the card never flashes over it.
+				const footprint = selectionTooltipsFootprintRef.current;
+				const markerLeft =
+					rect.left + clusterLeft - SELECTION_ACTIONS_MARKER_CLEAR_RADIUS_PX;
+				const markerTop =
+					rect.top + clusterTop - SELECTION_ACTIONS_MARKER_CLEAR_RADIUS_PX;
+				const markerRight =
+					rect.left + clusterRight + SELECTION_ACTIONS_MARKER_CLEAR_RADIUS_PX;
+				const markerBottom =
+					rect.top + clusterBottom + SELECTION_ACTIONS_MARKER_CLEAR_RADIUS_PX;
+				// Keep the conservative first-frame footprint in the union even
+				// after the exact tooltip footprint arrives. Otherwise the obstacle
+				// can shrink on the first pan after selection, making the card jump
+				// from its safe initial placement to a tighter placement.
+				const fallbackTooltipLeft =
+					rect.left + clusterLeft - SELECTION_ACTIONS_FALLBACK_TOOLTIP_HALF_W_PX;
+				const fallbackTooltipTop =
+					rect.top + clusterTop - SELECTION_ACTIONS_FALLBACK_TOOLTIP_ABOVE_PX;
+				const fallbackTooltipRight =
+					rect.left + clusterRight + SELECTION_ACTIONS_FALLBACK_TOOLTIP_HALF_W_PX;
+				const fallbackTooltipBottom = markerBottom;
+				const exactTooltipLeft = footprint ? rect.left + footprint.left : fallbackTooltipLeft;
+				const exactTooltipTop = footprint ? rect.top + footprint.top : fallbackTooltipTop;
+				const exactTooltipRight = footprint
+					? rect.left + footprint.right
+					: fallbackTooltipRight;
+				const exactTooltipBottom = footprint
+					? rect.top + footprint.bottom
+					: fallbackTooltipBottom;
+				const tooltipLeft = Math.min(fallbackTooltipLeft, exactTooltipLeft);
+				const tooltipTop = Math.min(fallbackTooltipTop, exactTooltipTop);
+				const tooltipRight = Math.max(fallbackTooltipRight, exactTooltipRight);
+				const tooltipBottom = Math.max(fallbackTooltipBottom, exactTooltipBottom);
+				const obLeft = Math.min(markerLeft, tooltipLeft);
+				const obTop = Math.min(markerTop, tooltipTop);
+				const obRight = Math.max(markerRight, tooltipRight);
+				const obBottom = Math.max(markerBottom, tooltipBottom);
+				obstacleBounds = { left: obLeft, top: obTop, right: obRight, bottom: obBottom };
+				const obCenterX = (obLeft + obRight) / 2;
+				const obCenterY = (obTop + obBottom) / 2;
+				const gap = SELECTION_ACTIONS_AROUND_SIDE_GAP_PX;
+				// Candidates fully clear of the obstacle on each side (a positive gap
+				// guarantees no overlap). Pick the one that best fits the viewport and
+				// otherwise hugs the selection — so it lands wherever is optimal at the
+				// moment instead of always favoring one side.
+				const candidates = [
+					{ side: 'top' as const, x: obCenterX - w / 2, y: obTop - gap - h },
+					{ side: 'bottom' as const, x: obCenterX - w / 2, y: obBottom + gap },
+					{ side: 'left' as const, x: obLeft - gap - w, y: obCenterY - h / 2 },
+					{ side: 'right' as const, x: obRight + gap, y: obCenterY - h / 2 },
+				];
+				const scoreCandidate = (c: (typeof candidates)[number]) => {
+					const outOfBounds =
+						Math.max(0, margin - c.x) +
+						Math.max(0, c.x - maxX) +
+						Math.max(0, minY - c.y) +
+						Math.max(0, c.y - maxY);
+					const cardCenterX = c.x + w / 2;
+					const cardCenterY = c.y + h / 2;
+					const hug = Math.hypot(cardCenterX - obCenterX, cardCenterY - obCenterY);
+					// Out-of-bounds dominates; hug distance breaks ties so the card
+					// snuggles the nearest comfortably-visible side.
+					return outOfBounds * 10000 + hug;
+				};
+				let best = candidates[0];
+				let bestScore = scoreCandidate(best);
+				for (const c of candidates) {
+					const score = scoreCandidate(c);
+					if (score < bestScore) {
+						bestScore = score;
+						best = c;
+					}
+				}
+				const current = candidates.find(
+					(c) => c.side === selectionActionsSideRef.current
+				);
+				if (current) {
+					const currentScore = scoreCandidate(current);
+					// Hysteresis: do not flip sides on tiny score changes while panning.
+					// That was the visible flicker. Only switch when the new side is
+					// meaningfully better or the current side is being clipped.
+					const currentOutOfBounds =
+						Math.max(0, margin - current.x) +
+						Math.max(0, current.x - maxX) +
+						Math.max(0, minY - current.y) +
+						Math.max(0, current.y - maxY);
+					if (currentOutOfBounds === 0 && currentScore <= bestScore + 80) {
+						best = current;
+					}
+				}
+				selectionActionsSideRef.current = best.side;
+				anchoredX = clamp(best.x, margin, maxX);
+				anchoredY = clamp(best.y, minY, maxY);
+
+				const boxCenterX = obCenterX;
+				const boxCenterY = obCenterY;
+				// Zoom term: ramps in as the view zooms out past the anchor zoom.
+				const zoomProgress = clamp(
+					(SELECTION_ACTIONS_ANCHOR_FULL_ZOOM - map.getZoom()) /
+						(SELECTION_ACTIONS_ANCHOR_FULL_ZOOM -
+							SELECTION_ACTIONS_DOCK_FULL_ZOOM),
+					0,
+					1
+				);
+				// Pan term: 0 while the selection's center sits inside the comfort
+				// rect, ramping to 1 as it travels toward / past the viewport edges.
+				const comfortPad = SELECTION_ACTIONS_PAN_COMFORT_PAD_PX;
+				const ramp = SELECTION_ACTIONS_PAN_DOCK_RAMP_PX;
+				const overX = Math.max(
+					0,
+					comfortPad - boxCenterX,
+					boxCenterX - (vw - comfortPad)
+				);
+				const overY = Math.max(
+					0,
+					minY + comfortPad - boxCenterY,
+					boxCenterY - (vh - comfortPad)
+				);
+				const panProgress = clamp(Math.max(overX, overY) / ramp, 0, 1);
+				dockProgress = Math.max(zoomProgress, panProgress);
 			} else {
-				x = clamp(dockMinX, margin, maxX);
-				y = clamp(dockTop, margin, vh - h - margin);
+				selectionActionsSideRef.current = null;
 			}
 
-			if (wasAnchored !== null && wasAnchored !== isAnchored) {
-				el.style.transition = 'transform 280ms ease';
-				if (transitionTimeout != null) window.clearTimeout(transitionTimeout);
-				transitionTimeout = window.setTimeout(() => {
-					el.style.transition = '';
-					transitionTimeout = null;
-				}, 300);
+			let viewportX = lerp(anchoredX, dockX, dockProgress);
+			let viewportY = lerp(anchoredY, dockY, dockProgress);
+			if (obstacleBounds) {
+				const gap = SELECTION_ACTIONS_AROUND_SIDE_GAP_PX;
+				const overlapsObstacle =
+					viewportX < obstacleBounds.right + gap &&
+					viewportX + w > obstacleBounds.left - gap &&
+					viewportY < obstacleBounds.bottom + gap &&
+					viewportY + h > obstacleBounds.top - gap;
+				if (overlapsObstacle) {
+					switch (selectionActionsSideRef.current) {
+						case 'top':
+							viewportY = obstacleBounds.top - gap - h;
+							break;
+						case 'bottom':
+							viewportY = obstacleBounds.bottom + gap;
+							break;
+						case 'left':
+							viewportX = obstacleBounds.left - gap - w;
+							break;
+						case 'right':
+						default:
+							viewportX = obstacleBounds.right + gap;
+							break;
+					}
+					viewportX = clamp(viewportX, margin, maxX);
+					viewportY = clamp(viewportY, minY, maxY);
+				}
 			}
-			wasAnchored = isAnchored;
 
-			el.style.transformOrigin = isAnchored ? 'bottom center' : 'top left';
+			// Container-relative coords — stays in the map layer (z-99) so the
+			// dashboard's portaled top nav / side panel always paints above.
+			const x = viewportX - rect.left;
+			const y = viewportY - rect.top;
+
+			// Rigid per-frame placement (no CSS easing): the position itself is what
+			// moves gradually, since dockProgress changes smoothly with zoom/pan — so
+			// the follow stays strict like the tooltips and the dock never snaps.
+			el.style.transition = 'none';
 			el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
 			el.style.opacity = '1';
 			el.style.pointerEvents = 'auto';
@@ -17972,7 +18192,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return () => {
 			map.off('move', place);
 			window.removeEventListener('resize', place);
-			if (transitionTimeout != null) window.clearTimeout(transitionTimeout);
 		};
 	}, [
 		map,
@@ -18231,6 +18450,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	]);
 	useLayoutEffect(() => {
 		if (selectedCompactTooltipEntries.length === 0) {
+			selectionTooltipsFootprintRef.current = null;
 			if (selectedTooltipStackSignatureRef.current) {
 				selectedTooltipStackSignatureRef.current = '';
 				setSelectedTooltipStackGroups([]);
@@ -18398,6 +18618,40 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						: String(placement.opacity ?? 1);
 				el.style.zIndex = String(HOVER_TOOLTIP_Z_INDEX + 1);
 			}
+
+			// Publish the union of every rendered tooltip box (container-px) so the
+			// action card can place itself clear of them. Skip individuals that are
+			// folded into a stack or hidden — they aren't visually present.
+			let fpLeft = Infinity;
+			let fpTop = Infinity;
+			let fpRight = -Infinity;
+			let fpBottom = -Infinity;
+			for (const entry of projectedEntries) {
+				if (
+					collisionGroupedContactIds.has(entry.contact.id) ||
+					shouldUseLegacyStack
+				) {
+					continue;
+				}
+				const placement = individualPlacements.get(entry.contact.id);
+				const px = placement?.x ?? entry.naturalX;
+				const py = placement?.y ?? entry.naturalY;
+				fpLeft = Math.min(fpLeft, px);
+				fpTop = Math.min(fpTop, py);
+				fpRight = Math.max(fpRight, px + entry.width);
+				fpBottom = Math.max(fpBottom, py + entry.height);
+			}
+			for (const placement of stackPlacements) {
+				const scale = placement.scale ?? 1;
+				fpLeft = Math.min(fpLeft, placement.x);
+				fpTop = Math.min(fpTop, placement.y);
+				fpRight = Math.max(fpRight, placement.x + placement.width * scale);
+				fpBottom = Math.max(fpBottom, placement.y + placement.height * scale);
+			}
+			selectionTooltipsFootprintRef.current =
+				fpLeft <= fpRight
+					? { left: fpLeft, top: fpTop, right: fpRight, bottom: fpBottom }
+					: null;
 		};
 
 		update();
@@ -20019,78 +20273,73 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			{/* Multi-select action card — docked beside the left "Showing" rail when the
 			    selection is off-screen or zoomed out; otherwise anchored above the
-			    top-most selected dot. Portaled to body so fixed positioning matches
-			    the dashboard's left rail (see VenueMapActionPills). */}
-			{!isLoading &&
-				selectedContacts.length >= 1 &&
-				onAddSelectionToFolder &&
-				typeof window !== 'undefined' &&
-				createPortal(
+			    top-most selected dot. Stays in the map layer so portaled top nav /
+			    side panel (z-120+) always stacks above (see VenueMapActionPills). */}
+			{!isLoading && selectedContacts.length >= 1 && onAddSelectionToFolder && (
+				<div
+					ref={selectionActionsOverlayRef}
+					className="pointer-events-none absolute left-0 top-0 will-change-transform"
+					style={{
+						opacity: 0,
+						zIndex: SELECTION_ACTIONS_Z_INDEX,
+					}}
+					onMouseDown={(e) => e.stopPropagation()}
+					onPointerDown={(e) => e.stopPropagation()}
+				>
 					<div
-						ref={selectionActionsOverlayRef}
-						className="pointer-events-none fixed left-0 top-0 will-change-transform"
 						style={{
-							opacity: 0,
-							zIndex: 131,
+							display: 'flex',
+							flexDirection: 'column',
+							gap: '4px',
+							padding: '5px',
+							backgroundColor: '#FFFFFF',
+							borderRadius: '9px',
+							boxSizing: 'border-box',
 						}}
-						onMouseDown={(e) => e.stopPropagation()}
-						onPointerDown={(e) => e.stopPropagation()}
 					>
-						<div
+						<button
+							type="button"
+							onClick={() => onAddSelectionToFolder?.()}
+							className="font-inter"
 							style={{
-								display: 'flex',
-								flexDirection: 'column',
-								gap: '4px',
-								padding: '5px',
-								backgroundColor: '#FFFFFF',
-								borderRadius: '9px',
-								boxSizing: 'border-box',
+								width: '100%',
+								padding: '5px 10px',
+								backgroundColor: '#EFEFEF',
+								border: 'none',
+								borderRadius: '6px',
+								fontSize: '12px',
+								fontWeight: 500,
+								color: '#000000',
+								textAlign: 'left',
+								whiteSpace: 'nowrap',
+								cursor: 'pointer',
 							}}
 						>
-							<button
-								type="button"
-								onClick={() => onAddSelectionToFolder?.()}
-								className="font-inter"
-								style={{
-									width: '100%',
-									padding: '5px 10px',
-									backgroundColor: '#EFEFEF',
-									border: 'none',
-									borderRadius: '6px',
-									fontSize: '12px',
-									fontWeight: 500,
-									color: '#000000',
-									textAlign: 'left',
-									whiteSpace: 'nowrap',
-									cursor: 'pointer',
-								}}
-							>
-								Add Contacts to Folder
-							</button>
-							<button
-								type="button"
-								onClick={() => onWriteSelectionMessage?.()}
-								className="font-inter"
-								style={{
-									width: '100%',
-									padding: '5px 10px',
-									backgroundColor: '#EFEFEF',
-									border: 'none',
-									borderRadius: '6px',
-									fontSize: '12px',
-									fontWeight: 500,
-									color: '#000000',
-									textAlign: 'left',
-									whiteSpace: 'nowrap',
-									cursor: 'pointer',
-								}}
-							>
-								Write Message
-							</button>
-						</div>
-					</div>,
-					document.body
-				)}
+							Add Contacts to Folder
+						</button>
+						<button
+							type="button"
+							onClick={() => onWriteSelectionMessage?.()}
+							className="font-inter"
+							style={{
+								width: '100%',
+								padding: '5px 10px',
+								backgroundColor: '#EFEFEF',
+								border: 'none',
+								borderRadius: '6px',
+								fontSize: '12px',
+								fontWeight: 500,
+								color: '#000000',
+								textAlign: 'left',
+								whiteSpace: 'nowrap',
+								cursor: 'pointer',
+							}}
+						>
+							Write Message
+						</button>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 };
