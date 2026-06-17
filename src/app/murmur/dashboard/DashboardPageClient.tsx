@@ -4686,6 +4686,17 @@ const DashboardContent = () => {
 			const nextState = (stateName || '').trim();
 			if (!nextState) return;
 
+			const currentCategorySearch = parseCategorySearchQuery(activeSearchQuery);
+			const nextCanonicalState = normalizeUsStateName(nextState);
+			const currentCanonicalState = normalizeUsStateName(currentCategorySearch.where);
+			if (
+				currentCategorySearch.isCategorySearch &&
+				nextCanonicalState &&
+				currentCanonicalState === nextCanonicalState
+			) {
+				return;
+			}
+
 			const isCurrentNonCategorySearch =
 				isCuratedSearchActive || isCuratedPicksSearchQuery(activeSearchQuery);
 			if (isCurrentNonCategorySearch) {
@@ -4718,6 +4729,32 @@ const DashboardContent = () => {
 		]
 	);
 
+	const resolveDefaultCategorySearchWhere = useCallback(async (): Promise<string> => {
+		let inferredWhere: string | null = null;
+		try {
+			const loc = await Promise.race([
+				getApproximateLocation(),
+				new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+			]);
+			if (loc) {
+				inferredWhere =
+					normalizeUsStateName(loc.regionCode) ??
+					normalizeUsStateName(loc.region) ??
+					(loc.lat != null && loc.lon != null
+						? getNearestUsStateNameForPoint(loc.lat, loc.lon)
+						: null);
+			}
+		} catch {
+			// Non-fatal — falls through to the random-state fallback below.
+		}
+		if (inferredWhere) return inferredWhere;
+
+		const lower48States = buildAllUsStateNames().filter(
+			(s) => s !== 'Alaska' && s !== 'Hawaii'
+		);
+		return lower48States[Math.floor(Math.random() * lower48States.length)] ?? 'California';
+	}, []);
+
 	// If the user submits with missing segments, auto-fill sensible defaults
 	// and (when Where is blank) best-effort infer a US state so the search always runs.
 	const ensureNonEmptyDashboardSearchOnBlankSubmit = useCallback(async () => {
@@ -4732,12 +4769,15 @@ const DashboardContent = () => {
 		let nextWhat = trimmedWhat;
 		let nextWhere = trimmedWhere;
 
-		// If BOTH Why + What are empty, set a default "starter" search.
-		if (!nextWhy && !nextWhat) {
-			nextWhy = '[Booking]';
-			nextWhat = 'Wine, Beer, and Spirits';
+		// If What is empty, set a default "starter" category.
+		if (!nextWhat) {
+			nextWhat = DEFAULT_CATEGORY_SEARCH_WHAT;
+			nextWhy = getCategorySearchWhyForWhat(nextWhat);
 			setWhyValue(nextWhy);
 			setWhatValue(nextWhat);
+		} else if (!nextWhy) {
+			nextWhy = getCategorySearchWhyForWhat(nextWhat);
+			setWhyValue(nextWhy);
 		}
 
 		// If Where is empty, try to infer the user's state from coarse IP geolocation
@@ -4745,36 +4785,8 @@ const DashboardContent = () => {
 		// 24h and falls back through ipapi.co → ipwho.is, so this is essentially free
 		// after the first successful resolution.
 		if (!nextWhere) {
-			let inferredWhere: string | null = null;
-			try {
-				const loc = await Promise.race([
-					getApproximateLocation(),
-					new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
-				]);
-				if (loc) {
-					inferredWhere =
-						normalizeUsStateName(loc.regionCode) ?? normalizeUsStateName(loc.region);
-				}
-			} catch {
-				// Non-fatal — falls through to the random-state fallback below.
-			}
-			if (inferredWhere) {
-				nextWhere = inferredWhere;
-				setWhereValue(inferredWhere);
-				setIsNearMeLocation(false);
-			}
-		}
-
-		// Ultimate fallback: if we still can't infer a state, pick a random lower-48 state
-		// so "Where" is never blank. (Exclude Alaska/Hawaii.)
-		if (!nextWhere) {
-			const lower48States = buildAllUsStateNames().filter(
-				(s) => s !== 'Alaska' && s !== 'Hawaii'
-			);
-			const fallback =
-				lower48States[Math.floor(Math.random() * lower48States.length)] ?? 'California';
-			nextWhere = fallback;
-			setWhereValue(fallback);
+			nextWhere = await resolveDefaultCategorySearchWhere();
+			setWhereValue(nextWhere);
 			setIsNearMeLocation(false);
 		}
 
@@ -4791,7 +4803,7 @@ const DashboardContent = () => {
 			shouldValidate: false,
 			shouldDirty: true,
 		});
-	}, [form, hasSearched, whatValue, whereValue, whyValue]);
+	}, [form, hasSearched, resolveDefaultCategorySearchWhere, whatValue, whereValue, whyValue]);
 
 	// Free trial CTA for fromHome demo mode
 	const handleStartFreeTrial = useCallback(() => {
@@ -7384,32 +7396,30 @@ const DashboardContent = () => {
 		}
 
 		const initialTrimmedWhat = whatValue.trim();
-		const trimmedWhere = whereValue.trim();
+		let trimmedWhere = whereValue.trim();
 		// Where without What would build "[Booking] (Maine)" with no category — default
 		// to Wine/Beer/Spirits so the curated search has a real category to filter on.
-		const trimmedWhat =
-			trimmedWhere && !initialTrimmedWhat
-				? DEFAULT_CATEGORY_SEARCH_WHAT
-				: initialTrimmedWhat;
+		// If both fields are empty, also infer a state so the arrow always runs a useful
+		// starter search from Category mode.
+		const shouldAutoFillWhat = !initialTrimmedWhat;
+		const shouldAutoFillWhere = shouldAutoFillWhat && !trimmedWhere;
+		const trimmedWhat = shouldAutoFillWhat
+			? DEFAULT_CATEGORY_SEARCH_WHAT
+			: initialTrimmedWhat;
 		const nextWhy = getCategorySearchWhyForWhat(trimmedWhat);
 
 		if (trimmedWhat !== initialTrimmedWhat) {
 			setWhatValue(trimmedWhat);
 		}
+		if (shouldAutoFillWhere) {
+			trimmedWhere = await resolveDefaultCategorySearchWhere();
+			setWhereValue(trimmedWhere);
+			setIsNearMeLocation(false);
+		}
 		setWhyValue(nextWhy);
 		setActiveSection(null);
 		setIsMapBottomCategoryDropdownActive(false);
-
-		if (!trimmedWhat && !trimmedWhere) {
-			if (hasSearched) return;
-
-			await ensureNonEmptyDashboardSearchOnBlankSubmit();
-			const currentSearchText = (form.getValues('searchText') ?? '').trim();
-			if (currentSearchText && onSubmit) {
-				form.handleSubmit(onSubmit)();
-			}
-			return;
-		}
+		setIsMapSearchEngaged(true);
 
 		const formattedWhere = trimmedWhere ? `(${trimmedWhere})` : '';
 		const combinedSearch = [nextWhy, trimmedWhat, formattedWhere]
@@ -7425,11 +7435,10 @@ const DashboardContent = () => {
 			form.handleSubmit(onSubmit)();
 		}
 	}, [
-		ensureNonEmptyDashboardSearchOnBlankSubmit,
 		form,
-		hasSearched,
 		isFromHomeDemoMode,
 		onSubmit,
+		resolveDefaultCategorySearchWhere,
 		whatValue,
 		whereValue,
 	]);
