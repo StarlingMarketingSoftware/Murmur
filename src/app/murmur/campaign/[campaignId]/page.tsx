@@ -63,12 +63,14 @@ import { SendQueueOverlayMount } from '@/app/murmur/campaign/[campaignId]/SendQu
 import { useEditCampaign, useGetCampaignContacts } from '@/hooks/queryHooks/useCampaigns';
 import { useCampaignTopNavScheme } from '@/hooks/useCampaignTopNavScheme';
 import { EMAIL_QUERY_KEYS, useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { useSendQueue } from '@/hooks/queryHooks/useSendQueue';
 import { toast } from 'sonner';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useCreateIdentity, useGetIdentities } from '@/hooks/queryHooks/useIdentities';
 import { EmailStatus } from '@/constants/prismaEnums';
 import { useQueryClient } from '@tanstack/react-query';
 import type { EmailWithRelations } from '@/types';
+import type { ContactWithName } from '@/types/contact';
 import { useSendingSessionState } from '@/contexts/SendingSessionContext';
 import { HoverDescriptionProvider } from '@/contexts/HoverDescriptionContext';
 import { CampaignTopSearchHighlightProvider } from '@/contexts/CampaignTopSearchHighlightContext';
@@ -219,6 +221,7 @@ const CAMPAIGN_TAB_HEATMAP_COLOR: Partial<Record<ViewType, string>> = {
 	drafting: '#FFD4A9', // Drafts — orange
 	inbox: '#ABD1FF', // Inbox — blue
 };
+const SEND_QUEUE_HEATMAP_COLOR = '#A2D99F';
 
 const CAMPAIGN_OVERVIEW_STATUS_PILL_HEIGHT_PX = 27;
 const CAMPAIGN_OVERVIEW_STATUS_PILL_RADIUS_PX = 8;
@@ -247,6 +250,14 @@ const getCampaignOverviewStatusFromEmailStatus = (
 		default:
 			return null;
 	}
+};
+
+const getCampaignMapContactWithCategory = (contact: ContactWithName): ContactWithName => {
+	const titleLike = contact.curatedDisplayLabel || contact.title || contact.headline || '';
+	const derivedCategory =
+		getPromotionOverlayWhatFromContactTitle(titleLike) ||
+		getBookingTitlePrefixFromContactTitle(titleLike);
+	return derivedCategory ? { ...contact, curatedCategory: derivedCategory } : contact;
 };
 
 type CampaignOverviewAskAnythingBoxProps = {
@@ -1185,6 +1196,13 @@ const Murmur = () => {
 	// Route id is known immediately (before the detail query resolves), so the contact/email/inbound
 	// queries can fire in parallel with useGetCampaign instead of waiting on campaign?.id.
 	const routeCampaignId = campaignId ? Number(campaignId) : undefined;
+	const { isOpen: isPersistedSendQueueMapOpen } = useSendQueueView();
+	const {
+		items: persistedSendQueueMapItems,
+		count: persistedSendQueueMapCount,
+	} = useSendQueue(routeCampaignId ?? 0, {
+		enabled: Boolean(routeCampaignId),
+	});
 	// Per-campaign color scheme for the top navigation box + folder icon.
 	const topNavScheme = useCampaignTopNavScheme(routeCampaignId);
 	const isMobile = useIsMobile();
@@ -3399,20 +3417,47 @@ const Murmur = () => {
 		return statusById;
 	}, [campaignMapContacts, headerEmails, overviewInboundEmails]);
 
-	const campaignMapContactsForMap = useMemo(() => {
-		const contacts = campaignMapContacts || [];
-		if (contacts.length === 0) return contacts;
+	const sendQueueMapMode =
+		isPersistedSendQueueMapOpen && persistedSendQueueMapCount > 0;
+	const sendQueueMapContactIds = useMemo(() => {
+		if (!sendQueueMapMode) return [];
+		const contactIds: number[] = [];
+		const seenIds = new Set<number>();
+		for (const item of persistedSendQueueMapItems) {
+			if (seenIds.has(item.contactId)) continue;
+			seenIds.add(item.contactId);
+			contactIds.push(item.contactId);
+		}
+		return contactIds;
+	}, [persistedSendQueueMapItems, sendQueueMapMode]);
+	const sendQueueMapContacts = useMemo(() => {
+		if (!sendQueueMapMode) return [];
+		const contacts: ContactWithName[] = [];
+		const seenIds = new Set<number>();
+		for (const item of persistedSendQueueMapItems) {
+			if (seenIds.has(item.contactId)) continue;
+			seenIds.add(item.contactId);
+			contacts.push(getCampaignMapContactWithCategory(item.contact));
+		}
+		return contacts;
+	}, [persistedSendQueueMapItems, sendQueueMapMode]);
+	const sendQueueMapContactStatusById = useMemo(() => {
+		const statusById = new Map<number, CampaignOverviewStatusKey>();
+		for (const contactId of sendQueueMapContactIds) {
+			statusById.set(contactId, 'contacts');
+		}
+		return statusById;
+	}, [sendQueueMapContactIds]);
 
-		const out = [] as typeof contacts;
+	const campaignMapContactsForMap = useMemo(() => {
+		if (sendQueueMapMode) return sendQueueMapContacts;
+
+		const contacts = campaignMapContacts || [];
+		const out: ContactWithName[] = [];
 		for (const contact of contacts) {
 			const titleLike =
 				contact.curatedDisplayLabel || contact.title || contact.headline || '';
-			const derivedCategory =
-				getPromotionOverlayWhatFromContactTitle(titleLike) ||
-				getBookingTitlePrefixFromContactTitle(titleLike);
-			const mapContact = derivedCategory
-				? { ...contact, curatedCategory: derivedCategory }
-				: contact;
+			const mapContact = getCampaignMapContactWithCategory(contact);
 
 			// The left-panel category-tile filter applies in every grouping mode, so
 			// deselecting a category hides those markers whether the map is grouped by
@@ -3445,6 +3490,8 @@ const Murmur = () => {
 		effectiveMapGroupingForActiveView,
 		mapGrabActiveCategories,
 		mapGrabUncategorizedActive,
+		sendQueueMapContacts,
+		sendQueueMapMode,
 	]);
 	const campaignSelectedContactObjectsForMap = useMemo(() => {
 		if (!campaignMapContacts || campaignMapSelectedContactIds.length === 0) return [];
@@ -3457,18 +3504,20 @@ const Murmur = () => {
 			seenIds.add(id);
 			const contact = contactsById.get(id);
 			if (!contact) continue;
-			const titleLike =
-				contact.curatedDisplayLabel || contact.title || contact.headline || '';
-			const derivedCategory =
-				getPromotionOverlayWhatFromContactTitle(titleLike) ||
-				getBookingTitlePrefixFromContactTitle(titleLike);
-			selectedObjects.push(
-				derivedCategory ? { ...contact, curatedCategory: derivedCategory } : contact
-			);
+			selectedObjects.push(getCampaignMapContactWithCategory(contact));
 		}
 
 		return selectedObjects;
 	}, [campaignMapContacts, campaignMapSelectedContactIds]);
+	const effectiveCampaignMapSelectedContactIds = sendQueueMapMode
+		? sendQueueMapContactIds
+		: campaignMapSelectedContactIds;
+	const effectiveCampaignSelectedContactObjectsForMap = sendQueueMapMode
+		? sendQueueMapContacts
+		: campaignSelectedContactObjectsForMap;
+	const effectiveCampaignMapContactStatusById = sendQueueMapMode
+		? sendQueueMapContactStatusById
+		: campaignOverviewContactStatusById;
 
 	const persistentCampaignMapProps = useMemo<SearchResultsMapProps>(
 		() => ({
@@ -3480,23 +3529,28 @@ const Murmur = () => {
 			autoSpin: false,
 			cameraPadding: campaignMapCameraPadding,
 			contacts: campaignMapContactsForMap,
-			selectedContacts: campaignMapSelectedContactIds,
-			selectedContactObjects: campaignSelectedContactObjectsForMap,
+			selectedContacts: effectiveCampaignMapSelectedContactIds,
+			selectedContactObjects: effectiveCampaignSelectedContactObjectsForMap,
 			showSelectedContactTooltips: true,
 			onToggleSelection: requestMapMarkerSelection,
-			campaignContactStatusById: campaignOverviewContactStatusById,
-			campaignMarkerMode: effectiveMapGroupingForActiveView,
-			campaignHeatmapColor: CAMPAIGN_TAB_HEATMAP_COLOR[activeView] ?? null,
+			campaignContactStatusById: effectiveCampaignMapContactStatusById,
+			campaignMarkerMode: sendQueueMapMode ? 'status' : effectiveMapGroupingForActiveView,
+			campaignHeatmapColor: sendQueueMapMode
+				? SEND_QUEUE_HEATMAP_COLOR
+				: CAMPAIGN_TAB_HEATMAP_COLOR[activeView] ?? null,
 			campaignHeatmapStatusColors:
-				activeView === 'overview' ? CAMPAIGN_OVERVIEW_STATUS_PILL_COLOR : undefined,
+				!sendQueueMapMode && activeView === 'overview'
+					? CAMPAIGN_OVERVIEW_STATUS_PILL_COLOR
+					: undefined,
 			// These campaign tabs glow their visible set before selection, then narrow
 			// to selected on-map contacts once a selection exists.
 			campaignHeatmapAmbient:
-				activeView === 'overview' ||
-				activeView === 'testing' ||
-				activeView === 'drafting' ||
-				activeView === 'inbox',
-			categoryConstellationsEnabled: true,
+				!sendQueueMapMode &&
+				(activeView === 'overview' ||
+					activeView === 'testing' ||
+					activeView === 'drafting' ||
+					activeView === 'inbox'),
+			categoryConstellationsEnabled: !sendQueueMapMode,
 			activeTool: activeMapTool,
 			requestedZoom: mapZoomControlRequest,
 			onViewportZoom: handleMapViewportZoom,
@@ -3510,11 +3564,12 @@ const Murmur = () => {
 			activeMapTool,
 			campaignMapCameraPadding,
 			campaignMapContactsForMap,
-			campaignMapSelectedContactIds,
-			campaignSelectedContactObjectsForMap,
+			effectiveCampaignMapSelectedContactIds,
+			effectiveCampaignSelectedContactObjectsForMap,
 			requestMapMarkerSelection,
-			campaignOverviewContactStatusById,
+			effectiveCampaignMapContactStatusById,
 			effectiveMapGroupingForActiveView,
+			sendQueueMapMode,
 			globeNightLighting,
 			globeWeatherMood,
 			globeWeatherRegionCenter,
@@ -3733,6 +3788,7 @@ const Murmur = () => {
 		(isCampaignWorkspaceExpanded && isCampaignStandardStageNarrow);
 	const isPresetMapControlsView =
 		!isMobile &&
+		!sendQueueMapMode &&
 		Boolean(activeTabPresetStatuses) &&
 		!shouldHideContent &&
 		!isNarrowestDesktop &&
@@ -3852,7 +3908,6 @@ const Murmur = () => {
 		<CampaignDeviceProvider isMobile={isMobile} activeView={activeView}>
 			<HoverDescriptionProvider defaultEnabled>
 				<CampaignTopSearchHighlightProvider value={topSearchHighlightCtx}>
-					<SendQueueViewProvider>
 					<div
 						className={cn(
 							'min-h-screen relative',
@@ -3863,7 +3918,10 @@ const Murmur = () => {
 						{usePersistentCampaignMapBackground && (
 							<div className="campaign-map-split-overlay" aria-hidden="true" />
 						)}
-						{isMobile === false && activeView === 'overview' && !shouldHideContent && (
+						{isMobile === false &&
+							activeView === 'overview' &&
+							!shouldHideContent &&
+							!sendQueueMapMode && (
 							<div
 								className="pointer-events-none fixed inset-0"
 								style={{
@@ -4813,7 +4871,7 @@ const Murmur = () => {
 							</button>
 						)}
 
-						{!isMobile && activeView === 'overview' && (
+						{!isMobile && activeView === 'overview' && !sendQueueMapMode && (
 							<div
 								data-campaign-interactive-surface
 								data-campaign-overview-left-panel="true"
@@ -5778,11 +5836,16 @@ const Murmur = () => {
 							/>
 						)}
 					</div>
-					</SendQueueViewProvider>
 				</CampaignTopSearchHighlightProvider>
 			</HoverDescriptionProvider>
 		</CampaignDeviceProvider>
 	);
 };
 
-export default Murmur;
+const MurmurWithSendQueueProvider = () => (
+	<SendQueueViewProvider>
+		<Murmur />
+	</SendQueueViewProvider>
+);
+
+export default MurmurWithSendQueueProvider;
