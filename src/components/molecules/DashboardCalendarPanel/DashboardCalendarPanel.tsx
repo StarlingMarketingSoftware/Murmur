@@ -1080,7 +1080,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 						? '#F14048'
 						: isHighlighted
 							? '#38E497'
-							: getCellBackground(gridMonthIndex, row, col);
+							: getCellBackground(date.getMonth(), row, col);
 
 					let label = String(date.getDate());
 					if (isTopRow) {

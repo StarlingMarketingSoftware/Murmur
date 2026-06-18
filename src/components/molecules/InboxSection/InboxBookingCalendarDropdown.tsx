@@ -1508,7 +1508,7 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 				: OTHER_BOOKING_CELL_BG
 			: isHighlighted
 				? '#38E497'
-				: getCellBackground(gridMonthIndex, row, col);
+				: getCellBackground(date.getMonth(), row, col);
 
 		const label =
 			date.getDate() === 1

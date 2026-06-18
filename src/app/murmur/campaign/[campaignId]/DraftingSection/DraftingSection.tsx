@@ -2292,6 +2292,28 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		setSelectedDraft(firstDraft);
 	}, [draftEmailsForView, isPendingEmails, selectedDraft, contentView]);
 
+	// On the Drafts tab the showing draft is always part of the send selection, so
+	// the gold "Showing" row is never left out of "Send N Messages". Other sources
+	// of showing changes (auto-select above, a shift-click range that omits the
+	// showing row, the send-advance effect below) don't touch the selection set, so
+	// re-seed it here. This only ever adds the showing id; it never removes, so it
+	// can't fight a row deselect.
+	useEffect(() => {
+		if (contentView !== 'drafting') return;
+		if (!selectedDraft) return;
+		// Guard against cross-filter contamination: only add the showing draft when
+		// it belongs to the current status filter's view.
+		if (!draftEmailsForView.some((draft) => draft.id === selectedDraft.id)) return;
+		const showingId = selectedDraft.id;
+		setDraftSelectionsByFilter((prev) => {
+			const current = prev[draftStatusFilter];
+			if (current.has(showingId)) return prev;
+			const next = new Set(current);
+			next.add(showingId);
+			return { ...prev, [draftStatusFilter]: next };
+		});
+	}, [contentView, selectedDraft, draftEmailsForView, draftStatusFilter]);
+
 	// While a send session runs, keep the draft review stack on the actively
 	// sending draft so the front card advances one-to-the-next per send. Sent
 	// drafts leave draftEmailsForView via the per-send invalidation, and the
@@ -3000,21 +3022,47 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	// Campaign map ↔ tab selection bridge --------------------------------------
 	// Publish the active tab's selected contact ids so the map highlights their
-	// markers as the bigger blue circle. Write = the multi-select draft set,
-	// Drafts = the contacts of selected drafts. Inbox is intentionally excluded:
-	// there a marker click just OPENS the conversation (handled below) — it is not
-	// a persistent map selection, so inbox markers never get the blue treatment.
+	// markers and selected SVG labels. Each tab keeps its native selection meaning:
+	// All = contact rows + selected draft rows, Write = draftable contacts, Drafts =
+	// selected draft contacts, Inbox/Sent = the opened conversation contact.
 	const lastPublishedMapSelectionKeyRef = useRef<string>('');
 	useEffect(() => {
 		if (!onMapSelectionChange) return;
-		let contactIds: number[] = [];
-		if (view === 'testing') {
-			contactIds = Array.from(contactsTabSelectedIds);
+		const contactIds: number[] = [];
+
+		const appendContactId = (id: number | null | undefined) => {
+			if (typeof id !== 'number' || contactIds.includes(id)) return;
+			contactIds.push(id);
+		};
+
+		if (view === 'overview') {
+			contactsTabSelectedIds.forEach(appendContactId);
+			draftEmails
+				.filter((d) => overviewSelectedDraftIds.has(d.id))
+				.forEach((d) => appendContactId(d.contactId));
+		} else if (view === 'testing') {
+			contactsTabSelectedIds.forEach(appendContactId);
 		} else if (view === 'drafting') {
-			contactIds = draftEmailsForView
+			draftEmailsForView
 				.filter((d) => draftsTabSelectedIds.has(d.id))
-				.map((d) => d.contactId)
-				.filter((id): id is number => id != null);
+				.forEach((d) => appendContactId(d.contactId));
+		} else if (view === 'inbox' || view === 'sent') {
+			const selectedInbound =
+				selectedInboxEmailId == null
+					? null
+					: (inboundEmails || []).find((email) => email.id === selectedInboxEmailId) ?? null;
+			if (selectedInbound) {
+				appendContactId(
+					selectedInbound.contactId ??
+						(selectedInbound.contact as { id?: number } | null | undefined)?.id
+				);
+			} else {
+				const selectedSent =
+					selectedInboxEmailId == null
+						? null
+						: sentEmails.find((email) => email.id === selectedInboxEmailId) ?? null;
+				appendContactId(selectedSent?.contactId);
+			}
 		}
 		// Skip redundant publishes (e.g. on draft refetches) so the parent's memoized
 		// map props don't rebuild when the selection hasn't actually changed.
@@ -3026,8 +3074,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		onMapSelectionChange,
 		view,
 		contactsTabSelectedIds,
+		overviewSelectedDraftIds,
+		draftEmails,
 		draftsTabSelectedIds,
 		draftEmailsForView,
+		selectedInboxEmailId,
+		inboundEmails,
+		sentEmails,
 	]);
 
 	// Run a campaign map marker click through the active tab's native selection.
@@ -3040,7 +3093,24 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		if (handledMapMarkerRequestIdRef.current === req.requestId) return;
 		handledMapMarkerRequestIdRef.current = req.requestId;
 		const { contactId } = req;
-		if (view === 'testing') {
+		if (view === 'overview') {
+			const draft = draftEmails.find((d) => d.contactId === contactId);
+			if (draft) {
+				setOverviewSelectedDraftIds((prev) => {
+					const next = new Set(prev);
+					if (next.has(draft.id)) next.delete(draft.id);
+					else next.add(draft.id);
+					return next;
+				});
+			} else {
+				setContactsTabSelectedIds((prev) => {
+					const next = new Set(prev);
+					if (next.has(contactId)) next.delete(contactId);
+					else next.add(contactId);
+					return next;
+				});
+			}
+		} else if (view === 'testing') {
 			setContactsTabSelectedIds((prev) => {
 				const next = new Set(prev);
 				if (next.has(contactId)) next.delete(contactId);
@@ -3050,7 +3120,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		} else if (view === 'drafting') {
 			const draft = draftEmailsForView.find((d) => d.contactId === contactId);
 			if (draft) handleDraftSelection(draft.id);
-		} else if (view === 'inbox') {
+		} else if (view === 'inbox' || view === 'sent') {
 			const byCreatedDesc = (a: { createdAt: string | Date }, b: { createdAt: string | Date }) =>
 				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
 			const inbound = (inboundEmails || [])
@@ -3072,7 +3142,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		// handleDraftSelection / handleInboxEmailClick read live state at call time;
 		// the request id is the trigger and the handled-ref guards re-execution.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [mapMarkerSelectionRequest, view, draftEmailsForView, inboundEmails, sentEmails]);
+	}, [mapMarkerSelectionRequest, view, draftEmails, draftEmailsForView, inboundEmails, sentEmails]);
 
 	// Mobile Summary view: which fullscreen overlay (chat / draft review) is open,
 	// the header-pill scroll target, and this session's send/delete counters.

@@ -992,7 +992,7 @@ const SELECTED_TOOLTIP_STACK_OFFSET_X_PX = 3;
 const SELECTED_TOOLTIP_STACK_OFFSET_Y_PX = 6;
 const SELECTED_TOOLTIP_STACK_FAKE_BACK_COUNT = 3;
 const HOVER_TOOLTIP_SIDE_GAP_X_PX = 3;
-const HOVER_TOOLTIP_SIDE_GAP_Y_PX = 8;
+const HOVER_TOOLTIP_SIDE_GAP_Y_PX = 14;
 const HOVER_TOOLTIP_VIEWPORT_PADDING_PX = 8;
 const PEOPLE_TOOLTIP_FILL_COLOR = '#99E0FF';
 
@@ -1153,11 +1153,11 @@ const selectedTooltipRectsOverlap = (
 		b.top - SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX;
 
 const SELECTED_TOOLTIP_PLACEMENT_SIDES: SelectedTooltipPlacementSide[] = [
+	'top-right',
 	'top',
 	'right',
 	'left',
 	'bottom',
-	'top-right',
 	'top-left',
 	'bottom-right',
 	'bottom-left',
@@ -1190,10 +1190,17 @@ const getSelectedTooltipPlacementTransformOrigin = (
 const createSelectedTooltipPlacement = (
 	entry: ProjectedSelectedTooltipEntry,
 	side: SelectedTooltipPlacementSide,
-	gapPx: number,
+	baseGapPx: number,
+	ringExpansionPx: number,
 	preferenceRank: number
 ): SelectedTooltipIndividualPlacement => {
 	const { markerX, markerY, width, height } = entry;
+	const gapPx = baseGapPx + ringExpansionPx;
+	// The primary `top-right` side hugs the marker at the same gaps as the hover
+	// overlay so the resting label sits exactly where the hover tooltip appears
+	// (a pure cross-fade on hover). Collisions still push it outward via the ring.
+	const topRightGapX = HOVER_TOOLTIP_SIDE_GAP_X_PX + ringExpansionPx;
+	const topRightGapY = HOVER_TOOLTIP_SIDE_GAP_Y_PX + ringExpansionPx;
 	let x = markerX - width / 2;
 	let y = markerY - height - gapPx;
 
@@ -1215,8 +1222,8 @@ const createSelectedTooltipPlacement = (
 			y = markerY - height - gapPx;
 			break;
 		case 'top-right':
-			x = markerX + gapPx;
-			y = markerY - height - gapPx;
+			x = markerX + topRightGapX;
+			y = markerY - height - topRightGapY;
 			break;
 		case 'bottom-left':
 			x = markerX - width - gapPx;
@@ -1331,6 +1338,7 @@ const createSelectedTooltipFallbackPlacement = (
 		entry,
 		'bottom',
 		gapPx,
+		0,
 		SELECTED_TOOLTIP_PLACEMENT_SIDES.length
 	);
 
@@ -1376,13 +1384,14 @@ const buildSelectedTooltipIndividualPlacements = (
 		let bestScore = Number.POSITIVE_INFINITY;
 
 		for (let ring = 0; ring <= SELECTED_TOOLTIP_PLACEMENT_MAX_RING; ring += 1) {
-			const ringGapPx = gapPx + ring * SELECTED_TOOLTIP_PLACEMENT_RING_STEP_PX;
+			const ringExpansionPx = ring * SELECTED_TOOLTIP_PLACEMENT_RING_STEP_PX;
 			for (let index = 0; index < SELECTED_TOOLTIP_PLACEMENT_SIDES.length; index += 1) {
 				const side = SELECTED_TOOLTIP_PLACEMENT_SIDES[index];
 				const placement = createSelectedTooltipPlacement(
 					entry,
 					side,
-					ringGapPx,
+					gapPx,
+					ringExpansionPx,
 					ring * SELECTED_TOOLTIP_PLACEMENT_SIDES.length + index
 				);
 				if (selectedTooltipPlacementOverlapsAny(placement, placedBounds)) continue;
@@ -1785,6 +1794,8 @@ export interface SearchResultsMapProps {
 	searchEngaged?: boolean;
 	/** When true, connects result dots by category even without an active search query. */
 	categoryConstellationsEnabled?: boolean;
+	/** When true, renders the persistent selected-contact SVG labels without requiring the Search action card. */
+	showSelectedContactTooltips?: boolean;
 	/** Campaign overview marker mode. Category mode preserves the normal category-colored markers. */
 	campaignMarkerMode?: 'category' | 'status';
 	/** Per-contact campaign status used when `campaignMarkerMode` is `status`. */
@@ -1795,11 +1806,12 @@ export interface SearchResultsMapProps {
 	 * `campaignMarkerMode === 'status'`.
 	 */
 	campaignHeatmapColor?: string | null;
+	/** Optional per-status tints for the campaign heatmap glow. */
+	campaignHeatmapStatusColors?: Readonly<Record<CampaignContactMapStatus, string>>;
 	/**
 	 * When true, the heatmap glow shows the whole tab set while nothing is
-	 * selected (ambient mode — used by the Inbox tab). When false/absent, the
-	 * glow is selection-only and stays hidden until contacts are selected
-	 * (Contacts and Drafts tabs).
+	 * selected. When false/absent, the glow is selection-only and stays hidden
+	 * until contacts are selected.
 	 */
 	campaignHeatmapAmbient?: boolean;
 	/** Real contacts from the active campaign, rendered as a subtle non-interactive footprint under search results. */
@@ -2030,9 +2042,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	searchWhat,
 	searchEngaged = true,
 	categoryConstellationsEnabled = false,
+	showSelectedContactTooltips = false,
 	campaignMarkerMode = 'category',
 	campaignContactStatusById,
 	campaignHeatmapColor = null,
+	campaignHeatmapStatusColors,
 	campaignHeatmapAmbient = false,
 	campaignFootprintContacts = [],
 	ambientContactsEnabled = false,
@@ -10420,11 +10434,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	// --- Campaign selection heatmap glow -------------------------------------
 	// The heatmap envelops the currently-selected contacts (intersected with the
-	// tab's on-map set so off-tab/coordless ids are dropped). On the Contacts and
-	// Drafts tabs there is no glow until something is selected. The Inbox tab is
-	// "ambient": with nothing selected it glows the whole tab set instead.
+	// tab's on-map set so off-tab/coordless ids are dropped). Ambient tab views
+	// glow the whole visible set when nothing is selected.
 	const heatmapContactIds = useMemo<number[]>(() => {
-		if (campaignMarkerMode !== 'status' || !campaignHeatmapColor) return [];
+		if (
+			campaignMarkerMode !== 'status' ||
+			(!campaignHeatmapColor && !campaignHeatmapStatusColors)
+		) {
+			return [];
+		}
 		const onMapIds = contactsWithCoords.map((c) => c.id);
 		if (selectedContacts.length === 0) return campaignHeatmapAmbient ? onMapIds : [];
 		const onMap = new Set(onMapIds);
@@ -10432,6 +10450,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [
 		campaignMarkerMode,
 		campaignHeatmapColor,
+		campaignHeatmapStatusColors,
 		campaignHeatmapAmbient,
 		contactsWithCoords,
 		selectedContacts,
@@ -10456,7 +10475,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 
 		// Off unless in status mode with a tint supplied.
-		if (campaignMarkerMode !== 'status' || !campaignHeatmapColor) {
+		if (
+			campaignMarkerMode !== 'status' ||
+			(!campaignHeatmapColor && !campaignHeatmapStatusColors)
+		) {
 			cancelFade();
 			campaignHeatmapFadeByIdRef.current.clear();
 			source.setData(emptyFeatureCollection());
@@ -10493,7 +10515,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				features.push({
 					type: 'Feature' as const,
 					id,
-					properties: { glowColor: campaignHeatmapColor, glowFade: fade },
+					properties: {
+						glowColor:
+							campaignHeatmapStatusColors?.[getCampaignStatusForContact(id)] ??
+							campaignHeatmapColor ??
+							'#FFA5A5',
+						glowFade: fade,
+					},
 					geometry: { type: 'Point' as const, coordinates: [coords.lng, coords.lat] },
 				});
 			});
@@ -10530,10 +10558,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isMapLoaded,
 		campaignMarkerMode,
 		campaignHeatmapColor,
+		campaignHeatmapStatusColors,
 		heatmapContactIds,
 		contactsWithCoords,
 		coordsByContactId,
 		getContactCoords,
+		getCampaignStatusForContact,
 	]);
 
 	useEffect(() => {
@@ -18366,7 +18396,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// only the ambient 'all'-contacts gray dots, which stay hover-only.
 	const isStreetCardMode = streetViewEnabled && zoomLevel >= STREET_VIEW_MIN_ZOOM;
 	const selectedCompactTooltipEntries = useMemo(() => {
-		if (!onAddSelectionToFolder || isStreetCardMode) return [];
+		if ((!onAddSelectionToFolder && !showSelectedContactTooltips) || isStreetCardMode) return [];
 
 		type SelectedTooltipKind = 'base' | 'booking' | 'promotion' | 'all' | 'fallback';
 
@@ -18515,6 +18545,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return entries;
 	}, [
 		onAddSelectionToFolder,
+		showSelectedContactTooltips,
 		isStreetCardMode,
 		selectedContacts,
 		contactsWithCoordsById,
@@ -18537,23 +18568,28 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		(m: mapboxgl.Map): ProjectedSelectedTooltipEntry[] =>
 			selectedCompactTooltipEntries.map((entry) => {
 				const p = m.project([entry.coords.lng, entry.coords.lat]);
-				const naturalX = p.x - entry.width / 2;
-				const naturalY = p.y - entry.anchorY - tooltipMarkerGapPx;
+				// Preferred resting anchor = the hover overlay's up-and-to-the-right
+				// spot (bottom-left corner at marker + 3 / marker - 8) so hovering is a
+				// pure cross-fade. The bounding rect stays horizontally centered on the
+				// marker so the zoomed-out stacks don't drift sideways.
+				const centeredX = p.x - entry.width / 2;
+				const naturalX = p.x + HOVER_TOOLTIP_SIDE_GAP_X_PX;
+				const naturalY = p.y - entry.anchorY - HOVER_TOOLTIP_SIDE_GAP_Y_PX;
 				return {
 					...entry,
 					markerX: p.x,
 					markerY: p.y,
 					naturalX,
 					naturalY,
-					left: naturalX,
+					left: centeredX,
 					top: naturalY,
-					right: naturalX + entry.width,
+					right: centeredX + entry.width,
 					bottom: naturalY + entry.height,
-					centerX: naturalX + entry.width / 2,
+					centerX: centeredX + entry.width / 2,
 					centerY: naturalY + entry.height / 2,
 				};
 			}),
-		[selectedCompactTooltipEntries, tooltipMarkerGapPx]
+		[selectedCompactTooltipEntries]
 	);
 	const buildSelectedTooltipStackLayout = useCallback(
 		(projectedEntries: ProjectedSelectedTooltipEntry[], zoom: number) => {
@@ -18752,7 +18788,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const isHiddenByTooltipHover =
 					selectedTooltipHoverHiddenTarget?.type === 'contact' &&
 					selectedTooltipHoverHiddenTarget.id === entry.contact.id;
-				el.style.transformOrigin = placement?.transformOrigin ?? 'bottom center';
+				el.style.transformOrigin = placement?.transformOrigin ?? 'bottom left';
 				el.style.transform = `translate(${Math.round(
 					placement?.x ?? entry.naturalX
 				)}px, ${Math.round(

@@ -76,6 +76,7 @@ import {
 	type MyEventApplication,
 } from '@/hooks/queryHooks/useEventApplications';
 import { deriveEventChatStatus, formatEventChatTimestamp } from '@/utils/eventChatStatus';
+import { resolveDraftRowClick } from './draftRowSelection';
 import {
 	EventChatCard,
 	EVENT_CHAT_COMPACT_ROW_HEIGHT_PX,
@@ -2458,6 +2459,29 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						return;
 					}
 
+					// Drafts tab: a single click cycles selection/showing state.
+					// (Showing row -> no-op, selected non-showing -> deselect,
+					// plain -> promote to showing + clear every other selection.)
+					if (
+						isDraftsFocusMode &&
+						!shouldRedOutDraftRows &&
+						onDraftSelectionChange
+					) {
+						lastClickedDraftRef.current = draft.id;
+						const result = resolveDraftRowClick(
+							draft.id,
+							selectedDraftId ?? null,
+							selectedDraftIds ?? new Set<number>()
+						);
+						if (result.showDraft) onDraftClick?.(draft);
+						if (result.nextSelectedIds) {
+							const nextSelectedIds = result.nextSelectedIds;
+							onDraftSelectionChange(() => nextSelectedIds);
+						}
+						if (contact) onContactClick?.(contact);
+						return;
+					}
+
 					lastClickedDraftRef.current = draft.id;
 					onDraftClick?.(draft);
 					if (contact) onContactClick?.(contact);
@@ -3761,61 +3785,14 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																	{/* Top Right - Title */}
 																	<div className="pr-1.5 pl-0.5 flex items-center justify-start h-[12px]">
 																		{contactTitle ? (
-																			<div
-																				className="h-[10px] rounded-[3px] px-1 flex items-center gap-0.5 max-w-full border border-black overflow-hidden"
-																				style={{
-																					backgroundColor: isRestaurantTitle(contactTitle)
-																						? '#C3FBD1'
-																						: isCoffeeShopTitle(contactTitle)
-																							? '#D6F1BD'
-																							: isMusicVenueTitle(contactTitle)
-																								? '#B7E5FF'
-																								: isMusicFestivalTitle(contactTitle)
-																									? '#C1D6FF'
-																									: isWeddingPlannerTitle(contactTitle) ||
-																										  isWeddingVenueTitle(contactTitle)
-																										? '#FFF2BC'
-																										: '#E8EFFF',
-																				}}
-																			>
-																				{isRestaurantTitle(contactTitle) && (
-																					<RestaurantsIcon size={7} />
-																				)}
-																				{isCoffeeShopTitle(contactTitle) && (
-																					<CoffeeShopsIcon size={4} />
-																				)}
-																				{isMusicVenueTitle(contactTitle) && (
-																					<MusicVenuesIcon
-																						size={7}
-																						className="flex-shrink-0"
-																					/>
-																				)}
-																				{isMusicFestivalTitle(contactTitle) && (
-																					<FestivalsIcon
-																						size={7}
-																						className="flex-shrink-0"
-																					/>
-																				)}
-																				{(isWeddingPlannerTitle(contactTitle) ||
-																					isWeddingVenueTitle(contactTitle)) && (
-																					<WeddingPlannersIcon size={7} />
-																				)}
-																				<span className="text-[7px] text-black leading-none truncate">
-																					{isRestaurantTitle(contactTitle)
-																						? 'Restaurant'
-																						: isCoffeeShopTitle(contactTitle)
-																							? 'Coffee Shop'
-																							: isMusicVenueTitle(contactTitle)
-																								? 'Music Venue'
-																								: isMusicFestivalTitle(contactTitle)
-																									? 'Music Festival'
-																									: isWeddingPlannerTitle(contactTitle)
-																										? 'Wedding Planner'
-																										: isWeddingVenueTitle(contactTitle)
-																											? 'Wedding Venue'
-																											: contactTitle}
-																				</span>
-																			</div>
+																			<TitleBadge
+																				title={contactTitle}
+																				className="h-[10px] rounded-[3px] px-1 max-w-full"
+																				textClassName="text-[7px] text-black"
+																				restaurantIconSize={7}
+																				coffeeIconSize={4}
+																				defaultIconSize={7}
+																			/>
 																		) : null}
 																	</div>
 																	{/* Bottom Left - Company */}
@@ -4087,65 +4064,14 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 															{/* Top Right - Title (aligned to top slot) */}
 															<div className="col-start-2 row-start-1 pr-2 pl-1 flex items-end pb-[2px] overflow-hidden">
 																{contactTitle ? (
-																	<div
-																		className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
-																		style={{
-																			backgroundColor: isRestaurantTitle(contactTitle)
-																				? '#C3FBD1'
-																				: isCoffeeShopTitle(contactTitle)
-																					? '#D6F1BD'
-																					: isMusicVenueTitle(contactTitle)
-																						? '#B7E5FF'
-																						: isMusicFestivalTitle(contactTitle)
-																							? '#C1D6FF'
-																							: isWeddingPlannerTitle(contactTitle) ||
-																								  isWeddingVenueTitle(contactTitle)
-																								? '#FFF2BC'
-																								: '#E8EFFF',
-																		}}
-																	>
-																		{isRestaurantTitle(contactTitle) && (
-																			<RestaurantsIcon size={12} />
-																		)}
-																		{isCoffeeShopTitle(contactTitle) && (
-																			<CoffeeShopsIcon size={7} />
-																		)}
-																		{isMusicVenueTitle(contactTitle) && (
-																			<MusicVenuesIcon
-																				size={12}
-																				className="flex-shrink-0"
-																			/>
-																		)}
-																		{isMusicFestivalTitle(contactTitle) && (
-																			<FestivalsIcon
-																				size={12}
-																				className="flex-shrink-0"
-																			/>
-																		)}
-																		{(isWeddingPlannerTitle(contactTitle) ||
-																			isWeddingVenueTitle(contactTitle)) && (
-																			<WeddingPlannersIcon size={12} />
-																		)}
-																		<ScrollableText
-																			text={
-																				isRestaurantTitle(contactTitle)
-																					? 'Restaurant'
-																					: isCoffeeShopTitle(contactTitle)
-																						? 'Coffee Shop'
-																						: isMusicVenueTitle(contactTitle)
-																							? 'Music Venue'
-																							: isMusicFestivalTitle(contactTitle)
-																								? 'Music Festival'
-																								: isWeddingPlannerTitle(contactTitle)
-																									? 'Wedding Planner'
-																									: isWeddingVenueTitle(contactTitle)
-																										? 'Wedding Venue'
-																										: contactTitle
-																			}
-																			className="text-[10px] text-black leading-none"
-																			scrollPixelsPerSecond={60}
-																		/>
-																	</div>
+																	<TitleBadge
+																		title={contactTitle}
+																		className="h-[17px] rounded-[6px] px-2 gap-1 w-full"
+																		textClassName="text-[10px] text-black"
+																		restaurantIconSize={12}
+																		coffeeIconSize={7}
+																		defaultIconSize={12}
+																	/>
 																) : (
 																	<div className="w-full" />
 																)}
@@ -4249,64 +4175,14 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																<>
 																	{/* Top Right - Title */}
 																	<div className="col-start-2 row-start-1 pr-2 pl-1 flex items-end pb-[2px] overflow-hidden">
-																		<div
-																			className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
-																			style={{
-																				backgroundColor: isRestaurantTitle(contactTitle)
-																					? '#C3FBD1'
-																					: isCoffeeShopTitle(contactTitle)
-																						? '#D6F1BD'
-																						: isMusicVenueTitle(contactTitle)
-																							? '#B7E5FF'
-																							: isMusicFestivalTitle(contactTitle)
-																								? '#C1D6FF'
-																								: isWeddingPlannerTitle(contactTitle) ||
-																									  isWeddingVenueTitle(contactTitle)
-																									? '#FFF2BC'
-																									: '#E8EFFF',
-																			}}
-																		>
-																			{isRestaurantTitle(contactTitle) && (
-																				<RestaurantsIcon size={12} />
-																			)}
-																			{isCoffeeShopTitle(contactTitle) && (
-																				<CoffeeShopsIcon size={7} />
-																			)}
-																			{isMusicVenueTitle(contactTitle) && (
-																				<MusicVenuesIcon
-																					size={12}
-																					className="flex-shrink-0"
-																				/>
-																			)}
-																			{isMusicFestivalTitle(contactTitle) && (
-																				<FestivalsIcon
-																					size={12}
-																					className="flex-shrink-0"
-																				/>
-																			)}
-																			{(isWeddingPlannerTitle(contactTitle) ||
-																				isWeddingVenueTitle(contactTitle)) && (
-																				<WeddingPlannersIcon size={12} />
-																			)}
-																			<ScrollableText
-																				text={
-																					isRestaurantTitle(contactTitle)
-																						? 'Restaurant'
-																						: isCoffeeShopTitle(contactTitle)
-																							? 'Coffee Shop'
-																							: isMusicVenueTitle(contactTitle)
-																								? 'Music Venue'
-																								: isMusicFestivalTitle(contactTitle)
-																									? 'Music Festival'
-																									: isWeddingPlannerTitle(contactTitle)
-																										? 'Wedding Planner'
-																										: isWeddingVenueTitle(contactTitle)
-																											? 'Wedding Venue'
-																											: contactTitle
-																				}
-																				className="text-[10px] text-black leading-none"
-																			/>
-																		</div>
+																		<TitleBadge
+																			title={contactTitle}
+																			className="h-[17px] rounded-[6px] px-2 gap-1 w-full"
+																			textClassName="text-[10px] text-black"
+																			restaurantIconSize={12}
+																			coffeeIconSize={7}
+																			defaultIconSize={12}
+																		/>
 																	</div>
 
 																	{/* Bottom Right - Location */}

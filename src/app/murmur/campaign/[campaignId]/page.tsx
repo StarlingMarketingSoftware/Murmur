@@ -209,9 +209,9 @@ const CAMPAIGN_TAB_PRESET_STATUSES: Partial<
 	inbox: ['sent', 'new-message'],
 };
 
-// Per-tab tint for the map selection heatmap glow (rendered behind the status
-// pins). Keyed on the active view; tabs without an entry (e.g. overview) get no
-// glow. The overview/All tab is intentionally omitted for now.
+// Per-tab tint for the map heatmap glow (rendered behind the status pins).
+// All/overview uses the per-status colors below because it can show multiple
+// statuses at once.
 const CAMPAIGN_TAB_HEATMAP_COLOR: Partial<Record<ViewType, string>> = {
 	testing: '#FFA5A5', // Contacts — pink/red
 	drafting: '#FFD4A9', // Drafts — orange
@@ -3380,6 +3380,12 @@ const Murmur = () => {
 		for (const contact of contacts) {
 			const titleLike =
 				contact.curatedDisplayLabel || contact.title || contact.headline || '';
+			const derivedCategory =
+				getPromotionOverlayWhatFromContactTitle(titleLike) ||
+				getBookingTitlePrefixFromContactTitle(titleLike);
+			const mapContact = derivedCategory
+				? { ...contact, curatedCategory: derivedCategory }
+				: contact;
 
 			// The left-panel category-tile filter applies in every grouping mode, so
 			// deselecting a category hides those markers whether the map is grouped by
@@ -3394,19 +3400,14 @@ const Murmur = () => {
 			if (effectiveMapGroupingForActiveView === 'status') {
 				const status = campaignOverviewContactStatusById.get(contact.id) ?? 'contacts';
 				if (!effectiveActiveStatusSetForActiveView.has(status)) continue;
-				out.push(contact);
+				out.push(mapContact);
 				continue;
 			}
 
 			// The map colors result dots by `contact.curatedCategory` (or the active search "What").
 			// Campaign contacts are not a single-category search, so derive a per-contact category
 			// from the stored title prefix.
-			const derivedCategory =
-				getPromotionOverlayWhatFromContactTitle(titleLike) ||
-				getBookingTitlePrefixFromContactTitle(titleLike);
-			out.push(
-				derivedCategory ? { ...contact, curatedCategory: derivedCategory } : contact
-			);
+			out.push(mapContact);
 		}
 
 		return out;
@@ -3418,6 +3419,29 @@ const Murmur = () => {
 		mapGrabActiveCategories,
 		mapGrabUncategorizedActive,
 	]);
+	const campaignSelectedContactObjectsForMap = useMemo(() => {
+		if (!campaignMapContacts || campaignMapSelectedContactIds.length === 0) return [];
+		const contactsById = new Map(campaignMapContacts.map((contact) => [contact.id, contact]));
+		const selectedObjects = [] as typeof campaignMapContacts;
+		const seenIds = new Set<number>();
+
+		for (const id of campaignMapSelectedContactIds) {
+			if (seenIds.has(id)) continue;
+			seenIds.add(id);
+			const contact = contactsById.get(id);
+			if (!contact) continue;
+			const titleLike =
+				contact.curatedDisplayLabel || contact.title || contact.headline || '';
+			const derivedCategory =
+				getPromotionOverlayWhatFromContactTitle(titleLike) ||
+				getBookingTitlePrefixFromContactTitle(titleLike);
+			selectedObjects.push(
+				derivedCategory ? { ...contact, curatedCategory: derivedCategory } : contact
+			);
+		}
+
+		return selectedObjects;
+	}, [campaignMapContacts, campaignMapSelectedContactIds]);
 
 	const persistentCampaignMapProps = useMemo<SearchResultsMapProps>(
 		() => ({
@@ -3430,12 +3454,21 @@ const Murmur = () => {
 			cameraPadding: campaignMapCameraPadding,
 			contacts: campaignMapContactsForMap,
 			selectedContacts: campaignMapSelectedContactIds,
+			selectedContactObjects: campaignSelectedContactObjectsForMap,
+			showSelectedContactTooltips: true,
 			onToggleSelection: requestMapMarkerSelection,
 			campaignContactStatusById: campaignOverviewContactStatusById,
 			campaignMarkerMode: effectiveMapGroupingForActiveView,
 			campaignHeatmapColor: CAMPAIGN_TAB_HEATMAP_COLOR[activeView] ?? null,
-			// Inbox glows its whole set ambiently; Contacts/Drafts glow only the selection.
-			campaignHeatmapAmbient: activeView === 'inbox',
+			campaignHeatmapStatusColors:
+				activeView === 'overview' ? CAMPAIGN_OVERVIEW_STATUS_PILL_COLOR : undefined,
+			// These campaign tabs glow their visible set before selection, then narrow
+			// to selected on-map contacts once a selection exists.
+			campaignHeatmapAmbient:
+				activeView === 'overview' ||
+				activeView === 'testing' ||
+				activeView === 'drafting' ||
+				activeView === 'inbox',
 			categoryConstellationsEnabled: true,
 			activeTool: activeMapTool,
 			requestedZoom: mapZoomControlRequest,
@@ -3451,6 +3484,7 @@ const Murmur = () => {
 			campaignMapCameraPadding,
 			campaignMapContactsForMap,
 			campaignMapSelectedContactIds,
+			campaignSelectedContactObjectsForMap,
 			requestMapMarkerSelection,
 			campaignOverviewContactStatusById,
 			effectiveMapGroupingForActiveView,
