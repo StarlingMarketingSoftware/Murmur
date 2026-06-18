@@ -2281,6 +2281,41 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		isPersistedSendQueueUiVisible && !isMobile && !hideHeaderBox && !isNarrowestDesktop;
 	const [persistedSendQueueFocusedIndex, setPersistedSendQueueFocusedIndex] = useState(0);
 	useEffect(() => {
+		if (!isPersistedSendQueueUiVisible) return;
+
+		const handlePointerDown = (event: PointerEvent) => {
+			const target =
+				event.target instanceof Element
+					? event.target
+					: event.target instanceof Node
+						? event.target.parentElement
+						: null;
+			const isWithinSendQueueApparatus = Array.from(
+				document.querySelectorAll<HTMLElement>('[data-send-queue-apparatus]')
+			).some((element) => {
+				const rect = element.getBoundingClientRect();
+				return (
+					event.clientX >= rect.left &&
+					event.clientX <= rect.right &&
+					event.clientY >= rect.top &&
+					event.clientY <= rect.bottom
+				);
+			});
+			if (
+				isWithinSendQueueApparatus ||
+				target?.closest(
+					'[data-send-queue-apparatus], [data-campaign-header-box], [data-campaign-workspace-toggle], .dashboard-globe-bg'
+				)
+			) {
+				return;
+			}
+			closePersistedSendQueue();
+		};
+
+		document.addEventListener('pointerdown', handlePointerDown, true);
+		return () => document.removeEventListener('pointerdown', handlePointerDown, true);
+	}, [closePersistedSendQueue, isPersistedSendQueueUiVisible]);
+	useEffect(() => {
 		if (persistedSendQueueFocusedIndex > persistedSendQueueItems.length - 1) {
 			setPersistedSendQueueFocusedIndex(Math.max(0, persistedSendQueueItems.length - 1));
 		}
@@ -2299,6 +2334,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			status: item.status === 'processing' ? ('sending' as const) : ('queued' as const),
 			logLines: [],
 			startedAt: new Date(item.scheduledFor).getTime(),
+			queuedAt: new Date(item.queuedAt).getTime(),
+			scheduledFor: new Date(item.scheduledFor).getTime(),
 			progress: item.status === 'processing' ? 0.5 : 0,
 		}));
 		return {
@@ -2331,20 +2368,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		isSendingUiVisible;
 
 	const renderQueuePanel = (width: number, height: number) => (
-		<SendingExpandedList
-			width={width}
-			height={height}
-			staticSession={queuePanelStaticSession}
-			onDismiss={queuePanelDismiss}
-			onItemClick={queuePanelStaticSession ? setPersistedSendQueueFocusedIndex : undefined}
-			showingIndex={queuePanelStaticSession ? persistedSendQueueFocusedIndex : undefined}
-			onItemCancel={queuePanelStaticSession ? handleCancelPersistedSendQueueItem : undefined}
-			isItemCanceling={(index) =>
-				isCancelingSendQueueItem &&
-				cancelSendQueueItemVariables?.queueId === persistedSendQueueItems[index]?.queueId
-			}
-			canCancelItem={(index) => persistedSendQueueItems[index]?.status === 'pending'}
-		/>
+		<div data-send-queue-apparatus style={{ display: 'contents' }}>
+			<SendingExpandedList
+				width={width}
+				height={height}
+				staticSession={queuePanelStaticSession}
+				onDismiss={queuePanelDismiss}
+				onItemClick={queuePanelStaticSession ? setPersistedSendQueueFocusedIndex : undefined}
+				showingIndex={queuePanelStaticSession ? persistedSendQueueFocusedIndex : undefined}
+				onItemCancel={queuePanelStaticSession ? handleCancelPersistedSendQueueItem : undefined}
+				isItemCanceling={(index) =>
+					isCancelingSendQueueItem &&
+					cancelSendQueueItemVariables?.queueId === persistedSendQueueItems[index]?.queueId
+				}
+				canCancelItem={(index) => persistedSendQueueItems[index]?.status === 'pending'}
+			/>
+		</div>
 	);
 	const queueDeckShouldUseDraftsOffset = view !== 'drafting';
 	const expandedSendQueueShiftRightPx = 16;
@@ -2372,10 +2411,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			/>
 		);
 
-		if (!queueDeckShouldUseDraftsOffset && queueDeckOffsetX === 0) return deck;
+		if (!queueDeckShouldUseDraftsOffset && queueDeckOffsetX === 0) {
+			return (
+				<div data-send-queue-apparatus style={{ display: 'contents' }}>
+					{deck}
+				</div>
+			);
+		}
 
 		return (
 			<div
+				data-send-queue-apparatus
 				style={{
 					marginTop: queueDeckShouldUseDraftsOffset ? '15px' : undefined,
 					transform:
@@ -4931,6 +4977,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const renderSendQueueBottomBar = () => (
 		<div
+			data-send-queue-apparatus
 			data-draft-button-container
 			className="flex items-center"
 			style={{ gap: 3, height: writeDraftBottomBarHeightPx }}
@@ -6217,6 +6264,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								<div
 									className="absolute"
 									data-research-panel-container
+									data-send-queue-apparatus={
+										isPersistedSendQueueUiVisible ? 'true' : undefined
+									}
 									style={{
 										top: isStandardSidePanelView || isInboxSendQueueRightResearchPanelActive
 											? `${standardSidePanelTopOffsetPx}px`

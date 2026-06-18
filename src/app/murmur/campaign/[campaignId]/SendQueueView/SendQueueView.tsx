@@ -47,9 +47,8 @@ export const SendQueueView: FC<SendQueueViewProps> = ({ items, onClose }) => {
 	}, [onClose]);
 
 	// Map the persisted queue rows into the shape the green "Sending" cards consume.
-	// status:'queued' gives the built-in "awaiting dispatch / holding position in
-	// send queue" placeholder lines; activeIndex:-1 keeps every card at full opacity
-	// with no highlight (static, not live).
+	// status:'queued' renders the queued/scheduled timeline; activeIndex:-1 keeps
+	// every card at full opacity with no highlight (static, not live).
 	const staticSession = useMemo(() => {
 		const queue: SendingQueueItem[] = items.map((it) => ({
 			emailId: it.emailId,
@@ -60,6 +59,8 @@ export const SendQueueView: FC<SendQueueViewProps> = ({ items, onClose }) => {
 			status: 'queued' as const,
 			logLines: [],
 			startedAt: new Date(it.scheduledFor).getTime(),
+			queuedAt: new Date(it.queuedAt).getTime(),
+			scheduledFor: new Date(it.scheduledFor).getTime(),
 			progress: 0,
 		}));
 		return {

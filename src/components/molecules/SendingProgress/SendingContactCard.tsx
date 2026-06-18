@@ -4,6 +4,7 @@ import { FC } from 'react';
 import { cn } from '@/utils';
 import {
 	formatLogTimestamp,
+	formatSendQueueDateTime,
 	formatSendStartedAt,
 	SendingQueueItem,
 } from '@/contexts/SendingSessionContext';
@@ -83,6 +84,23 @@ export const SendingContactCard: FC<SendingContactCardProps> = ({
 		: (backgroundColor ??
 			(isBlendedInactive ? SENDING_PANEL_GREEN : SENDING_QUEUED_CARD_GREEN));
 	const logLines = item.logLines.slice(-2);
+	const queuedAt =
+		typeof item.queuedAt === 'number' && Number.isFinite(item.queuedAt)
+			? item.queuedAt
+			: null;
+	const scheduledFor =
+		typeof item.scheduledFor === 'number' && Number.isFinite(item.scheduledFor)
+			? item.scheduledFor
+			: typeof item.startedAt === 'number' && Number.isFinite(item.startedAt)
+				? item.startedAt
+				: null;
+	const queuedTimelineLines =
+		scheduledFor != null
+			? [
+					`${formatSendQueueDateTime(queuedAt ?? scheduledFor)} sent to queue`,
+					`${formatSendQueueDateTime(scheduledFor)} will send`,
+				]
+			: QUEUED_PLACEHOLDER_LINES;
 
 	return (
 		<div
@@ -124,21 +142,23 @@ export const SendingContactCard: FC<SendingContactCardProps> = ({
 							</div>
 						) : null}
 					</div>
-					<div className="flex flex-col items-end gap-[3px] shrink-0 max-w-[55%]">
-						<div className="flex items-center gap-2">
-							{contactTitle ? (
-								<TitleBadge
-									title={contactTitle}
-									className="h-[17px] rounded-[6px] px-2 gap-1 max-w-[140px]"
-									textClassName="text-[10px] leading-none"
-									fillColor={pillFillColor}
-									strokeColor={strokeColor}
-									textColor={textColor}
-									restaurantIconSize={12}
-									coffeeIconSize={7}
-									defaultIconSize={12}
-								/>
-							) : null}
+					<div className="flex w-[186px] max-w-[55%] shrink-0 flex-col items-stretch gap-[3px]">
+						<div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+							<div className="min-w-0">
+								{contactTitle ? (
+									<TitleBadge
+										title={contactTitle}
+										className="h-[17px] max-w-full rounded-[6px] px-2 gap-1"
+										textClassName="text-[10px] leading-none"
+										fillColor={pillFillColor}
+										strokeColor={strokeColor}
+										textColor={textColor}
+										restaurantIconSize={12}
+										coffeeIconSize={7}
+										defaultIconSize={12}
+									/>
+								) : null}
+							</div>
 							{item.startedAt != null ? (
 								<span
 									className="text-[12px] font-semibold leading-none whitespace-nowrap"
@@ -150,7 +170,7 @@ export const SendingContactCard: FC<SendingContactCardProps> = ({
 						</div>
 						<StateLocationRow
 							contact={item.contact}
-							className="h-[16px] gap-1 justify-end"
+							className="h-[16px] min-w-0 gap-1 justify-start"
 							badgeClassName="box-border w-[29px] h-[16px] rounded-[4px] shrink-0"
 							badgeTextClassName="font-inter text-[10px] leading-none font-bold"
 							cityClassName="text-[12px] leading-none font-bold"
@@ -162,11 +182,11 @@ export const SendingContactCard: FC<SendingContactCardProps> = ({
 				</div>
 				<div className="mt-[6px] flex flex-col gap-[2px]">
 					{item.status === 'queued'
-						? QUEUED_PLACEHOLDER_LINES.map((line) => (
+						? queuedTimelineLines.map((line) => (
 								<div
 									key={line}
-									className="font-mono text-[10.5px] leading-[14px] truncate opacity-70"
-									style={{ color: textColor }}
+									className="overflow-hidden text-ellipsis whitespace-nowrap font-inter text-[13.261px] font-normal leading-[21.218px]"
+									style={{ color: '#FFFFFF' }}
 								>
 									{line}
 								</div>

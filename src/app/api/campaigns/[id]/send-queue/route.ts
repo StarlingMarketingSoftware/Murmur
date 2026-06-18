@@ -45,6 +45,7 @@ export async function GET(_req: NextRequest, { params }: { params: ApiRouteParam
 				contactId: true,
 				status: true,
 				scheduledFor: true,
+				createdAt: true,
 			},
 		});
 
@@ -80,6 +81,7 @@ export async function GET(_req: NextRequest, { params }: { params: ApiRouteParam
 				status:
 					row.status === SendQueueStatus.processing ? 'processing' : 'pending',
 				scheduledFor: row.scheduledFor.toISOString(),
+				queuedAt: row.createdAt.toISOString(),
 				email: {
 					subject: email.subject,
 					message: email.message,

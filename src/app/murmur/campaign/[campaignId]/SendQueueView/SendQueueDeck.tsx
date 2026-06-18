@@ -65,6 +65,7 @@ export const SendQueueDeck: FC<SendQueueDeckProps> = ({
 
 	return (
 		<div
+			data-send-queue-apparatus
 			style={{ position: 'relative', width, height }}
 			onClick={advance}
 			role={items.length > 1 ? 'button' : undefined}

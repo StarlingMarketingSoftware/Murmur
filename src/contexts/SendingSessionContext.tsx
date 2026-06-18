@@ -38,6 +38,8 @@ export type SendingQueueItem = {
 	status: SendingItemStatus;
 	logLines: SendingLogLine[];
 	startedAt: number | null;
+	queuedAt?: number;
+	scheduledFor?: number;
 	/** 0..1 scripted step progress for the active card's thin progress bar. */
 	progress: number;
 };
@@ -421,4 +423,12 @@ export const formatSendStartedAt = (ts: number): string => {
 	const hours = d.getHours() % 12 || 12;
 	const minutes = String(d.getMinutes()).padStart(2, '0');
 	return `${hours}:${minutes}${d.getHours() >= 12 ? 'pm' : 'am'}`;
+};
+
+/** "[03:12:2.18]" — compact month/day/hour.minute stamp for queue rows. */
+export const formatSendQueueDateTime = (ts: number): string => {
+	const d = new Date(ts);
+	const pad = (n: number) => String(n).padStart(2, '0');
+	const hours = d.getHours() % 12 || 12;
+	return `[${pad(d.getMonth() + 1)}:${pad(d.getDate())}:${hours}.${pad(d.getMinutes())}]`;
 };

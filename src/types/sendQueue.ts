@@ -16,6 +16,8 @@ export interface SendQueueItemVM {
 	status: 'pending' | 'processing';
 	/** ISO instant the worker will attempt the send. */
 	scheduledFor: string;
+	/** ISO instant the user added this message to the send queue. */
+	queuedAt: string;
 	email: {
 		subject: string | null;
 		message: string | null;
