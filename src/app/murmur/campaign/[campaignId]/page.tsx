@@ -58,6 +58,8 @@ import StatusSentIcon from '@/components/atoms/svg/StatusSentIcon';
 import nextDynamic from 'next/dynamic';
 import { CampaignsTable } from '@/components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
+import { SendQueueViewProvider, useSendQueueView } from '@/contexts/SendQueueViewContext';
+import { SendQueueOverlayMount } from '@/app/murmur/campaign/[campaignId]/SendQueueView/SendQueueOverlayMount';
 import { useEditCampaign, useGetCampaignContacts } from '@/hooks/queryHooks/useCampaigns';
 import { useCampaignTopNavScheme } from '@/hooks/useCampaignTopNavScheme';
 import { EMAIL_QUERY_KEYS, useGetEmails } from '@/hooks/queryHooks/useEmails';
@@ -631,6 +633,8 @@ const CampaignOverviewBottomBoxes = ({
 	onOpenSent,
 	onOpenOpportunities,
 }: CampaignOverviewBottomBoxesProps) => {
+	const { isOpen: isSendQueueOpen } = useSendQueueView();
+	const sendQueueBarScale = 39.154 / 40;
 	const boxStyle: CSSProperties = {
 		width: 39.154,
 		height: 39.154,
@@ -715,6 +719,29 @@ const CampaignOverviewBottomBoxes = ({
 				>
 					<SearchIconDesktop width={17} height={18} stroke="#8B8B8B" strokeWidth={2.3} />
 				</button>
+				{isSendQueueOpen ? (
+					<div
+						aria-hidden="true"
+						className="flex overflow-hidden"
+						style={{
+							width: 472 * sendQueueBarScale,
+							height: 39.154,
+							borderRadius: 5 * sendQueueBarScale,
+							border: `${2 * sendQueueBarScale}px solid #000`,
+							boxSizing: 'border-box',
+							background: '#FFEAEA',
+						}}
+					>
+						<div style={{ flex: 1 }} />
+						<div
+							style={{
+								width: 58 * sendQueueBarScale,
+								borderLeft: `${2 * sendQueueBarScale}px solid #000`,
+								background: '#EB8586',
+							}}
+						/>
+					</div>
+				) : null}
 				{countBox({
 					label: 'contacts',
 					count: contactsCount,
@@ -3825,6 +3852,7 @@ const Murmur = () => {
 		<CampaignDeviceProvider isMobile={isMobile} activeView={activeView}>
 			<HoverDescriptionProvider defaultEnabled>
 				<CampaignTopSearchHighlightProvider value={topSearchHighlightCtx}>
+					<SendQueueViewProvider>
 					<div
 						className={cn(
 							'min-h-screen relative',
@@ -5743,7 +5771,14 @@ const Murmur = () => {
 								onChange={setInboxMockState}
 							/>
 						)}
+						{routeCampaignId != null && (
+							<SendQueueOverlayMount
+								campaignId={routeCampaignId}
+								isMobile={isMobile}
+							/>
+						)}
 					</div>
+					</SendQueueViewProvider>
 				</CampaignTopSearchHighlightProvider>
 			</HoverDescriptionProvider>
 		</CampaignDeviceProvider>

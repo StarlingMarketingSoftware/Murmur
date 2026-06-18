@@ -4,20 +4,14 @@ import { FC, MouseEvent, useEffect, useMemo, useRef, useState, useCallback } fro
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
-import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
-import { useEditEmail } from '@/hooks/queryHooks/useEmails';
-import { useEditUser } from '@/hooks/queryHooks/useUsers';
+import { useDivertEmailToMessage } from '@/hooks/queryHooks/useConversations';
+import { useEnqueueEmails } from '@/hooks/queryHooks/useSendQueue';
 import { useMe } from '@/hooks/useMe';
 import { StripeSubscriptionStatus } from '@/types';
 import { EmailStatus } from '@/constants/prismaEnums';
 import { useGetCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { EmailWithRelations } from '@/types';
 import { ContactWithName } from '@/types/contact';
-import {
-	getSendDwellMs,
-	useSendingSessionActions,
-	waitForSendDwell,
-} from '@/contexts/SendingSessionContext';
 import { cn, convertHtmlToPlainText } from '@/utils';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
@@ -215,7 +209,6 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	onOpenDrafts,
 	onDraftHover,
 	interactionMode = 'default',
-	onSendingPreviewUpdate,
 	onSendingPreviewReset,
 	collapsed = false,
 	width = 376,
@@ -301,12 +294,10 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	const { data: campaign } = useGetCampaign(campaignId);
 	const { user, subscriptionTier } = useMe();
 	const queryClient = useQueryClient();
-	const { mutateAsync: sendMailgunMessage } = useSendMailgunMessage({
+	const { mutateAsync: divertEmailToMessage } = useDivertEmailToMessage({
 		suppressToasts: true,
 	});
-	const { mutateAsync: updateEmail } = useEditEmail({ suppressToasts: true });
-	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
-	const sendingActions = useSendingSessionActions();
+	const enqueueEmails = useEnqueueEmails();
 
 	const handleDraftClick = (draft: EmailWithRelations, e: MouseEvent) => {
 		if (isPreviewMode && onDraftPreviewClick) {
@@ -448,147 +439,85 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	const verticalPaddingClass = isBottomView ? 'pt-0 pb-0' : 'pt-2 pb-2';
 
 	const handleSendSelected = async () => {
-		console.log('handleSendSelected called', { isSendDisabled, selectedDraftIds });
 		if (isSendDisabled) return;
 		const selectedDrafts = drafts.filter((d) => selectedDraftIds.has(d.id as number));
-		console.log('Selected drafts:', selectedDrafts);
 		if (selectedDrafts.length === 0) return;
 
-		console.log('Campaign identity:', campaign?.identity);
-		if (!campaign?.identity?.email || !campaign?.identity?.name) {
-			toast.error('Please create an Identity before sending messages.');
-			return;
+		// Venue recipients become internal messages (synchronous, no credit, never
+		// queued); everyone else is enqueued into the async send queue. This split
+		// mirrors useDraftReviewHandlers.handleSendDrafts / useConfirmSendDialog.
+		const venueDrafts = selectedDrafts.filter((d) => d.contact?.venueId != null);
+		const emailDrafts = selectedDrafts.filter((d) => d.contact?.venueId == null);
+
+		// Identity + plan are required only to send EMAILS, not internal messages.
+		if (emailDrafts.length > 0) {
+			if (!campaign?.identity?.email || !campaign?.identity?.name) {
+				toast.error('Please create an Identity before sending messages.');
+				return;
+			}
+			if (
+				!subscriptionTier &&
+				user?.stripeSubscriptionStatus !== StripeSubscriptionStatus.TRIALING
+			) {
+				toast.error('Please upgrade to a paid plan to send messages.');
+				return;
+			}
 		}
 
-		if (
-			!subscriptionTier &&
-			user?.stripeSubscriptionStatus !== StripeSubscriptionStatus.TRIALING
-		) {
-			toast.error('Please upgrade to a paid plan to send messages.');
-			return;
-		}
-
-		const sendingCredits = user?.sendingCredits || 0;
-		if (sendingCredits === 0) {
-			toast.error(
-				'You have run out of sending credits. Please upgrade your subscription.'
-			);
-			return;
-		}
-
-		const emailsWeCanSend = Math.min(selectedDrafts.length, sendingCredits);
-		const emailsToProcess = selectedDrafts.slice(0, emailsWeCanSend);
-
-		// Drive the campaign-global sending UI; queue mirrors the processing order below.
-		const sessionStarted = sendingActions.startSession({
-			campaignId: campaign.id,
-			queue: emailsToProcess.map((email) => ({
-				emailId: email.id as number,
-				contactId: email.contactId,
-				contact: (contacts.find((c) => c.id === email.contactId) ??
-					email.contact) as ContactWithName,
-				kind: 'email',
-				subject: email.subject,
-			})),
-		});
-		if (!sessionStarted) {
-			toast.error('A send is already in progress.');
-			return;
-		}
-		// No sending UI without the provider — skip the dwell.
-		const dwellMs = sendingActions.hasProvider
-			? getSendDwellMs(emailsToProcess.length)
-			: 0;
+		if (!campaign) return;
 
 		setIsSending(true);
+		// Clear any stale live Send Preview in the status panel.
 		if (onSendingPreviewReset) onSendingPreviewReset();
-		let successfulSends = 0;
+		let messagedCount = 0;
+		let scheduledCount = 0;
+		let skippedNoCredits = 0;
 		try {
-			for (let i = 0; i < emailsToProcess.length; i++) {
-				const email = emailsToProcess[i];
-				const dwellStart = Date.now();
-				sendingActions.beginEmail(email.id as number);
-				if (onSendingPreviewUpdate) {
-					onSendingPreviewUpdate({
-						contactId: email.contactId,
-						subject: email.subject || undefined,
-					});
-				}
+			// 1) Internal messages to venue users — synchronous, no credit cost.
+			for (const email of venueDrafts) {
 				try {
-					const contact = contacts.find((c) => c.id === email.contactId);
-					const recipientEmail = email.contact?.email || contact?.email;
+					await divertEmailToMessage(email.id as number);
+					messagedCount++;
+				} catch (error) {
+					console.error('Failed to deliver internal message:', error);
+				}
+			}
 
-					if (!recipientEmail) {
-						console.error('No recipient email found for draft:', email.id);
-						sendingActions.failEmail(email.id as number);
-						continue;
-					}
-
-					const res = await sendMailgunMessage({
-						subject: email.subject,
-						message: email.message,
-						recipientEmail: recipientEmail,
-						senderEmail: campaign.identity?.email,
-						senderName: campaign.identity?.name,
-						originEmail:
-							user?.customDomain && user?.customDomain !== ''
-								? user?.customDomain
-								: user?.murmurEmail,
-						replyToEmail: user?.replyToEmail ?? user?.murmurEmail ?? undefined,
-						template: 'newMessage',
+			// 2) Regular emails → async send queue. The worker charges sending credits
+			// AT SEND TIME, so there is NO client-side credit debit here; the endpoint
+			// gates the batch and reports the remainder as skippedNoCredits.
+			if (emailDrafts.length > 0) {
+				try {
+					const result = await enqueueEmails.mutateAsync({
 						campaignId: campaign.id,
+						emailIds: emailDrafts.map((d) => d.id as number),
 					});
-					if (res.success) {
-						await updateEmail({
-							id: email.id.toString(),
-							data: { status: EmailStatus.sent, sentAt: new Date() },
-						});
-						successfulSends++;
-						sendingActions.completeEmail(email.id as number);
-						if (onSendingPreviewReset) onSendingPreviewReset();
-					} else {
-						sendingActions.failEmail(email.id as number);
-					}
-				} catch (err) {
-					console.error('Failed to send email:', err);
-					sendingActions.failEmail(email.id as number);
+					scheduledCount = result.scheduledCount;
+					skippedNoCredits = result.skippedNoCredits;
+				} catch (error) {
+					console.error('Failed to enqueue messages:', error);
+					toast.error('Failed to add messages to the sending queue.');
 				}
-				await waitForSendDwell(dwellStart, dwellMs);
 			}
 
-			// Update credits per user with this
-			if (user && successfulSends > 0) {
-				const newCreditBalance = Math.max(0, sendingCredits - successfulSends);
-				await editUser({
-					clerkId: user.clerkId,
-					data: { sendingCredits: newCreditBalance },
-				});
-			}
-
-			// Invalidate campaign and email queries
 			await queryClient.invalidateQueries({ queryKey: ['campaigns'] });
-			await queryClient.invalidateQueries({ queryKey: ['emails'] });
 
-			// Clear selection and notify
 			setSelectedDraftIds(new Set());
-			if (successfulSends === selectedDrafts.length) {
-				toast.success(`All ${successfulSends} messages sent successfully!`);
-			} else if (successfulSends > 0) {
-				if (emailsWeCanSend < selectedDrafts.length) {
-					toast.warning(`Sent ${successfulSends} messages before running out of credits.`);
-				} else {
-					toast.warning(
-						`${successfulSends} of ${selectedDrafts.length} messages sent successfully.`
-					);
-				}
-			} else {
-				toast.error('Failed to send messages. Please try again.');
+			if (scheduledCount > 0) {
+				toast.success('Message added to sending queue');
+			}
+			if (skippedNoCredits > 0) {
+				toast.warning(
+					`${skippedNoCredits} message${
+						skippedNoCredits === 1 ? '' : 's'
+					} not queued — out of sending credits.`
+				);
+			}
+			if (messagedCount > 0 && scheduledCount === 0 && skippedNoCredits === 0) {
+				toast.success(`${messagedCount} message${messagedCount === 1 ? '' : 's'} sent.`);
 			}
 		} finally {
-			sendingActions.finishSession();
 			setIsSending(false);
-			// Clear live Send Preview in status panel
-			if (onSendingPreviewReset) onSendingPreviewReset();
 		}
 	};
 	return (

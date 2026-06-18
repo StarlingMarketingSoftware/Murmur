@@ -979,9 +979,7 @@ const SELECTED_TOOLTIP_STACK_MIN_SCALE = 0.9;
 const SELECTED_TOOLTIP_LEGACY_STACK_T = 0.18;
 const SELECTED_TOOLTIP_STACK_GROUP_SIZE = 10;
 const SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX = 6;
-const SELECTED_TOOLTIP_PLACEMENT_VIEWPORT_PADDING_PX = 8;
 const SELECTED_TOOLTIP_PLACEMENT_OVERLAP_WEIGHT = 200;
-const SELECTED_TOOLTIP_PLACEMENT_OVERFLOW_WEIGHT = 250;
 const SELECTED_TOOLTIP_PLACEMENT_DISTANCE_WEIGHT = 0.08;
 const SELECTED_TOOLTIP_PLACEMENT_MAX_RING = 18;
 const SELECTED_TOOLTIP_PLACEMENT_RING_STEP_PX = 28;
@@ -1069,12 +1067,6 @@ type SelectedTooltipIndividualPlacement = SelectedTooltipBounds & {
 	centerY: number;
 	transformOrigin: string;
 	preferenceRank: number;
-};
-
-type SelectedTooltipViewport = {
-	width: number;
-	height: number;
-	padding: number;
 };
 
 const createHoverTooltipSidePlacement = ({
@@ -1284,46 +1276,21 @@ const selectedTooltipPlacementOverlapsAny = (
 		)
 	);
 
-const getSelectedTooltipViewportOverflowArea = (
-	placement: SelectedTooltipIndividualPlacement,
-	viewport: SelectedTooltipViewport | null
-): number => {
-	if (!viewport) return 0;
-	const minX = viewport.padding;
-	const minY = viewport.padding;
-	const maxX = viewport.width - viewport.padding;
-	const maxY = viewport.height - viewport.padding;
-	const visibleLeft = clamp(placement.left, minX, maxX);
-	const visibleRight = clamp(placement.right, minX, maxX);
-	const visibleTop = clamp(placement.top, minY, maxY);
-	const visibleBottom = clamp(placement.bottom, minY, maxY);
-	const visibleArea =
-		Math.max(0, visibleRight - visibleLeft) *
-		Math.max(0, visibleBottom - visibleTop);
-	const totalArea =
-		Math.max(0, placement.right - placement.left) *
-		Math.max(0, placement.bottom - placement.top);
-	return Math.max(0, totalArea - visibleArea);
-};
-
 const scoreSelectedTooltipPlacement = (
 	entry: ProjectedSelectedTooltipEntry,
 	placement: SelectedTooltipIndividualPlacement,
-	placedTooltips: SelectedTooltipIndividualPlacement[],
-	viewport: SelectedTooltipViewport | null
+	placedTooltips: SelectedTooltipIndividualPlacement[]
 ): number => {
 	const overlapArea = placedTooltips.reduce(
 		(sum, placed) => sum + getSelectedTooltipOverlapArea(placement, placed),
 		0
 	);
-	const overflowArea = getSelectedTooltipViewportOverflowArea(placement, viewport);
 	const distanceFromNatural = Math.hypot(
 		placement.x - entry.naturalX,
 		placement.y - entry.naturalY
 	);
 	return (
 		overlapArea * SELECTED_TOOLTIP_PLACEMENT_OVERLAP_WEIGHT +
-		overflowArea * SELECTED_TOOLTIP_PLACEMENT_OVERFLOW_WEIGHT +
 		distanceFromNatural * SELECTED_TOOLTIP_PLACEMENT_DISTANCE_WEIGHT +
 		placement.preferenceRank
 	);
@@ -1368,7 +1335,6 @@ const buildSelectedTooltipIndividualPlacements = (
 	projectedEntries: ProjectedSelectedTooltipEntry[],
 	hiddenContactIds: ReadonlySet<number>,
 	blockingBounds: SelectedTooltipBounds[],
-	viewport: SelectedTooltipViewport | null,
 	gapPx: number
 ): Map<number, SelectedTooltipIndividualPlacement> => {
 	const placements = new Map<number, SelectedTooltipIndividualPlacement>();
@@ -1399,8 +1365,7 @@ const buildSelectedTooltipIndividualPlacements = (
 				const score = scoreSelectedTooltipPlacement(
 					entry,
 					placement,
-					placedTooltips,
-					viewport
+					placedTooltips
 				);
 				if (score < bestScore) {
 					bestScore = score;
@@ -18749,15 +18714,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				projectedEntries,
 				map.getZoom() ?? MAP_DEFAULT_ZOOM
 			);
-			const container = mapContainerRef.current;
-			const viewport =
-				container && container.clientWidth > 0 && container.clientHeight > 0
-					? {
-							width: container.clientWidth,
-							height: container.clientHeight,
-							padding: SELECTED_TOOLTIP_PLACEMENT_VIEWPORT_PADDING_PX,
-						}
-					: null;
 			const stackBlockingBounds = stackPlacements.map(getSelectedTooltipStackBounds);
 			const individualPlacements = shouldUseLegacyStack
 				? new Map<number, SelectedTooltipIndividualPlacement>()
@@ -18765,7 +18721,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						projectedEntries,
 						collisionGroupedContactIds,
 						stackBlockingBounds,
-						viewport,
 						tooltipMarkerGapPx
 					);
 

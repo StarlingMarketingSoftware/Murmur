@@ -1,4 +1,8 @@
 type DetailRoute = <T extends string | number>(id: T) => string;
+type NestedDetailRoute = <T extends string | number, U extends string | number>(
+	id: T,
+	nestedId: U
+) => string;
 
 export const urls = {
 	home: {
@@ -100,6 +104,11 @@ export const urls = {
 			contacts: {
 				index: ((id) => `/api/campaigns/${id}/contacts`) as DetailRoute,
 			},
+			sendQueue: {
+				index: ((id) => `/api/campaigns/${id}/send-queue`) as DetailRoute,
+				detail: ((id, queueId) =>
+					`/api/campaigns/${id}/send-queue/${queueId}`) as NestedDetailRoute,
+			},
 		},
 		contactList: {
 			index: '/api/contact-list',
@@ -148,6 +157,7 @@ export const urls = {
 		emails: {
 			index: '/api/emails',
 			detail: ((id) => `/api/emails/${id}`) as DetailRoute,
+			schedule: '/api/emails/schedule',
 		},
 		inboundEmails: {
 			index: '/api/inbound',

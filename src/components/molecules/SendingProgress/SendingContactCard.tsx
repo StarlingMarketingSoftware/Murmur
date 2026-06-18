@@ -13,8 +13,8 @@ import {
 } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/ContactsExpandedList';
 import {
 	SENDING_ACTIVE_GREEN,
+	SENDING_PANEL_GREEN,
 	SENDING_QUEUED_CARD_GREEN,
-	SENDING_STACK_GREEN,
 } from './constants';
 
 const getContactName = (item: SendingQueueItem) =>
@@ -34,6 +34,7 @@ const QUEUED_PLACEHOLDER_LINES = [
 	'[--:--:--.---] awaiting dispatch...',
 	'[--:--:--.---] holding position in send queue...',
 ];
+const SENDING_PILL_GREEN = '#76CC82';
 
 export interface SendingContactCardProps {
 	item: SendingQueueItem;
@@ -45,6 +46,10 @@ export interface SendingContactCardProps {
 	frameless?: boolean;
 	width?: number | string;
 	className?: string;
+	backgroundColor?: string;
+	/** Let non-active static queue rows recede into the green panel background. */
+	blendInactiveWithPanel?: boolean;
+	disableTransition?: boolean;
 }
 
 /**
@@ -60,9 +65,23 @@ export const SendingContactCard: FC<SendingContactCardProps> = ({
 	frameless = false,
 	width,
 	className,
+	backgroundColor,
+	blendInactiveWithPanel = false,
+	disableTransition = false,
 }) => {
 	const contactTitle = item.contact?.title || item.contact?.headline || '';
+	const isBlendedInactive = blendInactiveWithPanel && !isActive;
 	const textColor = isActive ? '#FFFFFF' : '#000000';
+	const strokeColor = isActive
+		? '#FFFFFF'
+		: isBlendedInactive
+			? 'rgba(0, 0, 0, 0.5)'
+			: '#000000';
+	const pillFillColor = SENDING_PILL_GREEN;
+	const cardBackgroundColor = isActive
+		? SENDING_ACTIVE_GREEN
+		: (backgroundColor ??
+			(isBlendedInactive ? SENDING_PANEL_GREEN : SENDING_QUEUED_CARD_GREEN));
 	const logLines = item.logLines.slice(-2);
 
 	return (
@@ -74,15 +93,17 @@ export const SendingContactCard: FC<SendingContactCardProps> = ({
 			)}
 			style={{
 				width: width ?? '100%',
-				backgroundColor: isActive ? SENDING_ACTIVE_GREEN : SENDING_QUEUED_CARD_GREEN,
+				backgroundColor: cardBackgroundColor,
 				border: frameless
 					? 'none'
 					: isActive
 						? '2px solid #FFFFFF'
-						: '2px solid #000000',
+						: `2px solid ${strokeColor}`,
 				opacity,
 				color: textColor,
-				transition: 'background-color 200ms ease, opacity 200ms ease',
+				transition: disableTransition
+					? 'none'
+					: 'background-color 200ms ease, opacity 200ms ease',
 			}}
 		>
 			<div className="px-3 pt-2 pb-2">
@@ -110,9 +131,9 @@ export const SendingContactCard: FC<SendingContactCardProps> = ({
 									title={contactTitle}
 									className="h-[17px] rounded-[6px] px-2 gap-1 max-w-[140px]"
 									textClassName="text-[10px] leading-none"
-									fillColor={SENDING_STACK_GREEN}
-									strokeColor="#000000"
-									textColor="#000000"
+									fillColor={pillFillColor}
+									strokeColor={strokeColor}
+									textColor={textColor}
 									restaurantIconSize={12}
 									coffeeIconSize={7}
 									defaultIconSize={12}
@@ -133,8 +154,8 @@ export const SendingContactCard: FC<SendingContactCardProps> = ({
 							badgeClassName="box-border w-[29px] h-[16px] rounded-[4px] shrink-0"
 							badgeTextClassName="font-inter text-[10px] leading-none font-bold"
 							cityClassName="text-[12px] leading-none font-bold"
-							badgeFillColor="transparent"
-							strokeColor={textColor}
+							badgeFillColor={isActive ? pillFillColor : 'transparent'}
+							strokeColor={strokeColor}
 							textColor={textColor}
 						/>
 					</div>

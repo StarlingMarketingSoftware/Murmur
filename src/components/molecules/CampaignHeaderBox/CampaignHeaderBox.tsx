@@ -12,7 +12,8 @@ import Link from 'next/link';
 import { urls } from '@/constants/urls';
 import { cn } from '@/utils';
 import { useHoverDescription } from '@/contexts/HoverDescriptionContext';
-import { useSendingSessionState } from '@/contexts/SendingSessionContext';
+import { useSendQueueView } from '@/contexts/SendQueueViewContext';
+import { useSendQueue } from '@/hooks/queryHooks/useSendQueue';
 import { CampaignTitlePills } from '@/components/molecules/CampaignTitlePills/CampaignTitlePills';
 import { CampaignDataTypeIconStrip } from '@/components/molecules/CampaignDataTypeIconStrip/CampaignDataTypeIconStrip';
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
@@ -51,6 +52,9 @@ const getContactsFillColor = (): string => '#F5DADA';
 const getDraftFillColor = (): string => '#FFE3AA';
 const getSentFillColor = (): string => '#B0E0A6';
 const FOLDER_TOGGLE_IGNORE_SELECTOR = '[data-campaign-header-folder-toggle-ignore]';
+const SEND_QUEUE_HEADER_BACKGROUND =
+	'linear-gradient(90deg, rgba(224, 255, 232, 0.66) 0%, rgba(114, 200, 135, 0.66) 44.71%, rgba(117, 247, 149, 0.66) 62.98%, rgba(178, 246, 195, 0.66) 90.87%)';
+const SEND_QUEUE_PILL_WIDTH_PX = 186;
 
 type CampaignListItemWithDataTypes = {
 	id: number;
@@ -98,16 +102,12 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	const [isHoverDescriptionVisible, setIsHoverDescriptionVisible] = useState(false);
 	const hoverDescriptionTimeoutRef = useRef<number | null>(null);
 
-	// "{N} in send queue" pill while the campaign send session runs (idle default
-	// outside the SendingSessionProvider).
-	const sendingSession = useSendingSessionState();
-	const sendQueueRemaining =
-		sendingSession.status === 'sending' && !sendingSession.dismissed
-			? Math.max(
-					0,
-					sendingSession.total - sendingSession.sentCount - sendingSession.failedCount
-				)
-			: 0;
+	// "{N} in send queue" pill — reflects the PERSISTED async send queue depth
+	// (pending/processing rows) for this campaign, and toggles the send-queue view.
+	const { count: sendQueueRemaining } = useSendQueue(campaignId);
+	const { isOpen: isSendQueueOpen, toggle: toggleSendQueueView } = useSendQueueView();
+	const hasSendQueue = sendQueueRemaining > 0;
+	const shouldShowCampaignDataTypes = !hasSendQueue && campaignDataTypes.length > 0;
 
 	const draftingOperationsRaw = draftingProgress ?? [];
 	const draftingOperations = draftingOperationsRaw.filter(
@@ -208,6 +208,16 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 		if (shouldIgnoreFolderToggle(event.target)) return;
 		setIsFolderDropdownOpen((v) => !v);
 	};
+	const headerBackground = isFolderDropdownOpen
+		? '#FFFFFF'
+		: hasSendQueue
+			? SEND_QUEUE_HEADER_BACKGROUND
+			: 'rgba(255, 255, 255, 0.31)';
+	const titleMaxWidth = hasSendQueue
+		? canToggleHoverDescriptions
+			? `min(258px, calc(100% - ${SEND_QUEUE_PILL_WIDTH_PX + 42}px))`
+			: `min(258px, calc(100% - ${SEND_QUEUE_PILL_WIDTH_PX + 8}px))`
+		: 'min(258px, calc(100% - 76px))';
 
 	return (
 		<div
@@ -233,7 +243,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 				// When the folder dropdown is open, the header turns opaque white, thickens
 				// its stroke, and drops its bottom edge so it reads as one box with the
 				// dropdown (whose 2px top border becomes the divider under the pills).
-				background: isFolderDropdownOpen ? '#FFFFFF' : 'rgba(255, 255, 255, 0.31)',
+				background: headerBackground,
 				...(isFolderDropdownOpen
 					? {
 							borderWidth: '2px',
@@ -349,7 +359,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					className="flex min-w-0 flex-none items-center gap-[8px] overflow-hidden box-border pl-[8px] pr-[10px]"
 					style={{
 						width: 'fit-content',
-						maxWidth: 'min(258px, calc(100% - 76px))',
+						maxWidth: titleMaxWidth,
 						height: '26px',
 						borderRadius: '6px',
 						background: topNavScheme.box,
@@ -364,20 +374,31 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					<div
 						className="min-w-0 flex-none font-normal text-[26px] leading-none whitespace-nowrap overflow-hidden text-black"
 						style={{
-							fontFamily: 'Times New Roman, Times, serif',
-							maxWidth: campaignDataTypes.length > 0 ? '135px' : '190px',
-							maskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
-							WebkitMaskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
+							color: '#000',
+							fontFamily: 'Inter, sans-serif',
+							fontSize: '27px',
+							fontStyle: 'normal',
+							fontWeight: 500,
+							lineHeight: '29.3px',
+							maxWidth: shouldShowCampaignDataTypes ? '170px' : '190px',
+							maskImage: hasSendQueue
+								? 'none'
+								: 'linear-gradient(to right, black 97%, transparent 100%)',
+							WebkitMaskImage: hasSendQueue
+								? 'none'
+								: 'linear-gradient(to right, black 97%, transparent 100%)',
 						}}
 					>
-						<CampaignTitlePills title={campaignName} size="header" />
+						{hasSendQueue ? campaignName : <CampaignTitlePills title={campaignName} size="header" />}
 					</div>
-					<CampaignDataTypeIconStrip
-						dataTypes={campaignDataTypes}
-						fill={false}
-						renderEmpty={false}
-						spacingClassName="ml-[2px] mr-0"
-					/>
+					{shouldShowCampaignDataTypes ? (
+						<CampaignDataTypeIconStrip
+							dataTypes={campaignDataTypes}
+							fill={false}
+							renderEmpty={false}
+							spacingClassName="ml-[2px] mr-0"
+						/>
+					) : null}
 				</div>
 				{canToggleHoverDescriptions ? (
 					<button
@@ -417,28 +438,65 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 						</svg>
 					</button>
 				) : null}
-				{sendQueueRemaining > 0 ? (
-					<div
-						className="ml-[8px] flex items-center px-2 whitespace-nowrap font-inter font-semibold text-[12px] leading-none text-black"
+				{hasSendQueue ? (
+					<button
+						type="button"
+						onClick={(e) => {
+							e.stopPropagation();
+							toggleSendQueueView();
+						}}
+						data-campaign-header-folder-toggle-ignore="true"
+						aria-label="Toggle send queue"
+						aria-expanded={isSendQueueOpen}
+						className="ml-auto flex flex-none items-center justify-between whitespace-nowrap border-none px-[12px] font-inter text-black cursor-pointer outline-none focus:outline-none"
 						style={{
+							width: `${SEND_QUEUE_PILL_WIDTH_PX}px`,
 							height: '26px',
 							borderRadius: '6px',
-							background: '#85D790',
+							background: '#A5FDBB',
+							fontSize: '15px',
+							fontStyle: 'normal',
+							fontWeight: 500,
+							lineHeight: '20px',
+							textAlign: 'center',
 						}}
 					>
-						{sendQueueRemaining} in send queue
-					</div>
+						<span className="min-w-0 flex-1 truncate text-center">
+							{sendQueueRemaining} in send queue
+						</span>
+						<svg
+							width="26"
+							height="26"
+							viewBox="0 0 26 26"
+							fill="none"
+							aria-hidden="true"
+							className="ml-[8px] flex-shrink-0"
+							style={{
+								transform: isSendQueueOpen ? 'none' : 'rotate(180deg)',
+								transition: 'transform 150ms ease',
+							}}
+						>
+							<path
+								d="M6.5 16.25L13 9.75L19.5 16.25"
+								stroke="black"
+								strokeWidth="2"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+							/>
+						</svg>
+					</button>
 				) : null}
-				{/* Chevron marker — toggles the folder dropdown, pinned upper-right */}
-				<button
-					type="button"
-					ref={chevronButtonRef}
-					aria-label="Choose folder"
-					aria-expanded={isFolderDropdownOpen}
-					className="ml-auto mr-[10px] flex flex-shrink-0 cursor-pointer items-center justify-center border-none bg-transparent p-0 outline-none focus:outline-none"
-				>
-					<DiamondIcon aria-hidden="true" />
-				</button>
+				{!hasSendQueue ? (
+					<button
+						type="button"
+						ref={chevronButtonRef}
+						aria-label="Choose folder"
+						aria-expanded={isFolderDropdownOpen}
+						className="ml-auto mr-[10px] flex flex-shrink-0 cursor-pointer items-center justify-center border-none bg-transparent p-0 outline-none focus:outline-none"
+					>
+						<DiamondIcon aria-hidden="true" />
+					</button>
+				) : null}
 			</div>
 
 			{/* Spacer above To/From */}
