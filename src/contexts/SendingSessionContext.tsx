@@ -216,7 +216,7 @@ const sendingSessionReducer = (
 	}
 };
 
-const buildLogScript = (item: {
+export const buildLogScript = (item: {
 	kind: SendingItemKind;
 	recipientEmail?: string | null;
 }): string[] => [

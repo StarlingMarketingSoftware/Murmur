@@ -246,6 +246,12 @@ import { toast } from 'sonner';
 import { EmailStatus } from '@prisma/client';
 import { useSendingSessionState } from '@/contexts/SendingSessionContext';
 import { SearchSendingOverlay } from '@/components/molecules/SendingProgress/SearchSendingOverlay';
+import { DashboardSendQueueOverlay } from '@/components/molecules/SendingProgress/DashboardSendQueueOverlay';
+import {
+	SendQueueViewProvider,
+	useSendQueueView,
+} from '@/contexts/SendQueueViewContext';
+import { useSendQueue } from '@/hooks/queryHooks/useSendQueue';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -2966,6 +2972,9 @@ const DashboardContent = () => {
 		isMobile === false &&
 		(sendingSession.status === 'sending' || sendingSession.status === 'done') &&
 		!sendingSession.dismissed;
+	// Send-queue VIEW open/close — toggled by the campaign header "in send queue"
+	// pill (provider wraps DashboardContent), drives the on-demand queue overlay.
+	const { isOpen: isSendQueueViewOpen, close: closeSendQueueView } = useSendQueueView();
 	// Persisted (URL) search + view state for the normal dashboard flow so refresh keeps the user
 	// in the same results view (map/table) instead of resetting back to the initial search screen.
 	const dashboardViewParam = searchParams.get('view')?.trim() || '';
@@ -6090,6 +6099,44 @@ const DashboardContent = () => {
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
 	const dashboardMapCampaignForHeader = fromCampaign ?? activeCampaign;
+	// Keep the send-queue view honest: once the queue drains to 0 the header pill
+	// disappears (so it can't be toggled shut manually) — close the view so its
+	// open state and chevron don't get stuck. Shares useSendQueue's query key with
+	// the overlay + the pill, so this is the same deduped fetch (no extra request).
+	const { count: dashboardSendQueueCount } = useSendQueue(
+		dashboardMapCampaignForHeader?.id ?? 0
+	);
+	const isDashboardSendQueueResearchSuppressed =
+		activeTab === 'search' &&
+		isMapView &&
+		isSendQueueViewOpen &&
+		dashboardSendQueueCount > 0;
+	useEffect(() => {
+		if (isSendQueueViewOpen && dashboardSendQueueCount === 0) closeSendQueueView();
+	}, [isSendQueueViewOpen, dashboardSendQueueCount, closeSendQueueView]);
+	useEffect(() => {
+		if (!isDashboardSendQueueResearchSuppressed) return;
+
+		const handlePointerDown = (event: PointerEvent) => {
+			const target =
+				event.target instanceof Element
+					? event.target
+					: event.target instanceof Node
+						? event.target.parentElement
+						: null;
+			if (
+				target?.closest(
+					'[data-dashboard-send-queue-overlay], [data-send-queue-toggle]'
+				)
+			) {
+				return;
+			}
+			closeSendQueueView();
+		};
+
+		document.addEventListener('pointerdown', handlePointerDown, true);
+		return () => document.removeEventListener('pointerdown', handlePointerDown, true);
+	}, [closeSendQueueView, isDashboardSendQueueResearchSuppressed]);
 	const shouldLoadDashboardMapCampaignFootprint =
 		activeTab === 'search' && isMapView && Boolean(dashboardMapCampaignForHeader?.id);
 	const { data: dashboardMapCampaignFootprintContacts } = useGetCampaignContacts(
@@ -6725,10 +6772,11 @@ const DashboardContent = () => {
 
 	useEffect(() => {
 		// Prevent stale hover state when leaving map view or while results are transitioning.
-		if (!isMapView || isMapResultsLoading) {
+		if (!isMapView || isMapResultsLoading || isDashboardSendQueueResearchSuppressed) {
 			setHoveredMapPanelContactId(null);
+			setMapPanelHoverResearchTopPx(null);
 		}
-	}, [isMapResultsLoading, isMapView]);
+	}, [isDashboardSendQueueResearchSuppressed, isMapResultsLoading, isMapView]);
 
 	const [isMapBottomSearchActive, setIsMapBottomSearchActive] = useState(false);
 	const [mapBottomSearchValue, setMapBottomSearchValue] = useState('');
@@ -7592,10 +7640,33 @@ const DashboardContent = () => {
 		};
 	}, []);
 
+	useEffect(() => {
+		if (!isDashboardSendQueueResearchSuppressed) return;
+		if (mapPanelHoverResearchClearTimeoutRef.current) {
+			clearTimeout(mapPanelHoverResearchClearTimeoutRef.current);
+			mapPanelHoverResearchClearTimeoutRef.current = null;
+		}
+		if (mapResearchPanelCloseDelayTimeoutRef.current) {
+			clearTimeout(mapResearchPanelCloseDelayTimeoutRef.current);
+			mapResearchPanelCloseDelayTimeoutRef.current = null;
+		}
+		if (mapResearchPanelUnmountTimeoutRef.current) {
+			clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
+			mapResearchPanelUnmountTimeoutRef.current = null;
+		}
+		setHoveredMapPanelContactId(null);
+		setMapPanelHoverResearchTopPx(null);
+		setHoveredMapMarkerContact(null);
+		setIsMapMarkerResearchExpanded(false);
+		setIsMapResearchPanelVisible(false);
+		setMapResearchPanelContact(null);
+		mapResearchPanelContactRef.current = null;
+	}, [isDashboardSendQueueResearchSuppressed]);
+
 	// Ensure marker-hover research never "sticks" and apply hold+fade behavior.
 	useEffect(() => {
 		// Reset everything when leaving map view or while results are loading.
-		if (!isMapView || isMapResultsLoading) {
+		if (!isMapView || isMapResultsLoading || isDashboardSendQueueResearchSuppressed) {
 			setHoveredMapMarkerContact(null);
 			setIsMapResearchPanelVisible(false);
 			setMapResearchPanelContact(null);
@@ -7687,6 +7758,7 @@ const DashboardContent = () => {
 	}, [
 		canShowContactForWebsitePreview,
 		hoveredMapMarkerContact,
+		isDashboardSendQueueResearchSuppressed,
 		isMapView,
 		isMapResultsLoading,
 		isWebsitePreviewOpen,
@@ -7695,6 +7767,10 @@ const DashboardContent = () => {
 
 	const handleMapMarkerHover = useCallback(
 		(contact: ContactWithName | null, meta?: MarkerHoverMeta) => {
+			if (isDashboardSendQueueResearchSuppressed) {
+				setHoveredMapMarkerContact(null);
+				return;
+			}
 			if (contact && !canShowContactForWebsitePreview(contact.id)) {
 				setHoveredMapMarkerContact((current) =>
 					canShowContactForWebsitePreview(current?.id) ? current : null
@@ -7725,7 +7801,7 @@ const DashboardContent = () => {
 			}
 			setHoveredMapMarkerContact(contact);
 		},
-		[MAP_VIEW_PANEL_SCALE, canShowContactForWebsitePreview]
+		[MAP_VIEW_PANEL_SCALE, canShowContactForWebsitePreview, isDashboardSendQueueResearchSuppressed]
 	);
 
 	// Tab toggles the marker-hover Description box while the panel is visible.
@@ -8366,7 +8442,12 @@ const DashboardContent = () => {
 
 	const mapPanelHoveredResearchContact = useMemo(() => {
 		const effectiveContactId = websitePreviewContactId ?? hoveredMapPanelContactId;
-		if (!isMapView || isMapResultsLoading || effectiveContactId == null) {
+		if (
+			isDashboardSendQueueResearchSuppressed ||
+			!isMapView ||
+			isMapResultsLoading ||
+			effectiveContactId == null
+		) {
 			return null;
 		}
 
@@ -8380,6 +8461,7 @@ const DashboardContent = () => {
 		displayedMapPanelContacts,
 		getMapResearchDisplayFields,
 		hoveredMapPanelContactId,
+		isDashboardSendQueueResearchSuppressed,
 		isMapResultsLoading,
 		isMapView,
 		websitePreviewContactId,
@@ -8407,9 +8489,11 @@ const DashboardContent = () => {
 	const mapPanelHoverResearchDockSide: 'left' | 'right' =
 		isDashboardWriteOverlayVisible ? 'left' : 'right';
 	const shouldShowMapResearchPanel =
+		!isDashboardSendQueueResearchSuppressed &&
 		mapResearchPanelContact != null &&
 		canShowContactForWebsitePreview(mapResearchPanelContact.id);
 	const shouldShowMapPanelHoverResearch =
+		!isDashboardSendQueueResearchSuppressed &&
 		mapPanelHoveredResearchContact != null &&
 		canShowContactForWebsitePreview(mapPanelHoveredResearchContact.contact.id);
 	const isMapPanelHoverResearchVisible =
@@ -10724,11 +10808,13 @@ const DashboardContent = () => {
 				onClick={(event) => handleMapPanelRowSelect(contact, event, source)}
 				onMouseEnter={(event) => {
 					cancelMapPanelHoverResearchClear();
+					if (isDashboardSendQueueResearchSuppressed) return;
 					if (!canShowContactForWebsitePreview(contact.id)) return;
 					setHoveredMapPanelContactId(contact.id);
 					updateMapPanelHoverResearchTop(event.currentTarget);
 				}}
 				onMouseLeave={() => {
+					if (isDashboardSendQueueResearchSuppressed) return;
 					scheduleMapPanelHoverResearchClear(contact.id);
 				}}
 			>
@@ -14305,6 +14391,38 @@ const DashboardContent = () => {
 																	</div>
 													</div>
 												)}
+												{/* Send-queue stack overlay — opened on demand from the campaign
+												    header "in send queue" pill; floats left of the right-side
+												    panel. Shares the write overlay's slot, so it never co-shows
+												    with write mode or the live send overlay. */}
+												{isSendQueueViewOpen &&
+													!isMobile &&
+													!isWriteMode &&
+													!isCompressedMapChrome &&
+													shouldShowMapResultsSidePanel &&
+													!showMapSendingOverlay &&
+													dashboardMapCampaignForHeader && (
+														<div
+															className="absolute pointer-events-none map-overlay-appear"
+															style={{
+																zIndex: 125,
+																top: `calc(${MAP_VIEW_SIDE_PANEL_TOP_CSS} + 180px)`,
+																right: 10 + 433 * MAP_VIEW_PANEL_SCALE + 13,
+																transform: `scale(${MAP_VIEW_PANEL_SCALE * 0.85})`,
+																transformOrigin: 'top right',
+															}}
+														>
+															<div
+																data-dashboard-send-queue-overlay="true"
+																className="pointer-events-auto"
+															>
+																<DashboardSendQueueOverlay
+																	campaignId={dashboardMapCampaignForHeader.id}
+																	onClose={closeSendQueueView}
+																/>
+															</div>
+														</div>
+													)}
 												{!isCompressedMapChrome &&
 													mapPanelHoveredResearchContact &&
 													shouldShowMapPanelHoverResearch &&
@@ -15555,7 +15673,9 @@ const Dashboard = () => {
 				</div>
 			}
 		>
-			<DashboardContent />
+			<SendQueueViewProvider>
+				<DashboardContent />
+			</SendQueueViewProvider>
 		</Suspense>
 	);
 };

@@ -446,6 +446,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 							toggleSendQueueView();
 						}}
 						data-campaign-header-folder-toggle-ignore="true"
+						data-send-queue-toggle="true"
 						aria-label="Toggle send queue"
 						aria-expanded={isSendQueueOpen}
 						className="ml-auto flex flex-none items-center justify-between whitespace-nowrap border-none px-[12px] font-inter text-black cursor-pointer outline-none focus:outline-none"
