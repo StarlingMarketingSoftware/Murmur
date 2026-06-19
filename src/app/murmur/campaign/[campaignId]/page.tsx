@@ -47,10 +47,6 @@ import DashboardActionBarEnvelopeIcon from '@/components/atoms/_svg/DashboardAct
 import { DashboardStrategyBox } from '@/components/molecules/DashboardStrategyBox/DashboardStrategyBox';
 import DashboardOpportunitiesWidget from '@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesWidget';
 import DashboardResponsesWidget from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesWidget';
-import SearchMap from '@/components/atoms/_svg/SearchMap';
-import BottomFolderIcon from '@/components/atoms/_svg/BottomFolderIcon';
-import BottomHomeIcon from '@/components/atoms/_svg/BottomHomeIcon';
-import { EnvelopeIcon } from '@/components/atoms/_svg/EnvelopeIcon';
 import StatusContactsIcon from '@/components/atoms/svg/StatusContactsIcon';
 import StatusDraftsIcon from '@/components/atoms/svg/StatusDraftsIcon';
 import StatusNewMessageIcon from '@/components/atoms/svg/StatusNewMessageIcon';
@@ -58,15 +54,19 @@ import StatusSentIcon from '@/components/atoms/svg/StatusSentIcon';
 import nextDynamic from 'next/dynamic';
 import { CampaignsTable } from '@/components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
+import { SendQueueViewProvider, useSendQueueView } from '@/contexts/SendQueueViewContext';
+import { SendQueueOverlayMount } from '@/app/murmur/campaign/[campaignId]/SendQueueView/SendQueueOverlayMount';
 import { useEditCampaign, useGetCampaignContacts } from '@/hooks/queryHooks/useCampaigns';
 import { useCampaignTopNavScheme } from '@/hooks/useCampaignTopNavScheme';
 import { EMAIL_QUERY_KEYS, useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { useSendQueue } from '@/hooks/queryHooks/useSendQueue';
 import { toast } from 'sonner';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useCreateIdentity, useGetIdentities } from '@/hooks/queryHooks/useIdentities';
 import { EmailStatus } from '@/constants/prismaEnums';
 import { useQueryClient } from '@tanstack/react-query';
 import type { EmailWithRelations } from '@/types';
+import type { ContactWithName } from '@/types/contact';
 import { useSendingSessionState } from '@/contexts/SendingSessionContext';
 import { HoverDescriptionProvider } from '@/contexts/HoverDescriptionContext';
 import { CampaignTopSearchHighlightProvider } from '@/contexts/CampaignTopSearchHighlightContext';
@@ -208,15 +208,19 @@ const CAMPAIGN_TAB_PRESET_STATUSES: Partial<
 	drafting: ['drafts'],
 	inbox: ['sent', 'new-message'],
 };
+const CAMPAIGN_SENT_SEND_QUEUE_PRESET_STATUSES = [
+	'sent',
+] as const satisfies readonly CampaignOverviewStatusKey[];
 
-// Per-tab tint for the map selection heatmap glow (rendered behind the status
-// pins). Keyed on the active view; tabs without an entry (e.g. overview) get no
-// glow. The overview/All tab is intentionally omitted for now.
+// Per-tab tint for the map heatmap glow (rendered behind the status pins).
+// All/overview uses the per-status colors below because it can show multiple
+// statuses at once.
 const CAMPAIGN_TAB_HEATMAP_COLOR: Partial<Record<ViewType, string>> = {
 	testing: '#FFA5A5', // Contacts — pink/red
 	drafting: '#FFD4A9', // Drafts — orange
 	inbox: '#ABD1FF', // Inbox — blue
 };
+const SEND_QUEUE_HEATMAP_COLOR = '#A2D99F';
 
 const CAMPAIGN_OVERVIEW_STATUS_PILL_HEIGHT_PX = 27;
 const CAMPAIGN_OVERVIEW_STATUS_PILL_RADIUS_PX = 8;
@@ -245,6 +249,14 @@ const getCampaignOverviewStatusFromEmailStatus = (
 		default:
 			return null;
 	}
+};
+
+const getCampaignMapContactWithCategory = (contact: ContactWithName): ContactWithName => {
+	const titleLike = contact.curatedDisplayLabel || contact.title || contact.headline || '';
+	const derivedCategory =
+		getPromotionOverlayWhatFromContactTitle(titleLike) ||
+		getBookingTitlePrefixFromContactTitle(titleLike);
+	return derivedCategory ? { ...contact, curatedCategory: derivedCategory } : contact;
 };
 
 type CampaignOverviewAskAnythingBoxProps = {
@@ -631,6 +643,8 @@ const CampaignOverviewBottomBoxes = ({
 	onOpenSent,
 	onOpenOpportunities,
 }: CampaignOverviewBottomBoxesProps) => {
+	const { isOpen: isSendQueueOpen } = useSendQueueView();
+	const sendQueueBarScale = 39.154 / 40;
 	const boxStyle: CSSProperties = {
 		width: 39.154,
 		height: 39.154,
@@ -715,6 +729,29 @@ const CampaignOverviewBottomBoxes = ({
 				>
 					<SearchIconDesktop width={17} height={18} stroke="#8B8B8B" strokeWidth={2.3} />
 				</button>
+				{isSendQueueOpen ? (
+					<div
+						aria-hidden="true"
+						className="flex overflow-hidden"
+						style={{
+							width: 472 * sendQueueBarScale,
+							height: 39.154,
+							borderRadius: 5 * sendQueueBarScale,
+							border: `${2 * sendQueueBarScale}px solid #000`,
+							boxSizing: 'border-box',
+							background: '#FFEAEA',
+						}}
+					>
+						<div style={{ flex: 1 }} />
+						<div
+							style={{
+								width: 58 * sendQueueBarScale,
+								borderLeft: `${2 * sendQueueBarScale}px solid #000`,
+								background: '#EB8586',
+							}}
+						/>
+					</div>
+				) : null}
 				{countBox({
 					label: 'contacts',
 					count: contactsCount,
@@ -920,9 +957,6 @@ const CAMPAIGN_BACKDROP_MAX_EXTRA_GUTTER_PX = 600;
 const CAMPAIGN_COMPACT_WORKSPACE_BACKDROP_WIDTH_PX = 985;
 const CAMPAIGN_COMPACT_WORKSPACE_LEFT_PANEL_INSET_PX = 52;
 const CAMPAIGN_COMPACT_WORKSPACE_TOP_NAV_INSET_PX = 184;
-const CAMPAIGN_COMPACT_WORKSPACE_MAIN_PANEL_HALF_WIDTH_PX = 250;
-const CAMPAIGN_COMPACT_WORKSPACE_CONTACT_PANEL_WIDTH_PX = 377;
-const CAMPAIGN_COMPACT_WORKSPACE_MAIN_PANEL_GAP_PX = 34;
 // Below this layout-px width, non-overview tabs drop the split map strip: the translucent
 // band covers the full viewport and the workspace centers (shift = 0). Mirrors
 // DraftingSection's isNarrowDesktop upper bound (< 1317), where the grouped layouts begin.
@@ -1027,119 +1061,6 @@ const IdentityDialog = nextDynamic(
 	{}
 );
 
-// Dashboard inbox popover content (opened from the envelope icon in the campaign header)
-const DashboardInboxSection = nextDynamic(
-	() => import('@/components/molecules/InboxSection/InboxSection'),
-	{
-		ssr: false,
-		loading: () => (
-			<div
-				className="relative flex flex-col items-center overflow-hidden"
-				style={{
-					width: '625px',
-					height: '561px',
-					border: '3px solid #000000',
-					borderRadius: '8px',
-					padding: '16px',
-					paddingTop: '76px',
-					backgroundColor: '#6fa4e1',
-				}}
-				aria-busy="true"
-				aria-label="Loading inbox"
-			>
-				<span className="sr-only">Loading inbox…</span>
-
-				{/* Search Bar skeleton */}
-				<div
-					style={{
-						position: 'absolute',
-						top: '13px',
-						left: '14px',
-						right: '286px', // 14px + 260px toggle + 12px gap
-						height: '48px',
-						border: '3px solid #000000',
-						borderRadius: '8px',
-						backgroundColor: '#FFFFFF',
-						zIndex: 10,
-						display: 'flex',
-						alignItems: 'center',
-						paddingLeft: '16px',
-					}}
-					aria-hidden
-				>
-					<div className="w-[18px] h-[18px] rounded-[3px] bg-black/20" />
-					<div className="ml-4 h-[14px] w-[180px] rounded-[4px] bg-black/15" />
-				</div>
-
-				{/* Messages/Campaigns toggle skeleton */}
-				<div
-					style={{
-						position: 'absolute',
-						top: '13px',
-						right: '14px',
-						width: '260px',
-						height: '48px',
-						border: '3px solid #000000',
-						borderRadius: '8px',
-						overflow: 'hidden',
-						backgroundColor: '#FFFFFF',
-						zIndex: 10,
-						display: 'flex',
-					}}
-					aria-hidden
-				>
-					<div
-						aria-hidden
-						style={{
-							position: 'absolute',
-							left: '50%',
-							top: 0,
-							bottom: 0,
-							width: '3px',
-							backgroundColor: '#000000',
-							transform: 'translateX(-1.5px)',
-							pointerEvents: 'none',
-						}}
-					/>
-					<div className="h-full flex-1 bg-black/10" />
-					<div className="h-full flex-1 bg-black/10" />
-				</div>
-
-				{/* Email row skeletons */}
-				<div className="w-full flex flex-col items-center">
-					{Array.from({ length: 6 }).map((_, idx) => (
-						<div
-							key={`dashboard-inbox-loading-${idx}`}
-							className="select-none mb-2 overflow-hidden"
-							style={{
-								width: '587px',
-								height: '78px',
-								minHeight: '78px',
-								border: '3px solid #000000',
-								borderRadius: '8px',
-								backgroundColor: '#FFFFFF',
-								display: 'flex',
-								alignItems: 'center',
-								padding: '0 16px',
-							}}
-							aria-hidden
-						>
-							<div className="flex flex-col w-full">
-								<div className="flex items-center justify-between gap-3">
-									<div className="h-[14px] rounded bg-black/20 w-[180px]" />
-									<div className="h-[14px] rounded bg-black/20 w-[90px]" />
-								</div>
-								<div className="mt-2 h-[12px] rounded bg-black/15 w-[260px]" />
-								<div className="mt-2 h-[10px] rounded bg-black/15 w-[320px]" />
-							</div>
-						</div>
-					))}
-				</div>
-			</div>
-		),
-	}
-);
-
 const Murmur = () => {
 	// Add campaign-specific class to body for background styling
 	useEffect(() => {
@@ -1158,6 +1079,13 @@ const Murmur = () => {
 	// Route id is known immediately (before the detail query resolves), so the contact/email/inbound
 	// queries can fire in parallel with useGetCampaign instead of waiting on campaign?.id.
 	const routeCampaignId = campaignId ? Number(campaignId) : undefined;
+	const { isOpen: isPersistedSendQueueMapOpen } = useSendQueueView();
+	const {
+		items: persistedSendQueueMapItems,
+		count: persistedSendQueueMapCount,
+	} = useSendQueue(routeCampaignId ?? 0, {
+		enabled: Boolean(routeCampaignId),
+	});
 	// Per-campaign color scheme for the top navigation box + folder icon.
 	const topNavScheme = useCampaignTopNavScheme(routeCampaignId);
 	const isMobile = useIsMobile();
@@ -1174,6 +1102,7 @@ const Murmur = () => {
 	const CAMPAIGN_ZOOM_VAR = '--murmur-campaign-zoom';
 	const CAMPAIGN_VIEWPORT_H_VAR = '--murmur-campaign-viewport-h';
 	const DEFAULT_CAMPAIGN_ZOOM = 0.85;
+	const MURMUR_ROUTE_COMPACT_ZOOM = 0.9;
 	const CAMPAIGN_ZOOM_EVENT = 'murmur:campaign-zoom-changed';
 	const CAMPAIGN_SCROLLABLE_CLASS = 'murmur-campaign-scrollable';
 	const CAMPAIGN_FORCE_TRANSFORM_CLASS = 'murmur-campaign-force-transform';
@@ -1236,9 +1165,17 @@ const Murmur = () => {
 			html.classList.remove(CAMPAIGN_FORCE_TRANSFORM_CLASS);
 		}
 
-		// On the thinnest breakpoint (<= 776px), we *must* allow page scroll for the stacked layout.
-		const THINNEST_VIEWPORT_W_PX = 776;
-		const shouldAllowScroll = stableViewportW <= THINNEST_VIEWPORT_W_PX;
+		// Once the zoomed layout falls below the narrowest desktop width, the stacked
+		// page needs document scroll; a raw-width cutoff leaves a stuck middle band.
+		const THINNEST_EFFECTIVE_VIEWPORT_W_PX = CAMPAIGN_SNUG_MIN_EFFECTIVE_WIDTH_PX;
+		const scrollDecisionZoom = computeMurmurChromeZoomForViewport(
+			stableViewportW,
+			stableViewportH,
+			window.screen
+		);
+		const scrollableModeZoom = Math.max(scrollDecisionZoom, MURMUR_ROUTE_COMPACT_ZOOM);
+		const shouldAllowScroll =
+			stableViewportW / (scrollableModeZoom || 1) < THINNEST_EFFECTIVE_VIEWPORT_W_PX;
 
 		// IMPORTANT:
 		// The campaign page uses the "nuclear option" (overflow hidden + snug zoom fit) for normal + narrow.
@@ -2396,6 +2333,9 @@ const Murmur = () => {
 	const isOverviewSearchActive = (overviewSearchQuery ?? '').trim().length > 0;
 	const effectiveCampaignOverviewMapGrouping: CampaignOverviewMapGrouping =
 		isOverviewSearchActive ? 'category' : campaignOverviewMapGrouping;
+	const [inboxPresetSelectedStatuses, setInboxPresetSelectedStatuses] = useState<
+		readonly CampaignOverviewStatusKey[]
+	>(() => (CAMPAIGN_TAB_PRESET_STATUSES.inbox ?? ['sent', 'new-message']).slice());
 	const [campaignOverviewSelectedStatuses, setCampaignOverviewSelectedStatuses] =
 		useState<readonly CampaignOverviewStatusKey[]>([]);
 	const campaignOverviewSelectedStatusSet = useMemo(
@@ -2415,7 +2355,10 @@ const Murmur = () => {
 	// (see CAMPAIGN_TAB_PRESET_STATUSES). These derived values shadow the overview
 	// ones for the map filter only — the overview's own selection state is left
 	// untouched so returning to All restores whatever the user had chosen there.
-	const activeTabPresetStatuses = CAMPAIGN_TAB_PRESET_STATUSES[activeView];
+	const activeTabPresetStatuses =
+		activeView === 'inbox'
+			? inboxPresetSelectedStatuses
+			: CAMPAIGN_TAB_PRESET_STATUSES[activeView];
 	const effectiveMapGroupingForActiveView: CampaignOverviewMapGrouping =
 		activeTabPresetStatuses ? 'status' : effectiveCampaignOverviewMapGrouping;
 	const effectiveActiveStatusSetForActiveView = useMemo<
@@ -3122,10 +3065,11 @@ const Murmur = () => {
 	// selected. The explicit 'inbox' sent-tab request beats a stale 'sent' request
 	// left by a prior Sent navigation (the view dedupe can skip re-requesting).
 	const handleOpenInboxOpportunities = useCallback(() => {
+		setInboxPresetSelectedStatuses(['sent', 'new-message']);
 		requestInboxSentTab('inbox');
 		requestInboxPanelTab('opportunities');
 		setActiveView('inbox');
-	}, [requestInboxSentTab, requestInboxPanelTab, setActiveView]);
+	}, [requestInboxSentTab, requestInboxPanelTab, setActiveView, setInboxPresetSelectedStatuses]);
 
 	// Launch a campaign search from the Write/Drafts/Inbox tabs: jump to the All
 	// tab, drop that tab's preset status filter (so results aren't scoped to e.g.
@@ -3226,16 +3170,18 @@ const Murmur = () => {
 						: DEFAULT_CAMPAIGN_ZOOM;
 			const effectiveWidth = window.innerWidth / (z || 1);
 
-			setIsNarrowestDesktop(effectiveWidth < 952);
-			setIsCampaignChromeCentered(
-				effectiveWidth < CAMPAIGN_CENTERED_STAGE_COMPACT_MAX_LAYOUT_W_PX
-			);
-			setIsCampaignStandardStageNarrow(
-				effectiveWidth < CAMPAIGN_CENTERED_STAGE_STANDARD_MAX_LAYOUT_W_PX
-			);
-			setIsCompactPresetClusterBandClipped(
-				effectiveWidth < CAMPAIGN_COMPACT_PRESET_CLUSTER_MIN_LAYOUT_W_PX
-			);
+			const nextIsNarrowestDesktop = effectiveWidth < 952;
+			const nextIsCampaignChromeCentered =
+				effectiveWidth < CAMPAIGN_CENTERED_STAGE_COMPACT_MAX_LAYOUT_W_PX;
+			const nextIsCampaignStandardStageNarrow =
+				effectiveWidth < CAMPAIGN_CENTERED_STAGE_STANDARD_MAX_LAYOUT_W_PX;
+			const nextIsCompactPresetClusterBandClipped =
+				effectiveWidth < CAMPAIGN_COMPACT_PRESET_CLUSTER_MIN_LAYOUT_W_PX;
+
+			setIsNarrowestDesktop(nextIsNarrowestDesktop);
+			setIsCampaignChromeCentered(nextIsCampaignChromeCentered);
+			setIsCampaignStandardStageNarrow(nextIsCampaignStandardStageNarrow);
+			setIsCompactPresetClusterBandClipped(nextIsCompactPresetClusterBandClipped);
 		};
 		checkBreakpoints();
 		window.addEventListener('resize', checkBreakpoints);
@@ -3365,14 +3311,59 @@ const Murmur = () => {
 		return statusById;
 	}, [campaignMapContacts, headerEmails, overviewInboundEmails]);
 
-	const campaignMapContactsForMap = useMemo(() => {
-		const contacts = campaignMapContacts || [];
-		if (contacts.length === 0) return contacts;
+	const sendQueueMapMode =
+		isPersistedSendQueueMapOpen && persistedSendQueueMapCount > 0;
+	const activePresetControlStatuses =
+		activeTabPresetStatuses ??
+		(sendQueueMapMode && activeView === 'sent'
+			? CAMPAIGN_SENT_SEND_QUEUE_PRESET_STATUSES
+			: undefined);
+	const activePresetControlStatusSet = useMemo<ReadonlySet<CampaignOverviewStatusKey>>(
+		() =>
+			activePresetControlStatuses
+				? new Set<CampaignOverviewStatusKey>(activePresetControlStatuses)
+				: new Set<CampaignOverviewStatusKey>(),
+		[activePresetControlStatuses]
+	);
+	const sendQueueMapContactIds = useMemo(() => {
+		if (!sendQueueMapMode) return [];
+		const contactIds: number[] = [];
+		const seenIds = new Set<number>();
+		for (const item of persistedSendQueueMapItems) {
+			if (seenIds.has(item.contactId)) continue;
+			seenIds.add(item.contactId);
+			contactIds.push(item.contactId);
+		}
+		return contactIds;
+	}, [persistedSendQueueMapItems, sendQueueMapMode]);
+	const sendQueueMapContacts = useMemo(() => {
+		if (!sendQueueMapMode) return [];
+		const contacts: ContactWithName[] = [];
+		const seenIds = new Set<number>();
+		for (const item of persistedSendQueueMapItems) {
+			if (seenIds.has(item.contactId)) continue;
+			seenIds.add(item.contactId);
+			contacts.push(getCampaignMapContactWithCategory(item.contact));
+		}
+		return contacts;
+	}, [persistedSendQueueMapItems, sendQueueMapMode]);
+	const sendQueueMapContactStatusById = useMemo(() => {
+		const statusById = new Map<number, CampaignOverviewStatusKey>();
+		for (const contactId of sendQueueMapContactIds) {
+			statusById.set(contactId, 'contacts');
+		}
+		return statusById;
+	}, [sendQueueMapContactIds]);
 
-		const out = [] as typeof contacts;
+	const campaignMapContactsForMap = useMemo(() => {
+		if (sendQueueMapMode) return sendQueueMapContacts;
+
+		const contacts = campaignMapContacts || [];
+		const out: ContactWithName[] = [];
 		for (const contact of contacts) {
 			const titleLike =
 				contact.curatedDisplayLabel || contact.title || contact.headline || '';
+			const mapContact = getCampaignMapContactWithCategory(contact);
 
 			// The left-panel category-tile filter applies in every grouping mode, so
 			// deselecting a category hides those markers whether the map is grouped by
@@ -3387,19 +3378,14 @@ const Murmur = () => {
 			if (effectiveMapGroupingForActiveView === 'status') {
 				const status = campaignOverviewContactStatusById.get(contact.id) ?? 'contacts';
 				if (!effectiveActiveStatusSetForActiveView.has(status)) continue;
-				out.push(contact);
+				out.push(mapContact);
 				continue;
 			}
 
 			// The map colors result dots by `contact.curatedCategory` (or the active search "What").
 			// Campaign contacts are not a single-category search, so derive a per-contact category
 			// from the stored title prefix.
-			const derivedCategory =
-				getPromotionOverlayWhatFromContactTitle(titleLike) ||
-				getBookingTitlePrefixFromContactTitle(titleLike);
-			out.push(
-				derivedCategory ? { ...contact, curatedCategory: derivedCategory } : contact
-			);
+			out.push(mapContact);
 		}
 
 		return out;
@@ -3410,7 +3396,34 @@ const Murmur = () => {
 		effectiveMapGroupingForActiveView,
 		mapGrabActiveCategories,
 		mapGrabUncategorizedActive,
+		sendQueueMapContacts,
+		sendQueueMapMode,
 	]);
+	const campaignSelectedContactObjectsForMap = useMemo(() => {
+		if (!campaignMapContacts || campaignMapSelectedContactIds.length === 0) return [];
+		const contactsById = new Map(campaignMapContacts.map((contact) => [contact.id, contact]));
+		const selectedObjects = [] as typeof campaignMapContacts;
+		const seenIds = new Set<number>();
+
+		for (const id of campaignMapSelectedContactIds) {
+			if (seenIds.has(id)) continue;
+			seenIds.add(id);
+			const contact = contactsById.get(id);
+			if (!contact) continue;
+			selectedObjects.push(getCampaignMapContactWithCategory(contact));
+		}
+
+		return selectedObjects;
+	}, [campaignMapContacts, campaignMapSelectedContactIds]);
+	const effectiveCampaignMapSelectedContactIds = sendQueueMapMode
+		? sendQueueMapContactIds
+		: campaignMapSelectedContactIds;
+	const effectiveCampaignSelectedContactObjectsForMap = sendQueueMapMode
+		? sendQueueMapContacts
+		: campaignSelectedContactObjectsForMap;
+	const effectiveCampaignMapContactStatusById = sendQueueMapMode
+		? sendQueueMapContactStatusById
+		: campaignOverviewContactStatusById;
 
 	const persistentCampaignMapProps = useMemo<SearchResultsMapProps>(
 		() => ({
@@ -3422,14 +3435,28 @@ const Murmur = () => {
 			autoSpin: false,
 			cameraPadding: campaignMapCameraPadding,
 			contacts: campaignMapContactsForMap,
-			selectedContacts: campaignMapSelectedContactIds,
+			selectedContacts: effectiveCampaignMapSelectedContactIds,
+			selectedContactObjects: effectiveCampaignSelectedContactObjectsForMap,
+			showSelectedContactTooltips: true,
 			onToggleSelection: requestMapMarkerSelection,
-			campaignContactStatusById: campaignOverviewContactStatusById,
-			campaignMarkerMode: effectiveMapGroupingForActiveView,
-			campaignHeatmapColor: CAMPAIGN_TAB_HEATMAP_COLOR[activeView] ?? null,
-			// Inbox glows its whole set ambiently; Contacts/Drafts glow only the selection.
-			campaignHeatmapAmbient: activeView === 'inbox',
-			categoryConstellationsEnabled: true,
+			campaignContactStatusById: effectiveCampaignMapContactStatusById,
+			campaignMarkerMode: sendQueueMapMode ? 'status' : effectiveMapGroupingForActiveView,
+			campaignHeatmapColor: sendQueueMapMode
+				? SEND_QUEUE_HEATMAP_COLOR
+				: CAMPAIGN_TAB_HEATMAP_COLOR[activeView] ?? null,
+			campaignHeatmapStatusColors:
+				!sendQueueMapMode && activeView === 'overview'
+					? CAMPAIGN_OVERVIEW_STATUS_PILL_COLOR
+					: undefined,
+			// These campaign tabs glow their visible set before selection, then narrow
+			// to selected on-map contacts once a selection exists.
+			campaignHeatmapAmbient:
+				!sendQueueMapMode &&
+				(activeView === 'overview' ||
+					activeView === 'testing' ||
+					activeView === 'drafting' ||
+					activeView === 'inbox'),
+			categoryConstellationsEnabled: !sendQueueMapMode,
 			activeTool: activeMapTool,
 			requestedZoom: mapZoomControlRequest,
 			onViewportZoom: handleMapViewportZoom,
@@ -3443,10 +3470,12 @@ const Murmur = () => {
 			activeMapTool,
 			campaignMapCameraPadding,
 			campaignMapContactsForMap,
-			campaignMapSelectedContactIds,
+			effectiveCampaignMapSelectedContactIds,
+			effectiveCampaignSelectedContactObjectsForMap,
 			requestMapMarkerSelection,
-			campaignOverviewContactStatusById,
+			effectiveCampaignMapContactStatusById,
 			effectiveMapGroupingForActiveView,
+			sendQueueMapMode,
 			globeNightLighting,
 			globeWeatherMood,
 			globeWeatherRegionCenter,
@@ -3635,6 +3664,49 @@ const Murmur = () => {
 		requestInboxSentTab,
 	]);
 
+	// Hide underlying content while the full-screen User Settings dialog is open.
+	const shouldHideContent = isIdentityDialogOpen;
+
+	// The Write/Drafts/Inbox tabs reuse the overview map controls: a status legend
+	// locked to the tab's preset, plus a dimmed, display-only category strip and
+	// search bar. Sent opts into the same controls only while send queue is open. Only
+	// on the roomy desktop layout, where the split-screen leaves a clear left map
+	// region for them to sit over.
+	// Once the centered stage kicks in (the band covers the full viewport) there is
+	// no clear map strip left, so the controls hide. The expanded workspace uses the
+	// standard (wider) cluster, which centers at the higher 1418 threshold.
+	const isCampaignMapStageCentered =
+		isCampaignChromeCentered ||
+		(isCampaignWorkspaceExpanded && isCampaignStandardStageNarrow);
+	const isPresetMapControlsView =
+		!isMobile &&
+		Boolean(activePresetControlStatuses) &&
+		!shouldHideContent &&
+		!isNarrowestDesktop &&
+		!isCampaignMapStageCentered;
+	const isPersistentFilterPillVisible =
+		activeView === 'overview' || !isCampaignMapStageCentered;
+	// The compact (non-expanded) stage keeps the bottom cluster at a fixed scale, so
+	// the band's left edge reaches it before the centered-stage cutoff — drop just the
+	// bottom cluster once the clear strip can no longer fit it. The expanded workspace
+	// rescales the cluster to the strip instead, so it's exempt.
+	const isPresetBottomClusterVisible =
+		isPresetMapControlsView &&
+		(isCampaignWorkspaceExpanded || !isCompactPresetClusterBandClipped);
+	const shouldApplyWritingTopShift =
+		(activeView === 'testing' ||
+			activeView === 'drafting' ||
+			activeView === 'sent' ||
+			activeView === 'inbox') &&
+		!isMobile &&
+		!isNarrowestDesktop;
+	const shouldRenderNarrowestCampaignHeaderBox =
+		!isMobile &&
+		isNarrowestDesktop &&
+		!isCampaignMapStageCentered &&
+		activeView !== 'overview' &&
+		Boolean(campaign);
+
 	if (isPendingCampaign || !campaign) {
 		return (
 			<CampaignDeviceProvider isMobile={isMobile} activeView={activeView}>
@@ -3650,32 +3722,6 @@ const Murmur = () => {
 			</CampaignDeviceProvider>
 		);
 	}
-	// Hide underlying content while the full-screen User Settings dialog is open.
-	const shouldHideContent = isIdentityDialogOpen;
-
-	// The Write/Drafts/Inbox tabs reuse the overview map controls: a status legend
-	// locked to the tab's preset, plus a dimmed, display-only category strip and
-	// search bar. Only on the roomy desktop layout, where the split-screen leaves a
-	// clear left map region for them to sit over.
-	// Once the centered stage kicks in (the band covers the full viewport) there is
-	// no clear map strip left, so the controls hide. The expanded workspace uses the
-	// standard (wider) cluster, which centers at the higher 1418 threshold.
-	const isCampaignMapStageCentered =
-		isCampaignChromeCentered ||
-		(isCampaignWorkspaceExpanded && isCampaignStandardStageNarrow);
-	const isPresetMapControlsView =
-		!isMobile &&
-		Boolean(activeTabPresetStatuses) &&
-		!shouldHideContent &&
-		!isNarrowestDesktop &&
-		!isCampaignMapStageCentered;
-	// The compact (non-expanded) stage keeps the bottom cluster at a fixed scale, so
-	// the band's left edge reaches it before the centered-stage cutoff — drop just the
-	// bottom cluster once the clear strip can no longer fit it. The expanded workspace
-	// rescales the cluster to the strip instead, so it's exempt.
-	const isPresetBottomClusterVisible =
-		isPresetMapControlsView &&
-		(isCampaignWorkspaceExpanded || !isCompactPresetClusterBandClipped);
 	const presetMapControlsLeftCss = `calc(var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333vw) / 2)`;
 	const presetMapControlsScale =
 		isPresetMapControlsView && isCampaignWorkspaceExpanded && viewportWidth > 0
@@ -3707,6 +3753,43 @@ const Murmur = () => {
 		CAMPAIGN_PRESET_ASK_BOX_BOTTOM_PX + presetMapControlsExtraBottomPx;
 	const presetMapStatusStripBottomPx =
 		CAMPAIGN_PRESET_STATUS_STRIP_BOTTOM_PX + presetMapControlsExtraBottomPx;
+	const handlePresetStatusStripClick = (status: CampaignOverviewStatusKey) => {
+		if (activeView === 'inbox' && (status === 'sent' || status === 'new-message')) {
+			const isEnabled = inboxPresetSelectedStatuses.includes(status);
+			const nextStatuses = (
+				isEnabled
+					? inboxPresetSelectedStatuses.filter((value) => value !== status)
+					: [...inboxPresetSelectedStatuses, status]
+			).filter((value): value is 'sent' | 'new-message' => value === 'sent' || value === 'new-message');
+			// Keep at least one status enabled so Inbox doesn't become an empty/undefined slice.
+			if (nextStatuses.length === 0) return;
+			setInboxPresetSelectedStatuses(nextStatuses);
+			// If we just *disabled* one of the two, jump the inbox contacts list to the remaining tab.
+			if (isEnabled && nextStatuses.length === 1) {
+				requestInboxPanelTab(nextStatuses[0] === 'sent' ? 'sent' : 'responses');
+			}
+			return;
+		}
+		switch (status) {
+			case 'contacts':
+				setActiveView('testing');
+				return;
+			case 'drafts':
+				setActiveView('drafting');
+				return;
+			case 'new-message':
+				setInboxPresetSelectedStatuses(['new-message']);
+				requestInboxSentTab('inbox');
+				requestInboxPanelTab('responses');
+				setActiveView('inbox');
+				return;
+			case 'sent':
+				setInboxPresetSelectedStatuses(['sent']);
+				requestInboxPanelTab('sent');
+				setActiveView('sent');
+				return;
+		}
+	};
 
 	// Writing + Drafts + Sent + Inbox tab vertical alignment:
 	// Sit the top of the main content box exactly 27px below the bottom edge of the
@@ -3727,13 +3810,6 @@ const Murmur = () => {
 	const DRAFTING_SECTION_TOP_SPACER_PX = 4;
 	const writingContentTopMarginPx =
 		WRITING_BOX_TOP_PX - CAMPAIGN_HEADER_HEIGHT_PX - DRAFTING_SECTION_TOP_SPACER_PX; // 105px
-	const shouldApplyWritingTopShift =
-		(activeView === 'testing' ||
-			activeView === 'drafting' ||
-			activeView === 'sent' ||
-			activeView === 'inbox') &&
-		!isMobile &&
-		!isNarrowestDesktop;
 	// Per-view version of the crossfade wrapper's margin (mt-6 = 24px unless the
 	// top shift above applies for that view). The previous-layer snapshot offsets
 	// itself by the delta so it stays at the margin its view was painted with.
@@ -3757,7 +3833,9 @@ const Murmur = () => {
 						{usePersistentCampaignMapBackground && (
 							<div className="campaign-map-split-overlay" aria-hidden="true" />
 						)}
-						{isMobile === false && activeView === 'overview' && !shouldHideContent && (
+						{isMobile === false &&
+							activeView === 'overview' &&
+							!shouldHideContent && (
 							<div
 								className="pointer-events-none fixed inset-0"
 								style={{
@@ -3797,6 +3875,7 @@ const Murmur = () => {
 											? () => {
 													// Explicit 'inbox' request beats a stale 'sent' one when the
 													// view dedupe skips re-requesting (sent pill → inbox pill).
+													setInboxPresetSelectedStatuses(['sent', 'new-message']);
 													requestInboxSentTab('inbox');
 													setActiveView('inbox');
 												}
@@ -3826,11 +3905,10 @@ const Murmur = () => {
 										}}
 									>
 										<CampaignOverviewStatusStrip
-											selectedStatuses={effectiveActiveStatusSetForActiveView}
-											locked
+											selectedStatuses={activePresetControlStatusSet}
 											leftOverride={presetMapControlsLeftCss}
 											bottomOverride={presetMapStatusStripBottomPx}
-											onToggleStatus={() => undefined}
+											onToggleStatus={handlePresetStatusStripClick}
 										/>
 										<CampaignOverviewAskAnythingBox
 											onSubmit={handlePresetAskAnythingSubmit}
@@ -3949,6 +4027,7 @@ const Murmur = () => {
 											className="absolute left-0 pointer-events-none"
 											isSelectActive={isSelectMapToolActive}
 											selectedContent={<StackBoxSelectStarIcon />}
+											hoverLabel="Opportunities"
 											inactiveContent={
 												<MapSelectGrabStackTile backgroundColor="#EFEFEF">
 													<MapStackStarIcon />
@@ -3971,6 +4050,7 @@ const Murmur = () => {
 											className="absolute left-0 pointer-events-none"
 											isSelectActive={isSelectMapToolActive}
 											selectedContent={<StackBoxSelectBlueSparkIcon />}
+											hoverLabel="People"
 											inactiveContent={
 												<MapSelectGrabStackTile backgroundColor="#EFEFEF">
 													<MapStackBlueSparkIcon />
@@ -4036,24 +4116,6 @@ const Murmur = () => {
 									CAMPAIGN_TOP_NAV_BACKDROP_BOX_WIDTH_PX;
 								const MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX =
 									CAMPAIGN_TOP_NAV_BACKDROP_BOX_HEIGHT_PX;
-								const MAP_VIEW_TOP_OUTLINE_BOX_WIDTH_PX = Math.round(
-									124 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
-								);
-								const MAP_VIEW_TOP_OUTLINE_BOX_HEIGHT_PX = Math.round(
-									42 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
-								);
-								const MAP_VIEW_TOP_OUTLINE_BOX_LEFT_GAP_PX = Math.round(
-									23 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
-								);
-								const MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_WIDTH_PX = Math.round(
-									105 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
-								);
-								const MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_HEIGHT_PX = Math.round(
-									42 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
-								);
-								const MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_GAP_PX = Math.round(
-									31 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
-								);
 								const MAP_VIEW_SEARCH_BAR_BOTTOM_INSET_PX = 4;
 								const MAP_VIEW_SEARCH_BAR_TOP_PX =
 									MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX +
@@ -4117,46 +4179,53 @@ const Murmur = () => {
 										</div>
 
 										{/* Persistent "Filtering in {campaign}" status pill, centered over the
-										    map strip left of the panels. Display-only (pointer-events:none) and
+										    map strip left of the panels. Click returns to campaign search and
 										    intentionally NOT added to the top-nav right-shift rule below, so it
 										    stays over the map instead of riding the chrome's translateX. */}
-										<div
-											data-slot={
-												activeView === 'overview'
-													? 'campaign-top-filter-pill-nav'
-													: 'campaign-top-filter-pill'
-											}
-											aria-hidden="true"
-											className="fixed flex justify-center pointer-events-none"
-											style={
-												activeView === 'overview'
-													? {
-															// All/overview tab: center the pill UNDER the middle top-nav
-															// panel, just below the backdrop. The horizontal centering +
-															// right-shift are inherited from the shared top-nav shift CSS
-															// rule (which matches the campaign-top-filter-pill-nav slot),
-															// so the pill tracks the nav exactly in every layout mode
-															// (including origin=search, where the nav shift is 0).
-															top: `${
-																MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX +
-																MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX * MAP_VIEW_UI_SCALE +
-																8
-															}px`,
-															left: 0,
-															right: 0,
-															zIndex: 115,
-														}
-													: {
-															// Other tabs: top-center over the left map strip.
-															top: '10px',
-															left: 0,
-															width: `var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333%)`,
-															zIndex: 115,
-														}
-											}
-										>
+										{isPersistentFilterPillVisible && (
 											<div
+												data-slot={
+													activeView === 'overview'
+														? 'campaign-top-filter-pill-nav'
+														: 'campaign-top-filter-pill'
+												}
+												className="fixed flex justify-center pointer-events-none"
+												style={
+													activeView === 'overview'
+														? {
+																// All/overview tab: center the pill UNDER the middle top-nav
+																// panel, just below the backdrop. The horizontal centering +
+																// right-shift are inherited from the shared top-nav shift CSS
+																// rule (which matches the campaign-top-filter-pill-nav slot),
+																// so the pill tracks the nav exactly in every layout mode
+																// (including origin=search, where the nav shift is 0).
+																top: `${
+																	MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX +
+																	MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX *
+																		MAP_VIEW_UI_SCALE +
+																	8
+																}px`,
+																left: 0,
+																right: 0,
+																zIndex: 115,
+															}
+														: {
+																// Other tabs: top-center over the left map strip.
+																top: '10px',
+																left: 0,
+																width: `var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333%)`,
+																zIndex: 115,
+															}
+												}
+											>
+											<button
+												type="button"
+												aria-label="Open campaign search"
+												onClick={handleGoToDashboardSearch}
 												style={{
+													appearance: 'none',
+													border: 'none',
+													margin: 0,
 													transform: `scale(${MAP_VIEW_UI_SCALE})`,
 													transformOrigin: 'top center',
 													display: 'inline-flex',
@@ -4167,7 +4236,10 @@ const Murmur = () => {
 													borderRadius: '9999px',
 													backgroundColor: '#CDEFCF',
 													fontFamily: 'Inter, sans-serif',
+													color: '#000000',
 													whiteSpace: 'nowrap',
+													cursor: 'pointer',
+													pointerEvents: 'auto',
 												}}
 											>
 												<span
@@ -4229,8 +4301,9 @@ const Murmur = () => {
 														{campaignName}
 													</span>
 												</span>
+											</button>
 											</div>
-										</div>
+										)}
 
 										{/* Tabs row: Search / Write / [campaign chip] / Inbox / Drafts */}
 										<div
@@ -4319,7 +4392,15 @@ const Murmur = () => {
 														type="button"
 														className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
 														style={inactiveTabStyle(activeView === 'inbox')}
-														onClick={() => setActiveView('inbox')}
+														onClick={() => {
+															if (activeView !== 'inbox') {
+																setInboxPresetSelectedStatuses([
+																	'sent',
+																	'new-message',
+																]);
+															}
+															setActiveView('inbox');
+														}}
 													>
 														Inbox
 													</button>
@@ -4750,6 +4831,7 @@ const Murmur = () => {
 									className="absolute left-0 pointer-events-none"
 									isSelectActive={isSelectMapToolActive}
 									selectedContent={<StackBoxSelectStarIcon />}
+									hoverLabel="Opportunities"
 									inactiveContent={
 										<MapSelectGrabStackTile backgroundColor="#EFEFEF">
 											<MapStackStarIcon />
@@ -4772,6 +4854,7 @@ const Murmur = () => {
 									className="absolute left-0 pointer-events-none"
 									isSelectActive={isSelectMapToolActive}
 									selectedContent={<StackBoxSelectBlueSparkIcon />}
+									hoverLabel="People"
 									inactiveContent={
 										<MapSelectGrabStackTile backgroundColor="#EFEFEF">
 											<MapStackBlueSparkIcon />
@@ -4862,7 +4945,12 @@ const Murmur = () => {
 														? 'text-black border-black'
 														: 'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
 												)}
-												onClick={() => setActiveView('inbox')}
+												onClick={() => {
+													if (activeView !== 'inbox') {
+														setInboxPresetSelectedStatuses(['sent', 'new-message']);
+													}
+													setActiveView('inbox');
+												}}
 											>
 												Inbox
 											</button>
@@ -4920,10 +5008,7 @@ const Murmur = () => {
 
 								{/* Campaign Header Box - shown at narrowest breakpoint (< 952px).
 								    Excluded on the All tab, where the whole contacts column hides instead. */}
-								{!isMobile &&
-									isNarrowestDesktop &&
-									activeView !== 'overview' &&
-									campaign && (
+								{shouldRenderNarrowestCampaignHeaderBox && campaign && (
 										<div className="campaign-narrowest-header-box flex justify-center mb-4">
 											<CampaignHeaderBox
 												campaignId={campaign.id}
@@ -4996,7 +5081,12 @@ const Murmur = () => {
 												goToDrafting={() => setActiveView('drafting')}
 												goToWriting={() => setActiveView('testing')}
 												onGoToSearch={handleOpenDashboardSearchForCampaign}
-												goToInbox={() => setActiveView('inbox')}
+												goToInbox={() => {
+													if (activeView !== 'inbox') {
+														setInboxPresetSelectedStatuses(['sent', 'new-message']);
+													}
+													setActiveView('inbox');
+												}}
 												goToSent={() => setActiveView('sent')}
 												goToSummary={() => setActiveView('summary')}
 												onOpenIdentityDialog={() => {
@@ -5639,6 +5729,12 @@ const Murmur = () => {
 								onChange={setInboxMockState}
 							/>
 						)}
+						{routeCampaignId != null && (
+							<SendQueueOverlayMount
+								campaignId={routeCampaignId}
+								isMobile={isMobile}
+							/>
+						)}
 					</div>
 				</CampaignTopSearchHighlightProvider>
 			</HoverDescriptionProvider>
@@ -5646,4 +5742,10 @@ const Murmur = () => {
 	);
 };
 
-export default Murmur;
+const MurmurWithSendQueueProvider = () => (
+	<SendQueueViewProvider>
+		<Murmur />
+	</SendQueueViewProvider>
+);
+
+export default MurmurWithSendQueueProvider;

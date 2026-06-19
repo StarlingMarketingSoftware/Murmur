@@ -280,12 +280,12 @@ export const getMonthGridSpec = (year: number, monthIndex: number): MonthGridSpe
 };
 
 export const getCellBackground = (
-	monthIndex: number,
+	cellMonthIndex: number,
 	row: number,
 	col: number
 ): string => {
 	const d = row + col;
-	const palette = MONTH_COLOR_PALETTES[monthIndex];
+	const palette = MONTH_COLOR_PALETTES[cellMonthIndex];
 	return palette[d % palette.length] ?? '#FFFFFF';
 };
 

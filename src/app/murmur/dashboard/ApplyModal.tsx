@@ -35,6 +35,8 @@ import {
 } from '@/hooks/queryHooks/useEventApplications';
 import { useGetIdentities } from '@/hooks/queryHooks/useIdentities';
 import type { Identity } from '@prisma/client';
+import { formatMapPostedEventDate } from './MapEventPopupCard';
+import { stripTrailingDateFromEventName } from '@/utils/eventChatStatus';
 
 // Drop a file extension for display; YouTube embeds already have a clean "YouTube video".
 const getApplyMediaTitle = (filename: string) => filename.replace(/\.[^/.]+$/, '') || filename;
@@ -77,6 +79,13 @@ const computeApplySeed = (
 		),
 		bio: pick(forThisEvent?.bio, mostRecentOther?.bio, identity?.bio),
 	};
+};
+
+const getApplyDaysAway = (startsAt: string | null): number | null => {
+	if (!startsAt) return null;
+	const start = new Date(startsAt).getTime();
+	if (Number.isNaN(start)) return null;
+	return Math.max(0, Math.ceil((start - Date.now()) / 86_400_000));
 };
 
 /** A ready video slot (273px) — thumbnail, title, play, and delete-on-hover. */
@@ -158,6 +167,7 @@ export function ApplyModal({
 	const [selectedBio, setSelectedBio] = useState<string | null>(null);
 	const [bioDraft, setBioDraft] = useState('');
 	const [isBioEditorOpen, setIsBioEditorOpen] = useState(false);
+	const [isOpportunityExpanded, setIsOpportunityExpanded] = useState(false);
 
 	// Video section: account-level media shared with the profile (context 'profile_media').
 	const mediaInputRef = useRef<HTMLInputElement>(null);
@@ -210,6 +220,7 @@ export function ApplyModal({
 			setIsAreaChooserOpen(false);
 			setIsPerformingNameEditorOpen(false);
 			setIsBioEditorOpen(false);
+			setIsOpportunityExpanded(false);
 		}
 
 		// Errors count as settled so one failed source never blocks seeding from the other.
@@ -367,6 +378,12 @@ export function ApplyModal({
 	};
 
 	// Venue header (mirrors the pink band in MapEventPopupCard).
+	const eventName = event?.name?.trim() || 'Posted Event';
+	const eventTitle = stripTrailingDateFromEventName(eventName);
+	const dateLabel = event ? formatMapPostedEventDate(event) : 'Date TBA';
+	const daysAway = getApplyDaysAway(event?.startsAt ?? null);
+	const details = event?.details?.trim() || '';
+	const pay = event?.pay?.trim() || '';
 	const venueName = event?.venueName?.trim() || 'Venue TBA';
 	const venueCity = event?.venueCity?.trim() || '';
 	const venueStateAbbr =
@@ -422,8 +439,26 @@ export function ApplyModal({
 						boxSizing: 'border-box',
 					}}
 				>
-					{/* Box 1: venue band — 660x63, pink top region (#FFD5D5) above a divider at 40px. */}
+					{/* Box 1: opportunity surface — collapsed venue band, expanded details card. */}
 					<div
+						role="button"
+						tabIndex={0}
+						aria-expanded={isOpportunityExpanded}
+						aria-label={
+							isOpportunityExpanded
+								? `Collapse opportunity details for ${eventName}`
+								: `Expand opportunity details for ${eventName}`
+						}
+						onClick={(e) => {
+							e.stopPropagation();
+							setIsOpportunityExpanded((prev) => !prev);
+						}}
+						onKeyDown={(e) => {
+							if (e.key !== 'Enter' && e.key !== ' ') return;
+							e.preventDefault();
+							e.stopPropagation();
+							setIsOpportunityExpanded((prev) => !prev);
+						}}
 						style={{
 							position: 'absolute',
 							top: '21px',
@@ -432,14 +467,207 @@ export function ApplyModal({
 							marginLeft: 'auto',
 							marginRight: 'auto',
 							width: '660px',
-							height: '63px',
+							height: isOpportunityExpanded ? '452px' : '63px',
 							borderRadius: '12px',
 							border: '2px solid #000',
 							background: '#FFF',
 							overflow: 'hidden',
 							boxSizing: 'border-box',
+							cursor: 'pointer',
 						}}
 					>
+						{isOpportunityExpanded ? (
+							<>
+								<div
+									style={{
+										position: 'absolute',
+										top: 0,
+										left: 0,
+										right: 0,
+										height: '112px',
+										padding: '14px 24px 0',
+										boxSizing: 'border-box',
+										overflow: 'hidden',
+									}}
+								>
+									<div
+										style={{
+											display: 'flex',
+											alignItems: 'flex-start',
+											justifyContent: 'space-between',
+											gap: '18px',
+										}}
+									>
+										<div
+											style={{
+												minWidth: 0,
+												fontSize: '28px',
+												fontWeight: 500,
+												lineHeight: 1.08,
+											}}
+										>
+											<div>{eventTitle}</div>
+											<div
+												style={{
+													display: 'inline-flex',
+													marginTop: '3px',
+													borderRadius: '6px',
+													background: '#D6F7FF',
+													padding: '0 4px',
+												}}
+											>
+												{dateLabel}
+											</div>
+										</div>
+										{daysAway != null && (
+											<div
+												style={{
+													marginTop: '4px',
+													flexShrink: 0,
+													fontSize: '22px',
+													fontWeight: 500,
+													lineHeight: 1,
+													whiteSpace: 'nowrap',
+												}}
+											>
+												<span
+													style={{
+														borderRadius: '6px',
+														background: '#FFD5D5',
+														padding: '0 4px',
+													}}
+												>
+													{daysAway}
+												</span>{' '}
+												days away
+											</div>
+										)}
+									</div>
+								</div>
+								<div
+									style={{
+										position: 'absolute',
+										top: '112px',
+										left: 0,
+										right: 0,
+										height: '40px',
+										background: '#FFD5D5',
+										display: 'flex',
+										alignItems: 'center',
+										gap: '8px',
+										padding: '0 14px',
+										borderTop: '2px solid #000',
+										borderBottom: '2px solid #000',
+										boxSizing: 'border-box',
+									}}
+								>
+									<MapStackStarIcon size={24} className="flex-shrink-0" />
+									<span
+										style={{
+											fontSize: '18px',
+											fontWeight: 700,
+											lineHeight: 1.1,
+											overflow: 'hidden',
+											textOverflow: 'ellipsis',
+											whiteSpace: 'nowrap',
+											minWidth: 0,
+											flex: '0 1 auto',
+										}}
+									>
+										{venueName}
+									</span>
+									{iconSpec && (
+										<span
+											style={{
+												flexShrink: 0,
+												display: 'inline-flex',
+												alignItems: 'center',
+												justifyContent: 'center',
+												width: '28px',
+												height: '24px',
+												borderRadius: '6px',
+												border: '1.5px solid #000',
+												background: '#C9C2F2',
+											}}
+										>
+											<svg
+												viewBox={iconSpec.viewBox}
+												preserveAspectRatio="xMidYMid meet"
+												style={{ width: '18px', height: '18px', display: 'block' }}
+												dangerouslySetInnerHTML={{
+													__html: normalizeInlineSvgMarkupForXml(iconSpec.content),
+												}}
+											/>
+										</span>
+									)}
+									{venueStateAbbr && (
+										<span
+											style={{
+												flexShrink: 0,
+												display: 'inline-flex',
+												alignItems: 'center',
+												justifyContent: 'center',
+												height: '20px',
+												minWidth: '36px',
+												padding: '0 5px',
+												borderRadius: '6px',
+												border: '1px solid #000',
+												backgroundColor: stateBadgeColorMap[venueStateAbbr] || '#FFF8DC',
+												fontSize: '13px',
+												fontWeight: 700,
+												lineHeight: 1,
+											}}
+										>
+											{venueStateAbbr}
+										</span>
+									)}
+									{venueCity && (
+										<span
+											style={{
+												fontSize: '14px',
+												lineHeight: 1,
+												flexShrink: 0,
+												whiteSpace: 'nowrap',
+											}}
+										>
+											{venueCity}
+										</span>
+									)}
+								</div>
+								<div
+									style={{
+										position: 'absolute',
+										top: '152px',
+										left: 0,
+										right: 0,
+										bottom: 0,
+										display: 'grid',
+										gridTemplateColumns: pay ? '1fr 1fr' : '1fr',
+										columnGap: '34px',
+										padding: '30px 28px',
+										boxSizing: 'border-box',
+										overflow: 'hidden',
+										fontSize: '16px',
+										lineHeight: 1.2,
+									}}
+								>
+									{pay && (
+										<div
+											style={{
+												whiteSpace: 'pre-wrap',
+												fontWeight: 700,
+											}}
+										>
+											{pay}
+										</div>
+									)}
+									<div style={{ whiteSpace: 'pre-wrap' }}>
+										{details || 'Details TBA'}
+									</div>
+								</div>
+							</>
+						) : (
+							<>
 						<div
 							style={{
 								position: 'absolute',
@@ -538,24 +766,42 @@ export function ApplyModal({
 								background: '#000',
 							}}
 						/>
+							</>
+						)}
 					</div>
 
 					{/* Box 2: profile card — 659x552, blue header (#ABCBF9) above a divider at 56px. */}
 					<div
+						role={isOpportunityExpanded ? 'button' : undefined}
+						tabIndex={isOpportunityExpanded ? 0 : undefined}
+						aria-label={isOpportunityExpanded ? 'Expand profile application form' : undefined}
+						onClickCapture={(e) => {
+							if (!isOpportunityExpanded) return;
+							e.stopPropagation();
+							setIsOpportunityExpanded(false);
+						}}
+						onKeyDown={(e) => {
+							if (!isOpportunityExpanded) return;
+							if (e.key !== 'Enter' && e.key !== ' ') return;
+							e.preventDefault();
+							e.stopPropagation();
+							setIsOpportunityExpanded(false);
+						}}
 						style={{
 							position: 'absolute',
-							top: '94px',
+							top: isOpportunityExpanded ? '486px' : '94px',
 							left: 0,
 							right: 0,
 							marginLeft: 'auto',
 							marginRight: 'auto',
 							width: '659px',
-							height: '552px',
+							height: isOpportunityExpanded ? '160px' : '552px',
 							borderRadius: '12px',
 							border: '2px solid #000',
-							background: '#F2F7FF',
+							background: isOpportunityExpanded ? '#A9C9F9' : '#F2F7FF',
 							overflow: 'hidden',
 							boxSizing: 'border-box',
+							cursor: isOpportunityExpanded ? 'pointer' : undefined,
 						}}
 					>
 						<div
@@ -565,7 +811,7 @@ export function ApplyModal({
 								left: 0,
 								right: 0,
 								height: '56px',
-								background: '#ABCBF9',
+								background: isOpportunityExpanded ? '#FFF' : '#ABCBF9',
 								display: 'flex',
 								alignItems: 'center',
 								gap: '12px',
@@ -649,24 +895,150 @@ export function ApplyModal({
 						<div
 							style={{
 								position: 'absolute',
-								top: '116px',
+								top: isOpportunityExpanded ? '58px' : '116px',
 								left: 0,
 								right: 0,
 								marginLeft: 'auto',
 								marginRight: 'auto',
-								width: '639px',
-								height: '401px',
-								borderRadius: '9px',
-								background: '#FFF',
+								width: isOpportunityExpanded ? '100%' : '639px',
+								height: isOpportunityExpanded ? '102px' : '401px',
+								borderRadius: isOpportunityExpanded ? 0 : '9px',
+								background: isOpportunityExpanded ? '#A9C9F9' : '#FFF',
 								// Clip overflowing fields at the white box's own (rounded) bottom edge
 								// instead of letting them spill out to the card border below.
 								overflow: 'hidden',
 								display: 'flex',
 								gap: '24px',
-								padding: '32px 9px 32px 16px',
+								padding: isOpportunityExpanded
+									? '10px 9px 10px 68px'
+									: '32px 9px 32px 16px',
 								boxSizing: 'border-box',
 							}}
 						>
+							{isOpportunityExpanded ? (
+								<div
+									style={{
+										width: '100%',
+										display: 'grid',
+										gridTemplateColumns: '350px minmax(0, 1fr)',
+										columnGap: '22px',
+										alignItems: 'start',
+										color: '#000',
+										pointerEvents: 'none',
+									}}
+								>
+									<div style={{ minWidth: 0 }}>
+										<div
+											style={{
+												display: 'flex',
+												gap: '24px',
+												alignItems: 'flex-start',
+											}}
+										>
+											<div>
+												<div
+													style={{
+														color: 'rgba(255,255,255,0.65)',
+														fontSize: '9px',
+														fontWeight: 700,
+														lineHeight: 1,
+													}}
+												>
+													Genre
+												</div>
+												<div
+													style={{
+														marginTop: '2px',
+														fontSize: '16px',
+														fontWeight: 500,
+														lineHeight: 1.05,
+													}}
+												>
+													{selectedGenre || 'Not set'}
+												</div>
+											</div>
+											<div>
+												<div
+													style={{
+														color: 'rgba(255,255,255,0.65)',
+														fontSize: '9px',
+														fontWeight: 700,
+														lineHeight: 1,
+													}}
+												>
+													Area
+												</div>
+												<div
+													style={{
+														marginTop: '2px',
+														maxWidth: '230px',
+														overflow: 'hidden',
+														textOverflow: 'ellipsis',
+														whiteSpace: 'nowrap',
+														fontSize: '16px',
+														fontWeight: 500,
+														lineHeight: 1.05,
+													}}
+												>
+													{selectedArea || 'Not set'}
+												</div>
+											</div>
+										</div>
+										<div style={{ marginTop: '8px' }}>
+											<div
+												style={{
+													color: 'rgba(255,255,255,0.65)',
+													fontSize: '9px',
+													fontWeight: 700,
+													lineHeight: 1,
+												}}
+											>
+												Performing Name
+											</div>
+											<div
+												style={{
+													marginTop: '2px',
+													overflow: 'hidden',
+													textOverflow: 'ellipsis',
+													whiteSpace: 'nowrap',
+													fontSize: '16px',
+													fontWeight: 500,
+													lineHeight: 1.05,
+												}}
+											>
+												{selectedPerformingName || performerName}
+											</div>
+										</div>
+									</div>
+									<div style={{ minWidth: 0 }}>
+										<div
+											style={{
+												color: 'rgba(255,255,255,0.65)',
+												fontSize: '9px',
+												fontWeight: 700,
+												lineHeight: 1,
+											}}
+										>
+											Bio
+										</div>
+										<div
+											style={{
+												marginTop: '3px',
+												display: '-webkit-box',
+												WebkitLineClamp: 4,
+												WebkitBoxOrient: 'vertical',
+												overflow: 'hidden',
+												fontSize: '11px',
+												fontWeight: 700,
+												lineHeight: 1.28,
+											}}
+										>
+											{selectedBio || 'Tell venues about yourself'}
+										</div>
+									</div>
+								</div>
+							) : (
+								<>
 							<div
 								style={{
 									flex: 1,
@@ -1059,6 +1431,8 @@ export function ApplyModal({
 									);
 								})}
 							</div>
+								</>
+							)}
 						</div>
 					</div>
 

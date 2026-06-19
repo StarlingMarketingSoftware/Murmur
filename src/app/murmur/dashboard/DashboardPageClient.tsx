@@ -1,7 +1,6 @@
 'use client';
 
 import {
-	FC,
 	memo,
 	Suspense,
 	useCallback,
@@ -36,7 +35,12 @@ import {
 } from '@/components/molecules/MobileDashboardTabBar/MobileDashboardTabBar';
 import { MobileFolderCards } from '@/components/molecules/MobileFolderCards/MobileFolderCards';
 import { MobileDashboardSearch } from '@/app/murmur/dashboard/MobileDashboardSearch';
-import { useDashboard } from './useDashboard';
+import {
+	DASHBOARD_SEARCH_SELECTION_LIMIT,
+	getSelectionLimitedContactIds,
+	mergeContactIdsWithSelectionLimit,
+	useDashboard,
+} from './useDashboard';
 import { useLenis } from '@/contexts/ScrollContext';
 import { withClerkNoBranding } from '@/constants/auth';
 import { urls } from '@/constants/urls';
@@ -162,6 +166,8 @@ import {
 	usePersistentMapFirstPaint,
 	usePersistentMapSetter,
 } from '@/contexts/PersistentMapContext';
+import { useWebsitePreview } from '@/contexts/WebsitePreviewContext';
+import { getMurmurRootScale } from '@/utils/rootScale';
 import { DashboardBootBackdrop } from '@/components/molecules/DashboardBootBackdrop/DashboardBootBackdrop';
 import { DashboardBootProgress } from '@/components/molecules/DashboardBootProgress/DashboardBootProgress';
 import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
@@ -239,6 +245,12 @@ import { toast } from 'sonner';
 import { EmailStatus } from '@prisma/client';
 import { useSendingSessionState } from '@/contexts/SendingSessionContext';
 import { SearchSendingOverlay } from '@/components/molecules/SendingProgress/SearchSendingOverlay';
+import { DashboardSendQueueOverlay } from '@/components/molecules/SendingProgress/DashboardSendQueueOverlay';
+import {
+	SendQueueViewProvider,
+	useSendQueueView,
+} from '@/contexts/SendQueueViewContext';
+import { useSendQueue } from '@/hooks/queryHooks/useSendQueue';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -528,38 +540,6 @@ const formatMapTopSearchWhereLabel = (where: string): string => {
 const clampNumber = (n: number, min: number, max: number): number => {
 	return Math.min(max, Math.max(min, n));
 };
-
-const MAP_RESULTS_SEARCH_TRAY_WHAT_ICON_BY_LABEL: Record<
-	string,
-	{ backgroundColor: string; Icon: FC<{ size?: number; className?: string }> }
-> = {
-	'Radio Stations': { backgroundColor: '#56DA73', Icon: RadioStationsIcon },
-	'Music Venues': { backgroundColor: '#71C9FD', Icon: MusicVenuesIcon },
-	'Wine, Beer, and Spirits': { backgroundColor: '#80AAFF', Icon: WineBeerSpiritsIcon },
-	Restaurants: { backgroundColor: '#77DD91', Icon: RestaurantsIcon },
-	'Coffee Shops': { backgroundColor: '#A9DE78', Icon: CoffeeShopsIcon },
-	'Wedding Planners': { backgroundColor: '#EED56E', Icon: WeddingPlannersIcon },
-	Festivals: { backgroundColor: '#80AAFF', Icon: FestivalsIcon },
-};
-
-const MAP_RESULTS_SEARCH_TRAY = {
-	containerWidth: 189,
-	containerHeight: 52,
-	containerRadius: 6,
-	itemSize: 43,
-	itemRadius: 12,
-	itemGap: 12,
-	gapToSearchBar: 43,
-	borderWidth: 3,
-	borderColor: '#000000',
-	backgroundColor: 'rgba(255, 255, 255, 0.9)',
-	nearMeBackgroundColor: '#D0E6FF',
-	whyBackgroundColors: {
-		booking: '#9DCBFF',
-		promotion: '#7AD47A',
-	},
-	whatIconByLabel: MAP_RESULTS_SEARCH_TRAY_WHAT_ICON_BY_LABEL,
-} as const;
 
 const MAP_RESULTS_BOTTOM_SEARCH_BOX = {
 	width: 474,
@@ -1624,6 +1604,9 @@ const MAP_VIEW_CAMPAIGN_HEADER_GAP_PX = 13;
 // expanded: header (50px) + category toolbar (≈55px @ bottom-9) + breathing room. Below this
 // the Selection cap stops growing so the toolbar (and the bottom CTA) stay visible.
 const MAP_VIEW_SEARCH_RESULTS_MIN_HEIGHT_PX = 125;
+// Hold the Selection panel to ~50% height until Search Results is down to the last few rows,
+// then allow the existing “compress results, expand selection” behavior.
+const MAP_VIEW_SEARCH_RESULTS_COMPRESS_THRESHOLD = 5;
 // Keep both map side panels visually pinned after the dashboard root zoom is applied.
 // The side-shift var (written by the map-view zoom effect) lowers the whole side
 // chrome toward vertical center on tall monitors; 0px on the 1080p baseline.
@@ -2900,28 +2883,6 @@ const DashboardSearchFlankBoxes = ({
 	);
 };
 
-const SearchTrayIconTile = ({
-	backgroundColor,
-	children,
-}: {
-	backgroundColor: string;
-	children: ReactNode;
-}) => {
-	return (
-		<div
-			className="flex items-center justify-center flex-shrink-0"
-			style={{
-				width: `${MAP_RESULTS_SEARCH_TRAY.itemSize}px`,
-				height: `${MAP_RESULTS_SEARCH_TRAY.itemSize}px`,
-				backgroundColor,
-				borderRadius: `${MAP_RESULTS_SEARCH_TRAY.itemRadius}px`,
-			}}
-		>
-			{children}
-		</div>
-	);
-};
-
 const DashboardContent = () => {
 	const { openSignIn } = useClerk();
 	const { isSignedIn, isLoaded: isAuthLoaded } = useAuth();
@@ -2956,6 +2917,9 @@ const DashboardContent = () => {
 		isMobile === false &&
 		(sendingSession.status === 'sending' || sendingSession.status === 'done') &&
 		!sendingSession.dismissed;
+	// Send-queue VIEW open/close — toggled by the campaign header "in send queue"
+	// pill (provider wraps DashboardContent), drives the on-demand queue overlay.
+	const { isOpen: isSendQueueViewOpen, close: closeSendQueueView } = useSendQueueView();
 	// Persisted (URL) search + view state for the normal dashboard flow so refresh keeps the user
 	// in the same results view (map/table) instead of resetting back to the initial search screen.
 	const dashboardViewParam = searchParams.get('view')?.trim() || '';
@@ -3043,6 +3007,7 @@ const DashboardContent = () => {
 				apolloPersonId: null,
 				contactListId: null,
 				userId: null,
+				venueId: null,
 				isPrivate: false,
 				hasVectorEmbedding: false,
 				userContactListCount: 0,
@@ -3210,9 +3175,8 @@ const DashboardContent = () => {
 	const whatDropdownRef = useRef<HTMLDivElement>(null);
 	const [isWhereDropdownOpen, setIsWhereDropdownOpen] = useState(false);
 	const whereDropdownRef = useRef<HTMLDivElement>(null);
-	const [isNearMeLocation, setIsNearMeLocation] = useState(false);
+	const [, setIsNearMeLocation] = useState(false);
 	const hasWhereValue = whereValue.trim().length > 0;
-	const isPromotion = whyValue === '[Promotion]';
 	const [activeSection, setActiveSection] = useState<'why' | 'what' | 'where' | null>(
 		null
 	);
@@ -4364,7 +4328,6 @@ const DashboardContent = () => {
 		isMapView,
 		setIsMapView,
 		isSearchPending,
-		usedContactIdsSet,
 		isFromHomeDemoMode,
 		mapBboxFilter,
 		setMapBboxFilter,
@@ -5935,6 +5898,7 @@ const DashboardContent = () => {
 	const [selectedContactStickyHeadlineById, setSelectedContactStickyHeadlineById] =
 		useState<Record<number, string>>({});
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
+	const [isMapShowingRailHovered, setIsMapShowingRailHovered] = useState(false);
 	const [isMapSearchEngaged, setIsMapSearchEngaged] = useState(true);
 	// True only when the user explicitly exits the focused search via the map-view
 	// search-bar X (or the map's "Click to see all contacts"). Distinguishes that
@@ -6021,7 +5985,7 @@ const DashboardContent = () => {
 	// Last zoom the map reported — lets the ladder-rebase effect re-place the
 	// thumb when the floor changes without any camera movement (window shrink).
 	const lastMapViewportZoomRef = useRef<number | null>(null);
-	const [selectAllInViewNonce, setSelectAllInViewNonce] = useState(0);
+	const [selectAllInViewNonce] = useState(0);
 	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] =
 		useState<ContactWithName | null>(null);
 	// Marker-hover research group docking: right (beside Search Results) unless the
@@ -6079,6 +6043,44 @@ const DashboardContent = () => {
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
 	const dashboardMapCampaignForHeader = fromCampaign ?? activeCampaign;
+	// Keep the send-queue view honest: once the queue drains to 0 the header pill
+	// disappears (so it can't be toggled shut manually) — close the view so its
+	// open state and chevron don't get stuck. Shares useSendQueue's query key with
+	// the overlay + the pill, so this is the same deduped fetch (no extra request).
+	const { count: dashboardSendQueueCount } = useSendQueue(
+		dashboardMapCampaignForHeader?.id ?? 0
+	);
+	const isDashboardSendQueueResearchSuppressed =
+		activeTab === 'search' &&
+		isMapView &&
+		isSendQueueViewOpen &&
+		dashboardSendQueueCount > 0;
+	useEffect(() => {
+		if (isSendQueueViewOpen && dashboardSendQueueCount === 0) closeSendQueueView();
+	}, [isSendQueueViewOpen, dashboardSendQueueCount, closeSendQueueView]);
+	useEffect(() => {
+		if (!isDashboardSendQueueResearchSuppressed) return;
+
+		const handlePointerDown = (event: PointerEvent) => {
+			const target =
+				event.target instanceof Element
+					? event.target
+					: event.target instanceof Node
+						? event.target.parentElement
+						: null;
+			if (
+				target?.closest(
+					'[data-dashboard-send-queue-overlay], [data-send-queue-toggle]'
+				)
+			) {
+				return;
+			}
+			closeSendQueueView();
+		};
+
+		document.addEventListener('pointerdown', handlePointerDown, true);
+		return () => document.removeEventListener('pointerdown', handlePointerDown, true);
+	}, [closeSendQueueView, isDashboardSendQueueResearchSuppressed]);
 	const shouldLoadDashboardMapCampaignFootprint =
 		activeTab === 'search' && isMapView && Boolean(dashboardMapCampaignForHeader?.id);
 	const { data: dashboardMapCampaignFootprintContacts } = useGetCampaignContacts(
@@ -6714,10 +6716,11 @@ const DashboardContent = () => {
 
 	useEffect(() => {
 		// Prevent stale hover state when leaving map view or while results are transitioning.
-		if (!isMapView || isMapResultsLoading) {
+		if (!isMapView || isMapResultsLoading || isDashboardSendQueueResearchSuppressed) {
 			setHoveredMapPanelContactId(null);
+			setMapPanelHoverResearchTopPx(null);
 		}
-	}, [isMapResultsLoading, isMapView]);
+	}, [isDashboardSendQueueResearchSuppressed, isMapResultsLoading, isMapView]);
 
 	const [isMapBottomSearchActive, setIsMapBottomSearchActive] = useState(false);
 	const [mapBottomSearchValue, setMapBottomSearchValue] = useState('');
@@ -7450,7 +7453,7 @@ const DashboardContent = () => {
 		whereValue,
 	]);
 
-	const [isPointerInMapSidePanel, setIsPointerInMapSidePanel] = useState(false);
+	const [, setIsPointerInMapSidePanel] = useState(false);
 	const [isMapCampaignHeaderDropdownOpen, setIsMapCampaignHeaderDropdownOpen] =
 		useState(false);
 	const [selectedCategoryChips, setSelectedCategoryChips] = useState<Set<string>>(
@@ -7499,9 +7502,6 @@ const DashboardContent = () => {
 		!hasNoSearchResults &&
 		!isCompressedMapChrome;
 
-	const isMapPanelCreateCampaignVisible =
-		!shouldUseDynamicMapCreateCampaignCta || isPointerInMapSidePanel;
-
 	useEffect(() => {
 		// Reset when dynamic behavior is not active (prevents "stale" cursor state).
 		if (!shouldUseDynamicMapCreateCampaignCta) {
@@ -7519,6 +7519,30 @@ const DashboardContent = () => {
 	const mapResearchPanelCloseDelayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const mapResearchPanelUnmountTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const mapResearchPanelContactRef = useRef<ContactWithName | null>(null);
+	const {
+		activeContactId: websitePreviewContactId,
+		activeAnchorRect: websitePreviewAnchorRect,
+	} = useWebsitePreview();
+	const isWebsitePreviewOpen = websitePreviewContactId != null;
+	const canShowContactForWebsitePreview = useCallback(
+		(contactId: number | null | undefined) =>
+			!isWebsitePreviewOpen || contactId === websitePreviewContactId,
+		[isWebsitePreviewOpen, websitePreviewContactId]
+	);
+	useEffect(() => {
+		if (
+			isWebsitePreviewOpen &&
+			hoveredMapPanelContactId != null &&
+			!canShowContactForWebsitePreview(hoveredMapPanelContactId)
+		) {
+			setHoveredMapPanelContactId(null);
+			setMapPanelHoverResearchTopPx(null);
+		}
+	}, [
+		canShowContactForWebsitePreview,
+		hoveredMapPanelContactId,
+		isWebsitePreviewOpen,
+	]);
 	// When the executed search changes, reset map-panel "extras" for the new search,
 	// but keep any currently-selected contacts so selection can persist across searches
 	// within the same map session.
@@ -7557,10 +7581,33 @@ const DashboardContent = () => {
 		};
 	}, []);
 
+	useEffect(() => {
+		if (!isDashboardSendQueueResearchSuppressed) return;
+		if (mapPanelHoverResearchClearTimeoutRef.current) {
+			clearTimeout(mapPanelHoverResearchClearTimeoutRef.current);
+			mapPanelHoverResearchClearTimeoutRef.current = null;
+		}
+		if (mapResearchPanelCloseDelayTimeoutRef.current) {
+			clearTimeout(mapResearchPanelCloseDelayTimeoutRef.current);
+			mapResearchPanelCloseDelayTimeoutRef.current = null;
+		}
+		if (mapResearchPanelUnmountTimeoutRef.current) {
+			clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
+			mapResearchPanelUnmountTimeoutRef.current = null;
+		}
+		setHoveredMapPanelContactId(null);
+		setMapPanelHoverResearchTopPx(null);
+		setHoveredMapMarkerContact(null);
+		setIsMapMarkerResearchExpanded(false);
+		setIsMapResearchPanelVisible(false);
+		setMapResearchPanelContact(null);
+		mapResearchPanelContactRef.current = null;
+	}, [isDashboardSendQueueResearchSuppressed]);
+
 	// Ensure marker-hover research never "sticks" and apply hold+fade behavior.
 	useEffect(() => {
 		// Reset everything when leaving map view or while results are loading.
-		if (!isMapView || isMapResultsLoading) {
+		if (!isMapView || isMapResultsLoading || isDashboardSendQueueResearchSuppressed) {
 			setHoveredMapMarkerContact(null);
 			setIsMapResearchPanelVisible(false);
 			setMapResearchPanelContact(null);
@@ -7576,8 +7623,34 @@ const DashboardContent = () => {
 			return;
 		}
 
+		if (
+			isWebsitePreviewOpen &&
+			mapResearchPanelContactRef.current &&
+			!canShowContactForWebsitePreview(mapResearchPanelContactRef.current.id)
+		) {
+			if (mapResearchPanelCloseDelayTimeoutRef.current) {
+				clearTimeout(mapResearchPanelCloseDelayTimeoutRef.current);
+				mapResearchPanelCloseDelayTimeoutRef.current = null;
+			}
+			if (mapResearchPanelUnmountTimeoutRef.current) {
+				clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
+				mapResearchPanelUnmountTimeoutRef.current = null;
+			}
+			setHoveredMapMarkerContact((current) =>
+				canShowContactForWebsitePreview(current?.id) ? current : null
+			);
+			setIsMapResearchPanelVisible(false);
+			setMapResearchPanelContact(null);
+			mapResearchPanelContactRef.current = null;
+			return;
+		}
+
 		// Hovering a marker: show immediately (with snappy fade-in on first mount).
 		if (hoveredMapMarkerContact) {
+			if (!canShowContactForWebsitePreview(hoveredMapMarkerContact.id)) {
+				setHoveredMapMarkerContact(null);
+				return;
+			}
 			if (mapResearchPanelCloseDelayTimeoutRef.current) {
 				clearTimeout(mapResearchPanelCloseDelayTimeoutRef.current);
 				mapResearchPanelCloseDelayTimeoutRef.current = null;
@@ -7588,6 +7661,22 @@ const DashboardContent = () => {
 			}
 			setMapResearchPanelContact(hoveredMapMarkerContact);
 			mapResearchPanelContactRef.current = hoveredMapMarkerContact;
+			setIsMapResearchPanelVisible(true);
+			return;
+		}
+
+		if (
+			isWebsitePreviewOpen &&
+			mapResearchPanelContactRef.current?.id === websitePreviewContactId
+		) {
+			if (mapResearchPanelCloseDelayTimeoutRef.current) {
+				clearTimeout(mapResearchPanelCloseDelayTimeoutRef.current);
+				mapResearchPanelCloseDelayTimeoutRef.current = null;
+			}
+			if (mapResearchPanelUnmountTimeoutRef.current) {
+				clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
+				mapResearchPanelUnmountTimeoutRef.current = null;
+			}
 			setIsMapResearchPanelVisible(true);
 			return;
 		}
@@ -7607,10 +7696,28 @@ const DashboardContent = () => {
 				mapResearchPanelContactRef.current = null;
 			}, MAP_RESEARCH_PANEL_FADE_MS);
 		}, MAP_RESEARCH_PANEL_HOLD_MS);
-	}, [hoveredMapMarkerContact, isMapView, isMapResultsLoading]);
+	}, [
+		canShowContactForWebsitePreview,
+		hoveredMapMarkerContact,
+		isDashboardSendQueueResearchSuppressed,
+		isMapView,
+		isMapResultsLoading,
+		isWebsitePreviewOpen,
+		websitePreviewContactId,
+	]);
 
 	const handleMapMarkerHover = useCallback(
 		(contact: ContactWithName | null, meta?: MarkerHoverMeta) => {
+			if (isDashboardSendQueueResearchSuppressed) {
+				setHoveredMapMarkerContact(null);
+				return;
+			}
+			if (contact && !canShowContactForWebsitePreview(contact.id)) {
+				setHoveredMapMarkerContact((current) =>
+					canShowContactForWebsitePreview(current?.id) ? current : null
+				);
+				return;
+			}
 			// Pick the dock side once per hover-start so it never flickers; when meta
 			// is absent (tooltip-overlay re-entry) or hover ends, keep the prior side.
 			if (contact && meta) {
@@ -7635,7 +7742,7 @@ const DashboardContent = () => {
 			}
 			setHoveredMapMarkerContact(contact);
 		},
-		[MAP_VIEW_PANEL_SCALE]
+		[MAP_VIEW_PANEL_SCALE, canShowContactForWebsitePreview, isDashboardSendQueueResearchSuppressed]
 	);
 
 	// Tab toggles the marker-hover Description box while the panel is visible.
@@ -8088,11 +8195,19 @@ const DashboardContent = () => {
 
 	// Check if all panel contacts are selected (for map view "Select all" button)
 	const isAllPanelContactsSelected = useMemo(() => {
-		if (displayedMapPanelContacts.length === 0) return false;
-		return displayedMapPanelContacts.every((contact) =>
+		const cappedPanelContacts = displayedMapPanelContacts.slice(
+			0,
+			DASHBOARD_SEARCH_SELECTION_LIMIT
+		);
+		if (cappedPanelContacts.length === 0) return false;
+		return cappedPanelContacts.every((contact) =>
 			selectedContacts.includes(contact.id)
 		);
 	}, [displayedMapPanelContacts, selectedContacts]);
+	const mapSelectionDisplayTotal = Math.min(
+		displayedMapPanelContacts.length,
+		DASHBOARD_SEARCH_SELECTION_LIMIT
+	);
 
 	const mapPanelSelectedContacts = useMemo(
 		() => displayedMapPanelContacts.filter((c) => selectedContacts.includes(c.id)),
@@ -8167,6 +8282,47 @@ const DashboardContent = () => {
 
 	// Bottom category-tile box — only once results are loaded and at least one maps to a category.
 	const showMapPanelCategoryBox = !isMapResultsLoading && mapPanelCategoryKeys.size > 0;
+	// When the Search Results panel is intentionally compressed (last few remaining),
+	// reserve enough height to keep 1–2 rows fully visible above the bottom category box
+	// (rows are `h-[49px]` with `space-y-[7px]` between them).
+	const mapPanelCompressedVisibleSearchRows = Math.min(
+		2,
+		mapPanelUnselectedContactsFiltered.length
+	);
+	const mapPanelDesktopSearchResultsMinHeightPx =
+		MAP_VIEW_SEARCH_RESULTS_MIN_HEIGHT_PX +
+		(showMapPanelCategoryBox &&
+		mapPanelUnselectedContactsFiltered.length <=
+			MAP_VIEW_SEARCH_RESULTS_COMPRESS_THRESHOLD
+			? mapPanelCompressedVisibleSearchRows * 49 +
+				Math.max(0, mapPanelCompressedVisibleSearchRows - 1) * 7
+			: 0);
+	const mapPanelDesktopPanelBottomPadPx =
+		!isMapResultsLoading && !fromHomeParam ? 39 + 18 : 9;
+	// Gradually release the Selection panel height as Search Results gets low
+	// (avoid a hard jump at 6→5 remaining items). Uses a quadratic ramp so the
+	// earliest steps change minimally, then accelerate as you approach 0.
+	const mapPanelDesktopSelectionRampSpan =
+		MAP_VIEW_SEARCH_RESULTS_COMPRESS_THRESHOLD + 1;
+	const mapPanelDesktopSelectionRampProgress = Math.min(
+		1,
+		Math.max(
+			0,
+			(mapPanelDesktopSelectionRampSpan -
+				mapPanelUnselectedContactsFiltered.length) /
+				mapPanelDesktopSelectionRampSpan
+		)
+	);
+	const mapPanelDesktopSelectionRampEased =
+		mapPanelDesktopSelectionRampProgress * mapPanelDesktopSelectionRampProgress;
+	const mapPanelDesktopSelectionFraction =
+		0.5 + 0.5 * mapPanelDesktopSelectionRampEased;
+	const mapPanelDesktopSelectionDivisor = 1 / mapPanelDesktopSelectionFraction;
+	const mapPanelDesktopSelectionMaxHeightCss = `min(calc((100% - ${mapPanelDesktopPanelBottomPadPx}px) / ${mapPanelDesktopSelectionDivisor.toFixed(
+		4
+	)}), calc(100% - ${
+		mapPanelDesktopSearchResultsMinHeightPx + mapPanelDesktopPanelBottomPadPx
+	}px))`;
 
 	const getMapResearchDisplayFields = useCallback(
 		(contact: ContactWithName) => {
@@ -8226,12 +8382,18 @@ const DashboardContent = () => {
 	);
 
 	const mapPanelHoveredResearchContact = useMemo(() => {
-		if (!isMapView || isMapResultsLoading || hoveredMapPanelContactId == null) {
+		const effectiveContactId = websitePreviewContactId ?? hoveredMapPanelContactId;
+		if (
+			isDashboardSendQueueResearchSuppressed ||
+			!isMapView ||
+			isMapResultsLoading ||
+			effectiveContactId == null
+		) {
 			return null;
 		}
 
 		const contact = displayedMapPanelContacts.find(
-			(candidate) => candidate.id === hoveredMapPanelContactId
+			(candidate) => candidate.id === effectiveContactId
 		);
 		if (!contact) return null;
 
@@ -8240,8 +8402,10 @@ const DashboardContent = () => {
 		displayedMapPanelContacts,
 		getMapResearchDisplayFields,
 		hoveredMapPanelContactId,
+		isDashboardSendQueueResearchSuppressed,
 		isMapResultsLoading,
 		isMapView,
+		websitePreviewContactId,
 	]);
 
 	const mapMarkerResearchDisplayFields = useMemo(
@@ -8265,11 +8429,31 @@ const DashboardContent = () => {
 	// research on the left rail so it doesn't stack under the contact boxes.
 	const mapPanelHoverResearchDockSide: 'left' | 'right' =
 		isDashboardWriteOverlayVisible ? 'left' : 'right';
+	const shouldShowMapResearchPanel =
+		!isDashboardSendQueueResearchSuppressed &&
+		mapResearchPanelContact != null &&
+		canShowContactForWebsitePreview(mapResearchPanelContact.id);
+	const shouldShowMapPanelHoverResearch =
+		!isDashboardSendQueueResearchSuppressed &&
+		mapPanelHoveredResearchContact != null &&
+		canShowContactForWebsitePreview(mapPanelHoveredResearchContact.contact.id);
 	const isMapPanelHoverResearchVisible =
-		Boolean(mapPanelHoveredResearchContact) && !mapResearchPanelContact;
+		shouldShowMapPanelHoverResearch && !shouldShowMapResearchPanel;
 	useEffect(() => {
 		if (!isMapPanelHoverResearchVisible) setMapPanelHoverResearchExpanded(false);
 	}, [isMapPanelHoverResearchVisible]);
+	const websitePreviewPinnedResearchStyle = useMemo<React.CSSProperties | null>(() => {
+		if (!websitePreviewAnchorRect) return null;
+		const rootScale = getMurmurRootScale() || 1;
+		return {
+			position: 'fixed',
+			top: `${websitePreviewAnchorRect.top / rootScale}px`,
+			left: `${websitePreviewAnchorRect.left / rootScale}px`,
+			width: `${MAP_MARKER_RESEARCH_GROUP_WIDTH_PX}px`,
+			transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
+			transformOrigin: 'top left',
+		};
+	}, [MAP_VIEW_PANEL_SCALE, websitePreviewAnchorRect]);
 
 	// Hovered overlay markers/rows may be slim map-overlay payloads; backfill their
 	// research fields so the hover research panels don't render blank.
@@ -9153,26 +9337,6 @@ const DashboardContent = () => {
 		setActiveSection(null);
 	};
 
-	// Close map view and return to default dashboard view (before any search)
-	const handleCloseMapView = () => {
-		// If in "from home" mode, navigate back to the landing page
-		if (fromHomeParam) {
-			router.push(urls.home.index);
-			return;
-		}
-
-		setIsMapView(false);
-		setHoveredContact(null);
-		// Reset search completely to return to default dashboard
-		handleEnhancedResetSearch();
-
-		// If we entered the dashboard from a campaign (add-to-campaign mode), the "Home" button
-		// should take the user back to the *regular* dashboard (no campaign-search context).
-		if (isAddToCampaignMode) {
-			router.replace(urls.murmur.dashboard.index, { scroll: false });
-		}
-	};
-
 	// Entering the unsubscribe flow must land on the bare spinning globe: leave map
 	// view and clear any active search (idempotent — runs once, then the guard fails).
 	useEffect(() => {
@@ -9416,32 +9580,33 @@ const DashboardContent = () => {
 		) => {
 			const ids = payload?.contactIds ?? [];
 			const extraContacts = payload?.extraContacts ?? [];
+			const acceptedIds = getSelectionLimitedContactIds(selectedContacts, ids);
+			const acceptedIdSet = new Set(acceptedIds);
+			const acceptedExtraContacts = extraContacts.filter((contact) =>
+				acceptedIdSet.has(contact.id)
+			);
 
 			if (ids.length > 0) {
-				setSelectedContacts((prev) => {
-					const next = new Set(prev);
-					for (const id of ids) next.add(id);
-					return Array.from(next);
-				});
+				setSelectedContacts((prev) => mergeContactIdsWithSelectionLimit(prev, ids));
 			}
 
-			if (extraContacts.length > 0) {
+			if (acceptedExtraContacts.length > 0) {
 				setMapPanelExtraContacts((prev) => {
 					const byId = new Map<number, ContactWithName>();
 					for (const c of prev) byId.set(c.id, c);
-					for (const c of extraContacts) {
+					for (const c of acceptedExtraContacts) {
 						if (!byId.has(c.id)) byId.set(c.id, c);
 					}
 					return Array.from(byId.values());
 				});
 			}
 
-			if (ids.length > 0) {
+			if (acceptedIds.length > 0) {
 				const nextExtraIds: number[] = [];
 				const byId = new Map<number, ContactWithName>();
 				for (const c of contacts || []) byId.set(c.id, c);
 
-				for (const id of ids) {
+				for (const id of acceptedIds) {
 					if (!baseContactIdSet.has(id)) {
 						nextExtraIds.push(id);
 						continue;
@@ -9457,7 +9622,7 @@ const DashboardContent = () => {
 					}
 				}
 
-				for (const c of extraContacts) nextExtraIds.push(c.id);
+				for (const c of acceptedExtraContacts) nextExtraIds.push(c.id);
 
 				if (nextExtraIds.length > 0) {
 					setMapPanelExtraContactIds((prev) => {
@@ -9470,7 +9635,13 @@ const DashboardContent = () => {
 
 			setActiveMapTool('grab');
 		},
-		[contacts, baseContactIdSet, searchedStateAbbrForMap, setSelectedContacts]
+		[
+			selectedContacts,
+			contacts,
+			baseContactIdSet,
+			searchedStateAbbrForMap,
+			setSelectedContacts,
+		]
 	);
 
 	const handleMapMarkerClick = useCallback(
@@ -9501,6 +9672,7 @@ const DashboardContent = () => {
 	const handleMapToggleSelection = useCallback(
 		(contactId: number) => {
 			const wasSelected = selectedContacts.includes(contactId);
+			if (!wasSelected && selectedContacts.length >= DASHBOARD_SEARCH_SELECTION_LIMIT) return;
 
 			if (!wasSelected) {
 				const fromBase = (contacts || []).find((c) => c.id === contactId);
@@ -9520,7 +9692,7 @@ const DashboardContent = () => {
 				if (prev.includes(contactId)) {
 					return prev.filter((id) => id !== contactId);
 				}
-				return [...prev, contactId];
+				return mergeContactIdsWithSelectionLimit(prev, [contactId]);
 			});
 
 			const tryScroll = (attempt = 0) => {
@@ -9601,23 +9773,25 @@ const DashboardContent = () => {
 					contactsToPin.push(resultContact);
 				});
 
-				if (contactsToPin.length > 0) {
+				const acceptedRangeContactIds = getSelectionLimitedContactIds(
+					selectedContacts,
+					Array.from(rangeContactIds)
+				);
+				const acceptedRangeContactIdSet = new Set(acceptedRangeContactIds);
+				const acceptedContactsToPin = contactsToPin.filter((contact) =>
+					acceptedRangeContactIdSet.has(contact.id)
+				);
+
+				if (acceptedContactsToPin.length > 0) {
 					setMapPanelExtraContacts((prev) => {
 						const existing = new Set(prev.map((c) => c.id));
-						const toAdd = contactsToPin.filter((c) => !existing.has(c.id));
+						const toAdd = acceptedContactsToPin.filter((c) => !existing.has(c.id));
 						return toAdd.length > 0 ? [...toAdd, ...prev] : prev;
 					});
 				}
 
 				setSelectedContacts((prev) => {
-					const next = [...prev];
-					const selectedSet = new Set(prev);
-					for (const contactId of rangeContactIds) {
-						if (selectedSet.has(contactId)) continue;
-						selectedSet.add(contactId);
-						next.push(contactId);
-					}
-					return next;
+					return mergeContactIdsWithSelectionLimit(prev, Array.from(rangeContactIds));
 				});
 				setMapPanelShiftClickAnchor(null);
 				return;
@@ -9632,6 +9806,13 @@ const DashboardContent = () => {
 				setMapPanelShiftClickAnchor(null);
 			}
 
+			if (
+				!selectedContacts.includes(contact.id) &&
+				selectedContacts.length >= DASHBOARD_SEARCH_SELECTION_LIMIT
+			) {
+				return;
+			}
+
 			if (!selectedContacts.includes(contact.id)) {
 				setMapPanelExtraContacts((prev) =>
 					prev.some((c) => c.id === contact.id) ? prev : [contact, ...prev]
@@ -9640,7 +9821,7 @@ const DashboardContent = () => {
 			setSelectedContacts((prev) =>
 				prev.includes(contact.id)
 					? prev.filter((id) => id !== contact.id)
-					: [...prev, contact.id]
+					: mergeContactIdsWithSelectionLimit(prev, [contact.id])
 			);
 		},
 		[
@@ -10135,6 +10316,7 @@ const DashboardContent = () => {
 	};
 
 	const scheduleMapPanelHoverResearchClear = (contactId: number) => {
+		if (isWebsitePreviewOpen) return;
 		cancelMapPanelHoverResearchClear();
 		mapPanelHoverResearchClearTimeoutRef.current = setTimeout(() => {
 			mapPanelHoverResearchClearTimeoutRef.current = null;
@@ -10547,10 +10729,13 @@ const DashboardContent = () => {
 				onClick={(event) => handleMapPanelRowSelect(contact, event, source)}
 				onMouseEnter={(event) => {
 					cancelMapPanelHoverResearchClear();
+					if (isDashboardSendQueueResearchSuppressed) return;
+					if (!canShowContactForWebsitePreview(contact.id)) return;
 					setHoveredMapPanelContactId(contact.id);
 					updateMapPanelHoverResearchTop(event.currentTarget);
 				}}
 				onMouseLeave={() => {
+					if (isDashboardSendQueueResearchSuppressed) return;
 					scheduleMapPanelHoverResearchClear(contact.id);
 				}}
 			>
@@ -12240,74 +12425,6 @@ const DashboardContent = () => {
 						{((hasSearched && activeTab === 'search') || (fromHomeParam && isMapView)) &&
 							(isMapView || (!isLoadingContacts && !isRefetchingContacts)) &&
 							(() => {
-								const activeWhyForTray = (
-									fromHomeParam && isMapView && !hasSearched
-										? FROM_HOME_WHY
-										: extractWhyFromSearchQuery(activeSearchQuery) ||
-											(mapTopSearchDisplay.kind === 'category' && mapTopSearchDisplay.what
-												? getCategorySearchWhyForWhat(mapTopSearchDisplay.what)
-												: '') ||
-											whyValue
-								).trim();
-								const isPromotionForTray = activeWhyForTray === '[Promotion]';
-								const trayWhy = isPromotionForTray
-									? {
-											backgroundColor:
-												MAP_RESULTS_SEARCH_TRAY.whyBackgroundColors.promotion,
-											icon: <PromotionIcon />,
-										}
-									: {
-											backgroundColor:
-												MAP_RESULTS_SEARCH_TRAY.whyBackgroundColors.booking,
-											icon: <BookingIcon />,
-										};
-
-								const effectiveWhatKeyForTray =
-									mapTopSearchDisplay.kind === 'category'
-										? mapTopSearchDisplay.what.trim()
-										: (searchedWhat || '').trim();
-								const whatCfg =
-									MAP_RESULTS_SEARCH_TRAY.whatIconByLabel[effectiveWhatKeyForTray];
-								const TrayWhatIcon = whatCfg?.Icon || MusicVenuesIcon;
-								const trayWhatIconSize =
-									effectiveWhatKeyForTray === 'Wine, Beer, and Spirits' ? 22 : undefined;
-								const trayWhat = {
-									backgroundColor:
-										whatCfg?.backgroundColor ||
-										MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Music Venues']
-											.backgroundColor,
-									icon: <TrayWhatIcon size={trayWhatIconSize} />,
-								};
-
-								const whereCandidate =
-									mapTopSearchDisplay.kind === 'category'
-										? mapTopSearchDisplay.where.trim()
-										: (userLocationName || '').trim();
-								const [whereCity, whereState] = (() => {
-									if (!whereCandidate) return ['', ''];
-									if (whereCandidate.includes(',')) {
-										const parts = whereCandidate.split(',');
-										const city = (parts[0] || '').trim();
-										const state = parts.slice(1).join(',').trim();
-										return [city, state];
-									}
-									return ['', whereCandidate];
-								})();
-								const whereIconProps =
-									!isNearMeLocation && whereState
-										? getCityIconProps(whereCity, whereState)
-										: null;
-								const trayWhere = isNearMeLocation
-									? {
-											backgroundColor: MAP_RESULTS_SEARCH_TRAY.nearMeBackgroundColor,
-											icon: <NearMeIcon />,
-										}
-									: {
-											backgroundColor:
-												whereIconProps?.backgroundColor ||
-												MAP_RESULTS_SEARCH_TRAY.nearMeBackgroundColor,
-											icon: whereIconProps?.icon || <NearMeIcon />,
-										};
 								const mapTopSearchLabel = mapTopSearchDisplay.label.trim() || 'Search';
 								const isMapTopSearchReengageAvailable =
 									isMapView &&
@@ -13129,12 +13246,11 @@ const DashboardContent = () => {
 								) : null;
 
 								// Persistent "Searching New" status pill, centered directly below the
-								// map-view search bar. Display-only; shown for every map-view search
-								// (including the add-to-campaign pick flow) per the surface-based design.
+								// map-view search bar. When scoped to a campaign, it toggles back to
+								// that campaign's All tab.
 								const mapTopSearchingPill =
 									isMapView && !isMobile && !isSearchDeselectedByUser ? (
 										<div
-											aria-hidden="true"
 											className="fixed left-0 right-0 flex justify-center pointer-events-none map-overlay-appear"
 											style={{
 												top: `${
@@ -13148,8 +13264,21 @@ const DashboardContent = () => {
 													: undefined,
 											}}
 										>
-											<div
+											<button
+												type="button"
+												aria-label="Open all campaign contacts"
+												disabled={!mapCampaignId}
+												tabIndex={mapCampaignId ? 0 : -1}
+												onClick={() =>
+													mapCampaignId &&
+													router.push(
+														`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=all${campaignReturnAddedSuffix()}`
+													)
+												}
 												style={{
+													appearance: 'none',
+													border: 'none',
+													margin: 0,
 													transform: `scale(${MAP_VIEW_UI_SCALE})`,
 													transformOrigin: 'top center',
 													display: 'inline-flex',
@@ -13160,7 +13289,10 @@ const DashboardContent = () => {
 													borderRadius: '9999px',
 													backgroundColor: '#B9EAF1',
 													fontFamily: 'Inter, sans-serif',
+													color: '#000000',
 													whiteSpace: 'nowrap',
+													cursor: mapCampaignId ? 'pointer' : 'default',
+													pointerEvents: mapCampaignId ? 'auto' : 'none',
 												}}
 											>
 												<span style={{ color: '#000', fontSize: '15px', fontWeight: 600, lineHeight: 1 }}>
@@ -13191,7 +13323,7 @@ const DashboardContent = () => {
 														New
 													</span>
 												</span>
-											</div>
+											</button>
 										</div>
 									) : null;
 
@@ -13338,6 +13470,8 @@ const DashboardContent = () => {
 									isMapView && !isMobile && !isCompressedMapChrome ? (
 										<div
 											className="fixed z-[130] pointer-events-none"
+											onMouseEnter={() => setIsMapShowingRailHovered(true)}
+											onMouseLeave={() => setIsMapShowingRailHovered(false)}
 											style={{
 												left: `${MAP_SELECT_GRAB_LEFT_PX}px`,
 												// The visible column starts `TOP_EXTENT * scale` above this origin.
@@ -13345,8 +13479,23 @@ const DashboardContent = () => {
 												top: `calc(${MAP_VIEW_SIDE_PANEL_TOP_CSS} + ${mapSelectGrabOriginOffsetPx}px - ${MAP_SELECT_GRAB_VISUAL_TOP_NUDGE_UP_CSS})`,
 												transform: `scale(${mapSelectGrabViewScale})`,
 												transformOrigin: 'top left',
+												opacity: isMapShowingRailHovered ? 1 : 0.4,
+												transition: 'opacity 0.18s ease',
 											}}
 										>
+											<div
+												aria-hidden="true"
+												style={{
+													position: 'absolute',
+													left: '-2px',
+													width: '60px',
+													top: `-${
+														MAP_SELECT_GRAB_TOP_EXTENT_PX + 40
+													}px`,
+													height: `${MAP_SELECT_GRAB_TOP_EXTENT_PX + 200}px`,
+													pointerEvents: 'auto',
+												}}
+											/>
 											<div
 												className="absolute pointer-events-none flex items-center justify-center overflow-hidden rounded-[10px] bg-[#FDFCFB] font-inter font-normal text-black"
 												style={{
@@ -13375,7 +13524,6 @@ const DashboardContent = () => {
 											<MapSelectGrabTallStackBox
 												className="absolute pointer-events-none"
 												isSelectActive={isSelectMapToolActive}
-												onAllDeselected={() => setActiveMapTool('grab')}
 												onActiveCategoriesChange={handleMapGrabActiveCategoriesChange}
 												style={{
 													left: '-0.5px',
@@ -13401,6 +13549,7 @@ const DashboardContent = () => {
 												className="absolute left-0 pointer-events-none"
 												isSelectActive={isSelectMapToolActive}
 												selectedContent={<StackBoxSelectStarIcon />}
+												hoverLabel="Opportunities"
 												inactiveContent={
 													<MapSelectGrabStackTile backgroundColor="#EDF2F0">
 														<MapStackStarIcon fill="#EDF2F0" stroke="#9E9E9E" />
@@ -13424,6 +13573,7 @@ const DashboardContent = () => {
 												className="absolute left-0 pointer-events-none"
 												isSelectActive={isSelectMapToolActive}
 												selectedContent={<StackBoxSelectBlueSparkIcon />}
+												hoverLabel="People"
 												inactiveContent={
 													<MapSelectGrabStackTile backgroundColor="#EDF2F0">
 														<MapStackBlueSparkIcon fill="#9E9E9E" stroke="#EDF2F0" />
@@ -13808,84 +13958,7 @@ const DashboardContent = () => {
 																				}
 																				onViewportZoom={handleMapViewportZoom}
 																				onViewportIdle={handleMapViewportIdle}
-																				onAreaSelect={(bounds, payload) => {
-																					const ids = payload?.contactIds ?? [];
-																					const extraContacts =
-																						payload?.extraContacts ?? [];
-
-																					if (ids.length > 0) {
-																						setSelectedContacts((prev) => {
-																							const next = new Set(prev);
-																							for (const id of ids) next.add(id);
-																							return Array.from(next);
-																						});
-																					}
-
-																					// Ensure overlay-only contacts (booking/promotion map overlays) can appear
-																					// as rows in the right-hand panel.
-																					if (extraContacts.length > 0) {
-																						setMapPanelExtraContacts((prev) => {
-																							const byId = new Map<
-																								number,
-																								ContactWithName
-																							>();
-																							for (const c of prev) byId.set(c.id, c);
-																							for (const c of extraContacts) {
-																								if (!byId.has(c.id)) byId.set(c.id, c);
-																							}
-																							return Array.from(byId.values());
-																						});
-																					}
-
-																					// If selected contacts are outside the searched state (or are overlay-only),
-																					// include them in the panel list so the user sees what was selected.
-																					if (ids.length > 0) {
-																						const nextExtraIds: number[] = [];
-																						const byId = new Map<
-																							number,
-																							ContactWithName
-																						>();
-																						for (const c of contacts || [])
-																							byId.set(c.id, c);
-
-																						for (const id of ids) {
-																							if (!baseContactIdSet.has(id)) {
-																								nextExtraIds.push(id);
-																								continue;
-																							}
-																							if (!searchedStateAbbrForMap) continue;
-																							const c = byId.get(id);
-																							if (!c) continue;
-																							const contactStateAbbr =
-																								getStateAbbreviation(c.state || '')
-																									.trim()
-																									.toUpperCase();
-																							if (
-																								contactStateAbbr &&
-																								contactStateAbbr !==
-																									searchedStateAbbrForMap
-																							) {
-																								nextExtraIds.push(id);
-																							}
-																						}
-
-																						for (const c of extraContacts)
-																							nextExtraIds.push(c.id);
-
-																						if (nextExtraIds.length > 0) {
-																							setMapPanelExtraContactIds((prev) => {
-																								const next = new Set(prev);
-																								for (const id of nextExtraIds)
-																									next.add(id);
-																								return Array.from(next);
-																							});
-																						}
-																					}
-
-																					// After selecting an area, immediately switch back to Grab mode
-																					// so the user can pan/zoom without extra clicks.
-																					setActiveMapTool('grab');
-																				}}
+																				onAreaSelect={handleMapAreaSelect}
 																				onMarkerHover={handleMapMarkerHover}
 																				lockedStateName={
 																					// When a bbox search is active, don't lock/wash out a single state.
@@ -13947,63 +14020,7 @@ const DashboardContent = () => {
 																							: [...prev, contact.id]
 																					);
 																				}}
-																				onToggleSelection={(contactId) => {
-																					const wasSelected =
-																						selectedContacts.includes(contactId);
-
-																					// Ensure the selected contact stays renderable in the side panel across
-																					// subsequent searches by caching the full object.
-																					if (!wasSelected) {
-																						const fromBase = (contacts || []).find(
-																							(c) => c.id === contactId
-																						);
-																						const fromOverlay =
-																							mapPanelVisibleOverlayContacts.find(
-																								(c) => c.id === contactId
-																							);
-																						const fromExtra = mapPanelExtraContacts.find(
-																							(c) => c.id === contactId
-																						);
-																						const selectedContact =
-																							fromBase ?? fromOverlay ?? fromExtra;
-																						if (selectedContact) {
-																							setMapPanelExtraContacts((prev) =>
-																								prev.some((c) => c.id === contactId)
-																									? prev
-																									: [selectedContact, ...prev]
-																							);
-																						}
-																					}
-
-																					setSelectedContacts((prev) => {
-																						if (prev.includes(contactId)) {
-																							return prev.filter(
-																								(id) => id !== contactId
-																							);
-																						}
-																						return [...prev, contactId];
-																					});
-																					// Scroll to the contact in the side panel
-																					const tryScroll = (attempt = 0) => {
-																						const contactElement = document.querySelector(
-																							`[data-contact-id="${contactId}"]`
-																						);
-																						if (contactElement) {
-																							contactElement.scrollIntoView({
-																								behavior: 'smooth',
-																								block: 'center',
-																							});
-																							return;
-																						}
-																						if (attempt < 10) {
-																							setTimeout(
-																								() => tryScroll(attempt + 1),
-																								50
-																							);
-																						}
-																					};
-																					setTimeout(() => tryScroll(0), 0);
-																				}}
+																				onToggleSelection={handleMapToggleSelection}
 																			/>
 																		)}
 												{hasNoSearchResults && isMapSearchEngaged && !isError && (
@@ -14229,34 +14246,81 @@ const DashboardContent = () => {
 																	</div>
 													</div>
 												)}
+												{/* Send-queue stack overlay — opened on demand from the campaign
+												    header "in send queue" pill; floats left of the right-side
+												    panel. Shares the write overlay's slot, so it never co-shows
+												    with write mode or the live send overlay. */}
+												{isSendQueueViewOpen &&
+													!isMobile &&
+													!isWriteMode &&
+													!isCompressedMapChrome &&
+													shouldShowMapResultsSidePanel &&
+													!showMapSendingOverlay &&
+													dashboardMapCampaignForHeader && (
+														<div
+															className="absolute pointer-events-none map-overlay-appear"
+															style={{
+																zIndex: 125,
+																top: `calc(${MAP_VIEW_SIDE_PANEL_TOP_CSS} + 180px)`,
+																right: 10 + 433 * MAP_VIEW_PANEL_SCALE + 13,
+																transform: `scale(${MAP_VIEW_PANEL_SCALE * 0.85})`,
+																transformOrigin: 'top right',
+															}}
+														>
+															<div
+																data-dashboard-send-queue-overlay="true"
+																className="pointer-events-auto"
+															>
+																<DashboardSendQueueOverlay
+																	campaignId={dashboardMapCampaignForHeader.id}
+																	onClose={closeSendQueueView}
+																/>
+															</div>
+														</div>
+													)}
 												{!isCompressedMapChrome &&
 													mapPanelHoveredResearchContact &&
-													!mapResearchPanelContact && (
+													shouldShowMapPanelHoverResearch &&
+													!shouldShowMapResearchPanel && (
 													<div
-														className="absolute pointer-events-none"
+														data-dashboard-website-preview-size="large"
+														className="absolute"
+														onMouseEnter={cancelMapPanelHoverResearchClear}
+														onMouseLeave={() =>
+															scheduleMapPanelHoverResearchClear(
+																mapPanelHoveredResearchContact.contact.id
+															)
+														}
 														style={{
+															pointerEvents: 'auto',
 															// Lift above the bottom nav boxes (z-130) only while expanded,
 															// matching the marker-hover card's behavior.
 															zIndex: mapPanelHoverResearchExpanded ? 131 : 124,
-															top:
-																mapPanelHoverResearchTopPx != null
-																	? `${mapPanelHoverResearchTopPx}px`
-																	: MAP_VIEW_SIDE_PANEL_TOP_CSS,
-															...(mapPanelHoverResearchDockSide === 'right'
-																? {
-																		right:
-																			10 +
-																			433 * MAP_VIEW_PANEL_SCALE +
-																			MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX,
-																	}
+															...(websitePreviewContactId ===
+																mapPanelHoveredResearchContact.contact.id &&
+															websitePreviewPinnedResearchStyle
+																? websitePreviewPinnedResearchStyle
 																: {
-																		left: MAP_MARKER_RESEARCH_LEFT_DOCK_LEFT_PX,
+																		top:
+																			mapPanelHoverResearchTopPx != null
+																				? `${mapPanelHoverResearchTopPx}px`
+																				: MAP_VIEW_SIDE_PANEL_TOP_CSS,
+																		...(mapPanelHoverResearchDockSide === 'right'
+																			? {
+																					right:
+																						10 +
+																						433 * MAP_VIEW_PANEL_SCALE +
+																						MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX,
+																				}
+																			: {
+																					left: MAP_MARKER_RESEARCH_LEFT_DOCK_LEFT_PX,
+																				}),
+																		transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
+																		transformOrigin:
+																			mapPanelHoverResearchDockSide === 'right'
+																				? 'top right'
+																				: 'top left',
 																	}),
-															transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
-															transformOrigin:
-																mapPanelHoverResearchDockSide === 'right'
-																	? 'top right'
-																	: 'top left',
 														}}
 													>
 														<ContactResearchHoverCard
@@ -14276,29 +14340,40 @@ const DashboardContent = () => {
 												)}
 												{/* Marker-hover research group: abridged card + Description box,
 												    statically docked beside the results panel or the left rail. */}
-												{!isMobile && !isCompressedMapChrome && mapResearchPanelContact && (
+												{!isMobile &&
+													!isCompressedMapChrome &&
+													mapResearchPanelContact &&
+													shouldShowMapResearchPanel && (
 													<div
+														data-dashboard-website-preview-size="large"
 														className="absolute pointer-events-none"
 														style={{
 															// Lift above the bottom search bar's nav boxes (z-130) only while
 															// expanded — when the taller card overlaps that row — so collapsed
 															// hover keeps its prior ordering vs. the z-125 Write panel.
 															zIndex: isMapMarkerResearchExpanded ? 131 : 124,
-															top: MAP_VIEW_SIDE_PANEL_TOP_CSS,
-															...(mapMarkerResearchDockSide === 'right'
-																? {
-																		right:
-																			10 +
-																			433 * MAP_VIEW_PANEL_SCALE +
-																			MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX,
-																	}
-																: { left: MAP_MARKER_RESEARCH_LEFT_DOCK_LEFT_PX }),
-															width: `${MAP_MARKER_RESEARCH_GROUP_WIDTH_PX}px`,
-															transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
-															transformOrigin:
-																mapMarkerResearchDockSide === 'right'
-																	? 'top right'
-																	: 'top left',
+															...(websitePreviewContactId === mapResearchPanelContact.id &&
+															websitePreviewPinnedResearchStyle
+																? websitePreviewPinnedResearchStyle
+																: {
+																		top: MAP_VIEW_SIDE_PANEL_TOP_CSS,
+																		...(mapMarkerResearchDockSide === 'right'
+																			? {
+																					right:
+																						10 +
+																						433 * MAP_VIEW_PANEL_SCALE +
+																						MAP_PANEL_ABRIDGED_RESEARCH_GAP_PX,
+																				}
+																			: {
+																					left: MAP_MARKER_RESEARCH_LEFT_DOCK_LEFT_PX,
+																				}),
+																		width: `${MAP_MARKER_RESEARCH_GROUP_WIDTH_PX}px`,
+																		transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
+																		transformOrigin:
+																			mapMarkerResearchDockSide === 'right'
+																				? 'top right'
+																				: 'top left',
+																	}),
 															opacity: isMapResearchPanelVisible ? 1 : 0,
 															transition: `opacity ${MAP_RESEARCH_PANEL_FADE_MS}ms ease-out`,
 														}}
@@ -14441,7 +14516,9 @@ const DashboardContent = () => {
 																					<div
 																						className="flex flex-col flex-shrink-0"
 																						style={{
-																							maxHeight: isCompressedMapChrome ? '30%' : `calc(100% - ${MAP_VIEW_SEARCH_RESULTS_MIN_HEIGHT_PX + (!isMapResultsLoading && !fromHomeParam ? 39 + 18 : 9)}px)`,
+																							maxHeight: isCompressedMapChrome
+																								? '30%'
+																								: mapPanelDesktopSelectionMaxHeightCss,
 																							backgroundColor: isCompressedMapChrome
 																								? 'rgba(175, 214, 239, 0.8)'
 																								: 'rgba(184, 224, 255, 0.54)',
@@ -14456,7 +14533,7 @@ const DashboardContent = () => {
 																									Selection
 																								</span>
 																								<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
-																									{selectedContacts.length}/{displayedMapPanelContacts.length} selected
+																									{selectedContacts.length}/{mapSelectionDisplayTotal} selected
 																								</span>
 																								<button
 																									type="button"
@@ -14493,7 +14570,7 @@ const DashboardContent = () => {
 																									Selection
 																								</span>
 																								<span className="absolute left-1/2 top-[58px] -translate-x-1/2 -translate-y-1/2 font-inter text-[13px] font-medium text-black">
-																									{selectedContacts.length}/{displayedMapPanelContacts.length} selected
+																									{selectedContacts.length}/{mapSelectionDisplayTotal} selected
 																								</span>
 																								<button
 																									type="button"
@@ -15451,7 +15528,9 @@ const Dashboard = () => {
 				</div>
 			}
 		>
-			<DashboardContent />
+			<SendQueueViewProvider>
+				<DashboardContent />
+			</SendQueueViewProvider>
 		</Suspense>
 	);
 };

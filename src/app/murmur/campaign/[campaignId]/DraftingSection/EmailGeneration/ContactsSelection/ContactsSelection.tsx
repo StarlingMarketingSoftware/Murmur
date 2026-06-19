@@ -23,7 +23,6 @@ import {
 } from '@/constants/ui';
 import {
 	useGetUsedContactCampaigns,
-	useGetUsedContactIds,
 	useGetLocations,
 } from '@/hooks/queryHooks/useContacts';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -1113,12 +1112,6 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		router.push(dashboardUrl);
 	};
 
-	const { data: usedContactIds } = useGetUsedContactIds();
-	const usedContactIdsSet = useMemo(
-		() => new Set(usedContactIds || []),
-		[usedContactIds]
-	);
-
 	const [hoveredUsedContactId, setHoveredUsedContactId] = useState<number | null>(null);
 	const { data: hoveredUsedContactCampaigns } = useGetUsedContactCampaigns(hoveredUsedContactId);
 	const [activeUsedContactCampaignIndex, setActiveUsedContactCampaignIndex] = useState<number | null>(null);
@@ -1158,48 +1151,6 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 			usedContactTooltipCloseTimeoutRef.current = null;
 		}
 	}, []);
-
-	const openUsedContactTooltip = useCallback(
-		(contactId: number) => {
-			clearUsedContactTooltipCloseTimeout();
-			const el = usedContactRowElsRef.current.get(contactId);
-			if (el) {
-				const rect = el.getBoundingClientRect();
-				const bodyCtx = getBodyScaleContext();
-				const rowLeftInBody = (rect.left - bodyCtx.left) / bodyCtx.scaleX;
-				const rowTopInBody = (rect.top - bodyCtx.top) / bodyCtx.scaleY;
-				setUsedContactTooltipPos({
-					left: rowLeftInBody + 33,
-					top: rowTopInBody + 44,
-				});
-			}
-			// Start with first campaign active, but don't reset if we're already on this contact
-			// (e.g., user selected a row in the tooltip and moves back to the pill to click).
-			setActiveUsedContactCampaignIndex((prev) =>
-				hoveredUsedContactId === contactId ? (prev ?? 0) : 0
-			);
-			setHoveredUsedContactId(contactId);
-		},
-		[clearUsedContactTooltipCloseTimeout, getBodyScaleContext, hoveredUsedContactId]
-	);
-
-	const goToUsedContactCampaign = useCallback(
-		(contactId: number) => {
-			// Only navigate when this contact's hover state is active (campaign list is scoped to hovered contact).
-			if (hoveredUsedContactId !== contactId) return;
-			if (!resolvedUsedContactCampaigns.length) return;
-
-			const idx = Math.min(
-				resolvedUsedContactCampaigns.length - 1,
-				Math.max(0, activeUsedContactCampaignIndex ?? 0)
-			);
-			const selected = resolvedUsedContactCampaigns[idx];
-			if (!selected?.id) return;
-
-			router.push(`/murmur/campaign/${selected.id}`);
-		},
-		[activeUsedContactCampaignIndex, hoveredUsedContactId, resolvedUsedContactCampaigns, router]
-	);
 
 	const scheduleCloseUsedContactTooltip = useCallback(
 		(contactId: number) => {
@@ -1504,12 +1455,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 							);
 						})()}
 					{contacts.map((contact, contactIndex) => {
-						const isUsedContact = usedContactIdsSet.has(contact.id);
 						const isActivelyDrafting = Boolean(activelyDraftingContactIds?.has(contact.id));
-						const isUsedContactHoverCardVisible =
-							hoveredUsedContactId === contact.id &&
-							Boolean(usedContactTooltipPos) &&
-							Boolean(hoveredUsedContactCampaigns?.length);
 						// Mobile-specific width values (using CSS calc for responsive sizing)
 						const mobileContactRowWidth = 'calc(100vw - 24px)';
 						// Keyboard focus shows hover UI independently of mouse hover

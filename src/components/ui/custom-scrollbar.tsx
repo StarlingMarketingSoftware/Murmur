@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/utils';
 
 interface CustomScrollbarProps
@@ -17,6 +18,7 @@ interface CustomScrollbarProps
 	offsetRight?: number;
 	contentClassName?: string;
 	scrollContainerRef?: React.Ref<HTMLDivElement>;
+	scrollbarPortalRef?: React.RefObject<HTMLElement | null>;
 	hideThumb?: boolean;
 	/** When true, show a full-height thumb even if there is no overflow. */
 	alwaysShow?: boolean;
@@ -47,6 +49,7 @@ export function CustomScrollbar({
 	offsetRight = -4,
 	contentClassName,
 	scrollContainerRef,
+	scrollbarPortalRef,
 	hideThumb = false,
 	alwaysShow = false,
 	thumbHeightOverride,
@@ -261,6 +264,36 @@ export function CustomScrollbar({
 		);
 	}
 
+	const scrollbarTrack = thumbHeight > 0 && !hideThumb ? (
+		<div
+			className="absolute top-0 right-0 h-full cursor-pointer"
+			style={{
+				width: `${thumbWidth}px`,
+				backgroundColor: trackColor,
+				right: `${offsetRight}px`,
+				top: alignTrackToScrollContainer ? `${trackTop}px` : undefined,
+				height: alignTrackToScrollContainer ? `${trackHeight}px` : undefined,
+				zIndex: 50,
+			}}
+			onClick={handleTrackClick}
+		>
+			{/* Custom scrollbar thumb */}
+			<div
+				ref={scrollThumbRef}
+				className="absolute left-0 cursor-grab active:cursor-grabbing"
+				style={{
+					width: `${thumbWidth}px`,
+					height: `${thumbHeight}px`,
+					transform: `translateY(${thumbTop}px)`,
+					backgroundColor: thumbColor,
+					transition: 'none',
+					willChange: 'transform',
+				}}
+				onMouseDown={handleMouseDown}
+			/>
+		</div>
+	) : null;
+
 	return (
 		<div {...rest} className={cn('relative', className)} style={style} onWheel={handleWheel}>
 			{/* Scrollable content container */}
@@ -291,35 +324,9 @@ export function CustomScrollbar({
 			</div>
 
 			{/* Custom scrollbar track */}
-			{thumbHeight > 0 && !hideThumb && (
-				<div
-					className="absolute top-0 right-0 h-full cursor-pointer"
-					style={{
-						width: `${thumbWidth}px`,
-						backgroundColor: trackColor,
-						right: `${offsetRight}px`,
-						top: alignTrackToScrollContainer ? `${trackTop}px` : undefined,
-						height: alignTrackToScrollContainer ? `${trackHeight}px` : undefined,
-						zIndex: 50,
-					}}
-					onClick={handleTrackClick}
-				>
-					{/* Custom scrollbar thumb */}
-					<div
-						ref={scrollThumbRef}
-						className="absolute left-0 cursor-grab active:cursor-grabbing"
-						style={{
-							width: `${thumbWidth}px`,
-							height: `${thumbHeight}px`,
-							transform: `translateY(${thumbTop}px)`,
-							backgroundColor: thumbColor,
-							transition: 'none',
-							willChange: 'transform',
-						}}
-						onMouseDown={handleMouseDown}
-					/>
-				</div>
-			)}
+			{scrollbarPortalRef?.current
+				? createPortal(scrollbarTrack, scrollbarPortalRef.current)
+				: scrollbarTrack}
 		</div>
 	);
 }

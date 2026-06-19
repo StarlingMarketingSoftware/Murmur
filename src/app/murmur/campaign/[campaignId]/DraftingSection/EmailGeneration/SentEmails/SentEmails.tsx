@@ -20,7 +20,7 @@ import {
 	canadianProvinceNames,
 	stateBadgeColorMap,
 } from '@/constants/ui';
-import { useGetUsedContactCampaigns, useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
+import { useGetUsedContactCampaigns } from '@/hooks/queryHooks/useContacts';
 import { ContactWithName } from '@/types/contact';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
@@ -134,12 +134,6 @@ export const SentEmails: FC<SentEmailsProps> = ({
 		return Number.isFinite(n) ? n : null;
 	}, [campaignIdParam]);
 
-	const { data: usedContactIds } = useGetUsedContactIds();
-	const usedContactIdsSet = useMemo(
-		() => new Set(usedContactIds || []),
-		[usedContactIds]
-	);
-
 	// Used-contact hover tooltip ("Appears in" + Go To), matching Drafts/ContactsSelection behavior.
 	const [hoveredUsedContact, setHoveredUsedContact] = useState<{
 		contactId: number;
@@ -181,46 +175,6 @@ export const SentEmails: FC<SentEmailsProps> = ({
 			usedContactTooltipCloseTimeoutRef.current = null;
 		}
 	}, []);
-
-	const openUsedContactTooltip = useCallback(
-		(contactId: number, rowKey: number) => {
-			clearUsedContactTooltipCloseTimeout();
-			const el = usedContactRowElsRef.current.get(rowKey);
-			if (el) {
-				const rect = el.getBoundingClientRect();
-				const bodyCtx = getBodyScaleContext();
-				const rowLeftInBody = (rect.left - bodyCtx.left) / bodyCtx.scaleX;
-				const rowTopInBody = (rect.top - bodyCtx.top) / bodyCtx.scaleY;
-				setUsedContactTooltipPos({
-					// 43px from left wall, 49px from top of row box (matches Drafts tuning)
-					left: rowLeftInBody + 43,
-					top: rowTopInBody + 49,
-				});
-			}
-			setActiveUsedContactCampaignIndex((prev) =>
-				hoveredUsedContactId === contactId ? (prev ?? 0) : 0
-			);
-			setHoveredUsedContact({ contactId, rowKey });
-		},
-		[clearUsedContactTooltipCloseTimeout, getBodyScaleContext, hoveredUsedContactId]
-	);
-
-	const goToUsedContactCampaign = useCallback(
-		(contactId: number, rowKey: number) => {
-			if (!hoveredUsedContact) return;
-			if (hoveredUsedContact.contactId !== contactId || hoveredUsedContact.rowKey !== rowKey) return;
-			if (!resolvedUsedContactCampaigns.length) return;
-
-			const idx = Math.min(
-				resolvedUsedContactCampaigns.length - 1,
-				Math.max(0, activeUsedContactCampaignIndex ?? 0)
-			);
-			const selected = resolvedUsedContactCampaigns[idx];
-			if (!selected?.id) return;
-			router.push(`/murmur/campaign/${selected.id}`);
-		},
-		[activeUsedContactCampaignIndex, hoveredUsedContact, resolvedUsedContactCampaigns, router]
-	);
 
 	const scheduleCloseUsedContactTooltip = useCallback(
 		(contactId: number, rowKey: number) => {
@@ -430,13 +384,6 @@ export const SentEmails: FC<SentEmailsProps> = ({
 							(contact?.lastName && contact.lastName.trim())
 					);
 					const contactTitle = (contact as any)?.title || (contact as any)?.headline || '';
-					const isUsedContact = usedContactIdsSet.has(email.contactId);
-					const isUsedContactHoverCardVisible =
-						Boolean(hoveredUsedContact) &&
-						hoveredUsedContact?.contactId === email.contactId &&
-						hoveredUsedContact?.rowKey === (email.id as number) &&
-						Boolean(usedContactTooltipPos) &&
-						Boolean(hoveredUsedContactCampaigns?.length);
 
 					return (
 						<div

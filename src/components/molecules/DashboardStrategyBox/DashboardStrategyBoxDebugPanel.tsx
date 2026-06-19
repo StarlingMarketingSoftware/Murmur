@@ -1,5 +1,15 @@
 import { FC, useEffect, useState } from 'react';
-import type { StrategyMockState } from './DashboardStrategyBox';
+
+type StrategyMockState = {
+	campaigns: {
+		id: number;
+		name: string;
+		contactCount: number;
+		draftCount: number;
+		sentCount: number;
+	}[];
+	newEmailCount: number;
+};
 
 type Props = {
 	value: StrategyMockState | undefined;
@@ -196,7 +206,7 @@ export const DashboardStrategyBoxDebugPanel: FC<Props> = ({ value, onChange }) =
 					</div>
 
 					<div style={{ color: '#888', marginTop: 8, lineHeight: 1.4 }}>
-						"Contacts needing draft" = Contacts − Drafts − Sent.
+						&quot;Contacts needing draft&quot; = Contacts − Drafts − Sent.
 						<br />
 						Replies outrank drafts; drafts outrank drafting new contacts.
 					</div>

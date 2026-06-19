@@ -2225,12 +2225,7 @@ const SortableAIBlock = ({
 																			if (e.shiftKey) return;
 																			// Avoid interfering with IME composition confirmation.
 																			// (Some browsers also expose this as `e.nativeEvent.isComposing`.)
-																			// @ts-expect-error - React KeyboardEvent doesn't always expose isComposing in types
-																			if (
-																				e.isComposing ||
-																				(e.nativeEvent as any)?.isComposing
-																			)
-																				return;
+																			if ((e.nativeEvent as any)?.isComposing) return;
 
 																			e.preventDefault();
 																			e.stopPropagation();
@@ -3230,8 +3225,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		hideGenerateTestButton,
 		containerHeightPx,
 		dataCampaignMainBox,
-		onGoToContacts,
-		onGoToInbox,
 		onProfilePanelOpen,
 		autoOpenProfileTabWhenIncomplete,
 		forceDesktop,

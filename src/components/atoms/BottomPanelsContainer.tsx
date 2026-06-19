@@ -1,6 +1,12 @@
 'use client';
 
-import React, { useState, useRef, useCallback, type ReactNode } from 'react';
+import React, {
+	useState,
+	useRef,
+	useCallback,
+	useLayoutEffect,
+	type ReactNode,
+} from 'react';
 import LogsSvg from '@/components/atoms/_svg/logs';
 import { HistoryLedgerPanel } from '@/components/atoms/HistoryLedgerPanel';
 
@@ -49,22 +55,48 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 	const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 	const [lockedSide, setLockedSide] = useState<'left' | 'right' | null>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
-	const innerRef = useRef<HTMLDivElement>(null);
+	const lastPointerPositionRef = useRef<{ x: number; y: number } | null>(null);
 
-	const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+	const syncHoverFromPoint = useCallback((x: number, y: number) => {
 		if (!containerRef.current) return;
 		const rect = containerRef.current.getBoundingClientRect();
+		const isInside =
+			x >= rect.left &&
+			x <= rect.right &&
+			y >= rect.top &&
+			y <= rect.bottom;
+		setIsHovered(isInside);
+		if (!isInside) return;
 		const centerX = rect.left + rect.width / 2;
-		setCursorOnRightSide(e.clientX > centerX);
+		setCursorOnRightSide(x > centerX);
 	}, []);
 
-	const handleMouseEnter = useCallback(() => {
-		setIsHovered(true);
-	}, []);
+	const trackPointerPosition = useCallback((x: number, y: number) => {
+		lastPointerPositionRef.current = { x, y };
+		syncHoverFromPoint(x, y);
+	}, [syncHoverFromPoint]);
 
-	const handleMouseLeave = useCallback(() => {
-		setIsHovered(false);
-	}, []);
+	const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+		trackPointerPosition(e.clientX, e.clientY);
+	}, [trackPointerPosition]);
+
+	const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+		trackPointerPosition(e.clientX, e.clientY);
+	}, [trackPointerPosition]);
+
+	useLayoutEffect(() => {
+		const lastPointerPosition = lastPointerPositionRef.current;
+		if (!lastPointerPosition) return;
+		syncHoverFromPoint(lastPointerPosition.x, lastPointerPosition.y);
+	}, [children, collapsed, syncHoverFromPoint]);
+
+	const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+		trackPointerPosition(e.clientX, e.clientY);
+	}, [trackPointerPosition]);
+
+	const handleMouseLeave = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+		trackPointerPosition(e.clientX, e.clientY);
+	}, [trackPointerPosition]);
 
 	const handleLogsClick = useCallback(() => {
 		setIsHistoryOpen((prev) => {
@@ -86,29 +118,14 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 		setIsHovered(false); // Hide button at same time as panel
 	}, []);
 
-	// Clicking a ledger box (the "+NN" batch boxes inside the panels) opens the
-	// History panel, anchored to the side the box was clicked on.
-	const handleLedgerBoxClick = useCallback(
-		(e: React.MouseEvent<HTMLDivElement>) => {
-			if (!(e.target as HTMLElement).closest('[data-history-ledger-box]')) return;
-			// Captured before the panel's own onClick (which navigates to that tab),
-			// so a ledger-box click only opens History and doesn't change tabs.
-			e.stopPropagation();
-			const rect = containerRef.current?.getBoundingClientRect();
-			const onRight = rect ? e.clientX > rect.left + rect.width / 2 : cursorOnRightSide;
-			setLockedSide(onRight ? 'right' : 'left');
-			setIsHovered(true);
-			setIsHistoryOpen(true);
-		},
-		[cursorOnRightSide]
-	);
-
 	return (
 		<div
 			ref={containerRef}
+			className="pointer-events-auto"
 			onMouseEnter={handleMouseEnter}
 			onMouseLeave={handleMouseLeave}
 			onMouseMove={handleMouseMove}
+			onPointerDown={handlePointerDown}
 			style={{
 				// Extend hover area to the left and right
 				paddingLeft: HOVER_PADDING,
@@ -119,16 +136,15 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 		>
 			{/* The actual content (3 boxes) with original styling - relative for button positioning */}
 			<div
-				ref={innerRef}
 				className={`relative ${className}`}
 				{...rest}
-				onClickCapture={handleLedgerBoxClick}
 			>
 				{children}
 
 				{/* Logs button - appears on left or right based on cursor position */}
-				{(isHovered || isHistoryOpen) && (
+				{(isHovered || isButtonHovered || isHistoryOpen) && (
 					<div
+						data-history-toggle
 						className="absolute flex items-center justify-center pointer-events-auto cursor-pointer transition-colors duration-150"
 						style={{
 							width: BUTTON_WIDTH,
@@ -153,7 +169,7 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 				{/* History Panel - anchored above the boxes, aligned to the locked side */}
 				{isHistoryOpen && (
 					<div
-						className="absolute z-50"
+						className="absolute z-[80]"
 						style={{
 							bottom: '100%',
 							marginBottom: 10,

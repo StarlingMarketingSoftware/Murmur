@@ -14,9 +14,9 @@ const PANEL_HEIGHT = 288;
 interface CampaignFolderDropdownProps {
 	currentCampaignId: number;
 	onClose: () => void;
-	/** The chevron button that toggles this dropdown — excluded from outside-click close. */
+	/** The chevron button that toggles this dropdown — fallback excluded from outside-click close. */
 	chevronRef: RefObject<HTMLButtonElement | null>;
-	/** The header-box root the dropdown anchors beneath. */
+	/** The header-box root the dropdown anchors beneath and treats as its toggle surface. */
 	anchorRef: RefObject<HTMLDivElement | null>;
 }
 
@@ -72,13 +72,14 @@ export const CampaignFolderDropdown: FC<CampaignFolderDropdownProps> = ({
 		};
 	}, [anchorRef]);
 
-	// Close on outside mousedown / Escape. Excluding the chevron prevents the
-	// close-then-reopen race: mousedown fires onClose before the chevron's click
+	// Close on outside mousedown / Escape. Excluding the header prevents the
+	// close-then-reopen race: mousedown fires onClose before the header's click
 	// toggles it back open.
 	useEffect(() => {
 		const handleMouseDown = (event: MouseEvent) => {
 			const target = event.target as Node;
 			if (panelRef.current?.contains(target)) return;
+			if (anchorRef.current?.contains(target)) return;
 			if (chevronRef.current?.contains(target)) return;
 			onCloseRef.current();
 		};
@@ -91,7 +92,7 @@ export const CampaignFolderDropdown: FC<CampaignFolderDropdownProps> = ({
 			document.removeEventListener('mousedown', handleMouseDown);
 			document.removeEventListener('keydown', handleKeyDown);
 		};
-	}, [chevronRef]);
+	}, [anchorRef, chevronRef]);
 
 	const handleChooseFolder = () => {
 		onClose();

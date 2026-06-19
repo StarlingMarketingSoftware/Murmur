@@ -979,9 +979,7 @@ const SELECTED_TOOLTIP_STACK_MIN_SCALE = 0.9;
 const SELECTED_TOOLTIP_LEGACY_STACK_T = 0.18;
 const SELECTED_TOOLTIP_STACK_GROUP_SIZE = 10;
 const SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX = 6;
-const SELECTED_TOOLTIP_PLACEMENT_VIEWPORT_PADDING_PX = 8;
 const SELECTED_TOOLTIP_PLACEMENT_OVERLAP_WEIGHT = 200;
-const SELECTED_TOOLTIP_PLACEMENT_OVERFLOW_WEIGHT = 250;
 const SELECTED_TOOLTIP_PLACEMENT_DISTANCE_WEIGHT = 0.08;
 const SELECTED_TOOLTIP_PLACEMENT_MAX_RING = 18;
 const SELECTED_TOOLTIP_PLACEMENT_RING_STEP_PX = 28;
@@ -991,6 +989,9 @@ const SELECTED_TOOLTIP_PLACEMENT_MIN_SEPARATION_PX = 2;
 const SELECTED_TOOLTIP_STACK_OFFSET_X_PX = 3;
 const SELECTED_TOOLTIP_STACK_OFFSET_Y_PX = 6;
 const SELECTED_TOOLTIP_STACK_FAKE_BACK_COUNT = 3;
+const HOVER_TOOLTIP_SIDE_GAP_X_PX = 3;
+const HOVER_TOOLTIP_SIDE_GAP_Y_PX = 14;
+const HOVER_TOOLTIP_VIEWPORT_PADDING_PX = 8;
 const PEOPLE_TOOLTIP_FILL_COLOR = '#99E0FF';
 
 type SelectedCompactTooltipEntry = {
@@ -1068,10 +1069,49 @@ type SelectedTooltipIndividualPlacement = SelectedTooltipBounds & {
 	preferenceRank: number;
 };
 
-type SelectedTooltipViewport = {
-	width: number;
-	height: number;
-	padding: number;
+const createHoverTooltipSidePlacement = ({
+	markerX,
+	markerY,
+	tooltipWidth,
+	tooltipHeight,
+	hitSlopPx,
+	sideGapXPx,
+	sideGapYPx,
+	viewportWidth,
+	viewportHeight,
+}: {
+	markerX: number;
+	markerY: number;
+	tooltipWidth: number;
+	tooltipHeight: number;
+	hitSlopPx: number;
+	sideGapXPx: number;
+	sideGapYPx: number;
+	viewportWidth: number;
+	viewportHeight: number;
+}): { x: number; y: number } => {
+	const minX = HOVER_TOOLTIP_VIEWPORT_PADDING_PX;
+	const maxX = Math.max(
+		minX,
+		viewportWidth - HOVER_TOOLTIP_VIEWPORT_PADDING_PX - tooltipWidth
+	);
+	const rightX = markerX + sideGapXPx;
+	const leftX = markerX - tooltipWidth - sideGapXPx;
+	const rightFits = rightX + tooltipWidth <= viewportWidth - HOVER_TOOLTIP_VIEWPORT_PADDING_PX;
+	const leftFits = leftX >= HOVER_TOOLTIP_VIEWPORT_PADDING_PX;
+	const innerX = clamp(rightFits || !leftFits ? rightX : leftX, minX, maxX);
+
+	const minY = HOVER_TOOLTIP_VIEWPORT_PADDING_PX;
+	const maxY = Math.max(
+		minY,
+		viewportHeight - HOVER_TOOLTIP_VIEWPORT_PADDING_PX - tooltipHeight
+	);
+	const innerY = clamp(markerY - tooltipHeight - sideGapYPx, minY, maxY);
+
+	return {
+		x: innerX - hitSlopPx,
+		y: innerY - hitSlopPx,
+	};
 };
 
 const selectedTooltipHoverTargetsEqual = (
@@ -1105,11 +1145,11 @@ const selectedTooltipRectsOverlap = (
 		b.top - SELECTED_TOOLTIP_STACK_COLLISION_PADDING_PX;
 
 const SELECTED_TOOLTIP_PLACEMENT_SIDES: SelectedTooltipPlacementSide[] = [
+	'top-right',
 	'top',
 	'right',
 	'left',
 	'bottom',
-	'top-right',
 	'top-left',
 	'bottom-right',
 	'bottom-left',
@@ -1142,10 +1182,17 @@ const getSelectedTooltipPlacementTransformOrigin = (
 const createSelectedTooltipPlacement = (
 	entry: ProjectedSelectedTooltipEntry,
 	side: SelectedTooltipPlacementSide,
-	gapPx: number,
+	baseGapPx: number,
+	ringExpansionPx: number,
 	preferenceRank: number
 ): SelectedTooltipIndividualPlacement => {
 	const { markerX, markerY, width, height } = entry;
+	const gapPx = baseGapPx + ringExpansionPx;
+	// The primary `top-right` side hugs the marker at the same gaps as the hover
+	// overlay so the resting label sits exactly where the hover tooltip appears
+	// (a pure cross-fade on hover). Collisions still push it outward via the ring.
+	const topRightGapX = HOVER_TOOLTIP_SIDE_GAP_X_PX + ringExpansionPx;
+	const topRightGapY = HOVER_TOOLTIP_SIDE_GAP_Y_PX + ringExpansionPx;
 	let x = markerX - width / 2;
 	let y = markerY - height - gapPx;
 
@@ -1167,8 +1214,8 @@ const createSelectedTooltipPlacement = (
 			y = markerY - height - gapPx;
 			break;
 		case 'top-right':
-			x = markerX + gapPx;
-			y = markerY - height - gapPx;
+			x = markerX + topRightGapX;
+			y = markerY - height - topRightGapY;
 			break;
 		case 'bottom-left':
 			x = markerX - width - gapPx;
@@ -1229,46 +1276,21 @@ const selectedTooltipPlacementOverlapsAny = (
 		)
 	);
 
-const getSelectedTooltipViewportOverflowArea = (
-	placement: SelectedTooltipIndividualPlacement,
-	viewport: SelectedTooltipViewport | null
-): number => {
-	if (!viewport) return 0;
-	const minX = viewport.padding;
-	const minY = viewport.padding;
-	const maxX = viewport.width - viewport.padding;
-	const maxY = viewport.height - viewport.padding;
-	const visibleLeft = clamp(placement.left, minX, maxX);
-	const visibleRight = clamp(placement.right, minX, maxX);
-	const visibleTop = clamp(placement.top, minY, maxY);
-	const visibleBottom = clamp(placement.bottom, minY, maxY);
-	const visibleArea =
-		Math.max(0, visibleRight - visibleLeft) *
-		Math.max(0, visibleBottom - visibleTop);
-	const totalArea =
-		Math.max(0, placement.right - placement.left) *
-		Math.max(0, placement.bottom - placement.top);
-	return Math.max(0, totalArea - visibleArea);
-};
-
 const scoreSelectedTooltipPlacement = (
 	entry: ProjectedSelectedTooltipEntry,
 	placement: SelectedTooltipIndividualPlacement,
-	placedTooltips: SelectedTooltipIndividualPlacement[],
-	viewport: SelectedTooltipViewport | null
+	placedTooltips: SelectedTooltipIndividualPlacement[]
 ): number => {
 	const overlapArea = placedTooltips.reduce(
 		(sum, placed) => sum + getSelectedTooltipOverlapArea(placement, placed),
 		0
 	);
-	const overflowArea = getSelectedTooltipViewportOverflowArea(placement, viewport);
 	const distanceFromNatural = Math.hypot(
 		placement.x - entry.naturalX,
 		placement.y - entry.naturalY
 	);
 	return (
 		overlapArea * SELECTED_TOOLTIP_PLACEMENT_OVERLAP_WEIGHT +
-		overflowArea * SELECTED_TOOLTIP_PLACEMENT_OVERFLOW_WEIGHT +
 		distanceFromNatural * SELECTED_TOOLTIP_PLACEMENT_DISTANCE_WEIGHT +
 		placement.preferenceRank
 	);
@@ -1283,6 +1305,7 @@ const createSelectedTooltipFallbackPlacement = (
 		entry,
 		'bottom',
 		gapPx,
+		0,
 		SELECTED_TOOLTIP_PLACEMENT_SIDES.length
 	);
 
@@ -1312,7 +1335,6 @@ const buildSelectedTooltipIndividualPlacements = (
 	projectedEntries: ProjectedSelectedTooltipEntry[],
 	hiddenContactIds: ReadonlySet<number>,
 	blockingBounds: SelectedTooltipBounds[],
-	viewport: SelectedTooltipViewport | null,
 	gapPx: number
 ): Map<number, SelectedTooltipIndividualPlacement> => {
 	const placements = new Map<number, SelectedTooltipIndividualPlacement>();
@@ -1328,13 +1350,14 @@ const buildSelectedTooltipIndividualPlacements = (
 		let bestScore = Number.POSITIVE_INFINITY;
 
 		for (let ring = 0; ring <= SELECTED_TOOLTIP_PLACEMENT_MAX_RING; ring += 1) {
-			const ringGapPx = gapPx + ring * SELECTED_TOOLTIP_PLACEMENT_RING_STEP_PX;
+			const ringExpansionPx = ring * SELECTED_TOOLTIP_PLACEMENT_RING_STEP_PX;
 			for (let index = 0; index < SELECTED_TOOLTIP_PLACEMENT_SIDES.length; index += 1) {
 				const side = SELECTED_TOOLTIP_PLACEMENT_SIDES[index];
 				const placement = createSelectedTooltipPlacement(
 					entry,
 					side,
-					ringGapPx,
+					gapPx,
+					ringExpansionPx,
 					ring * SELECTED_TOOLTIP_PLACEMENT_SIDES.length + index
 				);
 				if (selectedTooltipPlacementOverlapsAny(placement, placedBounds)) continue;
@@ -1342,8 +1365,7 @@ const buildSelectedTooltipIndividualPlacements = (
 				const score = scoreSelectedTooltipPlacement(
 					entry,
 					placement,
-					placedTooltips,
-					viewport
+					placedTooltips
 				);
 				if (score < bestScore) {
 					bestScore = score;
@@ -1737,6 +1759,8 @@ export interface SearchResultsMapProps {
 	searchEngaged?: boolean;
 	/** When true, connects result dots by category even without an active search query. */
 	categoryConstellationsEnabled?: boolean;
+	/** When true, renders the persistent selected-contact SVG labels without requiring the Search action card. */
+	showSelectedContactTooltips?: boolean;
 	/** Campaign overview marker mode. Category mode preserves the normal category-colored markers. */
 	campaignMarkerMode?: 'category' | 'status';
 	/** Per-contact campaign status used when `campaignMarkerMode` is `status`. */
@@ -1747,11 +1771,12 @@ export interface SearchResultsMapProps {
 	 * `campaignMarkerMode === 'status'`.
 	 */
 	campaignHeatmapColor?: string | null;
+	/** Optional per-status tints for the campaign heatmap glow. */
+	campaignHeatmapStatusColors?: Readonly<Record<CampaignContactMapStatus, string>>;
 	/**
 	 * When true, the heatmap glow shows the whole tab set while nothing is
-	 * selected (ambient mode — used by the Inbox tab). When false/absent, the
-	 * glow is selection-only and stays hidden until contacts are selected
-	 * (Contacts and Drafts tabs).
+	 * selected. When false/absent, the glow is selection-only and stays hidden
+	 * until contacts are selected.
 	 */
 	campaignHeatmapAmbient?: boolean;
 	/** Real contacts from the active campaign, rendered as a subtle non-interactive footprint under search results. */
@@ -1982,9 +2007,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	searchWhat,
 	searchEngaged = true,
 	categoryConstellationsEnabled = false,
+	showSelectedContactTooltips = false,
 	campaignMarkerMode = 'category',
 	campaignContactStatusById,
 	campaignHeatmapColor = null,
+	campaignHeatmapStatusColors,
 	campaignHeatmapAmbient = false,
 	campaignFootprintContacts = [],
 	ambientContactsEnabled = false,
@@ -10372,11 +10399,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	// --- Campaign selection heatmap glow -------------------------------------
 	// The heatmap envelops the currently-selected contacts (intersected with the
-	// tab's on-map set so off-tab/coordless ids are dropped). On the Contacts and
-	// Drafts tabs there is no glow until something is selected. The Inbox tab is
-	// "ambient": with nothing selected it glows the whole tab set instead.
+	// tab's on-map set so off-tab/coordless ids are dropped). Ambient tab views
+	// glow the whole visible set when nothing is selected.
 	const heatmapContactIds = useMemo<number[]>(() => {
-		if (campaignMarkerMode !== 'status' || !campaignHeatmapColor) return [];
+		if (
+			campaignMarkerMode !== 'status' ||
+			(!campaignHeatmapColor && !campaignHeatmapStatusColors)
+		) {
+			return [];
+		}
 		const onMapIds = contactsWithCoords.map((c) => c.id);
 		if (selectedContacts.length === 0) return campaignHeatmapAmbient ? onMapIds : [];
 		const onMap = new Set(onMapIds);
@@ -10384,6 +10415,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [
 		campaignMarkerMode,
 		campaignHeatmapColor,
+		campaignHeatmapStatusColors,
 		campaignHeatmapAmbient,
 		contactsWithCoords,
 		selectedContacts,
@@ -10408,7 +10440,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 
 		// Off unless in status mode with a tint supplied.
-		if (campaignMarkerMode !== 'status' || !campaignHeatmapColor) {
+		if (
+			campaignMarkerMode !== 'status' ||
+			(!campaignHeatmapColor && !campaignHeatmapStatusColors)
+		) {
 			cancelFade();
 			campaignHeatmapFadeByIdRef.current.clear();
 			source.setData(emptyFeatureCollection());
@@ -10445,7 +10480,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				features.push({
 					type: 'Feature' as const,
 					id,
-					properties: { glowColor: campaignHeatmapColor, glowFade: fade },
+					properties: {
+						glowColor:
+							campaignHeatmapStatusColors?.[getCampaignStatusForContact(id)] ??
+							campaignHeatmapColor ??
+							'#FFA5A5',
+						glowFade: fade,
+					},
 					geometry: { type: 'Point' as const, coordinates: [coords.lng, coords.lat] },
 				});
 			});
@@ -10482,10 +10523,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isMapLoaded,
 		campaignMarkerMode,
 		campaignHeatmapColor,
+		campaignHeatmapStatusColors,
 		heatmapContactIds,
 		contactsWithCoords,
 		coordsByContactId,
 		getContactCoords,
+		getCampaignStatusForContact,
 	]);
 
 	useEffect(() => {
@@ -11819,8 +11862,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					maxLng: east,
 				};
 
-				const isAmbientContactAllowed = (contact: ContactWithName): boolean => {
-					if (!isAmbientAllContactsOverlay) return true;
+				const isAllContactsOverlayContactAllowed = (contact: ContactWithName): boolean => {
 					const categoryIndex = getAmbientContactCategoryIndexFromTitle(contact.title);
 					if (categoryIndex < 0) return ambientUncategorizedActive;
 					return ambientActiveCategories?.[categoryIndex] !== false;
@@ -11830,7 +11872,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const bufferInBounds: ContactWithName[] = [];
 				for (const contact of allContactsOverlayContactsWithCoords) {
 					if (excludeIdSet.has(contact.id)) continue;
-					if (!isAmbientContactAllowed(contact)) continue;
+					if (!isAllContactsOverlayContactAllowed(contact)) continue;
 					const coords = getAllContactsOverlayContactCoords(contact);
 					if (!coords) continue;
 					if (!isLatLngInBbox(coords.lat, coords.lng, viewportBbox)) continue;
@@ -15185,8 +15227,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (cached) return cached;
 
 			const url = generateSelectedCategorizedContactMarkerIconUrl(key);
+			const hoverColor = darkenHexColor(key, MARKER_HOVER_DARKEN_AMOUNT);
 			const hoverUrl = generateSelectedCategorizedContactMarkerIconUrl(
-				darkenHexColor(key, MARKER_HOVER_DARKEN_AMOUNT)
+				hoverColor,
+				hoverColor
 			);
 			const assets = {
 				imageName: imageNameFromUrl(url),
@@ -15224,10 +15268,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[]
 	);
 	const selectedUncategorizedContactMarkerHoverUrl = useMemo(
-		() =>
-			generateSelectedUncategorizedContactMarkerIconUrl(
-				darkenHexColor('#50A5C9', MARKER_HOVER_DARKEN_AMOUNT)
-			),
+		() => {
+			const hoverColor = darkenHexColor('#50A5C9', MARKER_HOVER_DARKEN_AMOUNT);
+			return generateSelectedUncategorizedContactMarkerIconUrl(hoverColor, hoverColor);
+		},
 		[]
 	);
 	const selectedUncategorizedContactMarkerImageName = useMemo(
@@ -17791,14 +17835,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		() => Math.max(18, markerScale + 10),
 		[markerScale]
 	);
-	const getSelectedTooltipZoomOpacity = useCallback((zoom: number): number => {
-		return clamp(
-			(zoom - SELECTED_TOOLTIP_FADE_END_ZOOM) /
-				(SELECTED_TOOLTIP_FADE_START_ZOOM - SELECTED_TOOLTIP_FADE_END_ZOOM),
-			0,
-			1
-		);
-	}, []);
 	const getSelectedTooltipStackT = useCallback((zoom: number): number => {
 		return clamp(
 			(SELECTED_TOOLTIP_FADE_START_ZOOM - zoom) /
@@ -18317,7 +18353,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// only the ambient 'all'-contacts gray dots, which stay hover-only.
 	const isStreetCardMode = streetViewEnabled && zoomLevel >= STREET_VIEW_MIN_ZOOM;
 	const selectedCompactTooltipEntries = useMemo(() => {
-		if (!onAddSelectionToFolder || isStreetCardMode) return [];
+		if ((!onAddSelectionToFolder && !showSelectedContactTooltips) || isStreetCardMode) return [];
 
 		type SelectedTooltipKind = 'base' | 'booking' | 'promotion' | 'all' | 'fallback';
 
@@ -18466,6 +18502,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return entries;
 	}, [
 		onAddSelectionToFolder,
+		showSelectedContactTooltips,
 		isStreetCardMode,
 		selectedContacts,
 		contactsWithCoordsById,
@@ -18488,23 +18525,28 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		(m: mapboxgl.Map): ProjectedSelectedTooltipEntry[] =>
 			selectedCompactTooltipEntries.map((entry) => {
 				const p = m.project([entry.coords.lng, entry.coords.lat]);
-				const naturalX = p.x - entry.width / 2;
-				const naturalY = p.y - entry.anchorY - tooltipMarkerGapPx;
+				// Preferred resting anchor = the hover overlay's up-and-to-the-right
+				// spot (bottom-left corner at marker + 3 / marker - 8) so hovering is a
+				// pure cross-fade. The bounding rect stays horizontally centered on the
+				// marker so the zoomed-out stacks don't drift sideways.
+				const centeredX = p.x - entry.width / 2;
+				const naturalX = p.x + HOVER_TOOLTIP_SIDE_GAP_X_PX;
+				const naturalY = p.y - entry.anchorY - HOVER_TOOLTIP_SIDE_GAP_Y_PX;
 				return {
 					...entry,
 					markerX: p.x,
 					markerY: p.y,
 					naturalX,
 					naturalY,
-					left: naturalX,
+					left: centeredX,
 					top: naturalY,
-					right: naturalX + entry.width,
+					right: centeredX + entry.width,
 					bottom: naturalY + entry.height,
-					centerX: naturalX + entry.width / 2,
+					centerX: centeredX + entry.width / 2,
 					centerY: naturalY + entry.height / 2,
 				};
 			}),
-		[selectedCompactTooltipEntries, tooltipMarkerGapPx]
+		[selectedCompactTooltipEntries]
 	);
 	const buildSelectedTooltipStackLayout = useCallback(
 		(projectedEntries: ProjectedSelectedTooltipEntry[], zoom: number) => {
@@ -18664,15 +18706,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				projectedEntries,
 				map.getZoom() ?? MAP_DEFAULT_ZOOM
 			);
-			const container = mapContainerRef.current;
-			const viewport =
-				container && container.clientWidth > 0 && container.clientHeight > 0
-					? {
-							width: container.clientWidth,
-							height: container.clientHeight,
-							padding: SELECTED_TOOLTIP_PLACEMENT_VIEWPORT_PADDING_PX,
-						}
-					: null;
 			const stackBlockingBounds = stackPlacements.map(getSelectedTooltipStackBounds);
 			const individualPlacements = shouldUseLegacyStack
 				? new Map<number, SelectedTooltipIndividualPlacement>()
@@ -18680,7 +18713,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						projectedEntries,
 						collisionGroupedContactIds,
 						stackBlockingBounds,
-						viewport,
 						tooltipMarkerGapPx
 					);
 
@@ -18703,7 +18735,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const isHiddenByTooltipHover =
 					selectedTooltipHoverHiddenTarget?.type === 'contact' &&
 					selectedTooltipHoverHiddenTarget.id === entry.contact.id;
-				el.style.transformOrigin = placement?.transformOrigin ?? 'bottom center';
+				el.style.transformOrigin = placement?.transformOrigin ?? 'bottom left';
 				el.style.transform = `translate(${Math.round(
 					placement?.x ?? entry.naturalX
 				)}px, ${Math.round(
@@ -19029,7 +19061,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const hoverTooltipLat = hoverTooltipCoords?.lat ?? null;
 	const hoverTooltipLng = hoverTooltipCoords?.lng ?? null;
 	const hoverTooltipWidth = hoverTooltipData?.width ?? null;
-	const hoverTooltipAnchorY = hoverTooltipData?.anchorY ?? null;
+	const hoverTooltipHeight = hoverTooltipData?.height ?? null;
 
 	useLayoutEffect(() => {
 		if (!map || !isMapLoaded) return;
@@ -19040,16 +19072,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			hoverTooltipLat == null ||
 			hoverTooltipLng == null ||
 			hoverTooltipWidth == null ||
-			hoverTooltipAnchorY == null
+			hoverTooltipHeight == null
 		)
 			return;
 
 		const update = () => {
 			const p = map.project([hoverTooltipLng, hoverTooltipLat]);
-			el.style.transform = `translate(${Math.round(
-				p.x - hoverTooltipWidth / 2 - hoverTooltipHitSlopPx
-			)}px, ${Math.round(
-				p.y - hoverTooltipAnchorY - hoverTooltipHitSlopPx - tooltipMarkerGapPx
+			const { clientWidth, clientHeight } = map.getContainer();
+			const placement = createHoverTooltipSidePlacement({
+				markerX: p.x,
+				markerY: p.y,
+				tooltipWidth: hoverTooltipWidth,
+				tooltipHeight: hoverTooltipHeight,
+				hitSlopPx: hoverTooltipHitSlopPx,
+				sideGapXPx: HOVER_TOOLTIP_SIDE_GAP_X_PX,
+				sideGapYPx: HOVER_TOOLTIP_SIDE_GAP_Y_PX,
+				viewportWidth: clientWidth,
+				viewportHeight: clientHeight,
+			});
+			el.style.transform = `translate(${Math.round(placement.x)}px, ${Math.round(
+				placement.y
 			)}px)`;
 		};
 
@@ -19071,7 +19113,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		hoverTooltipLat,
 		hoverTooltipLng,
 		hoverTooltipWidth,
-		hoverTooltipAnchorY,
+		hoverTooltipHeight,
 		hoverTooltipHitSlopPx,
 		tooltipMarkerGapPx,
 	]);
@@ -19139,6 +19181,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	return (
 		<div
+			data-website-preview-scroll-dismiss
 			className={
 				isBackgroundPresentation
 					? 'murmur-search-results-map murmur-search-results-map--background'

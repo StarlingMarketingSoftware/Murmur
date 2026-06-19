@@ -33,6 +33,8 @@ export const EVENT_CHAT_COMPACT_ROW_HEIGHT_PX = 86;
 const FOLDER_CHIP_FILL = '#B6E8F1';
 const FOLDER_ICON_COLOR = '#B94343';
 const DATE_PILL_FILL = '#B6E8F1';
+const EVENT_CHAT_HEADER_PILL_HEIGHT_PX = 19;
+const EVENT_CHAT_HEADER_PILL_RADIUS_PX = 9;
 
 // Single-line text that fades out at the right edge only when it overflows
 // (same measured-mask pattern as the list/widget locals).
@@ -99,8 +101,9 @@ export const EventChatStatusPill: FC<{
 	status: EventChatStatus;
 	height?: number;
 	fontSize?: number;
+	cornerRadius?: number;
 	className?: string;
-}> = ({ status, height = 16, fontSize = 10.5, className }) => {
+}> = ({ status, height = 16, fontSize = 10.5, cornerRadius = 6.866, className }) => {
 	const meta = EVENT_CHAT_STATUS_META[status];
 	return (
 		<span
@@ -109,7 +112,7 @@ export const EventChatStatusPill: FC<{
 				minWidth: '90px',
 				height: `${height}px`,
 				padding: '0 7px',
-				borderRadius: '6.866px',
+				borderRadius: `${cornerRadius}px`,
 				border: '0.858px solid #000',
 				backgroundColor: meta.fill,
 				boxSizing: 'border-box',
@@ -167,9 +170,9 @@ export const EventChatCard: FC<{
 						className="flex min-w-0 items-center gap-[6px]"
 						style={{
 							maxWidth: 'calc(100% - 80px)',
-							height: '22px',
+							height: `${EVENT_CHAT_HEADER_PILL_HEIGHT_PX}px`,
 							padding: '0 9px',
-							borderRadius: '11px',
+							borderRadius: `${EVENT_CHAT_HEADER_PILL_RADIUS_PX}px`,
 							border: '1.2px solid #000',
 							backgroundColor: bookedMeta.fill,
 							boxSizing: 'border-box',
@@ -190,7 +193,12 @@ export const EventChatCard: FC<{
 							text={venueName}
 							className="min-w-0 flex-shrink text-[14.661px] font-bold leading-none"
 						/>
-						<EventChatStatusPill status={state.status} />
+						<EventChatStatusPill
+							status={state.status}
+							height={EVENT_CHAT_HEADER_PILL_HEIGHT_PX}
+							fontSize={11}
+							cornerRadius={EVENT_CHAT_HEADER_PILL_RADIUS_PX}
+						/>
 					</>
 				)}
 				<span className="ml-auto shrink-0 whitespace-nowrap text-[12px] font-semibold leading-none">

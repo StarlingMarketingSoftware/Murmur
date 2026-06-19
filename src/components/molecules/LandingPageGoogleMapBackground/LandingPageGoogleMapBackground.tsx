@@ -960,6 +960,7 @@ export function LandingPageGoogleMapBackground({ className, onReady }: Props) {
 				/>
 				<MapSelectGrabStackBox
 					className="absolute left-0 pointer-events-none"
+					hoverLabel="Opportunities"
 					style={{
 						top: `-${
 							MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
@@ -975,6 +976,7 @@ export function LandingPageGoogleMapBackground({ className, onReady }: Props) {
 				</MapSelectGrabStackBox>
 				<MapSelectGrabStackBox
 					className="absolute left-0 pointer-events-none"
+					hoverLabel="People"
 					style={{
 						top: `-${
 							MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +

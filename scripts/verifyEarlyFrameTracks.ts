@@ -190,7 +190,7 @@ assertNear(
 );
 
 console.log('\n=== world icon must NOT shrink between adjacent keyframes ===');
-let prev = WORLD_ICON_SCALES[0];
+let prev: number = WORLD_ICON_SCALES[0];
 for (let i = 1; i < WORLD_ICON_SCALES.length; i++) {
 	const cur = WORLD_ICON_SCALES[i];
 	if (cur < prev) {

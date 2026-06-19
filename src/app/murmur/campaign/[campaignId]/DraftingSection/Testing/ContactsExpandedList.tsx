@@ -76,6 +76,7 @@ import {
 	type MyEventApplication,
 } from '@/hooks/queryHooks/useEventApplications';
 import { deriveEventChatStatus, formatEventChatTimestamp } from '@/utils/eventChatStatus';
+import { resolveDraftRowClick } from './draftRowSelection';
 import {
 	EventChatCard,
 	EVENT_CHAT_COMPACT_ROW_HEIGHT_PX,
@@ -1303,6 +1304,7 @@ export interface ContactsExpandedListProps {
 		application: MyEventApplication | null,
 		rowElement: HTMLElement | null
 	) => void;
+	onEventChatRowClick?: (application: MyEventApplication) => void;
 	onDraftClick?: (draft: EmailWithRelations) => void;
 	onDraftHover?: (draft: EmailWithRelations | null) => void;
 	selectedInboxEmailId?: number | null;
@@ -1356,11 +1358,14 @@ export interface ContactsExpandedListProps {
 	interactionMode?: 'default' | 'allTab';
 	focusMode?: ContactsExpandedListFocusMode;
 	/**
-	 * One-shot request to land the inbox panel on a specific Responses/Opportunities
+	 * One-shot request to land the inbox panel on a specific Responses/Sent/Opportunities
 	 * filter (e.g. the overview star pill). Consumed by requestId, otherwise the
 	 * filter resets to 'responses' whenever inbox focus mode engages.
 	 */
-	inboxPanelTabRequest?: { tab: 'responses' | 'opportunities'; requestId: number } | null;
+	inboxPanelTabRequest?: {
+		tab: 'responses' | 'sent' | 'opportunities';
+		requestId: number;
+	} | null;
 
 	onFocusContact?: (contactId: number) => void;
 	/**
@@ -1383,6 +1388,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	onContactHover,
 	onContactRowHover,
 	onEventChatRowHover,
+	onEventChatRowClick,
 	onDraftClick,
 	onDraftHover,
 	selectedInboxEmailId,
@@ -1852,21 +1858,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		(isDraftsFocusMode || (!isDraftsFocusMode && resolvedActiveTopNavStop === 'write'));
 	// draftSupplemental* colors are computed per-row inside renderSupplementalDraftRow
 	// so a hovered (peeked) row reveals in its non-redded "showing" style.
-	const inboxSupplementalTextClassName = shouldRedOutInboxRows
-		? 'text-[#F5C0BD]'
-		: 'text-black';
 	const inboxSupplementalBorderColor = shouldRedOutInboxRows
 		? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
 		: '#000000';
-	const inboxSupplementalRowFillColor = shouldRedOutInboxRows
-		? WRITE_TAB_SUPPLEMENTAL_ROW_FILL_COLOR
-		: undefined;
-	const inboxSupplementalBadgeFillColor = shouldRedOutInboxRows
-		? WRITE_TAB_SUPPLEMENTAL_BADGE_FILL_COLOR
-		: undefined;
-	const inboxSupplementalTextColor = shouldRedOutInboxRows
-		? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
-		: undefined;
 	const collapsedTopBoxHeightPx = 26;
 	const collapsedTopBoxWidthPx = 191;
 	const collapsedTopBoxRadiusPx = 3.33;
@@ -2453,6 +2447,29 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						return;
 					}
 
+					// Drafts tab: a single click cycles selection/showing state.
+					// (Showing row -> no-op, selected non-showing -> deselect,
+					// plain -> promote to showing + clear every other selection.)
+					if (
+						isDraftsFocusMode &&
+						!shouldRedOutDraftRows &&
+						onDraftSelectionChange
+					) {
+						lastClickedDraftRef.current = draft.id;
+						const result = resolveDraftRowClick(
+							draft.id,
+							selectedDraftId ?? null,
+							selectedDraftIds ?? new Set<number>()
+						);
+						if (result.showDraft) onDraftClick?.(draft);
+						if (result.nextSelectedIds) {
+							const nextSelectedIds = result.nextSelectedIds;
+							onDraftSelectionChange(() => nextSelectedIds);
+						}
+						if (contact) onContactClick?.(contact);
+						return;
+					}
+
 					lastClickedDraftRef.current = draft.id;
 					onDraftClick?.(draft);
 					if (contact) onContactClick?.(contact);
@@ -2538,6 +2555,8 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		const isEventChatCompact =
 			eventChatStateForLayout?.status === 'closed' ||
 			eventChatStateForLayout?.status === 'canceled';
+		const shouldRenderNoFillEventChatRow =
+			isInboxFocusMode && Boolean(eventChatStateForLayout?.isAboveFold);
 		const rowHeightPx = eventChatStateForLayout
 			? isEventChatCompact
 				? EVENT_CHAT_COMPACT_ROW_HEIGHT_PX
@@ -2579,9 +2598,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					borderRight: `1.949px solid ${inboxSupplementalBorderColor}`,
 					borderBottom: `1.949px solid ${inboxSupplementalBorderColor}`,
 					borderLeft: `1.949px solid ${inboxSupplementalBorderColor}`,
-					background: isSelectedInboxConversation
-						? selectedInboxRowFillColor
-						: (inboxSupplementalRowFillColor ?? '#F9FAFB'),
+					background: shouldRenderNoFillEventChatRow
+						? 'transparent'
+						: isSelectedInboxConversation
+							? selectedInboxRowFillColor
+							: (inboxSupplementalRowFillColor ?? '#F9FAFB'),
 					boxSizing: 'border-box',
 				}}
 				role={!isAllTabNavigation ? 'button' : undefined}
@@ -2612,6 +2633,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				onClick={(e) => {
 					if (isAllTabNavigation) return;
 					e.stopPropagation();
+					if (eventApplication && eventChatState) {
+						onEventChatRowClick?.(eventApplication);
+					}
 					if (onInboxEmailClick) {
 						onInboxEmailClick(selectionEmail);
 						// Redded-out on the Write/Drafts tab: jump to the Inbox tab (the
@@ -2625,6 +2649,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					if (isAllTabNavigation || !onInboxEmailClick) return;
 					if (e.key === 'Enter' || e.key === ' ') {
 						e.preventDefault();
+						if (eventApplication && eventChatState) {
+							onEventChatRowClick?.(eventApplication);
+						}
 						onInboxEmailClick(selectionEmail);
 					}
 				}}
@@ -2769,6 +2796,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				onClick={(e) => {
 					if (isAllTabNavigation) return;
 					e.stopPropagation();
+					if (eventApplication && eventChatState) {
+						onEventChatRowClick?.(eventApplication);
+					}
 					if (onInboxEmailClick) {
 						onInboxEmailClick(email);
 						return;
@@ -2779,6 +2809,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					if (isAllTabNavigation) return;
 					if (e.key === 'Enter' || e.key === ' ') {
 						e.preventDefault();
+						if (eventApplication && eventChatState) {
+							onEventChatRowClick?.(eventApplication);
+						}
 						if (onInboxEmailClick) {
 							onInboxEmailClick(email);
 							return;
@@ -3396,7 +3429,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						})()}
 					{/* Scrollable list */}
 					<CustomScrollbar
-						className="flex-1 drafting-table-content"
+						className="z-0 flex-1 drafting-table-content"
 						thumbWidth={shouldShowScrollbar ? 2 : 0}
 						thumbColor={shouldShowScrollbar ? '#000000' : 'transparent'}
 						trackColor="transparent"
@@ -3740,61 +3773,14 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																	{/* Top Right - Title */}
 																	<div className="pr-1.5 pl-0.5 flex items-center justify-start h-[12px]">
 																		{contactTitle ? (
-																			<div
-																				className="h-[10px] rounded-[3px] px-1 flex items-center gap-0.5 max-w-full border border-black overflow-hidden"
-																				style={{
-																					backgroundColor: isRestaurantTitle(contactTitle)
-																						? '#C3FBD1'
-																						: isCoffeeShopTitle(contactTitle)
-																							? '#D6F1BD'
-																							: isMusicVenueTitle(contactTitle)
-																								? '#B7E5FF'
-																								: isMusicFestivalTitle(contactTitle)
-																									? '#C1D6FF'
-																									: isWeddingPlannerTitle(contactTitle) ||
-																										  isWeddingVenueTitle(contactTitle)
-																										? '#FFF2BC'
-																										: '#E8EFFF',
-																				}}
-																			>
-																				{isRestaurantTitle(contactTitle) && (
-																					<RestaurantsIcon size={7} />
-																				)}
-																				{isCoffeeShopTitle(contactTitle) && (
-																					<CoffeeShopsIcon size={4} />
-																				)}
-																				{isMusicVenueTitle(contactTitle) && (
-																					<MusicVenuesIcon
-																						size={7}
-																						className="flex-shrink-0"
-																					/>
-																				)}
-																				{isMusicFestivalTitle(contactTitle) && (
-																					<FestivalsIcon
-																						size={7}
-																						className="flex-shrink-0"
-																					/>
-																				)}
-																				{(isWeddingPlannerTitle(contactTitle) ||
-																					isWeddingVenueTitle(contactTitle)) && (
-																					<WeddingPlannersIcon size={7} />
-																				)}
-																				<span className="text-[7px] text-black leading-none truncate">
-																					{isRestaurantTitle(contactTitle)
-																						? 'Restaurant'
-																						: isCoffeeShopTitle(contactTitle)
-																							? 'Coffee Shop'
-																							: isMusicVenueTitle(contactTitle)
-																								? 'Music Venue'
-																								: isMusicFestivalTitle(contactTitle)
-																									? 'Music Festival'
-																									: isWeddingPlannerTitle(contactTitle)
-																										? 'Wedding Planner'
-																										: isWeddingVenueTitle(contactTitle)
-																											? 'Wedding Venue'
-																											: contactTitle}
-																				</span>
-																			</div>
+																			<TitleBadge
+																				title={contactTitle}
+																				className="h-[10px] rounded-[3px] px-1 max-w-full"
+																				textClassName="text-[7px] text-black"
+																				restaurantIconSize={7}
+																				coffeeIconSize={4}
+																				defaultIconSize={7}
+																			/>
 																		) : null}
 																	</div>
 																	{/* Bottom Left - Company */}
@@ -4066,65 +4052,14 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 															{/* Top Right - Title (aligned to top slot) */}
 															<div className="col-start-2 row-start-1 pr-2 pl-1 flex items-end pb-[2px] overflow-hidden">
 																{contactTitle ? (
-																	<div
-																		className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
-																		style={{
-																			backgroundColor: isRestaurantTitle(contactTitle)
-																				? '#C3FBD1'
-																				: isCoffeeShopTitle(contactTitle)
-																					? '#D6F1BD'
-																					: isMusicVenueTitle(contactTitle)
-																						? '#B7E5FF'
-																						: isMusicFestivalTitle(contactTitle)
-																							? '#C1D6FF'
-																							: isWeddingPlannerTitle(contactTitle) ||
-																								  isWeddingVenueTitle(contactTitle)
-																								? '#FFF2BC'
-																								: '#E8EFFF',
-																		}}
-																	>
-																		{isRestaurantTitle(contactTitle) && (
-																			<RestaurantsIcon size={12} />
-																		)}
-																		{isCoffeeShopTitle(contactTitle) && (
-																			<CoffeeShopsIcon size={7} />
-																		)}
-																		{isMusicVenueTitle(contactTitle) && (
-																			<MusicVenuesIcon
-																				size={12}
-																				className="flex-shrink-0"
-																			/>
-																		)}
-																		{isMusicFestivalTitle(contactTitle) && (
-																			<FestivalsIcon
-																				size={12}
-																				className="flex-shrink-0"
-																			/>
-																		)}
-																		{(isWeddingPlannerTitle(contactTitle) ||
-																			isWeddingVenueTitle(contactTitle)) && (
-																			<WeddingPlannersIcon size={12} />
-																		)}
-																		<ScrollableText
-																			text={
-																				isRestaurantTitle(contactTitle)
-																					? 'Restaurant'
-																					: isCoffeeShopTitle(contactTitle)
-																						? 'Coffee Shop'
-																						: isMusicVenueTitle(contactTitle)
-																							? 'Music Venue'
-																							: isMusicFestivalTitle(contactTitle)
-																								? 'Music Festival'
-																								: isWeddingPlannerTitle(contactTitle)
-																									? 'Wedding Planner'
-																									: isWeddingVenueTitle(contactTitle)
-																										? 'Wedding Venue'
-																										: contactTitle
-																			}
-																			className="text-[10px] text-black leading-none"
-																			scrollPixelsPerSecond={60}
-																		/>
-																	</div>
+																	<TitleBadge
+																		title={contactTitle}
+																		className="h-[17px] rounded-[6px] px-2 gap-1 w-full"
+																		textClassName="text-[10px] text-black"
+																		restaurantIconSize={12}
+																		coffeeIconSize={7}
+																		defaultIconSize={12}
+																	/>
 																) : (
 																	<div className="w-full" />
 																)}
@@ -4228,64 +4163,14 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																<>
 																	{/* Top Right - Title */}
 																	<div className="col-start-2 row-start-1 pr-2 pl-1 flex items-end pb-[2px] overflow-hidden">
-																		<div
-																			className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
-																			style={{
-																				backgroundColor: isRestaurantTitle(contactTitle)
-																					? '#C3FBD1'
-																					: isCoffeeShopTitle(contactTitle)
-																						? '#D6F1BD'
-																						: isMusicVenueTitle(contactTitle)
-																							? '#B7E5FF'
-																							: isMusicFestivalTitle(contactTitle)
-																								? '#C1D6FF'
-																								: isWeddingPlannerTitle(contactTitle) ||
-																									  isWeddingVenueTitle(contactTitle)
-																									? '#FFF2BC'
-																									: '#E8EFFF',
-																			}}
-																		>
-																			{isRestaurantTitle(contactTitle) && (
-																				<RestaurantsIcon size={12} />
-																			)}
-																			{isCoffeeShopTitle(contactTitle) && (
-																				<CoffeeShopsIcon size={7} />
-																			)}
-																			{isMusicVenueTitle(contactTitle) && (
-																				<MusicVenuesIcon
-																					size={12}
-																					className="flex-shrink-0"
-																				/>
-																			)}
-																			{isMusicFestivalTitle(contactTitle) && (
-																				<FestivalsIcon
-																					size={12}
-																					className="flex-shrink-0"
-																				/>
-																			)}
-																			{(isWeddingPlannerTitle(contactTitle) ||
-																				isWeddingVenueTitle(contactTitle)) && (
-																				<WeddingPlannersIcon size={12} />
-																			)}
-																			<ScrollableText
-																				text={
-																					isRestaurantTitle(contactTitle)
-																						? 'Restaurant'
-																						: isCoffeeShopTitle(contactTitle)
-																							? 'Coffee Shop'
-																							: isMusicVenueTitle(contactTitle)
-																								? 'Music Venue'
-																								: isMusicFestivalTitle(contactTitle)
-																									? 'Music Festival'
-																									: isWeddingPlannerTitle(contactTitle)
-																										? 'Wedding Planner'
-																										: isWeddingVenueTitle(contactTitle)
-																											? 'Wedding Venue'
-																											: contactTitle
-																				}
-																				className="text-[10px] text-black leading-none"
-																			/>
-																		</div>
+																		<TitleBadge
+																			title={contactTitle}
+																			className="h-[17px] rounded-[6px] px-2 gap-1 w-full"
+																			textClassName="text-[10px] text-black"
+																			restaurantIconSize={12}
+																			coffeeIconSize={7}
+																			defaultIconSize={12}
+																		/>
 																	</div>
 
 																	{/* Bottom Right - Location */}

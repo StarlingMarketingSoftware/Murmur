@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { HistoryAction, HistoryActionType } from '@/components/atoms/BottomPanelsContainer';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 
@@ -179,6 +179,27 @@ interface HistoryLedgerPanelProps {
  */
 export const HistoryLedgerPanel: React.FC<HistoryLedgerPanelProps> = ({ historyActions, onClose }) => {
 	const [activeFilter, setActiveFilter] = useState<HistoryActionType | 'all'>('all');
+	const panelRef = useRef<HTMLDivElement>(null);
+	const scrollbarPortalRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		if (typeof document === 'undefined') return;
+
+		const handlePointerDown = (e: PointerEvent) => {
+			const target = e.target as HTMLElement | null;
+			if (!target) return;
+			// Let the history toggle control its own open/close state (avoids
+			// "close on pointerdown + re-open on click" batching issues).
+			if (target.closest('[data-history-toggle]')) return;
+			if (panelRef.current?.contains(target)) return;
+			onClose();
+		};
+
+		document.addEventListener('pointerdown', handlePointerDown, true);
+		return () => {
+			document.removeEventListener('pointerdown', handlePointerDown, true);
+		};
+	}, [onClose]);
 
 	// Filter and sort history actions (oldest at top, newest at bottom)
 	const filteredActions = historyActions
@@ -227,15 +248,23 @@ export const HistoryLedgerPanel: React.FC<HistoryLedgerPanelProps> = ({ historyA
 				onClick={onClose}
 			/>
 			<div
+				ref={panelRef}
 				className="relative z-50 animate-inbox-pop-in"
 				style={{
 					width: HISTORY_PANEL_WIDTH,
 					height: dynamicPanelHeight,
-					borderRadius: 8,
-					border: '2px solid #000000',
-					backgroundColor: '#FFFFFF',
 				}}
 			>
+				<div
+					className="overflow-hidden"
+					style={{
+						width: HISTORY_PANEL_WIDTH,
+						height: dynamicPanelHeight,
+						borderRadius: 8,
+						border: '2px solid #000000',
+						backgroundColor: '#FFFFFF',
+					}}
+				>
 				{/* Header - white background */}
 				<div
 					className="flex items-center px-3 cursor-pointer"
@@ -268,15 +297,12 @@ export const HistoryLedgerPanel: React.FC<HistoryLedgerPanelProps> = ({ historyA
 							}`}
 							style={{
 								width: 68,
-								borderLeft: '2px solid transparent',
-								borderRight: '2px solid transparent',
+								border: 'none',
 								transform: 'none',
-								transition: 'background-color 200ms ease-in-out, border-color 200ms ease-in-out',
+								transition: 'background-color 200ms ease-in-out',
 								...(activeFilter === tab.key
 									? {
 										backgroundColor: tab.activeColor,
-										borderLeft: '2px solid #000000',
-										borderRight: '2px solid #000000',
 									}
 									: {}),
 							}}
@@ -296,8 +322,6 @@ export const HistoryLedgerPanel: React.FC<HistoryLedgerPanelProps> = ({ historyA
 							onMouseLeave={(e) => {
 								if (activeFilter !== tab.key) {
 									e.currentTarget.style.backgroundColor = 'transparent';
-									e.currentTarget.style.borderLeft = '2px solid transparent';
-									e.currentTarget.style.borderRight = '2px solid transparent';
 								}
 							}}
 							onClick={() => handleTabClick(tab.key)}
@@ -312,15 +336,16 @@ export const HistoryLedgerPanel: React.FC<HistoryLedgerPanelProps> = ({ historyA
 					style={{
 						height: dynamicPanelHeight - HEADER_HEIGHT - TABS_HEIGHT,
 						backgroundColor: '#D66296',
-						// Card no longer clips (overflow-hidden removed so the scrollbar can sit
-						// outside the box) — round our own bottom corners to the inner radius.
+						// The card clips to its outer radius; keep the scroll area's fill rounded
+						// to the inner radius so the pink doesn't square off at the corners.
 						borderBottomLeftRadius: 6,
 						borderBottomRightRadius: 6,
 					}}
 					thumbWidth={2}
 					thumbColor="#000000"
 					trackColor="transparent"
-					offsetRight={-8}
+					scrollbarPortalRef={scrollbarPortalRef}
+					offsetRight={0}
 					lockHorizontalScroll
 				>
 					<div
@@ -378,6 +403,17 @@ export const HistoryLedgerPanel: React.FC<HistoryLedgerPanelProps> = ({ historyA
 					))}
 					</div>
 				</CustomScrollbar>
+				</div>
+				<div
+					ref={scrollbarPortalRef}
+					className="absolute"
+					style={{
+						top: HEADER_HEIGHT + TABS_HEIGHT + 4,
+						left: HISTORY_PANEL_WIDTH + 4,
+						width: 2,
+						height: dynamicPanelHeight - HEADER_HEIGHT - TABS_HEIGHT,
+					}}
+				/>
 			</div>
 		</>
 	);

@@ -346,6 +346,7 @@ const buildContactFromEsMetadata = (
 		createdAt: defaults.createdAt,
 		updatedAt: defaults.updatedAt,
 		userId: defaults.userId,
+		venueId: null,
 		contactListId: defaults.contactListId,
 	};
 };
