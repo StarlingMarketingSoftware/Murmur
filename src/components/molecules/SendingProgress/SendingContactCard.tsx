@@ -1,6 +1,6 @@
 'use client';
 
-import { FC } from 'react';
+import { type CSSProperties, FC } from 'react';
 import { cn } from '@/utils';
 import {
 	formatLogTimestamp,
@@ -51,6 +51,7 @@ export interface SendingContactCardProps {
 	/** Let non-active static queue rows recede into the green panel background. */
 	blendInactiveWithPanel?: boolean;
 	disableTransition?: boolean;
+	fadeContactTextEnd?: boolean;
 }
 
 /**
@@ -69,6 +70,7 @@ export const SendingContactCard: FC<SendingContactCardProps> = ({
 	backgroundColor,
 	blendInactiveWithPanel = false,
 	disableTransition = false,
+	fadeContactTextEnd = false,
 }) => {
 	const contactTitle = item.contact?.title || item.contact?.headline || '';
 	const isBlendedInactive = blendInactiveWithPanel && !isActive;
@@ -84,6 +86,13 @@ export const SendingContactCard: FC<SendingContactCardProps> = ({
 		: (backgroundColor ??
 			(isBlendedInactive ? SENDING_PANEL_GREEN : SENDING_QUEUED_CARD_GREEN));
 	const logLines = item.logLines.slice(-2);
+	const contactTextStyle: CSSProperties = fadeContactTextEnd
+		? {
+				color: textColor,
+				WebkitMaskImage: 'linear-gradient(to right, #000 calc(100% - 24px), transparent)',
+				maskImage: 'linear-gradient(to right, #000 calc(100% - 24px), transparent)',
+			}
+		: { color: textColor };
 	const queuedAt =
 		typeof item.queuedAt === 'number' && Number.isFinite(item.queuedAt)
 			? item.queuedAt
@@ -128,15 +137,21 @@ export const SendingContactCard: FC<SendingContactCardProps> = ({
 				<div className="flex items-start gap-2">
 					<div className="min-w-0 flex-1">
 						<div
-							className="font-inter text-[14.661px] font-bold leading-[19.547px] truncate"
-							style={{ color: textColor }}
+							className={cn(
+								'font-inter text-[14.661px] font-bold leading-[19.547px]',
+								fadeContactTextEnd ? 'overflow-hidden whitespace-nowrap' : 'truncate'
+							)}
+							style={contactTextStyle}
 						>
 							{getContactName(item)}
 						</div>
 						{getContactCompany(item) ? (
 							<div
-								className="font-inter text-[14.661px] font-normal leading-[19.547px] truncate"
-								style={{ color: textColor }}
+								className={cn(
+									'font-inter text-[14.661px] font-normal leading-[19.547px]',
+									fadeContactTextEnd ? 'overflow-hidden whitespace-nowrap' : 'truncate'
+								)}
+								style={contactTextStyle}
 							>
 								{getContactCompany(item)}
 							</div>

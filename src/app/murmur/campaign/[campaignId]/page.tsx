@@ -212,6 +212,9 @@ const CAMPAIGN_TAB_PRESET_STATUSES: Partial<
 	drafting: ['drafts'],
 	inbox: ['sent', 'new-message'],
 };
+const CAMPAIGN_SENT_SEND_QUEUE_PRESET_STATUSES = [
+	'sent',
+] as const satisfies readonly CampaignOverviewStatusKey[];
 
 // Per-tab tint for the map heatmap glow (rendered behind the status pins).
 // All/overview uses the per-status colors below because it can show multiple
@@ -1219,6 +1222,7 @@ const Murmur = () => {
 	const CAMPAIGN_ZOOM_VAR = '--murmur-campaign-zoom';
 	const CAMPAIGN_VIEWPORT_H_VAR = '--murmur-campaign-viewport-h';
 	const DEFAULT_CAMPAIGN_ZOOM = 0.85;
+	const MURMUR_ROUTE_COMPACT_ZOOM = 0.9;
 	const CAMPAIGN_ZOOM_EVENT = 'murmur:campaign-zoom-changed';
 	const CAMPAIGN_SCROLLABLE_CLASS = 'murmur-campaign-scrollable';
 	const CAMPAIGN_FORCE_TRANSFORM_CLASS = 'murmur-campaign-force-transform';
@@ -1281,9 +1285,17 @@ const Murmur = () => {
 			html.classList.remove(CAMPAIGN_FORCE_TRANSFORM_CLASS);
 		}
 
-		// On the thinnest breakpoint (<= 776px), we *must* allow page scroll for the stacked layout.
-		const THINNEST_VIEWPORT_W_PX = 776;
-		const shouldAllowScroll = stableViewportW <= THINNEST_VIEWPORT_W_PX;
+		// Once the zoomed layout falls below the narrowest desktop width, the stacked
+		// page needs document scroll; a raw-width cutoff leaves a stuck middle band.
+		const THINNEST_EFFECTIVE_VIEWPORT_W_PX = CAMPAIGN_SNUG_MIN_EFFECTIVE_WIDTH_PX;
+		const scrollDecisionZoom = computeMurmurChromeZoomForViewport(
+			stableViewportW,
+			stableViewportH,
+			window.screen
+		);
+		const scrollableModeZoom = Math.max(scrollDecisionZoom, MURMUR_ROUTE_COMPACT_ZOOM);
+		const shouldAllowScroll =
+			stableViewportW / (scrollableModeZoom || 1) < THINNEST_EFFECTIVE_VIEWPORT_W_PX;
 
 		// IMPORTANT:
 		// The campaign page uses the "nuclear option" (overflow hidden + snug zoom fit) for normal + narrow.
@@ -3278,16 +3290,18 @@ const Murmur = () => {
 						: DEFAULT_CAMPAIGN_ZOOM;
 			const effectiveWidth = window.innerWidth / (z || 1);
 
-			setIsNarrowestDesktop(effectiveWidth < 952);
-			setIsCampaignChromeCentered(
-				effectiveWidth < CAMPAIGN_CENTERED_STAGE_COMPACT_MAX_LAYOUT_W_PX
-			);
-			setIsCampaignStandardStageNarrow(
-				effectiveWidth < CAMPAIGN_CENTERED_STAGE_STANDARD_MAX_LAYOUT_W_PX
-			);
-			setIsCompactPresetClusterBandClipped(
-				effectiveWidth < CAMPAIGN_COMPACT_PRESET_CLUSTER_MIN_LAYOUT_W_PX
-			);
+			const nextIsNarrowestDesktop = effectiveWidth < 952;
+			const nextIsCampaignChromeCentered =
+				effectiveWidth < CAMPAIGN_CENTERED_STAGE_COMPACT_MAX_LAYOUT_W_PX;
+			const nextIsCampaignStandardStageNarrow =
+				effectiveWidth < CAMPAIGN_CENTERED_STAGE_STANDARD_MAX_LAYOUT_W_PX;
+			const nextIsCompactPresetClusterBandClipped =
+				effectiveWidth < CAMPAIGN_COMPACT_PRESET_CLUSTER_MIN_LAYOUT_W_PX;
+
+			setIsNarrowestDesktop(nextIsNarrowestDesktop);
+			setIsCampaignChromeCentered(nextIsCampaignChromeCentered);
+			setIsCampaignStandardStageNarrow(nextIsCampaignStandardStageNarrow);
+			setIsCompactPresetClusterBandClipped(nextIsCompactPresetClusterBandClipped);
 		};
 		checkBreakpoints();
 		window.addEventListener('resize', checkBreakpoints);
@@ -3419,6 +3433,18 @@ const Murmur = () => {
 
 	const sendQueueMapMode =
 		isPersistedSendQueueMapOpen && persistedSendQueueMapCount > 0;
+	const activePresetControlStatuses =
+		activeTabPresetStatuses ??
+		(sendQueueMapMode && activeView === 'sent'
+			? CAMPAIGN_SENT_SEND_QUEUE_PRESET_STATUSES
+			: undefined);
+	const activePresetControlStatusSet = useMemo<ReadonlySet<CampaignOverviewStatusKey>>(
+		() =>
+			activePresetControlStatuses
+				? new Set<CampaignOverviewStatusKey>(activePresetControlStatuses)
+				: new Set<CampaignOverviewStatusKey>(),
+		[activePresetControlStatuses]
+	);
 	const sendQueueMapContactIds = useMemo(() => {
 		if (!sendQueueMapMode) return [];
 		const contactIds: number[] = [];
@@ -3758,6 +3784,49 @@ const Murmur = () => {
 		requestInboxSentTab,
 	]);
 
+	// Hide underlying content while the full-screen User Settings dialog is open.
+	const shouldHideContent = isIdentityDialogOpen;
+
+	// The Write/Drafts/Inbox tabs reuse the overview map controls: a status legend
+	// locked to the tab's preset, plus a dimmed, display-only category strip and
+	// search bar. Sent opts into the same controls only while send queue is open. Only
+	// on the roomy desktop layout, where the split-screen leaves a clear left map
+	// region for them to sit over.
+	// Once the centered stage kicks in (the band covers the full viewport) there is
+	// no clear map strip left, so the controls hide. The expanded workspace uses the
+	// standard (wider) cluster, which centers at the higher 1418 threshold.
+	const isCampaignMapStageCentered =
+		isCampaignChromeCentered ||
+		(isCampaignWorkspaceExpanded && isCampaignStandardStageNarrow);
+	const isPresetMapControlsView =
+		!isMobile &&
+		Boolean(activePresetControlStatuses) &&
+		!shouldHideContent &&
+		!isNarrowestDesktop &&
+		!isCampaignMapStageCentered;
+	const isPersistentFilterPillVisible =
+		activeView === 'overview' || !isCampaignMapStageCentered;
+	// The compact (non-expanded) stage keeps the bottom cluster at a fixed scale, so
+	// the band's left edge reaches it before the centered-stage cutoff — drop just the
+	// bottom cluster once the clear strip can no longer fit it. The expanded workspace
+	// rescales the cluster to the strip instead, so it's exempt.
+	const isPresetBottomClusterVisible =
+		isPresetMapControlsView &&
+		(isCampaignWorkspaceExpanded || !isCompactPresetClusterBandClipped);
+	const shouldApplyWritingTopShift =
+		(activeView === 'testing' ||
+			activeView === 'drafting' ||
+			activeView === 'sent' ||
+			activeView === 'inbox') &&
+		!isMobile &&
+		!isNarrowestDesktop;
+	const shouldRenderNarrowestCampaignHeaderBox =
+		!isMobile &&
+		isNarrowestDesktop &&
+		!isCampaignMapStageCentered &&
+		activeView !== 'overview' &&
+		Boolean(campaign);
+
 	if (isPendingCampaign || !campaign) {
 		return (
 			<CampaignDeviceProvider isMobile={isMobile} activeView={activeView}>
@@ -3773,33 +3842,6 @@ const Murmur = () => {
 			</CampaignDeviceProvider>
 		);
 	}
-	// Hide underlying content while the full-screen User Settings dialog is open.
-	const shouldHideContent = isIdentityDialogOpen;
-
-	// The Write/Drafts/Inbox tabs reuse the overview map controls: a status legend
-	// locked to the tab's preset, plus a dimmed, display-only category strip and
-	// search bar. Only on the roomy desktop layout, where the split-screen leaves a
-	// clear left map region for them to sit over.
-	// Once the centered stage kicks in (the band covers the full viewport) there is
-	// no clear map strip left, so the controls hide. The expanded workspace uses the
-	// standard (wider) cluster, which centers at the higher 1418 threshold.
-	const isCampaignMapStageCentered =
-		isCampaignChromeCentered ||
-		(isCampaignWorkspaceExpanded && isCampaignStandardStageNarrow);
-	const isPresetMapControlsView =
-		!isMobile &&
-		!sendQueueMapMode &&
-		Boolean(activeTabPresetStatuses) &&
-		!shouldHideContent &&
-		!isNarrowestDesktop &&
-		!isCampaignMapStageCentered;
-	// The compact (non-expanded) stage keeps the bottom cluster at a fixed scale, so
-	// the band's left edge reaches it before the centered-stage cutoff — drop just the
-	// bottom cluster once the clear strip can no longer fit it. The expanded workspace
-	// rescales the cluster to the strip instead, so it's exempt.
-	const isPresetBottomClusterVisible =
-		isPresetMapControlsView &&
-		(isCampaignWorkspaceExpanded || !isCompactPresetClusterBandClipped);
 	const presetMapControlsLeftCss = `calc(var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333vw) / 2)`;
 	const presetMapControlsScale =
 		isPresetMapControlsView && isCampaignWorkspaceExpanded && viewportWidth > 0
@@ -3888,13 +3930,6 @@ const Murmur = () => {
 	const DRAFTING_SECTION_TOP_SPACER_PX = 4;
 	const writingContentTopMarginPx =
 		WRITING_BOX_TOP_PX - CAMPAIGN_HEADER_HEIGHT_PX - DRAFTING_SECTION_TOP_SPACER_PX; // 105px
-	const shouldApplyWritingTopShift =
-		(activeView === 'testing' ||
-			activeView === 'drafting' ||
-			activeView === 'sent' ||
-			activeView === 'inbox') &&
-		!isMobile &&
-		!isNarrowestDesktop;
 	// Per-view version of the crossfade wrapper's margin (mt-6 = 24px unless the
 	// top shift above applies for that view). The previous-layer snapshot offsets
 	// itself by the delta so it stays at the margin its view was painted with.
@@ -3920,8 +3955,7 @@ const Murmur = () => {
 						)}
 						{isMobile === false &&
 							activeView === 'overview' &&
-							!shouldHideContent &&
-							!sendQueueMapMode && (
+							!shouldHideContent && (
 							<div
 								className="pointer-events-none fixed inset-0"
 								style={{
@@ -3991,7 +4025,7 @@ const Murmur = () => {
 										}}
 									>
 										<CampaignOverviewStatusStrip
-											selectedStatuses={effectiveActiveStatusSetForActiveView}
+											selectedStatuses={activePresetControlStatusSet}
 											leftOverride={presetMapControlsLeftCss}
 											bottomOverride={presetMapStatusStripBottomPx}
 											onToggleStatus={handlePresetStatusStripClick}
@@ -4284,40 +4318,42 @@ const Murmur = () => {
 										    map strip left of the panels. Click returns to campaign search and
 										    intentionally NOT added to the top-nav right-shift rule below, so it
 										    stays over the map instead of riding the chrome's translateX. */}
-										<div
-											data-slot={
-												activeView === 'overview'
-													? 'campaign-top-filter-pill-nav'
-													: 'campaign-top-filter-pill'
-											}
-											className="fixed flex justify-center pointer-events-none"
-											style={
-												activeView === 'overview'
-													? {
-															// All/overview tab: center the pill UNDER the middle top-nav
-															// panel, just below the backdrop. The horizontal centering +
-															// right-shift are inherited from the shared top-nav shift CSS
-															// rule (which matches the campaign-top-filter-pill-nav slot),
-															// so the pill tracks the nav exactly in every layout mode
-															// (including origin=search, where the nav shift is 0).
-															top: `${
-																MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX +
-																MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX * MAP_VIEW_UI_SCALE +
-																8
-															}px`,
-															left: 0,
-															right: 0,
-															zIndex: 115,
-														}
-													: {
-															// Other tabs: top-center over the left map strip.
-															top: '10px',
-															left: 0,
-															width: `var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333%)`,
-															zIndex: 115,
-														}
-											}
-										>
+										{isPersistentFilterPillVisible && (
+											<div
+												data-slot={
+													activeView === 'overview'
+														? 'campaign-top-filter-pill-nav'
+														: 'campaign-top-filter-pill'
+												}
+												className="fixed flex justify-center pointer-events-none"
+												style={
+													activeView === 'overview'
+														? {
+																// All/overview tab: center the pill UNDER the middle top-nav
+																// panel, just below the backdrop. The horizontal centering +
+																// right-shift are inherited from the shared top-nav shift CSS
+																// rule (which matches the campaign-top-filter-pill-nav slot),
+																// so the pill tracks the nav exactly in every layout mode
+																// (including origin=search, where the nav shift is 0).
+																top: `${
+																	MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX +
+																	MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX *
+																		MAP_VIEW_UI_SCALE +
+																	8
+																}px`,
+																left: 0,
+																right: 0,
+																zIndex: 115,
+															}
+														: {
+																// Other tabs: top-center over the left map strip.
+																top: '10px',
+																left: 0,
+																width: `var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333%)`,
+																zIndex: 115,
+															}
+												}
+											>
 											<button
 												type="button"
 												aria-label="Open campaign search"
@@ -4402,7 +4438,8 @@ const Murmur = () => {
 													</span>
 												</span>
 											</button>
-										</div>
+											</div>
+										)}
 
 										{/* Tabs row: Search / Write / [campaign chip] / Inbox / Drafts */}
 										<div
@@ -4871,7 +4908,7 @@ const Murmur = () => {
 							</button>
 						)}
 
-						{!isMobile && activeView === 'overview' && !sendQueueMapMode && (
+						{!isMobile && activeView === 'overview' && (
 							<div
 								data-campaign-interactive-surface
 								data-campaign-overview-left-panel="true"
@@ -5105,10 +5142,7 @@ const Murmur = () => {
 
 								{/* Campaign Header Box - shown at narrowest breakpoint (< 952px).
 								    Excluded on the All tab, where the whole contacts column hides instead. */}
-								{!isMobile &&
-									isNarrowestDesktop &&
-									activeView !== 'overview' &&
-									campaign && (
+								{shouldRenderNarrowestCampaignHeaderBox && campaign && (
 										<div className="campaign-narrowest-header-box flex justify-center mb-4">
 											<CampaignHeaderBox
 												campaignId={campaign.id}

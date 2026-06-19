@@ -796,11 +796,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						: DEFAULT_CAMPAIGN_ZOOM;
 			const effectiveWidth = window.innerWidth / (z || 1);
 
-			setIsNarrowDesktop(effectiveWidth >= 952 && effectiveWidth < 1317);
-			setIsNarrowestDesktop(effectiveWidth < 952);
-			setIsSearchTabNarrow(effectiveWidth < 1414);
-			setIsInboxTabNarrow(effectiveWidth <= 1520);
-			setIsInboxTabStacked(effectiveWidth <= 1279);
+			const nextIsNarrowDesktop = effectiveWidth >= 952 && effectiveWidth < 1317;
+			const nextIsNarrowestDesktop = effectiveWidth < 952;
+			const nextIsSearchTabNarrow = effectiveWidth < 1414;
+			const nextIsInboxTabNarrow = effectiveWidth <= 1520;
+			const nextIsInboxTabStacked = effectiveWidth <= 1279;
+
+			setIsNarrowDesktop(nextIsNarrowDesktop);
+			setIsNarrowestDesktop(nextIsNarrowestDesktop);
+			setIsSearchTabNarrow(nextIsSearchTabNarrow);
+			setIsInboxTabNarrow(nextIsInboxTabNarrow);
+			setIsInboxTabStacked(nextIsInboxTabStacked);
 		};
 		checkBreakpoints();
 		window.addEventListener('resize', checkBreakpoints);
@@ -7495,21 +7501,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							/>
 												) : (
 													<>
-														<CampaignHeaderBox
-													campaignId={campaign?.id}
-													campaignName={campaign?.name || 'Untitled Campaign'}
-													toListNames={toListNames}
-													fromName={fromName}
-													contactsCount={contactsCount}
-													draftCount={draftCount}
-													sentCount={sentCount}
-													draftingProgress={draftingProgressForHeader}
-																	onFromClick={onOpenIdentityDialog}
-																	onDraftsClick={goToDrafting}
-																	onSentClick={goToSent}
-																	onFolderDropdownOpenChange={setIsCampaignHeaderDropdownOpen}
-																	width={330}
-																/>
 												{/* Compact Contacts table */}
 												<div
 									style={{
@@ -8127,21 +8118,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													className="flex flex-col flex-shrink-0"
 													style={{ gap: '10px', width: '330px' }}
 												>
-													<CampaignHeaderBox
-														campaignId={campaign?.id}
-														campaignName={campaign?.name || 'Untitled Campaign'}
-														toListNames={toListNames}
-														fromName={fromName}
-														contactsCount={contactsCount}
-														draftCount={draftCount}
-														sentCount={sentCount}
-														draftingProgress={draftingProgressForHeader}
-														onFromClick={onOpenIdentityDialog}
-														onDraftsClick={goToDrafting}
-														onSentClick={goToSent}
-														onFolderDropdownOpenChange={setIsCampaignHeaderDropdownOpen}
-														width={330}
-													/>
 													{/* Drafts-mode activity list */}
 													<div style={{ width: '330px', ...campaignHeaderPanelDimStyle }}>
 														{isQueuePanelVisible ? (
@@ -8578,21 +8554,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												className="flex flex-col flex-shrink-0"
 												style={{ gap: '10px', width: '330px' }}
 											>
-												<CampaignHeaderBox
-													campaignId={campaign?.id}
-													campaignName={campaign?.name || 'Untitled Campaign'}
-													toListNames={toListNames}
-													fromName={fromName}
-													contactsCount={contactsCount}
-													draftCount={draftCount}
-													sentCount={sentCount}
-													draftingProgress={draftingProgressForHeader}
-												onFromClick={onOpenIdentityDialog}
-												onDraftsClick={goToDrafting}
-												onSentClick={goToSent}
-												onFolderDropdownOpenChange={setIsCampaignHeaderDropdownOpen}
-												width={330}
-											/>
 												{/* Mini Email Structure panel */}
 											<div style={{ width: '330px', ...campaignHeaderPanelDimStyle }}>
 													<MiniEmailStructure
@@ -10097,7 +10058,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 						{/* Inbox tab: reuse the dashboard inbox UI, but scoped and labeled by campaign contacts */}
 						{view === 'inbox' && (
-							<div className="mt-6 flex flex-col items-center">
+							<div
+								className={cn(
+									'flex flex-col items-center',
+									!isNarrowestDesktop && 'mt-6'
+								)}
+							>
 								{isNarrowestDesktop ? (
 									// Narrowest layout (< 952px): the compact-workspace detail panel on top
 									// (501x703 — these exact dims gate InboxSection's campaign compact detail
@@ -10183,21 +10149,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												className="flex flex-col flex-shrink-0"
 												style={{ gap: '16px', width: '375px' }}
 											>
-												<CampaignHeaderBox
-													campaignId={campaign?.id}
-													campaignName={campaign?.name || 'Untitled Campaign'}
-													toListNames={toListNames}
-													fromName={fromName}
-													contactsCount={contactsCount}
-													draftCount={draftCount}
-													sentCount={sentCount}
-													draftingProgress={draftingProgressForHeader}
-												onFromClick={onOpenIdentityDialog}
-												onDraftsClick={goToDrafting}
-												onSentClick={goToSent}
-												onFolderDropdownOpenChange={setIsCampaignHeaderDropdownOpen}
-												width={375}
-											/>
 												{/* Inbox mode of ContactsExpandedList drives the selected email in the center panel. */}
 												<div style={campaignHeaderPanelDimStyle}>
 													{isQueuePanelVisible ? (

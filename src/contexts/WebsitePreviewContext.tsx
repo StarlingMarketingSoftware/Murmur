@@ -11,7 +11,10 @@ import {
 } from 'react';
 import { normalizeWebsiteUrl, websiteHost } from '@/utils/websiteUrl';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { WebsitePreviewOverlay } from '@/components/organisms/WebsitePreviewOverlay/WebsitePreviewOverlay';
+import {
+	canDockLeftSlotPreview,
+	WebsitePreviewOverlay,
+} from '@/components/organisms/WebsitePreviewOverlay/WebsitePreviewOverlay';
 
 /** Viewport-space rect of the research card the preview should sit beside. */
 export type WebsitePreviewAnchorRect = {
@@ -108,6 +111,15 @@ export const WebsitePreviewProvider: FC<{ children: ReactNode }> = ({ children }
 				if (typeof window !== 'undefined') {
 					window.open(url, '_blank', 'noopener,noreferrer');
 				}
+				return;
+			}
+			// Left-slot (campaign row-hover) previews need a clear map strip to the left
+			// of the card. If the window is already too narrow to dock the panel cleanly,
+			// do nothing rather than show a cramped/overlapping floating panel.
+			if (
+				opts?.placement === 'left-slot' &&
+				!canDockLeftSlotPreview(opts.size ?? 'default')
+			) {
 				return;
 			}
 			setActive({

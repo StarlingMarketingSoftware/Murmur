@@ -176,6 +176,32 @@ const computePanelStyle = (
 };
 
 /**
+ * Whether a campaign row-hover (`left-slot`) preview has room to dock cleanly over
+ * the map. The preview sits in the clear strip to the LEFT of the campaign
+ * workspace, whose live left edge is published as `--murmur-campaign-map-backdrop-start`
+ * (layout px — the same coordinate space computePanelStyle works in, so no rootScale
+ * conversion). When the window narrows the workspace marches left (and the strip
+ * collapses to 0 in the centered stage), so the strip must stay at least as wide as
+ * the panel's minimum width plus margins. Used to gate opening when already too
+ * narrow; returns true when the var is absent (i.e. not on the campaign page) so
+ * non-campaign callers are never gated.
+ */
+export const canDockLeftSlotPreview = (
+	size: WebsitePreviewSize = 'default'
+): boolean => {
+	if (typeof window === 'undefined') return true;
+	const isLarge = size === 'large';
+	const margin = isLarge ? LARGE_MARGIN_PX : MARGIN_PX;
+	const minWidth = isLarge ? LARGE_MIN_PANEL_WIDTH_PX : MIN_PANEL_WIDTH_PX;
+	const raw = getComputedStyle(document.documentElement).getPropertyValue(
+		'--murmur-campaign-map-backdrop-start'
+	);
+	const backdropStart = parseFloat(raw);
+	if (!Number.isFinite(backdropStart)) return true;
+	return backdropStart >= minWidth + 2 * margin;
+};
+
+/**
  * Shared, body-portaled panel that embeds a contact's website in a live iframe over
  * the map, docked beside the research card, with a graceful "Open in new tab"
  * fallback for sites that refuse framing. Mounted once by WebsitePreviewProvider;
@@ -259,6 +285,28 @@ export const WebsitePreviewOverlay: FC<WebsitePreviewOverlayProps> = ({
 		});
 		return () => document.removeEventListener('wheel', onDocWheel, true);
 	}, [url, onClose]);
+
+	// Left-slot previews dock over the campaign map using an anchor rect captured at
+	// open that can't be re-derived (the hover card is gone). Rather than let the fixed
+	// panel drift and overlap the workspace as the window changes, hide it the moment
+	// the viewport resizes. One-shot: the first resize detaches the listener and defers
+	// the actual close to the next frame, so it fires exactly once per drag and never
+	// runs the close (a context state change) reentrantly inside the resize handler —
+	// the same tick the campaign page recomputes its zoom/scroll layout. Scoped to
+	// left-slot so auto-placed previews (dashboard / Sent / full panel) are unaffected.
+	useEffect(() => {
+		if (!url || placement !== 'left-slot') return;
+		let rafId = 0;
+		const handleResize = () => {
+			window.removeEventListener('resize', handleResize);
+			rafId = requestAnimationFrame(() => onClose());
+		};
+		window.addEventListener('resize', handleResize);
+		return () => {
+			window.removeEventListener('resize', handleResize);
+			if (rafId) cancelAnimationFrame(rafId);
+		};
+	}, [url, placement, onClose]);
 
 	// Pre-check framability whenever the url changes; abort in-flight on change/close.
 	useEffect(() => {

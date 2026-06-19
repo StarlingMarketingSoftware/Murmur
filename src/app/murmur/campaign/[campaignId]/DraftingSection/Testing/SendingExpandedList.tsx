@@ -197,6 +197,7 @@ export const SendingExpandedList: FC<SendingExpandedListProps> = ({
 									className={staticSession ? 'h-[108px]' : undefined}
 									blendInactiveWithPanel={Boolean(staticSession)}
 									disableTransition={Boolean(staticSession)}
+									fadeContactTextEnd
 								/>
 								{onItemCancel && canCancel ? (
 									<button
