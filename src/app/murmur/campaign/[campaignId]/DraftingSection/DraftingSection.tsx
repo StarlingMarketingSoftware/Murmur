@@ -16,7 +16,6 @@ import { gsap } from 'gsap';
 import {
 	DraftingSectionProps,
 	useDraftingSection,
-	HybridBlockPrompt,
 	type DraftingFormValues,
 	type DraftingSectionView,
 } from './useDraftingSection';

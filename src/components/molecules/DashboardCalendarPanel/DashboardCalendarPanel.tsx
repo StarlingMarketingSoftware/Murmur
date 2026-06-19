@@ -271,7 +271,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	const syncDraft = useMemo(
 		() =>
 			debounce((isoKey: string, draft: CalendarEventDraft, date: Date) => {
-				const run = isDraftPersistable(draft, date)
+				const run: () => Promise<unknown> = isDraftPersistable(draft, date)
 					? () => {
 							const body = draftToUpsertBody(isoKey, draft);
 							if (

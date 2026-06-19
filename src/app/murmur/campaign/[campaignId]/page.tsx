@@ -47,10 +47,6 @@ import DashboardActionBarEnvelopeIcon from '@/components/atoms/_svg/DashboardAct
 import { DashboardStrategyBox } from '@/components/molecules/DashboardStrategyBox/DashboardStrategyBox';
 import DashboardOpportunitiesWidget from '@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesWidget';
 import DashboardResponsesWidget from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesWidget';
-import SearchMap from '@/components/atoms/_svg/SearchMap';
-import BottomFolderIcon from '@/components/atoms/_svg/BottomFolderIcon';
-import BottomHomeIcon from '@/components/atoms/_svg/BottomHomeIcon';
-import { EnvelopeIcon } from '@/components/atoms/_svg/EnvelopeIcon';
 import StatusContactsIcon from '@/components/atoms/svg/StatusContactsIcon';
 import StatusDraftsIcon from '@/components/atoms/svg/StatusDraftsIcon';
 import StatusNewMessageIcon from '@/components/atoms/svg/StatusNewMessageIcon';
@@ -961,9 +957,6 @@ const CAMPAIGN_BACKDROP_MAX_EXTRA_GUTTER_PX = 600;
 const CAMPAIGN_COMPACT_WORKSPACE_BACKDROP_WIDTH_PX = 985;
 const CAMPAIGN_COMPACT_WORKSPACE_LEFT_PANEL_INSET_PX = 52;
 const CAMPAIGN_COMPACT_WORKSPACE_TOP_NAV_INSET_PX = 184;
-const CAMPAIGN_COMPACT_WORKSPACE_MAIN_PANEL_HALF_WIDTH_PX = 250;
-const CAMPAIGN_COMPACT_WORKSPACE_CONTACT_PANEL_WIDTH_PX = 377;
-const CAMPAIGN_COMPACT_WORKSPACE_MAIN_PANEL_GAP_PX = 34;
 // Below this layout-px width, non-overview tabs drop the split map strip: the translucent
 // band covers the full viewport and the workspace centers (shift = 0). Mirrors
 // DraftingSection's isNarrowDesktop upper bound (< 1317), where the grouped layouts begin.
@@ -1066,119 +1059,6 @@ const IdentityDialog = nextDynamic(
 			(mod) => mod.IdentityDialog
 		),
 	{}
-);
-
-// Dashboard inbox popover content (opened from the envelope icon in the campaign header)
-const DashboardInboxSection = nextDynamic(
-	() => import('@/components/molecules/InboxSection/InboxSection'),
-	{
-		ssr: false,
-		loading: () => (
-			<div
-				className="relative flex flex-col items-center overflow-hidden"
-				style={{
-					width: '625px',
-					height: '561px',
-					border: '3px solid #000000',
-					borderRadius: '8px',
-					padding: '16px',
-					paddingTop: '76px',
-					backgroundColor: '#6fa4e1',
-				}}
-				aria-busy="true"
-				aria-label="Loading inbox"
-			>
-				<span className="sr-only">Loading inbox…</span>
-
-				{/* Search Bar skeleton */}
-				<div
-					style={{
-						position: 'absolute',
-						top: '13px',
-						left: '14px',
-						right: '286px', // 14px + 260px toggle + 12px gap
-						height: '48px',
-						border: '3px solid #000000',
-						borderRadius: '8px',
-						backgroundColor: '#FFFFFF',
-						zIndex: 10,
-						display: 'flex',
-						alignItems: 'center',
-						paddingLeft: '16px',
-					}}
-					aria-hidden
-				>
-					<div className="w-[18px] h-[18px] rounded-[3px] bg-black/20" />
-					<div className="ml-4 h-[14px] w-[180px] rounded-[4px] bg-black/15" />
-				</div>
-
-				{/* Messages/Campaigns toggle skeleton */}
-				<div
-					style={{
-						position: 'absolute',
-						top: '13px',
-						right: '14px',
-						width: '260px',
-						height: '48px',
-						border: '3px solid #000000',
-						borderRadius: '8px',
-						overflow: 'hidden',
-						backgroundColor: '#FFFFFF',
-						zIndex: 10,
-						display: 'flex',
-					}}
-					aria-hidden
-				>
-					<div
-						aria-hidden
-						style={{
-							position: 'absolute',
-							left: '50%',
-							top: 0,
-							bottom: 0,
-							width: '3px',
-							backgroundColor: '#000000',
-							transform: 'translateX(-1.5px)',
-							pointerEvents: 'none',
-						}}
-					/>
-					<div className="h-full flex-1 bg-black/10" />
-					<div className="h-full flex-1 bg-black/10" />
-				</div>
-
-				{/* Email row skeletons */}
-				<div className="w-full flex flex-col items-center">
-					{Array.from({ length: 6 }).map((_, idx) => (
-						<div
-							key={`dashboard-inbox-loading-${idx}`}
-							className="select-none mb-2 overflow-hidden"
-							style={{
-								width: '587px',
-								height: '78px',
-								minHeight: '78px',
-								border: '3px solid #000000',
-								borderRadius: '8px',
-								backgroundColor: '#FFFFFF',
-								display: 'flex',
-								alignItems: 'center',
-								padding: '0 16px',
-							}}
-							aria-hidden
-						>
-							<div className="flex flex-col w-full">
-								<div className="flex items-center justify-between gap-3">
-									<div className="h-[14px] rounded bg-black/20 w-[180px]" />
-									<div className="h-[14px] rounded bg-black/20 w-[90px]" />
-								</div>
-								<div className="mt-2 h-[12px] rounded bg-black/15 w-[260px]" />
-								<div className="mt-2 h-[10px] rounded bg-black/15 w-[320px]" />
-							</div>
-						</div>
-					))}
-				</div>
-			</div>
-		),
-	}
 );
 
 const Murmur = () => {
@@ -4236,24 +4116,6 @@ const Murmur = () => {
 									CAMPAIGN_TOP_NAV_BACKDROP_BOX_WIDTH_PX;
 								const MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX =
 									CAMPAIGN_TOP_NAV_BACKDROP_BOX_HEIGHT_PX;
-								const MAP_VIEW_TOP_OUTLINE_BOX_WIDTH_PX = Math.round(
-									124 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
-								);
-								const MAP_VIEW_TOP_OUTLINE_BOX_HEIGHT_PX = Math.round(
-									42 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
-								);
-								const MAP_VIEW_TOP_OUTLINE_BOX_LEFT_GAP_PX = Math.round(
-									23 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
-								);
-								const MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_WIDTH_PX = Math.round(
-									105 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
-								);
-								const MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_HEIGHT_PX = Math.round(
-									42 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
-								);
-								const MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_GAP_PX = Math.round(
-									31 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
-								);
 								const MAP_VIEW_SEARCH_BAR_BOTTOM_INSET_PX = 4;
 								const MAP_VIEW_SEARCH_BAR_TOP_PX =
 									MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX +

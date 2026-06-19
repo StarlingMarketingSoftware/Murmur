@@ -1,7 +1,6 @@
 'use client';
 
 import {
-	FC,
 	memo,
 	Suspense,
 	useCallback,
@@ -541,38 +540,6 @@ const formatMapTopSearchWhereLabel = (where: string): string => {
 const clampNumber = (n: number, min: number, max: number): number => {
 	return Math.min(max, Math.max(min, n));
 };
-
-const MAP_RESULTS_SEARCH_TRAY_WHAT_ICON_BY_LABEL: Record<
-	string,
-	{ backgroundColor: string; Icon: FC<{ size?: number; className?: string }> }
-> = {
-	'Radio Stations': { backgroundColor: '#56DA73', Icon: RadioStationsIcon },
-	'Music Venues': { backgroundColor: '#71C9FD', Icon: MusicVenuesIcon },
-	'Wine, Beer, and Spirits': { backgroundColor: '#80AAFF', Icon: WineBeerSpiritsIcon },
-	Restaurants: { backgroundColor: '#77DD91', Icon: RestaurantsIcon },
-	'Coffee Shops': { backgroundColor: '#A9DE78', Icon: CoffeeShopsIcon },
-	'Wedding Planners': { backgroundColor: '#EED56E', Icon: WeddingPlannersIcon },
-	Festivals: { backgroundColor: '#80AAFF', Icon: FestivalsIcon },
-};
-
-const MAP_RESULTS_SEARCH_TRAY = {
-	containerWidth: 189,
-	containerHeight: 52,
-	containerRadius: 6,
-	itemSize: 43,
-	itemRadius: 12,
-	itemGap: 12,
-	gapToSearchBar: 43,
-	borderWidth: 3,
-	borderColor: '#000000',
-	backgroundColor: 'rgba(255, 255, 255, 0.9)',
-	nearMeBackgroundColor: '#D0E6FF',
-	whyBackgroundColors: {
-		booking: '#9DCBFF',
-		promotion: '#7AD47A',
-	},
-	whatIconByLabel: MAP_RESULTS_SEARCH_TRAY_WHAT_ICON_BY_LABEL,
-} as const;
 
 const MAP_RESULTS_BOTTOM_SEARCH_BOX = {
 	width: 474,
@@ -2916,28 +2883,6 @@ const DashboardSearchFlankBoxes = ({
 	);
 };
 
-const SearchTrayIconTile = ({
-	backgroundColor,
-	children,
-}: {
-	backgroundColor: string;
-	children: ReactNode;
-}) => {
-	return (
-		<div
-			className="flex items-center justify-center flex-shrink-0"
-			style={{
-				width: `${MAP_RESULTS_SEARCH_TRAY.itemSize}px`,
-				height: `${MAP_RESULTS_SEARCH_TRAY.itemSize}px`,
-				backgroundColor,
-				borderRadius: `${MAP_RESULTS_SEARCH_TRAY.itemRadius}px`,
-			}}
-		>
-			{children}
-		</div>
-	);
-};
-
 const DashboardContent = () => {
 	const { openSignIn } = useClerk();
 	const { isSignedIn, isLoaded: isAuthLoaded } = useAuth();
@@ -3062,6 +3007,7 @@ const DashboardContent = () => {
 				apolloPersonId: null,
 				contactListId: null,
 				userId: null,
+				venueId: null,
 				isPrivate: false,
 				hasVectorEmbedding: false,
 				userContactListCount: 0,
@@ -3229,9 +3175,8 @@ const DashboardContent = () => {
 	const whatDropdownRef = useRef<HTMLDivElement>(null);
 	const [isWhereDropdownOpen, setIsWhereDropdownOpen] = useState(false);
 	const whereDropdownRef = useRef<HTMLDivElement>(null);
-	const [isNearMeLocation, setIsNearMeLocation] = useState(false);
+	const [, setIsNearMeLocation] = useState(false);
 	const hasWhereValue = whereValue.trim().length > 0;
-	const isPromotion = whyValue === '[Promotion]';
 	const [activeSection, setActiveSection] = useState<'why' | 'what' | 'where' | null>(
 		null
 	);
@@ -4383,7 +4328,6 @@ const DashboardContent = () => {
 		isMapView,
 		setIsMapView,
 		isSearchPending,
-		usedContactIdsSet,
 		isFromHomeDemoMode,
 		mapBboxFilter,
 		setMapBboxFilter,
@@ -6041,7 +5985,7 @@ const DashboardContent = () => {
 	// Last zoom the map reported — lets the ladder-rebase effect re-place the
 	// thumb when the floor changes without any camera movement (window shrink).
 	const lastMapViewportZoomRef = useRef<number | null>(null);
-	const [selectAllInViewNonce, setSelectAllInViewNonce] = useState(0);
+	const [selectAllInViewNonce] = useState(0);
 	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] =
 		useState<ContactWithName | null>(null);
 	// Marker-hover research group docking: right (beside Search Results) unless the
@@ -7509,7 +7453,7 @@ const DashboardContent = () => {
 		whereValue,
 	]);
 
-	const [isPointerInMapSidePanel, setIsPointerInMapSidePanel] = useState(false);
+	const [, setIsPointerInMapSidePanel] = useState(false);
 	const [isMapCampaignHeaderDropdownOpen, setIsMapCampaignHeaderDropdownOpen] =
 		useState(false);
 	const [selectedCategoryChips, setSelectedCategoryChips] = useState<Set<string>>(
@@ -7557,9 +7501,6 @@ const DashboardContent = () => {
 		!isMapResultsLoading &&
 		!hasNoSearchResults &&
 		!isCompressedMapChrome;
-
-	const isMapPanelCreateCampaignVisible =
-		!shouldUseDynamicMapCreateCampaignCta || isPointerInMapSidePanel;
 
 	useEffect(() => {
 		// Reset when dynamic behavior is not active (prevents "stale" cursor state).
@@ -9394,26 +9335,6 @@ const DashboardContent = () => {
 		setWhereValue('');
 		setIsNearMeLocation(false);
 		setActiveSection(null);
-	};
-
-	// Close map view and return to default dashboard view (before any search)
-	const handleCloseMapView = () => {
-		// If in "from home" mode, navigate back to the landing page
-		if (fromHomeParam) {
-			router.push(urls.home.index);
-			return;
-		}
-
-		setIsMapView(false);
-		setHoveredContact(null);
-		// Reset search completely to return to default dashboard
-		handleEnhancedResetSearch();
-
-		// If we entered the dashboard from a campaign (add-to-campaign mode), the "Home" button
-		// should take the user back to the *regular* dashboard (no campaign-search context).
-		if (isAddToCampaignMode) {
-			router.replace(urls.murmur.dashboard.index, { scroll: false });
-		}
 	};
 
 	// Entering the unsubscribe flow must land on the bare spinning globe: leave map
@@ -12504,74 +12425,6 @@ const DashboardContent = () => {
 						{((hasSearched && activeTab === 'search') || (fromHomeParam && isMapView)) &&
 							(isMapView || (!isLoadingContacts && !isRefetchingContacts)) &&
 							(() => {
-								const activeWhyForTray = (
-									fromHomeParam && isMapView && !hasSearched
-										? FROM_HOME_WHY
-										: extractWhyFromSearchQuery(activeSearchQuery) ||
-											(mapTopSearchDisplay.kind === 'category' && mapTopSearchDisplay.what
-												? getCategorySearchWhyForWhat(mapTopSearchDisplay.what)
-												: '') ||
-											whyValue
-								).trim();
-								const isPromotionForTray = activeWhyForTray === '[Promotion]';
-								const trayWhy = isPromotionForTray
-									? {
-											backgroundColor:
-												MAP_RESULTS_SEARCH_TRAY.whyBackgroundColors.promotion,
-											icon: <PromotionIcon />,
-										}
-									: {
-											backgroundColor:
-												MAP_RESULTS_SEARCH_TRAY.whyBackgroundColors.booking,
-											icon: <BookingIcon />,
-										};
-
-								const effectiveWhatKeyForTray =
-									mapTopSearchDisplay.kind === 'category'
-										? mapTopSearchDisplay.what.trim()
-										: (searchedWhat || '').trim();
-								const whatCfg =
-									MAP_RESULTS_SEARCH_TRAY.whatIconByLabel[effectiveWhatKeyForTray];
-								const TrayWhatIcon = whatCfg?.Icon || MusicVenuesIcon;
-								const trayWhatIconSize =
-									effectiveWhatKeyForTray === 'Wine, Beer, and Spirits' ? 22 : undefined;
-								const trayWhat = {
-									backgroundColor:
-										whatCfg?.backgroundColor ||
-										MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Music Venues']
-											.backgroundColor,
-									icon: <TrayWhatIcon size={trayWhatIconSize} />,
-								};
-
-								const whereCandidate =
-									mapTopSearchDisplay.kind === 'category'
-										? mapTopSearchDisplay.where.trim()
-										: (userLocationName || '').trim();
-								const [whereCity, whereState] = (() => {
-									if (!whereCandidate) return ['', ''];
-									if (whereCandidate.includes(',')) {
-										const parts = whereCandidate.split(',');
-										const city = (parts[0] || '').trim();
-										const state = parts.slice(1).join(',').trim();
-										return [city, state];
-									}
-									return ['', whereCandidate];
-								})();
-								const whereIconProps =
-									!isNearMeLocation && whereState
-										? getCityIconProps(whereCity, whereState)
-										: null;
-								const trayWhere = isNearMeLocation
-									? {
-											backgroundColor: MAP_RESULTS_SEARCH_TRAY.nearMeBackgroundColor,
-											icon: <NearMeIcon />,
-										}
-									: {
-											backgroundColor:
-												whereIconProps?.backgroundColor ||
-												MAP_RESULTS_SEARCH_TRAY.nearMeBackgroundColor,
-											icon: whereIconProps?.icon || <NearMeIcon />,
-										};
 								const mapTopSearchLabel = mapTopSearchDisplay.label.trim() || 'Search';
 								const isMapTopSearchReengageAvailable =
 									isMapView &&

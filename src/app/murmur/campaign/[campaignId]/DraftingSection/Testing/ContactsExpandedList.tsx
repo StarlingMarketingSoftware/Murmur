@@ -1858,21 +1858,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		(isDraftsFocusMode || (!isDraftsFocusMode && resolvedActiveTopNavStop === 'write'));
 	// draftSupplemental* colors are computed per-row inside renderSupplementalDraftRow
 	// so a hovered (peeked) row reveals in its non-redded "showing" style.
-	const inboxSupplementalTextClassName = shouldRedOutInboxRows
-		? 'text-[#F5C0BD]'
-		: 'text-black';
 	const inboxSupplementalBorderColor = shouldRedOutInboxRows
 		? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
 		: '#000000';
-	const inboxSupplementalRowFillColor = shouldRedOutInboxRows
-		? WRITE_TAB_SUPPLEMENTAL_ROW_FILL_COLOR
-		: undefined;
-	const inboxSupplementalBadgeFillColor = shouldRedOutInboxRows
-		? WRITE_TAB_SUPPLEMENTAL_BADGE_FILL_COLOR
-		: undefined;
-	const inboxSupplementalTextColor = shouldRedOutInboxRows
-		? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
-		: undefined;
 	const collapsedTopBoxHeightPx = 26;
 	const collapsedTopBoxWidthPx = 191;
 	const collapsedTopBoxRadiusPx = 3.33;

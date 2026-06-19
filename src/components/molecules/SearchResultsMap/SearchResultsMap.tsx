@@ -17835,14 +17835,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		() => Math.max(18, markerScale + 10),
 		[markerScale]
 	);
-	const getSelectedTooltipZoomOpacity = useCallback((zoom: number): number => {
-		return clamp(
-			(zoom - SELECTED_TOOLTIP_FADE_END_ZOOM) /
-				(SELECTED_TOOLTIP_FADE_START_ZOOM - SELECTED_TOOLTIP_FADE_END_ZOOM),
-			0,
-			1
-		);
-	}, []);
 	const getSelectedTooltipStackT = useCallback((zoom: number): number => {
 		return clamp(
 			(SELECTED_TOOLTIP_FADE_START_ZOOM - zoom) /

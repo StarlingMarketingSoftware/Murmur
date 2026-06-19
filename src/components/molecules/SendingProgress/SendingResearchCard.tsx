@@ -40,15 +40,11 @@ import { SENDING_RESEARCH_CARD_WIDTH_PX } from './constants';
 
 // Band colors mirror the abridged ContactResearchPanel / StreetViewContactCard
 // so the sending card reads as the same research surface.
-const ADDRESS_ROW_COLOR = '#ABDCF9';
 const LOCATION_ROW_COLOR = '#EDF8FF';
 const FOUNDED_ROW_COLOR = '#F4FBFF';
 const WEBSITE_ROW_COLOR = '#F8FCFF';
 const KEYWORDS_ROW_COLOR = '#FCFDFF';
 const HEADLINE_BAND_COLOR = '#BBE0F5';
-const TITLE_CATEGORY_ROW_COLOR = '#D2EFFF';
-const COMPANY_TYPE_ROW_COLOR = '#E8F7FF';
-const SEE_MORE_ROW_COLOR = '#F8FAFF';
 const DASHBOARD_ADDRESS_ROW_COLOR = '#E0F4FF';
 const DASHBOARD_HEADLINE_ROW_COLOR = '#DFF0FA';
 const DASHBOARD_TITLE_CATEGORY_ROW_COLOR = '#EEF7FF';

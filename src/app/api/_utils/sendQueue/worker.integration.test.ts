@@ -146,9 +146,7 @@ test('two concurrent ticks send a single row only once (at-most-once claim)', as
 	const campaignId = await makeCampaign(userId);
 	const { queueId } = await makeQueued({ userId, campaignId, scheduledFor: past(10) });
 
-	let sendCalls = 0;
 	const countingSend = async (a: { beforeDispatch: () => Promise<void> }) => {
-		sendCalls++;
 		await a.beforeDispatch();
 		return { status: 'sent' as const, messageId: 'fake' };
 	};

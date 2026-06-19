@@ -9,7 +9,7 @@ import {
 	apiUnauthorized,
 	handleApiError,
 } from '@/app/api/_utils';
-import { CONTEXT_CONFIG } from '@/app/api/media/upload-url/route';
+import { CONTEXT_CONFIG } from '@/app/api/media/contextConfig';
 import { MediaAssetDto } from '@/app/api/media/route';
 import { extractYouTubeId, youTubeThumbnailUrl, youTubeWatchUrl } from '@/utils/youtube';
 
