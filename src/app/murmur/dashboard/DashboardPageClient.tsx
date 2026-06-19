@@ -10177,6 +10177,10 @@ const DashboardContent = () => {
 				style={{
 					height:
 						'calc(var(--murmur-dashboard-viewport-h, 100dvh) / var(--murmur-dashboard-zoom, 0.9))',
+					backgroundImage: 'url(/photos/mobile-dashboard-bg.jpg)',
+					backgroundSize: 'cover',
+					backgroundPosition: 'center',
+					backgroundRepeat: 'no-repeat',
 				}}
 			>
 				{mapPortal}

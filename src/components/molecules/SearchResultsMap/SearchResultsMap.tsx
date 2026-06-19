@@ -4643,7 +4643,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// Mirror the same play() guarantee for the dedicated lightning canvas source.
 		// Safari: skipped — the tick uploads the lightning/snow canvases only while
 		// their weather visuals are actually active.
-		if (!SAFARI_CANVAS_PERF_MODE) {
+		// Mobile lite mode: skipped — the drift tick never runs, so these canvases
+		// stay blank; leaving them paused (see source setup) keeps the map idle.
+		if (!SAFARI_CANVAS_PERF_MODE && isMobileRef.current !== true) {
 			try {
 				const lightningSource: { play?: () => void } | null = (() => {
 					try {
@@ -7277,6 +7279,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 				const pattern = cloudsTexturePatternRef.current;
 				draw(img, pattern, 0, 0);
+				// Mobile lite mode: paint the cloud composite once and stop. The drift
+				// loop also drives snow + lightning and re-uploads every canvas to the GPU
+				// each frame; skipping it lets the phone idle. The static frame stays
+				// pinned to the globe via the canvas source coordinates.
+				if (isMobileRef.current === true) {
+					uploadCanvasSourceOnce(cloudsSource);
+					return;
+				}
 				cloudsDriftRafRef.current = requestAnimationFrame((t) => tick(t, img, pattern));
 			})
 			.catch(() => {
@@ -7314,7 +7324,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				cloudsDriftRafRef.current = null;
 			}
 		};
-	}, [map, isMapLoaded]);
+		// `isMobile` is included so the effect re-runs when device detection resolves
+		// (it starts null): mobile takes the static path above, desktop runs the loop.
+	}, [map, isMapLoaded, isMobile]);
 
 	// Keep the Mapbox "selected" feature-state for US states in sync with `selectedStateKey`.
 	const prevSelectedStateKeyOnMapRef = useRef<string | null>(null);
@@ -7402,7 +7414,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				try {
 					const cloudsSrc = mapInstance.getSource(MAPBOX_SOURCE_IDS.clouds) as any;
 					cloudsSrc?.play?.();
-					if (SAFARI_CANVAS_PERF_MODE) cloudsSrc?.pause?.();
+					// Mobile lite mode pauses every animated canvas source so the map idles;
+					// clouds are uploaded once + repinned by the static drift path.
+					if (SAFARI_CANVAS_PERF_MODE || isMobileRef.current === true)
+						cloudsSrc?.pause?.();
 				} catch {
 					// Ignore.
 				}
@@ -7431,7 +7446,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						| { play?: () => void; pause?: () => void }
 						| undefined;
 					lightningSrc?.play?.();
-					if (SAFARI_CANVAS_PERF_MODE) lightningSrc?.pause?.();
+					if (SAFARI_CANVAS_PERF_MODE || isMobileRef.current === true)
+						lightningSrc?.pause?.();
 				} catch {
 					// Non-fatal; storm mood simply renders without the dedicated lightning layer.
 				}
@@ -7452,7 +7468,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						| { play?: () => void; pause?: () => void }
 						| undefined;
 					snowSrc?.play?.();
-					if (SAFARI_CANVAS_PERF_MODE) snowSrc?.pause?.();
+					if (SAFARI_CANVAS_PERF_MODE || isMobileRef.current === true)
+						snowSrc?.pause?.();
 				} catch {
 					// Non-fatal; snowy mood simply renders without the particle layer.
 				}
@@ -7478,7 +7495,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						| { play?: () => void; pause?: () => void }
 						| undefined;
 					shadeSrc?.play?.();
-					if (SAFARI_CANVAS_PERF_MODE) shadeSrc?.pause?.();
+					// Far-side shade stays visible on mobile; it's re-uploaded once whenever
+					// the shade actually changes (see the shade repaint effect), then paused.
+					if (SAFARI_CANVAS_PERF_MODE || isMobileRef.current === true)
+						shadeSrc?.pause?.();
 				} catch {
 					// Non-fatal; the background globe simply renders without the extra shade.
 				}
@@ -7499,7 +7519,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						| { play?: () => void; pause?: () => void }
 						| undefined;
 					sunSrc?.play?.();
-					if (SAFARI_CANVAS_PERF_MODE) sunSrc?.pause?.();
+					if (SAFARI_CANVAS_PERF_MODE || isMobileRef.current === true)
+						sunSrc?.pause?.();
 				} catch {
 					// Non-fatal; sunrise still falls back to the normal day/night fade.
 				}
@@ -13567,16 +13588,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		try {
 			const m = mapRef.current;
 			if (m) {
+				// Mobile lite mode: far-side shade stays (cheap, static), but the animated
+				// sun-transition wash + catchlight are forced off.
+				const mobileLite = isMobileRef.current === true;
 				setRasterOpacityIfChanged(m, MAPBOX_LAYER_IDS.dayFarSideShade, dayShadeOpacity);
 				setRasterOpacityIfChanged(
 					m,
 					MAPBOX_LAYER_IDS.sunTransition,
-					sunTransitionOpacity
+					mobileLite ? 0 : sunTransitionOpacity
 				);
 				setRasterOpacityIfChanged(
 					m,
 					MAPBOX_LAYER_IDS.sunTransitionCloudCatchlight,
-					sunTransitionCatchlightOpacity
+					mobileLite ? 0 : sunTransitionCatchlightOpacity
 				);
 			}
 		} catch {
@@ -13653,6 +13677,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [setRasterOpacityIfChanged]);
 
 	const repaintSunTransitionCanvas = useCallback((nowMs: number, force = false) => {
+		// Mobile lite mode: the sunrise/sunset wash + cloud catchlight are disabled
+		// (layer opacity forced to 0 in applyLightingOverlayOpacity); skip painting and
+		// uploading the canvas so its source stays paused and the map idles. The plain
+		// day/night land palette still applies, so the globe still transitions.
+		if (isMobileRef.current === true) return false;
 		const sunCanvas = sunTransitionCanvasRef.current;
 		if (!sunCanvas) return false;
 
@@ -13692,8 +13721,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					| { play?: () => void; pause?: () => void }
 					| undefined;
 				source?.play?.();
-				// Safari: upload once, then stop forcing per-frame texture uploads.
-				if (SAFARI_CANVAS_PERF_MODE) source?.pause?.();
+				// Safari + mobile lite: upload once, then stop forcing per-frame texture uploads.
+				if (SAFARI_CANVAS_PERF_MODE || isMobileRef.current === true) source?.pause?.();
 				map?.triggerRepaint();
 			} catch {
 				// Non-fatal.
