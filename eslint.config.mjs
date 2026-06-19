@@ -44,6 +44,7 @@ const eslintConfig = [
 			'src/app/murmur/campaign/**/DraftingSection/EmailGeneration/DraftingTable/DraftingTableSkeleton.tsx',
 			'src/app/murmur/campaign/**/DraftingSection/useDraftingSection.ts',
 			'src/app/murmur/dashboard/page.tsx',
+			'src/app/murmur/dashboard/DashboardPageClient.tsx',
 			'src/components/molecules/CampaignPageSkeleton/CampaignPageSkeleton.tsx',
 			'src/components/molecules/HybridPromptInput/useHybridPromptInput.tsx',
 			'src/components/molecules/LandingHeroSearchBar/LandingHeroSearchBar.tsx',

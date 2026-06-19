@@ -743,3 +743,50 @@ model ApplicationMatchScore {
 
   @@index([eventId])
 }
+
+// Intelligent async send queue: cold campaign emails are queued and trickled out
+// at spread-out daytime times (<=100/sender/day, 11am-8pm ET window) instead of
+// firing synchronously. STRICTLY ADDITIVE: new model + enum only; all links
+// (emailId, userId, campaignId, contactId) are scalar columns with NO @relation,
+// resolved by explicit lookups in code (EmailSuppression / ContactNote pattern),
+// so no existing model is modified and the migration is CREATE-only.
+enum SendQueueStatus {
+  pending // waiting for its scheduledFor instant
+  processing // a worker run has claimed it (lockedAt/lockToken set) and is sending
+  sent // delivered via Mailgun; terminal
+  failed // permanently failed / expired / out-of-credits; terminal
+  canceled // un-queued before send (campaign archived etc.); terminal
+}
+
+model EmailSendQueue {
+  id            Int             @id @default(autoincrement())
+  emailId       Int             @unique // Email.id — one LIVE queue row per Email (cancel DELETEs the row)
+  userId        String // sender clerkId (== Email.userId); per-day cap + claim key
+  campaignId    Int // Campaign.id provenance; intentionally no FK
+  contactId     Int // Contact.id recipient; intentionally no FK
+
+  status        SendQueueStatus @default(pending)
+  scheduledFor  DateTime // UTC instant chosen by the pure scheduler
+  capDay        String // == capDayOf(scheduledFor) in senderRefTz; the per-day (100) cap bucket
+  recipientTz   String          @default("America/New_York") // window tz (v1: fixed; v2: per-recipient)
+
+  dispatchedAt  DateTime? // set IMMEDIATELY before mg.create() — splits the stuck-row sweeper
+  attempts      Int             @default(0) // ONLY incremented on a real Mailgun attempt
+  maxAttempts   Int             @default(5)
+  capRescheduleCount    Int     @default(0) // cap/window backlog rolls (lifetime-guarded)
+  creditRescheduleCount Int     @default(0) // credit-block rolls (rare) -> failed:no_credits at small N
+  creditBlockedAt DateTime? // first credit-block instant (notify-once)
+  nextRetryAt   DateTime? // transient-failure backoff gate
+  lockedAt      DateTime? // set when a worker claims the row
+  lockToken     String? // per-run uuid; guards the terminal write
+  failureReason String?
+  sentAt        DateTime?
+
+  createdAt     DateTime        @default(now()) // claim FIFO tiebreak + lifetime guard
+  updatedAt     DateTime        @updatedAt
+
+  @@index([status, scheduledFor]) // claim scan + overdue health
+  @@index([userId, capDay, status]) // per-sender-per-day cap accounting
+  @@index([campaignId, status]) // cancel-on-archive
+  @@index([status, lockedAt]) // stuck-row sweeper
+}

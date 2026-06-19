@@ -1,6 +1,7 @@
 /** Greens for the campaign "actively sending" UI (from the design mockups). */
 export const SENDING_PANEL_GREEN = '#74C27F';
 export const SENDING_ACTIVE_GREEN = '#3C975A';
+export const SENDING_ACTIVE_PILL_GREEN = '#77D284';
 export const SENDING_STACK_GREEN = '#85D790';
 export const SENDING_QUEUED_CARD_GREEN = '#5BB271';
 

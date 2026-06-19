@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { EmailVerificationStatus } from '@/constants/prismaEnums';
 import type { UserContactList } from '@prisma/client';
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef, type SetStateAction } from 'react';
 import {
 	CampaignApiError,
 	type CampaignListItem,
@@ -79,6 +79,55 @@ const formSchema = z.object({
 });
 
 type FormData = z.infer<typeof formSchema>;
+
+export const DASHBOARD_SEARCH_SELECTION_LIMIT = 50;
+
+export const clampContactIdsToSelectionLimit = (
+	contactIds: readonly number[],
+	limit = DASHBOARD_SEARCH_SELECTION_LIMIT
+): number[] => {
+	const next: number[] = [];
+	const seen = new Set<number>();
+
+	for (const id of contactIds) {
+		if (seen.has(id)) continue;
+		if (next.length >= limit) break;
+		seen.add(id);
+		next.push(id);
+	}
+
+	return next;
+};
+
+export const mergeContactIdsWithSelectionLimit = (
+	existingContactIds: readonly number[],
+	candidateContactIds: readonly number[],
+	limit = DASHBOARD_SEARCH_SELECTION_LIMIT
+): number[] =>
+	clampContactIdsToSelectionLimit(
+		[...existingContactIds, ...candidateContactIds],
+		limit
+	);
+
+export const getSelectionLimitedContactIds = (
+	existingContactIds: readonly number[],
+	candidateContactIds: readonly number[],
+	limit = DASHBOARD_SEARCH_SELECTION_LIMIT
+): number[] => {
+	const selectedSet = new Set(
+		mergeContactIdsWithSelectionLimit(existingContactIds, candidateContactIds, limit)
+	);
+	const acceptedIds: number[] = [];
+	const seen = new Set<number>();
+
+	for (const id of candidateContactIds) {
+		if (seen.has(id) || !selectedSet.has(id)) continue;
+		seen.add(id);
+		acceptedIds.push(id);
+	}
+
+	return acceptedIds;
+};
 
 const getRandomSearchResultLimit = (): number =>
 	Math.floor(Math.random() * 21) + 30;
@@ -216,7 +265,16 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	const [selectedContactListRows, setSelectedContactListRows] = useState<
 		UserContactList[]
 	>([]);
-	const [selectedContacts, setSelectedContacts] = useState<number[]>([]);
+	const [selectedContacts, setSelectedContactsState] = useState<number[]>([]);
+	const setSelectedContacts = useCallback((value: SetStateAction<number[]>) => {
+		setSelectedContactsState((prev) => {
+			const next =
+				typeof value === 'function'
+					? (value as (prevState: number[]) => number[])(prev)
+					: value;
+			return clampContactIdsToSelectionLimit(next);
+		});
+	}, []);
 	// Map "Write Message" flow: when true, the inline drafting panel is open over the search map
 	// for the current `selectedContacts`. Reset alongside selection so it never outlives it.
 	const [isWriteMode, setIsWriteMode] = useState(false);
@@ -395,9 +453,12 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		}
 
 		// `selectedContacts` may include contacts from prior searches (map flow). "All selected"
-		// should mean "all current results are selected", not "selected count equals results count".
+		// should mean "all selectable current results are selected", capped at the search limit.
 		const selectedSet = new Set<number>(selectedContacts);
-		const allSelected = contacts.every((c) => selectedSet.has(c.id));
+		const selectableContactIds = clampContactIdsToSelectionLimit(
+			contacts.map((contact) => contact.id)
+		);
+		const allSelected = selectableContactIds.every((id) => selectedSet.has(id));
 		setIsAllSelected(allSelected);
 	}, [selectedContacts, contacts]);
 
@@ -1189,7 +1250,9 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	const handleSelectAll = (panelContacts?: ContactWithName[]) => {
 		// In map view with panel contacts, toggle only the panel contacts
 		if (panelContacts && panelContacts.length > 0) {
-			const panelContactIds = panelContacts.map((c) => c.id);
+			const panelContactIds = clampContactIdsToSelectionLimit(
+				panelContacts.map((c) => c.id)
+			);
 			const panelContactIdsSet = new Set(panelContactIds);
 			const allPanelSelected = panelContactIds.every((id) =>
 				selectedContacts.includes(id)
@@ -1205,7 +1268,12 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				const existingNonPanelSelections = selectedContacts.filter(
 					(id) => !panelContactIdsSet.has(id)
 				);
-				setSelectedContacts([...existingNonPanelSelections, ...panelContactIds]);
+				setSelectedContacts(
+					mergeContactIdsWithSelectionLimit(
+						existingNonPanelSelections,
+						panelContactIds
+					)
+				);
 			}
 			return;
 		}

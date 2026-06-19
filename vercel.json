@@ -5,11 +5,16 @@
 		{
 			"path": "/api/webhooks/stripe/cron",
 			"schedule": "0 0 * * *"
+		},
+		{
+			"path": "/api/cron/send-queue",
+			"schedule": "*/5 * * * *"
 		}
 	],
 	"functions": {
 		"src/app/api/contacts/route.ts": { "maxDuration": 60 },
 		"src/app/api/mistral/route.ts": { "maxDuration": 60 },
+		"src/app/api/cron/send-queue/route.ts": { "maxDuration": 60 },
 		"src/app/api/**/route.ts": { "maxDuration": 30 },
 		"app/api/**/route.ts": { "maxDuration": 30 },
 		"src/app/murmur/campaign/[campaignId]/page.tsx": { "maxDuration": 60 }

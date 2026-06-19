@@ -16,7 +16,6 @@ import { gsap } from 'gsap';
 import {
 	DraftingSectionProps,
 	useDraftingSection,
-	HybridBlockPrompt,
 	type DraftingFormValues,
 	type DraftingSectionView,
 } from './useDraftingSection';
@@ -50,6 +49,7 @@ import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/Camp
 import { useGetContacts, useGetLocations } from '@/hooks/queryHooks/useContacts';
 import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { useCreateEmail, useDeleteEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { useCancelSendQueueItem, useSendQueue } from '@/hooks/queryHooks/useSendQueue';
 import {
 	EmailStatus,
 	EmailVerificationStatus,
@@ -70,6 +70,7 @@ import { toast } from 'sonner';
 import { ContactWithName } from '@/types/contact';
 import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { ContactResearchHoverCard } from '@/components/molecules/ContactResearchPanel/ContactResearchHoverCard';
+import { useWebsitePreview } from '@/contexts/WebsitePreviewContext';
 import { TestPreviewPanel } from '@/components/molecules/TestPreviewPanel/TestPreviewPanel';
 import { MiniEmailStructure } from './EmailGeneration/MiniEmailStructure';
 import ContactsExpandedList, {
@@ -86,9 +87,11 @@ import ContactsExpandedList, {
 import { DraftsExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftsExpandedList';
 import { DraftPreviewExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftPreviewExpandedList';
 import { SendingExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/SendingExpandedList';
+import { SendQueueDeck } from '@/app/murmur/campaign/[campaignId]/SendQueueView/SendQueueDeck';
 import { OverviewSelectionActionCard } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/OverviewSelectionActionCard';
 import { SearchSendingOverlay } from '@/components/molecules/SendingProgress/SearchSendingOverlay';
 import { useSendingSessionState } from '@/contexts/SendingSessionContext';
+import { useSendQueueView } from '@/contexts/SendQueueViewContext';
 import { SentExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/SentExpandedList';
 import { InboxExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/InboxExpandedList';
 import { MobileCampaignSearchHeader } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Mobile/MobileCampaignSearchHeader';
@@ -324,6 +327,9 @@ const ROW_HOVER_RESEARCH_CLEAR_DELAY_MS = 220;
 const HOVER_RESEARCH_CARD_FULL_HEIGHT_PX = 312.713 + 13 + 415 + 9 + 23; // ≈ 773
 // The search/overview rail card sits slightly above true-center (screen px).
 const RAIL_HOVER_RESEARCH_TOP_NUDGE_PX = 56;
+// All-tab hover cards share the top campaign chrome; keep the fixed overlay clear
+// of that bar on short viewports where vertical centering would clamp near 0.
+const OVERVIEW_RAIL_HOVER_RESEARCH_MIN_TOP_PX = 136;
 // Event-chat rows dock the opportunity panel in the same slot (larger card).
 const ROW_HOVER_OPPORTUNITY_DOCKED_LEFT_PX = -(
 	OPPORTUNITY_HOVER_PANEL_WIDTH_PX + ROW_HOVER_RESEARCH_GAP_PX
@@ -363,6 +369,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		whiteOutOverviewCampaignsMiniTable = false,
 		whiteOutOverviewStrategyBox = false,
 	} = props;
+	const { activePlacement: websitePreviewPlacement } = useWebsitePreview();
 	const [isCampaignHeaderDropdownOpen, setIsCampaignHeaderDropdownOpen] = useState(false);
 	const campaignHeaderPanelDimStyle: CSSProperties = {
 		opacity: isCampaignHeaderDropdownOpen || dimContactsExpandedList ? 0.5 : 1,
@@ -788,11 +795,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						: DEFAULT_CAMPAIGN_ZOOM;
 			const effectiveWidth = window.innerWidth / (z || 1);
 
-			setIsNarrowDesktop(effectiveWidth >= 952 && effectiveWidth < 1317);
-			setIsNarrowestDesktop(effectiveWidth < 952);
-			setIsSearchTabNarrow(effectiveWidth < 1414);
-			setIsInboxTabNarrow(effectiveWidth <= 1520);
-			setIsInboxTabStacked(effectiveWidth <= 1279);
+			const nextIsNarrowDesktop = effectiveWidth >= 952 && effectiveWidth < 1317;
+			const nextIsNarrowestDesktop = effectiveWidth < 952;
+			const nextIsSearchTabNarrow = effectiveWidth < 1414;
+			const nextIsInboxTabNarrow = effectiveWidth <= 1520;
+			const nextIsInboxTabStacked = effectiveWidth <= 1279;
+
+			setIsNarrowDesktop(nextIsNarrowDesktop);
+			setIsNarrowestDesktop(nextIsNarrowestDesktop);
+			setIsSearchTabNarrow(nextIsSearchTabNarrow);
+			setIsInboxTabNarrow(nextIsInboxTabNarrow);
+			setIsInboxTabStacked(nextIsInboxTabStacked);
 		};
 		checkBreakpoints();
 		window.addEventListener('resize', checkBreakpoints);
@@ -954,7 +967,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// Match the dashboard map-view search panel: reserve enough room for the Search
 	// Results header, category toolbar, and breathing room even when Selection expands.
 	const OVERVIEW_SEARCH_RESULTS_MIN_HEIGHT_PX = 125;
-	const OVERVIEW_SELECTION_PANEL_MIN_HEIGHT_PX = 260;
+	const OVERVIEW_SEARCH_RESULTS_COMPRESS_THRESHOLD = 5;
 	// CampaignHeaderBox sits above the results panel (same split as dashboard map search).
 	const MAP_VIEW_CAMPAIGN_HEADER_HEIGHT_PX = 59;
 	const MAP_VIEW_CAMPAIGN_HEADER_GAP_PX = 13;
@@ -1131,6 +1144,71 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 		return set;
 	}, [overviewRightRailUnselectedContactsFiltered, getOverviewRightRailChipKeyForContact]);
+
+	const getOverviewRightRailRowHeightPx = (contactId: number) => {
+		const status = overviewRightRailContactStatusById?.get(contactId) ?? 'contacts';
+		if (status === 'drafts') return 108;
+		if (status === 'sent' || status === 'new-message') return 92;
+		return 49.657;
+	};
+
+	// Match the dashboard map-side panel behavior:
+	// - Selection caps at ~50/50 while plenty of unselected results remain
+	// - As results get low, gradually allow Selection to grow and results to compress
+	// - When there are only 1–2 unselected results, keep them fully visible above the category bar
+	const overviewRightRailPanelGapPx = 9;
+	const overviewRightRailCompressedVisibleSelected = overviewRightRailSelectedContactsFull.slice(
+		0,
+		2
+	);
+	const overviewRightRailCompressedVisibleSelectedHeightPx =
+		overviewRightRailCompressedVisibleSelected.reduce(
+			(sum, c) => sum + getOverviewRightRailRowHeightPx(c.id),
+			0
+		) +
+		Math.max(0, overviewRightRailCompressedVisibleSelected.length - 1) * 7;
+	const overviewRightRailSelectionMinHeightPx =
+		overviewRightRailSelectedContactsFull.length > 0
+			? 77 + 6 + overviewRightRailCompressedVisibleSelectedHeightPx + 14
+			: 77 + 17 /* 77px header + ~17px translucent strip */;
+
+	const overviewRightRailCompressedVisibleUnselected =
+		overviewRightRailUnselectedContactsFiltered.slice(0, 2);
+	const overviewRightRailCompressedVisibleUnselectedHeightPx =
+		overviewRightRailCompressedVisibleUnselected.reduce(
+			(sum, c) => sum + getOverviewRightRailRowHeightPx(c.id),
+			0
+		) +
+		Math.max(0, overviewRightRailCompressedVisibleUnselected.length - 1) * 7;
+	const overviewRightRailSearchResultsMinHeightPx =
+		OVERVIEW_SEARCH_RESULTS_MIN_HEIGHT_PX +
+		(shouldShowOverviewRightRailCategoryBar &&
+		overviewRightRailUnselectedContactsFiltered.length <=
+			OVERVIEW_SEARCH_RESULTS_COMPRESS_THRESHOLD
+			? overviewRightRailCompressedVisibleUnselectedHeightPx
+			: 0);
+
+	const overviewRightRailSelectionRampSpan =
+		OVERVIEW_SEARCH_RESULTS_COMPRESS_THRESHOLD + 1;
+	const overviewRightRailSelectionRampProgress = Math.min(
+		1,
+		Math.max(
+			0,
+			(overviewRightRailSelectionRampSpan -
+				overviewRightRailUnselectedContactsFiltered.length) /
+				overviewRightRailSelectionRampSpan
+		)
+	);
+	const overviewRightRailSelectionRampEased =
+		overviewRightRailSelectionRampProgress * overviewRightRailSelectionRampProgress;
+	const overviewRightRailSelectionFraction =
+		0.5 + 0.5 * overviewRightRailSelectionRampEased;
+	const overviewRightRailSelectionDivisor = 1 / overviewRightRailSelectionFraction;
+	const overviewRightRailSelectionMaxHeightCss = `min(calc((100% - ${overviewRightRailPanelGapPx}px) / ${overviewRightRailSelectionDivisor.toFixed(
+		4
+	)}), calc(100% - ${
+		overviewRightRailSearchResultsMinHeightPx + overviewRightRailPanelGapPx
+	}px))`;
 
 	const [overviewContactsDockPos, setOverviewContactsDockPos] = useState<{
 		leftPx: number;
@@ -1739,10 +1817,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// Get active tab data
 	const activeSearchTab = searchTabs.find((tab) => tab.id === activeSearchTabId);
 	const hasCampaignSearched = activeSearchTabId !== null;
-	// The large right-side research panel renders only in these states. We reuse this
-	// single gate both for the panel's JSX and to suppress the left-over-map hover card
-	// (the map-area card is reserved for the compressed/compact view, where this is false).
-	const isRightResearchPanelActive =
+	// Base tabs that render the large right-side research panel. The persisted
+	// send-queue can opt Inbox into this later, after queue visibility is known.
+	const isBaseRightResearchPanelActive =
 		!isMobile &&
 		!isCampaignWorkspaceCompact &&
 		!isNarrowDesktop &&
@@ -2177,15 +2254,189 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// visible, the left expanded panel swaps to the sending list and — on the search
 	// tab — the floating sending overlay renders over the map instead.
 	const sendingSession = useSendingSessionState();
+	const { isOpen: isPersistedSendQueueOpen, close: closePersistedSendQueue } =
+		useSendQueueView();
+	const { items: persistedSendQueueItems, count: persistedSendQueueCount } = useSendQueue(
+		campaign?.id ?? 0,
+		{ enabled: Boolean(campaign?.id) }
+	);
+	const {
+		mutate: cancelSendQueueItem,
+		isPending: isCancelingSendQueueItem,
+		variables: cancelSendQueueItemVariables,
+	} = useCancelSendQueueItem();
 	const isSendingUiVisible =
 		(sendingSession.status === 'sending' || sendingSession.status === 'done') &&
 		!sendingSession.dismissed;
+	const isPersistedSendQueueUiVisible =
+		isPersistedSendQueueOpen && persistedSendQueueCount > 0;
+	const isInboxSendQueueRightResearchPanelActive =
+		isPersistedSendQueueUiVisible &&
+		!isMobile &&
+		!isCampaignWorkspaceCompact &&
+		!isNarrowDesktop &&
+		!isNarrowestDesktop &&
+		view === 'inbox';
+	// The large right-side research panel gate is shared by the JSX and by the
+	// left-docked hover-card suppressor.
+	const isRightResearchPanelActive =
+		isBaseRightResearchPanelActive || isInboxSendQueueRightResearchPanelActive;
+	const isQueuePanelVisible = isSendingUiVisible || isPersistedSendQueueUiVisible;
+	const shouldRenderSendQueueBottomBar =
+		isPersistedSendQueueUiVisible && !isMobile && !hideHeaderBox && !isNarrowestDesktop;
+	const [persistedSendQueueFocusedIndex, setPersistedSendQueueFocusedIndex] = useState(0);
+	useEffect(() => {
+		if (!isPersistedSendQueueUiVisible) return;
+
+		const handlePointerDown = (event: PointerEvent) => {
+			const target =
+				event.target instanceof Element
+					? event.target
+					: event.target instanceof Node
+						? event.target.parentElement
+						: null;
+			const isWithinSendQueueApparatus = Array.from(
+				document.querySelectorAll<HTMLElement>('[data-send-queue-apparatus]')
+			).some((element) => {
+				const rect = element.getBoundingClientRect();
+				return (
+					event.clientX >= rect.left &&
+					event.clientX <= rect.right &&
+					event.clientY >= rect.top &&
+					event.clientY <= rect.bottom
+				);
+			});
+			if (
+				isWithinSendQueueApparatus ||
+				target?.closest(
+					'[data-send-queue-apparatus], [data-campaign-header-box], [data-campaign-workspace-toggle], .dashboard-globe-bg'
+				)
+			) {
+				return;
+			}
+			closePersistedSendQueue();
+		};
+
+		document.addEventListener('pointerdown', handlePointerDown, true);
+		return () => document.removeEventListener('pointerdown', handlePointerDown, true);
+	}, [closePersistedSendQueue, isPersistedSendQueueUiVisible]);
+	useEffect(() => {
+		if (persistedSendQueueFocusedIndex > persistedSendQueueItems.length - 1) {
+			setPersistedSendQueueFocusedIndex(Math.max(0, persistedSendQueueItems.length - 1));
+		}
+	}, [persistedSendQueueFocusedIndex, persistedSendQueueItems.length]);
+	const sendQueueFocusedContact =
+		persistedSendQueueItems[persistedSendQueueFocusedIndex]?.contact ??
+		persistedSendQueueItems[0]?.contact ??
+		null;
+	const persistedSendQueueStaticSession = useMemo(() => {
+		const queue = persistedSendQueueItems.map((item) => ({
+			emailId: item.emailId,
+			contactId: item.contactId,
+			contact: item.contact,
+			kind: item.contact.venueId != null ? ('venueMessage' as const) : ('email' as const),
+			subject: item.email.subject,
+			status: item.status === 'processing' ? ('sending' as const) : ('queued' as const),
+			logLines: [],
+			startedAt: new Date(item.scheduledFor).getTime(),
+			queuedAt: new Date(item.queuedAt).getTime(),
+			scheduledFor: new Date(item.scheduledFor).getTime(),
+			progress: item.status === 'processing' ? 0.5 : 0,
+		}));
+		return {
+			queue,
+			total: persistedSendQueueCount,
+			sentCount: 0,
+			failedCount: 0,
+			activeIndex: queue.findIndex((item) => item.status === 'sending'),
+			status: 'sending' as const,
+		};
+	}, [persistedSendQueueCount, persistedSendQueueItems]);
+	const queuePanelStaticSession =
+		!isSendingUiVisible && isPersistedSendQueueUiVisible
+			? persistedSendQueueStaticSession
+			: undefined;
+	const queuePanelDismiss = queuePanelStaticSession ? closePersistedSendQueue : undefined;
+	const handleCancelPersistedSendQueueItem = useCallback(
+		(index: number) => {
+			const item = persistedSendQueueItems[index];
+			if (!item || !campaign?.id) return;
+			cancelSendQueueItem({ campaignId: campaign.id, queueId: item.queueId });
+		},
+		[campaign?.id, cancelSendQueueItem, persistedSendQueueItems]
+	);
 	const showSearchSendingOverlay =
 		view === 'search' &&
 		!isMobile &&
 		!isSearchTabNarrow &&
 		renderGlobalOverlays &&
 		isSendingUiVisible;
+
+	const renderQueuePanel = (width: number, height: number) => (
+		<div data-send-queue-apparatus style={{ display: 'contents' }}>
+			<SendingExpandedList
+				width={width}
+				height={height}
+				staticSession={queuePanelStaticSession}
+				onDismiss={queuePanelDismiss}
+				onItemClick={queuePanelStaticSession ? setPersistedSendQueueFocusedIndex : undefined}
+				showingIndex={queuePanelStaticSession ? persistedSendQueueFocusedIndex : undefined}
+				onItemCancel={queuePanelStaticSession ? handleCancelPersistedSendQueueItem : undefined}
+				isItemCanceling={(index) =>
+					isCancelingSendQueueItem &&
+					cancelSendQueueItemVariables?.queueId === persistedSendQueueItems[index]?.queueId
+				}
+				canCancelItem={(index) => persistedSendQueueItems[index]?.status === 'pending'}
+			/>
+		</div>
+	);
+	const queueDeckShouldUseDraftsOffset = view !== 'drafting';
+	const expandedSendQueueShiftRightPx = 16;
+	const shouldNormalizeExpandedQueueDeck =
+		isPersistedSendQueueUiVisible &&
+		isCampaignWorkspaceExpanded &&
+		!isMobile &&
+		!isNarrowDesktop &&
+		!isNarrowestDesktop;
+	const queueDeckOffsetX =
+		(shouldNormalizeExpandedQueueDeck && view === 'inbox'
+			? -activeInboxMainPanelShiftRightPx
+			: shouldNormalizeExpandedQueueDeck
+				? 0
+				: queueDeckShouldUseDraftsOffset
+					? 18
+					: 0) +
+		(shouldNormalizeExpandedQueueDeck ? expandedSendQueueShiftRightPx : 0);
+	const renderQueueDeck = () => {
+		const deck = (
+			<SendQueueDeck
+				items={persistedSendQueueItems}
+				focusedIndex={persistedSendQueueFocusedIndex}
+				onFocusChange={setPersistedSendQueueFocusedIndex}
+			/>
+		);
+
+		if (!queueDeckShouldUseDraftsOffset && queueDeckOffsetX === 0) {
+			return (
+				<div data-send-queue-apparatus style={{ display: 'contents' }}>
+					{deck}
+				</div>
+			);
+		}
+
+		return (
+			<div
+				data-send-queue-apparatus
+				style={{
+					marginTop: queueDeckShouldUseDraftsOffset ? '15px' : undefined,
+					transform:
+						queueDeckOffsetX === 0 ? undefined : `translateX(${queueDeckOffsetX}px)`,
+				}}
+			>
+				{deck}
+			</div>
+		);
+	};
 
 	// A truly empty campaign inbox (no replies AND nothing sent) bounces to Write so
 	// the user can get messages out first. Mid-send the counts are transiently 0 —
@@ -2221,6 +2472,28 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 		setSelectedDraft(firstDraft);
 	}, [draftEmailsForView, isPendingEmails, selectedDraft, contentView]);
+
+	// On the Drafts tab the showing draft is always part of the send selection, so
+	// the gold "Showing" row is never left out of "Send N Messages". Other sources
+	// of showing changes (auto-select above, a shift-click range that omits the
+	// showing row, the send-advance effect below) don't touch the selection set, so
+	// re-seed it here. This only ever adds the showing id; it never removes, so it
+	// can't fight a row deselect.
+	useEffect(() => {
+		if (contentView !== 'drafting') return;
+		if (!selectedDraft) return;
+		// Guard against cross-filter contamination: only add the showing draft when
+		// it belongs to the current status filter's view.
+		if (!draftEmailsForView.some((draft) => draft.id === selectedDraft.id)) return;
+		const showingId = selectedDraft.id;
+		setDraftSelectionsByFilter((prev) => {
+			const current = prev[draftStatusFilter];
+			if (current.has(showingId)) return prev;
+			const next = new Set(current);
+			next.add(showingId);
+			return { ...prev, [draftStatusFilter]: next };
+		});
+	}, [contentView, selectedDraft, draftEmailsForView, draftStatusFilter]);
 
 	// While a send session runs, keep the draft review stack on the actively
 	// sending draft so the front card advances one-to-the-next per send. Sent
@@ -2837,6 +3110,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// Shares the docked slot, position state and clear timer — one card at a time.
 	const [rowHoverOpportunity, setRowHoverOpportunity] =
 		useState<MyEventApplication | null>(null);
+	// Inbox tab: keep the opportunity panel visible for the selected event thread
+	// (not only while hovering). Cleared when leaving Inbox or selecting a non-event row.
+	const [pinnedInboxOpportunity, setPinnedInboxOpportunity] =
+		useState<MyEventApplication | null>(null);
+	const pinnedInboxOpportunityIdRef = useRef<number | null>(null);
+	// Write/Drafts tabs: keep the research card visible for the selected contact
+	// (not only while hovering). Cleared when leaving those tabs.
+	const [pinnedRowResearchContact, setPinnedRowResearchContact] =
+		useState<ContactWithName | null>(null);
+	const pinnedRowResearchContactIdRef = useRef<number | null>(null);
 	const [showTestPreview, setShowTestPreview] = useState(false);
 	const handleTestPreviewToggle = useCallback(
 		(open: boolean) => {
@@ -2920,21 +3203,47 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	// Campaign map ↔ tab selection bridge --------------------------------------
 	// Publish the active tab's selected contact ids so the map highlights their
-	// markers as the bigger blue circle. Write = the multi-select draft set,
-	// Drafts = the contacts of selected drafts. Inbox is intentionally excluded:
-	// there a marker click just OPENS the conversation (handled below) — it is not
-	// a persistent map selection, so inbox markers never get the blue treatment.
+	// markers and selected SVG labels. Each tab keeps its native selection meaning:
+	// All = contact rows + selected draft rows, Write = draftable contacts, Drafts =
+	// selected draft contacts, Inbox/Sent = the opened conversation contact.
 	const lastPublishedMapSelectionKeyRef = useRef<string>('');
 	useEffect(() => {
 		if (!onMapSelectionChange) return;
-		let contactIds: number[] = [];
-		if (view === 'testing') {
-			contactIds = Array.from(contactsTabSelectedIds);
+		const contactIds: number[] = [];
+
+		const appendContactId = (id: number | null | undefined) => {
+			if (typeof id !== 'number' || contactIds.includes(id)) return;
+			contactIds.push(id);
+		};
+
+		if (view === 'overview') {
+			contactsTabSelectedIds.forEach(appendContactId);
+			draftEmails
+				.filter((d) => overviewSelectedDraftIds.has(d.id))
+				.forEach((d) => appendContactId(d.contactId));
+		} else if (view === 'testing') {
+			contactsTabSelectedIds.forEach(appendContactId);
 		} else if (view === 'drafting') {
-			contactIds = draftEmailsForView
+			draftEmailsForView
 				.filter((d) => draftsTabSelectedIds.has(d.id))
-				.map((d) => d.contactId)
-				.filter((id): id is number => id != null);
+				.forEach((d) => appendContactId(d.contactId));
+		} else if (view === 'inbox' || view === 'sent') {
+			const selectedInbound =
+				selectedInboxEmailId == null
+					? null
+					: (inboundEmails || []).find((email) => email.id === selectedInboxEmailId) ?? null;
+			if (selectedInbound) {
+				appendContactId(
+					selectedInbound.contactId ??
+						(selectedInbound.contact as { id?: number } | null | undefined)?.id
+				);
+			} else {
+				const selectedSent =
+					selectedInboxEmailId == null
+						? null
+						: sentEmails.find((email) => email.id === selectedInboxEmailId) ?? null;
+				appendContactId(selectedSent?.contactId);
+			}
 		}
 		// Skip redundant publishes (e.g. on draft refetches) so the parent's memoized
 		// map props don't rebuild when the selection hasn't actually changed.
@@ -2946,8 +3255,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		onMapSelectionChange,
 		view,
 		contactsTabSelectedIds,
+		overviewSelectedDraftIds,
+		draftEmails,
 		draftsTabSelectedIds,
 		draftEmailsForView,
+		selectedInboxEmailId,
+		inboundEmails,
+		sentEmails,
 	]);
 
 	// Run a campaign map marker click through the active tab's native selection.
@@ -2960,7 +3274,24 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		if (handledMapMarkerRequestIdRef.current === req.requestId) return;
 		handledMapMarkerRequestIdRef.current = req.requestId;
 		const { contactId } = req;
-		if (view === 'testing') {
+		if (view === 'overview') {
+			const draft = draftEmails.find((d) => d.contactId === contactId);
+			if (draft) {
+				setOverviewSelectedDraftIds((prev) => {
+					const next = new Set(prev);
+					if (next.has(draft.id)) next.delete(draft.id);
+					else next.add(draft.id);
+					return next;
+				});
+			} else {
+				setContactsTabSelectedIds((prev) => {
+					const next = new Set(prev);
+					if (next.has(contactId)) next.delete(contactId);
+					else next.add(contactId);
+					return next;
+				});
+			}
+		} else if (view === 'testing') {
 			setContactsTabSelectedIds((prev) => {
 				const next = new Set(prev);
 				if (next.has(contactId)) next.delete(contactId);
@@ -2970,7 +3301,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		} else if (view === 'drafting') {
 			const draft = draftEmailsForView.find((d) => d.contactId === contactId);
 			if (draft) handleDraftSelection(draft.id);
-		} else if (view === 'inbox') {
+		} else if (view === 'inbox' || view === 'sent') {
 			const byCreatedDesc = (a: { createdAt: string | Date }, b: { createdAt: string | Date }) =>
 				new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
 			const inbound = (inboundEmails || [])
@@ -2992,7 +3323,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		// handleDraftSelection / handleInboxEmailClick read live state at call time;
 		// the request id is the trigger and the handled-ref guards re-execution.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [mapMarkerSelectionRequest, view, draftEmailsForView, inboundEmails, sentEmails]);
+	}, [mapMarkerSelectionRequest, view, draftEmails, draftEmailsForView, inboundEmails, sentEmails]);
 
 	// Mobile Summary view: which fullscreen overlay (chat / draft review) is open,
 	// the header-pill scroll target, and this session's send/delete counters.
@@ -3069,10 +3400,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [inboxEmailIdParam, inboxDeepLinkTabParam, campaign?.id]);
 
-	// When a draft is open, the research panel should stay locked to that draft's contact.
-	const displayedContactForResearch = isDraftPreviewOpen
-		? selectedContactForResearch
-		: hoveredContactForResearch || selectedContactForResearch;
+	// Queue mode replaces the tab's list/deck, so research follows the focused queue row.
+	const displayedContactForResearch = isPersistedSendQueueUiVisible
+		? sendQueueFocusedContact
+		: isDraftPreviewOpen
+			? selectedContactForResearch
+			: hoveredContactForResearch || selectedContactForResearch;
 	const profileSidePanelName = miniProfileFields?.name ?? null;
 	const profileSidePanelGenre = miniProfileFields?.genre ?? null;
 	const profileSidePanelArea = miniProfileFields?.area ?? null;
@@ -3256,6 +3589,59 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		setHasUserSelectedResearchContact(true);
 	}, [contentView, selectedDraft?.id, contacts]);
 
+	const pinRowResearchContact = useCallback((contact: ContactWithName | null) => {
+		if (!contact) {
+			pinnedRowResearchContactIdRef.current = null;
+			setPinnedRowResearchContact(null);
+			return;
+		}
+		if (pinnedRowResearchContactIdRef.current === contact.id) return;
+		pinnedRowResearchContactIdRef.current = contact.id;
+		setPinnedRowResearchContact(contact);
+	}, []);
+
+	useEffect(() => {
+		if (view !== 'testing') return;
+		const selectedIds = Array.from(contactsTabSelectedIds);
+		if (selectedIds.length === 0) {
+			pinRowResearchContact(null);
+			return;
+		}
+		if (
+			pinnedRowResearchContact &&
+			contactsTabSelectedIds.has(pinnedRowResearchContact.id)
+		) {
+			return;
+		}
+		const contact = contacts?.find((candidate) => candidate.id === selectedIds[0]) ?? null;
+		if (contact) pinRowResearchContact(contact);
+	}, [
+		contacts,
+		contactsTabSelectedIds,
+		pinRowResearchContact,
+		pinnedRowResearchContact,
+		view,
+	]);
+
+	useEffect(() => {
+		if (view !== 'drafting') return;
+		if (!selectedDraft) {
+			pinRowResearchContact(null);
+			return;
+		}
+		const contactFromList =
+			contacts?.find((candidate) => candidate.id === selectedDraft.contactId) ?? null;
+		const synthesizedFromEmail = {
+			...selectedDraft.contact,
+			name:
+				`${selectedDraft.contact.firstName || ''} ${
+					selectedDraft.contact.lastName || ''
+				}`.trim() || null,
+		} as ContactWithName;
+		const contact = contactFromList ?? synthesizedFromEmail;
+		pinRowResearchContact(contact);
+	}, [contacts, pinRowResearchContact, selectedDraft, view]);
+
 	useEffect(() => {
 		if (!contactsAvailableForDrafting) return;
 		// On the All tab the list shows fresh + drafted contacts, so a drafted contact is a
@@ -3414,6 +3800,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		if (!contact) return;
 		setSelectedContactForResearch(contact);
 		setHasUserSelectedResearchContact(true);
+		if (view === 'testing' || view === 'drafting' || view === 'inbox') {
+			pinRowResearchContact(contact);
+		}
 	};
 
 	const handleResearchContactHover = (contact: ContactWithName | null) => {
@@ -3531,6 +3920,67 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		[cancelRowHoverResearchClear, scheduleRowHoverResearchClear]
 	);
 
+	const applyInboxOpportunityPanelPlacement = useCallback(() => {
+		const anchor = document.querySelector<HTMLElement>('[data-row-hover-research-anchor]');
+		if (!anchor) return;
+		const anchorRect = anchor.getBoundingClientRect();
+		const scale = anchor.offsetHeight > 0 ? anchorRect.height / anchor.offsetHeight : 1;
+		const cardScreenHeightPx = HOVER_RESEARCH_CARD_FULL_HEIGHT_PX * (scale || 1);
+		const centeredScreenTopPx = Math.max(8, (window.innerHeight - cardScreenHeightPx) / 2);
+		setRowHoverResearchTopPx((centeredScreenTopPx - anchorRect.top) / (scale || 1));
+		let leftPx = ROW_HOVER_OPPORTUNITY_DOCKED_LEFT_PX;
+		const splitOverlay = document.querySelector('.campaign-map-split-overlay');
+		if (splitOverlay) {
+			const overlayLeftPx = splitOverlay.getBoundingClientRect().left;
+			const cardFootprintRealPx =
+				(OPPORTUNITY_HOVER_PANEL_WIDTH_PX + ROW_HOVER_RESEARCH_GAP_PX) * (scale || 1);
+			if (overlayLeftPx > cardFootprintRealPx) {
+				leftPx = Math.min(
+					leftPx,
+					(overlayLeftPx - anchorRect.left) / (scale || 1) +
+						ROW_HOVER_OPPORTUNITY_DOCKED_LEFT_PX
+				);
+			}
+		}
+		setRowHoverResearchLeftPx(leftPx);
+	}, []);
+
+	const applyPinnedRowResearchPanelPlacement = useCallback(() => {
+		const anchor = document.querySelector<HTMLElement>('[data-row-hover-research-anchor]');
+		if (!anchor) return null;
+		const anchorRect = anchor.getBoundingClientRect();
+		const scale = anchor.offsetHeight > 0 ? anchorRect.height / anchor.offsetHeight : 1;
+		const cardScreenHeightPx = HOVER_RESEARCH_CARD_FULL_HEIGHT_PX * (scale || 1);
+		const centeredScreenTopPx = Math.max(8, (window.innerHeight - cardScreenHeightPx) / 2);
+		setRowHoverResearchTopPx((centeredScreenTopPx - anchorRect.top) / (scale || 1));
+		let leftPx = ROW_HOVER_RESEARCH_DOCKED_LEFT_PX;
+		const splitOverlay = document.querySelector('.campaign-map-split-overlay');
+		if (splitOverlay) {
+			const overlayLeftPx = splitOverlay.getBoundingClientRect().left;
+			const cardFootprintRealPx =
+				(ROW_HOVER_RESEARCH_CARD_WIDTH_PX + ROW_HOVER_RESEARCH_GAP_PX) * (scale || 1);
+			if (overlayLeftPx > cardFootprintRealPx) {
+				leftPx = Math.min(
+					leftPx,
+					(overlayLeftPx - anchorRect.left) / (scale || 1) +
+						ROW_HOVER_RESEARCH_DOCKED_LEFT_PX
+				);
+			}
+		}
+		setRowHoverResearchLeftPx(leftPx);
+		return leftPx;
+	}, []);
+
+	const handleEventChatRowClick = useCallback(
+		(application: MyEventApplication) => {
+			if (!application.event) return;
+			pinnedInboxOpportunityIdRef.current = application.id;
+			setPinnedInboxOpportunity(application);
+			applyInboxOpportunityPanelPlacement();
+		},
+		[applyInboxOpportunityPanelPlacement]
+	);
+
 	const isRowHoverResearchEnabled =
 		!isMobile && (view === 'testing' || view === 'drafting' || view === 'inbox');
 	const isRailHoverResearchEnabled =
@@ -3615,8 +4065,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			// fold and always has room to Tab-expand (matches the pinned-list card), nudged
 			// slightly above true-center on the rail.
 			const cardScreenHeight = HOVER_RESEARCH_CARD_FULL_HEIGHT_PX * rowScale;
+			const minTopScreen =
+				view === 'overview' ? OVERVIEW_RAIL_HOVER_RESEARCH_MIN_TOP_PX : 8;
 			const topScreen = Math.max(
-				8,
+				minTopScreen,
 				(window.innerHeight - cardScreenHeight) / 2 - RAIL_HOVER_RESEARCH_TOP_NUDGE_PX
 			);
 			// getBoundingClientRect is screen space; `position: fixed` children of the
@@ -3666,6 +4118,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		cancelRowHoverResearchClear();
 		setRowHoverResearchContact(null);
 		setRowHoverOpportunity(null);
+		pinnedInboxOpportunityIdRef.current = null;
+		setPinnedInboxOpportunity(null);
+		if (view !== 'testing' && view !== 'drafting' && view !== 'inbox') {
+			pinnedRowResearchContactIdRef.current = null;
+			setPinnedRowResearchContact(null);
+		}
 		cancelRailHoverResearchClear();
 		setRailHoverResearchContact(null);
 		setRailHoverResearchPos(null);
@@ -3777,8 +4235,182 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// The artist's submitted applications thread into the mobile conversations as
 	// per-event "sent" items (same scoping as the inbox rows: campaign contacts).
 	const { data: myEventApplications } = useGetMyEventApplications({
-		enabled: isMobile === true && !inboxMockData,
+		enabled: !inboxMockData && (isMobile === true || view === 'inbox'),
 	});
+
+	const resolveInboxOpportunityFromEmailId = useCallback(
+		(emailId: number | null): MyEventApplication | null => {
+			if (emailId == null) return null;
+
+			for (const application of myEventApplications ?? []) {
+				const row = normalizeApplicationForInboxConversation(application);
+				if (row?.id === emailId) return application;
+			}
+
+			const inbound =
+				inboxEmailsForContactsExpandedList.find((email) => email.id === emailId) ?? null;
+			const threadApplicationId = inbound?.venueThreadApplicationId ?? null;
+			if (threadApplicationId != null) {
+				return (
+					(myEventApplications ?? []).find(
+						(candidate) => candidate.id === threadApplicationId
+					) ?? null
+				);
+			}
+
+			return null;
+		},
+		[inboxEmailsForContactsExpandedList, myEventApplications]
+	);
+
+	const resolveInboxContactFromEmailId = useCallback(
+		(emailId: number | null): ContactWithName | null => {
+			if (emailId == null) return null;
+			if (resolveInboxOpportunityFromEmailId(emailId)?.event) return null;
+
+			const inbound =
+				inboxEmailsForContactsExpandedList.find((email) => email.id === emailId) ?? null;
+			if (inbound) {
+				const senderKey = normalizeInboxEmailAddress(inbound.sender);
+				if (senderKey && campaignContactsByEmail?.[senderKey]) {
+					return campaignContactsByEmail[senderKey];
+				}
+				return (inbound.contact as ContactWithName | null) ?? null;
+			}
+
+			const sent = sentEmails.find((email) => email.id === emailId) ?? null;
+			if (sent) {
+				return contacts?.find((candidate) => candidate.id === sent.contactId) ?? null;
+			}
+
+			return null;
+		},
+		[
+			campaignContactsByEmail,
+			contacts,
+			inboxEmailsForContactsExpandedList,
+			resolveInboxOpportunityFromEmailId,
+			sentEmails,
+		]
+	);
+
+	const selectedInboxOpportunity = useMemo(() => {
+		if (view !== 'inbox' || selectedInboxEmailId == null) return null;
+		return resolveInboxOpportunityFromEmailId(selectedInboxEmailId);
+	}, [resolveInboxOpportunityFromEmailId, selectedInboxEmailId, view]);
+
+	useLayoutEffect(() => {
+		if (view !== 'inbox') {
+			pinnedInboxOpportunityIdRef.current = null;
+			setPinnedInboxOpportunity(null);
+			return;
+		}
+		if (!selectedInboxOpportunity?.event) {
+			pinnedInboxOpportunityIdRef.current = null;
+			setPinnedInboxOpportunity(null);
+			return;
+		}
+		const alreadyPinned =
+			pinnedInboxOpportunityIdRef.current === selectedInboxOpportunity.id &&
+			pinnedInboxOpportunity?.id === selectedInboxOpportunity.id;
+		pinnedInboxOpportunityIdRef.current = selectedInboxOpportunity.id;
+		if (!alreadyPinned) {
+			setPinnedInboxOpportunity(selectedInboxOpportunity);
+		}
+		if (!isPersistedSendQueueUiVisible) {
+			applyInboxOpportunityPanelPlacement();
+		}
+	}, [
+		applyInboxOpportunityPanelPlacement,
+		isPersistedSendQueueUiVisible,
+		pinnedInboxOpportunity?.id,
+		selectedInboxOpportunity,
+		view,
+	]);
+
+	useLayoutEffect(() => {
+		if (view !== 'testing' && view !== 'drafting' && view !== 'inbox') return;
+		if (!pinnedRowResearchContact) return;
+		if (rowHoverOpportunity || rowHoverResearchContact) return;
+		if (
+			view === 'inbox' &&
+			(pinnedInboxOpportunity || selectedInboxOpportunity?.event)
+		) {
+			return;
+		}
+		applyPinnedRowResearchPanelPlacement();
+	}, [
+		applyPinnedRowResearchPanelPlacement,
+		pinnedInboxOpportunity,
+		pinnedRowResearchContact,
+		rowHoverOpportunity,
+		rowHoverResearchContact,
+		selectedInboxEmailId,
+		selectedInboxOpportunity,
+		view,
+	]);
+
+	useLayoutEffect(() => {
+		if (!isPersistedSendQueueUiVisible || !sendQueueFocusedContact) return;
+		applyPinnedRowResearchPanelPlacement();
+	}, [
+		applyPinnedRowResearchPanelPlacement,
+		isPersistedSendQueueUiVisible,
+		persistedSendQueueFocusedIndex,
+		sendQueueFocusedContact,
+		view,
+	]);
+
+	useLayoutEffect(() => {
+		if (view !== 'inbox') return;
+		if (rowHoverOpportunity || rowHoverResearchContact) return;
+		if (selectedInboxOpportunity?.event || pinnedInboxOpportunity) {
+			pinRowResearchContact(null);
+			return;
+		}
+		if (selectedInboxEmailId == null) {
+			pinRowResearchContact(null);
+			return;
+		}
+		const contact = resolveInboxContactFromEmailId(selectedInboxEmailId);
+		if (!contact) return;
+		const isSamePinnedContact = pinnedRowResearchContactIdRef.current === contact.id;
+		pinnedRowResearchContactIdRef.current = contact.id;
+		if (!isSamePinnedContact) {
+			setPinnedRowResearchContact(contact);
+		}
+		applyPinnedRowResearchPanelPlacement();
+	}, [
+		applyPinnedRowResearchPanelPlacement,
+		pinRowResearchContact,
+		pinnedInboxOpportunity,
+		resolveInboxContactFromEmailId,
+		rowHoverOpportunity,
+		rowHoverResearchContact,
+		selectedInboxEmailId,
+		selectedInboxOpportunity,
+		view,
+	]);
+
+	useLayoutEffect(() => {
+		if (view !== 'inbox' || !rowHoverOpportunity) return;
+		applyInboxOpportunityPanelPlacement();
+	}, [applyInboxOpportunityPanelPlacement, rowHoverOpportunity, view]);
+
+	useLayoutEffect(() => {
+		if (view !== 'inbox') return;
+		if (isPersistedSendQueueUiVisible) return;
+		if (rowHoverResearchContact || rowHoverOpportunity) return;
+		if (!pinnedInboxOpportunity) return;
+		applyInboxOpportunityPanelPlacement();
+	}, [
+		applyInboxOpportunityPanelPlacement,
+		isPersistedSendQueueUiVisible,
+		pinnedInboxOpportunity,
+		rowHoverOpportunity,
+		rowHoverResearchContact,
+		view,
+	]);
 
 	// Summary list is "loading" until both the campaign contacts and emails resolve —
 	// before that, all three lists are empty and the empty state would flash. The mock
@@ -3972,11 +4604,31 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// when the split map strip is visible). Rendered inside the
 	// [data-row-hover-research-anchor] wrapper. `enabled` lets the search/overview rail
 	// reuse this with its own gate (defaults to the pinned-list gate).
+	const activeRowOpportunity = isPersistedSendQueueUiVisible
+		? null
+		: rowHoverOpportunity ??
+			(view === 'inbox' && !rowHoverResearchContact ? pinnedInboxOpportunity : null);
+	const pinnedResearchForList =
+		isPersistedSendQueueUiVisible
+			? sendQueueFocusedContact
+			: view === 'testing' || view === 'drafting' || view === 'inbox'
+			? pinnedRowResearchContact
+			: null;
+	const activeRowResearchContact = activeRowOpportunity
+		? null
+		: isPersistedSendQueueUiVisible
+			? sendQueueFocusedContact
+			: rowHoverResearchContact ?? pinnedResearchForList;
+	const shouldHideRowResearchForWebsitePreview =
+		websitePreviewPlacement === 'left-slot';
+
 	const renderRowHoverResearchCard = (enabled = isRowHoverResearchEnabled) =>
 		// When the large right-side research panel is showing (expanded layout), the
 		// over-map hover card is suppressed — research/opportunity render in the right
 		// panel instead. The map-area card is reserved for the compressed/compact view.
-		isRightResearchPanelActive ? null : enabled && rowHoverOpportunity ? (
+		isRightResearchPanelActive || shouldHideRowResearchForWebsitePreview ? (
+			null
+		) : enabled && activeRowOpportunity?.event ? (
 			<div
 				className="absolute pointer-events-none"
 				style={{
@@ -3985,18 +4637,23 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					left: `${rowHoverResearchLeftPx}px`,
 				}}
 			>
-				<OpportunityHoverPanel application={rowHoverOpportunity} nowMs={Date.now()} />
+				<OpportunityHoverPanel application={activeRowOpportunity} nowMs={Date.now()} />
 			</div>
-		) : enabled && rowHoverResearchContact ? (
+		) : enabled && activeRowResearchContact ? (
+			// Interactive (not pointer-events-none) + hover bridge so the card stays
+			// alive while the pointer travels onto it to click the Website row.
 			<div
-				className="absolute pointer-events-none"
+				className="absolute"
 				style={{
 					zIndex: 40,
 					top: `${rowHoverResearchTopPx}px`,
 					left: `${rowHoverResearchLeftPx}px`,
+					pointerEvents: 'auto',
 				}}
+				onMouseEnter={cancelRowHoverResearchClear}
+				onMouseLeave={scheduleRowHoverResearchClear}
 			>
-				<ContactResearchHoverCard contact={rowHoverResearchContact} />
+				<ContactResearchHoverCard contact={activeRowResearchContact} />
 			</div>
 		) : null;
 
@@ -4323,6 +4980,72 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			</div>
 		);
 	};
+
+	const renderSendQueueBottomBar = () => (
+		<div
+			data-send-queue-apparatus
+			data-draft-button-container
+			className="flex items-center"
+			style={{ gap: 3, height: writeDraftBottomBarHeightPx }}
+		>
+			{blankBox('left-1', 0.1)}
+			{blankBox('left-2', 0.2)}
+			<button
+				type="button"
+				aria-label="Open search"
+				className="border-0 p-0 transition-opacity duration-150 hover:opacity-85"
+				style={{
+					...boxStyle,
+					background: '#FFFFFF',
+					cursor: onGoToSearch ? 'pointer' : 'default',
+				}}
+				onClick={onGoToSearch}
+			>
+				<SearchIconDesktop width={17} height={18} stroke="#8B8B8B" strokeWidth={2.3} />
+			</button>
+			<div
+				aria-hidden="true"
+				className="flex overflow-hidden"
+				style={{
+					width: 472,
+					height: writeDraftBottomBarHeightPx,
+					borderRadius: 5,
+					border: '2px solid #000',
+					boxSizing: 'border-box',
+					background: '#FFEAEA',
+				}}
+			>
+				<div style={{ flex: 1 }} />
+				<div
+					style={{
+						width: 58,
+						borderLeft: '2px solid #000',
+						background: '#EB8586',
+					}}
+				/>
+			</div>
+			{counterBox({
+				label: 'drafts',
+				count: draftCount,
+				background: '#FFE3AA',
+				onClick: draftCount > 0 ? goToDrafting : undefined,
+			})}
+			{counterBox({
+				label: 'sent',
+				count: sentCount,
+				background: '#5AB478',
+				opacity: 0.2,
+				onClick: sentCount > 0 ? goToSent : undefined,
+			})}
+			{counterBox({
+				label: 'inbox',
+				count: inboxCount,
+				background: '#6EBED5',
+				opacity: 0.1,
+				onClick: inboxCount > 0 ? openInboxTab : undefined,
+			})}
+		</div>
+	);
 
 	// Render search dropdowns for the mini searchbar
 	const renderSearchDropdowns = () => {
@@ -4754,7 +5477,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					<div
 						className="relative w-full flex flex-col items-center"
 						style={{
-							...(shouldRenderSharedBottomPanels || shouldRenderWriteBottomDraftBar
+							...(shouldRenderSharedBottomPanels ||
+								shouldRenderWriteBottomDraftBar ||
+								shouldRenderSendQueueBottomBar
 								? { minHeight: `${sharedWideTabZoomEnvelopeBottomPx}px` }
 								: undefined),
 							// Envelope-expansion slack: lower the whole workspace cluster so it
@@ -4847,41 +5572,71 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onFolderDropdownOpenChange={setIsCampaignHeaderDropdownOpen}
 											width={mainContactsPanelWidthPx}
 										/>
-										{view === 'inbox' && (
-									<div
-										data-row-hover-research-anchor
-										style={{ position: 'relative', ...campaignHeaderPanelDimStyle }}
-									>
-										<ContactsExpandedList
-											contacts={contactsForContactsExpandedList}
-											{...contactsListSupplementalProps}
-											{...contactsListTopNavProps}
-											isLoading={isContactsLoading}
-											campaign={campaign}
-											focusMode="inbox"
-											inboxPanelTabRequest={inboxPanelTabRequest}
-											selectedInboxEmailId={selectedInboxEmailId}
-											onInboxEmailClick={handleInboxEmailClick}
-											onContactHover={handleResearchContactHover}
-											onContactRowHover={
-												isRowHoverResearchEnabled ? handleContactRowHoverResearch : undefined
-											}
-											onEventChatRowHover={
-												isRowHoverResearchEnabled ? handleEventChatRowHover : undefined
-											}
-											width={mainContactsPanelWidthPx}
-											height={mainContactsPanelHeightPx}
-										/>
-										{renderRowHoverResearchCard()}
-									</div>
-								)}
+										{view === 'inbox' &&
+											(isQueuePanelVisible ? (
+												<div
+													data-row-hover-research-anchor
+													style={{
+														position: 'relative',
+														...campaignHeaderPanelDimStyle,
+													}}
+												>
+													{renderQueuePanel(
+														mainContactsPanelWidthPx,
+														mainContactsPanelHeightPx
+													)}
+													{renderRowHoverResearchCard()}
+												</div>
+											) : (
+												<div
+													data-row-hover-research-anchor
+													style={{
+														position: 'relative',
+														...campaignHeaderPanelDimStyle,
+													}}
+												>
+													<ContactsExpandedList
+														contacts={contactsForContactsExpandedList}
+														{...contactsListSupplementalProps}
+														{...contactsListTopNavProps}
+														isLoading={isContactsLoading}
+														campaign={campaign}
+														focusMode="inbox"
+														inboxPanelTabRequest={inboxPanelTabRequest}
+														selectedInboxEmailId={selectedInboxEmailId}
+														onInboxEmailClick={handleInboxEmailClick}
+														onContactHover={handleResearchContactHover}
+														onContactRowHover={
+															isRowHoverResearchEnabled
+																? handleContactRowHoverResearch
+																: undefined
+														}
+														onEventChatRowHover={
+															isRowHoverResearchEnabled
+																? handleEventChatRowHover
+																: undefined
+														}
+														onEventChatRowClick={handleEventChatRowClick}
+														width={mainContactsPanelWidthPx}
+														height={mainContactsPanelHeightPx}
+													/>
+													{renderRowHoverResearchCard()}
+												</div>
+											))}
 								{view !== 'inbox' &&
-									(isSendingUiVisible ? (
-										<div style={campaignHeaderPanelDimStyle}>
-											<SendingExpandedList
-												width={mainContactsPanelWidthPx}
-												height={mainContactsPanelHeightPx}
-											/>
+									(isQueuePanelVisible ? (
+										<div
+											data-row-hover-research-anchor
+											style={{
+												position: 'relative',
+												...campaignHeaderPanelDimStyle,
+											}}
+										>
+											{renderQueuePanel(
+												mainContactsPanelWidthPx,
+												mainContactsPanelHeightPx
+											)}
+											{renderRowHoverResearchCard()}
 										</div>
 									) : isDraftPreviewOpen ? (
 										shouldShowPinnedRegenEmailPreview ? (
@@ -5515,21 +6270,46 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								<div
 									className="absolute"
 									data-research-panel-container
+									data-send-queue-apparatus={
+										isPersistedSendQueueUiVisible ? 'true' : undefined
+									}
 									style={{
-										top: isStandardSidePanelView
+										top: isStandardSidePanelView || isInboxSendQueueRightResearchPanelActive
 											? `${standardSidePanelTopOffsetPx}px`
 											: '29px',
 										left:
 											view === 'search'
 												? 'calc(50% + 384px + 32px)'
-												: view === 'inbox'
+												: isInboxSendQueueRightResearchPanelActive
+													? 'calc(50% + 250px + 32px)'
+													: view === 'inbox'
 													? isInboxTabNarrow
 														? 'calc(50% + 258px + 32px)' // 258px = half of 516px narrow inbox + 32px gap
 														: 'calc(50% + 453.5px + 32px)'
 													: 'calc(50% + 250px + 32px)',
 									}}
 								>
-									{isBatchDraftingInProgress ? (
+									{isPersistedSendQueueUiVisible ? (
+										<ContactResearchPanel
+											contact={displayedContactForResearch}
+											centerWebsitePreview={isCampaignWorkspaceExpanded}
+											style={
+												view === 'inbox' && !isInboxSendQueueRightResearchPanelActive
+													? { width: 259 }
+													: undefined
+											}
+											height={
+												isStandardSidePanelView || isInboxSendQueueRightResearchPanelActive
+													? standardResearchPanelHeightPx
+													: undefined
+											}
+											boxWidth={
+												view === 'inbox' && !isInboxSendQueueRightResearchPanelActive
+													? 247
+													: undefined
+											}
+										/>
+									) : isBatchDraftingInProgress ? (
 										<DraftPreviewExpandedList
 											contacts={contacts || []}
 											livePreview={liveDraftPreview}
@@ -5578,12 +6358,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									) : (
 										<ContactResearchPanel
 											contact={displayedContactForResearch}
+											centerWebsitePreview={isCampaignWorkspaceExpanded}
 											hideAllText={
 												// Hide all research text to show a chrome-only skeleton:
 												// - When the Drafts tab has no drafts
 												// - When the Sent tab is in its empty state
-												(contentView === 'drafting' && draftCount === 0) ||
-												(view === 'sent' && sentCount === 0)
+												!isPersistedSendQueueUiVisible &&
+												((contentView === 'drafting' && draftCount === 0) ||
+													(view === 'sent' && sentCount === 0))
 											}
 											style={view === 'inbox' ? { width: 259 } : undefined}
 											height={
@@ -6058,11 +6840,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<div
 													className="flex flex-col flex-shrink-0"
 													style={{
-														minHeight:
-															overviewRightRailSelectedContacts.length > 0
-																? OVERVIEW_SELECTION_PANEL_MIN_HEIGHT_PX
-																: 77 + 17 /* 77px header + ~17px translucent strip */,
-														maxHeight: `calc(100% - ${OVERVIEW_SEARCH_RESULTS_MIN_HEIGHT_PX + 9}px)`,
+														minHeight: overviewRightRailSelectionMinHeightPx,
+														maxHeight: overviewRightRailSelectionMaxHeightCss,
 														backgroundColor: 'rgba(214, 33, 39, 0.518)',
 														border: '3px solid #000',
 														borderRadius: '8px',
@@ -6150,7 +6929,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												className="flex flex-col flex-1 min-h-0"
 												style={{
-													minHeight: OVERVIEW_SEARCH_RESULTS_MIN_HEIGHT_PX,
+													minHeight: overviewRightRailSearchResultsMinHeightPx,
 													backgroundColor: 'rgba(214, 33, 39, 0.518)',
 													border: '1px solid #000',
 													borderRadius: '8px',
@@ -6724,21 +7503,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							/>
 												) : (
 													<>
-														<CampaignHeaderBox
-													campaignId={campaign?.id}
-													campaignName={campaign?.name || 'Untitled Campaign'}
-													toListNames={toListNames}
-													fromName={fromName}
-													contactsCount={contactsCount}
-													draftCount={draftCount}
-													sentCount={sentCount}
-													draftingProgress={draftingProgressForHeader}
-																	onFromClick={onOpenIdentityDialog}
-																	onDraftsClick={goToDrafting}
-																	onSentClick={goToSent}
-																	onFolderDropdownOpenChange={setIsCampaignHeaderDropdownOpen}
-																	width={330}
-																/>
 												{/* Compact Contacts table */}
 												<div
 									style={{
@@ -6748,8 +7512,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										...campaignHeaderPanelDimStyle,
 									}}
 												>
-													{isSendingUiVisible ? (
-														<SendingExpandedList width={330} height={263} />
+													{isQueuePanelVisible ? (
+														renderQueuePanel(330, 263)
 													) : (
 													<ContactsExpandedList
 														contacts={contactsForContactsExpandedList}
@@ -6780,7 +7544,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													)}
 												</div>
 												{/* Compact Research panel */}
-												{isBatchDraftingInProgress ? (
+												{isBatchDraftingInProgress && !isPersistedSendQueueUiVisible ? (
 													<DraftPreviewExpandedList
 														contacts={contacts || []}
 														livePreview={liveDraftPreview}
@@ -6791,7 +7555,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												) : (
 													<ContactResearchPanel
 														contact={displayedContactForResearch}
-														hideAllText={contactsAvailableForDrafting.length === 0}
+														centerWebsitePreview={isCampaignWorkspaceExpanded}
+														hideAllText={
+															!isPersistedSendQueueUiVisible &&
+															contactsAvailableForDrafting.length === 0
+														}
 														hideSummaryIfBullets={true}
 														height={347}
 														width={330}
@@ -6805,58 +7573,64 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 											{/* Right column: Writing box */}
 											<div data-campaign-interactive-surface>
-												<HybridPromptInput
-													trackFocusedField={trackFocusedField}
-													testMessage={campaign?.testMessage}
-													handleGenerateTestDrafts={handleGenerateTestDrafts}
-													isGenerationDisabled={isGenerationDisabled}
-													isPendingGeneration={isPendingGeneration}
-													isTest={isTest}
-													contact={contacts?.[0]}
-													onGoToDrafting={goToDrafting}
-													onGoToInbox={goToInbox}
-													onTestPreviewToggle={handleTestPreviewToggle}
-													onKeepTestDraft={() =>
-														handleKeepTestDraft(contacts?.[0] || null)
-													}
-													isKeepingTestDraft={isKeepingTestDraft}
-													draftCount={contactsTabSelectedIds.size}
-													onDraftClick={async () => {
-														if (contactsTabSelectedIds.size === 0) {
-															toast.error('Select at least one contact to draft messages.');
-															return;
+												{isPersistedSendQueueUiVisible ? (
+													renderQueueDeck()
+												) : (
+													<HybridPromptInput
+														trackFocusedField={trackFocusedField}
+														testMessage={campaign?.testMessage}
+														handleGenerateTestDrafts={handleGenerateTestDrafts}
+														isGenerationDisabled={isGenerationDisabled}
+														isPendingGeneration={isPendingGeneration}
+														isTest={isTest}
+														contact={contacts?.[0]}
+														onGoToDrafting={goToDrafting}
+														onGoToInbox={goToInbox}
+														onTestPreviewToggle={handleTestPreviewToggle}
+														onKeepTestDraft={() =>
+															handleKeepTestDraft(contacts?.[0] || null)
 														}
-														await handleGenerateDrafts(
-															Array.from(contactsTabSelectedIds.values())
-														);
-													}}
-													isDraftDisabled={contactsTabSelectedIds.size === 0}
-													onSelectAllContacts={handleSelectAllContacts}
-													isAllContactsSelected={areAllContactsSelected}
-													totalContactCount={contactsAvailableForDrafting.length}
-													onGetSuggestions={handleGetSuggestions}
-													onUpscalePrompt={upscalePrompt}
-													isUpscalingPrompt={isUpscalingPrompt}
-													promptQualityScore={promptQualityScore}
-													promptQualityLabel={promptQualityLabel}
-													hasPreviousPrompt={hasPreviousPrompt}
-													onUndoUpscalePrompt={undoUpscalePrompt}
-													onHoverChange={handlePromptInputHoverChange}
-												onCustomInstructionsOpenChange={setIsCustomInstructionsOpen}
-												hideDraftButton={true}
-												identity={campaign?.identity}
-												onIdentityUpdate={handleIdentityUpdate}
-												onProfilePanelOpen={
-													shouldUseProfileSidePanel ? handleOpenProfileSidePanel : undefined
-												}
-												autoOpenProfileTabWhenIncomplete={
-													props.autoOpenProfileTabWhenIncomplete
-												}
-											/>
+														isKeepingTestDraft={isKeepingTestDraft}
+														draftCount={contactsTabSelectedIds.size}
+														onDraftClick={async () => {
+															if (contactsTabSelectedIds.size === 0) {
+																toast.error('Select at least one contact to draft messages.');
+																return;
+															}
+															await handleGenerateDrafts(
+																Array.from(contactsTabSelectedIds.values())
+															);
+														}}
+														isDraftDisabled={contactsTabSelectedIds.size === 0}
+														onSelectAllContacts={handleSelectAllContacts}
+														isAllContactsSelected={areAllContactsSelected}
+														totalContactCount={contactsAvailableForDrafting.length}
+														onGetSuggestions={handleGetSuggestions}
+														onUpscalePrompt={upscalePrompt}
+														isUpscalingPrompt={isUpscalingPrompt}
+														promptQualityScore={promptQualityScore}
+														promptQualityLabel={promptQualityLabel}
+														hasPreviousPrompt={hasPreviousPrompt}
+														onUndoUpscalePrompt={undoUpscalePrompt}
+														onHoverChange={handlePromptInputHoverChange}
+														onCustomInstructionsOpenChange={setIsCustomInstructionsOpen}
+														hideDraftButton={true}
+														identity={campaign?.identity}
+														onIdentityUpdate={handleIdentityUpdate}
+														onProfilePanelOpen={
+															shouldUseProfileSidePanel
+																? handleOpenProfileSidePanel
+																: undefined
+														}
+														autoOpenProfileTabWhenIncomplete={
+															props.autoOpenProfileTabWhenIncomplete
+														}
+													/>
+												)}
 											</div>
 										</div>
 										{/* Draft button with arrows - spans full width below both columns */}
-										{!shouldRenderWriteBottomDraftBar && (
+										{!isPersistedSendQueueUiVisible && !shouldRenderWriteBottomDraftBar && (
 											<div className="mt-4 w-full">
 											<div className="flex items-center justify-center gap-[29px] w-full">
 												{/* Left arrow */}
@@ -6994,53 +7768,57 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								) : (
 									/* Regular centered layout for wider viewports, or narrowest breakpoint with contacts below */
 									<div className="flex flex-col items-center">
-										<HybridPromptInput
-											trackFocusedField={trackFocusedField}
-											testMessage={campaign?.testMessage}
-											handleGenerateTestDrafts={handleGenerateTestDrafts}
-											isGenerationDisabled={isGenerationDisabled}
-											isPendingGeneration={isPendingGeneration}
-											isTest={isTest}
-											contact={contacts?.[0]}
-											onGoToDrafting={goToDrafting}
-											onGoToInbox={goToInbox}
-											onTestPreviewToggle={handleTestPreviewToggle}
-											draftCount={contactsTabSelectedIds.size}
-											onDraftClick={async () => {
-												if (contactsTabSelectedIds.size === 0) {
-													toast.error('Select at least one contact to draft messages.');
-													return;
+										{isPersistedSendQueueUiVisible ? (
+											renderQueueDeck()
+										) : (
+											<HybridPromptInput
+												trackFocusedField={trackFocusedField}
+												testMessage={campaign?.testMessage}
+												handleGenerateTestDrafts={handleGenerateTestDrafts}
+												isGenerationDisabled={isGenerationDisabled}
+												isPendingGeneration={isPendingGeneration}
+												isTest={isTest}
+												contact={contacts?.[0]}
+												onGoToDrafting={goToDrafting}
+												onGoToInbox={goToInbox}
+												onTestPreviewToggle={handleTestPreviewToggle}
+												draftCount={contactsTabSelectedIds.size}
+												onDraftClick={async () => {
+													if (contactsTabSelectedIds.size === 0) {
+														toast.error('Select at least one contact to draft messages.');
+														return;
+													}
+													await handleGenerateDrafts(
+														Array.from(contactsTabSelectedIds.values())
+													);
+												}}
+												isDraftDisabled={contactsTabSelectedIds.size === 0}
+												onSelectAllContacts={handleSelectAllContacts}
+												isAllContactsSelected={areAllContactsSelected}
+												totalContactCount={contactsAvailableForDrafting.length}
+												onGetSuggestions={handleGetSuggestions}
+												onUpscalePrompt={upscalePrompt}
+												isUpscalingPrompt={isUpscalingPrompt}
+												promptQualityScore={promptQualityScore}
+												promptQualityLabel={promptQualityLabel}
+												hasPreviousPrompt={hasPreviousPrompt}
+												onUndoUpscalePrompt={undoUpscalePrompt}
+												onHoverChange={handlePromptInputHoverChange}
+												onCustomInstructionsOpenChange={setIsCustomInstructionsOpen}
+												isNarrowestDesktop={isNarrowestDesktop}
+												hideDraftButton={shouldRenderWriteBottomDraftBar || isNarrowestDesktop}
+												identity={campaign?.identity}
+												onIdentityUpdate={handleIdentityUpdate}
+												onProfilePanelOpen={
+													shouldUseProfileSidePanel ? handleOpenProfileSidePanel : undefined
 												}
-												await handleGenerateDrafts(
-													Array.from(contactsTabSelectedIds.values())
-												);
-											}}
-											isDraftDisabled={contactsTabSelectedIds.size === 0}
-											onSelectAllContacts={handleSelectAllContacts}
-											isAllContactsSelected={areAllContactsSelected}
-											totalContactCount={contactsAvailableForDrafting.length}
-											onGetSuggestions={handleGetSuggestions}
-											onUpscalePrompt={upscalePrompt}
-											isUpscalingPrompt={isUpscalingPrompt}
-											promptQualityScore={promptQualityScore}
-											promptQualityLabel={promptQualityLabel}
-											hasPreviousPrompt={hasPreviousPrompt}
-											onUndoUpscalePrompt={undoUpscalePrompt}
-											onHoverChange={handlePromptInputHoverChange}
-											onCustomInstructionsOpenChange={setIsCustomInstructionsOpen}
-											isNarrowestDesktop={isNarrowestDesktop}
-											hideDraftButton={shouldRenderWriteBottomDraftBar || isNarrowestDesktop}
-											identity={campaign?.identity}
-											onIdentityUpdate={handleIdentityUpdate}
-											onProfilePanelOpen={
-												shouldUseProfileSidePanel ? handleOpenProfileSidePanel : undefined
-											}
-											autoOpenProfileTabWhenIncomplete={
-												props.autoOpenProfileTabWhenIncomplete
-											}
-										/>
+												autoOpenProfileTabWhenIncomplete={
+													props.autoOpenProfileTabWhenIncomplete
+												}
+											/>
+										)}
 										{/* Draft button with arrows at narrowest breakpoint */}
-										{isNarrowestDesktop && (
+										{isNarrowestDesktop && !isPersistedSendQueueUiVisible && (
 											<div className="mt-4 w-full">
 												<div className="flex items-center justify-center gap-[20px] w-full">
 													{/* Left arrow */}
@@ -7180,8 +7958,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											className="mt-[20px] w-full flex justify-center"
 											style={campaignHeaderPanelDimStyle}
 										>
-												{isSendingUiVisible ? (
-													<SendingExpandedList width={489} height={349} />
+												{isQueuePanelVisible ? (
+													renderQueuePanel(489, 349)
 												) : (
 												<ContactsExpandedList
 													contacts={contactsForContactsExpandedList}
@@ -7217,7 +7995,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												data-campaign-interactive-surface
 												className="mt-[20px] w-full flex justify-center"
 											>
-												{isBatchDraftingInProgress ? (
+												{isBatchDraftingInProgress && !isPersistedSendQueueUiVisible ? (
 													<DraftPreviewExpandedList
 														contacts={contacts || []}
 														livePreview={liveDraftPreview}
@@ -7228,7 +8006,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												) : (
 													<ContactResearchPanel
 														contact={displayedContactForResearch}
-														hideAllText={contactsAvailableForDrafting.length === 0}
+														centerWebsitePreview={isCampaignWorkspaceExpanded}
+														hideAllText={
+															!isPersistedSendQueueUiVisible &&
+															contactsAvailableForDrafting.length === 0
+														}
 														hideSummaryIfBullets={true}
 														height={400}
 														width={489}
@@ -7340,25 +8122,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													className="flex flex-col flex-shrink-0"
 													style={{ gap: '10px', width: '330px' }}
 												>
-													<CampaignHeaderBox
-														campaignId={campaign?.id}
-														campaignName={campaign?.name || 'Untitled Campaign'}
-														toListNames={toListNames}
-														fromName={fromName}
-														contactsCount={contactsCount}
-														draftCount={draftCount}
-														sentCount={sentCount}
-														draftingProgress={draftingProgressForHeader}
-														onFromClick={onOpenIdentityDialog}
-														onDraftsClick={goToDrafting}
-														onSentClick={goToSent}
-														onFolderDropdownOpenChange={setIsCampaignHeaderDropdownOpen}
-														width={330}
-													/>
 													{/* Drafts-mode activity list */}
 													<div style={{ width: '330px', ...campaignHeaderPanelDimStyle }}>
-														{isSendingUiVisible ? (
-															<SendingExpandedList width={330} height={316} />
+														{isQueuePanelVisible ? (
+															renderQueuePanel(330, 316)
 														) : (
 														<ContactsExpandedList
 															contacts={contactsForContactsExpandedList}
@@ -7391,7 +8158,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														)}
 													</div>
 													{/* Research panel - height set so bottom aligns with drafts table (59 + 10 + 316 + 10 + 308 = 703 = drafts table height) */}
-													{isBatchDraftingInProgress ? (
+													{isBatchDraftingInProgress && !isPersistedSendQueueUiVisible ? (
 														<DraftPreviewExpandedList
 															contacts={contacts || []}
 															livePreview={liveDraftPreview}
@@ -7402,7 +8169,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													) : (
 														<ContactResearchPanel
 															contact={displayedContactForResearch}
-															hideAllText={draftCount === 0}
+															centerWebsitePreview={isCampaignWorkspaceExpanded}
+															hideAllText={!isPersistedSendQueueUiVisible && draftCount === 0}
 															hideSummaryIfBullets={true}
 															height={308}
 															width={330}
@@ -7417,50 +8185,54 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													className="flex-shrink-0 [&>*]:!items-start"
 													style={{ width: '499px', overflow: 'visible' }}
 												>
-													<DraftedEmails
-														ref={draftedEmailsRef}
-														mainBoxId="drafts"
-														contacts={contacts || []}
-														selectedDraftIds={draftsTabSelectedIds}
-														selectedDraft={selectedDraft}
-														setSelectedDraft={setSelectedDraft}
-														setIsDraftDialogOpen={setIsDraftDialogOpen}
-														handleDraftSelection={handleDraftSelection}
-														draftEmails={draftEmailsForView}
-														isPendingEmails={isPendingEmails}
-														setSelectedDraftIds={setDraftsTabSelectedIds}
-														onSend={handleSendDrafts}
-														isSendingDisabled={isSendingDisabled}
-														isFreeTrial={isFreeTrial || false}
-														fromName={fromName}
-														fromEmail={fromEmail}
-														identity={campaign?.identity ?? null}
-														onIdentityUpdate={handleIdentityUpdate}
-														subject={form.watch('subject')}
-														onContactClick={handleResearchContactClick}
-														onContactHover={handleResearchContactHover}
-														onDraftHover={setHoveredDraftForSettings}
-														goToWriting={goToWriting}
-														goToSearch={onGoToSearch}
-														goToSent={goToSent}
-														goToInbox={goToInbox}
-														onRejectDraft={handleRejectDraft}
-														onApproveDraft={handleApproveDraft}
-														onRegenerateDraft={handleRegenerateDraft}
-														onRegenSettingsPreviewOpenChange={
-															setIsSelectedDraftRegenSettingsPreviewOpen
-														}
-														rejectedDraftIds={rejectedDraftIds}
-														approvedDraftIds={approvedDraftIds}
-														statusFilter={draftStatusFilter}
-														onStatusFilterChange={setDraftStatusFilter}
-														hideSendButton
-														lockDraftReviewOpen
-														isNarrowDesktop
-														compactReviewActionRow={shouldRenderDraftsBottomSendBar}
-														goToPreviousTab={goToPreviousTab}
-														goToNextTab={goToNextTab}
-													/>
+													{isPersistedSendQueueUiVisible ? (
+														renderQueueDeck()
+													) : (
+														<DraftedEmails
+															ref={draftedEmailsRef}
+															mainBoxId="drafts"
+															contacts={contacts || []}
+															selectedDraftIds={draftsTabSelectedIds}
+															selectedDraft={selectedDraft}
+															setSelectedDraft={setSelectedDraft}
+															setIsDraftDialogOpen={setIsDraftDialogOpen}
+															handleDraftSelection={handleDraftSelection}
+															draftEmails={draftEmailsForView}
+															isPendingEmails={isPendingEmails}
+															setSelectedDraftIds={setDraftsTabSelectedIds}
+															onSend={handleSendDrafts}
+															isSendingDisabled={isSendingDisabled}
+															isFreeTrial={isFreeTrial || false}
+															fromName={fromName}
+															fromEmail={fromEmail}
+															identity={campaign?.identity ?? null}
+															onIdentityUpdate={handleIdentityUpdate}
+															subject={form.watch('subject')}
+															onContactClick={handleResearchContactClick}
+															onContactHover={handleResearchContactHover}
+															onDraftHover={setHoveredDraftForSettings}
+															goToWriting={goToWriting}
+															goToSearch={onGoToSearch}
+															goToSent={goToSent}
+															goToInbox={goToInbox}
+															onRejectDraft={handleRejectDraft}
+															onApproveDraft={handleApproveDraft}
+															onRegenerateDraft={handleRegenerateDraft}
+															onRegenSettingsPreviewOpenChange={
+																setIsSelectedDraftRegenSettingsPreviewOpen
+															}
+															rejectedDraftIds={rejectedDraftIds}
+															approvedDraftIds={approvedDraftIds}
+															statusFilter={draftStatusFilter}
+															onStatusFilterChange={setDraftStatusFilter}
+															hideSendButton
+															lockDraftReviewOpen
+															isNarrowDesktop
+															compactReviewActionRow={shouldRenderDraftsBottomSendBar}
+															goToPreviousTab={goToPreviousTab}
+															goToNextTab={goToNextTab}
+														/>
+													)}
 												</div>
 											</div>
 											{/* Send Button with arrows - centered relative to full container width */}
@@ -7557,51 +8329,55 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													: {}),
 											}}
 										>
-											<DraftedEmails
-												ref={draftedEmailsRef}
-												mainBoxId="drafts"
-												contacts={contacts || []}
-												selectedDraftIds={draftsTabSelectedIds}
-												selectedDraft={selectedDraft}
-												setSelectedDraft={setSelectedDraft}
-												setIsDraftDialogOpen={setIsDraftDialogOpen}
-												handleDraftSelection={handleDraftSelection}
-												draftEmails={draftEmailsForView}
-												isPendingEmails={isPendingEmails}
-												setSelectedDraftIds={setDraftsTabSelectedIds}
-												onSend={handleSendDrafts}
-												isSendingDisabled={isSendingDisabled}
-												isFreeTrial={isFreeTrial || false}
-												fromName={fromName}
-												fromEmail={fromEmail}
-												identity={campaign?.identity ?? null}
-												onIdentityUpdate={handleIdentityUpdate}
-												subject={form.watch('subject')}
-												onContactClick={handleResearchContactClick}
-												onContactHover={handleResearchContactHover}
-												onDraftHover={setHoveredDraftForSettings}
-												goToWriting={goToWriting}
-												goToSearch={onGoToSearch}
-												goToSent={goToSent}
-												goToInbox={goToInbox}
-												onRejectDraft={handleRejectDraft}
-												onApproveDraft={handleApproveDraft}
-												onRegenerateDraft={handleRegenerateDraft}
-												onRegenSettingsPreviewOpenChange={
-													setIsSelectedDraftRegenSettingsPreviewOpen
-												}
-												rejectedDraftIds={rejectedDraftIds}
-												approvedDraftIds={approvedDraftIds}
-												statusFilter={draftStatusFilter}
-												onStatusFilterChange={setDraftStatusFilter}
-												hideSendButton={isNarrowestDesktop}
-												lockDraftReviewOpen
-												isNarrowestDesktop={isNarrowestDesktop}
-												isNarrowDesktop={isNarrowDesktop}
-												compactReviewActionRow={shouldRenderDraftsBottomSendBar}
-												goToPreviousTab={goToPreviousTab}
-												goToNextTab={goToNextTab}
-											/>
+											{isPersistedSendQueueUiVisible ? (
+												renderQueueDeck()
+											) : (
+												<DraftedEmails
+													ref={draftedEmailsRef}
+													mainBoxId="drafts"
+													contacts={contacts || []}
+													selectedDraftIds={draftsTabSelectedIds}
+													selectedDraft={selectedDraft}
+													setSelectedDraft={setSelectedDraft}
+													setIsDraftDialogOpen={setIsDraftDialogOpen}
+													handleDraftSelection={handleDraftSelection}
+													draftEmails={draftEmailsForView}
+													isPendingEmails={isPendingEmails}
+													setSelectedDraftIds={setDraftsTabSelectedIds}
+													onSend={handleSendDrafts}
+													isSendingDisabled={isSendingDisabled}
+													isFreeTrial={isFreeTrial || false}
+													fromName={fromName}
+													fromEmail={fromEmail}
+													identity={campaign?.identity ?? null}
+													onIdentityUpdate={handleIdentityUpdate}
+													subject={form.watch('subject')}
+													onContactClick={handleResearchContactClick}
+													onContactHover={handleResearchContactHover}
+													onDraftHover={setHoveredDraftForSettings}
+													goToWriting={goToWriting}
+													goToSearch={onGoToSearch}
+													goToSent={goToSent}
+													goToInbox={goToInbox}
+													onRejectDraft={handleRejectDraft}
+													onApproveDraft={handleApproveDraft}
+													onRegenerateDraft={handleRegenerateDraft}
+													onRegenSettingsPreviewOpenChange={
+														setIsSelectedDraftRegenSettingsPreviewOpen
+													}
+													rejectedDraftIds={rejectedDraftIds}
+													approvedDraftIds={approvedDraftIds}
+													statusFilter={draftStatusFilter}
+													onStatusFilterChange={setDraftStatusFilter}
+													hideSendButton={isNarrowestDesktop}
+													lockDraftReviewOpen
+													isNarrowestDesktop={isNarrowestDesktop}
+													isNarrowDesktop={isNarrowDesktop}
+													compactReviewActionRow={shouldRenderDraftsBottomSendBar}
+													goToPreviousTab={goToPreviousTab}
+													goToNextTab={goToNextTab}
+												/>
+											)}
 
 											{/* Send Button with arrows at narrowest breakpoint (< 952px) */}
 											{isNarrowestDesktop && draftEmailsForView.length > 0 && !selectedDraft && (
@@ -7679,7 +8455,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											{/* Research panel below send button at narrowest breakpoint (< 952px) */}
 											{isNarrowestDesktop && (
 												<div className="mt-[20px] w-full flex justify-center">
-													{isBatchDraftingInProgress ? (
+													{isBatchDraftingInProgress && !isPersistedSendQueueUiVisible ? (
 														<DraftPreviewExpandedList
 															contacts={contacts || []}
 															livePreview={liveDraftPreview}
@@ -7690,7 +8466,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													) : (
 														<ContactResearchPanel
 															contact={displayedContactForResearch}
-															hideAllText={draftCount === 0}
+															centerWebsitePreview={isCampaignWorkspaceExpanded}
+															hideAllText={!isPersistedSendQueueUiVisible && draftCount === 0}
 															hideSummaryIfBullets={true}
 															height={400}
 															width={489}
@@ -7783,21 +8560,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												className="flex flex-col flex-shrink-0"
 												style={{ gap: '10px', width: '330px' }}
 											>
-												<CampaignHeaderBox
-													campaignId={campaign?.id}
-													campaignName={campaign?.name || 'Untitled Campaign'}
-													toListNames={toListNames}
-													fromName={fromName}
-													contactsCount={contactsCount}
-													draftCount={draftCount}
-													sentCount={sentCount}
-													draftingProgress={draftingProgressForHeader}
-												onFromClick={onOpenIdentityDialog}
-												onDraftsClick={goToDrafting}
-												onSentClick={goToSent}
-												onFolderDropdownOpenChange={setIsCampaignHeaderDropdownOpen}
-												width={330}
-											/>
 												{/* Mini Email Structure panel */}
 											<div style={{ width: '330px', ...campaignHeaderPanelDimStyle }}>
 													<MiniEmailStructure
@@ -7847,7 +8609,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													/>
 												</div>
 												{/* Research panel below mini email structure - height set so bottom aligns with sent table (59 + 10 + 316 + 10 + 308 = 703 = sent table height) */}
-												{isBatchDraftingInProgress ? (
+												{isBatchDraftingInProgress && !isPersistedSendQueueUiVisible ? (
 													<DraftPreviewExpandedList
 														contacts={contacts || []}
 														livePreview={liveDraftPreview}
@@ -7858,7 +8620,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												) : (
 													<ContactResearchPanel
 														contact={displayedContactForResearch}
-														hideAllText={sentEmails.length === 0}
+														centerWebsitePreview={isCampaignWorkspaceExpanded}
+														hideAllText={
+															!isPersistedSendQueueUiVisible && sentEmails.length === 0
+														}
 														hideSummaryIfBullets={true}
 														height={308}
 														width={330}
@@ -7907,7 +8672,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* Research panel below sent box at narrowest breakpoint (< 952px) */}
 										{isNarrowestDesktop && (
 											<div className="mt-[20px] w-full flex justify-center">
-												{isBatchDraftingInProgress ? (
+												{isBatchDraftingInProgress && !isPersistedSendQueueUiVisible ? (
 													<DraftPreviewExpandedList
 														contacts={contacts || []}
 														livePreview={liveDraftPreview}
@@ -7918,7 +8683,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												) : (
 													<ContactResearchPanel
 														contact={displayedContactForResearch}
-														hideAllText={sentEmails.length === 0}
+														centerWebsitePreview={isCampaignWorkspaceExpanded}
+														hideAllText={
+															!isPersistedSendQueueUiVisible && sentEmails.length === 0
+														}
 														hideSummaryIfBullets={true}
 														height={400}
 														width={489}
@@ -8488,7 +9256,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															</div>
 														)}
 													</div>
-												) : isBatchDraftingInProgress ? (
+												) : isBatchDraftingInProgress && !isPersistedSendQueueUiVisible ? (
 													<DraftPreviewExpandedList
 														contacts={contacts || []}
 														livePreview={liveDraftPreview}
@@ -8499,7 +9267,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												) : (
 													<ContactResearchPanel
 														contact={displayedContactForResearch}
-														hideAllText={contactsAvailableForDrafting.length === 0}
+														centerWebsitePreview={isCampaignWorkspaceExpanded}
+														hideAllText={
+															!isPersistedSendQueueUiVisible &&
+															contactsAvailableForDrafting.length === 0
+														}
 														className="!block"
 													/>
 												)}
@@ -9265,7 +10037,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													</div>
 												</CustomScrollbar>
 											</div>
-										) : isBatchDraftingInProgress ? (
+										) : isBatchDraftingInProgress && !isPersistedSendQueueUiVisible ? (
 											<DraftPreviewExpandedList
 												contacts={contacts || []}
 												livePreview={liveDraftPreview}
@@ -9276,7 +10048,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										) : (
 											<ContactResearchPanel
 												contact={displayedContactForResearch}
-												hideAllText={contactsAvailableForDrafting.length === 0}
+												centerWebsitePreview={isCampaignWorkspaceExpanded}
+												hideAllText={
+													!isPersistedSendQueueUiVisible &&
+													contactsAvailableForDrafting.length === 0
+												}
 												hideSummaryIfBullets={true}
 												height={400}
 												width={498}
@@ -9292,169 +10068,21 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 						{/* Inbox tab: reuse the dashboard inbox UI, but scoped and labeled by campaign contacts */}
 						{view === 'inbox' && (
-							<div className="mt-6 flex flex-col items-center">
+							<div
+								className={cn(
+									'flex flex-col items-center',
+									!isNarrowestDesktop && 'mt-6'
+								)}
+							>
 								{isNarrowestDesktop ? (
 									// Narrowest layout (< 952px): the compact-workspace detail panel on top
 									// (501x703 — these exact dims gate InboxSection's campaign compact detail
 									// design), with the inbox list that sits to its left at wider widths
 									// stacked below it.
 									<div className="flex flex-col items-center w-full">
-										<InboxSection
-											allowedSenderEmails={campaignContactEmails}
-											contactByEmail={campaignContactsByEmail}
-											campaignId={campaign.id}
-											onGoToDrafting={goToDrafting}
-											onGoToWriting={goToWriting}
-											onGoToSearch={onGoToSearch}
-											inboxSentTabRequest={effectiveInboxSentTabRequest}
-											onInboxSentTabChange={onInboxSentTabChange}
-											onCampaignInboxEmpty={
-												inboxMockOverrideActive || !renderGlobalOverlays
-													? undefined
-													: handleCampaignInboxEmpty
-											}
-											selectedEmailId={selectedInboxEmailId}
-											onSelectedEmailIdChange={setSelectedInboxEmailId}
-											onThreadReplySent={handleInboxThreadReplySent}
-											autoSelectFirstEmail
-											detailOnly
-											hideSelectedEmailBackButton
-											desktopWidth={501}
-											desktopHeight={703}
-											sampleData={inboxSectionSampleData}
-											onContactSelect={(contact) => {
-												if (contact) {
-													setSelectedContactForResearch(contact);
-												}
-											}}
-											onContactHover={(contact) => {
-												setHoveredContactForResearch(contact);
-											}}
-											isNarrow={true}
-										/>
-										{/* Inbox mode of ContactsExpandedList drives the selected email in the detail panel above. */}
-										<div
-											className="mt-[20px]"
-											data-campaign-interactive-surface
-											style={campaignHeaderPanelDimStyle}
-										>
-											<ContactsExpandedList
-												contacts={contactsForContactsExpandedList}
-												{...contactsListSupplementalProps}
-												{...contactsListTopNavProps}
-												isLoading={isContactsLoading}
-												campaign={campaign}
-												focusMode="inbox"
-												inboxPanelTabRequest={inboxPanelTabRequest}
-												selectedInboxEmailId={selectedInboxEmailId}
-												onInboxEmailClick={handleInboxEmailClick}
-												onContactHover={handleResearchContactHover}
-												width={501}
-												height={582}
-												minRows={6}
-											/>
-										</div>
-									</div>
-								) : isInboxTabStacked || isNarrowDesktop ? (
-									// Stacked layout (952px - 1317px): left inbox column + the compact-workspace
-									// detail panel (501x703 gates InboxSection's campaign compact detail design).
-									// 912 = 375 left column + 36 gap + 501 detail.
-									<div
-										className="flex flex-col items-center mx-auto"
-										style={{ width: '912px' }}
-									>
-										<div className="flex flex-row items-start gap-[36px] w-full">
-											{/* Left column: Campaign Header + Inbox list */}
-											<div
-												data-campaign-interactive-surface
-												className="flex flex-col flex-shrink-0"
-												style={{ gap: '16px', width: '375px' }}
-											>
-												<CampaignHeaderBox
-													campaignId={campaign?.id}
-													campaignName={campaign?.name || 'Untitled Campaign'}
-													toListNames={toListNames}
-													fromName={fromName}
-													contactsCount={contactsCount}
-													draftCount={draftCount}
-													sentCount={sentCount}
-													draftingProgress={draftingProgressForHeader}
-												onFromClick={onOpenIdentityDialog}
-												onDraftsClick={goToDrafting}
-												onSentClick={goToSent}
-												onFolderDropdownOpenChange={setIsCampaignHeaderDropdownOpen}
-												width={375}
-											/>
-												{/* Inbox mode of ContactsExpandedList drives the selected email in the center panel. */}
-												<div style={campaignHeaderPanelDimStyle}>
-													<ContactsExpandedList
-														contacts={contactsForContactsExpandedList}
-														{...contactsListSupplementalProps}
-														{...contactsListTopNavProps}
-														isLoading={isContactsLoading}
-														campaign={campaign}
-														focusMode="inbox"
-														inboxPanelTabRequest={inboxPanelTabRequest}
-														selectedInboxEmailId={selectedInboxEmailId}
-														onInboxEmailClick={handleInboxEmailClick}
-														onContactHover={handleResearchContactHover}
-														width={375}
-														height={582}
-														minRows={6}
-													/>
-												</div>
-											</div>
-											{/* Right column: selected email detail */}
-											<div className="flex-shrink-0">
-												<InboxSection
-													allowedSenderEmails={campaignContactEmails}
-													contactByEmail={campaignContactsByEmail}
-													campaignId={campaign.id}
-													onGoToDrafting={goToDrafting}
-													onGoToWriting={goToWriting}
-													onGoToSearch={onGoToSearch}
-													inboxSentTabRequest={effectiveInboxSentTabRequest}
-													onInboxSentTabChange={onInboxSentTabChange}
-													onCampaignInboxEmpty={
-														inboxMockOverrideActive || !renderGlobalOverlays
-															? undefined
-															: handleCampaignInboxEmpty
-													}
-													selectedEmailId={selectedInboxEmailId}
-													onSelectedEmailIdChange={setSelectedInboxEmailId}
-													onThreadReplySent={handleInboxThreadReplySent}
-													autoSelectFirstEmail
-													detailOnly
-													hideSelectedEmailBackButton
-													desktopWidth={501}
-													desktopHeight={703}
-													sampleData={inboxSectionSampleData}
-													onContactSelect={(contact) => {
-														if (contact) {
-															setSelectedContactForResearch(contact);
-														}
-													}}
-													onContactHover={(contact) => {
-														setHoveredContactForResearch(contact);
-													}}
-													isNarrow={true}
-												/>
-											</div>
-										</div>
-									</div>
-								) : (
-									// Normal wide layout
-									<>
-										{/* Center panel: selected email detail.
-										    Cancel the wrapping `mt-6` so the box sits flush at the top of
-										    the flow — matching the Write/Drafts right panel, which has no
-										    top margin and so sits slightly above the left header box. */}
-										<div
-											style={{
-												transform: `translateX(${activeInboxMainPanelShiftRightPx}px)`,
-												marginTop: `${-inboxWideTopMarginPx}px`,
-											}}
-										>
+										{isPersistedSendQueueUiVisible ? (
+											renderQueueDeck()
+										) : (
 											<InboxSection
 												allowedSenderEmails={campaignContactEmails}
 												contactByEmail={campaignContactsByEmail}
@@ -9475,8 +10103,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												autoSelectFirstEmail
 												detailOnly
 												hideSelectedEmailBackButton
-												desktopWidth={activeInboxMainPanelWidthPx}
-												desktopHeight={activeInboxMainPanelHeightPx}
+												desktopWidth={501}
+												desktopHeight={703}
 												sampleData={inboxSectionSampleData}
 												onContactSelect={(contact) => {
 													if (contact) {
@@ -9486,15 +10114,187 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												onContactHover={(contact) => {
 													setHoveredContactForResearch(contact);
 												}}
-												isNarrow={isCampaignWorkspaceCompact || isInboxTabNarrow}
+												isNarrow={true}
 											/>
+										)}
+										{/* Inbox mode of ContactsExpandedList drives the selected email in the detail panel above. */}
+										<div
+											className="mt-[20px]"
+											data-campaign-interactive-surface
+											style={campaignHeaderPanelDimStyle}
+										>
+											{isQueuePanelVisible ? (
+												renderQueuePanel(501, 582)
+											) : (
+												<ContactsExpandedList
+													contacts={contactsForContactsExpandedList}
+													{...contactsListSupplementalProps}
+													{...contactsListTopNavProps}
+													isLoading={isContactsLoading}
+													campaign={campaign}
+													focusMode="inbox"
+													inboxPanelTabRequest={inboxPanelTabRequest}
+													selectedInboxEmailId={selectedInboxEmailId}
+													onInboxEmailClick={handleInboxEmailClick}
+													onContactHover={handleResearchContactHover}
+													width={501}
+													height={582}
+													minRows={6}
+												/>
+											)}
+										</div>
+									</div>
+								) : isInboxTabStacked || isNarrowDesktop ? (
+									// Stacked layout (952px - 1317px): left inbox column + the compact-workspace
+									// detail panel (501x703 gates InboxSection's campaign compact detail design).
+									// 912 = 375 left column + 36 gap + 501 detail.
+									<div
+										className="flex flex-col items-center mx-auto"
+										style={{ width: '912px' }}
+									>
+										<div className="flex flex-row items-start gap-[36px] w-full">
+											{/* Left column: Campaign Header + Inbox list */}
+											<div
+												data-campaign-interactive-surface
+												className="flex flex-col flex-shrink-0"
+												style={{ gap: '16px', width: '375px' }}
+											>
+												{/* Inbox mode of ContactsExpandedList drives the selected email in the center panel. */}
+												<div style={campaignHeaderPanelDimStyle}>
+													{isQueuePanelVisible ? (
+														renderQueuePanel(375, 582)
+													) : (
+														<ContactsExpandedList
+															contacts={contactsForContactsExpandedList}
+															{...contactsListSupplementalProps}
+															{...contactsListTopNavProps}
+															isLoading={isContactsLoading}
+															campaign={campaign}
+															focusMode="inbox"
+															inboxPanelTabRequest={inboxPanelTabRequest}
+															selectedInboxEmailId={selectedInboxEmailId}
+															onInboxEmailClick={handleInboxEmailClick}
+															onContactHover={handleResearchContactHover}
+															width={375}
+															height={582}
+															minRows={6}
+														/>
+													)}
+												</div>
+											</div>
+											{/* Right column: selected email detail */}
+											<div className="flex-shrink-0">
+												{isPersistedSendQueueUiVisible ? (
+													renderQueueDeck()
+												) : (
+													<InboxSection
+														allowedSenderEmails={campaignContactEmails}
+														contactByEmail={campaignContactsByEmail}
+														campaignId={campaign.id}
+														onGoToDrafting={goToDrafting}
+														onGoToWriting={goToWriting}
+														onGoToSearch={onGoToSearch}
+														inboxSentTabRequest={effectiveInboxSentTabRequest}
+														onInboxSentTabChange={onInboxSentTabChange}
+														onCampaignInboxEmpty={
+															inboxMockOverrideActive || !renderGlobalOverlays
+																? undefined
+																: handleCampaignInboxEmpty
+														}
+														selectedEmailId={selectedInboxEmailId}
+														onSelectedEmailIdChange={setSelectedInboxEmailId}
+														onThreadReplySent={handleInboxThreadReplySent}
+														autoSelectFirstEmail
+														detailOnly
+														hideSelectedEmailBackButton
+														desktopWidth={501}
+														desktopHeight={703}
+														sampleData={inboxSectionSampleData}
+														onContactSelect={(contact) => {
+															if (contact) {
+																setSelectedContactForResearch(contact);
+															}
+														}}
+														onContactHover={(contact) => {
+															setHoveredContactForResearch(contact);
+														}}
+														isNarrow={true}
+													/>
+												)}
+											</div>
+										</div>
+									</div>
+								) : (
+									// Normal wide layout
+									<>
+										{/* Center panel: selected email detail.
+										    Cancel the wrapping `mt-6` so the box sits flush at the top of
+										    the flow — matching the Write/Drafts right panel, which has no
+										    top margin and so sits slightly above the left header box. */}
+										<div
+											style={{
+												transform: `translateX(${activeInboxMainPanelShiftRightPx}px)`,
+												marginTop: `${-inboxWideTopMarginPx}px`,
+											}}
+										>
+											{isPersistedSendQueueUiVisible ? (
+												renderQueueDeck()
+											) : (
+												<InboxSection
+													allowedSenderEmails={campaignContactEmails}
+													contactByEmail={campaignContactsByEmail}
+													campaignId={campaign.id}
+													onGoToDrafting={goToDrafting}
+													onGoToWriting={goToWriting}
+													onGoToSearch={onGoToSearch}
+													inboxSentTabRequest={effectiveInboxSentTabRequest}
+													onInboxSentTabChange={onInboxSentTabChange}
+													onCampaignInboxEmpty={
+														inboxMockOverrideActive || !renderGlobalOverlays
+															? undefined
+															: handleCampaignInboxEmpty
+													}
+													selectedEmailId={selectedInboxEmailId}
+													onSelectedEmailIdChange={setSelectedInboxEmailId}
+													onThreadReplySent={handleInboxThreadReplySent}
+													autoSelectFirstEmail
+													detailOnly
+													hideSelectedEmailBackButton
+													desktopWidth={activeInboxMainPanelWidthPx}
+													desktopHeight={activeInboxMainPanelHeightPx}
+													sampleData={inboxSectionSampleData}
+													onContactSelect={(contact) => {
+														if (contact) {
+															setSelectedContactForResearch(contact);
+														}
+													}}
+													onContactHover={(contact) => {
+														setHoveredContactForResearch(contact);
+													}}
+													isNarrow={isCampaignWorkspaceCompact || isInboxTabNarrow}
+												/>
+											)}
 										</div>
 									</>
 								)}
 							</div>
 						)}
 
-						{shouldRenderWriteBottomDraftBar && (
+						{shouldRenderSendQueueBottomBar && (
+							<div
+								className="absolute left-0 right-0 z-30 flex justify-center"
+								style={{
+									top: `${writeDraftBottomBarSlotTopPx}px`,
+									transform: isCampaignWorkspaceCompact
+										? 'translateX(-180px)'
+										: undefined,
+								}}
+							>
+								{renderSendQueueBottomBar()}
+							</div>
+						)}
+
+						{shouldRenderWriteBottomDraftBar && !isPersistedSendQueueUiVisible && (
 							<div
 								className="absolute left-0 right-0 z-30 flex justify-center"
 								style={{
@@ -9508,7 +10308,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							</div>
 						)}
 
-						{shouldRenderDraftsBottomSendBar && (
+						{shouldRenderDraftsBottomSendBar && !isPersistedSendQueueUiVisible && (
 							<div
 								ref={draftsSendBarWrapperRef}
 								className="absolute left-0 right-0 z-30 flex justify-center"
@@ -9601,15 +10401,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				railHoverResearchPos &&
 				typeof document !== 'undefined' &&
 				createPortal(
+					// Interactive (not pointer-events-none) + hover bridge so the card stays
+					// alive while the pointer travels onto it to click the Website row.
 					<div
-						className="fixed pointer-events-none"
+						className="fixed"
 						style={{
 							zIndex: 9999,
 							top: `${railHoverResearchPos.topPx}px`,
 							left: `${railHoverResearchPos.leftPx}px`,
 							transform: `scale(${railHoverResearchPos.scale})`,
 							transformOrigin: 'top left',
+							pointerEvents: 'auto',
 						}}
+						onMouseEnter={cancelRailHoverResearchClear}
+						onMouseLeave={scheduleRailHoverResearchClear}
 					>
 						<ContactResearchHoverCard contact={railHoverResearchContact} />
 					</div>,

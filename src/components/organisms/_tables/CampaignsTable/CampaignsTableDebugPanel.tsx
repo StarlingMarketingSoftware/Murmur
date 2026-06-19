@@ -296,9 +296,9 @@ export const CampaignsTableDebugPanel: FC<Props> = ({ value, onChange }) => {
 					</div>
 
 					<div style={{ color: '#888', marginTop: 8, lineHeight: 1.4 }}>
-						Contacts controls the count shown in the Finder's Contacts folder
+						Contacts controls the count shown in the Finder&apos;s Contacts folder
 						when this campaign is expanded. Drafts/Sent feed the metric pills.
-						Updated controls the Updated column color + label ("Today" at 0,
+						Updated controls the Updated column color + label (&quot;Today&quot; at 0,
 						then mm.dd). New Emails is stored on the row for upcoming UI.
 					</div>
 				</>

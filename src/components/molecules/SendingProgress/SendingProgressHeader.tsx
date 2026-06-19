@@ -19,8 +19,9 @@ export interface SendingProgressHeaderProps {
 	/**
 	 * 'panel' embeds the header at the top of the sending contact list panel;
 	 * 'floating' wraps it in its own bordered green box (search-tab overlay).
+	 * 'dashboard' is the single-row queued-send header over the dashboard stack.
 	 */
-	variant: 'panel' | 'floating';
+	variant: 'panel' | 'floating' | 'dashboard';
 	width?: number | string;
 }
 
@@ -33,6 +34,64 @@ export const SendingProgressHeader: FC<SendingProgressHeaderProps> = ({
 	width,
 }) => {
 	const fillFraction = total > 0 ? Math.min(1, completedCount / total) : 0;
+
+	if (variant === 'dashboard') {
+		return (
+			<div
+				className="flex flex-row items-center gap-[13px] rounded-[6px] border-[1.5px] border-black px-1 pr-2 font-inter"
+				style={{
+					width: width ?? '100%',
+					height: 28,
+					backgroundColor: SENDING_PANEL_GREEN,
+				}}
+			>
+				<div
+					className="flex items-center justify-between rounded-[6px] border-[1.5px] border-white/90 px-3"
+					style={{ width: 185, height: 20 }}
+				>
+					<span className="text-[13px] font-medium leading-none text-white">
+						Sending
+					</span>
+					<span className="text-[13px] font-medium leading-none text-white tabular-nums">
+						{total}
+					</span>
+				</div>
+				<div className="flex flex-1 items-center justify-end gap-[13px]">
+					<span className="text-[13px] font-medium leading-none text-black select-none">
+						About
+					</span>
+					<button
+						type="button"
+						aria-label="Hide sending view"
+						onClick={onDismiss}
+						className="flex items-center justify-center text-black hover:opacity-70"
+						style={{ width: 18, height: 18 }}
+					>
+						<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+							<line
+								x1="3"
+								y1="3"
+								x2="13"
+								y2="13"
+								stroke="currentColor"
+								strokeWidth="2.5"
+								strokeLinecap="butt"
+							/>
+							<line
+								x1="13"
+								y1="3"
+								x2="3"
+								y2="13"
+								stroke="currentColor"
+								strokeWidth="2.5"
+								strokeLinecap="butt"
+							/>
+						</svg>
+					</button>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<div

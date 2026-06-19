@@ -14,6 +14,7 @@ import {
 	allUserContactListsOwned,
 } from '@/app/api/_utils';
 import { DraftingTone, HybridBlock, Prisma, Status } from '@prisma/client';
+import { cancelQueuedSendsForCampaign } from '@/app/api/_utils/sendQueue/cancel';
 import { ApiRouteParams } from '@/types';
 import { NextRequest } from 'next/server';
 
@@ -295,6 +296,15 @@ export async function DELETE(req: NextRequest, { params }: { params: ApiRoutePar
 				status: Status.deleted,
 			},
 		});
+
+		// Stop any queued cold sends for this campaign (delete pending rows + restore
+		// their Emails to draft). Best-effort: the worker's send-time campaign-active
+		// re-check is the backstop if this ever fails.
+		try {
+			await cancelQueuedSendsForCampaign(Number(id));
+		} catch (cancelError) {
+			console.error('[send-queue] cancel-on-delete failed', cancelError);
+		}
 
 		return apiNoContent();
 	} catch (error) {

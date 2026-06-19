@@ -10,7 +10,9 @@ import {
 	type CSSProperties,
 	type KeyboardEvent as ReactKeyboardEvent,
 	type MouseEvent as ReactMouseEvent,
+	type TouchEvent as ReactTouchEvent,
 	type UIEvent,
+	type WheelEvent as ReactWheelEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { debounce } from 'lodash';
@@ -269,7 +271,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	const syncDraft = useMemo(
 		() =>
 			debounce((isoKey: string, draft: CalendarEventDraft, date: Date) => {
-				const run = isDraftPersistable(draft, date)
+				const run: () => Promise<unknown> = isDraftPersistable(draft, date)
 					? () => {
 							const body = draftToUpsertBody(isoKey, draft);
 							if (
@@ -592,6 +594,12 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 
 	const handleCalendarScroll = (event: UIEvent<HTMLDivElement>) => {
 		setScrollTop(event.currentTarget.scrollTop);
+	};
+
+	const containCalendarScrollGesture = (
+		event: ReactWheelEvent<HTMLDivElement> | ReactTouchEvent<HTMLDivElement>
+	) => {
+		event.stopPropagation();
 	};
 
 	const handleScrollbarThumbMouseDown = (event: ReactMouseEvent<HTMLDivElement>) => {
@@ -1072,7 +1080,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 						? '#F14048'
 						: isHighlighted
 							? '#38E497'
-							: getCellBackground(gridMonthIndex, row, col);
+							: getCellBackground(date.getMonth(), row, col);
 
 					let label = String(date.getDate());
 					if (isTopRow) {
@@ -1233,6 +1241,8 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 					ref={scrollContainerRef}
 					data-lenis-prevent
 					onScroll={handleCalendarScroll}
+					onTouchMove={containCalendarScrollGesture}
+					onWheel={containCalendarScrollGesture}
 					style={
 						{
 							width: '100%',

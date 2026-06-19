@@ -708,7 +708,7 @@ export const DashboardResponsesDebugPanel: FC<Props> = ({ value, onChange }) => 
 					<div style={{ color: '#888', marginTop: 8, lineHeight: 1.4 }}>
 						Tab routes the row to Responses / Sent / Opportunities. Rows tagged
 						Opportunities also show in Responses (matches real-data behavior). Toggle
-						"Tied to contact record" to switch between contact-attached and unattached
+						&quot;Tied to contact record&quot; to switch between contact-attached and unattached
 						(generic inbox) rows. Category drives the icon; State drives the badge.
 					</div>
 				</div>
