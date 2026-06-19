@@ -25,7 +25,7 @@ export type WebsitePreviewAnchorRect = {
 };
 
 export type WebsitePreviewSize = 'default' | 'large';
-export type WebsitePreviewPlacement = 'auto' | 'left-slot';
+export type WebsitePreviewPlacement = 'auto' | 'left-slot' | 'center-modal';
 
 export type WebsitePreviewOptions = {
 	label?: string;
@@ -49,6 +49,7 @@ type WebsitePreviewActions = {
 	close: () => void;
 	activeContactId: number | null;
 	activeAnchorRect: WebsitePreviewAnchorRect | null;
+	activePlacement: WebsitePreviewPlacement | null;
 };
 
 // Default is a no-op so consumers rendered OUTSIDE the provider (e.g. ContactResearchPanel
@@ -58,6 +59,7 @@ const WebsitePreviewContext = createContext<WebsitePreviewActions>({
 	close: () => {},
 	activeContactId: null,
 	activeAnchorRect: null,
+	activePlacement: null,
 });
 
 export const useWebsitePreview = (): WebsitePreviewActions =>
@@ -142,8 +144,9 @@ export const WebsitePreviewProvider: FC<{ children: ReactNode }> = ({ children }
 			close,
 			activeContactId: active?.contactId ?? null,
 			activeAnchorRect: active?.anchorRect ?? null,
+			activePlacement: active?.placement ?? null,
 		}),
-		[openWebsite, close, active?.contactId, active?.anchorRect]
+		[openWebsite, close, active?.contactId, active?.anchorRect, active?.placement]
 	);
 
 	return (

@@ -138,6 +138,8 @@ export interface SendingResearchCardProps {
 	largeTopBadges?: boolean;
 	queuedTimelineTextColor?: string;
 	progressFraction?: number;
+	centerWebsitePreview?: boolean;
+	onWebsitePreviewOpen?: () => void;
 	layout?: 'compact' | 'dashboard';
 }
 
@@ -158,6 +160,8 @@ export const SendingResearchCard: FC<SendingResearchCardProps> = ({
 	largeTopBadges,
 	queuedTimelineTextColor,
 	progressFraction,
+	centerWebsitePreview = false,
+	onWebsitePreviewOpen,
 	layout = 'compact',
 }) => {
 	const hasHeight = height != null;
@@ -197,6 +201,15 @@ export const SendingResearchCard: FC<SendingResearchCardProps> = ({
 		typeof contact?.latitude === 'number' ? contact.latitude.toFixed(4) : '';
 	const longitude =
 		typeof contact?.longitude === 'number' ? contact.longitude.toFixed(4) : '';
+	const openContactWebsitePreview = (target: HTMLElement | null) => {
+		if (!websiteUrl) return;
+		openWebsite(websiteUrl, {
+			label: websiteHost(websiteUrl),
+			contactId: centerWebsitePreview ? null : contact?.id ?? null,
+			anchorRect: centerWebsitePreview ? null : buildWebsiteAnchorRect(target),
+		});
+		onWebsitePreviewOpen?.();
+	};
 
 	const factRow = (label: ReactNode, color: string, key: string) => (
 		<div
@@ -336,18 +349,12 @@ export const SendingResearchCard: FC<SendingResearchCardProps> = ({
 						onMouseDown={(e) => {
 							e.stopPropagation();
 							e.preventDefault();
-							openWebsite(websiteUrl, {
-								label: websiteHost(websiteUrl),
-								anchorRect: buildWebsiteAnchorRect(e.currentTarget),
-							});
+							openContactWebsitePreview(e.currentTarget);
 						}}
 						onKeyDown={(e) => {
 							if (e.key === 'Enter' || e.key === ' ') {
 								e.preventDefault();
-								openWebsite(websiteUrl, {
-									label: websiteHost(websiteUrl),
-									anchorRect: buildWebsiteAnchorRect(e.currentTarget),
-								});
+								openContactWebsitePreview(e.currentTarget);
 							}
 						}}
 					>
@@ -441,18 +448,12 @@ export const SendingResearchCard: FC<SendingResearchCardProps> = ({
 					onMouseDown={(e) => {
 						e.stopPropagation();
 						e.preventDefault();
-						openWebsite(websiteUrl, {
-							label: websiteHost(websiteUrl),
-							anchorRect: buildWebsiteAnchorRect(e.currentTarget),
-						});
+						openContactWebsitePreview(e.currentTarget);
 					}}
 					onKeyDown={(e) => {
 						if (e.key === 'Enter' || e.key === ' ') {
 							e.preventDefault();
-							openWebsite(websiteUrl, {
-								label: websiteHost(websiteUrl),
-								anchorRect: buildWebsiteAnchorRect(e.currentTarget),
-							});
+							openContactWebsitePreview(e.currentTarget);
 						}
 					}}
 				>

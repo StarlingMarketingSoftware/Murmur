@@ -370,7 +370,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		whiteOutOverviewCampaignsMiniTable = false,
 		whiteOutOverviewStrategyBox = false,
 	} = props;
-	const { activeContactId: websitePreviewContactId } = useWebsitePreview();
+	const { activePlacement: websitePreviewPlacement } = useWebsitePreview();
 	const [isCampaignHeaderDropdownOpen, setIsCampaignHeaderDropdownOpen] = useState(false);
 	const campaignHeaderPanelDimStyle: CSSProperties = {
 		opacity: isCampaignHeaderDropdownOpen || dimContactsExpandedList ? 0.5 : 1,
@@ -4621,14 +4621,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			? sendQueueFocusedContact
 			: rowHoverResearchContact ?? pinnedResearchForList;
 	const shouldHideRowResearchForWebsitePreview =
-		websitePreviewContactId != null &&
-		activeRowResearchContact?.id === websitePreviewContactId;
+		websitePreviewPlacement === 'left-slot';
 
 	const renderRowHoverResearchCard = (enabled = isRowHoverResearchEnabled) =>
 		// When the large right-side research panel is showing (expanded layout), the
 		// over-map hover card is suppressed — research/opportunity render in the right
 		// panel instead. The map-area card is reserved for the compressed/compact view.
-		isRightResearchPanelActive ? null : enabled && activeRowOpportunity?.event ? (
+		isRightResearchPanelActive || shouldHideRowResearchForWebsitePreview ? (
+			null
+		) : enabled && activeRowOpportunity?.event ? (
 			<div
 				className="absolute pointer-events-none"
 				style={{
@@ -4639,7 +4640,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			>
 				<OpportunityHoverPanel application={activeRowOpportunity} nowMs={Date.now()} />
 			</div>
-		) : enabled && activeRowResearchContact && !shouldHideRowResearchForWebsitePreview ? (
+		) : enabled && activeRowResearchContact ? (
 			// Interactive (not pointer-events-none) + hover bridge so the card stays
 			// alive while the pointer travels onto it to click the Website row.
 			<div
@@ -6292,6 +6293,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									{isPersistedSendQueueUiVisible ? (
 										<ContactResearchPanel
 											contact={displayedContactForResearch}
+											centerWebsitePreview={isCampaignWorkspaceExpanded}
 											style={
 												view === 'inbox' && !isInboxSendQueueRightResearchPanelActive
 													? { width: 259 }
@@ -6357,6 +6359,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									) : (
 										<ContactResearchPanel
 											contact={displayedContactForResearch}
+											centerWebsitePreview={isCampaignWorkspaceExpanded}
 											hideAllText={
 												// Hide all research text to show a chrome-only skeleton:
 												// - When the Drafts tab has no drafts
@@ -7553,6 +7556,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												) : (
 													<ContactResearchPanel
 														contact={displayedContactForResearch}
+														centerWebsitePreview={isCampaignWorkspaceExpanded}
 														hideAllText={
 															!isPersistedSendQueueUiVisible &&
 															contactsAvailableForDrafting.length === 0
@@ -8003,6 +8007,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												) : (
 													<ContactResearchPanel
 														contact={displayedContactForResearch}
+														centerWebsitePreview={isCampaignWorkspaceExpanded}
 														hideAllText={
 															!isPersistedSendQueueUiVisible &&
 															contactsAvailableForDrafting.length === 0
@@ -8165,6 +8170,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													) : (
 														<ContactResearchPanel
 															contact={displayedContactForResearch}
+															centerWebsitePreview={isCampaignWorkspaceExpanded}
 															hideAllText={!isPersistedSendQueueUiVisible && draftCount === 0}
 															hideSummaryIfBullets={true}
 															height={308}
@@ -8461,6 +8467,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													) : (
 														<ContactResearchPanel
 															contact={displayedContactForResearch}
+															centerWebsitePreview={isCampaignWorkspaceExpanded}
 															hideAllText={!isPersistedSendQueueUiVisible && draftCount === 0}
 															hideSummaryIfBullets={true}
 															height={400}
@@ -8614,6 +8621,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												) : (
 													<ContactResearchPanel
 														contact={displayedContactForResearch}
+														centerWebsitePreview={isCampaignWorkspaceExpanded}
 														hideAllText={
 															!isPersistedSendQueueUiVisible && sentEmails.length === 0
 														}
@@ -8676,6 +8684,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												) : (
 													<ContactResearchPanel
 														contact={displayedContactForResearch}
+														centerWebsitePreview={isCampaignWorkspaceExpanded}
 														hideAllText={
 															!isPersistedSendQueueUiVisible && sentEmails.length === 0
 														}
@@ -9259,6 +9268,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												) : (
 													<ContactResearchPanel
 														contact={displayedContactForResearch}
+														centerWebsitePreview={isCampaignWorkspaceExpanded}
 														hideAllText={
 															!isPersistedSendQueueUiVisible &&
 															contactsAvailableForDrafting.length === 0
@@ -10039,6 +10049,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										) : (
 											<ContactResearchPanel
 												contact={displayedContactForResearch}
+												centerWebsitePreview={isCampaignWorkspaceExpanded}
 												hideAllText={
 													!isPersistedSendQueueUiVisible &&
 													contactsAvailableForDrafting.length === 0

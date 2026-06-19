@@ -67,6 +67,8 @@ const STACK_BOX_SIZE_PX = 55;
 const STACK_BOX_RADIUS_PX = 17;
 const STACK_BOX_TILE_SIZE_PX = 44;
 const STACK_BOX_TILE_RADIUS_PX = 10.658;
+const STACK_BOX_HOVER_LABEL_HEIGHT_PX = 17;
+const STACK_BOX_HOVER_LABEL_BOTTOM_PX = -8;
 const STACK_BOX_FIRST_GAP_PX = 21;
 const STACK_BOX_SECOND_GAP_PX = 12;
 const TALL_STACK_BOX_WIDTH_PX = 56;
@@ -103,6 +105,19 @@ const TALL_STACK_INNER_BOX_BOTTOM_POSITIONS_PX = [
 	TALL_STACK_BOTTOM_ICON_BOTTOM_PX + TALL_STACK_ICON_PITCH_PX * 5,
 	TALL_STACK_BOTTOM_ICON_BOTTOM_PX + TALL_STACK_ICON_PITCH_PX * 6,
 ] as const;
+const TALL_STACK_CATEGORY_HOVER_LABELS = [
+	'Radio',
+	'Weddings',
+	'Coffee',
+	'Festivals',
+	'Wine',
+	'Venues',
+	'Restaurants',
+] as const;
+const TALL_STACK_CATEGORY_HOVER_LABEL_HEIGHT_PX = 17;
+const TALL_STACK_CATEGORY_HOVER_LABEL_OVERLAP_PX = 3;
+const TALL_STACK_CATEGORY_HOVER_AREA_HEIGHT_PX = TALL_STACK_ICON_PITCH_PX;
+const TALL_STACK_CATEGORY_HOVER_AREA_OFFSET_PX = TALL_STACK_ICON_VERTICAL_GAP_PX / 2;
 const TALL_STACK_INNER_BOX_STYLES = [
 	{ backgroundColor: '#FFD5E4' },
 	{ backgroundColor: '#F0E0A15C' },
@@ -1219,6 +1234,7 @@ export function MapSelectGrabStackBox({
 	inactiveContent,
 	isSelectActive = false,
 	selectedContent,
+	hoverLabel,
 	onActiveChange,
 }: {
 	className?: string;
@@ -1230,6 +1246,7 @@ export function MapSelectGrabStackBox({
 	inactiveContent?: ReactNode;
 	isSelectActive?: boolean;
 	selectedContent?: ReactNode;
+	hoverLabel?: string;
 	// Fires whenever the active state changes. In grab mode this is the grabber
 	// active state; in select mode this is the selected state, so the visible
 	// markers match the icon's green/on state.
@@ -1237,6 +1254,7 @@ export function MapSelectGrabStackBox({
 }) {
 	const [isSelected, setIsSelected] = useState(false);
 	const [isGrabActive, setIsGrabActive] = useState(true);
+	const [isHovering, setIsHovering] = useState(false);
 	const isSelectInteractive = isSelectActive && Boolean(selectedContent);
 	const isGrabInteractive = !isSelectActive && Boolean(inactiveContent);
 
@@ -1264,8 +1282,35 @@ export function MapSelectGrabStackBox({
 		display: 'flex',
 		alignItems: 'center',
 		justifyContent: 'center',
+		overflow: 'visible',
+		pointerEvents: hoverLabel ? 'auto' : undefined,
 		...style,
 	};
+	const hoverHandlers = hoverLabel
+		? {
+				onMouseEnter: () => setIsHovering(true),
+				onMouseLeave: () => setIsHovering(false),
+			}
+		: {};
+	const hoverLabelElement =
+		hoverLabel && isHovering ? (
+			<div
+				aria-hidden="true"
+				className="absolute pointer-events-none flex items-center justify-center whitespace-nowrap rounded-[10px] bg-[#FDFCFB] px-[6px] font-inter font-normal text-black"
+				style={{
+					left: '50%',
+					bottom: `${STACK_BOX_HOVER_LABEL_BOTTOM_PX}px`,
+					height: `${STACK_BOX_HOVER_LABEL_HEIGHT_PX}px`,
+					fontSize: '14px',
+					lineHeight: '39.473px',
+					textAlign: 'center',
+					transform: 'translateX(-50%)',
+					zIndex: 3,
+				}}
+			>
+				{hoverLabel}
+			</div>
+		) : null;
 
 	const selectedOverlay = (
 		<div
@@ -1289,10 +1334,13 @@ export function MapSelectGrabStackBox({
 
 	if (isSelectInteractive) {
 		return (
-			<div className={className} style={containerStyle}>
+			<div className={className} style={containerStyle} {...hoverHandlers}>
+				{hoverLabelElement}
 				<button
 					type="button"
 					onClick={handleSelectClick}
+					onFocus={() => setIsHovering(true)}
+					onBlur={() => setIsHovering(false)}
 					aria-pressed={isSelected}
 					aria-label={isSelected ? 'Deselect category' : 'Select category'}
 					style={{
@@ -1319,10 +1367,13 @@ export function MapSelectGrabStackBox({
 
 	if (isGrabInteractive) {
 		return (
-			<div className={className} style={containerStyle}>
+			<div className={className} style={containerStyle} {...hoverHandlers}>
+				{hoverLabelElement}
 				<button
 					type="button"
 					onClick={handleGrabClick}
+					onFocus={() => setIsHovering(true)}
+					onBlur={() => setIsHovering(false)}
 					aria-pressed={!isGrabActive}
 					aria-label={isGrabActive ? 'Deactivate' : 'Activate'}
 					style={{
@@ -1348,7 +1399,8 @@ export function MapSelectGrabStackBox({
 	}
 
 	return (
-		<div aria-hidden="true" className={className} style={containerStyle}>
+		<div aria-hidden="true" className={className} style={containerStyle} {...hoverHandlers}>
+			{hoverLabelElement}
 			{children}
 		</div>
 	);
@@ -1420,6 +1472,7 @@ export function MapSelectGrabTallStackBox({
 	const [grabberActiveCategories, setGrabberActiveCategories] = useState<boolean[]>(
 		() => new Array(TALL_STACK_CATEGORY_COUNT).fill(true)
 	);
+	const [hoveredCategoryIndex, setHoveredCategoryIndex] = useState<number | null>(null);
 
 	// Propagate the currently-active categories so consumers can filter map
 	// markers. In grab mode that's the per-tile active state; in select mode it's
@@ -1511,12 +1564,14 @@ export function MapSelectGrabTallStackBox({
 				height: `${TALL_STACK_BOX_HEIGHT_PX}px`,
 				borderRadius: `${TALL_STACK_BOX_RADIUS_PX}px`,
 				backgroundColor: '#FFFFFF',
-				overflow: 'hidden',
+				overflow: 'visible',
 				...style,
 			}}
 		>
 			<div style={{ position: 'relative', width: '100%', height: '100%' }}>
 				{(() => {
+					if (hoveredCategoryIndex === 0) return null;
+
 					const allLabelWidthPx = isSelectActive
 						? TALL_STACK_ALL_LABEL_SELECTED_WIDTH_PX
 						: TALL_STACK_ALL_LABEL_WIDTH_PX;
@@ -1526,9 +1581,10 @@ export function MapSelectGrabTallStackBox({
 					// Pre-rotation `width` becomes the visual height after rotate(90deg).
 					// We want the visual bottom of the rotated pill to stay anchored at
 					// TALL_STACK_ALL_LABEL_GAP_FROM_BOTTOM_PX from the panel bottom.
-					const allLabelBottomPx =
-						TALL_STACK_ALL_LABEL_GAP_FROM_BOTTOM_PX -
-						(allLabelHeightPx - allLabelWidthPx) / 2;
+					const allLabelBottomPx = isSelectActive
+						? TALL_STACK_ALL_LABEL_GAP_FROM_BOTTOM_PX -
+							(allLabelHeightPx - allLabelWidthPx) / 2
+						: TALL_STACK_ALL_LABEL_BOTTOM_PX;
 					const sharedAllLabelStyle: CSSProperties = {
 						position: 'absolute',
 						left: `${(TALL_STACK_BOX_WIDTH_PX - allLabelWidthPx) / 2}px`,
@@ -1643,35 +1699,76 @@ export function MapSelectGrabTallStackBox({
 				{TALL_STACK_INNER_BOX_BOTTOM_POSITIONS_PX.map((bottomPx, index) => {
 					const isCategorySelected =
 						isSelectActive && selectedCategories[index] === true;
+					const hoverLabel = TALL_STACK_CATEGORY_HOVER_LABELS[index];
+					const hoverLabelElement =
+						hoveredCategoryIndex === index && hoverLabel ? (
+							<div
+								aria-hidden="true"
+								className="absolute pointer-events-none flex items-center justify-center whitespace-nowrap rounded-[10px] bg-[#FDFCFB] px-[6px] font-inter font-normal text-black"
+								style={{
+									left: '50%',
+									bottom: `${
+										TALL_STACK_CATEGORY_HOVER_AREA_OFFSET_PX -
+										TALL_STACK_CATEGORY_HOVER_LABEL_HEIGHT_PX +
+										TALL_STACK_CATEGORY_HOVER_LABEL_OVERLAP_PX
+									}px`,
+									height: `${TALL_STACK_CATEGORY_HOVER_LABEL_HEIGHT_PX}px`,
+									fontSize: '14px',
+									lineHeight: '39.473px',
+									textAlign: 'center',
+									transform: 'translateX(-50%)',
+									zIndex: 3,
+								}}
+							>
+								{hoverLabel}
+							</div>
+						) : null;
+					const hoverAreaStyle: CSSProperties = {
+						position: 'absolute',
+						left: 0,
+						bottom: `${bottomPx - TALL_STACK_CATEGORY_HOVER_AREA_OFFSET_PX}px`,
+						width: '100%',
+						height: `${TALL_STACK_CATEGORY_HOVER_AREA_HEIGHT_PX}px`,
+						pointerEvents: 'auto',
+					};
 
 					if (isCategorySelected) {
 						const greenContent = getTallStackSelectTileContent(index);
 						return (
-							<button
+							<div
 								key={index}
-								type="button"
-								onClick={() => handleToggleCategory(index)}
-								aria-label="Deselect category"
-								style={{
-									position: 'absolute',
-									left: `${TALL_STACK_INNER_BOX_LEFT_PX}px`,
-									bottom: `${bottomPx}px`,
-									width: `${TALL_STACK_INNER_BOX_SIZE_PX}px`,
-									height: `${TALL_STACK_INNER_BOX_SIZE_PX}px`,
-									display: 'flex',
-									alignItems: 'center',
-									justifyContent: 'center',
-									background: 'transparent',
-									border: 0,
-									padding: 0,
-									margin: 0,
-									cursor: 'pointer',
-									pointerEvents: 'auto',
-									lineHeight: 0,
-								}}
+								onMouseEnter={() => setHoveredCategoryIndex(index)}
+								onMouseLeave={() => setHoveredCategoryIndex(null)}
+								style={hoverAreaStyle}
 							>
-								{greenContent}
-							</button>
+								{hoverLabelElement}
+								<button
+									type="button"
+									onClick={() => handleToggleCategory(index)}
+									onFocus={() => setHoveredCategoryIndex(index)}
+									onBlur={() => setHoveredCategoryIndex(null)}
+									aria-label="Deselect category"
+									style={{
+										position: 'absolute',
+										left: `${TALL_STACK_INNER_BOX_LEFT_PX}px`,
+										bottom: `${TALL_STACK_CATEGORY_HOVER_AREA_OFFSET_PX}px`,
+										width: `${TALL_STACK_INNER_BOX_SIZE_PX}px`,
+										height: `${TALL_STACK_INNER_BOX_SIZE_PX}px`,
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center',
+										background: 'transparent',
+										border: 0,
+										padding: 0,
+										margin: 0,
+										cursor: 'pointer',
+										pointerEvents: 'auto',
+										lineHeight: 0,
+									}}
+								>
+									{greenContent}
+								</button>
+							</div>
 						);
 					}
 
@@ -1691,7 +1788,7 @@ export function MapSelectGrabTallStackBox({
 					const sharedTileStyle: CSSProperties = {
 						position: 'absolute',
 						left: `${TALL_STACK_INNER_BOX_LEFT_PX}px`,
-						bottom: `${bottomPx}px`,
+						bottom: `${TALL_STACK_CATEGORY_HOVER_AREA_OFFSET_PX}px`,
 						width: `${TALL_STACK_INNER_BOX_SIZE_PX}px`,
 						height: `${TALL_STACK_INNER_BOX_SIZE_PX}px`,
 						borderRadius: tileBorderRadius,
@@ -1732,11 +1829,49 @@ export function MapSelectGrabTallStackBox({
 
 					if (isSelectActive) {
 						return (
-							<button
+							<div
 								key={index}
+								onMouseEnter={() => setHoveredCategoryIndex(index)}
+								onMouseLeave={() => setHoveredCategoryIndex(null)}
+								style={hoverAreaStyle}
+							>
+								{hoverLabelElement}
+								<button
+									type="button"
+									onClick={() => handleToggleCategory(index)}
+									onFocus={() => setHoveredCategoryIndex(index)}
+									onBlur={() => setHoveredCategoryIndex(null)}
+									aria-label="Select category"
+									style={{
+										...sharedTileStyle,
+										background: 'transparent',
+										border: 0,
+										padding: 0,
+										margin: 0,
+										cursor: 'pointer',
+										pointerEvents: 'auto',
+									}}
+								>
+									{tileChildren}
+								</button>
+							</div>
+						);
+					}
+
+					return (
+						<div
+							key={index}
+							onMouseEnter={() => setHoveredCategoryIndex(index)}
+							onMouseLeave={() => setHoveredCategoryIndex(null)}
+							style={hoverAreaStyle}
+						>
+							{hoverLabelElement}
+							<button
 								type="button"
-								onClick={() => handleToggleCategory(index)}
-								aria-label="Select category"
+								onClick={() => handleToggleGrabberActive(index)}
+								onFocus={() => setHoveredCategoryIndex(index)}
+								onBlur={() => setHoveredCategoryIndex(null)}
+								aria-label={isTileActive ? 'Deactivate category' : 'Activate category'}
 								style={{
 									...sharedTileStyle,
 									background: 'transparent',
@@ -1749,27 +1884,7 @@ export function MapSelectGrabTallStackBox({
 							>
 								{tileChildren}
 							</button>
-						);
-					}
-
-					return (
-						<button
-							key={index}
-							type="button"
-							onClick={() => handleToggleGrabberActive(index)}
-							aria-label={isTileActive ? 'Deactivate category' : 'Activate category'}
-							style={{
-								...sharedTileStyle,
-								background: 'transparent',
-								border: 0,
-								padding: 0,
-								margin: 0,
-								cursor: 'pointer',
-								pointerEvents: 'auto',
-							}}
-						>
-							{tileChildren}
-						</button>
+						</div>
 					);
 				})}
 			</div>

@@ -13696,6 +13696,7 @@ const DashboardContent = () => {
 												className="absolute left-0 pointer-events-none"
 												isSelectActive={isSelectMapToolActive}
 												selectedContent={<StackBoxSelectStarIcon />}
+												hoverLabel="Opportunities"
 												inactiveContent={
 													<MapSelectGrabStackTile backgroundColor="#EDF2F0">
 														<MapStackStarIcon fill="#EDF2F0" stroke="#9E9E9E" />
@@ -13719,6 +13720,7 @@ const DashboardContent = () => {
 												className="absolute left-0 pointer-events-none"
 												isSelectActive={isSelectMapToolActive}
 												selectedContent={<StackBoxSelectBlueSparkIcon />}
+												hoverLabel="People"
 												inactiveContent={
 													<MapSelectGrabStackTile backgroundColor="#EDF2F0">
 														<MapStackBlueSparkIcon fill="#9E9E9E" stroke="#EDF2F0" />

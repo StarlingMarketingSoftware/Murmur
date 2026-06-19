@@ -315,6 +315,10 @@ export interface ContactResearchPanelProps {
 	 * Useful for demo/landing page views where interaction should be limited.
 	 */
 	disableExpansion?: boolean;
+	/**
+	 * When true, opens website previews as a centered modal instead of docking to this panel.
+	 */
+	centerWebsitePreview?: boolean;
 }
 
 // Parse metadata sections [1], [2], etc. from the contact metadata field.
@@ -1143,6 +1147,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	height,
 	width,
 	boxWidth,
+	centerWebsitePreview = false,
 }) => {
 	const { openWebsite } = useWebsitePreview();
 	const [isWebsiteHovered, setIsWebsiteHovered] = useState(false);
@@ -1498,7 +1503,10 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 									size: target?.closest('[data-dashboard-website-preview-size="large"]')
 										? 'large'
 										: 'default',
-									anchorRect: buildWebsiteAnchorRect(target),
+									placement: centerWebsitePreview ? 'center-modal' : 'auto',
+									anchorRect: centerWebsitePreview
+										? null
+										: buildWebsiteAnchorRect(target),
 								})
 						: null;
 				return (

@@ -4147,6 +4147,7 @@ const Murmur = () => {
 											className="absolute left-0 pointer-events-none"
 											isSelectActive={isSelectMapToolActive}
 											selectedContent={<StackBoxSelectStarIcon />}
+											hoverLabel="Opportunities"
 											inactiveContent={
 												<MapSelectGrabStackTile backgroundColor="#EFEFEF">
 													<MapStackStarIcon />
@@ -4169,6 +4170,7 @@ const Murmur = () => {
 											className="absolute left-0 pointer-events-none"
 											isSelectActive={isSelectMapToolActive}
 											selectedContent={<StackBoxSelectBlueSparkIcon />}
+											hoverLabel="People"
 											inactiveContent={
 												<MapSelectGrabStackTile backgroundColor="#EFEFEF">
 													<MapStackBlueSparkIcon />
@@ -4967,6 +4969,7 @@ const Murmur = () => {
 									className="absolute left-0 pointer-events-none"
 									isSelectActive={isSelectMapToolActive}
 									selectedContent={<StackBoxSelectStarIcon />}
+									hoverLabel="Opportunities"
 									inactiveContent={
 										<MapSelectGrabStackTile backgroundColor="#EFEFEF">
 											<MapStackStarIcon />
@@ -4989,6 +4992,7 @@ const Murmur = () => {
 									className="absolute left-0 pointer-events-none"
 									isSelectActive={isSelectMapToolActive}
 									selectedContent={<StackBoxSelectBlueSparkIcon />}
+									hoverLabel="People"
 									inactiveContent={
 										<MapSelectGrabStackTile backgroundColor="#EFEFEF">
 											<MapStackBlueSparkIcon />

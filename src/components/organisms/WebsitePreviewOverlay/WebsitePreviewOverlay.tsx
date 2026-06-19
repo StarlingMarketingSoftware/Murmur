@@ -52,46 +52,85 @@ const LARGE_MAX_PANEL_HEIGHT_PX = 680;
 const LARGE_MIN_PANEL_WIDTH_PX = 460;
 const LARGE_MIN_PANEL_HEIGHT_PX = 380;
 const LARGE_TOP_OFFSET_PX = 96;
-const LOADING_PROGRESS_TICK_MS = 120;
-const LOADING_PROGRESS_CAP = 0.96;
-const LOADING_PROGRESS_EASE = 0.045;
 
-const WebsitePreviewLoadingSurface: FC = () => {
-	const [progress, setProgress] = useState(0);
+const WebsitePreviewLoadingSurface: FC = () => (
+	<div
+		className="absolute inset-0 overflow-hidden bg-transparent"
+		aria-live="polite"
+		aria-busy="true"
+	>
+		<span className="sr-only">Loading website preview</span>
+		<div className="murmur-website-preview-gradient-base absolute inset-0" />
+		<div className="murmur-website-preview-gradient-sweep absolute inset-[-35%]" />
+		<div className="murmur-website-preview-gradient-soften absolute inset-0" />
+		<style jsx global>{`
+			@keyframes murmur-website-preview-gradient-flow {
+				0% {
+					opacity: 0.72;
+					transform: translate3d(-42%, 2%, 0) scale(1.06);
+				}
+				50% {
+					opacity: 1;
+					transform: translate3d(0%, -2%, 0) scale(1.09);
+				}
+				100% {
+					opacity: 0.78;
+					transform: translate3d(42%, 1%, 0) scale(1.06);
+				}
+			}
 
-	useEffect(() => {
-		const id = setInterval(() => {
-			setProgress((prev) =>
-				prev >= LOADING_PROGRESS_CAP
-					? prev
-					: prev + (LOADING_PROGRESS_CAP - prev) * LOADING_PROGRESS_EASE
-			);
-		}, LOADING_PROGRESS_TICK_MS);
-		return () => clearInterval(id);
-	}, []);
+			.murmur-website-preview-gradient-base {
+				background: linear-gradient(
+					64deg,
+					rgba(255, 255, 255, 0.78) 5.55%,
+					rgba(203, 240, 255, 0.86) 36.49%,
+					rgba(152, 206, 227, 0.68) 93.44%
+				);
+			}
 
-	const display = Math.round(progress * 100);
+			.murmur-website-preview-gradient-sweep {
+				background: linear-gradient(
+					86deg,
+					rgba(255, 255, 255, 0) 0%,
+					rgba(152, 206, 227, 0.1) 21%,
+					rgba(203, 240, 255, 0.82) 35%,
+					rgba(255, 255, 255, 0.98) 47%,
+					rgba(255, 255, 255, 0.96) 56%,
+					rgba(203, 240, 255, 0.78) 68%,
+					rgba(152, 206, 227, 0.16) 82%,
+					rgba(255, 255, 255, 0) 100%
+				);
+				filter: blur(5px);
+				animation: murmur-website-preview-gradient-flow 7.5s ease-in-out infinite
+					alternate;
+				will-change: opacity, transform;
+			}
 
-	return (
-		<div
-			className="absolute inset-0 flex items-center justify-center bg-white"
-			aria-live="polite"
-			aria-busy="true"
-		>
-			<div className="flex w-[200px] max-w-[60%] flex-col items-center gap-[9px]">
-				<div className="h-[3px] w-full overflow-hidden rounded-full bg-black/15">
-					<div
-						className="h-full rounded-full bg-black transition-[width] duration-200 ease-out"
-						style={{ width: `${display}%` }}
-					/>
-				</div>
-				<div className="select-none text-xs tracking-[0.08em] text-black/60 tabular-nums">
-					{display}%
-				</div>
-			</div>
-		</div>
-	);
-};
+			.murmur-website-preview-gradient-soften {
+				background:
+					radial-gradient(
+						ellipse 72% 62% at 14% 94%,
+						rgba(152, 206, 227, 0.22),
+						rgba(255, 255, 255, 0) 68%
+					),
+					linear-gradient(
+						180deg,
+						rgba(255, 255, 255, 0.2) 0%,
+						rgba(255, 255, 255, 0.04) 48%,
+						rgba(255, 255, 255, 0.12) 100%
+					);
+				pointer-events: none;
+			}
+
+			@media (prefers-reduced-motion: reduce) {
+				.murmur-website-preview-gradient-sweep {
+					animation: none;
+					transform: none;
+				}
+			}
+		`}</style>
+	</div>
+);
 
 // Docks the panel just to the side of the research card (over the map), in layout
 // px — getBoundingClientRect is visual-space, so divide by the root scale (Chrome
@@ -374,7 +413,12 @@ export const WebsitePreviewOverlay: FC<WebsitePreviewOverlayProps> = ({
 	if (!url || typeof window === 'undefined') return null;
 
 	const headerLabel = label || websiteHost(url) || url;
-	const panelStyle = computePanelStyle(anchorRect ?? null, size, placement);
+	const isCenterModal = placement === 'center-modal';
+	const panelStyle = computePanelStyle(
+		isCenterModal ? null : anchorRect ?? null,
+		size,
+		placement
+	);
 
 	// Scale the desktop-width iframe down to the panel's inner width (no horizontal
 	// scrollbar). Height is divided back out so the scaled frame fills the panel.
@@ -402,87 +446,96 @@ export const WebsitePreviewOverlay: FC<WebsitePreviewOverlayProps> = ({
 			!contentReady);
 
 	return createPortal(
-		// No backdrop / no page dimming — this is a floating panel over the map, not a
-		// modal. Close via click-off or Esc.
-		<div
-			ref={panelRef}
-			className="z-[10000] flex flex-col overflow-hidden rounded-[22px] border-[3px] border-black bg-white"
-			style={panelStyle}
-			role="dialog"
-			aria-label={`Website preview: ${headerLabel}`}
-		>
-			{/* No header chrome — the box is just the site. Close via click-off or Esc. */}
+		<>
+			{isCenterModal && (
+				<div
+					className="fixed inset-0 z-[9999] bg-black/20"
+					aria-hidden="true"
+				/>
+			)}
 			<div
-				ref={bodyRef}
-				className="relative min-h-0 w-full flex-1 overflow-hidden bg-[#02040d]"
+				ref={panelRef}
+				className="z-[10000] flex flex-col overflow-hidden rounded-[22px] border-[2px] border-black bg-transparent"
+				style={panelStyle}
+				role="dialog"
+				aria-modal={isCenterModal ? true : undefined}
+				aria-label={`Website preview: ${headerLabel}`}
 			>
-				{showLoadingSurface && <WebsitePreviewLoadingSurface />}
-				{/* Least-privilege sandbox: allow-scripts only — never allow-same-origin (with allow-scripts that would let a same-origin frame script the parent; we also refuse to embed our own origin in the check above), no forms/popups. */}
-				{state.kind === 'framable' && (
-					<iframe
-						key={state.src}
-						src={state.src}
-						title={`Preview of ${headerLabel}`}
-						onLoad={onIframeLoad}
-						className={`absolute left-0 top-0 z-10 border-0 bg-white transition-opacity duration-700 ease-out ${
-							contentReady ? 'opacity-100' : 'pointer-events-none opacity-0'
-						}`}
-						style={iframeStyle}
-						sandbox="allow-scripts"
-						referrerPolicy="no-referrer"
-						loading="lazy"
-					/>
-				)}
-				{state.kind === 'screenshot' && (
-					<>
-						<a
-							href={state.src}
-							target="_blank"
-							rel="noopener noreferrer"
-							className={`absolute inset-0 z-10 block transition-opacity duration-700 ease-out ${
+				{/* No header chrome — the box is just the site. Close via click-off or Esc. */}
+				<div
+					ref={bodyRef}
+					className={`relative min-h-0 w-full flex-1 overflow-hidden ${
+						showLoadingSurface ? 'bg-transparent' : 'bg-white'
+					}`}
+				>
+					{showLoadingSurface && <WebsitePreviewLoadingSurface />}
+					{/* Least-privilege sandbox: allow-scripts only — never allow-same-origin (with allow-scripts that would let a same-origin frame script the parent; we also refuse to embed our own origin in the check above), no forms/popups. */}
+					{state.kind === 'framable' && (
+						<iframe
+							key={state.src}
+							src={state.src}
+							title={`Preview of ${headerLabel}`}
+							onLoad={onIframeLoad}
+							className={`absolute left-0 top-0 z-10 border-0 bg-white transition-opacity duration-700 ease-out ${
 								contentReady ? 'opacity-100' : 'pointer-events-none opacity-0'
 							}`}
-							aria-label={`Open ${headerLabel} in new tab`}
-						>
-							<Image
-								key={state.src}
-								src={`/api/website-screenshot?url=${encodeURIComponent(state.src)}`}
-								alt={`Preview of ${headerLabel}`}
-								onLoad={() => setContentReady(true)}
-								onError={() => setState({ kind: 'blocked' })}
-								fill
-								unoptimized
-								sizes="(max-width: 940px) 100vw, 940px"
-								className="object-cover"
-							/>
-							<div className="absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-white via-white/90 to-transparent px-4 pb-4 pt-12">
-								<span className="rounded-[8px] border-[2px] border-black bg-white px-4 py-2 text-sm font-semibold text-black">
-									Open in new tab ↗
-								</span>
+							style={iframeStyle}
+							sandbox="allow-scripts"
+							referrerPolicy="no-referrer"
+							loading="lazy"
+						/>
+					)}
+					{state.kind === 'screenshot' && (
+						<>
+							<a
+								href={state.src}
+								target="_blank"
+								rel="noopener noreferrer"
+								className={`absolute inset-0 z-10 block transition-opacity duration-700 ease-out ${
+									contentReady ? 'opacity-100' : 'pointer-events-none opacity-0'
+								}`}
+								aria-label={`Open ${headerLabel} in new tab`}
+							>
+								<Image
+									key={state.src}
+									src={`/api/website-screenshot?url=${encodeURIComponent(state.src)}`}
+									alt={`Preview of ${headerLabel}`}
+									onLoad={() => setContentReady(true)}
+									onError={() => setState({ kind: 'blocked' })}
+									fill
+									unoptimized
+									sizes="(max-width: 940px) 100vw, 940px"
+									className="object-cover"
+								/>
+								<div className="absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-white via-white/90 to-transparent px-4 pb-4 pt-12">
+									<span className="rounded-[8px] border-[2px] border-black bg-white px-4 py-2 text-sm font-semibold text-black">
+										Open in new tab ↗
+									</span>
+								</div>
+							</a>
+						</>
+					)}
+					{state.kind === 'blocked' && (
+						<div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-white px-6 text-center">
+							<div className="text-sm font-semibold text-black">
+								This site can&apos;t be previewed here
 							</div>
-						</a>
-					</>
-				)}
-				{state.kind === 'blocked' && (
-					<div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-white px-6 text-center">
-						<div className="text-sm font-semibold text-black">
-							This site can&apos;t be previewed here
+							<div className="max-w-full truncate text-sm text-gray-600">
+								{websiteHost(url) || url}
+							</div>
+							<a
+								href={url}
+								target="_blank"
+								rel="noopener noreferrer"
+								className="rounded-[8px] border-[2px] border-black bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-black hover:text-white"
+							>
+								Open in new tab ↗
+							</a>
 						</div>
-						<div className="max-w-full truncate text-sm text-gray-600">
-							{websiteHost(url) || url}
-						</div>
-						<a
-							href={url}
-							target="_blank"
-							rel="noopener noreferrer"
-							className="rounded-[8px] border-[2px] border-black bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-black hover:text-white"
-						>
-							Open in new tab ↗
-						</a>
-					</div>
-				)}
+					)}
+				</div>
 			</div>
-		</div>,
+		</>,
 		document.body
 	);
 };

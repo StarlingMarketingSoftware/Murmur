@@ -141,6 +141,7 @@ export const SendQueueView: FC<SendQueueViewProps> = ({ items, onClose }) => {
 				>
 					<ContactResearchPanel
 						contact={focused.contact}
+						centerWebsitePreview
 						width={RESEARCH_WIDTH}
 						boxWidth={RESEARCH_WIDTH - 15}
 						height={RESEARCH_HEIGHT}

@@ -131,6 +131,8 @@ export const DashboardSendQueueOverlay: FC<DashboardSendQueueOverlayProps> = ({
 							largeTopBadges
 							queuedTimelineTextColor="#000000"
 							progressFraction={dashboardProgressFraction}
+							centerWebsitePreview
+							onWebsitePreviewOpen={onClose}
 							layout="dashboard"
 						/>
 					</div>
@@ -156,6 +158,8 @@ export const DashboardSendQueueOverlay: FC<DashboardSendQueueOverlayProps> = ({
 						largeTopBadges
 						queuedTimelineTextColor="#000000"
 						progressFraction={dashboardProgressFraction}
+						centerWebsitePreview
+						onWebsitePreviewOpen={onClose}
 						layout="dashboard"
 					/>
 				</div>
