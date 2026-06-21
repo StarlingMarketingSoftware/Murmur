@@ -16,22 +16,6 @@ export const isSafariBrowser = (): boolean => {
 	);
 };
 
-/**
- * Synchronous mobile/tablet device check. Mirrors the logic in `useIsMobile`,
- * but usable at module/construction time (the hook returns null until a
- * post-mount effect resolves). Returns false during SSR.
- */
-export const isMobileDevice = (): boolean => {
-	if (typeof navigator === 'undefined' || typeof window === 'undefined') return false;
-	const ua = navigator.userAgent || '';
-	const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-	const isIOS =
-		/iPad|iPhone|iPod/.test(navigator.platform) ||
-		(navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-	const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-	return isIOS || (isMobileUA && isTouch);
-};
-
 export const isProblematicBrowser = (): boolean => {
 	if (typeof navigator === 'undefined') return false;
 	

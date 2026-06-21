@@ -296,15 +296,6 @@ export const OVERVIEW_PREWARM_DEBOUNCE_MS = 350;
 // worth, so micro-pans at deep zoom don't re-fire the prewarm.
 export const OVERVIEW_PREWARM_CENTER_QUANT_DEG = 1;
 
-// Settle window for the camera-driven contact-marker resample (Airbnb-style: markers
-// refresh once the user stops moving). LEADING+TRAILING: a discrete pan/zoom stop (one
-// moveend after a quiet period) recomputes IMMEDIATELY — no load-in delay — while a
-// gesture's `moveend` storm (zoom-slider jumpTo per frame, scroll-wheel/inertia eases,
-// prewarm jumpTo chains) fires moveends faster than this window and collapses into ONE
-// trailing resample. So this delay only ever applies to storm frames, never to a normal
-// stop. The lightweight slider/CTA updates stay immediate (not gated by this).
-export const MARKER_RECOMPUTE_SETTLE_MS = 140;
-
 // Scroll/pinch zoom feel. Mapbox defaults (wheel 1/450, pinch 1/100) feel
 // jumpy on a Mac trackpad — each tick traverses a lot of zoom, which reads
 // as "aggressive." Lowering both rates produces a slower, more gradual,

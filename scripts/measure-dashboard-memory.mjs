@@ -10,11 +10,6 @@
 //        NEXT_DIST_DIR=.next-baseline npx next start -p 3010
 //   2. node scripts/measure-dashboard-memory.mjs --url http://localhost:3010 --label baseline
 //
-// Add --mobile to emulate an iPhone (390x844, DPR 3, touch, iOS UA) so the
-// mobile-only tile-cache caps in SearchResultsMap actually engage. The in-page
-// refine searches are skipped on mobile (different UI); the pan sequence — the
-// main memory driver — still runs.
-//
 // Output: a phase-by-phase table on stdout and a JSON file under .memory-baselines/.
 //
 // Requirements: playwright-core (devDependency, no browser download — uses system
@@ -34,30 +29,7 @@ const arg = (name, fallback) => {
 const BASE_URL = arg('url', 'http://localhost:3010');
 const LABEL = arg('label', 'run');
 const IDLE_MS = Number(arg('idle-ms', 60_000));
-const MOBILE = ARGS.includes('--mobile');
-// Desktop render viewport (CSS px), as WxH; default matches the historical runs.
-// Larger viewports raise Mapbox's dynamic per-source tile-cache target, so use
-// e.g. --viewport 3840x2160 to exercise the maxTileCacheSize ceiling (a no-op at
-// <=1440p). Ignored with --mobile (the iPhone profile fixes its own viewport).
-const DESKTOP_VIEWPORT = arg('viewport', '1680x1050');
 const DEV_USER_ID = 'user_31VOcmWR88mYFCbyk2NkLzEW4oC';
-
-// iPhone emulation profile (Playwright/Chromium). Used only with --mobile.
-const IPHONE_UA =
-	'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
-const MOBILE_CONTEXT = {
-	viewport: { width: 390, height: 844 },
-	deviceScaleFactor: 3,
-	isMobile: true,
-	hasTouch: true,
-	userAgent: IPHONE_UA,
-};
-const parseViewport = (s) => {
-	const m = /^(\d+)x(\d+)$/.exec(String(s).trim());
-	if (!m) throw new Error(`--viewport must be WxH (e.g. 3840x2160); got "${s}"`);
-	return { width: Number(m[1]), height: Number(m[2]) };
-};
-const DESKTOP_CONTEXT = { viewport: parseViewport(DESKTOP_VIEWPORT) };
 
 // The committed entry search (rehydrates a real curated booking search and lands
 // in the interactive map view) and the in-page refine searches. Keep these lists
@@ -160,10 +132,7 @@ async function main() {
 		args: ['--enable-precise-memory-info'],
 	});
 	const browserCdp = await browser.newBrowserCDPSession();
-	console.log(
-		`mode: ${MOBILE ? 'mobile (iPhone emulation)' : `desktop (${DESKTOP_VIEWPORT})`}`
-	);
-	const context = await browser.newContext(MOBILE ? MOBILE_CONTEXT : DESKTOP_CONTEXT);
+	const context = await browser.newContext({ viewport: { width: 1680, height: 1050 } });
 	const page = await context.newPage();
 	const cdp = await context.newCDPSession(page);
 	await cdp.send('Performance.enable');
@@ -276,15 +245,7 @@ async function main() {
 		outDir,
 		`${LABEL}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
 	);
-	const viewport = MOBILE ? MOBILE_CONTEXT.viewport : DESKTOP_CONTEXT.viewport;
-	writeFileSync(
-		file,
-		JSON.stringify(
-			{ label: LABEL, baseUrl: BASE_URL, mobile: MOBILE, viewport, samples },
-			null,
-			2
-		)
-	);
+	writeFileSync(file, JSON.stringify({ label: LABEL, baseUrl: BASE_URL, samples }, null, 2));
 	console.log(`\nwrote ${file}`);
 
 	await browser.close();
