@@ -99,6 +99,8 @@ const clamp = (value: number, min: number, max: number): number =>
 const COLS = 7;
 const CELL_W_PX = 94.542;
 const OUTER_PADDING_PX = 4;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const TODAY_JUMP_BUTTON_SCALE = 0.72;
 export const DASHBOARD_CALENDAR_OUTER_WIDTH_PX = COLS * CELL_W_PX + OUTER_PADDING_PX * 2;
 
 // `position: fixed` coordinates live in the zoomed CSS coordinate space under
@@ -410,6 +412,37 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	};
 
 	const scrollbarState = getScrollbarState(scrollTop);
+	const todayCellBounds = (() => {
+		const today = new Date(
+			effectiveToday.getFullYear(),
+			effectiveToday.getMonth(),
+			effectiveToday.getDate()
+		);
+
+		for (let windowIndex = 0; windowIndex < monthWeekCounts.length; windowIndex += 1) {
+			const monthOffset = windowIndex - MONTH_WINDOW_RADIUS;
+			const monthStart = new Date(inMonthYear, inMonthIndex + monthOffset, 1);
+			const { startDate, weekCount } = getMonthGridSpec(
+				monthStart.getFullYear(),
+				monthStart.getMonth()
+			);
+			const daysFromGridStart = Math.round((today.getTime() - startDate.getTime()) / DAY_MS);
+			if (daysFromGridStart < 0 || daysFromGridStart >= weekCount * COLS) continue;
+
+			const rowIndex = Math.floor(daysFromGridStart / COLS);
+			const top = monthTopOffsetsPx[windowIndex] + rowIndex * CELL_H_PX;
+			return { top, bottom: top + CELL_H_PX };
+		}
+
+		return null;
+	})();
+	const todayCellFullyVisible =
+		todayCellBounds != null &&
+		todayCellBounds.top >= scrollTop - 1 &&
+		todayCellBounds.bottom <= scrollTop + INNER_HEIGHT_PX + 1;
+	const showTodayJumpButton =
+		!onDateSelect && !showFullMonth && todayCellBounds != null && !todayCellFullyVisible;
+	const todayJumpButtonTop = innerHeightPx == null ? '-45px' : '12px';
 
 	useLayoutEffect(() => {
 		const container = scrollContainerRef.current;
@@ -594,6 +627,23 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 
 	const handleCalendarScroll = (event: UIEvent<HTMLDivElement>) => {
 		setScrollTop(event.currentTarget.scrollTop);
+	};
+
+	const jumpToToday = (event: ReactMouseEvent<HTMLButtonElement>) => {
+		event.preventDefault();
+		event.stopPropagation();
+		const container = scrollContainerRef.current;
+		if (!container || todayCellBounds == null) return;
+
+		setActiveTimeDropdownField(null);
+		setTimeRangeError(null);
+		setActivePopup(null);
+		dragStateRef.current = null;
+		setIsDraggingScrollbar(false);
+
+		const centeredTop = todayCellBounds.top - (INNER_HEIGHT_PX - CELL_H_PX) / 2;
+		const targetScrollTop = clamp(centeredTop, 0, MAX_SCROLL_TOP_PX);
+		container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
 	};
 
 	const containCalendarScrollGesture = (
@@ -1269,6 +1319,43 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 					</div>
 				</div>
 			</div>
+
+			{showTodayJumpButton && (
+				<button
+					type="button"
+					aria-label="Scroll calendar to today"
+					onClick={jumpToToday}
+					style={{
+						position: 'absolute',
+						left: '50%',
+						top: todayJumpButtonTop,
+						transform: `translateX(-50%) scale(${TODAY_JUMP_BUTTON_SCALE})`,
+						transformOrigin: 'center',
+						zIndex: 60,
+						display: 'flex',
+						width: '148px',
+						padding: '3.589px 49.242px 3.411px 47.758px',
+						justifyContent: 'center',
+						alignItems: 'center',
+						border: 0,
+						borderRadius: '47.758px',
+						opacity: 0.9,
+						background: '#FFF',
+						boxShadow: '0 1.165px 2.33px 0 rgba(0, 0, 0, 0.05)',
+						boxSizing: 'border-box',
+						color: '#000000',
+						cursor: 'pointer',
+						fontFamily:
+							'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+						fontSize: '24px',
+						fontWeight: 400,
+						lineHeight: '29px',
+						whiteSpace: 'nowrap',
+					}}
+				>
+					Today
+				</button>
+			)}
 
 			{activePopup &&
 				activeDraft &&
