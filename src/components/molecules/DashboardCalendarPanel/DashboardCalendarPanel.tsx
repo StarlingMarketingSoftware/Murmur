@@ -1116,6 +1116,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 					const isoKey = toIsoKey(date);
 					const draft = effectiveDrafts[isoKey];
 					const showDraftSummary = draft != null && isDraftPersistable(draft, date);
+					const isOpenEvent = activePopup?.key === isoKey;
 					// A draft on today's cell still shows the event card; the green
 					// "today" pill only appears when the cell has no scheduled event.
 					const isHighlighted = isToday && !showDraftSummary;
@@ -1127,7 +1128,9 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 								? IN_MONTH_TEXT.color
 								: OUTSIDE_MONTH_TEXT_COLOR;
 					const cellBackground = showDraftSummary
-						? '#F67C7E'
+						? isOpenEvent
+							? '#F14048'
+							: '#F67C7E'
 						: isHighlighted
 							? '#38E497'
 							: getCellBackground(date.getMonth(), row, col);
