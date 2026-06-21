@@ -57,6 +57,7 @@ type DashboardCalendarPanelProps = {
 	frameless?: boolean;
 	mockState?: DashboardCalendarMockState;
 	onDateSelect?: (date: Date, event: ReactMouseEvent<HTMLButtonElement>) => void;
+	showTodayReturnButton?: boolean;
 	showFullMonth?: boolean;
 	/**
 	 * Override the visible window height (unscaled px). Used by the mobile
@@ -93,6 +94,7 @@ type CalendarScrollbarState =
 
 const clamp = (value: number, min: number, max: number): number =>
 	Math.min(Math.max(value, min), max);
+const CALENDAR_DAY_MS = 24 * 60 * 60 * 1000;
 
 // Width constants live at module scope so the mobile wrapper can compute its
 // scale factor from the exported outer width.
@@ -118,6 +120,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	frameless = false,
 	mockState,
 	onDateSelect,
+	showTodayReturnButton = false,
 	showFullMonth = false,
 	innerHeightPx,
 	persistEvents = false,
@@ -366,6 +369,48 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	// Month-specific diagonal color palettes live in calendarShared (also used by
 	// the inbox booking dropdown, which mirrors this grid's look).
 
+	const getCalendarDayDiff = (startDate: Date, endDate: Date): number =>
+		Math.round(
+			(Date.UTC(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()) -
+				Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate())) /
+				CALENDAR_DAY_MS
+		);
+
+	const getMonthOffsetFromAnchor = (year: number, monthIndex: number): number =>
+		(year - inMonthYear) * 12 + monthIndex - inMonthIndex;
+
+	const getTodayCellBounds = (): { top: number; bottom: number } | null => {
+		const todayWeekStartDate = addDays(effectiveToday, -effectiveToday.getDay());
+		const ownerMonthYear = todayWeekStartDate.getFullYear();
+		const ownerMonthIndex = todayWeekStartDate.getMonth();
+		const ownerWindowIndex =
+			getMonthOffsetFromAnchor(ownerMonthYear, ownerMonthIndex) + MONTH_WINDOW_RADIUS;
+
+		if (ownerWindowIndex < 0 || ownerWindowIndex >= monthTopOffsetsPx.length) {
+			return null;
+		}
+
+		const ownerGridSpec = getMonthGridSpec(ownerMonthYear, ownerMonthIndex);
+		const rowIndex = Math.floor(
+			getCalendarDayDiff(ownerGridSpec.startDate, todayWeekStartDate) / COLS
+		);
+
+		if (rowIndex < 0 || rowIndex >= monthWeekCounts[ownerWindowIndex]) {
+			return null;
+		}
+
+		const top = monthTopOffsetsPx[ownerWindowIndex] + rowIndex * CELL_H_PX;
+		return { top, bottom: top + CELL_H_PX };
+	};
+
+	const todayCellBounds = getTodayCellBounds();
+	const isTodayCellVisible =
+		todayCellBounds != null &&
+		todayCellBounds.bottom > scrollTop + 1 &&
+		todayCellBounds.top < scrollTop + INNER_HEIGHT_PX - 1;
+	const shouldShowTodayReturnButton =
+		showTodayReturnButton && todayCellBounds != null && !isTodayCellVisible;
+
 	const getScrollbarState = (nextScrollTop: number): CalendarScrollbarState => {
 		// The up/down scrollbar math assumes the window is smaller than one month
 		// grid; the taller mobile window has no meaningful "beyond current month"
@@ -594,6 +639,19 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 
 	const handleCalendarScroll = (event: UIEvent<HTMLDivElement>) => {
 		setScrollTop(event.currentTarget.scrollTop);
+	};
+
+	const handleTodayReturnClick = () => {
+		const container = scrollContainerRef.current;
+		if (!container || !todayCellBounds) return;
+
+		const nextScrollTop = clamp(
+			todayCellBounds.top - (INNER_HEIGHT_PX - CELL_H_PX) / 2,
+			0,
+			MAX_SCROLL_TOP_PX
+		);
+		container.scrollTop = nextScrollTop;
+		setScrollTop(nextScrollTop);
 	};
 
 	const containCalendarScrollGesture = (
@@ -1066,9 +1124,10 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 					const isoKey = toIsoKey(date);
 					const draft = effectiveDrafts[isoKey];
 					const showDraftSummary = draft != null && isDraftPersistable(draft, date);
-					// A draft on today's cell still shows the red event card; the green
+					// A draft on today's cell still shows the event card; the green
 					// "today" pill only appears when the cell has no scheduled event.
 					const isHighlighted = isToday && !showDraftSummary;
+					const isOpenEventCell = showDraftSummary && activePopup?.key === isoKey;
 					const textColor = showDraftSummary
 						? '#FFFFFF'
 						: isHighlighted
@@ -1077,7 +1136,9 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 								? IN_MONTH_TEXT.color
 								: OUTSIDE_MONTH_TEXT_COLOR;
 					const cellBackground = showDraftSummary
-						? '#F14048'
+						? isOpenEventCell
+							? '#F14048'
+							: '#F67C7E'
 						: isHighlighted
 							? '#38E497'
 							: getCellBackground(date.getMonth(), row, col);
@@ -1269,6 +1330,42 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 					</div>
 				</div>
 			</div>
+
+			{shouldShowTodayReturnButton && (
+				<button
+					type="button"
+					aria-label="Scroll calendar to today"
+					onClick={handleTodayReturnClick}
+					style={{
+						position: 'absolute',
+						top: innerHeightPx == null ? '-42px' : '10px',
+						left: '50%',
+						transform: 'translateX(-50%)',
+						display: 'flex',
+						width: '136px',
+						padding: '3px 43px 3px 42px',
+						justifyContent: 'center',
+						alignItems: 'center',
+						borderRadius: '47.758px',
+						opacity: 0.9,
+						background: '#FFF',
+						boxShadow: '0 1.165px 2.33px 0 rgba(0, 0, 0, 0.05)',
+						border: 0,
+						boxSizing: 'border-box',
+						color: '#1A1A1A',
+						cursor: 'pointer',
+						zIndex: 60,
+						fontFamily:
+							'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+						fontSize: '17px',
+						fontWeight: 400,
+						lineHeight: '20px',
+						whiteSpace: 'nowrap',
+					}}
+				>
+					Today
+				</button>
+			)}
 
 			{activePopup &&
 				activeDraft &&

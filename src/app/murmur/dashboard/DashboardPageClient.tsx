@@ -10226,8 +10226,11 @@ const DashboardContent = () => {
 				<div className="flex-1 min-h-0 w-full" style={{ overflow: 'hidden' }}>
 					{mobileActiveTab === 'folders' && <MobileFolderCards className="h-full" />}
 					{mobileActiveTab === 'calendar' && (
-					<MobileDashboardCalendar persistEvents={isSignedIn === true} />
-				)}
+						<MobileDashboardCalendar
+							persistEvents={isSignedIn === true}
+							showTodayReturnButton
+						/>
+					)}
 					{mobileActiveTab === 'inbox' && (
 						<DashboardResponsesWidget
 							mobile
@@ -15361,6 +15364,7 @@ const DashboardContent = () => {
 										<DashboardCalendarPanel
 											mockState={calendarMockState}
 											persistEvents={isSignedIn === true}
+											showTodayReturnButton
 										/>
 									)}
 									{selectedActionBarIcon === 'folder' && (
