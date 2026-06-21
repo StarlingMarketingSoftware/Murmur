@@ -76,7 +76,7 @@ import {
 	isWineBeerSpiritsTitle,
 	getWineBeerSpiritsLabel,
 } from '@/utils/restaurantTitle';
-import { isSafariBrowser } from '@/utils/browserDetection';
+import { isMobileDevice, isSafariBrowser } from '@/utils/browserDetection';
 import { markPerf } from '@/utils/perfMarks';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
@@ -288,6 +288,7 @@ import {
 	MARKER_CONSTELLATION_SELECTED_GLOW_OPACITY,
 	MARKER_CONSTELLATION_SELECTED_HALO_COLOR,
 	MARKER_CONSTELLATION_SELECTED_LINE_COLOR,
+	MARKER_RECOMPUTE_SETTLE_MS,
 	MAX_TOTAL_DOTS,
 	MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX,
 	MOOD_CONTINUOUS_TRANSITION_MS,
@@ -577,6 +578,23 @@ if (typeof window !== 'undefined') {
 // animated canvas sources paused between content updates instead. Module-level:
 // the UA never changes within a session (false during SSR; the map only runs client-side).
 const SAFARI_CANVAS_PERF_MODE = isSafariBrowser();
+
+// Memory-constrained devices (phones/tablets) get a tighter Mapbox tile cache
+// (see the map constructor). Module-level for the same reason as above: the
+// device class never changes within a session (false during SSR; the map only
+// runs client-side), and the cache config must be chosen at construction —
+// `useIsMobile()` is still null at that point.
+const LOW_MEMORY_DEVICE = isMobileDevice();
+
+// Real per-source tile-cache ceiling (replaces the prior inert 1024). Per the
+// Mapbox source-cache formula the dynamic per-source target is
+// `(ceil(w/512)+1)*(ceil(h/512)+1)*5`, clamped by min/max. This ceiling only
+// binds on large/ultrawide/4K viewports where that target exceeds it (a no-op at
+// <=1440p), so it trims retained tiles on the highest-memory machines without
+// touching the 64 floor that drives instant, flash-free zoom-out. Verified: at
+// 3840x2160 this drops every per-source cap from 270 to 128 (in-view working set
+// ~90 tiles stays comfortably cached); a no-op at <=2560x1440 (dynamic 100–120).
+const MAP_MAX_TILE_CACHE_SIZE = 128;
 
 // Upload the current canvas content to the source's GPU texture once, leaving the
 // source paused afterwards (CanvasSource.pause() runs prepare() — a synchronous
@@ -2179,6 +2197,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// key for dedupe, and the pending debounce timer handle.
 	const lastPrewarmKeyRef = useRef<string | null>(null);
 	const prewarmTimerRef = useRef<number | null>(null);
+	// Leading+trailing settle for the camera-driven marker resample (see onMoveEnd): the
+	// first stop after a quiet period recomputes IMMEDIATELY (markers fill the instant you
+	// stop — no load-in delay), while a gesture's moveend storm collapses into one trailing
+	// recompute. `markerSettleTimerRef` holds the trailing timer (cleared on movestart /
+	// data-driven recompute / unmount); `lastHeavyMarkerRunRef` timestamps the last run so
+	// the leading edge can tell a discrete stop apart from a storm.
+	const markerSettleTimerRef = useRef<number | null>(null);
+	const lastHeavyMarkerRunRef = useRef<number>(0);
 
 	const clearEmptyMapPrompt = useCallback(() => {
 		setEmptyMapPromptPoint(null);
@@ -9319,14 +9345,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			dragRotate: false,
 			pitchWithRotate: false,
 			touchPitch: false,
-			// Retain recently-displayed low-zoom basemap tiles in-memory across a deep
-			// zoom-in so zooming back out renders the center area instantly (no re-parse,
-			// no ocean-blue flash). `minTileCacheSize` is the floor that does this work;
-			// `maxTileCacheSize` is only a sane ceiling. (A bare `maxTileCacheSize` was a
-			// no-op: the cache is dynamically sized ~viewport*5 (~60) and max only clamps
-			// *down*. The floor is the lever.) Per source; ~128 ≈ 2× the dynamic default.
-			minTileCacheSize: 128,
-			maxTileCacheSize: 1024,
+			// Per-source tile cache. `minTileCacheSize` (the FLOOR) retains
+			// recently-displayed low-zoom basemap tiles so a zoom-out renders the center
+			// instantly (no re-parse, no ocean-blue flash); held at 64 (~2× the in-view tile
+			// count) rather than 128 to halve retained tiles per source — the dominant
+			// renderer-memory cost — at the cost of an occasional re-stream when zooming out
+			// after a deep zoom-in (the scaled parent tile shows meanwhile).
+			// `maxTileCacheSize` is the CEILING: the dynamic per-source target
+			// (~(ceil(w/512)+1)*(ceil(h/512)+1)*5) outgrows the floor on normal viewports and
+			// was previously capped only at an inert 1024, so on large/ultrawide/4K screens
+			// each source retained ~150–270 tiles. MAP_MAX_TILE_CACHE_SIZE caps that growth
+			// (a no-op at <=1440p, where the dynamic target stays below it). Memory-constrained
+			// devices omit the floor (dynamic ~viewport*5, ~40 on a phone) and take a tight
+			// ceiling so panning can't grow the cache.
+			minTileCacheSize: LOW_MEMORY_DEVICE ? undefined : 64,
+			maxTileCacheSize: LOW_MEMORY_DEVICE ? 64 : MAP_MAX_TILE_CACHE_SIZE,
 			refreshExpiredTiles: false,
 		});
 
@@ -12100,7 +12133,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!map) return;
 		if (isBackgroundPresentation) return;
+		// Data-driven recompute stays IMMEDIATE (new search results / isLoading /
+		// isStateLayerReady flips must render synchronously). Cancel any pending
+		// camera-settle pass so this isn't followed ~MARKER_RECOMPUTE_SETTLE_MS later
+		// by a redundant trailing recompute against the same viewport.
+		if (markerSettleTimerRef.current != null) {
+			window.clearTimeout(markerSettleTimerRef.current);
+			markerSettleTimerRef.current = null;
+		}
 		recomputeViewportDots(map);
+		// Count this immediate pass as the last heavy run so the next moveend within the
+		// settle window defers instead of redundantly re-running the leading edge.
+		lastHeavyMarkerRunRef.current = performance.now();
 	}, [
 		map,
 		isBackgroundPresentation,
@@ -12148,15 +12192,47 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!map) return;
 		if (!isMapLoaded) return;
 		if (isBackgroundPresentation) return;
-		const onMoveEnd = () => {
-			const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
-			setZoomLevel(zoom);
-			syncUsOnlyBasemapCartography(map);
-
+		// The heavy contact-marker resample + overlay-fetch decisions. Reads the map LIVE
+		// at call time (getBounds/getZoom happen inside the callees), so when this runs on a
+		// trailing settle it samples the FINAL camera, not where the gesture started.
+		const runHeavy = () => {
 			updateBookingExtraFetchBbox(map);
 			updatePromotionOverlayFetchBbox(map);
 			updateAllContactsOverlayFetchBbox(map);
 			recomputeViewportDots(map);
+			lastHeavyMarkerRunRef.current = performance.now();
+		};
+
+		// Leading+trailing settle. A discrete pan/zoom stop fires a single moveend after a
+		// quiet period → run IMMEDIATELY (markers fill the instant you stop, exactly as
+		// before the debounce — no load-in delay). A gesture STORM (zoom-slider jumpTo per
+		// frame, wheel/inertia eases, prewarm jumpTo chains) fires moveends faster than the
+		// settle window → collapse them into ONE trailing recompute. Existing GeoJSON
+		// markers pan natively during the gesture, so nothing is ever blank mid-move.
+		const scheduleHeavy = () => {
+			if (markerSettleTimerRef.current != null) {
+				window.clearTimeout(markerSettleTimerRef.current);
+				markerSettleTimerRef.current = null;
+			}
+			if (performance.now() - lastHeavyMarkerRunRef.current > MARKER_RECOMPUTE_SETTLE_MS) {
+				// Leading edge: first stop of a gesture — no waiting.
+				runHeavy();
+				return;
+			}
+			// Inside a storm: defer to the trailing edge so the storm collapses to one pass.
+			markerSettleTimerRef.current = window.setTimeout(() => {
+				markerSettleTimerRef.current = null;
+				runHeavy();
+			}, MARKER_RECOMPUTE_SETTLE_MS);
+		};
+
+		// The lightweight, must-stay-immediate work: zoom-gated React state, basemap
+		// cartography, and the parent viewport-idle callback (zoom-slider thumb sync +
+		// "Search this area" CTA). Cheap, and already ran on every moveend — keep it live.
+		const emitLight = () => {
+			const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
+			setZoomLevel(zoom);
+			syncUsOnlyBasemapCartography(map);
 
 			const bounds = map.getBounds();
 			const center = map.getCenter();
@@ -12194,11 +12270,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				isCenterInSearchArea,
 			});
 		};
+
+		const onMoveEnd = () => {
+			emitLight();
+			scheduleHeavy();
+		};
 		map.on('moveend', onMoveEnd);
-		// Initial fill
-		onMoveEnd();
+		// Initial fill: light + heavy both run immediately so first marker paint is not
+		// delayed by the settle window.
+		emitLight();
+		runHeavy();
 		return () => {
 			map.off('moveend', onMoveEnd);
+			if (markerSettleTimerRef.current != null) {
+				window.clearTimeout(markerSettleTimerRef.current);
+				markerSettleTimerRef.current = null;
+			}
 		};
 	}, [
 		map,
@@ -12464,12 +12551,24 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!map || !isMapLoaded) return;
 		if (isBackgroundPresentation) return;
 		const onMoveStart = () => {
+			// A fresh gesture cancels any pending trailing marker resample aimed at the
+			// viewport the user is already leaving; the new gesture's moveend re-arms it.
+			// (Do NOT freeze recompute here — movestart also fires for programmatic
+			// jumpTo/easeTo/fitBounds, and a freeze would starve new-search auto-fit.)
+			if (markerSettleTimerRef.current != null) {
+				window.clearTimeout(markerSettleTimerRef.current);
+				markerSettleTimerRef.current = null;
+			}
 			clearEmptyMapPrompt();
 			onViewportInteractionRef.current?.();
 		};
 		map.on('movestart', onMoveStart);
 		return () => {
 			map.off('movestart', onMoveStart);
+			if (markerSettleTimerRef.current != null) {
+				window.clearTimeout(markerSettleTimerRef.current);
+				markerSettleTimerRef.current = null;
+			}
 		};
 	}, [map, isMapLoaded, isBackgroundPresentation, clearEmptyMapPrompt]);
 
