@@ -614,7 +614,6 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 			handleDismiss();
 		};
 
-		// On touch devices the on-screen keyboard fires window resizes whenever a
 		// popup input gains focus — dismissing there would make the popup untypable.
 		const dismissOnResize = !window.matchMedia('(pointer: coarse)').matches;
 
@@ -625,9 +624,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		if (dismissOnResize) {
 			window.addEventListener('resize', handleDismiss);
 		}
-		// Capture-phase scroll listener catches scroll on any ancestor (including the
-		// calendar's internal scroll container during wheel-snap between months), while
-		// allowing internal popup controls like the time dropdown to scroll normally.
+		
 		if (!isModal) {
 			window.addEventListener('scroll', handleScrollDismiss, true);
 		}
@@ -970,9 +967,6 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 			return;
 		}
 
-		// Apple-style placement: prefer right of the cell, flip to the left when there
-		// isn't room. The popup is allowed to overhang the panel edges; it's only
-		// clamped to the viewport so nothing gets cut off the screen.
 		const roomRight = viewportWidth - cellRect.right - POPUP_CELL_GAP_PX;
 		const roomLeft = cellRect.left - POPUP_CELL_GAP_PX;
 
