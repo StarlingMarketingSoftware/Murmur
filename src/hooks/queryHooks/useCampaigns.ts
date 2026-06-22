@@ -25,6 +25,7 @@ export class CampaignApiError extends Error {
 const QUERY_KEYS = {
 	all: ['campaigns'] as const,
 	list: () => [...QUERY_KEYS.all, 'list'] as const,
+	deleted: () => [...QUERY_KEYS.all, 'deleted'] as const,
 	detail: (id: string | number) => [...QUERY_KEYS.all, 'detail', id.toString()] as const,
 } as const;
 
@@ -67,6 +68,29 @@ export const useGetCampaigns = () => {
 	return useQuery({
 		queryKey: getCampaignsListQueryKey(),
 		queryFn: fetchCampaignsList,
+	});
+};
+
+// Soft-deleted campaigns, for the ARCHIVE folder in the campaign manager. Same
+// enriched shape as the active list (the API reuses the GET handler via
+// `?status=deleted`). The key lives under QUERY_KEYS.all, so useDeleteCampaign's
+// invalidateQueries({ queryKey: QUERY_KEYS.all }) refetches it automatically — a
+// just-deleted campaign appears in the archive without any extra wiring.
+export const getDeletedCampaignsListQueryKey = () => QUERY_KEYS.deleted();
+
+export const fetchDeletedCampaignsList = async () => {
+	const response = await _fetch(`${urls.api.campaigns.index}?status=deleted`);
+	if (!response.ok) {
+		throw new Error('Failed to fetch deleted campaigns');
+	}
+	return response.json();
+};
+
+export const useGetDeletedCampaigns = (options: { enabled?: boolean } = {}) => {
+	return useQuery({
+		queryKey: getDeletedCampaignsListQueryKey(),
+		queryFn: fetchDeletedCampaignsList,
+		enabled: options.enabled ?? true,
 	});
 };
 

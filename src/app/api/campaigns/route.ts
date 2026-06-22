@@ -240,10 +240,16 @@ export async function GET(req: NextRequest) {
 			return apiUnauthorized();
 		}
 
+		// `?status=deleted` returns soft-deleted campaigns (for the ARCHIVE folder).
+		// Any other value (including no param) keeps the default active-only list so
+		// existing callers of GET /api/campaigns are unaffected.
+		const statusParam = req.nextUrl.searchParams.get('status');
+		const statusFilter = statusParam === 'deleted' ? Status.deleted : Status.active;
+
 		const campaigns = await prisma.campaign.findMany({
 			where: {
 				userId: userId,
-				status: Status.active,
+				status: statusFilter,
 			},
 			include: {
 				_count: {

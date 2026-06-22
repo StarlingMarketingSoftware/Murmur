@@ -4930,6 +4930,56 @@ main {
 	background-position: center top 8px !important;
 }
 
+/* Hover-to-delete: while a row's delete "X" is hovered (or the confirm is armed),
+   the whole row paints red (#E7677C). Driven by an invisible
+   .campaign-delete-warning-marker rendered into the row by useCampaignsTable.
+   Placed after the green right-hover rules so it wins if both ever match. */
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.campaign-delete-warning-marker)
+	> td {
+	background-color: transparent !important;
+	background-image: linear-gradient(#e7677c, #e7677c) !important;
+	background-position: center !important;
+	background-repeat: no-repeat !important;
+	background-size: 100% var(--campaign-row-hover-fill-height, 22px) !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:first-child:has(.campaign-delete-warning-marker)
+	> td {
+	background-position: center top 8px !important;
+}
+
+/* ARCHIVE folder + its deleted-campaign children paint a gray (#F2F2F2) band,
+   mirroring the delete-warning band's geometry. Invisible .archive-*-row-marker
+   spans (rendered by useCampaignsTable) drive the match. These rows use their own
+   pill/text classes, so the green right-hover and red delete rules never apply. */
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.archive-folder-row-marker)
+	> td,
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.archive-campaign-row-marker)
+	> td {
+	background-color: transparent !important;
+	background-image: linear-gradient(#f2f2f2, #f2f2f2) !important;
+	background-position: center !important;
+	background-repeat: no-repeat !important;
+	background-size: 100% var(--campaign-row-hover-fill-height, 22px) !important;
+}
+
+/* When all active campaigns are gone the ARCHIVE row can be first; nudge its band
+   down to match the first-row top padding (same as the delete-warning case). */
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:first-child:has(.archive-folder-row-marker)
+	> td {
+	background-position: center top 8px !important;
+}
+
 .my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
 	tbody
 	tr:has(td:nth-child(2):hover)
@@ -5392,12 +5442,43 @@ html.murmur-compact.murmur-dashboard-map-compact {
 	min-height: 253px !important;
 }
 
+/* Collapsed (no finder/split, archive collapsed): grow to fit the rows — incl. the
+   ARCHIVE folder — so the table never scrolls until something is expanded. The
+   253px floor keeps the dashboard's baseline size for users with few campaigns. */
+.campaigns-table-container .my-campaigns-table.desktop-campaigns-table.campaigns-table-flow,
+.my-campaigns-table.desktop-campaigns-table.campaigns-table-flow {
+	height: auto !important;
+	min-height: 253px !important;
+	max-height: none !important;
+}
+
+/* Archive expanded: grow up to the finder's 415px, then the deleted list scrolls
+   inside the table (max-height on the inner scroller makes h-full scroll). */
+.campaigns-table-container .my-campaigns-table.desktop-campaigns-table.campaigns-table-archive-open,
+.my-campaigns-table.desktop-campaigns-table.campaigns-table-archive-open {
+	height: auto !important;
+	min-height: 253px !important;
+	max-height: 415px !important;
+}
+.my-campaigns-table.desktop-campaigns-table.campaigns-table-archive-open .scrollbar-hide {
+	height: auto !important;
+	max-height: 415px !important;
+}
+
 .my-campaigns-table .scrollbar-hide {
 	height: 100% !important;
 	overflow-y: auto !important;
 	overflow-x: hidden !important;
 	scrollbar-width: none !important;
 	-ms-overflow-style: none !important;
+}
+
+/* While a delete confirmation is armed, CustomScrollbar sets data-scroll-locked and
+   freezes its wheel/drag/track handlers. The attribute selector outranks the
+   `overflow-y: auto !important` above so native scrolling is blocked too — the
+   row-anchored confirmation can't slide out from under its floating "✕ Delete" button. */
+.my-campaigns-table .scrollbar-hide[data-scroll-locked='true'] {
+	overflow-y: hidden !important;
 }
 
 .my-campaigns-table .scrollbar-hide::-webkit-scrollbar {
@@ -7439,35 +7520,22 @@ body.murmur-mobile .search-input-icon-btn {
 	border-radius: 0 !important;
 }
 
-.campaign-finder-split-table thead {
+/* Split-pane "Folders" header: render the real column header (which lives inside
+   the scroll container) instead of a position:absolute ::after pinned to the
+   non-scrolling pane. The pinned pseudo-element stayed stuck at top:53px while the
+   list scrolled past it on both sides; the real <thead> scrolls away with the
+   content exactly like the single-pane view. Only the Folders column is shown in a
+   split pane, so the metrics column header is hidden to match the hidden tbody cell. */
+.campaign-finder-split-table thead th:nth-child(2) {
 	display: none !important;
 }
 
-.campaign-finder-split-table [data-slot='table'] {
-	margin-top: 28px;
-}
-
-.campaign-finder-split-table::after {
-	content: 'Folders';
-	position: absolute;
-	top: 53px;
-	left: 10px;
-	z-index: 2;
-	display: flex;
-	align-items: center;
-	box-sizing: border-box;
-	width: calc(100% - 20px);
-	max-width: calc(100% - 20px);
-	height: 28px;
-	padding: 0 12px;
-	border-radius: 8px 8px 0 0;
-	background: #ffffff;
-	color: #000000;
-	font-family: var(--font-inter), Inter, sans-serif;
-	font-size: 13px;
-	font-weight: 500;
-	line-height: 16px;
-	pointer-events: none;
+.campaign-finder-split-table thead th:first-child {
+	width: 100% !important;
+	min-width: 0 !important;
+	max-width: none !important;
+	padding-left: 22px !important;
+	padding-right: 0 !important;
 }
 
 .campaign-finder-split-table tbody tr:not(:has(.campaign-finder-cell)) > td:nth-child(2) {
@@ -8013,6 +8081,40 @@ body.murmur-mobile .search-input-icon-btn {
 	text-overflow: ellipsis;
 }
 
+/* Custom cursor-following drag overlay for the split-view finder. Replaces the native
+   setDragImage pill so a green "+" add affordance can be glued to it on the destination
+   side. Position is set imperatively via transform from a document `dragover` listener.
+   pointer-events:none so it never intercepts the drag hit-testing that lights up the
+   drop panes; portaled to <body> to escape the `main { isolation: isolate }` trap. */
+.campaign-finder-drag-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	z-index: 100000;
+	pointer-events: none;
+	will-change: transform;
+	display: inline-block;
+}
+
+.campaign-finder-drag-overlay-hidden {
+	display: none;
+}
+
+/* Anchor the green "+" badge to the pill's bottom-left corner. */
+.campaign-finder-drag-overlay .campaign-finder-drag-preview {
+	position: relative;
+}
+
+.campaign-finder-drag-add-badge {
+	position: absolute;
+	left: -6px;
+	bottom: -6px;
+	width: 18px;
+	height: 18px;
+	line-height: 0;
+	pointer-events: none;
+}
+
 .campaign-finder-folder-row {
 	display: flex;
 	align-items: center;
@@ -8284,6 +8386,114 @@ body.murmur-mobile .search-input-icon-btn {
 
 .campaign-finder-info-popup-close::after {
 	transform: rotate(-45deg);
+}
+
+/* Campaign-row "Get Info" summary card (right-click menu → Get Info). Reuses the
+   finder popup's card chrome + close button, with a compact stats/dates layout. */
+.campaign-row-info-popup {
+	position: fixed;
+	box-sizing: border-box;
+	padding: 14px 14px 12px;
+	border: 1px solid #dedede;
+	border-radius: 12px;
+	background: #ffffff;
+	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+	font-family: var(--font-inter), Inter, sans-serif;
+	color: #000000;
+	pointer-events: auto;
+	user-select: none;
+}
+
+.campaign-row-info-popup-header {
+	display: flex;
+	align-items: center;
+	margin-bottom: 12px;
+	padding-right: 24px;
+}
+
+.campaign-row-info-popup-name-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	max-width: 100%;
+	height: 24px;
+	padding: 0 10px;
+	border-radius: 7px;
+}
+
+.campaign-row-info-popup-folder-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 11px;
+	flex: 0 0 18px;
+}
+
+.campaign-row-info-popup-name {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 14px;
+	font-weight: 600;
+	line-height: 18px;
+	color: #1a1a1a;
+}
+
+.campaign-row-info-popup-stats {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 6px;
+	margin-bottom: 12px;
+}
+
+.campaign-row-info-popup-stat {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	padding: 6px 2px;
+	border-radius: 7px;
+	background: #f4f4f4;
+}
+
+.campaign-row-info-popup-stat-value {
+	font-size: 15px;
+	font-weight: 600;
+	line-height: 18px;
+	color: #000000;
+}
+
+.campaign-row-info-popup-stat-label {
+	font-size: 11px;
+	font-weight: 500;
+	line-height: 13px;
+	color: #6b6b6b;
+}
+
+.campaign-row-info-popup-dates {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.campaign-row-info-popup-date-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	font-size: 12px;
+	line-height: 16px;
+}
+
+.campaign-row-info-popup-date-label {
+	font-weight: 500;
+	color: #6b6b6b;
+}
+
+.campaign-row-info-popup-date-value {
+	font-weight: 500;
+	color: #1a1a1a;
 }
 
 @media (max-width: 960px) {

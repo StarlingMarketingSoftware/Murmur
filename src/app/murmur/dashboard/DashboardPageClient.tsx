@@ -13386,6 +13386,7 @@ const DashboardContent = () => {
 															defaultOpenCampaignId={fromCampaign?.id ?? activeCampaignId ?? null}
 															defaultOpenContactsFolder
 															onFinderOpenChange={setIsCampaignFinderOpen}
+															enableRowDelete
 														/>
 													</div>
 												</div>
@@ -15372,6 +15373,7 @@ const DashboardContent = () => {
 											mockState={campaignsMockState}
 											onMockStateChange={setCampaignsMockState}
 											onFinderOpenChange={setIsCampaignFinderOpen}
+											enableRowDelete
 										/>
 									)}
 									{selectedActionBarIcon === 'star' && (

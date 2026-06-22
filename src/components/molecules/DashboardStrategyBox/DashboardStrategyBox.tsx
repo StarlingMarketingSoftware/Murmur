@@ -663,7 +663,7 @@ const DraftRowContent: FC<{ draft: EmailWithRelations }> = ({ draft }) => {
 	const subject = draft.subject?.trim() || '(No Subject)';
 	const message = (draft as unknown as { message?: string | null }).message;
 	const preview = stripPreviewBody(message);
-	const categoryPill = getContactCategoryPill(contact);
+	const categoryPill = getContactCategoryPill(contact, 12);
 
 	return (
 		<div
@@ -824,7 +824,7 @@ const GridDraftCard: FC<{
 	const subject = draft.subject?.trim() || '(No Subject)';
 	const message = (draft as unknown as { message?: string | null }).message;
 	const preview = stripPreviewBody(message);
-	const categoryPill = getContactCategoryPill(contact);
+	const categoryPill = getContactCategoryPill(contact, 12);
 
 	return (
 		<div
@@ -1005,7 +1005,7 @@ const SmallGridDraftCard: FC<{
 	const subject = draft.subject?.trim() || '(No Subject)';
 	const message = (draft as unknown as { message?: string | null }).message;
 	const preview = stripPreviewBody(message);
-	const categoryPill = getContactCategoryPill(contact);
+	const categoryPill = getContactCategoryPill(contact, 10);
 
 	return (
 		<div

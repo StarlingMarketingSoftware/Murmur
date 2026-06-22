@@ -25,52 +25,57 @@ export const getContactCategoryPill = (
 		| EmailWithRelations['contact']
 		| { headline?: string | null; title?: string | null }
 		| null
-		| undefined
+		| undefined,
+	iconSize = 14
 ): CategoryPillSpec | null => {
 	const c = contact as { headline?: string | null; title?: string | null } | null | undefined;
 	const headline = (c?.headline || c?.title || '').trim();
 	if (!headline) return null;
 
+	// CoffeeShopsIcon reads visually larger at a given box, so keep it 2px
+	// under the others (preserves the original 12-vs-14 relationship).
+	const coffeeSize = iconSize - 2;
+
 	if (isMusicVenueTitle(headline)) {
 		return {
 			label: 'Music Venue',
 			background: '#B7E5FF',
-			icon: <MusicVenuesIcon size={14} className="flex-shrink-0" />,
+			icon: <MusicVenuesIcon size={iconSize} className="flex-shrink-0" />,
 		};
 	}
 	if (isRestaurantTitle(headline)) {
 		return {
 			label: 'Restaurant',
 			background: '#C3FBD1',
-			icon: <RestaurantsIcon size={14} className="flex-shrink-0" />,
+			icon: <RestaurantsIcon size={iconSize} className="flex-shrink-0" />,
 		};
 	}
 	if (isCoffeeShopTitle(headline)) {
 		return {
 			label: 'Coffee',
 			background: '#D6F1BD',
-			icon: <CoffeeShopsIcon size={12} className="flex-shrink-0" />,
+			icon: <CoffeeShopsIcon size={coffeeSize} className="flex-shrink-0" />,
 		};
 	}
 	if (isWeddingPlannerTitle(headline)) {
 		return {
 			label: 'Wedding Planner',
 			background: '#FFF2BC',
-			icon: <WeddingPlannersIcon size={14} className="flex-shrink-0" />,
+			icon: <WeddingPlannersIcon size={iconSize} className="flex-shrink-0" />,
 		};
 	}
 	if (isWeddingVenueTitle(headline)) {
 		return {
 			label: 'Wedding Venue',
 			background: '#FFF2BC',
-			icon: <WeddingPlannersIcon size={14} className="flex-shrink-0" />,
+			icon: <WeddingPlannersIcon size={iconSize} className="flex-shrink-0" />,
 		};
 	}
 	if (isWineBeerSpiritsTitle(headline)) {
 		return {
 			label: 'W.B.S.',
 			background: '#BFC4FF',
-			icon: <WineBeerSpiritsIcon size={14} className="flex-shrink-0" />,
+			icon: <WineBeerSpiritsIcon size={iconSize} className="flex-shrink-0" />,
 		};
 	}
 	return null;
