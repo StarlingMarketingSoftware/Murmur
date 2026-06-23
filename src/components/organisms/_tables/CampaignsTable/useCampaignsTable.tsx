@@ -46,6 +46,10 @@ import {
 } from '@/components/molecules/CampaignDataTypeIconStrip/CampaignDataTypeIconStrip';
 import { EmailStatus } from '@/constants/prismaEnums';
 import { stateBadgeColorMap } from '@/constants/ui';
+import {
+	CAMPAIGN_TOP_NAV_SCHEMES,
+	getCampaignTopNavSchemeIndex,
+} from '@/hooks/useCampaignTopNavScheme';
 import { getStateAbbreviation } from '@/utils/string';
 import type { ContactWithName } from '@/types/contact';
 import type { CampaignWithRelations, EmailWithRelations, InboundEmailWithRelations } from '@/types';
@@ -578,20 +582,17 @@ const MOCK_FINDER_CONTACTS: FinderContactItem[] = [
 
 const DEFAULT_MOCK_FOLDER_NAMES = ['Orion', 'Leo', 'Pieces', 'Capricorn', 'Sagittarius'];
 const MOCK_CONTACT_ID_BASE = 100000;
-const CAMPAIGN_FOLDER_NAME_BOX_COLORS = [
-	'#B9EAF1',
-	'#CDCFF9',
-	'#D0FFEA',
-	'#F7EBC0',
-	'#EEC7F7',
-] as const;
-const CAMPAIGN_FOLDER_ICON_COLORS = [
-	'#B84A4A',
-	'#CB56D1',
-	'#A256D1',
-	'#56BFD1',
-	'#DDA544',
-] as const;
+// Folder colorway for the campaigns finder/table is the SAME per-campaign scheme
+// used by the top-nav box and the campaign header box, so a folder's pill (name
+// box) + folder SVG icon match the surfaces it opens into. Derived from the
+// single source of truth (CAMPAIGN_TOP_NAV_SCHEMES) and keyed by campaign id (see
+// getCampaignFolderColors), NOT by render order.
+const CAMPAIGN_FOLDER_NAME_BOX_COLORS = CAMPAIGN_TOP_NAV_SCHEMES.map(
+	(scheme) => scheme.box
+);
+const CAMPAIGN_FOLDER_ICON_COLORS = CAMPAIGN_TOP_NAV_SCHEMES.map(
+	(scheme) => scheme.icon
+);
 // Grayed palette for the ARCHIVE folder row and its deleted-campaign children.
 // The #F2F2F2 row band is painted via CSS (.archive-*-row-marker); these drive
 // the inline folder-icon / name / metric-text colors so they read as muted.
@@ -627,6 +628,37 @@ const FINDER_CONTACT_CATEGORY_LABELS: Record<CampaignDataTypeCategoryKey, string
 const getCampaignFolderPaletteIndex = (rowIndex: number) => {
 	const paletteLength = CAMPAIGN_FOLDER_NAME_BOX_COLORS.length;
 	return ((rowIndex % paletteLength) + paletteLength) % paletteLength;
+};
+
+type CampaignFolderColors = { nameBoxColor: string; folderIconColor: string };
+
+/**
+ * Resolve a campaign's folder pill (name box) + folder-icon colors. The colorway
+ * is keyed by the campaign's id-sorted position in the real campaign list — the
+ * SAME source of truth the top-nav box and campaign header box use — so a finder
+ * folder's color always matches the campaign it opens into.
+ *
+ * `fallbackIndex` (the render-row index) is only used for rows whose id isn't in
+ * the real campaign list — i.e. the no-DB mock/debug harness rows — so that
+ * harness still shows distinct per-row colors.
+ */
+const getCampaignFolderColors = (
+	campaignId: number | string | null | undefined,
+	campaigns: ReadonlyArray<{ id: number }> | null | undefined,
+	fallbackIndex: number
+): CampaignFolderColors => {
+	const id = typeof campaignId === 'string' ? Number(campaignId) : campaignId;
+	const known =
+		id != null &&
+		!Number.isNaN(id) &&
+		(campaigns ?? []).some((campaign) => campaign.id === id);
+	const paletteIndex = known
+		? getCampaignTopNavSchemeIndex(id, campaigns)
+		: getCampaignFolderPaletteIndex(fallbackIndex);
+	return {
+		nameBoxColor: CAMPAIGN_FOLDER_NAME_BOX_COLORS[paletteIndex],
+		folderIconColor: CAMPAIGN_FOLDER_ICON_COLORS[paletteIndex],
+	};
 };
 
 const buildMockCampaignRows = (mockState: CampaignsMockState): CampaignWithCounts[] => {
@@ -2193,13 +2225,13 @@ export const useCampaignsTable = (options?: {
 			.map(({ campaign, index }) => ({
 				campaignId: campaign.id,
 				name: campaign.name || `Folder ${index + 1}`,
-				folderIconColor:
-					CAMPAIGN_FOLDER_ICON_COLORS[getCampaignFolderPaletteIndex(index)],
+				folderIconColor: getCampaignFolderColors(campaign.id, realData, index)
+					.folderIconColor,
 				userContactListIds: (campaign.userContactListIds ?? []).filter(
 					(id): id is number => typeof id === 'number'
 				),
 			}));
-	}, [displayedCampaignData, openCampaignId]);
+	}, [displayedCampaignData, openCampaignId, realData]);
 	const data = useMemo<CampaignTableRow[] | undefined>(() => {
 		if (!displayedCampaignData) return displayedCampaignData;
 
@@ -3623,11 +3655,15 @@ export const useCampaignsTable = (options?: {
 						(visibleRow) => !isFinderTableRow(visibleRow.original as CampaignTableRow)
 					)
 					.findIndex((visibleRow) => visibleRow.id === row.id);
-				const paletteIndex = getCampaignFolderPaletteIndex(
+				// Colorway is keyed by campaign id (shared with the top-nav box +
+				// campaign header box) so the folder pill/icon matches what opens; the
+				// visible-row index is only the fallback for mock/debug rows not in the
+				// real campaign list.
+				const { nameBoxColor, folderIconColor } = getCampaignFolderColors(
+					campaign.id,
+					realData,
 					visibleRowIndex >= 0 ? visibleRowIndex : row.index
 				);
-				const nameBoxColor = CAMPAIGN_FOLDER_NAME_BOX_COLORS[paletteIndex];
-				const folderIconColor = CAMPAIGN_FOLDER_ICON_COLORS[paletteIndex];
 				if (!name) {
 					return (
 						<Typography variant="muted" className="text-sm">

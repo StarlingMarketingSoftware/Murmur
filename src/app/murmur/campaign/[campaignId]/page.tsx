@@ -40,6 +40,7 @@ import {
 import { createPortal } from 'react-dom';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import MapBottomSearchArrowIcon from '@/components/atoms/_svg/MapBottomSearchArrowIcon';
+import MapBottomSearchProfileIcon from '@/components/atoms/_svg/MapBottomSearchProfileIcon';
 import DashboardActionBarPlaybookIcon from '@/components/atoms/_svg/DashboardActionBarPlaybookIcon';
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 import DashboardActionBarStarIcon from '@/components/atoms/_svg/DashboardActionBarStarIcon';
@@ -221,6 +222,13 @@ const CAMPAIGN_TAB_HEATMAP_COLOR: Partial<Record<ViewType, string>> = {
 	inbox: '#ABD1FF', // Inbox — blue
 };
 const SEND_QUEUE_HEATMAP_COLOR = '#A2D99F';
+
+// All/overview tab, with no bottom status filters selected: the heatmap is not a
+// per-status colored view but a neutral "overall density" wash, so it reads as a
+// plain white cloud (denser where contacts cluster) instead of a noisy mix of
+// every status color at once. As soon as the user selects one or more status
+// filters, the per-status pill colors take over (each filter = a colored view).
+const CAMPAIGN_OVERVIEW_UNFILTERED_HEATMAP_COLOR = '#FFFFFF';
 
 const CAMPAIGN_OVERVIEW_STATUS_PILL_HEIGHT_PX = 27;
 const CAMPAIGN_OVERVIEW_STATUS_PILL_RADIUS_PX = 8;
@@ -1802,6 +1810,9 @@ const Murmur = () => {
 		useState(false);
 
 	const [isTopSearchHighlighted, setTopSearchHighlighted] = useState(false);
+	// When hovering the "Filtering in {campaign}" status pill, preview what clicking
+	// it does by morphing the pill into the dashboard search's "Searching New" look.
+	const [isFilteringPillHovered, setIsFilteringPillHovered] = useState(false);
 	const [isHomeButtonHighlighted, setHomeButtonHighlighted] = useState(false);
 	const [isDraftsTabHighlighted, setDraftsTabHighlighted] = useState(false);
 	const [isInboxTabHighlighted, setInboxTabHighlighted] = useState(false);
@@ -2342,6 +2353,11 @@ const Murmur = () => {
 		() => new Set(campaignOverviewSelectedStatuses),
 		[campaignOverviewSelectedStatuses]
 	);
+	// True when the user has toggled at least one bottom status filter on the All
+	// tab. Unfiltered (no toggles) means "show everything", which the heatmap
+	// renders as a neutral white density wash rather than a per-status color mix.
+	const isCampaignOverviewStatusFilterActive =
+		campaignOverviewSelectedStatuses.length > 0;
 	// Each status toggles independently. With nothing toggled on there is no
 	// filter, so the map shows every status; otherwise it shows the union.
 	const campaignOverviewActiveStatusSet = useMemo(
@@ -3433,6 +3449,11 @@ const Murmur = () => {
 			nightLighting: globeNightLighting,
 			presentation: 'interactive',
 			autoSpin: false,
+			// Match the dashboard map-search surface: deep zoom transitions into the
+			// pitched street-level 3D view (extruded buildings + rich research hover
+			// cards). Desktop-only — the mobile campaign maps in DraftingSection never
+			// mount this persistent map, and street view is a desktop affordance.
+			streetViewEnabled: isMobile === false,
 			cameraPadding: campaignMapCameraPadding,
 			contacts: campaignMapContactsForMap,
 			selectedContacts: effectiveCampaignMapSelectedContactIds,
@@ -3443,9 +3464,17 @@ const Murmur = () => {
 			campaignMarkerMode: sendQueueMapMode ? 'status' : effectiveMapGroupingForActiveView,
 			campaignHeatmapColor: sendQueueMapMode
 				? SEND_QUEUE_HEATMAP_COLOR
-				: CAMPAIGN_TAB_HEATMAP_COLOR[activeView] ?? null,
+				: activeView === 'overview'
+					? // All tab: a neutral white density wash while unfiltered, switching
+						// to the per-status colored view once any bottom status filter is on.
+						isCampaignOverviewStatusFilterActive
+						? null
+						: CAMPAIGN_OVERVIEW_UNFILTERED_HEATMAP_COLOR
+					: CAMPAIGN_TAB_HEATMAP_COLOR[activeView] ?? null,
 			campaignHeatmapStatusColors:
-				!sendQueueMapMode && activeView === 'overview'
+				!sendQueueMapMode &&
+				activeView === 'overview' &&
+				isCampaignOverviewStatusFilterActive
 					? CAMPAIGN_OVERVIEW_STATUS_PILL_COLOR
 					: undefined,
 			// These campaign tabs glow their visible set before selection, then narrow
@@ -3469,6 +3498,7 @@ const Murmur = () => {
 			activeView,
 			activeMapTool,
 			campaignMapCameraPadding,
+			isMobile,
 			campaignMapContactsForMap,
 			effectiveCampaignMapSelectedContactIds,
 			effectiveCampaignSelectedContactObjectsForMap,
@@ -3476,6 +3506,7 @@ const Murmur = () => {
 			effectiveCampaignMapContactStatusById,
 			effectiveMapGroupingForActiveView,
 			sendQueueMapMode,
+			isCampaignOverviewStatusFilterActive,
 			globeNightLighting,
 			globeWeatherMood,
 			globeWeatherRegionCenter,
@@ -3686,6 +3717,11 @@ const Murmur = () => {
 		!isCampaignMapStageCentered;
 	const isPersistentFilterPillVisible =
 		activeView === 'overview' || !isCampaignMapStageCentered;
+	useEffect(() => {
+		if (!isPersistentFilterPillVisible) {
+			setIsFilteringPillHovered(false);
+		}
+	}, [isPersistentFilterPillVisible]);
 	// The compact (non-expanded) stage keeps the bottom cluster at a fixed scale, so
 	// the band's left edge reaches it before the centered-stage cutoff — drop just the
 	// bottom cluster once the clear strip can no longer fit it. The expanded workspace
@@ -4221,6 +4257,10 @@ const Murmur = () => {
 											<button
 												type="button"
 												aria-label="Open campaign search"
+												onPointerEnter={() => setIsFilteringPillHovered(true)}
+												onPointerLeave={() => setIsFilteringPillHovered(false)}
+												onFocus={() => setIsFilteringPillHovered(true)}
+												onBlur={() => setIsFilteringPillHovered(false)}
 												onClick={handleGoToDashboardSearch}
 												style={{
 													appearance: 'none',
@@ -4234,73 +4274,123 @@ const Murmur = () => {
 													alignItems: 'center',
 													gap: '8px',
 													borderRadius: '9999px',
-													backgroundColor: '#CDEFCF',
+													backgroundColor: isFilteringPillHovered ? '#B9EAF1' : '#CDEFCF',
 													fontFamily: 'Inter, sans-serif',
 													color: '#000000',
 													whiteSpace: 'nowrap',
 													cursor: 'pointer',
 													pointerEvents: 'auto',
+													transition: 'background-color 150ms ease',
 												}}
 											>
-												<span
-													style={{
-														color: '#000',
-														fontSize: '15px',
-														fontWeight: 600,
-														lineHeight: 1,
-													}}
-												>
-													Filtering in
-												</span>
-												<span
-													style={{
-														display: 'inline-flex',
-														alignItems: 'center',
-														justifyContent: 'center',
-														gap: '6px',
-														minWidth: '85px',
-														height: '19px',
-														maxWidth: '180px',
-														boxSizing: 'border-box',
-														background: '#FFFFFF',
-														borderRadius: '4px',
-														padding: '0 8px',
-													}}
-												>
-													<svg
-														aria-hidden="true"
-														focusable="false"
-														width="23"
-														height="13"
-														viewBox="0 0 30 17"
-														fill="none"
-														xmlns="http://www.w3.org/2000/svg"
-														className="block flex-shrink-0"
-													>
-														<rect
-															y="2"
-															width="30"
-															height="15"
-															rx="1"
-															fill={topNavScheme.icon}
-														/>
-														<path
-															d="M0 2C0 0.89543 0.895431 0 2 0H13C14.1046 0 15 0.895431 15 2V4C15 4.55228 14.5523 5 14 5H1C0.447715 5 0 4.55228 0 4V2Z"
-															fill={topNavScheme.icon}
-														/>
-													</svg>
-													<span
-														className="min-w-0 truncate"
-														style={{
-															color: '#000',
-															fontSize: '15px',
-															fontWeight: 600,
-															lineHeight: 1,
-														}}
-													>
-														{campaignName}
-													</span>
-												</span>
+												{isFilteringPillHovered ? (
+													<>
+														<span
+															style={{
+																color: '#000',
+																fontSize: '15px',
+																fontWeight: 600,
+																lineHeight: 1,
+															}}
+														>
+															Searching
+														</span>
+														<span
+															style={{
+																display: 'inline-flex',
+																alignItems: 'center',
+																justifyContent: 'center',
+																gap: '6px',
+																minWidth: '85px',
+																height: '19px',
+																boxSizing: 'border-box',
+																background: '#EAF6FF',
+																borderRadius: '4px',
+																padding: '0 8px',
+															}}
+														>
+															<MapBottomSearchProfileIcon
+																aria-hidden="true"
+																viewBox="0 0 28 28"
+																textColor="transparent"
+																iconColor="#3498DB"
+																style={{ width: 16, height: 16, flexShrink: 0, display: 'block' }}
+															/>
+															<span
+																style={{
+																	color: '#000',
+																	fontSize: '15px',
+																	fontWeight: 600,
+																	lineHeight: 1,
+																}}
+															>
+																New
+															</span>
+														</span>
+													</>
+												) : (
+													<>
+														<span
+															style={{
+																color: '#000',
+																fontSize: '15px',
+																fontWeight: 600,
+																lineHeight: 1,
+															}}
+														>
+															Filtering in
+														</span>
+														<span
+															style={{
+																display: 'inline-flex',
+																alignItems: 'center',
+																justifyContent: 'center',
+																gap: '6px',
+																minWidth: '85px',
+																height: '19px',
+																maxWidth: '180px',
+																boxSizing: 'border-box',
+																background: '#FFFFFF',
+																borderRadius: '4px',
+																padding: '0 8px',
+															}}
+														>
+															<svg
+																aria-hidden="true"
+																focusable="false"
+																width="23"
+																height="13"
+																viewBox="0 0 30 17"
+																fill="none"
+																xmlns="http://www.w3.org/2000/svg"
+																className="block flex-shrink-0"
+															>
+																<rect
+																	y="2"
+																	width="30"
+																	height="15"
+																	rx="1"
+																	fill={topNavScheme.icon}
+																/>
+																<path
+																	d="M0 2C0 0.89543 0.895431 0 2 0H13C14.1046 0 15 0.895431 15 2V4C15 4.55228 14.5523 5 14 5H1C0.447715 5 0 4.55228 0 4V2Z"
+																	fill={topNavScheme.icon}
+																/>
+															</svg>
+															<span
+																className="min-w-0 truncate"
+																style={{
+																	color: '#000',
+																	fontSize: '15px',
+																	fontWeight: 600,
+																	lineHeight: 1,
+																}}
+															>
+																{campaignName}
+															</span>
+														</span>
+													</>
+												)}
 											</button>
 											</div>
 										)}

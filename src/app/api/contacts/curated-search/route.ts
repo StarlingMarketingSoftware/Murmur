@@ -15,12 +15,15 @@ import {
 	DEFAULT_RADIUS_KM,
 	type CuratedSearchContact,
 } from './runCuratedNearbyPicks';
+import { getCityGazetteer } from '../search/cityGazetteer';
+import { parseFreeTextSearchQuery } from '../search/parse';
 
 export type { CuratedSearchContact, CuratedQualityTier } from './runCuratedNearbyPicks';
 
 export const maxDuration = 60;
 
 const createRequestId = (): string => Math.random().toString(36).slice(2, 8);
+const CITY_ANCHOR_RADIUS_KM = 30;
 
 const normalizeCategoryKey = (value: string | null | undefined): string =>
 	(value ?? '')
@@ -111,7 +114,52 @@ interface ResolvedCenter {
 	lon: number | null;
 	city: string | null;
 	region: string | null;
+	cityPrecisionAnchor?: boolean;
 }
+
+const resolveAreaCenter = async (
+	value: string | null
+): Promise<ResolvedCenter | null> => {
+	const raw = (value ?? '').trim();
+	if (!raw) return null;
+
+	const gazetteer = await getCityGazetteer();
+	const parsed = parseFreeTextSearchQuery(raw, { gazetteer });
+	if (!parsed.hadExplicitPlace) return null;
+
+	const cityState = parsed.city?.state
+		? US_STATES.find(
+				(state) => state.abbr.toLowerCase() === parsed.city!.state!.toLowerCase()
+		  )
+		: null;
+	const cityHasExactCenter = parsed.city?.coordinatePrecision === 'city';
+	const lat = cityHasExactCenter
+		? parsed.city!.lat
+		: parsed.state?.lat ??
+		  cityState?.centroid.lat ??
+		  parsed.region?.lat ??
+		  null;
+	const lon = cityHasExactCenter
+		? parsed.city!.lon
+		: parsed.state?.lon ??
+		  cityState?.centroid.lng ??
+		  parsed.region?.lon ??
+		  null;
+
+	if (lat == null || lon == null) return null;
+
+	return {
+		lat,
+		lon,
+		city: cityHasExactCenter ? parsed.city?.name ?? null : null,
+		region:
+			parsed.state?.name ??
+			cityState?.name ??
+			parsed.region?.name ??
+			null,
+		cityPrecisionAnchor: cityHasExactCenter,
+	};
+};
 
 const inferCenterFromRequest = (
 	req: NextRequest,
@@ -222,6 +270,7 @@ export async function GET(req: NextRequest) {
 		const overrideLat = parseFloatOrNull(url.searchParams.get('lat'));
 		const overrideLon = parseFloatOrNull(url.searchParams.get('lon'));
 		const overrideRadiusKm = parseFloatOrNull(url.searchParams.get('radiusKm'));
+		const areaCenter = await resolveAreaCenter(url.searchParams.get('area'));
 		const stateCenter = resolveStateCenter(url.searchParams.get('state'));
 		const requestedCategoryPrefixes = resolveRequestedCategoryPrefixes(
 			url.searchParams.get('category')
@@ -232,7 +281,9 @@ export async function GET(req: NextRequest) {
 			return Math.max(1, Math.min(Math.trunc(parsed), MAX_RESULT_COUNT));
 		})();
 
-		const center = stateCenter
+		const center = areaCenter
+			? areaCenter
+			: stateCenter
 			? {
 					lat: stateCenter.lat,
 					lon: stateCenter.lon,
@@ -242,7 +293,8 @@ export async function GET(req: NextRequest) {
 			: inferCenterFromRequest(req, { lat: overrideLat, lon: overrideLon });
 		const hasCenter = center.lat != null && center.lon != null;
 		const requestedRadiusKm = hasCenter
-			? overrideRadiusKm ?? DEFAULT_RADIUS_KM
+			? overrideRadiusKm ??
+			  (center.cityPrecisionAnchor ? CITY_ANCHOR_RADIUS_KM : DEFAULT_RADIUS_KM)
 			: null;
 		const centerPoint = hasCenter
 			? { lat: center.lat as number, lon: center.lon as number }
@@ -264,6 +316,7 @@ export async function GET(req: NextRequest) {
 					radiusKm: requestedRadiusKm,
 					limit: requestedLimit,
 					requestedCategoryPrefixes,
+					cityPrecisionAnchor: Boolean(center.cityPrecisionAnchor),
 					logTag: `[curated-search][${requestId}]`,
 				}),
 			{

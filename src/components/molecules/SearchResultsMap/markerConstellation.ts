@@ -1129,7 +1129,15 @@ export const buildBeautyMarkerConstellationFormation = (
 	);
 	const nodes = [...wide.nodes, ...mid.nodes, ...detail.nodes];
 	const lowZoomNodeIds = new Set<number>();
-	for (const node of nodes) lowZoomNodeIds.add(node.id);
+	// At the far-zoom/continental floor we intentionally keep only the sparse
+	// wide-level anchors "protected" from the base-dot fade. Mid/detail anchors
+	// are still available in the constellation source and fade in with zoom, but
+	// they no longer keep their underlying contact dots visible at globe distance.
+	// That is what makes the zoomed-out view collapse to a small constellation
+	// instead of a dense cluster of preserved marker dots.
+	const lowZoomNodes =
+		wide.nodes.length > 0 ? wide.nodes : mid.nodes.length > 0 ? mid.nodes : detail.nodes;
+	for (const node of lowZoomNodes) lowZoomNodeIds.add(node.id);
 
 	return { edges, nodes, lowZoomNodeIds };
 };
@@ -1142,9 +1150,23 @@ export const buildCategoryMarkerConstellationFormation = (
 		return { edges: [], nodes: [], lowZoomNodeIds: new Set() };
 	}
 
-	const edgeSeeds = buildCategoryMarkerConstellationEdges(points, seed);
-	const edges = annotateMarkerConstellationEdges('mid', points, edgeSeeds);
-	const nodes = buildMarkerConstellationNodesForLevel('mid', edges);
+	let edgeSeeds = buildCategoryMarkerConstellationEdges(points, seed);
+	// Category/status mode usually connects within each semantic group. If the
+	// campaign set is split into singleton groups, that yields no edges and would
+	// leave every marker visible at low zoom. Fall back to a sparse global graph so
+	// even those degenerate campaigns still simplify into a constellation.
+	if (edgeSeeds.length === 0) {
+		edgeSeeds = buildSparseMarkerConstellationEdges(
+			points,
+			`${seed}|category-global-fallback`,
+			CATEGORY_MARKER_CONSTELLATION_MAX_EDGE_PX
+		);
+	}
+	// Treat campaign category/status constellations as the low-zoom ("wide") graph:
+	// the campaign page wants this layer to replace the marker blob when zoomed
+	// out, not wait for mid/detail zooms.
+	const edges = annotateMarkerConstellationEdges('wide', points, edgeSeeds);
+	const nodes = buildMarkerConstellationNodesForLevel('wide', edges);
 	const lowZoomNodeIds = new Set<number>();
 	for (const node of nodes) lowZoomNodeIds.add(node.id);
 

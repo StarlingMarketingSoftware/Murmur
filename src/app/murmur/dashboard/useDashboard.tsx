@@ -766,6 +766,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			lon: overrides?.lon ?? undefined,
 			radiusKm: overrides?.radiusKm ?? undefined,
 			category: overrides?.category ?? undefined,
+			area: overrides?.area ?? undefined,
 			state: overrides?.state ?? undefined,
 			limit: 50,
 			signal,
@@ -878,7 +879,8 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					const result = await promise;
 					if (myGeneration !== searchGenerationRef.current) return result;
 					setCuratedContacts(result.contacts);
-					const where = result.city ?? result.region ?? overrides?.state ?? 'your area';
+					const where =
+						result.city ?? result.region ?? overrides?.area ?? overrides?.state ?? 'your area';
 					const query = `Curated picks near ${where}`;
 					setActiveSearchQuery(query);
 					writeSearchCacheEntry(
@@ -949,7 +951,8 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				if (myGeneration !== searchGenerationRef.current) return result;
 				setCuratedContacts(result.contacts);
 				markAfterPaint('murmur:pick:results-paint', 'murmur:pick:click');
-				const where = result.city ?? result.region ?? overrides?.state ?? 'your area';
+				const where =
+					result.city ?? result.region ?? overrides?.area ?? overrides?.state ?? 'your area';
 				const query = `Curated picks near ${where}`;
 				setActiveSearchQuery(query);
 				// Cache the *exact* contacts we just rendered so a repeat (or refresh) on the same

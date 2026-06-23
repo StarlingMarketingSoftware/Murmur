@@ -572,6 +572,7 @@ export interface CuratedSearchVariables {
 	lon?: number | null;
 	radiusKm?: number | null;
 	category?: string | null;
+	area?: string | null;
 	state?: string | null;
 	limit?: number;
 	// Caller-supplied signal: lets the dashboard cancel an in-flight curated
@@ -596,6 +597,7 @@ export const fetchCuratedSearch = async (
 		params.radiusKm = String(vars.radiusKm);
 	}
 	if (vars.category) params.category = vars.category;
+	if (vars.area) params.area = vars.area.slice(0, 120);
 	if (vars.state) params.state = vars.state;
 	if (typeof vars.limit === 'number') params.limit = String(vars.limit);
 	const url = appendQueryParamsToUrl(

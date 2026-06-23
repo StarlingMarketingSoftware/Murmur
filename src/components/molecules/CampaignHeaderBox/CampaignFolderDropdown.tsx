@@ -206,6 +206,17 @@ export const CampaignFolderDropdown: FC<CampaignFolderDropdownProps> = ({
 			role="dialog"
 			aria-label="Choose folder"
 			data-campaign-folder-dropdown=""
+			// The dropdown is portaled to <html>, but React still bubbles its
+			// synthetic events through the COMPONENT tree — i.e. up into the
+			// CampaignHeaderBox's onClick (handleHeaderClick), which toggles this
+			// panel shut. Without these, clicking a folder row / "Choose Folder" /
+			// the "+" add row immediately closes the panel (the reported "the
+			// folder dropdown doesn't work / won't change folders" bug). The header
+			// already opts its own controls out of the toggle via this data
+			// attribute; tag the whole panel so every click inside it is ignored,
+			// and stop propagation as a defensive backstop.
+			data-campaign-header-folder-toggle-ignore="true"
+			onClick={(event) => event.stopPropagation()}
 			style={{
 				position: 'fixed',
 				top: pos.top,

@@ -3,6 +3,7 @@
 import { FC, ReactNode, useMemo, useState } from 'react';
 import { useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
 import { MAX_CAMPAIGNS } from '@/hooks/useAddCampaignFolder';
+import { getCampaignTopNavScheme } from '@/hooks/useCampaignTopNavScheme';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { mmdd } from '@/utils';
 import type {
@@ -72,10 +73,19 @@ const CATEGORY_BACKGROUND: Record<CampaignDataTypeCategoryKey, string> = {
 	radio: '#E8EFFF',
 };
 
-const ROW_PALETTE = [
-	{ folder: '#C5494F', pill: '#B9EAF1' },
-	{ folder: '#C94AD8', pill: '#C8C5F4' },
-];
+// Folder colorway is the SAME per-campaign scheme as the top-nav box + campaign
+// header box (single source of truth), keyed by campaign id via
+// getMiniFolderPalette — NOT by render order — so the dropdown's folder pill +
+// icon match the surfaces they open into.
+type MiniRowPalette = { folder: string; pill: string };
+const FALLBACK_ROW_PALETTE: MiniRowPalette = { folder: '#C5494F', pill: '#B9EAF1' };
+const getMiniFolderPalette = (
+	campaignId: number | string | null | undefined,
+	campaigns: ReadonlyArray<{ id: number }> | null | undefined
+): MiniRowPalette => {
+	const scheme = getCampaignTopNavScheme(campaignId, campaigns);
+	return { folder: scheme.icon, pill: scheme.box };
+};
 
 const SELECTED_ROW_BACKGROUND = '#DFF4E5';
 const DELETE_WARNING_BACKGROUND = '#E7677C';
@@ -235,7 +245,7 @@ const FolderPill = ({
 	height = FOLDER_PILL_HEIGHT,
 }: {
 	row: MiniCampaign;
-	palette: (typeof ROW_PALETTE)[number];
+	palette: MiniRowPalette;
 	newCount: number;
 	confirming?: boolean;
 	bordered?: boolean;
@@ -378,7 +388,7 @@ export const CampaignsTableMini: FC<Props> = ({
 
 	const renderRow = (
 		row: MiniCampaign,
-		index: number,
+		_index: number,
 		opts: {
 			highlighted: boolean;
 			bottomBorder: boolean;
@@ -387,7 +397,9 @@ export const CampaignsTableMini: FC<Props> = ({
 			rowHeight?: number;
 		}
 	) => {
-		const palette = ROW_PALETTE[index % ROW_PALETTE.length] ?? ROW_PALETTE[0];
+		const palette = campaignsData
+			? getMiniFolderPalette(row.id, campaignsData as ReadonlyArray<{ id: number }>)
+			: FALLBACK_ROW_PALETTE;
 		const rh = opts.rowHeight ?? ROW_HEIGHT;
 		const rowContentHeight =
 			rh - (opts.bottomBorder ? SELECTED_ROW_BOTTOM_BORDER_WIDTH : 0);

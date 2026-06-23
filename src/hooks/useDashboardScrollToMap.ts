@@ -55,9 +55,17 @@ const REDUCED_MOTION_TRIGGER_PX = 220;
 // tilt/zoom-out and the chrome fade are one synchronized motion, not two. (Earlier
 // this tweened only the chrome and handed the globe a separate native easeTo, which
 // resolved on its own clock and read as a second "tilt back" after the chrome had
-// already settled.) Kept deliberately slow — a quick return read as a jarring "fast
-// tilt back"; this is the single knob for the whole return's pace.
+// already settled.) This is the pace knob for a FULL (near-commit) return.
 const SNAPBACK_MS = 1400;
+// Minimum return duration, used for a tiny scroll. CRITICAL for "one motion": the
+// snapback duration is scaled by how far the user actually scrolled (see snapBack),
+// so peak return velocity stays roughly constant across gesture sizes. Without this,
+// a small "scroll a bit" release ran the full SNAPBACK_MS dragging e.g. 0.1→0 so
+// slowly the camera barely crept — a languid, disconnected crawl out of all
+// proportion to the gesture, which read as a separate sluggish "thing" rather than a
+// single decisive snap. Scaling the time to the distance makes a small scroll spring
+// back quickly and a large one return deliberately, both as ONE continuous motion.
+const SNAPBACK_MIN_MS = 420;
 
 // CSS "dolly" overlay scale at full peek. The real Mapbox camera now zooms in
 // lock-step with the scrub (4→5), so this compositor scale only needs to add a
@@ -342,8 +350,13 @@ export function useDashboardScrollToMap({
 			}
 			// Intent is home; the tween supplies the displayed value en route.
 			targetProgress = 0;
+			// Scale duration to the distance being travelled (`from` = displayed progress
+			// at release) so the return's velocity profile is consistent regardless of how
+			// far the user scrolled — a small peek snaps back briskly, a near-commit peek
+			// returns slowly, and neither reads as a second disconnected phase.
+			const snapDurationMs = Math.max(SNAPBACK_MIN_MS, SNAPBACK_MS * from);
 			tween(
-				SNAPBACK_MS,
+				snapDurationMs,
 				(e) => {
 					renderProgress = from * (1 - e);
 					// One value → chrome AND globe camera, every frame, same as the live scrub.

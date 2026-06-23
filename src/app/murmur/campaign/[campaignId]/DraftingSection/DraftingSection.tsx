@@ -7622,6 +7622,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																? handleOpenProfileSidePanel
 																: undefined
 														}
+														isProfilePanelOpen={isProfileSidePanelOpen}
 														autoOpenProfileTabWhenIncomplete={
 															props.autoOpenProfileTabWhenIncomplete
 														}
@@ -7812,6 +7813,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												onProfilePanelOpen={
 													shouldUseProfileSidePanel ? handleOpenProfileSidePanel : undefined
 												}
+												isProfilePanelOpen={isProfileSidePanelOpen}
 												autoOpenProfileTabWhenIncomplete={
 													props.autoOpenProfileTabWhenIncomplete
 												}
@@ -9555,6 +9557,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														weatherRegionCenter={globeWeatherRegionCenter}
 														weatherTemperatureF={globeWeatherTemperatureF}
 														nightLighting={globeNightLighting}
+														// Keep campaign desktop search parity with the dashboard search tab:
+														// deep zoom should enter the pitched street-level view, but never
+														// enable it during mobile/unknown layout states.
+														streetViewEnabled={isMobile === false}
 														contacts={
 															activeSearchTabId === null
 																? contacts || [] // Original tab - show campaign contacts

@@ -119,10 +119,14 @@ import {
 	ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR,
 	ALL_CONTACTS_OVERLAY_LIMIT,
 	ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM,
+	CAMPAIGN_HEATMAP_DENSITY_SCALE_FULL_COUNT,
+	CAMPAIGN_HEATMAP_DENSITY_SCALE_MIN,
+	CAMPAIGN_HEATMAP_DENSITY_SCALE_START_COUNT,
 	CAMPAIGN_HEATMAP_FADE_MS,
 	CAMPAIGN_HEATMAP_GLOW_BLUR,
 	CAMPAIGN_HEATMAP_GLOW_OPACITY_MAX,
 	campaignHeatmapGlowRadiusExpr,
+	buildCampaignHeatmapZoomFadedOpacity,
 	AMBIENT_CONTACTS_OVERLAY_BUFFER_DOTS,
 	AMBIENT_CONTACTS_OVERLAY_LIMIT,
 	AMBIENT_CONTACTS_OVERLAY_MARKERS_FULL_ZOOM,
@@ -271,6 +275,8 @@ import {
 	MAP_BOOT_BASEMAP_SETTLE_BACKSTOP_MS,
 	MAP_BOOT_CONTACTS_GATE_BACKSTOP_MS,
 	MAP_DEFAULT_ZOOM,
+	MAP_VIEWPORT_SETTLE_DEBOUNCE_MS,
+	MAP_VIEWPORT_SETTLE_MAX_WAIT_MS,
 	MAP_MIN_ZOOM,
 	MOBILE_MAP_MIN_ZOOM,
 	getInteractiveMapMinZoomDelta,
@@ -996,6 +1002,52 @@ const HOVER_TOOLTIP_SIDE_GAP_X_PX = 3;
 const HOVER_TOOLTIP_SIDE_GAP_Y_PX = 14;
 const HOVER_TOOLTIP_VIEWPORT_PADDING_PX = 8;
 const PEOPLE_TOOLTIP_FILL_COLOR = '#99E0FF';
+// Lighter companion tint for the tooltip body card. Categories supply a
+// saturated title-band color + a lighter body color (see
+// WHAT_TO_HOVER_TOOLTIP_FILL_COLOR / WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR) so
+// the white title text reads against a distinct band. "People" (contacts with
+// no known category) previously reused PEOPLE_TOOLTIP_FILL_COLOR for BOTH the
+// band and the body, which made the band blend into the body card and hid the
+// title on hover. Pairing the saturated band with this lighter body restores a
+// visible title band, matching every category type.
+const PEOPLE_TOOLTIP_BODY_FILL_COLOR = '#D5F3FF';
+
+const getHoverTooltipFillColor = (whatForMarker: string | null | undefined): string => {
+	if (!whatForMarker) return PEOPLE_TOOLTIP_FILL_COLOR;
+	return (
+		WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizeWhatKey(whatForMarker)] ??
+		PEOPLE_TOOLTIP_FILL_COLOR
+	);
+};
+
+const getHoverTooltipBodyFillColor = (
+	whatForMarker: string | null | undefined
+): string => {
+	if (!whatForMarker) return PEOPLE_TOOLTIP_BODY_FILL_COLOR;
+	return (
+		WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR[normalizeWhatKey(whatForMarker)] ??
+		PEOPLE_TOOLTIP_BODY_FILL_COLOR
+	);
+};
+
+const firstTrimmedTooltipText = (
+	...values: Array<string | null | undefined>
+): string => {
+	for (const value of values) {
+		const trimmed = (value ?? '').trim();
+		if (trimmed) return trimmed;
+	}
+	return '';
+};
+
+const getContactTitleForTooltip = (
+	contact: Pick<ContactWithName, 'curatedDisplayLabel' | 'title' | 'headline'>
+): string =>
+	firstTrimmedTooltipText(
+		contact.curatedDisplayLabel,
+		contact.title,
+		contact.headline
+	);
 
 type SelectedCompactTooltipEntry = {
 	contact: ContactWithName;
@@ -2647,6 +2699,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [allContactsOverlayBufferFetchBbox, setAllContactsOverlayBufferFetchBbox] =
 		useState<AllContactsOverlayFetchBbox | null>(null);
 	const allContactsOverlayLandMaskByIdRef = useRef<Map<number, boolean>>(new Map());
+	// Viewport "settle" debounce (Airbnb/Zillow-style): the pending fetch timer and
+	// the timestamp of the first pending camera segment, used to enforce the max-wait
+	// ceiling across chained wheel/trackpad moveend→movestart bursts.
+	const viewportSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const viewportSettleFirstPendingAtRef = useRef<number | null>(null);
 	// Rectangle selection state (dashboard map select tool)
 	const [isAreaSelecting, setIsAreaSelecting] = useState(false);
 	const selectionStartLatLngRef = useRef<LatLngLiteral | null>(null);
@@ -8395,11 +8452,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				paint: {
 					'circle-radius': campaignHeatmapGlowRadiusExpr,
 					'circle-color': ['coalesce', ['get', 'glowColor'], '#FFA5A5'],
-					'circle-opacity': [
+					// Fade the whole glow out at far zoom (top-level zoom interpolate, as
+					// Mapbox requires) so dense clusters can't alpha-composite into a
+					// single white blob from globe distance.
+					'circle-opacity': buildCampaignHeatmapZoomFadedOpacity([
 						'*',
 						CAMPAIGN_HEATMAP_GLOW_OPACITY_MAX,
 						['coalesce', ['get', 'glowFade'], 1],
-					],
+						['coalesce', ['get', 'glowDensityScale'], 1],
+					]),
 					'circle-blur': CAMPAIGN_HEATMAP_GLOW_BLUR,
 					'circle-stroke-width': 0,
 				},
@@ -9838,6 +9899,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		useRef<DashboardMapCameraScrubState | null>(null);
 	const dashboardScrollScrubProgressRef = useRef(0);
 	const dashboardScrollScrubActiveRef = useRef(false);
+	const dashboardScrollScrubSuppressSpinUntilRef = useRef(0);
 
 	const cinematicAutoFitRef = useRef(false);
 
@@ -9867,16 +9929,35 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				if (width <= 0 || height <= 0) return null;
 
 				const center = map.getCenter();
-				const target = map.unproject([
-					width / 2 + DASHBOARD_DECORATIVE_OFFSET_PX[0],
-					height / 2 + DASHBOARD_DECORATIVE_OFFSET_PX[1],
-				]);
-
+				// CRITICAL: the scrub start pose MUST be the *canonical* decorative pose
+				// (the exact pose the background spin maintains:
+				// `easeTo({ center: [lng, DASHBOARD_DECORATIVE_CENTER[1]], offset: [0,140] })`),
+				// not `map.getCenter()`/`getPitch()`/`getZoom()`.
+				//
+				// Why this matters (this is the bug that made the release read as TWO motions):
+				// the +140px vertical `offset` means `map.getCenter()` returns a point *north*
+				// of `DASHBOARD_DECORATIVE_CENTER[1]` — the offset is already "baked in" to that
+				// latitude. Capturing it as `startCenter` and then re-applying `offset: [0,140]`
+				// every scrub frame double-counts the offset, so the camera's p=0 resting pose
+				// sits ~140px too low and does NOT match the pose the auto-spin expects. On
+				// release the snapback faithfully returns to that *wrong* pose, then the spin's
+				// `moveend` loop resumes and runs its own 1000ms `easeTo` to correct it — the
+				// delayed, separate "tilt/pan back to position at the end" the user is fighting.
+				//
+				// Keeping `lng` live preserves spin continuity (the vertical offset never changes
+				// lng, so this equals the spin's current longitude). Holding the geographic
+				// center fixed across the scrub means only offset + zoom + pitch animate off the
+				// single progress value `p`, so the entry AND the release are each one
+				// continuous, jolt-free motion in lock-step with the page chrome.
+				const canonicalCenter: [number, number] = [
+					center.lng,
+					DASHBOARD_DECORATIVE_CENTER[1],
+				];
 				const state: DashboardMapCameraScrubState = {
-					startCenter: [center.lng, center.lat],
-					targetCenter: [target.lng, target.lat],
-					startZoom: map.getZoom?.() ?? DASHBOARD_DECORATIVE_ZOOM,
-					startPitch: map.getPitch?.() ?? DASHBOARD_DECORATIVE_PITCH,
+					startCenter: canonicalCenter,
+					targetCenter: canonicalCenter,
+					startZoom: DASHBOARD_DECORATIVE_ZOOM,
+					startPitch: DASHBOARD_DECORATIVE_PITCH,
 					startOffset: DASHBOARD_DECORATIVE_OFFSET_PX,
 				};
 				dashboardScrollScrubCameraRef.current = state;
@@ -9928,8 +10009,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// that, so the separate snapback branch is gone.)
 			if (progress <= 0.0001 && !isCommit) {
 				const state = dashboardScrollScrubCameraRef.current;
-				dashboardScrollScrubActiveRef.current = false;
 				if (!state) return;
+				// Keep the decorative spin from treating this final duration:0 landing
+				// `moveend` as permission to start its own 1000ms ease immediately after the
+				// release tween. That instant follow-up ease is exactly what makes the
+				// below-threshold release feel like "snap back, then the map fixes itself".
+				//
+				// The spin loop will see the suppression window, reseat its timing/longitude
+				// to the landed camera, and resume on a delayed no-op tick instead of becoming
+				// a second visible camera owner on the same frame the snapback completes.
+				dashboardScrollScrubSuppressSpinUntilRef.current =
+					typeof performance !== 'undefined'
+						? performance.now() + 220
+						: Date.now() + 220;
+				dashboardScrollScrubActiveRef.current = false;
 				try {
 					map.easeTo({
 						center: state.startCenter,
@@ -10080,24 +10173,39 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				let currentLng = normalizeLng(map.getCenter()?.lng ?? baseLng);
 				// Seed one full step back so the kick-off tick advances a full increment.
 				let lastTickMs = performance.now() - animationDurationMs;
+				let resumeAfterScrubTimer: ReturnType<typeof setTimeout> | null = null;
 
 				const spinGlobe = () => {
-					if (dashboardScrollScrubActiveRef.current) {
+					const now = performance.now();
+					const suppressUntil = dashboardScrollScrubSuppressSpinUntilRef.current;
+					if (dashboardScrollScrubActiveRef.current || now < suppressUntil) {
 						// The scroll scrub owns the camera right now. Keep the spin loop's timing
 						// and longitude pinned to the *live* camera so that when the scrub releases
 						// (snapback) and the spin resumes, the first tick advances a normal small
 						// step from the current position. Without this, lastTickMs goes stale during
 						// the scrub and the resume tick computes a capped ~2s dt — a delayed,
 						// out-of-sync "pan back" right after the chrome has already settled.
-						lastTickMs = performance.now();
+						lastTickMs = now;
 						currentLng = normalizeLng(map.getCenter()?.lng ?? currentLng);
+						if (
+							!dashboardScrollScrubActiveRef.current &&
+							now < suppressUntil &&
+							resumeAfterScrubTimer == null
+						) {
+							resumeAfterScrubTimer = setTimeout(() => {
+								resumeAfterScrubTimer = null;
+								// Start the resumed decorative spin from rest after the snapback has
+								// visually completed, not as a same-frame continuation of it.
+								lastTickMs = performance.now();
+								spinGlobe();
+							}, Math.max(0, suppressUntil - now));
+						}
 						return;
 					}
 					try {
 						// Advance by wall-clock elapsed time, not per event: map.resize()
 						// (e.g. while the window is being drag-resized) fires extra moveend
 						// events, and a fixed per-tick step would speed up the spin.
-						const now = performance.now();
 						const dtMs = Math.min(now - lastTickMs, maxTickDtMs);
 						lastTickMs = now;
 						currentLng = normalizeLng(
@@ -10135,6 +10243,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				spinGlobe();
 
 				backgroundSpinCleanupRef.current = () => {
+					if (resumeAfterScrubTimer != null) {
+						clearTimeout(resumeAfterScrubTimer);
+						resumeAfterScrubTimer = null;
+					}
 					try {
 						map.off('moveend', spinGlobe);
 					} catch {}
@@ -10875,13 +10987,42 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// otherwise. Animate from the last rendered value toward the target, then
 		// go idle (the GPU re-projects the static layer on pan/zoom for free).
 		const targetSet = new Set(heatmapContactIds);
+		const startById = campaignHeatmapFadeByIdRef.current;
+		// Base density scaling on whichever set is larger: the new target set or the
+		// currently visible fading set. That avoids a bright flash when moving from a
+		// dense ambient heatmap to a tiny selection — outgoing contacts keep the dense
+		// attenuation while they fade away, then the remaining small selection can read
+		// normally once the crossfade reaches its final frame.
+		const previousVisibleCount = Array.from(startById.values()).filter(
+			(fade) => fade > 0.001
+		).length;
+		const densityBasisCount = Math.max(targetSet.size, previousVisibleCount);
+		const getGlowDensityScale = (basisCount: number) => {
+			const densityScaleT =
+				basisCount <= CAMPAIGN_HEATMAP_DENSITY_SCALE_START_COUNT
+					? 0
+					: smoothstep(
+							0,
+							1,
+							clamp(
+								(Math.sqrt(basisCount) -
+									Math.sqrt(CAMPAIGN_HEATMAP_DENSITY_SCALE_START_COUNT)) /
+									(Math.sqrt(CAMPAIGN_HEATMAP_DENSITY_SCALE_FULL_COUNT) -
+										Math.sqrt(CAMPAIGN_HEATMAP_DENSITY_SCALE_START_COUNT)),
+								0,
+								1
+							)
+						);
+			return lerp(1, CAMPAIGN_HEATMAP_DENSITY_SCALE_MIN, densityScaleT);
+		};
+		const crossfadeGlowDensityScale = getGlowDensityScale(densityBasisCount);
+		const targetGlowDensityScale = getGlowDensityScale(targetSet.size);
 		const coordsById = new Map<number, LatLngLiteral>();
 		for (const contact of contactsWithCoords) {
 			const coords = getContactCoords(contact);
 			if (coords) coordsById.set(contact.id, coords);
 		}
 
-		const startById = campaignHeatmapFadeByIdRef.current;
 		const needsAnim = Array.from(coordsById.keys()).some((id) => {
 			const start = startById.get(id) ?? 0;
 			const target = targetSet.has(id) ? 1 : 0;
@@ -10889,6 +11030,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		});
 
 		const writeFrame = (eased: number) => {
+			const glowDensityScale =
+				eased >= 1 ? targetGlowDensityScale : crossfadeGlowDensityScale;
 			const nextById = new Map<number, number>();
 			const features: GeoJSON.Feature[] = [];
 			coordsById.forEach((coords, id) => {
@@ -10906,6 +11049,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							campaignHeatmapColor ??
 							'#FFA5A5',
 						glowFade: fade,
+						glowDensityScale,
 					},
 					geometry: { type: 'Point' as const, coordinates: [coords.lng, coords.lat] },
 				});
@@ -12557,14 +12701,69 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!map) return;
 		if (!isMapLoaded) return;
 		if (isBackgroundPresentation) return;
+
+		// ── Airbnb/Zillow-style "settle" loading ──────────────────────────────
+		// A single user gesture frequently emits a *burst* of `moveend`s — wheel
+		// zoom ticks, inertial fling tails, trackpad pan segments. Recomputing the
+		// network-bound overlay fetch windows on every one of those is exactly what
+		// made the overlay feel like it was "loading and reloading every time you
+		// move once or twice." Competitor maps feel cleaner because marker data
+		// behaves as if it is requested for the settled camera. We do the same: the
+		// cheap, purely-visual work (zoom readout, basemap clip, local marker
+		// re-sampling, the "search this area" CTA) stays immediate so the chrome
+		// still tracks the camera live, but the three fetch-window recomputes that
+		// trigger overlay network queries are deferred until the viewport settles.
+		const runSettledViewportFetch = () => {
+			viewportSettleFirstPendingAtRef.current = null;
+			if (viewportSettleTimerRef.current) {
+				clearTimeout(viewportSettleTimerRef.current);
+				viewportSettleTimerRef.current = null;
+			}
+			updateBookingExtraFetchBbox(map);
+			updatePromotionOverlayFetchBbox(map);
+			updateAllContactsOverlayFetchBbox(map);
+		};
+
+		const scheduleSettledViewportFetch = () => {
+			const now = Date.now();
+			if (viewportSettleFirstPendingAtRef.current == null) {
+				viewportSettleFirstPendingAtRef.current = now;
+			}
+			if (viewportSettleTimerRef.current) {
+				clearTimeout(viewportSettleTimerRef.current);
+			}
+			// Honor a max-wait ceiling for chained wheel/trackpad segments: without it,
+			// a stream of short moveend→movestart cycles could keep postponing refreshes.
+			// Once pending work has aged past the ceiling, fire on the next completed segment.
+			const elapsed = now - viewportSettleFirstPendingAtRef.current;
+			const wait = Math.min(
+				MAP_VIEWPORT_SETTLE_DEBOUNCE_MS,
+				Math.max(0, MAP_VIEWPORT_SETTLE_MAX_WAIT_MS - elapsed)
+			);
+			viewportSettleTimerRef.current = setTimeout(runSettledViewportFetch, wait);
+		};
+
+		// A new gesture starting means the pending fetch for the (now superseded)
+		// intermediate view should not fire; the gesture's own `moveend` will
+		// reschedule. We keep `firstPendingAt` so the max-wait ceiling still spans
+		// a chained pan→pan→pan scrub rather than resetting on each grab.
+		const onMoveStartCancelSettle = () => {
+			if (viewportSettleTimerRef.current) {
+				clearTimeout(viewportSettleTimerRef.current);
+				viewportSettleTimerRef.current = null;
+			}
+		};
+
 		const onMoveEnd = () => {
 			const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
 			setZoomLevel(zoom);
 			syncUsOnlyBasemapCartography(map);
 
-			updateBookingExtraFetchBbox(map);
-			updatePromotionOverlayFetchBbox(map);
-			updateAllContactsOverlayFetchBbox(map);
+			// Defer the network-bound overlay fetch windows until the camera settles.
+			scheduleSettledViewportFetch();
+			// Local marker re-sampling stays immediate: it only reshuffles already
+			// loaded markers to track the camera and is what prevents on-screen
+			// flicker, so it must not wait for the settle debounce.
 			recomputeViewportDots(map);
 
 			const bounds = map.getBounds();
@@ -12604,10 +12803,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			});
 		};
 		map.on('moveend', onMoveEnd);
-		// Initial fill
+		map.on('movestart', onMoveStartCancelSettle);
+		// Initial fill: run the chrome/CTA path, then force the overlay fetch
+		// synchronously so first paint never waits out the settle debounce.
 		onMoveEnd();
+		runSettledViewportFetch();
 		return () => {
 			map.off('moveend', onMoveEnd);
+			map.off('movestart', onMoveStartCancelSettle);
+			if (viewportSettleTimerRef.current) {
+				clearTimeout(viewportSettleTimerRef.current);
+				viewportSettleTimerRef.current = null;
+			}
+			viewportSettleFirstPendingAtRef.current = null;
 		};
 	}, [
 		map,
@@ -12618,6 +12826,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		updateBookingExtraFetchBbox,
 		updatePromotionOverlayFetchBbox,
 		updateAllContactsOverlayFetchBbox,
+		isCoordsInLockedState,
 	]);
 
 	useEffect(() => {
@@ -18899,22 +19108,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
 			const nameForTooltip = fullName || contact.name || '';
 			const companyForTooltip = contact.company || '';
-			const titleForTooltip = (
-				contact.curatedDisplayLabel ||
-				contact.title ||
-				contact.headline ||
-				''
-			).trim();
+			const titleForTooltip = getContactTitleForTooltip(contact);
 			const whatForMarker = getWhatForSelectedTooltip(contact, kind);
 			const normalizedWhat = whatForMarker ? normalizeWhatKey(whatForMarker) : null;
-			const tooltipFillColor = normalizedWhat
-				? (WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? PEOPLE_TOOLTIP_FILL_COLOR)
-				: kind === 'all'
-					? PEOPLE_TOOLTIP_FILL_COLOR
-					: PEOPLE_TOOLTIP_FILL_COLOR;
-			const tooltipBodyFillColor = normalizedWhat
-				? (WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR[normalizedWhat] ?? PEOPLE_TOOLTIP_FILL_COLOR)
-				: tooltipFillColor;
+			const tooltipFillColor = getHoverTooltipFillColor(whatForMarker);
+			const tooltipBodyFillColor = getHoverTooltipBodyFillColor(whatForMarker);
 			const width = calculateTooltipWidth(
 				nameForTooltip,
 				companyForTooltip,
@@ -19414,21 +19612,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
 		const nameForTooltip = fullName || contact.name || '';
 		const companyForTooltip = contact.company || '';
-		const titleForTooltip = (
-			contact.curatedDisplayLabel ||
-			contact.title ||
-			contact.headline ||
-			''
-		).trim();
+		const titleForTooltip = getContactTitleForTooltip(contact);
 
 		if (kind === 'all') {
 			const whatForMarker = getAmbientContactWhatFromTitle(contact.title);
 			if (whatForMarker) {
-				const normalizedWhat = normalizeWhatKey(whatForMarker);
-				const tooltipFillColor =
-					WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? PEOPLE_TOOLTIP_FILL_COLOR;
-				const tooltipBodyFillColor =
-					WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR[normalizedWhat] ?? PEOPLE_TOOLTIP_FILL_COLOR;
+				const tooltipFillColor = getHoverTooltipFillColor(whatForMarker);
+				const tooltipBodyFillColor = getHoverTooltipBodyFillColor(whatForMarker);
 				const width = calculateTooltipWidth(
 					nameForTooltip,
 					companyForTooltip,
@@ -19465,7 +19655,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					nameForTooltip,
 					companyForTooltip,
 					titleForTooltip,
-					tooltipFillColor
+					tooltipFillColor,
+					whatForMarker,
+					PEOPLE_TOOLTIP_BODY_FILL_COLOR
 				),
 				width,
 				height,
@@ -19482,13 +19674,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		// Even if the marker dot is "washed out" outside the locked/selected state, keep the hover tooltip
 		// using the base category color so it consistently communicates the search intent.
-		const normalizedWhat = whatForMarker ? normalizeWhatKey(whatForMarker) : null;
-		const baseTooltipFillColor = normalizedWhat
-			? (WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? PEOPLE_TOOLTIP_FILL_COLOR)
-			: PEOPLE_TOOLTIP_FILL_COLOR;
-		const baseTooltipBodyFillColor = normalizedWhat
-			? (WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR[normalizedWhat] ?? PEOPLE_TOOLTIP_FILL_COLOR)
-			: baseTooltipFillColor;
+		const baseTooltipFillColor = getHoverTooltipFillColor(whatForMarker);
+		const baseTooltipBodyFillColor = getHoverTooltipBodyFillColor(whatForMarker);
 
 		const width = calculateTooltipWidth(
 			nameForTooltip,

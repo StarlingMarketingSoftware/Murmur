@@ -594,6 +594,7 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 									setShowTestPreview(false);
 									setIsProfileSidePanelOpen(true);
 								}}
+								isProfilePanelOpen={isProfileSidePanelOpen && !isReviewActive}
 								forceDesktop
 								useStaticDropdownPosition
 								hideMobileStickyTestFooter
