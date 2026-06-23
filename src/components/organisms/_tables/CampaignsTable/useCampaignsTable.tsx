@@ -1681,6 +1681,7 @@ export const useCampaignsTable = (options?: {
 	initialOpenCampaignId?: number | null;
 	initialOpenContactsFolder?: boolean;
 	onFinderOpenInNewTab?: (campaignId: number) => void;
+	onSelectCampaign?: (campaignId: number) => void;
 	/**
 	 * Campaign id whose row should show the red "Click to Delete and move
 	 * contents to Archive" warning because its hover-delete "X" is being hovered.
@@ -1697,6 +1698,7 @@ export const useCampaignsTable = (options?: {
 	const initialOpenCampaignId = options?.initialOpenCampaignId ?? null;
 	const initialOpenContactsFolder = options?.initialOpenContactsFolder ?? false;
 	const onFinderOpenInNewTab = options?.onFinderOpenInNewTab;
+	const onSelectCampaign = options?.onSelectCampaign;
 	const deleteWarningCampaignId = options?.deleteWarningCampaignId ?? null;
 	const normalizedFinderSearchQuery = normalizeFinderSearchText(finderSearchQuery);
 	const isMockActive = mockState != null;
@@ -4106,6 +4108,11 @@ export const useCampaignsTable = (options?: {
 			setConfirmingCampaignId(null);
 			setCurrentRow(null);
 		} else {
+			if (onSelectCampaign) {
+				onSelectCampaign(rowData.id);
+				return;
+			}
+
 			// Normal navigation
 			const target = `${urls.murmur.campaign.detail(rowData.id)}?silent=1`;
 			router.push(target);

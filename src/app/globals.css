@@ -3942,7 +3942,12 @@ body.murmur-page.murmur-map-view .results-search-input-group .search-wave-contai
 	}
 }
 .map-overlay-appear {
-	animation: mapOverlayAppear 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+	/* Even, gradual fade-in. The previous cubic-bezier(0.22, 1, 0.36, 1) is an
+	   ease-out: opacity rushed to ~70% in the first ~120ms, which read as the
+	   overlays "popping" in. An ease-in-out over a longer duration ramps opacity
+	   up evenly so the whole search-tab apparatus dissolves in smoothly. A short
+	   delay also lets the camera/scrub settle before the chrome starts appearing. */
+	animation: mapOverlayAppear 720ms cubic-bezier(0.45, 0, 0.2, 1) 80ms both;
 }
 
 @keyframes selectionFolderMoveBannerIn {

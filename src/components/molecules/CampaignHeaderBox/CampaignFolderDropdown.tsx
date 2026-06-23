@@ -2,14 +2,15 @@
 
 import { FC, RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import { getMurmurRootScale } from '@/utils/rootScale';
-import { useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
+import { useGetCampaigns, useDeleteCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { MAX_CAMPAIGNS, useAddCampaignFolder } from '@/hooks/useAddCampaignFolder';
 import { CampaignsTableMini } from '@/components/organisms/_tables/CampaignsTable/CampaignsTableMini';
 
 const PANEL_HEIGHT = 288;
+const DELETE_CONFIRM_TIMEOUT_MS = 5000;
 
 interface CampaignFolderDropdownProps {
 	currentCampaignId: number;
@@ -18,6 +19,14 @@ interface CampaignFolderDropdownProps {
 	chevronRef: RefObject<HTMLButtonElement | null>;
 	/** The header-box root the dropdown anchors beneath and treats as its toggle surface. */
 	anchorRef: RefObject<HTMLDivElement | null>;
+	/**
+	 * When provided, picking a folder switches the campaign IN CONTEXT instead of
+	 * navigating to that campaign's page. The dashboard search surface passes this
+	 * so selecting a folder swaps the active campaign of the search page rather
+	 * than redirecting to the campaign detail's "All" tab. Receives the chosen
+	 * campaign id; the dropdown still closes itself afterward.
+	 */
+	onSelectCampaign?: (campaignId: number) => void;
 }
 
 /**
@@ -34,8 +43,10 @@ export const CampaignFolderDropdown: FC<CampaignFolderDropdownProps> = ({
 	onClose,
 	chevronRef,
 	anchorRef,
+	onSelectCampaign,
 }) => {
 	const router = useRouter();
+	const pathname = usePathname();
 	const panelRef = useRef<HTMLDivElement>(null);
 	const onCloseRef = useRef(onClose);
 	onCloseRef.current = onClose;
@@ -44,9 +55,17 @@ export const CampaignFolderDropdown: FC<CampaignFolderDropdownProps> = ({
 	const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(
 		null
 	);
+	const [confirmingId, setConfirmingId] = useState<number | null>(null);
+	const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	const { data: campaignsData } = useGetCampaigns();
 	const { addFolder, isAddingFolder } = useAddCampaignFolder();
+	const { mutate: deleteCampaign } = useDeleteCampaign();
+	const isCampaignRoute = pathname?.startsWith('/murmur/campaign/');
+
+	useEffect(() => {
+		setSelectedId(currentCampaignId);
+	}, [currentCampaignId]);
 
 	// Anchor the panel flush beneath the header box. getBoundingClientRect() is in
 	// scaled (visual) units; position: fixed resolves in unscaled units, so divide
@@ -94,11 +113,89 @@ export const CampaignFolderDropdown: FC<CampaignFolderDropdownProps> = ({
 		};
 	}, [anchorRef, chevronRef]);
 
-	const handleChooseFolder = () => {
+	// Switch into a campaign. Re-selecting the campaign you're already viewing is a
+	// no-op (besides closing the panel).
+	//
+	// Two modes:
+	//  - In-context (onSelectCampaign provided, e.g. dashboard search): swap the
+	//    active campaign WITHOUT leaving the current page. This is what keeps the
+	//    dashboard search surface from auto-redirecting to the campaign detail
+	//    page's "All" tab when a folder is picked.
+	//  - Navigation (default, e.g. the campaign detail page): route to that
+	//    campaign's page.
+	const navigateToCampaign = (campaignId: number) => {
 		onClose();
-		if (selectedId && selectedId !== currentCampaignId) {
-			router.push(`${urls.murmur.campaign.detail(selectedId)}?tab=all`);
+		if (campaignId === currentCampaignId) return;
+		if (onSelectCampaign) {
+			onSelectCampaign(campaignId);
+			return;
 		}
+		router.push(`${urls.murmur.campaign.detail(campaignId)}?tab=all`);
+	};
+
+	// Clicking a folder row only moves the in-panel highlight; the green
+	// "Choose Folder" footer remains the explicit navigation action.
+	const handleRowClick = (campaignId: number) => {
+		setSelectedId(campaignId);
+	};
+
+	const handleChooseFolder = () => {
+		if (selectedId != null) {
+			navigateToCampaign(selectedId);
+		} else {
+			onClose();
+		}
+	};
+
+	// Clear the pending confirm timer on unmount (e.g. dropdown closes).
+	useEffect(() => {
+		return () => {
+			if (confirmTimeoutRef.current) clearTimeout(confirmTimeoutRef.current);
+		};
+	}, []);
+
+	// Two-step delete: the first X click arms the red confirm (auto-reverting
+	// after a timeout); the second click on the armed row executes the delete.
+	const handleDeleteClick = (campaignId: number) => {
+		if (confirmTimeoutRef.current) {
+			clearTimeout(confirmTimeoutRef.current);
+			confirmTimeoutRef.current = null;
+		}
+
+		if (campaignId === confirmingId) {
+			setConfirmingId(null);
+			// Deleting the in-panel pick falls back to the current campaign.
+			setSelectedId((prev) => (prev === campaignId ? currentCampaignId : prev));
+			deleteCampaign(campaignId, {
+				onSuccess: () => {
+					// If the deleted folder is the one being viewed, navigate away to
+					// another remaining folder (or the dashboard) so we don't sit on a
+					// dead campaign page.
+				if (campaignId === currentCampaignId) {
+						const remaining = ((campaignsData ?? []) as Array<{ id: number }>).find(
+							(c) => c.id !== campaignId
+						);
+						onClose();
+						if (onSelectCampaign && remaining) {
+							// In-context surface (dashboard search): keep the user on the
+							// page and switch to a remaining folder instead of redirecting.
+							onSelectCampaign(remaining.id);
+						} else if (isCampaignRoute && remaining) {
+							router.push(`${urls.murmur.campaign.detail(remaining.id)}?tab=all`);
+						} else {
+							router.push(urls.murmur.dashboard.index);
+						}
+					}
+				},
+			});
+			return;
+		}
+
+		setConfirmingId(campaignId);
+		confirmTimeoutRef.current = setTimeout(() => {
+			setConfirmingId(null);
+			confirmTimeoutRef.current = null;
+		}, DELETE_CONFIRM_TIMEOUT_MS);
 	};
 
 	if (typeof document === 'undefined' || !pos) return null;
@@ -133,10 +230,13 @@ export const CampaignFolderDropdown: FC<CampaignFolderDropdownProps> = ({
 				showChooseFolderButton
 				currentCampaignId={currentCampaignId}
 				selectedCampaignId={selectedId}
-				onRowClick={setSelectedId}
+				onRowClick={handleRowClick}
 				onAddRow={addFolder}
 				isAddingFolder={isAddingFolder}
 				onChooseFolder={handleChooseFolder}
+				showDeleteColumn
+				confirmingCampaignId={confirmingId}
+				onDeleteClick={handleDeleteClick}
 			/>
 		</div>,
 		document.documentElement

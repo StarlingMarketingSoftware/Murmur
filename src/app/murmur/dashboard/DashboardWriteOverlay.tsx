@@ -9,13 +9,20 @@ import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/Hybr
 import { ProfileSidePanelBox } from '@/components/molecules/HybridPromptInput/ProfileSidePanelBox';
 import { TestPreviewPanel } from '@/components/molecules/TestPreviewPanel/TestPreviewPanel';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
-import { DraftPreviewExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftPreviewExpandedList';
 import { useDraftingSection } from '@/app/murmur/campaign/[campaignId]/DraftingSection/useDraftingSection';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { useEditIdentity } from '@/hooks/queryHooks/useIdentities';
 import { EmailStatus } from '@/constants/prismaEnums';
 import { DashboardDraftReview } from './DashboardDraftReview';
+import { DashboardDraftingDeck } from './DashboardDraftingDeck';
 import type { CampaignWithRelations } from '@/types';
+
+export interface DashboardDraftingStatus {
+	isDrafting: boolean;
+	activeContactId: number | null;
+	completedContactIds: number[];
+	total: number;
+}
 
 interface DashboardWriteOverlayProps {
 	/** The campaign the search is in the context of (drafts land here). */
@@ -30,6 +37,11 @@ interface DashboardWriteOverlayProps {
 	onReviewActiveChange?: (active: boolean) => void;
 	/** Notify the parent which reviewed draft/contact is currently open. */
 	onActiveReviewContactChange?: (contactId: number | null) => void;
+	/** Notify the parent which selected rows should be shown as queued/active/drafted. */
+	onDraftingStatusChange?: (status: DashboardDraftingStatus) => void;
+	/** Shared collapsed state for the drafting deck and Selection-panel drafting bar. */
+	isDraftingDeckCollapsed?: boolean;
+	onDraftingDeckCollapsedChange?: (collapsed: boolean) => void;
 }
 
 // The campaign drafting panel renders natively at 499px wide; scale it down to the design's
@@ -62,12 +74,16 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 	onClose,
 	onReviewActiveChange,
 	onActiveReviewContactChange,
+	onDraftingStatusChange,
+	isDraftingDeckCollapsed = false,
+	onDraftingDeckCollapsedChange,
 }) => {
 	const d = useDraftingSection({ campaign, view: 'testing' });
 	const queryClient = useQueryClient();
 	const { mutateAsync: editIdentity } = useEditIdentity({ suppressToasts: true });
 	const [isProfileSidePanelOpen, setIsProfileSidePanelOpen] = useState(false);
 	const [showTestPreview, setShowTestPreview] = useState(false);
+	const [forceReviewOpen, setForceReviewOpen] = useState(false);
 
 	// Campaign drafts, scoped to the just-drafted batch for the review.
 	const { data: emails, isPending: isPendingEmails } = useGetEmails({
@@ -90,6 +106,7 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 		if (d.writeReviewBatchContactIds.size === 0) {
 			wasBatchDraftingRef.current = false;
 			setWriteReviewPreviewComplete(false);
+			setForceReviewOpen(false);
 			return;
 		}
 		if (isBatchDraftingInProgress) {
@@ -135,7 +152,8 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 	]);
 
 	const isReviewActive =
-		d.writeReviewBatchContactIds.size > 0 && writeReviewPreviewComplete;
+		d.writeReviewBatchContactIds.size > 0 &&
+		(writeReviewPreviewComplete || (forceReviewOpen && batchDrafts.length > 0));
 
 	useEffect(() => {
 		onReviewActiveChange?.(isReviewActive);
@@ -148,6 +166,13 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 	useEffect(() => {
 		if (isReviewActive) setIsProfileSidePanelOpen(false);
 	}, [isReviewActive]);
+
+	useEffect(() => {
+		if (d.isLivePreviewVisible) {
+			setIsProfileSidePanelOpen(false);
+			setShowTestPreview(false);
+		}
+	}, [d.isLivePreviewVisible]);
 
 	// `handleGetSuggestions` lives in the campaign-page component (not the hook); replicate it.
 	const handleGetSuggestions = useCallback(
@@ -227,6 +252,7 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 		if (isDraftDisabled) return;
 		setIsProfileSidePanelOpen(false);
 		setShowTestPreview(false);
+		setForceReviewOpen(false);
 		await d.handleGenerateDrafts(targetContactIds);
 	};
 
@@ -256,6 +282,69 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 		}),
 		[d.isLivePreviewVisible, d.livePreviewContactId, d.livePreviewSubject, d.livePreviewMessage]
 	);
+
+	const completedDraftingContactIds = useMemo(() => {
+		const targetSet = new Set(targetContactIds);
+		const seen = new Set<number>();
+		const completed: number[] = [];
+		for (const id of d.livePreviewCompletedContactIds ?? []) {
+			if (!targetSet.has(id) || seen.has(id)) continue;
+			seen.add(id);
+			completed.push(id);
+		}
+		return completed;
+	}, [d.livePreviewCompletedContactIds, targetContactIds]);
+
+	const draftingTotal = d.livePreviewTotal || targetContactIds.length;
+
+	useEffect(() => {
+		onDraftingStatusChange?.({
+			isDrafting: d.isLivePreviewVisible,
+			activeContactId: d.livePreviewContactId ?? null,
+			completedContactIds: completedDraftingContactIds,
+			total: draftingTotal,
+		});
+	}, [
+		completedDraftingContactIds,
+		d.isLivePreviewVisible,
+		d.livePreviewContactId,
+		draftingTotal,
+		onDraftingStatusChange,
+	]);
+
+	useEffect(() => {
+		return () => {
+			onDraftingStatusChange?.({
+				isDrafting: false,
+				activeContactId: null,
+				completedContactIds: [],
+				total: 0,
+			});
+		};
+	}, [onDraftingStatusChange]);
+
+	const handleCancelDrafting = useCallback(() => {
+		setForceReviewOpen(false);
+		d.cancelGeneration();
+	}, [d]);
+
+	const handleViewDrafts = useCallback(() => {
+		if (batchDrafts.length === 0) return;
+		setIsProfileSidePanelOpen(false);
+		setShowTestPreview(false);
+		setForceReviewOpen(true);
+		setWriteReviewPreviewComplete(false);
+	}, [batchDrafts.length]);
+
+	const handleReviewClose = useCallback(() => {
+		if (d.isLivePreviewVisible || d.isPendingGeneration) {
+			setForceReviewOpen(false);
+			setWriteReviewPreviewComplete(false);
+			return;
+		}
+		setForceReviewOpen(false);
+		d.clearWriteReviewBatch();
+	}, [d]);
 
 	return (
 		<div className="relative" style={{ width: TARGET_WIDTH_PX }}>
@@ -302,26 +391,23 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 					batchDrafts={batchDrafts}
 					isPendingEmails={isPendingEmails}
 					onActiveReviewContactChange={onActiveReviewContactChange}
-					onClose={() => d.clearWriteReviewBatch()}
+					onClose={handleReviewClose}
+				/>
+			) : d.isLivePreviewVisible ? (
+				<DashboardDraftingDeck
+					contacts={d.contacts || []}
+					targetContactIds={targetContactIds}
+					livePreview={livePreview}
+					completedContactIds={completedDraftingContactIds}
+					total={draftingTotal}
+					isCollapsed={isDraftingDeckCollapsed}
+					onCollapsedChange={onDraftingDeckCollapsedChange ?? (() => undefined)}
+					onCancel={handleCancelDrafting}
+					onViewDrafts={handleViewDrafts}
+					viewDraftsDisabled={batchDrafts.length === 0}
 				/>
 			) : (
 				<Form {...d.form}>
-					{/* Live drafting preview (streaming) — appears to the left while a batch generates,
-					    absolutely positioned so the panel itself never reflows when drafting starts. */}
-					{d.isLivePreviewVisible && (
-						<div
-							className="absolute top-[52px]"
-							style={{ right: '100%', marginRight: 12 }}
-						>
-							<DraftPreviewExpandedList
-								contacts={d.contacts || []}
-								livePreview={livePreview}
-								width={330}
-								height={TARGET_HEIGHT_PX}
-							/>
-						</div>
-					)}
-
 					{showTestPreview && !d.isLivePreviewVisible && (
 						<div
 							className="absolute z-[70]"

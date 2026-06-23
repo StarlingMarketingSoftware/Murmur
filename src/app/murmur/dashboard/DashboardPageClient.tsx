@@ -59,6 +59,8 @@ import {
 } from '@/utils/murmurChromeZoom';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
+import UndoIcon from '@/components/atoms/_svg/UndoIcon';
+import SelectionCountClearIcon from '@/components/atoms/_svg/SelectionCountClearIcon';
 import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
 import { BookingIcon } from '@/components/atoms/_svg/BookingIcon';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
@@ -201,7 +203,10 @@ import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/Ca
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import { HoverDescriptionProvider } from '@/contexts/HoverDescriptionContext';
-import { DashboardWriteOverlay } from './DashboardWriteOverlay';
+import {
+	DashboardWriteOverlay,
+	type DashboardDraftingStatus,
+} from './DashboardWriteOverlay';
 import { SelectionFolderMoveBanner } from './SelectionFolderMoveBanner';
 import { MapEventPopupCard, formatMapPostedEventDate } from './MapEventPopupCard';
 import { ApplyModal } from './ApplyModal';
@@ -539,6 +544,144 @@ const formatMapTopSearchWhereLabel = (where: string): string => {
 
 const clampNumber = (n: number, min: number, max: number): number => {
 	return Math.min(max, Math.max(min, n));
+};
+
+// Rounded white pill that houses the "X/Y selected" count on the Selection
+// sub-panel header. The trailing X clears the current selection (deselect all).
+const SelectionCountPill = ({
+	label,
+	onClear,
+	disabled = false,
+	className,
+	onUndo,
+	canUndo = false,
+}: {
+	label: string;
+	onClear: () => void;
+	disabled?: boolean;
+	className?: string;
+	onUndo?: () => void;
+	canUndo?: boolean;
+}) => {
+	const hasPositionClass = /\b(?:absolute|relative|fixed|sticky)\b/.test(
+		className ?? ''
+	);
+
+	return (
+		<div
+			className={`group ${hasPositionClass ? '' : 'relative'} flex items-center justify-center gap-[3px] ${className ?? ''}`}
+			style={{
+				width: '138px',
+				height: '20px',
+				borderRadius: '9px',
+			}}
+		>
+			{/* Undo last selection — revealed on hover of the pill. Reuses the shared
+			    UndoIcon (same glyph as the prompt-suggestions undo control). */}
+			{onUndo && (
+				<button
+					type="button"
+					aria-label="Undo last selection"
+					title="Undo last selection"
+					onClick={(e) => {
+						e.stopPropagation();
+						if (!canUndo) return;
+						onUndo();
+					}}
+					disabled={!canUndo}
+					className={`absolute left-full top-1/2 z-10 ml-[6px] flex -translate-y-1/2 items-center justify-center border-0 p-0 leading-none opacity-0 transition-opacity duration-150 group-hover:opacity-50 focus-visible:opacity-50 ${
+						canUndo ? 'cursor-pointer' : 'cursor-default'
+					}`}
+					style={{
+						width: '21px',
+						height: '20px',
+						borderRadius: '7px',
+						background: '#FFF',
+					}}
+				>
+					<UndoIcon
+						width="14"
+						height="14"
+						className={canUndo ? '' : 'opacity-40'}
+					/>
+				</button>
+			)}
+			<span
+				aria-hidden="true"
+				className="pointer-events-none absolute inset-0"
+				style={{
+					borderRadius: '9px',
+					opacity: 0.7,
+					background: '#FFF',
+				}}
+			/>
+			<span className="relative z-10 translate-x-[3px] font-inter text-[13px] font-medium text-black leading-none whitespace-nowrap">
+				{label}
+			</span>
+			<button
+				type="button"
+				aria-label="Deselect all"
+				onClick={(e) => {
+					e.stopPropagation();
+					if (disabled) return;
+					onClear();
+				}}
+				disabled={disabled}
+				className={`relative z-10 flex h-[18px] w-[18px] translate-x-[5px] flex-shrink-0 items-center justify-center border-0 bg-transparent p-0 leading-none ${
+					disabled ? 'cursor-default opacity-40' : 'cursor-pointer'
+				}`}
+			>
+				<SelectionCountClearIcon />
+			</button>
+		</div>
+	);
+};
+
+const SelectionDraftingProgressBar = ({
+	completed,
+	total,
+	isCollapsed,
+	onToggleCollapsed,
+	className,
+}: {
+	completed: number;
+	total: number;
+	isCollapsed: boolean;
+	onToggleCollapsed: () => void;
+	className?: string;
+}) => {
+	const safeTotal = Math.max(0, total);
+	const safeCompleted = safeTotal > 0 ? Math.min(completed, safeTotal) : completed;
+
+	return (
+		<div
+			className={`flex items-center ${className ?? ''}`}
+			style={{
+				height: 24,
+				backgroundColor: '#9AC3FF',
+				borderTop: '2px solid #000000',
+				borderBottom: '2px solid #000000',
+			}}
+		>
+			<div className="pl-[10px] font-inter text-[13px] font-semibold leading-none text-black">
+				Drafting
+			</div>
+			<div className="ml-[12px] font-inter text-[13px] font-medium leading-none text-black">
+				{safeCompleted}/{safeTotal}
+			</div>
+			<button
+				type="button"
+				onClick={onToggleCollapsed}
+				className="ml-auto mr-[9px] flex items-center justify-center border-0 bg-transparent p-0"
+				style={{ width: 22, height: 22 }}
+				aria-label={isCollapsed ? 'Expand drafting deck' : 'Collapse drafting deck'}
+			>
+				<span className="font-inter text-[22px] font-semibold leading-none text-black">
+					⤢
+				</span>
+			</button>
+		</div>
+	);
 };
 
 const MAP_RESULTS_BOTTOM_SEARCH_BOX = {
@@ -4317,6 +4460,8 @@ const DashboardContent = () => {
 		activeSearchQuery,
 		tableRef,
 		selectedContacts,
+		undoLastSelection,
+		canUndoSelection,
 		isPendingBatchUpdateContacts,
 		isError,
 		error,
@@ -4342,6 +4487,7 @@ const DashboardContent = () => {
 		lastFreeTextArgs,
 		activeCampaignId,
 		activeCampaign,
+		setActiveCampaignId,
 		ensureActiveCampaign,
 	} = useDashboard({
 		derivedTitle: derivedContactTitle,
@@ -4373,6 +4519,15 @@ const DashboardContent = () => {
 	const [activeWriteReviewContactId, setActiveWriteReviewContactId] = useState<
 		number | null
 	>(null);
+	const [dashboardDraftingStatus, setDashboardDraftingStatus] =
+		useState<DashboardDraftingStatus>({
+			isDrafting: false,
+			activeContactId: null,
+			completedContactIds: [],
+			total: 0,
+		});
+	const [isDashboardDraftingDeckCollapsed, setIsDashboardDraftingDeckCollapsed] =
+		useState(false);
 	const [folderMoveNotice, setFolderMoveNotice] = useState<FolderMoveNotice | null>(
 		null
 	);
@@ -4380,6 +4535,13 @@ const DashboardContent = () => {
 		if (!isWriteMode) {
 			setIsWriteReviewActive(false);
 			setActiveWriteReviewContactId(null);
+			setDashboardDraftingStatus({
+				isDrafting: false,
+				activeContactId: null,
+				completedContactIds: [],
+				total: 0,
+			});
+			setIsDashboardDraftingDeckCollapsed(false);
 		}
 	}, [isWriteMode]);
 
@@ -4404,8 +4566,22 @@ const DashboardContent = () => {
 		setIsWriteMode(false);
 		setIsWriteReviewActive(false);
 		setActiveWriteReviewContactId(null);
+		setDashboardDraftingStatus({
+			isDrafting: false,
+			activeContactId: null,
+			completedContactIds: [],
+			total: 0,
+		});
+		setIsDashboardDraftingDeckCollapsed(false);
 		setSelectedContacts([]);
 	}, [setIsWriteMode, setSelectedContacts]);
+
+	const handleDashboardDraftingStatusChange = useCallback(
+		(status: DashboardDraftingStatus) => {
+			setDashboardDraftingStatus(status);
+		},
+		[]
+	);
 
 	useEffect(() => {
 		if (folderMoveNotice?.phase !== 'complete') return;
@@ -6043,6 +6219,27 @@ const DashboardContent = () => {
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
 	const dashboardMapCampaignForHeader = fromCampaign ?? activeCampaign;
+	// Switch the campaign IN the dashboard search context (folder dropdown pick)
+	// WITHOUT redirecting to the campaign detail page's "All" tab. The header box
+	// reads `fromCampaign ?? activeCampaign`, so we update whichever source is
+	// currently driving it:
+	//  - add-to-campaign mode (?fromCampaignId=…): rewrite that URL param in place
+	//    so the header re-resolves to the picked folder while staying on /dashboard.
+	//  - normal search mode: persist the new active campaign id.
+	// In both cases we also persist the active id so the choice sticks across the
+	// surface (prefetch, "Add to {campaign}", etc.).
+	const handleSelectDashboardCampaign = useCallback(
+		(nextCampaignId: number) => {
+			if (!Number.isFinite(nextCampaignId)) return;
+			setActiveCampaignId(nextCampaignId);
+			if (fromCampaignIdParam) {
+				const params = new URLSearchParams(searchParams.toString());
+				params.set('fromCampaignId', String(nextCampaignId));
+				router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+			}
+		},
+		[fromCampaignIdParam, pathname, router, searchParams, setActiveCampaignId]
+	);
 	// Keep the send-queue view honest: once the queue drains to 0 the header pill
 	// disappears (so it can't be toggled shut manually) — close the view so its
 	// open state and chevron don't get stuck. Shares useSendQueue's query key with
@@ -8209,9 +8406,48 @@ const DashboardContent = () => {
 		DASHBOARD_SEARCH_SELECTION_LIMIT
 	);
 
+	const dashboardDraftingCompletedContactIdSet = useMemo(
+		() => new Set(dashboardDraftingStatus.completedContactIds),
+		[dashboardDraftingStatus.completedContactIds]
+	);
+	const dashboardDraftingCompletedOrderById = useMemo(() => {
+		const order = new Map<number, number>();
+		dashboardDraftingStatus.completedContactIds.forEach((id, index) => {
+			if (!order.has(id)) order.set(id, index);
+		});
+		return order;
+	}, [dashboardDraftingStatus.completedContactIds]);
+
 	const mapPanelSelectedContacts = useMemo(
-		() => displayedMapPanelContacts.filter((c) => selectedContacts.includes(c.id)),
-		[displayedMapPanelContacts, selectedContacts]
+		() => {
+			const selected = displayedMapPanelContacts.filter((c) =>
+				selectedContacts.includes(c.id)
+			);
+			if (!dashboardDraftingStatus.isDrafting) return selected;
+
+			const activeId = dashboardDraftingStatus.activeContactId;
+			return [...selected].sort((a, b) => {
+				const aCompletedOrder = dashboardDraftingCompletedOrderById.get(a.id);
+				const bCompletedOrder = dashboardDraftingCompletedOrderById.get(b.id);
+				const aCompleted = aCompletedOrder != null;
+				const bCompleted = bCompletedOrder != null;
+				if (aCompleted && bCompleted) return aCompletedOrder - bCompletedOrder;
+				if (aCompleted) return -1;
+				if (bCompleted) return 1;
+				const aActive = activeId != null && a.id === activeId;
+				const bActive = activeId != null && b.id === activeId;
+				if (aActive && !bActive) return -1;
+				if (!aActive && bActive) return 1;
+				return 0;
+			});
+		},
+		[
+			dashboardDraftingCompletedOrderById,
+			dashboardDraftingStatus.activeContactId,
+			dashboardDraftingStatus.isDrafting,
+			displayedMapPanelContacts,
+			selectedContacts,
+		]
 	);
 	const mapPanelUnselectedContacts = useMemo(
 		() => displayedMapPanelContacts.filter((c) => !selectedContacts.includes(c.id)),
@@ -10675,7 +10911,14 @@ const DashboardContent = () => {
 		const city = contact.city || '';
 		const isWriteReviewRow =
 			isWriteReviewActive || activeWriteReviewContactId != null;
-		const writeModeSelectedRowBackground = isWriteReviewRow
+		const isDashboardDraftingRow = dashboardDraftingStatus.isDrafting;
+		const writeModeSelectedRowBackground = isDashboardDraftingRow
+			? dashboardDraftingCompletedContactIdSet.has(contact.id)
+				? '#FDDEA5'
+				: contact.id === dashboardDraftingStatus.activeContactId
+					? '#9AC3FF'
+					: '#FD8E89'
+			: isWriteReviewRow
 			? contact.id === activeWriteReviewContactId
 				? '#F8C262'
 				: '#FDDEA5'
@@ -13387,6 +13630,10 @@ const DashboardContent = () => {
 															defaultOpenContactsFolder
 															onFinderOpenChange={setIsCampaignFinderOpen}
 															enableRowDelete
+															onSelectCampaign={(campaignId) => {
+																handleSelectDashboardCampaign(campaignId);
+																setOpenMapTopAction(null);
+															}}
 														/>
 													</div>
 												</div>
@@ -14208,6 +14455,7 @@ const DashboardContent = () => {
 																				);
 																			}}
 																			onFolderDropdownOpenChange={setIsMapCampaignHeaderDropdownOpen}
+																			onSelectCampaign={handleSelectDashboardCampaign}
 																			width={433}
 																		/>
 																	</HoverDescriptionProvider>
@@ -14245,6 +14493,15 @@ const DashboardContent = () => {
 																			onReviewActiveChange={setIsWriteReviewActive}
 																			onActiveReviewContactChange={
 																				handleActiveWriteReviewContactChange
+																			}
+																			onDraftingStatusChange={
+																				handleDashboardDraftingStatusChange
+																			}
+																			isDraftingDeckCollapsed={
+																				isDashboardDraftingDeckCollapsed
+																			}
+																			onDraftingDeckCollapsedChange={
+																				setIsDashboardDraftingDeckCollapsed
 																			}
 																		/>
 																	</div>
@@ -14532,13 +14789,24 @@ const DashboardContent = () => {
 																						}}
 																					>
 																						{isCompressedMapChrome ? (
-																							<div className="w-full h-[49px] flex-shrink-0 flex items-center justify-center px-4 relative">
-																								<span className="absolute left-[10px] top-1/2 -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
+																							<div
+																								className="w-full flex-shrink-0 flex items-start justify-center px-4 relative"
+																								style={{ height: dashboardDraftingStatus.isDrafting ? 73 : 49 }}
+																							>
+																								<span className="absolute left-[10px] top-[24.5px] -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
 																									Selection
 																								</span>
-																								<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
-																									{selectedContacts.length}/{mapSelectionDisplayTotal} selected
-																								</span>
+																								<SelectionCountPill
+																									className="absolute left-1/2 top-[24.5px] -translate-x-1/2 -translate-y-1/2"
+																									label={`${selectedContacts.length}/${mapSelectionDisplayTotal} selected`}
+																									disabled={selectedContacts.length === 0}
+																									onClear={() => {
+																										setMapPanelShiftClickAnchor(null);
+																										setSelectedContacts([]);
+																									}}
+																									onUndo={undoLastSelection}
+																									canUndo={canUndoSelection}
+																								/>
 																								<button
 																									type="button"
 																									onClick={() => {
@@ -14546,17 +14814,32 @@ const DashboardContent = () => {
 																										handleSelectAll(displayedMapPanelContacts);
 																									}}
 																									disabled={isMapResultsLoading}
-																									className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 translate-y-[4px] ${
+																									className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-[24.5px] -translate-y-1/2 ${
 																										isMapResultsLoading ? 'opacity-60 pointer-events-none' : 'hover:underline'
 																									}`}
 																								>
 																									{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
 																								</button>
+																								{dashboardDraftingStatus.isDrafting && (
+																									<SelectionDraftingProgressBar
+																										className="absolute left-0 right-0 bottom-0"
+																										completed={dashboardDraftingStatus.completedContactIds.length}
+																										total={dashboardDraftingStatus.total}
+																										isCollapsed={isDashboardDraftingDeckCollapsed}
+																										onToggleCollapsed={() =>
+																											setIsDashboardDraftingDeckCollapsed((prev) => !prev)
+																										}
+																									/>
+																								)}
 																							</div>
 																						) : (
 																							<div
-																								className="w-full h-[77px] flex-shrink-0 relative"
-																								style={{ backgroundColor: '#CBF0FF', borderBottom: '2px solid #000' }}
+																								className="w-full flex-shrink-0 relative"
+																								style={{
+																									height: dashboardDraftingStatus.isDrafting ? 101 : 77,
+																									backgroundColor: '#CBF0FF',
+																									borderBottom: '2px solid #000',
+																								}}
 																							>
 																								<ContactsHeaderChrome
 																									variant="campaignStops"
@@ -14573,9 +14856,17 @@ const DashboardContent = () => {
 																								<span className="absolute left-[10px] top-[58px] -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
 																									Selection
 																								</span>
-																								<span className="absolute left-1/2 top-[58px] -translate-x-1/2 -translate-y-1/2 font-inter text-[13px] font-medium text-black">
-																									{selectedContacts.length}/{mapSelectionDisplayTotal} selected
-																								</span>
+																								<SelectionCountPill
+																									className="absolute left-1/2 top-[58px] -translate-x-1/2 -translate-y-1/2"
+																									label={`${selectedContacts.length}/${mapSelectionDisplayTotal} selected`}
+																									disabled={selectedContacts.length === 0}
+																									onClear={() => {
+																										setMapPanelShiftClickAnchor(null);
+																										setSelectedContacts([]);
+																									}}
+																									onUndo={undoLastSelection}
+																									canUndo={canUndoSelection}
+																								/>
 																								<button
 																									type="button"
 																									onClick={() => {
@@ -14589,6 +14880,17 @@ const DashboardContent = () => {
 																								>
 																									{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
 																								</button>
+																								{dashboardDraftingStatus.isDrafting && (
+																									<SelectionDraftingProgressBar
+																										className="absolute left-0 right-0 top-[77px]"
+																										completed={dashboardDraftingStatus.completedContactIds.length}
+																										total={dashboardDraftingStatus.total}
+																										isCollapsed={isDashboardDraftingDeckCollapsed}
+																										onToggleCollapsed={() =>
+																											setIsDashboardDraftingDeckCollapsed((prev) => !prev)
+																										}
+																									/>
+																								)}
 																							</div>
 																						)}
 																						{folderMoveNotice && (

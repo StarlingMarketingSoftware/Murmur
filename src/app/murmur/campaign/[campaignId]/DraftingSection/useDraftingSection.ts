@@ -532,6 +532,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	// Live preview progress (drives the top-of-page progress bar; stays in sync with Draft Preview playback)
 	const [livePreviewDraftNumber, setLivePreviewDraftNumber] = useState(0);
 	const [livePreviewTotal, setLivePreviewTotal] = useState(0);
+	const [livePreviewCompletedContactIds, setLivePreviewCompletedContactIds] =
+		useState<number[]>([]);
 	const livePreviewDraftNumberRef = useRef(0);
 	const livePreviewTotalRef = useRef(0);
 	const livePreviewIsShowingFinalPlaceholderRef = useRef(false);
@@ -677,6 +679,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				stopLivePreviewTimers();
 				// Ensure we render the full message before moving on / hiding.
 				setLivePreviewMessage(full);
+				setLivePreviewCompletedContactIds((prev) =>
+					prev.includes(next.contactId) ? prev : [...prev, next.contactId]
+				);
 				const transitionDelayMs =
 					livePreviewQueueRef.current.length > 0
 						? LIVE_PREVIEW_QUEUED_TRANSITION_DELAY_MS
@@ -820,6 +825,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		setLivePreviewMessage('Drafting...');
 		setLivePreviewDraftNumber(0);
 		setLivePreviewTotal(nextTotal);
+		setLivePreviewCompletedContactIds([]);
 		livePreviewDraftNumberRef.current = 0;
 		livePreviewTotalRef.current = nextTotal;
 		livePreviewFullTextRef.current = '';
@@ -3595,6 +3601,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		livePreviewSubject,
 		livePreviewDraftNumber,
 		livePreviewTotal,
+		livePreviewCompletedContactIds,
 		scoreFullAutomatedPrompt,
 		critiqueManualEmailText,
 	};

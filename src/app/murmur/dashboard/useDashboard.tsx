@@ -5,7 +5,15 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { EmailVerificationStatus } from '@/constants/prismaEnums';
 import type { UserContactList } from '@prisma/client';
-import { useEffect, useState, useMemo, useCallback, useRef, type SetStateAction } from 'react';
+import {
+	useEffect,
+	useState,
+	useMemo,
+	useCallback,
+	useReducer,
+	useRef,
+	type SetStateAction,
+} from 'react';
 import {
 	CampaignApiError,
 	type CampaignListItem,
@@ -127,6 +135,65 @@ export const getSelectionLimitedContactIds = (
 	}
 
 	return acceptedIds;
+};
+
+// Shallow order-insensitive equality for selection id lists, used to avoid pushing
+// no-op selection changes onto the undo history.
+const areContactIdListsEqual = (
+	a: readonly number[],
+	b: readonly number[]
+): boolean => {
+	if (a === b) return true;
+	if (a.length !== b.length) return false;
+	const seen = new Set<number>(a);
+	for (const id of b) {
+		if (!seen.has(id)) return false;
+	}
+	return true;
+};
+
+// Undo-aware selection store. `current` is the live selection; `past` is the stack of
+// prior selections (most recent last). A normal "set" pushes the previous value onto
+// `past`; "undo" pops the most recent entry back into `current`.
+type SelectionState = {
+	current: number[];
+	past: number[][];
+};
+
+type SelectionAction =
+	| { type: 'set'; value: SetStateAction<number[]> }
+	| { type: 'undo' };
+
+// Cap the undo history so long selection sessions can't grow memory unbounded.
+const SELECTION_HISTORY_LIMIT = 50;
+
+const selectionReducer = (
+	state: SelectionState,
+	action: SelectionAction
+): SelectionState => {
+	switch (action.type) {
+		case 'set': {
+			const resolved =
+				typeof action.value === 'function'
+					? (action.value as (prev: number[]) => number[])(state.current)
+					: action.value;
+			const next = clampContactIdsToSelectionLimit(resolved);
+			// Ignore no-op writes so they don't pollute the undo stack (and so the
+			// undo button stays accurate after redundant re-selections).
+			if (areContactIdListsEqual(next, state.current)) return state;
+			const past = [...state.past, state.current];
+			if (past.length > SELECTION_HISTORY_LIMIT) past.shift();
+			return { current: next, past };
+		}
+		case 'undo': {
+			if (state.past.length === 0) return state;
+			const past = state.past.slice(0, -1);
+			const current = state.past[state.past.length - 1];
+			return { current, past };
+		}
+		default:
+			return state;
+	}
 };
 
 const getRandomSearchResultLimit = (): number =>
@@ -265,16 +332,20 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	const [selectedContactListRows, setSelectedContactListRows] = useState<
 		UserContactList[]
 	>([]);
-	const [selectedContacts, setSelectedContactsState] = useState<number[]>([]);
+	const [selectionState, dispatchSelection] = useReducer(selectionReducer, {
+		current: [],
+		past: [],
+	});
+	const selectedContacts = selectionState.current;
 	const setSelectedContacts = useCallback((value: SetStateAction<number[]>) => {
-		setSelectedContactsState((prev) => {
-			const next =
-				typeof value === 'function'
-					? (value as (prevState: number[]) => number[])(prev)
-					: value;
-			return clampContactIdsToSelectionLimit(next);
-		});
+		dispatchSelection({ type: 'set', value });
 	}, []);
+	// Restore the previous selection. No-op (and the button is disabled) when the
+	// undo history is empty.
+	const undoLastSelection = useCallback(() => {
+		dispatchSelection({ type: 'undo' });
+	}, []);
+	const canUndoSelection = selectionState.past.length > 0;
 	// Map "Write Message" flow: when true, the inline drafting panel is open over the search map
 	// for the current `selectedContacts`. Reset alongside selection so it never outlives it.
 	const [isWriteMode, setIsWriteMode] = useState(false);
@@ -1761,6 +1832,8 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		columns,
 		setSelectedContacts,
 		selectedContacts,
+		undoLastSelection,
+		canUndoSelection,
 		isWriteMode,
 		setIsWriteMode,
 		handleSelectAll,

@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, ReactNode, useMemo } from 'react';
+import { FC, ReactNode, useMemo, useState } from 'react';
 import { useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
 import { MAX_CAMPAIGNS } from '@/hooks/useAddCampaignFolder';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
@@ -43,7 +43,7 @@ type Props = {
 	showAllRows?: boolean;
 	/** Dropdown mode: the row to highlight (the in-panel pick). Defaults to currentCampaignId. */
 	selectedCampaignId?: number | null;
-	/** Dropdown mode: called when a row is clicked (select-to-confirm). */
+	/** Dropdown mode: called when a campaign row is clicked. */
 	onRowClick?: (campaignId: number) => void;
 	/** Dropdown mode: show the "+" add-folder row. */
 	showAddRow?: boolean;
@@ -53,6 +53,12 @@ type Props = {
 	showChooseFolderButton?: boolean;
 	onChooseFolder?: () => void;
 	chooseDisabled?: boolean;
+	/** Dropdown mode: show the per-row delete affordance (divider + white X cell). */
+	showDeleteColumn?: boolean;
+	/** Dropdown mode: the row currently armed for delete confirmation (red band). */
+	confirmingCampaignId?: number | null;
+	/** Dropdown mode: called when a row's delete "X" is clicked. */
+	onDeleteClick?: (campaignId: number) => void;
 };
 
 const CATEGORY_BACKGROUND: Record<CampaignDataTypeCategoryKey, string> = {
@@ -71,6 +77,8 @@ const ROW_PALETTE = [
 ];
 
 const SELECTED_ROW_BACKGROUND = '#DFF4E5';
+const DELETE_WARNING_BACKGROUND = '#E7677C';
+const DELETE_CELL_WIDTH = 21;
 
 const FOLDER_PILL_LEFT = 11;
 const FOLDER_PILL_WIDTH = 105.331;
@@ -151,6 +159,20 @@ const MiniPlusIcon = () => (
 	</svg>
 );
 
+const MiniXIcon = ({ color }: { color: string }) => (
+	<svg
+		width={12}
+		height={12}
+		viewBox="0 0 18 18"
+		fill="none"
+		xmlns="http://www.w3.org/2000/svg"
+		aria-hidden="true"
+	>
+		<line x1="4.58793" y1="4.41176" x2="13.5876" y2="13.4115" stroke={color} />
+		<line x1="4.41207" y1="13.4118" x2="13.4118" y2="4.41207" stroke={color} />
+	</svg>
+);
+
 const renderCategoryIcon = (key: CampaignDataTypeCategoryKey): ReactNode => {
 	switch (key) {
 		case 'wine_beer_spirits':
@@ -206,10 +228,18 @@ const FolderPill = ({
 	row,
 	palette,
 	newCount,
+	confirming = false,
+	bordered = false,
+	width = FOLDER_PILL_WIDTH,
+	height = FOLDER_PILL_HEIGHT,
 }: {
 	row: MiniCampaign;
 	palette: (typeof ROW_PALETTE)[number];
 	newCount: number;
+	confirming?: boolean;
+	bordered?: boolean;
+	width?: number | string;
+	height?: number;
 }) => {
 	const dataTypes = row.campaignDataTypes ?? [];
 	const visible = dataTypes.slice(0, 2);
@@ -218,11 +248,12 @@ const FolderPill = ({
 		<div
 			className="flex min-w-0 items-center overflow-hidden px-[3px]"
 			style={{
-				width: FOLDER_PILL_WIDTH,
-				height: FOLDER_PILL_HEIGHT,
+				width,
+				height,
 				boxSizing: 'border-box',
-				borderRadius: 2.5,
-				backgroundColor: palette.pill,
+				borderRadius: bordered ? 6 : 2.5,
+				border: bordered ? '1px solid #000' : undefined,
+				backgroundColor: confirming ? 'transparent' : palette.pill,
 			}}
 		>
 			<span className="flex-none">
@@ -288,9 +319,17 @@ export const CampaignsTableMini: FC<Props> = ({
 	showChooseFolderButton = false,
 	onChooseFolder,
 	chooseDisabled = false,
+	showDeleteColumn = false,
+	confirmingCampaignId = null,
+	onDeleteClick,
 }) => {
 	const { data: campaignsData, isPending } = useGetCampaigns();
 	const { data: inboundEmails } = useGetInboundEmails({ enabled: true });
+	const [hoveredRowId, setHoveredRowId] = useState<number | null>(null);
+	// Dropdown delete affordance: which row's "X" cell is currently hovered. While
+	// hovered (and not yet armed) the whole row previews the red delete-warning
+	// look; clicking the X swaps that row into the final confirmation banner.
+	const [hoveredDeleteId, setHoveredDeleteId] = useState<number | null>(null);
 
 	const isDropdown = variant === 'dropdown';
 
@@ -346,15 +385,131 @@ export const CampaignsTableMini: FC<Props> = ({
 			(rowContentHeight - FOLDER_PILL_HEIGHT) / 2 + FOLDER_PILL_TOP_OFFSET;
 		const metricPillTop =
 			(rowContentHeight - METRIC_PILL_HEIGHT) / 2 + METRIC_PILL_TOP_OFFSET;
+		// Delete affordance (dropdown only). Three layers:
+		//  1. Hovering the row paints it the selected green and reveals the white "X".
+		//  2. Hovering that "X" previews the delete by painting the whole row red
+		//     (#E7677C) with the metric pills hidden — the "are you sure?" warning.
+		//  3. Clicking the "X" arms the final confirmation: the row becomes the red
+		//     banner (bordered folder pill | divider | "Confirm Delete and Move to
+		//     Archive" + white close "X"); a second click executes the delete.
+		const deleteEnabled = showDeleteColumn && !!onDeleteClick;
+		const isConfirming = deleteEnabled && confirmingCampaignId === row.id;
+		const isRowHovered = hoveredRowId === row.id;
+		const isDeleteHovered = deleteEnabled && !isConfirming && hoveredDeleteId === row.id;
+		// The red "warning" wash is shown both while previewing (X hover) and while
+		// the final confirmation banner is armed.
+		const showWarning = isConfirming || isDeleteHovered;
+		const showHighlight = !showWarning && (opts.highlighted || (deleteEnabled && isRowHovered));
+		const rowBackground = showWarning
+			? DELETE_WARNING_BACKGROUND
+			: showHighlight
+				? SELECTED_ROW_BACKGROUND
+				: '#F8F8F8';
+
+		// Final confirmation banner: replaces the whole row content with the bordered
+		// folder pill on the left, a vertical divider, the warning copy, and a close X.
+		if (isConfirming) {
+			return (
+				<div
+					key={row.id}
+					style={{
+						position: 'relative',
+						height: rh,
+						boxSizing: 'border-box',
+						background: DELETE_WARNING_BACKGROUND,
+						borderBottom: opts.bottomBorder ? '1px solid #000' : '0',
+						display: 'flex',
+						alignItems: 'stretch',
+						cursor: 'default',
+					}}
+				>
+					{/* Left segment: bordered folder pill that still identifies the row. */}
+					<div
+						style={{
+							flex: `0 0 ${DRAFT_PILL_LEFT}px`,
+							display: 'flex',
+							alignItems: 'center',
+							paddingLeft: FOLDER_PILL_LEFT,
+							paddingRight: 6,
+							boxSizing: 'border-box',
+							borderRight: '1px solid #000',
+						}}
+					>
+						<FolderPill
+							row={row}
+							palette={palette}
+							newCount={newCountsByCampaign.get(row.id) ?? 0}
+							confirming
+							bordered
+							height={Math.min(rowContentHeight - 6, 20)}
+							width="100%"
+						/>
+					</div>
+					{/* Right segment: warning copy + close X, vertically centered. */}
+					<div
+						style={{
+							flex: '1 1 auto',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'space-between',
+							gap: 8,
+							paddingLeft: 14,
+							paddingRight: 12,
+							minWidth: 0,
+						}}
+					>
+						<span
+							className="min-w-0 truncate font-inter font-medium text-white"
+							style={{ fontSize: 12.555, lineHeight: '15.426px' }}
+						>
+							Confirm Delete and Move to Archive
+						</span>
+						<button
+							type="button"
+							aria-label={`Confirm delete ${row.name || 'folder'} and move to archive`}
+							title="Click to delete and move to archive"
+							onClick={(event) => {
+								event.stopPropagation();
+								setHoveredDeleteId((prev) => (prev === row.id ? null : prev));
+								onDeleteClick?.(row.id);
+							}}
+							style={{
+								flex: '0 0 auto',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+								background: 'transparent',
+								border: 'none',
+								padding: 0,
+								margin: 0,
+								cursor: 'pointer',
+							}}
+						>
+							<MiniXIcon color="#FFFFFF" />
+						</button>
+					</div>
+				</div>
+			);
+		}
+
 		return (
 			<div
 				key={row.id}
 				onClick={opts.clickable ? opts.onClick : undefined}
+				onMouseEnter={deleteEnabled ? () => setHoveredRowId(row.id) : undefined}
+				onMouseLeave={
+					deleteEnabled
+						? () => {
+								setHoveredRowId((prev) => (prev === row.id ? null : prev));
+								setHoveredDeleteId((prev) => (prev === row.id ? null : prev));
+							}
+						: undefined
+				}
 				style={{
 					position: 'relative',
 					height: rh,
 					boxSizing: 'border-box',
-					background: opts.highlighted ? SELECTED_ROW_BACKGROUND : '#F8F8F8',
+					background: rowBackground,
 					borderBottom: opts.bottomBorder ? '1px solid #000' : '0',
 					cursor: opts.clickable ? 'pointer' : 'default',
 				}}
@@ -364,23 +519,67 @@ export const CampaignsTableMini: FC<Props> = ({
 						row={row}
 						palette={palette}
 						newCount={newCountsByCampaign.get(row.id) ?? 0}
+						confirming={showWarning}
 					/>
 				</div>
 				<div style={{ position: 'absolute', left: DRAFT_PILL_LEFT, top: metricPillTop }}>
-					<MetricPill background={getDraftFill(row.draftCount)}>
+					<MetricPill
+						background={showWarning ? 'transparent' : getDraftFill(row.draftCount)}
+					>
 						{formatCount(row.draftCount)}
 					</MetricPill>
 				</div>
 				<div style={{ position: 'absolute', left: SENT_PILL_LEFT, top: metricPillTop }}>
-					<MetricPill background={getSentFill(row.sentCount)}>
+					<MetricPill
+						background={showWarning ? 'transparent' : getSentFill(row.sentCount)}
+					>
 						{row.sentCount ?? 0}
 					</MetricPill>
 				</div>
 				<div style={{ position: 'absolute', left: UPDATED_PILL_LEFT, top: metricPillTop }}>
-					<MetricPill background={getUpdatedFill(row.updatedAt)}>
+					<MetricPill
+						background={showWarning ? 'transparent' : getUpdatedFill(row.updatedAt)}
+					>
 						{formatUpdated(row.updatedAt)}
 					</MetricPill>
 				</div>
+				{deleteEnabled && (isRowHovered || isDeleteHovered) ? (
+					<button
+						type="button"
+						aria-label={`Delete ${row.name || 'folder'}`}
+						title={isDeleteHovered ? 'Click to confirm delete' : `Delete ${row.name || 'folder'}`}
+						onMouseEnter={() => setHoveredDeleteId(row.id)}
+						onMouseLeave={() =>
+							setHoveredDeleteId((prev) => (prev === row.id ? null : prev))
+						}
+						onClick={(event) => {
+							event.stopPropagation();
+							setHoveredDeleteId((prev) => (prev === row.id ? null : prev));
+							onDeleteClick?.(row.id);
+						}}
+						style={{
+							position: 'absolute',
+							top: 0,
+							right: 0,
+							width: DELETE_CELL_WIDTH,
+							height: rowContentHeight,
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							boxSizing: 'border-box',
+							background: isDeleteHovered ? DELETE_WARNING_BACKGROUND : '#FFFFFF',
+							// Vertical divider line on the left edge of the rightmost cell.
+							border: 'none',
+							borderLeft: '1px solid #000',
+							padding: 0,
+							margin: 0,
+							cursor: 'pointer',
+							zIndex: 1,
+						}}
+					>
+						<MiniXIcon color={isDeleteHovered ? '#FFFFFF' : '#000000'} />
+					</button>
+				) : null}
 			</div>
 		);
 	};

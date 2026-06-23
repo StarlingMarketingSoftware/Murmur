@@ -176,6 +176,11 @@ type CampaignsTableProps = {
 	 * delete flow. Opt-in; enabled on the dashboard only.
 	 */
 	enableRowDelete?: boolean;
+	/**
+	 * When provided, clicking a campaign row selects that campaign in the parent
+	 * surface instead of navigating to the campaign page.
+	 */
+	onSelectCampaign?: (campaignId: number) => void;
 };
 
 export const CampaignsTable: FC<CampaignsTableProps> = ({
@@ -185,6 +190,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 	defaultOpenContactsFolder,
 	onFinderOpenChange,
 	enableRowDelete = false,
+	onSelectCampaign,
 }) => {
 	const router = useRouter();
 	// Treat all mobile orientations (portrait and landscape) as mobile for this table
@@ -287,6 +293,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 		initialOpenCampaignId: defaultOpenCampaignId,
 		initialOpenContactsFolder: defaultOpenContactsFolder,
 		onFinderOpenInNewTab: (campaignId) => handleFinderOpenInNewTab(campaignId, 'left'),
+		onSelectCampaign,
 		deleteWarningCampaignId: deleteButtonHoverCampaignId,
 	});
 	const rightCampaignsTable = useCampaignsTable({
@@ -296,6 +303,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 		enableFinder: !shouldShowMobileFeatures,
 		finderSearchQuery: rightFinderSearchQuery,
 		onFinderOpenInNewTab: (campaignId) => handleFinderOpenInNewTab(campaignId, 'right'),
+		onSelectCampaign,
 	});
 	const {
 		data,

@@ -406,6 +406,7 @@ import {
 	clamp,
 	lerp,
 	mapboxEaseOutCubic,
+	mapboxEaseInOutCubic,
 	normalizeLngDeg,
 	smoothstep,
 } from './math';
@@ -1724,6 +1725,21 @@ const AMBIENT_CONTACT_CATEGORY_TITLE_PREFIXES: readonly (readonly string[])[] = 
 	['Music Venues'],
 	['Restaurants'],
 ] as const;
+const RADIO_CONTACT_CATEGORY_INDEX = 0;
+const DASHBOARD_MAP_CAMERA_SCRUB_EVENT = 'murmur:dashboard-map-camera-scrub';
+
+type DashboardMapCameraScrubDetail = {
+	progress?: number;
+	phase?: 'scrub' | 'commit';
+};
+
+type DashboardMapCameraScrubState = {
+	startCenter: [number, number];
+	targetCenter: [number, number];
+	startZoom: number;
+	startPitch: number;
+	startOffset: [number, number];
+};
 
 const getAmbientContactCategoryIndexFromTitle = (
 	title: string | null | undefined
@@ -3680,8 +3696,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		(mapInstance: mapboxgl.Map | null) => {
 			if (!mapInstance) return;
 
-			// Only run for promotion-mode searches.
-			if (!isPromotionSearch) {
+			// Radio stations are part of the general map overlay layer. Keep the
+			// dedicated promotion-search selection/list behavior below, but fetch the
+			// radio overlay for any engaged search so these category pins can appear
+			// alongside the rest of the map context.
+			if (!searchEngaged || !isAnySearch) {
 				if (lastPromotionOverlayFetchKeyRef.current !== '') {
 					lastPromotionOverlayFetchKeyRef.current = '';
 					setPromotionOverlayFetchBbox(null);
@@ -3741,7 +3760,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				maxLng: qEast,
 			});
 		},
-		[isPromotionSearch]
+		[isAnySearch, searchEngaged]
 	);
 
 	const updateAllContactsOverlayFetchBbox = useCallback(
@@ -9589,6 +9608,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [map, isMapLoaded, isMapFirstPainted]);
 
 	const prevPresentationRef = useRef<'background' | 'interactive'>(presentation);
+	const dashboardScrollScrubCameraRef =
+		useRef<DashboardMapCameraScrubState | null>(null);
+	const dashboardScrollScrubProgressRef = useRef(0);
+	const dashboardScrollScrubActiveRef = useRef(false);
 
 	const cinematicAutoFitRef = useRef(false);
 
@@ -9602,6 +9625,128 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		syncInteractiveFloor();
 	}, [map, isMobile, syncInteractiveFloor]);
+
+	useEffect(() => {
+		if (!map || !isMapLoaded || typeof window === 'undefined') return;
+
+		const getScrubState = (): DashboardMapCameraScrubState | null => {
+			if (dashboardScrollScrubCameraRef.current) {
+				return dashboardScrollScrubCameraRef.current;
+			}
+
+			try {
+				const container = map.getContainer?.() as HTMLElement | undefined;
+				const width = container?.clientWidth ?? 0;
+				const height = container?.clientHeight ?? 0;
+				if (width <= 0 || height <= 0) return null;
+
+				const center = map.getCenter();
+				const target = map.unproject([
+					width / 2 + DASHBOARD_DECORATIVE_OFFSET_PX[0],
+					height / 2 + DASHBOARD_DECORATIVE_OFFSET_PX[1],
+				]);
+
+				const state: DashboardMapCameraScrubState = {
+					startCenter: [center.lng, center.lat],
+					targetCenter: [target.lng, target.lat],
+					startZoom: map.getZoom?.() ?? DASHBOARD_DECORATIVE_ZOOM,
+					startPitch: map.getPitch?.() ?? DASHBOARD_DECORATIVE_PITCH,
+					startOffset: DASHBOARD_DECORATIVE_OFFSET_PX,
+				};
+				dashboardScrollScrubCameraRef.current = state;
+				return state;
+			} catch {
+				return null;
+			}
+		};
+
+		const restoreDecorativeZoomLock = () => {
+			try {
+				map.setMinZoom(DASHBOARD_DECORATIVE_ZOOM);
+				map.setMaxZoom(DASHBOARD_DECORATIVE_ZOOM);
+			} catch {
+				// Ignore.
+			}
+		};
+
+		const loosenZoomLockForScrub = () => {
+			try {
+				const currentZoom = map.getZoom?.() ?? DASHBOARD_DECORATIVE_ZOOM;
+				map.setMinZoom(Math.min(currentZoom, DASHBOARD_DECORATIVE_ZOOM));
+				map.setMaxZoom(DEFAULT_MAX_ZOOM_FALLBACK);
+			} catch {
+				// Ignore.
+			}
+		};
+
+		const handleCameraScrub = (event: Event) => {
+			const detail = (event as CustomEvent<DashboardMapCameraScrubDetail>).detail;
+			const progress = clamp(Number(detail?.progress ?? 0), 0, 1);
+			const isCommit = detail?.phase === 'commit';
+
+			// Scrub events are only meaningful for the dashboard background→map entry.
+			// During the commit frame React may already have flipped `presentation` to
+			// interactive, so allow the explicit commit event to finish the camera to p=1.
+			if (presentationRef.current !== 'background' && !isCommit) return;
+
+			dashboardScrollScrubProgressRef.current = progress;
+
+			if (progress <= 0.0001 && !isCommit) {
+				const state = dashboardScrollScrubCameraRef.current;
+				dashboardScrollScrubActiveRef.current = false;
+				if (!state) return;
+				try {
+					map.easeTo({
+						center: state.startCenter,
+						zoom: state.startZoom,
+						pitch: state.startPitch,
+						bearing: 0,
+						offset: state.startOffset,
+						duration: 0,
+					});
+				} catch {
+					// Ignore.
+				}
+				restoreDecorativeZoomLock();
+				dashboardScrollScrubCameraRef.current = null;
+				return;
+			}
+
+			const state = getScrubState();
+			if (!state) return;
+
+			dashboardScrollScrubActiveRef.current = true;
+			loosenZoomLockForScrub();
+
+			const lngDelta = normalizeLngDeg(state.targetCenter[0] - state.startCenter[0]);
+			const center: [number, number] = [
+				normalizeLngDeg(state.startCenter[0] + lngDelta * progress),
+				lerp(state.startCenter[1], state.targetCenter[1], progress),
+			];
+			const offset: [number, number] = [
+				lerp(state.startOffset[0], 0, progress),
+				lerp(state.startOffset[1], 0, progress),
+			];
+
+			try {
+				map.easeTo({
+					center,
+					zoom: lerp(state.startZoom, MAP_DEFAULT_ZOOM, progress),
+					pitch: lerp(state.startPitch, 0, progress),
+					bearing: 0,
+					offset,
+					duration: 0,
+				});
+			} catch {
+				// Ignore.
+			}
+		};
+
+		window.addEventListener(DASHBOARD_MAP_CAMERA_SCRUB_EVENT, handleCameraScrub);
+		return () => {
+			window.removeEventListener(DASHBOARD_MAP_CAMERA_SCRUB_EVENT, handleCameraScrub);
+		};
+	}, [map, isMapLoaded]);
 
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
@@ -9662,6 +9807,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (isBackgroundPresentation) {
 			// Decorative dashboard background: fixed zoom, no interactions, optional slow globe spin.
 			safeDisableInteractions();
+			if (!dashboardScrollScrubActiveRef.current) {
+				dashboardScrollScrubProgressRef.current = 0;
+				dashboardScrollScrubCameraRef.current = null;
+			}
 
 			// Tune these to match the homepage "globe peeking from the top" framing.
 			// Key trick: use `offset` (screen-space pan) rather than changing geo center a lot.
@@ -9694,6 +9843,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				let lastTickMs = performance.now() - animationDurationMs;
 
 				const spinGlobe = () => {
+					if (dashboardScrollScrubActiveRef.current) {
+						// The scroll scrub owns the camera right now. Keep the spin loop's timing
+						// and longitude pinned to the *live* camera so that when the scrub releases
+						// (snapback) and the spin resumes, the first tick advances a normal small
+						// step from the current position. Without this, lastTickMs goes stale during
+						// the scrub and the resume tick computes a capped ~2s dt — a delayed,
+						// out-of-sync "pan back" right after the chrome has already settled.
+						lastTickMs = performance.now();
+						currentLng = normalizeLng(map.getCenter()?.lng ?? currentLng);
+						return;
+					}
 					try {
 						// Advance by wall-clock elapsed time, not per event: map.resize()
 						// (e.g. while the window is being drag-resized) fires extra moveend
@@ -9899,6 +10059,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// interrupt and continue from the current camera position once data is ready.
 			// This avoids the old instant reset.
 			const entryCamera = interactiveEntryCameraRef.current;
+			const scrubbedEntryProgress = dashboardScrollScrubProgressRef.current;
+			const scrubbedEntryCamera = dashboardScrollScrubCameraRef.current;
+			const hasScrubbedEntryCamera =
+				!entryCamera && scrubbedEntryProgress >= 0.85 && !!scrubbedEntryCamera;
 			interactiveEntryCameraPendingRef.current = true;
 			interactiveEntryCameraAppliedKeyRef.current =
 				interactiveEntryCameraKey(entryCamera);
@@ -9908,6 +10072,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				if (entryCamera) {
 					center = [entryCamera.center.lng, entryCamera.center.lat];
 					zoom = entryCamera.zoom;
+				} else if (hasScrubbedEntryCamera && scrubbedEntryCamera) {
+					// The user already scrubbed the dashboard camera to the interactive
+					// framing. Reuse that exact target so the presentation flip does not
+					// compute a fresh offset-removal target and visibly "correct" afterward.
+					center = scrubbedEntryCamera.targetCenter;
 				} else {
 					const container = map.getContainer?.() as HTMLElement | undefined;
 					const w = container?.clientWidth ?? 0;
@@ -9926,9 +10095,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					pitch: 0,
 					bearing: 0,
 					offset: [0, 0],
-					duration: entryCamera ? 0 : DASHBOARD_TO_INTERACTIVE_HANDOFF_GLIDE_MS,
-					easing: mapboxEaseOutCubic,
+					duration:
+						entryCamera || hasScrubbedEntryCamera
+							? 0
+							: DASHBOARD_TO_INTERACTIVE_HANDOFF_GLIDE_MS,
+					// Ease-in-out (not ease-out): the camera fly begins right after the
+					// user-driven scroll scrub releases at ~zero velocity. An ease-out curve
+					// starts at max velocity, so the handoff lurched ("jarring shift"). Easing
+					// in from rest makes entering the map feel like one continuous gentle move.
+					easing: mapboxEaseInOutCubic,
 				});
+				if (hasScrubbedEntryCamera) {
+					dashboardScrollScrubActiveRef.current = false;
+					dashboardScrollScrubProgressRef.current = 0;
+					dashboardScrollScrubCameraRef.current = null;
+				}
 			} catch {}
 		}
 	}, [
@@ -11121,9 +11302,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			};
 
 			// Promotion overlay pins: state-wide "Radio Stations <State>" / "College Radio <State>"
-			// lists should all be visible together at low zoom.
+			// lists are also used as the general radio overlay. They should render for
+			// any engaged search (not just dedicated radio searches), while list/area
+			// selection remains gated to promotion search elsewhere.
 			const shouldShowPromotionOverlay =
-				isPromotionSearch &&
+				searchEngaged &&
+				isAnySearch &&
+				ambientActiveCategories?.[RADIO_CONTACT_CATEGORY_INDEX] !== false &&
 				zoomRaw >= PROMOTION_OVERLAY_MARKERS_MIN_ZOOM &&
 				promotionOverlayContactsWithCoords.length > 0;
 			let nextPromotionOverlayVisible: ContactWithName[] = [];
@@ -12057,6 +12242,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			baseContactIdSet,
 			selectedContacts,
 			searchQuery,
+			searchEngaged,
 			lockedStateKey,
 			isCoordsInLockedState,
 			isBookingSearch,
@@ -12750,8 +12936,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				bearing: 0,
 				offset: [0, 0],
 				duration: dur,
-				// Smooth ease-out for cinematic transitions (default Mapbox ease is too stiff at long durations).
-				...(dur > 1000 ? { easing: mapboxEaseOutCubic } : {}),
+				// Long cinematic fits (e.g. the dashboard→map entry sweep) run right after the
+				// scroll scrub, so ease in/out from rest to avoid a jarring fast start; short
+				// interactive fits keep the snappier ease-out.
+				...(dur > 1000 ? { easing: mapboxEaseInOutCubic } : {}),
 			});
 		},
 		[getContactCoords, resolveAutoFitPadding]
@@ -12788,8 +12976,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					bearing: 0,
 					offset: [0, 0],
 					duration: dur,
-					// Smooth ease-out for cinematic transitions.
-					...(dur > 1000 ? { easing: mapboxEaseOutCubic } : {}),
+					// Long cinematic fits (e.g. the dashboard→map entry sweep) run right after
+					// the scroll scrub, so ease in/out from rest to avoid a jarring fast start;
+					// short interactive fits keep the snappier ease-out.
+					...(dur > 1000 ? { easing: mapboxEaseInOutCubic } : {}),
 				}
 			);
 
