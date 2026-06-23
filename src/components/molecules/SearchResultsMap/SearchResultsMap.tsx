@@ -1854,6 +1854,12 @@ export interface SearchResultsMapProps {
 	campaignHeatmapAmbient?: boolean;
 	/** Real contacts from the active campaign, rendered as a subtle non-interactive footprint under search results. */
 	campaignFootprintContacts?: ContactWithName[];
+	/**
+	 * Changes when the persistent singleton map is handed to a different route host.
+	 * Used to synchronously clear imperative Mapbox overlays from the previous host
+	 * before the next route paints.
+	 */
+	transientOverlayResetKey?: string | number | null;
 	/** When true, renders a browse-oriented all-contact atlas while search results are visually disengaged. */
 	ambientContactsEnabled?: boolean;
 	/** When true, warms the ambient atlas cache before the user disengages the search. */
@@ -2095,6 +2101,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	campaignHeatmapStatusColors,
 	campaignHeatmapAmbient = false,
 	campaignFootprintContacts = [],
+	transientOverlayResetKey = null,
 	ambientContactsEnabled = false,
 	ambientContactsPreloadEnabled = false,
 	ambientActiveCategories,
@@ -2436,6 +2443,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [selectedMarker, setSelectedMarker] = useState<ContactWithName | null>(null);
 	const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
 	const hoveredMarkerIdRef = useRef<number | null>(null);
+	const transientOverlayResetKeyRef = useRef<string | number | null>(
+		transientOverlayResetKey
+	);
 	const hoverSourceRef = useRef<'map' | 'external' | null>(null);
 	// Event opportunity popup: hover opens it, click pins it open (pinned wins over hover).
 	// The ref mirrors `hoveredEventId` so the unified pointer handler can read/clear hover
@@ -2832,8 +2842,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		void ensureWasmGeoModuleLoaded();
 	}, []);
 
-	// Apply camera padding (campaign map shift-left uses this).
-	useEffect(() => {
+	// Apply camera padding (campaign map shift-left uses this). Layout timing is important
+	// for search→campaign tab switches: the dashboard commits optimistic campaign padding
+	// on the click frame, then starts route navigation on the next animation frame.
+	useLayoutEffect(() => {
 		if (!map) return;
 		if (!isMapLoaded) return;
 
@@ -2854,11 +2866,29 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					left: safe(cameraPadding?.left),
 				};
 		const key = `${next.top},${next.right},${next.bottom},${next.left}`;
-		if (key === lastCameraPaddingKeyRef.current) return;
+		const previousKey = lastCameraPaddingKeyRef.current;
+		if (key === previousKey) return;
 		lastCameraPaddingKeyRef.current = key;
 
 		try {
-			map.setPadding(next);
+			const shouldAnimatePadding =
+				previousKey !== '' &&
+				!isBackgroundPresentation &&
+				!(
+					typeof window !== 'undefined' &&
+					window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+				);
+
+			if (shouldAnimatePadding) {
+				map.easeTo({
+					padding: next,
+					duration: 520,
+					easing: mapboxEaseInOutCubic,
+					essential: true,
+				});
+			} else {
+				map.setPadding(next);
+			}
 		} catch {
 			// Non-fatal; map may be mid-teardown.
 		}
@@ -9488,14 +9518,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			dragRotate: false,
 			pitchWithRotate: false,
 			touchPitch: false,
-			// Retain recently-displayed low-zoom basemap tiles in-memory across a deep
-			// zoom-in so zooming back out renders the center area instantly (no re-parse,
-			// no ocean-blue flash). `minTileCacheSize` is the floor that does this work;
-			// `maxTileCacheSize` is only a sane ceiling. (A bare `maxTileCacheSize` was a
-			// no-op: the cache is dynamically sized ~viewport*5 (~60) and max only clamps
-			// *down*. The floor is the lever.) Per source; ~128 ≈ 2× the dynamic default.
-			minTileCacheSize: 128,
-			maxTileCacheSize: 1024,
+			// Retain some recently-displayed basemap tiles so zoom/pan-back stays smooth, but
+			// do not force the cache far above Mapbox's natural viewport-sized default. In
+			// Mapbox GL, `minTileCacheSize` raises the per-source floor, while
+			// `maxTileCacheSize` clamps the final cache size. A 64/128 band keeps normal
+			// laptop views warm and prevents large monitors / long pan sessions from
+			// retaining hundreds of parsed vector tiles at peak.
+			minTileCacheSize: 64,
+			maxTileCacheSize: 128,
 			refreshExpiredTiles: false,
 		});
 
@@ -16241,6 +16271,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const clearMarkerConstellation = useCallback(
 		(includeSelected = true) => {
 			stopMarkerConstellationReveal();
+			if (markerConstellationDeferredMoveEndRef.current && map) {
+				try {
+					map.off('moveend', markerConstellationDeferredMoveEndRef.current);
+				} catch {
+					// Ignore style timing races.
+				}
+				markerConstellationDeferredMoveEndRef.current = null;
+			}
 			markerConstellationEdgesRef.current = [];
 			markerConstellationUsesCategoryColorsRef.current = false;
 			markerConstellationNodesRef.current = [];
@@ -16273,6 +16311,142 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		},
 		[map, isMapLoaded, stopMarkerConstellationReveal, setMarkerConstellationLineOpacity]
 	);
+
+	useLayoutEffect(() => {
+		if (transientOverlayResetKeyRef.current === transientOverlayResetKey) return;
+		transientOverlayResetKeyRef.current = transientOverlayResetKey;
+		if (transientOverlayResetKey == null) return;
+
+		if (hoverClearTimeoutRef.current) {
+			clearTimeout(hoverClearTimeoutRef.current);
+			hoverClearTimeoutRef.current = null;
+		}
+		if (fadingTooltipTimeoutRef.current) {
+			clearTimeout(fadingTooltipTimeoutRef.current);
+			fadingTooltipTimeoutRef.current = null;
+		}
+		if (eventHoverCloseTimerRef.current) {
+			clearTimeout(eventHoverCloseTimerRef.current);
+			eventHoverCloseTimerRef.current = null;
+		}
+		if (campaignHeatmapFadeRafRef.current != null) {
+			cancelAnimationFrame(campaignHeatmapFadeRafRef.current);
+			campaignHeatmapFadeRafRef.current = null;
+		}
+		if (selectedConstellationLineFadeRafRef.current != null) {
+			cancelAnimationFrame(selectedConstellationLineFadeRafRef.current);
+			selectedConstellationLineFadeRafRef.current = null;
+		}
+		if (baseDotsWaveCancelRef.current) {
+			baseDotsWaveCancelRef.current();
+			baseDotsWaveCancelRef.current = null;
+		}
+
+		setSelectedMarker(null);
+		setHoveredMarkerId(null);
+		setFadingTooltipId(null);
+		setHoveredEventId(null);
+		setPinnedEventId(null);
+		setVisibleContacts([]);
+		setBookingExtraVisibleContacts([]);
+		setPromotionOverlayVisibleContacts([]);
+		setAllContactsOverlayVisibleContacts([]);
+		setSelectedTooltipHoverHiddenTargetIfChanged(null);
+		setSelectedTooltipStackGroups([]);
+
+		hoveredMarkerIdRef.current = null;
+		hoverSourceRef.current = null;
+		hoveredEventIdRef.current = null;
+		isPointerOverEventPopupRef.current = false;
+		selectedTooltipStackSignatureRef.current = '';
+		selectedTooltipStackSelectionKeyRef.current = '';
+		visibleContactIdSetRef.current = new Set();
+		bookingExtraVisibleIdSetRef.current = new Set();
+		allContactsOverlayVisibleIdSetRef.current = new Set();
+		lastVisibleContactsKeyRef.current = '';
+		lastBookingExtraVisibleContactsKeyRef.current = '';
+		lastPromotionOverlayVisibleContactsKeyRef.current = '';
+		lastAllContactsOverlayVisibleContactsKeyRef.current = '';
+		baseDotsLastDataKeyRef.current = '';
+		baseDotsPendingDataSearchKeyRef.current = null;
+		baseDotsPendingDataSawLoadingRef.current = false;
+		baseDotsWaveMetaRef.current = null;
+		baseDotsWavePrevIsLoadingRef.current = false;
+		baseDotsWavePendingSearchKeyRef.current = null;
+		campaignHeatmapFadeByIdRef.current.clear();
+		selectedConstellationLineOpacityRef.current = 0;
+		selectedConstellationHadPathRef.current = false;
+		selectedConstellationEdgesRef.current = [];
+		selectedConstellationGraphKeyRef.current = '';
+		radiusMarkerRef.current?.remove();
+		radiusMarkerRef.current = null;
+		if (radiusMarkerZoomHandlerRef.current && map) {
+			try {
+				map.off('zoom', radiusMarkerZoomHandlerRef.current);
+			} catch {
+				// Ignore style timing races.
+			}
+			radiusMarkerZoomHandlerRef.current = null;
+		}
+		isDraggingRadiusRef.current = false;
+		radiusDragSuppressEmptyMapUntilRef.current = 0;
+
+		onMarkerHover?.(null);
+		clearMarkerConstellation();
+
+		if (!map || !isMapLoaded) return;
+		const empty = emptyFeatureCollection();
+		const clearGeoJsonSources = [
+			MAPBOX_SOURCE_IDS.markersBase,
+			MAPBOX_SOURCE_IDS.markersSelected,
+			MAPBOX_SOURCE_IDS.markersBookingPin,
+			MAPBOX_SOURCE_IDS.markersPromotionDot,
+			MAPBOX_SOURCE_IDS.markersPromotionPin,
+			MAPBOX_SOURCE_IDS.markersAllOverlay,
+			MAPBOX_SOURCE_IDS.markerConstellation,
+			MAPBOX_SOURCE_IDS.markerConstellationSelected,
+			MAPBOX_SOURCE_IDS.markerConstellationNodes,
+			MAPBOX_SOURCE_IDS.campaignFootprintPoints,
+			MAPBOX_SOURCE_IDS.campaignFootprintLines,
+			MAPBOX_SOURCE_IDS.campaignFootprintNodes,
+			MAPBOX_SOURCE_IDS.campaignHeatmap,
+			MAPBOX_SOURCE_IDS.eventsGlow,
+			MAPBOX_SOURCE_IDS.eventsRings,
+			MAPBOX_SOURCE_IDS.eventsPulse,
+			MAPBOX_SOURCE_IDS.eventsIcon,
+			MAPBOX_SOURCE_IDS.ownedVenueGlow,
+			MAPBOX_SOURCE_IDS.ownedVenueRings,
+			MAPBOX_SOURCE_IDS.ownedVenuePulse,
+			MAPBOX_SOURCE_IDS.ownedVenueIcon,
+			MAPBOX_SOURCE_IDS.resultsOutline,
+			MAPBOX_SOURCE_IDS.lockedOutline,
+			MAPBOX_SOURCE_IDS.curatedBlob,
+			MAPBOX_SOURCE_IDS.selectedAreaRect,
+			MAPBOX_SOURCE_IDS.selectionRect,
+		];
+
+		try {
+			for (const sourceId of clearGeoJsonSources) {
+				const source = map.getSource(sourceId) as mapboxgl.GeoJSONSource | undefined;
+				source?.setData(empty);
+			}
+			map.removeFeatureState({ source: MAPBOX_SOURCE_IDS.markersBase });
+			map.removeFeatureState({ source: MAPBOX_SOURCE_IDS.markersBookingPin });
+			map.removeFeatureState({ source: MAPBOX_SOURCE_IDS.markersPromotionDot });
+			map.removeFeatureState({ source: MAPBOX_SOURCE_IDS.markersPromotionPin });
+			map.removeFeatureState({ source: MAPBOX_SOURCE_IDS.markersAllOverlay });
+			map.removeFeatureState({ source: MAPBOX_SOURCE_IDS.markersSelected });
+		} catch {
+			// Ignore style timing races while the route handoff is in progress.
+		}
+	}, [
+		clearMarkerConstellation,
+		isMapLoaded,
+		map,
+		onMarkerHover,
+		setSelectedTooltipHoverHiddenTargetIfChanged,
+		transientOverlayResetKey,
+	]);
 
 	const writeMarkerConstellationSourceData = useCallback(
 		(contactsForVisibility?: ContactWithName[]): void => {

@@ -188,6 +188,15 @@ const SHOWING_DRAFT_TOP_BAR_COLOR = '#FFE3AA';
 const SELECTED_DRAFT_ROW_FILL_COLOR = '#FDDEA5';
 const SELECTED_DRAFT_TOP_BAR_COLOR = '#F9D387';
 const INBOX_LAST_SENT_FILL_COLOR = '#7ED29E';
+// Write/Drafts-tab supplemental-row reveal (hover/peek) palette. These replace the
+// older "showing draft" gold + gray-strip look used inside the redded contacts box.
+// Email/message rows reveal as a blue card with a full-width white top strip; draft
+// rows reveal as a gold card with a cream rounded corner box on the top-left.
+const WRITE_TAB_EMAIL_PEEK_FILL_COLOR = '#AECCFD';
+const WRITE_TAB_DRAFT_PEEK_FILL_COLOR = '#FFDA8D';
+const WRITE_TAB_DRAFT_PEEK_CORNER_COLOR = '#FFFBF3';
+const WRITE_TAB_SUPPLEMENTAL_PEEK_BORDER_COLOR = '#FFFFFF';
+const WRITE_TAB_SUPPLEMENTAL_PEEK_TOP_STRIP_COLOR = '#FFFFFF';
 
 const formatBatchCount = (count: number) => `+${count < 10 ? `0${count}` : count}`;
 
@@ -973,6 +982,11 @@ export const DraftCardInner: FC<{
 	topBarLeftColor?: string;
 	topBarRightColor?: string;
 	topBarLeftWidthPx?: number;
+	// When true the top-left strip renders as a rounded "corner box" (radius on the
+	// top-left only) outlined by topBarLeftCornerBorderColor — the Write/Drafts-tab
+	// gold-reveal look. When false it's a flat color block (the legacy look).
+	topBarLeftAsCornerBox?: boolean;
+	topBarLeftCornerBorderColor?: string;
 	showStroke?: boolean;
 	showShowingBadge?: boolean;
 }> = ({
@@ -989,6 +1003,8 @@ export const DraftCardInner: FC<{
 	topBarLeftColor = SHOWING_DRAFT_TOP_BAR_COLOR,
 	topBarRightColor = '#F9FAFB',
 	topBarLeftWidthPx = 115,
+	topBarLeftAsCornerBox = false,
+	topBarLeftCornerBorderColor = '#FFFFFF',
 	showStroke = true,
 	showShowingBadge = false,
 }) => (
@@ -999,6 +1015,15 @@ export const DraftCardInner: FC<{
 				style={{
 					width: `${topBarLeftWidthPx}px`,
 					backgroundColor: topBarLeftColor,
+					...(topBarLeftAsCornerBox
+						? {
+								borderRadius: '7.798px 0 0 0',
+								borderTop: `2px solid ${topBarLeftCornerBorderColor}`,
+								borderLeft: `2px solid ${topBarLeftCornerBorderColor}`,
+								borderRight: `2px solid ${topBarLeftCornerBorderColor}`,
+								boxSizing: 'border-box',
+							}
+						: {}),
 				}}
 			/>
 			<div className="h-full flex-1" style={{ backgroundColor: topBarRightColor }} />
@@ -2330,21 +2355,26 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		const isInactiveSelectedDraft = isBatchSelectedDraft && !isShowingDraft;
 		const shouldSelectDraftInPlace =
 			!isDraftsFocusMode && Boolean(onDraftSelectionChange);
-		// Hovering a redded-out draft row reveals it in the gold "showing" style with
+		// Hovering a redded-out draft row (Write tab) reveals it in the gold reveal
+		// style — a #FFDA8D card with a cream rounded corner box on the top-left — with
 		// its subject + body visible (peek). The base flag still drives navigation.
 		const draftPeekKey = `draft:${draft.id}`;
 		const isReddedOut = shouldRedOutDraftRows && peekRowKey !== draftPeekKey;
-		// A peeked redded draft reveals in the gold "showing" style (Write tab has no
-		// real selected draft, so without this it would reveal as plain white).
+		// A peeked redded draft reveals in the gold corner-box style. Only ever true on
+		// the Write tab (shouldRedOutDraftRows); the Drafts tab keeps real selection UI.
 		const isPeeked = shouldRedOutDraftRows && peekRowKey === draftPeekKey;
-		const showAsShowingStyle = isShowingDraft || isPeeked;
+		const showAsShowingStyle = isShowingDraft;
 		const draftSupplementalTextClassName = isReddedOut ? 'text-[#F5C0BD]' : 'text-black';
 		const draftSupplementalBorderColor = isReddedOut
 			? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
-			: '#000000';
+			: isPeeked
+				? WRITE_TAB_SUPPLEMENTAL_PEEK_BORDER_COLOR
+				: '#000000';
 		const draftSupplementalRowFillColor = isReddedOut
 			? WRITE_TAB_SUPPLEMENTAL_ROW_FILL_COLOR
-			: undefined;
+			: isPeeked
+				? WRITE_TAB_DRAFT_PEEK_FILL_COLOR
+				: undefined;
 		const draftSupplementalBadgeFillColor = isReddedOut
 			? WRITE_TAB_SUPPLEMENTAL_BADGE_FILL_COLOR
 			: undefined;
@@ -2353,14 +2383,18 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			: undefined;
 		const topBarLeftColor = isReddedOut
 			? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
-			: isInactiveSelectedDraft
-				? SELECTED_DRAFT_TOP_BAR_COLOR
-				: SHOWING_DRAFT_TOP_BAR_COLOR;
+			: isPeeked
+				? WRITE_TAB_DRAFT_PEEK_CORNER_COLOR
+				: isInactiveSelectedDraft
+					? SELECTED_DRAFT_TOP_BAR_COLOR
+					: SHOWING_DRAFT_TOP_BAR_COLOR;
 		const topBarRightColor = isReddedOut
 			? WRITE_TAB_SUPPLEMENTAL_ROW_FILL_COLOR
-			: showAsShowingStyle
-				? SHOWING_DRAFT_TOP_BAR_COLOR
-				: '#F9FAFB';
+			: isPeeked
+				? WRITE_TAB_DRAFT_PEEK_FILL_COLOR
+				: showAsShowingStyle
+					? SHOWING_DRAFT_TOP_BAR_COLOR
+					: '#F9FAFB';
 		const topBarLeftWidthPx = isInactiveSelectedDraft ? 177 : 115;
 
 		return (
@@ -2374,24 +2408,12 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					}
 				}}
 				className={cn(
-					'relative select-none overflow-hidden',
+					'relative select-none',
 					isAllTabNavigation ? 'cursor-default' : 'cursor-pointer'
 				)}
 				style={{
 					width: contactRowWidth,
 					height: `${SUPPLEMENTAL_DRAFT_ROW_HEIGHT_PX}px`,
-					borderRadius: `${SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX}px`,
-					borderTop: `1.955px solid ${draftSupplementalBorderColor}`,
-					borderRight: `1.949px solid ${draftSupplementalBorderColor}`,
-					borderBottom: `1.949px solid ${draftSupplementalBorderColor}`,
-					borderLeft: `1.949px solid ${draftSupplementalBorderColor}`,
-					backgroundColor:
-						draftSupplementalRowFillColor ??
-						(showAsShowingStyle
-							? SHOWING_DRAFT_ROW_FILL_COLOR
-							: isInactiveSelectedDraft
-								? SELECTED_DRAFT_ROW_FILL_COLOR
-								: '#FFFFFF'),
 					boxSizing: 'border-box',
 				}}
 				onMouseEnter={(e) => {
@@ -2478,23 +2500,45 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					if (shouldRedOutDraftRows) onOpenSend?.();
 				}}
 			>
-				<DraftCardInner
-					contact={contact}
-					companyLabel={companyLabel}
-					contactName={contactName}
-					contactTitle={contactTitle}
-					subject={draft.subject || 'No subject'}
-					bodyPreview={messagePreview}
-					textClassName={draftSupplementalTextClassName}
-					borderColor={draftSupplementalBorderColor}
-					badgeFillColor={draftSupplementalBadgeFillColor}
-					textColor={draftSupplementalTextColor}
-					topBarLeftColor={topBarLeftColor}
-					topBarRightColor={topBarRightColor}
-					topBarLeftWidthPx={topBarLeftWidthPx}
-					showStroke={!isReddedOut}
-					showShowingBadge={isShowingDraft}
-				/>
+				<div
+					className="absolute inset-0 overflow-hidden"
+					style={{
+						borderRadius: `${SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX}px`,
+						borderTop: `1.955px solid ${draftSupplementalBorderColor}`,
+						borderRight: `1.949px solid ${draftSupplementalBorderColor}`,
+					borderBottom: `1.949px solid ${draftSupplementalBorderColor}`,
+					borderLeft: `1.949px solid ${draftSupplementalBorderColor}`,
+					backgroundColor:
+						draftSupplementalRowFillColor ??
+						(showAsShowingStyle
+							? SHOWING_DRAFT_ROW_FILL_COLOR
+							: isInactiveSelectedDraft
+								? SELECTED_DRAFT_ROW_FILL_COLOR
+								: '#FFFFFF'),
+					boxSizing: 'border-box',
+				}}
+				>
+					<DraftCardInner
+						contact={contact}
+						companyLabel={companyLabel}
+						contactName={contactName}
+						contactTitle={contactTitle}
+						subject={draft.subject || 'No subject'}
+						bodyPreview={messagePreview}
+						textClassName={draftSupplementalTextClassName}
+						borderColor={draftSupplementalBorderColor}
+						badgeFillColor={draftSupplementalBadgeFillColor}
+						textColor={draftSupplementalTextColor}
+						topBarLeftColor={topBarLeftColor}
+						topBarRightColor={topBarRightColor}
+						topBarLeftWidthPx={topBarLeftWidthPx}
+						topBarLeftAsCornerBox={isPeeked}
+						topBarLeftCornerBorderColor={WRITE_TAB_SUPPLEMENTAL_PEEK_BORDER_COLOR}
+						showStroke={!isReddedOut}
+						showShowingBadge={isShowingDraft}
+					/>
+				</div>
+				<div aria-hidden="true" className="absolute left-0 right-0 top-full h-2" />
 			</div>
 		);
 	};
@@ -2503,23 +2547,38 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		conversation: InboxConversation,
 		inboxIndex: number
 	) => {
-		// Hovering a redded-out inbox row reveals it in its normal style with content
-		// visible (peek). The base flag still drives navigation.
+		// On the Write/Drafts tab email/message rows render as a 108px card: redded out
+		// at rest, and on hover (peek) revealed as a #AECCFD blue card with a full-width
+		// white top strip. The base flag still drives navigation.
 		const inboxPeekKey = `inbox:${conversation.key}`;
 		const isReddedOut = shouldRedOutInboxRows && peekRowKey !== inboxPeekKey;
+		const isPeeked = shouldRedOutInboxRows && peekRowKey === inboxPeekKey;
+		// Write/Drafts tab uses the tall (108px) email card with the white top strip;
+		// the Inbox tab keeps its native 92px row + the rich EventChatCard.
+		const isWriteOrDraftEmailCard = shouldRedOutInboxRows;
 		const inboxSupplementalTextClassName = isReddedOut ? 'text-[#F5C0BD]' : 'text-black';
 		const inboxSupplementalBorderColor = isReddedOut
 			? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
-			: '#000000';
+			: isPeeked
+				? WRITE_TAB_SUPPLEMENTAL_PEEK_BORDER_COLOR
+				: '#000000';
 		const inboxSupplementalRowFillColor = isReddedOut
 			? WRITE_TAB_SUPPLEMENTAL_ROW_FILL_COLOR
-			: undefined;
+			: isPeeked
+				? WRITE_TAB_EMAIL_PEEK_FILL_COLOR
+				: undefined;
 		const inboxSupplementalBadgeFillColor = isReddedOut
 			? WRITE_TAB_SUPPLEMENTAL_BADGE_FILL_COLOR
 			: undefined;
 		const inboxSupplementalTextColor = isReddedOut
 			? WRITE_TAB_SUPPLEMENTAL_TEXT_COLOR
 			: undefined;
+		// Write/Drafts-tab email card top strip: full-width white on hover (peek), a
+		// subtle lighter-red band at rest (redded). Mirrors the blue card in the spec
+		// where the top 13px is white and the body is #AECCFD.
+		const emailCardTopStripColor = isPeeked
+			? WRITE_TAB_SUPPLEMENTAL_PEEK_TOP_STRIP_COLOR
+			: WRITE_TAB_SUPPLEMENTAL_BADGE_FILL_COLOR;
 		const selectionEmail = getInboxConversationSelectionEmail(conversation);
 		const email = selectionEmail;
 		const previewEmail = conversation.latestMessage;
@@ -2552,16 +2611,24 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			? deriveEventChatStatus(eventApplication, nowMs)
 			: null;
 		const eventChatState = eventChatStateForLayout;
+		// The rich EventChatCard (special opportunity/event UI) is reserved for the
+		// Inbox tab. On the Write/Drafts tab, opportunities render as plain email rows
+		// (the same blue 108px card as any other message), so we ignore the event-chat
+		// state entirely for layout, sizing, and rendering there.
+		const showEventChatCard =
+			!isWriteOrDraftEmailCard && Boolean(eventApplication && eventChatState);
 		const isEventChatCompact =
 			eventChatStateForLayout?.status === 'closed' ||
 			eventChatStateForLayout?.status === 'canceled';
 		const shouldRenderNoFillEventChatRow =
 			isInboxFocusMode && Boolean(eventChatStateForLayout?.isAboveFold);
-		const rowHeightPx = eventChatStateForLayout
-			? isEventChatCompact
-				? EVENT_CHAT_COMPACT_ROW_HEIGHT_PX
-				: EVENT_CHAT_ROW_HEIGHT_PX
-			: SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX;
+		const rowHeightPx = isWriteOrDraftEmailCard
+			? SUPPLEMENTAL_DRAFT_ROW_HEIGHT_PX
+			: eventChatStateForLayout
+				? isEventChatCompact
+					? EVENT_CHAT_COMPACT_ROW_HEIGHT_PX
+					: EVENT_CHAT_ROW_HEIGHT_PX
+				: SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX;
 		const latestMessageMs = getInboxMessageTimeMs(previewEmail);
 		const eventChatTimestampLabel = latestMessageMs
 			? formatEventChatTimestamp(new Date(latestMessageMs), nowMs)
@@ -2587,22 +2654,12 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			<div
 				key={`contacts-inbox-${conversation.key}-${inboxIndex}`}
 				className={cn(
-					'relative select-none overflow-hidden',
+					'relative select-none',
 					isAllTabNavigation ? 'cursor-default' : 'cursor-pointer'
 				)}
 				style={{
 					width: contactRowWidth,
 					height: `${rowHeightPx}px`,
-					borderRadius: `${SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX}px`,
-					borderTop: `1.955px solid ${inboxSupplementalBorderColor}`,
-					borderRight: `1.949px solid ${inboxSupplementalBorderColor}`,
-					borderBottom: `1.949px solid ${inboxSupplementalBorderColor}`,
-					borderLeft: `1.949px solid ${inboxSupplementalBorderColor}`,
-					background: shouldRenderNoFillEventChatRow
-						? 'transparent'
-						: isSelectedInboxConversation
-							? selectedInboxRowFillColor
-							: (inboxSupplementalRowFillColor ?? '#F9FAFB'),
 					boxSizing: 'border-box',
 				}}
 				role={!isAllTabNavigation ? 'button' : undefined}
@@ -2616,7 +2673,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					}
 					if (isDraftsFocusMode) onDraftHover?.(null);
 					onContactHover?.(contact);
-					if (eventApplication && eventChatState) {
+					if (showEventChatCard && eventApplication && eventChatState) {
 						onEventChatRowHover?.(eventApplication, e.currentTarget);
 					} else {
 						onContactRowHover?.(contact, e.currentTarget);
@@ -2624,7 +2681,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				}}
 				onMouseLeave={() => {
 					schedulePeekClear();
-					if (eventApplication && eventChatState) {
+					if (showEventChatCard) {
 						onEventChatRowHover?.(null, null);
 					} else {
 						onContactRowHover?.(null, null);
@@ -2633,7 +2690,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				onClick={(e) => {
 					if (isAllTabNavigation) return;
 					e.stopPropagation();
-					if (eventApplication && eventChatState) {
+					if (showEventChatCard && eventApplication) {
 						onEventChatRowClick?.(eventApplication);
 					}
 					if (onInboxEmailClick) {
@@ -2649,45 +2706,86 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					if (isAllTabNavigation || !onInboxEmailClick) return;
 					if (e.key === 'Enter' || e.key === ' ') {
 						e.preventDefault();
-						if (eventApplication && eventChatState) {
+						if (showEventChatCard && eventApplication) {
 							onEventChatRowClick?.(eventApplication);
 						}
 						onInboxEmailClick(selectionEmail);
 					}
 				}}
 			>
-				{eventApplication && eventChatState ? (
-					<div
-						className={cn(
-							'pointer-events-none h-full w-full',
-							isReddedOut && 'murmur-contacts-drafts-redout'
-						)}
-					>
-						<EventChatCard
-							application={eventApplication}
-							state={eventChatState}
-							nowMs={nowMs}
-							campaignName={campaign?.name?.trim() || null}
-							timestampLabel={eventChatTimestampLabel}
-							previewText={bodyPreview}
+				<div
+					className="absolute inset-0 overflow-hidden"
+					style={{
+						borderRadius: `${SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX}px`,
+						borderTop: `1.955px solid ${inboxSupplementalBorderColor}`,
+						borderRight: `1.949px solid ${inboxSupplementalBorderColor}`,
+					borderBottom: `1.949px solid ${inboxSupplementalBorderColor}`,
+					borderLeft: `1.949px solid ${inboxSupplementalBorderColor}`,
+					background: shouldRenderNoFillEventChatRow
+						? 'transparent'
+						: isWriteOrDraftEmailCard
+							? (inboxSupplementalRowFillColor ?? '#FFFFFF')
+							: isSelectedInboxConversation
+								? selectedInboxRowFillColor
+								: (inboxSupplementalRowFillColor ?? '#F9FAFB'),
+					boxSizing: 'border-box',
+				}}
+				>
+					{showEventChatCard && eventApplication && eventChatState ? (
+						<div
+							className={cn(
+								'pointer-events-none h-full w-full',
+								isReddedOut && 'murmur-contacts-drafts-redout'
+							)}
+						>
+							<EventChatCard
+								application={eventApplication}
+								state={eventChatState}
+								nowMs={nowMs}
+								campaignName={campaign?.name?.trim() || null}
+								timestampLabel={eventChatTimestampLabel}
+								previewText={bodyPreview}
+							/>
+						</div>
+					) : isWriteOrDraftEmailCard ? (
+						// Write/Drafts tab: render the tall (108px) email card — full-width top
+						// strip (white on hover, light-red at rest) over a #AECCFD body — and
+						// treat opportunities as plain emails (category chip, never an event
+						// badge). Reuses DraftCardInner's layout with a flat (non-corner) strip.
+						<DraftCardInner
+							contact={contact}
+							companyLabel={companyLabel}
+							contactName={contactName}
+							contactTitle={contactTitle}
+							subject={previewEmail.subject || 'No subject'}
+							bodyPreview={bodyPreview}
+							textClassName={inboxSupplementalTextClassName}
+							borderColor={inboxSupplementalBorderColor}
+							badgeFillColor={inboxSupplementalBadgeFillColor}
+							textColor={inboxSupplementalTextColor}
+							topBarLeftColor={emailCardTopStripColor}
+							topBarRightColor={emailCardTopStripColor}
+							topBarLeftWidthPx={0}
+							showStroke={!isReddedOut}
 						/>
-					</div>
-				) : (
-					<InboxCardInner
-						contact={contact}
-						companyLabel={companyLabel}
-						contactName={contactName}
-						contactTitle={contactTitle}
-						threadEventName={threadEventName}
-						subject={previewEmail.subject || 'No subject'}
-						bodyPreview={bodyPreview}
-						textClassName={inboxSupplementalTextClassName}
-						borderColor={inboxSupplementalBorderColor}
-						badgeFillColor={inboxSupplementalBadgeFillColor}
-						textColor={inboxSupplementalTextColor}
-						showStroke={!isReddedOut}
-					/>
-				)}
+					) : (
+						<InboxCardInner
+							contact={contact}
+							companyLabel={companyLabel}
+							contactName={contactName}
+							contactTitle={contactTitle}
+							threadEventName={threadEventName}
+							subject={previewEmail.subject || 'No subject'}
+							bodyPreview={bodyPreview}
+							textClassName={inboxSupplementalTextClassName}
+							borderColor={inboxSupplementalBorderColor}
+							badgeFillColor={inboxSupplementalBadgeFillColor}
+							textColor={inboxSupplementalTextColor}
+							showStroke={!isReddedOut}
+						/>
+					)}
+				</div>
+				<div aria-hidden="true" className="absolute left-0 right-0 top-full h-2" />
 			</div>
 		);
 	};

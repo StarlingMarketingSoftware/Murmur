@@ -881,6 +881,15 @@ const getInitialCampaignWorkspaceViewFromLocation = (): ViewType => {
 const TRANSITION_DURATION = 120;
 // Safety valve: if a destination view is unusually slow to paint, don't block the transition forever.
 const MAX_TRANSITION_WAIT_MS = 650;
+const SEARCH_TO_CAMPAIGN_TRANSITION_KEY = 'murmur_search_to_campaign_transition';
+const SEARCH_TO_CAMPAIGN_TRANSITION_BODY_CLASS =
+	'murmur-search-to-campaign-transitioning';
+const CAMPAIGN_SEARCH_ENTRY_TRANSITION_CLASS =
+	'murmur-campaign-search-entry-transition';
+const CAMPAIGN_SEARCH_ENTRY_PENDING_CLASS = 'murmur-campaign-search-entry-pending';
+const CAMPAIGN_SEARCH_ENTRY_STORAGE_MAX_AGE_MS = 10_000;
+const CAMPAIGN_SEARCH_ENTRY_CONTENT_DELAY_MS = 140;
+const CAMPAIGN_SEARCH_ENTRY_CONTENT_FADE_MS = 280;
 
 const CAMPAIGN_MAP_SHIFT_X_VAR = '--murmur-campaign-map-shift-x';
 const CAMPAIGN_TOP_NAV_SHIFT_X_VAR = '--murmur-campaign-top-nav-shift-x';
@@ -1044,6 +1053,25 @@ const resetCampaignDocumentScroll = () => {
 	root.scrollLeft = 0;
 	body.scrollTop = 0;
 	body.scrollLeft = 0;
+};
+
+const consumeSearchToCampaignTransitionFlag = (): boolean => {
+	if (typeof window === 'undefined') return false;
+
+	try {
+		const raw = window.sessionStorage.getItem(SEARCH_TO_CAMPAIGN_TRANSITION_KEY);
+		window.sessionStorage.removeItem(SEARCH_TO_CAMPAIGN_TRANSITION_KEY);
+		if (!raw) return false;
+
+		const timestamp = Number(raw);
+		return (
+			Number.isFinite(timestamp) &&
+			Date.now() - timestamp >= 0 &&
+			Date.now() - timestamp <= CAMPAIGN_SEARCH_ENTRY_STORAGE_MAX_AGE_MS
+		);
+	} catch {
+		return false;
+	}
 };
 
 const clampNumber = (n: number, min: number, max: number): number => {
@@ -1795,6 +1823,12 @@ const Murmur = () => {
 	const searchParams = useSearchParams();
 	const originParam = searchParams.get('origin');
 	const cameFromSearch = originParam === 'search';
+	const [isSearchEntryTransition] = useState(
+		() => cameFromSearch && consumeSearchToCampaignTransitionFlag()
+	);
+	const [isSearchEntryContentVisible, setIsSearchEntryContentVisible] = useState(
+		() => !isSearchEntryTransition
+	);
 	// Set only by the dashboard's add-to-campaign pushes — pure tab-switch arrivals
 	// (origin=search without it) skip the contacts refetch below.
 	const searchAddedContacts = searchParams.get('added') === '1';
@@ -1838,6 +1872,72 @@ const Murmur = () => {
 			isWriteTabHighlighted,
 		]
 	);
+	const shouldHoldSearchEntryContent =
+		isSearchEntryTransition && !isSearchEntryContentVisible;
+
+	useEffect(() => {
+		if (!isSearchEntryTransition || isSearchEntryContentVisible) return;
+		if (isMobile === null) return;
+
+		if (isMobile === true) {
+			setIsSearchEntryContentVisible(true);
+			return;
+		}
+
+		if (isPendingCampaign || !campaign) return;
+
+		const timer = window.setTimeout(() => {
+			setIsSearchEntryContentVisible(true);
+		}, CAMPAIGN_SEARCH_ENTRY_CONTENT_DELAY_MS);
+
+		return () => window.clearTimeout(timer);
+	}, [
+		campaign,
+		isMobile,
+		isPendingCampaign,
+		isSearchEntryContentVisible,
+		isSearchEntryTransition,
+	]);
+
+	useLayoutEffect(() => {
+		if (!isSearchEntryTransition || typeof document === 'undefined') return;
+		const body = document.body;
+		body.classList.add(CAMPAIGN_SEARCH_ENTRY_TRANSITION_CLASS);
+
+		return () => {
+			body.classList.remove(
+				CAMPAIGN_SEARCH_ENTRY_TRANSITION_CLASS,
+				CAMPAIGN_SEARCH_ENTRY_PENDING_CLASS,
+				SEARCH_TO_CAMPAIGN_TRANSITION_BODY_CLASS
+			);
+		};
+	}, [isSearchEntryTransition]);
+
+	useLayoutEffect(() => {
+		if (!isSearchEntryTransition || typeof document === 'undefined') return;
+		const body = document.body;
+		body.classList.remove(SEARCH_TO_CAMPAIGN_TRANSITION_BODY_CLASS);
+		body.classList.toggle(
+			CAMPAIGN_SEARCH_ENTRY_PENDING_CLASS,
+			shouldHoldSearchEntryContent
+		);
+	}, [isSearchEntryTransition, shouldHoldSearchEntryContent]);
+
+	useEffect(() => {
+		if (
+			!isSearchEntryTransition ||
+			!isSearchEntryContentVisible ||
+			typeof document === 'undefined'
+		) {
+			return;
+		}
+
+		const timer = window.setTimeout(() => {
+			document.body.classList.remove(CAMPAIGN_SEARCH_ENTRY_TRANSITION_CLASS);
+		}, CAMPAIGN_SEARCH_ENTRY_CONTENT_FADE_MS + 80);
+
+		return () => window.clearTimeout(timer);
+	}, [isSearchEntryContentVisible, isSearchEntryTransition]);
 
 	const topSearchHighlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -3523,6 +3623,7 @@ const Murmur = () => {
 		() =>
 			!isMobile
 				? {
+						ownerRoute: 'campaign',
 						isMapView: true,
 						mapViewClip: 'inset(0px round 0px)',
 						mapViewFrameTransition: '0ms ease',
@@ -3865,6 +3966,15 @@ const Murmur = () => {
 							!isMobile && 'campaign-map-interactive-page',
 							usePersistentCampaignMapBackground && 'campaign-persistent-map-page'
 						)}
+						style={
+							isSearchEntryTransition
+								? {
+										opacity: isSearchEntryContentVisible ? 1 : 0,
+										transition: `opacity ${CAMPAIGN_SEARCH_ENTRY_CONTENT_FADE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+										pointerEvents: shouldHoldSearchEntryContent ? 'none' : undefined,
+									}
+								: undefined
+						}
 					>
 						{usePersistentCampaignMapBackground && (
 							<div className="campaign-map-split-overlay" aria-hidden="true" />
@@ -5178,6 +5288,7 @@ const Murmur = () => {
 													setActiveView('inbox');
 												}}
 												goToSent={() => setActiveView('sent')}
+												onOpenOpportunities={handleOpenInboxOpportunities}
 												goToSummary={() => setActiveView('summary')}
 												onOpenIdentityDialog={() => {
 													setIdentityDialogOrigin('campaign');
@@ -5246,6 +5357,18 @@ const Murmur = () => {
 										pointer-events: none;
 									}
 
+									body.${CAMPAIGN_SEARCH_ENTRY_TRANSITION_CLASS}
+										[data-slot^='campaign-top-'] {
+										transition: opacity ${CAMPAIGN_SEARCH_ENTRY_CONTENT_FADE_MS}ms
+											cubic-bezier(0.22, 1, 0.36, 1) !important;
+									}
+
+									body.${CAMPAIGN_SEARCH_ENTRY_PENDING_CLASS}
+										[data-slot^='campaign-top-'] {
+										opacity: 0 !important;
+										pointer-events: none !important;
+									}
+
 									.campaign-map-interactive-page [data-slot='campaign-top-tabs'],
 									.campaign-map-interactive-page [data-slot='campaign-top-search-bar'],
 									.campaign-map-interactive-page [data-slot='campaign-header'],
@@ -5261,6 +5384,13 @@ const Murmur = () => {
 									.campaign-map-interactive-page [data-left-expanded-panel],
 									.campaign-map-interactive-page [role='dialog'] {
 										pointer-events: auto;
+									}
+
+									@media (prefers-reduced-motion: reduce) {
+										body.${CAMPAIGN_SEARCH_ENTRY_TRANSITION_CLASS}
+											[data-slot^='campaign-top-'] {
+											transition: none !important;
+										}
 									}
 
 									/* Opacity band behind the campaign content; pointer-events: auto so the map can't be dragged behind the panels; only the clear map area outside the band stays interactive. */

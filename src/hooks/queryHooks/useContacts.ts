@@ -504,7 +504,7 @@ export const useGetContactsMapOverlay = (options: {
 		refetchOnWindowFocus: false,
 		retry: false,
 		staleTime: 1000 * 60 * 5, // 5 minutes
-		gcTime: 1000 * 60 * 30, // Keep in cache for 30 minutes
+		gcTime: 1000 * 60 * 5, // Keep inactive overlay windows briefly without retaining long pan sessions
 	});
 };
 

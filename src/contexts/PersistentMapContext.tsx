@@ -10,7 +10,18 @@ import {
 } from 'react';
 import type { SearchResultsMapProps } from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 
+/**
+ * Which host route a persistent-map config belongs to. The singleton map is shared
+ * across every map-bearing route, so a config must declare its owner: during a route
+ * handoff the outgoing page's config can briefly still be the active one while the new
+ * route is already painting. Tagging the owner lets the renderer ignore a config that
+ * belongs to the page being left (e.g. a dashboard search config bleeding onto the
+ * campaign page), which is what made the search marker/constellation overlay linger.
+ */
+export type PersistentMapOwnerRoute = 'dashboard' | 'venue' | 'campaign';
+
 export interface PersistentDashboardMapConfig {
+	ownerRoute: PersistentMapOwnerRoute;
 	isMapView: boolean;
 	mapViewClip: string;
 	mapViewFrameTransition: string;

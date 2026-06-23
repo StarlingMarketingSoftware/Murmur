@@ -481,20 +481,48 @@ export function useDashboardScrollToMap({
 			);
 		};
 
-		// Keep the entire dashboard calendar box inert to the scrub. Its inner month-
-		// scroller already stops propagation, but the 4px frame and the floating "Today"
-		// button sit outside that — without this they'd start the scrub. We return *before*
-		// preventDefault so the page-level wheel lock (DashboardPageClient) still cancels
-		// native scroll there. (Generic enough to grow into an `ignoreWithinSelector` prop
-		// if other scroll-inert hero islands ever appear.)
+		// Keep the dashboard calendar box inert to the scrub. Its inner month-scroller stops its
+		// own wheels, but the 4px frame and the floating "Today" button sit outside that — so we
+		// bail for the whole box. We return *before* preventDefault so the page-level wheel lock
+		// (DashboardPageClient) still cancels native page scroll there.
 		const isOverCalendarPanel = (target: EventTarget | null) =>
 			!!(target as Element | null)?.closest?.('[data-dashboard-calendar-panel="true"]');
+
+		// Protect the campaigns table only while it is actually scrolling internally. When a
+		// campaign's folders are expanded (the finder) or the archive is open the table caps its
+		// height and scrolls within itself, so a wheel there must scroll the TABLE, not yank the
+		// user into the map — but we must not turn the COLLAPSED table (which grows to fit its
+		// rows and never scrolls) into a dead zone, or scrubbing to the map over the centered
+		// table would silently stop working. So we bail only when the hovered table shell has a
+		// real overflowing viewport; an unscrollable table falls through to the normal scrub.
+		// We return before preventDefault so the table's own scroll container (and the page wheel
+		// lock) handle the gesture. The inner viewport is CustomScrollbar's `.scrollbar-hide`
+		// div, while the shell is `.my-campaigns-table`; using the shell keeps the border and
+		// custom scrollbar thumb/track protected too. Split-finder renders two shells, so
+		// closest() resolves the pane actually under the cursor.
+		const isOverScrollableCampaignsTable = (target: EventTarget | null) => {
+			const el = target as Element | null;
+			const tableShell = el?.closest?.('.my-campaigns-table') as HTMLElement | null;
+			if (!tableShell?.closest?.('.campaigns-table-container')) return false;
+			const scrollers = Array.from(
+				tableShell.querySelectorAll<HTMLElement>('.scrollbar-hide')
+			);
+			return scrollers.some(
+				(scroller) => scroller.scrollHeight > scroller.clientHeight + 1
+			);
+		};
+
+		// The scrub stays armed even while these hero islands are expanded; we only step aside
+		// per-target so each panel can own the wheel it actually receives. (Generic enough to
+		// grow into an `ignoreWithinSelector` prop if more scroll-inert hero islands appear.)
+		const isOverScrollInertIsland = (target: EventTarget | null) =>
+			isOverCalendarPanel(target) || isOverScrollableCampaignsTable(target);
 
 		const onWheel = (e: WheelEvent) => {
 			if (committedRef.current) return;
 			// Don't yank the user to the map while they're typing in the search field.
 			if (targetProgress === 0 && isTypingTarget()) return;
-			if (isOverCalendarPanel(e.target)) return;
+			if (isOverScrollInertIsland(e.target)) return;
 			e.preventDefault();
 			onDelta(normalizeWheel(e));
 		};
@@ -509,7 +537,7 @@ export function useDashboardScrollToMap({
 			const delta = touchY - y; // drag up (finger moves up) = scroll down = positive
 			touchY = y;
 			if (targetProgress === 0 && isTypingTarget()) return;
-			if (isOverCalendarPanel(e.target)) return;
+			if (isOverScrollInertIsland(e.target)) return;
 			e.preventDefault();
 			onDelta(delta);
 		};

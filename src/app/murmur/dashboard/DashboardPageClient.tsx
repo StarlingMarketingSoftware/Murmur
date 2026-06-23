@@ -325,6 +325,9 @@ const MAP_POSTED_EVENT_CARD_SURFACE_STYLE = {
 // turns the mode off.
 const RADIUS_STORAGE_KEY = 'murmur_radius_mode_v1';
 const PENDING_SEARCH_STORAGE_KEY = 'murmur_pending_search';
+const SEARCH_TO_CAMPAIGN_TRANSITION_KEY = 'murmur_search_to_campaign_transition';
+const SEARCH_TO_CAMPAIGN_TRANSITION_BODY_CLASS =
+	'murmur-search-to-campaign-transitioning';
 const ALL_CONTACTS_MAP_PARAM = 'allContacts';
 
 // Bumped once per campaign-tab → search mount (the `instant=1` URL flag). The persistent Mapbox
@@ -3676,6 +3679,7 @@ const DashboardContent = () => {
 
 	const [isBelowMd, setIsBelowMd] = useState(false);
 	const [isXlDesktop, setIsXlDesktop] = useState(false);
+	const [viewportWidth, setViewportWidth] = useState(0);
 	const [viewportHeight, setViewportHeight] = useState(0);
 	// Map-view chrome width state: 'full' (today's layout), 'mid' (centered chrome
 	// re-centers over the map strip beside the right panel), 'compressed' (results
@@ -3691,6 +3695,7 @@ const DashboardContent = () => {
 
 		const handleResize = () => {
 			const width = window.innerWidth;
+			setViewportWidth(width);
 			setIsBelowMd(width < 768);
 			setIsXlDesktop(width >= 1280);
 			setViewportHeight(window.innerHeight);
@@ -4732,17 +4737,61 @@ const DashboardContent = () => {
 		() => (hasAddedContactsThisVisitRef.current ? '&added=1' : ''),
 		[]
 	);
+	const [optimisticSearchToCampaignTab, setOptimisticSearchToCampaignTab] =
+		useState<'write' | 'drafts' | 'inbox' | 'sent' | 'all' | null>(null);
+
+	const armSearchToCampaignTransition = useCallback(() => {
+		if (typeof window === 'undefined') return;
+
+		try {
+			window.sessionStorage.setItem(
+				SEARCH_TO_CAMPAIGN_TRANSITION_KEY,
+				String(Date.now())
+			);
+		} catch {
+			// Best-effort only: navigation should never depend on transition storage.
+		}
+
+		document.body.classList.add(SEARCH_TO_CAMPAIGN_TRANSITION_BODY_CLASS);
+
+		// If navigation is interrupted or the route chunk is unusually slow, do not leave
+		// the dashboard chrome faded forever. The campaign page also removes this class
+		// when it mounts/reveals.
+		window.setTimeout(() => {
+			document.body.classList.remove(SEARCH_TO_CAMPAIGN_TRANSITION_BODY_CLASS);
+		}, 6000);
+	}, []);
 
 	// The ask-box flanking nav boxes jump to the in-scope campaign's tabs, reusing
 	// the same push pattern as the map-view tab buttons below.
+	const navigateToCampaignRouteFromSearch = useCallback(
+		(tab: 'write' | 'drafts' | 'inbox' | 'sent' | 'all') => {
+			if (!mapCampaignId) return;
+			const href = `${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=${tab}${campaignReturnAddedSuffix()}`;
+
+			armSearchToCampaignTransition();
+			// Commit the visual state before handing control to the App Router. This makes
+			// the tab switch feel accepted on the click frame: dashboard chrome fades and
+			// the persistent map starts easing toward the campaign framing while the route
+			// payload/chunks catch up.
+			flushSync(() => {
+				setOptimisticSearchToCampaignTab(tab);
+			});
+			window.setTimeout(() => {
+				setOptimisticSearchToCampaignTab(null);
+			}, 6000);
+			window.requestAnimationFrame(() => {
+				router.push(href);
+			});
+		},
+		[armSearchToCampaignTransition, mapCampaignId, router, campaignReturnAddedSuffix]
+	);
+
 	const navigateToCampaignTab = useCallback(
 		(tab: 'write' | 'drafts' | 'inbox' | 'sent') => {
-			if (!mapCampaignId) return;
-			router.push(
-				`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=${tab}${campaignReturnAddedSuffix()}`
-			);
+			navigateToCampaignRouteFromSearch(tab);
 		},
-		[mapCampaignId, router, campaignReturnAddedSuffix]
+		[navigateToCampaignRouteFromSearch]
 	);
 
 	const prefetchedCampaignRoutes = useRef<Set<string>>(new Set());
@@ -9928,14 +9977,16 @@ const DashboardContent = () => {
 	// lands in the full search-results UI (right/left panels) with the URL updated, just like a
 	// normal search. The top search pill is staged empty (pendingForYouReveal) until those
 	// results load, then reveals "For You". Armed only in the locked-landing state, on desktop,
-	// not during an instant tab transition, and with nothing that owns scrolling on top: the
-	// campaign finder (a full scroll-hijacking overlay) or a calendar event-popup floating over
-	// the hero. The calendar tab itself stays armed — its month-scroller stops its own wheels, so
-	// the gesture only fires over non-calendar areas (this is why we gate on isCampaignFinderOpen
-	// rather than isOverflowingDashboardPanelOpen, which the calendar also trips for overflow).
+	// not during an instant tab transition, and with no full-screen flow owning scrolling on top
+	// (a calendar event-popup floating over the hero, or the unsubscribe flow). The campaign
+	// finder and the calendar tab both stay armed even while expanded: the gesture still fires
+	// over the surrounding hero/map, and the hook bails out per-target over each panel's own
+	// scroll area (the calendar month-scroller and the campaigns table) so a wheel there scrolls
+	// that panel independently instead of yanking the user into the map. This is why we gate on
+	// isCalendarPopupOpen — not isCampaignFinderOpen / isOverflowingDashboardPanelOpen, which
+	// expanding the table or the calendar would trip and would wrongly kill the whole gesture.
 	const scrollToMapEnabled =
 		shouldLockLandingDashboardScroll &&
-		!isCampaignFinderOpen &&
 		!isCalendarPopupOpen &&
 		!isInstantTabTransition &&
 		!isUnsubscribeFlowOpen;
@@ -10440,6 +10491,47 @@ const DashboardContent = () => {
 			viewportHeight,
 		]
 	);
+	const optimisticSearchToCampaignCameraPadding = useMemo<
+		| { top: number; right: number; bottom: number; left: number }
+		| undefined
+	>(() => {
+		if (!optimisticSearchToCampaignTab) return undefined;
+		if (!isMapView || isMobile !== false) return undefined;
+		if (optimisticSearchToCampaignTab === 'all') return undefined;
+
+		// Match the campaign page's compact-tab map framing ahead of navigation. The
+		// destination will recompute the exact same idea after mount; this optimistic
+		// value exists only so the map begins moving on the click frame instead of after
+		// the campaign route/data are ready.
+		const CAMPAIGN_OPTIMISTIC_ZOOM = 0.85;
+		const CAMPAIGN_COMPACT_WORKSPACE_BACKDROP_WIDTH_PX = 985;
+		const CAMPAIGN_CENTERED_STAGE_COMPACT_MAX_LAYOUT_W_PX = 1317;
+		const CAMERA_PADDING_BACKOFF_PX = 550;
+		// Use the dashboard's layout-tracked viewport width instead of reaching for an
+		// undeclared/global value during render. The window fallback only covers the
+		// first pre-resize commit in the browser.
+		const viewportW =
+			viewportWidth || (typeof window !== 'undefined' ? window.innerWidth : 0);
+
+		if (!viewportW) return undefined;
+		const layoutViewportW = viewportW / CAMPAIGN_OPTIMISTIC_ZOOM;
+		if (layoutViewportW < CAMPAIGN_CENTERED_STAGE_COMPACT_MAX_LAYOUT_W_PX) {
+			return { top: 0, right: 0, bottom: 0, left: 0 };
+		}
+
+		const backdropStartCss = Math.max(
+			0,
+			layoutViewportW - CAMPAIGN_COMPACT_WORKSPACE_BACKDROP_WIDTH_PX
+		);
+		const backdropStartPx = backdropStartCss * CAMPAIGN_OPTIMISTIC_ZOOM;
+		const uiCoveredRightPx = viewportW - backdropStartPx;
+		const rightPaddingPx = Math.max(
+			0,
+			Math.round(uiCoveredRightPx - CAMERA_PADDING_BACKOFF_PX)
+		);
+
+		return { top: 0, right: rightPaddingPx, bottom: 0, left: 0 };
+	}, [isMapView, isMobile, optimisticSearchToCampaignTab, viewportWidth]);
 
 	const persistentMapProps = useMemo<SearchResultsMapProps>(
 		() => ({
@@ -10455,13 +10547,15 @@ const DashboardContent = () => {
 			// header on top, search bar at the bottom) — same insets the in-campaign
 			// mobile map used.
 			cameraPadding:
-				isMobile === true && isAddToCampaignMode
+				optimisticSearchToCampaignCameraPadding ??
+				(isMobile === true && isAddToCampaignMode
 					? { top: 170, right: 30, bottom: 120, left: 30 }
-					: compressedMapChromePadding,
+					: compressedMapChromePadding),
 			autoFitPadding:
-				isMobile === true && isAddToCampaignMode
+				optimisticSearchToCampaignCameraPadding ??
+				(isMobile === true && isAddToCampaignMode
 					? { top: 170, right: 30, bottom: 120, left: 30 }
-					: compressedMapChromePadding,
+					: compressedMapChromePadding),
 			autoSpin: shouldSpinBackgroundMap,
 			contacts: shouldShowSearchGeometryOnMap ? contactsForMap : [],
 			selectedContacts:
@@ -10585,6 +10679,7 @@ const DashboardContent = () => {
 			mapPresentation,
 			MAP_VIEW_RIGHT_PANEL_EDGE_PX,
 			mapZoomControlRequest,
+			optimisticSearchToCampaignCameraPadding,
 			searchWhatForMap,
 			selectedAreaBoundsForMap,
 			selectedContacts,
@@ -10603,6 +10698,7 @@ const DashboardContent = () => {
 
 	const persistentMapConfig = useMemo<PersistentDashboardMapConfig>(
 		() => ({
+			ownerRoute: 'dashboard',
 			isMapView,
 			mapViewClip,
 			mapViewFrameTransition,
@@ -10617,6 +10713,17 @@ const DashboardContent = () => {
 	useLayoutEffect(() => {
 		setPersistentMapConfig(persistentMapConfig);
 	}, [persistentMapConfig, setPersistentMapConfig]);
+
+	// Clear the shared map config when the dashboard unmounts so the next route never
+	// inherits the dashboard's live search props (search markers + constellation lines).
+	// The campaign page and venue portal already do this; without the symmetric cleanup
+	// here the stale dashboard config could keep painting the search overlay after
+	// navigating away (e.g. search → campaign).
+	useLayoutEffect(() => {
+		return () => {
+			setPersistentMapConfig(null);
+		};
+	}, [setPersistentMapConfig]);
 
 	// The posted-event card is laid out at a fixed 420×121 design size, but in the
 	// desktop results column it must match the result-row width. We measure the
@@ -13883,12 +13990,7 @@ const DashboardContent = () => {
 												onPointerLeave={() => setIsSearchingPillHovered(false)}
 												onFocus={() => mapCampaignId && setIsSearchingPillHovered(true)}
 												onBlur={() => setIsSearchingPillHovered(false)}
-												onClick={() =>
-													mapCampaignId &&
-													router.push(
-														`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=all${campaignReturnAddedSuffix()}`
-													)
-												}
+												onClick={() => navigateToCampaignRouteFromSearch('all')}
 												style={{
 													appearance: 'none',
 													border: 'none',
@@ -14402,12 +14504,7 @@ const DashboardContent = () => {
 													onFocus={handleCampaignTabPointerEnter}
 													onPointerLeave={handleCampaignTabPointerLeave}
 													onPointerDown={handleCampaignTabPointerDown}
-													onClick={() => {
-														if (!mapCampaignId) return;
-														router.push(
-															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=write${campaignReturnAddedSuffix()}`
-														);
-													}}
+													onClick={() => navigateToCampaignRouteFromSearch('write')}
 												>
 													Write
 												</button>
@@ -14428,12 +14525,7 @@ const DashboardContent = () => {
 													onFocus={handleCampaignTabPointerEnter}
 													onPointerLeave={handleCampaignTabPointerLeave}
 													onPointerDown={handleCampaignTabPointerDown}
-													onClick={() => {
-														if (!mapCampaignId) return;
-														router.push(
-															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=all${campaignReturnAddedSuffix()}`
-														);
-													}}
+													onClick={() => navigateToCampaignRouteFromSearch('all')}
 												>
 													{mapCampaignName ? (
 														<>
@@ -14473,12 +14565,7 @@ const DashboardContent = () => {
 													onFocus={handleCampaignTabPointerEnter}
 													onPointerLeave={handleCampaignTabPointerLeave}
 													onPointerDown={handleCampaignTabPointerDown}
-													onClick={() => {
-														if (!mapCampaignId) return;
-														router.push(
-															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=inbox${campaignReturnAddedSuffix()}`
-														);
-													}}
+													onClick={() => navigateToCampaignRouteFromSearch('inbox')}
 												>
 													Inbox
 												</button>
@@ -14498,12 +14585,7 @@ const DashboardContent = () => {
 													onFocus={handleCampaignTabPointerEnter}
 													onPointerLeave={handleCampaignTabPointerLeave}
 													onPointerDown={handleCampaignTabPointerDown}
-													onClick={() => {
-														if (!mapCampaignId) return;
-														router.push(
-															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts${campaignReturnAddedSuffix()}`
-														);
-													}}
+													onClick={() => navigateToCampaignRouteFromSearch('drafts')}
 												>
 													Drafts
 												</button>
@@ -14862,24 +14944,9 @@ const DashboardContent = () => {
 																			contactsCount={dashboardMapHeaderContactsCount}
 																			draftCount={dashboardMapHeaderDraftCount}
 																			sentCount={dashboardMapHeaderSentCount}
-																			onContactsClick={() => {
-																				if (!mapCampaignId) return;
-																				router.push(
-																					`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=write${campaignReturnAddedSuffix()}`
-																				);
-																			}}
-																			onDraftsClick={() => {
-																				if (!mapCampaignId) return;
-																				router.push(
-																					`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts${campaignReturnAddedSuffix()}`
-																				);
-																			}}
-																			onSentClick={() => {
-																				if (!mapCampaignId) return;
-																				router.push(
-																					`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=sent${campaignReturnAddedSuffix()}`
-																				);
-																			}}
+																			onContactsClick={() => navigateToCampaignRouteFromSearch('write')}
+																			onDraftsClick={() => navigateToCampaignRouteFromSearch('drafts')}
+																			onSentClick={() => navigateToCampaignRouteFromSearch('sent')}
 																			onFolderDropdownOpenChange={setIsMapCampaignHeaderDropdownOpen}
 																			onSelectCampaign={handleSelectDashboardCampaign}
 																			width={433}
@@ -15278,10 +15345,10 @@ const DashboardContent = () => {
 																									offsetY={-19.5}
 																									hasData
 																									interactive
-																									onAllClick={() => mapCampaignId && router.push(`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=all${campaignReturnAddedSuffix()}`)}
-																									onWriteClick={() => mapCampaignId && router.push(`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=write${campaignReturnAddedSuffix()}`)}
-																									onSendClick={() => mapCampaignId && router.push(`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts${campaignReturnAddedSuffix()}`)}
-																									onInboxClick={() => mapCampaignId && router.push(`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=inbox${campaignReturnAddedSuffix()}`)}
+																									onAllClick={() => navigateToCampaignRouteFromSearch('all')}
+																									onWriteClick={() => navigateToCampaignRouteFromSearch('write')}
+																									onSendClick={() => navigateToCampaignRouteFromSearch('drafts')}
+																									onInboxClick={() => navigateToCampaignRouteFromSearch('inbox')}
 																								/>
 																								<span className="absolute left-[10px] top-[58px] -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
 																									Selection

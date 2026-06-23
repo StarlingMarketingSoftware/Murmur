@@ -25,7 +25,7 @@ const FALLBACK_MAP_PROPS: SearchResultsMapProps = {
 
 export function PersistentDashboardMap() {
 	const pathname = usePathname();
-	const mapConfig = usePersistentMapValue();
+	const rawMapConfig = usePersistentMapValue();
 	const setPersistentMapReady = usePersistentMapReadySetter();
 	const setPersistentMapFirstPaint = usePersistentMapFirstPaintSetter();
 	const [mounted, setMounted] = useState(false);
@@ -39,6 +39,24 @@ export function PersistentDashboardMap() {
 	const isCampaignRoute =
 		pathname === urls.murmur.campaign.index ||
 		pathname.startsWith(`${urls.murmur.campaign.index}/`);
+
+	// Ignore a config that belongs to a different route than the one currently shown.
+	// During a route handoff (e.g. search → campaign) the outgoing dashboard page's
+	// search config can still be the active value for a frame or two before the
+	// incoming page publishes its own — and the dashboard's config carries live
+	// search props (searchQuery/searchEngaged/result contacts) that would otherwise
+	// paint the result markers + constellation overlay on top of the new page. Gating
+	// on ownerRoute guarantees a stale cross-route config can never render, regardless
+	// of the effect-ordering race that made the overlay "sometimes" linger.
+	const configMatchesRoute =
+		rawMapConfig == null
+			? false
+			: rawMapConfig.ownerRoute === 'dashboard'
+				? isDashboardRoute
+				: rawMapConfig.ownerRoute === 'venue'
+					? isVenuePortalRoute
+					: isCampaignRoute;
+	const mapConfig = configMatchesRoute ? rawMapConfig : null;
 
 	// Keep the singleton Mapbox instance mounted across every map-bearing route, even while the
 	// config is momentarily null during a route handoff (e.g. campaign → dashboard, where the
@@ -135,6 +153,7 @@ export function PersistentDashboardMap() {
 						    update can never clobber it. */}
 						<SearchResultsMap
 							{...mapProps}
+							transientOverlayResetKey={pathname}
 							onMapLoadedChange={setPersistentMapReady}
 							onMapFirstPaintChange={setPersistentMapFirstPaint}
 						/>

@@ -169,6 +169,11 @@ export interface DraftingSectionProps {
 	 */
 	goToSent?: () => void;
 	/**
+	 * Optional callback to open the inbox left panel's Opportunities filter
+	 * (used by the star box on the Inbox/Sent bottom navigation row).
+	 */
+	onOpenOpportunities?: () => void;
+	/**
 	 * Optional request to switch the InboxSection's Inbox/Sent tab.
 	 * Used by the campaign page to route "Sent" navigation into the inbox's Sent view.
 	 */

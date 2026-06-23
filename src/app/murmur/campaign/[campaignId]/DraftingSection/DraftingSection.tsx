@@ -128,6 +128,7 @@ import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
 import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
+import DashboardActionBarStarIcon from '@/components/atoms/_svg/DashboardActionBarStarIcon';
 import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
 import { BookingIcon } from '@/components/atoms/_svg/BookingIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
@@ -350,6 +351,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		goToInbox,
 		goToSent,
 		goToSummary,
+		onOpenOpportunities,
 		inboxSentTabRequest,
 		inboxPanelTabRequest,
 		onInboxSentTabChange,
@@ -1489,6 +1491,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		contentView === 'testing' && !isMobile && !hideHeaderBox && !isNarrowestDesktop;
 	const shouldRenderDraftsBottomSendBar =
 		contentView === 'drafting' && !isMobile && !hideHeaderBox && !isNarrowestDesktop;
+	// Inbox/Sent tabs reuse the same centered bottom navigation row as Write/Drafts,
+	// but with a read-only count box in the middle (blue on Inbox, green on Sent).
+	const shouldRenderInboxSentBottomBar =
+		(view === 'inbox' || view === 'sent') &&
+		!isMobile &&
+		!hideHeaderBox &&
+		!isNarrowestDesktop;
 	const shouldRenderSharedBottomPanels =
 		sharedBottomPanelKinds.length > 0 &&
 		!isMobile &&
@@ -5046,6 +5055,119 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			})}
 		</div>
 	);
+
+	// Inbox/Sent bottom navigation row. Mirrors the Write/Drafts bars (same centered
+	// slot, square nav boxes, gap + height), but the middle is a read-only count box
+	// (112×40) that reports how many emails the active tab holds: blue (#8ECAD5) on
+	// Inbox, green on Sent. Flanked by the other tabs' counters, a search box, and the
+	// opportunities (star) box, keeping the row consistent across every campaign tab.
+	const renderInboxSentBottomBar = () => {
+		const isSent = view === 'sent';
+		const centerCount = isSent ? sentCount : inboxCount;
+		const centerBackground = isSent ? '#5AB478' : '#8ECAD5';
+		const centerStyle: CSSProperties = {
+			width: 112,
+			height: writeDraftBottomBarHeightPx,
+			borderRadius: 9,
+			border: '1px solid #000',
+			background: centerBackground,
+			boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+			boxSizing: 'border-box',
+			display: 'flex',
+			alignItems: 'center',
+			justifyContent: 'center',
+			fontFamily: 'Inter, sans-serif',
+			fontSize: 17,
+			fontWeight: 500,
+			lineHeight: 1,
+			color: '#000',
+		};
+		const starBox = (
+			<button
+				key="opportunities"
+				type="button"
+				aria-label="Open inbox opportunities"
+				disabled={!onOpenOpportunities}
+				className={cn(
+					'border-0 p-0 transition-opacity duration-150',
+					onOpenOpportunities && 'hover:opacity-85'
+				)}
+				style={{
+					...boxStyle,
+					background: '#EFD7D3',
+					cursor: onOpenOpportunities ? 'pointer' : 'default',
+				}}
+				onClick={onOpenOpportunities}
+			>
+				<DashboardActionBarStarIcon width={15} height={15} style={{ color: '#E32222' }} />
+			</button>
+		);
+		const searchBox = (
+			<button
+				key="search"
+				type="button"
+				aria-label="Open search"
+				className="border-0 p-0 transition-opacity duration-150 hover:opacity-85"
+				style={{
+					...boxStyle,
+					background: '#FFFFFF',
+					opacity: 0.2,
+					cursor: onGoToSearch ? 'pointer' : 'default',
+				}}
+				onClick={onGoToSearch}
+			>
+				<SearchIconDesktop width={17} height={18} stroke="#8B8B8B" strokeWidth={2.3} />
+			</button>
+		);
+
+		return (
+			<div
+				data-draft-button-container
+				className="flex items-center"
+				style={{ gap: 3, height: writeDraftBottomBarHeightPx }}
+			>
+				{blankBox('left-1', 0.1)}
+				{searchBox}
+				{counterBox({
+					label: 'contacts',
+					count: contactsCount,
+					background: '#EB8586',
+					opacity: 0.2,
+					onClick: contactsCount > 0 ? goToWriting : undefined,
+				})}
+				{counterBox({
+					label: 'drafts',
+					count: draftCount,
+					background: '#FFE3AA',
+					opacity: 0.2,
+					onClick: draftCount > 0 ? goToDrafting : undefined,
+				})}
+				<div
+					aria-label={`${centerCount} ${isSent ? 'sent' : 'inbox'}`}
+					style={centerStyle}
+				>
+					{centerCount}
+				</div>
+				{isSent
+					? counterBox({
+							label: 'inbox',
+							count: inboxCount,
+							background: '#6EBED5',
+							opacity: 0.2,
+							onClick: inboxCount > 0 ? openInboxTab : undefined,
+						})
+					: counterBox({
+							label: 'sent',
+							count: sentCount,
+							background: '#5AB478',
+							opacity: 0.2,
+							onClick: sentCount > 0 ? goToSent : undefined,
+						})}
+				{starBox}
+				{blankBox('right-1', 0.1)}
+			</div>
+		);
+	};
 
 	// Render search dropdowns for the mini searchbar
 	const renderSearchDropdowns = () => {
@@ -10331,6 +10453,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								}}
 							>
 								{renderDraftsBottomSendBar()}
+							</div>
+						)}
+
+						{shouldRenderInboxSentBottomBar && !isPersistedSendQueueUiVisible && (
+							<div
+								className="absolute left-0 right-0 z-30 flex justify-center"
+								style={{
+									top: `${writeDraftBottomBarSlotTopPx}px`,
+									transform: isCampaignWorkspaceCompact
+										? 'translateX(-180px)'
+										: undefined,
+								}}
+							>
+								{renderInboxSentBottomBar()}
 							</div>
 						)}
 

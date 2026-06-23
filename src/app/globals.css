@@ -4043,6 +4043,20 @@ body.murmur-page.murmur-map-view .results-search-input-group .search-wave-contai
 	animation: mapOverlayAppear 720ms cubic-bezier(0.45, 0, 0.2, 1) 80ms both;
 }
 
+/* Search → campaign tab switches should acknowledge the click immediately: keep the
+   existing map visible, fade the dashboard/search chrome out, then let the campaign
+   page fade its own chrome/content back in once ready. */
+body.murmur-search-to-campaign-transitioning .map-overlay-appear,
+body.murmur-search-to-campaign-transitioning .search-results-map-toggle,
+body.murmur-search-to-campaign-transitioning .search-results-table,
+body.murmur-search-to-campaign-transitioning .search-results-research-panel,
+body.murmur-search-to-campaign-transitioning .search-results-cta-wrapper,
+body.murmur-search-to-campaign-transitioning [data-dashboard-send-queue-overlay='true'] {
+	opacity: 0 !important;
+	pointer-events: none !important;
+	transition: opacity 160ms ease-out !important;
+}
+
 @keyframes selectionFolderMoveBannerIn {
 	from {
 		max-height: 0;
