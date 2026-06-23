@@ -758,6 +758,20 @@ export const MAP_WORLD_LAND_LOCAL_DATA_URL = '/maps/world-land-110m.json';
 // so deeper local tiles would be pure worker memory/CPU waste.
 export const MAP_WORLD_LAND_LOCAL_MAX_ZOOM = 6;
 
+// ── Sequential boot ladder backstops ─────────────────────────────────────────
+// The cold-start reveal is staged (land → basemap/roads → boundaries → pins) so
+// the map never drops state markers before the land beneath them exists. Each
+// downstream phase waits on its upstream phase, but with a wall-clock backstop so
+// a slow/failed upstream (offline tiles, non-US viewport with no state geometry)
+// can never permanently strand the phases below it. These are the backstops.
+//
+// Basemap-settle backstop: how long we wait for Mapbox to report the composite
+// basemap tiles (roads/landcover/water) as fully loaded before advancing anyway.
+export const MAP_BOOT_BASEMAP_SETTLE_BACKSTOP_MS = 2500;
+// Contacts-gate backstop: how long after the basemap settles we wait for the
+// state-boundary phase before opening the contact-pin stream regardless.
+export const MAP_BOOT_CONTACTS_GATE_BACKSTOP_MS = 1200;
+
 // Performance: the `within` filter is helpful when zoomed out (to hide Canada/Mexico labels/roads),
 // but it adds overhead at high zoom where there are many more road/label features.
 // Only apply the US-only basemap clipping up to this zoom level.

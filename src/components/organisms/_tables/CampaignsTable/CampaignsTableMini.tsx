@@ -24,6 +24,7 @@ type MiniCampaign = {
 	name: string;
 	draftCount?: number;
 	sentCount?: number;
+	newEmailCount?: number;
 	updatedAt?: string | Date;
 	campaignDataTypes?: CampaignDataTypeSummary[];
 };
@@ -335,13 +336,22 @@ export const CampaignsTableMini: FC<Props> = ({
 
 	const newCountsByCampaign = useMemo(() => {
 		const counts = new Map<number, number>();
+		for (const campaign of (campaignsData ?? []) as MiniCampaign[]) {
+			if (typeof campaign.id !== 'number') continue;
+			const persisted = campaign.newEmailCount ?? 0;
+			if (persisted > 0) counts.set(campaign.id, persisted);
+		}
+		const liveCounts = new Map<number, number>();
 		for (const email of (inboundEmails ?? []) as MiniInboundEmail[]) {
 			const id = email.campaign?.id ?? email.campaignId;
 			if (typeof id !== 'number') continue;
-			counts.set(id, (counts.get(id) ?? 0) + 1);
+			liveCounts.set(id, (liveCounts.get(id) ?? 0) + 1);
+		}
+		for (const [id, live] of liveCounts) {
+			counts.set(id, Math.max(counts.get(id) ?? 0, live));
 		}
 		return counts;
-	}, [inboundEmails]);
+	}, [campaignsData, inboundEmails]);
 
 	const rows = useMemo(() => {
 		const campaigns = (campaignsData ?? []) as MiniCampaign[];

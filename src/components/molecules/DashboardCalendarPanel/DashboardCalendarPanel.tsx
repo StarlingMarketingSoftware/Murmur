@@ -81,6 +81,13 @@ type DashboardCalendarPanelProps = {
 	 * calendar (venue map view) pass their composite scale to match.
 	 */
 	popupScale?: number;
+	/**
+	 * Reports whether the body-portaled event-editor popup is open. Lets a host
+	 * that runs a page-level scroll gesture (the dashboard scroll-to-map scrub)
+	 * suppress it while the popup floats over the hero — the popup portals to body
+	 * and dismisses on scroll but not wheel, so it can't self-guard against it.
+	 */
+	onPopupOpenChange?: (open: boolean) => void;
 };
 
 type ActiveCalendarPopup = {
@@ -137,6 +144,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	innerHeightPx,
 	persistEvents = false,
 	popupScale = 1,
+	onPopupOpenChange,
 }) => {
 	// Layout constants (hard dashboard sizing)
 	const ROWS = 6;
@@ -561,6 +569,14 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		SCROLLBAR_TRAVEL_PX,
 		isDraggingScrollbar,
 	]);
+
+	// Report popup open/closed to the host. Keyed on the activePopup object (not its
+	// key) so switching directly between cells stays a stable `true`; the cleanup
+	// reports `false` to cover an unmount while a popup is still open.
+	useEffect(() => {
+		onPopupOpenChange?.(activePopup != null);
+		return () => onPopupOpenChange?.(false);
+	}, [activePopup, onPopupOpenChange]);
 
 	// While the popup is open: dismiss on outside mousedown, Escape, or any window-level
 	// scroll/resize (the popup anchors to a cell that may have moved).

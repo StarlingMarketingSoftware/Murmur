@@ -268,6 +268,8 @@ import {
 	MAPBOX_LAYER_IDS,
 	MAPBOX_SOURCE_IDS,
 	MAPBOX_STYLE,
+	MAP_BOOT_BASEMAP_SETTLE_BACKSTOP_MS,
+	MAP_BOOT_CONTACTS_GATE_BACKSTOP_MS,
 	MAP_DEFAULT_ZOOM,
 	MAP_MIN_ZOOM,
 	MOBILE_MAP_MIN_ZOOM,
@@ -1730,6 +1732,9 @@ const DASHBOARD_MAP_CAMERA_SCRUB_EVENT = 'murmur:dashboard-map-camera-scrub';
 
 type DashboardMapCameraScrubDetail = {
 	progress?: number;
+	// 'scrub' (default) drives the camera per-frame off a single progress value for BOTH the
+	// live entry peek and the release return (the hook reverses by streaming scrub events back
+	// to 0). 'commit' finalizes the camera at p=1 for the flip into interactive map mode.
 	phase?: 'scrub' | 'commit';
 };
 
@@ -1964,6 +1969,14 @@ export interface SearchResultsMapProps {
 	 * not a draft slider value.
 	 */
 	radiusOverlay?: { center: LatLngLiteral; radiusMiles: number } | null;
+	/**
+	 * Suppresses viewport-wide contextual contact overlays (booking extras,
+	 * promotion pins, and close-zoom all-contact dots) without drawing the radius
+	 * circle. Used while a radius search is pending: the committed `radiusOverlay`
+	 * intentionally stays null until results resolve, but the old contextual
+	 * overlays must already be hidden.
+	 */
+	suppressContextualContactOverlays?: boolean;
 	/** Called when the user drops the draggable radius center pin at a new location. */
 	onRadiusCenterChange?: (center: LatLngLiteral) => void;
 	/** Current venue account location; draws the map-anchored home/radar overlay. */
@@ -2072,6 +2085,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	nightLighting = null,
 	nightT: nightTProp = null,
 	radiusOverlay = null,
+	suppressContextualContactOverlays = false,
 	onRadiusCenterChange,
 	ownedVenueLocation = null,
 	interactiveEntryCamera = null,
@@ -2729,6 +2743,34 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const stateClickZoomInFlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const [isStateLayerReady, setIsStateLayerReady] = useState(false);
 
+	// ── Sequential boot ladder (Airbnb-style staged reveal) ──────────────────
+	// Reference: airbnb.com's result map never paints everything at once. It
+	// brings up the cream landmasses + ocean first, lets the street/road raster
+	// settle, *then* streams the price/result pins by viewport bounds. We mirror
+	// that ordering here so the map never tries to drop state markers before the
+	// land underneath them exists.
+	//
+	//   Phase 1  land masses painted      → `isMapFirstPainted` (existing latch)
+	//   Phase 2  basemap tiles/roads in   → `isBasemapTilesSettled` (below)
+	//   Phase 3  state boundaries + labels → `isStateLayerReady` (existing)
+	//   Phase 4  contact pins streamed     → `isReadyForContactsOverlay` (below)
+	//
+	// Each phase gates the *initial boot* of the next; once a phase has fired it
+	// stays latched, so subsequent pans/zooms remain instantly responsive (the
+	// ladder only shapes the cold-start reveal, never steady-state interaction).
+	// Every gate also has a wall-clock backstop so a slow/failed upstream phase
+	// (offline tiles, non-US viewport with no state geometry, etc.) can never
+	// permanently strand a downstream phase.
+	const [isBasemapTilesSettled, setIsBasemapTilesSettled] = useState(false);
+	const [isReadyForContactsOverlay, setIsReadyForContactsOverlay] =
+		useState(false);
+	// Ref mirror so the (frequently-memoized) fetch-bbox callback can read the
+	// contacts gate without taking it as a dependency and thrashing its identity.
+	const isReadyForContactsOverlayRef = useRef(false);
+	useEffect(() => {
+		isReadyForContactsOverlayRef.current = isReadyForContactsOverlay;
+	}, [isReadyForContactsOverlay]);
+
 	useEffect(() => {
 		void ensureWasmGeoModuleLoaded();
 	}, []);
@@ -2737,19 +2779,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!map) return;
 		if (!isMapLoaded) return;
-		// Never apply UI-driven padding in decorative background mode.
-		if (isBackgroundPresentation) return;
 
 		const safe = (n: unknown) => {
 			const v = typeof n === 'number' && Number.isFinite(n) ? n : 0;
 			return v > 0 ? v : 0;
 		};
-		const next = {
-			top: safe(cameraPadding?.top),
-			right: safe(cameraPadding?.right),
-			bottom: safe(cameraPadding?.bottom),
-			left: safe(cameraPadding?.left),
-		};
+		// In decorative background mode (dashboard globe) UI-driven padding must not apply — but we
+		// must still CLEAR any padding left over from a prior interactive view (e.g. the campaign
+		// left-shift). Otherwise the decorative easeTo({ offset }) centering runs on top of stale
+		// right-padding and the globe sits off-center to the left (e.g. after campaign -> Back).
+		const next = isBackgroundPresentation
+			? { top: 0, right: 0, bottom: 0, left: 0 }
+			: {
+					top: safe(cameraPadding?.top),
+					right: safe(cameraPadding?.right),
+					bottom: safe(cameraPadding?.bottom),
+					left: safe(cameraPadding?.left),
+				};
 		const key = `${next.top},${next.right},${next.bottom},${next.left}`;
 		if (key === lastCameraPaddingKeyRef.current) return;
 		lastCameraPaddingKeyRef.current = key;
@@ -2841,6 +2887,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const isBookingSearch = searchMode === 'booking';
 	const isPromotionSearch = searchMode === 'promotion';
 	const isAnySearch = useMemo(() => Boolean((searchQuery ?? '').trim()), [searchQuery]);
+	// Radius search runs through the free-text pipeline, so `searchMode` can infer
+	// booking/promotion from the typed query and switch on the viewport-driven
+	// contextual overlays (booking-extra pins, promotion overlay pins, and the
+	// all-contacts gray dots). Those overlays fetch/render across the WHOLE viewport
+	// — far outside the radius circle — using the older pin/dot styling, which reads
+	// as the outdated "contact overlay" UI. A radius search is meant to show only its
+	// in-radius result markers, so suppress every viewport-wide contextual overlay
+	// whenever a radius search is active. `radiusOverlay` is non-null exactly when an
+	// active radius search is showing its geometry (see `activeRadiusSearchOverlay`);
+	// `suppressContextualContactOverlays` covers the pending gap before results commit.
+	// If the user explicitly disengages the search ("Click to see all contacts"),
+	// stop treating the stale radius overlay props as active so the ambient atlas can render.
+	const isRadiusSearchActive =
+		searchEngaged && (radiusOverlay != null || suppressContextualContactOverlays);
 	const isAmbientContactsEnabled = ambientContactsEnabled && !isBackgroundPresentation;
 	const shouldFetchAmbientContacts =
 		(ambientContactsEnabled || ambientContactsPreloadEnabled) &&
@@ -2917,6 +2977,28 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		lastAllContactsOverlayVisibleContactsKeyRef.current = '';
 		setAllContactsOverlayVisibleContacts([]);
 	}, [searchQuery]);
+
+	useEffect(() => {
+		if (!isRadiusSearchActive) return;
+
+		// Radius searches must not inherit any viewport-wide contextual overlay from
+		// the previous map state — including during the pending/loading gap where
+		// marker-source effects normally preserve old overlay data to avoid flicker.
+		lastBookingExtraFetchKeyRef.current = '';
+		setBookingExtraFetchBbox(null);
+		lastBookingExtraVisibleContactsKeyRef.current = '';
+		setBookingExtraVisibleContacts([]);
+		lastPromotionOverlayFetchKeyRef.current = '';
+		setPromotionOverlayFetchBbox(null);
+		lastPromotionOverlayVisibleContactsKeyRef.current = '';
+		setPromotionOverlayVisibleContacts([]);
+		lastAllContactsOverlayVisibleFetchKeyRef.current = '';
+		lastAllContactsOverlayBufferFetchKeyRef.current = '';
+		setAllContactsOverlayFetchBbox(null);
+		setAllContactsOverlayBufferFetchBbox(null);
+		lastAllContactsOverlayVisibleContactsKeyRef.current = '';
+		setAllContactsOverlayVisibleContacts([]);
+	}, [isRadiusSearchActive]);
 
 	const normalizedSearchWhatKey = useMemo(
 		() => (searchWhat ? normalizeWhatKey(searchWhat) : null),
@@ -3628,7 +3710,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (!mapInstance) return;
 
 			// Only run for booking-mode searches, and only once the user is zoomed in.
-			if (!isBookingSearch) {
+			// Never run during a radius search: its viewport-wide booking-extra pins are
+			// the outdated contextual overlay we must not show alongside radius results.
+			if (!isBookingSearch || isRadiusSearchActive) {
 				if (lastBookingExtraFetchKeyRef.current !== '') {
 					lastBookingExtraFetchKeyRef.current = '';
 					setBookingExtraFetchBbox(null);
@@ -3689,7 +3773,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				maxLng: qEast,
 			});
 		},
-		[isBookingSearch]
+		[isBookingSearch, isRadiusSearchActive]
 	);
 
 	const updatePromotionOverlayFetchBbox = useCallback(
@@ -3700,7 +3784,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// dedicated promotion-search selection/list behavior below, but fetch the
 			// radio overlay for any engaged search so these category pins can appear
 			// alongside the rest of the map context.
-			if (!searchEngaged || !isAnySearch) {
+			// Suppress entirely during a radius search: these viewport-wide promotion
+			// pins are part of the outdated contextual overlay we must not show
+			// alongside radius results.
+			if (!searchEngaged || !isAnySearch || isRadiusSearchActive) {
 				if (lastPromotionOverlayFetchKeyRef.current !== '') {
 					lastPromotionOverlayFetchKeyRef.current = '';
 					setPromotionOverlayFetchBbox(null);
@@ -3760,7 +3847,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				maxLng: qEast,
 			});
 		},
-		[isAnySearch, searchEngaged]
+		[isAnySearch, searchEngaged, isRadiusSearchActive]
 	);
 
 	const updateAllContactsOverlayFetchBbox = useCallback(
@@ -3778,12 +3865,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 			};
 
+			// Phase 4 gate: on cold boot, hold the (heaviest, top-most) contact-pin
+			// fetch until the land + basemap + boundaries phases have resolved. This
+			// is what stops pins racing ahead of the land beneath them. We deliberately
+			// DON'T clear existing fetch windows here — clearing would tear down pins
+			// that are already streaming once the gate opens; we simply defer the first
+			// fetch. The gate latches open permanently after boot, so live searches and
+			// pans are never throttled.
+			if (!isReadyForContactsOverlayRef.current) {
+				return;
+			}
+
 			// Search mode uses the close-zoom "all contacts" overlay. Disengaged mode uses
 			// the regional ambient atlas. We also preload ambient while the empty-map prompt
 			// is available so disengaging can render from cache immediately.
+			// The active-search "all" overlay (viewport-wide gray context dots) is part of
+			// the outdated contextual overlay, so it must never run during a radius search.
+			// Ambient mode is a disengaged state (never concurrent with an active radius
+			// search) and is intentionally left untouched.
 			const overlayMode: AllContactsOverlayFetchMode | null = shouldFetchAmbientContacts
 				? 'ambient'
-				: isAnySearch
+				: isAnySearch && !isRadiusSearchActive
 					? 'all'
 					: null;
 			if (!overlayMode) {
@@ -3890,7 +3992,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				setAllContactsOverlayBufferFetchBbox(bufferFetchBbox);
 			}
 		},
-		[isAnySearch, shouldFetchAmbientContacts]
+		[isAnySearch, shouldFetchAmbientContacts, isRadiusSearchActive]
 	);
 
 	const allContactsOverlayFilters = useMemo(() => {
@@ -4542,8 +4644,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const isEnteringInteractiveFromDashboard =
 			wasBackgroundPresentation && !isBackgroundPresentation;
 
-		// Overall: state overlays are hidden in decorative background mode, and until GeoJSON is loaded.
-		const targetOverlayOpacity = !isBackgroundPresentation && isStateLayerReady ? 1 : 0;
+		// Overall: state overlays are hidden in decorative background mode, until the
+		// GeoJSON is loaded, and (on cold boot) until the land + basemap tiles have
+		// settled beneath them. The `isBasemapTilesSettled` gate is the fix for state
+		// boundaries/markers flashing in before any land has painted — it enforces the
+		// Airbnb ordering (land + roads first, region boundaries second). Once the
+		// basemap has settled the gate stays latched, so this never throttles a later
+		// presentation toggle or restyle.
+		const targetOverlayOpacity =
+			!isBackgroundPresentation && isStateLayerReady && isBasemapTilesSettled ? 1 : 0;
 		// Mode: divider lines when state interactions are disabled; interactive borders when enabled.
 		const targetModeT = stateInteractionsEnabled ? 1 : 0;
 
@@ -4605,6 +4714,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isMapLoaded,
 		isBackgroundPresentation,
 		isStateLayerReady,
+		isBasemapTilesSettled,
 		stateInteractionsEnabled,
 		applyStateOverlayOpacity,
 	]);
@@ -9607,6 +9717,122 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [map, isMapLoaded, isMapFirstPainted]);
 
+	// ── Phase 2: basemap tiles (roads/landcover/water) settled ───────────────
+	// Only starts watching once the land masses have painted (Phase 1). We wait
+	// for Mapbox to report the composite basemap source as loaded for the current
+	// viewport — that's the moment the streets-v12 roads, landcover and water have
+	// actually streamed in, mirroring how Airbnb lets the road raster settle
+	// before layering result pins on top. A 2.5s wall-clock backstop guarantees we
+	// advance even if the tile fetch stalls (slow network / scoped token), so the
+	// downstream phases are never permanently stranded.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapFirstPainted) return;
+		if (isBasemapTilesSettled) return;
+		if (typeof window === 'undefined') return;
+
+		let settled = false;
+		let intervalId: number | null = null;
+		let backstop: number | null = null;
+		const settle = () => {
+			if (settled) return;
+			settled = true;
+			markPerf('murmur:map:basemap-settled');
+			setIsBasemapTilesSettled(true);
+			map.off('idle', onIdle);
+			if (intervalId != null) window.clearInterval(intervalId);
+			if (backstop != null) window.clearTimeout(backstop);
+		};
+
+		// We can't rely on `idle` alone: the always-animating clouds canvas source
+		// keeps the render loop hot, so `idle` may never fire. We instead poll
+		// `areTilesLoaded()` (true once every renderable source's tiles for the
+		// current view are in) on a short interval, and also opportunistically
+		// check on `idle` if it ever does fire. Either path that observes tiles-in
+		// settles immediately — so the wait is "as fast as the tiles arrive,"
+		// not a fixed delay.
+		const tilesIn = () => {
+			try {
+				return (
+					typeof (map as any).areTilesLoaded !== 'function' ||
+					(map as any).areTilesLoaded()
+				);
+			} catch {
+				// If the check throws, treat as ready rather than stalling the ladder.
+				return true;
+			}
+		};
+		const onIdle = () => {
+			if (tilesIn()) settle();
+		};
+		map.on('idle', onIdle);
+		// Fast path: tiles may already be in (warm cache / instant return).
+		if (tilesIn()) settle();
+		// Poll while we wait — cheap boolean check; cleared the moment we settle.
+		if (!settled) {
+			intervalId = window.setInterval(() => {
+				if (tilesIn()) settle();
+			}, 120);
+		}
+		// Backstop: never let a stalled tile fetch block the boundary/pin phases.
+		if (!settled) {
+			backstop = window.setTimeout(settle, MAP_BOOT_BASEMAP_SETTLE_BACKSTOP_MS);
+		}
+
+		return () => {
+			map.off('idle', onIdle);
+			if (intervalId != null) window.clearInterval(intervalId);
+			if (backstop != null) window.clearTimeout(backstop);
+		};
+	}, [map, isMapFirstPainted, isBasemapTilesSettled]);
+
+	// ── Phase 4 gate: clear to stream contact pins ───────────────────────────
+	// Contacts are the heaviest, top-most overlay, so on cold boot we hold their
+	// first fetch/paint until the state boundaries phase has resolved (or its own
+	// backstop has fired). This is the exact Airbnb ordering: the basemap and
+	// region context come up first, then the result pins stream in on top — never
+	// pins racing ahead of the land/boundaries beneath them. Once latched it stays
+	// open so live searches and pans stream contacts immediately.
+	useEffect(() => {
+		if (!map) return;
+		if (isReadyForContactsOverlay) return;
+		if (typeof window === 'undefined') return;
+
+		// Primary path: boundaries are in (or the viewport has no US states to load
+		// and the basemap is already settled — e.g. an international view).
+		if (isStateLayerReady && isBasemapTilesSettled) {
+			markPerf('murmur:map:contacts-gate-open');
+			setIsReadyForContactsOverlay(true);
+			return;
+		}
+
+		// Backstop: even if the boundary phase never resolves (non-US viewport,
+		// geometry fetch failure), open the gate so pins still appear. Anchored off
+		// the basemap-settled signal so we measure the wait from a real milestone.
+		if (!isBasemapTilesSettled) return;
+		const backstop = window.setTimeout(() => {
+			markPerf('murmur:map:contacts-gate-open');
+			setIsReadyForContactsOverlay(true);
+		}, MAP_BOOT_CONTACTS_GATE_BACKSTOP_MS);
+		return () => window.clearTimeout(backstop);
+	}, [map, isReadyForContactsOverlay, isStateLayerReady, isBasemapTilesSettled]);
+
+	// When the Phase 4 gate finally opens, the deferred contact fetch must be
+	// kicked once — otherwise pins wouldn't appear until the next user pan/zoom
+	// (the fetch window is normally only recomputed on `moveend`). This is the
+	// "now stream the pins" step in the Airbnb-style ladder.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		if (!isReadyForContactsOverlay) return;
+		updateAllContactsOverlayFetchBbox(map);
+	}, [
+		map,
+		isMapLoaded,
+		isReadyForContactsOverlay,
+		updateAllContactsOverlayFetchBbox,
+	]);
+
 	const prevPresentationRef = useRef<'background' | 'interactive'>(presentation);
 	const dashboardScrollScrubCameraRef =
 		useRef<DashboardMapCameraScrubState | null>(null);
@@ -9691,6 +9917,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			dashboardScrollScrubProgressRef.current = progress;
 
+			// Release-below-threshold return: the hook reverses the scrub as a per-frame eased
+			// tween that streams ordinary 'scrub' events back down to p=0 (see snapBack in
+			// useDashboardScrollToMap). That keeps the globe on the SAME per-frame camera path as
+			// the live entry — chrome and camera recomputed together off one value every frame —
+			// so the return is one motion. (A previous approach used a dedicated 'snapback' phase
+			// that drove the globe with a single native easeTo on its own clock; the page chrome
+			// settled and the globe's pitch then resolved as a visibly separate second "tilt
+			// back". The unified per-frame path below — which forces a repaint each frame — fixed
+			// that, so the separate snapback branch is gone.)
 			if (progress <= 0.0001 && !isCommit) {
 				const state = dashboardScrollScrubCameraRef.current;
 				dashboardScrollScrubActiveRef.current = false;
@@ -9737,6 +9972,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					offset,
 					duration: 0,
 				});
+				// Same no-continuous-render caveat as the snapback branch: a duration:0 easeTo
+				// moves the camera but doesn't guarantee a canvas repaint on the Safari perf path,
+				// so force one per scrub frame to keep the live tilt-down painting in lock-step.
+				map.triggerRepaint();
 			} catch {
 				// Ignore.
 			}
@@ -11308,6 +11547,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const shouldShowPromotionOverlay =
 				searchEngaged &&
 				isAnySearch &&
+				!isRadiusSearchActive &&
 				ambientActiveCategories?.[RADIO_CONTACT_CATEGORY_INDEX] !== false &&
 				zoomRaw >= PROMOTION_OVERLAY_MARKERS_MIN_ZOOM &&
 				promotionOverlayContactsWithCoords.length > 0;
@@ -11855,6 +12095,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// exceeding MAX_TOTAL_DOTS total markers.
 			const shouldShowBookingExtras =
 				isBookingSearch &&
+				!isRadiusSearchActive &&
 				zoomRaw >= BOOKING_EXTRA_MARKERS_MIN_ZOOM &&
 				bookingExtraContactsWithCoords.length > 0;
 			let nextBookingExtraVisible: ContactWithName[] = [];
@@ -12030,7 +12271,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				zoomRaw >=
 					AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM + interactiveFloorDeltaRef.current;
 			const isSearchAllContactsOverlay =
-				isAnySearch && zoomRaw >= ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM;
+				isAnySearch &&
+				!isRadiusSearchActive &&
+				zoomRaw >= ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM;
 			const shouldShowAllContactsOverlay =
 				(isAmbientAllContactsOverlay || isSearchAllContactsOverlay) &&
 				allContactsOverlayContactsWithCoords.length > 0;
@@ -12252,6 +12495,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			promotionOverlayContactsWithCoords,
 			getPromotionOverlayContactCoords,
 			isAnySearch,
+			isRadiusSearchActive,
 			isAmbientContactsEnabled,
 			ambientActiveCategories,
 			ambientUncategorizedActive,
@@ -17660,6 +17904,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			| undefined;
 		if (!source) return;
 
+		if (isRadiusSearchActive) {
+			source.setData({ type: 'FeatureCollection', features: [] } as any);
+			return;
+		}
+
 		if (isLoading) {
 			// Preserve existing overlay dots while parent data is refetching.
 			return;
@@ -17712,6 +17961,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [
 		map,
 		isMapLoaded,
+		isRadiusSearchActive,
 		isLoading,
 		isAnySearch,
 		isAmbientContactsEnabled,
@@ -17733,6 +17983,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			| mapboxgl.GeoJSONSource
 			| undefined;
 		if (!dotSource || !pinSource) return;
+
+		if (isRadiusSearchActive) {
+			const empty = { type: 'FeatureCollection', features: [] } as any;
+			dotSource.setData(empty);
+			pinSource.setData(empty);
+			promotionDotIdsRef.current = new Set();
+			promotionPinIdsRef.current = new Set();
+			return;
+		}
 
 		if (isLoading) {
 			// Preserve existing promotion markers while parent data is refetching.
@@ -17843,6 +18102,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [
 		map,
 		isMapLoaded,
+		isRadiusSearchActive,
 		isLoading,
 		searchEngaged,
 		promotionOverlayVisibleContacts,
@@ -17862,6 +18122,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			| mapboxgl.GeoJSONSource
 			| undefined;
 		if (!source) return;
+
+		if (isRadiusSearchActive) {
+			source.setData({ type: 'FeatureCollection', features: [] } as any);
+			return;
+		}
 
 		if (isLoading) {
 			// Preserve existing booking markers while parent data is refetching.
@@ -17951,6 +18216,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [
 		map,
 		isMapLoaded,
+		isRadiusSearchActive,
 		isLoading,
 		searchEngaged,
 		bookingExtraVisibleContacts,

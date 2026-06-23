@@ -11,6 +11,7 @@ import {
 	type CSSProperties,
 } from 'react';
 import { useRouter } from 'next/navigation';
+import { createPortal } from 'react-dom';
 import { urls } from '@/constants/urls';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import DashboardActionBarStarIcon from '@/components/atoms/_svg/DashboardActionBarStarIcon';
@@ -22,12 +23,14 @@ import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import { OpportunityHoverPanel } from '@/components/molecules/OpportunityHoverPanel/OpportunityHoverPanel';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import {
 	useGetMyEventApplications,
 	type MyEventApplication,
 } from '@/hooks/queryHooks/useEventApplications';
 import type { InboundEmailWithRelations } from '@/types';
+import { APPLICATION_SENT_ROW_ID_OFFSET } from '@/utils/inboxConversations';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { cn } from '@/utils/ui';
@@ -62,9 +65,9 @@ type OpportunityRow = {
 	opportunityDate: string;
 	lastMessage: string;
 	lastReceivedLabel: string;
-	// Application rows with venue responses: unread shows the blue "venue
-	// responded" dot; inboxLink deep-links into the conversation in the campaign
-	// inbox (null when no response yet or no campaign to route through).
+	// Application rows: unread shows the blue "venue responded" dot; inboxLink
+	// deep-links into the campaign inbox that hosts this thread (null when there
+	// is no campaign home — the row opens a read-only detail card instead).
 	unread?: boolean;
 	inboxLink?: string | null;
 };
@@ -602,11 +605,17 @@ const buildApplicationOpportunityRow = (
 			response?.lastMessageAt ?? application.createdAt
 		),
 		unread: (response?.unreadCount ?? 0) > 0,
-		// The projected inbox row id for a venue message is the message id negated.
+		// Deep-link into the campaign inbox that hosts this thread. Responded
+		// applications open the venue's latest reply (projected row = negated
+		// message id); pending ones open the artist's own application (projected
+		// "sent" row = negated APPLICATION_SENT_ROW_ID_OFFSET + id). null when the
+		// venue has no campaign home — the row opens a read-only detail card.
 		inboxLink:
-			response && response.campaignId != null
-				? `${urls.murmur.campaign.detail(response.campaignId)}?tab=inbox&inboxEmailId=${-response.latestMessageId}&silent=1`
-				: null,
+			application.homeCampaignId == null
+				? null
+				: response
+					? `${urls.murmur.campaign.detail(application.homeCampaignId)}?tab=inbox&inboxEmailId=${-response.latestMessageId}&silent=1`
+					: `${urls.murmur.campaign.detail(application.homeCampaignId)}?tab=sent&inboxEmailId=${-(APPLICATION_SENT_ROW_ID_OFFSET + application.id)}&silent=1`,
 	};
 };
 
@@ -644,6 +653,17 @@ export const DashboardOpportunitiesContent: FC<{
 	const isLoading =
 		isLoadingOverride ?? (mockOverrideActive || hasInboundEmailsOverride ? false : isLoadingEmails);
 	const [activeStatus, setActiveStatus] = useState<OpportunityStatus | null>(null);
+	// Dead application rows (no campaign inbox home) open this read-only detail
+	// card instead of navigating; closes on backdrop click or Escape.
+	const [detailApplication, setDetailApplication] = useState<MyEventApplication | null>(null);
+	useEffect(() => {
+		if (!detailApplication) return;
+		const onKeyDown = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') setDetailApplication(null);
+		};
+		window.addEventListener('keydown', onKeyDown);
+		return () => window.removeEventListener('keydown', onKeyDown);
+	}, [detailApplication]);
 
 	const threadExchangeCounts = useMemo(() => {
 		const counts: Record<string, number> = {};
@@ -795,6 +815,15 @@ export const DashboardOpportunitiesContent: FC<{
 		const isCompactClosedRow =
 			isUnfilteredView &&
 			(opportunity.status === 'closed' || opportunity.status === 'canceled');
+		// Without a campaign inbox home, an application row opens the read-only
+		// Opportunity card (needs the raw application + an event to render).
+		const detailApp =
+			!opportunity.inboxLink && opportunity.source === 'application'
+				? ((myApplications ?? []).find(
+						(application) =>
+							application.id === opportunity.id && application.event != null
+					) ?? null)
+				: null;
 		return (
 			<button
 				key={`${opportunity.source}-${opportunity.id}`}
@@ -802,7 +831,9 @@ export const DashboardOpportunitiesContent: FC<{
 				onClick={
 					opportunity.inboxLink
 						? () => router.push(opportunity.inboxLink!)
-						: undefined
+						: detailApp
+							? () => setDetailApplication(detailApp)
+							: undefined
 				}
 				className="text-left hover:brightness-[0.985] transition-[filter]"
 				style={{
@@ -826,7 +857,7 @@ export const DashboardOpportunitiesContent: FC<{
 					padding: 0,
 					fontFamily: 'Inter, sans-serif',
 					color: '#000000',
-					cursor: opportunity.inboxLink ? 'pointer' : 'default',
+					cursor: opportunity.inboxLink || detailApp ? 'pointer' : 'default',
 				}}
 			>
 				<span
@@ -1331,6 +1362,24 @@ export const DashboardOpportunitiesContent: FC<{
 					)}
 				</div>
 			</CustomScrollbar>
+			{detailApplication &&
+				createPortal(
+					<div
+						role="dialog"
+						aria-modal="true"
+						onClick={() => setDetailApplication(null)}
+						className="fixed inset-0 z-[100001] flex items-center justify-center"
+						style={{ background: 'rgba(0, 0, 0, 0.45)' }}
+					>
+						<div onClick={(event) => event.stopPropagation()}>
+							<OpportunityHoverPanel
+								application={detailApplication}
+								nowMs={Date.now()}
+							/>
+						</div>
+					</div>,
+					document.body
+				)}
 		</div>
 	);
 };

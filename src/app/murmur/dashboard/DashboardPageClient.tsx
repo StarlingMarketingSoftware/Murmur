@@ -207,6 +207,7 @@ import {
 	DashboardWriteOverlay,
 	type DashboardDraftingStatus,
 } from './DashboardWriteOverlay';
+import { LegacyInwardExpandIcon } from './DashboardDraftingDeck';
 import { SelectionFolderMoveBanner } from './SelectionFolderMoveBanner';
 import { MapEventPopupCard, formatMapPostedEventDate } from './MapEventPopupCard';
 import { ApplyModal } from './ApplyModal';
@@ -676,9 +677,7 @@ const SelectionDraftingProgressBar = ({
 				style={{ width: 22, height: 22 }}
 				aria-label={isCollapsed ? 'Expand drafting deck' : 'Collapse drafting deck'}
 			>
-				<span className="font-inter text-[22px] font-semibold leading-none text-black">
-					⤢
-				</span>
+				<LegacyInwardExpandIcon className="text-black" />
 			</button>
 		</div>
 	);
@@ -2328,19 +2327,19 @@ const MapBottomSearchBar = memo(
 					onActivate();
 				}}
 			>
-				{value.length === 0 && (
+				{/* Leading mode icons (profile avatar / radius pin) live in their own
+				    persistent slot so they stay visible while typing. They must NOT be
+				    nested in the placeholder block below, which unmounts the moment the
+				    box has any text. */}
+				{(shouldShowProfilePlaceholderIcon ||
+					(radiusEnabled && !isInitialDashboardSearch)) && (
 					<div
 						aria-hidden="true"
-						className="absolute flex items-center gap-[4px] font-inter text-[16px] leading-none text-black pointer-events-none"
+						className="absolute flex items-center gap-[4px] pointer-events-none"
 						style={{
 							top: 0,
-							left: isInitialDashboardSearch ? '24px' : '14px',
-							right: `${anythingRightReservedWidth}px`,
-							height: isInitialDashboardSearch
-								? `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.height - 4}px`
-								: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.textRowHeight}px`,
-							fontSize: isInitialDashboardSearch ? '16px' : undefined,
-							fontWeight: isInitialDashboardSearch ? 500 : undefined,
+							left: '14px',
+							height: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.textRowHeight}px`,
 						}}
 					>
 						{shouldShowProfilePlaceholderIcon && (
@@ -2368,6 +2367,23 @@ const MapBottomSearchBar = memo(
 								}}
 							/>
 						)}
+					</div>
+				)}
+				{value.length === 0 && (
+					<div
+						aria-hidden="true"
+						className="absolute flex items-center gap-[4px] font-inter text-[16px] leading-none text-black pointer-events-none"
+						style={{
+							top: 0,
+							left: isInitialDashboardSearch ? '24px' : `${14 + leadingIconOffset}px`,
+							right: `${anythingRightReservedWidth}px`,
+							height: isInitialDashboardSearch
+								? `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.height - 4}px`
+								: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.textRowHeight}px`,
+							fontSize: isInitialDashboardSearch ? '16px' : undefined,
+							fontWeight: isInitialDashboardSearch ? 500 : undefined,
+						}}
+					>
 						{shouldShowKeywordPlaceholder ? (
 							<>
 								<span>Search any</span>
@@ -3240,7 +3256,17 @@ const DashboardContent = () => {
 
 	const { data: fromCampaign, isPending: isPendingFromCampaign } =
 		useGetCampaign(fromCampaignIdParam);
-	const addToCampaignUserContactListId = fromCampaign?.userContactLists?.[0]?.id;
+	const [dashboardSearchCampaignIdOverride, setDashboardSearchCampaignIdOverride] =
+		useState<number | null>(null);
+	const dashboardSearchCampaignOverrideFetchId =
+		dashboardSearchCampaignIdOverride != null &&
+		String(dashboardSearchCampaignIdOverride) !== fromCampaignIdParam
+			? String(dashboardSearchCampaignIdOverride)
+			: '';
+	const {
+		data: fetchedDashboardSearchCampaignOverride,
+		isPending: isPendingDashboardSearchCampaignOverride,
+	} = useGetCampaign(dashboardSearchCampaignOverrideFetchId);
 	const { mutateAsync: editUserContactList, isPending: isPendingAddToCampaign } =
 		useEditUserContactList({ suppressToasts: true });
 
@@ -3362,6 +3388,11 @@ const DashboardContent = () => {
 	const [isRadiusModeEnabled, setIsRadiusModeEnabled] = useState(false);
 	const [radiusCenter, setRadiusCenter] = useState<LatLngLiteral | null>(null);
 	const [radiusMiles, setRadiusMiles] = useState(RADIUS_DEFAULT_MILES);
+	// While a strict-radius free-text search is pending, `lastFreeTextArgs` is
+	// intentionally null (so URL/state mirroring does not label stale results as
+	// current). The map still needs an immediate signal to hide the old
+	// viewport-wide contact overlays during that pending gap.
+	const [isPendingRadiusSearchOnMap, setIsPendingRadiusSearchOnMap] = useState(false);
 	// Ref mirrors so submitMapBottomSearchQuery (a stable useCallback) reads current
 	// radius values without churning its deps on every slider tick.
 	const isRadiusModeEnabledRef = useRef(false);
@@ -3369,6 +3400,7 @@ const DashboardContent = () => {
 	const radiusMilesRef = useRef(RADIUS_DEFAULT_MILES);
 	// Cancels a stale async geolocation enable (toggled off / re-toggled mid-fetch).
 	const radiusEnableTokenRef = useRef(0);
+	const pendingRadiusSearchTokenRef = useRef(0);
 	useEffect(() => {
 		isRadiusModeEnabledRef.current = isRadiusModeEnabled;
 	}, [isRadiusModeEnabled]);
@@ -3542,6 +3574,9 @@ const DashboardContent = () => {
 		ResponsesMockState | undefined
 	>(undefined);
 	const [isCampaignFinderOpen, setIsCampaignFinderOpen] = useState(false);
+	// The calendar tab's body-portaled event-editor popup. Tracked here so the
+	// scroll-to-map gesture can stand down while it floats over the hero.
+	const [isCalendarPopupOpen, setIsCalendarPopupOpen] = useState(false);
 	const isTabPreviewingOther = hoveredTab != null && hoveredTab !== activeTab;
 	// Dashboard inbox deep-link (`?tab=inbox`) should land on the Campaigns sub-tab.
 	const [inboxSubtab, setInboxSubtab] = useState<'messages' | 'campaigns'>('campaigns');
@@ -4496,6 +4531,30 @@ const DashboardContent = () => {
 		disableAutoCreateCampaign: isAddToCampaignMode,
 	});
 
+	// Dashboard search has its own campaign context. In normal mode it follows the
+	// active campaign; in add-to-campaign mode it follows `fromCampaignId`; after a
+	// folder-dropdown pick it follows the locally selected id immediately, without
+	// waiting for a navigation/remount. This is the source of truth for the search
+	// page header, counts, add-to-folder/write actions, and campaign tab prefetching.
+	const dashboardSearchCampaignOverride = useMemo(() => {
+		if (dashboardSearchCampaignIdOverride == null) return null;
+		if (fromCampaign?.id === dashboardSearchCampaignIdOverride) return fromCampaign;
+		if (activeCampaign?.id === dashboardSearchCampaignIdOverride) return activeCampaign;
+		if (fetchedDashboardSearchCampaignOverride?.id === dashboardSearchCampaignIdOverride) {
+			return fetchedDashboardSearchCampaignOverride;
+		}
+		return null;
+	}, [
+		activeCampaign,
+		dashboardSearchCampaignIdOverride,
+		fetchedDashboardSearchCampaignOverride,
+		fromCampaign,
+	]);
+	const dashboardSearchCampaign =
+		dashboardSearchCampaignOverride ?? fromCampaign ?? activeCampaign;
+	const addToCampaignUserContactListId =
+		dashboardSearchCampaign?.userContactLists?.[0]?.id;
+
 	// Profile search source: the active campaign's identity, falling back to the
 	// user's most-recently-edited identity. Mirrored to a ref so the stable submit
 	// callback reads the latest without churning its deps.
@@ -4619,6 +4678,9 @@ const DashboardContent = () => {
 	// heavy contacts list), gated behind real intent. mapCampaignId mirrors the
 	// value the tabs compute below.
 	const mapCampaignId =
+		(dashboardSearchCampaignIdOverride != null
+			? String(dashboardSearchCampaignIdOverride)
+			: '') ||
 		fromCampaignIdParam ||
 		(activeCampaignId != null ? String(activeCampaignId) : '');
 	// Per-campaign color scheme for the top navigation box + folder icon (matches
@@ -4630,21 +4692,19 @@ const DashboardContent = () => {
 	// same React Query key. null when the campaign isn't warm enough to build it —
 	// in that case we skip the contacts prefetch rather than miss the key.
 	const prefetchContactsFilter = useMemo(() => {
-		const campaignForPrefetch = fromCampaign ?? activeCampaign;
-		const lists = campaignForPrefetch?.userContactLists;
+		const lists = dashboardSearchCampaign?.userContactLists;
 		if (!lists) return null;
 		return { contactListIds: lists.map((list) => list.id) };
-	}, [fromCampaign, activeCampaign]);
+	}, [dashboardSearchCampaign]);
 
 	// The emails/inbound-emails queries key on the NUMERIC campaign id (every campaign-page
 	// caller passes `campaign.id` / `Number(params.campaignId)`); a string id would warm a
 	// key nobody reads. null when we can't resolve a numeric id.
 	const prefetchEmailsCampaignId = useMemo(() => {
-		const campaignForPrefetch = fromCampaign ?? activeCampaign;
-		if (campaignForPrefetch?.id != null) return campaignForPrefetch.id;
+		if (dashboardSearchCampaign?.id != null) return dashboardSearchCampaign.id;
 		const parsed = Number(mapCampaignId);
 		return mapCampaignId && Number.isFinite(parsed) ? parsed : null;
-	}, [fromCampaign, activeCampaign, mapCampaignId]);
+	}, [dashboardSearchCampaign, mapCampaignId]);
 
 	// True once contacts were added during this dashboard visit WITHOUT navigating
 	// (folder add / write-selection commit). The campaign-tab pushes below append
@@ -5715,7 +5775,7 @@ const DashboardContent = () => {
 			return;
 		}
 
-		if (isPendingFromCampaign) {
+		if (isPendingFromCampaign || isPendingDashboardSearchCampaignOverride) {
 			toast('Loading campaign…');
 			return;
 		}
@@ -5772,8 +5832,9 @@ const DashboardContent = () => {
 			// Return to the campaign page we came from
 			// `added=1`: contacts actually changed — the campaign page uses it to refetch
 			// contacts/lists on arrival (pure tab-switch arrivals skip that work).
+			const returnCampaignId = dashboardSearchCampaign?.id ?? fromCampaignIdParam;
 			router.push(
-				`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&added=1`
+				`${urls.murmur.campaign.detail(returnCampaignId)}?origin=search&added=1`
 			);
 		} catch (error) {
 			console.error('Error adding contacts to campaign:', error);
@@ -5784,9 +5845,11 @@ const DashboardContent = () => {
 		addToCampaignUserContactListId,
 		batchUpdateContacts,
 		contacts,
+		dashboardSearchCampaign,
 		derivedContactTitle,
 		editUserContactList,
 		isAddToCampaignMode,
+		isPendingDashboardSearchCampaignOverride,
 		isPendingFromCampaign,
 		shouldForceApplyDerivedTitle,
 		queryClient,
@@ -5795,7 +5858,8 @@ const DashboardContent = () => {
 		setSelectedContacts,
 	]);
 
-	const activeCampaignUserContactListId = activeCampaign?.userContactLists?.[0]?.id;
+	const activeCampaignUserContactListId =
+		dashboardSearchCampaign?.userContactLists?.[0]?.id;
 
 	const handleAddSelectedToActiveCampaign = useCallback(async () => {
 		if (selectedContacts.length === 0) {
@@ -5803,7 +5867,7 @@ const DashboardContent = () => {
 			return;
 		}
 
-		if (activeCampaignId == null || !activeCampaign) {
+		if (!dashboardSearchCampaign) {
 			toast.error('No active campaign yet — search to start one.');
 			return;
 		}
@@ -5850,22 +5914,21 @@ const DashboardContent = () => {
 			]);
 
 			toast.success(
-				`${addedCount} contact${addedCount === 1 ? '' : 's'} added to ${activeCampaign.name}`
+				`${addedCount} contact${addedCount === 1 ? '' : 's'} added to ${dashboardSearchCampaign.name}`
 			);
 
 			router.push(
-				`${urls.murmur.campaign.detail(activeCampaignId)}?origin=search&added=1`
+				`${urls.murmur.campaign.detail(dashboardSearchCampaign.id)}?origin=search&added=1`
 			);
 		} catch (error) {
 			console.error('Error adding contacts to active campaign:', error);
 			toast.error('Failed to add contacts to campaign');
 		}
 	}, [
-		activeCampaign,
-		activeCampaignId,
 		activeCampaignUserContactListId,
 		batchUpdateContacts,
 		contacts,
+		dashboardSearchCampaign,
 		derivedContactTitle,
 		editUserContactList,
 		queryClient,
@@ -5894,7 +5957,9 @@ const DashboardContent = () => {
 		const contactIdsToAdd = [...selectedContacts];
 		const addedCount = contactIdsToAdd.length;
 		const folderName =
-			activeCampaign?.userContactLists?.[0]?.name ?? activeCampaign?.name ?? 'folder';
+			dashboardSearchCampaign?.userContactLists?.[0]?.name ??
+			dashboardSearchCampaign?.name ??
+			'folder';
 
 		setFolderMoveNotice({
 			count: addedCount,
@@ -5949,10 +6014,10 @@ const DashboardContent = () => {
 			toast.error('Failed to add contacts to folder');
 		}
 	}, [
-		activeCampaign,
 		activeCampaignUserContactListId,
 		batchUpdateContacts,
 		contacts,
+		dashboardSearchCampaign,
 		derivedContactTitle,
 		editUserContactList,
 		queryClient,
@@ -5962,8 +6027,8 @@ const DashboardContent = () => {
 	]);
 
 	// Map multi-select "Write Message" action. Opens the inline drafting panel over the map for the
-	// current selection, scoped to the campaign the search is in the context of (the one shown in
-	// the header: `fromCampaign ?? activeCampaign`). The panel opens immediately; the contacts are
+	// current selection, scoped to the campaign the search is in the context of
+	// (the one shown in the dashboard search header). The panel opens immediately; the contacts are
 	// committed to that campaign's contact list in the background (the drafting engine only drafts
 	// for campaign members, so the panel's Draft button stays gated until they land). Keeps
 	// `selectedContacts` — they are the draft target.
@@ -5973,7 +6038,7 @@ const DashboardContent = () => {
 			return;
 		}
 
-		const contextCampaign = fromCampaign ?? activeCampaign;
+		const contextCampaign = dashboardSearchCampaign;
 		const contextUclId = contextCampaign?.userContactLists?.[0]?.id;
 		if (!contextCampaign || !contextUclId) {
 			toast.error('This search isn’t linked to a campaign yet — try again in a moment.');
@@ -6028,10 +6093,9 @@ const DashboardContent = () => {
 			toast.error('Failed to add contacts to campaign');
 		}
 	}, [
-		activeCampaign,
-		fromCampaign,
 		batchUpdateContacts,
 		contacts,
+		dashboardSearchCampaign,
 		derivedContactTitle,
 		editUserContactList,
 		queryClient,
@@ -6042,17 +6106,17 @@ const DashboardContent = () => {
 
 	const primaryCtaLabel = isAddToCampaignMode
 		? 'Add to Campaign'
-		: activeCampaignId
-			? `Add to ${activeCampaign?.name ?? 'Campaign'}`
+		: dashboardSearchCampaign
+			? `Add to ${dashboardSearchCampaign.name ?? 'Campaign'}`
 			: 'Create Campaign';
 	const primaryCtaPending = isAddToCampaignMode
 		? isPendingAddToCampaign || isPendingFromCampaign
-		: activeCampaignId
+		: dashboardSearchCampaign
 			? isPendingAddToCampaign || isPendingBatchUpdateContacts
 			: isPendingCreateCampaign || isPendingBatchUpdateContacts;
 	const handlePrimaryCta = isAddToCampaignMode
 		? handleAddSelectedToCampaign
-		: activeCampaignId
+		: dashboardSearchCampaign
 			? handleAddSelectedToActiveCampaign
 			: handleCreateCampaign;
 
@@ -6218,11 +6282,11 @@ const DashboardContent = () => {
 	const isSelectMapToolActive = activeMapTool === 'select';
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
-	const dashboardMapCampaignForHeader = fromCampaign ?? activeCampaign;
+	const dashboardMapCampaignForHeader = dashboardSearchCampaign;
 	// Switch the campaign IN the dashboard search context (folder dropdown pick)
 	// WITHOUT redirecting to the campaign detail page's "All" tab. The header box
-	// reads `fromCampaign ?? activeCampaign`, so we update whichever source is
-	// currently driving it:
+	// reads `dashboardSearchCampaign`, so we set a local override immediately and
+	// also update whichever persisted source is currently driving the page:
 	//  - add-to-campaign mode (?fromCampaignId=…): rewrite that URL param in place
 	//    so the header re-resolves to the picked folder while staying on /dashboard.
 	//  - normal search mode: persist the new active campaign id.
@@ -6231,6 +6295,7 @@ const DashboardContent = () => {
 	const handleSelectDashboardCampaign = useCallback(
 		(nextCampaignId: number) => {
 			if (!Number.isFinite(nextCampaignId)) return;
+			setDashboardSearchCampaignIdOverride(nextCampaignId);
 			setActiveCampaignId(nextCampaignId);
 			if (fromCampaignIdParam) {
 				const params = new URLSearchParams(searchParams.toString());
@@ -7224,6 +7289,8 @@ const DashboardContent = () => {
 			// not wherever the previous radius pin was dragged. If user location can't be
 			// resolved, fall through to the normal soft-locality path so the search still runs.
 			if (isRadiusModeEnabledRef.current) {
+				const pendingRadiusToken = (pendingRadiusSearchTokenRef.current += 1);
+				setIsPendingRadiusSearchOnMap(true);
 				const center = await resolveRadiusCenter({ allowViewportFallback: false });
 				if (center) {
 					setRadiusCenter(center);
@@ -7234,10 +7301,22 @@ const DashboardContent = () => {
 						strictRadius: true,
 						keywordMode,
 						...profileOverrides,
-					}).catch(() => undefined);
+					})
+						.catch(() => undefined)
+						.finally(() => {
+							if (pendingRadiusSearchTokenRef.current === pendingRadiusToken) {
+								setIsPendingRadiusSearchOnMap(false);
+							}
+						});
 					return;
 				}
+				if (pendingRadiusSearchTokenRef.current === pendingRadiusToken) {
+					setIsPendingRadiusSearchOnMap(false);
+				}
 			}
+
+			pendingRadiusSearchTokenRef.current += 1;
+			setIsPendingRadiusSearchOnMap(false);
 
 			if (keywordMode) {
 				triggerFreeTextSearch(q, { keywordMode: true }).catch(() => undefined);
@@ -9629,10 +9708,15 @@ const DashboardContent = () => {
 	// lands in the full search-results UI (right/left panels) with the URL updated, just like a
 	// normal search. The top search pill is staged empty (pendingForYouReveal) until those
 	// results load, then reveals "For You". Armed only in the locked-landing state, on desktop,
-	// with no scroll-hijacking panel open, and not during an instant tab transition.
+	// not during an instant tab transition, and with nothing that owns scrolling on top: the
+	// campaign finder (a full scroll-hijacking overlay) or a calendar event-popup floating over
+	// the hero. The calendar tab itself stays armed — its month-scroller stops its own wheels, so
+	// the gesture only fires over non-calendar areas (this is why we gate on isCampaignFinderOpen
+	// rather than isOverflowingDashboardPanelOpen, which the calendar also trips for overflow).
 	const scrollToMapEnabled =
 		shouldLockLandingDashboardScroll &&
-		!isOverflowingDashboardPanelOpen &&
+		!isCampaignFinderOpen &&
+		!isCalendarPopupOpen &&
 		!isInstantTabTransition &&
 		!isUnsubscribeFlowOpen;
 	const handleScrollCommitToMap = useCallback(() => {
@@ -10203,6 +10287,7 @@ const DashboardContent = () => {
 			// Drive circle-vs-blob from the active result set, not the bottom
 			// radius toggle. Toggling the icon off only affects the next search.
 			radiusOverlay: activeRadiusSearchOverlay,
+			suppressContextualContactOverlays: isPendingRadiusSearchOnMap,
 			onRadiusCenterChange: handleRadiusCenterChange,
 			// Venue-posted opportunity markers only on the interactive map, not the globe.
 			events: isMapView && mapGrabEventsActive ? eventsForMap : [],
@@ -10253,6 +10338,7 @@ const DashboardContent = () => {
 			isMapView,
 			isMobile,
 			isCompressedMapChrome,
+			isPendingRadiusSearchOnMap,
 			isRefetchingContacts,
 			isSearchPending,
 			lockedStateNameForMap,
@@ -10361,7 +10447,7 @@ const DashboardContent = () => {
 				<div className="w-full">
 					{mapPortal}
 					<MobileDashboardSearch
-						campaignName={fromCampaign?.name || 'Untitled Campaign'}
+						campaignName={dashboardSearchCampaign?.name || 'Untitled Campaign'}
 						headerContacts={dashboardMapHeaderContacts ?? []}
 						contactsCount={dashboardMapHeaderContactsCount}
 						draftCount={dashboardMapHeaderDraftCount}
@@ -10369,7 +10455,7 @@ const DashboardContent = () => {
 						newMessageCount={mobileSearchNewMessageCount}
 						onOpenCampaignSummary={(section) =>
 							router.push(
-								`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&summarySection=${section}${campaignReturnAddedSuffix()}`
+								`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&summarySection=${section}${campaignReturnAddedSuffix()}`
 							)
 						}
 						queryPillLabel={
@@ -14473,7 +14559,11 @@ const DashboardContent = () => {
 																	className="absolute pointer-events-none map-overlay-appear"
 																			style={{
 																				zIndex: 125,
-																				top: `calc(${MAP_VIEW_SIDE_PANEL_TOP_CSS} + ${isWriteReviewActive ? 84 : 36}px)`,
+																				top: `calc(${MAP_VIEW_SIDE_PANEL_TOP_CSS} + ${
+																					isWriteReviewActive || dashboardDraftingStatus.isDrafting
+																						? 84
+																						: 36
+																				}px)`,
 																				right: 10 + 433 * MAP_VIEW_PANEL_SCALE + 13,
 																			}}
 																>
@@ -15668,6 +15758,7 @@ const DashboardContent = () => {
 											mockState={calendarMockState}
 											persistEvents={isSignedIn === true}
 											showTodayReturnButton
+											onPopupOpenChange={setIsCalendarPopupOpen}
 										/>
 									)}
 									{selectedActionBarIcon === 'folder' && (

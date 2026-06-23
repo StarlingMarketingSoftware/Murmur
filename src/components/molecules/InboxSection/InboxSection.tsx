@@ -2152,7 +2152,17 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		setSelectedEmailId,
 	]);
 
-	if (isLoading || (error && visibleEmails.length === 0)) {
+	// The campaign page should never paint the legacy empty-state CTA panel. While
+	// data is still settling, this prevents the transient "Check Back Later" flash;
+	// once data is settled and truly empty, the layout effect above notifies the
+	// parent to leave the inbox tab, so this skeleton is just a safe pre-paint shell.
+	const shouldRenderCampaignInboxEmptySkeleton =
+		isCampaignInbox && visibleEmails.length === 0;
+	if (
+		isLoading ||
+		shouldRenderCampaignInboxEmptySkeleton ||
+		(error && visibleEmails.length === 0)
+	) {
 		// Campaign inbox detail design loads into the teal detail box (header pill +
 		// thread + composer), so mirror that layout instead of the list-style skeleton.
 		// A failed/timed-out load with nothing to show keeps the skeleton too (rather

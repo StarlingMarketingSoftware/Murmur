@@ -1,6 +1,7 @@
 'use client';
 
 import { type FC, useMemo } from 'react';
+import { X } from 'lucide-react';
 
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { stateBadgeColorMap } from '@/constants/ui';
@@ -34,6 +35,47 @@ const HEADER_HEIGHT_PX = 28;
 const STACK_STEP_PX = Math.round(19 * CARD_SCALE);
 const STACK_INSET_PX = Math.round(18 * CARD_SCALE);
 const MAX_BACK_CARDS = 4;
+
+export const LegacyInwardExpandIcon: FC<{ className?: string }> = ({ className }) => (
+	<svg
+		className={className}
+		width="14"
+		height="14"
+		viewBox="0 0 26 26"
+		fill="none"
+		xmlns="http://www.w3.org/2000/svg"
+		aria-hidden="true"
+	>
+		<path
+			d="M3 3L10 10M10 10H4M10 10V4"
+			stroke="currentColor"
+			strokeWidth="3"
+			strokeLinecap="square"
+			strokeLinejoin="miter"
+		/>
+		<path
+			d="M23 3L16 10M16 10H22M16 10V4"
+			stroke="currentColor"
+			strokeWidth="3"
+			strokeLinecap="square"
+			strokeLinejoin="miter"
+		/>
+		<path
+			d="M3 23L10 16M10 16H4M10 16V22"
+			stroke="currentColor"
+			strokeWidth="3"
+			strokeLinecap="square"
+			strokeLinejoin="miter"
+		/>
+		<path
+			d="M23 23L16 16M16 16H22M16 16V22"
+			stroke="currentColor"
+			strokeWidth="3"
+			strokeLinecap="square"
+			strokeLinejoin="miter"
+		/>
+	</svg>
+);
 
 const getContactDisplayName = (contact: ContactWithName | null | undefined) => {
 	if (!contact) return '';
@@ -275,7 +317,7 @@ const CompactDashboardDraftingCard: FC<{
 					<div
 						className="flex-1 overflow-hidden flex flex-col relative"
 						style={{
-							padding: '6px 4px 12px 4px',
+							padding: '6px 4px 4px 4px',
 							borderBottomLeftRadius: '5px',
 							borderBottomRightRadius: '5px',
 							backgroundColor: bodyColor,
@@ -319,8 +361,8 @@ const CompactDashboardDraftingCard: FC<{
 						<div
 							className="flex items-center font-inter font-normal text-[11px] text-black leading-none"
 							style={{
-								height: '22px',
-								marginTop: '8px',
+								height: '16px',
+								marginTop: '4px',
 								paddingLeft: '8px',
 								paddingRight: '8px',
 								pointerEvents: 'none',
@@ -352,9 +394,10 @@ export interface DashboardDraftingDeckProps {
 	total: number;
 	isCollapsed: boolean;
 	onCollapsedChange: (collapsed: boolean) => void;
-	onCancel: () => void;
 	onViewDrafts: () => void;
 	viewDraftsDisabled?: boolean;
+	/** Abort the in-progress batch drafting (wired to the hook's `cancelGeneration`). */
+	onCancel?: () => void;
 }
 
 export const DashboardDraftingDeck: FC<DashboardDraftingDeckProps> = ({
@@ -365,9 +408,9 @@ export const DashboardDraftingDeck: FC<DashboardDraftingDeckProps> = ({
 	total,
 	isCollapsed,
 	onCollapsedChange,
-	onCancel,
 	onViewDrafts,
 	viewDraftsDisabled = false,
+	onCancel,
 }) => {
 	const contactById = useMemo(() => {
 		const map = new Map<number, ContactWithName>();
@@ -404,13 +447,13 @@ export const DashboardDraftingDeck: FC<DashboardDraftingDeckProps> = ({
 			<div
 				className="flex flex-row items-center gap-[13px]"
 				style={{
-					width: DECK_WIDTH_PX,
+					width: CARD_WIDTH_PX,
 					height: HEADER_HEIGHT_PX,
 					borderRadius: 6,
 					background: '#B0CEFB',
 					paddingLeft: 4,
 					paddingRight: 8,
-					border: '2px solid #000000',
+					marginLeft: 'auto',
 				}}
 			>
 				<div
@@ -419,7 +462,7 @@ export const DashboardDraftingDeck: FC<DashboardDraftingDeckProps> = ({
 						width: 185,
 						height: 20,
 						borderRadius: 6,
-						background: '#9AC3FF',
+						background: '#88B4F7',
 						border: '1.5px solid #FFFFFF',
 					}}
 				>
@@ -428,27 +471,32 @@ export const DashboardDraftingDeck: FC<DashboardDraftingDeckProps> = ({
 				<div className="font-inter text-[13px] font-semibold text-black">
 					{inQueue} in Queue
 				</div>
-				<button
-					type="button"
-					onClick={onCancel}
-					className="ml-auto flex items-center gap-[5px] rounded-[6px] border-0 bg-white/35 px-[8px] py-[1px] font-inter text-[12px] font-medium text-black"
-					aria-label="Cancel drafting"
-				>
-					Cancel
-					<span aria-hidden="true" className="text-[16px] leading-none">
-						×
-					</span>
-				</button>
+				{onCancel && (
+					<button
+						type="button"
+						onClick={onCancel}
+						className="flex cursor-pointer items-center justify-center gap-[4px] border-0 font-inter text-[13px] font-medium leading-none text-black"
+						style={{
+							width: 86,
+							height: 16,
+							borderRadius: 7,
+							opacity: 0.4,
+							background: '#FCFEFF',
+						}}
+						aria-label="Cancel drafting"
+					>
+						Cancel
+						<X className="h-3 w-3" />
+					</button>
+				)}
 				<button
 					type="button"
 					onClick={() => onCollapsedChange(!isCollapsed)}
-					className="flex items-center justify-center border-0 bg-transparent p-0"
-					style={{ width: 22, height: 22 }}
+					className="ml-auto flex items-center justify-center border-0 bg-transparent p-0"
+					style={{ width: 18, height: 18 }}
 					aria-label={isCollapsed ? 'Expand drafting deck' : 'Collapse drafting deck'}
 				>
-					<span className="font-inter text-[24px] font-semibold leading-none text-black">
-						⤢
-					</span>
+					<LegacyInwardExpandIcon className="text-black" />
 				</button>
 			</div>
 
@@ -459,7 +507,7 @@ export const DashboardDraftingDeck: FC<DashboardDraftingDeckProps> = ({
 						style={{
 							width: CARD_WIDTH_PX,
 							height: stackPadPx + CARD_HEIGHT_PX,
-							marginTop: 34,
+							marginTop: 8,
 						}}
 					>
 						{Array.from({ length: backCardCount }, (_, index) => {
@@ -517,9 +565,10 @@ export const DashboardDraftingDeck: FC<DashboardDraftingDeckProps> = ({
 							disabled={viewDraftsDisabled}
 							className="font-inter text-black text-[14px] font-medium"
 							style={{
-								display: 'inline-flex',
-								width: 180,
-								height: 34,
+								display: 'flex',
+								width: 212,
+								height: 27.956,
+								padding: '3.589px 58.242px 3.367px 56.758px',
 								justifyContent: 'center',
 								alignItems: 'center',
 								borderRadius: '999px',

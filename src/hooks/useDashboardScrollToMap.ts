@@ -49,12 +49,15 @@ const SETTLE_MS = 220;
 const FOLLOW_TAU_MS = 70;
 const COMMIT_FINISH_MS = 760;
 const REDUCED_MOTION_TRIGGER_PX = 220;
-// Release-below-threshold snapback. This is a single deterministic, eased tween
-// (not the exponential follower) so the page chrome AND the globe camera return
-// to the hero in perfect lock-step over a known, slightly slow duration. The
-// follower's ~exponential convergence read as the chrome "snapping instantly"
-// while the globe lagged; a fixed eased tween makes both move together cleanly.
-const SNAPBACK_MS = 700;
+// Release-below-threshold return. A single deterministic, eased tween (not the
+// exponential follower) whose per-frame value drives BOTH the page chrome and the
+// globe camera through the same apply() path the live entry scrub uses — so the
+// tilt/zoom-out and the chrome fade are one synchronized motion, not two. (Earlier
+// this tweened only the chrome and handed the globe a separate native easeTo, which
+// resolved on its own clock and read as a second "tilt back" after the chrome had
+// already settled.) Kept deliberately slow — a quick return read as a jarring "fast
+// tilt back"; this is the single knob for the whole return's pace.
+const SNAPBACK_MS = 1400;
 
 // CSS "dolly" overlay scale at full peek. The real Mapbox camera now zooms in
 // lock-step with the scrub (4→5), so this compositor scale only needs to add a
@@ -203,8 +206,11 @@ export function useDashboardScrollToMap({
 			);
 		};
 
-		// Apply all scrub visuals as a pure function of progress p — fully reversible.
-		const apply = (p: number) => {
+		// Apply the page-chrome scrub visuals as a pure function of progress p — fully
+		// reversible, DOM-only (no Mapbox camera dispatch). Split out from `apply` so callers
+		// that want chrome without re-dispatching the camera (none currently) can, but both the
+		// entry and the release return go through `apply` so the globe stays in lock-step.
+		const applyChrome = (p: number) => {
 			setOpacityTransform(
 				heroWrapper,
 				1 - smoothstep(0, 0.85, p),
@@ -236,10 +242,17 @@ export function useDashboardScrollToMap({
 				`translateY(${ASK_BAR_TRANSLATE_PX * p}px)`
 			);
 			root.style.setProperty('--map-scrub-scale', `scale(${1 + MAP_DOLLY_MAX * p})`);
-			// Keep the real Mapbox camera in lock-step with the visual scrub (pitch,
-			// zoom, offset, and center). Without this, the UI arrives in map mode first
-			// and the camera then "fixes itself" afterward, which reads as a jarring
-			// secondary shift.
+		};
+
+		// Apply all scrub visuals as a pure function of progress p — fully reversible, and the
+		// ONLY way the camera is driven. Used by BOTH the live gesture follower (entry peek) and
+		// the release return tween (snapBack), so the real Mapbox camera stays in lock-step with
+		// the visual scrub per frame (pitch, zoom, offset, center) in both directions. Driving
+		// the camera per-frame off the same value as the chrome — rather than handing it a
+		// separate fixed-duration easeTo — is what prevents the UI and globe from resolving as
+		// two separate motions (the camera "fixing itself" / a secondary "tilt back" afterward).
+		const apply = (p: number) => {
+			applyChrome(p);
 			dispatchMapCameraScrub(p);
 		};
 
@@ -301,13 +314,16 @@ export function useDashboardScrollToMap({
 			followId = requestAnimationFrame(step);
 		};
 
-		// Reverse the scrub on release-below-threshold. Unlike the live follower (which
-		// converges exponentially and reads as an instant "snap"), this is a single
-		// deterministic eased tween over SNAPBACK_MS. Because every frame calls the same
-		// apply() — which moves the page chrome AND dispatches the camera-scrub progress —
-		// the hero elements and the globe camera glide home together, in lock-step, at the
-		// same eased rate. That synchronization + the slightly slower duration is exactly
-		// the "clean, together" snap-back the user asked for.
+		// Reverse the scrub on release-below-threshold as a single deterministic eased tween
+		// over SNAPBACK_MS. Crucially this drives BOTH the page chrome and the globe camera
+		// from the same per-frame value via `apply()` — exactly the path the live entry scrub
+		// uses (applyChrome + a per-frame duration:0 camera easeTo + triggerRepaint). Because
+		// chrome and camera are recomputed together every frame off one number, they return as
+		// ONE motion. (The earlier approach drove only the chrome here and handed the globe a
+		// separate one-shot Mapbox easeTo on its own clock/trajectory; the chrome would settle
+		// and the globe's pitch then resolved as a visibly separate second "tilt back". Reusing
+		// the live path — which already pumps triggerRepaint each frame — keeps the globe
+		// painting in lock-step with the chrome instead of catching up afterward.)
 		const snapBack = () => {
 			// Stop the live follower so it can't also paint and fight the tween.
 			cancelFollower();
@@ -318,6 +334,9 @@ export function useDashboardScrollToMap({
 				accumPx = 0;
 				crossedCommit = false;
 				cancelTween();
+				// Nudge the camera home (no-op if it never moved) so its decorative zoom lock
+				// and spin are restored, then release the chrome to the CSS layer.
+				dispatchMapCameraScrub(0);
 				clearInlineStyles();
 				return;
 			}
@@ -327,12 +346,16 @@ export function useDashboardScrollToMap({
 				SNAPBACK_MS,
 				(e) => {
 					renderProgress = from * (1 - e);
+					// One value → chrome AND globe camera, every frame, same as the live scrub.
 					apply(renderProgress);
 				},
 				() => {
 					renderProgress = 0;
 					accumPx = 0;
 					crossedCommit = false;
+					// Final p=0 frame: the camera receiver lands on the decorative pose, restores
+					// its zoom lock and re-kicks the background spin (idempotent if already done).
+					apply(0);
 					clearInlineStyles();
 				},
 				easeInOutCubic
@@ -445,10 +468,20 @@ export function useDashboardScrollToMap({
 			);
 		};
 
+		// Keep the entire dashboard calendar box inert to the scrub. Its inner month-
+		// scroller already stops propagation, but the 4px frame and the floating "Today"
+		// button sit outside that — without this they'd start the scrub. We return *before*
+		// preventDefault so the page-level wheel lock (DashboardPageClient) still cancels
+		// native scroll there. (Generic enough to grow into an `ignoreWithinSelector` prop
+		// if other scroll-inert hero islands ever appear.)
+		const isOverCalendarPanel = (target: EventTarget | null) =>
+			!!(target as Element | null)?.closest?.('[data-dashboard-calendar-panel="true"]');
+
 		const onWheel = (e: WheelEvent) => {
 			if (committedRef.current) return;
 			// Don't yank the user to the map while they're typing in the search field.
 			if (targetProgress === 0 && isTypingTarget()) return;
+			if (isOverCalendarPanel(e.target)) return;
 			e.preventDefault();
 			onDelta(normalizeWheel(e));
 		};
@@ -463,6 +496,7 @@ export function useDashboardScrollToMap({
 			const delta = touchY - y; // drag up (finger moves up) = scroll down = positive
 			touchY = y;
 			if (targetProgress === 0 && isTypingTarget()) return;
+			if (isOverCalendarPanel(e.target)) return;
 			e.preventDefault();
 			onDelta(delta);
 		};

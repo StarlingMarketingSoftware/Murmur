@@ -2033,7 +2033,39 @@ export const useCampaignsTable = (options?: {
 		() => (mockState ? buildMockCampaignRows(mockState) : null),
 		[mockState]
 	);
-	const baseData = (mockData ?? realData) as CampaignWithCounts[] | undefined;
+	const baseDataRaw = (mockData ?? realData) as CampaignWithCounts[] | undefined;
+
+	// The campaigns list query doesn't poll and its DB-derived `newEmailCount`
+	// (real InboundEmail rows) misses venue→artist messages, which are projected
+	// into the inbound feed only at read time. The inbound feed DOES poll, so top
+	// each campaign's "New" count up from the live feed: this both refreshes the
+	// count as replies arrive (without a manual reload) and includes the projected
+	// venue messages the DB count can't see. Mock mode keeps its scripted counts.
+	const { data: liveInboundEmails } = useGetInboundEmails({ enabled: !isMockActive });
+	const liveNewCountByCampaign = useMemo(() => {
+		const counts = new Map<number, number>();
+		for (const email of liveInboundEmails ?? []) {
+			const id =
+				(email.campaign as { id?: number } | null | undefined)?.id ??
+				(email.campaignId ?? undefined);
+			if (typeof id !== 'number') continue;
+			counts.set(id, (counts.get(id) ?? 0) + 1);
+		}
+		return counts;
+	}, [liveInboundEmails]);
+	const baseData = useMemo(() => {
+		if (!baseDataRaw) return baseDataRaw;
+		if (isMockActive || liveNewCountByCampaign.size === 0) return baseDataRaw;
+		return baseDataRaw.map((campaign) => {
+			const live = liveNewCountByCampaign.get(campaign.id);
+			if (live == null) return campaign;
+			// Prefer the live feed count when it's at least the persisted count so a
+			// freshly-arrived reply bumps the badge immediately; never shrink below the
+			// DB count (which may include rows scoped out of the current feed fetch).
+			const persisted = campaign.newEmailCount ?? 0;
+			return { ...campaign, newEmailCount: Math.max(persisted, live) };
+		});
+	}, [baseDataRaw, isMockActive, liveNewCountByCampaign]);
 
 	// Soft-deleted campaigns drive the ARCHIVE folder. Fetched separately so the
 	// active-list query (useGetCampaigns) keeps its shape for its many callers.
@@ -3493,19 +3525,23 @@ export const useCampaignsTable = (options?: {
 									setIsArchiveExpanded((prev) => !prev);
 								}}
 							/>
-							<CampaignRowChevronIcon
-								className={cn(
-									'campaign-row-chevron pointer-events-none absolute left-[-19px] top-1/2 h-[14px] w-[14px] -translate-y-1/2',
-									'text-black',
-									isArchiveExpanded && 'campaign-row-chevron-open'
-								)}
-							/>
 							<div
 								className="inline-flex items-center box-border flex-none"
-								style={{ height: 20, paddingLeft: 7 }}
+								style={{ height: 20, paddingLeft: 0 }}
 							>
+								{/* Inline (not absolutely-positioned) so the chevron stays inside
+								    the table's clipping viewport when the archive is expanded —
+								    a `left:-19px` absolute chevron gets cut off by the left wall
+								    once the table switches to its scrolling layout. */}
+								<CampaignRowChevronIcon
+									className={cn(
+										'campaign-archive-chevron pointer-events-none flex-none h-[14px] w-[14px]',
+										'text-black',
+										isArchiveExpanded && 'campaign-archive-chevron-open'
+									)}
+								/>
 								<span
-									className="inline-flex items-center justify-center flex-none"
+									className="ml-[4px] inline-flex items-center justify-center flex-none"
 									style={{ color: ARCHIVE_ROW_ICON_COLOR }}
 								>
 									<DashboardActionBarFolderIcon width={16} height={10} />
@@ -3539,7 +3575,7 @@ export const useCampaignsTable = (options?: {
 								style={{ display: 'none' }}
 							/>
 							<div
-								className="inline-flex items-center box-border flex-none"
+								className="campaign-archive-name-row inline-flex items-center box-border"
 								style={{ height: 20, paddingLeft: 18 }}
 							>
 								<span
@@ -3549,12 +3585,12 @@ export const useCampaignsTable = (options?: {
 									<DashboardActionBarFolderIcon width={16} height={10} />
 								</span>
 								<span
-									className="ml-[7px] truncate text-[13.854px] leading-[15px] font-inter font-medium"
+									className="campaign-archive-name ml-[7px] text-[13.854px] leading-[15px] font-inter font-medium"
 									style={{ color: ARCHIVE_ROW_NAME_COLOR }}
 								>
 									{original.name}
 								</span>
-								<span className="ml-[10px] inline-flex items-center">
+								<span className="ml-[10px] inline-flex flex-none items-center">
 									<CampaignDataTypeIconStrip
 										dataTypes={original.campaignDataTypes ?? []}
 										isConfirming={false}
@@ -3675,7 +3711,7 @@ export const useCampaignsTable = (options?: {
 									</span>
 									<span
 										className={cn(
-											'ml-[7px] truncate text-[13.854px] leading-[15px] font-inter font-medium',
+											'campaign-folder-name-text ml-[7px] truncate text-[13.854px] leading-[15px] font-inter font-medium',
 											'text-black'
 										)}
 									>

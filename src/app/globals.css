@@ -5122,6 +5122,66 @@ main {
 	background-color: transparent !important;
 }
 
+.my-campaigns-table .campaign-folder-name-content {
+	width: 100%;
+	overflow: hidden;
+}
+
+/* Long campaign / archive names: cut off and fade out instead of overflowing into
+   the adjacent metric columns (most visible in the expanded ARCHIVE folder). The
+   fade is applied at the right edge of a fixed-width/flexed text area, so short names
+   are not faded. */
+.my-campaigns-table .campaign-folder-name-text {
+	display: block;
+	min-width: 0;
+	flex: 1 1 auto;
+	overflow: hidden;
+	white-space: nowrap;
+	/* Drop the truncate ellipsis in favor of a gradient fade. */
+	text-overflow: clip;
+	-webkit-mask-image: linear-gradient(
+		90deg,
+		#000 0%,
+		#000 calc(100% - 14px),
+		transparent 100%
+	);
+	mask-image: linear-gradient(
+		90deg,
+		#000 0%,
+		#000 calc(100% - 14px),
+		transparent 100%
+	);
+}
+
+.my-campaigns-table .campaign-archive-name-row {
+	width: 100%;
+	min-width: 0;
+	max-width: 315px;
+	overflow: hidden;
+}
+
+.my-campaigns-table .campaign-archive-name {
+	display: block;
+	min-width: 0;
+	flex: 1 1 auto;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: clip;
+	vertical-align: middle;
+	-webkit-mask-image: linear-gradient(
+		90deg,
+		#000 0%,
+		#000 calc(100% - 16px),
+		transparent 100%
+	);
+	mask-image: linear-gradient(
+		90deg,
+		#000 0%,
+		#000 calc(100% - 16px),
+		transparent 100%
+	);
+}
+
 /* Drafts sort indicators (Campaigns table)
    - Mode `desc`: underline is anchored to the bottom of the table container
    - Mode `asc`: underline sits just below the header row (beneath the yellow highlight)
@@ -7920,6 +7980,51 @@ body.murmur-mobile .search-input-icon-btn {
 
 .my-campaigns-table:not(.mobile-table-no-scroll) .campaign-row-chevron-open {
 	transform: translateY(calc(-50% + 1.5px)) rotate(90deg) !important;
+}
+
+/* ARCHIVE disclosure chevron: rendered inline (in the row's normal flow) rather than
+   absolutely positioned in the left gutter, so it can't be clipped by the table's
+   horizontal-overflow clip once the archive expands and the table starts scrolling. */
+.my-campaigns-table:not(.mobile-table-no-scroll) .campaign-archive-chevron {
+	transform: rotate(0deg);
+	transition: none !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) .campaign-archive-chevron-open {
+	transform: rotate(90deg) !important;
+}
+
+/* ARCHIVE section: mute the column-separator "ticks" and the data-type icon badges so
+   they recede into the grayed archive band instead of reading at full strength. Driven
+   by the invisible .archive-*-row-marker spans already rendered into each archive row. */
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.archive-folder-row-marker)
+	.campaign-metric-slot:not(:last-child)::after,
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.archive-campaign-row-marker)
+	.campaign-metric-slot:not(:last-child)::after,
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.archive-folder-row-marker)
+	.campaign-metric-slot:first-child:has(.metric-box[data-draft-fill])::before,
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.archive-campaign-row-marker)
+	.campaign-metric-slot:first-child:has(.metric-box[data-draft-fill])::before {
+	opacity: 0.25;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.archive-folder-row-marker)
+	.folder-icon-strip,
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.archive-campaign-row-marker)
+	.folder-icon-strip {
+	opacity: 0.4;
 }
 
 .my-campaigns-table:not(.mobile-table-no-scroll)

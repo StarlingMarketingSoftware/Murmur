@@ -1,6 +1,14 @@
 'use client';
 
-import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+	type FC,
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -155,7 +163,10 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 		d.writeReviewBatchContactIds.size > 0 &&
 		(writeReviewPreviewComplete || (forceReviewOpen && batchDrafts.length > 0));
 
-	useEffect(() => {
+	// Pre-paint: the parent shifts the write-overlay slot down (+36 → +84) when the review opens.
+	// Commit it in a layout effect so the review's first painted frame is already at the settled
+	// position (mirrors the drafting-status sync below) — no form→review jump.
+	useLayoutEffect(() => {
 		onReviewActiveChange?.(isReviewActive);
 	}, [isReviewActive, onReviewActiveChange]);
 
@@ -297,20 +308,36 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 
 	const draftingTotal = d.livePreviewTotal || targetContactIds.length;
 
-	useEffect(() => {
-		onDraftingStatusChange?.({
+	const draftingStatus = useMemo<DashboardDraftingStatus>(
+		() => ({
 			isDrafting: d.isLivePreviewVisible,
 			activeContactId: d.livePreviewContactId ?? null,
 			completedContactIds: completedDraftingContactIds,
 			total: draftingTotal,
-		});
-	}, [
-		completedDraftingContactIds,
-		d.isLivePreviewVisible,
-		d.livePreviewContactId,
-		draftingTotal,
-		onDraftingStatusChange,
-	]);
+		}),
+		[
+			completedDraftingContactIds,
+			d.isLivePreviewVisible,
+			d.livePreviewContactId,
+			draftingTotal,
+		]
+	);
+
+	// Position-critical: the parent shifts the write-overlay slot down (+36 → +84) while drafting.
+	// Push the drafting boolean BEFORE the browser paints so the deck's first painted frame is
+	// already at the settled position — no initial flicker/jump. Gated on the start/stop
+	// transition only (not per-contact detail) to avoid synchronous pre-paint re-renders of the
+	// large DashboardPageClient during streaming.
+	useLayoutEffect(() => {
+		onDraftingStatusChange?.(draftingStatus);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [d.isLivePreviewVisible, onDraftingStatusChange]);
+
+	// Per-contact detail (active/completed/total) for the Selection-panel row states — fine to
+	// land post-paint, so the streaming updates don't block the paint.
+	useEffect(() => {
+		onDraftingStatusChange?.(draftingStatus);
+	}, [draftingStatus, onDraftingStatusChange]);
 
 	useEffect(() => {
 		return () => {
@@ -322,11 +349,6 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 			});
 		};
 	}, [onDraftingStatusChange]);
-
-	const handleCancelDrafting = useCallback(() => {
-		setForceReviewOpen(false);
-		d.cancelGeneration();
-	}, [d]);
 
 	const handleViewDrafts = useCallback(() => {
 		if (batchDrafts.length === 0) return;
@@ -344,6 +366,16 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 		}
 		setForceReviewOpen(false);
 		d.clearWriteReviewBatch();
+	}, [d]);
+
+	// Cancel mid-draft: abort generation AND drop the review batch so the overlay falls back to
+	// the HybridPrompt form (not the partial-draft review). Drafts already finished stay saved in
+	// the campaign — clearWriteReviewBatch only resets the in-memory batch set.
+	const handleCancelDrafting = useCallback(() => {
+		d.cancelGeneration();
+		d.clearWriteReviewBatch();
+		setForceReviewOpen(false);
+		setWriteReviewPreviewComplete(false);
 	}, [d]);
 
 	return (
@@ -402,9 +434,9 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 					total={draftingTotal}
 					isCollapsed={isDraftingDeckCollapsed}
 					onCollapsedChange={onDraftingDeckCollapsedChange ?? (() => undefined)}
-					onCancel={handleCancelDrafting}
 					onViewDrafts={handleViewDrafts}
 					viewDraftsDisabled={batchDrafts.length === 0}
+					onCancel={handleCancelDrafting}
 				/>
 			) : (
 				<Form {...d.form}>
