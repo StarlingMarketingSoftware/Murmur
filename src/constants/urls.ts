@@ -98,6 +98,7 @@ export const urls = {
 		campaigns: {
 			index: '/api/campaigns',
 			detail: ((id) => `/api/campaigns/${id}`) as DetailRoute,
+			merge: ((id) => `/api/campaigns/${id}/merge`) as DetailRoute,
 			contactEvents: {
 				index: ((id) => `/api/campaigns/${id}/contact-events`) as DetailRoute,
 			},
@@ -274,6 +275,8 @@ export const urls = {
 			index: '/api/events',
 			applications: ((id) => `/api/events/${id}/applications`) as DetailRoute,
 			myApplications: '/api/events/applications',
+			applicationCampaignHome: ((id) =>
+				`/api/events/applications/${id}/campaign-home`) as DetailRoute,
 		},
 		// Batch reachability/framability classifier — used to preemptively mark a contact's
 		// website as un-previewable (dead) and disable its Website button.

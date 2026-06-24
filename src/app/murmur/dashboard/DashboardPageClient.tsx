@@ -146,6 +146,7 @@ import { CITY_LOCATIONS_LIST } from '@/constants/cityLocations';
 import SearchResultsMap, {
 	DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING,
 	DASHBOARD_TO_INTERACTIVE_TRANSITION_MS,
+	type DashboardDraftingMapContactStatus,
 	type SearchResultsMapProps,
 } from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import { MAP_MIN_ZOOM } from '@/components/molecules/SearchResultsMap/constants';
@@ -166,6 +167,7 @@ import type {
 import {
 	type PersistentDashboardMapConfig,
 	usePersistentMapFirstPaint,
+	usePersistentMapReady,
 	usePersistentMapSetter,
 } from '@/contexts/PersistentMapContext';
 import { useWebsitePreview } from '@/contexts/WebsitePreviewContext';
@@ -264,6 +266,92 @@ import {
 	useSendQueue,
 } from '@/hooks/queryHooks/useSendQueue';
 
+// Horizontally-scrollable row with edge fades but NO visible scrollbar.
+// The fades are dynamic: the left edge only fades once the content has been
+// scrolled off the left, and the right edge stops fading once the end is
+// reached. Native trackpad/touch horizontal scrolling works as-is, and a wheel
+// handler translates predominantly-vertical mouse-wheel deltas into horizontal
+// scroll so mouse users can scroll the row too.
+const HorizontalFadeScroller = ({
+	className,
+	style,
+	contentClassName,
+	fadeWidth = 40,
+	children,
+}: {
+	className?: string;
+	style?: React.CSSProperties;
+	contentClassName?: string;
+	fadeWidth?: number;
+	children: ReactNode;
+}) => {
+	const scrollRef = useRef<HTMLDivElement>(null);
+	const [fade, setFade] = useState({ left: false, right: false });
+
+	const updateFades = useCallback(() => {
+		const el = scrollRef.current;
+		if (!el) return;
+		const maxScroll = el.scrollWidth - el.clientWidth;
+		const left = el.scrollLeft > 1;
+		const right = el.scrollLeft < maxScroll - 1;
+		setFade((prev) =>
+			prev.left === left && prev.right === right ? prev : { left, right }
+		);
+	}, []);
+
+	useLayoutEffect(() => {
+		updateFades();
+	}, [updateFades, children]);
+
+	useEffect(() => {
+		const el = scrollRef.current;
+		if (!el) return;
+		updateFades();
+		const handleWheel = (event: WheelEvent) => {
+			const maxScroll = el.scrollWidth - el.clientWidth;
+			if (maxScroll <= 0) return;
+			const delta =
+				Math.abs(event.deltaY) > Math.abs(event.deltaX)
+					? event.deltaY
+					: event.deltaX;
+			if (delta === 0) return;
+			const atStart = el.scrollLeft <= 0;
+			const atEnd = el.scrollLeft >= maxScroll;
+			// Let the page scroll naturally when we're already at an edge.
+			if ((delta < 0 && atStart) || (delta > 0 && atEnd)) return;
+			event.preventDefault();
+			el.scrollLeft += delta;
+			updateFades();
+		};
+		el.addEventListener('wheel', handleWheel, { passive: false });
+		const resizeObserver = new ResizeObserver(() => updateFades());
+		resizeObserver.observe(el);
+		return () => {
+			el.removeEventListener('wheel', handleWheel);
+			resizeObserver.disconnect();
+		};
+	}, [updateFades]);
+
+	const leftStop = fade.left ? 'transparent 0' : 'black 0';
+	const rightStop = fade.right ? 'transparent 100%' : 'black 100%';
+	const mask = `linear-gradient(to right, ${leftStop}, black ${fadeWidth}px, black calc(100% - ${fadeWidth}px), ${rightStop})`;
+
+	return (
+		<div
+			ref={scrollRef}
+			className={`scrollbar-hide overflow-x-auto overflow-y-hidden ${className ?? ''}`}
+			onScroll={updateFades}
+			style={{
+				maskImage: mask,
+				WebkitMaskImage: mask,
+				...style,
+			}}
+		>
+			<div className={contentClassName}>{children}</div>
+		</div>
+	);
+};
+
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
 		label: 'New York',
@@ -295,6 +383,18 @@ const isCuratedPicksSearchQuery = (query: string): boolean =>
 	/^curated picks near\b/i.test(query.trim());
 
 const DEFAULT_CATEGORY_SEARCH_WHAT = 'Wine, Beer, and Spirits';
+
+// ── Curated "For You" search-results skin ─────────────────────────────────────
+// Only the curated ("For You") search type gets a special results-box treatment:
+// the header band ("top part") and the rows container ("body area") swap their
+// flat fills for these linear gradients. Every other search type keeps the
+// existing flat fills, and all sizing/borders stay identical — only the
+// background changes. These two constants are the single source of truth, so
+// the exact Figma gradient CSS can be pasted here verbatim.
+const FOR_YOU_RESULTS_HEADER_GRADIENT =
+	'linear-gradient(90deg, #A0E6B5 0%, #E78FBE 55%, #EF7D7D 100%)';
+const FOR_YOU_RESULTS_BODY_GRADIENT =
+	'linear-gradient(180deg, #D8C6E3 0%, #E9CCDC 48%, #F0C7C7 100%)';
 
 const CURATED_URL_PARAM_KEYS = ['pick', 'area', 'state', 'cat', 'lat', 'lon', 'r'] as const;
 // Distinct from CURATED_URL_PARAM_KEYS so a refresh from a free-text run can't be mistaken
@@ -559,8 +659,8 @@ const clampNumber = (n: number, min: number, max: number): number => {
 	return Math.min(max, Math.max(min, n));
 };
 
-// Rounded white pill that houses the "X/Y selected" count on the Selection
-// sub-panel header. The trailing X clears the current selection (deselect all).
+// Hover-revealed white pill around the "X/Y selected" count on the Selection
+// sub-panel header. The count text remains visible; the backing + X reveal on hover.
 const SelectionCountPill = ({
 	label,
 	onClear,
@@ -621,10 +721,9 @@ const SelectionCountPill = ({
 			)}
 			<span
 				aria-hidden="true"
-				className="pointer-events-none absolute inset-0"
+				className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-150 group-hover:opacity-70 group-focus-within:opacity-70"
 				style={{
 					borderRadius: '9px',
-					opacity: 0.7,
 					background: '#FFF',
 				}}
 			/>
@@ -640,8 +739,10 @@ const SelectionCountPill = ({
 					onClear();
 				}}
 				disabled={disabled}
-				className={`relative z-10 flex h-[18px] w-[18px] translate-x-[5px] flex-shrink-0 items-center justify-center border-0 bg-transparent p-0 leading-none ${
-					disabled ? 'cursor-default opacity-40' : 'cursor-pointer'
+				className={`relative z-10 flex h-[18px] w-[18px] translate-x-[5px] flex-shrink-0 items-center justify-center border-0 bg-transparent p-0 leading-none opacity-0 transition-opacity duration-150 ${
+					disabled
+						? 'cursor-default group-hover:opacity-40 group-focus-within:opacity-40'
+						: 'cursor-pointer group-hover:opacity-100 group-focus-within:opacity-100'
 				}`}
 			>
 				<SelectionCountClearIcon />
@@ -728,8 +829,8 @@ const MAP_CHROME_COMPRESSED_MAX_LAYOUT_WIDTH_PX = 1080;
 
 // Cinematic boot splash over the cold-loading map: minimum on-screen time, fade-out
 // duration, and a safety cap that dismisses the splash even if Mapbox errors or never
-// loads. The minimum is 0 by explicit choice: the fade starts the moment the globe's
-// land silhouette has painted (the 800ms fade itself keeps the reveal cinematic).
+// loads. The desktop reveal waits for the persistent map's full readiness signal,
+// then the loading chrome fades away without animating the SVG/logo morph.
 const DASHBOARD_BOOT_MIN_VISIBLE_MS = 0;
 const DASHBOARD_BOOT_FADE_MS = 800;
 const DASHBOARD_BOOT_MAX_WAIT_MS = 10000;
@@ -8833,6 +8934,11 @@ const DashboardContent = () => {
 			: isWeddingPlannersSearch;
 	const shouldShowMapResultsSidePanel =
 		!hasNoSearchResults || displayedMapPanelContacts.length > 0;
+	// "For You" is the curated search type: results came from the curated engine
+	// (lastCuratedArgs set), not the free-text/category path (lastFreeTextArgs).
+	// Only this type gets the gradient results-box skin; everything else keeps
+	// the existing flat fills.
+	const isForYouCuratedSearch = isCuratedSearchActive && lastCuratedArgs != null;
 	// Mid chrome state only matters while the right panel actually occupies the right
 	// edge — with no panel there is nothing to re-center away from.
 	const isMidMapChrome =
@@ -8939,6 +9045,33 @@ const DashboardContent = () => {
 		});
 		return order;
 	}, [dashboardDraftingStatus.completedContactIds]);
+	const dashboardDraftingMapStatusByContactId = useMemo<
+		ReadonlyMap<number, DashboardDraftingMapContactStatus> | undefined
+	>(() => {
+		if (!isWriteMode || selectedContacts.length === 0) return undefined;
+		const statuses = new Map<number, DashboardDraftingMapContactStatus>();
+		const activeId = dashboardDraftingStatus.isDrafting
+			? dashboardDraftingStatus.activeContactId
+			: null;
+		for (const id of selectedContacts) {
+			if (dashboardDraftingCompletedContactIdSet.has(id)) {
+				statuses.set(id, 'drafted');
+				continue;
+			}
+			if (activeId != null && id === activeId) {
+				statuses.set(id, 'drafting');
+				continue;
+			}
+			statuses.set(id, 'queued');
+		}
+		return statuses;
+	}, [
+		dashboardDraftingCompletedContactIdSet,
+		dashboardDraftingStatus.activeContactId,
+		dashboardDraftingStatus.isDrafting,
+		isWriteMode,
+		selectedContacts,
+	]);
 
 	const mapPanelSelectedContacts = useMemo(
 		() => {
@@ -9464,28 +9597,27 @@ const DashboardContent = () => {
 		!hasSearched && activeTab === 'search' && selectedActionBarIcon === 'calendar';
 	const isOverflowingDashboardPanelOpen = isCampaignFinderOpen || isCalendarPanelOpen;
 
-	// Cinematic boot splash: a dark starfield + skeleton hero chrome shown over the
-	// cold-loading map, fading into the globe once the land silhouette has painted
-	// (the map's first-paint stage — earlier than the full `load`, so street detail
-	// streams in behind the fade). Lazy init from the layout-persistent flag so
-	// client-side route returns (dashboard → campaign → dashboard, map still
-	// mounted/painted) skip the splash entirely.
+	// Cinematic boot splash: dark starfield + skeleton hero chrome while the map
+	// cold-loads. Desktop waits for Mapbox's full `load` readiness signal before
+	// fading out, so the reveal does not happen over half-loaded map detail. The
+	// mobile progress pill still keys off the earlier first-paint signal below.
 	const isPersistentMapFirstPainted = usePersistentMapFirstPaint();
+	const isPersistentMapReady = usePersistentMapReady();
 	const [bootPhase, setBootPhase] = useState<DashboardBootPhase>(() =>
-		isPersistentMapFirstPainted ? 'done' : 'active'
+		isPersistentMapReady ? 'done' : 'active'
 	);
 	const bootStartRef = useRef(Date.now());
 
-	// Land painted → hold until the minimum splash time has elapsed, then start the fade.
+	// Full map load → hold until the minimum cover time has elapsed, then fade in.
 	useEffect(() => {
-		if (bootPhase !== 'active' || !isPersistentMapFirstPainted) return;
+		if (bootPhase !== 'active' || !isPersistentMapReady) return;
 		const elapsed = Date.now() - bootStartRef.current;
 		const timer = setTimeout(
 			() => setBootPhase('fading'),
 			Math.max(0, DASHBOARD_BOOT_MIN_VISIBLE_MS - elapsed)
 		);
 		return () => clearTimeout(timer);
-	}, [bootPhase, isPersistentMapFirstPainted]);
+	}, [bootPhase, isPersistentMapReady]);
 
 	useEffect(() => {
 		if (bootPhase !== 'fading') return;
@@ -9494,8 +9626,8 @@ const DashboardContent = () => {
 		return () => clearTimeout(timer);
 	}, [bootPhase]);
 
-	// Safety cap: never hold the splash past the max wait (map error / blocked tiles);
-	// what's revealed underneath is the map's own dark loading mask — same as today.
+	// Safety cap: never hold the cover past the max wait (map error / blocked tiles);
+	// reveal anyway rather than leaving the dashboard hidden forever.
 	useEffect(() => {
 		if (bootPhase !== 'active') return;
 		const elapsed = Date.now() - bootStartRef.current;
@@ -9507,9 +9639,7 @@ const DashboardContent = () => {
 	}, [bootPhase]);
 
 	// Abort instantly anywhere off the clean desktop landing (mobile tree, deep-linked
-	// search/map-view/?fromHome, or a search/scroll-to-map commit mid-splash): the
-	// skeleton chrome only exists on the locked landing hero, and once the map jumps
-	// to its interactive z-index the splash must not linger underneath.
+	// search/map-view/?fromHome, or a search/scroll-to-map commit mid-load).
 	useEffect(() => {
 		if (bootPhase === 'done') return;
 		if (isMobile === true || (isMobile === false && !shouldLockLandingDashboardScroll)) {
@@ -9517,9 +9647,9 @@ const DashboardContent = () => {
 		}
 	}, [bootPhase, isMobile, shouldLockLandingDashboardScroll]);
 
-	// Body classes drive the boot chrome skin (globals.css "dashboard cinematic boot"
-	// block). Classes rather than prop-threading because the skinned elements span the
-	// hero and the ask-anything bar, which lives outside the scroll-lock wrapper.
+	// Body classes drive the boot chrome skin/fade. Classes rather than prop-threading
+	// because the skinned elements span the hero and the ask-anything bar, which
+	// lives outside the scroll-lock wrapper.
 	useLayoutEffect(() => {
 		const body = document.body;
 		body.classList.toggle(
@@ -10749,6 +10879,9 @@ const DashboardContent = () => {
 			searchQuery: shouldShowSearchGeometryOnMap ? activeSearchQuery : '',
 			searchWhat: shouldShowSearchGeometryOnMap ? searchWhatForMap : null,
 			searchEngaged: shouldShowSearchGeometryOnMap,
+			dashboardDraftingContactStatusById: isMapView
+				? dashboardDraftingMapStatusByContactId
+				: undefined,
 			campaignFootprintContacts: shouldLoadDashboardMapCampaignFootprint
 				? (dashboardMapCampaignFootprintContacts ?? [])
 				: [],
@@ -10819,6 +10952,7 @@ const DashboardContent = () => {
 			compressedMapChromePadding,
 			contactsForMap,
 			dashboardMapCampaignFootprintContacts,
+			dashboardDraftingMapStatusByContactId,
 			handleRadiusCenterChange,
 			globeNightLighting,
 			globeWeatherMood,
@@ -11964,7 +12098,7 @@ const DashboardContent = () => {
 				<DashboardBootBackdrop fading={bootPhase === 'fading'} />
 			)}
 			{/* Loading-progress % below the hero logo. Keyed to the splash lifecycle
-			    (bootPhase leaves 'active' on land-ready OR the safety cap), so it snaps
+			    (bootPhase leaves 'active' on map-ready OR the safety cap), so it snaps
 			    to 100% and fades out in lockstep with the starfield. */}
 			<DashboardBootProgress
 				enabled={shouldLockLandingDashboardScroll}
@@ -13296,6 +13430,9 @@ const DashboardContent = () => {
 									isCuratedTopSearch && isSearchDeselectedByUser;
 								const isCuratedSearchDeselectedHovered =
 									isCuratedSearchDeselected && isDisengagedSearchHovered;
+								const showCuratedDisengagedActivateOverlay =
+									isCuratedSearchDeselectedHovered &&
+									isMapTopSearchReengageAvailable;
 								// When the user exits the focused search via the bar X, the bar drops
 								// to a plain white pill showing the prior query grayed out.
 								const showExitSearchButton =
@@ -13408,11 +13545,7 @@ const DashboardContent = () => {
 																}}
 															>
 																<div
-																	className={`absolute left-[6px] top-1/2 -translate-y-1/2 flex items-center rounded-[6px] z-10 overflow-hidden border border-black ${
-																		showCuratedPill
-																			? 'search-gradient-button'
-																			: ''
-																	}`}
+																	className="absolute left-[6px] top-1/2 z-10 flex -translate-y-1/2 items-center overflow-hidden rounded-[6px] border border-black"
 																	style={{
 																		width: 'calc(100% - 12px)',
 																		height: '38px',
@@ -13422,30 +13555,54 @@ const DashboardContent = () => {
 																				: showDisengagedActivate
 																					? 'linear-gradient(90deg, #ADFFC2 0%, #EFFFF3 100%)'
 																					: '#FFFFFF',
-																		filter:
-																			isCuratedSearchDeselected &&
-																			!isCuratedSearchDeselectedHovered
-																				? 'grayscale(0.85) saturate(0.55)'
-																				: undefined,
-																		opacity:
-																			isCuratedSearchDeselected &&
-																			!isCuratedSearchDeselectedHovered
-																				? 0.68
-																				: undefined,
-																		transition:
-																			isCuratedSearchDeselected
-																				? 'opacity 150ms ease, filter 150ms ease'
-																				: undefined,
 																	}}
 																>
-																	{showCuratedPill ? (
+																	{showCuratedPill && (
 																		<div
-																			className={`flex h-full w-full items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-white ${
-																				showExitSearchButton ? 'pr-[40px]' : ''
+																			aria-hidden="true"
+																			className={`search-gradient-button absolute inset-0 z-0 ${
+																				isCuratedSearchDeselected
+																					? 'for-you-curated-search-gradient--grayscale'
+																					: ''
 																			}`}
-																		>
-																			{mapTopSearchDisplay.label}
-																		</div>
+																			style={{ transition: 'filter 150ms ease' }}
+																		/>
+																	)}
+																	{showCuratedPill ? (
+																		<>
+																			<div
+																				className={`relative z-10 flex h-full w-full items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-white ${
+																					showExitSearchButton ? 'pr-[40px]' : ''
+																				}`}
+																			>
+																				{mapTopSearchDisplay.label}
+																			</div>
+																			{showCuratedDisengagedActivateOverlay && (
+																				<div
+																					className="absolute inset-0 z-20 flex h-full w-full min-w-0 items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-black/40"
+																					style={{
+																						background:
+																							'linear-gradient(90deg, #ADFFC2 0%, #EFFFF3 100%)',
+																					}}
+																				>
+																					<button
+																						type="button"
+																						aria-label={`Activate ${mapTopSearchLabel}`}
+																						title="Activate this search"
+																						onClick={(event) => {
+																							event.stopPropagation();
+																							handleMapTopSearchReengage();
+																						}}
+																						className="absolute left-[12px] top-1/2 z-10 -translate-y-1/2 cursor-pointer rounded-[10px] bg-[#D9D9D9] px-[10px] py-[6px] font-secondary text-[13px] font-bold leading-none text-black/60 transition-colors hover:bg-[#cfcfcf] hover:text-black/80"
+																					>
+																						Activate
+																					</button>
+																					<span className="truncate">
+																						{mapTopSearchLabel}
+																					</span>
+																				</div>
+																			)}
+																		</>
 																	) : isSearchDeselectedByUser ? (
 																		<div className="relative flex h-full w-full min-w-0 items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-black/40">
 																			{showDisengagedActivate && (
@@ -15616,22 +15773,19 @@ const DashboardContent = () => {
 																					<div
 																						className="w-full h-[50px] flex-shrink-0 flex items-center justify-center px-4 relative"
 																						style={{
-																							backgroundColor: '#CBF0FF',
+																							...(isForYouCuratedSearch
+																								? { backgroundImage: FOR_YOU_RESULTS_HEADER_GRADIENT }
+																								: { backgroundColor: '#CBF0FF' }),
 																							border: '2px solid #000',
 																							borderRadius: '8px 8px 0 0',
 																						}}
 																					>
 																						<span className="absolute left-[13px] top-[2px] font-inter text-[15px] font-semibold leading-[20px] text-center text-black">
-																							Search Results
+																							{isForYouCuratedSearch ? 'For You' : 'Search Results'}
 																						</span>
-																						<div
-																							className="absolute left-[14px] right-[10px] bottom-[7px] flex items-center gap-[12px] overflow-hidden"
-																							style={{
-																								maskImage:
-																									'linear-gradient(to right, black 0, black calc(100% - 40px), transparent 100%)',
-																								WebkitMaskImage:
-																									'linear-gradient(to right, black 0, black calc(100% - 40px), transparent 100%)',
-																							}}
+																						<HorizontalFadeScroller
+																							className="absolute left-[14px] right-[10px] bottom-[7px]"
+																							contentClassName="flex items-center gap-[12px] w-max"
 																						>
 																							{[
 																								{
@@ -15724,11 +15878,14 @@ const DashboardContent = () => {
 																										</div>
 																									)
 																								)}
-																						</div>
+																						</HorizontalFadeScroller>
 																					</div>
 																					<div
 																						className="flex flex-col flex-1 min-h-0 relative"
 																						style={{
+																							...(isForYouCuratedSearch
+																								? { backgroundImage: FOR_YOU_RESULTS_BODY_GRADIENT }
+																								: null),
 																							borderLeft: '3px solid #5B7469',
 																							borderRight: '3px solid #5B7469',
 																							borderBottom: '3px solid #5B7469',

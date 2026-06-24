@@ -973,6 +973,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	const { data: myApplications } = useGetMyEventApplications({
 		enabled: !isUsingSampleData,
 	});
+	const isApplicationsLoaded = isUsingSampleData || myApplications !== undefined;
 	// Event-chat rows resolve their application (live status, event metadata) by
 	// thread-application id. One Date.now() frame per render keeps every row's
 	// derived status consistent (venue-panel convention).
@@ -996,7 +997,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		: inboundEmailsFromApi;
 	const emails = isUsingSampleData ? undefined : emailsFromApi;
 	const sentEmails = emails?.filter((email) => email.status === 'sent') || [];
-	const campaignSentCount = isUsingSampleData
+	const sentEmailCount = isUsingSampleData
 		? (sampleData?.sentEmails?.length ?? 0)
 		: sentEmails.length;
 	const isSentLoaded = isUsingSampleData || emailsFromApi !== undefined;
@@ -1010,7 +1011,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		if (inboxSentTabRequest?.tab) return inboxSentTabRequest.tab;
 		if (detailOnly) return 'inbox';
 		if (!isCampaignInbox) return 'inbox';
-		return campaignSentCount > 0 ? 'sent' : 'inbox';
+		return sentEmailCount > 0 ? 'sent' : 'inbox';
 	});
 	const lastHandledInboxSentTabRequestIdRef = useRef<number | null>(null);
 	const hasUserSelectedInboxSentTabRef = useRef(false);
@@ -1087,6 +1088,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 			const sender = row.sender?.toLowerCase().trim();
 			return !!sender && normalizedAllowedSenders.has(sender);
 		});
+	const campaignSentCount =
+		sentEmailCount + (isUsingSampleData ? 0 : applicationSentRows.length);
 
 	const campaignReplyCount = Array.isArray(filteredBySender)
 		? filteredBySender.length
@@ -1117,6 +1120,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		// Wait until the campaign contact allowlist is available so we don't briefly
 		// compute reply counts against *unfiltered* inbound mail.
 		if (allowedSenderEmails === undefined) return;
+		if (!isApplicationsLoaded) return;
 		// If the campaign page explicitly requested a tab (e.g. Inbox -> Sent), never auto-override it.
 		if (inboxSentTabRequest) return;
 		if (hasUserSelectedInboxSentTabRef.current) return;
@@ -1153,6 +1157,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		allowedSenderEmails,
 		campaignReplyCount,
 		campaignSentCount,
+		isApplicationsLoaded,
 		isSentLoaded,
 		activeTab,
 		selectedEmailId,
@@ -1779,6 +1784,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		// (same guard the auto-default and never-empty effects use).
 		if (isCampaignInbox && allowedSenderEmails === undefined) return;
 		if (activeTab === 'inbox' ? !isInboundLoaded : !isSentLoaded) return;
+		if (!isApplicationsLoaded) return;
 		if (
 			inboxSentTabRequest?.preserveSelection &&
 			lastHandledInboxSentTabRequestIdRef.current !== inboxSentTabRequest.requestId
@@ -1806,6 +1812,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		activeTab,
 		inboxSentTabRequest?.preserveSelection,
 		inboxSentTabRequest?.requestId,
+		isApplicationsLoaded,
 		isCampaignInbox,
 		isInboundLoaded,
 		isSentLoaded,
@@ -2117,7 +2124,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		// Wait for the contact allowlist + email data so we never act on partial data
 		// (which would briefly look empty and bounce the user out mid-load).
 		if (allowedSenderEmails === undefined) return;
-		if (!isInboundLoaded || !isSentLoaded) return;
+		if (!isInboundLoaded || !isSentLoaded || !isApplicationsLoaded) return;
 
 		const inboxCount = inboxConversations.length;
 		const sentCount = campaignSentCount;
@@ -2144,6 +2151,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		allowedSenderEmails,
 		isInboundLoaded,
 		isSentLoaded,
+		isApplicationsLoaded,
 		inboxConversations.length,
 		campaignSentCount,
 		activeTab,

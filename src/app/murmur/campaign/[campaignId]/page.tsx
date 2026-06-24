@@ -967,15 +967,25 @@ const CampaignInitialRevealGradientSurface = ({
 	phase,
 	isMobile,
 }: CampaignInitialRevealGradientSurfaceProps) => {
-	if (isMobile !== false || phase === 'map' || phase === 'done') return null;
-
-	const isOverview = activeView === 'overview';
+	// The overview ("All") tab is a bare map view — the same map the dashboard search
+	// showed — so there's no workspace panel for the reveal band to dress, and the
+	// gradient just reads as a meaningless wash over the right half of the map. Skip it
+	// there entirely so search→All (and a cold ?tab=all load) stay clean map→map
+	// transitions. The band only renders on the focused workspace tabs
+	// (Write/Drafts/Inbox/Sent), where it covers content as it reveals.
+	if (
+		isMobile !== false ||
+		activeView === 'overview' ||
+		phase === 'map' ||
+		phase === 'done'
+	)
+		return null;
 
 	return (
 		<div
 			aria-hidden="true"
 			data-campaign-initial-gradient-surface
-			data-campaign-initial-gradient-view={isOverview ? 'overview' : 'split'}
+			data-campaign-initial-gradient-view="split"
 			className={cn(
 				'fixed overflow-hidden pointer-events-none',
 				phase === 'main' && 'campaign-initial-gradient-surface--leaving'
@@ -983,12 +993,8 @@ const CampaignInitialRevealGradientSurface = ({
 			style={{
 				top: 0,
 				bottom: 0,
-				left: isOverview
-					? `var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 46%)`
-					: `var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, calc(100% - ${CAMPAIGN_INITIAL_REVEAL_COMPACT_BAND_WIDTH_PX}px))`,
-				right: isOverview
-					? 0
-					: `calc(100% - var(${CAMPAIGN_MAP_BACKDROP_END_VAR}, 100%))`,
+				left: `var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, calc(100% - ${CAMPAIGN_INITIAL_REVEAL_COMPACT_BAND_WIDTH_PX}px))`,
+				right: `calc(100% - var(${CAMPAIGN_MAP_BACKDROP_END_VAR}, 100%))`,
 				zIndex: 2,
 				opacity: phase === 'main' ? 0 : CAMPAIGN_INITIAL_REVEAL_GRADIENT_PEAK_OPACITY,
 				transition: `opacity ${CAMPAIGN_INITIAL_REVEAL_GRADIENT_FADE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,

@@ -51,10 +51,6 @@ type Props = {
 	showAddRow?: boolean;
 	onAddRow?: () => void;
 	isAddingFolder?: boolean;
-	/** Dropdown mode: show the green "Choose Folder" footer button. */
-	showChooseFolderButton?: boolean;
-	onChooseFolder?: () => void;
-	chooseDisabled?: boolean;
 	/** Dropdown mode: show the per-row delete affordance (divider + white X cell). */
 	showDeleteColumn?: boolean;
 	/** Dropdown mode: the row currently armed for delete confirmation (red band). */
@@ -327,9 +323,6 @@ export const CampaignsTableMini: FC<Props> = ({
 	showAddRow = false,
 	onAddRow,
 	isAddingFolder = false,
-	showChooseFolderButton = false,
-	onChooseFolder,
-	chooseDisabled = false,
 	showDeleteColumn = false,
 	confirmingCampaignId = null,
 	onDeleteClick,
@@ -775,21 +768,6 @@ export const CampaignsTableMini: FC<Props> = ({
 							<MiniPlusIcon />
 						</button>
 					</div>
-				) : null}
-				{showChooseFolderButton ? (
-					<>
-						{/* Divider 2: the thick line between the "Choose Folder" button and the rest. */}
-						<div style={{ height: 2, background: '#000', flexShrink: 0 }} />
-						<button
-							type="button"
-							onClick={onChooseFolder}
-							disabled={chooseDisabled}
-							className="flex h-[38px] w-full flex-shrink-0 items-center justify-center font-inter font-bold text-[16px] text-white transition-colors duration-150 hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-70"
-							style={{ background: '#4E9D6B' }}
-						>
-							Choose Folder
-						</button>
-					</>
 				) : null}
 			</div>
 		);

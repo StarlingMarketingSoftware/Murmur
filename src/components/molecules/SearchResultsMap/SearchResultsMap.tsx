@@ -618,6 +618,34 @@ const SELECTED_STATUS_DOT_FILL_COLOR = '#A8BFF5';
 const SELECTED_STATUS_DOT_STROKE_COLOR = '#5A81DA';
 const SELECTED_STATUS_DOT_STROKE_WIDTH = 2.4;
 
+export type DashboardDraftingMapContactStatus = 'queued' | 'drafting' | 'drafted';
+
+const DASHBOARD_DRAFTING_MARKER_STYLES: Record<
+	DashboardDraftingMapContactStatus,
+	{
+		centerFillColor: string;
+		strokeColor: string;
+		tooltipFillColor: string;
+	}
+> = {
+	queued: {
+		centerFillColor: '#FFFFFF',
+		strokeColor: '#A33535',
+		tooltipFillColor: '#FF8D8D',
+	},
+	drafting: {
+		centerFillColor: '#B0CEFB',
+		strokeColor: '#5A8DD8',
+		tooltipFillColor: '#B0CEFB',
+	},
+	drafted: {
+		centerFillColor: '#F8C262',
+		strokeColor: '#B78429',
+		tooltipFillColor: '#FFE4B6',
+	},
+};
+const DASHBOARD_DRAFTING_DRAFT_LINE_COLOR = '#F8EBD0';
+
 export type CampaignContactMapStatus = 'contacts' | 'drafts' | 'new-message' | 'sent';
 
 type CampaignStatusMarkerStyle = {
@@ -1001,7 +1029,7 @@ const SELECTED_TOOLTIP_STACK_FAKE_BACK_COUNT = 3;
 const HOVER_TOOLTIP_SIDE_GAP_X_PX = 3;
 const HOVER_TOOLTIP_SIDE_GAP_Y_PX = 14;
 const HOVER_TOOLTIP_VIEWPORT_PADDING_PX = 8;
-const PEOPLE_TOOLTIP_FILL_COLOR = '#99E0FF';
+const PEOPLE_TOOLTIP_FILL_COLOR = '#4FBCDD';
 // Lighter companion tint for the tooltip body card. Categories supply a
 // saturated title-band color + a lighter body color (see
 // WHAT_TO_HOVER_TOOLTIP_FILL_COLOR / WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR) so
@@ -1010,7 +1038,7 @@ const PEOPLE_TOOLTIP_FILL_COLOR = '#99E0FF';
 // band and the body, which made the band blend into the body card and hid the
 // title on hover. Pairing the saturated band with this lighter body restores a
 // visible title band, matching every category type.
-const PEOPLE_TOOLTIP_BODY_FILL_COLOR = '#D5F3FF';
+const PEOPLE_TOOLTIP_BODY_FILL_COLOR = '#99E0FF';
 
 const getHoverTooltipFillColor = (whatForMarker: string | null | undefined): string => {
 	if (!whatForMarker) return PEOPLE_TOOLTIP_FILL_COLOR;
@@ -1839,6 +1867,15 @@ export interface SearchResultsMapProps {
 	/** Per-contact campaign status used when `campaignMarkerMode` is `status`. */
 	campaignContactStatusById?: ReadonlyMap<number, CampaignContactMapStatus>;
 	/**
+	 * Dashboard search-tab write workflow status for selected contacts. When present, the
+	 * selected marker artwork + selected tooltips are recolored for queued/drafting/drafted
+	 * progress and automatically fall back to normal selection UI when omitted/empty.
+	 */
+	dashboardDraftingContactStatusById?: ReadonlyMap<
+		number,
+		DashboardDraftingMapContactStatus
+	>;
+	/**
 	 * Tint for the campaign selection heatmap glow (rendered behind the status
 	 * pins). `null`/absent disables the glow. Only takes effect in
 	 * `campaignMarkerMode === 'status'`.
@@ -2097,6 +2134,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	showSelectedContactTooltips = false,
 	campaignMarkerMode = 'category',
 	campaignContactStatusById,
+	dashboardDraftingContactStatusById,
 	campaignHeatmapColor = null,
 	campaignHeatmapStatusColors,
 	campaignHeatmapAmbient = false,
@@ -2223,6 +2261,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		(contactId: number): CampaignContactMapStatus =>
 			campaignContactStatusById?.get(contactId) ?? 'contacts',
 		[campaignContactStatusById]
+	);
+	const getDashboardDraftingStatusForContact = useCallback(
+		(contactId: number): DashboardDraftingMapContactStatus | null =>
+			dashboardDraftingContactStatusById?.get(contactId) ?? null,
+		[dashboardDraftingContactStatusById]
+	);
+	const getDashboardDraftingMarkerStyleForContact = useCallback(
+		(contactId: number) => {
+			const status = getDashboardDraftingStatusForContact(contactId);
+			return status ? DASHBOARD_DRAFTING_MARKER_STYLES[status] : null;
+		},
+		[getDashboardDraftingStatusForContact]
+	);
+	const getDashboardDraftingTooltipFillColorForContact = useCallback(
+		(contactId: number): string | null =>
+			getDashboardDraftingMarkerStyleForContact(contactId)?.tooltipFillColor ?? null,
+		[getDashboardDraftingMarkerStyleForContact]
 	);
 	const getCampaignStatusLineStyleForContacts = useCallback(
 		(fromContactId: number, toContactId: number): CampaignStatusMarkerStyle | null => {
@@ -8684,10 +8739,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			layout: { 'line-join': 'round', 'line-cap': 'round' },
 			paint: {
 				'line-color': [
-					'case',
-					['boolean', ['get', 'statusMode'], false],
-					SELECTED_STATUS_DOT_FILL_COLOR,
-					MARKER_CONSTELLATION_SELECTED_HALO_COLOR,
+					'coalesce',
+					['get', 'lineGlowColor'],
+					[
+						'case',
+						['boolean', ['get', 'statusMode'], false],
+						SELECTED_STATUS_DOT_FILL_COLOR,
+						MARKER_CONSTELLATION_SELECTED_HALO_COLOR,
+					],
 				],
 				'line-opacity': getSelectedMarkerConstellationZoomFadedOpacity(
 					MARKER_CONSTELLATION_SELECTED_GLOW_OPACITY
@@ -8703,10 +8762,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			layout: { 'line-join': 'round', 'line-cap': 'round' },
 			paint: {
 				'line-color': [
-					'case',
-					['boolean', ['get', 'statusMode'], false],
-					SELECTED_STATUS_DOT_STROKE_COLOR,
-					MARKER_CONSTELLATION_SELECTED_LINE_COLOR,
+					'coalesce',
+					['get', 'lineColor'],
+					[
+						'case',
+						['boolean', ['get', 'statusMode'], false],
+						SELECTED_STATUS_DOT_STROKE_COLOR,
+						MARKER_CONSTELLATION_SELECTED_LINE_COLOR,
+					],
 				],
 				'line-opacity': getSelectedMarkerConstellationZoomFadedOpacity(
 					MARKER_CONSTELLATION_SELECTED_CORE_OPACITY
@@ -15894,16 +15957,24 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		>
 	>(new Map());
 	const getSelectedCategorizedContactMarkerAssets = useCallback(
-		(accentColor: string) => {
-			const key = accentColor.trim();
+		(
+			accentColor: string,
+			centerFillColor = 'white',
+			hoverCenterFillColor?: string
+		) => {
+			const key = `${accentColor.trim()}|${centerFillColor.trim()}|${
+				hoverCenterFillColor?.trim() ?? '__default_hover_center__'
+			}`;
 			const cached = selectedCategorizedContactMarkerAssetCacheRef.current.get(key);
 			if (cached) return cached;
 
-			const url = generateSelectedCategorizedContactMarkerIconUrl(key);
-			const hoverColor = darkenHexColor(key, MARKER_HOVER_DARKEN_AMOUNT);
+			const accent = accentColor.trim();
+			const center = centerFillColor.trim();
+			const url = generateSelectedCategorizedContactMarkerIconUrl(accent, center);
+			const hoverColor = darkenHexColor(accent, MARKER_HOVER_DARKEN_AMOUNT);
 			const hoverUrl = generateSelectedCategorizedContactMarkerIconUrl(
 				hoverColor,
-				hoverColor
+				hoverCenterFillColor ?? hoverColor
 			);
 			const assets = {
 				imageName: imageNameFromUrl(url),
@@ -15912,6 +15983,48 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				hoverUrl,
 			};
 			selectedCategorizedContactMarkerAssetCacheRef.current.set(key, assets);
+			return assets;
+		},
+		[imageNameFromUrl]
+	);
+	const selectedUncategorizedContactMarkerAssetCacheRef = useRef<
+		Map<
+			string,
+			{
+				imageName: string;
+				url: string;
+				hoverImageName: string;
+				hoverUrl: string;
+			}
+		>
+	>(new Map());
+	const getSelectedUncategorizedContactMarkerAssets = useCallback(
+		(
+			accentColor = '#50A5C9',
+			centerFillColor = 'white',
+			hoverCenterFillColor?: string
+		) => {
+			const key = `${accentColor.trim()}|${centerFillColor.trim()}|${
+				hoverCenterFillColor?.trim() ?? '__default_hover_center__'
+			}`;
+			const cached = selectedUncategorizedContactMarkerAssetCacheRef.current.get(key);
+			if (cached) return cached;
+
+			const accent = accentColor.trim();
+			const center = centerFillColor.trim();
+			const url = generateSelectedUncategorizedContactMarkerIconUrl(accent, center);
+			const hoverColor = darkenHexColor(accent, MARKER_HOVER_DARKEN_AMOUNT);
+			const hoverUrl = generateSelectedUncategorizedContactMarkerIconUrl(
+				hoverColor,
+				hoverCenterFillColor ?? hoverColor
+			);
+			const assets = {
+				imageName: imageNameFromUrl(url),
+				url,
+				hoverImageName: imageNameFromUrl(hoverUrl),
+				hoverUrl,
+			};
+			selectedUncategorizedContactMarkerAssetCacheRef.current.set(key, assets);
 			return assets;
 		},
 		[imageNameFromUrl]
@@ -16690,7 +16803,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					const edgeIndex = selectedLineFeatures.length;
 					const edgeId = markerConstellationPairKey(edge.fromId, edge.toId);
 					const featureId = `selected:${edgeIndex}:${edgeId}`;
-					dataKeyParts.push(`s:${featureId}`);
+					const fromDraftingStatus = getDashboardDraftingStatusForContact(edge.fromId);
+					const toDraftingStatus = getDashboardDraftingStatusForContact(edge.toId);
+					const isDraftedLine =
+						fromDraftingStatus === 'drafted' && toDraftingStatus === 'drafted';
+					dataKeyParts.push(
+						`s:${featureId}:${isDraftedLine ? DASHBOARD_DRAFTING_DRAFT_LINE_COLOR : ''}`
+					);
 					selectedLineFeatures.push({
 						type: 'Feature',
 						id: featureId,
@@ -16699,6 +16818,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							// Campaign status mode recolors the selected lines blue to match the
 							// blue selected circles (dashboard pick-flow keeps the white lines).
 							statusMode: campaignMarkerMode === 'status',
+							...(isDraftedLine
+								? {
+										lineColor: DASHBOARD_DRAFTING_DRAFT_LINE_COLOR,
+										lineGlowColor: DASHBOARD_DRAFTING_DRAFT_LINE_COLOR,
+									}
+								: {}),
 							fromId: edge.fromId,
 							toId: edge.toId,
 						},
@@ -16737,6 +16862,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			allContactsOverlayVisibleContacts,
 			getCampaignStatusLineStyleForContacts,
 			getCampaignStatusMarkerStyleForContact,
+			getDashboardDraftingStatusForContact,
 			getContactCoords,
 			getBookingExtraContactCoords,
 			getPromotionOverlayContactCoords,
@@ -17257,16 +17383,30 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				if (!coords) return;
 
 				const isUncategorized = !isCleanMapMarkerCategory(whatForMarker);
-				const selectedIconAssets = isUncategorized
-					? {
-							imageName: selectedUncategorizedContactMarkerImageName,
-							url: selectedUncategorizedContactMarkerUrl,
-							hoverImageName: selectedUncategorizedContactMarkerHoverImageName,
-							hoverUrl: selectedUncategorizedContactMarkerHoverUrl,
-						}
-					: getSelectedCategorizedContactMarkerAssets(
-							getResultDotColorForWhat(whatForMarker)
-						);
+				const dashboardDraftingMarkerStyle =
+					getDashboardDraftingMarkerStyleForContact(contact.id);
+				const selectedIconAssets = dashboardDraftingMarkerStyle
+					? isUncategorized
+						? getSelectedUncategorizedContactMarkerAssets(
+								dashboardDraftingMarkerStyle.strokeColor,
+								dashboardDraftingMarkerStyle.centerFillColor,
+								dashboardDraftingMarkerStyle.centerFillColor
+							)
+						: getSelectedCategorizedContactMarkerAssets(
+								dashboardDraftingMarkerStyle.strokeColor,
+								dashboardDraftingMarkerStyle.centerFillColor,
+								dashboardDraftingMarkerStyle.centerFillColor
+							)
+					: isUncategorized
+						? {
+								imageName: selectedUncategorizedContactMarkerImageName,
+								url: selectedUncategorizedContactMarkerUrl,
+								hoverImageName: selectedUncategorizedContactMarkerHoverImageName,
+								hoverUrl: selectedUncategorizedContactMarkerHoverUrl,
+							}
+						: getSelectedCategorizedContactMarkerAssets(
+								getResultDotColorForWhat(whatForMarker)
+							);
 				selectedMarkerImagesToEnsure.set(
 					selectedIconAssets.imageName,
 					selectedIconAssets.url
@@ -17517,7 +17657,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		lockedStateKey,
 		isStateLayerReady,
 		ensureMapImageFromUrl,
+		getDashboardDraftingMarkerStyleForContact,
 		getSelectedCategorizedContactMarkerAssets,
+		getSelectedUncategorizedContactMarkerAssets,
 		selectedUncategorizedContactMarkerImageName,
 		selectedUncategorizedContactMarkerUrl,
 		selectedUncategorizedContactMarkerHoverImageName,
@@ -19196,7 +19338,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		type SelectedTooltipKind = 'base' | 'booking' | 'promotion' | 'all' | 'fallback';
 
-		const compactTooltipOptions = { showTitleBand: false };
+		const compactTooltipOptions = { showTitleBand: true };
 		const entries: SelectedCompactTooltipEntry[] = [];
 		const seenIds = new Set<number>();
 
@@ -19285,8 +19427,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const titleForTooltip = getContactTitleForTooltip(contact);
 			const whatForMarker = getWhatForSelectedTooltip(contact, kind);
 			const normalizedWhat = whatForMarker ? normalizeWhatKey(whatForMarker) : null;
-			const tooltipFillColor = getHoverTooltipFillColor(whatForMarker);
-			const tooltipBodyFillColor = getHoverTooltipBodyFillColor(whatForMarker);
+			const dashboardDraftingTooltipFillColor =
+				getDashboardDraftingTooltipFillColorForContact(contact.id);
+			const tooltipFillColor =
+				dashboardDraftingTooltipFillColor ?? getHoverTooltipFillColor(whatForMarker);
+			const tooltipBodyFillColor =
+				dashboardDraftingTooltipFillColor ??
+				getHoverTooltipBodyFillColor(whatForMarker);
 			const width = calculateTooltipWidth(
 				nameForTooltip,
 				companyForTooltip,
@@ -19343,6 +19490,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		getBookingExtraContactCoords,
 		getPromotionOverlayContactCoords,
 		getAllContactsOverlayContactCoords,
+		getDashboardDraftingTooltipFillColorForContact,
 		searchWhat,
 	]);
 	const selectedCompactTooltipEntryIdsKey = useMemo(
@@ -19787,12 +19935,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const nameForTooltip = fullName || contact.name || '';
 		const companyForTooltip = contact.company || '';
 		const titleForTooltip = getContactTitleForTooltip(contact);
+		const dashboardDraftingTooltipFillColor =
+			getDashboardDraftingTooltipFillColorForContact(contact.id);
 
 		if (kind === 'all') {
 			const whatForMarker = getAmbientContactWhatFromTitle(contact.title);
 			if (whatForMarker) {
-				const tooltipFillColor = getHoverTooltipFillColor(whatForMarker);
-				const tooltipBodyFillColor = getHoverTooltipBodyFillColor(whatForMarker);
+				const tooltipFillColor =
+					dashboardDraftingTooltipFillColor ??
+					getHoverTooltipFillColor(whatForMarker);
+				const tooltipBodyFillColor =
+					dashboardDraftingTooltipFillColor ??
+					getHoverTooltipBodyFillColor(whatForMarker);
 				const width = calculateTooltipWidth(
 					nameForTooltip,
 					companyForTooltip,
@@ -19816,7 +19970,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				};
 			}
 
-			const tooltipFillColor = PEOPLE_TOOLTIP_FILL_COLOR;
+			const tooltipFillColor =
+				dashboardDraftingTooltipFillColor ?? PEOPLE_TOOLTIP_FILL_COLOR;
+			const tooltipBodyFillColor =
+				dashboardDraftingTooltipFillColor ?? PEOPLE_TOOLTIP_BODY_FILL_COLOR;
 			const width = calculateTooltipWidth(
 				nameForTooltip,
 				companyForTooltip,
@@ -19831,7 +19988,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					titleForTooltip,
 					tooltipFillColor,
 					whatForMarker,
-					PEOPLE_TOOLTIP_BODY_FILL_COLOR
+					tooltipBodyFillColor
 				),
 				width,
 				height,
@@ -19848,8 +20005,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		// Even if the marker dot is "washed out" outside the locked/selected state, keep the hover tooltip
 		// using the base category color so it consistently communicates the search intent.
-		const baseTooltipFillColor = getHoverTooltipFillColor(whatForMarker);
-		const baseTooltipBodyFillColor = getHoverTooltipBodyFillColor(whatForMarker);
+		const baseTooltipFillColor =
+			dashboardDraftingTooltipFillColor ?? getHoverTooltipFillColor(whatForMarker);
+		const baseTooltipBodyFillColor =
+			dashboardDraftingTooltipFillColor ??
+			getHoverTooltipBodyFillColor(whatForMarker);
 
 		const width = calculateTooltipWidth(
 			nameForTooltip,
@@ -19873,7 +20033,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			height,
 			anchorY,
 		};
-	}, [hoverTooltipEntry, searchWhat]);
+	}, [hoverTooltipEntry, searchWhat, getDashboardDraftingTooltipFillColorForContact]);
 
 	const hoverTooltipLat = hoverTooltipCoords?.lat ?? null;
 	const hoverTooltipLng = hoverTooltipCoords?.lng ?? null;
@@ -20562,9 +20722,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					);
 				})}
 
-			{/* Selected compact SVG tooltips: persistent top-card-only labels for the
-			    dashboard search map. The active hover tooltip renders above these and
-			    includes the bottom title band. */}
+			{/* Selected compact SVG tooltips: persistent labels for the dashboard
+			    search map. These use the same top-card + bottom title-band palette as
+			    the active hover tooltip, so selected labels match the map tooltip
+			    styling exactly. */}
 			{!isLoading &&
 				!isStreetCardMode &&
 				selectedCompactTooltipEntries.length > 0 &&

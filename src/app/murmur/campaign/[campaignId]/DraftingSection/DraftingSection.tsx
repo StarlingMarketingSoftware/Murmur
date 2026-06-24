@@ -1544,7 +1544,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// row. The bar is absolute (out of flow) and is hidden via `visibility` (kept mounted),
 	// so neither hiding it nor measuring it perturbs the action row's geometry — the overlap
 	// computation is stable and won't oscillate at the threshold.
-	useEffect(() => {
+	//
+	// This runs as a *layout* effect (not a passive one) and the initial measure is
+	// synchronous — so when the user switches into the Drafts tab the collision is resolved
+	// before the browser paints. A passive effect + rAF (the previous approach) let the bar
+	// paint visible for a frame or two before being hidden, which read as a flash.
+	useLayoutEffect(() => {
 		if (typeof window === 'undefined') return;
 		if (!isDraftPreviewOpen || !shouldRenderDraftsBottomSendBar) {
 			setIsDraftReviewOverlappingSendBar(false);
@@ -1585,7 +1590,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		};
 
 		ro = new ResizeObserver(schedule);
-		schedule();
+		// Measure synchronously on mount/dep-change so the initial visibility is settled
+		// before paint (no flash on tab-switch). Subsequent updates stay rAF-throttled.
+		measure();
 		window.addEventListener('resize', schedule);
 		window.addEventListener('murmur:campaign-zoom-changed', schedule as EventListener);
 		return () => {

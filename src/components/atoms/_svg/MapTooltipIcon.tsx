@@ -1,4 +1,7 @@
-import { getTooltipCategoryIconSpec } from './mapTooltipCategoryIcons';
+import {
+	getTooltipCategoryIconSpec,
+	type TooltipCategoryIconSpec,
+} from './mapTooltipCategoryIcons';
 
 const DEFAULT_TOOLTIP_FILL_COLOR = '#0E8530';
 
@@ -24,6 +27,17 @@ const STROKE_PADDING = Math.ceil(TOOLTIP_STROKE_WIDTH);
 const TOOLTIP_CATEGORY_ICON_SIZE = 16;
 const TOOLTIP_CATEGORY_ICON_GAP = 8;
 const TOOLTIP_CATEGORY_ICON_TOP_OFFSET = 5;
+
+const PEOPLE_TOOLTIP_ICON_SPEC: TooltipCategoryIconSpec = {
+	viewBox: '0 0 27 27',
+	content: `
+<path
+	d="M12.1865 0.979492C12.5764 0.341123 13.5037 0.341124 13.8936 0.979492L18.1416 7.93945L25.1016 12.1875C25.7399 12.5774 25.7399 13.5047 25.1016 13.8945L18.1416 18.1426L13.8936 25.1025C13.5037 25.7409 12.5764 25.7409 12.1865 25.1025L7.93848 18.1426L0.978516 13.8945C0.340147 13.5047 0.340147 12.5774 0.978516 12.1875L7.93848 7.93945L12.1865 0.979492Z"
+	fill="#50A5C9"
+	stroke="white"
+/>
+`.trim(),
+};
 
 // Convert React-style SVG attrs (camelCase) to SVG/XML attrs (kebab-case).
 // The tooltip is rendered via `data:image/svg+xml`, which is parsed as XML.
@@ -226,8 +240,11 @@ export const generateMapTooltipSvg = (
 	const titleTextRaw = (title ?? '').trim();
 
 	// Category icon comes from the "What" search category (when available).
-	const categoryIconSpec = getTooltipCategoryIconSpec(searchWhat);
-	const showCategoryIcon = Boolean(categoryIconSpec && hasCompany);
+	// Contacts without a known category use the people/spark icon so the top-right
+	// glyph stays consistent with the map's People stack control.
+	const knownCategoryIconSpec = getTooltipCategoryIconSpec(searchWhat);
+	const tooltipIconSpec = knownCategoryIconSpec ?? PEOPLE_TOOLTIP_ICON_SPEC;
+	const showCategoryIcon = Boolean(knownCategoryIconSpec ? hasCompany : tooltipIconSpec);
 	const categoryIconSlotExtra = showCategoryIcon
 		? TOOLTIP_CATEGORY_ICON_SIZE + TOOLTIP_CATEGORY_ICON_GAP
 		: 0;
@@ -326,9 +343,9 @@ export const generateMapTooltipSvg = (
 	const topCardLineTwoFadeWidth = primaryTextX + topCardLineTwoMaxWidth - topCardLineTwoFadeX;
 
 	const renderCategoryIcon = (x: number, y: number): string => {
-		if (!categoryIconSpec || !showCategoryIcon) return '';
-		const normalized = normalizeInlineSvgMarkupForXml(categoryIconSpec.content);
-		return `<svg x="${x}" y="${y}" width="${TOOLTIP_CATEGORY_ICON_SIZE}" height="${TOOLTIP_CATEGORY_ICON_SIZE}" viewBox="${categoryIconSpec.viewBox}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+		if (!tooltipIconSpec || !showCategoryIcon) return '';
+		const normalized = normalizeInlineSvgMarkupForXml(tooltipIconSpec.content);
+		return `<svg x="${x}" y="${y}" width="${TOOLTIP_CATEGORY_ICON_SIZE}" height="${TOOLTIP_CATEGORY_ICON_SIZE}" viewBox="${tooltipIconSpec.viewBox}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
 ${normalized}
 </svg>`;
 	};
@@ -408,7 +425,8 @@ export const calculateTooltipWidth = (
 	const secondaryText = hasName && hasCompany ? trimmedCompany : '';
 	const titleTextForWidth = options.showTitleBand === false ? '' : trimmedTitle;
 
-	const showCategoryIcon = Boolean(getTooltipCategoryIconSpec(searchWhat) && hasCompany);
+	const knownCategoryIconSpec = getTooltipCategoryIconSpec(searchWhat);
+	const showCategoryIcon = Boolean(knownCategoryIconSpec ? hasCompany : PEOPLE_TOOLTIP_ICON_SPEC);
 	const categoryIconSlotExtra = showCategoryIcon
 		? TOOLTIP_CATEGORY_ICON_SIZE + TOOLTIP_CATEGORY_ICON_GAP
 		: 0;
@@ -456,4 +474,3 @@ export const calculateTooltipAnchorY = (
 
 // Legacy constant for backwards compatibility
 export const MAP_TOOLTIP_ANCHOR_Y = MAP_TOOLTIP_HEIGHT;
-

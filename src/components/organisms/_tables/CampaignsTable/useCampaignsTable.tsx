@@ -7,6 +7,7 @@ import {
 	useGetCampaign,
 	useGetCampaigns,
 	useGetDeletedCampaigns,
+	useMergeArchivedCampaign,
 } from '@/hooks/queryHooks/useCampaigns';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
 import { useEditEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
@@ -56,6 +57,7 @@ import type { CampaignWithRelations, EmailWithRelations, InboundEmailWithRelatio
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
+import { ConfirmDialog } from '@/components/organisms/_dialogs/ConfirmDialog/ConfirmDialog';
 
 type CampaignWithCounts = Campaign & {
 	draftCount?: number;
@@ -1089,6 +1091,13 @@ const CampaignFinderInfoPopup = ({
 	);
 };
 
+// One active folder the user can merge an archived folder into.
+type CampaignRowMoveTarget = {
+	campaignId: number;
+	name: string;
+	folderIconColor: string;
+};
+
 type CampaignRowMenuAnchor = {
 	// Anchor point in client/visual coordinates (the table's right edge + gap, and
 	// the clicked row's top). Clamped to the viewport inside the components via
@@ -1098,6 +1107,9 @@ type CampaignRowMenuAnchor = {
 	campaign: CampaignWithCounts;
 	nameBoxColor: string;
 	folderIconColor: string;
+	// True only for rows inside the ARCHIVE folder. Archived rows additionally get the
+	// "Activate and Move to" section (merge-restore into an active folder).
+	isArchived: boolean;
 };
 
 const formatCampaignInfoDate = (value: Date | string | null | undefined) => {
@@ -1113,21 +1125,36 @@ const formatCampaignInfoDate = (value: Date | string | null | undefined) => {
 
 const CampaignRowContextMenu = ({
 	state,
+	moveTargets,
+	isMergePending,
 	onOpenInNewTab,
+	onActivateAndMoveTo,
 	onGetInfo,
 }: {
 	state: CampaignRowMenuAnchor | null;
+	moveTargets: CampaignRowMoveTarget[];
+	isMergePending: boolean;
 	onOpenInNewTab: (state: CampaignRowMenuAnchor) => void;
+	onActivateAndMoveTo: (state: CampaignRowMenuAnchor, target: CampaignRowMoveTarget) => void;
 	onGetInfo: (state: CampaignRowMenuAnchor) => void;
 }) => {
 	if (!state) return null;
 	if (typeof document === 'undefined') return null;
 
+	// Only archived rows get the merge-restore section, and only when there is at
+	// least one active folder to merge into.
+	const showMoveSection = state.isArchived && moveTargets.length > 0;
+	const estimatedHeight =
+		CAMPAIGN_ROW_MENU_HEIGHT +
+		(showMoveSection
+			? 31 + moveTargets.length * FINDER_CONTEXT_MENU_MOVE_TARGET_HEIGHT
+			: 0);
+
 	const position = getClampedFinderPopupPosition(
 		state.anchorX,
 		state.anchorY,
 		FINDER_CONTEXT_MENU_WIDTH,
-		CAMPAIGN_ROW_MENU_HEIGHT
+		estimatedHeight
 	);
 
 	return createPortal(
@@ -1147,6 +1174,35 @@ const CampaignRowContextMenu = ({
 			>
 				Open in New Tab
 			</button>
+
+			{showMoveSection ? (
+				<>
+					<div className="campaign-finder-context-menu-separator" role="separator" />
+					<div className="campaign-finder-context-menu-label">Activate and Move to</div>
+					{moveTargets.map((target) => (
+						<button
+							type="button"
+							key={target.campaignId}
+							className="campaign-finder-context-menu-item campaign-finder-context-menu-move-item"
+							role="menuitem"
+							disabled={isMergePending}
+							onClick={() => onActivateAndMoveTo(state, target)}
+						>
+							<span
+								className="campaign-finder-context-menu-folder-icon"
+								style={{ color: target.folderIconColor }}
+								aria-hidden="true"
+							>
+								<DashboardActionBarFolderIcon width={18} height={11} />
+							</span>
+							<span className="campaign-finder-context-menu-target-name">
+								{target.name}
+							</span>
+						</button>
+					))}
+				</>
+			) : null}
+
 			<div className="campaign-finder-context-menu-separator" role="separator" />
 			<button
 				type="button"
@@ -1756,6 +1812,14 @@ export const useCampaignsTable = (options?: {
 	// Campaign-row right-click menu + its "Get Info" popup (one open at a time).
 	const [campaignRowMenu, setCampaignRowMenu] = useState<CampaignRowMenuAnchor | null>(null);
 	const [campaignRowInfo, setCampaignRowInfo] = useState<CampaignRowMenuAnchor | null>(null);
+	// Pending merge-restore awaiting confirmation: which archived folder into which
+	// active folder.
+	const [mergeConfirm, setMergeConfirm] = useState<{
+		source: CampaignWithCounts;
+		target: CampaignRowMoveTarget;
+	} | null>(null);
+	const { mutateAsync: mergeArchivedCampaign, isPending: isMergePending } =
+		useMergeArchivedCampaign();
 	const { mutateAsync: createFinderUserContactList } = useCreateUserContactList({
 		suppressToasts: true,
 	});
@@ -2232,6 +2296,19 @@ export const useCampaignsTable = (options?: {
 				),
 			}));
 	}, [displayedCampaignData, openCampaignId, realData]);
+
+	// Every active folder is a valid merge target for an archived folder (unlike the
+	// finder's move targets, there is no open-campaign to exclude). Folder icon colors
+	// are keyed by campaign id so they match the row pills.
+	const campaignRowMoveTargets = useMemo<CampaignRowMoveTarget[]>(() => {
+		if (!displayedCampaignData) return [];
+		return displayedCampaignData.map((campaign, index) => ({
+			campaignId: campaign.id,
+			name: campaign.name || `Folder ${index + 1}`,
+			folderIconColor: getCampaignFolderColors(campaign.id, realData, index)
+				.folderIconColor,
+		}));
+	}, [displayedCampaignData, realData]);
 	const data = useMemo<CampaignTableRow[] | undefined>(() => {
 		if (!displayedCampaignData) return displayedCampaignData;
 
@@ -3422,7 +3499,14 @@ export const useCampaignsTable = (options?: {
 			setFinderContextMenu(null);
 			setFinderInfoPopup(null);
 			setCampaignRowInfo(null);
-			setCampaignRowMenu({ anchorX, anchorY, campaign, nameBoxColor, folderIconColor });
+			setCampaignRowMenu({
+				anchorX,
+				anchorY,
+				campaign,
+				nameBoxColor,
+				folderIconColor,
+				isArchived: isArchivedCampaignRow(rowData),
+			});
 		},
 		[]
 	);
@@ -3450,6 +3534,30 @@ export const useCampaignsTable = (options?: {
 	const handleCampaignRowInfoClose = useCallback(() => {
 		setCampaignRowInfo(null);
 	}, []);
+
+	// Archived row → "Activate and Move to" target picked: confirm before merging.
+	const handleCampaignRowActivateAndMoveTo = useCallback(
+		(state: CampaignRowMenuAnchor, target: CampaignRowMoveTarget) => {
+			setCampaignRowMenu(null);
+			// Mock rows use synthetic negative ids — nothing to merge.
+			if (isMockActive) return;
+			setMergeConfirm({ source: state.campaign, target });
+		},
+		[isMockActive]
+	);
+
+	const handleConfirmMerge = useCallback(async () => {
+		if (!mergeConfirm) return;
+		const { source, target } = mergeConfirm;
+		try {
+			await mergeArchivedCampaign({
+				sourceId: source.id,
+				targetCampaignId: target.campaignId,
+			});
+		} finally {
+			setMergeConfirm(null);
+		}
+	}, [mergeConfirm, mergeArchivedCampaign]);
 
 	const finderContextMenuPayloadItems = getFinderContextPayloadItems(finderContextMenu);
 	const canMoveFinderContextItem = Boolean(
@@ -4253,13 +4361,36 @@ export const useCampaignsTable = (options?: {
 			<>
 				<CampaignRowContextMenu
 					state={campaignRowMenu}
+					moveTargets={campaignRowMoveTargets}
+					isMergePending={isMergePending}
 					onOpenInNewTab={handleCampaignRowOpenInNewTab}
+					onActivateAndMoveTo={handleCampaignRowActivateAndMoveTo}
 					onGetInfo={handleCampaignRowGetInfo}
 				/>
 				<CampaignRowInfoPopup
 					state={campaignRowInfo}
 					onClose={handleCampaignRowInfoClose}
 				/>
+				<ConfirmDialog
+					title={
+						mergeConfirm
+							? `Activate & merge into ${mergeConfirm.target.name}?`
+							: 'Activate & merge'
+					}
+					open={!!mergeConfirm}
+					onOpenChange={(open) => {
+						if (!open) setMergeConfirm(null);
+					}}
+					confirmButtonText="Activate & Merge"
+					confirmAction={handleConfirmMerge}
+					isLoading={isMergePending}
+				>
+					<Typography>
+						{mergeConfirm
+							? `This imports all contacts, drafts, and emails from "${mergeConfirm.source.name}" into "${mergeConfirm.target.name}". The archived folder will be removed.`
+							: ''}
+					</Typography>
+				</ConfirmDialog>
 			</>
 		),
 		isFinderOpen,
