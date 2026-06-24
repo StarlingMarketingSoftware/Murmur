@@ -74,6 +74,7 @@ import { CampaignTopSearchHighlightProvider } from '@/contexts/CampaignTopSearch
 import { CampaignDeviceProvider } from '@/contexts/CampaignDeviceContext';
 import {
 	type PersistentDashboardMapConfig,
+	usePersistentMapFirstPaint,
 	usePersistentMapSetter,
 } from '@/contexts/PersistentMapContext';
 import type {
@@ -888,8 +889,48 @@ const CAMPAIGN_SEARCH_ENTRY_TRANSITION_CLASS =
 	'murmur-campaign-search-entry-transition';
 const CAMPAIGN_SEARCH_ENTRY_PENDING_CLASS = 'murmur-campaign-search-entry-pending';
 const CAMPAIGN_SEARCH_ENTRY_STORAGE_MAX_AGE_MS = 10_000;
-const CAMPAIGN_SEARCH_ENTRY_CONTENT_DELAY_MS = 140;
-const CAMPAIGN_SEARCH_ENTRY_CONTENT_FADE_MS = 280;
+const CAMPAIGN_SEARCH_ENTRY_CONTENT_DELAY_MS = 60;
+const CAMPAIGN_SEARCH_ENTRY_CONTENT_FADE_MS = 180;
+// First let the bare map breathe on its own. The whole workspace mounts invisibly and
+// the chrome zoom/shift vars converge BEHIND this bare map (see isCampaignLayoutSettled),
+// so nothing the user can see ever rescales. Only once the layout is final do we bring in
+// the opacity/gradient band — which is itself positioned by those vars, so holding it until
+// settle is what stops the band from shifting as it appears.
+const CAMPAIGN_INITIAL_REVEAL_MIN_MAP_MS = 120;
+// Generous safety cap only: in practice the bare-map phase ends as soon as the layout has
+// settled. This cap just prevents a permanent hold if settling never reports (e.g. the
+// workspace chunk never mounts) — in which case there are no elements to shift anyway.
+const CAMPAIGN_INITIAL_REVEAL_MAX_MAP_WAIT_MS = 2800;
+const CAMPAIGN_INITIAL_REVEAL_MIN_GRADIENT_MS = 180;
+const CAMPAIGN_INITIAL_REVEAL_BASE_FADE_MS = 240;
+// Slightly longer than the base fade so the base chrome is fully in before the main
+// content begins — a clean "map → gradient → base → main" cascade rather than one blur.
+const CAMPAIGN_INITIAL_REVEAL_BASE_DWELL_MS = 260;
+const CAMPAIGN_INITIAL_REVEAL_MAIN_FADE_MS = 320;
+const CAMPAIGN_INITIAL_REVEAL_MAIN_MAX_WAIT_MS = 2200;
+const CAMPAIGN_INITIAL_REVEAL_GRADIENT_FADE_MS = 260;
+// Peak opacity of the initial reveal gradient band. Kept in sync with the instant
+// `body.murmur-search-to-campaign-transitioning::after` handoff surface (globals.css)
+// so the gradient never jumps brighter when the campaign page takes over from the
+// click-frame overlay. Deliberately well below 1 — the band is a soft tint, not a wash.
+const CAMPAIGN_INITIAL_REVEAL_GRADIENT_PEAK_OPACITY = 0.5;
+// Pre-mount fallback for the initial reveal band's left edge on the compact
+// (Write/Drafts/Inbox/Sent) tabs: the campaign's compressed workspace band is a
+// fixed 985px wide, right-anchored. Used until the real backdrop-start var is
+// published. Mirrors CAMPAIGN_COMPACT_WORKSPACE_BACKDROP_WIDTH_PX (defined later
+// for the runtime computation); kept here so the reveal surface — declared above
+// that block — can reference it without a use-before-define.
+const CAMPAIGN_INITIAL_REVEAL_COMPACT_BAND_WIDTH_PX = 985;
+// The chrome zoom/shift vars are considered "converged" once they hold steady for this
+// long after the workspace has mounted; the cap (relative to mount) bounds pathological
+// reflow churn so the reveal still proceeds.
+const CAMPAIGN_LAYOUT_SETTLE_QUIET_MS = 140;
+const CAMPAIGN_LAYOUT_SETTLE_MAX_WAIT_MS = 1800;
+// SearchResultsMap eases camera-padding changes over 520ms; hold the campaign
+// chrome/main reveal until that pan has effectively finished so the user sees
+// "gradient + map pan" first, then stable UI.
+const CAMPAIGN_MAP_CAMERA_PADDING_SETTLE_MS = 580;
+type CampaignInitialRevealPhase = 'map' | 'gradient' | 'base' | 'main' | 'done';
 
 const CAMPAIGN_MAP_SHIFT_X_VAR = '--murmur-campaign-map-shift-x';
 const CAMPAIGN_TOP_NAV_SHIFT_X_VAR = '--murmur-campaign-top-nav-shift-x';
@@ -913,6 +954,124 @@ type CampaignViewSnapshot = {
 	// applied once the clone is attached and has layout, so they're replayed in
 	// the overlay's mount callback rather than written onto the detached clone.
 	scrolls: Array<[number, number, number]>;
+};
+
+type CampaignInitialRevealGradientSurfaceProps = {
+	activeView: ViewType;
+	phase: CampaignInitialRevealPhase;
+	isMobile: boolean | null;
+};
+
+const CampaignInitialRevealGradientSurface = ({
+	activeView,
+	phase,
+	isMobile,
+}: CampaignInitialRevealGradientSurfaceProps) => {
+	if (isMobile !== false || phase === 'map' || phase === 'done') return null;
+
+	const isOverview = activeView === 'overview';
+
+	return (
+		<div
+			aria-hidden="true"
+			data-campaign-initial-gradient-surface
+			data-campaign-initial-gradient-view={isOverview ? 'overview' : 'split'}
+			className={cn(
+				'fixed overflow-hidden pointer-events-none',
+				phase === 'main' && 'campaign-initial-gradient-surface--leaving'
+			)}
+			style={{
+				top: 0,
+				bottom: 0,
+				left: isOverview
+					? `var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 46%)`
+					: `var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, calc(100% - ${CAMPAIGN_INITIAL_REVEAL_COMPACT_BAND_WIDTH_PX}px))`,
+				right: isOverview
+					? 0
+					: `calc(100% - var(${CAMPAIGN_MAP_BACKDROP_END_VAR}, 100%))`,
+				zIndex: 2,
+				opacity: phase === 'main' ? 0 : CAMPAIGN_INITIAL_REVEAL_GRADIENT_PEAK_OPACITY,
+				transition: `opacity ${CAMPAIGN_INITIAL_REVEAL_GRADIENT_FADE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+				willChange: 'opacity',
+			}}
+		>
+			<div className="murmur-campaign-initial-gradient-base absolute inset-0" />
+			<div className="murmur-campaign-initial-gradient-sweep absolute inset-[-35%]" />
+			<div className="murmur-campaign-initial-gradient-soften absolute inset-0" />
+			<style jsx global>{`
+				@keyframes murmur-campaign-initial-gradient-flow {
+					0% {
+						opacity: 0.48;
+						transform: translate3d(-40%, 2%, 0) scale(1.04);
+					}
+					50% {
+						opacity: 0.72;
+						transform: translate3d(0%, -2%, 0) scale(1.07);
+					}
+					100% {
+						opacity: 0.5;
+						transform: translate3d(40%, 1%, 0) scale(1.04);
+					}
+				}
+
+				.murmur-campaign-initial-gradient-base {
+					background: linear-gradient(
+						64deg,
+						rgba(255, 255, 255, 0.12) 5.55%,
+						rgba(203, 240, 255, 0.2) 36.49%,
+						rgba(152, 206, 227, 0.14) 93.44%
+					);
+				}
+
+				.murmur-campaign-initial-gradient-sweep {
+					background: linear-gradient(
+						86deg,
+						rgba(255, 255, 255, 0) 0%,
+						rgba(152, 206, 227, 0.05) 21%,
+						rgba(203, 240, 255, 0.24) 35%,
+						rgba(255, 255, 255, 0.34) 48%,
+						rgba(255, 255, 255, 0.3) 56%,
+						rgba(203, 240, 255, 0.18) 68%,
+						rgba(152, 206, 227, 0.06) 82%,
+						rgba(255, 255, 255, 0) 100%
+					);
+					filter: blur(5px);
+					animation: murmur-campaign-initial-gradient-flow 7.5s ease-in-out
+						infinite alternate;
+					will-change: opacity, transform;
+				}
+
+				.murmur-campaign-initial-gradient-soften {
+					background:
+						radial-gradient(
+							ellipse 72% 62% at 14% 94%,
+							rgba(152, 206, 227, 0.08),
+							rgba(255, 255, 255, 0) 68%
+						),
+						linear-gradient(
+							180deg,
+							rgba(255, 255, 255, 0.06) 0%,
+							rgba(255, 255, 255, 0.015) 48%,
+							rgba(255, 255, 255, 0.05) 100%
+						);
+					pointer-events: none;
+				}
+
+				@media (prefers-reduced-motion: reduce) {
+					[data-campaign-initial-gradient-surface],
+					[data-campaign-initial-base-layer],
+					[data-campaign-initial-main-layer] {
+						transition: none !important;
+					}
+
+					.murmur-campaign-initial-gradient-sweep {
+						animation: none;
+						transform: none;
+					}
+				}
+			`}</style>
+		</div>
+	);
 };
 
 // Static DOM snapshot of the active view layer for the tab crossfade's previous
@@ -971,7 +1130,8 @@ const CAMPAIGN_BACKDROP_TARGET_START_RATIO = 1 / 3;
 // at just above the largest tuned look (556px at 2560×1440) so tuned sizes are
 // pixel-identical and only ultrawide layouts pull the band back toward content.
 const CAMPAIGN_BACKDROP_MAX_EXTRA_GUTTER_PX = 600;
-const CAMPAIGN_COMPACT_WORKSPACE_BACKDROP_WIDTH_PX = 985;
+const CAMPAIGN_COMPACT_WORKSPACE_BACKDROP_WIDTH_PX =
+	CAMPAIGN_INITIAL_REVEAL_COMPACT_BAND_WIDTH_PX;
 const CAMPAIGN_COMPACT_WORKSPACE_LEFT_PANEL_INSET_PX = 52;
 const CAMPAIGN_COMPACT_WORKSPACE_TOP_NAV_INSET_PX = 184;
 // Below this layout-px width, non-overview tabs drop the split map strip: the translucent
@@ -1128,6 +1288,7 @@ const Murmur = () => {
 	const [viewportWidth, setViewportWidth] = useState(0);
 	const [viewportHeight, setViewportHeight] = useState(0);
 	const setPersistentMapConfig = usePersistentMapSetter();
+	const isPersistentMapFirstPainted = usePersistentMapFirstPaint();
 	const {
 		mood: globeWeatherMood,
 		temperatureF: globeWeatherTemperatureF,
@@ -1824,7 +1985,13 @@ const Murmur = () => {
 	const originParam = searchParams.get('origin');
 	const cameFromSearch = originParam === 'search';
 	const [isSearchEntryTransition] = useState(
-		() => cameFromSearch && consumeSearchToCampaignTransitionFlag()
+		() =>
+			cameFromSearch &&
+			(consumeSearchToCampaignTransitionFlag() ||
+				(typeof document !== 'undefined' &&
+					document.body.classList.contains(
+						SEARCH_TO_CAMPAIGN_TRANSITION_BODY_CLASS
+					)))
 	);
 	const [isSearchEntryContentVisible, setIsSearchEntryContentVisible] = useState(
 		() => !isSearchEntryTransition
@@ -1884,17 +2051,13 @@ const Murmur = () => {
 			return;
 		}
 
-		if (isPendingCampaign || !campaign) return;
-
 		const timer = window.setTimeout(() => {
 			setIsSearchEntryContentVisible(true);
 		}, CAMPAIGN_SEARCH_ENTRY_CONTENT_DELAY_MS);
 
 		return () => window.clearTimeout(timer);
 	}, [
-		campaign,
 		isMobile,
-		isPendingCampaign,
 		isSearchEntryContentVisible,
 		isSearchEntryTransition,
 	]);
@@ -1910,13 +2073,13 @@ const Murmur = () => {
 				CAMPAIGN_SEARCH_ENTRY_PENDING_CLASS,
 				SEARCH_TO_CAMPAIGN_TRANSITION_BODY_CLASS
 			);
+			delete body.dataset.searchToCampaignTab;
 		};
 	}, [isSearchEntryTransition]);
 
 	useLayoutEffect(() => {
 		if (!isSearchEntryTransition || typeof document === 'undefined') return;
 		const body = document.body;
-		body.classList.remove(SEARCH_TO_CAMPAIGN_TRANSITION_BODY_CLASS);
 		body.classList.toggle(
 			CAMPAIGN_SEARCH_ENTRY_PENDING_CLASS,
 			shouldHoldSearchEntryContent
@@ -1933,7 +2096,11 @@ const Murmur = () => {
 		}
 
 		const timer = window.setTimeout(() => {
-			document.body.classList.remove(CAMPAIGN_SEARCH_ENTRY_TRANSITION_CLASS);
+			document.body.classList.remove(
+				CAMPAIGN_SEARCH_ENTRY_TRANSITION_CLASS,
+				SEARCH_TO_CAMPAIGN_TRANSITION_BODY_CLASS
+			);
+			delete document.body.dataset.searchToCampaignTab;
 		}, CAMPAIGN_SEARCH_ENTRY_CONTENT_FADE_MS + 80);
 
 		return () => window.clearTimeout(timer);
@@ -2241,6 +2408,334 @@ const Murmur = () => {
 	};
 
 	const [activeView, setActiveViewInternal] = useState<ViewType>(getInitialView());
+	const [campaignInitialRevealPhase, setCampaignInitialRevealPhase] =
+		useState<CampaignInitialRevealPhase>(() =>
+			isSearchEntryTransition ? 'main' : 'map'
+		);
+	const campaignInitialRevealStartRef = useRef(Date.now());
+	const campaignInitialMapFirstPaintRef = useRef<number | null>(null);
+	const campaignInitialRevealGradientStartRef = useRef<number | null>(
+		isSearchEntryTransition ? campaignInitialRevealStartRef.current : null
+	);
+	const campaignInitialRevealBaseStartRef = useRef<number | null>(
+		isSearchEntryTransition ? campaignInitialRevealStartRef.current : null
+	);
+	const campaignInitialRevealViewRef = useRef<ViewType>(activeView);
+	const campaignInitialRevealClockResetRef = useRef(false);
+	const [isInitialActiveViewPainted, setIsInitialActiveViewPainted] = useState(false);
+	const [isInitialActiveViewContentReady, setIsInitialActiveViewContentReady] =
+		useState(false);
+	// True once the chrome zoom/shift vars have stopped changing (the resettle from
+	// DraftingSection mounting + envelope convergence is over). The reveal holds the
+	// gradient over the map until this is true so visible UI never rescales mid-fade.
+	const [isCampaignLayoutSettled, setIsCampaignLayoutSettled] = useState(false);
+	// True once the persistent map has received its campaign camera padding and that
+	// padding has gone quiet. This avoids revealing the gradient right before the map
+	// applies the split-layout camera push.
+	const [isCampaignMapCameraSettled, setIsCampaignMapCameraSettled] = useState(false);
+	const isCampaignInitialRevealActive = campaignInitialRevealPhase !== 'done';
+	const isCampaignInitialOpacityVisible =
+		!isCampaignInitialRevealActive || campaignInitialRevealPhase !== 'map';
+	const isCampaignInitialBaseVisible =
+		campaignInitialRevealPhase === 'base' ||
+		campaignInitialRevealPhase === 'main' ||
+		campaignInitialRevealPhase === 'done';
+	const isCampaignInitialMainVisible =
+		campaignInitialRevealPhase === 'main' ||
+		campaignInitialRevealPhase === 'done';
+	const campaignInitialOpacityLayerStyle = useMemo<CSSProperties | undefined>(
+		() =>
+			isCampaignInitialRevealActive
+				? {
+						opacity: isCampaignInitialOpacityVisible ? 1 : 0,
+						transition: `opacity ${CAMPAIGN_INITIAL_REVEAL_GRADIENT_FADE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+						willChange: 'opacity',
+					}
+				: undefined,
+		[isCampaignInitialOpacityVisible, isCampaignInitialRevealActive]
+	);
+	const campaignInitialBaseLayerStyle = useMemo<CSSProperties | undefined>(
+		() =>
+			isCampaignInitialRevealActive
+				? {
+						opacity: isCampaignInitialBaseVisible ? 1 : 0,
+						pointerEvents: isCampaignInitialBaseVisible ? undefined : 'none',
+						transition: `opacity ${CAMPAIGN_INITIAL_REVEAL_BASE_FADE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+						willChange: 'opacity',
+					}
+				: undefined,
+		[isCampaignInitialBaseVisible, isCampaignInitialRevealActive]
+	);
+	const campaignInitialMainLayerStyle = useMemo<CSSProperties | undefined>(
+		() =>
+			isCampaignInitialRevealActive
+				? {
+						opacity: isCampaignInitialMainVisible ? 1 : 0,
+						pointerEvents: isCampaignInitialMainVisible ? undefined : 'none',
+						transition: `opacity ${
+							isSearchEntryTransition
+								? CAMPAIGN_SEARCH_ENTRY_CONTENT_FADE_MS
+								: CAMPAIGN_INITIAL_REVEAL_MAIN_FADE_MS
+						}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+						willChange: 'opacity',
+					}
+				: undefined,
+		[
+			isCampaignInitialMainVisible,
+			isCampaignInitialRevealActive,
+			isSearchEntryTransition,
+		]
+	);
+	const advanceCampaignInitialRevealToGradient = useCallback(() => {
+		setCampaignInitialRevealPhase((phase) => {
+			if (phase !== 'map') return phase;
+			campaignInitialRevealGradientStartRef.current = Date.now();
+			return 'gradient';
+		});
+	}, []);
+	const advanceCampaignInitialRevealToBase = useCallback(() => {
+		setCampaignInitialRevealPhase((phase) => {
+			if (phase !== 'gradient' && phase !== 'map') return phase;
+			campaignInitialRevealBaseStartRef.current = Date.now();
+			return 'base';
+		});
+	}, []);
+	const advanceCampaignInitialRevealToMain = useCallback(() => {
+		setCampaignInitialRevealPhase((phase) => (phase === 'base' ? 'main' : phase));
+	}, []);
+
+	useEffect(() => {
+		if (campaignInitialRevealViewRef.current === activeView) return;
+		campaignInitialRevealViewRef.current = activeView;
+		if (campaignInitialRevealPhase === 'done') return;
+		setIsInitialActiveViewPainted(false);
+		setIsInitialActiveViewContentReady(false);
+		setIsCampaignLayoutSettled(false);
+		setIsCampaignMapCameraSettled(false);
+		// Only reset on tab/view changes during the initial reveal. Phase changes must
+		// not clear readiness that was just reported by the mounted DraftingSection.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [activeView]);
+
+	// Watch the chrome zoom/shift vars for convergence. The campaign chrome is scaled
+	// by --murmur-campaign-zoom (+ shift/backdrop vars) that recompute across several
+	// passes as DraftingSection mounts and its vertical envelope settles. We hold the
+	// element reveal until those passes go quiet so the visible UI fades in over an
+	// already-stable layout instead of resettling/resizing mid-fade.
+	useEffect(() => {
+		if (campaignInitialRevealPhase === 'done') return;
+		if (isMobile !== false) return;
+		if (!isInitialActiveViewPainted) return;
+		if (isCampaignLayoutSettled) return;
+
+		let cancelled = false;
+		let quietTimer: number | null = null;
+		let capTimer: number | null = null;
+
+		const markSettled = () => {
+			if (cancelled) return;
+			setIsCampaignLayoutSettled(true);
+		};
+		const resetQuiet = () => {
+			if (cancelled) return;
+			if (quietTimer !== null) window.clearTimeout(quietTimer);
+			quietTimer = window.setTimeout(markSettled, CAMPAIGN_LAYOUT_SETTLE_QUIET_MS);
+		};
+
+		// Start the quiet window now (the view just painted). Each subsequent zoom /
+		// envelope recompute pushes it back; once they stop, the layout has converged.
+		resetQuiet();
+		window.addEventListener(CAMPAIGN_ZOOM_EVENT, resetQuiet as EventListener);
+		window.addEventListener(
+			'murmur:campaign-envelope-changed',
+			resetQuiet as EventListener
+		);
+		// Safety cap: never hold the reveal on settling forever.
+		capTimer = window.setTimeout(markSettled, CAMPAIGN_LAYOUT_SETTLE_MAX_WAIT_MS);
+
+		return () => {
+			cancelled = true;
+			if (quietTimer !== null) window.clearTimeout(quietTimer);
+			if (capTimer !== null) window.clearTimeout(capTimer);
+			window.removeEventListener(CAMPAIGN_ZOOM_EVENT, resetQuiet as EventListener);
+			window.removeEventListener(
+				'murmur:campaign-envelope-changed',
+				resetQuiet as EventListener
+			);
+		};
+	}, [
+		campaignInitialRevealPhase,
+		isCampaignLayoutSettled,
+		isInitialActiveViewPainted,
+		isMobile,
+	]);
+
+	useEffect(() => {
+		if (campaignInitialRevealPhase !== 'map') return;
+		if (isMobile === null) return;
+
+		// Anchor the bare-map timing to when the page can actually make progress
+		// (device known + campaign detail resolved), not raw mount — a slow campaign
+		// fetch must not burn the safety cap while only the bare map is up.
+		if (!campaignInitialRevealClockResetRef.current && campaign) {
+			campaignInitialRevealClockResetRef.current = true;
+			campaignInitialRevealStartRef.current = Date.now();
+		}
+
+		// Mobile has no desktop split opacity/zoom system, so it can move straight to
+		// the base reveal.
+		if (isMobile === true) {
+			const elapsed = Date.now() - campaignInitialRevealStartRef.current;
+			const minDelay = Math.max(0, CAMPAIGN_INITIAL_REVEAL_MIN_MAP_MS - elapsed);
+			const timer = window.setTimeout(advanceCampaignInitialRevealToBase, minDelay);
+			return () => window.clearTimeout(timer);
+		}
+
+		// Absolutely never show the opacity/gradient layer before the persistent map's
+		// first-paint signal. No safety timer is allowed to bypass this: if Mapbox is
+		// slow, we stay on the bare map/loading shell rather than racing the gradient
+		// ahead of the map.
+		if (!isPersistentMapFirstPainted) return;
+
+		if (campaignInitialMapFirstPaintRef.current == null) {
+			campaignInitialMapFirstPaintRef.current = Date.now();
+		}
+		const elapsedSinceMapPaint =
+			Date.now() - campaignInitialMapFirstPaintRef.current;
+		const minDelay = Math.max(
+			0,
+			CAMPAIGN_INITIAL_REVEAL_MIN_MAP_MS - elapsedSinceMapPaint
+		);
+
+		// Desktop holds the BARE map until the map has painted, the workspace has
+		// mounted (invisibly), AND the chrome zoom/shift vars have converged. The
+		// opacity band that fades in next is positioned by those same vars, so waiting
+		// for settle here is what guarantees the band — and everything after it —
+		// appears over already-final geometry with no horizontal/scale resettle.
+		const isLayoutReadyForReveal =
+			isInitialActiveViewPainted &&
+			isCampaignLayoutSettled &&
+			isCampaignMapCameraSettled;
+
+		if (isLayoutReadyForReveal) {
+			const timer = window.setTimeout(
+				advanceCampaignInitialRevealToGradient,
+				minDelay
+			);
+			return () => window.clearTimeout(timer);
+		}
+
+		const maxDelay = Math.max(
+			minDelay,
+			CAMPAIGN_INITIAL_REVEAL_MAX_MAP_WAIT_MS - elapsedSinceMapPaint
+		);
+		const timer = window.setTimeout(advanceCampaignInitialRevealToGradient, maxDelay);
+		return () => window.clearTimeout(timer);
+	}, [
+		advanceCampaignInitialRevealToBase,
+		advanceCampaignInitialRevealToGradient,
+		campaign,
+		campaignInitialRevealPhase,
+		isCampaignLayoutSettled,
+		isCampaignMapCameraSettled,
+		isInitialActiveViewPainted,
+		isMobile,
+		isPersistentMapFirstPainted,
+	]);
+
+	useEffect(() => {
+		if (campaignInitialRevealPhase !== 'gradient') return;
+		if (isMobile === null) return;
+		if (!campaign) return;
+
+		// Search→campaign starts in the gradient phase so the transition acknowledges
+		// the click immediately. Hold the rest of the chrome behind that gradient until
+		// the invisible workspace has painted, the chrome geometry has settled, and the
+		// map-padding pan has effectively finished.
+		if (!campaignInitialRevealClockResetRef.current) {
+			campaignInitialRevealClockResetRef.current = true;
+			campaignInitialRevealGradientStartRef.current = Date.now();
+		}
+
+		const gradientStart =
+			campaignInitialRevealGradientStartRef.current ??
+			campaignInitialRevealStartRef.current;
+		const elapsed = Date.now() - gradientStart;
+		const minDelay = Math.max(0, CAMPAIGN_INITIAL_REVEAL_MIN_GRADIENT_MS - elapsed);
+
+		const isReadyForBaseReveal =
+			isMobile === true ||
+			(isInitialActiveViewPainted &&
+				isCampaignLayoutSettled &&
+				isCampaignMapCameraSettled);
+
+		if (isReadyForBaseReveal) {
+			const timer = window.setTimeout(advanceCampaignInitialRevealToBase, minDelay);
+			return () => window.clearTimeout(timer);
+		}
+
+		const maxDelay = Math.max(
+			minDelay,
+			CAMPAIGN_INITIAL_REVEAL_MAX_MAP_WAIT_MS - elapsed
+		);
+		const timer = window.setTimeout(advanceCampaignInitialRevealToBase, maxDelay);
+		return () => window.clearTimeout(timer);
+	}, [
+		advanceCampaignInitialRevealToBase,
+		campaign,
+		campaignInitialRevealPhase,
+		isCampaignLayoutSettled,
+		isCampaignMapCameraSettled,
+		isInitialActiveViewPainted,
+		isMobile,
+	]);
+
+	useEffect(() => {
+		if (campaignInitialRevealPhase !== 'base') return;
+		if (!isInitialActiveViewPainted) return;
+
+		const baseStart = campaignInitialRevealBaseStartRef.current ?? Date.now();
+		const elapsed = Date.now() - baseStart;
+		const minDelay = Math.max(0, CAMPAIGN_INITIAL_REVEAL_BASE_DWELL_MS - elapsed);
+
+		if (isInitialActiveViewContentReady || isMobile === true) {
+			const timer = window.setTimeout(advanceCampaignInitialRevealToMain, minDelay);
+			return () => window.clearTimeout(timer);
+		}
+
+		const maxDelay = Math.max(
+			minDelay,
+			CAMPAIGN_INITIAL_REVEAL_MAIN_MAX_WAIT_MS - elapsed
+		);
+		const timer = window.setTimeout(advanceCampaignInitialRevealToMain, maxDelay);
+		return () => window.clearTimeout(timer);
+	}, [
+		advanceCampaignInitialRevealToMain,
+		campaignInitialRevealPhase,
+		isInitialActiveViewContentReady,
+		isInitialActiveViewPainted,
+		isMobile,
+	]);
+
+	useEffect(() => {
+		if (campaignInitialRevealPhase !== 'main') return;
+		const timer = window.setTimeout(
+			() => setCampaignInitialRevealPhase('done'),
+			isSearchEntryTransition
+				? CAMPAIGN_SEARCH_ENTRY_CONTENT_FADE_MS
+				: CAMPAIGN_INITIAL_REVEAL_MAIN_FADE_MS
+		);
+		return () => window.clearTimeout(timer);
+	}, [campaignInitialRevealPhase, isSearchEntryTransition]);
+
+	const handleInitialContentReady = useCallback(
+		(readyView: DraftingSectionView) => {
+			if (readyView !== activeView) return;
+			setIsInitialActiveViewContentReady(true);
+		},
+		[activeView]
+	);
+
 	// When the user switches tabs, DraftingSection swaps out and we need to (re)observe
 	// the new bottom anchor(s) so the zoom clamp can auto-correct if they become clipped.
 	useLayoutEffect(() => {
@@ -2257,94 +2752,107 @@ const Murmur = () => {
 	// excludes the right-side UI panels. This must not affect dashboard/search and must
 	// reset on the Overview tab unless the Overview right-rail is present.
 	const shouldApplyCampaignMapCameraPadding = isMobile === false;
+	const computeCampaignMapCameraPaddingForView = useCallback(
+		(view: ViewType): SearchResultsMapProps['cameraPadding'] => {
+			if (typeof window === 'undefined') return null;
+			if (view === 'overview') return null;
+
+			try {
+				const html = document.documentElement;
+				const cs = window.getComputedStyle(html);
+				const zoomStr = cs.zoom;
+				const parsedZoom = zoomStr ? parseFloat(zoomStr) : Number.NaN;
+				const varZoomStr = cs.getPropertyValue(CAMPAIGN_ZOOM_VAR);
+				const parsedVarZoom = varZoomStr ? parseFloat(varZoomStr) : Number.NaN;
+				const z =
+					Number.isFinite(parsedZoom) && parsedZoom > 0 && parsedZoom !== 1
+						? parsedZoom
+						: Number.isFinite(parsedVarZoom) && parsedVarZoom > 0
+							? parsedVarZoom
+							: DEFAULT_CAMPAIGN_ZOOM;
+
+				const viewportW = window.innerWidth;
+				const layoutViewportWForStage = viewportW / (z || 1);
+				const isCompactWorkspaceActiveForStage =
+					isCompactCampaignWorkspaceView(view) &&
+					!isCampaignWorkspaceExpandedRef.current;
+				const centeredStageMaxLayoutW = isCompactWorkspaceActiveForStage
+					? CAMPAIGN_CENTERED_STAGE_COMPACT_MAX_LAYOUT_W_PX
+					: CAMPAIGN_CENTERED_STAGE_STANDARD_MAX_LAYOUT_W_PX;
+				if (layoutViewportWForStage < centeredStageMaxLayoutW) return null;
+
+				let backdropStartCss: number;
+				if (isCompactCampaignWorkspaceView(view)) {
+					// Anchor the globe to the COMPACT backdrop regardless of expand state,
+					// matching the campaign layout and the dashboard's optimistic handoff.
+					const layoutViewportW = viewportW / (z || 1);
+					backdropStartCss = Math.max(
+						0,
+						layoutViewportW - CAMPAIGN_COMPACT_WORKSPACE_BACKDROP_WIDTH_PX
+					);
+				} else {
+					const backdropStartStr =
+						html.style.getPropertyValue(CAMPAIGN_MAP_BACKDROP_START_VAR) ||
+						cs.getPropertyValue(CAMPAIGN_MAP_BACKDROP_START_VAR);
+					const parsed = backdropStartStr ? parseFloat(backdropStartStr) : Number.NaN;
+					if (!Number.isFinite(parsed) || parsed <= 0) {
+						return { right: 0, left: 0, top: 0, bottom: 0 };
+					}
+					backdropStartCss = parsed;
+				}
+
+				const backdropStartPx = backdropStartCss * (z || 1);
+				const uiCoveredRightPx = viewportW - backdropStartPx;
+				const CAMERA_PADDING_BACKOFF_PX = 550;
+				const rightPaddingPx = Math.max(
+					0,
+					Math.round(uiCoveredRightPx - CAMERA_PADDING_BACKOFF_PX)
+				);
+				return { right: rightPaddingPx, left: 0, top: 0, bottom: 0 };
+			} catch {
+				return null;
+			}
+		},
+		[CAMPAIGN_ZOOM_VAR, DEFAULT_CAMPAIGN_ZOOM]
+	);
 	const [campaignMapCameraPadding, setCampaignMapCameraPadding] =
-		useState<SearchResultsMapProps['cameraPadding']>(null);
+		useState<SearchResultsMapProps['cameraPadding']>(() =>
+			computeCampaignMapCameraPaddingForView(activeView)
+		);
+	useEffect(() => {
+		if (!isCampaignInitialRevealActive) return;
+		if (isMobile !== false) {
+			setIsCampaignMapCameraSettled(true);
+			return;
+		}
+
+		setIsCampaignMapCameraSettled(false);
+		const timer = window.setTimeout(
+			() => setIsCampaignMapCameraSettled(true),
+			CAMPAIGN_MAP_CAMERA_PADDING_SETTLE_MS
+		);
+		return () => window.clearTimeout(timer);
+	}, [
+		campaignMapCameraPadding?.top,
+		campaignMapCameraPadding?.right,
+		campaignMapCameraPadding?.bottom,
+		campaignMapCameraPadding?.left,
+		isCampaignInitialRevealActive,
+		isMobile,
+	]);
 	const recomputeCampaignMapCameraPadding = useCallback(() => {
-		if (typeof window === 'undefined') return;
-		const html = document.documentElement;
+		if (isMobile === null) return;
 		if (!shouldApplyCampaignMapCameraPadding) {
 			setCampaignMapCameraPadding(null);
 			return;
 		}
-
-		// Overview ("All" tab): keep the globe centered in the full viewport, matching the
-		// dashboard map. We intentionally do NOT apply right-side camera padding here (even
-		// when the Overview right rail is present), so the globe isn't pushed to the left.
-		// The other (compact) tabs keep their left-shifted padding via the branch below.
-		if (activeView === 'overview') {
-			setCampaignMapCameraPadding(null);
-			return;
-		}
-
-		try {
-			const cs = window.getComputedStyle(html);
-			const zoomStr = cs.zoom;
-			const parsedZoom = zoomStr ? parseFloat(zoomStr) : Number.NaN;
-			const varZoomStr = cs.getPropertyValue(CAMPAIGN_ZOOM_VAR);
-			const parsedVarZoom = varZoomStr ? parseFloat(varZoomStr) : Number.NaN;
-			const z =
-				Number.isFinite(parsedZoom) && parsedZoom > 0 && parsedZoom !== 1
-					? parsedZoom
-					: Number.isFinite(parsedVarZoom) && parsedVarZoom > 0
-						? parsedVarZoom
-						: DEFAULT_CAMPAIGN_ZOOM;
-
-			const viewportW = window.innerWidth;
-
-			// Centered stage: the band covers the full viewport, so there is no clear
-			// map strip to keep markers inside — center the globe like the overview tab.
-			// Mirrors the centered branch of updateCampaignZoomForViewport.
-			const layoutViewportWForStage = viewportW / (z || 1);
-			const isCompactWorkspaceActiveForStage =
-				isCompactCampaignWorkspaceView(activeView) &&
-				!isCampaignWorkspaceExpandedRef.current;
-			const centeredStageMaxLayoutW = isCompactWorkspaceActiveForStage
-				? CAMPAIGN_CENTERED_STAGE_COMPACT_MAX_LAYOUT_W_PX
-				: CAMPAIGN_CENTERED_STAGE_STANDARD_MAX_LAYOUT_W_PX;
-			if (layoutViewportWForStage < centeredStageMaxLayoutW) {
-				setCampaignMapCameraPadding(null);
-				return;
-			}
-
-			let backdropStartCss: number;
-			if (isCompactCampaignWorkspaceView(activeView)) {
-				// Anchor the globe to the COMPACT backdrop regardless of expand state, so
-				// expanding the workspace never shoves the globe further left (which drags
-				// its globe-projection limb into view as a black ring). Mirrors the compact
-				// branch of updateCampaignZoomForViewport.
-				const layoutViewportW = viewportW / (z || 1);
-				backdropStartCss = Math.max(
-					0,
-					layoutViewportW - CAMPAIGN_COMPACT_WORKSPACE_BACKDROP_WIDTH_PX
-				);
-			} else {
-				const backdropStartStr =
-					html.style.getPropertyValue(CAMPAIGN_MAP_BACKDROP_START_VAR) ||
-					cs.getPropertyValue(CAMPAIGN_MAP_BACKDROP_START_VAR);
-				const parsed = backdropStartStr ? parseFloat(backdropStartStr) : Number.NaN;
-				if (!Number.isFinite(parsed) || parsed <= 0) {
-					setCampaignMapCameraPadding({ right: 0, left: 0, top: 0, bottom: 0 });
-					return;
-				}
-				backdropStartCss = parsed;
-			}
-
-			// CSS vars are expressed in the unscaled (layout) coordinate space; multiply by the
-			// effective campaign zoom to convert to physical pixels.
-			const backdropStartPx = backdropStartCss * (z || 1);
-			const uiCoveredRightPx = viewportW - backdropStartPx;
-			// Back off a bit from the overlay boundary so the globe doesn't feel "too far left".
-			// This still keeps markers away from the main UI column, but preserves more center mass.
-			const CAMERA_PADDING_BACKOFF_PX = 550;
-			const rightPaddingPx = Math.max(
-				0,
-				Math.round(uiCoveredRightPx - CAMERA_PADDING_BACKOFF_PX)
-			);
-			setCampaignMapCameraPadding({ right: rightPaddingPx, left: 0, top: 0, bottom: 0 });
-		} catch {
-			setCampaignMapCameraPadding(null);
-		}
-	}, [activeView, shouldApplyCampaignMapCameraPadding]);
+		setCampaignMapCameraPadding(computeCampaignMapCameraPaddingForView(activeView));
+	}, [
+		activeView,
+		computeCampaignMapCameraPaddingForView,
+		isMobile,
+		shouldApplyCampaignMapCameraPadding,
+	]);
 	const [draftOperationsProgress, setDraftOperationsProgress] = useState<{
 		visible: boolean;
 		operations: Array<{ current: number; total: number }>;
@@ -3203,6 +3711,10 @@ const Murmur = () => {
 
 	const handleActiveViewReady = useCallback(
 		(readyView: DraftingSectionView) => {
+			if (readyView === activeView) {
+				setIsInitialActiveViewPainted(true);
+			}
+
 			// Only start fading once the destination view has actually painted.
 			if (!isTransitioning || !previousView) return;
 			if (readyView !== activeView) return;
@@ -3594,12 +4106,12 @@ const Murmur = () => {
 			isLoading: isCampaignMapContactsLoading,
 			skipAutoFit: true,
 		}),
-		[
-			activeView,
-			activeMapTool,
-			campaignMapCameraPadding,
-			isMobile,
-			campaignMapContactsForMap,
+			[
+				activeView,
+				activeMapTool,
+				campaignMapCameraPadding,
+				isMobile,
+				campaignMapContactsForMap,
 			effectiveCampaignMapSelectedContactIds,
 			effectiveCampaignSelectedContactObjectsForMap,
 			requestMapMarkerSelection,
@@ -3636,9 +4148,10 @@ const Murmur = () => {
 		[isMobile, persistentCampaignMapProps]
 	);
 
-	// Deferred to useEffect (not useLayoutEffect) so a tab switch paints the new tab UI immediately;
-	// the background map picks up the new config one frame later (imperceptible behind the content).
-	useEffect(() => {
+	// Publish before paint. Search→campaign uses the same singleton Mapbox instance;
+	// a one-frame config gap lets the map see "no campaign padding" and visibly ease
+	// back toward the Search framing before the Write/Drafts/Inbox framing takes over.
+	useLayoutEffect(() => {
 		setPersistentMapConfig(persistentCampaignMapConfig);
 	}, [persistentCampaignMapConfig, setPersistentMapConfig]);
 
@@ -3844,18 +4357,33 @@ const Murmur = () => {
 		activeView !== 'overview' &&
 		Boolean(campaign);
 
-	if (isPendingCampaign || !campaign) {
+	if (isPendingCampaign || !campaign || isMobile === null) {
 		return (
 			<CampaignDeviceProvider isMobile={isMobile} activeView={activeView}>
-				{null}
-			</CampaignDeviceProvider>
-		);
-	}
-
-	if (isMobile === null) {
-		return (
-			<CampaignDeviceProvider isMobile={isMobile} activeView={activeView}>
-				{null}
+				<div className="min-h-screen relative pointer-events-none">
+					{isMobile === false && activeView !== 'overview' && (
+						<div
+							aria-hidden="true"
+							data-campaign-initial-opacity-band
+							style={{
+								position: 'fixed',
+								top: 0,
+								bottom: 0,
+								left: `var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, calc(100% - ${CAMPAIGN_INITIAL_REVEAL_COMPACT_BAND_WIDTH_PX}px))`,
+								right: `calc(100% - var(${CAMPAIGN_MAP_BACKDROP_END_VAR}, 100%))`,
+								zIndex: 1,
+								background: 'rgba(136, 136, 136, 0.15)',
+								pointerEvents: 'none',
+								...campaignInitialOpacityLayerStyle,
+							}}
+						/>
+					)}
+					<CampaignInitialRevealGradientSurface
+						activeView={activeView}
+						phase={campaignInitialRevealPhase}
+						isMobile={isMobile}
+					/>
+				</div>
 			</CampaignDeviceProvider>
 		);
 	}
@@ -3977,17 +4505,28 @@ const Murmur = () => {
 						}
 					>
 						{usePersistentCampaignMapBackground && (
-							<div className="campaign-map-split-overlay" aria-hidden="true" />
+							<div
+								className="campaign-map-split-overlay"
+								aria-hidden="true"
+								style={campaignInitialOpacityLayerStyle}
+							/>
 						)}
+						<CampaignInitialRevealGradientSurface
+							activeView={activeView}
+							phase={campaignInitialRevealPhase}
+							isMobile={isMobile}
+						/>
 						{isMobile === false &&
 							activeView === 'overview' &&
 							!shouldHideContent && (
 							<div
+								data-campaign-initial-base-layer
 								className="pointer-events-none fixed inset-0"
 								style={{
 									transform: `scale(${CAMPAIGN_OVERVIEW_CLUSTER_SCALE})`,
 									transformOrigin: 'bottom center',
 									zIndex: 126,
+									...campaignInitialBaseLayerStyle,
 								}}
 							>
 								<CampaignOverviewStatusToggle
@@ -4043,11 +4582,13 @@ const Murmur = () => {
 							<>
 								{isPresetBottomClusterVisible && (
 									<div
+										data-campaign-initial-base-layer
 										className="pointer-events-none fixed inset-0"
 										style={{
 											transform: `scale(${presetMapControlsScale})`,
 											transformOrigin: `${presetMapControlsLeftCss} bottom`,
 											zIndex: 126,
+											...campaignInitialBaseLayerStyle,
 										}}
 									>
 										<CampaignOverviewStatusStrip
@@ -4072,6 +4613,7 @@ const Murmur = () => {
 								    data-campaign-overview-* attrs — DraftingSection queries those only to
 								    dock overview contacts, which never happens on these preset tabs. */}
 								<div
+									data-campaign-initial-base-layer
 									data-campaign-interactive-surface
 									className="fixed z-[130] pointer-events-none"
 									onMouseEnter={() => setIsPresetStripHovered(true)}
@@ -4081,8 +4623,15 @@ const Murmur = () => {
 										top: presetMapToolTopCss,
 										transform: `scale(${campaignMapSelectGrabViewScale})`,
 										transformOrigin: 'top left',
-										opacity: isPresetStripHovered ? 1 : 0.4,
-										transition: 'opacity 0.18s ease',
+										opacity: isCampaignInitialBaseVisible
+											? isPresetStripHovered
+												? 1
+												: 0.4
+											: 0,
+										transition: isCampaignInitialRevealActive
+											? `opacity ${CAMPAIGN_INITIAL_REVEAL_BASE_FADE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`
+											: 'opacity 0.18s ease',
+										pointerEvents: isCampaignInitialBaseVisible ? undefined : 'none',
 									}}
 								>
 									{/* Invisible hit-area spanning the whole column so hovering anywhere
@@ -4916,17 +5465,28 @@ const Murmur = () => {
 										) : null}
 									</>
 								);
+								const topNavRevealContent = campaignInitialBaseLayerStyle ? (
+									<div
+										data-campaign-initial-base-layer
+										style={campaignInitialBaseLayerStyle}
+									>
+										{topNavContent}
+									</div>
+								) : (
+									topNavContent
+								);
 
 								if (typeof window !== 'undefined') {
-									return createPortal(topNavContent, document.body);
+									return createPortal(topNavRevealContent, document.body);
 								}
 
-								return topNavContent;
+								return topNavRevealContent;
 							})()}
 
 						{isCampaignWorkspaceToggleVisible && (
 							<button
 								type="button"
+								data-campaign-initial-base-layer
 								data-campaign-workspace-toggle
 								aria-label={
 									isCampaignWorkspaceExpanded
@@ -4948,6 +5508,7 @@ const Murmur = () => {
 									height: '56px',
 									cursor: 'pointer',
 									color: '#777777',
+									...campaignInitialBaseLayerStyle,
 								}}
 							>
 								<svg
@@ -5173,7 +5734,12 @@ const Murmur = () => {
 						</div>
 
 						{/* Main content container */}
-						<div data-slot="campaign-content" className="relative">
+						<div
+							data-slot="campaign-content"
+							data-campaign-initial-main-layer
+							className="relative"
+							style={campaignInitialMainLayerStyle}
+						>
 							{shouldHideContent && (
 								<div
 									className={cn(
@@ -5270,6 +5836,7 @@ const Murmur = () => {
 												}
 												renderGlobalOverlays
 												onViewReady={handleActiveViewReady}
+												onInitialContentReady={handleInitialContentReady}
 												onDraftOperationsProgress={setDraftOperationsProgress}
 												autoOpenProfileTabWhenIncomplete={cameFromSearch}
 												inboxSentTabRequest={inboxSentTabRequest}

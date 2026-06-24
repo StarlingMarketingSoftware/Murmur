@@ -35,6 +35,10 @@ const CONTACT_EVENTS_QUERY_KEY = (id: string | number) =>
 const CONTACTS_QUERY_KEY = (id: string | number) =>
 	[...QUERY_KEYS.detail(id), 'contacts'] as const;
 
+// Exported so Dashboard Search can warm the exact same page-level campaign
+// contacts query that the campaign page's persistent map reads on mount.
+export const getCampaignContactsQueryKey = (id: string | number) => CONTACTS_QUERY_KEY(id);
+
 interface EditCampaignData {
 	id: string | number;
 	data: PatchCampaignData;
@@ -137,22 +141,24 @@ export const useGetCampaignContactEvents = (
 	});
 };
 
+export const fetchCampaignContacts = async (
+	campaignId: string | number
+): Promise<ContactWithName[]> => {
+	const response = await _fetch(urls.api.campaigns.contacts.index(campaignId));
+	if (!response.ok) {
+		throw new Error('Failed to fetch campaign contacts');
+	}
+	return response.json();
+};
+
 export const useGetCampaignContacts = (
 	campaignId?: string | number,
 	options: { enabled?: boolean } = {}
 ) => {
 	const enabled = (options.enabled ?? true) && Boolean(campaignId);
 	return useQuery<ContactWithName[]>({
-		queryKey: CONTACTS_QUERY_KEY(String(campaignId || '')),
-		queryFn: async () => {
-			const response = await _fetch(
-				urls.api.campaigns.contacts.index(campaignId as string | number)
-			);
-			if (!response.ok) {
-				throw new Error('Failed to fetch campaign contacts');
-			}
-			return response.json();
-		},
+		queryKey: getCampaignContactsQueryKey(String(campaignId || '')),
+		queryFn: () => fetchCampaignContacts(campaignId as string | number),
 		enabled,
 		// 5 min, matching the other campaign queries: avoids refetching contacts on quick
 		// dashboard<->campaign round-trips. Add-contacts mutations invalidate this key, which

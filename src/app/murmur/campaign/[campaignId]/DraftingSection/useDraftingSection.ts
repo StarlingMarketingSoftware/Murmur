@@ -139,6 +139,11 @@ export interface DraftingSectionProps {
 	 */
 	onViewReady?: (view: DraftingSectionView) => void;
 	/**
+	 * Called once the active view's primary first-load content is ready enough for
+	 * the campaign page's initial reveal to fade in the main workspace.
+	 */
+	onInitialContentReady?: (view: DraftingSectionView) => void;
+	/**
 	 * When true, renders viewport-fixed overlays (like the top drafting progress bar).
 	 * This should only be enabled on the "active" DraftingSection instance during tab crossfades.
 	 */
@@ -894,7 +899,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		[beginLivePreviewBatch, isLivePreviewVisible, livePreviewTotal]
 	);
 
-	const { data: signatures } = useGetSignatures();
+	const { data: signatures, isFetched: isSignaturesFetched } = useGetSignatures();
 
 	const form = useForm<DraftingFormValues>({
 		resolver: zodResolver(draftingFormSchema),
@@ -3329,7 +3334,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 	}, [signatures, form]);
 
 	useEffect(() => {
-		if (campaign && form && signatures?.length > 0 && isFirstLoad) {
+		if (campaign && form && isSignaturesFetched && isFirstLoad) {
 			// Check if campaign has the old default blocks (introduction, research, action)
 			const campaignBlocks = campaign.hybridBlockPrompts as HybridBlockPrompt[];
 			const hasOldDefaults =
@@ -3395,7 +3400,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 
 			setIsFirstLoad(false);
 		}
-	}, [campaign, form, signatures, isFirstLoad, saveCampaign]);
+	}, [campaign, form, signatures, isSignaturesFetched, isFirstLoad, saveCampaign]);
 
 	// Update signature when identity changes
 	useEffect(() => {

@@ -418,8 +418,13 @@ export interface LocationResult {
 	label: string;
 }
 
-export const useGetLocations = (query: string, mode?: 'state' | 'state-first') => {
+export const useGetLocations = (
+	query: string,
+	mode?: 'state' | 'state-first',
+	options: { enabled?: boolean } = {}
+) => {
 	const isStateOnly = mode === 'state';
+	const enabled = options.enabled ?? true;
 
 	return useQuery<LocationResult[]>({
 		queryKey: ['locations', query, mode],
@@ -437,7 +442,7 @@ export const useGetLocations = (query: string, mode?: 'state' | 'state-first') =
 			}
 			return response.json();
 		},
-		enabled: isStateOnly || query.length >= 1,
+		enabled: enabled && (isStateOnly || query.length >= 1),
 		staleTime: 1000 * 60 * 5, // 5 minutes
 	});
 };

@@ -1392,6 +1392,20 @@ export interface ContactsExpandedListProps {
 		requestId: number;
 	} | null;
 
+	/**
+	 * Controlled active Responses/Sent/Opportunities filter for inbox focus mode.
+	 * When provided, the filter bar mirrors this value while still reporting user
+	 * tab changes through `onInboxPanelTabChange`.
+	 */
+	activeInboxPanelTab?: DashboardResponsesTab;
+
+	/**
+	 * Fired whenever the inbox left panel's Responses/Sent/Opportunities filter
+	 * changes, so the campaign's bottom navigation row can mirror the active
+	 * sub-tab in its center box.
+	 */
+	onInboxPanelTabChange?: (tab: DashboardResponsesTab) => void;
+
 	onFocusContact?: (contactId: number) => void;
 	/**
 	 * One-shot request to scroll a contact row into view and highlight it. Consumed
@@ -1443,6 +1457,8 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	interactionMode = 'default',
 	focusMode = 'contacts',
 	inboxPanelTabRequest,
+	activeInboxPanelTab: controlledInboxPanelTab,
+	onInboxPanelTabChange,
 	onFocusContact,
 	focusContactRequest,
 }) => {
@@ -1482,7 +1498,16 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	}, [cancelPeekClear]);
 
 	const [hoveredUsedContactId, setHoveredUsedContactId] = useState<number | null>(null);
-	const [inboxPanelTab, setInboxPanelTab] = useState<DashboardResponsesTab>('responses');
+	const [internalInboxPanelTab, setInternalInboxPanelTab] =
+		useState<DashboardResponsesTab>('responses');
+	const inboxPanelTab = controlledInboxPanelTab ?? internalInboxPanelTab;
+	const setInboxPanelTab = useCallback(
+		(nextTab: DashboardResponsesTab) => {
+			setInternalInboxPanelTab(nextTab);
+			onInboxPanelTabChange?.(nextTab);
+		},
+		[onInboxPanelTabChange]
+	);
 	const [isInboxSearchOpen, setIsInboxSearchOpen] = useState(false);
 	const [inboxSearchQuery, setInboxSearchQuery] = useState('');
 	const inboxSearchContainerRef = useRef<HTMLDivElement | null>(null);
@@ -1618,7 +1643,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			setInboxPanelTab(inboxPanelTabRequest.tab);
 			return;
 		}
-		if (enteredInboxFocusMode) setInboxPanelTab('responses');
+		if (enteredInboxFocusMode && controlledInboxPanelTab == null) {
+			setInboxPanelTab('responses');
+		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isInboxFocusMode, inboxPanelTabRequest?.requestId]);
 	useEffect(() => {

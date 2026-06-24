@@ -12,16 +12,18 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
+import nextDynamic from 'next/dynamic';
 import { gsap } from 'gsap';
 import {
 	DraftingSectionProps,
 	useDraftingSection,
 	type DraftingFormValues,
+	type InboxPanelTabRequest,
 	type DraftingSectionView,
 } from './useDraftingSection';
 import { Form } from '@/components/ui/form';
 import { useForm } from 'react-hook-form';
-import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
+import { HybridPromptInputSkeleton } from '@/components/molecules/HybridPromptInput/HybridPromptInputSkeleton';
 import { ProfileSidePanelBox } from '@/components/molecules/HybridPromptInput/ProfileSidePanelBox';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 // EmailGeneration kept available but not used in current view
@@ -311,6 +313,7 @@ interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 }
 
 type CampaignBottomPanelKind = 'contacts' | 'drafts' | 'sent' | 'inbox';
+type InboxPanelTab = InboxPanelTabRequest['tab'];
 
 // Row-aligned abridged research card hovered to the left of the pinned contact
 // list (Write / Drafts / Inbox tabs). Mirrors the dashboard map-panel hover
@@ -336,11 +339,22 @@ const ROW_HOVER_OPPORTUNITY_DOCKED_LEFT_PX = -(
 	OPPORTUNITY_HOVER_PANEL_WIDTH_PX + ROW_HOVER_RESEARCH_GAP_PX
 );
 
+const HybridPromptInput = nextDynamic(
+	() =>
+		import('@/components/molecules/HybridPromptInput/HybridPromptInput').then(
+			(mod) => mod.HybridPromptInput
+		),
+	{
+		loading: () => <HybridPromptInputSkeleton />,
+	}
+);
+
 export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const {
 		view = 'testing',
 		renderGlobalOverlays = true,
 		onViewReady,
+		onInitialContentReady,
 		goToOverview,
 		goToDrafting,
 		goToWriting,
@@ -432,10 +446,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		generationTotal,
 		scoreFullAutomatedPrompt,
 		critiqueManualEmailText,
+		isFirstLoad,
 		// These are kept available for future use but not in current view:
 		// setGenerationProgress,
 		// cancelGeneration,
-		// isFirstLoad,
 		// scrollToEmailStructure,
 		draftingRef,
 		emailStructureRef,
@@ -514,6 +528,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const router = useRouter();
 	const isMobile = useIsMobile();
+	const [activeInboxPanelTab, setActiveInboxPanelTab] =
+		useState<InboxPanelTab>('responses');
 	const [localInboxSentTabRequest, setLocalInboxSentTabRequest] = useState<{
 		tab: 'inbox' | 'sent';
 		requestId: number;
@@ -523,13 +539,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		localInboxSentTabRequest.requestId > (inboxSentTabRequest?.requestId ?? 0)
 			? localInboxSentTabRequest
 			: inboxSentTabRequest;
+	useEffect(() => {
+		if (!inboxPanelTabRequest) return;
+		setActiveInboxPanelTab(inboxPanelTabRequest.tab);
+	}, [inboxPanelTabRequest?.requestId, inboxPanelTabRequest?.tab]);
 	const openInboxTab = useCallback(() => {
+		setActiveInboxPanelTab('responses');
 		setLocalInboxSentTabRequest((prev) => ({
 			tab: 'inbox',
 			requestId: Math.max(prev?.requestId ?? 0, inboxSentTabRequest?.requestId ?? 0) + 1,
 		}));
 		goToInbox?.();
 	}, [goToInbox, inboxSentTabRequest?.requestId]);
+	const openInboxSentPanelTab = useCallback(() => {
+		setActiveInboxPanelTab('sent');
+		goToSent?.();
+	}, [goToSent]);
+	const openInboxOpportunitiesPanelTab = useCallback(() => {
+		setActiveInboxPanelTab('opportunities');
+		onOpenOpportunities?.();
+	}, [onOpenOpportunities]);
 	// `contentView` (not `view`) so the Write-tab batch review renders the full drafts
 	// experience (draft preview open, research reflects the open draft, drafts-mode left list).
 	const isDraftingView = contentView === 'drafting';
@@ -1682,7 +1711,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const debouncedWhereValue = useDebounce(searchWhereValue, 300);
 	const { data: locationResults, isLoading: isLoadingLocations } = useGetLocations(
 		debouncedWhereValue,
-		'state'
+		'state',
+		{ enabled: view === 'search' }
 	);
 	const isPromotion = searchWhyValue === '[Promotion]';
 
@@ -2762,7 +2792,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	}, [activelyDraftingContactIds, contactedContactIds, shouldPaceContactsList]);
 
 	// Fetch inbound emails for history panel
-	const { data: inboundEmails } = useGetInboundEmails({
+	const {
+		data: inboundEmails,
+		isPending: isPendingInboundEmails,
+		isLoading: isLoadingInboundEmails,
+	} = useGetInboundEmails({
 		filters: { campaignId: campaign?.id },
 		enabled: Boolean(campaign?.id),
 	});
@@ -4193,7 +4227,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		? inboxMockData.contactByEmail
 		: campaignContactsByEmailReal;
 	const { data: allInboundEmailsForContactsTable } = useGetInboundEmails({
-		enabled: Boolean(contacts?.length) && !inboxMockOverrideActive,
+		enabled:
+			Boolean(contacts?.length) &&
+			!inboxMockOverrideActive &&
+			(contentView === 'inbox' || view === 'inbox'),
 	});
 	const inboxEmailsForContactsExpandedListReal = useMemo(() => {
 		if (!allInboundEmailsForContactsTable || !contacts?.length) return [];
@@ -4426,6 +4463,33 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// harness supplies its own data, so it never shows the skeleton.
 	const isMobileSummaryLoading =
 		!inboxMockData && (isContactsLoading || isPendingEmails);
+	const isInitialContentLoading =
+		!inboxMockData &&
+		(contentView === 'testing'
+			? isContactsLoading
+			: contentView === 'drafting' || contentView === 'sent'
+				? isContactsLoading || isPendingEmails
+				: contentView === 'inbox'
+					? isContactsLoading ||
+						isPendingEmails ||
+						isPendingInboundEmails ||
+						isLoadingInboundEmails
+					: contentView === 'summary'
+						? isMobileSummaryLoading
+						: contentView === 'overview'
+							? Boolean(overviewRightRailSearchContactsLoading)
+							: false);
+
+	useEffect(() => {
+		if (!renderGlobalOverlays) return;
+		if (isInitialContentLoading) return;
+		onInitialContentReady?.(view);
+	}, [
+		isInitialContentLoading,
+		onInitialContentReady,
+		renderGlobalOverlays,
+		view,
+	]);
 
 	// Mobile Summary view data: ongoing conversations (≥1 inbound reply) first, then
 	// drafts, then the remaining plain contacts. Conversations thread the campaign's
@@ -5056,35 +5120,42 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		</div>
 	);
 
-	// Inbox/Sent bottom navigation row. Mirrors the Write/Drafts bars (same centered
-	// slot, square nav boxes, gap + height), but the middle is a read-only count box
-	// (112×40) that reports how many emails the active tab holds: blue (#8ECAD5) on
-	// Inbox, green on Sent. Flanked by the other tabs' counters, a search box, and the
-	// opportunities (star) box, keeping the row consistent across every campaign tab.
+	// Inbox bottom navigation row. Mirrors the Write/Drafts bars with exactly
+	// three small boxes on each side of the center slot. The center follows the
+	// inbox contacts panel's active sub-tab (Responses/Sent/Opportunities), not
+	// the page-level view, because Sent is routed through the Inbox page view.
 	const renderInboxSentBottomBar = () => {
-		const isSent = view === 'sent';
-		const centerCount = isSent ? sentCount : inboxCount;
-		const centerBackground = isSent ? '#5AB478' : '#8ECAD5';
-		const centerStyle: CSSProperties = {
+		const centerBoxStyle = (background: string): CSSProperties => ({
+			...boxStyle,
 			width: 112,
 			height: writeDraftBottomBarHeightPx,
 			borderRadius: 9,
 			border: '1px solid #000',
-			background: centerBackground,
+			background,
 			boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-			boxSizing: 'border-box',
-			display: 'flex',
-			alignItems: 'center',
-			justifyContent: 'center',
-			fontFamily: 'Inter, sans-serif',
-			fontSize: 17,
-			fontWeight: 500,
-			lineHeight: 1,
-			color: '#000',
-		};
-		const starBox = (
+		});
+		const searchBox = (opacity: number) => (
 			<button
-				key="opportunities"
+				type="button"
+				aria-label="Open search"
+				disabled={!onGoToSearch}
+				className={cn(
+					'border-0 p-0 transition-opacity duration-150',
+					onGoToSearch && 'hover:opacity-85'
+				)}
+				style={{
+					...boxStyle,
+					background: '#FFFFFF',
+					opacity,
+					cursor: onGoToSearch ? 'pointer' : 'default',
+				}}
+				onClick={onGoToSearch}
+			>
+				<SearchIconDesktop width={17} height={18} stroke="#8B8B8B" strokeWidth={2.3} />
+			</button>
+		);
+		const opportunitiesSideBox = (opacity: number) => (
+			<button
 				type="button"
 				aria-label="Open inbox opportunities"
 				disabled={!onOpenOpportunities}
@@ -5095,30 +5166,44 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				style={{
 					...boxStyle,
 					background: '#EFD7D3',
+					opacity,
 					cursor: onOpenOpportunities ? 'pointer' : 'default',
 				}}
-				onClick={onOpenOpportunities}
+				onClick={openInboxOpportunitiesPanelTab}
 			>
 				<DashboardActionBarStarIcon width={15} height={15} style={{ color: '#E32222' }} />
 			</button>
 		);
-		const searchBox = (
-			<button
-				key="search"
-				type="button"
-				aria-label="Open search"
-				className="border-0 p-0 transition-opacity duration-150 hover:opacity-85"
-				style={{
-					...boxStyle,
-					background: '#FFFFFF',
-					opacity: 0.2,
-					cursor: onGoToSearch ? 'pointer' : 'default',
-				}}
-				onClick={onGoToSearch}
-			>
-				<SearchIconDesktop width={17} height={18} stroke="#8B8B8B" strokeWidth={2.3} />
-			</button>
-		);
+		const inboxSideBox = (opacity?: number) =>
+			counterBox({
+				label: 'inbox',
+				count: inboxCount,
+				background: '#6EBED5',
+				opacity,
+				onClick: inboxCount > 0 ? openInboxTab : undefined,
+			});
+		const sentSideBox = (opacity?: number) =>
+			counterBox({
+				label: 'sent',
+				count: sentCount,
+				background: '#5AB478',
+				opacity,
+				onClick: sentCount > 0 ? openInboxSentPanelTab : undefined,
+			});
+		const centerTab = activeInboxPanelTab;
+		const centerCount = centerTab === 'sent' ? sentCount : inboxCount;
+		const centerLabel = centerTab === 'sent' ? 'sent' : 'inbox';
+		const centerBackground = centerTab === 'sent' ? '#5AB478' : '#8ECAD5';
+		const centerBox =
+			centerTab === 'opportunities' ? (
+				<div aria-label="Inbox opportunities" style={centerBoxStyle('#EFD7D3')}>
+					<DashboardActionBarStarIcon width={15} height={15} style={{ color: '#E32222' }} />
+				</div>
+			) : (
+				<div aria-label={`${centerCount} ${centerLabel}`} style={centerBoxStyle(centerBackground)}>
+					{centerCount}
+				</div>
+			);
 
 		return (
 			<div
@@ -5126,8 +5211,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				className="flex items-center"
 				style={{ gap: 3, height: writeDraftBottomBarHeightPx }}
 			>
-				{blankBox('left-1', 0.1)}
-				{searchBox}
+				{searchBox(0.1)}
 				{counterBox({
 					label: 'contacts',
 					count: contactsCount,
@@ -5139,32 +5223,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					label: 'drafts',
 					count: draftCount,
 					background: '#FFE3AA',
-					opacity: 0.2,
 					onClick: draftCount > 0 ? goToDrafting : undefined,
 				})}
-				<div
-					aria-label={`${centerCount} ${isSent ? 'sent' : 'inbox'}`}
-					style={centerStyle}
-				>
-					{centerCount}
-				</div>
-				{isSent
-					? counterBox({
-							label: 'inbox',
-							count: inboxCount,
-							background: '#6EBED5',
-							opacity: 0.2,
-							onClick: inboxCount > 0 ? openInboxTab : undefined,
-						})
-					: counterBox({
-							label: 'sent',
-							count: sentCount,
-							background: '#5AB478',
-							opacity: 0.2,
-							onClick: sentCount > 0 ? goToSent : undefined,
-						})}
-				{starBox}
-				{blankBox('right-1', 0.1)}
+				{centerBox}
+				{centerTab === 'sent' || centerTab === 'opportunities'
+					? inboxSideBox()
+					: sentSideBox()}
+				{centerTab === 'opportunities' ? sentSideBox(0.2) : opportunitiesSideBox(0.2)}
+				{searchBox(0.1)}
 			</div>
 		);
 	};
@@ -5725,6 +5791,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														campaign={campaign}
 														focusMode="inbox"
 														inboxPanelTabRequest={inboxPanelTabRequest}
+														activeInboxPanelTab={activeInboxPanelTab}
+														onInboxPanelTabChange={setActiveInboxPanelTab}
 														selectedInboxEmailId={selectedInboxEmailId}
 														onInboxEmailClick={handleInboxEmailClick}
 														onContactHover={handleResearchContactHover}
@@ -7697,6 +7765,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div data-campaign-interactive-surface>
 												{isPersistedSendQueueUiVisible ? (
 													renderQueueDeck()
+												) : isFirstLoad ? (
+													<HybridPromptInputSkeleton />
 												) : (
 													<HybridPromptInput
 														trackFocusedField={trackFocusedField}
@@ -7893,6 +7963,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									<div className="flex flex-col items-center">
 										{isPersistedSendQueueUiVisible ? (
 											renderQueueDeck()
+										) : isFirstLoad ? (
+											<HybridPromptInputSkeleton />
 										) : (
 											<HybridPromptInput
 												trackFocusedField={trackFocusedField}
@@ -10262,6 +10334,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													campaign={campaign}
 													focusMode="inbox"
 													inboxPanelTabRequest={inboxPanelTabRequest}
+													activeInboxPanelTab={activeInboxPanelTab}
+													onInboxPanelTabChange={setActiveInboxPanelTab}
 													selectedInboxEmailId={selectedInboxEmailId}
 													onInboxEmailClick={handleInboxEmailClick}
 													onContactHover={handleResearchContactHover}
@@ -10300,6 +10374,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															campaign={campaign}
 															focusMode="inbox"
 															inboxPanelTabRequest={inboxPanelTabRequest}
+															activeInboxPanelTab={activeInboxPanelTab}
+															onInboxPanelTabChange={setActiveInboxPanelTab}
 															selectedInboxEmailId={selectedInboxEmailId}
 															onInboxEmailClick={handleInboxEmailClick}
 															onContactHover={handleResearchContactHover}

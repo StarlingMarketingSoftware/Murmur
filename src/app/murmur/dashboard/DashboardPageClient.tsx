@@ -226,6 +226,8 @@ import {
 	useGetCampaigns,
 	getCampaignDetailQueryKey,
 	fetchCampaignDetail,
+	getCampaignContactsQueryKey,
+	fetchCampaignContacts,
 } from '@/hooks/queryHooks/useCampaigns';
 import { useCampaignTopNavScheme } from '@/hooks/useCampaignTopNavScheme';
 import {
@@ -256,7 +258,11 @@ import {
 	SendQueueViewProvider,
 	useSendQueueView,
 } from '@/contexts/SendQueueViewContext';
-import { useSendQueue } from '@/hooks/queryHooks/useSendQueue';
+import {
+	SEND_QUEUE_QUERY_KEYS,
+	fetchSendQueue,
+	useSendQueue,
+} from '@/hooks/queryHooks/useSendQueue';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -3377,13 +3383,13 @@ const DashboardContent = () => {
 	// ── Profile search mode (the bottom "Profile" pill) ────────────────────────
 	// Folds identity-derived signals (genre/area/bio) into the search. Page-level
 	// state + ref so the stable submit callback can read it, mirroring keyword/radius.
-	// Enabled by DEFAULT — like a search engine personalizing results out of the
-	// box, a new user's "Search Anything" results are biased toward their genre and
-	// anchored near their set location until they explicitly opt out. The Profile
-	// pill toggles it off; an active free-text rehydration (the `ftProfile` effect
-	// below) still restores whatever state that specific search actually ran with.
-	const [isProfileModeEnabled, setIsProfileModeEnabled] = useState(true);
-	const isProfileModeEnabledRef = useRef(true);
+	// Disabled by DEFAULT — a plain "Search Anything" should return unbiased
+	// results, and the user explicitly opts in via the Profile pill to personalize
+	// toward their genre/location. The Profile pill toggles it on; an active
+	// free-text rehydration (the `ftProfile` effect below) still restores whatever
+	// state that specific search actually ran with.
+	const [isProfileModeEnabled, setIsProfileModeEnabled] = useState(false);
+	const isProfileModeEnabledRef = useRef(false);
 	useEffect(() => {
 		isProfileModeEnabledRef.current = isProfileModeEnabled;
 	}, [isProfileModeEnabled]);
@@ -4719,10 +4725,10 @@ const DashboardContent = () => {
 		return { contactListIds: lists.map((list) => list.id) };
 	}, [dashboardSearchCampaign]);
 
-	// The emails/inbound-emails queries key on the NUMERIC campaign id (every campaign-page
+	// Some campaign-page queries key on the NUMERIC campaign id (every campaign-page
 	// caller passes `campaign.id` / `Number(params.campaignId)`); a string id would warm a
 	// key nobody reads. null when we can't resolve a numeric id.
-	const prefetchEmailsCampaignId = useMemo(() => {
+	const prefetchNumericCampaignId = useMemo(() => {
 		if (dashboardSearchCampaign?.id != null) return dashboardSearchCampaign.id;
 		const parsed = Number(mapCampaignId);
 		return mapCampaignId && Number.isFinite(parsed) ? parsed : null;
@@ -4739,28 +4745,59 @@ const DashboardContent = () => {
 	);
 	const [optimisticSearchToCampaignTab, setOptimisticSearchToCampaignTab] =
 		useState<'write' | 'drafts' | 'inbox' | 'sent' | 'all' | null>(null);
+	// Latch: true from the instant a search → campaign tab handoff is armed until it
+	// completes (this page unmounts) or is abandoned (the safety timeout below). The
+	// dashboard stays mounted and interactive while Next.js loads the campaign route,
+	// and the shared persistent map keeps firing THIS page's handlers. Any dashboard
+	// self-navigation (a router.replace on the dashboard URL) during that window would
+	// supersede the in-flight router.push and bounce the user back to the dashboard —
+	// which reads as "the tab I clicked got undone" when you play with the map mid-
+	// transition. While this is set, the URL-mirror effects and the map gestures that
+	// would start a new dashboard search all bail, so the campaign push always wins.
+	const isLeavingForCampaignRef = useRef(false);
 
-	const armSearchToCampaignTransition = useCallback(() => {
+	// Arm the leaving-for-campaign latch for any dashboard → campaign navigation. The
+	// dashboard stays mounted on the shared persistent map while Next.js loads the
+	// campaign route, so this stands the dashboard's own URL writers down until the
+	// handoff completes (unmount) or is abandoned (the timeout self-heals control).
+	const beginCampaignHandoffLatch = useCallback(() => {
+		isLeavingForCampaignRef.current = true;
 		if (typeof window === 'undefined') return;
-
-		try {
-			window.sessionStorage.setItem(
-				SEARCH_TO_CAMPAIGN_TRANSITION_KEY,
-				String(Date.now())
-			);
-		} catch {
-			// Best-effort only: navigation should never depend on transition storage.
-		}
-
-		document.body.classList.add(SEARCH_TO_CAMPAIGN_TRANSITION_BODY_CLASS);
-
-		// If navigation is interrupted or the route chunk is unusually slow, do not leave
-		// the dashboard chrome faded forever. The campaign page also removes this class
-		// when it mounts/reveals.
 		window.setTimeout(() => {
-			document.body.classList.remove(SEARCH_TO_CAMPAIGN_TRANSITION_BODY_CLASS);
+			isLeavingForCampaignRef.current = false;
 		}, 6000);
 	}, []);
+
+	const armSearchToCampaignTransition = useCallback(
+		(tab?: 'write' | 'drafts' | 'inbox' | 'sent' | 'all') => {
+			if (typeof window === 'undefined') return;
+
+			try {
+				window.sessionStorage.setItem(
+					SEARCH_TO_CAMPAIGN_TRANSITION_KEY,
+					String(Date.now())
+				);
+			} catch {
+				// Best-effort only: navigation should never depend on transition storage.
+			}
+
+			document.body.classList.add(SEARCH_TO_CAMPAIGN_TRANSITION_BODY_CLASS);
+			if (tab) {
+				document.body.dataset.searchToCampaignTab = tab;
+			} else {
+				delete document.body.dataset.searchToCampaignTab;
+			}
+
+			// If navigation is interrupted or the route chunk is unusually slow, do not leave
+			// the dashboard chrome faded forever. The campaign page also removes this class
+			// when it mounts/reveals.
+			window.setTimeout(() => {
+				document.body.classList.remove(SEARCH_TO_CAMPAIGN_TRANSITION_BODY_CLASS);
+				delete document.body.dataset.searchToCampaignTab;
+			}, 6000);
+		},
+		[]
+	);
 
 	// The ask-box flanking nav boxes jump to the in-scope campaign's tabs, reusing
 	// the same push pattern as the map-view tab buttons below.
@@ -4769,7 +4806,12 @@ const DashboardContent = () => {
 			if (!mapCampaignId) return;
 			const href = `${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=${tab}${campaignReturnAddedSuffix()}`;
 
-			armSearchToCampaignTransition();
+			// Latch the handoff BEFORE any state commit so the URL-mirror effects and
+			// map-search gestures that this same click frame (or a mid-transition map
+			// interaction) could trigger see the page as "leaving" and stand down. This
+			// guarantees the campaign push below is the last navigation that runs.
+			beginCampaignHandoffLatch();
+			armSearchToCampaignTransition(tab);
 			// Commit the visual state before handing control to the App Router. This makes
 			// the tab switch feel accepted on the click frame: dashboard chrome fades and
 			// the persistent map starts easing toward the campaign framing while the route
@@ -4784,7 +4826,13 @@ const DashboardContent = () => {
 				router.push(href);
 			});
 		},
-		[armSearchToCampaignTransition, mapCampaignId, router, campaignReturnAddedSuffix]
+		[
+			armSearchToCampaignTransition,
+			beginCampaignHandoffLatch,
+			mapCampaignId,
+			router,
+			campaignReturnAddedSuffix,
+		]
 	);
 
 	const navigateToCampaignTab = useCallback(
@@ -4828,12 +4876,31 @@ const DashboardContent = () => {
 				staleTime: 1000 * 60 * 60, // match useGetContacts so the page won't refetch
 			});
 		}
+		// Tier 3 (medium): the page-level campaign contacts — this is the query the
+		// campaign page uses to feed the persistent map on desktop. The DraftingSection's
+		// main contact list is warmed above via the contact-list filter.
+		if (prefetchNumericCampaignId != null && isMobile === false) {
+			queryClient.prefetchQuery({
+				queryKey: getCampaignContactsQueryKey(prefetchNumericCampaignId),
+				queryFn: () => fetchCampaignContacts(prefetchNumericCampaignId),
+				staleTime: 1000 * 60 * 5,
+			});
+		}
+		// Tier 3 (light/medium): send queue count/items — this is read by both the
+		// campaign page header/map affordance and the DraftingSection.
+		if (prefetchNumericCampaignId != null) {
+			queryClient.prefetchQuery({
+				queryKey: SEND_QUEUE_QUERY_KEYS.list(prefetchNumericCampaignId),
+				queryFn: () => fetchSendQueue(prefetchNumericCampaignId),
+				staleTime: 1000 * 60 * 5,
+			});
+		}
 		// Tier 3 (heavy): the campaign's emails + inbound emails — these gate the
 		// Drafts/Sent/Inbox lists and the header counts on every campaign tab.
 		// 5-min staleTime matches the global default useGetEmails inherits, so the
 		// page reads the prefetched entry without refetching on mount.
-		if (prefetchEmailsCampaignId != null) {
-			const emailFilters = { campaignId: prefetchEmailsCampaignId };
+		if (prefetchNumericCampaignId != null) {
+			const emailFilters = { campaignId: prefetchNumericCampaignId };
 			queryClient.prefetchQuery({
 				queryKey: getEmailsListQueryKey(emailFilters),
 				queryFn: () => fetchEmailsList(emailFilters),
@@ -4845,7 +4912,13 @@ const DashboardContent = () => {
 				staleTime: 1000 * 60 * 5,
 			});
 		}
-	}, [queryClient, mapCampaignId, prefetchContactsFilter, prefetchEmailsCampaignId]);
+	}, [
+		queryClient,
+		mapCampaignId,
+		prefetchContactsFilter,
+		prefetchNumericCampaignId,
+		isMobile,
+	]);
 
 	// Fire Tier 1 immediately on hover/focus; gate Tier 2/3 behind ~120ms of sustained
 	// hover (or pointerdown) so an incidental pass-over doesn't trigger the large fetch.
@@ -4886,7 +4959,39 @@ const DashboardContent = () => {
 		if (isMapView && mapCampaignId) prefetchCampaignRoute();
 	}, [isMapView, mapCampaignId, prefetchCampaignRoute]);
 
-	// Also warm the campaign page's heavy DraftingSection async chunk on idle.
+	// Eagerly warm the campaign data once the Search map is stable, not only on
+	// hover. This makes touch/keyboard/fast-click entries benefit from the same warm
+	// React Query state as repeat transitions, while still yielding to first paint.
+	const idlePrefetchedCampaignData = useRef<Set<string>>(new Set());
+	useEffect(() => {
+		if (!isMapView || !mapCampaignId || isMobile === null) return;
+		if (idlePrefetchedCampaignData.current.has(mapCampaignId)) return;
+		idlePrefetchedCampaignData.current.add(mapCampaignId);
+
+		let didRun = false;
+		const warm = () => {
+			didRun = true;
+			prefetchCampaignData();
+		};
+		const idle = window as unknown as {
+			requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number;
+			cancelIdleCallback?: (handle: number) => void;
+		};
+		if (typeof idle.requestIdleCallback === 'function') {
+			const handle = idle.requestIdleCallback(warm, { timeout: 2000 });
+			return () => {
+				idle.cancelIdleCallback?.(handle);
+				if (!didRun) idlePrefetchedCampaignData.current.delete(mapCampaignId);
+			};
+		}
+		const timer = window.setTimeout(warm, 800);
+		return () => {
+			window.clearTimeout(timer);
+			if (!didRun) idlePrefetchedCampaignData.current.delete(mapCampaignId);
+		};
+	}, [isMapView, mapCampaignId, isMobile, prefetchCampaignData]);
+
+	// Also warm the campaign page's heavy async chunks on idle.
 	// router.prefetch above only loads the route's own chunks — the nextDynamic
 	// import inside the campaign page starts downloading only when it renders,
 	// which is exactly the first-switch wait this removes. Webpack resolves this
@@ -4897,10 +5002,17 @@ const DashboardContent = () => {
 		if (!isMapView || !mapCampaignId) return;
 		if (hasWarmedDraftingSectionChunkRef.current) return;
 		hasWarmedDraftingSectionChunkRef.current = true;
-		const warm = () =>
+		const warm = () => {
 			void import(
 				'@/app/murmur/campaign/[campaignId]/DraftingSection/DraftingSection'
 			).catch(() => undefined);
+			void import(
+				'@/components/organisms/_dialogs/IdentityDialog/IdentityDialog'
+			).catch(() => undefined);
+			void import(
+				'@/components/molecules/HybridPromptInput/HybridPromptInput'
+			).catch(() => undefined);
+		};
 		const idle = window as unknown as {
 			requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number;
 			cancelIdleCallback?: (handle: number) => void;
@@ -4949,6 +5061,10 @@ const DashboardContent = () => {
 
 	const handleMapStateSelect = useCallback(
 		(stateName: string) => {
+			// A campaign tab handoff is in flight (the dashboard is still mounted on the
+			// shared map while the campaign route loads). Starting a new state search now
+			// would update the dashboard URL and undo the tab switch — ignore it.
+			if (isLeavingForCampaignRef.current) return;
 			// In demo mode, show the free trial prompt instead of searching
 			if (isFromHomeDemoMode) {
 				setShowFreeTrialPrompt(true);
@@ -5584,6 +5700,9 @@ const DashboardContent = () => {
 	// in the same place (normal dashboard flow).
 	useEffect(() => {
 		if (isAddToCampaignMode) return;
+		// A search → campaign tab handoff is in flight. Writing the dashboard URL now
+		// would replace the pending campaign push and bounce the user back here.
+		if (isLeavingForCampaignRef.current) return;
 		if (!hasSearched) return;
 		if (!activeSearchQuery || activeSearchQuery.trim().length === 0) return;
 
@@ -5668,6 +5787,8 @@ const DashboardContent = () => {
 		prevHasSearchedRef.current = hasSearched;
 
 		if (isAddToCampaignMode) return;
+		// Don't rewrite the dashboard URL while handing off to the campaign route.
+		if (isLeavingForCampaignRef.current) return;
 		if (!prev || hasSearched) return;
 
 		if (typeof window !== 'undefined') {
@@ -5701,6 +5822,8 @@ const DashboardContent = () => {
 	// changing behavior for the normal dashboard entry.
 	useEffect(() => {
 		if (!isAddToCampaignMode) return;
+		// Don't rewrite the dashboard URL while handing off to the campaign route.
+		if (isLeavingForCampaignRef.current) return;
 		if (!hasSearched) return;
 		if (!activeSearchQuery || activeSearchQuery.trim().length === 0) return;
 
@@ -5907,6 +6030,7 @@ const DashboardContent = () => {
 			// `added=1`: contacts actually changed — the campaign page uses it to refetch
 			// contacts/lists on arrival (pure tab-switch arrivals skip that work).
 			const returnCampaignId = dashboardSearchCampaign?.id ?? fromCampaignIdParam;
+			beginCampaignHandoffLatch();
 			router.push(
 				`${urls.murmur.campaign.detail(returnCampaignId)}?origin=search&added=1`
 			);
@@ -5918,6 +6042,7 @@ const DashboardContent = () => {
 		fromCampaignIdParam,
 		addToCampaignUserContactListId,
 		batchUpdateContacts,
+		beginCampaignHandoffLatch,
 		contacts,
 		dashboardSearchCampaign,
 		derivedContactTitle,
@@ -5991,6 +6116,7 @@ const DashboardContent = () => {
 				`${addedCount} contact${addedCount === 1 ? '' : 's'} added to ${dashboardSearchCampaign.name}`
 			);
 
+			beginCampaignHandoffLatch();
 			router.push(
 				`${urls.murmur.campaign.detail(dashboardSearchCampaign.id)}?origin=search&added=1`
 			);
@@ -6001,6 +6127,7 @@ const DashboardContent = () => {
 	}, [
 		activeCampaignUserContactListId,
 		batchUpdateContacts,
+		beginCampaignHandoffLatch,
 		contacts,
 		dashboardSearchCampaign,
 		derivedContactTitle,
@@ -6924,6 +7051,9 @@ const DashboardContent = () => {
 
 	const handleMapTopSearchReengage = useCallback(() => {
 		if (!isMapView || !hasSearched || activeSearchQuery.trim().length === 0) return;
+		// Mid-handoff to the campaign route: ignore map-search re-engagement so it can't
+		// router.replace the dashboard URL over the pending campaign push.
+		if (isLeavingForCampaignRef.current) return;
 		setIsMapSearchEngaged(true);
 		if (allContactsMapParam) {
 			const params = new URLSearchParams(searchParams.toString());
@@ -7035,6 +7165,9 @@ const DashboardContent = () => {
 	const handleSearchThisAreaClick = useCallback(() => {
 		const payload = lastSearchThisAreaViewportRef.current;
 		if (!payload) return;
+		// In flight to the campaign route: a new bbox search would re-mirror the
+		// dashboard URL and clobber the pending campaign navigation.
+		if (isLeavingForCampaignRef.current) return;
 
 		// Keep the same query (Why/What), but constrain the search to the exact current viewport.
 		// Provide an explicit title prefix when available (API also infers from `activeSearchQuery`).
@@ -7088,6 +7221,12 @@ const DashboardContent = () => {
 
 	const [isMapBottomSearchActive, setIsMapBottomSearchActive] = useState(false);
 	const [mapBottomSearchValue, setMapBottomSearchValue] = useState('');
+	// Last submitted "Search Anything" text that we keep visible in
+	// the bottom bar after the search collapses. When the user clicks the bar again
+	// we clear the draft field so typing starts a fresh search instead of editing
+	// the prior query.
+	const [mapBottomCommittedSearchValue, setMapBottomCommittedSearchValue] =
+		useState('');
 	// Advanced toggles should open the bottom search into its taller composing
 	// state for the current draft, even before the user has typed anything.
 	// After submit/reset, the persisted search text (if any) drives the shell.
@@ -7107,6 +7246,7 @@ const DashboardContent = () => {
 		handleResetSearch();
 		setIsMapView(false);
 		setMapBottomSearchValue('');
+		setMapBottomCommittedSearchValue('');
 		setIsMapBottomSearchAdvancedDraftArmed(false);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isMobile, isAddToCampaignMode, hasSearched, isMapView]);
@@ -7330,12 +7470,41 @@ const DashboardContent = () => {
 	const handleMapBottomSearchActivate = useCallback(() => {
 		// Focusing the box starts a draft session so it expands and stays expanded
 		// while the user composes (text present) or has Keyword/Radius enabled.
+		if (
+			!isMapBottomSearchAdvancedDraftArmed &&
+			mapBottomCommittedSearchValue.trim().length > 0 &&
+			mapBottomSearchValue.trim() === mapBottomCommittedSearchValue.trim()
+		) {
+			setMapBottomSearchValue('');
+		}
 		setIsMapBottomSearchAdvancedDraftArmed(true);
 		setIsMapBottomSearchActive(true);
 		window.requestAnimationFrame(() => {
 			mapBottomSearchInputRef.current?.focus();
 		});
-	}, []);
+	}, [
+		isMapBottomSearchAdvancedDraftArmed,
+		mapBottomCommittedSearchValue,
+		mapBottomSearchValue,
+	]);
+
+	const handleMapBottomSearchActiveChange = useCallback(
+		(active: boolean) => {
+			setIsMapBottomSearchActive(active);
+			if (active) return;
+
+			// If the user clicked into the committed query but left without typing a
+			// replacement, restore the submitted text so it still "sticks" in the bar.
+			if (
+				mapBottomCommittedSearchValue.trim().length > 0 &&
+				mapBottomSearchValue.trim().length === 0
+			) {
+				setIsMapBottomSearchAdvancedDraftArmed(false);
+				setMapBottomSearchValue(mapBottomCommittedSearchValue.trim());
+			}
+		},
+		[mapBottomCommittedSearchValue, mapBottomSearchValue]
+	);
 
 	// Typing in the box arms the draft session too, so the tall variant persists on
 	// blur as long as there is text. Submitting (or resetting) disarms it, which
@@ -7383,12 +7552,9 @@ const DashboardContent = () => {
 	const submitMapBottomSearchQuery = useCallback(
 		async (query: string) => {
 			const q = query.trim();
-			const shouldPreserveBottomSearchValue =
-				isProfileModeEnabledRef.current ||
-				isKeywordModeEnabledRef.current ||
-				isRadiusModeEnabledRef.current;
 			setIsMapBottomSearchAdvancedDraftArmed(false);
 			if (!q) {
+				setMapBottomCommittedSearchValue('');
 				// Empty box → still run a search; the blue arrow must never be a no-op.
 				// Route by the active advanced mode (precedence: radius → profile →
 				// plain). Keyword mode with nothing typed has no literal to match, so it
@@ -7407,6 +7573,7 @@ const DashboardContent = () => {
 				return;
 			}
 			const keywordMode = isKeywordModeEnabledRef.current;
+			const shouldPersistBottomSearchValue = isMobile !== true;
 			// Profile overlay: derive soft signals from the resolved identity. Omitted
 			// in keyword mode (literal field matching ignores semantic/area signals).
 			const profileSignals =
@@ -7424,7 +7591,8 @@ const DashboardContent = () => {
 					: undefined;
 			mapBottomSearchInputRef.current?.blur();
 			setIsMapBottomSearchActive(false);
-			setMapBottomSearchValue(shouldPreserveBottomSearchValue ? q : '');
+			setMapBottomCommittedSearchValue(shouldPersistBottomSearchValue ? q : '');
+			setMapBottomSearchValue(shouldPersistBottomSearchValue ? q : '');
 			primeFreeTextSearch(q);
 
 			// First search of the session creates the active campaign (in parallel
@@ -7521,6 +7689,7 @@ const DashboardContent = () => {
 			resolveRadiusCenter,
 			triggerFreeTextSearch,
 			ensureActiveCampaign,
+			isMobile,
 			isAddToCampaignMode,
 			isFromHomeDemoMode,
 		]
@@ -7593,6 +7762,9 @@ const DashboardContent = () => {
 	// the user's draft/default location, not the last dragged result center.
 	const handleRadiusCenterChange = useCallback(
 		(center: LatLngLiteral) => {
+			// In flight to the campaign route: dragging the radius pin would rerun a
+			// dashboard search and re-mirror the URL over the pending campaign push.
+			if (isLeavingForCampaignRef.current) return;
 			// Typed radius search: rerun the same free-text query at the new center.
 			if (
 				lastFreeTextArgs?.strictRadius &&
@@ -7693,6 +7865,7 @@ const DashboardContent = () => {
 		mapBottomSearchInputRef.current?.blur();
 		setIsMapBottomSearchActive(false);
 		setMapBottomSearchValue('');
+		setMapBottomCommittedSearchValue('');
 		setIsMapBottomSearchAdvancedDraftArmed(false);
 		setActiveSection(null);
 
@@ -7740,6 +7913,7 @@ const DashboardContent = () => {
 		mapBottomSearchInputRef.current?.blur();
 		setIsMapBottomSearchActive(false);
 		setMapBottomSearchValue('');
+		setMapBottomCommittedSearchValue('');
 		setIsMapBottomSearchAdvancedDraftArmed(false);
 		setActiveSection(null);
 
@@ -7813,6 +7987,7 @@ const DashboardContent = () => {
 		mapBottomSearchInputRef.current?.blur();
 		setIsMapBottomSearchActive(false);
 		setMapBottomSearchValue('');
+		setMapBottomCommittedSearchValue('');
 		setIsMapBottomSearchAdvancedDraftArmed(false);
 		setActiveSection(null);
 
@@ -9913,6 +10088,8 @@ const DashboardContent = () => {
 	const handleEnhancedResetSearch = () => {
 		handleResetSearch();
 		setIsMapBottomSearchAdvancedDraftArmed(false);
+		setMapBottomCommittedSearchValue('');
+		setMapBottomSearchValue('');
 		setMapPanelShiftClickAnchor(null);
 		setWhyValue('');
 		setWhatValue('');
@@ -10796,11 +10973,12 @@ const DashboardContent = () => {
 						draftCount={dashboardMapHeaderDraftCount}
 						sentCount={dashboardMapHeaderSentCount}
 						newMessageCount={mobileSearchNewMessageCount}
-						onOpenCampaignSummary={(section) =>
+						onOpenCampaignSummary={(section) => {
+							beginCampaignHandoffLatch();
 							router.push(
 								`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&summarySection=${section}${campaignReturnAddedSuffix()}`
-							)
-						}
+							);
+						}}
 						queryPillLabel={
 							canDisengageMapSearch && isMapSearchEngaged
 								? mapTopSearchDisplay.label
@@ -11896,7 +12074,7 @@ const DashboardContent = () => {
 								onActivate={handleMapBottomSearchActivate}
 								onSubmit={handleMapBottomSearchSubmit}
 								onValueChange={handleMapBottomSearchValueChange}
-								onActiveChange={setIsMapBottomSearchActive}
+								onActiveChange={handleMapBottomSearchActiveChange}
 								onCategoryFieldFocus={handleMapBottomCategoryFieldFocus}
 								onCategoryWhatChange={handleMapBottomCategoryWhatChange}
 								onCategoryWhereChange={handleMapBottomCategoryWhereChange}
@@ -15780,7 +15958,9 @@ const DashboardContent = () => {
 																						onActivate={handleMapBottomSearchActivate}
 																						onSubmit={handleMapBottomSearchSubmit}
 																						onValueChange={handleMapBottomSearchValueChange}
-																						onActiveChange={setIsMapBottomSearchActive}
+																						onActiveChange={
+																							handleMapBottomSearchActiveChange
+																						}
 																						onCategoryFieldFocus={
 																							handleMapBottomCategoryFieldFocus
 																						}

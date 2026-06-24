@@ -4057,6 +4057,69 @@ body.murmur-search-to-campaign-transitioning [data-dashboard-send-queue-overlay=
 	transition: opacity 160ms ease-out !important;
 }
 
+/* The search→campaign gradient has to start on the click frame, before the App
+   Router has mounted the campaign page. Keep this tiny handoff surface in the
+   shared body class; the campaign page removes it once its own staged reveal is
+   visible. */
+body.murmur-search-to-campaign-transitioning::after {
+	content: '';
+	position: fixed;
+	top: 0;
+	bottom: 0;
+	/* Match the campaign's *compressed* workspace band (985px wide, right-anchored)
+	   rather than the wide standard 1/3-viewport band. Once the campaign page mounts
+	   and publishes the real backdrop-start var, this seamlessly adopts the exact
+	   value; the calc() fallback covers the pre-mount click frame. `%` (not `vw`) is
+	   used so it resolves in the same zoomed coordinate space as the campaign's
+	   backdrop var and the `.campaign-map-split-overlay` band. */
+	left: var(--murmur-campaign-map-backdrop-start, calc(100% - 985px));
+	right: calc(100% - var(--murmur-campaign-map-backdrop-end, 100%));
+	z-index: 99;
+	pointer-events: none;
+	opacity: 0.5;
+	background:
+		radial-gradient(
+			ellipse 72% 62% at 14% 94%,
+			rgba(152, 206, 227, 0.08),
+			rgba(255, 255, 255, 0) 68%
+		),
+		linear-gradient(
+			86deg,
+			rgba(255, 255, 255, 0) 0%,
+			rgba(152, 206, 227, 0.05) 21%,
+			rgba(203, 240, 255, 0.24) 35%,
+			rgba(255, 255, 255, 0.34) 48%,
+			rgba(255, 255, 255, 0.3) 56%,
+			rgba(203, 240, 255, 0.18) 68%,
+			rgba(152, 206, 227, 0.06) 82%,
+			rgba(255, 255, 255, 0) 100%
+		),
+		linear-gradient(
+			64deg,
+			rgba(255, 255, 255, 0.12) 5.55%,
+			rgba(203, 240, 255, 0.2) 36.49%,
+			rgba(152, 206, 227, 0.14) 93.44%
+		);
+	backdrop-filter: blur(0.01px);
+	transition: opacity 160ms ease-out;
+}
+
+body.murmur-search-to-campaign-transitioning[data-search-to-campaign-tab='all']::after {
+	/* The All/overview tab uses a wider right-side band than the compact tabs. */
+	left: var(--murmur-campaign-map-backdrop-start, 46%);
+}
+
+/* Once the campaign route owns the screen, keep the handoff gradient above the
+   persistent map but below campaign chrome/content while the route's own reveal
+   takes over. */
+body.murmur-campaign.murmur-search-to-campaign-transitioning::after {
+	z-index: 1;
+}
+
+body.murmur-mobile.murmur-search-to-campaign-transitioning::after {
+	display: none;
+}
+
 @keyframes selectionFolderMoveBannerIn {
 	from {
 		max-height: 0;
