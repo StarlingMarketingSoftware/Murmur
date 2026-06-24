@@ -164,7 +164,18 @@ export const MobileDashboardSearch: FC<{
 						onNewMessageClick={() => onOpenCampaignSummary('conversations')}
 					/>
 					{viewMode === 'map' && queryPillLabel !== null && (
-						<div className="pointer-events-auto relative h-[40px] bg-white rounded-[10px] border border-black flex items-center pl-3 pr-2 gap-2 overflow-hidden">
+						<div
+							role="button"
+							tabIndex={0}
+							aria-label={`Disable ${queryPillLabel} search`}
+							onClick={onClearQuery}
+							onKeyDown={(event) => {
+								if (event.key !== 'Enter' && event.key !== ' ') return;
+								event.preventDefault();
+								onClearQuery();
+							}}
+							className="pointer-events-auto relative h-[40px] bg-white rounded-[10px] border border-black flex items-center pl-3 pr-2 gap-2 overflow-hidden cursor-pointer"
+						>
 							{/* Same animated search gradient as the desktop For You box */}
 							<div
 								className="search-gradient-button absolute overflow-hidden"
@@ -185,7 +196,10 @@ export const MobileDashboardSearch: FC<{
 							<button
 								type="button"
 								aria-label="Clear search"
-								onClick={onClearQuery}
+								onClick={(event) => {
+									event.stopPropagation();
+									onClearQuery();
+								}}
 								className="relative w-[26px] h-[24px] rounded-[6px] bg-white flex items-center justify-center text-black text-[14px] leading-none flex-shrink-0"
 							>
 								✕

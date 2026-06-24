@@ -6,6 +6,7 @@ import {
 	useEditCampaign,
 	useGetCampaign,
 	useGetCampaigns,
+	useGetDeletedCampaigns,
 } from '@/hooks/queryHooks/useCampaigns';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
 import { useEditEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
@@ -30,7 +31,6 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { _fetch, cn, mmdd } from '@/utils';
-import { useRowConfirmationAnimation } from '@/hooks/useRowConfirmationAnimation';
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 import CampaignRowChevronIcon from '@/components/atoms/_svg/CampaignRowChevronIcon';
 import type { CampaignsMockFolder, CampaignsMockState } from './CampaignsTable';
@@ -46,6 +46,10 @@ import {
 } from '@/components/molecules/CampaignDataTypeIconStrip/CampaignDataTypeIconStrip';
 import { EmailStatus } from '@/constants/prismaEnums';
 import { stateBadgeColorMap } from '@/constants/ui';
+import {
+	CAMPAIGN_TOP_NAV_SCHEMES,
+	getCampaignTopNavSchemeIndex,
+} from '@/hooks/useCampaignTopNavScheme';
 import { getStateAbbreviation } from '@/utils/string';
 import type { ContactWithName } from '@/types/contact';
 import type { CampaignWithRelations, EmailWithRelations, InboundEmailWithRelations } from '@/types';
@@ -108,52 +112,39 @@ const getFinderMovedItemsErrorLabel = (items: CampaignFinderDragPayload[]): stri
 
 let activeCampaignFinderDragPayload: CampaignFinderDragTransfer | null = null;
 
-// Apple Finder-style drag preview: a small card that floats with the cursor and shows
-// the dragged contact identity (colored dot + name, plus optional company subtitle). We
-// render it off-screen so the browser can snapshot it for the native drag image, then
-// remove it on the next frame.
-const createCampaignFinderDragPreview = ({
-	label,
-	secondary,
-	dotColor,
-}: {
+// Visual descriptor for the floating drag pill, set at dragstart and read by the
+// parent CampaignsTable overlay (the cursor-following preview that also shows the
+// green "+" add affordance on the destination pane). Module-level (not React state)
+// so the document `dragover` listener can read it without re-rendering the finder
+// tables on every mouse move.
+type CampaignFinderDragPreviewData = {
 	label: string;
 	secondary?: string | null;
 	dotColor?: string | null;
-}): HTMLDivElement => {
+};
+
+let activeCampaignFinderDragPreview: CampaignFinderDragPreviewData | null = null;
+
+export const getActiveCampaignFinderDragPreview = (): CampaignFinderDragPreviewData | null =>
+	activeCampaignFinderDragPreview;
+
+// We draw the floating drag pill ourselves (see CampaignsTable's overlay) so the
+// green "+" badge can be glued to it on the destination side. To suppress the OS's
+// native drag image we hand `setDragImage` a 1x1, fully-transparent, in-document
+// element: an empty `new Image()` is unreliable in Safari and detached/`display:none`
+// nodes are ignored by Chrome, but a real opacity:0 element is honored everywhere.
+// It is removed on the next tick, after `dragstart` has snapshotted it.
+const createEmptyCampaignFinderDragImage = (): HTMLDivElement => {
 	const node = document.createElement('div');
-	node.className = 'campaign-finder-drag-preview';
 	node.setAttribute('aria-hidden', 'true');
-
-	if (dotColor) {
-		const dot = document.createElement('span');
-		dot.className = 'campaign-finder-drag-preview-dot';
-		dot.style.backgroundColor = dotColor;
-		node.appendChild(dot);
-	}
-
-	const textWrap = document.createElement('span');
-	textWrap.className = 'campaign-finder-drag-preview-text';
-
-	const labelEl = document.createElement('span');
-	labelEl.className = 'campaign-finder-drag-preview-label';
-	labelEl.textContent = label;
-	textWrap.appendChild(labelEl);
-
-	if (secondary && secondary.trim()) {
-		const sub = document.createElement('span');
-		sub.className = 'campaign-finder-drag-preview-secondary';
-		sub.textContent = secondary;
-		textWrap.appendChild(sub);
-	}
-
-	node.appendChild(textWrap);
-
 	node.style.position = 'fixed';
-	node.style.top = '-1000px';
-	node.style.left = '-1000px';
+	node.style.top = '0';
+	node.style.left = '0';
+	node.style.width = '1px';
+	node.style.height = '1px';
+	node.style.opacity = '0';
+	node.style.background = 'transparent';
 	node.style.pointerEvents = 'none';
-
 	document.body.appendChild(node);
 	return node;
 };
@@ -306,6 +297,14 @@ const FINDER_SELECTED_ROW_COLORS: Record<FinderFolderKey, string> = {
 	archive: '#CCC9C9',
 };
 
+const FINDER_HOVER_ROW_COLORS: Record<FinderFolderKey, string> = {
+	contacts: '#FFD7D7',
+	drafts: '#FFEFD7',
+	inbox: '#D7E9FF',
+	sent: '#D7FFD9',
+	archive: '#E8E8E8',
+};
+
 const FINDER_CONTEXT_MENU_WIDTH = 180;
 const FINDER_CONTEXT_MENU_VIEWPORT_PADDING = 8;
 const FINDER_CONTEXT_MENU_BASE_HEIGHT = 111;
@@ -313,6 +312,13 @@ const FINDER_CONTEXT_MENU_MOVE_TARGET_HEIGHT = 27;
 const FINDER_INFO_POPUP_WIDTH = 318;
 const FINDER_INFO_POPUP_HEIGHT = 352;
 const FINDER_INFO_POPUP_GAP = 10;
+
+// Campaign-row right-click menu (a trimmed reuse of the finder contact menu, but
+// anchored to the right edge of the table rather than the cursor).
+const CAMPAIGN_ROW_MENU_GAP = 8;
+const CAMPAIGN_ROW_MENU_HEIGHT = 82;
+const CAMPAIGN_ROW_INFO_POPUP_WIDTH = 264;
+const CAMPAIGN_ROW_INFO_POPUP_HEIGHT = 200;
 
 const getDocumentZoomFactor = () => {
 	if (typeof window === 'undefined') return 1;
@@ -452,7 +458,29 @@ type FinderTableRow = {
 	updatedAt: Date;
 };
 
-type CampaignTableRow = CampaignWithCounts | FinderTableRow;
+// The single grayed "ARCHIVE" folder row, shown at the bottom of the table only
+// when >=1 soft-deleted campaign exists. Its metric columns are aggregates across
+// all deleted campaigns; expanding it reveals one ArchivedCampaignRow per campaign.
+type ArchiveFolderRow = {
+	id: 'archive-folder';
+	__rowType: 'archiveFolder';
+	name: string;
+	draftCount: number;
+	sentCount: number;
+	newEmailCount: number;
+	updatedAt: Date;
+	archivedCount: number;
+	campaignDataTypes: CampaignDataTypeSummary[];
+};
+
+// A soft-deleted campaign rendered (grayed) as a child of the ARCHIVE folder.
+type ArchivedCampaignRow = CampaignWithCounts & { __rowType: 'archivedCampaign' };
+
+type CampaignTableRow =
+	| CampaignWithCounts
+	| FinderTableRow
+	| ArchiveFolderRow
+	| ArchivedCampaignRow;
 
 type FinderContactSource = Partial<Contact> & {
 	name?: string | null;
@@ -462,6 +490,12 @@ type FinderContactSource = Partial<Contact> & {
 
 const isFinderTableRow = (row: CampaignTableRow): row is FinderTableRow =>
 	(row as FinderTableRow).__rowType === 'finder';
+
+const isArchiveFolderRow = (row: CampaignTableRow): row is ArchiveFolderRow =>
+	(row as ArchiveFolderRow).__rowType === 'archiveFolder';
+
+const isArchivedCampaignRow = (row: CampaignTableRow): row is ArchivedCampaignRow =>
+	(row as ArchivedCampaignRow).__rowType === 'archivedCampaign';
 
 const FINDER_FOLDER_CONFIG: Array<Pick<FinderFolder, 'key' | 'label' | 'color'>> = [
 	{ key: 'contacts', label: 'Contacts', color: '#CC5858' },
@@ -548,20 +582,24 @@ const MOCK_FINDER_CONTACTS: FinderContactItem[] = [
 
 const DEFAULT_MOCK_FOLDER_NAMES = ['Orion', 'Leo', 'Pieces', 'Capricorn', 'Sagittarius'];
 const MOCK_CONTACT_ID_BASE = 100000;
-const CAMPAIGN_FOLDER_NAME_BOX_COLORS = [
-	'#B9EAF1',
-	'#CDCFF9',
-	'#D0FFEA',
-	'#F7EBC0',
-	'#EEC7F7',
-] as const;
-const CAMPAIGN_FOLDER_ICON_COLORS = [
-	'#B84A4A',
-	'#CB56D1',
-	'#A256D1',
-	'#56BFD1',
-	'#DDA544',
-] as const;
+// Folder colorway for the campaigns finder/table is the SAME per-campaign scheme
+// used by the top-nav box and the campaign header box, so a folder's pill (name
+// box) + folder SVG icon match the surfaces it opens into. Derived from the
+// single source of truth (CAMPAIGN_TOP_NAV_SCHEMES) and keyed by campaign id (see
+// getCampaignFolderColors), NOT by render order.
+const CAMPAIGN_FOLDER_NAME_BOX_COLORS = CAMPAIGN_TOP_NAV_SCHEMES.map(
+	(scheme) => scheme.box
+);
+const CAMPAIGN_FOLDER_ICON_COLORS = CAMPAIGN_TOP_NAV_SCHEMES.map(
+	(scheme) => scheme.icon
+);
+// Grayed palette for the ARCHIVE folder row and its deleted-campaign children.
+// The #F2F2F2 row band is painted via CSS (.archive-*-row-marker); these drive
+// the inline folder-icon / name / metric-text colors so they read as muted.
+const ARCHIVE_ROW_ICON_COLOR = '#ACACAC';
+const ARCHIVE_ROW_NAME_COLOR = '#6B6B6B';
+const ARCHIVE_ROW_METRIC_COLOR = '#9A9A9A';
+const ARCHIVE_FOLDER_NAME_COLOR = '#5A5A5A';
 const DEFAULT_MOCK_CAMPAIGN_DATA_TYPES: CampaignDataTypeSummary[] = [
 	{
 		kind: 'category',
@@ -592,6 +630,37 @@ const getCampaignFolderPaletteIndex = (rowIndex: number) => {
 	return ((rowIndex % paletteLength) + paletteLength) % paletteLength;
 };
 
+type CampaignFolderColors = { nameBoxColor: string; folderIconColor: string };
+
+/**
+ * Resolve a campaign's folder pill (name box) + folder-icon colors. The colorway
+ * is keyed by the campaign's id-sorted position in the real campaign list — the
+ * SAME source of truth the top-nav box and campaign header box use — so a finder
+ * folder's color always matches the campaign it opens into.
+ *
+ * `fallbackIndex` (the render-row index) is only used for rows whose id isn't in
+ * the real campaign list — i.e. the no-DB mock/debug harness rows — so that
+ * harness still shows distinct per-row colors.
+ */
+const getCampaignFolderColors = (
+	campaignId: number | string | null | undefined,
+	campaigns: ReadonlyArray<{ id: number }> | null | undefined,
+	fallbackIndex: number
+): CampaignFolderColors => {
+	const id = typeof campaignId === 'string' ? Number(campaignId) : campaignId;
+	const known =
+		id != null &&
+		!Number.isNaN(id) &&
+		(campaigns ?? []).some((campaign) => campaign.id === id);
+	const paletteIndex = known
+		? getCampaignTopNavSchemeIndex(id, campaigns)
+		: getCampaignFolderPaletteIndex(fallbackIndex);
+	return {
+		nameBoxColor: CAMPAIGN_FOLDER_NAME_BOX_COLORS[paletteIndex],
+		folderIconColor: CAMPAIGN_FOLDER_ICON_COLORS[paletteIndex],
+	};
+};
+
 const buildMockCampaignRows = (mockState: CampaignsMockState): CampaignWithCounts[] => {
 	const folders = mockState.folders ?? [];
 	const limited = folders.slice(0, 5);
@@ -612,6 +681,30 @@ const buildMockCampaignRows = (mockState: CampaignsMockState): CampaignWithCount
 			contactCount: Math.max(0, folder.contactCount ?? folder.contactIds?.length ?? 0),
 			campaignDataTypes: folder.campaignDataTypes ?? DEFAULT_MOCK_CAMPAIGN_DATA_TYPES,
 			updatedAt,
+		} as unknown as CampaignWithCounts;
+	});
+};
+
+// Static seed so the no-auth debug harness (zzcamprowdbg) renders the ARCHIVE
+// folder + expanded children without a DB. Negative ids stay clear of the active
+// mock ids (-1000 range) and handleRowClick is short-circuited under mock data.
+const buildMockDeletedCampaignRows = (): CampaignWithCounts[] => {
+	const now = Date.now();
+	const msInDay = 24 * 60 * 60 * 1000;
+	const seeds = [
+		{ name: 'Capricorn', draftCount: 12, sentCount: 30, daysAgo: 21 },
+		{ name: 'Gemini', draftCount: 5, sentCount: 8, daysAgo: 64 },
+	];
+	return seeds.map((seed, index) => {
+		return {
+			id: -2000 - index,
+			name: seed.name,
+			draftCount: seed.draftCount,
+			sentCount: seed.sentCount,
+			newEmailCount: 0,
+			contactCount: 0,
+			campaignDataTypes: DEFAULT_MOCK_CAMPAIGN_DATA_TYPES,
+			updatedAt: new Date(now - seed.daysAgo * msInDay),
 		} as unknown as CampaignWithCounts;
 	});
 };
@@ -996,6 +1089,166 @@ const CampaignFinderInfoPopup = ({
 	);
 };
 
+type CampaignRowMenuAnchor = {
+	// Anchor point in client/visual coordinates (the table's right edge + gap, and
+	// the clicked row's top). Clamped to the viewport inside the components via
+	// getClampedFinderPopupPosition (which divides by the document zoom factor).
+	anchorX: number;
+	anchorY: number;
+	campaign: CampaignWithCounts;
+	nameBoxColor: string;
+	folderIconColor: string;
+};
+
+const formatCampaignInfoDate = (value: Date | string | null | undefined) => {
+	if (!value) return '—';
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) return '—';
+	return date.toLocaleDateString('en-US', {
+		month: 'short',
+		day: 'numeric',
+		year: 'numeric',
+	});
+};
+
+const CampaignRowContextMenu = ({
+	state,
+	onOpenInNewTab,
+	onGetInfo,
+}: {
+	state: CampaignRowMenuAnchor | null;
+	onOpenInNewTab: (state: CampaignRowMenuAnchor) => void;
+	onGetInfo: (state: CampaignRowMenuAnchor) => void;
+}) => {
+	if (!state) return null;
+	if (typeof document === 'undefined') return null;
+
+	const position = getClampedFinderPopupPosition(
+		state.anchorX,
+		state.anchorY,
+		FINDER_CONTEXT_MENU_WIDTH,
+		CAMPAIGN_ROW_MENU_HEIGHT
+	);
+
+	return createPortal(
+		<div
+			className="campaign-finder-context-menu"
+			data-custom-table-ignore-row-click="true"
+			role="menu"
+			style={{ position: 'fixed', zIndex: 10000, left: position.left, top: position.top }}
+			onContextMenu={(event) => event.preventDefault()}
+			onPointerDown={(event) => event.stopPropagation()}
+		>
+			<button
+				type="button"
+				className="campaign-finder-context-menu-item"
+				role="menuitem"
+				onClick={() => onOpenInNewTab(state)}
+			>
+				Open in New Tab
+			</button>
+			<div className="campaign-finder-context-menu-separator" role="separator" />
+			<button
+				type="button"
+				className="campaign-finder-context-menu-item"
+				role="menuitem"
+				onClick={() => onGetInfo(state)}
+			>
+				Get Info
+			</button>
+		</div>,
+		document.documentElement
+	);
+};
+
+const CampaignRowInfoPopup = ({
+	state,
+	onClose,
+}: {
+	state: CampaignRowMenuAnchor | null;
+	onClose: () => void;
+}) => {
+	if (!state) return null;
+	if (typeof document === 'undefined') return null;
+
+	const position = getClampedFinderPopupPosition(
+		state.anchorX,
+		state.anchorY,
+		CAMPAIGN_ROW_INFO_POPUP_WIDTH,
+		CAMPAIGN_ROW_INFO_POPUP_HEIGHT
+	);
+	const { campaign } = state;
+	const stats = [
+		{ label: 'New', value: campaign.newEmailCount ?? 0 },
+		{ label: 'Drafts', value: campaign.draftCount ?? 0 },
+		{ label: 'Sent', value: campaign.sentCount ?? 0 },
+		{ label: 'Contacts', value: campaign.contactCount ?? 0 },
+	];
+
+	return createPortal(
+		<div
+			className="campaign-row-info-popup"
+			data-custom-table-ignore-row-click="true"
+			role="dialog"
+			aria-label={`Info for ${campaign.name}`}
+			style={{
+				position: 'fixed',
+				zIndex: 10001,
+				left: position.left,
+				top: position.top,
+				width: CAMPAIGN_ROW_INFO_POPUP_WIDTH,
+			}}
+			onContextMenu={(event) => event.preventDefault()}
+			onPointerDown={(event) => event.stopPropagation()}
+		>
+			<button
+				type="button"
+				className="campaign-finder-info-popup-close"
+				aria-label="Close info"
+				onClick={onClose}
+			/>
+			<div className="campaign-row-info-popup-header">
+				<span
+					className="campaign-row-info-popup-name-pill"
+					style={{ backgroundColor: state.nameBoxColor }}
+				>
+					<span
+						className="campaign-row-info-popup-folder-icon"
+						style={{ color: state.folderIconColor }}
+						aria-hidden="true"
+					>
+						<DashboardActionBarFolderIcon width={18} height={11} />
+					</span>
+					<span className="campaign-row-info-popup-name">{campaign.name}</span>
+				</span>
+			</div>
+			<div className="campaign-row-info-popup-stats">
+				{stats.map((stat) => (
+					<div key={stat.label} className="campaign-row-info-popup-stat">
+						<span className="campaign-row-info-popup-stat-value">{stat.value}</span>
+						<span className="campaign-row-info-popup-stat-label">{stat.label}</span>
+					</div>
+				))}
+			</div>
+			<div className="campaign-row-info-popup-dates">
+				<div className="campaign-row-info-popup-date-row">
+					<span className="campaign-row-info-popup-date-label">Created</span>
+					<span className="campaign-row-info-popup-date-value">
+						{formatCampaignInfoDate(campaign.createdAt)}
+					</span>
+				</div>
+				<div className="campaign-row-info-popup-date-row">
+					<span className="campaign-row-info-popup-date-label">Updated</span>
+					<span className="campaign-row-info-popup-date-value">
+						{formatCampaignInfoDate(campaign.updatedAt)}
+					</span>
+				</div>
+			</div>
+		</div>,
+		document.documentElement
+	);
+};
+
 const FinderContactRow = ({
 	item,
 	index,
@@ -1050,6 +1303,7 @@ const FinderContactRow = ({
 	const descriptorText = item.category?.label || item.title?.trim() || item.headline?.trim() || '';
 	const selectionKey = getFinderItemSelectionKey(folderKey, item);
 	const isSelected = selectedItemKeys.has(selectionKey);
+	const [isHovered, setIsHovered] = useState(false);
 	const dragItemKind = getFinderDragItemKind(folderKey);
 	const canDrag = Boolean(
 		isDragEnabled &&
@@ -1086,10 +1340,14 @@ const FinderContactRow = ({
 			style={{
 				backgroundColor: isSelected
 					? FINDER_SELECTED_ROW_COLORS[folderKey]
-					: index % 2 === 0
-						? '#FAF7F7'
-						: '#FFFFFF',
+					: isHovered
+						? FINDER_HOVER_ROW_COLORS[folderKey]
+						: index % 2 === 0
+							? '#FAF7F7'
+							: '#FFFFFF',
 			}}
+			onMouseEnter={() => setIsHovered(true)}
+			onMouseLeave={() => setIsHovered(false)}
 			onPointerDown={(event) => {
 				if (event.button !== 0) return;
 				if (event.shiftKey) {
@@ -1116,19 +1374,18 @@ const FinderContactRow = ({
 
 				const isMultiContactDrag =
 					isSelected && dragItemKind === 'contact' && selectedContactDragCount > 1;
-				const preview = createCampaignFinderDragPreview({
+				// Stash the visual descriptor for the parent overlay, which renders the
+				// floating pill + the green "+" add badge that follows the cursor.
+				activeCampaignFinderDragPreview = {
 					label: isMultiContactDrag ? `${selectedContactDragCount} contacts` : primaryText,
 					secondary: isMultiContactDrag ? null : showCompany ? item.company : null,
 					dotColor,
-				});
-				const rect = preview.getBoundingClientRect();
-				event.dataTransfer.setDragImage(
-					preview,
-					Math.round(rect.width / 2),
-					Math.round(rect.height / 2)
-				);
+				};
+				// Suppress the browser's native drag image; our overlay replaces it.
+				const emptyDragImage = createEmptyCampaignFinderDragImage();
+				event.dataTransfer.setDragImage(emptyDragImage, 0, 0);
 				window.setTimeout(() => {
-					preview.remove();
+					emptyDragImage.remove();
 				}, 0);
 
 				onDragStart(event, dragPayload, selectionKey);
@@ -1177,6 +1434,53 @@ const FinderContactRow = ({
 				<span className="campaign-finder-contact-city-empty" aria-hidden="true" />
 			)}
 		</div>
+	);
+};
+
+const FinderFolderRow = ({
+	folder,
+	folderIndex,
+	isExpanded,
+	isFolderDropTarget,
+	onToggleClick,
+}: {
+	folder: FinderFolder;
+	folderIndex: number;
+	isExpanded: boolean;
+	isFolderDropTarget: boolean;
+	onToggleClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+}) => {
+	const [isHovered, setIsHovered] = useState(false);
+
+	return (
+		<button
+			type="button"
+			className="campaign-finder-folder-row"
+			data-custom-table-ignore-row-click="true"
+			data-finder-folder-drop-target={isFolderDropTarget ? 'true' : undefined}
+			style={{
+				backgroundColor: isHovered
+					? FINDER_HOVER_ROW_COLORS[folder.key]
+					: folderIndex % 2 === 0
+						? '#FAF7F7'
+						: '#FFFFFF',
+			}}
+			onMouseEnter={() => setIsHovered(true)}
+			onMouseLeave={() => setIsHovered(false)}
+			onClick={onToggleClick}
+			aria-expanded={isExpanded}
+		>
+			<CampaignRowChevronIcon
+				className={cn(
+					'campaign-finder-folder-chevron',
+					isExpanded && 'campaign-finder-folder-chevron-open'
+				)}
+			/>
+			<span className="campaign-finder-folder-icon" style={{ color: folder.color }}>
+				<DashboardActionBarFolderIcon width={16} height={10} />
+			</span>
+			<span className="campaign-finder-folder-label">{folder.label}</span>
+		</button>
 	);
 };
 
@@ -1293,34 +1597,16 @@ const CampaignFinderPanel = ({
 
 					return (
 						<div key={folder.key} className="campaign-finder-folder-group">
-							<button
-								type="button"
-								className="campaign-finder-folder-row"
-								data-custom-table-ignore-row-click="true"
-								data-finder-folder-drop-target={isFolderDropTarget ? 'true' : undefined}
-								style={{
-									backgroundColor: folderIndex % 2 === 0 ? '#FAF7F7' : '#FFFFFF',
-								}}
-								onClick={(event) => {
+							<FinderFolderRow
+								folder={folder}
+								folderIndex={folderIndex}
+								isExpanded={isExpanded}
+								isFolderDropTarget={isFolderDropTarget}
+								onToggleClick={(event) => {
 									stopFinderEvent(event);
 									handleToggle();
 								}}
-								aria-expanded={isExpanded}
-							>
-								<CampaignRowChevronIcon
-									className={cn(
-										'campaign-finder-folder-chevron',
-										isExpanded && 'campaign-finder-folder-chevron-open'
-									)}
-								/>
-								<span
-									className="campaign-finder-folder-icon"
-									style={{ color: folder.color }}
-								>
-									<DashboardActionBarFolderIcon width={16} height={10} />
-								</span>
-								<span className="campaign-finder-folder-label">{folder.label}</span>
-							</button>
+							/>
 							{isExpanded
 								? folder.items.map((item, itemIndex) => (
 									<FinderContactRow
@@ -1427,6 +1713,14 @@ export const useCampaignsTable = (options?: {
 	initialOpenCampaignId?: number | null;
 	initialOpenContactsFolder?: boolean;
 	onFinderOpenInNewTab?: (campaignId: number) => void;
+	onSelectCampaign?: (campaignId: number) => void;
+	/**
+	 * Campaign id whose row should show the red "Click to Delete and move
+	 * contents to Archive" warning because its hover-delete "X" is being hovered.
+	 * The armed (post-first-click) state is driven internally by
+	 * confirmingCampaignId; both render the same warning visual.
+	 */
+	deleteWarningCampaignId?: number | null;
 }) => {
 	const compactMetrics = options?.compactMetrics ?? false;
 	const mockState = options?.mockState;
@@ -1436,10 +1730,11 @@ export const useCampaignsTable = (options?: {
 	const initialOpenCampaignId = options?.initialOpenCampaignId ?? null;
 	const initialOpenContactsFolder = options?.initialOpenContactsFolder ?? false;
 	const onFinderOpenInNewTab = options?.onFinderOpenInNewTab;
+	const onSelectCampaign = options?.onSelectCampaign;
+	const deleteWarningCampaignId = options?.deleteWarningCampaignId ?? null;
 	const normalizedFinderSearchQuery = normalizeFinderSearchText(finderSearchQuery);
 	const isMockActive = mockState != null;
 	const [confirmingCampaignId, setConfirmingCampaignId] = useState<number | null>(null);
-	const [countdown, setCountdown] = useState<number>(5);
 	const confirmationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const [openCampaignId, setOpenCampaignId] = useState<number | null>(null);
 	const [openFolderKeys, setOpenFolderKeys] = useState<FinderFolderKey[]>([]);
@@ -1458,6 +1753,9 @@ export const useCampaignsTable = (options?: {
 	const [finderContextMenu, setFinderContextMenu] =
 		useState<FinderContextMenuState | null>(null);
 	const [finderInfoPopup, setFinderInfoPopup] = useState<FinderInfoPopupState | null>(null);
+	// Campaign-row right-click menu + its "Get Info" popup (one open at a time).
+	const [campaignRowMenu, setCampaignRowMenu] = useState<CampaignRowMenuAnchor | null>(null);
+	const [campaignRowInfo, setCampaignRowInfo] = useState<CampaignRowMenuAnchor | null>(null);
 	const { mutateAsync: createFinderUserContactList } = useCreateUserContactList({
 		suppressToasts: true,
 	});
@@ -1487,12 +1785,6 @@ export const useCampaignsTable = (options?: {
 	const setUpdatedHeaderButtonRef = useCallback((el: HTMLButtonElement | null) => {
 		updatedHeaderButtonRef.current = el;
 	}, []);
-
-	// Use the custom animation hook
-	useRowConfirmationAnimation({
-		confirmingCampaignId,
-		setCountdown,
-	});
 
 	// Clear timeout on unmount
 	useEffect(() => {
@@ -1557,7 +1849,14 @@ export const useCampaignsTable = (options?: {
 	}, [closeFinder, isFinderOpen]);
 
 	useEffect(() => {
-		if (!finderContextMenu && !finderInfoPopup) return;
+		if (!finderContextMenu && !finderInfoPopup && !campaignRowMenu && !campaignRowInfo) return;
+
+		const closeAllMenus = () => {
+			setFinderContextMenu(null);
+			setFinderInfoPopup(null);
+			setCampaignRowMenu(null);
+			setCampaignRowInfo(null);
+		};
 
 		const handleDocumentPointerDown = (event: PointerEvent) => {
 			const target = event.target;
@@ -1568,18 +1867,20 @@ export const useCampaignsTable = (options?: {
 						? target.parentElement
 						: null;
 
-			if (targetElement?.closest('.campaign-finder-context-menu, .campaign-finder-info-popup')) {
+			if (
+				targetElement?.closest(
+					'.campaign-finder-context-menu, .campaign-finder-info-popup, .campaign-row-info-popup'
+				)
+			) {
 				return;
 			}
 
-			setFinderContextMenu(null);
-			setFinderInfoPopup(null);
+			closeAllMenus();
 		};
 
 		const handleDocumentKeyDown = (event: KeyboardEvent) => {
 			if (event.key !== 'Escape') return;
-			setFinderContextMenu(null);
-			setFinderInfoPopup(null);
+			closeAllMenus();
 		};
 
 		document.addEventListener('pointerdown', handleDocumentPointerDown);
@@ -1588,7 +1889,7 @@ export const useCampaignsTable = (options?: {
 			document.removeEventListener('pointerdown', handleDocumentPointerDown);
 			document.removeEventListener('keydown', handleDocumentKeyDown);
 		};
-	}, [finderContextMenu, finderInfoPopup]);
+	}, [finderContextMenu, finderInfoPopup, campaignRowMenu, campaignRowInfo]);
 
 	// Keep the Drafts sort underline anchored to the bottom of the table container,
 	// aligned with the Drafts header "pill" width.
@@ -1764,7 +2065,92 @@ export const useCampaignsTable = (options?: {
 		() => (mockState ? buildMockCampaignRows(mockState) : null),
 		[mockState]
 	);
-	const baseData = (mockData ?? realData) as CampaignWithCounts[] | undefined;
+	const baseDataRaw = (mockData ?? realData) as CampaignWithCounts[] | undefined;
+
+	// The campaigns list query doesn't poll and its DB-derived `newEmailCount`
+	// (real InboundEmail rows) misses venue→artist messages, which are projected
+	// into the inbound feed only at read time. The inbound feed DOES poll, so top
+	// each campaign's "New" count up from the live feed: this both refreshes the
+	// count as replies arrive (without a manual reload) and includes the projected
+	// venue messages the DB count can't see. Mock mode keeps its scripted counts.
+	const { data: liveInboundEmails } = useGetInboundEmails({ enabled: !isMockActive });
+	const liveNewCountByCampaign = useMemo(() => {
+		const counts = new Map<number, number>();
+		for (const email of liveInboundEmails ?? []) {
+			const id =
+				(email.campaign as { id?: number } | null | undefined)?.id ??
+				(email.campaignId ?? undefined);
+			if (typeof id !== 'number') continue;
+			counts.set(id, (counts.get(id) ?? 0) + 1);
+		}
+		return counts;
+	}, [liveInboundEmails]);
+	const baseData = useMemo(() => {
+		if (!baseDataRaw) return baseDataRaw;
+		if (isMockActive || liveNewCountByCampaign.size === 0) return baseDataRaw;
+		return baseDataRaw.map((campaign) => {
+			const live = liveNewCountByCampaign.get(campaign.id);
+			if (live == null) return campaign;
+			// Prefer the live feed count when it's at least the persisted count so a
+			// freshly-arrived reply bumps the badge immediately; never shrink below the
+			// DB count (which may include rows scoped out of the current feed fetch).
+			const persisted = campaign.newEmailCount ?? 0;
+			return { ...campaign, newEmailCount: Math.max(persisted, live) };
+		});
+	}, [baseDataRaw, isMockActive, liveNewCountByCampaign]);
+
+	// Soft-deleted campaigns drive the ARCHIVE folder. Fetched separately so the
+	// active-list query (useGetCampaigns) keeps its shape for its many callers.
+	const [isArchiveExpanded, setIsArchiveExpanded] = useState(false);
+	const { data: deletedRealData } = useGetDeletedCampaigns({ enabled: !isMockActive });
+	const mockDeletedData = useMemo(
+		() => (isMockActive ? buildMockDeletedCampaignRows() : null),
+		[isMockActive]
+	);
+	const deletedCampaigns = (mockDeletedData ?? deletedRealData) as
+		| CampaignWithCounts[]
+		| undefined;
+	// The ARCHIVE folder row's own columns are aggregates over all deleted campaigns
+	// (summed counts, most-recent update, merged data-type icons).
+	const archiveFolderRow = useMemo<ArchiveFolderRow | null>(() => {
+		if (!deletedCampaigns || deletedCampaigns.length === 0) return null;
+		let draftCount = 0;
+		let sentCount = 0;
+		let newEmailCount = 0;
+		let latest = 0;
+		const mergedTypes = new Map<string, CampaignDataTypeSummary>();
+		for (const campaign of deletedCampaigns) {
+			draftCount += campaign.draftCount ?? 0;
+			sentCount += campaign.sentCount ?? 0;
+			newEmailCount += campaign.newEmailCount ?? 0;
+			const updatedMs = new Date(campaign.updatedAt).getTime();
+			if (Number.isFinite(updatedMs) && updatedMs > latest) latest = updatedMs;
+			for (const type of campaign.campaignDataTypes ?? []) {
+				const mapKey = `${type.kind}:${type.key}`;
+				const existing = mergedTypes.get(mapKey);
+				if (existing) {
+					existing.count += type.count;
+				} else {
+					mergedTypes.set(mapKey, { ...type });
+				}
+			}
+		}
+		const campaignDataTypes = Array.from(mergedTypes.values()).sort(
+			(a, b) => b.count - a.count
+		);
+		return {
+			id: 'archive-folder',
+			__rowType: 'archiveFolder',
+			name: 'ARCHIVE',
+			draftCount,
+			sentCount,
+			newEmailCount,
+			updatedAt: latest > 0 ? new Date(latest) : new Date(),
+			archivedCount: deletedCampaigns.length,
+			campaignDataTypes,
+		};
+	}, [deletedCampaigns]);
+
 	const selectedCampaignId = enableFinder && openCampaignId !== null ? openCampaignId : null;
 	const selectedCampaignIdForRealQuery =
 		!isMockActive && selectedCampaignId !== null ? String(selectedCampaignId) : '';
@@ -1839,23 +2225,22 @@ export const useCampaignsTable = (options?: {
 			.map(({ campaign, index }) => ({
 				campaignId: campaign.id,
 				name: campaign.name || `Folder ${index + 1}`,
-				folderIconColor:
-					CAMPAIGN_FOLDER_ICON_COLORS[getCampaignFolderPaletteIndex(index)],
+				folderIconColor: getCampaignFolderColors(campaign.id, realData, index)
+					.folderIconColor,
 				userContactListIds: (campaign.userContactListIds ?? []).filter(
 					(id): id is number => typeof id === 'number'
 				),
 			}));
-	}, [displayedCampaignData, openCampaignId]);
+	}, [displayedCampaignData, openCampaignId, realData]);
 	const data = useMemo<CampaignTableRow[] | undefined>(() => {
 		if (!displayedCampaignData) return displayedCampaignData;
-		if (!isFinderOpen || openCampaignId === null) return displayedCampaignData;
 
-		return displayedCampaignData.flatMap((campaign) => {
-			if (campaign.id !== openCampaignId) return [campaign];
-
-			return [
-				campaign,
-				{
+		const rows: CampaignTableRow[] = [];
+		const finderActive = isFinderOpen && openCampaignId !== null;
+		for (const campaign of displayedCampaignData) {
+			rows.push(campaign);
+			if (finderActive && campaign.id === openCampaignId) {
+				rows.push({
 					id: `finder-${campaign.id}`,
 					__rowType: 'finder',
 					__customTableColSpanAll: true,
@@ -1865,10 +2250,30 @@ export const useCampaignsTable = (options?: {
 					sentCount: 0,
 					newEmailCount: 0,
 					updatedAt: new Date(campaign.updatedAt),
-				} satisfies FinderTableRow,
-			];
-		});
-	}, [displayedCampaignData, isFinderOpen, openCampaignId]);
+				} satisfies FinderTableRow);
+			}
+		}
+
+		// ARCHIVE folder pinned after the active campaigns; its deleted-campaign
+		// children follow only while expanded.
+		if (archiveFolderRow) {
+			rows.push(archiveFolderRow);
+			if (isArchiveExpanded && deletedCampaigns) {
+				for (const campaign of deletedCampaigns) {
+					rows.push({ ...campaign, __rowType: 'archivedCampaign' });
+				}
+			}
+		}
+
+		return rows;
+	}, [
+		displayedCampaignData,
+		isFinderOpen,
+		openCampaignId,
+		archiveFolderRow,
+		isArchiveExpanded,
+		deletedCampaigns,
+	]);
 	const openFinderForCampaign = useCallback(
 		(campaignId: number | null, expandedFolderKeys: FinderFolderKey[] = []) => {
 			if (!enableFinder || campaignId === null) {
@@ -2702,6 +3107,7 @@ export const useCampaignsTable = (options?: {
 				);
 			} finally {
 				activeCampaignFinderDragPayload = null;
+				activeCampaignFinderDragPreview = null;
 				setIsFinderDropPending(false);
 				setIsFinderDropTargetActive(false);
 				setFinderDropTargetFolderKey(null);
@@ -2736,9 +3142,17 @@ export const useCampaignsTable = (options?: {
 
 			activeCampaignFinderDragPayload = transfer;
 			if (!shouldDragSelectedContacts) {
-				setSelectedFinderItemKeys(new Set([selectionKey]));
-				lastClickedFinderItemKeyRef.current =
-					payload.itemKind === 'contact' ? selectionKey : null;
+				// Defer the selection sync: mutating React state synchronously inside
+				// `dragstart` re-renders the source row mid-dispatch, which makes the
+				// browser abort the native drag before it begins. The multi-select path
+				// skips this block, which is why dragging multiple contacts worked but
+				// dragging a single item (or a draft/inbox email) did not. Running it on
+				// the next tick lets the native drag commit before the row re-renders.
+				window.setTimeout(() => {
+					setSelectedFinderItemKeys(new Set([selectionKey]));
+					lastClickedFinderItemKeyRef.current =
+						payload.itemKind === 'contact' ? selectionKey : null;
+				}, 0);
 			}
 			event.dataTransfer.effectAllowed = 'move';
 			event.dataTransfer.setData(CAMPAIGN_FINDER_DRAG_MIME, JSON.stringify(transfer));
@@ -2752,6 +3166,7 @@ export const useCampaignsTable = (options?: {
 
 	const handleFinderItemDragEnd = useCallback(() => {
 		activeCampaignFinderDragPayload = null;
+		activeCampaignFinderDragPreview = null;
 		setIsFinderDropTargetActive(false);
 		setFinderDropTargetFolderKey(null);
 	}, []);
@@ -2977,6 +3392,65 @@ export const useCampaignsTable = (options?: {
 		setFinderInfoPopup(null);
 	}, []);
 
+	const handleCampaignRowContextMenu = useCallback(
+		(rowData: CampaignTableRow, event: React.MouseEvent) => {
+			// Finder (contact) rows keep their own context menu; only real campaign
+			// rows get this one.
+			if (isFinderTableRow(rowData)) return;
+			const campaign = rowData as CampaignWithCounts;
+			if (typeof campaign.id !== 'number') return;
+			event.preventDefault();
+
+			// Anchor the menu just outside the table's right edge, aligned to the
+			// clicked row's top (rather than the cursor).
+			const rowEl = event.currentTarget as HTMLElement;
+			const rowRect = rowEl.getBoundingClientRect();
+			const tableRect = rowEl.closest('table')?.getBoundingClientRect();
+			const anchorX = (tableRect?.right ?? rowRect.right) + CAMPAIGN_ROW_MENU_GAP;
+			const anchorY = rowRect.top;
+
+			// Mirror the exact folder colors painted on this row (stamped onto the
+			// folder cell) so the Get Info card matches.
+			const folderCell = rowEl.querySelector('.campaign-row-folder-cell');
+			const nameBoxColor =
+				folderCell?.getAttribute('data-folder-name-color') ??
+				CAMPAIGN_FOLDER_NAME_BOX_COLORS[0];
+			const folderIconColor =
+				folderCell?.getAttribute('data-folder-icon-color') ??
+				CAMPAIGN_FOLDER_ICON_COLORS[0];
+
+			setFinderContextMenu(null);
+			setFinderInfoPopup(null);
+			setCampaignRowInfo(null);
+			setCampaignRowMenu({ anchorX, anchorY, campaign, nameBoxColor, folderIconColor });
+		},
+		[]
+	);
+
+	const handleCampaignRowOpenInNewTab = useCallback(
+		(state: CampaignRowMenuAnchor) => {
+			setCampaignRowMenu(null);
+			// Mock rows use synthetic negative ids that route nowhere.
+			if (isMockActive) return;
+			if (typeof window === 'undefined') return;
+			window.open(
+				`${urls.murmur.campaign.detail(state.campaign.id)}?silent=1`,
+				'_blank',
+				'noopener,noreferrer'
+			);
+		},
+		[isMockActive]
+	);
+
+	const handleCampaignRowGetInfo = useCallback((state: CampaignRowMenuAnchor) => {
+		setCampaignRowMenu(null);
+		setCampaignRowInfo(state);
+	}, []);
+
+	const handleCampaignRowInfoClose = useCallback(() => {
+		setCampaignRowInfo(null);
+	}, []);
+
 	const finderContextMenuPayloadItems = getFinderContextPayloadItems(finderContextMenu);
 	const canMoveFinderContextItem = Boolean(
 		finderContextMenuPayloadItems.length > 0 &&
@@ -3062,9 +3536,115 @@ export const useCampaignsTable = (options?: {
 					);
 				}
 
+				// ARCHIVE folder row: flat grayed pill, chevron toggles the deleted list.
+				if (isArchiveFolderRow(original)) {
+					return (
+						<div className="campaign-row-folder-cell relative text-left">
+							{/* Invisible marker → CSS paints the whole row #F2F2F2 via
+							    tr:has(.archive-folder-row-marker). */}
+							<span
+								className="archive-folder-row-marker"
+								aria-hidden="true"
+								style={{ display: 'none' }}
+							/>
+							<button
+								type="button"
+								className="campaign-row-left-hover-surface"
+								data-custom-table-ignore-row-click="true"
+								aria-label={`${isArchiveExpanded ? 'Hide' : 'Show'} archived campaigns`}
+								onClick={(event) => {
+									event.stopPropagation();
+									setIsArchiveExpanded((prev) => !prev);
+								}}
+							/>
+							<div
+								className="inline-flex items-center box-border flex-none"
+								style={{ height: 20, paddingLeft: 0 }}
+							>
+								{/* Inline (not absolutely-positioned) so the chevron stays inside
+								    the table's clipping viewport when the archive is expanded —
+								    a `left:-19px` absolute chevron gets cut off by the left wall
+								    once the table switches to its scrolling layout. */}
+								<CampaignRowChevronIcon
+									className={cn(
+										'campaign-archive-chevron pointer-events-none flex-none h-[14px] w-[14px]',
+										'text-black',
+										isArchiveExpanded && 'campaign-archive-chevron-open'
+									)}
+								/>
+								<span
+									className="ml-[4px] inline-flex items-center justify-center flex-none"
+									style={{ color: ARCHIVE_ROW_ICON_COLOR }}
+								>
+									<DashboardActionBarFolderIcon width={16} height={10} />
+								</span>
+								<span
+									className="ml-[7px] truncate text-[13.854px] leading-[15px] font-inter font-semibold"
+									style={{ color: ARCHIVE_FOLDER_NAME_COLOR, letterSpacing: '0.04em' }}
+								>
+									ARCHIVE
+								</span>
+								<span className="ml-[10px] inline-flex items-center">
+									<CampaignDataTypeIconStrip
+										dataTypes={original.campaignDataTypes}
+										isConfirming={false}
+										hasNew={false}
+									/>
+								</span>
+							</div>
+						</div>
+					);
+				}
+
+				// A deleted campaign listed under the expanded ARCHIVE folder (grayed,
+				// indented, no chevron/finder toggle).
+				if (isArchivedCampaignRow(original)) {
+					return (
+						<div className="campaign-row-folder-cell relative text-left">
+							<span
+								className="archive-campaign-row-marker"
+								aria-hidden="true"
+								style={{ display: 'none' }}
+							/>
+							<div
+								className="campaign-archive-name-row inline-flex items-center box-border"
+								style={{ height: 20, paddingLeft: 18 }}
+							>
+								<span
+									className="inline-flex items-center justify-center flex-none"
+									style={{ color: ARCHIVE_ROW_ICON_COLOR }}
+								>
+									<DashboardActionBarFolderIcon width={16} height={10} />
+								</span>
+								<span
+									className="campaign-archive-name ml-[7px] text-[13.854px] leading-[15px] font-inter font-medium"
+									style={{ color: ARCHIVE_ROW_NAME_COLOR }}
+								>
+									{original.name}
+								</span>
+								<span className="ml-[10px] inline-flex flex-none items-center">
+									<CampaignDataTypeIconStrip
+										dataTypes={original.campaignDataTypes ?? []}
+										isConfirming={false}
+										hasNew={false}
+									/>
+								</span>
+							</div>
+						</div>
+					);
+				}
+
 				const name: string = row.getValue('name');
 				const campaign = original as CampaignWithCounts;
 				const isConfirming = campaign.id === confirmingCampaignId;
+				// Red "delete" warning: hovering the row's delete "X"
+				// (deleteWarningCampaignId) or the armed confirm (confirmingCampaignId).
+				// The folder pill itself stays normal; the red row band + warning text
+				// in the metrics column convey the state.
+				const isDeleteWarning =
+					isConfirming ||
+					(deleteWarningCampaignId != null &&
+						campaign.id === deleteWarningCampaignId);
 				const isCampaignFinderOpen = isFinderOpen && campaign.id === openCampaignId;
 				const newCount = campaign.newEmailCount ?? 0;
 				const campaignDataTypes = campaign.campaignDataTypes ?? [];
@@ -3075,11 +3655,15 @@ export const useCampaignsTable = (options?: {
 						(visibleRow) => !isFinderTableRow(visibleRow.original as CampaignTableRow)
 					)
 					.findIndex((visibleRow) => visibleRow.id === row.id);
-				const paletteIndex = getCampaignFolderPaletteIndex(
+				// Colorway is keyed by campaign id (shared with the top-nav box +
+				// campaign header box) so the folder pill/icon matches what opens; the
+				// visible-row index is only the fallback for mock/debug rows not in the
+				// real campaign list.
+				const { nameBoxColor, folderIconColor } = getCampaignFolderColors(
+					campaign.id,
+					realData,
 					visibleRowIndex >= 0 ? visibleRowIndex : row.index
 				);
-				const nameBoxColor = CAMPAIGN_FOLDER_NAME_BOX_COLORS[paletteIndex];
-				const folderIconColor = CAMPAIGN_FOLDER_ICON_COLORS[paletteIndex];
 				if (!name) {
 					return (
 						<Typography variant="muted" className="text-sm">
@@ -3090,6 +3674,8 @@ export const useCampaignsTable = (options?: {
 				return (
 					<div
 						className="campaign-row-folder-cell relative text-left"
+						data-folder-name-color={nameBoxColor}
+						data-folder-icon-color={folderIconColor}
 						data-finder-open={isCampaignFinderOpen ? 'true' : undefined}
 						data-finder-drop-zone={isCampaignFinderOpen ? 'true' : undefined}
 						data-finder-drop-target={
@@ -3099,7 +3685,16 @@ export const useCampaignsTable = (options?: {
 						onDragLeave={isCampaignFinderOpen ? handleFinderPanelDragLeave : undefined}
 						onDrop={isCampaignFinderOpen ? handleFinderPanelDrop : undefined}
 					>
-						{!isConfirming && enableFinder && (
+						{/* Invisible marker → CSS paints the whole row red (#E7677C) via
+						    tr:has(.campaign-delete-warning-marker). */}
+						{isDeleteWarning && (
+							<span
+								className="campaign-delete-warning-marker"
+								aria-hidden="true"
+								style={{ display: 'none' }}
+							/>
+						)}
+						{!isDeleteWarning && enableFinder && (
 							<button
 								type="button"
 								className="campaign-row-left-hover-surface"
@@ -3111,7 +3706,7 @@ export const useCampaignsTable = (options?: {
 						<CampaignRowChevronIcon
 							className={cn(
 								'campaign-row-chevron pointer-events-none absolute left-[-19px] top-1/2 h-[14px] w-[14px] -translate-y-1/2',
-								isConfirming ? 'text-white' : 'text-black',
+								'text-black',
 								isCampaignFinderOpen && 'campaign-row-chevron-open'
 							)}
 						/>
@@ -3122,7 +3717,7 @@ export const useCampaignsTable = (options?: {
 								height: 20,
 								borderRadius: 6.389,
 								border: '0.799px solid #000',
-								background: isConfirming ? 'transparent' : '#EEFFF0',
+								background: '#EEFFF0',
 								paddingLeft: 7,
 								/* paddingRight 26 (1+ new) shifts the new-count text ~14px left so it
 								   sits visually under the "New" column header rather than
@@ -3136,7 +3731,7 @@ export const useCampaignsTable = (options?: {
 									width: 112,
 									height: 15,
 									borderRadius: 3,
-									background: isConfirming ? 'transparent' : nameBoxColor,
+									background: nameBoxColor,
 									paddingLeft: 2,
 									paddingRight: 6,
 								}}
@@ -3146,14 +3741,14 @@ export const useCampaignsTable = (options?: {
 								>
 									<span
 										className="inline-flex items-center justify-center flex-none"
-										style={{ color: isConfirming ? '#FFFFFF' : folderIconColor }}
+										style={{ color: folderIconColor }}
 									>
 										<DashboardActionBarFolderIcon width={16} height={10} />
 									</span>
 									<span
 										className={cn(
-											'ml-[7px] truncate text-[13.854px] leading-[15px] font-inter font-medium',
-											isConfirming ? 'text-white' : 'text-black'
+											'campaign-folder-name-text ml-[7px] truncate text-[13.854px] leading-[15px] font-inter font-medium',
+											'text-black'
 										)}
 									>
 										{name}
@@ -3162,7 +3757,7 @@ export const useCampaignsTable = (options?: {
 								<span className="campaign-folder-show-content min-w-0 items-center">
 									<span
 										className="inline-flex items-center justify-center flex-none"
-										style={{ color: isConfirming ? '#FFFFFF' : folderIconColor }}
+										style={{ color: folderIconColor }}
 									>
 										<DashboardActionBarFolderIcon
 											className="campaign-folder-show-icon"
@@ -3173,7 +3768,7 @@ export const useCampaignsTable = (options?: {
 									<span
 										className={cn(
 											'ml-[9px] text-[13.854px] leading-[15px] font-inter font-medium',
-											isConfirming ? 'text-white' : 'text-black'
+											'text-black'
 										)}
 									>
 										Show
@@ -3183,7 +3778,7 @@ export const useCampaignsTable = (options?: {
 								<span className="campaign-folder-goto-content min-w-0 items-center">
 									<span
 										className="inline-flex items-center justify-center flex-none"
-										style={{ color: isConfirming ? '#FFFFFF' : folderIconColor }}
+										style={{ color: folderIconColor }}
 									>
 										<DashboardActionBarFolderIcon
 											className="campaign-folder-goto-icon"
@@ -3194,7 +3789,7 @@ export const useCampaignsTable = (options?: {
 									<span
 										className={cn(
 											'ml-[9px] text-[13.854px] leading-[15px] font-inter font-medium',
-											isConfirming ? 'text-white' : 'text-black'
+											'text-black'
 										)}
 									>
 										Go To
@@ -3203,14 +3798,14 @@ export const useCampaignsTable = (options?: {
 							</div>
 							<CampaignDataTypeIconStrip
 								dataTypes={campaignDataTypes}
-								isConfirming={isConfirming}
+								isConfirming={false}
 								hasNew={hasNew}
 							/>
 							{hasNew && (
 								<span
 									className={cn(
 										'campaign-folder-new-count flex-none text-[13.854px] leading-[17.186px] font-inter font-medium whitespace-nowrap',
-										isConfirming ? 'text-white' : 'text-black'
+										'text-black'
 									)}
 								>
 									{formatMetricPillLabel(newCount, 'new')}
@@ -3227,7 +3822,14 @@ export const useCampaignsTable = (options?: {
 			// Finder freezes row order while open, so metric sorting is applied before
 			// rows reach CustomTable instead of using TanStack's internal sorting state.
 			accessorFn: (row) => {
-				if (isFinderTableRow(row as CampaignTableRow)) return 0;
+				const typedRow = row as CampaignTableRow;
+				if (
+					isFinderTableRow(typedRow) ||
+					isArchiveFolderRow(typedRow) ||
+					isArchivedCampaignRow(typedRow)
+				) {
+					return 0;
+				}
 				return (
 					(metricSortKey === 'sent'
 						? (row as CampaignWithCounts)?.sentCount
@@ -3357,55 +3959,83 @@ export const useCampaignsTable = (options?: {
 				const original = row.original as CampaignTableRow;
 				if (isFinderTableRow(original)) return null;
 
-				const campaign = original as CampaignWithCounts;
-				const isConfirming = campaign.id === confirmingCampaignId;
-
-				if (isConfirming) {
+				// Archive rows (folder aggregate + deleted children) share a flat grayed
+				// metrics layout: same column slots/widths as active rows so New/Drafts/
+				// Sent/Updated stay aligned, but plain muted text instead of colored pills.
+				if (isArchiveFolderRow(original) || isArchivedCampaignRow(original)) {
+					const archiveDraftCount = original.draftCount ?? 0;
+					const archiveSentCount = original.sentCount ?? 0;
+					const archiveNewCount = original.newEmailCount ?? 0;
+					const archiveUpdatedAt = new Date(original.updatedAt);
+					const archiveLabels = [
+						...(shouldShowNewMetricSlot
+							? [archiveNewCount >= 1 ? formatMetricPillLabel(archiveNewCount, 'new') : '']
+							: []),
+						compactMetrics
+							? formatMetricCount(archiveDraftCount)
+							: formatMetricPillLabel(
+									archiveDraftCount,
+									archiveDraftCount === 1 ? 'draft' : 'drafts'
+								),
+						compactMetrics
+							? formatMetricCount(archiveSentCount)
+							: formatMetricPillLabel(archiveSentCount, 'sent'),
+						getUpdatedLabel(archiveUpdatedAt),
+					];
 					return (
 						<div
 							className={cn(
 								'metrics-grid-container w-full items-center text-left',
+								!shouldShowNewMetricSlot && 'campaign-metrics-no-new-layout',
 								compactMetrics
 									? 'flex flex-nowrap gap-[7px] justify-start'
-									: 'grid justify-items-start gap-8 md:gap-10 lg:gap-12'
+									: 'flex flex-nowrap justify-end'
 							)}
-							style={
-								compactMetrics
-									? undefined
-									: {
-											gridTemplateColumns:
-												'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)',
-									  }
-							}
+							style={desktopMetricsStyle}
 						>
-							<div
-								className={cn(
-									'relative flex items-center',
-									compactMetrics ? 'w-auto flex-shrink-0 justify-start' : 'w-full'
-								)}
-							>
-								<div
-									className={cn(
-										'pointer-events-none font-inter font-normal text-white',
-										compactMetrics
-											? 'flex h-[20px] items-center justify-start text-[11px] uppercase tracking-[0.01em]'
-											: 'text-[14px]'
-									)}
-								>
-									Click to confirm <span className="ml-2">{countdown}</span>
-								</div>
-							</div>
-							{[0, 1, 2].map((index) => (
+							{archiveLabels.map((label, index) => (
 								<div
 									key={index}
 									className={cn(
-										'flex items-center',
+										'campaign-metric-slot relative flex items-center',
 										compactMetrics
-											? 'h-[20px] w-[80px] flex-none justify-center'
-											: 'w-full'
+											? 'w-auto flex-shrink-0 justify-start'
+											: 'h-[20px] w-[80px] flex-none justify-center'
 									)}
-								/>
+								>
+									<span
+										className={cn(
+											'inline-flex box-border items-center justify-center truncate font-inter font-medium text-[13.854px] leading-[17.186px]',
+											!compactMetrics && 'h-[20px] w-[80px] min-w-[80px] max-w-[80px] px-0'
+										)}
+										style={{ color: ARCHIVE_ROW_METRIC_COLOR }}
+									>
+										{label}
+									</span>
+								</div>
 							))}
+						</div>
+					);
+				}
+
+				const campaign = original as CampaignWithCounts;
+				const isConfirming = campaign.id === confirmingCampaignId;
+				// The "Click to Delete..." message replaces the metric pills ONLY after the
+				// first click arms the confirm (isConfirming). On plain X-hover the row band
+				// turns red (folder-cell marker) but the pills stay with their normal colors.
+				if (isConfirming) {
+					return (
+						<div className="metrics-grid-container flex w-full items-center text-left">
+							<div
+								className={cn(
+									'pointer-events-none font-inter font-medium text-white whitespace-nowrap',
+									compactMetrics
+										? 'flex h-[20px] items-center text-[11px] uppercase tracking-[0.01em]'
+										: 'flex h-[20px] items-center leading-none text-[14px]'
+								)}
+							>
+								Click to Delete and move contents to Archive
+							</div>
 						</div>
 					);
 				}
@@ -3494,11 +4124,9 @@ export const useCampaignsTable = (options?: {
 								)}
 								style={
 									{
-										backgroundColor: isConfirming ? 'transparent' : fill,
-										color: isConfirming ? 'white' : '#000000',
-										borderColor: isConfirming
-											? '#A20000'
-											: '#000000',
+										backgroundColor: fill,
+										color: '#000000',
+										borderColor: '#000000',
 										} as React.CSSProperties
 									}
 								>
@@ -3524,6 +4152,14 @@ export const useCampaignsTable = (options?: {
 	const handleRowClick = (rowData: CampaignTableRow) => {
 		if (isFinderTableRow(rowData)) return;
 
+		// Clicking anywhere on the ARCHIVE folder row toggles its expansion; deleted
+		// campaigns inside it are view-only (no navigation).
+		if (isArchiveFolderRow(rowData)) {
+			setIsArchiveExpanded((prev) => !prev);
+			return;
+		}
+		if (isArchivedCampaignRow(rowData)) return;
+
 		if (enableFinder && openCampaignId === rowData.id) {
 			return;
 		}
@@ -3544,6 +4180,11 @@ export const useCampaignsTable = (options?: {
 			setConfirmingCampaignId(null);
 			setCurrentRow(null);
 		} else {
+			if (onSelectCampaign) {
+				onSelectCampaign(rowData.id);
+				return;
+			}
+
 			// Normal navigation
 			const target = `${urls.murmur.campaign.detail(rowData.id)}?silent=1`;
 			router.push(target);
@@ -3607,7 +4248,22 @@ export const useCampaignsTable = (options?: {
 		campaignRows: displayedCampaignData,
 		isPending,
 		handleRowClick,
+		onRowContextMenu: handleCampaignRowContextMenu,
+		campaignRowMenuPortals: (
+			<>
+				<CampaignRowContextMenu
+					state={campaignRowMenu}
+					onOpenInNewTab={handleCampaignRowOpenInNewTab}
+					onGetInfo={handleCampaignRowGetInfo}
+				/>
+				<CampaignRowInfoPopup
+					state={campaignRowInfo}
+					onClose={handleCampaignRowInfoClose}
+				/>
+			</>
+		),
 		isFinderOpen,
+		isArchiveExpanded,
 		isFinderDropTargetActive,
 		isFinderDropPending,
 		openCampaignId,

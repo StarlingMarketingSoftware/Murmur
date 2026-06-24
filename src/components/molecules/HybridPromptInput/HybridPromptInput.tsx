@@ -3226,6 +3226,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		containerHeightPx,
 		dataCampaignMainBox,
 		onProfilePanelOpen,
+		isProfilePanelOpen,
 		autoOpenProfileTabWhenIncomplete,
 		forceDesktop,
 	} = props;
@@ -3274,6 +3275,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	const subjectManualTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 	const signatureManualTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+	// Refs to the expanded manual Subject/Signature boxes. Used to keep the box
+	// open until the user clicks outside of it (instead of closing when the
+	// cursor merely leaves the box).
+	const manualSubjectBoxRef = useRef<HTMLDivElement | null>(null);
+	const manualSignatureBoxRef = useRef<HTMLDivElement | null>(null);
 
 	// Subject hover animation (Auto -> Auto Subject)
 	const autoSubjectPillRef = useRef<HTMLDivElement | null>(null);
@@ -3497,6 +3504,65 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			requestAnimationFrame(() => signatureManualTextareaRef.current?.focus());
 		}
 	}, [isAutoSignature]);
+
+	// Keep the manual Subject box open once it's been opened, and only revert
+	// back to Auto when the user clicks outside of it (and hasn't typed
+	// anything). Previously this reverted on `onMouseLeave`, which made the box
+	// close as soon as the cursor left it.
+	useEffect(() => {
+		if (!isManualSubject) return;
+
+		const handleOutsideInteraction = (event: Event) => {
+			const target = event.target as Node | null;
+			const container = manualSubjectBoxRef.current;
+			if (!target || !container) return;
+			if (container.contains(target)) return;
+
+			// Only snap back to Auto if the user never typed a manual subject.
+			const value = (form.getValues('subject') ?? '').trim();
+			if (!value) {
+				form.setValue('subject', '');
+				form.setValue('isAiSubject', true);
+			}
+		};
+
+		document.addEventListener('pointerdown', handleOutsideInteraction, true);
+		document.addEventListener('mousedown', handleOutsideInteraction, true);
+		document.addEventListener('click', handleOutsideInteraction, true);
+		return () => {
+			document.removeEventListener('pointerdown', handleOutsideInteraction, true);
+			document.removeEventListener('mousedown', handleOutsideInteraction, true);
+			document.removeEventListener('click', handleOutsideInteraction, true);
+		};
+	}, [isManualSubject, form]);
+
+	// Keep the manual Signature box open once it's been opened, and only revert
+	// back to Auto when the user clicks outside of it (and hasn't typed
+	// anything). Previously this reverted on `onMouseLeave`.
+	useEffect(() => {
+		if (isAutoSignature) return;
+
+		const handleOutsideInteraction = (event: Event) => {
+			const target = event.target as Node | null;
+			const container = manualSignatureBoxRef.current;
+			if (!target || !container) return;
+			if (container.contains(target)) return;
+
+			if (!manualSignatureValue.trim()) {
+				setManualSignatureValue('');
+				setIsAutoSignature(true);
+			}
+		};
+
+		document.addEventListener('pointerdown', handleOutsideInteraction, true);
+		document.addEventListener('mousedown', handleOutsideInteraction, true);
+		document.addEventListener('click', handleOutsideInteraction, true);
+		return () => {
+			document.removeEventListener('pointerdown', handleOutsideInteraction, true);
+			document.removeEventListener('mousedown', handleOutsideInteraction, true);
+			document.removeEventListener('click', handleOutsideInteraction, true);
+		};
+	}, [isAutoSignature, manualSignatureValue]);
 
 	// Track if Custom Instructions is open (for adjusting Generate Test button position)
 	const [isLocalCustomInstructionsOpen, setIsLocalCustomInstructionsOpen] =
@@ -5165,9 +5231,20 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									className="pointer-events-none absolute -inset-[3px] z-[60] rounded-[8px] border-[3px] border-black"
 								/>
 							)}
+							{/* Profile side panel open: dim the whole Write box so attention moves to the
+							    profile panel that opened beside it. The Profile summary box (z-50) sits
+							    above this scrim, so it stays fully lit — visually tying the in-box summary
+							    to the expanded side panel (see reference screenshots). */}
+							<ProfileCompletionDarkOverlay
+								opacity={isProfilePanelOpen ? 0.18 : 0}
+								className="rounded-[5px] duration-300"
+								zIndex={40}
+							/>
 							{activeTab === 'main' && selectedModeKey === 'full' && (
 								<ProfileCompletionDarkOverlay
-									opacity={hybridProfileSummary.darkOverlayOpacity}
+									opacity={
+										isProfilePanelOpen ? 0 : hybridProfileSummary.darkOverlayOpacity
+									}
 									className="rounded-[5px]"
 									zIndex={30}
 								/>
@@ -5435,7 +5512,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		<div
 																			onClick={() => {
 																				// Click anywhere on the hover UI -> switch to manual.
-																				// If the user doesn't type anything and moves away, we snap back to auto (handled in manual view).
+																				// If the user doesn't type anything and clicks away, we snap back to auto (handled by the outside-click effect).
 																				if (!isHandwrittenMode) {
 																					form.setValue('isAiSubject', false);
 																				}
@@ -5535,17 +5612,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																) : (
 																	// Auto OFF: expand downward (matches the signature manual box pattern)
 																	<div
+																		ref={manualSubjectBoxRef}
 																		className="w-full h-[97px] rounded-[8px] border-2 border-black overflow-hidden flex flex-col"
-																		onMouseLeave={() => {
-																			// If user hasn't actually typed a manual subject, revert back to auto when leaving.
-																			const value = (
-																				form.getValues('subject') ?? ''
-																			).trim();
-																			if (!value) {
-																				form.setValue('subject', '');
-																				form.setValue('isAiSubject', true);
-																			}
-																		}}
 																	>
 																		{/* Header row */}
 																		<div className="flex items-center h-[31px] shrink-0 bg-[#8DDF90]">
@@ -7861,13 +7929,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	</div>
 																) : (
 																	<div
+																		ref={manualSignatureBoxRef}
 																		className="w-full h-[97px] rounded-[8px] border-2 border-black overflow-hidden flex flex-col"
-																		onMouseLeave={() => {
-																			if (!manualSignatureValue.trim()) {
-																				setManualSignatureValue('');
-																				setIsAutoSignature(true);
-																			}
-																		}}
 																	>
 																		<div className="flex items-center h-[31px] shrink-0 bg-[#8DDF90]">
 																			<div className="pl-2 flex items-center h-full shrink-0 w-[120px] bg-[#8DDF90]">
@@ -8220,7 +8283,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		<div
 																			onClick={() => {
 																				// Click anywhere on the hover UI -> switch to manual.
-																				// If the user doesn't type anything and moves away, we snap back to auto (handled in manual view).
+																				// If the user doesn't type anything and clicks away, we snap back to auto (handled by the outside-click effect).
 																				setIsAutoSignature(false);
 																			}}
 																			onMouseLeave={handleSignatureHoverLeave}
@@ -8304,16 +8367,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																) : (
 																	/* Manual signature mode: 467x97px box with header and text area */
 																	<div
+																		ref={manualSignatureBoxRef}
 																		className={cn(
 																			'w-full h-[97px] rounded-[8px] border-2 border-black overflow-hidden flex flex-col'
 																		)}
-																		onMouseLeave={() => {
-																			// If user hasn't actually typed a manual signature, revert back to auto when leaving.
-																			if (!manualSignatureValue.trim()) {
-																				setManualSignatureValue('');
-																				setIsAutoSignature(true);
-																			}
-																		}}
 																	>
 																		{/* Header row */}
 																		<div className="flex items-center h-[31px] shrink-0 bg-[#8DDF90]">

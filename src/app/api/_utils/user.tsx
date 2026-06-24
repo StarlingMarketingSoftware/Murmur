@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { Prisma, User, UserRole } from '@prisma/client';
@@ -7,7 +8,7 @@ import { generateMurmurEmail, generateMurmurReplyToEmail } from '@/utils';
 
 // gets the currently logged in Clerk user, then fetches the local user
 // if user is not authenticated, not found, or error, it returns null
-export const getUser = async (): Promise<User | null> => {
+export const getUser = cache(async (): Promise<User | null> => {
 	const { userId } = await auth();
 
 	if (!userId) {
@@ -26,7 +27,7 @@ export const getUser = async (): Promise<User | null> => {
 		console.error(error);
 		return null;
 	}
-};
+});
 
 /**
  * Resolves a user's account type from Clerk metadata at creation time.

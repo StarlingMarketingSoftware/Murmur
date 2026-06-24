@@ -1,5 +1,5 @@
 import { auth } from '@clerk/nextjs/server';
-import { MessageSender, type ApplicationStatus } from '@prisma/client';
+import { MessageSender, Status, type ApplicationStatus } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { apiResponse, apiUnauthorized, handleApiError } from '@/app/api/_utils';
 import {
@@ -74,6 +74,11 @@ export type MyEventApplication = {
 	// null if the event was deleted after the application was submitted.
 	event: MyApplicationEvent | null;
 	venueResponse: MyApplicationVenueResponse | null;
+	// Campaign whose inbox hosts this application's thread: the divert-provenance
+	// campaign when the venue replied through one, else an active campaign that
+	// already contains the venue's contact. null → no campaign-inbox home, so the
+	// dashboard opens a read-only detail card instead of navigating.
+	homeCampaignId: number | null;
 	// Active booking-request handshake for this application (drives the Booked
 	// label on the artist's opportunity row; canceled requests don't surface).
 	booking: MyApplicationBooking | null;
@@ -173,6 +178,72 @@ export async function GET() {
 		const conversationIds = conversations.map((c) => c.id);
 		const applicationIds = applications.map((a) => a.id);
 
+		// A campaign-inbox "home" for applications the venue hasn't replied to yet:
+		// an active (non-deleted) campaign of this user that already contains a
+		// contact with the venue's projection email. Matching that exact email is
+		// what keeps the row inside the campaign inbox's sender allowlist when the
+		// dashboard deep-links to it.
+		const venueEmails = [
+			...new Set(
+				venueContacts
+					.map((c) => c.email)
+					.filter((email): email is string => Boolean(email))
+			),
+		];
+		const homeCampaignContactsPromise = venueEmails.length
+			? prisma.contact.findMany({
+					where: {
+						AND: [
+							{
+								OR: venueEmails.map((email) => ({
+									email: { equals: email, mode: 'insensitive' as const },
+								})),
+							},
+							{
+								OR: [
+									{ campaigns: { some: { userId, status: { not: Status.deleted } } } },
+									{
+										userContactLists: {
+											some: {
+												campaigns: { some: { userId, status: { not: Status.deleted } } },
+											},
+										},
+									},
+									{
+										contactList: {
+											campaigns: { some: { userId, status: { not: Status.deleted } } },
+										},
+									},
+								],
+							},
+						],
+					},
+					select: {
+						email: true,
+						campaigns: {
+							where: { userId, status: { not: Status.deleted } },
+							select: { id: true, createdAt: true },
+						},
+						userContactLists: {
+							select: {
+								campaigns: {
+									where: { userId, status: { not: Status.deleted } },
+									select: { id: true, createdAt: true },
+								},
+							},
+						},
+						contactList: {
+							select: {
+								campaigns: {
+									where: { userId, status: { not: Status.deleted } },
+									select: { id: true, createdAt: true },
+								},
+							},
+						},
+					},
+				})
+			: Promise.resolve([]);
+
 		// Started before (and awaited after) the conversation lookups — it only
 		// needs applicationIds, so it rides the same roundtrip window.
 		const bookingRowsPromise = applicationIds.length
@@ -225,9 +296,10 @@ export async function GET() {
 					}),
 				])
 			: [[], [], []];
-		const [bookingRows, confirmedBookings] = await Promise.all([
+		const [bookingRows, confirmedBookings, homeCampaignContacts] = await Promise.all([
 			bookingRowsPromise,
 			confirmedBookingsPromise,
+			homeCampaignContactsPromise,
 		]);
 		const confirmedOwnerByEventId = new Map<number, string>();
 		for (const booking of confirmedBookings) {
@@ -250,6 +322,25 @@ export async function GET() {
 		const campaignByConversation = new Map(
 			provenanceDiverts.map((m) => [m.conversationId, m.campaignId])
 		);
+		// venue email (lowercased) → its most-recent active campaign id.
+		const campaignIdByVenueEmail = new Map<string, number>();
+		const newestCampaignAtByEmail = new Map<string, Date>();
+		for (const contact of homeCampaignContacts) {
+			if (!contact.email) continue;
+			const key = contact.email.toLowerCase();
+			const candidateCampaigns = [
+				...contact.campaigns,
+				...contact.userContactLists.flatMap((list) => list.campaigns),
+				...(contact.contactList?.campaigns ?? []),
+			];
+			for (const campaign of candidateCampaigns) {
+				const newest = newestCampaignAtByEmail.get(key);
+				if (!newest || campaign.createdAt > newest) {
+					newestCampaignAtByEmail.set(key, campaign.createdAt);
+					campaignIdByVenueEmail.set(key, campaign.id);
+				}
+			}
+		}
 		const latestByApp = new Map<number, (typeof venueThreadMessages)[number]>();
 		const responseCountByApp = new Map<number, number>();
 		const unreadByApp = new Map<number, number>();
@@ -271,6 +362,17 @@ export async function GET() {
 				const conversationId =
 					venueId != null ? (conversationByVenueId.get(venueId) ?? null) : null;
 				const latest = latestByApp.get(application.id);
+				const divertCampaignId =
+					conversationId != null
+						? (campaignByConversation.get(conversationId) ?? null)
+						: null;
+				const venueEmail =
+					venueId != null ? (venueContactByVenueId.get(venueId)?.email ?? null) : null;
+				const homeCampaignId =
+					divertCampaignId ??
+					(venueEmail
+						? (campaignIdByVenueEmail.get(venueEmail.toLowerCase()) ?? null)
+						: null);
 				return {
 					id: application.id,
 					eventId: application.eventId,
@@ -287,6 +389,7 @@ export async function GET() {
 					),
 					venueContact:
 						venueId != null ? (venueContactByVenueId.get(venueId) ?? null) : null,
+					homeCampaignId,
 					event: event
 						? {
 								id: event.id,

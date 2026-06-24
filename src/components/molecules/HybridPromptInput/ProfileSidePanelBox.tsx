@@ -1,4 +1,4 @@
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { Pause, Play, Upload, X } from 'lucide-react';
@@ -47,6 +47,21 @@ const profileFieldLabelClassName =
 	'font-inter text-[10.292px] font-medium leading-[18.479px] text-[#9A9A9A]';
 const completedProfileFieldLabelClassName =
 	'font-inter text-[10.292px] font-black leading-[18.479px] text-[#76E59B]';
+
+// The outermost profile panel "fills" with green from the bottom up as the user
+// completes profile fields. The index is the number of completed fields (0–5):
+//   0 fields → solid blue (untouched starting state)
+//   1–4 fields → blue→green gradient whose green stop rises as more is filled
+//   5 fields (everything) → solid green
+// `fill:` in the design spec maps to CSS `background` on this HTML element.
+const PROFILE_PANEL_FILL_BACKGROUNDS = [
+	'#75BEF9',
+	'linear-gradient(180deg, #75BEF9 76.73%, #7BDB7F 100%)',
+	'linear-gradient(180deg, #75BEF9 0%, #7BDB7F 100%)',
+	'linear-gradient(180deg, #75BEF9 0%, #7BDB7F 57.21%)',
+	'linear-gradient(180deg, #75BEF9 0%, #7BDB7F 0.01%)',
+	'#7BDB7F',
+] as const;
 
 const DEFAULT_AREA_CENTER: [number, number] = [-98.5795, 39.8283];
 const DEFAULT_AREA_ZOOM = 2.6;
@@ -122,6 +137,8 @@ export type ProfileAreaMapBoxProps = {
 	onCoordinatesChange?: (coordinates: AreaCoordinates) => void;
 	/** Fires with the resolved geocode feature so a parent can read structured parts (city/region). */
 	onFeatureSelect?: (feature: ProfileAreaMapFeature) => void;
+	/** Fires when the user dismisses the editor (e.g. Escape) so a parent can collapse the chooser. */
+	onClose?: () => void;
 	/** Camera zoom once a location is picked — street-level pickers want closer than the regional default. */
 	selectedZoom?: number;
 };
@@ -158,6 +175,7 @@ export const ProfileAreaMapBox = ({
 	onCoordinatesChange,
 	onAreaCommit,
 	onFeatureSelect,
+	onClose,
 	selectedZoom = SELECTED_AREA_ZOOM,
 }: ProfileAreaMapBoxProps) => {
 	const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
@@ -505,6 +523,9 @@ export const ProfileAreaMapBox = ({
 								event.preventDefault();
 								setAreaQuery(area);
 								setIsEditingArea(false);
+								// Escape from the search box collapses the whole chooser, not just
+								// the text-edit sub-state, so a single Escape exits the field.
+								onClose?.();
 							}
 						}}
 						autoFocus
@@ -721,6 +742,12 @@ export const ProfileSidePanelBox = ({
 	const [bioDraft, setBioDraft] = useState(() => profileBio?.trim() || '');
 	const [isBioEditorOpen, setIsBioEditorOpen] = useState(() => !profileBio?.trim());
 
+	// Containers for the non-text choosers (genre grid, area map). A document-level
+	// mousedown listener uses these to close an open chooser when the user clicks
+	// away — including while the field is still empty.
+	const genreEditorRef = useRef<HTMLDivElement | null>(null);
+	const areaEditorRef = useRef<HTMLDivElement | null>(null);
+
 	// Keep the draft in sync with the incoming name when not actively editing.
 	useEffect(() => {
 		if (!isEditingName) setNameDraft(profileName?.trim() || '');
@@ -729,25 +756,28 @@ export const ProfileSidePanelBox = ({
 	useEffect(() => {
 		const nextGenre = profileGenre?.trim() || '';
 		setSelectedGenreDraft(nextGenre);
-		setIsGenreChooserOpen(!nextGenre);
+		// Only auto-collapse when a value arrives; never force the chooser back open
+		// on an empty value, so a user who dismissed an empty field (Escape /
+		// click-away) isn't fought by an incoming render.
+		if (nextGenre) setIsGenreChooserOpen(false);
 	}, [profileGenre]);
 
 	useEffect(() => {
 		const nextArea = profileArea?.trim() || '';
 		setSelectedAreaDraft(nextArea);
-		setIsAreaChooserOpen(!nextArea);
+		if (nextArea) setIsAreaChooserOpen(false);
 	}, [profileArea]);
 
 	useEffect(() => {
 		const nextPerformingName = profilePerformingName?.trim() || '';
 		setPerformingNameDraft(nextPerformingName);
-		setIsPerformingNameEditorOpen(!nextPerformingName);
+		if (nextPerformingName) setIsPerformingNameEditorOpen(false);
 	}, [profilePerformingName]);
 
 	useEffect(() => {
 		const nextBio = profileBio?.trim() || '';
 		setBioDraft(nextBio);
-		setIsBioEditorOpen(!nextBio);
+		if (nextBio) setIsBioEditorOpen(false);
 	}, [profileBio]);
 
 	const effectiveName = (isEditingName ? nameDraft : profileName)?.trim() || '';
@@ -766,11 +796,21 @@ export const ProfileSidePanelBox = ({
 		.find((genre) => genre.label.toLowerCase() === normalizedSelectedGenre);
 	const SelectedGenreIcon = selectedGenreOption?.Icon;
 	const isGenreEditable = Boolean(onProfileGenreUpdate);
+	const showGenreChip = Boolean(selectedGenre && !isGenreChooserOpen);
+	const showGenrePlaceholder = Boolean(!selectedGenre && !isGenreChooserOpen);
 	const showAreaStep = Boolean(selectedGenre);
 	const hasCompletedArea = Boolean(showAreaStep && selectedArea);
-	const showCompletedArea = Boolean(hasCompletedArea && !isAreaChooserOpen);
+	// Whether each field's editor is open is driven purely by its `is*Open` flag
+	// (not by emptiness). This lets the user dismiss an empty field via Escape or a
+	// click-away and have it collapse to a re-openable placeholder instead of being
+	// forced back open. Progressive disclosure is preserved by the handlers, which
+	// open the next field once the previous one is filled.
+	const showCompletedArea = Boolean(showAreaStep && selectedArea && !isAreaChooserOpen);
 	const showAreaEditor = Boolean(
-		showAreaStep && !isGenreChooserOpen && (!selectedArea || isAreaChooserOpen)
+		showAreaStep && !isGenreChooserOpen && isAreaChooserOpen
+	);
+	const showAreaPlaceholder = Boolean(
+		showAreaStep && !selectedArea && !isAreaChooserOpen && !isGenreChooserOpen
 	);
 	const showPerformingNameField = hasCompletedArea;
 	const showCompletedPerformingName = Boolean(
@@ -780,7 +820,14 @@ export const ProfileSidePanelBox = ({
 		showPerformingNameField &&
 		!isGenreChooserOpen &&
 		!isAreaChooserOpen &&
-		(!selectedPerformingName || isPerformingNameEditorOpen)
+		isPerformingNameEditorOpen
+	);
+	const showPerformingNamePlaceholder = Boolean(
+		showPerformingNameField &&
+		!selectedPerformingName &&
+		!isPerformingNameEditorOpen &&
+		!isGenreChooserOpen &&
+		!isAreaChooserOpen
 	);
 	const showBioStep = Boolean(showPerformingNameField && selectedPerformingName);
 	const showCompletedBio = Boolean(showBioStep && selectedBio && !isBioEditorOpen);
@@ -789,13 +836,22 @@ export const ProfileSidePanelBox = ({
 		!isGenreChooserOpen &&
 		!isAreaChooserOpen &&
 		!isPerformingNameEditorOpen &&
-		(!selectedBio || isBioEditorOpen)
+		isBioEditorOpen
+	);
+	const showBioPlaceholder = Boolean(
+		showBioStep &&
+		!selectedBio &&
+		!isBioEditorOpen &&
+		!isGenreChooserOpen &&
+		!isAreaChooserOpen &&
+		!isPerformingNameEditorOpen
 	);
 	const showVideoVerificationSection = Boolean(
 		showCompletedBio &&
 		!isGenreChooserOpen &&
 		!isAreaChooserOpen &&
-		!isPerformingNameEditorOpen
+		!isPerformingNameEditorOpen &&
+		!isBioEditorOpen
 	);
 
 	// Profile media (video/audio) lives on the account and is fetched independently
@@ -817,6 +873,24 @@ export const ProfileSidePanelBox = ({
 		...activeUploads.map((upload) => ({ type: 'upload' as const, upload })),
 	];
 	const canAddMedia = mediaSlots.length < 3;
+
+	// How "full" the profile is, used to green-fill the outer panel from the
+	// bottom up. Each of the five profile inputs counts once when it carries real
+	// data: genre, area, performing name, bio, and at least one ready media clip.
+	// Media only counts once it's actually saved (status "ready") so in-flight or
+	// failed uploads don't prematurely tint the panel.
+	const hasReadyMedia = profileMedia.some((asset) => asset.status === 'ready');
+	const completedProfileFieldCount = [
+		Boolean(selectedGenre),
+		Boolean(selectedArea),
+		Boolean(selectedPerformingName),
+		Boolean(selectedBio),
+		hasReadyMedia,
+	].filter(Boolean).length;
+	const profilePanelFillBackground =
+		PROFILE_PANEL_FILL_BACKGROUNDS[
+			Math.min(completedProfileFieldCount, PROFILE_PANEL_FILL_BACKGROUNDS.length - 1)
+		];
 
 	const handleSelectMediaFile = (event: ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0];
@@ -941,11 +1015,119 @@ export const ProfileSidePanelBox = ({
 		onProfileAreaUpdate?.(next);
 	};
 
+	// --- Close (Escape / click-away) ---------------------------------------
+	// Collapse an open field without changing its value. An empty field collapses
+	// to its re-openable placeholder; a filled field collapses to its chip.
+	const closeGenreChooser = useCallback(() => {
+		setIsGenreChooserOpen(false);
+	}, []);
+	const closeAreaChooser = useCallback(() => {
+		setIsAreaChooserOpen(false);
+	}, []);
+
+	// --- Clear (Delete / Backspace) ----------------------------------------
+	// Empty the field's value and persist the cleared state. Used by the non-text
+	// choosers (genre grid, area map) where there's no input to receive the key.
+	const clearGenre = useCallback(() => {
+		if (!isGenreEditable) return;
+		setSelectedGenreDraft('');
+		setIsGenreChooserOpen(true);
+		setIsAreaChooserOpen(false);
+		setIsPerformingNameEditorOpen(false);
+		setIsBioEditorOpen(false);
+		if (normalizedSelectedGenre) onProfileGenreUpdate?.('');
+	}, [isGenreEditable, normalizedSelectedGenre, onProfileGenreUpdate]);
+	const clearArea = useCallback(() => {
+		setSelectedAreaDraft('');
+		setIsAreaChooserOpen(true);
+		setIsPerformingNameEditorOpen(false);
+		setIsBioEditorOpen(false);
+		if (selectedArea) onProfileAreaUpdate?.('');
+	}, [selectedArea, onProfileAreaUpdate]);
+
+	// Keyboard handling for the non-text choosers (genre grid, area map). These have
+	// no text input to receive keys, so the focusable wrapper handles them:
+	//   Escape          → collapse the field (empty → placeholder, filled → chip)
+	//   Delete/Backspace → empty the field's value
+	// Keys originating from an actual text field (e.g. the area search box) are left
+	// to that field's own handlers so editing text isn't hijacked.
+	const isEditableEventTarget = (target: EventTarget | null) => {
+		const el = target as HTMLElement | null;
+		if (!el || !el.tagName) return false;
+		return (
+			el.tagName === 'INPUT' ||
+			el.tagName === 'TEXTAREA' ||
+			el.isContentEditable === true
+		);
+	};
+
+	const handleGenreKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+		if (isEditableEventTarget(event.target)) return;
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			closeGenreChooser();
+		} else if (event.key === 'Delete' || event.key === 'Backspace') {
+			event.preventDefault();
+			clearGenre();
+		}
+	};
+
+	const handleAreaKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+		if (isEditableEventTarget(event.target)) return;
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			closeAreaChooser();
+		} else if (event.key === 'Delete' || event.key === 'Backspace') {
+			event.preventDefault();
+			clearArea();
+		}
+	};
+
+	// Move focus into a chooser when it opens so it can receive Escape/Delete keys
+	// right away. `preventScroll` keeps the surrounding layout from jumping.
+	useEffect(() => {
+		if (isGenreChooserOpen && isGenreEditable) {
+			genreEditorRef.current?.focus({ preventScroll: true });
+		}
+	}, [isGenreChooserOpen, isGenreEditable]);
+
+	useEffect(() => {
+		if (showAreaEditor) {
+			areaEditorRef.current?.focus({ preventScroll: true });
+		}
+	}, [showAreaEditor]);
+
+	// Click-away closes an open chooser even while it's still empty, collapsing it
+	// to a re-openable placeholder. (The text editors below close on blur instead.)
+	useEffect(() => {
+		if (!isGenreChooserOpen) return;
+		const onDown = (event: MouseEvent) => {
+			if (genreEditorRef.current && !genreEditorRef.current.contains(event.target as Node)) {
+				closeGenreChooser();
+			}
+		};
+		document.addEventListener('mousedown', onDown);
+		return () => document.removeEventListener('mousedown', onDown);
+	}, [isGenreChooserOpen, closeGenreChooser]);
+
+	useEffect(() => {
+		if (!showAreaEditor) return;
+		const onDown = (event: MouseEvent) => {
+			if (areaEditorRef.current && !areaEditorRef.current.contains(event.target as Node)) {
+				closeAreaChooser();
+			}
+		};
+		document.addEventListener('mousedown', onDown);
+		return () => document.removeEventListener('mousedown', onDown);
+	}, [showAreaEditor, closeAreaChooser]);
+
 	const commitPerformingName = () => {
 		const next = performingNameDraft.trim();
 		const prev = (profilePerformingName ?? '').trim();
 		setPerformingNameDraft(next);
-		setIsPerformingNameEditorOpen(!next);
+		// Always collapse on commit so an empty field can be dismissed by clicking
+		// away; it falls back to a re-openable placeholder instead of staying open.
+		setIsPerformingNameEditorOpen(false);
 		if (next === prev) return;
 		onProfilePerformingNameUpdate?.(next || null);
 	};
@@ -953,14 +1135,14 @@ export const ProfileSidePanelBox = ({
 	const cancelPerformingNameEdit = () => {
 		const prev = profilePerformingName?.trim() || '';
 		setPerformingNameDraft(prev);
-		setIsPerformingNameEditorOpen(!prev);
+		setIsPerformingNameEditorOpen(false);
 	};
 
 	const commitBio = () => {
 		const next = bioDraft.trim();
 		const prev = (profileBio ?? '').trim();
 		setBioDraft(next);
-		setIsBioEditorOpen(!next);
+		setIsBioEditorOpen(false);
 		if (next === prev) return;
 		onProfileBioUpdate?.(next || null);
 	};
@@ -968,7 +1150,7 @@ export const ProfileSidePanelBox = ({
 	const cancelBioEdit = () => {
 		const prev = profileBio?.trim() || '';
 		setBioDraft(prev);
-		setIsBioEditorOpen(!prev);
+		setIsBioEditorOpen(false);
 	};
 
 	const nameClassName =
@@ -978,7 +1160,8 @@ export const ProfileSidePanelBox = ({
 		<div
 			data-campaign-profile-side-panel
 			aria-label="Profile panel"
-			className="relative box-border flex h-[681px] w-[393px] items-end justify-center rounded-[12px] border-[3px] border-[#070707] bg-[#75BEF9] pb-[5px]"
+			className="relative box-border flex h-[681px] w-[393px] items-end justify-center rounded-[12px] border-[3px] border-[#070707] pb-[5px] transition-[background] duration-500 ease-out"
+			style={{ background: profilePanelFillBackground }}
 		>
 			<span className="absolute left-[22px] top-[0px] font-inter text-[17.507px] font-medium leading-[23.342px] text-black">
 				Profile
@@ -1066,21 +1249,41 @@ export const ProfileSidePanelBox = ({
 						<ProfileFieldLabel completed={Boolean(selectedGenre)}>
 							Genre
 						</ProfileFieldLabel>
-						{selectedGenreOption && !isGenreChooserOpen ? (
+						{showGenreChip ? (
 							<button
 								type="button"
 								disabled={!isGenreEditable}
 								onClick={openGenreChooser}
 								className="mt-[5px] flex h-[21.374px] shrink-0 appearance-none items-center justify-center gap-[3px] rounded-[7.491px] border-0 bg-[#F4F4F4] px-[4px] font-inter text-[14px] font-medium leading-[21.374px] text-black transition hover:brightness-95 disabled:cursor-default disabled:opacity-100"
-								style={{ width: `${selectedGenreOption.width}px` }}
+								style={
+									selectedGenreOption
+										? { width: `${selectedGenreOption.width}px` }
+										: undefined
+								}
 							>
 								{SelectedGenreIcon && (
 									<SelectedGenreIcon aria-hidden="true" className="shrink-0" />
 								)}
-								<span>{selectedGenreOption.label}</span>
+								<span>{selectedGenreOption?.label ?? selectedGenre}</span>
+							</button>
+						) : showGenrePlaceholder ? (
+							<button
+								type="button"
+								disabled={!isGenreEditable}
+								onClick={openGenreChooser}
+								className="mt-[5px] flex h-[21.374px] w-fit shrink-0 appearance-none items-center justify-center rounded-[7.491px] border-0 bg-[#F4F4F4] px-[8px] font-inter text-[14px] font-medium leading-[21.374px] text-black/50 transition hover:brightness-95 disabled:cursor-default disabled:opacity-100"
+							>
+								Add your genre
 							</button>
 						) : (
-							<div className="relative mt-[5px] box-border h-[129px] w-[334px] shrink-0 overflow-hidden rounded-[9px] border-[1.526px] border-black bg-white opacity-80">
+							<div
+								ref={genreEditorRef}
+								tabIndex={-1}
+								role="group"
+								aria-label="Choose your Genre"
+								onKeyDown={handleGenreKeyDown}
+								className="relative mt-[5px] box-border h-[129px] w-[334px] shrink-0 overflow-hidden rounded-[9px] border-[1.526px] border-black bg-white opacity-80 outline-none"
+							>
 								<div className="box-border flex h-[27px] items-center px-[10px] font-inter text-[17.507px] font-medium leading-[23.342px] text-black">
 									Choose your Genre
 								</div>
@@ -1139,7 +1342,29 @@ export const ProfileSidePanelBox = ({
 								<span className="min-w-0 truncate">{selectedArea}</span>
 							</button>
 						) : showAreaEditor ? (
-							<ProfileAreaMapBox area={selectedArea} onAreaUpdate={handleAreaUpdate} />
+							<div
+								ref={areaEditorRef}
+								tabIndex={-1}
+								onKeyDown={handleAreaKeyDown}
+								className="outline-none"
+							>
+								<ProfileAreaMapBox
+									area={selectedArea}
+									onAreaUpdate={handleAreaUpdate}
+									onClose={closeAreaChooser}
+								/>
+							</div>
+						) : showAreaPlaceholder ? (
+							<button
+								type="button"
+								onClick={openAreaChooser}
+								className="mt-[5px] flex h-[21.374px] w-fit max-w-[334px] shrink-0 appearance-none items-center gap-[4px] overflow-hidden rounded-[7.491px] border-0 bg-[#F4F4F4] px-[6px] font-inter text-[14px] font-medium leading-[21.374px] text-black/50 transition hover:brightness-95"
+							>
+								<span aria-hidden="true" className="block h-[16px] w-[13px] shrink-0">
+									<ProfileAreaMarkerIcon className="h-full w-full" />
+								</span>
+								<span className="min-w-0 truncate">Add your area</span>
+							</button>
 						) : null}
 						<ProfileFieldLabel
 							completed={Boolean(selectedPerformingName)}
@@ -1176,6 +1401,19 @@ export const ProfileSidePanelBox = ({
 								aria-label="Performing name"
 								className="mt-[9px] box-border h-[50px] w-[301px] shrink-0 resize-none rounded-[9px] border-[1.526px] border-black bg-white px-[14px] py-[4px] font-inter text-[18px] font-medium leading-[20px] text-black opacity-80 outline-none"
 							/>
+						) : showPerformingNamePlaceholder ? (
+							<button
+								type="button"
+								onClick={openPerformingNameEditor}
+								className="mt-[5px] flex h-[21.374px] w-fit max-w-[334px] shrink-0 appearance-none items-center gap-[4px] overflow-hidden rounded-[7.491px] border-0 bg-[#F4F4F4] px-[6px] font-inter text-[14px] font-medium leading-[21.374px] text-black/50 transition hover:brightness-95"
+							>
+								<span
+									aria-hidden="true"
+									className="block h-[16px] w-[16px] shrink-0"
+									dangerouslySetInnerHTML={{ __html: profilePerformingNameIconSvg }}
+								/>
+								<span className="min-w-0 truncate">Add a performing name</span>
+							</button>
 						) : null}
 						<ProfileFieldLabel completed={Boolean(selectedBio)} className="mt-[16px]">
 							Bio
@@ -1206,10 +1444,23 @@ export const ProfileSidePanelBox = ({
 										cancelBioEdit();
 									}
 								}}
-								autoFocus={!selectedBio}
+								autoFocus
 								aria-label="Bio"
 								className="ml-[27px] mt-[24px] h-[132px] w-[301px] shrink-0 resize-none border-0 bg-transparent p-0 font-inter text-[18px] font-medium leading-[24px] text-black outline-none"
 							/>
+						) : showBioPlaceholder ? (
+							<button
+								type="button"
+								onClick={openBioEditor}
+								className="mt-[5px] flex h-[21.374px] w-fit max-w-[334px] shrink-0 appearance-none items-center gap-[4px] overflow-hidden rounded-[7.491px] border-0 bg-[#F4F4F4] px-[6px] font-inter text-[14px] font-medium leading-[21.374px] text-black/50 transition hover:brightness-95"
+							>
+								<span
+									aria-hidden="true"
+									className="block h-[17px] w-[8px] shrink-0"
+									dangerouslySetInnerHTML={{ __html: profileBioIconSvg }}
+								/>
+								<span className="min-w-0 truncate">Add a bio</span>
+							</button>
 						) : null}
 						{showVideoVerificationSection && (
 							<>

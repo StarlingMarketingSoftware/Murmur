@@ -190,6 +190,12 @@ export interface HybridPromptInputProps {
 	 */
 	onProfilePanelOpen?: () => void;
 	/**
+	 * Optional: when true, the external Profile side panel is currently open. While open, the
+	 * whole Write box dims behind a scrim EXCEPT the Profile summary box (which is mirrored in
+	 * the open side panel), so the connection between the two reads clearly.
+	 */
+	isProfilePanelOpen?: boolean;
+	/**
 	 * Optional: when true, default-open the Full Auto "Custom Instructions" expander on mount.
 	 * Useful for demos (e.g. landing page) so the Suggestions UI is visible immediately.
 	 */

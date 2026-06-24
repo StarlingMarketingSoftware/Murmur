@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { HistoryAction, HistoryActionType } from '@/components/atoms/BottomPanelsContainer';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 
@@ -181,6 +181,7 @@ export const HistoryLedgerPanel: React.FC<HistoryLedgerPanelProps> = ({ historyA
 	const [activeFilter, setActiveFilter] = useState<HistoryActionType | 'all'>('all');
 	const panelRef = useRef<HTMLDivElement>(null);
 	const scrollbarPortalRef = useRef<HTMLDivElement>(null);
+	const scrollContainerRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
 		if (typeof document === 'undefined') return;
@@ -205,6 +206,16 @@ export const HistoryLedgerPanel: React.FC<HistoryLedgerPanelProps> = ({ historyA
 	const filteredActions = historyActions
 		.filter((action) => activeFilter === 'all' || action.type === activeFilter)
 		.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+	// Default the scroll position to the bottom (the most recent actions) whenever the
+	// panel opens or the filtered set changes. Rows are ordered oldest -> newest, so the
+	// newest entries live at the bottom of the scroll area; without this the panel would
+	// open scrolled to the oldest actions at the top.
+	useLayoutEffect(() => {
+		const container = scrollContainerRef.current;
+		if (!container) return;
+		container.scrollTop = container.scrollHeight;
+	}, [filteredActions.length, activeFilter]);
 
 	// Calculate dynamic panel height based on number of filtered actions
 	// Header: 19px, Tabs: 25px, Content padding: 5px top, 70px bottom
@@ -345,6 +356,7 @@ export const HistoryLedgerPanel: React.FC<HistoryLedgerPanelProps> = ({ historyA
 					thumbColor="#000000"
 					trackColor="transparent"
 					scrollbarPortalRef={scrollbarPortalRef}
+					scrollContainerRef={scrollContainerRef}
 					offsetRight={0}
 					lockHorizontalScroll
 				>

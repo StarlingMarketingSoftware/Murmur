@@ -1934,6 +1934,7 @@ export async function GET(req: NextRequest) {
 		let profileAreaCenterLon: number | null = null;
 		let profileAreaCity: string | null = null;
 		let profileAreaState: string | null = null;
+		let profileAreaHasExactCenter = false;
 		if (profileAreaParsed?.hadExplicitPlace) {
 			const areaCityState = profileAreaParsed.city?.state
 				? US_STATES.find(
@@ -1944,15 +1945,25 @@ export async function GET(req: NextRequest) {
 				: null;
 			const areaHasExactCenter =
 				profileAreaParsed.city?.coordinatePrecision === 'city';
+			profileAreaHasExactCenter = areaHasExactCenter;
 			profileAreaCenterLat = areaHasExactCenter
 				? profileAreaParsed.city!.lat
-				: profileAreaParsed.state?.lat ?? areaCityState?.centroid.lat ?? null;
+				: profileAreaParsed.state?.lat ??
+				  areaCityState?.centroid.lat ??
+				  profileAreaParsed.region?.lat ??
+				  null;
 			profileAreaCenterLon = areaHasExactCenter
 				? profileAreaParsed.city!.lon
-				: profileAreaParsed.state?.lon ?? areaCityState?.centroid.lng ?? null;
+				: profileAreaParsed.state?.lon ??
+				  areaCityState?.centroid.lng ??
+				  profileAreaParsed.region?.lon ??
+				  null;
 			profileAreaCity = profileAreaParsed.city?.name ?? null;
 			profileAreaState =
-				profileAreaParsed.state?.name ?? areaCityState?.name ?? null;
+				profileAreaParsed.state?.name ??
+				areaCityState?.name ??
+				profileAreaParsed.region?.name ??
+				null;
 		}
 		const center: ResolvedCenter = strictRadiusActive
 			? {
@@ -1980,6 +1991,8 @@ export async function GET(req: NextRequest) {
 		const centerPoint = hasCenter
 			? { lat: center.lat as number, lon: center.lon as number }
 			: null;
+		const profileAreaCityPrecisionAnchor =
+			!parsed.hadExplicitPlace && profileAreaHasExactCenter;
 		// Radius derivation. When the user typed an explicit place, the PLACE
 		// decides the radius — exact cities get a tight anchor, regions their
 		// own extent — and the client's soft radius is ignored (the dashboard
@@ -1994,6 +2007,8 @@ export async function GET(req: NextRequest) {
 					: parsed.state || cityStateForCenter
 					? DEFAULT_LOCALITY_RADIUS_KM
 					: parsed.region?.radiusKm ?? DEFAULT_LOCALITY_RADIUS_KM
+				: profileAreaCityPrecisionAnchor && !strictRadiusActive
+				? CITY_ANCHOR_RADIUS_KM
 				: overrideRadiusKm ?? DEFAULT_LOCALITY_RADIUS_KM;
 		const emptyResponse = (
 			retrieverBreakdown: Record<string, number>
@@ -2158,7 +2173,8 @@ export async function GET(req: NextRequest) {
 						requestedLimit,
 						strictRadius: strictRadiusActive,
 						enforcedStates: typedEnforcedStates,
-						cityPrecisionAnchor: parsedCityHasExactCenter,
+						cityPrecisionAnchor:
+							parsedCityHasExactCenter || profileAreaCityPrecisionAnchor,
 						metroRegionAnchor: metroRegionIsAnchor,
 					}),
 				{
@@ -2267,7 +2283,8 @@ export async function GET(req: NextRequest) {
 						requestedLimit,
 						strictRadius: strictRadiusActive,
 						enforcedStates: typedEnforcedStates,
-						cityPrecisionAnchor: parsedCityHasExactCenter,
+						cityPrecisionAnchor:
+							parsedCityHasExactCenter || profileAreaCityPrecisionAnchor,
 						metroRegionAnchor: metroRegionIsAnchor,
 					}),
 				{

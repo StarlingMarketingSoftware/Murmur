@@ -40,8 +40,13 @@ import {
 	getMonthGridSpec,
 	getSameDayTimeRangeError,
 	getTimeChoiceError,
+	getTodayEventInnerBoxStyle,
+	getTodayEventInnerContentScale,
 	isDraftPersistable,
 	parseClockMinutes,
+	TODAY_EVENT_CELL_BORDER,
+	TODAY_EVENT_DATE_COLOR,
+	TODAY_EVENT_OUTER_RADIUS_PX,
 	toIsoKey,
 	weekdayLabel,
 } from './calendarShared';
@@ -57,6 +62,7 @@ type DashboardCalendarPanelProps = {
 	frameless?: boolean;
 	mockState?: DashboardCalendarMockState;
 	onDateSelect?: (date: Date, event: ReactMouseEvent<HTMLButtonElement>) => void;
+	showTodayReturnButton?: boolean;
 	showFullMonth?: boolean;
 	/**
 	 * Override the visible window height (unscaled px). Used by the mobile
@@ -75,6 +81,13 @@ type DashboardCalendarPanelProps = {
 	 * calendar (venue map view) pass their composite scale to match.
 	 */
 	popupScale?: number;
+	/**
+	 * Reports whether the body-portaled event-editor popup is open. Lets a host
+	 * that runs a page-level scroll gesture (the dashboard scroll-to-map scrub)
+	 * suppress it while the popup floats over the hero — the popup portals to body
+	 * and dismisses on scroll but not wheel, so it can't self-guard against it.
+	 */
+	onPopupOpenChange?: (open: boolean) => void;
 };
 
 type ActiveCalendarPopup = {
@@ -91,8 +104,16 @@ type CalendarScrollbarState =
 	| { visible: false; direction: null; thumbTop: number }
 	| { visible: true; direction: 'up' | 'down'; thumbTop: number };
 
+type MonthLabelPlacement = {
+	key: string;
+	label: string;
+	top: number;
+	leftCellDate: Date;
+};
+
 const clamp = (value: number, min: number, max: number): number =>
 	Math.min(Math.max(value, min), max);
+const CALENDAR_DAY_MS = 24 * 60 * 60 * 1000;
 
 // Width constants live at module scope so the mobile wrapper can compute its
 // scale factor from the exported outer width.
@@ -118,10 +139,12 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	frameless = false,
 	mockState,
 	onDateSelect,
+	showTodayReturnButton = false,
 	showFullMonth = false,
 	innerHeightPx,
 	persistEvents = false,
 	popupScale = 1,
+	onPopupOpenChange,
 }) => {
 	// Layout constants (hard dashboard sizing)
 	const ROWS = 6;
@@ -143,6 +166,9 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 	const CELL_BORDER = '1px solid #E0E0E0';
 	const GRID_BG = '#A3CEFF'; // shows through rounded cell corners
 	const INNER_STROKE_W_PX = 0.717;
+	const MONTH_LABEL_TOP_PX = 9;
+	const MONTH_LABEL_LEFT_PX = 9;
+	const MONTH_LABEL_HEIGHT_PX = 43.644;
 	// Months rendered before and after the current month, enabling wheel scrolling
 	// between adjacent months. 6 → half a year of history + lookahead in each direction.
 	const MONTH_WINDOW_RADIUS = 6;
@@ -355,6 +381,31 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		return null;
 	};
 
+	const monthLabelPlacements: MonthLabelPlacement[] = [];
+	for (let windowIndex = 0; windowIndex < monthWeekCounts.length; windowIndex += 1) {
+		const monthStart = new Date(
+			inMonthYear,
+			inMonthIndex + windowIndex - MONTH_WINDOW_RADIUS,
+			1
+		);
+		const { startDate: gridStartDate } = getMonthGridSpec(
+			monthStart.getFullYear(),
+			monthStart.getMonth()
+		);
+		for (let row = 0; row < monthWeekCounts[windowIndex]; row += 1) {
+			const weekStartDate = addDays(gridStartDate, row * COLS);
+			const label = getMonthLabelForWeekStart(weekStartDate);
+			if (!label) continue;
+
+			monthLabelPlacements.push({
+				key: `${toIsoKey(weekStartDate)}-${label}`,
+				label,
+				top: monthTopOffsetsPx[windowIndex] + row * CELL_H_PX,
+				leftCellDate: weekStartDate,
+			});
+		}
+	}
+
 	const getCellDateForGridIndex = (
 		calendarGridStartDate: Date,
 		gridIndex: number
@@ -365,6 +416,48 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 
 	// Month-specific diagonal color palettes live in calendarShared (also used by
 	// the inbox booking dropdown, which mirrors this grid's look).
+
+	const getCalendarDayDiff = (startDate: Date, endDate: Date): number =>
+		Math.round(
+			(Date.UTC(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()) -
+				Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate())) /
+				CALENDAR_DAY_MS
+		);
+
+	const getMonthOffsetFromAnchor = (year: number, monthIndex: number): number =>
+		(year - inMonthYear) * 12 + monthIndex - inMonthIndex;
+
+	const getTodayCellBounds = (): { top: number; bottom: number } | null => {
+		const todayWeekStartDate = addDays(effectiveToday, -effectiveToday.getDay());
+		const ownerMonthYear = todayWeekStartDate.getFullYear();
+		const ownerMonthIndex = todayWeekStartDate.getMonth();
+		const ownerWindowIndex =
+			getMonthOffsetFromAnchor(ownerMonthYear, ownerMonthIndex) + MONTH_WINDOW_RADIUS;
+
+		if (ownerWindowIndex < 0 || ownerWindowIndex >= monthTopOffsetsPx.length) {
+			return null;
+		}
+
+		const ownerGridSpec = getMonthGridSpec(ownerMonthYear, ownerMonthIndex);
+		const rowIndex = Math.floor(
+			getCalendarDayDiff(ownerGridSpec.startDate, todayWeekStartDate) / COLS
+		);
+
+		if (rowIndex < 0 || rowIndex >= monthWeekCounts[ownerWindowIndex]) {
+			return null;
+		}
+
+		const top = monthTopOffsetsPx[ownerWindowIndex] + rowIndex * CELL_H_PX;
+		return { top, bottom: top + CELL_H_PX };
+	};
+
+	const todayCellBounds = getTodayCellBounds();
+	const isTodayCellVisible =
+		todayCellBounds != null &&
+		todayCellBounds.bottom > scrollTop + 1 &&
+		todayCellBounds.top < scrollTop + INNER_HEIGHT_PX - 1;
+	const shouldShowTodayReturnButton =
+		showTodayReturnButton && todayCellBounds != null && !isTodayCellVisible;
 
 	const getScrollbarState = (nextScrollTop: number): CalendarScrollbarState => {
 		// The up/down scrollbar math assumes the window is smaller than one month
@@ -477,6 +570,14 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		isDraggingScrollbar,
 	]);
 
+	// Report popup open/closed to the host. Keyed on the activePopup object (not its
+	// key) so switching directly between cells stays a stable `true`; the cleanup
+	// reports `false` to cover an unmount while a popup is still open.
+	useEffect(() => {
+		onPopupOpenChange?.(activePopup != null);
+		return () => onPopupOpenChange?.(false);
+	}, [activePopup, onPopupOpenChange]);
+
 	// While the popup is open: dismiss on outside mousedown, Escape, or any window-level
 	// scroll/resize (the popup anchors to a cell that may have moved).
 	useEffect(() => {
@@ -529,7 +630,6 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 			handleDismiss();
 		};
 
-		// On touch devices the on-screen keyboard fires window resizes whenever a
 		// popup input gains focus — dismissing there would make the popup untypable.
 		const dismissOnResize = !window.matchMedia('(pointer: coarse)').matches;
 
@@ -540,9 +640,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		if (dismissOnResize) {
 			window.addEventListener('resize', handleDismiss);
 		}
-		// Capture-phase scroll listener catches scroll on any ancestor (including the
-		// calendar's internal scroll container during wheel-snap between months), while
-		// allowing internal popup controls like the time dropdown to scroll normally.
+		
 		if (!isModal) {
 			window.addEventListener('scroll', handleScrollDismiss, true);
 		}
@@ -596,6 +694,19 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 		setScrollTop(event.currentTarget.scrollTop);
 	};
 
+	const handleTodayReturnClick = () => {
+		const container = scrollContainerRef.current;
+		if (!container || !todayCellBounds) return;
+
+		const nextScrollTop = clamp(
+			todayCellBounds.top - (INNER_HEIGHT_PX - CELL_H_PX) / 2,
+			0,
+			MAX_SCROLL_TOP_PX
+		);
+		container.scrollTop = nextScrollTop;
+		setScrollTop(nextScrollTop);
+	};
+
 	const containCalendarScrollGesture = (
 		event: ReactWheelEvent<HTMLDivElement> | ReactTouchEvent<HTMLDivElement>
 	) => {
@@ -634,6 +745,76 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 			container.scrollTop =
 				INITIAL_SCROLL_TOP_PX - (1 - clickProgress) * INITIAL_SCROLL_TOP_PX;
 		}
+	};
+
+	const getMonthLabelColor = (leftCellDate: Date): string => {
+		const draft = effectiveDrafts[toIsoKey(leftCellDate)];
+		const showDraftSummary =
+			draft != null && isDraftPersistable(draft, leftCellDate);
+		const isToday =
+			leftCellDate.getFullYear() === effectiveToday.getFullYear() &&
+			leftCellDate.getMonth() === effectiveToday.getMonth() &&
+			leftCellDate.getDate() === effectiveToday.getDate();
+
+		return showDraftSummary && !isToday ? '#FFFFFF' : monthLabelStyle.color;
+	};
+
+	const renderMonthLabelScrollLayer = () => {
+		if (monthLabelPlacements.length === 0) return null;
+
+		return (
+			<div
+				aria-hidden="true"
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					zIndex: 20,
+				}}
+			>
+				{monthLabelPlacements.map((placement, index) => {
+					const nextPlacementTop =
+						monthLabelPlacements[index + 1]?.top ??
+						TOTAL_SCROLL_HEIGHT_PX + INNER_HEIGHT_PX;
+					const stickyRoom = MONTH_LABEL_TOP_PX + MONTH_LABEL_HEIGHT_PX;
+					const height = Math.max(
+						nextPlacementTop - placement.top,
+						stickyRoom
+					);
+
+					return (
+						<div
+							key={placement.key}
+							style={{
+								position: 'absolute',
+								top: `${placement.top}px`,
+								left: 0,
+								right: 0,
+								height: `${height}px`,
+								pointerEvents: 'none',
+							}}
+						>
+							<div
+								style={{
+									position: 'sticky',
+									top: `${MONTH_LABEL_TOP_PX}px`,
+									marginTop: `${MONTH_LABEL_TOP_PX}px`,
+									marginLeft: `${MONTH_LABEL_LEFT_PX}px`,
+									marginRight: `${MONTH_LABEL_LEFT_PX}px`,
+									textAlign: 'left',
+									...monthLabelStyle,
+									color: getMonthLabelColor(placement.leftCellDate),
+									whiteSpace: 'nowrap',
+									pointerEvents: 'none',
+								}}
+							>
+								{placement.label}
+							</div>
+						</div>
+					);
+				})}
+			</div>
+		);
 	};
 
 	const activeDraft = activePopup
@@ -802,9 +983,6 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 			return;
 		}
 
-		// Apple-style placement: prefer right of the cell, flip to the left when there
-		// isn't room. The popup is allowed to overhang the panel edges; it's only
-		// clamped to the viewport so nothing gets cut off the screen.
 		const roomRight = viewportWidth - cellRect.right - POPUP_CELL_GAP_PX;
 		const roomLeft = cellRect.left - POPUP_CELL_GAP_PX;
 
@@ -1052,10 +1230,10 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 					const col = gridIndex % COLS;
 					const date = getCellDateForGridIndex(gridCalendarStartDate, gridIndex);
 					const inPrimary = isInPrimaryMonth(date, gridMonthYear, gridMonthIndex);
-					const monthLabel = col === 0 ? getMonthLabelForWeekStart(date) : null;
 					// The left cell of the week containing the 1st carries the big month
-					// label, matching Apple Calendar's boundary-row placement.
-					const isLabelCell = monthLabel != null;
+					// label spacing; the visible label itself lives in the sticky overlay.
+					const isLabelCell =
+						col === 0 && getMonthLabelForWeekStart(date) != null;
 					const isTopRow = row === 0;
 					const isFirstOfMonth = date.getDate() === 1;
 					const isToday =
@@ -1066,21 +1244,29 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 					const isoKey = toIsoKey(date);
 					const draft = effectiveDrafts[isoKey];
 					const showDraftSummary = draft != null && isDraftPersistable(draft, date);
-					// A draft on today's cell still shows the red event card; the green
-					// "today" pill only appears when the cell has no scheduled event.
+					const isTodayWithDraft = isToday && showDraftSummary;
 					const isHighlighted = isToday && !showDraftSummary;
-					const textColor = showDraftSummary
-						? '#FFFFFF'
-						: isHighlighted
-							? '#00AFE5'
-							: inPrimary
-								? IN_MONTH_TEXT.color
-								: OUTSIDE_MONTH_TEXT_COLOR;
+					const isOpenEventCell = showDraftSummary && activePopup?.key === isoKey;
+					const textColor = isTodayWithDraft
+						? TODAY_EVENT_DATE_COLOR
+						: showDraftSummary
+							? '#FFFFFF'
+							: isHighlighted
+								? '#00AFE5'
+								: inPrimary
+									? IN_MONTH_TEXT.color
+									: OUTSIDE_MONTH_TEXT_COLOR;
 					const cellBackground = showDraftSummary
-						? '#F14048'
+						? isOpenEventCell
+							? '#F14048'
+							: '#F67C7E'
 						: isHighlighted
 							? '#38E497'
 							: getCellBackground(date.getMonth(), row, col);
+					const innerContentScale = getTodayEventInnerContentScale(
+						CELL_W_PX,
+						CELL_H_PX
+					);
 
 					let label = String(date.getDate());
 					if (isTopRow) {
@@ -1109,10 +1295,13 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 							style={{
 								width: '100%',
 								height: `${CELL_H_PX}px`,
-								borderRadius: isHighlighted ? '9.747px' : `${CELL_RADIUS_PX}px`,
+								borderRadius:
+									isHighlighted || isTodayWithDraft
+										? `${TODAY_EVENT_OUTER_RADIUS_PX}px`
+										: `${CELL_RADIUS_PX}px`,
 								border:
 									isHighlighted || showDraftSummary
-										? '1.175px solid #FFFFFF'
+										? TODAY_EVENT_CELL_BORDER
 										: CELL_BORDER,
 								backgroundColor: cellBackground,
 								boxSizing: 'border-box',
@@ -1124,80 +1313,128 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 								WebkitAppearance: 'none',
 							}}
 						>
-							{isLabelCell && (
-								<div
-									style={{
-										position: 'absolute',
-										top: '9px',
-										left: '9px',
-										right: '9px',
-										textAlign: 'left',
-										...monthLabelStyle,
-										...(showDraftSummary ? { color: '#FFFFFF' } : {}),
-										whiteSpace: 'nowrap',
-										pointerEvents: 'none',
-									}}
-								>
-									{monthLabel}
-								</div>
-							)}
-							{!(isLabelCell && showDraftSummary) && (
-								<div
-									style={{
-										position: 'absolute',
-										...(isLabelCell ? { bottom: '10px' } : { top: '10px' }),
-										left: '12px',
-										right: '12px',
-										textAlign: 'right',
-										...IN_MONTH_TEXT,
-										color: textColor,
-										whiteSpace: 'nowrap',
-										overflow: 'hidden',
-										textOverflow: 'ellipsis',
-										pointerEvents: 'none',
-										fontWeight: isHighlighted ? 700 : IN_MONTH_TEXT.fontWeight,
-									}}
-								>
-									{label}
-								</div>
-							)}
-							{showDraftSummary && (
-								<div
-									style={{
-										position: 'absolute',
-										left: '9px',
-										right: '8px',
-										...(isLabelCell ? { bottom: '8px' } : { top: '33px' }),
-										textAlign: 'left',
-										color: '#FFFFFF',
-										fontFamily:
-											'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-										fontSize: '12.25px',
-										fontWeight: 600,
-										lineHeight: '13.25px',
-										overflow: 'hidden',
-										pointerEvents: 'none',
-									}}
-								>
+							{isTodayWithDraft ? (
+								<div style={getTodayEventInnerBoxStyle(CELL_W_PX, CELL_H_PX)}>
 									<div
 										style={{
+											position: 'absolute',
+											top: `${10 * innerContentScale}px`,
+											left: `${12 * innerContentScale}px`,
+											right: `${12 * innerContentScale}px`,
+											textAlign: 'right',
+											...IN_MONTH_TEXT,
+											color: TODAY_EVENT_DATE_COLOR,
+											fontWeight: 700,
 											whiteSpace: 'nowrap',
 											overflow: 'hidden',
 											textOverflow: 'ellipsis',
 										}}
 									>
-										{draft.personName.trim() || draft.company.trim() || 'Untitled'}
+										{label}
 									</div>
 									<div
 										style={{
-											whiteSpace: 'nowrap',
+											position: 'absolute',
+											left: `${9 * innerContentScale}px`,
+											right: `${8 * innerContentScale}px`,
+											top: `${33 * innerContentScale}px`,
+											textAlign: 'left',
+											color: '#FFFFFF',
+											fontFamily:
+												'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+											fontSize: `${12.25 * innerContentScale}px`,
+											fontWeight: 600,
+											lineHeight: `${13.25 * innerContentScale}px`,
 											overflow: 'hidden',
-											textOverflow: 'ellipsis',
 										}}
 									>
-										{draft.startTime.trim()}-{draft.endTime.trim()}
+										<div
+											style={{
+												whiteSpace: 'nowrap',
+												overflow: 'hidden',
+												textOverflow: 'ellipsis',
+											}}
+										>
+											{draft.personName.trim() ||
+												draft.company.trim() ||
+												'Untitled'}
+										</div>
+										<div
+											style={{
+												whiteSpace: 'nowrap',
+												overflow: 'hidden',
+												textOverflow: 'ellipsis',
+											}}
+										>
+											{draft.startTime.trim()}-{draft.endTime.trim()}
+										</div>
 									</div>
 								</div>
+							) : (
+								<>
+									{!(isLabelCell && showDraftSummary) && (
+										<div
+											style={{
+												position: 'absolute',
+												...(isLabelCell ? { bottom: '10px' } : { top: '10px' }),
+												left: '12px',
+												right: '12px',
+												textAlign: 'right',
+												...IN_MONTH_TEXT,
+												color: textColor,
+												whiteSpace: 'nowrap',
+												overflow: 'hidden',
+												textOverflow: 'ellipsis',
+												pointerEvents: 'none',
+												fontWeight: isHighlighted
+													? 700
+													: IN_MONTH_TEXT.fontWeight,
+											}}
+										>
+											{label}
+										</div>
+									)}
+									{showDraftSummary && (
+										<div
+											style={{
+												position: 'absolute',
+												left: '9px',
+												right: '8px',
+												...(isLabelCell ? { bottom: '8px' } : { top: '33px' }),
+												textAlign: 'left',
+												color: '#FFFFFF',
+												fontFamily:
+													'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+												fontSize: '12.25px',
+												fontWeight: 600,
+												lineHeight: '13.25px',
+												overflow: 'hidden',
+												pointerEvents: 'none',
+											}}
+										>
+											<div
+												style={{
+													whiteSpace: 'nowrap',
+													overflow: 'hidden',
+													textOverflow: 'ellipsis',
+												}}
+											>
+												{draft.personName.trim() ||
+													draft.company.trim() ||
+													'Untitled'}
+											</div>
+											<div
+												style={{
+													whiteSpace: 'nowrap',
+													overflow: 'hidden',
+													textOverflow: 'ellipsis',
+												}}
+											>
+												{draft.startTime.trim()}-{draft.endTime.trim()}
+											</div>
+										</div>
+									)}
+								</>
 							)}
 						</button>
 					);
@@ -1235,6 +1472,7 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 					overflow: 'hidden',
 					boxSizing: 'border-box',
 					backgroundColor: GRID_BG,
+					position: 'relative',
 				}}
 			>
 				<div
@@ -1261,14 +1499,52 @@ export const DashboardCalendarPanel: FC<DashboardCalendarPanelProps> = ({
 						style={{
 							width: '100%',
 							height: `${TOTAL_SCROLL_HEIGHT_PX}px`,
+							position: 'relative',
 						}}
 					>
 						{Array.from({ length: MONTH_WINDOW_RADIUS * 2 + 1 }, (_, index) =>
 							renderMonthGrid(index - MONTH_WINDOW_RADIUS)
 						)}
+						{renderMonthLabelScrollLayer()}
 					</div>
 				</div>
 			</div>
+
+			{shouldShowTodayReturnButton && (
+				<button
+					type="button"
+					aria-label="Scroll calendar to today"
+					onClick={handleTodayReturnClick}
+					style={{
+						position: 'absolute',
+						top: innerHeightPx == null ? '-42px' : '10px',
+						left: '50%',
+						transform: 'translateX(-50%)',
+						display: 'flex',
+						width: '136px',
+						padding: '3px 43px 3px 42px',
+						justifyContent: 'center',
+						alignItems: 'center',
+						borderRadius: '47.758px',
+						opacity: 0.9,
+						background: '#FFF',
+						boxShadow: '0 1.165px 2.33px 0 rgba(0, 0, 0, 0.05)',
+						border: 0,
+						boxSizing: 'border-box',
+						color: '#1A1A1A',
+						cursor: 'pointer',
+						zIndex: 60,
+						fontFamily:
+							'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+						fontSize: '17px',
+						fontWeight: 400,
+						lineHeight: '20px',
+						whiteSpace: 'nowrap',
+					}}
+				>
+					Today
+				</button>
+			)}
 
 			{activePopup &&
 				activeDraft &&

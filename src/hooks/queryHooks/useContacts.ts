@@ -418,8 +418,13 @@ export interface LocationResult {
 	label: string;
 }
 
-export const useGetLocations = (query: string, mode?: 'state' | 'state-first') => {
+export const useGetLocations = (
+	query: string,
+	mode?: 'state' | 'state-first',
+	options: { enabled?: boolean } = {}
+) => {
 	const isStateOnly = mode === 'state';
+	const enabled = options.enabled ?? true;
 
 	return useQuery<LocationResult[]>({
 		queryKey: ['locations', query, mode],
@@ -437,7 +442,7 @@ export const useGetLocations = (query: string, mode?: 'state' | 'state-first') =
 			}
 			return response.json();
 		},
-		enabled: isStateOnly || query.length >= 1,
+		enabled: enabled && (isStateOnly || query.length >= 1),
 		staleTime: 1000 * 60 * 5, // 5 minutes
 	});
 };
@@ -504,7 +509,7 @@ export const useGetContactsMapOverlay = (options: {
 		refetchOnWindowFocus: false,
 		retry: false,
 		staleTime: 1000 * 60 * 5, // 5 minutes
-		gcTime: 1000 * 60 * 30, // Keep in cache for 30 minutes
+		gcTime: 1000 * 60 * 5, // Keep inactive overlay windows briefly without retaining long pan sessions
 	});
 };
 
@@ -572,6 +577,7 @@ export interface CuratedSearchVariables {
 	lon?: number | null;
 	radiusKm?: number | null;
 	category?: string | null;
+	area?: string | null;
 	state?: string | null;
 	limit?: number;
 	// Caller-supplied signal: lets the dashboard cancel an in-flight curated
@@ -596,6 +602,7 @@ export const fetchCuratedSearch = async (
 		params.radiusKm = String(vars.radiusKm);
 	}
 	if (vars.category) params.category = vars.category;
+	if (vars.area) params.area = vars.area.slice(0, 120);
 	if (vars.state) params.state = vars.state;
 	if (typeof vars.limit === 'number') params.limit = String(vars.limit);
 	const url = appendQueryParamsToUrl(
