@@ -27,6 +27,12 @@ export interface DraftPreviewExpandedListProps {
 	width?: number;
 	/** Custom height in pixels */
 	height?: number;
+	/** Optional override for the preview shell color. */
+	outerBgColor?: string;
+	/** Optional override for the blank/wave base color. */
+	waveBaseColor?: string;
+	/** Optional bottom breadcrumb/footer label. */
+	footerLabel?: string;
 }
 
 export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
@@ -36,6 +42,9 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 	fallbackDraft,
 	width = 376,
 	height = 426,
+	outerBgColor,
+	waveBaseColor,
+	footerLabel,
 }) => {
 	// Layout spec (pixel-perfect):
 	// - First divider line: 4px from top
@@ -48,7 +57,7 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 	const IDENTITY_BAR_TOP = TOP_DIVIDER_Y + STROKE_PX;
 	const SUBJECT_GAP_BELOW_IDENTITY = 5;
 	const SUBJECT_BOX_HEIGHT = 46;
-	const BODY_BOTTOM_GAP = 12;
+	const BODY_BOTTOM_GAP = footerLabel ? 34 : 12;
 	// Body marginTop = first divider (STROKE_PX) + identity bar (40px) + gap (5px)
 	// This places the subject box 5px below the identity bar's bottom border
 	const BODY_TOP_MARGIN = STROKE_PX + IDENTITY_BAR_HEIGHT + SUBJECT_GAP_BELOW_IDENTITY;
@@ -78,9 +87,9 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 	// - Identity strip: #E5EEFF
 	// - Rest of the preview box: #BAD1FB
 	const identityBg = '#E5EEFF';
-	const outerBg = '#BAD1FB';
+	const outerBg = outerBgColor ?? '#BAD1FB';
 	const subjectAndBodyBg = '#FFFFFF';
-	const draftWaveBaseBg = '#B6CCF6';
+	const draftWaveBaseBg = waveBaseColor ?? '#B6CCF6';
 
 	const contact = useMemo(
 		() => contacts.find((c) => c.id === effectiveContactId) || null,
@@ -349,6 +358,21 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 				)}
 				</div>
 			</div>
+			{footerLabel ? (
+				<div
+					className="absolute left-[12px] right-[12px] bottom-0 flex items-center font-inter text-[11px] font-normal leading-none text-black"
+					style={{
+						height: '24px',
+						pointerEvents: 'none',
+						WebkitMaskImage: 'linear-gradient(90deg, #000 92%, transparent 100%)',
+						maskImage: 'linear-gradient(90deg, #000 92%, transparent 100%)',
+					}}
+				>
+					<span className="whitespace-nowrap">Drafts</span>
+					<span className="mx-[10px] whitespace-nowrap">{'>'}</span>
+					<span className="min-w-0 truncate">{footerLabel}</span>
+				</div>
+			) : null}
 		</div>
 	);
 };

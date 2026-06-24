@@ -570,415 +570,471 @@ body {
 	}
 }
 
-	@keyframes gradient-breathe {
-		0%, 100% {
-			background-position: 0% 50%;
-			filter: brightness(1) saturate(1);
-		}
-		50% {
-			background-position: 100% 50%;
-			filter: brightness(1.08) saturate(1.05);
-		}
+@keyframes gradient-breathe {
+	0%,
+	100% {
+		background-position: 0% 50%;
+		filter: brightness(1) saturate(1);
+	}
+	50% {
+		background-position: 100% 50%;
+		filter: brightness(1.08) saturate(1.05);
+	}
+}
+
+/* Hover-only "pond" shimmer: slow caustics drift (subtle, meant for tiny surfaces). */
+@keyframes pond-caustics-drift {
+	0% {
+		background-position:
+			0 0,
+			0px 0px,
+			0px 0px,
+			0px 0px;
+	}
+	50% {
+		background-position:
+			0 0,
+			70px -34px,
+			-44px 62px,
+			58px 42px;
+	}
+	100% {
+		background-position:
+			0 0,
+			140px -68px,
+			-88px 124px,
+			116px 84px;
+	}
+}
+
+/* Premium prismatic refraction animation: gentle waves of light distortion. */
+@keyframes prismatic-flow {
+	0% {
+		background-position:
+			0% 50%,
+			100% 50%,
+			50% 0%,
+			50% 100%;
+	}
+	50% {
+		background-position:
+			100% 50%,
+			0% 50%,
+			50% 100%,
+			50% 0%;
+	}
+	100% {
+		background-position:
+			0% 50%,
+			100% 50%,
+			50% 0%,
+			50% 100%;
+	}
+}
+
+/* Micro-shimmer: tiny specular beads drifting along the gradient direction. */
+@keyframes micro-shimmer-drift {
+	0% {
+		background-position:
+			0% 0%,
+			40% 20%,
+			80% 60%,
+			20% 80%;
+	}
+	33% {
+		background-position:
+			30% 40%,
+			70% 10%,
+			10% 80%,
+			60% 50%;
+	}
+	66% {
+		background-position:
+			60% 20%,
+			10% 70%,
+			50% 30%,
+			90% 10%;
+	}
+	100% {
+		background-position:
+			0% 0%,
+			40% 20%,
+			80% 60%,
+			20% 80%;
+	}
+}
+
+/* Specular pulse: very slow brightening / dimming of the refraction core. */
+@keyframes specular-breathe {
+	0%,
+	100% {
+		opacity: 0.35;
+		transform: scale(1);
+	}
+	50% {
+		opacity: 0.55;
+		transform: scale(1.04);
+	}
+}
+
+/* Anisotropic streak drift: soft horizontal flares that follow gradient flow. */
+@keyframes streak-drift {
+	0% {
+		background-position:
+			-120% 50%,
+			220% 50%;
+	}
+	50% {
+		background-position:
+			20% 50%,
+			80% 50%;
+	}
+	100% {
+		background-position:
+			-120% 50%,
+			220% 50%;
+	}
+}
+
+.search-gradient-button {
+	background: var(
+		--search-gradient,
+		linear-gradient(90deg, #da29b4 1.69%, #ea1f1f 34.7%, #e122f2 65.83%, #f00404 98.97%)
+	);
+	background-size: 250% 100%;
+	animation: gradient-breathe 16s ease-in-out infinite;
+}
+
+/* The booking-confirm footer: the search bar's breathe, recolored green. */
+.booking-confirm-gradient-button {
+	background: linear-gradient(
+		90deg,
+		#b7ffc5 1.69%,
+		#4dc864 34.7%,
+		#38e497 65.83%,
+		#a4f5b3 98.97%
+	);
+	background-size: 250% 100%;
+	animation: gradient-breathe 16s ease-in-out infinite;
+}
+
+/* Hero searchbar: cursor-follow spotlight overlay (opt-in via extra class) */
+@media (hover: hover) and (pointer: fine) {
+	.search-spotlight-zone {
+		overflow: hidden;
+		isolation: isolate; /* keep blend effects self-contained */
+		--spotlight-x: 50%;
+		--spotlight-y: 50%;
+		--spotlight-size: 260px;
+		--pond-mask-size: 220px;
+		/* Add smooth transitions for the CSS variables themselves */
+		transition:
+			--spotlight-x 160ms ease-out,
+			--spotlight-y 160ms ease-out;
+		/* Vendor prefixes for broader browser support */
+		-webkit-transition:
+			--spotlight-x 160ms ease-out,
+			--spotlight-y 160ms ease-out;
+		-moz-transition:
+			--spotlight-x 160ms ease-out,
+			--spotlight-y 160ms ease-out;
+		-o-transition:
+			--spotlight-x 160ms ease-out,
+			--spotlight-y 160ms ease-out;
 	}
 
-	/* Hover-only "pond" shimmer: slow caustics drift (subtle, meant for tiny surfaces). */
-	@keyframes pond-caustics-drift {
-		0% {
-			background-position: 0 0, 0px 0px, 0px 0px, 0px 0px;
-		}
-		50% {
-			background-position: 0 0, 70px -34px, -44px 62px, 58px 42px;
-		}
-		100% {
-			background-position: 0 0, 140px -68px, -88px 124px, 116px 84px;
-		}
+	.search-spotlight-zone-sm {
+		--spotlight-size: 170px;
+		--pond-mask-size: 140px;
 	}
 
-	/* Premium prismatic refraction animation: gentle waves of light distortion. */
-	@keyframes prismatic-flow {
-		0% {
-			background-position: 0% 50%, 100% 50%, 50% 0%, 50% 100%;
-		}
-		50% {
-			background-position: 100% 50%, 0% 50%, 50% 100%, 50% 0%;
-		}
-		100% {
-			background-position: 0% 50%, 100% 50%, 50% 0%, 50% 100%;
-		}
-	}
-
-	/* Micro-shimmer: tiny specular beads drifting along the gradient direction. */
-	@keyframes micro-shimmer-drift {
-		0% {
-			background-position: 0% 0%, 40% 20%, 80% 60%, 20% 80%;
-		}
-		33% {
-			background-position: 30% 40%, 70% 10%, 10% 80%, 60% 50%;
-		}
-		66% {
-			background-position: 60% 20%, 10% 70%, 50% 30%, 90% 10%;
-		}
-		100% {
-			background-position: 0% 0%, 40% 20%, 80% 60%, 20% 80%;
-		}
-	}
-
-	/* Specular pulse: very slow brightening / dimming of the refraction core. */
-	@keyframes specular-breathe {
-		0%, 100% {
-			opacity: 0.35;
-			transform: scale(1);
-		}
-		50% {
-			opacity: 0.55;
-			transform: scale(1.04);
-		}
-	}
-
-	/* Anisotropic streak drift: soft horizontal flares that follow gradient flow. */
-	@keyframes streak-drift {
-		0% {
-			background-position: -120% 50%, 220% 50%;
-		}
-		50% {
-			background-position: 20% 50%, 80% 50%;
-		}
-		100% {
-			background-position: -120% 50%, 220% 50%;
-		}
-	}
-
-		.search-gradient-button {
-			background: var(
-				--search-gradient,
-				linear-gradient(
-					90deg,
-					#DA29B4 1.69%,
-					#EA1F1F 34.7%,
-					#E122F2 65.83%,
-					#F00404 98.97%
-				)
-			);
-			background-size: 250% 100%;
-			animation: gradient-breathe 16s ease-in-out infinite;
-		}
-
-		/* The booking-confirm footer: the search bar's breathe, recolored green. */
-		.booking-confirm-gradient-button {
-			background: linear-gradient(
-				90deg,
-				#B7FFC5 1.69%,
-				#4DC864 34.7%,
-				#38E497 65.83%,
-				#A4F5B3 98.97%
-			);
-			background-size: 250% 100%;
-			animation: gradient-breathe 16s ease-in-out infinite;
-		}
-
-		/* Hero searchbar: cursor-follow spotlight overlay (opt-in via extra class) */
-		@media (hover: hover) and (pointer: fine) {
-			.search-spotlight-zone {
-				overflow: hidden;
-				isolation: isolate; /* keep blend effects self-contained */
-				--spotlight-x: 50%;
-				--spotlight-y: 50%;
-				--spotlight-size: 260px;
-				--pond-mask-size: 220px;
-				/* Add smooth transitions for the CSS variables themselves */
-				transition: 
-					--spotlight-x 160ms ease-out,
-					--spotlight-y 160ms ease-out;
-				/* Vendor prefixes for broader browser support */
-				-webkit-transition: 
-					--spotlight-x 160ms ease-out,
-					--spotlight-y 160ms ease-out;
-				-moz-transition: 
-					--spotlight-x 160ms ease-out,
-					--spotlight-y 160ms ease-out;
-				-o-transition: 
-					--spotlight-x 160ms ease-out,
-					--spotlight-y 160ms ease-out;
-			}
-
-			.search-spotlight-zone-sm {
-				--spotlight-size: 170px;
-				--pond-mask-size: 140px;
-			}
-
-			/*
+	/*
 			 * LAYER 1 — Soft volumetric glow
 			 * A wide, diffused radial glow that follows the cursor. Very subtle, sets the stage.
 			 */
-			.search-spotlight-zone::before {
-				content: '';
-				position: absolute;
-				inset: 0;
-				border-radius: inherit;
-				pointer-events: none;
-				z-index: 0;
-				opacity: 0;
-				background: radial-gradient(
-					ellipse var(--spotlight-size) calc(var(--spotlight-size) * 0.6) at var(--spotlight-x) var(--spotlight-y),
-					rgba(255, 255, 255, 0.14) 0%,
-					rgba(255, 255, 255, 0.06) 35%,
-					rgba(255, 255, 255, 0.00) 65%
-				);
-				mix-blend-mode: screen;
-				filter: blur(18px);
-				/* Slower, more fluid transition for the base glow */
-				transition: opacity 480ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
-			}
+	.search-spotlight-zone::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		pointer-events: none;
+		z-index: 0;
+		opacity: 0;
+		background: radial-gradient(
+			ellipse var(--spotlight-size) calc(var(--spotlight-size) * 0.6) at
+				var(--spotlight-x) var(--spotlight-y),
+			rgba(255, 255, 255, 0.14) 0%,
+			rgba(255, 255, 255, 0.06) 35%,
+			rgba(255, 255, 255, 0) 65%
+		);
+		mix-blend-mode: screen;
+		filter: blur(18px);
+		/* Slower, more fluid transition for the base glow */
+		transition: opacity 480ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+	}
 
-			/*
+	/*
 			 * LAYER 2 — Prismatic light refraction (cursor-follow)
 			 * Chromatic dispersion: slightly offset warm/cool cores that split light
 			 * like a prism. Feels like studio light hitting polished glass.
 			 */
-			.search-spotlight-zone::after {
-				content: '';
-				position: absolute;
-				inset: 0;
-				border-radius: inherit;
-				pointer-events: none;
-				z-index: 1;
-				opacity: 0;
-				background:
+	.search-spotlight-zone::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		pointer-events: none;
+		z-index: 1;
+		opacity: 0;
+		background:
 					/* Warm core (amber/pink) — trails cursor slightly */
-					radial-gradient(
-						ellipse calc(var(--spotlight-size) * 0.55) calc(var(--spotlight-size) * 0.35)
-						at calc(var(--spotlight-x) - 18px) calc(var(--spotlight-y) + 6px),
-						rgba(255, 210, 160, 0.22) 0%,
-						rgba(255, 180, 140, 0.08) 45%,
-						transparent 72%
-					),
-					/* Cool core (cyan/white) — leads cursor slightly */
-					radial-gradient(
-						ellipse calc(var(--spotlight-size) * 0.45) calc(var(--spotlight-size) * 0.3)
-						at calc(var(--spotlight-x) + 14px) calc(var(--spotlight-y) - 4px),
-						rgba(200, 240, 255, 0.18) 0%,
-						rgba(180, 220, 255, 0.06) 50%,
-						transparent 78%
-					),
-					/* Specular micro-beads — tiny bright spots that drift with the gradient flow */
-					radial-gradient(
-						ellipse 6px 3px at calc(var(--spotlight-x) + 40px) calc(var(--spotlight-y) - 20px),
-						rgba(255, 255, 255, 0.55) 0%,
-						transparent 100%
-					),
-					radial-gradient(
-						ellipse 4px 2px at calc(var(--spotlight-x) - 30px) calc(var(--spotlight-y) + 14px),
-						rgba(255, 255, 255, 0.4) 0%,
-						transparent 100%
-					),
-					radial-gradient(
-						ellipse 8px 4px at calc(var(--spotlight-x) + 12px) calc(var(--spotlight-y) + 28px),
-						rgba(255, 255, 255, 0.3) 0%,
-						transparent 100%
-					);
-				mix-blend-mode: soft-light;
-				filter: blur(0px);
-				/* Medium speed transition for the prismatic layer */
-				transition: opacity 420ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
-				animation: specular-breathe 8s ease-in-out infinite;
-			}
+			radial-gradient(
+				ellipse calc(var(--spotlight-size) * 0.55) calc(var(--spotlight-size) * 0.35) at
+					calc(var(--spotlight-x) - 18px) calc(var(--spotlight-y) + 6px),
+				rgba(255, 210, 160, 0.22) 0%,
+				rgba(255, 180, 140, 0.08) 45%,
+				transparent 72%
+			),
+			/* Cool core (cyan/white) — leads cursor slightly */
+				radial-gradient(
+					ellipse calc(var(--spotlight-size) * 0.45) calc(var(--spotlight-size) * 0.3) at
+						calc(var(--spotlight-x) + 14px) calc(var(--spotlight-y) - 4px),
+					rgba(200, 240, 255, 0.18) 0%,
+					rgba(180, 220, 255, 0.06) 50%,
+					transparent 78%
+				),
+			/* Specular micro-beads — tiny bright spots that drift with the gradient flow */
+				radial-gradient(
+					ellipse 6px 3px at calc(var(--spotlight-x) + 40px)
+						calc(var(--spotlight-y) - 20px),
+					rgba(255, 255, 255, 0.55) 0%,
+					transparent 100%
+				),
+			radial-gradient(
+				ellipse 4px 2px at calc(var(--spotlight-x) - 30px) calc(var(--spotlight-y) + 14px),
+				rgba(255, 255, 255, 0.4) 0%,
+				transparent 100%
+			),
+			radial-gradient(
+				ellipse 8px 4px at calc(var(--spotlight-x) + 12px) calc(var(--spotlight-y) + 28px),
+				rgba(255, 255, 255, 0.3) 0%,
+				transparent 100%
+			);
+		mix-blend-mode: soft-light;
+		filter: blur(0px);
+		/* Medium speed transition for the prismatic layer */
+		transition: opacity 420ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+		animation: specular-breathe 8s ease-in-out infinite;
+	}
 
-			/*
+	/*
 			 * LAYER 3 — Anisotropic streak field (pond zone only)
 			 * Soft horizontal light streaks that mimic the gradient's linear flow.
 			 * They drift gently and create that "light brushing across satin" feel.
 			 */
-			.search-pond-zone .search-refraction-streaks {
-				position: absolute;
-				inset: 0;
-				border-radius: inherit;
-				pointer-events: none;
-				z-index: 0;
-				opacity: 0;
-				background:
-					linear-gradient(
-						90deg,
-						transparent 0%,
-						rgba(255, 255, 255, 0.035) 18%,
-						rgba(255, 255, 255, 0.08) 32%,
-						rgba(255, 255, 255, 0.035) 46%,
-						transparent 58%,
-						rgba(255, 255, 255, 0.045) 72%,
-						rgba(255, 255, 255, 0.09) 84%,
-						rgba(255, 255, 255, 0.03) 94%,
-						transparent 100%
-					),
-					linear-gradient(
-						90deg,
-						transparent 0%,
-						rgba(255, 240, 220, 0.025) 25%,
-						rgba(255, 255, 255, 0.055) 50%,
-						rgba(220, 240, 255, 0.025) 75%,
-						transparent 100%
-					);
-				background-size: 240% 100%, 180% 100%;
-				background-position: -120% 50%, 220% 50%;
-				mix-blend-mode: overlay;
-				-webkit-mask-image: radial-gradient(
-					ellipse calc(var(--pond-mask-size) * 1.1) calc(var(--pond-mask-size) * 0.65)
-					at var(--spotlight-x) var(--spotlight-y),
-					rgba(0, 0, 0, 1) 0%,
-					rgba(0, 0, 0, 0.6) 45%,
-					transparent 72%
-				);
-				mask-image: radial-gradient(
-					ellipse calc(var(--pond-mask-size) * 1.1) calc(var(--pond-mask-size) * 0.65)
-					at var(--spotlight-x) var(--spotlight-y),
-					rgba(0, 0, 0, 1) 0%,
-					rgba(0, 0, 0, 0.6) 45%,
-					transparent 72%
-				);
-				-webkit-mask-repeat: no-repeat;
-				mask-repeat: no-repeat;
-				-webkit-mask-size: 100% 100%;
-				mask-size: 100% 100%;
-				/* Slower transition for streaks to create a "dragging through water" effect */
-				transition: opacity 520ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
-				animation: streak-drift 12s ease-in-out infinite;
-			}
+	.search-pond-zone .search-refraction-streaks {
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		pointer-events: none;
+		z-index: 0;
+		opacity: 0;
+		background:
+			linear-gradient(
+				90deg,
+				transparent 0%,
+				rgba(255, 255, 255, 0.035) 18%,
+				rgba(255, 255, 255, 0.08) 32%,
+				rgba(255, 255, 255, 0.035) 46%,
+				transparent 58%,
+				rgba(255, 255, 255, 0.045) 72%,
+				rgba(255, 255, 255, 0.09) 84%,
+				rgba(255, 255, 255, 0.03) 94%,
+				transparent 100%
+			),
+			linear-gradient(
+				90deg,
+				transparent 0%,
+				rgba(255, 240, 220, 0.025) 25%,
+				rgba(255, 255, 255, 0.055) 50%,
+				rgba(220, 240, 255, 0.025) 75%,
+				transparent 100%
+			);
+		background-size:
+			240% 100%,
+			180% 100%;
+		background-position:
+			-120% 50%,
+			220% 50%;
+		mix-blend-mode: overlay;
+		-webkit-mask-image: radial-gradient(
+			ellipse calc(var(--pond-mask-size) * 1.1) calc(var(--pond-mask-size) * 0.65) at
+				var(--spotlight-x) var(--spotlight-y),
+			rgba(0, 0, 0, 1) 0%,
+			rgba(0, 0, 0, 0.6) 45%,
+			transparent 72%
+		);
+		mask-image: radial-gradient(
+			ellipse calc(var(--pond-mask-size) * 1.1) calc(var(--pond-mask-size) * 0.65) at
+				var(--spotlight-x) var(--spotlight-y),
+			rgba(0, 0, 0, 1) 0%,
+			rgba(0, 0, 0, 0.6) 45%,
+			transparent 72%
+		);
+		-webkit-mask-repeat: no-repeat;
+		mask-repeat: no-repeat;
+		-webkit-mask-size: 100% 100%;
+		mask-size: 100% 100%;
+		/* Slower transition for streaks to create a "dragging through water" effect */
+		transition: opacity 520ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+		animation: streak-drift 12s ease-in-out infinite;
+	}
 
-			/*
+	/*
 			 * LAYER 4 — Micro caustics (pond zone only)
 			 * A scaled-down, more refined version of the original caustics.
 			 * Much subtler, acts like tiny light ripples moving across the surface.
 			 */
-			.search-pond-zone .search-refraction-caustics {
-				position: absolute;
-				inset: 1px;
-				border-radius: inherit;
-				pointer-events: none;
-				z-index: 0;
-				opacity: 0;
-				background-image:
-					radial-gradient(
-						ellipse 140px 90px at var(--spotlight-x) var(--spotlight-y),
-						rgba(255, 255, 255, 0.16) 0%,
-						rgba(255, 255, 255, 0.06) 40%,
-						transparent 68%
-					),
-					radial-gradient(
-						ellipse 50% 40% at 22% 32%,
-						rgba(255, 255, 255, 0.10) 0%,
-						transparent 55%
-					),
-					radial-gradient(
-						ellipse 55% 35% at 78% 64%,
-						rgba(255, 255, 255, 0.08) 0%,
-						transparent 52%
-					),
-					radial-gradient(
-						ellipse 35% 45% at 44% 14%,
-						rgba(255, 255, 255, 0.07) 0%,
-						transparent 48%
-					);
-				background-repeat: no-repeat, repeat, repeat, repeat;
-				background-size: 100% 100%, 200px 130px, 240px 180px, 180px 130px;
-				background-position: 0 0, 0px 0px, 0px 0px, 0px 0px;
-				background-blend-mode: normal;
-				mix-blend-mode: screen;
-				filter: blur(8px) contrast(1.15) saturate(1.05);
-				-webkit-mask-image: radial-gradient(
-					ellipse calc(var(--pond-mask-size) * 0.9) calc(var(--pond-mask-size) * 0.55)
-					at var(--spotlight-x) var(--spotlight-y),
-					rgba(0, 0, 0, 1) 0%,
-						rgba(0, 0, 0, 0.5) 55%,
-						transparent 78%
-				);
-				mask-image: radial-gradient(
-					ellipse calc(var(--pond-mask-size) * 0.9) calc(var(--pond-mask-size) * 0.55)
-					at var(--spotlight-x) var(--spotlight-y),
-					rgba(0, 0, 0, 1) 0%,
-						rgba(0, 0, 0, 0.5) 55%,
-						transparent 78%
-				);
-				-webkit-mask-repeat: no-repeat;
-				mask-repeat: no-repeat;
-				-webkit-mask-size: 100% 100%;
-				mask-size: 100% 100%;
-				/* Fastest transition for micro-caustics to respond quickly to cursor */
-				transition: opacity 380ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
-				animation: pond-caustics-drift 16s ease-in-out infinite;
-			}
+	.search-pond-zone .search-refraction-caustics {
+		position: absolute;
+		inset: 1px;
+		border-radius: inherit;
+		pointer-events: none;
+		z-index: 0;
+		opacity: 0;
+		background-image:
+			radial-gradient(
+				ellipse 140px 90px at var(--spotlight-x) var(--spotlight-y),
+				rgba(255, 255, 255, 0.16) 0%,
+				rgba(255, 255, 255, 0.06) 40%,
+				transparent 68%
+			),
+			radial-gradient(
+				ellipse 50% 40% at 22% 32%,
+				rgba(255, 255, 255, 0.1) 0%,
+				transparent 55%
+			),
+			radial-gradient(
+				ellipse 55% 35% at 78% 64%,
+				rgba(255, 255, 255, 0.08) 0%,
+				transparent 52%
+			),
+			radial-gradient(
+				ellipse 35% 45% at 44% 14%,
+				rgba(255, 255, 255, 0.07) 0%,
+				transparent 48%
+			);
+		background-repeat: no-repeat, repeat, repeat, repeat;
+		background-size:
+			100% 100%,
+			200px 130px,
+			240px 180px,
+			180px 130px;
+		background-position:
+			0 0,
+			0px 0px,
+			0px 0px,
+			0px 0px;
+		background-blend-mode: normal;
+		mix-blend-mode: screen;
+		filter: blur(8px) contrast(1.15) saturate(1.05);
+		-webkit-mask-image: radial-gradient(
+			ellipse calc(var(--pond-mask-size) * 0.9) calc(var(--pond-mask-size) * 0.55) at
+				var(--spotlight-x) var(--spotlight-y),
+			rgba(0, 0, 0, 1) 0%,
+			rgba(0, 0, 0, 0.5) 55%,
+			transparent 78%
+		);
+		mask-image: radial-gradient(
+			ellipse calc(var(--pond-mask-size) * 0.9) calc(var(--pond-mask-size) * 0.55) at
+				var(--spotlight-x) var(--spotlight-y),
+			rgba(0, 0, 0, 1) 0%,
+			rgba(0, 0, 0, 0.5) 55%,
+			transparent 78%
+		);
+		-webkit-mask-repeat: no-repeat;
+		mask-repeat: no-repeat;
+		-webkit-mask-size: 100% 100%;
+		mask-size: 100% 100%;
+		/* Fastest transition for micro-caustics to respond quickly to cursor */
+		transition: opacity 380ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+		animation: pond-caustics-drift 16s ease-in-out infinite;
+	}
 
-			/*
+	/*
 			 * HOVER STATES
 			 * We reveal layers progressively for a richer, more premium feel.
 			 * Staggered timing creates a "liquid displacement" effect.
 			 */
-			.search-spotlight-zone:hover::before,
-			.search-spotlight-zone:focus-visible::before {
-				opacity: 1;
-			}
+	.search-spotlight-zone:hover::before,
+	.search-spotlight-zone:focus-visible::before {
+		opacity: 1;
+	}
 
-			.search-spotlight-zone:hover::after,
-			.search-spotlight-zone:focus-visible::after {
-				opacity: 1;
-			}
+	.search-spotlight-zone:hover::after,
+	.search-spotlight-zone:focus-visible::after {
+		opacity: 1;
+	}
 
-			.search-pond-zone:hover .search-refraction-streaks,
-			.search-pond-zone:focus-visible .search-refraction-streaks {
-				/* Slightly delayed entrance for streaks to create water-like displacement */
-				transition-delay: 80ms;
-				opacity: 0.45;
-			}
+	.search-pond-zone:hover .search-refraction-streaks,
+	.search-pond-zone:focus-visible .search-refraction-streaks {
+		/* Slightly delayed entrance for streaks to create water-like displacement */
+		transition-delay: 80ms;
+		opacity: 0.45;
+	}
 
-			.search-pond-zone:hover .search-refraction-caustics,
-			.search-pond-zone:focus-visible .search-refraction-caustics {
-				/* Fast response for micro-caustics */
-				opacity: 0.32;
-			}
+	.search-pond-zone:hover .search-refraction-caustics,
+	.search-pond-zone:focus-visible .search-refraction-caustics {
+		/* Fast response for micro-caustics */
+		opacity: 0.32;
+	}
 
-			/* Exit animations with staggered delays for a smooth "settling" effect */
-			.search-pond-zone:not(:hover):not(:focus-visible) .search-refraction-streaks {
-				transition-delay: 0ms;
-			}
+	/* Exit animations with staggered delays for a smooth "settling" effect */
+	.search-pond-zone:not(:hover):not(:focus-visible) .search-refraction-streaks {
+		transition-delay: 0ms;
+	}
 
-			.search-pond-zone:not(:hover):not(:focus-visible) .search-refraction-caustics {
-				transition-delay: 40ms;
-			}
+	.search-pond-zone:not(:hover):not(:focus-visible) .search-refraction-caustics {
+		transition-delay: 40ms;
+	}
 
-			/* These layers are opacity:0 at rest, yet their infinite animations keep
+	/* These layers are opacity:0 at rest, yet their infinite animations keep
 			   ticking style invalidations over the live WebGL globe forever. Pause
 			   the timelines until hover; resuming mid-phase on hover reads better
 			   than a restart anyway. */
-			.search-spotlight-zone:not(:hover):not(:focus-visible)::after {
-				animation-play-state: paused;
-			}
+	.search-spotlight-zone:not(:hover):not(:focus-visible)::after {
+		animation-play-state: paused;
+	}
 
-			.search-pond-zone:not(:hover):not(:focus-visible) .search-refraction-streaks,
-			.search-pond-zone:not(:hover):not(:focus-visible) .search-refraction-caustics {
-				animation-play-state: paused;
-			}
+	.search-pond-zone:not(:hover):not(:focus-visible) .search-refraction-streaks,
+	.search-pond-zone:not(:hover):not(:focus-visible) .search-refraction-caustics {
+		animation-play-state: paused;
+	}
 
-			.search-spotlight-zone > .search-spotlight-content {
-				position: relative;
-				z-index: 2;
-			}
-		}
+	.search-spotlight-zone > .search-spotlight-content {
+		position: relative;
+		z-index: 2;
+	}
+}
 
-		@media (prefers-reduced-motion: reduce) {
-			.search-gradient-button {
-				animation: none;
-				background: var(
-					--search-gradient,
-					linear-gradient(90deg, #DA29B4 1.69%, #EA1F1F 34.7%, #E122F2 65.83%, #F00404 98.97%)
-				);
-			}
+@media (prefers-reduced-motion: reduce) {
+	.search-gradient-button {
+		animation: none;
+		background: var(
+			--search-gradient,
+			linear-gradient(90deg, #da29b4 1.69%, #ea1f1f 34.7%, #e122f2 65.83%, #f00404 98.97%)
+		);
+	}
 
-			.search-spotlight-zone::after {
-				animation: none;
-			}
+	.search-spotlight-zone::after {
+		animation: none;
+	}
 
-			.search-pond-zone .search-refraction-streaks,
-			.search-pond-zone .search-refraction-caustics {
-				animation: none;
-			}
-		}
+	.search-pond-zone .search-refraction-streaks,
+	.search-pond-zone .search-refraction-caustics {
+		animation: none;
+	}
+}
 
 .search-wave-container {
 	position: relative;
@@ -1000,7 +1056,9 @@ body {
 
 /* Dashboard search button - subtle hover scale effect */
 .dashboard-search-button {
-	transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+	transition:
+		transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+		background-color 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dashboard-search-button:hover {
@@ -1081,7 +1139,11 @@ html.is-safari
 	body.murmur-map-view
 	.results-search-input-group
 	.search-wave-container::before {
-	background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.62));
+	background: linear-gradient(
+		135deg,
+		rgba(255, 255, 255, 0.92),
+		rgba(255, 255, 255, 0.62)
+	);
 }
 
 .search-wave-input:hover {
@@ -1214,7 +1276,13 @@ html.is-safari
 	display: inline-flex;
 	align-items: baseline;
 	gap: 0.25rem;
-	font-family: var(--font-secondary), 'Inter', system-ui, -apple-system, Segoe UI, Roboto,
+	font-family:
+		var(--font-secondary),
+		'Inter',
+		system-ui,
+		-apple-system,
+		Segoe UI,
+		Roboto,
 		sans-serif;
 	font-size: 1rem;
 	line-height: 1.4;
@@ -1232,19 +1300,37 @@ html.is-safari
 
 .custom-placeholder-bold {
 	font-weight: 700;
-	font-family: var(--font-secondary), 'Inter', system-ui, -apple-system, Segoe UI, Roboto,
+	font-family:
+		var(--font-secondary),
+		'Inter',
+		system-ui,
+		-apple-system,
+		Segoe UI,
+		Roboto,
 		sans-serif;
 }
 
 .custom-placeholder-regular {
 	font-weight: 400;
-	font-family: var(--font-secondary), 'Inter', system-ui, -apple-system, Segoe UI, Roboto,
+	font-family:
+		var(--font-secondary),
+		'Inter',
+		system-ui,
+		-apple-system,
+		Segoe UI,
+		Roboto,
 		sans-serif;
 }
 
 .custom-placeholder-italic {
 	font-style: italic;
-	font-family: var(--font-secondary), 'Inter', system-ui, -apple-system, Segoe UI, Roboto,
+	font-family:
+		var(--font-secondary),
+		'Inter',
+		system-ui,
+		-apple-system,
+		Segoe UI,
+		Roboto,
 		sans-serif;
 }
 
@@ -1846,7 +1932,8 @@ html.is-safari
 	opacity: 1;
 	-webkit-transform: translateY(0);
 	transform: translateY(0);
-	transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+	transition:
+		opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1),
 		transform 0.8s cubic-bezier(0.4, 0, 0.2, 1),
 		-webkit-transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 	position: relative;
@@ -1863,7 +1950,8 @@ html.is-safari
 	min-height: 0;
 	overflow: hidden;
 	margin-bottom: 0;
-	transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+	transition:
+		opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
 		transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
 		-webkit-transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
 		height 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s,
@@ -1877,7 +1965,8 @@ html.is-safari
 	opacity: 1;
 	-webkit-transform: translateY(0);
 	transform: translateY(0);
-	transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+	transition:
+		opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1),
 		transform 0.8s cubic-bezier(0.4, 0, 0.2, 1),
 		-webkit-transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 	z-index: 20;
@@ -1896,7 +1985,8 @@ html.is-safari
 	height: 0;
 	overflow: hidden;
 	margin: 0;
-	transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+	transition:
+		opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
 		transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
 		-webkit-transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
 		height 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
@@ -1928,21 +2018,24 @@ html.is-safari
 .search-active .premium-logo-container {
 	opacity: 0;
 	transform: translateY(-10px);
-	transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+	transition:
+		opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1),
 		transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .search-active .premium-gradient-text {
 	opacity: 0;
 	transform: translateY(-10px);
-	transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.05s,
+	transition:
+		opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.05s,
 		transform 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.05s;
 }
 
 .search-active .premium-subtitle-gradient {
 	opacity: 0;
 	transform: translateY(-10px);
-	transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.1s,
+	transition:
+		opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.1s,
 		transform 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.1s;
 }
 
@@ -3942,7 +4035,89 @@ body.murmur-page.murmur-map-view .results-search-input-group .search-wave-contai
 	}
 }
 .map-overlay-appear {
-	animation: mapOverlayAppear 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+	/* Even, gradual fade-in. The previous cubic-bezier(0.22, 1, 0.36, 1) is an
+	   ease-out: opacity rushed to ~70% in the first ~120ms, which read as the
+	   overlays "popping" in. An ease-in-out over a longer duration ramps opacity
+	   up evenly so the whole search-tab apparatus dissolves in smoothly. A short
+	   delay also lets the camera/scrub settle before the chrome starts appearing. */
+	animation: mapOverlayAppear 720ms cubic-bezier(0.45, 0, 0.2, 1) 80ms both;
+}
+
+/* Search → campaign tab switches should acknowledge the click immediately: keep the
+   existing map visible, fade the dashboard/search chrome out, then let the campaign
+   page fade its own chrome/content back in once ready. */
+body.murmur-search-to-campaign-transitioning .map-overlay-appear,
+body.murmur-search-to-campaign-transitioning .search-results-map-toggle,
+body.murmur-search-to-campaign-transitioning .search-results-table,
+body.murmur-search-to-campaign-transitioning .search-results-research-panel,
+body.murmur-search-to-campaign-transitioning .search-results-cta-wrapper,
+body.murmur-search-to-campaign-transitioning [data-dashboard-send-queue-overlay='true'] {
+	opacity: 0 !important;
+	pointer-events: none !important;
+	transition: opacity 160ms ease-out !important;
+}
+
+/* The search→campaign gradient has to start on the click frame, before the App
+   Router has mounted the campaign page. Keep this tiny handoff surface in the
+   shared body class; the campaign page removes it once its own staged reveal is
+   visible. */
+body.murmur-search-to-campaign-transitioning::after {
+	content: '';
+	position: fixed;
+	top: 0;
+	bottom: 0;
+	/* Match the campaign's *compressed* workspace band (985px wide, right-anchored)
+	   rather than the wide standard 1/3-viewport band. Once the campaign page mounts
+	   and publishes the real backdrop-start var, this seamlessly adopts the exact
+	   value; the calc() fallback covers the pre-mount click frame. `%` (not `vw`) is
+	   used so it resolves in the same zoomed coordinate space as the campaign's
+	   backdrop var and the `.campaign-map-split-overlay` band. */
+	left: var(--murmur-campaign-map-backdrop-start, calc(100% - 985px));
+	right: calc(100% - var(--murmur-campaign-map-backdrop-end, 100%));
+	z-index: 99;
+	pointer-events: none;
+	opacity: 0.5;
+	background:
+		radial-gradient(
+			ellipse 72% 62% at 14% 94%,
+			rgba(152, 206, 227, 0.08),
+			rgba(255, 255, 255, 0) 68%
+		),
+		linear-gradient(
+			86deg,
+			rgba(255, 255, 255, 0) 0%,
+			rgba(152, 206, 227, 0.05) 21%,
+			rgba(203, 240, 255, 0.24) 35%,
+			rgba(255, 255, 255, 0.34) 48%,
+			rgba(255, 255, 255, 0.3) 56%,
+			rgba(203, 240, 255, 0.18) 68%,
+			rgba(152, 206, 227, 0.06) 82%,
+			rgba(255, 255, 255, 0) 100%
+		),
+		linear-gradient(
+			64deg,
+			rgba(255, 255, 255, 0.12) 5.55%,
+			rgba(203, 240, 255, 0.2) 36.49%,
+			rgba(152, 206, 227, 0.14) 93.44%
+		);
+	backdrop-filter: blur(0.01px);
+	transition: opacity 160ms ease-out;
+}
+
+body.murmur-search-to-campaign-transitioning[data-search-to-campaign-tab='all']::after {
+	/* The All/overview tab uses a wider right-side band than the compact tabs. */
+	left: var(--murmur-campaign-map-backdrop-start, 46%);
+}
+
+/* Once the campaign route owns the screen, keep the handoff gradient above the
+   persistent map but below campaign chrome/content while the route's own reveal
+   takes over. */
+body.murmur-campaign.murmur-search-to-campaign-transitioning::after {
+	z-index: 1;
+}
+
+body.murmur-mobile.murmur-search-to-campaign-transitioning::after {
+	display: none;
 }
 
 @keyframes selectionFolderMoveBannerIn {
@@ -4029,7 +4204,9 @@ body.murmur-page.murmur-map-view .results-search-input-group .search-wave-contai
 
 	.dashboard-main-offset.search-active .search-results-map-toggle {
 		position: fixed;
-		top: calc(var(--dashboard-results-table-top) - 26px); /* table top minus button height & gap */
+		top: calc(
+			var(--dashboard-results-table-top) - 26px
+		); /* table top minus button height & gap */
 		left: 50%;
 		transform: translateX(-50%);
 		z-index: 61;
@@ -4060,7 +4237,9 @@ body.murmur-page.murmur-map-view .results-search-input-group .search-wave-contai
    This preserves the ~305px offset from the very top of the page for the
    table view, matching the full desktop behavior on resized laptop windows. */
 @media (max-width: 1023px) {
-	body:not(.murmur-mobile) .dashboard-main-offset.search-active .results-search-bar-wrapper {
+	body:not(.murmur-mobile)
+		.dashboard-main-offset.search-active
+		.results-search-bar-wrapper {
 		position: fixed;
 		top: var(--dashboard-mini-search-top);
 		left: 0;
@@ -4090,16 +4269,22 @@ body.murmur-page.murmur-map-view .results-search-input-group .search-wave-contai
 		z-index: 60;
 	}
 
-	body:not(.murmur-mobile) .dashboard-main-offset.search-active .search-results-map-toggle {
+	body:not(.murmur-mobile)
+		.dashboard-main-offset.search-active
+		.search-results-map-toggle {
 		position: fixed;
-		top: calc(var(--dashboard-results-table-top) - 26px); /* table top minus button height & gap */
+		top: calc(
+			var(--dashboard-results-table-top) - 26px
+		); /* table top minus button height & gap */
 		left: 50%;
 		transform: translateX(-50%);
 		z-index: 61;
 		pointer-events: auto;
 	}
 
-	body:not(.murmur-mobile) .dashboard-main-offset.search-active .search-results-cta-wrapper {
+	body:not(.murmur-mobile)
+		.dashboard-main-offset.search-active
+		.search-results-cta-wrapper {
 		position: fixed;
 		/* table top + table height (571px) + gap below table */
 		top: calc(var(--dashboard-results-table-top) + 571px + 20px);
@@ -4111,7 +4296,9 @@ body.murmur-page.murmur-map-view .results-search-input-group .search-wave-contai
 		pointer-events: auto;
 	}
 
-	body:not(.murmur-mobile) .dashboard-main-offset.search-active .search-results-research-panel {
+	body:not(.murmur-mobile)
+		.dashboard-main-offset.search-active
+		.search-results-research-panel {
 		position: fixed;
 		top: var(--dashboard-results-table-top);
 		z-index: 62;
@@ -4697,9 +4884,15 @@ body.murmur-page.murmur-map-view .clerk-user-button {
    IMPORTANT: exclude containers that explicitly hide native scrollbars (e.g. CustomScrollbar). */
 .custom-scroll:not(.my-campaigns-table):not(.scrollbar-hide):not(.hide-native-scrollbar),
 .overflow-auto:not(.my-campaigns-table):not(.scrollbar-hide):not(.hide-native-scrollbar),
-.overflow-y-auto:not(.my-campaigns-table):not(.scrollbar-hide):not(.hide-native-scrollbar),
-.overflow-x-auto:not(.my-campaigns-table):not(.scrollbar-hide):not(.hide-native-scrollbar),
-.overflow-scroll:not(.my-campaigns-table):not(.scrollbar-hide):not(.hide-native-scrollbar) {
+.overflow-y-auto:not(.my-campaigns-table):not(.scrollbar-hide):not(
+		.hide-native-scrollbar
+	),
+.overflow-x-auto:not(.my-campaigns-table):not(.scrollbar-hide):not(
+		.hide-native-scrollbar
+	),
+.overflow-scroll:not(.my-campaigns-table):not(.scrollbar-hide):not(
+		.hide-native-scrollbar
+	) {
 	scrollbar-width: thin !important;
 	scrollbar-color: #000000 transparent !important;
 }
@@ -4814,8 +5007,8 @@ main {
 	--campaign-row-left-hover-width: 236px;
 	--campaign-row-hover-fill-height: 22px;
 	--campaign-row-hover-fill-color: #d2e7f6;
-	--campaign-row-right-hover-fill-color: #D6F7DD;
-	--campaign-row-right-hover-box-color: #A0F2B2;
+	--campaign-row-right-hover-fill-color: #d6f7dd;
+	--campaign-row-right-hover-box-color: #a0f2b2;
 }
 
 .my-campaigns-table.desktop-campaigns-table::before {
@@ -4911,8 +5104,8 @@ main {
 	> td {
 	background-color: transparent !important;
 	background-image: linear-gradient(
-		var(--campaign-row-right-hover-fill-color, #D6F7DD),
-		var(--campaign-row-right-hover-fill-color, #D6F7DD)
+		var(--campaign-row-right-hover-fill-color, #d6f7dd),
+		var(--campaign-row-right-hover-fill-color, #d6f7dd)
 	) !important;
 	background-position: center !important;
 	background-repeat: no-repeat !important;
@@ -4926,6 +5119,56 @@ main {
 .my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
 	tbody
 	tr:first-child:has(.campaign-folder-new-count:hover)
+	> td {
+	background-position: center top 8px !important;
+}
+
+/* Hover-to-delete: while a row's delete "X" is hovered (or the confirm is armed),
+   the whole row paints red (#E7677C). Driven by an invisible
+   .campaign-delete-warning-marker rendered into the row by useCampaignsTable.
+   Placed after the green right-hover rules so it wins if both ever match. */
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.campaign-delete-warning-marker)
+	> td {
+	background-color: transparent !important;
+	background-image: linear-gradient(#e7677c, #e7677c) !important;
+	background-position: center !important;
+	background-repeat: no-repeat !important;
+	background-size: 100% var(--campaign-row-hover-fill-height, 22px) !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:first-child:has(.campaign-delete-warning-marker)
+	> td {
+	background-position: center top 8px !important;
+}
+
+/* ARCHIVE folder + its deleted-campaign children paint a gray (#F2F2F2) band,
+   mirroring the delete-warning band's geometry. Invisible .archive-*-row-marker
+   spans (rendered by useCampaignsTable) drive the match. These rows use their own
+   pill/text classes, so the green right-hover and red delete rules never apply. */
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.archive-folder-row-marker)
+	> td,
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.archive-campaign-row-marker)
+	> td {
+	background-color: transparent !important;
+	background-image: linear-gradient(#f2f2f2, #f2f2f2) !important;
+	background-position: center !important;
+	background-repeat: no-repeat !important;
+	background-size: 100% var(--campaign-row-hover-fill-height, 22px) !important;
+}
+
+/* When all active campaigns are gone the ARCHIVE row can be first; nudge its band
+   down to match the first-row top padding (same as the delete-warning case). */
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:first-child:has(.archive-folder-row-marker)
 	> td {
 	background-position: center top 8px !important;
 }
@@ -4946,8 +5189,8 @@ main {
 	tbody
 	tr:has(.campaign-folder-new-count:hover)
 	.metric-box {
-	background: var(--campaign-row-right-hover-box-color, #A0F2B2) !important;
-	background-color: var(--campaign-row-right-hover-box-color, #A0F2B2) !important;
+	background: var(--campaign-row-right-hover-box-color, #a0f2b2) !important;
+	background-color: var(--campaign-row-right-hover-box-color, #a0f2b2) !important;
 }
 
 .my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
@@ -5065,6 +5308,56 @@ main {
 .my-campaigns-table [data-slot='table'],
 .my-campaigns-table [data-slot='table-body'] {
 	background-color: transparent !important;
+}
+
+.my-campaigns-table .campaign-folder-name-content {
+	width: 100%;
+	overflow: hidden;
+}
+
+/* Long campaign / archive names: cut off and fade out instead of overflowing into
+   the adjacent metric columns (most visible in the expanded ARCHIVE folder). The
+   fade is applied at the right edge of a fixed-width/flexed text area, so short names
+   are not faded. */
+.my-campaigns-table .campaign-folder-name-text {
+	display: block;
+	min-width: 0;
+	flex: 1 1 auto;
+	overflow: hidden;
+	white-space: nowrap;
+	/* Drop the truncate ellipsis in favor of a gradient fade. */
+	text-overflow: clip;
+	-webkit-mask-image: linear-gradient(
+		90deg,
+		#000 0%,
+		#000 calc(100% - 14px),
+		transparent 100%
+	);
+	mask-image: linear-gradient(90deg, #000 0%, #000 calc(100% - 14px), transparent 100%);
+}
+
+.my-campaigns-table .campaign-archive-name-row {
+	width: 100%;
+	min-width: 0;
+	max-width: 315px;
+	overflow: hidden;
+}
+
+.my-campaigns-table .campaign-archive-name {
+	display: block;
+	min-width: 0;
+	flex: 1 1 auto;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: clip;
+	vertical-align: middle;
+	-webkit-mask-image: linear-gradient(
+		90deg,
+		#000 0%,
+		#000 calc(100% - 16px),
+		transparent 100%
+	);
+	mask-image: linear-gradient(90deg, #000 0%, #000 calc(100% - 16px), transparent 100%);
 }
 
 /* Drafts sort indicators (Campaigns table)
@@ -5300,7 +5593,9 @@ html.murmur-campaign-scrollable body {
 
 /* Thinnest campaign breakpoint: hide the hover-description banner above the campaign header box.
    This text can overlap the header area and isn't useful at the stacked/scrollable layout. */
-html.murmur-campaign-scrollable [data-campaign-header-box='true'] [data-hover-description-ignore='true'] {
+html.murmur-campaign-scrollable
+	[data-campaign-header-box='true']
+	[data-hover-description-ignore='true'] {
 	display: none !important;
 }
 
@@ -5392,12 +5687,45 @@ html.murmur-compact.murmur-dashboard-map-compact {
 	min-height: 253px !important;
 }
 
+/* Collapsed (no finder/split, archive collapsed): grow to fit the rows — incl. the
+   ARCHIVE folder — so the table never scrolls until something is expanded. The
+   253px floor keeps the dashboard's baseline size for users with few campaigns. */
+.campaigns-table-container
+	.my-campaigns-table.desktop-campaigns-table.campaigns-table-flow,
+.my-campaigns-table.desktop-campaigns-table.campaigns-table-flow {
+	height: auto !important;
+	min-height: 253px !important;
+	max-height: none !important;
+}
+
+/* Archive expanded: grow up to the finder's 415px, then the deleted list scrolls
+   inside the table (max-height on the inner scroller makes h-full scroll). */
+.campaigns-table-container
+	.my-campaigns-table.desktop-campaigns-table.campaigns-table-archive-open,
+.my-campaigns-table.desktop-campaigns-table.campaigns-table-archive-open {
+	height: auto !important;
+	min-height: 253px !important;
+	max-height: 415px !important;
+}
+.my-campaigns-table.desktop-campaigns-table.campaigns-table-archive-open .scrollbar-hide {
+	height: auto !important;
+	max-height: 415px !important;
+}
+
 .my-campaigns-table .scrollbar-hide {
 	height: 100% !important;
 	overflow-y: auto !important;
 	overflow-x: hidden !important;
 	scrollbar-width: none !important;
 	-ms-overflow-style: none !important;
+}
+
+/* While a delete confirmation is armed, CustomScrollbar sets data-scroll-locked and
+   freezes its wheel/drag/track handlers. The attribute selector outranks the
+   `overflow-y: auto !important` above so native scrolling is blocked too — the
+   row-anchored confirmation can't slide out from under its floating "✕ Delete" button. */
+.my-campaigns-table .scrollbar-hide[data-scroll-locked='true'] {
+	overflow-y: hidden !important;
 }
 
 .my-campaigns-table .scrollbar-hide::-webkit-scrollbar {
@@ -5603,44 +5931,44 @@ body,
 
 /* --- Draft Preview Blank-State Color Wave (Unified Flow - Blue) --- */
 .draft-preview-blank-wave-identity {
-    background-color: #B6CCF6;
-    animation: draftPreviewWaveFlowBlue 1.2s ease-in-out infinite;
-    animation-delay: 0s;
+	background-color: #b6ccf6;
+	animation: draftPreviewWaveFlowBlue 1.2s ease-in-out infinite;
+	animation-delay: 0s;
 }
 
 .draft-preview-blank-wave-subject {
-    background-color: #B6CCF6;
-    animation: draftPreviewWaveFlowBlue 1.2s ease-in-out infinite;
-    animation-delay: 0.2s;
+	background-color: #b6ccf6;
+	animation: draftPreviewWaveFlowBlue 1.2s ease-in-out infinite;
+	animation-delay: 0.2s;
 }
 
 .draft-preview-blank-wave-body {
-    background-color: #B6CCF6;
-    animation: draftPreviewWaveFlowBlue 1.2s ease-in-out infinite;
-    animation-delay: 0.4s;
+	background-color: #b6ccf6;
+	animation: draftPreviewWaveFlowBlue 1.2s ease-in-out infinite;
+	animation-delay: 0.4s;
 }
 
 @keyframes draftPreviewWaveFlowBlue {
-    0%,
-    100% {
-        background-color: #B6CCF6;
-    }
-    50% {
-        background-color: #93B2EB;
-    }
+	0%,
+	100% {
+		background-color: #b6ccf6;
+	}
+	50% {
+		background-color: #93b2eb;
+	}
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .draft-preview-blank-wave-identity,
-    .draft-preview-blank-wave-subject,
-    .draft-preview-blank-wave-body {
-        animation: none;
-    }
+	.draft-preview-blank-wave-identity,
+	.draft-preview-blank-wave-subject,
+	.draft-preview-blank-wave-body {
+		animation: none;
+	}
 }
 
 /* --- Map Search Results Panel Loading Wave (12-step top-to-bottom + reverse) --- */
 .map-results-panel-loading-wave-row {
-	background-color: #C5F0FF;
+	background-color: #c5f0ff;
 	animation: mapResultsPanelLoadingWave 2.5s ease-in-out infinite;
 	will-change: background-color;
 }
@@ -5648,16 +5976,16 @@ body,
 @keyframes mapResultsPanelLoadingWave {
 	0%,
 	100% {
-		background-color: #C5F0FF;
+		background-color: #c5f0ff;
 	}
 	50% {
-		background-color: #81C8E1;
+		background-color: #81c8e1;
 	}
 }
 
 /* --- Contacts Expanded List Loading Wave (9-color forward + reverse, no loop jump) --- */
 .contacts-expanded-list-loading-wave-row {
-	background-color: #FFA3A4;
+	background-color: #ffa3a4;
 	animation: contactsExpandedListLoadingWave 4.5s linear infinite;
 	will-change: background-color;
 }
@@ -5665,117 +5993,117 @@ body,
 @keyframes contactsExpandedListLoadingWave {
 	0%,
 	100% {
-		background-color: #FFA3A4;
+		background-color: #ffa3a4;
 	}
 	6.25% {
-		background-color: #FF9798;
+		background-color: #ff9798;
 	}
 	12.5% {
-		background-color: #EE8889;
+		background-color: #ee8889;
 	}
 	18.75% {
-		background-color: #E76E6F;
+		background-color: #e76e6f;
 	}
 	25% {
-		background-color: #E56667;
+		background-color: #e56667;
 	}
 	31.25% {
-		background-color: #DF6061;
+		background-color: #df6061;
 	}
 	37.5% {
-		background-color: #DA5556;
+		background-color: #da5556;
 	}
 	43.75% {
-		background-color: #C64142;
+		background-color: #c64142;
 	}
 	50% {
-		background-color: #B32A2B;
+		background-color: #b32a2b;
 	}
 	56.25% {
-		background-color: #C64142;
+		background-color: #c64142;
 	}
 	62.5% {
-		background-color: #DA5556;
+		background-color: #da5556;
 	}
 	68.75% {
-		background-color: #DF6061;
+		background-color: #df6061;
 	}
 	75% {
-		background-color: #E56667;
+		background-color: #e56667;
 	}
 	81.25% {
-		background-color: #E76E6F;
+		background-color: #e76e6f;
 	}
 	87.5% {
-		background-color: #EE8889;
+		background-color: #ee8889;
 	}
 	93.75% {
-		background-color: #FF9798;
+		background-color: #ff9798;
 	}
 }
 
 /* Inbox variant: blue ramp, same 4.5s cadence as the red wave so the per-row
    animationDelay stagger lands identically. */
 .contacts-expanded-list-loading-wave-row.contacts-expanded-list-loading-wave-row--inbox {
-	background-color: #AEE1FD;
+	background-color: #aee1fd;
 	animation: contactsExpandedListLoadingWaveInbox 4.5s linear infinite;
 }
 
 @keyframes contactsExpandedListLoadingWaveInbox {
 	0%,
 	100% {
-		background-color: #AEE1FD;
+		background-color: #aee1fd;
 	}
 	6.25% {
-		background-color: #9FD7F4;
+		background-color: #9fd7f4;
 	}
 	12.5% {
-		background-color: #8FCDEC;
+		background-color: #8fcdec;
 	}
 	18.75% {
-		background-color: #7DC0E1;
+		background-color: #7dc0e1;
 	}
 	25% {
-		background-color: #6EB4D8;
+		background-color: #6eb4d8;
 	}
 	31.25% {
-		background-color: #5AA3CA;
+		background-color: #5aa3ca;
 	}
 	37.5% {
-		background-color: #4690BC;
+		background-color: #4690bc;
 	}
 	43.75% {
-		background-color: #2E78A6;
+		background-color: #2e78a6;
 	}
 	50% {
-		background-color: #1B5F8E;
+		background-color: #1b5f8e;
 	}
 	56.25% {
-		background-color: #2E78A6;
+		background-color: #2e78a6;
 	}
 	62.5% {
-		background-color: #4690BC;
+		background-color: #4690bc;
 	}
 	68.75% {
-		background-color: #5AA3CA;
+		background-color: #5aa3ca;
 	}
 	75% {
-		background-color: #6EB4D8;
+		background-color: #6eb4d8;
 	}
 	81.25% {
-		background-color: #7DC0E1;
+		background-color: #7dc0e1;
 	}
 	87.5% {
-		background-color: #8FCDEC;
+		background-color: #8fcdec;
 	}
 	93.75% {
-		background-color: #9FD7F4;
+		background-color: #9fd7f4;
 	}
 }
 
 /* --- Research Panel Loading Wave (Hold light briefly, then smooth wave) --- */
 .research-panel-loading-wave-box {
-	background-color: #E9F7FF;
+	background-color: #e9f7ff;
 	animation: researchPanelLoadingWave 6s linear infinite;
 	will-change: background-color;
 }
@@ -5784,21 +6112,21 @@ body,
 	/* Hold on lightest (0-30%) */
 	0%,
 	30% {
-		background-color: #E9F7FF;
+		background-color: #e9f7ff;
 	}
 	/* Smooth wave down */
 	47.5% {
-		background-color: #43AEEC; /* Mid-point */
+		background-color: #43aeec; /* Mid-point */
 	}
 	65% {
 		background-color: #005587; /* Darkest */
 	}
 	/* Smooth wave up */
 	82.5% {
-		background-color: #43AEEC; /* Mid-point */
+		background-color: #43aeec; /* Mid-point */
 	}
 	100% {
-		background-color: #E9F7FF;
+		background-color: #e9f7ff;
 	}
 }
 
@@ -6399,7 +6727,13 @@ body.murmur-mobile .exclude-contacts-box [data-slot='form-label'] {
 	font-size: 8px !important;
 	line-height: 10px !important;
 	font-weight: 700 !important;
-	font-family: var(--font-secondary), 'Inter', system-ui, -apple-system, Segoe UI, Roboto,
+	font-family:
+		var(--font-secondary),
+		'Inter',
+		system-ui,
+		-apple-system,
+		Segoe UI,
+		Roboto,
 		sans-serif !important;
 	white-space: nowrap !important;
 	max-width: 100px !important; /* leave space for 13px switch + gap */
@@ -6515,7 +6849,9 @@ body.murmur-mobile .search-bar-wrapper .flex-wrap > .h-\[39px\] {
 
 /* Zoomed desktop dashboard: same hero input styling at EVERY window width — the root
    zoom owns responsive scaling, so the styling above must not key off real width. */
-html.murmur-dashboard-compact .search-bar-wrapper:not(.search-bar-active) .search-input-group {
+html.murmur-dashboard-compact
+	.search-bar-wrapper:not(.search-bar-active)
+	.search-input-group {
 	width: 603px !important;
 	max-width: 603px !important;
 	min-width: 603px !important;
@@ -7323,7 +7659,8 @@ body.murmur-mobile .search-input-icon-btn {
    keep the mobile campaigns table layout at 388px and scale it down as a whole
    (instead of squeezing the columns horizontally).
    ========================================================= */
-.campaigns-table-container[data-mobile-ultra-narrow-scale='true'] .mobile-campaigns-outer-container {
+.campaigns-table-container[data-mobile-ultra-narrow-scale='true']
+	.mobile-campaigns-outer-container {
 	/* Lock the layout width, then scale to fit */
 	width: 388px !important;
 	max-width: 388px !important;
@@ -7333,7 +7670,8 @@ body.murmur-mobile .search-input-icon-btn {
 }
 
 @supports not (zoom: 1) {
-	.campaigns-table-container[data-mobile-ultra-narrow-scale='true'] .mobile-campaigns-outer-container {
+	.campaigns-table-container[data-mobile-ultra-narrow-scale='true']
+		.mobile-campaigns-outer-container {
 		zoom: 1;
 		transform: scale(var(--campaigns-table-scale));
 		transform-origin: top center;
@@ -7379,7 +7717,8 @@ body.murmur-mobile .search-input-icon-btn {
    Finder is rendered as a synthetic table row; the first cell visually spans
    the metrics cell so CustomTable can remain unchanged.
    ========================================================= */
-.campaigns-table-container .my-campaigns-table.desktop-campaigns-table.campaigns-finder-open {
+.campaigns-table-container
+	.my-campaigns-table.desktop-campaigns-table.campaigns-finder-open {
 	width: 660px !important;
 	max-width: 660px !important;
 	height: var(--campaigns-finder-height, 415px) !important;
@@ -7430,7 +7769,8 @@ body.murmur-mobile .search-input-icon-btn {
 	flex: 0 0 9px;
 }
 
-.campaign-finder-split-pane .my-campaigns-table.desktop-campaigns-table.campaigns-finder-open {
+.campaign-finder-split-pane
+	.my-campaigns-table.desktop-campaigns-table.campaigns-finder-open {
 	width: 367px !important;
 	max-width: 367px !important;
 	min-width: 367px !important;
@@ -7439,35 +7779,22 @@ body.murmur-mobile .search-input-icon-btn {
 	border-radius: 0 !important;
 }
 
-.campaign-finder-split-table thead {
+/* Split-pane "Folders" header: render the real column header (which lives inside
+   the scroll container) instead of a position:absolute ::after pinned to the
+   non-scrolling pane. The pinned pseudo-element stayed stuck at top:53px while the
+   list scrolled past it on both sides; the real <thead> scrolls away with the
+   content exactly like the single-pane view. Only the Folders column is shown in a
+   split pane, so the metrics column header is hidden to match the hidden tbody cell. */
+.campaign-finder-split-table thead th:nth-child(2) {
 	display: none !important;
 }
 
-.campaign-finder-split-table [data-slot='table'] {
-	margin-top: 28px;
-}
-
-.campaign-finder-split-table::after {
-	content: 'Folders';
-	position: absolute;
-	top: 53px;
-	left: 10px;
-	z-index: 2;
-	display: flex;
-	align-items: center;
-	box-sizing: border-box;
-	width: calc(100% - 20px);
-	max-width: calc(100% - 20px);
-	height: 28px;
-	padding: 0 12px;
-	border-radius: 8px 8px 0 0;
-	background: #ffffff;
-	color: #000000;
-	font-family: var(--font-inter), Inter, sans-serif;
-	font-size: 13px;
-	font-weight: 500;
-	line-height: 16px;
-	pointer-events: none;
+.campaign-finder-split-table thead th:first-child {
+	width: 100% !important;
+	min-width: 0 !important;
+	max-width: none !important;
+	padding-left: 22px !important;
+	padding-right: 0 !important;
 }
 
 .campaign-finder-split-table tbody tr:not(:has(.campaign-finder-cell)) > td:nth-child(2) {
@@ -7481,7 +7808,10 @@ body.murmur-mobile .search-input-icon-btn {
 	overflow: visible !important;
 }
 
-.campaign-finder-split-table tbody tr:not(:has(.campaign-finder-cell)) .campaign-row-folder-cell {
+.campaign-finder-split-table
+	tbody
+	tr:not(:has(.campaign-finder-cell))
+	.campaign-row-folder-cell {
 	width: 307px !important;
 	max-width: calc(100% + 64px) !important;
 }
@@ -7509,14 +7839,20 @@ body.murmur-mobile .search-input-icon-btn {
 	min-width: 335px !important;
 }
 
-.campaign-finder-split-table tbody tr:not(:has(.campaign-finder-cell)) .campaign-folder-name-box {
+.campaign-finder-split-table
+	tbody
+	tr:not(:has(.campaign-finder-cell))
+	.campaign-folder-name-box {
 	flex: 1 1 112px !important;
 	width: auto !important;
 	min-width: 96px !important;
 	max-width: 174px !important;
 }
 
-.campaign-finder-split-table tbody tr:not(:has(.campaign-finder-cell)) .folder-icon-strip {
+.campaign-finder-split-table
+	tbody
+	tr:not(:has(.campaign-finder-cell))
+	.folder-icon-strip {
 	flex: 0 0 78px !important;
 	min-width: 78px !important;
 	max-width: 78px !important;
@@ -7525,7 +7861,10 @@ body.murmur-mobile .search-input-icon-btn {
 	overflow: visible !important;
 }
 
-.campaign-finder-split-table tbody tr:not(:has(.campaign-finder-cell)) .campaign-folder-new-count {
+.campaign-finder-split-table
+	tbody
+	tr:not(:has(.campaign-finder-cell))
+	.campaign-folder-new-count {
 	flex: none !important;
 	margin-left: auto !important;
 }
@@ -7554,11 +7893,13 @@ body.murmur-mobile .search-input-icon-btn {
 	display: none;
 }
 
-.campaign-finder-split-pane-left .my-campaigns-table.desktop-campaigns-table.campaigns-finder-open {
+.campaign-finder-split-pane-left
+	.my-campaigns-table.desktop-campaigns-table.campaigns-finder-open {
 	border-radius: 8px 0 0 8px !important;
 }
 
-.campaign-finder-split-pane-right .my-campaigns-table.desktop-campaigns-table.campaigns-finder-open {
+.campaign-finder-split-pane-right
+	.my-campaigns-table.desktop-campaigns-table.campaigns-finder-open {
 	border-radius: 0 8px 8px 0 !important;
 }
 
@@ -7682,26 +8023,28 @@ body.murmur-mobile .search-input-icon-btn {
 }
 
 .campaign-finder-view-icon-split {
-	background: linear-gradient(
-		90deg,
-		transparent 0,
-		transparent calc(50% - 0.5px),
-		#e0e0e0 calc(50% - 0.5px),
-		#e0e0e0 calc(50% + 0.5px),
-		transparent calc(50% + 0.5px)
-	),
+	background:
+		linear-gradient(
+			90deg,
+			transparent 0,
+			transparent calc(50% - 0.5px),
+			#e0e0e0 calc(50% - 0.5px),
+			#e0e0e0 calc(50% + 0.5px),
+			transparent calc(50% + 0.5px)
+		),
 		#f8f8f8;
 }
 
 .campaign-finder-view-icon-split.campaign-finder-view-icon-active {
-	background: linear-gradient(
-		90deg,
-		transparent 0,
-		transparent calc(50% - 0.5px),
-		#cecece calc(50% - 0.5px),
-		#cecece calc(50% + 0.5px),
-		transparent calc(50% + 0.5px)
-	),
+	background:
+		linear-gradient(
+			90deg,
+			transparent 0,
+			transparent calc(50% - 0.5px),
+			#cecece calc(50% - 0.5px),
+			#cecece calc(50% + 0.5px),
+			transparent calc(50% + 0.5px)
+		),
 		#ffffff;
 }
 
@@ -7726,12 +8069,16 @@ body.murmur-mobile .search-input-icon-btn {
 	color: #737373;
 	gap: 10px;
 	cursor: text;
-	transition: border-color 120ms ease, box-shadow 120ms ease;
+	transition:
+		border-color 120ms ease,
+		box-shadow 120ms ease;
 }
 
 .campaign-finder-topbar-search:focus-within {
 	border-color: rgba(0, 0, 0, 0.12);
-	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9), 0 0 14px rgba(0, 0, 0, 0.12);
+	box-shadow:
+		0 0 0 1px rgba(255, 255, 255, 0.9),
+		0 0 14px rgba(0, 0, 0, 0.12);
 }
 
 .campaign-finder-topbar-search-input {
@@ -7815,7 +8162,8 @@ body.murmur-mobile .search-input-icon-btn {
 }
 
 @media (max-width: 960px) {
-	.campaigns-table-container .my-campaigns-table.desktop-campaigns-table.campaigns-finder-open {
+	.campaigns-table-container
+		.my-campaigns-table.desktop-campaigns-table.campaigns-finder-open {
 		width: min(660px, calc(100vw - 32px)) !important;
 		max-width: calc(100vw - 32px) !important;
 		height: var(--campaigns-finder-height, 415px) !important;
@@ -7823,7 +8171,8 @@ body.murmur-mobile .search-input-icon-btn {
 		min-height: var(--campaigns-finder-height, 415px) !important;
 	}
 
-	.campaign-finder-split-pane .my-campaigns-table.desktop-campaigns-table.campaigns-finder-open {
+	.campaign-finder-split-pane
+		.my-campaigns-table.desktop-campaigns-table.campaigns-finder-open {
 		width: 367px !important;
 		max-width: 367px !important;
 		min-width: 367px !important;
@@ -7849,6 +8198,51 @@ body.murmur-mobile .search-input-icon-btn {
 	transform: translateY(calc(-50% + 1.5px)) rotate(90deg) !important;
 }
 
+/* ARCHIVE disclosure chevron: rendered inline (in the row's normal flow) rather than
+   absolutely positioned in the left gutter, so it can't be clipped by the table's
+   horizontal-overflow clip once the archive expands and the table starts scrolling. */
+.my-campaigns-table:not(.mobile-table-no-scroll) .campaign-archive-chevron {
+	transform: rotate(0deg);
+	transition: none !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) .campaign-archive-chevron-open {
+	transform: rotate(90deg) !important;
+}
+
+/* ARCHIVE section: mute the column-separator "ticks" and the data-type icon badges so
+   they recede into the grayed archive band instead of reading at full strength. Driven
+   by the invisible .archive-*-row-marker spans already rendered into each archive row. */
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.archive-folder-row-marker)
+	.campaign-metric-slot:not(:last-child)::after,
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.archive-campaign-row-marker)
+	.campaign-metric-slot:not(:last-child)::after,
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.archive-folder-row-marker)
+	.campaign-metric-slot:first-child:has(.metric-box[data-draft-fill])::before,
+.my-campaigns-table:not(.mobile-table-no-scroll):not(.campaign-finder-split-table)
+	tbody
+	tr:has(.archive-campaign-row-marker)
+	.campaign-metric-slot:first-child:has(.metric-box[data-draft-fill])::before {
+	opacity: 0.25;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.archive-folder-row-marker)
+	.folder-icon-strip,
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.archive-campaign-row-marker)
+	.folder-icon-strip {
+	opacity: 0.4;
+}
+
 .my-campaigns-table:not(.mobile-table-no-scroll)
 	.campaign-row-folder-cell[data-finder-open='true'] {
 	transform: translateX(6px);
@@ -7872,9 +8266,7 @@ body.murmur-mobile .search-input-icon-btn {
 	display: none !important;
 }
 
-.my-campaigns-table:not(.mobile-table-no-scroll)
-	tbody
-	tr:has(.campaign-finder-cell),
+.my-campaigns-table:not(.mobile-table-no-scroll) tbody tr:has(.campaign-finder-cell),
 .my-campaigns-table:not(.mobile-table-no-scroll)
 	tbody
 	tr:has(.campaign-finder-cell)
@@ -8013,6 +8405,40 @@ body.murmur-mobile .search-input-icon-btn {
 	text-overflow: ellipsis;
 }
 
+/* Custom cursor-following drag overlay for the split-view finder. Replaces the native
+   setDragImage pill so a green "+" add affordance can be glued to it on the destination
+   side. Position is set imperatively via transform from a document `dragover` listener.
+   pointer-events:none so it never intercepts the drag hit-testing that lights up the
+   drop panes; portaled to <body> to escape the `main { isolation: isolate }` trap. */
+.campaign-finder-drag-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	z-index: 100000;
+	pointer-events: none;
+	will-change: transform;
+	display: inline-block;
+}
+
+.campaign-finder-drag-overlay-hidden {
+	display: none;
+}
+
+/* Anchor the green "+" badge to the pill's bottom-left corner. */
+.campaign-finder-drag-overlay .campaign-finder-drag-preview {
+	position: relative;
+}
+
+.campaign-finder-drag-add-badge {
+	position: absolute;
+	left: -6px;
+	bottom: -6px;
+	width: 18px;
+	height: 18px;
+	line-height: 0;
+	pointer-events: none;
+}
+
 .campaign-finder-folder-row {
 	display: flex;
 	align-items: center;
@@ -8063,7 +8489,9 @@ body.murmur-mobile .search-input-icon-btn {
 
 .campaign-finder-contact-row {
 	display: grid;
-	grid-template-columns: 8px minmax(90px, 128px) minmax(118px, 1fr) minmax(76px, 104px) 17px 42px minmax(58px, 86px);
+	grid-template-columns:
+		8px minmax(90px, 128px) minmax(118px, 1fr) minmax(76px, 104px)
+		17px 42px minmax(58px, 86px);
 	align-items: center;
 	column-gap: 10px;
 	padding: 0 16px 0 70px;
@@ -8073,7 +8501,7 @@ body.murmur-mobile .search-input-icon-btn {
 	display: flex;
 	align-items: center;
 	padding: 0 16px 0 70px;
-	background: #FAF7F7;
+	background: #faf7f7;
 	font-size: 12px;
 	font-weight: 400;
 	line-height: 14px;
@@ -8286,6 +8714,114 @@ body.murmur-mobile .search-input-icon-btn {
 	transform: rotate(-45deg);
 }
 
+/* Campaign-row "Get Info" summary card (right-click menu → Get Info). Reuses the
+   finder popup's card chrome + close button, with a compact stats/dates layout. */
+.campaign-row-info-popup {
+	position: fixed;
+	box-sizing: border-box;
+	padding: 14px 14px 12px;
+	border: 1px solid #dedede;
+	border-radius: 12px;
+	background: #ffffff;
+	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+	font-family: var(--font-inter), Inter, sans-serif;
+	color: #000000;
+	pointer-events: auto;
+	user-select: none;
+}
+
+.campaign-row-info-popup-header {
+	display: flex;
+	align-items: center;
+	margin-bottom: 12px;
+	padding-right: 24px;
+}
+
+.campaign-row-info-popup-name-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	max-width: 100%;
+	height: 24px;
+	padding: 0 10px;
+	border-radius: 7px;
+}
+
+.campaign-row-info-popup-folder-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 11px;
+	flex: 0 0 18px;
+}
+
+.campaign-row-info-popup-name {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 14px;
+	font-weight: 600;
+	line-height: 18px;
+	color: #1a1a1a;
+}
+
+.campaign-row-info-popup-stats {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 6px;
+	margin-bottom: 12px;
+}
+
+.campaign-row-info-popup-stat {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	padding: 6px 2px;
+	border-radius: 7px;
+	background: #f4f4f4;
+}
+
+.campaign-row-info-popup-stat-value {
+	font-size: 15px;
+	font-weight: 600;
+	line-height: 18px;
+	color: #000000;
+}
+
+.campaign-row-info-popup-stat-label {
+	font-size: 11px;
+	font-weight: 500;
+	line-height: 13px;
+	color: #6b6b6b;
+}
+
+.campaign-row-info-popup-dates {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.campaign-row-info-popup-date-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	font-size: 12px;
+	line-height: 16px;
+}
+
+.campaign-row-info-popup-date-label {
+	font-weight: 500;
+	color: #6b6b6b;
+}
+
+.campaign-row-info-popup-date-value {
+	font-weight: 500;
+	color: #1a1a1a;
+}
+
 @media (max-width: 960px) {
 	.campaign-finder-cell,
 	.campaign-finder-panel,
@@ -8299,7 +8835,9 @@ body.murmur-mobile .search-input-icon-btn {
 	}
 
 	.campaign-finder-contact-row {
-		grid-template-columns: 8px minmax(64px, 1fr) minmax(64px, 1fr) minmax(52px, 72px) 15px 32px;
+		grid-template-columns:
+			8px minmax(64px, 1fr) minmax(64px, 1fr) minmax(52px, 72px)
+			15px 32px;
 		column-gap: 6px;
 		padding: 0 8px 0 42px;
 	}

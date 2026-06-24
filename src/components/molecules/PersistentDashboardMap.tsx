@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import SearchResultsMap, {
 	type SearchResultsMapProps,
@@ -14,6 +14,63 @@ import {
 
 const IDLE_CLIP_PATH = 'inset(0px round 0px)';
 const IDLE_FRAME_TRANSITION = '0ms ease';
+const SEARCH_TO_CAMPAIGN_TRANSITION_BODY_CLASS =
+	'murmur-search-to-campaign-transitioning';
+
+type MapCameraPadding = SearchResultsMapProps['cameraPadding'];
+
+const isCameraPaddingNonEmpty = (padding: MapCameraPadding): boolean =>
+	Boolean(
+		padding &&
+			((padding.top ?? 0) ||
+				(padding.right ?? 0) ||
+				(padding.bottom ?? 0) ||
+				(padding.left ?? 0))
+	);
+
+const normalizeAutoFitPadding = (
+	padding: NonNullable<MapCameraPadding>
+): NonNullable<SearchResultsMapProps['autoFitPadding']> => ({
+	top: padding.top ?? 0,
+	right: padding.right ?? 0,
+	bottom: padding.bottom ?? 0,
+	left: padding.left ?? 0,
+});
+
+const getSearchToCampaignCompactPaddingFallback =
+	(): NonNullable<MapCameraPadding> | null => {
+		if (typeof window === 'undefined') return null;
+
+		// Mirrors the dashboard's optimistic search→campaign compact-tab framing and
+		// the campaign page's compact Write/Drafts/Inbox framing. This is the hard
+		// fallback for the exact route-handoff gap where the outgoing dashboard config
+		// may already be cleared and the incoming campaign config has not yet landed.
+		const CAMPAIGN_OPTIMISTIC_ZOOM = 0.85;
+		const CAMPAIGN_COMPACT_WORKSPACE_BACKDROP_WIDTH_PX = 985;
+		const CAMPAIGN_CENTERED_STAGE_COMPACT_MAX_LAYOUT_W_PX = 1317;
+		const CAMERA_PADDING_BACKOFF_PX = 550;
+
+		const viewportW = window.innerWidth;
+		if (!viewportW) return null;
+
+		const layoutViewportW = viewportW / CAMPAIGN_OPTIMISTIC_ZOOM;
+		if (layoutViewportW < CAMPAIGN_CENTERED_STAGE_COMPACT_MAX_LAYOUT_W_PX) {
+			return { top: 0, right: 0, bottom: 0, left: 0 };
+		}
+
+		const backdropStartCss = Math.max(
+			0,
+			layoutViewportW - CAMPAIGN_COMPACT_WORKSPACE_BACKDROP_WIDTH_PX
+		);
+		const backdropStartPx = backdropStartCss * CAMPAIGN_OPTIMISTIC_ZOOM;
+		const uiCoveredRightPx = viewportW - backdropStartPx;
+		const rightPaddingPx = Math.max(
+			0,
+			Math.round(uiCoveredRightPx - CAMERA_PADDING_BACKOFF_PX)
+		);
+
+		return { top: 0, right: rightPaddingPx, bottom: 0, left: 0 };
+	};
 
 const FALLBACK_MAP_PROPS: SearchResultsMapProps = {
 	contacts: [],
@@ -25,10 +82,20 @@ const FALLBACK_MAP_PROPS: SearchResultsMapProps = {
 
 export function PersistentDashboardMap() {
 	const pathname = usePathname();
-	const mapConfig = usePersistentMapValue();
+	const rawMapConfig = usePersistentMapValue();
 	const setPersistentMapReady = usePersistentMapReadySetter();
 	const setPersistentMapFirstPaint = usePersistentMapFirstPaintSetter();
 	const [mounted, setMounted] = useState(false);
+	// Search→campaign tab switches briefly pass through route/config states where
+	// the outgoing dashboard has cleaned up its search config, but the incoming
+	// campaign has not yet published its first split-map padding. If the singleton
+	// map sees that as "no padding", Mapbox eases back to the centered search
+	// framing before easing to Write/Drafts/Inbox — the visible "back to Search,
+	// then jump to Campaign" bug. Keep the last non-empty padding from the click
+	// frame and use it only while the explicit handoff body class is active.
+	const lastSearchToCampaignPaddingRef = useRef<NonNullable<MapCameraPadding> | null>(
+		null
+	);
 
 	useEffect(() => {
 		setMounted(true);
@@ -39,6 +106,38 @@ export function PersistentDashboardMap() {
 	const isCampaignRoute =
 		pathname === urls.murmur.campaign.index ||
 		pathname.startsWith(`${urls.murmur.campaign.index}/`);
+	const searchToCampaignTab =
+		typeof document !== 'undefined'
+			? document.body.dataset.searchToCampaignTab
+			: undefined;
+	const isSearchToCampaignHandoff =
+		typeof document !== 'undefined' &&
+		document.body.classList.contains(SEARCH_TO_CAMPAIGN_TRANSITION_BODY_CLASS);
+	const shouldHoldSearchToCampaignPadding =
+		isSearchToCampaignHandoff && searchToCampaignTab !== 'all';
+
+	const rawCameraPadding = rawMapConfig?.mapProps.cameraPadding ?? null;
+	if (isCameraPaddingNonEmpty(rawCameraPadding)) {
+		lastSearchToCampaignPaddingRef.current = rawCameraPadding;
+	}
+
+	// Ignore a config that belongs to a different route than the one currently shown.
+	// During a route handoff (e.g. search → campaign) the outgoing dashboard page's
+	// search config can still be the active value for a frame or two before the
+	// incoming page publishes its own — and the dashboard's config carries live
+	// search props (searchQuery/searchEngaged/result contacts) that would otherwise
+	// paint the result markers + constellation overlay on top of the new page. Gating
+	// on ownerRoute guarantees a stale cross-route config can never render, regardless
+	// of the effect-ordering race that made the overlay "sometimes" linger.
+	const configMatchesRoute =
+		rawMapConfig == null
+			? false
+			: rawMapConfig.ownerRoute === 'dashboard'
+				? isDashboardRoute
+				: rawMapConfig.ownerRoute === 'venue'
+					? isVenuePortalRoute
+					: isCampaignRoute;
+	const mapConfig = configMatchesRoute ? rawMapConfig : null;
 
 	// Keep the singleton Mapbox instance mounted across every map-bearing route, even while the
 	// config is momentarily null during a route handoff (e.g. campaign → dashboard, where the
@@ -56,16 +155,65 @@ export function PersistentDashboardMap() {
 	const isInteractiveCampaignMap = isCampaignRoute;
 	const isInteractiveMap = isInteractiveRevealMap || isInteractiveCampaignMap;
 
-	const mapProps = useMemo<SearchResultsMapProps>(() => {
-		const props = mapConfig?.mapProps ?? FALLBACK_MAP_PROPS;
-		if (!isInteractiveCampaignMap) return props;
+	const routeHandoffMapProps = useMemo<SearchResultsMapProps>(() => {
+		if (configMatchesRoute) return FALLBACK_MAP_PROPS;
+
+		// During a dashboard-search → campaign handoff, the incoming campaign route
+		// intentionally ignores the outgoing dashboard config so search markers/lines
+		// cannot bleed onto the campaign page. Do not also wipe the camera padding in
+		// that short gap, though: the dashboard already committed the optimistic
+		// campaign split padding on the click frame, and clearing it for one route frame
+		// is what makes the map pan back toward Search before snapping to Campaign.
+		const retainedOrComputedPadding = shouldHoldSearchToCampaignPadding
+			? (getSearchToCampaignCompactPaddingFallback() ??
+				lastSearchToCampaignPaddingRef.current)
+			: null;
+		const handoffPadding =
+			rawMapConfig?.mapProps.cameraPadding ?? retainedOrComputedPadding;
+		if (!handoffPadding) return FALLBACK_MAP_PROPS;
+		const autoFitPadding =
+			rawMapConfig?.mapProps.autoFitPadding ?? normalizeAutoFitPadding(handoffPadding);
 
 		return {
-			...props,
+			...FALLBACK_MAP_PROPS,
+			cameraPadding: handoffPadding,
+			autoFitPadding,
+		};
+	}, [
+		configMatchesRoute,
+		rawMapConfig?.mapProps,
+		shouldHoldSearchToCampaignPadding,
+	]);
+
+	const mapProps = useMemo<SearchResultsMapProps>(() => {
+		const props = mapConfig?.mapProps ?? routeHandoffMapProps;
+		const retainedPadding =
+			shouldHoldSearchToCampaignPadding &&
+			!isCameraPaddingNonEmpty(props.cameraPadding)
+				? (getSearchToCampaignCompactPaddingFallback() ??
+					lastSearchToCampaignPaddingRef.current)
+				: null;
+		const resolvedProps = retainedPadding
+			? {
+					...props,
+					cameraPadding: retainedPadding,
+					autoFitPadding:
+						props.autoFitPadding ?? normalizeAutoFitPadding(retainedPadding),
+				}
+			: props;
+		if (!isInteractiveCampaignMap) return resolvedProps;
+
+		return {
+			...resolvedProps,
 			presentation: 'interactive',
 			autoSpin: false,
 		};
-	}, [isInteractiveCampaignMap, mapConfig?.mapProps]);
+	}, [
+		isInteractiveCampaignMap,
+		mapConfig?.mapProps,
+		routeHandoffMapProps,
+		shouldHoldSearchToCampaignPadding,
+	]);
 
 	if (!shouldRenderMap) return null;
 
@@ -135,6 +283,7 @@ export function PersistentDashboardMap() {
 						    update can never clobber it. */}
 						<SearchResultsMap
 							{...mapProps}
+							transientOverlayResetKey={pathname}
 							onMapLoadedChange={setPersistentMapReady}
 							onMapFirstPaintChange={setPersistentMapFirstPaint}
 						/>

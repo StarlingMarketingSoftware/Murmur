@@ -37,6 +37,13 @@ interface CustomScrollbarProps
 	nativeScroll?: boolean;
 	/** When true, prevent any horizontal scrolling/overflow inside the scroll container. */
 	lockHorizontalScroll?: boolean;
+	/**
+	 * When true, freeze the scroll position entirely: wheel, thumb-drag and track-click
+	 * are all ignored and the container's overflow is hidden. Used to pin transient,
+	 * row-anchored overlays (e.g. the campaign delete confirmation) in place so they
+	 * don't slide while the user scrolls.
+	 */
+	scrollLocked?: boolean;
 }
 
 export function CustomScrollbar({
@@ -58,6 +65,7 @@ export function CustomScrollbar({
 	onScroll,
 	nativeScroll = false,
 	lockHorizontalScroll = false,
+	scrollLocked = false,
 	onWheel: onWheelProp,
 	...rest
 }: CustomScrollbarProps) {
@@ -138,6 +146,7 @@ export function CustomScrollbar({
 
 	const handleMouseMove = useCallback(
 		(e: MouseEvent) => {
+			if (scrollLocked) return;
 			if (!isDragging || !internalScrollContainerRef.current) return;
 
 			const deltaY = e.clientY - dragStartY;
@@ -148,7 +157,7 @@ export function CustomScrollbar({
 
 			container.scrollTop = scrollStartY + deltaY * scrollRatio;
 		},
-		[isDragging, dragStartY, scrollStartY, thumbHeight]
+		[isDragging, dragStartY, scrollStartY, thumbHeight, scrollLocked]
 	);
 
 	const handleMouseUp = useCallback(() => {
@@ -157,6 +166,7 @@ export function CustomScrollbar({
 
 	// Handle track clicks
 	const handleTrackClick = useCallback((e: React.MouseEvent) => {
+		if (scrollLocked) return;
 		const container = internalScrollContainerRef.current;
 		const thumb = scrollThumbRef.current;
 		if (!container || !thumb || e.target === thumb) return;
@@ -169,10 +179,16 @@ export function CustomScrollbar({
 		// Calculate target scroll position
 		const targetRatio = rect.height ? clickY / rect.height : 0;
 		container.scrollTop = targetRatio * maxScrollTop;
-	}, []);
+	}, [scrollLocked]);
 
 	// Forward wheel to internal container to ensure scrolling always works
 	const handleWheel: React.WheelEventHandler<HTMLDivElement> = useCallback((e) => {
+		// Frozen (e.g. an armed delete confirmation is pinned to a row): swallow the
+		// wheel so neither this container nor any ancestor scrolls.
+		if (scrollLocked) {
+			e.stopPropagation();
+			return;
+		}
 		// Campaign "scrollable" mode (<= 776px): allow natural page scrolling / scroll chaining.
 		// The campaign page intentionally becomes page-scrollable in this mode, so we should not
 		// trap wheel events inside nested custom scroll containers.
@@ -193,7 +209,7 @@ export function CustomScrollbar({
 			e.stopPropagation();
 		}
 		onWheelProp?.(e);
-	}, [onWheelProp]);
+	}, [onWheelProp, scrollLocked]);
 
 	useEffect(() => {
 		if (nativeScroll) return;
@@ -254,10 +270,10 @@ export function CustomScrollbar({
 			<div
 				{...rest}
 				ref={setScrollContainerRef}
-				className={cn(className, 'overflow-y-auto')}
+				className={cn(className, !scrollLocked && 'overflow-y-auto')}
 				onScroll={onScroll}
-				onWheel={onWheelProp}
-				style={style}
+				onWheel={scrollLocked ? undefined : onWheelProp}
+				style={scrollLocked ? { ...style, overflowY: 'hidden' } : style}
 			>
 				{children}
 			</div>
@@ -300,6 +316,9 @@ export function CustomScrollbar({
 			<div
 				ref={setScrollContainerRef}
 				onScroll={onScroll}
+				// Hook for CSS overflow overrides that must beat a consumer's own
+				// `overflow-y: auto !important` rule (e.g. the campaigns table) when frozen.
+				data-scroll-locked={scrollLocked ? 'true' : undefined}
 				className={cn(
 					'h-full scrollbar-hide hide-native-scrollbar',
 					!disableOverflowClass && 'overflow-y-auto',
@@ -312,7 +331,7 @@ export function CustomScrollbar({
 						msOverflowStyle: 'none',
 						// Control horizontal overflow/scrolling
 						overflowX: lockHorizontalScroll ? 'hidden' : 'visible',
-						overflowY: 'auto',
+						overflowY: scrollLocked ? 'hidden' : 'auto',
 						// Prevent scroll chaining to parent/page and improve mobile scroll behavior
 						overscrollBehavior: 'contain',
 						WebkitOverflowScrolling: 'touch',

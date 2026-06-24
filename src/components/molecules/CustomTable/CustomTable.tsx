@@ -116,8 +116,11 @@ interface CustomTableProps<TData, TValue> extends DataTableProps<TData, TValue> 
 	useCustomScrollbar?: boolean;
 	scrollbarOffsetRight?: number;
 	onRowHover?: (rowData: TData | null) => void;
+	onRowContextMenu?: (rowData: TData, event: React.MouseEvent) => void;
 	onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
 	nativeScroll?: boolean;
+	/** When true, freeze the custom scrollbar in place (wheel/drag/track ignored). */
+	scrollLocked?: boolean;
 	stickyHeader?: boolean;
 	stickyHeaderClassName?: string;
 }
@@ -155,8 +158,10 @@ export function CustomTable<TData, TValue>({
 	useCustomScrollbar = false,
 	scrollbarOffsetRight = -4,
 	onRowHover,
+	onRowContextMenu,
 	onScroll,
 	nativeScroll,
+	scrollLocked = false,
 	stickyHeader = true,
 	stickyHeaderClassName,
 }: CustomTableProps<TData, TValue>) {
@@ -404,6 +409,7 @@ export function CustomTable<TData, TValue>({
 					offsetRight={scrollbarOffsetRight}
 					onScroll={onScroll}
 					nativeScroll={nativeScroll}
+					scrollLocked={scrollLocked}
 				>
 					<div className="min-w-full">
 						{showInContainerHeader && (
@@ -580,6 +586,7 @@ export function CustomTable<TData, TValue>({
 											}}
 											onMouseEnter={() => onRowHover && onRowHover(row.original)}
 											onMouseLeave={() => onRowHover && onRowHover(null)}
+											onContextMenu={(e) => onRowContextMenu?.(row.original, e)}
 											key={row.id}
 											data-state={row.getIsSelected() && 'selected'}
 										>
@@ -816,6 +823,7 @@ export function CustomTable<TData, TValue>({
 										}}
 										onMouseEnter={() => onRowHover && onRowHover(row.original)}
 										onMouseLeave={() => onRowHover && onRowHover(null)}
+										onContextMenu={(e) => onRowContextMenu?.(row.original, e)}
 										key={row.id}
 										data-state={row.getIsSelected() && 'selected'}
 									>

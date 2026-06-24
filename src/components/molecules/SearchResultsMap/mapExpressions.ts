@@ -4,12 +4,17 @@ import {
 	CURATED_DOT_FADE_START_ZOOM,
 	CURATED_ORB_TRANSITION_END_ZOOM,
 	CURATED_ORB_TRANSITION_START_ZOOM,
+	MARKER_CONSTELLATION_DETAIL_COMPOSE_ZOOM,
 	MARKER_CONSTELLATION_EDGE_RANK_OPACITY_EXPR,
+	MARKER_CONSTELLATION_MID_COMPOSE_ZOOM,
 	MARKER_CONSTELLATION_NODE_RANK_OPACITY_EXPR,
+	MARKER_CONSTELLATION_ZOOM_FADE_END_ZOOM,
+	MARKER_CONSTELLATION_ZOOM_FADE_START_ZOOM,
 	NON_CONSTELLATION_FADE_END_ZOOM,
 	NON_CONSTELLATION_FADE_START_ZOOM,
 	ORB_FADE_MARKER_FEATURE_EXPR,
 	RESULT_DOT_GLOW_OPACITY,
+	RESULT_DOT_GLOW_ZOOM_FADE_END_ZOOM,
 	SELECTED_STATE_ORB_FADE_MARKER_FEATURE_EXPR,
 } from './constants';
 import { clamp } from './math';
@@ -122,6 +127,11 @@ export const getCategorizedDotGlowZoomFadedOpacity = (
 		'interpolate',
 		['linear'],
 		['zoom'],
+		// Far-zoom floor: the soft white halo fully fades out before globe
+		// distance so stacked halos can't composite into a white blob. Sits just
+		// below the curated dot-fade stop, so 3.0→3.6 is the halo's fade-out ramp.
+		RESULT_DOT_GLOW_ZOOM_FADE_END_ZOOM,
+		0,
 		CURATED_DOT_FADE_END_ZOOM,
 		multiplyOpacityExpr(
 			[
@@ -283,17 +293,36 @@ const markerConstellationNodeOpacityAtZoomStop = (
 export const getMarkerConstellationZoomFadedOpacity = (opacity: any): any => {
 	if (typeof opacity !== 'number') return opacity;
 	if (opacity <= 0) return 0;
-	const unifiedOpacity = markerConstellationEdgeOpacityAtZoomStop(opacity, 1, 1, 1);
+	const wideOnlyOpacity = markerConstellationEdgeOpacityAtZoomStop(
+		opacity,
+		1,
+		0,
+		0
+	);
+	const widePlusMidHintOpacity = markerConstellationEdgeOpacityAtZoomStop(
+		opacity,
+		1,
+		0.34,
+		0
+	);
+	const midOpacity = markerConstellationEdgeOpacityAtZoomStop(opacity, 0.92, 1, 0.25);
+	const detailOpacity = markerConstellationEdgeOpacityAtZoomStop(opacity, 0.82, 1, 1);
 	return [
 		'interpolate',
 		['linear'],
 		['zoom'],
-		3.6,
+		MARKER_CONSTELLATION_ZOOM_FADE_END_ZOOM,
 		0,
-		4.2,
-		unifiedOpacity,
+		MARKER_CONSTELLATION_ZOOM_FADE_START_ZOOM,
+		wideOnlyOpacity,
+		CURATED_DOT_FADE_START_ZOOM,
+		widePlusMidHintOpacity,
+		MARKER_CONSTELLATION_MID_COMPOSE_ZOOM,
+		midOpacity,
+		MARKER_CONSTELLATION_DETAIL_COMPOSE_ZOOM,
+		detailOpacity,
 		13,
-		unifiedOpacity,
+		detailOpacity,
 	];
 };
 
@@ -310,9 +339,9 @@ export const getSelectedMarkerConstellationZoomFadedOpacity = (
 		'interpolate',
 		['linear'],
 		['zoom'],
-		3.6,
+		MARKER_CONSTELLATION_ZOOM_FADE_END_ZOOM,
 		0,
-		4.2,
+		MARKER_CONSTELLATION_ZOOM_FADE_START_ZOOM,
 		unifiedOpacity,
 		13,
 		unifiedOpacity,
@@ -323,16 +352,35 @@ export const getMarkerConstellationNodeZoomFadedOpacity = (
 	opacity: number
 ): any => {
 	if (opacity <= 0) return 0;
-	const unifiedOpacity = markerConstellationNodeOpacityAtZoomStop(opacity, 1, 1, 1);
+	const wideOnlyOpacity = markerConstellationNodeOpacityAtZoomStop(
+		opacity,
+		1,
+		0,
+		0
+	);
+	const widePlusMidHintOpacity = markerConstellationNodeOpacityAtZoomStop(
+		opacity,
+		1,
+		0.38,
+		0
+	);
+	const midOpacity = markerConstellationNodeOpacityAtZoomStop(opacity, 0.9, 1, 0.28);
+	const detailOpacity = markerConstellationNodeOpacityAtZoomStop(opacity, 0.78, 1, 1);
 	return [
 		'interpolate',
 		['linear'],
 		['zoom'],
-		3.6,
+		MARKER_CONSTELLATION_ZOOM_FADE_END_ZOOM,
 		0,
-		4.2,
-		unifiedOpacity,
+		MARKER_CONSTELLATION_ZOOM_FADE_START_ZOOM,
+		wideOnlyOpacity,
+		CURATED_DOT_FADE_START_ZOOM,
+		widePlusMidHintOpacity,
+		MARKER_CONSTELLATION_MID_COMPOSE_ZOOM,
+		midOpacity,
+		MARKER_CONSTELLATION_DETAIL_COMPOSE_ZOOM,
+		detailOpacity,
 		13,
-		unifiedOpacity,
+		detailOpacity,
 	];
 };

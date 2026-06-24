@@ -31,8 +31,13 @@ import {
 	getMonthGridSpec,
 	getSameDayTimeRangeError,
 	getTimeChoiceError,
+	getTodayEventInnerBoxStyle,
+	getTodayEventInnerContentScale,
 	parseClockMinutes,
 	parseIsoKey,
+	TODAY_EVENT_CELL_BORDER,
+	TODAY_EVENT_DATE_COLOR,
+	TODAY_EVENT_OUTER_RADIUS_PX,
 	toIsoKey,
 	weekdayLabel,
 } from '@/components/molecules/DashboardCalendarPanel/calendarShared';
@@ -1493,15 +1498,18 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 		const isInert = isOtherBooking || (lockedDateIso != null && iso !== lockedDateIso);
 		const isPopupCell = isOwn && activePopup?.dateIso === iso;
 		const showBookingCard = occupant != null;
+		const isTodayWithBooking = isToday && showBookingCard;
 		const isHighlighted = isToday && !showBookingCard;
 
-		const textColor = showBookingCard
-			? '#FFFFFF'
-			: isHighlighted
-				? '#00AFE5'
-				: inPrimary
+		const textColor = isTodayWithBooking
+			? TODAY_EVENT_DATE_COLOR
+			: showBookingCard
+				? '#FFFFFF'
+				: isHighlighted
 					? '#00AFE5'
-					: 'rgba(0, 0, 0, 0.22)';
+					: inPrimary
+						? '#00AFE5'
+						: 'rgba(0, 0, 0, 0.22)';
 		const cellBackground = showBookingCard
 			? isOwn
 				? OWN_BOOKING_CELL_BG
@@ -1509,6 +1517,7 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 			: isHighlighted
 				? '#38E497'
 				: getCellBackground(date.getMonth(), row, col);
+		const innerContentScale = getTodayEventInnerContentScale(cellW, cellH);
 
 		const label =
 			date.getDate() === 1
@@ -1526,9 +1535,12 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 				style={{
 					width: '100%',
 					height: `${cellH}px`,
-					borderRadius: isHighlighted ? '9.747px' : `${CELL_RADIUS_PX}px`,
+					borderRadius:
+						isHighlighted || isTodayWithBooking
+							? `${TODAY_EVENT_OUTER_RADIUS_PX}px`
+							: `${CELL_RADIUS_PX}px`,
 					border:
-						isHighlighted || showBookingCard ? '1.175px solid #FFFFFF' : CELL_BORDER,
+						isHighlighted || showBookingCard ? TODAY_EVENT_CELL_BORDER : CELL_BORDER,
 					backgroundColor: cellBackground,
 					boxSizing: 'border-box',
 					position: 'relative',
@@ -1539,64 +1551,130 @@ export const InboxBookingCalendarDropdown: FC<InboxBookingCalendarDropdownProps>
 					WebkitAppearance: 'none',
 				}}
 			>
-				<div
-					style={{
-						position: 'absolute',
-						top: '10px',
-						left: '12px',
-						right: '12px',
-						textAlign: 'right',
-						fontFamily: FONT_FAMILY,
-						fontSize: '12.172px',
-						fontStyle: 'normal',
-						fontWeight: isHighlighted ? 700 : 500,
-						lineHeight: '16.229px',
-						color: textColor,
-						whiteSpace: 'nowrap',
-						overflow: 'hidden',
-						textOverflow: 'ellipsis',
-						pointerEvents: 'none',
-					}}
-				>
-					{label}
-				</div>
-				{showBookingCard && (
-					<div
-						style={{
-							position: 'absolute',
-							left: '9px',
-							right: '8px',
-							top: '33px',
-							textAlign: 'left',
-							color: '#FFFFFF',
-							fontFamily: FONT_FAMILY,
-							fontSize: '12.25px',
-							fontWeight: 600,
-							lineHeight: '13.25px',
-							overflow: 'hidden',
-							pointerEvents: 'none',
-						}}
-					>
+				{isTodayWithBooking && occupant ? (
+					<div style={getTodayEventInnerBoxStyle(cellW, cellH)}>
 						<div
 							style={{
+								position: 'absolute',
+								top: `${10 * innerContentScale}px`,
+								left: `${12 * innerContentScale}px`,
+								right: `${12 * innerContentScale}px`,
+								textAlign: 'right',
+								fontFamily: FONT_FAMILY,
+								fontSize: `${12.172 * innerContentScale}px`,
+								fontStyle: 'normal',
+								fontWeight: 700,
+								lineHeight: `${16.229 * innerContentScale}px`,
+								color: TODAY_EVENT_DATE_COLOR,
 								whiteSpace: 'nowrap',
 								overflow: 'hidden',
 								textOverflow: 'ellipsis',
 							}}
 						>
-							{occupant.personName.trim() || occupant.company.trim() || 'Untitled'}
+							{label}
 						</div>
 						<div
 							style={{
-								whiteSpace: 'nowrap',
+								position: 'absolute',
+								left: `${9 * innerContentScale}px`,
+								right: `${8 * innerContentScale}px`,
+								top: `${33 * innerContentScale}px`,
+								textAlign: 'left',
+								color: '#FFFFFF',
+								fontFamily: FONT_FAMILY,
+								fontSize: `${12.25 * innerContentScale}px`,
+								fontWeight: 600,
+								lineHeight: `${13.25 * innerContentScale}px`,
 								overflow: 'hidden',
-								textOverflow: 'ellipsis',
 							}}
 						>
-							{(occupant.startTime || DEFAULT_START_TIME).replace(' ', '')}-
-							{(occupant.endTime || DEFAULT_END_TIME).replace(' ', '')}
+							<div
+								style={{
+									whiteSpace: 'nowrap',
+									overflow: 'hidden',
+									textOverflow: 'ellipsis',
+								}}
+							>
+								{occupant.personName.trim() ||
+									occupant.company.trim() ||
+									'Untitled'}
+							</div>
+							<div
+								style={{
+									whiteSpace: 'nowrap',
+									overflow: 'hidden',
+									textOverflow: 'ellipsis',
+								}}
+							>
+								{(occupant.startTime || DEFAULT_START_TIME).replace(' ', '')}-
+								{(occupant.endTime || DEFAULT_END_TIME).replace(' ', '')}
+							</div>
 						</div>
 					</div>
+				) : (
+					<>
+						<div
+							style={{
+								position: 'absolute',
+								top: '10px',
+								left: '12px',
+								right: '12px',
+								textAlign: 'right',
+								fontFamily: FONT_FAMILY,
+								fontSize: '12.172px',
+								fontStyle: 'normal',
+								fontWeight: isHighlighted ? 700 : 500,
+								lineHeight: '16.229px',
+								color: textColor,
+								whiteSpace: 'nowrap',
+								overflow: 'hidden',
+								textOverflow: 'ellipsis',
+								pointerEvents: 'none',
+							}}
+						>
+							{label}
+						</div>
+						{showBookingCard && occupant && (
+							<div
+								style={{
+									position: 'absolute',
+									left: '9px',
+									right: '8px',
+									top: '33px',
+									textAlign: 'left',
+									color: '#FFFFFF',
+									fontFamily: FONT_FAMILY,
+									fontSize: '12.25px',
+									fontWeight: 600,
+									lineHeight: '13.25px',
+									overflow: 'hidden',
+									pointerEvents: 'none',
+								}}
+							>
+								<div
+									style={{
+										whiteSpace: 'nowrap',
+										overflow: 'hidden',
+										textOverflow: 'ellipsis',
+									}}
+								>
+									{occupant.personName.trim() ||
+										occupant.company.trim() ||
+										'Untitled'}
+								</div>
+								<div
+									style={{
+										whiteSpace: 'nowrap',
+										overflow: 'hidden',
+										textOverflow: 'ellipsis',
+									}}
+								>
+									{(occupant.startTime || DEFAULT_START_TIME).replace(' ', '')}-
+									{(occupant.endTime || DEFAULT_END_TIME).replace(' ', '')}
+								</div>
+							</div>
+						)}
+					</>
 				)}
 				{isPopupCell && (
 					<div

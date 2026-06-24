@@ -25,6 +25,7 @@ export class CampaignApiError extends Error {
 const QUERY_KEYS = {
 	all: ['campaigns'] as const,
 	list: () => [...QUERY_KEYS.all, 'list'] as const,
+	deleted: () => [...QUERY_KEYS.all, 'deleted'] as const,
 	detail: (id: string | number) => [...QUERY_KEYS.all, 'detail', id.toString()] as const,
 } as const;
 
@@ -33,6 +34,10 @@ const CONTACT_EVENTS_QUERY_KEY = (id: string | number) =>
 
 const CONTACTS_QUERY_KEY = (id: string | number) =>
 	[...QUERY_KEYS.detail(id), 'contacts'] as const;
+
+// Exported so Dashboard Search can warm the exact same page-level campaign
+// contacts query that the campaign page's persistent map reads on mount.
+export const getCampaignContactsQueryKey = (id: string | number) => CONTACTS_QUERY_KEY(id);
 
 interface EditCampaignData {
 	id: string | number;
@@ -67,6 +72,29 @@ export const useGetCampaigns = () => {
 	return useQuery({
 		queryKey: getCampaignsListQueryKey(),
 		queryFn: fetchCampaignsList,
+	});
+};
+
+// Soft-deleted campaigns, for the ARCHIVE folder in the campaign manager. Same
+// enriched shape as the active list (the API reuses the GET handler via
+// `?status=deleted`). The key lives under QUERY_KEYS.all, so useDeleteCampaign's
+// invalidateQueries({ queryKey: QUERY_KEYS.all }) refetches it automatically — a
+// just-deleted campaign appears in the archive without any extra wiring.
+export const getDeletedCampaignsListQueryKey = () => QUERY_KEYS.deleted();
+
+export const fetchDeletedCampaignsList = async () => {
+	const response = await _fetch(`${urls.api.campaigns.index}?status=deleted`);
+	if (!response.ok) {
+		throw new Error('Failed to fetch deleted campaigns');
+	}
+	return response.json();
+};
+
+export const useGetDeletedCampaigns = (options: { enabled?: boolean } = {}) => {
+	return useQuery({
+		queryKey: getDeletedCampaignsListQueryKey(),
+		queryFn: fetchDeletedCampaignsList,
+		enabled: options.enabled ?? true,
 	});
 };
 
@@ -113,22 +141,24 @@ export const useGetCampaignContactEvents = (
 	});
 };
 
+export const fetchCampaignContacts = async (
+	campaignId: string | number
+): Promise<ContactWithName[]> => {
+	const response = await _fetch(urls.api.campaigns.contacts.index(campaignId));
+	if (!response.ok) {
+		throw new Error('Failed to fetch campaign contacts');
+	}
+	return response.json();
+};
+
 export const useGetCampaignContacts = (
 	campaignId?: string | number,
 	options: { enabled?: boolean } = {}
 ) => {
 	const enabled = (options.enabled ?? true) && Boolean(campaignId);
 	return useQuery<ContactWithName[]>({
-		queryKey: CONTACTS_QUERY_KEY(String(campaignId || '')),
-		queryFn: async () => {
-			const response = await _fetch(
-				urls.api.campaigns.contacts.index(campaignId as string | number)
-			);
-			if (!response.ok) {
-				throw new Error('Failed to fetch campaign contacts');
-			}
-			return response.json();
-		},
+		queryKey: getCampaignContactsQueryKey(String(campaignId || '')),
+		queryFn: () => fetchCampaignContacts(campaignId as string | number),
 		enabled,
 		// 5 min, matching the other campaign queries: avoids refetching contacts on quick
 		// dashboard<->campaign round-trips. Add-contacts mutations invalidate this key, which

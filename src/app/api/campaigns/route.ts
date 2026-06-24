@@ -36,6 +36,37 @@ const getCampaignContactsCount = async (campaignId: number) => {
 	});
 };
 
+const countInboundMessagesForCampaign = async ({
+	userId,
+	campaignId,
+	contactIds,
+	contactEmails,
+}: {
+	userId: string;
+	campaignId: number;
+	contactIds: number[];
+	contactEmails: string[];
+}) => {
+	const or: Prisma.InboundEmailWhereInput[] = [{ campaignId }];
+	if (contactIds.length > 0) {
+		or.push({ campaignId: null, contactId: { in: contactIds } });
+	}
+	if (contactEmails.length > 0) {
+		or.push({
+			campaignId: null,
+			contactId: null,
+			sender: { in: contactEmails },
+		});
+	}
+
+	return prisma.inboundEmail.count({
+		where: {
+			userId,
+			OR: or,
+		},
+	});
+};
+
 const safeInsertCampaignContactEvent = async (args: {
 	campaignId: number;
 	createdAt: Date;
@@ -240,15 +271,22 @@ export async function GET(req: NextRequest) {
 			return apiUnauthorized();
 		}
 
+		// `?status=deleted` returns soft-deleted campaigns (for the ARCHIVE folder).
+		// Any other value (including no param) keeps the default active-only list so
+		// existing callers of GET /api/campaigns are unaffected.
+		const statusParam = req.nextUrl.searchParams.get('status');
+		const statusFilter = statusParam === 'deleted' ? Status.deleted : Status.active;
+
 		const campaigns = await prisma.campaign.findMany({
 			where: {
 				userId: userId,
-				status: Status.active,
+				status: statusFilter,
 			},
 			include: {
 				_count: {
 					select: {
 						emails: true,
+						inboundEmails: true,
 					},
 				},
 				contacts: {
@@ -278,72 +316,100 @@ export async function GET(req: NextRequest) {
 					},
 				},
 			},
-			orderBy: {
-				createdAt: 'desc',
-			},
+			orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
 		});
 
-		// Transform the data to include draft and sent counts
-		const campaignsWithCounts = campaigns.map((campaign) => {
-			const draftCount = campaign.emails.filter(
-				(email) => email.status === 'draft'
-			).length;
-			const sentCount = campaign.emails.filter((email) => email.status === 'sent').length;
+		// Transform the data to include draft/sent/new counts
+		const campaignsWithCounts = await Promise.all(
+			campaigns.map(async (campaign) => {
+				const draftCount = campaign.emails.filter(
+					(email) => email.status === 'draft'
+				).length;
+				const sentCount = campaign.emails.filter((email) => email.status === 'sent').length;
 
-			// Extract contact emails from userContactLists for inbox filtering
-			// Flatten all contacts from all userContactLists connected to this campaign
-			const contactEmails = campaign.userContactLists
-				.flatMap((list) => list.contacts.map((c) => c.email))
-				.filter((email): email is string => Boolean(email));
-			const campaignContactsById = new Map<number, CampaignDataTypeContactSource>();
-			const addCampaignContacts = (
-				contacts: Array<
-					CampaignDataTypeContactSource & {
-						id: number;
+				// Extract contact emails from userContactLists for inbox filtering
+				// Flatten all contacts from all userContactLists connected to this campaign
+				const contactEmails = campaign.userContactLists
+					.flatMap((list) => list.contacts.map((c) => c.email))
+					.filter((email): email is string => Boolean(email));
+				const campaignContactsById = new Map<number, CampaignDataTypeContactSource>();
+				const addCampaignContacts = (
+					contacts: Array<
+						CampaignDataTypeContactSource & {
+							id: number;
+						}
+					>
+				) => {
+					for (const contact of contacts) {
+						if (campaignContactsById.has(contact.id)) continue;
+						campaignContactsById.set(contact.id, contact);
 					}
-				>
-			) => {
-				for (const contact of contacts) {
-					if (campaignContactsById.has(contact.id)) continue;
-					campaignContactsById.set(contact.id, contact);
+				};
+				const campaignInboundContactIds = new Set<number>();
+				const campaignInboundContactEmails = new Set<string>();
+				const addCampaignInboundContacts = (
+					contacts: Array<{
+						id: number;
+						email?: string | null;
+					}>
+				) => {
+					for (const contact of contacts) {
+						campaignInboundContactIds.add(contact.id);
+						const email = contact.email?.trim().toLowerCase();
+						if (email) campaignInboundContactEmails.add(email);
+					}
+				};
+
+				addCampaignContacts(campaign.contacts);
+				addCampaignInboundContacts(campaign.contacts);
+				for (const list of campaign.userContactLists) {
+					addCampaignContacts(list.contacts);
+					addCampaignInboundContacts(list.contacts);
 				}
-			};
+				for (const list of campaign.contactLists) {
+					addCampaignContacts(list.contacts);
+					addCampaignInboundContacts(list.contacts);
+				}
 
-			addCampaignContacts(campaign.contacts);
-			for (const list of campaign.userContactLists) {
-				addCampaignContacts(list.contacts);
-			}
-			for (const list of campaign.contactLists) {
-				addCampaignContacts(list.contacts);
-			}
+				// Inbound replies drive the "New" column. Count directly-assigned rows and
+				// also old/unprocessed rows that still have campaignId=null but clearly
+				// belong to this campaign by contactId/sender. The latter covers historical
+				// webhook rows created before the webhook started persisting campaignId.
+				const newEmailCount = await countInboundMessagesForCampaign({
+					userId,
+					campaignId: campaign.id,
+					contactIds: [...campaignInboundContactIds],
+					contactEmails: [...campaignInboundContactEmails],
+				});
 
-			const campaignDataTypes = summarizeCampaignDataTypes({
-				contacts: Array.from(campaignContactsById.values()),
-				extraTexts: [
-					campaign.name,
-					...campaign.userContactLists.map((list) => list.name),
-					...campaign.contactLists.flatMap((list) => [list.name, list.title]),
-				],
-			});
-			const userContactListIds = campaign.userContactLists
-				.map((list) => list.id)
-				.filter((id): id is number => typeof id === 'number');
+				const campaignDataTypes = summarizeCampaignDataTypes({
+					contacts: Array.from(campaignContactsById.values()),
+					extraTexts: [
+						campaign.name,
+						...campaign.userContactLists.map((list) => list.name),
+						...campaign.contactLists.flatMap((list) => [list.name, list.title]),
+					],
+				});
+				const userContactListIds = campaign.userContactLists
+					.map((list) => list.id)
+					.filter((id): id is number => typeof id === 'number');
 
-			// Remove the emails and userContactLists arrays from the response, keep only counts and contactEmails
+				// Remove the emails and userContactLists arrays from the response, keep only counts and contactEmails
 
-			// eslint-disable-next-line @typescript-eslint/no-unused-vars
-			const { emails, userContactLists, contacts, contactLists, ...campaignWithoutEmails } =
-				campaign;
+				// eslint-disable-next-line @typescript-eslint/no-unused-vars
+				const { emails, userContactLists, contacts, contactLists, _count, ...campaignWithoutEmails } = campaign;
 
-			return {
-				...campaignWithoutEmails,
-				draftCount,
-				sentCount,
-				contactEmails,
-				campaignDataTypes,
-				userContactListIds,
-			};
-		});
+				return {
+					...campaignWithoutEmails,
+					draftCount,
+					sentCount,
+					newEmailCount,
+					contactEmails,
+					campaignDataTypes,
+					userContactListIds,
+				};
+			})
+		);
 
 		return apiResponse(campaignsWithCounts);
 	} catch (error) {

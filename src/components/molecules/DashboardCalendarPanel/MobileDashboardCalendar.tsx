@@ -11,9 +11,10 @@ import {
  * panel down to the viewport width and stretches its visible window to fill
  * the available height (a uniformly scaled-down desktop calendar, per Figma).
  */
-export const MobileDashboardCalendar: FC<{ persistEvents?: boolean }> = ({
-	persistEvents = false,
-}) => {
+export const MobileDashboardCalendar: FC<{
+	persistEvents?: boolean;
+	showTodayReturnButton?: boolean;
+}> = ({ persistEvents = false, showTodayReturnButton = false }) => {
 	const [area, setArea] = useState<{ width: number; height: number } | null>(null);
 	const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
@@ -61,6 +62,7 @@ export const MobileDashboardCalendar: FC<{ persistEvents?: boolean }> = ({
 						// real-date "today" highlight.
 						mockState={{ year: today.getFullYear(), monthIndex: today.getMonth() }}
 						persistEvents={persistEvents}
+						showTodayReturnButton={showTodayReturnButton}
 					/>
 				</div>
 			)}

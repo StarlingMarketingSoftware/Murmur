@@ -1786,6 +1786,7 @@ function VenuePortalPersistentMap({
 
 		if (view === 'map') {
 			return {
+				ownerRoute: 'venue',
 				isMapView: true,
 				mapViewClip: IDLE_MAP_CLIP,
 				mapViewFrameTransition: `${DASHBOARD_TO_INTERACTIVE_TRANSITION_MS}ms ${DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING}`,
@@ -1811,6 +1812,7 @@ function VenuePortalPersistentMap({
 		}
 
 		return {
+			ownerRoute: 'venue',
 			isMapView: false,
 			mapViewClip: IDLE_MAP_CLIP,
 			mapViewFrameTransition: IDLE_MAP_TRANSITION,

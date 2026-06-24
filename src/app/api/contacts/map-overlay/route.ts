@@ -212,6 +212,7 @@ export async function GET(req: NextRequest) {
 				1,
 				Math.min(4, Math.ceil((ambientTake * 1.4) / Math.max(1, cols * rows)))
 			);
+			const radioPerCellCategory = Math.min(6, perCellCategory + 2);
 
 			const contacts = await withOverlayBudgetFallback(
 				() =>
@@ -230,6 +231,16 @@ export async function GET(req: NextRequest) {
 								"longitude",
 								"venueId",
 								NULLIF(TRIM(CONCAT_WS(' ', NULLIF("firstName", ''), NULLIF("lastName", ''))), '') AS "name",
+								CASE
+									WHEN "title" ILIKE 'Radio Stations%' OR "title" ILIKE 'College Radio%' THEN 'radio'
+									WHEN "title" ILIKE 'Wedding Planners%' OR "title" ILIKE 'Wedding Venues%' THEN 'wedding'
+									WHEN "title" ILIKE 'Coffee Shops%' THEN 'coffee'
+									WHEN "title" ILIKE 'Music Festivals%' THEN 'festival'
+									WHEN "title" ILIKE 'Breweries%' OR "title" ILIKE 'Distilleries%' OR "title" ILIKE 'Wineries%' OR "title" ILIKE 'Cideries%' THEN 'winebeer'
+									WHEN "title" ILIKE 'Music Venues%' THEN 'venue'
+									WHEN "title" ILIKE 'Restaurants%' THEN 'restaurant'
+									ELSE 'general'
+								END AS category_bucket,
 								ROW_NUMBER() OVER (
 									PARTITION BY
 										FLOOR((("longitude" - ${minLng}) / ${lngSpan}) * ${cols}),
@@ -269,7 +280,10 @@ export async function GET(req: NextRequest) {
 							"venueId",
 							"name"
 						FROM ranked
-						WHERE rn <= ${perCellCategory} OR "venueId" IS NOT NULL
+						WHERE
+							rn <= ${perCellCategory}
+							OR (category_bucket = 'radio' AND rn <= ${radioPerCellCategory})
+							OR "venueId" IS NOT NULL
 						ORDER BY ("venueId" IS NOT NULL) DESC, rn ASC, stable_key ASC
 						LIMIT ${ambientTake}
 					`),

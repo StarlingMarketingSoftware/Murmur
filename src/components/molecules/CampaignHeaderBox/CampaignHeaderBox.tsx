@@ -41,6 +41,13 @@ interface CampaignHeaderBoxProps {
 	onDraftsClick?: () => void;
 	onSentClick?: () => void;
 	onFolderDropdownOpenChange?: (isOpen: boolean) => void;
+	/**
+	 * When provided, the folder dropdown switches campaigns IN CONTEXT (no page
+	 * navigation) by invoking this with the chosen campaign id. The dashboard
+	 * search surface passes this so picking a folder swaps the active campaign of
+	 * the search page instead of redirecting to the campaign detail "All" tab.
+	 */
+	onSelectCampaign?: (campaignId: number) => void;
 	width?: number;
 	/** When true, uses responsive width (matching writing box) with left-aligned content */
 	fullWidth?: boolean;
@@ -75,6 +82,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	onDraftsClick,
 	onSentClick,
 	onFolderDropdownOpenChange,
+	onSelectCampaign,
 	width = 374,
 	fullWidth = false,
 	className,
@@ -659,6 +667,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					onClose={() => setIsFolderDropdownOpen(false)}
 					chevronRef={chevronButtonRef}
 					anchorRef={headerBoxRef}
+					onSelectCampaign={onSelectCampaign}
 				/>
 			) : null}
 		</div>

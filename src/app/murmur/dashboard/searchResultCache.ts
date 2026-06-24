@@ -18,6 +18,7 @@ export type CuratedSearchArgs = {
 	lon: number | null;
 	radiusKm: number | null;
 	category: string | null;
+	area: string | null;
 	state: string | null;
 };
 
@@ -164,6 +165,7 @@ export const normalizeCuratedArgs = (args: CuratedSearchArgs): CuratedSearchArgs
 	lon: args.lon == null ? null : roundTo(args.lon, 2),
 	radiusKm: args.radiusKm == null ? null : Math.round(args.radiusKm),
 	category: args.category?.trim().toLowerCase() ?? null,
+	area: args.area?.trim().toLowerCase() ?? null,
 	state: args.state?.trim().toLowerCase() ?? null,
 });
 
@@ -182,7 +184,8 @@ export const curatedArgsEqual = (a: CuratedSearchArgs, b: CuratedSearchArgs): bo
 	a.lon === b.lon &&
 	a.radiusKm === b.radiusKm &&
 	a.category === b.category &&
-	a.state === b.state;
+	(a.area ?? null) === (b.area ?? null) &&
+	(a.state ?? null) === (b.state ?? null);
 
 export const freeTextArgsEqual = (a: FreeTextSearchArgs, b: FreeTextSearchArgs): boolean =>
 	a.q === b.q &&
@@ -198,6 +201,7 @@ export type CuratedOverrides = {
 	lon?: number | null;
 	radiusKm?: number | null;
 	category?: string | null;
+	area?: string | null;
 	state?: string | null;
 };
 
@@ -206,6 +210,7 @@ export const toCuratedArgs = (overrides?: CuratedOverrides): CuratedSearchArgs =
 	lon: overrides?.lon ?? null,
 	radiusKm: overrides?.radiusKm ?? null,
 	category: overrides?.category ?? null,
+	area: overrides?.area ?? null,
 	state: overrides?.state ?? null,
 });
 

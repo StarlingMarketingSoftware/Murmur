@@ -59,6 +59,8 @@ import {
 } from '@/utils/murmurChromeZoom';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
+import UndoIcon from '@/components/atoms/_svg/UndoIcon';
+import SelectionCountClearIcon from '@/components/atoms/_svg/SelectionCountClearIcon';
 import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
 import { BookingIcon } from '@/components/atoms/_svg/BookingIcon';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
@@ -201,7 +203,11 @@ import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/Ca
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import { HoverDescriptionProvider } from '@/contexts/HoverDescriptionContext';
-import { DashboardWriteOverlay } from './DashboardWriteOverlay';
+import {
+	DashboardWriteOverlay,
+	type DashboardDraftingStatus,
+} from './DashboardWriteOverlay';
+import { LegacyInwardExpandIcon } from './DashboardDraftingDeck';
 import { SelectionFolderMoveBanner } from './SelectionFolderMoveBanner';
 import { MapEventPopupCard, formatMapPostedEventDate } from './MapEventPopupCard';
 import { ApplyModal } from './ApplyModal';
@@ -220,6 +226,8 @@ import {
 	useGetCampaigns,
 	getCampaignDetailQueryKey,
 	fetchCampaignDetail,
+	getCampaignContactsQueryKey,
+	fetchCampaignContacts,
 } from '@/hooks/queryHooks/useCampaigns';
 import { useCampaignTopNavScheme } from '@/hooks/useCampaignTopNavScheme';
 import {
@@ -250,7 +258,11 @@ import {
 	SendQueueViewProvider,
 	useSendQueueView,
 } from '@/contexts/SendQueueViewContext';
-import { useSendQueue } from '@/hooks/queryHooks/useSendQueue';
+import {
+	SEND_QUEUE_QUERY_KEYS,
+	fetchSendQueue,
+	useSendQueue,
+} from '@/hooks/queryHooks/useSendQueue';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -284,7 +296,7 @@ const isCuratedPicksSearchQuery = (query: string): boolean =>
 
 const DEFAULT_CATEGORY_SEARCH_WHAT = 'Wine, Beer, and Spirits';
 
-const CURATED_URL_PARAM_KEYS = ['pick', 'state', 'cat', 'lat', 'lon', 'r'] as const;
+const CURATED_URL_PARAM_KEYS = ['pick', 'area', 'state', 'cat', 'lat', 'lon', 'r'] as const;
 // Distinct from CURATED_URL_PARAM_KEYS so a refresh from a free-text run can't be mistaken
 // for a curated rehydration (which would replay /api/contacts/curated-search instead of
 // restoring the cached free-text results from sessionStorage).
@@ -319,6 +331,9 @@ const MAP_POSTED_EVENT_CARD_SURFACE_STYLE = {
 // turns the mode off.
 const RADIUS_STORAGE_KEY = 'murmur_radius_mode_v1';
 const PENDING_SEARCH_STORAGE_KEY = 'murmur_pending_search';
+const SEARCH_TO_CAMPAIGN_TRANSITION_KEY = 'murmur_search_to_campaign_transition';
+const SEARCH_TO_CAMPAIGN_TRANSITION_BODY_CLASS =
+	'murmur-search-to-campaign-transitioning';
 const ALL_CONTACTS_MAP_PARAM = 'allContacts';
 
 // Bumped once per campaign-tab → search mount (the `instant=1` URL flag). The persistent Mapbox
@@ -331,6 +346,7 @@ type CuratedUrlArgs = {
 	lon: number | null;
 	radiusKm: number | null;
 	category: string | null;
+	area: string | null;
 	state: string | null;
 } | null;
 
@@ -394,6 +410,8 @@ const writeCuratedParams = (params: URLSearchParams, args: CuratedUrlArgs): void
 		return;
 	}
 	params.set('pick', '1');
+	if (args.area) params.set('area', args.area);
+	else params.delete('area');
 	if (args.state) params.set('state', args.state);
 	else params.delete('state');
 	if (args.category) params.set('cat', args.category);
@@ -539,6 +557,142 @@ const formatMapTopSearchWhereLabel = (where: string): string => {
 
 const clampNumber = (n: number, min: number, max: number): number => {
 	return Math.min(max, Math.max(min, n));
+};
+
+// Rounded white pill that houses the "X/Y selected" count on the Selection
+// sub-panel header. The trailing X clears the current selection (deselect all).
+const SelectionCountPill = ({
+	label,
+	onClear,
+	disabled = false,
+	className,
+	onUndo,
+	canUndo = false,
+}: {
+	label: string;
+	onClear: () => void;
+	disabled?: boolean;
+	className?: string;
+	onUndo?: () => void;
+	canUndo?: boolean;
+}) => {
+	const hasPositionClass = /\b(?:absolute|relative|fixed|sticky)\b/.test(
+		className ?? ''
+	);
+
+	return (
+		<div
+			className={`group ${hasPositionClass ? '' : 'relative'} flex items-center justify-center gap-[3px] ${className ?? ''}`}
+			style={{
+				width: '138px',
+				height: '20px',
+				borderRadius: '9px',
+			}}
+		>
+			{/* Undo last selection — revealed on hover of the pill. Reuses the shared
+			    UndoIcon (same glyph as the prompt-suggestions undo control). */}
+			{onUndo && (
+				<button
+					type="button"
+					aria-label="Undo last selection"
+					title="Undo last selection"
+					onClick={(e) => {
+						e.stopPropagation();
+						if (!canUndo) return;
+						onUndo();
+					}}
+					disabled={!canUndo}
+					className={`absolute left-full top-1/2 z-10 ml-[6px] flex -translate-y-1/2 items-center justify-center border-0 p-0 leading-none opacity-0 transition-opacity duration-150 group-hover:opacity-50 focus-visible:opacity-50 ${
+						canUndo ? 'cursor-pointer' : 'cursor-default'
+					}`}
+					style={{
+						width: '21px',
+						height: '20px',
+						borderRadius: '7px',
+						background: '#FFF',
+					}}
+				>
+					<UndoIcon
+						width="14"
+						height="14"
+						className={canUndo ? '' : 'opacity-40'}
+					/>
+				</button>
+			)}
+			<span
+				aria-hidden="true"
+				className="pointer-events-none absolute inset-0"
+				style={{
+					borderRadius: '9px',
+					opacity: 0.7,
+					background: '#FFF',
+				}}
+			/>
+			<span className="relative z-10 translate-x-[3px] font-inter text-[13px] font-medium text-black leading-none whitespace-nowrap">
+				{label}
+			</span>
+			<button
+				type="button"
+				aria-label="Deselect all"
+				onClick={(e) => {
+					e.stopPropagation();
+					if (disabled) return;
+					onClear();
+				}}
+				disabled={disabled}
+				className={`relative z-10 flex h-[18px] w-[18px] translate-x-[5px] flex-shrink-0 items-center justify-center border-0 bg-transparent p-0 leading-none ${
+					disabled ? 'cursor-default opacity-40' : 'cursor-pointer'
+				}`}
+			>
+				<SelectionCountClearIcon />
+			</button>
+		</div>
+	);
+};
+
+const SelectionDraftingProgressBar = ({
+	completed,
+	total,
+	isCollapsed,
+	onToggleCollapsed,
+	className,
+}: {
+	completed: number;
+	total: number;
+	isCollapsed: boolean;
+	onToggleCollapsed: () => void;
+	className?: string;
+}) => {
+	const safeTotal = Math.max(0, total);
+	const safeCompleted = safeTotal > 0 ? Math.min(completed, safeTotal) : completed;
+
+	return (
+		<div
+			className={`flex items-center ${className ?? ''}`}
+			style={{
+				height: 24,
+				backgroundColor: '#9AC3FF',
+				borderTop: '2px solid #000000',
+				borderBottom: '2px solid #000000',
+			}}
+		>
+			<div className="pl-[10px] font-inter text-[13px] font-semibold leading-none text-black">
+				Drafting
+			</div>
+			<div className="ml-[12px] font-inter text-[13px] font-medium leading-none text-black">
+				{safeCompleted}/{safeTotal}
+			</div>
+			<button
+				type="button"
+				onClick={onToggleCollapsed}
+				className="ml-auto mr-[9px] flex items-center justify-center border-0 bg-transparent p-0"
+				style={{ width: 22, height: 22 }}
+				aria-label={isCollapsed ? 'Expand drafting deck' : 'Collapse drafting deck'}
+			>
+				<LegacyInwardExpandIcon className="text-black" />
+			</button>
+		</div>
+	);
 };
 
 const MAP_RESULTS_BOTTOM_SEARCH_BOX = {
@@ -1752,8 +1906,6 @@ type MapBottomSearchBarProps = {
 	activeCategoryField?: 'what' | 'where' | null;
 	onActivate: () => void;
 	onSubmit: () => void;
-	/** When true, the submit button fires even with an empty box (Profile mode). */
-	allowEmptySubmit?: boolean;
 	onValueChange: (value: string) => void;
 	onActiveChange: (active: boolean) => void;
 	onCategoryFieldFocus?: (field: 'what' | 'where') => void;
@@ -1780,7 +1932,6 @@ const MapBottomSearchBar = memo(
 		activeCategoryField = null,
 		onActivate,
 		onSubmit,
-		allowEmptySubmit = false,
 		onValueChange,
 		onActiveChange,
 		onCategoryFieldFocus,
@@ -2185,19 +2336,19 @@ const MapBottomSearchBar = memo(
 					onActivate();
 				}}
 			>
-				{value.length === 0 && (
+				{/* Leading mode icons (profile avatar / radius pin) live in their own
+				    persistent slot so they stay visible while typing. They must NOT be
+				    nested in the placeholder block below, which unmounts the moment the
+				    box has any text. */}
+				{(shouldShowProfilePlaceholderIcon ||
+					(radiusEnabled && !isInitialDashboardSearch)) && (
 					<div
 						aria-hidden="true"
-						className="absolute flex items-center gap-[4px] font-inter text-[16px] leading-none text-black pointer-events-none"
+						className="absolute flex items-center gap-[4px] pointer-events-none"
 						style={{
 							top: 0,
-							left: isInitialDashboardSearch ? '24px' : '14px',
-							right: `${anythingRightReservedWidth}px`,
-							height: isInitialDashboardSearch
-								? `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.height - 4}px`
-								: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.textRowHeight}px`,
-							fontSize: isInitialDashboardSearch ? '16px' : undefined,
-							fontWeight: isInitialDashboardSearch ? 500 : undefined,
+							left: '14px',
+							height: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.textRowHeight}px`,
 						}}
 					>
 						{shouldShowProfilePlaceholderIcon && (
@@ -2225,6 +2376,23 @@ const MapBottomSearchBar = memo(
 								}}
 							/>
 						)}
+					</div>
+				)}
+				{value.length === 0 && (
+					<div
+						aria-hidden="true"
+						className="absolute flex items-center gap-[4px] font-inter text-[16px] leading-none text-black pointer-events-none"
+						style={{
+							top: 0,
+							left: isInitialDashboardSearch ? '24px' : `${14 + leadingIconOffset}px`,
+							right: `${anythingRightReservedWidth}px`,
+							height: isInitialDashboardSearch
+								? `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.height - 4}px`
+								: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.textRowHeight}px`,
+							fontSize: isInitialDashboardSearch ? '16px' : undefined,
+							fontWeight: isInitialDashboardSearch ? 500 : undefined,
+						}}
+					>
 						{shouldShowKeywordPlaceholder ? (
 							<>
 								<span>Search any</span>
@@ -2338,11 +2506,14 @@ const MapBottomSearchBar = memo(
 							MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotHoverBackgroundColor;
 					}}
 					onClick={() => {
-						if (value.trim().length > 0 || allowEmptySubmit) {
-							onSubmit();
-						} else {
-							onActivate();
-						}
+						// The arrow is an explicit "run the search" affordance, so it must
+						// always submit — never just open/refocus the box. An empty box is a
+						// valid submit: submitMapBottomSearchQuery routes it to a curated
+						// "For You" (or a profile-tailored / radius search when those advanced
+						// modes are on). Gating this on non-empty text was why clicking the
+						// blue button in keyword/radius mode (or with an empty box) did nothing
+						// but blur/close the box.
+						onSubmit();
 					}}
 				>
 					<MapBottomSearchArrowIcon aria-hidden="true" />
@@ -2932,8 +3103,9 @@ const DashboardContent = () => {
 	// the regular text search (the API path is different and curated metadata like
 	// `curatedCategory`/`curatedDisplayLabel` would be lost), so we persist the original args
 	// and restore via triggerCuratedSearch on refresh. The `pick=` flag identifies the mode;
-	// remaining args reuse short keys (state/cat/lat/lon/r) under that namespace.
+	// remaining args reuse short keys (area/state/cat/lat/lon/r) under that namespace.
 	const curatedModeParam = searchParams.get('pick')?.trim() === '1';
+	const curatedAreaParam = searchParams.get('area')?.trim() || '';
 	const curatedStateParam = searchParams.get('state')?.trim() || '';
 	const curatedCategoryParam = searchParams.get('cat')?.trim() || '';
 	const parseFiniteNumberParam = (key: string): number | null => {
@@ -3097,7 +3269,17 @@ const DashboardContent = () => {
 
 	const { data: fromCampaign, isPending: isPendingFromCampaign } =
 		useGetCampaign(fromCampaignIdParam);
-	const addToCampaignUserContactListId = fromCampaign?.userContactLists?.[0]?.id;
+	const [dashboardSearchCampaignIdOverride, setDashboardSearchCampaignIdOverride] =
+		useState<number | null>(null);
+	const dashboardSearchCampaignOverrideFetchId =
+		dashboardSearchCampaignIdOverride != null &&
+		String(dashboardSearchCampaignIdOverride) !== fromCampaignIdParam
+			? String(dashboardSearchCampaignIdOverride)
+			: '';
+	const {
+		data: fetchedDashboardSearchCampaignOverride,
+		isPending: isPendingDashboardSearchCampaignOverride,
+	} = useGetCampaign(dashboardSearchCampaignOverrideFetchId);
 	const { mutateAsync: editUserContactList, isPending: isPendingAddToCampaign } =
 		useEditUserContactList({ suppressToasts: true });
 
@@ -3201,6 +3383,11 @@ const DashboardContent = () => {
 	// ── Profile search mode (the bottom "Profile" pill) ────────────────────────
 	// Folds identity-derived signals (genre/area/bio) into the search. Page-level
 	// state + ref so the stable submit callback can read it, mirroring keyword/radius.
+	// Disabled by DEFAULT — a plain "Search Anything" should return unbiased
+	// results, and the user explicitly opts in via the Profile pill to personalize
+	// toward their genre/location. The Profile pill toggles it on; an active
+	// free-text rehydration (the `ftProfile` effect below) still restores whatever
+	// state that specific search actually ran with.
 	const [isProfileModeEnabled, setIsProfileModeEnabled] = useState(false);
 	const isProfileModeEnabledRef = useRef(false);
 	useEffect(() => {
@@ -3214,11 +3401,21 @@ const DashboardContent = () => {
 	// Lets submitMapBottomSearchQuery (defined before the curated handler) invoke
 	// the empty-query profile path without a forward reference or dep churn.
 	const runProfileTailoredForYouRef = useRef<() => void>(() => {});
+	// Same forward-reference trick for the other empty-query entry points so
+	// submitMapBottomSearchQuery (defined above the curated handlers) can route an
+	// empty submit to a plain curated "For You" or a curated radius search.
+	const runCuratedForYouRef = useRef<() => void>(() => {});
+	const runRadiusCuratedForYouRef = useRef<() => void>(() => {});
 
 	// ── Radius search mode (the bottom "Radius" pill) ──────────────────────────
 	const [isRadiusModeEnabled, setIsRadiusModeEnabled] = useState(false);
 	const [radiusCenter, setRadiusCenter] = useState<LatLngLiteral | null>(null);
 	const [radiusMiles, setRadiusMiles] = useState(RADIUS_DEFAULT_MILES);
+	// While a strict-radius free-text search is pending, `lastFreeTextArgs` is
+	// intentionally null (so URL/state mirroring does not label stale results as
+	// current). The map still needs an immediate signal to hide the old
+	// viewport-wide contact overlays during that pending gap.
+	const [isPendingRadiusSearchOnMap, setIsPendingRadiusSearchOnMap] = useState(false);
 	// Ref mirrors so submitMapBottomSearchQuery (a stable useCallback) reads current
 	// radius values without churning its deps on every slider tick.
 	const isRadiusModeEnabledRef = useRef(false);
@@ -3226,6 +3423,7 @@ const DashboardContent = () => {
 	const radiusMilesRef = useRef(RADIUS_DEFAULT_MILES);
 	// Cancels a stale async geolocation enable (toggled off / re-toggled mid-fetch).
 	const radiusEnableTokenRef = useRef(0);
+	const pendingRadiusSearchTokenRef = useRef(0);
 	useEffect(() => {
 		isRadiusModeEnabledRef.current = isRadiusModeEnabled;
 	}, [isRadiusModeEnabled]);
@@ -3360,6 +3558,9 @@ const DashboardContent = () => {
 			: 'search';
 	const [activeTab, setActiveTab] = useState<'search' | 'inbox'>(initialTabFromQuery);
 	const [hoveredTab, setHoveredTab] = useState<'search' | 'inbox' | null>(null);
+	// When hovering the "Searching New" status pill, preview what clicking it does
+	// by morphing the pill into the destination's "Filtering in {campaign}" look.
+	const [isSearchingPillHovered, setIsSearchingPillHovered] = useState(false);
 	const inboxView = activeTab === 'inbox';
 	type DashboardActionBarKey = 'playbook' | 'folder' | 'calendar' | 'star' | 'envelope';
 	type DashboardMapTopActionKey = Exclude<DashboardActionBarKey, 'calendar'>;
@@ -3399,6 +3600,9 @@ const DashboardContent = () => {
 		ResponsesMockState | undefined
 	>(undefined);
 	const [isCampaignFinderOpen, setIsCampaignFinderOpen] = useState(false);
+	// The calendar tab's body-portaled event-editor popup. Tracked here so the
+	// scroll-to-map gesture can stand down while it floats over the hero.
+	const [isCalendarPopupOpen, setIsCalendarPopupOpen] = useState(false);
 	const isTabPreviewingOther = hoveredTab != null && hoveredTab !== activeTab;
 	// Dashboard inbox deep-link (`?tab=inbox`) should land on the Campaigns sub-tab.
 	const [inboxSubtab, setInboxSubtab] = useState<'messages' | 'campaigns'>('campaigns');
@@ -3481,6 +3685,7 @@ const DashboardContent = () => {
 
 	const [isBelowMd, setIsBelowMd] = useState(false);
 	const [isXlDesktop, setIsXlDesktop] = useState(false);
+	const [viewportWidth, setViewportWidth] = useState(0);
 	const [viewportHeight, setViewportHeight] = useState(0);
 	// Map-view chrome width state: 'full' (today's layout), 'mid' (centered chrome
 	// re-centers over the map strip beside the right panel), 'compressed' (results
@@ -3496,6 +3701,7 @@ const DashboardContent = () => {
 
 		const handleResize = () => {
 			const width = window.innerWidth;
+			setViewportWidth(width);
 			setIsBelowMd(width < 768);
 			setIsXlDesktop(width >= 1280);
 			setViewportHeight(window.innerHeight);
@@ -4317,6 +4523,8 @@ const DashboardContent = () => {
 		activeSearchQuery,
 		tableRef,
 		selectedContacts,
+		undoLastSelection,
+		canUndoSelection,
 		isPendingBatchUpdateContacts,
 		isError,
 		error,
@@ -4342,6 +4550,7 @@ const DashboardContent = () => {
 		lastFreeTextArgs,
 		activeCampaignId,
 		activeCampaign,
+		setActiveCampaignId,
 		ensureActiveCampaign,
 	} = useDashboard({
 		derivedTitle: derivedContactTitle,
@@ -4349,6 +4558,30 @@ const DashboardContent = () => {
 		fromHome: fromHomeParam,
 		disableAutoCreateCampaign: isAddToCampaignMode,
 	});
+
+	// Dashboard search has its own campaign context. In normal mode it follows the
+	// active campaign; in add-to-campaign mode it follows `fromCampaignId`; after a
+	// folder-dropdown pick it follows the locally selected id immediately, without
+	// waiting for a navigation/remount. This is the source of truth for the search
+	// page header, counts, add-to-folder/write actions, and campaign tab prefetching.
+	const dashboardSearchCampaignOverride = useMemo(() => {
+		if (dashboardSearchCampaignIdOverride == null) return null;
+		if (fromCampaign?.id === dashboardSearchCampaignIdOverride) return fromCampaign;
+		if (activeCampaign?.id === dashboardSearchCampaignIdOverride) return activeCampaign;
+		if (fetchedDashboardSearchCampaignOverride?.id === dashboardSearchCampaignIdOverride) {
+			return fetchedDashboardSearchCampaignOverride;
+		}
+		return null;
+	}, [
+		activeCampaign,
+		dashboardSearchCampaignIdOverride,
+		fetchedDashboardSearchCampaignOverride,
+		fromCampaign,
+	]);
+	const dashboardSearchCampaign =
+		dashboardSearchCampaignOverride ?? fromCampaign ?? activeCampaign;
+	const addToCampaignUserContactListId =
+		dashboardSearchCampaign?.userContactLists?.[0]?.id;
 
 	// Profile search source: the active campaign's identity, falling back to the
 	// user's most-recently-edited identity. Mirrored to a ref so the stable submit
@@ -4373,6 +4606,15 @@ const DashboardContent = () => {
 	const [activeWriteReviewContactId, setActiveWriteReviewContactId] = useState<
 		number | null
 	>(null);
+	const [dashboardDraftingStatus, setDashboardDraftingStatus] =
+		useState<DashboardDraftingStatus>({
+			isDrafting: false,
+			activeContactId: null,
+			completedContactIds: [],
+			total: 0,
+		});
+	const [isDashboardDraftingDeckCollapsed, setIsDashboardDraftingDeckCollapsed] =
+		useState(false);
 	const [folderMoveNotice, setFolderMoveNotice] = useState<FolderMoveNotice | null>(
 		null
 	);
@@ -4380,6 +4622,13 @@ const DashboardContent = () => {
 		if (!isWriteMode) {
 			setIsWriteReviewActive(false);
 			setActiveWriteReviewContactId(null);
+			setDashboardDraftingStatus({
+				isDrafting: false,
+				activeContactId: null,
+				completedContactIds: [],
+				total: 0,
+			});
+			setIsDashboardDraftingDeckCollapsed(false);
 		}
 	}, [isWriteMode]);
 
@@ -4404,8 +4653,22 @@ const DashboardContent = () => {
 		setIsWriteMode(false);
 		setIsWriteReviewActive(false);
 		setActiveWriteReviewContactId(null);
+		setDashboardDraftingStatus({
+			isDrafting: false,
+			activeContactId: null,
+			completedContactIds: [],
+			total: 0,
+		});
+		setIsDashboardDraftingDeckCollapsed(false);
 		setSelectedContacts([]);
 	}, [setIsWriteMode, setSelectedContacts]);
+
+	const handleDashboardDraftingStatusChange = useCallback(
+		(status: DashboardDraftingStatus) => {
+			setDashboardDraftingStatus(status);
+		},
+		[]
+	);
 
 	useEffect(() => {
 		if (folderMoveNotice?.phase !== 'complete') return;
@@ -4443,6 +4706,9 @@ const DashboardContent = () => {
 	// heavy contacts list), gated behind real intent. mapCampaignId mirrors the
 	// value the tabs compute below.
 	const mapCampaignId =
+		(dashboardSearchCampaignIdOverride != null
+			? String(dashboardSearchCampaignIdOverride)
+			: '') ||
 		fromCampaignIdParam ||
 		(activeCampaignId != null ? String(activeCampaignId) : '');
 	// Per-campaign color scheme for the top navigation box + folder icon (matches
@@ -4454,21 +4720,19 @@ const DashboardContent = () => {
 	// same React Query key. null when the campaign isn't warm enough to build it —
 	// in that case we skip the contacts prefetch rather than miss the key.
 	const prefetchContactsFilter = useMemo(() => {
-		const campaignForPrefetch = fromCampaign ?? activeCampaign;
-		const lists = campaignForPrefetch?.userContactLists;
+		const lists = dashboardSearchCampaign?.userContactLists;
 		if (!lists) return null;
 		return { contactListIds: lists.map((list) => list.id) };
-	}, [fromCampaign, activeCampaign]);
+	}, [dashboardSearchCampaign]);
 
-	// The emails/inbound-emails queries key on the NUMERIC campaign id (every campaign-page
+	// Some campaign-page queries key on the NUMERIC campaign id (every campaign-page
 	// caller passes `campaign.id` / `Number(params.campaignId)`); a string id would warm a
 	// key nobody reads. null when we can't resolve a numeric id.
-	const prefetchEmailsCampaignId = useMemo(() => {
-		const campaignForPrefetch = fromCampaign ?? activeCampaign;
-		if (campaignForPrefetch?.id != null) return campaignForPrefetch.id;
+	const prefetchNumericCampaignId = useMemo(() => {
+		if (dashboardSearchCampaign?.id != null) return dashboardSearchCampaign.id;
 		const parsed = Number(mapCampaignId);
 		return mapCampaignId && Number.isFinite(parsed) ? parsed : null;
-	}, [fromCampaign, activeCampaign, mapCampaignId]);
+	}, [dashboardSearchCampaign, mapCampaignId]);
 
 	// True once contacts were added during this dashboard visit WITHOUT navigating
 	// (folder add / write-selection commit). The campaign-tab pushes below append
@@ -4479,17 +4743,103 @@ const DashboardContent = () => {
 		() => (hasAddedContactsThisVisitRef.current ? '&added=1' : ''),
 		[]
 	);
+	const [optimisticSearchToCampaignTab, setOptimisticSearchToCampaignTab] =
+		useState<'write' | 'drafts' | 'inbox' | 'sent' | 'all' | null>(null);
+	// Latch: true from the instant a search → campaign tab handoff is armed until it
+	// completes (this page unmounts) or is abandoned (the safety timeout below). The
+	// dashboard stays mounted and interactive while Next.js loads the campaign route,
+	// and the shared persistent map keeps firing THIS page's handlers. Any dashboard
+	// self-navigation (a router.replace on the dashboard URL) during that window would
+	// supersede the in-flight router.push and bounce the user back to the dashboard —
+	// which reads as "the tab I clicked got undone" when you play with the map mid-
+	// transition. While this is set, the URL-mirror effects and the map gestures that
+	// would start a new dashboard search all bail, so the campaign push always wins.
+	const isLeavingForCampaignRef = useRef(false);
+
+	// Arm the leaving-for-campaign latch for any dashboard → campaign navigation. The
+	// dashboard stays mounted on the shared persistent map while Next.js loads the
+	// campaign route, so this stands the dashboard's own URL writers down until the
+	// handoff completes (unmount) or is abandoned (the timeout self-heals control).
+	const beginCampaignHandoffLatch = useCallback(() => {
+		isLeavingForCampaignRef.current = true;
+		if (typeof window === 'undefined') return;
+		window.setTimeout(() => {
+			isLeavingForCampaignRef.current = false;
+		}, 6000);
+	}, []);
+
+	const armSearchToCampaignTransition = useCallback(
+		(tab?: 'write' | 'drafts' | 'inbox' | 'sent' | 'all') => {
+			if (typeof window === 'undefined') return;
+
+			try {
+				window.sessionStorage.setItem(
+					SEARCH_TO_CAMPAIGN_TRANSITION_KEY,
+					String(Date.now())
+				);
+			} catch {
+				// Best-effort only: navigation should never depend on transition storage.
+			}
+
+			document.body.classList.add(SEARCH_TO_CAMPAIGN_TRANSITION_BODY_CLASS);
+			if (tab) {
+				document.body.dataset.searchToCampaignTab = tab;
+			} else {
+				delete document.body.dataset.searchToCampaignTab;
+			}
+
+			// If navigation is interrupted or the route chunk is unusually slow, do not leave
+			// the dashboard chrome faded forever. The campaign page also removes this class
+			// when it mounts/reveals.
+			window.setTimeout(() => {
+				document.body.classList.remove(SEARCH_TO_CAMPAIGN_TRANSITION_BODY_CLASS);
+				delete document.body.dataset.searchToCampaignTab;
+			}, 6000);
+		},
+		[]
+	);
 
 	// The ask-box flanking nav boxes jump to the in-scope campaign's tabs, reusing
 	// the same push pattern as the map-view tab buttons below.
+	const navigateToCampaignRouteFromSearch = useCallback(
+		(tab: 'write' | 'drafts' | 'inbox' | 'sent' | 'all') => {
+			if (!mapCampaignId) return;
+			const href = `${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=${tab}${campaignReturnAddedSuffix()}`;
+
+			// Latch the handoff BEFORE any state commit so the URL-mirror effects and
+			// map-search gestures that this same click frame (or a mid-transition map
+			// interaction) could trigger see the page as "leaving" and stand down. This
+			// guarantees the campaign push below is the last navigation that runs.
+			beginCampaignHandoffLatch();
+			armSearchToCampaignTransition(tab);
+			// Commit the visual state before handing control to the App Router. This makes
+			// the tab switch feel accepted on the click frame: dashboard chrome fades and
+			// the persistent map starts easing toward the campaign framing while the route
+			// payload/chunks catch up.
+			flushSync(() => {
+				setOptimisticSearchToCampaignTab(tab);
+			});
+			window.setTimeout(() => {
+				setOptimisticSearchToCampaignTab(null);
+			}, 6000);
+			window.requestAnimationFrame(() => {
+				router.push(href);
+			});
+		},
+		[
+			armSearchToCampaignTransition,
+			beginCampaignHandoffLatch,
+			mapCampaignId,
+			router,
+			campaignReturnAddedSuffix,
+		]
+	);
+
 	const navigateToCampaignTab = useCallback(
 		(tab: 'write' | 'drafts' | 'inbox' | 'sent') => {
-			if (!mapCampaignId) return;
-			router.push(
-				`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=${tab}${campaignReturnAddedSuffix()}`
-			);
+			navigateToCampaignRouteFromSearch(tab);
 		},
-		[mapCampaignId, router, campaignReturnAddedSuffix]
+		[navigateToCampaignRouteFromSearch]
 	);
 
 	const prefetchedCampaignRoutes = useRef<Set<string>>(new Set());
@@ -4526,12 +4876,31 @@ const DashboardContent = () => {
 				staleTime: 1000 * 60 * 60, // match useGetContacts so the page won't refetch
 			});
 		}
+		// Tier 3 (medium): the page-level campaign contacts — this is the query the
+		// campaign page uses to feed the persistent map on desktop. The DraftingSection's
+		// main contact list is warmed above via the contact-list filter.
+		if (prefetchNumericCampaignId != null && isMobile === false) {
+			queryClient.prefetchQuery({
+				queryKey: getCampaignContactsQueryKey(prefetchNumericCampaignId),
+				queryFn: () => fetchCampaignContacts(prefetchNumericCampaignId),
+				staleTime: 1000 * 60 * 5,
+			});
+		}
+		// Tier 3 (light/medium): send queue count/items — this is read by both the
+		// campaign page header/map affordance and the DraftingSection.
+		if (prefetchNumericCampaignId != null) {
+			queryClient.prefetchQuery({
+				queryKey: SEND_QUEUE_QUERY_KEYS.list(prefetchNumericCampaignId),
+				queryFn: () => fetchSendQueue(prefetchNumericCampaignId),
+				staleTime: 1000 * 60 * 5,
+			});
+		}
 		// Tier 3 (heavy): the campaign's emails + inbound emails — these gate the
 		// Drafts/Sent/Inbox lists and the header counts on every campaign tab.
 		// 5-min staleTime matches the global default useGetEmails inherits, so the
 		// page reads the prefetched entry without refetching on mount.
-		if (prefetchEmailsCampaignId != null) {
-			const emailFilters = { campaignId: prefetchEmailsCampaignId };
+		if (prefetchNumericCampaignId != null) {
+			const emailFilters = { campaignId: prefetchNumericCampaignId };
 			queryClient.prefetchQuery({
 				queryKey: getEmailsListQueryKey(emailFilters),
 				queryFn: () => fetchEmailsList(emailFilters),
@@ -4543,7 +4912,13 @@ const DashboardContent = () => {
 				staleTime: 1000 * 60 * 5,
 			});
 		}
-	}, [queryClient, mapCampaignId, prefetchContactsFilter, prefetchEmailsCampaignId]);
+	}, [
+		queryClient,
+		mapCampaignId,
+		prefetchContactsFilter,
+		prefetchNumericCampaignId,
+		isMobile,
+	]);
 
 	// Fire Tier 1 immediately on hover/focus; gate Tier 2/3 behind ~120ms of sustained
 	// hover (or pointerdown) so an incidental pass-over doesn't trigger the large fetch.
@@ -4584,7 +4959,39 @@ const DashboardContent = () => {
 		if (isMapView && mapCampaignId) prefetchCampaignRoute();
 	}, [isMapView, mapCampaignId, prefetchCampaignRoute]);
 
-	// Also warm the campaign page's heavy DraftingSection async chunk on idle.
+	// Eagerly warm the campaign data once the Search map is stable, not only on
+	// hover. This makes touch/keyboard/fast-click entries benefit from the same warm
+	// React Query state as repeat transitions, while still yielding to first paint.
+	const idlePrefetchedCampaignData = useRef<Set<string>>(new Set());
+	useEffect(() => {
+		if (!isMapView || !mapCampaignId || isMobile === null) return;
+		if (idlePrefetchedCampaignData.current.has(mapCampaignId)) return;
+		idlePrefetchedCampaignData.current.add(mapCampaignId);
+
+		let didRun = false;
+		const warm = () => {
+			didRun = true;
+			prefetchCampaignData();
+		};
+		const idle = window as unknown as {
+			requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number;
+			cancelIdleCallback?: (handle: number) => void;
+		};
+		if (typeof idle.requestIdleCallback === 'function') {
+			const handle = idle.requestIdleCallback(warm, { timeout: 2000 });
+			return () => {
+				idle.cancelIdleCallback?.(handle);
+				if (!didRun) idlePrefetchedCampaignData.current.delete(mapCampaignId);
+			};
+		}
+		const timer = window.setTimeout(warm, 800);
+		return () => {
+			window.clearTimeout(timer);
+			if (!didRun) idlePrefetchedCampaignData.current.delete(mapCampaignId);
+		};
+	}, [isMapView, mapCampaignId, isMobile, prefetchCampaignData]);
+
+	// Also warm the campaign page's heavy async chunks on idle.
 	// router.prefetch above only loads the route's own chunks — the nextDynamic
 	// import inside the campaign page starts downloading only when it renders,
 	// which is exactly the first-switch wait this removes. Webpack resolves this
@@ -4595,10 +5002,17 @@ const DashboardContent = () => {
 		if (!isMapView || !mapCampaignId) return;
 		if (hasWarmedDraftingSectionChunkRef.current) return;
 		hasWarmedDraftingSectionChunkRef.current = true;
-		const warm = () =>
+		const warm = () => {
 			void import(
 				'@/app/murmur/campaign/[campaignId]/DraftingSection/DraftingSection'
 			).catch(() => undefined);
+			void import(
+				'@/components/organisms/_dialogs/IdentityDialog/IdentityDialog'
+			).catch(() => undefined);
+			void import(
+				'@/components/molecules/HybridPromptInput/HybridPromptInput'
+			).catch(() => undefined);
+		};
 		const idle = window as unknown as {
 			requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number;
 			cancelIdleCallback?: (handle: number) => void;
@@ -4647,6 +5061,10 @@ const DashboardContent = () => {
 
 	const handleMapStateSelect = useCallback(
 		(stateName: string) => {
+			// A campaign tab handoff is in flight (the dashboard is still mounted on the
+			// shared map while the campaign route loads). Starting a new state search now
+			// would update the dashboard URL and undo the tab switch — ignore it.
+			if (isLeavingForCampaignRef.current) return;
 			// In demo mode, show the free trial prompt instead of searching
 			if (isFromHomeDemoMode) {
 				setShowFreeTrialPrompt(true);
@@ -4977,14 +5395,16 @@ const DashboardContent = () => {
 
 			hasHydratedDashboardUrlRef.current = true;
 			// Fresh curated entry (e.g. arriving via the campaign "Search" tab with just `?pick=1`)
-			// won't have captured lat/lon in the URL the way a refresh-resume does. Match the
-			// "For You" submit by trying `getApproximateLocation` so the curated picks are
-			// location-aware instead of falling back to an unrestricted sample.
-			const hasCapturedCoords = curatedLatParam != null && curatedLonParam != null;
+			// won't have captured a location anchor in the URL the way a refresh-resume does.
+			// Match the "For You" submit by trying `getApproximateLocation` only when neither
+			// coords nor an explicit area/state anchor were captured.
+			const hasCapturedLocationAnchor =
+				(curatedLatParam != null && curatedLonParam != null) ||
+				Boolean(curatedAreaParam || curatedStateParam);
 			void (async () => {
 				let lat = curatedLatParam;
 				let lon = curatedLonParam;
-				if (!hasCapturedCoords) {
+				if (!hasCapturedLocationAnchor) {
 					try {
 						const loc = await getApproximateLocation();
 						lat = loc.lat;
@@ -4998,6 +5418,7 @@ const DashboardContent = () => {
 					lon,
 					radiusKm: curatedRadiusKmParam,
 					category: curatedCategoryParam || null,
+					area: curatedAreaParam || null,
 					state: curatedStateParam || null,
 				}).catch(() => undefined);
 			})();
@@ -5090,6 +5511,7 @@ const DashboardContent = () => {
 		}, 0);
 	}, [
 		activeSearchQuery,
+		curatedAreaParam,
 		curatedCategoryParam,
 		curatedLatParam,
 		curatedLonParam,
@@ -5140,11 +5562,13 @@ const DashboardContent = () => {
 
 			hasHydratedFromCampaignUrlRef.current = true;
 			markPerf('murmur:pick:rehydrate-start');
-			const hasCapturedCoords = curatedLatParam != null && curatedLonParam != null;
+			const hasCapturedLocationAnchor =
+				(curatedLatParam != null && curatedLonParam != null) ||
+				Boolean(curatedAreaParam || curatedStateParam);
 			void (async () => {
 				let lat = curatedLatParam;
 				let lon = curatedLonParam;
-				if (!hasCapturedCoords) {
+				if (!hasCapturedLocationAnchor) {
 					try {
 						const loc = await getApproximateLocation();
 						lat = loc.lat;
@@ -5159,6 +5583,7 @@ const DashboardContent = () => {
 					lon,
 					radiusKm: curatedRadiusKmParam,
 					category: curatedCategoryParam || null,
+					area: curatedAreaParam || null,
 					state: curatedStateParam || null,
 				}).catch(() => undefined);
 			})();
@@ -5244,6 +5669,7 @@ const DashboardContent = () => {
 		}, 0);
 	}, [
 		activeSearchQuery,
+		curatedAreaParam,
 		curatedCategoryParam,
 		curatedLatParam,
 		curatedLonParam,
@@ -5274,6 +5700,9 @@ const DashboardContent = () => {
 	// in the same place (normal dashboard flow).
 	useEffect(() => {
 		if (isAddToCampaignMode) return;
+		// A search → campaign tab handoff is in flight. Writing the dashboard URL now
+		// would replace the pending campaign push and bounce the user back here.
+		if (isLeavingForCampaignRef.current) return;
 		if (!hasSearched) return;
 		if (!activeSearchQuery || activeSearchQuery.trim().length === 0) return;
 
@@ -5358,6 +5787,8 @@ const DashboardContent = () => {
 		prevHasSearchedRef.current = hasSearched;
 
 		if (isAddToCampaignMode) return;
+		// Don't rewrite the dashboard URL while handing off to the campaign route.
+		if (isLeavingForCampaignRef.current) return;
 		if (!prev || hasSearched) return;
 
 		if (typeof window !== 'undefined') {
@@ -5391,6 +5822,8 @@ const DashboardContent = () => {
 	// changing behavior for the normal dashboard entry.
 	useEffect(() => {
 		if (!isAddToCampaignMode) return;
+		// Don't rewrite the dashboard URL while handing off to the campaign route.
+		if (isLeavingForCampaignRef.current) return;
 		if (!hasSearched) return;
 		if (!activeSearchQuery || activeSearchQuery.trim().length === 0) return;
 
@@ -5539,7 +5972,7 @@ const DashboardContent = () => {
 			return;
 		}
 
-		if (isPendingFromCampaign) {
+		if (isPendingFromCampaign || isPendingDashboardSearchCampaignOverride) {
 			toast('Loading campaign…');
 			return;
 		}
@@ -5596,8 +6029,10 @@ const DashboardContent = () => {
 			// Return to the campaign page we came from
 			// `added=1`: contacts actually changed — the campaign page uses it to refetch
 			// contacts/lists on arrival (pure tab-switch arrivals skip that work).
+			const returnCampaignId = dashboardSearchCampaign?.id ?? fromCampaignIdParam;
+			beginCampaignHandoffLatch();
 			router.push(
-				`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&added=1`
+				`${urls.murmur.campaign.detail(returnCampaignId)}?origin=search&added=1`
 			);
 		} catch (error) {
 			console.error('Error adding contacts to campaign:', error);
@@ -5607,10 +6042,13 @@ const DashboardContent = () => {
 		fromCampaignIdParam,
 		addToCampaignUserContactListId,
 		batchUpdateContacts,
+		beginCampaignHandoffLatch,
 		contacts,
+		dashboardSearchCampaign,
 		derivedContactTitle,
 		editUserContactList,
 		isAddToCampaignMode,
+		isPendingDashboardSearchCampaignOverride,
 		isPendingFromCampaign,
 		shouldForceApplyDerivedTitle,
 		queryClient,
@@ -5619,7 +6057,8 @@ const DashboardContent = () => {
 		setSelectedContacts,
 	]);
 
-	const activeCampaignUserContactListId = activeCampaign?.userContactLists?.[0]?.id;
+	const activeCampaignUserContactListId =
+		dashboardSearchCampaign?.userContactLists?.[0]?.id;
 
 	const handleAddSelectedToActiveCampaign = useCallback(async () => {
 		if (selectedContacts.length === 0) {
@@ -5627,7 +6066,7 @@ const DashboardContent = () => {
 			return;
 		}
 
-		if (activeCampaignId == null || !activeCampaign) {
+		if (!dashboardSearchCampaign) {
 			toast.error('No active campaign yet — search to start one.');
 			return;
 		}
@@ -5674,22 +6113,23 @@ const DashboardContent = () => {
 			]);
 
 			toast.success(
-				`${addedCount} contact${addedCount === 1 ? '' : 's'} added to ${activeCampaign.name}`
+				`${addedCount} contact${addedCount === 1 ? '' : 's'} added to ${dashboardSearchCampaign.name}`
 			);
 
+			beginCampaignHandoffLatch();
 			router.push(
-				`${urls.murmur.campaign.detail(activeCampaignId)}?origin=search&added=1`
+				`${urls.murmur.campaign.detail(dashboardSearchCampaign.id)}?origin=search&added=1`
 			);
 		} catch (error) {
 			console.error('Error adding contacts to active campaign:', error);
 			toast.error('Failed to add contacts to campaign');
 		}
 	}, [
-		activeCampaign,
-		activeCampaignId,
 		activeCampaignUserContactListId,
 		batchUpdateContacts,
+		beginCampaignHandoffLatch,
 		contacts,
+		dashboardSearchCampaign,
 		derivedContactTitle,
 		editUserContactList,
 		queryClient,
@@ -5718,7 +6158,9 @@ const DashboardContent = () => {
 		const contactIdsToAdd = [...selectedContacts];
 		const addedCount = contactIdsToAdd.length;
 		const folderName =
-			activeCampaign?.userContactLists?.[0]?.name ?? activeCampaign?.name ?? 'folder';
+			dashboardSearchCampaign?.userContactLists?.[0]?.name ??
+			dashboardSearchCampaign?.name ??
+			'folder';
 
 		setFolderMoveNotice({
 			count: addedCount,
@@ -5773,10 +6215,10 @@ const DashboardContent = () => {
 			toast.error('Failed to add contacts to folder');
 		}
 	}, [
-		activeCampaign,
 		activeCampaignUserContactListId,
 		batchUpdateContacts,
 		contacts,
+		dashboardSearchCampaign,
 		derivedContactTitle,
 		editUserContactList,
 		queryClient,
@@ -5786,8 +6228,8 @@ const DashboardContent = () => {
 	]);
 
 	// Map multi-select "Write Message" action. Opens the inline drafting panel over the map for the
-	// current selection, scoped to the campaign the search is in the context of (the one shown in
-	// the header: `fromCampaign ?? activeCampaign`). The panel opens immediately; the contacts are
+	// current selection, scoped to the campaign the search is in the context of
+	// (the one shown in the dashboard search header). The panel opens immediately; the contacts are
 	// committed to that campaign's contact list in the background (the drafting engine only drafts
 	// for campaign members, so the panel's Draft button stays gated until they land). Keeps
 	// `selectedContacts` — they are the draft target.
@@ -5797,7 +6239,7 @@ const DashboardContent = () => {
 			return;
 		}
 
-		const contextCampaign = fromCampaign ?? activeCampaign;
+		const contextCampaign = dashboardSearchCampaign;
 		const contextUclId = contextCampaign?.userContactLists?.[0]?.id;
 		if (!contextCampaign || !contextUclId) {
 			toast.error('This search isn’t linked to a campaign yet — try again in a moment.');
@@ -5852,10 +6294,9 @@ const DashboardContent = () => {
 			toast.error('Failed to add contacts to campaign');
 		}
 	}, [
-		activeCampaign,
-		fromCampaign,
 		batchUpdateContacts,
 		contacts,
+		dashboardSearchCampaign,
 		derivedContactTitle,
 		editUserContactList,
 		queryClient,
@@ -5866,17 +6307,17 @@ const DashboardContent = () => {
 
 	const primaryCtaLabel = isAddToCampaignMode
 		? 'Add to Campaign'
-		: activeCampaignId
-			? `Add to ${activeCampaign?.name ?? 'Campaign'}`
+		: dashboardSearchCampaign
+			? `Add to ${dashboardSearchCampaign.name ?? 'Campaign'}`
 			: 'Create Campaign';
 	const primaryCtaPending = isAddToCampaignMode
 		? isPendingAddToCampaign || isPendingFromCampaign
-		: activeCampaignId
+		: dashboardSearchCampaign
 			? isPendingAddToCampaign || isPendingBatchUpdateContacts
 			: isPendingCreateCampaign || isPendingBatchUpdateContacts;
 	const handlePrimaryCta = isAddToCampaignMode
 		? handleAddSelectedToCampaign
-		: activeCampaignId
+		: dashboardSearchCampaign
 			? handleAddSelectedToActiveCampaign
 			: handleCreateCampaign;
 
@@ -5906,6 +6347,11 @@ const DashboardContent = () => {
 	// from the automatic entry disengages (pick-mode landing, For You scroll-entry),
 	// which must keep their normal look.
 	const [isSearchDeselectedByUser, setIsSearchDeselectedByUser] = useState(false);
+	useEffect(() => {
+		if (!isMapView || isMobile || isSearchDeselectedByUser || !mapCampaignId) {
+			setIsSearchingPillHovered(false);
+		}
+	}, [isMapView, isMobile, isSearchDeselectedByUser, mapCampaignId]);
 	// Hover over the user-deselected (grayed) search bar reveals the green
 	// "Activate" affordance that re-engages the just-disengaged search.
 	const [isDisengagedSearchHovered, setIsDisengagedSearchHovered] = useState(false);
@@ -6042,7 +6488,29 @@ const DashboardContent = () => {
 	const isSelectMapToolActive = activeMapTool === 'select';
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
-	const dashboardMapCampaignForHeader = fromCampaign ?? activeCampaign;
+	const dashboardMapCampaignForHeader = dashboardSearchCampaign;
+	// Switch the campaign IN the dashboard search context (folder dropdown pick)
+	// WITHOUT redirecting to the campaign detail page's "All" tab. The header box
+	// reads `dashboardSearchCampaign`, so we set a local override immediately and
+	// also update whichever persisted source is currently driving the page:
+	//  - add-to-campaign mode (?fromCampaignId=…): rewrite that URL param in place
+	//    so the header re-resolves to the picked folder while staying on /dashboard.
+	//  - normal search mode: persist the new active campaign id.
+	// In both cases we also persist the active id so the choice sticks across the
+	// surface (prefetch, "Add to {campaign}", etc.).
+	const handleSelectDashboardCampaign = useCallback(
+		(nextCampaignId: number) => {
+			if (!Number.isFinite(nextCampaignId)) return;
+			setDashboardSearchCampaignIdOverride(nextCampaignId);
+			setActiveCampaignId(nextCampaignId);
+			if (fromCampaignIdParam) {
+				const params = new URLSearchParams(searchParams.toString());
+				params.set('fromCampaignId', String(nextCampaignId));
+				router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+			}
+		},
+		[fromCampaignIdParam, pathname, router, searchParams, setActiveCampaignId]
+	);
 	// Keep the send-queue view honest: once the queue drains to 0 the header pill
 	// disappears (so it can't be toggled shut manually) — close the view so its
 	// open state and chevron don't get stuck. Shares useSendQueue's query key with
@@ -6583,6 +7051,9 @@ const DashboardContent = () => {
 
 	const handleMapTopSearchReengage = useCallback(() => {
 		if (!isMapView || !hasSearched || activeSearchQuery.trim().length === 0) return;
+		// Mid-handoff to the campaign route: ignore map-search re-engagement so it can't
+		// router.replace the dashboard URL over the pending campaign push.
+		if (isLeavingForCampaignRef.current) return;
 		setIsMapSearchEngaged(true);
 		if (allContactsMapParam) {
 			const params = new URLSearchParams(searchParams.toString());
@@ -6601,6 +7072,29 @@ const DashboardContent = () => {
 		pathname,
 		router,
 		searchParams,
+	]);
+
+	// The top search bar is a single toggle: clicking anywhere on it disables an
+	// engaged search (same as the inline × affordance) and re-engages a disengaged
+	// one. The × button and "Activate" chip remain as explicit affordances, but the
+	// whole pill now drives the same on/off behavior. While results are loading the
+	// search can't be disengaged (canDisengageMapSearch is false), so a click in that
+	// window falls through to a harmless re-engage/refocus rather than no-oping.
+	const handleMapTopSearchToggle = useCallback(() => {
+		if (!isMapView || !hasSearched || activeSearchQuery.trim().length === 0) return;
+		if (canDisengageMapSearch && isMapSearchEngaged) {
+			handleEmptyMapClick();
+			return;
+		}
+		handleMapTopSearchReengage();
+	}, [
+		activeSearchQuery,
+		canDisengageMapSearch,
+		handleEmptyMapClick,
+		handleMapTopSearchReengage,
+		hasSearched,
+		isMapSearchEngaged,
+		isMapView,
 	]);
 
 	const handleMapViewportZoom = useCallback(
@@ -6671,6 +7165,9 @@ const DashboardContent = () => {
 	const handleSearchThisAreaClick = useCallback(() => {
 		const payload = lastSearchThisAreaViewportRef.current;
 		if (!payload) return;
+		// In flight to the campaign route: a new bbox search would re-mirror the
+		// dashboard URL and clobber the pending campaign navigation.
+		if (isLeavingForCampaignRef.current) return;
 
 		// Keep the same query (Why/What), but constrain the search to the exact current viewport.
 		// Provide an explicit title prefix when available (API also infers from `activeSearchQuery`).
@@ -6724,6 +7221,17 @@ const DashboardContent = () => {
 
 	const [isMapBottomSearchActive, setIsMapBottomSearchActive] = useState(false);
 	const [mapBottomSearchValue, setMapBottomSearchValue] = useState('');
+	// Last submitted "Search Anything" text that we keep visible in
+	// the bottom bar after the search collapses. When the user clicks the bar again
+	// we clear the draft field so typing starts a fresh search instead of editing
+	// the prior query.
+	const [mapBottomCommittedSearchValue, setMapBottomCommittedSearchValue] =
+		useState('');
+	// Advanced toggles should open the bottom search into its taller composing
+	// state for the current draft, even before the user has typed anything.
+	// After submit/reset, the persisted search text (if any) drives the shell.
+	const [isMapBottomSearchAdvancedDraftArmed, setIsMapBottomSearchAdvancedDraftArmed] =
+		useState(false);
 
 	// Mobile pick-flow exit (browser back / any navigation that strips the pick
 	// params): same-route navigations don't remount DashboardContent, so the search
@@ -6738,6 +7246,8 @@ const DashboardContent = () => {
 		handleResetSearch();
 		setIsMapView(false);
 		setMapBottomSearchValue('');
+		setMapBottomCommittedSearchValue('');
+		setIsMapBottomSearchAdvancedDraftArmed(false);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isMobile, isAddToCampaignMode, hasSearched, isMapView]);
 
@@ -6796,7 +7306,19 @@ const DashboardContent = () => {
 	);
 	const mapBottomSearchInputRef = useRef<HTMLTextAreaElement | null>(null);
 	const hasLoadedInitialDashboardSearchSuggestionsRef = useRef(false);
-	const isMapBottomSearchExpanded = isMapBottomSearchActive;
+	// The bottom "anything" box grows to its tall composing variant only while the
+	// user is actively drafting a search. A draft session is "armed" when the user
+	// types text or toggles Keyword/Radius, and it is disarmed the moment a search
+	// runs (or the search is reset). That way, after a search the box snaps back to
+	// the slim variant even though the submitted text stays "in mind" in the field.
+	const hasMapBottomSearchDraftText = mapBottomSearchValue.trim().length > 0;
+	const isMapBottomSearchKeywordOrRadiusMode =
+		isKeywordModeEnabled || isRadiusModeEnabled;
+	const isMapBottomSearchDraftExpanded =
+		isMapBottomSearchAdvancedDraftArmed &&
+		(hasMapBottomSearchDraftText || isMapBottomSearchKeywordOrRadiusMode);
+	const isMapBottomSearchExpanded =
+		isMapBottomSearchActive || isMapBottomSearchDraftExpanded;
 	const initialDashboardSearchSuggestions = useMemo(
 		() =>
 			buildInitialDashboardSearchSuggestions(
@@ -6946,10 +7468,50 @@ const DashboardContent = () => {
 	}, [isMapBottomSearchExpanded, mapBottomSearchValue, isMapView]);
 
 	const handleMapBottomSearchActivate = useCallback(() => {
+		// Focusing the box starts a draft session so it expands and stays expanded
+		// while the user composes (text present) or has Keyword/Radius enabled.
+		if (
+			!isMapBottomSearchAdvancedDraftArmed &&
+			mapBottomCommittedSearchValue.trim().length > 0 &&
+			mapBottomSearchValue.trim() === mapBottomCommittedSearchValue.trim()
+		) {
+			setMapBottomSearchValue('');
+		}
+		setIsMapBottomSearchAdvancedDraftArmed(true);
 		setIsMapBottomSearchActive(true);
 		window.requestAnimationFrame(() => {
 			mapBottomSearchInputRef.current?.focus();
 		});
+	}, [
+		isMapBottomSearchAdvancedDraftArmed,
+		mapBottomCommittedSearchValue,
+		mapBottomSearchValue,
+	]);
+
+	const handleMapBottomSearchActiveChange = useCallback(
+		(active: boolean) => {
+			setIsMapBottomSearchActive(active);
+			if (active) return;
+
+			// If the user clicked into the committed query but left without typing a
+			// replacement, restore the submitted text so it still "sticks" in the bar.
+			if (
+				mapBottomCommittedSearchValue.trim().length > 0 &&
+				mapBottomSearchValue.trim().length === 0
+			) {
+				setIsMapBottomSearchAdvancedDraftArmed(false);
+				setMapBottomSearchValue(mapBottomCommittedSearchValue.trim());
+			}
+		},
+		[mapBottomCommittedSearchValue, mapBottomSearchValue]
+	);
+
+	// Typing in the box arms the draft session too, so the tall variant persists on
+	// blur as long as there is text. Submitting (or resetting) disarms it, which
+	// returns the box to the slim variant with the searched text still shown.
+	const handleMapBottomSearchValueChange = useCallback((value: string) => {
+		setIsMapBottomSearchAdvancedDraftArmed(true);
+		setMapBottomSearchValue(value);
 	}, []);
 
 	// Resolve the radius center. Typed radius searches use only user-location sources
@@ -6990,12 +7552,28 @@ const DashboardContent = () => {
 	const submitMapBottomSearchQuery = useCallback(
 		async (query: string) => {
 			const q = query.trim();
+			setIsMapBottomSearchAdvancedDraftArmed(false);
 			if (!q) {
-				// Profile mode supports an empty box: run a profile-tailored "For You".
-				if (isProfileModeEnabledRef.current) runProfileTailoredForYouRef.current?.();
+				setMapBottomCommittedSearchValue('');
+				// Empty box → still run a search; the blue arrow must never be a no-op.
+				// Route by the active advanced mode (precedence: radius → profile →
+				// plain). Keyword mode with nothing typed has no literal to match, so it
+				// falls through to a plain curated "For You" too.
+				//  • Radius: a radius-bounded curated search around the chosen center, so
+				//    the circle/pin render even without a typed query.
+				//  • Profile: a profile-tailored "For You" (genre/area-biased picks).
+				//  • Otherwise: a plain curated "For You".
+				if (isRadiusModeEnabledRef.current) {
+					runRadiusCuratedForYouRef.current?.();
+				} else if (isProfileModeEnabledRef.current && !isKeywordModeEnabledRef.current) {
+					runProfileTailoredForYouRef.current?.();
+				} else {
+					runCuratedForYouRef.current?.();
+				}
 				return;
 			}
 			const keywordMode = isKeywordModeEnabledRef.current;
+			const shouldPersistBottomSearchValue = isMobile !== true;
 			// Profile overlay: derive soft signals from the resolved identity. Omitted
 			// in keyword mode (literal field matching ignores semantic/area signals).
 			const profileSignals =
@@ -7013,7 +7591,8 @@ const DashboardContent = () => {
 					: undefined;
 			mapBottomSearchInputRef.current?.blur();
 			setIsMapBottomSearchActive(false);
-			setMapBottomSearchValue('');
+			setMapBottomCommittedSearchValue(shouldPersistBottomSearchValue ? q : '');
+			setMapBottomSearchValue(shouldPersistBottomSearchValue ? q : '');
 			primeFreeTextSearch(q);
 
 			// First search of the session creates the active campaign (in parallel
@@ -7023,11 +7602,18 @@ const DashboardContent = () => {
 				void ensureActiveCampaign(q);
 			}
 
-			// Radius mode: a fresh typed query starts from the user's default location,
-			// not wherever the previous radius pin was dragged. If user location can't be
-			// resolved, fall through to the normal soft-locality path so the search still runs.
+			// Radius mode: run from the currently chosen draft center (set when the
+			// user enabled Radius) or resolve a user-location center on demand. We do
+			// not use the last dragged result pin here, so a fresh query does not
+			// accidentally inherit a prior result-center tweak. If no center can be
+			// resolved, fall through to the normal soft-locality path so the search
+			// still runs.
 			if (isRadiusModeEnabledRef.current) {
-				const center = await resolveRadiusCenter({ allowViewportFallback: false });
+				const pendingRadiusToken = (pendingRadiusSearchTokenRef.current += 1);
+				setIsPendingRadiusSearchOnMap(true);
+				const center =
+					radiusCenterRef.current ??
+					(await resolveRadiusCenter({ allowViewportFallback: false }));
 				if (center) {
 					setRadiusCenter(center);
 					triggerFreeTextSearch(q, {
@@ -7037,10 +7623,22 @@ const DashboardContent = () => {
 						strictRadius: true,
 						keywordMode,
 						...profileOverrides,
-					}).catch(() => undefined);
+					})
+						.catch(() => undefined)
+						.finally(() => {
+							if (pendingRadiusSearchTokenRef.current === pendingRadiusToken) {
+								setIsPendingRadiusSearchOnMap(false);
+							}
+						});
 					return;
 				}
+				if (pendingRadiusSearchTokenRef.current === pendingRadiusToken) {
+					setIsPendingRadiusSearchOnMap(false);
+				}
 			}
+
+			pendingRadiusSearchTokenRef.current += 1;
+			setIsPendingRadiusSearchOnMap(false);
 
 			if (keywordMode) {
 				triggerFreeTextSearch(q, { keywordMode: true }).catch(() => undefined);
@@ -7091,6 +7689,7 @@ const DashboardContent = () => {
 			resolveRadiusCenter,
 			triggerFreeTextSearch,
 			ensureActiveCampaign,
+			isMobile,
 			isAddToCampaignMode,
 			isFromHomeDemoMode,
 		]
@@ -7101,10 +7700,12 @@ const DashboardContent = () => {
 	}, [mapBottomSearchValue, submitMapBottomSearchQuery]);
 
 	const handleKeywordToggle = useCallback(() => {
+		setIsMapBottomSearchAdvancedDraftArmed(true);
 		setIsKeywordModeEnabled((enabled) => !enabled);
 	}, []);
 
 	const handleProfileToggle = useCallback(() => {
+		setIsMapBottomSearchAdvancedDraftArmed(true);
 		setIsProfileModeEnabled((enabled) => {
 			const next = !enabled;
 			// On enable with an empty profile, nudge the user to fill it out (once
@@ -7128,6 +7729,7 @@ const DashboardContent = () => {
 	const handleRadiusToggle = useCallback(() => {
 		// Disable: keep radiusCenter/miles in memory so re-enabling reuses them
 		// without re-prompting for location.
+		setIsMapBottomSearchAdvancedDraftArmed(true);
 		if (isRadiusModeEnabledRef.current) {
 			radiusEnableTokenRef.current += 1;
 			setIsRadiusModeEnabled(false);
@@ -7160,19 +7762,38 @@ const DashboardContent = () => {
 	// the user's draft/default location, not the last dragged result center.
 	const handleRadiusCenterChange = useCallback(
 		(center: LatLngLiteral) => {
-			if (!lastFreeTextArgs?.strictRadius || lastFreeTextArgs.radiusKm == null) return;
-			const q = lastFreeTextArgs.q.trim();
-			if (!q) return;
+			// In flight to the campaign route: dragging the radius pin would rerun a
+			// dashboard search and re-mirror the URL over the pending campaign push.
+			if (isLeavingForCampaignRef.current) return;
+			// Typed radius search: rerun the same free-text query at the new center.
+			if (
+				lastFreeTextArgs?.strictRadius &&
+				lastFreeTextArgs.radiusKm != null &&
+				lastFreeTextArgs.q.trim()
+			) {
+				triggerFreeTextSearch(lastFreeTextArgs.q.trim(), {
+					lat: center.lat,
+					lon: center.lng,
+					radiusKm: lastFreeTextArgs.radiusKm,
+					strictRadius: true,
+					keywordMode: lastFreeTextArgs.keywordMode,
+				}).catch(() => undefined);
+				return;
+			}
 
-			triggerFreeTextSearch(q, {
-				lat: center.lat,
-				lon: center.lng,
-				radiusKm: lastFreeTextArgs.radiusKm,
-				strictRadius: true,
-				keywordMode: lastFreeTextArgs.keywordMode,
-			}).catch(() => undefined);
+			// Empty-box radius search (curated radius): rerun the curated radius search
+			// at the dragged center so the pin stays draggable for query-less searches.
+			if (lastCuratedArgs?.radiusKm != null) {
+				setRadiusCenter(center);
+				triggerCuratedSearch({
+					lat: center.lat,
+					lon: center.lng,
+					radiusKm: lastCuratedArgs.radiusKm,
+					category: lastCuratedArgs.category ?? undefined,
+				}).catch(() => undefined);
+			}
 		},
-		[lastFreeTextArgs, triggerFreeTextSearch]
+		[lastFreeTextArgs, lastCuratedArgs, triggerFreeTextSearch, triggerCuratedSearch]
 	);
 
 	const handleInitialDashboardSearchSuggestionClick = useCallback(
@@ -7244,6 +7865,8 @@ const DashboardContent = () => {
 		mapBottomSearchInputRef.current?.blur();
 		setIsMapBottomSearchActive(false);
 		setMapBottomSearchValue('');
+		setMapBottomCommittedSearchValue('');
+		setIsMapBottomSearchAdvancedDraftArmed(false);
 		setActiveSection(null);
 
 		// "For You" has no user-typed query — pass an empty string; the campaign
@@ -7279,9 +7902,10 @@ const DashboardContent = () => {
 	]);
 
 	// Empty-box Profile search: a profile-tailored "For You". Genre tightens the
-	// curated category subset (still broad); area sets the center (state-level via
-	// the curated route, else IP/user location). Reuses the curated engine so
-	// results flow through the same rendering/cache path as the For-You tile.
+	// curated category subset (still broad); area sets the center (city-level
+	// when the profile area can be geocoded, then state-level, else IP/user
+	// location). Reuses the curated engine so results flow through the same
+	// rendering/cache path as the For-You tile.
 	const runProfileTailoredForYou = useCallback(async () => {
 		cancelMapBottomSearchFollowupPreviewClear();
 		setMapBottomSearchFollowupPreview(null);
@@ -7289,6 +7913,8 @@ const DashboardContent = () => {
 		mapBottomSearchInputRef.current?.blur();
 		setIsMapBottomSearchActive(false);
 		setMapBottomSearchValue('');
+		setMapBottomCommittedSearchValue('');
+		setIsMapBottomSearchAdvancedDraftArmed(false);
 		setActiveSection(null);
 
 		if (!isAddToCampaignMode && !isFromHomeDemoMode) {
@@ -7300,14 +7926,27 @@ const DashboardContent = () => {
 			? signals.categorySubset.join(',')
 			: undefined;
 
+		// Anchor on the user's SET location, not their current IP. Pass the raw
+		// profile area so the curated route can use the same gazetteer-backed
+		// parser as typed Search Anything ("Brooklyn, NY" stays Brooklyn, not a
+		// broad NY/IP fallback). The normalized state is only a safe fallback for
+		// area strings that contain a US state but cannot be city-geocoded.
+		const profileArea = signals.areaText?.trim() || null;
+		const profileState = extractUsStateNameFromText(profileArea);
+
 		let lat: number | null = null;
 		let lon: number | null = null;
-		try {
-			const loc = await getApproximateLocation();
-			lat = loc.lat;
-			lon = loc.lon;
-		} catch {
-			// Non-fatal: the backend can infer from request headers.
+		// Skip the IP/geo lookup entirely when the profile provides an area to
+		// anchor on — it would only add latency and, if sent as lat/lon, risk
+		// competing with the configured profile location.
+		if (!profileArea) {
+			try {
+				const loc = await getApproximateLocation();
+				lat = loc.lat;
+				lon = loc.lon;
+			} catch {
+				// Non-fatal: the backend can infer from request headers.
+			}
 		}
 
 		try {
@@ -7315,7 +7954,8 @@ const DashboardContent = () => {
 				lat: lat ?? undefined,
 				lon: lon ?? undefined,
 				category,
-				state: signals.areaText ?? undefined,
+				area: profileArea ?? undefined,
+				state: profileState ?? undefined,
 			});
 		} catch {
 			// triggerCuratedSearch owns the user-facing error toast.
@@ -7330,6 +7970,85 @@ const DashboardContent = () => {
 	useEffect(() => {
 		runProfileTailoredForYouRef.current = runProfileTailoredForYou;
 	}, [runProfileTailoredForYou]);
+	useEffect(() => {
+		runCuratedForYouRef.current = handleMapBottomForYouSubmit;
+	}, [handleMapBottomForYouSubmit]);
+
+	// Empty-box Radius search: a radius-bounded curated "For You" centered on the
+	// chosen radius center (the user's location / remembered center), using the
+	// draft slider radius. Reuses the curated engine — which already honors a hard
+	// `radiusKm` — so an empty Radius submit still draws the circle/pin and returns
+	// in-area picks even though no specific query was typed. Profile mode layers its
+	// genre/area signals on top so an empty Radius+Profile submit stays personalized.
+	const runRadiusCuratedForYou = useCallback(async () => {
+		cancelMapBottomSearchFollowupPreviewClear();
+		setMapBottomSearchFollowupPreview(null);
+		setMapBottomSearchFollowupSelection(null);
+		mapBottomSearchInputRef.current?.blur();
+		setIsMapBottomSearchActive(false);
+		setMapBottomSearchValue('');
+		setMapBottomCommittedSearchValue('');
+		setIsMapBottomSearchAdvancedDraftArmed(false);
+		setActiveSection(null);
+
+		if (!isAddToCampaignMode && !isFromHomeDemoMode) {
+			void ensureActiveCampaign('');
+		}
+
+		// Profile signals (when Profile is also on and Keyword is off) narrow the
+		// curated categories, mirroring the typed radius+profile path.
+		const profileSignals =
+			isProfileModeEnabledRef.current && !isKeywordModeEnabledRef.current
+				? deriveProfileSearchSignals(resolvedIdentityRef.current)
+				: null;
+		const category = profileSignals?.categorySubset?.length
+			? profileSignals.categorySubset.join(',')
+			: undefined;
+
+		const radiusKm = radiusMilesRef.current * MILES_TO_KM;
+		const pendingRadiusToken = (pendingRadiusSearchTokenRef.current += 1);
+		setIsPendingRadiusSearchOnMap(true);
+
+		// The circle must be drawn around an explicit center. Prefer the currently
+		// chosen draft center (the "specified area" from the Radius control); if it
+		// is not ready yet, resolve a user-location center on demand.
+		const center =
+			radiusCenterRef.current ??
+			(await resolveRadiusCenter({ allowViewportFallback: false }));
+		if (!center) {
+			if (pendingRadiusSearchTokenRef.current === pendingRadiusToken) {
+				setIsPendingRadiusSearchOnMap(false);
+			}
+			toast.error('Could not determine your location for a radius search');
+			return;
+		}
+		setRadiusCenter(center);
+
+		try {
+			await triggerCuratedSearch({
+				lat: center.lat,
+				lon: center.lng,
+				radiusKm,
+				category,
+			});
+		} catch {
+			// triggerCuratedSearch owns the user-facing error toast.
+		} finally {
+			if (pendingRadiusSearchTokenRef.current === pendingRadiusToken) {
+				setIsPendingRadiusSearchOnMap(false);
+			}
+		}
+	}, [
+		cancelMapBottomSearchFollowupPreviewClear,
+		resolveRadiusCenter,
+		triggerCuratedSearch,
+		ensureActiveCampaign,
+		isAddToCampaignMode,
+		isFromHomeDemoMode,
+	]);
+	useEffect(() => {
+		runRadiusCuratedForYouRef.current = runRadiusCuratedForYou;
+	}, [runRadiusCuratedForYou]);
 
 	const handleMapBottomSearchFollowupSelectionChange = useCallback(
 		(selection: MapBottomSearchFollowupSelection) => {
@@ -8209,9 +8928,48 @@ const DashboardContent = () => {
 		DASHBOARD_SEARCH_SELECTION_LIMIT
 	);
 
+	const dashboardDraftingCompletedContactIdSet = useMemo(
+		() => new Set(dashboardDraftingStatus.completedContactIds),
+		[dashboardDraftingStatus.completedContactIds]
+	);
+	const dashboardDraftingCompletedOrderById = useMemo(() => {
+		const order = new Map<number, number>();
+		dashboardDraftingStatus.completedContactIds.forEach((id, index) => {
+			if (!order.has(id)) order.set(id, index);
+		});
+		return order;
+	}, [dashboardDraftingStatus.completedContactIds]);
+
 	const mapPanelSelectedContacts = useMemo(
-		() => displayedMapPanelContacts.filter((c) => selectedContacts.includes(c.id)),
-		[displayedMapPanelContacts, selectedContacts]
+		() => {
+			const selected = displayedMapPanelContacts.filter((c) =>
+				selectedContacts.includes(c.id)
+			);
+			if (!dashboardDraftingStatus.isDrafting) return selected;
+
+			const activeId = dashboardDraftingStatus.activeContactId;
+			return [...selected].sort((a, b) => {
+				const aCompletedOrder = dashboardDraftingCompletedOrderById.get(a.id);
+				const bCompletedOrder = dashboardDraftingCompletedOrderById.get(b.id);
+				const aCompleted = aCompletedOrder != null;
+				const bCompleted = bCompletedOrder != null;
+				if (aCompleted && bCompleted) return aCompletedOrder - bCompletedOrder;
+				if (aCompleted) return -1;
+				if (bCompleted) return 1;
+				const aActive = activeId != null && a.id === activeId;
+				const bActive = activeId != null && b.id === activeId;
+				if (aActive && !bActive) return -1;
+				if (!aActive && bActive) return 1;
+				return 0;
+			});
+		},
+		[
+			dashboardDraftingCompletedOrderById,
+			dashboardDraftingStatus.activeContactId,
+			dashboardDraftingStatus.isDrafting,
+			displayedMapPanelContacts,
+			selectedContacts,
+		]
 	);
 	const mapPanelUnselectedContacts = useMemo(
 		() => displayedMapPanelContacts.filter((c) => !selectedContacts.includes(c.id)),
@@ -9329,6 +10087,9 @@ const DashboardContent = () => {
 	// Enhanced reset search that also clears section values
 	const handleEnhancedResetSearch = () => {
 		handleResetSearch();
+		setIsMapBottomSearchAdvancedDraftArmed(false);
+		setMapBottomCommittedSearchValue('');
+		setMapBottomSearchValue('');
 		setMapPanelShiftClickAnchor(null);
 		setWhyValue('');
 		setWhatValue('');
@@ -9393,10 +10154,17 @@ const DashboardContent = () => {
 	// lands in the full search-results UI (right/left panels) with the URL updated, just like a
 	// normal search. The top search pill is staged empty (pendingForYouReveal) until those
 	// results load, then reveals "For You". Armed only in the locked-landing state, on desktop,
-	// with no scroll-hijacking panel open, and not during an instant tab transition.
+	// not during an instant tab transition, and with no full-screen flow owning scrolling on top
+	// (a calendar event-popup floating over the hero, or the unsubscribe flow). The campaign
+	// finder and the calendar tab both stay armed even while expanded: the gesture still fires
+	// over the surrounding hero/map, and the hook bails out per-target over each panel's own
+	// scroll area (the calendar month-scroller and the campaigns table) so a wheel there scrolls
+	// that panel independently instead of yanking the user into the map. This is why we gate on
+	// isCalendarPopupOpen — not isCampaignFinderOpen / isOverflowingDashboardPanelOpen, which
+	// expanding the table or the calendar would trip and would wrongly kill the whole gesture.
 	const scrollToMapEnabled =
 		shouldLockLandingDashboardScroll &&
-		!isOverflowingDashboardPanelOpen &&
+		!isCalendarPopupOpen &&
 		!isInstantTabTransition &&
 		!isUnsubscribeFlowOpen;
 	const handleScrollCommitToMap = useCallback(() => {
@@ -9842,21 +10610,37 @@ const DashboardContent = () => {
 	const activeRadiusSearchOverlay = useMemo<
 		NonNullable<SearchResultsMapProps['radiusOverlay']> | null
 	>(() => {
-		if (!lastFreeTextArgs?.strictRadius || lastFreeTextArgs.radiusKm == null) {
-			return null;
+		// Typed radius search (free-text strict-radius): the circle comes from the
+		// committed free-text args.
+		if (
+			lastFreeTextArgs?.strictRadius &&
+			lastFreeTextArgs.radiusKm != null &&
+			lastFreeTextArgs.lat != null &&
+			lastFreeTextArgs.lon != null
+		) {
+			return {
+				center: { lat: lastFreeTextArgs.lat, lng: lastFreeTextArgs.lon },
+				radiusMiles: lastFreeTextArgs.radiusKm / MILES_TO_KM,
+			};
 		}
 
-		const committedCenter =
-			lastFreeTextArgs.lat != null && lastFreeTextArgs.lon != null
-				? { lat: lastFreeTextArgs.lat, lng: lastFreeTextArgs.lon }
-				: null;
-		if (!committedCenter) return null;
+		// Empty-box radius search (curated radius): runRadiusCuratedForYou is the only
+		// curated path that commits a hard radiusKm alongside an explicit center, so a
+		// non-null radiusKm + coords reliably identifies it. Draw the same circle/pin
+		// so an empty Radius submit reads exactly like a typed one.
+		if (
+			lastCuratedArgs?.radiusKm != null &&
+			lastCuratedArgs.lat != null &&
+			lastCuratedArgs.lon != null
+		) {
+			return {
+				center: { lat: lastCuratedArgs.lat, lng: lastCuratedArgs.lon },
+				radiusMiles: lastCuratedArgs.radiusKm / MILES_TO_KM,
+			};
+		}
 
-		return {
-			center: committedCenter,
-			radiusMiles: lastFreeTextArgs.radiusKm / MILES_TO_KM,
-		};
-	}, [lastFreeTextArgs]);
+		return null;
+	}, [lastFreeTextArgs, lastCuratedArgs]);
 
 	// Compressed chrome: the bottom sheet covers the lower half of the viewport, so
 	// camera fits must land markers in the visible top-half strip. Values are real px —
@@ -9884,6 +10668,47 @@ const DashboardContent = () => {
 			viewportHeight,
 		]
 	);
+	const optimisticSearchToCampaignCameraPadding = useMemo<
+		| { top: number; right: number; bottom: number; left: number }
+		| undefined
+	>(() => {
+		if (!optimisticSearchToCampaignTab) return undefined;
+		if (!isMapView || isMobile !== false) return undefined;
+		if (optimisticSearchToCampaignTab === 'all') return undefined;
+
+		// Match the campaign page's compact-tab map framing ahead of navigation. The
+		// destination will recompute the exact same idea after mount; this optimistic
+		// value exists only so the map begins moving on the click frame instead of after
+		// the campaign route/data are ready.
+		const CAMPAIGN_OPTIMISTIC_ZOOM = 0.85;
+		const CAMPAIGN_COMPACT_WORKSPACE_BACKDROP_WIDTH_PX = 985;
+		const CAMPAIGN_CENTERED_STAGE_COMPACT_MAX_LAYOUT_W_PX = 1317;
+		const CAMERA_PADDING_BACKOFF_PX = 550;
+		// Use the dashboard's layout-tracked viewport width instead of reaching for an
+		// undeclared/global value during render. The window fallback only covers the
+		// first pre-resize commit in the browser.
+		const viewportW =
+			viewportWidth || (typeof window !== 'undefined' ? window.innerWidth : 0);
+
+		if (!viewportW) return undefined;
+		const layoutViewportW = viewportW / CAMPAIGN_OPTIMISTIC_ZOOM;
+		if (layoutViewportW < CAMPAIGN_CENTERED_STAGE_COMPACT_MAX_LAYOUT_W_PX) {
+			return { top: 0, right: 0, bottom: 0, left: 0 };
+		}
+
+		const backdropStartCss = Math.max(
+			0,
+			layoutViewportW - CAMPAIGN_COMPACT_WORKSPACE_BACKDROP_WIDTH_PX
+		);
+		const backdropStartPx = backdropStartCss * CAMPAIGN_OPTIMISTIC_ZOOM;
+		const uiCoveredRightPx = viewportW - backdropStartPx;
+		const rightPaddingPx = Math.max(
+			0,
+			Math.round(uiCoveredRightPx - CAMERA_PADDING_BACKOFF_PX)
+		);
+
+		return { top: 0, right: rightPaddingPx, bottom: 0, left: 0 };
+	}, [isMapView, isMobile, optimisticSearchToCampaignTab, viewportWidth]);
 
 	const persistentMapProps = useMemo<SearchResultsMapProps>(
 		() => ({
@@ -9899,13 +10724,15 @@ const DashboardContent = () => {
 			// header on top, search bar at the bottom) — same insets the in-campaign
 			// mobile map used.
 			cameraPadding:
-				isMobile === true && isAddToCampaignMode
+				optimisticSearchToCampaignCameraPadding ??
+				(isMobile === true && isAddToCampaignMode
 					? { top: 170, right: 30, bottom: 120, left: 30 }
-					: compressedMapChromePadding,
+					: compressedMapChromePadding),
 			autoFitPadding:
-				isMobile === true && isAddToCampaignMode
+				optimisticSearchToCampaignCameraPadding ??
+				(isMobile === true && isAddToCampaignMode
 					? { top: 170, right: 30, bottom: 120, left: 30 }
-					: compressedMapChromePadding,
+					: compressedMapChromePadding),
 			autoSpin: shouldSpinBackgroundMap,
 			contacts: shouldShowSearchGeometryOnMap ? contactsForMap : [],
 			selectedContacts:
@@ -9967,6 +10794,7 @@ const DashboardContent = () => {
 			// Drive circle-vs-blob from the active result set, not the bottom
 			// radius toggle. Toggling the icon off only affects the next search.
 			radiusOverlay: activeRadiusSearchOverlay,
+			suppressContextualContactOverlays: isPendingRadiusSearchOnMap,
 			onRadiusCenterChange: handleRadiusCenterChange,
 			// Venue-posted opportunity markers only on the interactive map, not the globe.
 			events: isMapView && mapGrabEventsActive ? eventsForMap : [],
@@ -10017,6 +10845,7 @@ const DashboardContent = () => {
 			isMapView,
 			isMobile,
 			isCompressedMapChrome,
+			isPendingRadiusSearchOnMap,
 			isRefetchingContacts,
 			isSearchPending,
 			lockedStateNameForMap,
@@ -10027,6 +10856,7 @@ const DashboardContent = () => {
 			mapPresentation,
 			MAP_VIEW_RIGHT_PANEL_EDGE_PX,
 			mapZoomControlRequest,
+			optimisticSearchToCampaignCameraPadding,
 			searchWhatForMap,
 			selectedAreaBoundsForMap,
 			selectedContacts,
@@ -10045,6 +10875,7 @@ const DashboardContent = () => {
 
 	const persistentMapConfig = useMemo<PersistentDashboardMapConfig>(
 		() => ({
+			ownerRoute: 'dashboard',
 			isMapView,
 			mapViewClip,
 			mapViewFrameTransition,
@@ -10059,6 +10890,17 @@ const DashboardContent = () => {
 	useLayoutEffect(() => {
 		setPersistentMapConfig(persistentMapConfig);
 	}, [persistentMapConfig, setPersistentMapConfig]);
+
+	// Clear the shared map config when the dashboard unmounts so the next route never
+	// inherits the dashboard's live search props (search markers + constellation lines).
+	// The campaign page and venue portal already do this; without the symmetric cleanup
+	// here the stale dashboard config could keep painting the search overlay after
+	// navigating away (e.g. search → campaign).
+	useLayoutEffect(() => {
+		return () => {
+			setPersistentMapConfig(null);
+		};
+	}, [setPersistentMapConfig]);
 
 	// The posted-event card is laid out at a fixed 420×121 design size, but in the
 	// desktop results column it must match the result-row width. We measure the
@@ -10125,17 +10967,18 @@ const DashboardContent = () => {
 				<div className="w-full">
 					{mapPortal}
 					<MobileDashboardSearch
-						campaignName={fromCampaign?.name || 'Untitled Campaign'}
+						campaignName={dashboardSearchCampaign?.name || 'Untitled Campaign'}
 						headerContacts={dashboardMapHeaderContacts ?? []}
 						contactsCount={dashboardMapHeaderContactsCount}
 						draftCount={dashboardMapHeaderDraftCount}
 						sentCount={dashboardMapHeaderSentCount}
 						newMessageCount={mobileSearchNewMessageCount}
-						onOpenCampaignSummary={(section) =>
+						onOpenCampaignSummary={(section) => {
+							beginCampaignHandoffLatch();
 							router.push(
-								`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&summarySection=${section}${campaignReturnAddedSuffix()}`
-							)
-						}
+								`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&summarySection=${section}${campaignReturnAddedSuffix()}`
+							);
+						}}
 						queryPillLabel={
 							canDisengageMapSearch && isMapSearchEngaged
 								? mapTopSearchDisplay.label
@@ -10149,7 +10992,7 @@ const DashboardContent = () => {
 						hasNoResults={hasNoSearchResults}
 						hasSearched={hasSearched}
 						searchValue={mapBottomSearchValue}
-						onSearchValueChange={setMapBottomSearchValue}
+						onSearchValueChange={handleMapBottomSearchValueChange}
 						onSubmitSearch={handleMapBottomSearchSubmit}
 						canAddSelected={selectedContacts.length > 0}
 						onAddSelected={handleAddSelectedToCampaign}
@@ -10226,8 +11069,11 @@ const DashboardContent = () => {
 				<div className="flex-1 min-h-0 w-full" style={{ overflow: 'hidden' }}>
 					{mobileActiveTab === 'folders' && <MobileFolderCards className="h-full" />}
 					{mobileActiveTab === 'calendar' && (
-					<MobileDashboardCalendar persistEvents={isSignedIn === true} />
-				)}
+						<MobileDashboardCalendar
+							persistEvents={isSignedIn === true}
+							showTodayReturnButton
+						/>
+					)}
 					{mobileActiveTab === 'inbox' && (
 						<DashboardResponsesWidget
 							mobile
@@ -10672,7 +11518,14 @@ const DashboardContent = () => {
 		const city = contact.city || '';
 		const isWriteReviewRow =
 			isWriteReviewActive || activeWriteReviewContactId != null;
-		const writeModeSelectedRowBackground = isWriteReviewRow
+		const isDashboardDraftingRow = dashboardDraftingStatus.isDrafting;
+		const writeModeSelectedRowBackground = isDashboardDraftingRow
+			? dashboardDraftingCompletedContactIdSet.has(contact.id)
+				? '#FDDEA5'
+				: contact.id === dashboardDraftingStatus.activeContactId
+					? '#9AC3FF'
+					: '#FD8E89'
+			: isWriteReviewRow
 			? contact.id === activeWriteReviewContactId
 				? '#F8C262'
 				: '#FDDEA5'
@@ -11220,9 +12073,8 @@ const DashboardContent = () => {
 								activeCategoryField={activeMapBottomCategoryField}
 								onActivate={handleMapBottomSearchActivate}
 								onSubmit={handleMapBottomSearchSubmit}
-								allowEmptySubmit={isProfileModeEnabled}
-								onValueChange={setMapBottomSearchValue}
-								onActiveChange={setIsMapBottomSearchActive}
+								onValueChange={handleMapBottomSearchValueChange}
+								onActiveChange={handleMapBottomSearchActiveChange}
 								onCategoryFieldFocus={handleMapBottomCategoryFieldFocus}
 								onCategoryWhatChange={handleMapBottomCategoryWhatChange}
 								onCategoryWhereChange={handleMapBottomCategoryWhereChange}
@@ -12426,6 +13278,7 @@ const DashboardContent = () => {
 							(isMapView || (!isLoadingContacts && !isRefetchingContacts)) &&
 							(() => {
 								const mapTopSearchLabel = mapTopSearchDisplay.label.trim() || 'Search';
+								const isCuratedTopSearch = mapTopSearchDisplay.kind === 'curated';
 								const isMapTopSearchReengageAvailable =
 									isMapView &&
 									hasSearched &&
@@ -12436,10 +13289,13 @@ const DashboardContent = () => {
 									mapTopSearchDisplay.whereLabel.trim().length > 0;
 								// Staged reveal for the scroll-to-map entry: hold the pill empty/white
 								// until the For You results have loaded, then show the gradient pill.
-								const showCuratedPill =
-									mapTopSearchDisplay.kind === 'curated' &&
-									!pendingForYouReveal &&
-									!isSearchDeselectedByUser;
+								// If a For You search is user-disabled, keep the For You gradient chrome
+								// visible instead of collapsing to the generic white inactive search pill.
+								const showCuratedPill = isCuratedTopSearch && !pendingForYouReveal;
+								const isCuratedSearchDeselected =
+									isCuratedTopSearch && isSearchDeselectedByUser;
+								const isCuratedSearchDeselectedHovered =
+									isCuratedSearchDeselected && isDisengagedSearchHovered;
 								// When the user exits the focused search via the bar X, the bar drops
 								// to a plain white pill showing the prior query grayed out.
 								const showExitSearchButton =
@@ -12447,6 +13303,7 @@ const DashboardContent = () => {
 								// Hovering the user-deselected (grayed) bar reveals the green
 								// "Activate" affordance that re-engages the prior search.
 								const showDisengagedActivate =
+									!isCuratedTopSearch &&
 									isSearchDeselectedByUser &&
 									isDisengagedSearchHovered &&
 									isMapTopSearchReengageAvailable;
@@ -12491,20 +13348,24 @@ const DashboardContent = () => {
 															}
 															aria-label={
 																isMapTopSearchReengageAvailable
-																	? `${isMapSearchEngaged ? 'Refocus' : 'Re-engage'} ${mapTopSearchLabel} on the map`
+																	? `${
+																			canDisengageMapSearch && isMapSearchEngaged
+																				? 'Disable'
+																				: 'Re-engage'
+																		} ${mapTopSearchLabel} search`
 																	: undefined
 															}
 															tabIndex={isMapTopSearchReengageAvailable ? 0 : undefined}
 															title={
 																isMapTopSearchReengageAvailable
-																	? isMapSearchEngaged
-																		? 'Refocus this search on the map'
-																		: 'Re-engage this search on the map'
+																	? canDisengageMapSearch && isMapSearchEngaged
+																		? 'Click to disable this search'
+																		: 'Click to re-engage this search on the map'
 																	: undefined
 															}
 															onClick={
 																isMapTopSearchReengageAvailable
-																	? handleMapTopSearchReengage
+																	? handleMapTopSearchToggle
 																	: undefined
 															}
 															onKeyDown={
@@ -12513,7 +13374,7 @@ const DashboardContent = () => {
 																			if (event.key !== 'Enter' && event.key !== ' ')
 																				return;
 																			event.preventDefault();
-																			handleMapTopSearchReengage();
+																			handleMapTopSearchToggle();
 																		}
 																	: undefined
 															}
@@ -12530,7 +13391,12 @@ const DashboardContent = () => {
 															}}
 														>
 															<div
-																className={`search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black ${showExitSearchButton ? '!bg-[#A6C5F3]' : '!bg-white'} !pr-[12px] !text-black`}
+																className={`search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black ${
+																	showExitSearchButton ||
+																	isCuratedSearchDeselectedHovered
+																		? '!bg-[#A6C5F3]'
+																		: '!bg-white'
+																} !pr-[12px] !text-black`}
 																style={{
 																	accentColor: 'transparent',
 																	cursor: isMapTopSearchReengageAvailable
@@ -12556,9 +13422,31 @@ const DashboardContent = () => {
 																				: showDisengagedActivate
 																					? 'linear-gradient(90deg, #ADFFC2 0%, #EFFFF3 100%)'
 																					: '#FFFFFF',
+																		filter:
+																			isCuratedSearchDeselected &&
+																			!isCuratedSearchDeselectedHovered
+																				? 'grayscale(0.85) saturate(0.55)'
+																				: undefined,
+																		opacity:
+																			isCuratedSearchDeselected &&
+																			!isCuratedSearchDeselectedHovered
+																				? 0.68
+																				: undefined,
+																		transition:
+																			isCuratedSearchDeselected
+																				? 'opacity 150ms ease, filter 150ms ease'
+																				: undefined,
 																	}}
 																>
-																	{isSearchDeselectedByUser ? (
+																	{showCuratedPill ? (
+																		<div
+																			className={`flex h-full w-full items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-white ${
+																				showExitSearchButton ? 'pr-[40px]' : ''
+																			}`}
+																		>
+																			{mapTopSearchDisplay.label}
+																		</div>
+																	) : isSearchDeselectedByUser ? (
 																		<div className="relative flex h-full w-full min-w-0 items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-black/40">
 																			{showDisengagedActivate && (
 																				<button
@@ -12580,14 +13468,6 @@ const DashboardContent = () => {
 																		</div>
 																	) : pendingForYouReveal ? (
 																		<div className="flex h-full w-full items-center px-[24px]" />
-																	) : mapTopSearchDisplay.kind === 'curated' ? (
-																		<div
-																			className={`flex h-full w-full items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-white ${
-																				showExitSearchButton ? 'pr-[40px]' : ''
-																			}`}
-																		>
-																			{mapTopSearchDisplay.label}
-																		</div>
 																	) : isSplitCategoryTopSearch &&
 																	  mapTopSearchDisplay.kind === 'category' ? (
 																		<div className="flex h-full w-full items-center font-secondary text-[13px] font-bold leading-none text-black">
@@ -13245,11 +14125,22 @@ const DashboardContent = () => {
 									</div>
 								) : null;
 
+								// mapCampaignName resolves to the campaign currently scoping the dashboard
+								// search (or '' while still loading). Declared here so the "Searching New"
+								// pill below can preview the "Filtering in {campaign}" destination on hover.
+								const mapCampaignName = dashboardSearchCampaign?.name || '';
+
 								// Persistent "Searching New" status pill, centered directly below the
 								// map-view search bar. When scoped to a campaign, it toggles back to
 								// that campaign's All tab.
+								// On hover (and keyboard focus) the pill previews its click target by
+								// morphing into the campaign's "Filtering in {campaign}" look, so users
+								// understand they're about to leave search for the campaign view before
+								// they click.
 								const mapTopSearchingPill =
-									isMapView && !isMobile && !isSearchDeselectedByUser ? (
+									isMapView &&
+									!isMobile &&
+									(!isSearchDeselectedByUser || isCuratedTopSearch) ? (
 										<div
 											className="fixed left-0 right-0 flex justify-center pointer-events-none map-overlay-appear"
 											style={{
@@ -13266,15 +14157,18 @@ const DashboardContent = () => {
 										>
 											<button
 												type="button"
-												aria-label="Open all campaign contacts"
+												aria-label={
+													mapCampaignName
+														? `Open all contacts in ${mapCampaignName}`
+														: 'Open all campaign contacts'
+												}
 												disabled={!mapCampaignId}
 												tabIndex={mapCampaignId ? 0 : -1}
-												onClick={() =>
-													mapCampaignId &&
-													router.push(
-														`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=all${campaignReturnAddedSuffix()}`
-													)
-												}
+												onPointerEnter={() => mapCampaignId && setIsSearchingPillHovered(true)}
+												onPointerLeave={() => setIsSearchingPillHovered(false)}
+												onFocus={() => mapCampaignId && setIsSearchingPillHovered(true)}
+												onBlur={() => setIsSearchingPillHovered(false)}
+												onClick={() => navigateToCampaignRouteFromSearch('all')}
 												style={{
 													appearance: 'none',
 													border: 'none',
@@ -13287,42 +14181,103 @@ const DashboardContent = () => {
 													alignItems: 'center',
 													gap: '8px',
 													borderRadius: '9999px',
-													backgroundColor: '#B9EAF1',
+													backgroundColor:
+														isSearchingPillHovered && mapCampaignName ? '#CDEFCF' : '#B9EAF1',
 													fontFamily: 'Inter, sans-serif',
 													color: '#000000',
 													whiteSpace: 'nowrap',
 													cursor: mapCampaignId ? 'pointer' : 'default',
 													pointerEvents: mapCampaignId ? 'auto' : 'none',
+													transition: 'background-color 150ms ease',
 												}}
 											>
-												<span style={{ color: '#000', fontSize: '15px', fontWeight: 600, lineHeight: 1 }}>
-													Searching
-												</span>
-												<span
-													style={{
-														display: 'inline-flex',
-														alignItems: 'center',
-														justifyContent: 'center',
-														gap: '6px',
-														minWidth: '85px',
-														height: '19px',
-														boxSizing: 'border-box',
-														background: '#EAF6FF',
-														borderRadius: '4px',
-														padding: '0 8px',
-													}}
-												>
-													<MapBottomSearchProfileIcon
-														aria-hidden="true"
-														viewBox="0 0 28 28"
-														textColor="transparent"
-														iconColor="#3498DB"
-														style={{ width: 16, height: 16, flexShrink: 0, display: 'block' }}
-													/>
-													<span style={{ color: '#000', fontSize: '15px', fontWeight: 600, lineHeight: 1 }}>
-														New
-													</span>
-												</span>
+												{isSearchingPillHovered && mapCampaignName ? (
+													<>
+														<span
+															style={{ color: '#000', fontSize: '15px', fontWeight: 600, lineHeight: 1 }}
+														>
+															Filtering in
+														</span>
+														<span
+															style={{
+																display: 'inline-flex',
+																alignItems: 'center',
+																justifyContent: 'center',
+																gap: '6px',
+																minWidth: '85px',
+																height: '19px',
+																maxWidth: '180px',
+																boxSizing: 'border-box',
+																background: '#FFFFFF',
+																borderRadius: '4px',
+																padding: '0 8px',
+															}}
+														>
+															<svg
+																aria-hidden="true"
+																focusable="false"
+																width="23"
+																height="13"
+																viewBox="0 0 30 17"
+																fill="none"
+																xmlns="http://www.w3.org/2000/svg"
+																className="block flex-shrink-0"
+															>
+																<rect y="2" width="30" height="15" rx="1" fill={topNavScheme.icon} />
+																<path
+																	d="M0 2C0 0.89543 0.895431 0 2 0H13C14.1046 0 15 0.895431 15 2V4C15 4.55228 14.5523 5 14 5H1C0.447715 5 0 4.55228 0 4V2Z"
+																	fill={topNavScheme.icon}
+																/>
+															</svg>
+															<span
+																className="min-w-0 truncate"
+																style={{
+																	color: '#000',
+																	fontSize: '15px',
+																	fontWeight: 600,
+																	lineHeight: 1,
+																}}
+															>
+																{mapCampaignName}
+															</span>
+														</span>
+													</>
+												) : (
+													<>
+														<span
+															style={{ color: '#000', fontSize: '15px', fontWeight: 600, lineHeight: 1 }}
+														>
+															Searching
+														</span>
+														<span
+															style={{
+																display: 'inline-flex',
+																alignItems: 'center',
+																justifyContent: 'center',
+																gap: '6px',
+																minWidth: '85px',
+																height: '19px',
+																boxSizing: 'border-box',
+																background: '#EAF6FF',
+																borderRadius: '4px',
+																padding: '0 8px',
+															}}
+														>
+															<MapBottomSearchProfileIcon
+																aria-hidden="true"
+																viewBox="0 0 28 28"
+																textColor="transparent"
+																iconColor="#3498DB"
+																style={{ width: 16, height: 16, flexShrink: 0, display: 'block' }}
+															/>
+															<span
+																style={{ color: '#000', fontSize: '15px', fontWeight: 600, lineHeight: 1 }}
+															>
+																New
+															</span>
+														</span>
+													</>
+												)}
 											</button>
 										</div>
 									) : null;
@@ -13383,6 +14338,11 @@ const DashboardContent = () => {
 															defaultOpenCampaignId={fromCampaign?.id ?? activeCampaignId ?? null}
 															defaultOpenContactsFolder
 															onFinderOpenChange={setIsCampaignFinderOpen}
+															enableRowDelete
+															onSelectCampaign={(campaignId) => {
+																handleSelectDashboardCampaign(campaignId);
+																setOpenMapTopAction(null);
+															}}
 														/>
 													</div>
 												</div>
@@ -13662,9 +14622,6 @@ const DashboardContent = () => {
 								// hover-prefetch handlers wired onto these tabs below).
 								// '' — not the literal "Campaign" — while the active campaign is still
 								// resolving, so the tab below renders nothing until a real name loads.
-								const mapCampaignName =
-									fromCampaign?.name || activeCampaign?.name || '';
-
 								const campaignMapTopTabs = isMapView ? (
 									<div
 										data-slot="campaign-map-top-tabs"
@@ -13725,12 +14682,7 @@ const DashboardContent = () => {
 													onFocus={handleCampaignTabPointerEnter}
 													onPointerLeave={handleCampaignTabPointerLeave}
 													onPointerDown={handleCampaignTabPointerDown}
-													onClick={() => {
-														if (!mapCampaignId) return;
-														router.push(
-															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=write${campaignReturnAddedSuffix()}`
-														);
-													}}
+													onClick={() => navigateToCampaignRouteFromSearch('write')}
 												>
 													Write
 												</button>
@@ -13751,12 +14703,7 @@ const DashboardContent = () => {
 													onFocus={handleCampaignTabPointerEnter}
 													onPointerLeave={handleCampaignTabPointerLeave}
 													onPointerDown={handleCampaignTabPointerDown}
-													onClick={() => {
-														if (!mapCampaignId) return;
-														router.push(
-															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=all${campaignReturnAddedSuffix()}`
-														);
-													}}
+													onClick={() => navigateToCampaignRouteFromSearch('all')}
 												>
 													{mapCampaignName ? (
 														<>
@@ -13796,12 +14743,7 @@ const DashboardContent = () => {
 													onFocus={handleCampaignTabPointerEnter}
 													onPointerLeave={handleCampaignTabPointerLeave}
 													onPointerDown={handleCampaignTabPointerDown}
-													onClick={() => {
-														if (!mapCampaignId) return;
-														router.push(
-															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=inbox${campaignReturnAddedSuffix()}`
-														);
-													}}
+													onClick={() => navigateToCampaignRouteFromSearch('inbox')}
 												>
 													Inbox
 												</button>
@@ -13821,12 +14763,7 @@ const DashboardContent = () => {
 													onFocus={handleCampaignTabPointerEnter}
 													onPointerLeave={handleCampaignTabPointerLeave}
 													onPointerDown={handleCampaignTabPointerDown}
-													onClick={() => {
-														if (!mapCampaignId) return;
-														router.push(
-															`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts${campaignReturnAddedSuffix()}`
-														);
-													}}
+													onClick={() => navigateToCampaignRouteFromSearch('drafts')}
 												>
 													Drafts
 												</button>
@@ -14185,25 +15122,11 @@ const DashboardContent = () => {
 																			contactsCount={dashboardMapHeaderContactsCount}
 																			draftCount={dashboardMapHeaderDraftCount}
 																			sentCount={dashboardMapHeaderSentCount}
-																			onContactsClick={() => {
-																				if (!mapCampaignId) return;
-																				router.push(
-																					`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=write${campaignReturnAddedSuffix()}`
-																				);
-																			}}
-																			onDraftsClick={() => {
-																				if (!mapCampaignId) return;
-																				router.push(
-																					`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts${campaignReturnAddedSuffix()}`
-																				);
-																			}}
-																			onSentClick={() => {
-																				if (!mapCampaignId) return;
-																				router.push(
-																					`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=sent${campaignReturnAddedSuffix()}`
-																				);
-																			}}
+																			onContactsClick={() => navigateToCampaignRouteFromSearch('write')}
+																			onDraftsClick={() => navigateToCampaignRouteFromSearch('drafts')}
+																			onSentClick={() => navigateToCampaignRouteFromSearch('sent')}
 																			onFolderDropdownOpenChange={setIsMapCampaignHeaderDropdownOpen}
+																			onSelectCampaign={handleSelectDashboardCampaign}
 																			width={433}
 																		/>
 																	</HoverDescriptionProvider>
@@ -14221,7 +15144,11 @@ const DashboardContent = () => {
 																	className="absolute pointer-events-none map-overlay-appear"
 																			style={{
 																				zIndex: 125,
-																				top: `calc(${MAP_VIEW_SIDE_PANEL_TOP_CSS} + ${isWriteReviewActive ? 84 : 36}px)`,
+																				top: `calc(${MAP_VIEW_SIDE_PANEL_TOP_CSS} + ${
+																					isWriteReviewActive || dashboardDraftingStatus.isDrafting
+																						? 84
+																						: 36
+																				}px)`,
 																				right: 10 + 433 * MAP_VIEW_PANEL_SCALE + 13,
 																			}}
 																>
@@ -14241,6 +15168,15 @@ const DashboardContent = () => {
 																			onReviewActiveChange={setIsWriteReviewActive}
 																			onActiveReviewContactChange={
 																				handleActiveWriteReviewContactChange
+																			}
+																			onDraftingStatusChange={
+																				handleDashboardDraftingStatusChange
+																			}
+																			isDraftingDeckCollapsed={
+																				isDashboardDraftingDeckCollapsed
+																			}
+																			onDraftingDeckCollapsedChange={
+																				setIsDashboardDraftingDeckCollapsed
 																			}
 																		/>
 																	</div>
@@ -14528,13 +15464,24 @@ const DashboardContent = () => {
 																						}}
 																					>
 																						{isCompressedMapChrome ? (
-																							<div className="w-full h-[49px] flex-shrink-0 flex items-center justify-center px-4 relative">
-																								<span className="absolute left-[10px] top-1/2 -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
+																							<div
+																								className="w-full flex-shrink-0 flex items-start justify-center px-4 relative"
+																								style={{ height: dashboardDraftingStatus.isDrafting ? 73 : 49 }}
+																							>
+																								<span className="absolute left-[10px] top-[24.5px] -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
 																									Selection
 																								</span>
-																								<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
-																									{selectedContacts.length}/{mapSelectionDisplayTotal} selected
-																								</span>
+																								<SelectionCountPill
+																									className="absolute left-1/2 top-[24.5px] -translate-x-1/2 -translate-y-1/2"
+																									label={`${selectedContacts.length}/${mapSelectionDisplayTotal} selected`}
+																									disabled={selectedContacts.length === 0}
+																									onClear={() => {
+																										setMapPanelShiftClickAnchor(null);
+																										setSelectedContacts([]);
+																									}}
+																									onUndo={undoLastSelection}
+																									canUndo={canUndoSelection}
+																								/>
 																								<button
 																									type="button"
 																									onClick={() => {
@@ -14542,17 +15489,32 @@ const DashboardContent = () => {
 																										handleSelectAll(displayedMapPanelContacts);
 																									}}
 																									disabled={isMapResultsLoading}
-																									className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 translate-y-[4px] ${
+																									className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-[24.5px] -translate-y-1/2 ${
 																										isMapResultsLoading ? 'opacity-60 pointer-events-none' : 'hover:underline'
 																									}`}
 																								>
 																									{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
 																								</button>
+																								{dashboardDraftingStatus.isDrafting && (
+																									<SelectionDraftingProgressBar
+																										className="absolute left-0 right-0 bottom-0"
+																										completed={dashboardDraftingStatus.completedContactIds.length}
+																										total={dashboardDraftingStatus.total}
+																										isCollapsed={isDashboardDraftingDeckCollapsed}
+																										onToggleCollapsed={() =>
+																											setIsDashboardDraftingDeckCollapsed((prev) => !prev)
+																										}
+																									/>
+																								)}
 																							</div>
 																						) : (
 																							<div
-																								className="w-full h-[77px] flex-shrink-0 relative"
-																								style={{ backgroundColor: '#CBF0FF', borderBottom: '2px solid #000' }}
+																								className="w-full flex-shrink-0 relative"
+																								style={{
+																									height: dashboardDraftingStatus.isDrafting ? 101 : 77,
+																									backgroundColor: '#CBF0FF',
+																									borderBottom: '2px solid #000',
+																								}}
 																							>
 																								<ContactsHeaderChrome
 																									variant="campaignStops"
@@ -14561,17 +15523,25 @@ const DashboardContent = () => {
 																									offsetY={-19.5}
 																									hasData
 																									interactive
-																									onAllClick={() => mapCampaignId && router.push(`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=all${campaignReturnAddedSuffix()}`)}
-																									onWriteClick={() => mapCampaignId && router.push(`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=write${campaignReturnAddedSuffix()}`)}
-																									onSendClick={() => mapCampaignId && router.push(`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafts${campaignReturnAddedSuffix()}`)}
-																									onInboxClick={() => mapCampaignId && router.push(`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=inbox${campaignReturnAddedSuffix()}`)}
+																									onAllClick={() => navigateToCampaignRouteFromSearch('all')}
+																									onWriteClick={() => navigateToCampaignRouteFromSearch('write')}
+																									onSendClick={() => navigateToCampaignRouteFromSearch('drafts')}
+																									onInboxClick={() => navigateToCampaignRouteFromSearch('inbox')}
 																								/>
 																								<span className="absolute left-[10px] top-[58px] -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
 																									Selection
 																								</span>
-																								<span className="absolute left-1/2 top-[58px] -translate-x-1/2 -translate-y-1/2 font-inter text-[13px] font-medium text-black">
-																									{selectedContacts.length}/{mapSelectionDisplayTotal} selected
-																								</span>
+																								<SelectionCountPill
+																									className="absolute left-1/2 top-[58px] -translate-x-1/2 -translate-y-1/2"
+																									label={`${selectedContacts.length}/${mapSelectionDisplayTotal} selected`}
+																									disabled={selectedContacts.length === 0}
+																									onClear={() => {
+																										setMapPanelShiftClickAnchor(null);
+																										setSelectedContacts([]);
+																									}}
+																									onUndo={undoLastSelection}
+																									canUndo={canUndoSelection}
+																								/>
 																								<button
 																									type="button"
 																									onClick={() => {
@@ -14585,6 +15555,17 @@ const DashboardContent = () => {
 																								>
 																									{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
 																								</button>
+																								{dashboardDraftingStatus.isDrafting && (
+																									<SelectionDraftingProgressBar
+																										className="absolute left-0 right-0 top-[77px]"
+																										completed={dashboardDraftingStatus.completedContactIds.length}
+																										total={dashboardDraftingStatus.total}
+																										isCollapsed={isDashboardDraftingDeckCollapsed}
+																										onToggleCollapsed={() =>
+																											setIsDashboardDraftingDeckCollapsed((prev) => !prev)
+																										}
+																									/>
+																								)}
 																							</div>
 																						)}
 																						{folderMoveNotice && (
@@ -14976,9 +15957,10 @@ const DashboardContent = () => {
 																						}
 																						onActivate={handleMapBottomSearchActivate}
 																						onSubmit={handleMapBottomSearchSubmit}
-																						allowEmptySubmit={isProfileModeEnabled}
-																						onValueChange={setMapBottomSearchValue}
-																						onActiveChange={setIsMapBottomSearchActive}
+																						onValueChange={handleMapBottomSearchValueChange}
+																						onActiveChange={
+																							handleMapBottomSearchActiveChange
+																						}
 																						onCategoryFieldFocus={
 																							handleMapBottomCategoryFieldFocus
 																						}
@@ -15361,6 +16343,8 @@ const DashboardContent = () => {
 										<DashboardCalendarPanel
 											mockState={calendarMockState}
 											persistEvents={isSignedIn === true}
+											showTodayReturnButton
+											onPopupOpenChange={setIsCalendarPopupOpen}
 										/>
 									)}
 									{selectedActionBarIcon === 'folder' && (
@@ -15368,6 +16352,7 @@ const DashboardContent = () => {
 											mockState={campaignsMockState}
 											onMockStateChange={setCampaignsMockState}
 											onFinderOpenChange={setIsCampaignFinderOpen}
+											enableRowDelete
 										/>
 									)}
 									{selectedActionBarIcon === 'star' && (

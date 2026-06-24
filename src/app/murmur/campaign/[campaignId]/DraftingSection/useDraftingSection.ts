@@ -139,6 +139,11 @@ export interface DraftingSectionProps {
 	 */
 	onViewReady?: (view: DraftingSectionView) => void;
 	/**
+	 * Called once the active view's primary first-load content is ready enough for
+	 * the campaign page's initial reveal to fade in the main workspace.
+	 */
+	onInitialContentReady?: (view: DraftingSectionView) => void;
+	/**
 	 * When true, renders viewport-fixed overlays (like the top drafting progress bar).
 	 * This should only be enabled on the "active" DraftingSection instance during tab crossfades.
 	 */
@@ -168,6 +173,11 @@ export interface DraftingSectionProps {
 	 * Optional callback to switch the campaign page into the Sent tab.
 	 */
 	goToSent?: () => void;
+	/**
+	 * Optional callback to open the inbox left panel's Opportunities filter
+	 * (used by the star box on the Inbox/Sent bottom navigation row).
+	 */
+	onOpenOpportunities?: () => void;
 	/**
 	 * Optional request to switch the InboxSection's Inbox/Sent tab.
 	 * Used by the campaign page to route "Sent" navigation into the inbox's Sent view.
@@ -532,6 +542,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	// Live preview progress (drives the top-of-page progress bar; stays in sync with Draft Preview playback)
 	const [livePreviewDraftNumber, setLivePreviewDraftNumber] = useState(0);
 	const [livePreviewTotal, setLivePreviewTotal] = useState(0);
+	const [livePreviewCompletedContactIds, setLivePreviewCompletedContactIds] =
+		useState<number[]>([]);
 	const livePreviewDraftNumberRef = useRef(0);
 	const livePreviewTotalRef = useRef(0);
 	const livePreviewIsShowingFinalPlaceholderRef = useRef(false);
@@ -677,6 +689,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				stopLivePreviewTimers();
 				// Ensure we render the full message before moving on / hiding.
 				setLivePreviewMessage(full);
+				setLivePreviewCompletedContactIds((prev) =>
+					prev.includes(next.contactId) ? prev : [...prev, next.contactId]
+				);
 				const transitionDelayMs =
 					livePreviewQueueRef.current.length > 0
 						? LIVE_PREVIEW_QUEUED_TRANSITION_DELAY_MS
@@ -820,6 +835,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		setLivePreviewMessage('Drafting...');
 		setLivePreviewDraftNumber(0);
 		setLivePreviewTotal(nextTotal);
+		setLivePreviewCompletedContactIds([]);
 		livePreviewDraftNumberRef.current = 0;
 		livePreviewTotalRef.current = nextTotal;
 		livePreviewFullTextRef.current = '';
@@ -883,7 +899,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		[beginLivePreviewBatch, isLivePreviewVisible, livePreviewTotal]
 	);
 
-	const { data: signatures } = useGetSignatures();
+	const { data: signatures, isFetched: isSignaturesFetched } = useGetSignatures();
 
 	const form = useForm<DraftingFormValues>({
 		resolver: zodResolver(draftingFormSchema),
@@ -3318,7 +3334,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 	}, [signatures, form]);
 
 	useEffect(() => {
-		if (campaign && form && signatures?.length > 0 && isFirstLoad) {
+		if (campaign && form && isSignaturesFetched && isFirstLoad) {
 			// Check if campaign has the old default blocks (introduction, research, action)
 			const campaignBlocks = campaign.hybridBlockPrompts as HybridBlockPrompt[];
 			const hasOldDefaults =
@@ -3384,7 +3400,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 
 			setIsFirstLoad(false);
 		}
-	}, [campaign, form, signatures, isFirstLoad, saveCampaign]);
+	}, [campaign, form, signatures, isSignaturesFetched, isFirstLoad, saveCampaign]);
 
 	// Update signature when identity changes
 	useEffect(() => {
@@ -3595,6 +3611,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		livePreviewSubject,
 		livePreviewDraftNumber,
 		livePreviewTotal,
+		livePreviewCompletedContactIds,
 		scoreFullAutomatedPrompt,
 		critiqueManualEmailText,
 	};

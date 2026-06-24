@@ -758,6 +758,44 @@ export const MAP_WORLD_LAND_LOCAL_DATA_URL = '/maps/world-land-110m.json';
 // so deeper local tiles would be pure worker memory/CPU waste.
 export const MAP_WORLD_LAND_LOCAL_MAX_ZOOM = 6;
 
+// ── Sequential boot ladder backstops ─────────────────────────────────────────
+// The cold-start reveal is staged (land → basemap/roads → boundaries → pins) so
+// the map never drops state markers before the land beneath them exists. Each
+// downstream phase waits on its upstream phase, but with a wall-clock backstop so
+// a slow/failed upstream (offline tiles, non-US viewport with no state geometry)
+// can never permanently strand the phases below it. These are the backstops.
+//
+// Basemap-settle backstop: how long we wait for Mapbox to report the composite
+// basemap tiles (roads/landcover/water) as fully loaded before advancing anyway.
+export const MAP_BOOT_BASEMAP_SETTLE_BACKSTOP_MS = 2500;
+// Contacts-gate backstop: how long after the basemap settles we wait for the
+// state-boundary phase before opening the contact-pin stream regardless.
+export const MAP_BOOT_CONTACTS_GATE_BACKSTOP_MS = 1200;
+
+// ── Viewport "settle" debounce (Airbnb/Zillow-style data loading) ────────────
+// Competitor maps such as Airbnb/Zillow feel clean because their marker data
+// behaves as if it is loaded for the *settled* camera, not for every intermediate
+// camera frame. We mirror that interaction model by recomputing the visible bounds
+// and streaming markers only after the camera has gone quiet. This avoids the
+// "load → reload → load again" thrash that happens when wheel zoom, inertial
+// flings, and trackpad pans emit a burst of move/zoom end events.
+//
+// The viewport-derived fetch windows (contact pins, booking extras, promotion
+// overlay, ambient atlas) are recomputed only after the camera has been quiet for
+// this long. Cheap, purely-visual work (zoom-control sync,
+// "search this area" CTA) keeps running immediately on `moveend` so the chrome
+// still feels live — only the network-bound marker fetches are settle-gated.
+//
+// ~280ms matches the feel of Airbnb/Zillow: short enough that a deliberate pan
+// loads almost instantly once you stop, long enough that a multi-flick scrub or
+// continuous wheel zoom collapses into a single fetch at the end.
+export const MAP_VIEWPORT_SETTLE_DEBOUNCE_MS = 280;
+// A long stream of short, chained gestures (wheel zoom ticks, trackpad pan
+// segments) can keep resetting the settle timer. This ceiling lets the next
+// completed segment refresh promptly instead of waiting forever for perfect quiet.
+// A true click-drag still refreshes at drag end, which is the desired settled view.
+export const MAP_VIEWPORT_SETTLE_MAX_WAIT_MS = 900;
+
 // Performance: the `within` filter is helpful when zoomed out (to hide Canada/Mexico labels/roads),
 // but it adds overhead at high zoom where there are many more road/label features.
 // Only apply the US-only basemap clipping up to this zoom level.
@@ -920,6 +958,15 @@ export const MARKER_CONSTELLATION_MAX_EDGES = 140;
 export const MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM = MAP_DEFAULT_ZOOM;
 export const MARKER_CONSTELLATION_MID_COMPOSE_ZOOM = 5.8;
 export const MARKER_CONSTELLATION_DETAIL_COMPOSE_ZOOM = 7.4;
+// Zoom range over which the constellation linework/nodes fade in as you zoom in
+// (and out as you zoom further out). Previously hardcoded as 3.6→0 / 4.2→full in
+// mapExpressions.ts, which hid the entire constellation below ~3.6 — exactly the
+// continental/globe distance where the campaign map otherwise collapses contact
+// markers into a featureless white glow blob. Lowering the floor to globe zoom
+// keeps the simplified "wide" constellation visible all the way out, so the
+// zoomed-out view reads as a small constellation instead of a blob.
+export const MARKER_CONSTELLATION_ZOOM_FADE_END_ZOOM = 2.4;
+export const MARKER_CONSTELLATION_ZOOM_FADE_START_ZOOM = 2.95;
 export const MARKER_CONSTELLATION_MIN_EDGE_PX = 18;
 export const MARKER_CONSTELLATION_MAX_EDGE_PX = 185;
 export const MARKER_CONSTELLATION_FALLBACK_GROUP_PX = 230;
@@ -1091,6 +1138,16 @@ export const RESULT_DOT_STROKE_WEIGHT_MAX_PX = 3;
 export const RESULT_DOT_STROKE_COLOR_DEFAULT = '#FFFFFF';
 export const RESULT_DOT_STROKE_COLOR_SELECTED = '#15C948';
 export const RESULT_DOT_GLOW_COLOR = '#FFFFFF';
+// Far-zoom fade for the soft white per-dot glow halo. At globe/continental
+// distance every result dot is only a few pixels, so the blurred white halos
+// stack and alpha-composite into a featureless white blob (visible on the
+// campaign category view, where the colored status heatmap is hidden). Fade the
+// glow halo out over this range so the marker constellation — not a white cloud
+// — is what reads when zoomed out. The crisp dots themselves are governed by the
+// inConstellation fade and stay put; only the soft halo is attenuated here.
+export const RESULT_DOT_GLOW_ZOOM_FADE_END_ZOOM = 3.0;
+// The fade-out ramp's upper anchor is the existing curated dot-fade stop
+// (CURATED_DOT_FADE_END_ZOOM = 3.6), so 3.0 → 3.6 is the halo's fade window.
 export const RESULT_DOT_GLOW_RADIUS_MIN_PX = 8;
 export const RESULT_DOT_GLOW_RADIUS_MAX_PX = 16;
 export const RESULT_DOT_GLOW_OPACITY = 0.72;
@@ -1195,7 +1252,52 @@ export const RESULT_DOT_GLOW_BLUR = 0.86;
 // overlapping discs sum toward saturation over clusters (the heatmap read).
 // Tinted per active tab; only visible in `campaignMarkerMode === 'status'`.
 export const CAMPAIGN_HEATMAP_GLOW_BLUR = 1.25; // very soft, near-Gaussian falloff
-export const CAMPAIGN_HEATMAP_GLOW_OPACITY_MAX = 0.22; // per-disc; overlaps build up
+// Per-disc opacity. Overlapping discs alpha-composite, so the effective opacity
+// over a cluster is 1-(1-a)^n — it climbs toward full saturation fast. Kept
+// deliberately low so even very dense clusters stay a faint, subtle wash
+// instead of a dark, smudgy blob: a single contact reads as a soft tint, while
+// a "ton of contacts" still only builds to a gentle, translucent cloud.
+//
+// This is the per-disc opacity for SPARSE selections (before density scaling
+// kicks in), so it has to be high enough that a lone contact's glow is clearly
+// visible. The density guardrail below scales it back down for big clusters so a
+// "ton of contacts" never saturates — meaning we can keep this base value
+// comfortably readable without making dense views too intense.
+export const CAMPAIGN_HEATMAP_GLOW_OPACITY_MAX = 0.15; // per-disc before density scaling
+// Extra density guardrail for campaign views with many glowing contacts. The
+// circle layer alpha-composites every overlapping disc, so a pure fixed opacity
+// still becomes dark when dozens of contacts stack up. Start backing off the
+// per-disc opacity once the heatmap has a meaningful cluster and keep very large
+// sets in a faint, airy range instead of allowing them to saturate.
+// The min is tuned so the dense effective per-disc opacity (base × min ≈ 0.013)
+// matches the prior gentle dense wash, while the higher base above restores
+// sparse visibility.
+export const CAMPAIGN_HEATMAP_DENSITY_SCALE_START_COUNT = 10;
+export const CAMPAIGN_HEATMAP_DENSITY_SCALE_FULL_COUNT = 90;
+export const CAMPAIGN_HEATMAP_DENSITY_SCALE_MIN = 0.085;
+// Far-zoom fade for the campaign heatmap glow. Zooming out past the continental
+// view, every contact collapses into a few screen pixels, so the soft blurred
+// discs alpha-composite into one saturated white/colored blob that swallows the
+// map (the "weird white blob when zoomed out" report). Fade the whole glow out
+// over this range so that at globe distance the simplified marker constellation
+// is what remains, not a featureless cloud. Kept just below the constellation's
+// own fade window so the two cross over cleanly: the blob dissolves as the
+// constellation linework takes over.
+export const CAMPAIGN_HEATMAP_ZOOM_FADE_END_ZOOM = 3.0;
+export const CAMPAIGN_HEATMAP_ZOOM_FADE_START_ZOOM = 3.9;
+// Wraps a per-disc opacity expression in a top-level zoom interpolate that holds
+// the supplied opacity above START and fades it to 0 below END. Mapbox only
+// allows `['zoom']` at the top level of a step/interpolate, so the fade has to
+// be the outermost expression rather than a nested multiplier.
+export const buildCampaignHeatmapZoomFadedOpacity = (opacity: any): any => [
+	'interpolate',
+	['linear'],
+	['zoom'],
+	CAMPAIGN_HEATMAP_ZOOM_FADE_END_ZOOM,
+	0,
+	CAMPAIGN_HEATMAP_ZOOM_FADE_START_ZOOM,
+	opacity,
+];
 // Crossfade duration when the heatmap set (or tint) changes.
 export const CAMPAIGN_HEATMAP_FADE_MS = 320;
 // Radius (px) interpolated by zoom: large at globe distance (a contact is only

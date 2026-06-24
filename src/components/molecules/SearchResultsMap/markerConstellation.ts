@@ -1129,9 +1129,96 @@ export const buildBeautyMarkerConstellationFormation = (
 	);
 	const nodes = [...wide.nodes, ...mid.nodes, ...detail.nodes];
 	const lowZoomNodeIds = new Set<number>();
-	for (const node of nodes) lowZoomNodeIds.add(node.id);
+	// At the far-zoom/continental floor we intentionally keep only the sparse
+	// wide-level anchors "protected" from the base-dot fade. Mid/detail anchors
+	// are still available in the constellation source and fade in with zoom, but
+	// they no longer keep their underlying contact dots visible at globe distance.
+	// That is what makes the zoomed-out view collapse to a small constellation
+	// instead of a dense cluster of preserved marker dots.
+	const lowZoomNodes =
+		wide.nodes.length > 0 ? wide.nodes : mid.nodes.length > 0 ? mid.nodes : detail.nodes;
+	for (const node of lowZoomNodes) lowZoomNodeIds.add(node.id);
 
 	return { edges, nodes, lowZoomNodeIds };
+};
+
+// Build nodes from a selected category/status anchor subset, not only from edge
+// endpoints, so a dense/fragmented campaign still shows a few anchor dots even
+// when no clean connecting lines can be drawn between those anchors.
+const buildCategoryConstellationNodesForSelection = (
+	level: MarkerConstellationLevel,
+	selected: MarkerConstellationPoint[],
+	edges: MarkerConstellationEdge[]
+): MarkerConstellationNode[] => {
+	const rankById = new Map<number, number>();
+	for (const edge of edges) {
+		const existingFrom = rankById.get(edge.fromId);
+		if (existingFrom == null || edge.rank < existingFrom) rankById.set(edge.fromId, edge.rank);
+		const existingTo = rankById.get(edge.toId);
+		if (existingTo == null || edge.rank < existingTo) rankById.set(edge.toId, edge.rank);
+	}
+
+	const opacityScale = level === 'wide' ? 0.88 : level === 'mid' ? 0.78 : 0.62;
+	return selected
+		.slice()
+		.sort((a, b) => a.id - b.id)
+		.map((point) => ({
+			id: point.id,
+			level,
+			// Unconnected anchors should still render as dots; give them the lowest
+			// rank so connected anchors remain visually dominant when linework exists.
+			rank: rankById.get(point.id) ?? 1,
+			opacityScale,
+		}));
+};
+
+// Build a single category/status level: pick a spatially-spread subset sized to
+// the level, then connect it with category/status-aware edges (falling back to a
+// sparse global graph when the subset's groups are too fragmented to link).
+const buildCategoryConstellationLevel = (
+	allPoints: MarkerConstellationPoint[],
+	seed: string,
+	level: MarkerConstellationLevel,
+	minSeparationPx: number
+): {
+	edges: MarkerConstellationEdge[];
+	nodes: MarkerConstellationNode[];
+	selectedIds: Set<number>;
+} => {
+	if (allPoints.length < 2) {
+		return { edges: [], nodes: [], selectedIds: new Set<number>() };
+	}
+
+	const targetCount = getBeautyConstellationTargetCount(allPoints, level);
+	const selected =
+		allPoints.length <= targetCount
+			? allPoints.slice().sort((a, b) => a.id - b.id)
+			: selectBeautyConstellationPoints(
+					allPoints,
+					`${seed}|${level}`,
+					targetCount,
+					minSeparationPx
+				);
+	if (selected.length < 2) {
+		return { edges: [], nodes: [], selectedIds: new Set<number>() };
+	}
+
+	let edgeSeeds = buildCategoryMarkerConstellationEdges(selected, `${seed}|${level}|category`);
+	// Category/status grouping usually connects within each semantic group. A
+	// spread subset (or singleton groups) can yield no edges, so fall back to a
+	// sparse global graph that still links the anchors into a constellation.
+	if (edgeSeeds.length === 0) {
+		edgeSeeds = buildSparseMarkerConstellationEdges(
+			selected,
+			`${seed}|${level}|sparse`,
+			CATEGORY_MARKER_CONSTELLATION_MAX_EDGE_PX
+		);
+	}
+
+	const edges = annotateMarkerConstellationEdges(level, selected, edgeSeeds);
+	const nodes = buildCategoryConstellationNodesForSelection(level, selected, edges);
+	const selectedIds = new Set<number>(selected.map((point) => point.id));
+	return { edges, nodes, selectedIds };
 };
 
 export const buildCategoryMarkerConstellationFormation = (
@@ -1142,11 +1229,35 @@ export const buildCategoryMarkerConstellationFormation = (
 		return { edges: [], nodes: [], lowZoomNodeIds: new Set() };
 	}
 
-	const edgeSeeds = buildCategoryMarkerConstellationEdges(points, seed);
-	const edges = annotateMarkerConstellationEdges('mid', points, edgeSeeds);
-	const nodes = buildMarkerConstellationNodesForLevel('mid', edges);
+	// Three tiers (wide / mid / detail), mirroring the dashboard search map so the
+	// campaign map collapses to a small spread of anchor dots at globe/continental
+	// distance instead of preserving every contact (which alpha-composited into a
+	// featureless white "smudge" when fully zoomed out). The wide tier is a tiny
+	// subset that stays visible at far zoom; mid/detail fade in as you zoom, and
+	// the real base dots all return by their own non-constellation fade band.
+	const wide = buildCategoryConstellationLevel(points, `${seed}|wide`, 'wide', 58);
+	const mid = buildCategoryConstellationLevel(points, `${seed}|mid`, 'mid', 38);
+	const detail = buildCategoryConstellationLevel(points, `${seed}|detail`, 'detail', 24);
+
+	const edges = [...wide.edges, ...mid.edges, ...detail.edges].slice(
+		0,
+		MARKER_CONSTELLATION_MAX_EDGES * 2
+	);
+	const nodes = [...wide.nodes, ...mid.nodes, ...detail.nodes];
+
+	// Only the wide subset is "protected" from the far-zoom base-dot fade, so the
+	// fully zoomed-out view shows just those few anchor dots (the user's ask). The
+	// protected set is the wide SELECTION (not only edge endpoints) so isolated
+	// anchors still render as lone dots when the graph can't link them. Fall back
+	// to mid/detail only if the wide tier somehow produced nothing.
+	const lowZoomSelection =
+		wide.selectedIds.size > 0
+			? wide.selectedIds
+			: mid.selectedIds.size > 0
+				? mid.selectedIds
+				: detail.selectedIds;
 	const lowZoomNodeIds = new Set<number>();
-	for (const node of nodes) lowZoomNodeIds.add(node.id);
+	for (const id of lowZoomSelection) lowZoomNodeIds.add(id);
 
 	return { edges, nodes, lowZoomNodeIds };
 };

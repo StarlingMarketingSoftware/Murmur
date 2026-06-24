@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import type {
 	GetCalendarEntryData,
 	PatchCalendarEntryData,
@@ -350,3 +351,54 @@ export const draftToUpsertBody = (
 	drivingDuration: draft.drivingDuration,
 	...(provenance ?? {}),
 });
+
+// Dashboard month-cell reference size and today+event inner box (scaled per host).
+export const DASHBOARD_CELL_W_PX = 94.542;
+export const DASHBOARD_CELL_H_PX = 91.224;
+export const TODAY_EVENT_INNER_W_PX = 88;
+export const TODAY_EVENT_INNER_H_PX = 84;
+export const TODAY_EVENT_INNER_RADIUS_PX = 6.75;
+export const TODAY_EVENT_OUTER_RADIUS_PX = 9.747;
+export const TODAY_EVENT_BORDER_W_PX = 1.175;
+export const TODAY_EVENT_CELL_BORDER = `${TODAY_EVENT_BORDER_W_PX}px solid #FFFFFF`;
+export const TODAY_EVENT_INNER_BG = '#38E497';
+export const TODAY_EVENT_DATE_COLOR = '#00AFE5';
+
+const getTodayEventInnerContentArea = (
+	cellW: number,
+	cellH: number
+): { width: number; height: number } => ({
+	width: cellW - 2 * TODAY_EVENT_BORDER_W_PX,
+	height: cellH - 2 * TODAY_EVENT_BORDER_W_PX,
+});
+
+export const getTodayEventInnerContentScale = (cellW: number, cellH: number): number => {
+	const { width, height } = getTodayEventInnerContentArea(cellW, cellH);
+	const refContentW = DASHBOARD_CELL_W_PX - 2 * TODAY_EVENT_BORDER_W_PX;
+	const refContentH = DASHBOARD_CELL_H_PX - 2 * TODAY_EVENT_BORDER_W_PX;
+	return Math.min(width / refContentW, height / refContentH);
+};
+
+export const getTodayEventInnerBoxStyle = (cellW: number, cellH: number): CSSProperties => {
+	const { width: contentW, height: contentH } = getTodayEventInnerContentArea(cellW, cellH);
+	const refContentW = DASHBOARD_CELL_W_PX - 2 * TODAY_EVENT_BORDER_W_PX;
+	const refContentH = DASHBOARD_CELL_H_PX - 2 * TODAY_EVENT_BORDER_W_PX;
+	const scaleW = contentW / refContentW;
+	const scaleH = contentH / refContentH;
+	const innerW = TODAY_EVENT_INNER_W_PX * scaleW;
+	const innerH = TODAY_EVENT_INNER_H_PX * scaleH;
+	return {
+		position: 'absolute',
+		left: '50%',
+		top: '50%',
+		transform: 'translate(-50%, -50%)',
+		width: `${innerW}px`,
+		height: `${innerH}px`,
+		borderRadius: `${TODAY_EVENT_INNER_RADIUS_PX * Math.min(scaleW, scaleH)}px`,
+		border: TODAY_EVENT_CELL_BORDER,
+		backgroundColor: TODAY_EVENT_INNER_BG,
+		boxSizing: 'border-box',
+		overflow: 'hidden',
+		pointerEvents: 'none',
+	};
+};
