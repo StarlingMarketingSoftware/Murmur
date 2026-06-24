@@ -16161,6 +16161,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
 
+		// Keep hover tooltip logic responsive even below the global hover-zoom floor
+		// for contacts that are explicitly selected.
+		const selectedContactIdSetForHover = new Set<number>(selectedContacts);
+
 		// Coalesce mousemove hover detection to one run per animation frame, against the
 		// latest event. Mapbox fires mousemove 60–120×/sec; running the 6-layer
 		// queryRenderedFeatures + setHoveredMarkerId on every event janks rapid sweeps.
@@ -16243,6 +16247,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					bookingExtraContactsById.get(id) ??
 					promotionOverlayContactsById.get(id) ??
 					allOverlayContactsById.get(id) ??
+					selectedContactObjectsById.get(id) ??
 					visibleContactsById.get(id) ??
 					null
 				);
@@ -16425,13 +16430,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					setCursor('pointer');
 					setMarkerVisualHover(sourceId, markerId);
 					clearStateHover();
+					const allowLowZoomTooltipHover =
+						zoom < HOVER_INTERACTION_MIN_ZOOM &&
+						selectedContactIdSetForHover.has(markerId);
 					if (
-						zoom >= HOVER_INTERACTION_MIN_ZOOM &&
+						(zoom >= HOVER_INTERACTION_MIN_ZOOM || allowLowZoomTooltipHover) &&
 						(hoverSourceRef.current !== 'map' || hoveredMarkerIdRef.current !== markerId)
 					) {
 						handleMarkerMouseOver(
 							contact,
-							e.originalEvent as unknown as MouseEvent | TouchEvent
+							e.originalEvent as unknown as MouseEvent | TouchEvent,
+							allowLowZoomTooltipHover ? { allowLowZoom: true } : undefined
 						);
 					}
 					return;
@@ -16799,6 +16808,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		bookingExtraContactsById,
 		promotionOverlayContactsById,
 		allOverlayContactsById,
+		selectedContactObjectsById,
 		clearEmptyMapPrompt,
 		scheduleEmptyMapPrompt,
 		shouldSuppressEmptyMapPrompt,
@@ -16815,6 +16825,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		clearEventHoverImmediate,
 		scheduleEventHoverClose,
 		updateSelectedTooltipHoverHiddenTarget,
+		selectedContacts,
 		setSelectedTooltipHoverHiddenTargetIfChanged,
 	]);
 
@@ -20280,18 +20291,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	]);
 
 	// Hover tooltip anchoring (single overlay).
-	const stackedSelectedContactIdSet = useMemo(() => {
-		const ids = new Set<number>();
-		for (const group of selectedTooltipStackGroups) {
-			for (const contactId of group.contactIds) ids.add(contactId);
-		}
-		return ids;
-	}, [selectedTooltipStackGroups]);
 	const hoverTooltipContactId = hoveredMarkerId ?? fadingTooltipId;
 	const hoverTooltipEntry = useMemo(() => {
 		if (hoverTooltipContactId == null) return null;
-		if (stackedSelectedContactIdSet.has(hoverTooltipContactId)) return null;
-		const base = visibleContactsById.get(hoverTooltipContactId);
+		// IMPORTANT: hovered markers may be present even when they aren't in the
+		// current `visibleContacts` sample (e.g. selected-marker halos, zoom-budget
+		// sampling). Resolve from the full contact maps so hover never blanks out.
+		const base =
+			contactsWithCoordsById.get(hoverTooltipContactId) ??
+			visibleContactsById.get(hoverTooltipContactId) ??
+			selectedContactObjectsById.get(hoverTooltipContactId);
 		if (base) return { kind: 'base' as const, contact: base };
 		const booking = bookingExtraContactsById.get(hoverTooltipContactId);
 		if (booking) return { kind: 'booking' as const, contact: booking };
@@ -20302,8 +20311,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return null;
 	}, [
 		hoverTooltipContactId,
-		stackedSelectedContactIdSet,
+		contactsWithCoordsById,
 		visibleContactsById,
+		selectedContactObjectsById,
 		bookingExtraContactsById,
 		promotionOverlayContactsById,
 		allOverlayContactsById,
@@ -20314,7 +20324,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const c = hoverTooltipEntry.contact;
 		switch (hoverTooltipEntry.kind) {
 			case 'base':
-				return getContactCoords(c);
+				return getContactCoords(c) ?? getLatLngFromContact(c);
 			case 'booking':
 				return getBookingExtraContactCoords(c);
 			case 'promotion':
@@ -20339,7 +20349,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const selectedCompactTooltipEntries = useMemo(() => {
 		if ((!onAddSelectionToFolder && !showSelectedContactTooltips) || isStreetCardMode) return [];
 
-		const compactTooltipOptions = { showTitleBand: true };
+		// Resting (selected) labels intentionally omit the bottom title band; the
+		// full hover tooltip includes it. This matches the live-site behavior where
+		// the "little title box" only appears while hovering.
+		const compactTooltipOptions = { showTitleBand: false };
 		const entries: SelectedCompactTooltipEntry[] = [];
 		const seenIds = new Set<number>();
 
@@ -20724,7 +20737,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				el.style.transform = `translate(${Math.round(placement.x)}px, ${Math.round(
 					placement.y
 				)}px) scale(${placement.scale ?? 1})`;
+				const isHiddenByStackHover =
+					hoveredMarkerId != null && placement.contactIds.includes(hoveredMarkerId);
 				el.style.opacity =
+					isHiddenByStackHover ||
 					selectedTooltipHoverHiddenTarget?.type === 'stack' &&
 					selectedTooltipHoverHiddenTarget.id === id
 						? '0'
