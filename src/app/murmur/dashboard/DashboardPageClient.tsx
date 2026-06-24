@@ -10276,8 +10276,8 @@ const DashboardContent = () => {
 			: 'interactive';
 	const shouldSpinBackgroundMap = mapPresentation === 'background';
 	const shouldShowSearchGeometryOnMap = !hasSearched || isMapSearchEngaged;
-	const shouldShowAmbientContactsOnMap = canDisengageMapSearch && !isMapSearchEngaged;
-	const shouldPreloadAmbientContactsOnMap = canDisengageMapSearch && isMapSearchEngaged;
+	// `shouldShowAmbientContactsOnMap` / `shouldPreloadAmbientContactsOnMap` are defined below,
+	// after `activeRadiusSearchOverlay` (they now depend on `curatedBlobSearchActive`).
 
 	// Scroll-to-map gesture: scrubbing down on the locked landing hero fades it out and dollies
 	// the map in, then commits by firing the same "For You" curated search a click would — so it
@@ -10772,6 +10772,23 @@ const DashboardContent = () => {
 		return null;
 	}, [lastFreeTextArgs, lastCuratedArgs]);
 
+	// A curated/"For You" blob search is the active geometry when engaged and the search drew a
+	// blob — the radius circle (typed strict-radius OR curated-radius For You) or the organic
+	// curated For-You blob — and it's NOT a bbox "Search this area" rectangle. This is the scope
+	// gate for letting the lightweight ambient overlay render outside the blob and swapping the
+	// empty-map prompt for the perimeter-only "Disengage search" affordance. State-lock and bbox
+	// searches are intentionally excluded (they keep the full-marker UI + "Click to see all
+	// contacts"). The map ANDs this with its own `hasCuratedBlobOutline`, so if a curated search
+	// ever drew a non-blob footprint the new mode stays inert.
+	const curatedBlobSearchActive =
+		isMapSearchEngaged &&
+		!mapBboxFilter &&
+		(activeRadiusSearchOverlay != null || isForYouCuratedSearch);
+	const shouldShowAmbientContactsOnMap =
+		canDisengageMapSearch && (!isMapSearchEngaged || curatedBlobSearchActive);
+	const shouldPreloadAmbientContactsOnMap =
+		canDisengageMapSearch && isMapSearchEngaged && !curatedBlobSearchActive;
+
 	// Compressed chrome: the bottom sheet covers the lower half of the viewport, so
 	// camera fits must land markers in the visible top-half strip. Values are real px —
 	// the map canvas counter-zooms the dashboard zoom var, and viewportHeight is real px.
@@ -10879,6 +10896,8 @@ const DashboardContent = () => {
 			searchQuery: shouldShowSearchGeometryOnMap ? activeSearchQuery : '',
 			searchWhat: shouldShowSearchGeometryOnMap ? searchWhatForMap : null,
 			searchEngaged: shouldShowSearchGeometryOnMap,
+			lightweightSearchOverlayEnabled: isMapView,
+			curatedBlobSearchActive: isMapView && curatedBlobSearchActive,
 			dashboardDraftingContactStatusById: isMapView
 				? dashboardDraftingMapStatusByContactId
 				: undefined,
@@ -10892,7 +10911,11 @@ const DashboardContent = () => {
 			autoFitRequestNonce: mapSearchAutoFitRequestNonce,
 			instantAutoFitNonce: instantTabFitNonce,
 			emptyMapClickPrompt:
-				canDisengageMapSearch && isMapSearchEngaged ? 'Click to see all contacts' : null,
+				canDisengageMapSearch && isMapSearchEngaged
+					? curatedBlobSearchActive
+						? 'Disengage search'
+						: 'Click to see all contacts'
+					: null,
 			onEmptyMapClick:
 				canDisengageMapSearch && isMapSearchEngaged ? handleEmptyMapClick : undefined,
 			disableDotWaveReveal: isMapView,
@@ -11000,6 +11023,7 @@ const DashboardContent = () => {
 			shouldShowMapResultsSidePanel,
 			shouldShowSearchGeometryOnMap,
 			shouldShowAmbientContactsOnMap,
+			curatedBlobSearchActive,
 			shouldLoadDashboardMapCampaignFootprint,
 			shouldPreloadAmbientContactsOnMap,
 			shouldSpinBackgroundMap,

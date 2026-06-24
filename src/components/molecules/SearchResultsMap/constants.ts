@@ -1358,6 +1358,56 @@ export const AMBIENT_CONTACTS_OVERLAY_BUFFER_DOTS = 420;
 export const AMBIENT_CONTACTS_OVERLAY_LIMIT = 1800;
 export const AMBIENT_CONTACTS_UNCATEGORIZED_FILL_COLOR = '#5BB6DD';
 
+// Lightweight dashboard general/ambient map overlay (Airbnb-style): render a tiny,
+// stable set of HTML suggestion pills while zoomed out/moderately zoomed, then hand
+// off to the existing ambient Mapbox marker styling at closer zoom with a smaller
+// total marker cap. Active search result markers intentionally keep their old UI.
+// Per-patch pill count is randomized within this inclusive range (stable per zoom
+// bucket — see compactOverlayPillEntries) rather than always maxing out. Same range
+// on desktop and mobile; collision spacing self-limits how many actually fit.
+export const LIGHTWEIGHT_COMPACT_OVERLAY_TARGET_PILLS_MIN = 9;
+export const LIGHTWEIGHT_COMPACT_OVERLAY_TARGET_PILLS_MAX = 14;
+export const LIGHTWEIGHT_COMPACT_OVERLAY_CANDIDATE_LIMIT = 45;
+export const LIGHTWEIGHT_COMPACT_OVERLAY_MIN_WIDTH_PX = 62;
+export const LIGHTWEIGHT_COMPACT_OVERLAY_MAX_WIDTH_PX = 128;
+export const LIGHTWEIGHT_COMPACT_OVERLAY_HEIGHT_PX = 20;
+export const LIGHTWEIGHT_COMPACT_OVERLAY_COLLISION_MARGIN_PX = 5;
+// Sticky "keep" padding (fraction of the viewport span added on every side). A
+// committed pill is retained while it sits within this padded ring, so pills just
+// past the edge don't flicker out and a small pan never reshuffles the set. Pan-back
+// stability comes from the per-zoom-bucket ranking seed (deterministic re-pick), not
+// from a large off-screen buffer, so this stays modest.
+export const LIGHTWEIGHT_COMPACT_OVERLAY_KEEP_PAD_FACTOR = 0.25;
+// Hysteresis band: compact → detail at 10.8; detail → compact at 10.3.
+export const LIGHTWEIGHT_COMPACT_OVERLAY_DETAIL_ENTER_ZOOM = 10.8;
+export const LIGHTWEIGHT_COMPACT_OVERLAY_COMPACT_REENTER_ZOOM = 10.3;
+export const LIGHTWEIGHT_DETAIL_MARKER_BUDGET = 30;
+// --- Compact overlay: fully-zoomed-out (globe) handling ----------------------
+// The compact pills used to share the ambient atlas fetch gate
+// (AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM + the interactive floor delta),
+// which sits ~0.35 zoom ABOVE every interactive floor. So the moment you reached
+// the globe view the candidate fetch was cleared and the pills blanked out
+// entirely. Compact mode is itself the zoomed-out browse gate (USA-centered AND
+// inside the compact zoom band), so the overlay can safely fetch all the way down
+// to the floor and let that flag own the gating.
+export const LIGHTWEIGHT_COMPACT_OVERLAY_FETCH_MIN_ZOOM = 0;
+// Pill count at the globe view: show only a handful when fully zoomed out, then
+// ramp up to the normal randomized [MIN, MAX] range as you zoom toward the
+// continental view (so the globe isn't blanketed in pills).
+export const LIGHTWEIGHT_COMPACT_OVERLAY_ZOOMED_OUT_TARGET_PILLS = 5;
+// Floor-relative zoom band the ramp runs across. Zoom is normalized by the
+// interactive floor delta first, so a large monitor (whose floor sits higher)
+// still reads its globe view as "fully zoomed out" and gets the same ~5 pills.
+// At/below FULL_ZOOM => the zoomed-out target; at/above END_ZOOM => the normal
+// randomized count; linearly interpolated in between.
+export const LIGHTWEIGHT_COMPACT_OVERLAY_ZOOMED_OUT_FULL_ZOOM = MAP_MIN_ZOOM;
+export const LIGHTWEIGHT_COMPACT_OVERLAY_ZOOMED_OUT_END_ZOOM = 4;
+// Half-width (in screen px) of the "Disengage search" hover band hugging the curated blob's
+// outer edge ring while a curated/"For You" search is engaged. Hovering within this band of the
+// outline (inside OR outside) surfaces the disengage prompt; everywhere else suppresses it so the
+// in-blob result markers and the outside-blob ambient overlay stay freely interactive.
+export const CURATED_BLOB_DISENGAGE_PERIMETER_BAND_PX = 22;
+
 export const BOOKING_EXTRA_TITLE_PREFIXES = BOOKING_CONTACT_TITLE_PREFIXES;
 
 export const PROMOTION_OVERLAY_TITLE_PREFIXES = PROMOTION_CONTACT_TITLE_PREFIXES;

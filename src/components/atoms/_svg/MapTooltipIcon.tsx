@@ -69,7 +69,24 @@ const measureTextWidthPx = (text: string, font: string): number | null => {
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
-const measureTextWidthWithFallback = (
+// These tooltips are injected as INLINE SVG (dangerouslySetInnerHTML), so all of
+// their gradient/clipPath `id`s live in the shared host document. With static
+// ids, a second tooltip's `url(#titleFadeOverlayGradient)` resolves to the FIRST
+// matching def in the document — so one band's right-edge fade paints with
+// another tooltip's color (and clip), which is the "random gradient on the bottom
+// band" bug. Scope every id with a prefix keyed on the values that feed <defs>
+// (fill colors + geometry); byte-identical tooltips can safely share a prefix
+// (their defs are identical), while any difference yields distinct ids. Keyed on
+// content (not a counter) so the markup stays stable across renders/SSR.
+const hashIdSeed = (seed: string): string => {
+	let hash = 5381;
+	for (let i = 0; i < seed.length; i += 1) {
+		hash = ((hash << 5) + hash + seed.charCodeAt(i)) | 0;
+	}
+	return (hash >>> 0).toString(36);
+};
+
+export const measureTextWidthWithFallback = (
 	text: string,
 	font: string,
 	fallbackCharWidth: number
@@ -352,22 +369,36 @@ ${normalized}
 
 	const bodyCornerRadius = 8;
 	const titleCornerRadius = 4;
+
+	// Unique per-tooltip id prefix — see hashIdSeed. Covers every value that
+	// distinguishes a tooltip's <defs> so colliding ids only ever happen between
+	// tooltips whose defs are identical.
+	const idPrefix = `mt-${hashIdSeed(
+		`${safeFillColor}|${safeBodyFillColor}|${innerWidth}|${topCardLineOneMaxWidth}|${topCardLineTwoMaxWidth}|${showTitleBand ? 1 : 0}`
+	)}`;
+	const topCardClipId = `${idPrefix}-topCardClip`;
+	const topCardLineOneClipId = `${idPrefix}-topCardLineOneClip`;
+	const topCardLineTwoClipId = `${idPrefix}-topCardLineTwoClip`;
+	const topCardFadeOverlayGradientId = `${idPrefix}-topCardFadeOverlayGradient`;
+	const titleBoxClipId = `${idPrefix}-titleBoxClip`;
+	const titleFadeOverlayGradientId = `${idPrefix}-titleFadeOverlayGradient`;
+
 	const titleDefs = showTitleBand
-		? `  <clipPath id="titleBoxClip">
+		? `  <clipPath id="${titleBoxClipId}">
     <rect x="${offsetX}" y="${titleBandTopY + offsetY}" width="${innerWidth}" height="${TITLE_BAND_HEIGHT}" rx="${titleCornerRadius}"/>
   </clipPath>
-  <linearGradient id="titleFadeOverlayGradient" x1="0" y1="0" x2="1" y2="0">
+  <linearGradient id="${titleFadeOverlayGradientId}" x1="0" y1="0" x2="1" y2="0">
     <stop offset="0%" stop-color="${safeFillColor}" stop-opacity="0"/>
     <stop offset="100%" stop-color="${safeFillColor}" stop-opacity="1"/>
   </linearGradient>`
 		: '';
 	const titleBand = showTitleBand
 		? `<rect x="${offsetX}" y="${titleBandTopY + offsetY}" width="${innerWidth}" height="${TITLE_BAND_HEIGHT}" rx="${titleCornerRadius}" fill="${safeFillColor}"/>
-<g clip-path="url(#titleBoxClip)">
+<g clip-path="url(#${titleBoxClipId})">
   ${
 		titleText
 			? `<text x="${titleTextX}" y="${titleBaselineY}" font-family="Arial, sans-serif" font-size="11" fill="${titleTextFill}" text-anchor="start">${titleText}</text>
-  <rect x="${titleFadeOverlayX}" y="${titleBandTopY + offsetY + 1}" width="${titleFadeOverlayWidth}" height="${TITLE_BAND_HEIGHT - 2}" fill="url(#titleFadeOverlayGradient)"/>`
+  <rect x="${titleFadeOverlayX}" y="${titleBandTopY + offsetY + 1}" width="${titleFadeOverlayWidth}" height="${TITLE_BAND_HEIGHT - 2}" fill="url(#${titleFadeOverlayGradientId})"/>`
 			: ''
 	}
 </g>
@@ -376,31 +407,31 @@ ${normalized}
 
 	return `<svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" fill="none" xmlns="http://www.w3.org/2000/svg">
 <defs>
-  <clipPath id="topCardClip">
+  <clipPath id="${topCardClipId}">
     <rect x="${offsetX}" y="${offsetY}" width="${innerWidth}" height="${TOP_CARD_HEIGHT}" rx="${bodyCornerRadius}"/>
   </clipPath>
-  <clipPath id="topCardLineOneClip">
+  <clipPath id="${topCardLineOneClipId}">
     <rect x="${primaryTextX}" y="${offsetY}" width="${topCardLineOneMaxWidth}" height="${TOP_CARD_HEIGHT / 2}"/>
   </clipPath>
-  <clipPath id="topCardLineTwoClip">
+  <clipPath id="${topCardLineTwoClipId}">
     <rect x="${primaryTextX}" y="${offsetY + TOP_CARD_HEIGHT / 2}" width="${topCardLineTwoMaxWidth}" height="${TOP_CARD_HEIGHT / 2}"/>
   </clipPath>
-  <linearGradient id="topCardFadeOverlayGradient" x1="0" y1="0" x2="1" y2="0">
+  <linearGradient id="${topCardFadeOverlayGradientId}" x1="0" y1="0" x2="1" y2="0">
     <stop offset="0%" stop-color="${safeBodyFillColor}" stop-opacity="0"/>
     <stop offset="100%" stop-color="${safeBodyFillColor}" stop-opacity="1"/>
   </linearGradient>
 ${titleDefs}
 </defs>
 <rect x="${offsetX}" y="${offsetY}" width="${innerWidth}" height="${TOP_CARD_HEIGHT}" rx="${bodyCornerRadius}" fill="${safeBodyFillColor}" stroke="black" stroke-width="${TOOLTIP_STROKE_WIDTH}"/>
-<g clip-path="url(#topCardClip)">
-  <g clip-path="url(#topCardLineOneClip)">
+<g clip-path="url(#${topCardClipId})">
+  <g clip-path="url(#${topCardLineOneClipId})">
     <text x="${primaryTextX}" y="${topCardLineOneBaselineY}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="${bodyTextFill}">${topCardLineOne}</text>
   </g>
-  ${topCardLineOneOverflows ? `<rect x="${topCardLineOneFadeX}" y="${offsetY + 1}" width="${topCardLineOneFadeWidth}" height="${TOP_CARD_HEIGHT / 2 - 1}" fill="url(#topCardFadeOverlayGradient)"/>` : ''}
-  ${topCardLineTwo ? `<g clip-path="url(#topCardLineTwoClip)">
+  ${topCardLineOneOverflows ? `<rect x="${topCardLineOneFadeX}" y="${offsetY + 1}" width="${topCardLineOneFadeWidth}" height="${TOP_CARD_HEIGHT / 2 - 1}" fill="url(#${topCardFadeOverlayGradientId})"/>` : ''}
+  ${topCardLineTwo ? `<g clip-path="url(#${topCardLineTwoClipId})">
     <text x="${primaryTextX}" y="${topCardLineTwoBaselineY}" font-family="Arial, sans-serif" font-size="13" font-weight="normal" fill="${bodyTextFill}">${topCardLineTwo}</text>
   </g>` : ''}
-  ${topCardLineTwo && topCardLineTwoOverflows ? `<rect x="${topCardLineTwoFadeX}" y="${offsetY + TOP_CARD_HEIGHT / 2}" width="${topCardLineTwoFadeWidth}" height="${TOP_CARD_HEIGHT / 2 - 1}" fill="url(#topCardFadeOverlayGradient)"/>` : ''}
+  ${topCardLineTwo && topCardLineTwoOverflows ? `<rect x="${topCardLineTwoFadeX}" y="${offsetY + TOP_CARD_HEIGHT / 2}" width="${topCardLineTwoFadeWidth}" height="${TOP_CARD_HEIGHT / 2 - 1}" fill="url(#${topCardFadeOverlayGradientId})"/>` : ''}
   ${categoryIconPlacement === 'primary' ? renderCategoryIcon(primaryIconX, categoryIconPrimaryY) : ''}
 </g>
 ${titleBand}
