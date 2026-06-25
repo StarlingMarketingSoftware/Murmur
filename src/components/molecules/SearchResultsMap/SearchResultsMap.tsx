@@ -1103,6 +1103,7 @@ type SelectedCompactTooltipEntry = {
 	contact: ContactWithName;
 	coords: LatLngLiteral;
 	sourceKind: SelectedCompactTooltipSourceKind;
+	whatForMarker: string | null;
 	width: number;
 	height: number;
 	anchorY: number;
@@ -12511,7 +12512,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (isLoadingRef.current) return;
 
 			if (isCompactOverlayActive) {
-				if (lastVisibleContactsKeyRef.current !== '') {
+				// Compact overlay (pill) mode is an AMBIENT layer. When an active search is
+				// engaged (curated blob mode), keep the base result dots/markers intact and
+				// only suppress the viewport-wide contextual overlays.
+				if (!searchEngaged && lastVisibleContactsKeyRef.current !== '') {
 					lastVisibleContactsKeyRef.current = '';
 					visibleContactIdSetRef.current = new Set();
 					setVisibleContacts([]);
@@ -12528,7 +12532,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					lastAllContactsOverlayVisibleContactsKeyRef.current = '';
 					setAllContactsOverlayVisibleContacts([]);
 				}
-				return;
+				if (!searchEngaged) return;
 			}
 
 			const maxTotalMarkers = isLightweightDetailMarkerMode
@@ -17954,7 +17958,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			| mapboxgl.GeoJSONSource
 			| undefined;
 		if (!source) return;
-		if (isCompactOverlayActive) {
+		if (isCompactOverlayActive && !searchEngaged) {
 			if (baseDotsWaveCancelRef.current) {
 				baseDotsWaveCancelRef.current();
 				baseDotsWaveCancelRef.current = null;
@@ -20484,6 +20488,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				contact,
 				coords,
 				sourceKind: kind,
+				whatForMarker,
 				width,
 				height,
 				anchorY,
@@ -20527,6 +20532,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		() => selectedCompactTooltipEntries.map((entry) => entry.contact.id).join(','),
 		[selectedCompactTooltipEntries]
 	);
+	const selectedTooltipWhatForMarkerById = useMemo(() => {
+		const byId = new Map<number, string | null>();
+		for (const entry of selectedCompactTooltipEntries) {
+			byId.set(entry.contact.id, entry.whatForMarker);
+		}
+		return byId;
+	}, [selectedCompactTooltipEntries]);
 	const projectSelectedTooltipEntries = useCallback(
 		(m: mapboxgl.Map): ProjectedSelectedTooltipEntry[] =>
 			selectedCompactTooltipEntries.map((entry) => {
@@ -20937,9 +20949,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const titleForTooltip = getContactTitleForTooltip(contact);
 		const dashboardDraftingTooltipFillColor =
 			getDashboardDraftingTooltipFillColorForContact(contact.id);
+		const selectedWhatForMarker = selectedTooltipWhatForMarkerById.get(contact.id) ?? null;
 
 		if (kind === 'all') {
-			const whatForMarker = getAmbientContactWhatFromTitle(contact.title);
+			const ambientWhatForMarker = getAmbientContactWhatFromTitle(contact.title);
+			const whatForMarker = selectedWhatForMarker ?? ambientWhatForMarker;
 			if (whatForMarker) {
 				const tooltipFillColor =
 					dashboardDraftingTooltipFillColor ??
@@ -20996,12 +21010,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			};
 		}
 
-		const whatForMarker =
+		const resolvedWhatForMarker =
 			kind === 'base'
 				? (contact.curatedCategory ?? searchWhat ?? null)
 				: kind === 'booking'
 					? (getBookingTitlePrefixFromContactTitle(contact.title) ?? null)
 					: (getPromotionOverlayWhatFromContactTitle(contact.title) ?? null);
+		const whatForMarker = selectedWhatForMarker ?? resolvedWhatForMarker;
 
 		// Even if the marker dot is "washed out" outside the locked/selected state, keep the hover tooltip
 		// using the base category color so it consistently communicates the search intent.
@@ -21033,7 +21048,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			height,
 			anchorY,
 		};
-	}, [hoverTooltipEntry, searchWhat, getDashboardDraftingTooltipFillColorForContact]);
+	}, [
+		hoverTooltipEntry,
+		searchWhat,
+		getDashboardDraftingTooltipFillColorForContact,
+		selectedTooltipWhatForMarkerById,
+	]);
 
 	const hoverTooltipLat = hoverTooltipCoords?.lat ?? null;
 	const hoverTooltipLng = hoverTooltipCoords?.lng ?? null;
