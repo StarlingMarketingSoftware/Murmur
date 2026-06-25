@@ -19119,7 +19119,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const loading = Boolean(isLoading);
 
 		if (
-			isCompactOverlayActive ||
 			!shouldComposeConstellation ||
 			isBackgroundPresentation ||
 			!searchEngaged
