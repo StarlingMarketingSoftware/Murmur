@@ -603,12 +603,14 @@ if (typeof window !== 'undefined') {
 	}
 }
 
-// Safari/WebKit: canvas→GPU-texture uploads are far slower than Chrome's, and any
-// *playing* Mapbox canvas source forces the map to re-render (and re-upload every
-// playing canvas) every frame, forever — the map never idles. In Safari we keep the
-// animated canvas sources paused between content updates instead. Module-level:
-// the UA never changes within a session (false during SSR; the map only runs client-side).
-const SAFARI_CANVAS_PERF_MODE = isSafariBrowser();
+// Canvas-source perf: any *playing* Mapbox canvas source forces the map to re-render
+// (and re-upload every playing canvas) every frame — the map never idles. Keep canvas
+// sources paused between content updates instead, and upload on-demand.
+//
+// Module-level: the UA never changes within a session (false during SSR; the map only
+// runs client-side).
+const IS_SAFARI = isSafariBrowser();
+const CANVAS_PERF_MODE = true;
 
 // Upload the current canvas content to the source's GPU texture once, leaving the
 // source paused afterwards (CanvasSource.pause() runs prepare() — a synchronous
@@ -5285,19 +5287,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!isCanvasSource) return;
 
 		// Ensure Mapbox is actively sampling the canvas each frame.
-		// Safari: the tick below re-uploads after each draw instead; keep the source
-		// paused between ticks so the map can idle (see SAFARI_CANVAS_PERF_MODE).
+		// In perf mode, the tick below re-uploads after each draw instead; keep the
+		// source paused between ticks so the map can idle.
 		try {
 			cloudsSource.play?.();
-			if (SAFARI_CANVAS_PERF_MODE) cloudsSource.pause?.();
+			if (CANVAS_PERF_MODE) cloudsSource.pause?.();
 		} catch {
 			// Ignore.
 		}
 
 		// Mirror the same play() guarantee for the dedicated lightning canvas source.
-		// Safari: skipped — the tick uploads the lightning/snow canvases only while
+		// In perf mode, skipped — the tick uploads the lightning/snow canvases only while
 		// their weather visuals are actually active.
-		if (!SAFARI_CANVAS_PERF_MODE) {
+		if (!CANVAS_PERF_MODE) {
 			try {
 				const lightningSource: { play?: () => void } | null = (() => {
 					try {
@@ -7752,19 +7754,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 		};
 
-		const driftUpdateMs = SAFARI_CANVAS_PERF_MODE
-			? SAFARI_CLOUDS_DRIFT_UPDATE_MS
-			: CLOUDS_DRIFT_UPDATE_MS;
+		const driftUpdateMs = IS_SAFARI ? SAFARI_CLOUDS_DRIFT_UPDATE_MS : CLOUDS_DRIFT_UPDATE_MS;
 		const tick = (now: number, img: HTMLImageElement, pattern: CanvasPattern | null) => {
 			if (canceled) return;
 
-			// Safari: every drift tick forces a whole-map repaint (triggerRepaint
-			// below). Skip ticks entirely while the weather visuals are invisible
-			// (deep zoom in moods with no deep-zoom cloud veil; lightning and snow
-			// are also hidden at CLOUDS_OVERLAY_FADE_OUT_END_ZOOM), and at rest
-			// drop the cadence — sub-pixel drift at 10fps reads the same.
+			// Every drift tick can force a whole-map repaint (triggerRepaint below). Skip
+			// ticks entirely while the weather visuals are invisible (deep zoom in moods
+			// with no deep-zoom cloud veil; lightning and snow are also hidden at
+			// CLOUDS_OVERLAY_FADE_OUT_END_ZOOM), and at rest drop the cadence —
+			// sub-pixel drift at 10fps reads the same.
 			let effectiveDriftMs = driftUpdateMs;
-			if (SAFARI_CANVAS_PERF_MODE) {
+			if (CANVAS_PERF_MODE) {
 				const cfg = weatherMoodConfigRef.current;
 				let zoom: number | null = null;
 				try {
@@ -7820,7 +7820,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				} catch {
 					// Ignore.
 				}
-				if (SAFARI_CANVAS_PERF_MODE) {
+				if (CANVAS_PERF_MODE) {
 					// Upload this tick's content, then leave the sources paused so the map
 					// idles between ticks instead of re-uploading every canvas every frame.
 					uploadCanvasSourceOnce(cloudsSource);
@@ -8056,7 +8056,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				try {
 					const cloudsSrc = mapInstance.getSource(MAPBOX_SOURCE_IDS.clouds) as any;
 					cloudsSrc?.play?.();
-					if (SAFARI_CANVAS_PERF_MODE) cloudsSrc?.pause?.();
+					if (CANVAS_PERF_MODE) cloudsSrc?.pause?.();
 				} catch {
 					// Ignore.
 				}
@@ -8085,7 +8085,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						| { play?: () => void; pause?: () => void }
 						| undefined;
 					lightningSrc?.play?.();
-					if (SAFARI_CANVAS_PERF_MODE) lightningSrc?.pause?.();
+					if (CANVAS_PERF_MODE) lightningSrc?.pause?.();
 				} catch {
 					// Non-fatal; storm mood simply renders without the dedicated lightning layer.
 				}
@@ -8106,7 +8106,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						| { play?: () => void; pause?: () => void }
 						| undefined;
 					snowSrc?.play?.();
-					if (SAFARI_CANVAS_PERF_MODE) snowSrc?.pause?.();
+					if (CANVAS_PERF_MODE) snowSrc?.pause?.();
 				} catch {
 					// Non-fatal; snowy mood simply renders without the particle layer.
 				}
@@ -8132,7 +8132,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						| { play?: () => void; pause?: () => void }
 						| undefined;
 					shadeSrc?.play?.();
-					if (SAFARI_CANVAS_PERF_MODE) shadeSrc?.pause?.();
+					if (CANVAS_PERF_MODE) shadeSrc?.pause?.();
 				} catch {
 					// Non-fatal; the background globe simply renders without the extra shade.
 				}
@@ -8153,7 +8153,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						| { play?: () => void; pause?: () => void }
 						| undefined;
 					sunSrc?.play?.();
-					if (SAFARI_CANVAS_PERF_MODE) sunSrc?.pause?.();
+					if (CANVAS_PERF_MODE) sunSrc?.pause?.();
 				} catch {
 					// Non-fatal; sunrise still falls back to the normal day/night fade.
 				}
@@ -12651,6 +12651,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					? new Set<number>(nextPromotionOverlayVisible.map((c) => c.id))
 					: null;
 
+			const selectedSet = new Set<number>(selectedContacts);
+			const hoveredId = hoveredMarkerIdRef.current;
+			let nextVisibleContacts: ContactWithName[] = [];
+
 			const curatedContactsWithCoords = contactsWithCoords.filter(
 				(contact) => Boolean(contact.curatedCategory) && getContactCoords(contact) != null
 			);
@@ -12661,11 +12665,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				curatedContactsWithCoords.length === contactsWithCoords.length &&
 				curatedContactsWithCoords.length <= CURATED_STABLE_MARKER_MAX_DOTS;
 			if (shouldUseStableCuratedMarkers) {
-				let nextVisibleContacts = curatedContactsWithCoords
+				nextVisibleContacts = curatedContactsWithCoords
 					.slice()
 					.sort((a, b) => a.id - b.id);
 				if (isLightweightDetailMarkerMode && nextVisibleContacts.length > maxTotalMarkers) {
-					const selectedSet = new Set<number>(selectedContacts);
 					const selected = nextVisibleContacts.filter((contact) =>
 						selectedSet.has(contact.id)
 					);
@@ -12682,10 +12685,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					lastVisibleContactsKeyRef.current = nextKey;
 					setVisibleContacts(nextVisibleContacts);
 				}
-				return;
 			}
 
-			// Determine which contacts are currently in the viewport.
+			if (!shouldUseStableCuratedMarkers) {
+				// Determine which contacts are currently in the viewport.
 			const inBounds: ContactWithName[] = [];
 			for (const contact of contactsWithCoords) {
 				// If this contact is rendered as a promotion overlay pin, don't duplicate it as a dot.
@@ -12701,8 +12704,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				lockedStateSelectionKeyRef.current === lockedStateKey &&
 				!!lockedStateSelectionMultiPolygonRef.current;
 
-			const selectedSet = new Set<number>(selectedContacts);
-			const hoveredId = hoveredMarkerIdRef.current;
 			const priorityIdSet = new Set<number>(selectedSet);
 			if (hoveredId != null) priorityIdSet.add(hoveredId);
 			for (const id of visibleContactIdSetRef.current) priorityIdSet.add(id);
@@ -13132,7 +13133,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				if (visibleContactIdSetRef.current.has(contact.id)) carryOver.push(contact);
 			}
 
-			let nextVisibleContacts: ContactWithName[];
 			if (carryOver.length === 0) {
 				nextVisibleContacts = picked;
 			} else if (picked.length + carryOver.length <= maxPrimaryDots) {
@@ -13174,6 +13174,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				lastVisibleContactsKeyRef.current = nextKey;
 				setVisibleContacts(nextVisibleContacts);
 			}
+		}
 
 			// Booking zoom-in extras: render additional booking categories at high zoom without
 			// exceeding MAX_TOTAL_DOTS total markers.
@@ -15265,6 +15266,47 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Non-fatal.
 		}
 
+		// Hide weather raster layers when effectively invisible. Mapbox keeps loading +
+		// compositing raster/canvas sources for opacity-0 layers, so visibility gates
+		// remove the work entirely.
+		try {
+			const m = mapRef.current;
+			if (m) {
+				const setVisibility = (layerId: string, visible: boolean) => {
+					if (!m.getLayer(layerId)) return;
+					const v = visible ? 'visible' : 'none';
+					if (lightingLayerVisibilityAppliedRef.current[layerId] !== v) {
+						m.setLayoutProperty(layerId, 'visibility', v);
+						lightingLayerVisibilityAppliedRef.current[layerId] = v;
+					}
+				};
+
+				const anyCloudOpacity =
+					cfg.cloudOpacityGlobeZoom > 0.0005 ||
+					cfg.cloudOpacityDecorativeZoom > 0.0005 ||
+					cfg.cloudDeepZoomOpacity > 0.0005;
+				const showClouds =
+					anyCloudOpacity &&
+					(zoom < CLOUDS_OVERLAY_FADE_OUT_END_ZOOM || cfg.cloudDeepZoomOpacity > 0.0005);
+
+				const showLightning =
+					Boolean(cfg.lightning) &&
+					cfg.lightningIntensity > 0.001 &&
+					zoom < LIGHTNING_HIDE_AT_OR_ABOVE_ZOOM;
+
+				const showSnow =
+					cfg.snowOpacity > 0.001 &&
+					cfg.snowDensity > 0.001 &&
+					zoom < SNOW_HIDE_AT_OR_ABOVE_ZOOM;
+
+				setVisibility(MAPBOX_LAYER_IDS.clouds, showClouds);
+				setVisibility(MAPBOX_LAYER_IDS.lightning, showLightning);
+				setVisibility(MAPBOX_LAYER_IDS.snow, showSnow);
+			}
+		} catch {
+			// Non-fatal.
+		}
+
 		// Night rear-lighting: deep silhouette + moon rim.
 		const nightBase = base * night;
 		const shadeOpacity = clamp(nightBase * NIGHT_FACE_SHADE_OPACITY, 0, 1);
@@ -15356,8 +15398,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					| { play?: () => void; pause?: () => void }
 					| undefined;
 				sunSrc?.play?.();
-				// Safari: upload once, then stop forcing per-frame texture uploads.
-				if (SAFARI_CANVAS_PERF_MODE) sunSrc?.pause?.();
+				// Perf mode: upload once, then stop forcing per-frame texture uploads.
+				if (CANVAS_PERF_MODE) sunSrc?.pause?.();
 				m?.triggerRepaint();
 			} catch {
 				// Non-fatal.
@@ -15374,8 +15416,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					| { play?: () => void; pause?: () => void }
 					| undefined;
 				source?.play?.();
-				// Safari: upload once, then stop forcing per-frame texture uploads.
-				if (SAFARI_CANVAS_PERF_MODE) source?.pause?.();
+				// Perf mode: upload once, then stop forcing per-frame texture uploads.
+				if (CANVAS_PERF_MODE) source?.pause?.();
 				map?.triggerRepaint();
 			} catch {
 				// Non-fatal.

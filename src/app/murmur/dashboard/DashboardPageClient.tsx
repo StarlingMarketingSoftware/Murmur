@@ -10784,10 +10784,10 @@ const DashboardContent = () => {
 		isMapSearchEngaged &&
 		!mapBboxFilter &&
 		(activeRadiusSearchOverlay != null || isForYouCuratedSearch);
-	const shouldShowAmbientContactsOnMap =
-		canDisengageMapSearch && (!isMapSearchEngaged || curatedBlobSearchActive);
-	const shouldPreloadAmbientContactsOnMap =
-		canDisengageMapSearch && isMapSearchEngaged && !curatedBlobSearchActive;
+	const canUseAmbientContactsOverlay =
+		isMapView && hasSearched && activeSearchQuery.trim().length > 0;
+	const shouldShowAmbientContactsOnMap = canUseAmbientContactsOverlay;
+	const shouldPreloadAmbientContactsOnMap = false;
 
 	// Compressed chrome: the bottom sheet covers the lower half of the viewport, so
 	// camera fits must land markers in the visible top-half strip. Values are real px —
