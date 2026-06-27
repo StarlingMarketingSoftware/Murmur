@@ -436,8 +436,8 @@ import {
 	angularLngDistanceDeg,
 	clamp,
 	lerp,
+	mapboxEaseOutAirbnb,
 	mapboxEaseOutCubic,
-	mapboxEaseInOutCubic,
 	normalizeLngDeg,
 	smoothstep,
 } from './math';
@@ -3176,8 +3176,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (shouldAnimatePadding) {
 				map.easeTo({
 					padding: next,
-					duration: 520,
-					easing: mapboxEaseInOutCubic,
+					duration: 250,
+					easing: mapboxEaseOutAirbnb,
 					essential: true,
 				});
 			} else {
@@ -8351,6 +8351,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// haze persists into city zoom.
 			paint: {
 				'raster-opacity': cloudsOpacityExpr,
+				'raster-fade-duration': 0,
 				'raster-brightness-min': cfg.cloudBrightnessMin,
 				'raster-brightness-max': cfg.cloudBrightnessMax,
 				'raster-contrast': 0.36,
@@ -9952,7 +9953,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		syncInteractiveFloor();
 
 		markPerf('murmur:map:construct');
-		const mapInstance = new mapboxgl.Map({
+		const mapInstance = new (mapboxgl.Map as any)({
 			container: mapContainerRef.current,
 			style: MAPBOX_STYLE,
 			center: initialCenter,
@@ -9964,16 +9965,28 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			dragRotate: false,
 			pitchWithRotate: false,
 			touchPitch: false,
+			fadeDuration: 0,
+			prefetchZoomDelta: 4,
 			// Retain some recently-displayed basemap tiles so zoom/pan-back stays smooth, but
-			// do not force the cache far above Mapbox's natural viewport-sized default. In
+			// keep the cache high enough that recently-seen tiles are served from memory. In
 			// Mapbox GL, `minTileCacheSize` raises the per-source floor, while
-			// `maxTileCacheSize` clamps the final cache size. A 64/128 band keeps normal
-			// laptop views warm and prevents large monitors / long pan sessions from
-			// retaining hundreds of parsed vector tiles at peak.
+			// `maxTileCacheSize` clamps the final cache size.
 			minTileCacheSize: 64,
-			maxTileCacheSize: 128,
+			maxTileCacheSize: 512,
 			refreshExpiredTiles: false,
-		});
+		}) as mapboxgl.Map;
+
+		// Apply snappy drag inertia immediately (before `load`) so early interactions
+		// don't use Mapbox defaults.
+		try {
+			(mapInstance.dragPan as any).enable({
+				deceleration: 4000,
+				maxSpeed: 1200,
+				easing: mapboxEaseOutAirbnb,
+			});
+		} catch {
+			// Ignore.
+		}
 
 		mapRef.current = mapInstance;
 		setMap(mapInstance);
@@ -10577,7 +10590,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				map.doubleClickZoom.enable();
 			} catch {}
 			try {
-				map.dragPan.enable();
+				(map.dragPan as any).enable({
+					deceleration: 4000,
+					maxSpeed: 1200,
+					easing: mapboxEaseOutAirbnb,
+				});
 			} catch {}
 			try {
 				map.keyboard.enable();
@@ -10762,7 +10779,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					clearTimeout(cinematicInFlightTimerRef.current);
 				cinematicInFlightTimerRef.current = null;
 
-				const dur = DASHBOARD_TO_INTERACTIVE_TRANSITION_MS;
+				const dur = 250;
 				const onCinematicEnd = () => {
 					backgroundCinematicMoveEndHandlerRef.current = null;
 					// If the user already flipped back to interactive, don't lock/override anything.
@@ -10797,7 +10814,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						bearing: 0,
 						offset: DASHBOARD_DECORATIVE_OFFSET_PX,
 						duration: dur,
-						easing: mapboxEaseOutCubic,
+						easing: mapboxEaseOutAirbnb,
 					});
 				} catch {
 					// Ignore.
@@ -10926,11 +10943,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						entryCamera || hasScrubbedEntryCamera
 							? 0
 							: DASHBOARD_TO_INTERACTIVE_HANDOFF_GLIDE_MS,
-					// Ease-in-out (not ease-out): the camera fly begins right after the
-					// user-driven scroll scrub releases at ~zero velocity. An ease-out curve
-					// starts at max velocity, so the handoff lurched ("jarring shift"). Easing
-					// in from rest makes entering the map feel like one continuous gentle move.
-					easing: mapboxEaseInOutCubic,
+					easing: mapboxEaseOutAirbnb,
 				});
 				if (hasScrubbedEntryCamera) {
 					dashboardScrollScrubActiveRef.current = false;
@@ -13641,7 +13654,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 			map.easeTo({
 				zoom: targetZoom,
-				duration: 180,
+				duration: 250,
+				easing: mapboxEaseOutAirbnb,
 				essential: true,
 			});
 		} catch {
@@ -14132,7 +14146,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (selecting) {
 				map.dragPan.disable();
 			} else {
-				map.dragPan.enable();
+				(map.dragPan as any).enable({
+					deceleration: 4000,
+					maxSpeed: 1200,
+					easing: mapboxEaseOutAirbnb,
+				});
 			}
 		} catch {
 			// Ignore (handlers may not be ready yet).
@@ -14378,7 +14396,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			if (!bounds) return;
 
-			const dur = opts?.durationMs ?? 650;
+			const dur = opts?.durationMs ?? 250;
 			mapInstance.fitBounds(bounds, {
 				padding: resolveAutoFitPadding(mapInstance, {
 					top: 50,
@@ -14391,10 +14409,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				bearing: 0,
 				offset: [0, 0],
 				duration: dur,
-				// Long cinematic fits (e.g. the dashboard→map entry sweep) run right after the
-				// scroll scrub, so ease in/out from rest to avoid a jarring fast start; short
-				// interactive fits keep the snappier ease-out.
-				...(dur > 1000 ? { easing: mapboxEaseInOutCubic } : {}),
+				easing: mapboxEaseOutAirbnb,
 			});
 		},
 		[getContactCoords, resolveAutoFitPadding]
@@ -14413,7 +14428,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const bbox = entry?.bbox;
 			if (!bbox) return false;
 
-			const dur = opts?.durationMs ?? 650;
+			const dur = opts?.durationMs ?? 250;
 			mapInstance.fitBounds(
 				[
 					[bbox.minLng, bbox.minLat],
@@ -14431,10 +14446,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					bearing: 0,
 					offset: [0, 0],
 					duration: dur,
-					// Long cinematic fits (e.g. the dashboard→map entry sweep) run right after
-					// the scroll scrub, so ease in/out from rest to avoid a jarring fast start;
-					// short interactive fits keep the snappier ease-out.
-					...(dur > 1000 ? { easing: mapboxEaseInOutCubic } : {}),
+					easing: mapboxEaseOutAirbnb,
 				}
 			);
 
@@ -14581,11 +14593,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				!!pendingSearchNow &&
 				pendingSearchNow.key === searchQueryKey &&
 				Date.now() - pendingSearchNow.at < 10_000;
-			const durationMs = instantFitRequested
-				? 0
-				: cinematicNow || isUserStateClickCinematic || isSearchQueryCinematicNow
-					? DASHBOARD_TO_INTERACTIVE_TRANSITION_MS
-					: 650;
+			const durationMs = instantFitRequested ? 0 : 250;
 
 			// If there's a locked state (searched state) and this is a new search or new state,
 			// zoom to that state first for a better initial view (works even with 0 geocoded contacts).

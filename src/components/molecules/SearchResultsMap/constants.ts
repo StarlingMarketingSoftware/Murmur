@@ -582,7 +582,7 @@ export const DEFAULT_MAX_ZOOM_FALLBACK = 22;
 export const DASHBOARD_TO_INTERACTIVE_TRANSITION_MS = 2000;
 export const DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING =
 	'cubic-bezier(0.22, 1, 0.36, 1)';
-export const DASHBOARD_TO_INTERACTIVE_HANDOFF_GLIDE_MS = 1800;
+export const DASHBOARD_TO_INTERACTIVE_HANDOFF_GLIDE_MS = 250;
 
 // ============================================================================
 // Mapbox base style + globe lighting
