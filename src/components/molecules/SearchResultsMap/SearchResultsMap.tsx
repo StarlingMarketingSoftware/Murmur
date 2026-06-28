@@ -8832,6 +8832,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// Keep labels flat (no glow) to match `/free-trial`.
 				'text-halo-color': 'rgba(0, 0, 0, 0)',
 				'text-halo-width': 0,
+				// Born hidden. State-name labels come from local GeoJSON, so the symbol
+				// layer would otherwise paint at the Mapbox default text-opacity of 1 the
+				// instant its source data lands — which can beat the cream land/basemap
+				// onto the screen and flash scattered initials over empty ocean/space.
+				// The boot ladder's reveal (applyStateOverlayOpacity, gated on
+				// isStateLayerReady && isBasemapTilesSettled) is the *only* thing that
+				// fades them in, so starting at 0 guarantees labels never appear before
+				// the land beneath them. Safe to bake (unlike the divider/border lines):
+				// label opacity is always rebuilt fresh via buildStateLabelsTextOpacityExpr
+				// and never captured-then-scaled, so a baked 0 can't poison a base value.
+				'text-opacity': 0,
 			},
 		});
 		applyStateOverlayNightColors(
@@ -10007,6 +10018,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				styleLoadMarked = true;
 				markPerf('murmur:map:style-load');
 			}
+			// Add the flat low-zoom base before hiding Streets detail: ocean
+			// background, cream land, and major lakes must exist before composite
+			// water/landcover/roads are culled below z6.
+			ensureWorldLandFill(mapInstance);
 			applyFreeTrialMapVisualTuning(mapInstance);
 			const initialVisualNightT = computeMoodVisualNightT(
 				nightTRef.current,
@@ -10026,6 +10041,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const onLoad = () => {
 			markPerf('murmur:map:load');
+			// See the style-load copy: keep the flat low-zoom base in place before
+			// the Streets detail gate is re-applied after full load.
+			ensureWorldLandFill(mapInstance);
 			applyFreeTrialMapVisualTuning(mapInstance);
 			const initialVisualNightT = computeMoodVisualNightT(
 				nightTRef.current,

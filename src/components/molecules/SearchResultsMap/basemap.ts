@@ -1,6 +1,20 @@
 import mapboxgl from 'mapbox-gl';
 import { formatCssColor, parseCssColor, parseHexColor } from './color';
 import {
+	BASEMAP_DETAIL_FILL_FADE_END_ZOOM,
+	BASEMAP_DETAIL_FILL_FADE_START_ZOOM,
+	BASEMAP_DETAIL_FILL_MIN_ZOOM,
+	BASEMAP_DETAIL_HILLSHADE_FADE_END_ZOOM,
+	BASEMAP_DETAIL_HILLSHADE_FADE_START_ZOOM,
+	BASEMAP_DETAIL_HILLSHADE_MIN_ZOOM,
+	BASEMAP_DETAIL_ROAD_MAJOR_MIN_ZOOM,
+	BASEMAP_DETAIL_ROAD_MINOR_MIN_ZOOM,
+	BASEMAP_DETAIL_WATER_FILL_FADE_END_ZOOM,
+	BASEMAP_DETAIL_WATER_FILL_FADE_START_ZOOM,
+	BASEMAP_DETAIL_WATER_FILL_MIN_ZOOM,
+	BASEMAP_DETAIL_WATERWAY_LINE_FADE_END_ZOOM,
+	BASEMAP_DETAIL_WATERWAY_LINE_FADE_START_ZOOM,
+	BASEMAP_DETAIL_WATERWAY_LINE_MIN_ZOOM,
 	BASEMAP_LABEL_HALO_BLUR,
 	BASEMAP_LABEL_HALO_COLOR,
 	BASEMAP_LABEL_HALO_WIDTH,
@@ -12,6 +26,10 @@ import {
 	MAP_DEFAULT_ZOOM,
 	MAP_LAND_CREAM,
 	MAP_LANDCOVER_GREEN,
+	MAP_LOW_ZOOM_LAKES_DATA_URL,
+	MAP_LOW_ZOOM_LAKES_LAYER_ID,
+	MAP_LOW_ZOOM_LAKES_MAX_ZOOM,
+	MAP_LOW_ZOOM_LAKES_SOURCE_ID,
 	MAP_OCEAN_BLUE,
 	MAP_WORLD_LAND_LAYER_ID,
 	MAP_WORLD_LAND_LOCAL_DATA_URL,
@@ -50,6 +68,16 @@ import {
 	UNSUBSCRIBE_BURN_SPACE_COLOR,
 	UNSUBSCRIBE_BURN_STAR_INTENSITY,
 } from './constants';
+import {
+	buildBasemapDetailOpacityRamp,
+	classifyBasemapDetailLayer,
+	isBasemapHillshadeLayer,
+	isBasemapLandcoverLikeFillLayer,
+	isBasemapMajorRoadLikeLineLayer,
+	isBasemapRoadLikeLineLayer,
+	isBasemapWaterFillLayer,
+	isBasemapWaterwayLineLayer,
+} from './basemapDetailGate';
 import { clamp, lerp } from './math';
 import { scaleMapboxOpacityExpr } from './searchMode';
 import type {
@@ -163,8 +191,10 @@ export const applyMurmurGlobeLighting = (mapInstance: mapboxgl.Map, burnT = 0) =
 // and add a separate cream-colored fill layer sourced from Mapbox's free vector tileset
 // `mapbox.country-boundaries-v1`, which has complete world coverage (every country, plus
 // Antarctica) and is extremely lightweight. Country tiles cache at all zooms, so after
-// the first paint the continents stay cream through every subsequent zoom/pan; water
-// fills still draw blue on top, so lakes/rivers inside countries look right.
+// the first paint the continents stay cream through every subsequent zoom/pan. Below
+// the staggered Streets detail ladder, a local major-lakes layer restores large
+// inland water; once Mapbox water reaches full opacity, it takes over the precise
+// river/lake detail.
 // Visual night intentionally keeps the day basemap palette — the night look is
 // driven by DOM overlays + globe lighting, not by recoloring tiles. This getter
 // stays as a single source of truth for the basemap colors.
@@ -451,6 +481,70 @@ const classifyBasemapLabelLayer = (
 	return null;
 };
 
+const setLayerMinZoomAtLeast = (
+	mapInstance: mapboxgl.Map,
+	layerId: string,
+	minZoom: number
+) => {
+	const live = mapInstance.getLayer(layerId) as
+		| { minzoom?: number; maxzoom?: number }
+		| undefined;
+	const nextMinZoom = Math.max(live?.minzoom ?? 0, minZoom);
+	const nativeMaxZoom = live?.maxzoom ?? 24;
+	mapInstance.setLayerZoomRange(
+		layerId,
+		nextMinZoom,
+		nativeMaxZoom <= nextMinZoom ? Math.min(24, nextMinZoom + 0.01) : nativeMaxZoom
+	);
+};
+
+const applyBasemapPaintRamp = (
+	mapInstance: mapboxgl.Map,
+	layerId: string,
+	paintProperty: string,
+	nativeDefault: unknown,
+	fadeStartZoom: number,
+	fadeEndZoom: number
+) => {
+	try {
+		const nativeValue =
+			mapInstance.getPaintProperty(layerId, paintProperty as any) ?? nativeDefault;
+		const gatedValue = buildBasemapDetailOpacityRamp(
+			nativeValue,
+			fadeStartZoom,
+			fadeEndZoom
+		);
+		if (gatedValue) {
+			mapInstance.setPaintProperty(layerId, paintProperty as any, gatedValue as any);
+		}
+	} catch {
+		// Unsupported/data-driven property — the zoom range still culls the layer.
+	}
+};
+
+const applyBasemapDetailFillGate = (
+	mapInstance: mapboxgl.Map,
+	layerId: string,
+	minZoom: number,
+	fadeStartZoom: number,
+	fadeEndZoom: number
+) => {
+	setLayerMinZoomAtLeast(mapInstance, layerId, minZoom);
+
+	try {
+		applyBasemapPaintRamp(
+			mapInstance,
+			layerId,
+			'fill-opacity',
+			1,
+			fadeStartZoom,
+			fadeEndZoom
+		);
+	} catch {
+		// Non-fill layer / unsupported paint property — the zoom range still culls it.
+	}
+};
+
 export const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 	// Projection
 	try {
@@ -490,6 +584,7 @@ export const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 			const type = (layer as any).type as string | undefined;
 			const sourceLayer = (layer as any)['source-layer'] as string | undefined;
 			const idLower = id.toLowerCase();
+			const detailKind = classifyBasemapDetailLayer(type, idLower, sourceLayer);
 
 			// Text/icon labels — keep city/town + street labels, hide everything else.
 			if (type === 'symbol') {
@@ -563,21 +658,66 @@ export const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 				continue;
 			}
 
-			// Roads / highways — recolor to a soft gray (darker than the land cream so
-			// the network reads clearly, Google-Maps style; still lighter than borders).
-			if (
-				type === 'line' &&
-				(sourceLayer === 'road' ||
-					idLower.includes('road') ||
-					idLower.includes('motorway') ||
-					idLower.includes('highway') ||
-					idLower.includes('bridge') ||
-					idLower.includes('tunnel'))
-			) {
+			// Detail linework is staggered above state-level zoom so roads/waterways do
+			// not stream as one big chunk. Do not write road line-opacity: the night
+			// pipeline scales the native road expression and must stay the sole owner of
+			// that paint property. Waterways are safe to fade because that pipeline does
+			// not touch them.
+			if (detailKind === 'detail-line') {
 				try {
-					mapInstance.setPaintProperty(id, 'line-color', '#C2C9D0');
+					if (isBasemapWaterwayLineLayer(idLower, sourceLayer)) {
+						setLayerMinZoomAtLeast(
+							mapInstance,
+							id,
+							BASEMAP_DETAIL_WATERWAY_LINE_MIN_ZOOM
+						);
+						applyBasemapPaintRamp(
+							mapInstance,
+							id,
+							'line-opacity',
+							1,
+							BASEMAP_DETAIL_WATERWAY_LINE_FADE_START_ZOOM,
+							BASEMAP_DETAIL_WATERWAY_LINE_FADE_END_ZOOM
+						);
+					} else if (isBasemapRoadLikeLineLayer(idLower, sourceLayer)) {
+						mapInstance.setPaintProperty(id, 'line-color', '#C2C9D0');
+						setLayerMinZoomAtLeast(
+							mapInstance,
+							id,
+							isBasemapMajorRoadLikeLineLayer(idLower, sourceLayer)
+								? BASEMAP_DETAIL_ROAD_MAJOR_MIN_ZOOM
+								: BASEMAP_DETAIL_ROAD_MINOR_MIN_ZOOM
+						);
+					} else {
+						setLayerMinZoomAtLeast(
+							mapInstance,
+							id,
+							BASEMAP_DETAIL_ROAD_MINOR_MIN_ZOOM
+						);
+					}
 				} catch {
-					// Data-driven color expression we can't override — skip.
+					// Data-driven property / layer range we can't override — skip.
+				}
+				continue;
+			}
+
+			// Terrain hillshade is its own Mapbox layer type (not fill/line), so it
+			// would otherwise stream heavy DEM texture across the globe/state overview.
+			// Cull it as the final detail rung and fade exaggeration so DEM texture does
+			// not pop in after the vector details have already settled.
+			if (isBasemapHillshadeLayer(type)) {
+				try {
+					setLayerMinZoomAtLeast(mapInstance, id, BASEMAP_DETAIL_HILLSHADE_MIN_ZOOM);
+					applyBasemapPaintRamp(
+						mapInstance,
+						id,
+						'hillshade-exaggeration',
+						0.5,
+						BASEMAP_DETAIL_HILLSHADE_FADE_START_ZOOM,
+						BASEMAP_DETAIL_HILLSHADE_FADE_END_ZOOM
+					);
+				} catch {
+					// Layer range we can't override — skip.
 				}
 				continue;
 			}
@@ -591,22 +731,33 @@ export const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 					// pans into untiled areas) reads as water. The cream land tone comes
 					// from the `murmur-world-land-fill` layer added in ensureMapboxSourcesAndLayers.
 					mapInstance.setPaintProperty(id, 'background-color', MAP_OCEAN_BLUE);
-				} else if (
-					type === 'fill' &&
-					(idLower === 'water' || idLower.startsWith('water'))
-				) {
+				} else if (isBasemapWaterFillLayer(type, idLower, sourceLayer)) {
 					mapInstance.setPaintProperty(id, 'fill-color', MAP_OCEAN_BLUE);
-				} else if (
-					type === 'fill' &&
-					(idLower.includes('landcover') ||
-						idLower.includes('national-park') ||
-						idLower.includes('pitch') ||
-						idLower === 'park' ||
-						idLower.startsWith('park'))
-				) {
-					mapInstance.setPaintProperty(id, 'fill-color', MAP_LANDCOVER_GREEN);
-				} else if (type === 'fill' && idLower.includes('landuse')) {
-					mapInstance.setPaintProperty(id, 'fill-color', MAP_LAND_CREAM);
+					// With the local major-lakes layer covering low zoom, Mapbox water
+					// polygons can wait until after state-level zoom. This prevents Streets'
+					// composite source from being needed at the globe/state overview.
+					applyBasemapDetailFillGate(
+						mapInstance,
+						id,
+						BASEMAP_DETAIL_WATER_FILL_MIN_ZOOM,
+						BASEMAP_DETAIL_WATER_FILL_FADE_START_ZOOM,
+						BASEMAP_DETAIL_WATER_FILL_FADE_END_ZOOM
+					);
+				} else if (detailKind === 'detail-fill') {
+					mapInstance.setPaintProperty(
+						id,
+						'fill-color',
+						isBasemapLandcoverLikeFillLayer(idLower, sourceLayer)
+							? MAP_LANDCOVER_GREEN
+							: MAP_LAND_CREAM
+					);
+					applyBasemapDetailFillGate(
+						mapInstance,
+						id,
+						BASEMAP_DETAIL_FILL_MIN_ZOOM,
+						BASEMAP_DETAIL_FILL_FADE_START_ZOOM,
+						BASEMAP_DETAIL_FILL_FADE_END_ZOOM
+					);
 				} else if (type === 'fill' && idLower === 'land') {
 					mapInstance.setPaintProperty(id, 'fill-color', MAP_LAND_CREAM);
 				}
@@ -662,6 +813,70 @@ const ensureLocalWorldLandLayer = (mapInstance: mapboxgl.Map) => {
 	}
 };
 
+export const ensureLowZoomLakesFill = (mapInstance: mapboxgl.Map) => {
+	try {
+		if (!mapInstance.getSource(MAP_LOW_ZOOM_LAKES_SOURCE_ID)) {
+			mapInstance.addSource(MAP_LOW_ZOOM_LAKES_SOURCE_ID, {
+				type: 'geojson',
+				data: MAP_LOW_ZOOM_LAKES_DATA_URL,
+				maxzoom: MAP_LOW_ZOOM_LAKES_MAX_ZOOM,
+			} as any);
+		}
+	} catch {
+		// Non-fatal. The map still has the ocean-blue background; low-zoom lakes are
+		// a back-stop for hiding Mapbox water tiles, not a hard dependency.
+	}
+
+	try {
+		if (!mapInstance.getSource(MAP_LOW_ZOOM_LAKES_SOURCE_ID)) return;
+		if (mapInstance.getLayer(MAP_LOW_ZOOM_LAKES_LAYER_ID)) return;
+
+		let beforeId: string | undefined;
+		const style = mapInstance.getStyle();
+		const layers = style?.layers ?? [];
+		const worldLandIndex = layers.findIndex(
+			(layer: any) => layer?.id === MAP_WORLD_LAND_LAYER_ID
+		);
+		const localLandIndex = layers.findIndex(
+			(layer: any) => layer?.id === MAP_WORLD_LAND_LOCAL_LAYER_ID
+		);
+		const anchorIndex = worldLandIndex >= 0 ? worldLandIndex : localLandIndex;
+		if (anchorIndex >= 0) {
+			for (let i = anchorIndex + 1; i < layers.length; i += 1) {
+				const id = (layers[i] as any)?.id as string | undefined;
+				if (!id || id === MAP_LOW_ZOOM_LAKES_LAYER_ID) continue;
+				beforeId = id;
+				break;
+			}
+		} else {
+			for (const layer of layers as any[]) {
+				const id = layer?.id as string | undefined;
+				if (!id) continue;
+				if (id.startsWith('murmur-')) continue;
+				if (layer?.type === 'background') continue;
+				beforeId = id;
+				break;
+			}
+		}
+
+		mapInstance.addLayer(
+			{
+				id: MAP_LOW_ZOOM_LAKES_LAYER_ID,
+				type: 'fill',
+				source: MAP_LOW_ZOOM_LAKES_SOURCE_ID,
+				maxzoom: MAP_LOW_ZOOM_LAKES_MAX_ZOOM,
+				paint: {
+					'fill-color': MAP_OCEAN_BLUE,
+					'fill-antialias': true,
+				},
+			} as any,
+			beforeId
+		);
+	} catch {
+		// Non-fatal.
+	}
+};
+
 export const ensureWorldLandFill = (mapInstance: mapboxgl.Map) => {
 	try {
 		if (!mapInstance.getSource(MAP_WORLD_LAND_SOURCE_ID)) {
@@ -693,6 +908,7 @@ export const ensureWorldLandFill = (mapInstance: mapboxgl.Map) => {
 
 	if (mapInstance.getLayer(MAP_WORLD_LAND_LAYER_ID)) {
 		ensureLocalWorldLandLayer(mapInstance);
+		ensureLowZoomLakesFill(mapInstance);
 		return;
 	}
 
@@ -734,6 +950,7 @@ export const ensureWorldLandFill = (mapInstance: mapboxgl.Map) => {
 	}
 
 	ensureLocalWorldLandLayer(mapInstance);
+	ensureLowZoomLakesFill(mapInstance);
 };
 
 // ============================================================================

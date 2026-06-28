@@ -653,11 +653,37 @@ export const MURMUR_GLOBE_LIGHT_POLAR_DEG = 75;
 // and add a separate cream-colored fill layer sourced from Mapbox's free vector tileset
 // `mapbox.country-boundaries-v1`, which has complete world coverage (every country, plus
 // Antarctica) and is extremely lightweight. Country tiles cache at all zooms, so after
-// the first paint the continents stay cream through every subsequent zoom/pan; water
-// fills still draw blue on top, so lakes/rivers inside countries look right.
+// the first paint the continents stay cream through every subsequent zoom/pan. Below
+// the staggered Streets detail ladder, a local major-lakes layer restores large
+// inland water; once Mapbox water reaches full opacity, it takes over the precise
+// river/lake detail.
 export const MAP_OCEAN_BLUE = '#62C7E3';
-export const MAP_LAND_CREAM = '#F1EDE2';
+export const MAP_LAND_CREAM = '#B9E4D6';
 export const MAP_LANDCOVER_GREEN = '#B3E6D7';
+
+// Low-zoom detail ladder: the globe/state overview should stay a clean, instant
+// base map. Mapbox Streets detail is held until after state-level zoom, then
+// returns one class at a time so roads/water/terrain never stream as one big chunk.
+export const BASEMAP_DETAIL_CLEAN_CEILING_ZOOM = 6.5;
+
+export const BASEMAP_DETAIL_WATER_FILL_MIN_ZOOM = 7.0;
+export const BASEMAP_DETAIL_WATER_FILL_FADE_START_ZOOM = 7.0;
+export const BASEMAP_DETAIL_WATER_FILL_FADE_END_ZOOM = 8.0;
+
+export const BASEMAP_DETAIL_FILL_MIN_ZOOM = 7.75;
+export const BASEMAP_DETAIL_FILL_FADE_START_ZOOM = 7.75;
+export const BASEMAP_DETAIL_FILL_FADE_END_ZOOM = 8.75;
+
+export const BASEMAP_DETAIL_WATERWAY_LINE_MIN_ZOOM = 8.25;
+export const BASEMAP_DETAIL_WATERWAY_LINE_FADE_START_ZOOM = 8.25;
+export const BASEMAP_DETAIL_WATERWAY_LINE_FADE_END_ZOOM = 9.25;
+
+export const BASEMAP_DETAIL_ROAD_MAJOR_MIN_ZOOM = 8.75;
+export const BASEMAP_DETAIL_ROAD_MINOR_MIN_ZOOM = 9.75;
+
+export const BASEMAP_DETAIL_HILLSHADE_MIN_ZOOM = 10.25;
+export const BASEMAP_DETAIL_HILLSHADE_FADE_START_ZOOM = 10.25;
+export const BASEMAP_DETAIL_HILLSHADE_FADE_END_ZOOM = 11.25;
 
 export const NIGHT_HIDE_ROADS_START_T = 0.18;
 export const NIGHT_HIDE_ROADS_END_T = 0.42;
@@ -757,6 +783,15 @@ export const MAP_WORLD_LAND_LOCAL_DATA_URL = '/maps/world-land-110m.json';
 // Cap geojson-vt tiling depth: past z6 the tileset fill has long since painted,
 // so deeper local tiles would be pure worker memory/CPU waste.
 export const MAP_WORLD_LAND_LOCAL_MAX_ZOOM = 6;
+
+// Local major-lakes back-stop for the low-zoom clean base map. While Mapbox
+// Streets `water` is gated/fading in, the cream land silhouette would otherwise
+// cover the Great Lakes and other large inland water bodies because the bundled
+// 110m land polygons have almost no lake holes.
+export const MAP_LOW_ZOOM_LAKES_SOURCE_ID = 'murmur-low-zoom-lakes';
+export const MAP_LOW_ZOOM_LAKES_LAYER_ID = 'murmur-low-zoom-lakes-fill';
+export const MAP_LOW_ZOOM_LAKES_DATA_URL = '/maps/world-lakes-110m.json';
+export const MAP_LOW_ZOOM_LAKES_MAX_ZOOM = BASEMAP_DETAIL_WATER_FILL_FADE_END_ZOOM;
 
 // ── Sequential boot ladder backstops ─────────────────────────────────────────
 // The cold-start reveal is staged (land → basemap/roads → boundaries → pins) so
