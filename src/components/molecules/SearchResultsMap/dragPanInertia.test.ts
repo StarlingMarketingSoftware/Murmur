@@ -1,0 +1,154 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import {
+	DRAG_PAN_DECELERATION,
+	DRAG_PAN_LINEARITY,
+	DRAG_PAN_MAX_SPEED,
+	DRAG_PAN_ZOOMED_IN_MAX_SPEED,
+	DRAG_PAN_ZOOM_BOOST_START_ZOOM,
+	DRAG_PAN_ZOOM_BOOST_END_ZOOM,
+	DRAG_PAN_INERTIA_OPTIONS,
+	getDragPanInertiaOptions,
+	getDragPanMaxSpeedForZoom,
+} from './constants';
+import { mapboxDragPanLinearDecel } from './math';
+
+// These tests lock in the drag-pan "Airbnb latch" feel and, crucially, guard
+// against the regression they fix: in mapbox-gl 3.x `dragPan.enable()` with no
+// args resets inertia to Mapbox defaults, so every enable() site must pass the
+// zoom-aware tuned options. The helper below is the single source of truth
+// re-passed at all dragPan.enable call sites in SearchResultsMap.tsx.
+
+// Mapbox GL 3.x built-in pan inertia defaults (the "floaty" preset we override).
+const MAPBOX_DEFAULT_DECELERATION = 2500;
+const MAPBOX_DEFAULT_LINEARITY = 0.3;
+const MAPBOX_DEFAULT_MAX_SPEED = 1400;
+const searchResultsMapSource = readFileSync(
+	new URL('./SearchResultsMap.tsx', import.meta.url),
+	'utf8'
+);
+
+// Mirrors mapbox-gl's calculateEasing(): coast distance for a flick at the
+// velocity clamp. speed is clamped to maxSpeed, duration = speed /
+// (deceleration * linearity), and the eased distance = speed * duration / 2.
+const coastDistanceAtClamp = (opts: {
+	deceleration: number;
+	linearity: number;
+	maxSpeed: number;
+}) => {
+	const speed = opts.maxSpeed;
+	const duration = Math.abs(speed) / (opts.deceleration * opts.linearity);
+	return speed * (duration / 2);
+};
+
+const durationAtClamp = (opts: {
+	deceleration: number;
+	linearity: number;
+	maxSpeed: number;
+}) => Math.abs(opts.maxSpeed) / (opts.deceleration * opts.linearity);
+
+test('default inertia object carries the tuned zoomed-out values', () => {
+	assert.equal(DRAG_PAN_INERTIA_OPTIONS.deceleration, DRAG_PAN_DECELERATION);
+	assert.equal(DRAG_PAN_INERTIA_OPTIONS.linearity, DRAG_PAN_LINEARITY);
+	assert.equal(DRAG_PAN_INERTIA_OPTIONS.maxSpeed, DRAG_PAN_MAX_SPEED);
+	assert.equal(DRAG_PAN_INERTIA_OPTIONS.easing, mapboxDragPanLinearDecel);
+	assert.deepEqual(DRAG_PAN_INERTIA_OPTIONS, getDragPanInertiaOptions(0));
+});
+
+test('tuning keeps the snap fields non-default while allowing larger flicks', () => {
+	// If any field silently matched the Mapbox default, a bare enable() reset
+	// would be indistinguishable from our tuning — defeating the fix.
+	assert.notEqual(
+		DRAG_PAN_INERTIA_OPTIONS.deceleration,
+		MAPBOX_DEFAULT_DECELERATION
+	);
+	assert.notEqual(DRAG_PAN_INERTIA_OPTIONS.linearity, MAPBOX_DEFAULT_LINEARITY);
+	assert.notEqual(DRAG_PAN_INERTIA_OPTIONS.maxSpeed, MAPBOX_DEFAULT_MAX_SPEED);
+	// deceleration must remain aggressive for the crisp end snap; maxSpeed is
+	// intentionally above Mapbox's default so big flicks travel farther.
+	assert.ok(DRAG_PAN_INERTIA_OPTIONS.deceleration > MAPBOX_DEFAULT_DECELERATION);
+	assert.ok(DRAG_PAN_INERTIA_OPTIONS.maxSpeed > MAPBOX_DEFAULT_MAX_SPEED);
+	// heavy/direct blend in the documented 0.3-0.5 band.
+	assert.ok(
+		DRAG_PAN_INERTIA_OPTIONS.linearity >= 0.3 &&
+			DRAG_PAN_INERTIA_OPTIONS.linearity <= 0.5
+	);
+});
+
+test('zoom-aware maxSpeed keeps low zoom restrained and boosts high zoom', () => {
+	assert.equal(
+		getDragPanMaxSpeedForZoom(DRAG_PAN_ZOOM_BOOST_START_ZOOM - 1),
+		DRAG_PAN_MAX_SPEED
+	);
+	assert.equal(
+		getDragPanMaxSpeedForZoom(DRAG_PAN_ZOOM_BOOST_START_ZOOM),
+		DRAG_PAN_MAX_SPEED
+	);
+	assert.equal(
+		getDragPanMaxSpeedForZoom(DRAG_PAN_ZOOM_BOOST_END_ZOOM),
+		DRAG_PAN_ZOOMED_IN_MAX_SPEED
+	);
+	assert.equal(
+		getDragPanMaxSpeedForZoom(DRAG_PAN_ZOOM_BOOST_END_ZOOM + 1),
+		DRAG_PAN_ZOOMED_IN_MAX_SPEED
+	);
+	const midZoom =
+		(DRAG_PAN_ZOOM_BOOST_START_ZOOM + DRAG_PAN_ZOOM_BOOST_END_ZOOM) / 2;
+	const midSpeed = getDragPanMaxSpeedForZoom(midZoom);
+	assert.ok(midSpeed > DRAG_PAN_MAX_SPEED);
+	assert.ok(midSpeed < DRAG_PAN_ZOOMED_IN_MAX_SPEED);
+});
+
+test('SearchResultsMap re-passes zoom-aware inertia at every dragPan.enable site', () => {
+	const enableLines = searchResultsMapSource
+		.split('\n')
+		.filter((line) => line.includes('dragPan.enable('));
+	assert.equal(enableLines.length, 4);
+	for (const line of enableLines) {
+		assert.match(line, /getDragPanInertiaOptions\(.+\.getZoom\(\)\)/);
+	}
+});
+
+test('hard flicks travel farther when zoomed in while keeping a snappy duration', () => {
+	const zoomedOut = getDragPanInertiaOptions(DRAG_PAN_ZOOM_BOOST_START_ZOOM);
+	const zoomedIn = getDragPanInertiaOptions(DRAG_PAN_ZOOM_BOOST_END_ZOOM);
+	const zoomedOutCoast = coastDistanceAtClamp(zoomedOut);
+	const zoomedInCoast = coastDistanceAtClamp(zoomedIn);
+	const zoomedInDuration = durationAtClamp(zoomedIn);
+	const mapboxDefault = coastDistanceAtClamp({
+		deceleration: MAPBOX_DEFAULT_DECELERATION,
+		linearity: MAPBOX_DEFAULT_LINEARITY,
+		maxSpeed: MAPBOX_DEFAULT_MAX_SPEED,
+	});
+	const mapboxDefaultDuration = durationAtClamp({
+		deceleration: MAPBOX_DEFAULT_DECELERATION,
+		linearity: MAPBOX_DEFAULT_LINEARITY,
+		maxSpeed: MAPBOX_DEFAULT_MAX_SPEED,
+	});
+	// Low zoom remains the current open-but-bounded coast (~691px).
+	assert.ok(zoomedOutCoast < mapboxDefault * 0.6);
+	// High zoom travels much farther (~1286px) so zoomed-in flicks stop feeling
+	// underpowered, but the duration remains much shorter than Mapbox default so
+	// the end still snaps instead of floating.
+	assert.ok(zoomedInCoast > zoomedOutCoast * 1.8);
+	assert.ok(zoomedInCoast < mapboxDefault);
+	assert.ok(zoomedInDuration < mapboxDefaultDuration / 2);
+});
+
+test('custom easing is constant-deceleration ease-out (no soft bezier tail)', () => {
+	// position(t) = 1 - (1 - t)^2 → endpoints clamped, monotonic, midpoint 0.75.
+	assert.equal(mapboxDragPanLinearDecel(0), 0);
+	assert.equal(mapboxDragPanLinearDecel(1), 1);
+	assert.equal(mapboxDragPanLinearDecel(0.5), 0.75);
+	// out-of-range inputs clamp rather than overshoot.
+	assert.equal(mapboxDragPanLinearDecel(-0.5), 0);
+	assert.equal(mapboxDragPanLinearDecel(1.5), 1);
+	// strictly increasing across the interval.
+	let prev = -Infinity;
+	for (let t = 0; t <= 1.0001; t += 0.1) {
+		const v = mapboxDragPanLinearDecel(t);
+		assert.ok(v >= prev, `easing must be monotonic non-decreasing at t=${t}`);
+		prev = v;
+	}
+});

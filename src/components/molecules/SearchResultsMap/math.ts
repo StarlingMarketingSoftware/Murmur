@@ -45,10 +45,9 @@ export const mapboxEaseInOutCubic = (t: number): number => {
 // Drag-pan inertia easing for the "heavy / abrupt-stop" feel (Airbnb-style).
 // Ease-out quadratic: position(t) = 2t - t². In velocity space this is a LINEAR
 // decrease (constant deceleration), which is what makes it feel "weighted"
-// rather than the exponential/asymptotic decay of Mapbox's default bezier
-// (the "floaty tail"). Combined with a high `deceleration` value the coast is
-// short and the residual velocity at the end is imperceptible — emulating the
-// "hard cutoff" without a custom physics loop.
+// rather than Mapbox's softer default bezier tail. Combined with a high
+// `deceleration` value the coast is short and the residual velocity at the end
+// is imperceptible — emulating the "hard cutoff" without a custom physics loop.
 export const mapboxDragPanLinearDecel = (t: number): number => {
 	const x = t < 0 ? 0 : t > 1 ? 1 : t;
 	return 1 - (1 - x) * (1 - x);

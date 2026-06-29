@@ -4,6 +4,7 @@ import {
 } from '@/constants/contactCategories';
 import { WeatherMood } from '@/lib/weather/regions';
 import type { OutlinePolygonFeatureCollection, ParsedCssColor } from './types';
+import { mapboxDragPanLinearDecel } from './math';
 
 // ============================================================================
 // Geometry / clipping
@@ -321,24 +322,83 @@ export const MAP_PINCH_ZOOM_RATE = 1 / 200;
 export const MAP_REQUESTED_ZOOM_EASE_MS = 400;
 
 // Drag-pan inertia "heavy / abrupt-stop" tuning (Airbnb-style feel).
-// Mapbox's defaults (deceleration 2500, linearity 0, bezier easing) produce
-// an exponential/asymptotic decay — the "floaty tail" that standard map
-// libraries use. Raising `deceleration` shortens the coast; `linearity` blends
+// Mapbox's defaults (deceleration 2500, linearity 0.3, bezier easing) produce
+// a longer, softer ease-out tail than the latched feel we want. Raising
+// `deceleration` shortens the coast; `linearity` blends
 // the raw flick velocity in for a more direct/heavy feel; the custom easing
 // (mapboxDragPanLinearDecel) makes velocity decrease linearly instead of
-// exponentially. Combined, the map glides a short distance and stops dead
-// rather than asymptotically fading — the "weighted furniture on a rubber
-// mat" feel. Options persist across the enable()/disable() calls in
-// safeEnableInteractions and rectangle-select toggles because Mapbox stores
-// them on the handler and enable() without args reuses the last-set options.
+// following Mapbox's default bezier. Combined, the map glides a short distance
+// and stops crisply — the "weighted furniture on a rubber mat" feel.
+//
+// IMPORTANT (mapbox-gl 3.x): `DragPanHandler.enable(opts)` does
+// `this._inertiaOptions = opts || {}`, so calling `enable()` with NO args
+// RESETS the inertia back to Mapbox's defaults (deceleration 2500 / maxSpeed
+// 1400 / linearity 0.3 / bezier — the floaty preset). These options do NOT
+// persist on the handler. Every `dragPan.enable()` call site must therefore
+// pass `getDragPanInertiaOptions(currentZoom)` (below); a bare `enable()`
+// silently reverts the feel. Note these options only affect the post-release
+// inertial coast — the active (button-held) drag is always Mapbox's native 1:1
+// pan.
 //
 // TUNING GUIDE:
 //   deceleration — higher = shorter coast (default 2500; Airbnb ~8000-12000)
-//   linearity    — 0..1, raw velocity blend (default 0; 0.3-0.5 feels heavy)
-//   maxSpeed     — clamp on flick velocity (default 1400; keep default)
+//   linearity    — 0..1, raw velocity blend (default 0.3; 0.3-0.5 feels heavy)
+//   maxSpeed     — clamp on flick velocity (default 1400; lower = tighter
+//                  "latch" so a hard flick coasts a shorter, bounded distance)
+// Approx coast distance at the clamp ≈ maxSpeed² / (2·deceleration·linearity).
+// Zoomed-out maxSpeed 2200 ≈ 691px; zoomed-in maxSpeed 3000 ≈ 1286px. This
+// lets city/street-level flicks travel much farther, while the high
+// deceleration/custom easing keeps the crisp end snap instead of Mapbox's
+// softer default tail.
 export const DRAG_PAN_DECELERATION = 10000;
 export const DRAG_PAN_LINEARITY = 0.35;
-export const DRAG_PAN_MAX_SPEED = 1400;
+export const DRAG_PAN_MAX_SPEED = 2200;
+export const DRAG_PAN_ZOOMED_IN_MAX_SPEED = 3000;
+export const DRAG_PAN_ZOOM_BOOST_START_ZOOM = 6;
+export const DRAG_PAN_ZOOM_BOOST_END_ZOOM = 11;
+
+export type DragPanInertiaOptions = {
+	deceleration: number;
+	linearity: number;
+	maxSpeed: number;
+	easing: (t: number) => number;
+};
+
+const easeDragPanZoomBoost = (zoomBoostT: number) => {
+	const t = Math.max(0, Math.min(1, zoomBoostT));
+	return t * t * (3 - 2 * t);
+};
+
+export const getDragPanZoomBoostT = (zoom: number): number => {
+	const raw =
+		(zoom - DRAG_PAN_ZOOM_BOOST_START_ZOOM) /
+		(DRAG_PAN_ZOOM_BOOST_END_ZOOM - DRAG_PAN_ZOOM_BOOST_START_ZOOM);
+	return easeDragPanZoomBoost(raw);
+};
+
+export const getDragPanMaxSpeedForZoom = (zoom: number): number =>
+	Math.round(
+		DRAG_PAN_MAX_SPEED +
+			(DRAG_PAN_ZOOMED_IN_MAX_SPEED - DRAG_PAN_MAX_SPEED) *
+				getDragPanZoomBoostT(zoom)
+	);
+
+// Single source of truth for the inertia options passed to EVERY
+// `dragPan.enable(...)` call (construction, safeEnableInteractions, the
+// rectangle-select toggle, and zoom-end refreshes). Because mapbox-gl 3.x does
+// not persist these on the handler, re-passing fresh options on every enable()
+// is what keeps the tuned "latch" feel from reverting to Mapbox defaults after
+// interaction toggles. The maxSpeed is zoom-aware so high-zoom flicks travel
+// farther across the map while retaining the same crisp deceleration curve.
+export const getDragPanInertiaOptions = (zoom = 0): DragPanInertiaOptions => ({
+	deceleration: DRAG_PAN_DECELERATION,
+	linearity: DRAG_PAN_LINEARITY,
+	maxSpeed: getDragPanMaxSpeedForZoom(zoom),
+	easing: mapboxDragPanLinearDecel,
+});
+
+export const DRAG_PAN_INERTIA_OPTIONS: DragPanInertiaOptions =
+	getDragPanInertiaOptions();
 
 // Decorative dashboard background framing. Keep these in sync with the background-mode
 // camera settings so the initial mount doesn't "pop" after the map loads.

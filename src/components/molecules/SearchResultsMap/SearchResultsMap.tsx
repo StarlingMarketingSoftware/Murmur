@@ -306,9 +306,7 @@ import {
 	MAP_PINCH_ZOOM_RATE,
 	MAP_WHEEL_ZOOM_RATE,
 	MAP_REQUESTED_ZOOM_EASE_MS,
-	DRAG_PAN_DECELERATION,
-	DRAG_PAN_LINEARITY,
-	DRAG_PAN_MAX_SPEED,
+	getDragPanInertiaOptions,
 	MAP_WORLD_LAND_LOCAL_SOURCE_ID,
 	MARKER_CONSTELLATION_CORE_OPACITY,
 	MARKER_CONSTELLATION_GLOW_OPACITY,
@@ -444,7 +442,6 @@ import {
 	mapboxEaseOutCubic,
 	mapboxEaseOutQuart,
 	mapboxEaseInOutCubic,
-	mapboxDragPanLinearDecel,
 	normalizeLngDeg,
 	smoothstep,
 } from './math';
@@ -10031,17 +10028,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 
 		// Drag-pan inertia: "heavy / abrupt-stop" feel (Airbnb-style). Replaces
-		// Mapbox's default exponential/asymptotic decay (the floaty tail) with a
-		// short, linearly-decelerating coast that stops dead. Options live on the
-		// handler, so the bare enable()/disable() calls in safeEnableInteractions
-		// and rectangle-select toggles reuse these values without resetting them.
+		// Mapbox's default long/soft ease-out tail with a short,
+		// linearly-decelerating coast that stops crisply. mapbox-gl 3.x does
+		// NOT persist these options on the handler (a bare enable() resets them to
+		// defaults), so zoom-aware options are re-passed at every enable() site
+		// (safeEnableInteractions + rectangle-select toggle + zoom-end refresh).
 		try {
-			mapInstance.dragPan.enable({
-				deceleration: DRAG_PAN_DECELERATION,
-				linearity: DRAG_PAN_LINEARITY,
-				easing: mapboxDragPanLinearDecel,
-				maxSpeed: DRAG_PAN_MAX_SPEED,
-			});
+			mapInstance.dragPan.enable(getDragPanInertiaOptions(mapInstance.getZoom()));
 		} catch {
 			// Non-fatal — older Mapbox builds may not accept all options.
 		}
@@ -10631,7 +10624,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				map.doubleClickZoom.enable();
 			} catch {}
 			try {
-				map.dragPan.enable();
+				// Re-pass options: a bare enable() resets inertia to Mapbox defaults
+				// (mapbox-gl 3.x does not persist _inertiaOptions on the handler).
+				map.dragPan.enable(getDragPanInertiaOptions(map.getZoom()));
 			} catch {}
 			try {
 				map.keyboard.enable();
@@ -14187,11 +14182,39 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (selecting) {
 				map.dragPan.disable();
 			} else {
-				map.dragPan.enable();
+				// Re-pass options: a bare enable() resets inertia to Mapbox defaults
+				// (mapbox-gl 3.x does not persist _inertiaOptions on the handler).
+				map.dragPan.enable(getDragPanInertiaOptions(map.getZoom()));
 			}
 		} catch {
 			// Ignore (handlers may not be ready yet).
 		}
+	}, [map, isMapLoaded, isBackgroundPresentation, areaSelectionEnabled, isAreaSelecting]);
+
+	// Keep drag-pan inertia zoom-aware. The max flick speed intentionally ramps
+	// up at high zoom so city/street-level drags travel farther across the map,
+	// while the high deceleration/custom easing still gives the crisp end snap.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const syncDragPanInertiaForZoom = () => {
+			if (isBackgroundPresentation || areaSelectionEnabled || isAreaSelecting) return;
+			try {
+				if (!map.dragPan.isEnabled()) return;
+				map.dragPan.enable(getDragPanInertiaOptions(map.getZoom()));
+			} catch {
+				// Non-fatal — handler may be unavailable during teardown/style churn.
+			}
+		};
+
+		syncDragPanInertiaForZoom();
+		map.on('zoomend', syncDragPanInertiaForZoom);
+		return () => {
+			try {
+				map.off('zoomend', syncDragPanInertiaForZoom);
+			} catch {
+				// Ignore.
+			}
+		};
 	}, [map, isMapLoaded, isBackgroundPresentation, areaSelectionEnabled, isAreaSelecting]);
 
 	// Draw a gray outline around the *group of states* that have results.
