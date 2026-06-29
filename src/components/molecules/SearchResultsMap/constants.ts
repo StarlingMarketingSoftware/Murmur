@@ -275,6 +275,14 @@ export const getInteractiveMapMinZoomDelta = (
 // Zoom at which state initials reach full opacity. Kept close to MAP_MIN_ZOOM so
 // labels are legible from the wide continental view, not only when zoomed in.
 export const STATE_LABELS_FULL_OPACITY_ZOOM = MAP_MIN_ZOOM + 0.5;
+// State labels are now contextual backdrop typography: visible early, then
+// progressively quieter as city/town labels become the foreground hierarchy.
+export const STATE_LABEL_CONTEXT_OPACITY = 0.52;
+export const STATE_LABEL_CONTEXT_HOLD_ZOOM = 6.0;
+export const STATE_LABEL_CONTEXT_FADE_START_ZOOM = 7.4;
+export const STATE_LABEL_CONTEXT_FADE_END_ZOOM = 10.5;
+export const STATE_LABEL_CONTEXT_HIDE_ZOOM = 12.0;
+export const STATE_LABEL_FULL_NAME_ZOOM = 6.8;
 // Dashboard UX: allow state hover highlight one zoom step past the default zoom.
 export const STATE_HOVER_HIGHLIGHT_MAX_ZOOM = MAP_DEFAULT_ZOOM + 1;
 
@@ -299,10 +307,38 @@ export const OVERVIEW_PREWARM_CENTER_QUANT_DEG = 1;
 // Scroll/pinch zoom feel. Mapbox defaults (wheel 1/450, pinch 1/100) feel
 // jumpy on a Mac trackpad — each tick traverses a lot of zoom, which reads
 // as "aggressive." Lowering both rates produces a slower, more gradual,
-// Apple-Maps-style glide. Mapbox's internal easing handles the in-between
-// smoothing once each tick is small enough.
-export const MAP_WHEEL_ZOOM_RATE = 1 / 700;
+// Airbnb-style "heavy/deliberate" glide where a single scroll or flick
+// barely moves the map and a full zoom level takes several deliberate ticks.
+// Mapbox's internal easing handles the in-between smoothing once each tick
+// is small enough.
+export const MAP_WHEEL_ZOOM_RATE = 1 / 2000;
 export const MAP_PINCH_ZOOM_RATE = 1 / 200;
+
+// Duration of the easeTo for +/- click and keyboard zoom requests (the
+// `requestedZoom` prop). Previously 180ms inline — too short to read as
+// deliberate. Paired with mapboxEaseOutQuart this gives the "heavy,
+// weighted" Airbnb feel: fast commit, hard stop, no floaty tail.
+export const MAP_REQUESTED_ZOOM_EASE_MS = 400;
+
+// Drag-pan inertia "heavy / abrupt-stop" tuning (Airbnb-style feel).
+// Mapbox's defaults (deceleration 2500, linearity 0, bezier easing) produce
+// an exponential/asymptotic decay — the "floaty tail" that standard map
+// libraries use. Raising `deceleration` shortens the coast; `linearity` blends
+// the raw flick velocity in for a more direct/heavy feel; the custom easing
+// (mapboxDragPanLinearDecel) makes velocity decrease linearly instead of
+// exponentially. Combined, the map glides a short distance and stops dead
+// rather than asymptotically fading — the "weighted furniture on a rubber
+// mat" feel. Options persist across the enable()/disable() calls in
+// safeEnableInteractions and rectangle-select toggles because Mapbox stores
+// them on the handler and enable() without args reuses the last-set options.
+//
+// TUNING GUIDE:
+//   deceleration — higher = shorter coast (default 2500; Airbnb ~8000-12000)
+//   linearity    — 0..1, raw velocity blend (default 0; 0.3-0.5 feels heavy)
+//   maxSpeed     — clamp on flick velocity (default 1400; keep default)
+export const DRAG_PAN_DECELERATION = 10000;
+export const DRAG_PAN_LINEARITY = 0.35;
+export const DRAG_PAN_MAX_SPEED = 1400;
 
 // Decorative dashboard background framing. Keep these in sync with the background-mode
 // camera settings so the initial mount doesn't "pop" after the map loads.
@@ -1138,18 +1174,98 @@ export const NIGHT_STATE_LINE_DARKEN_MAX = 0;
 // We hide every Mapbox symbol layer EXCEPT city/town labels and the road/street
 // label, then restyle the kept ones for contrast against the cream land
 // (#F1EDE2) and gray roads (#C2C9D0): dark ink + a soft near-white cream
-// halo so glyphs stay legible over both. Labels fade in only when zoomed in so
-// the globe/US-wide overview stays clean (state labels carry it).
+// halo so glyphs stay legible over both. City/town labels are deliberately
+// tiered like an atlas: big metros arrive at the US-wide view, smaller cities
+// follow quickly, neighborhoods wait until local zoom, and street names remain
+// street-level only.
 export const BASEMAP_LABEL_TEXT_COLOR = STATE_LABEL_COLOR; // '#111827'
 export const BASEMAP_LABEL_HALO_COLOR = 'rgba(248, 246, 240, 0.92)';
 export const BASEMAP_LABEL_HALO_WIDTH = 1.3;
 export const BASEMAP_LABEL_HALO_BLUR = 0.4;
 
-// City/town labels: invisible at globe/US-wide zoom (where the murmur state
-// labels already carry the cartography), then fade in across the regional band
-// so they don't collide with state names.
-export const BASEMAP_SETTLEMENT_LABEL_FADE_START_ZOOM = 6.5;
-export const BASEMAP_SETTLEMENT_LABEL_FADE_END_ZOOM = 8.0;
+// Major cities are the first place names to appear. Their opacity fade is
+// intentionally pinned to the SAME zoom band as the murmur state initials
+// (MAP_MIN_ZOOM → STATE_LABELS_FULL_OPACITY_ZOOM) so big cities and state names
+// establish together at the far-out view.
+export const BASEMAP_SETTLEMENT_MAJOR_LABEL_MIN_ZOOM = MAP_MIN_ZOOM;
+export const BASEMAP_SETTLEMENT_MAJOR_LABEL_FADE_START_ZOOM = MAP_MIN_ZOOM;
+export const BASEMAP_SETTLEMENT_MAJOR_LABEL_FADE_END_ZOOM =
+	STATE_LABELS_FULL_OPACITY_ZOOM;
+export const BASEMAP_SETTLEMENT_MAJOR_LABEL_OPACITY = 0.95;
+
+// Far-out city allowlist: top 15 U.S. incorporated places by latest researched
+// Census population estimate (city proper, not metro area). State codes
+// disambiguate names like Columbus and keep the filter from picking similarly
+// named towns elsewhere.
+export const BASEMAP_SETTLEMENT_TOP_CITY_MATCHES = [
+	{ name: 'New York', iso3166_2: 'US-NY' },
+	{ name: 'Los Angeles', iso3166_2: 'US-CA' },
+	{ name: 'Chicago', iso3166_2: 'US-IL' },
+	{ name: 'Houston', iso3166_2: 'US-TX' },
+	{ name: 'Phoenix', iso3166_2: 'US-AZ' },
+	{ name: 'Philadelphia', iso3166_2: 'US-PA' },
+	{ name: 'San Antonio', iso3166_2: 'US-TX' },
+	{ name: 'San Diego', iso3166_2: 'US-CA' },
+	{ name: 'Dallas', iso3166_2: 'US-TX' },
+	{ name: 'Fort Worth', iso3166_2: 'US-TX' },
+	{ name: 'Jacksonville', iso3166_2: 'US-FL' },
+	{ name: 'Austin', iso3166_2: 'US-TX' },
+	{ name: 'San Jose', iso3166_2: 'US-CA' },
+	{ name: 'Charlotte', iso3166_2: 'US-NC' },
+	{ name: 'Columbus', iso3166_2: 'US-OH' },
+] as const;
+
+// Keep the far-out view to exactly the allowlisted top-15 city labels. Once the
+// user is past the regional/state band, the usual ranked major-city pool can
+// take over and continue the progressive reveal.
+export const BASEMAP_SETTLEMENT_TOP_CITY_ONLY_MAX_ZOOM = 6.3;
+
+// symbolrank is a GLOBAL Mapbox prominence ranking (1 = most prominent). We use
+// it only after the far-out top-15 band, when the map can safely admit the rest
+// of the major city pool.
+export const BASEMAP_SETTLEMENT_MAJOR_SYMBOLRANK_CEILING = 8;
+
+// With the far-out pool already hard-capped to 15, keep padding close to native
+// so those labels have the best chance to place without overlap. It relaxes to
+// the native default (~2px) before smaller city tiers arrive.
+export const BASEMAP_SETTLEMENT_MAJOR_TEXT_PADDING_STOPS = [
+	[3, 4],
+	[4, 4],
+	[5, 3],
+	[6, 2],
+	[7, 2],
+] as const;
+
+// Smaller cities / important towns: the settlement hierarchy below the major
+// ceiling, revealed on a zoom-stepped symbolrank window so they fill in
+// gradually AFTER the far-out top-15 view.
+export const BASEMAP_SETTLEMENT_MINOR_LABEL_MIN_ZOOM =
+	BASEMAP_SETTLEMENT_TOP_CITY_ONLY_MAX_ZOOM;
+export const BASEMAP_SETTLEMENT_MINOR_LABEL_FADE_START_ZOOM =
+	BASEMAP_SETTLEMENT_TOP_CITY_ONLY_MAX_ZOOM;
+export const BASEMAP_SETTLEMENT_MINOR_LABEL_FADE_END_ZOOM = 7.6;
+export const BASEMAP_SETTLEMENT_MINOR_LABEL_OPACITY = 0.86;
+// [zoom, inclusive symbolrank ceiling] for the minor tier. Below the first stop
+// the ceiling equals the major ceiling, so (rank > majorCeiling AND rank <=
+// ceiling) is empty and no minor settlements paint at the far-out view.
+// Strictly increasing zoom and ceiling so towns reveal monotonically.
+export const BASEMAP_SETTLEMENT_MINOR_SYMBOLRANK_STOPS = [
+	[6.3, 9],
+	[7.0, 10],
+	[8.0, 12],
+	[9.0, 14],
+] as const;
+
+export const BASEMAP_SETTLEMENT_SUBDIVISION_LABEL_MIN_ZOOM = 9.0;
+export const BASEMAP_SETTLEMENT_SUBDIVISION_LABEL_FADE_START_ZOOM = 9.35;
+export const BASEMAP_SETTLEMENT_SUBDIVISION_LABEL_FADE_END_ZOOM = 10.75;
+export const BASEMAP_SETTLEMENT_SUBDIVISION_LABEL_OPACITY = 0.72;
+
+// Settlement icon dots should not litter the early atlas view. They gently join
+// after the names have already established place context.
+export const BASEMAP_SETTLEMENT_ICON_FADE_START_ZOOM = 7.0;
+export const BASEMAP_SETTLEMENT_ICON_FADE_END_ZOOM = 8.0;
+export const BASEMAP_SETTLEMENT_ICON_OPACITY = 0.28;
 
 // Street labels: only at true street-level zoom (Mapbox's road-label layer has a
 // high native minzoom ~12), so streets never compete with city names.

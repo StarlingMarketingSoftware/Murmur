@@ -305,6 +305,10 @@ import {
 	getInteractiveMapMinZoomDelta,
 	MAP_PINCH_ZOOM_RATE,
 	MAP_WHEEL_ZOOM_RATE,
+	MAP_REQUESTED_ZOOM_EASE_MS,
+	DRAG_PAN_DECELERATION,
+	DRAG_PAN_LINEARITY,
+	DRAG_PAN_MAX_SPEED,
 	MAP_WORLD_LAND_LOCAL_SOURCE_ID,
 	MARKER_CONSTELLATION_CORE_OPACITY,
 	MARKER_CONSTELLATION_GLOW_OPACITY,
@@ -390,6 +394,7 @@ import {
 	STATE_HOVER_HIGHLIGHT_MAX_ZOOM,
 	STATE_LABELS_URL,
 	STATE_LABEL_COLOR,
+	STATE_LABEL_FULL_NAME_ZOOM,
 	STATE_META_URL,
 	STATE_OUTLINE_URL,
 	STATE_PREPARED_POLYGONS_URL,
@@ -437,7 +442,9 @@ import {
 	clamp,
 	lerp,
 	mapboxEaseOutCubic,
+	mapboxEaseOutQuart,
 	mapboxEaseInOutCubic,
+	mapboxDragPanLinearDecel,
 	normalizeLngDeg,
 	smoothstep,
 } from './math';
@@ -455,6 +462,8 @@ import {
 	applyNightLandPalette,
 	applyUsOnlyBasemapCartography,
 	ensureWorldLandFill,
+	getFirstBasemapSettlementLabelLayerId,
+	reapplyMajorSettlementLabelFade,
 	restoreBasemapCartography,
 	unsubscribeBurnEase,
 } from './basemap';
@@ -3366,10 +3375,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	);
 	// Perimeter hit-test for the "Disengage search" prompt: true when a lng/lat lies within
 	// CURATED_BLOB_DISENGAGE_PERIMETER_BAND_PX (screen px) of the blob's outer edge ring. Reuses
-	// the world-pixel segment helpers; outer-ring segments are rebuilt only when the blob
-	// signature or current worldSize changes (so a static-zoom mouse stream reuses the cache).
+	// the world-pixel segment helpers; outer-ring segments are rebuilt only when the *morphed*
+	// blob geometry identity or current worldSize changes. We key the cache on the live
+	// multipolygon reference (applyBlobMorph reassigns a fresh array on every geometry change —
+	// including resize-driven morphs at a constant zoom, which the old `signature` key missed)
+	// AND on worldSize (the segments are projected in world pixels, so a zoom change at constant
+	// geometry must still reproject). This mirrors `isLngLatInsideActiveSearchBlob`'s bbox cache.
 	const blobPerimeterSegmentsCacheRef = useRef<{
-		signature: string;
+		mp: ClippingMultiPolygon | null;
 		worldSize: number;
 		segments: ReturnType<typeof buildOuterRingWorldSegments>;
 	} | null>(null);
@@ -3380,14 +3393,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (!m || !mp?.length) return false;
 			const zoom = m.getZoom() ?? MAP_DEFAULT_ZOOM;
 			const worldSize = 512 * Math.pow(2, zoom);
-			const signature = curatedBlobSignatureRef.current;
 			const cache = blobPerimeterSegmentsCacheRef.current;
 			let segments: ReturnType<typeof buildOuterRingWorldSegments>;
-			if (cache && cache.signature === signature && cache.worldSize === worldSize) {
+			if (cache && cache.mp === mp && cache.worldSize === worldSize) {
 				segments = cache.segments;
 			} else {
 				segments = buildOuterRingWorldSegments(mp, worldSize);
-				blobPerimeterSegmentsCacheRef.current = { signature, worldSize, segments };
+				blobPerimeterSegmentsCacheRef.current = { mp, worldSize, segments };
 			}
 			if (segments.length === 0) return false;
 			const wp = latLngToWorldPixel({ lat: lngLat.lat, lng: lngLat.lng }, worldSize);
@@ -8804,6 +8816,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'line-width': stateInteractiveBorderWidthExpr,
 			},
 		});
+		const stateLabelsBeforeId = getFirstBasemapSettlementLabelLayerId(mapInstance);
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.statesLabels,
 			type: 'symbol',
@@ -8815,16 +8828,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			filter: ['>=', ['zoom'], ['get', 'minZoom']],
 			layout: {
 				// Abbreviations when zoomed out, full names when zoomed in.
-				'text-field': ['step', ['zoom'], ['get', 'key'], 8.5, ['get', 'name']],
+				'text-field': [
+					'step',
+					['zoom'],
+					['get', 'key'],
+					STATE_LABEL_FULL_NAME_ZOOM,
+					['get', 'name'],
+				],
 				'text-size': ['interpolate', ['linear'], ['zoom'], 3, 9, 5, 10, 7, 12, 10, 14],
 				'text-font': ['Inter Medium', 'Arial Unicode MS Regular'],
-				'text-allow-overlap': false,
-				'text-ignore-placement': false,
+				'text-allow-overlap': true,
+				'text-ignore-placement': true,
+				'text-letter-spacing': ['interpolate', ['linear'], ['zoom'], 3, 0.08, 7, 0.06, 10, 0.03],
 				// Smaller padding lets more initials survive collision when zoomed out.
 				'text-padding': 1,
-				// Rank 1 = largest state. Lower sort key is placed first and wins
-				// collisions, so big states stay legible far out and crowded small
-				// states (NE corner) fill in as you zoom.
+				// Rank 1 = largest state. Keep the rank stable even though labels no
+				// longer block city placement; if overlap behavior is tuned again later,
+				// large-state labels still win first.
 				'symbol-sort-key': ['get', 'rank'],
 			},
 			paint: {
@@ -8844,7 +8864,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// and never captured-then-scaled, so a baked 0 can't poison a base value.
 				'text-opacity': 0,
 			},
-		});
+		}, stateLabelsBeforeId);
 		applyStateOverlayNightColors(
 			mapInstance,
 			computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current)
@@ -10010,6 +10030,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Non-fatal — older Mapbox builds may not expose these setters.
 		}
 
+		// Drag-pan inertia: "heavy / abrupt-stop" feel (Airbnb-style). Replaces
+		// Mapbox's default exponential/asymptotic decay (the floaty tail) with a
+		// short, linearly-decelerating coast that stops dead. Options live on the
+		// handler, so the bare enable()/disable() calls in safeEnableInteractions
+		// and rectangle-select toggles reuse these values without resetting them.
+		try {
+			mapInstance.dragPan.enable({
+				deceleration: DRAG_PAN_DECELERATION,
+				linearity: DRAG_PAN_LINEARITY,
+				easing: mapboxDragPanLinearDecel,
+				maxSpeed: DRAG_PAN_MAX_SPEED,
+			});
+		} catch {
+			// Non-fatal — older Mapbox builds may not accept all options.
+		}
+
 		// Boot-stage marks (construct → style-load → land-ready → load) for the
 		// measurement scripts; latched so style reload re-fires don't re-mark.
 		let styleLoadMarked = false;
@@ -10022,7 +10058,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// background, cream land, and major lakes must exist before composite
 			// water/landcover/roads are culled below z6.
 			ensureWorldLandFill(mapInstance);
-			applyFreeTrialMapVisualTuning(mapInstance);
+			applyFreeTrialMapVisualTuning(mapInstance, interactiveFloorDeltaRef.current);
 			const initialVisualNightT = computeMoodVisualNightT(
 				nightTRef.current,
 				weatherMoodConfigRef.current
@@ -10044,7 +10080,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// See the style-load copy: keep the flat low-zoom base in place before
 			// the Streets detail gate is re-applied after full load.
 			ensureWorldLandFill(mapInstance);
-			applyFreeTrialMapVisualTuning(mapInstance);
+			applyFreeTrialMapVisualTuning(mapInstance, interactiveFloorDeltaRef.current);
 			const initialVisualNightT = computeMoodVisualNightT(
 				nightTRef.current,
 				weatherMoodConfigRef.current
@@ -13659,7 +13695,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 			map.easeTo({
 				zoom: targetZoom,
-				duration: 180,
+				duration: MAP_REQUESTED_ZOOM_EASE_MS,
+				easing: mapboxEaseOutQuart,
 				essential: true,
 			});
 		} catch {
@@ -14811,7 +14848,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Hover cards flip to pointer-events:auto while their marker is hovered, which
 	// otherwise swallows wheel events before they reach Mapbox's scroll-zoom handler
 	// (it lives on the canvas container, a sibling subtree). Re-dispatch the wheel
-	// onto that element so native zoom-to-cursor / wheel rate / pinch all still apply.
+	// onto that element so the same native-or-latched wheel pipeline still applies.
 	const forwardWheelToMap = useCallback((e: React.WheelEvent) => {
 		const map = mapRef.current;
 		if (!map) return;
@@ -16047,6 +16084,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// (incl. the shifted labels expr) — all flow through the mood path.
 		applyWeatherMoodConfig(weatherMoodConfigRef.current);
 
+		// Major-city basemap labels share the state-initials near-floor fade band,
+		// so they shift with the same delta on large monitors.
+		reapplyMajorSettlementLabelFade(m, delta);
+
 		// Curated orb morph + selected-state gradient recompute their t on the
 		// shifted ramp (t-cached, so cheap when nothing changed).
 		applyBlobMorphRef.current?.();
@@ -16557,6 +16598,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (isCuratedBlobSearchEngaged) {
 				if (emptyMapPromptEnabled && isLngLatNearActiveBlobPerimeter(e.lngLat)) {
 					clearStateHover();
+					// The band is clickable (it disengages the search), so show the pointer
+					// cursor to match the "Disengage search" prompt and make the affordance
+					// discoverable instead of looking like inert map.
+					setCursor('pointer');
 					scheduleEmptyMapPrompt(e.point);
 					return;
 				}
@@ -16693,6 +16738,47 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				return;
 			}
 
+			// A click is only a "click" (not a pan) when the pointer barely moved between
+			// mousedown and mouseup. Computed once here and reused by every disengage path
+			// below so a drag along the blob edge can never accidentally disengage. The
+			// pointer-down anchor is consumed (cleared) so a later stray click without a
+			// fresh mousedown is treated as "not moved".
+			const downClient = emptyMapPointerDownClientRef.current;
+			emptyMapPointerDownClientRef.current = null;
+			const upClient = getClientPointFromDomEvent(e.originalEvent);
+			const movedAfterPointerDown = Boolean(
+				downClient &&
+				upClient &&
+				(Math.abs(downClient.x - upClient.x) >= 6 ||
+					Math.abs(downClient.y - upClient.y) >= 6)
+			);
+
+			// Curated/"For You" blob engaged: the "Disengage search" affordance is the band
+			// hugging the blob outline (CURATED_BLOB_DISENGAGE_PERIMETER_BAND_PX on BOTH sides of
+			// the edge — see isLngLatNearActiveBlobPerimeter / the hover prompt above). This must
+			// run BEFORE the in-blob `isSearchAreaHit` early-return below: the inner half of that
+			// band overlaps the blob fill, so the old ordering swallowed those clicks as a
+			// "search interaction" and the disengage never fired — the user saw the prompt but had
+			// to fish for the razor-thin OUTSIDE sliver, which read as "buggy / needs many clicks."
+			// Markers and event stars are already handled above, so they still win over disengage.
+			// Only a genuine (non-drag) click disengages; pans and the radius-drag suppression
+			// window fall through to the normal in-blob/ambient handling unchanged.
+			if (
+				isCuratedBlobSearchEngaged &&
+				emptyMapPromptEnabled &&
+				onEmptyMapClick &&
+				!movedAfterPointerDown &&
+				!shouldSuppressEmptyMapPrompt() &&
+				isLngLatNearActiveBlobPerimeter(e.lngLat)
+			) {
+				setSelectedMarker(null);
+				setPinnedEventId(null);
+				clearEmptyMapPrompt();
+				clearStateHover();
+				onEmptyMapClick();
+				return;
+			}
+
 			// Clicks inside curated blobs are intentional search-result interactions, not
 			// empty-map clicks that should disengage the current search.
 			if (isSearchAreaHit(e)) {
@@ -16754,16 +16840,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 			}
 
-			const downClient = emptyMapPointerDownClientRef.current;
-			emptyMapPointerDownClientRef.current = null;
-			const upClient = getClientPointFromDomEvent(e.originalEvent);
-			const movedAfterPointerDown = Boolean(
-				downClient &&
-				upClient &&
-				(Math.abs(downClient.x - upClient.x) >= 6 ||
-					Math.abs(downClient.y - upClient.y) >= 6)
-			);
-
 			// Click on empty map clears any selected marker panel and dismisses a pinned
 			// event popup.
 			setSelectedMarker(null);
@@ -16775,20 +16851,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				return;
 			}
 
-			// Curated/"For You" blob engaged: only a click within the perimeter band disengages.
-			// Clicks over the blob interior or far outside it (the freely interactive ambient
-			// overlay) never disengage — they just behave like an ordinary empty-map click.
+			// Curated/"For You" blob engaged: disengage is owned entirely by the perimeter-band
+			// check above (which already returned for a valid disengage click). Reaching here while
+			// engaged means the click was NOT a disengage — blob-interior clicks already returned
+			// via isSearchAreaHit, and clicks far outside (the freely interactive ambient overlay)
+			// or pans must NOT disengage. Stop here so they never fall through to the generic
+			// empty-map disengage below.
 			if (isCuratedBlobSearchEngaged) {
-				if (
-					!movedAfterPointerDown &&
-					emptyMapPromptEnabled &&
-					onEmptyMapClick &&
-					!shouldSuppressEmptyMapPrompt() &&
-					isLngLatNearActiveBlobPerimeter(e.lngLat)
-				) {
-					clearEmptyMapPrompt();
-					onEmptyMapClick();
-				}
+				clearEmptyMapPrompt();
 				return;
 			}
 

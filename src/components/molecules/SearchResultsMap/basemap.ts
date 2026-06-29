@@ -19,10 +19,6 @@ import {
 	BASEMAP_LABEL_HALO_COLOR,
 	BASEMAP_LABEL_HALO_WIDTH,
 	BASEMAP_LABEL_TEXT_COLOR,
-	BASEMAP_SETTLEMENT_LABEL_FADE_END_ZOOM,
-	BASEMAP_SETTLEMENT_LABEL_FADE_START_ZOOM,
-	BASEMAP_STREET_LABEL_FADE_END_ZOOM,
-	BASEMAP_STREET_LABEL_FADE_START_ZOOM,
 	MAP_DEFAULT_ZOOM,
 	MAP_LAND_CREAM,
 	MAP_LANDCOVER_GREEN,
@@ -78,6 +74,15 @@ import {
 	isBasemapWaterFillLayer,
 	isBasemapWaterwayLineLayer,
 } from './basemapDetailGate';
+import {
+	buildBasemapLabelOpacityRamp,
+	buildBasemapMajorSettlementTextPaddingRamp,
+	buildBasemapSettlementIconOpacityRamp,
+	classifyBasemapLabelLayer,
+	composeBasemapSettlementFilter,
+	getBasemapLabelVisualSpec,
+	isBasemapSettlementLabelKind,
+} from './basemapLabelGate';
 import { clamp, lerp } from './math';
 import { scaleMapboxOpacityExpr } from './searchMode';
 import type {
@@ -443,44 +448,6 @@ export const applyNightLandPalette = (
 // One-time basemap setup (projection, fog, palette, label/border hides)
 // ============================================================================
 
-// Which base-style symbol layers we re-enable: city/town labels and the road
-// label. Everything else (POI, transit, airport, natural, water, country,
-// continent, Mapbox's own state label) stays hidden. Robust to Streets v12
-// naming via id substring + `source-layer`.
-const classifyBasemapLabelLayer = (
-	idLower: string,
-	sourceLayer: string | undefined
-): 'settlement' | 'street' | null => {
-	const src = (sourceLayer ?? '').toLowerCase();
-
-	// Street/road name labels (v12: `road-label-simple`, source-layer `road`).
-	// Exclude route shields / road numbers.
-	if (
-		(src === 'road' || idLower.includes('road-label')) &&
-		idLower.includes('label') &&
-		!idLower.includes('shield') &&
-		!idLower.includes('number')
-	) {
-		return 'street';
-	}
-
-	// Settlement (city / town / village) labels (v12: settlement-*-label,
-	// source-layer `place_label`). Exclude the larger geo labels that also live
-	// in place_label (country/continent/state/marine).
-	if (
-		idLower.includes('settlement') ||
-		((src === 'place_label' || idLower.includes('place-label')) &&
-			!idLower.includes('country') &&
-			!idLower.includes('continent') &&
-			!idLower.includes('state') &&
-			!idLower.includes('marine'))
-	) {
-		return 'settlement';
-	}
-
-	return null;
-};
-
 const setLayerMinZoomAtLeast = (
 	mapInstance: mapboxgl.Map,
 	layerId: string,
@@ -545,7 +512,112 @@ const applyBasemapDetailFillGate = (
 	}
 };
 
-export const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
+const basemapLabelFilterBaseByMap = new WeakMap<
+	mapboxgl.Map,
+	Map<string, any | null>
+>();
+
+const getBasemapLabelFilterBase = (mapInstance: mapboxgl.Map, layerId: string) => {
+	let byLayerId = basemapLabelFilterBaseByMap.get(mapInstance);
+	if (!byLayerId) {
+		byLayerId = new Map();
+		basemapLabelFilterBaseByMap.set(mapInstance, byLayerId);
+	}
+
+	if (byLayerId.has(layerId)) return byLayerId.get(layerId) ?? null;
+
+	try {
+		const base = mapInstance.getFilter(layerId) as any;
+		byLayerId.set(layerId, base == null ? null : base);
+		return base == null ? null : base;
+	} catch {
+		byLayerId.set(layerId, null);
+		return null;
+	}
+};
+
+const applyBasemapLabelFilterGate = (
+	mapInstance: mapboxgl.Map,
+	layerId: string,
+	kind: ReturnType<typeof classifyBasemapLabelLayer>
+) => {
+	if (kind !== 'settlement-major' && kind !== 'settlement-minor') return;
+
+	try {
+		const base = getBasemapLabelFilterBase(mapInstance, layerId);
+		// Replace the basemap's native zoom→symbolrank clause with our broader,
+		// tier-specific window (keeps class/filterrank/worldview predicates). The
+		// cached `base` is the original native filter captured before any mutation,
+		// so this stays idempotent across style reloads / re-tuning.
+		mapInstance.setFilter(
+			layerId,
+			composeBasemapSettlementFilter(base, kind) as any
+		);
+	} catch {
+		// Some style layers may not support filter mutation; opacity/minzoom still
+		// provide the main stagger.
+	}
+};
+
+export const getFirstBasemapSettlementLabelLayerId = (
+	mapInstance: mapboxgl.Map
+): string | undefined => {
+	try {
+		for (const layer of mapInstance.getStyle()?.layers ?? []) {
+			const id = (layer as any)?.id as string | undefined;
+			if (!id || id.startsWith('murmur-')) continue;
+			if ((layer as any)?.type !== 'symbol') continue;
+			const sourceLayer = (layer as any)['source-layer'] as string | undefined;
+			const kind = classifyBasemapLabelLayer(id.toLowerCase(), sourceLayer);
+			if (isBasemapSettlementLabelKind(kind)) return id;
+		}
+	} catch {
+		// Fall through; caller can append normally.
+	}
+	return undefined;
+};
+
+// Re-applies only the major-city label fade for a new interactive floor delta
+// (the major fade is pinned to the state-initials near-floor band, so it must
+// shift with that band on large monitors). Cheap + idempotent: safe to call
+// from the resize parity path without re-running the full basemap tuning.
+export const reapplyMajorSettlementLabelFade = (
+	mapInstance: mapboxgl.Map,
+	floorDelta = 0
+) => {
+	try {
+		for (const layer of mapInstance.getStyle()?.layers ?? []) {
+			const id = (layer as any)?.id as string | undefined;
+			if (!id || id.startsWith('murmur-')) continue;
+			if ((layer as any)?.type !== 'symbol') continue;
+			const sourceLayer = (layer as any)['source-layer'] as string | undefined;
+			if (classifyBasemapLabelLayer(id.toLowerCase(), sourceLayer) !== 'settlement-major') {
+				continue;
+			}
+			const spec = getBasemapLabelVisualSpec('settlement-major', floorDelta);
+			try {
+				mapInstance.setPaintProperty(
+					id,
+					'text-opacity',
+					buildBasemapLabelOpacityRamp(
+						spec.fadeStartZoom,
+						spec.fadeEndZoom,
+						spec.targetOpacity
+					) as any
+				);
+			} catch {
+				// Data-driven override we can't set — leave as-is.
+			}
+		}
+	} catch {
+		// Non-fatal.
+	}
+};
+
+export const applyFreeTrialMapVisualTuning = (
+	mapInstance: mapboxgl.Map,
+	floorDelta = 0
+) => {
 	// Projection
 	try {
 		mapInstance.setProjection({ name: 'globe' } as any);
@@ -599,47 +671,86 @@ export const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 				// it updates per-zoom with no extra render-frame hook).
 				try {
 					mapInstance.setLayoutProperty(id, 'visibility', 'visible');
+					if (isBasemapSettlementLabelKind(kind)) {
+						mapInstance.setLayoutProperty(id, 'text-variable-anchor', [
+							'top',
+							'bottom',
+							'left',
+							'right',
+							'top-left',
+							'top-right',
+							'bottom-left',
+							'bottom-right',
+						]);
+						mapInstance.setLayoutProperty(id, 'text-radial-offset', [
+							'interpolate',
+							['linear'],
+							['zoom'],
+							4,
+							0.45,
+							8,
+							0.62,
+							12,
+							0.8,
+						]);
+						mapInstance.setLayoutProperty(id, 'text-justify', 'auto');
+						mapInstance.setLayoutProperty(
+							id,
+							'symbol-sort-key',
+							['coalesce', ['get', 'symbolrank'], ['get', 'filterrank'], 99]
+						);
+						// Major tier: wide far-out collision padding caps the visible set to
+						// the ~top 15 most-prominent, well-spread US cities (sorted by the
+						// symbolrank key above), easing to the native spacing as the user
+						// zooms in. Minor/subdivision tiers keep the native default padding.
+						if (kind === 'settlement-major') {
+							mapInstance.setLayoutProperty(
+								id,
+								'text-padding',
+								buildBasemapMajorSettlementTextPaddingRamp() as any
+							);
+						}
+					}
 					mapInstance.setPaintProperty(id, 'text-color', BASEMAP_LABEL_TEXT_COLOR);
 					mapInstance.setPaintProperty(id, 'text-halo-color', BASEMAP_LABEL_HALO_COLOR);
 					mapInstance.setPaintProperty(id, 'text-halo-width', BASEMAP_LABEL_HALO_WIDTH);
 					mapInstance.setPaintProperty(id, 'text-halo-blur', BASEMAP_LABEL_HALO_BLUR);
 
-					const [startZoom, endZoom] =
-						kind === 'street'
-							? [
-									BASEMAP_STREET_LABEL_FADE_START_ZOOM,
-									BASEMAP_STREET_LABEL_FADE_END_ZOOM,
-								]
-							: [
-									BASEMAP_SETTLEMENT_LABEL_FADE_START_ZOOM,
-									BASEMAP_SETTLEMENT_LABEL_FADE_END_ZOOM,
-								];
-					const fade = [
-						'interpolate',
-						['linear'],
-						['zoom'],
-						startZoom,
-						0,
-						endZoom,
-						1,
-					] as any;
+					const spec = getBasemapLabelVisualSpec(kind, floorDelta);
+					const fade = buildBasemapLabelOpacityRamp(
+						spec.fadeStartZoom,
+						spec.fadeEndZoom,
+						spec.targetOpacity
+					) as any;
 					mapInstance.setPaintProperty(id, 'text-opacity', fade);
 					// Settlement layers also carry an icon (the city-center dot). Fade it
-					// on the same ramp so the dots don't litter the zoomed-out overview.
-					mapInstance.setPaintProperty(id, 'icon-opacity', fade);
+					// later and much lower than the text so the early atlas view reads as
+					// place names, not dotted noise.
+					mapInstance.setPaintProperty(
+						id,
+						'icon-opacity',
+						(isBasemapSettlementLabelKind(kind)
+							? buildBasemapSettlementIconOpacityRamp()
+							: fade) as any
+					);
+					applyBasemapLabelFilterGate(mapInstance, id, kind);
 					// The opacity ramp hides the labels below startZoom, but the layers are
 					// still "visible" there — glyphs get fetched and symbol layout/placement
 					// runs in tiles where nothing is legible (boot zoom 4 included). Also
 					// cull by zoom range so that work disappears entirely. Floor matters:
-					// tiles lay out at their integer tile zoom, so a 6.5 minzoom would skip
-					// layout in z6 tiles and break the 6.5→8 fade-in.
+					// tiles lay out at their integer tile zoom, so a fractional fade start
+					// should floor to the integer tile zoom that feeds the fade-in.
 					const live = mapInstance.getLayer(id) as
 						| { minzoom?: number; maxzoom?: number }
 						| undefined;
+					const nextMinZoom = Math.floor(spec.minZoom);
+					const nativeMaxZoom = live?.maxzoom ?? 24;
 					mapInstance.setLayerZoomRange(
 						id,
-						Math.max(live?.minzoom ?? 0, Math.floor(startZoom)),
-						live?.maxzoom ?? 24
+						nextMinZoom,
+						nativeMaxZoom <= nextMinZoom
+							? Math.min(24, nextMinZoom + 0.01)
+							: nativeMaxZoom
 					);
 				} catch {
 					// Data-driven property we can't override — leave the layer as-is.
