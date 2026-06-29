@@ -1113,7 +1113,9 @@ export const MARKER_CONSTELLATION_NODE_RANK_OPACITY_EXPR: any = [
 
 export const STATE_PROCESSED_GEOJSON_URL = '/geo/us-states-processed.json';
 export const STATE_META_URL = '/geo/us-states-meta.json';
-export const STATE_LABELS_URL = '/geo/us-states-labels.json';
+// ?v= bumped whenever us-states-labels.json content changes — the /geo/* route
+// is served `immutable`, so without a new URL cached clients never refetch it.
+export const STATE_LABELS_URL = '/geo/us-states-labels.json?v=8';
 export const STATE_OUTLINE_URL = '/geo/us-states-outline.json';
 export const STATE_PREPARED_POLYGONS_URL = '/geo/us-states-prepared-polygons.json';
 export const STATE_HIGHLIGHT_COLOR = '#5DAB68';

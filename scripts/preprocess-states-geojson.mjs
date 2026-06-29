@@ -137,6 +137,15 @@ const STATE_LABEL_OVERRIDES = {
 	CT: [-72.75, 41.64],
 	PA: [-77.6, 40.88],
 	TX: [-99.35, 31.48],
+	// Big-state labels nudged to the geometric center; polylabel placed these
+	// off-center (too far E/W, or too far N for CA's diagonal shape).
+	MT: [-109.6, 47.0],
+	ND: [-100.3, 47.47],
+	SD: [-100.3, 44.42],
+	CA: [-119.45, 37.2],
+	OK: [-97.5, 35.43],
+	OR: [-120.5, 43.96],
+	IA: [-93.5, 42.04],
 };
 
 // Zoom-gating for labels: big states label from the wide view, tiny ones (DC,
