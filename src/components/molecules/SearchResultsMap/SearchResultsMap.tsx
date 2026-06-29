@@ -2876,6 +2876,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const pendingMinZoomRestoreRef = useRef(false);
 	const hasAttachedMinZoomRestoreRef = useRef(false);
 
+	// Drag-pan gesture tracking. Used to (a) prevent the street-view pitch ramp
+	// from firing during a pure pan (so panning upward never changes the tilt)
+	// and (b) clamp the zoom to its drag-start value mid-pan (preventing the
+	// unintended zoom-in when dragging toward the world bounds / poles at a
+	// closer zoom level). `isRestoringDragZoomRef` breaks the feedback loop
+	// since writing tr.zoom fires another synchronous 'zoom' event.
+	const isDragPanningRef = useRef(false);
+	const dragStartZoomRef = useRef<number | null>(null);
+	const isRestoringDragZoomRef = useRef(false);
+	const lastReconciledPitchZoomRef = useRef<number | null>(null);
+
 	// Single compute+apply+report function for the interactive zoom floor. Reads
 	// only refs (deps []) so the map-init effect, the resize pipeline and the
 	// device-class effect can all share it.
@@ -13924,7 +13935,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				frameId = null;
 				try {
 					if (map.isEasing() || map.isMoving()) return;
-					const target = computeStreetViewPitch(map.getZoom() ?? MAP_DEFAULT_ZOOM);
+					const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
+					// Skip pan-only moveends: if the zoom hasn't changed since the
+					// last reconcile, the camera is already at the correct pitch for
+					// this zoom level. This prevents re-pitching after a drag-pan
+					// (panning upward should never change the tilt).
+					if (
+						isDragPanningRef.current ||
+						(lastReconciledPitchZoomRef.current != null &&
+							Math.abs(lastReconciledPitchZoomRef.current - zoom) < 0.01)
+					)
+						return;
+					lastReconciledPitchZoomRef.current = zoom;
+					const target = computeStreetViewPitch(zoom);
 					const current = map.getPitch() ?? 0;
 					if (Math.abs(current - target) < STREET_VIEW_PITCH_EPSILON_DEG) return;
 					map.easeTo({
@@ -13974,6 +13997,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			try {
 				const originalEvent = (e as { originalEvent?: Event }).originalEvent;
 				if (!originalEvent) return; // programmatic camera move — skip
+				// Skip during drag-pan: a pure pan should never change the tilt.
+				// This prevents the pitch ramp from firing when a pan-induced zoom
+				// change (e.g., at the world bounds) emits a 'zoom' event.
+				if (isDragPanningRef.current) return;
 				const tr = map.transform;
 				if (!tr || typeof tr.pitch !== 'number') return; // private-API fence
 				const target = computeStreetViewPitch(map.getZoom() ?? MAP_DEFAULT_ZOOM);
@@ -14216,6 +14243,70 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 		};
 	}, [map, isMapLoaded, isBackgroundPresentation, areaSelectionEnabled, isAreaSelecting]);
+
+	// Drag-pan gesture tracking + zoom clamp. Two fixes live here:
+	//
+	// 1. Tilt change on pan: `isDragPanningRef` is read by the continuous pitch
+	//    ramp (onZoomFrame) and the moveend reconcile to skip pitch writes while
+	//    a drag-pan is active — panning upward should never change the tilt.
+	//
+	// 2. Zoom-in at the poles: when dragging toward the world bounds (max
+	//    latitude) at a closer zoom level, the camera can pick up an unintended
+	//    zoom change. We clamp the zoom back to its drag-start value on every
+	//    'zoom' event during the drag by writing map.transform.zoom directly
+	//    (same private-API pattern the pitch ramp uses for tr.pitch). This
+	//    avoids stop()/jumpTo, which would cancel the in-flight drag handler.
+	//    `isRestoringDragZoomRef` breaks the feedback loop since writing tr.zoom
+	//    fires another synchronous 'zoom' event.
+	useEffect(() => {
+		if (!map || !isMapLoaded || isBackgroundPresentation) return;
+
+		const onDragStart = () => {
+			isDragPanningRef.current = true;
+			dragStartZoomRef.current = map.getZoom() ?? MAP_DEFAULT_ZOOM;
+		};
+		const onDragEnd = () => {
+			isDragPanningRef.current = false;
+			dragStartZoomRef.current = null;
+		};
+		const onZoomDuringDrag = (e: mapboxgl.MapboxEvent) => {
+			if (!isDragPanningRef.current) return;
+			if (isRestoringDragZoomRef.current) return;
+			if (dragStartZoomRef.current == null) return;
+			// Don't interfere with legitimate zoom gestures during a drag (e.g.,
+			// scroll-wheel zoom while click-dragging on desktop, or double-click
+			// zoom). Only clamp zoom changes that aren't from an explicit zoom
+			// input — the unintended zoom-in when dragging toward the world bounds.
+			const originalEvent = (e as { originalEvent?: Event }).originalEvent;
+			if (originalEvent) {
+				const type = originalEvent.type;
+				if (type === 'wheel' || type === 'dblclick') return;
+			}
+			try {
+				const tr = map.transform;
+				if (!tr || typeof tr.zoom !== 'number') return;
+				if (Math.abs(tr.zoom - dragStartZoomRef.current) > 0.01) {
+					isRestoringDragZoomRef.current = true;
+					tr.zoom = dragStartZoomRef.current;
+					map.triggerRepaint();
+					isRestoringDragZoomRef.current = false;
+				}
+			} catch {
+				// Non-fatal — private-API fence.
+			}
+		};
+
+		map.on('dragstart', onDragStart);
+		map.on('dragend', onDragEnd);
+		map.on('zoom', onZoomDuringDrag);
+		return () => {
+			map.off('dragstart', onDragStart);
+			map.off('dragend', onDragEnd);
+			map.off('zoom', onZoomDuringDrag);
+			isDragPanningRef.current = false;
+			dragStartZoomRef.current = null;
+		};
+	}, [map, isMapLoaded, isBackgroundPresentation]);
 
 	// Draw a gray outline around the *group of states* that have results.
 	// We union the result states' polygons so the outline is one shape.
