@@ -305,20 +305,19 @@ export const OVERVIEW_PREWARM_DEBOUNCE_MS = 350;
 // worth, so micro-pans at deep zoom don't re-fire the prewarm.
 export const OVERVIEW_PREWARM_CENTER_QUANT_DEG = 1;
 
-// Scroll/pinch zoom feel. Mapbox defaults (wheel 1/450, pinch 1/100) feel
-// jumpy on a Mac trackpad — each tick traverses a lot of zoom, which reads
-// as "aggressive." Lowering both rates produces a slower, more gradual,
-// Airbnb-style "heavy/deliberate" glide where a single scroll or flick
-// barely moves the map and a full zoom level takes several deliberate ticks.
-// Mapbox's internal easing handles the in-between smoothing once each tick
-// is small enough.
-export const MAP_WHEEL_ZOOM_RATE = 1 / 2000;
-export const MAP_PINCH_ZOOM_RATE = 1 / 200;
+// Scroll/trackpad zoom feel. Mapbox defaults (wheel 1/450, trackpad 1/100)
+// feel jumpy — each tick traverses a lot of zoom, which reads as "aggressive."
+// These rates keep the same weighted, deliberate glide while giving the wheel
+// only a little more authority than the first heavy pass: one gesture should
+// feel intentional without becoming loose or jumpy.
+export const MAP_WHEEL_ZOOM_RATE = 1 / 1850;
+export const MAP_PINCH_ZOOM_RATE = 1 / 190;
 
-// Aggressive zoom-out governor (see zoomOutGovernor.ts).
+// Sustained zoom-out governor (see zoomOutGovernor.ts): catches runaway flings
+// without making ordinary scroll-wheel zoom feel capped.
 export const ZOOM_OUT_GOVERNOR_ENABLED = true;
-export const ZOOM_OUT_GOVERNOR_MIN_RATE_MULTIPLIER = 0.32;
-export const ZOOM_OUT_GOVERNOR_ENERGY_SCALE = 1.1;
+export const ZOOM_OUT_GOVERNOR_MIN_RATE_MULTIPLIER = 0.38;
+export const ZOOM_OUT_GOVERNOR_ENERGY_SCALE = 1.2;
 export const ZOOM_OUT_GOVERNOR_ENERGY_DECAY_TAU_MS = 320;
 export const ZOOM_OUT_GOVERNOR_GESTURE_GAP_MS = 220;
 export const ZOOM_OUT_GOVERNOR_DEADZONE = 0.01;
