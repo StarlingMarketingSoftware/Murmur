@@ -41,6 +41,7 @@ import { createPortal } from 'react-dom';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import MapBottomSearchArrowIcon from '@/components/atoms/_svg/MapBottomSearchArrowIcon';
 import MapBottomSearchProfileIcon from '@/components/atoms/_svg/MapBottomSearchProfileIcon';
+import { MapStatusLoadingPill } from '@/components/molecules/MapStatusLoadingPill';
 import DashboardActionBarPlaybookIcon from '@/components/atoms/_svg/DashboardActionBarPlaybookIcon';
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 import DashboardActionBarStarIcon from '@/components/atoms/_svg/DashboardActionBarStarIcon';
@@ -2926,6 +2927,20 @@ const Murmur = () => {
 			requestId: (prev?.requestId ?? 0) + 1,
 		}));
 	}, []);
+	// Batch sibling of the single-marker request above: a drag-rectangle (Select tool)
+	// on the map selects every contact inside it at once. The child DraftingSection
+	// consumes this nonce and merges the ids into the active tab's native selection.
+	const [mapAreaSelectionRequest, setMapAreaSelectionRequest] = useState<{
+		contactIds: number[];
+		requestId: number;
+	} | null>(null);
+	const requestMapAreaSelection = useCallback((contactIds: number[]) => {
+		if (contactIds.length === 0) return;
+		setMapAreaSelectionRequest((prev) => ({
+			contactIds,
+			requestId: (prev?.requestId ?? 0) + 1,
+		}));
+	}, []);
 	// Note: no separate reset-on-tab-switch effect — DraftingSection republishes the
 	// active tab's selection (defaulting to []) whenever `view` changes, which is the
 	// single source of truth. A parent reset here would fire AFTER the child's publish
@@ -2941,6 +2956,17 @@ const Murmur = () => {
 	}, [activeView]);
 
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
+	const handleCampaignMapAreaSelect = useCallback(
+		(
+			_bounds: { south: number; west: number; north: number; east: number },
+			payload?: { contactIds?: number[] }
+		) => {
+			requestMapAreaSelection(payload?.contactIds ?? []);
+			// Match the dashboard: snap back to the grab tool after a selection completes.
+			setActiveMapTool('grab');
+		},
+		[requestMapAreaSelection]
+	);
 	// Hover state for the dimmed Write/Drafts/Inbox left "Showing" strip: dimmed
 	// by default, full opacity + interactive while hovered (like the search page).
 	const [isPresetStripHovered, setIsPresetStripHovered] = useState(false);
@@ -3831,6 +3857,13 @@ const Murmur = () => {
 		useGetCampaignContacts(routeCampaignId, {
 			enabled: Boolean(routeCampaignId) && !isMobile,
 		});
+	const [isCampaignMapOverlayBusy, setIsCampaignMapOverlayBusy] = useState(false);
+	const handleCampaignMapOverlayBusyChange = useCallback((busy: boolean) => {
+		setIsCampaignMapOverlayBusy(busy);
+	}, []);
+	const isCampaignFilterPillBusy = Boolean(
+		isCampaignMapContactsLoading || isCampaignMapOverlayBusy
+	);
 	const { data: headerEmails } = useGetEmails({
 		filters: { campaignId: routeCampaignId },
 		enabled:
@@ -4078,6 +4111,7 @@ const Murmur = () => {
 			selectedContactObjects: effectiveCampaignSelectedContactObjectsForMap,
 			showSelectedContactTooltips: true,
 			onToggleSelection: requestMapMarkerSelection,
+			onAreaSelect: handleCampaignMapAreaSelect,
 			campaignContactStatusById: effectiveCampaignMapContactStatusById,
 			campaignMarkerMode: sendQueueMapMode ? 'status' : effectiveMapGroupingForActiveView,
 			campaignHeatmapColor: sendQueueMapMode
@@ -4108,6 +4142,7 @@ const Murmur = () => {
 			requestedZoom: mapZoomControlRequest,
 			onViewportZoom: handleMapViewportZoom,
 			onViewportIdle: handleMapViewportIdle,
+			onOverlayBusyChange: handleCampaignMapOverlayBusyChange,
 			onInteractiveMinZoomChange: handleInteractiveMinZoomChange,
 			isLoading: isCampaignMapContactsLoading,
 			skipAutoFit: true,
@@ -4121,6 +4156,7 @@ const Murmur = () => {
 			effectiveCampaignMapSelectedContactIds,
 			effectiveCampaignSelectedContactObjectsForMap,
 			requestMapMarkerSelection,
+			handleCampaignMapAreaSelect,
 			effectiveCampaignMapContactStatusById,
 			effectiveMapGroupingForActiveView,
 			sendQueueMapMode,
@@ -4130,6 +4166,7 @@ const Murmur = () => {
 			globeWeatherRegionCenter,
 			globeWeatherTemperatureF,
 			handleMapViewportIdle,
+			handleCampaignMapOverlayBusyChange,
 			isCampaignMapContactsLoading,
 			handleMapViewportZoom,
 			handleInteractiveMinZoomChange,
@@ -4514,7 +4551,15 @@ const Murmur = () => {
 							<div
 								className="campaign-map-split-overlay"
 								aria-hidden="true"
-								style={campaignInitialOpacityLayerStyle}
+								// While the Select tool is active, let drag-select pass through the
+								// dimmed panel band so a box-select spans the whole map (like the
+								// dashboard). Safe because map panning is already disabled in select
+								// mode — blocking accidental pans is the band's only job.
+								style={
+									isSelectMapToolActive
+										? { ...campaignInitialOpacityLayerStyle, pointerEvents: 'none' }
+										: campaignInitialOpacityLayerStyle
+								}
 							/>
 						)}
 						<CampaignInitialRevealGradientSurface
@@ -4919,9 +4964,10 @@ const Murmur = () => {
 															}
 												}
 											>
-											<button
+											<MapStatusLoadingPill
 												type="button"
 												aria-label="Open campaign search"
+												isBusy={isCampaignFilterPillBusy}
 												onPointerEnter={() => setIsFilteringPillHovered(true)}
 												onPointerLeave={() => setIsFilteringPillHovered(false)}
 												onFocus={() => setIsFilteringPillHovered(true)}
@@ -5056,7 +5102,7 @@ const Murmur = () => {
 														</span>
 													</>
 												)}
-											</button>
+											</MapStatusLoadingPill>
 											</div>
 										)}
 
@@ -5850,6 +5896,7 @@ const Murmur = () => {
 												onInboxSentTabChange={setInboxSentTab}
 												onMapSelectionChange={setCampaignMapSelectedContactIds}
 												mapMarkerSelectionRequest={mapMarkerSelectionRequest}
+												mapAreaSelectionRequest={mapAreaSelectionRequest}
 												goToOverview={() => setActiveView('overview')}
 												goToDrafting={() => setActiveView('drafting')}
 												goToWriting={() => setActiveView('testing')}

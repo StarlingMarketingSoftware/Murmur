@@ -1892,7 +1892,13 @@ export const useCampaignsTable = (options?: {
 				'.my-campaigns-table.campaigns-finder-open'
 			);
 
-			if (targetElement?.closest('.my-campaigns-table, .campaign-finder-split-shell')) return;
+			if (
+				targetElement?.closest(
+					'.my-campaigns-table, .campaign-finder-split-shell, .campaign-row-delete-overlay'
+				)
+			) {
+				return;
+			}
 
 			if (tableBox instanceof HTMLElement) {
 				const rect = tableBox.getBoundingClientRect();

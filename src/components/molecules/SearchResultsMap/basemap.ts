@@ -614,6 +614,53 @@ export const reapplyMajorSettlementLabelFade = (
 	}
 };
 
+export const applyBasemapSettlementLabelPresentation = (
+	mapInstance: mapboxgl.Map,
+	visible: boolean,
+	floorDelta = 0
+) => {
+	try {
+		for (const layer of mapInstance.getStyle()?.layers ?? []) {
+			const id = (layer as any)?.id as string | undefined;
+			if (!id || id.startsWith('murmur-')) continue;
+			if ((layer as any)?.type !== 'symbol') continue;
+
+			const sourceLayer = (layer as any)['source-layer'] as string | undefined;
+			const kind = classifyBasemapLabelLayer(id.toLowerCase(), sourceLayer);
+			if (kind == null || !isBasemapSettlementLabelKind(kind)) continue;
+			const spec = getBasemapLabelVisualSpec(kind, floorDelta);
+
+			try {
+				mapInstance.setPaintProperty(
+					id,
+					'text-opacity',
+					visible
+						? (buildBasemapLabelOpacityRamp(
+								spec.fadeStartZoom,
+								spec.fadeEndZoom,
+								spec.targetOpacity
+							) as any)
+						: 0
+				);
+			} catch {
+				// Data-driven override we can't set — leave as-is.
+			}
+
+			try {
+				mapInstance.setPaintProperty(
+					id,
+					'icon-opacity',
+					visible ? (buildBasemapSettlementIconOpacityRamp() as any) : 0
+				);
+			} catch {
+				// Some style variants may not have an icon-opacity paint property.
+			}
+		}
+	} catch {
+		// Non-fatal.
+	}
+};
+
 export const applyFreeTrialMapVisualTuning = (
 	mapInstance: mapboxgl.Map,
 	floorDelta = 0

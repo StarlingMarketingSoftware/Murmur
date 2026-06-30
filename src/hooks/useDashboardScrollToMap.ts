@@ -80,6 +80,17 @@ const SEARCH_BAR_TRANSLATE_PX = 28; // drifts up with the logo
 const PANEL_TRANSLATE_PX = 32; // landing panel (Strategy box et al.) sinks down
 const ASK_BAR_TRANSLATE_PX = 16; // fixed bottom bar sinks toward the edge
 const MAP_CAMERA_SCRUB_EVENT = 'murmur:dashboard-map-camera-scrub';
+// Toggled on <html> for the lifetime of a scrub gesture. While present, the hero
+// search bar drops its backdrop-filter blur (see globals.css). A backdrop-filter
+// over the continuously-repainting WebGL globe is re-resolved against a shifting
+// backdrop every frame, so translating the bar sub-pixel per frame made its
+// rounded clip + border edges rasterize at a slightly different offset each frame
+// — the "edges twitching/shaking" while scrolling in (and while held mid-scroll,
+// since the globe keeps spinning). Without the blur the bar promotes to a single
+// stable compositor layer (will-change:transform is already armed), so the eased
+// translate is a clean GPU transform. Removed the instant the scrub settles, so
+// the resting/focused look is byte-for-byte unchanged.
+const SCRUB_ACTIVE_CLASS = 'dashboard-map-scrubbing';
 
 const clamp01 = (n: number) => (n < 0 ? 0 : n > 1 ? 1 : n);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -273,9 +284,16 @@ export function useDashboardScrollToMap({
 				el.style.removeProperty('will-change');
 			}
 			root.style.removeProperty('--map-scrub-scale');
+			// Scrub is fully over — restore the hero search bar's backdrop blur.
+			root.classList.remove(SCRUB_ACTIVE_CLASS);
 		};
 
 		const armWillChange = () => {
+			// Mark the scrub active so the hero search bar drops its backdrop blur for
+			// the whole gesture (it would otherwise re-blur against the repainting globe
+			// every frame and shake its edges). Same lifetime as will-change below:
+			// added once at gesture start, removed in clearInlineStyles when it settles.
+			root.classList.add(SCRUB_ACTIVE_CLASS);
 			for (const el of heroTargets) {
 				// The landing hero/search chrome has long CSS transitions for normal
 				// search-state changes. During scroll scrubbing we own opacity/transform

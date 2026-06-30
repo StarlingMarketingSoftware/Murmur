@@ -394,10 +394,10 @@ export interface DashboardDraftingDeckProps {
 	total: number;
 	isCollapsed: boolean;
 	onCollapsedChange: (collapsed: boolean) => void;
-	onViewDrafts: () => void;
-	viewDraftsDisabled?: boolean;
 	/** Abort the in-progress batch drafting (wired to the hook's `cancelGeneration`). */
 	onCancel?: () => void;
+	/** Navigate to the campaign Write tab to watch the drafting in its full view. */
+	onViewDrafting?: () => void;
 }
 
 export const DashboardDraftingDeck: FC<DashboardDraftingDeckProps> = ({
@@ -408,9 +408,8 @@ export const DashboardDraftingDeck: FC<DashboardDraftingDeckProps> = ({
 	total,
 	isCollapsed,
 	onCollapsedChange,
-	onViewDrafts,
-	viewDraftsDisabled = false,
 	onCancel,
+	onViewDrafting,
 }) => {
 	const contactById = useMemo(() => {
 		const map = new Map<number, ContactWithName>();
@@ -426,6 +425,11 @@ export const DashboardDraftingDeck: FC<DashboardDraftingDeckProps> = ({
 		const nextId = targetContactIds.find((id) => !completed.has(id));
 		return nextId ? contactById.get(nextId) ?? null : null;
 	}, [completedContactIds, contactById, livePreview.contactId, targetContactIds]);
+
+	// Minimize = fully hide the deck (header bar included). While collapsed, the map
+	// panel's "Drafting X/Y" SelectionDraftingProgressBar stays visible and its expand
+	// toggle (same isDashboardDraftingDeckCollapsed state) brings the deck back.
+	if (isCollapsed) return null;
 
 	const footerLabel = getContactDisplayName(activeOrNextContact) || 'Drafting';
 	const completedCount = Math.min(completedContactIds.length, total || targetContactIds.length);
@@ -558,30 +562,30 @@ export const DashboardDraftingDeck: FC<DashboardDraftingDeckProps> = ({
 							/>
 						</div>
 					</div>
-					<div className="flex justify-center" style={{ marginTop: 12 }}>
-						<button
-							type="button"
-							onClick={onViewDrafts}
-							disabled={viewDraftsDisabled}
-							className="font-inter text-black text-[14px] font-medium"
-							style={{
-								display: 'flex',
-								width: 212,
-								height: 27.956,
-								padding: '3.589px 58.242px 3.367px 56.758px',
-								justifyContent: 'center',
-								alignItems: 'center',
-								borderRadius: '999px',
-								background: '#FFF',
-								boxShadow: '0 1.165px 2.33px 0 rgba(0, 0, 0, 0.05)',
-								whiteSpace: 'nowrap',
-								opacity: viewDraftsDisabled ? 0.55 : 1,
-								cursor: viewDraftsDisabled ? 'not-allowed' : 'pointer',
-							}}
-						>
-							View Drafts
-						</button>
-					</div>
+					{onViewDrafting && (
+						<div className="flex justify-center" style={{ marginTop: 12 }}>
+							<button
+								type="button"
+								onClick={onViewDrafting}
+								className="font-inter text-black text-[14px] font-medium"
+								style={{
+									display: 'flex',
+									width: 212,
+									height: 27.956,
+									padding: '3.589px 58.242px 3.367px 56.758px',
+									justifyContent: 'center',
+									alignItems: 'center',
+									borderRadius: '999px',
+									background: '#FFF',
+									boxShadow: '0 1.165px 2.33px 0 rgba(0, 0, 0, 0.05)',
+									whiteSpace: 'nowrap',
+									cursor: 'pointer',
+								}}
+							>
+								View Drafting
+							</button>
+						</div>
+					)}
 				</>
 			)}
 		</div>

@@ -433,6 +433,10 @@ import {
 import { setDashboardGlobeSpinLng } from './dashboardGlobeSpinState';
 import { createZoomOutGovernor } from './zoomOutGovernor';
 import {
+	buildCompactOverlayLabel,
+	shrinkCompactOverlayLabelToFit,
+} from './compactOverlayLabel';
+import {
 	getUnsubscribeBurnTarget,
 	subscribeUnsubscribeBurn,
 } from './unsubscribeBurnState';
@@ -461,6 +465,7 @@ import {
 	jitterDuplicateCoords,
 } from './coordinates';
 import {
+	applyBasemapSettlementLabelPresentation,
 	applyFreeTrialMapVisualTuning,
 	applyMapboxFogForMoodAndNight,
 	applyMurmurGlobeLighting,
@@ -468,7 +473,6 @@ import {
 	applyUsOnlyBasemapCartography,
 	ensureWorldLandFill,
 	getFirstBasemapSettlementLabelLayerId,
-	reapplyMajorSettlementLabelFade,
 	restoreBasemapCartography,
 	unsubscribeBurnEase,
 } from './basemap';
@@ -1935,13 +1939,11 @@ const getCompactOverlayDisplaySource = (contact: ContactWithName): string =>
 
 const getCompactOverlayLabel = (contact: ContactWithName): string => {
 	const source = getCompactOverlayDisplaySource(contact) || 'Unknown';
-	const words = source
-		.replace(/[(){}[\]<>]/g, ' ')
-		.trim()
-		.split(/\s+/)
-		.filter(Boolean);
-	if (words.length <= 2) return words.join(' ') || source.trim() || 'Unknown';
-	return words.slice(0, 2).join(' ');
+	// Shorten to the first couple of significant words, but never leave the label
+	// ending on an open-ended conjunction / article / joining preposition / "&"
+	// (e.g. "Washington & Jefferson College" must not render as "Washington &").
+	const parsedLabel = buildCompactOverlayLabel(source) || source.trim() || 'Unknown';
+	return shrinkCompactOverlayLabelToFit(parsedLabel, doesCompactOverlayLabelFitMaxPill);
 };
 
 // 5px left pad + 14px icon + 4px gap + 7px right pad = 30px chrome around the
@@ -1954,6 +1956,17 @@ const COMPACT_OVERLAY_PILL_TEXT_SLACK_PX = 1;
 const COMPACT_OVERLAY_PILL_FONT = '500 12.975px Inter, Arial, sans-serif';
 // SSR fallback only (pills render client-side, where canvas measurement is used).
 const COMPACT_OVERLAY_PILL_FALLBACK_CHAR_WIDTH_PX = 7.2;
+const COMPACT_OVERLAY_PILL_MAX_TEXT_WIDTH_PX =
+	LIGHTWEIGHT_COMPACT_OVERLAY_MAX_WIDTH_PX -
+	COMPACT_OVERLAY_PILL_BASE_WIDTH_PX -
+	COMPACT_OVERLAY_PILL_TEXT_SLACK_PX;
+
+const doesCompactOverlayLabelFitMaxPill = (label: string): boolean =>
+	measureTextWidthWithFallback(
+		label,
+		COMPACT_OVERLAY_PILL_FONT,
+		COMPACT_OVERLAY_PILL_FALLBACK_CHAR_WIDTH_PX
+	) <= COMPACT_OVERLAY_PILL_MAX_TEXT_WIDTH_PX;
 
 const getCompactOverlayPillWidth = (label: string): number => {
 	const textWidth = measureTextWidthWithFallback(
@@ -2176,6 +2189,11 @@ export interface SearchResultsMapProps {
 	/** When true, hides the state outlines (useful while search is loading). */
 	isLoading?: boolean;
 	/**
+	 * Reports viewport-driven overlay contact fetches (for example when panning or
+	 * zooming into a new area) so host chrome can show a lightweight loading state.
+	 */
+	onOverlayBusyChange?: (busy: boolean) => void;
+	/**
 	 * Reports map readiness: called with true once Mapbox's `load` event fires (style + first
 	 * render complete), and with false on map teardown/recreate or unmount.
 	 */
@@ -2211,6 +2229,13 @@ export interface SearchResultsMapProps {
 	 *  OUTSIDE the curated blob while the search stays engaged, and swaps the empty-map prompt
 	 *  for a perimeter-only "Disengage search" affordance. */
 	curatedBlobSearchActive?: boolean;
+	/** When true, the currently engaged search is a category search scoped to a US state
+	 *  (e.g. "Wine, Beer, and Spirits in Pennsylvania"). Gives the locked-state outline the
+	 *  same treatment as the curated blob: the lightweight ambient overlay renders OUTSIDE the
+	 *  state polygon and the empty-map prompt becomes a perimeter-only "Disengage search"
+	 *  affordance. ANDed map-side with `hasLockedStateOutline` so it stays inert until the
+	 *  state polygon is actually drawn. */
+	stateCategorySearchActive?: boolean;
 	/** When true, prevents the map from auto-zooming to fit contacts or the locked state. */
 	skipAutoFit?: boolean;
 	/**
@@ -2386,12 +2411,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	enableStateInteractions,
 	lockedStateName,
 	isLoading,
+	onOverlayBusyChange,
 	onMapLoadedChange,
 	onMapFirstPaintChange,
 	onInteractiveMinZoomChange,
 	disableDotWaveReveal = false,
 	lightweightSearchOverlayEnabled = false,
 	curatedBlobSearchActive = false,
+	stateCategorySearchActive = false,
 	skipAutoFit,
 	cameraPadding = null,
 	autoFitPadding = null,
@@ -2723,7 +2750,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const transientOverlayResetKeyRef = useRef<string | number | null>(
 		transientOverlayResetKey
 	);
-	const hoverSourceRef = useRef<'map' | 'external' | null>(null);
+	const hoverSourceRef = useRef<'map' | 'pill' | 'external' | null>(null);
 	// Event opportunity popup: hover opens it, click pins it open (pinned wins over hover).
 	// The ref mirrors `hoveredEventId` so the unified pointer handler can read/clear hover
 	// without being added to that effect's dependency array.
@@ -3109,6 +3136,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// memos that clip the ambient overlay to outside the blob can depend on it without churning
 	// on every per-zoom morph reassignment.
 	const [hasCuratedBlobOutline, setHasCuratedBlobOutline] = useState(false);
+	// Reactive mirror of "a locked-state outline is currently drawn" (presence of
+	// lockedStateSelectionMultiPolygonRef geometry). Mirrors `hasCuratedBlobOutline` so the
+	// state-category search can drive the same clip/perimeter machinery as the curated blob.
+	const [hasLockedStateOutline, setHasLockedStateOutline] = useState(false);
 	// Source-of-truth for the blob outline morph: the natural smoothed cluster
 	// geometries in Mercator space, plus each cluster's own circle target.
 	// Each zoom event lerps every vertex from its natural position toward a
@@ -3326,17 +3357,31 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// runs; `curatedBlobSearchActive` (dashboard) excludes bbox/state-lock searches from scope.
 	const isCuratedBlobSearchEngaged =
 		searchEngaged && curatedBlobSearchActive && hasCuratedBlobOutline;
-	// IMPORTANT: the lightweight Airbnb-style overlay engages in TWO states: (1) the
-	// disengaged/general *ambient* browse state (no search), and (2) OUTSIDE the blob of an
-	// engaged curated/"For You" search. It never engages for typed state-lock or bbox searches,
-	// and the legacy contextual overlays (booking/promotion pins, gray all-contacts dots) stay
-	// suppressed via `isRadiusSearchActive` — only this lightweight layer is re-enabled here.
+	// State-category sibling of `isCuratedBlobSearchEngaged`: true while a category search scoped
+	// to a US state is engaged AND its locked-state outline is actually drawn. In this mode the
+	// locked-state display polygon (the morphed orb / state shape) plays the role of the "active
+	// search region" — the lightweight ambient overlay renders OUTSIDE it and the empty-map prompt
+	// becomes the perimeter-only "Disengage search" affordance. `stateCategorySearchActive`
+	// (dashboard) already excludes bbox/curated/non-state searches.
+	const isStateCategorySearchEngaged =
+		searchEngaged && stateCategorySearchActive && hasLockedStateOutline;
+	// Unified gate: either active-search region (curated blob OR locked-state outline) is engaged.
+	// The clip/perimeter machinery keys off this so both search types share one code path.
+	const isActiveSearchRegionEngaged =
+		isCuratedBlobSearchEngaged || isStateCategorySearchEngaged;
+	// IMPORTANT: the lightweight Airbnb-style overlay engages in THREE states: (1) the
+	// disengaged/general *ambient* browse state (no search), (2) OUTSIDE the blob of an engaged
+	// curated/"For You" search, and (3) OUTSIDE the locked-state outline of an engaged category
+	// search. It never engages for typed bbox searches, and the legacy contextual overlays
+	// (booking/promotion pins, gray all-contacts dots) stay suppressed via `isRadiusSearchActive` —
+	// only this lightweight layer is re-enabled here.
 	const isLightweightSearchOverlayActive =
 		lightweightSearchOverlayEnabled &&
 		!isBackgroundPresentation &&
 		campaignMarkerMode === 'category' &&
 		isAmbientContactsEnabled &&
 		(isCuratedBlobSearchEngaged ||
+			isStateCategorySearchEngaged ||
 			(!isRadiusSearchActive && !isAnySearch && !searchEngaged));
 	useEffect(() => {
 		if (!isLightweightSearchOverlayActive) {
@@ -3374,18 +3419,39 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// working in every country; only the lighter overview mode above is US-only.
 	const isLightweightDetailMarkerMode =
 		isLightweightSearchOverlayActive && !isCompactOverlayActive;
-	// Outside-blob clip predicate: true when (lng,lat) falls inside the active curated blob's
-	// drawn (morphed) footprint, so the lightweight ambient overlay can be excluded there while
-	// a curated search is engaged. Reads the live morphed multipolygon ref and caches its bbox
-	// per-identity for a cheap reject (the ref is reassigned with a fresh array each morph). The
-	// caller gates on `isCuratedBlobSearchEngaged`, so this is a no-op in the disengaged path.
+	// Ref mirror of `isStateCategorySearchEngaged` so the empty-dep hit-test callbacks below can
+	// resolve the active region without going stale — they must keep a stable identity so their
+	// per-identity caches and the map `move` bindings survive across renders.
+	const isStateCategorySearchEngagedRef = useRef(isStateCategorySearchEngaged);
+	useEffect(() => {
+		isStateCategorySearchEngagedRef.current = isStateCategorySearchEngaged;
+	}, [isStateCategorySearchEngaged]);
+	// Resolve the currently-active "search region" multipolygon for clip/perimeter hit-testing:
+	// the curated blob's morphed footprint when present, else (only while a state-category search
+	// is engaged) the locked-state display polygon — the morphed orb at low zoom, the raw state
+	// shape at high zoom (kept live in `selectedStateDisplayMultiPolygonRef` by
+	// `getSelectedStateDisplayMultiPolygon`, with the raw selection as a first-frame fallback).
+	const getActiveSearchRegionMultiPolygon = useCallback((): ClippingMultiPolygon | null => {
+		const blob = curatedBlobLngLatMultiPolygonRef.current;
+		if (blob?.length) return blob;
+		if (!isStateCategorySearchEngagedRef.current) return null;
+		return (
+			selectedStateDisplayMultiPolygonRef.current ??
+			lockedStateSelectionMultiPolygonRef.current
+		);
+	}, []);
+	// Outside-region clip predicate: true when (lng,lat) falls inside the active search region's
+	// drawn (morphed) footprint — the curated blob OR the locked-state outline — so the lightweight
+	// ambient overlay can be excluded there while a search is engaged. Reads the live multipolygon
+	// and caches its bbox per-identity for a cheap reject (the ref is reassigned with a fresh array
+	// each morph). The caller gates on `isActiveSearchRegionEngaged`, so this is a no-op otherwise.
 	const curatedBlobBboxCacheRef = useRef<{
 		mp: ClippingMultiPolygon | null;
 		bbox: BoundingBox | null;
 	}>({ mp: null, bbox: null });
 	const isLngLatInsideActiveSearchBlob = useCallback(
 		(lng: number, lat: number): boolean => {
-			const mp = curatedBlobLngLatMultiPolygonRef.current;
+			const mp = getActiveSearchRegionMultiPolygon();
 			if (!mp?.length) return false;
 			const cache = curatedBlobBboxCacheRef.current;
 			if (cache.mp !== mp) {
@@ -3395,16 +3461,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (cache.bbox && !isLatLngInBbox(lat, lng, cache.bbox)) return false;
 			return pointInMultiPolygon([lng, lat], mp);
 		},
-		[]
+		[getActiveSearchRegionMultiPolygon]
 	);
 	// Perimeter hit-test for the "Disengage search" prompt: true when a lng/lat lies within
-	// CURATED_BLOB_DISENGAGE_PERIMETER_BAND_PX (screen px) of the blob's outer edge ring. Reuses
-	// the world-pixel segment helpers; outer-ring segments are rebuilt only when the *morphed*
-	// blob geometry identity or current worldSize changes. We key the cache on the live
-	// multipolygon reference (applyBlobMorph reassigns a fresh array on every geometry change —
-	// including resize-driven morphs at a constant zoom, which the old `signature` key missed)
-	// AND on worldSize (the segments are projected in world pixels, so a zoom change at constant
-	// geometry must still reproject). This mirrors `isLngLatInsideActiveSearchBlob`'s bbox cache.
+	// CURATED_BLOB_DISENGAGE_PERIMETER_BAND_PX (screen px) of the active region's outer edge ring
+	// (curated blob OR locked-state outline). Reuses the world-pixel segment helpers; outer-ring
+	// segments are rebuilt only when the *morphed* geometry identity or current worldSize changes.
+	// We key the cache on the live multipolygon reference (applyBlobMorph / the state morph reassign
+	// a fresh array on every geometry change — including resize-driven morphs at a constant zoom,
+	// which the old `signature` key missed) AND on worldSize (the segments are projected in world
+	// pixels, so a zoom change at constant geometry must still reproject). This mirrors
+	// `isLngLatInsideActiveSearchBlob`'s bbox cache.
 	const blobPerimeterSegmentsCacheRef = useRef<{
 		mp: ClippingMultiPolygon | null;
 		worldSize: number;
@@ -3413,7 +3480,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const isLngLatNearActiveBlobPerimeter = useCallback(
 		(lngLat: { lng: number; lat: number }): boolean => {
 			const m = mapRef.current;
-			const mp = curatedBlobLngLatMultiPolygonRef.current;
+			const mp = getActiveSearchRegionMultiPolygon();
 			if (!m || !mp?.length) return false;
 			const zoom = m.getZoom() ?? MAP_DEFAULT_ZOOM;
 			const worldSize = 512 * Math.pow(2, zoom);
@@ -3434,7 +3501,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				CURATED_BLOB_DISENGAGE_PERIMETER_BAND_PX
 			);
 		},
-		[]
+		[getActiveSearchRegionMultiPolygon]
 	);
 	const onViewportInteractionRef = useRef<
 		SearchResultsMapProps['onViewportInteraction'] | null
@@ -4583,11 +4650,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [allContactsOverlayBufferFetchBbox]);
 
-	const { data: allContactsOverlayVisibleRawContacts } = useGetContactsMapOverlay({
+	const {
+		data: allContactsOverlayVisibleRawContacts,
+		isFetching: isAllContactsOverlayVisibleFetching,
+	} = useGetContactsMapOverlay({
 		filters: allContactsOverlayFilters,
 		enabled: Boolean(allContactsOverlayFilters),
 	});
-	const { data: allContactsOverlayBufferRawContacts } = useGetContactsMapOverlay({
+	const {
+		data: allContactsOverlayBufferRawContacts,
+		isFetching: isAllContactsOverlayBufferFetching,
+	} = useGetContactsMapOverlay({
 		filters: allContactsOverlayBufferFilters,
 		enabled: Boolean(
 			!isCompactOverlayActive &&
@@ -4630,10 +4703,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [bookingExtraFetchBbox]);
 
-	const { data: bookingExtraRawContacts } = useGetContactsMapOverlay({
-		filters: bookingExtraOverlayFilters,
-		enabled: Boolean(bookingExtraOverlayFilters),
-	});
+	const { data: bookingExtraRawContacts, isFetching: isBookingExtraOverlayFetching } =
+		useGetContactsMapOverlay({
+			filters: bookingExtraOverlayFilters,
+			enabled: Boolean(bookingExtraOverlayFilters),
+		});
 
 	const promotionOverlayFilters = useMemo(() => {
 		if (!promotionOverlayFetchBbox) return undefined;
@@ -4647,10 +4721,28 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [promotionOverlayFetchBbox]);
 
-	const { data: promotionOverlayRawContacts } = useGetContactsMapOverlay({
-		filters: promotionOverlayFilters,
-		enabled: Boolean(promotionOverlayFilters),
-	});
+	const { data: promotionOverlayRawContacts, isFetching: isPromotionOverlayFetching } =
+		useGetContactsMapOverlay({
+			filters: promotionOverlayFilters,
+			enabled: Boolean(promotionOverlayFilters),
+		});
+
+	const isOverlayBusy = Boolean(
+		isAllContactsOverlayVisibleFetching ||
+			isAllContactsOverlayBufferFetching ||
+			isBookingExtraOverlayFetching ||
+			isPromotionOverlayFetching
+	);
+
+	useEffect(() => {
+		onOverlayBusyChange?.(isOverlayBusy);
+	}, [isOverlayBusy, onOverlayBusyChange]);
+
+	useEffect(() => {
+		return () => {
+			onOverlayBusyChange?.(false);
+		};
+	}, [onOverlayBusyChange]);
 
 	const bookingExtraContacts = useMemo(() => {
 		if (!bookingExtraRawContacts || bookingExtraRawContacts.length === 0) return [];
@@ -10137,6 +10229,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// water/landcover/roads are culled below z6.
 			ensureWorldLandFill(mapInstance);
 			applyFreeTrialMapVisualTuning(mapInstance, interactiveFloorDeltaRef.current);
+			applyBasemapSettlementLabelPresentation(
+				mapInstance,
+				presentationRef.current !== 'background',
+				interactiveFloorDeltaRef.current
+			);
 			const initialVisualNightT = computeMoodVisualNightT(
 				nightTRef.current,
 				weatherMoodConfigRef.current
@@ -10159,6 +10256,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// the Streets detail gate is re-applied after full load.
 			ensureWorldLandFill(mapInstance);
 			applyFreeTrialMapVisualTuning(mapInstance, interactiveFloorDeltaRef.current);
+			applyBasemapSettlementLabelPresentation(
+				mapInstance,
+				presentationRef.current !== 'background',
+				interactiveFloorDeltaRef.current
+			);
 			const initialVisualNightT = computeMoodVisualNightT(
 				nightTRef.current,
 				weatherMoodConfigRef.current
@@ -10687,6 +10789,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const wasBackground = prevPresentationRef.current === 'background';
 		prevPresentationRef.current = presentation;
+
+		applyBasemapSettlementLabelPresentation(
+			map,
+			!isBackgroundPresentation,
+			interactiveFloorDeltaRef.current
+		);
 
 		// Stop any prior background spin when presentation changes.
 		backgroundSpinCleanupRef.current?.();
@@ -11426,6 +11534,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return ambientActiveCategories?.[categoryIndex] !== false;
 		};
 
+		// Reserve uncategorized "people" for the older zoomed-in detail marker layer:
+		// the lightweight compact overlay only ever shows pills that resolve to a real
+		// category icon (coffee / restaurants / venues / festivals / weddings /
+		// wine-beer-spirits / radio). Anything that would fall back to the generic blue
+		// "people" spark icon (null category OR a curatedCategory with no mapped icon)
+		// is excluded here so it never appears as a compact pill.
+		const isCompactOverlayCategorized = (contact: ContactWithName): boolean =>
+			isCleanMapMarkerCategory(getCompactOverlayWhatForContact(contact, null));
+
 		const coordsFor = (contact: ContactWithName): LatLngLiteral | null =>
 			getAllContactsOverlayContactCoords(contact) ?? getLatLngFromContact(contact);
 
@@ -11537,10 +11654,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const coords = coordsFor(prev.contact);
 			if (!coords) continue;
 			if (!ambientContactAllowed(prev.contact)) continue;
-			// Clip to OUTSIDE the engaged curated blob: survivors that fall inside the blob
-			// (e.g. after a center-drag moved the circle over them) are dropped.
+			// People belong to the zoomed-in detail layer only — drop any carried-over
+			// uncategorized survivor so it fades out instead of lingering as a spark pill.
+			if (!isCompactOverlayCategorized(prev.contact)) continue;
+			// Clip to OUTSIDE the engaged search region (curated blob OR locked state): survivors
+			// that fall inside it (e.g. after a center-drag moved the circle over them) are dropped.
 			if (
-				isCuratedBlobSearchEngaged &&
+				isActiveSearchRegionEngaged &&
 				isLngLatInsideActiveSearchBlob(coords.lng, coords.lat)
 			)
 				continue;
@@ -11563,13 +11683,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			for (const contact of allContactsOverlayContactsWithCoords) {
 				if (pickedIds.has(contact.id)) continue;
 				if (!ambientContactAllowed(contact)) continue;
+				// Skip uncategorized "people" — they're reserved for the older zoomed-in
+				// detail marker layer and must not surface as compact suggestion pills.
+				if (!isCompactOverlayCategorized(contact)) continue;
 				const coords = coordsFor(contact);
 				if (!coords) continue;
 				if (!isLatLngInBbox(coords.lat, coords.lng, viewport)) continue;
-				// Clip to OUTSIDE the engaged curated blob — the in-blob region keeps only its
-				// search-result markers; the ambient pill layer renders everywhere else.
+				// Clip to OUTSIDE the engaged search region (curated blob OR locked state) — the
+				// in-region keeps only its result markers; the ambient pill layer renders elsewhere.
 				if (
-					isCuratedBlobSearchEngaged &&
+					isActiveSearchRegionEngaged &&
 					isLngLatInsideActiveSearchBlob(coords.lng, coords.lat)
 				)
 					continue;
@@ -11681,8 +11804,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		getAllContactsOverlayContactCoords,
 		ambientUncategorizedActive,
 		ambientActiveCategories,
-		isCuratedBlobSearchEngaged,
+		isActiveSearchRegionEngaged,
 		hasCuratedBlobOutline,
+		hasLockedStateOutline,
 		isLngLatInsideActiveSearchBlob,
 	]);
 
@@ -12672,6 +12796,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const maxTotalMarkers = isLightweightDetailMarkerMode
 				? LIGHTWEIGHT_DETAIL_MARKER_BUDGET
 				: MAX_TOTAL_DOTS;
+			// A state-category search's result markers are the user's targeted set (e.g. every
+			// winery in the state), not a curated sampling — keep them at full density even when the
+			// lightweight detail overlay engages for the OUTSIDE-region ambient markers. Only the
+			// ambient overlay (and booking/promotion extras) stay on the lighter detail budget.
+			const maxResultMarkers =
+				isLightweightDetailMarkerMode && !isStateCategorySearchEngaged
+					? LIGHTWEIGHT_DETAIL_MARKER_BUDGET
+					: MAX_TOTAL_DOTS;
 
 			const bounds = mapInstance.getBounds();
 			if (!bounds) return;
@@ -12916,7 +13048,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// Reserve budget for promotion overlay pins so they always render.
 				const maxPrimaryDots = Math.max(
 					0,
-					maxTotalMarkers - nextPromotionOverlayVisible.length
+					maxResultMarkers - nextPromotionOverlayVisible.length
 				);
 
 				// Build a stable "candidate pool" larger than what we render, then pick a
@@ -13539,10 +13671,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					if (!isLatLngInBbox(coords.lat, coords.lng, viewportBbox)) continue;
 					// Never render gray dots in water once state polygons are ready. Cached per id.
 					if (!isAllContactsOverlayContactOnLand(contact, coords)) continue;
-					// Clip the lightweight detail markers to OUTSIDE the engaged curated blob —
-					// the searched region keeps only its result markers until the user disengages.
+					// Clip the lightweight detail markers to OUTSIDE the engaged search region (curated
+					// blob OR locked state) — the region keeps only its result markers until disengage.
 					if (
-						isCuratedBlobSearchEngaged &&
+						isActiveSearchRegionEngaged &&
 						isLngLatInsideActiveSearchBlob(coords.lng, coords.lat)
 					)
 						continue;
@@ -13751,7 +13883,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			isAllContactsOverlayContactOnLand,
 			isCompactOverlayActive,
 			isLightweightDetailMarkerMode,
-			isCuratedBlobSearchEngaged,
+			isActiveSearchRegionEngaged,
+			isStateCategorySearchEngaged,
 			isLngLatInsideActiveSearchBlob,
 		]
 	);
@@ -14489,6 +14622,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lockedStateSelectionMultiPolygonRef.current = null;
 			lockedStateSelectionBboxRef.current = null;
 			lockedStateSelectionKeyRef.current = null;
+			setHasLockedStateOutline(false);
 			selectedStateMorphSourceRef.current = null;
 			selectedStateDisplayMultiPolygonRef.current = null;
 			selectedStateLastMorphTAppliedRef.current = Number.NaN;
@@ -14503,6 +14637,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lockedStateSelectionMultiPolygonRef.current = null;
 			lockedStateSelectionBboxRef.current = null;
 			lockedStateSelectionKeyRef.current = null;
+			setHasLockedStateOutline(false);
 			selectedStateMorphSourceRef.current = null;
 			selectedStateDisplayMultiPolygonRef.current = null;
 			selectedStateLastMorphTAppliedRef.current = Number.NaN;
@@ -14518,6 +14653,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lockedStateSelectionMultiPolygonRef.current = null;
 			lockedStateSelectionBboxRef.current = null;
 			lockedStateSelectionKeyRef.current = null;
+			setHasLockedStateOutline(false);
 			selectedStateMorphSourceRef.current = null;
 			selectedStateDisplayMultiPolygonRef.current = null;
 			selectedStateLastMorphTAppliedRef.current = Number.NaN;
@@ -14531,6 +14667,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		lockedStateSelectionMultiPolygonRef.current = found;
 		lockedStateSelectionBboxRef.current = found ? bboxFromMultiPolygon(found) : null;
 		lockedStateSelectionKeyRef.current = lockedStateKey;
+		setHasLockedStateOutline(true);
 		selectedStateMorphSourceRef.current = createSelectedStateMorphSource(found);
 		selectedStateDisplayMultiPolygonRef.current = null;
 		selectedStateLastMorphTAppliedRef.current = Number.NaN;
@@ -15068,14 +15205,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		(
 			contact: ContactWithName,
 			domEvent?: MouseEvent | TouchEvent,
-			options?: { allowLowZoom?: boolean }
+			options?: { allowLowZoom?: boolean; source?: 'map' | 'pill' }
 		) => {
 			clearEmptyMapPrompt();
 			// Don't trigger tiny-dot hover interactions until sufficiently zoomed in.
 			// Compact pills opt out because their DOM target is large/readable at wide zoom.
 			if (!options?.allowLowZoom && zoomLevel < HOVER_INTERACTION_MIN_ZOOM) return;
 
-			hoverSourceRef.current = 'map';
+			// Compact pills are real DOM nodes layered ABOVE the Mapbox canvas, so they
+			// own their own enter/leave. Tag their hover as 'pill' (not 'map') so the
+			// canvas-level teardown paths — the coalesced `mousemove` "no feature here"
+			// branch and the canvas `mouseleave` handler, both gated on
+			// `hoverSourceRef.current === 'map'` — never tear down a pill hover the
+			// instant the cursor crosses off the canvas onto the pill.
+			hoverSourceRef.current = options?.source ?? 'map';
 			if (hoverClearTimeoutRef.current) {
 				clearTimeout(hoverClearTimeoutRef.current);
 				hoverClearTimeoutRef.current = null;
@@ -15152,8 +15295,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 
-		// If the map is actively hovering something, don't override it from the panel.
-		if (hoverSourceRef.current === 'map') return;
+		// If the map (a marker) or a compact pill is actively hovering something,
+		// don't override it from the panel.
+		if (hoverSourceRef.current === 'map' || hoverSourceRef.current === 'pill') return;
 
 		if (nextId == null) {
 			if (hoverSourceRef.current !== 'external') return;
@@ -15994,7 +16138,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			let displayMultiPolygon: ClippingMultiPolygon | null = null;
 			if (!shouldUseCircleMorph) {
+				// High zoom (no orb morph): the drawn outline is the raw state polygon. Keep the
+				// display ref pointed at it (and invalidate the morph cache with NaN) so the
+				// outside-region clip + perimeter hit-tests read the shape the user actually sees,
+				// instead of a stale orb left over from a previous low-zoom frame.
 				displayMultiPolygon = selection;
+				selectedStateDisplayMultiPolygonRef.current = selection;
+				selectedStateLastMorphTAppliedRef.current = Number.NaN;
 			} else if (
 				Number.isFinite(selectedStateLastMorphTAppliedRef.current) &&
 				Math.abs(t - selectedStateLastMorphTAppliedRef.current) < 0.001 &&
@@ -16286,8 +16436,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		applyWeatherMoodConfig(weatherMoodConfigRef.current);
 
 		// Major-city basemap labels share the state-initials near-floor fade band,
-		// so they shift with the same delta on large monitors.
-		reapplyMajorSettlementLabelFade(m, delta);
+		// so they shift with the same delta on large monitors. Keep the dashboard
+		// background presentation label-free while preserving the interactive ramps.
+		applyBasemapSettlementLabelPresentation(
+			m,
+			presentationRef.current !== 'background',
+			delta
+		);
 
 		// Curated orb morph + selected-state gradient recompute their t on the
 		// shifted ramp (t-cached, so cheap when nothing changed).
@@ -16779,17 +16934,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// window to reach the (interactive) popup box, whose onMouseEnter cancels this close.
 			scheduleEventHoverClose();
 
-			// While a curated/"For You" blob is engaged the empty-map prompt becomes a
-			// perimeter-only "Disengage search" affordance. Inside the band hugging the blob's
-			// outer edge → show it (this overrides the in-blob clear below). Anywhere else — the
-			// blob interior, or the freely interactive ambient overlay outside it — suppress the
-			// prompt entirely. The generic fallthrough scheduleEmptyMapPrompt calls below are
-			// routed through this wrapper so they never re-show the prompt in this mode.
+			// While a search region is engaged (curated/"For You" blob OR a locked-state category
+			// search) the empty-map prompt becomes a perimeter-only "Disengage search" affordance.
+			// Inside the band hugging the region's outer edge → show it (this overrides the in-region
+			// clear below). Anywhere else — the region interior, or the freely interactive ambient
+			// overlay outside it — suppress the prompt entirely. The generic fallthrough
+			// scheduleEmptyMapPrompt calls below are routed through this wrapper so they never
+			// re-show the prompt in this mode.
 			const scheduleAmbientEmptyMapPrompt = (point: { x: number; y: number }) => {
-				if (isCuratedBlobSearchEngaged) return;
+				if (isActiveSearchRegionEngaged) return;
 				scheduleEmptyMapPrompt(point);
 			};
-			if (isCuratedBlobSearchEngaged) {
+			if (isActiveSearchRegionEngaged) {
 				if (emptyMapPromptEnabled && isLngLatNearActiveBlobPerimeter(e.lngLat)) {
 					clearStateHover();
 					// The band is clickable (it disengages the search), so show the pointer
@@ -16834,8 +16990,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				return;
 			}
 
-			// If a marker is hovered, don't also hover-highlight the state underneath.
-			if (hoverSourceRef.current === 'map' && hoveredMarkerIdRef.current != null) {
+			// If a marker or a compact pill is hovered, don't also hover-highlight the
+			// state underneath.
+			if (
+				(hoverSourceRef.current === 'map' || hoverSourceRef.current === 'pill') &&
+				hoveredMarkerIdRef.current != null
+			) {
 				clearStateHover();
 				clearEmptyMapPrompt();
 				return;
@@ -16947,23 +17107,39 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					Math.abs(downClient.y - upClient.y) >= 6)
 			);
 
-			// Curated/"For You" blob engaged: the "Disengage search" affordance is the band
-			// hugging the blob outline (CURATED_BLOB_DISENGAGE_PERIMETER_BAND_PX on BOTH sides of
-			// the edge — see isLngLatNearActiveBlobPerimeter / the hover prompt above). This must
-			// run BEFORE the in-blob `isSearchAreaHit` early-return below: the inner half of that
-			// band overlaps the blob fill, so the old ordering swallowed those clicks as a
-			// "search interaction" and the disengage never fired — the user saw the prompt but had
-			// to fish for the razor-thin OUTSIDE sliver, which read as "buggy / needs many clicks."
-			// Markers and event stars are already handled above, so they still win over disengage.
-			// Only a genuine (non-drag) click disengages; pans and the radius-drag suppression
-			// window fall through to the normal in-blob/ambient handling unchanged.
+			// Active search region engaged (curated/"For You" blob OR a locked-state category
+			// search): the "Disengage search" affordance is the band hugging the region outline
+			// (CURATED_BLOB_DISENGAGE_PERIMETER_BAND_PX on BOTH sides of the edge — see
+			// isLngLatNearActiveBlobPerimeter / the hover prompt above). This must run BEFORE the
+			// in-region `isSearchAreaHit` early-return below: the inner half of that band overlaps the
+			// region fill, so the old ordering swallowed those clicks as a "search interaction" and
+			// the disengage never fired — the user saw the prompt but had to fish for the razor-thin
+			// OUTSIDE sliver, which read as "buggy / needs many clicks." Markers and event stars are
+			// already handled above, so they still win over disengage. Only a genuine (non-drag)
+			// click disengages; pans and the radius-drag suppression window fall through unchanged.
+			//
+			// State-category refinement: the band can straddle a neighboring state's territory, so a
+			// click that lands OUTSIDE the locked state and over a different selectable state should
+			// start a NEW category search there (handled by the state-click block below) instead of
+			// disengaging. Inner-band clicks (still inside the locked state) and clicks over non-state
+			// area (e.g. water) keep disengaging.
+			const perimeterDisengageBlockedByNeighborState =
+				isStateCategorySearchEngaged &&
+				stateInteractionsEnabled &&
+				isStateLayerReady &&
+				(map.getZoom() ?? MAP_DEFAULT_ZOOM) <= STATE_HOVER_HIGHLIGHT_MAX_ZOOM + 0.001 &&
+				!isCoordsInLockedState({ lat: e.lngLat.lat, lng: e.lngLat.lng }) &&
+				map.queryRenderedFeatures(e.point, {
+					layers: [MAPBOX_LAYER_IDS.statesFillHit],
+				}).length > 0;
 			if (
-				isCuratedBlobSearchEngaged &&
+				isActiveSearchRegionEngaged &&
 				emptyMapPromptEnabled &&
 				onEmptyMapClick &&
 				!movedAfterPointerDown &&
 				!shouldSuppressEmptyMapPrompt() &&
-				isLngLatNearActiveBlobPerimeter(e.lngLat)
+				isLngLatNearActiveBlobPerimeter(e.lngLat) &&
+				!perimeterDisengageBlockedByNeighborState
 			) {
 				setSelectedMarker(null);
 				setPinnedEventId(null);
@@ -17045,13 +17221,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				return;
 			}
 
-			// Curated/"For You" blob engaged: disengage is owned entirely by the perimeter-band
-			// check above (which already returned for a valid disengage click). Reaching here while
-			// engaged means the click was NOT a disengage — blob-interior clicks already returned
-			// via isSearchAreaHit, and clicks far outside (the freely interactive ambient overlay)
-			// or pans must NOT disengage. Stop here so they never fall through to the generic
-			// empty-map disengage below.
-			if (isCuratedBlobSearchEngaged) {
+			// Active search region engaged (curated blob OR locked-state category): disengage is
+			// owned entirely by the perimeter-band check above (which already returned for a valid
+			// disengage click). Reaching here while engaged means the click was NOT a disengage —
+			// region-interior clicks already returned via isSearchAreaHit / isActiveSearchSelectionHit,
+			// a different-state click already returned via the state-click block, and clicks far
+			// outside (the freely interactive ambient overlay) or pans must NOT disengage. Stop here
+			// so they never fall through to the generic empty-map disengage below.
+			if (isActiveSearchRegionEngaged) {
 				clearEmptyMapPrompt();
 				return;
 			}
@@ -17142,7 +17319,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		shouldSuppressEmptyMapPrompt,
 		emptyMapPromptEnabled,
 		onEmptyMapClick,
-		isCuratedBlobSearchEngaged,
+		isActiveSearchRegionEngaged,
+		isStateCategorySearchEngaged,
+		isCoordsInLockedState,
 		isLngLatNearActiveBlobPerimeter,
 		handleMarkerMouseOver,
 		handleMarkerMouseOut,
@@ -17464,6 +17643,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const baseDotsWavePendingSearchKeyRef = useRef<string | null>(null);
 	// Tracks the last query key that actually played the base-dot wave animation.
 	const baseDotsWaveLastSearchKeyRef = useRef<string>('');
+	// Defer the base-dot reveal wave until the cinematic search camera ease settles
+	// (moveend) instead of popping the dots in mid-flight. `awaitingSettle` marks a
+	// wave that is armed but waiting for the camera to stop; `moveEndArmed` guards
+	// against stacking duplicate one-shot moveend listeners; the settle nonce
+	// re-enters the wave effect once the camera stops.
+	const baseDotsWaveAwaitingSettleRef = useRef<boolean>(false);
+	const baseDotsWaveMoveEndArmedRef = useRef<boolean>(false);
+	const [baseDotsWaveSettleNonce, setBaseDotsWaveSettleNonce] = useState(0);
+	// Tracks the search-query key whose stale result layers have already been cleared.
+	// On a brand-new dashboard search the previous result set's markers/pills are
+	// dropped immediately (instead of lingering, recolored, while the new request
+	// loads). Initialized to the current query so a deep-linked initial search is not
+	// treated as "new" and wiped on mount.
+	const newSearchStaleClearKeyRef = useRef<string>((searchQuery ?? '').trim());
 	const hoveredMarkerVisualRef = useRef<{ sourceId: string; id: number } | null>(null);
 	const markerConstellationEdgesRef = useRef<MarkerConstellationEdge[]>([]);
 	const markerConstellationUsesCategoryColorsRef = useRef<boolean>(false);
@@ -18268,6 +18461,93 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		setMarkerConstellationLineOpacity,
 	]);
 
+	// Drop the previous search's result layers the instant a NEW dashboard search
+	// starts loading, so the old (scattered, recolored) markers and overview pills
+	// don't linger over the new region while React Query serves the stale
+	// `keepPreviousData` result set. The per-layer effects below intentionally
+	// preserve their sources during `isLoading` (to avoid zoom flicker on
+	// same-query refetches); this central reset is what distinguishes a brand-new
+	// query from a refetch. The marker constellation already self-clears on a new
+	// key, so it is deliberately not touched here.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const searchKey = (searchQuery ?? '').trim();
+		const isRealSearch =
+			searchEngaged && searchKey.length > 0 && !isBackgroundPresentation;
+		if (!isRealSearch) {
+			// Not a real dashboard search (e.g. the campaign contacts view): never wipe.
+			newSearchStaleClearKeyRef.current = searchKey;
+			return;
+		}
+		const isNewSearchKey = searchKey !== newSearchStaleClearKeyRef.current;
+		if (!isNewSearchKey) return;
+		if (!isLoading) {
+			// Fresh data for this key has begun to land (or an instant cache hit) —
+			// close the window so the populated layers are never wiped.
+			newSearchStaleClearKeyRef.current = searchKey;
+			return;
+		}
+
+		// New query + still loading (contacts are stale): clear the stale result
+		// layers. Keep clearing across subsequent loading renders for this same key
+		// (do NOT advance the ref until loading flips false) so a late stale
+		// re-render can't repaint the old set.
+		const emptySource = (sourceId: string) => {
+			try {
+				const layerSource = map.getSource(sourceId) as
+					| mapboxgl.GeoJSONSource
+					| undefined;
+				layerSource?.setData({ type: 'FeatureCollection', features: [] } as any);
+			} catch {
+				// Ignore style-timing races.
+			}
+		};
+
+		// Base result dots.
+		if (baseDotsWaveCancelRef.current) {
+			baseDotsWaveCancelRef.current();
+			baseDotsWaveCancelRef.current = null;
+		}
+		baseDotsWaveMetaRef.current = null;
+		baseDotsLastDataKeyRef.current = '';
+		emptySource(MAPBOX_SOURCE_IDS.markersBase);
+
+		// Selected-marker halo. Mirror the "nothing selected" hard-clear so the
+		// rebuild isn't no-op'd by a stale build signature when the new results land.
+		if (selectedMarkerFadeRafRef.current != null) {
+			cancelAnimationFrame(selectedMarkerFadeRafRef.current);
+			selectedMarkerFadeRafRef.current = null;
+		}
+		selectedMarkerFadeByIdRef.current.clear();
+		selectedMarkerScaleByIdRef.current.clear();
+		selectedMarkerFeatureByIdRef.current = new Map();
+		selectedMarkerBuildSignatureRef.current = '';
+		emptySource(MAPBOX_SOURCE_IDS.markersSelected);
+
+		// Ambient gray / detail overlay dots.
+		emptySource(MAPBOX_SOURCE_IDS.markersAllOverlay);
+
+		// Promotion + booking pins.
+		emptySource(MAPBOX_SOURCE_IDS.markersPromotionDot);
+		emptySource(MAPBOX_SOURCE_IDS.markersPromotionPin);
+		promotionDotIdsRef.current = new Set();
+		promotionPinIdsRef.current = new Set();
+		emptySource(MAPBOX_SOURCE_IDS.markersBookingPin);
+
+		// Lightweight overview pills are positioned from the settled viewport, which
+		// is still the previous (whole-US) view until the camera settles on the new
+		// region. Reset it so the pills don't flash at stale positions; they
+		// repopulate, freshly placed, on the next viewport settle after the fly.
+		setCompactOverlaySettledViewport(null);
+	}, [
+		map,
+		isMapLoaded,
+		searchQuery,
+		isLoading,
+		searchEngaged,
+		isBackgroundPresentation,
+	]);
+
 	// Base result dots
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
@@ -18532,23 +18812,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 		prefersReducedMotion =
 			prefersReducedMotion || disableDotWaveReveal || isStableCuratedMarkerSet;
-		// During long camera eases (e.g. cinematic fitBounds after a top-search),
-		// avoid priming the "hide then reveal" wave frame. Otherwise dots can
-		// disappear mid-flight and then reappear as the wave runs.
-		let isCameraMoving = false;
-		try {
-			isCameraMoving = map.isMoving();
-		} catch {
-			isCameraMoving = false;
-		}
+		// Prime the "hide then reveal" wave frame even during a cinematic camera ease.
+		// The reveal itself is deferred until the camera settles (see the wave effect),
+		// so the dots stay hidden through the fly and wave in together with the
+		// constellation once the camera stops — instead of popping in mid-flight.
 		const shouldPrimeWaveFrameZero =
 			baseDotsWavePrevIsLoadingRef.current &&
 			searchKey.length > 0 &&
 			!isBackgroundPresentation &&
 			!prefersReducedMotion &&
 			baseDotsWavePendingSearchKeyRef.current === searchKey &&
-			features.length > 0 &&
-			!isCameraMoving;
+			features.length > 0;
 		if (shouldPrimeWaveFrameZero) {
 			const expr0 = [
 				'interpolate',
@@ -19181,21 +19455,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Only schedule a wave when a *new* search actually enters a loading state.
 			// This prevents zoom/viewport refetches from triggering a full hide→reveal cycle.
 			if (loading && isNewSearchKey) {
-				const pendingCinematic = pendingSearchQueryCinematicRef.current;
-				const isCinematicSearchKey =
-					!!pendingCinematic &&
-					pendingCinematic.key === searchKey &&
-					Date.now() - pendingCinematic.at < 10_000;
-
-				// In fullscreen map-view searches we often kick off a long cinematic camera ease.
-				// Running the hide→reveal wave during that sweep causes dots to disappear/reappear.
-				// Mark the search as "handled" so we keep dots steady instead.
-				if (isCinematicSearchKey) {
-					baseDotsWaveLastSearchKeyRef.current = searchKey;
-					baseDotsWavePendingSearchKeyRef.current = null;
-				} else {
-					baseDotsWavePendingSearchKeyRef.current = searchKey;
-				}
+				// A brand-new search just entered loading: arm the reveal wave for this
+				// key. Even for fullscreen map-view searches with a long cinematic camera
+				// ease, the wave is now deferred until the camera settles (with the dots
+				// primed hidden in the meantime), so it no longer flickers mid-sweep —
+				// keep it armed instead of marking it "handled". Reset any prior deferral
+				// state so a superseded search can't resume.
+				baseDotsWavePendingSearchKeyRef.current = searchKey;
+				baseDotsWaveAwaitingSettleRef.current = false;
 			}
 
 			stopRunningWave();
@@ -19218,10 +19485,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			prevLoading && !loading && baseDotsWavePendingSearchKeyRef.current === searchKey;
 		baseDotsWavePrevIsLoadingRef.current = loading;
 
-		if (!shouldStartWave) return;
+		// A wave can also resume here after being deferred for the camera ease below:
+		// on that moveend-triggered re-entry `prevLoading` is already false, so
+		// `shouldStartWave` is false even though the (still-pending) wave should run.
+		const isAwaitingSettleResume =
+			baseDotsWaveAwaitingSettleRef.current &&
+			!loading &&
+			baseDotsWavePendingSearchKeyRef.current === searchKey;
+
+		if (!shouldStartWave && !isAwaitingSettleResume) return;
 
 		// If the map camera is still moving/easing (common in cinematic search sweeps),
-		// keep dots steady. Starting the wave now causes a visible disappear/reappear flicker.
+		// defer the reveal until it settles. The dots are already primed hidden
+		// (frame 0) by the base-dots source effect, so they stay invisible through the
+		// fly and wave in together with the constellation on `moveend` — instead of
+		// popping in mid-flight. Keep the wave armed (pending key intact) and re-enter
+		// via the settle nonce once the camera stops.
 		let isCameraMoving = false;
 		try {
 			isCameraMoving = map.isMoving();
@@ -19230,11 +19509,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 		if (isCameraMoving) {
 			stopRunningWave();
-			restoreBaseDotsRendering(0);
-			baseDotsWaveLastSearchKeyRef.current = searchKey;
-			baseDotsWavePendingSearchKeyRef.current = null;
+			baseDotsWaveAwaitingSettleRef.current = true;
+			if (!baseDotsWaveMoveEndArmedRef.current) {
+				baseDotsWaveMoveEndArmedRef.current = true;
+				try {
+					map.once('moveend', () => {
+						baseDotsWaveMoveEndArmedRef.current = false;
+						setBaseDotsWaveSettleNonce((value) => value + 1);
+					});
+				} catch {
+					baseDotsWaveMoveEndArmedRef.current = false;
+				}
+			}
 			return;
 		}
+		baseDotsWaveAwaitingSettleRef.current = false;
 
 		stopRunningWave();
 
@@ -19385,6 +19674,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		searchQuery,
 		disableDotWaveReveal,
 		campaignFootprintContactIdSet,
+		baseDotsWaveSettleNonce,
 	]);
 
 	// Keep the frozen constellation's rendered line source synced after style/coordinate changes.
@@ -19709,7 +19999,36 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			setMarkerConstellationCompositionNonce((value) => value + 1);
 			setMarkerConstellationLineOpacity(0, 0, 0);
 			writeMarkerConstellationSourceData();
-			startMarkerConstellationReveal();
+			// Defer the line fade-in until the cinematic camera ease settles so the
+			// constellation reveals together with the dot-wave instead of fading in
+			// over the fly. The lines are already at opacity 0 above, so they stay
+			// invisible through the fly; reveal on `moveend` only if this composition is
+			// still the active one.
+			let constellationCameraMoving = false;
+			try {
+				constellationCameraMoving = map.isMoving();
+			} catch {
+				constellationCameraMoving = false;
+			}
+			if (constellationCameraMoving) {
+				const revealCompositionKey = compositionKey;
+				try {
+					map.once('moveend', () => {
+						if (cancelled) return;
+						if (
+							markerConstellationComposedSearchKeyRef.current ===
+								revealCompositionKey &&
+							!markerConstellationRevealDoneRef.current
+						) {
+							startMarkerConstellationReveal();
+						}
+					});
+				} catch {
+					startMarkerConstellationReveal();
+				}
+			} else {
+				startMarkerConstellationReveal();
+			}
 		});
 
 		return () => {
@@ -22102,12 +22421,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 								onMouseEnter={(event) =>
 									handleMarkerMouseOver(entry.contact, event.nativeEvent, {
 										allowLowZoom: true,
+										source: 'pill',
 									})
 								}
 								onMouseLeave={() => handleMarkerMouseOut(entry.contact.id)}
 								onFocus={() =>
 									handleMarkerMouseOver(entry.contact, undefined, {
 										allowLowZoom: true,
+										source: 'pill',
 									})
 								}
 								onBlur={() => handleMarkerMouseOut(entry.contact.id)}
@@ -22131,11 +22452,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 									background: '#FFFFFF',
 									boxShadow: entry.isSelected
 										? '0 0 0 1.4px #258530, 0 5px 14px -4px rgba(0, 0, 0, 0.25)'
-										: '0 5px 14px -4px rgba(0, 0, 0, 0.25)',
+										: isHovered
+											? '0 9px 22px -4px rgba(0, 0, 0, 0.32)'
+											: '0 5px 14px -4px rgba(0, 0, 0, 0.25)',
 									cursor: 'pointer',
-									transform: isHovered ? 'scale(1.045)' : 'scale(1)',
+									// Grow noticeably on hover so the pill "pops" toward the cursor.
+									transform: isHovered ? 'scale(1.12)' : 'scale(1)',
 									transformOrigin: 'center center',
-									transition: 'transform 120ms ease-out, box-shadow 120ms ease-out',
+									transition: 'transform 130ms ease-out, box-shadow 130ms ease-out',
 									fontFamily: 'Inter, Arial, sans-serif',
 									fontSize: '12.975px',
 									fontWeight: 500,

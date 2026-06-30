@@ -42,7 +42,15 @@ type ProfileSidePanelBoxProps = {
 	onProfileBioUpdate?: (bio: string | null) => void | Promise<void>;
 };
 
-const profileSwatchColors = ['#D5E5FC', '#EEF5FE', '#FFFFFF'] as const;
+// The three small boxes next to the name mirror profile completeness.
+// Not-yet-complete (incl. empty) keeps the original blue; once the profile is
+// complete the trio turns green and deepens with each ready media piece (1–3).
+const PROFILE_SWATCH_INCOMPLETE = ['#D5E5FC', '#EEF5FE', '#FFFFFF'] as const;
+const PROFILE_SWATCH_COMPLETE_BY_MEDIA = [
+	['#C3FBD1', '#E5F8E5', '#FFFFFF'], // 1 ready media
+	['#C3FBD1', '#8EDEA2', '#FFFFFF'], // 2 ready media
+	['#C3FBD1', '#8EDEA2', '#71D189'], // 3 ready media
+] as const;
 const profileFieldLabelClassName =
 	'font-inter text-[10.292px] font-medium leading-[18.479px] text-[#9A9A9A]';
 const completedProfileFieldLabelClassName =
@@ -879,7 +887,11 @@ export const ProfileSidePanelBox = ({
 	// data: genre, area, performing name, bio, and at least one ready media clip.
 	// Media only counts once it's actually saved (status "ready") so in-flight or
 	// failed uploads don't prematurely tint the panel.
-	const hasReadyMedia = profileMedia.some((asset) => asset.status === 'ready');
+	const readyMediaCount = profileMedia.reduce(
+		(n, asset) => (asset.status === 'ready' ? n + 1 : n),
+		0,
+	);
+	const hasReadyMedia = readyMediaCount > 0;
 	const completedProfileFieldCount = [
 		Boolean(selectedGenre),
 		Boolean(selectedArea),
@@ -891,6 +903,16 @@ export const ProfileSidePanelBox = ({
 		PROFILE_PANEL_FILL_BACKGROUNDS[
 			Math.min(completedProfileFieldCount, PROFILE_PANEL_FILL_BACKGROUNDS.length - 1)
 		];
+	// The profile crosses the "complete" threshold once every info field carries
+	// real data (genre, area, performing name, bio) and at least one media clip is
+	// ready — i.e. all five tracked inputs are filled. At that point the inner card
+	// area turns solid green to mirror the fully-filled outer panel.
+	const isProfileComplete = completedProfileFieldCount === PROFILE_PANEL_FILL_BACKGROUNDS.length - 1;
+	// The trio of boxes next to the name mirrors completeness: blue until the
+	// profile is complete, then green deepening with each ready media piece (1–3).
+	const profileSwatchColors = isProfileComplete
+		? PROFILE_SWATCH_COMPLETE_BY_MEDIA[Math.min(Math.max(readyMediaCount, 1), 3) - 1]
+		: PROFILE_SWATCH_INCOMPLETE;
 
 	const handleSelectMediaFile = (event: ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0];
@@ -1227,9 +1249,9 @@ export const ProfileSidePanelBox = ({
 					) : (
 						<div className={nameClassName}>{displayName}</div>
 					)}
-					{profileSwatchColors.map((color) => (
+					{profileSwatchColors.map((color, index) => (
 						<div
-							key={color}
+							key={index}
 							aria-hidden="true"
 							className="box-border h-[21px] w-[21px] shrink-0 rounded-[2.86px] border-[0.782px] border-black opacity-50"
 							style={{ backgroundColor: color }}
@@ -1238,7 +1260,9 @@ export const ProfileSidePanelBox = ({
 				</div>
 				<div className="flex flex-1 items-center justify-center bg-[#F2F7FF]">
 					<CustomScrollbar
-						className="h-[578px] w-[352px] rounded-[9px] bg-white"
+						className={`h-[578px] w-[352px] rounded-[9px] transition-[background-color] duration-500 ease-out ${
+							isProfileComplete ? 'bg-[#7BDB7F]' : 'bg-white'
+						}`}
 						contentClassName="box-border flex flex-col rounded-[9px] px-[9px] pt-[8px] pb-[18px]"
 						thumbWidth={2}
 						thumbColor="#000000"

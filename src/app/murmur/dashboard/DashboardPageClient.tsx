@@ -174,6 +174,7 @@ import { useWebsitePreview } from '@/contexts/WebsitePreviewContext';
 import { getMurmurRootScale } from '@/utils/rootScale';
 import { DashboardBootBackdrop } from '@/components/molecules/DashboardBootBackdrop/DashboardBootBackdrop';
 import { DashboardBootProgress } from '@/components/molecules/DashboardBootProgress/DashboardBootProgress';
+import { MapStatusLoadingPill } from '@/components/molecules/MapStatusLoadingPill';
 import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
 import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
 import DashboardHeroDateWeatherBar from './DashboardHeroDateWeatherBar';
@@ -6556,6 +6557,10 @@ const DashboardContent = () => {
 		number | null
 	>(null);
 	const mapPanelHoverResearchClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const [isMapOverlayBusy, setIsMapOverlayBusy] = useState(false);
+	const handleMapOverlayBusyChange = useCallback((busy: boolean) => {
+		setIsMapOverlayBusy(busy);
+	}, []);
 	// Show loading in the map panel when:
 	// 1. A search is actively pending/loading, OR
 	// 2. We're in fromHome mode and the search hasn't been executed yet (user not signed in or waiting for search trigger)
@@ -6564,6 +6569,9 @@ const DashboardContent = () => {
 		isLoadingContacts ||
 		isRefetchingContacts ||
 		(fromHomeParam && isMapView && (!isSignedIn || !hasSearched));
+	const isMapStatusPillBusy =
+		isMapView &&
+		Boolean(isSearchPending || isLoadingContacts || isRefetchingContacts || isMapOverlayBusy);
 	useEffect(() => {
 		if (isMapView && !isMapResultsLoading) return;
 		if (mapPanelHoverResearchClearTimeoutRef.current) {
@@ -7396,17 +7404,18 @@ const DashboardContent = () => {
 		}, 3000);
 		return () => window.clearTimeout(timer);
 	}, [isAddToCampaignMode, zeroCampaignEntryState]);
-	const [
-		initialDashboardSearchSuggestionSeeds,
-		setInitialDashboardSearchSuggestionSeeds,
-	] = useState<InitialDashboardSearchSuggestionSeed[]>(
-		getDefaultInitialDashboardSearchSuggestionSeeds
-	);
+	// Location-aware seeds for the no-results recovery suggestion pills (rendered above
+	// the map-results bottom search bar). Loaded once from /api/search-suggestions when
+	// the user is in the search results context, so they are ready if a search comes back
+	// empty. Mirrors the engine that formerly fed the initial-dashboard suggestion bar.
+	const [emptyResultSuggestionSeeds, setEmptyResultSuggestionSeeds] = useState<
+		InitialDashboardSearchSuggestionSeed[]
+	>(getDefaultInitialDashboardSearchSuggestionSeeds);
+	const hasLoadedEmptyResultSuggestionsRef = useRef(false);
 	const [mapBottomSearchActiveHeight, setMapBottomSearchActiveHeight] = useState<number>(
 		MAP_RESULTS_BOTTOM_SEARCH_BOX.activeHeight
 	);
 	const mapBottomSearchInputRef = useRef<HTMLTextAreaElement | null>(null);
-	const hasLoadedInitialDashboardSearchSuggestionsRef = useRef(false);
 	// The bottom "anything" box grows to its tall composing variant only while the
 	// user is actively drafting a search. A draft session is "armed" when the user
 	// types text or toggles Keyword/Radius, and it is disarmed the moment a search
@@ -7420,30 +7429,51 @@ const DashboardContent = () => {
 		(hasMapBottomSearchDraftText || isMapBottomSearchKeywordOrRadiusMode);
 	const isMapBottomSearchExpanded =
 		isMapBottomSearchActive || isMapBottomSearchDraftExpanded;
-	const initialDashboardSearchSuggestions = useMemo(
+
+	// A completed search on the dashboard search tab that returned no contacts. Drives the
+	// recovery suggestion pills above the bottom search bar.
+	const isSearchEmptyResult =
+		hasSearched &&
+		!isLoadingContacts &&
+		!isRefetchingContacts &&
+		(contacts === undefined ||
+			(Array.isArray(contacts) && contacts.length === 0));
+	// Suggestions are derived from the FAILED query so they steer the user toward related
+	// searches that actually return results (the engine falls back to location-popular
+	// categories when the query has no usable signal).
+	const emptyResultSearchSuggestions = useMemo(
 		() =>
 			buildInitialDashboardSearchSuggestions(
-				mapBottomSearchValue,
-				initialDashboardSearchSuggestionSeeds
+				activeSearchQuery,
+				emptyResultSuggestionSeeds
 			),
-		[initialDashboardSearchSuggestionSeeds, mapBottomSearchValue]
+		[activeSearchQuery, emptyResultSuggestionSeeds]
 	);
+	// Float the recovery pills clear of whatever stacks above the bottom search bar so they
+	// never overlap it: the radius slider (29px tall, anchored at +12) in normal chrome, and
+	// the follow-up segmented control in compressed chrome (which flips above the bar and
+	// already clears the radius slider, so we only need to clear the control itself).
+	const emptyResultSuggestionsBottomOffsetPx = isCompressedMapChrome
+		? (isRadiusModeEnabled ? 53 : 20) +
+			MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.height +
+			12
+		: isRadiusModeEnabled
+			? 53
+			: 12;
 
 	useEffect(() => {
 		if (
-			hasLoadedInitialDashboardSearchSuggestionsRef.current ||
-			!isMapBottomSearchExpanded ||
+			hasLoadedEmptyResultSuggestionsRef.current ||
 			isMobile !== false ||
-			hasSearched ||
+			!hasSearched ||
 			activeTab !== 'search' ||
-			fromHomeParam ||
-			isMapView
+			fromHomeParam
 		) {
 			return;
 		}
 
 		let cancelled = false;
-		hasLoadedInitialDashboardSearchSuggestionsRef.current = true;
+		hasLoadedEmptyResultSuggestionsRef.current = true;
 
 		const loadSuggestions = async () => {
 			const params = new URLSearchParams();
@@ -7521,11 +7551,11 @@ const DashboardContent = () => {
 					!cancelled &&
 					suggestionSeeds.length === INITIAL_DASHBOARD_SEARCH_SUGGESTION_COUNT
 				) {
-					setInitialDashboardSearchSuggestionSeeds(suggestionSeeds);
+					setEmptyResultSuggestionSeeds(suggestionSeeds);
 				}
 			} catch {
 				if (!cancelled) {
-					hasLoadedInitialDashboardSearchSuggestionsRef.current = false;
+					hasLoadedEmptyResultSuggestionsRef.current = false;
 				}
 			}
 		};
@@ -7535,14 +7565,7 @@ const DashboardContent = () => {
 		return () => {
 			cancelled = true;
 		};
-	}, [
-		activeTab,
-		fromHomeParam,
-		hasSearched,
-		isMapBottomSearchExpanded,
-		isMapView,
-		isMobile,
-	]);
+	}, [activeTab, fromHomeParam, hasSearched, isMobile]);
 
 	useLayoutEffect(() => {
 		const baseHeight = isMapView
@@ -7895,13 +7918,6 @@ const DashboardContent = () => {
 			}
 		},
 		[lastFreeTextArgs, lastCuratedArgs, triggerFreeTextSearch, triggerCuratedSearch]
-	);
-
-	const handleInitialDashboardSearchSuggestionClick = useCallback(
-		(suggestion: string) => {
-			void submitMapBottomSearchQuery(suggestion);
-		},
-		[submitMapBottomSearchQuery]
 	);
 
 	const cancelMapBottomSearchFollowupPreviewClear = useCallback(() => {
@@ -10246,8 +10262,8 @@ const DashboardContent = () => {
 	useEffect(() => {
 		if (typeof document === 'undefined') return;
 
-		if (isMapView) {
-			document.body.classList.add('murmur-map-view');
+		if (isMapView || bootPhase !== 'done') {
+			document.body.classList.toggle('murmur-map-view', isMapView);
 			lenis?.stop();
 		} else {
 			document.body.classList.remove('murmur-map-view');
@@ -10258,7 +10274,7 @@ const DashboardContent = () => {
 			document.body.classList.remove('murmur-map-view');
 			lenis?.start();
 		};
-	}, [isMapView, lenis]);
+	}, [isMapView, bootPhase, lenis]);
 
 	// Shared Mapbox layer (background globe + interactive results) — one map instance.
 	// One-shot signal set only by the campaign "Search" tab. Captured once at mount (the URL is
@@ -10294,6 +10310,7 @@ const DashboardContent = () => {
 	// expanding the table or the calendar would trip and would wrongly kill the whole gesture.
 	const scrollToMapEnabled =
 		shouldLockLandingDashboardScroll &&
+		bootPhase === 'done' && // do not arm the gesture during the boot splash/fade
 		!isCalendarPopupOpen &&
 		!isInstantTabTransition &&
 		!isUnsubscribeFlowOpen;
@@ -10784,6 +10801,18 @@ const DashboardContent = () => {
 		isMapSearchEngaged &&
 		!mapBboxFilter &&
 		(activeRadiusSearchOverlay != null || isForYouCuratedSearch);
+	// A category search scoped to a US state (e.g. "Wine, Beer, and Spirits in
+	// Pennsylvania") is the active geometry when engaged and the map drew the locked-state
+	// outline. This is the scope gate that lets the lightweight ambient overlay render
+	// OUTSIDE the state polygon and swaps the empty-map prompt for the perimeter-only
+	// "Disengage search" affordance — the same treatment the curated blob gets.
+	// `shouldEnableMapStateCategorySelection` already requires a real category query, a valid
+	// state, and excludes bbox/curated searches; the map ANDs this with its own
+	// `hasLockedStateOutline` so it stays inert until the state polygon is actually drawn.
+	const stateCategorySearchActive =
+		isMapSearchEngaged &&
+		shouldEnableMapStateCategorySelection &&
+		Boolean(lockedStateNameForMap);
 	const canUseAmbientContactsOverlay =
 		isMapView && hasSearched && activeSearchQuery.trim().length > 0;
 	const shouldShowAmbientContactsOnMap = canUseAmbientContactsOverlay;
@@ -10898,6 +10927,7 @@ const DashboardContent = () => {
 			searchEngaged: shouldShowSearchGeometryOnMap,
 			lightweightSearchOverlayEnabled: isMapView,
 			curatedBlobSearchActive: isMapView && curatedBlobSearchActive,
+			stateCategorySearchActive: isMapView && stateCategorySearchActive,
 			dashboardDraftingContactStatusById: isMapView
 				? dashboardDraftingMapStatusByContactId
 				: undefined,
@@ -10912,7 +10942,7 @@ const DashboardContent = () => {
 			instantAutoFitNonce: instantTabFitNonce,
 			emptyMapClickPrompt:
 				canDisengageMapSearch && isMapSearchEngaged
-					? curatedBlobSearchActive
+					? curatedBlobSearchActive || stateCategorySearchActive
 						? 'Disengage search'
 						: 'Click to see all contacts'
 					: null,
@@ -10923,6 +10953,7 @@ const DashboardContent = () => {
 			onVisibleOverlayContactsChange: isMapView
 				? handleMapVisibleOverlayContactsChange
 				: undefined,
+			onOverlayBusyChange: handleMapOverlayBusyChange,
 			activeTool: isMapView ? activeMapTool : undefined,
 			requestedZoom: isMapView ? mapZoomControlRequest : null,
 			selectedAreaBounds: selectedAreaBoundsForMap,
@@ -10992,6 +11023,7 @@ const DashboardContent = () => {
 			handleMapViewportIdle,
 			handleMapViewportInteraction,
 			handleMapViewportZoom,
+			handleMapOverlayBusyChange,
 			handleInteractiveMinZoomChange,
 			handleMapVisibleOverlayContactsChange,
 			hoveredMapPanelContactId,
@@ -11024,6 +11056,7 @@ const DashboardContent = () => {
 			shouldShowSearchGeometryOnMap,
 			shouldShowAmbientContactsOnMap,
 			curatedBlobSearchActive,
+			stateCategorySearchActive,
 			shouldLoadDashboardMapCampaignFootprint,
 			shouldPreloadAmbientContactsOnMap,
 			shouldSpinBackgroundMap,
@@ -12131,118 +12164,6 @@ const DashboardContent = () => {
 				fadeMs={DASHBOARD_BOOT_FADE_MS}
 				maxWaitMs={DASHBOARD_BOOT_MAX_WAIT_MS}
 			/>
-			{!hasSearched &&
-				activeTab === 'search' &&
-				!fromHomeParam &&
-				!isMapView &&
-				!isUnsubscribeFlowOpen && (
-					<div
-						className="dashboard-ask-anything-root fixed left-1/2 pointer-events-none"
-						onMouseEnter={cancelMapBottomSearchFollowupPreviewClear}
-						onMouseLeave={scheduleMapBottomSearchFollowupPreviewClear}
-						style={{
-							bottom: `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.bottomOffset}px`,
-							width: `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.width}px`,
-							height: `${mapBottomSearchActiveHeight}px`,
-							transform: 'translateX(-50%)',
-							transition: 'none',
-							zIndex: 70,
-						}}
-					>
-						{/* Inner scrub target: the wheel-to-map gesture animates this div's
-						    opacity/transform, leaving the React-owned translateX(-50%) on the
-						    fixed wrapper above untouched. */}
-						<div className="dashboard-ask-bar-scrub relative h-full w-full pointer-events-none">
-							{isMapBottomSearchExpanded &&
-								!isMapBottomCategoryMode &&
-								!isMapBottomForYouMode && (
-									<div
-										aria-label="Search suggestions"
-										className="absolute left-1/2 flex flex-col gap-[5px] pointer-events-none"
-										style={{
-											bottom: 'calc(100% + 12px)',
-											width: '404px',
-											transform: 'translateX(-50%)',
-										}}
-									>
-										{initialDashboardSearchSuggestions.map((label, index) => (
-											<button
-												type="button"
-												aria-label={`Search for ${label}`}
-												key={`initial-dashboard-search-suggestion-${index}`}
-												className="initial-dashboard-search-suggestion pointer-events-auto flex items-center overflow-hidden"
-												style={
-													{
-														width: '404px',
-														height: '29px',
-														borderRadius: '10px',
-														'--initial-dashboard-search-suggestion-background': '#F8F8F8',
-														'--initial-dashboard-search-suggestion-opacity':
-															INITIAL_DASHBOARD_ACTIVE_SEARCH_SUGGESTIONS[index]?.opacity ??
-															0.5,
-														animationDelay: `${
-															(initialDashboardSearchSuggestions.length - 1 - index) * 48
-														}ms`,
-														boxSizing: 'border-box',
-														padding: '0 16px',
-													} as React.CSSProperties
-												}
-												onMouseDown={(event) => {
-													event.preventDefault();
-													event.stopPropagation();
-												}}
-												onClick={(event) => {
-													event.stopPropagation();
-													handleInitialDashboardSearchSuggestionClick(label);
-												}}
-											>
-												<span
-													className="truncate"
-													style={{
-														color: '#000000',
-														fontFamily: 'Inter, sans-serif',
-														fontSize: '12.809px',
-														fontStyle: 'normal',
-														fontWeight: 400,
-														lineHeight: '20.199px',
-													}}
-												>
-													{label}
-												</span>
-											</button>
-										))}
-									</div>
-								)}
-							<MapBottomSearchBar
-								value={mapBottomSearchValue}
-								isExpanded={isMapBottomSearchExpanded}
-								activeHeight={mapBottomSearchActiveHeight}
-								inputRef={mapBottomSearchInputRef}
-								appearance="initial-dashboard"
-								mode={
-									isMapBottomCategoryMode
-										? 'category'
-										: isMapBottomForYouMode
-											? 'for-you'
-											: 'anything'
-								}
-								categoryWhatValue={whatValue}
-								categoryWhereValue={whereValue}
-								activeCategoryField={activeMapBottomCategoryField}
-								onActivate={handleMapBottomSearchActivate}
-								onSubmit={handleMapBottomSearchSubmit}
-								onValueChange={handleMapBottomSearchValueChange}
-								onActiveChange={handleMapBottomSearchActiveChange}
-								onCategoryFieldFocus={handleMapBottomCategoryFieldFocus}
-								onCategoryWhatChange={handleMapBottomCategoryWhatChange}
-								onCategoryWhereChange={handleMapBottomCategoryWhereChange}
-								onCategoryWhatEnter={handleMapBottomCategoryWhatEnter}
-								onCategorySubmit={handleMapBottomCategorySubmit}
-								onForYouSubmit={handleMapBottomForYouSubmit}
-							/>
-						</div>
-					</div>
-				)}
 
 			<div
 				data-dashboard-scroll-lock={shouldLockDashboardPageScroll ? 'true' : undefined}
@@ -14336,13 +14257,14 @@ const DashboardContent = () => {
 													: undefined,
 											}}
 										>
-											<button
+											<MapStatusLoadingPill
 												type="button"
 												aria-label={
 													mapCampaignName
 														? `Open all contacts in ${mapCampaignName}`
 														: 'Open all campaign contacts'
 												}
+												isBusy={isMapStatusPillBusy}
 												disabled={!mapCampaignId}
 												tabIndex={mapCampaignId ? 0 : -1}
 												onPointerEnter={() => mapCampaignId && setIsSearchingPillHovered(true)}
@@ -14459,7 +14381,7 @@ const DashboardContent = () => {
 														</span>
 													</>
 												)}
-											</button>
+											</MapStatusLoadingPill>
 										</div>
 									) : null;
 
@@ -15141,60 +15063,6 @@ const DashboardContent = () => {
 																				onToggleSelection={handleMapToggleSelection}
 																			/>
 																		)}
-												{hasNoSearchResults && isMapSearchEngaged && !isError && (
-																			<div
-																				className="absolute inset-0 z-[120] flex items-start justify-center pt-[120px] pointer-events-none"
-																				style={{
-																					paddingRight: isMidMapChrome
-																						? `${MAP_VIEW_RIGHT_PANEL_FOOTPRINT_PX}px`
-																						: undefined,
-																				}}
-																			>
-																				<div
-																					className="pointer-events-auto flex flex-col items-center justify-center text-center"
-																					style={{
-																						width: 517,
-																						height: 174,
-																						borderRadius: 8,
-																						backgroundColor: 'rgba(106, 180, 227, 0.8)', // #6AB4E3 @ 80%
-																						border: '3px solid #143883',
-																					}}
-																				>
-																					<div
-																						className="flex flex-col items-center justify-center gap-[16px]"
-																						style={{ width: 496 }}
-																					>
-																						<div
-																							className="flex items-center justify-center text-center bg-white"
-																							style={{
-																								width: 496,
-																								height: 58,
-																								borderRadius: 8,
-																								border: '2px solid #101010',
-																							}}
-																						>
-																							<span className="font-secondary font-bold text-[18px] leading-none text-black">
-																								Keep Exploring
-																							</span>
-																						</div>
-																						<div
-																							className="flex items-center justify-center text-center bg-white px-6"
-																							style={{
-																								width: 496,
-																								height: 58,
-																								borderRadius: 8,
-																								border: '2px solid #101010',
-																							}}
-																						>
-																							<span className="font-secondary font-bold text-[16px] leading-tight text-black">
-																								Try a new search term to find contacts in
-																								this area
-																							</span>
-																						</div>
-																					</div>
-																				</div>
-																			</div>
-																		)}
 																		{/* Search Failed overlay - shown when there's an error */}
 																		{isError && (
 																			<div
@@ -15359,6 +15227,7 @@ const DashboardContent = () => {
 																			onDraftingDeckCollapsedChange={
 																				setIsDashboardDraftingDeckCollapsed
 																			}
+																			onViewDrafting={() => navigateToCampaignRouteFromSearch('write')}
 																		/>
 																	</div>
 													</div>
@@ -16119,6 +15988,66 @@ const DashboardContent = () => {
 																						zIndex: 130,
 																					}}
 																				>
+																					{isSearchEmptyResult &&
+																						!isMapBottomCategoryMode &&
+																						!isMapBottomForYouMode && (
+																						<div
+																							aria-label="Search suggestions"
+																							className="absolute left-1/2 flex flex-col gap-[5px] pointer-events-none"
+																							style={{
+																								bottom: `calc(100% + ${emptyResultSuggestionsBottomOffsetPx}px)`,
+																								width: '100%',
+																								transform: 'translateX(-50%)',
+																							}}
+																						>
+																							{emptyResultSearchSuggestions.map((label, index) => (
+																								<button
+																									type="button"
+																									aria-label={`Search for ${label}`}
+																									key={`empty-result-search-suggestion-${index}`}
+																									className="initial-dashboard-search-suggestion pointer-events-auto flex items-center overflow-hidden"
+																									style={
+																										{
+																											width: '100%',
+																											height: '29px',
+																											borderRadius: '10px',
+																											'--initial-dashboard-search-suggestion-background': '#F8F8F8',
+																											'--initial-dashboard-search-suggestion-opacity':
+																												INITIAL_DASHBOARD_ACTIVE_SEARCH_SUGGESTIONS[index]?.opacity ??
+																												0.5,
+																											animationDelay: `${
+																												(emptyResultSearchSuggestions.length - 1 - index) * 48
+																											}ms`,
+																											boxSizing: 'border-box',
+																											padding: '0 16px',
+																										} as React.CSSProperties
+																									}
+																									onMouseDown={(event) => {
+																										event.preventDefault();
+																										event.stopPropagation();
+																									}}
+																									onClick={(event) => {
+																										event.stopPropagation();
+																										void submitMapBottomSearchQuery(label);
+																									}}
+																								>
+																									<span
+																										className="truncate"
+																										style={{
+																											color: '#000000',
+																											fontFamily: 'Inter, sans-serif',
+																											fontSize: '12.809px',
+																											fontStyle: 'normal',
+																											fontWeight: 400,
+																											lineHeight: '20.199px',
+																										}}
+																									>
+																										{label}
+																									</span>
+																								</button>
+																							))}
+																						</div>
+																					)}
 																					<MapBottomSearchBar
 																						value={mapBottomSearchValue}
 																						isExpanded={isMapBottomSearchExpanded}
