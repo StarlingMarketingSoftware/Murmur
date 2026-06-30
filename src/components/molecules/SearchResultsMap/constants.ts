@@ -310,14 +310,14 @@ export const OVERVIEW_PREWARM_CENTER_QUANT_DEG = 1;
 // These rates keep the same weighted, deliberate glide while giving the wheel
 // only a little more authority than the first heavy pass: one gesture should
 // feel intentional without becoming loose or jumpy.
-export const MAP_WHEEL_ZOOM_RATE = 1 / 1850;
-export const MAP_PINCH_ZOOM_RATE = 1 / 190;
+export const MAP_WHEEL_ZOOM_RATE = 1 / 1700;
+export const MAP_PINCH_ZOOM_RATE = 1 / 175;
 
 // Sustained zoom-out governor (see zoomOutGovernor.ts): catches runaway flings
 // without making ordinary scroll-wheel zoom feel capped.
 export const ZOOM_OUT_GOVERNOR_ENABLED = true;
-export const ZOOM_OUT_GOVERNOR_MIN_RATE_MULTIPLIER = 0.38;
-export const ZOOM_OUT_GOVERNOR_ENERGY_SCALE = 1.2;
+export const ZOOM_OUT_GOVERNOR_MIN_RATE_MULTIPLIER = 0.42;
+export const ZOOM_OUT_GOVERNOR_ENERGY_SCALE = 1.3;
 export const ZOOM_OUT_GOVERNOR_ENERGY_DECAY_TAU_MS = 320;
 export const ZOOM_OUT_GOVERNOR_GESTURE_GAP_MS = 220;
 export const ZOOM_OUT_GOVERNOR_DEADZONE = 0.01;
