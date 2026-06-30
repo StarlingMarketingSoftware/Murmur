@@ -618,6 +618,10 @@ const SortableAIBlock = ({
 			const container = customInstructionsContainerRef.current;
 			if (!target || !container) return;
 			if (container.contains(target)) return;
+			// Keep Custom Instructions expanded while it holds text, so a stray
+			// click-away doesn't hide content the user has already typed.
+			const currentValue = form.getValues(`hybridBlockPrompts.${fieldIndex}.value`);
+			if (typeof currentValue === 'string' && currentValue.trim().length > 0) return;
 			setIsCustomInstructionsOpen(false);
 		};
 
@@ -625,7 +629,7 @@ const SortableAIBlock = ({
 		return () => {
 			document.removeEventListener('pointerdown', handlePointerDown);
 		};
-	}, [isCustomInstructionsOpen]);
+	}, [isCustomInstructionsOpen, form, fieldIndex]);
 
 	const style = {
 		transform: CSS.Transform.toString(transform),

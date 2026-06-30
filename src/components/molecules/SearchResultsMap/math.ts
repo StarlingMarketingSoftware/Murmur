@@ -20,6 +20,12 @@ export const degreesToRadians = (degrees: number) => (degrees * Math.PI) / 180;
 
 export const mapboxEaseOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
+// EaseOutQuart: snappy start, hard stop. Used for discrete +/- click and
+// keyboard zoom requests (Airbnb-style). Higher polynomial than
+// mapboxEaseOutCubic so the camera commits fast and brakes dead — no
+// "floaty tail" on integer/ladder-stop zoom steps.
+export const mapboxEaseOutQuart = (t: number) => 1 - Math.pow(1 - t, 4);
+
 export const easeInOutCubic = (t: number): number => {
 	const x = clamp(t, 0, 1);
 	return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
@@ -34,4 +40,15 @@ export const easeInOutCubic = (t: number): number => {
 export const mapboxEaseInOutCubic = (t: number): number => {
 	const x = t < 0 ? 0 : t > 1 ? 1 : t;
 	return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+};
+
+// Drag-pan inertia easing for the "heavy / abrupt-stop" feel (Airbnb-style).
+// Ease-out quadratic: position(t) = 2t - t². In velocity space this is a LINEAR
+// decrease (constant deceleration), which is what makes it feel "weighted"
+// rather than Mapbox's softer default bezier tail. Combined with a high
+// `deceleration` value the coast is short and the residual velocity at the end
+// is imperceptible — emulating the "hard cutoff" without a custom physics loop.
+export const mapboxDragPanLinearDecel = (t: number): number => {
+	const x = t < 0 ? 0 : t > 1 ? 1 : t;
+	return 1 - (1 - x) * (1 - x);
 };

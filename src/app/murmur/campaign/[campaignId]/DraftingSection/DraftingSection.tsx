@@ -371,6 +371,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		onInboxSentTabChange,
 		onMapSelectionChange,
 		mapMarkerSelectionRequest,
+		mapAreaSelectionRequest,
 		goToPreviousTab,
 		goToNextTab,
 		hideHeaderBox,
@@ -1544,7 +1545,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// row. The bar is absolute (out of flow) and is hidden via `visibility` (kept mounted),
 	// so neither hiding it nor measuring it perturbs the action row's geometry — the overlap
 	// computation is stable and won't oscillate at the threshold.
-	useEffect(() => {
+	//
+	// This runs as a *layout* effect (not a passive one) and the initial measure is
+	// synchronous — so when the user switches into the Drafts tab the collision is resolved
+	// before the browser paints. A passive effect + rAF (the previous approach) let the bar
+	// paint visible for a frame or two before being hidden, which read as a flash.
+	useLayoutEffect(() => {
 		if (typeof window === 'undefined') return;
 		if (!isDraftPreviewOpen || !shouldRenderDraftsBottomSendBar) {
 			setIsDraftReviewOverlappingSendBar(false);
@@ -1585,7 +1591,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		};
 
 		ro = new ResizeObserver(schedule);
-		schedule();
+		// Measure synchronously on mount/dep-change so the initial visibility is settled
+		// before paint (no flash on tab-switch). Subsequent updates stay rAF-throttled.
+		measure();
 		window.addEventListener('resize', schedule);
 		window.addEventListener('murmur:campaign-zoom-changed', schedule as EventListener);
 		return () => {
@@ -3367,6 +3375,57 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		// the request id is the trigger and the handled-ref guards re-execution.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [mapMarkerSelectionRequest, view, draftEmails, draftEmailsForView, inboundEmails, sentEmails]);
+
+	// Batch sibling of the marker effect above: a drag-rectangle (Select tool) on the
+	// map merges every contact in the region into the active tab's native selection.
+	// One-shot per requestId (the handled-ref guards re-execution). Region select adds
+	// (never removes) so successive drags accumulate, matching the dashboard. All/Write
+	// add contacts, Drafts adds draft rows; Inbox/Sent are single-conversation views and
+	// ignore it.
+	const handledMapAreaRequestIdRef = useRef<number | null>(null);
+	useEffect(() => {
+		const req = mapAreaSelectionRequest;
+		if (!req) return;
+		if (handledMapAreaRequestIdRef.current === req.requestId) return;
+		handledMapAreaRequestIdRef.current = req.requestId;
+		const ids = req.contactIds;
+		if (ids.length === 0) return;
+		if (view === 'overview') {
+			// Already-drafted contacts toggle a draft row; the rest are plain contacts.
+			const draftIdByContactId = new Map<number, number>();
+			for (const d of draftEmails) {
+				if (typeof d.contactId === 'number' && !draftIdByContactId.has(d.contactId)) {
+					draftIdByContactId.set(d.contactId, d.id);
+				}
+			}
+			const draftIdsToAdd: number[] = [];
+			const contactIdsToAdd: number[] = [];
+			for (const id of ids) {
+				const draftId = draftIdByContactId.get(id);
+				if (draftId != null) draftIdsToAdd.push(draftId);
+				else contactIdsToAdd.push(id);
+			}
+			if (draftIdsToAdd.length > 0) {
+				setOverviewSelectedDraftIds((prev) => new Set([...prev, ...draftIdsToAdd]));
+			}
+			if (contactIdsToAdd.length > 0) {
+				setContactsTabSelectedIds((prev) => new Set([...prev, ...contactIdsToAdd]));
+			}
+		} else if (view === 'testing') {
+			setContactsTabSelectedIds((prev) => new Set([...prev, ...ids]));
+		} else if (view === 'drafting') {
+			const idSet = new Set(ids);
+			const draftIdsToAdd = draftEmailsForView
+				.filter((d) => typeof d.contactId === 'number' && idSet.has(d.contactId))
+				.map((d) => d.id);
+			if (draftIdsToAdd.length > 0) {
+				setDraftsTabSelectedIds((prev) => new Set([...prev, ...draftIdsToAdd]));
+			}
+		}
+		// Inbox/Sent: region drag has no batch meaning (single-conversation views).
+		// Functional Set updaters read live state; the request id guards re-execution.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [mapAreaSelectionRequest, view, draftEmails, draftEmailsForView]);
 
 	// Mobile Summary view: which fullscreen overlay (chat / draft review) is open,
 	// the header-pill scroll target, and this session's send/delete counters.

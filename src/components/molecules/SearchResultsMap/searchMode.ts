@@ -190,26 +190,26 @@ export const WHAT_TO_RESULT_DOT_COLOR: Record<string, string> = {
 export const WHAT_TO_HOVER_TOOLTIP_FILL_COLOR: Record<string, string> = {
 	// Promotion: match the search tray palette.
 	[normalizeWhatKey('Radio Stations')]: '#56DA73',
-	[normalizeWhatKey('Venues')]: '#71C9FD',
-	[normalizeWhatKey('Music Venues')]: '#71C9FD',
+	[normalizeWhatKey('Venues')]: '#59A3DC',
+	[normalizeWhatKey('Music Venues')]: '#59A3DC',
 
-	[normalizeWhatKey('Wine, Beer, and Spirits')]: '#80AAFF',
-	[normalizeWhatKey('Wine, Beer, Spirits')]: '#80AAFF',
-	[normalizeWhatKey('Wine Beer and Spirits')]: '#80AAFF',
-	[normalizeWhatKey('Wine Beer Spirits')]: '#80AAFF',
-	[normalizeWhatKey('Breweries')]: '#80AAFF',
-	[normalizeWhatKey('Wineries')]: '#80AAFF',
-	[normalizeWhatKey('Distilleries')]: '#80AAFF',
-	[normalizeWhatKey('Cideries')]: '#80AAFF',
+	[normalizeWhatKey('Wine, Beer, and Spirits')]: '#6B6FDF',
+	[normalizeWhatKey('Wine, Beer, Spirits')]: '#6B6FDF',
+	[normalizeWhatKey('Wine Beer and Spirits')]: '#6B6FDF',
+	[normalizeWhatKey('Wine Beer Spirits')]: '#6B6FDF',
+	[normalizeWhatKey('Breweries')]: '#6B6FDF',
+	[normalizeWhatKey('Wineries')]: '#6B6FDF',
+	[normalizeWhatKey('Distilleries')]: '#6B6FDF',
+	[normalizeWhatKey('Cideries')]: '#6B6FDF',
 	// Defensive: handle a misspelling we've seen in copy.
-	[normalizeWhatKey('Wine, Beer, and Spiriti')]: '#80AAFF',
-	[normalizeWhatKey('Wine Beer and Spiriti')]: '#80AAFF',
-	[normalizeWhatKey('Wine Beer Spiriti')]: '#80AAFF',
+	[normalizeWhatKey('Wine, Beer, and Spiriti')]: '#6B6FDF',
+	[normalizeWhatKey('Wine Beer and Spiriti')]: '#6B6FDF',
+	[normalizeWhatKey('Wine Beer Spiriti')]: '#6B6FDF',
 
-	[normalizeWhatKey('Restaurants')]: '#77DD91',
-	[normalizeWhatKey('Coffee Shops')]: '#A9DE78',
-	[normalizeWhatKey('Wedding Planners')]: '#EED56E',
-	[normalizeWhatKey('Wedding Venues')]: '#EED56E',
+	[normalizeWhatKey('Restaurants')]: '#51D376',
+	[normalizeWhatKey('Coffee Shops')]: '#8BD457',
+	[normalizeWhatKey('Wedding Planners')]: '#D8BD52',
+	[normalizeWhatKey('Wedding Venues')]: '#D8BD52',
 	[normalizeWhatKey('Festivals')]: '#80AAFF',
 	[normalizeWhatKey('Music Festivals')]: '#80AAFF',
 };
@@ -218,8 +218,8 @@ export const WHAT_TO_HOVER_TOOLTIP_FILL_COLOR: Record<string, string> = {
 // Match the faded category backgrounds used by the Showing rail.
 export const WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR: Record<string, string> = {
 	[normalizeWhatKey('Radio Stations')]: '#C5F0CC',
-	[normalizeWhatKey('Venues')]: '#B7E5FF',
-	[normalizeWhatKey('Music Venues')]: '#B7E5FF',
+	[normalizeWhatKey('Venues')]: '#A1D8F7',
+	[normalizeWhatKey('Music Venues')]: '#A1D8F7',
 
 	[normalizeWhatKey('Wine, Beer, and Spirits')]: '#BFC4FF',
 	[normalizeWhatKey('Wine, Beer, Spirits')]: '#BFC4FF',
@@ -233,10 +233,10 @@ export const WHAT_TO_HOVER_TOOLTIP_BODY_FILL_COLOR: Record<string, string> = {
 	[normalizeWhatKey('Wine Beer and Spiriti')]: '#BFC4FF',
 	[normalizeWhatKey('Wine Beer Spiriti')]: '#BFC4FF',
 
-	[normalizeWhatKey('Restaurants')]: '#C3FBD1',
-	[normalizeWhatKey('Coffee Shops')]: '#D6F1BD',
-	[normalizeWhatKey('Wedding Planners')]: '#FFF8DC',
-	[normalizeWhatKey('Wedding Venues')]: '#FFF8DC',
+	[normalizeWhatKey('Restaurants')]: '#81D697',
+	[normalizeWhatKey('Coffee Shops')]: '#C5EDA0',
+	[normalizeWhatKey('Wedding Planners')]: '#F0E0A1',
+	[normalizeWhatKey('Wedding Venues')]: '#F0E0A1',
 	[normalizeWhatKey('Festivals')]: '#C1D6FF',
 	[normalizeWhatKey('Music Festivals')]: '#C1D6FF',
 };

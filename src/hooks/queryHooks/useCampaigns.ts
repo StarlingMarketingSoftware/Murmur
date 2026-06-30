@@ -245,6 +245,55 @@ export const useEditCampaign = (options: CustomMutationOptions = {}) => {
 	});
 };
 
+interface MergeArchivedCampaignData {
+	// The archived (soft-deleted) campaign being restored.
+	sourceId: number;
+	// The active campaign it is merged into.
+	targetCampaignId: number;
+}
+
+// Restore an archived folder by merging its contacts/drafts/emails/inbox into an
+// existing active folder. The server reassigns the data and flips the source to
+// `archived`, so it disappears from both the active list and the ARCHIVE folder.
+export const useMergeArchivedCampaign = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Folder restored',
+		errorMessage = 'Failed to restore folder',
+		onSuccess: onSuccessCallback,
+	} = options;
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async ({ sourceId, targetCampaignId }: MergeArchivedCampaignData) => {
+			const response = await _fetch(urls.api.campaigns.merge(sourceId), 'POST', {
+				targetCampaignId,
+			});
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(errorData.error || 'Failed to restore folder');
+			}
+			return response.json();
+		},
+		onSuccess: () => {
+			// Refetches active + ARCHIVE lists, details, contacts, and contact-events.
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.all });
+			// The target's Drafts/Sent/Inbox lists now contain the merged rows.
+			queryClient.invalidateQueries({ queryKey: ['emails'] });
+			queryClient.invalidateQueries({ queryKey: ['inboundEmails'] });
+			if (!suppressToasts) {
+				toast.success(successMessage);
+			}
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
+			}
+		},
+	});
+};
+
 export const ACTIVE_CAMPAIGN_STORAGE_KEY = 'murmur_active_campaign_v1';
 
 type ActiveCampaignStorage = { v: 1; ts: number; id: number };

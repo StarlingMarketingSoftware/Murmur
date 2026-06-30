@@ -1,4 +1,7 @@
-import { getTooltipCategoryIconSpec } from './mapTooltipCategoryIcons';
+import {
+	getTooltipCategoryIconSpec,
+	type TooltipCategoryIconSpec,
+} from './mapTooltipCategoryIcons';
 
 const DEFAULT_TOOLTIP_FILL_COLOR = '#0E8530';
 
@@ -24,6 +27,17 @@ const STROKE_PADDING = Math.ceil(TOOLTIP_STROKE_WIDTH);
 const TOOLTIP_CATEGORY_ICON_SIZE = 16;
 const TOOLTIP_CATEGORY_ICON_GAP = 8;
 const TOOLTIP_CATEGORY_ICON_TOP_OFFSET = 5;
+
+const PEOPLE_TOOLTIP_ICON_SPEC: TooltipCategoryIconSpec = {
+	viewBox: '0 0 27 27',
+	content: `
+<path
+	d="M12.1865 0.979492C12.5764 0.341123 13.5037 0.341124 13.8936 0.979492L18.1416 7.93945L25.1016 12.1875C25.7399 12.5774 25.7399 13.5047 25.1016 13.8945L18.1416 18.1426L13.8936 25.1025C13.5037 25.7409 12.5764 25.7409 12.1865 25.1025L7.93848 18.1426L0.978516 13.8945C0.340147 13.5047 0.340147 12.5774 0.978516 12.1875L7.93848 7.93945L12.1865 0.979492Z"
+	fill="#50A5C9"
+	stroke="white"
+/>
+`.trim(),
+};
 
 // Convert React-style SVG attrs (camelCase) to SVG/XML attrs (kebab-case).
 // The tooltip is rendered via `data:image/svg+xml`, which is parsed as XML.
@@ -55,7 +69,24 @@ const measureTextWidthPx = (text: string, font: string): number | null => {
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
-const measureTextWidthWithFallback = (
+// These tooltips are injected as INLINE SVG (dangerouslySetInnerHTML), so all of
+// their gradient/clipPath `id`s live in the shared host document. With static
+// ids, a second tooltip's `url(#titleFadeOverlayGradient)` resolves to the FIRST
+// matching def in the document — so one band's right-edge fade paints with
+// another tooltip's color (and clip), which is the "random gradient on the bottom
+// band" bug. Scope every id with a prefix keyed on the values that feed <defs>
+// (fill colors + geometry); byte-identical tooltips can safely share a prefix
+// (their defs are identical), while any difference yields distinct ids. Keyed on
+// content (not a counter) so the markup stays stable across renders/SSR.
+const hashIdSeed = (seed: string): string => {
+	let hash = 5381;
+	for (let i = 0; i < seed.length; i += 1) {
+		hash = ((hash << 5) + hash + seed.charCodeAt(i)) | 0;
+	}
+	return (hash >>> 0).toString(36);
+};
+
+export const measureTextWidthWithFallback = (
 	text: string,
 	font: string,
 	fallbackCharWidth: number
@@ -226,8 +257,11 @@ export const generateMapTooltipSvg = (
 	const titleTextRaw = (title ?? '').trim();
 
 	// Category icon comes from the "What" search category (when available).
-	const categoryIconSpec = getTooltipCategoryIconSpec(searchWhat);
-	const showCategoryIcon = Boolean(categoryIconSpec && hasCompany);
+	// Contacts without a known category use the people/spark icon so the top-right
+	// glyph stays consistent with the map's People stack control.
+	const knownCategoryIconSpec = getTooltipCategoryIconSpec(searchWhat);
+	const tooltipIconSpec = knownCategoryIconSpec ?? PEOPLE_TOOLTIP_ICON_SPEC;
+	const showCategoryIcon = Boolean(knownCategoryIconSpec ? hasCompany : tooltipIconSpec);
 	const categoryIconSlotExtra = showCategoryIcon
 		? TOOLTIP_CATEGORY_ICON_SIZE + TOOLTIP_CATEGORY_ICON_GAP
 		: 0;
@@ -326,31 +360,45 @@ export const generateMapTooltipSvg = (
 	const topCardLineTwoFadeWidth = primaryTextX + topCardLineTwoMaxWidth - topCardLineTwoFadeX;
 
 	const renderCategoryIcon = (x: number, y: number): string => {
-		if (!categoryIconSpec || !showCategoryIcon) return '';
-		const normalized = normalizeInlineSvgMarkupForXml(categoryIconSpec.content);
-		return `<svg x="${x}" y="${y}" width="${TOOLTIP_CATEGORY_ICON_SIZE}" height="${TOOLTIP_CATEGORY_ICON_SIZE}" viewBox="${categoryIconSpec.viewBox}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+		if (!tooltipIconSpec || !showCategoryIcon) return '';
+		const normalized = normalizeInlineSvgMarkupForXml(tooltipIconSpec.content);
+		return `<svg x="${x}" y="${y}" width="${TOOLTIP_CATEGORY_ICON_SIZE}" height="${TOOLTIP_CATEGORY_ICON_SIZE}" viewBox="${tooltipIconSpec.viewBox}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
 ${normalized}
 </svg>`;
 	};
 
 	const bodyCornerRadius = 8;
 	const titleCornerRadius = 4;
+
+	// Unique per-tooltip id prefix — see hashIdSeed. Covers every value that
+	// distinguishes a tooltip's <defs> so colliding ids only ever happen between
+	// tooltips whose defs are identical.
+	const idPrefix = `mt-${hashIdSeed(
+		`${safeFillColor}|${safeBodyFillColor}|${innerWidth}|${topCardLineOneMaxWidth}|${topCardLineTwoMaxWidth}|${showTitleBand ? 1 : 0}`
+	)}`;
+	const topCardClipId = `${idPrefix}-topCardClip`;
+	const topCardLineOneClipId = `${idPrefix}-topCardLineOneClip`;
+	const topCardLineTwoClipId = `${idPrefix}-topCardLineTwoClip`;
+	const topCardFadeOverlayGradientId = `${idPrefix}-topCardFadeOverlayGradient`;
+	const titleBoxClipId = `${idPrefix}-titleBoxClip`;
+	const titleFadeOverlayGradientId = `${idPrefix}-titleFadeOverlayGradient`;
+
 	const titleDefs = showTitleBand
-		? `  <clipPath id="titleBoxClip">
+		? `  <clipPath id="${titleBoxClipId}">
     <rect x="${offsetX}" y="${titleBandTopY + offsetY}" width="${innerWidth}" height="${TITLE_BAND_HEIGHT}" rx="${titleCornerRadius}"/>
   </clipPath>
-  <linearGradient id="titleFadeOverlayGradient" x1="0" y1="0" x2="1" y2="0">
+  <linearGradient id="${titleFadeOverlayGradientId}" x1="0" y1="0" x2="1" y2="0">
     <stop offset="0%" stop-color="${safeFillColor}" stop-opacity="0"/>
     <stop offset="100%" stop-color="${safeFillColor}" stop-opacity="1"/>
   </linearGradient>`
 		: '';
 	const titleBand = showTitleBand
 		? `<rect x="${offsetX}" y="${titleBandTopY + offsetY}" width="${innerWidth}" height="${TITLE_BAND_HEIGHT}" rx="${titleCornerRadius}" fill="${safeFillColor}"/>
-<g clip-path="url(#titleBoxClip)">
+<g clip-path="url(#${titleBoxClipId})">
   ${
 		titleText
 			? `<text x="${titleTextX}" y="${titleBaselineY}" font-family="Arial, sans-serif" font-size="11" fill="${titleTextFill}" text-anchor="start">${titleText}</text>
-  <rect x="${titleFadeOverlayX}" y="${titleBandTopY + offsetY + 1}" width="${titleFadeOverlayWidth}" height="${TITLE_BAND_HEIGHT - 2}" fill="url(#titleFadeOverlayGradient)"/>`
+  <rect x="${titleFadeOverlayX}" y="${titleBandTopY + offsetY + 1}" width="${titleFadeOverlayWidth}" height="${TITLE_BAND_HEIGHT - 2}" fill="url(#${titleFadeOverlayGradientId})"/>`
 			: ''
 	}
 </g>
@@ -359,31 +407,31 @@ ${normalized}
 
 	return `<svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" fill="none" xmlns="http://www.w3.org/2000/svg">
 <defs>
-  <clipPath id="topCardClip">
+  <clipPath id="${topCardClipId}">
     <rect x="${offsetX}" y="${offsetY}" width="${innerWidth}" height="${TOP_CARD_HEIGHT}" rx="${bodyCornerRadius}"/>
   </clipPath>
-  <clipPath id="topCardLineOneClip">
+  <clipPath id="${topCardLineOneClipId}">
     <rect x="${primaryTextX}" y="${offsetY}" width="${topCardLineOneMaxWidth}" height="${TOP_CARD_HEIGHT / 2}"/>
   </clipPath>
-  <clipPath id="topCardLineTwoClip">
+  <clipPath id="${topCardLineTwoClipId}">
     <rect x="${primaryTextX}" y="${offsetY + TOP_CARD_HEIGHT / 2}" width="${topCardLineTwoMaxWidth}" height="${TOP_CARD_HEIGHT / 2}"/>
   </clipPath>
-  <linearGradient id="topCardFadeOverlayGradient" x1="0" y1="0" x2="1" y2="0">
+  <linearGradient id="${topCardFadeOverlayGradientId}" x1="0" y1="0" x2="1" y2="0">
     <stop offset="0%" stop-color="${safeBodyFillColor}" stop-opacity="0"/>
     <stop offset="100%" stop-color="${safeBodyFillColor}" stop-opacity="1"/>
   </linearGradient>
 ${titleDefs}
 </defs>
 <rect x="${offsetX}" y="${offsetY}" width="${innerWidth}" height="${TOP_CARD_HEIGHT}" rx="${bodyCornerRadius}" fill="${safeBodyFillColor}" stroke="black" stroke-width="${TOOLTIP_STROKE_WIDTH}"/>
-<g clip-path="url(#topCardClip)">
-  <g clip-path="url(#topCardLineOneClip)">
+<g clip-path="url(#${topCardClipId})">
+  <g clip-path="url(#${topCardLineOneClipId})">
     <text x="${primaryTextX}" y="${topCardLineOneBaselineY}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="${bodyTextFill}">${topCardLineOne}</text>
   </g>
-  ${topCardLineOneOverflows ? `<rect x="${topCardLineOneFadeX}" y="${offsetY + 1}" width="${topCardLineOneFadeWidth}" height="${TOP_CARD_HEIGHT / 2 - 1}" fill="url(#topCardFadeOverlayGradient)"/>` : ''}
-  ${topCardLineTwo ? `<g clip-path="url(#topCardLineTwoClip)">
+  ${topCardLineOneOverflows ? `<rect x="${topCardLineOneFadeX}" y="${offsetY + 1}" width="${topCardLineOneFadeWidth}" height="${TOP_CARD_HEIGHT / 2 - 1}" fill="url(#${topCardFadeOverlayGradientId})"/>` : ''}
+  ${topCardLineTwo ? `<g clip-path="url(#${topCardLineTwoClipId})">
     <text x="${primaryTextX}" y="${topCardLineTwoBaselineY}" font-family="Arial, sans-serif" font-size="13" font-weight="normal" fill="${bodyTextFill}">${topCardLineTwo}</text>
   </g>` : ''}
-  ${topCardLineTwo && topCardLineTwoOverflows ? `<rect x="${topCardLineTwoFadeX}" y="${offsetY + TOP_CARD_HEIGHT / 2}" width="${topCardLineTwoFadeWidth}" height="${TOP_CARD_HEIGHT / 2 - 1}" fill="url(#topCardFadeOverlayGradient)"/>` : ''}
+  ${topCardLineTwo && topCardLineTwoOverflows ? `<rect x="${topCardLineTwoFadeX}" y="${offsetY + TOP_CARD_HEIGHT / 2}" width="${topCardLineTwoFadeWidth}" height="${TOP_CARD_HEIGHT / 2 - 1}" fill="url(#${topCardFadeOverlayGradientId})"/>` : ''}
   ${categoryIconPlacement === 'primary' ? renderCategoryIcon(primaryIconX, categoryIconPrimaryY) : ''}
 </g>
 ${titleBand}
@@ -408,7 +456,8 @@ export const calculateTooltipWidth = (
 	const secondaryText = hasName && hasCompany ? trimmedCompany : '';
 	const titleTextForWidth = options.showTitleBand === false ? '' : trimmedTitle;
 
-	const showCategoryIcon = Boolean(getTooltipCategoryIconSpec(searchWhat) && hasCompany);
+	const knownCategoryIconSpec = getTooltipCategoryIconSpec(searchWhat);
+	const showCategoryIcon = Boolean(knownCategoryIconSpec ? hasCompany : PEOPLE_TOOLTIP_ICON_SPEC);
 	const categoryIconSlotExtra = showCategoryIcon
 		? TOOLTIP_CATEGORY_ICON_SIZE + TOOLTIP_CATEGORY_ICON_GAP
 		: 0;
@@ -456,4 +505,3 @@ export const calculateTooltipAnchorY = (
 
 // Legacy constant for backwards compatibility
 export const MAP_TOOLTIP_ANCHOR_Y = MAP_TOOLTIP_HEIGHT;
-

@@ -11,7 +11,7 @@ import {
 	type CSSProperties,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import { createPortal } from 'react-dom';
+import { toast } from 'sonner';
 import { urls } from '@/constants/urls';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import DashboardActionBarStarIcon from '@/components/atoms/_svg/DashboardActionBarStarIcon';
@@ -23,9 +23,12 @@ import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
-import { OpportunityHoverPanel } from '@/components/molecules/OpportunityHoverPanel/OpportunityHoverPanel';
-import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import {
+	useAssignInboundEmailToCampaign,
+	useGetInboundEmails,
+} from '@/hooks/queryHooks/useInboundEmails';
+import {
+	useEnsureApplicationCampaignHome,
 	useGetMyEventApplications,
 	type MyEventApplication,
 } from '@/hooks/queryHooks/useEventApplications';
@@ -507,6 +510,7 @@ const buildOpportunityRow = (
 	exchangeCount: number
 ): OpportunityRow | null => {
 	const contact = email.contact;
+	const campaignId = email.campaignId ?? email.campaign?.id ?? null;
 	const city = contact?.city?.trim() || '';
 	const stateAbbr = contact?.state
 		? getStateAbbreviation(contact.state)?.trim().toUpperCase() || ''
@@ -531,6 +535,10 @@ const buildOpportunityRow = (
 		opportunityDate,
 		lastMessage: getEmailSnippet(email),
 		lastReceivedLabel: formatOpportunityTimestamp(email.receivedAt),
+		inboxLink:
+			campaignId == null
+				? null
+				: `${urls.murmur.campaign.detail(campaignId)}?tab=inbox&inboxEmailId=${email.id}&silent=1`,
 	};
 };
 
@@ -553,6 +561,17 @@ const buildMockOpportunityRow = (row: OpportunitiesMockRow, index: number): Oppo
 		lastMessage: row.lastMessage?.trim() || '',
 		lastReceivedLabel: row.lastReceivedLabel?.trim() || '',
 	};
+};
+
+const getApplicationOpportunityInboxLink = (
+	application: MyEventApplication,
+	campaignId: number | null | undefined = application.homeCampaignId
+) => {
+	if (campaignId == null) return null;
+	const response = application.venueResponse;
+	return response
+		? `${urls.murmur.campaign.detail(campaignId)}?tab=inbox&inboxEmailId=${-response.latestMessageId}&silent=1`
+		: `${urls.murmur.campaign.detail(campaignId)}?tab=sent&inboxEmailId=${-(APPLICATION_SENT_ROW_ID_OFFSET + application.id)}&silent=1`;
 };
 
 // An opportunity the user actively applied to. Status comes from the shared
@@ -608,14 +627,9 @@ const buildApplicationOpportunityRow = (
 		// Deep-link into the campaign inbox that hosts this thread. Responded
 		// applications open the venue's latest reply (projected row = negated
 		// message id); pending ones open the artist's own application (projected
-		// "sent" row = negated APPLICATION_SENT_ROW_ID_OFFSET + id). null when the
-		// venue has no campaign home — the row opens a read-only detail card.
-		inboxLink:
-			application.homeCampaignId == null
-				? null
-				: response
-					? `${urls.murmur.campaign.detail(application.homeCampaignId)}?tab=inbox&inboxEmailId=${-response.latestMessageId}&silent=1`
-					: `${urls.murmur.campaign.detail(application.homeCampaignId)}?tab=sent&inboxEmailId=${-(APPLICATION_SENT_ROW_ID_OFFSET + application.id)}&silent=1`,
+		// "sent" row = negated APPLICATION_SENT_ROW_ID_OFFSET + id). Null means the
+		// click handler will first create/attach a campaign home, then navigate.
+		inboxLink: getApplicationOpportunityInboxLink(application),
 	};
 };
 
@@ -646,6 +660,13 @@ export const DashboardOpportunitiesContent: FC<{
 	const { data: myApplications } = useGetMyEventApplications({
 		enabled: enabled && !mockOverrideActive && !hasInboundEmailsOverride,
 	});
+	const { mutateAsync: assignInboundEmailToCampaign } = useAssignInboundEmailToCampaign({
+		suppressToasts: true,
+	});
+	const { mutateAsync: ensureApplicationCampaignHome } =
+		useEnsureApplicationCampaignHome({
+			suppressToasts: true,
+		});
 	const sourceInboundEmails = useMemo(
 		() => inboundEmailsOverride ?? inboundEmails ?? [],
 		[inboundEmails, inboundEmailsOverride]
@@ -653,17 +674,7 @@ export const DashboardOpportunitiesContent: FC<{
 	const isLoading =
 		isLoadingOverride ?? (mockOverrideActive || hasInboundEmailsOverride ? false : isLoadingEmails);
 	const [activeStatus, setActiveStatus] = useState<OpportunityStatus | null>(null);
-	// Dead application rows (no campaign inbox home) open this read-only detail
-	// card instead of navigating; closes on backdrop click or Escape.
-	const [detailApplication, setDetailApplication] = useState<MyEventApplication | null>(null);
-	useEffect(() => {
-		if (!detailApplication) return;
-		const onKeyDown = (event: KeyboardEvent) => {
-			if (event.key === 'Escape') setDetailApplication(null);
-		};
-		window.addEventListener('keydown', onKeyDown);
-		return () => window.removeEventListener('keydown', onKeyDown);
-	}, [detailApplication]);
+	const navigationPromisesRef = useRef<Partial<Record<string, Promise<void>>>>({});
 
 	const threadExchangeCounts = useMemo(() => {
 		const counts: Record<string, number> = {};
@@ -802,6 +813,78 @@ export const DashboardOpportunitiesContent: FC<{
 		setIsPinnedScrollbarVisible(activeSection.offsetHeight > scroller.clientHeight + 1);
 	}, [enabled, isUnfilteredView, opportunities, isLoading]);
 
+	const navigateToOpportunity = useCallback(
+		(opportunity: OpportunityRow) => {
+			const key = `${opportunity.source}-${opportunity.id}`;
+			if (navigationPromisesRef.current[key]) return;
+
+			const promise = (async () => {
+				if (opportunity.inboxLink) {
+					router.push(opportunity.inboxLink);
+					return;
+				}
+
+				if (opportunity.source === 'inbound') {
+					const email = sourceInboundEmails.find(
+						(candidate) => candidate.id === opportunity.id
+					);
+					if (!email) return;
+
+					let campaignId = email.campaignId ?? email.campaign?.id ?? null;
+					if (campaignId == null) {
+						const assignedEmail = await assignInboundEmailToCampaign({
+							id: email.id,
+						});
+						campaignId = assignedEmail.campaignId ?? assignedEmail.campaign?.id ?? null;
+					}
+					if (campaignId == null) {
+						toast.error('Could not find a campaign for this opportunity.');
+						return;
+					}
+					router.push(
+						`${urls.murmur.campaign.detail(campaignId)}?tab=inbox&inboxEmailId=${email.id}&silent=1`
+					);
+					return;
+				}
+
+				if (opportunity.source === 'application') {
+					const application = (myApplications ?? []).find(
+						(candidate) => candidate.id === opportunity.id
+					);
+					if (!application) return;
+
+					const home = await ensureApplicationCampaignHome({
+						applicationId: application.id,
+					});
+					const link = getApplicationOpportunityInboxLink(
+						application,
+						home.campaignId
+					);
+					if (!link) {
+						toast.error('Could not open this opportunity in a campaign inbox.');
+						return;
+					}
+					router.push(link);
+				}
+			})().catch((error) => {
+				console.error('[dashboard-opportunities] navigation failed', error);
+				toast.error('Could not open this opportunity in a campaign inbox.');
+			});
+
+			navigationPromisesRef.current[key] = promise;
+			promise.finally(() => {
+				delete navigationPromisesRef.current[key];
+			});
+		},
+		[
+			assignInboundEmailToCampaign,
+			ensureApplicationCampaignHome,
+			myApplications,
+			router,
+			sourceInboundEmails,
+		]
+	);
+
 	if (!enabled) return null;
 
 	const rowWidth = fluid ? '100%' : '639px';
@@ -815,26 +898,15 @@ export const DashboardOpportunitiesContent: FC<{
 		const isCompactClosedRow =
 			isUnfilteredView &&
 			(opportunity.status === 'closed' || opportunity.status === 'canceled');
-		// Without a campaign inbox home, an application row opens the read-only
-		// Opportunity card (needs the raw application + an event to render).
-		const detailApp =
-			!opportunity.inboxLink && opportunity.source === 'application'
-				? ((myApplications ?? []).find(
-						(application) =>
-							application.id === opportunity.id && application.event != null
-					) ?? null)
-				: null;
+		const isNavigable =
+			Boolean(opportunity.inboxLink) ||
+			opportunity.source === 'inbound' ||
+			opportunity.source === 'application';
 		return (
 			<button
 				key={`${opportunity.source}-${opportunity.id}`}
 				type="button"
-				onClick={
-					opportunity.inboxLink
-						? () => router.push(opportunity.inboxLink!)
-						: detailApp
-							? () => setDetailApplication(detailApp)
-							: undefined
-				}
+				onClick={isNavigable ? () => navigateToOpportunity(opportunity) : undefined}
 				className="text-left hover:brightness-[0.985] transition-[filter]"
 				style={{
 					width: rowWidth,
@@ -857,7 +929,7 @@ export const DashboardOpportunitiesContent: FC<{
 					padding: 0,
 					fontFamily: 'Inter, sans-serif',
 					color: '#000000',
-					cursor: opportunity.inboxLink || detailApp ? 'pointer' : 'default',
+					cursor: isNavigable ? 'pointer' : 'default',
 				}}
 			>
 				<span
@@ -1362,24 +1434,6 @@ export const DashboardOpportunitiesContent: FC<{
 					)}
 				</div>
 			</CustomScrollbar>
-			{detailApplication &&
-				createPortal(
-					<div
-						role="dialog"
-						aria-modal="true"
-						onClick={() => setDetailApplication(null)}
-						className="fixed inset-0 z-[100001] flex items-center justify-center"
-						style={{ background: 'rgba(0, 0, 0, 0.45)' }}
-					>
-						<div onClick={(event) => event.stopPropagation()}>
-							<OpportunityHoverPanel
-								application={detailApplication}
-								nowMs={Date.now()}
-							/>
-						</div>
-					</div>,
-					document.body
-				)}
 		</div>
 	);
 };
