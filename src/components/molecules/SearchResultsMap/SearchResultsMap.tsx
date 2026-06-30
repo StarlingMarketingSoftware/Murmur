@@ -630,6 +630,48 @@ if (typeof window !== 'undefined') {
 const IS_SAFARI = isSafariBrowser();
 const CANVAS_PERF_MODE = true;
 
+const createConfiguredZoomOutGovernor = () =>
+	createZoomOutGovernor({
+		enabled: ZOOM_OUT_GOVERNOR_ENABLED,
+		baseWheelRate: MAP_WHEEL_ZOOM_RATE,
+		baseTrackpadRate: MAP_PINCH_ZOOM_RATE,
+		minRateMultiplier: ZOOM_OUT_GOVERNOR_MIN_RATE_MULTIPLIER,
+		energyScale: ZOOM_OUT_GOVERNOR_ENERGY_SCALE,
+		energyDecayTauMs: ZOOM_OUT_GOVERNOR_ENERGY_DECAY_TAU_MS,
+		gestureGapMs: ZOOM_OUT_GOVERNOR_GESTURE_GAP_MS,
+		deadzone: ZOOM_OUT_GOVERNOR_DEADZONE,
+		applyEpsilon: ZOOM_OUT_GOVERNOR_APPLY_EPSILON,
+	});
+
+const applyScrollZoomFeel = (mapInstance: mapboxgl.Map) => {
+	try {
+		mapInstance.scrollZoom.setWheelZoomRate(MAP_WHEEL_ZOOM_RATE);
+		mapInstance.scrollZoom.setZoomRate(MAP_PINCH_ZOOM_RATE);
+	} catch {
+		// Non-fatal — older Mapbox builds may not expose these setters.
+	}
+
+	// Local-dev sanity hook: if Fast Refresh preserves the Mapbox instance, this
+	// lets us confirm the live handler has received the newest tuning constants.
+	if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
+		(
+			window as unknown as {
+				__murmurMapZoomFeel?: {
+					wheelRate: number;
+					trackpadRate: number;
+					zoomOutGovernorMinMultiplier: number;
+					zoomOutGovernorEnergyScale: number;
+				};
+			}
+		).__murmurMapZoomFeel = {
+			wheelRate: MAP_WHEEL_ZOOM_RATE,
+			trackpadRate: MAP_PINCH_ZOOM_RATE,
+			zoomOutGovernorMinMultiplier: ZOOM_OUT_GOVERNOR_MIN_RATE_MULTIPLIER,
+			zoomOutGovernorEnergyScale: ZOOM_OUT_GOVERNOR_ENERGY_SCALE,
+		};
+	}
+};
+
 // Upload the current canvas content to the source's GPU texture once, leaving the
 // source paused afterwards (CanvasSource.pause() runs prepare() — a synchronous
 // texture.update — before clearing its playing flag).
@@ -10162,31 +10204,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		// Soften scroll/pinch zoom for a smoother, more premium feel. Persists
 		// across scrollZoom enable/disable cycles since rates live on the handler.
-		try {
-			mapInstance.scrollZoom.setWheelZoomRate(MAP_WHEEL_ZOOM_RATE);
-			mapInstance.scrollZoom.setZoomRate(MAP_PINCH_ZOOM_RATE);
-		} catch {
-			// Non-fatal — older Mapbox builds may not expose these setters.
-		}
+		applyScrollZoomFeel(mapInstance);
 
-		const governor = createZoomOutGovernor({
-			enabled: ZOOM_OUT_GOVERNOR_ENABLED,
-			baseWheelRate: MAP_WHEEL_ZOOM_RATE,
-			baseTrackpadRate: MAP_PINCH_ZOOM_RATE,
-			minRateMultiplier: ZOOM_OUT_GOVERNOR_MIN_RATE_MULTIPLIER,
-			energyScale: ZOOM_OUT_GOVERNOR_ENERGY_SCALE,
-			energyDecayTauMs: ZOOM_OUT_GOVERNOR_ENERGY_DECAY_TAU_MS,
-			gestureGapMs: ZOOM_OUT_GOVERNOR_GESTURE_GAP_MS,
-			deadzone: ZOOM_OUT_GOVERNOR_DEADZONE,
-			applyEpsilon: ZOOM_OUT_GOVERNOR_APPLY_EPSILON,
-		});
+		const governor = createConfiguredZoomOutGovernor();
 		zoomOutGovernorRef.current = governor;
 		const onGovernedWheel = (e: mapboxgl.MapWheelEvent) => {
 			if (presentationRef.current === 'background') return;
 			const oe = e.originalEvent;
 			if (!oe) return;
 			try {
-				const result = governor.onWheel(
+				// Read through the ref instead of permanently closing over the
+				// construction-time governor. In local dev, Fast Refresh can preserve
+				// the Mapbox instance/listener while the tuning constants change.
+				const activeGovernor = zoomOutGovernorRef.current ?? governor;
+				const result = activeGovernor.onWheel(
 					oe.deltaY,
 					oe.deltaMode,
 					oe.shiftKey,
@@ -10196,10 +10227,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				mapInstance.scrollZoom.setWheelZoomRate(result.wheelRate);
 				mapInstance.scrollZoom.setZoomRate(result.trackpadRate);
 			} catch {
-				try {
-					mapInstance.scrollZoom.setWheelZoomRate(MAP_WHEEL_ZOOM_RATE);
-					mapInstance.scrollZoom.setZoomRate(MAP_PINCH_ZOOM_RATE);
-				} catch {}
+				applyScrollZoomFeel(mapInstance);
 			}
 		};
 		mapInstance.on('wheel', onGovernedWheel);
@@ -10412,6 +10440,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			setIsMapFirstPainted(false);
 		};
 	}, [ensureMapboxSourcesAndLayers, syncInteractiveFloor]);
+
+	// Keep the live Mapbox scroll handler in sync with tuning constants even when
+	// local Fast Refresh preserves the existing map instance. Production gets the
+	// same values during construction; this effect mainly prevents "works in prod,
+	// not locally" while iterating on zoom feel.
+	useEffect(() => {
+		if (!map) return;
+		zoomOutGovernorRef.current = createConfiguredZoomOutGovernor();
+		applyScrollZoomFeel(map);
+	}, [
+		map,
+		MAP_WHEEL_ZOOM_RATE,
+		MAP_PINCH_ZOOM_RATE,
+		ZOOM_OUT_GOVERNOR_ENABLED,
+		ZOOM_OUT_GOVERNOR_MIN_RATE_MULTIPLIER,
+		ZOOM_OUT_GOVERNOR_ENERGY_SCALE,
+		ZOOM_OUT_GOVERNOR_ENERGY_DECAY_TAU_MS,
+		ZOOM_OUT_GOVERNOR_GESTURE_GAP_MS,
+		ZOOM_OUT_GOVERNOR_DEADZONE,
+		ZOOM_OUT_GOVERNOR_APPLY_EPSILON,
+	]);
 
 	// Land-first readiness latch: flip `isMapFirstPainted` once the local
 	// world-land fill has painted (style in + cream continents on ocean blue) —
@@ -10805,9 +10854,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				map.scrollZoom.enable();
 			} catch {}
 			try {
-				zoomOutGovernorRef.current?.reset();
-				map.scrollZoom.setWheelZoomRate(MAP_WHEEL_ZOOM_RATE);
-				map.scrollZoom.setZoomRate(MAP_PINCH_ZOOM_RATE);
+				zoomOutGovernorRef.current = createConfiguredZoomOutGovernor();
+				applyScrollZoomFeel(map);
 			} catch {}
 			try {
 				map.boxZoom.enable();

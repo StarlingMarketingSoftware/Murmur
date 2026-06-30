@@ -9,15 +9,15 @@ import {
 	type ZoomOutGovernorConfig,
 } from './zoomOutGovernor';
 
-const BASE_WHEEL = 1 / 2000;
-const BASE_TRACKPAD = 1 / 200;
+const BASE_WHEEL = 1 / 1850;
+const BASE_TRACKPAD = 1 / 190;
 
 const cfg = (over: Partial<ZoomOutGovernorConfig> = {}): ZoomOutGovernorConfig => ({
 	enabled: true,
 	baseWheelRate: BASE_WHEEL,
 	baseTrackpadRate: BASE_TRACKPAD,
-	minRateMultiplier: 0.32,
-	energyScale: 1.1,
+	minRateMultiplier: 0.38,
+	energyScale: 1.2,
 	energyDecayTauMs: 320,
 	gestureGapMs: 220,
 	deadzone: 0.01,
@@ -41,22 +41,22 @@ test('classifyWheelKind detects notched wheel vs trackpad', () => {
 });
 
 test('rateMultiplierForEnergy is 1 at 0, asymptotes to floor, strictly decreasing', () => {
-	assert.equal(rateMultiplierForEnergy(0, 0.32, 1.1), 1);
-	let prev = rateMultiplierForEnergy(0, 0.32, 1.1);
+	assert.equal(rateMultiplierForEnergy(0, 0.38, 1.2), 1);
+	let prev = rateMultiplierForEnergy(0, 0.38, 1.2);
 	for (let e = 0.05; e <= 20; e += 0.05) {
-		const m = rateMultiplierForEnergy(e, 0.32, 1.1);
+		const m = rateMultiplierForEnergy(e, 0.38, 1.2);
 		assert.ok(m <= prev, `non-increasing at e=${e}: ${m} > ${prev}`);
-		assert.ok(m >= 0.32 - 1e-9, `never below floor at e=${e}: ${m}`);
+		assert.ok(m >= 0.38 - 1e-9, `never below floor at e=${e}: ${m}`);
 		assert.ok(m <= 1 + 1e-9, `never above 1 at e=${e}: ${m}`);
 		prev = m;
 	}
-	assert.ok(rateMultiplierForEnergy(50, 0.32, 1.1) < 0.33);
+	assert.ok(rateMultiplierForEnergy(50, 0.38, 1.2) < 0.39);
 });
 
 test('rate curve has no discontinuity (small input => small output change)', () => {
-	let prev = rateMultiplierForEnergy(0, 0.32, 1.1);
+	let prev = rateMultiplierForEnergy(0, 0.38, 1.2);
 	for (let e = 0.01; e <= 20; e += 0.01) {
-		const m = rateMultiplierForEnergy(e, 0.32, 1.1);
+		const m = rateMultiplierForEnergy(e, 0.38, 1.2);
 		assert.ok(Math.abs(m - prev) < 0.01, `jump at e=${e}: ${Math.abs(m - prev)}`);
 		prev = m;
 	}
@@ -78,7 +78,7 @@ test('a single gentle notch does not perceptibly govern', () => {
 	assert.ok(g.getMultiplier() > 0.98);
 });
 
-test('aggressive trackpad fling ramps friction down to the floor', () => {
+test('sustained trackpad fling ramps friction down to the moderated floor', () => {
 	const g = createZoomOutGovernor(cfg());
 	let t = 1000;
 	let last = 1;
@@ -88,7 +88,7 @@ test('aggressive trackpad fling ramps friction down to the floor', () => {
 		last = r.multiplier;
 		t += 16;
 	}
-	assert.ok(last <= 0.34, `reaches near floor, got ${last}`);
+	assert.ok(last <= 0.41, `reaches near the moderated floor, got ${last}`);
 });
 
 test('MONOTONIC-DOWN within a gesture: multiplier never rises while flinging', () => {
