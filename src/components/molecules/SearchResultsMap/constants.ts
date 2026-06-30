@@ -307,17 +307,22 @@ export const OVERVIEW_PREWARM_CENTER_QUANT_DEG = 1;
 
 // Scroll/trackpad zoom feel. Mapbox defaults (wheel 1/450, trackpad 1/100)
 // feel jumpy — each tick traverses a lot of zoom, which reads as "aggressive."
-// These rates keep the same weighted, deliberate glide while giving the wheel
-// only a little more authority than the first heavy pass: one gesture should
-// feel intentional without becoming loose or jumpy.
-export const MAP_WHEEL_ZOOM_RATE = 1 / 1850;
-export const MAP_PINCH_ZOOM_RATE = 1 / 190;
+// These rates keep the same weighted, deliberate glide. History: this was
+// over-corrected down to 1/2000 (felt clipped/governed), then walked back up
+// 1/1850 → 1/1700. A single notch still read as too short, so the wheel gets a
+// bit more per-notch travel here (~13% further than 1/1700) — enough to feel
+// like one scroll covers ground without returning to the loose/jumpy 1/700
+// original. The trackpad gets a smaller matching nudge so mouse and trackpad
+// "scroll to zoom" stay consistent. The sustained zoom-out governor below is
+// unchanged: it only damps long flings, never a single deliberate notch.
+export const MAP_WHEEL_ZOOM_RATE = 1 / 1500;
+export const MAP_PINCH_ZOOM_RATE = 1 / 165;
 
 // Sustained zoom-out governor (see zoomOutGovernor.ts): catches runaway flings
 // without making ordinary scroll-wheel zoom feel capped.
 export const ZOOM_OUT_GOVERNOR_ENABLED = true;
-export const ZOOM_OUT_GOVERNOR_MIN_RATE_MULTIPLIER = 0.38;
-export const ZOOM_OUT_GOVERNOR_ENERGY_SCALE = 1.2;
+export const ZOOM_OUT_GOVERNOR_MIN_RATE_MULTIPLIER = 0.42;
+export const ZOOM_OUT_GOVERNOR_ENERGY_SCALE = 1.3;
 export const ZOOM_OUT_GOVERNOR_ENERGY_DECAY_TAU_MS = 320;
 export const ZOOM_OUT_GOVERNOR_GESTURE_GAP_MS = 220;
 export const ZOOM_OUT_GOVERNOR_DEADZONE = 0.01;
