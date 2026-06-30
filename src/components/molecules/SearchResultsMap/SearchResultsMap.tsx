@@ -306,6 +306,13 @@ import {
 	MAP_PINCH_ZOOM_RATE,
 	MAP_WHEEL_ZOOM_RATE,
 	MAP_REQUESTED_ZOOM_EASE_MS,
+	ZOOM_OUT_GOVERNOR_ENABLED,
+	ZOOM_OUT_GOVERNOR_MIN_RATE_MULTIPLIER,
+	ZOOM_OUT_GOVERNOR_ENERGY_SCALE,
+	ZOOM_OUT_GOVERNOR_ENERGY_DECAY_TAU_MS,
+	ZOOM_OUT_GOVERNOR_GESTURE_GAP_MS,
+	ZOOM_OUT_GOVERNOR_DEADZONE,
+	ZOOM_OUT_GOVERNOR_APPLY_EPSILON,
 	getDragPanInertiaOptions,
 	MAP_WORLD_LAND_LOCAL_SOURCE_ID,
 	MARKER_CONSTELLATION_CORE_OPACITY,
@@ -424,6 +431,7 @@ import {
 	stateBadgeColorMap,
 } from './constants';
 import { setDashboardGlobeSpinLng } from './dashboardGlobeSpinState';
+import { createZoomOutGovernor } from './zoomOutGovernor';
 import {
 	getUnsubscribeBurnTarget,
 	subscribeUnsubscribeBurn,
@@ -2818,6 +2826,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	);
 	const mapRef = useRef<mapboxgl.Map | null>(null);
 	const [map, setMap] = useState<mapboxgl.Map | null>(null);
+	const zoomOutGovernorRef = useRef<ReturnType<typeof createZoomOutGovernor> | null>(
+		null
+	);
 	// Mobile gets a lower interactive zoom floor so the full globe fits the narrow
 	// viewport. Kept in a ref because the camera-constraint paths below (decorative
 	// transitions, post-cinematic restore) re-apply the floor when they settle.
@@ -10038,6 +10049,41 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Non-fatal — older Mapbox builds may not expose these setters.
 		}
 
+		const governor = createZoomOutGovernor({
+			enabled: ZOOM_OUT_GOVERNOR_ENABLED,
+			baseWheelRate: MAP_WHEEL_ZOOM_RATE,
+			baseTrackpadRate: MAP_PINCH_ZOOM_RATE,
+			minRateMultiplier: ZOOM_OUT_GOVERNOR_MIN_RATE_MULTIPLIER,
+			energyScale: ZOOM_OUT_GOVERNOR_ENERGY_SCALE,
+			energyDecayTauMs: ZOOM_OUT_GOVERNOR_ENERGY_DECAY_TAU_MS,
+			gestureGapMs: ZOOM_OUT_GOVERNOR_GESTURE_GAP_MS,
+			deadzone: ZOOM_OUT_GOVERNOR_DEADZONE,
+			applyEpsilon: ZOOM_OUT_GOVERNOR_APPLY_EPSILON,
+		});
+		zoomOutGovernorRef.current = governor;
+		const onGovernedWheel = (e: mapboxgl.MapWheelEvent) => {
+			if (presentationRef.current === 'background') return;
+			const oe = e.originalEvent;
+			if (!oe) return;
+			try {
+				const result = governor.onWheel(
+					oe.deltaY,
+					oe.deltaMode,
+					oe.shiftKey,
+					Number.isFinite(oe.timeStamp) ? oe.timeStamp : Date.now()
+				);
+				if (!result.changed) return;
+				mapInstance.scrollZoom.setWheelZoomRate(result.wheelRate);
+				mapInstance.scrollZoom.setZoomRate(result.trackpadRate);
+			} catch {
+				try {
+					mapInstance.scrollZoom.setWheelZoomRate(MAP_WHEEL_ZOOM_RATE);
+					mapInstance.scrollZoom.setZoomRate(MAP_PINCH_ZOOM_RATE);
+				} catch {}
+			}
+		};
+		mapInstance.on('wheel', onGovernedWheel);
+
 		// Drag-pan inertia: "heavy / abrupt-stop" feel (Airbnb-style). Replaces
 		// Mapbox's default long/soft ease-out tail with a short,
 		// linearly-decelerating coast that stops crisply. mapbox-gl 3.x does
@@ -10225,6 +10271,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			mapInstance.off('style.load', onStyleLoad);
 			mapInstance.off('error', onError);
 			mapInstance.off('rotate', onRotate);
+			mapInstance.off('wheel', onGovernedWheel);
+			zoomOutGovernorRef.current = null;
 			backgroundSpinCleanupRef.current?.();
 			backgroundSpinCleanupRef.current = null;
 			mapInstance.remove();
@@ -10627,6 +10675,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const safeEnableInteractions = () => {
 			try {
 				map.scrollZoom.enable();
+			} catch {}
+			try {
+				zoomOutGovernorRef.current?.reset();
+				map.scrollZoom.setWheelZoomRate(MAP_WHEEL_ZOOM_RATE);
+				map.scrollZoom.setZoomRate(MAP_PINCH_ZOOM_RATE);
 			} catch {}
 			try {
 				map.boxZoom.enable();

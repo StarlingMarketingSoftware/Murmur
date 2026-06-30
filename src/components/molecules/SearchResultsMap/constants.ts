@@ -315,6 +315,15 @@ export const OVERVIEW_PREWARM_CENTER_QUANT_DEG = 1;
 export const MAP_WHEEL_ZOOM_RATE = 1 / 2000;
 export const MAP_PINCH_ZOOM_RATE = 1 / 200;
 
+// Aggressive zoom-out governor (see zoomOutGovernor.ts).
+export const ZOOM_OUT_GOVERNOR_ENABLED = true;
+export const ZOOM_OUT_GOVERNOR_MIN_RATE_MULTIPLIER = 0.32;
+export const ZOOM_OUT_GOVERNOR_ENERGY_SCALE = 1.1;
+export const ZOOM_OUT_GOVERNOR_ENERGY_DECAY_TAU_MS = 320;
+export const ZOOM_OUT_GOVERNOR_GESTURE_GAP_MS = 220;
+export const ZOOM_OUT_GOVERNOR_DEADZONE = 0.01;
+export const ZOOM_OUT_GOVERNOR_APPLY_EPSILON = 0.02;
+
 // Duration of the easeTo for +/- click and keyboard zoom requests (the
 // `requestedZoom` prop). Previously 180ms inline — too short to read as
 // deliberate. Paired with mapboxEaseOutQuart this gives the "heavy,
