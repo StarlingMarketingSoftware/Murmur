@@ -41,6 +41,7 @@ import { createPortal } from 'react-dom';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import MapBottomSearchArrowIcon from '@/components/atoms/_svg/MapBottomSearchArrowIcon';
 import MapBottomSearchProfileIcon from '@/components/atoms/_svg/MapBottomSearchProfileIcon';
+import { MapStatusLoadingPill } from '@/components/molecules/MapStatusLoadingPill';
 import DashboardActionBarPlaybookIcon from '@/components/atoms/_svg/DashboardActionBarPlaybookIcon';
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 import DashboardActionBarStarIcon from '@/components/atoms/_svg/DashboardActionBarStarIcon';
@@ -967,15 +968,25 @@ const CampaignInitialRevealGradientSurface = ({
 	phase,
 	isMobile,
 }: CampaignInitialRevealGradientSurfaceProps) => {
-	if (isMobile !== false || phase === 'map' || phase === 'done') return null;
-
-	const isOverview = activeView === 'overview';
+	// The overview ("All") tab is a bare map view — the same map the dashboard search
+	// showed — so there's no workspace panel for the reveal band to dress, and the
+	// gradient just reads as a meaningless wash over the right half of the map. Skip it
+	// there entirely so search→All (and a cold ?tab=all load) stay clean map→map
+	// transitions. The band only renders on the focused workspace tabs
+	// (Write/Drafts/Inbox/Sent), where it covers content as it reveals.
+	if (
+		isMobile !== false ||
+		activeView === 'overview' ||
+		phase === 'map' ||
+		phase === 'done'
+	)
+		return null;
 
 	return (
 		<div
 			aria-hidden="true"
 			data-campaign-initial-gradient-surface
-			data-campaign-initial-gradient-view={isOverview ? 'overview' : 'split'}
+			data-campaign-initial-gradient-view="split"
 			className={cn(
 				'fixed overflow-hidden pointer-events-none',
 				phase === 'main' && 'campaign-initial-gradient-surface--leaving'
@@ -983,12 +994,8 @@ const CampaignInitialRevealGradientSurface = ({
 			style={{
 				top: 0,
 				bottom: 0,
-				left: isOverview
-					? `var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 46%)`
-					: `var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, calc(100% - ${CAMPAIGN_INITIAL_REVEAL_COMPACT_BAND_WIDTH_PX}px))`,
-				right: isOverview
-					? 0
-					: `calc(100% - var(${CAMPAIGN_MAP_BACKDROP_END_VAR}, 100%))`,
+				left: `var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, calc(100% - ${CAMPAIGN_INITIAL_REVEAL_COMPACT_BAND_WIDTH_PX}px))`,
+				right: `calc(100% - var(${CAMPAIGN_MAP_BACKDROP_END_VAR}, 100%))`,
 				zIndex: 2,
 				opacity: phase === 'main' ? 0 : CAMPAIGN_INITIAL_REVEAL_GRADIENT_PEAK_OPACITY,
 				transition: `opacity ${CAMPAIGN_INITIAL_REVEAL_GRADIENT_FADE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
@@ -2920,6 +2927,20 @@ const Murmur = () => {
 			requestId: (prev?.requestId ?? 0) + 1,
 		}));
 	}, []);
+	// Batch sibling of the single-marker request above: a drag-rectangle (Select tool)
+	// on the map selects every contact inside it at once. The child DraftingSection
+	// consumes this nonce and merges the ids into the active tab's native selection.
+	const [mapAreaSelectionRequest, setMapAreaSelectionRequest] = useState<{
+		contactIds: number[];
+		requestId: number;
+	} | null>(null);
+	const requestMapAreaSelection = useCallback((contactIds: number[]) => {
+		if (contactIds.length === 0) return;
+		setMapAreaSelectionRequest((prev) => ({
+			contactIds,
+			requestId: (prev?.requestId ?? 0) + 1,
+		}));
+	}, []);
 	// Note: no separate reset-on-tab-switch effect — DraftingSection republishes the
 	// active tab's selection (defaulting to []) whenever `view` changes, which is the
 	// single source of truth. A parent reset here would fire AFTER the child's publish
@@ -2935,6 +2956,17 @@ const Murmur = () => {
 	}, [activeView]);
 
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
+	const handleCampaignMapAreaSelect = useCallback(
+		(
+			_bounds: { south: number; west: number; north: number; east: number },
+			payload?: { contactIds?: number[] }
+		) => {
+			requestMapAreaSelection(payload?.contactIds ?? []);
+			// Match the dashboard: snap back to the grab tool after a selection completes.
+			setActiveMapTool('grab');
+		},
+		[requestMapAreaSelection]
+	);
 	// Hover state for the dimmed Write/Drafts/Inbox left "Showing" strip: dimmed
 	// by default, full opacity + interactive while hovered (like the search page).
 	const [isPresetStripHovered, setIsPresetStripHovered] = useState(false);
@@ -3825,6 +3857,13 @@ const Murmur = () => {
 		useGetCampaignContacts(routeCampaignId, {
 			enabled: Boolean(routeCampaignId) && !isMobile,
 		});
+	const [isCampaignMapOverlayBusy, setIsCampaignMapOverlayBusy] = useState(false);
+	const handleCampaignMapOverlayBusyChange = useCallback((busy: boolean) => {
+		setIsCampaignMapOverlayBusy(busy);
+	}, []);
+	const isCampaignFilterPillBusy = Boolean(
+		isCampaignMapContactsLoading || isCampaignMapOverlayBusy
+	);
 	const { data: headerEmails } = useGetEmails({
 		filters: { campaignId: routeCampaignId },
 		enabled:
@@ -4072,6 +4111,7 @@ const Murmur = () => {
 			selectedContactObjects: effectiveCampaignSelectedContactObjectsForMap,
 			showSelectedContactTooltips: true,
 			onToggleSelection: requestMapMarkerSelection,
+			onAreaSelect: handleCampaignMapAreaSelect,
 			campaignContactStatusById: effectiveCampaignMapContactStatusById,
 			campaignMarkerMode: sendQueueMapMode ? 'status' : effectiveMapGroupingForActiveView,
 			campaignHeatmapColor: sendQueueMapMode
@@ -4102,6 +4142,7 @@ const Murmur = () => {
 			requestedZoom: mapZoomControlRequest,
 			onViewportZoom: handleMapViewportZoom,
 			onViewportIdle: handleMapViewportIdle,
+			onOverlayBusyChange: handleCampaignMapOverlayBusyChange,
 			onInteractiveMinZoomChange: handleInteractiveMinZoomChange,
 			isLoading: isCampaignMapContactsLoading,
 			skipAutoFit: true,
@@ -4115,6 +4156,7 @@ const Murmur = () => {
 			effectiveCampaignMapSelectedContactIds,
 			effectiveCampaignSelectedContactObjectsForMap,
 			requestMapMarkerSelection,
+			handleCampaignMapAreaSelect,
 			effectiveCampaignMapContactStatusById,
 			effectiveMapGroupingForActiveView,
 			sendQueueMapMode,
@@ -4124,6 +4166,7 @@ const Murmur = () => {
 			globeWeatherRegionCenter,
 			globeWeatherTemperatureF,
 			handleMapViewportIdle,
+			handleCampaignMapOverlayBusyChange,
 			isCampaignMapContactsLoading,
 			handleMapViewportZoom,
 			handleInteractiveMinZoomChange,
@@ -4508,7 +4551,15 @@ const Murmur = () => {
 							<div
 								className="campaign-map-split-overlay"
 								aria-hidden="true"
-								style={campaignInitialOpacityLayerStyle}
+								// While the Select tool is active, let drag-select pass through the
+								// dimmed panel band so a box-select spans the whole map (like the
+								// dashboard). Safe because map panning is already disabled in select
+								// mode — blocking accidental pans is the band's only job.
+								style={
+									isSelectMapToolActive
+										? { ...campaignInitialOpacityLayerStyle, pointerEvents: 'none' }
+										: campaignInitialOpacityLayerStyle
+								}
 							/>
 						)}
 						<CampaignInitialRevealGradientSurface
@@ -4913,9 +4964,10 @@ const Murmur = () => {
 															}
 												}
 											>
-											<button
+											<MapStatusLoadingPill
 												type="button"
 												aria-label="Open campaign search"
+												isBusy={isCampaignFilterPillBusy}
 												onPointerEnter={() => setIsFilteringPillHovered(true)}
 												onPointerLeave={() => setIsFilteringPillHovered(false)}
 												onFocus={() => setIsFilteringPillHovered(true)}
@@ -5050,7 +5102,7 @@ const Murmur = () => {
 														</span>
 													</>
 												)}
-											</button>
+											</MapStatusLoadingPill>
 											</div>
 										)}
 
@@ -5844,6 +5896,7 @@ const Murmur = () => {
 												onInboxSentTabChange={setInboxSentTab}
 												onMapSelectionChange={setCampaignMapSelectedContactIds}
 												mapMarkerSelectionRequest={mapMarkerSelectionRequest}
+												mapAreaSelectionRequest={mapAreaSelectionRequest}
 												goToOverview={() => setActiveView('overview')}
 												goToDrafting={() => setActiveView('drafting')}
 												goToWriting={() => setActiveView('testing')}

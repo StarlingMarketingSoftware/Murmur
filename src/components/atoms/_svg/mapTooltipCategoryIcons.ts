@@ -367,5 +367,39 @@ export const getTooltipCategoryIconSpec = (searchWhat?: string | null): TooltipC
 	return WHAT_TO_TOOLTIP_CATEGORY_ICON[key] ?? null;
 };
 
+// Inner-fill color for each category's tooltip icon. Values mirror the left
+// "Showing" / filtering rail's active tiles (MapSelectGrabTool
+// `TALL_STACK_INNER_BOX_INNER_FILLS`) so map UI that opts in can color the
+// inside of each SVG exactly like that panel does. Outlines stay black.
+const WHAT_TO_TOOLTIP_CATEGORY_INNER_FILL: Record<string, string> = {
+	[normalizeWhatKey('Coffee Shops')]: '#C5EDA0',
+	[normalizeWhatKey('Restaurants')]: '#81D697',
+	[normalizeWhatKey('Music Venues')]: '#9BDAFF',
+	[normalizeWhatKey('Venues')]: '#9BDAFF',
+	[normalizeWhatKey('Festivals')]: '#B9D0FF',
+	[normalizeWhatKey('Music Festivals')]: '#B9D0FF',
+	[normalizeWhatKey('Wedding Planners')]: '#F0E0A1',
+	[normalizeWhatKey('Wedding Venues')]: '#F0E0A1',
+	[normalizeWhatKey('Wine, Beer, and Spirits')]: '#A5C3FF',
+	[normalizeWhatKey('Wine, Beer, Spirits')]: '#A5C3FF',
+	[normalizeWhatKey('Wine Beer and Spirits')]: '#A5C3FF',
+	[normalizeWhatKey('Wine Beer Spirits')]: '#A5C3FF',
+	[normalizeWhatKey('Breweries')]: '#A5C3FF',
+	[normalizeWhatKey('Wineries')]: '#A5C3FF',
+	[normalizeWhatKey('Distilleries')]: '#A5C3FF',
+	[normalizeWhatKey('Cideries')]: '#A5C3FF',
+	[normalizeWhatKey('Radio Stations')]: '#FF88B3',
+};
+
+/**
+ * Resolves the left-rail inner-fill color for a category's tooltip icon, or
+ * `null` when the category has no dedicated color (e.g. uncategorized people,
+ * whose icon already carries its own fill).
+ */
+export const getTooltipCategoryInnerFillColor = (searchWhat?: string | null): string | null => {
+	if (!searchWhat) return null;
+	return WHAT_TO_TOOLTIP_CATEGORY_INNER_FILL[normalizeWhatKey(searchWhat)] ?? null;
+};
+
 export const isCleanMapMarkerCategory = (searchWhat?: string | null): boolean =>
 	Boolean(getTooltipCategoryIconSpec(searchWhat));

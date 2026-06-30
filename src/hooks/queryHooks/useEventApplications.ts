@@ -7,7 +7,12 @@ import type {
 	CreateApplicationData,
 	EventApplicationResponse,
 } from '@/app/api/events/[id]/applications/route';
+import type {
+	EnsureApplicationCampaignHomeResponse,
+} from '@/app/api/events/applications/[applicationId]/campaign-home/route';
 import type { MyEventApplicationsResponse } from '@/app/api/events/applications/route';
+import { getCampaignContactsQueryKey } from '@/hooks/queryHooks/useCampaigns';
+import { INBOUND_EMAIL_QUERY_KEYS } from '@/hooks/queryHooks/useInboundEmails';
 
 export type {
 	MyEventApplication,
@@ -36,6 +41,48 @@ export const useGetMyEventApplications = (options: CustomQueryOptions = {}) => {
 		// The response now carries venue-reply state (the opportunities "venue
 		// responded" indicator) — poll on the messaging Phase-1 cadence.
 		refetchInterval: 30_000,
+	});
+};
+
+/** Ensure a submitted event application has a campaign inbox home for deep links. */
+export const useEnsureApplicationCampaignHome = (
+	options: CustomMutationOptions = {}
+) => {
+	const {
+		suppressToasts = false,
+		errorMessage = 'Failed to open opportunity in a campaign',
+		onSuccess: onSuccessCallback,
+	} = options;
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async ({ applicationId }: { applicationId: number }) => {
+			const response = await _fetch(
+				urls.api.events.applicationCampaignHome(applicationId),
+				'POST'
+			);
+			if (!response.ok) {
+				const err = await response.json().catch(() => ({}));
+				throw new Error(err.error || errorMessage);
+			}
+			return response.json() as Promise<EnsureApplicationCampaignHomeResponse>;
+		},
+		onSuccess: async (data) => {
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: EVENT_APPLICATION_QUERY_KEYS.all }),
+				queryClient.invalidateQueries({ queryKey: ['campaigns'] }),
+				queryClient.invalidateQueries({
+					queryKey: getCampaignContactsQueryKey(data.campaignId),
+				}),
+				queryClient.invalidateQueries({ queryKey: INBOUND_EMAIL_QUERY_KEYS.all }),
+			]);
+			onSuccessCallback?.();
+		},
+		onError: (error) => {
+			if (!suppressToasts) {
+				toast.error(error instanceof Error ? error.message : errorMessage);
+			}
+		},
 	});
 };
 

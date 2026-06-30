@@ -41,6 +41,10 @@ const REVIEW_ACTION_ROW_NATIVE_HEIGHT_PX = 62;
 const TARGET_HEIGHT_PX = Math.round(
 	(REVIEW_NATIVE_COMPACT_HEIGHT_PX + REVIEW_ACTION_ROW_NATIVE_HEIGHT_PX) * REVIEW_SCALE
 );
+// With >1 draft, `DraftedEmails` renders a stacked back card peeking 19px above the front card in
+// native px; after REVIEW_SCALE it overhangs the card container's top by ~18px. We add that much to
+// the gap below the "Drafts" strip so the peeking card clears the strip instead of poking into it.
+const STACKED_BACK_CARD_OVERHANG_PX = Math.round(19 * REVIEW_SCALE); // ≈ 18
 
 /**
  * The stacked-draft review shown in the dashboard search overlay after a batch is drafted.
@@ -152,12 +156,16 @@ export const DashboardDraftReview: FC<DashboardDraftReviewProps> = ({
 
 	const isSendingDisabled = isFreeTrial || (user?.sendingCredits || 0) === 0;
 
+	// >1 draft → the stacked back card peeks above the front card; push the card stack down so it
+	// clears the "Drafts" strip above (the strip itself stays put).
+	const hasStackedBackCard = batchDrafts.length > 1;
+
 	return (
 		<div style={{ width: TARGET_WIDTH_PX, marginLeft: 'auto' }}>
 			{/* Drafts mode strip — yellow replica of the write overlay's red Draft/Add-to-Folder
 			    bar, shown above the review card while looking over drafts. */}
 			<div
-				className="flex flex-row items-center gap-[13px] mb-2"
+				className="flex flex-row items-center gap-[13px]"
 				style={{
 					width: TARGET_WIDTH_PX,
 					height: 28,
@@ -165,6 +173,7 @@ export const DashboardDraftReview: FC<DashboardDraftReviewProps> = ({
 					background: '#FDDEA5',
 					paddingLeft: 4,
 					paddingRight: 8,
+					marginBottom: hasStackedBackCard ? 8 + STACKED_BACK_CARD_OVERHANG_PX : 8,
 				}}
 			>
 				<div

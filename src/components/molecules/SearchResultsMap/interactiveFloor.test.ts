@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import {
 	INTERACTIVE_MAP_MIN_ZOOM_DELTA_MAX,
 	MAP_MIN_ZOOM,
+	STATE_LABEL_CONTEXT_FADE_END_ZOOM,
+	STATE_LABEL_CONTEXT_FADE_START_ZOOM,
+	STATE_LABEL_CONTEXT_HIDE_ZOOM,
+	STATE_LABEL_CONTEXT_HOLD_ZOOM,
 	STATE_LABELS_FULL_OPACITY_ZOOM,
 	getInteractiveMapMinZoomDelta,
 } from './constants';
@@ -83,11 +87,19 @@ test('expression builders shift only the near-floor stops', () => {
 
 	const labels0 = interpolateStops(buildStateLabelsTextOpacityExpr(0.8, 0));
 	const labelsD = interpolateStops(buildStateLabelsTextOpacityExpr(0.8, d));
-	assert.deepEqual(labels0, [MAP_MIN_ZOOM, STATE_LABELS_FULL_OPACITY_ZOOM]);
+	assert.deepEqual(labels0, [
+		MAP_MIN_ZOOM,
+		STATE_LABELS_FULL_OPACITY_ZOOM,
+		STATE_LABEL_CONTEXT_HOLD_ZOOM,
+		STATE_LABEL_CONTEXT_FADE_START_ZOOM,
+		STATE_LABEL_CONTEXT_FADE_END_ZOOM,
+		STATE_LABEL_CONTEXT_HIDE_ZOOM,
+	]);
 	assert.deepEqual(
-		labelsD,
-		labels0.map((stop) => stop + d)
+		labelsD.slice(0, 2),
+		labels0.slice(0, 2).map((stop) => stop + d)
 	);
+	assert.deepEqual(labelsD.slice(2), labels0.slice(2));
 
 	const dividers0 = interpolateStops(buildStateDividerLineOpacityExpr(0));
 	const dividersD = interpolateStops(buildStateDividerLineOpacityExpr(d));

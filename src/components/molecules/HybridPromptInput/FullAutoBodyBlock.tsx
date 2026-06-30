@@ -235,6 +235,10 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 			const container = customInstructionsContainerRef.current;
 			if (!target || !container) return;
 			if (container.contains(target)) return;
+			// Keep Custom Instructions expanded while it holds text, so a stray
+			// click-away doesn't hide content the user has already typed.
+			const currentValue = form.getValues(`hybridBlockPrompts.${fieldIndex}.value`);
+			if (typeof currentValue === 'string' && currentValue.trim().length > 0) return;
 			setIsCustomInstructionsOpen(false);
 		};
 
@@ -242,7 +246,7 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 		return () => {
 			document.removeEventListener('pointerdown', handlePointerDown);
 		};
-	}, [isCustomInstructionsOpen]);
+	}, [isCustomInstructionsOpen, form, fieldIndex]);
 
 	// Close Booking For dropdown when clicking away
 	useEffect(() => {

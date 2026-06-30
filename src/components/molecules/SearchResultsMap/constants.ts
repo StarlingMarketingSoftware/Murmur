@@ -4,6 +4,7 @@ import {
 } from '@/constants/contactCategories';
 import { WeatherMood } from '@/lib/weather/regions';
 import type { OutlinePolygonFeatureCollection, ParsedCssColor } from './types';
+import { mapboxDragPanLinearDecel } from './math';
 
 // ============================================================================
 // Geometry / clipping
@@ -275,6 +276,14 @@ export const getInteractiveMapMinZoomDelta = (
 // Zoom at which state initials reach full opacity. Kept close to MAP_MIN_ZOOM so
 // labels are legible from the wide continental view, not only when zoomed in.
 export const STATE_LABELS_FULL_OPACITY_ZOOM = MAP_MIN_ZOOM + 0.5;
+// State labels are now contextual backdrop typography: visible early, then
+// progressively quieter as city/town labels become the foreground hierarchy.
+export const STATE_LABEL_CONTEXT_OPACITY = 0.52;
+export const STATE_LABEL_CONTEXT_HOLD_ZOOM = 6.0;
+export const STATE_LABEL_CONTEXT_FADE_START_ZOOM = 7.4;
+export const STATE_LABEL_CONTEXT_FADE_END_ZOOM = 10.5;
+export const STATE_LABEL_CONTEXT_HIDE_ZOOM = 12.0;
+export const STATE_LABEL_FULL_NAME_ZOOM = 6.8;
 // Dashboard UX: allow state hover highlight one zoom step past the default zoom.
 export const STATE_HOVER_HIGHLIGHT_MAX_ZOOM = MAP_DEFAULT_ZOOM + 1;
 
@@ -299,10 +308,106 @@ export const OVERVIEW_PREWARM_CENTER_QUANT_DEG = 1;
 // Scroll/pinch zoom feel. Mapbox defaults (wheel 1/450, pinch 1/100) feel
 // jumpy on a Mac trackpad — each tick traverses a lot of zoom, which reads
 // as "aggressive." Lowering both rates produces a slower, more gradual,
-// Apple-Maps-style glide. Mapbox's internal easing handles the in-between
-// smoothing once each tick is small enough.
-export const MAP_WHEEL_ZOOM_RATE = 1 / 700;
+// Airbnb-style "heavy/deliberate" glide where a single scroll or flick
+// barely moves the map and a full zoom level takes several deliberate ticks.
+// Mapbox's internal easing handles the in-between smoothing once each tick
+// is small enough.
+export const MAP_WHEEL_ZOOM_RATE = 1 / 2000;
 export const MAP_PINCH_ZOOM_RATE = 1 / 200;
+
+// Aggressive zoom-out governor (see zoomOutGovernor.ts).
+export const ZOOM_OUT_GOVERNOR_ENABLED = true;
+export const ZOOM_OUT_GOVERNOR_MIN_RATE_MULTIPLIER = 0.32;
+export const ZOOM_OUT_GOVERNOR_ENERGY_SCALE = 1.1;
+export const ZOOM_OUT_GOVERNOR_ENERGY_DECAY_TAU_MS = 320;
+export const ZOOM_OUT_GOVERNOR_GESTURE_GAP_MS = 220;
+export const ZOOM_OUT_GOVERNOR_DEADZONE = 0.01;
+export const ZOOM_OUT_GOVERNOR_APPLY_EPSILON = 0.02;
+
+// Duration of the easeTo for +/- click and keyboard zoom requests (the
+// `requestedZoom` prop). Previously 180ms inline — too short to read as
+// deliberate. Paired with mapboxEaseOutQuart this gives the "heavy,
+// weighted" Airbnb feel: fast commit, hard stop, no floaty tail.
+export const MAP_REQUESTED_ZOOM_EASE_MS = 400;
+
+// Drag-pan inertia "heavy / abrupt-stop" tuning (Airbnb-style feel).
+// Mapbox's defaults (deceleration 2500, linearity 0.3, bezier easing) produce
+// a longer, softer ease-out tail than the latched feel we want. Raising
+// `deceleration` shortens the coast; `linearity` blends
+// the raw flick velocity in for a more direct/heavy feel; the custom easing
+// (mapboxDragPanLinearDecel) makes velocity decrease linearly instead of
+// following Mapbox's default bezier. Combined, the map glides a short distance
+// and stops crisply — the "weighted furniture on a rubber mat" feel.
+//
+// IMPORTANT (mapbox-gl 3.x): `DragPanHandler.enable(opts)` does
+// `this._inertiaOptions = opts || {}`, so calling `enable()` with NO args
+// RESETS the inertia back to Mapbox's defaults (deceleration 2500 / maxSpeed
+// 1400 / linearity 0.3 / bezier — the floaty preset). These options do NOT
+// persist on the handler. Every `dragPan.enable()` call site must therefore
+// pass `getDragPanInertiaOptions(currentZoom)` (below); a bare `enable()`
+// silently reverts the feel. Note these options only affect the post-release
+// inertial coast — the active (button-held) drag is always Mapbox's native 1:1
+// pan.
+//
+// TUNING GUIDE:
+//   deceleration — higher = shorter coast (default 2500; Airbnb ~8000-12000)
+//   linearity    — 0..1, raw velocity blend (default 0.3; 0.3-0.5 feels heavy)
+//   maxSpeed     — clamp on flick velocity (default 1400; lower = tighter
+//                  "latch" so a hard flick coasts a shorter, bounded distance)
+// Approx coast distance at the clamp ≈ maxSpeed² / (2·deceleration·linearity).
+// Zoomed-out maxSpeed 2200 ≈ 691px; zoomed-in maxSpeed 3000 ≈ 1286px. This
+// lets city/street-level flicks travel much farther, while the high
+// deceleration/custom easing keeps the crisp end snap instead of Mapbox's
+// softer default tail.
+export const DRAG_PAN_DECELERATION = 10000;
+export const DRAG_PAN_LINEARITY = 0.35;
+export const DRAG_PAN_MAX_SPEED = 2200;
+export const DRAG_PAN_ZOOMED_IN_MAX_SPEED = 3000;
+export const DRAG_PAN_ZOOM_BOOST_START_ZOOM = 6;
+export const DRAG_PAN_ZOOM_BOOST_END_ZOOM = 11;
+
+export type DragPanInertiaOptions = {
+	deceleration: number;
+	linearity: number;
+	maxSpeed: number;
+	easing: (t: number) => number;
+};
+
+const easeDragPanZoomBoost = (zoomBoostT: number) => {
+	const t = Math.max(0, Math.min(1, zoomBoostT));
+	return t * t * (3 - 2 * t);
+};
+
+export const getDragPanZoomBoostT = (zoom: number): number => {
+	const raw =
+		(zoom - DRAG_PAN_ZOOM_BOOST_START_ZOOM) /
+		(DRAG_PAN_ZOOM_BOOST_END_ZOOM - DRAG_PAN_ZOOM_BOOST_START_ZOOM);
+	return easeDragPanZoomBoost(raw);
+};
+
+export const getDragPanMaxSpeedForZoom = (zoom: number): number =>
+	Math.round(
+		DRAG_PAN_MAX_SPEED +
+			(DRAG_PAN_ZOOMED_IN_MAX_SPEED - DRAG_PAN_MAX_SPEED) *
+				getDragPanZoomBoostT(zoom)
+	);
+
+// Single source of truth for the inertia options passed to EVERY
+// `dragPan.enable(...)` call (construction, safeEnableInteractions, the
+// rectangle-select toggle, and zoom-end refreshes). Because mapbox-gl 3.x does
+// not persist these on the handler, re-passing fresh options on every enable()
+// is what keeps the tuned "latch" feel from reverting to Mapbox defaults after
+// interaction toggles. The maxSpeed is zoom-aware so high-zoom flicks travel
+// farther across the map while retaining the same crisp deceleration curve.
+export const getDragPanInertiaOptions = (zoom = 0): DragPanInertiaOptions => ({
+	deceleration: DRAG_PAN_DECELERATION,
+	linearity: DRAG_PAN_LINEARITY,
+	maxSpeed: getDragPanMaxSpeedForZoom(zoom),
+	easing: mapboxDragPanLinearDecel,
+});
+
+export const DRAG_PAN_INERTIA_OPTIONS: DragPanInertiaOptions =
+	getDragPanInertiaOptions();
 
 // Decorative dashboard background framing. Keep these in sync with the background-mode
 // camera settings so the initial mount doesn't "pop" after the map loads.
@@ -653,11 +758,37 @@ export const MURMUR_GLOBE_LIGHT_POLAR_DEG = 75;
 // and add a separate cream-colored fill layer sourced from Mapbox's free vector tileset
 // `mapbox.country-boundaries-v1`, which has complete world coverage (every country, plus
 // Antarctica) and is extremely lightweight. Country tiles cache at all zooms, so after
-// the first paint the continents stay cream through every subsequent zoom/pan; water
-// fills still draw blue on top, so lakes/rivers inside countries look right.
+// the first paint the continents stay cream through every subsequent zoom/pan. Below
+// the staggered Streets detail ladder, a local major-lakes layer restores large
+// inland water; once Mapbox water reaches full opacity, it takes over the precise
+// river/lake detail.
 export const MAP_OCEAN_BLUE = '#62C7E3';
-export const MAP_LAND_CREAM = '#F1EDE2';
+export const MAP_LAND_CREAM = '#B9E4D6';
 export const MAP_LANDCOVER_GREEN = '#B3E6D7';
+
+// Low-zoom detail ladder: the globe/state overview should stay a clean, instant
+// base map. Mapbox Streets detail is held until after state-level zoom, then
+// returns one class at a time so roads/water/terrain never stream as one big chunk.
+export const BASEMAP_DETAIL_CLEAN_CEILING_ZOOM = 6.5;
+
+export const BASEMAP_DETAIL_WATER_FILL_MIN_ZOOM = 7.0;
+export const BASEMAP_DETAIL_WATER_FILL_FADE_START_ZOOM = 7.0;
+export const BASEMAP_DETAIL_WATER_FILL_FADE_END_ZOOM = 8.0;
+
+export const BASEMAP_DETAIL_FILL_MIN_ZOOM = 7.75;
+export const BASEMAP_DETAIL_FILL_FADE_START_ZOOM = 7.75;
+export const BASEMAP_DETAIL_FILL_FADE_END_ZOOM = 8.75;
+
+export const BASEMAP_DETAIL_WATERWAY_LINE_MIN_ZOOM = 8.25;
+export const BASEMAP_DETAIL_WATERWAY_LINE_FADE_START_ZOOM = 8.25;
+export const BASEMAP_DETAIL_WATERWAY_LINE_FADE_END_ZOOM = 9.25;
+
+export const BASEMAP_DETAIL_ROAD_MAJOR_MIN_ZOOM = 8.75;
+export const BASEMAP_DETAIL_ROAD_MINOR_MIN_ZOOM = 9.75;
+
+export const BASEMAP_DETAIL_HILLSHADE_MIN_ZOOM = 10.25;
+export const BASEMAP_DETAIL_HILLSHADE_FADE_START_ZOOM = 10.25;
+export const BASEMAP_DETAIL_HILLSHADE_FADE_END_ZOOM = 11.25;
 
 export const NIGHT_HIDE_ROADS_START_T = 0.18;
 export const NIGHT_HIDE_ROADS_END_T = 0.42;
@@ -757,6 +888,15 @@ export const MAP_WORLD_LAND_LOCAL_DATA_URL = '/maps/world-land-110m.json';
 // Cap geojson-vt tiling depth: past z6 the tileset fill has long since painted,
 // so deeper local tiles would be pure worker memory/CPU waste.
 export const MAP_WORLD_LAND_LOCAL_MAX_ZOOM = 6;
+
+// Local major-lakes back-stop for the low-zoom clean base map. While Mapbox
+// Streets `water` is gated/fading in, the cream land silhouette would otherwise
+// cover the Great Lakes and other large inland water bodies because the bundled
+// 110m land polygons have almost no lake holes.
+export const MAP_LOW_ZOOM_LAKES_SOURCE_ID = 'murmur-low-zoom-lakes';
+export const MAP_LOW_ZOOM_LAKES_LAYER_ID = 'murmur-low-zoom-lakes-fill';
+export const MAP_LOW_ZOOM_LAKES_DATA_URL = '/maps/world-lakes-110m.json';
+export const MAP_LOW_ZOOM_LAKES_MAX_ZOOM = BASEMAP_DETAIL_WATER_FILL_FADE_END_ZOOM;
 
 // ── Sequential boot ladder backstops ─────────────────────────────────────────
 // The cold-start reveal is staged (land → basemap/roads → boundaries → pins) so
@@ -1078,7 +1218,9 @@ export const MARKER_CONSTELLATION_NODE_RANK_OPACITY_EXPR: any = [
 
 export const STATE_PROCESSED_GEOJSON_URL = '/geo/us-states-processed.json';
 export const STATE_META_URL = '/geo/us-states-meta.json';
-export const STATE_LABELS_URL = '/geo/us-states-labels.json';
+// ?v= bumped whenever us-states-labels.json content changes — the /geo/* route
+// is served `immutable`, so without a new URL cached clients never refetch it.
+export const STATE_LABELS_URL = '/geo/us-states-labels.json?v=8';
 export const STATE_OUTLINE_URL = '/geo/us-states-outline.json';
 export const STATE_PREPARED_POLYGONS_URL = '/geo/us-states-prepared-polygons.json';
 export const STATE_HIGHLIGHT_COLOR = '#5DAB68';
@@ -1101,18 +1243,98 @@ export const NIGHT_STATE_LINE_DARKEN_MAX = 0;
 // We hide every Mapbox symbol layer EXCEPT city/town labels and the road/street
 // label, then restyle the kept ones for contrast against the cream land
 // (#F1EDE2) and gray roads (#C2C9D0): dark ink + a soft near-white cream
-// halo so glyphs stay legible over both. Labels fade in only when zoomed in so
-// the globe/US-wide overview stays clean (state labels carry it).
+// halo so glyphs stay legible over both. City/town labels are deliberately
+// tiered like an atlas: big metros arrive at the US-wide view, smaller cities
+// follow quickly, neighborhoods wait until local zoom, and street names remain
+// street-level only.
 export const BASEMAP_LABEL_TEXT_COLOR = STATE_LABEL_COLOR; // '#111827'
 export const BASEMAP_LABEL_HALO_COLOR = 'rgba(248, 246, 240, 0.92)';
 export const BASEMAP_LABEL_HALO_WIDTH = 1.3;
 export const BASEMAP_LABEL_HALO_BLUR = 0.4;
 
-// City/town labels: invisible at globe/US-wide zoom (where the murmur state
-// labels already carry the cartography), then fade in across the regional band
-// so they don't collide with state names.
-export const BASEMAP_SETTLEMENT_LABEL_FADE_START_ZOOM = 6.5;
-export const BASEMAP_SETTLEMENT_LABEL_FADE_END_ZOOM = 8.0;
+// Major cities are the first place names to appear. Their opacity fade is
+// intentionally pinned to the SAME zoom band as the murmur state initials
+// (MAP_MIN_ZOOM → STATE_LABELS_FULL_OPACITY_ZOOM) so big cities and state names
+// establish together at the far-out view.
+export const BASEMAP_SETTLEMENT_MAJOR_LABEL_MIN_ZOOM = MAP_MIN_ZOOM;
+export const BASEMAP_SETTLEMENT_MAJOR_LABEL_FADE_START_ZOOM = MAP_MIN_ZOOM;
+export const BASEMAP_SETTLEMENT_MAJOR_LABEL_FADE_END_ZOOM =
+	STATE_LABELS_FULL_OPACITY_ZOOM;
+export const BASEMAP_SETTLEMENT_MAJOR_LABEL_OPACITY = 0.95;
+
+// Far-out city allowlist: top 15 U.S. incorporated places by latest researched
+// Census population estimate (city proper, not metro area). State codes
+// disambiguate names like Columbus and keep the filter from picking similarly
+// named towns elsewhere.
+export const BASEMAP_SETTLEMENT_TOP_CITY_MATCHES = [
+	{ name: 'New York', iso3166_2: 'US-NY' },
+	{ name: 'Los Angeles', iso3166_2: 'US-CA' },
+	{ name: 'Chicago', iso3166_2: 'US-IL' },
+	{ name: 'Houston', iso3166_2: 'US-TX' },
+	{ name: 'Phoenix', iso3166_2: 'US-AZ' },
+	{ name: 'Philadelphia', iso3166_2: 'US-PA' },
+	{ name: 'San Antonio', iso3166_2: 'US-TX' },
+	{ name: 'San Diego', iso3166_2: 'US-CA' },
+	{ name: 'Dallas', iso3166_2: 'US-TX' },
+	{ name: 'Fort Worth', iso3166_2: 'US-TX' },
+	{ name: 'Jacksonville', iso3166_2: 'US-FL' },
+	{ name: 'Austin', iso3166_2: 'US-TX' },
+	{ name: 'San Jose', iso3166_2: 'US-CA' },
+	{ name: 'Charlotte', iso3166_2: 'US-NC' },
+	{ name: 'Columbus', iso3166_2: 'US-OH' },
+] as const;
+
+// Keep the far-out view to exactly the allowlisted top-15 city labels. Once the
+// user is past the regional/state band, the usual ranked major-city pool can
+// take over and continue the progressive reveal.
+export const BASEMAP_SETTLEMENT_TOP_CITY_ONLY_MAX_ZOOM = 6.3;
+
+// symbolrank is a GLOBAL Mapbox prominence ranking (1 = most prominent). We use
+// it only after the far-out top-15 band, when the map can safely admit the rest
+// of the major city pool.
+export const BASEMAP_SETTLEMENT_MAJOR_SYMBOLRANK_CEILING = 8;
+
+// With the far-out pool already hard-capped to 15, keep padding close to native
+// so those labels have the best chance to place without overlap. It relaxes to
+// the native default (~2px) before smaller city tiers arrive.
+export const BASEMAP_SETTLEMENT_MAJOR_TEXT_PADDING_STOPS = [
+	[3, 4],
+	[4, 4],
+	[5, 3],
+	[6, 2],
+	[7, 2],
+] as const;
+
+// Smaller cities / important towns: the settlement hierarchy below the major
+// ceiling, revealed on a zoom-stepped symbolrank window so they fill in
+// gradually AFTER the far-out top-15 view.
+export const BASEMAP_SETTLEMENT_MINOR_LABEL_MIN_ZOOM =
+	BASEMAP_SETTLEMENT_TOP_CITY_ONLY_MAX_ZOOM;
+export const BASEMAP_SETTLEMENT_MINOR_LABEL_FADE_START_ZOOM =
+	BASEMAP_SETTLEMENT_TOP_CITY_ONLY_MAX_ZOOM;
+export const BASEMAP_SETTLEMENT_MINOR_LABEL_FADE_END_ZOOM = 7.6;
+export const BASEMAP_SETTLEMENT_MINOR_LABEL_OPACITY = 0.86;
+// [zoom, inclusive symbolrank ceiling] for the minor tier. Below the first stop
+// the ceiling equals the major ceiling, so (rank > majorCeiling AND rank <=
+// ceiling) is empty and no minor settlements paint at the far-out view.
+// Strictly increasing zoom and ceiling so towns reveal monotonically.
+export const BASEMAP_SETTLEMENT_MINOR_SYMBOLRANK_STOPS = [
+	[6.3, 9],
+	[7.0, 10],
+	[8.0, 12],
+	[9.0, 14],
+] as const;
+
+export const BASEMAP_SETTLEMENT_SUBDIVISION_LABEL_MIN_ZOOM = 9.0;
+export const BASEMAP_SETTLEMENT_SUBDIVISION_LABEL_FADE_START_ZOOM = 9.35;
+export const BASEMAP_SETTLEMENT_SUBDIVISION_LABEL_FADE_END_ZOOM = 10.75;
+export const BASEMAP_SETTLEMENT_SUBDIVISION_LABEL_OPACITY = 0.72;
+
+// Settlement icon dots should not litter the early atlas view. They gently join
+// after the names have already established place context.
+export const BASEMAP_SETTLEMENT_ICON_FADE_START_ZOOM = 7.0;
+export const BASEMAP_SETTLEMENT_ICON_FADE_END_ZOOM = 8.0;
+export const BASEMAP_SETTLEMENT_ICON_OPACITY = 0.28;
 
 // Street labels: only at true street-level zoom (Mapbox's road-label layer has a
 // high native minzoom ~12), so streets never compete with city names.
@@ -1357,6 +1579,56 @@ export const AMBIENT_CONTACTS_OVERLAY_TARGET_DOTS = MAX_TOTAL_DOTS;
 export const AMBIENT_CONTACTS_OVERLAY_BUFFER_DOTS = 420;
 export const AMBIENT_CONTACTS_OVERLAY_LIMIT = 1800;
 export const AMBIENT_CONTACTS_UNCATEGORIZED_FILL_COLOR = '#5BB6DD';
+
+// Lightweight dashboard general/ambient map overlay (Airbnb-style): render a tiny,
+// stable set of HTML suggestion pills while zoomed out/moderately zoomed, then hand
+// off to the existing ambient Mapbox marker styling at closer zoom with a smaller
+// total marker cap. Active search result markers intentionally keep their old UI.
+// Per-patch pill count is randomized within this inclusive range (stable per zoom
+// bucket — see compactOverlayPillEntries) rather than always maxing out. Same range
+// on desktop and mobile; collision spacing self-limits how many actually fit.
+export const LIGHTWEIGHT_COMPACT_OVERLAY_TARGET_PILLS_MIN = 9;
+export const LIGHTWEIGHT_COMPACT_OVERLAY_TARGET_PILLS_MAX = 14;
+export const LIGHTWEIGHT_COMPACT_OVERLAY_CANDIDATE_LIMIT = 45;
+export const LIGHTWEIGHT_COMPACT_OVERLAY_MIN_WIDTH_PX = 62;
+export const LIGHTWEIGHT_COMPACT_OVERLAY_MAX_WIDTH_PX = 128;
+export const LIGHTWEIGHT_COMPACT_OVERLAY_HEIGHT_PX = 20;
+export const LIGHTWEIGHT_COMPACT_OVERLAY_COLLISION_MARGIN_PX = 5;
+// Sticky "keep" padding (fraction of the viewport span added on every side). A
+// committed pill is retained while it sits within this padded ring, so pills just
+// past the edge don't flicker out and a small pan never reshuffles the set. Pan-back
+// stability comes from the per-zoom-bucket ranking seed (deterministic re-pick), not
+// from a large off-screen buffer, so this stays modest.
+export const LIGHTWEIGHT_COMPACT_OVERLAY_KEEP_PAD_FACTOR = 0.25;
+// Hysteresis band: compact → detail at 10.8; detail → compact at 10.3.
+export const LIGHTWEIGHT_COMPACT_OVERLAY_DETAIL_ENTER_ZOOM = 10.8;
+export const LIGHTWEIGHT_COMPACT_OVERLAY_COMPACT_REENTER_ZOOM = 10.3;
+export const LIGHTWEIGHT_DETAIL_MARKER_BUDGET = 30;
+// --- Compact overlay: fully-zoomed-out (globe) handling ----------------------
+// The compact pills used to share the ambient atlas fetch gate
+// (AMBIENT_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM + the interactive floor delta),
+// which sits ~0.35 zoom ABOVE every interactive floor. So the moment you reached
+// the globe view the candidate fetch was cleared and the pills blanked out
+// entirely. Compact mode is itself the zoomed-out browse gate (USA-centered AND
+// inside the compact zoom band), so the overlay can safely fetch all the way down
+// to the floor and let that flag own the gating.
+export const LIGHTWEIGHT_COMPACT_OVERLAY_FETCH_MIN_ZOOM = 0;
+// Pill count at the globe view: show only a handful when fully zoomed out, then
+// ramp up to the normal randomized [MIN, MAX] range as you zoom toward the
+// continental view (so the globe isn't blanketed in pills).
+export const LIGHTWEIGHT_COMPACT_OVERLAY_ZOOMED_OUT_TARGET_PILLS = 5;
+// Floor-relative zoom band the ramp runs across. Zoom is normalized by the
+// interactive floor delta first, so a large monitor (whose floor sits higher)
+// still reads its globe view as "fully zoomed out" and gets the same ~5 pills.
+// At/below FULL_ZOOM => the zoomed-out target; at/above END_ZOOM => the normal
+// randomized count; linearly interpolated in between.
+export const LIGHTWEIGHT_COMPACT_OVERLAY_ZOOMED_OUT_FULL_ZOOM = MAP_MIN_ZOOM;
+export const LIGHTWEIGHT_COMPACT_OVERLAY_ZOOMED_OUT_END_ZOOM = 4;
+// Half-width (in screen px) of the "Disengage search" hover band hugging the curated blob's
+// outer edge ring while a curated/"For You" search is engaged. Hovering within this band of the
+// outline (inside OR outside) surfaces the disengage prompt; everywhere else suppresses it so the
+// in-blob result markers and the outside-blob ambient overlay stay freely interactive.
+export const CURATED_BLOB_DISENGAGE_PERIMETER_BAND_PX = 22;
 
 export const BOOKING_EXTRA_TITLE_PREFIXES = BOOKING_CONTACT_TITLE_PREFIXES;
 

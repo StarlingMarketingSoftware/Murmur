@@ -2496,25 +2496,43 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						return;
 					}
 
-					// Drafts tab: a single click cycles selection/showing state.
-					// (Showing row -> no-op, selected non-showing -> deselect,
-					// plain -> promote to showing + clear every other selection.)
+					// Drafts tab: a single click cycles selection/showing state in two
+					// steps — selected non-showing -> showing (selection unchanged),
+					// showing -> deselect + move preview to the nearest still-selected
+					// draft, plain -> promote to showing + clear every other selection.
 					if (
 						isDraftsFocusMode &&
 						!shouldRedOutDraftRows &&
 						onDraftSelectionChange
 					) {
-						lastClickedDraftRef.current = draft.id;
+						const orderedIds = supplementalDraftRows.map((row) => row.id);
 						const result = resolveDraftRowClick(
 							draft.id,
 							selectedDraftId ?? null,
-							selectedDraftIds ?? new Set<number>()
+							selectedDraftIds ?? new Set<number>(),
+							orderedIds
 						);
-						if (result.showDraft) onDraftClick?.(draft);
 						if (result.nextSelectedIds) {
 							const nextSelectedIds = result.nextSelectedIds;
 							onDraftSelectionChange(() => nextSelectedIds);
 						}
+						// Resolve the next showing draft. null means nothing else is
+						// selected; the Drafts tab always shows something, so fall back to
+						// the first row (the DraftingSection effects re-add it to selection).
+						if (result.nextShowingId === draft.id) {
+							onDraftClick?.(draft);
+						} else if (result.nextShowingId != null) {
+							const nextDraft = supplementalDraftRows.find(
+								(row) => row.id === result.nextShowingId
+							);
+							if (nextDraft) onDraftClick?.(nextDraft);
+						} else {
+							const firstDraft = supplementalDraftRows[0];
+							if (firstDraft) onDraftClick?.(firstDraft);
+						}
+						// Anchor shift-range selection to the row that ends up showing.
+						lastClickedDraftRef.current =
+							result.nextShowingId ?? supplementalDraftRows[0]?.id ?? draft.id;
 						if (contact) onContactClick?.(contact);
 						return;
 					}

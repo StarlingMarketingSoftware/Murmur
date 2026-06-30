@@ -1,17 +1,31 @@
 import mapboxgl from 'mapbox-gl';
 import { formatCssColor, parseCssColor, parseHexColor } from './color';
 import {
+	BASEMAP_DETAIL_FILL_FADE_END_ZOOM,
+	BASEMAP_DETAIL_FILL_FADE_START_ZOOM,
+	BASEMAP_DETAIL_FILL_MIN_ZOOM,
+	BASEMAP_DETAIL_HILLSHADE_FADE_END_ZOOM,
+	BASEMAP_DETAIL_HILLSHADE_FADE_START_ZOOM,
+	BASEMAP_DETAIL_HILLSHADE_MIN_ZOOM,
+	BASEMAP_DETAIL_ROAD_MAJOR_MIN_ZOOM,
+	BASEMAP_DETAIL_ROAD_MINOR_MIN_ZOOM,
+	BASEMAP_DETAIL_WATER_FILL_FADE_END_ZOOM,
+	BASEMAP_DETAIL_WATER_FILL_FADE_START_ZOOM,
+	BASEMAP_DETAIL_WATER_FILL_MIN_ZOOM,
+	BASEMAP_DETAIL_WATERWAY_LINE_FADE_END_ZOOM,
+	BASEMAP_DETAIL_WATERWAY_LINE_FADE_START_ZOOM,
+	BASEMAP_DETAIL_WATERWAY_LINE_MIN_ZOOM,
 	BASEMAP_LABEL_HALO_BLUR,
 	BASEMAP_LABEL_HALO_COLOR,
 	BASEMAP_LABEL_HALO_WIDTH,
 	BASEMAP_LABEL_TEXT_COLOR,
-	BASEMAP_SETTLEMENT_LABEL_FADE_END_ZOOM,
-	BASEMAP_SETTLEMENT_LABEL_FADE_START_ZOOM,
-	BASEMAP_STREET_LABEL_FADE_END_ZOOM,
-	BASEMAP_STREET_LABEL_FADE_START_ZOOM,
 	MAP_DEFAULT_ZOOM,
 	MAP_LAND_CREAM,
 	MAP_LANDCOVER_GREEN,
+	MAP_LOW_ZOOM_LAKES_DATA_URL,
+	MAP_LOW_ZOOM_LAKES_LAYER_ID,
+	MAP_LOW_ZOOM_LAKES_MAX_ZOOM,
+	MAP_LOW_ZOOM_LAKES_SOURCE_ID,
 	MAP_OCEAN_BLUE,
 	MAP_WORLD_LAND_LAYER_ID,
 	MAP_WORLD_LAND_LOCAL_DATA_URL,
@@ -50,6 +64,25 @@ import {
 	UNSUBSCRIBE_BURN_SPACE_COLOR,
 	UNSUBSCRIBE_BURN_STAR_INTENSITY,
 } from './constants';
+import {
+	buildBasemapDetailOpacityRamp,
+	classifyBasemapDetailLayer,
+	isBasemapHillshadeLayer,
+	isBasemapLandcoverLikeFillLayer,
+	isBasemapMajorRoadLikeLineLayer,
+	isBasemapRoadLikeLineLayer,
+	isBasemapWaterFillLayer,
+	isBasemapWaterwayLineLayer,
+} from './basemapDetailGate';
+import {
+	buildBasemapLabelOpacityRamp,
+	buildBasemapMajorSettlementTextPaddingRamp,
+	buildBasemapSettlementIconOpacityRamp,
+	classifyBasemapLabelLayer,
+	composeBasemapSettlementFilter,
+	getBasemapLabelVisualSpec,
+	isBasemapSettlementLabelKind,
+} from './basemapLabelGate';
 import { clamp, lerp } from './math';
 import { scaleMapboxOpacityExpr } from './searchMode';
 import type {
@@ -163,8 +196,10 @@ export const applyMurmurGlobeLighting = (mapInstance: mapboxgl.Map, burnT = 0) =
 // and add a separate cream-colored fill layer sourced from Mapbox's free vector tileset
 // `mapbox.country-boundaries-v1`, which has complete world coverage (every country, plus
 // Antarctica) and is extremely lightweight. Country tiles cache at all zooms, so after
-// the first paint the continents stay cream through every subsequent zoom/pan; water
-// fills still draw blue on top, so lakes/rivers inside countries look right.
+// the first paint the continents stay cream through every subsequent zoom/pan. Below
+// the staggered Streets detail ladder, a local major-lakes layer restores large
+// inland water; once Mapbox water reaches full opacity, it takes over the precise
+// river/lake detail.
 // Visual night intentionally keeps the day basemap palette — the night look is
 // driven by DOM overlays + globe lighting, not by recoloring tiles. This getter
 // stays as a single source of truth for the basemap colors.
@@ -413,45 +448,223 @@ export const applyNightLandPalette = (
 // One-time basemap setup (projection, fog, palette, label/border hides)
 // ============================================================================
 
-// Which base-style symbol layers we re-enable: city/town labels and the road
-// label. Everything else (POI, transit, airport, natural, water, country,
-// continent, Mapbox's own state label) stays hidden. Robust to Streets v12
-// naming via id substring + `source-layer`.
-const classifyBasemapLabelLayer = (
-	idLower: string,
-	sourceLayer: string | undefined
-): 'settlement' | 'street' | null => {
-	const src = (sourceLayer ?? '').toLowerCase();
-
-	// Street/road name labels (v12: `road-label-simple`, source-layer `road`).
-	// Exclude route shields / road numbers.
-	if (
-		(src === 'road' || idLower.includes('road-label')) &&
-		idLower.includes('label') &&
-		!idLower.includes('shield') &&
-		!idLower.includes('number')
-	) {
-		return 'street';
-	}
-
-	// Settlement (city / town / village) labels (v12: settlement-*-label,
-	// source-layer `place_label`). Exclude the larger geo labels that also live
-	// in place_label (country/continent/state/marine).
-	if (
-		idLower.includes('settlement') ||
-		((src === 'place_label' || idLower.includes('place-label')) &&
-			!idLower.includes('country') &&
-			!idLower.includes('continent') &&
-			!idLower.includes('state') &&
-			!idLower.includes('marine'))
-	) {
-		return 'settlement';
-	}
-
-	return null;
+const setLayerMinZoomAtLeast = (
+	mapInstance: mapboxgl.Map,
+	layerId: string,
+	minZoom: number
+) => {
+	const live = mapInstance.getLayer(layerId) as
+		| { minzoom?: number; maxzoom?: number }
+		| undefined;
+	const nextMinZoom = Math.max(live?.minzoom ?? 0, minZoom);
+	const nativeMaxZoom = live?.maxzoom ?? 24;
+	mapInstance.setLayerZoomRange(
+		layerId,
+		nextMinZoom,
+		nativeMaxZoom <= nextMinZoom ? Math.min(24, nextMinZoom + 0.01) : nativeMaxZoom
+	);
 };
 
-export const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
+const applyBasemapPaintRamp = (
+	mapInstance: mapboxgl.Map,
+	layerId: string,
+	paintProperty: string,
+	nativeDefault: unknown,
+	fadeStartZoom: number,
+	fadeEndZoom: number
+) => {
+	try {
+		const nativeValue =
+			mapInstance.getPaintProperty(layerId, paintProperty as any) ?? nativeDefault;
+		const gatedValue = buildBasemapDetailOpacityRamp(
+			nativeValue,
+			fadeStartZoom,
+			fadeEndZoom
+		);
+		if (gatedValue) {
+			mapInstance.setPaintProperty(layerId, paintProperty as any, gatedValue as any);
+		}
+	} catch {
+		// Unsupported/data-driven property — the zoom range still culls the layer.
+	}
+};
+
+const applyBasemapDetailFillGate = (
+	mapInstance: mapboxgl.Map,
+	layerId: string,
+	minZoom: number,
+	fadeStartZoom: number,
+	fadeEndZoom: number
+) => {
+	setLayerMinZoomAtLeast(mapInstance, layerId, minZoom);
+
+	try {
+		applyBasemapPaintRamp(
+			mapInstance,
+			layerId,
+			'fill-opacity',
+			1,
+			fadeStartZoom,
+			fadeEndZoom
+		);
+	} catch {
+		// Non-fill layer / unsupported paint property — the zoom range still culls it.
+	}
+};
+
+const basemapLabelFilterBaseByMap = new WeakMap<
+	mapboxgl.Map,
+	Map<string, any | null>
+>();
+
+const getBasemapLabelFilterBase = (mapInstance: mapboxgl.Map, layerId: string) => {
+	let byLayerId = basemapLabelFilterBaseByMap.get(mapInstance);
+	if (!byLayerId) {
+		byLayerId = new Map();
+		basemapLabelFilterBaseByMap.set(mapInstance, byLayerId);
+	}
+
+	if (byLayerId.has(layerId)) return byLayerId.get(layerId) ?? null;
+
+	try {
+		const base = mapInstance.getFilter(layerId) as any;
+		byLayerId.set(layerId, base == null ? null : base);
+		return base == null ? null : base;
+	} catch {
+		byLayerId.set(layerId, null);
+		return null;
+	}
+};
+
+const applyBasemapLabelFilterGate = (
+	mapInstance: mapboxgl.Map,
+	layerId: string,
+	kind: ReturnType<typeof classifyBasemapLabelLayer>
+) => {
+	if (kind !== 'settlement-major' && kind !== 'settlement-minor') return;
+
+	try {
+		const base = getBasemapLabelFilterBase(mapInstance, layerId);
+		// Replace the basemap's native zoom→symbolrank clause with our broader,
+		// tier-specific window (keeps class/filterrank/worldview predicates). The
+		// cached `base` is the original native filter captured before any mutation,
+		// so this stays idempotent across style reloads / re-tuning.
+		mapInstance.setFilter(
+			layerId,
+			composeBasemapSettlementFilter(base, kind) as any
+		);
+	} catch {
+		// Some style layers may not support filter mutation; opacity/minzoom still
+		// provide the main stagger.
+	}
+};
+
+export const getFirstBasemapSettlementLabelLayerId = (
+	mapInstance: mapboxgl.Map
+): string | undefined => {
+	try {
+		for (const layer of mapInstance.getStyle()?.layers ?? []) {
+			const id = (layer as any)?.id as string | undefined;
+			if (!id || id.startsWith('murmur-')) continue;
+			if ((layer as any)?.type !== 'symbol') continue;
+			const sourceLayer = (layer as any)['source-layer'] as string | undefined;
+			const kind = classifyBasemapLabelLayer(id.toLowerCase(), sourceLayer);
+			if (isBasemapSettlementLabelKind(kind)) return id;
+		}
+	} catch {
+		// Fall through; caller can append normally.
+	}
+	return undefined;
+};
+
+// Re-applies only the major-city label fade for a new interactive floor delta
+// (the major fade is pinned to the state-initials near-floor band, so it must
+// shift with that band on large monitors). Cheap + idempotent: safe to call
+// from the resize parity path without re-running the full basemap tuning.
+export const reapplyMajorSettlementLabelFade = (
+	mapInstance: mapboxgl.Map,
+	floorDelta = 0
+) => {
+	try {
+		for (const layer of mapInstance.getStyle()?.layers ?? []) {
+			const id = (layer as any)?.id as string | undefined;
+			if (!id || id.startsWith('murmur-')) continue;
+			if ((layer as any)?.type !== 'symbol') continue;
+			const sourceLayer = (layer as any)['source-layer'] as string | undefined;
+			if (classifyBasemapLabelLayer(id.toLowerCase(), sourceLayer) !== 'settlement-major') {
+				continue;
+			}
+			const spec = getBasemapLabelVisualSpec('settlement-major', floorDelta);
+			try {
+				mapInstance.setPaintProperty(
+					id,
+					'text-opacity',
+					buildBasemapLabelOpacityRamp(
+						spec.fadeStartZoom,
+						spec.fadeEndZoom,
+						spec.targetOpacity
+					) as any
+				);
+			} catch {
+				// Data-driven override we can't set — leave as-is.
+			}
+		}
+	} catch {
+		// Non-fatal.
+	}
+};
+
+export const applyBasemapSettlementLabelPresentation = (
+	mapInstance: mapboxgl.Map,
+	visible: boolean,
+	floorDelta = 0
+) => {
+	try {
+		for (const layer of mapInstance.getStyle()?.layers ?? []) {
+			const id = (layer as any)?.id as string | undefined;
+			if (!id || id.startsWith('murmur-')) continue;
+			if ((layer as any)?.type !== 'symbol') continue;
+
+			const sourceLayer = (layer as any)['source-layer'] as string | undefined;
+			const kind = classifyBasemapLabelLayer(id.toLowerCase(), sourceLayer);
+			if (kind == null || !isBasemapSettlementLabelKind(kind)) continue;
+			const spec = getBasemapLabelVisualSpec(kind, floorDelta);
+
+			try {
+				mapInstance.setPaintProperty(
+					id,
+					'text-opacity',
+					visible
+						? (buildBasemapLabelOpacityRamp(
+								spec.fadeStartZoom,
+								spec.fadeEndZoom,
+								spec.targetOpacity
+							) as any)
+						: 0
+				);
+			} catch {
+				// Data-driven override we can't set — leave as-is.
+			}
+
+			try {
+				mapInstance.setPaintProperty(
+					id,
+					'icon-opacity',
+					visible ? (buildBasemapSettlementIconOpacityRamp() as any) : 0
+				);
+			} catch {
+				// Some style variants may not have an icon-opacity paint property.
+			}
+		}
+	} catch {
+		// Non-fatal.
+	}
+};
+
+export const applyFreeTrialMapVisualTuning = (
+	mapInstance: mapboxgl.Map,
+	floorDelta = 0
+) => {
 	// Projection
 	try {
 		mapInstance.setProjection({ name: 'globe' } as any);
@@ -490,6 +703,7 @@ export const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 			const type = (layer as any).type as string | undefined;
 			const sourceLayer = (layer as any)['source-layer'] as string | undefined;
 			const idLower = id.toLowerCase();
+			const detailKind = classifyBasemapDetailLayer(type, idLower, sourceLayer);
 
 			// Text/icon labels — keep city/town + street labels, hide everything else.
 			if (type === 'symbol') {
@@ -504,47 +718,86 @@ export const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 				// it updates per-zoom with no extra render-frame hook).
 				try {
 					mapInstance.setLayoutProperty(id, 'visibility', 'visible');
+					if (isBasemapSettlementLabelKind(kind)) {
+						mapInstance.setLayoutProperty(id, 'text-variable-anchor', [
+							'top',
+							'bottom',
+							'left',
+							'right',
+							'top-left',
+							'top-right',
+							'bottom-left',
+							'bottom-right',
+						]);
+						mapInstance.setLayoutProperty(id, 'text-radial-offset', [
+							'interpolate',
+							['linear'],
+							['zoom'],
+							4,
+							0.45,
+							8,
+							0.62,
+							12,
+							0.8,
+						]);
+						mapInstance.setLayoutProperty(id, 'text-justify', 'auto');
+						mapInstance.setLayoutProperty(
+							id,
+							'symbol-sort-key',
+							['coalesce', ['get', 'symbolrank'], ['get', 'filterrank'], 99]
+						);
+						// Major tier: wide far-out collision padding caps the visible set to
+						// the ~top 15 most-prominent, well-spread US cities (sorted by the
+						// symbolrank key above), easing to the native spacing as the user
+						// zooms in. Minor/subdivision tiers keep the native default padding.
+						if (kind === 'settlement-major') {
+							mapInstance.setLayoutProperty(
+								id,
+								'text-padding',
+								buildBasemapMajorSettlementTextPaddingRamp() as any
+							);
+						}
+					}
 					mapInstance.setPaintProperty(id, 'text-color', BASEMAP_LABEL_TEXT_COLOR);
 					mapInstance.setPaintProperty(id, 'text-halo-color', BASEMAP_LABEL_HALO_COLOR);
 					mapInstance.setPaintProperty(id, 'text-halo-width', BASEMAP_LABEL_HALO_WIDTH);
 					mapInstance.setPaintProperty(id, 'text-halo-blur', BASEMAP_LABEL_HALO_BLUR);
 
-					const [startZoom, endZoom] =
-						kind === 'street'
-							? [
-									BASEMAP_STREET_LABEL_FADE_START_ZOOM,
-									BASEMAP_STREET_LABEL_FADE_END_ZOOM,
-								]
-							: [
-									BASEMAP_SETTLEMENT_LABEL_FADE_START_ZOOM,
-									BASEMAP_SETTLEMENT_LABEL_FADE_END_ZOOM,
-								];
-					const fade = [
-						'interpolate',
-						['linear'],
-						['zoom'],
-						startZoom,
-						0,
-						endZoom,
-						1,
-					] as any;
+					const spec = getBasemapLabelVisualSpec(kind, floorDelta);
+					const fade = buildBasemapLabelOpacityRamp(
+						spec.fadeStartZoom,
+						spec.fadeEndZoom,
+						spec.targetOpacity
+					) as any;
 					mapInstance.setPaintProperty(id, 'text-opacity', fade);
 					// Settlement layers also carry an icon (the city-center dot). Fade it
-					// on the same ramp so the dots don't litter the zoomed-out overview.
-					mapInstance.setPaintProperty(id, 'icon-opacity', fade);
+					// later and much lower than the text so the early atlas view reads as
+					// place names, not dotted noise.
+					mapInstance.setPaintProperty(
+						id,
+						'icon-opacity',
+						(isBasemapSettlementLabelKind(kind)
+							? buildBasemapSettlementIconOpacityRamp()
+							: fade) as any
+					);
+					applyBasemapLabelFilterGate(mapInstance, id, kind);
 					// The opacity ramp hides the labels below startZoom, but the layers are
 					// still "visible" there — glyphs get fetched and symbol layout/placement
 					// runs in tiles where nothing is legible (boot zoom 4 included). Also
 					// cull by zoom range so that work disappears entirely. Floor matters:
-					// tiles lay out at their integer tile zoom, so a 6.5 minzoom would skip
-					// layout in z6 tiles and break the 6.5→8 fade-in.
+					// tiles lay out at their integer tile zoom, so a fractional fade start
+					// should floor to the integer tile zoom that feeds the fade-in.
 					const live = mapInstance.getLayer(id) as
 						| { minzoom?: number; maxzoom?: number }
 						| undefined;
+					const nextMinZoom = Math.floor(spec.minZoom);
+					const nativeMaxZoom = live?.maxzoom ?? 24;
 					mapInstance.setLayerZoomRange(
 						id,
-						Math.max(live?.minzoom ?? 0, Math.floor(startZoom)),
-						live?.maxzoom ?? 24
+						nextMinZoom,
+						nativeMaxZoom <= nextMinZoom
+							? Math.min(24, nextMinZoom + 0.01)
+							: nativeMaxZoom
 					);
 				} catch {
 					// Data-driven property we can't override — leave the layer as-is.
@@ -563,21 +816,66 @@ export const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 				continue;
 			}
 
-			// Roads / highways — recolor to a soft gray (darker than the land cream so
-			// the network reads clearly, Google-Maps style; still lighter than borders).
-			if (
-				type === 'line' &&
-				(sourceLayer === 'road' ||
-					idLower.includes('road') ||
-					idLower.includes('motorway') ||
-					idLower.includes('highway') ||
-					idLower.includes('bridge') ||
-					idLower.includes('tunnel'))
-			) {
+			// Detail linework is staggered above state-level zoom so roads/waterways do
+			// not stream as one big chunk. Do not write road line-opacity: the night
+			// pipeline scales the native road expression and must stay the sole owner of
+			// that paint property. Waterways are safe to fade because that pipeline does
+			// not touch them.
+			if (detailKind === 'detail-line') {
 				try {
-					mapInstance.setPaintProperty(id, 'line-color', '#C2C9D0');
+					if (isBasemapWaterwayLineLayer(idLower, sourceLayer)) {
+						setLayerMinZoomAtLeast(
+							mapInstance,
+							id,
+							BASEMAP_DETAIL_WATERWAY_LINE_MIN_ZOOM
+						);
+						applyBasemapPaintRamp(
+							mapInstance,
+							id,
+							'line-opacity',
+							1,
+							BASEMAP_DETAIL_WATERWAY_LINE_FADE_START_ZOOM,
+							BASEMAP_DETAIL_WATERWAY_LINE_FADE_END_ZOOM
+						);
+					} else if (isBasemapRoadLikeLineLayer(idLower, sourceLayer)) {
+						mapInstance.setPaintProperty(id, 'line-color', '#C2C9D0');
+						setLayerMinZoomAtLeast(
+							mapInstance,
+							id,
+							isBasemapMajorRoadLikeLineLayer(idLower, sourceLayer)
+								? BASEMAP_DETAIL_ROAD_MAJOR_MIN_ZOOM
+								: BASEMAP_DETAIL_ROAD_MINOR_MIN_ZOOM
+						);
+					} else {
+						setLayerMinZoomAtLeast(
+							mapInstance,
+							id,
+							BASEMAP_DETAIL_ROAD_MINOR_MIN_ZOOM
+						);
+					}
 				} catch {
-					// Data-driven color expression we can't override — skip.
+					// Data-driven property / layer range we can't override — skip.
+				}
+				continue;
+			}
+
+			// Terrain hillshade is its own Mapbox layer type (not fill/line), so it
+			// would otherwise stream heavy DEM texture across the globe/state overview.
+			// Cull it as the final detail rung and fade exaggeration so DEM texture does
+			// not pop in after the vector details have already settled.
+			if (isBasemapHillshadeLayer(type)) {
+				try {
+					setLayerMinZoomAtLeast(mapInstance, id, BASEMAP_DETAIL_HILLSHADE_MIN_ZOOM);
+					applyBasemapPaintRamp(
+						mapInstance,
+						id,
+						'hillshade-exaggeration',
+						0.5,
+						BASEMAP_DETAIL_HILLSHADE_FADE_START_ZOOM,
+						BASEMAP_DETAIL_HILLSHADE_FADE_END_ZOOM
+					);
+				} catch {
+					// Layer range we can't override — skip.
 				}
 				continue;
 			}
@@ -591,22 +889,33 @@ export const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 					// pans into untiled areas) reads as water. The cream land tone comes
 					// from the `murmur-world-land-fill` layer added in ensureMapboxSourcesAndLayers.
 					mapInstance.setPaintProperty(id, 'background-color', MAP_OCEAN_BLUE);
-				} else if (
-					type === 'fill' &&
-					(idLower === 'water' || idLower.startsWith('water'))
-				) {
+				} else if (isBasemapWaterFillLayer(type, idLower, sourceLayer)) {
 					mapInstance.setPaintProperty(id, 'fill-color', MAP_OCEAN_BLUE);
-				} else if (
-					type === 'fill' &&
-					(idLower.includes('landcover') ||
-						idLower.includes('national-park') ||
-						idLower.includes('pitch') ||
-						idLower === 'park' ||
-						idLower.startsWith('park'))
-				) {
-					mapInstance.setPaintProperty(id, 'fill-color', MAP_LANDCOVER_GREEN);
-				} else if (type === 'fill' && idLower.includes('landuse')) {
-					mapInstance.setPaintProperty(id, 'fill-color', MAP_LAND_CREAM);
+					// With the local major-lakes layer covering low zoom, Mapbox water
+					// polygons can wait until after state-level zoom. This prevents Streets'
+					// composite source from being needed at the globe/state overview.
+					applyBasemapDetailFillGate(
+						mapInstance,
+						id,
+						BASEMAP_DETAIL_WATER_FILL_MIN_ZOOM,
+						BASEMAP_DETAIL_WATER_FILL_FADE_START_ZOOM,
+						BASEMAP_DETAIL_WATER_FILL_FADE_END_ZOOM
+					);
+				} else if (detailKind === 'detail-fill') {
+					mapInstance.setPaintProperty(
+						id,
+						'fill-color',
+						isBasemapLandcoverLikeFillLayer(idLower, sourceLayer)
+							? MAP_LANDCOVER_GREEN
+							: MAP_LAND_CREAM
+					);
+					applyBasemapDetailFillGate(
+						mapInstance,
+						id,
+						BASEMAP_DETAIL_FILL_MIN_ZOOM,
+						BASEMAP_DETAIL_FILL_FADE_START_ZOOM,
+						BASEMAP_DETAIL_FILL_FADE_END_ZOOM
+					);
 				} else if (type === 'fill' && idLower === 'land') {
 					mapInstance.setPaintProperty(id, 'fill-color', MAP_LAND_CREAM);
 				}
@@ -662,6 +971,70 @@ const ensureLocalWorldLandLayer = (mapInstance: mapboxgl.Map) => {
 	}
 };
 
+export const ensureLowZoomLakesFill = (mapInstance: mapboxgl.Map) => {
+	try {
+		if (!mapInstance.getSource(MAP_LOW_ZOOM_LAKES_SOURCE_ID)) {
+			mapInstance.addSource(MAP_LOW_ZOOM_LAKES_SOURCE_ID, {
+				type: 'geojson',
+				data: MAP_LOW_ZOOM_LAKES_DATA_URL,
+				maxzoom: MAP_LOW_ZOOM_LAKES_MAX_ZOOM,
+			} as any);
+		}
+	} catch {
+		// Non-fatal. The map still has the ocean-blue background; low-zoom lakes are
+		// a back-stop for hiding Mapbox water tiles, not a hard dependency.
+	}
+
+	try {
+		if (!mapInstance.getSource(MAP_LOW_ZOOM_LAKES_SOURCE_ID)) return;
+		if (mapInstance.getLayer(MAP_LOW_ZOOM_LAKES_LAYER_ID)) return;
+
+		let beforeId: string | undefined;
+		const style = mapInstance.getStyle();
+		const layers = style?.layers ?? [];
+		const worldLandIndex = layers.findIndex(
+			(layer: any) => layer?.id === MAP_WORLD_LAND_LAYER_ID
+		);
+		const localLandIndex = layers.findIndex(
+			(layer: any) => layer?.id === MAP_WORLD_LAND_LOCAL_LAYER_ID
+		);
+		const anchorIndex = worldLandIndex >= 0 ? worldLandIndex : localLandIndex;
+		if (anchorIndex >= 0) {
+			for (let i = anchorIndex + 1; i < layers.length; i += 1) {
+				const id = (layers[i] as any)?.id as string | undefined;
+				if (!id || id === MAP_LOW_ZOOM_LAKES_LAYER_ID) continue;
+				beforeId = id;
+				break;
+			}
+		} else {
+			for (const layer of layers as any[]) {
+				const id = layer?.id as string | undefined;
+				if (!id) continue;
+				if (id.startsWith('murmur-')) continue;
+				if (layer?.type === 'background') continue;
+				beforeId = id;
+				break;
+			}
+		}
+
+		mapInstance.addLayer(
+			{
+				id: MAP_LOW_ZOOM_LAKES_LAYER_ID,
+				type: 'fill',
+				source: MAP_LOW_ZOOM_LAKES_SOURCE_ID,
+				maxzoom: MAP_LOW_ZOOM_LAKES_MAX_ZOOM,
+				paint: {
+					'fill-color': MAP_OCEAN_BLUE,
+					'fill-antialias': true,
+				},
+			} as any,
+			beforeId
+		);
+	} catch {
+		// Non-fatal.
+	}
+};
+
 export const ensureWorldLandFill = (mapInstance: mapboxgl.Map) => {
 	try {
 		if (!mapInstance.getSource(MAP_WORLD_LAND_SOURCE_ID)) {
@@ -693,6 +1066,7 @@ export const ensureWorldLandFill = (mapInstance: mapboxgl.Map) => {
 
 	if (mapInstance.getLayer(MAP_WORLD_LAND_LAYER_ID)) {
 		ensureLocalWorldLandLayer(mapInstance);
+		ensureLowZoomLakesFill(mapInstance);
 		return;
 	}
 
@@ -734,6 +1108,7 @@ export const ensureWorldLandFill = (mapInstance: mapboxgl.Map) => {
 	}
 
 	ensureLocalWorldLandLayer(mapInstance);
+	ensureLowZoomLakesFill(mapInstance);
 };
 
 // ============================================================================

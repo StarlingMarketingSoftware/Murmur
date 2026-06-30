@@ -9,7 +9,11 @@ import { useGetCampaigns, useDeleteCampaign } from '@/hooks/queryHooks/useCampai
 import { MAX_CAMPAIGNS, useAddCampaignFolder } from '@/hooks/useAddCampaignFolder';
 import { CampaignsTableMini } from '@/components/organisms/_tables/CampaignsTable/CampaignsTableMini';
 
-const PANEL_HEIGHT = 288;
+// Was 288 with the green "Choose Folder" footer; clicking a folder row now
+// switches campaigns directly, so the footer (2px divider + 38px button = 40px)
+// is gone and the panel shrinks by that exact amount, preserving the folder
+// list area.
+const PANEL_HEIGHT = 248;
 const DELETE_CONFIRM_TIMEOUT_MS = 5000;
 
 interface CampaignFolderDropdownProps {
@@ -51,7 +55,6 @@ export const CampaignFolderDropdown: FC<CampaignFolderDropdownProps> = ({
 	const onCloseRef = useRef(onClose);
 	onCloseRef.current = onClose;
 
-	const [selectedId, setSelectedId] = useState<number | null>(currentCampaignId);
 	const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(
 		null
 	);
@@ -62,10 +65,6 @@ export const CampaignFolderDropdown: FC<CampaignFolderDropdownProps> = ({
 	const { addFolder, isAddingFolder } = useAddCampaignFolder();
 	const { mutate: deleteCampaign } = useDeleteCampaign();
 	const isCampaignRoute = pathname?.startsWith('/murmur/campaign/');
-
-	useEffect(() => {
-		setSelectedId(currentCampaignId);
-	}, [currentCampaignId]);
 
 	// Anchor the panel flush beneath the header box. getBoundingClientRect() is in
 	// scaled (visual) units; position: fixed resolves in unscaled units, so divide
@@ -113,8 +112,9 @@ export const CampaignFolderDropdown: FC<CampaignFolderDropdownProps> = ({
 		};
 	}, [anchorRef, chevronRef]);
 
-	// Switch into a campaign. Re-selecting the campaign you're already viewing is a
-	// no-op (besides closing the panel).
+	// Switch into a campaign. A single click on a folder row triggers this directly
+	// (no separate "Choose Folder" confirmation step) and closes the panel.
+	// Re-selecting the campaign you're already viewing is a no-op (besides closing).
 	//
 	// Two modes:
 	//  - In-context (onSelectCampaign provided, e.g. dashboard search): swap the
@@ -131,20 +131,6 @@ export const CampaignFolderDropdown: FC<CampaignFolderDropdownProps> = ({
 			return;
 		}
 		router.push(`${urls.murmur.campaign.detail(campaignId)}?tab=all`);
-	};
-
-	// Clicking a folder row only moves the in-panel highlight; the green
-	// "Choose Folder" footer remains the explicit navigation action.
-	const handleRowClick = (campaignId: number) => {
-		setSelectedId(campaignId);
-	};
-
-	const handleChooseFolder = () => {
-		if (selectedId != null) {
-			navigateToCampaign(selectedId);
-		} else {
-			onClose();
-		}
 	};
 
 	// Clear the pending confirm timer on unmount (e.g. dropdown closes).
@@ -164,8 +150,6 @@ export const CampaignFolderDropdown: FC<CampaignFolderDropdownProps> = ({
 
 		if (campaignId === confirmingId) {
 			setConfirmingId(null);
-			// Deleting the in-panel pick falls back to the current campaign.
-			setSelectedId((prev) => (prev === campaignId ? currentCampaignId : prev));
 			deleteCampaign(campaignId, {
 				onSuccess: () => {
 					// If the deleted folder is the one being viewed, navigate away to
@@ -238,13 +222,11 @@ export const CampaignFolderDropdown: FC<CampaignFolderDropdownProps> = ({
 				variant="dropdown"
 				showAllRows
 				showAddRow={(campaignsData?.length ?? 0) < MAX_CAMPAIGNS}
-				showChooseFolderButton
 				currentCampaignId={currentCampaignId}
-				selectedCampaignId={selectedId}
-				onRowClick={handleRowClick}
+				selectedCampaignId={currentCampaignId}
+				onRowClick={navigateToCampaign}
 				onAddRow={addFolder}
 				isAddingFolder={isAddingFolder}
-				onChooseFolder={handleChooseFolder}
 				showDeleteColumn
 				confirmingCampaignId={confirmingId}
 				onDeleteClick={handleDeleteClick}

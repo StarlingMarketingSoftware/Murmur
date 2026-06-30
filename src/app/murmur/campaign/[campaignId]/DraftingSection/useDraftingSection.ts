@@ -129,6 +129,12 @@ export type MapMarkerSelectionRequest = {
 	requestId: number;
 };
 
+/** One-shot request to merge a drag-rectangle's contacts into the active tab's selection. */
+export type MapAreaSelectionRequest = {
+	contactIds: number[];
+	requestId: number;
+};
+
 export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
 	view?: DraftingSectionView;
@@ -202,6 +208,12 @@ export interface DraftingSectionProps {
 	 * routes the contactId into its own native selection action.
 	 */
 	mapMarkerSelectionRequest?: MapMarkerSelectionRequest | null;
+	/**
+	 * Optional one-shot request from a campaign map drag-rectangle (Select tool).
+	 * The active tab merges every contactId in the region into its own selection
+	 * (All/Write → contacts, Drafts → draft rows; Inbox/Sent ignore it).
+	 */
+	mapAreaSelectionRequest?: MapAreaSelectionRequest | null;
 	/**
 	 * Optional callback to navigate to the previous tab.
 	 */

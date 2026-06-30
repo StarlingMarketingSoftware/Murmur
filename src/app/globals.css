@@ -705,6 +705,15 @@ body {
 	animation: gradient-breathe 16s ease-in-out infinite;
 }
 
+/*
+ * Disengaged curated "For You" map-top search pills must keep the same animated
+ * gradient chrome, but as true grayscale. `gradient-breathe` animates `filter`,
+ * so this needs `!important`; otherwise the keyframe filter wins every frame.
+ */
+.for-you-curated-search-gradient--grayscale {
+	filter: grayscale(1) saturate(0) !important;
+}
+
 /* The booking-confirm footer: the search bar's breathe, recolored green. */
 .booking-confirm-gradient-button {
 	background: linear-gradient(
@@ -1131,6 +1140,25 @@ body {
    blur is a visual no-op everywhere except the map-view mini searchbar, whose
    sheen gets a compensating bump below. */
 html.is-safari .search-wave-input {
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+}
+
+/* Scroll-to-map scrub: the hero search bar is translated by a sub-pixel, eased
+   amount every animation frame (useDashboardScrollToMap) while the WebGL globe
+   behind it keeps repainting (decorative spin + a per-frame camera dolly). A
+   backdrop-filter over that moving canvas is re-blurred against a fractionally
+   shifted backdrop every frame, so the rounded clip + border edge rasterize at a
+   slightly different offset each frame — the "edges twitching/shaking" reported
+   while scrolling in (and while held mid-scroll, since the globe keeps spinning).
+   Drop the blur for the duration of the scrub only — the input is opaque enough
+   that this is a visual no-op, exactly as the permanent Safari kill-switch above
+   relies on — so the bar composites as one stable layer while it fades/drifts.
+   The class is toggled on <html> by the hook for the whole gesture and removed
+   the instant it settles, so the resting/focused look and the motion are
+   unchanged. Scoped to the hero wrapper (not the map-view results bar) and given
+   higher specificity than `.dark .search-wave-input` so it covers both themes. */
+html.dashboard-map-scrubbing .search-bar-wrapper .search-wave-input {
 	-webkit-backdrop-filter: none;
 	backdrop-filter: none;
 }
@@ -4105,8 +4133,12 @@ body.murmur-search-to-campaign-transitioning::after {
 }
 
 body.murmur-search-to-campaign-transitioning[data-search-to-campaign-tab='all']::after {
-	/* The All/overview tab uses a wider right-side band than the compact tabs. */
-	left: var(--murmur-campaign-map-backdrop-start, 46%);
+	/* The All/overview tab is a bare map view — the same map the dashboard search
+	   showed — so there's no workspace panel for the handoff band to cover and it just
+	   reads as a wash over the right half of the map. Suppress it so search→All is a
+	   clean map→map transition; the chrome-fade rules above still hand the dashboard
+	   chrome off smoothly. (The compact workspace tabs keep their band.) */
+	display: none;
 }
 
 /* Once the campaign route owns the screen, keep the handoff gradient above the
@@ -9047,25 +9079,18 @@ body.dashboard-booting .dashboard-search-button .search-spotlight-content {
 	opacity: 0;
 }
 
-/* --- Action toolbar: dark fill, light border, uniformly dim icons. */
-body.dashboard-booting .dashboard-action-bar {
-	background: #191b1d !important;
-	border: 2px solid #caccce !important;
-}
+/* --- Action toolbar: keep the empty bar visible during boot, but suppress the
+   currentColor SVG buttons. This avoids the old inverse-color crossfade (light
+   icons on a dark bar → dark icons on a light bar), where icon and bar colors
+   passed through a zero-contrast midpoint and flickered. */
 body.dashboard-booting .dashboard-action-bar button {
-	color: #caccce !important;
-	opacity: 0.3 !important;
+	opacity: 0 !important;
 }
 
 /* --- Everything else on the landing hides until the reveal. */
 body.dashboard-booting .dashboard-recent-campaigns,
-body.dashboard-booting .dashboard-ask-anything-root,
 body.dashboard-booting .clerk-user-button {
 	opacity: 0 !important;
-}
-body.dashboard-booting .dashboard-ask-anything-root,
-body.dashboard-booting .dashboard-ask-anything-root * {
-	pointer-events: none !important;
 }
 
 /* The "Search Anything" bar's flanking campaign nav boxes need ~686px of width
@@ -9078,34 +9103,31 @@ body.dashboard-booting .dashboard-ask-anything-root * {
 }
 
 /* --- Crossfade back: transitions live only on the fading class, so swapping
-   dashboard-booting → dashboard-boot-fading in one commit animates every skinned
-   property to its normal value, then both classes drop at 'done'. */
-body.dashboard-boot-fading .dashboard-hero-logo {
-	transition: translate 800ms ease;
-}
+   dashboard-booting → dashboard-boot-fading in one commit animates the non-SVG
+   chrome back to normal. The SVG/logo itself is intentionally static here — no
+   translate/recolor/wordmark morph at the end of the load. */
+body.dashboard-boot-fading .dashboard-hero-logo,
 body.dashboard-boot-fading .dashboard-hero-logo path {
-	transition:
-		fill 800ms ease,
-		stroke 800ms ease,
-		opacity 800ms ease;
+	transition: none !important;
 }
-/* !important: several of these carry inline `transition: none` (wave container) or
-   inline micro-transitions (action-bar buttons) that would make the crossfade snap. */
+/* !important: the wave container carries an inline `transition: none` that would
+   otherwise make the search-bar crossfade snap. */
 body.dashboard-boot-fading .search-wave-container,
 body.dashboard-boot-fading .search-wave-container::before,
 body.dashboard-boot-fading .search-gradient-button,
 body.dashboard-boot-fading .dashboard-search-button,
-body.dashboard-boot-fading .dashboard-search-button .search-spotlight-content,
-body.dashboard-boot-fading .dashboard-action-bar,
-body.dashboard-boot-fading .dashboard-action-bar button,
-body.dashboard-boot-fading .dashboard-recent-campaigns,
-body.dashboard-boot-fading .dashboard-ask-anything-root,
-body.dashboard-boot-fading .clerk-user-button {
+body.dashboard-boot-fading .dashboard-search-button .search-spotlight-content {
 	transition:
 		opacity 700ms ease,
 		background-color 700ms ease,
 		border-color 700ms ease,
 		color 700ms ease !important;
+}
+/* The action bar shell stays visible; only its SVG buttons fade in. */
+body.dashboard-boot-fading .dashboard-action-bar button,
+body.dashboard-boot-fading .dashboard-recent-campaigns,
+body.dashboard-boot-fading .clerk-user-button {
+	transition: opacity 700ms ease !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -9125,10 +9147,8 @@ body.dashboard-boot-fading .clerk-user-button {
 	body.dashboard-boot-fading .search-gradient-button,
 	body.dashboard-boot-fading .dashboard-search-button,
 	body.dashboard-boot-fading .dashboard-search-button .search-spotlight-content,
-	body.dashboard-boot-fading .dashboard-action-bar,
 	body.dashboard-boot-fading .dashboard-action-bar button,
 	body.dashboard-boot-fading .dashboard-recent-campaigns,
-	body.dashboard-boot-fading .dashboard-ask-anything-root,
 	body.dashboard-boot-fading .clerk-user-button {
 		transition-duration: 1ms !important;
 	}

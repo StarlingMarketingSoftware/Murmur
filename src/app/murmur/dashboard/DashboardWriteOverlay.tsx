@@ -50,6 +50,8 @@ interface DashboardWriteOverlayProps {
 	/** Shared collapsed state for the drafting deck and Selection-panel drafting bar. */
 	isDraftingDeckCollapsed?: boolean;
 	onDraftingDeckCollapsedChange?: (collapsed: boolean) => void;
+	/** Navigate into the campaign Write tab (shown beneath the live drafting deck). */
+	onViewDrafting?: () => void;
 }
 
 // The campaign drafting panel renders natively at 499px wide; scale it down to the design's
@@ -59,6 +61,11 @@ const TARGET_WIDTH_PX = 449;
 const TARGET_HEIGHT_PX = 555;
 const HPI_SCALE = TARGET_WIDTH_PX / HPI_NATIVE_WIDTH_PX;
 const HPI_CONTAINER_HEIGHT_PX = Math.round(TARGET_HEIGHT_PX / HPI_SCALE);
+// Manual mode's entry box defaults to 623px, which overflows the 617px container and
+// hides its formatting toolbar behind the Draft/Test pills below. Shrink it to fit the
+// visible area above those pills: container 617 − mode-toggle header (31) − top pad (20)
+// − bottom clearance for the pills (≈66) ≈ 500.
+const HPI_MANUAL_ENTRY_HEIGHT_PX = 500;
 const PROFILE_SIDE_PANEL_NATIVE_WIDTH_PX = 393;
 const PROFILE_SIDE_PANEL_NATIVE_HEIGHT_PX = 681;
 const PROFILE_SIDE_PANEL_SCALE = TARGET_HEIGHT_PX / PROFILE_SIDE_PANEL_NATIVE_HEIGHT_PX;
@@ -85,6 +92,7 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 	onDraftingStatusChange,
 	isDraftingDeckCollapsed = false,
 	onDraftingDeckCollapsedChange,
+	onViewDrafting,
 }) => {
 	const d = useDraftingSection({ campaign, view: 'testing' });
 	const queryClient = useQueryClient();
@@ -350,14 +358,6 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 		};
 	}, [onDraftingStatusChange]);
 
-	const handleViewDrafts = useCallback(() => {
-		if (batchDrafts.length === 0) return;
-		setIsProfileSidePanelOpen(false);
-		setShowTestPreview(false);
-		setForceReviewOpen(true);
-		setWriteReviewPreviewComplete(false);
-	}, [batchDrafts.length]);
-
 	const handleReviewClose = useCallback(() => {
 		if (d.isLivePreviewVisible || d.isPendingGeneration) {
 			setForceReviewOpen(false);
@@ -434,9 +434,8 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 					total={draftingTotal}
 					isCollapsed={isDraftingDeckCollapsed}
 					onCollapsedChange={onDraftingDeckCollapsedChange ?? (() => undefined)}
-					onViewDrafts={handleViewDrafts}
-					viewDraftsDisabled={batchDrafts.length === 0}
 					onCancel={handleCancelDrafting}
+					onViewDrafting={onViewDrafting}
 				/>
 			) : (
 				<Form {...d.form}>
@@ -599,6 +598,7 @@ export const DashboardWriteOverlay: FC<DashboardWriteOverlayProps> = ({
 								useStaticDropdownPosition
 								hideMobileStickyTestFooter
 								containerHeightPx={HPI_CONTAINER_HEIGHT_PX}
+								manualEntryHeightPx={HPI_MANUAL_ENTRY_HEIGHT_PX}
 							/>
 						</div>
 						{/* Draft pill centered in the box; Test sits to its right

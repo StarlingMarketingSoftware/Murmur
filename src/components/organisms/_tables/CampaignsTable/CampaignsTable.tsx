@@ -37,6 +37,11 @@ const FINDER_DRAG_PILL_CURSOR_DY = 36;
 // so this only needs to bridge the row→overlay mouseleave/mouseenter event race —
 // kept short so the "X" doesn't visibly linger after you move away.
 const ROW_DELETE_HIDE_DELAY_MS = 50;
+// Invisible bridge to the right of the campaigns table that stays hover-active while
+// moving from a row to its floating delete button.
+const ROW_DELETE_HOVER_GUTTER_OVERLAP_PX = 8;
+const ROW_DELETE_HOVER_GUTTER_WIDTH_PX = 66;
+const ROW_DELETE_ARMED_HOVER_GUTTER_WIDTH_PX = 150;
 
 const AddCampaignPlusIcon = () => (
 	<svg
@@ -384,6 +389,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 	const deleteClearTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const activeDeleteIdRef = useRef<number | null>(null);
 	const deleteOverlayRef = useRef<HTMLDivElement | null>(null);
+	const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
 
 	// Write the new anchor straight to the overlay node so the "X" snaps to the
 	// hovered row on the same frame as the cursor, instead of trailing a few
@@ -393,9 +399,16 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 	const applyDeleteOverlayPosition = useCallback((top: number, left: number) => {
 		const node = deleteOverlayRef.current;
 		if (node) {
-			node.style.top = `${top}px`;
-			node.style.left = `${left}px`;
+			node.style.top = '0px';
+			node.style.bottom = '0px';
+			node.style.left = `${left - ROW_DELETE_HOVER_GUTTER_OVERLAP_PX}px`;
 		}
+
+		const button = deleteButtonRef.current;
+		if (button) {
+			button.style.top = `${top}px`;
+		}
+
 		setDeleteOverlayTop(top);
 		setDeleteOverlayLeft(left);
 	}, []);
@@ -930,12 +943,12 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 
 	// Active campaign for the hover-to-delete "X": the confirming row pins the X
 	// (so the 2nd confirm click is easy even if the cursor drifts), otherwise the
-	// currently hovered row. Only the single, non-finder, desktop table qualifies.
+	// currently hovered row. The single dashboard table keeps this active even
+	// while its Finder is open so the right-side delete gutter remains usable.
 	const isRowDeleteOverlayEnabled =
 		enableRowDelete &&
 		!shouldShowMobileFeatures &&
-		!shouldRenderSplitFinderView &&
-		!singleCampaignsTable.isFinderOpen;
+		!isSplitFinderView;
 	const activeDeleteCampaignId = isRowDeleteOverlayEnabled
 		? singleCampaignsTable.confirmingCampaignId ?? hoveredDeleteCampaignId
 		: null;
@@ -1078,21 +1091,34 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 								data-custom-table-ignore-row-click="true"
 								style={{
 									position: 'absolute',
-									top: deleteOverlayTop,
-									left: deleteOverlayLeft,
-									transform: 'translateY(-50%)',
-									display: 'flex',
-									alignItems: 'center',
-									height: 34,
-									paddingLeft: 10,
-									paddingRight: 6,
+									top: 0,
+									bottom: 0,
+									left: deleteOverlayLeft - ROW_DELETE_HOVER_GUTTER_OVERLAP_PX,
+									width:
+										(showDeletePill
+											? ROW_DELETE_ARMED_HOVER_GUTTER_WIDTH_PX
+											: ROW_DELETE_HOVER_GUTTER_WIDTH_PX) +
+										ROW_DELETE_HOVER_GUTTER_OVERLAP_PX,
 									zIndex: 60,
 									pointerEvents: 'auto',
 								}}
 								onMouseEnter={cancelDeleteClear}
 								onMouseLeave={scheduleDeleteClear}
+								onPointerDown={(event) => {
+									event.stopPropagation();
+									event.nativeEvent.stopImmediatePropagation();
+								}}
+								onMouseDown={(event) => {
+									event.stopPropagation();
+									event.nativeEvent.stopImmediatePropagation();
+								}}
+								onClick={(event) => {
+									event.stopPropagation();
+									event.nativeEvent.stopImmediatePropagation();
+								}}
 							>
 								<button
+									ref={deleteButtonRef}
 									type="button"
 									aria-label={`Delete ${activeDeleteCampaignName}`}
 									onMouseEnter={() => {
@@ -1117,6 +1143,10 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 									style={
 										showDeletePill
 											? {
+													position: 'absolute',
+													top: deleteOverlayTop,
+													left: ROW_DELETE_HOVER_GUTTER_OVERLAP_PX + 10,
+													transform: 'translateY(-50%)',
 													height: 21,
 													borderRadius: 7,
 													background: '#E7677C',
@@ -1132,6 +1162,10 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 											  }
 											: isActiveDeleteButtonHovered
 											? {
+													position: 'absolute',
+													top: deleteOverlayTop,
+													left: ROW_DELETE_HOVER_GUTTER_OVERLAP_PX + 10,
+													transform: 'translateY(-50%)',
 													width: 21,
 													height: 21,
 													borderRadius: 7,
@@ -1146,6 +1180,10 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 													flex: 'none',
 											  }
 											: {
+													position: 'absolute',
+													top: deleteOverlayTop,
+													left: ROW_DELETE_HOVER_GUTTER_OVERLAP_PX + 10,
+													transform: 'translateY(-50%)',
 													width: 21,
 													height: 21,
 													borderRadius: 7,
