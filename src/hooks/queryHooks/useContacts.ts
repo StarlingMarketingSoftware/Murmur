@@ -643,6 +643,112 @@ export const trimContactsMapOverlayCache = (queryClient: QueryClient) => {
 	retainContactResearchSeeds(retainedIds);
 };
 
+// Contacts-list results are one full fat ContactWithName[] per distinct search
+// filter set, kept 10 min by gcTime — a search-heavy stretch retains every
+// result set at once. Keep only the most recently used inactive entries; the
+// current search is always observed (never evicted), so toggling between the
+// last few searches still renders instantly from cache.
+const CONTACTS_LIST_LRU_KEEP = 6;
+const CONTACTS_LIST_LRU_MIN_AGE_MS = 1000 * 60 * 2;
+const contactsListLastActiveAt = new Map<string, number>();
+
+// Hovering many map pins accumulates one research entry (large metadata text)
+// per contact for 30 min (gcTime). Individually small; capped so hover-scrubbing
+// hundreds of pins stays bounded. Evicting a seeded entry is safe — the seed
+// store re-serves it synchronously via initialData on the next mount.
+const CONTACT_RESEARCH_CACHE_KEEP = 150;
+const CONTACT_RESEARCH_CACHE_MIN_AGE_MS = 1000 * 60 * 2;
+const contactResearchLastActiveAt = new Map<string, number>();
+
+type TrimmableQuery = {
+	queryHash: string;
+	getObserversCount: () => number;
+	state: { fetchStatus: string; dataUpdatedAt: number };
+};
+
+// Shared LRU pass: stamp observed queries as active, exclude in-flight, evict
+// beyond `keep` by true recency with an age floor. Same contract as the overlay
+// trim above, minus its per-group partitioning.
+const evictBeyondLru = (
+	queryClient: QueryClient,
+	queries: TrimmableQuery[],
+	lastActiveAt: Map<string, number>,
+	keep: number,
+	minAgeMs: number
+) => {
+	const now = Date.now();
+	const liveHashes = new Set<string>();
+	const candidates: TrimmableQuery[] = [];
+	for (const query of queries) {
+		liveHashes.add(query.queryHash);
+		if (query.getObserversCount() > 0) {
+			lastActiveAt.set(query.queryHash, now);
+			continue;
+		}
+		if (query.state.fetchStatus !== 'idle') continue;
+		candidates.push(query);
+	}
+	for (const hash of lastActiveAt.keys()) {
+		if (!liveHashes.has(hash)) lastActiveAt.delete(hash);
+	}
+	if (candidates.length <= keep) return;
+	const lastUsed = (q: TrimmableQuery) =>
+		Math.max(q.state.dataUpdatedAt, lastActiveAt.get(q.queryHash) ?? 0);
+	candidates.sort((a, b) => lastUsed(b) - lastUsed(a));
+	const evictHashes = new Set<string>();
+	for (const query of candidates.slice(keep)) {
+		if (now - lastUsed(query) < minAgeMs) continue;
+		evictHashes.add(query.queryHash);
+	}
+	if (evictHashes.size > 0) {
+		queryClient.removeQueries({ predicate: (q) => evictHashes.has(q.queryHash) });
+		for (const hash of evictHashes) lastActiveAt.delete(hash);
+	}
+};
+
+export const trimContactsListCache = (queryClient: QueryClient) => {
+	const queries = queryClient
+		.getQueryCache()
+		.findAll({ queryKey: QUERY_KEYS.list() })
+		// Exactly ['contacts','list', <filters object>] — leaves the map-overlay
+		// windows (own LRU above) and the 'used-contacts' string-keyed family alone.
+		.filter(
+			(q) =>
+				q.queryKey.length === 3 &&
+				typeof q.queryKey[2] === 'object' &&
+				q.queryKey[2] !== null
+		);
+	evictBeyondLru(
+		queryClient,
+		queries,
+		contactsListLastActiveAt,
+		CONTACTS_LIST_LRU_KEEP,
+		CONTACTS_LIST_LRU_MIN_AGE_MS
+	);
+};
+
+export const trimContactResearchCache = (queryClient: QueryClient) => {
+	const queries = queryClient
+		.getQueryCache()
+		.findAll({ queryKey: [...QUERY_KEYS.all, 'detail'] })
+		.filter((q) => q.queryKey.length === 4 && q.queryKey[3] === 'research');
+	evictBeyondLru(
+		queryClient,
+		queries,
+		contactResearchLastActiveAt,
+		CONTACT_RESEARCH_CACHE_KEEP,
+		CONTACT_RESEARCH_CACHE_MIN_AGE_MS
+	);
+};
+
+// Single entry point for the map's post-fetch trim effect: bounds all three
+// contact cache families that grow with map/search use.
+export const trimContactsQueryCaches = (queryClient: QueryClient) => {
+	trimContactsMapOverlayCache(queryClient);
+	trimContactsListCache(queryClient);
+	trimContactResearchCache(queryClient);
+};
+
 // Backfills the research-detail fields for a single contact when a hovered map-overlay
 // row arrived without them (slim payload — see api/contacts/map-overlay).
 export const useGetContactResearch = (contactId: number | null) => {

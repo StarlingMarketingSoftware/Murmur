@@ -10,6 +10,8 @@ import { QueryClient } from '@tanstack/react-query';
 import {
 	getContactsMapOverlayBaseKey,
 	trimContactsMapOverlayCache,
+	trimContactsListCache,
+	trimContactResearchCache,
 	type ContactsMapOverlayFilters,
 } from './useContacts';
 import {
@@ -128,6 +130,94 @@ describe('trimContactsMapOverlayCache', () => {
 		// Entries 0..5 were evicted → their seeds must be gone; the rest survive.
 		for (let i = 0; i < 30; i++) {
 			assert.equal(hasContactResearchSeed(i), i >= 6, `seed ${i}`);
+		}
+	});
+});
+
+describe('trimContactsListCache', () => {
+	it('keeps the 6 most recent inactive list entries, ignores other families', () => {
+		const queryClient = new QueryClient();
+		// 10 list entries (['contacts','list', filters]), oldest first.
+		for (let i = 0; i < 10; i++) {
+			const key = ['contacts', 'list', { q: `search-${i}` }];
+			queryClient.setQueryData(key, [{ id: i }]);
+			const query = queryClient.getQueryCache().find({ queryKey: key });
+			assert.ok(query);
+			query.setState({ dataUpdatedAt: Date.now() - OLD_MS - (10 - i) * 1000 });
+		}
+		// Same-length string-keyed sibling + an overlay window: both untouchable.
+		queryClient.setQueryData(['contacts', 'list', 'used-contacts'], [{ id: 999 }]);
+		queryClient.setQueryData(
+			['contacts', 'list', 'map-overlay', { mode: 'booking' }],
+			[{ id: 998 }]
+		);
+
+		trimContactsListCache(queryClient);
+
+		const lists = queryClient
+			.getQueryCache()
+			.findAll({ queryKey: ['contacts', 'list'] })
+			.filter(
+				(q) =>
+					q.queryKey.length === 3 &&
+					typeof q.queryKey[2] === 'object' &&
+					q.queryKey[2] !== null
+			);
+		assert.equal(lists.length, 6);
+		// Oldest four (i = 0..3) evicted.
+		for (let i = 0; i < 10; i++) {
+			const exists = lists.some(
+				(q) => (q.queryKey[2] as { q: string }).q === `search-${i}`
+			);
+			assert.equal(exists, i >= 4, `list entry ${i}`);
+		}
+		assert.ok(
+			queryClient.getQueryData(['contacts', 'list', 'used-contacts']),
+			'used-contacts untouched'
+		);
+		assert.ok(
+			queryClient.getQueryData(['contacts', 'list', 'map-overlay', { mode: 'booking' }]),
+			'overlay window untouched'
+		);
+	});
+
+	it('never evicts fresh list entries (age floor)', () => {
+		const queryClient = new QueryClient();
+		for (let i = 0; i < 10; i++) {
+			queryClient.setQueryData(['contacts', 'list', { q: `s${i}` }], [{ id: i }]);
+		}
+		trimContactsListCache(queryClient);
+		const lists = queryClient
+			.getQueryCache()
+			.findAll({ queryKey: ['contacts', 'list'] })
+			.filter((q) => q.queryKey.length === 3 && typeof q.queryKey[2] === 'object');
+		assert.equal(lists.length, 10);
+	});
+});
+
+describe('trimContactResearchCache', () => {
+	it('caps research entries at 150 by recency', () => {
+		const queryClient = new QueryClient();
+		for (let i = 0; i < 160; i++) {
+			const key = ['contacts', 'detail', String(i), 'research'];
+			queryClient.setQueryData(key, { id: i, metadata: 'm' });
+			const query = queryClient.getQueryCache().find({ queryKey: key });
+			assert.ok(query);
+			query.setState({ dataUpdatedAt: Date.now() - OLD_MS - (160 - i) * 1000 });
+		}
+		trimContactResearchCache(queryClient);
+		const remaining = queryClient
+			.getQueryCache()
+			.findAll({ queryKey: ['contacts', 'detail'] })
+			.filter((q) => q.queryKey.length === 4 && q.queryKey[3] === 'research');
+		assert.equal(remaining.length, 150);
+		// The 10 oldest (i = 0..9) are gone.
+		for (let i = 0; i < 10; i++) {
+			assert.equal(
+				queryClient.getQueryData(['contacts', 'detail', String(i), 'research']),
+				undefined,
+				`research ${i} evicted`
+			);
 		}
 	});
 });
