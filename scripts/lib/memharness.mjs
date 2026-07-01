@@ -140,9 +140,11 @@ const NET_CLASSES = [
 	['research', /\/api\/contacts\/[^/]+\/research/],
 	['curated', /\/api\/contacts\/curated/],
 	['apiOther', /\/api\//],
-	['tiles', /(\.pbf(\?|$))|(api\.mapbox\.com\/(v4|rasterarrays|raster))|(\/tiles\/)/],
+	// glyphs/sprites BEFORE tiles: glyph ranges are .pbf files too and would
+	// otherwise be swallowed by the tiles class.
 	['glyphs', /api\.mapbox\.com\/fonts/],
 	['spritesStyles', /api\.mapbox\.com\/(styles|sprites|map-sessions)/],
+	['tiles', /(\.pbf(\?|$))|(api\.mapbox\.com\/(v4|rasterarrays|raster))|(\/tiles\/)/],
 	['mapboxEvents', /events\.mapbox\.com/],
 	['geo', /\/geo\//],
 ];
@@ -177,15 +179,21 @@ export async function installNetworkCounters(cdp) {
 			/* ignore */
 		}
 	});
+	cdp.on('Network.loadingFailed', (e) => {
+		classByRequestId.delete(e.requestId);
+	});
 	return {
 		snapshot: () => JSON.parse(JSON.stringify(counters)),
-		diff: (before) => {
+		// Diff `now` (a snapshot; defaults to the live counters) against `before`.
+		// Pass an explicit `now` when the result must be consistent with a snapshot
+		// taken at the same instant — the live counters keep moving.
+		diff: (before, now) => {
 			const out = {};
-			for (const [cls, c] of Object.entries(counters)) {
+			for (const [cls, c] of Object.entries(now ?? counters)) {
 				const b = before?.[cls] ?? { count: 0, encodedBytes: 0 };
 				out[cls] = {
-					count: c.count - (b.count ?? 0),
-					encodedBytes: c.encodedBytes - (b.encodedBytes ?? 0),
+					count: (c.count ?? 0) - (b.count ?? 0),
+					encodedBytes: (c.encodedBytes ?? 0) - (b.encodedBytes ?? 0),
 				};
 			}
 			return out;
@@ -205,23 +213,31 @@ export async function memoryInfraDump(browserCdp, outFile) {
 		if (Array.isArray(e.value)) events.push(...e.value);
 	};
 	browserCdp.on('Tracing.dataCollected', onData);
-	await browserCdp.send('Tracing.start', {
-		traceConfig: {
-			includedCategories: ['disabled-by-default-memory-infra'],
-			excludedCategories: ['*'],
-		},
-		transferMode: 'ReportEvents',
-	});
+	let started = false;
 	let dumpOk = false;
 	try {
+		await browserCdp.send('Tracing.start', {
+			traceConfig: {
+				includedCategories: ['disabled-by-default-memory-infra'],
+				excludedCategories: ['*'],
+				// No periodic dumps: exactly one explicit detailed dump below, so the
+				// offline parser never sees multiple dumps per pid (memory-infra's
+				// default config would emit periodic dumps on its own).
+				memoryDumpConfig: { triggers: [] },
+			},
+			transferMode: 'ReportEvents',
+		});
+		started = true;
 		const res = await browserCdp.send('Tracing.requestMemoryDump', {
 			levelOfDetail: 'detailed',
 		});
 		dumpOk = Boolean(res.success);
 	} finally {
-		const complete = new Promise((res) => browserCdp.once('Tracing.tracingComplete', res));
-		await browserCdp.send('Tracing.end');
-		await complete;
+		if (started) {
+			const complete = new Promise((res) => browserCdp.once('Tracing.tracingComplete', res));
+			await browserCdp.send('Tracing.end');
+			await complete;
+		}
 		browserCdp.off('Tracing.dataCollected', onData);
 	}
 	if (outFile) writeFileSync(outFile, JSON.stringify(events));
@@ -235,12 +251,18 @@ export async function memoryInfraDump(browserCdp, outFile) {
 export async function takeHeapSnapshotToFile(cdp, filePath) {
 	mkdirSync(path.dirname(filePath), { recursive: true });
 	const ws = createWriteStream(filePath);
-	const onChunk = (e) => ws.write(e.chunk);
+	let lastChunkAt = Date.now();
+	const onChunk = (e) => {
+		lastChunkAt = Date.now();
+		ws.write(e.chunk);
+	};
 	cdp.on('HeapProfiler.addHeapSnapshotChunk', onChunk);
 	await cdp.send('HeapProfiler.takeHeapSnapshot', { reportProgress: false });
-	// Chunks are flushed synchronously with the command in practice; small grace
-	// period to be safe before detaching.
-	await sleep(500);
+	// Chrome usually flushes every chunk before the command resolves, but large
+	// snapshots have been seen to trail — detach only after 500ms of chunk
+	// silence (bounded so a wedged stream can't hang the run).
+	const deadline = Date.now() + 60_000;
+	while (Date.now() - lastChunkAt < 500 && Date.now() < deadline) await sleep(100);
 	cdp.off('HeapProfiler.addHeapSnapshotChunk', onChunk);
 	await new Promise((res) => ws.end(res));
 }

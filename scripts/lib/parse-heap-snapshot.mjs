@@ -43,7 +43,13 @@ export function aggregateSnapshot(file) {
 			special.codeBytes += size;
 			continue;
 		}
-		if (name === 'ArrayBuffer' || name === 'JSArrayBufferData' || type === 'array buffer') {
+		// Backing stores are named "system / JSArrayBufferData" in V8 snapshots —
+		// match by substring so the actual bytes (not just the wrapper objects) count.
+		if (
+			name === 'ArrayBuffer' ||
+			(typeof name === 'string' && name.includes('JSArrayBufferData')) ||
+			type === 'array buffer'
+		) {
 			special.arrayBufferBytes += size;
 		}
 		if (detachedIdx >= 0 && nodes[i + detachedIdx] === 2) {
@@ -64,9 +70,19 @@ function topEntries(buckets, top) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-	const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
-	const topIdx = process.argv.indexOf('--top');
-	const top = topIdx >= 0 ? Number(process.argv[topIdx + 1]) : 40;
+	// Collect file args, skipping flags AND their values (`--top 40`'s "40" must
+	// not be mistaken for a second snapshot file).
+	const argv = process.argv.slice(2);
+	const args = [];
+	let top = 40;
+	for (let i = 0; i < argv.length; i++) {
+		if (argv[i] === '--top') {
+			top = Number(argv[++i]);
+			continue;
+		}
+		if (argv[i].startsWith('--')) continue;
+		args.push(argv[i]);
+	}
 	const mb = (b) => (b / 1048576).toFixed(2);
 	if (!args.length) {
 		console.error('usage: parse-heap-snapshot.mjs <a.heapsnapshot> [<b.heapsnapshot>] [--top 40]');

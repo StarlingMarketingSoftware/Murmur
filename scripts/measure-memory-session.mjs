@@ -95,7 +95,11 @@ const STREET_CITIES = [
 ];
 const STREET_ZOOM = 16;
 const STREET_MICRO_PANS = 5;
-const STREET_PAN_STEP = 0.002; // each step mints a new overlay query key
+// Overlay/booking-extra fetch windows are quantized to a 0.05° grid at street
+// zooms (getBackgroundDotsQuantizationDeg), so each pan must land in a fresh
+// grid cell to mint a new overlay query key. Steps alternate around the city
+// center (+0.06, -0.06, +0.12, -0.12, +0.18) to stay inside the metro.
+const STREET_PAN_STEP = 0.06;
 
 const HOVERS_PER_CITY = 10;
 const HOVER_DWELL_MS = 1200;
@@ -128,8 +132,8 @@ and "Safari Graphics and Media" at each CHECKPOINT, into
                                                         CHECKPOINT searches
  3. Pan/zoom through: Memphis z9, New Orleans z10, Atlanta z11, Miami z12,
     DC z13, NYC z14, Chicago z12, Denver z10 (~3s each) CHECKPOINT hops
- 4. In Nashville, Chicago, LA: zoom to street level (z16) and make 5 small
-    pans in each city (~3s apart).                      CHECKPOINT street
+ 4. In Nashville, Chicago, LA: zoom to street level (z16) and hop across 5
+    different neighborhoods (~5km apart, ~3s each).     CHECKPOINT street
  5. In each of those cities hover ~10 marker pins (1-2s each) so research
     panels open.                                        CHECKPOINT hovers
  6. Open a campaign from the dashboard, wait 20s, go Back to the dashboard.
@@ -187,8 +191,11 @@ async function runOnce(repeatIndex, chromium, ticket) {
 
 	const identifyAppRenderer = (procs) => {
 		// The main-frame renderer hosting mapbox dominates renderer footprint.
-		const renderers = procs.filter((p) => p.type === 'renderer' && (p.footprintKb ?? 0) > 0);
-		renderers.sort((a, b) => (b.footprintKb ?? 0) - (a.footprintKb ?? 0));
+		// Fall back to ps rss so identification still works if /usr/bin/footprint
+		// ever yields nothing (otherwise appKb silently stays 0 for the whole run).
+		const size = (p) => p.footprintKb ?? p.rssKb ?? 0;
+		const renderers = procs.filter((p) => p.type === 'renderer' && size(p) > 0);
+		renderers.sort((a, b) => size(b) - size(a));
 		return renderers[0]?.pid ?? null;
 	};
 
@@ -222,10 +229,15 @@ async function runOnce(repeatIndex, chromium, ticket) {
 		const procs = await processTable(browserCdp);
 		if (!run.appRendererPid) run.appRendererPid = identifyAppRenderer(procs);
 		const app = procs.find((p) => p.pid === run.appRendererPid);
+		if (run.appRendererPid && !app) {
+			console.warn(`[${phase}] app renderer pid ${run.appRendererPid} missing (crashed?)`);
+		}
 		const gpu = procs.find((p) => p.type === 'GPU');
 		const appKb = app?.footprintKb ?? app?.rssKb ?? 0;
 		const gpuKb = gpu?.footprintKb ?? gpu?.rssKb ?? 0;
 		const gpuDeltaKb = Math.max(0, gpuKb - (run.gpuBaselineKb ?? 0));
+		// Snapshot once and diff against that same snapshot — diffing against the
+		// live counters would double-count anything landing between the two reads.
 		const netNow = net.snapshot();
 		const s = {
 			phase,
@@ -240,7 +252,7 @@ async function runOnce(repeatIndex, chromium, ticket) {
 			gpuFootprintKb: gpuKb,
 			gpuDeltaKb,
 			mUserKb: appKb + gpuDeltaKb,
-			netSincePrev: net.diff(lastNetSnapshot),
+			netSincePrev: net.diff(lastNetSnapshot, netNow),
 			queryCache,
 			mapStats,
 		};
@@ -300,15 +312,19 @@ async function runOnce(repeatIndex, chromium, ticket) {
 		await sleep(settleMs);
 	};
 
-	// --- Sign in.
-	await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
-
-	// GPU baseline BEFORE the app loads: everything above this is the app's doing.
+	// GPU baseline BEFORE any app content loads (about:blank): the landing page
+	// itself holds GPU memory that is freed on navigation, so sampling after it
+	// loads would inflate the baseline and understate the map's gpuDelta forever.
 	{
 		const procs = await processTable(browserCdp);
-		run.gpuBaselineKb = procs.find((p) => p.type === 'GPU')?.footprintKb ?? 0;
+		const gpu = procs.find((p) => p.type === 'GPU');
+		if (!gpu) console.warn('no GPU process found at baseline — gpuDelta will be absolute');
+		run.gpuBaselineKb = gpu?.footprintKb ?? gpu?.rssKb ?? 0;
 		console.log(`gpu baseline ${(run.gpuBaselineKb / 1024).toFixed(0)}MB`);
 	}
+
+	// --- Sign in.
+	await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
 
 	await signIn(page, ticket);
 	console.log('signed in as', await page.evaluate(() => window.Clerk.user?.id));
@@ -388,14 +404,10 @@ async function runOnce(repeatIndex, chromium, ticket) {
 		for (const city of STREET_CITIES) {
 			await jumpTo({ lng: city.lng, lat: city.lat, zoom: STREET_ZOOM }, 2500);
 			for (let i = 1; i <= STREET_MICRO_PANS; i++) {
-				await jumpTo(
-					{
-						lng: city.lng + i * STREET_PAN_STEP,
-						lat: city.lat + (i % 2 === 0 ? 0.0015 : 0),
-						zoom: STREET_ZOOM,
-					},
-					2500
-				);
+				// +1, -1, +2, -2, +3 × STREET_PAN_STEP — every step crosses into a new
+				// 0.05° overlay-fetch quantization cell (see STREET_PAN_STEP comment).
+				const offset = (i % 2 === 0 ? -1 : 1) * Math.ceil(i / 2) * STREET_PAN_STEP;
+				await jumpTo({ lng: city.lng + offset, lat: city.lat, zoom: STREET_ZOOM }, 2500);
 			}
 			// Hover pass: project real rendered marker features to screen points.
 			const points = await page.evaluate(
@@ -405,15 +417,21 @@ async function runOnce(repeatIndex, chromium, ticket) {
 						const present = layers.filter((l) => map.getLayer && map.getLayer(l));
 						if (!present.length) return [];
 						const feats = map.queryRenderedFeatures(undefined, { layers: present });
-						const rect = map.getContainer().getBoundingClientRect();
+						const container = map.getContainer();
+						const rect = container.getBoundingClientRect();
+						// map.project() returns container-layout px; the container normally
+						// counter-zooms the html root back to scale 1, but derive the actual
+						// visual/layout ratio so a residual CSS zoom can't skew mouse targets.
+						const sx = container.clientWidth ? rect.width / container.clientWidth : 1;
+						const sy = container.clientHeight ? rect.height / container.clientHeight : 1;
 						const seen = new Set();
 						const pts = [];
 						for (const f of feats) {
 							const g = f.geometry;
 							if (!g || g.type !== 'Point') continue;
 							const p = map.project(g.coordinates);
-							const x = Math.round(rect.left + p.x);
-							const y = Math.round(rect.top + p.y);
+							const x = Math.round(rect.left + p.x * sx);
+							const y = Math.round(rect.top + p.y * sy);
 							const key = `${Math.round(x / 8)}:${Math.round(y / 8)}`;
 							if (seen.has(key)) continue;
 							seen.add(key);
@@ -441,6 +459,11 @@ async function runOnce(repeatIndex, chromium, ticket) {
 		// 5. Route round-trips (client-side; the persistent map must survive).
 		if (campaignPath) {
 			for (let i = 0; i < 2; i++) {
+				// The dashboard mirrors the engaged search + map view into its URL —
+				// return to that exact URL. A bare /murmur/dashboard push would remount
+				// into the initial hero (no refine input, background-mode map) and
+				// silently hollow out every later cycle.
+				const returnUrl = await page.evaluate(() => location.pathname + location.search);
 				const navOk = await page.evaluate((p) => {
 					if (!window.__murmurNavDebug?.push) return false;
 					window.__murmurNavDebug.push(p);
@@ -454,7 +477,7 @@ async function runOnce(repeatIndex, chromium, ticket) {
 					.waitForFunction((p) => location.pathname === p, campaignPath, { timeout: 30_000 })
 					.catch(() => console.warn(`${tag}: campaign nav did not land`));
 				await sleep(20_000);
-				await page.evaluate(() => window.__murmurNavDebug.push('/murmur/dashboard'));
+				await page.evaluate((u) => window.__murmurNavDebug.push(u), returnUrl);
 				await page
 					.waitForFunction(() => location.pathname === '/murmur/dashboard', null, {
 						timeout: 30_000,
@@ -514,8 +537,11 @@ async function runOnce(repeatIndex, chromium, ticket) {
 		await attribPass('after-drop');
 	}
 
-	// --- Gate summary (time-weighted average + peak of M_user).
-	const gateSamples = run.samples.filter((s) => s.mUserKb > 0);
+	// --- Gate summary (time-weighted average + peak of M_user). The tile-drop
+	// probes are an arbitration experiment, not user experience — keep them out.
+	const gateSamples = run.samples.filter(
+		(s) => s.mUserKb > 0 && !s.phase.startsWith('after-tile-drop')
+	);
 	let weighted = 0;
 	let dt = 0;
 	for (let i = 1; i < gateSamples.length; i++) {
@@ -524,7 +550,7 @@ async function runOnce(repeatIndex, chromium, ticket) {
 		dt += w;
 	}
 	const avgKb = dt ? weighted / dt : 0;
-	const peakKb = Math.max(...gateSamples.map((s) => s.mUserKb));
+	const peakKb = gateSamples.length ? Math.max(...gateSamples.map((s) => s.mUserKb)) : 0;
 	run.gate = {
 		avgMUserMb: +(avgKb / 1024).toFixed(0),
 		peakMUserMb: +(peakKb / 1024).toFixed(0),
@@ -543,7 +569,9 @@ async function runOnce(repeatIndex, chromium, ticket) {
 	writeFileSync(file, JSON.stringify(run, null, 2));
 	console.log(`wrote ${file}`);
 
-	await browser.close();
+	// browser.close() has been observed to hang after long CDP sessions; the run's
+	// data is already on disk, so never let teardown wedge an unattended run.
+	await Promise.race([browser.close(), sleep(15_000)]);
 	return run;
 }
 
@@ -568,6 +596,7 @@ async function main() {
 			`\nMEDIANS over ${results.length} repeats: avg M_user ${med(results.map((x) => x.gate.avgMUserMb))}MB, peak ${med(results.map((x) => x.gate.peakMUserMb))}MB`
 		);
 	}
+	process.exit(0);
 }
 
 main().catch((err) => {

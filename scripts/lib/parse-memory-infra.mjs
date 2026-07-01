@@ -53,7 +53,16 @@ export function summarizeMemoryInfra(events) {
 		if (e.ph !== 'v') continue;
 		const allocators = e.args?.dumps?.allocators;
 		const totals = e.args?.dumps?.process_totals;
-		const entry = perPid.get(e.pid) ?? { topLevel: {}, detail: {}, totals: {} };
+		// A trace can contain several dumps per pid (periodic + explicit). Each 'v'
+		// event is one complete dump for one process — never sum across them; keep
+		// exactly one per pid, preferring detailed dumps, then the latest timestamp.
+		const isDetailed = (e.args?.dumps?.level_of_detail ?? 'detailed') === 'detailed';
+		const prev = perPid.get(e.pid);
+		if (prev) {
+			if (prev.isDetailed && !isDetailed) continue;
+			if (prev.isDetailed === isDetailed && (e.ts ?? 0) < prev.ts) continue;
+		}
+		const entry = { topLevel: {}, detail: {}, totals: {}, isDetailed, ts: e.ts ?? 0 };
 		if (totals) {
 			entry.totals.residentBytes =
 				typeof totals.resident_set_bytes === 'string'
