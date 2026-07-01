@@ -2700,7 +2700,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		null
 	);
 	const cloudsTextureGroupPatternsRef = useRef<(CanvasPattern | null)[] | null>(null);
-	const cloudsTextureGroupCanvasesRef = useRef<HTMLCanvasElement[] | null>(null);
+	// Indexed by group (null = empty group). Retained so the per-group storm masks
+	// can be rebuilt from getImageData if a storm mood re-enters after release.
+	const cloudsTextureGroupCanvasesRef = useRef<(HTMLCanvasElement | null)[] | null>(
+		null
+	);
+	// Per-group "mask build attempted" flags for the incremental (one group per
+	// frame) storm-mask builder; null until a storm/cloudy mood first needs them.
+	const cloudsTextureStormGroupMasksBuiltRef = useRef<boolean[] | null>(null);
 	const cloudsTextureGroupReadyRef = useRef<boolean>(false);
 	const cloudsTextureGroupDebugLoggedRef = useRef<boolean>(false);
 	const cloudsTextureGroupDebugActiveLoggedRef = useRef<boolean>(false);
@@ -7434,22 +7441,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					compId++;
 				}
 
-				const groupCanvases: HTMLCanvasElement[] = [];
+				const groupCanvases: (HTMLCanvasElement | null)[] = [];
 				const groupPatterns: (CanvasPattern | null)[] = [];
-				const stormCoreGroupPatterns: (CanvasPattern | null)[] = [];
-				const stormEdgeGroupPatterns: (CanvasPattern | null)[] = [];
 
 				for (let g = 0; g < groupCount; g++) {
 					if (typeof document === 'undefined') {
+						groupCanvases.push(null);
 						groupPatterns.push(null);
-						stormCoreGroupPatterns.push(null);
-						stormEdgeGroupPatterns.push(null);
 						continue;
 					}
 					if (!groupPixelCounts[g]) {
+						groupCanvases.push(null);
 						groupPatterns.push(null);
-						stormCoreGroupPatterns.push(null);
-						stormEdgeGroupPatterns.push(null);
 						continue;
 					}
 
@@ -7458,9 +7461,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					c.height = h;
 					const ctx = c.getContext('2d');
 					if (!ctx) {
+						groupCanvases.push(null);
 						groupPatterns.push(null);
-						stormCoreGroupPatterns.push(null);
-						stormEdgeGroupPatterns.push(null);
 						continue;
 					}
 
@@ -7472,9 +7474,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						applied = false;
 					}
 					if (!applied) {
+						groupCanvases.push(null);
 						groupPatterns.push(null);
-						stormCoreGroupPatterns.push(null);
-						stormEdgeGroupPatterns.push(null);
 						continue;
 					}
 
@@ -7484,33 +7485,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					} catch {
 						groupPatterns.push(null);
 					}
-
-					try {
-						const { coreData, edgeData, corePixels, edgePixels } =
-							buildStormCloudMaskData(groupDatas[g], w, h);
-						const coreCanvas = document.createElement('canvas');
-						coreCanvas.width = w;
-						coreCanvas.height = h;
-						stormCoreGroupPatterns.push(
-							corePixels > 0 ? putStormMaskPattern(coreCanvas, coreData, w, h) : null
-						);
-
-						const edgeCanvas = document.createElement('canvas');
-						edgeCanvas.width = w;
-						edgeCanvas.height = h;
-						stormEdgeGroupPatterns.push(
-							edgePixels > 0 ? putStormMaskPattern(edgeCanvas, edgeData, w, h) : null
-						);
-					} catch {
-						stormCoreGroupPatterns.push(null);
-						stormEdgeGroupPatterns.push(null);
-					}
 				}
 
+				// Per-group storm core/edge masks are NOT built here: normal/sunny moods
+				// never sample them (their opacities are 0). They're built lazily — one
+				// group per frame, hidden under the mood fade — by
+				// ensureStormGroupMasksStep() when a storm/cloudy mood first needs them.
 				cloudsTextureGroupCanvasesRef.current = groupCanvases;
 				cloudsTextureGroupPatternsRef.current = groupPatterns;
-				cloudsTextureStormCoreGroupPatternsRef.current = stormCoreGroupPatterns;
-				cloudsTextureStormEdgeGroupPatternsRef.current = stormEdgeGroupPatterns;
 				cloudsTextureGroupReadyRef.current = groupPatterns.some(Boolean);
 				if (
 					cloudsTextureGroupReadyRef.current &&
@@ -7536,6 +7518,198 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				cloudsTextureStormEdgeGroupPatternsRef.current = null;
 			}
 		};
+
+		// ---- Mood-gated weather asset lifecycle -------------------------------
+		// The heavyweight weather assets (storm masks, secondary cloud texture,
+		// lightning stamps + potential map, snow stamps) are sampled only by some
+		// moods; normal/sunny zero out every consumer. Build them only when the
+		// live blended config OR the active transition's target needs them (so
+		// they exist before the fade-in becomes visible), and release them once a
+		// completed transition lands on a mood that doesn't.
+
+		type WeatherAssetNeeds = {
+			stormMasks: boolean;
+			secondary: boolean;
+			lightning: boolean;
+			snow: boolean;
+		};
+
+		const weatherAssetNeedsFor = (
+			cfg: RuntimeMoodVisualConfig | null | undefined
+		): WeatherAssetNeeds => ({
+			stormMasks: Boolean(
+				cfg && (cfg.cloudCoreShadowOpacity > 0.001 || cfg.cloudEdgeLiftOpacity > 0.001)
+			),
+			secondary: Boolean(cfg && cfg.cloudSecondaryLayerOpacity > 0.001),
+			lightning: Boolean(cfg && (cfg.lightning || cfg.lightningIntensity > 0.001)),
+			snow: Boolean(cfg && cfg.snowOpacity > 0.001 && cfg.snowDensity > 0.001),
+		});
+
+		const currentWeatherAssetNeeds = (): WeatherAssetNeeds => {
+			const live = weatherAssetNeedsFor(weatherMoodConfigRef.current);
+			const target = weatherAssetNeedsFor(moodTransitionRef.current?.to);
+			return {
+				stormMasks: live.stormMasks || target.stormMasks,
+				secondary: live.secondary || target.secondary,
+				lightning: live.lightning || target.lightning,
+				snow: live.snow || target.snow,
+			};
+		};
+
+		// Build ONE missing per-group storm mask pair per call (each is a linear
+		// pass over the 512² group canvas, ~10-20ms) so the work spreads across
+		// frames while the mood fade still has the masks at near-zero opacity.
+		const ensureStormGroupMasksStep = () => {
+			const groupCanvases = cloudsTextureGroupCanvasesRef.current;
+			const groupPatterns = cloudsTextureGroupPatternsRef.current;
+			if (!Array.isArray(groupCanvases) || !Array.isArray(groupPatterns)) return;
+			const count = groupPatterns.length;
+
+			let built = cloudsTextureStormGroupMasksBuiltRef.current;
+			if (!built || built.length !== count) {
+				built = new Array<boolean>(count).fill(false);
+				cloudsTextureStormGroupMasksBuiltRef.current = built;
+				cloudsTextureStormCoreGroupPatternsRef.current = new Array<CanvasPattern | null>(
+					count
+				).fill(null);
+				cloudsTextureStormEdgeGroupPatternsRef.current = new Array<CanvasPattern | null>(
+					count
+				).fill(null);
+			}
+			const cores = cloudsTextureStormCoreGroupPatternsRef.current;
+			const edges = cloudsTextureStormEdgeGroupPatternsRef.current;
+			if (!cores || !edges) return;
+
+			for (let g = 0; g < count; g++) {
+				if (built[g]) continue;
+				// Mark attempted up front so a failing group is never retried per-frame.
+				built[g] = true;
+				const canvas = groupCanvases[g];
+				if (!canvas) continue; // empty group — nothing to mask, keep scanning
+				try {
+					const ctx = canvas.getContext('2d');
+					if (!ctx) continue;
+					const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+					const { coreData, edgeData, corePixels, edgePixels } = buildStormCloudMaskData(
+						imageData.data,
+						canvas.width,
+						canvas.height
+					);
+					if (typeof document !== 'undefined') {
+						if (corePixels > 0) {
+							const coreCanvas = document.createElement('canvas');
+							coreCanvas.width = canvas.width;
+							coreCanvas.height = canvas.height;
+							cores[g] = putStormMaskPattern(
+								coreCanvas,
+								coreData,
+								canvas.width,
+								canvas.height
+							);
+						}
+						if (edgePixels > 0) {
+							const edgeCanvas = document.createElement('canvas');
+							edgeCanvas.width = canvas.width;
+							edgeCanvas.height = canvas.height;
+							edges[g] = putStormMaskPattern(
+								edgeCanvas,
+								edgeData,
+								canvas.width,
+								canvas.height
+							);
+						}
+					}
+				} catch {
+					// Leave this group's masks null (matches today's failure handling).
+				}
+				return; // one real build per frame
+			}
+		};
+
+		const releaseUnneededWeatherAssets = (needs: WeatherAssetNeeds) => {
+			if (!needs.stormMasks) {
+				if (
+					cloudsTextureStormReadyRef.current ||
+					cloudsTextureStormCorePatternRef.current ||
+					cloudsTextureStormEdgePatternRef.current ||
+					cloudsTextureStormGroupMasksBuiltRef.current
+				) {
+					cloudsTextureStormCorePatternRef.current = null;
+					cloudsTextureStormEdgePatternRef.current = null;
+					cloudsTextureStormCoreCanvasRef.current = null;
+					cloudsTextureStormEdgeCanvasRef.current = null;
+					cloudsTextureStormReadyRef.current = false;
+					cloudsTextureStormCoreGroupPatternsRef.current = null;
+					cloudsTextureStormEdgeGroupPatternsRef.current = null;
+					cloudsTextureStormGroupMasksBuiltRef.current = null;
+				}
+			}
+			// The secondary texture doubles as the non-group fallback layer, so it is
+			// only releasable while the group pipeline is healthy.
+			if (!needs.secondary && cloudsTextureGroupReadyRef.current) {
+				if (
+					cloudsTexturePatternSecondaryRef.current ||
+					cloudsTextureSecondaryCanvasRef.current
+				) {
+					cloudsTexturePatternSecondaryRef.current = null;
+					cloudsTextureSecondaryCanvasRef.current = null;
+					cloudsTextureSecondaryReadyRef.current = false;
+				}
+			}
+			if (!needs.lightning) {
+				if (lightningStampImagesRef.current || lightningPotentialU8Ref.current) {
+					lightningStampImagesRef.current = null;
+					lightningStampLoadPromiseRef.current = null;
+					lightningPotentialU8Ref.current = null;
+					lightningPotentialLoadPromiseRef.current = null;
+				}
+			}
+			if (!needs.snow) {
+				if (snowStampImagesRef.current) {
+					snowStampImagesRef.current = null;
+					snowStampLoadPromiseRef.current = null;
+				}
+				// Snow-interaction scratch + stamp canvases rebuild lazily on next snow;
+				// canvas and ctx refs must be dropped together.
+				if (cloudsSnowInteractionScratchCanvasRef.current) {
+					cloudsSnowInteractionScratchCanvasRef.current = null;
+					cloudsSnowInteractionScratchCtxRef.current = null;
+					cloudsSnowInteractionThinStampRef.current = null;
+					cloudsSnowInteractionGlowStampRef.current = null;
+				}
+			}
+		};
+
+		const ensureWeatherAssetsForNeeds = (img: HTMLImageElement) => {
+			const needs = currentWeatherAssetNeeds();
+			// Secondary also serves as the fallback second layer when the group
+			// pipeline failed, where it draws at ≥0.52 alpha — keep that path warm.
+			if (needs.secondary || !cloudsTextureGroupReadyRef.current) {
+				ensureSecondaryCloudsTexture(img);
+			}
+			if (needs.stormMasks) {
+				if (cloudsTextureGroupReadyRef.current) {
+					ensureStormGroupMasksStep();
+				} else {
+					ensureStormCloudTextures(img);
+				}
+			}
+			if (needs.lightning) {
+				loadLightningStamps().catch(() => {
+					// Non-fatal.
+				});
+				loadLightningPotential().catch(() => {
+					// Non-fatal.
+				});
+			}
+			if (needs.snow) {
+				loadSnowStamps().catch(() => {
+					// Non-fatal.
+				});
+			}
+			releaseUnneededWeatherAssets(needs);
+		};
+		// -----------------------------------------------------------------------
 
 		const draw = (
 			img: HTMLImageElement,
@@ -8001,6 +8175,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const dtReal = clamp(dtS, 0, 0.25);
 				const dt = dtReal * CLOUDS_DRIFT_TIME_SCALE;
 				cloudsDriftSimTimeMsRef.current += dt * 1000;
+				// Mood-gated asset lifecycle: cheap boolean checks per frame; builds or
+				// releases only when the needed-asset set actually changes (e.g. a mood
+				// transition starts or completes).
+				try {
+					ensureWeatherAssetsForNeeds(img);
+				} catch {
+					// Ignore.
+				}
 				try {
 					draw(img, pattern, cloudsDriftSimTimeMsRef.current, dt);
 				} catch {
@@ -8077,16 +8259,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			.then((img) => {
 				if (canceled) return;
 				const initialNow = performance.now();
-				// Preload lightning assets so the first storm flash doesn't hitch.
-				loadLightningStamps().catch(() => {
-					// Non-fatal.
-				});
-				loadLightningPotential().catch(() => {
-					// Non-fatal.
-				});
-				loadSnowStamps().catch(() => {
-					// Non-fatal.
-				});
 				cloudsDriftOffsetRef.current = { x: 0, y: 0 };
 				// Seed a non-zero initial offset so the secondary layer reads as a distinct
 				// cloud system immediately (rather than starting perfectly aligned and only
@@ -8107,11 +8279,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						cloudsTexturePatternRef.current = null;
 					}
 				}
-				// Build the secondary (sparser) texture once so the second drift layer is ready
-				// for the first painted frame.
-				ensureSecondaryCloudsTexture(img);
-				ensureStormCloudTextures(img);
+				// Build the always-needed patterns (base/groups/haze) first, then let the
+				// mood-gated pass decide which heavyweight extras this session needs —
+				// normal/sunny sessions skip the storm/secondary/lightning/snow assets
+				// entirely (the per-frame ensure in tick() builds them if a mood arrives).
 				ensureCloudsGroupPatterns(img);
+				ensureWeatherAssetsForNeeds(img);
 				// Seed group offsets so the independently-drifting structures start de-phased
 				// immediately (no initial "locked" look).
 				{
