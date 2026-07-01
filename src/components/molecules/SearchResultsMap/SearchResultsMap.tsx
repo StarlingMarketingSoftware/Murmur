@@ -1,5 +1,9 @@
 'use client';
 
+import { useApplyWeatherMoodConfig } from './useApplyWeatherMoodConfig';
+import { useLightingAppliers } from './useLightingAppliers';
+import { useLightingDrivers } from './useLightingDrivers';
+import { useWeatherMoodTransitions } from './useWeatherMoodTransitions';
 import { useWeatherCanvasAnimation } from './useWeatherCanvasAnimation';
 import { useContactOverlayFetching } from './useContactOverlayFetching';
 import { useCampaignFootprint } from './useCampaignFootprint';
@@ -8192,399 +8196,45 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, []);
 	applyBlobMorphRef.current = applyBlobMorph;
 
-	// Softbox lighting overlay opacity is owned entirely by `applyLightingOverlayOpacity`
-	// below, which fires on every `zoom` event and on mood changes. We deliberately do
-	// NOT render an `opacity` value into the JSX style: any React re-render during a
-	// zoom gesture would otherwise overwrite the smooth imperative update with the stale
-	// `zoomLevel`-derived value (zoomLevel only updates on `moveend`).
-
-	const setRasterOpacityIfChanged = useCallback(
-		(m: mapboxgl.Map, layerId: string, value: number) => {
-			const prev = lightingRasterOpacityAppliedRef.current[layerId];
-			if (prev != null && Math.abs(prev - value) < 0.0005) return;
-			if (!m.getLayer(layerId)) return;
-			m.setPaintProperty(layerId, 'raster-opacity', value);
-			// While effectively invisible, hide the layer outright: mapbox keeps
-			// loading + compositing raster/canvas sources for opacity-0 layers.
-			const visibility = value < 0.0005 ? 'none' : 'visible';
-			if (lightingLayerVisibilityAppliedRef.current[layerId] !== visibility) {
-				m.setLayoutProperty(layerId, 'visibility', visibility);
-				lightingLayerVisibilityAppliedRef.current[layerId] = visibility;
-			}
-			lightingRasterOpacityAppliedRef.current[layerId] = value;
-		},
-		[]
-	);
-
-	const applyLightingOverlayOpacity = useCallback(() => {
-		if (!mapRef.current) return;
-		const zoom = mapRef.current.getZoom() ?? MAP_DEFAULT_ZOOM;
-		const base = computeLightingOverlayOpacity(zoom, interactiveFloorDeltaRef.current);
-		const cfg = weatherMoodConfigRef.current;
-		const rawNight = clamp(nightTRef.current, 0, 1);
-		const night = computeMoodVisualNightT(nightTRef.current, cfg);
-		const sunTransitionVisual = getSunTransitionVisualState(
-			nightLightingRef.current,
-			Date.now()
-		);
-		const sunTransitionOpacity = computeSunTransitionLayerOpacity(
-			sunTransitionVisual,
-			zoom
-		);
-		const sunTransitionCatchlightOpacity = clamp(
-			sunTransitionOpacity * SUN_TRANSITION_CLOUD_CATCHLIGHT_OPACITY_MULT,
-			0,
-			1
-		);
-		const sunSpaceGlowOpacity = clamp(
-			sunTransitionOpacity * SUN_TRANSITION_SPACE_GLOW_OPACITY_MULT,
-			0,
-			0.18
-		);
-		const sunWashSuppression = smoothstep(0.02, 0.22, sunTransitionOpacity);
-		const foregroundSunMul = 1 - sunWashSuppression * 0.78;
-
-		const trueNightEase = rawNight * rawNight * (3 - 2 * rawNight);
-		// Let night take over the lighting direction: the warm daytime key fades
-		// out while the moonlit upper-right key and lower-left shadow fade in.
-		const keyNightMul = 1 - trueNightEase * (1 - clamp(NIGHT_WARM_KEY_MIN_MUL, 0, 1));
-		const shadowNightMul =
-			1 - trueNightEase * (1 - clamp(NIGHT_SHADOW_OVERLAY_MUL_MIN, 0, 1));
-
-		const warmKeyOpacity = clamp(
-			base * cfg.warmSoftboxOpacityMultiplier * keyNightMul * foregroundSunMul,
-			0,
-			1
-		);
-		const darkKeyOpacity = clamp(
-			base * cfg.darkSoftboxOpacityMultiplier * keyNightMul,
-			0,
-			1
-		);
-		const shadowOpacity = clamp(
-			base *
-				cfg.shadowOpacityMultiplier *
-				shadowNightMul *
-				(1 - sunWashSuppression * 0.9),
-			0,
-			1
-		);
-		if (lightingOverlayWarmKeyRef.current)
-			lightingOverlayWarmKeyRef.current.style.opacity = String(warmKeyOpacity);
-		if (lightingOverlayDarkKeyRef.current)
-			lightingOverlayDarkKeyRef.current.style.opacity = String(darkKeyOpacity);
-		if (lightingOverlayShadowRef.current)
-			lightingOverlayShadowRef.current.style.opacity = String(shadowOpacity);
-		if (lightingOverlaySunSpaceGlowRef.current)
-			lightingOverlaySunSpaceGlowRef.current.style.opacity = String(sunSpaceGlowOpacity);
-
-		const nightMoonlightOpacity = clamp(
-			base *
-				trueNightEase *
-				NIGHT_MOONLIGHT_KEY_OPACITY *
-				(1 - sunWashSuppression * 0.72),
-			0,
-			1
-		);
-		const nightLowerLeftShadowOpacity = clamp(
-			base *
-				trueNightEase *
-				NIGHT_LOWER_LEFT_SHADOW_OPACITY *
-				(1 - sunWashSuppression * 0.55),
-			0,
-			1
-		);
-		if (lightingOverlayNightMoonlightRef.current) {
-			lightingOverlayNightMoonlightRef.current.style.opacity =
-				String(nightMoonlightOpacity);
-		}
-		if (lightingOverlayNightLowerLeftShadowRef.current) {
-			lightingOverlayNightLowerLeftShadowRef.current.style.opacity = String(
-				nightLowerLeftShadowOpacity
-			);
-		}
-
-		// Globe-zoom only via `base` (full at zoom ≤2.5, gone by zoom 5), and only
-		// during true full day. Intentionally NOT gated on presentation: the shade is
-		// a globe-surface effect that's just as valid in the interactive results map
-		// when the user is zoomed all the way out to the globe view.
-		const dayShadeOpacity = clamp(
-			base *
-				DAY_FAR_SIDE_SHADE_OPACITY_MULTIPLIER *
-				(1 - smoothstep(0.02, 0.22, rawNight)),
-			0,
-			1
-		);
-		try {
-			const m = mapRef.current;
-			if (m) {
-				setRasterOpacityIfChanged(m, MAPBOX_LAYER_IDS.dayFarSideShade, dayShadeOpacity);
-				setRasterOpacityIfChanged(
-					m,
-					MAPBOX_LAYER_IDS.sunTransition,
-					sunTransitionOpacity
-				);
-				setRasterOpacityIfChanged(
-					m,
-					MAPBOX_LAYER_IDS.sunTransitionCloudCatchlight,
-					sunTransitionCatchlightOpacity
-				);
-			}
-		} catch {
-			// Non-fatal.
-		}
-
-		// Hide weather raster layers when effectively invisible. Mapbox keeps loading +
-		// compositing raster/canvas sources for opacity-0 layers, so visibility gates
-		// remove the work entirely.
-		try {
-			const m = mapRef.current;
-			if (m) {
-				const setVisibility = (layerId: string, visible: boolean) => {
-					if (!m.getLayer(layerId)) return;
-					const v = visible ? 'visible' : 'none';
-					if (lightingLayerVisibilityAppliedRef.current[layerId] !== v) {
-						m.setLayoutProperty(layerId, 'visibility', v);
-						lightingLayerVisibilityAppliedRef.current[layerId] = v;
-					}
-				};
-
-				const anyCloudOpacity =
-					cfg.cloudOpacityGlobeZoom > 0.0005 ||
-					cfg.cloudOpacityDecorativeZoom > 0.0005 ||
-					cfg.cloudDeepZoomOpacity > 0.0005;
-				const showClouds =
-					anyCloudOpacity &&
-					(zoom < CLOUDS_OVERLAY_FADE_OUT_END_ZOOM || cfg.cloudDeepZoomOpacity > 0.0005);
-
-				const showLightning =
-					Boolean(cfg.lightning) &&
-					cfg.lightningIntensity > 0.001 &&
-					zoom < LIGHTNING_HIDE_AT_OR_ABOVE_ZOOM;
-
-				const showSnow =
-					cfg.snowOpacity > 0.001 &&
-					cfg.snowDensity > 0.001 &&
-					zoom < SNOW_HIDE_AT_OR_ABOVE_ZOOM;
-
-				setVisibility(MAPBOX_LAYER_IDS.clouds, showClouds);
-				setVisibility(MAPBOX_LAYER_IDS.lightning, showLightning);
-				setVisibility(MAPBOX_LAYER_IDS.snow, showSnow);
-			}
-		} catch {
-			// Non-fatal.
-		}
-
-		// Night rear-lighting: deep silhouette + moon rim.
-		const nightBase = base * night;
-		const shadeOpacity = clamp(nightBase * NIGHT_FACE_SHADE_OPACITY, 0, 1);
-		const rimOpacity = clamp(nightBase * NIGHT_MOON_RIM_OPACITY, 0, 1);
-		if (lightingOverlayNightShadeRef.current)
-			lightingOverlayNightShadeRef.current.style.opacity = String(shadeOpacity);
-		if (lightingOverlayMoonRimRef.current)
-			lightingOverlayMoonRimRef.current.style.opacity = String(rimOpacity);
-
-		// Night vignette: drives off `trueNightEase` (ignores the per-mood visual
-		// floor used for `night`) so it only appears in true full night, then
-		// holds steady across all zooms — vignettes shouldn't fade as you zoom in.
-		const vignetteOpacity = clamp(trueNightEase * NIGHT_VIGNETTE_OPACITY, 0, 1);
-		if (lightingOverlayNightVignetteRef.current)
-			lightingOverlayNightVignetteRef.current.style.opacity = String(vignetteOpacity);
-
-		// Hot wash — uniform warm-white screen-blend overlay that brightens the
-		// whole globe. Gated on the mood's `hotWashEligible` flag (only sunny/normal)
-		// so cloudy/stormy/snowy don't get a brightening lift, and on the raw
-		// clock night so a mood's `nightVisualBlend` floor doesn't suppress it.
-		const brightSoftboxStrength = clamp(cfg.warmSoftboxOpacityMultiplier, 0, 1);
-		const hotActive = isHotRef.current && cfg.hotWashEligible && rawNight < 0.12;
-		const washOpacity = hotActive
-			? base * HOT_WASH_OPACITY * brightSoftboxStrength * foregroundSunMul
-			: 0;
-		if (lightingOverlayHotWashRef.current)
-			lightingOverlayHotWashRef.current.style.opacity = String(washOpacity);
-
-		// Gloom wash — uniform dark multiply-blend overlay for stormy that
-		// persists into city zoom (longer fade curve than the softbox/shadow).
-		// Bright moods have gloomWashOpacity=0 so this is a no-op for them.
-		const gloomFade = computeGloomWashFade(zoom);
-		const gloomOpacity = clamp(
-			(cfg.gloomWashOpacity + night * NIGHT_GLOOM_WASH_OPACITY) * gloomFade,
-			0,
-			0.62
-		);
-		if (lightingOverlayGloomWashRef.current)
-			lightingOverlayGloomWashRef.current.style.opacity = String(gloomOpacity);
-
-		const nightDarkT = night * night * (3 - 2 * night);
-		const nightDarkOpacity = clamp(
-			nightDarkT * NIGHT_DARK_WASH_OPACITY * gloomFade,
-			0,
-			NIGHT_DARK_WASH_OPACITY
-		);
-		if (lightingOverlayNightDarkWashRef.current)
-			lightingOverlayNightDarkWashRef.current.style.opacity = String(nightDarkOpacity);
-
-		// Unsubscribe burn washes — uniform multiply char plus a late-stage
-		// screen-blend ember under-glow (only emerges past mid-burn). Both are
-		// 0 outside the unsubscribe flow.
-		const unsubscribeBurn = unsubscribeBurnEase(unsubscribeBurnTRef.current);
-		const burnWashOpacity = clamp(
-			unsubscribeBurn * UNSUBSCRIBE_BURN_WASH_MAX_OPACITY,
-			0,
-			1
-		);
-		const burnGlowOpacity = clamp(
-			smoothstep(0.45, 1, unsubscribeBurn) * UNSUBSCRIBE_BURN_GLOW_MAX_OPACITY,
-			0,
-			1
-		);
-		if (lightingOverlayBurnWashRef.current)
-			lightingOverlayBurnWashRef.current.style.opacity = String(burnWashOpacity);
-		if (lightingOverlayBurnGlowRef.current)
-			lightingOverlayBurnGlowRef.current.style.opacity = String(burnGlowOpacity);
-	}, [setRasterOpacityIfChanged]);
-
-	const repaintSunTransitionCanvas = useCallback((nowMs: number, force = false) => {
-		const sunCanvas = sunTransitionCanvasRef.current;
-		if (!sunCanvas) return false;
-
-		const visual = getSunTransitionVisualState(nightLightingRef.current, nowMs);
-		const paintKey = visual
-			? [
-					visual.phase,
-					Math.round(visual.progress * SUN_TRANSITION_PROGRESS_PAINT_STEPS),
-					Math.round(visual.centerLng * 10),
-				].join(':')
-			: 'off';
-
-		if (force || paintKey !== sunTransitionPaintKeyRef.current) {
-			if (!paintSunTransitionCanvas(sunCanvas, visual)) return false;
-			sunTransitionPaintKeyRef.current = paintKey;
-			try {
-				const m = mapRef.current;
-				const sunSrc = m?.getSource(MAPBOX_SOURCE_IDS.sunTransition) as
-					| { play?: () => void; pause?: () => void }
-					| undefined;
-				sunSrc?.play?.();
-				// Perf mode: upload once, then stop forcing per-frame texture uploads.
-				if (CANVAS_PERF_MODE) sunSrc?.pause?.();
-				m?.triggerRepaint();
-			} catch {
-				// Non-fatal.
-			}
-		}
-
-		return Boolean(visual);
-	}, []);
-
-	useEffect(() => {
-		const refreshSource = () => {
-			try {
-				const source = map?.getSource(MAPBOX_SOURCE_IDS.dayFarSideShade) as
-					| { play?: () => void; pause?: () => void }
-					| undefined;
-				source?.play?.();
-				// Perf mode: upload once, then stop forcing per-frame texture uploads.
-				if (CANVAS_PERF_MODE) source?.pause?.();
-				map?.triggerRepaint();
-			} catch {
-				// Non-fatal.
-			}
-		};
-
-		const repaint = (nowMs: number, forceRefresh = false) => {
-			const shadeCanvas = dayFarSideShadeCanvasRef.current;
-			if (!shadeCanvas) return false;
-
-			const nextCenterLng = getDayFarSideShadeCenterLng(
-				getDayFarSideShadeDayProgress(dayFarSideShadeLightingRef.current, nowMs)
-			);
-			const centerDelta = angularLngDistanceDeg(
-				nextCenterLng,
-				dayFarSideShadeCenterLngRef.current
-			);
-			const needsPaint =
-				centerDelta >= DAY_FAR_SIDE_SHADE_MIN_REPAINT_DELTA_DEG ||
-				shadeCanvas.width !== DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX ||
-				shadeCanvas.height !== DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX;
-
-			if (needsPaint && !paintDayFarSideShadeCanvas(shadeCanvas, nextCenterLng)) {
-				return false;
-			}
-			if (needsPaint) dayFarSideShadeCenterLngRef.current = nextCenterLng;
-
-			// Re-upload + reapply lighting only when the canvas actually changed
-			// (or on the forced setup call after a (re)mount/style reload): the
-			// unconditional 4s refresh re-uploaded the texture and restarted paint
-			// transitions for nothing, keeping the map's render loop warm at idle.
-			if (needsPaint || forceRefresh) {
-				refreshSource();
-				if (map && isMapLoaded) applyLightingOverlayOpacity();
-			}
-			return true;
-		};
-
-		repaint(Date.now(), true);
-		if (!map || !isMapLoaded || typeof window === 'undefined') return;
-
-		let timeoutId: number | null = null;
-		let rafId: number | null = null;
-		let canceled = false;
-
-		const schedule = () => {
-			if (canceled) return;
-			timeoutId = window.setTimeout(() => {
-				timeoutId = null;
-				rafId = window.requestAnimationFrame(() => {
-					rafId = null;
-					if (canceled) return;
-					repaint(Date.now());
-					schedule();
-				});
-			}, DAY_FAR_SIDE_SHADE_REPAINT_MS);
-		};
-
-		schedule();
-		return () => {
-			canceled = true;
-			if (timeoutId != null) window.clearTimeout(timeoutId);
-			if (rafId != null) window.cancelAnimationFrame(rafId);
-		};
-	}, [
-		map,
-		isMapLoaded,
-		applyLightingOverlayOpacity,
+	const { setRasterOpacityIfChanged, applyLightingOverlayOpacity, repaintSunTransitionCanvas } = useLightingAppliers({
+		dayFarSideShadeCanvasRef,
+		dayFarSideShadeCenterLngRef,
+		dayFarSideShadeLightingRef,
 		dayFarSideShadePhase,
-		dayFarSideShadePhaseStartMs,
 		dayFarSideShadePhaseEndMs,
-	]);
-
-	useEffect(() => {
-		if (!map || !isMapLoaded) return;
-		ensureMapboxSourcesAndLayers(map);
-		repaintSunTransitionCanvas(Date.now(), true);
-		applyLightingOverlayOpacity();
-	}, [
-		map,
-		isMapLoaded,
+		dayFarSideShadePhaseStartMs,
 		ensureMapboxSourcesAndLayers,
-		repaintSunTransitionCanvas,
-		applyLightingOverlayOpacity,
+		interactiveFloorDeltaRef,
+		isHotRef,
+		isMapLoaded,
+		lightingLayerVisibilityAppliedRef,
+		lightingOverlayBurnGlowRef,
+		lightingOverlayBurnWashRef,
+		lightingOverlayDarkKeyRef,
+		lightingOverlayGloomWashRef,
+		lightingOverlayHotWashRef,
+		lightingOverlayMoonRimRef,
+		lightingOverlayNightDarkWashRef,
+		lightingOverlayNightLowerLeftShadowRef,
+		lightingOverlayNightMoonlightRef,
+		lightingOverlayNightShadeRef,
+		lightingOverlayNightVignetteRef,
+		lightingOverlayShadowRef,
+		lightingOverlaySunSpaceGlowRef,
+		lightingOverlayWarmKeyRef,
+		lightingRasterOpacityAppliedRef,
+		map,
+		mapRef,
+		nightLightingRef,
+		nightTRef,
+		sunTransitionCanvasRef,
+		sunTransitionPaintKeyRef,
 		sunTransitionPhase,
-		sunTransitionPhaseStartMs,
 		sunTransitionPhaseEndMs,
-	]);
-
-	useEffect(() => {
-		if (!map) return;
-		if (!isMapLoaded) return;
-
-		applyLightingOverlayOpacity();
-		map.on('zoom', applyLightingOverlayOpacity);
-		return () => {
-			map.off('zoom', applyLightingOverlayOpacity);
-		};
-	}, [map, isMapLoaded, applyLightingOverlayOpacity]);
+		sunTransitionPhaseStartMs,
+		unsubscribeBurnTRef,
+		weatherMoodConfigRef,
+	});
 
 	useEffect(() => {
 		if (!map) return;
@@ -8606,193 +8256,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [map, isMapLoaded, applyBlobMorph]);
 
-	// Update overlays when the day/night factor changes (e.g. dusk progression).
-	useEffect(() => {
-		if (!map) return;
-		if (!isMapLoaded) return;
-		applyLightingOverlayOpacity();
-	}, [nightT, presentation, map, isMapLoaded, applyLightingOverlayOpacity]);
-
-	// Keep Mapbox globe lights and land/water palette in sync with day/night.
-	useEffect(() => {
-		if (!map) return;
-		if (!isMapLoaded) return;
-		const visualNightT = computeMoodVisualNightT(nightT, weatherMoodConfigRef.current);
-		applyMurmurGlobeLighting(map, unsubscribeBurnTRef.current);
-		applyNightLandPalette(map, visualNightT, unsubscribeBurnTRef.current);
-		applyStateOverlayNightColors(map, visualNightT);
-		applyMapboxFogForMoodAndNight(
-			map,
-			weatherMoodConfigRef.current,
-			visualNightT,
-			unsubscribeBurnTRef.current
-		);
-	}, [nightT, weatherMood, map, isMapLoaded]);
-
-	// During sunrise/sunset, `useGlobeNightLighting` intentionally avoids React
-	// re-rendering every frame. Drive the visual night factor imperatively so
-	// lights, dimming, and mood-night blends move continuously through the phase.
-	useEffect(() => {
-		if (!map) return;
-		if (!isMapLoaded) return;
-		if (MANUAL_NIGHT_T_OVERRIDE !== null) {
-			nightTRef.current = nightT;
-			repaintSunTransitionCanvas(Date.now(), true);
-			applyLightingOverlayOpacity();
-			return;
-		}
-
-		const phase = nightLighting?.phase ?? null;
-		if (phase !== 'sunrise' && phase !== 'sunset') {
-			nightTRef.current = nightT;
-			repaintSunTransitionCanvas(Date.now(), true);
-			applyLightingOverlayOpacity();
-			return;
-		}
-
-		let cancelled = false;
-		let rafId: number | null = null;
-		let lastMapPaintAt = 0;
-
-		const applyMapNightState = (runtimeNightT: number, force = false) => {
-			const now = performance.now();
-			const shouldPaintMap = force || now - lastMapPaintAt >= 250;
-			if (!shouldPaintMap) return;
-			lastMapPaintAt = now;
-			const visualNightT = computeMoodVisualNightT(
-				runtimeNightT,
-				weatherMoodConfigRef.current
-			);
-			applyMurmurGlobeLighting(map, unsubscribeBurnTRef.current);
-			applyNightLandPalette(map, visualNightT, unsubscribeBurnTRef.current);
-			applyStateOverlayNightColors(map, visualNightT);
-			applyMapboxFogForMoodAndNight(
-				map,
-				weatherMoodConfigRef.current,
-				visualNightT,
-				unsubscribeBurnTRef.current
-			);
-			applyStateOverlayOpacity(
-				stateOverlayOpacityRef.current,
-				stateOverlayModeRef.current
-			);
-		};
-
-		const tick = () => {
-			if (cancelled) return;
-			const nowMs = Date.now();
-			const runtimeNightT = computeRuntimeNightT(nightLighting, nightT, nowMs);
-			nightTRef.current = runtimeNightT;
-			repaintSunTransitionCanvas(nowMs);
-			applyLightingOverlayOpacity();
-			applyMapNightState(runtimeNightT, nowMs >= (nightLighting?.phaseEndMs ?? 0));
-
-			if (nowMs < (nightLighting?.phaseEndMs ?? 0)) {
-				rafId = requestAnimationFrame(tick);
-				return;
-			}
-
-			applyMapNightState(runtimeNightT, true);
-		};
-
-		tick();
-		return () => {
-			cancelled = true;
-			if (rafId != null) cancelAnimationFrame(rafId);
-		};
-	}, [
-		map,
-		isMapLoaded,
-		nightLighting,
-		nightT,
-		repaintSunTransitionCanvas,
+	useLightingDrivers({
 		applyLightingOverlayOpacity,
 		applyStateOverlayOpacity,
-	]);
-
-	// Unsubscribe burn ("globe on fire"): tween the visual burn factor toward
-	// the flow's published target and repaint the burn-aware appliers each
-	// frame. Burn composes *inside* the night/mood pipeline, so the periodic
-	// reapplications elsewhere repaint (rather than wipe) the current level.
-	useEffect(() => {
-		if (!map) return;
-		if (!isMapLoaded) return;
-
-		let rafId: number | null = null;
-
-		const applyBurnFrame = () => {
-			const burn = unsubscribeBurnTRef.current;
-			const visualNightT = computeMoodVisualNightT(
-				nightTRef.current,
-				weatherMoodConfigRef.current
-			);
-			applyMurmurGlobeLighting(map, burn);
-			applyNightLandPalette(map, visualNightT, burn);
-			applyMapboxFogForMoodAndNight(
-				map,
-				weatherMoodConfigRef.current,
-				visualNightT,
-				burn
-			);
-			applyLightingOverlayOpacity();
-			try {
-				map.triggerRepaint();
-			} catch {
-				// Non-fatal.
-			}
-		};
-
-		// Tuning/screenshot escape hatch: `?devBurnT=0.5` pins the burn factor.
-		const devBurnRaw =
-			typeof window === 'undefined'
-				? null
-				: new URLSearchParams(window.location.search).get('devBurnT');
-		const devBurnT = devBurnRaw == null ? null : Number(devBurnRaw);
-		if (devBurnT != null && Number.isFinite(devBurnT)) {
-			unsubscribeBurnTRef.current = clamp(devBurnT, 0, 1);
-			applyBurnFrame();
-			return;
-		}
-
-		const seekTo = (target: number) => {
-			if (rafId != null) cancelAnimationFrame(rafId);
-			rafId = null;
-			const from = unsubscribeBurnTRef.current;
-			if (Math.abs(target - from) < 0.001) {
-				unsubscribeBurnTRef.current = target;
-				applyBurnFrame();
-				return;
-			}
-			const startMs = performance.now();
-			const tick = () => {
-				const t = clamp(
-					(performance.now() - startMs) / UNSUBSCRIBE_BURN_TRANSITION_MS,
-					0,
-					1
-				);
-				const eased = t * t * (3 - 2 * t);
-				unsubscribeBurnTRef.current = lerp(from, target, eased);
-				applyBurnFrame();
-				if (t < 1) {
-					rafId = requestAnimationFrame(tick);
-					return;
-				}
-				rafId = null;
-			};
-			tick();
-		};
-
-		// Catch up if the flow advanced before the map was ready (or after a
-		// style reload re-asserted the unburned look).
-		if (getUnsubscribeBurnTarget() !== unsubscribeBurnTRef.current) {
-			seekTo(getUnsubscribeBurnTarget());
-		}
-		const unsubscribe = subscribeUnsubscribeBurn(seekTo);
-		return () => {
-			unsubscribe();
-			if (rafId != null) cancelAnimationFrame(rafId);
-		};
-	}, [map, isMapLoaded, applyLightingOverlayOpacity]);
+		isMapLoaded,
+		map,
+		nightLighting,
+		nightT,
+		nightTRef,
+		presentation,
+		repaintSunTransitionCanvas,
+		stateOverlayModeRef,
+		stateOverlayOpacityRef,
+		unsubscribeBurnTRef,
+		weatherMood,
+		weatherMoodConfigRef,
+	});
 
 	const getSelectedStateDisplayMultiPolygon = useCallback(
 		(mapInstance: mapboxgl.Map): ClippingMultiPolygon | null => {
@@ -8988,98 +8467,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isStateLayerReady,
 	]);
 
-	// Re-apply the night palette when zoom changes so the "zoomed in" view can be
-	// slightly brighter without changing the low-zoom globe read.
-	useEffect(() => {
-		if (!map) return;
-		if (!isMapLoaded) return;
-		const onZoomEnd = () =>
-			applyNightLandPalette(
-				map,
-				computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current),
-				unsubscribeBurnTRef.current
-			);
-		map.on('zoomend', onZoomEnd);
-		return () => {
-			map.off('zoomend', onZoomEnd);
-		};
-	}, [map, isMapLoaded]);
-
-	const applyWeatherMoodConfig = useCallback(
-		(cfg: RuntimeMoodVisualConfig) => {
-			weatherMoodConfigRef.current = cfg;
-
-			const m = mapRef.current;
-			if (!m) return;
-
-			// Cloud raster paint — opacity expression + brightness clamp.
-			try {
-				const opacityExpr = buildCloudsOpacityExpr(
-					cfg.cloudOpacityGlobeZoom,
-					cfg.cloudOpacityDecorativeZoom,
-					cfg.cloudDeepZoomOpacity,
-					interactiveFloorDeltaRef.current
-				);
-				if (m.getLayer(MAPBOX_LAYER_IDS.clouds)) {
-					m.setPaintProperty(
-						MAPBOX_LAYER_IDS.clouds,
-						'raster-opacity',
-						opacityExpr as any
-					);
-					m.setPaintProperty(
-						MAPBOX_LAYER_IDS.clouds,
-						'raster-brightness-min',
-						cfg.cloudBrightnessMin
-					);
-					m.setPaintProperty(
-						MAPBOX_LAYER_IDS.clouds,
-						'raster-brightness-max',
-						cfg.cloudBrightnessMax
-					);
-				}
-				if (m.getLayer(MAPBOX_LAYER_IDS.lightning)) {
-					m.setPaintProperty(
-						MAPBOX_LAYER_IDS.lightning,
-						'raster-opacity',
-						buildLightningOpacityExpr(
-							cfg.lightningIntensity * LIGHTNING_LAYER_OPACITY
-						) as unknown as mapboxgl.Expression
-					);
-				}
-				if (m.getLayer(MAPBOX_LAYER_IDS.snow)) {
-					m.setPaintProperty(
-						MAPBOX_LAYER_IDS.snow,
-						'raster-opacity',
-						buildSnowOpacityExpr(cfg.snowOpacity) as unknown as mapboxgl.Expression
-					);
-				}
-			} catch {
-				// Non-fatal.
-			}
-
-			applyLightingOverlayOpacity();
-			const visualNightT = computeMoodVisualNightT(nightTRef.current, cfg);
-			// Atmosphere fog tint — combined with night-aware modulation so the
-			// star glow / space haze / muted limb-mist react in a single pass.
-			applyMapboxFogForMoodAndNight(m, cfg, visualNightT, unsubscribeBurnTRef.current);
-			applyMurmurGlobeLighting(m, unsubscribeBurnTRef.current);
-			applyNightLandPalette(m, visualNightT, unsubscribeBurnTRef.current);
-			applyStateOverlayNightColors(m, visualNightT);
-			applyStateOverlayOpacity(
-				stateOverlayOpacityRef.current,
-				stateOverlayModeRef.current
-			);
-			try {
-				m.triggerRepaint();
-			} catch {
-				// Non-fatal.
-			}
-		},
-		// NOTE: besides mood changes, reapplyFloorShiftedAnchors re-runs this whole
-		// bundle when the viewport-proportional floor delta changes (rare resize) —
-		// additions here inherit that trigger and must stay idempotent.
-		[applyLightingOverlayOpacity, applyStateOverlayOpacity]
-	);
+	const { applyWeatherMoodConfig } = useApplyWeatherMoodConfig({
+		applyLightingOverlayOpacity,
+		applyStateOverlayOpacity,
+		interactiveFloorDeltaRef,
+		isMapLoaded,
+		map,
+		mapRef,
+		nightTRef,
+		stateOverlayModeRef,
+		stateOverlayOpacityRef,
+		unsubscribeBurnTRef,
+		weatherMoodConfigRef,
+	});
 
 	// Re-applies every floor-shifted visual anchor after the interactive floor
 	// delta changes (rare: monitor/window resize). Returns true only when the
@@ -9130,103 +8530,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	]);
 	reapplyFloorParityRef.current = reapplyFloorShiftedAnchors;
 
-	const startWeatherMoodTransition = useCallback(
-		(mood: WeatherMood) => {
-			const to = toRuntimeMoodConfig(getMoodConfig(mood));
-			const from = weatherMoodConfigRef.current;
-			appliedWeatherMoodRef.current = mood;
-			moodTransitionRef.current = {
-				from,
-				to,
-				startMs: performance.now(),
-				continuousMs: getDevMoodTransitionMs() ?? MOOD_CONTINUOUS_TRANSITION_MS,
-				discreteMs: Math.min(
-					MOOD_DISCRETE_EFFECT_FADE_MS,
-					getDevMoodTransitionMs() ?? MOOD_DISCRETE_EFFECT_FADE_MS
-				),
-			};
-			moodTransitionLastPaintMsRef.current = 0;
-
-			if (moodTransitionRafRef.current != null) {
-				cancelAnimationFrame(moodTransitionRafRef.current);
-				moodTransitionRafRef.current = null;
-			}
-
-			const tick = (now: number) => {
-				const transition = moodTransitionRef.current;
-				if (!transition) {
-					moodTransitionRafRef.current = null;
-					return;
-				}
-
-				const continuousT = clamp(
-					(now - transition.startMs) / transition.continuousMs,
-					0,
-					1
-				);
-				const discreteT = clamp((now - transition.startMs) / transition.discreteMs, 0, 1);
-				const cfg = blendRuntimeMoodConfig(
-					transition.from,
-					transition.to,
-					continuousT,
-					discreteT
-				);
-
-				if (
-					now - moodTransitionLastPaintMsRef.current >= MOOD_TRANSITION_PAINT_FRAME_MS ||
-					continuousT >= 1
-				) {
-					moodTransitionLastPaintMsRef.current = now;
-					applyWeatherMoodConfig(cfg);
-				} else {
-					weatherMoodConfigRef.current = cfg;
-					applyLightingOverlayOpacity();
-				}
-
-				if (continuousT < 1 || discreteT < 1) {
-					moodTransitionRafRef.current = requestAnimationFrame(tick);
-					return;
-				}
-
-				moodTransitionRef.current = null;
-				moodTransitionRafRef.current = null;
-				applyWeatherMoodConfig(transition.to);
-			};
-
-			moodTransitionRafRef.current = requestAnimationFrame(tick);
-		},
-		[applyLightingOverlayOpacity, applyWeatherMoodConfig]
-	);
-
-	useEffect(() => {
-		if (!map) return;
-		if (!isMapLoaded) return;
-		if (appliedWeatherMoodRef.current === weatherMood) {
-			applyWeatherMoodConfig(weatherMoodConfigRef.current);
-			return;
-		}
-		startWeatherMoodTransition(weatherMood);
-	}, [map, isMapLoaded, weatherMood, applyWeatherMoodConfig, startWeatherMoodTransition]);
-
-	useEffect(() => {
-		return () => {
-			if (moodTransitionRafRef.current != null) {
-				cancelAnimationFrame(moodTransitionRafRef.current);
-				moodTransitionRafRef.current = null;
-			}
-			moodTransitionRef.current = null;
-		};
-	}, []);
-
-	useEffect(() => {
-		const nextHot =
-			typeof effectiveTemperatureF === 'number' &&
-			effectiveTemperatureF > HOT_TEMPERATURE_THRESHOLD_F;
-		if (nextHot === isHotRef.current) return;
-		isHotRef.current = nextHot;
-		if (!map || !isMapLoaded) return;
-		applyLightingOverlayOpacity();
-	}, [effectiveTemperatureF, map, isMapLoaded, applyLightingOverlayOpacity]);
+	useWeatherMoodTransitions({
+		appliedWeatherMoodRef,
+		applyLightingOverlayOpacity,
+		applyWeatherMoodConfig,
+		effectiveTemperatureF,
+		isHotRef,
+		isMapLoaded,
+		map,
+		moodTransitionLastPaintMsRef,
+		moodTransitionRafRef,
+		moodTransitionRef,
+		weatherMood,
+		weatherMoodConfigRef,
+	});
 
 	const markerPinUrlCacheRef = useRef<Map<string, string>>(new Map());
 	const getMarkerPinUrl = useCallback(
