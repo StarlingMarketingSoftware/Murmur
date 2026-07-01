@@ -309,14 +309,13 @@ export const OVERVIEW_PREWARM_CENTER_QUANT_DEG = 1;
 // feel jumpy — each tick traverses a lot of zoom, which reads as "aggressive."
 // These rates keep the same weighted, deliberate glide. History: this was
 // over-corrected down to 1/2000 (felt clipped/governed), then walked back up
-// 1/1850 → 1/1700. A single notch still read as too short, so the wheel gets a
-// bit more per-notch travel here (~13% further than 1/1700) — enough to feel
-// like one scroll covers ground without returning to the loose/jumpy 1/700
-// original. The trackpad gets a smaller matching nudge so mouse and trackpad
-// "scroll to zoom" stay consistent. The sustained zoom-out governor below is
-// unchanged: it only damps long flings, never a single deliberate notch.
-export const MAP_WHEEL_ZOOM_RATE = 1 / 1500;
-export const MAP_PINCH_ZOOM_RATE = 1 / 165;
+// 1/1850 → 1/1700 → 1/1500. Follow-up tuning asks for zooming to feel roughly
+// 2× less restrictive, so the base per-scroll travel is doubled from 1/1500 to
+// 1/750 (still a touch slower than the original loose/jumpy 1/700 pass). The
+// sustained zoom-out governor below is unchanged: it only damps long flings,
+// never a single deliberate notch.
+export const MAP_WHEEL_ZOOM_RATE = 1 / 750;
+export const MAP_PINCH_ZOOM_RATE = 1 / 82.5;
 
 // Sustained zoom-out governor (see zoomOutGovernor.ts): catches runaway flings
 // without making ordinary scroll-wheel zoom feel capped.

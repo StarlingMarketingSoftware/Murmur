@@ -11,8 +11,8 @@ import {
 
 // Mirror the production base rates from constants.ts (MAP_WHEEL_ZOOM_RATE /
 // MAP_PINCH_ZOOM_RATE) so these fixtures stay representative of real config.
-const BASE_WHEEL = 1 / 1500;
-const BASE_TRACKPAD = 1 / 165;
+const BASE_WHEEL = 1 / 750;
+const BASE_TRACKPAD = 1 / 82.5;
 
 const cfg = (over: Partial<ZoomOutGovernorConfig> = {}): ZoomOutGovernorConfig => ({
 	enabled: true,
