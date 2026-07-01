@@ -1,5 +1,7 @@
 'use client';
 
+import { useAreaSelectCompletion } from './useAreaSelectCompletion';
+import { useRadiusSearchTool } from './useRadiusSearchTool';
 import { useCuratedBlobBuilder, useCuratedBlobOrb, useCuratedBlobMorphBinding } from './useCuratedBlob';
 import { useSelectedStateGradient } from './useSelectedStateGradient';
 import { useBaseDotsWaveControl, useBaseDotsSource, useBaseDotsVisibilityFilter, useBaseDotsWaveReveal } from './useBaseResultDots';
@@ -4740,585 +4742,55 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		updateCuratedBlobProtectedMarkerIds,
 	});
 
-	// Radius-search center pin. Appears alongside the single-circle blob (i.e. only
-	// once a radius search has results), reusing the shared profile-area location
-	// marker SVG — a touch smaller, scaled with zoom. Draggable: dropping it
-	// recenters the radius and re-runs the search.
-	useEffect(() => {
-		if (!map || !isMapLoaded) return;
-		// While the user is placing a new center, the cursor-locked ghost pin stands in
-		// for the committed pin — hide the draggable one so there's never two.
-		const showPin =
-			!!radiusOverlay &&
-			searchEngaged &&
-			!radiusPlacementActive;
-		if (!showPin) {
-			if (radiusMarkerZoomHandlerRef.current) {
-				map.off('zoom', radiusMarkerZoomHandlerRef.current);
-				radiusMarkerZoomHandlerRef.current = null;
-			}
-			radiusMarkerRef.current?.remove();
-			radiusMarkerRef.current = null;
-			return;
-		}
-		const { center } = radiusOverlay;
-		if (!radiusMarkerRef.current) {
-			const el = document.createElement('div');
-			el.dataset.radiusCenterMarker = 'true';
-			el.style.cursor = 'grab';
-			el.style.width = '22px';
-			el.style.height = '27px';
-			const inner = document.createElement('div');
-			inner.style.width = '100%';
-			inner.style.height = '100%';
-			inner.style.transformOrigin = 'bottom center';
-			inner.innerHTML = profileAreaMarkerSvg;
-			el.appendChild(inner);
-
-			const applyRadiusPinZoomScale = () => {
-				const scale = clamp(0.55 + (map.getZoom() - 5) * 0.075, 0.6, 1.15);
-				inner.style.transform = `scale(${scale})`;
-			};
-			applyRadiusPinZoomScale();
-			map.on('zoom', applyRadiusPinZoomScale);
-			radiusMarkerZoomHandlerRef.current = applyRadiusPinZoomScale;
-
-			const marker = new mapboxgl.Marker({
-				element: el,
-				anchor: 'bottom',
-				draggable: true,
-			})
-				.setLngLat([center.lng, center.lat])
-				.addTo(map);
-			marker.on('dragstart', () => {
-				isDraggingRadiusRef.current = true;
-				radiusDragSuppressEmptyMapUntilRef.current = Number.POSITIVE_INFINITY;
-				clearEmptyMapPrompt();
-				el.style.cursor = 'grabbing';
-			});
-			marker.on('dragend', () => {
-				isDraggingRadiusRef.current = false;
-				radiusDragSuppressEmptyMapUntilRef.current = Date.now() + 300;
-				el.style.cursor = 'grab';
-				const ll = marker.getLngLat();
-				onRadiusCenterChangeRef.current?.({ lat: ll.lat, lng: ll.lng });
-			});
-			radiusMarkerRef.current = marker;
-		} else if (!isDraggingRadiusRef.current) {
-			radiusMarkerRef.current.setLngLat([center.lng, center.lat]);
-		}
-	}, [
-		map,
-		isMapLoaded,
-		radiusOverlay,
-		searchEngaged,
-		radiusPlacementActive,
+	useRadiusSearchTool({
 		clearEmptyMapPrompt,
-	]);
-
-	// ── Radius-center placement (cursor-locked pin + live preview circle) ──────
-	// When radius mode is turned on, instead of assuming the user's closest location
-	// the map enters a "placement" mode: the same red radius pin used by the dropped
-	// center is locked to the cursor with a preview circle (sized to the draft
-	// slider), so the user can click anywhere to drop the center. Panning still
-	// works — only a click that isn't a drag commits. ESC cancels.
-	//
-	// Helper to (re)draw the preview circle from a lngLat + current draft radius.
-	const drawRadiusPlacementPreview = useCallback(
-		(lngLat: LatLngLiteral | null, radiusMilesOverride?: number) => {
-			if (!map) return;
-			const source = map.getSource(MAPBOX_SOURCE_IDS.radiusPreview) as
-				| mapboxgl.GeoJSONSource
-				| undefined;
-			if (!source) return;
-			if (!lngLat) {
-				source.setData(EMPTY_POLYGON_FC as GeoJSON.FeatureCollection);
-				return;
-			}
-			const radiusMiles = radiusMilesOverride ?? radiusPlacementMilesRef.current;
-			const radiusKm = Math.max(0, radiusMiles) * KM_PER_MILE;
-			const circle = buildMercatorCircleMultiPolygon(
-				lngLat,
-				radiusKm,
-				RADIUS_PLACEMENT_PREVIEW_STEPS,
-				0,
-				0
-			);
-			const rings = circle ? mercatorMultiPolygonToLngLat(circle) : null;
-			if (!rings || rings.length === 0) {
-				source.setData(EMPTY_POLYGON_FC as GeoJSON.FeatureCollection);
-				return;
-			}
-			source.setData({
-				type: 'FeatureCollection',
-				features: [
-					{
-						type: 'Feature',
-						properties: {},
-						geometry: { type: 'Polygon', coordinates: rings[0] as number[][][] },
-					},
-				],
-			} as GeoJSON.FeatureCollection);
-		},
-		[map]
-	);
-
-	// Keep the preview circle in sync when the draft radius changes mid-placement.
-	useEffect(() => {
-		if (!map || !isMapLoaded) return;
-		if (!radiusPlacementActive) return;
-		drawRadiusPlacementPreview(radiusPlacementLastLngLatRef.current);
-	}, [map, isMapLoaded, radiusPlacementActive, radiusPlacementMiles, drawRadiusPlacementPreview]);
-
-	// Once a radius center has been dropped, keep drawing the "old" radius UI circle
-	// from the committed overlay itself. This makes the red pin + circle appear
-	// immediately on drop (and stay visible even while results are loading / empty),
-	// instead of only appearing after curated blob geometry has contacts to build from.
-	useEffect(() => {
-		if (!map || !isMapLoaded) return;
-		if (radiusPlacementActive) return;
-		if (
-			!radiusOverlay ||
-			!searchEngaged ||
-			// Once real radius results have loaded, the normal curated blob layer owns
-			// the circle behind markers. Keep this top-level preview only during the
-			// pending gap or for empty-result radius searches.
-			(!isLoading && contactsWithCoords.length > 0)
-		) {
-			drawRadiusPlacementPreview(null);
-			return;
-		}
-		drawRadiusPlacementPreview(radiusOverlay.center, radiusOverlay.radiusMiles);
-	}, [
-		map,
-		isMapLoaded,
-		radiusPlacementActive,
-		radiusOverlay,
-		searchEngaged,
-		isLoading,
 		contactsWithCoords,
-		drawRadiusPlacementPreview,
-	]);
-
-	useEffect(() => {
-		if (!map || !isMapLoaded) return;
-		if (isBackgroundPresentation) return;
-		if (!radiusPlacementActive) return;
-
-		const canvas = map.getCanvas();
-		const container = map.getContainer();
-
-		// Build the cursor-locked ghost pin (absolutely positioned inside the map
-		// container; we move it in viewport px on each pointer move).
-		const ghost = document.createElement('div');
-		ghost.dataset.radiusPlacementGhost = 'true';
-		ghost.style.position = 'absolute';
-		ghost.style.left = '0';
-		ghost.style.top = '0';
-		ghost.style.width = '22px';
-		ghost.style.height = '27px';
-		ghost.style.pointerEvents = 'none';
-		ghost.style.zIndex = String(HOVER_TOOLTIP_Z_INDEX + 9);
-		ghost.style.transformOrigin = 'bottom center';
-		ghost.style.willChange = 'transform';
-		ghost.style.filter = 'drop-shadow(0 2px 3px rgba(0,0,0,0.35))';
-		ghost.style.opacity = '0';
-		const ghostInner = document.createElement('div');
-		ghostInner.style.width = '100%';
-		ghostInner.style.height = '100%';
-		ghostInner.innerHTML = profileAreaMarkerSvg;
-		ghost.appendChild(ghostInner);
-		container.appendChild(ghost);
-		radiusPlacementGhostElRef.current = ghost;
-
-		// Position the ghost from Mapbox's `point` (canvas-local CSS px, i.e. the map
-		// container's own untransformed coordinate space). This is robust to any CSS
-		// transform on an ancestor (e.g. the scroll-scrub scale) — unlike a clientX -
-		// containerRect computation, which would be thrown off by that scale.
-		const positionGhost = (point: { x: number; y: number } | null) => {
-			if (!point) {
-				ghost.style.opacity = '0';
-				return;
-			}
-			// Anchor the pin tip at the pointer; scale the glyph with zoom to mirror the
-			// committed radius pin.
-			const scale = clamp(0.55 + ((map.getZoom() ?? 5) - 5) * 0.075, 0.6, 1.15);
-			ghost.style.transform = `translate(${point.x}px, ${point.y}px) translate(-50%, -100%) scale(${scale})`;
-			ghost.style.opacity = '1';
-		};
-
-		// Hide the native cursor over the canvas so only the ghost pin shows.
-		let prevCursor = '';
-		try {
-			prevCursor = canvas.style.cursor;
-			canvas.style.cursor = 'none';
-		} catch {
-			// Ignore.
-		}
-
-		const onMove = (e: mapboxgl.MapMouseEvent) => {
-			// Re-assert the hidden cursor: the shared hover handler resets it to '' on
-			// canvas mouseleave, so keep hiding it while placing.
-			try {
-				canvas.style.cursor = 'none';
-			} catch {
-				// Ignore.
-			}
-			radiusPlacementLastLngLatRef.current = { lat: e.lngLat.lat, lng: e.lngLat.lng };
-			positionGhost(e.point);
-			drawRadiusPlacementPreview({ lat: e.lngLat.lat, lng: e.lngLat.lng });
-		};
-		const onTouchMove = (e: mapboxgl.MapTouchEvent) => {
-			radiusPlacementLastLngLatRef.current = { lat: e.lngLat.lat, lng: e.lngLat.lng };
-			positionGhost(e.point);
-			drawRadiusPlacementPreview({ lat: e.lngLat.lat, lng: e.lngLat.lng });
-		};
-		const onDown = (e: mapboxgl.MapMouseEvent) => {
-			radiusPlacementDownClientRef.current = getClientPointFromDomEvent(e.originalEvent);
-		};
-		const onUp = (e: mapboxgl.MapMouseEvent) => {
-			// Only a left-click that didn't move (i.e. not a pan) places the center.
-			const domEv = e.originalEvent;
-			if (domEv instanceof MouseEvent && domEv.button !== 0) return;
-			const down = radiusPlacementDownClientRef.current;
-			radiusPlacementDownClientRef.current = null;
-			const up = getClientPointFromDomEvent(domEv);
-			const moved = Boolean(
-				down &&
-				up &&
-				(Math.abs(down.x - up.x) >= 6 || Math.abs(down.y - up.y) >= 6)
-			);
-			if (moved) return;
-			onRadiusPlaceRef.current?.({ lat: e.lngLat.lat, lng: e.lngLat.lng });
-		};
-		const onCanvasLeave = () => {
-			ghost.style.opacity = '0';
-		};
-		const onKeyDown = (ev: KeyboardEvent) => {
-			if (ev.key === 'Escape') onRadiusPlacementCancelRef.current?.();
-		};
-
-		map.on('mousemove', onMove);
-		map.on('touchmove', onTouchMove);
-		map.on('mousedown', onDown);
-		map.on('click', onUp);
-		canvas.addEventListener('mouseleave', onCanvasLeave);
-		window.addEventListener('keydown', onKeyDown);
-
-		// Seed the preview at the last known pointer position (if any) so the circle is
-		// visible immediately after entering placement without waiting for a move.
-		drawRadiusPlacementPreview(radiusPlacementLastLngLatRef.current);
-
-		return () => {
-			map.off('mousemove', onMove);
-			map.off('touchmove', onTouchMove);
-			map.off('mousedown', onDown);
-			map.off('click', onUp);
-			canvas.removeEventListener('mouseleave', onCanvasLeave);
-			window.removeEventListener('keydown', onKeyDown);
-			try {
-				canvas.style.cursor = prevCursor;
-			} catch {
-				// Ignore.
-			}
-			ghost.remove();
-			radiusPlacementGhostElRef.current = null;
-			radiusPlacementDownClientRef.current = null;
-			drawRadiusPlacementPreview(null);
-		};
-	}, [
-		map,
-		isMapLoaded,
 		isBackgroundPresentation,
+		isDraggingRadiusRef,
+		isLoading,
+		isMapLoaded,
+		map,
+		onRadiusCenterChangeRef,
+		onRadiusPlaceRef,
+		onRadiusPlacementCancelRef,
+		radiusDragSuppressEmptyMapUntilRef,
+		radiusMarkerRef,
+		radiusMarkerZoomHandlerRef,
+		radiusOverlay,
 		radiusPlacementActive,
-		drawRadiusPlacementPreview,
-	]);
+		radiusPlacementDownClientRef,
+		radiusPlacementGhostElRef,
+		radiusPlacementLastLngLatRef,
+		radiusPlacementMiles,
+		radiusPlacementMilesRef,
+		searchEngaged,
+	});
 
-	const completeAreaSelection = useCallback(
-		(end: { lat: number; lng: number }, endClient: { x: number; y: number } | null) => {
-			if (!isAreaSelecting) return;
-			const start = selectionStartLatLngRef.current;
-			if (!start) {
-				clearSelectionRect();
-				return;
-			}
-
-			// Ignore tiny "click" selections (treat as cancel).
-			const startClient = selectionStartClientRef.current;
-			const dx = startClient && endClient ? Math.abs(endClient.x - startClient.x) : 0;
-			const dy = startClient && endClient ? Math.abs(endClient.y - startClient.y) : 0;
-			const movedEnough = dx >= 6 || dy >= 6;
-
-			clearSelectionRect();
-
-			if (!movedEnough) return;
-
-			const bounds: MapSelectionBounds = {
-				south: Math.min(start.lat, end.lat),
-				west: Math.min(start.lng, end.lng),
-				north: Math.max(start.lat, end.lat),
-				east: Math.max(start.lng, end.lng),
-			};
-
-			const isCoordsInBounds = (coords: LatLngLiteral | null | undefined): boolean => {
-				if (!coords) return false;
-				return (
-					coords.lat >= bounds.south &&
-					coords.lat <= bounds.north &&
-					coords.lng >= bounds.west &&
-					coords.lng <= bounds.east
-				);
-			};
-
-			// Build a selection payload so the dashboard can select contacts without triggering a new search.
-			const selectedIds = new Set<number>();
-			for (const contact of contactsWithCoords) {
-				const coords = coordsByContactId.get(contact.id) ?? null;
-				if (!isCoordsInBounds(coords)) continue;
-				selectedIds.add(contact.id);
-			}
-
-			const normalizedSearchWhat = searchWhat ? normalizeWhatKey(searchWhat) : null;
-
-			const extraContactsById = new Map<number, ContactWithName>();
-
-			// Include booking overlay pins only when they match the active "What" (category) and are visible.
-			if (
-				isBookingSearch &&
-				normalizedSearchWhat &&
-				bookingExtraVisibleContacts.length > 0
-			) {
-				for (const contact of bookingExtraVisibleContacts) {
-					const prefix = getBookingTitlePrefixFromContactTitle(contact.title);
-					if (!prefix) continue;
-					if (!bookingTitlePrefixMatchesSearchWhatKey(prefix, normalizedSearchWhat))
-						continue;
-					const coords = bookingExtraCoordsByContactId.get(contact.id) ?? null;
-					if (!isCoordsInBounds(coords)) continue;
-					selectedIds.add(contact.id);
-					if (!baseContactIdSet.has(contact.id)) {
-						extraContactsById.set(contact.id, contact);
-					}
-				}
-			}
-
-			// Include promotion overlay pins only when they match the active "What" (category) and are visible.
-			if (
-				isPromotionSearch &&
-				normalizedSearchWhat &&
-				promotionOverlayVisibleContacts.length > 0
-			) {
-				for (const contact of promotionOverlayVisibleContacts) {
-					const title = contact.title ?? '';
-					const matchedPrefix =
-						PROMOTION_OVERLAY_TITLE_PREFIXES.find((p) =>
-							startsWithCaseInsensitive(title, p)
-						) ?? null;
-					if (!matchedPrefix) continue;
-					if (normalizeWhatKey(matchedPrefix) !== normalizedSearchWhat) continue;
-					const coords = promotionOverlayCoordsByContactId.get(contact.id) ?? null;
-					if (!isCoordsInBounds(coords)) continue;
-					selectedIds.add(contact.id);
-					if (!baseContactIdSet.has(contact.id)) {
-						extraContactsById.set(contact.id, contact);
-					}
-				}
-			}
-
-			// Include "all contacts" high-zoom gray dots (no category filtering).
-			if (allContactsOverlayVisibleContacts.length > 0) {
-				for (const contact of allContactsOverlayVisibleContacts) {
-					const coords = allContactsOverlayCoordsByContactId.get(contact.id) ?? null;
-					if (!isCoordsInBounds(coords)) continue;
-					selectedIds.add(contact.id);
-					if (!baseContactIdSet.has(contact.id)) {
-						extraContactsById.set(contact.id, contact);
-					}
-				}
-			}
-
-			if (compactOverlayPillEntries.length > 0) {
-				for (const entry of compactOverlayPillEntries) {
-					if (!isCoordsInBounds(entry.coords)) continue;
-					selectedIds.add(entry.contact.id);
-					if (!baseContactIdSet.has(entry.contact.id)) {
-						extraContactsById.set(entry.contact.id, entry.contact);
-					}
-				}
-			}
-
-			onAreaSelect?.(bounds, {
-				contactIds: Array.from(selectedIds),
-				extraContacts: Array.from(extraContactsById.values()),
-			});
-		},
-		[
-			isAreaSelecting,
-			clearSelectionRect,
-			onAreaSelect,
-			contactsWithCoords,
-			coordsByContactId,
-			isBookingSearch,
-			bookingExtraVisibleContacts,
-			bookingExtraCoordsByContactId,
-			isPromotionSearch,
-			promotionOverlayVisibleContacts,
-			promotionOverlayCoordsByContactId,
-			allContactsOverlayVisibleContacts,
-			allContactsOverlayCoordsByContactId,
-			compactOverlayPillEntries,
-			baseContactIdSet,
-		]
-	);
-
-	const handleMapMouseUp = useCallback(
-		(e: mapboxgl.MapMouseEvent) => {
-			completeAreaSelection(
-				{ lat: e.lngLat.lat, lng: e.lngLat.lng },
-				getClientPointFromDomEvent(e.originalEvent)
-			);
-		},
-		[completeAreaSelection]
-	);
-
-	const handleMapTouchEnd = useCallback(
-		(e: mapboxgl.MapTouchEvent) => {
-			if (!isAreaSelecting) return;
-			// `touches` is empty on touchend — the lifted finger lives in `changedTouches`.
-			const changed = e.originalEvent.changedTouches;
-			const endClient =
-				changed && changed.length > 0
-					? { x: changed[0].clientX, y: changed[0].clientY }
-					: getClientPointFromDomEvent(e.originalEvent);
-			completeAreaSelection({ lat: e.lngLat.lat, lng: e.lngLat.lng }, endClient);
-		},
-		[isAreaSelecting, completeAreaSelection]
-	);
-
-	// Dashboard UX: "All" button selects all markers currently visible in the viewport that
-	// match the active search category (including overlay pins when visible).
-	useEffect(() => {
-		if (!selectAllInViewNonce) return;
-		if (selectAllInViewNonce === lastSelectAllInViewNonceRef.current) return;
-		if (!map) return;
-		if (typeof onAreaSelect !== 'function') return;
-
-		const viewportBounds = map.getBounds();
-		if (!viewportBounds) return;
-		const sw = viewportBounds.getSouthWest();
-		const ne = viewportBounds.getNorthEast();
-		const west = sw.lng;
-		const east = ne.lng;
-
-		// Skip in the unlikely case the viewport crosses the antimeridian (not relevant for our UI).
-		if (east < west) return;
-
-		const bounds: MapSelectionBounds = {
-			south: sw.lat,
-			west,
-			north: ne.lat,
-			east,
-		};
-
-		const selectedIds = new Set<number>();
-
-		// Base results: only select dots currently rendered in the viewport. Curated
-		// searches may keep the full small result set in the marker source for zoom stability.
-		for (const contact of visibleContacts) {
-			const coords = getContactCoords(contact);
-			if (!coords) continue;
-			if (
-				coords.lat < bounds.south ||
-				coords.lat > bounds.north ||
-				coords.lng < bounds.west ||
-				coords.lng > bounds.east
-			) {
-				continue;
-			}
-			selectedIds.add(contact.id);
-		}
-
-		const normalizedSearchWhat = searchWhat ? normalizeWhatKey(searchWhat) : null;
-		const extraContactsById = new Map<number, ContactWithName>();
-
-		// Booking overlay pins: select only the visible pins that match the active category.
-		if (
-			isBookingSearch &&
-			normalizedSearchWhat &&
-			bookingExtraVisibleContacts.length > 0
-		) {
-			for (const contact of bookingExtraVisibleContacts) {
-				const prefix = getBookingTitlePrefixFromContactTitle(contact.title);
-				if (!prefix) continue;
-				if (!bookingTitlePrefixMatchesSearchWhatKey(prefix, normalizedSearchWhat))
-					continue;
-				selectedIds.add(contact.id);
-				if (!baseContactIdSet.has(contact.id)) {
-					extraContactsById.set(contact.id, contact);
-				}
-			}
-		}
-
-		// Promotion overlay pins: select only the visible pins that match the active category.
-		if (
-			isPromotionSearch &&
-			normalizedSearchWhat &&
-			promotionOverlayVisibleContacts.length > 0
-		) {
-			for (const contact of promotionOverlayVisibleContacts) {
-				const title = contact.title ?? '';
-				const matchedPrefix =
-					PROMOTION_OVERLAY_TITLE_PREFIXES.find((p) =>
-						startsWithCaseInsensitive(title, p)
-					) ?? null;
-				if (!matchedPrefix) continue;
-				if (normalizeWhatKey(matchedPrefix) !== normalizedSearchWhat) continue;
-				selectedIds.add(contact.id);
-				if (!baseContactIdSet.has(contact.id)) {
-					extraContactsById.set(contact.id, contact);
-				}
-			}
-		}
-
-		// All-contacts gray overlay: select all visible gray dots in the viewport.
-		if (allContactsOverlayVisibleContacts.length > 0) {
-			for (const contact of allContactsOverlayVisibleContacts) {
-				selectedIds.add(contact.id);
-				if (!baseContactIdSet.has(contact.id)) {
-					extraContactsById.set(contact.id, contact);
-				}
-			}
-		}
-
-		if (compactOverlayPillEntries.length > 0) {
-			for (const entry of compactOverlayPillEntries) {
-				selectedIds.add(entry.contact.id);
-				if (!baseContactIdSet.has(entry.contact.id)) {
-					extraContactsById.set(entry.contact.id, entry.contact);
-				}
-			}
-		}
-
-		onAreaSelect(bounds, {
-			contactIds: Array.from(selectedIds),
-			extraContacts: Array.from(extraContactsById.values()),
-		});
-
-		// Ensure this runs once per dashboard click, even as viewport-driven state changes.
-		lastSelectAllInViewNonceRef.current = selectAllInViewNonce;
-	}, [
-		selectAllInViewNonce,
+	const { completeAreaSelection, handleMapMouseUp, handleMapTouchEnd } = useAreaSelectCompletion({
+		allContactsOverlayCoordsByContactId,
+		allContactsOverlayVisibleContacts,
+		baseContactIdSet,
+		bookingExtraCoordsByContactId,
+		bookingExtraVisibleContacts,
+		clearSelectionRect,
+		compactOverlayPillEntries,
+		contactsWithCoords,
+		coordsByContactId,
+		getContactCoords,
+		isAreaSelecting,
+		isBookingSearch,
+		isPromotionSearch,
+		lastSelectAllInViewNonceRef,
 		map,
 		onAreaSelect,
-		visibleContacts,
-		isBookingSearch,
-		bookingExtraVisibleContacts,
-		isPromotionSearch,
+		promotionOverlayCoordsByContactId,
 		promotionOverlayVisibleContacts,
-		allContactsOverlayVisibleContacts,
-		compactOverlayPillEntries,
-		baseContactIdSet,
-	]);
+		searchWhat,
+		selectAllInViewNonce,
+		selectionStartClientRef,
+		selectionStartLatLngRef,
+		visibleContacts,
+	});
 
 	// Recompute which contact markers are rendered in the current viewport, and
 	// budget background dots so the combined total stays under MAX_TOTAL_DOTS.
