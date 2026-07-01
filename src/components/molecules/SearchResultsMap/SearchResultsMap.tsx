@@ -6190,6 +6190,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				scheduleNextLightning(nowMs, { fast: justEnabled, zoom: currentZoom });
 			}
 			if (canSpawnLightning && nowMs >= lightningNextFlashAtMsRef.current) {
+				// Stamps now load lazily on mood entry; if a flash slot fires while
+				// the fetch is still in flight, retry on the short first-flash
+				// cadence instead of burning a full normal interval — keeps the
+				// first storm flash prompt on cold caches without preloading.
+				if (
+					!Array.isArray(lightningStampImagesRef.current) ||
+					lightningStampImagesRef.current.length === 0
+				) {
+					scheduleNextLightning(nowMs, { fast: true, zoom: currentZoom });
+					return;
+				}
 				const spawnCount =
 					Math.random() <
 					0.08 *
@@ -8153,6 +8164,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					!lightningUploadWasActiveRef.current &&
 					!snowUploadWasActiveRef.current
 				) {
+					// Run the mood-gated asset lifecycle even while idling: a
+					// storm→normal fade crosses this skip's opacity gate (~8s) long
+					// before the 90s continuous fade flips the storm-asset needs off,
+					// so without this the release would never fire during a deep-zoom
+					// dwell and the retired masks/stamps (~17MB) would stay resident
+					// until the user happened to zoom back out. Cheap boolean checks
+					// when nothing changed; builds only run when a mood actually
+					// needs assets (which also disengages this skip via the mood's
+					// nonzero deep-zoom opacity floor).
+					try {
+						ensureWeatherAssetsForNeeds(img);
+					} catch {
+						// Ignore.
+					}
 					// Keep dt sane for the eventual resume, keep the rAF chain
 					// alive, do no draw/upload/repaint work: the map truly idles.
 					cloudsDriftLastFrameMsRef.current = now;
@@ -8411,11 +8436,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// lifetime — deep-zoom panning accumulates worker heap for the whole
 		// session (measured: v8/workers was the single largest renderer pool).
 		// Cap tiling depth per source class; rendering past the cap reuses the
-		// deepest tile via Mapbox overzoom, so nothing disappears:
-		// - Point sources overzoom losslessly (points are never simplified).
-		// - Shape sources keep ~0.9m fidelity at z14 (0.375 tile-px tolerance) —
-		//   invisible at the zooms these decorative layers render.
-		const GEOJSON_POINT_SOURCE_MAXZOOM = 12;
+		// deepest tile via Mapbox overzoom, so nothing disappears.
+		//
+		// Caps are set by the WORST-CASE displacement of overzoomed geometry
+		// (geojson-vt rounds vertices to the 8192-unit tile grid, i.e.
+		// 0.03125px × 2^(zoom − maxzoom) on screen):
+		// - Points at 16 → ≤0.125px at z18, 2px at the z22 hard max. Pins must
+		//   track their DOM-anchored tooltips/cards (which project RAW coords),
+		//   so 12 was NOT acceptable (~2px drift at z18). Point tiles are tiny;
+		//   16 still eliminates the z17-22 slicing depth.
+		// - Shapes at 14 → ≤0.5px at z18 for the decorative rings/outlines.
+		const GEOJSON_POINT_SOURCE_MAXZOOM = 16;
 		const GEOJSON_SHAPE_SOURCE_MAXZOOM = 14;
 
 		const ensureSource = (id: string, maxzoom: number) => {
@@ -8551,12 +8582,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				type: 'geojson',
 				data: emptyFc,
 				promoteId: 'key',
-				// The visible divider lines cap at z8 (STATE_DIVIDER_LINES_MAX_ZOOM);
-				// past z10 only the invisible hover/hit fills sample this source, and
-				// their boundary tolerance at z10 (~3m) is far below hover precision.
 				// Caps the worker-side geojson-vt tree for the largest static polygon
 				// payload on the map (deep-zoom slicing of 304 detailed state polygons).
-				maxzoom: 10,
+				// 14, not lower: statesBordersInteractive is a VISIBLE line layer with
+				// no layer maxzoom (0.7 opacity from z14 up), and overzoom quantization
+				// is 0.03125px × 2^(zoom − maxzoom) — ≤0.5px at z18 with this cap.
+				maxzoom: 14,
 			});
 		}
 		ensureSource(MAPBOX_SOURCE_IDS.resultsOutline, GEOJSON_SHAPE_SOURCE_MAXZOOM);
