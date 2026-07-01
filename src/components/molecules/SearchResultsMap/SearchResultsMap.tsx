@@ -305,6 +305,8 @@ import {
 	getInteractiveMapMinZoomDelta,
 	MAP_PINCH_ZOOM_RATE,
 	MAP_WHEEL_ZOOM_RATE,
+	MAPBOX_NATIVE_PINCH_ZOOM_RATE,
+	MAPBOX_NATIVE_WHEEL_ZOOM_RATE,
 	MAP_REQUESTED_ZOOM_EASE_MS,
 	ZOOM_OUT_GOVERNOR_ENABLED,
 	ZOOM_OUT_GOVERNOR_MIN_RATE_MULTIPLIER,
@@ -643,10 +645,21 @@ const createConfiguredZoomOutGovernor = () =>
 		applyEpsilon: ZOOM_OUT_GOVERNOR_APPLY_EPSILON,
 	});
 
-const applyScrollZoomFeel = (mapInstance: mapboxgl.Map) => {
+// `nativeFeel` restores Mapbox's built-in scroll/pinch zoom rates. The tuned
+// MAP_WHEEL_ZOOM_RATE / MAP_PINCH_ZOOM_RATE are a DESKTOP feel; on touch devices
+// we want native pinch-zoom, so the mobile paths call this with
+// `nativeFeel = true`. Defaults to the desktop tuning so every existing desktop
+// call site is unchanged.
+const applyScrollZoomFeel = (mapInstance: mapboxgl.Map, nativeFeel = false) => {
+	const wheelRate = nativeFeel
+		? MAPBOX_NATIVE_WHEEL_ZOOM_RATE
+		: MAP_WHEEL_ZOOM_RATE;
+	const pinchRate = nativeFeel
+		? MAPBOX_NATIVE_PINCH_ZOOM_RATE
+		: MAP_PINCH_ZOOM_RATE;
 	try {
-		mapInstance.scrollZoom.setWheelZoomRate(MAP_WHEEL_ZOOM_RATE);
-		mapInstance.scrollZoom.setZoomRate(MAP_PINCH_ZOOM_RATE);
+		mapInstance.scrollZoom.setWheelZoomRate(wheelRate);
+		mapInstance.scrollZoom.setZoomRate(pinchRate);
 	} catch {
 		// Non-fatal — older Mapbox builds may not expose these setters.
 	}
@@ -664,11 +677,36 @@ const applyScrollZoomFeel = (mapInstance: mapboxgl.Map) => {
 				};
 			}
 		).__murmurMapZoomFeel = {
-			wheelRate: MAP_WHEEL_ZOOM_RATE,
-			trackpadRate: MAP_PINCH_ZOOM_RATE,
+			wheelRate,
+			trackpadRate: pinchRate,
 			zoomOutGovernorMinMultiplier: ZOOM_OUT_GOVERNOR_MIN_RATE_MULTIPLIER,
 			zoomOutGovernorEnergyScale: ZOOM_OUT_GOVERNOR_ENERGY_SCALE,
 		};
+	}
+};
+
+// Enable drag-pan with the right inertia "feel" for the device. Desktop gets the
+// tuned "Airbnb latch" inertia (getDragPanInertiaOptions, zoom-aware); mobile
+// gets Mapbox's native touch inertia. mapbox-gl 3.x does NOT persist inertia
+// options on the handler: `DragPanHandler.enable(opts)` does
+// `this._inertiaOptions = opts || {}`, and on release Mapbox merges
+// `Object.assign({}, defaultPanInertiaOptions, this._inertiaOptions)` — so a bare
+// `enable()` (empty options) yields native inertia, while the desktop feel must
+// be RE-passed at every enable() site (a bare enable() silently reverts it).
+// This helper is therefore the single source of truth invoked at all drag-pan
+// enable sites (construction, safeEnableInteractions, rectangle-select toggle,
+// zoom-end refresh) so the desktop/mobile split can't drift between them.
+const enableDragPanFeel = (mapInstance: mapboxgl.Map, nativeFeel = false) => {
+	try {
+		if (nativeFeel) {
+			// Mobile / touch: bare enable() → Mapbox's native pan inertia.
+			mapInstance.dragPan.enable();
+		} else {
+			// Desktop: re-pass the tuned, zoom-aware inertia every time.
+			mapInstance.dragPan.enable(getDragPanInertiaOptions(mapInstance.getZoom()));
+		}
+	} catch {
+		// Non-fatal — older Mapbox builds may not accept all options.
 	}
 };
 
@@ -2921,6 +2959,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const reapplyFloorParityRef = useRef<(() => boolean) | null>(null);
 	const isMobileRef = useRef(isMobile);
 	isMobileRef.current = isMobile;
+	// Desktop-only interaction tuning gate. The tuned zoom/drag "feel" (zoom-out
+	// governor wheel friction, custom wheel/pinch rates, heavy drag-pan inertia,
+	// and the drag-time zoom clamp) is a DESKTOP experience; on touch devices it
+	// fights native gestures (e.g. the zoom clamp cancels pinch-driven zoom mid
+	// drag, and the pinch-rate override makes two-finger zoom feel wrong). Mobile
+	// therefore uses Mapbox's native zoom/drag behavior.
+	//
+	// `useIsMobile()` is `null` until it resolves on the client. Treat the
+	// unresolved state as NON-desktop (`=== false` required) so a real phone never
+	// gets the desktop clamp/rates applied on its very first gesture; the effect
+	// keyed on `isMobile` below re-applies the correct feel once detection settles.
+	const desktopInteractionTuningEnabled = isMobile === false;
+	const desktopInteractionTuningRef = useRef(desktopInteractionTuningEnabled);
+	desktopInteractionTuningRef.current = desktopInteractionTuningEnabled;
 	const [isMapLoaded, setIsMapLoaded] = useState(false);
 	const initialZoomConstraintsRef = useRef<{ minZoom: number; maxZoom: number } | null>(
 		null
@@ -10202,14 +10254,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Non-fatal.
 		}
 
-		// Soften scroll/pinch zoom for a smoother, more premium feel. Persists
-		// across scrollZoom enable/disable cycles since rates live on the handler.
-		applyScrollZoomFeel(mapInstance);
+		// Soften scroll/pinch zoom for a smoother, more premium feel (desktop only;
+		// mobile keeps Mapbox's native rates). Persists across scrollZoom
+		// enable/disable cycles since rates live on the handler.
+		applyScrollZoomFeel(mapInstance, !desktopInteractionTuningRef.current);
 
 		const governor = createConfiguredZoomOutGovernor();
 		zoomOutGovernorRef.current = governor;
 		const onGovernedWheel = (e: mapboxgl.MapWheelEvent) => {
 			if (presentationRef.current === 'background') return;
+			// Desktop-only zoom-out friction. On touch devices the wheel governor is
+			// off entirely so mobile pinch/scroll zoom behaves natively.
+			if (!desktopInteractionTuningRef.current) return;
 			const oe = e.originalEvent;
 			if (!oe) return;
 			try {
@@ -10227,22 +10283,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				mapInstance.scrollZoom.setWheelZoomRate(result.wheelRate);
 				mapInstance.scrollZoom.setZoomRate(result.trackpadRate);
 			} catch {
-				applyScrollZoomFeel(mapInstance);
+				applyScrollZoomFeel(mapInstance, !desktopInteractionTuningRef.current);
 			}
 		};
 		mapInstance.on('wheel', onGovernedWheel);
 
-		// Drag-pan inertia: "heavy / abrupt-stop" feel (Airbnb-style). Replaces
-		// Mapbox's default long/soft ease-out tail with a short,
-		// linearly-decelerating coast that stops crisply. mapbox-gl 3.x does
-		// NOT persist these options on the handler (a bare enable() resets them to
-		// defaults), so zoom-aware options are re-passed at every enable() site
-		// (safeEnableInteractions + rectangle-select toggle + zoom-end refresh).
-		try {
-			mapInstance.dragPan.enable(getDragPanInertiaOptions(mapInstance.getZoom()));
-		} catch {
-			// Non-fatal — older Mapbox builds may not accept all options.
-		}
+		// Drag-pan inertia: desktop gets the "heavy / abrupt-stop" (Airbnb-style)
+		// feel; mobile gets Mapbox's native touch inertia. mapbox-gl 3.x does NOT
+		// persist these options on the handler (a bare enable() resets them to
+		// defaults), so the desktop feel is re-passed at every enable() site
+		// (safeEnableInteractions + rectangle-select toggle + zoom-end refresh) via
+		// enableDragPanFeel.
+		enableDragPanFeel(mapInstance, !desktopInteractionTuningRef.current);
 
 		// Boot-stage marks (construct → style-load → land-ready → load) for the
 		// measurement scripts; latched so style reload re-fires don't re-mark.
@@ -10445,12 +10497,30 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// local Fast Refresh preserves the existing map instance. Production gets the
 	// same values during construction; this effect mainly prevents "works in prod,
 	// not locally" while iterating on zoom feel.
+	//
+	// Also load-bearing at runtime: `useIsMobile()` resolves AFTER first paint, and
+	// the singleton map is constructed once and reused across routes. Depending on
+	// `isMobile` here re-applies the correct desktop/mobile zoom + drag-pan feel the
+	// moment the device class settles (or changes, e.g. devtools device emulation),
+	// so a phone that briefly looked like desktop gets native rates/inertia restored
+	// rather than keeping the desktop tuning applied at construction.
 	useEffect(() => {
 		if (!map) return;
+		const nativeFeel = !desktopInteractionTuningRef.current;
 		zoomOutGovernorRef.current = createConfiguredZoomOutGovernor();
-		applyScrollZoomFeel(map);
+		applyScrollZoomFeel(map, nativeFeel);
+		// Only re-pass drag-pan inertia if drag-pan is currently enabled, so we don't
+		// silently re-enable it while a rectangle selection has it disabled.
+		try {
+			if (map.dragPan?.isEnabled?.()) {
+				enableDragPanFeel(map, nativeFeel);
+			}
+		} catch {
+			// Non-fatal — handler may be mid-teardown.
+		}
 	}, [
 		map,
+		isMobile,
 		MAP_WHEEL_ZOOM_RATE,
 		MAP_PINCH_ZOOM_RATE,
 		ZOOM_OUT_GOVERNOR_ENABLED,
@@ -10850,12 +10920,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		backgroundSpinCleanupRef.current = null;
 
 		const safeEnableInteractions = () => {
+			const nativeFeel = !desktopInteractionTuningRef.current;
 			try {
 				map.scrollZoom.enable();
 			} catch {}
 			try {
 				zoomOutGovernorRef.current = createConfiguredZoomOutGovernor();
-				applyScrollZoomFeel(map);
+				applyScrollZoomFeel(map, nativeFeel);
 			} catch {}
 			try {
 				map.boxZoom.enable();
@@ -10864,9 +10935,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				map.doubleClickZoom.enable();
 			} catch {}
 			try {
-				// Re-pass options: a bare enable() resets inertia to Mapbox defaults
-				// (mapbox-gl 3.x does not persist _inertiaOptions on the handler).
-				map.dragPan.enable(getDragPanInertiaOptions(map.getZoom()));
+				// Desktop re-passes the tuned inertia (a bare enable() resets it to
+				// Mapbox defaults — mapbox-gl 3.x does not persist _inertiaOptions);
+				// mobile intentionally gets native inertia via a bare enable().
+				enableDragPanFeel(map, nativeFeel);
 			} catch {}
 			try {
 				map.keyboard.enable();
@@ -14470,25 +14542,29 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (selecting) {
 				map.dragPan.disable();
 			} else {
-				// Re-pass options: a bare enable() resets inertia to Mapbox defaults
-				// (mapbox-gl 3.x does not persist _inertiaOptions on the handler).
-				map.dragPan.enable(getDragPanInertiaOptions(map.getZoom()));
+				// Desktop re-passes the tuned inertia (a bare enable() resets it to
+				// Mapbox defaults); mobile gets native inertia via a bare enable().
+				enableDragPanFeel(map, !desktopInteractionTuningRef.current);
 			}
 		} catch {
 			// Ignore (handlers may not be ready yet).
 		}
 	}, [map, isMapLoaded, isBackgroundPresentation, areaSelectionEnabled, isAreaSelecting]);
 
-	// Keep drag-pan inertia zoom-aware. The max flick speed intentionally ramps
-	// up at high zoom so city/street-level drags travel farther across the map,
-	// while the high deceleration/custom easing still gives the crisp end snap.
+	// Keep the DESKTOP drag-pan inertia zoom-aware. The max flick speed
+	// intentionally ramps up at high zoom so city/street-level drags travel farther
+	// across the map, while the high deceleration/custom easing still gives the
+	// crisp end snap. Mobile uses Mapbox's native (zoom-independent) inertia, so
+	// this per-zoom refresh is a no-op there.
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
+		if (!desktopInteractionTuningEnabled) return;
 		const syncDragPanInertiaForZoom = () => {
 			if (isBackgroundPresentation || areaSelectionEnabled || isAreaSelecting) return;
 			try {
 				if (!map.dragPan.isEnabled()) return;
-				map.dragPan.enable(getDragPanInertiaOptions(map.getZoom()));
+				// Effect is desktop-gated above, so always the tuned feel here.
+				enableDragPanFeel(map, false);
 			} catch {
 				// Non-fatal — handler may be unavailable during teardown/style churn.
 			}
@@ -14503,13 +14579,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// Ignore.
 			}
 		};
-	}, [map, isMapLoaded, isBackgroundPresentation, areaSelectionEnabled, isAreaSelecting]);
+	}, [
+		map,
+		isMapLoaded,
+		isBackgroundPresentation,
+		areaSelectionEnabled,
+		isAreaSelecting,
+		desktopInteractionTuningEnabled,
+	]);
 
 	// Drag-pan gesture tracking + zoom clamp. Two fixes live here:
 	//
 	// 1. Tilt change on pan: `isDragPanningRef` is read by the continuous pitch
 	//    ramp (onZoomFrame) and the moveend reconcile to skip pitch writes while
 	//    a drag-pan is active — panning upward should never change the tilt.
+	//    This tracking runs on ALL devices (mobile street-view pitch depends on
+	//    it), so `dragstart`/`dragend` are always registered.
 	//
 	// 2. Zoom-in at the poles: when dragging toward the world bounds (max
 	//    latitude) at a closer zoom level, the camera can pick up an unintended
@@ -14518,7 +14603,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	//    (same private-API pattern the pitch ramp uses for tr.pitch). This
 	//    avoids stop()/jumpTo, which would cancel the in-flight drag handler.
 	//    `isRestoringDragZoomRef` breaks the feedback loop since writing tr.zoom
-	//    fires another synchronous 'zoom' event.
+	//    fires another synchronous 'zoom' event. This clamp is DESKTOP-ONLY: on
+	//    touch devices a two-finger pinch during a one-finger-started drag emits
+	//    'zoom' with a `touchmove` originalEvent (not in the wheel/dblclick skip
+	//    list), so the clamp would cancel legitimate mobile pinch-zoom. Mobile
+	//    therefore skips the clamp entirely and keeps native gesture behavior.
 	useEffect(() => {
 		if (!map || !isMapLoaded || isBackgroundPresentation) return;
 
@@ -14531,6 +14620,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			dragStartZoomRef.current = null;
 		};
 		const onZoomDuringDrag = (e: mapboxgl.MapboxEvent) => {
+			// Desktop-only zoom clamp. Read through the ref so a device-class change
+			// takes effect without re-subscribing the listener.
+			if (!desktopInteractionTuningRef.current) return;
 			if (!isDragPanningRef.current) return;
 			if (isRestoringDragZoomRef.current) return;
 			if (dragStartZoomRef.current == null) return;

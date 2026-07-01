@@ -79,3 +79,150 @@ export function getMsUntilNextSearchGradientBucket(from: Date): number {
 	next.setHours(from.getHours() < 12 ? 12 : 24);
 	return next.getTime() - from.getTime();
 }
+
+// ── "For You" results-box skin, derived from the day's search-bar gradient ────
+//
+// The dashboard's curated "For You" results box (header band + rows body) used to
+// carry two hard-coded pink/red gradients, so it never matched the hero search
+// bar's per-day mood. These helpers instead PASTELIZE the exact gradient the bar
+// is showing for the current AM/PM bucket, so the box tracks the same daily color
+// scheme as the bar (green day → green box, blue day → blue box, etc.).
+//
+// The box keeps its own geometry: the header stays horizontal (90deg, matching the
+// bar) and slightly more saturated; the body stays vertical (180deg) and much paler
+// so black row text/labels stay legible on top. We mix each stop toward white by a
+// fixed amount rather than reusing the bar's saturated colors directly.
+
+// How far each stop is mixed toward white (0 = raw day color, 1 = pure white).
+// Header keeps more color than the body; body is a soft, high-legibility wash.
+const FOR_YOU_HEADER_WHITE_MIX = 0.48;
+const FOR_YOU_BODY_WHITE_MIX = 0.74;
+
+export type ForYouResultsGradients = {
+	header: string;
+	body: string;
+};
+
+type GradientStop = { color: string; offset: string | null };
+type ParsedLinearGradient = { angle: string; stops: GradientStop[] };
+
+const clampChannel = (value: number): number =>
+	Math.max(0, Math.min(255, Math.round(value)));
+
+const parseHexColor = (raw: string): { r: number; g: number; b: number } | null => {
+	const match = /^#([0-9a-fA-F]{6})$/.exec(raw.trim());
+	if (!match) return null;
+	const int = Number.parseInt(match[1], 16);
+	return { r: (int >> 16) & 0xff, g: (int >> 8) & 0xff, b: int & 0xff };
+};
+
+const toHexColor = (r: number, g: number, b: number): string => {
+	const hex = ((clampChannel(r) << 16) | (clampChannel(g) << 8) | clampChannel(b))
+		.toString(16)
+		.padStart(6, '0');
+	return `#${hex.toUpperCase()}`;
+};
+
+// Mix a hex color toward white by `amount` (0..1). Non-hex colors pass through
+// unchanged so we never emit something the browser can't parse.
+const mixColorTowardWhite = (color: string, amount: number): string => {
+	const rgb = parseHexColor(color);
+	if (!rgb) return color;
+	const clampedAmount = Math.max(0, Math.min(1, amount));
+	return toHexColor(
+		rgb.r + (255 - rgb.r) * clampedAmount,
+		rgb.g + (255 - rgb.g) * clampedAmount,
+		rgb.b + (255 - rgb.b) * clampedAmount
+	);
+};
+
+// Paren-aware split so any future rgb()/rgba() stops (which contain commas) don't
+// get torn apart. Today's gradients are all hex, but this keeps the parser robust.
+const splitTopLevelCommas = (input: string): string[] => {
+	const parts: string[] = [];
+	let depth = 0;
+	let current = '';
+	for (const char of input) {
+		if (char === '(') depth += 1;
+		else if (char === ')') depth = Math.max(0, depth - 1);
+		if (char === ',' && depth === 0) {
+			parts.push(current);
+			current = '';
+		} else {
+			current += char;
+		}
+	}
+	if (current.trim().length > 0) parts.push(current);
+	return parts;
+};
+
+const parseLinearGradient = (gradient: string): ParsedLinearGradient | null => {
+	const trimmed = gradient.trim();
+	const open = trimmed.indexOf('(');
+	if (!trimmed.startsWith('linear-gradient') || open === -1 || !trimmed.endsWith(')')) {
+		return null;
+	}
+	const inner = trimmed.slice(open + 1, -1);
+	const tokens = splitTopLevelCommas(inner)
+		.map((token) => token.trim())
+		.filter((token) => token.length > 0);
+	if (tokens.length < 2) return null;
+	const [angle, ...stopTokens] = tokens;
+	const stops: GradientStop[] = [];
+	for (const token of stopTokens) {
+		// color then optional position (percentage or length). Handles hex + functional colors.
+		const stopMatch = /^(#[0-9a-fA-F]{3,8}|[a-zA-Z]+\([^)]*\)|[a-zA-Z]+)\s*(.*)$/.exec(
+			token
+		);
+		if (!stopMatch) return null;
+		const offset = stopMatch[2].trim();
+		stops.push({ color: stopMatch[1], offset: offset.length > 0 ? offset : null });
+	}
+	if (stops.length === 0) return null;
+	return { angle, stops };
+};
+
+const buildPastelGradient = (
+	parsed: ParsedLinearGradient,
+	angle: string,
+	whiteMix: number
+): string => {
+	const stops = parsed.stops.map((stop) => {
+		const color = mixColorTowardWhite(stop.color, whiteMix);
+		return stop.offset ? `${color} ${stop.offset}` : color;
+	});
+	return `linear-gradient(${angle}, ${stops.join(', ')})`;
+};
+
+// Header keeps the bar's horizontal sweep and more color; body runs vertically
+// down the rows and is far paler so black row text/labels stay legible on top.
+const deriveForYouGradients = (parsed: ParsedLinearGradient): ForYouResultsGradients => ({
+	header: buildPastelGradient(parsed, '90deg', FOR_YOU_HEADER_WHITE_MIX),
+	body: buildPastelGradient(parsed, '180deg', FOR_YOU_BODY_WHITE_MIX),
+});
+
+// Pastelized fallback (a whitened version of the bar's own magenta/red default),
+// used for SSR / first paint before the client effect publishes the live per-day
+// values, and whenever a gradient string fails to parse. Defined before the
+// builder so there is no forward reference.
+export const FOR_YOU_RESULTS_DEFAULT_GRADIENTS: ForYouResultsGradients = (() => {
+	const parsed = parseLinearGradient(SEARCH_GRADIENT_DEFAULT);
+	// Should never happen for our own constant, but stay defensive.
+	if (!parsed) return { header: SEARCH_GRADIENT_DEFAULT, body: SEARCH_GRADIENT_DEFAULT };
+	return deriveForYouGradients(parsed);
+})();
+
+// Derive the For You results box header/body gradients from an arbitrary bar
+// gradient string. Falls back to the pastelized default if the string can't be
+// parsed, so callers always get two valid, legible gradients.
+export function buildForYouResultsGradients(barGradient: string): ForYouResultsGradients {
+	const parsed = parseLinearGradient(barGradient);
+	if (!parsed) return FOR_YOU_RESULTS_DEFAULT_GRADIENTS;
+	return deriveForYouGradients(parsed);
+}
+
+// The per-day pair the dashboard publishes to CSS vars, mirroring
+// getSearchGradientForDate for the bar.
+export function getForYouResultsGradientsForDate(date: Date): ForYouResultsGradients {
+	return buildForYouResultsGradients(getSearchGradientForDate(date));
+}

@@ -11,6 +11,10 @@ import {
 	DRAG_PAN_INERTIA_OPTIONS,
 	getDragPanInertiaOptions,
 	getDragPanMaxSpeedForZoom,
+	MAP_WHEEL_ZOOM_RATE,
+	MAP_PINCH_ZOOM_RATE,
+	MAPBOX_NATIVE_WHEEL_ZOOM_RATE,
+	MAPBOX_NATIVE_PINCH_ZOOM_RATE,
 } from './constants';
 import { mapboxDragPanLinearDecel } from './math';
 
@@ -100,14 +104,55 @@ test('zoom-aware maxSpeed keeps low zoom restrained and boosts high zoom', () =>
 	assert.ok(midSpeed < DRAG_PAN_ZOOMED_IN_MAX_SPEED);
 });
 
-test('SearchResultsMap re-passes zoom-aware inertia at every dragPan.enable site', () => {
-	const enableLines = searchResultsMapSource
+test('drag-pan enable is centralized with a desktop-tuned / mobile-native split', () => {
+	// Drag-pan inertia is now DESKTOP-only: desktop keeps the tuned "Airbnb latch"
+	// feel, mobile gets Mapbox's native touch inertia (a bare enable(), which
+	// Mapbox merges over defaultPanInertiaOptions on release). Both raw
+	// dragPan.enable() calls must live inside the single enableDragPanFeel helper
+	// so the desktop/mobile decision can't drift between call sites, and the
+	// desktop branch must still RE-pass the zoom-aware options (mapbox-gl 3.x does
+	// not persist _inertiaOptions on the handler — the original regression).
+	const rawEnableLines = searchResultsMapSource
 		.split('\n')
 		.filter((line) => line.includes('dragPan.enable('));
-	assert.equal(enableLines.length, 4);
-	for (const line of enableLines) {
-		assert.match(line, /getDragPanInertiaOptions\(.+\.getZoom\(\)\)/);
-	}
+	assert.equal(rawEnableLines.length, 2);
+	const desktopEnable = rawEnableLines.filter((line) =>
+		/getDragPanInertiaOptions\(.+\.getZoom\(\)\)/.test(line)
+	);
+	const nativeEnable = rawEnableLines.filter((line) =>
+		/dragPan\.enable\(\s*\)/.test(line)
+	);
+	assert.equal(desktopEnable.length, 1);
+	assert.equal(nativeEnable.length, 1);
+
+	// Every drag-pan (re-)enable site must delegate to the helper rather than
+	// calling dragPan.enable() directly (construction, the device-class/Fast-Refresh
+	// re-apply, safeEnableInteractions, the rectangle-select toggle, and the
+	// zoom-end inertia refresh).
+	const helperCallSites = searchResultsMapSource
+		.split('\n')
+		.filter((line) => /enableDragPanFeel\((?:map|mapInstance)/.test(line)).length;
+	assert.ok(
+		helperCallSites >= 4,
+		`expected >=4 enableDragPanFeel call sites, found ${helperCallSites}`
+	);
+});
+
+test('mobile scroll/pinch zoom feel falls back to Mapbox native rates', () => {
+	// The desktop feel tuning (MAP_WHEEL_ZOOM_RATE / MAP_PINCH_ZOOM_RATE) must not
+	// leak onto touch devices: the native fallbacks must equal Mapbox's built-in
+	// ScrollZoomHandler rates, and must differ from the desktop tuning so the split
+	// is real.
+	assert.equal(MAPBOX_NATIVE_WHEEL_ZOOM_RATE, 1 / 450);
+	assert.equal(MAPBOX_NATIVE_PINCH_ZOOM_RATE, 1 / 100);
+	assert.notEqual(MAPBOX_NATIVE_WHEEL_ZOOM_RATE, MAP_WHEEL_ZOOM_RATE);
+	assert.notEqual(MAPBOX_NATIVE_PINCH_ZOOM_RATE, MAP_PINCH_ZOOM_RATE);
+
+	// applyScrollZoomFeel must actually consume the native constants on its
+	// nativeFeel path (guards against the mobile branch silently keeping desktop
+	// rates).
+	assert.match(searchResultsMapSource, /MAPBOX_NATIVE_WHEEL_ZOOM_RATE/);
+	assert.match(searchResultsMapSource, /MAPBOX_NATIVE_PINCH_ZOOM_RATE/);
 });
 
 test('hard flicks travel farther when zoomed in while keeping a snappy duration', () => {

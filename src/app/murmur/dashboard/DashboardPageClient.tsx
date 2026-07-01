@@ -48,6 +48,8 @@ import { ContactsHeaderChrome } from '@/app/murmur/campaign/[campaignId]/Draftin
 import {
 	getMsUntilNextSearchGradientBucket,
 	getSearchGradientForDate,
+	getForYouResultsGradientsForDate,
+	FOR_YOU_RESULTS_DEFAULT_GRADIENTS,
 } from '@/constants/searchGradients';
 import { isProblematicBrowser } from '@/utils/browserDetection';
 import {
@@ -207,9 +209,9 @@ import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import { HoverDescriptionProvider } from '@/contexts/HoverDescriptionContext';
 import {
-	DashboardWriteOverlay,
-	type DashboardDraftingStatus,
-} from './DashboardWriteOverlay';
+	type DashboardDraftingPlacement,
+	useDashboardDraftingSession,
+} from '@/contexts/DashboardDraftingSessionContext';
 import { LegacyInwardExpandIcon } from './DashboardDraftingDeck';
 import { SelectionFolderMoveBanner } from './SelectionFolderMoveBanner';
 import { MapEventPopupCard, formatMapPostedEventDate } from './MapEventPopupCard';
@@ -340,6 +342,7 @@ const HorizontalFadeScroller = ({
 	return (
 		<div
 			ref={scrollRef}
+			data-dashboard-horizontal-fade-scroller="true"
 			className={`scrollbar-hide overflow-x-auto overflow-y-hidden ${className ?? ''}`}
 			onScroll={updateFades}
 			style={{
@@ -388,14 +391,21 @@ const DEFAULT_CATEGORY_SEARCH_WHAT = 'Wine, Beer, and Spirits';
 // ── Curated "For You" search-results skin ─────────────────────────────────────
 // Only the curated ("For You") search type gets a special results-box treatment:
 // the header band ("top part") and the rows container ("body area") swap their
-// flat fills for these linear gradients. Every other search type keeps the
-// existing flat fills, and all sizing/borders stay identical — only the
-// background changes. These two constants are the single source of truth, so
-// the exact Figma gradient CSS can be pasted here verbatim.
-const FOR_YOU_RESULTS_HEADER_GRADIENT =
-	'linear-gradient(90deg, #A0E6B5 0%, #E78FBE 55%, #EF7D7D 100%)';
-const FOR_YOU_RESULTS_BODY_GRADIENT =
-	'linear-gradient(180deg, #D8C6E3 0%, #E9CCDC 48%, #F0C7C7 100%)';
+// flat fills for a pastelized version of the hero search bar's gradient. Every
+// other search type keeps the existing flat fills, and all sizing/borders stay
+// identical — only the background changes.
+//
+// The live per-day values are published to CSS vars in the same effect/timer that
+// drives the bar (`--for-you-results-header-gradient` / `--for-you-results-body-
+// gradient`), so the box tracks the same daily scheme as the bar and swaps at the
+// AM/PM boundary without a reload. These constants are the SSR / first-paint
+// fallback the `var(..., fallback)` reads before the client effect runs — a
+// pastelized version of the bar's own magenta/red default, so it stays consistent
+// even on the very first frame.
+const FOR_YOU_RESULTS_HEADER_GRADIENT_VAR = '--for-you-results-header-gradient';
+const FOR_YOU_RESULTS_BODY_GRADIENT_VAR = '--for-you-results-body-gradient';
+const FOR_YOU_RESULTS_HEADER_GRADIENT = `var(${FOR_YOU_RESULTS_HEADER_GRADIENT_VAR}, ${FOR_YOU_RESULTS_DEFAULT_GRADIENTS.header})`;
+const FOR_YOU_RESULTS_BODY_GRADIENT = `var(${FOR_YOU_RESULTS_BODY_GRADIENT_VAR}, ${FOR_YOU_RESULTS_DEFAULT_GRADIENTS.body})`;
 
 const CURATED_URL_PARAM_KEYS = ['pick', 'area', 'state', 'cat', 'lat', 'lon', 'r'] as const;
 // Distinct from CURATED_URL_PARAM_KEYS so a refresh from a free-text run can't be mistaken
@@ -1863,6 +1873,63 @@ const MAP_VIEW_SEARCH_RESULTS_MIN_HEIGHT_PX = 125;
 // Hold the Selection panel to ~50% height until Search Results is down to the last few rows,
 // then allow the existing “compress results, expand selection” behavior.
 const MAP_VIEW_SEARCH_RESULTS_COMPRESS_THRESHOLD = 5;
+// ── Selection⇄Search Results "ledger" gesture ────────────────────────────────
+// The desktop side panel stacks Selection over Search Results. By default the
+// split is chosen automatically (see mapPanelDesktopSelectionFraction). Once the
+// user wheels anywhere in the panel, a capture-phase arbiter serializes the
+// gesture: wheel samples first reallocate visible room to the active ledger; only
+// after that ledger visibly reaches its useful limit do later samples scroll the
+// inner rows. The divider holds where released ("fixed ledger"), and the split is
+// expressed as a single fraction in [0,1] written to a CSS var so the height
+// animates with zero React re-renders during the gesture.
+//
+// The auto ramp rests Selection at 0.5 of the usable height and only ever grows it
+// (0.5→1.0) as results deplete. The ledger can push the split BELOW that rest to
+// reveal Search Results, so its floor is a small share (just the Selection header,
+// computed at runtime from the live header height) with LEDGER_FRACTION_FLOOR as a
+// hard backstop. LEDGER_FRACTION_MAX lets Selection claim almost everything; the
+// existing `min(…, 100% − (resultsFloor + pad))` term still guarantees the Search
+// Results floor and the CTA stay visible, so this is only an upper safety rail.
+const LEDGER_FRACTION_FLOOR = 0.1;
+const LEDGER_FRACTION_MAX = 0.92;
+// The auto ramp's resting Selection share (its formula is `0.5 + 0.5·eased`, so this
+// is the value when results are plentiful). The ledger may push BELOW this to reveal
+// Search Results; but once results deplete enough that the auto ramp climbs ABOVE this
+// rest, auto's rise reasserts (see the void-guard effect) so a shrunk Selection can't
+// strand an empty Results panel.
+const LEDGER_REST_FRACTION = 0.5;
+// Clamp any single wheel sample so an inertial "fling" can't slam the divider
+// across the whole range in one frame.
+const LEDGER_MAX_STEP_PX = 60;
+// Idle gap (ms) that resets the active ledger latch. Momentum frames arrive
+// ~16ms apart, well under this; a new gesture can re-target a different ledger.
+const LEDGER_GESTURE_IDLE_RESET_MS = 160;
+// Exponential-smoothing time constant (ms) for the render follower. Frame-rate
+// independent: alpha = 1 - exp(-dt / tau). Smaller = snappier, larger = smoother.
+const LEDGER_FOLLOW_TAU_MS = 90;
+// Selection header heights (px) used to keep the header from being clipped when the
+// ledger shrinks Selection to reveal Search Results. Mirrors the header block heights
+// in the Selection sub-panel (77 normal, 101 while drafting).
+const LEDGER_SELECTION_HEADER_PX = 77;
+const LEDGER_SELECTION_HEADER_DRAFTING_PX = 101;
+// Keep a small translucent Selection body strip as part of the minimum, so
+// shrinking Selection to reveal Results never collapses it into a clipped
+// header-only tab.
+const LEDGER_SELECTION_BODY_MIN_PX = 24;
+// One visible contact-row slot: row height (49px) + vertical gap (7px). Selecting
+// a result transfers one slot from Results into Selection.
+const LEDGER_ROW_SLOT_PX = 56;
+// Below this |deltaY| a wheel sample is treated as noise (prevents twitch).
+const LEDGER_WHEEL_DEADZONE_PX = 1;
+// How close (in split fraction) the divider must be to its limit to count as
+// "arrived". Used twice: (1) the resize phase stops feeding the target once within
+// this band and pins it to the exact limit; (2) the resize→scroll handoff waits
+// until the *displayed* (eased) divider is within this band so the box visibly
+// finishes moving before its rows scroll — never both at once. ~2% of the panel is
+// visually "at rest" yet loose enough that normal scrolls hand off within a frame
+// or two (no perceptible stall) while a hard fling still settles fully first.
+const LEDGER_LIMIT_EPS = 0.02;
+type LedgerRegion = 'selection' | 'results';
 // Keep both map side panels visually pinned after the dashboard root zoom is applied.
 // The side-shift var (written by the map-view zoom effect) lowers the whole side
 // chrome toward vertical center on tall monitors; 0px on the 1080p baseline.
@@ -3431,6 +3498,12 @@ const DashboardContent = () => {
 	// this var (with the original magenta/red as fallback). Re-pick at the next
 	// bucket boundary so a user sitting on the dashboard across noon/midnight gets
 	// the swap without a reload.
+	//
+	// The curated "For You" results box tracks the SAME per-day scheme: we derive a
+	// pastelized header/body pair from the day's gradient and publish them as
+	// `--for-you-results-header-gradient` / `--for-you-results-body-gradient` here,
+	// in the same tick and on the same boundary timer, so the box and the bar always
+	// agree and swap together (see FOR_YOU_RESULTS_*_GRADIENT).
 	useEffect(() => {
 		const root = document.documentElement;
 		let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -3438,6 +3511,12 @@ const DashboardContent = () => {
 		const applyForNow = () => {
 			const now = new Date();
 			root.style.setProperty('--search-gradient', getSearchGradientForDate(now));
+			const forYouGradients = getForYouResultsGradientsForDate(now);
+			root.style.setProperty(
+				FOR_YOU_RESULTS_HEADER_GRADIENT_VAR,
+				forYouGradients.header
+			);
+			root.style.setProperty(FOR_YOU_RESULTS_BODY_GRADIENT_VAR, forYouGradients.body);
 			// +1s margin so we land cleanly inside the next bucket rather than racing the boundary.
 			timeoutId = setTimeout(applyForNow, getMsUntilNextSearchGradientBucket(now) + 1000);
 		};
@@ -3447,6 +3526,8 @@ const DashboardContent = () => {
 		return () => {
 			if (timeoutId !== undefined) clearTimeout(timeoutId);
 			root.style.removeProperty('--search-gradient');
+			root.style.removeProperty(FOR_YOU_RESULTS_HEADER_GRADIENT_VAR);
+			root.style.removeProperty(FOR_YOU_RESULTS_BODY_GRADIENT_VAR);
 		};
 	}, []);
 	const [isMobileLandscape, setIsMobileLandscape] = useState(false);
@@ -4702,41 +4783,31 @@ const DashboardContent = () => {
 		resolvedIdentityRef.current = resolvedIdentity;
 	}, [resolvedIdentity]);
 
-	// True while the dashboard Write overlay shows the post-draft review; keeps the overlay mounted
-	// even if the live map selection changes mid-review.
-	const [isWriteReviewActive, setIsWriteReviewActive] = useState(false);
-	const [activeWriteReviewContactId, setActiveWriteReviewContactId] = useState<
-		number | null
-	>(null);
-	const [dashboardDraftingStatus, setDashboardDraftingStatus] =
-		useState<DashboardDraftingStatus>({
-			isDrafting: false,
-			activeContactId: null,
-			completedContactIds: [],
-			total: 0,
-		});
-	const [isDashboardDraftingDeckCollapsed, setIsDashboardDraftingDeckCollapsed] =
-		useState(false);
+	// Dashboard Write is now driven by a layout-level session host, so the generation
+	// engine survives Search-tab subtree unmounts and campaign-route tab switches.
+	const {
+		status: dashboardDraftingStatus,
+		isReviewActive: isWriteReviewActive,
+		activeReviewContactId: activeWriteReviewContactId,
+		isDraftingDeckCollapsed: isDashboardDraftingDeckCollapsed,
+		openOrUpdateSession: openOrUpdateDashboardDraftingSession,
+		closeSession: closeDashboardDraftingSession,
+		setActiveReviewContactId: setActiveWriteReviewContactId,
+		setDraftingDeckCollapsed: setIsDashboardDraftingDeckCollapsed,
+		registerDashboardHandlers: registerDashboardDraftingHandlers,
+	} = useDashboardDraftingSession();
 	const [folderMoveNotice, setFolderMoveNotice] = useState<FolderMoveNotice | null>(
 		null
 	);
 	useEffect(() => {
 		if (!isWriteMode) {
-			setIsWriteReviewActive(false);
-			setActiveWriteReviewContactId(null);
-			setDashboardDraftingStatus({
-				isDrafting: false,
-				activeContactId: null,
-				completedContactIds: [],
-				total: 0,
-			});
-			setIsDashboardDraftingDeckCollapsed(false);
+			closeDashboardDraftingSession();
 		}
-	}, [isWriteMode]);
+	}, [closeDashboardDraftingSession, isWriteMode]);
 
 	useEffect(() => {
 		if (!isWriteReviewActive) setActiveWriteReviewContactId(null);
-	}, [isWriteReviewActive]);
+	}, [isWriteReviewActive, setActiveWriteReviewContactId]);
 
 	useEffect(() => {
 		if (isWriteMode && selectedContacts.length === 0 && !isWriteReviewActive) {
@@ -4744,33 +4815,11 @@ const DashboardContent = () => {
 		}
 	}, [isWriteMode, isWriteReviewActive, selectedContacts.length, setIsWriteMode]);
 
-	const handleActiveWriteReviewContactChange = useCallback((contactId: number | null) => {
-		setActiveWriteReviewContactId(contactId);
-		if (contactId != null) {
-			setIsWriteReviewActive(true);
-		}
-	}, []);
-
 	const handleCloseWriteOverlay = useCallback(() => {
 		setIsWriteMode(false);
-		setIsWriteReviewActive(false);
-		setActiveWriteReviewContactId(null);
-		setDashboardDraftingStatus({
-			isDrafting: false,
-			activeContactId: null,
-			completedContactIds: [],
-			total: 0,
-		});
-		setIsDashboardDraftingDeckCollapsed(false);
+		closeDashboardDraftingSession();
 		setSelectedContacts([]);
-	}, [setIsWriteMode, setSelectedContacts]);
-
-	const handleDashboardDraftingStatusChange = useCallback(
-		(status: DashboardDraftingStatus) => {
-			setDashboardDraftingStatus(status);
-		},
-		[]
-	);
+	}, [closeDashboardDraftingSession, setIsWriteMode, setSelectedContacts]);
 
 	useEffect(() => {
 		if (folderMoveNotice?.phase !== 'complete') return;
@@ -5488,6 +5537,11 @@ const DashboardContent = () => {
 			curatedModeParam || isCuratedPicksSearchQuery(dashboardSearchParam);
 
 		if (isCuratedRehydration) {
+			// Restore the bottom panel's resting selection to For You alongside the curated
+			// results (mirrors the category rehydration below) so the pill matches the restored
+			// search after navigating back or reloading.
+			setMapBottomSearchFollowupSelection('for-you');
+			setMapBottomSearchFollowupPreview(null);
 			// If we already have curated results in memory (e.g. just navigated back to this
 			// page in-app), don't trigger a duplicate fetch.
 			if (hasSearched && activeSearchQuery.trim().length > 0) {
@@ -5657,6 +5711,11 @@ const DashboardContent = () => {
 			curatedModeParam || isCuratedPicksSearchQuery(fromCampaignSearchParam);
 
 		if (isCuratedRehydration) {
+			// Restore the bottom panel's resting selection to For You alongside the curated
+			// results (mirrors the category rehydration below) so the pill matches the restored
+			// search after navigating back or reloading.
+			setMapBottomSearchFollowupSelection('for-you');
+			setMapBottomSearchFollowupPreview(null);
 			if (hasSearched && activeSearchQuery.trim().length > 0) {
 				hasHydratedFromCampaignUrlRef.current = true;
 				return;
@@ -6407,6 +6466,27 @@ const DashboardContent = () => {
 		shouldForceApplyDerivedTitle,
 	]);
 
+	useEffect(
+		() =>
+			registerDashboardDraftingHandlers({
+				onClose: handleCloseWriteOverlay,
+				onSwitchToAddToFolder: () => {
+					void handleAddSelectedToContextFolder();
+					setIsWriteMode(false);
+					closeDashboardDraftingSession();
+				},
+				onViewDrafting: () => navigateToCampaignRouteFromSearch('write'),
+			}),
+		[
+			closeDashboardDraftingSession,
+			handleAddSelectedToContextFolder,
+			handleCloseWriteOverlay,
+			navigateToCampaignRouteFromSearch,
+			registerDashboardDraftingHandlers,
+			setIsWriteMode,
+		]
+	);
+
 	const primaryCtaLabel = isAddToCampaignMode
 		? 'Add to Campaign'
 		: dashboardSearchCampaign
@@ -6834,6 +6914,31 @@ const DashboardContent = () => {
 	const mapPanelRowsDesktopRef = useRef<HTMLDivElement>(null);
 	const prevMapResultsLoadingRef = useRef(isMapResultsLoading);
 	const cascadeTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+	// ── Selection⇄Search Results ledger gesture refs ─────────────────────────
+	// Element the CSS var `--ledger-divisor` is written to (the outer side panel).
+	const ledgerPanelRef = useRef<HTMLDivElement>(null);
+	// Visible Selection sub-panel. Used to seed manual control from the *actual*
+	// rendered split, which avoids dead wheel travel when Selection shrink-wraps.
+	const ledgerSelectionPanelRef = useRef<HTMLDivElement | null>(null);
+	// The two inner scroll containers, used to detect scroll boundaries + overflow
+	// (which doubles as the content-aware gate that prevents revealing empty space).
+	const ledgerSelectionScrollRef = useRef<HTMLDivElement | null>(null);
+	const ledgerResultsScrollRef = useRef<HTMLDivElement | null>(null);
+	// Whether the user has taken manual control of the split this session. While false
+	// the auto count-ramp owns the split; the first divider movement flips it true.
+	const ledgerEngagedRef = useRef(false);
+	// Absolute target fraction (Selection's share of usable height) and the eased,
+	// currently-displayed fraction the follower writes to the CSS var each frame.
+	const ledgerTargetFractionRef = useRef(0.5);
+	const ledgerDisplayFractionRef = useRef(0.5);
+	const ledgerRafRef = useRef<number | null>(null);
+	const ledgerLastTsRef = useRef(0);
+	// The first wheel target in a continuous gesture owns the sequence until an
+	// idle gap resets it; this keeps trackpad momentum from retargeting mid-flick.
+	const ledgerGestureRegionRef = useRef<LedgerRegion | null>(null);
+	const ledgerLastWheelTsRef = useRef(0);
+	const ledgerPrevSelectedCountRef = useRef(selectedContacts.length);
 
 	// Match the map panel skeleton wave animation so the cascade feels like it
 	// "resolves" the wave into real results.
@@ -7715,6 +7820,10 @@ const DashboardContent = () => {
 					: undefined;
 			mapBottomSearchInputRef.current?.blur();
 			setIsMapBottomSearchActive(false);
+			// A typed "Search Anything" query is an Advanced/free-text search — return the
+			// bottom panel's resting selection to Advanced (its default) so the pill reflects
+			// this newest search rather than a prior For You session.
+			setMapBottomSearchFollowupSelection(null);
 			setMapBottomCommittedSearchValue(shouldPersistBottomSearchValue ? q : '');
 			setMapBottomSearchValue(shouldPersistBottomSearchValue ? q : '');
 			primeFreeTextSearch(q);
@@ -7978,13 +8087,28 @@ const DashboardContent = () => {
 	const handleMapBottomForYouSubmit = useCallback(async () => {
 		cancelMapBottomSearchFollowupPreviewClear();
 		setMapBottomSearchFollowupPreview(null);
-		setMapBottomSearchFollowupSelection(null);
+		// Rest the bottom panel on "For You" (compact pill) so its idle state reflects the
+		// search the user just ran instead of snapping back to the Advanced layout. This only
+		// sets the resting selection; the search bar's for-you mode is preview-driven, so the
+		// bar stays in "Search Anything". Set before the re-engage early return below so both a
+		// fresh For You search and a For You re-engage land on For You.
+		setMapBottomSearchFollowupSelection('for-you');
 		mapBottomSearchInputRef.current?.blur();
 		setIsMapBottomSearchActive(false);
 		setMapBottomSearchValue('');
 		setMapBottomCommittedSearchValue('');
 		setIsMapBottomSearchAdvancedDraftArmed(false);
 		setActiveSection(null);
+
+		// Re-engage instead of re-running: if a For You curated search is already
+		// in memory but the user has disengaged it, clicking "For You" should bring
+		// the exact same results back (no reshuffle, no refetch) rather than start a
+		// new one. Disengage never clears curatedContacts/lastCuratedArgs, so the
+		// prior search is fully resident and handleMapTopSearchReengage restores it.
+		if (isCuratedSearchActive && lastCuratedArgs != null && !isMapSearchEngaged) {
+			handleMapTopSearchReengage();
+			return;
+		}
 
 		// "For You" has no user-typed query — pass an empty string; the campaign
 		// gets a generateCampaignName constellation name like any other search.
@@ -8016,6 +8140,10 @@ const DashboardContent = () => {
 		ensureActiveCampaign,
 		isAddToCampaignMode,
 		isFromHomeDemoMode,
+		isCuratedSearchActive,
+		lastCuratedArgs,
+		isMapSearchEngaged,
+		handleMapTopSearchReengage,
 	]);
 
 	// Empty-box Profile search: a profile-tailored "For You". Genre tightens the
@@ -9091,9 +9219,12 @@ const DashboardContent = () => {
 
 	const mapPanelSelectedContacts = useMemo(
 		() => {
-			const selected = displayedMapPanelContacts.filter((c) =>
-				selectedContacts.includes(c.id)
-			);
+			const byId = new Map(displayedMapPanelContacts.map((c) => [c.id, c]));
+			const selectedOrderById = new Map<number, number>();
+			selectedContacts.forEach((id, index) => selectedOrderById.set(id, index));
+			const selected = selectedContacts
+				.map((id) => byId.get(id))
+				.filter((contact): contact is ContactWithName => Boolean(contact));
 			if (!dashboardDraftingStatus.isDrafting) return selected;
 
 			const activeId = dashboardDraftingStatus.activeContactId;
@@ -9109,7 +9240,10 @@ const DashboardContent = () => {
 				const bActive = activeId != null && b.id === activeId;
 				if (aActive && !bActive) return -1;
 				if (!aActive && bActive) return 1;
-				return 0;
+				return (
+					(selectedOrderById.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
+					(selectedOrderById.get(b.id) ?? Number.MAX_SAFE_INTEGER)
+				);
 			});
 		},
 		[
@@ -9224,12 +9358,578 @@ const DashboardContent = () => {
 		mapPanelDesktopSelectionRampProgress * mapPanelDesktopSelectionRampProgress;
 	const mapPanelDesktopSelectionFraction =
 		0.5 + 0.5 * mapPanelDesktopSelectionRampEased;
-	const mapPanelDesktopSelectionDivisor = 1 / mapPanelDesktopSelectionFraction;
-	const mapPanelDesktopSelectionMaxHeightCss = `min(calc((100% - ${mapPanelDesktopPanelBottomPadPx}px) / ${mapPanelDesktopSelectionDivisor.toFixed(
+	// "Auto" resting divisor from the count ramp. The ledger gesture, when engaged,
+	// overrides this by writing `--ledger-divisor` on the panel element (see the rAF
+	// follower); when disengaged the var is cleared and CSS falls back to this value.
+	// Driving the override through a CSS var means the height animates every frame with
+	// ZERO React re-renders during the gesture.
+	const mapPanelDesktopSelectionAutoDivisor =
+		1 / mapPanelDesktopSelectionFraction;
+	// The trailing `min(…, 100% − (resultsFloor + pad))` term is the hard safety rail:
+	// no matter what divisor the ledger writes, Search Results keeps its floor and the
+	// CTA stays visible. `LEDGER_FRACTION_MAX` isn't needed here because this CSS clamp
+	// already caps how far Selection can grow.
+	const mapPanelDesktopSelectionMaxHeightCss = `min(calc((100% - ${mapPanelDesktopPanelBottomPadPx}px) / var(--ledger-divisor, ${mapPanelDesktopSelectionAutoDivisor.toFixed(
 		4
-	)}), calc(100% - ${
+	)})), calc(100% - ${
 		mapPanelDesktopSearchResultsMinHeightPx + mapPanelDesktopPanelBottomPadPx
 	}px))`;
+
+	// ── Ledger gesture: follower + wheel handler + sync/reset ─────────────────
+	// Whether the ledger gesture is active for the current layout (desktop wide/mid
+	// chrome with the side panel visible and results settled).
+	const ledgerGestureEnabled =
+		isMapView &&
+		isMobile === false &&
+		!isCompressedMapChrome &&
+		shouldShowMapResultsSidePanel &&
+		!isMapResultsLoading;
+	// Cancel the follower rAF (used both while animating and on teardown).
+	const stopLedgerFollower = useCallback(() => {
+		if (ledgerRafRef.current != null) {
+			cancelAnimationFrame(ledgerRafRef.current);
+			ledgerRafRef.current = null;
+		}
+	}, []);
+	// Fully hand the split back to the auto ramp: stop the follower, clear engagement
+	// state, and remove the CSS var so the Selection maxHeight falls back to the auto
+	// divisor baked into the render.
+	const disengageLedger = useCallback(() => {
+		stopLedgerFollower();
+		ledgerEngagedRef.current = false;
+		ledgerGestureRegionRef.current = null;
+		ledgerLastWheelTsRef.current = 0;
+		const panel = ledgerPanelRef.current;
+		if (panel) panel.style.removeProperty('--ledger-divisor');
+	}, [stopLedgerFollower]);
+	// rAF loop: eases the displayed fraction toward the target and writes the divisor.
+	const runLedgerFollower = useCallback(() => {
+		const step = (ts: number) => {
+			const panel = ledgerPanelRef.current;
+			if (!panel || !ledgerEngagedRef.current) {
+				ledgerRafRef.current = null;
+				return;
+			}
+			const last = ledgerLastTsRef.current || ts;
+			const dt = Math.max(0, Math.min(64, ts - last));
+			ledgerLastTsRef.current = ts;
+			const target = ledgerTargetFractionRef.current;
+			const current = ledgerDisplayFractionRef.current;
+			const alpha = 1 - Math.exp(-dt / LEDGER_FOLLOW_TAU_MS);
+			let next = current + (target - current) * alpha;
+			if (Math.abs(target - next) < 0.0005) next = target;
+			ledgerDisplayFractionRef.current = next;
+			panel.style.setProperty(
+				'--ledger-divisor',
+				(1 / Math.max(0.0001, next)).toFixed(4)
+			);
+			if (next === target) {
+				ledgerRafRef.current = null;
+				return;
+			}
+			ledgerRafRef.current = requestAnimationFrame(step);
+		};
+		if (ledgerRafRef.current == null) {
+			ledgerLastTsRef.current = 0;
+			ledgerRafRef.current = requestAnimationFrame(step);
+		}
+	}, []);
+	// Capture-phase wheel arbiter. Attached as a NATIVE, non-passive, capture-phase
+	// listener (see the effect below) — not a React onWheel — because React binds
+	// `wheel` passively, so `preventDefault()` in a synthetic handler is a no-op and
+	// the browser would still natively scroll the inner list *alongside* our manual
+	// scroll (the "both motions at once" bug). A native non-passive capture listener
+	// lets us fully suppress both the native scroll and CustomScrollbar's own wheel
+	// handler, so this arbiter is the single source of motion and can enforce the
+	// strict sequence: resize the active ledger first, then — only once it has
+	// visibly finished — scroll its contents; if that ledger can do nothing with the
+	// sample, fall through to the other so short lists never create a dead zone.
+	const handleLedgerWheel = useCallback(
+		(event: WheelEvent) => {
+			if (!ledgerGestureEnabled) return;
+			const panel = ledgerPanelRef.current;
+			if (!panel) return;
+			if (event.ctrlKey || event.metaKey) return;
+			const eventTarget =
+				event.target instanceof Element ? event.target : null;
+
+			// Preserve intentional horizontal scrolling on the category-chip rail; a
+			// mostly-vertical gesture over it still belongs to the ledger.
+			const horizontalScroller = eventTarget?.closest(
+				'[data-dashboard-horizontal-fade-scroller="true"]'
+			);
+			if (
+				horizontalScroller &&
+				(Math.abs(event.deltaX) > Math.abs(event.deltaY) || event.shiftKey)
+			) {
+				return;
+			}
+
+			// Normalize wheel deltas to pixels (line/page modes fire on some mice).
+			let rawDelta = event.deltaY;
+			if (event.deltaMode === 1) rawDelta *= 16;
+			else if (event.deltaMode === 2) rawDelta *= panel.clientHeight || 400;
+			if (Math.abs(rawDelta) < LEDGER_WHEEL_DEADZONE_PX) return;
+			const delta = clampNumber(rawDelta, -LEDGER_MAX_STEP_PX, LEDGER_MAX_STEP_PX);
+			// Suppress native inner-list scroll + CustomScrollbar's wheel handler so this
+			// arbiter is the sole mover (guarded: passive listeners can't preventDefault).
+			if (event.cancelable) event.preventDefault();
+			event.stopPropagation();
+
+			// Live panel layout height (unscaled — transform doesn't affect clientHeight),
+			// which is what the maxHeight `100%` resolves against.
+			const panelHeight = panel.clientHeight;
+			const usable = Math.max(1, panelHeight - mapPanelDesktopPanelBottomPadPx);
+			const headerPx = dashboardDraftingStatus.isDrafting
+				? LEDGER_SELECTION_HEADER_DRAFTING_PX
+				: LEDGER_SELECTION_HEADER_PX;
+			const floorFraction = clampNumber(
+				(headerPx + LEDGER_SELECTION_BODY_MIN_PX) / usable,
+				LEDGER_FRACTION_FLOOR,
+				LEDGER_FRACTION_MAX
+			);
+			const ceilingFraction = clampNumber(
+				(usable - mapPanelDesktopSearchResultsMinHeightPx) / usable,
+				floorFraction,
+				LEDGER_FRACTION_MAX
+			);
+
+			// Content-aware gate: only reveal a panel that actually has hidden content.
+			const results = ledgerResultsScrollRef.current;
+			const selection = ledgerSelectionScrollRef.current;
+			const resultsOverflow = results
+				? results.scrollHeight - results.clientHeight > 2
+				: false;
+			const selectionOverflow = selection
+				? selection.scrollHeight - selection.clientHeight > 2
+				: false;
+
+			const getVisibleSelectionFraction = () => {
+				const selectionPanel = ledgerSelectionPanelRef.current;
+				if (!selectionPanel) {
+					return clampNumber(
+						mapPanelDesktopSelectionFraction,
+						floorFraction,
+						ceilingFraction
+					);
+				}
+				return clampNumber(
+					selectionPanel.offsetHeight / usable,
+					floorFraction,
+					ceilingFraction
+				);
+			};
+
+			const getCurrentFraction = () =>
+				ledgerEngagedRef.current
+					? clampNumber(
+							ledgerTargetFractionRef.current,
+							floorFraction,
+							ceilingFraction
+						)
+					: getVisibleSelectionFraction();
+
+			// The *visually displayed* split share (the eased follower value while
+			// engaged, else the live rendered split). The resize→scroll handoff is
+			// gated on this so the box has actually finished moving on screen before
+			// its contents begin to scroll — never both at once.
+			const getDisplayedFraction = () =>
+				ledgerEngagedRef.current
+					? clampNumber(
+							ledgerDisplayFractionRef.current,
+							floorFraction,
+							ceilingFraction
+						)
+					: getVisibleSelectionFraction();
+
+			const setLedgerFraction = (nextFraction: number, seedFraction: number) => {
+				const next = clampNumber(nextFraction, floorFraction, ceilingFraction);
+				if (!ledgerEngagedRef.current) {
+					ledgerEngagedRef.current = true;
+					ledgerTargetFractionRef.current = seedFraction;
+					ledgerDisplayFractionRef.current = seedFraction;
+				}
+				// Wheel-driven resize writes the divider IMMEDIATELY (no eased follower):
+				// the inner lists move their rows instantly with `scrollTop += deltaPx`, so
+				// routing the resize through the ~90ms follower would make the ledger feel
+				// laggy/floaty next to the rows and add a stutter at the resize→scroll
+				// handoff. Writing 1:1 here keeps both motions at one identical speed and
+				// cadence. (The eased follower stays in use for the programmatic
+				// select/deselect row-slot transfer, which wants smoothing.)
+				stopLedgerFollower();
+				ledgerTargetFractionRef.current = next;
+				ledgerDisplayFractionRef.current = next;
+				panel.style.setProperty(
+					'--ledger-divisor',
+					(1 / Math.max(0.0001, next)).toFixed(4)
+				);
+			};
+
+			// Scroll an inner list by a wheel sample. Returns true if it actually moved.
+			const scrollElementBy = (
+				el: HTMLDivElement | null,
+				deltaPx: number
+			): boolean => {
+				if (!el || Math.abs(deltaPx) < LEDGER_WHEEL_DEADZONE_PX) return false;
+				const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+				if (maxScrollTop <= 1) return false;
+				const previous = el.scrollTop;
+				const next = clampNumber(previous + deltaPx, 0, maxScrollTop);
+				if (Math.abs(next - previous) < 0.01) return false;
+				el.scrollTop = next;
+				return true;
+			};
+
+			// The auto/resting split, used as the neutral point for the empty-space gate
+			// below: expanding a box BEYOND its resting share is only allowed when it has
+			// hidden content to reveal, but returning TOWARD rest is always allowed (so a
+			// box the user grew can always be handed back even if it has nothing hidden).
+			const restingSelectionFraction = clampNumber(
+				mapPanelDesktopSelectionFraction,
+				floorFraction,
+				ceilingFraction
+			);
+
+			// Move the divider by one wheel sample. Positive deltaPx grows Selection
+			// (fraction↑); negative grows Search Results (fraction↓). Returns true if the
+			// target actually moved. Empty-space gate: only block EXPANDING a box past its
+			// resting share when it has nothing hidden to show — never block a return
+			// toward rest, so a grown box can always be handed back.
+			const resizeByDelta = (deltaPx: number): boolean => {
+				const current = getCurrentFraction();
+				// Convert wheel pixels → split fraction using the LIVE usable height, so the
+				// divider travels exactly `deltaPx` on-screen pixels per wheel sample — the
+				// same 1:1 mapping the inner lists use (`scrollTop += deltaPx`). This keeps
+				// the general-ledger resize and the internal row scroll at one consistent
+				// speed at every panel size (a fixed px→fraction constant made the divider
+				// slower than the rows, and by a ratio that drifted with panel height).
+				let nextFraction = clampNumber(
+					current + deltaPx / usable,
+					floorFraction,
+					ceilingFraction
+				);
+				// Once within the arrival band of an end stop, pin the target exactly to
+				// it so the divider comes to a clean, complete rest (rather than idling a
+				// hair short) before the gesture is allowed to hand off to inner scroll.
+				if (deltaPx > 0 && ceilingFraction - nextFraction <= LEDGER_LIMIT_EPS) {
+					nextFraction = ceilingFraction;
+				} else if (deltaPx < 0 && nextFraction - floorFraction <= LEDGER_LIMIT_EPS) {
+					nextFraction = floorFraction;
+				}
+				if (Math.abs(nextFraction - current) < 1e-4) return false;
+				if (
+					deltaPx > 0 &&
+					!selectionOverflow &&
+					nextFraction > restingSelectionFraction + 1e-4
+				) {
+					return false;
+				}
+				if (
+					deltaPx < 0 &&
+					!resultsOverflow &&
+					nextFraction < restingSelectionFraction - 1e-4
+				) {
+					return false;
+				}
+				setLedgerFraction(nextFraction, current);
+				return true;
+			};
+
+			// Spend a wheel sample on exactly ONE motion for the given region — never a
+			// resize AND a content scroll in the same event. This is what makes the
+			// gesture strictly sequential:
+			//   • Forward (deltaY > 0, the browser's normal "scroll down" direction):
+			//     first move that box toward its fully-open size; only once it has
+			//     *visibly* (eased divider) arrived does the next sample begin scrolling
+			//     the rows down inside it. For Search Results, "fully open" means its top
+			//     edge moves UP (Selection fraction↓); for Selection it means the bottom
+			//     edge moves DOWN (Selection fraction↑).
+			//   • Reverse (deltaY < 0): first retrace the row scroll back to the top, and
+			//     only once it's back does the next sample hand the room back / move the
+			//     box toward its resting split.
+			const spendForRegion = (region: LedgerRegion, deltaPx: number): boolean => {
+				if (Math.abs(deltaPx) < LEDGER_WHEEL_DEADZONE_PX) return false;
+				const forward = deltaPx > 0;
+				const content =
+					region === 'selection' ? selection ?? null : results ?? null;
+				// A forward sample grows the active box. Since the shared split fraction
+				// measures Selection's share, growing Search Results is a NEGATIVE split
+				// movement while growing Selection is positive. Inner content scrolling,
+				// however, always uses the browser's native delta sign.
+				const resizeDelta =
+					region === 'selection' ? deltaPx : -deltaPx;
+				// Fraction the divider reaches when this box is fully open.
+				const growLimitFraction =
+					region === 'selection' ? ceilingFraction : floorFraction;
+				const targetAtGrowLimit =
+					Math.abs(getCurrentFraction() - growLimitFraction) <= LEDGER_LIMIT_EPS;
+				const displayedAtGrowLimit =
+					Math.abs(getDisplayedFraction() - growLimitFraction) <=
+					LEDGER_LIMIT_EPS;
+
+				if (forward) {
+					// Phase 1 — grow the box toward its open limit.
+					if (!targetAtGrowLimit) {
+						return resizeByDelta(resizeDelta);
+					}
+					// Phase 1's target is at the limit, but the eased divider hasn't
+					// visually arrived yet. Consume the sample WITHOUT scrolling so the box
+					// finishes coming to rest on screen first — this is exactly what keeps
+					// resize and scroll strictly sequential (never simultaneous). The band
+					// is wide enough that normal scrolls clear it within a frame or two, so
+					// there's no perceptible stall; a hard fling settles fully first.
+					if (!displayedAtGrowLimit) return true;
+					// Phase 2 — the box is fully open; now scroll its rows forward.
+					return scrollElementBy(content, deltaPx);
+				}
+
+				// Reverse. Phase 1 — retrace the row scroll back toward the top first.
+				const contentAtTop = !content || content.scrollTop <= 0;
+				if (!contentAtTop) {
+					return scrollElementBy(content, deltaPx);
+				}
+				// Phase 2 — rows are back at the top; hand the room back / move the box.
+				return resizeByDelta(resizeDelta);
+			};
+
+			const getRegionFromPointer = (): LedgerRegion => {
+				const node = eventTarget?.closest('[data-dashboard-ledger-region]');
+				const attr = node?.getAttribute('data-dashboard-ledger-region');
+				if (attr === 'selection' || attr === 'results') return attr;
+
+				const selectionPanel = ledgerSelectionPanelRef.current;
+				const resultsPanel = results?.closest('[data-dashboard-ledger-region]');
+				if (selectionPanel && resultsPanel) {
+					const y = event.clientY;
+					const selectionRect = selectionPanel.getBoundingClientRect();
+					const resultsRect = resultsPanel.getBoundingClientRect();
+					if (y <= selectionRect.bottom) return 'selection';
+					if (y >= resultsRect.top) return 'results';
+					// In the seam/gap BETWEEN the two boxes, pick the region by scroll
+					// DIRECTION rather than the sub-pixel cursor position. The gap is a
+					// genuine discontinuity — its two halves resize the divider in opposite
+					// directions for the same scroll — so a nearest-edge midpoint split made
+					// a 1px cursor move flip the behavior (the "bug out" in the gap). Reading
+					// the panel as one continuous ledger, scrolling down reveals lower
+					// content (Results) and scrolling up reveals higher content (Selection);
+					// this also matches each neighbor (the gap's lower edge for downward
+					// scrolls, its upper edge for upward scrolls), so the seam stays
+					// consistent no matter where in the gap the pointer sits.
+					return delta > 0 ? 'results' : 'selection';
+				}
+				return 'results';
+			};
+
+			// Results-header scroll affordance. Wheeling over the Search Results / For You
+			// header strip (the label + category-pill row) normally runs the standard
+			// results dispatch, which resizes the box first. Per the requirement, once the
+			// results list actually OVERFLOWS ("has met the scrolling amount where it
+			// overflows"), hovering that header and scrolling should grab the LIST
+			// directly — like a sticky list header — regardless of the current ledger
+			// split. If the list does not overflow, or the rows are already pinned at the
+			// boundary in this direction, scrollElementBy no-ops and we fall through to
+			// the normal ledger behavior so the header still "works like it does now".
+			const overResultsHeader = Boolean(
+				eventTarget?.closest('[data-dashboard-results-header="true"]')
+			);
+			if (overResultsHeader && results) {
+				// `resultsOverflow` (computed above) is the "has met the scrolling amount
+				// where it overflows" test. `scrollElementBy` returns false at the top/
+				// bottom boundary, so a fully-scrolled list falls through cleanly.
+				if (resultsOverflow && scrollElementBy(results, delta)) {
+					// Latch the gesture to the results list so trackpad momentum keeps
+					// scrolling it rather than snapping into a resize mid-flick.
+					ledgerGestureRegionRef.current = 'results';
+					ledgerLastWheelTsRef.current = performance.now();
+					return;
+				}
+			}
+
+			const now = performance.now();
+			if (
+				!ledgerGestureRegionRef.current ||
+				now - ledgerLastWheelTsRef.current > LEDGER_GESTURE_IDLE_RESET_MS
+			) {
+				ledgerGestureRegionRef.current = getRegionFromPointer();
+			}
+			ledgerLastWheelTsRef.current = now;
+
+			const primaryRegion = ledgerGestureRegionRef.current ?? 'results';
+			const secondaryRegion: LedgerRegion =
+				primaryRegion === 'selection' ? 'results' : 'selection';
+			// Spend the whole sample on ONE motion of the latched box (resize XOR
+			// scroll — see spendForRegion). Only if that box can do nothing at all with
+			// this sample (fully open AND its rows can't scroll further) do we fall
+			// through to the other box, so short lists never create a dead wheel zone.
+			const actedOnPrimary = spendForRegion(primaryRegion, delta);
+			if (!actedOnPrimary) {
+				spendForRegion(secondaryRegion, delta);
+			}
+		},
+		[
+			ledgerGestureEnabled,
+			mapPanelDesktopPanelBottomPadPx,
+			mapPanelDesktopSearchResultsMinHeightPx,
+			mapPanelDesktopSelectionFraction,
+			dashboardDraftingStatus.isDrafting,
+			stopLedgerFollower,
+		]
+	);
+	// Attach the arbiter as a NATIVE, non-passive, capture-phase wheel listener on
+	// the panel. Capture + non-passive is what lets it run before — and fully
+	// suppress (preventDefault + stopPropagation) — the nested CustomScrollbar wheel
+	// handlers and the browser's own inner-list scroll, so the resize and content
+	// scroll can never fire in the same event. React's synthetic onWheel is passive
+	// (preventDefault is ignored), so it cannot be used for this.
+	useEffect(() => {
+		const panel = ledgerPanelRef.current;
+		if (!panel) return;
+		const listener = (event: WheelEvent) => handleLedgerWheel(event);
+		panel.addEventListener('wheel', listener, {
+			passive: false,
+			capture: true,
+		});
+		return () => {
+			panel.removeEventListener('wheel', listener, {
+				capture: true,
+			} as EventListenerOptions);
+		};
+	}, [handleLedgerWheel]);
+	// Selecting/deselecting is also a ledger transfer: each contact moved into
+	// Selection gives it one visible row-slot; each contact moved back gives one slot
+	// back to Results. That way a newly selected row is actually revealed in the
+	// Selection ledger instead of hiding inside a collapsed body.
+	useLayoutEffect(() => {
+		const previousCount = ledgerPrevSelectedCountRef.current;
+		const nextCount = selectedContacts.length;
+		ledgerPrevSelectedCountRef.current = nextCount;
+
+		const countDelta = nextCount - previousCount;
+		if (countDelta === 0) return;
+		if (!ledgerGestureEnabled) return;
+		// Let the existing empty-selection reset fully hand control back to auto.
+		if (nextCount === 0) return;
+
+		const panel = ledgerPanelRef.current;
+		if (!panel) return;
+		const panelHeight = panel.clientHeight;
+		const usable = Math.max(1, panelHeight - mapPanelDesktopPanelBottomPadPx);
+		const headerPx = dashboardDraftingStatus.isDrafting
+			? LEDGER_SELECTION_HEADER_DRAFTING_PX
+			: LEDGER_SELECTION_HEADER_PX;
+		const floorFraction = clampNumber(
+			(headerPx + LEDGER_SELECTION_BODY_MIN_PX) / usable,
+			LEDGER_FRACTION_FLOOR,
+			LEDGER_FRACTION_MAX
+		);
+		const ceilingFraction = clampNumber(
+			(usable - mapPanelDesktopSearchResultsMinHeightPx) / usable,
+			floorFraction,
+			LEDGER_FRACTION_MAX
+		);
+		const selectionPanel = ledgerSelectionPanelRef.current;
+		const visibleFraction = selectionPanel
+			? clampNumber(
+					selectionPanel.offsetHeight / usable,
+					floorFraction,
+					ceilingFraction
+				)
+			: clampNumber(
+					mapPanelDesktopSelectionFraction,
+					floorFraction,
+					ceilingFraction
+				);
+		const currentFraction = ledgerEngagedRef.current
+			? clampNumber(
+					ledgerTargetFractionRef.current,
+					floorFraction,
+					ceilingFraction
+				)
+			: visibleFraction;
+		const nextFraction = clampNumber(
+			currentFraction + (countDelta * LEDGER_ROW_SLOT_PX) / usable,
+			floorFraction,
+			ceilingFraction
+		);
+
+		if (Math.abs(nextFraction - currentFraction) >= 0.0005) {
+			if (!ledgerEngagedRef.current) {
+				ledgerEngagedRef.current = true;
+				ledgerDisplayFractionRef.current = currentFraction;
+			}
+			ledgerTargetFractionRef.current = nextFraction;
+			// This was not a wheel gesture, so let the next wheel event retarget by
+			// pointer instead of inheriting Selection as the latched gesture region.
+			ledgerGestureRegionRef.current = null;
+			ledgerLastWheelTsRef.current = 0;
+			runLedgerFollower();
+		}
+
+		if (countDelta <= 0) return;
+
+		let rafOne: number | null = null;
+		let rafTwo: number | null = null;
+		let timeout: ReturnType<typeof setTimeout> | null = null;
+		const pinSelectionToBottom = () => {
+			const scrollEl = ledgerSelectionScrollRef.current;
+			if (!scrollEl) return;
+			scrollEl.scrollTop = scrollEl.scrollHeight;
+		};
+		rafOne = requestAnimationFrame(() => {
+			pinSelectionToBottom();
+			rafTwo = requestAnimationFrame(pinSelectionToBottom);
+		});
+		timeout = setTimeout(pinSelectionToBottom, 140);
+		return () => {
+			if (rafOne != null) cancelAnimationFrame(rafOne);
+			if (rafTwo != null) cancelAnimationFrame(rafTwo);
+			if (timeout != null) clearTimeout(timeout);
+		};
+	}, [
+		dashboardDraftingStatus.isDrafting,
+		ledgerGestureEnabled,
+		mapPanelDesktopPanelBottomPadPx,
+		mapPanelDesktopSearchResultsMinHeightPx,
+		mapPanelDesktopSelectionFraction,
+		runLedgerFollower,
+		selectedContacts.length,
+	]);
+	// Hard resets: hand the split back to the auto ramp on context changes where a
+	// held divider would be stale or nonsensical.
+	useEffect(() => {
+		if (!ledgerGestureEnabled) disengageLedger();
+	}, [ledgerGestureEnabled, disengageLedger]);
+	useEffect(() => {
+		// New search / refetch (results reloading) and empty selection both reset.
+		disengageLedger();
+	}, [activeSearchQuery, disengageLedger]);
+	useEffect(() => {
+		if (selectedContacts.length === 0) disengageLedger();
+	}, [selectedContacts.length, disengageLedger]);
+	// Void guard. Search Results is `flex-1`, so it fills whatever height it's given
+	// even when it has few rows. If the user shrank Selection to reveal Results and then
+	// depletes Results (e.g. by selecting the remaining rows), a held-low divider would
+	// strand an empty Results panel. When the auto ramp climbs above its rest — its
+	// signal that results are running low — hand control back so the divider re-closes.
+	// This never fights the reveal gesture (auto sits AT rest while results are plentiful)
+	// nor the prune-selection gesture (there the target is already above rest).
+	useEffect(() => {
+		if (!ledgerEngagedRef.current) return;
+		if (
+			mapPanelDesktopSelectionFraction > LEDGER_REST_FRACTION + 0.0005 &&
+			ledgerTargetFractionRef.current < mapPanelDesktopSelectionFraction
+		) {
+			disengageLedger();
+		}
+	}, [mapPanelDesktopSelectionFraction, disengageLedger]);
+	// A viewport resize changes the panel's usable height, which the engaged target
+	// fraction was clamped against. Hand control back to the auto ramp so the divider
+	// can't sit slightly out of range until the next wheel re-clamps it.
+	useEffect(() => {
+		disengageLedger();
+	}, [viewportHeight, disengageLedger]);
+	// Cleanup on unmount.
+	useEffect(() => () => stopLedgerFollower(), [stopLedgerFollower]);
 
 	const getMapResearchDisplayFields = useCallback(
 		(contact: ContactWithName) => {
@@ -9326,12 +10026,50 @@ const DashboardContent = () => {
 	// The row-hover card owns its expand state internally and resets it on unmount;
 	// clear the parent mirror whenever that card isn't showing so the nav boxes
 	// don't stay receded after the hover ends.
-	const isDashboardWriteOverlayVisible =
+	const shouldMountDashboardWriteOverlay =
 		isWriteMode &&
 		Boolean(dashboardMapCampaignForHeader) &&
-		(selectedContacts.length > 0 || isWriteReviewActive) &&
+		(selectedContacts.length > 0 ||
+			isWriteReviewActive ||
+			dashboardDraftingStatus.isDrafting);
+	const isDashboardWriteOverlayVisible =
+		shouldMountDashboardWriteOverlay &&
+		activeTab === 'search' &&
+		isMapView &&
 		!isCompressedMapChrome &&
+		shouldRenderSearchResultsStage &&
 		shouldShowMapResultsSidePanel;
+	const dashboardWriteOverlayPlacement = useMemo<DashboardDraftingPlacement | null>(() => {
+		if (!isDashboardWriteOverlayVisible) return null;
+		return {
+			zIndex: 125,
+			top: `calc(${MAP_VIEW_SIDE_PANEL_TOP_CSS} + ${
+				isWriteReviewActive || dashboardDraftingStatus.isDrafting ? 84 : 36
+			}px)`,
+			right: 10 + 433 * MAP_VIEW_PANEL_SCALE + 13,
+		};
+	}, [
+		MAP_VIEW_PANEL_SCALE,
+		dashboardDraftingStatus.isDrafting,
+		isDashboardWriteOverlayVisible,
+		isWriteReviewActive,
+	]);
+	useEffect(() => {
+		if (!shouldMountDashboardWriteOverlay || !dashboardMapCampaignForHeader) return;
+		openOrUpdateDashboardDraftingSession({
+			campaign: dashboardMapCampaignForHeader,
+			targetContactIds: selectedContacts,
+			isVisible: isDashboardWriteOverlayVisible,
+			placement: dashboardWriteOverlayPlacement,
+		});
+	}, [
+		dashboardMapCampaignForHeader,
+		dashboardWriteOverlayPlacement,
+		isDashboardWriteOverlayVisible,
+		openOrUpdateDashboardDraftingSession,
+		selectedContacts,
+		shouldMountDashboardWriteOverlay,
+	]);
 	// While the write overlay occupies the space beside Search Results, dock row-hover
 	// research on the left rail so it doesn't stack under the contact boxes.
 	const mapPanelHoverResearchDockSide: 'left' | 'right' =
@@ -15181,57 +15919,8 @@ const DashboardContent = () => {
 																	</HoverDescriptionProvider>
 																</div>
 															)}
-														{/* Inline "Write Message" drafting panel — floats over the map (left of the
-											    right-side panel) for the current selection, scoped to the active campaign. */}
-														{isWriteMode &&
-															dashboardMapCampaignForHeader &&
-													(selectedContacts.length > 0 ||
-														isWriteReviewActive) &&
-													!isCompressedMapChrome &&
-													shouldShowMapResultsSidePanel && (
-																<div
-																	className="absolute pointer-events-none map-overlay-appear"
-																			style={{
-																				zIndex: 125,
-																				top: `calc(${MAP_VIEW_SIDE_PANEL_TOP_CSS} + ${
-																					isWriteReviewActive || dashboardDraftingStatus.isDrafting
-																						? 84
-																						: 36
-																				}px)`,
-																				right: 10 + 433 * MAP_VIEW_PANEL_SCALE + 13,
-																			}}
-																>
-																	<div
-																		className="pointer-events-auto"
-																		style={{
-																		}}
-																	>
-																		<DashboardWriteOverlay
-																			campaign={dashboardMapCampaignForHeader}
-																			targetContactIds={selectedContacts}
-																			onClose={handleCloseWriteOverlay}
-																			onSwitchToAddToFolder={() => {
-																				void handleAddSelectedToContextFolder();
-																				setIsWriteMode(false);
-																			}}
-																			onReviewActiveChange={setIsWriteReviewActive}
-																			onActiveReviewContactChange={
-																				handleActiveWriteReviewContactChange
-																			}
-																			onDraftingStatusChange={
-																				handleDashboardDraftingStatusChange
-																			}
-																			isDraftingDeckCollapsed={
-																				isDashboardDraftingDeckCollapsed
-																			}
-																			onDraftingDeckCollapsedChange={
-																				setIsDashboardDraftingDeckCollapsed
-																			}
-																			onViewDrafting={() => navigateToCampaignRouteFromSearch('write')}
-																		/>
-																	</div>
-													</div>
-												)}
+														{/* Inline Write Message drafting is hosted by DashboardDraftingSessionHost
+														    outside this Search-tab subtree so tab switches don't abort generation. */}
 												{/* Send-queue stack overlay — opened on demand from the campaign
 												    header "in send queue" pill; floats left of the right-side
 												    panel. Shares the write overlay's slot, so it never co-shows
@@ -15409,6 +16098,7 @@ const DashboardContent = () => {
 																{shouldShowMapResultsSidePanel && (
 																			<div
 																				className="absolute flex flex-col gap-[9px] pointer-events-auto"
+																				ref={ledgerPanelRef}
 																				onMouseEnter={() => {
 																					if (!shouldUseDynamicMapCreateCampaignCta)
 																						return;
@@ -15501,6 +16191,8 @@ const DashboardContent = () => {
 																					folderMoveNotice != null) && (
 																					<div
 																						className="flex flex-col flex-shrink-0"
+																						data-dashboard-ledger-region="selection"
+																						ref={ledgerSelectionPanelRef}
 																						style={{
 																							maxHeight: isCompressedMapChrome
 																								? '30%'
@@ -15636,14 +16328,15 @@ const DashboardContent = () => {
 																						)}
 																						<CustomScrollbar
 																							className="flex-1 min-h-0"
-																							contentClassName="p-[6px] pb-[14px] space-y-[7px]"
+																							contentClassName="p-[6px] pb-[14px] flex flex-col"
+																							scrollContainerRef={ledgerSelectionScrollRef}
 																							thumbWidth={2}
 																							thumbColor="#000000"
 																							trackColor="transparent"
 																							offsetRight={-6}
 																							disableOverflowClass
 																						>
-																							<div className="space-y-[7px]">
+																							<div className="mt-auto space-y-[7px]">
 																								{mapPanelSelectedContacts.map((contact) =>
 																									renderMapPanelDesktopRow(contact, 'selection')
 																								)}
@@ -15654,6 +16347,7 @@ const DashboardContent = () => {
 																				{/* Search Results sub-panel — always present; flexes to fill remaining height. */}
 																				<div
 																					className="flex flex-col flex-1 min-h-0"
+																					data-dashboard-ledger-region="results"
 																					style={{
 																						backgroundColor: 'rgba(99, 155, 244, 0.5)',
 																						// Desktop floor so a fully expanded Selection can't compress this below its
@@ -15663,16 +16357,17 @@ const DashboardContent = () => {
 																						overflow: 'hidden',
 																					}}
 																				>
-																					<div
-																						className="w-full h-[50px] flex-shrink-0 flex items-center justify-center px-4 relative"
-																						style={{
-																							...(isForYouCuratedSearch
-																								? { backgroundImage: FOR_YOU_RESULTS_HEADER_GRADIENT }
-																								: { backgroundColor: '#CBF0FF' }),
-																							border: '2px solid #000',
-																							borderRadius: '8px 8px 0 0',
-																						}}
-																					>
+																				<div
+																					className="w-full h-[50px] flex-shrink-0 flex items-center justify-center px-4 relative"
+																					data-dashboard-results-header="true"
+																					style={{
+																						...(isForYouCuratedSearch
+																							? { backgroundImage: FOR_YOU_RESULTS_HEADER_GRADIENT }
+																							: { backgroundColor: '#CBF0FF' }),
+																						border: '2px solid #000',
+																						borderRadius: '8px 8px 0 0',
+																					}}
+																				>
 																						<span className="absolute left-[13px] top-[2px] font-inter text-[15px] font-semibold leading-[20px] text-center text-black">
 																							{isForYouCuratedSearch ? 'For You' : 'Search Results'}
 																						</span>
@@ -15792,6 +16487,7 @@ const DashboardContent = () => {
 																									? 'pb-[78px]'
 																									: 'pb-[14px]'
 																							} space-y-[7px]`}
+																							scrollContainerRef={ledgerResultsScrollRef}
 																							thumbWidth={2}
 																							thumbColor="#000000"
 																							trackColor="transparent"

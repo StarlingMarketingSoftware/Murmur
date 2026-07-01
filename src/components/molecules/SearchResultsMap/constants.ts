@@ -317,6 +317,16 @@ export const OVERVIEW_PREWARM_CENTER_QUANT_DEG = 1;
 export const MAP_WHEEL_ZOOM_RATE = 1 / 750;
 export const MAP_PINCH_ZOOM_RATE = 1 / 82.5;
 
+// Mapbox GL's built-in scroll/pinch zoom rates (ScrollZoomHandler defaults:
+// wheelZoomRate 1/450, "defaultZoomRate" 1/100 used for trackpad + pinch). The
+// custom rates above are a DESKTOP feel tuning; on touch devices we restore
+// these native rates so pinch-zoom behaves like every other mobile map instead
+// of inheriting the desktop-tuned (slower, "weighted") pinch. Kept here as named
+// constants so the mobile reset path can't silently drift from Mapbox's real
+// defaults.
+export const MAPBOX_NATIVE_WHEEL_ZOOM_RATE = 1 / 450;
+export const MAPBOX_NATIVE_PINCH_ZOOM_RATE = 1 / 100;
+
 // Sustained zoom-out governor (see zoomOutGovernor.ts): catches runaway flings
 // without making ordinary scroll-wheel zoom feel capped.
 export const ZOOM_OUT_GOVERNOR_ENABLED = true;

@@ -14,6 +14,8 @@ import { MapErrorBoundary } from '@/components/molecules/MapErrorBoundary';
 import { PersistentMapProvider } from '@/contexts/PersistentMapContext';
 import { SendingSessionProvider } from '@/contexts/SendingSessionContext';
 import { WebsitePreviewProvider } from '@/contexts/WebsitePreviewContext';
+import { DashboardDraftingSessionProvider } from '@/contexts/DashboardDraftingSessionContext';
+import { DashboardDraftingSessionHost } from './dashboard/DashboardDraftingSessionHost';
 import { isSafariBrowser } from '@/utils/browserDetection';
 
 export default function MurmurLayoutClient({ children }: { children: React.ReactNode }) {
@@ -98,8 +100,10 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 
 	return (
 		<SendingSessionProvider>
+		<DashboardDraftingSessionProvider>
 		<PersistentMapProvider>
 		<WebsitePreviewProvider>
+			<DashboardDraftingSessionHost />
 			<MapErrorBoundary>
 				<PersistentDashboardMap />
 			</MapErrorBoundary>
@@ -181,6 +185,7 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 			`}</style>
 		</WebsitePreviewProvider>
 		</PersistentMapProvider>
+		</DashboardDraftingSessionProvider>
 		</SendingSessionProvider>
 	);
 }
