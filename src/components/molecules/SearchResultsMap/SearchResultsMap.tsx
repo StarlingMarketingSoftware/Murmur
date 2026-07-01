@@ -17,7 +17,7 @@ import mapboxgl from 'mapbox-gl';
 import { ContactWithName } from '@/types/contact';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import {
-	trimContactsMapOverlayCache,
+	trimContactsQueryCaches,
 	useGetContactResearch,
 	useGetContactsMapOverlay,
 } from '@/hooks/queryHooks/useContacts';
@@ -404,7 +404,6 @@ import {
 	STATE_LABEL_FULL_NAME_ZOOM,
 	STATE_META_URL,
 	STATE_OUTLINE_URL,
-	STATE_PREPARED_POLYGONS_URL,
 	STATE_PROCESSED_GEOJSON_URL,
 	STREET_VIEW_BUILDINGS_MIN_ZOOM,
 	STREET_VIEW_BUILDINGS_RISE_FULL_ZOOM,
@@ -3129,14 +3128,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Small delay when moving between marker layers (prevents hover flicker)
 	const hoverClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	// US state geometry for outlines, hover/click selection, and point-in-polygon checks.
-	const usStatesGeoJsonRef = useRef<GeoJsonFeatureCollection | null>(null);
+	// Loaded-guard only: the processed FeatureCollection itself lives in the Mapbox
+	// source (setData) — retaining it here too would double-hold ~2MB of parsed JSON.
+	const usStatesLoadedRef = useRef<boolean>(false);
 	const usStatesByKeyRef = useRef<
 		Map<
 			string,
 			{
 				key: string;
 				name: string;
-				geometry: GeoJsonGeometry;
 				multiPolygon: ClippingMultiPolygon;
 				bbox: BoundingBox | null;
 			}
@@ -4799,11 +4799,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [onOverlayBusyChange]);
 
-	// Re-assert the overlay cache bound after every successful overlay fetch —
-	// off the interaction critical path, never touching observed/in-flight queries.
+	// Re-assert the contact cache bounds (overlay windows, list results, research
+	// entries) after every successful overlay fetch — off the interaction critical
+	// path, never touching observed/in-flight queries.
 	const queryClient = useQueryClient();
 	useEffect(() => {
-		trimContactsMapOverlayCache(queryClient);
+		trimContactsQueryCaches(queryClient);
 	}, [
 		queryClient,
 		allContactsOverlayVisibleRawContacts,
@@ -5093,7 +5094,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		// If we've already loaded the shapes for this map instance, don't refetch.
 		// Presentation toggles should only affect visibility/interaction, not data loading.
-		if (usStatesGeoJsonRef.current?.features?.length) {
+		if (usStatesLoadedRef.current) {
 			setIsStateLayerReady(true);
 			return;
 		}
@@ -5110,30 +5111,24 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					return (await res.json()) as T;
 				};
 
-				const [
-					processedGeoJson,
-					statesMetaByKey,
-					stateLabels,
-					usOutlineGeometry,
-					preparedPolygons,
-				] = await Promise.all([
-					fetchJson<GeoJsonFeatureCollection>(STATE_PROCESSED_GEOJSON_URL),
-					fetchJson<
-						Record<
-							string,
-							{
-								key: string;
-								name: string;
-								bbox: BoundingBox | null;
-							}
-						>
-					>(STATE_META_URL),
-					fetchJson<GeoJSON.FeatureCollection>(STATE_LABELS_URL),
-					fetchJson<Extract<GeoJsonGeometry, { type: 'MultiPolygon' }>>(
-						STATE_OUTLINE_URL
-					),
-					fetchJson<PreparedClippingPolygon[]>(STATE_PREPARED_POLYGONS_URL),
-				]);
+				const [processedGeoJson, statesMetaByKey, stateLabels, usOutlineGeometry] =
+					await Promise.all([
+						fetchJson<GeoJsonFeatureCollection>(STATE_PROCESSED_GEOJSON_URL),
+						fetchJson<
+							Record<
+								string,
+								{
+									key: string;
+									name: string;
+									bbox: BoundingBox | null;
+								}
+							>
+						>(STATE_META_URL),
+						fetchJson<GeoJSON.FeatureCollection>(STATE_LABELS_URL),
+						fetchJson<Extract<GeoJsonGeometry, { type: 'MultiPolygon' }>>(
+							STATE_OUTLINE_URL
+						),
+					]);
 
 				if (cancelled) return;
 
@@ -5169,7 +5164,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					{
 						key: string;
 						name: string;
-						geometry: GeoJsonGeometry;
 						multiPolygon: ClippingMultiPolygon;
 						bbox: BoundingBox | null;
 					}
@@ -5191,7 +5185,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							: (nameByKey.get(key) ?? key);
 
 					const bbox = metaEntry?.bbox ?? bboxFromMultiPolygon(multiPolygon);
-					byKey.set(key, { key, name, geometry, multiPolygon, bbox });
+					byKey.set(key, { key, name, multiPolygon, bbox });
 				}
 
 				// Ensure by-key metadata remains usable even if a key is missing from meta payload.
@@ -5202,15 +5196,24 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					byKey.set(key, {
 						key,
 						name: nameByKey.get(key) ?? key,
-						geometry,
 						multiPolygon,
 						bbox: bboxFromMultiPolygon(multiPolygon),
 					});
 				}
 
-				usStatesGeoJsonRef.current = processed;
+				usStatesLoadedRef.current = true;
 				usStatesByKeyRef.current = byKey;
-				const prepared = Array.isArray(preparedPolygons) ? preparedPolygons : [];
+				// Prepared clipping polygons derive from byKey's multiPolygons, SHARING
+				// their polygon array references (verified bit-identical to the previously
+				// fetched us-states-prepared-polygons.json — readers are order-independent
+				// any-match point tests), so the 612KB fetch + duplicate parse are gone.
+				const prepared: PreparedClippingPolygon[] = [];
+				for (const entry of byKey.values()) {
+					for (const polygon of entry.multiPolygon) {
+						const polygonBbox = bboxFromMultiPolygon([polygon]);
+						if (polygonBbox) prepared.push({ polygon, bbox: polygonBbox });
+					}
+				}
 				usStatesPolygonsRef.current = prepared.length ? prepared : null;
 
 				const source = map.getSource(MAPBOX_SOURCE_IDS.states) as
@@ -5244,7 +5247,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			} catch (err) {
 				if (cancelled) return;
 				console.error('Failed to load preprocessed US states geometry', err);
-				usStatesGeoJsonRef.current = null;
+				usStatesLoadedRef.current = false;
 				usStatesByKeyRef.current = new Map();
 				usStatesPolygonsRef.current = null;
 				usBasemapClipGeometryRef.current = null;
