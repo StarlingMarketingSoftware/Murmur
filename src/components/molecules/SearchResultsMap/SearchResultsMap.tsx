@@ -17,9 +17,11 @@ import mapboxgl from 'mapbox-gl';
 import { ContactWithName } from '@/types/contact';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import {
+	trimContactsMapOverlayCache,
 	useGetContactResearch,
 	useGetContactsMapOverlay,
 } from '@/hooks/queryHooks/useContacts';
+import { useQueryClient } from '@tanstack/react-query';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import {
 	MAP_SELECT_GRAB_STARTER_BOX_GAP_PX,
@@ -4785,6 +4787,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			onOverlayBusyChange?.(false);
 		};
 	}, [onOverlayBusyChange]);
+
+	// Re-assert the overlay cache bound after every successful overlay fetch —
+	// off the interaction critical path, never touching observed/in-flight queries.
+	const queryClient = useQueryClient();
+	useEffect(() => {
+		trimContactsMapOverlayCache(queryClient);
+	}, [
+		queryClient,
+		allContactsOverlayVisibleRawContacts,
+		allContactsOverlayBufferRawContacts,
+		bookingExtraRawContacts,
+		promotionOverlayRawContacts,
+	]);
 
 	const bookingExtraContacts = useMemo(() => {
 		if (!bookingExtraRawContacts || bookingExtraRawContacts.length === 0) return [];
