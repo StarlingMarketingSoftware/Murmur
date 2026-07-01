@@ -90,6 +90,8 @@ export interface DraftsExpandedListProps {
 	rowHeight?: number;
 	rejectedDraftIds?: Set<number>;
 	approvedDraftIds?: Set<number>;
+	/** Drafts returned from the send queue by the moderation agent (generic badge; reason stays server-side) */
+	returnedDraftIds?: Set<number>;
 	previewedDraftId?: number | null;
 	/** When true, clicking a draft opens it in preview instead of selecting it */
 	isPreviewMode?: boolean;
@@ -219,6 +221,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	rowHeight,
 	rejectedDraftIds,
 	approvedDraftIds,
+	returnedDraftIds,
 	previewedDraftId,
 	isPreviewMode = false,
 	onDraftPreviewClick,
@@ -837,6 +840,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 									const isSelected = !isPreviewMode && selectedDraftIds.has(draft.id as number);
 									const isRejected = rejectedDraftIds?.has(draft.id as number) ?? false;
 									const isApproved = approvedDraftIds?.has(draft.id as number) ?? false;
+									const isReturned = returnedDraftIds?.has(draft.id as number) ?? false;
 									const isPreviewed = previewedDraftId === draft.id;
 									const contactTitle = contact?.headline || contact?.title || '';
 									const indicatorLeftClass = isBottomView ? 'left-2' : 'left-[8px]';
@@ -924,6 +928,25 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 														borderRadius: '50%',
 														border: '1px solid #000000',
 														backgroundColor: '#69AF69',
+													}}
+												/>
+											)}
+											{/* Returned-for-review indicator (moderation). Returned drafts come
+											    back with reviewStatus cleared, so a user reject/approve dot only
+											    coexists after a later user action — user action wins. */}
+											{isReturned && !isRejected && !isApproved && (
+												<span
+													className={cn('absolute', indicatorLeftClass)}
+													title="Returned for review"
+													aria-label="Returned for review"
+													style={{
+														top: '50%',
+														transform: 'translateY(-50%)',
+														width: isBottomView ? '12px' : '13px',
+														height: isBottomView ? '12px' : '13px',
+														borderRadius: '50%',
+														border: '1px solid #000000',
+														backgroundColor: '#D98E2B',
 													}}
 												/>
 											)}

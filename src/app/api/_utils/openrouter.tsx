@@ -209,6 +209,54 @@ export const fetchOpenRouter = async (
 	}
 };
 
+// Non-streaming single-shot JSON completion (response_format json_object,
+// temperature 0). Mirrors the private helper in
+// contacts/search/queryUnderstanding.ts — kept separate from the streaming
+// fetchOpenRouter above because callers here want one strict JSON object,
+// not token deltas. Used by the send-queue moderation ladder.
+export const fetchOpenRouterJson = async (
+	model: string,
+	system: string,
+	user: string,
+	timeoutMs: number,
+	options?: { maxTokens?: number }
+): Promise<string> => {
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+	try {
+		const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+			method: 'POST',
+			headers: {
+				Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				model,
+				messages: [
+					{ role: 'system', content: system },
+					{ role: 'user', content: user },
+				],
+				temperature: 0,
+				max_tokens: options?.maxTokens ?? 350,
+				response_format: { type: 'json_object' },
+			}),
+			signal: controller.signal,
+		});
+		const res = (await response.json()) as {
+			error?: { message?: string };
+			choices?: { message?: { content?: string } }[];
+		};
+		if (!response.ok) {
+			throw new Error(res.error?.message || `OpenRouter ${model} request failed`);
+		}
+		const content = res.choices?.[0]?.message?.content;
+		if (!content) throw new Error(`OpenRouter ${model} response empty`);
+		return content;
+	} finally {
+		clearTimeout(timeoutId);
+	}
+};
+
 export const fetchOpenRouterEmbedding = async (
 	input: string,
 	options?: {

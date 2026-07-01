@@ -810,3 +810,44 @@ model SearchQueryIntent {
   @@unique([queryKey, promptVersion])
   @@index([lastUsedAt])
 }
+
+// LLM moderation verdicts for queued outbound campaign emails. Append-only:
+// each row is BOTH the cache (a re-enqueue of unedited content resolves with
+// no LLM call) and the audit record (verdict/categories/reason are NEVER
+// serialized to the client — the UI only ever sees a boolean). Keyed on the
+// sha256 of the exact stored subject+message plus promptVersion — bumping
+// MODERATION_PROMPT_VERSION in sendQueue/moderation.ts orphans old rows
+// (atomic invalidation, SearchQueryIntent pattern), and editing a draft
+// changes the hash so stale verdicts stop matching. LLM-failure outcomes are
+// NEVER persisted (fail-closed holds retry naturally on later ticks).
+// STRICTLY ADDITIVE: new model + enum only; emailId/userId/campaignId/
+// contactId are scalar columns with NO @relation, resolved by explicit
+// lookups in code (EmailSendQueue pattern), so no existing model is modified
+// and the migration is CREATE-only.
+enum ModerationVerdict {
+  approved // safe to dispatch
+  flagged // pulled from the queue, Email returned to draft
+}
+
+model EmailModerationVerdict {
+  id          Int    @id @default(autoincrement())
+  emailId     Int // Email.id — intentionally no FK
+  userId      String // sender clerkId provenance — no FK
+  campaignId  Int // Campaign.id provenance — no FK
+  contactId   Int // Contact.id provenance — no FK
+  contentHash String // sha256 hex of subject + " " + message (exact stored bytes)
+
+  promptVersion Int
+  verdict       ModerationVerdict
+  categories    Json? // server-side audit only; never sent to the client
+  reason        String? // server-side audit only; never sent to the client
+  confidence    Float?
+  model         String // provider/model that produced the verdict
+  latencyMs     Int?
+
+  createdAt DateTime @default(now())
+
+  @@unique([emailId, contentHash, promptVersion]) // cache key + dispatch-gate lookup
+  @@index([userId, createdAt]) // per-user audit review
+  @@index([campaignId, verdict]) // batch returnedForReview lookup per campaign
+}

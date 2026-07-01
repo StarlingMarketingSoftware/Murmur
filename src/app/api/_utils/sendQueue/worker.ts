@@ -22,6 +22,16 @@ import {
 	PER_DAY_CAP,
 } from './scheduler';
 import { sendCampaignEmail, type SendOutcome } from './sender';
+import {
+	MODERATION_HOLD_REASON,
+	MODERATION_HOLD_RETRY_MS,
+	isEmailModerationEnabled,
+	moderationMaxPerTick,
+	moderationTickBudgetMs,
+	returnQueueRowToDrafts,
+	sweepModerationQueue,
+	type ModerationLlmFetch,
+} from './moderation';
 
 export type TickDeps = {
 	now?: Date;
@@ -40,6 +50,8 @@ export type TickDeps = {
 		userId: string;
 		beforeDispatch: () => Promise<void>;
 	}) => Promise<SendOutcome>;
+	// Test seam: inject a fake moderation LLM. Defaults to the real ladder.
+	moderationLlmFetch?: ModerationLlmFetch;
 };
 
 export type TickResult = {
@@ -50,6 +62,17 @@ export type TickResult = {
 	canceled: number;
 	claimed: number;
 	offHours: boolean;
+	// Moderation counters (all 0 while EMAIL_MODERATION_ENABLED is off):
+	// checked/llm/cache from the sweep; flagged counts BOTH sweep and
+	// dispatch-gate returns-to-drafts; held = fail-closed holds (sweep misses
+	// + claim releases); returnedStale = held-too-long bailouts.
+	modChecked: number;
+	modLlmCalls: number;
+	modCacheHits: number;
+	modApproved: number;
+	modFlagged: number;
+	modHeld: number;
+	modReturnedStale: number;
 };
 
 const backoffMs = (attempts: number) => Math.min(2 ** attempts * 60_000, 60 * 60_000);
@@ -75,6 +98,13 @@ export async function runSendQueueTick(deps: TickDeps = {}): Promise<TickResult>
 		canceled: 0,
 		claimed: 0,
 		offHours: false,
+		modChecked: 0,
+		modLlmCalls: 0,
+		modCacheHits: 0,
+		modApproved: 0,
+		modFlagged: 0,
+		modHeld: 0,
+		modReturnedStale: 0,
 	};
 
 	// ── Sweeper ────────────────────────────────────────────────────────────────
@@ -129,9 +159,40 @@ export async function runSendQueueTick(deps: TickDeps = {}): Promise<TickResult>
 		}
 	}
 
-	// ── Window gate: only dispatch inside 11am–8pm ET ───────────────────────────
+	// ── Moderation sweep (the ONLY LLM caller) ──────────────────────────────────
+	// Runs BEFORE the window gate so idle off-hours ticks pre-clear the 11am
+	// burst. Budget is carved from the shared startWall clock: in-window it
+	// must leave the claim loop ≥15s; off-hours the loop won't run, so the
+	// sweep may take a larger slice (still bounded ≪ the 5-min interval, so
+	// ticks never overlap).
 	const nowLocalMin = localMinutesOf(now, tz);
-	if (nowLocalMin < WINDOW_START_MIN || nowLocalMin >= WINDOW_END_MIN) {
+	const offHours = nowLocalMin < WINDOW_START_MIN || nowLocalMin >= WINDOW_END_MIN;
+	if (isEmailModerationEnabled()) {
+		const elapsedMs = Date.now() - startWall;
+		const reservedMs = offHours ? 2_000 : 15_000;
+		const budgetMs = Math.min(
+			moderationTickBudgetMs() * (offHours ? 2 : 1),
+			wallBudgetMs - elapsedMs - reservedMs,
+		);
+		if (budgetMs >= 1_000) {
+			const sweep = await sweepModerationQueue({
+				now,
+				budgetMs,
+				maxItems: moderationMaxPerTick() * (offHours ? 2 : 1),
+				llmFetch: deps.moderationLlmFetch,
+			});
+			result.modChecked = sweep.checked;
+			result.modLlmCalls = sweep.llmCalls;
+			result.modCacheHits = sweep.cacheHits;
+			result.modApproved = sweep.approved;
+			result.modFlagged = sweep.flagged;
+			result.modHeld = sweep.held;
+			result.modReturnedStale = sweep.returnedStale;
+		}
+	}
+
+	// ── Window gate: only dispatch inside 11am–8pm ET ───────────────────────────
+	if (offHours) {
 		result.offHours = true;
 		return result;
 	}
@@ -198,14 +259,26 @@ export async function runSendQueueTick(deps: TickDeps = {}): Promise<TickResult>
 			result.failed++;
 		} else if (outcome === 'canceled') {
 			result.canceled++;
+		} else if (outcome === 'flagged') {
+			result.modFlagged++;
+		} else if (outcome === 'moderation_hold') {
+			result.modHeld++;
 		}
-		// 'retry' / 'credit_block' leave the row pending for a later tick.
+		// 'retry' / 'credit_block' / 'moderation_hold' leave the row pending
+		// for a later tick.
 	}
 
 	return result;
 }
 
-type RowOutcome = 'sent' | 'failed' | 'canceled' | 'retry' | 'credit_block';
+type RowOutcome =
+	| 'sent'
+	| 'failed'
+	| 'canceled'
+	| 'retry'
+	| 'credit_block'
+	| 'flagged'
+	| 'moderation_hold';
 
 async function processClaimedRow(
 	row: EmailSendQueue,
@@ -286,6 +359,34 @@ async function processClaimedRow(
 			// stays out of the "already-contacted" dedup re-draft set.
 			await terminal(row, SendQueueStatus.canceled, EmailStatus.failed, 'suppressed');
 			return 'canceled';
+		}
+		case 'moderation_flagged': {
+			// Flagged content reached dispatch (sweep raced or was budget-cut):
+			// pull the row we own and restore the Email to an active draft.
+			await returnQueueRowToDrafts({
+				queueId: row.id,
+				emailId: row.emailId,
+				userId: row.userId,
+				guard: { status: 'processing', lockToken: token },
+			});
+			return 'flagged';
+		}
+		case 'moderation_hold': {
+			// Fail-closed: no verdict for the CURRENT content — release the
+			// claim untouched (dispatchedAt still null, attempts is a
+			// Mailgun-only counter). nextRetryAt is MANDATORY: without it the
+			// candidate query re-picks this row immediately and the tick spins.
+			await prisma.emailSendQueue.updateMany({
+				where: { id: row.id, status: SendQueueStatus.processing, lockToken: token },
+				data: {
+					status: SendQueueStatus.pending,
+					lockedAt: null,
+					lockToken: null,
+					nextRetryAt: new Date(now.getTime() + MODERATION_HOLD_RETRY_MS),
+					failureReason: MODERATION_HOLD_REASON,
+				},
+			});
+			return 'moderation_hold';
 		}
 		case 'skipped': {
 			if (outcome.reason === 'campaign_inactive') {

@@ -31,6 +31,11 @@ const requiredEnvVars = {
 const optionalEnvVars = {
 	UPSTASH_REDIS_REST_URL: 'Upstash Redis REST URL (API rate limiting)',
 	UPSTASH_REDIS_REST_TOKEN: 'Upstash Redis REST token (API rate limiting)',
+	// Send-queue moderation (EMAIL_MODERATION_ENABLED): the ladder needs at
+	// least one of these; with neither set, moderation fails closed and holds
+	// every queued send.
+	OPENROUTER_API_KEY: 'OpenRouter key (queued-email moderation ladder + search intent + drafting)',
+	GEMINI_API_KEY: 'Gemini key (moderation/search ladder final rung)',
 };
 
 export function checkRequiredEnvVariables() {

@@ -2717,6 +2717,18 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		return ids;
 	}, [activeDraftEmails]);
 
+	// Drafts the send-queue moderation agent pulled back for review (generic
+	// amber dot; the verdict reason never reaches the client).
+	const returnedDraftIds = useMemo(() => {
+		const ids = new Set<number>();
+		activeDraftEmails.forEach((email) => {
+			if (email.returnedForReview) {
+				ids.add(email.id);
+			}
+		});
+		return ids;
+	}, [activeDraftEmails]);
+
 	const contactedContactIds = useMemo(() => {
 		const ids = new Set<number>();
 		for (const email of activeDraftEmails) ids.add(email.contactId);
@@ -5982,6 +5994,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														// Disable regen inside the side preview so it stays as an email preview.
 														onRegenerateDraft={undefined}
 														rejectedDraftIds={rejectedDraftIds}
+														returnedDraftIds={returnedDraftIds}
 														approvedDraftIds={approvedDraftIds}
 														statusFilter={draftStatusFilter}
 														onStatusFilterChange={setDraftStatusFilter}
@@ -8389,6 +8402,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													setIsSelectedDraftRegenSettingsPreviewOpen
 												}
 												rejectedDraftIds={rejectedDraftIds}
+												returnedDraftIds={returnedDraftIds}
 												approvedDraftIds={approvedDraftIds}
 												statusFilter={draftStatusFilter}
 												onStatusFilterChange={setDraftStatusFilter}
@@ -8514,6 +8528,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																setIsSelectedDraftRegenSettingsPreviewOpen
 															}
 															rejectedDraftIds={rejectedDraftIds}
+															returnedDraftIds={returnedDraftIds}
 															approvedDraftIds={approvedDraftIds}
 															statusFilter={draftStatusFilter}
 															onStatusFilterChange={setDraftStatusFilter}
@@ -8658,6 +8673,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														setIsSelectedDraftRegenSettingsPreviewOpen
 													}
 													rejectedDraftIds={rejectedDraftIds}
+													returnedDraftIds={returnedDraftIds}
 													approvedDraftIds={approvedDraftIds}
 													statusFilter={draftStatusFilter}
 													onStatusFilterChange={setDraftStatusFilter}

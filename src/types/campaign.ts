@@ -18,7 +18,14 @@ export type EmailWithRelations = Prisma.EmailGetPayload<{
 		contact: true;
 		campaign: true;
 	};
-}>;
+}> & {
+	/**
+	 * Set by GET /api/emails (moderation flag on) for drafts whose current
+	 * content was flagged by the send-queue moderation agent and returned for
+	 * review. Boolean only — the verdict reason never leaves the server.
+	 */
+	returnedForReview?: boolean;
+};
 
 export type InboundEmailWithRelations = Prisma.InboundEmailGetPayload<{
 	include: {

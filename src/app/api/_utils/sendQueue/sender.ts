@@ -6,7 +6,13 @@
 
 import FormData from 'form-data';
 import Mailgun from 'mailgun.js';
+import { ModerationVerdict } from '@prisma/client';
 import prisma from '@/lib/prisma';
+import {
+	MODERATION_PROMPT_VERSION,
+	contentHash,
+	isEmailModerationEnabled,
+} from './moderation';
 import { convertHtmlToPlainText, formatHTMLForEmailClients } from '@/utils';
 import { buildUnsubscribeToken } from '@/app/api/_utils/unsubscribe';
 import {
@@ -40,6 +46,11 @@ export type SendOutcome =
 	| { status: 'sent'; messageId: string }
 	| { status: 'suppressed' }
 	| { status: 'skipped'; reason: SkipReason }
+	// Moderation gate (flag-on only): flagged → worker returns the row to
+	// drafts; hold → no verdict exists for the CURRENT content, worker
+	// releases the claim (fail-closed — never dispatched unmoderated).
+	| { status: 'moderation_flagged' }
+	| { status: 'moderation_hold' }
 	| { status: 'transient_error'; error: string }
 	| { status: 'permanent_error'; error: string };
 
@@ -87,6 +98,31 @@ export async function sendCampaignEmail(args: SendArgs): Promise<SendOutcome> {
 		where: { email_userId: { email: recipient, userId } },
 	});
 	if (suppressed) return { status: 'suppressed' };
+
+	// Moderation gate — hash-lookup ONLY (the sweep is the sole LLM caller;
+	// an inline ladder here could blow the cron's 60s maxDuration). Hashing
+	// THIS email object closes the edit-while-scheduled race: messageData
+	// below is built from these same bytes, so approved-bytes ===
+	// dispatched-bytes no matter what PATCH /api/emails/[id] does meanwhile.
+	// Placed after the suppression check so an unsubscribed recipient's row is
+	// still canceled even while moderation is holding.
+	if (isEmailModerationEnabled()) {
+		const hash = contentHash(email.subject, email.message);
+		const verdictRow = await prisma.emailModerationVerdict.findUnique({
+			where: {
+				emailId_contentHash_promptVersion: {
+					emailId: email.id,
+					contentHash: hash,
+					promptVersion: MODERATION_PROMPT_VERSION,
+				},
+			},
+			select: { verdict: true },
+		});
+		if (verdictRow?.verdict === ModerationVerdict.flagged) {
+			return { status: 'moderation_flagged' };
+		}
+		if (!verdictRow) return { status: 'moderation_hold' };
+	}
 
 	const [user, video] = await Promise.all([
 		prisma.user.findUnique({

@@ -30,7 +30,9 @@ export async function GET(req: NextRequest) {
 		console.log(
 			`[send-queue] tick ok offHours=${r.offHours} claimed=${r.claimed} sent=${r.sent} ` +
 				`failed=${r.failed} canceled=${r.canceled} swept=${r.swept} requeued=${r.requeued} ` +
-				`elapsedMs=${Date.now() - startedAt}`,
+				`modChecked=${r.modChecked} modLlmCalls=${r.modLlmCalls} modCacheHits=${r.modCacheHits} ` +
+				`modApproved=${r.modApproved} modFlagged=${r.modFlagged} modHeld=${r.modHeld} ` +
+				`modReturnedStale=${r.modReturnedStale} elapsedMs=${Date.now() - startedAt}`,
 		);
 		return apiResponse({ ok: true, ...r });
 	} catch (error) {

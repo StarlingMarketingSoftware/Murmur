@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { _fetch } from '@/utils';
@@ -26,6 +27,7 @@ export const fetchSendQueue = async (campaignId: number): Promise<SendQueueRespo
  * header "in send queue" count and the send-queue view. Disabled for invalid ids.
  */
 export const useSendQueue = (campaignId: number, options?: { enabled?: boolean }) => {
+	const queryClient = useQueryClient();
 	const query = useQuery({
 		queryKey: SEND_QUEUE_QUERY_KEYS.list(campaignId),
 		queryFn: () => fetchSendQueue(campaignId),
@@ -35,6 +37,20 @@ export const useSendQueue = (campaignId: number, options?: { enabled?: boolean }
 			return (data?.count ?? 0) > 0 ? SEND_QUEUE_REFETCH_INTERVAL_MS : false;
 		},
 	});
+	// The emails list doesn't poll (invalidation-only), but rows can leave the
+	// queue server-side: sent by the worker, or returned to Drafts by the
+	// moderation sweep. Piggyback on this query's 15s poll — a count drop means
+	// the Drafts/Sent lists are stale, so refresh them (returned drafts
+	// reappear with their badge without requiring a navigation/focus refetch).
+	const prevCountRef = useRef<number | null>(null);
+	const count = query.data?.count;
+	useEffect(() => {
+		if (count === undefined) return;
+		if (prevCountRef.current !== null && count < prevCountRef.current) {
+			queryClient.invalidateQueries({ queryKey: EMAIL_QUERY_KEYS.list() });
+		}
+		prevCountRef.current = count;
+	}, [count, queryClient]);
 	return {
 		items: query.data?.items ?? [],
 		count: query.data?.count ?? 0,
@@ -50,6 +66,9 @@ export interface EnqueueEmailsResult {
 	firstSendAt: string | null;
 	lastSendAt: string | null;
 	skippedNoCredits: number;
+	// Drafts refused because their current content carries a flagged moderation
+	// verdict (generic count only — the reason stays server-side).
+	skippedForReview: number;
 }
 
 /**
@@ -72,7 +91,7 @@ export const useEnqueueEmails = () => {
 			}
 			return response.json() as Promise<EnqueueEmailsResult>;
 		},
-		onSuccess: (_result, vars) => {
+		onSuccess: (result, vars) => {
 			queryClient.invalidateQueries({
 				queryKey: SEND_QUEUE_QUERY_KEYS.list(vars.campaignId),
 			});
@@ -80,6 +99,16 @@ export const useEnqueueEmails = () => {
 			// status === draft), so refreshing the emails list drops them.
 			queryClient.invalidateQueries({ queryKey: EMAIL_QUERY_KEYS.list() });
 			queryClient.invalidateQueries({ queryKey: ['campaign', vars.campaignId] });
+			// Toast here (not per-handler) so all three send handlers report the
+			// moderation skip identically. Deliberately generic — the verdict
+			// reason is server-side only.
+			if ((result.skippedForReview ?? 0) > 0) {
+				toast.warning(
+					`${result.skippedForReview} message${
+						result.skippedForReview === 1 ? ' was' : 's were'
+					} held for review and not queued.`
+				);
+			}
 		},
 	});
 };

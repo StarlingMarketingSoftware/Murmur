@@ -15,6 +15,11 @@ import {
 import { EmailStatus } from '@prisma/client';
 import { getValidatedParamsFromUrl } from '@/utils';
 import { withRateLimit } from '@/app/api/_utils/rateLimit';
+import {
+	contentHash,
+	flaggedHashesByEmailIds,
+	isEmailModerationEnabled,
+} from '@/app/api/_utils/sendQueue/moderation';
 
 const postSingleEmailSchema = z.object({
 	subject: z.string().min(1),
@@ -68,6 +73,28 @@ export async function GET(req: NextRequest) {
 				createdAt: 'desc' as const,
 			},
 		});
+
+		// Moderation badge (flag-gated so "off" costs nothing): a draft whose
+		// CURRENT content hash carries a flagged verdict was returned from the
+		// send queue for review. The client sees ONLY this boolean — the
+		// verdict/reason/categories are never selected on this path. Editing
+		// the draft changes its hash, so the badge self-clears.
+		if (isEmailModerationEnabled()) {
+			const draftIds = emails
+				.filter((e) => e.status === EmailStatus.draft)
+				.map((e) => e.id);
+			const flaggedByEmail = await flaggedHashesByEmailIds(draftIds);
+			if (flaggedByEmail.size > 0) {
+				return apiResponse(
+					emails.map((e) => ({
+						...e,
+						returnedForReview:
+							e.status === EmailStatus.draft &&
+							(flaggedByEmail.get(e.id)?.has(contentHash(e.subject, e.message)) ?? false),
+					})),
+				);
+			}
+		}
 
 		return apiResponse(emails);
 	} catch (error) {

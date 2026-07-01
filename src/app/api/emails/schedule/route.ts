@@ -12,6 +12,11 @@ import prisma from '@/lib/prisma';
 import { apiBadRequest, apiResponse, apiUnauthorized, handleApiError } from '@/app/api/_utils';
 import { withRateLimit } from '@/app/api/_utils/rateLimit';
 import { computeSchedule, SENDER_REF_TZ } from '@/app/api/_utils/sendQueue/scheduler';
+import {
+	contentHash,
+	flaggedHashesByEmailIds,
+	isEmailModerationEnabled,
+} from '@/app/api/_utils/sendQueue/moderation';
 
 const bodySchema = z.object({
 	campaignId: z.number().int().positive(),
@@ -38,16 +43,35 @@ export async function POST(request: Request) {
 			firstSendAt: null as string | null,
 			lastSendAt: null as string | null,
 			skippedNoCredits: 0,
+			skippedForReview: 0,
 		};
 
 		// Owned (userId == clerkId), still-draft emails in this campaign. An email is
 		// an email — no contact-type special casing; every selected draft is queued.
-		const schedulable = await prisma.email.findMany({
+		const allSchedulable = await prisma.email.findMany({
 			where: { id: { in: emailIds }, userId, campaignId, status: EmailStatus.draft },
-			select: { id: true, contactId: true },
+			select: { id: true, contactId: true, subject: true, message: true },
 		});
-		if (schedulable.length === 0) {
+		if (allSchedulable.length === 0) {
 			return apiResponse(emptySummary);
+		}
+
+		// Moderation skip: a draft whose CURRENT content already carries a flagged
+		// verdict is refused here (generic count only — the reason stays server-
+		// side) instead of round-tripping the queue just to bounce back to Drafts.
+		// Editing the draft changes its hash, so it becomes schedulable again and
+		// gets a fresh review in the queue.
+		let skippedForReview = 0;
+		let schedulable = allSchedulable;
+		if (isEmailModerationEnabled()) {
+			const flaggedHashes = await flaggedHashesByEmailIds(allSchedulable.map((e) => e.id));
+			schedulable = allSchedulable.filter(
+				(e) => !flaggedHashes.get(e.id)?.has(contentHash(e.subject, e.message)),
+			);
+			skippedForReview = allSchedulable.length - schedulable.length;
+			if (schedulable.length === 0) {
+				return apiResponse({ ...emptySummary, skippedForReview });
+			}
 		}
 
 		// Credit gate: available = floor(credits) − live pending/processing queue rows.
@@ -61,7 +85,7 @@ export async function POST(request: Request) {
 		const toSchedule = schedulable.slice(0, available);
 		const skippedNoCredits = schedulable.length - toSchedule.length;
 		if (toSchedule.length === 0) {
-			return apiResponse({ ...emptySummary, skippedNoCredits });
+			return apiResponse({ ...emptySummary, skippedNoCredits, skippedForReview });
 		}
 
 		// Existing per-day load so the scheduler fills only the remaining daily capacity.
@@ -127,6 +151,7 @@ export async function POST(request: Request) {
 			firstSendAt: slots[0].scheduledForUtc.toISOString(),
 			lastSendAt: slots[slots.length - 1].scheduledForUtc.toISOString(),
 			skippedNoCredits,
+			skippedForReview,
 		});
 	} catch (error) {
 		return handleApiError(error);
