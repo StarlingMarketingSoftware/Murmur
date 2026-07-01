@@ -239,6 +239,22 @@ async function runOnce(repeatIndex, chromium, ticket) {
 		const appKb = app?.footprintKb ?? app?.rssKb ?? 0;
 		const gpuKb = gpu?.footprintKb ?? gpu?.rssKb ?? 0;
 		const gpuDeltaKb = Math.max(0, gpuKb - (run.gpuBaselineKb ?? 0));
+		// Per-worker JS heap (mapbox tile/GeoJSON workers): memory-infra showed
+		// v8/workers as the largest renderer pool, and JSHeapUsedSize can't see it.
+		const workers = [];
+		for (const w of page.workers()) {
+			try {
+				const heap = await w.evaluate(() => {
+					const mem = globalThis.performance && performance.memory;
+					return mem
+						? { usedMb: +(mem.usedJSHeapSize / 1048576).toFixed(1), totalMb: +(mem.totalJSHeapSize / 1048576).toFixed(1) }
+						: null;
+				});
+				workers.push({ url: w.url().split('/').pop(), ...(heap ?? {}) });
+			} catch {
+				/* worker may be mid-teardown */
+			}
+		}
 		// Snapshot once and diff against that same snapshot — diffing against the
 		// live counters would double-count anything landing between the two reads.
 		const netNow = net.snapshot();
@@ -258,6 +274,7 @@ async function runOnce(repeatIndex, chromium, ticket) {
 			netSincePrev: net.diff(lastNetSnapshot, netNow),
 			queryCache,
 			mapStats,
+			workers,
 		};
 		lastNetSnapshot = netNow;
 		run.samples.push(s);
@@ -266,6 +283,9 @@ async function runOnce(repeatIndex, chromium, ticket) {
 			`[${phase}] heap ${s.jsHeapUsedMb}MB nodes ${s.domNodes} | app ${mb(appKb)}MB gpuΔ ${mb(gpuDeltaKb)}MB → M_user ${mb(s.mUserKb)}MB` +
 				(queryCache?.ok
 					? ` | RQ ovl ${queryCache.families?.overlay?.count ?? 0}/${((queryCache.families?.overlay?.estChars ?? 0) / 524288).toFixed(1)}MB res ${queryCache.families?.research?.count ?? 0} list ${queryCache.families?.list?.count ?? 0}`
+					: '') +
+				(workers.length
+					? ` | workers ${workers.map((w) => w.usedMb ?? '?').join('+')}MB`
 					: '')
 		);
 		return s;
@@ -402,7 +422,10 @@ async function runOnce(repeatIndex, chromium, ticket) {
 				const offset = (i % 2 === 0 ? -1 : 1) * Math.ceil(i / 2) * STREET_PAN_STEP;
 				await jumpTo({ lng: city.lng + offset, lat: city.lat, zoom: STREET_ZOOM }, 2500);
 			}
-			// Hover pass: project real rendered marker features to screen points.
+			// Hover pass at the city center (the last micro-pan parked ~15km out,
+			// where queryRenderedFeatures finds no markers).
+			await jumpTo({ lng: city.lng, lat: city.lat, zoom: STREET_ZOOM }, 2500);
+			// Project real rendered marker features to screen points.
 			const points = await page.evaluate(
 				({ layers, cap }) => {
 					try {
