@@ -33,7 +33,7 @@ export const INTENT_PROMPT_VERSION = 3;
 // deterministic fallback keeps search functional whenever the ladder loses.
 export const INTENT_LLM_TIMEOUT_MS = (() => {
 	const parsed = Number(process.env.SEARCH_QUERY_INTENT_TIMEOUT_MS);
-	return Number.isFinite(parsed) && parsed >= 500 ? parsed : 6000;
+	return Number.isFinite(parsed) && parsed >= 500 ? parsed : 7500;
 })();
 export const PERSON_TARGET_MATCH_THRESHOLD = 8;
 
@@ -377,23 +377,30 @@ export const parseLlmIntent = (
 type LlmFetchResult = { raw: string; model: string };
 type LlmFetch = (system: string, user: string) => Promise<LlmFetchResult>;
 
-// Provider ladder: OpenRouter models in order (DeepSeek first — cheapest
-// capable model for this classification job; env-overridable via
+// Provider ladder: OpenRouter models in order (env-overridable via
 // SEARCH_INTENT_OPENROUTER_MODELS so the rotation can change without a code
 // edit), then DIRECT Gemini as the last resort (separate provider path — an
 // OpenRouter outage can't take out the whole ladder).
 //
-// Budget discipline: each rung is CAPPED (primary gets the most room — the
-// full ~350-token completion on DeepSeek takes 2-4s; later rungs are fast
-// models) so a hung rung can never eat the whole ladder — measured live:
-// deepseek-v3.2 ~1.4-4s, gemini-2.5-flash-lite ~0.5s.
+// Default order is DATA-DRIVEN (measured on the real prompt, 2026-07):
+// gemini-2.5-flash-lite resolves the intent in ~0.5-1s at ~$0.10/M input;
+// deepseek-v3.2 needs ~4.3-4.6s at ~2.5x the input price and lost 6/6 in-app
+// attempts even at a 5s cap — putting it first paid its prefill on every
+// novel query while flash-lite did the work anyway. DeepSeek stays in the
+// ladder as the backup rung; flip the order with
+// SEARCH_INTENT_OPENROUTER_MODELS="deepseek/deepseek-v3.2,google/gemini-2.5-flash-lite"
+// if its pricing story changes.
+//
+// Budget discipline: each rung is CAPPED so a hung rung can never eat the
+// whole ladder. The rung-2 cap is sized so DeepSeek's honest ~4.5s completion
+// can finish when it actually gets its turn.
 const DEFAULT_OPENROUTER_INTENT_MODELS = [
-	'deepseek/deepseek-v3.2',
 	'google/gemini-2.5-flash-lite',
+	'deepseek/deepseek-v3.2',
 ] as const;
 const MIN_ATTEMPT_BUDGET_MS = 800;
-const PRIMARY_ATTEMPT_CAP_MS = 3500;
-const SECONDARY_ATTEMPT_CAP_MS = 1500;
+const PRIMARY_ATTEMPT_CAP_MS = 3000;
+const SECONDARY_ATTEMPT_CAP_MS = 5000;
 
 const openRouterIntentModels = (): string[] => {
 	const fromEnv = (process.env.SEARCH_INTENT_OPENROUTER_MODELS ?? '')
