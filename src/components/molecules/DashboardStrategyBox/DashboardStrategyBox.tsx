@@ -1587,30 +1587,68 @@ const DecorativeGlobeMap: FC = () => {
 		let viewportHeight = 0;
 		let map: mapboxgl.Map | null = null;
 
+		// Resolution cap: render this decoration at an effective devicePixelRatio
+		// of ~1 instead of the display's native ratio. Shrinking the canvas CSS
+		// size by `s`, compensating the camera with zoom + log2(s) and pixel
+		// offsets ×s, then CSS-upscaling the node by 1/s renders the *identical*
+		// frame at lower resolution (field-of-view is angular, so camera
+		// distance, globe radius and pixel offsets all scale linearly with
+		// canvas pixels; pitch/bearing/center are invariant).
+		const computeResolutionScale = () =>
+			Math.min(1, Math.max(0.5, 1 / (window.devicePixelRatio || 1)));
+		let resolutionScale = computeResolutionScale();
+		const insetZoom = () => DECORATIVE_INSET_ZOOM + Math.log2(resolutionScale);
+		const insetOffset = (): [number, number] => [
+			DECORATIVE_INSET_OFFSET_PX[0] * resolutionScale,
+			DECORATIVE_INSET_OFFSET_PX[1] * resolutionScale,
+		];
+
 		const syncViewportFrame = () => {
 			const rect = clipNode.getBoundingClientRect();
 			const width = Math.max(window.innerWidth, 1);
 			const height = Math.max(window.innerHeight, 1);
-			const shouldResizeMap = width !== viewportWidth || height !== viewportHeight;
+			// Recompute the scale so moving the window across monitors with
+			// different devicePixelRatios re-targets effective dpr 1.
+			const nextScale = computeResolutionScale();
+			const scaleChanged = nextScale !== resolutionScale;
+			const shouldResizeMap =
+				width !== viewportWidth || height !== viewportHeight || scaleChanged;
 
 			viewportWidth = width;
 			viewportHeight = height;
+			resolutionScale = nextScale;
 
-			mapNode.style.width = `${width}px`;
-			mapNode.style.height = `${height}px`;
-			mapNode.style.transform = `translate(${-rect.left}px, ${-rect.top}px)`;
+			mapNode.style.width = `${width * nextScale}px`;
+			mapNode.style.height = `${height * nextScale}px`;
+			mapNode.style.transformOrigin = '0 0';
+			// Translate first (parent-space px), then upscale about 0,0 — the
+			// on-screen footprint stays exactly the viewport as before.
+			mapNode.style.transform = `translate(${-rect.left}px, ${-rect.top}px) scale(${1 / nextScale})`;
 
 			if (shouldResizeMap && map) {
 				try {
+					if (scaleChanged) {
+						// Order matters: mapbox rejects min > current max (and
+						// max < current min), so raise the ceiling first when
+						// the compensated zoom goes up, floor first when down.
+						const nextZoom = insetZoom();
+						if (nextZoom > map.getMaxZoom()) {
+							map.setMaxZoom(nextZoom);
+							map.setMinZoom(nextZoom);
+						} else {
+							map.setMinZoom(nextZoom);
+							map.setMaxZoom(nextZoom);
+						}
+					}
 					map.resize();
 					map.easeTo({
 						center: [currentLng, baseLat],
-							zoom: DECORATIVE_INSET_ZOOM,
-							pitch: DASHBOARD_DECORATIVE_PITCH,
-							bearing: 0,
-							offset: DECORATIVE_INSET_OFFSET_PX,
-							duration: 0,
-						});
+						zoom: insetZoom(),
+						pitch: DASHBOARD_DECORATIVE_PITCH,
+						bearing: 0,
+						offset: insetOffset(),
+						duration: 0,
+					});
 				} catch {
 					// Non-fatal — map may be mid-teardown.
 				}
@@ -1635,16 +1673,19 @@ const DecorativeGlobeMap: FC = () => {
 			container: mapNode,
 			style: MAPBOX_STYLE,
 			center: [currentLng, baseLat],
-			zoom: DECORATIVE_INSET_ZOOM,
+			zoom: insetZoom(),
 			pitch: DASHBOARD_DECORATIVE_PITCH,
 			bearing: 0,
-			minZoom: DECORATIVE_INSET_ZOOM,
-			maxZoom: DECORATIVE_INSET_ZOOM,
+			minZoom: insetZoom(),
+			maxZoom: insetZoom(),
 			interactive: false,
 			attributionControl: false,
 			dragRotate: false,
 			pitchWithRotate: false,
 			touchPitch: false,
+			// Zoom-locked decoration — a retained tile LRU is pure waste
+			// (tiles in active use are unaffected by this setting).
+			maxTileCacheSize: 0,
 		});
 
 		const syncCamera = (duration = 0) => {
@@ -1652,10 +1693,10 @@ const DecorativeGlobeMap: FC = () => {
 			try {
 				map.easeTo({
 					center: [currentLng, baseLat],
-					zoom: DECORATIVE_INSET_ZOOM,
+					zoom: insetZoom(),
 					pitch: DASHBOARD_DECORATIVE_PITCH,
 					bearing: 0,
-					offset: DECORATIVE_INSET_OFFSET_PX,
+					offset: insetOffset(),
 					duration,
 					easing: (n) => n,
 				});
