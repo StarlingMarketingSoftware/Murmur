@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { MutableRefObject } from 'react';
 import type mapboxgl from 'mapbox-gl';
-import type { ContactWithName } from '@/types/contact';
 import type { LatLngLiteral } from './types';
 import { hashStringToStableKey } from './color';
 import { MARKER_HOVER_DARKEN_AMOUNT, darkenHexColor } from './mapExpressions';

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useEffect } from 'react';
 import type { MutableRefObject } from 'react';
 import type mapboxgl from 'mapbox-gl';
 import type { ContactWithName } from '@/types/contact';
