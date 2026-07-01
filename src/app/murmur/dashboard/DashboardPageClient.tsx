@@ -41,6 +41,21 @@ import {
 	mergeContactIdsWithSelectionLimit,
 	useDashboard,
 } from './useDashboard';
+import {
+	// DOM-free decision helpers for the Selection⇄Search Results ledger wheel arbiter.
+	// The arbiter reads live DOM + performs the scroll/divider side effects; these
+	// encode the tricky *decisions* (terminal absorb vs. fall-through, static-cursor
+	// region latch, seam resolution, wheel-delta split) and are unit-tested in
+	// ./ledgerWheel.test.ts.
+	LEDGER_POINTER_MOVE_EPS_PX,
+	clampLedgerResizeDelta,
+	forwardTerminalResult,
+	normalizeWheelDeltaPx,
+	resolveLedgerRegionFromGeometry,
+	shouldFallThroughToSecondary,
+	shouldRetargetLedgerRegion,
+	type LedgerSpendResult,
+} from './ledgerWheel';
 import { useLenis } from '@/contexts/ScrollContext';
 import { withClerkNoBranding } from '@/constants/auth';
 import { urls } from '@/constants/urls';
@@ -133,6 +148,7 @@ import { useClerk, useAuth, SignUp } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDashboardScrollToMap } from '@/hooks/useDashboardScrollToMap';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useShiftHoldMapSelectTool } from '@/hooks/useShiftHoldMapSelectTool';
 import {
 	useBatchUpdateContacts,
 	useGetContacts,
@@ -1898,9 +1914,9 @@ const LEDGER_FRACTION_MAX = 0.92;
 // rest, auto's rise reasserts (see the void-guard effect) so a shrunk Selection can't
 // strand an empty Results panel.
 const LEDGER_REST_FRACTION = 0.5;
-// Clamp any single wheel sample so an inertial "fling" can't slam the divider
-// across the whole range in one frame.
-const LEDGER_MAX_STEP_PX = 60;
+// The per-sample divider fling clamp now lives in ./ledgerWheel
+// (clampLedgerResizeDelta / LEDGER_MAX_STEP_PX) so it can be unit-tested and so the
+// unclamped delta can still drive native-speed inner-list scrolling.
 // Idle gap (ms) that resets the active ledger latch. Momentum frames arrive
 // ~16ms apart, well under this; a new gesture can re-target a different ledger.
 const LEDGER_GESTURE_IDLE_RESET_MS = 160;
@@ -3599,6 +3615,12 @@ const DashboardContent = () => {
 	// current). The map still needs an immediate signal to hide the old
 	// viewport-wide contact overlays during that pending gap.
 	const [isPendingRadiusSearchOnMap, setIsPendingRadiusSearchOnMap] = useState(false);
+	// Radius-center placement: while true, the map locks the radius pin to the cursor
+	// so the user picks the center by clicking, instead of the app assuming their
+	// closest location. Turned on when the user enables Radius (and re-armable via the
+	// slider handle); turned off once they click to place, cancel, or leave map view.
+	const [isRadiusPlacementActive, setIsRadiusPlacementActive] = useState(false);
+	const isRadiusPlacementActiveRef = useRef(false);
 	// Ref mirrors so submitMapBottomSearchQuery (a stable useCallback) reads current
 	// radius values without churning its deps on every slider tick.
 	const isRadiusModeEnabledRef = useRef(false);
@@ -3616,6 +3638,9 @@ const DashboardContent = () => {
 	useEffect(() => {
 		radiusMilesRef.current = radiusMiles;
 	}, [radiusMiles]);
+	useEffect(() => {
+		isRadiusPlacementActiveRef.current = isRadiusPlacementActive;
+	}, [isRadiusPlacementActive]);
 
 	// Restore remembered radius mode once on mount, then persist on change. The
 	// `radiusHydrated` gate stops the persist effect from clobbering storage with
@@ -4741,6 +4766,15 @@ const DashboardContent = () => {
 		fromHome: fromHomeParam,
 		disableAutoCreateCampaign: isAddToCampaignMode,
 	});
+
+	// Leaving the interactive map view cancels any in-progress radius placement so we
+	// never come back with the pin still glued to the cursor. (Declared after
+	// useDashboard since `isMapView` comes from it.)
+	useEffect(() => {
+		if (!isMapView && isRadiusPlacementActiveRef.current) {
+			setIsRadiusPlacementActive(false);
+		}
+	}, [isMapView]);
 
 	// Dashboard search has its own campaign context. In normal mode it follows the
 	// active campaign; in add-to-campaign mode it follows `fromCampaignId`; after a
@@ -6674,7 +6708,27 @@ const DashboardContent = () => {
 		(activeSearchQuery.trim().length > 0 ||
 			fromHomeParam ||
 			(isMapView && hasSearched && isMapResultsLoading));
-	const isSelectMapToolActive = activeMapTool === 'select';
+	// Hold Shift to temporarily switch to the square Select tool while the map's
+	// left-rail tool cluster is actually on screen (search tab, desktop map view,
+	// uncompressed chrome). Releasing Shift restores the user's chosen tool.
+	// Mirror the exact render gate of `mapSelectGrabberTool` so Shift arms only
+	// when the cluster is actually on screen: the tool renders when
+	// `isMapView && !isMobile && !isCompressedMapChrome` AND the search-results
+	// chrome is shown — i.e. a real search on the search tab, or the pre-auth
+	// fromHome map preview (which forces map view regardless of the active tab).
+	const isMapSelectToolClusterVisible =
+		isMapView &&
+		isMobile === false &&
+		!isCompressedMapChrome &&
+		((hasSearched && activeTab === 'search') || fromHomeParam);
+	const isShiftHoldMapSelect = useShiftHoldMapSelectTool(isMapSelectToolClusterVisible);
+	// Derived tool: Shift-hold overlays 'select' without mutating `activeMapTool`,
+	// so the base tool is restored on release and the post-selection snap-back to
+	// 'grab' can't cut a continuous Shift-hold multi-select short.
+	const effectiveMapTool: 'select' | 'grab' = isShiftHoldMapSelect
+		? 'select'
+		: activeMapTool;
+	const isSelectMapToolActive = effectiveMapTool === 'select';
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
 	const dashboardMapCampaignForHeader = dashboardSearchCampaign;
@@ -6938,6 +6992,10 @@ const DashboardContent = () => {
 	// idle gap resets it; this keeps trackpad momentum from retargeting mid-flick.
 	const ledgerGestureRegionRef = useRef<LedgerRegion | null>(null);
 	const ledgerLastWheelTsRef = useRef(0);
+	// Last pointer Y (clientY) seen by the wheel arbiter. Used to tell a *static*
+	// cursor (divider merely sliding under it) from a real re-aim, so an idle gap
+	// only re-targets the latched region when the pointer has actually moved.
+	const ledgerLastPointerYRef = useRef<number | null>(null);
 	const ledgerPrevSelectedCountRef = useRef(selectedContacts.length);
 
 	// Match the map panel skeleton wave animation so the cascade feels like it
@@ -7435,6 +7493,12 @@ const DashboardContent = () => {
 
 	const [isMapBottomSearchActive, setIsMapBottomSearchActive] = useState(false);
 	const [mapBottomSearchValue, setMapBottomSearchValue] = useState('');
+	// Ref mirror so radius placement (a click on the map) can read the current draft
+	// query text without recreating its handler on every keystroke.
+	const mapBottomSearchValueRef = useRef('');
+	useEffect(() => {
+		mapBottomSearchValueRef.current = mapBottomSearchValue;
+	}, [mapBottomSearchValue]);
 	// Last submitted "Search Anything" text that we keep visible in
 	// the bottom bar after the search collapses. When the user clicks the bar again
 	// we clear the draft field so typing starts a fresh search instead of editing
@@ -7782,6 +7846,10 @@ const DashboardContent = () => {
 		async (query: string) => {
 			const q = query.trim();
 			setIsMapBottomSearchAdvancedDraftArmed(false);
+			// Any explicit submit ends radius placement: if the user typed + hit enter
+			// instead of clicking the map, we shouldn't leave the pin glued to the
+			// cursor. (handleRadiusPlace already cleared it for click-to-place.)
+			setIsRadiusPlacementActive(false);
 			if (!q) {
 				setMapBottomCommittedSearchValue('');
 				// Empty box → still run a search; the blue arrow must never be a no-op.
@@ -7966,22 +8034,46 @@ const DashboardContent = () => {
 		if (isRadiusModeEnabledRef.current) {
 			radiusEnableTokenRef.current += 1;
 			setIsRadiusModeEnabled(false);
+			// Leaving radius mode also cancels any in-progress center placement.
+			setIsRadiusPlacementActive(false);
 			return;
 		}
-		// Enable: reuse a remembered center if we have one; otherwise prompt for
-		// location (with fallbacks). Do NOT run a search here — the circle/blob and
-		// center pin only appear once the user actually runs a radius search.
+		// Enable: enter cursor-locked PLACEMENT mode so the user drops the radius
+		// center wherever they want, instead of the app assuming their closest
+		// location. We intentionally do NOT resolve geolocation here anymore — the
+		// old behavior silently centered on the nearest location, which is exactly
+		// what the user asked us to stop doing. The circle/blob and committed center
+		// pin appear once they click to place (and run the search).
+		radiusEnableTokenRef.current += 1;
 		setIsRadiusModeEnabled(true);
-		if (radiusCenterRef.current) return;
-		const token = (radiusEnableTokenRef.current += 1);
-		void (async () => {
-			const resolved = await resolveRadiusCenter();
-			// Aborted if the user toggled off (or re-toggled) while we were resolving.
-			if (radiusEnableTokenRef.current !== token) return;
-			if (!resolved) return;
-			setRadiusCenter(resolved);
-		})();
-	}, [resolveRadiusCenter]);
+		setIsRadiusPlacementActive(true);
+	}, []);
+
+	// User clicked the map to drop the radius center. Commit the chosen center
+	// (synchronously on the ref so the search below reads it immediately), exit
+	// placement, and run the radius search from there — typed radius if there's
+	// query text, otherwise a curated radius "For You". This is what makes "place it
+	// down wherever I want" land the circle/pin/results exactly at the click.
+	const handleRadiusPlace = useCallback(
+		(center: LatLngLiteral) => {
+			// In flight to the campaign route: don't kick off a dashboard search that
+			// would re-mirror the URL over the pending campaign push.
+			if (isLeavingForCampaignRef.current) return;
+			radiusCenterRef.current = center;
+			setRadiusCenter(center);
+			setIsRadiusPlacementActive(false);
+			void submitMapBottomSearchQuery(mapBottomSearchValueRef.current);
+		},
+		[submitMapBottomSearchQuery]
+	);
+
+	// User cancelled placement (ESC) without picking a spot. Leave radius mode on but
+	// stop locking the pin to the cursor. Re-toggling Radius re-arms placement; if the
+	// user searches without ever placing, the submit path still falls back to their
+	// location, so a cancel never dead-ends the search.
+	const handleRadiusPlacementCancel = useCallback(() => {
+		setIsRadiusPlacementActive(false);
+	}, []);
 
 	// The radius slider is a pre-search filter: changing it only updates the draft
 	// value. The radius is applied on the next explicit search, not by mutating the
@@ -9399,6 +9491,7 @@ const DashboardContent = () => {
 		ledgerEngagedRef.current = false;
 		ledgerGestureRegionRef.current = null;
 		ledgerLastWheelTsRef.current = 0;
+		ledgerLastPointerYRef.current = null;
 		const panel = ledgerPanelRef.current;
 		if (panel) panel.style.removeProperty('--ledger-divisor');
 	}, [stopLedgerFollower]);
@@ -9465,12 +9558,19 @@ const DashboardContent = () => {
 				return;
 			}
 
-			// Normalize wheel deltas to pixels (line/page modes fire on some mice).
-			let rawDelta = event.deltaY;
-			if (event.deltaMode === 1) rawDelta *= 16;
-			else if (event.deltaMode === 2) rawDelta *= panel.clientHeight || 400;
-			if (Math.abs(rawDelta) < LEDGER_WHEEL_DEADZONE_PX) return;
-			const delta = clampNumber(rawDelta, -LEDGER_MAX_STEP_PX, LEDGER_MAX_STEP_PX);
+			// Normalize wheel deltas to pixels (line/page modes fire on some mice). This
+			// value is left UNCLAMPED: inner-list content scrolling uses it verbatim
+			// (`scrollTop += delta`) so scrolling the rows matches the browser's native
+			// wheel speed 1:1 — the previous shared 60px clamp made in-list scrolling feel
+			// clunky/slow next to normal scrolling. The DIVIDER resize applies its own
+			// fling-safety clamp internally (see resizeByDelta → clampLedgerResizeDelta),
+			// so a pathological inertial sample still can't slam the split across the panel.
+			const delta = normalizeWheelDeltaPx(
+				event.deltaY,
+				event.deltaMode,
+				panel.clientHeight
+			);
+			if (Math.abs(delta) < LEDGER_WHEEL_DEADZONE_PX) return;
 			// Suppress native inner-list scroll + CustomScrollbar's wheel handler so this
 			// arbiter is the sole mover (guarded: passive listeners can't preventDefault).
 			if (event.cancelable) event.preventDefault();
@@ -9597,35 +9697,40 @@ const DashboardContent = () => {
 			// toward rest, so a grown box can always be handed back.
 			const resizeByDelta = (deltaPx: number): boolean => {
 				const current = getCurrentFraction();
+				// Apply the fling-safety clamp to the DIVIDER only (content scroll stays
+				// unclamped for native feel). A normal mouse notch passes through untouched;
+				// only a pathological inertial sample is capped so it can't slam the split
+				// across the whole panel in one frame.
+				const resizePx = clampLedgerResizeDelta(deltaPx);
 				// Convert wheel pixels → split fraction using the LIVE usable height, so the
-				// divider travels exactly `deltaPx` on-screen pixels per wheel sample — the
+				// divider travels exactly `resizePx` on-screen pixels per wheel sample — the
 				// same 1:1 mapping the inner lists use (`scrollTop += deltaPx`). This keeps
 				// the general-ledger resize and the internal row scroll at one consistent
 				// speed at every panel size (a fixed px→fraction constant made the divider
 				// slower than the rows, and by a ratio that drifted with panel height).
 				let nextFraction = clampNumber(
-					current + deltaPx / usable,
+					current + resizePx / usable,
 					floorFraction,
 					ceilingFraction
 				);
 				// Once within the arrival band of an end stop, pin the target exactly to
 				// it so the divider comes to a clean, complete rest (rather than idling a
 				// hair short) before the gesture is allowed to hand off to inner scroll.
-				if (deltaPx > 0 && ceilingFraction - nextFraction <= LEDGER_LIMIT_EPS) {
+				if (resizePx > 0 && ceilingFraction - nextFraction <= LEDGER_LIMIT_EPS) {
 					nextFraction = ceilingFraction;
-				} else if (deltaPx < 0 && nextFraction - floorFraction <= LEDGER_LIMIT_EPS) {
+				} else if (resizePx < 0 && nextFraction - floorFraction <= LEDGER_LIMIT_EPS) {
 					nextFraction = floorFraction;
 				}
 				if (Math.abs(nextFraction - current) < 1e-4) return false;
 				if (
-					deltaPx > 0 &&
+					resizePx > 0 &&
 					!selectionOverflow &&
 					nextFraction > restingSelectionFraction + 1e-4
 				) {
 					return false;
 				}
 				if (
-					deltaPx < 0 &&
+					resizePx < 0 &&
 					!resultsOverflow &&
 					nextFraction < restingSelectionFraction - 1e-4
 				) {
@@ -9647,8 +9752,11 @@ const DashboardContent = () => {
 			//   • Reverse (deltaY < 0): first retrace the row scroll back to the top, and
 			//     only once it's back does the next sample hand the room back / move the
 			//     box toward its resting split.
-			const spendForRegion = (region: LedgerRegion, deltaPx: number): boolean => {
-				if (Math.abs(deltaPx) < LEDGER_WHEEL_DEADZONE_PX) return false;
+			const spendForRegion = (
+				region: LedgerRegion,
+				deltaPx: number
+			): LedgerSpendResult => {
+				if (Math.abs(deltaPx) < LEDGER_WHEEL_DEADZONE_PX) return 'blocked';
 				const forward = deltaPx > 0;
 				const content =
 					region === 'selection' ? selection ?? null : results ?? null;
@@ -9670,7 +9778,11 @@ const DashboardContent = () => {
 				if (forward) {
 					// Phase 1 — grow the box toward its open limit.
 					if (!targetAtGrowLimit) {
-						return resizeByDelta(resizeDelta);
+						// If the box can actually grow, that's a move. If it can't (already at
+						// its cap, or the empty-space gate blocked an over-rest expansion),
+						// this box has nothing to reveal in this direction: report `blocked`
+						// so the sample can fall through to the other box (no dead zone).
+						return resizeByDelta(resizeDelta) ? 'moved' : 'blocked';
 					}
 					// Phase 1's target is at the limit, but the eased divider hasn't
 					// visually arrived yet. Consume the sample WITHOUT scrolling so the box
@@ -9678,18 +9790,29 @@ const DashboardContent = () => {
 					// resize and scroll strictly sequential (never simultaneous). The band
 					// is wide enough that normal scrolls clear it within a frame or two, so
 					// there's no perceptible stall; a hard fling settles fully first.
-					if (!displayedAtGrowLimit) return true;
-					// Phase 2 — the box is fully open; now scroll its rows forward.
-					return scrollElementBy(content, deltaPx);
+					if (!displayedAtGrowLimit) return 'settling';
+					// Phase 2 — the box is fully open; now scroll its rows forward. If the
+					// rows can't move, the box is FULLY spent for a down-scroll: absorb the
+					// sample (`exhausted`) rather than fall through, so continuing to scroll
+					// past the end never reverses the divider by growing the other box (the
+					// "bugs when I get to the end and keep scrolling" jump).
+					return forwardTerminalResult(scrollElementBy(content, deltaPx));
 				}
 
 				// Reverse. Phase 1 — retrace the row scroll back toward the top first.
 				const contentAtTop = !content || content.scrollTop <= 0;
 				if (!contentAtTop) {
-					return scrollElementBy(content, deltaPx);
+					return scrollElementBy(content, deltaPx) ? 'moved' : 'exhausted';
 				}
-				// Phase 2 — rows are back at the top; hand the room back / move the box.
-				return resizeByDelta(resizeDelta);
+				// Phase 2 — rows are back at the top; hand the room back / move the box
+				// toward its resting split. If the divider can't move (already at rest/floor,
+				// or the empty-space gate blocks it), the box is spent for this up-scroll.
+				// Whether that's a dead zone worth handing to the other box depends on
+				// whether we ever grew past rest: if the box was already fully open (its rows
+				// were what we just retraced) treat a no-op resize as `exhausted` so we don't
+				// bounce the divider; otherwise `blocked` so a short list still falls through.
+				if (resizeByDelta(resizeDelta)) return 'moved';
+				return targetAtGrowLimit ? 'exhausted' : 'blocked';
 			};
 
 			const getRegionFromPointer = (): LedgerRegion => {
@@ -9700,22 +9823,23 @@ const DashboardContent = () => {
 				const selectionPanel = ledgerSelectionPanelRef.current;
 				const resultsPanel = results?.closest('[data-dashboard-ledger-region]');
 				if (selectionPanel && resultsPanel) {
-					const y = event.clientY;
 					const selectionRect = selectionPanel.getBoundingClientRect();
 					const resultsRect = resultsPanel.getBoundingClientRect();
-					if (y <= selectionRect.bottom) return 'selection';
-					if (y >= resultsRect.top) return 'results';
-					// In the seam/gap BETWEEN the two boxes, pick the region by scroll
-					// DIRECTION rather than the sub-pixel cursor position. The gap is a
-					// genuine discontinuity — its two halves resize the divider in opposite
-					// directions for the same scroll — so a nearest-edge midpoint split made
-					// a 1px cursor move flip the behavior (the "bug out" in the gap). Reading
-					// the panel as one continuous ledger, scrolling down reveals lower
-					// content (Results) and scrolling up reveals higher content (Selection);
-					// this also matches each neighbor (the gap's lower edge for downward
-					// scrolls, its upper edge for upward scrolls), so the seam stays
-					// consistent no matter where in the gap the pointer sits.
-					return delta > 0 ? 'results' : 'selection';
+					// Above the Selection box → Selection; below the Results box → Results.
+					// In the seam/gap BETWEEN them, resolve by scroll DIRECTION rather than
+					// the sub-pixel cursor position: the gap is a genuine discontinuity whose
+					// two halves resize the divider in opposite directions for the same
+					// scroll, so a nearest-edge midpoint split let a 1px cursor move flip the
+					// behavior (the "bug out" in the gap). Read as one continuous ledger,
+					// down reveals lower content (Results) and up reveals higher content
+					// (Selection); this also matches each neighbor at the gap's edges, so the
+					// seam stays consistent wherever in the gap the pointer sits.
+					return resolveLedgerRegionFromGeometry({
+						clientY: event.clientY,
+						selectionBottom: selectionRect.bottom,
+						resultsTop: resultsRect.top,
+						deltaSign: delta,
+					});
 				}
 				return 'results';
 			};
@@ -9741,28 +9865,45 @@ const DashboardContent = () => {
 					// scrolling it rather than snapping into a resize mid-flick.
 					ledgerGestureRegionRef.current = 'results';
 					ledgerLastWheelTsRef.current = performance.now();
+					ledgerLastPointerYRef.current = event.clientY;
 					return;
 				}
 			}
 
 			const now = performance.now();
+			// Re-target the latched region only when it's truly a new gesture: no latch
+			// yet, OR the wheel has gone idle AND the cursor has physically moved. A
+			// perfectly static cursor keeps its region across idle gaps, so the divider
+			// sliding UNDER a stationary pointer can never flip the active region — the
+			// cause of the seam "twitch/stutter" when the cursor straddled both boxes.
+			const prevPointerY = ledgerLastPointerYRef.current;
+			const pointerMoved =
+				prevPointerY == null ||
+				Math.abs(event.clientY - prevPointerY) > LEDGER_POINTER_MOVE_EPS_PX;
+			const idle = now - ledgerLastWheelTsRef.current > LEDGER_GESTURE_IDLE_RESET_MS;
 			if (
-				!ledgerGestureRegionRef.current ||
-				now - ledgerLastWheelTsRef.current > LEDGER_GESTURE_IDLE_RESET_MS
+				shouldRetargetLedgerRegion({
+					hasLatch: Boolean(ledgerGestureRegionRef.current),
+					idle,
+					pointerMoved,
+				})
 			) {
 				ledgerGestureRegionRef.current = getRegionFromPointer();
 			}
 			ledgerLastWheelTsRef.current = now;
+			ledgerLastPointerYRef.current = event.clientY;
 
 			const primaryRegion = ledgerGestureRegionRef.current ?? 'results';
 			const secondaryRegion: LedgerRegion =
 				primaryRegion === 'selection' ? 'results' : 'selection';
-			// Spend the whole sample on ONE motion of the latched box (resize XOR
-			// scroll — see spendForRegion). Only if that box can do nothing at all with
-			// this sample (fully open AND its rows can't scroll further) do we fall
-			// through to the other box, so short lists never create a dead wheel zone.
-			const actedOnPrimary = spendForRegion(primaryRegion, delta);
-			if (!actedOnPrimary) {
+			// Spend the whole sample on ONE motion of the latched box (resize XOR scroll —
+			// see spendForRegion). Fall through to the other box ONLY when the primary hit a
+			// genuine dead zone (`blocked`: nothing to reveal/scroll from a non-terminal
+			// state) so short lists never leave the wheel dead. A reached terminal
+			// (`exhausted`) is ABSORBED — handing it over would grow the other box and
+			// reverse the divider the user just moved (the end-of-scroll "bug out").
+			const primaryResult = spendForRegion(primaryRegion, delta);
+			if (shouldFallThroughToSecondary(primaryResult)) {
 				spendForRegion(secondaryRegion, delta);
 			}
 		},
@@ -11495,6 +11636,16 @@ const DashboardContent = () => {
 	const activeRadiusSearchOverlay = useMemo<
 		NonNullable<SearchResultsMapProps['radiusOverlay']> | null
 	>(() => {
+		// Immediately after the user drops a radius center (or submits a radius search),
+		// show the classic red pin + circle at that chosen center while results are
+		// still loading. Previously the visual could lag until results resolved.
+		if (isPendingRadiusSearchOnMap && radiusCenter) {
+			return {
+				center: radiusCenter,
+				radiusMiles,
+			};
+		}
+
 		// Typed radius search (free-text strict-radius): the circle comes from the
 		// committed free-text args.
 		if (
@@ -11525,7 +11676,7 @@ const DashboardContent = () => {
 		}
 
 		return null;
-	}, [lastFreeTextArgs, lastCuratedArgs]);
+	}, [isPendingRadiusSearchOnMap, radiusCenter, radiusMiles, lastFreeTextArgs, lastCuratedArgs]);
 
 	// A curated/"For You" blob search is the active geometry when engaged and the search drew a
 	// blob — the radius circle (typed strict-radius OR curated-radius For You) or the organic
@@ -11692,7 +11843,7 @@ const DashboardContent = () => {
 				? handleMapVisibleOverlayContactsChange
 				: undefined,
 			onOverlayBusyChange: handleMapOverlayBusyChange,
-			activeTool: isMapView ? activeMapTool : undefined,
+			activeTool: isMapView ? effectiveMapTool : undefined,
 			requestedZoom: isMapView ? mapZoomControlRequest : null,
 			selectedAreaBounds: selectedAreaBoundsForMap,
 			onViewportInteraction: isMapView ? handleMapViewportInteraction : undefined,
@@ -11721,6 +11872,12 @@ const DashboardContent = () => {
 			radiusOverlay: activeRadiusSearchOverlay,
 			suppressContextualContactOverlays: isPendingRadiusSearchOnMap,
 			onRadiusCenterChange: handleRadiusCenterChange,
+			// Cursor-locked radius-center placement (choose the center by clicking the
+			// map). Only meaningful in the interactive map view.
+			radiusPlacementActive: isMapView && isRadiusPlacementActive,
+			radiusPlacementMiles: radiusMiles,
+			onRadiusPlace: isMapView ? handleRadiusPlace : undefined,
+			onRadiusPlacementCancel: isMapView ? handleRadiusPlacementCancel : undefined,
 			// Venue-posted opportunity markers only on the interactive map, not the globe.
 			events: isMapView && mapGrabEventsActive ? eventsForMap : [],
 			suppressEventPopups: applyModalOpen,
@@ -11734,7 +11891,7 @@ const DashboardContent = () => {
 			renderEventPopupContent: isMapView ? renderEventPopupContent : undefined,
 		}),
 		[
-			activeMapTool,
+			effectiveMapTool,
 			applyModalOpen,
 			activeRadiusSearchOverlay,
 			activeSearchQuery,
@@ -11746,6 +11903,10 @@ const DashboardContent = () => {
 			dashboardMapCampaignFootprintContacts,
 			dashboardDraftingMapStatusByContactId,
 			handleRadiusCenterChange,
+			isRadiusPlacementActive,
+			radiusMiles,
+			handleRadiusPlace,
+			handleRadiusPlacementCancel,
 			globeNightLighting,
 			globeWeatherMood,
 			globeWeatherRegionCenter,
@@ -15178,6 +15339,7 @@ const DashboardContent = () => {
 															onMockStateChange={setCampaignsMockState}
 															defaultOpenCampaignId={fromCampaign?.id ?? activeCampaignId ?? null}
 															defaultOpenContactsFolder
+															showFinderSidebar
 															onFinderOpenChange={setIsCampaignFinderOpen}
 															enableRowDelete
 															onSelectCampaign={(campaignId) => {
@@ -15416,7 +15578,7 @@ const DashboardContent = () => {
 												}}
 											/>
 											<MapSelectGrabTool
-												activeTool={activeMapTool}
+												activeTool={effectiveMapTool}
 												onSelectClick={handleSelectMapToolClick}
 												onGrabClick={() => setActiveMapTool('grab')}
 												className="pointer-events-auto"
@@ -15728,7 +15890,7 @@ const DashboardContent = () => {
 																						});
 																					}
 																				}}
-																				activeTool={activeMapTool}
+																				activeTool={effectiveMapTool}
 																				requestedZoom={mapZoomControlRequest}
 																				selectedAreaBounds={selectedAreaBoundsForMap}
 																				onViewportInteraction={

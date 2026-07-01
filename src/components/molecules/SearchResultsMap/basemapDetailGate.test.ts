@@ -12,10 +12,13 @@ import {
 	MAP_LOW_ZOOM_LAKES_MAX_ZOOM,
 } from './constants';
 import {
+	buildBasemapLanduseFillColorExpression,
+	buildBasemapUrbanLanduseFilterExpression,
 	buildBasemapDetailOpacityRamp,
 	classifyBasemapDetailLayer,
 	containsZoomExpression,
 	isBasemapHillshadeLayer,
+	isBasemapLanduseLikeFillLayer,
 	isBasemapMajorRoadLikeLineLayer,
 	isBasemapWaterFillLayer,
 	isBasemapWaterwayLineLayer,
@@ -32,12 +35,58 @@ test('classifies low-zoom detail fills without matching base land or water', () 
 	);
 	assert.equal(classifyBasemapDetailLayer('fill', 'park', undefined), 'detail-fill');
 	assert.equal(classifyBasemapDetailLayer('fill', 'landuse', 'landuse'), 'detail-fill');
+	assert.equal(isBasemapLanduseLikeFillLayer('landuse', 'landuse'), true);
 
 	assert.equal(classifyBasemapDetailLayer('fill', 'water', 'water'), null);
 	assert.equal(classifyBasemapDetailLayer('fill', 'water-depth', 'water'), null);
 	assert.equal(classifyBasemapDetailLayer('fill', 'land', undefined), null);
 	assert.equal(classifyBasemapDetailLayer('fill', 'murmur-states-fill-hit'), null);
 	assert.equal(isBasemapWaterFillLayer('fill', 'water', 'water'), true);
+});
+
+test('keeps Mapbox landuse residential/city areas as a separate cream tone', () => {
+	assert.deepEqual(
+		buildBasemapLanduseFillColorExpression({
+			urban: '#F5F2EF',
+			land: '#B9E4D6',
+			landcover: '#B3E6D7',
+		}),
+		[
+			'match',
+			['get', 'class'],
+			[
+				'residential',
+				'commercial_area',
+				'industrial',
+				'facility',
+				'school',
+				'hospital',
+				'parking',
+				'airport',
+			],
+			'#F5F2EF',
+			['park', 'wood', 'grass', 'scrub', 'agriculture', 'cemetery', 'pitch'],
+			'#B3E6D7',
+			'#B9E4D6',
+		]
+	);
+
+	assert.deepEqual(buildBasemapUrbanLanduseFilterExpression(), [
+		'match',
+		['get', 'class'],
+		[
+			'residential',
+			'commercial_area',
+			'industrial',
+			'facility',
+			'school',
+			'hospital',
+			'parking',
+			'airport',
+		],
+		true,
+		false,
+	]);
 });
 
 test('classifies roads and waterways as detail linework', () => {

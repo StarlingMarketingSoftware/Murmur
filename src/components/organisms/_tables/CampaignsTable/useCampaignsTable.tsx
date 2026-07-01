@@ -68,7 +68,7 @@ type CampaignWithCounts = Campaign & {
 	userContactListIds?: number[];
 };
 
-type FinderFolderKey = 'contacts' | 'drafts' | 'inbox' | 'sent' | 'archive';
+export type FinderFolderKey = 'contacts' | 'drafts' | 'inbox' | 'sent' | 'archive';
 
 const CAMPAIGN_FINDER_DRAG_MIME = 'application/x-murmur-campaign-finder-item';
 
@@ -644,7 +644,7 @@ type CampaignFolderColors = { nameBoxColor: string; folderIconColor: string };
  * the real campaign list — i.e. the no-DB mock/debug harness rows — so that
  * harness still shows distinct per-row colors.
  */
-const getCampaignFolderColors = (
+export const getCampaignFolderColors = (
 	campaignId: number | string | null | undefined,
 	campaigns: ReadonlyArray<{ id: number }> | null | undefined,
 	fallbackIndex: number

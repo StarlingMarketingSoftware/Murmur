@@ -778,6 +778,18 @@ export const MURMUR_GLOBE_LIGHT_POLAR_DEG = 75;
 export const MAP_OCEAN_BLUE = '#62C7E3';
 export const MAP_LAND_CREAM = '#B9E4D6';
 export const MAP_LANDCOVER_GREEN = '#B3E6D7';
+// Mapbox Streets draws the broad city/town tint from the `landuse` source-layer,
+// primarily features whose `class` is `residential`. Keep that urban overlay
+// separate from the general land green so city areas read as a second tone.
+export const MAP_URBAN_LANDUSE_CREAM = '#F5F2EF';
+export const MAP_URBAN_LANDUSE_SOURCE_ID = 'murmur-urban-landuse';
+export const MAP_URBAN_LANDUSE_LAYER_ID = 'murmur-urban-landuse-fill';
+export const MAP_URBAN_LANDUSE_TILESET_URL = 'mapbox://mapbox.mapbox-streets-v8';
+export const MAP_URBAN_LANDUSE_SOURCE_LAYER = 'landuse';
+// Source residential landuse from z12 and overzoom it closer in. Mapbox Streets'
+// native z13+ landuse tiles drop the broad residential polygons, leaving only
+// individual facilities/parking/schools — the patchy white blocks from the bug.
+export const MAP_URBAN_LANDUSE_SOURCE_MAX_ZOOM = 12;
 
 // Low-zoom detail ladder: the globe/state overview should stay a clean, instant
 // base map. Mapbox Streets detail is held until after state-level zoom, then
@@ -976,6 +988,7 @@ export const MAPBOX_SOURCE_IDS = {
 	campaignFootprintNodes: 'murmur-campaign-footprint-nodes',
 	selectionRect: 'murmur-selection-rect',
 	selectedAreaRect: 'murmur-selected-area-rect',
+	radiusPreview: 'murmur-radius-preview',
 	campaignHeatmap: 'murmur-campaign-heatmap',
 	markersBase: 'murmur-markers-base',
 	markersPromotionDot: 'murmur-markers-promo-dot',
@@ -1064,6 +1077,9 @@ export const MAPBOX_LAYER_IDS = {
 	selectedAreaRect: 'murmur-selected-area-rect-line',
 	selectionRectFill: 'murmur-selection-rect-fill',
 	selectionRectLine: 'murmur-selection-rect-line',
+	// Radius placement preview (cursor-locked circle while choosing a center)
+	radiusPreviewFill: 'murmur-radius-preview-fill',
+	radiusPreviewLine: 'murmur-radius-preview-line',
 } as const;
 
 // ============================================================================

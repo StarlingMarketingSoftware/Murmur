@@ -631,6 +631,15 @@ if (typeof window !== 'undefined') {
 // runs client-side).
 const IS_SAFARI = isSafariBrowser();
 const CANVAS_PERF_MODE = true;
+const MAP_RIGHT_CLICK_DOUBLE_MS = 500;
+const MAP_RIGHT_CLICK_DOUBLE_DISTANCE_PX = 18;
+// "a bit of a zoom out": intentionally smaller than Mapbox's default full-level
+// (1.0) double-click step so a double right-click nudges the camera out rather
+// than making a big jump.
+const MAP_RIGHT_DOUBLE_CLICK_ZOOM_OUT_DELTA = 0.75;
+const MAP_RIGHT_DOUBLE_CLICK_ZOOM_EASE_MS = 300;
+const MAP_SHIFT_ARROW_ZOOM_DELTA = 1;
+const MAP_CUSTOM_INPUT_EVENT_KEY = '__murmurMapCustomInput';
 
 const createConfiguredZoomOutGovernor = () =>
 	createZoomOutGovernor({
@@ -852,6 +861,10 @@ const OWNED_VENUE_HOME_ICON_URL = `data:image/svg+xml;charset=UTF-8,${encodeURIC
 const OWNED_VENUE_HOME_ICON_IMAGE_DIMENSIONS = { width: 72, height: 63 } as const;
 const OWNED_VENUE_RING_STEPS = 160;
 const OWNED_VENUE_RADAR_MS = 3400;
+// Radius placement preview: convert the draft miles to km and how many segments to
+// draw the tracking circle with (smooth without being heavy on every mousemove).
+const KM_PER_MILE = 1.609344;
+const RADIUS_PLACEMENT_PREVIEW_STEPS = 128;
 // Radar sweeps animate via 3 GeoJSON setData calls per frame (reparse +
 // re-tessellation + forced repaint); 30fps over a 3.4s period is ~113 steps —
 // visually identical to 60fps at half the cost.
@@ -2399,6 +2412,21 @@ export interface SearchResultsMapProps {
 	suppressContextualContactOverlays?: boolean;
 	/** Called when the user drops the draggable radius center pin at a new location. */
 	onRadiusCenterChange?: (center: LatLngLiteral) => void;
+	/**
+	 * Radius-center placement mode. When true, the map locks the same red radius pin
+	 * used by the dropped-center UI (plus a live preview circle sized to
+	 * `radiusPlacementMiles`) to the cursor so the user can click anywhere to choose
+	 * the search center — instead of the app assuming the user's closest location.
+	 * Panning still works; a click that isn't a drag commits via `onRadiusPlace`.
+	 * ESC (or the parent toggling this off) cancels.
+	 */
+	radiusPlacementActive?: boolean;
+	/** Draft radius (miles) for the placement preview circle. */
+	radiusPlacementMiles?: number;
+	/** Fires with the chosen center when the user clicks to place the radius. */
+	onRadiusPlace?: (center: LatLngLiteral) => void;
+	/** Fires when the user cancels placement from within the map (e.g. ESC). */
+	onRadiusPlacementCancel?: () => void;
 	/** Current venue account location; draws the map-anchored home/radar overlay. */
 	ownedVenueLocation?: OwnedVenueLocation | null;
 	/**
@@ -2513,6 +2541,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	radiusOverlay = null,
 	suppressContextualContactOverlays = false,
 	onRadiusCenterChange,
+	radiusPlacementActive = false,
+	radiusPlacementMiles = 50,
+	onRadiusPlace,
+	onRadiusPlacementCancel,
 	ownedVenueLocation = null,
 	interactiveEntryCamera = null,
 	onOwnedVenueAnchorChange,
@@ -3756,8 +3788,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [onVisibleOverlayContactsChange, visibleOverlayContactsMatchingWhat]);
 
 	const areaSelectionEnabled = useMemo(
-		() => activeTool === 'select' && typeof onAreaSelect === 'function',
-		[activeTool, onAreaSelect]
+		// Radius-center placement owns all pointer input while active, so the square
+		// Select tool (incl. its Shift-hold shortcut) can't run at the same time.
+		() =>
+			activeTool === 'select' &&
+			typeof onAreaSelect === 'function' &&
+			!radiusPlacementActive,
+		[activeTool, onAreaSelect, radiusPlacementActive]
 	);
 
 	const setPolygonSourceBounds = useCallback(
@@ -3827,6 +3864,31 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const radiusMarkerRef = useRef<mapboxgl.Marker | null>(null);
 	const radiusMarkerZoomHandlerRef = useRef<(() => void) | null>(null);
+	// Cursor-locked radius placement (choose a center by clicking the map). The ghost
+	// marker is a plain DOM element positioned in viewport px on every mousemove; the
+	// preview circle is a Mapbox GeoJSON source updated from the same pointer lngLat.
+	const radiusPlacementGhostElRef = useRef<HTMLDivElement | null>(null);
+	const radiusPlacementLastLngLatRef = useRef<LatLngLiteral | null>(null);
+	const radiusPlacementDownClientRef = useRef<{ x: number; y: number } | null>(null);
+	// Latest props read inside the (create-once) placement pointer handlers.
+	const radiusPlacementActiveRef = useRef(radiusPlacementActive);
+	const radiusPlacementMilesRef = useRef(radiusPlacementMiles);
+	const onRadiusPlaceRef = useRef<SearchResultsMapProps['onRadiusPlace'] | null>(null);
+	const onRadiusPlacementCancelRef = useRef<
+		SearchResultsMapProps['onRadiusPlacementCancel'] | null
+	>(null);
+	useEffect(() => {
+		radiusPlacementActiveRef.current = radiusPlacementActive;
+	}, [radiusPlacementActive]);
+	useEffect(() => {
+		radiusPlacementMilesRef.current = radiusPlacementMiles;
+	}, [radiusPlacementMiles]);
+	useEffect(() => {
+		onRadiusPlaceRef.current = onRadiusPlace ?? null;
+	}, [onRadiusPlace]);
+	useEffect(() => {
+		onRadiusPlacementCancelRef.current = onRadiusPlacementCancel ?? null;
+	}, [onRadiusPlacementCancel]);
 	const ownedVenuePulseRafRef = useRef<number | null>(null);
 	const ownedVenueLat = ownedVenueLocation?.lat;
 	const ownedVenueLng = ownedVenueLocation?.lng;
@@ -8415,6 +8477,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		ensureSource(MAPBOX_SOURCE_IDS.campaignFootprintNodes);
 		ensureSource(MAPBOX_SOURCE_IDS.selectedAreaRect);
 		ensureSource(MAPBOX_SOURCE_IDS.selectionRect);
+		ensureSource(MAPBOX_SOURCE_IDS.radiusPreview);
 
 		// State label centroids (one point per state — avoids duplicate labels on MultiPolygon states)
 		ensureSource(MAPBOX_SOURCE_IDS.stateLabels);
@@ -10108,6 +10171,29 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			paint: { 'line-color': '#143883', 'line-opacity': 1, 'line-width': 2 },
 		});
 
+		// Radius placement preview — the live circle that tracks the cursor while the
+		// user is choosing a radius-search center. Matches the committed radius circle
+		// language (cream fill + white ring) so placement reads as a preview of the
+		// real result geometry. Above everything so it's never occluded while placing.
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.radiusPreviewFill,
+			type: 'fill',
+			source: MAPBOX_SOURCE_IDS.radiusPreview,
+			paint: { 'fill-color': '#EFE8D8', 'fill-opacity': 0.34, 'fill-antialias': true },
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.radiusPreviewLine,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.radiusPreview,
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
+			paint: {
+				'line-color': '#FFFFFF',
+				'line-opacity': 0.92,
+				'line-width': 2,
+				'line-blur': 0,
+			},
+		});
+
 		// All floor-shifted expressions above were built with the current floor
 		// delta, so creation/style-reload bakes it — keep the parity gate in step.
 		lastParityAppliedFloorDeltaRef.current = interactiveFloorDeltaRef.current;
@@ -10250,6 +10336,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				minZoom: mapInstance.getMinZoom(),
 				maxZoom: mapInstance.getMaxZoom(),
 			};
+		} catch {
+			// Non-fatal.
+		}
+		try {
+			mapInstance.keyboard.disableRotation();
 		} catch {
 			// Non-fatal.
 		}
@@ -10942,6 +11033,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			} catch {}
 			try {
 				map.keyboard.enable();
+				map.keyboard.disableRotation();
 			} catch {}
 			try {
 				map.touchZoomRotate.enable();
@@ -12528,7 +12620,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// recenters the radius and re-runs the search.
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
-		const showPin = !!radiusOverlay && searchEngaged && contactsWithCoords.length > 0;
+		// While the user is placing a new center, the cursor-locked ghost pin stands in
+		// for the committed pin — hide the draggable one so there's never two.
+		const showPin =
+			!!radiusOverlay &&
+			searchEngaged &&
+			!radiusPlacementActive;
 		if (!showPin) {
 			if (radiusMarkerZoomHandlerRef.current) {
 				map.off('zoom', radiusMarkerZoomHandlerRef.current);
@@ -12589,8 +12686,226 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isMapLoaded,
 		radiusOverlay,
 		searchEngaged,
-		contactsWithCoords,
+		radiusPlacementActive,
 		clearEmptyMapPrompt,
+	]);
+
+	// ── Radius-center placement (cursor-locked pin + live preview circle) ──────
+	// When radius mode is turned on, instead of assuming the user's closest location
+	// the map enters a "placement" mode: the same red radius pin used by the dropped
+	// center is locked to the cursor with a preview circle (sized to the draft
+	// slider), so the user can click anywhere to drop the center. Panning still
+	// works — only a click that isn't a drag commits. ESC cancels.
+	//
+	// Helper to (re)draw the preview circle from a lngLat + current draft radius.
+	const drawRadiusPlacementPreview = useCallback(
+		(lngLat: LatLngLiteral | null, radiusMilesOverride?: number) => {
+			if (!map) return;
+			const source = map.getSource(MAPBOX_SOURCE_IDS.radiusPreview) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			if (!source) return;
+			if (!lngLat) {
+				source.setData(EMPTY_POLYGON_FC as GeoJSON.FeatureCollection);
+				return;
+			}
+			const radiusMiles = radiusMilesOverride ?? radiusPlacementMilesRef.current;
+			const radiusKm = Math.max(0, radiusMiles) * KM_PER_MILE;
+			const circle = buildMercatorCircleMultiPolygon(
+				lngLat,
+				radiusKm,
+				RADIUS_PLACEMENT_PREVIEW_STEPS,
+				0,
+				0
+			);
+			const rings = circle ? mercatorMultiPolygonToLngLat(circle) : null;
+			if (!rings || rings.length === 0) {
+				source.setData(EMPTY_POLYGON_FC as GeoJSON.FeatureCollection);
+				return;
+			}
+			source.setData({
+				type: 'FeatureCollection',
+				features: [
+					{
+						type: 'Feature',
+						properties: {},
+						geometry: { type: 'Polygon', coordinates: rings[0] as number[][][] },
+					},
+				],
+			} as GeoJSON.FeatureCollection);
+		},
+		[map]
+	);
+
+	// Keep the preview circle in sync when the draft radius changes mid-placement.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		if (!radiusPlacementActive) return;
+		drawRadiusPlacementPreview(radiusPlacementLastLngLatRef.current);
+	}, [map, isMapLoaded, radiusPlacementActive, radiusPlacementMiles, drawRadiusPlacementPreview]);
+
+	// Once a radius center has been dropped, keep drawing the "old" radius UI circle
+	// from the committed overlay itself. This makes the red pin + circle appear
+	// immediately on drop (and stay visible even while results are loading / empty),
+	// instead of only appearing after curated blob geometry has contacts to build from.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		if (radiusPlacementActive) return;
+		if (
+			!radiusOverlay ||
+			!searchEngaged ||
+			// Once real radius results have loaded, the normal curated blob layer owns
+			// the circle behind markers. Keep this top-level preview only during the
+			// pending gap or for empty-result radius searches.
+			(!isLoading && contactsWithCoords.length > 0)
+		) {
+			drawRadiusPlacementPreview(null);
+			return;
+		}
+		drawRadiusPlacementPreview(radiusOverlay.center, radiusOverlay.radiusMiles);
+	}, [
+		map,
+		isMapLoaded,
+		radiusPlacementActive,
+		radiusOverlay,
+		searchEngaged,
+		isLoading,
+		contactsWithCoords,
+		drawRadiusPlacementPreview,
+	]);
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		if (isBackgroundPresentation) return;
+		if (!radiusPlacementActive) return;
+
+		const canvas = map.getCanvas();
+		const container = map.getContainer();
+
+		// Build the cursor-locked ghost pin (absolutely positioned inside the map
+		// container; we move it in viewport px on each pointer move).
+		const ghost = document.createElement('div');
+		ghost.dataset.radiusPlacementGhost = 'true';
+		ghost.style.position = 'absolute';
+		ghost.style.left = '0';
+		ghost.style.top = '0';
+		ghost.style.width = '22px';
+		ghost.style.height = '27px';
+		ghost.style.pointerEvents = 'none';
+		ghost.style.zIndex = String(HOVER_TOOLTIP_Z_INDEX + 9);
+		ghost.style.transformOrigin = 'bottom center';
+		ghost.style.willChange = 'transform';
+		ghost.style.filter = 'drop-shadow(0 2px 3px rgba(0,0,0,0.35))';
+		ghost.style.opacity = '0';
+		const ghostInner = document.createElement('div');
+		ghostInner.style.width = '100%';
+		ghostInner.style.height = '100%';
+		ghostInner.innerHTML = profileAreaMarkerSvg;
+		ghost.appendChild(ghostInner);
+		container.appendChild(ghost);
+		radiusPlacementGhostElRef.current = ghost;
+
+		// Position the ghost from Mapbox's `point` (canvas-local CSS px, i.e. the map
+		// container's own untransformed coordinate space). This is robust to any CSS
+		// transform on an ancestor (e.g. the scroll-scrub scale) — unlike a clientX -
+		// containerRect computation, which would be thrown off by that scale.
+		const positionGhost = (point: { x: number; y: number } | null) => {
+			if (!point) {
+				ghost.style.opacity = '0';
+				return;
+			}
+			// Anchor the pin tip at the pointer; scale the glyph with zoom to mirror the
+			// committed radius pin.
+			const scale = clamp(0.55 + ((map.getZoom() ?? 5) - 5) * 0.075, 0.6, 1.15);
+			ghost.style.transform = `translate(${point.x}px, ${point.y}px) translate(-50%, -100%) scale(${scale})`;
+			ghost.style.opacity = '1';
+		};
+
+		// Hide the native cursor over the canvas so only the ghost pin shows.
+		let prevCursor = '';
+		try {
+			prevCursor = canvas.style.cursor;
+			canvas.style.cursor = 'none';
+		} catch {
+			// Ignore.
+		}
+
+		const onMove = (e: mapboxgl.MapMouseEvent) => {
+			// Re-assert the hidden cursor: the shared hover handler resets it to '' on
+			// canvas mouseleave, so keep hiding it while placing.
+			try {
+				canvas.style.cursor = 'none';
+			} catch {
+				// Ignore.
+			}
+			radiusPlacementLastLngLatRef.current = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+			positionGhost(e.point);
+			drawRadiusPlacementPreview({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+		};
+		const onTouchMove = (e: mapboxgl.MapTouchEvent) => {
+			radiusPlacementLastLngLatRef.current = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+			positionGhost(e.point);
+			drawRadiusPlacementPreview({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+		};
+		const onDown = (e: mapboxgl.MapMouseEvent) => {
+			radiusPlacementDownClientRef.current = getClientPointFromDomEvent(e.originalEvent);
+		};
+		const onUp = (e: mapboxgl.MapMouseEvent) => {
+			// Only a left-click that didn't move (i.e. not a pan) places the center.
+			const domEv = e.originalEvent;
+			if (domEv instanceof MouseEvent && domEv.button !== 0) return;
+			const down = radiusPlacementDownClientRef.current;
+			radiusPlacementDownClientRef.current = null;
+			const up = getClientPointFromDomEvent(domEv);
+			const moved = Boolean(
+				down &&
+				up &&
+				(Math.abs(down.x - up.x) >= 6 || Math.abs(down.y - up.y) >= 6)
+			);
+			if (moved) return;
+			onRadiusPlaceRef.current?.({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+		};
+		const onCanvasLeave = () => {
+			ghost.style.opacity = '0';
+		};
+		const onKeyDown = (ev: KeyboardEvent) => {
+			if (ev.key === 'Escape') onRadiusPlacementCancelRef.current?.();
+		};
+
+		map.on('mousemove', onMove);
+		map.on('touchmove', onTouchMove);
+		map.on('mousedown', onDown);
+		map.on('click', onUp);
+		canvas.addEventListener('mouseleave', onCanvasLeave);
+		window.addEventListener('keydown', onKeyDown);
+
+		// Seed the preview at the last known pointer position (if any) so the circle is
+		// visible immediately after entering placement without waiting for a move.
+		drawRadiusPlacementPreview(radiusPlacementLastLngLatRef.current);
+
+		return () => {
+			map.off('mousemove', onMove);
+			map.off('touchmove', onTouchMove);
+			map.off('mousedown', onDown);
+			map.off('click', onUp);
+			canvas.removeEventListener('mouseleave', onCanvasLeave);
+			window.removeEventListener('keydown', onKeyDown);
+			try {
+				canvas.style.cursor = prevCursor;
+			} catch {
+				// Ignore.
+			}
+			ghost.remove();
+			radiusPlacementGhostElRef.current = null;
+			radiusPlacementDownClientRef.current = null;
+			drawRadiusPlacementPreview(null);
+		};
+	}, [
+		map,
+		isMapLoaded,
+		isBackgroundPresentation,
+		radiusPlacementActive,
+		drawRadiusPlacementPreview,
 	]);
 
 	const completeAreaSelection = useCallback(
@@ -14330,6 +14645,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			try {
 				const originalEvent = (e as { originalEvent?: Event }).originalEvent;
 				if (!originalEvent) return; // programmatic camera move — skip
+				if (
+					(originalEvent as Event & { [MAP_CUSTOM_INPUT_EVENT_KEY]?: boolean })[
+						MAP_CUSTOM_INPUT_EVENT_KEY
+					]
+				)
+					return;
 				// Skip during drag-pan: a pure pan should never change the tilt.
 				// This prevents the pitch ramp from firing when a pan-induced zoom
 				// change (e.g., at the world bounds) emits a 'zoom' event.
@@ -14541,15 +14862,176 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		try {
 			if (selecting) {
 				map.dragPan.disable();
+				// The square Select tool can now be engaged by *holding Shift*
+				// (hold-to-select on the dashboard search map + campaign map). Mapbox's
+				// native box-zoom is also a Shift+drag gesture, so while selecting we
+				// must disable it — otherwise a Shift+drag would draw our selection
+				// rectangle AND trigger a box-zoom on release, snapping the camera.
+				map.boxZoom.disable();
 			} else {
 				// Desktop re-passes the tuned inertia (a bare enable() resets it to
 				// Mapbox defaults); mobile gets native inertia via a bare enable().
 				enableDragPanFeel(map, !desktopInteractionTuningRef.current);
+				// Restore native box-zoom once the select tool is no longer active.
+				map.boxZoom.enable();
 			}
 		} catch {
 			// Ignore (handlers may not be ready yet).
 		}
 	}, [map, isMapLoaded, isBackgroundPresentation, areaSelectionEnabled, isAreaSelecting]);
+
+	// Custom map mouse/keyboard affordances:
+	// - a normal right click should be inert (and should not open the browser menu);
+	// - a double right click zooms out a small step;
+	// - Mapbox's built-in Shift+Arrow tilt/rotate shortcuts stay disabled. We let
+	//   Shift+Up/Right zoom in and Shift+Down/Left zoom out instead.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		if (isBackgroundPresentation) return;
+
+		try {
+			map.keyboard.disableRotation();
+		} catch {
+			// Non-fatal — older Mapbox builds may not expose keyboard rotation toggles.
+		}
+
+		let lastRightClick:
+			| {
+					at: number;
+					x: number;
+					y: number;
+			  }
+			| null = null;
+
+		const easeZoomBy = (
+			delta: number,
+			point: mapboxgl.Point | [number, number] | null,
+			originalEvent: Event
+		) => {
+			try {
+				(
+					originalEvent as Event & {
+						[MAP_CUSTOM_INPUT_EVENT_KEY]?: boolean;
+					}
+				)[MAP_CUSTOM_INPUT_EVENT_KEY] = true;
+				const currentZoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
+				const targetZoom = clamp(
+					currentZoom + delta,
+					map.getMinZoom(),
+					map.getMaxZoom()
+				);
+				if (Math.abs(targetZoom - currentZoom) < 0.01) return;
+				map.easeTo(
+					{
+						zoom: targetZoom,
+						around: point ? map.unproject(point) : map.getCenter(),
+						duration: MAP_RIGHT_DOUBLE_CLICK_ZOOM_EASE_MS,
+						easing: mapboxEaseOutQuart,
+						essential: true,
+					},
+					{ originalEvent }
+				);
+			} catch {
+				// Ignore transient teardown/style-race errors.
+			}
+		};
+
+		const canvas = map.getCanvas();
+		const canvasContainer = map.getCanvasContainer();
+		const getCanvasPoint = (event: MouseEvent): [number, number] => {
+			const rect = canvas.getBoundingClientRect();
+			const scaleX = rect.width > 0 ? canvas.offsetWidth / rect.width : 1;
+			const scaleY = rect.height > 0 ? canvas.offsetHeight / rect.height : 1;
+			return [
+				(event.clientX - rect.left) * scaleX,
+				(event.clientY - rect.top) * scaleY,
+			];
+		};
+
+		const onContextMenuCapture = (event: MouseEvent) => {
+			event.preventDefault();
+			event.stopPropagation();
+			if (typeof event.stopImmediatePropagation === 'function') {
+				event.stopImmediatePropagation();
+			}
+		};
+
+		const onMouseDownCapture = (event: MouseEvent) => {
+			if (event.button !== 2) return;
+
+			event.preventDefault();
+			event.stopPropagation();
+			if (typeof event.stopImmediatePropagation === 'function') {
+				event.stopImmediatePropagation();
+			}
+
+			const now =
+				Number.isFinite(event.timeStamp) && event.timeStamp > 0
+					? event.timeStamp
+					: Date.now();
+			const current = { at: now, x: event.clientX, y: event.clientY };
+			const previous = lastRightClick;
+			lastRightClick = current;
+			if (!previous || now - previous.at > MAP_RIGHT_CLICK_DOUBLE_MS) return;
+
+			const dx = current.x - previous.x;
+			const dy = current.y - previous.y;
+			if (Math.hypot(dx, dy) > MAP_RIGHT_CLICK_DOUBLE_DISTANCE_PX) return;
+
+			lastRightClick = null;
+			easeZoomBy(
+				-MAP_RIGHT_DOUBLE_CLICK_ZOOM_OUT_DELTA,
+				getCanvasPoint(event),
+				event
+			);
+		};
+
+		const onDblClickCapture = (event: MouseEvent) => {
+			if (event.button !== 2) return;
+			event.preventDefault();
+			event.stopPropagation();
+			if (typeof event.stopImmediatePropagation === 'function') {
+				event.stopImmediatePropagation();
+			}
+		};
+
+		const onKeyDownCapture = (event: KeyboardEvent) => {
+			if (!event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
+			if (
+				event.key !== 'ArrowUp' &&
+				event.key !== 'ArrowDown' &&
+				event.key !== 'ArrowLeft' &&
+				event.key !== 'ArrowRight'
+			) {
+				return;
+			}
+
+			event.preventDefault();
+			event.stopPropagation();
+			if (typeof event.stopImmediatePropagation === 'function') {
+				event.stopImmediatePropagation();
+			}
+
+			const zoomDirection =
+				event.key === 'ArrowUp' || event.key === 'ArrowRight' ? 1 : -1;
+			easeZoomBy(zoomDirection * MAP_SHIFT_ARROW_ZOOM_DELTA, null, event);
+		};
+
+		canvasContainer.addEventListener('contextmenu', onContextMenuCapture, true);
+		canvasContainer.addEventListener('mousedown', onMouseDownCapture, true);
+		canvasContainer.addEventListener('dblclick', onDblClickCapture, true);
+		// Mapbox binds its own keyboard handler on the canvas *container* in the
+		// bubble phase, so a capture-phase listener on that same element is
+		// guaranteed to run first (and intercept Shift+Arrow before Mapbox's
+		// pitch/rotate shortcuts) regardless of which child is the focus target.
+		canvasContainer.addEventListener('keydown', onKeyDownCapture, true);
+		return () => {
+			canvasContainer.removeEventListener('contextmenu', onContextMenuCapture, true);
+			canvasContainer.removeEventListener('mousedown', onMouseDownCapture, true);
+			canvasContainer.removeEventListener('dblclick', onDblClickCapture, true);
+			canvasContainer.removeEventListener('keydown', onKeyDownCapture, true);
+		};
+	}, [map, isMapLoaded, isBackgroundPresentation]);
 
 	// Keep the DESKTOP drag-pan inertia zoom-aware. The max flick speed
 	// intentionally ramps up at high zoom so city/street-level drags travel farther
@@ -16941,6 +17423,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 
 		const processMouseMove = (e: mapboxgl.MapMouseEvent) => {
+			// Radius placement owns the cursor (ghost pin + preview circle); skip the
+			// normal hover detection so it doesn't fight the hidden native cursor or
+			// surface marker/state hover affordances mid-placement.
+			if (radiusPlacementActiveRef.current) {
+				clearEmptyMapPrompt();
+				clearEventHoverImmediate();
+				return;
+			}
 			const pointer = getClientPointFromDomEvent(e.originalEvent);
 			if (pointer) {
 				updateSelectedTooltipHoverHiddenTarget(pointer.x, pointer.y);
@@ -17201,6 +17691,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const onClick = (e: mapboxgl.MapMouseEvent) => {
 			// In select mode, clicks are part of drawing/finishing a rectangle selection.
 			if (areaSelectionEnabled || isAreaSelecting) return;
+			// Radius placement owns clicks (its own handler commits the center); never
+			// let a placement click also disengage a search / select a marker or state.
+			if (radiusPlacementActiveRef.current) return;
 
 			// Marker click takes priority over state click.
 			const markerFeatures = map.queryRenderedFeatures(e.point, {
@@ -18147,6 +18640,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 		isDraggingRadiusRef.current = false;
 		radiusDragSuppressEmptyMapUntilRef.current = 0;
+		// Tear down any in-progress radius placement ghost pin.
+		radiusPlacementGhostElRef.current?.remove();
+		radiusPlacementGhostElRef.current = null;
+		radiusPlacementDownClientRef.current = null;
 
 		onMarkerHover?.(null);
 		clearMarkerConstellation();
@@ -18180,6 +18677,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			MAPBOX_SOURCE_IDS.curatedBlob,
 			MAPBOX_SOURCE_IDS.selectedAreaRect,
 			MAPBOX_SOURCE_IDS.selectionRect,
+			MAPBOX_SOURCE_IDS.radiusPreview,
 		];
 
 		try {

@@ -1,4 +1,5 @@
-import { useDeleteEmail, useEditEmail } from '@/hooks/queryHooks/useEmails';
+import { useEditEmail } from '@/hooks/queryHooks/useEmails';
+import { ReviewStatus } from '@/constants/prismaEnums';
 import { EmailWithRelations } from '@/types';
 import { ContactWithName } from '@/types/contact';
 import { convertHtmlToPlainText } from '@/utils';
@@ -132,7 +133,9 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 		subject,
 	} = props;
 
-	const { mutateAsync: deleteEmail, isPending: isPendingDeleteEmail } = useDeleteEmail();
+	const { mutateAsync: archiveEmail, isPending: isPendingDeleteEmail } = useEditEmail({
+		suppressToasts: true,
+	});
 
 	const lastClickedRef = useRef<number | null>(null);
 	const draftSettingsSnapshotRef = useRef<MurmurDraftSettingsSnapshotV1 | null>(null);
@@ -203,7 +206,10 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 	const handleDeleteDraft = async (e: React.MouseEvent, draftId: number) => {
 		e.stopPropagation();
 		e.preventDefault();
-		await deleteEmail(draftId);
+		await archiveEmail({
+			id: draftId,
+			data: { reviewStatus: ReviewStatus.rejected },
+		});
 	};
 
 	const [editedSubject, setEditedSubject] = useState('');
@@ -346,7 +352,7 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 		draftEmails,
 		isPendingEmails,
 		isPendingDeleteEmail,
-		deleteEmail,
+		deleteEmail: archiveEmail,
 		handleDraftClick,
 		handleDraftDoubleClick,
 		handleDeleteDraft,

@@ -27,6 +27,12 @@ import {
 	MAP_LOW_ZOOM_LAKES_MAX_ZOOM,
 	MAP_LOW_ZOOM_LAKES_SOURCE_ID,
 	MAP_OCEAN_BLUE,
+	MAP_URBAN_LANDUSE_CREAM,
+	MAP_URBAN_LANDUSE_LAYER_ID,
+	MAP_URBAN_LANDUSE_SOURCE_ID,
+	MAP_URBAN_LANDUSE_SOURCE_LAYER,
+	MAP_URBAN_LANDUSE_SOURCE_MAX_ZOOM,
+	MAP_URBAN_LANDUSE_TILESET_URL,
 	MAP_WORLD_LAND_LAYER_ID,
 	MAP_WORLD_LAND_LOCAL_DATA_URL,
 	MAP_WORLD_LAND_LOCAL_LAYER_ID,
@@ -65,10 +71,13 @@ import {
 	UNSUBSCRIBE_BURN_STAR_INTENSITY,
 } from './constants';
 import {
+	buildBasemapLanduseFillColorExpression,
+	buildBasemapUrbanLanduseFilterExpression,
 	buildBasemapDetailOpacityRamp,
 	classifyBasemapDetailLayer,
 	isBasemapHillshadeLayer,
 	isBasemapLandcoverLikeFillLayer,
+	isBasemapLanduseLikeFillLayer,
 	isBasemapMajorRoadLikeLineLayer,
 	isBasemapRoadLikeLineLayer,
 	isBasemapWaterFillLayer,
@@ -207,6 +216,7 @@ const getMapPalette = () => ({
 	ocean: MAP_OCEAN_BLUE,
 	land: MAP_LAND_CREAM,
 	landcover: MAP_LANDCOVER_GREEN,
+	urban: MAP_URBAN_LANDUSE_CREAM,
 });
 
 const getNightRoadHideT = (nightT: number, zoom: number) => {
@@ -360,6 +370,12 @@ export const applyNightLandPalette = (
 						UNSUBSCRIBE_BURN_LANDCOVER_HOT,
 						burnT
 					),
+					urban: burnMixColor3(
+						basePalette.urban,
+						UNSUBSCRIBE_BURN_LAND_MID,
+						UNSUBSCRIBE_BURN_LAND_HOT,
+						burnT
+					),
 				}
 			: basePalette;
 	const roadOpacityMul = 1 - getNightRoadHideT(nightT, zoom);
@@ -378,6 +394,8 @@ export const applyNightLandPalette = (
 	} catch {
 		// Non-fatal.
 	}
+	// eslint-disable-next-line @typescript-eslint/no-use-before-define -- defined below in the same module (concurrent urban-landuse helper); call site precedes its declaration.
+	ensureUrbanLanduseLayer(mapInstance, palette.urban);
 
 	try {
 		const style = mapInstance.getStyle();
@@ -408,8 +426,18 @@ export const applyNightLandPalette = (
 					mapInstance.setPaintProperty(id, 'fill-color', palette.landcover);
 				} else if (
 					type === 'fill' &&
-					(idLower.includes('landuse') || idLower === 'land')
+					isBasemapLanduseLikeFillLayer(idLower, sourceLayer)
 				) {
+					mapInstance.setPaintProperty(
+						id,
+						'fill-color',
+						buildBasemapLanduseFillColorExpression({
+							urban: palette.urban,
+							land: palette.land,
+							landcover: palette.landcover,
+						}) as any
+					);
+				} else if (type === 'fill' && idLower === 'land') {
 					mapInstance.setPaintProperty(id, 'fill-color', palette.land);
 				} else if (
 					type === 'line' &&
@@ -509,6 +537,81 @@ const applyBasemapDetailFillGate = (
 		);
 	} catch {
 		// Non-fill layer / unsupported paint property — the zoom range still culls it.
+	}
+};
+
+
+const getFirstMapboxLandDetailLayerId = (mapInstance: mapboxgl.Map): string | undefined => {
+	try {
+		for (const layer of mapInstance.getStyle()?.layers ?? []) {
+			const id = (layer as any)?.id as string | undefined;
+			if (!id || id.startsWith('murmur-')) continue;
+			if ((layer as any)?.type !== 'fill') continue;
+
+			const idLower = id.toLowerCase();
+			const sourceLayer = (layer as any)['source-layer'] as string | undefined;
+			if (
+				isBasemapLandcoverLikeFillLayer(idLower, sourceLayer) ||
+				isBasemapLanduseLikeFillLayer(idLower, sourceLayer)
+			) {
+				return id;
+			}
+		}
+	} catch {
+		// No insertion anchor.
+	}
+	return undefined;
+};
+
+const ensureUrbanLanduseLayer = (mapInstance: mapboxgl.Map, color = MAP_URBAN_LANDUSE_CREAM) => {
+	try {
+		if (!mapInstance.getSource(MAP_URBAN_LANDUSE_SOURCE_ID)) {
+			mapInstance.addSource(MAP_URBAN_LANDUSE_SOURCE_ID, {
+				type: 'vector',
+				url: MAP_URBAN_LANDUSE_TILESET_URL,
+				maxzoom: MAP_URBAN_LANDUSE_SOURCE_MAX_ZOOM,
+			} as any);
+		}
+	} catch {
+		// Optional visual refinement; native landuse still gets the palette expression.
+	}
+
+	try {
+		if (!mapInstance.getSource(MAP_URBAN_LANDUSE_SOURCE_ID)) return;
+		const beforeId = getFirstMapboxLandDetailLayerId(mapInstance);
+
+		if (mapInstance.getLayer(MAP_URBAN_LANDUSE_LAYER_ID)) {
+			mapInstance.setPaintProperty(MAP_URBAN_LANDUSE_LAYER_ID, 'fill-color', color);
+			if (beforeId) mapInstance.moveLayer(MAP_URBAN_LANDUSE_LAYER_ID, beforeId);
+			return;
+		}
+
+		mapInstance.addLayer(
+			{
+				id: MAP_URBAN_LANDUSE_LAYER_ID,
+				type: 'fill',
+				source: MAP_URBAN_LANDUSE_SOURCE_ID,
+				'source-layer': MAP_URBAN_LANDUSE_SOURCE_LAYER,
+				minzoom: BASEMAP_DETAIL_FILL_MIN_ZOOM,
+				filter: buildBasemapUrbanLanduseFilterExpression(),
+				paint: {
+					'fill-color': color,
+					'fill-opacity': [
+						'interpolate',
+						['linear'],
+						['zoom'],
+						BASEMAP_DETAIL_FILL_FADE_START_ZOOM,
+						0,
+						BASEMAP_DETAIL_FILL_FADE_END_ZOOM,
+						1,
+					],
+					'fill-antialias': false,
+				},
+			} as any,
+			beforeId
+		);
+	} catch {
+		// Optional visual refinement; native landuse still gets the palette expression.
 	}
 };
 
@@ -905,7 +1008,13 @@ export const applyFreeTrialMapVisualTuning = (
 					mapInstance.setPaintProperty(
 						id,
 						'fill-color',
-						isBasemapLandcoverLikeFillLayer(idLower, sourceLayer)
+						isBasemapLanduseLikeFillLayer(idLower, sourceLayer)
+							? (buildBasemapLanduseFillColorExpression({
+									urban: MAP_URBAN_LANDUSE_CREAM,
+									land: MAP_LAND_CREAM,
+									landcover: MAP_LANDCOVER_GREEN,
+								}) as any)
+							: isBasemapLandcoverLikeFillLayer(idLower, sourceLayer)
 							? MAP_LANDCOVER_GREEN
 							: MAP_LAND_CREAM
 					);

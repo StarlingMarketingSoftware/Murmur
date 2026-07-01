@@ -11,15 +11,26 @@ import { createPortal } from 'react-dom';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import CustomTable from '../../../molecules/CustomTable/CustomTable';
-import { useCampaignsTable, getActiveCampaignFinderDragPreview } from './useCampaignsTable';
+import {
+	useCampaignsTable,
+	getActiveCampaignFinderDragPreview,
+	getCampaignFolderColors,
+	type FinderFolderKey,
+} from './useCampaignsTable';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { cn } from '@/utils';
 import type { CampaignDataTypeSummary } from '@/utils/campaignDataTypes';
-import { CampaignApiError, useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
+import {
+	CampaignApiError,
+	useCreateCampaign,
+	useGetCampaigns,
+} from '@/hooks/queryHooks/useCampaigns';
 import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { generateCampaignName } from '@/utils/campaignNames';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import DragAddBadgeIcon from '@/components/atoms/_svg/DragAddBadgeIcon';
+import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
+import LogoIcon from '@/components/atoms/_svg/LogoIcon';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
@@ -153,6 +164,99 @@ const CampaignFinderTopBar = ({
 	);
 };
 
+type FinderSidebarRow = {
+	id: number;
+	name: string;
+	folderIconColor: string;
+};
+
+type CampaignsFinderSidebarProps = {
+	/** Active campaign folders, in the same order the table renders them. */
+	rows: FinderSidebarRow[];
+	/** The campaign whose finder is currently open (green highlight), or null. */
+	openCampaignId: number | null;
+	/** Open a campaign's finder in the main pane (Contacts pre-expanded). */
+	onSelectRoot: () => void;
+	/** Collapse the finder back to the all-folders list ("Murmur" root click). */
+	onSelectCampaign: (campaignId: number) => void;
+};
+
+/**
+ * Left rail for the dropdown finder view. It is NOT a second table — it's a
+ * Finder-style source list of shortcuts:
+ *   • "Murmur" (root) → closes the finder so every folder shows collapsed.
+ *   • each campaign  → opens that campaign's finder (Contacts expanded).
+ * It drives the SAME finder state the main pane reads (openCampaignId), so the
+ * two never disagree. Rendered as a sibling to the LEFT of
+ * `.campaigns-table-container` so the hover-delete overlay's container-anchored
+ * math is untouched.
+ */
+const CampaignsFinderSidebar: FC<CampaignsFinderSidebarProps> = ({
+	rows,
+	openCampaignId,
+	onSelectRoot,
+	onSelectCampaign,
+}) => {
+	// Root ("Murmur") is the active shortcut whenever no campaign finder is open.
+	const isRootActive = openCampaignId === null;
+	return (
+		<div
+			className="campaigns-finder-sidebar"
+			data-custom-table-ignore-row-click="true"
+			aria-label="Folders"
+		>
+			<div className="campaigns-finder-sidebar-dots" aria-hidden="true">
+				<span />
+				<span />
+				<span />
+			</div>
+			<div className="campaigns-finder-sidebar-label">Folders</div>
+			<div className="campaigns-finder-sidebar-list">
+				<button
+					type="button"
+					className={cn(
+						'campaigns-finder-sidebar-item campaigns-finder-sidebar-item-root',
+						isRootActive && 'campaigns-finder-sidebar-item-active'
+					)}
+					aria-pressed={isRootActive}
+					onClick={onSelectRoot}
+				>
+					<span className="campaigns-finder-sidebar-item-icon campaigns-finder-sidebar-item-icon-root">
+						<LogoIcon width={18} height={16} pathClassName="fill-black" />
+					</span>
+					<span className="campaigns-finder-sidebar-item-name">Murmur</span>
+				</button>
+				{rows.map((row) => {
+					const isActive = row.id === openCampaignId;
+					return (
+						<button
+							key={row.id}
+							type="button"
+							className={cn(
+								'campaigns-finder-sidebar-item',
+								isActive && 'campaigns-finder-sidebar-item-active'
+							)}
+							aria-pressed={isActive}
+							onClick={() => onSelectCampaign(row.id)}
+							title={row.name}
+						>
+							<span className="campaigns-finder-sidebar-item-icon">
+								<DashboardActionBarFolderIcon
+									width={18}
+									height={11}
+									style={{ color: row.folderIconColor, display: 'block' }}
+									aria-hidden="true"
+								/>
+							</span>
+							<span className="campaigns-finder-sidebar-item-name">{row.name}</span>
+						</button>
+					);
+				})}
+			</div>
+		</div>
+	);
+};
+
 export type CampaignsMockFolder = {
 	name?: string;
 	draftCount?: number;
@@ -186,6 +290,12 @@ type CampaignsTableProps = {
 	 * surface instead of navigating to the campaign page.
 	 */
 	onSelectCampaign?: (campaignId: number) => void;
+	/**
+	 * Dropdown-only: render the left #F4F4F4 Finder sidebar (source list of
+	 * folder shortcuts) beside the table. The box grows leftward by the sidebar
+	 * width; the main table keeps its size. Desktop single-pane view only.
+	 */
+	showFinderSidebar?: boolean;
 };
 
 export const CampaignsTable: FC<CampaignsTableProps> = ({
@@ -196,6 +306,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 	onFinderOpenChange,
 	enableRowDelete = false,
 	onSelectCampaign,
+	showFinderSidebar = false,
 }) => {
 	const router = useRouter();
 	// Treat all mobile orientations (portrait and landscape) as mobile for this table
@@ -325,6 +436,10 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 	const { mutateAsync: createCampaign, isPending: isPendingCreateCampaign } =
 		useCreateCampaign({ suppressToasts: true });
 	const isAddingCampaign = isPendingCreateContactList || isPendingCreateCampaign;
+	// Real campaign list — the id-keyed source of truth for folder colors so the
+	// sidebar swatches match the table row pills exactly (falls back to render
+	// index for mock/debug rows not in this list).
+	const { data: realCampaignsData } = useGetCampaigns();
 	const campaignRows = Array.isArray(campaignDataRows) ? campaignDataRows : [];
 	const campaignCount = campaignRows.length;
 	const isSplitFinderView =
@@ -981,6 +1096,43 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 	// Read the drag-preview descriptor once per render (const so TS narrows the union).
 	const finderDragPreview = finderDragPreviewRef.current;
 
+	// Finder sidebar (dropdown-only). It mirrors the SINGLE finder's state so the
+	// rail highlight and the open pane never disagree. Colors are resolved from the
+	// real campaign list (id-keyed) exactly like the table rows, with the render
+	// index as the mock/debug fallback.
+	const singleOpenCampaignId = singleCampaignsTable.openCampaignId;
+	const openSingleFinderForCampaign = singleCampaignsTable.openFinderForCampaign;
+	const closeSingleFinder = singleCampaignsTable.closeFinder;
+	const finderSidebarRows: FinderSidebarRow[] = campaignRows.map((campaign, index) => {
+		const row = campaign as { id: number; name?: string | null };
+		return {
+			id: row.id,
+			name: row.name || `Folder ${index + 1}`,
+			folderIconColor: getCampaignFolderColors(
+				row.id,
+				realCampaignsData as ReadonlyArray<{ id: number }> | null | undefined,
+				index
+			).folderIconColor,
+		};
+	});
+	// Desktop, single-pane view only: the sidebar shares the single table's finder.
+	const isFinderSidebarVisible =
+		showFinderSidebar && !shouldShowMobileFeatures && !isSplitFinderView;
+	// Plain handlers (not hooks): this point is past the `isMobile === null` early
+	// return, so calling useCallback here would violate rules-of-hooks. They're
+	// only handed to a child that re-renders with this component anyway.
+	const handleFinderSidebarSelectRoot = () => {
+		// "Murmur" root → collapse the finder so every folder shows closed.
+		closeSingleFinder();
+	};
+	const handleFinderSidebarSelectCampaign = (campaignId: number) => {
+		// Re-selecting the already-open folder is a no-op (keeps it open).
+		if (campaignId === singleOpenCampaignId) return;
+		// Open the campaign with Contacts pre-expanded, matching the dropdown's
+		// default-open behavior.
+		openSingleFinderForCampaign(campaignId, ['contacts'] as FinderFolderKey[]);
+	};
+
 	return (
 		<>
 		{leftCampaignsTable.campaignRowMenuPortals}
@@ -1007,8 +1159,18 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 				<div
 					className={`mobile-campaigns-wrapper ${
 						shouldShowMobileFeatures ? 'mobile-portrait-mode' : ''
-					} ${shouldShowMobileFeatures && isLandscape ? 'mobile-landscape-mode' : ''}`}
+					} ${shouldShowMobileFeatures && isLandscape ? 'mobile-landscape-mode' : ''} ${
+						isFinderSidebarVisible ? 'campaigns-finder-has-sidebar' : ''
+					}`}
 				>
+					{isFinderSidebarVisible ? (
+						<CampaignsFinderSidebar
+							rows={finderSidebarRows}
+							openCampaignId={singleOpenCampaignId}
+							onSelectRoot={handleFinderSidebarSelectRoot}
+							onSelectCampaign={handleFinderSidebarSelectCampaign}
+						/>
+					) : null}
 					<div
 						className="campaigns-table-container"
 						id="campaigns-table-container"

@@ -50,6 +50,49 @@ const isLanduseLikeFillLayer = (idLower: string, sourceLayer?: string) => {
 	return src === 'landuse' || idLower.includes('landuse');
 };
 
+export type BasemapLanduseFillPalette = {
+	urban: string;
+	land: string;
+	landcover: string;
+};
+
+// Every *developed / built* landuse class reads as the cream "city" tone. This
+// must be the full built set, not just `residential`: in Mapbox Streets the
+// native `landuse` fill drives `residential` opacity to 0 at zoom ≥ 10 (Mapbox
+// expects the base land color to carry residential), while the OTHER built
+// classes (industrial, commercial, school, hospital, parking, …) stay fully
+// opaque at close zoom. If those are not cream, they fall through to the green
+// land fallback and punch green holes into the city — the "patchy" look. Keeping
+// the whole built set cream makes the urban footprint one consistent tone; only
+// true vegetation (handled separately below) stays green.
+export const MAPBOX_URBAN_LANDUSE_CLASSES = [
+	'residential',
+	'commercial_area',
+	'industrial',
+	'facility',
+	'school',
+	'hospital',
+	'parking',
+	'airport',
+] as const;
+export const buildBasemapLanduseFillColorExpression = ({
+	urban,
+	land,
+	landcover,
+}: BasemapLanduseFillPalette) =>
+	[
+		'match',
+		['get', 'class'],
+		MAPBOX_URBAN_LANDUSE_CLASSES,
+		urban,
+		['park', 'wood', 'grass', 'scrub', 'agriculture', 'cemetery', 'pitch'],
+		landcover,
+		land,
+	] as const;
+
+export const buildBasemapUrbanLanduseFilterExpression = () =>
+	['match', ['get', 'class'], MAPBOX_URBAN_LANDUSE_CLASSES, true, false] as const;
+
 export const classifyBasemapDetailLayer = (
 	type: string | undefined,
 	idLower: string,
@@ -99,6 +142,11 @@ export const isBasemapLandcoverLikeFillLayer = (
 	idLower: string,
 	sourceLayer?: string
 ) => isLandcoverLikeFillLayer(idLower, sourceLayer);
+
+export const isBasemapLanduseLikeFillLayer = (
+	idLower: string,
+	sourceLayer?: string
+) => isLanduseLikeFillLayer(idLower, sourceLayer);
 
 export const isBasemapRoadLikeLineLayer = (
 	idLower: string,

@@ -269,6 +269,16 @@ const formatBatchTimestamp = (date: Date) => {
 	return `${month}/${day}`;
 };
 
+const formatArchiveDraftDate = (value?: string | Date | null) => {
+	if (!value) return '';
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) return '';
+	const month = String(date.getMonth() + 1).padStart(2, '0');
+	const day = String(date.getDate()).padStart(2, '0');
+	const year = String(date.getFullYear()).slice(-2);
+	return `${month}.${day}.${year}`;
+};
+
 export type ContactsExpandedTopNavStop = ContactsHeaderChromeCampaignStop;
 export type ContactsExpandedListFocusMode = 'contacts' | 'drafts' | 'inbox';
 
@@ -1294,6 +1304,8 @@ export interface ContactsExpandedListProps {
 	allContacts?: ContactWithName[];
 	/** Optional campaign drafts to show below draftable contacts. */
 	drafts?: EmailWithRelations[];
+	/** Optional rejected/deleted campaign drafts shown in the All-tab Archive band. */
+	archivedDrafts?: EmailWithRelations[];
 	/** Optional campaign sent emails shown by the inbox-panel Sent filter. */
 	sentEmails?: EmailWithRelations[];
 	/** Optional campaign inbox replies to show below drafts. */
@@ -1418,6 +1430,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	contacts,
 	allContacts,
 	drafts,
+	archivedDrafts,
 	sentEmails,
 	inboxEmails,
 	optimisticInboxReplyByEmailId,
@@ -1939,6 +1952,15 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		return map;
 	}, [allCampaignContacts, contactByEmail]);
 	const supplementalDraftRows = useMemo(() => drafts ?? [], [drafts]);
+	const archivedDraftRows = useMemo(
+		() =>
+			[...(archivedDrafts ?? [])].sort(
+				(a, b) =>
+					new Date(b.updatedAt ?? b.createdAt).getTime() -
+					new Date(a.updatedAt ?? a.createdAt).getTime()
+			),
+		[archivedDrafts]
+	);
 	const supplementalSentRows = useMemo(() => sentEmails ?? [], [sentEmails]);
 	const supplementalSentThreadMessages = useMemo(
 		() => supplementalSentRows.map(normalizeSentEmailForInboxConversation),
@@ -2254,22 +2276,29 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const supplementalInboxConversationsGrouped = [...supplementalInboxConversations].sort(
 		(a, b) => getInboxGroupRank(a) - getInboxGroupRank(b)
 	);
+	const shouldShowArchiveSection =
+		!isBottomView &&
+		!isDraftsFocusMode &&
+		!isInboxFocusMode &&
+		resolvedActiveTopNavStop === 'all' &&
+		archivedDraftRows.length > 0;
 	const pastInboxIdsKey = pastInboxPanelConversations
 		.map((conversation) => conversation.key)
 		.join(',');
 	const visibleInboxPanelRowCount = filteredInboxPanelConversations.length;
+	const activeRenderedRows =
+		contacts.length + supplementalDraftRows.length + supplementalInboxConversations.length;
 	const totalRenderedRows = isInboxFocusMode
 		? visibleInboxPanelRowCount
-		: contacts.length +
-			supplementalDraftRows.length +
-			supplementalInboxConversations.length;
+		: activeRenderedRows + (shouldShowArchiveSection ? archivedDraftRows.length + 1 : 0);
 	const shouldShowAllTabEmptyContacts =
 		!shouldShowLoadingWave &&
 		!isBottomView &&
 		!isDraftsFocusMode &&
 		!isInboxFocusMode &&
 		activeTopNavStop === 'all' &&
-		totalRenderedRows === 0;
+		activeRenderedRows === 0 &&
+		!shouldShowArchiveSection;
 	const shouldShowScrollbar =
 		!isBottomView &&
 		(isInboxFocusMode ? visibleInboxPanelRowCount >= 6 : totalRenderedRows >= 14);
@@ -2303,6 +2332,37 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		// offsetTop is scroller-relative, so it equals the past band's height.
 		scroller.scrollTop = liveSection.offsetTop;
 	}, [isInboxFocusMode, inboxPanelTab, pastInboxIdsKey]);
+
+	const archiveListScrollerRef = useRef<HTMLDivElement | null>(null);
+	const archiveSectionRef = useRef<HTMLDivElement | null>(null);
+	const [isArchivePinned, setIsArchivePinned] = useState(false);
+	const [shouldShowSeeArchivedButton, setShouldShowSeeArchivedButton] =
+		useState(false);
+	const updateArchiveScrollState = useCallback(() => {
+		const scroller = archiveListScrollerRef.current;
+		const section = archiveSectionRef.current;
+		if (!shouldShowArchiveSection || !scroller || !section) {
+			setIsArchivePinned(false);
+			setShouldShowSeeArchivedButton(false);
+			return;
+		}
+		const archiveTop = Math.max(0, section.offsetTop);
+		const pinned = scroller.scrollTop >= archiveTop - 4;
+		setIsArchivePinned(pinned);
+		setShouldShowSeeArchivedButton(scroller.scrollTop < archiveTop - 24);
+	}, [shouldShowArchiveSection]);
+	useLayoutEffect(() => {
+		updateArchiveScrollState();
+	}, [archivedDraftRows.length, updateArchiveScrollState]);
+	const scrollToArchiveSection = useCallback(() => {
+		const scroller = archiveListScrollerRef.current;
+		const section = archiveSectionRef.current;
+		if (!scroller || !section) return;
+		scroller.scrollTo({ top: section.offsetTop, behavior: 'smooth' });
+	}, []);
+	const scrollToActiveRows = useCallback(() => {
+		archiveListScrollerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+	}, []);
 
 	const { data: campaignContactEvents } = useGetCampaignContactEvents(campaign?.id, {
 		enabled: isBottomView && Boolean(campaign?.id),
@@ -3078,6 +3138,128 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		);
 	};
 
+	const renderArchivedDraftRow = (draft: EmailWithRelations, archiveIndex: number) => {
+		const contact =
+			contactsById.get(draft.contactId) ??
+			((draft.contact as ContactWithName | null) || null);
+		const rawContactName = getContactFullName(contact);
+		const rawCompanyLabel = contact?.company || '';
+		const contactName = rawContactName.includes('@') ? '' : rawContactName;
+		const companyLabel = rawCompanyLabel.includes('@')
+			? !contactName
+				? 'Unknown Contact'
+				: ''
+			: rawCompanyLabel || (!contactName ? 'Unknown Contact' : '');
+		const contactTitle = getContactTitle(contact);
+		const messagePreview = draft.message
+			? convertHtmlToPlainText(draft.message)
+			: 'No content';
+		const archivedAtLabel = formatArchiveDraftDate(draft.updatedAt ?? draft.createdAt);
+
+		return (
+			<div
+				key={`contacts-archive-draft-${draft.id}-${archiveIndex}`}
+				className="relative select-none cursor-pointer overflow-hidden"
+				style={{
+					width: contactRowWidth,
+					height: `${SUPPLEMENTAL_INBOX_ROW_HEIGHT_PX}px`,
+					borderRadius: `${SUPPLEMENTAL_DRAFT_ROW_RADIUS_PX}px`,
+					borderTop: '1.955px solid #000000',
+					borderRight: '1.949px solid #000000',
+					borderBottom: '1.949px solid #000000',
+					borderLeft: '1.949px solid #000000',
+					backgroundColor: '#EFEFEF',
+					boxSizing: 'border-box',
+				}}
+				onMouseEnter={(e) => {
+					setHoveredContactIndex(null);
+					onDraftHover?.(draft);
+					onContactHover?.(contact);
+					onContactRowHover?.(contact, e.currentTarget);
+				}}
+				onMouseLeave={() => {
+					onContactRowHover?.(null, null);
+				}}
+				onClick={(e) => {
+					e.stopPropagation();
+					onDraftClick?.(draft);
+					if (contact) onContactClick?.(contact);
+				}}
+			>
+				{/* Company (top, medium) + contact name (below, normal) — mirrors the sent/inbox
+				    card (InboxCardInner) so an archived row reads continuously with the rows above
+				    it, just gray and with an archived-date on the right. */}
+				<div className="absolute left-3 top-[10px] right-[58px] pr-1 pointer-events-none">
+					<FadeOverflowText
+						text={companyLabel}
+						className="font-inter text-[14.661px] font-medium leading-[19.547px] text-black"
+						splitNumericSuffix={false}
+					/>
+					<FadeOverflowText
+						text={contactName}
+						className="font-inter text-[14.661px] font-normal leading-[19.547px] text-black"
+						splitNumericSuffix={false}
+					/>
+				</div>
+
+				{archivedAtLabel && (
+					<div className="absolute right-[10px] top-[10px] pointer-events-none font-inter text-[13px] font-normal leading-none text-black">
+						{archivedAtLabel}
+					</div>
+				)}
+
+				<div className="absolute top-[9px] left-1/2 right-[58px] pl-1 pointer-events-none">
+					{contactTitle ? (
+						<TitleBadge
+							title={contactTitle}
+							className="w-full h-[17px] rounded-[6px] px-2 gap-1"
+							textClassName="text-[10px] leading-none text-black"
+							fillColor="#EFEFEF"
+							strokeColor="#000000"
+							textColor="#000000"
+							showStroke={false}
+							restaurantIconSize={12}
+							coffeeIconSize={7}
+							defaultIconSize={12}
+						/>
+					) : null}
+				</div>
+
+				<div
+					className={cn(
+						'absolute left-1/2 right-[58px] pl-1 pointer-events-none',
+						contactTitle ? 'top-[30px]' : 'top-[9px]'
+					)}
+				>
+					<StateLocationRow
+						contact={contact}
+						className="h-[16px] w-full gap-1"
+						badgeClassName="box-border w-[29px] h-[16px] rounded-[4px] shrink-0"
+						badgeTextClassName="font-inter text-[10px] leading-none font-normal"
+						cityClassName="text-[10px] leading-none text-black"
+						badgeFillColor="#EFEFEF"
+						strokeColor="#000000"
+						textColor="#000000"
+						showBadgeStroke={false}
+					/>
+				</div>
+
+				<div className="absolute left-3 right-[12px] top-[48px] pointer-events-none">
+					<FadeOverflowText
+						text={draft.subject || 'No subject'}
+						className="font-inter text-[13.215px] font-semibold leading-[17px] text-black"
+						splitNumericSuffix={false}
+					/>
+					<FadeOverflowText
+						text={messagePreview}
+						className="font-inter text-[13.215px] font-normal leading-[17px] text-black"
+						splitNumericSuffix={false}
+					/>
+				</div>
+			</div>
+		);
+	};
+
 	return (
 		<div
 			className={cn(
@@ -3570,6 +3752,48 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 								document.body
 							);
 						})()}
+					{shouldShowArchiveSection && shouldShowSeeArchivedButton && (
+						<button
+							type="button"
+							className="absolute left-1/2 bottom-[9px] z-30 -translate-x-1/2 rounded-full bg-white px-[18px] py-[9px] font-inter text-[15px] font-semibold leading-none text-black transition-colors hover:bg-[#F3F4F6]"
+							style={{ border: 'none', cursor: 'pointer' }}
+							onClick={(e) => {
+								e.stopPropagation();
+								scrollToArchiveSection();
+							}}
+						>
+							See Archived
+						</button>
+					)}
+					{shouldShowArchiveSection && isArchivePinned && (
+						<button
+							type="button"
+							aria-label="Back to active rows"
+							className="absolute left-1/2 top-[4px] z-30 flex h-[16px] w-[44px] -translate-x-1/2 items-center justify-center rounded-full bg-white transition-colors hover:bg-[#F3F4F6]"
+							style={{ border: 'none', cursor: 'pointer' }}
+							onClick={(e) => {
+								e.stopPropagation();
+								scrollToActiveRows();
+							}}
+						>
+							<svg
+								width="12"
+								height="8"
+								viewBox="0 0 12 8"
+								fill="none"
+								xmlns="http://www.w3.org/2000/svg"
+								aria-hidden="true"
+							>
+								<path
+									d="M1 6.5L6 1.5L11 6.5"
+									stroke="#000000"
+									strokeWidth="1.6"
+									strokeLinecap="round"
+									strokeLinejoin="round"
+								/>
+							</svg>
+						</button>
+					)}
 					{/* Scrollable list */}
 					<CustomScrollbar
 						className="z-0 flex-1 drafting-table-content"
@@ -3580,8 +3804,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						contentClassName="overflow-x-hidden"
 						alwaysShow={false}
 						scrollContainerRef={
-							isInboxFocusMode && !isBottomView ? inboxListScrollerRef : undefined
+							isInboxFocusMode && !isBottomView
+								? inboxListScrollerRef
+								: shouldShowArchiveSection
+									? archiveListScrollerRef
+									: undefined
 						}
+						onScroll={shouldShowArchiveSection ? updateArchiveScrollState : undefined}
 					>
 						{isInboxFocusMode && !isBottomView ? (
 							<>
@@ -4466,12 +4695,38 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 										{supplementalInboxConversationsGrouped.map(
 											renderSupplementalInboxRow
 										)}
+										{shouldShowArchiveSection && (
+											<div
+												ref={archiveSectionRef}
+												className="flex w-full shrink-0 flex-col items-center"
+												style={{
+													backgroundColor: '#F3F2F1',
+													paddingBottom: '8px',
+													marginTop: '0px',
+												}}
+											>
+												<div
+													className="sticky top-0 z-20 flex w-full items-center justify-center font-inter text-[14px] font-semibold leading-none text-black"
+													style={{
+														height: '28px',
+														backgroundColor: '#F3F2F1',
+													}}
+												>
+													Archive
+												</div>
+												<div className="flex flex-col items-center space-y-2 pb-2">
+													{archivedDraftRows.map(renderArchivedDraftRow)}
+												</div>
+											</div>
+										)}
 									</>
 								)}
 								{Array.from({
 									length: shouldShowAllTabEmptyContacts
 										? 0
-										: Math.max(0, (!isBottomView ? minRows : 0) - totalRenderedRows),
+										: shouldShowArchiveSection
+											? 0
+											: Math.max(0, (!isBottomView ? minRows : 0) - totalRenderedRows),
 								}).map((_, idx) => {
 									const inboxPlaceholderStyle = isInboxFocusMode
 										? {

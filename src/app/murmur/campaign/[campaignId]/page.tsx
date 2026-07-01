@@ -28,6 +28,7 @@ import {
 } from '@/utils/murmurChromeZoom';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useMe } from '@/hooks/useMe';
+import { useShiftHoldMapSelectTool } from '@/hooks/useShiftHoldMapSelectTool';
 import {
 	useState,
 	useEffect,
@@ -2956,6 +2957,18 @@ const Murmur = () => {
 	}, [activeView]);
 
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
+	// Hold Shift to temporarily switch to the square Select tool while the campaign
+	// desktop map area is on screen. The persistent campaign map is a route-scoped
+	// singleton that stays mounted+interactive on every desktop tab, so `isMobile
+	// === false` is the right gate (and it's TDZ-safe for the map-props memo below,
+	// which the finer preset/overview view flags — defined later — are not).
+	const isShiftHoldMapSelect = useShiftHoldMapSelectTool(isMobile === false);
+	// Derived tool: Shift-hold overlays 'select' without mutating `activeMapTool`,
+	// so the base tool is restored on release and the post-selection snap-back to
+	// 'grab' can't cut a continuous Shift-hold multi-select short.
+	const effectiveMapTool: 'select' | 'grab' = isShiftHoldMapSelect
+		? 'select'
+		: activeMapTool;
 	const handleCampaignMapAreaSelect = useCallback(
 		(
 			_bounds: { south: number; west: number; north: number; east: number },
@@ -3084,7 +3097,7 @@ const Murmur = () => {
 	// Last zoom the map reported — lets the ladder-rebase effect re-place the
 	// thumb when the floor changes without any camera movement (window shrink).
 	const lastMapViewportZoomRef = useRef<number | null>(null);
-	const isSelectMapToolActive = activeMapTool === 'select';
+	const isSelectMapToolActive = effectiveMapTool === 'select';
 	const mapZoomControlDisplayValue = mapZoomControlIndex;
 	const pushMapZoomControlRequest = useCallback((zoom: number, isDragging = false) => {
 		mapZoomControlRequestNonceRef.current += 1;
@@ -4138,7 +4151,7 @@ const Murmur = () => {
 					activeView === 'drafting' ||
 					activeView === 'inbox'),
 			categoryConstellationsEnabled: !sendQueueMapMode,
-			activeTool: activeMapTool,
+			activeTool: effectiveMapTool,
 			requestedZoom: mapZoomControlRequest,
 			onViewportZoom: handleMapViewportZoom,
 			onViewportIdle: handleMapViewportIdle,
@@ -4149,7 +4162,7 @@ const Murmur = () => {
 		}),
 			[
 				activeView,
-				activeMapTool,
+				effectiveMapTool,
 				campaignMapCameraPadding,
 				isMobile,
 				campaignMapContactsForMap,
@@ -4836,7 +4849,7 @@ const Murmur = () => {
 											}}
 										/>
 										<MapSelectGrabTool
-											activeTool={activeMapTool}
+											activeTool={effectiveMapTool}
 											onSelectClick={handleSelectMapToolClick}
 											onGrabClick={() => setActiveMapTool('grab')}
 											className="pointer-events-auto"
@@ -5460,6 +5473,7 @@ const Murmur = () => {
 														<CampaignsTable
 															defaultOpenCampaignId={campaign.id}
 															defaultOpenContactsFolder
+															showFinderSidebar
 														/>
 													</div>
 												</div>
@@ -5707,7 +5721,7 @@ const Murmur = () => {
 									}}
 								/>
 								<MapSelectGrabTool
-									activeTool={activeMapTool}
+									activeTool={effectiveMapTool}
 									onSelectClick={handleSelectMapToolClick}
 									onGrabClick={() => setActiveMapTool('grab')}
 									className="pointer-events-auto"

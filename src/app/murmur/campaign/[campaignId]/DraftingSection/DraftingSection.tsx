@@ -50,7 +50,11 @@ import DraftingStatusPanel from '@/app/murmur/campaign/[campaignId]/DraftingSect
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import { useGetContacts, useGetLocations } from '@/hooks/queryHooks/useContacts';
 import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
-import { useCreateEmail, useDeleteEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
+import {
+	useCreateEmail,
+	useEditEmail,
+	useGetEmails,
+} from '@/hooks/queryHooks/useEmails';
 import { useCancelSendQueueItem, useSendQueue } from '@/hooks/queryHooks/useSendQueue';
 import {
 	EmailStatus,
@@ -2232,12 +2236,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		Boolean(campaign) && (contactListIds.length === 0 || headerContacts !== undefined);
 	const isEmptyCampaign = isHeaderContactsResolved && contactsCount === 0;
 	const draftEmails = (headerEmails || []).filter((e) => e.status === EmailStatus.draft);
-	const draftCount = draftEmails.length;
+	const archivedDraftEmails = useMemo(
+		() => draftEmails.filter((e) => e.reviewStatus === ReviewStatus.rejected),
+		[draftEmails]
+	);
+	const activeDraftEmails = useMemo(
+		() => draftEmails.filter((e) => e.reviewStatus !== ReviewStatus.rejected),
+		[draftEmails]
+	);
+	const draftCount = activeDraftEmails.length;
 	useEffect(() => {
 		setOverviewSelectedDraftIds((prev) => {
 			if (prev.size === 0) return prev;
 
-			const draftIds = new Set(draftEmails.map((draft) => draft.id));
+			const draftIds = new Set(activeDraftEmails.map((draft) => draft.id));
 			const next = new Set<number>();
 			let hasChange = false;
 
@@ -2251,16 +2263,36 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 			return hasChange ? next : prev;
 		});
-	}, [draftEmails]);
+	}, [activeDraftEmails]);
+	useEffect(() => {
+		const activeDraftIds = new Set(activeDraftEmails.map((draft) => draft.id));
+		setDraftSelectionsByFilter((prev) => {
+			let hasChange = false;
+			const nextSelections = {
+				all: new Set<number>(),
+				approved: new Set<number>(),
+				rejected: new Set<number>(),
+			};
+			(['all', 'approved', 'rejected'] as const).forEach((key) => {
+				prev[key].forEach((id) => {
+					if (activeDraftIds.has(id)) {
+						nextSelections[key].add(id);
+					} else {
+						hasChange = true;
+					}
+				});
+			});
+			return hasChange ? nextSelections : prev;
+		});
+	}, [activeDraftEmails]);
 	// Drafts belonging to the batch the user just drafted from the Write tab (empty otherwise).
 	const batchDrafts = useMemo(
-		() => draftEmails.filter((d) => writeReviewBatchContactIds.has(d.contactId)),
-		[draftEmails, writeReviewBatchContactIds]
+		() => activeDraftEmails.filter((d) => writeReviewBatchContactIds.has(d.contactId)),
+		[activeDraftEmails, writeReviewBatchContactIds]
 	);
 	// The draft list the drafts layout renders: scoped to the just-drafted batch during the
-	// Write-tab review, the full set on the real Drafts tab. (`draftCount` stays the campaign
-	// total — it feeds the header summary, not the review.)
-	const draftEmailsForView = isWriteReviewActive ? batchDrafts : draftEmails;
+	// Write-tab review, the active (non-archived) set on the real Drafts tab.
+	const draftEmailsForView = isWriteReviewActive ? batchDrafts : activeDraftEmails;
 
 	const {
 		handleRejectDraft,
@@ -2271,7 +2303,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		campaign,
 		form,
 		contacts: contacts ?? [],
-		draftEmails,
+		draftEmails: activeDraftEmails,
 		selectedSendIds: draftsTabSelectedIds,
 		clearSelectedSendIds: () => setDraftsTabSelectedIds(new Set()),
 	});
@@ -2281,8 +2313,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// Contacts that currently have a draft — drives the All-tab list draft indicator and
 	// the "Send {N} Drafts" split (selected contacts with a draft).
 	const draftContactIdSet = useMemo(
-		() => new Set(draftEmails.map((d) => d.contactId)),
-		[draftEmails]
+		() => new Set(activeDraftEmails.map((d) => d.contactId)),
+		[activeDraftEmails]
 	);
 	const sentContactIdSet = useMemo(
 		() => new Set(sentEmails.map((e) => e.contactId)),
@@ -2570,11 +2602,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	useEffect(() => {
 		if (contentView !== 'drafting') return;
 		if (!pendingKeptDraftContactId) return;
-		const kept = draftEmails.find((e) => e.contactId === pendingKeptDraftContactId);
+		const kept = activeDraftEmails.find((e) => e.contactId === pendingKeptDraftContactId);
 		if (!kept) return;
 		setSelectedDraft(kept);
 		setPendingKeptDraftContactId(null);
-	}, [draftEmails, pendingKeptDraftContactId, contentView]);
+	}, [activeDraftEmails, pendingKeptDraftContactId, contentView]);
 
 	// When batch drafting is in progress (or still animating queued drafts), swap the campaign
 	// research panel slot to a live "Draft Preview" so users can watch drafts type out from any tab.
@@ -2642,14 +2674,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		clearWriteReviewBatch,
 	]);
 	const draftPreviewFallbackDraft = useMemo(() => {
-		const first = draftEmails[0];
+		const first = activeDraftEmails[0];
 		if (!first) return null;
 		return {
 			contactId: first.contactId,
 			subject: first.subject,
 			message: first.message,
 		};
-	}, [draftEmails]);
+	}, [activeDraftEmails]);
 	const liveDraftPreview = useMemo(
 		() => ({
 			visible: isBatchDraftingInProgress,
@@ -2667,30 +2699,30 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const rejectedDraftIds = useMemo(() => {
 		const ids = new Set<number>();
-		draftEmails.forEach((email) => {
+		activeDraftEmails.forEach((email) => {
 			if (email.reviewStatus === ReviewStatus.rejected) {
 				ids.add(email.id);
 			}
 		});
 		return ids;
-	}, [draftEmails]);
+	}, [activeDraftEmails]);
 
 	const approvedDraftIds = useMemo(() => {
 		const ids = new Set<number>();
-		draftEmails.forEach((email) => {
+		activeDraftEmails.forEach((email) => {
 			if (email.reviewStatus === ReviewStatus.approved) {
 				ids.add(email.id);
 			}
 		});
 		return ids;
-	}, [draftEmails]);
+	}, [activeDraftEmails]);
 
 	const contactedContactIds = useMemo(() => {
 		const ids = new Set<number>();
-		for (const email of draftEmails) ids.add(email.contactId);
+		for (const email of activeDraftEmails) ids.add(email.contactId);
 		for (const email of sentEmails) ids.add(email.contactId);
 		return ids;
-	}, [draftEmails, sentEmails]);
+	}, [activeDraftEmails, sentEmails]);
 	const contactsAvailableForDrafting = (contacts || []).filter(
 		(contact) => !contactedContactIds.has(contact.id)
 	);
@@ -3080,7 +3112,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			.filter(Boolean) as HistoryAction[];
 
 		// Drafts batches
-		const draftItems = draftEmails
+		const draftItems = activeDraftEmails
 			.map((e) => {
 				const createdAt = new Date(e.createdAt);
 				if (Number.isNaN(createdAt.getTime())) return null;
@@ -3116,7 +3148,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			...sentBatches,
 			...receivedBatches,
 		].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-	}, [campaignContactEvents, draftEmails, sentEmails, inboundEmails]);
+	}, [campaignContactEvents, activeDraftEmails, sentEmails, inboundEmails]);
 
 	const isSendingDisabled = isFreeTrial || (user?.sendingCredits || 0) === 0;
 
@@ -3269,7 +3301,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 		if (view === 'overview') {
 			contactsTabSelectedIds.forEach(appendContactId);
-			draftEmails
+			activeDraftEmails
 				.filter((d) => overviewSelectedDraftIds.has(d.id))
 				.forEach((d) => appendContactId(d.contactId));
 		} else if (view === 'testing') {
@@ -3307,7 +3339,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		view,
 		contactsTabSelectedIds,
 		overviewSelectedDraftIds,
-		draftEmails,
+		activeDraftEmails,
 		draftsTabSelectedIds,
 		draftEmailsForView,
 		selectedInboxEmailId,
@@ -3326,7 +3358,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		handledMapMarkerRequestIdRef.current = req.requestId;
 		const { contactId } = req;
 		if (view === 'overview') {
-			const draft = draftEmails.find((d) => d.contactId === contactId);
+			const draft = activeDraftEmails.find((d) => d.contactId === contactId);
 			if (draft) {
 				setOverviewSelectedDraftIds((prev) => {
 					const next = new Set(prev);
@@ -3374,7 +3406,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		// handleDraftSelection / handleInboxEmailClick read live state at call time;
 		// the request id is the trigger and the handled-ref guards re-execution.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [mapMarkerSelectionRequest, view, draftEmails, draftEmailsForView, inboundEmails, sentEmails]);
+	}, [mapMarkerSelectionRequest, view, activeDraftEmails, draftEmailsForView, inboundEmails, sentEmails]);
 
 	// Batch sibling of the marker effect above: a drag-rectangle (Select tool) on the
 	// map merges every contact in the region into the active tab's native selection.
@@ -3393,7 +3425,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		if (view === 'overview') {
 			// Already-drafted contacts toggle a draft row; the rest are plain contacts.
 			const draftIdByContactId = new Map<number, number>();
-			for (const d of draftEmails) {
+			for (const d of activeDraftEmails) {
 				if (typeof d.contactId === 'number' && !draftIdByContactId.has(d.contactId)) {
 					draftIdByContactId.set(d.contactId, d.id);
 				}
@@ -3425,7 +3457,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		// Inbox/Sent: region drag has no batch meaning (single-conversation views).
 		// Functional Set updaters read live state; the request id guards re-execution.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [mapAreaSelectionRequest, view, draftEmails, draftEmailsForView]);
+	}, [mapAreaSelectionRequest, view, activeDraftEmails, draftEmailsForView]);
 
 	// Mobile Summary view: which fullscreen overlay (chat / draft review) is open,
 	// the header-pill scroll target, and this session's send/delete counters.
@@ -3436,7 +3468,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		useState<MobileSummaryScrollRequest | null>(null);
 	const [mobileSessionSentCount, setMobileSessionSentCount] = useState(0);
 	const [mobileSessionDeletedCount, setMobileSessionDeletedCount] = useState(0);
-	const { mutateAsync: deleteDraftEmail } = useDeleteEmail();
+	const { mutateAsync: archiveDraftEmail } = useEditEmail({ suppressToasts: true });
 
 	// Header pills (both mobile views) scroll to their Summary section instead of
 	// switching tabs; from the Search view this navigates to the Summary first.
@@ -3858,7 +3890,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	);
 	const handleOverviewRightRailSendDrafts = useCallback(async () => {
 		const contactIds = new Set(overviewRightRailSelectedDraftContactIds);
-		const draftIds = draftEmails
+		const draftIds = activeDraftEmails
 			.filter((d) => contactIds.has(d.contactId))
 			.map((d) => d.id);
 		if (draftIds.length === 0) return;
@@ -3871,7 +3903,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	}, [
 		overviewRightRailSelectedDraftContactIds,
-		draftEmails,
+		activeDraftEmails,
 		handleSendDrafts,
 		setOverviewRightRailSelectedContacts,
 	]);
@@ -4310,7 +4342,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const contactsListSupplementalProps = useMemo(
 		() => ({
 			allContacts: inboxMockData ? inboxMockData.contacts : contacts || [],
-			drafts: draftEmails,
+			drafts: activeDraftEmails,
+			archivedDrafts: archivedDraftEmails,
 			sentEmails: inboxMockData ? inboxMockData.sentEmails : sentEmails,
 			inboxEmails: inboxEmailsForContactsExpandedList,
 			optimisticInboxReplyByEmailId,
@@ -4324,7 +4357,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}),
 		[
 			contacts,
-			draftEmails,
+			activeDraftEmails,
+			archivedDraftEmails,
 			sentEmails,
 			inboxEmailsForContactsExpandedList,
 			optimisticInboxReplyByEmailId,
@@ -4700,10 +4734,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const handleMobileDraftDelete = useCallback(async () => {
 		if (mobileSummarySelection?.kind !== 'draft') return;
 		const draftId = mobileSummarySelection.id;
-		await deleteDraftEmail(draftId);
+		await archiveDraftEmail({
+			id: draftId,
+			data: { reviewStatus: ReviewStatus.rejected },
+		});
 		setMobileSessionDeletedCount((count) => count + 1);
 		advanceFromMobileDraft(draftId);
-	}, [mobileSummarySelection, deleteDraftEmail, advanceFromMobileDraft]);
+	}, [mobileSummarySelection, archiveDraftEmail, advanceFromMobileDraft]);
 
 	// Mobile deep link (?inboxEmailId=...): open that message's conversation fullscreen.
 	useEffect(() => {
@@ -4811,7 +4848,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				return (
 					<DraftsExpandedList
 						key={kind}
-						drafts={draftEmails}
+						drafts={activeDraftEmails}
 						contacts={contacts || []}
 						generationProgress={generationProgress}
 						generationTotal={generationTotal}

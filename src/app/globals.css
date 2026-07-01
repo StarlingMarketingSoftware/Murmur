@@ -7749,6 +7749,138 @@ body.murmur-mobile .search-input-icon-btn {
    Finder is rendered as a synthetic table row; the first cell visually spans
    the metrics cell so CustomTable can remain unchanged.
    ========================================================= */
+
+/* =========================================================
+   CAMPAIGNS FINDER SIDEBAR (dropdown-only)
+   A #F4F4F4 macOS-Finder-style source-list rail rendered to the LEFT of the
+   finder table. The dropdown box grows LEFTWARD by the rail's width; the main
+   table keeps its own width/geometry (so the container-anchored hover-delete
+   overlay math is untouched). The rail lists "Murmur" (root → collapse to all
+   folders) plus every campaign as a quick shortcut into its finder view.
+   ========================================================= */
+.mobile-campaigns-wrapper.campaigns-finder-has-sidebar {
+	display: flex;
+	flex-direction: row;
+	align-items: stretch;
+	justify-content: center;
+	gap: 0;
+}
+
+/* Pin the main pane to the finder width so the flex row never squeezes it and
+   the collapsed ("Murmur" root) state — where the table falls back to
+   width:100%/max-width:655px — resolves against a stable box. Total dropdown
+   width = 115 rail + 660 table = 775px (the mockup's ~772px). */
+.mobile-campaigns-wrapper.campaigns-finder-has-sidebar .campaigns-table-container {
+	flex: 0 0 660px;
+	width: 660px;
+}
+
+.campaigns-finder-sidebar {
+	flex: 0 0 115px;
+	width: 115px;
+	align-self: stretch;
+	box-sizing: border-box;
+	background: #f4f4f4;
+	border-radius: 8px 0 0 8px;
+	padding: 14px 0 12px;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	font-family: var(--font-inter), Inter, sans-serif;
+	/* Soft seam between the #F4F4F4 rail and the #F8F8F8 table (no layout cost). */
+	box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.05);
+}
+
+.campaigns-finder-sidebar-dots {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex: none;
+	padding: 0 0 14px 14px;
+}
+.campaigns-finder-sidebar-dots > span {
+	width: 8px;
+	height: 8px;
+	border-radius: 9999px;
+	background: #c4c4c4;
+}
+
+.campaigns-finder-sidebar-label {
+	flex: none;
+	padding: 0 0 6px 14px;
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 15px;
+	color: #6f6f6f;
+}
+
+.campaigns-finder-sidebar-list {
+	flex: 1 1 auto;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	overflow-y: auto;
+	padding: 0 5px;
+}
+
+.campaigns-finder-sidebar-item {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	box-sizing: border-box;
+	padding: 3px 4px;
+	border: 0;
+	background: transparent;
+	border-radius: 6px;
+	cursor: pointer;
+	text-align: left;
+	color: #000000;
+	font-family: inherit;
+	appearance: none;
+	transition: background-color 120ms ease;
+}
+.campaigns-finder-sidebar-item:hover {
+	background: #ececec;
+}
+.campaigns-finder-sidebar-item-active {
+	background: #e6e6e6;
+}
+.campaigns-finder-sidebar-item:focus-visible {
+	outline: 2px solid #000000;
+	outline-offset: -2px;
+}
+
+.campaigns-finder-sidebar-item-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	flex: none;
+}
+
+.campaigns-finder-sidebar-item-name {
+	min-width: 0;
+	flex: 1 1 auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 14px;
+	font-weight: 500;
+	line-height: 18px;
+}
+
+/* Flatten the table's LEFT corners so the rail + table read as one window. High
+   specificity (5 classes) beats the finder-open border-radius regardless of
+   source order; the rail owns the left rounded corners. */
+.mobile-campaigns-wrapper.campaigns-finder-has-sidebar
+	.campaigns-table-container
+	.my-campaigns-table.desktop-campaigns-table {
+	border-top-left-radius: 0 !important;
+	border-bottom-left-radius: 0 !important;
+}
+
 .campaigns-table-container
 	.my-campaigns-table.desktop-campaigns-table.campaigns-finder-open {
 	width: 660px !important;
