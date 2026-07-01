@@ -720,6 +720,25 @@ const COUNTRY_DETECTORS: { country: string; patterns: RegExp[] }[] = [
 	{ country: 'United Kingdom', patterns: [/\buk\b/i, /\bunited kingdom\b/i, /\bbritain\b/i, /\benglish?\b/i] },
 ];
 
+// Filler connectives/articles removed from restOfQuery as WHOLE tokens (never
+// substrings — see the A&R note at the strip site).
+const FILLER_TOKEN_SET = new Set([
+	'in',
+	'near',
+	'around',
+	'at',
+	'located',
+	'within',
+	'that',
+	'which',
+	'who',
+	'and',
+	'or',
+	'the',
+	'a',
+	'an',
+]);
+
 export const parseFreeTextSearchQuery = (
 	rawQuery: string,
 	options?: { gazetteer?: CityGazetteer | null }
@@ -845,12 +864,18 @@ export const parseFreeTextSearchQuery = (
 	// "the" once the region phrase is consumed). The remaining tokens become
 	// `restOfQuery` for the kNN retriever — best when it's the substantive
 	// intent ("indie rock with craft beer" rather than "music venues in austin").
+	// Token filtering, NOT a \b regex: `\b` matches inside "A&R" (the `&` is a
+	// word boundary), stripping the leading A as an article → "&R". Whole-token
+	// comparison keeps "A&R", "rock-and-roll", etc. intact. Orphaned
+	// parentheses left behind by place stripping ("record label (Austin, TX)"
+	// → the matchers consume "(Austin, TX" but not the trailing ")") are
+	// dropped as bare tokens and trimmed from token edges.
 	const restOfQuery = working
-		.replace(
-			/\b(in|near|around|at|located|within|that|which|who|and|or|the|a|an)\b/gi,
-			' '
-		)
-		.replace(/\s+/g, ' ')
+		.split(/\s+/)
+		.map((token) => token.replace(/^[()]+|[()]+$/g, ''))
+		.filter((token) => token.length > 0)
+		.filter((token) => !FILLER_TOKEN_SET.has(token.toLowerCase()))
+		.join(' ')
 		.trim();
 
 	const mentionsLiveMusic = LIVE_MUSIC_DETECTORS.some((re) => re.test(raw));

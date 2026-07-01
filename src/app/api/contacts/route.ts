@@ -27,6 +27,13 @@ import {
 import { applyHardcodedLocationOverrides } from '@/app/api/_utils/searchPreprocess';
 import { Contact, EmailVerificationStatus, Prisma } from '@prisma/client';
 import { searchSimilarContacts, upsertContactToVectorDb } from '../_utils/vectorDb';
+import {
+	createRequestId,
+	runFreeTextSearch,
+} from '@/app/api/contacts/search/engine';
+import { parseFreeTextSearchQuery } from '@/app/api/contacts/search/parse';
+import { getCityGazetteer } from '@/app/api/contacts/search/cityGazetteer';
+import { isUnifiedFreeTextSearchEnabled } from '@/app/api/contacts/search/flags';
 import { GEMINI_MODEL_OPTIONS } from '@/constants';
 import {
 	BOOKING_CONTACT_TITLE_PREFIXES,
@@ -1422,6 +1429,96 @@ export async function GET(req: NextRequest) {
 		// Strip the leading "[Booking]" / "[Promotion]" (or any future bracket tag) for parsing + ES/LLM logic.
 		const rawQueryForParsing = stripLeadingBracketTag(rawQuery);
 		const rawQueryForPostTraining = rawQueryForParsing.length > 0 ? rawQueryForParsing : rawQuery;
+		const isWineBeerSpiritsQuery = (() => {
+			const normalized = rawQueryForParsing.toLowerCase();
+			const hasWine = /\bwine\b/.test(normalized);
+			const hasBeer = /\bbeer\b/.test(normalized);
+			const hasSpirits = /\bspirits?\b/.test(normalized);
+			if (!(hasWine && hasBeer && hasSpirits)) return false;
+			// Prefer matches where the three appear in the canonical order but allow any punctuation
+			return /\bwine[^a-zA-Z0-9]+beer[^a-zA-Z0-9]+(and\s+)?spirits?/.test(
+				normalized
+			);
+		})();
+		// Detect wedding planner queries - more lenient matching for wedding-related contacts
+		const isWeddingPlannerQuery = (() => {
+			const normalized = rawQueryForParsing.toLowerCase();
+			return /\bwedding\s*(planner|coordinator|organizer|consultant)?s?\b/i.test(normalized);
+		})();
+
+		// ---- Unified free-text delegation (UNIFIED_FREE_TEXT_SEARCH) ----
+		// General queries (professions, org types — anything outside this
+		// route's curated/venue-filler branches) delegate to the free-text
+		// search engine so the hero form and the map "Search Anything" bar
+		// share one brain. Delegated requests skip the legacy Gemini location
+		// parse AND the post-training LLM entirely (the engine's deterministic
+		// parser + gazetteer own location). Gate rules:
+		//   - NEVER delegate the legacy branch queries: wine/beer/spirits (the
+		//     demo query AND the Where-only hero default), wedding queries,
+		//     parse.ts categories, and canonical BOOKING/PROMOTION "What"
+		//     prefixes — their venue-filler branches keep exact behavior.
+		//   - Engine ERROR falls through to the legacy path (self-healing);
+		//     engine EMPTY returns empty honestly (re-running legacy would
+		//     double latency and reintroduce venue filler on true voids).
+		//   - Non-'valid' verification filters stay legacy (the engine only
+		//     supports the valid contract).
+		if (
+			isUnifiedFreeTextSearchEnabled() &&
+			useVectorSearch &&
+			rawQueryForParsing &&
+			!isWineBeerSpiritsQuery &&
+			!isWeddingPlannerQuery &&
+			(!verificationStatus || verificationStatus === 'valid')
+		) {
+			try {
+				const unifiedGazetteer = await getCityGazetteer().catch(() => null);
+				const unifiedParse = parseFreeTextSearchQuery(rawQueryForParsing, {
+					gazetteer: unifiedGazetteer,
+				});
+				const canonicalPrefixKey = normalizeSearchText(
+					normalizeWhatToTitlePrefix(unifiedParse.restOfQuery)
+				);
+				const isRecognizedCuratedQuery =
+					unifiedParse.categories.length > 0 ||
+					BOOKING_TITLE_PREFIX_KEY_SET.has(canonicalPrefixKey) ||
+					PROMOTION_TITLE_PREFIX_KEY_SET.has(canonicalPrefixKey);
+				if (!isRecognizedCuratedQuery) {
+					const unifiedRequestId = createRequestId();
+					const usedContactIds: number[] = excludeUsedContacts
+						? (
+								await prisma.userContactList.findMany({
+									where: { userId },
+									select: { contacts: { select: { id: true } } },
+								})
+						  ).flatMap((list) => list.contacts.map((c) => c.id))
+						: [];
+					const engineResponse = await runFreeTextSearch({
+						rawQuery: rawQueryForParsing,
+						limit: Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 500)),
+						ipHeaders: req.headers,
+						excludeContactIds: usedContactIds,
+						verificationStatus: verificationStatus ? 'valid' : undefined,
+						requestId: unifiedRequestId,
+						requestStartedAt: requestStartedAtMs,
+					});
+					console.info(
+						`[contacts] unified-delegation[${unifiedRequestId}] q="${rawQueryForParsing}" returned=${engineResponse.contacts.length} expansionMode=${engineResponse.expansionMode ?? 'none'}${engineResponse.coverage ? ` coverage=${engineResponse.coverage}` : ''} totalMs=${Date.now() - requestStartedAtMs}`
+					);
+					if (engineResponse.contacts.length === 0) {
+						console.warn(
+							`[contacts] unified-delegation-empty[${unifiedRequestId}] q="${rawQueryForParsing}"`
+						);
+					}
+					return apiResponse(engineResponse.contacts);
+				}
+			} catch (unifiedError) {
+				console.error(
+					'[contacts] unified-delegation-error, falling back to legacy path',
+					unifiedError
+				);
+			}
+		}
+
 		const preVectorPrepStartMs = Date.now();
 		const defaultPostTrainingProfile: PostTrainingProfile = {
 			active: false,
@@ -1448,22 +1545,6 @@ export async function GET(req: NextRequest) {
 							});
 				  })()
 				: Promise.resolve(defaultPostTrainingProfile);
-		const isWineBeerSpiritsQuery = (() => {
-			const normalized = rawQueryForParsing.toLowerCase();
-			const hasWine = /\bwine\b/.test(normalized);
-			const hasBeer = /\bbeer\b/.test(normalized);
-			const hasSpirits = /\bspirits?\b/.test(normalized);
-			if (!(hasWine && hasBeer && hasSpirits)) return false;
-			// Prefer matches where the three appear in the canonical order but allow any punctuation
-			return /\bwine[^a-zA-Z0-9]+beer[^a-zA-Z0-9]+(and\s+)?spirits?/.test(
-				normalized
-			);
-		})();
-		// Detect wedding planner queries - more lenient matching for wedding-related contacts
-		const isWeddingPlannerQuery = (() => {
-			const normalized = rawQueryForParsing.toLowerCase();
-			return /\bwedding\s*(planner|coordinator|organizer|consultant)?s?\b/i.test(normalized);
-		})();
 		const parentheticalLocation = extractParentheticalLocation(rawQueryForParsing);
 		if (parentheticalLocation && !locationFilter) {
 			locationFilter = parentheticalLocation.originalText;

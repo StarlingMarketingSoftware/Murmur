@@ -324,18 +324,31 @@ export const updateWithNewFields = async () => {
 		const existingProperties =
 			Object.values(currentMapping)[0]?.mappings?.properties || {};
 
+		// Keep these aligned with initializeVectorDb: the text company-meta
+		// fields carry a lowercase-normalized `.keyword` sub-field that the
+		// search paths term/prefix-query. Declaring them bare-text here caused
+		// mapping drift on indexes bootstrapped via this path (`.keyword`
+		// queries silently matched nothing). Multi-field ADDITIONS to an
+		// existing text field are a legal putMapping.
+		const keywordSubField = {
+			fields: {
+				keyword: { type: 'keyword', normalizer: 'lowercase' },
+			},
+		};
 		const newFields = {
-			companyType: { type: 'text' },
-			companyTechStack: { type: 'text' },
-			companyKeywords: { type: 'text' },
-			companyIndustry: { type: 'text' },
+			companyType: { type: 'text', ...keywordSubField },
+			companyTechStack: { type: 'text', ...keywordSubField },
+			companyKeywords: { type: 'text', ...keywordSubField },
+			companyIndustry: { type: 'text', ...keywordSubField },
 			coordinates: { type: 'geo_point' },
 		};
 
 		const fieldsToUpdate: Record<string, MappingProperty> = {};
 
 		for (const [fieldName, mapping] of Object.entries(newFields)) {
-			const existingField = existingProperties[fieldName];
+			const existingField = existingProperties[fieldName] as
+				| (MappingProperty & { fields?: Record<string, unknown> })
+				| undefined;
 
 			if (!existingField) {
 				fieldsToUpdate[fieldName] = mapping as MappingProperty;
@@ -344,6 +357,15 @@ export const updateWithNewFields = async () => {
 				console.warn(
 					`Field ${fieldName} exists with type ${existingField.type}, wanted ${mapping.type}`
 				);
+			} else if (
+				'fields' in mapping &&
+				existingField.type === 'text' &&
+				!existingField.fields?.keyword
+			) {
+				// Present but missing the .keyword sub-field — additive repair.
+				// Existing docs populate the sub-field on their next write.
+				fieldsToUpdate[fieldName] = mapping as MappingProperty;
+				console.log(`Will add .keyword sub-field to: ${fieldName}`);
 			}
 		}
 
@@ -1024,6 +1046,17 @@ const buildEnforcedStateClauses = (
 	return stateClauses;
 };
 
+// Intent-derived term structure for the lexical retriever (SEARCH_RANKING_V2
+// path). Index 0 of each list is the user's literal phrasing (full boost);
+// later entries are LLM synonyms (half boost). All clauses run fuzziness-0 —
+// synonyms provide the recall that fuzziness provided badly.
+export type StructuredQueryTerms = {
+	roleTerms: readonly string[];
+	domainTerms: readonly string[];
+	orgTerms: readonly string[];
+	expandedPhrases: readonly string[];
+};
+
 export type LexicalSearchOptions = {
 	queryText: string;
 	limit?: number;
@@ -1038,6 +1071,13 @@ export type LexicalSearchOptions = {
 	// explicit state — they don't want results in other states no matter how
 	// strong the semantic match is.
 	enforcedStateValues?: readonly string[] | null;
+	// Intent-derived clause structure. Takes precedence over shortQueryMode
+	// (literalSweepMode still wins — the national-fallback sweep never runs
+	// with intent terms). Role terms hit person-signal fields, org terms hit
+	// company-shaped fields (record labels live in companyIndustry/company,
+	// not title), domain terms qualify; BM25 clause-summing makes role+domain
+	// rows outrank single-clause rows regardless of word order.
+	structuredTerms?: StructuredQueryTerms | null;
 	// Tightens the multi_match for short, noun-led queries (e.g. "deli",
 	// "bookstore", "italian deli"). Drops headline/metadata/address from the
 	// field list — those are the main source of person-row leakage where a
@@ -1068,7 +1108,82 @@ export const lexicalSearchContacts = async (options: LexicalSearchOptions) => {
 	// Multi-field match on the substantive query text. Boost weights chosen so
 	// title and company dominate; headline and keywords contribute meaningfully;
 	// metadata is broad context.
-	if (queryText) {
+	const structured = !options.literalSweepMode ? options.structuredTerms : null;
+	if (structured) {
+		const pushTermClauses = (
+			terms: readonly string[],
+			build: (term: string, isLiteral: boolean) => Record<string, unknown>
+		): void => {
+			terms.forEach((term, index) => {
+				const cleaned = term.trim();
+				if (!cleaned) return;
+				should.push(build(cleaned, index === 0));
+			});
+		};
+		// ROLE — person-signal fields.
+		pushTermClauses(structured.roleTerms, (term, isLiteral) => ({
+			multi_match: {
+				query: term,
+				type: 'phrase',
+				fields: ['title^6', 'headline^3'],
+				slop: 1,
+				boost: isLiteral ? 3 : 1.5,
+			},
+		}));
+		// DOMAIN — qualifier; low weight alone (ranking gates it on a role/org
+		// hit so "Music Venues Tennessee" gets nothing for "music magazine").
+		pushTermClauses(structured.domainTerms, (term, isLiteral) => ({
+			multi_match: {
+				query: term,
+				type: 'best_fields',
+				fields: ['title^3', 'headline^2', 'metadata', 'companyKeywords'],
+				operator: 'and',
+				fuzziness: 0,
+				boost: isLiteral ? 1.5 : 0.8,
+			},
+		}));
+		// ORG — company-shaped fields (probe-verified: record label lives in
+		// companyIndustry 87×/company, not title 4×).
+		pushTermClauses(structured.orgTerms, (term, isLiteral) => ({
+			multi_match: {
+				query: term,
+				type: 'phrase',
+				fields: [
+					'company^5',
+					'companyIndustry^4',
+					'title^3',
+					'companyKeywords^2',
+					'metadata',
+				],
+				slop: 1,
+				boost: isLiteral ? 3 : 1.5,
+			},
+		}));
+		// FULL PHRASES — LLM-vetted word-order variants.
+		pushTermClauses(structured.expandedPhrases, (term) => ({
+			multi_match: {
+				query: term,
+				type: 'phrase',
+				fields: ['title^8', 'headline^5', 'company^5'],
+				slop: 1,
+				boost: 4,
+			},
+		}));
+		// MORPHOLOGY — plural/derivational tolerance without fuzz
+		// ("janitor" → "janitorial", "plumber" → "plumbing").
+		const morphologyHead =
+			structured.roleTerms[0] ?? structured.orgTerms[0] ?? '';
+		if (morphologyHead.trim()) {
+			should.push({
+				multi_match: {
+					query: morphologyHead.trim(),
+					type: 'phrase_prefix',
+					fields: ['title^3', 'company^2', 'headline'],
+					boost: 1,
+				},
+			});
+		}
+	} else if (queryText) {
 		if (options.literalSweepMode) {
 			// Widest-possible no-fuzziness sweep across every text field that
 			// could plausibly mention the user's noun. fuzziness=0 keeps
@@ -1157,7 +1272,14 @@ export const lexicalSearchContacts = async (options: LexicalSearchOptions) => {
 						'location',
 					],
 					operator: 'or',
-					fuzziness: 'AUTO',
+					// AUTO grants 2 edits at length ≥6, which drifts
+					// "professor" ↔ "profession" (edit distance 2) and floods
+					// role queries with junk. AUTO:4,12 keeps 1-typo tolerance
+					// for 4-11 char tokens and only allows 2 edits at ≥12;
+					// prefix_length pins the first character so short tokens
+					// can't rewrite their head.
+					fuzziness: 'AUTO:4,12',
+					prefix_length: 1,
 				},
 			});
 			// Phrase match for queries containing multi-word concepts ("live
@@ -1296,6 +1418,84 @@ export const lexicalSearchContacts = async (options: LexicalSearchOptions) => {
 		},
 	}));
 
+	return { matches, totalFound: matches.length };
+};
+
+// Dedicated retriever for first-class music-industry org types (record
+// labels, magazines, radio...). Recall insurance beyond the structured
+// lexical clauses: guarantees the vertical's data-verified clause bundle
+// contributes its own RRF list even when role clauses dominate the lexical
+// top-200. Geo/state filters apply ONLY when the caller passes them (org
+// inventory is national; 27.8% of docs have no coordinates and must stay
+// visible on implicit-locality queries).
+export const orgTypeSearchContacts = async (options: {
+	esShould: readonly Record<string, unknown>[];
+	domainTerms?: readonly string[];
+	limit?: number;
+	center?: { lat: number; lon: number } | null;
+	radiusKm?: number | null;
+	enforcedStateValues?: readonly string[] | null;
+}) => {
+	const limit = Math.max(1, Math.min(options.limit ?? 200, 1000));
+	const should: Record<string, unknown>[] = [...options.esShould];
+	// Domain qualifiers ("music" for "music magazine") are boost-only — never
+	// must — so thin verticals don't starve.
+	for (const term of options.domainTerms ?? []) {
+		const cleaned = term.trim();
+		if (!cleaned) continue;
+		should.push({
+			multi_match: {
+				query: cleaned,
+				type: 'best_fields',
+				fields: ['company^2', 'companyIndustry^2', 'headline'],
+				operator: 'and',
+				fuzziness: 0,
+				boost: 2,
+			},
+		});
+	}
+	if (should.length === 0) return { matches: [], totalFound: 0 };
+
+	const canUseGeoDistance =
+		options.center && options.radiusKm
+			? await contactsIndexHasGeoCoordinatesField()
+			: false;
+	const filter: Record<string, unknown>[] = [];
+	if (canUseGeoDistance && options.center && options.radiusKm) {
+		filter.push({
+			geo_distance: {
+				distance: `${options.radiusKm}km`,
+				coordinates: { lat: options.center.lat, lon: options.center.lon },
+			},
+		});
+	}
+	if (options.enforcedStateValues && options.enforcedStateValues.length > 0) {
+		filter.push({
+			bool: {
+				should: buildEnforcedStateClauses(options.enforcedStateValues),
+				minimum_should_match: 1,
+			},
+		});
+	}
+
+	const results = await elasticsearch.search<ContactDocument>({
+		index: INDEX_NAME,
+		size: limit,
+		query: {
+			bool: {
+				should,
+				minimum_should_match: 1,
+				filter,
+			},
+		},
+		fields: ['contactId', 'title', 'company', 'companyIndustry', 'state'],
+		_source: false,
+	});
+
+	const matches = results.hits.hits.map((hit) => ({
+		id: hit._id,
+		score: hit._score || 0,
+	}));
 	return { matches, totalFound: matches.length };
 };
 

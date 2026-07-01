@@ -9,6 +9,10 @@ import {
 } from '../src/app/api/contacts/search/parse';
 import { SEARCH_REGIONS_LIST } from '../src/constants/searchRegions';
 import { US_STATES } from '../src/constants/usStates';
+import {
+	isNounLedQuery,
+	resolveSearchDispatchBranch,
+} from '../src/app/api/contacts/search/queryPredicates';
 
 const expectCategory = (query: string, category: BookingContactTitlePrefix): void => {
 	const parsed = parseFreeTextSearchQuery(query);
@@ -248,5 +252,155 @@ assert.equal(midwestCity.region ?? null, null);
 const noGazetteer = parseFreeTextSearchQuery('music venues willimantic ct');
 assert.equal(noGazetteer.city ?? null, null);
 assert.equal(noGazetteer.state?.abbr, 'CT');
+
+// ---------------------------------------------------------------------------
+// General-query battery: professions / org types must stay category-free and
+// route to the hybrid branch — the parser must never hijack them into a
+// curated path. Dispatch is computed via queryPredicates (same predicates the
+// route uses).
+// ---------------------------------------------------------------------------
+
+const expectGeneralQuery = (
+	query: string,
+	expected: { rest?: string; nounLed?: boolean } = {}
+): void => {
+	const parsed = parseFreeTextSearchQuery(query);
+	assert.deepEqual(parsed.categories, [], `${query} must stay category-free`);
+	assert.equal(
+		resolveSearchDispatchBranch(parsed),
+		'hybrid',
+		`${query} must route to the hybrid branch`
+	);
+	if (expected.rest !== undefined) {
+		assert.equal(parsed.restOfQuery, expected.rest, `${query} restOfQuery`);
+	}
+	if (expected.nounLed !== undefined) {
+		assert.equal(
+			isNounLedQuery(parsed),
+			expected.nounLed,
+			`${query} isNounLedQuery`
+		);
+	}
+};
+
+expectGeneralQuery('professor of music', {
+	// "of" survives filler stripping — 3 substantive tokens → NOT noun-led,
+	// which is why the person-target probe historically never ran for this.
+	rest: 'professor of music',
+	nounLed: false,
+});
+expectGeneralQuery('music professor', { rest: 'music professor', nounLed: true });
+expectGeneralQuery('professor of history', {
+	rest: 'professor of history',
+	nounLed: false,
+});
+expectGeneralQuery('professor', { rest: 'professor', nounLed: true });
+expectGeneralQuery('plumber', { rest: 'plumber', nounLed: true });
+expectGeneralQuery('janitor', { rest: 'janitor', nounLed: true });
+expectGeneralQuery('record label', { rest: 'record label', nounLed: true });
+expectGeneralQuery('music magazine', { rest: 'music magazine', nounLed: true });
+expectGeneralQuery('magazine editor', { rest: 'magazine editor', nounLed: true });
+expectGeneralQuery('booking agent', { rest: 'booking agent', nounLed: true });
+expectGeneralQuery('talent buyer', { rest: 'talent buyer', nounLed: true });
+expectGeneralQuery('music supervisor', { rest: 'music supervisor', nounLed: true });
+// Wedding phrases in CATEGORY_VARIANTS are all two-word ("wedding planners",
+// "wedding venues") — "wedding photographer" must never match them.
+expectGeneralQuery('wedding photographer', {
+	rest: 'wedding photographer',
+	nounLed: true,
+});
+
+// Filler stripping is whole-token: "A&R" survives (a \b regex would strip the
+// leading A as an article — the `&` is a word boundary), and hyphenated
+// compounds like "rock-and-roll" keep their connectives.
+{
+	const anr = parseFreeTextSearchQuery('A&R');
+	assert.deepEqual(anr.categories, []);
+	assert.equal(resolveSearchDispatchBranch(anr), 'hybrid');
+	assert.equal(anr.restOfQuery, 'A&R');
+
+	const rockAndRoll = parseFreeTextSearchQuery('rock-and-roll venues');
+	assert.equal(rockAndRoll.restOfQuery, 'rock-and-roll');
+}
+
+// Place-bearing general queries: the place parses, the profession/org rest
+// survives, and the branch stays hybrid.
+{
+	const laLabels = parseFreeTextSearchQuery('record labels in los angeles');
+	assert.equal(laLabels.city?.name, 'Los Angeles');
+	assert.equal(laLabels.restOfQuery, 'record labels');
+	assert.deepEqual(laLabels.categories, []);
+	assert.equal(resolveSearchDispatchBranch(laLabels), 'hybrid');
+
+	const sfManagers = parseFreeTextSearchQuery('marketing manager san francisco');
+	assert.equal(sfManagers.city?.name, 'San Francisco');
+	assert.equal(sfManagers.restOfQuery, 'marketing manager');
+	assert.equal(resolveSearchDispatchBranch(sfManagers), 'hybrid');
+}
+
+// Category-noun traps: a trailing category noun attaches a category (known
+// behavior) but the non-vague rest keeps these on the HYBRID branch — they
+// must never fully hijack into the curated tray. (The category-multiplier
+// distortion these carry is addressed at the intent layer, not the parser.)
+{
+	const roaster = parseFreeTextSearchQuery('coffee roaster');
+	assert.deepEqual(roaster.categories, ['Coffee Shops']);
+	assert.equal(roaster.restOfQuery, 'roaster');
+	assert.equal(resolveSearchDispatchBranch(roaster), 'hybrid');
+
+	const restaurantManager = parseFreeTextSearchQuery('restaurant manager');
+	assert.deepEqual(restaurantManager.categories, ['Restaurants']);
+	assert.equal(restaurantManager.restOfQuery, 'manager');
+	assert.equal(resolveSearchDispatchBranch(restaurantManager), 'hybrid');
+}
+
+// Bare category nouns keep their intended curated default.
+assert.equal(
+	resolveSearchDispatchBranch(parseFreeTextSearchQuery('coffee')),
+	'curated-category'
+);
+assert.equal(
+	resolveSearchDispatchBranch(parseFreeTextSearchQuery('festival')),
+	'curated-category'
+);
+
+// Regression pins: the curated/place/local-business branches must keep
+// winning dispatch for their queries (the hybrid-path overhaul never runs).
+assert.equal(
+	resolveSearchDispatchBranch(parseFreeTextSearchQuery('music venues nashville')),
+	'curated-category'
+);
+assert.equal(
+	resolveSearchDispatchBranch(parseFreeTextSearchQuery('bars in austin')),
+	'local-business'
+);
+assert.equal(
+	resolveSearchDispatchBranch(parseFreeTextSearchQuery('austin')),
+	'place-only'
+);
+
+// ---------------------------------------------------------------------------
+// Hero-bar query format: the dashboard's why/what/where form composes
+// "[Why] What (Where)" (no "in", parens included). The place matchers consume
+// the span and the token-level filler strip drops the orphaned parens; the
+// legacy-route delegation additionally pre-normalizes before calling the
+// engine.
+// ---------------------------------------------------------------------------
+
+{
+	// Orphaned parens left by place stripping are dropped from restOfQuery.
+	const parenQuery = parseFreeTextSearchQuery('record label (Austin, TX)');
+	assert.equal(parenQuery.city?.name, 'Austin');
+	assert.equal(parenQuery.state?.abbr, 'TX');
+	assert.equal(parenQuery.restOfQuery, 'record label');
+
+	// The demo/Where-only default query. parse.ts recognizes NO category here
+	// ("wine"/"beer"/"spirits" match nothing in CATEGORY_VARIANTS) — which is
+	// exactly why the PR-7 legacy-delegation gate must use the LEGACY route's
+	// own detectors (isWineBeerSpiritsQuery) and never delegate this shape.
+	const wbs = parseFreeTextSearchQuery('[Booking] Wine, Beer, and Spirits (California)');
+	assert.deepEqual(wbs.categories, []);
+	assert.equal(wbs.state?.abbr, 'CA');
+}
 
 console.log('free-text parser checks passed');

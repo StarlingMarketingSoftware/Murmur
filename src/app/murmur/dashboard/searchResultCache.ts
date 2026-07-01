@@ -55,7 +55,10 @@ const SEARCH_CACHE_MAX_AGE_MS = 3 * 60 * 60 * 1000;
 // Per path. ~50 contacts/entry × ~1.5 KB ≈ <1 MB/path, comfortably under the localStorage budget.
 const SEARCH_CACHE_MAX_ENTRIES = 12;
 export const CURATED_CACHE_KEY_PREFIX = 'murmur_search_cache_curated_v3';
-export const FREETEXT_CACHE_KEY_PREFIX = 'murmur_search_cache_freetext_v3';
+// v4: the SEARCH_RANKING_V2 server overhaul changes free-text result
+// composition — a stale v3 tray must not mask the new ranking for up to 3h
+// after the server flag flips.
+export const FREETEXT_CACHE_KEY_PREFIX = 'murmur_search_cache_freetext_v4';
 
 // One cached result set: the args that produced it, the display query, and the exact contacts
 // that were rendered (so a replay is byte-identical).

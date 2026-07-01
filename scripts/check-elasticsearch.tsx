@@ -51,6 +51,58 @@ const searchContacts = async (field: string, value: string) => {
 	}
 };
 
+// Assert the live index mapping carries the .keyword sub-fields the search
+// paths term/prefix-query. Indexes bootstrapped via the old updateWithNewFields
+// were missing them (bare-text drift) — queries silently matched nothing.
+const checkMapping = async () => {
+	const REQUIRED_KEYWORD_SUBFIELDS = [
+		'title',
+		'company',
+		'state',
+		'city',
+		'country',
+		'companyType',
+		'companyTechStack',
+		'companyKeywords',
+		'companyIndustry',
+	];
+	try {
+		const mapping = await elasticsearch.indices.getMapping({ index: INDEX_NAME });
+		const properties =
+			Object.values(mapping)[0]?.mappings?.properties ?? {};
+		let failures = 0;
+		for (const field of REQUIRED_KEYWORD_SUBFIELDS) {
+			const prop = properties[field] as
+				| { type?: string; fields?: Record<string, unknown> }
+				| undefined;
+			if (!prop) {
+				console.error(`MISSING field: ${field}`);
+				failures++;
+			} else if (!prop.fields?.keyword) {
+				console.error(`MISSING .keyword sub-field: ${field} (type=${prop.type})`);
+				failures++;
+			} else {
+				console.log(`ok: ${field}.keyword`);
+			}
+		}
+		const coords = properties.coordinates as { type?: string } | undefined;
+		if (coords?.type !== 'geo_point') {
+			console.error(`coordinates mapping is ${coords?.type ?? 'missing'}, wanted geo_point`);
+			failures++;
+		} else {
+			console.log('ok: coordinates geo_point');
+		}
+		if (failures > 0) {
+			console.error(`mapping check FAILED (${failures} problems)`);
+			process.exit(1);
+		}
+		console.log('mapping check passed');
+	} catch (error) {
+		console.error('Error checking mapping:', error);
+		process.exit(1);
+	}
+};
+
 // Function to list all contacts
 const listAllContacts = async () => {
 	try {
@@ -94,12 +146,16 @@ switch (command) {
 	case 'list':
 		listAllContacts();
 		break;
+	case 'mapping':
+		checkMapping();
+		break;
 	default:
 		console.log(`
 Usage:
   npx tsx scripts/check-elasticsearch.tsx check <contactId>
   npx tsx scripts/check-elasticsearch.tsx search <field> <value>
   npx tsx scripts/check-elasticsearch.tsx list
+  npx tsx scripts/check-elasticsearch.tsx mapping
 
 Examples:
   npx tsx scripts/check-elasticsearch.tsx check "contact-1"

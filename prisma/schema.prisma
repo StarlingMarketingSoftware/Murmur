@@ -516,24 +516,24 @@ model Conversation {
 }
 
 model Message {
-  id             Int           @id @default(autoincrement())
-  conversationId Int
-  sender         MessageSender
-  senderClerkId  String
-  body           String
-  isHtml         Boolean       @default(false)
-  emailId        Int? // provenance of the diverted first message (scalar, no FK)
-  applicationId  Int? // provenance of an application-seeded message (scalar, no FK)
-  campaignId     Int? // provenance of the originating campaign (scalar, no FK)
+  id                  Int           @id @default(autoincrement())
+  conversationId      Int
+  sender              MessageSender
+  senderClerkId       String
+  body                String
+  isHtml              Boolean       @default(false)
+  emailId             Int? // provenance of the diverted first message (scalar, no FK)
+  applicationId       Int? // provenance of an application-seeded message (scalar, no FK)
+  campaignId          Int? // provenance of the originating campaign (scalar, no FK)
   // Thread partition within the conversation: messages exchanged in the context of
   // a specific EventApplication carry its id; null = the general/cold-outreach
   // thread (scalar, no FK). Seeded summaries carry both this and applicationId.
   threadApplicationId Int?
   // Booking-request delivery: set on the Message that carries a BookingRequest so
   // it rides the thread like any reply (scalar, no FK; additive column).
-  bookingRequestId Int?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  bookingRequestId    Int?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
@@ -681,25 +681,25 @@ model ContactNote {
 }
 
 model CalendarEntry {
-  id              Int      @id @default(autoincrement())
-  userId          String
-  date            String
-  personName      String   @default("")
-  company         String   @default("")
-  startTime       String   @default("")
-  endTime         String   @default("")
-  notes           String   @default("")
-  address         String   @default("")
-  placeId         String?
-  latitude        Float?
-  longitude       Float?
-  drivingDuration String?
-  campaignId      Int? // Campaign.id provenance from the inbox booking flow; intentionally no FK
-  contactId       Int? // Contact.id provenance; intentionally no FK
+  id               Int      @id @default(autoincrement())
+  userId           String
+  date             String
+  personName       String   @default("")
+  company          String   @default("")
+  startTime        String   @default("")
+  endTime          String   @default("")
+  notes            String   @default("")
+  address          String   @default("")
+  placeId          String?
+  latitude         Float?
+  longitude        Float?
+  drivingDuration  String?
+  campaignId       Int? // Campaign.id provenance from the inbox booking flow; intentionally no FK
+  contactId        Int? // Contact.id provenance; intentionally no FK
   bookingRequestId Int? // BookingRequest.id provenance for confirmed bookings; intentionally no FK
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@unique([userId, date])
 }
@@ -759,34 +759,54 @@ enum SendQueueStatus {
 }
 
 model EmailSendQueue {
-  id            Int             @id @default(autoincrement())
-  emailId       Int             @unique // Email.id — one LIVE queue row per Email (cancel DELETEs the row)
-  userId        String // sender clerkId (== Email.userId); per-day cap + claim key
-  campaignId    Int // Campaign.id provenance; intentionally no FK
-  contactId     Int // Contact.id recipient; intentionally no FK
+  id         Int    @id @default(autoincrement())
+  emailId    Int    @unique // Email.id — one LIVE queue row per Email (cancel DELETEs the row)
+  userId     String // sender clerkId (== Email.userId); per-day cap + claim key
+  campaignId Int // Campaign.id provenance; intentionally no FK
+  contactId  Int // Contact.id recipient; intentionally no FK
 
-  status        SendQueueStatus @default(pending)
-  scheduledFor  DateTime // UTC instant chosen by the pure scheduler
-  capDay        String // == capDayOf(scheduledFor) in senderRefTz; the per-day (100) cap bucket
-  recipientTz   String          @default("America/New_York") // window tz (v1: fixed; v2: per-recipient)
+  status       SendQueueStatus @default(pending)
+  scheduledFor DateTime // UTC instant chosen by the pure scheduler
+  capDay       String // == capDayOf(scheduledFor) in senderRefTz; the per-day (100) cap bucket
+  recipientTz  String          @default("America/New_York") // window tz (v1: fixed; v2: per-recipient)
 
-  dispatchedAt  DateTime? // set IMMEDIATELY before mg.create() — splits the stuck-row sweeper
-  attempts      Int             @default(0) // ONLY incremented on a real Mailgun attempt
-  maxAttempts   Int             @default(5)
-  capRescheduleCount    Int     @default(0) // cap/window backlog rolls (lifetime-guarded)
-  creditRescheduleCount Int     @default(0) // credit-block rolls (rare) -> failed:no_credits at small N
-  creditBlockedAt DateTime? // first credit-block instant (notify-once)
-  nextRetryAt   DateTime? // transient-failure backoff gate
-  lockedAt      DateTime? // set when a worker claims the row
-  lockToken     String? // per-run uuid; guards the terminal write
-  failureReason String?
-  sentAt        DateTime?
+  dispatchedAt          DateTime? // set IMMEDIATELY before mg.create() — splits the stuck-row sweeper
+  attempts              Int       @default(0) // ONLY incremented on a real Mailgun attempt
+  maxAttempts           Int       @default(5)
+  capRescheduleCount    Int       @default(0) // cap/window backlog rolls (lifetime-guarded)
+  creditRescheduleCount Int       @default(0) // credit-block rolls (rare) -> failed:no_credits at small N
+  creditBlockedAt       DateTime? // first credit-block instant (notify-once)
+  nextRetryAt           DateTime? // transient-failure backoff gate
+  lockedAt              DateTime? // set when a worker claims the row
+  lockToken             String? // per-run uuid; guards the terminal write
+  failureReason         String?
+  sentAt                DateTime?
 
-  createdAt     DateTime        @default(now()) // claim FIFO tiebreak + lifetime guard
-  updatedAt     DateTime        @updatedAt
+  createdAt DateTime @default(now()) // claim FIFO tiebreak + lifetime guard
+  updatedAt DateTime @updatedAt
 
   @@index([status, scheduledFor]) // claim scan + overdue health
   @@index([userId, capDay, status]) // per-sender-per-day cap accounting
   @@index([campaignId, status]) // cancel-on-archive
   @@index([status, lockedAt]) // stuck-row sweeper
+}
+
+// Persistent cache for LLM query-intent classifications (free-text search
+// query understanding). Keyed on the normalized query remainder + prompt
+// version — bumping INTENT_PROMPT_VERSION in queryUnderstanding.ts orphans
+// old rows (atomic invalidation). Serverless lambdas lose in-memory LRUs on
+// every cold start; this table is what makes repeat queries never re-pay the
+// LLM. Deterministic-fallback intents are NEVER persisted here.
+model SearchQueryIntent {
+  id            Int      @id @default(autoincrement())
+  queryKey      String
+  promptVersion Int
+  intent        Json
+  model         String
+  hitCount      Int      @default(0)
+  createdAt     DateTime @default(now())
+  lastUsedAt    DateTime @default(now())
+
+  @@unique([queryKey, promptVersion])
+  @@index([lastUsedAt])
 }

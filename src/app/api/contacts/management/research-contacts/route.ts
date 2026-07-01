@@ -7,6 +7,7 @@ import {
 	handleApiError,
 } from '@/app/api/_utils';
 import { fetchPerplexity } from '@/app/api/_utils/perplexity';
+import { upsertContactToVectorDb } from '@/app/api/_utils/vectorDb';
 import { OPEN_AI_MODEL_OPTIONS, PERPLEXITY_MODEL_OPTIONS } from '@/constants';
 import { Contact, EmailVerificationStatus, UserRole } from '@prisma/client';
 import { PerplexityCompletionObject } from '@/types';
@@ -252,6 +253,32 @@ Return your response as a JSON string that can be parsed by JSON.parse() in Java
 
 				const updateResults = await Promise.all(updatePromises);
 				successCount += updateResults.length;
+
+				// Enrichment must reach the search index: the ES doc AND its
+				// embedding are built from the fields this route just improved
+				// (title/headline/companyIndustry/companyKeywords/metadata).
+				// Without this re-index the enrichment is invisible to search.
+				// On failure, flip hasVectorEmbedding=false so the row becomes
+				// eligible for the generate-embeddings backfill loop instead of
+				// silently staying stale.
+				await Promise.all(
+					updateResults.map(async (updated) => {
+						try {
+							await upsertContactToVectorDb(updated);
+						} catch (esError) {
+							console.error(
+								`Failed to re-index enriched contact ${updated.id} to ES; flagging for backfill`,
+								esError
+							);
+							await prisma.contact
+								.update({
+									where: { id: updated.id },
+									data: { hasVectorEmbedding: false },
+								})
+								.catch(() => undefined);
+						}
+					})
+				);
 
 				console.log(`Successfully updated ${updateResults.length} contacts in batch`);
 			}

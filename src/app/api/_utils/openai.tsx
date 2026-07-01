@@ -2,7 +2,12 @@ export const fetchOpenAi = async (
 	model: string,
 	prompt: string,
 	content: string,
-	options?: { timeoutMs?: number }
+	options?: {
+		timeoutMs?: number;
+		temperature?: number;
+		maxTokens?: number;
+		responseFormat?: 'json_object';
+	}
 ): Promise<string> => {
 	const controller = new AbortController();
 	const timeoutMs = options?.timeoutMs ?? 12000; // 12s hard limit by default (tuned per caller)
@@ -23,6 +28,15 @@ export const fetchOpenAi = async (
 						content,
 					},
 				],
+				...(options?.temperature != null
+					? { temperature: options.temperature }
+					: {}),
+				...(options?.maxTokens != null
+					? { max_tokens: options.maxTokens }
+					: {}),
+				...(options?.responseFormat
+					? { response_format: { type: options.responseFormat } }
+					: {}),
 			}),
 			signal: controller.signal,
 		});

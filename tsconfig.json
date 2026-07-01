@@ -39,6 +39,7 @@
     ".next-baseline/types/**/*.ts",
     ".next-build-check/types/**/*.ts",
     ".next-build-verify/types/**/*.ts",
+    ".next-finalize-build/types/**/*.ts",
     ".next-minzoom-verify/types/**/*.ts",
     ".next-safari-fix/types/**/*.ts",
     ".next-safariperf/types/**/*.ts",
@@ -50,7 +51,7 @@
     ".next-zoom-verify/types/**/*.ts",
     ".next/types/**/*.ts",
     "next-env.d.ts",
-    ".next-finalize-build/types/**/*.ts"
+    ".next-mapsplit-verify/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
