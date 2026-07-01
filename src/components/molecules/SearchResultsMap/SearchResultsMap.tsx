@@ -631,6 +631,10 @@ if (typeof window !== 'undefined') {
 // runs client-side).
 const IS_SAFARI = isSafariBrowser();
 const CANVAS_PERF_MODE = true;
+// Cap for the marker pin data-URL memo cache (getMarkerPinUrl) — comfortably
+// above the distinct (fill|stroke|searchWhat|base) combos a working set uses,
+// so eviction only trims long-session accumulation, never live churn.
+const MARKER_PIN_URL_CACHE_MAX = 256;
 
 const createConfiguredZoomOutGovernor = () =>
 	createZoomOutGovernor({
@@ -16623,6 +16627,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		applyLightingOverlayOpacity();
 	}, [effectiveTemperatureF, map, isMapLoaded, applyLightingOverlayOpacity]);
 
+	// Bounded via Map-reinsertion LRU: the key space multiplies per color transform
+	// (darken/wash-out variants per locked state × category), so a long browsing
+	// session would otherwise accumulate data-URL strings for the map's lifetime.
 	const markerPinUrlCacheRef = useRef<Map<string, string>>(new Map());
 	const getMarkerPinUrl = useCallback(
 		(
@@ -16632,10 +16639,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			baseColor?: string
 		): string => {
 			const key = `${fillColor}|${strokeColor}|${searchWhat ?? ''}|${baseColor ?? ''}`;
-			const cached = markerPinUrlCacheRef.current.get(key);
-			if (cached) return cached;
+			const cache = markerPinUrlCacheRef.current;
+			const cached = cache.get(key);
+			if (cached) {
+				// Re-insert on hit so Map iteration order doubles as LRU order.
+				cache.delete(key);
+				cache.set(key, cached);
+				return cached;
+			}
 			const url = generateMapMarkerPinIconUrl(fillColor, strokeColor, baseColor);
-			markerPinUrlCacheRef.current.set(key, url);
+			cache.set(key, url);
+			if (cache.size > MARKER_PIN_URL_CACHE_MAX) {
+				cache.delete(cache.keys().next().value as string);
+			}
 			return url;
 		},
 		[]
