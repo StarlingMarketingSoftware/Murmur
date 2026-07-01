@@ -8406,9 +8406,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			features: [],
 		};
 
-		const ensureSource = (id: string) => {
+		// geojson-vt (inside the map's workers) slices every GeoJSON source to
+		// maxzoom 18 by default and caches every generated tile for the source's
+		// lifetime — deep-zoom panning accumulates worker heap for the whole
+		// session (measured: v8/workers was the single largest renderer pool).
+		// Cap tiling depth per source class; rendering past the cap reuses the
+		// deepest tile via Mapbox overzoom, so nothing disappears:
+		// - Point sources overzoom losslessly (points are never simplified).
+		// - Shape sources keep ~0.9m fidelity at z14 (0.375 tile-px tolerance) —
+		//   invisible at the zooms these decorative layers render.
+		const GEOJSON_POINT_SOURCE_MAXZOOM = 12;
+		const GEOJSON_SHAPE_SOURCE_MAXZOOM = 14;
+
+		const ensureSource = (id: string, maxzoom: number) => {
 			if (mapInstance.getSource(id)) return;
-			mapInstance.addSource(id, { type: 'geojson', data: emptyFc });
+			mapInstance.addSource(id, { type: 'geojson', data: emptyFc, maxzoom });
 		};
 
 		// Core sources
@@ -8539,15 +8551,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				type: 'geojson',
 				data: emptyFc,
 				promoteId: 'key',
+				// The visible divider lines cap at z8 (STATE_DIVIDER_LINES_MAX_ZOOM);
+				// past z10 only the invisible hover/hit fills sample this source, and
+				// their boundary tolerance at z10 (~3m) is far below hover precision.
+				// Caps the worker-side geojson-vt tree for the largest static polygon
+				// payload on the map (deep-zoom slicing of 304 detailed state polygons).
+				maxzoom: 10,
 			});
 		}
-		ensureSource(MAPBOX_SOURCE_IDS.resultsOutline);
-		ensureSource(MAPBOX_SOURCE_IDS.lockedOutline);
-		ensureSource(MAPBOX_SOURCE_IDS.curatedBlob);
-		ensureSource(MAPBOX_SOURCE_IDS.markerConstellation);
-		ensureSource(MAPBOX_SOURCE_IDS.markerConstellationSelected);
-		ensureSource(MAPBOX_SOURCE_IDS.markerConstellationNodes);
-		ensureSource(MAPBOX_SOURCE_IDS.campaignFootprintPoints);
+		ensureSource(MAPBOX_SOURCE_IDS.resultsOutline, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.lockedOutline, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.curatedBlob, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.markerConstellation, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.markerConstellationSelected, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.markerConstellationNodes, GEOJSON_POINT_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.campaignFootprintPoints, GEOJSON_POINT_SOURCE_MAXZOOM);
 		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.campaignFootprintLines)) {
 			mapInstance.addSource(MAPBOX_SOURCE_IDS.campaignFootprintLines, {
 				type: 'geojson',
@@ -8555,29 +8573,29 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				lineMetrics: true,
 			});
 		}
-		ensureSource(MAPBOX_SOURCE_IDS.campaignFootprintNodes);
-		ensureSource(MAPBOX_SOURCE_IDS.selectedAreaRect);
-		ensureSource(MAPBOX_SOURCE_IDS.selectionRect);
+		ensureSource(MAPBOX_SOURCE_IDS.campaignFootprintNodes, GEOJSON_POINT_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.selectedAreaRect, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.selectionRect, GEOJSON_SHAPE_SOURCE_MAXZOOM);
 
 		// State label centroids (one point per state — avoids duplicate labels on MultiPolygon states)
-		ensureSource(MAPBOX_SOURCE_IDS.stateLabels);
+		ensureSource(MAPBOX_SOURCE_IDS.stateLabels, GEOJSON_POINT_SOURCE_MAXZOOM);
 
 		// Marker sources (all are point FeatureCollections keyed by contact.id)
-		ensureSource(MAPBOX_SOURCE_IDS.markersAllOverlay);
-		ensureSource(MAPBOX_SOURCE_IDS.markersPromotionPin);
-		ensureSource(MAPBOX_SOURCE_IDS.markersBookingPin);
-		ensureSource(MAPBOX_SOURCE_IDS.markersPromotionDot);
-		ensureSource(MAPBOX_SOURCE_IDS.markersBase);
-		ensureSource(MAPBOX_SOURCE_IDS.markersSelected);
-		ensureSource(MAPBOX_SOURCE_IDS.campaignHeatmap);
-		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueGlow);
-		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueRings);
-		ensureSource(MAPBOX_SOURCE_IDS.ownedVenuePulse);
-		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueIcon);
-		ensureSource(MAPBOX_SOURCE_IDS.eventsGlow);
-		ensureSource(MAPBOX_SOURCE_IDS.eventsRings);
-		ensureSource(MAPBOX_SOURCE_IDS.eventsPulse);
-		ensureSource(MAPBOX_SOURCE_IDS.eventsIcon);
+		ensureSource(MAPBOX_SOURCE_IDS.markersAllOverlay, GEOJSON_POINT_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.markersPromotionPin, GEOJSON_POINT_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.markersBookingPin, GEOJSON_POINT_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.markersPromotionDot, GEOJSON_POINT_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.markersBase, GEOJSON_POINT_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.markersSelected, GEOJSON_POINT_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.campaignHeatmap, GEOJSON_POINT_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueGlow, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueRings, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.ownedVenuePulse, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueIcon, GEOJSON_POINT_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.eventsGlow, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.eventsRings, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.eventsPulse, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.eventsIcon, GEOJSON_POINT_SOURCE_MAXZOOM);
 
 		const ensureLayer = (layer: any, beforeId?: string) => {
 			if (mapInstance.getLayer(layer.id)) {
