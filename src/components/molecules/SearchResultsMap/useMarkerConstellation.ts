@@ -5,17 +5,76 @@ import type { MutableRefObject, Dispatch, SetStateAction } from 'react';
 import type mapboxgl from 'mapbox-gl';
 import type { ContactWithName } from '@/types/contact';
 import type { LatLngLiteral } from './types';
+import type {
+	MarkerConstellationEdge,
+	MarkerConstellationEdgeSeed,
+	MarkerConstellationNode,
+} from './types';
+import type { CampaignContactMapStatus, CampaignStatusMarkerStyle, DashboardDraftingMapContactStatus } from './markerStatusStyles';
+import { washOutHexColor } from './color';
+import {
+	MAPBOX_LAYER_IDS,
+	MAPBOX_SOURCE_IDS,
+	MAP_DEFAULT_ZOOM,
+	MARKER_CONSTELLATION_CORE_OPACITY,
+	MARKER_CONSTELLATION_GLOW_OPACITY,
+	MARKER_CONSTELLATION_HALO_COLOR,
+	MARKER_CONSTELLATION_MAX_POINTS,
+	MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM,
+	MARKER_CONSTELLATION_REVEAL_FADE_MS,
+	OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE,
+} from './constants';
+import { pickAdaptiveCuratedBlobClusters, projectCuratedBlobPoint } from './curatedBlob';
+import { getMarkerConstellationZoomFadedOpacity } from './mapExpressions';
+import {
+	buildBeautyMarkerConstellationFormation,
+	buildCategoryMarkerConstellationFormation,
+	buildFallbackMarkerConstellationGroupKeys,
+	buildSelectedMarkerConstellationEdges,
+	markerConstellationPairKey,
+} from './markerConstellation';
+import { CAMPAIGN_STATUS_CONSTELLATION_CORE_OPACITY, CAMPAIGN_STATUS_CONSTELLATION_GLOW_OPACITY, DASHBOARD_DRAFTING_DRAFT_LINE_COLOR, GENERAL_CONTACT_CONSTELLATION_LINE_COLOR } from './markerStatusStyles';
+import { clamp } from './math';
+import { normalizeStateKey } from './metadata';
+import { getResultDotColorForWhat, normalizeWhatKey } from './searchMode';
+import { CuratedBlobMercatorPoint, MarkerConstellationPoint } from './types';
+import { hashStringToUint32, latLngToWorldPixel } from './wasmGeo';
 
-
-// Marker constellation: control helpers, the single source-data writer, the
-// inConstellation dim sync, and the per-result-set composer.
 
 export interface UseConstellationControlsParams {
-	_unused?: never;
+	isMapLoaded: boolean;
+	map: mapboxgl.Map | null;
+	markerConstellationComposedSearchKeyRef: MutableRefObject<string>;
+	markerConstellationContactsByIdRef: MutableRefObject<Map<number, ContactWithName>>;
+	markerConstellationDeferredMoveEndRef: MutableRefObject<(() => void) | null>;
+	markerConstellationEdgesRef: MutableRefObject<MarkerConstellationEdge[]>;
+	markerConstellationIsStatusModeRef: MutableRefObject<boolean>;
+	markerConstellationLastDataKeyRef: MutableRefObject<string>;
+	markerConstellationNodeIdsRef: MutableRefObject<Set<number>>;
+	markerConstellationNodesRef: MutableRefObject<MarkerConstellationNode[]>;
+	markerConstellationRevealCancelRef: MutableRefObject<(() => void) | null>;
+	markerConstellationRevealDoneRef: MutableRefObject<boolean>;
+	markerConstellationUsesCategoryColorsRef: MutableRefObject<boolean>;
+	setMarkerConstellationCompositionNonce: Dispatch<SetStateAction<number>>;
 }
 
 export const useConstellationControls = (params: UseConstellationControlsParams) => {
-	void params;
+	const {
+		isMapLoaded,
+		map,
+		markerConstellationComposedSearchKeyRef,
+		markerConstellationContactsByIdRef,
+		markerConstellationDeferredMoveEndRef,
+		markerConstellationEdgesRef,
+		markerConstellationIsStatusModeRef,
+		markerConstellationLastDataKeyRef,
+		markerConstellationNodeIdsRef,
+		markerConstellationNodesRef,
+		markerConstellationRevealCancelRef,
+		markerConstellationRevealDoneRef,
+		markerConstellationUsesCategoryColorsRef,
+		setMarkerConstellationCompositionNonce,
+	} = params;
 	const stopMarkerConstellationReveal = useCallback(() => {
 		const cancel = markerConstellationRevealCancelRef.current;
 		if (cancel) {
@@ -106,12 +165,86 @@ export const useConstellationControls = (params: UseConstellationControlsParams)
 	return { stopMarkerConstellationReveal, setMarkerConstellationLineOpacity, clearMarkerConstellation };
 };
 
+
 export interface UseConstellationWriterParams {
-	_unused?: never;
+	allContactsOverlayVisibleContacts: ContactWithName[];
+	bookingExtraVisibleContacts: ContactWithName[];
+	campaignMarkerMode: 'category' | 'status';
+	contactsWithCoords: ContactWithName[];
+	getAllContactsOverlayContactCoords: (contact: ContactWithName) => LatLngLiteral | null;
+	getBookingExtraContactCoords: (contact: ContactWithName) => LatLngLiteral | null;
+	getCampaignStatusLineStyleForContacts: (
+		fromContactId: number,
+		toContactId: number
+	) => CampaignStatusMarkerStyle | null;
+	getCampaignStatusMarkerStyleForContact: (contactId: number) => CampaignStatusMarkerStyle | null;
+	getContactCoords: (contact: ContactWithName) => LatLngLiteral | null;
+	getDashboardDraftingStatusForContact: (contactId: number) => DashboardDraftingMapContactStatus | null;
+	getPromotionOverlayContactCoords: (contact: ContactWithName) => LatLngLiteral | null;
+	isCoordsInLockedState: (coords: LatLngLiteral) => boolean;
+	isMapLoaded: boolean;
+	lockedStateKey: string | null;
+	lockedStateSelectionKeyRef: MutableRefObject<string | null>;
+	map: mapboxgl.Map | null;
+	markerConstellationContactsByIdRef: MutableRefObject<Map<number, ContactWithName>>;
+	markerConstellationEdgesRef: MutableRefObject<MarkerConstellationEdge[]>;
+	markerConstellationIsStatusModeRef: MutableRefObject<boolean>;
+	markerConstellationLastDataKeyRef: MutableRefObject<string>;
+	markerConstellationNodesRef: MutableRefObject<MarkerConstellationNode[]>;
+	markerConstellationRevealDoneRef: MutableRefObject<boolean>;
+	markerConstellationUsesCategoryColorsRef: MutableRefObject<boolean>;
+	promotionOverlayVisibleContacts: ContactWithName[];
+	searchWhat: string | null | undefined;
+	selectedConstellationEdgesRef: MutableRefObject<MarkerConstellationEdgeSeed[]>;
+	selectedConstellationGraphKeyRef: MutableRefObject<string>;
+	selectedConstellationHadPathRef: MutableRefObject<boolean>;
+	selectedConstellationLineFadeRafRef: MutableRefObject<number | null>;
+	selectedConstellationLineOpacityRef: MutableRefObject<number>;
+	selectedContacts: number[];
+	setMarkerConstellationLineOpacity: (
+		coreOpacity: unknown,
+		glowOpacity: unknown,
+		transitionMs?: number
+	) => void;
+	stopMarkerConstellationReveal: () => void;
 }
 
 export const useConstellationWriter = (params: UseConstellationWriterParams) => {
-	void params;
+	const {
+		allContactsOverlayVisibleContacts,
+		bookingExtraVisibleContacts,
+		campaignMarkerMode,
+		contactsWithCoords,
+		getAllContactsOverlayContactCoords,
+		getBookingExtraContactCoords,
+		getCampaignStatusLineStyleForContacts,
+		getCampaignStatusMarkerStyleForContact,
+		getContactCoords,
+		getDashboardDraftingStatusForContact,
+		getPromotionOverlayContactCoords,
+		isCoordsInLockedState,
+		isMapLoaded,
+		lockedStateKey,
+		lockedStateSelectionKeyRef,
+		map,
+		markerConstellationContactsByIdRef,
+		markerConstellationEdgesRef,
+		markerConstellationIsStatusModeRef,
+		markerConstellationLastDataKeyRef,
+		markerConstellationNodesRef,
+		markerConstellationRevealDoneRef,
+		markerConstellationUsesCategoryColorsRef,
+		promotionOverlayVisibleContacts,
+		searchWhat,
+		selectedConstellationEdgesRef,
+		selectedConstellationGraphKeyRef,
+		selectedConstellationHadPathRef,
+		selectedConstellationLineFadeRafRef,
+		selectedConstellationLineOpacityRef,
+		selectedContacts,
+		setMarkerConstellationLineOpacity,
+		stopMarkerConstellationReveal,
+	} = params;
 	const writeMarkerConstellationSourceData = useCallback(
 		(contactsForVisibility?: ContactWithName[]): void => {
 			if (!map || !isMapLoaded) return;
@@ -510,12 +643,27 @@ export const useConstellationWriter = (params: UseConstellationWriterParams) => 
 	return { writeMarkerConstellationSourceData, startMarkerConstellationReveal };
 };
 
+
 export interface UseConstellationDimSyncParams {
-	_unused?: never;
+	curatedBlobProtectedMarkerIdsNonce: number;
+	curatedBlobProtectedMarkerIdsRef: MutableRefObject<Set<number>>;
+	isMapLoaded: boolean;
+	map: mapboxgl.Map | null;
+	markerConstellationCompositionNonce: number;
+	markerConstellationNodeIdsRef: MutableRefObject<Set<number>>;
+	visibleContacts: ContactWithName[];
 }
 
 export const useConstellationDimSync = (params: UseConstellationDimSyncParams): void => {
-	void params;
+	const {
+		curatedBlobProtectedMarkerIdsNonce,
+		curatedBlobProtectedMarkerIdsRef,
+		isMapLoaded,
+		map,
+		markerConstellationCompositionNonce,
+		markerConstellationNodeIdsRef,
+		visibleContacts,
+	} = params;
 	// Sync `inConstellation` feature-state on the base markers source so the
 	// zoom-fade paint expressions can dim non-constellation dots at low zoom.
 	// Default (unset) reads as visible; only contacts NOT in the frozen
@@ -551,14 +699,88 @@ export const useConstellationDimSync = (params: UseConstellationDimSyncParams): 
 		visibleContacts,
 		markerConstellationCompositionNonce,
 		curatedBlobProtectedMarkerIdsNonce,
-	]);};
+	]);
+};
+
 
 export interface UseConstellationComposerParams {
-	_unused?: never;
+	campaignMarkerMode: 'category' | 'status';
+	categoryConstellationsEnabled: boolean;
+	clearMarkerConstellation: (includeSelected?: boolean) => void;
+	contactsWithCoords: ContactWithName[];
+	getCampaignStatusForContact: (contactId: number) => CampaignContactMapStatus;
+	getContactCoords: (contact: ContactWithName) => LatLngLiteral | null;
+	isAmbientContactsEnabled: boolean;
+	isBackgroundPresentation: boolean;
+	isCompactOverlayActive: boolean;
+	isCoordsInLockedState: (coords: LatLngLiteral) => boolean;
+	isLoading: boolean | undefined;
+	isMapLoaded: boolean;
+	lockedStateKey: string | null;
+	map: mapboxgl.Map | null;
+	markerConstellationComposedSearchKeyRef: MutableRefObject<string>;
+	markerConstellationContactsByIdRef: MutableRefObject<Map<number, ContactWithName>>;
+	markerConstellationDeferredMoveEndRef: MutableRefObject<(() => void) | null>;
+	markerConstellationEdgesRef: MutableRefObject<MarkerConstellationEdge[]>;
+	markerConstellationIdleNonce: number;
+	markerConstellationIsStatusModeRef: MutableRefObject<boolean>;
+	markerConstellationLastDataKeyRef: MutableRefObject<string>;
+	markerConstellationLastSearchKeyRef: MutableRefObject<string>;
+	markerConstellationNodeIdsRef: MutableRefObject<Set<number>>;
+	markerConstellationNodesRef: MutableRefObject<MarkerConstellationNode[]>;
+	markerConstellationRevealDoneRef: MutableRefObject<boolean>;
+	markerConstellationUsesCategoryColorsRef: MutableRefObject<boolean>;
+	searchEngaged: boolean;
+	searchQuery: string | null | undefined;
+	setMarkerConstellationCompositionNonce: Dispatch<SetStateAction<number>>;
+	setMarkerConstellationIdleNonce: Dispatch<SetStateAction<number>>;
+	setMarkerConstellationLineOpacity: (
+		coreOpacity: unknown,
+		glowOpacity: unknown,
+		transitionMs?: number
+	) => void;
+	startMarkerConstellationReveal: () => void;
+	stopMarkerConstellationReveal: () => void;
+	writeMarkerConstellationSourceData: () => void;
 }
 
 export const useConstellationComposer = (params: UseConstellationComposerParams): void => {
-	void params;
+	const {
+		campaignMarkerMode,
+		categoryConstellationsEnabled,
+		clearMarkerConstellation,
+		contactsWithCoords,
+		getCampaignStatusForContact,
+		getContactCoords,
+		isAmbientContactsEnabled,
+		isBackgroundPresentation,
+		isCompactOverlayActive,
+		isCoordsInLockedState,
+		isLoading,
+		isMapLoaded,
+		lockedStateKey,
+		map,
+		markerConstellationComposedSearchKeyRef,
+		markerConstellationContactsByIdRef,
+		markerConstellationDeferredMoveEndRef,
+		markerConstellationEdgesRef,
+		markerConstellationIdleNonce,
+		markerConstellationIsStatusModeRef,
+		markerConstellationLastDataKeyRef,
+		markerConstellationLastSearchKeyRef,
+		markerConstellationNodeIdsRef,
+		markerConstellationNodesRef,
+		markerConstellationRevealDoneRef,
+		markerConstellationUsesCategoryColorsRef,
+		searchEngaged,
+		searchQuery,
+		setMarkerConstellationCompositionNonce,
+		setMarkerConstellationIdleNonce,
+		setMarkerConstellationLineOpacity,
+		startMarkerConstellationReveal,
+		stopMarkerConstellationReveal,
+		writeMarkerConstellationSourceData,
+	} = params;
 	// Keep the frozen constellation's rendered line source synced after style/coordinate changes.
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
@@ -939,38 +1161,4 @@ export const useConstellationComposer = (params: UseConstellationComposerParams)
 		startMarkerConstellationReveal,
 		isCompactOverlayActive,
 	]);
-
-	useOverlayMarkerSources({
-		allContactsOverlayVisibleContacts,
-		bookingExtraVisibleContacts,
-		ensureMapImageFromUrl,
-		getAllContactsOverlayContactCoords,
-		getBookingExtraContactCoords,
-		getMarkerPinUrl,
-		getPromotionOverlayContactCoords,
-		hoveredBookingExtraCategory,
-		imageNameFromUrl,
-		isAmbientContactsEnabled,
-		isAnySearch,
-		isCompactOverlayActive,
-		isCoordsInLockedState,
-		isLightweightDetailMarkerMode,
-		isLoading,
-		isMapLoaded,
-		isRadiusSearchActive,
-		isStateLayerReady,
-		lockedStateKey,
-		lockedStateSelectionKeyRef,
-		map,
-		promotionDotIdsRef,
-		promotionOverlayVisibleContacts,
-		promotionPinIdsRef,
-		searchEngaged,
-		selectedContacts,
-		selectedStateMorphSourceRef,
-		uncategorizedContactMarkerHoverImageName,
-		uncategorizedContactMarkerImageName,
-		visibleContacts,
-	});
-
-	// Give the DOM tooltip a real hover target around the SVG so moving from the};
+};

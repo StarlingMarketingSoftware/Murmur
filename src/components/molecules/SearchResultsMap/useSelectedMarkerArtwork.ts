@@ -1,18 +1,110 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
-import type { MutableRefObject, Dispatch, SetStateAction } from 'react';
+import { useEffect } from 'react';
+import type { MutableRefObject } from 'react';
 import type mapboxgl from 'mapbox-gl';
 import type { ContactWithName } from '@/types/contact';
 import type { LatLngLiteral } from './types';
+import type {
+	CuratedBlobMorphSource,
+} from './types';
+import type { CompactOverlayPillEntry } from './compactOverlayPillPrimitives';
+type GetSelectedMarkerAssets = (
+	accentColor?: string,
+	centerFillColor?: string,
+	hoverCenterFillColor?: string
+) => { imageName: string; url: string; hoverImageName: string; hoverUrl: string };
+import { getAmbientContactWhatFromTitle } from './ambientOverlayShared';
+import { MAPBOX_SOURCE_IDS } from './constants';
+import { getLatLngFromContact } from './coordinates';
+import { SELECTED_MARKER_ENTRY_OPACITY, SELECTED_MARKER_FADE_MS, SELECTED_MARKER_INITIAL_TRANSFORM_SCALE } from './mapExpressions';
+import { getBookingTitlePrefixFromContactTitle, getPromotionOverlayWhatFromContactTitle, getResultDotColorForWhat } from './searchMode';
+import { SELECTED_CONTACT_MARKER_VIEWBOX_HEIGHT, SELECTED_CONTACT_MARKER_VIEWBOX_WIDTH } from '@/components/atoms/_svg/SelectedContactMarkerIcon';
+import { isCleanMapMarkerCategory } from '@/components/atoms/_svg/mapTooltipCategoryIcons';
 
 
 export interface UseSelectedMarkerArtworkParams {
-	_unused?: never;
+	allContactsOverlayVisibleContactsRef: MutableRefObject<ContactWithName[]>;
+	bookingExtraVisibleContactsRef: MutableRefObject<ContactWithName[]>;
+	campaignMarkerMode: 'category' | 'status';
+	compactOverlayPillEntries: CompactOverlayPillEntry[];
+	contactsWithCoords: ContactWithName[];
+	ensureMapImageFromUrl: (imageName: string, url: string, dimensions?: { width: number; height: number }) => Promise<void>;
+	getAllContactsOverlayContactCoords: (contact: ContactWithName) => LatLngLiteral | null;
+	getBookingExtraContactCoords: (contact: ContactWithName) => LatLngLiteral | null;
+	getContactCoords: (contact: ContactWithName) => LatLngLiteral | null;
+	getDashboardDraftingMarkerStyleForContact: (
+		contactId: number
+	) => { centerFillColor: string; strokeColor: string; tooltipFillColor: string } | null;
+	getPromotionOverlayContactCoords: (contact: ContactWithName) => LatLngLiteral | null;
+	getSelectedCategorizedContactMarkerAssets: (
+		accentColor: string,
+		centerFillColor?: string,
+		hoverCenterFillColor?: string
+	) => { imageName: string; url: string; hoverImageName: string; hoverUrl: string };
+	getSelectedUncategorizedContactMarkerAssets: GetSelectedMarkerAssets;
+	isAmbientContactsEnabled: boolean;
+	isLoading: boolean | undefined;
+	isMapLoaded: boolean;
+	isStateLayerReady: boolean;
+	lockedStateKey: string | null;
+	lockedStateSelectionKeyRef: MutableRefObject<string | null>;
+	map: mapboxgl.Map | null;
+	promotionOverlayVisibleContactsRef: MutableRefObject<ContactWithName[]>;
+	searchEngaged: boolean;
+	searchWhat: string | null | undefined;
+	selectedContactObjects: ContactWithName[];
+	selectedContacts: number[];
+	selectedMarkerBuildSignatureRef: MutableRefObject<string>;
+	selectedMarkerFadeByIdRef: MutableRefObject<Map<number, number>>;
+	selectedMarkerFadeRafRef: MutableRefObject<number | null>;
+	selectedMarkerFeatureByIdRef: MutableRefObject<Map<number, any>>;
+	selectedMarkerScaleByIdRef: MutableRefObject<Map<number, number>>;
+	selectedStateMorphSourceRef: MutableRefObject<CuratedBlobMorphSource | null>;
+	selectedUncategorizedContactMarkerHoverImageName: string;
+	selectedUncategorizedContactMarkerHoverUrl: string;
+	selectedUncategorizedContactMarkerImageName: string;
+	selectedUncategorizedContactMarkerUrl: string;
 }
 
 export const useSelectedMarkerArtwork = (params: UseSelectedMarkerArtworkParams): void => {
-	void params;
+	const {
+		allContactsOverlayVisibleContactsRef,
+		bookingExtraVisibleContactsRef,
+		campaignMarkerMode,
+		compactOverlayPillEntries,
+		contactsWithCoords,
+		ensureMapImageFromUrl,
+		getAllContactsOverlayContactCoords,
+		getBookingExtraContactCoords,
+		getContactCoords,
+		getDashboardDraftingMarkerStyleForContact,
+		getPromotionOverlayContactCoords,
+		getSelectedCategorizedContactMarkerAssets,
+		getSelectedUncategorizedContactMarkerAssets,
+		isAmbientContactsEnabled,
+		isLoading,
+		isMapLoaded,
+		isStateLayerReady,
+		lockedStateKey,
+		lockedStateSelectionKeyRef,
+		map,
+		promotionOverlayVisibleContactsRef,
+		searchEngaged,
+		searchWhat,
+		selectedContactObjects,
+		selectedContacts,
+		selectedMarkerBuildSignatureRef,
+		selectedMarkerFadeByIdRef,
+		selectedMarkerFadeRafRef,
+		selectedMarkerFeatureByIdRef,
+		selectedMarkerScaleByIdRef,
+		selectedStateMorphSourceRef,
+		selectedUncategorizedContactMarkerHoverImageName,
+		selectedUncategorizedContactMarkerHoverUrl,
+		selectedUncategorizedContactMarkerImageName,
+		selectedUncategorizedContactMarkerUrl,
+	} = params;
 	// Selected marker artwork. This source is separate from the normal dot/pin sources so
 	// selected contacts can swap to the bespoke halo markers without rebuilding every marker.
 	useEffect(() => {
@@ -373,4 +465,5 @@ export const useSelectedMarkerArtwork = (params: UseSelectedMarkerArtworkParams)
 		selectedUncategorizedContactMarkerUrl,
 		selectedUncategorizedContactMarkerHoverImageName,
 		selectedUncategorizedContactMarkerHoverUrl,
-	]);};
+	]);
+};

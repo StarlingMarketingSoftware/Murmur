@@ -5,17 +5,55 @@ import type { MutableRefObject, Dispatch, SetStateAction } from 'react';
 import type mapboxgl from 'mapbox-gl';
 import type { ContactWithName } from '@/types/contact';
 import type { LatLngLiteral } from './types';
+import type {
+	CuratedBlobMorphSource,
+	DotWaveMeta,
+} from './types';
+import type { CampaignStatusMarkerStyle } from './markerStatusStyles';
+import { washOutHexColor } from './color';
+import {
+	CURATED_STABLE_MARKER_MAX_DOTS,
+	DOT_WAVE_DELAY_PROP,
+	DOT_WAVE_EASING,
+	DOT_WAVE_FADE_MS,
+	DOT_WAVE_FRAME_MS,
+	DOT_WAVE_SMOOTH_TRANSITION_MS,
+	MAPBOX_LAYER_IDS,
+	MAPBOX_SOURCE_IDS,
+	OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE,
+	RESULT_DOT_TRANSPARENT_STROKE_COLOR,
+} from './constants';
+import { computeDotWaveDelayMs, computeDotWaveTravelMs } from './dotWave';
+import {
+	darkenHexColor,
+	getCategorizedDotGlowZoomFadedOpacity,
+	getCategorizedDotZoomFadedOpacity,
+	getNormalMarkerFadeOpacityExpr,
+	getSelectedStateOrbZoomFadedOpacity,
+} from './mapExpressions';
+import { VENUE_DOT_RADIUS_SCALE, buildBaseMarkerVisibilityFilter, withFeatureFillOpacity, withFeatureStrokeOpacity } from './markerStatusStyles';
+import { getResultDotColorForWhat, withCategorizedDotOpacity, withResultDotGlowOpacity } from './searchMode';
+import { isCleanMapMarkerCategory } from '@/components/atoms/_svg/mapTooltipCategoryIcons';
 
-
-// Base result dots: source writes, setFilter visibility narrowing, the
-// left-to-right post-search wave reveal, and its stop/restore control.
 
 export interface UseBaseDotsWaveControlParams {
-	_unused?: never;
+	baseDotsWaveCancelRef: MutableRefObject<(() => void) | null>;
+	campaignFootprintContactIdSet: Set<number>;
+	campaignMarkerMode: 'category' | 'status';
+	isMapLoaded: boolean;
+	map: mapboxgl.Map | null;
+	visibleContactIdSetRef: MutableRefObject<Set<number>>;
 }
 
 export const useBaseDotsWaveControl = (params: UseBaseDotsWaveControlParams) => {
-	void params;
+	const {
+		baseDotsWaveCancelRef,
+		campaignFootprintContactIdSet,
+		campaignMarkerMode,
+		isMapLoaded,
+		map,
+		visibleContactIdSetRef,
+	} = params;
 	const stopBaseDotsWaveAndRestoreSteadyRendering = useCallback(() => {
 		if (!map || !isMapLoaded) return;
 
@@ -151,12 +189,77 @@ export const useBaseDotsWaveControl = (params: UseBaseDotsWaveControlParams) => 
 	return { stopBaseDotsWaveAndRestoreSteadyRendering };
 };
 
+
 export interface UseBaseDotsSourceParams {
-	_unused?: never;
+	baseDotsLastDataKeyRef: MutableRefObject<string>;
+	baseDotsLastSearchKeyRef: MutableRefObject<string>;
+	baseDotsPendingDataSawLoadingRef: MutableRefObject<boolean>;
+	baseDotsPendingDataSearchKeyRef: MutableRefObject<string | null>;
+	baseDotsPrevContactsPropLengthRef: MutableRefObject<number>;
+	baseDotsWaveCancelRef: MutableRefObject<(() => void) | null>;
+	baseDotsWaveMetaRef: MutableRefObject<DotWaveMeta | null>;
+	baseDotsWavePendingSearchKeyRef: MutableRefObject<string | null>;
+	baseDotsWavePrevIsLoadingRef: MutableRefObject<boolean>;
+	contacts: ContactWithName[];
+	contactsPropLengthRef: MutableRefObject<number>;
+	contactsWithCoords: ContactWithName[];
+	disableDotWaveReveal: boolean;
+	getCampaignStatusMarkerStyleForContact: (contactId: number) => CampaignStatusMarkerStyle | null;
+	getContactCoords: (contact: ContactWithName) => LatLngLiteral | null;
+	isBackgroundPresentation: boolean;
+	isCompactOverlayActive: boolean;
+	isCoordsInLockedState: (coords: LatLngLiteral) => boolean;
+	isLoading: boolean | undefined;
+	isMapLoaded: boolean;
+	isStateLayerReady: boolean;
+	lockedStateKey: string | null;
+	lockedStateSelectionKeyRef: MutableRefObject<string | null>;
+	map: mapboxgl.Map | null;
+	searchEngaged: boolean;
+	searchQuery: string | null | undefined;
+	searchWhat: string | null | undefined;
+	selectedStateMorphSourceRef: MutableRefObject<CuratedBlobMorphSource | null>;
+	stopBaseDotsWaveAndRestoreSteadyRendering: () => void;
+	uncategorizedContactMarkerHoverImageName: string;
+	uncategorizedContactMarkerImageName: string;
+	visibleContacts: ContactWithName[];
 }
 
 export const useBaseDotsSource = (params: UseBaseDotsSourceParams): void => {
-	void params;
+	const {
+		baseDotsLastDataKeyRef,
+		baseDotsLastSearchKeyRef,
+		baseDotsPendingDataSawLoadingRef,
+		baseDotsPendingDataSearchKeyRef,
+		baseDotsPrevContactsPropLengthRef,
+		baseDotsWaveCancelRef,
+		baseDotsWaveMetaRef,
+		baseDotsWavePendingSearchKeyRef,
+		baseDotsWavePrevIsLoadingRef,
+		contacts,
+		contactsPropLengthRef,
+		contactsWithCoords,
+		disableDotWaveReveal,
+		getCampaignStatusMarkerStyleForContact,
+		getContactCoords,
+		isBackgroundPresentation,
+		isCompactOverlayActive,
+		isCoordsInLockedState,
+		isLoading,
+		isMapLoaded,
+		isStateLayerReady,
+		lockedStateKey,
+		lockedStateSelectionKeyRef,
+		map,
+		searchEngaged,
+		searchQuery,
+		searchWhat,
+		selectedStateMorphSourceRef,
+		stopBaseDotsWaveAndRestoreSteadyRendering,
+		uncategorizedContactMarkerHoverImageName,
+		uncategorizedContactMarkerImageName,
+		visibleContacts,
+	} = params;
 	// Base result dots
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
@@ -507,14 +610,26 @@ export const useBaseDotsSource = (params: UseBaseDotsSourceParams): void => {
 		uncategorizedContactMarkerImageName,
 		uncategorizedContactMarkerHoverImageName,
 		isCompactOverlayActive,
-	]);};
+	]);
+};
+
 
 export interface UseBaseDotsVisibilityFilterParams {
-	_unused?: never;
+	baseDotsWaveCancelRef: MutableRefObject<(() => void) | null>;
+	campaignFootprintContactIdSet: Set<number>;
+	isMapLoaded: boolean;
+	map: mapboxgl.Map | null;
+	visibleContacts: ContactWithName[];
 }
 
 export const useBaseDotsVisibilityFilter = (params: UseBaseDotsVisibilityFilterParams): void => {
-	void params;
+	const {
+		baseDotsWaveCancelRef,
+		campaignFootprintContactIdSet,
+		isMapLoaded,
+		map,
+		visibleContacts,
+	} = params;
 	// Drive base-marker visibility via `setFilter` (cheap, no layer rebuild)
 	// instead of changing source data on every viewport change. The source
 	// above contains the full `contactsWithCoords`; this filter narrows what
@@ -567,14 +682,50 @@ export const useBaseDotsVisibilityFilter = (params: UseBaseDotsVisibilityFilterP
 		return () => {
 			map.off('zoomend', applyFilters);
 		};
-	}, [map, isMapLoaded, visibleContacts, campaignFootprintContactIdSet]);};
+	}, [map, isMapLoaded, visibleContacts, campaignFootprintContactIdSet]);
+};
+
 
 export interface UseBaseDotsWaveRevealParams {
-	_unused?: never;
+	baseDotsWaveAwaitingSettleRef: MutableRefObject<boolean>;
+	baseDotsWaveCancelRef: MutableRefObject<(() => void) | null>;
+	baseDotsWaveLastSearchKeyRef: MutableRefObject<string>;
+	baseDotsWaveMetaRef: MutableRefObject<DotWaveMeta | null>;
+	baseDotsWaveMoveEndArmedRef: MutableRefObject<boolean>;
+	baseDotsWavePendingSearchKeyRef: MutableRefObject<string | null>;
+	baseDotsWavePrevIsLoadingRef: MutableRefObject<boolean>;
+	baseDotsWaveSettleNonce: number;
+	campaignFootprintContactIdSet: Set<number>;
+	disableDotWaveReveal: boolean;
+	isBackgroundPresentation: boolean;
+	isLoading: boolean | undefined;
+	isMapLoaded: boolean;
+	map: mapboxgl.Map | null;
+	searchQuery: string | null | undefined;
+	setBaseDotsWaveSettleNonce: Dispatch<SetStateAction<number>>;
+	visibleContactIdSetRef: MutableRefObject<Set<number>>;
 }
 
 export const useBaseDotsWaveReveal = (params: UseBaseDotsWaveRevealParams): void => {
-	void params;
+	const {
+		baseDotsWaveAwaitingSettleRef,
+		baseDotsWaveCancelRef,
+		baseDotsWaveLastSearchKeyRef,
+		baseDotsWaveMetaRef,
+		baseDotsWaveMoveEndArmedRef,
+		baseDotsWavePendingSearchKeyRef,
+		baseDotsWavePrevIsLoadingRef,
+		baseDotsWaveSettleNonce,
+		campaignFootprintContactIdSet,
+		disableDotWaveReveal,
+		isBackgroundPresentation,
+		isLoading,
+		isMapLoaded,
+		map,
+		searchQuery,
+		setBaseDotsWaveSettleNonce,
+		visibleContactIdSetRef,
+	} = params;
 	// Wave reveal for base dots on each completed search (left → right).
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
@@ -897,4 +1048,5 @@ export const useBaseDotsWaveReveal = (params: UseBaseDotsWaveRevealParams): void
 		disableDotWaveReveal,
 		campaignFootprintContactIdSet,
 		baseDotsWaveSettleNonce,
-	]);};
+	]);
+};

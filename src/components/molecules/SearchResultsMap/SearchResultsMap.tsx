@@ -9439,11 +9439,29 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [markerConstellationCompositionNonce, setMarkerConstellationCompositionNonce] =
 		useState(0);
 	const { stopBaseDotsWaveAndRestoreSteadyRendering } = useBaseDotsWaveControl({
-
+		baseDotsWaveCancelRef,
+		campaignFootprintContactIdSet,
+		campaignMarkerMode,
+		isMapLoaded,
+		map,
+		visibleContactIdSetRef,
 	});
 
 	const { stopMarkerConstellationReveal, setMarkerConstellationLineOpacity, clearMarkerConstellation } = useConstellationControls({
-
+		isMapLoaded,
+		map,
+		markerConstellationComposedSearchKeyRef,
+		markerConstellationContactsByIdRef,
+		markerConstellationDeferredMoveEndRef,
+		markerConstellationEdgesRef,
+		markerConstellationIsStatusModeRef,
+		markerConstellationLastDataKeyRef,
+		markerConstellationNodeIdsRef,
+		markerConstellationNodesRef,
+		markerConstellationRevealCancelRef,
+		markerConstellationRevealDoneRef,
+		markerConstellationUsesCategoryColorsRef,
+		setMarkerConstellationCompositionNonce,
 	});
 
 	useLayoutEffect(() => {
@@ -9588,7 +9606,39 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	]);
 
 	const { writeMarkerConstellationSourceData, startMarkerConstellationReveal } = useConstellationWriter({
-
+		allContactsOverlayVisibleContacts,
+		bookingExtraVisibleContacts,
+		campaignMarkerMode,
+		contactsWithCoords,
+		getAllContactsOverlayContactCoords,
+		getBookingExtraContactCoords,
+		getCampaignStatusLineStyleForContacts,
+		getCampaignStatusMarkerStyleForContact,
+		getContactCoords,
+		getDashboardDraftingStatusForContact,
+		getPromotionOverlayContactCoords,
+		isCoordsInLockedState,
+		isMapLoaded,
+		lockedStateKey,
+		lockedStateSelectionKeyRef,
+		map,
+		markerConstellationContactsByIdRef,
+		markerConstellationEdgesRef,
+		markerConstellationIsStatusModeRef,
+		markerConstellationLastDataKeyRef,
+		markerConstellationNodesRef,
+		markerConstellationRevealDoneRef,
+		markerConstellationUsesCategoryColorsRef,
+		promotionOverlayVisibleContacts,
+		searchWhat,
+		selectedConstellationEdgesRef,
+		selectedConstellationGraphKeyRef,
+		selectedConstellationHadPathRef,
+		selectedConstellationLineFadeRafRef,
+		selectedConstellationLineOpacityRef,
+		selectedContacts,
+		setMarkerConstellationLineOpacity,
+		stopMarkerConstellationReveal,
 	});
 
 	// Drop the previous search's result layers the instant a NEW dashboard search
@@ -9679,28 +9729,187 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	]);
 
 	useBaseDotsSource({
-
+		baseDotsLastDataKeyRef,
+		baseDotsLastSearchKeyRef,
+		baseDotsPendingDataSawLoadingRef,
+		baseDotsPendingDataSearchKeyRef,
+		baseDotsPrevContactsPropLengthRef,
+		baseDotsWaveCancelRef,
+		baseDotsWaveMetaRef,
+		baseDotsWavePendingSearchKeyRef,
+		baseDotsWavePrevIsLoadingRef,
+		contacts,
+		contactsPropLengthRef,
+		contactsWithCoords,
+		disableDotWaveReveal,
+		getCampaignStatusMarkerStyleForContact,
+		getContactCoords,
+		isBackgroundPresentation,
+		isCompactOverlayActive,
+		isCoordsInLockedState,
+		isLoading,
+		isMapLoaded,
+		isStateLayerReady,
+		lockedStateKey,
+		lockedStateSelectionKeyRef,
+		map,
+		searchEngaged,
+		searchQuery,
+		searchWhat,
+		selectedStateMorphSourceRef,
+		stopBaseDotsWaveAndRestoreSteadyRendering,
+		uncategorizedContactMarkerHoverImageName,
+		uncategorizedContactMarkerImageName,
+		visibleContacts,
 	});
 
 	useSelectedMarkerArtwork({
-
+		allContactsOverlayVisibleContactsRef,
+		bookingExtraVisibleContactsRef,
+		campaignMarkerMode,
+		compactOverlayPillEntries,
+		contactsWithCoords,
+		ensureMapImageFromUrl,
+		getAllContactsOverlayContactCoords,
+		getBookingExtraContactCoords,
+		getContactCoords,
+		getDashboardDraftingMarkerStyleForContact,
+		getPromotionOverlayContactCoords,
+		getSelectedCategorizedContactMarkerAssets,
+		getSelectedUncategorizedContactMarkerAssets,
+		isAmbientContactsEnabled,
+		isLoading,
+		isMapLoaded,
+		isStateLayerReady,
+		lockedStateKey,
+		lockedStateSelectionKeyRef,
+		map,
+		promotionOverlayVisibleContactsRef,
+		searchEngaged,
+		searchWhat,
+		selectedContactObjects,
+		selectedContacts,
+		selectedMarkerBuildSignatureRef,
+		selectedMarkerFadeByIdRef,
+		selectedMarkerFadeRafRef,
+		selectedMarkerFeatureByIdRef,
+		selectedMarkerScaleByIdRef,
+		selectedStateMorphSourceRef,
+		selectedUncategorizedContactMarkerHoverImageName,
+		selectedUncategorizedContactMarkerHoverUrl,
+		selectedUncategorizedContactMarkerImageName,
+		selectedUncategorizedContactMarkerUrl,
 	});
 
 	useBaseDotsVisibilityFilter({
-
+		baseDotsWaveCancelRef,
+		campaignFootprintContactIdSet,
+		isMapLoaded,
+		map,
+		visibleContacts,
 	});
 
 	useConstellationDimSync({
-
+		curatedBlobProtectedMarkerIdsNonce,
+		curatedBlobProtectedMarkerIdsRef,
+		isMapLoaded,
+		map,
+		markerConstellationCompositionNonce,
+		markerConstellationNodeIdsRef,
+		visibleContacts,
 	});
 
 	useBaseDotsWaveReveal({
-
+		baseDotsWaveAwaitingSettleRef,
+		baseDotsWaveCancelRef,
+		baseDotsWaveLastSearchKeyRef,
+		baseDotsWaveMetaRef,
+		baseDotsWaveMoveEndArmedRef,
+		baseDotsWavePendingSearchKeyRef,
+		baseDotsWavePrevIsLoadingRef,
+		baseDotsWaveSettleNonce,
+		campaignFootprintContactIdSet,
+		disableDotWaveReveal,
+		isBackgroundPresentation,
+		isLoading,
+		isMapLoaded,
+		map,
+		searchQuery,
+		setBaseDotsWaveSettleNonce,
+		visibleContactIdSetRef,
 	});
 
 	useConstellationComposer({
-
+		campaignMarkerMode,
+		categoryConstellationsEnabled,
+		clearMarkerConstellation,
+		contactsWithCoords,
+		getCampaignStatusForContact,
+		getContactCoords,
+		isAmbientContactsEnabled,
+		isBackgroundPresentation,
+		isCompactOverlayActive,
+		isCoordsInLockedState,
+		isLoading,
+		isMapLoaded,
+		lockedStateKey,
+		map,
+		markerConstellationComposedSearchKeyRef,
+		markerConstellationContactsByIdRef,
+		markerConstellationDeferredMoveEndRef,
+		markerConstellationEdgesRef,
+		markerConstellationIdleNonce,
+		markerConstellationIsStatusModeRef,
+		markerConstellationLastDataKeyRef,
+		markerConstellationLastSearchKeyRef,
+		markerConstellationNodeIdsRef,
+		markerConstellationNodesRef,
+		markerConstellationRevealDoneRef,
+		markerConstellationUsesCategoryColorsRef,
+		searchEngaged,
+		searchQuery,
+		setMarkerConstellationCompositionNonce,
+		setMarkerConstellationIdleNonce,
+		setMarkerConstellationLineOpacity,
+		startMarkerConstellationReveal,
+		stopMarkerConstellationReveal,
+		writeMarkerConstellationSourceData,
 	});
+
+	useOverlayMarkerSources({
+		allContactsOverlayVisibleContacts,
+		bookingExtraVisibleContacts,
+		ensureMapImageFromUrl,
+		getAllContactsOverlayContactCoords,
+		getBookingExtraContactCoords,
+		getMarkerPinUrl,
+		getPromotionOverlayContactCoords,
+		hoveredBookingExtraCategory,
+		imageNameFromUrl,
+		isAmbientContactsEnabled,
+		isAnySearch,
+		isCompactOverlayActive,
+		isCoordsInLockedState,
+		isLightweightDetailMarkerMode,
+		isLoading,
+		isMapLoaded,
+		isRadiusSearchActive,
+		isStateLayerReady,
+		lockedStateKey,
+		lockedStateSelectionKeyRef,
+		map,
+		promotionDotIdsRef,
+		promotionOverlayVisibleContacts,
+		promotionPinIdsRef,
+		searchEngaged,
+		selectedContacts,
+		selectedStateMorphSourceRef,
+		uncategorizedContactMarkerHoverImageName,
+		uncategorizedContactMarkerImageName,
+		visibleContacts,
+	});
+
+	// Give the DOM tooltip a real hover target around the SVG so moving from the
 	// marker into the bubble does not cross a tiny Mapbox/DOM dead zone.
 	const hoverTooltipHitSlopPx = useMemo(
 		() => Math.max(14, markerScale * 2),
