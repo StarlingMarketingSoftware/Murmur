@@ -1,5 +1,8 @@
 'use client';
 
+import { CuratedOrbSvg } from './CuratedOrbSvg';
+import { MapLightingOverlays } from './MapLightingOverlays';
+import { SelectedStateGradientSvg } from './SelectedStateGradientSvg';
 import { useAreaSelectCompletion } from './useAreaSelectCompletion';
 import { useRadiusSearchTool } from './useRadiusSearchTool';
 import { useCuratedBlobBuilder, useCuratedBlobOrb, useCuratedBlobMorphBinding } from './useCuratedBlob';
@@ -10287,419 +10290,39 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 			`}</style>
 			<div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
-			{/*
-			  Selected state wash. This reuses the curated blob gradient language,
-			  but clips it to the searched state's projected polygon. The white
-			  border is a Mapbox layer so markers always render above it.
-			*/}
-			<svg
-				ref={selectedStateGradientSvgRef}
-				aria-hidden
-				width="100%"
-				height="100%"
-				style={{
-					position: 'absolute',
-					inset: 0,
-					pointerEvents: 'none',
-					opacity: 0,
-					willChange: 'opacity',
-					zIndex: 2,
-					overflow: 'visible',
-				}}
-			>
-				<defs>
-					<radialGradient
-						ref={selectedStateGradientRef}
-						id={selectedStateGradientIds.gradient}
-						cx="0"
-						cy="0"
-						r="1"
-						gradientUnits="userSpaceOnUse"
-					>
-						<stop offset="0.716346" stopColor="#EFE8D8" stopOpacity="0" />
-						<stop offset="0.783654" stopColor="#FFF8E5" stopOpacity="0.55" />
-						<stop offset="0.841346" stopColor="#CAD7FF" />
-						<stop offset="0.884615" stopColor="#CBFFE7" />
-						<stop offset="1" stopColor="#F0EBDE" stopOpacity="0.2" />
-					</radialGradient>
-					<radialGradient
-						ref={selectedStateGradientBloomRef}
-						id={selectedStateGradientIds.bloomGradient}
-						cx="0"
-						cy="0"
-						r="1"
-						gradientUnits="userSpaceOnUse"
-					>
-						<stop offset="0" stopColor="#FFFFFF" stopOpacity="0.95" />
-						<stop offset="0.14" stopColor="#FFFFFF" stopOpacity="0.7" />
-						<stop offset="0.36" stopColor="#FFFFFF" stopOpacity="0.4" />
-						<stop offset="0.6" stopColor="#FFFFFF" stopOpacity="0.18" />
-						<stop offset="0.8" stopColor="#FFFFFF" stopOpacity="0.06" />
-						<stop offset="0.92" stopColor="#FFFFFF" stopOpacity="0" />
-					</radialGradient>
-					<clipPath id={selectedStateGradientIds.clipPath} clipPathUnits="userSpaceOnUse">
-						<path ref={selectedStateGradientClipPathRef} d="" clipRule="evenodd" />
-					</clipPath>
-				</defs>
-				<ellipse
-					ref={selectedStateGradientBloomEllipseRef}
-					cx="0"
-					cy="0"
-					rx="0"
-					ry="0"
-					opacity="0"
-					fill={`url(#${selectedStateGradientIds.bloomGradient})`}
-					clipPath={`url(#${selectedStateGradientIds.clipPath})`}
-				/>
-				<ellipse
-					ref={selectedStateGradientEllipseRef}
-					cx="0"
-					cy="0"
-					rx="0"
-					ry="0"
-					opacity="0"
-					fill={`url(#${selectedStateGradientIds.gradient})`}
-					clipPath={`url(#${selectedStateGradientIds.clipPath})`}
-					style={{ mixBlendMode: 'color' }}
-				/>
-			</svg>
-			{/*
-			  Curated cluster zoom-out orbs. Each SVG ellipse paints its own
-			  radial gradient, while the clip paths are rebuilt from the same
-			  morphed Mapbox blob geometry that draws the white outlines.
-			*/}
-			<svg
-				ref={curatedOrbRef}
-				aria-hidden
-				width="100%"
-				height="100%"
-				style={{
-					position: 'absolute',
-					inset: 0,
-					pointerEvents: 'none',
-					opacity: 0,
-					willChange: 'opacity',
-					zIndex: 2,
-					overflow: 'visible',
-				}}
-			>
-				<defs>
-					{curatedOrbSlotIds.map((ids, index) => (
-						<Fragment key={ids.gradient}>
-							<radialGradient
-								ref={(node) => {
-									curatedOrbGradientRefs.current[index] = node;
-								}}
-								id={ids.gradient}
-								cx="0"
-								cy="0"
-								r="1"
-								gradientUnits="userSpaceOnUse"
-							>
-								<stop offset="0.716346" stopColor="#EFE8D8" stopOpacity="0" />
-								<stop offset="0.783654" stopColor="#FFF8E5" stopOpacity="0.55" />
-								<stop offset="0.841346" stopColor="#CAD7FF" />
-								<stop offset="0.884615" stopColor="#CBFFE7" />
-								<stop offset="1" stopColor="#F0EBDE" stopOpacity="0.2" />
-							</radialGradient>
-							<radialGradient
-								ref={(node) => {
-									curatedOrbBloomGradientRefs.current[index] = node;
-								}}
-								id={ids.bloomGradient}
-								cx="0"
-								cy="0"
-								r="1"
-								gradientUnits="userSpaceOnUse"
-							>
-								<stop offset="0" stopColor="#FFFFFF" stopOpacity="0.95" />
-								<stop offset="0.14" stopColor="#FFFFFF" stopOpacity="0.7" />
-								<stop offset="0.36" stopColor="#FFFFFF" stopOpacity="0.4" />
-								<stop offset="0.6" stopColor="#FFFFFF" stopOpacity="0.18" />
-								<stop offset="0.8" stopColor="#FFFFFF" stopOpacity="0.06" />
-								<stop offset="0.92" stopColor="#FFFFFF" stopOpacity="0" />
-							</radialGradient>
-							<clipPath id={ids.clipPath} clipPathUnits="userSpaceOnUse">
-								<path
-									ref={(node) => {
-										curatedOrbClipPathRefs.current[index] = node;
-									}}
-									d=""
-									clipRule="evenodd"
-								/>
-							</clipPath>
-						</Fragment>
-					))}
-				</defs>
-				{curatedOrbSlotIds.map((ids, index) => (
-					<Fragment key={ids.clipPath}>
-						<ellipse
-							ref={(node) => {
-								curatedOrbBloomEllipseRefs.current[index] = node;
-							}}
-							cx="0"
-							cy="0"
-							rx="0"
-							ry="0"
-							opacity="0"
-							fill={`url(#${ids.bloomGradient})`}
-							clipPath={`url(#${ids.clipPath})`}
-						/>
-						<ellipse
-							ref={(node) => {
-								curatedOrbEllipseRefs.current[index] = node;
-							}}
-							cx="0"
-							cy="0"
-							rx="0"
-							ry="0"
-							opacity="0"
-							fill={`url(#${ids.gradient})`}
-							clipPath={`url(#${ids.clipPath})`}
-							style={{ mixBlendMode: 'color' }}
-						/>
-					</Fragment>
-				))}
-			</svg>
-			{/*
-			  Softbox lighting overlay. Two stacked viewport-anchored radial gradients
-			  paint the "lit sphere" feel directly on top of the map. Because these
-			  are DOM layers on the container, they stay locked to the viewer no
-			  matter how the globe is panned, zoomed, or rotated.
-
-			  Layer 1a (screen): warm highlight radiating from the upper-left.
-			  Layer 1b (multiply): stormy dark-pool key in the same upper-left slot.
-			  Keeping both layers mounted lets mood transitions crossfade instead of
-			  swapping an un-animatable mix-blend-mode.
-			  Layer 2 (multiply): cool deep-shadow pooling in the lower-right.
-			*/}
-			<div
-				ref={lightingOverlayWarmKeyRef}
-				aria-hidden
-				style={{
-					position: 'absolute',
-					inset: 0,
-					pointerEvents: 'none',
-					// Anchor the radial "hot spot" offscreen past the upper-left so the
-					// visible gradient reads as ambient warm wash rather than a disc.
-					// Peaks are cranked up because the hot center is offscreen.
-					background: SOFTBOX_WARM_KEY_BG,
-					mixBlendMode: 'screen',
-					// opacity intentionally unset — see applyLightingOverlayOpacity above.
-					zIndex: 1,
-				}}
+			<SelectedStateGradientSvg
+				selectedStateGradientSvgRef={selectedStateGradientSvgRef}
+				selectedStateGradientRef={selectedStateGradientRef}
+				selectedStateGradientBloomRef={selectedStateGradientBloomRef}
+				selectedStateGradientClipPathRef={selectedStateGradientClipPathRef}
+				selectedStateGradientBloomEllipseRef={selectedStateGradientBloomEllipseRef}
+				selectedStateGradientEllipseRef={selectedStateGradientEllipseRef}
+				selectedStateGradientIds={selectedStateGradientIds}
 			/>
-			<div
-				ref={lightingOverlayDarkKeyRef}
-				aria-hidden
-				style={{
-					position: 'absolute',
-					inset: 0,
-					pointerEvents: 'none',
-					background: SOFTBOX_DARK_POOL_BG,
-					mixBlendMode: 'multiply',
-					// opacity intentionally unset — see applyLightingOverlayOpacity above.
-					zIndex: 1,
-				}}
+			<CuratedOrbSvg
+				curatedOrbRef={curatedOrbRef}
+				curatedOrbGradientRefs={curatedOrbGradientRefs}
+				curatedOrbBloomGradientRefs={curatedOrbBloomGradientRefs}
+				curatedOrbClipPathRefs={curatedOrbClipPathRefs}
+				curatedOrbBloomEllipseRefs={curatedOrbBloomEllipseRefs}
+				curatedOrbEllipseRefs={curatedOrbEllipseRefs}
+				curatedOrbSlotIds={curatedOrbSlotIds}
 			/>
-			<div
-				ref={lightingOverlayShadowRef}
-				aria-hidden
-				style={{
-					position: 'absolute',
-					inset: 0,
-					pointerEvents: 'none',
-					// Push the dark pool offscreen past the lower-right corner so only
-					// the broad outer falloff is in the viewport — no obvious radial
-					// "eye" of shadow in the corner. Peaks are strong to keep the
-					// shaded hemisphere readable at globe zoom.
-					background:
-						'radial-gradient(ellipse 160% 160% at 115% 115%, rgba(6, 10, 28, 0.70) 0%, rgba(6, 10, 28, 0.50) 28%, rgba(10, 16, 36, 0.28) 55%, rgba(20, 28, 56, 0.08) 78%, rgba(0, 0, 0, 0) 100%)',
-					mixBlendMode: 'multiply',
-					// opacity intentionally unset — see applyLightingOverlayOpacity above.
-					zIndex: 1,
-				}}
-			/>
-			{/*
-			  Sunrise space glow. A very faint screen-blend bloom in the surrounding
-			  "space" so dawn feels present on the page without becoming a full wash.
-			  Opacity is owned by applyLightingOverlayOpacity.
-			*/}
-			<div
-				ref={lightingOverlaySunSpaceGlowRef}
-				aria-hidden
-				style={{
-					position: 'absolute',
-					inset: 0,
-					pointerEvents: 'none',
-					background: SUN_TRANSITION_SPACE_GLOW_BG,
-					mixBlendMode: 'screen',
-					zIndex: 1,
-				}}
-			/>
-			{/*
-			  Hot-weather wash. Uniform warm-white screen-blend overlay that
-			  brightens the entire globe. Opacity is owned by
-			  applyLightingOverlayOpacity (0 when temp is below the hot
-			  threshold OR when the mood is a dark-pool variant).
-			*/}
-			<div
-				ref={lightingOverlayHotWashRef}
-				aria-hidden
-				style={{
-					position: 'absolute',
-					inset: 0,
-					pointerEvents: 'none',
-					background: 'rgb(255, 240, 215)',
-					mixBlendMode: 'screen',
-					zIndex: 1,
-				}}
-			/>
-			{/*
-			  Night dark wash. A neutral overlay that slightly lowers value while
-			  preserving the normal day map hues. Opacity is owned by
-			  applyLightingOverlayOpacity.
-			*/}
-			<div
-				ref={lightingOverlayNightDarkWashRef}
-				aria-hidden
-				style={{
-					position: 'absolute',
-					inset: 0,
-					pointerEvents: 'none',
-					background: 'rgb(0, 0, 0)',
-					mixBlendMode: 'multiply',
-					zIndex: 1,
-				}}
-			/>
-			{/*
-			  Night composition. The moon key comes from the upper-right while the
-			  counter-shade pools in the lower-left, opposite the daytime lighting.
-			  Opacity is owned by applyLightingOverlayOpacity.
-			*/}
-			<div
-				ref={lightingOverlayNightLowerLeftShadowRef}
-				aria-hidden
-				style={{
-					position: 'absolute',
-					inset: 0,
-					pointerEvents: 'none',
-					background: NIGHT_LOWER_LEFT_SHADOW_BG,
-					mixBlendMode: 'multiply',
-					zIndex: 1,
-				}}
-			/>
-			<div
-				ref={lightingOverlayNightMoonlightRef}
-				aria-hidden
-				style={{
-					position: 'absolute',
-					inset: 0,
-					pointerEvents: 'none',
-					background: NIGHT_MOONLIGHT_KEY_BG,
-					mixBlendMode: 'screen',
-					zIndex: 1,
-				}}
-			/>
-			{/*
-			  Night silhouette (multiply). Darkens the visible face of the globe so the
-			  moon backlight can read as true rear lighting instead of a generic glow.
-			  Opacity owned by applyLightingOverlayOpacity.
-			*/}
-			<div
-				ref={lightingOverlayNightShadeRef}
-				aria-hidden
-				style={{
-					position: 'absolute',
-					inset: 0,
-					pointerEvents: 'none',
-					background: NIGHT_FACE_SHADE_BG,
-					mixBlendMode: 'multiply',
-					zIndex: 1,
-				}}
-			/>
-			<div
-				ref={lightingOverlayMoonRimRef}
-				aria-hidden
-				style={{
-					position: 'absolute',
-					inset: 0,
-					pointerEvents: 'none',
-					background: NIGHT_MOON_RIM_BG,
-					mixBlendMode: 'screen',
-					zIndex: 1,
-				}}
-			/>
-			{/*
-			  Gloom wash. Uniform dark multiply-blend overlay for stormy
-			  that persists into city zoom (longer fade curve than the softbox/
-			  shadow). Opacity owned by applyLightingOverlayOpacity; bright
-			  moods set gloomWashOpacity=0 so this is a no-op for them.
-			*/}
-			<div
-				ref={lightingOverlayGloomWashRef}
-				aria-hidden
-				style={{
-					position: 'absolute',
-					inset: 0,
-					pointerEvents: 'none',
-					background: 'rgb(20, 28, 50)',
-					mixBlendMode: 'multiply',
-					zIndex: 1,
-				}}
-			/>
-			{/*
-			  Night vignette. Soft viewport-anchored darkening at the corners that
-			  pulls the eye toward the globe and gives the night sky an intimate,
-			  cinematic frame. Sits on top of the night lighting overlays so the
-			  cornering applies even where moonlight or rim light brightens. Opacity
-			  is owned by applyLightingOverlayOpacity and is gated on true night.
-			*/}
-			<div
-				ref={lightingOverlayNightVignetteRef}
-				aria-hidden
-				style={{
-					position: 'absolute',
-					inset: 0,
-					pointerEvents: 'none',
-					background: NIGHT_VIGNETTE_BG,
-					mixBlendMode: 'multiply',
-					zIndex: 1,
-				}}
-			/>
-			{/*
-			  Unsubscribe burn washes. The flow's "globe on fire" effect: a uniform
-			  multiply char that reddens/darkens what the basemap paint can't reach
-			  (clouds, lighting overlays), plus a late-stage screen-blend ember
-			  under-glow. Opacities owned by applyLightingOverlayOpacity; both stay
-			  0 outside the unsubscribe flow, so initial opacity is set explicitly
-			  to avoid a dark-red first paint before the first apply runs.
-			*/}
-			<div
-				ref={lightingOverlayBurnWashRef}
-				aria-hidden
-				style={{
-					position: 'absolute',
-					inset: 0,
-					pointerEvents: 'none',
-					background: UNSUBSCRIBE_BURN_WASH_COLOR,
-					mixBlendMode: 'multiply',
-					zIndex: 1,
-					opacity: 0,
-				}}
-			/>
-			<div
-				ref={lightingOverlayBurnGlowRef}
-				aria-hidden
-				style={{
-					position: 'absolute',
-					inset: 0,
-					pointerEvents: 'none',
-					background: UNSUBSCRIBE_BURN_GLOW_BG,
-					mixBlendMode: 'screen',
-					zIndex: 1,
-					opacity: 0,
-				}}
+			<MapLightingOverlays
+				lightingOverlayWarmKeyRef={lightingOverlayWarmKeyRef}
+				lightingOverlayDarkKeyRef={lightingOverlayDarkKeyRef}
+				lightingOverlayShadowRef={lightingOverlayShadowRef}
+				lightingOverlaySunSpaceGlowRef={lightingOverlaySunSpaceGlowRef}
+				lightingOverlayHotWashRef={lightingOverlayHotWashRef}
+				lightingOverlayNightDarkWashRef={lightingOverlayNightDarkWashRef}
+				lightingOverlayNightLowerLeftShadowRef={lightingOverlayNightLowerLeftShadowRef}
+				lightingOverlayNightMoonlightRef={lightingOverlayNightMoonlightRef}
+				lightingOverlayNightShadeRef={lightingOverlayNightShadeRef}
+				lightingOverlayMoonRimRef={lightingOverlayMoonRimRef}
+				lightingOverlayGloomWashRef={lightingOverlayGloomWashRef}
+				lightingOverlayNightVignetteRef={lightingOverlayNightVignetteRef}
+				lightingOverlayBurnWashRef={lightingOverlayBurnWashRef}
+				lightingOverlayBurnGlowRef={lightingOverlayBurnGlowRef}
 			/>
 			{mapLoadError && (
 				<div
