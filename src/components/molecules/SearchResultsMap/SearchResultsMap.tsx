@@ -1,5 +1,10 @@
 'use client';
 
+import { useBasemapPrewarm } from './useBasemapPrewarm';
+import { useCameraPadding } from './useCameraPadding';
+import { useEventsRadar } from './useEventsRadar';
+import { useMapInputAffordances } from './useMapInputAffordances';
+import { useOwnedVenueRadar } from './useOwnedVenueRadar';
 import { AllContactsOverlayFetchBbox, AllContactsOverlayFetchMode, AllContactsOverlayFetchPhase, DASHBOARD_MAP_CAMERA_SCRUB_EVENT, DashboardMapCameraScrubDetail, DashboardMapCameraScrubState, RADIO_CONTACT_CATEGORY_INDEX, getAmbientContactCategoryIndexFromTitle, getAmbientContactWhatFromTitle } from './ambientOverlayShared';
 import { CompactOverlayPillEntry, CompactOverlaySettledViewport, applyCompactPillLabelFade, compactOverlayRectsOverlap, getCompactOverlayCategoryKey, getCompactOverlayIconSpec, getCompactOverlayLabel, getCompactOverlayPillWidth, getCompactOverlayWhatForContact, prefixCompactOverlayInlineSvgIds, projectCompactOverlayPoint, recolorCompactOverlayInnerFill } from './compactOverlayPillPrimitives';
 import { MAP_CUSTOM_INPUT_EVENT_KEY, MAP_RIGHT_CLICK_DOUBLE_DISTANCE_PX, MAP_RIGHT_CLICK_DOUBLE_MS, MAP_RIGHT_DOUBLE_CLICK_ZOOM_EASE_MS, MAP_RIGHT_DOUBLE_CLICK_ZOOM_OUT_DELTA, MAP_SHIFT_ARROW_ZOOM_DELTA, applyScrollZoomFeel, computeStreetViewPitch, createConfiguredZoomOutGovernor, enableDragPanFeel, uploadCanvasSourceOnce } from './mapInputFeel';
@@ -840,10 +845,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	interactiveEntryCameraRef.current = interactiveEntryCamera;
 	const interactiveEntryCameraPendingRef = useRef(false);
 	const interactiveEntryCameraAppliedKeyRef = useRef<string | null>(null);
-	// Basemap overview prewarm (see the prewarm effect below): last-warmed center
-	// key for dedupe, and the pending debounce timer handle.
-	const lastPrewarmKeyRef = useRef<string | null>(null);
-	const prewarmTimerRef = useRef<number | null>(null);
 
 	const clearEmptyMapPrompt = useCallback(() => {
 		setEmptyMapPromptPoint(null);
@@ -1288,8 +1289,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// the committed set verbatim, so the overlay "sticks" instead of reloading.
 	const compactOverlayCommittedRef = useRef<CompactOverlayPillEntry[]>([]);
 	const compactOverlayCommittedZoomBucketRef = useRef<number | null>(null);
-	// Track last-applied camera padding so we don't spam Mapbox with identical updates.
-	const lastCameraPaddingKeyRef = useRef<string>('');
 	// Live-updated softbox overlay refs. zoomLevel only updates on `moveend`, so
 	// we drive these imperatively from the map's `zoom` event to keep the lighting
 	// fade in lockstep with pinch/scroll/wheel interactions.
@@ -1486,65 +1485,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		void ensureWasmGeoModuleLoaded();
 	}, []);
 
-	// Apply camera padding (campaign map shift-left uses this). Layout timing is important
-	// for search→campaign tab switches: the dashboard commits optimistic campaign padding
-	// on the click frame, then starts route navigation on the next animation frame.
-	useLayoutEffect(() => {
-		if (!map) return;
-		if (!isMapLoaded) return;
-
-		const safe = (n: unknown) => {
-			const v = typeof n === 'number' && Number.isFinite(n) ? n : 0;
-			return v > 0 ? v : 0;
-		};
-		// In decorative background mode (dashboard globe) UI-driven padding must not apply — but we
-		// must still CLEAR any padding left over from a prior interactive view (e.g. the campaign
-		// left-shift). Otherwise the decorative easeTo({ offset }) centering runs on top of stale
-		// right-padding and the globe sits off-center to the left (e.g. after campaign -> Back).
-		const next = isBackgroundPresentation
-			? { top: 0, right: 0, bottom: 0, left: 0 }
-			: {
-					top: safe(cameraPadding?.top),
-					right: safe(cameraPadding?.right),
-					bottom: safe(cameraPadding?.bottom),
-					left: safe(cameraPadding?.left),
-				};
-		const key = `${next.top},${next.right},${next.bottom},${next.left}`;
-		const previousKey = lastCameraPaddingKeyRef.current;
-		if (key === previousKey) return;
-		lastCameraPaddingKeyRef.current = key;
-
-		try {
-			const shouldAnimatePadding =
-				previousKey !== '' &&
-				!isBackgroundPresentation &&
-				!(
-					typeof window !== 'undefined' &&
-					window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-				);
-
-			if (shouldAnimatePadding) {
-				map.easeTo({
-					padding: next,
-					duration: 520,
-					easing: mapboxEaseInOutCubic,
-					essential: true,
-				});
-			} else {
-				map.setPadding(next);
-			}
-		} catch {
-			// Non-fatal; map may be mid-teardown.
-		}
-	}, [
-		map,
-		isMapLoaded,
-		isBackgroundPresentation,
-		cameraPadding?.top,
-		cameraPadding?.right,
-		cameraPadding?.bottom,
-		cameraPadding?.left,
-	]);
+	useCameraPadding({ map, isMapLoaded, isBackgroundPresentation, cameraPadding });
 
 	const syncUsOnlyBasemapCartography = useCallback(
 		(mapInstance: mapboxgl.Map | null) => {
@@ -2049,17 +1990,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		onRadiusPlacementCancelRef.current = onRadiusPlacementCancel ?? null;
 	}, [onRadiusPlacementCancel]);
-	const ownedVenuePulseRafRef = useRef<number | null>(null);
-	const ownedVenueLat = ownedVenueLocation?.lat;
-	const ownedVenueLng = ownedVenueLocation?.lng;
-	const ownedVenueCenter = useMemo<LatLngLiteral | null>(() => {
-		const location =
-			typeof ownedVenueLat === 'number' && typeof ownedVenueLng === 'number'
-				? { lat: ownedVenueLat, lng: ownedVenueLng }
-				: null;
-		return isValidOwnedVenueLocation(location) ? location : null;
-	}, [ownedVenueLat, ownedVenueLng]);
-	const eventsPulseRafRef = useRef<number | null>(null);
 	const eventCenters = useMemo<MapEvent[]>(
 		() =>
 			events.filter((event) =>
@@ -2179,310 +2109,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [map]);
 
-	useEffect(() => {
-		if (!map || !isMapLoaded) return;
+	useOwnedVenueRadar({
+		map,
+		isMapLoaded,
+		ownedVenueLocation,
+		mapContainerRef,
+		onOwnedVenueAnchorChangeRef,
+	});
 
-		const setSourceData = (sourceId: string, data: GeoJSON.FeatureCollection) => {
-			const source = map.getSource(sourceId) as mapboxgl.GeoJSONSource | undefined;
-			source?.setData(data);
-		};
-
-		if (!ownedVenueCenter) {
-			const empty = emptyFeatureCollection();
-			setSourceData(MAPBOX_SOURCE_IDS.ownedVenueGlow, empty);
-			setSourceData(MAPBOX_SOURCE_IDS.ownedVenueRings, empty);
-			setSourceData(MAPBOX_SOURCE_IDS.ownedVenueIcon, empty);
-			return;
-		}
-
-		const overlayData = buildOwnedVenueMapOverlayData(ownedVenueCenter);
-		setSourceData(MAPBOX_SOURCE_IDS.ownedVenueGlow, overlayData.glow);
-		setSourceData(MAPBOX_SOURCE_IDS.ownedVenueRings, overlayData.rings);
-		setSourceData(MAPBOX_SOURCE_IDS.ownedVenueIcon, overlayData.icon);
-	}, [map, isMapLoaded, ownedVenueCenter]);
-
-	useEffect(() => {
-		if (!map || !isMapLoaded) return;
-
-		const glowSource = map.getSource(MAPBOX_SOURCE_IDS.ownedVenueGlow) as
-			| mapboxgl.GeoJSONSource
-			| undefined;
-		const ringsSource = map.getSource(MAPBOX_SOURCE_IDS.ownedVenueRings) as
-			| mapboxgl.GeoJSONSource
-			| undefined;
-		const pulseSource = map.getSource(MAPBOX_SOURCE_IDS.ownedVenuePulse) as
-			| mapboxgl.GeoJSONSource
-			| undefined;
-		if (!glowSource || !ringsSource || !pulseSource) return;
-
-		const clearPulse = () => {
-			try {
-				pulseSource.setData(emptyFeatureCollection());
-			} catch {
-				// Non-fatal; source may be tearing down.
-			}
-		};
-
-		if (!ownedVenueCenter) {
-			clearPulse();
-			return;
-		}
-
-		let prefersReducedMotion = false;
-		try {
-			prefersReducedMotion = window.matchMedia(
-				'(prefers-reduced-motion: reduce)'
-			).matches;
-		} catch {
-			prefersReducedMotion = false;
-		}
-
-		if (prefersReducedMotion) {
-			clearPulse();
-			return;
-		}
-
-		let cancelled = false;
-
-		let lastFrameMs = 0;
-		const animateRadar = (nowMs: number) => {
-			if (cancelled) return;
-			if (nowMs - lastFrameMs < RADAR_FRAME_MS) {
-				ownedVenuePulseRafRef.current = window.requestAnimationFrame(animateRadar);
-				return;
-			}
-			lastFrameMs = nowMs;
-
-			const phase = (nowMs % OWNED_VENUE_RADAR_MS) / OWNED_VENUE_RADAR_MS;
-			// Re-fetch the sources each tick: the once-captured refs go stale if a
-			// source is invalidated under rapid camera churn, and setData() on a stale
-			// source throws — uncaught in rAF, which would crash the whole app.
-			const glow = map.getSource(MAPBOX_SOURCE_IDS.ownedVenueGlow) as
-				| mapboxgl.GeoJSONSource
-				| undefined;
-			const rings = map.getSource(MAPBOX_SOURCE_IDS.ownedVenueRings) as
-				| mapboxgl.GeoJSONSource
-				| undefined;
-			const pulse = map.getSource(MAPBOX_SOURCE_IDS.ownedVenuePulse) as
-				| mapboxgl.GeoJSONSource
-				| undefined;
-			if (!glow || !rings || !pulse) {
-				ownedVenuePulseRafRef.current = window.requestAnimationFrame(animateRadar);
-				return;
-			}
-			try {
-				glow.setData({
-					type: 'FeatureCollection',
-					features: buildOwnedVenueGlowFeatures(ownedVenueCenter, phase, true),
-				});
-				rings.setData({
-					type: 'FeatureCollection',
-					features: buildOwnedVenueRadarLineFeatures(ownedVenueCenter, phase, {
-						animated: true,
-					}),
-				});
-				pulse.setData({
-					type: 'FeatureCollection',
-					features: buildOwnedVenueRadarLineFeatures(ownedVenueCenter, phase, {
-						animated: true,
-						bloom: true,
-					}),
-				});
-			} catch {
-				// Source transiently invalid mid-churn; stop cleanly. The effect
-				// re-arms on the next map / center change.
-				cancelled = true;
-				return;
-			}
-
-			ownedVenuePulseRafRef.current = window.requestAnimationFrame(animateRadar);
-		};
-
-		ownedVenuePulseRafRef.current = window.requestAnimationFrame(animateRadar);
-
-		return () => {
-			cancelled = true;
-			if (ownedVenuePulseRafRef.current != null) {
-				window.cancelAnimationFrame(ownedVenuePulseRafRef.current);
-				ownedVenuePulseRafRef.current = null;
-			}
-			clearPulse();
-		};
-	}, [map, isMapLoaded, ownedVenueCenter]);
-
-	// Owned-venue anchor reporting: lets the host (venue portal) pin DOM chrome next to
-	// the home icon. Mirrors the selected-marker overlay pattern (map.project on 'move').
-	useEffect(() => {
-		const notify = (
-			anchor: { x: number; y: number; isOnScreen: boolean; zoom: number } | null
-		) => onOwnedVenueAnchorChangeRef.current?.(anchor);
-		if (!map || !isMapLoaded || !ownedVenueCenter) {
-			notify(null);
-			return;
-		}
-
-		const update = () => {
-			const container = mapContainerRef.current;
-			if (!container) return;
-			const rect = container.getBoundingClientRect();
-			const p = map.project([ownedVenueCenter.lng, ownedVenueCenter.lat]);
-			// Globe far-side guard: an occluded point round-trips to a different location.
-			const roundTrip = map.unproject(p);
-			const occluded =
-				Math.abs(roundTrip.lng - ownedVenueCenter.lng) > 1 ||
-				Math.abs(roundTrip.lat - ownedVenueCenter.lat) > 1;
-			const pad = 40;
-			const isOnScreen =
-				!occluded &&
-				p.x >= -pad &&
-				p.x <= rect.width + pad &&
-				p.y >= -pad &&
-				p.y <= rect.height + pad;
-			notify({ x: rect.left + p.x, y: rect.top + p.y, isOnScreen, zoom: map.getZoom() });
-		};
-
-		update();
-		map.on('move', update);
-		map.on('resize', update);
-		return () => {
-			map.off('move', update);
-			map.off('resize', update);
-			notify(null);
-		};
-	}, [map, isMapLoaded, ownedVenueCenter]);
-
-	// Event opportunity markers: same radar machinery as the owned venue, but anchored
-	// to many event centers at once (red star icon instead of the home icon).
-	useEffect(() => {
-		if (!map || !isMapLoaded) return;
-
-		const setSourceData = (sourceId: string, data: GeoJSON.FeatureCollection) => {
-			const source = map.getSource(sourceId) as mapboxgl.GeoJSONSource | undefined;
-			source?.setData(data);
-		};
-
-		if (eventCenters.length === 0) {
-			const empty = emptyFeatureCollection();
-			setSourceData(MAPBOX_SOURCE_IDS.eventsGlow, empty);
-			setSourceData(MAPBOX_SOURCE_IDS.eventsRings, empty);
-			setSourceData(MAPBOX_SOURCE_IDS.eventsIcon, empty);
-			return;
-		}
-
-		const overlayData = buildEventsMapOverlayData(eventCenters);
-		setSourceData(MAPBOX_SOURCE_IDS.eventsGlow, overlayData.glow);
-		setSourceData(MAPBOX_SOURCE_IDS.eventsRings, overlayData.rings);
-		setSourceData(MAPBOX_SOURCE_IDS.eventsIcon, overlayData.icon);
-	}, [map, isMapLoaded, eventCenters]);
-
-	useEffect(() => {
-		if (!map || !isMapLoaded) return;
-
-		const glowSource = map.getSource(MAPBOX_SOURCE_IDS.eventsGlow) as
-			| mapboxgl.GeoJSONSource
-			| undefined;
-		const ringsSource = map.getSource(MAPBOX_SOURCE_IDS.eventsRings) as
-			| mapboxgl.GeoJSONSource
-			| undefined;
-		const pulseSource = map.getSource(MAPBOX_SOURCE_IDS.eventsPulse) as
-			| mapboxgl.GeoJSONSource
-			| undefined;
-		if (!glowSource || !ringsSource || !pulseSource) return;
-
-		const clearPulse = () => {
-			try {
-				pulseSource.setData(emptyFeatureCollection());
-			} catch {
-				// Non-fatal; source may be tearing down.
-			}
-		};
-
-		if (eventCenters.length === 0) {
-			clearPulse();
-			return;
-		}
-
-		let prefersReducedMotion = false;
-		try {
-			prefersReducedMotion = window.matchMedia(
-				'(prefers-reduced-motion: reduce)'
-			).matches;
-		} catch {
-			prefersReducedMotion = false;
-		}
-
-		if (prefersReducedMotion) {
-			clearPulse();
-			return;
-		}
-
-		let cancelled = false;
-
-		let lastFrameMs = 0;
-		const animateRadar = (nowMs: number) => {
-			if (cancelled) return;
-			if (nowMs - lastFrameMs < RADAR_FRAME_MS) {
-				eventsPulseRafRef.current = window.requestAnimationFrame(animateRadar);
-				return;
-			}
-			lastFrameMs = nowMs;
-
-			const phase = (nowMs % OWNED_VENUE_RADAR_MS) / OWNED_VENUE_RADAR_MS;
-			// Re-fetch the sources each tick: the once-captured refs go stale if a
-			// source is invalidated under rapid camera churn, and setData() on a stale
-			// source throws — uncaught in rAF, which would crash the whole app.
-			const glow = map.getSource(MAPBOX_SOURCE_IDS.eventsGlow) as
-				| mapboxgl.GeoJSONSource
-				| undefined;
-			const rings = map.getSource(MAPBOX_SOURCE_IDS.eventsRings) as
-				| mapboxgl.GeoJSONSource
-				| undefined;
-			const pulse = map.getSource(MAPBOX_SOURCE_IDS.eventsPulse) as
-				| mapboxgl.GeoJSONSource
-				| undefined;
-			if (!glow || !rings || !pulse) {
-				eventsPulseRafRef.current = window.requestAnimationFrame(animateRadar);
-				return;
-			}
-			try {
-				glow.setData({
-					type: 'FeatureCollection',
-					features: buildEventsGlowFeatures(eventCenters, phase, true),
-				});
-				rings.setData({
-					type: 'FeatureCollection',
-					features: buildEventsRadarLineFeatures(eventCenters, phase, {
-						animated: true,
-					}),
-				});
-				pulse.setData({
-					type: 'FeatureCollection',
-					features: buildEventsRadarLineFeatures(eventCenters, phase, {
-						animated: true,
-						bloom: true,
-					}),
-				});
-			} catch {
-				// Source transiently invalid mid-churn; stop cleanly. The effect
-				// re-arms on the next map / centers change.
-				cancelled = true;
-				return;
-			}
-
-			eventsPulseRafRef.current = window.requestAnimationFrame(animateRadar);
-		};
-
-		eventsPulseRafRef.current = window.requestAnimationFrame(animateRadar);
-
-		return () => {
-			cancelled = true;
-			if (eventsPulseRafRef.current != null) {
-				window.cancelAnimationFrame(eventsPulseRafRef.current);
-				eventsPulseRafRef.current = null;
-			}
-			clearPulse();
-		};
-	}, [map, isMapLoaded, eventCenters]);
+	useEventsRadar({ map, isMapLoaded, eventCenters });
 
 	// Cancel selection if the tool changes or the map unmounts.
 	useEffect(() => {
@@ -12893,82 +12528,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [map, isMapLoaded, isBackgroundPresentation, streetViewEnabled]);
 
-	// Prewarm the coarse low-zoom basemap for the wide region the user would reveal
-	// on zoom-out, so even the FIRST zoom-out renders already-cached cartography
-	// instead of streaming streets-v12 across the periphery. Uses Mapbox's public,
-	// event-free `jumpTo(preloadOnly)`: it clones the transform (no camera move, no
-	// events) and warms the browser tile cache for that camera. Fires on a debounced
-	// settle so it stays off the interaction hot path. The first settle after the
-	// map turns interactive seeds the whole zoom-out path (overview levels + floor
-	// view), so even a boot-then-immediate-zoom-out never streams.
-	//
-	// The background-presentation gate below is load-bearing beyond etiquette: the
-	// decorative dashboard locks minZoom=maxZoom, and `preloadOnly` transforms clamp
-	// to the live zoom constraints — a background-mode preload would silently warm
-	// nothing useful.
-	useEffect(() => {
-		if (!map) return;
-		if (!isMapLoaded) return;
-		if (isBackgroundPresentation) return;
-
-		const prewarm = () => {
-			try {
-				if (typeof map.jumpTo !== 'function') return;
-				// `jumpTo` calls `map.stop()`, which would abort an in-progress camera
-				// animation. Never prewarm while the camera is moving — defer until it
-				// settles so we can't interrupt a fresh gesture started mid-debounce.
-				if (typeof map.isMoving === 'function' && map.isMoving()) {
-					schedule();
-					return;
-				}
-				const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
-				if (typeof document !== 'undefined' && document.hidden) return;
-				const c = map.getCenter();
-				if (!c) return;
-				// Warm only the levels a zoom-out from here would newly reveal, plus
-				// the floor view itself — the level every zoom-out ultimately lands
-				// on (live getMinZoom: z2 desktop / z1 mobile / z3 large monitors).
-				const minZoom =
-					typeof map.getMinZoom === 'function' ? map.getMinZoom() : MAP_MIN_ZOOM;
-				const zoomBand = Math.floor(zoom);
-				const levels: number[] = OVERVIEW_PREWARM_ZOOMS.filter((z) => z < zoomBand);
-				if (zoom - minZoom >= OVERVIEW_PREWARM_FLOOR_SKIP_MARGIN) {
-					levels.push(minZoom);
-				}
-				if (levels.length === 0) return;
-				const q = OVERVIEW_PREWARM_CENTER_QUANT_DEG;
-				// Key includes the zoom band so descending in steps re-warms the levels
-				// each step newly uncovers, while micro-zooms within a band still dedupe.
-				const key = `${Math.round(c.lng / q) * q}:${Math.round(c.lat / q) * q}:${zoomBand}`;
-				if (lastPrewarmKeyRef.current === key) return;
-				lastPrewarmKeyRef.current = key;
-				for (const z of levels) {
-					map.jumpTo({ center: [c.lng, c.lat], zoom: z, preloadOnly: true } as any);
-				}
-			} catch {
-				// Non-fatal — prewarm is a pure optimization, never break the map.
-			}
-		};
-
-		const schedule = () => {
-			if (prewarmTimerRef.current != null) {
-				window.clearTimeout(prewarmTimerRef.current);
-			}
-			prewarmTimerRef.current = window.setTimeout(prewarm, OVERVIEW_PREWARM_DEBOUNCE_MS);
-		};
-
-		map.on('moveend', schedule);
-		// Seed once on first settle (covers deep-link-then-zoom-out with no pan).
-		schedule();
-
-		return () => {
-			map.off('moveend', schedule);
-			if (prewarmTimerRef.current != null) {
-				window.clearTimeout(prewarmTimerRef.current);
-				prewarmTimerRef.current = null;
-			}
-		};
-	}, [map, isMapLoaded, isBackgroundPresentation]);
+	useBasemapPrewarm({ map, isMapLoaded, isBackgroundPresentation });
 
 	// Notify the parent as soon as the user starts interacting with the viewport.
 	useEffect(() => {
@@ -13040,158 +12600,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 	}, [map, isMapLoaded, isBackgroundPresentation, areaSelectionEnabled, isAreaSelecting]);
 
-	// Custom map mouse/keyboard affordances:
-	// - a normal right click should be inert (and should not open the browser menu);
-	// - a double right click zooms out a small step;
-	// - Mapbox's built-in Shift+Arrow tilt/rotate shortcuts stay disabled. We let
-	//   Shift+Up/Right zoom in and Shift+Down/Left zoom out instead.
-	useEffect(() => {
-		if (!map || !isMapLoaded) return;
-		if (isBackgroundPresentation) return;
-
-		try {
-			map.keyboard.disableRotation();
-		} catch {
-			// Non-fatal — older Mapbox builds may not expose keyboard rotation toggles.
-		}
-
-		let lastRightClick:
-			| {
-					at: number;
-					x: number;
-					y: number;
-			  }
-			| null = null;
-
-		const easeZoomBy = (
-			delta: number,
-			point: mapboxgl.Point | [number, number] | null,
-			originalEvent: Event
-		) => {
-			try {
-				(
-					originalEvent as Event & {
-						[MAP_CUSTOM_INPUT_EVENT_KEY]?: boolean;
-					}
-				)[MAP_CUSTOM_INPUT_EVENT_KEY] = true;
-				const currentZoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
-				const targetZoom = clamp(
-					currentZoom + delta,
-					map.getMinZoom(),
-					map.getMaxZoom()
-				);
-				if (Math.abs(targetZoom - currentZoom) < 0.01) return;
-				map.easeTo(
-					{
-						zoom: targetZoom,
-						around: point ? map.unproject(point) : map.getCenter(),
-						duration: MAP_RIGHT_DOUBLE_CLICK_ZOOM_EASE_MS,
-						easing: mapboxEaseOutQuart,
-						essential: true,
-					},
-					{ originalEvent }
-				);
-			} catch {
-				// Ignore transient teardown/style-race errors.
-			}
-		};
-
-		const canvas = map.getCanvas();
-		const canvasContainer = map.getCanvasContainer();
-		const getCanvasPoint = (event: MouseEvent): [number, number] => {
-			const rect = canvas.getBoundingClientRect();
-			const scaleX = rect.width > 0 ? canvas.offsetWidth / rect.width : 1;
-			const scaleY = rect.height > 0 ? canvas.offsetHeight / rect.height : 1;
-			return [
-				(event.clientX - rect.left) * scaleX,
-				(event.clientY - rect.top) * scaleY,
-			];
-		};
-
-		const onContextMenuCapture = (event: MouseEvent) => {
-			event.preventDefault();
-			event.stopPropagation();
-			if (typeof event.stopImmediatePropagation === 'function') {
-				event.stopImmediatePropagation();
-			}
-		};
-
-		const onMouseDownCapture = (event: MouseEvent) => {
-			if (event.button !== 2) return;
-
-			event.preventDefault();
-			event.stopPropagation();
-			if (typeof event.stopImmediatePropagation === 'function') {
-				event.stopImmediatePropagation();
-			}
-
-			const now =
-				Number.isFinite(event.timeStamp) && event.timeStamp > 0
-					? event.timeStamp
-					: Date.now();
-			const current = { at: now, x: event.clientX, y: event.clientY };
-			const previous = lastRightClick;
-			lastRightClick = current;
-			if (!previous || now - previous.at > MAP_RIGHT_CLICK_DOUBLE_MS) return;
-
-			const dx = current.x - previous.x;
-			const dy = current.y - previous.y;
-			if (Math.hypot(dx, dy) > MAP_RIGHT_CLICK_DOUBLE_DISTANCE_PX) return;
-
-			lastRightClick = null;
-			easeZoomBy(
-				-MAP_RIGHT_DOUBLE_CLICK_ZOOM_OUT_DELTA,
-				getCanvasPoint(event),
-				event
-			);
-		};
-
-		const onDblClickCapture = (event: MouseEvent) => {
-			if (event.button !== 2) return;
-			event.preventDefault();
-			event.stopPropagation();
-			if (typeof event.stopImmediatePropagation === 'function') {
-				event.stopImmediatePropagation();
-			}
-		};
-
-		const onKeyDownCapture = (event: KeyboardEvent) => {
-			if (!event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
-			if (
-				event.key !== 'ArrowUp' &&
-				event.key !== 'ArrowDown' &&
-				event.key !== 'ArrowLeft' &&
-				event.key !== 'ArrowRight'
-			) {
-				return;
-			}
-
-			event.preventDefault();
-			event.stopPropagation();
-			if (typeof event.stopImmediatePropagation === 'function') {
-				event.stopImmediatePropagation();
-			}
-
-			const zoomDirection =
-				event.key === 'ArrowUp' || event.key === 'ArrowRight' ? 1 : -1;
-			easeZoomBy(zoomDirection * MAP_SHIFT_ARROW_ZOOM_DELTA, null, event);
-		};
-
-		canvasContainer.addEventListener('contextmenu', onContextMenuCapture, true);
-		canvasContainer.addEventListener('mousedown', onMouseDownCapture, true);
-		canvasContainer.addEventListener('dblclick', onDblClickCapture, true);
-		// Mapbox binds its own keyboard handler on the canvas *container* in the
-		// bubble phase, so a capture-phase listener on that same element is
-		// guaranteed to run first (and intercept Shift+Arrow before Mapbox's
-		// pitch/rotate shortcuts) regardless of which child is the focus target.
-		canvasContainer.addEventListener('keydown', onKeyDownCapture, true);
-		return () => {
-			canvasContainer.removeEventListener('contextmenu', onContextMenuCapture, true);
-			canvasContainer.removeEventListener('mousedown', onMouseDownCapture, true);
-			canvasContainer.removeEventListener('dblclick', onDblClickCapture, true);
-			canvasContainer.removeEventListener('keydown', onKeyDownCapture, true);
-		};
-	}, [map, isMapLoaded, isBackgroundPresentation]);
+	useMapInputAffordances({ map, isMapLoaded, isBackgroundPresentation });
 
 	// Keep the DESKTOP drag-pan inertia zoom-aware. The max flick speed
 	// intentionally ramps up at high zoom so city/street-level drags travel farther
