@@ -1,5 +1,7 @@
 'use client';
 
+import { useCampaignFootprint } from './useCampaignFootprint';
+import { useCampaignHeatmap } from './useCampaignHeatmap';
 import { ensureMapboxSourcesAndLayersImpl } from './ensureMapboxSourcesAndLayers';
 import { useBasemapPrewarm } from './useBasemapPrewarm';
 import { useCameraPadding } from './useCameraPadding';
@@ -7991,365 +7993,32 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [map, isMapLoaded, compactOverlayPillEntries]);
 
-	const { campaignFootprintContactsWithCoords, campaignFootprintCoordsByContactId } =
-		useMemo(() => {
-			const coordsByContactId = new Map<number, LatLngLiteral>();
-			const contactsWithCoords: ContactWithName[] = [];
-			const groups = new Map<string, number[]>();
-			const seenContactIds = new Set<number>();
-
-			for (const contact of campaignFootprintContacts) {
-				if (seenContactIds.has(contact.id)) continue;
-				seenContactIds.add(contact.id);
-				const coords = getLatLngFromContact(contact);
-				if (!coords) continue;
-				coordsByContactId.set(contact.id, coords);
-				contactsWithCoords.push(contact);
-				const key = coordinateKey(coords);
-				const existing = groups.get(key);
-				if (existing) existing.push(contact.id);
-				else groups.set(key, [contact.id]);
-			}
-
-			for (const ids of groups.values()) {
-				if (ids.length <= 1) continue;
-				ids.sort((a, b) => a - b);
-				for (let i = 1; i < ids.length; i++) {
-					const id = ids[i];
-					const base = coordsByContactId.get(id);
-					if (!base) continue;
-					coordsByContactId.set(id, jitterDuplicateCoords(base, i));
-				}
-			}
-
-			return {
-				campaignFootprintContactsWithCoords: contactsWithCoords,
-				campaignFootprintCoordsByContactId: coordsByContactId,
-			};
-		}, [campaignFootprintContacts]);
-	const campaignFootprintContactIdSet = useMemo(
-		() => new Set(campaignFootprintContactsWithCoords.map((contact) => contact.id)),
-		[campaignFootprintContactsWithCoords]
-	);
-
-	useEffect(() => {
-		if (!map || !isMapLoaded) return;
-		const pointSource = map.getSource(MAPBOX_SOURCE_IDS.campaignFootprintPoints) as
-			| mapboxgl.GeoJSONSource
-			| undefined;
-		const lineSource = map.getSource(MAPBOX_SOURCE_IDS.campaignFootprintLines) as
-			| mapboxgl.GeoJSONSource
-			| undefined;
-		const nodeSource = map.getSource(MAPBOX_SOURCE_IDS.campaignFootprintNodes) as
-			| mapboxgl.GeoJSONSource
-			| undefined;
-		if (!pointSource || !lineSource || !nodeSource) return;
-
-		const clearFootprint = () => {
-			const empty = emptyFeatureCollection();
-			pointSource.setData(empty);
-			lineSource.setData(empty);
-			nodeSource.setData(empty);
-		};
-
-		// Hide the footprint whenever a search is engaged (typed query or a curated
-		// "For You" search) so it never clutters the live result dots/lines. It only
-		// shows in the disengaged/browse state.
-		if (
-			isBackgroundPresentation ||
-			searchEngaged ||
-			campaignFootprintContactsWithCoords.length === 0
-		) {
-			clearFootprint();
-			return;
-		}
-
-		const pointFeatures: GeoJSON.Feature[] = [];
-		for (const contact of campaignFootprintContactsWithCoords) {
-			const coords = campaignFootprintCoordsByContactId.get(contact.id);
-			if (!coords) continue;
-			pointFeatures.push({
-				type: 'Feature',
-				id: contact.id,
-				properties: { contactId: contact.id },
-				geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
-			});
-		}
-
-		let contactsForConstellation = campaignFootprintContactsWithCoords.slice();
-		if (contactsForConstellation.length > CAMPAIGN_FOOTPRINT_MAX_POINTS) {
-			contactsForConstellation = contactsForConstellation
-				.map((contact) => ({
-					contact,
-					score: hashStringToUint32(`campaign-footprint|${contact.id}`),
-				}))
-				.sort((a, b) => a.score - b.score)
-				.slice(0, CAMPAIGN_FOOTPRINT_MAX_POINTS)
-				.map(({ contact }) => contact);
-		}
-		contactsForConstellation.sort((a, b) => a.id - b.id);
-
-		const constellationWorldSize =
-			512 * Math.pow(2, MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM);
-		const constellationPoints: MarkerConstellationPoint[] = [];
-		for (const contact of contactsForConstellation) {
-			const coords = campaignFootprintCoordsByContactId.get(contact.id);
-			if (!coords) continue;
-			const projected = latLngToWorldPixel(coords, constellationWorldSize);
-			if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y)) continue;
-			constellationPoints.push({
-				id: contact.id,
-				coords,
-				x: projected.x,
-				y: projected.y,
-				groupKey: 'campaign-footprint',
-			});
-		}
-
-		const formation =
-			constellationPoints.length >= 2
-				? buildBeautyMarkerConstellationFormation(
-						constellationPoints,
-						'campaign-footprint',
-						MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM
-					)
-				: { edges: [], nodes: [], lowZoomNodeIds: new Set<number>() };
-
-		const lineFeatures: GeoJSON.Feature[] = [];
-		for (const edge of formation.edges) {
-			const fromCoords = campaignFootprintCoordsByContactId.get(edge.fromId);
-			const toCoords = campaignFootprintCoordsByContactId.get(edge.toId);
-			if (!fromCoords || !toCoords) continue;
-			const edgeId = markerConstellationPairKey(edge.fromId, edge.toId);
-			const lineOpacity = Math.max(0.36, (1 - edge.rank * 0.34) * edge.opacityScale);
-			lineFeatures.push({
-				type: 'Feature',
-				id: `campaign-footprint:${edge.level}:${edgeId}`,
-				properties: { level: edge.level, lineOpacity },
-				geometry: {
-					type: 'LineString',
-					coordinates: [
-						[fromCoords.lng, fromCoords.lat],
-						[toCoords.lng, toCoords.lat],
-					],
-				},
-			});
-		}
-
-		const nodeFeatureById = new Map<number, GeoJSON.Feature>();
-		for (const node of formation.nodes) {
-			const coords = campaignFootprintCoordsByContactId.get(node.id);
-			if (!coords) continue;
-			const nodeOpacity = Math.max(0.46, (1 - node.rank * 0.26) * node.opacityScale);
-			nodeFeatureById.set(node.id, {
-				type: 'Feature',
-				id: `campaign-footprint:${node.level}:${node.id}`,
-				properties: {
-					level: node.level,
-					nodeOpacity,
-					closeNodeGlowOpacity: 0.9,
-					closeSparkOpacity: 1,
-					sparkRotation: hashStringToUint32(`campaign-footprint-spark|${node.id}`) % 90,
-				},
-				geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
-			});
-		}
-		for (const contact of campaignFootprintContactsWithCoords) {
-			if (nodeFeatureById.has(contact.id)) continue;
-			const coords = campaignFootprintCoordsByContactId.get(contact.id);
-			if (!coords) continue;
-			nodeFeatureById.set(contact.id, {
-				type: 'Feature',
-				id: `campaign-footprint:contact:${contact.id}`,
-				properties: {
-					level: 'detail',
-					nodeOpacity: 0.46,
-					closeNodeGlowOpacity: 0.9,
-					closeSparkOpacity: 1,
-					sparkRotation:
-						hashStringToUint32(`campaign-footprint-spark|${contact.id}`) % 90,
-				},
-				geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
-			});
-		}
-		const nodeFeatures = Array.from(nodeFeatureById.values());
-
-		pointSource.setData({ type: 'FeatureCollection', features: pointFeatures });
-		lineSource.setData({ type: 'FeatureCollection', features: lineFeatures });
-		nodeSource.setData({ type: 'FeatureCollection', features: nodeFeatures });
-	}, [
+	const { campaignFootprintContactIdSet } = useCampaignFootprint({
 		map,
 		isMapLoaded,
 		isBackgroundPresentation,
 		searchEngaged,
-		campaignFootprintContactsWithCoords,
-		campaignFootprintCoordsByContactId,
-	]);
+		campaignFootprintContacts,
+	});
 
-	// --- Campaign selection heatmap glow -------------------------------------
-	// The heatmap envelops the currently-selected contacts (intersected with the
-	// tab's on-map set so off-tab/coordless ids are dropped). Ambient tab views
-	// glow the whole visible set when nothing is selected.
-	const heatmapContactIds = useMemo<number[]>(() => {
-		if (
-			campaignMarkerMode !== 'status' ||
-			(!campaignHeatmapColor && !campaignHeatmapStatusColors)
-		) {
-			return [];
-		}
-		const onMapIds = contactsWithCoords.map((c) => c.id);
-		if (selectedContacts.length === 0) return campaignHeatmapAmbient ? onMapIds : [];
-		const onMap = new Set(onMapIds);
-		return selectedContacts.filter((id) => onMap.has(id));
-	}, [
+	const campaignHeatmapFadeRafRef = useRef<number | null>(null);
+	// Last rendered glowFade per contact id — the start of the next crossfade.
+	const campaignHeatmapFadeByIdRef = useRef<Map<number, number>>(new Map());
+	useCampaignHeatmap({
+		map,
+		isMapLoaded,
 		campaignMarkerMode,
 		campaignHeatmapColor,
 		campaignHeatmapStatusColors,
 		campaignHeatmapAmbient,
 		contactsWithCoords,
 		selectedContacts,
-	]);
-
-	const campaignHeatmapFadeRafRef = useRef<number | null>(null);
-	// Last rendered glowFade per contact id — the start of the next crossfade.
-	const campaignHeatmapFadeByIdRef = useRef<Map<number, number>>(new Map());
-
-	useEffect(() => {
-		if (!map || !isMapLoaded) return;
-		const source = map.getSource(MAPBOX_SOURCE_IDS.campaignHeatmap) as
-			| mapboxgl.GeoJSONSource
-			| undefined;
-		if (!source) return;
-
-		const cancelFade = () => {
-			if (campaignHeatmapFadeRafRef.current != null) {
-				cancelAnimationFrame(campaignHeatmapFadeRafRef.current);
-				campaignHeatmapFadeRafRef.current = null;
-			}
-		};
-
-		// Off unless in status mode with a tint supplied.
-		if (
-			campaignMarkerMode !== 'status' ||
-			(!campaignHeatmapColor && !campaignHeatmapStatusColors)
-		) {
-			cancelFade();
-			campaignHeatmapFadeByIdRef.current.clear();
-			source.setData(emptyFeatureCollection());
-			return;
-		}
-
-		// The source carries the full tab set so members can crossfade in and out:
-		// each contact's target glowFade is 1 when it's in the heatmap set and 0
-		// otherwise. Animate from the last rendered value toward the target, then
-		// go idle (the GPU re-projects the static layer on pan/zoom for free).
-		const targetSet = new Set(heatmapContactIds);
-		const startById = campaignHeatmapFadeByIdRef.current;
-		// Base density scaling on whichever set is larger: the new target set or the
-		// currently visible fading set. That avoids a bright flash when moving from a
-		// dense ambient heatmap to a tiny selection — outgoing contacts keep the dense
-		// attenuation while they fade away, then the remaining small selection can read
-		// normally once the crossfade reaches its final frame.
-		const previousVisibleCount = Array.from(startById.values()).filter(
-			(fade) => fade > 0.001
-		).length;
-		const densityBasisCount = Math.max(targetSet.size, previousVisibleCount);
-		const getGlowDensityScale = (basisCount: number) => {
-			const densityScaleT =
-				basisCount <= CAMPAIGN_HEATMAP_DENSITY_SCALE_START_COUNT
-					? 0
-					: smoothstep(
-							0,
-							1,
-							clamp(
-								(Math.sqrt(basisCount) -
-									Math.sqrt(CAMPAIGN_HEATMAP_DENSITY_SCALE_START_COUNT)) /
-									(Math.sqrt(CAMPAIGN_HEATMAP_DENSITY_SCALE_FULL_COUNT) -
-										Math.sqrt(CAMPAIGN_HEATMAP_DENSITY_SCALE_START_COUNT)),
-								0,
-								1
-							)
-						);
-			return lerp(1, CAMPAIGN_HEATMAP_DENSITY_SCALE_MIN, densityScaleT);
-		};
-		const crossfadeGlowDensityScale = getGlowDensityScale(densityBasisCount);
-		const targetGlowDensityScale = getGlowDensityScale(targetSet.size);
-		const coordsById = new Map<number, LatLngLiteral>();
-		for (const contact of contactsWithCoords) {
-			const coords = getContactCoords(contact);
-			if (coords) coordsById.set(contact.id, coords);
-		}
-
-		const needsAnim = Array.from(coordsById.keys()).some((id) => {
-			const start = startById.get(id) ?? 0;
-			const target = targetSet.has(id) ? 1 : 0;
-			return Math.abs(start - target) > 0.001;
-		});
-
-		const writeFrame = (eased: number) => {
-			const glowDensityScale =
-				eased >= 1 ? targetGlowDensityScale : crossfadeGlowDensityScale;
-			const nextById = new Map<number, number>();
-			const features: GeoJSON.Feature[] = [];
-			coordsById.forEach((coords, id) => {
-				const start = startById.get(id) ?? 0;
-				const target = targetSet.has(id) ? 1 : 0;
-				const fade = eased >= 1 ? target : start + (target - start) * eased;
-				nextById.set(id, fade);
-				if (fade <= 0.001) return; // fully faded out — omit (opacity 0)
-				features.push({
-					type: 'Feature' as const,
-					id,
-					properties: {
-						glowColor:
-							campaignHeatmapStatusColors?.[getCampaignStatusForContact(id)] ??
-							campaignHeatmapColor ??
-							'#FFA5A5',
-						glowFade: fade,
-						glowDensityScale,
-					},
-					geometry: { type: 'Point' as const, coordinates: [coords.lng, coords.lat] },
-				});
-			});
-			campaignHeatmapFadeByIdRef.current = nextById;
-			source.setData({ type: 'FeatureCollection' as const, features });
-		};
-
-		cancelFade();
-
-		if (!needsAnim) {
-			writeFrame(1);
-			return;
-		}
-
-		const startMs = performance.now();
-		writeFrame(0);
-		const tick = () => {
-			const progress = Math.min(
-				1,
-				(performance.now() - startMs) / CAMPAIGN_HEATMAP_FADE_MS
-			);
-			writeFrame(smoothstep(0, 1, progress));
-			if (progress < 1) {
-				campaignHeatmapFadeRafRef.current = requestAnimationFrame(tick);
-				return;
-			}
-			campaignHeatmapFadeRafRef.current = null;
-		};
-		campaignHeatmapFadeRafRef.current = requestAnimationFrame(tick);
-
-		return cancelFade;
-	}, [
-		map,
-		isMapLoaded,
-		campaignMarkerMode,
-		campaignHeatmapColor,
-		campaignHeatmapStatusColors,
-		heatmapContactIds,
-		contactsWithCoords,
 		coordsByContactId,
+		getContactCoords,
 		getCampaignStatusForContact,
-	]);
+		campaignHeatmapFadeRafRef,
+		campaignHeatmapFadeByIdRef,
+	});
 
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
