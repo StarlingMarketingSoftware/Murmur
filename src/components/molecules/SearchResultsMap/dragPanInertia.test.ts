@@ -21,8 +21,9 @@ import { mapboxDragPanLinearDecel } from './math';
 // These tests lock in the drag-pan "Airbnb latch" feel and, crucially, guard
 // against the regression they fix: in mapbox-gl 3.x `dragPan.enable()` with no
 // args resets inertia to Mapbox defaults, so every enable() site must pass the
-// zoom-aware tuned options. The helper below is the single source of truth
-// re-passed at all dragPan.enable call sites in SearchResultsMap.tsx.
+// zoom-aware tuned options. enableDragPanFeel (mapInputFeel.ts) is the single
+// source of truth re-passed at all dragPan.enable call sites; the component
+// (SearchResultsMap.tsx) must only ever call the helper.
 
 // Mapbox GL 3.x built-in pan inertia defaults (the "floaty" preset we override).
 const MAPBOX_DEFAULT_DECELERATION = 2500;
@@ -30,6 +31,10 @@ const MAPBOX_DEFAULT_LINEARITY = 0.3;
 const MAPBOX_DEFAULT_MAX_SPEED = 1400;
 const searchResultsMapSource = readFileSync(
 	new URL('./SearchResultsMap.tsx', import.meta.url),
+	'utf8'
+);
+const mapInputFeelSource = readFileSync(
+	new URL('./mapInputFeel.ts', import.meta.url),
 	'utf8'
 );
 
@@ -112,10 +117,17 @@ test('drag-pan enable is centralized with a desktop-tuned / mobile-native split'
 	// so the desktop/mobile decision can't drift between call sites, and the
 	// desktop branch must still RE-pass the zoom-aware options (mapbox-gl 3.x does
 	// not persist _inertiaOptions on the handler — the original regression).
-	const rawEnableLines = searchResultsMapSource
+	const rawEnableLines = mapInputFeelSource
 		.split('\n')
 		.filter((line) => line.includes('dragPan.enable('));
 	assert.equal(rawEnableLines.length, 2);
+	// The component itself must never call dragPan.enable() directly.
+	assert.equal(
+		searchResultsMapSource
+			.split('\n')
+			.filter((line) => line.includes('dragPan.enable(')).length,
+		0
+	);
 	const desktopEnable = rawEnableLines.filter((line) =>
 		/getDragPanInertiaOptions\(.+\.getZoom\(\)\)/.test(line)
 	);
@@ -151,8 +163,8 @@ test('mobile scroll/pinch zoom feel falls back to Mapbox native rates', () => {
 	// applyScrollZoomFeel must actually consume the native constants on its
 	// nativeFeel path (guards against the mobile branch silently keeping desktop
 	// rates).
-	assert.match(searchResultsMapSource, /MAPBOX_NATIVE_WHEEL_ZOOM_RATE/);
-	assert.match(searchResultsMapSource, /MAPBOX_NATIVE_PINCH_ZOOM_RATE/);
+	assert.match(mapInputFeelSource, /MAPBOX_NATIVE_WHEEL_ZOOM_RATE/);
+	assert.match(mapInputFeelSource, /MAPBOX_NATIVE_PINCH_ZOOM_RATE/);
 });
 
 test('hard flicks travel farther when zoomed in while keeping a snappy duration', () => {
