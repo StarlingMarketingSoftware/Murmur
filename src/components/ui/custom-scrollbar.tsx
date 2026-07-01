@@ -38,6 +38,16 @@ interface CustomScrollbarProps
 	/** When true, prevent any horizontal scrolling/overflow inside the scroll container. */
 	lockHorizontalScroll?: boolean;
 	/**
+	 * `overscroll-behavior` for the inner scroll container. Defaults to `'contain'`
+	 * (block scroll chaining to the page while still allowing this element's own
+	 * bounce). Pass `'none'` to ALSO suppress the local rubber-band/bounce — required
+	 * for containers whose wheel is driven by an external arbiter, because macOS
+	 * momentum wheel events are non-cancelable, so the arbiter can't `preventDefault`
+	 * them and the browser would otherwise bounce this element at its scroll boundary
+	 * (the "flicker when you keep scrolling past the end").
+	 */
+	overscrollBehavior?: React.CSSProperties['overscrollBehavior'];
+	/**
 	 * When true, freeze the scroll position entirely: wheel, thumb-drag and track-click
 	 * are all ignored and the container's overflow is hidden. Used to pin transient,
 	 * row-anchored overlays (e.g. the campaign delete confirmation) in place so they
@@ -65,6 +75,7 @@ export function CustomScrollbar({
 	onScroll,
 	nativeScroll = false,
 	lockHorizontalScroll = false,
+	overscrollBehavior = 'contain',
 	scrollLocked = false,
 	onWheel: onWheelProp,
 	...rest
@@ -273,7 +284,11 @@ export function CustomScrollbar({
 				className={cn(className, !scrollLocked && 'overflow-y-auto')}
 				onScroll={onScroll}
 				onWheel={scrollLocked ? undefined : onWheelProp}
-				style={scrollLocked ? { ...style, overflowY: 'hidden' } : style}
+				style={
+					scrollLocked
+						? { ...style, overflowY: 'hidden', overscrollBehavior }
+						: { ...style, overscrollBehavior }
+				}
 			>
 				{children}
 			</div>
@@ -332,8 +347,13 @@ export function CustomScrollbar({
 						// Control horizontal overflow/scrolling
 						overflowX: lockHorizontalScroll ? 'hidden' : 'visible',
 						overflowY: scrollLocked ? 'hidden' : 'auto',
-						// Prevent scroll chaining to parent/page and improve mobile scroll behavior
-						overscrollBehavior: 'contain',
+						// Prevent scroll chaining to parent/page and improve mobile scroll
+						// behavior. Defaults to 'contain'; consumers whose wheel is owned by an
+						// external arbiter pass 'none' to ALSO kill this element's own rubber-band
+						// bounce (macOS momentum wheel events are non-cancelable, so the arbiter
+						// can't preventDefault them — 'contain' would still let the box bounce at
+						// its boundary, which is the "keep scrolling past the end" flicker).
+						overscrollBehavior,
 						WebkitOverflowScrolling: 'touch',
 						touchAction: 'pan-y',
 					} as React.CSSProperties

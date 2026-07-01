@@ -50,11 +50,14 @@ import {
 	LEDGER_POINTER_MOVE_EPS_PX,
 	clampLedgerResizeDelta,
 	forwardTerminalResult,
+	isLatchedInDirection,
+	nextTerminalLatch,
 	normalizeWheelDeltaPx,
 	resolveLedgerRegionFromGeometry,
 	shouldFallThroughToSecondary,
 	shouldRetargetLedgerRegion,
 	type LedgerSpendResult,
+	type LedgerTerminalLatch,
 } from './ledgerWheel';
 import { useLenis } from '@/contexts/ScrollContext';
 import { withClerkNoBranding } from '@/constants/auth';
@@ -6996,6 +6999,17 @@ const DashboardContent = () => {
 	// cursor (divider merely sliding under it) from a real re-aim, so an idle gap
 	// only re-targets the latched region when the pointer has actually moved.
 	const ledgerLastPointerYRef = useRef<number | null>(null);
+	// Directional terminal latch. Once a continuous gesture drives the ledger fully to
+	// a stop in one direction (Search Results scrolled to its last row, or Selection
+	// retraced to the very top), every FURTHER same-direction sample in that gesture is
+	// hard-absorbed: no resize, no content scroll, no fall-through. This is what kills
+	// the boundary "flicker when you keep scrolling past the end" — at the terminal,
+	// per-frame DOM re-measurement (and non-cancelable macOS momentum events) would
+	// otherwise let the decision oscillate frame-to-frame and bounce the divider. The
+	// latch clears the moment the user scrolls the other way, re-aims the pointer, or
+	// the list contents/split reset.
+	// +1 = bottomed out on downward scroll, -1 = topped out on upward scroll, 0 = none.
+	const ledgerTerminalLatchRef = useRef<LedgerTerminalLatch>(0);
 	const ledgerPrevSelectedCountRef = useRef(selectedContacts.length);
 
 	// Match the map panel skeleton wave animation so the cascade feels like it
@@ -9175,6 +9189,16 @@ const DashboardContent = () => {
 	// Only this type gets the gradient results-box skin; everything else keeps
 	// the existing flat fills.
 	const isForYouCuratedSearch = isCuratedSearchActive && lastCuratedArgs != null;
+	// A free-text "Search Anything" run (e.g. "Breweries in Delaware") is the other
+	// curated-pipeline flavour: it also flips isCuratedSearchActive and decorates its
+	// contacts with a curatedCategory, so the map draws the SAME organic curated blob —
+	// it just carries lastFreeTextArgs instead of lastCuratedArgs. It therefore needs the
+	// same map treatment as For You (the lightweight "light" overlay OUTSIDE the blob plus
+	// the perimeter-only "Disengage search" affordance) instead of leaking the legacy
+	// full-viewport contextual overlays. Kept distinct from isForYouCuratedSearch so the
+	// results-panel header still reads "Search Results" (that copy keys off the For-You
+	// flag above), while the geometry/disengage behaviour is shared below.
+	const isFreeTextBlobSearch = isCuratedSearchActive && lastFreeTextArgs != null;
 	// Mid chrome state only matters while the right panel actually occupies the right
 	// edge — with no panel there is nothing to re-center away from.
 	const isMidMapChrome =
@@ -9492,6 +9516,7 @@ const DashboardContent = () => {
 		ledgerGestureRegionRef.current = null;
 		ledgerLastWheelTsRef.current = 0;
 		ledgerLastPointerYRef.current = null;
+		ledgerTerminalLatchRef.current = 0;
 		const panel = ledgerPanelRef.current;
 		if (panel) panel.style.removeProperty('--ledger-divisor');
 	}, [stopLedgerFollower]);
@@ -9866,6 +9891,8 @@ const DashboardContent = () => {
 					ledgerGestureRegionRef.current = 'results';
 					ledgerLastWheelTsRef.current = performance.now();
 					ledgerLastPointerYRef.current = event.clientY;
+					// Real movement — clear any directional terminal latch.
+					ledgerTerminalLatchRef.current = 0;
 					return;
 				}
 			}
@@ -9889,6 +9916,12 @@ const DashboardContent = () => {
 				})
 			) {
 				ledgerGestureRegionRef.current = getRegionFromPointer();
+				// Pointer actually re-aimed (or first wheel in a fresh region): release the
+				// terminal latch so the newly targeted ledger can act. Do NOT clear this on
+				// idle alone — discrete mouse-wheel notches are often separated by more than
+				// the idle window, and clearing on each notch was the remaining bottom-edge
+				// flicker path.
+				ledgerTerminalLatchRef.current = 0;
 			}
 			ledgerLastWheelTsRef.current = now;
 			ledgerLastPointerYRef.current = event.clientY;
@@ -9896,16 +9929,48 @@ const DashboardContent = () => {
 			const primaryRegion = ledgerGestureRegionRef.current ?? 'results';
 			const secondaryRegion: LedgerRegion =
 				primaryRegion === 'selection' ? 'results' : 'selection';
-			// Spend the whole sample on ONE motion of the latched box (resize XOR scroll —
-			// see spendForRegion). Fall through to the other box ONLY when the primary hit a
-			// genuine dead zone (`blocked`: nothing to reveal/scroll from a non-terminal
-			// state) so short lists never leave the wheel dead. A reached terminal
-			// (`exhausted`) is ABSORBED — handing it over would grow the other box and
-			// reverse the divider the user just moved (the end-of-scroll "bug out").
-			const primaryResult = spendForRegion(primaryRegion, delta);
-			if (shouldFallThroughToSecondary(primaryResult)) {
-				spendForRegion(secondaryRegion, delta);
+			// Directional terminal latch (flicker guard). If a previous sample in THIS
+			// gesture already drove the ledger fully to a stop in this same direction, the
+			// whole panel has nothing left to do for it — hard-absorb the sample. Without
+			// this, "keep scrolling past the end" re-runs the full resize/scroll/fall-
+			// through decision every frame against freshly measured DOM; at the boundary
+			// that measurement (and non-cancelable macOS momentum) makes the decision flip
+			// frame-to-frame, bouncing the divider by ±epsilon — the flicker. Momentum
+			// frames stay latched. Reversal, pointer re-targeting, and content/split resets
+			// re-open the ledger; idle alone intentionally does not.
+			if (isLatchedInDirection(ledgerTerminalLatchRef.current, delta)) {
+				return;
 			}
+			// Spend the whole sample on ONE motion of the latched box (resize XOR scroll —
+			// see spendForRegion). A reached terminal (`exhausted`) is ABSORBED. Fall
+			// through to the other box ONLY on a genuine dead zone (`blocked`), and even
+			// then the fall-through may ONLY scroll that box's rows — never resize the
+			// divider — because a fall-through resize moves the split the opposite way and,
+			// once the shrunk box re-overflows, the next frame reverses it again (a bounce).
+			const primaryResult = spendForRegion(primaryRegion, delta);
+			let secondaryResult: LedgerSpendResult | null = null;
+			if (shouldFallThroughToSecondary(primaryResult)) {
+				const other =
+					secondaryRegion === 'selection' ? selection : results;
+				secondaryResult = scrollElementBy(other ?? null, delta)
+					? 'moved'
+					: 'exhausted';
+			}
+			// Update the latch from the outcome: arm it if nothing in the whole panel could
+			// move (a true terminal), clear it on reversal, else carry it. Idle alone is
+			// intentionally NOT a clear: mouse-wheel notches commonly exceed the idle gap,
+			// and re-evaluating every same-direction notch at the bottom was the remaining
+			// flicker path.
+			const anythingMoved =
+				primaryResult === 'moved' ||
+				primaryResult === 'settling' ||
+				secondaryResult === 'moved';
+			ledgerTerminalLatchRef.current = nextTerminalLatch({
+				current: ledgerTerminalLatchRef.current,
+				deltaSign: delta,
+				idle,
+				anythingMoved,
+			});
 		},
 		[
 			ledgerGestureEnabled,
@@ -9947,6 +10012,9 @@ const DashboardContent = () => {
 
 		const countDelta = nextCount - previousCount;
 		if (countDelta === 0) return;
+		// Selection/results membership changed, so any previously latched terminal is
+		// stale. The next wheel should re-evaluate against the new scroll extents.
+		ledgerTerminalLatchRef.current = 0;
 		if (!ledgerGestureEnabled) return;
 		// Let the existing empty-selection reset fully hand control back to auto.
 		if (nextCount === 0) return;
@@ -10047,6 +10115,12 @@ const DashboardContent = () => {
 	useEffect(() => {
 		if (selectedContacts.length === 0) disengageLedger();
 	}, [selectedContacts.length, disengageLedger]);
+	useEffect(() => {
+		// Content extents changed without necessarily resetting the split (category
+		// filters, selecting/deselecting rows, refetched result counts, etc.). Release a
+		// same-direction terminal latch so the next wheel samples live scroll bounds.
+		ledgerTerminalLatchRef.current = 0;
+	}, [mapPanelSelectedContacts.length, mapPanelUnselectedContactsFiltered.length]);
 	// Void guard. Search Results is `flex-1`, so it fills whatever height it's given
 	// even when it has few rows. If the user shrank Selection to reveal Results and then
 	// depletes Results (e.g. by selecting the remaining rows), a held-low divider would
@@ -11678,18 +11752,22 @@ const DashboardContent = () => {
 		return null;
 	}, [isPendingRadiusSearchOnMap, radiusCenter, radiusMiles, lastFreeTextArgs, lastCuratedArgs]);
 
-	// A curated/"For You" blob search is the active geometry when engaged and the search drew a
-	// blob — the radius circle (typed strict-radius OR curated-radius For You) or the organic
-	// curated For-You blob — and it's NOT a bbox "Search this area" rectangle. This is the scope
-	// gate for letting the lightweight ambient overlay render outside the blob and swapping the
-	// empty-map prompt for the perimeter-only "Disengage search" affordance. State-lock and bbox
-	// searches are intentionally excluded (they keep the full-marker UI + "Click to see all
-	// contacts"). The map ANDs this with its own `hasCuratedBlobOutline`, so if a curated search
-	// ever drew a non-blob footprint the new mode stays inert.
+	// A curated blob search is the active geometry when engaged and the search drew a
+	// blob — the radius circle (typed strict-radius OR curated-radius For You), the organic
+	// curated For-You blob, OR a free-text "Search Anything" run (which flows through the same
+	// curated pipeline + curatedCategory decoration and so draws the same organic blob) — and
+	// it's NOT a bbox "Search this area" rectangle. This is the scope gate for letting the
+	// lightweight ("light") ambient overlay render outside the blob and swapping the empty-map
+	// prompt for the perimeter-only "Disengage search" affordance. State-lock and bbox searches
+	// are intentionally excluded (they keep the full-marker UI + "Click to see all contacts").
+	// The map ANDs this with its own `hasCuratedBlobOutline`, so if a search ever drew a
+	// non-blob footprint the new mode stays inert.
 	const curatedBlobSearchActive =
 		isMapSearchEngaged &&
 		!mapBboxFilter &&
-		(activeRadiusSearchOverlay != null || isForYouCuratedSearch);
+		(activeRadiusSearchOverlay != null ||
+			isForYouCuratedSearch ||
+			isFreeTextBlobSearch);
 	// A category search scoped to a US state (e.g. "Wine, Beer, and Spirits in
 	// Pennsylvania") is the active geometry when engaged and the map drew the locked-state
 	// outline. This is the scope gate that lets the lightweight ambient overlay render
@@ -16488,16 +16566,21 @@ const DashboardContent = () => {
 																								}
 																							/>
 																						)}
-																						<CustomScrollbar
-																							className="flex-1 min-h-0"
-																							contentClassName="p-[6px] pb-[14px] flex flex-col"
-																							scrollContainerRef={ledgerSelectionScrollRef}
-																							thumbWidth={2}
-																							thumbColor="#000000"
-																							trackColor="transparent"
-																							offsetRight={-6}
-																							disableOverflowClass
-																						>
+										<CustomScrollbar
+											className="flex-1 min-h-0"
+											contentClassName="p-[6px] pb-[14px] flex flex-col"
+											scrollContainerRef={ledgerSelectionScrollRef}
+											thumbWidth={2}
+											thumbColor="#000000"
+											trackColor="transparent"
+											offsetRight={-6}
+											disableOverflowClass
+											// The ledger wheel arbiter owns this box's scrolling. macOS momentum
+											// wheel events are non-cancelable, so the arbiter can't preventDefault
+											// them; 'none' stops the browser from bouncing this box at its scroll
+											// boundary — the residual "keep scrolling past the end" flicker.
+											overscrollBehavior="none"
+										>
 																							<div className="mt-auto space-y-[7px]">
 																								{mapPanelSelectedContacts.map((contact) =>
 																									renderMapPanelDesktopRow(contact, 'selection')
@@ -16642,20 +16725,24 @@ const DashboardContent = () => {
 																							borderRadius: '0 0 8px 8px',
 																						}}
 																					>
-																						<CustomScrollbar
-																							className="flex-1 min-h-0"
-																							contentClassName={`p-[6px] ${
-																								showMapPanelCategoryBox
-																									? 'pb-[78px]'
-																									: 'pb-[14px]'
-																							} space-y-[7px]`}
-																							scrollContainerRef={ledgerResultsScrollRef}
-																							thumbWidth={2}
-																							thumbColor="#000000"
-																							trackColor="transparent"
-																							offsetRight={-6}
-																							disableOverflowClass
-																						>
+										<CustomScrollbar
+											className="flex-1 min-h-0"
+											contentClassName={`p-[6px] ${
+												showMapPanelCategoryBox
+													? 'pb-[78px]'
+													: 'pb-[14px]'
+											} space-y-[7px]`}
+											scrollContainerRef={ledgerResultsScrollRef}
+											thumbWidth={2}
+											thumbColor="#000000"
+											trackColor="transparent"
+											offsetRight={-6}
+											disableOverflowClass
+											// Arbiter-owned box (see Selection above): 'none' suppresses the native
+											// rubber-band bounce that non-cancelable macOS momentum wheel events
+											// would otherwise trigger at the bottom of Search Results.
+											overscrollBehavior="none"
+										>
 																							{isMapResultsLoading ? (
 																								<MapResultsPanelSkeleton
 																									variant={

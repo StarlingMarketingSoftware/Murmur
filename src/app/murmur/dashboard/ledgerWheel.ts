@@ -124,3 +124,47 @@ export function resolveLedgerRegionFromGeometry(args: {
 export function forwardTerminalResult(contentScrolled: boolean): LedgerSpendResult {
 	return contentScrolled ? 'moved' : 'exhausted';
 }
+
+// ── Directional terminal latch ───────────────────────────────────────────────
+// A gesture that has driven the ledger fully to a stop in one direction should
+// hard-absorb every FURTHER same-direction sample until the user reverses, moves the
+// cursor to a new ledger region, or the ledger content/split is reset. Re-running the
+// resize/scroll/fall-through decision every wheel notch at the boundary (including
+// discrete mouse-wheel notches spaced farther apart than the gesture idle window) is
+// what let the divider bounce by ±epsilon — the flicker the user still sees when they
+// "keep scrolling past the end". The latch is stored as a sign:
+//   0 = not latched, +1 = bottomed out scrolling down, -1 = topped out scrolling up.
+export type LedgerTerminalLatch = 0 | 1 | -1;
+
+// Should the current sample be absorbed WITHOUT running the arbiter? True only when
+// the latch is armed in the same direction as this sample.
+export function isLatchedInDirection(
+	latch: LedgerTerminalLatch,
+	deltaSign: number
+): boolean {
+	if (latch === 0) return false;
+	const dir = deltaSign > 0 ? 1 : -1;
+	return latch === dir;
+}
+
+// Next latch value after processing one sample. Precedence, in order:
+//   1) A sample opposite the armed latch clears it (reversing is always instant).
+//   2) Any real movement clears a stale latch (live content/split can move again).
+//   3) If the whole panel could move nothing for this sample, arm the latch in this
+//      direction (we've hit a true terminal — silence the momentum tail).
+//
+// `idle` is intentionally NOT a clear signal by itself. A physical mouse wheel often
+// spaces notches farther apart than the idle timeout, and clearing the terminal latch
+// on every notch was the remaining bottom-flicker path: each new notch re-ran the
+// boundary resize/fall-through logic and could twitch the divider. Callers should
+// clear the latch on actual content/split changes, pointer re-targets, or reversal.
+export function nextTerminalLatch(args: {
+	current: LedgerTerminalLatch;
+	deltaSign: number;
+	idle: boolean;
+	anythingMoved: boolean;
+}): LedgerTerminalLatch {
+	const dir: 1 | -1 = args.deltaSign > 0 ? 1 : -1;
+	if (args.current === -dir) return 0;
+	return args.anythingMoved ? 0 : dir;
+}

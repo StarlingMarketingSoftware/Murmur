@@ -5,11 +5,14 @@ import {
 	LEDGER_POINTER_MOVE_EPS_PX,
 	clampLedgerResizeDelta,
 	forwardTerminalResult,
+	isLatchedInDirection,
+	nextTerminalLatch,
 	normalizeWheelDeltaPx,
 	resolveLedgerRegionFromGeometry,
 	shouldFallThroughToSecondary,
 	shouldRetargetLedgerRegion,
 	type LedgerSpendResult,
+	type LedgerTerminalLatch,
 } from './ledgerWheel';
 
 // ── normalizeWheelDeltaPx ────────────────────────────────────────────────────
@@ -138,4 +141,104 @@ test('forwardTerminalResult: a fully-open box that cannot scroll is exhausted', 
 	// No movement at a fully-open box = genuine terminal → absorb (never reverse the
 	// divider by handing the sample to the other box).
 	assert.equal(forwardTerminalResult(false), 'exhausted');
+});
+
+// ── isLatchedInDirection (the residual "keep scrolling past the end" flicker) ──
+test('an unarmed latch never absorbs', () => {
+	assert.equal(isLatchedInDirection(0, 120), false);
+	assert.equal(isLatchedInDirection(0, -120), false);
+});
+
+test('a latch absorbs only same-direction samples', () => {
+	// Bottomed out (latch +1): further DOWN samples are swallowed, UP passes through.
+	assert.equal(isLatchedInDirection(1, 120), true);
+	assert.equal(isLatchedInDirection(1, -120), false);
+	// Topped out (latch -1): further UP samples are swallowed, DOWN passes through.
+	assert.equal(isLatchedInDirection(-1, -120), true);
+	assert.equal(isLatchedInDirection(-1, 120), false);
+});
+
+// ── nextTerminalLatch ─────────────────────────────────────────────────────────
+test('arms the latch when a continuous sample moves nothing (true terminal)', () => {
+	// Not idle + nothing moved + scrolling down → latch downward so the momentum tail
+	// is silenced instead of oscillating the divider.
+	assert.equal(
+		nextTerminalLatch({ current: 0, deltaSign: 120, idle: false, anythingMoved: false }),
+		1
+	);
+	assert.equal(
+		nextTerminalLatch({ current: 0, deltaSign: -120, idle: false, anythingMoved: false }),
+		-1
+	);
+});
+
+test('does not arm while the ledger is still moving', () => {
+	assert.equal(
+		nextTerminalLatch({ current: 0, deltaSign: 120, idle: false, anythingMoved: true }),
+		0
+	);
+});
+
+test('carries an armed latch across continuous same-direction momentum', () => {
+	// Already latched down, still flinging down, still nothing moves → stay latched.
+	assert.equal(
+		nextTerminalLatch({ current: 1, deltaSign: 120, idle: false, anythingMoved: false }),
+		1
+	);
+});
+
+test('a reversal clears the latch instantly (never a stuck wheel)', () => {
+	// Latched down, now scrolling up → clear so the reverse gesture acts immediately.
+	assert.equal(
+		nextTerminalLatch({ current: 1, deltaSign: -120, idle: false, anythingMoved: false }),
+		0
+	);
+	assert.equal(
+		nextTerminalLatch({ current: -1, deltaSign: 120, idle: false, anythingMoved: false }),
+		0
+	);
+});
+
+test('idle alone does not clear a same-direction terminal latch', () => {
+	// Physical mouse-wheel notches often arrive farther apart than the idle timeout.
+	// Clearing on idle alone re-ran the boundary decision on every notch and was the
+	// remaining "keep scrolling at the bottom" flicker path.
+	assert.equal(
+		nextTerminalLatch({ current: 1, deltaSign: 120, idle: true, anythingMoved: true }),
+		0
+	);
+	assert.equal(
+		nextTerminalLatch({ current: 1, deltaSign: 120, idle: true, anythingMoved: false }),
+		1
+	);
+});
+
+test('real movement clears a stale terminal latch', () => {
+	// If content/split has become movable again (normally because the caller cleared
+	// the latch after content-count changes, but this keeps the pure helper safe too),
+	// the terminal state must not stick.
+	assert.equal(
+		nextTerminalLatch({ current: 1, deltaSign: 120, idle: false, anythingMoved: true }),
+		0
+	);
+	assert.equal(
+		nextTerminalLatch({ current: -1, deltaSign: -120, idle: false, anythingMoved: true }),
+		0
+	);
+});
+
+test('latch values stay within the allowed set for every input combination', () => {
+	const latches: LedgerTerminalLatch[] = [0, 1, -1];
+	const signs = [120, -120];
+	const bools = [true, false];
+	for (const current of latches) {
+		for (const deltaSign of signs) {
+			for (const idle of bools) {
+				for (const anythingMoved of bools) {
+					const out = nextTerminalLatch({ current, deltaSign, idle, anythingMoved });
+					assert.ok(out === 0 || out === 1 || out === -1);
+				}
+			}
+		}
+	}
 });
