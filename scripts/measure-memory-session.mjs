@@ -10,7 +10,8 @@
 //   NEXT_DIST_DIR=.next-mem VERCEL=1 npm run build
 //   NEXT_DIST_DIR=.next-mem npx next start -p 3010
 //   node scripts/measure-memory-session.mjs --url http://localhost:3010 --label baseline \
-//        [--cycles 4] [--repeats 1] [--attrib] [--tile-cache N] [--drop-tiles-at-end]
+//        [--cycles 4] [--repeats 1] [--attrib] [--attrib-every-cycle] [--gc-workers]
+//        [--dsf 2] [--headed] [--tile-cache N] [--drop-tiles-at-end] [--pressure-probe]
 //        [--entry-idle-ms 60000] [--idle-ms 120000] [--final-idle-ms 300000]
 //        [--campaign-path /murmur/campaign/<id>] [--print-manual]
 //
@@ -36,6 +37,10 @@ import {
 	queryCacheProbe,
 	tileCacheOverrideProbe,
 	dropTileCachesProbe,
+	devtoolsAvailable,
+	workerHeapProbe,
+	canvasCensusProbe,
+	glInfoProbe,
 } from './lib/memharness.mjs';
 import { summarizeMemoryInfra, formatSummary } from './lib/parse-memory-infra.mjs';
 
@@ -48,8 +53,27 @@ const ENTRY_IDLE_MS = args.num('entry-idle-ms', 60_000);
 const IDLE_MS = args.num('idle-ms', 120_000);
 const FINAL_IDLE_MS = args.num('final-idle-ms', 300_000);
 const ATTRIB = args.flag('attrib');
+// memory-infra only (no heap snapshot — snapshots inflate footprint ~100MB)
+// after every cycle's idle, so cN-vs-cN+1 pool diffs exist when an anomaly
+// fires mid-run. Requires --attrib.
+const ATTRIB_EVERY_CYCLE = args.flag('attrib-every-cycle');
+// Force GC inside each worker isolate before sampling: page-session GC never
+// collects workers, so without this the v8/workers pool reads as "growth" even
+// when it's just uncollected garbage.
+const GC_WORKERS = args.flag('gc-workers');
+// deviceScaleFactor for the page (default 1). Real Retina users run 2 — every
+// viewport-sized framebuffer/canvas costs ~4x — so DPR-sensitive fixes must be
+// judged with --dsf 2; the DPR-1 default stays the comparable regression gate.
+const DSF = args.num('dsf', 1);
 const TILE_CACHE = args.str('tile-cache', null);
 const DROP_TILES_AT_END = args.flag('drop-tiles-at-end');
+// At final idle: force GC, then Memory.simulatePressureNotification(critical),
+// wait, resample. A big drop ⇒ allocator slack/fragmentation from churn; no
+// drop ⇒ real live retention.
+const PRESSURE_PROBE = args.flag('pressure-probe');
+// Extra devtools HTTP endpoint for raw worker-target attachment (coexists with
+// playwright's pipe). Offset by pid so serialized runs can't collide.
+const DEVTOOLS_PORT = 19555 + (process.pid % 200);
 const CAMPAIGN_PATH_ARG = args.str('campaign-path', null);
 const OUT_DIR = args.str('out-dir', path.join(process.cwd(), '.memory-baselines'));
 
@@ -157,17 +181,27 @@ if (args.flag('print-manual')) {
 // ---------------------------------------------------------------------------
 
 async function runOnce(repeatIndex, chromium, ticket) {
-	// Default headless runs use SwiftShader (software GL): comparable across
-	// runs, but GPU-ish memory lands in-renderer. --headed uses hardware GL —
-	// closer to what Activity Monitor shows real users; use for spot-checks.
+	// GL stack is NOT assumed: the run logs WEBGL_debug_renderer_info at entry
+	// (headless macOS Chrome has been observed on hardware Metal — the
+	// ioaccelerator/iosurface pools in memory-infra dumps are IOKit hardware
+	// mappings). --headed remains available for visible spot-checks.
 	const browser = await chromium.launch({
 		channel: 'chrome',
 		headless: !args.flag('headed'),
-		args: ['--enable-precise-memory-info'],
+		args: ['--enable-precise-memory-info', `--remote-debugging-port=${DEVTOOLS_PORT}`],
 	});
 	const browserCdp = await browser.newBrowserCDPSession();
-	const context = await browser.newContext({ viewport: { width: 1680, height: 1050 } });
+	const context = await browser.newContext({
+		viewport: { width: 1680, height: 1050 },
+		deviceScaleFactor: DSF,
+	});
 	const page = await context.newPage();
+	const devtoolsOk = await devtoolsAvailable(DEVTOOLS_PORT);
+	if (!devtoolsOk) {
+		console.warn(
+			`devtools port ${DEVTOOLS_PORT} unavailable — worker heap sampling/GC disabled this run`
+		);
+	}
 	const cdp = await context.newCDPSession(page);
 	await cdp.send('Performance.enable');
 	await cdp.send('HeapProfiler.enable');
@@ -227,10 +261,21 @@ async function runOnce(repeatIndex, chromium, ticket) {
 				mapStats = { ok: false, reason: 'evaluate-failed' };
 			}
 		}
+		let canvases = null;
+		try {
+			canvases = await page.evaluate(canvasCensusProbe);
+		} catch {
+			canvases = { ok: false, reason: 'evaluate-failed' };
+		}
 		await cdp.send('HeapProfiler.collectGarbage');
 		await sleep(500);
 		await cdp.send('HeapProfiler.collectGarbage');
 		await sleep(500);
+		// Per-worker JS heap via raw devtools targets (playwright Worker.evaluate
+		// can't see heap numbers, and page-session GC never collects worker
+		// isolates — with --gc-workers each worker is GC'd here, BEFORE the
+		// footprint read, so the process numbers reflect it too).
+		const workers = devtoolsOk ? await workerHeapProbe(DEVTOOLS_PORT, { gc: GC_WORKERS }) : [];
 		const { metrics } = await cdp.send('Performance.getMetrics');
 		const get = (n) => metrics.find((m) => m.name === n)?.value ?? null;
 		const procs = await processTable(browserCdp);
@@ -243,22 +288,6 @@ async function runOnce(repeatIndex, chromium, ticket) {
 		const appKb = app?.footprintKb ?? app?.rssKb ?? 0;
 		const gpuKb = gpu?.footprintKb ?? gpu?.rssKb ?? 0;
 		const gpuDeltaKb = Math.max(0, gpuKb - (run.gpuBaselineKb ?? 0));
-		// Per-worker JS heap (mapbox tile/GeoJSON workers): memory-infra showed
-		// v8/workers as the largest renderer pool, and JSHeapUsedSize can't see it.
-		const workers = [];
-		for (const w of page.workers()) {
-			try {
-				const heap = await w.evaluate(() => {
-					const mem = globalThis.performance && performance.memory;
-					return mem
-						? { usedMb: +(mem.usedJSHeapSize / 1048576).toFixed(1), totalMb: +(mem.totalJSHeapSize / 1048576).toFixed(1) }
-						: null;
-				});
-				workers.push({ url: w.url().split('/').pop(), ...(heap ?? {}) });
-			} catch {
-				/* worker may be mid-teardown */
-			}
-		}
 		// Snapshot once and diff against that same snapshot — diffing against the
 		// live counters would double-count anything landing between the two reads.
 		const netNow = net.snapshot();
@@ -279,6 +308,7 @@ async function runOnce(repeatIndex, chromium, ticket) {
 			queryCache,
 			mapStats,
 			workers,
+			canvases,
 		};
 		lastNetSnapshot = netNow;
 		run.samples.push(s);
@@ -290,8 +320,18 @@ async function runOnce(repeatIndex, chromium, ticket) {
 					: '') +
 				(workers.length
 					? ` | workers ${workers.map((w) => w.usedMb ?? '?').join('+')}MB`
-					: '')
+					: '') +
+				(canvases?.ok ? ` | cv ${canvases.count}/${canvases.totalMb}MB` : '')
 		);
+		if (canvases?.ok && canvases.mapboxCount > 1) {
+			console.warn(
+				`  [${phase}] ${canvases.mapboxCount} mapboxgl canvases present:`,
+				canvases.top
+					.filter((c) => c.cls.includes('mapboxgl-canvas'))
+					.map((c) => `${c.w}x${c.h}`)
+					.join(', ')
+			);
+		}
 		return s;
 	};
 
@@ -309,9 +349,11 @@ async function runOnce(repeatIndex, chromium, ticket) {
 		});
 	};
 
-	const attribPass = async (tag) => {
+	const attribPass = async (tag, { snapshot = true } = {}) => {
 		if (!ATTRIB) return;
-		console.log(`  … attribution pass (${tag}): memory-infra dump + heap snapshot`);
+		console.log(
+			`  … attribution pass (${tag}): memory-infra dump${snapshot ? ' + heap snapshot' : ''}`
+		);
 		try {
 			const infraFile = `${outBase}-infra-${tag}.json`;
 			const { events } = await memoryInfraDump(browserCdp, infraFile);
@@ -321,6 +363,7 @@ async function runOnce(repeatIndex, chromium, ticket) {
 		} catch (err) {
 			console.warn(`  memory-infra dump failed (${tag}):`, err.message);
 		}
+		if (!snapshot) return;
 		try {
 			const snapFile = path.join(OUT_DIR, 'snapshots', `${LABEL}-r${repeatIndex}-${tag}.heapsnapshot`);
 			await takeHeapSnapshotToFile(cdp, snapFile);
@@ -374,6 +417,16 @@ async function runOnce(repeatIndex, chromium, ticket) {
 	await page.evaluate(() => {
 		window.__murmurMapDebug.__memHarnessTag = 'longmix';
 	});
+
+	// One-time GL-stack + DPR proof (settles hardware-Metal vs SwiftShader).
+	try {
+		run.glInfo = await page.evaluate(glInfoProbe);
+		console.log(
+			`GL: ${run.glInfo?.renderer ?? '?'} (${run.glInfo?.vendor ?? '?'}) via ${run.glInfo?.source ?? '?'} | dpr ${run.glInfo?.dpr}`
+		);
+	} catch {
+		/* proof is best-effort */
+	}
 
 	if (TILE_CACHE) {
 		const touched = await page.evaluate(tileCacheOverrideProbe, Number(TILE_CACHE));
@@ -534,6 +587,7 @@ async function runOnce(repeatIndex, chromium, ticket) {
 		}
 		await sample(`${tag}-idle`);
 		if (c === 1) await attribPass('cycle1');
+		else if (ATTRIB_EVERY_CYCLE) await attribPass(`cycle${c}`, { snapshot: false });
 	}
 
 	// --- Final: pan back (cache-hit check), long idle, final sample + attrib.
@@ -553,6 +607,21 @@ async function runOnce(repeatIndex, chromium, ticket) {
 	await sample('final-idle');
 	await attribPass('final');
 
+	// --- Optional memory-pressure discrimination probe: a big drop after the
+	// critical-pressure signal ⇒ the "growth" was allocator slack/fragmentation
+	// kept warm by churn; no drop ⇒ genuinely live retention.
+	if (PRESSURE_PROBE) {
+		try {
+			await cdp.send('Memory.simulatePressureNotification', { level: 'critical' });
+			console.log('  … simulated critical memory pressure');
+			await sleep(30_000);
+			await sample('after-pressure');
+			run.events.push({ type: 'pressure-probe' });
+		} catch (err) {
+			console.warn('  pressure probe failed:', err.message);
+		}
+	}
+
 	// --- Optional live-drop arbitration probe: the measured drop IS the mapbox
 	// tile/texture share of peak memory.
 	if (DROP_TILES_AT_END) {
@@ -570,9 +639,10 @@ async function runOnce(repeatIndex, chromium, ticket) {
 	}
 
 	// --- Gate summary (time-weighted average + peak of M_user). The tile-drop
-	// probes are an arbitration experiment, not user experience — keep them out.
+	// and pressure probes are arbitration experiments, not user experience —
+	// keep them out.
 	const gateSamples = run.samples.filter(
-		(s) => s.mUserKb > 0 && !s.phase.startsWith('after-tile-drop')
+		(s) => s.mUserKb > 0 && !s.phase.startsWith('after-tile-drop') && s.phase !== 'after-pressure'
 	);
 	let weighted = 0;
 	let dt = 0;

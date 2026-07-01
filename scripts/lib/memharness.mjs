@@ -268,11 +268,178 @@ export async function takeHeapSnapshotToFile(cdp, filePath) {
 }
 
 // ---------------------------------------------------------------------------
+// Worker-isolate heap sampling via the DevTools HTTP endpoint.
+//
+// playwright's Worker.evaluate can't see heap numbers (performance.memory is
+// not exposed in workers) and page-session HeapProfiler.collectGarbage never
+// touches worker isolates — yet v8/workers is one of the largest renderer
+// pools. So the harness launches Chrome with an extra --remote-debugging-port
+// (the pipe playwright uses coexists with it) and we attach to each dedicated
+// worker target directly over its own WebSocket.
+// ---------------------------------------------------------------------------
+
+async function devtoolsJson(port, path_) {
+	const res = await fetch(`http://127.0.0.1:${port}${path_}`, { signal: AbortSignal.timeout(3000) });
+	if (!res.ok) throw new Error(`devtools ${path_}: ${res.status}`);
+	return res.json();
+}
+
+export async function devtoolsAvailable(port) {
+	try {
+		await devtoolsJson(port, '/json/version');
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+// One short-lived CDP-over-WebSocket command round-trip against a raw target.
+function wsCommands(wsUrl, commands, timeoutMs = 5000) {
+	return new Promise((resolve) => {
+		const results = new Map();
+		let ws;
+		const done = (why) => {
+			try {
+				ws?.close();
+			} catch {
+				/* ignore */
+			}
+			resolve({ results, why });
+		};
+		const timer = setTimeout(() => done('timeout'), timeoutMs);
+		try {
+			ws = new WebSocket(wsUrl);
+		} catch {
+			clearTimeout(timer);
+			return resolve({ results, why: 'connect-failed' });
+		}
+		ws.onerror = () => {
+			clearTimeout(timer);
+			done('error');
+		};
+		ws.onopen = () => {
+			for (const c of commands) ws.send(JSON.stringify(c));
+		};
+		ws.onmessage = (e) => {
+			try {
+				const msg = JSON.parse(e.data);
+				if (msg.id !== undefined) results.set(msg.id, msg);
+				if (results.size >= commands.length) {
+					clearTimeout(timer);
+					done('ok');
+				}
+			} catch {
+				/* ignore non-JSON frames */
+			}
+		};
+	});
+}
+
+// Per-worker heap usage (optionally after forcing GC in each worker isolate).
+// Never throws; returns [] when the devtools port is unavailable.
+export async function workerHeapProbe(port, { gc = false } = {}) {
+	let targets;
+	try {
+		targets = await devtoolsJson(port, '/json/list');
+	} catch {
+		return [];
+	}
+	const workers = targets.filter(
+		(t) => (t.type === 'worker' || t.type === 'shared_worker') && t.webSocketDebuggerUrl
+	);
+	const out = [];
+	for (const t of workers) {
+		const commands = [];
+		if (gc) {
+			commands.push({ id: 1, method: 'HeapProfiler.enable' });
+			commands.push({ id: 2, method: 'HeapProfiler.collectGarbage' });
+		}
+		commands.push({ id: 3, method: 'Runtime.getHeapUsage' });
+		const { results } = await wsCommands(t.webSocketDebuggerUrl, commands, gc ? 8000 : 4000);
+		const heap = results.get(3)?.result;
+		out.push({
+			url: (t.url || '').split('/').pop()?.slice(0, 48) || t.url,
+			usedMb: heap ? +(heap.usedSize / 1048576).toFixed(1) : null,
+			totalMb: heap ? +(heap.totalSize / 1048576).toFixed(1) : null,
+			gc: gc || undefined,
+		});
+	}
+	return out;
+}
+
+// ---------------------------------------------------------------------------
 // In-page probes. These are serialized by playwright and executed in the page,
 // so they must be fully self-contained (no closure over node-side state).
 // Probes are defensive to the extreme: they read mapbox-gl 3.17 internals and
 // must degrade to partial data, never throw.
 // ---------------------------------------------------------------------------
+
+// Census of every <canvas> in the document: catches second map instances,
+// weather canvases, and the real backing-store sizes (which multiply by
+// deviceScaleFactor for map drawing buffers). Cheap enough for every sample.
+export function canvasCensusProbe() {
+	try {
+		const list = [];
+		let totalBytes = 0;
+		let mapboxCount = 0;
+		for (const c of document.querySelectorAll('canvas')) {
+			const bytes = (c.width || 0) * (c.height || 0) * 4;
+			totalBytes += bytes;
+			const cls = String(c.className || '').slice(0, 64);
+			if (cls.includes('mapboxgl-canvas')) mapboxCount += 1;
+			list.push({ cls, w: c.width, h: c.height, mb: +(bytes / 1048576).toFixed(1) });
+		}
+		list.sort((a, b) => b.mb - a.mb);
+		return {
+			ok: true,
+			count: list.length,
+			mapboxCount,
+			totalMb: +(totalBytes / 1048576).toFixed(1),
+			dpr: window.devicePixelRatio,
+			top: list.slice(0, 12),
+		};
+	} catch (err) {
+		return { ok: false, reason: String(err) };
+	}
+}
+
+// One-time proof of which GL stack the run is actually using (hardware Metal
+// vs SwiftShader) — reads the live map context, falling back to a probe canvas.
+export function glInfoProbe() {
+	const read = (gl) => {
+		if (!gl) return null;
+		try {
+			const ext = gl.getExtension('WEBGL_debug_renderer_info');
+			return {
+				renderer: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+				vendor: ext ? gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR),
+			};
+		} catch {
+			return null;
+		}
+	};
+	try {
+		let info = null;
+		let source = null;
+		try {
+			const c = window.__murmurMapDebug?.getCanvas?.();
+			if (c) {
+				info = read(c.getContext('webgl2') || c.getContext('webgl'));
+				if (info) source = 'map-canvas';
+			}
+		} catch {
+			/* context type mismatch — fall through */
+		}
+		if (!info) {
+			const probe = document.createElement('canvas');
+			info = read(probe.getContext('webgl2') || probe.getContext('webgl'));
+			if (info) source = 'probe-canvas';
+		}
+		return { ok: Boolean(info), source, dpr: window.devicePixelRatio, ...(info || {}) };
+	} catch (err) {
+		return { ok: false, reason: String(err) };
+	}
+}
 
 export function mapboxProbe() {
 	const out = { ok: false, sources: [], listenerCounts: {}, canvas: null };
