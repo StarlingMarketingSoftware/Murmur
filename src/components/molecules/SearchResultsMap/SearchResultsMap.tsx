@@ -3131,6 +3131,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Loaded-guard only: the processed FeatureCollection itself lives in the Mapbox
 	// source (setData) — retaining it here too would double-hold ~2MB of parsed JSON.
 	const usStatesLoadedRef = useRef<boolean>(false);
+	// While the map is in background (decorative) presentation, the fetched
+	// states/labels payloads are stashed here instead of setData'd: nothing from
+	// those sources is rendered in background mode (dividers/labels/fill are all
+	// ≈0 opacity there), and the setData would make the workers geojson-vt-slice
+	// ~600KB of polygons for an invisible layer. Flushed on the
+	// background→interactive flip, under the reveal transition.
+	const deferredStatesPayloadRef = useRef<{
+		processed: GeoJsonFeatureCollection;
+		labels: GeoJSON.FeatureCollection;
+	} | null>(null);
 	const usStatesByKeyRef = useRef<
 		Map<
 			string,
@@ -3251,9 +3261,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isReadyForContactsOverlayRef.current = isReadyForContactsOverlay;
 	}, [isReadyForContactsOverlay]);
 
+	// The WASM geo module (~1.4MB + linear memory) is only exercised by
+	// search/curated polygon ops, so the decorative background globe never needs
+	// it. Load on the background→interactive flip (seconds before any sampler
+	// can want it) with the contacts gate as a backstop, instead of at boot.
 	useEffect(() => {
+		if (isBackgroundPresentation) return;
 		void ensureWasmGeoModuleLoaded();
-	}, []);
+	}, [isBackgroundPresentation]);
+	useEffect(() => {
+		if (!isReadyForContactsOverlay) return;
+		void ensureWasmGeoModuleLoaded();
+	}, [isReadyForContactsOverlay]);
 
 	// Apply camera padding (campaign map shift-left uses this). Layout timing is important
 	// for search→campaign tab switches: the dashboard commits optimistic campaign padding
@@ -5095,7 +5114,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// If we've already loaded the shapes for this map instance, don't refetch.
 		// Presentation toggles should only affect visibility/interaction, not data loading.
 		if (usStatesLoadedRef.current) {
-			setIsStateLayerReady(true);
+			// Ready only once the payload actually reached the map source — a
+			// still-deferred payload (background presentation) flips ready in the
+			// flush effect below instead.
+			if (!deferredStatesPayloadRef.current) setIsStateLayerReady(true);
 			return;
 		}
 
@@ -5216,19 +5238,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 				usStatesPolygonsRef.current = prepared.length ? prepared : null;
 
-				const source = map.getSource(MAPBOX_SOURCE_IDS.states) as
-					| mapboxgl.GeoJSONSource
-					| undefined;
-				source?.setData(processed as any);
-
 				const labels: GeoJSON.FeatureCollection =
 					stateLabels?.type === 'FeatureCollection' && Array.isArray(stateLabels.features)
 						? stateLabels
 						: { type: 'FeatureCollection', features: [] };
-				const labelSource = map.getSource(MAPBOX_SOURCE_IDS.stateLabels) as
-					| mapboxgl.GeoJSONSource
-					| undefined;
-				labelSource?.setData(labels as any);
 
 				const outline =
 					usOutlineGeometry?.type === 'MultiPolygon' &&
@@ -5243,7 +5256,24 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// Apply/restore the clip based on current zoom (performance).
 				syncUsOnlyBasemapCartography(map);
 
-				setIsStateLayerReady(true);
+				if (presentationRef.current === 'background') {
+					// Background (decorative) presentation renders nothing from the
+					// states/labels sources (dividers/labels/fill all ≈0 opacity), but
+					// setData would make the workers geojson-vt-slice ~600KB of
+					// polygons immediately. Stash the payloads; the presentation-flip
+					// effect below flushes them under the reveal transition.
+					deferredStatesPayloadRef.current = { processed, labels };
+				} else {
+					const source = map.getSource(MAPBOX_SOURCE_IDS.states) as
+						| mapboxgl.GeoJSONSource
+						| undefined;
+					source?.setData(processed as any);
+					const labelSource = map.getSource(MAPBOX_SOURCE_IDS.stateLabels) as
+						| mapboxgl.GeoJSONSource
+						| undefined;
+					labelSource?.setData(labels as any);
+					setIsStateLayerReady(true);
+				}
 			} catch (err) {
 				if (cancelled) return;
 				console.error('Failed to load preprocessed US states geometry', err);
@@ -5272,6 +5302,33 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		clearSearchedStateOutline,
 		syncUsOnlyBasemapCartography,
 	]);
+
+	// Flush the deferred states/labels payload the moment the map leaves
+	// background presentation (reveal start): the ~100-200ms worker slice runs
+	// under the reveal transition, before dividers/labels could be visible, so
+	// the interactive experience is unchanged while decorative-globe sessions
+	// never pay for it.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		if (isBackgroundPresentation) return;
+		const payload = deferredStatesPayloadRef.current;
+		if (!payload) return;
+		deferredStatesPayloadRef.current = null;
+		try {
+			const source = map.getSource(MAPBOX_SOURCE_IDS.states) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			source?.setData(payload.processed as any);
+			const labelSource = map.getSource(MAPBOX_SOURCE_IDS.stateLabels) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			labelSource?.setData(payload.labels as any);
+		} catch {
+			// Sources are recreated by ensureMapboxSourcesAndLayers on style
+			// (re)loads; ready still flips below so downstream gates can't strand.
+		}
+		setIsStateLayerReady(true);
+	}, [map, isMapLoaded, isBackgroundPresentation]);
 
 	const applyStateOverlayOpacity = useCallback(
 		(nextOverlayOpacity: number, nextModeT: number) => {
@@ -5455,6 +5512,142 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!map || !isMapLoaded) return;
 		applyStateOverlayOpacity(stateOverlayOpacityRef.current, stateOverlayModeRef.current);
 	}, [nightT, map, isMapLoaded, applyStateOverlayOpacity]);
+
+	// Lightning/snow pipelines (1024² canvas + GPU-uploaded canvas source +
+	// raster layer) are LAZY: they exist only once a mood has actually needed
+	// them, so calm sessions never pay their ~16MB. Both helpers are idempotent
+	// (cheap getSource/getLayer checks) and are called from (a) the canonical
+	// layer positions in ensureMapboxSourcesAndLayers — which resurrects them
+	// after style reloads once the canvas has latched — and (b) the clouds-drift
+	// ensureWeatherAssetsForNeeds at mood-fade start, while layer opacity is
+	// still ≈0 (the same guarantee the mood-gated stamp assets rely on).
+	const ensureLightningSourceAndLayer = useCallback((mapInstance: mapboxgl.Map) => {
+		if (!lightningCanvasRef.current && typeof document !== 'undefined') {
+			const canvas = document.createElement('canvas');
+			canvas.width = LIGHTNING_CANVAS_WIDTH_PX;
+			canvas.height = LIGHTNING_CANVAS_HEIGHT_PX;
+			const ctx = canvas.getContext('2d');
+			if (ctx) {
+				try {
+					ctx.imageSmoothingEnabled = true;
+					ctx.imageSmoothingQuality = 'high';
+				} catch {
+					// Ignore.
+				}
+				lightningCanvasRef.current = canvas;
+				lightningCanvasCtxRef.current = ctx;
+			}
+		}
+		const lightningCanvas = lightningCanvasRef.current;
+		if (!lightningCanvas) return;
+		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.lightning)) {
+			try {
+				mapInstance.addSource(MAPBOX_SOURCE_IDS.lightning, {
+					type: 'canvas',
+					canvas: lightningCanvas,
+					animate: true,
+					coordinates: LIGHTNING_CANVAS_COORDINATES,
+				} as unknown as mapboxgl.AnySourceData);
+				const lightningSrc = mapInstance.getSource(MAPBOX_SOURCE_IDS.lightning) as
+					| { play?: () => void; pause?: () => void }
+					| undefined;
+				lightningSrc?.play?.();
+				if (CANVAS_PERF_MODE) lightningSrc?.pause?.();
+			} catch {
+				// Non-fatal; storm mood simply renders without the dedicated lightning layer.
+			}
+		}
+		if (
+			mapInstance.getSource(MAPBOX_SOURCE_IDS.lightning) &&
+			!mapInstance.getLayer(MAPBOX_LAYER_IDS.lightning)
+		) {
+			const cfg = weatherMoodConfigRef.current;
+			const layer = {
+				id: MAPBOX_LAYER_IDS.lightning,
+				type: 'raster',
+				source: MAPBOX_SOURCE_IDS.lightning,
+				paint: {
+					'raster-opacity': buildLightningOpacityExpr(
+						cfg.lightningIntensity * LIGHTNING_LAYER_OPACITY
+					),
+					'raster-fade-duration': 0,
+					'raster-resampling': 'linear',
+				},
+			} as any;
+			// Canonical position: directly before the sun-transition catchlight. At
+			// boot that layer does not exist yet (lightning is appended and the
+			// catchlight lands right after it — identical order); on a mid-session
+			// lazy add it does exist, so the layer slots into the exact boot
+			// position instead of on top of pins.
+			if (mapInstance.getLayer(MAPBOX_LAYER_IDS.sunTransitionCloudCatchlight)) {
+				mapInstance.addLayer(layer, MAPBOX_LAYER_IDS.sunTransitionCloudCatchlight);
+			} else {
+				mapInstance.addLayer(layer);
+			}
+		}
+	}, []);
+
+	const ensureSnowSourceAndLayer = useCallback((mapInstance: mapboxgl.Map) => {
+		if (!snowCanvasRef.current && typeof document !== 'undefined') {
+			const canvas = document.createElement('canvas');
+			canvas.width = SNOW_CANVAS_SIZE_PX;
+			canvas.height = SNOW_CANVAS_SIZE_PX;
+			const ctx = canvas.getContext('2d');
+			if (ctx) {
+				try {
+					ctx.imageSmoothingEnabled = false;
+				} catch {
+					// Ignore.
+				}
+				snowCanvasRef.current = canvas;
+				snowCanvasCtxRef.current = ctx;
+			}
+		}
+		const snowCanvas = snowCanvasRef.current;
+		if (!snowCanvas) return;
+		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.snow)) {
+			try {
+				mapInstance.addSource(MAPBOX_SOURCE_IDS.snow, {
+					type: 'canvas',
+					canvas: snowCanvas,
+					animate: true,
+					coordinates: CLOUDS_CANVAS_COORDINATES,
+				} as unknown as mapboxgl.AnySourceData);
+				const snowSrc = mapInstance.getSource(MAPBOX_SOURCE_IDS.snow) as
+					| { play?: () => void; pause?: () => void }
+					| undefined;
+				snowSrc?.play?.();
+				if (CANVAS_PERF_MODE) snowSrc?.pause?.();
+			} catch {
+				// Non-fatal; snowy mood simply renders without the particle layer.
+			}
+		}
+		if (
+			mapInstance.getSource(MAPBOX_SOURCE_IDS.snow) &&
+			!mapInstance.getLayer(MAPBOX_LAYER_IDS.snow)
+		) {
+			const cfg = weatherMoodConfigRef.current;
+			const layer = {
+				id: MAPBOX_LAYER_IDS.snow,
+				type: 'raster',
+				source: MAPBOX_SOURCE_IDS.snow,
+				paint: {
+					'raster-opacity': buildSnowOpacityExpr(cfg.snowOpacity),
+					'raster-fade-duration': 0,
+					'raster-resampling': 'linear',
+				},
+			} as any;
+			// Canonical position: directly beneath the cloud deck (flakes read as
+			// suspended below it). At boot the clouds layer is added right after
+			// this — identical order; on a mid-session lazy add it exists.
+			if (mapInstance.getLayer(MAPBOX_LAYER_IDS.clouds)) {
+				mapInstance.addLayer(layer, MAPBOX_LAYER_IDS.clouds);
+			} else {
+				mapInstance.addLayer(layer);
+			}
+		}
+	}, []);
+
 
 	// Subtle cloud drift so the overlay feels "alive" (especially in background globe mode).
 	useEffect(() => {
@@ -7709,6 +7902,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 			}
 			if (needs.lightning) {
+				// Lazy pipeline: canvas+source+layer come into existence at fade
+				// start (opacity ≈ 0), same guarantee as the stamp assets below.
+				ensureLightningSourceAndLayer(map);
 				loadLightningStamps().catch(() => {
 					// Non-fatal.
 				});
@@ -7717,6 +7913,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				});
 			}
 			if (needs.snow) {
+				ensureSnowSourceAndLayer(map);
 				loadSnowStamps().catch(() => {
 					// Non-fatal.
 				});
@@ -8365,7 +8562,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				cloudsDriftRafRef.current = null;
 			}
 		};
-	}, [map, isMapLoaded]);
+	}, [map, isMapLoaded, ensureLightningSourceAndLayer, ensureSnowSourceAndLayer]);
 
 	// Keep the Mapbox "selected" feature-state for US states in sync with `selectedStateKey`.
 	const prevSelectedStateKeyOnMapRef = useRef<string | null>(null);
@@ -8486,47 +8683,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 		}
 
-		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.lightning)) {
-			const lightningCanvas = lightningCanvasRef.current;
-			if (lightningCanvas) {
-				try {
-					mapInstance.addSource(MAPBOX_SOURCE_IDS.lightning, {
-						type: 'canvas',
-						canvas: lightningCanvas,
-						animate: true,
-						coordinates: LIGHTNING_CANVAS_COORDINATES,
-					} as unknown as mapboxgl.AnySourceData);
-					const lightningSrc = mapInstance.getSource(MAPBOX_SOURCE_IDS.lightning) as
-						| { play?: () => void; pause?: () => void }
-						| undefined;
-					lightningSrc?.play?.();
-					if (CANVAS_PERF_MODE) lightningSrc?.pause?.();
-				} catch {
-					// Non-fatal; storm mood simply renders without the dedicated lightning layer.
-				}
-			}
-		}
-
-		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.snow)) {
-			const snowCanvas = snowCanvasRef.current;
-			if (snowCanvas) {
-				try {
-					mapInstance.addSource(MAPBOX_SOURCE_IDS.snow, {
-						type: 'canvas',
-						canvas: snowCanvas,
-						animate: true,
-						coordinates: CLOUDS_CANVAS_COORDINATES,
-					} as unknown as mapboxgl.AnySourceData);
-					const snowSrc = mapInstance.getSource(MAPBOX_SOURCE_IDS.snow) as
-						| { play?: () => void; pause?: () => void }
-						| undefined;
-					snowSrc?.play?.();
-					if (CANVAS_PERF_MODE) snowSrc?.pause?.();
-				} catch {
-					// Non-fatal; snowy mood simply renders without the particle layer.
-				}
-			}
-		}
+		// Lightning/snow sources are NOT added here unconditionally — their
+		// canvas+source+layer pipelines are lazy (see ensureLightningSourceAndLayer
+		// / ensureSnowSourceAndLayer above), created at their canonical layer
+		// positions further down only when a mood has latched them or needs them.
 
 		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.dayFarSideShade)) {
 			const shadeCanvas = dayFarSideShadeCanvasRef.current;
@@ -8742,20 +8902,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			});
 		}
 
-		if (mapInstance.getSource(MAPBOX_SOURCE_IDS.snow)) {
-			ensureLayer(
-				{
-					id: MAPBOX_LAYER_IDS.snow,
-					type: 'raster',
-					source: MAPBOX_SOURCE_IDS.snow,
-					paint: {
-						'raster-opacity': buildSnowOpacityExpr(cfg.snowOpacity),
-						'raster-fade-duration': 0,
-						'raster-resampling': 'linear',
-					},
-				},
-				MAPBOX_LAYER_IDS.clouds
-			);
+		// Snow pipeline: resurrect after style reloads once a snowy mood has
+		// latched the canvas, or create at boot when the boot mood already needs
+		// it (predicate mirrors weatherAssetNeedsFor's `snow`). Calm sessions
+		// skip the canvas, source, layer and GPU texture entirely.
+		if (
+			snowCanvasRef.current ||
+			(cfg.snowOpacity > 0.001 && cfg.snowDensity > 0.001)
+		) {
+			ensureSnowSourceAndLayer(mapInstance);
 		}
 
 		// Clouds (baseline globe texture). Added above the dawn band so clouds
@@ -8780,19 +8935,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			},
 		});
 
-		if (mapInstance.getSource(MAPBOX_SOURCE_IDS.lightning)) {
-			ensureLayer({
-				id: MAPBOX_LAYER_IDS.lightning,
-				type: 'raster',
-				source: MAPBOX_SOURCE_IDS.lightning,
-				paint: {
-					'raster-opacity': buildLightningOpacityExpr(
-						cfg.lightningIntensity * LIGHTNING_LAYER_OPACITY
-					),
-					'raster-fade-duration': 0,
-					'raster-resampling': 'linear',
-				},
-			});
+		// Lightning pipeline: same lazy contract as snow above (predicate mirrors
+		// weatherAssetNeedsFor's `lightning`).
+		if (
+			lightningCanvasRef.current ||
+			cfg.lightning ||
+			cfg.lightningIntensity > 0.001
+		) {
+			ensureLightningSourceAndLayer(mapInstance);
 		}
 
 		if (mapInstance.getSource(MAPBOX_SOURCE_IDS.sunTransition)) {
@@ -10303,7 +10453,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// All floor-shifted expressions above were built with the current floor
 		// delta, so creation/style-reload bakes it — keep the parity gate in step.
 		lastParityAppliedFloorDeltaRef.current = interactiveFloorDeltaRef.current;
-	}, []);
+	}, [ensureLightningSourceAndLayer, ensureSnowSourceAndLayer]);
 
 	useEffect(() => {
 		if (!mapContainerRef.current) return;
@@ -10337,38 +10487,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 			}
 
-			if (!lightningCanvasRef.current && typeof document !== 'undefined') {
-				const canvas = document.createElement('canvas');
-				canvas.width = LIGHTNING_CANVAS_WIDTH_PX;
-				canvas.height = LIGHTNING_CANVAS_HEIGHT_PX;
-				const ctx = canvas.getContext('2d');
-				if (ctx) {
-					try {
-						ctx.imageSmoothingEnabled = true;
-						ctx.imageSmoothingQuality = 'high';
-					} catch {
-						// Ignore.
-					}
-					lightningCanvasRef.current = canvas;
-					lightningCanvasCtxRef.current = ctx;
-				}
-			}
-
-			if (!snowCanvasRef.current && typeof document !== 'undefined') {
-				const canvas = document.createElement('canvas');
-				canvas.width = SNOW_CANVAS_SIZE_PX;
-				canvas.height = SNOW_CANVAS_SIZE_PX;
-				const ctx = canvas.getContext('2d');
-				if (ctx) {
-					try {
-						ctx.imageSmoothingEnabled = false;
-					} catch {
-						// Ignore.
-					}
-					snowCanvasRef.current = canvas;
-					snowCanvasCtxRef.current = ctx;
-				}
-			}
+			// Lightning/snow canvases are intentionally NOT created here — their
+			// pipelines are lazy (ensureLightningSourceAndLayer /
+			// ensureSnowSourceAndLayer) so calm sessions never allocate the two
+			// 1024² backing stores + GPU textures.
 		} catch {
 			// Non-fatal; we'll fall back to static raster tiles.
 		}
