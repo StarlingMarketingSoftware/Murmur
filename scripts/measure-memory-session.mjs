@@ -62,18 +62,22 @@ const OUT_DIR = args.str('out-dir', path.join(process.cwd(), '.memory-baselines'
 
 const ENTRY_SEARCH = '[Booking] Music Venues (Tennessee)';
 
+// Consumed by the campaign→dashboard pending-search handoff (2 per cycle).
+// Alternates [Booking]-prefixed (curated booking search → fat booking-extra
+// overlay rows at z≥8) and bare free-text ("Search Anything" vector path) so
+// both search classes churn every cycle.
 const REFINE_SEARCHES = [
-	'Music venues in North Carolina',
+	'[Booking] Music Venues (North Carolina)',
 	'Coffee shops in Austin',
-	'Recording studios in Los Angeles',
+	'[Booking] Recording Studios (Los Angeles)',
 	'Wedding photographers in Chicago',
-	'Art galleries in Portland',
+	'[Booking] Art Galleries (Portland)',
 	'Jazz clubs in New York',
-	'Breweries in Denver',
+	'[Booking] Breweries (Denver)',
 	'Yoga studios in San Diego',
-	'Bookstores in Seattle',
+	'[Booking] Bookstores (Seattle)',
 	'Event venues in Dallas',
-	'Photographers in Boston',
+	'[Booking] Music Venues (Boston)',
 	'Music festivals in California',
 ];
 
@@ -127,17 +131,16 @@ and "Safari Graphics and Media" at each CHECKPOINT, into
 
  1. Sign in, open /murmur/dashboard?search=${encodeURIComponent(ENTRY_SEARCH)}
     Wait 60s idle.                                      CHECKPOINT entry-idle
- 2. Run 3 searches in the refine bar, 10s apart:
-      ${REFINE_SEARCHES.slice(0, 3).join(' | ')}
-                                                        CHECKPOINT searches
- 3. Pan/zoom through: Memphis z9, New Orleans z10, Atlanta z11, Miami z12,
+ 2. Pan/zoom through: Memphis z9, New Orleans z10, Atlanta z11, Miami z12,
     DC z13, NYC z14, Chicago z12, Denver z10 (~3s each) CHECKPOINT hops
  4. In Nashville, Chicago, LA: zoom to street level (z16) and hop across 5
     different neighborhoods (~5km apart, ~3s each).     CHECKPOINT street
  5. In each of those cities hover ~10 marker pins (1-2s each) so research
     panels open.                                        CHECKPOINT hovers
- 6. Open a campaign from the dashboard, wait 20s, go Back to the dashboard.
-    Do this twice.                                      CHECKPOINT nav
+ 6. Open a campaign from the dashboard, wait 20s, then run a search from the
+    campaign's search bar (landing back on the dashboard). Do this twice with:
+      ${REFINE_SEARCHES.slice(0, 2).join(' | ')}
+                                                        CHECKPOINT nav
  7. Leave the tab idle and visible for 2 min.           CHECKPOINT idle
  8. (Optional) Repeat 2-7 for a second cycle.
 Also capture Web Inspector > Timelines > Memory at entry and at the end.
@@ -377,24 +380,14 @@ async function runOnce(repeatIndex, chromium, ticket) {
 	if (campaignPath) console.log(`campaign path for nav block: ${campaignPath}`);
 	else console.warn('no campaign found — nav block will be skipped');
 
-	const refine = page.locator('input[placeholder*="Refine your search"]');
-
 	// ------------------------------------------------------------------ cycles
 	for (let c = 1; c <= CYCLES; c++) {
 		const tag = `c${c}`;
 
-		// 1. Refine searches (3, rotated deterministically per cycle).
-		if (await refine.count()) {
-			for (let i = 0; i < 3; i++) {
-				const q = REFINE_SEARCHES[((c - 1) * 3 + i) % REFINE_SEARCHES.length];
-				await refine.first().fill(q);
-				await refine.first().press('Enter');
-				await sleep(6000);
-			}
-			await sample(`${tag}-searches`, { mapProbe: false });
-		} else {
-			console.warn(`${tag}: refine input not found — skipping searches`);
-		}
+		// 1. Searches ride the nav round-trips (block 5): the map view's ledger
+		// results bar no longer hosts a refine <input>, and URL rehydration is
+		// once-per-mount, so the harness uses the campaign→dashboard
+		// pending-search handoff — the path campaign searchbars actually use.
 
 		// 2. Cross-country hops.
 		for (const vp of HOP_VIEWPORTS) await jumpTo(vp, 2000);
@@ -456,14 +449,13 @@ async function runOnce(repeatIndex, chromium, ticket) {
 		}
 		await sample(`${tag}-street-hovers`);
 
-		// 5. Route round-trips (client-side; the persistent map must survive).
+		// 5. Route round-trips (client-side; the persistent map must survive),
+		// each returning WITH a real search via the pending-search handoff:
+		// sessionStorage payload + a BARE dashboard URL (any explicit search
+		// params in the URL block the handoff), which the dashboard consumes
+		// through its standard submit path and re-engages the map view.
 		if (campaignPath) {
 			for (let i = 0; i < 2; i++) {
-				// The dashboard mirrors the engaged search + map view into its URL —
-				// return to that exact URL. A bare /murmur/dashboard push would remount
-				// into the initial hero (no refine input, background-mode map) and
-				// silently hollow out every later cycle.
-				const returnUrl = await page.evaluate(() => location.pathname + location.search);
 				const navOk = await page.evaluate((p) => {
 					if (!window.__murmurNavDebug?.push) return false;
 					window.__murmurNavDebug.push(p);
@@ -477,13 +469,26 @@ async function runOnce(repeatIndex, chromium, ticket) {
 					.waitForFunction((p) => location.pathname === p, campaignPath, { timeout: 30_000 })
 					.catch(() => console.warn(`${tag}: campaign nav did not land`));
 				await sleep(20_000);
-				await page.evaluate((u) => window.__murmurNavDebug.push(u), returnUrl);
+				const q = REFINE_SEARCHES[((c - 1) * 2 + i) % REFINE_SEARCHES.length];
+				await page.evaluate((query) => {
+					sessionStorage.setItem(
+						'murmur_pending_search',
+						JSON.stringify({ query, fromCampaignId: null })
+					);
+				}, q);
+				await page.evaluate(() => window.__murmurNavDebug.push('/murmur/dashboard'));
 				await page
 					.waitForFunction(() => location.pathname === '/murmur/dashboard', null, {
 						timeout: 30_000,
 					})
 					.catch(() => console.warn(`${tag}: dashboard nav-back did not land`));
-				await sleep(10_000);
+				// Let the handoff search execute and the map view re-engage.
+				await sleep(15_000);
+				const urlAfter = await page.evaluate(() => location.search);
+				run.events.push({ type: 'handoff-search', cycle: c, query: q, urlAfter });
+				if (!urlAfter.includes('search=')) {
+					console.warn(`${tag}: handoff search did not engage (url: ${urlAfter})`);
+				}
 			}
 			const mapSurvived = await page.evaluate(
 				() => window.__murmurMapDebug?.__memHarnessTag === 'longmix'
