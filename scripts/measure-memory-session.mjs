@@ -157,8 +157,12 @@ if (args.flag('print-manual')) {
 // ---------------------------------------------------------------------------
 
 async function runOnce(repeatIndex, chromium, ticket) {
+	// Default headless runs use SwiftShader (software GL): comparable across
+	// runs, but GPU-ish memory lands in-renderer. --headed uses hardware GL —
+	// closer to what Activity Monitor shows real users; use for spot-checks.
 	const browser = await chromium.launch({
 		channel: 'chrome',
+		headless: !args.flag('headed'),
 		args: ['--enable-precise-memory-info'],
 	});
 	const browserCdp = await browser.newBrowserCDPSession();
