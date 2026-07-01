@@ -69,6 +69,10 @@ const nextConfig: NextConfig = {
 	},
 	// Reduce serverless function size and provisioning time
 	experimental: {
+		// Trades a little dev-compile speed for substantially lower `next dev`
+		// node-process memory (webpack keeps fewer in-memory caches). No effect
+		// on production builds' output.
+		webpackMemoryOptimizations: true,
 		optimizePackageImports: [
 			'@clerk/nextjs',
 			'@tanstack/react-query',
