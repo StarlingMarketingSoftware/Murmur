@@ -125,6 +125,18 @@ export const DashboardDraftReview: FC<DashboardDraftReviewProps> = ({
 		return ids;
 	}, [batchDrafts]);
 
+	// Drafts the send-queue moderation agent pulled back for review (generic
+	// amber dot; the verdict reason never reaches the client).
+	const returnedDraftIds = useMemo(() => {
+		const ids = new Set<number>();
+		batchDrafts.forEach((email) => {
+			if ((email as { returnedForReview?: boolean }).returnedForReview) {
+				ids.add(email.id);
+			}
+		});
+		return ids;
+	}, [batchDrafts]);
+
 	const handleIdentityUpdate = useCallback(
 		async (data: Parameters<typeof editIdentity>[0]['data']) => {
 			const identityId = campaign.identity?.id;
@@ -255,6 +267,7 @@ export const DashboardDraftReview: FC<DashboardDraftReviewProps> = ({
 					onRegenerateDraft={handleRegenerateDraft}
 					rejectedDraftIds={rejectedDraftIds}
 					approvedDraftIds={approvedDraftIds}
+					returnedDraftIds={returnedDraftIds}
 					statusFilter={statusFilter}
 					onStatusFilterChange={setStatusFilter}
 					hideSendButton

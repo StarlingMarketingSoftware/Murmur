@@ -72,6 +72,8 @@ export interface DraftedEmailsProps {
 	rejectedDraftIds?: Set<number>;
 	/** Optional: drafts marked for approval (for UI badges) */
 	approvedDraftIds?: Set<number>;
+	/** Optional: drafts returned from the send queue by moderation (generic badge; reason stays server-side) */
+	returnedDraftIds?: Set<number>;
 	/** Current status filter for Drafts tab */
 	statusFilter: 'all' | 'approved' | 'rejected';
 	/** Callback to change status filter */

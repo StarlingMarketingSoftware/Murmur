@@ -95,6 +95,18 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 		return ids;
 	}, [draftEmails]);
 
+	// Drafts the send-queue moderation agent pulled back for review (generic
+	// amber dot; the verdict reason never reaches the client).
+	const returnedDraftIds = useMemo(() => {
+		const ids = new Set<number>();
+		draftEmails.forEach((email) => {
+			if ((email as { returnedForReview?: boolean }).returnedForReview) {
+				ids.add(email.id);
+			}
+		});
+		return ids;
+	}, [draftEmails]);
+
 	// Sending preview: shows the email currently being sent
 	const [sendingPreview, setSendingPreview] = useState<{
 		contactId: number;
@@ -466,6 +478,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 												rowWidth={366}
 												rowHeight={92}
 												rejectedDraftIds={rejectedDraftIds}
+												returnedDraftIds={returnedDraftIds}
 												previewedDraftId={selectedDraft?.id}
 												isPreviewMode
 												onDraftPreviewClick={(draft) =>
@@ -570,6 +583,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 												subject={form.watch('subject')}
 												onRejectDraft={handleRejectDraft}
 												rejectedDraftIds={rejectedDraftIds}
+												returnedDraftIds={returnedDraftIds}
 												statusFilter={statusFilter}
 												onStatusFilterChange={setStatusFilter}
 											/>

@@ -2458,6 +2458,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 								const isSelected = selectedDraftIds.has(draft.id);
 								const isRejected = props.rejectedDraftIds?.has(draft.id) ?? false;
 								const isApproved = props.approvedDraftIds?.has(draft.id) ?? false;
+								const isReturned = props.returnedDraftIds?.has(draft.id) ?? false;
 								const isUsedContact = usedContactIdsSet.has(draft.contactId);
 								const isUsedContactHoverCardVisible =
 									isUsedContact &&
@@ -2615,6 +2616,25 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 														borderRadius: '50%',
 														border: '1px solid #000000',
 														backgroundColor: '#69AF69',
+													}}
+												/>
+											)}
+											{/* Returned-for-review indicator (moderation). Returned drafts come
+											    back with reviewStatus cleared, so a reject/approve dot only
+											    coexists after a later user action — user action wins. */}
+											{isReturned && !isRejected && !isApproved && (
+												<span
+													className="absolute z-10 transition-all duration-150 ease-out"
+													title="Returned for review"
+													aria-label="Returned for review"
+													style={{
+														left: '8px',
+														top: '11px',
+														width: '16px',
+														height: '16px',
+														borderRadius: '50%',
+														border: '1px solid #000000',
+														backgroundColor: '#D98E2B',
 													}}
 												/>
 											)}

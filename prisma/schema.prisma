@@ -835,7 +835,7 @@ model EmailModerationVerdict {
   userId      String // sender clerkId provenance — no FK
   campaignId  Int // Campaign.id provenance — no FK
   contactId   Int // Contact.id provenance — no FK
-  contentHash String // sha256 hex of subject + " " + message (exact stored bytes)
+  contentHash String // sha256 hex of subject + "\u0000" + message (exact stored bytes)
 
   promptVersion Int
   verdict       ModerationVerdict

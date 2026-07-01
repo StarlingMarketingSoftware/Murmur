@@ -3186,17 +3186,15 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					if (contact) onContactClick?.(contact);
 				}}
 			>
-				{/* Company (top, medium) + contact name (below, normal) — mirrors the sent/inbox
-				    card (InboxCardInner) so an archived row reads continuously with the rows above
-				    it, just gray and with an archived-date on the right. */}
-				<div className="absolute left-3 top-[10px] right-[58px] pr-1 pointer-events-none">
+				{/* Contact name first, company second — matching the Archive rows in the screenshots. */}
+				<div className="absolute left-3 top-[10px] right-1/2 pr-1 pointer-events-none">
 					<FadeOverflowText
-						text={companyLabel}
-						className="font-inter text-[14.661px] font-medium leading-[19.547px] text-black"
+						text={contactName || companyLabel}
+						className="font-inter text-[14.661px] font-normal leading-[19.547px] text-black"
 						splitNumericSuffix={false}
 					/>
 					<FadeOverflowText
-						text={contactName}
+						text={companyLabel && contactName ? companyLabel : ''}
 						className="font-inter text-[14.661px] font-normal leading-[19.547px] text-black"
 						splitNumericSuffix={false}
 					/>
@@ -3755,7 +3753,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					{shouldShowArchiveSection && shouldShowSeeArchivedButton && (
 						<button
 							type="button"
-							className="absolute left-1/2 bottom-[9px] z-30 -translate-x-1/2 rounded-full bg-white px-[18px] py-[9px] font-inter text-[15px] font-semibold leading-none text-black transition-colors hover:bg-[#F3F4F6]"
+							className="absolute left-1/2 bottom-[9px] z-30 -translate-x-1/2 rounded-[4px] bg-white px-[16px] py-[3px] font-inter text-[16px] font-normal leading-none text-black transition-colors hover:bg-[#F3F4F6]"
 							style={{ border: 'none', cursor: 'pointer' }}
 							onClick={(e) => {
 								e.stopPropagation();
@@ -3769,7 +3767,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						<button
 							type="button"
 							aria-label="Back to active rows"
-							className="absolute left-1/2 top-[4px] z-30 flex h-[16px] w-[44px] -translate-x-1/2 items-center justify-center rounded-full bg-white transition-colors hover:bg-[#F3F4F6]"
+							className="absolute left-1/2 top-[4px] z-30 flex h-[12px] w-[52px] -translate-x-1/2 items-center justify-center rounded-full bg-white transition-colors hover:bg-[#F3F4F6]"
 							style={{ border: 'none', cursor: 'pointer' }}
 							onClick={(e) => {
 								e.stopPropagation();

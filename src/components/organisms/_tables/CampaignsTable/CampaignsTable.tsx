@@ -444,6 +444,12 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 	const campaignCount = campaignRows.length;
 	const isSplitFinderView =
 		!shouldShowMobileFeatures && campaignFinderViewMode === 'split';
+	// Dropdown-only sidebar mode: keep the single-pane table in the same
+	// finder-style frame even when the "Murmur" root collapses the open campaign.
+	// This must be known before we build topContent / table classes so the
+	// collapsed/root view stays visually connected to the 115px sidebar.
+	const isFinderSidebarVisible =
+		showFinderSidebar && !shouldShowMobileFeatures && !isSplitFinderView;
 	// The green "+" add affordance shows only while the cursor is over the OTHER pane (a
 	// valid drop target). Only the destination pane's hook flips isFinderDropTargetActive
 	// true (its dragOver rejects same-campaign drops), so the OR is exactly "is over the
@@ -986,7 +992,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 		singleFinderPane === 'right' ? rightFinderSearchQuery : leftFinderSearchQuery;
 	const setSingleFinderSearchQuery =
 		singleFinderPane === 'right' ? setRightFinderSearchQuery : setLeftFinderSearchQuery;
-	const finderTopContent = singleCampaignsTable.isFinderOpen ? (
+	const finderTopContent = singleCampaignsTable.isFinderOpen || isFinderSidebarVisible ? (
 		<CampaignFinderTopBar
 			searchValue={singleFinderSearchQuery}
 			onSearchChange={setSingleFinderSearchQuery}
@@ -1008,16 +1014,19 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 			containerClassName={cn(
 				'border-none rounded-[8px] my-campaigns-table desktop-campaigns-table !bg-[#F8F8F8] !mx-auto !py-[8px] !px-0 w-[654px] h-[253px]',
 				isNarrowDesktop && 'narrow-desktop-table',
-				(tableState.isFinderOpen || splitPane) && 'campaigns-finder-open',
+				(tableState.isFinderOpen || splitPane || (isFinderSidebarVisible && !splitPane)) &&
+					'campaigns-finder-open',
 				// Without an expansion the table grows to fit its rows (incl. the ARCHIVE
 				// folder) so it never shows a scrollbar; expanding the archive caps it so
 				// a long deleted list scrolls within the table.
 				!tableState.isFinderOpen &&
 					!splitPane &&
+					!isFinderSidebarVisible &&
 					!tableState.isArchiveExpanded &&
 					'campaigns-table-flow',
 				!tableState.isFinderOpen &&
 					!splitPane &&
+					!isFinderSidebarVisible &&
 					tableState.isArchiveExpanded &&
 					'campaigns-table-archive-open',
 				splitPane && 'campaign-finder-split-table',
@@ -1052,7 +1061,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 				!splitPane && enableRowDelete && tableState.confirmingCampaignId !== null
 			}
 			stickyHeader={false}
-			footerContent={splitPane ? null : addCampaignFooter}
+			footerContent={splitPane || (isFinderSidebarVisible && !splitPane) ? null : addCampaignFooter}
 		/>
 	);
 
@@ -1115,9 +1124,6 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({
 			).folderIconColor,
 		};
 	});
-	// Desktop, single-pane view only: the sidebar shares the single table's finder.
-	const isFinderSidebarVisible =
-		showFinderSidebar && !shouldShowMobileFeatures && !isSplitFinderView;
 	// Plain handlers (not hooks): this point is past the `isMobile === null` early
 	// return, so calling useCallback here would violate rules-of-hooks. They're
 	// only handed to a child that re-renders with this component anyway.
