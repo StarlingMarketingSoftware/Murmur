@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useAuth, useUser, SignInButton } from '@clerk/nextjs';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import HomeIcon from '@/components/atoms/_svg/HomeIcon';
 import { TopRightClerkButton } from '@/components/atoms/TopRightHeaderIcon/TopRightClerkButton';
@@ -44,6 +44,16 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 	useEffect(() => {
 		setIsSettingsOpen(false);
 	}, [pathname]);
+
+	// Measurement/debug handle (mirrors window.__murmurMapDebug): lets the memory
+	// harness drive real client-side route transitions so the persistent map
+	// singleton is exercised, not remounted (scripts/measure-memory-session.mjs).
+	const router = useRouter();
+	useEffect(() => {
+		(
+			window as unknown as { __murmurNavDebug?: { push: (href: string) => void } }
+		).__murmurNavDebug = { push: (href: string) => router.push(href) };
+	}, [router]);
 
 	// Hide footer for murmur pages and apply animations
 	useEffect(() => {

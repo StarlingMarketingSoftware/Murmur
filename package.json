@@ -4,7 +4,7 @@
 	"private": true,
 	"scripts": {
 		"predev": "npm run preprocess-geo",
-		"dev": "next dev --port 3000",
+		"dev": "cross-env NODE_OPTIONS=--max-old-space-size=4096 next dev --port 3000",
 		"build:wasm:node": "wasm-pack build rust-scorer --target nodejs --out-dir pkg-node && rm -f rust-scorer/pkg-node/.gitignore",
 		"build:wasm:web": "wasm-pack build rust-scorer --target web --out-dir pkg-web && rm -f rust-scorer/pkg-web/.gitignore",
 		"build:wasm": "npm run build:wasm:node && npm run build:wasm:web",

@@ -1,4 +1,10 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+	keepPreviousData,
+	useMutation,
+	useQuery,
+	useQueryClient,
+	type QueryClient,
+} from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { CustomMutationOptions, CustomQueryOptions } from '@/types';
 import { toast } from 'sonner';
@@ -11,6 +17,12 @@ import { PostBulkUpdateContactData } from '@/app/api/contacts/bulk-update/route'
 import { _fetch } from '@/utils';
 import { urls } from '@/constants/urls';
 import { ContactWithName } from '@/types/contact';
+import {
+	getContactResearchSeed,
+	hasContactResearchSeed,
+	retainContactResearchSeeds,
+	setContactResearchSeed,
+} from './contactResearchSeeds';
 
 const QUERY_KEYS = {
 	all: ['contacts'] as const,
@@ -462,6 +474,42 @@ export interface ContactsMapOverlayFilters
 	phase?: 'visible' | 'buffer';
 }
 
+// The research-detail fields the map-overlay route inlines on "fat" rows
+// (booking/promotion always; 'all' at deep zoom — see api/contacts/map-overlay).
+type OverlayResearchFields = {
+	metadata?: string | null;
+	website?: string | null;
+	address?: string | null;
+	companyType?: string | null;
+	companyFoundedYear?: string | null;
+};
+
+// Move a fat row's research fields into the per-contact seed store and return the
+// row slim. The fields would otherwise be duplicated in every overlapping cached
+// overlay window (~0.5-2KB metadata blurb per row × up to 2000 rows × dozens of
+// windows); seeded once per contact id they're served back synchronously through
+// useGetContactResearch's initialData — render-identical, no loading flash.
+const slimAndSeedOverlayRow = (
+	row: ContactWithName & OverlayResearchFields
+): ContactWithName => {
+	// Key-absence (not null) marks an already-slim row: useContactWithResearch's
+	// `'metadata' in contact` contract distinguishes slim from fetched-but-empty.
+	if (!('metadata' in row)) return row;
+	const { metadata, website, address, companyType, companyFoundedYear, ...slim } = row;
+	setContactResearchSeed(row.id, {
+		id: row.id,
+		metadata: metadata ?? null,
+		website: website ?? null,
+		address: address ?? null,
+		companyType: companyType ?? null,
+		companyFoundedYear: companyFoundedYear ?? null,
+		// Inline fat rows never carried keywords, so the seeded research must not
+		// surface a keywords band either (see useContactWithResearch's seeded merge).
+		companyKeywords: [],
+	});
+	return slim as ContactWithName;
+};
+
 export const useGetContactsMapOverlay = (options: {
 	filters?: ContactsMapOverlayFilters;
 	enabled?: boolean;
@@ -498,7 +546,9 @@ export const useGetContactsMapOverlay = (options: {
 				return [];
 			}
 
-			return response.json() as Promise<ContactWithName[]>;
+			const rows = (await response.json()) as (ContactWithName &
+				OverlayResearchFields)[];
+			return rows.map(slimAndSeedOverlayRow);
 		},
 		enabled: (options.enabled ?? true) && Boolean(options.filters),
 		// Prevent marker flicker when the bbox/zoom changes by keeping the previous
@@ -511,6 +561,192 @@ export const useGetContactsMapOverlay = (options: {
 		staleTime: 1000 * 60 * 5, // 5 minutes
 		gcTime: 1000 * 60 * 5, // Keep inactive overlay windows briefly without retaining long pan sessions
 	});
+};
+
+export const getContactsMapOverlayBaseKey = () =>
+	[...QUERY_KEYS.list(), 'map-overlay'] as const;
+
+// The overlay queryKey embeds the quantized viewport, so every distinct pan/zoom
+// position mints a new cache entry (up to ~2000 rows each) that gcTime keeps for
+// 5 minutes — an unbounded pool during a heavy pan burst (gcTime can't cap how
+// many windows are minted INSIDE its window). Bound it: keep the most recently
+// USED windows per overlay group and evict the rest.
+//
+// 24 covers a full 16→8→16 zoom traversal (booking/promotion windows mint a new
+// key at every integer zoom step) plus pan margin, so any plausible pan-back /
+// zoom-back retrace stays a synchronous cache hit. The 2-min age floor must sit
+// BELOW the 5-min gcTime or the LRU would never fire before gcTime collects.
+const MAP_OVERLAY_LRU_KEEP_PER_GROUP = 24;
+const MAP_OVERLAY_LRU_MIN_AGE_MS = 1000 * 60 * 2;
+
+// Cache-hit revisits don't bump dataUpdatedAt, so recency needs its own stamp:
+// each trim pass marks the currently-observed (rendered) windows as active.
+const mapOverlayLastActiveAt = new Map<string, number>();
+
+export const trimContactsMapOverlayCache = (queryClient: QueryClient) => {
+	const now = Date.now();
+	const queries = queryClient
+		.getQueryCache()
+		.findAll({ queryKey: getContactsMapOverlayBaseKey() });
+
+	const liveHashes = new Set<string>();
+	const groups = new Map<string, typeof queries>();
+	for (const query of queries) {
+		liveHashes.add(query.queryHash);
+		if (query.getObserversCount() > 0) {
+			// Rendered right now (or held by a mounted hook) — never evict.
+			mapOverlayLastActiveAt.set(query.queryHash, now);
+			continue;
+		}
+		// Never cancel an in-flight fetch.
+		if (query.state.fetchStatus !== 'idle') continue;
+		const filters = query.queryKey[query.queryKey.length - 1] as
+			| ContactsMapOverlayFilters
+			| undefined;
+		if (!filters) continue;
+		const groupKey = `${filters.mode ?? 'booking'}|${filters.phase ?? ''}`;
+		const group = groups.get(groupKey) ?? [];
+		group.push(query);
+		groups.set(groupKey, group);
+	}
+	// Don't let the recency map itself outlive the cache entries it describes.
+	for (const hash of mapOverlayLastActiveAt.keys()) {
+		if (!liveHashes.has(hash)) mapOverlayLastActiveAt.delete(hash);
+	}
+
+	const evictHashes = new Set<string>();
+	for (const group of groups.values()) {
+		if (group.length <= MAP_OVERLAY_LRU_KEEP_PER_GROUP) continue;
+		const lastUsed = (q: (typeof group)[number]) =>
+			Math.max(q.state.dataUpdatedAt, mapOverlayLastActiveAt.get(q.queryHash) ?? 0);
+		group.sort((a, b) => lastUsed(b) - lastUsed(a));
+		for (const query of group.slice(MAP_OVERLAY_LRU_KEEP_PER_GROUP)) {
+			if (now - lastUsed(query) < MAP_OVERLAY_LRU_MIN_AGE_MS) continue;
+			evictHashes.add(query.queryHash);
+		}
+	}
+	if (evictHashes.size > 0) {
+		queryClient.removeQueries({ predicate: (q) => evictHashes.has(q.queryHash) });
+		for (const hash of evictHashes) mapOverlayLastActiveAt.delete(hash);
+	}
+
+	// Keep the research-seed store in lockstep with the windows that survive: any
+	// contact still renderable from a retained window keeps its seed; the rest die
+	// with their windows (also catches windows the 5-min gcTime removed quietly).
+	const retainedIds = new Set<number>();
+	for (const query of queries) {
+		if (evictHashes.has(query.queryHash)) continue;
+		const data = query.state.data as ContactWithName[] | undefined;
+		if (!Array.isArray(data)) continue;
+		for (const row of data) retainedIds.add(row.id);
+	}
+	retainContactResearchSeeds(retainedIds);
+};
+
+// Contacts-list results are one full fat ContactWithName[] per distinct search
+// filter set, kept 10 min by gcTime — a search-heavy stretch retains every
+// result set at once. Keep only the most recently used inactive entries; the
+// current search is always observed (never evicted), so toggling between the
+// last few searches still renders instantly from cache.
+const CONTACTS_LIST_LRU_KEEP = 6;
+const CONTACTS_LIST_LRU_MIN_AGE_MS = 1000 * 60 * 2;
+const contactsListLastActiveAt = new Map<string, number>();
+
+// Hovering many map pins accumulates one research entry (large metadata text)
+// per contact for 30 min (gcTime). Individually small; capped so hover-scrubbing
+// hundreds of pins stays bounded. Evicting a seeded entry is safe — the seed
+// store re-serves it synchronously via initialData on the next mount.
+const CONTACT_RESEARCH_CACHE_KEEP = 150;
+const CONTACT_RESEARCH_CACHE_MIN_AGE_MS = 1000 * 60 * 2;
+const contactResearchLastActiveAt = new Map<string, number>();
+
+type TrimmableQuery = {
+	queryHash: string;
+	getObserversCount: () => number;
+	state: { fetchStatus: string; dataUpdatedAt: number };
+};
+
+// Shared LRU pass: stamp observed queries as active, exclude in-flight, evict
+// beyond `keep` by true recency with an age floor. Same contract as the overlay
+// trim above, minus its per-group partitioning.
+const evictBeyondLru = (
+	queryClient: QueryClient,
+	queries: TrimmableQuery[],
+	lastActiveAt: Map<string, number>,
+	keep: number,
+	minAgeMs: number
+) => {
+	const now = Date.now();
+	const liveHashes = new Set<string>();
+	const candidates: TrimmableQuery[] = [];
+	for (const query of queries) {
+		liveHashes.add(query.queryHash);
+		if (query.getObserversCount() > 0) {
+			lastActiveAt.set(query.queryHash, now);
+			continue;
+		}
+		if (query.state.fetchStatus !== 'idle') continue;
+		candidates.push(query);
+	}
+	for (const hash of lastActiveAt.keys()) {
+		if (!liveHashes.has(hash)) lastActiveAt.delete(hash);
+	}
+	if (candidates.length <= keep) return;
+	const lastUsed = (q: TrimmableQuery) =>
+		Math.max(q.state.dataUpdatedAt, lastActiveAt.get(q.queryHash) ?? 0);
+	candidates.sort((a, b) => lastUsed(b) - lastUsed(a));
+	const evictHashes = new Set<string>();
+	for (const query of candidates.slice(keep)) {
+		if (now - lastUsed(query) < minAgeMs) continue;
+		evictHashes.add(query.queryHash);
+	}
+	if (evictHashes.size > 0) {
+		queryClient.removeQueries({ predicate: (q) => evictHashes.has(q.queryHash) });
+		for (const hash of evictHashes) lastActiveAt.delete(hash);
+	}
+};
+
+export const trimContactsListCache = (queryClient: QueryClient) => {
+	const queries = queryClient
+		.getQueryCache()
+		.findAll({ queryKey: QUERY_KEYS.list() })
+		// Exactly ['contacts','list', <filters object>] — leaves the map-overlay
+		// windows (own LRU above) and the 'used-contacts' string-keyed family alone.
+		.filter(
+			(q) =>
+				q.queryKey.length === 3 &&
+				typeof q.queryKey[2] === 'object' &&
+				q.queryKey[2] !== null
+		);
+	evictBeyondLru(
+		queryClient,
+		queries,
+		contactsListLastActiveAt,
+		CONTACTS_LIST_LRU_KEEP,
+		CONTACTS_LIST_LRU_MIN_AGE_MS
+	);
+};
+
+export const trimContactResearchCache = (queryClient: QueryClient) => {
+	const queries = queryClient
+		.getQueryCache()
+		.findAll({ queryKey: [...QUERY_KEYS.all, 'detail'] })
+		.filter((q) => q.queryKey.length === 4 && q.queryKey[3] === 'research');
+	evictBeyondLru(
+		queryClient,
+		queries,
+		contactResearchLastActiveAt,
+		CONTACT_RESEARCH_CACHE_KEEP,
+		CONTACT_RESEARCH_CACHE_MIN_AGE_MS
+	);
+};
+
+// Single entry point for the map's post-fetch trim effect: bounds all three
+// contact cache families that grow with map/search use.
+export const trimContactsQueryCaches = (queryClient: QueryClient) => {
+	trimContactsMapOverlayCache(queryClient);
+	trimContactsListCache(queryClient);
+	trimContactResearchCache(queryClient);
 };
 
 // Backfills the research-detail fields for a single contact when a hovered map-overlay
@@ -535,6 +771,14 @@ export const useGetContactResearch = (contactId: number | null) => {
 			return response.json() as Promise<GetContactResearchData>;
 		},
 		enabled: contactId != null,
+		// Slimmed overlay rows seed this query synchronously, so consumers render
+		// success-with-data on first paint (no fetch, no "Researching…" flash) —
+		// matching what the inline fields used to provide. With refetchOnMount
+		// false, seeded data is pinned exactly like the inline fields were.
+		initialData: () =>
+			contactId != null ? (getContactResearchSeed(contactId)?.data ?? undefined) : undefined,
+		initialDataUpdatedAt: () =>
+			contactId != null ? getContactResearchSeed(contactId)?.ts : undefined,
 		refetchOnMount: false,
 		refetchOnReconnect: false,
 		refetchOnWindowFocus: false,
@@ -559,6 +803,16 @@ export const useContactWithResearch = (contact: ContactWithName | null) => {
 	return useMemo(() => {
 		if (!contact) return null;
 		if (!research || research.id !== contact.id) return contact;
+		if (hasContactResearchSeed(contact.id)) {
+			// This row arrived as a fat overlay row (slimmed into the seed store).
+			// The inline path never carried companyKeywords, so a real cached
+			// research entry (e.g. from an earlier ambient-dot hover of the same
+			// contact) must not surface a keywords band that today's inline rows
+			// never show on this surface.
+			const researchRest: Partial<typeof research> = { ...research };
+			delete researchRest.companyKeywords;
+			return { ...contact, ...researchRest };
+		}
 		return { ...contact, ...research };
 	}, [contact, research]);
 };

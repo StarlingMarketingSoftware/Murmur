@@ -33,6 +33,12 @@ const queryClient = new QueryClient({
 	},
 });
 
+if (typeof window !== 'undefined') {
+	// Measurement/debug handle (mirrors window.__murmurMapDebug): lets the memory
+	// harness sample React Query cache sizes (scripts/measure-memory-session.mjs).
+	(window as unknown as { __murmurQueryClient?: QueryClient }).__murmurQueryClient = queryClient;
+}
+
 interface SubLayoutProps {
 	children: React.ReactNode;
 }

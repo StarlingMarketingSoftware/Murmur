@@ -1251,7 +1251,9 @@ export const STATE_META_URL = '/geo/us-states-meta.json';
 // is served `immutable`, so without a new URL cached clients never refetch it.
 export const STATE_LABELS_URL = '/geo/us-states-labels.json?v=8';
 export const STATE_OUTLINE_URL = '/geo/us-states-outline.json';
-export const STATE_PREPARED_POLYGONS_URL = '/geo/us-states-prepared-polygons.json';
+// us-states-prepared-polygons.json is no longer fetched: prepared clipping
+// polygons derive from the processed GeoJSON's multiPolygons at load time
+// (bit-identical output, shared references — see loadStates in SearchResultsMap).
 export const STATE_HIGHLIGHT_COLOR = '#5DAB68';
 export const STATE_HIGHLIGHT_OPACITY = 0.68;
 export const STATE_DIVIDER_COLOR = '#7A8799';

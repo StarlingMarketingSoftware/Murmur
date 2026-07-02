@@ -249,6 +249,19 @@ export const stableViewportSampleContacts = (
 		}
 	}
 
+	// The TS fallback below picks a DIFFERENT (still stable) sample than the
+	// WASM path. With the module now lazy-loaded, a sample racing the load
+	// would silently diverge from the post-load sample — surface that in dev.
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		wasmGeoModulePromise &&
+		!cachedWasmGeoModule
+	) {
+		console.warn(
+			'[SearchResultsMap] stableViewportSampleContacts ran while the WASM geo module was still loading — TS fallback sample may differ from the post-load sample'
+		);
+	}
+
 	const latSpan = viewportBbox.maxLat - viewportBbox.minLat;
 	const lngSpan = viewportBbox.maxLng - viewportBbox.minLng;
 	if (

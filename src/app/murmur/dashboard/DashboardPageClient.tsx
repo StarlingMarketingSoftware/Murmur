@@ -27,8 +27,19 @@ import { DashboardStrategyBox } from '@/components/molecules/DashboardStrategyBo
 import DashboardCalendarPanel, {
 	type DashboardCalendarMockState,
 } from '@/components/molecules/DashboardCalendarPanel/DashboardCalendarPanel';
-import { DashboardCalendarDebugPanel } from '@/components/molecules/DashboardCalendarPanel/DashboardCalendarDebugPanel';
 import { MobileDashboardCalendar } from '@/components/molecules/DashboardCalendarPanel/MobileDashboardCalendar';
+import nextDynamic from 'next/dynamic';
+
+// Debug-only panels (?calendarDebug=1 etc.) and the hard-disabled dashboard
+// inbox (ENABLE_DASHBOARD_INBOX_TAB = false) load as separate chunks so their
+// subtrees stay out of the dashboard bundle for every normal session.
+const DashboardCalendarDebugPanel = nextDynamic(
+	() =>
+		import('@/components/molecules/DashboardCalendarPanel/DashboardCalendarDebugPanel').then(
+			(m) => m.DashboardCalendarDebugPanel
+		),
+	{ ssr: false }
+);
 import {
 	MobileDashboardTabBar,
 	type MobileDashboardTab,
@@ -224,7 +235,10 @@ import {
 import { ContactResearchDescriptionBox } from '@/components/molecules/ContactResearchPanel/ContactResearchDescriptionBox';
 import { ContactResearchHoverCard } from '@/components/molecules/ContactResearchPanel/ContactResearchHoverCard';
 import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
-import InboxSection from '@/components/molecules/InboxSection/InboxSection';
+const InboxSection = nextDynamic(
+	() => import('@/components/molecules/InboxSection/InboxSection'),
+	{ ssr: false }
+);
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import { HoverDescriptionProvider } from '@/contexts/HoverDescriptionContext';
 import {
@@ -239,11 +253,23 @@ import { UnsubscribeFlow } from '@/components/organisms/UnsubscribeFlow/Unsubscr
 import DashboardResponsesWidget, {
 	type ResponsesMockState,
 } from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesWidget';
-import { DashboardResponsesDebugPanel } from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesDebugPanel';
+const DashboardResponsesDebugPanel = nextDynamic(
+	() =>
+		import('@/components/molecules/DashboardResponsesWidget/DashboardResponsesDebugPanel').then(
+			(m) => m.DashboardResponsesDebugPanel
+		),
+	{ ssr: false }
+);
 import DashboardOpportunitiesWidget, {
 	type OpportunitiesMockState,
 } from '@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesWidget';
-import { DashboardOpportunitiesDebugPanel } from '@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesDebugPanel';
+const DashboardOpportunitiesDebugPanel = nextDynamic(
+	() =>
+		import(
+			'@/components/molecules/DashboardOpportunitiesWidget/DashboardOpportunitiesDebugPanel'
+		).then((m) => m.DashboardOpportunitiesDebugPanel),
+	{ ssr: false }
+);
 import {
 	useGetCampaign,
 	useGetCampaignContacts,
