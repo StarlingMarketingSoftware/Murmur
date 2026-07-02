@@ -277,8 +277,6 @@ import {
 	LIGHTNING_ALTITUDE_CLOSE_PX,
 	LIGHTNING_ALTITUDE_GLOBE_PX,
 	LIGHTNING_CANVAS_COORDINATES,
-	LIGHTNING_CANVAS_HEIGHT_PX,
-	LIGHTNING_CANVAS_WIDTH_PX,
 	LIGHTNING_CATCHLIGHT_OPACITY,
 	LIGHTNING_CELL_RADIUS_CLOSE_PX,
 	LIGHTNING_CELL_RADIUS_GLOBE_PX,
@@ -416,7 +414,6 @@ import {
 	SNOWFLAKE_STAMPS_COUNT,
 	SNOW_BASE_FALL_PX_PER_S,
 	SNOW_BASE_WIND_PX_PER_S,
-	SNOW_CANVAS_SIZE_PX,
 	SNOW_DENSITY_BAND_LOOP_MS,
 	SNOW_EDDY_DRIFT_BASE_PX,
 	SNOW_GUST_BAND_LOOP_MS,
@@ -467,6 +464,7 @@ import {
 	UNSUBSCRIBE_BURN_WASH_COLOR,
 	UNSUBSCRIBE_BURN_WASH_MAX_OPACITY,
 	US_ONLY_BASEMAP_CLIP_MAX_ZOOM,
+	MARKER_PIN_URL_CACHE_MAX,
 	VIEWPORT_BBOX_PAD_FACTOR,
 	defaultCenter,
 	stateBadgeColorMap,
@@ -1317,6 +1315,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const hoverClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	// US state geometry for outlines, hover/click selection, and point-in-polygon checks.
 	const usStatesGeoJsonRef = useRef<GeoJsonFeatureCollection | null>(null);
+	// While the map is in background (decorative) presentation, the fetched
+	// states/labels payloads are stashed here instead of setData'd: nothing from
+	// those sources is rendered in background mode (dividers/labels/fill are all
+	// ≈0 opacity there), and the setData would make the workers geojson-vt-slice
+	// ~600KB of polygons for an invisible layer. Flushed on the
+	// background→interactive presentation flip, under the reveal transition.
+	const deferredStatesPayloadRef = useRef<{
+		processed: GeoJsonFeatureCollection;
+		labels: GeoJSON.FeatureCollection;
+	} | null>(null);
 	const usStatesByKeyRef = useRef<
 		Map<
 			string,
@@ -1438,9 +1446,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isReadyForContactsOverlayRef.current = isReadyForContactsOverlay;
 	}, [isReadyForContactsOverlay]);
 
+	// The WASM geo module (~1.4MB + linear memory) is only exercised by
+	// search/curated polygon ops, so the decorative background globe never needs
+	// it. Load on the background→interactive flip (seconds before any sampler
+	// can want it) with the contacts gate as a backstop, instead of at boot.
 	useEffect(() => {
+		if (isBackgroundPresentation) return;
 		void ensureWasmGeoModuleLoaded();
-	}, []);
+	}, [isBackgroundPresentation]);
+	useEffect(() => {
+		if (!isReadyForContactsOverlay) return;
+		void ensureWasmGeoModuleLoaded();
+	}, [isReadyForContactsOverlay]);
 
 	useCameraPadding({ map, isMapLoaded, isBackgroundPresentation, cameraPadding });
 
@@ -2390,7 +2407,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// If we've already loaded the shapes for this map instance, don't refetch.
 		// Presentation toggles should only affect visibility/interaction, not data loading.
 		if (usStatesGeoJsonRef.current?.features?.length) {
-			setIsStateLayerReady(true);
+			// Ready only once the payload actually reached the map source — a
+			// still-deferred payload (background presentation) flips ready in the
+			// flush effect below instead.
+			if (!deferredStatesPayloadRef.current) setIsStateLayerReady(true);
 			return;
 		}
 
@@ -2509,19 +2529,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const prepared = Array.isArray(preparedPolygons) ? preparedPolygons : [];
 				usStatesPolygonsRef.current = prepared.length ? prepared : null;
 
-				const source = map.getSource(MAPBOX_SOURCE_IDS.states) as
-					| mapboxgl.GeoJSONSource
-					| undefined;
-				source?.setData(processed as any);
-
 				const labels: GeoJSON.FeatureCollection =
 					stateLabels?.type === 'FeatureCollection' && Array.isArray(stateLabels.features)
 						? stateLabels
 						: { type: 'FeatureCollection', features: [] };
-				const labelSource = map.getSource(MAPBOX_SOURCE_IDS.stateLabels) as
-					| mapboxgl.GeoJSONSource
-					| undefined;
-				labelSource?.setData(labels as any);
 
 				const outline =
 					usOutlineGeometry?.type === 'MultiPolygon' &&
@@ -2536,7 +2547,24 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// Apply/restore the clip based on current zoom (performance).
 				syncUsOnlyBasemapCartography(map);
 
-				setIsStateLayerReady(true);
+				if (presentationRef.current === 'background') {
+					// Background (decorative) presentation renders nothing from the
+					// states/labels sources (dividers/labels/fill all ≈0 opacity), but
+					// setData would make the workers geojson-vt-slice ~600KB of
+					// polygons immediately. Stash the payloads; the presentation-flip
+					// effect below flushes them under the reveal transition.
+					deferredStatesPayloadRef.current = { processed, labels };
+				} else {
+					const source = map.getSource(MAPBOX_SOURCE_IDS.states) as
+						| mapboxgl.GeoJSONSource
+						| undefined;
+					source?.setData(processed as any);
+					const labelSource = map.getSource(MAPBOX_SOURCE_IDS.stateLabels) as
+						| mapboxgl.GeoJSONSource
+						| undefined;
+					labelSource?.setData(labels as any);
+					setIsStateLayerReady(true);
+				}
 			} catch (err) {
 				if (cancelled) return;
 				console.error('Failed to load preprocessed US states geometry', err);
@@ -2565,6 +2593,33 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		clearSearchedStateOutline,
 		syncUsOnlyBasemapCartography,
 	]);
+
+	// Flush the deferred states/labels payload the moment the map leaves
+	// background presentation (reveal start): the ~100-200ms worker slice runs
+	// under the reveal transition, before dividers/labels could be visible, so
+	// the interactive experience is unchanged while decorative-globe sessions
+	// never pay for it.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		if (isBackgroundPresentation) return;
+		const payload = deferredStatesPayloadRef.current;
+		if (!payload) return;
+		deferredStatesPayloadRef.current = null;
+		try {
+			const source = map.getSource(MAPBOX_SOURCE_IDS.states) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			source?.setData(payload.processed as any);
+			const labelSource = map.getSource(MAPBOX_SOURCE_IDS.stateLabels) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			labelSource?.setData(payload.labels as any);
+		} catch {
+			// Sources are recreated by ensureMapboxSourcesAndLayers on style
+			// (re)loads; ready still flips below so downstream gates can't strand.
+		}
+		setIsStateLayerReady(true);
+	}, [map, isMapLoaded, isBackgroundPresentation]);
 
 	const applyStateOverlayOpacity = useCallback(
 		(nextOverlayOpacity: number, nextModeT: number) => {
@@ -2760,6 +2815,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		snowCanvasCtxRef,
 		interactiveFloorDeltaRef,
 		usStatesPolygonsRef,
+		moodTransitionRef,
 		weatherMoodConfigRef,
 		weatherRegionCenterRef,
 		snowCloudInteractionMultiplier,
@@ -2816,8 +2872,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lightingLayerVisibilityAppliedRef,
 			lightingRasterOpacityAppliedRef,
 			lightningCanvasRef,
+			lightningCanvasCtxRef,
 			nightTRef,
 			snowCanvasRef,
+			snowCanvasCtxRef,
 			sunTransitionCanvasRef,
 			weatherMoodConfigRef,
 		});
@@ -2855,38 +2913,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 			}
 
-			if (!lightningCanvasRef.current && typeof document !== 'undefined') {
-				const canvas = document.createElement('canvas');
-				canvas.width = LIGHTNING_CANVAS_WIDTH_PX;
-				canvas.height = LIGHTNING_CANVAS_HEIGHT_PX;
-				const ctx = canvas.getContext('2d');
-				if (ctx) {
-					try {
-						ctx.imageSmoothingEnabled = true;
-						ctx.imageSmoothingQuality = 'high';
-					} catch {
-						// Ignore.
-					}
-					lightningCanvasRef.current = canvas;
-					lightningCanvasCtxRef.current = ctx;
-				}
-			}
-
-			if (!snowCanvasRef.current && typeof document !== 'undefined') {
-				const canvas = document.createElement('canvas');
-				canvas.width = SNOW_CANVAS_SIZE_PX;
-				canvas.height = SNOW_CANVAS_SIZE_PX;
-				const ctx = canvas.getContext('2d');
-				if (ctx) {
-					try {
-						ctx.imageSmoothingEnabled = false;
-					} catch {
-						// Ignore.
-					}
-					snowCanvasRef.current = canvas;
-					snowCanvasCtxRef.current = ctx;
-				}
-			}
+			// Lightning/snow canvases are intentionally NOT created here — their
+			// pipelines are lazy (ensureLightningSourceAndLayer /
+			// ensureSnowSourceAndLayer) so calm sessions never allocate the two
+			// 1024² backing stores + GPU textures.
 		} catch {
 			// Non-fatal; we'll fall back to static raster tiles.
 		}
@@ -7549,6 +7579,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		weatherMoodConfigRef,
 	});
 
+	// Bounded via Map-reinsertion LRU: the key space multiplies per color transform
+	// (darken/wash-out variants per locked state × category), so a long browsing
+	// session would otherwise accumulate data-URL strings for the map's lifetime.
 	const markerPinUrlCacheRef = useRef<Map<string, string>>(new Map());
 	const getMarkerPinUrl = useCallback(
 		(
@@ -7558,10 +7591,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			baseColor?: string
 		): string => {
 			const key = `${fillColor}|${strokeColor}|${searchWhat ?? ''}|${baseColor ?? ''}`;
-			const cached = markerPinUrlCacheRef.current.get(key);
-			if (cached) return cached;
+			const cache = markerPinUrlCacheRef.current;
+			const cached = cache.get(key);
+			if (cached) {
+				// Re-insert on hit so Map iteration order doubles as LRU order.
+				cache.delete(key);
+				cache.set(key, cached);
+				return cached;
+			}
 			const url = generateMapMarkerPinIconUrl(fillColor, strokeColor, baseColor);
-			markerPinUrlCacheRef.current.set(key, url);
+			cache.set(key, url);
+			if (cache.size > MARKER_PIN_URL_CACHE_MAX) {
+				cache.delete(cache.keys().next().value as string);
+			}
 			return url;
 		},
 		[]

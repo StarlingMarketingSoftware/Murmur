@@ -10,6 +10,7 @@ import {
 	buildEventsMapOverlayData,
 	buildEventsRadarLineFeatures,
 	emptyFeatureCollection,
+	radarDisksIntersectViewport,
 } from './radarOverlays';
 import type { MapEvent } from './radarOverlays';
 
@@ -100,6 +101,13 @@ export const useEventsRadar = ({
 				return;
 			}
 			lastFrameMs = nowMs;
+
+			// Off-screen radar disks skip the geometry regen entirely (see
+			// radarDisksIntersectViewport) — the chain stays alive for resume.
+			if (!radarDisksIntersectViewport(map, eventCenters)) {
+				eventsPulseRafRef.current = window.requestAnimationFrame(animateRadar);
+				return;
+			}
 
 			const phase = (nowMs % OWNED_VENUE_RADAR_MS) / OWNED_VENUE_RADAR_MS;
 			// Re-fetch the sources each tick: the once-captured refs go stale if a

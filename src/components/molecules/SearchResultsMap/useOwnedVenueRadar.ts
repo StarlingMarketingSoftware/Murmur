@@ -12,6 +12,7 @@ import {
 	buildOwnedVenueRadarLineFeatures,
 	emptyFeatureCollection,
 	isValidOwnedVenueLocation,
+	radarDisksIntersectViewport,
 } from './radarOverlays';
 import type { OwnedVenueLocation } from './radarOverlays';
 import type { LatLngLiteral } from './types';
@@ -119,6 +120,13 @@ export const useOwnedVenueRadar = ({
 				return;
 			}
 			lastFrameMs = nowMs;
+
+			// Off-screen radar disks skip the geometry regen entirely (see
+			// radarDisksIntersectViewport) — the chain stays alive for resume.
+			if (!radarDisksIntersectViewport(map, [ownedVenueCenter])) {
+				ownedVenuePulseRafRef.current = window.requestAnimationFrame(animateRadar);
+				return;
+			}
 
 			const phase = (nowMs % OWNED_VENUE_RADAR_MS) / OWNED_VENUE_RADAR_MS;
 			// Re-fetch the sources each tick: the once-captured refs go stale if a

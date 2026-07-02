@@ -1,3 +1,4 @@
+import type mapboxgl from 'mapbox-gl';
 import { mixCssColorString } from './color';
 import { CAMPAIGN_FOOTPRINT_COLOR, CAMPAIGN_FOOTPRINT_SPARK_COLOR } from './constants';
 import { buildMercatorCircleMultiPolygon, mercatorMultiPolygonToLngLat } from './curatedBlob';
@@ -60,6 +61,45 @@ export const OWNED_VENUE_RING_CIRCLES = [
 	{ radiusKm: 222, opacity: 0.21, width: 0.86 },
 	{ radiusKm: 272, opacity: 0.15, width: 0.72 },
 ] as const;
+
+// The radar decorations extend at most ~350km from their center (largest glow
+// circle is 340km + pulse travel). When every center's disk is fully outside
+// the viewport, regenerating the ring geometry is pure worker churn for
+// invisible pixels — each 30fps tick setData's ~26 features of 160-point
+// circles per center through JSON serialization, structured clone, and
+// worker-side geojson-vt slicing (measured as the dominant renderer-memory
+// feeder). Callers keep their rAF chain alive so the time-based animation
+// resumes seamlessly the moment a disk re-enters the viewport.
+export const OWNED_VENUE_RADAR_MAX_EXTENT_KM = 350;
+export const radarDisksIntersectViewport = (
+	mapInstance: mapboxgl.Map,
+	centers: readonly LatLngLiteral[]
+): boolean => {
+	try {
+		const bounds = mapInstance.getBounds();
+		if (!bounds) return true;
+		const latPadDeg = OWNED_VENUE_RADAR_MAX_EXTENT_KM / 111;
+		const south = bounds.getSouth() - latPadDeg;
+		const north = bounds.getNorth() + latPadDeg;
+		const west = bounds.getWest();
+		const east = bounds.getEast();
+		for (const center of centers) {
+			if (center.lat < south || center.lat > north) continue;
+			const cosLat = Math.max(0.2, Math.cos((center.lat * Math.PI) / 180));
+			const lngPadDeg = latPadDeg / cosLat;
+			// getBounds() longitudes can exceed ±180 on wide/globe views; bring the
+			// center into the bounds' frame before comparing.
+			let lng = center.lng;
+			while (lng < west - 180) lng += 360;
+			while (lng > east + 180) lng -= 360;
+			if (lng >= west - lngPadDeg && lng <= east + lngPadDeg) return true;
+		}
+		return false;
+	} catch {
+		// Never let the visibility test kill the animation.
+		return true;
+	}
+};
 
 
 export const isValidOwnedVenueLocation = (

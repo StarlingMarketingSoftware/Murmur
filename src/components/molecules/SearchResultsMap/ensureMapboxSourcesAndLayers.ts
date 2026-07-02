@@ -3,7 +3,7 @@ import mapboxgl from 'mapbox-gl';
 import type { RuntimeMoodVisualConfig } from './types';
 import { applyNightLandPalette, ensureWorldLandFill, getFirstBasemapSettlementLabelLayerId } from './basemap';
 import { buildCloudsOpacityExpr } from './clouds';
-import { ALL_CONTACTS_DOT_GLOW_OPACITY, CAMPAIGN_FOOTPRINT_COLOR, CAMPAIGN_FOOTPRINT_GLOW_OPACITY, CAMPAIGN_FOOTPRINT_LINE_COLOR, CAMPAIGN_FOOTPRINT_LINE_CORE_COLOR, CAMPAIGN_FOOTPRINT_LINE_CORE_OPACITY, CAMPAIGN_FOOTPRINT_LINE_GLOW_OPACITY, CAMPAIGN_FOOTPRINT_NODE_GLOW_OPACITY, CAMPAIGN_FOOTPRINT_REPLACE_MARKER_MIN_ZOOM, CAMPAIGN_FOOTPRINT_SPARK_OPACITY, CAMPAIGN_HEATMAP_GLOW_BLUR, CAMPAIGN_HEATMAP_GLOW_OPACITY_MAX, CLOUDS_CANVAS_COORDINATES, CLOUDS_TILES_MAX_ZOOM, CLOUDS_TILES_URL_TEMPLATE, CURATED_DOT_FADE_END_ZOOM, LIGHTNING_CANVAS_COORDINATES, LIGHTNING_LAYER_OPACITY, MAPBOX_LAYER_IDS, MAPBOX_SOURCE_IDS, MAP_DEFAULT_ZOOM, MAP_MIN_ZOOM, MARKER_CONSTELLATION_HALO_COLOR, MARKER_CONSTELLATION_LINE_COLOR, MARKER_CONSTELLATION_NODE_GLOW_OPACITY, MARKER_CONSTELLATION_NODE_OPACITY, MARKER_CONSTELLATION_SELECTED_CORE_OPACITY, MARKER_CONSTELLATION_SELECTED_GLOW_OPACITY, MARKER_CONSTELLATION_SELECTED_HALO_COLOR, MARKER_CONSTELLATION_SELECTED_LINE_COLOR, MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, RESULT_DOT_GLOW_BLUR, RESULT_DOT_GLOW_COLOR, RESULT_DOT_GLOW_OPACITY, RESULT_DOT_GLOW_RADIUS_MAX_PX, RESULT_DOT_GLOW_RADIUS_MIN_PX, RESULT_DOT_SCALE_MAX, RESULT_DOT_SCALE_MIN, RESULT_DOT_TRANSPARENT_STROKE_COLOR, RESULT_DOT_ZOOM_MAX, RESULT_DOT_ZOOM_MIN, STATE_DIVIDER_COLOR, STATE_DIVIDER_LINES_MAX_ZOOM, STATE_HIGHLIGHT_COLOR, STATE_HIGHLIGHT_OPACITY, STATE_LABEL_COLOR, STATE_LABEL_FULL_NAME_ZOOM, STREET_VIEW_BUILDINGS_MIN_ZOOM, STREET_VIEW_BUILDINGS_RISE_FULL_ZOOM, STREET_VIEW_BUILDING_COLOR, STREET_VIEW_BUILDING_OPACITY, buildCampaignHeatmapZoomFadedOpacity, campaignFootprintGlowRadiusExpr, campaignFootprintLineCoreWidthExpr, campaignFootprintLineGlowWidthExpr, campaignFootprintNodeGlowRadiusExpr, campaignFootprintSparkSizeExpr, campaignHeatmapGlowRadiusExpr } from './constants';
+import { ALL_CONTACTS_DOT_GLOW_OPACITY, CAMPAIGN_FOOTPRINT_COLOR, CAMPAIGN_FOOTPRINT_GLOW_OPACITY, CAMPAIGN_FOOTPRINT_LINE_COLOR, CAMPAIGN_FOOTPRINT_LINE_CORE_COLOR, CAMPAIGN_FOOTPRINT_LINE_CORE_OPACITY, CAMPAIGN_FOOTPRINT_LINE_GLOW_OPACITY, CAMPAIGN_FOOTPRINT_NODE_GLOW_OPACITY, CAMPAIGN_FOOTPRINT_REPLACE_MARKER_MIN_ZOOM, CAMPAIGN_FOOTPRINT_SPARK_OPACITY, CAMPAIGN_HEATMAP_GLOW_BLUR, CAMPAIGN_HEATMAP_GLOW_OPACITY_MAX, CLOUDS_CANVAS_COORDINATES, CLOUDS_TILES_MAX_ZOOM, CLOUDS_TILES_URL_TEMPLATE, CURATED_DOT_FADE_END_ZOOM, LIGHTNING_CANVAS_COORDINATES, LIGHTNING_CANVAS_HEIGHT_PX, LIGHTNING_CANVAS_WIDTH_PX, LIGHTNING_LAYER_OPACITY, MAPBOX_LAYER_IDS, MAPBOX_SOURCE_IDS, MAP_DEFAULT_ZOOM, MAP_MIN_ZOOM, MARKER_CONSTELLATION_HALO_COLOR, MARKER_CONSTELLATION_LINE_COLOR, MARKER_CONSTELLATION_NODE_GLOW_OPACITY, MARKER_CONSTELLATION_NODE_OPACITY, MARKER_CONSTELLATION_SELECTED_CORE_OPACITY, MARKER_CONSTELLATION_SELECTED_GLOW_OPACITY, MARKER_CONSTELLATION_SELECTED_HALO_COLOR, MARKER_CONSTELLATION_SELECTED_LINE_COLOR, MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, RESULT_DOT_GLOW_BLUR, RESULT_DOT_GLOW_COLOR, RESULT_DOT_GLOW_OPACITY, RESULT_DOT_GLOW_RADIUS_MAX_PX, RESULT_DOT_GLOW_RADIUS_MIN_PX, RESULT_DOT_SCALE_MAX, RESULT_DOT_SCALE_MIN, RESULT_DOT_TRANSPARENT_STROKE_COLOR, RESULT_DOT_ZOOM_MAX, RESULT_DOT_ZOOM_MIN, SNOW_CANVAS_SIZE_PX, STATE_DIVIDER_COLOR, STATE_DIVIDER_LINES_MAX_ZOOM, STATE_HIGHLIGHT_COLOR, STATE_HIGHLIGHT_OPACITY, STATE_LABEL_COLOR, STATE_LABEL_FULL_NAME_ZOOM, STREET_VIEW_BUILDINGS_MIN_ZOOM, STREET_VIEW_BUILDINGS_RISE_FULL_ZOOM, STREET_VIEW_BUILDING_COLOR, STREET_VIEW_BUILDING_OPACITY, buildCampaignHeatmapZoomFadedOpacity, campaignFootprintGlowRadiusExpr, campaignFootprintLineCoreWidthExpr, campaignFootprintLineGlowWidthExpr, campaignFootprintNodeGlowRadiusExpr, campaignFootprintSparkSizeExpr, campaignHeatmapGlowRadiusExpr } from './constants';
 import { buildLightningOpacityExpr } from './lightning';
 import { MARKER_HOVER_FEATURE_STATE_EXPR, MARKER_HOVER_RADIUS_SCALE, SELECTED_MARKER_SCALE_MULTIPLIER, getCategorizedDotGlowZoomFadedOpacity, getCategorizedDotZoomFadedOpacity, getMarkerConstellationNodeZoomFadedOpacity, getMarkerHoverFillColorExpr, getMarkerHoverOpacityExpr, getNormalMarkerFadeOpacityExpr, getSelectedMarkerConstellationZoomFadedOpacity, getSelectedMarkerHoverIconOpacityExpr, getSelectedMarkerIconOpacityExpr, getSelectedStateOrbZoomFadedOpacity } from './mapExpressions';
 import { FEATURE_FILL_OPACITY_FACTOR, FEATURE_STROKE_OPACITY_FACTOR, SELECTED_STATUS_DOT_FILL_COLOR, SELECTED_STATUS_DOT_RADIUS_SCALE, SELECTED_STATUS_DOT_STROKE_COLOR, SELECTED_STATUS_DOT_STROKE_WIDTH, VENUE_ICON_SIZE_SCALE_EXPR, withFeatureFillOpacity, withFeatureOpacityFactor, withFeatureStrokeOpacity } from './markerStatusStyles';
@@ -24,11 +24,168 @@ export interface EnsureMapboxSourcesAndLayersDeps {
 	lightingLayerVisibilityAppliedRef: MutableRefObject<Record<string, string>>;
 	lightingRasterOpacityAppliedRef: MutableRefObject<Record<string, number>>;
 	lightningCanvasRef: MutableRefObject<HTMLCanvasElement | null>;
+	lightningCanvasCtxRef: MutableRefObject<CanvasRenderingContext2D | null>;
 	nightTRef: MutableRefObject<number>;
 	snowCanvasRef: MutableRefObject<HTMLCanvasElement | null>;
+	snowCanvasCtxRef: MutableRefObject<CanvasRenderingContext2D | null>;
 	sunTransitionCanvasRef: MutableRefObject<HTMLCanvasElement | null>;
 	weatherMoodConfigRef: MutableRefObject<RuntimeMoodVisualConfig>;
 }
+
+// Lightning/snow pipelines (1024² canvas + GPU-uploaded canvas source +
+// raster layer) are LAZY: they exist only once a mood has actually needed
+// them, so calm sessions never pay their ~16MB. Both helpers are idempotent
+// (cheap getSource/getLayer checks) and are called from (a) the canonical
+// layer positions in ensureMapboxSourcesAndLayersImpl — which resurrects them
+// after style reloads once the canvas has latched — and (b) the clouds-drift
+// ensureWeatherAssetsForNeeds at mood-fade start, while layer opacity is
+// still ≈0 (the same guarantee the mood-gated stamp assets rely on).
+export interface EnsureLightningSourceAndLayerDeps {
+	lightningCanvasRef: MutableRefObject<HTMLCanvasElement | null>;
+	lightningCanvasCtxRef: MutableRefObject<CanvasRenderingContext2D | null>;
+	weatherMoodConfigRef: MutableRefObject<RuntimeMoodVisualConfig>;
+}
+
+export const ensureLightningSourceAndLayer = (
+	mapInstance: mapboxgl.Map,
+	deps: EnsureLightningSourceAndLayerDeps
+): void => {
+	const { lightningCanvasRef, lightningCanvasCtxRef, weatherMoodConfigRef } = deps;
+	if (!lightningCanvasRef.current && typeof document !== 'undefined') {
+		const canvas = document.createElement('canvas');
+		canvas.width = LIGHTNING_CANVAS_WIDTH_PX;
+		canvas.height = LIGHTNING_CANVAS_HEIGHT_PX;
+		const ctx = canvas.getContext('2d');
+		if (ctx) {
+			try {
+				ctx.imageSmoothingEnabled = true;
+				ctx.imageSmoothingQuality = 'high';
+			} catch {
+				// Ignore.
+			}
+			lightningCanvasRef.current = canvas;
+			lightningCanvasCtxRef.current = ctx;
+		}
+	}
+	const lightningCanvas = lightningCanvasRef.current;
+	if (!lightningCanvas) return;
+	if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.lightning)) {
+		try {
+			mapInstance.addSource(MAPBOX_SOURCE_IDS.lightning, {
+				type: 'canvas',
+				canvas: lightningCanvas,
+				animate: true,
+				coordinates: LIGHTNING_CANVAS_COORDINATES,
+			} as unknown as mapboxgl.AnySourceData);
+			const lightningSrc = mapInstance.getSource(MAPBOX_SOURCE_IDS.lightning) as
+				| { play?: () => void; pause?: () => void }
+				| undefined;
+			lightningSrc?.play?.();
+			if (CANVAS_PERF_MODE) lightningSrc?.pause?.();
+		} catch {
+			// Non-fatal; storm mood simply renders without the dedicated lightning layer.
+		}
+	}
+	if (
+		mapInstance.getSource(MAPBOX_SOURCE_IDS.lightning) &&
+		!mapInstance.getLayer(MAPBOX_LAYER_IDS.lightning)
+	) {
+		const cfg = weatherMoodConfigRef.current;
+		const layer = {
+			id: MAPBOX_LAYER_IDS.lightning,
+			type: 'raster',
+			source: MAPBOX_SOURCE_IDS.lightning,
+			paint: {
+				'raster-opacity': buildLightningOpacityExpr(
+					cfg.lightningIntensity * LIGHTNING_LAYER_OPACITY
+				),
+				'raster-fade-duration': 0,
+				'raster-resampling': 'linear',
+			},
+		} as any;
+		// Canonical position: directly before the sun-transition catchlight. At
+		// boot that layer does not exist yet (lightning is appended and the
+		// catchlight lands right after it — identical order); on a mid-session
+		// lazy add it does exist, so the layer slots into the exact boot
+		// position instead of on top of pins.
+		if (mapInstance.getLayer(MAPBOX_LAYER_IDS.sunTransitionCloudCatchlight)) {
+			mapInstance.addLayer(layer, MAPBOX_LAYER_IDS.sunTransitionCloudCatchlight);
+		} else {
+			mapInstance.addLayer(layer);
+		}
+	}
+};
+
+export interface EnsureSnowSourceAndLayerDeps {
+	snowCanvasRef: MutableRefObject<HTMLCanvasElement | null>;
+	snowCanvasCtxRef: MutableRefObject<CanvasRenderingContext2D | null>;
+	weatherMoodConfigRef: MutableRefObject<RuntimeMoodVisualConfig>;
+}
+
+export const ensureSnowSourceAndLayer = (
+	mapInstance: mapboxgl.Map,
+	deps: EnsureSnowSourceAndLayerDeps
+): void => {
+	const { snowCanvasRef, snowCanvasCtxRef, weatherMoodConfigRef } = deps;
+	if (!snowCanvasRef.current && typeof document !== 'undefined') {
+		const canvas = document.createElement('canvas');
+		canvas.width = SNOW_CANVAS_SIZE_PX;
+		canvas.height = SNOW_CANVAS_SIZE_PX;
+		const ctx = canvas.getContext('2d');
+		if (ctx) {
+			try {
+				ctx.imageSmoothingEnabled = false;
+			} catch {
+				// Ignore.
+			}
+			snowCanvasRef.current = canvas;
+			snowCanvasCtxRef.current = ctx;
+		}
+	}
+	const snowCanvas = snowCanvasRef.current;
+	if (!snowCanvas) return;
+	if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.snow)) {
+		try {
+			mapInstance.addSource(MAPBOX_SOURCE_IDS.snow, {
+				type: 'canvas',
+				canvas: snowCanvas,
+				animate: true,
+				coordinates: CLOUDS_CANVAS_COORDINATES,
+			} as unknown as mapboxgl.AnySourceData);
+			const snowSrc = mapInstance.getSource(MAPBOX_SOURCE_IDS.snow) as
+				| { play?: () => void; pause?: () => void }
+				| undefined;
+			snowSrc?.play?.();
+			if (CANVAS_PERF_MODE) snowSrc?.pause?.();
+		} catch {
+			// Non-fatal; snowy mood simply renders without the particle layer.
+		}
+	}
+	if (
+		mapInstance.getSource(MAPBOX_SOURCE_IDS.snow) &&
+		!mapInstance.getLayer(MAPBOX_LAYER_IDS.snow)
+	) {
+		const cfg = weatherMoodConfigRef.current;
+		const layer = {
+			id: MAPBOX_LAYER_IDS.snow,
+			type: 'raster',
+			source: MAPBOX_SOURCE_IDS.snow,
+			paint: {
+				'raster-opacity': buildSnowOpacityExpr(cfg.snowOpacity),
+				'raster-fade-duration': 0,
+				'raster-resampling': 'linear',
+			},
+		} as any;
+		// Canonical position: directly beneath the cloud deck (flakes read as
+		// suspended below it). At boot the clouds layer is added right after
+		// this — identical order; on a mid-session lazy add it exists.
+		if (mapInstance.getLayer(MAPBOX_LAYER_IDS.clouds)) {
+			mapInstance.addLayer(layer, MAPBOX_LAYER_IDS.clouds);
+		} else {
+			mapInstance.addLayer(layer);
+		}
+	}
+};
 
 // The single source+layer registration pass for the whole map: registers every
 // GeoJSON/canvas source and all overlay layers (idempotent; runs on style.load
@@ -47,8 +204,10 @@ export const ensureMapboxSourcesAndLayersImpl = (
 		lightingLayerVisibilityAppliedRef,
 		lightingRasterOpacityAppliedRef,
 		lightningCanvasRef,
+		lightningCanvasCtxRef,
 		nightTRef,
 		snowCanvasRef,
+		snowCanvasCtxRef,
 		sunTransitionCanvasRef,
 		weatherMoodConfigRef,
 	} = deps;
@@ -74,9 +233,27 @@ export const ensureMapboxSourcesAndLayersImpl = (
 			features: [],
 		};
 
-		const ensureSource = (id: string) => {
+		// geojson-vt (inside the map's workers) slices every GeoJSON source to
+		// maxzoom 18 by default and caches every generated tile for the source's
+		// lifetime — deep-zoom panning accumulates worker heap for the whole
+		// session (measured: v8/workers was the single largest renderer pool).
+		// Cap tiling depth per source class; rendering past the cap reuses the
+		// deepest tile via Mapbox overzoom, so nothing disappears.
+		//
+		// Caps are set by the WORST-CASE displacement of overzoomed geometry
+		// (geojson-vt rounds vertices to the 8192-unit tile grid, i.e.
+		// 0.03125px × 2^(zoom − maxzoom) on screen):
+		// - Points at 16 → ≤0.125px at z18, 2px at the z22 hard max. Pins must
+		//   track their DOM-anchored tooltips/cards (which project RAW coords),
+		//   so 12 was NOT acceptable (~2px drift at z18). Point tiles are tiny;
+		//   16 still eliminates the z17-22 slicing depth.
+		// - Shapes at 14 → ≤0.5px at z18 for the decorative rings/outlines.
+		const GEOJSON_POINT_SOURCE_MAXZOOM = 16;
+		const GEOJSON_SHAPE_SOURCE_MAXZOOM = 14;
+
+		const ensureSource = (id: string, maxzoom: number) => {
 			if (mapInstance.getSource(id)) return;
-			mapInstance.addSource(id, { type: 'geojson', data: emptyFc });
+			mapInstance.addSource(id, { type: 'geojson', data: emptyFc, maxzoom });
 		};
 
 		// Core sources
@@ -111,47 +288,10 @@ export const ensureMapboxSourcesAndLayersImpl = (
 			}
 		}
 
-		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.lightning)) {
-			const lightningCanvas = lightningCanvasRef.current;
-			if (lightningCanvas) {
-				try {
-					mapInstance.addSource(MAPBOX_SOURCE_IDS.lightning, {
-						type: 'canvas',
-						canvas: lightningCanvas,
-						animate: true,
-						coordinates: LIGHTNING_CANVAS_COORDINATES,
-					} as unknown as mapboxgl.AnySourceData);
-					const lightningSrc = mapInstance.getSource(MAPBOX_SOURCE_IDS.lightning) as
-						| { play?: () => void; pause?: () => void }
-						| undefined;
-					lightningSrc?.play?.();
-					if (CANVAS_PERF_MODE) lightningSrc?.pause?.();
-				} catch {
-					// Non-fatal; storm mood simply renders without the dedicated lightning layer.
-				}
-			}
-		}
-
-		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.snow)) {
-			const snowCanvas = snowCanvasRef.current;
-			if (snowCanvas) {
-				try {
-					mapInstance.addSource(MAPBOX_SOURCE_IDS.snow, {
-						type: 'canvas',
-						canvas: snowCanvas,
-						animate: true,
-						coordinates: CLOUDS_CANVAS_COORDINATES,
-					} as unknown as mapboxgl.AnySourceData);
-					const snowSrc = mapInstance.getSource(MAPBOX_SOURCE_IDS.snow) as
-						| { play?: () => void; pause?: () => void }
-						| undefined;
-					snowSrc?.play?.();
-					if (CANVAS_PERF_MODE) snowSrc?.pause?.();
-				} catch {
-					// Non-fatal; snowy mood simply renders without the particle layer.
-				}
-			}
-		}
+		// Lightning/snow sources are NOT added here unconditionally — their
+		// canvas+source+layer pipelines are lazy (see ensureLightningSourceAndLayer
+		// / ensureSnowSourceAndLayer above), created at their canonical layer
+		// positions further down only when a mood has latched them or needs them.
 
 		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.dayFarSideShade)) {
 			const shadeCanvas = dayFarSideShadeCanvasRef.current;
@@ -207,15 +347,21 @@ export const ensureMapboxSourcesAndLayersImpl = (
 				type: 'geojson',
 				data: emptyFc,
 				promoteId: 'key',
+				// Caps the worker-side geojson-vt tree for the largest static polygon
+				// payload on the map (deep-zoom slicing of 304 detailed state polygons).
+				// 14, not lower: statesBordersInteractive is a VISIBLE line layer with
+				// no layer maxzoom (0.7 opacity from z14 up), and overzoom quantization
+				// is 0.03125px × 2^(zoom − maxzoom) — ≤0.5px at z18 with this cap.
+				maxzoom: 14,
 			});
 		}
-		ensureSource(MAPBOX_SOURCE_IDS.resultsOutline);
-		ensureSource(MAPBOX_SOURCE_IDS.lockedOutline);
-		ensureSource(MAPBOX_SOURCE_IDS.curatedBlob);
-		ensureSource(MAPBOX_SOURCE_IDS.markerConstellation);
-		ensureSource(MAPBOX_SOURCE_IDS.markerConstellationSelected);
-		ensureSource(MAPBOX_SOURCE_IDS.markerConstellationNodes);
-		ensureSource(MAPBOX_SOURCE_IDS.campaignFootprintPoints);
+		ensureSource(MAPBOX_SOURCE_IDS.resultsOutline, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.lockedOutline, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.curatedBlob, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.markerConstellation, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.markerConstellationSelected, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.markerConstellationNodes, GEOJSON_POINT_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.campaignFootprintPoints, GEOJSON_POINT_SOURCE_MAXZOOM);
 		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.campaignFootprintLines)) {
 			mapInstance.addSource(MAPBOX_SOURCE_IDS.campaignFootprintLines, {
 				type: 'geojson',
@@ -223,30 +369,30 @@ export const ensureMapboxSourcesAndLayersImpl = (
 				lineMetrics: true,
 			});
 		}
-		ensureSource(MAPBOX_SOURCE_IDS.campaignFootprintNodes);
-		ensureSource(MAPBOX_SOURCE_IDS.selectedAreaRect);
-		ensureSource(MAPBOX_SOURCE_IDS.selectionRect);
-		ensureSource(MAPBOX_SOURCE_IDS.radiusPreview);
+		ensureSource(MAPBOX_SOURCE_IDS.campaignFootprintNodes, GEOJSON_POINT_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.selectedAreaRect, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.selectionRect, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.radiusPreview, GEOJSON_SHAPE_SOURCE_MAXZOOM);
 
 		// State label centroids (one point per state — avoids duplicate labels on MultiPolygon states)
-		ensureSource(MAPBOX_SOURCE_IDS.stateLabels);
+		ensureSource(MAPBOX_SOURCE_IDS.stateLabels, GEOJSON_POINT_SOURCE_MAXZOOM);
 
 		// Marker sources (all are point FeatureCollections keyed by contact.id)
-		ensureSource(MAPBOX_SOURCE_IDS.markersAllOverlay);
-		ensureSource(MAPBOX_SOURCE_IDS.markersPromotionPin);
-		ensureSource(MAPBOX_SOURCE_IDS.markersBookingPin);
-		ensureSource(MAPBOX_SOURCE_IDS.markersPromotionDot);
-		ensureSource(MAPBOX_SOURCE_IDS.markersBase);
-		ensureSource(MAPBOX_SOURCE_IDS.markersSelected);
-		ensureSource(MAPBOX_SOURCE_IDS.campaignHeatmap);
-		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueGlow);
-		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueRings);
-		ensureSource(MAPBOX_SOURCE_IDS.ownedVenuePulse);
-		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueIcon);
-		ensureSource(MAPBOX_SOURCE_IDS.eventsGlow);
-		ensureSource(MAPBOX_SOURCE_IDS.eventsRings);
-		ensureSource(MAPBOX_SOURCE_IDS.eventsPulse);
-		ensureSource(MAPBOX_SOURCE_IDS.eventsIcon);
+		ensureSource(MAPBOX_SOURCE_IDS.markersAllOverlay, GEOJSON_POINT_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.markersPromotionPin, GEOJSON_POINT_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.markersBookingPin, GEOJSON_POINT_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.markersPromotionDot, GEOJSON_POINT_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.markersBase, GEOJSON_POINT_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.markersSelected, GEOJSON_POINT_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.campaignHeatmap, GEOJSON_POINT_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueGlow, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueRings, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.ownedVenuePulse, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.ownedVenueIcon, GEOJSON_POINT_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.eventsGlow, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.eventsRings, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.eventsPulse, GEOJSON_SHAPE_SOURCE_MAXZOOM);
+		ensureSource(MAPBOX_SOURCE_IDS.eventsIcon, GEOJSON_POINT_SOURCE_MAXZOOM);
 
 		const ensureLayer = (layer: any, beforeId?: string) => {
 			if (mapInstance.getLayer(layer.id)) {
@@ -362,20 +508,19 @@ export const ensureMapboxSourcesAndLayersImpl = (
 			});
 		}
 
-		if (mapInstance.getSource(MAPBOX_SOURCE_IDS.snow)) {
-			ensureLayer(
-				{
-					id: MAPBOX_LAYER_IDS.snow,
-					type: 'raster',
-					source: MAPBOX_SOURCE_IDS.snow,
-					paint: {
-						'raster-opacity': buildSnowOpacityExpr(cfg.snowOpacity),
-						'raster-fade-duration': 0,
-						'raster-resampling': 'linear',
-					},
-				},
-				MAPBOX_LAYER_IDS.clouds
-			);
+		// Snow pipeline: resurrect after style reloads once a snowy mood has
+		// latched the canvas, or create at boot when the boot mood already needs
+		// it (predicate mirrors weatherAssetNeedsFor's `snow`). Calm sessions
+		// skip the canvas, source, layer and GPU texture entirely.
+		if (
+			snowCanvasRef.current ||
+			(cfg.snowOpacity > 0.001 && cfg.snowDensity > 0.001)
+		) {
+			ensureSnowSourceAndLayer(mapInstance, {
+				snowCanvasRef,
+				snowCanvasCtxRef,
+				weatherMoodConfigRef,
+			});
 		}
 
 		// Clouds (baseline globe texture). Added above the dawn band so clouds
@@ -400,18 +545,17 @@ export const ensureMapboxSourcesAndLayersImpl = (
 			},
 		});
 
-		if (mapInstance.getSource(MAPBOX_SOURCE_IDS.lightning)) {
-			ensureLayer({
-				id: MAPBOX_LAYER_IDS.lightning,
-				type: 'raster',
-				source: MAPBOX_SOURCE_IDS.lightning,
-				paint: {
-					'raster-opacity': buildLightningOpacityExpr(
-						cfg.lightningIntensity * LIGHTNING_LAYER_OPACITY
-					),
-					'raster-fade-duration': 0,
-					'raster-resampling': 'linear',
-				},
+		// Lightning pipeline: same lazy contract as snow above (predicate mirrors
+		// weatherAssetNeedsFor's `lightning`).
+		if (
+			lightningCanvasRef.current ||
+			cfg.lightning ||
+			cfg.lightningIntensity > 0.001
+		) {
+			ensureLightningSourceAndLayer(mapInstance, {
+				lightningCanvasRef,
+				lightningCanvasCtxRef,
+				weatherMoodConfigRef,
 			});
 		}
 

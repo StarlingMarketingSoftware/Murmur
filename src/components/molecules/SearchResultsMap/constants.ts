@@ -1781,3 +1781,9 @@ export const SUN_TRANSITION_SPACE_GLOW_BG = [
 	'radial-gradient(ellipse 58% 44% at 18% 14%, rgba(217, 86, 184, 0.18) 0%, rgba(142, 88, 210, 0.09) 42%, rgba(142, 88, 210, 0) 78%)',
 	'radial-gradient(ellipse 120% 84% at -18% -14%, rgba(255, 238, 182, 0.13) 0%, rgba(255, 210, 150, 0.06) 48%, rgba(255, 210, 150, 0) 82%)',
 ].join(', ');
+
+// Marker-pin data-URL string cache cap (reinsertion LRU in the shell): the key
+// space multiplies per color transform (locked-state darken/wash-out variants
+// × category), so a long browsing session would otherwise accumulate data-URL
+// strings for the map's lifetime.
+export const MARKER_PIN_URL_CACHE_MAX = 256;
