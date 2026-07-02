@@ -1315,16 +1315,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const hoverClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	// US state geometry for outlines, hover/click selection, and point-in-polygon checks.
 	const usStatesGeoJsonRef = useRef<GeoJsonFeatureCollection | null>(null);
-	// While the map is in background (decorative) presentation, the fetched
-	// states/labels payloads are stashed here instead of setData'd: nothing from
-	// those sources is rendered in background mode (dividers/labels/fill are all
-	// ≈0 opacity there), and the setData would make the workers geojson-vt-slice
-	// ~600KB of polygons for an invisible layer. Flushed on the
-	// background→interactive presentation flip, under the reveal transition.
-	const deferredStatesPayloadRef = useRef<{
-		processed: GeoJsonFeatureCollection;
-		labels: GeoJSON.FeatureCollection;
-	} | null>(null);
+	// NOTE: an attempted memory optimization deferred the states/labels setData
+	// while presentation === 'background'. REVERTED: the dashboard map view
+	// keeps 'background' presentation even while fully engaged (interactivity
+	// is layered on top), so the deferral starved state dividers/labels
+	// everywhere. States data loads unconditionally; do not re-gate it on
+	// presentation.
 	const usStatesByKeyRef = useRef<
 		Map<
 			string,
@@ -2407,10 +2403,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// If we've already loaded the shapes for this map instance, don't refetch.
 		// Presentation toggles should only affect visibility/interaction, not data loading.
 		if (usStatesGeoJsonRef.current?.features?.length) {
-			// Ready only once the payload actually reached the map source — a
-			// still-deferred payload (background presentation) flips ready in the
-			// flush effect below instead.
-			if (!deferredStatesPayloadRef.current) setIsStateLayerReady(true);
+			setIsStateLayerReady(true);
 			return;
 		}
 
@@ -2547,24 +2540,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// Apply/restore the clip based on current zoom (performance).
 				syncUsOnlyBasemapCartography(map);
 
-				if (presentationRef.current === 'background') {
-					// Background (decorative) presentation renders nothing from the
-					// states/labels sources (dividers/labels/fill all ≈0 opacity), but
-					// setData would make the workers geojson-vt-slice ~600KB of
-					// polygons immediately. Stash the payloads; the presentation-flip
-					// effect below flushes them under the reveal transition.
-					deferredStatesPayloadRef.current = { processed, labels };
-				} else {
-					const source = map.getSource(MAPBOX_SOURCE_IDS.states) as
-						| mapboxgl.GeoJSONSource
-						| undefined;
-					source?.setData(processed as any);
-					const labelSource = map.getSource(MAPBOX_SOURCE_IDS.stateLabels) as
-						| mapboxgl.GeoJSONSource
-						| undefined;
-					labelSource?.setData(labels as any);
-					setIsStateLayerReady(true);
-				}
+				const source = map.getSource(MAPBOX_SOURCE_IDS.states) as
+					| mapboxgl.GeoJSONSource
+					| undefined;
+				source?.setData(processed as any);
+				const labelSource = map.getSource(MAPBOX_SOURCE_IDS.stateLabels) as
+					| mapboxgl.GeoJSONSource
+					| undefined;
+				labelSource?.setData(labels as any);
+				setIsStateLayerReady(true);
 			} catch (err) {
 				if (cancelled) return;
 				console.error('Failed to load preprocessed US states geometry', err);
@@ -2593,33 +2577,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		clearSearchedStateOutline,
 		syncUsOnlyBasemapCartography,
 	]);
-
-	// Flush the deferred states/labels payload the moment the map leaves
-	// background presentation (reveal start): the ~100-200ms worker slice runs
-	// under the reveal transition, before dividers/labels could be visible, so
-	// the interactive experience is unchanged while decorative-globe sessions
-	// never pay for it.
-	useEffect(() => {
-		if (!map || !isMapLoaded) return;
-		if (isBackgroundPresentation) return;
-		const payload = deferredStatesPayloadRef.current;
-		if (!payload) return;
-		deferredStatesPayloadRef.current = null;
-		try {
-			const source = map.getSource(MAPBOX_SOURCE_IDS.states) as
-				| mapboxgl.GeoJSONSource
-				| undefined;
-			source?.setData(payload.processed as any);
-			const labelSource = map.getSource(MAPBOX_SOURCE_IDS.stateLabels) as
-				| mapboxgl.GeoJSONSource
-				| undefined;
-			labelSource?.setData(payload.labels as any);
-		} catch {
-			// Sources are recreated by ensureMapboxSourcesAndLayers on style
-			// (re)loads; ready still flips below so downstream gates can't strand.
-		}
-		setIsStateLayerReady(true);
-	}, [map, isMapLoaded, isBackgroundPresentation]);
 
 	const applyStateOverlayOpacity = useCallback(
 		(nextOverlayOpacity: number, nextModeT: number) => {
